@@ -9,8 +9,11 @@ Thumbs.db
 *.swo
 *~
 
-# Node modules (
+# Node modules
 node_modules/
+
+# Image files
+images/
 
 # Obsidian-specific 
 .obsidian/workspace*
