@@ -14,7 +14,7 @@ Thumbs.db
 node_modules/
 
 # Image files
-images/
+/images/
 
 
 # Obsidian-specific 
