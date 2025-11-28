@@ -1,0 +1,214 @@
+const pathResolverPath = dc.resolvePath("pathResolver.js");
+const { requireModuleByName } = await dc.require(pathResolverPath);
+
+
+const { DEFAULTS, DATA_FILE_PATH } = await requireModuleByName("dmtConstants.js");
+const { offsetToAxial } = await requireModuleByName("offsetCoordinates.js");
+const { getSettings } = await requireModuleByName("settingsAccessor.js");
+
+async function loadMapData(mapId, mapName = '', mapType = 'grid') {
+  try {
+    const file = app.vault.getAbstractFileByPath(DATA_FILE_PATH);
+    
+    if (!file) {
+      return createNewMap(mapId, mapName, mapType);
+    }
+    
+    const content = await app.vault.read(file);
+    const data = JSON.parse(content);
+    
+    if (data.maps && data.maps[mapId]) {
+      // Map exists - ensure all arrays exist
+      if (!data.maps[mapId].objects) {
+        data.maps[mapId].objects = [];
+      }
+      if (!data.maps[mapId].textLabels) {
+        data.maps[mapId].textLabels = [];
+      }
+      if (!data.maps[mapId].customColors) {
+        data.maps[mapId].customColors = [];
+      }
+      // Ensure mapType exists (backward compatibility)
+      if (!data.maps[mapId].mapType) {
+        data.maps[mapId].mapType = 'grid';
+      }
+      // Ensure settings exist (backward compatibility)
+      if (!data.maps[mapId].settings) {
+        data.maps[mapId].settings = {
+          useGlobalSettings: true,
+          overrides: {}
+        };
+      }
+      // Ensure uiPreferences exist (backward compatibility)
+      if (!data.maps[mapId].uiPreferences) {
+        data.maps[mapId].uiPreferences = {
+          rememberPanZoom: true,
+          rememberSidebarState: true,
+          rememberExpandedState: false
+        };
+      }
+      // Ensure expandedState exists (backward compatibility)
+      if (data.maps[mapId].expandedState === undefined) {
+        data.maps[mapId].expandedState = false;
+      }
+      // Ensure hexBounds exists for hex maps (use defaults, handle migration)
+      if (data.maps[mapId].mapType === 'hex') {
+        if (!data.maps[mapId].hexBounds) {
+          // No bounds at all - use defaults
+          data.maps[mapId].hexBounds = { ...DEFAULTS.hexBounds };
+        } else if (data.maps[mapId].hexBounds.maxQ !== undefined) {
+          // Old axial bounds format - convert to offset format
+          data.maps[mapId].hexBounds = {
+            maxCol: data.maps[mapId].hexBounds.maxQ,
+            maxRow: data.maps[mapId].hexBounds.maxR
+          };
+        }
+        // else: already has maxCol/maxRow (new format) - no action needed
+        
+        // Ensure backgroundImage exists for hex maps (backward compatibility)
+        if (!data.maps[mapId].backgroundImage) {
+          data.maps[mapId].backgroundImage = { 
+            path: null, 
+            lockBounds: false,
+            gridDensity: 'medium',
+            customColumns: 24
+          };
+        } else {
+          // Ensure new fields exist on existing backgroundImage objects
+          if (data.maps[mapId].backgroundImage.gridDensity === undefined) {
+            data.maps[mapId].backgroundImage.gridDensity = 'medium';
+          }
+          if (data.maps[mapId].backgroundImage.customColumns === undefined) {
+            data.maps[mapId].backgroundImage.customColumns = 24;
+          }
+        }
+      }
+      return data.maps[mapId];
+    } else {
+      return createNewMap(mapId, mapName, mapType);
+    }
+  } catch (error) {
+    console.error('[loadMapData] Error:', error);
+    return createNewMap(mapId, mapName, mapType);
+  }
+}
+
+async function saveMapData(mapId, mapData) {
+  try {
+    let allData = { maps: {} };
+    
+    // Load existing data
+    const file = app.vault.getAbstractFileByPath(DATA_FILE_PATH);
+    if (file) {
+      const content = await app.vault.read(file);
+      allData = JSON.parse(content);
+    }
+    
+    // Update specific map
+    if (!allData.maps) allData.maps = {};
+    allData.maps[mapId] = mapData;
+    
+    // Save back
+    const jsonString = JSON.stringify(allData, null, 2);
+    
+    if (file) {
+      await app.vault.modify(file, jsonString);
+    } else {
+      await app.vault.create(DATA_FILE_PATH, jsonString);
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('Error saving map data:', error);
+    return false;
+  }
+}
+
+function createNewMap(mapId, mapName = '', mapType = 'grid') {
+
+  if (!DEFAULTS) {
+    console.error('[createNewMap] CRITICAL: DEFAULTS is undefined!');
+    throw new Error('DEFAULTS is undefined - constants.js import failed');
+  }
+  
+  // Base map structure shared by all map types
+  const baseMap = {
+    name: mapName,  
+    description: "",
+    mapType: mapType,
+    northDirection: 0,
+    cells: [],
+    objects: [],
+    textLabels: [],
+    customColors: [],
+    sidebarCollapsed: false,
+    expandedState: false,
+    settings: {
+      useGlobalSettings: true,
+      overrides: {}
+    },
+    uiPreferences: {
+      rememberPanZoom: true,
+      rememberSidebarState: true,
+      rememberExpandedState: false
+    }
+  };
+  
+  // Add type-specific properties
+  if (mapType === 'hex') {
+    // Get global settings to respect user configuration
+    const globalSettings = getSettings();
+    
+    baseMap.hexSize = globalSettings.hexSize || DEFAULTS.hexSize;
+    baseMap.orientation = globalSettings.hexOrientation || DEFAULTS.hexOrientation;
+    baseMap.hexBounds = { ...DEFAULTS.hexBounds }; // Now {maxCol, maxRow}
+    baseMap.dimensions = { ...DEFAULTS.dimensions };
+    
+    // Calculate proper viewport center for hex map using offset coordinates
+    // Center on the middle of the rectangular bounds, then convert to axial for world coords
+    const hexSize = baseMap.hexSize;
+    const orientation = baseMap.orientation;
+    
+    // Calculate center in offset coordinates (rectangular bounds)
+    const centerCol = Math.floor(DEFAULTS.hexBounds.maxCol / 2);
+    const centerRow = Math.floor(DEFAULTS.hexBounds.maxRow / 2);
+    
+    // Convert offset center to axial coordinates
+    const { q: centerQ, r: centerR } = offsetToAxial(centerCol, centerRow, orientation);
+    
+    // Convert hex center to world coordinates (using axial coords)
+    let worldX, worldY;
+    if (orientation === 'flat') {
+      worldX = hexSize * (3/2) * centerQ;
+      worldY = hexSize * (Math.sqrt(3) / 2 * centerQ + Math.sqrt(3) * centerR);
+    } else {
+      // pointy
+      worldX = hexSize * (Math.sqrt(3) * centerQ + Math.sqrt(3) / 2 * centerR);
+      worldY = hexSize * (3/2) * centerR;
+    }
+    
+    baseMap.viewState = {
+      zoom: DEFAULTS.initialZoom,
+      center: { 
+        x: worldX, 
+        y: worldY 
+      }
+    };
+    
+  } else {
+    // Grid map
+    baseMap.gridSize = DEFAULTS.gridSize;
+    baseMap.dimensions = { ...DEFAULTS.dimensions };
+    baseMap.viewState = {
+      zoom: DEFAULTS.initialZoom,
+      center: { 
+        x: Math.floor(DEFAULTS.dimensions.width / 2), 
+        y: Math.floor(DEFAULTS.dimensions.height / 2) 
+      }
+    };
+  }
+  
+  return baseMap;
+}
+
+return { loadMapData, saveMapData, createNewMap };

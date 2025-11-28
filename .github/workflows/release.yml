@@ -1,0 +1,52 @@
+name: Create Release
+
+on:
+  push:
+    tags:
+      - 'v*'  # Triggers on version tags like v1.0.0, v1.2.3, etc.
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # Required to create releases
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Read version from VERSION file
+        id: version
+        run: |
+          VERSION=$(cat dist/VERSION)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Found version: $VERSION"
+      
+      - name: Read changelog
+        id: changelog
+        run: |
+          if [ -f dist/CHANGELOG.md ]; then
+            echo "changelog_exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "changelog_exists=false" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Create release archive
+        run: |
+          cd dist
+          zip -r ../windrose-md-v${{ steps.version.outputs.version }}.zip \
+            compiled-windrose-md.md \
+            "Insert Windrose Map Template.md"
+          cd ..
+      
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: Windrose MapDesigner v${{ steps.version.outputs.version }}
+          body_path: ${{ steps.changelog.outputs.changelog_exists == 'true' && 'dist/CHANGELOG.md' || '' }}
+          files: |
+            windrose-md-v${{ steps.version.outputs.version }}.zip
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

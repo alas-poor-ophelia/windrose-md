@@ -1,0 +1,21 @@
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Node modules (
+node_modules/
+
+# Obsidian-specific 
+.obsidian/workspace*
+.obsidian/workspace-mobile*
+
+# Temporary files
+*.tmp
+*.log

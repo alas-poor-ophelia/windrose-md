@@ -1,0 +1,52 @@
+"filename", "language", "JavaScript JSX", "JavaScript", "Markdown", "PostCSS", "comment", "blank", "total"
+"c:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker\DungeonMapTracker.jsx", "JavaScript JSX", 576, 0, 0, 0, 71, 93, 740
+"c:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker\DungeonMapTracker.md", "Markdown", 0, 0, 88, 0, 0, 20, 108
+"c:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker\components\ColorPicker.jsx", "JavaScript JSX", 203, 0, 0, 0, 17, 22, 242
+"c:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker\components\LinkedNoteHoverOverlays.jsx", "JavaScript JSX", 128, 0, 0, 0, 14, 21, 163
+"c:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker\components\MapControls.jsx", "JavaScript JSX", 300, 0, 0, 0, 11, 29, 340
+"c:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker\components\MapHeader.jsx", "JavaScript JSX", 44, 0, 0, 0, 2, 5, 51
+"c:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker\components\MapSettingsModal.jsx", "JavaScript JSX", 269, 0, 0, 0, 12, 33, 314
+"c:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker\components\NoteLinkModal.jsx", "JavaScript JSX", 353, 0, 0, 0, 11, 54, 418
+"c:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker\components\ObjectSidebar.jsx", "JavaScript JSX", 125, 0, 0, 0, 7, 14, 146
+"c:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker\components\SettingsPluginInstaller.jsx", "JavaScript JSX", 351, 0, 0, 0, 13, 21, 385
+"c:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker\components\TextInputModal.jsx", "JavaScript JSX", 69, 0, 0, 0, 5, 10, 84
+"c:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker\components\TextLabelEditor.jsx", "JavaScript JSX", 251, 0, 0, 0, 18, 32, 301
+"c:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker\components\ToolPalette.jsx", "JavaScript JSX", 193, 0, 0, 0, 13, 22, 228
+"c:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker\components\mapcanvas\DrawingLayer.jsx", "JavaScript JSX", 160, 0, 0, 0, 13, 33, 206
+"c:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker\components\mapcanvas\EventCoordinationLayer.jsx", "JavaScript JSX", 408, 0, 0, 0, 78, 86, 572
+"c:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker\components\mapcanvas\MapCanvas.jsx", "JavaScript JSX", 211, 0, 0, 0, 34, 42, 287
+"c:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker\components\mapcanvas\MapCanvasActionButtons.jsx", "JavaScript JSX", 327, 0, 0, 0, 18, 23, 368
+"c:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker\components\mapcanvas\NotePinLayer.jsx", "JavaScript JSX", 49, 0, 0, 0, 20, 10, 79
+"c:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker\components\mapcanvas\ObjectLayer.jsx", "JavaScript JSX", 333, 0, 0, 0, 54, 42, 429
+"c:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker\components\mapcanvas\PanZoomLayer.jsx", "JavaScript JSX", 77, 0, 0, 0, 22, 8, 107
+"c:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker\components\mapcanvas\TextLayer.jsx", "JavaScript JSX", 112, 0, 0, 0, 23, 12, 147
+"c:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker\context\EventHandlerContext.jsx", "JavaScript JSX", 49, 0, 0, 0, 41, 12, 102
+"c:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker\context\MapContext.jsx", "JavaScript JSX", 38, 0, 0, 0, 23, 6, 67
+"c:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker\context\MapSelectionContext.jsx", "JavaScript JSX", 45, 0, 0, 0, 16, 8, 69
+"c:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker\css\DungeonMapTracker - FONTS.css", "PostCSS", 0, 0, 0, 42, 3, 10, 55
+"c:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker\css\DungeonMapTracker.css", "PostCSS", 0, 0, 0, 1658, 62, 269, 1989
+"c:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker\geometry\GridGeometry.js", "JavaScript", 0, 166, 0, 0, 179, 48, 393
+"c:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker\geometry\HexGeometry.js", "JavaScript", 0, 195, 0, 0, 208, 52, 455
+"c:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker\geometry\gridRenderer.js", "JavaScript", 0, 96, 0, 0, 52, 19, 167
+"c:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker\geometry\hexRenderer.js", "JavaScript", 0, 44, 0, 0, 48, 10, 102
+"c:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker\hooks\useCanvasInteraction.js", "JavaScript", 0, 270, 0, 0, 40, 80, 390
+"c:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker\hooks\useCanvasRenderer.js", "JavaScript", 0, 236, 0, 0, 58, 54, 348
+"c:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker\hooks\useDrawingTools.js", "JavaScript", 0, 250, 0, 0, 85, 53, 388
+"c:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker\hooks\useHistory.js", "JavaScript", 0, 71, 0, 0, 10, 13, 94
+"c:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker\hooks\useMapData.js", "JavaScript", 0, 63, 0, 0, 9, 14, 86
+"c:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker\hooks\useNotePinInteraction.js", "JavaScript", 0, 91, 0, 0, 54, 31, 176
+"c:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker\hooks\useObjectInteractions.js", "JavaScript", 0, 476, 0, 0, 138, 104, 718
+"c:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker\hooks\useTextLabelInteraction.js", "JavaScript", 0, 301, 0, 0, 111, 64, 476
+"c:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker\utils\borderCalculator.js", "JavaScript", 0, 53, 0, 0, 10, 14, 77
+"c:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker\utils\colorOperations.js", "JavaScript", 0, 29, 0, 0, 16, 6, 51
+"c:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker\utils\dmtConstants.js", "JavaScript", 0, 42, 0, 0, 7, 8, 57
+"c:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker\utils\fileOperations.js", "JavaScript", 0, 115, 0, 0, 11, 18, 144
+"c:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker\utils\fontOptions.js", "JavaScript", 0, 66, 0, 0, 21, 6, 93
+"c:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker\utils\noteOperations.js", "JavaScript", 0, 63, 0, 0, 40, 11, 114
+"c:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker\utils\objectOperations.js", "JavaScript", 0, 102, 0, 0, 77, 28, 207
+"c:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker\utils\objectTypes.js", "JavaScript", 0, 51, 0, 0, 8, 8, 67
+"c:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker\utils\pathResolver.js", "JavaScript", 0, 23, 0, 0, 27, 8, 58
+"c:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker\utils\screenPositionUtils.js", "JavaScript", 0, 55, 0, 0, 28, 18, 101
+"c:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker\utils\settingsAccessor.js", "JavaScript", 0, 77, 0, 0, 29, 14, 120
+"c:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker\utils\textLabelOperations.js", "JavaScript", 0, 114, 0, 0, 68, 26, 208
+"Total", "-", 4671, 3049, 88, 1700, 1935, 1644, 13087
