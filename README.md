@@ -2,7 +2,7 @@ WIndrose MapDesigner (WindroseMD) is a simple TTRPG-focused mapping tool for Obs
 
 Low tech enough to run in your text editor, high tech enough to... make you forget you're in your text editor?
 
-![[main-ui-docs-screenshot.png]]
+![Full Interface](docs/images/main-ui-docs-screenshot.png)
 
 "Windrose" is an obvious reference to a compass rose, a visual object I've always had a fascination with. If anything, the marketing copy is that it speaks to the "care in design" I put into this project, but really I just liked the name, and like compass roses (and am not a designer). Feel free to refer to this project as just "Map Designer" if you want--above all I want this tool to be useful. 
 
@@ -25,7 +25,7 @@ That said, it also works fully on desktop Obsidian, with the added convenience o
 - Erase tool (or clear entire areas if your artistic vision is scuffed/a cat walks on your keyboard)
 - 50-level undo/redo (for when the cat walks on your keyboard a lot)
 
-![[drawing-tools-docs-screenshot.png]]
+![Drawing Tools](docs/images/drawing-tools-docs-screenshot.png)
 
 **Hex Maps**
 - Supports both pointy and flat-top hexes, configurable in global settings as a default.
@@ -34,7 +34,7 @@ That said, it also works fully on desktop Obsidian, with the added convenience o
 - Coordinates can be configured to display as the default rectangle, or set to display a radial hex grid. Full radial/center out support coming soon.
 - Supports background images. Select any image from your vault, and how many hexes you want to divide it into (with presets, as well as full customization).
 
-![[hex-map-docs-screenshot.png]]
+![Hex Map](docs/images/hex-map-docs-screenshot.png)
 
 **Objects**
 
@@ -43,7 +43,7 @@ That said, it also works fully on desktop Obsidian, with the added convenience o
 - Objects can be placed in the center of a grid space, or hold ALT while placing or dragging an object to enter Snap to Edges mode, which allows you to place objects on grid lines.
 - Link any object to an Obsidian note—hover to preview, ctrl/cmd+click to open
 
-![[objects-docs-screenshot.png]]
+![Map Objects](docs/images/objects-docs-screenshot.png)
 
 **Text Labels**
 
