@@ -7,6 +7,7 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
+.VSCodeCounter/
 *~
 
 # Node modules
@@ -14,6 +15,7 @@ node_modules/
 
 # Image files
 images/
+
 
 # Obsidian-specific 
 .obsidian/workspace*
