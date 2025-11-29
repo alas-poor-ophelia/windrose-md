@@ -36,7 +36,7 @@ jobs:
           cd dist
           zip -r ../windrose-md-v${{ steps.version.outputs.version }}.zip \
             compiled-windrose-md.md \
-            "Insert Windrose Map Template.md"
+            "WindroseMD Map Block.md"
           cd ..
       
       - name: Create GitHub Release

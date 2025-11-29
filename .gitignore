@@ -21,6 +21,9 @@ node_modules/
 .obsidian/workspace*
 .obsidian/workspace-mobile*
 
+# Test files
+DungeonMapTracker.md
+
 # Temporary files
 *.tmp
 *.log
