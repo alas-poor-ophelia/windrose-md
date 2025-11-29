@@ -62,7 +62,7 @@ That said, it also works fully on desktop Obsidian, with the added convenience o
 - Each map has per map settings, including local overrides for any global settings, fiddly UI preferences you probably won’t need, and additional hex map options to configure size or background image. 
 
 ## Installation
-Windrose is distributed as a “compiled” Datacore script, which just means it’s been all packaged up in a single Markdown file, for nice and easy use.
+Windrose is distributed as a “[compiled](https://github.com/alas-poor-ophelia/datacore-compiler/releases)” Datacore script, which just means it’s been all packaged up in a single Markdown file, for nice and easy use.
 
 There is also an optional but STRONGLY recommended Templater template included. All it does is just give you a shortcut to insert a new map, but it makes that process effortless, something which can otherwise be fiddly. But also completely optional.
 
