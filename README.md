@@ -85,7 +85,7 @@ Blacksmithgu for creating Datacore, and making it easy enough to trick myself in
 Many members of the Obsidian TTRPG discord, including:
 - BloatedBlowfish
 - Coehoorn
-- drgonls
+- 36457453746
 - LastElf
 - And many others, especially those who goaded me into and taught me about hex mapping.
 
