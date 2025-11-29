@@ -1,4 +1,8 @@
 // settingsPluginMain.js - Template for Windrose MapDesigner Settings Plugin
+// Returns the plugin source as a string for templating by SettingsPluginInstaller
+// This wrapper allows the file to be dc.require()'d without Datacore trying to execute it as an Obsidian plugin
+
+return `// settingsPluginMain.js - Template for Windrose MapDesigner Settings Plugin
 // This file is used by SettingsPluginInstaller to create the plugin
 // Default color values are injected at install time from dmtConstants
 
@@ -312,4 +316,4 @@ class WindroseMDSettingsTab extends PluginSettingTab {
   }
 }
 
-module.exports = WindroseMDSettingsPlugin;
+module.exports = WindroseMDSettingsPlugin;`;

@@ -4,6 +4,9 @@ const pathResolverPath = dc.resolvePath("pathResolver.js");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 const { THEME, DEFAULTS } = await requireModuleByName("dmtConstants.js");
 
+// Import the plugin template as a string (allows bundling without Datacore trying to execute it)
+const SETTINGS_PLUGIN_TEMPLATE = await requireModuleByName("settingsPluginMain.js");
+
 // Plugin version from template
 const PACKAGED_PLUGIN_VERSION = '0.4.1';
 
@@ -93,11 +96,8 @@ function generateManifest() {
 /**
  * Generate main.js content from template with injected constants
  */
-async function generateMainJs(adapter) {
-  const templatePath = dc.resolvePath("settingsPluginMain.js");
-  let mainJsTemplate = await adapter.read(templatePath);
-  
-  return mainJsTemplate
+function generateMainJs() {
+  return SETTINGS_PLUGIN_TEMPLATE
     .replace(/\{\{PLUGIN_VERSION\}\}/g, PACKAGED_PLUGIN_VERSION)
     .replace(/\{\{DEFAULT_HEX_ORIENTATION\}\}/g, DEFAULTS.hexOrientation)
     .replace(/\{\{DEFAULT_GRID_LINE_COLOR\}\}/g, THEME.grid.lines)
@@ -144,7 +144,7 @@ const SettingsPluginInstaller = ({ onInstall, onDecline, mode = 'auto' }) => {
       );
 
       // Write main.js from template
-      const mainJs = await generateMainJs(adapter);
+      const mainJs = generateMainJs();
       await adapter.write(`${pluginDir}/main.js`, mainJs);
 
       // Create initial data.json with defaults from dmtConstants
@@ -218,7 +218,7 @@ const SettingsPluginInstaller = ({ onInstall, onDecline, mode = 'auto' }) => {
       );
 
       // Write updated main.js from template
-      const mainJs = await generateMainJs(adapter);
+      const mainJs = generateMainJs();
       await adapter.write(`${pluginDir}/main.js`, mainJs);
 
       // DO NOT overwrite data.json - preserve user settings!
@@ -292,7 +292,7 @@ const SettingsPluginInstaller = ({ onInstall, onDecline, mode = 'auto' }) => {
         <div className="dmt-plugin-installer-content">
           <h3>
             {actionMode === 'upgrade' 
-              ? `Update Available (v${installedVersion} â†’ v${PACKAGED_PLUGIN_VERSION})`
+              ? `Update Available (v${installedVersion} → v${PACKAGED_PLUGIN_VERSION})`
               : 'Enhance Your Mapping Experience'
             }
           </h3>
