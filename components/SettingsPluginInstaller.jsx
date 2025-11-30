@@ -8,7 +8,7 @@ const { THEME, DEFAULTS } = await requireModuleByName("dmtConstants.js");
 const SETTINGS_PLUGIN_TEMPLATE = await requireModuleByName("settingsPluginMain.js");
 
 // Plugin version from template
-const PACKAGED_PLUGIN_VERSION = '0.4.1';
+const PACKAGED_PLUGIN_VERSION = '0.4.5';
 
 // LocalStorage keys for tracking user preferences
 const STORAGE_KEYS = {
@@ -152,6 +152,7 @@ const SettingsPluginInstaller = ({ onInstall, onDecline, mode = 'auto' }) => {
         version: '1.0.0',
         hexOrientation: DEFAULTS.hexOrientation,
         gridLineColor: THEME.grid.lines,
+        gridLineWidth: THEME.grid.lineWidth,
         backgroundColor: THEME.grid.background,
         borderColor: THEME.cells.border,
         coordinateKeyColor: THEME.coordinateKey.color,
@@ -292,7 +293,7 @@ const SettingsPluginInstaller = ({ onInstall, onDecline, mode = 'auto' }) => {
         <div className="dmt-plugin-installer-content">
           <h3>
             {actionMode === 'upgrade' 
-              ? `Update Available (v${installedVersion} → v${PACKAGED_PLUGIN_VERSION})`
+              ? `Update Available (v${installedVersion} â†’ v${PACKAGED_PLUGIN_VERSION})`
               : 'Enhance Your Mapping Experience'
             }
           </h3>

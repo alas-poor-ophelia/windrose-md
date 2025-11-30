@@ -24,6 +24,7 @@ class WindroseMDSettingsPlugin extends Plugin {
         version: '{{PLUGIN_VERSION}}',
         hexOrientation: '{{DEFAULT_HEX_ORIENTATION}}',
         gridLineColor: '{{DEFAULT_GRID_LINE_COLOR}}',
+        gridLineWidth: 1,
         backgroundColor: '{{DEFAULT_BACKGROUND_COLOR}}',
         borderColor: '{{DEFAULT_BORDER_COLOR}}',
         coordinateKeyColor: '{{DEFAULT_COORDINATE_KEY_COLOR}}',
@@ -39,6 +40,7 @@ class WindroseMDSettingsPlugin extends Plugin {
         version: '{{PLUGIN_VERSION}}',
         hexOrientation: '{{DEFAULT_HEX_ORIENTATION}}',
         gridLineColor: '{{DEFAULT_GRID_LINE_COLOR}}',
+        gridLineWidth: 1,
         backgroundColor: '{{DEFAULT_BACKGROUND_COLOR}}',
         borderColor: '{{DEFAULT_BORDER_COLOR}}',
         coordinateKeyColor: '{{DEFAULT_COORDINATE_KEY_COLOR}}',
@@ -191,6 +193,29 @@ class WindroseMDSettingsTab extends PluginSettingTab {
         .setTooltip('Reset to default')
         .onClick(async () => {
           this.plugin.settings.gridLineColor = '{{DEFAULT_GRID_LINE_COLOR}}';
+          this.settingsChanged = true;
+          await this.plugin.saveSettings();
+          this.display();
+        }));
+
+    // Grid Line Width (grid maps only)
+    new Setting(containerEl)
+      .setName('Grid Line Width')
+      .setDesc('Thickness of grid lines in pixels (1-5). Applies to grid maps only.')
+      .addSlider(slider => slider
+        .setLimits(1, 5, 1)
+        .setValue(this.plugin.settings.gridLineWidth ?? 1)
+        .setDynamicTooltip()
+        .onChange(async (value) => {
+          this.plugin.settings.gridLineWidth = value;
+          this.settingsChanged = true;
+          await this.plugin.saveSettings();
+        }))
+      .addExtraButton(btn => btn
+        .setIcon('rotate-ccw')
+        .setTooltip('Reset to default (1px)')
+        .onClick(async () => {
+          this.plugin.settings.gridLineWidth = 1;
           this.settingsChanged = true;
           await this.plugin.saveSettings();
           this.display();

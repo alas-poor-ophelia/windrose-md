@@ -9,6 +9,7 @@ const FALLBACK_SETTINGS = {
   version: '1.0.0',
   hexOrientation: DEFAULTS.hexOrientation,
   gridLineColor: THEME.grid.lines,
+  gridLineWidth: THEME.grid.lineWidth,
   backgroundColor: THEME.grid.background,
   borderColor: THEME.cells.border,  
   coordinateKeyColor: THEME.coordinateKey.color,
@@ -82,6 +83,7 @@ function getTheme() {
   return {
     grid: {
       lines: settings.gridLineColor,
+      lineWidth: settings.gridLineWidth,
       background: settings.backgroundColor
     },
     cells: {

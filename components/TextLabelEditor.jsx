@@ -105,13 +105,8 @@ const TextLabelEditor = ({
   
   const handleAddCustomColor = (newColor) => {
     if (onAddCustomColor) {
-      const colorId = 'custom-' + Date.now();
-      const newCustomColor = {
-        id: colorId,
-        color: newColor,
-        label: newColor
-      };
-      onAddCustomColor(newCustomColor);
+      // Pass raw color string - parent handles wrapping into color object
+      onAddCustomColor(newColor);
     }
   };
   

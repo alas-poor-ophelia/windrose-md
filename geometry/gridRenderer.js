@@ -62,6 +62,69 @@ const gridRenderer = {
   },
 
   /**
+   * Render interior grid lines between adjacent painted cells
+   * These are drawn on top of painted cells to restore grid visibility
+   * @param {CanvasRenderingContext2D} ctx
+   * @param {Array} cells - Array of {x, y, color}
+   * @param {GridGeometry} geometry
+   * @param {Object} viewState - {x, y, zoom}
+   * @param {Object} style - Grid style options
+   * @param {string} style.lineColor - Grid line color
+   * @param {number} style.lineWidth - Base grid line width
+   * @param {number} style.interiorRatio - Ratio for interior lines (default 0.5)
+   */
+  renderInteriorGridLines(ctx, cells, geometry, viewState, style = {}) {
+    if (!cells || cells.length === 0) return;
+    
+    const { lineColor = '#666666', lineWidth = 1, interiorRatio = 0.5 } = style;
+    const scaledSize = geometry.getScaledCellSize(viewState.zoom);
+    
+    // Build lookup set for O(1) cell existence checks
+    const cellSet = new Set(cells.map(c => `${c.x},${c.y}`));
+    
+    // Track which interior lines we've already drawn to avoid duplicates
+    const drawnLines = new Set();
+    
+    ctx.strokeStyle = lineColor;
+    ctx.lineWidth = Math.max(1, lineWidth * interiorRatio);
+    ctx.beginPath();
+    
+    for (const cell of cells) {
+      const { screenX, screenY } = geometry.gridToScreen(
+        cell.x,
+        cell.y,
+        viewState.x,
+        viewState.y,
+        viewState.zoom
+      );
+      
+      // Check right neighbor - draw vertical line between them
+      const rightKey = `${cell.x + 1},${cell.y}`;
+      if (cellSet.has(rightKey)) {
+        const lineKey = `v:${cell.x + 1},${cell.y}`;
+        if (!drawnLines.has(lineKey)) {
+          ctx.moveTo(screenX + scaledSize, screenY);
+          ctx.lineTo(screenX + scaledSize, screenY + scaledSize);
+          drawnLines.add(lineKey);
+        }
+      }
+      
+      // Check bottom neighbor - draw horizontal line between them
+      const bottomKey = `${cell.x},${cell.y + 1}`;
+      if (cellSet.has(bottomKey)) {
+        const lineKey = `h:${cell.x},${cell.y + 1}`;
+        if (!drawnLines.has(lineKey)) {
+          ctx.moveTo(screenX, screenY + scaledSize);
+          ctx.lineTo(screenX + scaledSize, screenY + scaledSize);
+          drawnLines.add(lineKey);
+        }
+      }
+    }
+    
+    ctx.stroke();
+  },
+
+  /**
    * Render smart borders for painted cells
    * @param {CanvasRenderingContext2D} ctx
    * @param {Array} cells - Array of {x, y, color}

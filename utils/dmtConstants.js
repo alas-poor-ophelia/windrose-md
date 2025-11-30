@@ -7,6 +7,7 @@ const { getJsonPath } = pathResolverImport;
 const THEME = {
   grid: {
     lines: '#666666',
+    lineWidth: 1,
     background: '#1a1a1a'
   },
   cells: {

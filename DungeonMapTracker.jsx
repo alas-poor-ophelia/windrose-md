@@ -58,6 +58,7 @@ const CornerBracket = ({ position }) => {
       {/* Main L-bracket with ornamental details */}
       <path
         d="M 0 18 L 0 0 L 18 0"
+        stroke="#c4a57b"
         strokeWidth="3"
         fill="none"
         filter={`url(#bracket-glow-${position})`}
@@ -72,16 +73,19 @@ const CornerBracket = ({ position }) => {
       {/* Small notches for detail */}
       <line
         x1="0" y1="9" x2="5" y2="9"
+        stroke="#c4a57b"
         strokeWidth="2"
       />
       <line
         x1="9" y1="0" x2="9" y2="5"
+        stroke="#c4a57b"
         strokeWidth="2"
       />
       {/* Corner ornament */}
       <circle
         cx="18" cy="18" r="3"
         fill="none"
+        stroke="#c4a57b"
         strokeWidth="1.5"
         filter={`url(#bracket-glow-${position})`}
       />
@@ -126,6 +130,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   const theme = effectiveSettings ? {
     grid: {
       lines: effectiveSettings.gridLineColor,
+      lineWidth: effectiveSettings.gridLineWidth ?? 1,
       background: effectiveSettings.backgroundColor
     },
     cells: {

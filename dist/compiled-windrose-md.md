@@ -1,9 +1,9 @@
 <!-- Compiled by Datacore Script Compiler -->
 <!-- Source: Projects/dungeon-map-tracker -->
 <!-- Main Component: DungeonMapTracker -->
-<!-- Compiled: 2025-11-29T21:42:19.957Z -->
+<!-- Compiled: 2025-11-30T02:49:59.499Z -->
 <!-- Files: 54 -->
-<!-- Version: 1.0.2 -->
+<!-- Version: 1.0.5 -->
 <!-- CSS Files: 2 -->
 
 # Demo
@@ -26,6 +26,7 @@ return <DungeonMapTracker />;
 const THEME = {
   grid: {
     lines: '#666666',
+    lineWidth: 1,
     background: '#1a1a1a'
   },
   cells: {
@@ -224,6 +225,7 @@ const FALLBACK_SETTINGS = {
   version: '1.0.0',
   hexOrientation: DEFAULTS.hexOrientation,
   gridLineColor: THEME.grid.lines,
+  gridLineWidth: THEME.grid.lineWidth,
   backgroundColor: THEME.grid.background,
   borderColor: THEME.cells.border,  
   coordinateKeyColor: THEME.coordinateKey.color,
@@ -297,6 +299,7 @@ function getTheme() {
   return {
     grid: {
       lines: settings.gridLineColor,
+      lineWidth: settings.gridLineWidth,
       background: settings.backgroundColor
     },
     cells: {
@@ -3300,6 +3303,69 @@ const gridRenderer = {
   },
 
   /**
+   * Render interior grid lines between adjacent painted cells
+   * These are drawn on top of painted cells to restore grid visibility
+   * @param {CanvasRenderingContext2D} ctx
+   * @param {Array} cells - Array of {x, y, color}
+   * @param {GridGeometry} geometry
+   * @param {Object} viewState - {x, y, zoom}
+   * @param {Object} style - Grid style options
+   * @param {string} style.lineColor - Grid line color
+   * @param {number} style.lineWidth - Base grid line width
+   * @param {number} style.interiorRatio - Ratio for interior lines (default 0.5)
+   */
+  renderInteriorGridLines(ctx, cells, geometry, viewState, style = {}) {
+    if (!cells || cells.length === 0) return;
+    
+    const { lineColor = '#666666', lineWidth = 1, interiorRatio = 0.5 } = style;
+    const scaledSize = geometry.getScaledCellSize(viewState.zoom);
+    
+    // Build lookup set for O(1) cell existence checks
+    const cellSet = new Set(cells.map(c => `${c.x},${c.y}`));
+    
+    // Track which interior lines we've already drawn to avoid duplicates
+    const drawnLines = new Set();
+    
+    ctx.strokeStyle = lineColor;
+    ctx.lineWidth = Math.max(1, lineWidth * interiorRatio);
+    ctx.beginPath();
+    
+    for (const cell of cells) {
+      const { screenX, screenY } = geometry.gridToScreen(
+        cell.x,
+        cell.y,
+        viewState.x,
+        viewState.y,
+        viewState.zoom
+      );
+      
+      // Check right neighbor - draw vertical line between them
+      const rightKey = `${cell.x + 1},${cell.y}`;
+      if (cellSet.has(rightKey)) {
+        const lineKey = `v:${cell.x + 1},${cell.y}`;
+        if (!drawnLines.has(lineKey)) {
+          ctx.moveTo(screenX + scaledSize, screenY);
+          ctx.lineTo(screenX + scaledSize, screenY + scaledSize);
+          drawnLines.add(lineKey);
+        }
+      }
+      
+      // Check bottom neighbor - draw horizontal line between them
+      const bottomKey = `${cell.x},${cell.y + 1}`;
+      if (cellSet.has(bottomKey)) {
+        const lineKey = `h:${cell.x},${cell.y + 1}`;
+        if (!drawnLines.has(lineKey)) {
+          ctx.moveTo(screenX, screenY + scaledSize);
+          ctx.lineTo(screenX + scaledSize, screenY + scaledSize);
+          drawnLines.add(lineKey);
+        }
+      }
+    }
+    
+    ctx.stroke();
+  },
+
+  /**
    * Render smart borders for painted cells
    * @param {CanvasRenderingContext2D} ctx
    * @param {Array} cells - Array of {x, y, color}
@@ -3648,7 +3714,7 @@ function renderCanvas(canvas, mapData, geometry, selectedItem = null, isResizeMo
   // Draw grid lines using renderer
   renderer.renderGrid(ctx, geometry, rendererViewState, { width, height }, true, {
     lineColor: THEME.grid.lines,
-    lineWidth: 1
+    lineWidth: THEME.grid.lineWidth || 1
   });
   
   // Draw filled cells using renderer
@@ -3661,6 +3727,16 @@ function renderCanvas(canvas, mapData, geometry, selectedItem = null, isResizeMo
     
     // Render painted cells using renderer
     renderer.renderPaintedCells(ctx, cellsWithColor, geometry, rendererViewState);
+    
+    // Render interior grid lines on top of painted cells (grid only)
+    // These are slightly thinner than exterior lines for visual distinction
+    if (renderer.renderInteriorGridLines) {
+      renderer.renderInteriorGridLines(ctx, cellsWithColor, geometry, rendererViewState, {
+        lineColor: THEME.grid.lines,
+        lineWidth: THEME.grid.lineWidth || 1,
+        interiorRatio: 0.5
+      });
+    }
     
     // Render smart borders using renderer (grid only - hex renderer no-ops this)
     renderer.renderCellBorders(
@@ -9174,13 +9250,8 @@ const TextLabelEditor = ({
   
   const handleAddCustomColor = (newColor) => {
     if (onAddCustomColor) {
-      const colorId = 'custom-' + Date.now();
-      const newCustomColor = {
-        id: colorId,
-        color: newColor,
-        label: newColor
-      };
-      onAddCustomColor(newCustomColor);
+      // Pass raw color string - parent handles wrapping into color object
+      onAddCustomColor(newColor);
     }
   };
   
@@ -12091,6 +12162,7 @@ class WindroseMDSettingsPlugin extends Plugin {
         version: '{{PLUGIN_VERSION}}',
         hexOrientation: '{{DEFAULT_HEX_ORIENTATION}}',
         gridLineColor: '{{DEFAULT_GRID_LINE_COLOR}}',
+        gridLineWidth: 1,
         backgroundColor: '{{DEFAULT_BACKGROUND_COLOR}}',
         borderColor: '{{DEFAULT_BORDER_COLOR}}',
         coordinateKeyColor: '{{DEFAULT_COORDINATE_KEY_COLOR}}',
@@ -12106,6 +12178,7 @@ class WindroseMDSettingsPlugin extends Plugin {
         version: '{{PLUGIN_VERSION}}',
         hexOrientation: '{{DEFAULT_HEX_ORIENTATION}}',
         gridLineColor: '{{DEFAULT_GRID_LINE_COLOR}}',
+        gridLineWidth: 1,
         backgroundColor: '{{DEFAULT_BACKGROUND_COLOR}}',
         borderColor: '{{DEFAULT_BORDER_COLOR}}',
         coordinateKeyColor: '{{DEFAULT_COORDINATE_KEY_COLOR}}',
@@ -12263,6 +12336,29 @@ class WindroseMDSettingsTab extends PluginSettingTab {
           this.display();
         }));
 
+    // Grid Line Width (grid maps only)
+    new Setting(containerEl)
+      .setName('Grid Line Width')
+      .setDesc('Thickness of grid lines in pixels (1-5). Applies to grid maps only.')
+      .addSlider(slider => slider
+        .setLimits(1, 5, 1)
+        .setValue(this.plugin.settings.gridLineWidth ?? 1)
+        .setDynamicTooltip()
+        .onChange(async (value) => {
+          this.plugin.settings.gridLineWidth = value;
+          this.settingsChanged = true;
+          await this.plugin.saveSettings();
+        }))
+      .addExtraButton(btn => btn
+        .setIcon('rotate-ccw')
+        .setTooltip('Reset to default (1px)')
+        .onClick(async () => {
+          this.plugin.settings.gridLineWidth = 1;
+          this.settingsChanged = true;
+          await this.plugin.saveSettings();
+          this.display();
+        }));
+
     // Background Color
     new Setting(containerEl)
       .setName('Background Color')
@@ -12397,7 +12493,7 @@ const { THEME, DEFAULTS } = await dc.require(dc.headerLink(dc.resolvePath("compi
 const SETTINGS_PLUGIN_TEMPLATE = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "settingsPluginMain"));
 
 // Plugin version from template
-const PACKAGED_PLUGIN_VERSION = '0.4.1';
+const PACKAGED_PLUGIN_VERSION = '0.4.5';
 
 // LocalStorage keys for tracking user preferences
 const STORAGE_KEYS = {
@@ -12541,6 +12637,7 @@ const SettingsPluginInstaller = ({ onInstall, onDecline, mode = 'auto' }) => {
         version: '1.0.0',
         hexOrientation: DEFAULTS.hexOrientation,
         gridLineColor: THEME.grid.lines,
+        gridLineWidth: THEME.grid.lineWidth,
         backgroundColor: THEME.grid.background,
         borderColor: THEME.cells.border,
         coordinateKeyColor: THEME.coordinateKey.color,
@@ -12681,7 +12778,7 @@ const SettingsPluginInstaller = ({ onInstall, onDecline, mode = 'auto' }) => {
         <div className="dmt-plugin-installer-content">
           <h3>
             {actionMode === 'upgrade' 
-              ? `Update Available (v${installedVersion} → v${PACKAGED_PLUGIN_VERSION})`
+              ? `Update Available (v${installedVersion} â†’ v${PACKAGED_PLUGIN_VERSION})`
               : 'Enhance Your Mapping Experience'
             }
           </h3>
@@ -12914,6 +13011,7 @@ function MapSettingsModal({
   
   const [overrides, setOverrides] = dc.useState({
     gridLineColor: currentSettings?.overrides?.gridLineColor ?? globalSettings.gridLineColor,
+    gridLineWidth: currentSettings?.overrides?.gridLineWidth ?? globalSettings.gridLineWidth ?? 1,
     backgroundColor: currentSettings?.overrides?.backgroundColor ?? globalSettings.backgroundColor,
     borderColor: currentSettings?.overrides?.borderColor ?? globalSettings.borderColor,
     coordinateKeyColor: currentSettings?.overrides?.coordinateKeyColor ?? globalSettings.coordinateKeyColor,
@@ -12975,6 +13073,7 @@ function MapSettingsModal({
       setUseGlobalSettings(currentSettings?.useGlobalSettings ?? true);
       setOverrides({
         gridLineColor: currentSettings?.overrides?.gridLineColor ?? globalSettings.gridLineColor,
+        gridLineWidth: currentSettings?.overrides?.gridLineWidth ?? globalSettings.gridLineWidth ?? 1,
         backgroundColor: currentSettings?.overrides?.backgroundColor ?? globalSettings.backgroundColor,
         borderColor: currentSettings?.overrides?.borderColor ?? globalSettings.borderColor,
         coordinateKeyColor: currentSettings?.overrides?.coordinateKeyColor ?? globalSettings.coordinateKeyColor,
@@ -13041,6 +13140,16 @@ function MapSettingsModal({
       ...prev,
       [colorKey]: newColor
     }));
+  }, []);
+  
+  const handleLineWidthChange = dc.useCallback((value) => {
+    const numValue = parseInt(value, 10);
+    if (!isNaN(numValue) && numValue >= 1 && numValue <= 5) {
+      setOverrides(prev => ({
+        ...prev,
+        gridLineWidth: numValue
+      }));
+    }
   }, []);
   
   const handlePreferenceToggle = dc.useCallback((prefKey) => {
@@ -13356,6 +13465,47 @@ function MapSettingsModal({
                     defaultColor={THEME.coordinateKey.color}
                   />
                 </div>
+                
+                {/* Grid Line Width slider (grid maps only) */}
+                {mapType === 'grid' && (
+                  <div 
+                    class="dmt-form-group" 
+                    style={{ 
+                      marginTop: '20px',
+                      opacity: useGlobalSettings ? 0.5 : 1
+                    }}
+                  >
+                    <label class="dmt-form-label" style={{ marginBottom: '8px' }}>
+                      Grid Line Width: {overrides.gridLineWidth}px
+                    </label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <input
+                        type="range"
+                        min="1"
+                        max="5"
+                        value={overrides.gridLineWidth}
+                        onChange={(e) => handleLineWidthChange(e.target.value)}
+                        disabled={useGlobalSettings}
+                        style={{
+                          flex: 1,
+                          cursor: useGlobalSettings ? 'not-allowed' : 'pointer'
+                        }}
+                      />
+                      <button
+                        class="dmt-color-reset-btn"
+                        disabled={useGlobalSettings}
+                        onClick={() => !useGlobalSettings && handleLineWidthChange(THEME.grid.lineWidth)}
+                        title="Reset to default (1px)"
+                        style={{ cursor: useGlobalSettings ? 'not-allowed' : 'pointer' }}
+                      >
+                        <dc.Icon icon="lucide-rotate-ccw" />
+                      </button>
+                    </div>
+                    <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '6px' }}>
+                      Thickness of the grid lines (1-5 pixels)
+                    </p>
+                  </div>
+                )}
               </div>
             )}
             
@@ -13412,7 +13562,7 @@ function MapSettingsModal({
                         }}
                         title="Clear image"
                       >
-                        ×
+                        Ã—
                       </button>
                     )}
                     
@@ -13456,7 +13606,7 @@ function MapSettingsModal({
                   {imageDimensions && (
                     <div style={{ marginBottom: '16px' }}>
                       <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                        Detected: {imageDimensions.width} × {imageDimensions.height} px
+                        Detected: {imageDimensions.width} Ã— {imageDimensions.height} px
                       </p>
                     </div>
                   )}
@@ -13552,7 +13702,7 @@ function MapSettingsModal({
                       {/* Show calculated result */}
                       <div style={{ marginTop: '12px', padding: '8px', background: 'var(--background-secondary)', borderRadius: '4px' }}>
                         <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                          Result: {hexBounds.maxCol} columns × {hexBounds.maxRow} rows
+                          Result: {hexBounds.maxCol} columns Ã— {hexBounds.maxRow} rows
                           {imageDimensions && (() => {
                             const columns = gridDensity === 'custom' ? customColumns : GRID_DENSITY_PRESETS[gridDensity]?.columns || 24;
                             const calc = calculateGridFromImage(imageDimensions.width, imageDimensions.height, columns, orientation);
@@ -13650,7 +13800,7 @@ function MapSettingsModal({
                         }}
                       />
                     </div>
-                    <span style={{ color: 'var(--text-muted)' }}>×</span>
+                    <span style={{ color: 'var(--text-muted)' }}>Ã—</span>
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                       <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Rows:</span>
                       <input
@@ -13713,7 +13863,7 @@ function MapSettingsModal({
                         style={{ marginTop: '2px' }}
                       />
                       <div>
-                        <span style={{ fontWeight: 500 }}>◈, 1-1, 2-5, ...)</span>
+                        <span style={{ fontWeight: 500 }}>â—ˆ, 1-1, 2-5, ...)</span>
                         <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
                           Ring-position labels centered in grid
                         </p>
@@ -13882,6 +14032,7 @@ const CornerBracket = ({ position }) => {
       {/* Main L-bracket with ornamental details */}
       <path
         d="M 0 18 L 0 0 L 18 0"
+        stroke="#c4a57b"
         strokeWidth="3"
         fill="none"
         filter={`url(#bracket-glow-${position})`}
@@ -13896,16 +14047,19 @@ const CornerBracket = ({ position }) => {
       {/* Small notches for detail */}
       <line
         x1="0" y1="9" x2="5" y2="9"
+        stroke="#c4a57b"
         strokeWidth="2"
       />
       <line
         x1="9" y1="0" x2="9" y2="5"
+        stroke="#c4a57b"
         strokeWidth="2"
       />
       {/* Corner ornament */}
       <circle
         cx="18" cy="18" r="3"
         fill="none"
+        stroke="#c4a57b"
         strokeWidth="1.5"
         filter={`url(#bracket-glow-${position})`}
       />
@@ -13950,6 +14104,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   const theme = effectiveSettings ? {
     grid: {
       lines: effectiveSettings.gridLineColor,
+      lineWidth: effectiveSettings.gridLineWidth ?? 1,
       background: effectiveSettings.backgroundColor
     },
     cells: {
@@ -14316,7 +14471,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   const handleCompassClick = () => {
     if (!mapData) return;
 
-    // Cycle through: 0° -> 90° -> 180° -> 270° -> 0°
+    // Cycle through: 0ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â° -> 90ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â° -> 180ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â° -> 270ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â° -> 0ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°
     const rotations = [0, 90, 180, 270];
     const currentIndex = rotations.indexOf(mapData.northDirection);
     const nextIndex = (currentIndex + 1) % rotations.length;
