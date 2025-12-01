@@ -36,14 +36,25 @@ const DrawingLayer = ({
     isDrawing,
     rectangleStart,
     circleStart,
+    edgeLineStart,
     handleDrawingPointerDown,
     handleDrawingPointerMove,
     stopDrawing,
+    stopEdgeDrawing,
     cancelDrawing
   } = useDrawingTools(
     currentTool,
     selectedColor
   );
+  
+  // Combined stop function that handles both cell and edge drawing
+  const handleStopDrawing = dc.useCallback(() => {
+    if (currentTool === 'edgeDraw' || currentTool === 'edgeErase') {
+      stopEdgeDrawing();
+    } else {
+      stopDrawing();
+    }
+  }, [currentTool, stopDrawing, stopEdgeDrawing]);
   
   const { registerHandlers, unregisterHandlers } = useEventHandlerRegistration();
   
@@ -51,15 +62,16 @@ const DrawingLayer = ({
     registerHandlers('drawing', {
       handleDrawingPointerDown,
       handleDrawingPointerMove,
-      stopDrawing,
+      stopDrawing: handleStopDrawing,
       cancelDrawing,
       isDrawing,
       rectangleStart,
-      circleStart
+      circleStart,
+      edgeLineStart
     });
     
     return () => unregisterHandlers('drawing');
-  }, [registerHandlers, unregisterHandlers, handleDrawingPointerDown, handleDrawingPointerMove, stopDrawing, cancelDrawing, isDrawing, rectangleStart, circleStart]);
+  }, [registerHandlers, unregisterHandlers, handleDrawingPointerDown, handleDrawingPointerMove, handleStopDrawing, cancelDrawing, isDrawing, rectangleStart, circleStart, edgeLineStart]);
   
   dc.useEffect(() => {
     if (onDrawingStateChange) {
@@ -67,15 +79,16 @@ const DrawingLayer = ({
         isDrawing,
         rectangleStart,
         circleStart,
+        edgeLineStart,
         handlers: {
           handleDrawingPointerDown,
           handleDrawingPointerMove,
-          stopDrawing,
+          stopDrawing: handleStopDrawing,
           cancelDrawing
         }
       });
     }
-  }, [isDrawing, rectangleStart, circleStart, onDrawingStateChange]);
+  }, [isDrawing, rectangleStart, circleStart, edgeLineStart, onDrawingStateChange, handleStopDrawing]);
   
   const renderPreviewOverlay = () => {
     if (!canvasRef.current || !geometry) return null;
@@ -145,6 +158,43 @@ const DrawingLayer = ({
       };
     };
     
+    // Convert grid intersection point to canvas position
+    // Unlike gridToCanvasPosition, this targets the corner/intersection, not cell center
+    const intersectionToCanvasPosition = (intX, intY) => {
+      // Intersection point - no +0.5 offset since we want the corner
+      const worldX = intX * geometry.cellSize;
+      const worldY = intY * geometry.cellSize;
+      
+      // Convert world to canvas coordinates (non-rotated)
+      let screenX = offsetX + worldX * zoom;
+      let screenY = offsetY + worldY * zoom;
+      
+      // Apply rotation around canvas center (matching canvas rendering)
+      if (northDirection !== 0) {
+        const centerX = width / 2;
+        const centerY = height / 2;
+        
+        screenX -= centerX;
+        screenY -= centerY;
+        
+        const angleRad = (northDirection * Math.PI) / 180;
+        const rotatedX = screenX * Math.cos(angleRad) - screenY * Math.sin(angleRad);
+        const rotatedY = screenX * Math.sin(angleRad) + screenY * Math.cos(angleRad);
+        
+        screenX = rotatedX + centerX;
+        screenY = rotatedY + centerY;
+      }
+      
+      // Scale to display coordinates
+      screenX *= displayScale;
+      screenY *= displayScale;
+      
+      return { 
+        x: canvasOffsetX + screenX, 
+        y: canvasOffsetY + screenY
+      };
+    };
+    
     const overlays = [];
     const displayScaledSize = scaledSize * displayScale;
     
@@ -194,6 +244,55 @@ const DrawingLayer = ({
             zIndex: 100
           }}
         />
+      );
+    }
+    
+    // Edge line start indicator - X marker at grid intersection
+    if (edgeLineStart) {
+      // Use intersection positioning since edgeLineStart stores intersection coords
+      const pos = intersectionToCanvasPosition(edgeLineStart.x, edgeLineStart.y);
+      
+      const highlightColor = '#ff9500'; // Orange for edge line
+      const markerSize = Math.max(16, displayScaledSize * 0.4); // Scale with zoom but min 16px
+      const halfMarker = markerSize / 2;
+      const strokeWidth = Math.max(2, markerSize / 8);
+      
+      overlays.push(
+        <svg
+          key="edgeline-preview"
+          className="dmt-drawing-preview"
+          style={{
+            position: 'absolute',
+            left: `${pos.x - halfMarker}px`,
+            top: `${pos.y - halfMarker}px`,
+            width: `${markerSize}px`,
+            height: `${markerSize}px`,
+            pointerEvents: 'none',
+            zIndex: 100,
+            overflow: 'visible'
+          }}
+          viewBox={`0 0 ${markerSize} ${markerSize}`}
+        >
+          {/* X mark centered on intersection */}
+          <line
+            x1={strokeWidth}
+            y1={strokeWidth}
+            x2={markerSize - strokeWidth}
+            y2={markerSize - strokeWidth}
+            stroke={highlightColor}
+            strokeWidth={strokeWidth}
+            strokeLinecap="round"
+          />
+          <line
+            x1={markerSize - strokeWidth}
+            y1={strokeWidth}
+            x2={strokeWidth}
+            y2={markerSize - strokeWidth}
+            stroke={highlightColor}
+            strokeWidth={strokeWidth}
+            strokeLinecap="round"
+          />
+        </svg>
       );
     }
     

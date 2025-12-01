@@ -50,7 +50,7 @@ const Coordinators = ({ canvasRef, mapData, geometry, onViewStateChange, isFocus
  * MapCanvasContent - Inner component that uses context hooks
  * Contains all the map canvas logic and interacts with shared selection state
  */
-const MapCanvasContent = ({ mapData, onCellsChange, onObjectsChange, onTextLabelsChange, currentTool, onViewStateChange, selectedObjectType, selectedColor, isColorPickerOpen, customColors, onAddCustomColor, onDeleteCustomColor, isFocused, isAnimating, theme, children }) => {
+const MapCanvasContent = ({ mapData, onCellsChange, onObjectsChange, onTextLabelsChange, onEdgesChange, currentTool, onViewStateChange, selectedObjectType, selectedColor, isColorPickerOpen, customColors, onAddCustomColor, onDeleteCustomColor, isFocused, isAnimating, theme, children }) => {
   const canvasRef = dc.useRef(null);
   const containerRef = dc.useRef(null);
   const [canvasDimensions, setCanvasDimensions] = dc.useState({
@@ -311,8 +311,9 @@ const MapCanvasContent = ({ mapData, onCellsChange, onObjectsChange, onTextLabel
     onCellsChange,
     onObjectsChange,
     onTextLabelsChange,
+    onEdgesChange,
     onViewStateChange
-  }), [onCellsChange, onObjectsChange, onTextLabelsChange, onViewStateChange]);
+  }), [onCellsChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onViewStateChange]);
 
 
 

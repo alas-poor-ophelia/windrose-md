@@ -163,6 +163,19 @@ function renderCanvas(canvas, mapData, geometry, selectedItem = null, isResizeMo
     );
   }
   
+  // Draw painted edges (grid maps only, after cells/borders)
+  // Edges are custom-colored grid lines that overlay the base grid
+  if (mapData.edges && mapData.edges.length > 0 && geometry instanceof GridGeometry) {
+    try {
+      renderer.renderEdges(ctx, mapData.edges, geometry, rendererViewState, {
+        lineWidth: 1,
+        borderWidth: THEME.cells.borderWidth
+      });
+    } catch (err) {
+      console.error('Error rendering edges:', err, 'edges data:', mapData.edges);
+    }
+  }
+  
   // Draw objects (after cells and borders, so they appear on top)
   // Skip when coordinate overlay is visible or objects layer is hidden
   if (mapData.objects && mapData.objects.length > 0 && !showCoordinates && visibility.objects) {

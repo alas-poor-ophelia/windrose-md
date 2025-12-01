@@ -175,6 +175,7 @@ const useEventCoordinator = ({
         startPan(clientX, clientY);
         
       } else if (currentTool === 'draw' || currentTool === 'erase' || 
+                 currentTool === 'edgeDraw' || currentTool === 'edgeErase' || currentTool === 'edgeLine' ||
                  currentTool === 'rectangle' || currentTool === 'circle' || 
                  currentTool === 'clearArea' || currentTool === 'line') {
         // Drawing tools
@@ -295,6 +296,7 @@ const useEventCoordinator = ({
     
     // Handle drawing tools
     if (currentTool === 'draw' || currentTool === 'erase' || 
+        currentTool === 'edgeDraw' || currentTool === 'edgeErase' || currentTool === 'edgeLine' ||
         currentTool === 'rectangle' || currentTool === 'circle' || 
         currentTool === 'line' || currentTool === 'clearArea') {
       if (drawingHandlers?.handleDrawingPointerMove) {
@@ -383,6 +385,7 @@ const useEventCoordinator = ({
     
     // Handle drawing tools
     if (currentTool === 'draw' || currentTool === 'erase' || 
+        currentTool === 'edgeDraw' || currentTool === 'edgeErase' || currentTool === 'edgeLine' ||
         currentTool === 'rectangle' || currentTool === 'circle' || 
         currentTool === 'line' || currentTool === 'clearArea') {
       if (drawingHandlers?.stopDrawing) {
@@ -407,6 +410,7 @@ const useEventCoordinator = ({
     
     // Cancel any in-progress drawing
     if (currentTool === 'draw' || currentTool === 'erase' || 
+        currentTool === 'edgeDraw' || currentTool === 'edgeErase' || currentTool === 'edgeLine' ||
         currentTool === 'rectangle' || currentTool === 'circle' || 
         currentTool === 'line' || currentTool === 'clearArea') {
       if (drawingHandlers?.cancelDrawing) {

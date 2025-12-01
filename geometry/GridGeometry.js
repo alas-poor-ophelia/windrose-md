@@ -159,7 +159,57 @@ class GridGeometry extends BaseGeometry {
   }
   
   /**
-   * Draw grid lines on the canvas
+   * Determine which edge of a cell was clicked based on world coordinates
+   * 
+   * Used for edge painting - detects if a click was near a cell edge rather
+   * than in the cell center. Returns the cell coordinates and which side
+   * of that cell the click was near.
+   * 
+   * @param {number} worldX - World X coordinate (from screenToWorld)
+   * @param {number} worldY - World Y coordinate (from screenToWorld)
+   * @param {number} threshold - Distance from edge to count as hit (0-0.5, default 0.15)
+   *                             Expressed as fraction of cell size
+   * @returns {{ x: number, y: number, side: string } | null} 
+   *          Edge info with cell coords and side ('top'|'right'|'bottom'|'left'), 
+   *          or null if click was in cell center
+   */
+  screenToEdge(worldX, worldY, threshold = 0.15) {
+    // Get the cell coordinates
+    const cellX = Math.floor(worldX / this.cellSize);
+    const cellY = Math.floor(worldY / this.cellSize);
+    
+    // Calculate position within the cell (0-1 range)
+    const offsetX = (worldX / this.cellSize) - cellX;
+    const offsetY = (worldY / this.cellSize) - cellY;
+    
+    // Check proximity to each edge
+    // Priority order: top, bottom, left, right (for corner disambiguation)
+    // A click in a corner will prefer vertical edges (top/bottom)
+    if (offsetY < threshold) {
+      return { x: cellX, y: cellY, side: 'top' };
+    }
+    if (offsetY > 1 - threshold) {
+      return { x: cellX, y: cellY, side: 'bottom' };
+    }
+    if (offsetX < threshold) {
+      return { x: cellX, y: cellY, side: 'left' };
+    }
+    if (offsetX > 1 - threshold) {
+      return { x: cellX, y: cellY, side: 'right' };
+    }
+    
+    // Click was in cell center, not near any edge
+    return null;
+  }
+  
+  /**
+   * Draw grid lines on the canvas using fill-based rendering
+   * 
+   * NOTE: This uses ctx.fillRect() instead of ctx.stroke() to work around
+   * a rendering bug in Obsidian's Live Preview mode where CodeMirror's
+   * canvas operations can corrupt the strokeStyle state. Fill-based
+   * rendering is unaffected by this issue.
+   * 
    * @param {CanvasRenderingContext2D} ctx - Canvas context
    * @param {number} offsetX - Screen offset X
    * @param {number} offsetY - Screen offset Y
@@ -192,25 +242,36 @@ class GridGeometry extends BaseGeometry {
     // Calculate how far to extend lines beyond the viewport
     const lineExtension = diagonal * 1.5;
     
-    ctx.strokeStyle = lineColor;
-    ctx.lineWidth = lineWidth;
-    ctx.beginPath();
+    // Use fillRect instead of stroke for iOS/CodeMirror compatibility
+    // fillRect is immune to strokeStyle state corruption
+    ctx.fillStyle = lineColor;
+    
+    // For centered lines, offset by half the line width
+    const halfWidth = lineWidth / 2;
     
     // Draw vertical lines with symmetric padding
     for (let x = paddedStartX; x <= paddedEndX; x++) {
       const screenX = offsetX + x * scaledCellSize;
-      ctx.moveTo(screenX, -lineExtension);
-      ctx.lineTo(screenX, height + lineExtension);
+      // fillRect(x, y, width, height) - vertical line is narrow width, tall height
+      ctx.fillRect(
+        screenX - halfWidth,
+        -lineExtension,
+        lineWidth,
+        height + lineExtension * 2
+      );
     }
     
     // Draw horizontal lines with symmetric padding
     for (let y = paddedStartY; y <= paddedEndY; y++) {
       const screenY = offsetY + y * scaledCellSize;
-      ctx.moveTo(-lineExtension, screenY);
-      ctx.lineTo(width + lineExtension, screenY);
+      // fillRect(x, y, width, height) - horizontal line is wide width, narrow height
+      ctx.fillRect(
+        -lineExtension,
+        screenY - halfWidth,
+        width + lineExtension * 2,
+        lineWidth
+      );
     }
-    
-    ctx.stroke();
   }
 
 

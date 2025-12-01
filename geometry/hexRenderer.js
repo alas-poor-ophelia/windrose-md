@@ -83,8 +83,9 @@ const hexRenderer = {
    */
   renderCellHighlight(ctx, cell, geometry, viewState, isResizeMode) {
     // Selection border (thicker for hex to be visible)
-    ctx.strokeStyle = isResizeMode ? '#ff6b6b' : '#4dabf7';
-    ctx.lineWidth = 3;
+    // Use fillStyle since drawHexOutline now uses fill-based rendering
+    ctx.fillStyle = isResizeMode ? '#ff6b6b' : '#4dabf7';
+    const lineWidth = 3;
     
     geometry.drawHexOutline(
       ctx,
@@ -92,7 +93,8 @@ const hexRenderer = {
       cell.r,
       viewState.x,
       viewState.y,
-      viewState.zoom
+      viewState.zoom,
+      lineWidth
     );
     
     // Note: Resize mode doesn't apply to individual hexes (no corner handles)

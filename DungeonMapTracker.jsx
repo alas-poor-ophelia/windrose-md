@@ -236,7 +236,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     setShowPluginInstaller(false);
   };
 
-  // Initialize history with empty state (including objects and text labels)
+  // Initialize history with empty state (including objects, text labels, and edges)
   const {
     currentState: historyState,
     addToHistory,
@@ -245,7 +245,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     canUndo,
     canRedo,
     resetHistory
-  } = useHistory({ cells: [], name: "", objects: [], textLabels: [] });
+  } = useHistory({ cells: [], name: "", objects: [], textLabels: [], edges: [] });
 
   const containerRef = dc.useRef(null);
 
@@ -294,7 +294,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
         cells: mapData.cells,
         name: mapData.name,
         objects: mapData.objects || [],
-        textLabels: mapData.textLabels || []
+        textLabels: mapData.textLabels || [],
+        edges: mapData.edges || []
       });
       historyInitialized.current = true;
     }
@@ -310,7 +311,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
       cells: mapData.cells,
       name: newName,
       objects: mapData.objects || [],
-      textLabels: mapData.textLabels || []
+      textLabels: mapData.textLabels || [],
+      edges: mapData.edges || []
     });
   };
 
@@ -327,7 +329,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
         cells: newCells,
         name: mapData.name,
         objects: mapData.objects || [],
-        textLabels: mapData.textLabels || []
+        textLabels: mapData.textLabels || [],
+        edges: mapData.edges || []
       });
     }
   };
@@ -345,7 +348,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
         cells: mapData.cells,
         name: mapData.name,
         objects: newObjects,
-        textLabels: mapData.textLabels || []
+        textLabels: mapData.textLabels || [],
+        edges: mapData.edges || []
       });
     }
   };
@@ -363,7 +367,27 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
         cells: mapData.cells,
         name: mapData.name,
         objects: mapData.objects || [],
-        textLabels: newTextLabels
+        textLabels: newTextLabels,
+        edges: mapData.edges || []
+      });
+    }
+  };
+
+  // Handle edges change (for edge painting feature)
+  const handleEdgesChange = (newEdges, suppressHistory = false) => {
+    if (!mapData || isApplyingHistoryRef.current) return;
+
+    const newMapData = { ...mapData, edges: newEdges };
+    updateMapData(newMapData);
+
+    // Only add to history if not suppressed (used for batched operations)
+    if (!suppressHistory) {
+      addToHistory({
+        cells: mapData.cells,
+        name: mapData.name,
+        objects: mapData.objects || [],
+        textLabels: mapData.textLabels || [],
+        edges: newEdges
       });
     }
   };
@@ -432,7 +456,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
         cells: previousState.cells,
         name: previousState.name,
         objects: previousState.objects || [],
-        textLabels: previousState.textLabels || []
+        textLabels: previousState.textLabels || [],
+        edges: previousState.edges || []
       };
       updateMapData(newMapData);
       // Use setTimeout to ensure state update completes before re-enabling history
@@ -452,7 +477,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
         cells: nextState.cells,
         name: nextState.name,
         objects: nextState.objects || [],
-        textLabels: nextState.textLabels || []
+        textLabels: nextState.textLabels || [],
+        edges: nextState.edges || []
       };
       updateMapData(newMapData);
       // Use setTimeout to ensure state update completes before re-enabling history
@@ -492,7 +518,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   const handleCompassClick = () => {
     if (!mapData) return;
 
-    // Cycle through: 0ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â° -> 90ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â° -> 180ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â° -> 270ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â° -> 0ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°
+    // Cycle through: 0ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â° -> 90ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â° -> 180ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â° -> 270ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â° -> 0ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°
     const rotations = [0, 90, 180, 270];
     const currentIndex = rotations.indexOf(mapData.northDirection);
     const nextIndex = (currentIndex + 1) % rotations.length;
@@ -682,6 +708,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               onCellsChange={handleCellsChange}
               onObjectsChange={handleObjectsChange}
               onTextLabelsChange={handleTextLabelsChange}
+              onEdgesChange={handleEdgesChange}
               onViewStateChange={handleViewStateChange}
               currentTool={currentTool}
               selectedObjectType={selectedObjectType}

@@ -393,6 +393,7 @@
 }
 
 .dmt-tool-btn {
+  position: relative;
   background-color: var(--dmt-bg-secondary);
   border: 1px solid var(--dmt-border-secondary);
   border-radius: 3px;
@@ -438,6 +439,83 @@
 .dmt-color-tool-btn {
   position: relative;
   /* Bottom border shows current color - defined inline via style attribute */
+}
+
+/* Sub-tool indicator triangle */
+.dmt-subtool-indicator {
+  position: absolute;
+  bottom: 1px;
+  right: 1px;
+  font-size: 7px;
+  opacity: 0.6;
+  pointer-events: none;
+  line-height: 1;
+}
+
+.dmt-tool-btn-active .dmt-subtool-indicator {
+  opacity: 0.9;
+  color: var(--dmt-bg-primary);
+}
+
+/* Tool button container for sub-menu positioning */
+.dmt-tool-btn-container {
+  position: relative;
+  display: inline-block;
+}
+
+/* Sub-menu flyout */
+.dmt-subtool-menu {
+  position: absolute;
+  left: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  margin-left: 6px;
+  background: var(--dmt-bg-secondary);
+  border: 1px solid var(--dmt-border-primary);
+  border-radius: 6px;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  z-index: 1001;
+  box-shadow: 
+    0 4px 12px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  min-width: 120px;
+}
+
+.dmt-subtool-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  color: var(--dmt-text-primary);
+  cursor: pointer;
+  border-radius: 4px;
+  white-space: nowrap;
+  font-size: 13px;
+  transition: var(--dmt-transition);
+
+  svg {
+    width: 16px;
+    height: 16px;
+    color: var(--dmt-border-primary);
+  }
+
+  &:hover {
+    background: var(--dmt-bg-tertiary);
+  }
+
+  &.dmt-subtool-option-active {
+    background: var(--dmt-border-primary);
+    color: var(--dmt-bg-primary);
+
+    svg {
+      color: var(--dmt-bg-primary);
+    }
+  }
 }
 
 /* History Controls */
