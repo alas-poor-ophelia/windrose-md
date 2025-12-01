@@ -16,6 +16,7 @@ const { requireModuleByName } = await dc.require(pathResolverPath);
 
 const { useMapState, useMapOperations } = await requireModuleByName("MapContext.jsx");
 const { addEdge, removeEdge, getEdgeAt, generateEdgeLine, mergeEdges } = await requireModuleByName("edgeOperations.js");
+const { eraseObjectAt } = await requireModuleByName("objectOperations.js");
 
 /**
  * Hook for managing drawing tools
@@ -49,7 +50,6 @@ const useDrawingTools = (
     removeObjectsInRectangle
   } = useMapOperations();
   
-  // Drawing state
   // Drawing state
   const [isDrawing, setIsDrawing] = dc.useState(false);
   const [processedCells, setProcessedCells] = dc.useState(new Set());
@@ -149,8 +149,12 @@ const useDrawingTools = (
       const coordY = coords.gridY !== undefined ? coords.gridY : coords.r;
       const obj = getObjectAtPosition(mapData.objects || [], coordX, coordY);
       if (obj) {
-        const newObjects = removeObjectAtPosition(mapData.objects || [], coordX, coordY);
-        onObjectsChange(newObjects);
+        // Use unified API - handles hex (one at a time) vs grid (all at position)
+        const mapType = mapData.mapType || 'grid';
+        const result = eraseObjectAt(mapData.objects || [], coordX, coordY, mapType);
+        if (result.success) {
+          onObjectsChange(result.objects);
+        }
       } else if (existingCellIndex !== -1) {
         // Finally remove cell if no text or object
         const newCells = mapData.cells.filter(

@@ -17,7 +17,9 @@ const { requireModuleByName } = await dc.require(pathResolverPath);
 const { calculateObjectScreenPosition: calculateScreenPos, applyInverseRotation } = await requireModuleByName("screenPositionUtils.js");
 const { useMapState, useMapOperations } = await requireModuleByName("MapContext.jsx");
 const { useMapSelection } = await requireModuleByName("MapSelectionContext.jsx");
-const { calculateEdgeAlignment, getAlignmentOffset } = await requireModuleByName("objectOperations.js");
+const { calculateEdgeAlignment, getAlignmentOffset, placeObject, canPlaceObjectAt, removeObjectFromHex } = await requireModuleByName("objectOperations.js");
+const { getClickedObjectInCell, getObjectsInCell, canAddObjectToCell, assignSlot } = await requireModuleByName("hexSlotPositioner.js");
+const { HexGeometry } = await requireModuleByName("HexGeometry.js");
 
 /**
  * Hook for managing object interactions
@@ -256,41 +258,40 @@ const useObjectInteractions = (
       }
     }
 
-    const existingObj = getObjectAtPosition(mapData.objects || [], gridX, gridY);
-    if (existingObj) {
-      return true; // Handled but blocked (collision)
+    const mapType = mapData.mapType || 'grid';
+    
+    // Check if placement is allowed
+    if (!canPlaceObjectAt(mapData.objects || [], gridX, gridY, mapType)) {
+      return true; // Handled but blocked (cell occupied/full)
     }
 
-    // Determine alignment based on edge snap mode
+    // Determine alignment for grid maps with edge snap
     let alignment = 'center';
-    if (edgeSnapMode && clientX !== undefined && clientY !== undefined) {
-      // Convert raw client coords to fractional grid coordinates
+    if (mapType === 'grid' && edgeSnapMode && clientX !== undefined && clientY !== undefined) {
       const worldCoords = screenToWorld(clientX, clientY);
-      
       if (worldCoords && geometry) {
-        // For grid: get fractional position
         const cellSize = mapData.gridSize || geometry.cellSize;
         const fractionalX = worldCoords.worldX / cellSize;
         const fractionalY = worldCoords.worldY / cellSize;
-        
-        // Calculate alignment based on position within cell
         alignment = calculateEdgeAlignment(fractionalX, fractionalY, gridX, gridY);
       }
     }
 
-    // Create object with alignment
-    let newObjects = addObject(mapData.objects || [], selectedObjectType, gridX, gridY);
+    // Place object using unified API
+    const result = placeObject(
+      mapData.objects || [],
+      selectedObjectType,
+      gridX,
+      gridY,
+      { mapType, alignment }
+    );
     
-    // Update the alignment on the newly created object
-    if (alignment !== 'center' && newObjects.length > 0) {
-      const newObject = newObjects[newObjects.length - 1];
-      newObjects = updateObject(newObjects, newObject.id, { alignment });
+    if (result.success) {
+      onObjectsChange(result.objects);
     }
-    
-    onObjectsChange(newObjects);
     return true;
   }, [currentTool, selectedObjectType, mapData, geometry, edgeSnapMode, 
-      getObjectAtPosition, addObject, updateObject, onObjectsChange, screenToWorld, calculateEdgeAlignment]);
+      onObjectsChange, screenToWorld]);
 
 
 
@@ -323,8 +324,38 @@ const useObjectInteractions = (
       }
     }
 
-    // Check for object at grid position
-    const object = getObjectAtPosition(mapData.objects || [], gridX, gridY);
+    // For hex maps with multi-object support: resolve click to specific object
+    let object = null;
+    if (mapData.mapType === 'hex' && geometry instanceof HexGeometry) {
+      const cellObjects = getObjectsInCell(mapData.objects || [], gridX, gridY);
+      
+      if (cellObjects.length > 1) {
+        // Calculate click offset within hex (relative to hex center)
+        const worldCoords = screenToWorld(clientX, clientY);
+        if (worldCoords && geometry.hexToWorld) {
+          const { worldX: hexCenterX, worldY: hexCenterY } = geometry.hexToWorld(gridX, gridY);
+          // Offset in hex-width units (hexWidth = 2 * hexSize)
+          const hexWidth = geometry.hexSize * 2;
+          const clickOffsetX = (worldCoords.worldX - hexCenterX) / hexWidth;
+          const clickOffsetY = (worldCoords.worldY - hexCenterY) / hexWidth;
+          
+          object = getClickedObjectInCell(
+            mapData.objects || [],
+            gridX,
+            gridY,
+            clickOffsetX,
+            clickOffsetY,
+            mapData.orientation || 'flat'
+          );
+        }
+      } else if (cellObjects.length === 1) {
+        object = cellObjects[0];
+      }
+    } else {
+      // Grid maps: use standard single-object lookup
+      object = getObjectAtPosition(mapData.objects || [], gridX, gridY);
+    }
+    
     if (object) {
       // Check if this object is already selected
       const isAlreadySelected = selectedItem?.type === 'object' && selectedItem.id === object.id;
@@ -336,18 +367,21 @@ const useObjectInteractions = (
           clearTimeout(longPressTimerRef.current);
         }
         
-        // Start long press timer (500ms threshold)
-        longPressTimerRef.current = setTimeout(() => {
-          // Toggle edge snap mode on long press
-          setEdgeSnapMode(prev => !prev);
-          
-          // Haptic feedback if available
-          if (navigator.vibrate) {
-            navigator.vibrate(50);
-          }
-          
-          longPressTimerRef.current = null;
-        }, 500);
+        // Start long press timer (500ms threshold) - grid maps only
+        // Edge snap mode is not implemented for hex maps
+        if (mapData.mapType !== 'hex') {
+          longPressTimerRef.current = setTimeout(() => {
+            // Toggle edge snap mode on long press
+            setEdgeSnapMode(prev => !prev);
+            
+            // Haptic feedback if available
+            if (navigator.vibrate) {
+              navigator.vibrate(50);
+            }
+            
+            longPressTimerRef.current = null;
+          }, 500);
+        }
         
         // Start dragging
         dragInitialStateRef.current = [...(mapData.objects || [])];
@@ -384,18 +418,21 @@ const useObjectInteractions = (
           clearTimeout(longPressTimerRef.current);
         }
         
-        // Start long press timer - will enable edge snap mode if held
-        longPressTimerRef.current = setTimeout(() => {
-          // Enable edge snap mode on long press (not toggle, since we just selected)
-          setEdgeSnapMode(true);
-          
-          // Haptic feedback if available
-          if (navigator.vibrate) {
-            navigator.vibrate(50);
-          }
-          
-          longPressTimerRef.current = null;
-        }, 500);
+        // Start long press timer - will enable edge snap mode if held (grid maps only)
+        // Edge snap mode is not implemented for hex maps
+        if (mapData.mapType !== 'hex') {
+          longPressTimerRef.current = setTimeout(() => {
+            // Enable edge snap mode on long press (not toggle, since we just selected)
+            setEdgeSnapMode(true);
+            
+            // Haptic feedback if available
+            if (navigator.vibrate) {
+              navigator.vibrate(50);
+            }
+            
+            longPressTimerRef.current = null;
+          }, 500);
+        }
       }
 
       return true;
@@ -452,40 +489,83 @@ const useObjectInteractions = (
 
     // Only update if we've moved to a different grid cell
     if (gridX !== dragStart.gridX || gridY !== dragStart.gridY) {
-      // Check if target position is empty
-      const existingObj = getObjectAtPosition(mapData.objects || [], targetX, targetY);
+      const currentObject = mapData.objects?.find(o => o.id === objectId);
+      if (!currentObject) return true;
       
-      if (!existingObj || existingObj.id === objectId) {
-        // Determine alignment if in edge snap mode
-        let alignment = 'center';
-        if (edgeSnapMode) {
-          const worldCoords = screenToWorld(clientX, clientY);
-          if (worldCoords && geometry.worldToGrid) {
-            const fractionalX = worldCoords.worldX / (mapData.gridSize || geometry.cellSize);
-            const fractionalY = worldCoords.worldY / (mapData.gridSize || geometry.cellSize);
-            alignment = calculateEdgeAlignment(fractionalX, fractionalY, targetX, targetY);
-          }
+      const isMovingWithinSameCell = currentObject.position.x === targetX && currentObject.position.y === targetY;
+      
+      // For hex maps: handle multi-object cell logic
+      if (mapData.mapType === 'hex' && !isMovingWithinSameCell) {
+        // Check if target cell can accept this object
+        const targetCellObjects = getObjectsInCell(mapData.objects || [], targetX, targetY);
+        
+        if (targetCellObjects.length >= 4) {
+          // Target cell is full - block the move
+          return true;
         }
         
-        // Update object position and alignment (suppress history during drag)
-        const updatedObjects = updateObject(
-          mapData.objects,
-          objectId,
-          { position: { x: targetX, y: targetY }, alignment }
-        );
-        onObjectsChange(updatedObjects, true); // Suppress history
-
-        // Update drag start and selected item data for next frame (preserve offset and objectId)
+        // Assign new slot in target cell
+        const targetSlots = targetCellObjects.map(o => o.slot ?? 0);
+        const newSlot = assignSlot(targetSlots);
+        
+        // Remove from old cell with reorganization, then update position and slot
+        let updatedObjects = removeObjectFromHex(mapData.objects, objectId);
+        
+        // Re-add the moved object with new position and slot
+        updatedObjects = [...updatedObjects, {
+          ...currentObject,
+          position: { x: targetX, y: targetY },
+          slot: newSlot
+        }];
+        
+        onObjectsChange(updatedObjects, true); // Suppress history during drag
+        
+        // Update drag start and selected item
         setDragStart({ x: clientX, y: clientY, gridX, gridY, offsetX, offsetY, objectId });
-        const updatedObject = updatedObjects.find(obj => obj.id === objectId);
-        if (updatedObject) {
+        const movedObject = updatedObjects.find(obj => obj.id === objectId);
+        if (movedObject) {
           setSelectedItem({
             type: 'object',
             id: objectId,
-            data: updatedObject
+            data: movedObject
           });
         }
-    }
+      } else {
+        // Grid maps or same-cell movement: use existing single-object logic
+        const existingObj = getObjectAtPosition(mapData.objects || [], targetX, targetY);
+        
+        if (!existingObj || existingObj.id === objectId) {
+          // Determine alignment if in edge snap mode
+          let alignment = 'center';
+          if (edgeSnapMode) {
+            const worldCoords = screenToWorld(clientX, clientY);
+            if (worldCoords && geometry.worldToGrid) {
+              const fractionalX = worldCoords.worldX / (mapData.gridSize || geometry.cellSize);
+              const fractionalY = worldCoords.worldY / (mapData.gridSize || geometry.cellSize);
+              alignment = calculateEdgeAlignment(fractionalX, fractionalY, targetX, targetY);
+            }
+          }
+          
+          // Update object position and alignment (suppress history during drag)
+          const updatedObjects = updateObject(
+            mapData.objects,
+            objectId,
+            { position: { x: targetX, y: targetY }, alignment }
+          );
+          onObjectsChange(updatedObjects, true); // Suppress history
+
+          // Update drag start and selected item data for next frame (preserve offset and objectId)
+          setDragStart({ x: clientX, y: clientY, gridX, gridY, offsetX, offsetY, objectId });
+          const updatedObject = updatedObjects.find(obj => obj.id === objectId);
+          if (updatedObject) {
+            setSelectedItem({
+              type: 'object',
+              id: objectId,
+              data: updatedObject
+            });
+          }
+        }
+      }
     }
     return true;
   }, [isDraggingSelection, selectedItem, dragStart, mapData, edgeSnapMode, geometry,
@@ -925,7 +1005,7 @@ const useObjectInteractions = (
   }, [handleObjectColorSelect]);
 
   /**
-   * Handle object rotation (cycles 0Ã‚Â° Ã¢â€ â€™ 90Ã‚Â° Ã¢â€ â€™ 180Ã‚Â° Ã¢â€ â€™ 270Ã‚Â° Ã¢â€ â€™ 0Ã‚Â°)
+   * Handle object rotation (cycles 0Ãƒâ€šÃ‚Â° ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ 90Ãƒâ€šÃ‚Â° ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ 180Ãƒâ€šÃ‚Â° ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ 270Ãƒâ€šÃ‚Â° ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ 0Ãƒâ€šÃ‚Â°)
    */
   const handleObjectRotation = dc.useCallback(() => {
     if (!selectedItem || selectedItem.type !== 'object' || !mapData) {

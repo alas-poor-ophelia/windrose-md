@@ -286,7 +286,7 @@ const ObjectLayer = ({
     ? mapData.objects.find(obj => obj.id === selectedItem.id)
     : null;
   
-  const indicatorPositions = edgeSnapMode && selectedObject 
+  const indicatorPositions = edgeSnapMode && selectedObject && mapData?.mapType !== 'hex'
     ? getCardinalIndicatorPositions(selectedObject)
     : null;
   
