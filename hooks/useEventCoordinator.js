@@ -175,10 +175,11 @@ const useEventCoordinator = ({
         startPan(clientX, clientY);
         
       } else if (currentTool === 'draw' || currentTool === 'erase' || 
-                 currentTool === 'edgeDraw' || currentTool === 'edgeErase' || currentTool === 'edgeLine' ||
                  currentTool === 'rectangle' || currentTool === 'circle' || 
-                 currentTool === 'clearArea' || currentTool === 'line') {
-        // Drawing tools
+                 currentTool === 'clearArea' || currentTool === 'line' ||
+                 currentTool === 'edgeDraw' || currentTool === 'edgeErase' || 
+                 currentTool === 'edgeLine') {
+        // Drawing tools (including edge tools)
         if (drawingHandlers?.handleDrawingPointerDown) {
           const eventToUse = isTouchEvent ? syntheticEvent : e;
           drawingHandlers.handleDrawingPointerDown(eventToUse, gridX, gridY);
@@ -294,11 +295,12 @@ const useEventCoordinator = ({
       return;
     }
     
-    // Handle drawing tools
+    // Handle drawing tools (including edge tools)
     if (currentTool === 'draw' || currentTool === 'erase' || 
-        currentTool === 'edgeDraw' || currentTool === 'edgeErase' || currentTool === 'edgeLine' ||
         currentTool === 'rectangle' || currentTool === 'circle' || 
-        currentTool === 'line' || currentTool === 'clearArea') {
+        currentTool === 'line' || currentTool === 'clearArea' ||
+        currentTool === 'edgeDraw' || currentTool === 'edgeErase' || 
+        currentTool === 'edgeLine') {
       if (drawingHandlers?.handleDrawingPointerMove) {
         drawingHandlers.handleDrawingPointerMove(e);
       }
@@ -383,11 +385,12 @@ const useEventCoordinator = ({
       return;
     }
     
-    // Handle drawing tools
+    // Handle drawing tools (including edge tools)
     if (currentTool === 'draw' || currentTool === 'erase' || 
-        currentTool === 'edgeDraw' || currentTool === 'edgeErase' || currentTool === 'edgeLine' ||
         currentTool === 'rectangle' || currentTool === 'circle' || 
-        currentTool === 'line' || currentTool === 'clearArea') {
+        currentTool === 'line' || currentTool === 'clearArea' ||
+        currentTool === 'edgeDraw' || currentTool === 'edgeErase' || 
+        currentTool === 'edgeLine') {
       if (drawingHandlers?.stopDrawing) {
         drawingHandlers.stopDrawing(e);
       }
@@ -408,11 +411,12 @@ const useEventCoordinator = ({
       setPendingToolAction(null);
     }
     
-    // Cancel any in-progress drawing
+    // Cancel any in-progress drawing (including edge tools)
     if (currentTool === 'draw' || currentTool === 'erase' || 
-        currentTool === 'edgeDraw' || currentTool === 'edgeErase' || currentTool === 'edgeLine' ||
         currentTool === 'rectangle' || currentTool === 'circle' || 
-        currentTool === 'line' || currentTool === 'clearArea') {
+        currentTool === 'line' || currentTool === 'clearArea' ||
+        currentTool === 'edgeDraw' || currentTool === 'edgeErase' || 
+        currentTool === 'edgeLine') {
       if (drawingHandlers?.cancelDrawing) {
         drawingHandlers.cancelDrawing();
       }
@@ -443,9 +447,16 @@ const useEventCoordinator = ({
   }, [getHandlers]);
   
   /**
-   * Handle wheel events for zoom
+   * Handle wheel events for zoom or object scaling
    */
   const handleWheel = dc.useCallback((e) => {
+    // First, check if we should scale an object (when hovering over selected object)
+    const objectHandlers = getHandlers('object');
+    if (objectHandlers?.handleObjectWheel) {
+      const handled = objectHandlers.handleObjectWheel(e);
+      if (handled) return;
+    }
+    
     const panZoomHandlers = getHandlers('panZoom');
     if (!panZoomHandlers?.handleWheel) return;
     
@@ -625,5 +636,4 @@ const useEventCoordinator = ({
   // Coordinator hooks don't return anything - they just set up behavior
 };
 
-// Datacore export
 return { useEventCoordinator };

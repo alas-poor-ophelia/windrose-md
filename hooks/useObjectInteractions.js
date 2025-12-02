@@ -817,6 +817,56 @@ const useObjectInteractions = (
   );
 
   /**
+   * Handle mouse wheel for object scaling when hovering over selected object
+   * @param {WheelEvent} e - Wheel event
+   * @returns {boolean} True if wheel was handled
+   */
+  const handleObjectWheel = dc.useCallback((e) => {
+    // Only handle if an object is selected and we're hovering over it
+    if (selectedItem?.type !== 'object' || !mapData?.objects) {
+      return false;
+    }
+    
+    // Check if mouse is over the selected object
+    const coords = screenToGrid(e.clientX, e.clientY);
+    if (!coords) return false;
+    
+    const { gridX, gridY } = coords;
+    const selectedObject = mapData.objects.find(obj => obj.id === selectedItem.id);
+    if (!selectedObject) return false;
+    
+    // Check if cursor is over the selected object's cell
+    const isOverObject = gridX >= selectedObject.position.x && 
+                         gridX < selectedObject.position.x + (selectedObject.size?.width || 1) &&
+                         gridY >= selectedObject.position.y && 
+                         gridY < selectedObject.position.y + (selectedObject.size?.height || 1);
+    
+    if (!isOverObject) return false;
+    
+    // Prevent page scroll
+    e.preventDefault();
+    
+    // Calculate new scale (allow up to 130% for symbols with inherent padding)
+    const currentScale = selectedObject.scale ?? 1.0;
+    const delta = e.deltaY > 0 ? -0.05 : 0.05; // Scroll down = smaller, scroll up = larger
+    const newScale = Math.max(0.25, Math.min(1.3, currentScale + delta));
+    
+    // Only update if scale changed
+    if (newScale !== currentScale) {
+      const updatedObjects = updateObject(mapData.objects, selectedItem.id, { scale: newScale });
+      onObjectsChange(updatedObjects);
+      
+      // Update selected item data
+      const updatedObject = updatedObjects.find(obj => obj.id === selectedItem.id);
+      if (updatedObject) {
+        setSelectedItem({ ...selectedItem, data: updatedObject });
+      }
+    }
+    
+    return true;
+  }, [selectedItem, mapData, screenToGrid, updateObject, onObjectsChange, setSelectedItem]);
+
+  /**
    * Calculate note button position (top-right corner)
    */
   const calculateLabelButtonPosition = dc.useCallback(() => {
@@ -1075,6 +1125,7 @@ const useObjectInteractions = (
     handleObjectSelection,
     handleObjectDragging,
     handleObjectResizing,
+    handleObjectWheel,
     handleHoverUpdate,
     stopObjectDragging,
     stopObjectResizing,

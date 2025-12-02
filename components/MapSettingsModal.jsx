@@ -45,6 +45,7 @@ function MapSettingsModal({
   
   const [overrides, setOverrides] = dc.useState({
     gridLineColor: currentSettings?.overrides?.gridLineColor ?? globalSettings.gridLineColor,
+    gridLineWidth: currentSettings?.overrides?.gridLineWidth ?? globalSettings.gridLineWidth ?? 1,
     backgroundColor: currentSettings?.overrides?.backgroundColor ?? globalSettings.backgroundColor,
     borderColor: currentSettings?.overrides?.borderColor ?? globalSettings.borderColor,
     coordinateKeyColor: currentSettings?.overrides?.coordinateKeyColor ?? globalSettings.coordinateKeyColor,
@@ -106,6 +107,7 @@ function MapSettingsModal({
       setUseGlobalSettings(currentSettings?.useGlobalSettings ?? true);
       setOverrides({
         gridLineColor: currentSettings?.overrides?.gridLineColor ?? globalSettings.gridLineColor,
+        gridLineWidth: currentSettings?.overrides?.gridLineWidth ?? globalSettings.gridLineWidth ?? 1,
         backgroundColor: currentSettings?.overrides?.backgroundColor ?? globalSettings.backgroundColor,
         borderColor: currentSettings?.overrides?.borderColor ?? globalSettings.borderColor,
         coordinateKeyColor: currentSettings?.overrides?.coordinateKeyColor ?? globalSettings.coordinateKeyColor,
@@ -172,6 +174,16 @@ function MapSettingsModal({
       ...prev,
       [colorKey]: newColor
     }));
+  }, []);
+  
+  const handleLineWidthChange = dc.useCallback((value) => {
+    const numValue = parseInt(value, 10);
+    if (!isNaN(numValue) && numValue >= 1 && numValue <= 5) {
+      setOverrides(prev => ({
+        ...prev,
+        gridLineWidth: numValue
+      }));
+    }
   }, []);
   
   const handlePreferenceToggle = dc.useCallback((prefKey) => {
@@ -487,6 +499,47 @@ function MapSettingsModal({
                     defaultColor={THEME.coordinateKey.color}
                   />
                 </div>
+                
+                {/* Grid Line Width slider (grid maps only) */}
+                {mapType === 'grid' && (
+                  <div 
+                    class="dmt-form-group" 
+                    style={{ 
+                      marginTop: '20px',
+                      opacity: useGlobalSettings ? 0.5 : 1
+                    }}
+                  >
+                    <label class="dmt-form-label" style={{ marginBottom: '8px' }}>
+                      Grid Line Width: {overrides.gridLineWidth ?? 1}px
+                    </label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <input
+                        type="range"
+                        min="1"
+                        max="5"
+                        value={overrides.gridLineWidth ?? 1}
+                        onInput={(e) => handleLineWidthChange(e.target.value)}
+                        disabled={useGlobalSettings}
+                        style={{
+                          flex: 1,
+                          cursor: useGlobalSettings ? 'not-allowed' : 'pointer'
+                        }}
+                      />
+                      <button
+                        class="dmt-color-reset-btn"
+                        disabled={useGlobalSettings}
+                        onClick={() => !useGlobalSettings && handleLineWidthChange(1)}
+                        title="Reset to default (1px)"
+                        style={{ cursor: useGlobalSettings ? 'not-allowed' : 'pointer' }}
+                      >
+                        <dc.Icon icon="lucide-rotate-ccw" />
+                      </button>
+                    </div>
+                    <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '6px' }}>
+                      Thickness of the grid lines (1-5 pixels)
+                    </p>
+                  </div>
+                )}
               </div>
             )}
             
@@ -543,7 +596,7 @@ function MapSettingsModal({
                         }}
                         title="Clear image"
                       >
-                        ×
+                        Ã—
                       </button>
                     )}
                     
@@ -587,7 +640,7 @@ function MapSettingsModal({
                   {imageDimensions && (
                     <div style={{ marginBottom: '16px' }}>
                       <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                        Detected: {imageDimensions.width} × {imageDimensions.height} px
+                        Detected: {imageDimensions.width} Ã— {imageDimensions.height} px
                       </p>
                     </div>
                   )}
@@ -683,7 +736,7 @@ function MapSettingsModal({
                       {/* Show calculated result */}
                       <div style={{ marginTop: '12px', padding: '8px', background: 'var(--background-secondary)', borderRadius: '4px' }}>
                         <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                          Result: {hexBounds.maxCol} columns × {hexBounds.maxRow} rows
+                          Result: {hexBounds.maxCol} columns Ã— {hexBounds.maxRow} rows
                           {imageDimensions && (() => {
                             const columns = gridDensity === 'custom' ? customColumns : GRID_DENSITY_PRESETS[gridDensity]?.columns || 24;
                             const calc = calculateGridFromImage(imageDimensions.width, imageDimensions.height, columns, orientation);
@@ -781,7 +834,7 @@ function MapSettingsModal({
                         }}
                       />
                     </div>
-                    <span style={{ color: 'var(--text-muted)' }}>×</span>
+                    <span style={{ color: 'var(--text-muted)' }}>Ã—</span>
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                       <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Rows:</span>
                       <input
@@ -844,7 +897,7 @@ function MapSettingsModal({
                         style={{ marginTop: '2px' }}
                       />
                       <div>
-                        <span style={{ fontWeight: 500 }}>◈, 1-1, 2-5, ...)</span>
+                        <span style={{ fontWeight: 500 }}>â—ˆ, 1-1, 2-5, ...)</span>
                         <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
                           Ring-position labels centered in grid
                         </p>

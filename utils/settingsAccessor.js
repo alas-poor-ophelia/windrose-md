@@ -9,6 +9,7 @@ const FALLBACK_SETTINGS = {
   version: '1.0.0',
   hexOrientation: DEFAULTS.hexOrientation,
   gridLineColor: THEME.grid.lines,
+  gridLineWidth: THEME.grid.lineWidth,
   backgroundColor: THEME.grid.background,
   borderColor: THEME.cells.border,  
   coordinateKeyColor: THEME.coordinateKey.color,
@@ -82,6 +83,7 @@ function getTheme() {
   return {
     grid: {
       lines: settings.gridLineColor,
+      lineWidth: settings.gridLineWidth,
       background: settings.backgroundColor
     },
     cells: {
@@ -120,4 +122,43 @@ function getEffectiveSettings(mapSettings, globalSettings = null) {
   };
 }
 
-return { getSettings, getSetting, isPluginAvailable, getTheme, getEffectiveSettings, FALLBACK_SETTINGS };
+/**
+ * Default object customization settings
+ * Used when settings plugin is not available or doesn't have object settings
+ */
+const FALLBACK_OBJECT_SETTINGS = {
+  objectOverrides: {},
+  customObjects: [],
+  customCategories: []
+};
+
+/**
+ * Get object customization settings from the plugin
+ * Returns object overrides, custom objects, and custom categories
+ * @returns {Object} Object settings { objectOverrides, customObjects, customCategories }
+ */
+function getObjectSettings() {
+  try {
+    // Check if dc.app exists and is ready
+    if (!dc || !dc.app || !dc.app.plugins) {
+      return FALLBACK_OBJECT_SETTINGS;
+    }
+    
+    // Try to get plugin settings
+    const plugin = dc.app.plugins.plugins['dungeon-map-tracker-settings'];
+    
+    if (plugin && plugin.settings) {
+      return {
+        objectOverrides: plugin.settings.objectOverrides || {},
+        customObjects: plugin.settings.customObjects || [],
+        customCategories: plugin.settings.customCategories || []
+      };
+    }
+  } catch (error) {
+    console.warn('[settingsAccessor] Could not access object settings:', error);
+  }
+  
+  return FALLBACK_OBJECT_SETTINGS;
+}
+
+return { getSettings, getSetting, isPluginAvailable, getTheme, getEffectiveSettings, getObjectSettings, FALLBACK_SETTINGS };

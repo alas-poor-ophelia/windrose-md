@@ -7,6 +7,7 @@ const { getJsonPath } = pathResolverImport;
 const THEME = {
   grid: {
     lines: '#666666',
+    lineWidth: 1,
     background: '#1a1a1a'
   },
   cells: {
@@ -39,8 +40,8 @@ const DEFAULTS = {
   hexSize: 80,              // Radius from center to vertex
   hexOrientation: 'flat',   // 'flat' or 'pointy'
   hexBounds: {
-    maxCol: 26,             // Default 27 columns (0-26) â†’ A-AA for coordinate keys
-    maxRow: 20              // Default 21 rows (0-20) â†’ 1-21 for coordinate keys
+    maxCol: 26,             // Default 27 columns (0-26) Ã¢â€ â€™ A-AA for coordinate keys
+    maxRow: 20              // Default 21 rows (0-20) Ã¢â€ â€™ 1-21 for coordinate keys
   },
   
   // Map type

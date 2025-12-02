@@ -135,7 +135,7 @@ function renderCanvas(canvas, mapData, geometry, selectedItem = null, isResizeMo
   // Draw grid lines using renderer
   renderer.renderGrid(ctx, geometry, rendererViewState, { width, height }, true, {
     lineColor: THEME.grid.lines,
-    lineWidth: 1
+    lineWidth: THEME.grid.lineWidth || 1
   });
   
   // Draw filled cells using renderer
@@ -148,6 +148,16 @@ function renderCanvas(canvas, mapData, geometry, selectedItem = null, isResizeMo
     
     // Render painted cells using renderer
     renderer.renderPaintedCells(ctx, cellsWithColor, geometry, rendererViewState);
+    
+    // Render interior grid lines on top of painted cells (grid only)
+    // These are slightly thinner than exterior lines for visual distinction
+    if (renderer.renderInteriorGridLines) {
+      renderer.renderInteriorGridLines(ctx, cellsWithColor, geometry, rendererViewState, {
+        lineColor: THEME.grid.lines,
+        lineWidth: THEME.grid.lineWidth || 1,
+        interiorRatio: 0.5
+      });
+    }
     
     // Render smart borders using renderer (grid only - hex renderer no-ops this)
     renderer.renderCellBorders(
@@ -253,8 +263,11 @@ function renderCanvas(canvas, mapData, geometry, selectedItem = null, isResizeMo
       const centerX = screenX + objectWidth / 2;
       const centerY = screenY + objectHeight / 2;
       
-      // Object symbol sized to fit within the multi-cell bounds
-      const fontSize = Math.min(objectWidth, objectHeight) * 0.8;
+      // Apply user-defined object scale (0.25 to 1.0, default 1.0)
+      const objectScale = obj.scale ?? 1.0;
+      
+      // Object symbol sized to fit within the multi-cell bounds, with user scale applied
+      const fontSize = Math.min(objectWidth, objectHeight) * 0.8 * objectScale;
       
       // Apply rotation if object has rotation property
       const rotation = obj.rotation || 0;

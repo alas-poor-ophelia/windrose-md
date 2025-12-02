@@ -7,8 +7,7 @@ const { THEME, DEFAULTS } = await requireModuleByName("dmtConstants.js");
 // Import the plugin template as a string (allows bundling without Datacore trying to execute it)
 const SETTINGS_PLUGIN_TEMPLATE = await requireModuleByName("settingsPluginMain.js");
 
-// Plugin version from template
-const PACKAGED_PLUGIN_VERSION = '0.4.1';
+const PACKAGED_PLUGIN_VERSION = '0.5.12';
 
 // LocalStorage keys for tracking user preferences
 const STORAGE_KEYS = {
@@ -155,7 +154,11 @@ const SettingsPluginInstaller = ({ onInstall, onDecline, mode = 'auto' }) => {
         backgroundColor: THEME.grid.background,
         borderColor: THEME.cells.border,
         coordinateKeyColor: THEME.coordinateKey.color,
-        expandedByDefault: false
+        expandedByDefault: false,
+        // Object customization
+        objectOverrides: {},
+        customObjects: [],
+        customCategories: []
       };
       await adapter.write(
         `${pluginDir}/data.json`,
@@ -307,6 +310,7 @@ const SettingsPluginInstaller = ({ onInstall, onDecline, mode = 'auto' }) => {
               <li>Default colors for grids, borders, and backgrounds</li>
               <li>Hex grid orientation (flat-top or pointy-top)</li>
               <li>Coordinate label colors</li>
+              <li>Custom map objects and symbols</li>
               <li>Visual preferences across all your maps</li>
             </ul>
           )}

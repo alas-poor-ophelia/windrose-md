@@ -7,7 +7,7 @@ const {
   getDisplayNameFromPath
 } = await requireModuleByName("noteOperations.js");
 
-const { OBJECT_TYPES } = await requireModuleByName("objectTypes.js");
+const { getObjectType } = await requireModuleByName("objectTypeResolver.js");
 
 /**
  * Modal for linking notes to objects
@@ -88,7 +88,7 @@ function NoteLinkModal({
   // Get object type label for display
   const objectTypeLabel = dc.useMemo(() => {
     if (!objectType) return 'Object';
-    const type = OBJECT_TYPES.find(t => t.id === objectType);
+    const type = getObjectType(objectType);
     return type ? type.label : 'Object';
   }, [objectType]);
   

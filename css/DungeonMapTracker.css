@@ -2457,3 +2457,89 @@ button.dmt-orientation-btn,
     color: var(--dmt-bg-primary);
   }
 }
+/* ==========================================================================
+   Scale Slider (shown during resize mode)
+   ========================================================================== */
+
+.dmt-scale-slider-container {
+  background: var(--dmt-bg-secondary);
+  border: 1px solid var(--dmt-border-primary);
+  border-radius: 6px;
+  padding: 6px 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3),
+              inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.dmt-scale-slider-inner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  
+  svg {
+    color: var(--dmt-text-muted);
+    flex-shrink: 0;
+  }
+}
+
+.dmt-scale-slider {
+  flex: 1;
+  height: 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: var(--dmt-bg-tertiary);
+  border-radius: 2px;
+  cursor: pointer;
+  
+  &::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    background: var(--dmt-border-primary);
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid var(--dmt-bg-secondary);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    transition: transform 0.1s ease;
+    
+    &:hover {
+      transform: scale(1.15);
+    }
+  }
+  
+  &::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    background: var(--dmt-border-primary);
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid var(--dmt-bg-secondary);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    transition: transform 0.1s ease;
+    
+    &:hover {
+      transform: scale(1.15);
+    }
+  }
+  
+  &::-webkit-slider-runnable-track {
+    height: 4px;
+    background: var(--dmt-bg-tertiary);
+    border-radius: 2px;
+  }
+  
+  &::-moz-range-track {
+    height: 4px;
+    background: var(--dmt-bg-tertiary);
+    border-radius: 2px;
+  }
+}
+
+.dmt-scale-value {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--dmt-text-muted);
+  min-width: 36px;
+  text-align: right;
+  font-family: var(--font-monospace);
+}

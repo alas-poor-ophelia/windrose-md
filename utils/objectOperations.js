@@ -1,7 +1,8 @@
 const pathResolverPath = dc.resolvePath("pathResolver.js");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
-const { OBJECT_TYPES } = await requireModuleByName("objectTypes.js");
+// Import getObjectType from the resolver (handles overrides, custom objects, fallback)
+const { getObjectType } = await requireModuleByName("objectTypeResolver.js");
 const { 
   assignSlot, 
   getObjectsInCell, 
@@ -10,14 +11,8 @@ const {
   reorganizeAfterRemoval 
 } = await requireModuleByName("hexSlotPositioner.js");
 
-/**
- * Get object type definition by ID
- * @param {string} typeId - The object type ID
- * @returns {Object|null} Object type definition or null if not found
- */
-function getObjectType(typeId) {
-  return OBJECT_TYPES.find(type => type.id === typeId) || null;
-}
+// Note: getObjectType is imported from objectTypeResolver.js
+// It handles built-in objects, overrides, custom objects, and unknown fallback
 
 /**
  * Generate a unique ID for an object
@@ -58,7 +53,7 @@ function getObjectAtPosition(objects, x, y) {
  */
 function addObject(objects, typeId, x, y) {
   const objectType = getObjectType(typeId);
-  if (!objectType) {
+  if (objectType.isUnknown) {
     console.error(`Unknown object type: ${typeId}`);
     return objects;
   }
@@ -95,7 +90,7 @@ function addObject(objects, typeId, x, y) {
  */
 function addObjectToHex(objects, typeId, x, y) {
   const objectType = getObjectType(typeId);
-  if (!objectType) {
+  if (objectType.isUnknown) {
     return { 
       objects, 
       success: false, 
@@ -426,7 +421,7 @@ function placeObject(objects, typeId, x, y, options) {
   
   // Grid: single object per cell
   const objectType = getObjectType(typeId);
-  if (!objectType) {
+  if (objectType.isUnknown) {
     return { 
       objects, 
       success: false, 
