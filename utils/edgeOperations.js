@@ -81,9 +81,10 @@ function getEdgeAt(edges, x, y, side) {
  * @param {number} y - Cell y coordinate
  * @param {string} side - Edge side ('top' | 'right' | 'bottom' | 'left')
  * @param {string} color - Edge color (hex code)
+ * @param {number} opacity - Edge opacity (0-1, optional, defaults to 1)
  * @returns {Array} New edges array with added/updated edge
  */
-function addEdge(edges, x, y, side, color) {
+function addEdge(edges, x, y, side, color, opacity = 1) {
   // Validate inputs - return unchanged array if invalid
   if (typeof x !== 'number' || typeof y !== 'number' || !side || !color) {
     return edges || [];
@@ -94,9 +95,9 @@ function addEdge(edges, x, y, side, color) {
   const existing = getEdgeAt(edgeArray, x, y, side);
   
   if (existing) {
-    // Update existing edge color
+    // Update existing edge color and opacity
     return edgeArray.map(e => 
-      e.id === existing.id ? { ...e, color } : e
+      e.id === existing.id ? { ...e, color, opacity } : e
     );
   }
   
@@ -106,7 +107,8 @@ function addEdge(edges, x, y, side, color) {
     x: normalized.x,
     y: normalized.y,
     side: normalized.side,
-    color
+    color,
+    opacity
   }];
 }
 

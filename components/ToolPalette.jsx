@@ -190,12 +190,15 @@ const ToolPalette = ({
   canRedo,
   selectedColor,
   onColorChange,
+  selectedOpacity = 1,
+  onOpacityChange,
   isColorPickerOpen,       
   onColorPickerOpenChange,
   customColors,
   onAddCustomColor,
   onDeleteCustomColor,
-  mapType
+  mapType,
+  isFocused = false
 }) => {
   const colorBtnRef = dc.useRef(null);
   const pendingCustomColorRef = dc.useRef(null);
@@ -207,12 +210,50 @@ const ToolPalette = ({
     rectangle: 'rectangle'  // 'rectangle' (fill) | 'edgeLine'
   });
   
+  // Keyboard shortcuts for common tools
+  dc.useEffect(() => {
+    // Don't attach keyboard shortcuts if map is not focused
+    if (!isFocused) return;
+    
+    const handleKeyDown = (e) => {
+      // Don't trigger if typing in an input or textarea
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      // Don't trigger with modifier keys (except for special cases)
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      
+      const key = e.key.toLowerCase();
+      
+      switch (key) {
+        case 'd':
+          onToolChange('draw');
+          break;
+        case 'e':
+          onToolChange('erase');
+          break;
+        case 's':
+        case 'v':
+          onToolChange('select');
+          break;
+        case 'm':
+          onToolChange('measure');
+          break;
+        default:
+          return; // Don't prevent default for unhandled keys
+      }
+      
+      e.preventDefault();
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onToolChange, isFocused]);
+  
   // Tool groups with sub-tools
   const toolGroups = [
     {
       id: 'draw',
       subTools: [
-        { id: 'draw', label: 'Paint Cells', title: 'Draw (fill cells)', icon: 'lucide-paintbrush' },
+        { id: 'draw', label: 'Paint Cells', title: 'Draw (fill cells) (D)', icon: 'lucide-paintbrush' },
         { id: 'edgeDraw', label: 'Paint Edges', title: 'Paint Edges (grid lines)', icon: 'lucide-pencil-ruler', gridOnly: true }
       ]
     },
@@ -227,12 +268,13 @@ const ToolPalette = ({
   
   // Simple tools (no sub-menu)
   const simpleTools = [
-    { id: 'select', title: 'Select/Move Text & Objects', icon: 'lucide-hand' },
-    { id: 'erase', title: 'Erase (remove text/objects/cells/edges)', icon: 'lucide-eraser' },
+    { id: 'select', title: 'Select/Move Text & Objects (S)', icon: 'lucide-hand' },
+    { id: 'erase', title: 'Erase (remove text/objects/cells/edges) (E)', icon: 'lucide-eraser' },
     { id: 'circle', title: 'Circle (click edge, then center)', icon: 'lucide-circle', gridOnly: true },
     { id: 'clearArea', title: 'Clear Area (click two corners to erase)', icon: 'lucide-square-x', gridOnly: true },
     { id: 'addObject', title: 'Add Object (select from sidebar)', icon: 'lucide-map-pin-plus' },
-    { id: 'addText', title: 'Add Text Label', icon: 'lucide-type' }
+    { id: 'addText', title: 'Add Text Label', icon: 'lucide-type' },
+    { id: 'measure', title: 'Measure Distance (M)', icon: 'lucide-ruler' }
   ];
   
   // Filter simple tools for hex maps
@@ -382,6 +424,8 @@ const ToolPalette = ({
           position={null}
           pendingCustomColorRef={pendingCustomColorRef}
           title="Color"
+          opacity={selectedOpacity}
+          onOpacityChange={onOpacityChange}
         />
       </div>
       

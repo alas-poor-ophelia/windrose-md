@@ -22,10 +22,12 @@ const { eraseObjectAt } = await requireModuleByName("objectOperations.js");
  * Hook for managing drawing tools
  * @param {string} currentTool - Current active tool
  * @param {string} selectedColor - Currently selected color
+ * @param {number} selectedOpacity - Currently selected opacity (0-1)
  */
 const useDrawingTools = (
   currentTool,
-  selectedColor
+  selectedColor,
+  selectedOpacity = 1
 ) => {
   // Get all required state and operations from Context
   const {
@@ -88,19 +90,19 @@ const useDrawingTools = (
     
     if (shouldFill) {
       if (existingCellIndex !== -1) {
-        // Cell exists - update its color (paint over)
+        // Cell exists - update its color and opacity (paint over)
         const newCells = [...mapData.cells];
         newCells[existingCellIndex] = {
           ...newCells[existingCellIndex],
-          color: selectedColor
+          color: selectedColor,
+          opacity: selectedOpacity
         };
         onCellsChange(newCells, isBatchedStroke);
       } else {
-        // Cell doesn't exist - create new with selected color
-        const newCells = [
-          ...mapData.cells, 
-          geometry.createCellObject(coords, selectedColor)
-        ];
+        // Cell doesn't exist - create new with selected color and opacity
+        const newCell = geometry.createCellObject(coords, selectedColor);
+        newCell.opacity = selectedOpacity;
+        const newCells = [...mapData.cells, newCell];
         onCellsChange(newCells, isBatchedStroke);
       }
     } else if (!shouldFill) {
@@ -188,8 +190,8 @@ const useDrawingTools = (
     const isBatchedStroke = strokeInitialEdgesRef.current !== null;
     
     if (shouldPaint) {
-      // Paint the edge with selected color
-      const newEdges = addEdge(mapData.edges || [], x, y, side, selectedColor);
+      // Paint the edge with selected color and opacity
+      const newEdges = addEdge(mapData.edges || [], x, y, side, selectedColor, selectedOpacity);
       onEdgesChange(newEdges, isBatchedStroke);
     } else {
       // Erase the edge
@@ -310,14 +312,17 @@ const useDrawingTools = (
       const existingIndex = newCells.findIndex(c => geometry.cellMatchesCoords(c, coords));
       
       if (existingIndex !== -1) {
-        // Cell exists - update its color (paint over)
+        // Cell exists - update its color and opacity (paint over)
         newCells[existingIndex] = {
           ...newCells[existingIndex],
-          color: selectedColor
+          color: selectedColor,
+          opacity: selectedOpacity
         };
       } else {
-        // Cell doesn't exist - create new
-        newCells.push(geometry.createCellObject(coords, selectedColor));
+        // Cell doesn't exist - create new with opacity
+        const newCell = geometry.createCellObject(coords, selectedColor);
+        newCell.opacity = selectedOpacity;
+        newCells.push(newCell);
       }
     }
     
@@ -343,14 +348,17 @@ const useDrawingTools = (
       const existingIndex = newCells.findIndex(c => geometry.cellMatchesCoords(c, coords));
       
       if (existingIndex !== -1) {
-        // Cell exists - update its color (paint over)
+        // Cell exists - update its color and opacity (paint over)
         newCells[existingIndex] = {
           ...newCells[existingIndex],
-          color: selectedColor
+          color: selectedColor,
+          opacity: selectedOpacity
         };
       } else {
-        // Cell doesn't exist - create new
-        newCells.push(geometry.createCellObject(coords, selectedColor));
+        // Cell doesn't exist - create new with opacity
+        const newCell = geometry.createCellObject(coords, selectedColor);
+        newCell.opacity = selectedOpacity;
+        newCells.push(newCell);
       }
     }
     

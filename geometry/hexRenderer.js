@@ -36,7 +36,7 @@ const hexRenderer = {
   /**
    * Render painted hexes
    * @param {CanvasRenderingContext2D} ctx
-   * @param {Array} cells - Array of {q, r, color}
+   * @param {Array} cells - Array of {q, r, color, opacity?}
    * @param {HexGeometry} geometry
    * @param {Object} viewState - {x, y, zoom}
    */
@@ -44,6 +44,12 @@ const hexRenderer = {
     if (!cells || cells.length === 0) return;
     
     cells.forEach(cell => {
+      // Apply opacity if specified
+      const opacity = cell.opacity ?? 1;
+      if (opacity < 1) {
+        ctx.globalAlpha = opacity;
+      }
+      
       geometry.drawHex(
         ctx,
         cell.q,
@@ -53,6 +59,11 @@ const hexRenderer = {
         viewState.zoom,
         cell.color
       );
+      
+      // Reset opacity
+      if (opacity < 1) {
+        ctx.globalAlpha = 1;
+      }
     });
   },
 

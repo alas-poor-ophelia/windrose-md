@@ -754,6 +754,22 @@ class HexGeometry extends BaseGeometry {
   }
 
   /**
+   * Calculate game distance between two hexes
+   * For hexes, this is simply the hex distance - no diagonal rules apply
+   * The options parameter is included for API consistency with GridGeometry
+   * @param {number} q1 - First hex q coordinate
+   * @param {number} r1 - First hex r coordinate
+   * @param {number} q2 - Second hex q coordinate
+   * @param {number} r2 - Second hex r coordinate
+   * @param {Object} options - Ignored for hex (included for API consistency)
+   * @returns {number} Distance in hexes
+   */
+  getCellDistance(q1, r1, q2, r2, options = {}) {
+    // Hex grids have no diagonal ambiguity - all neighbors are equidistant
+    return this.getHexDistance(q1, r1, q2, r2);
+  }
+
+  /**
    * Get hexes along a line between two hexes
    * Uses hex line traversal algorithm (linear interpolation in cube coordinates)
    * Returns cells in format {x, y} for API consistency with GridGeometry

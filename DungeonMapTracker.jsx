@@ -34,6 +34,13 @@ const { getSetting, getTheme, getEffectiveSettings } = await requireModuleByName
 const { DEFAULTS } = await requireModuleByName("dmtConstants.js");
 const { DEFAULT_COLOR, getColorByHex, isDefaultColor } = await requireModuleByName("colorOperations.js");
 
+// RPGAwesome icon font support
+const { RA_ICONS } = await requireModuleByName("rpgAwesomeIcons.js");
+const { injectIconCSS } = await requireModuleByName("rpgAwesomeLoader.js");
+
+// Inject RPGAwesome icon CSS classes on module load
+injectIconCSS(RA_ICONS);
+
 
 // ============================================================================
 // MAIN COMPONENT
@@ -94,6 +101,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   const [currentTool, setCurrentTool] = dc.useState('draw');
   const [selectedObjectType, setSelectedObjectType] = dc.useState(null);
   const [selectedColor, setSelectedColor] = dc.useState(DEFAULT_COLOR);
+  const [selectedOpacity, setSelectedOpacity] = dc.useState(1);  // Opacity for painting (0-1)
   const [isColorPickerOpen, setIsColorPickerOpen] = dc.useState(false);
   const [showFooter, setShowFooter] = dc.useState(false);
   const [isFocused, setIsFocused] = dc.useState(false);
@@ -519,7 +527,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   const handleCompassClick = () => {
     if (!mapData) return;
 
-    // Cycle through: 0ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â° -> 90ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â° -> 180ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â° -> 270ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â° -> 0ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°
+    // Cycle through: 0° -> 90° -> 180° -> 270° -> 0°
     const rotations = [0, 90, 180, 270];
     const currentIndex = rotations.indexOf(mapData.northDirection);
     const nextIndex = (currentIndex + 1) % rotations.length;
@@ -675,12 +683,15 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
           canRedo={canRedo}
           selectedColor={selectedColor}
           onColorChange={handleColorChange}
+          selectedOpacity={selectedOpacity}
+          onOpacityChange={setSelectedOpacity}
           isColorPickerOpen={isColorPickerOpen}
           onColorPickerOpenChange={setIsColorPickerOpen}
           customColors={mapData.customColors || []}
           onAddCustomColor={handleAddCustomColor}
           onDeleteCustomColor={handleDeleteCustomColor}
           mapType={mapData.mapType}
+          isFocused={isFocused}
         />
 
         <VisibilityToolbar
@@ -727,6 +738,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               <MapCanvas.DrawingLayer
                 currentTool={currentTool}
                 selectedColor={selectedColor}
+                selectedOpacity={selectedOpacity}
               />
               
               {/* ObjectLayer - handles object placement and interactions */}
@@ -754,6 +766,13 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               
               {/* HexCoordinateLayer - displays coordinate labels when 'C' key is held */}
               <MapCanvas.HexCoordinateLayer />
+
+              {/* MeasurementLayer - distance measurement tool overlay */}
+              <MapCanvas.MeasurementLayer
+                currentTool={currentTool}
+                globalSettings={effectiveSettings}
+                mapDistanceOverrides={mapData?.distanceSettings}
+              />
             </MapCanvas>
           </div>
 

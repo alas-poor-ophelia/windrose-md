@@ -14,7 +14,9 @@ const ColorPicker = ({
   onDeleteCustomColor,
   pendingCustomColorRef,
   title = 'Color',
-  position = 'below' // 'below' or 'above'
+  position = 'below', // 'below' or 'above'
+  opacity = 1,  // Current opacity value (0-1), optional
+  onOpacityChange = null  // Callback when opacity changes, optional
 }) => {
   const [previewColor, setPreviewColor] = dc.useState(null);
   const [deleteTargetId, setDeleteTargetId] = dc.useState(null);
@@ -239,6 +241,24 @@ const ColorPicker = ({
           }
         })}
       </div>
+      
+      {/* Opacity slider - only show when onOpacityChange is provided */}
+      {onOpacityChange && (
+        <div className="dmt-color-opacity-section">
+          <div className="dmt-color-opacity-header">
+            <span className="dmt-color-opacity-label">Opacity</span>
+            <span className="dmt-color-opacity-value">{Math.round(opacity * 100)}%</span>
+          </div>
+          <input
+            type="range"
+            min="0"
+            max="100"
+            value={Math.round(opacity * 100)}
+            onChange={(e) => onOpacityChange(parseInt(e.target.value, 10) / 100)}
+            className="dmt-color-opacity-slider"
+          />
+        </div>
+      )}
     </div>
   );
 };

@@ -273,6 +273,24 @@ class BaseGeometry {
   }
   
   /**
+   * Calculate "game distance" between two cells with configurable rules
+   * For grid: supports different diagonal calculation rules (alternating, equal, euclidean)
+   * For hex: returns hex distance (options are ignored - hex has no diagonal ambiguity)
+   * @abstract
+   * @param {number} x1 - First cell X (gridX or q)
+   * @param {number} y1 - First cell Y (gridY or r)
+   * @param {number} x2 - Second cell X (gridX or q)
+   * @param {number} y2 - Second cell Y (gridY or r)
+   * @param {Object} options - Distance calculation options
+   * @param {string} options.diagonalRule - For grid: 'alternating' | 'equal' | 'euclidean'
+   * @returns {number} Distance in cells
+   * @throws {Error} If not implemented by subclass
+   */
+  getCellDistance(x1, y1, x2, y2, options = {}) {
+    throw new Error('getCellDistance() must be implemented by subclass');
+  }
+  
+  /**
    * Get all neighboring cells
    * @abstract
    * @param {number} x - Cell X coordinate

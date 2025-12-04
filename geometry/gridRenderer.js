@@ -36,7 +36,7 @@ const gridRenderer = {
   /**
    * Render painted cells
    * @param {CanvasRenderingContext2D} ctx
-   * @param {Array} cells - Array of {x, y, color}
+   * @param {Array} cells - Array of {x, y, color, opacity?}
    * @param {GridGeometry} geometry
    * @param {Object} viewState - {x, y, zoom}
    */
@@ -45,19 +45,45 @@ const gridRenderer = {
     
     const scaledSize = geometry.getScaledCellSize(viewState.zoom);
     
-    // Group cells by color for efficient rendering
-    const cellsByColor = {};
+    // Separate cells by whether they have custom opacity
+    const fullOpacityCells = [];
+    const customOpacityCells = [];
+    
     for (const cell of cells) {
-      const color = cell.color;
-      if (!cellsByColor[color]) {
-        cellsByColor[color] = [];
+      const opacity = cell.opacity ?? 1;
+      if (opacity === 1) {
+        fullOpacityCells.push(cell);
+      } else {
+        customOpacityCells.push(cell);
       }
-      cellsByColor[color].push(cell);
     }
     
-    // Draw all cells of each color using geometry's batch rendering
-    for (const [color, cellGroup] of Object.entries(cellsByColor)) {
-      geometry.drawCells(ctx, cellGroup, viewState.x, viewState.y, viewState.zoom, color);
+    // Draw full opacity cells grouped by color (efficient batch rendering)
+    if (fullOpacityCells.length > 0) {
+      const cellsByColor = {};
+      for (const cell of fullOpacityCells) {
+        const color = cell.color;
+        if (!cellsByColor[color]) {
+          cellsByColor[color] = [];
+        }
+        cellsByColor[color].push(cell);
+      }
+      
+      for (const [color, cellGroup] of Object.entries(cellsByColor)) {
+        geometry.drawCells(ctx, cellGroup, viewState.x, viewState.y, viewState.zoom, color);
+      }
+    }
+    
+    // Draw cells with custom opacity individually
+    if (customOpacityCells.length > 0) {
+      for (const cell of customOpacityCells) {
+        const opacity = cell.opacity ?? 1;
+        ctx.globalAlpha = opacity;
+        ctx.fillStyle = cell.color;
+        const { screenX, screenY } = geometry.gridToScreen(cell.x, cell.y, viewState.x, viewState.y, viewState.zoom);
+        ctx.fillRect(screenX, screenY, scaledSize, scaledSize);
+      }
+      ctx.globalAlpha = 1; // Reset
     }
   },
 
@@ -131,7 +157,7 @@ const gridRenderer = {
    * as colored overlays on specific grid lines.
    * 
    * @param {CanvasRenderingContext2D} ctx
-   * @param {Array} edges - Array of {x, y, side, color} where side is 'right' or 'bottom'
+   * @param {Array} edges - Array of {x, y, side, color, opacity?} where side is 'right' or 'bottom'
    * @param {GridGeometry} geometry
    * @param {Object} viewState - {x, y, zoom}
    * @param {Object} style - Edge style options
@@ -161,6 +187,12 @@ const gridRenderer = {
         viewState.zoom
       );
       
+      // Apply opacity if specified
+      const opacity = edge.opacity ?? 1;
+      if (opacity < 1) {
+        ctx.globalAlpha = opacity;
+      }
+      
       ctx.fillStyle = edge.color;
       
       // Edges are stored normalized as 'right' or 'bottom' only
@@ -180,6 +212,11 @@ const gridRenderer = {
           scaledSize + edgeWidth,
           edgeWidth
         );
+      }
+      
+      // Reset opacity
+      if (opacity < 1) {
+        ctx.globalAlpha = 1;
       }
     }
   },

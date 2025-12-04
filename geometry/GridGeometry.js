@@ -472,6 +472,41 @@ class GridGeometry extends BaseGeometry {
   }
   
   /**
+   * Calculate game distance between two grid cells with configurable diagonal rules
+   * @param {number} gridX1 - First cell X
+   * @param {number} gridY1 - First cell Y
+   * @param {number} gridX2 - Second cell X
+   * @param {number} gridY2 - Second cell Y
+   * @param {Object} options - Distance options
+   * @param {string} options.diagonalRule - 'alternating' | 'equal' | 'euclidean'
+   * @returns {number} Distance in cells
+   */
+  getCellDistance(gridX1, gridY1, gridX2, gridY2, options = {}) {
+    const { diagonalRule = 'alternating' } = options;
+    
+    const dx = Math.abs(gridX2 - gridX1);
+    const dy = Math.abs(gridY2 - gridY1);
+    
+    switch (diagonalRule) {
+      case 'equal':
+        // Chebyshev distance - every step (including diagonal) = 1
+        return Math.max(dx, dy);
+        
+      case 'euclidean':
+        // True geometric distance
+        return Math.sqrt(dx * dx + dy * dy);
+        
+      case 'alternating':
+      default:
+        // D&D 5e / Pathfinder style: 5-10-5-10
+        // Each diagonal costs 1.5 on average (first = 1, second = 2, etc.)
+        const straights = Math.abs(dx - dy);
+        const diagonals = Math.min(dx, dy);
+        return straights + diagonals + Math.floor(diagonals / 2);
+    }
+  }
+  
+  /**
    * Create a cell object in grid coordinate format
    * Abstraction layer for cell creation - isolates coordinate property naming
    * @param {{gridX: number, gridY: number}} coords - Grid coordinates from worldToGrid()

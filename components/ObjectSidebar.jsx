@@ -2,7 +2,7 @@ const pathResolverPath = dc.resolvePath("pathResolver.js");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
 // Use resolver for dynamic object types (supports overrides and custom objects)
-const { getResolvedObjectTypes, getResolvedCategories } = await requireModuleByName("objectTypeResolver.js");
+const { getResolvedObjectTypes, getResolvedCategories, hasIconClass } = await requireModuleByName("objectTypeResolver.js");
 
 // Ornamental Arrow SVG - Double Chevron Design
 const OrnamentalArrow = ({ direction = "right" }) => {
@@ -130,7 +130,13 @@ const ObjectSidebar = ({ selectedObjectType, onObjectTypeSelect, onToolChange, i
                 onClick={() => handleObjectSelect(objType.id)}
                 title={objType.label}
               >
-                <div className="dmt-object-symbol">{objType.symbol}</div>
+                <div className="dmt-object-symbol">
+                  {hasIconClass(objType) ? (
+                    <span className={`ra ${objType.iconClass}`}></span>
+                  ) : (
+                    objType.symbol || '?'
+                  )}
+                </div>
                 <div className="dmt-object-label">{objType.label}</div>
               </button>
             ))}

@@ -43,6 +43,7 @@ const useEventCoordinator = ({
     const textHandlers = getHandlers('text');
     const notePinHandlers = getHandlers('notePin');
     const panZoomHandlers = getHandlers('panZoom');
+    const measureHandlers = getHandlers('measure');
     
     if (!panZoomHandlers) return; // Need pan/zoom handlers at minimum
     
@@ -207,6 +208,12 @@ const useEventCoordinator = ({
         if (textHandlers?.handleTextPlacement) {
           textHandlers.handleTextPlacement(clientX, clientY);
         }
+        
+      } else if (currentTool === 'measure') {
+        // Distance measurement tool
+        if (measureHandlers?.handleMeasureClick) {
+          measureHandlers.handleMeasureClick(gridX, gridY, isTouchEvent);
+        }
       }
     };
     
@@ -233,6 +240,7 @@ const useEventCoordinator = ({
     const objectHandlers = getHandlers('object');
     const textHandlers = getHandlers('text');
     const panZoomHandlers = getHandlers('panZoom');
+    const measureHandlers = getHandlers('measure');
     
     if (!panZoomHandlers) return;
     
@@ -307,6 +315,19 @@ const useEventCoordinator = ({
       // Update hover only if objects visible
       if (layerVisibility.objects && objectHandlers?.handleHoverUpdate) {
         objectHandlers.handleHoverUpdate(e);
+      }
+      return;
+    }
+    
+    // Handle measure tool - live distance updates
+    if (currentTool === 'measure' && measureHandlers?.handleMeasureMove) {
+      // Get grid coordinates for measure update
+      const { screenToGrid } = panZoomHandlers;
+      if (screenToGrid) {
+        const coords = screenToGrid(clientX, clientY);
+        const gridX = coords.gridX !== undefined ? coords.gridX : coords.q;
+        const gridY = coords.gridY !== undefined ? coords.gridY : coords.r;
+        measureHandlers.handleMeasureMove(gridX, gridY);
       }
       return;
     }

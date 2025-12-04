@@ -7,7 +7,14 @@ const { THEME, DEFAULTS } = await requireModuleByName("dmtConstants.js");
 // Import the plugin template as a string (allows bundling without Datacore trying to execute it)
 const SETTINGS_PLUGIN_TEMPLATE = await requireModuleByName("settingsPluginMain.js");
 
-const PACKAGED_PLUGIN_VERSION = '0.5.12';
+// Import object types for template injection (single source of truth)
+const { OBJECT_TYPES, CATEGORIES } = await requireModuleByName("objectTypes.js");
+
+// Import RPGAwesome icon data for template injection
+const { RA_ICONS, RA_CATEGORIES } = await requireModuleByName("rpgAwesomeIcons.js");
+
+// Plugin version from template
+const PACKAGED_PLUGIN_VERSION = '0.8.2';
 
 // LocalStorage keys for tracking user preferences
 const STORAGE_KEYS = {
@@ -93,9 +100,24 @@ function generateManifest() {
 }
 
 /**
+ * Escape non-ASCII unicode characters in a string as \uXXXX sequences.
+ * Required for PUA (Private Use Area) characters in RA_ICONS that can
+ * cause parsing issues on some platforms when embedded as raw characters.
+ */
+function escapeUnicode(str) {
+  return str.replace(/[\u0080-\uffff]/g, (c) => {
+    return '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0');
+  });
+}
+
+/**
  * Generate main.js content from template with injected constants
  */
 function generateMainJs() {
+  // Build category order map from CATEGORIES
+  const categoryOrder = {};
+  CATEGORIES.forEach(c => { categoryOrder[c.id] = c.order; });
+  
   return SETTINGS_PLUGIN_TEMPLATE
     .replace(/\{\{PLUGIN_VERSION\}\}/g, PACKAGED_PLUGIN_VERSION)
     .replace(/\{\{DEFAULT_HEX_ORIENTATION\}\}/g, DEFAULTS.hexOrientation)
@@ -104,7 +126,12 @@ function generateMainJs() {
     .replace(/\{\{DEFAULT_BORDER_COLOR\}\}/g, THEME.cells.border)
     .replace(/\{\{DEFAULT_COORDINATE_KEY_COLOR\}\}/g, THEME.coordinateKey.color)
     .replace(/\{\{DEFAULT_COORDINATE_TEXT_COLOR\}\}/g, THEME.coordinateText.color)
-    .replace(/\{\{DEFAULT_COORDINATE_TEXT_SHADOW\}\}/g, THEME.coordinateText.shadow);
+    .replace(/\{\{DEFAULT_COORDINATE_TEXT_SHADOW\}\}/g, THEME.coordinateText.shadow)
+    .replace('{{BUILT_IN_OBJECTS}}', JSON.stringify(OBJECT_TYPES, null, 2))
+    .replace('{{BUILT_IN_CATEGORIES}}', JSON.stringify(CATEGORIES, null, 2))
+    .replace('{{CATEGORY_ORDER}}', JSON.stringify(categoryOrder, null, 2))
+    .replace('{{RA_ICONS}}', escapeUnicode(JSON.stringify(RA_ICONS, null, 2)))
+    .replace('{{RA_CATEGORIES}}', JSON.stringify(RA_CATEGORIES, null, 2));
 }
 
 const SettingsPluginInstaller = ({ onInstall, onDecline, mode = 'auto' }) => {

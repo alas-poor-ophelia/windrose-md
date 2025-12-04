@@ -57,7 +57,17 @@ const DEFAULTS = {
   minZoom: 0.1,       
   maxZoom: 4,         
   zoomButtonStep: 0.05, // zoom step for buttons 
-  zoomWheelStep: 0.05   // zoom step for wheel
+  zoomWheelStep: 0.05,  // zoom step for wheel
+  
+  // Distance measurement defaults
+  distance: {
+    perCellGrid: 5,              // Grid maps: 5 ft per cell (D&D standard)
+    perCellHex: 6,               // Hex maps: 6 miles per hex (common world map)
+    unitGrid: 'ft',              // Grid default unit
+    unitHex: 'mi',               // Hex default unit
+    gridDiagonalRule: 'alternating',  // 'alternating' | 'equal' | 'euclidean'
+    displayFormat: 'both'        // 'cells' | 'units' | 'both'
+  }
 };
 
 // Dynamically resolve the correct JSON path

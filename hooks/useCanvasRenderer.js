@@ -4,6 +4,7 @@ const { requireModuleByName } = await dc.require(pathResolverPath);
 const { getTheme } = await requireModuleByName("settingsAccessor.js");
 const { buildCellLookup, calculateBordersOptimized } = await requireModuleByName("borderCalculator.js");
 const { getObjectType } = await requireModuleByName("objectOperations.js");
+const { getRenderChar } = await requireModuleByName("objectTypeResolver.js");
 const { getCellColor } = await requireModuleByName("colorOperations.js");
 const { getFontCss } = await requireModuleByName("fontOptions.js");
 const { GridGeometry } = await requireModuleByName("GridGeometry.js");
@@ -96,11 +97,16 @@ function renderCanvas(canvas, mapData, geometry, selectedItem = null, isResizeMo
       const imgWidth = bgImage.naturalWidth;
       const imgHeight = bgImage.naturalHeight;
       
+      // Get offset values (default to 0 for backward compatibility)
+      const imgOffsetX = mapData.backgroundImage.offsetX ?? 0;
+      const imgOffsetY = mapData.backgroundImage.offsetY ?? 0;
+      
       // Position image centered at grid center in screen coordinates
+      // Apply user offset (scaled by zoom to maintain position at different zoom levels)
       const screenCenterX = offsetX + gridCenterX * zoom;
       const screenCenterY = offsetY + gridCenterY * zoom;
-      const screenX = screenCenterX - (imgWidth * zoom) / 2;
-      const screenY = screenCenterY - (imgHeight * zoom) / 2;
+      const screenX = screenCenterX - (imgWidth * zoom) / 2 + (imgOffsetX * zoom);
+      const screenY = screenCenterY - (imgHeight * zoom) / 2 + (imgOffsetY * zoom);
       
       // Apply opacity if specified (default to 1 for backward compatibility)
       const opacity = mapData.backgroundImage.opacity ?? 1;
@@ -278,16 +284,24 @@ function renderCanvas(canvas, mapData, geometry, selectedItem = null, isResizeMo
         ctx.translate(-centerX, -centerY);
       }
       
-      ctx.font = `${fontSize}px 'Noto Emoji', 'Noto Sans Symbols 2', monospace`;
+      // Get the character to render (handles both icons and symbols with fallback)
+      const { char: renderChar, isIcon } = getRenderChar(objType);
+      
+      // Use RPGAwesome font for icons, Noto for symbols
+      if (isIcon) {
+        ctx.font = `${fontSize}px rpgawesome`;
+      } else {
+        ctx.font = `${fontSize}px 'Noto Emoji', 'Noto Sans Symbols 2', monospace`;
+      }
       
       // Draw shadow/stroke for visibility
       ctx.strokeStyle = '#000000';
       ctx.lineWidth = Math.max(2, fontSize * 0.08);
-      ctx.strokeText(objType.symbol, centerX, centerY);
+      ctx.strokeText(renderChar, centerX, centerY);
       
       // Draw the object symbol with object's color (defaults to white for backward compatibility)
       ctx.fillStyle = obj.color || '#ffffff';
-      ctx.fillText(objType.symbol, centerX, centerY);
+      ctx.fillText(renderChar, centerX, centerY);
       
       // Restore context if we applied rotation
       if (rotation !== 0) {

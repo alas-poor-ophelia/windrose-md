@@ -2,77 +2,49 @@
 // Returns the plugin source as a string for templating by SettingsPluginInstaller
 // This wrapper allows the file to be dc.require()'d without Datacore trying to execute it as an Obsidian plugin
 
-return `// settingsPluginMain.js - Template for Windrose MapDesigner Settings Plugin
-// This file is used by SettingsPluginInstaller to create the plugin
-// Default color values are injected at install time from dmtConstants
+return `// settingsPluginMain.js - Windrose MapDesigner Settings Plugin
+// This file is generated from a template by SettingsPluginInstaller
+// Default values are injected at install time from dmtConstants and objectTypes
 
-// VERSION MARKER - Used to detect when upgrades are available
+/**
+ * ============================================================================
+ * TABLE OF CONTENTS
+ * ============================================================================
+ * 
+ * Line ~25:   VERSION & IMPORTS
+ * Line ~35:   DATA CONSTANTS (BUILT_IN_OBJECTS, CATEGORIES, QUICK_SYMBOLS)
+ * Line ~100:  HELPER NAMESPACES (ObjectHelpers, DragHelpers, IconHelpers)
+ * Line ~200:  STYLES (DMT_SETTINGS_STYLES)
+ * Line ~520:  MODAL CLASSES (ObjectEditModal, CategoryEditModal, ExportModal, ImportModal)
+ * Line ~900:  MAIN PLUGIN CLASS (WindroseMDSettingsPlugin)
+ * Line ~1000: SETTINGS TAB CLASS (WindroseMDSettingsTab)
+ * 
+ * ============================================================================
+ */
+
+// =============================================================================
+// VERSION & IMPORTS
+// =============================================================================
+
 const PLUGIN_VERSION = '{{PLUGIN_VERSION}}';
 
 const { Plugin, PluginSettingTab, Setting, Modal, setIcon } = require('obsidian');
 
-// Built-in object types (mirror of objectTypes.js)
-const BUILT_IN_OBJECTS = [
-  { id: 'note_pin', symbol: '📌', label: 'Note Pin', category: 'notes' },
-  { id: 'entrance', symbol: '⬤', label: 'Entrance/Exit', category: 'navigation' },
-  { id: 'stairs-up', symbol: '▲', label: 'Stairs Up', category: 'navigation' },
-  { id: 'stairs-down', symbol: '▼', label: 'Stairs Down', category: 'navigation' },
-  { id: 'ladder', symbol: '☡', label: 'Ladder', category: 'navigation' },
-  { id: 'door-vertical', symbol: '╫', label: 'Door (Vertical)', category: 'navigation' },
-  { id: 'door-horizontal', symbol: '═', label: 'Door (Horizontal)', category: 'navigation' },
-  { id: 'secret-door', symbol: '≡', label: 'Secret Door', category: 'navigation' },
-  { id: 'portal', symbol: '⊛', label: 'Portal/Teleport', category: 'navigation' },
-  { id: 'trap', symbol: '✱', label: 'Trap', category: 'hazards' },
-  { id: 'hazard', symbol: '⚠', label: 'Hazard', category: 'hazards' },
-  { id: 'pit', symbol: '◊', label: 'Pit', category: 'hazards' },
-  { id: 'poison', symbol: '☠', label: 'Poison', category: 'hazards' },
-  { id: 'chest', symbol: '🪎', label: 'Chest/Treasure', category: 'features' },
-  { id: 'crate', symbol: '📦', label: 'Crate/Barrel', category: 'features' },
-  { id: 'sack', symbol: '💰', label: 'Sack/Bag', category: 'features' },
-  { id: 'altar', symbol: '⛧', label: 'Altar', category: 'features' },
-  { id: 'coffin', symbol: '⚰', label: 'Coffin', category: 'features' },
-  { id: 'statue', symbol: '♜', label: 'Statue', category: 'features' },
-  { id: 'cage', symbol: '⛓', label: 'Chains/Cage', category: 'features' },
-  { id: 'book', symbol: '🕮', label: 'Book/Shelf', category: 'features' },
-  { id: 'table', symbol: '▭', label: 'Table', category: 'features' },
-  { id: 'chair', symbol: '🪑', label: 'Chair', category: 'features' },
-  { id: 'bed', symbol: '🛏', label: 'Bed', category: 'features' },
-  { id: 'anvil', symbol: '⚒', label: 'Anvil/Forge', category: 'features' },
-  { id: 'cauldron', symbol: '⚗', label: 'Cauldron', category: 'features' },
-  { id: 'fountain', symbol: '⛲', label: 'Fountain', category: 'features' },
-  { id: 'lever', symbol: '⚡', label: 'Lever/Switch', category: 'features' },
-  { id: 'flower', symbol: '⚘', label: 'Flower', category: 'features' },
-  { id: 'plant', symbol: '❊', label: 'Plant', category: 'features' },
-  { id: 'tree-dec', symbol: '🌳', label: 'Tree', category: 'features' },
-  { id: 'tree-ev', symbol: '🌲', label: 'Tree', category: 'features' },
-  { id: 'tree-lfls', symbol: '🪾', label: 'Tree', category: 'features' },
-  { id: 'monster', symbol: '♅', label: 'Monster/Enemy', category: 'encounters' },
-  { id: 'boss', symbol: '♛', label: 'Boss', category: 'encounters' },
-  { id: 'boss-alt', symbol: '💀', label: 'Boss (alt)', category: 'encounters' },
-  { id: 'npc', symbol: '☺', label: 'NPC', category: 'encounters' },
-  { id: 'npc-alt', symbol: '🧝', label: 'NPC', category: 'encounters' },
-  { id: 'guard', symbol: '⚔', label: 'Guard', category: 'encounters' },
-  { id: 'poi', symbol: '◉', label: 'Point of Interest', category: 'markers' },
-  { id: 'flag', symbol: '⚑', label: 'Note/Flag', category: 'markers' }
-];
+// =============================================================================
+// DATA CONSTANTS
+// Injected from objectTypes.js at install time - single source of truth
+// =============================================================================
 
-const BUILT_IN_CATEGORIES = [
-  { id: 'notes', label: 'Notes' },
-  { id: 'navigation', label: 'Navigation' },
-  { id: 'hazards', label: 'Hazards' },
-  { id: 'features', label: 'Features' },
-  { id: 'encounters', label: 'Encounters' },
-  { id: 'markers', label: 'Markers' }
-];
+const BUILT_IN_OBJECTS = {{BUILT_IN_OBJECTS}};
 
-const CATEGORY_ORDER = {
-  'notes': 0,
-  'navigation': 10,
-  'hazards': 20,
-  'features': 30,
-  'encounters': 40,
-  'markers': 50
-};
+const BUILT_IN_CATEGORIES = {{BUILT_IN_CATEGORIES}};
+
+const CATEGORY_ORDER = {{CATEGORY_ORDER}};
+
+// RPGAwesome icon data - injected from rpgAwesomeIcons.js at install time
+const RA_ICONS = {{RA_ICONS}};
+
+const RA_CATEGORIES = {{RA_CATEGORIES}};
 
 // Quick symbols palette for object creation
 const QUICK_SYMBOLS = [
@@ -86,7 +58,762 @@ const QUICK_SYMBOLS = [
   '🏛', '🏰', '⛪', '🗿', '⚱', '🏺', '🪔'
 ];
 
-// Object Edit Modal
+// =============================================================================
+// HELPER NAMESPACES
+// Pure functions for data transformation - no side effects, easy to test/debug
+// =============================================================================
+
+/**
+ * Object resolution helpers
+ * Transform raw settings into resolved object/category lists
+ */
+const ObjectHelpers = {
+  /**
+   * Get all resolved object types (built-in + custom, with overrides applied)
+   * @param {Object} settings - Plugin settings
+   * @returns {Array} Resolved object array with isBuiltIn, isModified flags
+   */
+  getResolved(settings) {
+    const { objectOverrides = {}, customObjects = [] } = settings;
+    
+    const resolvedBuiltIns = BUILT_IN_OBJECTS
+      .filter(obj => !objectOverrides[obj.id]?.hidden)
+      .map((obj, index) => {
+        const override = objectOverrides[obj.id];
+        const defaultOrder = index * 10;
+        if (override) {
+          const { hidden, ...overrideProps } = override;
+          return { 
+            ...obj, 
+            ...overrideProps, 
+            order: override.order ?? defaultOrder, 
+            isBuiltIn: true, 
+            isModified: true 
+          };
+        }
+        return { ...obj, order: defaultOrder, isBuiltIn: true, isModified: false };
+      });
+    
+    const resolvedCustom = customObjects.map((obj, index) => ({
+      ...obj,
+      order: obj.order ?? (1000 + index * 10),
+      isCustom: true,
+      isBuiltIn: false
+    }));
+    
+    return [...resolvedBuiltIns, ...resolvedCustom];
+  },
+  
+  /**
+   * Get all resolved categories (built-in + custom, sorted by order)
+   * @param {Object} settings - Plugin settings
+   * @returns {Array} Sorted category array with isBuiltIn flag
+   */
+  getCategories(settings) {
+    const { customCategories = [] } = settings;
+    
+    const resolvedBuiltIns = BUILT_IN_CATEGORIES.map(c => ({
+      ...c,
+      isBuiltIn: true,
+      order: CATEGORY_ORDER[c.id] ?? 50
+    }));
+    
+    const resolvedCustom = customCategories.map(c => ({
+      ...c,
+      isCustom: true,
+      isBuiltIn: false,
+      order: c.order ?? 100
+    }));
+    
+    return [...resolvedBuiltIns, ...resolvedCustom].sort((a, b) => (a.order ?? 50) - (b.order ?? 50));
+  },
+  
+  /**
+   * Get hidden built-in objects
+   * @param {Object} settings - Plugin settings
+   * @returns {Array} Hidden objects with isBuiltIn, isHidden flags
+   */
+  getHidden(settings) {
+    const { objectOverrides = {} } = settings;
+    return BUILT_IN_OBJECTS
+      .filter(obj => objectOverrides[obj.id]?.hidden)
+      .map(obj => ({ ...obj, isBuiltIn: true, isHidden: true }));
+  },
+  
+  /**
+   * Get all categories including notes (for dropdowns)
+   * @param {Object} settings - Plugin settings
+   * @returns {Array} All categories
+   */
+  getAllCategories(settings) {
+    const { customCategories = [] } = settings;
+    const builtIn = BUILT_IN_CATEGORIES.map(c => ({ ...c, isBuiltIn: true }));
+    const custom = customCategories.map(c => ({ ...c, isCustom: true }));
+    return [...builtIn, ...custom];
+  },
+  
+  /**
+   * Get default ID order for a category (for drag/drop comparison)
+   * @param {string} categoryId - Category ID
+   * @param {Object} settings - Plugin settings
+   * @returns {Array} Array of object IDs in default order
+   */
+  getDefaultIdOrder(categoryId, settings) {
+    const { objectOverrides = {} } = settings;
+    return BUILT_IN_OBJECTS
+      .filter(o => o.category === categoryId && !objectOverrides[o.id]?.hidden)
+      .map(o => o.id);
+  }
+};
+
+/**
+ * Drag and drop helpers
+ */
+const DragHelpers = {
+  /**
+   * Find element to insert before during drag operation
+   * @param {HTMLElement} container - Container element
+   * @param {number} y - Mouse Y position
+   * @returns {HTMLElement|undefined} Element to insert before
+   */
+  getAfterElement(container, y) {
+    const draggableElements = [...container.querySelectorAll('.dmt-settings-object-row:not(.dmt-dragging)')];
+    
+    return draggableElements.reduce((closest, child) => {
+      const box = child.getBoundingClientRect();
+      const offset = y - box.top - box.height / 2;
+      if (offset < 0 && offset > closest.offset) {
+        return { offset: offset, element: child };
+      } else {
+        return closest;
+      }
+    }, { offset: Number.NEGATIVE_INFINITY }).element;
+  }
+};
+
+/**
+ * Icon helpers
+ */
+const IconHelpers = {
+  /**
+   * Set icon on element with fallback
+   * @param {HTMLElement} el - Target element
+   * @param {string} iconId - Lucide icon ID
+   */
+  set(el, iconId) {
+    if (typeof setIcon !== 'undefined') {
+      setIcon(el, iconId);
+    } else {
+      // Fallback: create a simple text representation
+      const icons = {
+        'pencil': 'âœŽ',
+        'eye': 'ðŸ‘',
+        'eye-off': 'ðŸš«',
+        'rotate-ccw': 'â†º',
+        'trash-2': 'ðŸ—‘',
+        'grip-vertical': 'â‹®â‹®',
+        'x': 'âœ•'
+      };
+      el.textContent = icons[iconId] || '?';
+    }
+  }
+};
+
+/**
+ * RPGAwesome icon helpers
+ */
+const RPGAwesomeHelpers = {
+  /**
+   * Get icons filtered by category
+   * @param {string} categoryId - Category ID or 'all'
+   * @returns {Array} Array of { iconClass, char, label, category }
+   */
+  getByCategory(categoryId) {
+    const icons = Object.entries(RA_ICONS).map(([iconClass, data]) => ({
+      iconClass,
+      ...data
+    }));
+    
+    if (categoryId === 'all') return icons;
+    return icons.filter(i => i.category === categoryId);
+  },
+  
+  /**
+   * Search icons by label
+   * @param {string} query - Search query
+   * @returns {Array} Matching icons
+   */
+  search(query) {
+    const q = query.toLowerCase().trim();
+    if (!q) return this.getByCategory('all');
+    
+    return Object.entries(RA_ICONS)
+      .filter(([iconClass, data]) => 
+        iconClass.toLowerCase().includes(q) || 
+        data.label.toLowerCase().includes(q)
+      )
+      .map(([iconClass, data]) => ({ iconClass, ...data }));
+  },
+  
+  /**
+   * Get sorted categories for tab display
+   * @returns {Array} Array of { id, label, order }
+   */
+  getCategories() {
+    return [...RA_CATEGORIES].sort((a, b) => a.order - b.order);
+  },
+  
+  /**
+   * Validate an icon class exists
+   * @param {string} iconClass - Icon class to validate
+   * @returns {boolean}
+   */
+  isValid(iconClass) {
+    return iconClass && RA_ICONS.hasOwnProperty(iconClass);
+  },
+  
+  /**
+   * Get icon info
+   * @param {string} iconClass - Icon class
+   * @returns {Object|null} Icon data or null
+   */
+  getInfo(iconClass) {
+    return RA_ICONS[iconClass] || null;
+  }
+};
+
+// =============================================================================
+// STYLES
+// All CSS for the settings UI - injected into document.head when tab is shown
+// =============================================================================
+
+const DMT_SETTINGS_STYLES = \`
+  /* Subheadings */
+  .dmt-settings-subheading {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin: 1.5em 0 0.5em 0;
+    padding-bottom: 4px;
+    border-bottom: 1px solid var(--background-modifier-border);
+  }
+  
+  /* Search/Filter */
+  .dmt-settings-search-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 1em;
+  }
+  
+  .dmt-settings-search-input {
+    flex: 1;
+    padding: 8px 12px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 4px;
+    background: var(--background-primary);
+    font-size: 14px;
+  }
+  
+  .dmt-settings-search-input:focus {
+    border-color: var(--interactive-accent);
+    outline: none;
+  }
+  
+  .dmt-settings-search-clear {
+    background: transparent;
+    border: none;
+    padding: 6px;
+    border-radius: 4px;
+    cursor: pointer;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .dmt-settings-search-clear:hover {
+    background: var(--background-modifier-hover);
+    color: var(--text-normal);
+  }
+  
+  .dmt-settings-no-results {
+    text-align: center;
+    padding: 2em;
+    color: var(--text-muted);
+    font-style: italic;
+  }
+  
+  /* Category containers */
+  .dmt-settings-category {
+    margin: 1em 0;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  
+  .dmt-settings-category-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background: var(--background-secondary);
+    border-bottom: 1px solid var(--background-modifier-border);
+  }
+  
+  .dmt-settings-category-label {
+    font-weight: 600;
+    font-size: 0.95em;
+  }
+  
+  .dmt-settings-category-actions {
+    display: flex;
+    gap: 4px;
+  }
+  
+  /* Object rows */
+  .dmt-settings-object-list {
+    padding: 4px 0;
+  }
+  
+  .dmt-settings-object-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    transition: background-color 0.15s ease;
+  }
+  
+  .dmt-settings-object-row:hover {
+    background: var(--background-modifier-hover);
+  }
+  
+  .dmt-drag-handle {
+    color: var(--text-muted);
+    cursor: grab;
+    padding: 0 4px;
+    font-size: 1em;
+    opacity: 0.4;
+    user-select: none;
+    flex-shrink: 0;
+  }
+  
+  .dmt-settings-object-row:hover .dmt-drag-handle {
+    opacity: 1;
+  }
+  
+  .dmt-dragging {
+    opacity: 0.5;
+    background: var(--interactive-accent) !important;
+    border-radius: 4px;
+  }
+  
+  .dmt-settings-object-symbol {
+    font-family: 'Noto Emoji', 'Noto Sans Symbols 2', sans-serif;
+    font-size: 1.4em;
+    width: 32px;
+    text-align: center;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .dmt-settings-object-symbol .ra {
+    font-size: 1.2em;
+    line-height: 1;
+  }
+  
+  .dmt-settings-object-label {
+    flex: 1;
+    min-width: 0;
+  }
+  
+  .dmt-settings-object-label.dmt-settings-modified {
+    font-style: italic;
+    color: var(--text-accent);
+  }
+  
+  .dmt-settings-object-label.dmt-settings-modified::after {
+    content: ' (modified)';
+    font-size: 0.8em;
+    opacity: 0.7;
+  }
+  
+  .dmt-settings-object-actions {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+  
+  .dmt-settings-icon-btn {
+    background: transparent;
+    border: none;
+    padding: 4px 6px;
+    border-radius: 4px;
+    cursor: pointer;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .dmt-settings-icon-btn:hover {
+    background: var(--background-modifier-hover);
+    color: var(--text-normal);
+  }
+  
+  .dmt-settings-icon-btn-danger:hover {
+    color: var(--text-error);
+  }
+  
+  /* Hidden section */
+  .dmt-settings-hidden-section {
+    margin-top: 2em;
+    padding-top: 1em;
+    border-top: 1px solid var(--background-modifier-border);
+  }
+  
+  .dmt-settings-hidden-list {
+    margin-top: 8px;
+    opacity: 0.7;
+  }
+  
+  .dmt-settings-hidden-list .dmt-settings-object-row {
+    background: var(--background-secondary);
+  }
+  
+  /* Modal Styles */
+  .dmt-object-edit-modal,
+  .dmt-category-edit-modal {
+    padding: 0;
+  }
+  
+  .dmt-symbol-input {
+    font-family: 'Noto Emoji', 'Noto Sans Symbols 2', sans-serif;
+    font-size: 1.5em;
+    width: 80px;
+    text-align: center;
+    padding: 8px;
+  }
+  
+  .dmt-symbol-preview {
+    font-family: 'Noto Emoji', 'Noto Sans Symbols 2', sans-serif;
+    font-size: 2em;
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--background-secondary);
+    border-radius: 8px;
+    margin-left: 8px;
+  }
+  
+  .dmt-quick-symbols {
+    margin: 1em 0;
+  }
+  
+  .dmt-quick-symbols-label {
+    display: block;
+    font-size: 0.9em;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+  }
+  
+  .dmt-quick-symbols-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    max-height: 150px;
+    overflow-y: auto;
+    padding: 4px;
+    background: var(--background-secondary);
+    border-radius: 8px;
+  }
+  
+  .dmt-quick-symbol-btn {
+    font-family: 'Noto Emoji', 'Noto Sans Symbols 2', sans-serif;
+    width: 32px;
+    height: 32px;
+    font-size: 1.2em;
+    border: 1px solid var(--background-modifier-border);
+    background: var(--background-primary);
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .dmt-quick-symbol-btn:hover {
+    background: var(--background-modifier-hover);
+    border-color: var(--interactive-accent);
+  }
+  
+  .dmt-modal-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 1.5em;
+    padding-top: 1em;
+    border-top: 1px solid var(--background-modifier-border);
+  }
+  
+  /* Import/Export Modal Styles */
+  .dmt-export-modal,
+  .dmt-import-modal {
+    padding: 0;
+  }
+  
+  .dmt-export-empty {
+    text-align: center;
+    padding: 1em;
+    color: var(--text-muted);
+    font-style: italic;
+  }
+  
+  .dmt-import-file-container {
+    margin: 1em 0;
+  }
+  
+  .dmt-import-file-container input[type="file"] {
+    width: 100%;
+    padding: 1em;
+    border: 2px dashed var(--background-modifier-border);
+    border-radius: 8px;
+    background: var(--background-secondary);
+    cursor: pointer;
+  }
+  
+  .dmt-import-file-container input[type="file"]:hover {
+    border-color: var(--interactive-accent);
+  }
+  
+  .dmt-import-preview {
+    margin: 1em 0;
+    padding: 1em;
+    background: var(--background-secondary);
+    border-radius: 8px;
+  }
+  
+  .dmt-import-preview p {
+    margin: 0.25em 0;
+  }
+  
+  .dmt-import-date {
+    font-size: 0.85em;
+    color: var(--text-muted);
+  }
+  
+  .dmt-import-error {
+    color: var(--text-error);
+    font-weight: 500;
+  }
+  
+  .dmt-import-options {
+    margin-top: 1em;
+  }
+  
+  /* Icon Type Toggle */
+  .dmt-icon-type-toggle {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 1em;
+  }
+  
+  .dmt-icon-type-btn {
+    flex: 1;
+    padding: 8px 12px;
+    border: 1px solid var(--background-modifier-border);
+    background: var(--background-primary);
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.15s ease;
+  }
+  
+  .dmt-icon-type-btn:hover {
+    background: var(--background-modifier-hover);
+  }
+  
+  .dmt-icon-type-btn.active {
+    background: var(--interactive-accent);
+    color: var(--text-on-accent);
+    border-color: var(--interactive-accent);
+  }
+  
+  /* Icon Picker Container */
+  .dmt-icon-picker {
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 8px;
+    background: var(--background-secondary);
+    margin-bottom: 1em;
+  }
+  
+  .dmt-icon-picker-search {
+    padding: 8px;
+    border-bottom: 1px solid var(--background-modifier-border);
+  }
+  
+  .dmt-icon-picker-search input {
+    width: 100%;
+    padding: 6px 10px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 4px;
+    background: var(--background-primary);
+    font-size: 14px;
+  }
+  
+  .dmt-icon-picker-search input:focus {
+    border-color: var(--interactive-accent);
+    outline: none;
+  }
+  
+  /* Category Tabs */
+  .dmt-icon-picker-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 8px;
+    border-bottom: 1px solid var(--background-modifier-border);
+    background: var(--background-primary-alt);
+  }
+  
+  .dmt-icon-picker-tab {
+    padding: 4px 8px;
+    border: 1px solid transparent;
+    background: transparent;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    color: var(--text-muted);
+    transition: all 0.15s ease;
+  }
+  
+  .dmt-icon-picker-tab:hover {
+    background: var(--background-modifier-hover);
+    color: var(--text-normal);
+  }
+  
+  .dmt-icon-picker-tab.active {
+    background: var(--interactive-accent);
+    color: var(--text-on-accent);
+  }
+  
+  /* Icon Grid */
+  .dmt-icon-picker-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
+    gap: 4px;
+    padding: 8px;
+    max-height: 200px;
+    overflow-y: auto;
+  }
+  
+  .dmt-icon-picker-icon {
+    width: 40px;
+    height: 40px;
+    border: 1px solid var(--background-modifier-border);
+    background: var(--background-primary);
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    transition: all 0.15s ease;
+  }
+  
+  .dmt-icon-picker-icon:hover {
+    background: var(--background-modifier-hover);
+    border-color: var(--interactive-accent);
+    transform: scale(1.1);
+  }
+  
+  .dmt-icon-picker-icon.selected {
+    background: var(--interactive-accent);
+    color: var(--text-on-accent);
+    border-color: var(--interactive-accent);
+  }
+  
+  .dmt-icon-picker-icon .ra {
+    font-size: 20px;
+    line-height: 1;
+  }
+  
+  .dmt-icon-picker-empty {
+    padding: 2em;
+    text-align: center;
+    color: var(--text-muted);
+    font-style: italic;
+  }
+  
+  /* Selected Icon Preview */
+  .dmt-icon-preview-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px;
+    border-top: 1px solid var(--background-modifier-border);
+    background: var(--background-primary);
+  }
+  
+  .dmt-icon-preview-large {
+    width: 48px;
+    height: 48px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    background: var(--background-secondary);
+  }
+  
+  .dmt-icon-preview-large .ra {
+    font-size: 28px;
+    line-height: 1;
+  }
+  
+  .dmt-icon-preview-info {
+    flex: 1;
+  }
+  
+  .dmt-icon-preview-label {
+    font-weight: 500;
+    margin-bottom: 2px;
+  }
+  
+  .dmt-icon-preview-class {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-family: var(--font-monospace);
+  }
+  
+  /* RPGAwesome icon font - must be bundled in DungeonMapTracker - FONTS.css */
+  /* Font-family name must be exactly 'rpgawesome' */
+  .ra {
+    font-family: 'rpgawesome' !important;
+    font-style: normal;
+    font-variant: normal;
+    font-weight: normal;
+    line-height: 1;
+    speak: never;
+    text-transform: none;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+\`;
+
+// =============================================================================
+// MODAL CLASSES
+// Each modal is self-contained with its own state and rendering logic
+// =============================================================================
+
+/**
+ * Modal for creating/editing objects
+ */
 class ObjectEditModal extends Modal {
   constructor(app, plugin, existingObject, onSave) {
     super(app);
@@ -96,8 +823,14 @@ class ObjectEditModal extends Modal {
     
     // Form state
     this.symbol = existingObject?.symbol || '';
+    this.iconClass = existingObject?.iconClass || '';
     this.label = existingObject?.label || '';
     this.category = existingObject?.category || 'features';
+    
+    // UI state - determine initial mode based on existing object
+    this.useIcon = !!existingObject?.iconClass;
+    this.iconSearchQuery = '';
+    this.iconCategory = 'all';
   }
   
   onOpen() {
@@ -106,51 +839,52 @@ class ObjectEditModal extends Modal {
     contentEl.addClass('dmt-object-edit-modal');
     
     const isEditing = !!this.existingObject;
-    const isBuiltIn = this.existingObject?.isBuiltIn;
     
     contentEl.createEl('h2', { text: isEditing ? 'Edit Object' : 'Create Custom Object' });
     
-    // Symbol input
-    const symbolSetting = new Setting(contentEl)
-      .setName('Symbol')
-      .setDesc('Paste any Unicode character or emoji');
+    // Icon type toggle
+    const toggleContainer = contentEl.createDiv({ cls: 'dmt-icon-type-toggle' });
     
-    const symbolInput = symbolSetting.controlEl.createEl('input', {
-      type: 'text',
-      cls: 'dmt-symbol-input',
-      value: this.symbol,
-      attr: { placeholder: 'Paste symbol...' }
-    });
-    symbolInput.addEventListener('input', (e) => {
-      this.symbol = e.target.value.trim();
-      this.updatePreview();
+    const unicodeBtn = toggleContainer.createEl('button', { 
+      text: 'Unicode Symbol',
+      cls: 'dmt-icon-type-btn' + (this.useIcon ? '' : ' active'),
+      attr: { type: 'button' }
     });
     
-    // Focus the symbol input after a short delay (allows modal to fully render)
-    setTimeout(() => symbolInput.focus(), 50);
+    const iconBtn = toggleContainer.createEl('button', { 
+      text: 'RPGAwesome Icon',
+      cls: 'dmt-icon-type-btn' + (this.useIcon ? ' active' : ''),
+      attr: { type: 'button' }
+    });
     
-    // Symbol preview
-    const previewEl = symbolSetting.controlEl.createDiv({ cls: 'dmt-symbol-preview' });
-    previewEl.textContent = this.symbol || '?';
-    this.previewEl = previewEl;
+    // Container for symbol input (shown when useIcon is false)
+    this.symbolContainer = contentEl.createDiv({ cls: 'dmt-symbol-container' });
     
-    // Quick symbols
-    const quickSymbolsContainer = contentEl.createDiv({ cls: 'dmt-quick-symbols' });
-    quickSymbolsContainer.createEl('label', { text: 'Quick Symbols', cls: 'dmt-quick-symbols-label' });
-    const symbolGrid = quickSymbolsContainer.createDiv({ cls: 'dmt-quick-symbols-grid' });
+    // Container for icon picker (shown when useIcon is true)
+    this.iconPickerContainer = contentEl.createDiv({ cls: 'dmt-icon-picker-container' });
     
-    for (const sym of QUICK_SYMBOLS) {
-      const symBtn = symbolGrid.createEl('button', { 
-        text: sym, 
-        cls: 'dmt-quick-symbol-btn',
-        attr: { type: 'button' }
-      });
-      symBtn.onclick = () => {
-        this.symbol = sym;
-        symbolInput.value = sym;
-        this.updatePreview();
-      };
-    }
+    // Toggle handlers
+    unicodeBtn.onclick = () => {
+      if (!this.useIcon) return;
+      this.useIcon = false;
+      unicodeBtn.addClass('active');
+      iconBtn.removeClass('active');
+      this.renderSymbolInput();
+      this.renderIconPicker();
+    };
+    
+    iconBtn.onclick = () => {
+      if (this.useIcon) return;
+      this.useIcon = true;
+      iconBtn.addClass('active');
+      unicodeBtn.removeClass('active');
+      this.renderSymbolInput();
+      this.renderIconPicker();
+    };
+    
+    // Initial render of symbol/icon sections
+    this.renderSymbolInput();
+    this.renderIconPicker();
     
     // Label input
     new Setting(contentEl)
@@ -164,7 +898,7 @@ class ObjectEditModal extends Modal {
         }));
     
     // Category dropdown
-    const allCategories = this.getAllCategories();
+    const allCategories = ObjectHelpers.getAllCategories(this.plugin.settings);
     new Setting(contentEl)
       .setName('Category')
       .setDesc('Group this object belongs to')
@@ -188,25 +922,226 @@ class ObjectEditModal extends Modal {
     saveBtn.onclick = () => this.save();
   }
   
-  updatePreview() {
-    if (this.previewEl) {
-      this.previewEl.textContent = this.symbol || '?';
+  renderSymbolInput() {
+    const container = this.symbolContainer;
+    container.empty();
+    
+    if (this.useIcon) {
+      container.style.display = 'none';
+      return;
+    }
+    container.style.display = 'block';
+    
+    // Symbol input with preview
+    const symbolSetting = new Setting(container)
+      .setName('Symbol')
+      .setDesc('Paste any Unicode character or emoji');
+    
+    const symbolInput = symbolSetting.controlEl.createEl('input', {
+      type: 'text',
+      cls: 'dmt-symbol-input',
+      value: this.symbol,
+      attr: { placeholder: 'Paste symbol...' }
+    });
+    symbolInput.addEventListener('input', (e) => {
+      this.symbol = e.target.value.trim();
+      this.updateSymbolPreview();
+    });
+    
+    // Focus the symbol input after a short delay
+    setTimeout(() => symbolInput.focus(), 50);
+    
+    // Symbol preview
+    const previewEl = symbolSetting.controlEl.createDiv({ cls: 'dmt-symbol-preview' });
+    previewEl.textContent = this.symbol || '?';
+    this.symbolPreviewEl = previewEl;
+    this.symbolInputEl = symbolInput;
+    
+    // Quick symbols
+    const quickSymbolsContainer = container.createDiv({ cls: 'dmt-quick-symbols' });
+    quickSymbolsContainer.createEl('label', { text: 'Quick Symbols', cls: 'dmt-quick-symbols-label' });
+    const symbolGrid = quickSymbolsContainer.createDiv({ cls: 'dmt-quick-symbols-grid' });
+    
+    for (const sym of QUICK_SYMBOLS) {
+      const symBtn = symbolGrid.createEl('button', { 
+        text: sym, 
+        cls: 'dmt-quick-symbol-btn',
+        attr: { type: 'button' }
+      });
+      symBtn.onclick = () => {
+        this.symbol = sym;
+        symbolInput.value = sym;
+        this.updateSymbolPreview();
+      };
     }
   }
   
-  getAllCategories() {
-    const { customCategories = [] } = this.plugin.settings;
-    const builtIn = BUILT_IN_CATEGORIES.map(c => ({ ...c, isBuiltIn: true }));
-    const custom = customCategories.map(c => ({ ...c, isCustom: true }));
-    return [...builtIn, ...custom];
+  renderIconPicker() {
+    const container = this.iconPickerContainer;
+    container.empty();
+    
+    if (!this.useIcon) {
+      container.style.display = 'none';
+      return;
+    }
+    container.style.display = 'block';
+    
+    const picker = container.createDiv({ cls: 'dmt-icon-picker' });
+    
+    // Search input
+    const searchContainer = picker.createDiv({ cls: 'dmt-icon-picker-search' });
+    const searchInput = searchContainer.createEl('input', {
+      type: 'text',
+      value: this.iconSearchQuery,
+      attr: { placeholder: 'Search icons...' }
+    });
+    searchInput.addEventListener('input', (e) => {
+      this.iconSearchQuery = e.target.value;
+      this.renderIconGrid();
+    });
+    
+    // Category tabs
+    const tabsContainer = picker.createDiv({ cls: 'dmt-icon-picker-tabs' });
+    
+    // "All" tab
+    const allTab = tabsContainer.createEl('button', {
+      text: 'All',
+      cls: 'dmt-icon-picker-tab' + (this.iconCategory === 'all' ? ' active' : ''),
+      attr: { type: 'button' }
+    });
+    allTab.onclick = () => {
+      this.iconCategory = 'all';
+      this.renderIconTabs(tabsContainer);
+      this.renderIconGrid();
+    };
+    
+    // Category tabs
+    const categories = RPGAwesomeHelpers.getCategories();
+    for (const cat of categories) {
+      const tab = tabsContainer.createEl('button', {
+        text: cat.label,
+        cls: 'dmt-icon-picker-tab' + (this.iconCategory === cat.id ? ' active' : ''),
+        attr: { type: 'button', 'data-category': cat.id }
+      });
+      tab.onclick = () => {
+        this.iconCategory = cat.id;
+        this.renderIconTabs(tabsContainer);
+        this.renderIconGrid();
+      };
+    }
+    this.tabsContainer = tabsContainer;
+    
+    // Icon grid
+    this.iconGridContainer = picker.createDiv({ cls: 'dmt-icon-picker-grid' });
+    this.renderIconGrid();
+    
+    // Selected icon preview
+    this.iconPreviewContainer = picker.createDiv({ cls: 'dmt-icon-preview-row' });
+    this.updateIconPreview();
+  }
+  
+  renderIconTabs(container) {
+    // Update active state on all tabs
+    const tabs = container.querySelectorAll('.dmt-icon-picker-tab');
+    tabs.forEach(tab => {
+      const catId = tab.getAttribute('data-category') || 'all';
+      if (catId === this.iconCategory) {
+        tab.addClass('active');
+      } else {
+        tab.removeClass('active');
+      }
+    });
+  }
+  
+  renderIconGrid() {
+    const container = this.iconGridContainer;
+    if (!container) return;
+    container.empty();
+    
+    // Get icons based on search or category
+    let icons;
+    if (this.iconSearchQuery.trim()) {
+      icons = RPGAwesomeHelpers.search(this.iconSearchQuery);
+    } else {
+      icons = RPGAwesomeHelpers.getByCategory(this.iconCategory);
+    }
+    
+    if (icons.length === 0) {
+      container.createDiv({ cls: 'dmt-icon-picker-empty', text: 'No icons found' });
+      return;
+    }
+    
+    // Render icon buttons
+    for (const icon of icons) {
+      const iconBtn = container.createEl('button', {
+        cls: 'dmt-icon-picker-icon' + (this.iconClass === icon.iconClass ? ' selected' : ''),
+        attr: { 
+          type: 'button',
+          title: icon.label
+        }
+      });
+      
+      // Create the icon span with the character
+      const iconSpan = iconBtn.createEl('span', { cls: 'ra' });
+      iconSpan.textContent = icon.char;
+      
+      iconBtn.onclick = () => {
+        this.iconClass = icon.iconClass;
+        // Update selection state
+        container.querySelectorAll('.dmt-icon-picker-icon').forEach(btn => btn.removeClass('selected'));
+        iconBtn.addClass('selected');
+        this.updateIconPreview();
+      };
+    }
+  }
+  
+  updateSymbolPreview() {
+    if (this.symbolPreviewEl) {
+      this.symbolPreviewEl.textContent = this.symbol || '?';
+    }
+  }
+  
+  updateIconPreview() {
+    const container = this.iconPreviewContainer;
+    if (!container) return;
+    container.empty();
+    
+    if (!this.iconClass) {
+      container.createDiv({ cls: 'dmt-icon-preview-info', text: 'Select an icon above' });
+      return;
+    }
+    
+    const iconInfo = RPGAwesomeHelpers.getInfo(this.iconClass);
+    if (!iconInfo) {
+      container.createDiv({ cls: 'dmt-icon-preview-info', text: 'Invalid icon selected' });
+      return;
+    }
+    
+    // Large preview
+    const previewBox = container.createDiv({ cls: 'dmt-icon-preview-large' });
+    const iconSpan = previewBox.createEl('span', { cls: 'ra' });
+    iconSpan.textContent = iconInfo.char;
+    
+    // Info
+    const infoBox = container.createDiv({ cls: 'dmt-icon-preview-info' });
+    infoBox.createDiv({ cls: 'dmt-icon-preview-label', text: iconInfo.label });
+    infoBox.createDiv({ cls: 'dmt-icon-preview-class', text: this.iconClass });
   }
   
   save() {
-    // Validate
-    if (!this.symbol || this.symbol.length === 0 || this.symbol.length > 8) {
-      alert('Please enter a valid symbol (1-8 characters)');
-      return;
+    // Validate based on mode
+    if (this.useIcon) {
+      if (!this.iconClass || !RPGAwesomeHelpers.isValid(this.iconClass)) {
+        alert('Please select a valid icon');
+        return;
+      }
+    } else {
+      if (!this.symbol || this.symbol.length === 0 || this.symbol.length > 8) {
+        alert('Please enter a valid symbol (1-8 characters)');
+        return;
+      }
     }
+    
     if (!this.label || this.label.trim().length === 0) {
       alert('Please enter a label');
       return;
@@ -221,13 +1156,28 @@ class ObjectEditModal extends Modal {
       const original = BUILT_IN_OBJECTS.find(o => o.id === this.existingObject.id);
       const override = {};
       
-      if (this.symbol !== original.symbol) override.symbol = this.symbol;
+      // Handle symbol/iconClass based on mode
+      if (this.useIcon) {
+        if (this.iconClass !== original.iconClass) override.iconClass = this.iconClass;
+        // Clear symbol override if switching to icon
+        if (original.symbol && !this.iconClass) override.symbol = null;
+      } else {
+        if (this.symbol !== original.symbol) override.symbol = this.symbol;
+        // Clear iconClass override if switching to symbol
+        if (original.iconClass) override.iconClass = null;
+      }
+      
       if (this.label !== original.label) override.label = this.label;
       if (this.category !== original.category) override.category = this.category;
       
       // Preserve hidden state if it exists
       if (this.plugin.settings.objectOverrides[this.existingObject.id]?.hidden) {
         override.hidden = true;
+      }
+      
+      // Preserve order if it exists
+      if (this.plugin.settings.objectOverrides[this.existingObject.id]?.order !== undefined) {
+        override.order = this.plugin.settings.objectOverrides[this.existingObject.id].order;
       }
       
       if (Object.keys(override).length > 0) {
@@ -239,12 +1189,22 @@ class ObjectEditModal extends Modal {
       // Editing existing custom object
       const idx = this.plugin.settings.customObjects.findIndex(o => o.id === this.existingObject.id);
       if (idx !== -1) {
-        this.plugin.settings.customObjects[idx] = {
+        const updated = {
           ...this.plugin.settings.customObjects[idx],
-          symbol: this.symbol,
           label: this.label.trim(),
           category: this.category
         };
+        
+        // Set symbol or iconClass based on mode
+        if (this.useIcon) {
+          updated.iconClass = this.iconClass;
+          delete updated.symbol;
+        } else {
+          updated.symbol = this.symbol;
+          delete updated.iconClass;
+        }
+        
+        this.plugin.settings.customObjects[idx] = updated;
       }
     } else {
       // Creating new custom object
@@ -254,10 +1214,16 @@ class ObjectEditModal extends Modal {
       
       const newObject = {
         id: 'custom-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9),
-        symbol: this.symbol,
         label: this.label.trim(),
         category: this.category
       };
+      
+      // Set symbol or iconClass based on mode
+      if (this.useIcon) {
+        newObject.iconClass = this.iconClass;
+      } else {
+        newObject.symbol = this.symbol;
+      }
       
       this.plugin.settings.customObjects.push(newObject);
     }
@@ -271,7 +1237,9 @@ class ObjectEditModal extends Modal {
   }
 }
 
-// Category Edit Modal
+/**
+ * Modal for creating/editing categories
+ */
 class CategoryEditModal extends Modal {
   constructor(app, plugin, existingCategory, onSave) {
     super(app);
@@ -370,7 +1338,9 @@ class CategoryEditModal extends Modal {
   }
 }
 
-// Export Modal
+/**
+ * Modal for exporting object customizations
+ */
 class ExportModal extends Modal {
   constructor(app, plugin) {
     super(app);
@@ -487,7 +1457,9 @@ class ExportModal extends Modal {
   }
 }
 
-// Import Modal
+/**
+ * Modal for importing object customizations
+ */
 class ImportModal extends Modal {
   constructor(app, plugin, onImport) {
     super(app);
@@ -503,34 +1475,45 @@ class ImportModal extends Modal {
     
     contentEl.createEl('h2', { text: 'Import Object Customizations' });
     
-    // File input
+    contentEl.createEl('p', { 
+      text: 'Select a Windrose MD object export file (.json) to import.',
+      cls: 'setting-item-description'
+    });
+    
+    // File picker
     const fileContainer = contentEl.createDiv({ cls: 'dmt-import-file-container' });
     const fileInput = fileContainer.createEl('input', {
       type: 'file',
       attr: { accept: '.json' }
     });
     
-    const previewContainer = contentEl.createDiv({ cls: 'dmt-import-preview' });
-    previewContainer.style.display = 'none';
+    // Preview area (hidden until file selected)
+    const previewArea = contentEl.createDiv({ cls: 'dmt-import-preview' });
+    previewArea.style.display = 'none';
     
-    const importOptionsContainer = contentEl.createDiv({ cls: 'dmt-import-options' });
-    importOptionsContainer.style.display = 'none';
+    // Import options (hidden until file validated)
+    const optionsArea = contentEl.createDiv({ cls: 'dmt-import-options' });
+    optionsArea.style.display = 'none';
     
-    let importMode = 'merge'; // 'merge' or 'replace'
+    let mergeMode = 'merge'; // 'merge' or 'replace'
     
     fileInput.addEventListener('change', async (e) => {
-      const file = e.target.files?.[0];
+      const file = e.target.files[0];
       if (!file) return;
       
       try {
         const text = await file.text();
         const data = JSON.parse(text);
         
-        // Validate it's our export format
+        // Validate it's a Windrose export
         if (!data.windroseMD_objectExport) {
-          previewContainer.innerHTML = '<p class="dmt-import-error">Invalid file: Not a Windrose MD object export.</p>';
-          previewContainer.style.display = 'block';
-          importOptionsContainer.style.display = 'none';
+          previewArea.empty();
+          previewArea.createEl('p', { 
+            text: 'This file is not a valid Windrose MD object export.',
+            cls: 'dmt-import-error'
+          });
+          previewArea.style.display = 'block';
+          optionsArea.style.display = 'none';
           this.importData = null;
           return;
         }
@@ -538,97 +1521,120 @@ class ImportModal extends Modal {
         this.importData = data;
         
         // Show preview
-        const counts = [];
-        if (data.objectOverrides) counts.push(\`\${Object.keys(data.objectOverrides).length} built-in modification(s)\`);
-        if (data.customObjects) counts.push(\`\${data.customObjects.length} custom object(s)\`);
-        if (data.customCategories) counts.push(\`\${data.customCategories.length} custom category(ies)\`);
+        previewArea.empty();
+        previewArea.createEl('p', { text: 'Valid Windrose MD export file' });
+        if (data.exportedAt) {
+          previewArea.createEl('p', { 
+            text: \`Exported: \${new Date(data.exportedAt).toLocaleString()}\`,
+            cls: 'dmt-import-date'
+          });
+        }
         
-        previewContainer.innerHTML = \`
-          <p><strong>Found:</strong> \${counts.join(', ')}</p>
-          <p class="dmt-import-date">Exported: \${new Date(data.exportedAt).toLocaleString()}</p>
-        \`;
-        previewContainer.style.display = 'block';
-        importOptionsContainer.style.display = 'block';
+        const overrideCount = data.objectOverrides ? Object.keys(data.objectOverrides).length : 0;
+        const customObjCount = data.customObjects?.length || 0;
+        const customCatCount = data.customCategories?.length || 0;
+        
+        if (overrideCount > 0) {
+          previewArea.createEl('p', { text: \`â€¢ \${overrideCount} built-in modification(s)\` });
+        }
+        if (customObjCount > 0) {
+          previewArea.createEl('p', { text: \`â€¢ \${customObjCount} custom object(s)\` });
+        }
+        if (customCatCount > 0) {
+          previewArea.createEl('p', { text: \`â€¢ \${customCatCount} custom category(ies)\` });
+        }
+        
+        previewArea.style.display = 'block';
+        
+        // Show import options
+        optionsArea.empty();
+        new Setting(optionsArea)
+          .setName('Import Mode')
+          .setDesc('How to handle existing customizations')
+          .addDropdown(dropdown => dropdown
+            .addOption('merge', 'Merge (keep existing, add new)')
+            .addOption('replace', 'Replace (remove existing first)')
+            .setValue(mergeMode)
+            .onChange(v => { mergeMode = v; }));
+        
+        optionsArea.style.display = 'block';
         
       } catch (err) {
-        previewContainer.innerHTML = \`<p class="dmt-import-error">Error reading file: \${err.message}</p>\`;
-        previewContainer.style.display = 'block';
-        importOptionsContainer.style.display = 'none';
+        previewArea.empty();
+        previewArea.createEl('p', { 
+          text: \`Error reading file: \${err.message}\`,
+          cls: 'dmt-import-error'
+        });
+        previewArea.style.display = 'block';
+        optionsArea.style.display = 'none';
         this.importData = null;
       }
     });
     
-    // Import mode selection
-    new Setting(importOptionsContainer)
-      .setName('Import Mode')
-      .setDesc('How to handle existing customizations')
-      .addDropdown(dropdown => dropdown
-        .addOption('merge', 'Merge (update matches, keep others)')
-        .addOption('replace', 'Replace (remove all existing first)')
-        .setValue(importMode)
-        .onChange(v => { importMode = v; }));
+    // Buttons
+    const buttonContainer = contentEl.createDiv({ cls: 'dmt-modal-buttons' });
     
-    // Import button
-    new Setting(importOptionsContainer)
-      .addButton(btn => btn
-        .setButtonText('Import')
-        .setCta()
-        .onClick(async () => {
-          if (!this.importData) return;
-          
-          const data = this.importData;
-          
-          if (importMode === 'replace') {
-            // Clear existing
-            this.plugin.settings.objectOverrides = {};
-            this.plugin.settings.customObjects = [];
-            this.plugin.settings.customCategories = [];
+    const cancelBtn = buttonContainer.createEl('button', { text: 'Cancel' });
+    cancelBtn.onclick = () => this.close();
+    
+    const importBtn = buttonContainer.createEl('button', { text: 'Import', cls: 'mod-cta' });
+    importBtn.onclick = async () => {
+      if (!this.importData) {
+        alert('Please select a valid export file first.');
+        return;
+      }
+      
+      const data = this.importData;
+      
+      if (mergeMode === 'replace') {
+        // Clear existing
+        this.plugin.settings.objectOverrides = {};
+        this.plugin.settings.customObjects = [];
+        this.plugin.settings.customCategories = [];
+      }
+      
+      // Import overrides
+      if (data.objectOverrides) {
+        if (!this.plugin.settings.objectOverrides) {
+          this.plugin.settings.objectOverrides = {};
+        }
+        Object.assign(this.plugin.settings.objectOverrides, data.objectOverrides);
+      }
+      
+      // Import custom objects (avoid duplicates by ID)
+      if (data.customObjects) {
+        if (!this.plugin.settings.customObjects) {
+          this.plugin.settings.customObjects = [];
+        }
+        for (const obj of data.customObjects) {
+          const existingIdx = this.plugin.settings.customObjects.findIndex(o => o.id === obj.id);
+          if (existingIdx !== -1) {
+            this.plugin.settings.customObjects[existingIdx] = obj;
+          } else {
+            this.plugin.settings.customObjects.push(obj);
           }
-          
-          // Import overrides
-          if (data.objectOverrides) {
-            if (!this.plugin.settings.objectOverrides) {
-              this.plugin.settings.objectOverrides = {};
-            }
-            for (const [id, override] of Object.entries(data.objectOverrides)) {
-              this.plugin.settings.objectOverrides[id] = override;
-            }
+        }
+      }
+      
+      // Import custom categories (avoid duplicates by ID)
+      if (data.customCategories) {
+        if (!this.plugin.settings.customCategories) {
+          this.plugin.settings.customCategories = [];
+        }
+        for (const cat of data.customCategories) {
+          const existingIdx = this.plugin.settings.customCategories.findIndex(c => c.id === cat.id);
+          if (existingIdx !== -1) {
+            this.plugin.settings.customCategories[existingIdx] = cat;
+          } else {
+            this.plugin.settings.customCategories.push(cat);
           }
-          
-          // Import custom categories (merge by id)
-          if (data.customCategories) {
-            if (!this.plugin.settings.customCategories) {
-              this.plugin.settings.customCategories = [];
-            }
-            for (const cat of data.customCategories) {
-              const existingIdx = this.plugin.settings.customCategories.findIndex(c => c.id === cat.id);
-              if (existingIdx !== -1) {
-                this.plugin.settings.customCategories[existingIdx] = cat;
-              } else {
-                this.plugin.settings.customCategories.push(cat);
-              }
-            }
-          }
-          
-          // Import custom objects (merge by id)
-          if (data.customObjects) {
-            if (!this.plugin.settings.customObjects) {
-              this.plugin.settings.customObjects = [];
-            }
-            for (const obj of data.customObjects) {
-              const existingIdx = this.plugin.settings.customObjects.findIndex(o => o.id === obj.id);
-              if (existingIdx !== -1) {
-                this.plugin.settings.customObjects[existingIdx] = obj;
-              } else {
-                this.plugin.settings.customObjects.push(obj);
-              }
-            }
-          }
-          
-          await this.plugin.saveSettings();
-          this.onImport();
-          this.close();
-        }));
+        }
+      }
+      
+      await this.plugin.saveSettings();
+      this.onImport();
+      this.close();
+    };
   }
   
   onClose() {
@@ -636,16 +1642,22 @@ class ImportModal extends Modal {
   }
 }
 
+// =============================================================================
+// MAIN PLUGIN CLASS
+// =============================================================================
+
 class WindroseMDSettingsPlugin extends Plugin {
   async onload() {
     await this.loadSettings();
     this.addSettingTab(new WindroseMDSettingsTab(this.app, this));
   }
 
+  onunload() {}
+
   async loadSettings() {
     try {
       const data = await this.loadData();
-      this.settings = Object.assign({}, {
+      this.settings = Object.assign({
         version: '{{PLUGIN_VERSION}}',
         hexOrientation: '{{DEFAULT_HEX_ORIENTATION}}',
         gridLineColor: '{{DEFAULT_GRID_LINE_COLOR}}',
@@ -654,16 +1666,22 @@ class WindroseMDSettingsPlugin extends Plugin {
         coordinateKeyColor: '{{DEFAULT_COORDINATE_KEY_COLOR}}',
         coordinateTextColor: '{{DEFAULT_COORDINATE_TEXT_COLOR}}',
         coordinateTextShadow: '{{DEFAULT_COORDINATE_TEXT_SHADOW}}',
-        coordinateKeyMode: 'hold', // 'hold' or 'toggle'
+        coordinateKeyMode: 'hold',
         expandedByDefault: false,
+        // Distance measurement settings
+        distancePerCellGrid: 5,
+        distancePerCellHex: 6,
+        distanceUnitGrid: 'ft',
+        distanceUnitHex: 'mi',
+        gridDiagonalRule: 'alternating',
+        distanceDisplayFormat: 'both',
         // Object customization
-        objectOverrides: {},    // { [builtInId]: { label?, symbol?, category?, hidden? } }
-        customObjects: [],      // [{ id, symbol, label, category }]
-        customCategories: []    // [{ id, label, order }]
+        objectOverrides: {},
+        customObjects: [],
+        customCategories: []
       }, data || {});
     } catch (error) {
       console.warn('[DMT Settings] Error loading settings, using defaults:', error);
-      // Use defaults if loading fails
       this.settings = {
         version: '{{PLUGIN_VERSION}}',
         hexOrientation: '{{DEFAULT_HEX_ORIENTATION}}',
@@ -673,9 +1691,15 @@ class WindroseMDSettingsPlugin extends Plugin {
         coordinateKeyColor: '{{DEFAULT_COORDINATE_KEY_COLOR}}',
         coordinateTextColor: '{{DEFAULT_COORDINATE_TEXT_COLOR}}',
         coordinateTextShadow: '{{DEFAULT_COORDINATE_TEXT_SHADOW}}',
-        coordinateKeyMode: 'hold', // 'hold' or 'toggle'
+        coordinateKeyMode: 'hold',
         expandedByDefault: false,
-        // Object customization
+        // Distance measurement settings
+        distancePerCellGrid: 5,
+        distancePerCellHex: 6,
+        distanceUnitGrid: 'ft',
+        distanceUnitHex: 'mi',
+        gridDiagonalRule: 'alternating',
+        distanceDisplayFormat: 'both',
         objectOverrides: {},
         customObjects: [],
         customCategories: []
@@ -688,21 +1712,41 @@ class WindroseMDSettingsPlugin extends Plugin {
   }
 }
 
+// =============================================================================
+// SETTINGS TAB CLASS
+// =============================================================================
+
 class WindroseMDSettingsTab extends PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
     this.plugin = plugin;
-    this.settingsChanged = false; // Track if any settings were modified
+    this.settingsChanged = false;
     this.styleEl = null;
+    this.objectFilter = '';
   }
 
+  // ---------------------------------------------------------------------------
+  // Main display method - orchestrates section rendering
+  // ---------------------------------------------------------------------------
+  
   display() {
     const { containerEl } = this;
     containerEl.empty();
     
-    // Inject styles for object settings UI
     this.injectStyles();
+    
+    this.renderHexSettings(containerEl);
+    this.renderColorSettings(containerEl);
+    this.renderMapBehaviorSettings(containerEl);
+    this.renderDistanceMeasurementSettings(containerEl);
+    this.renderObjectTypesSection(containerEl);
+  }
 
+  // ---------------------------------------------------------------------------
+  // Section: Hex Map Settings
+  // ---------------------------------------------------------------------------
+  
+  renderHexSettings(containerEl) {
     new Setting(containerEl).setName("Hex Map Settings").setHeading();
 
     // Hex Orientation
@@ -794,8 +1838,13 @@ class WindroseMDSettingsTab extends PluginSettingTab {
           await this.plugin.saveSettings();
           this.display();
         }));
+  }
 
-    
+  // ---------------------------------------------------------------------------
+  // Section: Color Settings
+  // ---------------------------------------------------------------------------
+  
+  renderColorSettings(containerEl) {
     new Setting(containerEl).setName("Color Settings").setHeading();
     containerEl.createEl('p', { 
       text: 'These settings control default colors and behavior for all WindroseMD maps in this vault.',
@@ -898,7 +1947,7 @@ class WindroseMDSettingsTab extends PluginSettingTab {
     // Coordinate Key Color
     new Setting(containerEl)
       .setName('Coordinate Key Color')
-      .setDesc('Color for hex coordinate labels (hex format: #RRGGBB)')
+      .setDesc('Background color for coordinate key indicator (hex format: #RRGGBB)')
       .addColorPicker(color => color
         .setValue(this.plugin.settings.coordinateKeyColor)
         .onChange(async (value) => {
@@ -925,14 +1974,19 @@ class WindroseMDSettingsTab extends PluginSettingTab {
           await this.plugin.saveSettings();
           this.display();
         }));
+  }
 
+  // ---------------------------------------------------------------------------
+  // Section: Map Behavior
+  // ---------------------------------------------------------------------------
+  
+  renderMapBehaviorSettings(containerEl) {
+    new Setting(containerEl).setName("Map Behavior").setHeading();
 
-    new Setting(containerEl).setName("UI Preferences").setHeading();
-    
     // Expanded by Default
     new Setting(containerEl)
-      .setName('Expanded by Default')
-      .setDesc('Start maps in expanded (full-width) mode')
+      .setName('Start Maps Expanded')
+      .setDesc('When enabled, maps will start in expanded (fullscreen) mode by default')
       .addToggle(toggle => toggle
         .setValue(this.plugin.settings.expandedByDefault)
         .onChange(async (value) => {
@@ -940,10 +1994,105 @@ class WindroseMDSettingsTab extends PluginSettingTab {
           this.settingsChanged = true;
           await this.plugin.saveSettings();
         }));
-
-    // Object Types Section
-    this.renderObjectTypesSection(containerEl);
   }
+
+  // ---------------------------------------------------------------------------
+  // Section: Distance Measurement
+  // ---------------------------------------------------------------------------
+  
+  renderDistanceMeasurementSettings(containerEl) {
+    new Setting(containerEl).setName("Distance Measurement").setHeading();
+
+    // Grid: Distance per cell
+    new Setting(containerEl)
+      .setName('Grid Map: Distance per Cell')
+      .setDesc('Distance each cell represents on grid maps (default: 5 ft for D&D)')
+      .addText(text => text
+        .setPlaceholder('5')
+        .setValue(String(this.plugin.settings.distancePerCellGrid))
+        .onChange(async (value) => {
+          const num = parseFloat(value);
+          if (!isNaN(num) && num > 0) {
+            this.plugin.settings.distancePerCellGrid = num;
+            this.settingsChanged = true;
+            await this.plugin.saveSettings();
+          }
+        }))
+      .addDropdown(dropdown => dropdown
+        .addOption('ft', 'feet')
+        .addOption('m', 'meters')
+        .addOption('mi', 'miles')
+        .addOption('km', 'kilometers')
+        .addOption('yd', 'yards')
+        .setValue(this.plugin.settings.distanceUnitGrid)
+        .onChange(async (value) => {
+          this.plugin.settings.distanceUnitGrid = value;
+          this.settingsChanged = true;
+          await this.plugin.saveSettings();
+        }));
+
+    // Hex: Distance per cell
+    new Setting(containerEl)
+      .setName('Hex Map: Distance per Hex')
+      .setDesc('Distance each hex represents on hex maps (default: 6 miles for world maps)')
+      .addText(text => text
+        .setPlaceholder('6')
+        .setValue(String(this.plugin.settings.distancePerCellHex))
+        .onChange(async (value) => {
+          const num = parseFloat(value);
+          if (!isNaN(num) && num > 0) {
+            this.plugin.settings.distancePerCellHex = num;
+            this.settingsChanged = true;
+            await this.plugin.saveSettings();
+          }
+        }))
+      .addDropdown(dropdown => dropdown
+        .addOption('mi', 'miles')
+        .addOption('km', 'kilometers')
+        .addOption('ft', 'feet')
+        .addOption('m', 'meters')
+        .addOption('yd', 'yards')
+        .setValue(this.plugin.settings.distanceUnitHex)
+        .onChange(async (value) => {
+          this.plugin.settings.distanceUnitHex = value;
+          this.settingsChanged = true;
+          await this.plugin.saveSettings();
+        }));
+
+    // Grid diagonal rule
+    new Setting(containerEl)
+      .setName('Grid Diagonal Movement')
+      .setDesc('How to calculate diagonal distance on grid maps')
+      .addDropdown(dropdown => dropdown
+        .addOption('alternating', 'Alternating (5-10-5-10, D&D 5e)')
+        .addOption('equal', 'Equal (Chebyshev, all moves = 1)')
+        .addOption('euclidean', 'True Distance (Euclidean)')
+        .setValue(this.plugin.settings.gridDiagonalRule)
+        .onChange(async (value) => {
+          this.plugin.settings.gridDiagonalRule = value;
+          this.settingsChanged = true;
+          await this.plugin.saveSettings();
+        }));
+
+    // Display format
+    new Setting(containerEl)
+      .setName('Distance Display Format')
+      .setDesc('How to display measured distances')
+      .addDropdown(dropdown => dropdown
+        .addOption('both', 'Cells and Units (e.g., "3 cells (15 ft)")')
+        .addOption('cells', 'Cells Only (e.g., "3 cells")')
+        .addOption('units', 'Units Only (e.g., "15 ft")')
+        .setValue(this.plugin.settings.distanceDisplayFormat)
+        .onChange(async (value) => {
+          this.plugin.settings.distanceDisplayFormat = value;
+          this.settingsChanged = true;
+          await this.plugin.saveSettings();
+        }));
+  }
+
+  // ---------------------------------------------------------------------------
+  // Section: Object Types
+  // ---------------------------------------------------------------------------
   
   renderObjectTypesSection(containerEl) {
     new Setting(containerEl).setName("Object Types").setHeading();
@@ -1000,10 +2149,10 @@ class WindroseMDSettingsTab extends PluginSettingTab {
           new ExportModal(this.app, this.plugin).open();
         }));
     
-    // Get resolved objects and categories
-    const allCategories = this.getResolvedCategories();
-    const allObjects = this.getResolvedObjectTypes();
-    const hiddenObjects = this.getHiddenObjects();
+    // Get resolved data using helpers
+    const allCategories = ObjectHelpers.getCategories(this.plugin.settings);
+    const allObjects = ObjectHelpers.getResolved(this.plugin.settings);
+    const hiddenObjects = ObjectHelpers.getHidden(this.plugin.settings);
     
     // Check if there are any customizations
     const hasOverrides = Object.keys(this.plugin.settings.objectOverrides || {}).length > 0;
@@ -1054,7 +2203,7 @@ class WindroseMDSettingsTab extends PluginSettingTab {
         cls: 'dmt-settings-search-clear',
         attr: { 'aria-label': 'Clear filter', title: 'Clear filter' }
       });
-      this.setIcon(clearBtn, 'x');
+      IconHelpers.set(clearBtn, 'x');
       clearBtn.onclick = () => {
         this.objectFilter = '';
         searchInput.value = '';
@@ -1066,6 +2215,10 @@ class WindroseMDSettingsTab extends PluginSettingTab {
     const objectListContainer = containerEl.createDiv({ cls: 'dmt-settings-object-list-container' });
     this.renderObjectList(objectListContainer, allCategories, allObjects, hiddenObjects);
   }
+
+  // ---------------------------------------------------------------------------
+  // Object list rendering (called by renderObjectTypesSection)
+  // ---------------------------------------------------------------------------
   
   renderObjectList(container, allCategories, allObjects, hiddenObjects) {
     container.empty();
@@ -1077,13 +2230,15 @@ class WindroseMDSettingsTab extends PluginSettingTab {
     const filteredObjects = filter
       ? allObjects.filter(obj => 
           obj.label.toLowerCase().includes(filter) || 
-          obj.symbol.toLowerCase().includes(filter))
+          (obj.symbol && obj.symbol.toLowerCase().includes(filter)) ||
+          (obj.iconClass && obj.iconClass.toLowerCase().includes(filter)))
       : allObjects;
     
     const filteredHidden = filter
       ? hiddenObjects.filter(obj =>
           obj.label.toLowerCase().includes(filter) ||
-          obj.symbol.toLowerCase().includes(filter))
+          (obj.symbol && obj.symbol.toLowerCase().includes(filter)) ||
+          (obj.iconClass && obj.iconClass.toLowerCase().includes(filter)))
       : hiddenObjects;
     
     // Show "no results" message if filter returns nothing
@@ -1101,7 +2256,6 @@ class WindroseMDSettingsTab extends PluginSettingTab {
       
       let categoryObjects = filteredObjects.filter(obj => obj.category === category.id);
       if (categoryObjects.length === 0 && category.isBuiltIn) continue;
-      // Also skip custom categories with no matching objects when filtering
       if (categoryObjects.length === 0 && filter) continue;
       
       // Sort by order
@@ -1119,7 +2273,7 @@ class WindroseMDSettingsTab extends PluginSettingTab {
         const categoryActions = categoryHeader.createDiv({ cls: 'dmt-settings-category-actions' });
         
         const editBtn = categoryActions.createEl('button', { cls: 'dmt-settings-icon-btn', attr: { 'aria-label': 'Edit category', title: 'Edit category' } });
-        this.setIcon(editBtn, 'pencil');
+        IconHelpers.set(editBtn, 'pencil');
         editBtn.onclick = () => {
           new CategoryEditModal(this.app, this.plugin, category, async () => {
             this.settingsChanged = true;
@@ -1131,7 +2285,7 @@ class WindroseMDSettingsTab extends PluginSettingTab {
         // Get unfiltered count for delete validation
         const allCategoryObjects = allObjects.filter(obj => obj.category === category.id);
         const deleteBtn = categoryActions.createEl('button', { cls: 'dmt-settings-icon-btn dmt-settings-icon-btn-danger', attr: { 'aria-label': 'Delete category', title: 'Delete category' } });
-        this.setIcon(deleteBtn, 'trash-2');
+        IconHelpers.set(deleteBtn, 'trash-2');
         deleteBtn.onclick = async () => {
           if (allCategoryObjects.length > 0) {
             alert(\`Cannot delete "\${category.label}" - it contains \${allCategoryObjects.length} object(s). Move or delete them first.\`);
@@ -1152,87 +2306,7 @@ class WindroseMDSettingsTab extends PluginSettingTab {
       
       // Only enable drag/drop when not filtering
       if (!filter) {
-        objectList.addEventListener('dragover', (e) => {
-          e.preventDefault();
-          e.dataTransfer.dropEffect = 'move';
-          
-          const dragging = objectList.querySelector('.dmt-dragging');
-          if (!dragging) {
-
-            return;
-          }
-          
-          const afterElement = this.getDragAfterElement(objectList, e.clientY);
-          if (afterElement == null) {
-            objectList.appendChild(dragging);
-          } else {
-            objectList.insertBefore(dragging, afterElement);
-          }
-        });
-        
-        objectList.addEventListener('dragenter', (e) => {
-          e.preventDefault();
-        });
-        
-        objectList.addEventListener('drop', async (e) => {
-          e.preventDefault();
-          
-          // Get new order from DOM positions
-          const rows = [...objectList.querySelectorAll('.dmt-settings-object-row')];
-          
-          // Get default ID order for this category (from BUILT_IN_OBJECTS, excluding hidden)
-          const { objectOverrides = {} } = this.plugin.settings;
-          const categoryBuiltIns = BUILT_IN_OBJECTS
-            .filter(o => o.category === category.id && !objectOverrides[o.id]?.hidden);
-          const defaultIdOrder = categoryBuiltIns.map(o => o.id);
-          
-          
-          // Apply new orders to settings - only save if position differs from default
-          rows.forEach((row, actualPosition) => {
-            const id = row.dataset.objectId;
-            const isBuiltIn = row.dataset.isBuiltIn === 'true';
-            const newOrder = actualPosition * 10;
-            
-            if (isBuiltIn) {
-              // Find default position within this category
-              const defaultPosition = defaultIdOrder.indexOf(id);
-              
-              if (actualPosition === defaultPosition) {
-                // In default position - remove order override if present
-                if (this.plugin.settings.objectOverrides[id]) {
-                  delete this.plugin.settings.objectOverrides[id].order;
-                  // Clean up empty override object
-                  if (Object.keys(this.plugin.settings.objectOverrides[id]).length === 0) {
-                    delete this.plugin.settings.objectOverrides[id];
-                  }
-                }
-              } else {
-                // Not in default position - save order override
-                if (!this.plugin.settings.objectOverrides[id]) {
-                  this.plugin.settings.objectOverrides[id] = {};
-                }
-                this.plugin.settings.objectOverrides[id].order = newOrder;
-              }
-              
-              // Update modified indicator in DOM immediately
-              const labelEl = row.querySelector('.dmt-settings-object-label');
-              if (labelEl) {
-                const override = this.plugin.settings.objectOverrides[id];
-                const hasAnyOverride = override && Object.keys(override).length > 0;
-                labelEl.classList.toggle('dmt-settings-modified', !!hasAnyOverride);
-              }
-            } else {
-              // Custom objects - always save order
-              const customObj = this.plugin.settings.customObjects.find(o => o.id === id);
-              if (customObj) {
-                customObj.order = newOrder;
-              }
-            }
-          });
-          
-          this.settingsChanged = true;
-          await this.plugin.saveSettings();
-        });
+        this.setupDragDropForList(objectList, category);
       }
       
       for (const obj of categoryObjects) {
@@ -1264,6 +2338,89 @@ class WindroseMDSettingsTab extends PluginSettingTab {
       }
     }
   }
+
+  // ---------------------------------------------------------------------------
+  // Drag/drop setup for object lists
+  // ---------------------------------------------------------------------------
+  
+  setupDragDropForList(objectList, category) {
+    objectList.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      
+      const dragging = objectList.querySelector('.dmt-dragging');
+      if (!dragging) return;
+      
+      const afterElement = DragHelpers.getAfterElement(objectList, e.clientY);
+      if (afterElement == null) {
+        objectList.appendChild(dragging);
+      } else {
+        objectList.insertBefore(dragging, afterElement);
+      }
+    });
+    
+    objectList.addEventListener('dragenter', (e) => {
+      e.preventDefault();
+    });
+    
+    objectList.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      
+      // Get new order from DOM positions
+      const rows = [...objectList.querySelectorAll('.dmt-settings-object-row')];
+      
+      // Get default ID order for this category
+      const defaultIdOrder = ObjectHelpers.getDefaultIdOrder(category.id, this.plugin.settings);
+      
+      // Apply new orders to settings
+      rows.forEach((row, actualPosition) => {
+        const id = row.dataset.objectId;
+        const isBuiltIn = row.dataset.isBuiltIn === 'true';
+        const newOrder = actualPosition * 10;
+        
+        if (isBuiltIn) {
+          const defaultPosition = defaultIdOrder.indexOf(id);
+          
+          if (actualPosition === defaultPosition) {
+            // In default position - remove order override if present
+            if (this.plugin.settings.objectOverrides[id]) {
+              delete this.plugin.settings.objectOverrides[id].order;
+              if (Object.keys(this.plugin.settings.objectOverrides[id]).length === 0) {
+                delete this.plugin.settings.objectOverrides[id];
+              }
+            }
+          } else {
+            // Not in default position - save order override
+            if (!this.plugin.settings.objectOverrides[id]) {
+              this.plugin.settings.objectOverrides[id] = {};
+            }
+            this.plugin.settings.objectOverrides[id].order = newOrder;
+          }
+          
+          // Update modified indicator in DOM immediately
+          const labelEl = row.querySelector('.dmt-settings-object-label');
+          if (labelEl) {
+            const override = this.plugin.settings.objectOverrides[id];
+            const hasAnyOverride = override && Object.keys(override).length > 0;
+            labelEl.classList.toggle('dmt-settings-modified', !!hasAnyOverride);
+          }
+        } else {
+          // Custom objects - always save order
+          const customObj = this.plugin.settings.customObjects.find(o => o.id === id);
+          if (customObj) {
+            customObj.order = newOrder;
+          }
+        }
+      });
+      
+      this.settingsChanged = true;
+      await this.plugin.saveSettings();
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Single object row rendering
+  // ---------------------------------------------------------------------------
   
   renderObjectRow(container, obj, isHiddenSection = false, canDrag = false) {
     const row = container.createDiv({ cls: 'dmt-settings-object-row' });
@@ -1271,41 +2428,41 @@ class WindroseMDSettingsTab extends PluginSettingTab {
     // Data attributes for drag/drop
     row.dataset.objectId = obj.id;
     row.dataset.isBuiltIn = String(!!obj.isBuiltIn);
-    row.dataset.originalOrder = String(obj.order ?? 0);  // Store original order for comparison
+    row.dataset.originalOrder = String(obj.order ?? 0);
     
     // Drag handle (only if draggable and not in hidden section)
     if (canDrag && !isHiddenSection) {
-      // Use setAttribute for better cross-platform support
       row.setAttribute('draggable', 'true');
       row.classList.add('dmt-draggable');
       
       const dragHandle = row.createSpan({ cls: 'dmt-drag-handle' });
-      this.setIcon(dragHandle, 'grip-vertical');
+      IconHelpers.set(dragHandle, 'grip-vertical');
       
-      // Prevent text selection interfering with drag
       row.style.userSelect = 'none';
       row.style.webkitUserSelect = 'none';
       
       row.addEventListener('dragstart', (e) => {
-
-        // Required: set data for the drag operation
         e.dataTransfer.setData('text/plain', obj.id);
         e.dataTransfer.effectAllowed = 'move';
-        
-        // Use setTimeout to allow the drag image to be captured first
         setTimeout(() => {
           row.classList.add('dmt-dragging');
         }, 0);
       });
       
       row.addEventListener('dragend', (e) => {
-
         row.classList.remove('dmt-dragging');
       });
     }
     
-    // Symbol
-    row.createSpan({ text: obj.symbol, cls: 'dmt-settings-object-symbol' });
+    // Symbol or Icon
+    const symbolEl = row.createSpan({ cls: 'dmt-settings-object-symbol' });
+    if (obj.iconClass && RPGAwesomeHelpers.isValid(obj.iconClass)) {
+      const iconInfo = RPGAwesomeHelpers.getInfo(obj.iconClass);
+      const iconSpan = symbolEl.createEl('span', { cls: 'ra' });
+      iconSpan.textContent = iconInfo.char;
+    } else {
+      symbolEl.textContent = obj.symbol || '?';
+    }
     
     // Label
     const labelEl = row.createSpan({ text: obj.label, cls: 'dmt-settings-object-label' });
@@ -1318,7 +2475,7 @@ class WindroseMDSettingsTab extends PluginSettingTab {
     
     // Edit button
     const editBtn = actions.createEl('button', { cls: 'dmt-settings-icon-btn', attr: { 'aria-label': 'Edit', title: 'Edit object' } });
-    this.setIcon(editBtn, 'pencil');
+    IconHelpers.set(editBtn, 'pencil');
     editBtn.onclick = () => {
       new ObjectEditModal(this.app, this.plugin, obj, async () => {
         this.settingsChanged = true;
@@ -1331,7 +2488,7 @@ class WindroseMDSettingsTab extends PluginSettingTab {
       if (isHiddenSection) {
         // Unhide button
         const unhideBtn = actions.createEl('button', { cls: 'dmt-settings-icon-btn', attr: { 'aria-label': 'Unhide', title: 'Show in palette' } });
-        this.setIcon(unhideBtn, 'eye');
+        IconHelpers.set(unhideBtn, 'eye');
         unhideBtn.onclick = async () => {
           if (this.plugin.settings.objectOverrides[obj.id]) {
             delete this.plugin.settings.objectOverrides[obj.id].hidden;
@@ -1346,7 +2503,7 @@ class WindroseMDSettingsTab extends PluginSettingTab {
       } else {
         // Hide button
         const hideBtn = actions.createEl('button', { cls: 'dmt-settings-icon-btn', attr: { 'aria-label': 'Hide', title: 'Hide from palette' } });
-        this.setIcon(hideBtn, 'eye-off');
+        IconHelpers.set(hideBtn, 'eye-off');
         hideBtn.onclick = async () => {
           if (!this.plugin.settings.objectOverrides[obj.id]) {
             this.plugin.settings.objectOverrides[obj.id] = {};
@@ -1361,7 +2518,7 @@ class WindroseMDSettingsTab extends PluginSettingTab {
       // Reset button (only for modified)
       if (obj.isModified) {
         const resetBtn = actions.createEl('button', { cls: 'dmt-settings-icon-btn', attr: { 'aria-label': 'Reset to default', title: 'Reset to default' } });
-        this.setIcon(resetBtn, 'rotate-ccw');
+        IconHelpers.set(resetBtn, 'rotate-ccw');
         resetBtn.onclick = async () => {
           if (confirm(\`Reset "\${obj.label}" to its default symbol and name?\`)) {
             delete this.plugin.settings.objectOverrides[obj.id];
@@ -1374,7 +2531,7 @@ class WindroseMDSettingsTab extends PluginSettingTab {
     } else {
       // Delete button for custom objects
       const deleteBtn = actions.createEl('button', { cls: 'dmt-settings-icon-btn dmt-settings-icon-btn-danger', attr: { 'aria-label': 'Delete', title: 'Delete object' } });
-      this.setIcon(deleteBtn, 'trash-2');
+      IconHelpers.set(deleteBtn, 'trash-2');
       deleteBtn.onclick = async () => {
         if (confirm(\`Delete "\${obj.label}"? Maps using this object will show a "?" placeholder.\`)) {
           this.plugin.settings.customObjects = this.plugin.settings.customObjects.filter(o => o.id !== obj.id);
@@ -1385,414 +2542,18 @@ class WindroseMDSettingsTab extends PluginSettingTab {
       };
     }
   }
-  
-  setIcon(el, iconId) {
-    // Use Obsidian's setIcon if available, otherwise fallback
-    if (typeof setIcon !== 'undefined') {
-      setIcon(el, iconId);
-    } else if (this.app.plugins) {
-      // Fallback: create a simple text representation
-      const icons = {
-        'pencil': '✎',
-        'eye': '👁',
-        'eye-off': '🚫',
-        'rotate-ccw': '↺',
-        'trash-2': '🗑',
-        'grip-vertical': '⋮⋮',
-        'x': '✕'
-      };
-      el.textContent = icons[iconId] || '?';
-    }
-  }
-  
-  // Helper for drag and drop - finds element to insert before
-  getDragAfterElement(container, y) {
-    const draggableElements = [...container.querySelectorAll('.dmt-settings-object-row:not(.dmt-dragging)')];
-    
-    return draggableElements.reduce((closest, child) => {
-      const box = child.getBoundingClientRect();
-      const offset = y - box.top - box.height / 2;
-      if (offset < 0 && offset > closest.offset) {
-        return { offset: offset, element: child };
-      } else {
-        return closest;
-      }
-    }, { offset: Number.NEGATIVE_INFINITY }).element;
-  }
-  
-  getResolvedObjectTypes() {
-    const { objectOverrides = {}, customObjects = [] } = this.plugin.settings;
-    
-    const resolvedBuiltIns = BUILT_IN_OBJECTS
-      .filter(obj => !objectOverrides[obj.id]?.hidden)
-      .map((obj, index) => {
-        const override = objectOverrides[obj.id];
-        const defaultOrder = index * 10;
-        if (override) {
-          const { hidden, ...overrideProps } = override;
-          return { ...obj, ...overrideProps, order: override.order ?? defaultOrder, isBuiltIn: true, isModified: true };
-        }
-        return { ...obj, order: defaultOrder, isBuiltIn: true, isModified: false };
-      });
-    
-    const resolvedCustom = customObjects.map((obj, index) => ({
-      ...obj,
-      order: obj.order ?? (1000 + index * 10),
-      isCustom: true,
-      isBuiltIn: false
-    }));
-    
-    return [...resolvedBuiltIns, ...resolvedCustom];
-  }
-  
-  getResolvedCategories() {
-    const { customCategories = [] } = this.plugin.settings;
-    
-    const resolvedBuiltIns = BUILT_IN_CATEGORIES.map(c => ({
-      ...c,
-      isBuiltIn: true,
-      order: CATEGORY_ORDER[c.id] ?? 50
-    }));
-    
-    const resolvedCustom = customCategories.map(c => ({
-      ...c,
-      isCustom: true,
-      isBuiltIn: false,
-      order: c.order ?? 100
-    }));
-    
-    return [...resolvedBuiltIns, ...resolvedCustom].sort((a, b) => (a.order ?? 50) - (b.order ?? 50));
-  }
-  
-  getHiddenObjects() {
-    const { objectOverrides = {} } = this.plugin.settings;
-    return BUILT_IN_OBJECTS
-      .filter(obj => objectOverrides[obj.id]?.hidden)
-      .map(obj => ({ ...obj, isBuiltIn: true, isHidden: true }));
-  }
+
+  // ---------------------------------------------------------------------------
+  // Styles injection
+  // ---------------------------------------------------------------------------
   
   injectStyles() {
-    // Remove existing style element if present
     if (this.styleEl) {
       this.styleEl.remove();
     }
     
-    const css = \`
-      /* Object Settings Styles */
-      
-      /* Search/Filter */
-      .dmt-settings-search-container {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        margin-bottom: 1em;
-      }
-      
-      .dmt-settings-search-input {
-        flex: 1;
-        padding: 8px 12px;
-        border: 1px solid var(--background-modifier-border);
-        border-radius: 4px;
-        background: var(--background-primary);
-        font-size: 14px;
-      }
-      
-      .dmt-settings-search-input:focus {
-        border-color: var(--interactive-accent);
-        outline: none;
-      }
-      
-      .dmt-settings-search-clear {
-        background: transparent;
-        border: none;
-        padding: 6px;
-        border-radius: 4px;
-        cursor: pointer;
-        color: var(--text-muted);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-      }
-      
-      .dmt-settings-search-clear:hover {
-        background: var(--background-modifier-hover);
-        color: var(--text-normal);
-      }
-      
-      .dmt-settings-no-results {
-        text-align: center;
-        padding: 2em;
-        color: var(--text-muted);
-        font-style: italic;
-      }
-      
-      .dmt-settings-category {
-        margin: 1em 0;
-        border: 1px solid var(--background-modifier-border);
-        border-radius: 8px;
-        overflow: hidden;
-      }
-      
-      .dmt-settings-category-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 8px 12px;
-        background: var(--background-secondary);
-        font-weight: 600;
-      }
-      
-      .dmt-settings-category-actions {
-        display: flex;
-        gap: 4px;
-      }
-      
-      .dmt-settings-object-list {
-        padding: 4px;
-      }
-      
-      .dmt-settings-object-row {
-        display: flex;
-        align-items: center;
-        padding: 6px 8px;
-        border-radius: 4px;
-        gap: 8px;
-      }
-      
-      .dmt-settings-object-row:hover {
-        background: var(--background-modifier-hover);
-      }
-      
-      /* Drag and Drop Styles */
-      .dmt-draggable {
-        cursor: grab;
-      }
-      
-      .dmt-draggable:active {
-        cursor: grabbing;
-      }
-      
-      .dmt-drag-handle {
-        color: var(--text-muted);
-        cursor: grab;
-        padding: 0 4px;
-        font-size: 1em;
-        opacity: 0.4;
-        user-select: none;
-        flex-shrink: 0;
-      }
-      
-      .dmt-settings-object-row:hover .dmt-drag-handle {
-        opacity: 1;
-      }
-      
-      .dmt-dragging {
-        opacity: 0.5;
-        background: var(--interactive-accent) !important;
-        border-radius: 4px;
-      }
-      
-      .dmt-settings-object-symbol {
-        font-family: 'Noto Emoji', 'Noto Sans Symbols 2', sans-serif;
-        font-size: 1.4em;
-        width: 32px;
-        text-align: center;
-        flex-shrink: 0;
-      }
-      
-      .dmt-settings-object-label {
-        flex: 1;
-        min-width: 0;
-      }
-      
-      .dmt-settings-object-label.dmt-settings-modified {
-        font-style: italic;
-        color: var(--text-accent);
-      }
-      
-      .dmt-settings-object-label.dmt-settings-modified::after {
-        content: ' (modified)';
-        font-size: 0.8em;
-        opacity: 0.7;
-      }
-      
-      .dmt-settings-object-actions {
-        display: flex;
-        gap: 4px;
-        flex-shrink: 0;
-      }
-      
-      .dmt-settings-icon-btn {
-        background: transparent;
-        border: none;
-        padding: 4px 6px;
-        border-radius: 4px;
-        cursor: pointer;
-        color: var(--text-muted);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-      }
-      
-      .dmt-settings-icon-btn:hover {
-        background: var(--background-modifier-hover);
-        color: var(--text-normal);
-      }
-      
-      .dmt-settings-icon-btn-danger:hover {
-        color: var(--text-error);
-      }
-      
-      .dmt-settings-hidden-section {
-        margin-top: 2em;
-        padding-top: 1em;
-        border-top: 1px solid var(--background-modifier-border);
-      }
-      
-      .dmt-settings-hidden-list {
-        margin-top: 8px;
-        opacity: 0.7;
-      }
-      
-      .dmt-settings-hidden-list .dmt-settings-object-row {
-        background: var(--background-secondary);
-      }
-      
-      /* Modal Styles */
-      .dmt-object-edit-modal,
-      .dmt-category-edit-modal {
-        padding: 0;
-      }
-      
-      .dmt-symbol-input {
-        font-family: 'Noto Emoji', 'Noto Sans Symbols 2', sans-serif;
-        font-size: 1.5em;
-        width: 80px;
-        text-align: center;
-        padding: 8px;
-      }
-      
-      .dmt-symbol-preview {
-        font-family: 'Noto Emoji', 'Noto Sans Symbols 2', sans-serif;
-        font-size: 2em;
-        width: 48px;
-        height: 48px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background: var(--background-secondary);
-        border-radius: 8px;
-        margin-left: 8px;
-      }
-      
-      .dmt-quick-symbols {
-        margin: 1em 0;
-      }
-      
-      .dmt-quick-symbols-label {
-        display: block;
-        font-size: 0.9em;
-        color: var(--text-muted);
-        margin-bottom: 8px;
-      }
-      
-      .dmt-quick-symbols-grid {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 4px;
-        max-height: 150px;
-        overflow-y: auto;
-        padding: 4px;
-        background: var(--background-secondary);
-        border-radius: 8px;
-      }
-      
-      .dmt-quick-symbol-btn {
-        font-family: 'Noto Emoji', 'Noto Sans Symbols 2', sans-serif;
-        width: 32px;
-        height: 32px;
-        font-size: 1.2em;
-        border: 1px solid var(--background-modifier-border);
-        background: var(--background-primary);
-        border-radius: 4px;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-      }
-      
-      .dmt-quick-symbol-btn:hover {
-        background: var(--background-modifier-hover);
-        border-color: var(--interactive-accent);
-      }
-      
-      .dmt-modal-buttons {
-        display: flex;
-        justify-content: flex-end;
-        gap: 8px;
-        margin-top: 1.5em;
-        padding-top: 1em;
-        border-top: 1px solid var(--background-modifier-border);
-      }
-      
-      /* Import/Export Modal Styles */
-      .dmt-export-modal,
-      .dmt-import-modal {
-        padding: 0;
-      }
-      
-      .dmt-export-empty {
-        text-align: center;
-        padding: 1em;
-        color: var(--text-muted);
-        font-style: italic;
-      }
-      
-      .dmt-import-file-container {
-        margin: 1em 0;
-      }
-      
-      .dmt-import-file-container input[type="file"] {
-        width: 100%;
-        padding: 1em;
-        border: 2px dashed var(--background-modifier-border);
-        border-radius: 8px;
-        background: var(--background-secondary);
-        cursor: pointer;
-      }
-      
-      .dmt-import-file-container input[type="file"]:hover {
-        border-color: var(--interactive-accent);
-      }
-      
-      .dmt-import-preview {
-        margin: 1em 0;
-        padding: 1em;
-        background: var(--background-secondary);
-        border-radius: 8px;
-      }
-      
-      .dmt-import-preview p {
-        margin: 0.25em 0;
-      }
-      
-      .dmt-import-date {
-        font-size: 0.85em;
-        color: var(--text-muted);
-      }
-      
-      .dmt-import-error {
-        color: var(--text-error);
-        font-weight: 500;
-      }
-      
-      .dmt-import-options {
-        margin-top: 1em;
-      }
-    \`;
-    
     this.styleEl = document.createElement('style');
-    this.styleEl.textContent = css;
+    this.styleEl.textContent = DMT_SETTINGS_STYLES;
     document.head.appendChild(this.styleEl);
   }
   
@@ -1802,7 +2563,7 @@ class WindroseMDSettingsTab extends PluginSettingTab {
       window.dispatchEvent(new CustomEvent('dmt-settings-changed', {
         detail: { timestamp: Date.now() }
       }));
-      this.settingsChanged = false; // Reset flag
+      this.settingsChanged = false;
     }
     
     // Clean up injected styles

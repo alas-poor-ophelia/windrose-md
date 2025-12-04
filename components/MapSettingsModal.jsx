@@ -30,7 +30,8 @@ function MapSettingsModal({
   currentSettings = null,  // { useGlobalSettings: bool, overrides: {...} }
   currentPreferences = null,  // { rememberPanZoom: bool, rememberSidebarState: bool, rememberExpandedState: bool }
   currentHexBounds = null,  // { maxCol: number, maxRow: number } - for hex maps only
-  currentBackgroundImage = null  // { path: string|null, lockBounds: bool, opacity: number } - for hex maps only
+  currentBackgroundImage = null,  // { path: string|null, lockBounds: bool, opacity: number } - for hex maps only
+  currentDistanceSettings = null  // { distancePerCell: number, distanceUnit: string, gridDiagonalRule: string, displayFormat: string }
 }) {
   // Get global settings for comparison/defaults
   const globalSettings = getSettings();
@@ -59,6 +60,23 @@ function MapSettingsModal({
     rememberExpandedState: currentPreferences?.rememberExpandedState ?? false
   });
   
+  // Distance measurement settings (per-map overrides)
+  const isHexMap = mapType === 'hex';
+  const defaultDistancePerCell = isHexMap 
+    ? (globalSettings.distancePerCellHex ?? 6) 
+    : (globalSettings.distancePerCellGrid ?? 5);
+  const defaultDistanceUnit = isHexMap 
+    ? (globalSettings.distanceUnitHex ?? 'mi') 
+    : (globalSettings.distanceUnitGrid ?? 'ft');
+  
+  const [distanceSettings, setDistanceSettings] = dc.useState({
+    useGlobalDistance: currentDistanceSettings?.useGlobalDistance ?? true,
+    distancePerCell: currentDistanceSettings?.distancePerCell ?? defaultDistancePerCell,
+    distanceUnit: currentDistanceSettings?.distanceUnit ?? defaultDistanceUnit,
+    gridDiagonalRule: currentDistanceSettings?.gridDiagonalRule ?? (globalSettings.gridDiagonalRule ?? 'alternating'),
+    displayFormat: currentDistanceSettings?.displayFormat ?? (globalSettings.distanceDisplayFormat ?? 'both')
+  });
+  
   const [hexBounds, setHexBounds] = dc.useState({
     maxCol: currentHexBounds?.maxCol ?? 26,
     maxRow: currentHexBounds?.maxRow ?? 20
@@ -85,6 +103,12 @@ function MapSettingsModal({
   );
   const [imageOpacity, setImageOpacity] = dc.useState(
     currentBackgroundImage?.opacity ?? 1  // Default to fully opaque
+  );
+  const [imageOffsetX, setImageOffsetX] = dc.useState(
+    currentBackgroundImage?.offsetX ?? 0  // Horizontal offset in pixels
+  );
+  const [imageOffsetY, setImageOffsetY] = dc.useState(
+    currentBackgroundImage?.offsetY ?? 0  // Vertical offset in pixels
   );
   const [imageSearchResults, setImageSearchResults] = dc.useState([]);
   
@@ -125,6 +149,24 @@ function MapSettingsModal({
       });
       setCoordinateDisplayMode(currentSettings?.coordinateDisplayMode ?? 'rectangular');
       
+      // Reset distance settings
+      const savedDistanceSettings = currentSettings?.distanceSettings;
+      const currentGlobalSettings = getSettings();
+      const isHex = mapType === 'hex';
+      const defaultPerCell = isHex 
+        ? (currentGlobalSettings.distancePerCellHex ?? 6) 
+        : (currentGlobalSettings.distancePerCellGrid ?? 5);
+      const defaultUnit = isHex 
+        ? (currentGlobalSettings.distanceUnitHex ?? 'mi') 
+        : (currentGlobalSettings.distanceUnitGrid ?? 'ft');
+      setDistanceSettings({
+        useGlobalDistance: !savedDistanceSettings,
+        distancePerCell: savedDistanceSettings?.distancePerCell ?? defaultPerCell,
+        distanceUnit: savedDistanceSettings?.distanceUnit ?? defaultUnit,
+        gridDiagonalRule: savedDistanceSettings?.gridDiagonalRule ?? (currentGlobalSettings.gridDiagonalRule ?? 'alternating'),
+        displayFormat: savedDistanceSettings?.displayFormat ?? (currentGlobalSettings.distanceDisplayFormat ?? 'both')
+      });
+      
       // Reset background image state
       const bgImage = currentBackgroundImage || {};
       setBackgroundImagePath(bgImage.path ?? null);
@@ -136,6 +178,8 @@ function MapSettingsModal({
       setCustomColumns(bgImage.customColumns ?? 24);
       setBoundsLocked(bgImage.path ? (bgImage.lockBounds ?? true) : false);
       setImageOpacity(bgImage.opacity ?? 1);
+      setImageOffsetX(bgImage.offsetX ?? 0);
+      setImageOffsetY(bgImage.offsetY ?? 0);
       setImageSearchResults([]);
       
       // Load image dimensions if path exists
@@ -163,7 +207,7 @@ function MapSettingsModal({
       setActiveColorPicker(null);
       setActiveTab('appearance');
     }
-  }, [isOpen, currentSettings, currentPreferences, currentHexBounds, currentBackgroundImage]);
+  }, [isOpen, currentSettings, currentPreferences, currentHexBounds, currentBackgroundImage, currentDistanceSettings, mapType]);
   
   const handleToggleUseGlobal = dc.useCallback(() => {
     setUseGlobalSettings(prev => !prev);
@@ -292,7 +336,14 @@ function MapSettingsModal({
       useGlobalSettings,
       overrides: useGlobalSettings ? {} : overrides,  // Only save overrides if not using global
       // Always save coordinate display settings for hex maps (independent of color overrides)
-      coordinateDisplayMode
+      coordinateDisplayMode,
+      // Distance measurement settings (per-map overrides)
+      distanceSettings: distanceSettings.useGlobalDistance ? null : {
+        distancePerCell: distanceSettings.distancePerCell,
+        distanceUnit: distanceSettings.distanceUnit,
+        gridDiagonalRule: distanceSettings.gridDiagonalRule,
+        displayFormat: distanceSettings.displayFormat
+      }
     };
     
     // Prepare background image data for hex maps
@@ -301,7 +352,9 @@ function MapSettingsModal({
       lockBounds: boundsLocked,
       gridDensity: gridDensity,
       customColumns: customColumns,
-      opacity: imageOpacity
+      opacity: imageOpacity,
+      offsetX: imageOffsetX,
+      offsetY: imageOffsetY
     } : undefined;
     
     // Calculate hexSize if we have an image with locked bounds
@@ -316,7 +369,7 @@ function MapSettingsModal({
     onSave(settingsData, preferences, mapType === 'hex' ? hexBounds : null, backgroundImageData, calculatedHexSize);
     setIsLoading(false);
     onClose();
-  }, [useGlobalSettings, overrides, preferences, hexBounds, mapType, coordinateDisplayMode, onSave, onClose, backgroundImagePath, boundsLocked, imageDimensions, gridDensity, customColumns, imageOpacity, orientation]);
+  }, [useGlobalSettings, overrides, preferences, hexBounds, mapType, coordinateDisplayMode, distanceSettings, onSave, onClose, backgroundImagePath, boundsLocked, imageDimensions, gridDensity, customColumns, imageOpacity, imageOffsetX, imageOffsetY, orientation]);
   
   const handleCancel = dc.useCallback(() => {
     onClose();
@@ -364,6 +417,7 @@ function MapSettingsModal({
     if (mapType === 'hex') {
       baseTabs.push({ id: 'hexgrid', label: 'Hex Grid' });
     }
+    baseTabs.push({ id: 'measurement', label: 'Measurement' });
     baseTabs.push({ id: 'preferences', label: 'Preferences' });
     return baseTabs;
   }, [mapType]);
@@ -596,7 +650,7 @@ function MapSettingsModal({
                         }}
                         title="Clear image"
                       >
-                        Ã—
+                        ×
                       </button>
                     )}
                     
@@ -640,7 +694,7 @@ function MapSettingsModal({
                   {imageDimensions && (
                     <div style={{ marginBottom: '16px' }}>
                       <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                        Detected: {imageDimensions.width} Ã— {imageDimensions.height} px
+                        Detected: {imageDimensions.width} × {imageDimensions.height} px
                       </p>
                     </div>
                   )}
@@ -736,7 +790,7 @@ function MapSettingsModal({
                       {/* Show calculated result */}
                       <div style={{ marginTop: '12px', padding: '8px', background: 'var(--background-secondary)', borderRadius: '4px' }}>
                         <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                          Result: {hexBounds.maxCol} columns Ã— {hexBounds.maxRow} rows
+                          Result: {hexBounds.maxCol} columns × {hexBounds.maxRow} rows
                           {imageDimensions && (() => {
                             const columns = gridDensity === 'custom' ? customColumns : GRID_DENSITY_PRESETS[gridDensity]?.columns || 24;
                             const calc = calculateGridFromImage(imageDimensions.width, imageDimensions.height, columns, orientation);
@@ -794,6 +848,69 @@ function MapSettingsModal({
                       </p>
                     </div>
                   )}
+                  
+                  {/* Image offset controls - only show when image is selected */}
+                  {backgroundImagePath && (
+                    <div style={{ marginTop: '16px' }}>
+                      <label class="dmt-form-label" style={{ marginBottom: '8px', display: 'block' }}>
+                        Image Offset (pixels)
+                      </label>
+                      <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                          <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>X:</span>
+                          <input
+                            type="number"
+                            value={imageOffsetX}
+                            onChange={(e) => setImageOffsetX(parseInt(e.target.value, 10) || 0)}
+                            class="dmt-number-input"
+                            style={{
+                              width: '80px',
+                              padding: '6px 8px',
+                              border: '1px solid var(--background-modifier-border)',
+                              borderRadius: '4px',
+                              background: 'var(--background-primary)',
+                              color: 'var(--text-normal)'
+                            }}
+                          />
+                        </div>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                          <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Y:</span>
+                          <input
+                            type="number"
+                            value={imageOffsetY}
+                            onChange={(e) => setImageOffsetY(parseInt(e.target.value, 10) || 0)}
+                            class="dmt-number-input"
+                            style={{
+                              width: '80px',
+                              padding: '6px 8px',
+                              border: '1px solid var(--background-modifier-border)',
+                              borderRadius: '4px',
+                              background: 'var(--background-primary)',
+                              color: 'var(--text-normal)'
+                            }}
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => { setImageOffsetX(0); setImageOffsetY(0); }}
+                          style={{
+                            padding: '4px 8px',
+                            fontSize: '12px',
+                            background: 'var(--background-secondary)',
+                            border: '1px solid var(--background-modifier-border)',
+                            borderRadius: '4px',
+                            color: 'var(--text-muted)',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Reset
+                        </button>
+                      </div>
+                      <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                        Fine-tune image alignment with the hex grid
+                      </p>
+                    </div>
+                  )}
                 </div>
                 
                 {/* Bounds - Columns and Rows on same row */}
@@ -834,7 +951,7 @@ function MapSettingsModal({
                         }}
                       />
                     </div>
-                    <span style={{ color: 'var(--text-muted)' }}>Ã—</span>
+                    <span style={{ color: 'var(--text-muted)' }}>×</span>
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                       <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Rows:</span>
                       <input
@@ -897,7 +1014,7 @@ function MapSettingsModal({
                         style={{ marginTop: '2px' }}
                       />
                       <div>
-                        <span style={{ fontWeight: 500 }}>â—ˆ, 1-1, 2-5, ...)</span>
+                        <span style={{ fontWeight: 500 }}>Radial (â–³, 1-1, 2-5, ...)</span>
                         <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
                           Ring-position labels centered in grid
                         </p>
@@ -933,6 +1050,92 @@ function MapSettingsModal({
                       buttonRef={coordinateTextShadowBtnRef}
                       defaultColor={THEME.coordinateText.shadow}
                     />
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {/* Tab: Measurement */}
+            {activeTab === 'measurement' && (
+              <div class="dmt-settings-tab-content">
+                <div class="dmt-form-group" style={{ marginBottom: '16px' }}>
+                  <label class="dmt-checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={!distanceSettings.useGlobalDistance}
+                      onChange={() => setDistanceSettings(prev => ({
+                        ...prev,
+                        useGlobalDistance: !prev.useGlobalDistance
+                      }))}
+                      class="dmt-checkbox"
+                    />
+                    <span>Use custom measurement settings for this map</span>
+                  </label>
+                </div>
+                
+                <div style={{ opacity: distanceSettings.useGlobalDistance ? 0.5 : 1 }}>
+                  <div class="dmt-form-group">
+                    <label class="dmt-form-label">Distance per {isHexMap ? 'Hex' : 'Cell'}</label>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <input
+                        type="number"
+                        min="0.1"
+                        step="0.1"
+                        value={distanceSettings.distancePerCell}
+                        disabled={distanceSettings.useGlobalDistance}
+                        onChange={(e) => {
+                          const val = parseFloat(e.target.value);
+                          if (!isNaN(val) && val > 0) {
+                            setDistanceSettings(prev => ({ ...prev, distancePerCell: val }));
+                          }
+                        }}
+                        class="dmt-form-input"
+                        style={{ width: '80px' }}
+                      />
+                      <select
+                        value={distanceSettings.distanceUnit}
+                        disabled={distanceSettings.useGlobalDistance}
+                        onChange={(e) => setDistanceSettings(prev => ({ ...prev, distanceUnit: e.target.value }))}
+                        class="dmt-form-select"
+                        style={{ width: '120px' }}
+                      >
+                        <option value="ft">feet</option>
+                        <option value="m">meters</option>
+                        <option value="mi">miles</option>
+                        <option value="km">kilometers</option>
+                        <option value="yd">yards</option>
+                      </select>
+                    </div>
+                  </div>
+                  
+                  {!isHexMap && (
+                    <div class="dmt-form-group">
+                      <label class="dmt-form-label">Diagonal Movement</label>
+                      <select
+                        value={distanceSettings.gridDiagonalRule}
+                        disabled={distanceSettings.useGlobalDistance}
+                        onChange={(e) => setDistanceSettings(prev => ({ ...prev, gridDiagonalRule: e.target.value }))}
+                        class="dmt-form-select"
+                      >
+                        <option value="alternating">Alternating (5-10-5-10, D&D 5e)</option>
+                        <option value="equal">Equal (Chebyshev, all moves = 1)</option>
+                        <option value="euclidean">True Distance (Euclidean)</option>
+                      </select>
+                    </div>
+                  )}
+                  
+                  <div class="dmt-form-group">
+                    <label class="dmt-form-label">Display Format</label>
+                    <select
+                      value={distanceSettings.displayFormat}
+                      disabled={distanceSettings.useGlobalDistance}
+                      onChange={(e) => setDistanceSettings(prev => ({ ...prev, displayFormat: e.target.value }))}
+                      class="dmt-form-select"
+                    >
+                      <option value="both">Cells and Units (e.g., "3 cells (15 ft)")</option>
+                      <option value="cells">Cells Only (e.g., "3 cells")</option>
+                      <option value="units">Units Only (e.g., "15 ft")</option>
+                    </select>
                   </div>
                 </div>
               </div>

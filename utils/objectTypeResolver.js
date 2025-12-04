@@ -15,6 +15,7 @@ const { requireModuleByName } = await dc.require(pathResolverPath);
 
 const { OBJECT_TYPES, CATEGORIES } = await requireModuleByName("objectTypes.js");
 const { getObjectSettings } = await requireModuleByName("settingsAccessor.js");
+const { RA_ICONS, getIconChar, getIconInfo } = await requireModuleByName("rpgAwesomeIcons.js");
 
 /**
  * Fallback for unknown/deleted object types
@@ -27,6 +28,56 @@ const UNKNOWN_OBJECT_FALLBACK = {
   category: 'markers',
   isUnknown: true
 };
+
+/**
+ * Check if an object type uses an RPGAwesome icon
+ * @param {Object} objectType - The object type definition
+ * @returns {boolean} True if the object uses an icon font
+ */
+function hasIconClass(objectType) {
+  return objectType && typeof objectType.iconClass === 'string' && objectType.iconClass.length > 0;
+}
+
+/**
+ * Get the render character for an object type
+ * Handles both iconClass (RPGAwesome) and symbol (Unicode) with fallback
+ * 
+ * @param {Object} objectType - The object type definition
+ * @returns {{ char: string, isIcon: boolean }} Character to render and whether it's an icon font
+ */
+function getRenderChar(objectType) {
+  if (!objectType) {
+    return { char: '?', isIcon: false };
+  }
+  
+  // If iconClass is set, try to get the icon character
+  if (hasIconClass(objectType)) {
+    const iconChar = getIconChar(objectType.iconClass);
+    if (iconChar) {
+      return { char: iconChar, isIcon: true };
+    }
+    // iconClass was set but invalid - fall through to symbol/fallback
+    console.warn(`[objectTypeResolver] Invalid iconClass: ${objectType.iconClass}`);
+  }
+  
+  // Use symbol if available
+  if (objectType.symbol) {
+    return { char: objectType.symbol, isIcon: false };
+  }
+  
+  // Final fallback
+  return { char: '?', isIcon: false };
+}
+
+/**
+ * Validate an iconClass value
+ * @param {string} iconClass - The icon class to validate (e.g., 'ra-sword')
+ * @returns {boolean} True if valid
+ */
+function isValidIconClass(iconClass) {
+  if (!iconClass || typeof iconClass !== 'string') return false;
+  return RA_ICONS.hasOwnProperty(iconClass);
+}
 
 /**
  * Default category order for built-in categories
@@ -249,6 +300,7 @@ function isValidSymbol(symbol) {
 
 /**
  * Validate an object definition
+ * Objects can have either a symbol (Unicode) OR an iconClass (RPGAwesome), or both
  * 
  * @param {Object} obj - Object definition to validate
  * @returns {{ valid: boolean, errors: string[] }} Validation result
@@ -256,8 +308,18 @@ function isValidSymbol(symbol) {
 function validateObjectDefinition(obj) {
   const errors = [];
   
-  if (!obj.symbol || !isValidSymbol(obj.symbol)) {
-    errors.push('Symbol is required and must be 1-8 characters');
+  const hasSymbol = obj.symbol && isValidSymbol(obj.symbol);
+  const hasIcon = obj.iconClass && isValidIconClass(obj.iconClass);
+  
+  // Must have at least one of symbol or iconClass
+  if (!hasSymbol && !hasIcon) {
+    if (obj.iconClass && !hasIcon) {
+      errors.push('Invalid icon selection');
+    } else if (obj.symbol && !hasSymbol) {
+      errors.push('Symbol must be 1-8 characters');
+    } else {
+      errors.push('Either a symbol or an icon is required');
+    }
   }
   
   if (!obj.label || typeof obj.label !== 'string' || obj.label.trim().length === 0) {
@@ -282,6 +344,11 @@ return {
   getObjectType,
   getHiddenObjects,
   
+  // Icon/symbol helpers
+  hasIconClass,
+  getRenderChar,
+  isValidIconClass,
+  
   // Utilities
   objectTypeExists,
   getOriginalBuiltIn,
@@ -292,5 +359,8 @@ return {
   
   // Constants
   UNKNOWN_OBJECT_FALLBACK,
-  BUILT_IN_CATEGORY_ORDER
+  BUILT_IN_CATEGORY_ORDER,
+  
+  // Re-export icon data for convenience
+  RA_ICONS
 };

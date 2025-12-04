@@ -16,7 +16,15 @@ const FALLBACK_SETTINGS = {
   coordinateTextColor: THEME.coordinateText.color,
   coordinateTextShadow: THEME.coordinateText.shadow,
   coordinateKeyMode: 'hold', // 'hold' or 'toggle'
-  expandedByDefault: false
+  expandedByDefault: false,
+  
+  // Distance measurement settings
+  distancePerCellGrid: DEFAULTS.distance.perCellGrid,
+  distancePerCellHex: DEFAULTS.distance.perCellHex,
+  distanceUnitGrid: DEFAULTS.distance.unitGrid,
+  distanceUnitHex: DEFAULTS.distance.unitHex,
+  gridDiagonalRule: DEFAULTS.distance.gridDiagonalRule,
+  distanceDisplayFormat: DEFAULTS.distance.displayFormat
 };
 
 /**

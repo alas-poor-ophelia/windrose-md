@@ -22,6 +22,22 @@
 }
 
 /* ============================================
+   RPGAWESOME ICON FONT BASE STYLES
+   ============================================ */
+
+/* Base class for RPGAwesome icons */
+.ra {
+  font-family: 'rpgawesome' !important;
+  font-style: normal;
+  font-variant: normal;
+  font-weight: normal;
+  line-height: 1;
+  text-transform: none;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ============================================
    CONTAINER & LAYOUT
    ============================================ */
 
@@ -340,13 +356,15 @@
 .dmt-canvas-circle,
 .dmt-canvas-cleararea,
 .dmt-canvas-add-object,
-.dmt-canvas-add-text {
+.dmt-canvas-add-text,
+.dmt-canvas-measure {
   cursor: crosshair;
 }
 
 .dmt-canvas-drawing,
 .dmt-canvas-rectangle-active,
-.dmt-canvas-circle-active {
+.dmt-canvas-circle-active,
+.dmt-canvas-measure-active {
   cursor: cell;
 }
 
@@ -1804,6 +1822,77 @@ button.dmt-orientation-btn,
   &:active {
     transform: translateY(-50%) scale(0.95);
   }
+}
+
+/* Color picker opacity slider */
+.dmt-color-opacity-section {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--dmt-bg-tertiary);
+}
+
+.dmt-color-opacity-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.dmt-color-opacity-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--dmt-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.dmt-color-opacity-value {
+  font-size: 12px;
+  color: var(--dmt-text-primary);
+  font-weight: 500;
+  min-width: 35px;
+  text-align: right;
+}
+
+.dmt-color-opacity-slider {
+  width: 100%;
+  height: 6px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: var(--dmt-bg-tertiary);
+  border-radius: 3px;
+  outline: none;
+  cursor: pointer;
+}
+
+.dmt-color-opacity-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  background: var(--dmt-accent-blue);
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid var(--dmt-text-primary);
+  transition: transform 0.15s ease;
+}
+
+.dmt-color-opacity-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+}
+
+.dmt-color-opacity-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  background: var(--dmt-accent-blue);
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid var(--dmt-text-primary);
+  transition: transform 0.15s ease;
+}
+
+.dmt-color-opacity-slider::-moz-range-thumb:hover {
+  transform: scale(1.15);
 }
 
 /* ============================================

@@ -12,6 +12,7 @@ const { useEventHandlerRegistration } = await requireModuleByName("EventHandlerC
 const DrawingLayer = ({
   currentTool,
   selectedColor,
+  selectedOpacity = 1,
   onDrawingStateChange
 }) => {
   const { 
@@ -44,7 +45,8 @@ const DrawingLayer = ({
     cancelDrawing
   } = useDrawingTools(
     currentTool,
-    selectedColor
+    selectedColor,
+    selectedOpacity
   );
   
   // Combined stop function that handles both cell and edge drawing
