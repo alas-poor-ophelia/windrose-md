@@ -36,7 +36,8 @@ jobs:
           cd dist
           zip -r ../windrose-md-v${{ steps.version.outputs.version }}.zip \
             compiled-windrose-md.md \
-            "WindroseMD Map Block.md"
+            "WindroseMD Map Block.md" \
+            "WindroseMD - FONTS (Snippet).css"
           cd ..
       
       - name: Create GitHub Release
