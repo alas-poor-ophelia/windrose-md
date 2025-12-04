@@ -108,7 +108,6 @@ const hexRenderer = {
       lineWidth
     );
     
-    // Note: Resize mode doesn't apply to individual hexes (no corner handles)
   }
 };
 

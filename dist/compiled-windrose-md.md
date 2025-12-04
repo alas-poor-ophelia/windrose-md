@@ -1,9 +1,9 @@
 <!-- Compiled by Datacore Script Compiler -->
 <!-- Source: Projects/dungeon-map-tracker -->
 <!-- Main Component: DungeonMapTracker -->
-<!-- Compiled: 2025-12-04T03:16:15.624Z -->
+<!-- Compiled: 2025-12-04T21:48:49.880Z -->
 <!-- Files: 63 -->
-<!-- Version: 1.1.0 -->
+<!-- Version: 1.1.1 -->
 <!-- CSS Files: 1 -->
 
 # Demo
@@ -59,8 +59,8 @@ const DEFAULTS = {
   hexSize: 80,              // Radius from center to vertex
   hexOrientation: 'flat',   // 'flat' or 'pointy'
   hexBounds: {
-    maxCol: 26,             // Default 27 columns (0-26) Ã¢â€ â€™ A-AA for coordinate keys
-    maxRow: 20              // Default 21 rows (0-20) Ã¢â€ â€™ 1-21 for coordinate keys
+    maxCol: 26,             // Default 27 columns (0-26) → A-AA for coordinate keys
+    maxRow: 20              // Default 21 rows (0-20) → 1-21 for coordinate keys
   },
   
   // Map type
@@ -631,9 +631,9 @@ return { loadMapData, saveMapData, createNewMap };
  */
 
 // Module-level caches (persist across renders)
-const imageCache = new Map();        // path â†’ HTMLImageElement
-const loadingPromises = new Map();   // path â†’ Promise (prevents duplicate loads)
-const dimensionsCache = new Map();   // path â†’ {width, height}
+const imageCache = new Map();        // path → HTMLImageElement
+const loadingPromises = new Map();   // path → Promise (prevents duplicate loads)
+const dimensionsCache = new Map();   // path → {width, height}
 
 /**
  * Grid density presets for hex maps
@@ -5540,7 +5540,6 @@ const hexRenderer = {
       lineWidth
     );
     
-    // Note: Resize mode doesn't apply to individual hexes (no corner handles)
   }
 };
 
@@ -8191,7 +8190,36 @@ const useObjectInteractions = (
       const { clientX, clientY } = getClientCoords(e);
       const coords = screenToGrid(clientX, clientY);
       if (coords) {
-        const obj = getObjectAtPosition(mapData.objects, coords.gridX, coords.gridY);
+        let obj = null;
+        
+        // coords always has gridX and gridY for both hex and grid maps
+        const { gridX, gridY } = coords;
+        
+        // For hex maps, try using getClickedObjectInCell to handle multi-object cells
+        if (mapData.mapType === 'hex' && geometry instanceof HexGeometry) {
+          // Get world coordinates for click offset calculation
+          const worldCoords = screenToWorld(clientX, clientY);
+          if (worldCoords) {
+            // Calculate click offset from hex center
+            const hexCenter = geometry.gridToWorld(gridX, gridY);
+            const clickOffsetX = (worldCoords.worldX - hexCenter.worldX) / geometry.width;
+            const clickOffsetY = (worldCoords.worldY - hexCenter.worldY) / geometry.width;
+            
+            obj = getClickedObjectInCell(
+              mapData.objects,
+              gridX, gridY,
+              clickOffsetX, clickOffsetY,
+              mapData.orientation || 'flat'
+            );
+          }
+        }
+        
+        // Fallback to simple position lookup if getClickedObjectInCell didn't find anything
+        // or if not a hex map
+        if (!obj) {
+          obj = getObjectAtPosition(mapData.objects, gridX, gridY);
+        }
+        
         setHoveredObject(obj);
 
         // Calculate position relative to container for absolute positioning
@@ -8204,7 +8232,7 @@ const useObjectInteractions = (
         setHoveredObject(null);
       }
     }
-  }, [mapData, getClientCoords, screenToGrid, getObjectAtPosition, setHoveredObject, setMousePosition, containerRef]
+  }, [mapData, geometry, getClientCoords, screenToGrid, screenToWorld, getObjectAtPosition, setHoveredObject, setMousePosition, containerRef]
   );
 
   /**
@@ -8550,7 +8578,7 @@ const useObjectInteractions = (
   }, [handleObjectColorSelect]);
 
   /**
-   * Handle object rotation (cycles 0Ãƒâ€šÃ‚Â° ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ 90Ãƒâ€šÃ‚Â° ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ 180Ãƒâ€šÃ‚Â° ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ 270Ãƒâ€šÃ‚Â° ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ 0Ãƒâ€šÃ‚Â°)
+   * Handle object rotation (cycles 0ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â° ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ 90ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â° ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ 180ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â° ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ 270ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â° ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ 0ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°)
    */
   const handleObjectRotation = dc.useCallback(() => {
     if (!selectedItem || selectedItem.type !== 'object' || !mapData) {
@@ -9623,11 +9651,9 @@ const SelectionToolbar = ({
   let linkedNoteY;
   
   if (shouldFlipAbove) {
-    // Position above: Linked Note (top) Ã¢â€ â€™ Toolbar Ã¢â€ â€™ Selection (bottom)
     toolbarY = selectionTop - toolbarGap - toolbarHeight;
     linkedNoteY = toolbarY - linkedNoteGap - linkedNoteHeight;
   } else {
-    // Position below: Selection (top) Ã¢â€ â€™ Toolbar Ã¢â€ â€™ Linked Note (bottom)
     toolbarY = selectionBottom + toolbarGap;
     linkedNoteY = toolbarY + toolbarHeight + linkedNoteGap;
   }
@@ -9742,7 +9768,7 @@ const SelectionToolbar = ({
               onClick={(e) => {
                 if (onRotate) onRotate(e);
               }}
-              title="Rotate 90Ã‚Â° (or press R)"
+              title="Rotate 90Ãƒâ€š° (or press R)"
             >
               <dc.Icon icon="lucide-rotate-cw" />
             </button>
@@ -9844,7 +9870,7 @@ const SelectionToolbar = ({
             <button
               className="dmt-toolbar-button"
               onClick={onRotate}
-              title="Rotate 90Ã‚Â° (or press R)"
+              title="Rotate 90Ãƒâ€š° (or press R)"
             >
               <dc.Icon icon="lucide-rotate-cw" />
             </button>
@@ -10020,6 +10046,13 @@ const ObjectLayer = ({
     if (selectedItem?.type === 'object') {
       e.preventDefault();
       e.stopPropagation();
+      
+      // Clear any drag state before opening modal (prevents stuck cursor bug)
+      if (isDraggingSelection) {
+        setIsDraggingSelection(false);
+        setDragStart(null);
+      }
+      
       setEditingObjectId(selectedItem.id);
       setShowNoteModal(true);
     }
@@ -10068,6 +10101,12 @@ const ObjectLayer = ({
   
   // Handle edit note link button click
   const handleEditNoteLink = (objectId) => {
+    // Clear any drag state before opening modal (prevents stuck cursor bug)
+    if (isDraggingSelection) {
+      setIsDraggingSelection(false);
+      setDragStart(null);
+    }
+    
     setEditingNoteObjectId(objectId);
     setShowNoteLinkModal(true);
   };
@@ -10084,6 +10123,15 @@ const ObjectLayer = ({
     });
     
     onObjectsChange(updatedObjects);
+    
+    // Update selectedItem if this is the currently selected object
+    if (selectedItem?.type === 'object' && selectedItem.id === editingNoteObjectId) {
+      const updatedObject = updatedObjects.find(obj => obj.id === editingNoteObjectId);
+      if (updatedObject) {
+        setSelectedItem({ ...selectedItem, data: updatedObject });
+      }
+    }
+    
     setShowNoteLinkModal(false);
     setEditingNoteObjectId(null);
   };
@@ -12993,7 +13041,7 @@ function getVisibleHexes(geometry, mapData, canvas, displayMode = 'rectangular')
         // Calculate position within ring
         let label;
         if (ring === 0) {
-          label = "â—ˆ";
+          label = "⟐";
         } else {
           const position = getPositionInRing(dq, dr, ring);
           label = `${ring}-${position}`;
@@ -14845,7 +14893,7 @@ const MapControls = ({ onZoomIn, onZoomOut, onCompassClick, northDirection, curr
           onClick={mapType === 'hex' ? () => {} : onCompassClick}
           title={mapType === 'hex' 
             ? "Map rotation temporarily disabled (coordinate key feature in development)"
-            : `North is at ${northDirection}Â° (click to rotate)`
+            : `North is at ${northDirection}° (click to rotate)`
           }
         >
           <svg 
@@ -15756,7 +15804,7 @@ const ObjectSidebar = ({ selectedObjectType, onObjectTypeSelect, onToolChange, i
   return (
     <div className="dmt-object-sidebar">
       {/* Hidden element to force early emoji font loading */}
-      <div className="dmt-font-preloader" aria-hidden="true">ðŸ“ŒðŸšªâ¬†ï¸â¬‡ï¸ðŸ—ï¸ðŸª™ðŸ‘€ðŸ‰ðŸ§™â€â™‚ï¸ðŸ›¡ï¸âš”ï¸ðŸºðŸª¤ðŸ“œðŸ”®</div>
+      <div className="dmt-font-preloader" aria-hidden="true">🔐🦪⬆️⬇️📍⚜️⚡🪐🧙‍♂️🗡️🏹⚔️⛏️🔱💀🎯🦡⚰️🛐🪔</div>
       
       <div className="dmt-sidebar-header">
         Objects
@@ -18843,7 +18891,7 @@ const SettingsPluginInstaller = ({ onInstall, onDecline, mode = 'auto' }) => {
         <div className="dmt-plugin-installer-content">
           <h3>
             {actionMode === 'upgrade' 
-              ? `Update Available (v${installedVersion} â†’ v${PACKAGED_PLUGIN_VERSION})`
+              ? `Update Available (v${installedVersion} → v${PACKAGED_PLUGIN_VERSION})`
               : 'Enhance Your Mapping Experience'
             }
           </h3>
@@ -19798,7 +19846,7 @@ function MapSettingsModal({
                         }}
                         title="Clear image"
                       >
-                        Ã—
+                        ×
                       </button>
                     )}
                     
@@ -19842,7 +19890,7 @@ function MapSettingsModal({
                   {imageDimensions && (
                     <div style={{ marginBottom: '16px' }}>
                       <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                        Detected: {imageDimensions.width} Ã— {imageDimensions.height} px
+                        Detected: {imageDimensions.width} × {imageDimensions.height} px
                       </p>
                     </div>
                   )}
@@ -19938,7 +19986,7 @@ function MapSettingsModal({
                       {/* Show calculated result */}
                       <div style={{ marginTop: '12px', padding: '8px', background: 'var(--background-secondary)', borderRadius: '4px' }}>
                         <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                          Result: {hexBounds.maxCol} columns Ã— {hexBounds.maxRow} rows
+                          Result: {hexBounds.maxCol} columns × {hexBounds.maxRow} rows
                           {imageDimensions && (() => {
                             const columns = gridDensity === 'custom' ? customColumns : GRID_DENSITY_PRESETS[gridDensity]?.columns || 24;
                             const calc = calculateGridFromImage(imageDimensions.width, imageDimensions.height, columns, orientation);
@@ -20099,7 +20147,7 @@ function MapSettingsModal({
                         }}
                       />
                     </div>
-                    <span style={{ color: 'var(--text-muted)' }}>Ã—</span>
+                    <span style={{ color: 'var(--text-muted)' }}>×</span>
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                       <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Rows:</span>
                       <input
@@ -20162,7 +20210,7 @@ function MapSettingsModal({
                         style={{ marginTop: '2px' }}
                       />
                       <div>
-                        <span style={{ fontWeight: 500 }}>Radial (⬡, 1-1, 2-5, ...)</span>
+                        <span style={{ fontWeight: 500 }}>Radial (⟐, 1-1, 2-5, ...)</span>
                         <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
                           Ring-position labels centered in grid
                         </p>
@@ -21139,7 +21187,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   const handleCompassClick = () => {
     if (!mapData) return;
 
-    // Cycle through: 0Â° -> 90Â° -> 180Â° -> 270Â° -> 0Â°
+    // Cycle through: 0° -> 90° -> 180° -> 270° -> 0°
     const rotations = [0, 90, 180, 270];
     const currentIndex = rotations.indexOf(mapData.northDirection);
     const nextIndex = (currentIndex + 1) % rotations.length;
@@ -21378,6 +21426,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               <MapCanvas.ObjectLayer
                 currentTool={currentTool}
                 selectedObjectType={selectedObjectType}
+                onObjectsChange={handleObjectsChange}
                 customColors={mapData.customColors || []}
                 onAddCustomColor={handleAddCustomColor}
                 onDeleteCustomColor={handleDeleteCustomColor}

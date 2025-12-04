@@ -24,7 +24,7 @@ const MapControls = ({ onZoomIn, onZoomOut, onCompassClick, northDirection, curr
           onClick={mapType === 'hex' ? () => {} : onCompassClick}
           title={mapType === 'hex' 
             ? "Map rotation temporarily disabled (coordinate key feature in development)"
-            : `North is at ${northDirection}Â° (click to rotate)`
+            : `North is at ${northDirection}° (click to rotate)`
           }
         >
           <svg 

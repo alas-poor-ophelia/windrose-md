@@ -766,7 +766,7 @@ function MapSettingsModal({
                         }}
                         title="Clear image"
                       >
-                        Ã—
+                        ×
                       </button>
                     )}
                     
@@ -810,7 +810,7 @@ function MapSettingsModal({
                   {imageDimensions && (
                     <div style={{ marginBottom: '16px' }}>
                       <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                        Detected: {imageDimensions.width} Ã— {imageDimensions.height} px
+                        Detected: {imageDimensions.width} × {imageDimensions.height} px
                       </p>
                     </div>
                   )}
@@ -906,7 +906,7 @@ function MapSettingsModal({
                       {/* Show calculated result */}
                       <div style={{ marginTop: '12px', padding: '8px', background: 'var(--background-secondary)', borderRadius: '4px' }}>
                         <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                          Result: {hexBounds.maxCol} columns Ã— {hexBounds.maxRow} rows
+                          Result: {hexBounds.maxCol} columns × {hexBounds.maxRow} rows
                           {imageDimensions && (() => {
                             const columns = gridDensity === 'custom' ? customColumns : GRID_DENSITY_PRESETS[gridDensity]?.columns || 24;
                             const calc = calculateGridFromImage(imageDimensions.width, imageDimensions.height, columns, orientation);
@@ -1067,7 +1067,7 @@ function MapSettingsModal({
                         }}
                       />
                     </div>
-                    <span style={{ color: 'var(--text-muted)' }}>Ã—</span>
+                    <span style={{ color: 'var(--text-muted)' }}>×</span>
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                       <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Rows:</span>
                       <input
@@ -1130,7 +1130,7 @@ function MapSettingsModal({
                         style={{ marginTop: '2px' }}
                       />
                       <div>
-                        <span style={{ fontWeight: 500 }}>Radial (⬡, 1-1, 2-5, ...)</span>
+                        <span style={{ fontWeight: 500 }}>Radial (⟐, 1-1, 2-5, ...)</span>
                         <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
                           Ring-position labels centered in grid
                         </p>

@@ -528,7 +528,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   const handleCompassClick = () => {
     if (!mapData) return;
 
-    // Cycle through: 0Â° -> 90Â° -> 180Â° -> 270Â° -> 0Â°
+    // Cycle through: 0° -> 90° -> 180° -> 270° -> 0°
     const rotations = [0, 90, 180, 270];
     const currentIndex = rotations.indexOf(mapData.northDirection);
     const nextIndex = (currentIndex + 1) % rotations.length;
@@ -767,6 +767,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               <MapCanvas.ObjectLayer
                 currentTool={currentTool}
                 selectedObjectType={selectedObjectType}
+                onObjectsChange={handleObjectsChange}
                 customColors={mapData.customColors || []}
                 onAddCustomColor={handleAddCustomColor}
                 onDeleteCustomColor={handleDeleteCustomColor}

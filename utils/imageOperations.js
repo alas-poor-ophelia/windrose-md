@@ -8,9 +8,9 @@
  */
 
 // Module-level caches (persist across renders)
-const imageCache = new Map();        // path â†’ HTMLImageElement
-const loadingPromises = new Map();   // path â†’ Promise (prevents duplicate loads)
-const dimensionsCache = new Map();   // path â†’ {width, height}
+const imageCache = new Map();        // path → HTMLImageElement
+const loadingPromises = new Map();   // path → Promise (prevents duplicate loads)
+const dimensionsCache = new Map();   // path → {width, height}
 
 /**
  * Grid density presets for hex maps

@@ -696,7 +696,36 @@ const useObjectInteractions = (
       const { clientX, clientY } = getClientCoords(e);
       const coords = screenToGrid(clientX, clientY);
       if (coords) {
-        const obj = getObjectAtPosition(mapData.objects, coords.gridX, coords.gridY);
+        let obj = null;
+        
+        // coords always has gridX and gridY for both hex and grid maps
+        const { gridX, gridY } = coords;
+        
+        // For hex maps, try using getClickedObjectInCell to handle multi-object cells
+        if (mapData.mapType === 'hex' && geometry instanceof HexGeometry) {
+          // Get world coordinates for click offset calculation
+          const worldCoords = screenToWorld(clientX, clientY);
+          if (worldCoords) {
+            // Calculate click offset from hex center
+            const hexCenter = geometry.gridToWorld(gridX, gridY);
+            const clickOffsetX = (worldCoords.worldX - hexCenter.worldX) / geometry.width;
+            const clickOffsetY = (worldCoords.worldY - hexCenter.worldY) / geometry.width;
+            
+            obj = getClickedObjectInCell(
+              mapData.objects,
+              gridX, gridY,
+              clickOffsetX, clickOffsetY,
+              mapData.orientation || 'flat'
+            );
+          }
+        }
+        
+        // Fallback to simple position lookup if getClickedObjectInCell didn't find anything
+        // or if not a hex map
+        if (!obj) {
+          obj = getObjectAtPosition(mapData.objects, gridX, gridY);
+        }
+        
         setHoveredObject(obj);
 
         // Calculate position relative to container for absolute positioning
@@ -709,7 +738,7 @@ const useObjectInteractions = (
         setHoveredObject(null);
       }
     }
-  }, [mapData, getClientCoords, screenToGrid, getObjectAtPosition, setHoveredObject, setMousePosition, containerRef]
+  }, [mapData, geometry, getClientCoords, screenToGrid, screenToWorld, getObjectAtPosition, setHoveredObject, setMousePosition, containerRef]
   );
 
   /**
@@ -1055,7 +1084,7 @@ const useObjectInteractions = (
   }, [handleObjectColorSelect]);
 
   /**
-   * Handle object rotation (cycles 0Ãƒâ€šÃ‚Â° ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ 90Ãƒâ€šÃ‚Â° ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ 180Ãƒâ€šÃ‚Â° ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ 270Ãƒâ€šÃ‚Â° ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ 0Ãƒâ€šÃ‚Â°)
+   * Handle object rotation (cycles 0ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â° ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ 90ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â° ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ 180ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â° ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ 270ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â° ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ 0ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°)
    */
   const handleObjectRotation = dc.useCallback(() => {
     if (!selectedItem || selectedItem.type !== 'object' || !mapData) {

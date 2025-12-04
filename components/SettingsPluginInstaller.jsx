@@ -323,7 +323,7 @@ const SettingsPluginInstaller = ({ onInstall, onDecline, mode = 'auto' }) => {
         <div className="dmt-plugin-installer-content">
           <h3>
             {actionMode === 'upgrade' 
-              ? `Update Available (v${installedVersion} â†’ v${PACKAGED_PLUGIN_VERSION})`
+              ? `Update Available (v${installedVersion} → v${PACKAGED_PLUGIN_VERSION})`
               : 'Enhance Your Mapping Experience'
             }
           </h3>

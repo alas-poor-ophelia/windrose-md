@@ -151,6 +151,13 @@ const ObjectLayer = ({
     if (selectedItem?.type === 'object') {
       e.preventDefault();
       e.stopPropagation();
+      
+      // Clear any drag state before opening modal (prevents stuck cursor bug)
+      if (isDraggingSelection) {
+        setIsDraggingSelection(false);
+        setDragStart(null);
+      }
+      
       setEditingObjectId(selectedItem.id);
       setShowNoteModal(true);
     }
@@ -199,6 +206,12 @@ const ObjectLayer = ({
   
   // Handle edit note link button click
   const handleEditNoteLink = (objectId) => {
+    // Clear any drag state before opening modal (prevents stuck cursor bug)
+    if (isDraggingSelection) {
+      setIsDraggingSelection(false);
+      setDragStart(null);
+    }
+    
     setEditingNoteObjectId(objectId);
     setShowNoteLinkModal(true);
   };
@@ -215,6 +228,15 @@ const ObjectLayer = ({
     });
     
     onObjectsChange(updatedObjects);
+    
+    // Update selectedItem if this is the currently selected object
+    if (selectedItem?.type === 'object' && selectedItem.id === editingNoteObjectId) {
+      const updatedObject = updatedObjects.find(obj => obj.id === editingNoteObjectId);
+      if (updatedObject) {
+        setSelectedItem({ ...selectedItem, data: updatedObject });
+      }
+    }
+    
     setShowNoteLinkModal(false);
     setEditingNoteObjectId(null);
   };

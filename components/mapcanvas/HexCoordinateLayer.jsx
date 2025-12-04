@@ -210,7 +210,7 @@ function getVisibleHexes(geometry, mapData, canvas, displayMode = 'rectangular')
         // Calculate position within ring
         let label;
         if (ring === 0) {
-          label = "â—ˆ";
+          label = "⟐";
         } else {
           const position = getPositionInRing(dq, dr, ring);
           label = `${ring}-${position}`;
