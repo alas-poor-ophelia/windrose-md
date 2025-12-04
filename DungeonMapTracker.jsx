@@ -10,13 +10,9 @@ const { requireModuleByName, getBasePath } = await dc.require(`${window.__dmtBas
 const css = await app.vault.cachedRead(
   await app.vault.getFileByPath(`${getBasePath()}/css/DungeonMapTracker.css`)
 );
-const fontCss = await app.vault.cachedRead(
-  await app.vault.getFileByPath(`${getBasePath()}/css/DungeonMapTracker - FONTS.css`)
-);
 
 const combinedCss = [
   css,
-  fontCss
 ].join('\n');
 
 
@@ -33,6 +29,7 @@ const { MapSettingsModal } = await requireModuleByName("MapSettingsModal.jsx");
 const { getSetting, getTheme, getEffectiveSettings } = await requireModuleByName("settingsAccessor.js");
 const { DEFAULTS } = await requireModuleByName("dmtConstants.js");
 const { DEFAULT_COLOR, getColorByHex, isDefaultColor } = await requireModuleByName("colorOperations.js");
+const { axialToOffset, isWithinOffsetBounds } = await requireModuleByName("offsetCoordinates.js");
 
 // RPGAwesome icon font support
 const { RA_ICONS } = await requireModuleByName("rpgAwesomeIcons.js");
@@ -527,7 +524,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   const handleCompassClick = () => {
     if (!mapData) return;
 
-    // Cycle through: 0° -> 90° -> 180° -> 270° -> 0°
+    // Cycle through: 0Â° -> 90Â° -> 180Â° -> 270Â° -> 0Â°
     const rotations = [0, 90, 180, 270];
     const currentIndex = rotations.indexOf(mapData.northDirection);
     const nextIndex = (currentIndex + 1) % rotations.length;
@@ -588,7 +585,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     setShowSettingsModal(true);
   };
 
-  const handleSettingsSave = (settingsData, preferencesData, hexBounds = null, backgroundImage = undefined, hexSize = null) => {
+  const handleSettingsSave = (settingsData, preferencesData, hexBounds = null, backgroundImage = undefined, hexSize = null, deleteOrphanedContent = false) => {
     if (!mapData) return;
     
     const newMapData = {
@@ -600,6 +597,27 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     // Only update hexBounds for hex maps
     if (hexBounds !== null && mapData.mapType === 'hex') {
       newMapData.hexBounds = hexBounds;
+      
+      // If requested, delete content that would be outside the new bounds
+      if (deleteOrphanedContent) {
+        const orientation = mapData.orientation || 'flat';
+        
+        // Filter cells to keep only those within new bounds
+        if (newMapData.cells && newMapData.cells.length > 0) {
+          newMapData.cells = newMapData.cells.filter(cell => {
+            const { col, row } = axialToOffset(cell.q, cell.r, orientation);
+            return isWithinOffsetBounds(col, row, hexBounds);
+          });
+        }
+        
+        // Filter objects to keep only those within new bounds
+        if (newMapData.objects && newMapData.objects.length > 0) {
+          newMapData.objects = newMapData.objects.filter(obj => {
+            const { col, row } = axialToOffset(obj.position.x, obj.position.y, orientation);
+            return isWithinOffsetBounds(col, row, hexBounds);
+          });
+        }
+      }
     }
     
     // Only update backgroundImage for hex maps
@@ -818,6 +836,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
           currentPreferences={mapData.uiPreferences}
           currentHexBounds={mapData.mapType === 'hex' ? mapData.hexBounds : null}
           currentBackgroundImage={mapData.mapType === 'hex' ? mapData.backgroundImage : null}
+          currentCells={mapData.mapType === 'hex' ? (mapData.cells || []) : []}
+          currentObjects={mapData.mapType === 'hex' ? (mapData.objects || []) : []}
         />
       </div>
     </>

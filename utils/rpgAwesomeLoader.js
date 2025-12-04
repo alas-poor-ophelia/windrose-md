@@ -137,8 +137,6 @@ function injectIconCSS(iconMap) {
   style.id = styleId;
   style.textContent = css;
   document.head.appendChild(style);
-  
-  console.log('[RPGAwesome] Icon CSS classes injected');
 }
 
 return {
