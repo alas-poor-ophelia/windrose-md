@@ -36,7 +36,7 @@ const gridRenderer = {
   /**
    * Render painted cells
    * @param {CanvasRenderingContext2D} ctx
-   * @param {Array} cells - Array of {x, y, color}
+   * @param {Array} cells - Array of {x, y, color, opacity?}
    * @param {GridGeometry} geometry
    * @param {Object} viewState - {x, y, zoom}
    */
@@ -45,19 +45,45 @@ const gridRenderer = {
     
     const scaledSize = geometry.getScaledCellSize(viewState.zoom);
     
-    // Group cells by color for efficient rendering
-    const cellsByColor = {};
+    // Separate cells by whether they have custom opacity
+    const fullOpacityCells = [];
+    const customOpacityCells = [];
+    
     for (const cell of cells) {
-      const color = cell.color;
-      if (!cellsByColor[color]) {
-        cellsByColor[color] = [];
+      const opacity = cell.opacity ?? 1;
+      if (opacity === 1) {
+        fullOpacityCells.push(cell);
+      } else {
+        customOpacityCells.push(cell);
       }
-      cellsByColor[color].push(cell);
     }
     
-    // Draw all cells of each color using geometry's batch rendering
-    for (const [color, cellGroup] of Object.entries(cellsByColor)) {
-      geometry.drawCells(ctx, cellGroup, viewState.x, viewState.y, viewState.zoom, color);
+    // Draw full opacity cells grouped by color (efficient batch rendering)
+    if (fullOpacityCells.length > 0) {
+      const cellsByColor = {};
+      for (const cell of fullOpacityCells) {
+        const color = cell.color;
+        if (!cellsByColor[color]) {
+          cellsByColor[color] = [];
+        }
+        cellsByColor[color].push(cell);
+      }
+      
+      for (const [color, cellGroup] of Object.entries(cellsByColor)) {
+        geometry.drawCells(ctx, cellGroup, viewState.x, viewState.y, viewState.zoom, color);
+      }
+    }
+    
+    // Draw cells with custom opacity individually
+    if (customOpacityCells.length > 0) {
+      for (const cell of customOpacityCells) {
+        const opacity = cell.opacity ?? 1;
+        ctx.globalAlpha = opacity;
+        ctx.fillStyle = cell.color;
+        const { screenX, screenY } = geometry.gridToScreen(cell.x, cell.y, viewState.x, viewState.y, viewState.zoom);
+        ctx.fillRect(screenX, screenY, scaledSize, scaledSize);
+      }
+      ctx.globalAlpha = 1; // Reset
     }
   },
 
@@ -125,7 +151,83 @@ const gridRenderer = {
   },
 
   /**
-   * Render smart borders for painted cells
+   * Render painted edges (custom colored grid lines)
+   * 
+   * Edges are rendered after cells and before cell borders, appearing
+   * as colored overlays on specific grid lines.
+   * 
+   * @param {CanvasRenderingContext2D} ctx
+   * @param {Array} edges - Array of {x, y, side, color, opacity?} where side is 'right' or 'bottom'
+   * @param {GridGeometry} geometry
+   * @param {Object} viewState - {x, y, zoom}
+   * @param {Object} style - Edge style options
+   * @param {number} style.lineWidth - Base line width (will be scaled for visibility)
+   */
+  renderEdges(ctx, edges, geometry, viewState, style = {}) {
+    if (!edges || edges.length === 0) return;
+    
+    const scaledSize = geometry.getScaledCellSize(viewState.zoom);
+    // Edge thickness: slightly thicker than grid lines for visibility
+    // Use 2.5x grid line width, clamped between 2 and borderWidth
+    const baseWidth = style.lineWidth || 1;
+    const edgeWidth = Math.min(Math.max(2, baseWidth * 2.5), style.borderWidth || 4);
+    const halfWidth = edgeWidth / 2;
+    
+    for (const edge of edges) {
+      // Skip malformed edges
+      if (!edge || typeof edge.x !== 'number' || typeof edge.y !== 'number' || !edge.side || !edge.color) {
+        continue;
+      }
+      
+      const { screenX, screenY } = geometry.gridToScreen(
+        edge.x,
+        edge.y,
+        viewState.x,
+        viewState.y,
+        viewState.zoom
+      );
+      
+      // Apply opacity if specified
+      const opacity = edge.opacity ?? 1;
+      if (opacity < 1) {
+        ctx.globalAlpha = opacity;
+      }
+      
+      ctx.fillStyle = edge.color;
+      
+      // Edges are stored normalized as 'right' or 'bottom' only
+      if (edge.side === 'right') {
+        // Right edge of cell (x,y) - vertical line at x+1 boundary
+        ctx.fillRect(
+          screenX + scaledSize - halfWidth,
+          screenY - halfWidth,
+          edgeWidth,
+          scaledSize + edgeWidth
+        );
+      } else if (edge.side === 'bottom') {
+        // Bottom edge of cell (x,y) - horizontal line at y+1 boundary
+        ctx.fillRect(
+          screenX - halfWidth,
+          screenY + scaledSize - halfWidth,
+          scaledSize + edgeWidth,
+          edgeWidth
+        );
+      }
+      
+      // Reset opacity
+      if (opacity < 1) {
+        ctx.globalAlpha = 1;
+      }
+    }
+  },
+
+  /**
+   * Render smart borders for painted cells using fill-based rendering
+   * 
+   * NOTE: This uses ctx.fillRect() instead of ctx.stroke() to work around
+   * a rendering bug in Obsidian's Live Preview mode where CodeMirror's
+   * canvas operations can corrupt the strokeStyle state.
+   * 
    * @param {CanvasRenderingContext2D} ctx
    * @param {Array} cells - Array of {x, y, color}
    * @param {GridGeometry} geometry
@@ -139,9 +241,11 @@ const gridRenderer = {
     
     const scaledSize = geometry.getScaledCellSize(viewState.zoom);
     const cellLookup = buildCellLookup(cells);
+    const borderWidth = theme.borderWidth;
+    const halfWidth = borderWidth / 2;
     
-    ctx.strokeStyle = theme.border;
-    ctx.lineWidth = theme.borderWidth;
+    // Use fillStyle instead of strokeStyle for fill-based rendering
+    ctx.fillStyle = theme.border;
     
     for (const cell of cells) {
       const { screenX, screenY } = geometry.gridToScreen(
@@ -155,34 +259,53 @@ const gridRenderer = {
       // Calculate which borders this cell needs
       const borders = calculateBorders(cellLookup, cell.x, cell.y);
       
-      // Draw each border
-      ctx.beginPath();
+      // Draw each border as a filled rectangle
       for (const side of borders) {
         switch (side) {
           case 'top':
-            ctx.moveTo(screenX, screenY);
-            ctx.lineTo(screenX + scaledSize, screenY);
+            ctx.fillRect(
+              screenX - halfWidth,
+              screenY - halfWidth,
+              scaledSize + borderWidth,
+              borderWidth
+            );
             break;
           case 'right':
-            ctx.moveTo(screenX + scaledSize, screenY);
-            ctx.lineTo(screenX + scaledSize, screenY + scaledSize);
+            ctx.fillRect(
+              screenX + scaledSize - halfWidth,
+              screenY - halfWidth,
+              borderWidth,
+              scaledSize + borderWidth
+            );
             break;
           case 'bottom':
-            ctx.moveTo(screenX, screenY + scaledSize);
-            ctx.lineTo(screenX + scaledSize, screenY + scaledSize);
+            ctx.fillRect(
+              screenX - halfWidth,
+              screenY + scaledSize - halfWidth,
+              scaledSize + borderWidth,
+              borderWidth
+            );
             break;
           case 'left':
-            ctx.moveTo(screenX, screenY);
-            ctx.lineTo(screenX, screenY + scaledSize);
+            ctx.fillRect(
+              screenX - halfWidth,
+              screenY - halfWidth,
+              borderWidth,
+              scaledSize + borderWidth
+            );
             break;
         }
       }
-      ctx.stroke();
     }
   },
 
   /**
-   * Render selection highlight for a cell
+   * Render selection highlight for a cell using fill-based rendering
+   * 
+   * NOTE: This uses ctx.fillRect() instead of ctx.strokeRect() to work around
+   * a rendering bug in Obsidian's Live Preview mode where CodeMirror's
+   * canvas operations can corrupt the strokeStyle state.
+   * 
    * @param {CanvasRenderingContext2D} ctx
    * @param {Object} cell - {x, y}
    * @param {GridGeometry} geometry
@@ -200,14 +323,40 @@ const gridRenderer = {
       viewState.zoom
     );
     
-    // Selection border
-    ctx.strokeStyle = isResizeMode ? '#ff6b6b' : '#4dabf7';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(
-      screenX,
-      screenY,
-      scaledSize,
-      scaledSize
+    // Selection border - draw as 4 filled rectangles instead of strokeRect
+    const color = isResizeMode ? '#ff6b6b' : '#4dabf7';
+    const lineWidth = 2;
+    const halfWidth = lineWidth / 2;
+    
+    ctx.fillStyle = color;
+    
+    // Top border
+    ctx.fillRect(
+      screenX - halfWidth,
+      screenY - halfWidth,
+      scaledSize + lineWidth,
+      lineWidth
+    );
+    // Bottom border
+    ctx.fillRect(
+      screenX - halfWidth,
+      screenY + scaledSize - halfWidth,
+      scaledSize + lineWidth,
+      lineWidth
+    );
+    // Left border
+    ctx.fillRect(
+      screenX - halfWidth,
+      screenY - halfWidth,
+      lineWidth,
+      scaledSize + lineWidth
+    );
+    // Right border
+    ctx.fillRect(
+      screenX + scaledSize - halfWidth,
+      screenY - halfWidth,
+      lineWidth,
+      scaledSize + lineWidth
     );
     
     // Corner handles for resize mode (grid cells don't resize, but kept for API consistency)

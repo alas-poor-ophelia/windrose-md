@@ -22,6 +22,22 @@
 }
 
 /* ============================================
+   RPGAWESOME ICON FONT BASE STYLES
+   ============================================ */
+
+/* Base class for RPGAwesome icons */
+.ra {
+  font-family: 'rpgawesome' !important;
+  font-style: normal;
+  font-variant: normal;
+  font-weight: normal;
+  line-height: 1;
+  text-transform: none;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ============================================
    CONTAINER & LAYOUT
    ============================================ */
 
@@ -340,13 +356,15 @@
 .dmt-canvas-circle,
 .dmt-canvas-cleararea,
 .dmt-canvas-add-object,
-.dmt-canvas-add-text {
+.dmt-canvas-add-text,
+.dmt-canvas-measure {
   cursor: crosshair;
 }
 
 .dmt-canvas-drawing,
 .dmt-canvas-rectangle-active,
-.dmt-canvas-circle-active {
+.dmt-canvas-circle-active,
+.dmt-canvas-measure-active {
   cursor: cell;
 }
 
@@ -393,6 +411,7 @@
 }
 
 .dmt-tool-btn {
+  position: relative;
   background-color: var(--dmt-bg-secondary);
   border: 1px solid var(--dmt-border-secondary);
   border-radius: 3px;
@@ -438,6 +457,83 @@
 .dmt-color-tool-btn {
   position: relative;
   /* Bottom border shows current color - defined inline via style attribute */
+}
+
+/* Sub-tool indicator triangle */
+.dmt-subtool-indicator {
+  position: absolute;
+  bottom: 1px;
+  right: 1px;
+  font-size: 7px;
+  opacity: 0.6;
+  pointer-events: none;
+  line-height: 1;
+}
+
+.dmt-tool-btn-active .dmt-subtool-indicator {
+  opacity: 0.9;
+  color: var(--dmt-bg-primary);
+}
+
+/* Tool button container for sub-menu positioning */
+.dmt-tool-btn-container {
+  position: relative;
+  display: inline-block;
+}
+
+/* Sub-menu flyout */
+.dmt-subtool-menu {
+  position: absolute;
+  left: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  margin-left: 6px;
+  background: var(--dmt-bg-secondary);
+  border: 1px solid var(--dmt-border-primary);
+  border-radius: 6px;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  z-index: 1001;
+  box-shadow: 
+    0 4px 12px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  min-width: 120px;
+}
+
+.dmt-subtool-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  color: var(--dmt-text-primary);
+  cursor: pointer;
+  border-radius: 4px;
+  white-space: nowrap;
+  font-size: 13px;
+  transition: var(--dmt-transition);
+
+  svg {
+    width: 16px;
+    height: 16px;
+    color: var(--dmt-border-primary);
+  }
+
+  &:hover {
+    background: var(--dmt-bg-tertiary);
+  }
+
+  &.dmt-subtool-option-active {
+    background: var(--dmt-border-primary);
+    color: var(--dmt-bg-primary);
+
+    svg {
+      color: var(--dmt-bg-primary);
+    }
+  }
 }
 
 /* History Controls */
@@ -1728,6 +1824,77 @@ button.dmt-orientation-btn,
   }
 }
 
+/* Color picker opacity slider */
+.dmt-color-opacity-section {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--dmt-bg-tertiary);
+}
+
+.dmt-color-opacity-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.dmt-color-opacity-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--dmt-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.dmt-color-opacity-value {
+  font-size: 12px;
+  color: var(--dmt-text-primary);
+  font-weight: 500;
+  min-width: 35px;
+  text-align: right;
+}
+
+.dmt-color-opacity-slider {
+  width: 100%;
+  height: 6px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: var(--dmt-bg-tertiary);
+  border-radius: 3px;
+  outline: none;
+  cursor: pointer;
+}
+
+.dmt-color-opacity-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  background: var(--dmt-accent-blue);
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid var(--dmt-text-primary);
+  transition: transform 0.15s ease;
+}
+
+.dmt-color-opacity-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+}
+
+.dmt-color-opacity-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  background: var(--dmt-accent-blue);
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid var(--dmt-text-primary);
+  transition: transform 0.15s ease;
+}
+
+.dmt-color-opacity-slider::-moz-range-thumb:hover {
+  transform: scale(1.15);
+}
+
 /* ============================================
    TOUCH/TABLET RESPONSIVE ADJUSTMENTS
    ============================================ */
@@ -2378,4 +2545,90 @@ button.dmt-orientation-btn,
   svg {
     color: var(--dmt-bg-primary);
   }
+}
+/* ==========================================================================
+   Scale Slider (shown during resize mode)
+   ========================================================================== */
+
+.dmt-scale-slider-container {
+  background: var(--dmt-bg-secondary);
+  border: 1px solid var(--dmt-border-primary);
+  border-radius: 6px;
+  padding: 6px 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3),
+              inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.dmt-scale-slider-inner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  
+  svg {
+    color: var(--dmt-text-muted);
+    flex-shrink: 0;
+  }
+}
+
+.dmt-scale-slider {
+  flex: 1;
+  height: 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: var(--dmt-bg-tertiary);
+  border-radius: 2px;
+  cursor: pointer;
+  
+  &::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    background: var(--dmt-border-primary);
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid var(--dmt-bg-secondary);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    transition: transform 0.1s ease;
+    
+    &:hover {
+      transform: scale(1.15);
+    }
+  }
+  
+  &::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    background: var(--dmt-border-primary);
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid var(--dmt-bg-secondary);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    transition: transform 0.1s ease;
+    
+    &:hover {
+      transform: scale(1.15);
+    }
+  }
+  
+  &::-webkit-slider-runnable-track {
+    height: 4px;
+    background: var(--dmt-bg-tertiary);
+    border-radius: 2px;
+  }
+  
+  &::-moz-range-track {
+    height: 4px;
+    background: var(--dmt-bg-tertiary);
+    border-radius: 2px;
+  }
+}
+
+.dmt-scale-value {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--dmt-text-muted);
+  min-width: 36px;
+  text-align: right;
+  font-family: var(--font-monospace);
 }

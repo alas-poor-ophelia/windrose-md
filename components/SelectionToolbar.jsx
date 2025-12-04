@@ -96,6 +96,7 @@ const SelectionToolbar = ({
   onColorClick,
   onResize,
   onDelete,
+  onScaleChange,  // NEW: handler for scale slider
   
   // Text-specific handlers
   onEdit,
@@ -195,11 +196,11 @@ const SelectionToolbar = ({
   let linkedNoteY;
   
   if (shouldFlipAbove) {
-    // Position above: Linked Note (top) â†’ Toolbar â†’ Selection (bottom)
+    // Position above: Linked Note (top) Ã¢â€ â€™ Toolbar Ã¢â€ â€™ Selection (bottom)
     toolbarY = selectionTop - toolbarGap - toolbarHeight;
     linkedNoteY = toolbarY - linkedNoteGap - linkedNoteHeight;
   } else {
-    // Position below: Selection (top) â†’ Toolbar â†’ Linked Note (bottom)
+    // Position below: Selection (top) Ã¢â€ â€™ Toolbar Ã¢â€ â€™ Linked Note (bottom)
     toolbarY = selectionBottom + toolbarGap;
     linkedNoteY = toolbarY + toolbarHeight + linkedNoteGap;
   }
@@ -209,7 +210,57 @@ const SelectionToolbar = ({
   const maxX = containerRect.width - toolbarWidth - 4;
   toolbarX = Math.max(minX, Math.min(maxX, toolbarX));
   
-  // Don't show action buttons during resize mode (only show resize handles)
+  // During resize mode, show scale slider instead of action buttons
+  if (isResizeMode && isObject) {
+    // Read scale from actual object in mapData, not from selectedItem.data which may be stale
+    const actualObject = mapData.objects?.find(obj => obj.id === selectedItem.id);
+    const currentScale = actualObject?.scale ?? 1.0;
+    const sliderWidth = 140;
+    const sliderHeight = 36;
+    const sliderGap = 8;
+    
+    // Position slider above the selection
+    const sliderX = bounds.screenX - sliderWidth / 2;
+    const sliderY = selectionTop - sliderGap - sliderHeight;
+    
+    // Clamp horizontal position
+    const clampedSliderX = Math.max(4, Math.min(containerRect.width - sliderWidth - 4, sliderX));
+    
+    return (
+      <div 
+        className="dmt-scale-slider-container"
+        style={{
+          position: 'absolute',
+          left: `${clampedSliderX}px`,
+          top: `${sliderY}px`,
+          width: `${sliderWidth}px`,
+          height: `${sliderHeight}px`,
+          pointerEvents: 'auto',
+          zIndex: 150
+        }}
+      >
+        <div className="dmt-scale-slider-inner">
+          <dc.Icon icon="lucide-scaling" size={14} />
+          <input
+            type="range"
+            className="dmt-scale-slider"
+            min="25"
+            max="130"
+            step="5"
+            value={Math.round(currentScale * 100)}
+            onInput={(e) => {
+              const newScale = parseInt(e.target.value) / 100;
+              onScaleChange?.(newScale);
+            }}
+            title={`Scale: ${Math.round(currentScale * 100)}%`}
+          />
+          <span className="dmt-scale-value">{Math.round(currentScale * 100)}%</span>
+        </div>
+      </div>
+    );
+  }
+  
+  // Don't show toolbar during resize mode for non-objects
   if (isResizeMode) {
     return null;
   }
@@ -264,7 +315,7 @@ const SelectionToolbar = ({
               onClick={(e) => {
                 if (onRotate) onRotate(e);
               }}
-              title="Rotate 90Â° (or press R)"
+              title="Rotate 90Ã‚Â° (or press R)"
             >
               <dc.Icon icon="lucide-rotate-cw" />
             </button>
@@ -366,7 +417,7 @@ const SelectionToolbar = ({
             <button
               className="dmt-toolbar-button"
               onClick={onRotate}
-              title="Rotate 90Â° (or press R)"
+              title="Rotate 90Ã‚Â° (or press R)"
             >
               <dc.Icon icon="lucide-rotate-cw" />
             </button>

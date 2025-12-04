@@ -396,8 +396,9 @@ class HexGeometry extends BaseGeometry {
       return;
     }
     
-    ctx.strokeStyle = lineColor;
-    ctx.lineWidth = lineWidth;
+    // Use fillStyle instead of strokeStyle for fill-based hex outline rendering
+    // This works around strokeStyle state corruption in Obsidian's Live Preview mode
+    ctx.fillStyle = lineColor;
     
     // CRITICAL: Iterate in OFFSET space (rectangular)
     // This creates a rectangular grid instead of a parallelogram
@@ -408,7 +409,7 @@ class HexGeometry extends BaseGeometry {
         
         // Only draw if within bounds (or no bounds set for infinite maps)
         if (!this.bounds || this.isWithinBounds(q, r)) {
-          this.drawHexOutline(ctx, q, r, offsetX, offsetY, zoom);
+          this.drawHexOutline(ctx, q, r, offsetX, offsetY, zoom, lineWidth);
         }
       }
     }
@@ -416,32 +417,69 @@ class HexGeometry extends BaseGeometry {
 
   
   /**
-   * Draw a single hex outline
+   * Draw a line segment as a filled rectangle
+   * 
+   * Used to work around strokeStyle state corruption in Obsidian's Live Preview mode.
+   * Converts a line segment into a thin rectangle oriented along the line.
+   * 
+   * @param {CanvasRenderingContext2D} ctx - Canvas context
+   * @param {number} x1 - Start X (screen coordinates)
+   * @param {number} y1 - Start Y (screen coordinates)
+   * @param {number} x2 - End X (screen coordinates)
+   * @param {number} y2 - End Y (screen coordinates)
+   * @param {number} lineWidth - Width of the line
+   */
+  drawLineAsFill(ctx, x1, y1, x2, y2, lineWidth) {
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const length = Math.sqrt(dx * dx + dy * dy);
+    
+    if (length === 0) return;
+    
+    // Calculate perpendicular offset for line thickness
+    const nx = -dy / length * (lineWidth / 2);
+    const ny = dx / length * (lineWidth / 2);
+    
+    // Draw as a quadrilateral (4-point polygon)
+    ctx.beginPath();
+    ctx.moveTo(x1 + nx, y1 + ny);
+    ctx.lineTo(x2 + nx, y2 + ny);
+    ctx.lineTo(x2 - nx, y2 - ny);
+    ctx.lineTo(x1 - nx, y1 - ny);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  /**
+   * Draw a single hex outline using fill-based rendering
+   * 
+   * NOTE: This uses ctx.fill() with polygon shapes instead of ctx.stroke() to 
+   * work around a rendering bug in Obsidian's Live Preview mode where CodeMirror's
+   * canvas operations can corrupt the strokeStyle state.
+   * 
    * @param {CanvasRenderingContext2D} ctx - Canvas context
    * @param {number} q - Axial q coordinate
    * @param {number} r - Axial r coordinate
    * @param {number} offsetX - Screen offset X
    * @param {number} offsetY - Screen offset Y
    * @param {number} zoom - Current zoom level
+   * @param {number} lineWidth - Line width (optional, defaults to context lineWidth or 1)
    */
-  drawHexOutline(ctx, q, r, offsetX, offsetY, zoom) {
+  drawHexOutline(ctx, q, r, offsetX, offsetY, zoom, lineWidth = null) {
     const vertices = this.getHexVertices(q, r);
+    const width = lineWidth !== null ? lineWidth : (ctx.lineWidth || 1);
     
-    ctx.beginPath();
+    // Convert all vertices to screen coordinates
+    const screenVertices = vertices.map(v => 
+      this.worldToScreen(v.worldX, v.worldY, offsetX, offsetY, zoom)
+    );
     
-    // Convert first vertex to screen coordinates and move to it
-    const first = this.worldToScreen(vertices[0].worldX, vertices[0].worldY, offsetX, offsetY, zoom);
-    ctx.moveTo(first.screenX, first.screenY);
-    
-    // Draw lines to remaining vertices
-    for (let i = 1; i < vertices.length; i++) {
-      const vertex = this.worldToScreen(vertices[i].worldX, vertices[i].worldY, offsetX, offsetY, zoom);
-      ctx.lineTo(vertex.screenX, vertex.screenY);
+    // Draw each edge as a filled polygon
+    for (let i = 0; i < 6; i++) {
+      const v1 = screenVertices[i];
+      const v2 = screenVertices[(i + 1) % 6];
+      this.drawLineAsFill(ctx, v1.screenX, v1.screenY, v2.screenX, v2.screenY, width);
     }
-    
-    // Close the path back to first vertex
-    ctx.closePath();
-    ctx.stroke();
   }
   
   /**
@@ -712,6 +750,22 @@ class HexGeometry extends BaseGeometry {
    */
   getManhattanDistance(q1, r1, q2, r2) {
     // For hexes, Manhattan distance is the same as hex distance
+    return this.getHexDistance(q1, r1, q2, r2);
+  }
+
+  /**
+   * Calculate game distance between two hexes
+   * For hexes, this is simply the hex distance - no diagonal rules apply
+   * The options parameter is included for API consistency with GridGeometry
+   * @param {number} q1 - First hex q coordinate
+   * @param {number} r1 - First hex r coordinate
+   * @param {number} q2 - Second hex q coordinate
+   * @param {number} r2 - Second hex r coordinate
+   * @param {Object} options - Ignored for hex (included for API consistency)
+   * @returns {number} Distance in hexes
+   */
+  getCellDistance(q1, r1, q2, r2, options = {}) {
+    // Hex grids have no diagonal ambiguity - all neighbors are equidistant
     return this.getHexDistance(q1, r1, q2, r2);
   }
 

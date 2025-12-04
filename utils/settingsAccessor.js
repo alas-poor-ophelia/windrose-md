@@ -16,7 +16,15 @@ const FALLBACK_SETTINGS = {
   coordinateTextColor: THEME.coordinateText.color,
   coordinateTextShadow: THEME.coordinateText.shadow,
   coordinateKeyMode: 'hold', // 'hold' or 'toggle'
-  expandedByDefault: false
+  expandedByDefault: false,
+  
+  // Distance measurement settings
+  distancePerCellGrid: DEFAULTS.distance.perCellGrid,
+  distancePerCellHex: DEFAULTS.distance.perCellHex,
+  distanceUnitGrid: DEFAULTS.distance.unitGrid,
+  distanceUnitHex: DEFAULTS.distance.unitHex,
+  gridDiagonalRule: DEFAULTS.distance.gridDiagonalRule,
+  distanceDisplayFormat: DEFAULTS.distance.displayFormat
 };
 
 /**
@@ -122,4 +130,43 @@ function getEffectiveSettings(mapSettings, globalSettings = null) {
   };
 }
 
-return { getSettings, getSetting, isPluginAvailable, getTheme, getEffectiveSettings, FALLBACK_SETTINGS };
+/**
+ * Default object customization settings
+ * Used when settings plugin is not available or doesn't have object settings
+ */
+const FALLBACK_OBJECT_SETTINGS = {
+  objectOverrides: {},
+  customObjects: [],
+  customCategories: []
+};
+
+/**
+ * Get object customization settings from the plugin
+ * Returns object overrides, custom objects, and custom categories
+ * @returns {Object} Object settings { objectOverrides, customObjects, customCategories }
+ */
+function getObjectSettings() {
+  try {
+    // Check if dc.app exists and is ready
+    if (!dc || !dc.app || !dc.app.plugins) {
+      return FALLBACK_OBJECT_SETTINGS;
+    }
+    
+    // Try to get plugin settings
+    const plugin = dc.app.plugins.plugins['dungeon-map-tracker-settings'];
+    
+    if (plugin && plugin.settings) {
+      return {
+        objectOverrides: plugin.settings.objectOverrides || {},
+        customObjects: plugin.settings.customObjects || [],
+        customCategories: plugin.settings.customCategories || []
+      };
+    }
+  } catch (error) {
+    console.warn('[settingsAccessor] Could not access object settings:', error);
+  }
+  
+  return FALLBACK_OBJECT_SETTINGS;
+}
+
+return { getSettings, getSetting, isPluginAvailable, getTheme, getEffectiveSettings, getObjectSettings, FALLBACK_SETTINGS };

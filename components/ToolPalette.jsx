@@ -1,4 +1,4 @@
-// components/ToolPalette.jsx - Tool selection palette with history controls, object tool, circle tool, and color picker
+// components/ToolPalette.jsx - Tool selection palette with sub-tool menus, history controls, and color picker
 
 const pathResolverPath = dc.resolvePath("pathResolver.js");
 const { requireModuleByName } = await dc.require(pathResolverPath);
@@ -49,6 +49,138 @@ const ToolPaletteBracket = ({ position }) => {
   );
 };
 
+/**
+ * Sub-menu flyout component
+ */
+const SubMenuFlyout = ({ subTools, currentSubTool, onSelect, onClose }) => {
+  return (
+    <div className="dmt-subtool-menu">
+      {subTools.map(subTool => (
+        <button
+          key={subTool.id}
+          className={`dmt-subtool-option ${currentSubTool === subTool.id ? 'dmt-subtool-option-active' : ''}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            onSelect(subTool.id);
+            onClose();
+          }}
+          title={subTool.title}
+        >
+          <dc.Icon icon={subTool.icon} />
+          <span>{subTool.label}</span>
+        </button>
+      ))}
+    </div>
+  );
+};
+
+/**
+ * Tool button with optional sub-menu support
+ */
+const ToolButtonWithSubMenu = ({ 
+  toolGroup,
+  currentTool,
+  currentSubTool,
+  isSubMenuOpen,
+  onToolSelect,
+  onSubToolSelect,
+  onSubMenuOpen,
+  onSubMenuClose,
+  mapType
+}) => {
+  const longPressTimer = dc.useRef(null);
+  const LONG_PRESS_DURATION = 300;
+  
+  // Filter sub-tools based on map type
+  const visibleSubTools = toolGroup.subTools.filter(st => 
+    mapType !== 'hex' || !st.gridOnly
+  );
+  
+  // If no visible sub-tools, don't render
+  if (visibleSubTools.length === 0) return null;
+  
+  // Find current sub-tool definition
+  const currentSubToolDef = visibleSubTools.find(st => st.id === currentSubTool) || visibleSubTools[0];
+  
+  // Check if this tool group (any sub-tool) is active
+  const isActive = visibleSubTools.some(st => st.id === currentTool);
+  
+  // Only show sub-menu indicator if there are multiple sub-tools
+  const hasMultipleSubTools = visibleSubTools.length > 1;
+  
+  const handlePointerDown = (e) => {
+    if (!hasMultipleSubTools) return;
+    
+    longPressTimer.current = setTimeout(() => {
+      onSubMenuOpen(toolGroup.id);
+      longPressTimer.current = null;
+    }, LONG_PRESS_DURATION);
+  };
+  
+  const handlePointerUp = (e) => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+      // Short click - activate tool with current sub-tool
+      onToolSelect(currentSubToolDef.id);
+    } else if (!hasMultipleSubTools) {
+      // No sub-menu, just select the tool
+      onToolSelect(currentSubToolDef.id);
+    }
+  };
+  
+  const handlePointerLeave = () => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  };
+  
+  const handleContextMenu = (e) => {
+    if (!hasMultipleSubTools) return;
+    
+    e.preventDefault();
+    e.stopPropagation();
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+    onSubMenuOpen(toolGroup.id);
+  };
+  
+  const handleSubToolSelect = (subToolId) => {
+    onSubToolSelect(toolGroup.id, subToolId);
+    onToolSelect(subToolId);
+  };
+  
+  return (
+    <div className="dmt-tool-btn-container" style={{ position: 'relative', display: 'inline-block' }}>
+      <button
+        className={`dmt-tool-btn ${isActive ? 'dmt-tool-btn-active' : ''}`}
+        onPointerDown={handlePointerDown}
+        onPointerUp={handlePointerUp}
+        onPointerLeave={handlePointerLeave}
+        onContextMenu={handleContextMenu}
+        title={currentSubToolDef?.title}
+      >
+        <dc.Icon icon={currentSubToolDef?.icon} />
+        {hasMultipleSubTools && (
+          <span className="dmt-subtool-indicator">▼</span>
+        )}
+      </button>
+      
+      {isSubMenuOpen && hasMultipleSubTools && (
+        <SubMenuFlyout
+          subTools={visibleSubTools}
+          currentSubTool={currentSubTool}
+          onSelect={handleSubToolSelect}
+          onClose={onSubMenuClose}
+        />
+      )}
+    </div>
+  );
+};
+
 const ToolPalette = ({ 
   currentTool, 
   onToolChange, 
@@ -58,33 +190,113 @@ const ToolPalette = ({
   canRedo,
   selectedColor,
   onColorChange,
+  selectedOpacity = 1,
+  onOpacityChange,
   isColorPickerOpen,       
   onColorPickerOpenChange,
   customColors,
   onAddCustomColor,
   onDeleteCustomColor,
-  mapType
+  mapType,
+  isFocused = false
 }) => {
-	const colorBtnRef = dc.useRef(null);
-	const pendingCustomColorRef = dc.useRef(null);
+  const colorBtnRef = dc.useRef(null);
+  const pendingCustomColorRef = dc.useRef(null);
   
-  const tools = [
-    { id: 'select', label: '🖐️', title: 'Select/Move Text & Objects', icon: 'lucide-hand' },
-    { id: 'draw', label: '✏️', title: 'Draw (fill cells)', icon: 'lucide-paintbrush' },
-    { id: 'erase', label: '🗑️', title: 'Erase (remove text/objects/cells)', icon: 'lucide-eraser' },
-    { id: 'rectangle', label: '⬜', title: 'Rectangle (click two corners)', icon: 'lucide-square' },
-    { id: 'circle', label: '⭕', title: 'Circle (click edge, then center)', icon: 'lucide-circle' },
-    { id: 'clearArea', label: '❎', title: 'Clear Area (click two corners to erase)', icon: 'lucide-square-x' },
-    { id: 'addObject', label: '📍', title: 'Add Object (select from sidebar)', icon: 'lucide-map-pin-plus' },
-    { id: 'addText', label: '✨', title: 'Add Text Label', icon: 'lucide-type' }
+  // Sub-menu state
+  const [openSubMenu, setOpenSubMenu] = dc.useState(null);
+  const [subToolSelections, setSubToolSelections] = dc.useState({
+    draw: 'draw',           // 'draw' (cells) | 'edgeDraw' (edges)
+    rectangle: 'rectangle'  // 'rectangle' (fill) | 'edgeLine'
+  });
+  
+  // Keyboard shortcuts for common tools
+  dc.useEffect(() => {
+    // Don't attach keyboard shortcuts if map is not focused
+    if (!isFocused) return;
+    
+    const handleKeyDown = (e) => {
+      // Don't trigger if typing in an input or textarea
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      // Don't trigger with modifier keys (except for special cases)
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      
+      const key = e.key.toLowerCase();
+      
+      switch (key) {
+        case 'd':
+          onToolChange('draw');
+          break;
+        case 'e':
+          onToolChange('erase');
+          break;
+        case 's':
+        case 'v':
+          onToolChange('select');
+          break;
+        case 'm':
+          onToolChange('measure');
+          break;
+        default:
+          return; // Don't prevent default for unhandled keys
+      }
+      
+      e.preventDefault();
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onToolChange, isFocused]);
+  
+  // Tool groups with sub-tools
+  const toolGroups = [
+    {
+      id: 'draw',
+      subTools: [
+        { id: 'draw', label: 'Paint Cells', title: 'Draw (fill cells) (D)', icon: 'lucide-paintbrush' },
+        { id: 'edgeDraw', label: 'Paint Edges', title: 'Paint Edges (grid lines)', icon: 'lucide-pencil-ruler', gridOnly: true }
+      ]
+    },
+    {
+      id: 'rectangle',
+      subTools: [
+        { id: 'rectangle', label: 'Fill Rectangle', title: 'Rectangle (click two corners)', icon: 'lucide-square', gridOnly: true },
+        { id: 'edgeLine', label: 'Edge Line', title: 'Edge Line (click two points)', icon: 'lucide-git-commit-horizontal', gridOnly: true }
+      ]
+    }
   ];
   
+  // Simple tools (no sub-menu)
+  const simpleTools = [
+    { id: 'select', title: 'Select/Move Text & Objects (S)', icon: 'lucide-hand' },
+    { id: 'erase', title: 'Erase (remove text/objects/cells/edges) (E)', icon: 'lucide-eraser' },
+    { id: 'circle', title: 'Circle (click edge, then center)', icon: 'lucide-circle', gridOnly: true },
+    { id: 'clearArea', title: 'Clear Area (click two corners to erase)', icon: 'lucide-square-x', gridOnly: true },
+    { id: 'addObject', title: 'Add Object (select from sidebar)', icon: 'lucide-map-pin-plus' },
+    { id: 'addText', title: 'Add Text Label', icon: 'lucide-type' },
+    { id: 'measure', title: 'Measure Distance (M)', icon: 'lucide-ruler' }
+  ];
   
-  // Filter out tools that don't work with hex maps
-  const hexIncompatibleTools = ['rectangle', 'circle', 'clearArea'];
-  const visibleTools = mapType === 'hex' 
-    ? tools.filter(tool => !hexIncompatibleTools.includes(tool.id))
-    : tools;
+  // Filter simple tools for hex maps
+  const visibleSimpleTools = mapType === 'hex'
+    ? simpleTools.filter(tool => !tool.gridOnly)
+    : simpleTools;
+  
+  const handleSubMenuOpen = (groupId) => {
+    setOpenSubMenu(openSubMenu === groupId ? null : groupId);
+  };
+  
+  const handleSubMenuClose = () => {
+    setOpenSubMenu(null);
+  };
+  
+  const handleSubToolSelect = (groupId, subToolId) => {
+    setSubToolSelections(prev => ({
+      ...prev,
+      [groupId]: subToolId
+    }));
+  };
+  
   const toggleColorPicker = (e) => {
     e.stopPropagation();
     onColorPickerOpenChange(!isColorPickerOpen);
@@ -92,7 +304,6 @@ const ToolPalette = ({
   
   const handleColorSelect = (color) => {
     onColorChange(color);
-    // Keep picker open for multiple selections
   };
   
   const handleColorReset = () => {
@@ -104,27 +315,47 @@ const ToolPalette = ({
     onColorPickerOpenChange(false);
   };
   
+  // Close sub-menu when clicking outside
+  dc.useEffect(() => {
+    if (openSubMenu) {
+      const handleClickOutside = (e) => {
+        const menuElement = e.target.closest('.dmt-subtool-menu');
+        const buttonElement = e.target.closest('.dmt-tool-btn-container');
+        
+        if (!menuElement && !buttonElement) {
+          handleSubMenuClose();
+        }
+      };
+      
+      setTimeout(() => {
+        document.addEventListener('mousedown', handleClickOutside);
+        document.addEventListener('touchstart', handleClickOutside);
+      }, 10);
+      
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+        document.removeEventListener('touchstart', handleClickOutside);
+      };
+    }
+  }, [openSubMenu]);
+  
   // Close color picker when clicking outside
   dc.useEffect(() => {
     if (isColorPickerOpen) {
       const handleClickOutside = (e) => {
-        // Check if click is inside the color picker or the color button
         const pickerElement = e.target.closest('.dmt-color-picker');
         const buttonElement = e.target.closest('.dmt-color-tool-btn');
         
         if (!pickerElement && !buttonElement) {
-          // Click is outside - save any pending color and close the picker
           if (pendingCustomColorRef.current) {
             onAddCustomColor(pendingCustomColorRef.current);
             onColorChange(pendingCustomColorRef.current);
             pendingCustomColorRef.current = null;
           }
-          
           handleCloseColorPicker();
         }
       };
       
-      // Use a small timeout to avoid catching the opening click
       setTimeout(() => {
         document.addEventListener('mousedown', handleClickOutside);
         document.addEventListener('touchstart', handleClickOutside);
@@ -145,7 +376,7 @@ const ToolPalette = ({
       <ToolPaletteBracket position="bl" />
       <ToolPaletteBracket position="br" />
       
-      {/* Render select and draw tools first */}
+      {/* Select tool */}
       <button
         className={`dmt-tool-btn ${currentTool === 'select' ? 'dmt-tool-btn-active' : ''}`}
         onClick={() => onToolChange('select')}
@@ -153,21 +384,27 @@ const ToolPalette = ({
       >
         <dc.Icon icon="lucide-hand" />
       </button>
-      <button
-        className={`dmt-tool-btn ${currentTool === 'draw' ? 'dmt-tool-btn-active' : ''}`}
-        onClick={() => onToolChange('draw')}
-        title="Draw (fill cells)"
-      >
-        <dc.Icon icon="lucide-paintbrush" />
-      </button>
       
-      {/* Color Picker Button - right after draw tool */}
-<div style={{ position: 'relative', display: 'inline-block' }}>
+      {/* Draw tool group (with sub-menu) */}
+      <ToolButtonWithSubMenu
+        toolGroup={toolGroups[0]}
+        currentTool={currentTool}
+        currentSubTool={subToolSelections.draw}
+        isSubMenuOpen={openSubMenu === 'draw'}
+        onToolSelect={onToolChange}
+        onSubToolSelect={handleSubToolSelect}
+        onSubMenuOpen={handleSubMenuOpen}
+        onSubMenuClose={handleSubMenuClose}
+        mapType={mapType}
+      />
+      
+      {/* Color Picker Button */}
+      <div style={{ position: 'relative', display: 'inline-block' }}>
         <button
           ref={colorBtnRef}
           className={`dmt-tool-btn dmt-color-tool-btn ${isColorPickerOpen ? 'dmt-tool-btn-active' : ''}`}
           onClick={toggleColorPicker}
-          title="Choose cell color"
+          title="Choose color"
           style={{
             borderBottom: `4px solid ${selectedColor || DEFAULT_COLOR}`
           }}
@@ -175,7 +412,6 @@ const ToolPalette = ({
           <dc.Icon icon="lucide-palette" />
         </button>
         
-        {/* Updated ColorPicker with custom colors */}
         <ColorPicker
           isOpen={isColorPickerOpen}
           selectedColor={selectedColor}
@@ -186,13 +422,39 @@ const ToolPalette = ({
           onAddCustomColor={onAddCustomColor}
           onDeleteCustomColor={onDeleteCustomColor}
           position={null}
-		  pendingCustomColorRef={pendingCustomColorRef}
-          title="Cell Color"
+          pendingCustomColorRef={pendingCustomColorRef}
+          title="Color"
+          opacity={selectedOpacity}
+          onOpacityChange={onOpacityChange}
         />
       </div>
       
-      {/* Render remaining tools */}
-      {visibleTools.slice(2).map(tool => (
+      {/* Erase tool */}
+      <button
+        className={`dmt-tool-btn ${currentTool === 'erase' ? 'dmt-tool-btn-active' : ''}`}
+        onClick={() => onToolChange('erase')}
+        title="Erase (remove text/objects/cells/edges)"
+      >
+        <dc.Icon icon="lucide-eraser" />
+      </button>
+      
+      {/* Rectangle tool group (with sub-menu) - grid only */}
+      {mapType !== 'hex' && (
+        <ToolButtonWithSubMenu
+          toolGroup={toolGroups[1]}
+          currentTool={currentTool}
+          currentSubTool={subToolSelections.rectangle}
+          isSubMenuOpen={openSubMenu === 'rectangle'}
+          onToolSelect={onToolChange}
+          onSubToolSelect={handleSubToolSelect}
+          onSubMenuOpen={handleSubMenuOpen}
+          onSubMenuClose={handleSubMenuClose}
+          mapType={mapType}
+        />
+      )}
+      
+      {/* Remaining simple tools */}
+      {visibleSimpleTools.filter(t => !['select', 'erase'].includes(t.id)).map(tool => (
         <button
           key={tool.id}
           className={`dmt-tool-btn ${currentTool === tool.id ? 'dmt-tool-btn-active' : ''}`}

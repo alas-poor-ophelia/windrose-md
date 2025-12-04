@@ -5,6 +5,7 @@ const { ColorPicker } = await requireModuleByName("ColorPicker.jsx");
 const { ModalPortal } = await requireModuleByName("ModalPortal.jsx");
 const { getSettings, FALLBACK_SETTINGS } = await requireModuleByName("settingsAccessor.js");
 const { THEME } = await requireModuleByName("dmtConstants.js");
+const { axialToOffset, isWithinOffsetBounds } = await requireModuleByName("offsetCoordinates.js");
 const { 
   getImageDisplayNames, 
   getFullPathFromDisplayName, 
@@ -30,7 +31,10 @@ function MapSettingsModal({
   currentSettings = null,  // { useGlobalSettings: bool, overrides: {...} }
   currentPreferences = null,  // { rememberPanZoom: bool, rememberSidebarState: bool, rememberExpandedState: bool }
   currentHexBounds = null,  // { maxCol: number, maxRow: number } - for hex maps only
-  currentBackgroundImage = null  // { path: string|null, lockBounds: bool, opacity: number } - for hex maps only
+  currentBackgroundImage = null,  // { path: string|null, lockBounds: bool, opacity: number } - for hex maps only
+  currentDistanceSettings = null,  // { distancePerCell: number, distanceUnit: string, gridDiagonalRule: string, displayFormat: string }
+  currentCells = [],  // Array of {q, r, color} - painted cells for hex maps
+  currentObjects = []  // Array of objects with {x, y} positions - for checking orphaned content
 }) {
   // Get global settings for comparison/defaults
   const globalSettings = getSettings();
@@ -57,6 +61,23 @@ function MapSettingsModal({
     rememberPanZoom: currentPreferences?.rememberPanZoom ?? true,
     rememberSidebarState: currentPreferences?.rememberSidebarState ?? true,
     rememberExpandedState: currentPreferences?.rememberExpandedState ?? false
+  });
+  
+  // Distance measurement settings (per-map overrides)
+  const isHexMap = mapType === 'hex';
+  const defaultDistancePerCell = isHexMap 
+    ? (globalSettings.distancePerCellHex ?? 6) 
+    : (globalSettings.distancePerCellGrid ?? 5);
+  const defaultDistanceUnit = isHexMap 
+    ? (globalSettings.distanceUnitHex ?? 'mi') 
+    : (globalSettings.distanceUnitGrid ?? 'ft');
+  
+  const [distanceSettings, setDistanceSettings] = dc.useState({
+    useGlobalDistance: currentDistanceSettings?.useGlobalDistance ?? true,
+    distancePerCell: currentDistanceSettings?.distancePerCell ?? defaultDistancePerCell,
+    distanceUnit: currentDistanceSettings?.distanceUnit ?? defaultDistanceUnit,
+    gridDiagonalRule: currentDistanceSettings?.gridDiagonalRule ?? (globalSettings.gridDiagonalRule ?? 'alternating'),
+    displayFormat: currentDistanceSettings?.displayFormat ?? (globalSettings.distanceDisplayFormat ?? 'both')
   });
   
   const [hexBounds, setHexBounds] = dc.useState({
@@ -86,10 +107,52 @@ function MapSettingsModal({
   const [imageOpacity, setImageOpacity] = dc.useState(
     currentBackgroundImage?.opacity ?? 1  // Default to fully opaque
   );
+  const [imageOffsetX, setImageOffsetX] = dc.useState(
+    currentBackgroundImage?.offsetX ?? 0  // Horizontal offset in pixels
+  );
+  const [imageOffsetY, setImageOffsetY] = dc.useState(
+    currentBackgroundImage?.offsetY ?? 0  // Vertical offset in pixels
+  );
   const [imageSearchResults, setImageSearchResults] = dc.useState([]);
   
   const [activeColorPicker, setActiveColorPicker] = dc.useState(null);
   const [isLoading, setIsLoading] = dc.useState(false);
+  
+  // Resize confirmation dialog state
+  const [showResizeConfirm, setShowResizeConfirm] = dc.useState(false);
+  const [pendingBoundsChange, setPendingBoundsChange] = dc.useState(null); // { newBounds, previousBounds }
+  const [orphanInfo, setOrphanInfo] = dc.useState({ cells: 0, objects: 0 });
+  const [deleteOrphanedContent, setDeleteOrphanedContent] = dc.useState(false);
+  
+  // Helper function to check if content would be orphaned by new bounds
+  const getOrphanedContentInfo = dc.useCallback((newBounds) => {
+    if (mapType !== 'hex') return { cells: 0, objects: 0 };
+    
+    let orphanedCells = 0;
+    let orphanedObjects = 0;
+    
+    // Check cells (stored as {q, r, color})
+    if (currentCells && currentCells.length > 0) {
+      currentCells.forEach(cell => {
+        const { col, row } = axialToOffset(cell.q, cell.r, orientation);
+        if (!isWithinOffsetBounds(col, row, newBounds)) {
+          orphanedCells++;
+        }
+      });
+    }
+    
+    // Check objects (position.x=q, position.y=r for hex maps)
+    if (currentObjects && currentObjects.length > 0) {
+      currentObjects.forEach(obj => {
+        const { col, row } = axialToOffset(obj.position.x, obj.position.y, orientation);
+        if (!isWithinOffsetBounds(col, row, newBounds)) {
+          orphanedObjects++;
+        }
+      });
+    }
+    
+    return { cells: orphanedCells, objects: orphanedObjects };
+  }, [mapType, currentCells, currentObjects, orientation]);
   
   // Refs for color buttons to detect clicks outside
   const gridLineColorBtnRef = dc.useRef(null);
@@ -125,6 +188,24 @@ function MapSettingsModal({
       });
       setCoordinateDisplayMode(currentSettings?.coordinateDisplayMode ?? 'rectangular');
       
+      // Reset distance settings
+      const savedDistanceSettings = currentSettings?.distanceSettings;
+      const currentGlobalSettings = getSettings();
+      const isHex = mapType === 'hex';
+      const defaultPerCell = isHex 
+        ? (currentGlobalSettings.distancePerCellHex ?? 6) 
+        : (currentGlobalSettings.distancePerCellGrid ?? 5);
+      const defaultUnit = isHex 
+        ? (currentGlobalSettings.distanceUnitHex ?? 'mi') 
+        : (currentGlobalSettings.distanceUnitGrid ?? 'ft');
+      setDistanceSettings({
+        useGlobalDistance: !savedDistanceSettings,
+        distancePerCell: savedDistanceSettings?.distancePerCell ?? defaultPerCell,
+        distanceUnit: savedDistanceSettings?.distanceUnit ?? defaultUnit,
+        gridDiagonalRule: savedDistanceSettings?.gridDiagonalRule ?? (currentGlobalSettings.gridDiagonalRule ?? 'alternating'),
+        displayFormat: savedDistanceSettings?.displayFormat ?? (currentGlobalSettings.distanceDisplayFormat ?? 'both')
+      });
+      
       // Reset background image state
       const bgImage = currentBackgroundImage || {};
       setBackgroundImagePath(bgImage.path ?? null);
@@ -136,6 +217,8 @@ function MapSettingsModal({
       setCustomColumns(bgImage.customColumns ?? 24);
       setBoundsLocked(bgImage.path ? (bgImage.lockBounds ?? true) : false);
       setImageOpacity(bgImage.opacity ?? 1);
+      setImageOffsetX(bgImage.offsetX ?? 0);
+      setImageOffsetY(bgImage.offsetY ?? 0);
       setImageSearchResults([]);
       
       // Load image dimensions if path exists
@@ -162,8 +245,14 @@ function MapSettingsModal({
       
       setActiveColorPicker(null);
       setActiveTab('appearance');
+      
+      // Reset resize confirmation state
+      setShowResizeConfirm(false);
+      setPendingBoundsChange(null);
+      setOrphanInfo({ cells: 0, objects: 0 });
+      setDeleteOrphanedContent(false);
     }
-  }, [isOpen, currentSettings, currentPreferences, currentHexBounds, currentBackgroundImage]);
+  }, [isOpen, currentSettings, currentPreferences, currentHexBounds, currentBackgroundImage, currentDistanceSettings, mapType]);
   
   const handleToggleUseGlobal = dc.useCallback(() => {
     setUseGlobalSettings(prev => !prev);
@@ -196,12 +285,30 @@ function MapSettingsModal({
   const handleHexBoundsChange = dc.useCallback((axis, value) => {
     const numValue = parseInt(value, 10);
     if (!isNaN(numValue) && numValue > 0 && numValue <= 1000) {
-      setHexBounds(prev => ({
-        ...prev,
+      const newBounds = {
+        ...hexBounds,
         [axis]: numValue
-      }));
+      };
+      
+      // Check if this is a reduction that would orphan content
+      const isReduction = newBounds.maxCol < hexBounds.maxCol || newBounds.maxRow < hexBounds.maxRow;
+      
+      if (isReduction) {
+        const orphans = getOrphanedContentInfo(newBounds);
+        
+        if (orphans.cells > 0 || orphans.objects > 0) {
+          // Show confirmation dialog
+          setPendingBoundsChange({ newBounds, previousBounds: { ...hexBounds } });
+          setOrphanInfo(orphans);
+          setShowResizeConfirm(true);
+          return; // Don't apply change yet
+        }
+      }
+      
+      // No orphaned content or expanding bounds - apply directly
+      setHexBounds(newBounds);
     }
-  }, []);
+  }, [hexBounds, getOrphanedContentInfo]);
   
   // Background image handlers
   const handleImageSearch = dc.useCallback(async (searchTerm) => {
@@ -258,12 +365,29 @@ function MapSettingsModal({
     if (imageDimensions && boundsLocked) {
       const columns = density === 'custom' ? customColumns : GRID_DENSITY_PRESETS[density].columns;
       const calculated = calculateGridFromImage(imageDimensions.width, imageDimensions.height, columns, orientation);
-      setHexBounds({
+      const newBounds = {
         maxCol: calculated.columns,
         maxRow: calculated.rows
-      });
+      };
+      
+      // Check if this is a reduction that would orphan content
+      const isReduction = newBounds.maxCol < hexBounds.maxCol || newBounds.maxRow < hexBounds.maxRow;
+      
+      if (isReduction) {
+        const orphans = getOrphanedContentInfo(newBounds);
+        
+        if (orphans.cells > 0 || orphans.objects > 0) {
+          // Show confirmation dialog
+          setPendingBoundsChange({ newBounds, previousBounds: { ...hexBounds } });
+          setOrphanInfo(orphans);
+          setShowResizeConfirm(true);
+          return; // Don't apply change yet
+        }
+      }
+      
+      setHexBounds(newBounds);
     }
-  }, [imageDimensions, boundsLocked, customColumns, orientation]);
+  }, [imageDimensions, boundsLocked, customColumns, orientation, hexBounds, getOrphanedContentInfo]);
   
   const handleCustomColumnsChange = dc.useCallback((value) => {
     const numValue = parseInt(value, 10);
@@ -273,16 +397,49 @@ function MapSettingsModal({
       // Recalculate bounds if we have dimensions and bounds are locked
       if (imageDimensions && boundsLocked && gridDensity === 'custom') {
         const calculated = calculateGridFromImage(imageDimensions.width, imageDimensions.height, numValue, orientation);
-        setHexBounds({
+        const newBounds = {
           maxCol: calculated.columns,
           maxRow: calculated.rows
-        });
+        };
+        
+        // Check if this is a reduction that would orphan content
+        const isReduction = newBounds.maxCol < hexBounds.maxCol || newBounds.maxRow < hexBounds.maxRow;
+        
+        if (isReduction) {
+          const orphans = getOrphanedContentInfo(newBounds);
+          
+          if (orphans.cells > 0 || orphans.objects > 0) {
+            // Show confirmation dialog
+            setPendingBoundsChange({ newBounds, previousBounds: { ...hexBounds } });
+            setOrphanInfo(orphans);
+            setShowResizeConfirm(true);
+            return; // Don't apply change yet
+          }
+        }
+        
+        setHexBounds(newBounds);
       }
     }
-  }, [imageDimensions, boundsLocked, gridDensity, orientation]);
+  }, [imageDimensions, boundsLocked, gridDensity, orientation, hexBounds, getOrphanedContentInfo]);
   
   const handleBoundsLockToggle = dc.useCallback(() => {
     setBoundsLocked(prev => !prev);
+  }, []);
+  
+  // Resize confirmation dialog handlers
+  const handleResizeConfirmDelete = dc.useCallback(() => {
+    if (pendingBoundsChange) {
+      setHexBounds(pendingBoundsChange.newBounds);
+      setDeleteOrphanedContent(true);
+    }
+    setShowResizeConfirm(false);
+    setPendingBoundsChange(null);
+  }, [pendingBoundsChange]);
+  
+  const handleResizeConfirmCancel = dc.useCallback(() => {
+    // Revert to previous bounds - don't apply the change
+    setShowResizeConfirm(false);
+    setPendingBoundsChange(null);
   }, []);
   
   const handleSave = dc.useCallback(() => {
@@ -292,7 +449,14 @@ function MapSettingsModal({
       useGlobalSettings,
       overrides: useGlobalSettings ? {} : overrides,  // Only save overrides if not using global
       // Always save coordinate display settings for hex maps (independent of color overrides)
-      coordinateDisplayMode
+      coordinateDisplayMode,
+      // Distance measurement settings (per-map overrides)
+      distanceSettings: distanceSettings.useGlobalDistance ? null : {
+        distancePerCell: distanceSettings.distancePerCell,
+        distanceUnit: distanceSettings.distanceUnit,
+        gridDiagonalRule: distanceSettings.gridDiagonalRule,
+        displayFormat: distanceSettings.displayFormat
+      }
     };
     
     // Prepare background image data for hex maps
@@ -301,7 +465,9 @@ function MapSettingsModal({
       lockBounds: boundsLocked,
       gridDensity: gridDensity,
       customColumns: customColumns,
-      opacity: imageOpacity
+      opacity: imageOpacity,
+      offsetX: imageOffsetX,
+      offsetY: imageOffsetY
     } : undefined;
     
     // Calculate hexSize if we have an image with locked bounds
@@ -313,10 +479,13 @@ function MapSettingsModal({
       calculatedHexSize = calculated.hexSize;
     }
     
-    onSave(settingsData, preferences, mapType === 'hex' ? hexBounds : null, backgroundImageData, calculatedHexSize);
+    onSave(settingsData, preferences, mapType === 'hex' ? hexBounds : null, backgroundImageData, calculatedHexSize, deleteOrphanedContent);
+    
+    // Reset the delete flag after saving
+    setDeleteOrphanedContent(false);
     setIsLoading(false);
     onClose();
-  }, [useGlobalSettings, overrides, preferences, hexBounds, mapType, coordinateDisplayMode, onSave, onClose, backgroundImagePath, boundsLocked, imageDimensions, gridDensity, customColumns, imageOpacity, orientation]);
+  }, [useGlobalSettings, overrides, preferences, hexBounds, mapType, coordinateDisplayMode, distanceSettings, onSave, onClose, backgroundImagePath, boundsLocked, imageDimensions, gridDensity, customColumns, imageOpacity, imageOffsetX, imageOffsetY, orientation, deleteOrphanedContent]);
   
   const handleCancel = dc.useCallback(() => {
     onClose();
@@ -364,6 +533,7 @@ function MapSettingsModal({
     if (mapType === 'hex') {
       baseTabs.push({ id: 'hexgrid', label: 'Hex Grid' });
     }
+    baseTabs.push({ id: 'measurement', label: 'Measurement' });
     baseTabs.push({ id: 'preferences', label: 'Preferences' });
     return baseTabs;
   }, [mapType]);
@@ -510,15 +680,15 @@ function MapSettingsModal({
                     }}
                   >
                     <label class="dmt-form-label" style={{ marginBottom: '8px' }}>
-                      Grid Line Width: {overrides.gridLineWidth}px
+                      Grid Line Width: {overrides.gridLineWidth ?? 1}px
                     </label>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                       <input
                         type="range"
                         min="1"
                         max="5"
-                        value={overrides.gridLineWidth}
-                        onChange={(e) => handleLineWidthChange(e.target.value)}
+                        value={overrides.gridLineWidth ?? 1}
+                        onInput={(e) => handleLineWidthChange(e.target.value)}
                         disabled={useGlobalSettings}
                         style={{
                           flex: 1,
@@ -528,7 +698,7 @@ function MapSettingsModal({
                       <button
                         class="dmt-color-reset-btn"
                         disabled={useGlobalSettings}
-                        onClick={() => !useGlobalSettings && handleLineWidthChange(THEME.grid.lineWidth)}
+                        onClick={() => !useGlobalSettings && handleLineWidthChange(1)}
                         title="Reset to default (1px)"
                         style={{ cursor: useGlobalSettings ? 'not-allowed' : 'pointer' }}
                       >
@@ -794,6 +964,69 @@ function MapSettingsModal({
                       </p>
                     </div>
                   )}
+                  
+                  {/* Image offset controls - only show when image is selected */}
+                  {backgroundImagePath && (
+                    <div style={{ marginTop: '16px' }}>
+                      <label class="dmt-form-label" style={{ marginBottom: '8px', display: 'block' }}>
+                        Image Offset (pixels)
+                      </label>
+                      <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                          <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>X:</span>
+                          <input
+                            type="number"
+                            value={imageOffsetX}
+                            onChange={(e) => setImageOffsetX(parseInt(e.target.value, 10) || 0)}
+                            class="dmt-number-input"
+                            style={{
+                              width: '80px',
+                              padding: '6px 8px',
+                              border: '1px solid var(--background-modifier-border)',
+                              borderRadius: '4px',
+                              background: 'var(--background-primary)',
+                              color: 'var(--text-normal)'
+                            }}
+                          />
+                        </div>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                          <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Y:</span>
+                          <input
+                            type="number"
+                            value={imageOffsetY}
+                            onChange={(e) => setImageOffsetY(parseInt(e.target.value, 10) || 0)}
+                            class="dmt-number-input"
+                            style={{
+                              width: '80px',
+                              padding: '6px 8px',
+                              border: '1px solid var(--background-modifier-border)',
+                              borderRadius: '4px',
+                              background: 'var(--background-primary)',
+                              color: 'var(--text-normal)'
+                            }}
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => { setImageOffsetX(0); setImageOffsetY(0); }}
+                          style={{
+                            padding: '4px 8px',
+                            fontSize: '12px',
+                            background: 'var(--background-secondary)',
+                            border: '1px solid var(--background-modifier-border)',
+                            borderRadius: '4px',
+                            color: 'var(--text-muted)',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Reset
+                        </button>
+                      </div>
+                      <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                        Fine-tune image alignment with the hex grid
+                      </p>
+                    </div>
+                  )}
                 </div>
                 
                 {/* Bounds - Columns and Rows on same row */}
@@ -897,7 +1130,7 @@ function MapSettingsModal({
                         style={{ marginTop: '2px' }}
                       />
                       <div>
-                        <span style={{ fontWeight: 500 }}>â—ˆ, 1-1, 2-5, ...)</span>
+                        <span style={{ fontWeight: 500 }}>Radial (⬡, 1-1, 2-5, ...)</span>
                         <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
                           Ring-position labels centered in grid
                         </p>
@@ -933,6 +1166,92 @@ function MapSettingsModal({
                       buttonRef={coordinateTextShadowBtnRef}
                       defaultColor={THEME.coordinateText.shadow}
                     />
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {/* Tab: Measurement */}
+            {activeTab === 'measurement' && (
+              <div class="dmt-settings-tab-content">
+                <div class="dmt-form-group" style={{ marginBottom: '16px' }}>
+                  <label class="dmt-checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={!distanceSettings.useGlobalDistance}
+                      onChange={() => setDistanceSettings(prev => ({
+                        ...prev,
+                        useGlobalDistance: !prev.useGlobalDistance
+                      }))}
+                      class="dmt-checkbox"
+                    />
+                    <span>Use custom measurement settings for this map</span>
+                  </label>
+                </div>
+                
+                <div style={{ opacity: distanceSettings.useGlobalDistance ? 0.5 : 1 }}>
+                  <div class="dmt-form-group">
+                    <label class="dmt-form-label">Distance per {isHexMap ? 'Hex' : 'Cell'}</label>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <input
+                        type="number"
+                        min="0.1"
+                        step="0.1"
+                        value={distanceSettings.distancePerCell}
+                        disabled={distanceSettings.useGlobalDistance}
+                        onChange={(e) => {
+                          const val = parseFloat(e.target.value);
+                          if (!isNaN(val) && val > 0) {
+                            setDistanceSettings(prev => ({ ...prev, distancePerCell: val }));
+                          }
+                        }}
+                        class="dmt-form-input"
+                        style={{ width: '80px' }}
+                      />
+                      <select
+                        value={distanceSettings.distanceUnit}
+                        disabled={distanceSettings.useGlobalDistance}
+                        onChange={(e) => setDistanceSettings(prev => ({ ...prev, distanceUnit: e.target.value }))}
+                        class="dmt-form-select"
+                        style={{ width: '120px' }}
+                      >
+                        <option value="ft">feet</option>
+                        <option value="m">meters</option>
+                        <option value="mi">miles</option>
+                        <option value="km">kilometers</option>
+                        <option value="yd">yards</option>
+                      </select>
+                    </div>
+                  </div>
+                  
+                  {!isHexMap && (
+                    <div class="dmt-form-group">
+                      <label class="dmt-form-label">Diagonal Movement</label>
+                      <select
+                        value={distanceSettings.gridDiagonalRule}
+                        disabled={distanceSettings.useGlobalDistance}
+                        onChange={(e) => setDistanceSettings(prev => ({ ...prev, gridDiagonalRule: e.target.value }))}
+                        class="dmt-form-select"
+                      >
+                        <option value="alternating">Alternating (5-10-5-10, D&D 5e)</option>
+                        <option value="equal">Equal (Chebyshev, all moves = 1)</option>
+                        <option value="euclidean">True Distance (Euclidean)</option>
+                      </select>
+                    </div>
+                  )}
+                  
+                  <div class="dmt-form-group">
+                    <label class="dmt-form-label">Display Format</label>
+                    <select
+                      value={distanceSettings.displayFormat}
+                      disabled={distanceSettings.useGlobalDistance}
+                      onChange={(e) => setDistanceSettings(prev => ({ ...prev, displayFormat: e.target.value }))}
+                      class="dmt-form-select"
+                    >
+                      <option value="both">Cells and Units (e.g., "3 cells (15 ft)")</option>
+                      <option value="cells">Cells Only (e.g., "3 cells")</option>
+                      <option value="units">Units Only (e.g., "15 ft")</option>
+                    </select>
                   </div>
                 </div>
               </div>
@@ -1003,6 +1322,103 @@ function MapSettingsModal({
           </div>
         </div>
       </div>
+      
+      {/* Resize Confirmation Dialog - in separate portal to render above settings */}
+      {showResizeConfirm && (
+        <ModalPortal>
+          <div 
+            class="dmt-modal-backdrop" 
+            style={{ 
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0, 0, 0, 0.5)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 10001
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div 
+              class="dmt-confirm-dialog"
+              style={{
+                background: 'var(--background-primary)',
+                borderRadius: '8px',
+                padding: '20px',
+                maxWidth: '400px',
+                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
+                border: '1px solid var(--background-modifier-border)'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                <span style={{ color: 'var(--text-warning)', display: 'flex' }}>
+                  <dc.Icon icon="lucide-alert-triangle" />
+                </span>
+                <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: 'var(--text-normal)' }}>
+                  Content Outside New Grid
+                </h3>
+              </div>
+              
+              <p style={{ fontSize: '14px', color: 'var(--text-normal)', marginBottom: '12px', lineHeight: '1.5' }}>
+                Resizing the grid will remove content outside the new boundaries:
+              </p>
+              
+              <ul style={{ 
+                fontSize: '13px', 
+                color: 'var(--text-muted)', 
+                marginBottom: '16px', 
+                paddingLeft: '20px',
+                lineHeight: '1.6'
+              }}>
+                {orphanInfo.cells > 0 && (
+                  <li>{orphanInfo.cells} painted cell{orphanInfo.cells !== 1 ? 's' : ''}</li>
+                )}
+                {orphanInfo.objects > 0 && (
+                  <li>{orphanInfo.objects} object{orphanInfo.objects !== 1 ? 's' : ''}/pin{orphanInfo.objects !== 1 ? 's' : ''}</li>
+                )}
+              </ul>
+              
+              <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '20px', lineHeight: '1.5' }}>
+                This content will be permanently deleted when you save. To recover it, cancel and expand the grid bounds instead.
+              </p>
+              
+              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                <button
+                  class="dmt-modal-btn"
+                  onClick={handleResizeConfirmCancel}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '4px',
+                    border: '1px solid var(--background-modifier-border)',
+                    background: 'var(--background-secondary)',
+                    color: 'var(--text-normal)',
+                    cursor: 'pointer',
+                    fontSize: '13px'
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  class="dmt-modal-btn"
+                  onClick={handleResizeConfirmDelete}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '4px',
+                    border: 'none',
+                    background: 'var(--text-error)',
+                    color: 'white',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    fontWeight: 500
+                  }}
+                >
+                  Delete & Resize
+                </button>
+              </div>
+            </div>
+          </div>
+        </ModalPortal>
+      )}
     </ModalPortal>
   );
 }

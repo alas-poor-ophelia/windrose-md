@@ -10,13 +10,9 @@ const { requireModuleByName, getBasePath } = await dc.require(`${window.__dmtBas
 const css = await app.vault.cachedRead(
   await app.vault.getFileByPath(`${getBasePath()}/css/DungeonMapTracker.css`)
 );
-const fontCss = await app.vault.cachedRead(
-  await app.vault.getFileByPath(`${getBasePath()}/css/DungeonMapTracker - FONTS.css`)
-);
 
 const combinedCss = [
   css,
-  fontCss
 ].join('\n');
 
 
@@ -33,6 +29,14 @@ const { MapSettingsModal } = await requireModuleByName("MapSettingsModal.jsx");
 const { getSetting, getTheme, getEffectiveSettings } = await requireModuleByName("settingsAccessor.js");
 const { DEFAULTS } = await requireModuleByName("dmtConstants.js");
 const { DEFAULT_COLOR, getColorByHex, isDefaultColor } = await requireModuleByName("colorOperations.js");
+const { axialToOffset, isWithinOffsetBounds } = await requireModuleByName("offsetCoordinates.js");
+
+// RPGAwesome icon font support
+const { RA_ICONS } = await requireModuleByName("rpgAwesomeIcons.js");
+const { injectIconCSS } = await requireModuleByName("rpgAwesomeLoader.js");
+
+// Inject RPGAwesome icon CSS classes on module load
+injectIconCSS(RA_ICONS);
 
 
 // ============================================================================
@@ -98,6 +102,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   const [currentTool, setCurrentTool] = dc.useState('draw');
   const [selectedObjectType, setSelectedObjectType] = dc.useState(null);
   const [selectedColor, setSelectedColor] = dc.useState(DEFAULT_COLOR);
+  const [selectedOpacity, setSelectedOpacity] = dc.useState(1);  // Opacity for painting (0-1)
   const [isColorPickerOpen, setIsColorPickerOpen] = dc.useState(false);
   const [showFooter, setShowFooter] = dc.useState(false);
   const [isFocused, setIsFocused] = dc.useState(false);
@@ -130,7 +135,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   const theme = effectiveSettings ? {
     grid: {
       lines: effectiveSettings.gridLineColor,
-      lineWidth: effectiveSettings.gridLineWidth ?? 1,
+      lineWidth: effectiveSettings.gridLineWidth,
       background: effectiveSettings.backgroundColor
     },
     cells: {
@@ -241,7 +246,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     setShowPluginInstaller(false);
   };
 
-  // Initialize history with empty state (including objects and text labels)
+  // Initialize history with empty state (including objects, text labels, and edges)
   const {
     currentState: historyState,
     addToHistory,
@@ -250,7 +255,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     canUndo,
     canRedo,
     resetHistory
-  } = useHistory({ cells: [], name: "", objects: [], textLabels: [] });
+  } = useHistory({ cells: [], name: "", objects: [], textLabels: [], edges: [] });
 
   const containerRef = dc.useRef(null);
 
@@ -299,7 +304,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
         cells: mapData.cells,
         name: mapData.name,
         objects: mapData.objects || [],
-        textLabels: mapData.textLabels || []
+        textLabels: mapData.textLabels || [],
+        edges: mapData.edges || []
       });
       historyInitialized.current = true;
     }
@@ -315,7 +321,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
       cells: mapData.cells,
       name: newName,
       objects: mapData.objects || [],
-      textLabels: mapData.textLabels || []
+      textLabels: mapData.textLabels || [],
+      edges: mapData.edges || []
     });
   };
 
@@ -332,7 +339,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
         cells: newCells,
         name: mapData.name,
         objects: mapData.objects || [],
-        textLabels: mapData.textLabels || []
+        textLabels: mapData.textLabels || [],
+        edges: mapData.edges || []
       });
     }
   };
@@ -350,7 +358,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
         cells: mapData.cells,
         name: mapData.name,
         objects: newObjects,
-        textLabels: mapData.textLabels || []
+        textLabels: mapData.textLabels || [],
+        edges: mapData.edges || []
       });
     }
   };
@@ -368,7 +377,27 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
         cells: mapData.cells,
         name: mapData.name,
         objects: mapData.objects || [],
-        textLabels: newTextLabels
+        textLabels: newTextLabels,
+        edges: mapData.edges || []
+      });
+    }
+  };
+
+  // Handle edges change (for edge painting feature)
+  const handleEdgesChange = (newEdges, suppressHistory = false) => {
+    if (!mapData || isApplyingHistoryRef.current) return;
+
+    const newMapData = { ...mapData, edges: newEdges };
+    updateMapData(newMapData);
+
+    // Only add to history if not suppressed (used for batched operations)
+    if (!suppressHistory) {
+      addToHistory({
+        cells: mapData.cells,
+        name: mapData.name,
+        objects: mapData.objects || [],
+        textLabels: mapData.textLabels || [],
+        edges: newEdges
       });
     }
   };
@@ -437,7 +466,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
         cells: previousState.cells,
         name: previousState.name,
         objects: previousState.objects || [],
-        textLabels: previousState.textLabels || []
+        textLabels: previousState.textLabels || [],
+        edges: previousState.edges || []
       };
       updateMapData(newMapData);
       // Use setTimeout to ensure state update completes before re-enabling history
@@ -457,7 +487,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
         cells: nextState.cells,
         name: nextState.name,
         objects: nextState.objects || [],
-        textLabels: nextState.textLabels || []
+        textLabels: nextState.textLabels || [],
+        edges: nextState.edges || []
       };
       updateMapData(newMapData);
       // Use setTimeout to ensure state update completes before re-enabling history
@@ -497,7 +528,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   const handleCompassClick = () => {
     if (!mapData) return;
 
-    // Cycle through: 0ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â° -> 90ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â° -> 180ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â° -> 270ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â° -> 0ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°
+    // Cycle through: 0Â° -> 90Â° -> 180Â° -> 270Â° -> 0Â°
     const rotations = [0, 90, 180, 270];
     const currentIndex = rotations.indexOf(mapData.northDirection);
     const nextIndex = (currentIndex + 1) % rotations.length;
@@ -558,7 +589,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     setShowSettingsModal(true);
   };
 
-  const handleSettingsSave = (settingsData, preferencesData, hexBounds = null, backgroundImage = undefined, hexSize = null) => {
+  const handleSettingsSave = (settingsData, preferencesData, hexBounds = null, backgroundImage = undefined, hexSize = null, deleteOrphanedContent = false) => {
     if (!mapData) return;
     
     const newMapData = {
@@ -570,6 +601,27 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     // Only update hexBounds for hex maps
     if (hexBounds !== null && mapData.mapType === 'hex') {
       newMapData.hexBounds = hexBounds;
+      
+      // If requested, delete content that would be outside the new bounds
+      if (deleteOrphanedContent) {
+        const orientation = mapData.orientation || 'flat';
+        
+        // Filter cells to keep only those within new bounds
+        if (newMapData.cells && newMapData.cells.length > 0) {
+          newMapData.cells = newMapData.cells.filter(cell => {
+            const { col, row } = axialToOffset(cell.q, cell.r, orientation);
+            return isWithinOffsetBounds(col, row, hexBounds);
+          });
+        }
+        
+        // Filter objects to keep only those within new bounds
+        if (newMapData.objects && newMapData.objects.length > 0) {
+          newMapData.objects = newMapData.objects.filter(obj => {
+            const { col, row } = axialToOffset(obj.position.x, obj.position.y, orientation);
+            return isWithinOffsetBounds(col, row, hexBounds);
+          });
+        }
+      }
     }
     
     // Only update backgroundImage for hex maps
@@ -653,12 +705,15 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
           canRedo={canRedo}
           selectedColor={selectedColor}
           onColorChange={handleColorChange}
+          selectedOpacity={selectedOpacity}
+          onOpacityChange={setSelectedOpacity}
           isColorPickerOpen={isColorPickerOpen}
           onColorPickerOpenChange={setIsColorPickerOpen}
           customColors={mapData.customColors || []}
           onAddCustomColor={handleAddCustomColor}
           onDeleteCustomColor={handleDeleteCustomColor}
           mapType={mapData.mapType}
+          isFocused={isFocused}
         />
 
         <VisibilityToolbar
@@ -687,6 +742,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               onCellsChange={handleCellsChange}
               onObjectsChange={handleObjectsChange}
               onTextLabelsChange={handleTextLabelsChange}
+              onEdgesChange={handleEdgesChange}
               onViewStateChange={handleViewStateChange}
               currentTool={currentTool}
               selectedObjectType={selectedObjectType}
@@ -704,6 +760,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               <MapCanvas.DrawingLayer
                 currentTool={currentTool}
                 selectedColor={selectedColor}
+                selectedOpacity={selectedOpacity}
               />
               
               {/* ObjectLayer - handles object placement and interactions */}
@@ -731,6 +788,13 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               
               {/* HexCoordinateLayer - displays coordinate labels when 'C' key is held */}
               <MapCanvas.HexCoordinateLayer />
+
+              {/* MeasurementLayer - distance measurement tool overlay */}
+              <MapCanvas.MeasurementLayer
+                currentTool={currentTool}
+                globalSettings={effectiveSettings}
+                mapDistanceOverrides={mapData?.distanceSettings}
+              />
             </MapCanvas>
           </div>
 
@@ -776,6 +840,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
           currentPreferences={mapData.uiPreferences}
           currentHexBounds={mapData.mapType === 'hex' ? mapData.hexBounds : null}
           currentBackgroundImage={mapData.mapType === 'hex' ? mapData.backgroundImage : null}
+          currentCells={mapData.mapType === 'hex' ? (mapData.cells || []) : []}
+          currentObjects={mapData.mapType === 'hex' ? (mapData.objects || []) : []}
         />
       </div>
     </>

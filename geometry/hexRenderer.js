@@ -36,7 +36,7 @@ const hexRenderer = {
   /**
    * Render painted hexes
    * @param {CanvasRenderingContext2D} ctx
-   * @param {Array} cells - Array of {q, r, color}
+   * @param {Array} cells - Array of {q, r, color, opacity?}
    * @param {HexGeometry} geometry
    * @param {Object} viewState - {x, y, zoom}
    */
@@ -44,6 +44,12 @@ const hexRenderer = {
     if (!cells || cells.length === 0) return;
     
     cells.forEach(cell => {
+      // Apply opacity if specified
+      const opacity = cell.opacity ?? 1;
+      if (opacity < 1) {
+        ctx.globalAlpha = opacity;
+      }
+      
       geometry.drawHex(
         ctx,
         cell.q,
@@ -53,6 +59,11 @@ const hexRenderer = {
         viewState.zoom,
         cell.color
       );
+      
+      // Reset opacity
+      if (opacity < 1) {
+        ctx.globalAlpha = 1;
+      }
     });
   },
 
@@ -83,8 +94,9 @@ const hexRenderer = {
    */
   renderCellHighlight(ctx, cell, geometry, viewState, isResizeMode) {
     // Selection border (thicker for hex to be visible)
-    ctx.strokeStyle = isResizeMode ? '#ff6b6b' : '#4dabf7';
-    ctx.lineWidth = 3;
+    // Use fillStyle since drawHexOutline now uses fill-based rendering
+    ctx.fillStyle = isResizeMode ? '#ff6b6b' : '#4dabf7';
+    const lineWidth = 3;
     
     geometry.drawHexOutline(
       ctx,
@@ -92,7 +104,8 @@ const hexRenderer = {
       cell.r,
       viewState.x,
       viewState.y,
-      viewState.zoom
+      viewState.zoom,
+      lineWidth
     );
     
     // Note: Resize mode doesn't apply to individual hexes (no corner handles)

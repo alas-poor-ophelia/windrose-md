@@ -1,9 +1,10 @@
 /**
  * useDrawingTools.js
  * 
- * Custom hook for managing drawing tools (paint, rectangle, circle, clear area).
+ * Custom hook for managing drawing tools (paint, rectangle, circle, clear area, edge paint).
  * Handles all drawing-related state and operations including:
  * - Paint tool (draw/erase) with cell tracking
+ * - Edge paint tool for painting grid edges
  * - Rectangle drawing
  * - Circle drawing
  * - Clear area tool
@@ -14,15 +15,19 @@ const pathResolverPath = dc.resolvePath("pathResolver.js");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
 const { useMapState, useMapOperations } = await requireModuleByName("MapContext.jsx");
+const { addEdge, removeEdge, getEdgeAt, generateEdgeLine, mergeEdges } = await requireModuleByName("edgeOperations.js");
+const { eraseObjectAt } = await requireModuleByName("objectOperations.js");
 
 /**
  * Hook for managing drawing tools
  * @param {string} currentTool - Current active tool
  * @param {string} selectedColor - Currently selected color
+ * @param {number} selectedOpacity - Currently selected opacity (0-1)
  */
 const useDrawingTools = (
   currentTool,
-  selectedColor
+  selectedColor,
+  selectedOpacity = 1
 ) => {
   // Get all required state and operations from Context
   const {
@@ -39,6 +44,7 @@ const useDrawingTools = (
     onCellsChange,
     onObjectsChange,
     onTextLabelsChange,
+    onEdgesChange,
     getTextLabelAtPosition,
     removeTextLabel,
     getObjectAtPosition,
@@ -47,15 +53,17 @@ const useDrawingTools = (
   } = useMapOperations();
   
   // Drawing state
-  // Drawing state
   const [isDrawing, setIsDrawing] = dc.useState(false);
   const [processedCells, setProcessedCells] = dc.useState(new Set());
+  const [processedEdges, setProcessedEdges] = dc.useState(new Set()); // Track processed edges for edge paint
   const [rectangleStart, setRectangleStart] = dc.useState(null);
   const [circleStart, setCircleStart] = dc.useState(null);
+  const [edgeLineStart, setEdgeLineStart] = dc.useState(null); // For edge line tool (two-click)
   
-  // Track initial cell state at start of drag stroke for batched history
+  // Track initial state at start of drag stroke for batched history
   // This allows immediate visual updates while creating a single undo entry
   const strokeInitialStateRef = dc.useRef(null);
+  const strokeInitialEdgesRef = dc.useRef(null); // For edge strokes
   
   /**
    * Toggle a single cell (paint or erase)
@@ -82,23 +90,23 @@ const useDrawingTools = (
     
     if (shouldFill) {
       if (existingCellIndex !== -1) {
-        // Cell exists - update its color (paint over)
+        // Cell exists - update its color and opacity (paint over)
         const newCells = [...mapData.cells];
         newCells[existingCellIndex] = {
           ...newCells[existingCellIndex],
-          color: selectedColor
+          color: selectedColor,
+          opacity: selectedOpacity
         };
         onCellsChange(newCells, isBatchedStroke);
       } else {
-        // Cell doesn't exist - create new with selected color
-        const newCells = [
-          ...mapData.cells, 
-          geometry.createCellObject(coords, selectedColor)
-        ];
+        // Cell doesn't exist - create new with selected color and opacity
+        const newCell = geometry.createCellObject(coords, selectedColor);
+        newCell.opacity = selectedOpacity;
+        const newCells = [...mapData.cells, newCell];
         onCellsChange(newCells, isBatchedStroke);
       }
     } else if (!shouldFill) {
-      // When erasing: check text first, then objects, then cells
+      // When erasing: check text first, then objects, then edges, then cells
       // First check for text label (requires world coordinates)
       const { clientX, clientY } = dragStart || { clientX: 0, clientY: 0 };
       const worldCoords = screenToWorld(clientX, clientY);
@@ -116,6 +124,26 @@ const useDrawingTools = (
           onTextLabelsChange(newLabels);
           return;
         }
+        
+        // Check for edge if this is a grid map and we're near an edge
+        if (geometry instanceof GridGeometry && onEdgesChange) {
+          const edgeInfo = geometry.screenToEdge(worldCoords.worldX, worldCoords.worldY, 0.15);
+          if (edgeInfo) {
+            // Create edge key for tracking processed edges during drag
+            const edgeKey = `${edgeInfo.x},${edgeInfo.y},${edgeInfo.side}`;
+            
+            // Skip if already processed this edge during current stroke
+            if (!processedEdges.has(edgeKey)) {
+              const existingEdge = getEdgeAt(mapData.edges || [], edgeInfo.x, edgeInfo.y, edgeInfo.side);
+              if (existingEdge) {
+                setProcessedEdges(prev => new Set([...prev, edgeKey]));
+                const newEdges = removeEdge(mapData.edges || [], edgeInfo.x, edgeInfo.y, edgeInfo.side);
+                onEdgesChange(newEdges, isBatchedStroke);
+                return;
+              }
+            }
+          }
+        }
       }
       
       // Then check for object (extract coordinates based on map type)
@@ -123,8 +151,12 @@ const useDrawingTools = (
       const coordY = coords.gridY !== undefined ? coords.gridY : coords.r;
       const obj = getObjectAtPosition(mapData.objects || [], coordX, coordY);
       if (obj) {
-        const newObjects = removeObjectAtPosition(mapData.objects || [], coordX, coordY);
-        onObjectsChange(newObjects);
+        // Use unified API - handles hex (one at a time) vs grid (all at position)
+        const mapType = mapData.mapType || 'grid';
+        const result = eraseObjectAt(mapData.objects || [], coordX, coordY, mapType);
+        if (result.success) {
+          onObjectsChange(result.objects);
+        }
       } else if (existingCellIndex !== -1) {
         // Finally remove cell if no text or object
         const newCells = mapData.cells.filter(
@@ -133,6 +165,133 @@ const useDrawingTools = (
         onCellsChange(newCells, isBatchedStroke);
       }
     }
+  };
+  
+  /**
+   * Paint or erase a single edge
+   * Only works for grid maps (edges are a grid-only feature)
+   * @param {number} worldX - World X coordinate
+   * @param {number} worldY - World Y coordinate
+   * @param {boolean} shouldPaint - True to paint, false to erase
+   */
+  const toggleEdge = (worldX, worldY, shouldPaint) => {
+    if (!mapData || !geometry || !onEdgesChange) return;
+    
+    // Edge painting only works for grid geometry
+    if (!(geometry instanceof GridGeometry)) return;
+    
+    // Use screenToEdge to detect which edge was clicked
+    const edgeInfo = geometry.screenToEdge(worldX, worldY, 0.15);
+    if (!edgeInfo) return; // Click was in cell center, not near an edge
+    
+    const { x, y, side } = edgeInfo;
+    
+    // Check if we're in a batched stroke (suppress history for intermediate updates)
+    const isBatchedStroke = strokeInitialEdgesRef.current !== null;
+    
+    if (shouldPaint) {
+      // Paint the edge with selected color and opacity
+      const newEdges = addEdge(mapData.edges || [], x, y, side, selectedColor, selectedOpacity);
+      onEdgesChange(newEdges, isBatchedStroke);
+    } else {
+      // Erase the edge
+      const newEdges = removeEdge(mapData.edges || [], x, y, side);
+      onEdgesChange(newEdges, isBatchedStroke);
+    }
+  };
+  
+  /**
+   * Process edge during drag (for edgeDraw/edgeErase tools)
+   */
+  const processEdgeDuringDrag = (e) => {
+    if (!geometry || !(geometry instanceof GridGeometry)) return;
+    
+    const { clientX, clientY } = getClientCoords(e);
+    const worldCoords = screenToWorld(clientX, clientY);
+    if (!worldCoords) return;
+    
+    // Detect edge at this position
+    const edgeInfo = geometry.screenToEdge(worldCoords.worldX, worldCoords.worldY, 0.15);
+    if (!edgeInfo) return;
+    
+    // Generate unique key for this edge (using normalized position)
+    const edgeKey = `${edgeInfo.x},${edgeInfo.y},${edgeInfo.side}`;
+    
+    if (processedEdges.has(edgeKey)) return;
+    
+    setProcessedEdges(prev => new Set([...prev, edgeKey]));
+    
+    const shouldPaint = currentTool === 'edgeDraw';
+    toggleEdge(worldCoords.worldX, worldCoords.worldY, shouldPaint);
+  };
+  
+  /**
+   * Start edge drawing stroke
+   */
+  const startEdgeDrawing = (e) => {
+    if (!mapData) return;
+    
+    setIsDrawing(true);
+    setProcessedEdges(new Set());
+    // Store initial edge state for batched history entry at stroke end
+    strokeInitialEdgesRef.current = [...(mapData.edges || [])];
+    processEdgeDuringDrag(e);
+  };
+  
+  /**
+   * Stop edge drawing stroke and create history entry
+   */
+  const stopEdgeDrawing = () => {
+    if (!isDrawing) return;
+    
+    setIsDrawing(false);
+    setProcessedEdges(new Set());
+    
+    // Add single history entry for the completed stroke
+    if (strokeInitialEdgesRef.current !== null && mapData && onEdgesChange) {
+      onEdgesChange(mapData.edges || [], false);
+      strokeInitialEdgesRef.current = null;
+    }
+  };
+  
+  /**
+   * Fill edges along a line between two grid intersections
+   * Constrains to horizontal or vertical based on dominant axis
+   * @param {number} x1 - Start grid x
+   * @param {number} y1 - Start grid y
+   * @param {number} x2 - End grid x
+   * @param {number} y2 - End grid y
+   */
+  const fillEdgeLine = (x1, y1, x2, y2) => {
+    if (!mapData || !onEdgesChange) return;
+    if (!(geometry instanceof GridGeometry)) return;
+    
+    // Determine if this is more horizontal or vertical
+    const dx = Math.abs(x2 - x1);
+    const dy = Math.abs(y2 - y1);
+    
+    let lineX1, lineY1, lineX2, lineY2;
+    
+    if (dx >= dy) {
+      // Horizontal line - constrain y to start point
+      lineX1 = x1;
+      lineY1 = y1;
+      lineX2 = x2;
+      lineY2 = y1; // Same y as start
+    } else {
+      // Vertical line - constrain x to start point
+      lineX1 = x1;
+      lineY1 = y1;
+      lineX2 = x1; // Same x as start
+      lineY2 = y2;
+    }
+    
+    // Generate the edges for this line
+    const newEdgesData = generateEdgeLine(lineX1, lineY1, lineX2, lineY2, selectedColor);
+    
+    // Merge with existing edges
+    const newEdges = mergeEdges(mapData.edges || [], newEdgesData);
+    onEdgesChange(newEdges);
   };
   
   /**
@@ -153,14 +312,17 @@ const useDrawingTools = (
       const existingIndex = newCells.findIndex(c => geometry.cellMatchesCoords(c, coords));
       
       if (existingIndex !== -1) {
-        // Cell exists - update its color (paint over)
+        // Cell exists - update its color and opacity (paint over)
         newCells[existingIndex] = {
           ...newCells[existingIndex],
-          color: selectedColor
+          color: selectedColor,
+          opacity: selectedOpacity
         };
       } else {
-        // Cell doesn't exist - create new
-        newCells.push(geometry.createCellObject(coords, selectedColor));
+        // Cell doesn't exist - create new with opacity
+        const newCell = geometry.createCellObject(coords, selectedColor);
+        newCell.opacity = selectedOpacity;
+        newCells.push(newCell);
       }
     }
     
@@ -186,14 +348,17 @@ const useDrawingTools = (
       const existingIndex = newCells.findIndex(c => geometry.cellMatchesCoords(c, coords));
       
       if (existingIndex !== -1) {
-        // Cell exists - update its color (paint over)
+        // Cell exists - update its color and opacity (paint over)
         newCells[existingIndex] = {
           ...newCells[existingIndex],
-          color: selectedColor
+          color: selectedColor,
+          opacity: selectedOpacity
         };
       } else {
-        // Cell doesn't exist - create new
-        newCells.push(geometry.createCellObject(coords, selectedColor));
+        // Cell doesn't exist - create new with opacity
+        const newCell = geometry.createCellObject(coords, selectedColor);
+        newCell.opacity = selectedOpacity;
+        newCells.push(newCell);
       }
     }
     
@@ -261,15 +426,19 @@ const useDrawingTools = (
     setProcessedCells(prev => new Set([...prev, cellKey]));
     
     const shouldFill = currentTool === 'draw';
-    toggleCell(coords, shouldFill, dragStart);
+    // Pass the current event coordinates for edge/text detection during erase
+    toggleCell(coords, shouldFill, { clientX, clientY });
   };
   const startDrawing = (e, dragStart = null) => {
     if (!mapData) return;
     
     setIsDrawing(true);
     setProcessedCells(new Set());
+    setProcessedEdges(new Set()); // Also reset processed edges for erase strokes
     // Store initial cell state for batched history entry at stroke end
     strokeInitialStateRef.current = [...mapData.cells];
+    // Also store initial edge state for erase strokes that may remove edges
+    strokeInitialEdgesRef.current = mapData.edges ? [...mapData.edges] : [];
     processCellDuringDrag(e, dragStart);
   };
   
@@ -281,11 +450,17 @@ const useDrawingTools = (
     
     setIsDrawing(false);
     setProcessedCells(new Set());
+    setProcessedEdges(new Set());
     
-    // Add single history entry for the completed stroke
+    // Add single history entry for the completed stroke (cells)
     if (strokeInitialStateRef.current !== null && mapData) {
       onCellsChange(mapData.cells, false);
       strokeInitialStateRef.current = null;
+    }
+    // Add single history entry for edges if any were erased
+    if (strokeInitialEdgesRef.current !== null && mapData && onEdgesChange) {
+      onEdgesChange(mapData.edges || [], false);
+      strokeInitialEdgesRef.current = null;
     }
   };
   
@@ -319,6 +494,36 @@ const useDrawingTools = (
       return true;
     }
     
+    // Handle edge line tool (two-click, grid maps only)
+    // Snaps to nearest grid intersection point
+    if (currentTool === 'edgeLine') {
+      if (!(geometry instanceof GridGeometry)) return false;
+      
+      // Get world coordinates to find nearest intersection
+      const { clientX, clientY } = getClientCoords(e);
+      const worldCoords = screenToWorld(clientX, clientY);
+      if (!worldCoords) return false;
+      
+      // Find nearest grid intersection by rounding world coords to cell size
+      const cellSize = geometry.cellSize;
+      const nearestX = Math.round(worldCoords.worldX / cellSize);
+      const nearestY = Math.round(worldCoords.worldY / cellSize);
+      
+      if (!edgeLineStart) {
+        setEdgeLineStart({ x: nearestX, y: nearestY });
+      } else {
+        fillEdgeLine(edgeLineStart.x, edgeLineStart.y, nearestX, nearestY);
+        setEdgeLineStart(null);
+      }
+      return true;
+    }
+    
+    // Handle edge paint/erase tools (grid maps only)
+    if (currentTool === 'edgeDraw' || currentTool === 'edgeErase') {
+      startEdgeDrawing(e);
+      return true;
+    }
+    
     // Handle paint/erase tools
     if (currentTool === 'draw' || currentTool === 'erase') {
       startDrawing(e);
@@ -333,6 +538,13 @@ const useDrawingTools = (
    * Returns true if the event was handled by drawing tools
    */
   const handleDrawingPointerMove = (e, dragStart = null) => {
+    // Handle edge paint/erase during drag
+    if (isDrawing && (currentTool === 'edgeDraw' || currentTool === 'edgeErase')) {
+      processEdgeDuringDrag(e);
+      return true;
+    }
+    
+    // Handle cell paint/erase during drag
     if (isDrawing && (currentTool === 'draw' || currentTool === 'erase')) {
       processCellDuringDrag(e, dragStart);
       return true;
@@ -347,7 +559,9 @@ const useDrawingTools = (
     if (isDrawing) {
       setIsDrawing(false);
       setProcessedCells(new Set());
+      setProcessedEdges(new Set());
       strokeInitialStateRef.current = null;
+      strokeInitialEdgesRef.current = null;
     }
   };
   
@@ -357,6 +571,7 @@ const useDrawingTools = (
   const resetDrawingState = () => {
     setRectangleStart(null);
     setCircleStart(null);
+    setEdgeLineStart(null);
     cancelDrawing();
   };
   
@@ -370,8 +585,9 @@ const useDrawingTools = (
     isDrawing,
     rectangleStart,
     circleStart,
+    edgeLineStart,
     
-    // Functions
+    // Cell Functions
     toggleCell,
     fillRectangle,
     fillCircle,
@@ -379,6 +595,15 @@ const useDrawingTools = (
     processCellDuringDrag,
     startDrawing,
     stopDrawing,
+    
+    // Edge Functions
+    toggleEdge,
+    processEdgeDuringDrag,
+    startEdgeDrawing,
+    stopEdgeDrawing,
+    fillEdgeLine,
+    
+    // Handler Functions
     handleDrawingPointerDown,
     handleDrawingPointerMove,
     cancelDrawing,
@@ -387,8 +612,10 @@ const useDrawingTools = (
     // Setters (for advanced use cases)
     setIsDrawing,
     setProcessedCells,
+    setProcessedEdges,
     setRectangleStart,
-    setCircleStart
+    setCircleStart,
+    setEdgeLineStart
   };
 };
 

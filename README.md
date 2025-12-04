@@ -20,7 +20,7 @@ That said, it also works fully on desktop Obsidian, with the added convenience o
 
 **Drawing**
 
-- Paint cells with customizable colors
+- Paint cells with customizable colors (and opacity)
 - Rectangle and circle fill tools
 - Erase tool (or clear entire areas if your artistic vision is scuffed/a cat walks on your keyboard)
 - 50-level undo/redo (for when the cat walks on your keyboard a lot)
@@ -32,6 +32,7 @@ That said, it also works fully on desktop Obsidian, with the added convenience o
 - Set a size for your grid.
 - Display coordinates.
 - Coordinates can be configured to display as the default rectangle, or set to display a radial hex grid. Full radial/center out support coming soon.
+- Up to 4 objects allowed per hex, for any regions with multiple points of interest.
 - Supports background images. Select any image from your vault, and how many hexes you want to divide it into (with presets, as well as full customization).
 
 ![Hex Map](docs/images/hex-map-docs-screenshot.png)
@@ -39,7 +40,8 @@ That said, it also works fully on desktop Obsidian, with the added convenience o
 **Objects**
 
 - ~40 object types across categories: navigation (doors, stairs, portals), hazards (traps, pits), dungeon features (chests, altars, furniture), encounters (monsters, NPCs, bosses), and general markers.
-- Resize objects, rotate them, change their colors (including being able to assign custom ones), add notes, forget what the heck ♅ means (don't worry, there's tooltips). You can also move them around.
+- Full object customization: Rename, rearrange, delete, change the icon of any default object, as well as adding your own custom objects and categories. Supports any unicode character (so long as you have a supporting font), as well as the bundled RPG Awesome icon set.
+- Resize objects, rotate them, change their scale, change their colors (including being able to assign custom ones), add notes, forget what the heck ♅ means (don't worry, there's tooltips). You can also move them around.
 - Objects can be placed in the center of a grid space, or hold ALT while placing or dragging an object to enter Snap to Edges mode, which allows you to place objects on grid lines.
 - Link any object to an Obsidian note—hover to preview, ctrl/cmd+click to open
 
@@ -63,6 +65,8 @@ That said, it also works fully on desktop Obsidian, with the added convenience o
 
 ## Installation
 Windrose is distributed as a “[compiled](https://github.com/alas-poor-ophelia/datacore-compiler/)” Datacore script, which just means it’s been all packaged up in a single Markdown file, for nice and easy use.
+
+**IMPORTANT: As of version 1.1.0, the extra fonts are included as a separate file in the zip which must be added to your CSS snippets. This is to keep vault size down if you don't care about the extra fonts, allow better support inside the plugin, and allow easier customization for new fonts (more relevant for future releases.)
 
 There is also an optional but STRONGLY recommended Templater template included. All it does is just give you a shortcut to insert a new map, but it makes that process effortless, something which can otherwise be fiddly. But also completely optional.
 

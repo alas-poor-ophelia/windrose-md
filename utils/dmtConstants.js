@@ -40,8 +40,8 @@ const DEFAULTS = {
   hexSize: 80,              // Radius from center to vertex
   hexOrientation: 'flat',   // 'flat' or 'pointy'
   hexBounds: {
-    maxCol: 26,             // Default 27 columns (0-26) â†’ A-AA for coordinate keys
-    maxRow: 20              // Default 21 rows (0-20) â†’ 1-21 for coordinate keys
+    maxCol: 26,             // Default 27 columns (0-26) Ã¢â€ â€™ A-AA for coordinate keys
+    maxRow: 20              // Default 21 rows (0-20) Ã¢â€ â€™ 1-21 for coordinate keys
   },
   
   // Map type
@@ -57,7 +57,17 @@ const DEFAULTS = {
   minZoom: 0.1,       
   maxZoom: 4,         
   zoomButtonStep: 0.05, // zoom step for buttons 
-  zoomWheelStep: 0.05   // zoom step for wheel
+  zoomWheelStep: 0.05,  // zoom step for wheel
+  
+  // Distance measurement defaults
+  distance: {
+    perCellGrid: 5,              // Grid maps: 5 ft per cell (D&D standard)
+    perCellHex: 6,               // Hex maps: 6 miles per hex (common world map)
+    unitGrid: 'ft',              // Grid default unit
+    unitHex: 'mi',               // Hex default unit
+    gridDiagonalRule: 'alternating',  // 'alternating' | 'equal' | 'euclidean'
+    displayFormat: 'both'        // 'cells' | 'units' | 'both'
+  }
 };
 
 // Dynamically resolve the correct JSON path

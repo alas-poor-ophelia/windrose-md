@@ -1,7 +1,8 @@
 const pathResolverPath = dc.resolvePath("pathResolver.js");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
-const { OBJECT_TYPES, CATEGORIES } = await requireModuleByName("objectTypes.js");
+// Use resolver for dynamic object types (supports overrides and custom objects)
+const { getResolvedObjectTypes, getResolvedCategories, hasIconClass } = await requireModuleByName("objectTypeResolver.js");
 
 // Ornamental Arrow SVG - Double Chevron Design
 const OrnamentalArrow = ({ direction = "right" }) => {
@@ -48,11 +49,20 @@ const OrnamentalArrow = ({ direction = "right" }) => {
 };
 
 const ObjectSidebar = ({ selectedObjectType, onObjectTypeSelect, onToolChange, isCollapsed, onCollapseChange }) => {
-  // Group objects by category
-  const objectsByCategory = CATEGORIES.map(category => ({
-    ...category,
-    objects: OBJECT_TYPES.filter(obj => obj.category === category.id)
-  }));
+  // Get resolved object types and categories (includes overrides and custom)
+  const allObjectTypes = getResolvedObjectTypes();
+  const allCategories = getResolvedCategories();
+  
+  // Group objects by category (excluding 'notes' category which is handled specially)
+  const objectsByCategory = allCategories
+    .filter(category => category.id !== 'notes')
+    .map(category => ({
+      ...category,
+      objects: allObjectTypes
+        .filter(obj => obj.category === category.id)
+        .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))  // Sort by order
+    }))
+    .filter(category => category.objects.length > 0);  // Only show categories with objects
   
   const handleObjectSelect = (objectId) => {
     onObjectTypeSelect(objectId);
@@ -82,7 +92,7 @@ const ObjectSidebar = ({ selectedObjectType, onObjectTypeSelect, onToolChange, i
   return (
     <div className="dmt-object-sidebar">
       {/* Hidden element to force early emoji font loading */}
-      <div className="dmt-font-preloader" aria-hidden="true">📌🚪⬆️⬇️🗝️🪙👀🐉🧙‍♂️🛡️⚔️🺐🪤📜🔮</div>
+      <div className="dmt-font-preloader" aria-hidden="true">ðŸ“ŒðŸšªâ¬†ï¸â¬‡ï¸ðŸ—ï¸ðŸª™ðŸ‘€ðŸ‰ðŸ§™â€â™‚ï¸ðŸ›¡ï¸âš”ï¸ðŸºðŸª¤ðŸ“œðŸ”®</div>
       
       <div className="dmt-sidebar-header">
         Objects
@@ -120,7 +130,13 @@ const ObjectSidebar = ({ selectedObjectType, onObjectTypeSelect, onToolChange, i
                 onClick={() => handleObjectSelect(objType.id)}
                 title={objType.label}
               >
-                <div className="dmt-object-symbol">{objType.symbol}</div>
+                <div className="dmt-object-symbol">
+                  {hasIconClass(objType) ? (
+                    <span className={`ra ${objType.iconClass}`}></span>
+                  ) : (
+                    objType.symbol || '?'
+                  )}
+                </div>
                 <div className="dmt-object-label">{objType.label}</div>
               </button>
             ))}

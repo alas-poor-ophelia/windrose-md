@@ -40,7 +40,7 @@ const ObjectLayer = ({
 }) => {
   // Get shared state from Context
   const { canvasRef, containerRef, mapData, geometry, screenToGrid, screenToWorld, getClientCoords, GridGeometry } = useMapState();
-  const { getObjectAtPosition, addObject, updateObject, removeObject, isAreaFree } = useMapOperations();
+  const { getObjectAtPosition, addObject, updateObject, removeObject, isAreaFree, onObjectsChange: contextOnObjectsChange } = useMapOperations();
   const { 
     selectedItem, setSelectedItem, 
     isDraggingSelection, setIsDraggingSelection, 
@@ -61,6 +61,20 @@ const ObjectLayer = ({
   // Object color picker state
   const [showObjectColorPicker, setShowObjectColorPicker] = dc.useState(false);
   
+  // Handle object scale change from slider
+  const handleScaleChange = dc.useCallback((newScale) => {
+    if (!selectedItem || selectedItem.type !== 'object' || !mapData?.objects) return;
+    
+    const updatedObjects = updateObject(mapData.objects, selectedItem.id, { scale: newScale });
+    contextOnObjectsChange(updatedObjects);
+    
+    // Update selected item data
+    const updatedObject = updatedObjects.find(obj => obj.id === selectedItem.id);
+    if (updatedObject) {
+      setSelectedItem({ ...selectedItem, data: updatedObject });
+    }
+  }, [selectedItem, mapData, updateObject, contextOnObjectsChange, setSelectedItem]);
+  
   // Note link modal state is now from MapSelectionContext (shared with NotePinLayer)
   
   // Use object interactions hook (optimized - gets most values from Context)
@@ -76,6 +90,7 @@ const ObjectLayer = ({
     handleObjectSelection,
     handleObjectDragging,
     handleObjectResizing,
+    handleObjectWheel,
     handleHoverUpdate,
     stopObjectDragging,
     stopObjectResizing,
@@ -109,6 +124,8 @@ const ObjectLayer = ({
       stopObjectResizing,
       // Hover updates
       handleHoverUpdate,
+      // Wheel for scaling
+      handleObjectWheel,
       // Keyboard handling
       handleObjectKeyDown,
       // State for coordination
@@ -124,7 +141,7 @@ const ObjectLayer = ({
     handleObjectPlacement, handleObjectSelection,
     handleObjectDragging, handleObjectResizing,
     stopObjectDragging, stopObjectResizing,
-    handleHoverUpdate, handleObjectKeyDown,
+    handleHoverUpdate, handleObjectWheel, handleObjectKeyDown,
     isResizing, resizeCorner,
     edgeSnapMode, setEdgeSnapMode
   ]);
@@ -286,7 +303,7 @@ const ObjectLayer = ({
     ? mapData.objects.find(obj => obj.id === selectedItem.id)
     : null;
   
-  const indicatorPositions = edgeSnapMode && selectedObject 
+  const indicatorPositions = edgeSnapMode && selectedObject && mapData?.mapType !== 'hex'
     ? getCardinalIndicatorPositions(selectedObject)
     : null;
   
@@ -367,8 +384,8 @@ const ObjectLayer = ({
         </>
       )}
       
-      {/* Selection Toolbar for objects - only render when an object is selected */}
-      {selectedItem?.type === 'object' && (
+      {/* Selection Toolbar for objects - only render when an object is selected and not dragging */}
+      {selectedItem?.type === 'object' && !isDraggingSelection && (
         <SelectionToolbar
           selectedItem={selectedItem}
           mapData={mapData}
@@ -383,6 +400,7 @@ const ObjectLayer = ({
           onColorClick={handleObjectColorButtonClick}
           onResize={handleResizeButtonClick}
           onDelete={handleObjectDeletion}
+          onScaleChange={handleScaleChange}
           
           // State
           isResizeMode={isResizeMode}

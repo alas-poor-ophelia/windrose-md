@@ -28,6 +28,10 @@ async function loadMapData(mapId, mapName = '', mapType = 'grid') {
       if (!data.maps[mapId].customColors) {
         data.maps[mapId].customColors = [];
       }
+      // Ensure edges array exists (for edge painting feature)
+      if (!data.maps[mapId].edges) {
+        data.maps[mapId].edges = [];
+      }
       // Ensure mapType exists (backward compatibility)
       if (!data.maps[mapId].mapType) {
         data.maps[mapId].mapType = 'grid';
@@ -138,6 +142,7 @@ function createNewMap(mapId, mapName = '', mapType = 'grid') {
     mapType: mapType,
     northDirection: 0,
     cells: [],
+    edges: [],  // For edge painting (grid maps only)
     objects: [],
     textLabels: [],
     customColors: [],

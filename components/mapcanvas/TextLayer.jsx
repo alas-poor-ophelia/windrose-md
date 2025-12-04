@@ -25,7 +25,7 @@ const TextLayer = ({
 }) => {
   // Get values needed for rendering from Context
   const { mapData, canvasRef, containerRef, geometry } = useMapState();
-  const { selectedItem, showCoordinates, layerVisibility } = useMapSelection();
+  const { selectedItem, showCoordinates, layerVisibility, isDraggingSelection } = useMapSelection();
   
   // Use text label interaction hook (optimized - gets most values from Context)
   const {
@@ -86,8 +86,8 @@ const TextLayer = ({
   // Render text label UI controls and modals
   return (
     <>
-      {/* Selection Toolbar for text labels - only render when a text label is selected */}
-      {selectedItem?.type === 'text' && (
+      {/* Selection Toolbar for text labels - only render when a text label is selected and not dragging */}
+      {selectedItem?.type === 'text' && !isDraggingSelection && (
         <SelectionToolbar
           selectedItem={selectedItem}
           mapData={mapData}

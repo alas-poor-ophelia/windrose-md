@@ -17,6 +17,7 @@ const { TextLayer } = await requireModuleByName("TextLayer.jsx");
 const { NotePinLayer } = await requireModuleByName("NotePinLayer.jsx");
 const { EventHandlerProvider } = await requireModuleByName("EventHandlerContext.jsx");
 const { HexCoordinateLayer } = await requireModuleByName("HexCoordinateLayer.jsx");
+const { MeasurementLayer } = await requireModuleByName("MeasurementLayer.jsx");
 const { getSetting } = await requireModuleByName("settingsAccessor.js");
 const { usePanZoomCoordinator } = await requireModuleByName("usePanZoomCoordinator.js");
 const { useEventCoordinator } = await requireModuleByName("useEventCoordinator.js");
@@ -50,7 +51,7 @@ const Coordinators = ({ canvasRef, mapData, geometry, onViewStateChange, isFocus
  * MapCanvasContent - Inner component that uses context hooks
  * Contains all the map canvas logic and interacts with shared selection state
  */
-const MapCanvasContent = ({ mapData, onCellsChange, onObjectsChange, onTextLabelsChange, currentTool, onViewStateChange, selectedObjectType, selectedColor, isColorPickerOpen, customColors, onAddCustomColor, onDeleteCustomColor, isFocused, isAnimating, theme, children }) => {
+const MapCanvasContent = ({ mapData, onCellsChange, onObjectsChange, onTextLabelsChange, onEdgesChange, currentTool, onViewStateChange, selectedObjectType, selectedColor, isColorPickerOpen, customColors, onAddCustomColor, onDeleteCustomColor, isFocused, isAnimating, theme, children }) => {
   const canvasRef = dc.useRef(null);
   const containerRef = dc.useRef(null);
   const [canvasDimensions, setCanvasDimensions] = dc.useState({
@@ -248,6 +249,7 @@ const MapCanvasContent = ({ mapData, onCellsChange, onObjectsChange, onTextLabel
     if (effectivePanZoomState.isPanning || effectivePanZoomState.isTouchPanning) return 'dmt-canvas-panning';
     if (isDraggingSelection) return 'dmt-canvas-selecting';
     if (currentTool === 'select') return 'dmt-canvas-select';
+    if (currentTool === 'measure') return 'dmt-canvas-measure';
     if (currentTool === 'addObject') {
       return selectedObjectType ? 'dmt-canvas-add-object' : 'dmt-canvas';
     }
@@ -311,8 +313,9 @@ const MapCanvasContent = ({ mapData, onCellsChange, onObjectsChange, onTextLabel
     onCellsChange,
     onObjectsChange,
     onTextLabelsChange,
+    onEdgesChange,
     onViewStateChange
-  }), [onCellsChange, onObjectsChange, onTextLabelsChange, onViewStateChange]);
+  }), [onCellsChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onViewStateChange]);
 
 
 
@@ -376,5 +379,6 @@ MapCanvas.DrawingLayer = DrawingLayer;
 MapCanvas.TextLayer = TextLayer;
 MapCanvas.NotePinLayer = NotePinLayer;
 MapCanvas.HexCoordinateLayer = HexCoordinateLayer;
+MapCanvas.MeasurementLayer = MeasurementLayer;
 
 return { MapCanvas };

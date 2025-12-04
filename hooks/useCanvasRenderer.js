@@ -4,6 +4,7 @@ const { requireModuleByName } = await dc.require(pathResolverPath);
 const { getTheme } = await requireModuleByName("settingsAccessor.js");
 const { buildCellLookup, calculateBordersOptimized } = await requireModuleByName("borderCalculator.js");
 const { getObjectType } = await requireModuleByName("objectOperations.js");
+const { getRenderChar } = await requireModuleByName("objectTypeResolver.js");
 const { getCellColor } = await requireModuleByName("colorOperations.js");
 const { getFontCss } = await requireModuleByName("fontOptions.js");
 const { GridGeometry } = await requireModuleByName("GridGeometry.js");
@@ -11,6 +12,7 @@ const { HexGeometry } = await requireModuleByName("HexGeometry.js");
 const { gridRenderer } = await requireModuleByName("gridRenderer.js");
 const { hexRenderer } = await requireModuleByName("hexRenderer.js");
 const { getCachedImage } = await requireModuleByName("imageOperations.js");
+const { getSlotOffset, getMultiObjectScale, getObjectsInCell } = await requireModuleByName("hexSlotPositioner.js");
 
 /**
  * Get appropriate renderer for geometry type
@@ -95,11 +97,16 @@ function renderCanvas(canvas, mapData, geometry, selectedItem = null, isResizeMo
       const imgWidth = bgImage.naturalWidth;
       const imgHeight = bgImage.naturalHeight;
       
+      // Get offset values (default to 0 for backward compatibility)
+      const imgOffsetX = mapData.backgroundImage.offsetX ?? 0;
+      const imgOffsetY = mapData.backgroundImage.offsetY ?? 0;
+      
       // Position image centered at grid center in screen coordinates
+      // Apply user offset (scaled by zoom to maintain position at different zoom levels)
       const screenCenterX = offsetX + gridCenterX * zoom;
       const screenCenterY = offsetY + gridCenterY * zoom;
-      const screenX = screenCenterX - (imgWidth * zoom) / 2;
-      const screenY = screenCenterY - (imgHeight * zoom) / 2;
+      const screenX = screenCenterX - (imgWidth * zoom) / 2 + (imgOffsetX * zoom);
+      const screenY = screenCenterY - (imgHeight * zoom) / 2 + (imgOffsetY * zoom);
       
       // Apply opacity if specified (default to 1 for backward compatibility)
       const opacity = mapData.backgroundImage.opacity ?? 1;
@@ -173,6 +180,15 @@ function renderCanvas(canvas, mapData, geometry, selectedItem = null, isResizeMo
     );
   }
   
+  // Draw painted edges (grid maps only, after cells/borders)
+  // Edges are custom-colored grid lines that overlay the base grid
+  if (mapData.edges && mapData.edges.length > 0 && geometry instanceof GridGeometry) {
+    renderer.renderEdges(ctx, mapData.edges, geometry, rendererViewState, {
+      lineWidth: 1,
+      borderWidth: THEME.cells.borderWidth
+    });
+  }
+  
   // Draw objects (after cells and borders, so they appear on top)
   // Skip when coordinate overlay is visible or objects layer is hidden
   if (mapData.objects && mapData.objects.length > 0 && !showCoordinates && visibility.objects) {
@@ -188,6 +204,55 @@ function renderCanvas(canvas, mapData, geometry, selectedItem = null, isResizeMo
       
       let { screenX, screenY } = geometry.gridToScreen(obj.position.x, obj.position.y, offsetX, offsetY, zoom);
       
+      // Calculate base dimensions
+      let objectWidth = size.width * scaledSize;
+      let objectHeight = size.height * scaledSize;
+      
+      // For hex maps with multi-object support
+      if (geometry instanceof HexGeometry) {
+        // Count objects in same cell
+        const cellObjects = getObjectsInCell(mapData.objects, obj.position.x, obj.position.y);
+        const objectCount = cellObjects.length;
+        
+        if (objectCount > 1) {
+          // Apply multi-object scaling
+          const multiScale = getMultiObjectScale(objectCount);
+          objectWidth *= multiScale;
+          objectHeight *= multiScale;
+          
+          // Get this object's slot (default to index in cell if no slot assigned)
+          let effectiveSlot = obj.slot;
+          if (effectiveSlot === undefined || effectiveSlot === null) {
+            // Legacy object without slot - assign based on position in cell objects array
+            effectiveSlot = cellObjects.findIndex(o => o.id === obj.id);
+          }
+          
+          // Get slot offset
+          const { offsetX: slotOffsetX, offsetY: slotOffsetY } = getSlotOffset(
+            effectiveSlot,
+            objectCount,
+            mapData.orientation || 'flat'
+          );
+          
+          // Calculate hex center from the top-left position
+          // gridToScreen returns top-left such that topLeft + scaledSize/2 = hexCenter
+          const hexCenterX = screenX + scaledSize / 2;
+          const hexCenterY = screenY + scaledSize / 2;
+          
+          // Apply slot offset to get object center
+          // scaledSize = hexSize (radius), but hex width = 2 * hexSize
+          // So we multiply by 2 * scaledSize to get offsets relative to hex width
+          const hexWidth = scaledSize * 2;
+          const objectCenterX = hexCenterX + slotOffsetX * hexWidth;
+          const objectCenterY = hexCenterY + slotOffsetY * hexWidth;
+          
+          // Convert back to top-left for rendering
+          screenX = objectCenterX - objectWidth / 2;
+          screenY = objectCenterY - objectHeight / 2;
+        }
+        // Single object in hex: no changes needed, renders centered as before
+      }
+      
       // Apply alignment offset (edge snapping)
       const alignment = obj.alignment || 'center';
       if (alignment !== 'center') {
@@ -200,17 +265,15 @@ function renderCanvas(canvas, mapData, geometry, selectedItem = null, isResizeMo
         }
       }
       
-      // gridToScreen already centers the object correctly for both grid and hex
-      // For hex, it returns hexCenter - hexSize/2, so rendering at hexSize centers it
-      const objectWidth = size.width * scaledSize;
-      const objectHeight = size.height * scaledSize;
-      
       // Object center for rotation
       const centerX = screenX + objectWidth / 2;
       const centerY = screenY + objectHeight / 2;
       
-      // Object symbol sized to fit within the multi-cell bounds
-      const fontSize = Math.min(objectWidth, objectHeight) * 0.8;
+      // Apply user-defined object scale (0.25 to 1.0, default 1.0)
+      const objectScale = obj.scale ?? 1.0;
+      
+      // Object symbol sized to fit within the multi-cell bounds, with user scale applied
+      const fontSize = Math.min(objectWidth, objectHeight) * 0.8 * objectScale;
       
       // Apply rotation if object has rotation property
       const rotation = obj.rotation || 0;
@@ -221,16 +284,24 @@ function renderCanvas(canvas, mapData, geometry, selectedItem = null, isResizeMo
         ctx.translate(-centerX, -centerY);
       }
       
-      ctx.font = `${fontSize}px 'Noto Emoji', 'Noto Sans Symbols 2', monospace`;
+      // Get the character to render (handles both icons and symbols with fallback)
+      const { char: renderChar, isIcon } = getRenderChar(objType);
+      
+      // Use RPGAwesome font for icons, Noto for symbols
+      if (isIcon) {
+        ctx.font = `${fontSize}px rpgawesome`;
+      } else {
+        ctx.font = `${fontSize}px 'Noto Emoji', 'Noto Sans Symbols 2', monospace`;
+      }
       
       // Draw shadow/stroke for visibility
       ctx.strokeStyle = '#000000';
       ctx.lineWidth = Math.max(2, fontSize * 0.08);
-      ctx.strokeText(objType.symbol, centerX, centerY);
+      ctx.strokeText(renderChar, centerX, centerY);
       
       // Draw the object symbol with object's color (defaults to white for backward compatibility)
       ctx.fillStyle = obj.color || '#ffffff';
-      ctx.fillText(objType.symbol, centerX, centerY);
+      ctx.fillText(renderChar, centerX, centerY);
       
       // Restore context if we applied rotation
       if (rotation !== 0) {
@@ -399,18 +470,43 @@ function renderCanvas(canvas, mapData, geometry, selectedItem = null, isResizeMo
       let screenX, screenY, objectWidth, objectHeight, cellWidth, cellHeight;
       
       if (geometry instanceof HexGeometry) {
-        // For hex: screenPositionUtils returns CENTER position
-        // We need to calculate top-left for selection box rendering
+        // For hex: calculate position accounting for multi-object slots
         const { worldX, worldY } = geometry.hexToWorld(object.position.x, object.position.y);
         
+        // Count objects in same cell for multi-object support
+        const cellObjects = getObjectsInCell(mapData.objects, object.position.x, object.position.y);
+        const objectCount = cellObjects.length;
+        
+        // Base object dimensions
         objectWidth = size.width * scaledSize;
         objectHeight = size.height * scaledSize;
         cellWidth = scaledSize;
         cellHeight = scaledSize;
         
+        // Apply multi-object scaling if needed
+        if (objectCount > 1) {
+          const multiScale = getMultiObjectScale(objectCount);
+          objectWidth *= multiScale;
+          objectHeight *= multiScale;
+        }
+        
         // Calculate center in screen space
         let centerScreenX = offsetX + worldX * zoom;
         let centerScreenY = offsetY + worldY * zoom;
+        
+        // Apply slot offset for multi-object cells
+        if (objectCount > 1) {
+          const effectiveSlot = object.slot ?? cellObjects.findIndex(o => o.id === object.id);
+          const { offsetX: slotOffsetX, offsetY: slotOffsetY } = getSlotOffset(
+            effectiveSlot,
+            objectCount,
+            mapData.orientation || 'flat'
+          );
+          // Offset is in hex-width units (2 * scaledSize)
+          const hexWidth = scaledSize * 2;
+          centerScreenX += slotOffsetX * hexWidth;
+          centerScreenY += slotOffsetY * hexWidth;
+        }
         
         // Apply alignment offset
         if (alignment !== 'center') {
