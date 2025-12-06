@@ -206,13 +206,13 @@ const IconHelpers = {
     } else {
       // Fallback: create a simple text representation
       const icons = {
-        'pencil': 'âœŽ',
-        'eye': 'ðŸ‘',
-        'eye-off': 'ðŸš«',
-        'rotate-ccw': 'â†º',
-        'trash-2': 'ðŸ—‘',
-        'grip-vertical': 'â‹®â‹®',
-        'x': 'âœ•'
+        'pencil': 'Ã¢Å“Å½',
+        'eye': 'Ã°Å¸â€˜Â',
+        'eye-off': 'Ã°Å¸Å¡Â«',
+        'rotate-ccw': 'Ã¢â€ Âº',
+        'trash-2': 'Ã°Å¸â€”â€˜',
+        'grip-vertical': 'Ã¢â€¹Â®Ã¢â€¹Â®',
+        'x': 'Ã¢Å“â€¢'
       };
       el.textContent = icons[iconId] || '?';
     }
@@ -1535,13 +1535,13 @@ class ImportModal extends Modal {
         const customCatCount = data.customCategories?.length || 0;
         
         if (overrideCount > 0) {
-          previewArea.createEl('p', { text: \`â€¢ \${overrideCount} built-in modification(s)\` });
+          previewArea.createEl('p', { text: \`Ã¢â‚¬Â¢ \${overrideCount} built-in modification(s)\` });
         }
         if (customObjCount > 0) {
-          previewArea.createEl('p', { text: \`â€¢ \${customObjCount} custom object(s)\` });
+          previewArea.createEl('p', { text: \`Ã¢â‚¬Â¢ \${customObjCount} custom object(s)\` });
         }
         if (customCatCount > 0) {
-          previewArea.createEl('p', { text: \`â€¢ \${customCatCount} custom category(ies)\` });
+          previewArea.createEl('p', { text: \`Ã¢â‚¬Â¢ \${customCatCount} custom category(ies)\` });
         }
         
         previewArea.style.display = 'block';
@@ -1669,6 +1669,9 @@ class WindroseMDSettingsPlugin extends Plugin {
         coordinateTextShadow: '{{DEFAULT_COORDINATE_TEXT_SHADOW}}',
         coordinateKeyMode: 'hold',
         expandedByDefault: false,
+        // Canvas dimensions
+        canvasHeight: 600,
+        canvasHeightMobile: 400,
         // Distance measurement settings
         distancePerCellGrid: 5,
         distancePerCellHex: 6,
@@ -1695,6 +1698,9 @@ class WindroseMDSettingsPlugin extends Plugin {
         coordinateTextShadow: '{{DEFAULT_COORDINATE_TEXT_SHADOW}}',
         coordinateKeyMode: 'hold',
         expandedByDefault: false,
+        // Canvas dimensions
+        canvasHeight: 600,
+        canvasHeightMobile: 400,
         // Distance measurement settings
         distancePerCellGrid: 5,
         distancePerCellHex: 6,
@@ -2018,6 +2024,38 @@ class WindroseMDSettingsTab extends PluginSettingTab {
           this.plugin.settings.expandedByDefault = value;
           this.settingsChanged = true;
           await this.plugin.saveSettings();
+        }));
+
+    // Canvas Height (Desktop)
+    new Setting(containerEl)
+      .setName('Canvas Height (Desktop)')
+      .setDesc('Default height in pixels for map canvas on desktop devices')
+      .addText(text => text
+        .setPlaceholder('600')
+        .setValue(String(this.plugin.settings.canvasHeight))
+        .onChange(async (value) => {
+          const num = parseInt(value);
+          if (!isNaN(num)) {
+            this.plugin.settings.canvasHeight = num;
+            this.settingsChanged = true;
+            await this.plugin.saveSettings();
+          }
+        }));
+
+    // Canvas Height (Mobile)
+    new Setting(containerEl)
+      .setName('Canvas Height (Mobile/Touch)')
+      .setDesc('Default height in pixels for map canvas on mobile and touch devices')
+      .addText(text => text
+        .setPlaceholder('400')
+        .setValue(String(this.plugin.settings.canvasHeightMobile))
+        .onChange(async (value) => {
+          const num = parseInt(value);
+          if (!isNaN(num)) {
+            this.plugin.settings.canvasHeightMobile = num;
+            this.settingsChanged = true;
+            await this.plugin.saveSettings();
+          }
         }));
   }
 

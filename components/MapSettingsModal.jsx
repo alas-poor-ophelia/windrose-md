@@ -11,9 +11,26 @@ const {
   getFullPathFromDisplayName, 
   getDisplayNameFromPath,
   getImageDimensions,
-  calculateGridFromImage,
-  GRID_DENSITY_PRESETS 
+  calculateGridFromImage
 } = await requireModuleByName("imageOperations.js");
+
+const {
+  calculateGridFromColumns,
+  calculateGridFromMeasurement,
+  measurementToHexSize,
+  hexSizeToMeasurement,
+  MEASUREMENT_EDGE,
+  MEASUREMENT_CORNER,
+  validateMeasurementSize,
+  getFineTuneRange
+} = await requireModuleByName("hexMeasurements.js");
+
+// Grid density presets (moved from imageOperations.js)
+const GRID_DENSITY_PRESETS = {
+  sparse: { columns: 12, label: 'Sparse (~12 columns)', description: 'Regional scale' },
+  medium: { columns: 24, label: 'Medium (~24 columns)', description: 'Dungeon scale' },
+  dense:  { columns: 48, label: 'Dense (~48 columns)', description: 'Tactical scale' }
+};
 
 /**
  * Modal for configuring per-map settings and UI preferences
@@ -54,7 +71,9 @@ function MapSettingsModal({
     borderColor: currentSettings?.overrides?.borderColor ?? globalSettings.borderColor,
     coordinateKeyColor: currentSettings?.overrides?.coordinateKeyColor ?? globalSettings.coordinateKeyColor,
     coordinateTextColor: currentSettings?.overrides?.coordinateTextColor ?? globalSettings.coordinateTextColor,
-    coordinateTextShadow: currentSettings?.overrides?.coordinateTextShadow ?? globalSettings.coordinateTextShadow
+    coordinateTextShadow: currentSettings?.overrides?.coordinateTextShadow ?? globalSettings.coordinateTextShadow,
+    canvasHeight: currentSettings?.overrides?.canvasHeight ?? globalSettings.canvasHeight ?? 600,
+    canvasHeightMobile: currentSettings?.overrides?.canvasHeightMobile ?? globalSettings.canvasHeightMobile ?? 400
   });
   
   const [preferences, setPreferences] = dc.useState({
@@ -98,8 +117,12 @@ function MapSettingsModal({
     currentBackgroundImage?.path ? getDisplayNameFromPath(currentBackgroundImage.path) : ''
   );
   const [imageDimensions, setImageDimensions] = dc.useState(null);
-  const [gridDensity, setGridDensity] = dc.useState('medium');
-  const [customColumns, setCustomColumns] = dc.useState(24);
+  const [gridDensity, setGridDensity] = dc.useState(
+    currentBackgroundImage?.gridDensity ?? 'medium'
+  );
+  const [customColumns, setCustomColumns] = dc.useState(
+    currentBackgroundImage?.customColumns ?? 24
+  );
   const [savedDensity, setSavedDensity] = dc.useState(null);  // Track saved density preference
   const [boundsLocked, setBoundsLocked] = dc.useState(
     currentBackgroundImage?.lockBounds ?? true  // Lock by default when image exists
@@ -114,6 +137,23 @@ function MapSettingsModal({
     currentBackgroundImage?.offsetY ?? 0  // Vertical offset in pixels
   );
   const [imageSearchResults, setImageSearchResults] = dc.useState([]);
+  
+  // Measurement mode state (v1.1.0)
+  const [sizingMode, setSizingMode] = dc.useState(
+    currentBackgroundImage?.sizingMode ?? 'density'  // 'density' or 'measurement'
+  );
+  const [measurementMethod, setMeasurementMethod] = dc.useState(
+    currentBackgroundImage?.measurementMethod ?? MEASUREMENT_CORNER  // 'edge' or 'corner'
+  );
+  const [measurementSize, setMeasurementSize] = dc.useState(
+    currentBackgroundImage?.measurementSize ?? 86  // Size in pixels
+  );
+  const [fineTuneEnabled, setFineTuneEnabled] = dc.useState(
+    (currentBackgroundImage?.fineTuneOffset ?? 0) !== 0  // Enable if offset exists
+  );
+  const [fineTuneOffset, setFineTuneOffset] = dc.useState(
+    currentBackgroundImage?.fineTuneOffset ?? 0  // Fine-tune adjustment
+  );
   
   const [activeColorPicker, setActiveColorPicker] = dc.useState(null);
   const [isLoading, setIsLoading] = dc.useState(false);
@@ -175,7 +215,9 @@ function MapSettingsModal({
         borderColor: currentSettings?.overrides?.borderColor ?? globalSettings.borderColor,
         coordinateKeyColor: currentSettings?.overrides?.coordinateKeyColor ?? globalSettings.coordinateKeyColor,
         coordinateTextColor: currentSettings?.overrides?.coordinateTextColor ?? globalSettings.coordinateTextColor,
-        coordinateTextShadow: currentSettings?.overrides?.coordinateTextShadow ?? globalSettings.coordinateTextShadow
+        coordinateTextShadow: currentSettings?.overrides?.coordinateTextShadow ?? globalSettings.coordinateTextShadow,
+        canvasHeight: currentSettings?.overrides?.canvasHeight ?? globalSettings.canvasHeight ?? 600,
+        canvasHeightMobile: currentSettings?.overrides?.canvasHeightMobile ?? globalSettings.canvasHeightMobile ?? 400
       });
       setPreferences({
         rememberPanZoom: currentPreferences?.rememberPanZoom ?? true,
@@ -230,14 +272,28 @@ function MapSettingsModal({
             // Recalculate bounds if locked (ensures consistency)
             const shouldLock = bgImage.lockBounds ?? true;
             if (shouldLock) {
-              const density = bgImage.gridDensity ?? 'medium';
-              const customCols = bgImage.customColumns ?? 24;
-              const columns = density === 'custom' ? customCols : GRID_DENSITY_PRESETS[density]?.columns ?? 24;
-              const calculated = calculateGridFromImage(dims.width, dims.height, columns, orientation);
-              setHexBounds({
-                maxCol: calculated.columns,
-                maxRow: calculated.rows
-              });
+              const savedSizingMode = bgImage.sizingMode ?? 'density';
+              
+              if (savedSizingMode === 'density') {
+                // Use density mode calculation
+                const density = bgImage.gridDensity ?? 'medium';
+                const customCols = bgImage.customColumns ?? 24;
+                const columns = density === 'custom' ? customCols : GRID_DENSITY_PRESETS[density]?.columns ?? 24;
+                const calculated = calculateGridFromImage(dims.width, dims.height, columns, orientation);
+                setHexBounds({
+                  maxCol: calculated.columns,
+                  maxRow: calculated.rows
+                });
+              } else {
+                // Use measurement mode calculation
+                const savedMeasurementSize = bgImage.measurementSize ?? 86;
+                const savedMeasurementMethod = bgImage.measurementMethod ?? MEASUREMENT_CORNER;
+                const calculated = calculateGridFromMeasurement(dims.width, dims.height, savedMeasurementSize, savedMeasurementMethod, orientation);
+                setHexBounds({
+                  maxCol: calculated.columns,
+                  maxRow: calculated.rows
+                });
+              }
             }
           }
         });
@@ -337,9 +393,18 @@ function MapSettingsModal({
     if (dims) {
       setImageDimensions(dims);
       
-      // Auto-calculate bounds based on current density and enable lock
-      const columns = gridDensity === 'custom' ? customColumns : GRID_DENSITY_PRESETS[gridDensity].columns;
-      const calculated = calculateGridFromImage(dims.width, dims.height, columns, orientation);
+      // Auto-calculate bounds based on current sizing mode and enable lock
+      let calculated;
+      
+      if (sizingMode === 'density') {
+        const columns = gridDensity === 'custom' ? customColumns : GRID_DENSITY_PRESETS[gridDensity].columns;
+        calculated = calculateGridFromColumns(dims.width, dims.height, columns, orientation);
+      } else {
+        // Measurement mode
+        const baseHexSize = measurementToHexSize(measurementSize, measurementMethod, orientation);
+        const effectiveHexSize = fineTuneEnabled ? baseHexSize + fineTuneOffset : baseHexSize;
+        calculated = calculateGridFromMeasurement(dims.width, dims.height, measurementSize, measurementMethod, orientation);
+      }
       
       // Always set bounds when selecting new image, and enable lock
       setHexBounds({
@@ -348,7 +413,7 @@ function MapSettingsModal({
       });
       setBoundsLocked(true);
     }
-  }, [gridDensity, customColumns, boundsLocked, orientation]);
+  }, [gridDensity, customColumns, sizingMode, measurementSize, measurementMethod, fineTuneEnabled, fineTuneOffset, orientation]);
   
   const handleImageClear = dc.useCallback(() => {
     setBackgroundImagePath(null);
@@ -364,7 +429,7 @@ function MapSettingsModal({
     // Recalculate bounds if we have dimensions and bounds are locked
     if (imageDimensions && boundsLocked) {
       const columns = density === 'custom' ? customColumns : GRID_DENSITY_PRESETS[density].columns;
-      const calculated = calculateGridFromImage(imageDimensions.width, imageDimensions.height, columns, orientation);
+      const calculated = calculateGridFromColumns(imageDimensions.width, imageDimensions.height, columns, orientation);
       const newBounds = {
         maxCol: calculated.columns,
         maxRow: calculated.rows
@@ -396,7 +461,7 @@ function MapSettingsModal({
       
       // Recalculate bounds if we have dimensions and bounds are locked
       if (imageDimensions && boundsLocked && gridDensity === 'custom') {
-        const calculated = calculateGridFromImage(imageDimensions.width, imageDimensions.height, numValue, orientation);
+        const calculated = calculateGridFromColumns(imageDimensions.width, imageDimensions.height, numValue, orientation);
         const newBounds = {
           maxCol: calculated.columns,
           maxRow: calculated.rows
@@ -421,6 +486,68 @@ function MapSettingsModal({
       }
     }
   }, [imageDimensions, boundsLocked, gridDensity, orientation, hexBounds, getOrphanedContentInfo]);
+  
+  // Sizing mode change handler (switch between Quick Setup and Advanced tabs)
+  const handleSizingModeChange = dc.useCallback((mode) => {
+    setSizingMode(mode);
+    // NOTE: We do NOT recalculate bounds when switching tabs.
+    // The tab change is purely UI - user must explicitly click Save to apply changes.
+  }, []);
+  
+  // Measurement method change handler (edge-to-edge vs corner-to-corner)
+  const handleMeasurementMethodChange = dc.useCallback((method) => {
+    setMeasurementMethod(method);
+    
+    // Recalculate bounds if we have dimensions and bounds are locked
+    if (imageDimensions && boundsLocked && sizingMode === 'measurement') {
+      const baseHexSize = measurementToHexSize(measurementSize, method, orientation);
+      const effectiveHexSize = fineTuneEnabled ? baseHexSize + fineTuneOffset : baseHexSize;
+      const calculated = calculateGridFromMeasurement(imageDimensions.width, imageDimensions.height, measurementSize, method, orientation);
+      
+      setHexBounds({ maxCol: calculated.columns, maxRow: calculated.rows });
+    }
+  }, [imageDimensions, boundsLocked, sizingMode, measurementSize, fineTuneEnabled, fineTuneOffset, orientation]);
+  
+  // Measurement size change handler
+  const handleMeasurementSizeChange = dc.useCallback((size) => {
+    const numValue = parseFloat(size);
+    if (isNaN(numValue)) return;
+    
+    // Validate
+    const validation = validateMeasurementSize(numValue);
+    if (!validation.valid) {
+      // Could show error message here
+      return;
+    }
+    
+    setMeasurementSize(numValue);
+    
+    // Recalculate bounds if we have dimensions and bounds are locked
+    if (imageDimensions && boundsLocked && sizingMode === 'measurement') {
+      const baseHexSize = measurementToHexSize(numValue, measurementMethod, orientation);
+      const effectiveHexSize = fineTuneEnabled ? baseHexSize + fineTuneOffset : baseHexSize;
+      const calculated = calculateGridFromMeasurement(imageDimensions.width, imageDimensions.height, numValue, measurementMethod, orientation);
+      
+      setHexBounds({ maxCol: calculated.columns, maxRow: calculated.rows });
+    }
+  }, [imageDimensions, boundsLocked, sizingMode, measurementMethod, fineTuneEnabled, fineTuneOffset, orientation]);
+  
+  // Fine-tune adjustment handler
+  const handleFineTuneChange = dc.useCallback((adjustedHexSize) => {
+    if (!imageDimensions || !boundsLocked || sizingMode !== 'measurement') return;
+    
+    const baseHexSize = measurementToHexSize(measurementSize, measurementMethod, orientation);
+    const offset = adjustedHexSize - baseHexSize;
+    
+    setFineTuneOffset(offset);
+    setFineTuneEnabled(offset !== 0);
+    
+    // Recalculate bounds with adjusted hex size
+    const columns = Math.ceil(imageDimensions.width / (adjustedHexSize * (orientation === 'pointy' ? Math.sqrt(3) : 1.5)));
+    const rows = Math.ceil(imageDimensions.height / (adjustedHexSize * (orientation === 'flat' ? Math.sqrt(3) : 1.5)));
+    
+    setHexBounds({ maxCol: columns, maxRow: rows });
+  }, [imageDimensions, boundsLocked, sizingMode, measurementSize, measurementMethod, orientation]);
   
   const handleBoundsLockToggle = dc.useCallback(() => {
     setBoundsLocked(prev => !prev);
@@ -467,17 +594,28 @@ function MapSettingsModal({
       customColumns: customColumns,
       opacity: imageOpacity,
       offsetX: imageOffsetX,
-      offsetY: imageOffsetY
+      offsetY: imageOffsetY,
+      // New fields for measurement mode (v1.1.0)
+      sizingMode: sizingMode,
+      measurementMethod: measurementMethod,
+      measurementSize: measurementSize,
+      fineTuneOffset: fineTuneOffset
     } : undefined;
     
     // Calculate hexSize if we have an image with locked bounds
     let calculatedHexSize = null;
     if (mapType === 'hex' && backgroundImagePath && boundsLocked && imageDimensions && hexBounds) {
-      // Use the actual hexBounds.maxCol value, not the density preset
-      // This ensures we use the exact bounds that will be saved
-      const calculated = calculateGridFromImage(imageDimensions.width, imageDimensions.height, hexBounds.maxCol, orientation);
-      calculatedHexSize = calculated.hexSize;
-    }
+      if (sizingMode === 'density') {
+        // Use density mode calculation
+        const calculated = calculateGridFromColumns(imageDimensions.width, imageDimensions.height, hexBounds.maxCol, orientation);
+        calculatedHexSize = calculated.hexSize;
+        } else {
+        // Use measurement mode calculation with fine-tune
+        const baseHexSize = measurementToHexSize(measurementSize, measurementMethod, orientation);
+        calculatedHexSize = fineTuneOffset !== 0 ? baseHexSize + fineTuneOffset : baseHexSize;
+        }
+    } else {
+      }
     
     onSave(settingsData, preferences, mapType === 'hex' ? hexBounds : null, backgroundImageData, calculatedHexSize, deleteOrphanedContent);
     
@@ -815,111 +953,316 @@ function MapSettingsModal({
                     </div>
                   )}
                   
-                  {/* Grid density options - only show when image is selected */}
+                  {/* Tabbed sizing interface - only show when image is selected */}
                   {backgroundImagePath && imageDimensions && (
-                    <div style={{ marginBottom: '16px' }}>
-                      <label class="dmt-form-label" style={{ marginBottom: '8px' }}>Grid Density</label>
+                    <div style={{ marginTop: '20px' }}>
+                      {/* Tab buttons */}
+                      <div style={{ 
+                        display: 'flex', 
+                        gap: '4px',
+                        borderBottom: '1px solid var(--background-modifier-border)',
+                        marginBottom: '16px'
+                      }}>
+                        <button
+                          onClick={() => handleSizingModeChange('density')}
+                          style={{
+                            flex: 1,
+                            padding: '8px 16px',
+                            background: sizingMode === 'density' ? 'var(--background-modifier-hover)' : 'transparent',
+                            border: 'none',
+                            borderBottom: sizingMode === 'density' ? '2px solid var(--interactive-accent)' : '2px solid transparent',
+                            color: sizingMode === 'density' ? 'var(--text-normal)' : 'var(--text-muted)',
+                            cursor: 'pointer',
+                            fontSize: '13px',
+                            fontWeight: sizingMode === 'density' ? '600' : '400',
+                            transition: 'all 0.2s'
+                          }}
+                        >
+                          Quick Setup
+                        </button>
+                        <button
+                          onClick={() => handleSizingModeChange('measurement')}
+                          style={{
+                            flex: 1,
+                            padding: '8px 16px',
+                            background: sizingMode === 'measurement' ? 'var(--background-modifier-hover)' : 'transparent',
+                            border: 'none',
+                            borderBottom: sizingMode === 'measurement' ? '2px solid var(--interactive-accent)' : '2px solid transparent',
+                            color: sizingMode === 'measurement' ? 'var(--text-normal)' : 'var(--text-muted)',
+                            cursor: 'pointer',
+                            fontSize: '13px',
+                            fontWeight: sizingMode === 'measurement' ? '600' : '400',
+                            transition: 'all 0.2s'
+                          }}
+                        >
+                          Advanced
+                        </button>
+                      </div>
                       
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                        <label class="dmt-radio-label" style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: 'pointer' }}>
-                          <input
-                            type="radio"
-                            name="gridDensity"
-                            value="sparse"
-                            checked={gridDensity === 'sparse'}
-                            onChange={() => handleDensityChange('sparse')}
-                            style={{ marginTop: '2px' }}
-                          />
-                          <div>
-                            <span style={{ fontWeight: 500 }}>{GRID_DENSITY_PRESETS.sparse.label}</span>
-                            <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                              {GRID_DENSITY_PRESETS.sparse.description}
+                      {/* Quick Setup Tab Content */}
+                      {sizingMode === 'density' && (
+                        <div>
+                          <label class="dmt-form-label" style={{ marginBottom: '8px' }}>Grid Density</label>
+                          
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            <label class="dmt-radio-label" style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: 'pointer' }}>
+                              <input
+                                type="radio"
+                                name="gridDensity"
+                                value="sparse"
+                                checked={gridDensity === 'sparse'}
+                                onChange={() => handleDensityChange('sparse')}
+                                style={{ marginTop: '2px' }}
+                              />
+                              <div>
+                                <span style={{ fontWeight: 500 }}>{GRID_DENSITY_PRESETS.sparse.label}</span>
+                                <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                                  {GRID_DENSITY_PRESETS.sparse.description}
+                                </p>
+                              </div>
+                            </label>
+                            
+                            <label class="dmt-radio-label" style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: 'pointer' }}>
+                              <input
+                                type="radio"
+                                name="gridDensity"
+                                value="medium"
+                                checked={gridDensity === 'medium'}
+                                onChange={() => handleDensityChange('medium')}
+                                style={{ marginTop: '2px' }}
+                              />
+                              <div>
+                                <span style={{ fontWeight: 500 }}>{GRID_DENSITY_PRESETS.medium.label}</span>
+                                <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                                  {GRID_DENSITY_PRESETS.medium.description}
+                                </p>
+                              </div>
+                            </label>
+                            
+                            <label class="dmt-radio-label" style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: 'pointer' }}>
+                              <input
+                                type="radio"
+                                name="gridDensity"
+                                value="dense"
+                                checked={gridDensity === 'dense'}
+                                onChange={() => handleDensityChange('dense')}
+                                style={{ marginTop: '2px' }}
+                              />
+                              <div>
+                                <span style={{ fontWeight: 500 }}>{GRID_DENSITY_PRESETS.dense.label}</span>
+                                <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                                  {GRID_DENSITY_PRESETS.dense.description}
+                                </p>
+                              </div>
+                            </label>
+                            
+                            <label class="dmt-radio-label" style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                              <input
+                                type="radio"
+                                name="gridDensity"
+                                value="custom"
+                                checked={gridDensity === 'custom'}
+                                onChange={() => handleDensityChange('custom')}
+                              />
+                              <span style={{ fontWeight: 500 }}>Custom</span>
+                              <input
+                                type="number"
+                                min="1"
+                                max="200"
+                                value={customColumns}
+                                onChange={(e) => handleCustomColumnsChange(e.target.value)}
+                                disabled={gridDensity !== 'custom'}
+                                style={{
+                                  width: '60px',
+                                  padding: '4px 8px',
+                                  borderRadius: '4px',
+                                  border: '1px solid var(--background-modifier-border)',
+                                  background: 'var(--background-primary)',
+                                  color: 'var(--text-normal)',
+                                  fontSize: '13px',
+                                  opacity: gridDensity !== 'custom' ? 0.5 : 1
+                                }}
+                              />
+                              <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>columns</span>
+                            </label>
+                          </div>
+                          
+                          {/* Show calculated result */}
+                          <div style={{ marginTop: '12px', padding: '8px', background: 'var(--background-secondary)', borderRadius: '4px' }}>
+                            <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                              Result: {hexBounds.maxCol} columns × {hexBounds.maxRow} rows
+                              {(() => {
+                                const columns = gridDensity === 'custom' ? customColumns : GRID_DENSITY_PRESETS[gridDensity]?.columns || 24;
+                                const calc = calculateGridFromColumns(imageDimensions.width, imageDimensions.height, columns, orientation);
+                                return ` (~${Math.round(hexSizeToMeasurement(calc.hexSize, MEASUREMENT_EDGE, orientation))}px hex width)`;
+                              })()}
                             </p>
                           </div>
-                        </label>
-                        
-                        <label class="dmt-radio-label" style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: 'pointer' }}>
-                          <input
-                            type="radio"
-                            name="gridDensity"
-                            value="medium"
-                            checked={gridDensity === 'medium'}
-                            onChange={() => handleDensityChange('medium')}
-                            style={{ marginTop: '2px' }}
-                          />
-                          <div>
-                            <span style={{ fontWeight: 500 }}>{GRID_DENSITY_PRESETS.medium.label}</span>
-                            <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                              {GRID_DENSITY_PRESETS.medium.description}
+                        </div>
+                      )}
+                      
+                      {/* Advanced Tab Content */}
+                      {sizingMode === 'measurement' && (
+                        <div>
+                          <label class="dmt-form-label" style={{ marginBottom: '8px' }}>Hex Measurement</label>
+                          
+                          {/* Measurement method selector */}
+                          <div style={{ display: 'flex', gap: '12px', marginBottom: '12px' }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                              <input
+                                type="radio"
+                                name="measurementMethod"
+                                value={MEASUREMENT_EDGE}
+                                checked={measurementMethod === MEASUREMENT_EDGE}
+                                onChange={() => handleMeasurementMethodChange(MEASUREMENT_EDGE)}
+                              />
+                              <span style={{ fontSize: '13px' }}>Edge-to-edge</span>
+                            </label>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                              <input
+                                type="radio"
+                                name="measurementMethod"
+                                value={MEASUREMENT_CORNER}
+                                checked={measurementMethod === MEASUREMENT_CORNER}
+                                onChange={() => handleMeasurementMethodChange(MEASUREMENT_CORNER)}
+                              />
+                              <span style={{ fontSize: '13px' }}>Corner-to-corner</span>
+                            </label>
+                          </div>
+                          
+                          {/* Size input */}
+                          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '12px' }}>
+                            <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Size:</span>
+                            <input
+                              type="number"
+                              min="10"
+                              max="500"
+                              step="1"
+                              value={measurementSize}
+                              onChange={(e) => handleMeasurementSizeChange(e.target.value)}
+                              style={{
+                                width: '80px',
+                                padding: '4px 8px',
+                                borderRadius: '4px',
+                                border: '1px solid var(--background-modifier-border)',
+                                background: 'var(--background-primary)',
+                                color: 'var(--text-normal)',
+                                fontSize: '13px'
+                              }}
+                            />
+                            <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>pixels</span>
+                          </div>
+                          
+                          {/* Calculated result */}
+                          <div style={{ padding: '8px', background: 'var(--background-secondary)', borderRadius: '4px', marginBottom: '12px' }}>
+                            <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                              Calculated Grid: {hexBounds.maxCol} columns × {hexBounds.maxRow} rows
+                              {(() => {
+                                const baseHexSize = measurementToHexSize(measurementSize, measurementMethod, orientation);
+                                const effectiveHexSize = fineTuneEnabled ? baseHexSize + fineTuneOffset : baseHexSize;
+                                return ` (hexSize: ${effectiveHexSize.toFixed(1)}px)`;
+                              })()}
                             </p>
                           </div>
-                        </label>
-                        
-                        <label class="dmt-radio-label" style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: 'pointer' }}>
-                          <input
-                            type="radio"
-                            name="gridDensity"
-                            value="dense"
-                            checked={gridDensity === 'dense'}
-                            onChange={() => handleDensityChange('dense')}
-                            style={{ marginTop: '2px' }}
-                          />
-                          <div>
-                            <span style={{ fontWeight: 500 }}>{GRID_DENSITY_PRESETS.dense.label}</span>
-                            <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                              {GRID_DENSITY_PRESETS.dense.description}
-                            </p>
-                          </div>
-                        </label>
-                        
-                        <label class="dmt-radio-label" style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                          <input
-                            type="radio"
-                            name="gridDensity"
-                            value="custom"
-                            checked={gridDensity === 'custom'}
-                            onChange={() => handleDensityChange('custom')}
-                          />
-                          <span style={{ fontWeight: 500 }}>Custom</span>
-                          <input
-                            type="number"
-                            min="1"
-                            max="200"
-                            value={customColumns}
-                            onChange={(e) => handleCustomColumnsChange(e.target.value)}
-                            disabled={gridDensity !== 'custom'}
-                            style={{
-                              width: '60px',
-                              padding: '4px 8px',
-                              borderRadius: '4px',
-                              border: '1px solid var(--background-modifier-border)',
-                              background: 'var(--background-primary)',
-                              color: 'var(--text-normal)',
+                          
+                          {/* Fine-tune section */}
+                          <details style={{ marginTop: '12px' }}>
+                            <summary style={{ 
+                              cursor: 'pointer', 
+                              fontWeight: '500', 
                               fontSize: '13px',
-                              opacity: gridDensity !== 'custom' ? 0.5 : 1
-                            }}
-                          />
-                          <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>columns</span>
-                        </label>
-                      </div>
-                      
-                      {/* Show calculated result */}
-                      <div style={{ marginTop: '12px', padding: '8px', background: 'var(--background-secondary)', borderRadius: '4px' }}>
-                        <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                          Result: {hexBounds.maxCol} columns × {hexBounds.maxRow} rows
-                          {imageDimensions && (() => {
-                            const columns = gridDensity === 'custom' ? customColumns : GRID_DENSITY_PRESETS[gridDensity]?.columns || 24;
-                            const calc = calculateGridFromImage(imageDimensions.width, imageDimensions.height, columns, orientation);
-                            return ` (~${calc.hexWidth}px hex width)`;
-                          })()}
-                        </p>
-                      </div>
+                              color: 'var(--text-normal)',
+                              padding: '4px 0',
+                              userSelect: 'none'
+                            }}>
+                              ⚙ Fine-Tune Alignment
+                            </summary>
+                            
+                            <div style={{ marginTop: '8px', padding: '12px', background: 'var(--background-secondary)', borderRadius: '4px' }}>
+                              <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '12px' }}>
+                                Manually adjust hex size for perfect alignment with your image.
+                              </p>
+                              
+                              <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                                <label style={{ fontSize: '12px', minWidth: '70px' }}>
+                                  Calculated:
+                                </label>
+                                <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+                                  {measurementToHexSize(measurementSize, measurementMethod, orientation).toFixed(1)}px
+                                </span>
+                              </div>
+                              
+                              <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginTop: '8px' }}>
+                                <label style={{ fontSize: '12px', minWidth: '70px' }}>
+                                  Override:
+                                </label>
+                                <input
+                                  type="number"
+                                  min={(() => {
+                                    const baseHexSize = measurementToHexSize(measurementSize, measurementMethod, orientation);
+                                    return (baseHexSize - 3).toFixed(1);
+                                  })()}
+                                  max={(() => {
+                                    const baseHexSize = measurementToHexSize(measurementSize, measurementMethod, orientation);
+                                    return (baseHexSize + 3).toFixed(1);
+                                  })()}
+                                  step="0.1"
+                                  value={(() => {
+                                    const baseHexSize = measurementToHexSize(measurementSize, measurementMethod, orientation);
+                                    return (baseHexSize + fineTuneOffset).toFixed(1);
+                                  })()}
+                                  onChange={(e) => handleFineTuneChange(parseFloat(e.target.value))}
+                                  style={{
+                                    width: '80px',
+                                    padding: '4px 8px',
+                                    borderRadius: '4px',
+                                    border: '1px solid var(--background-modifier-border)',
+                                    background: 'var(--background-primary)',
+                                    color: 'var(--text-normal)',
+                                    fontSize: '13px'
+                                  }}
+                                />
+                                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>px</span>
+                                
+                                {fineTuneOffset !== 0 && (
+                                  <>
+                                    <span style={{ fontSize: '12px', color: 'var(--text-accent)' }}>
+                                      ({fineTuneOffset > 0 ? '+' : ''}{fineTuneOffset.toFixed(1)})
+                                    </span>
+                                    <button
+                                      onClick={() => {
+                                        setFineTuneOffset(0);
+                                        setFineTuneEnabled(false);
+                                        // Recalculate without fine-tune
+                                        const baseHexSize = measurementToHexSize(measurementSize, measurementMethod, orientation);
+                                        const calculated = calculateGridFromMeasurement(imageDimensions.width, imageDimensions.height, measurementSize, measurementMethod, orientation);
+                                        setHexBounds({ maxCol: calculated.columns, maxRow: calculated.rows });
+                                      }}
+                                      style={{
+                                        padding: '4px 8px',
+                                        fontSize: '11px',
+                                        background: 'var(--interactive-normal)',
+                                        border: 'none',
+                                        borderRadius: '3px',
+                                        cursor: 'pointer',
+                                        color: 'var(--text-normal)'
+                                      }}
+                                    >
+                                      Reset
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          </details>
+                        </div>
+                      )}
                     </div>
                   )}
                   
                   {/* Lock bounds checkbox - only show when image is selected */}
                   {backgroundImagePath && (
-                    <label class="dmt-checkbox-label" style={{ marginTop: '12px' }}>
+                    <label class="dmt-checkbox-label" style={{ marginTop: '16px', display: 'block' }}>
                       <input
                         type="checkbox"
                         checked={boundsLocked}
@@ -981,11 +1324,12 @@ function MapSettingsModal({
                             class="dmt-number-input"
                             style={{
                               width: '80px',
-                              padding: '6px 8px',
-                              border: '1px solid var(--background-modifier-border)',
+                              padding: '4px 8px',
                               borderRadius: '4px',
+                              border: '1px solid var(--background-modifier-border)',
                               background: 'var(--background-primary)',
-                              color: 'var(--text-normal)'
+                              color: 'var(--text-normal)',
+                              fontSize: '13px'
                             }}
                           />
                         </div>
@@ -998,36 +1342,23 @@ function MapSettingsModal({
                             class="dmt-number-input"
                             style={{
                               width: '80px',
-                              padding: '6px 8px',
-                              border: '1px solid var(--background-modifier-border)',
+                              padding: '4px 8px',
                               borderRadius: '4px',
+                              border: '1px solid var(--background-modifier-border)',
                               background: 'var(--background-primary)',
-                              color: 'var(--text-normal)'
+                              color: 'var(--text-normal)',
+                              fontSize: '13px'
                             }}
                           />
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => { setImageOffsetX(0); setImageOffsetY(0); }}
-                          style={{
-                            padding: '4px 8px',
-                            fontSize: '12px',
-                            background: 'var(--background-secondary)',
-                            border: '1px solid var(--background-modifier-border)',
-                            borderRadius: '4px',
-                            color: 'var(--text-muted)',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          Reset
-                        </button>
                       </div>
                       <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                        Fine-tune image alignment with the hex grid
+                        Fine-tune image position relative to grid center
                       </p>
                     </div>
                   )}
                 </div>
+
                 
                 {/* Bounds - Columns and Rows on same row */}
                 <div class="dmt-form-group">
@@ -1130,7 +1461,7 @@ function MapSettingsModal({
                         style={{ marginTop: '2px' }}
                       />
                       <div>
-                        <span style={{ fontWeight: 500 }}>Radial (⟐, 1-1, 2-5, ...)</span>
+                        <span style={{ fontWeight: 500 }}>Radial (⬡, 1-1, 2-5, ...)</span>
                         <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
                           Ring-position labels centered in grid
                         </p>
@@ -1298,6 +1629,53 @@ function MapSettingsModal({
                     />
                     <span>Remember expanded state</span>
                   </label>
+                </div>
+                
+                {/* Canvas Height Settings */}
+                <div style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px solid var(--background-modifier-border)' }}>
+                  <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '16px' }}>
+                    Canvas height settings (leave blank to use global defaults)
+                  </p>
+                  
+                  <div style={{ display: 'flex', gap: '12px', padding: '0 2px' }}>
+                    <div class="dmt-form-group" style={{ flex: 1, marginBottom: 0 }}>
+                      <label class="dmt-form-label">Desktop (pixels)</label>
+                      <input
+                        type="number"
+                        class="dmt-modal-input"
+                        placeholder={String(globalSettings.canvasHeight ?? 600)}
+                        value={useGlobalSettings ? '' : (overrides.canvasHeight ?? '')}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setOverrides(prev => ({
+                            ...prev,
+                            canvasHeight: value === '' ? undefined : parseInt(value)
+                          }));
+                        }}
+                        disabled={useGlobalSettings}
+                        style={{ opacity: useGlobalSettings ? 0.5 : 1 }}
+                      />
+                    </div>
+                    
+                    <div class="dmt-form-group" style={{ flex: 1, marginBottom: 0 }}>
+                      <label class="dmt-form-label">Mobile/Touch (pixels)</label>
+                      <input
+                        type="number"
+                        class="dmt-modal-input"
+                        placeholder={String(globalSettings.canvasHeightMobile ?? 400)}
+                        value={useGlobalSettings ? '' : (overrides.canvasHeightMobile ?? '')}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setOverrides(prev => ({
+                            ...prev,
+                            canvasHeightMobile: value === '' ? undefined : parseInt(value)
+                          }));
+                        }}
+                        disabled={useGlobalSettings}
+                        style={{ opacity: useGlobalSettings ? 0.5 : 1 }}
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
             )}

@@ -18,6 +18,10 @@ const FALLBACK_SETTINGS = {
   coordinateKeyMode: 'hold', // 'hold' or 'toggle'
   expandedByDefault: false,
   
+  // Canvas dimensions
+  canvasHeight: 600,  // Desktop/default canvas height in pixels
+  canvasHeightMobile: 400,  // Mobile/touch device canvas height in pixels
+  
   // Distance measurement settings
   distancePerCellGrid: DEFAULTS.distance.perCellGrid,
   distancePerCellHex: DEFAULTS.distance.perCellHex,

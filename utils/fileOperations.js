@@ -75,7 +75,11 @@ async function loadMapData(mapId, mapName = '', mapType = 'grid') {
             path: null, 
             lockBounds: false,
             gridDensity: 'medium',
-            customColumns: 24
+            customColumns: 24,
+            sizingMode: 'density',  // 'density' or 'measurement'
+            measurementMethod: 'corner',  // 'edge' or 'corner'
+            measurementSize: 86,  // Size in pixels
+            fineTuneOffset: 0  // Fine-tune adjustment (0 = no adjustment)
           };
         } else {
           // Ensure new fields exist on existing backgroundImage objects
@@ -84,6 +88,19 @@ async function loadMapData(mapId, mapName = '', mapType = 'grid') {
           }
           if (data.maps[mapId].backgroundImage.customColumns === undefined) {
             data.maps[mapId].backgroundImage.customColumns = 24;
+          }
+          // Add new fields for measurement mode (v1.1.0)
+          if (data.maps[mapId].backgroundImage.sizingMode === undefined) {
+            data.maps[mapId].backgroundImage.sizingMode = 'density';
+          }
+          if (data.maps[mapId].backgroundImage.measurementMethod === undefined) {
+            data.maps[mapId].backgroundImage.measurementMethod = 'corner';
+          }
+          if (data.maps[mapId].backgroundImage.measurementSize === undefined) {
+            data.maps[mapId].backgroundImage.measurementSize = 86;
+          }
+          if (data.maps[mapId].backgroundImage.fineTuneOffset === undefined) {
+            data.maps[mapId].backgroundImage.fineTuneOffset = 0;
           }
         }
       }

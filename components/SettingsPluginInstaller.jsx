@@ -14,7 +14,7 @@ const { OBJECT_TYPES, CATEGORIES } = await requireModuleByName("objectTypes.js")
 const { RA_ICONS, RA_CATEGORIES } = await requireModuleByName("rpgAwesomeIcons.js");
 
 // Plugin version from template
-const PACKAGED_PLUGIN_VERSION = '0.8.2';
+const PACKAGED_PLUGIN_VERSION = '0.8.3';
 
 // LocalStorage keys for tracking user preferences
 const STORAGE_KEYS = {

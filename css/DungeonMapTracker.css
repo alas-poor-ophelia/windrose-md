@@ -101,7 +101,6 @@
   background-color: var(--dmt-bg-primary);
   border-radius: 4px;
   overflow: hidden;
-  height: 600px;
   width: 100%;
 }
 
@@ -1900,9 +1899,6 @@ button.dmt-orientation-btn,
    ============================================ */
 
 @media (hover: none) and (pointer: coarse) {
-  .dmt-canvas-wrapper {
-    height: 400px;
-  }
 
   .dmt-compass {
     width: 35px;

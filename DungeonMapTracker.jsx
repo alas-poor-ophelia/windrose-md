@@ -148,6 +148,18 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     coordinateKey: effectiveSettings.coordinateKeyColor
   } : getTheme();
 
+  // Determine canvas height based on device type and settings
+  // Detect touch devices using media query match
+  const isTouchDevice = dc.useMemo(() => {
+    return window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+  }, []);
+  
+  const canvasHeight = effectiveSettings 
+    ? (isTouchDevice 
+        ? (effectiveSettings.canvasHeightMobile ?? 400)
+        : (effectiveSettings.canvasHeight ?? 600))
+    : (isTouchDevice ? 400 : 600);
+
   // Check if settings plugin is installed
   dc.useEffect(() => {
     async function checkPlugin() {
@@ -528,7 +540,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   const handleCompassClick = () => {
     if (!mapData) return;
 
-    // Cycle through: 0° -> 90° -> 180° -> 270° -> 0°
+    // Cycle through: 0ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â° -> 90ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â° -> 180ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â° -> 270ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â° -> 0ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°
     const rotations = [0, 90, 180, 270];
     const currentIndex = rotations.indexOf(mapData.northDirection);
     const nextIndex = (currentIndex + 1) % rotations.length;
@@ -632,7 +644,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     // Update hexSize if calculated from background image
     if (hexSize !== null && mapData.mapType === 'hex') {
       newMapData.hexSize = hexSize;
-    }
+    } else {
+      }
     
     updateMapData(newMapData);
     
@@ -725,6 +738,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
 
         <div
           className="dmt-canvas-wrapper"
+          style={{ height: `${canvasHeight}px` }}
           onMouseEnter={() => setIsFocused(true)}
           onMouseLeave={() => setIsFocused(false)}
         >

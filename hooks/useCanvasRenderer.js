@@ -13,6 +13,7 @@ const { gridRenderer } = await requireModuleByName("gridRenderer.js");
 const { hexRenderer } = await requireModuleByName("hexRenderer.js");
 const { getCachedImage } = await requireModuleByName("imageOperations.js");
 const { getSlotOffset, getMultiObjectScale, getObjectsInCell } = await requireModuleByName("hexSlotPositioner.js");
+const { offsetToAxial } = await requireModuleByName("offsetCoordinates.js");
 
 /**
  * Get appropriate renderer for geometry type
@@ -75,23 +76,44 @@ function renderCanvas(canvas, mapData, geometry, selectedItem = null, isResizeMo
       // Get orientation from mapData (default to 'flat' for backward compatibility)
       const orientation = mapData.orientation || 'flat';
       
-      // Calculate the center of the hex grid in WORLD coordinates
-      // The spacing formulas differ based on orientation
-      let gridCenterX, gridCenterY;
+      // Calculate the ACTUAL bounding box of the hex grid in world coordinates
+      // Offset coordinates create a parallelogram, not a rectangle, so we need to check all corners
       
-      if (orientation === 'pointy') {
-        // For pointy-top hexes:
-        // - Horizontal spacing: hexSize * sqrt(3)
-        // - Vertical spacing: hexSize * 1.5
-        gridCenterX = ((mapData.hexBounds.maxCol - 1) / 2) * (geometry.hexSize * geometry.sqrt3);
-        gridCenterY = ((mapData.hexBounds.maxRow - 1) / 2) * (geometry.hexSize * 1.5);
-      } else {
-        // For flat-top hexes:
-        // - Horizontal spacing: hexSize * 1.5
-        // - Vertical spacing: hexSize * sqrt(3)
-        gridCenterX = ((mapData.hexBounds.maxCol - 1) / 2) * (geometry.hexSize * 1.5);
-        gridCenterY = ((mapData.hexBounds.maxRow - 1) / 2) * (geometry.hexSize * geometry.sqrt3);
+      let minWorldX = Infinity, maxWorldX = -Infinity;
+      let minWorldY = Infinity, maxWorldY = -Infinity;
+      
+      // Check all four corners of the offset grid
+      const corners = [
+        { col: 0, row: 0 },
+        { col: mapData.hexBounds.maxCol - 1, row: 0 },
+        { col: 0, row: mapData.hexBounds.maxRow - 1 },
+        { col: mapData.hexBounds.maxCol - 1, row: mapData.hexBounds.maxRow - 1 }
+      ];
+      
+      for (const corner of corners) {
+        const { q, r } = offsetToAxial(corner.col, corner.row, orientation);
+        const worldPos = geometry.hexToWorld(q, r);
+        
+        if (worldPos.worldX < minWorldX) minWorldX = worldPos.worldX;
+        if (worldPos.worldX > maxWorldX) maxWorldX = worldPos.worldX;
+        if (worldPos.worldY < minWorldY) minWorldY = worldPos.worldY;
+        if (worldPos.worldY > maxWorldY) maxWorldY = worldPos.worldY;
       }
+      
+      // Account for hex extents beyond center points
+      const hexExtentX = geometry.hexSize;
+      const hexExtentY = geometry.hexSize * geometry.sqrt3 / 2;
+      
+      minWorldX -= hexExtentX;
+      maxWorldX += hexExtentX;
+      minWorldY -= hexExtentY;
+      maxWorldY += hexExtentY;
+      
+      // Calculate world coordinate bounding box
+      const worldWidth = maxWorldX - minWorldX;
+      const worldHeight = maxWorldY - minWorldY;
+      const worldCenterX = (minWorldX + maxWorldX) / 2;
+      const worldCenterY = (minWorldY + maxWorldY) / 2;
       
       // Calculate image dimensions
       const imgWidth = bgImage.naturalWidth;
@@ -103,8 +125,8 @@ function renderCanvas(canvas, mapData, geometry, selectedItem = null, isResizeMo
       
       // Position image centered at grid center in screen coordinates
       // Apply user offset (scaled by zoom to maintain position at different zoom levels)
-      const screenCenterX = offsetX + gridCenterX * zoom;
-      const screenCenterY = offsetY + gridCenterY * zoom;
+      const screenCenterX = offsetX + worldCenterX * zoom;
+      const screenCenterY = offsetY + worldCenterY * zoom;
       const screenX = screenCenterX - (imgWidth * zoom) / 2 + (imgOffsetX * zoom);
       const screenY = screenCenterY - (imgHeight * zoom) / 2 + (imgOffsetY * zoom);
       

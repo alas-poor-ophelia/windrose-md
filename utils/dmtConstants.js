@@ -51,7 +51,7 @@ const DEFAULTS = {
   initialZoom: 1.5,
   canvasSize: {              
     width: 800, 
-    height: 600 
+    height: 900 
   },
   maxHistory: 50,
   minZoom: 0.1,       
