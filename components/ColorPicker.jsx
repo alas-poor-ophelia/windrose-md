@@ -15,6 +15,7 @@ const ColorPicker = ({
   pendingCustomColorRef,
   title = 'Color',
   position = 'below', // 'below' or 'above'
+  align = 'left',     // 'left' or 'right'
   opacity = 1,  // Current opacity value (0-1), optional
   onOpacityChange = null  // Callback when opacity changes, optional
 }) => {
@@ -133,6 +134,11 @@ const ColorPicker = ({
     { id: 'add-custom', color: null, label: 'Add custom color', isAddButton: true }
   ];
   
+  // Determine horizontal alignment
+  const horizontalStyle = align === 'right' 
+    ? { right: '0', left: 'auto' }
+    : { left: '0' };
+  
   return (
     <div 
       className="dmt-color-picker" 
@@ -146,7 +152,7 @@ const ColorPicker = ({
           ? { bottom: 'calc(100% + 8px)', top: 'auto' }
           : { top: 'calc(100% + 8px)' }
         ),
-        left: '0',
+        ...horizontalStyle,
         zIndex: 1501
       }}
     >

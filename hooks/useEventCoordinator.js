@@ -16,7 +16,8 @@ const { useRegisteredHandlers } = await requireModuleByName("EventHandlerContext
  */
 const useEventCoordinator = ({
   isColorPickerOpen,
-  showObjectColorPicker = false
+  showObjectColorPicker = false,
+  isAlignmentMode = false
 }) => {
   // Get shared state from contexts
   const { canvasRef, currentTool } = useMapState();
@@ -44,8 +45,16 @@ const useEventCoordinator = ({
     const notePinHandlers = getHandlers('notePin');
     const panZoomHandlers = getHandlers('panZoom');
     const measureHandlers = getHandlers('measure');
+    const alignmentHandlers = getHandlers('imageAlignment');
     
-    if (!panZoomHandlers) return; // Need pan/zoom handlers at minimum
+    if (!panZoomHandlers) return;
+    
+    // In alignment mode, skip all normal tool handling except two-finger gestures
+    if (isAlignmentMode && (!e.touches || e.touches.length === 1)) {
+      // Let alignment mode canvas listeners handle single-finger/mouse events
+      // Don't process any normal tool actions
+      return;
+    }
     
     const {
       getClientCoords,
@@ -229,7 +238,7 @@ const useEventCoordinator = ({
       // Mouse events execute immediately
       executeToolAction();
     }
-  }, [currentTool, isColorPickerOpen, showObjectColorPicker, recentMultiTouch, selectedItem, getHandlers, layerVisibility]);
+  }, [currentTool, isColorPickerOpen, showObjectColorPicker, recentMultiTouch, selectedItem, getHandlers, layerVisibility, isAlignmentMode]);
   
   /**
    * Handle pointer move events
@@ -241,8 +250,14 @@ const useEventCoordinator = ({
     const textHandlers = getHandlers('text');
     const panZoomHandlers = getHandlers('panZoom');
     const measureHandlers = getHandlers('measure');
+    const alignmentHandlers = getHandlers('imageAlignment');
     
     if (!panZoomHandlers) return;
+    
+    // In alignment mode, skip all normal tool handling except two-finger gestures
+    if (isAlignmentMode && (!e.touches || e.touches.length !== 2)) {
+      return;
+    }
     
     const { 
       getClientCoords, 
@@ -336,7 +351,7 @@ const useEventCoordinator = ({
     if (layerVisibility.objects && objectHandlers?.handleHoverUpdate) {
       objectHandlers.handleHoverUpdate(e);
     }
-  }, [currentTool, isDraggingSelection, selectedItem, getHandlers, layerVisibility]);
+  }, [currentTool, isDraggingSelection, selectedItem, getHandlers, layerVisibility, isAlignmentMode]);
   
   /**
    * Handle pointer up events
@@ -347,8 +362,14 @@ const useEventCoordinator = ({
     const objectHandlers = getHandlers('object');
     const textHandlers = getHandlers('text');
     const panZoomHandlers = getHandlers('panZoom');
+    const alignmentHandlers = getHandlers('imageAlignment');
     
     if (!panZoomHandlers) return;
+    
+    // In alignment mode, skip all normal tool handling
+    if (isAlignmentMode) {
+      return;
+    }
     
     const { 
       getClientCoords,
@@ -416,7 +437,7 @@ const useEventCoordinator = ({
         drawingHandlers.stopDrawing(e);
       }
     }
-  }, [currentTool, recentMultiTouch, isDraggingSelection, selectedItem, setSelectedItem, getHandlers]);
+  }, [currentTool, recentMultiTouch, isDraggingSelection, selectedItem, setSelectedItem, getHandlers, isAlignmentMode]);
   
   /**
    * Handle pointer leave events

@@ -30,6 +30,7 @@ const { getSetting, getTheme, getEffectiveSettings } = await requireModuleByName
 const { DEFAULTS } = await requireModuleByName("dmtConstants.js");
 const { DEFAULT_COLOR, getColorByHex, isDefaultColor } = await requireModuleByName("colorOperations.js");
 const { axialToOffset, isWithinOffsetBounds } = await requireModuleByName("offsetCoordinates.js");
+const { ImageAlignmentMode } = await requireModuleByName("ImageAlignmentMode.jsx");
 
 // RPGAwesome icon font support
 const { RA_ICONS } = await requireModuleByName("rpgAwesomeIcons.js");
@@ -113,6 +114,12 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   const [settingsVersion, setSettingsVersion] = dc.useState(0); // Incremented to force re-render on settings change
   const [showSettingsModal, setShowSettingsModal] = dc.useState(false);
   const [showVisibilityToolbar, setShowVisibilityToolbar] = dc.useState(false);
+  
+  // Image alignment mode state
+  const [isAlignmentMode, setIsAlignmentMode] = dc.useState(false);
+  const [alignmentOffsetX, setAlignmentOffsetX] = dc.useState(0);
+  const [alignmentOffsetY, setAlignmentOffsetY] = dc.useState(0);
+  const [returningFromAlignment, setReturningFromAlignment] = dc.useState(false);
   
   // Layer visibility state (session-only, resets on reload)
   const [layerVisibility, setLayerVisibility] = dc.useState({
@@ -653,9 +660,64 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     setSettingsVersion(prev => prev + 1);
   };
 
+
   const handleSettingsClose = () => {
     setShowSettingsModal(false);
+    setReturningFromAlignment(false); // Reset flag when modal closes
   };
+
+  // Image alignment mode handlers
+  const handleOpenAlignmentMode = dc.useCallback((currentX, currentY) => {
+    setAlignmentOffsetX(currentX);
+    setAlignmentOffsetY(currentY);
+    setIsAlignmentMode(true);
+    setShowSettingsModal(false); // Hide settings modal
+  }, []);
+
+  const handleAlignmentOffsetChange = dc.useCallback((newX, newY) => {
+    setAlignmentOffsetX(newX);
+    setAlignmentOffsetY(newY);
+    
+    // Update the map data immediately for visual feedback
+    if (mapData && mapData.backgroundImage) {
+      updateMapData({
+        ...mapData,
+        backgroundImage: {
+          ...mapData.backgroundImage,
+          offsetX: newX,
+          offsetY: newY
+        }
+      });
+    }
+  }, [mapData, updateMapData]);
+
+  const handleAlignmentApply = dc.useCallback((finalX, finalY) => {
+    // Offset values are already in mapData from handleAlignmentOffsetChange
+    setIsAlignmentMode(false);
+    setReturningFromAlignment(true); // Flag that we're returning from alignment
+    setShowSettingsModal(true); // Reopen settings modal
+  }, []);
+
+  const handleAlignmentCancel = dc.useCallback((originalX, originalY) => {
+    // Revert to original offset
+    setAlignmentOffsetX(originalX);
+    setAlignmentOffsetY(originalY);
+    
+    if (mapData && mapData.backgroundImage) {
+      updateMapData({
+        ...mapData,
+        backgroundImage: {
+          ...mapData.backgroundImage,
+          offsetX: originalX,
+          offsetY: originalY
+        }
+      });
+    }
+    
+    setIsAlignmentMode(false);
+    setReturningFromAlignment(true); // Flag that we're returning from alignment
+    setShowSettingsModal(true); // Reopen settings modal
+  }, [mapData, updateMapData]);
 
   // Loading state
   if (isLoading) {
@@ -759,6 +821,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               onEdgesChange={handleEdgesChange}
               onViewStateChange={handleViewStateChange}
               currentTool={currentTool}
+              isAlignmentMode={isAlignmentMode}
               selectedObjectType={selectedObjectType}
               selectedColor={selectedColor}
               isColorPickerOpen={isColorPickerOpen}
@@ -849,6 +912,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
           isOpen={showSettingsModal}
           onClose={handleSettingsClose}
           onSave={handleSettingsSave}
+          onOpenAlignmentMode={handleOpenAlignmentMode}
+          initialTab={returningFromAlignment ? 'hexgrid' : null}
           mapType={mapData?.mapType || 'grid'}
           orientation={mapData?.orientation || 'flat'}
           currentSettings={mapData.settings}
@@ -858,6 +923,19 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
           currentCells={mapData.mapType === 'hex' ? (mapData.cells || []) : []}
           currentObjects={mapData.mapType === 'hex' ? (mapData.objects || []) : []}
         />
+
+        {/* Image Alignment Mode */}
+        {isAlignmentMode && mapData.backgroundImage?.path && (
+          <ImageAlignmentMode
+            dc={dc}
+            isActive={isAlignmentMode}
+            offsetX={alignmentOffsetX}
+            offsetY={alignmentOffsetY}
+            onOffsetChange={handleAlignmentOffsetChange}
+            onApply={handleAlignmentApply}
+            onCancel={handleAlignmentCancel}
+          />
+        )}
       </div>
     </>
   );

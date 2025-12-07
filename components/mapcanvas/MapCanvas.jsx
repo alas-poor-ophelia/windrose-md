@@ -28,7 +28,7 @@ const { useEventCoordinator } = await requireModuleByName("useEventCoordinator.j
  * so the hooks have access to MapState, MapSelection, and EventHandler contexts.
  * Returns null (no visual rendering) - only manages behavioral coordination.
  */
-const Coordinators = ({ canvasRef, mapData, geometry, onViewStateChange, isFocused, isColorPickerOpen }) => {
+const Coordinators = ({ canvasRef, mapData, geometry, onViewStateChange, isFocused, isColorPickerOpen, isAlignmentMode }) => {
   // Coordinator hooks need to be called inside the provider tree
   usePanZoomCoordinator({
     canvasRef,
@@ -41,7 +41,8 @@ const Coordinators = ({ canvasRef, mapData, geometry, onViewStateChange, isFocus
   useEventCoordinator({
     canvasRef,
     isColorPickerOpen,
-    showObjectColorPicker: false
+    showObjectColorPicker: false,
+    isAlignmentMode
   });
 
   return null; // No UI - coordinators only manage behavior
@@ -51,7 +52,7 @@ const Coordinators = ({ canvasRef, mapData, geometry, onViewStateChange, isFocus
  * MapCanvasContent - Inner component that uses context hooks
  * Contains all the map canvas logic and interacts with shared selection state
  */
-const MapCanvasContent = ({ mapData, onCellsChange, onObjectsChange, onTextLabelsChange, onEdgesChange, currentTool, onViewStateChange, selectedObjectType, selectedColor, isColorPickerOpen, customColors, onAddCustomColor, onDeleteCustomColor, isFocused, isAnimating, theme, children }) => {
+const MapCanvasContent = ({ mapData, onCellsChange, onObjectsChange, onTextLabelsChange, onEdgesChange, currentTool, onViewStateChange, selectedObjectType, selectedColor, isColorPickerOpen, customColors, onAddCustomColor, onDeleteCustomColor, isFocused, isAnimating, theme, isAlignmentMode, children }) => {
   const canvasRef = dc.useRef(null);
   const containerRef = dc.useRef(null);
   const [canvasDimensions, setCanvasDimensions] = dc.useState({
@@ -331,6 +332,7 @@ const MapCanvasContent = ({ mapData, onCellsChange, onObjectsChange, onTextLabel
             onViewStateChange={onViewStateChange}
             isFocused={isFocused}
             isColorPickerOpen={isColorPickerOpen}
+            isAlignmentMode={isAlignmentMode}
           />
           
           <div className="dmt-canvas-container" ref={containerRef}>
