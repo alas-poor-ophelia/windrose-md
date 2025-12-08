@@ -17,7 +17,7 @@ const { requireModuleByName } = await dc.require(pathResolverPath);
 const { calculateObjectScreenPosition: calculateScreenPos, applyInverseRotation } = await requireModuleByName("screenPositionUtils.js");
 const { useMapState, useMapOperations } = await requireModuleByName("MapContext.jsx");
 const { useMapSelection } = await requireModuleByName("MapSelectionContext.jsx");
-const { calculateEdgeAlignment, getAlignmentOffset, placeObject, canPlaceObjectAt, removeObjectFromHex } = await requireModuleByName("objectOperations.js");
+const { calculateEdgeAlignment, getAlignmentOffset, placeObject, canPlaceObjectAt, removeObjectFromHex, generateObjectId } = await requireModuleByName("objectOperations.js");
 const { getClickedObjectInCell, getObjectsInCell, canAddObjectToCell, assignSlot } = await requireModuleByName("hexSlotPositioner.js");
 const { HexGeometry } = await requireModuleByName("HexGeometry.js");
 
@@ -1084,7 +1084,7 @@ const useObjectInteractions = (
   }, [handleObjectColorSelect]);
 
   /**
-   * Handle object rotation (cycles 0ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â° ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ 90ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â° ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ 180ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â° ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ 270ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â° ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ 0ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°)
+   * Handle object rotation (cycles 0° -> 90° -> 180° -> 270° -> 0°)
    */
   const handleObjectRotation = dc.useCallback(() => {
     if (!selectedItem || selectedItem.type !== 'object' || !mapData) {
@@ -1127,6 +1127,93 @@ const useObjectInteractions = (
     setSelectedItem(null);
   }, [selectedItem, mapData, removeObject, onObjectsChange, setSelectedItem]);
 
+  /**
+   * Handle object duplication - creates a copy at nearest empty space
+   */
+  const handleObjectDuplicate = dc.useCallback(() => {
+    if (!selectedItem || selectedItem.type !== 'object' || !mapData) {
+      return;
+    }
+    
+    const sourceObject = mapData.objects.find(obj => obj.id === selectedItem.id);
+    if (!sourceObject) return;
+    
+    const { mapType } = mapData;
+    const { x: sourceX, y: sourceY } = sourceObject.position;
+    
+    // Spiral search for nearby empty cell
+    // Direction vectors for spiral: right, down, left, up
+    const directions = [[1, 0], [0, 1], [-1, 0], [0, -1]];
+    let targetX = sourceX;
+    let targetY = sourceY;
+    let found = false;
+    
+    // Start by checking adjacent cells, then spiral outward
+    for (let ring = 1; ring <= 10 && !found; ring++) {
+      for (let dir = 0; dir < 4 && !found; dir++) {
+        for (let step = 0; step < ring && !found; step++) {
+          const checkX = sourceX + directions[dir][0] * ring;
+          const checkY = sourceY + directions[dir][1] * (step + 1 - ring);
+          
+          if (canPlaceObjectAt(mapData.objects, checkX, checkY, mapType)) {
+            targetX = checkX;
+            targetY = checkY;
+            found = true;
+          }
+        }
+      }
+      
+      // If not found in simple checks, try each position in ring
+      if (!found) {
+        for (let dx = -ring; dx <= ring && !found; dx++) {
+          for (let dy = -ring; dy <= ring && !found; dy++) {
+            if (Math.abs(dx) === ring || Math.abs(dy) === ring) {
+              const checkX = sourceX + dx;
+              const checkY = sourceY + dy;
+              
+              if (canPlaceObjectAt(mapData.objects, checkX, checkY, mapType)) {
+                targetX = checkX;
+                targetY = checkY;
+                found = true;
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    if (!found) {
+      console.warn('No empty space found for duplicate');
+      return;
+    }
+    
+    // Clone the object with new ID and position
+    const newObject = {
+      ...sourceObject,
+      id: generateObjectId(),
+      position: { x: targetX, y: targetY }
+    };
+    
+    // For hex maps, assign a slot
+    if (mapType === 'hex') {
+      const occupiedSlots = mapData.objects
+        .filter(obj => obj.position.x === targetX && obj.position.y === targetY)
+        .map(obj => obj.slot)
+        .filter(s => s !== undefined);
+      newObject.slot = assignSlot(occupiedSlots);
+    }
+    
+    const updatedObjects = [...mapData.objects, newObject];
+    onObjectsChange(updatedObjects);
+    
+    // Select the new object
+    setSelectedItem({
+      type: 'object',
+      id: newObject.id,
+      data: newObject
+    });
+  }, [selectedItem, mapData, onObjectsChange, setSelectedItem]);
+
   // Reset resize mode when switching away from select tool
   dc.useEffect(() => {
     if (currentTool !== 'select') {
@@ -1161,6 +1248,7 @@ const useObjectInteractions = (
     handleObjectKeyDown,
     handleObjectRotation,
     handleObjectDeletion,
+    handleObjectDuplicate,
 
     // Button position calculators
     calculateLabelButtonPosition,

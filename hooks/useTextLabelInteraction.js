@@ -40,6 +40,7 @@ const useTextLabelInteraction = (
   
   const {
     onTextLabelsChange,
+    onMapDataUpdate,
     getTextLabelAtPosition,
     addTextLabel,
     updateTextLabel,
@@ -174,7 +175,7 @@ const useTextLabelInteraction = (
       return;
     }
     
-    // Cycle through 0° -> 90° -> 180° -> 270° -> 0°
+    // Cycle through 0Â° -> 90Â° -> 180Â° -> 270Â° -> 0Â°
     const rotations = [0, 90, 180, 270];
     const currentRotation = selectedItem.data.rotation || 0;
     const currentIndex = rotations.indexOf(currentRotation);
@@ -276,6 +277,18 @@ const useTextLabelInteraction = (
         }
       );
       onTextLabelsChange(newLabels);
+      
+      // Save text label settings for future new labels (per-map)
+      // Uses functional update in useMapData to avoid race condition
+      if (onMapDataUpdate) {
+        onMapDataUpdate({
+          lastTextLabelSettings: {
+            fontSize: labelData.fontSize,
+            fontFace: labelData.fontFace,
+            color: labelData.color
+          }
+        });
+      }
     }
     
     setShowTextModal(false);

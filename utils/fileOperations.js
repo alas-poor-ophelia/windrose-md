@@ -55,6 +55,10 @@ async function loadMapData(mapId, mapName = '', mapType = 'grid') {
       if (data.maps[mapId].expandedState === undefined) {
         data.maps[mapId].expandedState = false;
       }
+      // Ensure lastTextLabelSettings exists (backward compatibility)
+      if (!data.maps[mapId].lastTextLabelSettings) {
+        data.maps[mapId].lastTextLabelSettings = null;
+      }
       // Ensure hexBounds exists for hex maps (use defaults, handle migration)
       if (data.maps[mapId].mapType === 'hex') {
         if (!data.maps[mapId].hexBounds) {
@@ -173,7 +177,8 @@ function createNewMap(mapId, mapName = '', mapType = 'grid') {
       rememberPanZoom: true,
       rememberSidebarState: true,
       rememberExpandedState: false
-    }
+    },
+    lastTextLabelSettings: null  // Stores {fontFace, fontSize, color} for new labels
   };
   
   // Add type-specific properties

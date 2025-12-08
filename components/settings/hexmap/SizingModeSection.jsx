@@ -9,6 +9,7 @@ const pathResolverPath = dc.resolvePath("pathResolver.js");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
 const { useMapSettings } = await requireModuleByName("MapSettingsContext.jsx");
+const { CollapsibleSection } = await requireModuleByName("CollapsibleSection.jsx");
 
 /**
  * Quick Setup tab content - density presets
@@ -292,7 +293,6 @@ function SizingModeSection() {
     backgroundImagePath,
     imageDimensions,
     sizingMode,
-    boundsLocked,
     imageOpacity,
     setImageOpacity,
     imageOffsetX,
@@ -300,7 +300,6 @@ function SizingModeSection() {
     imageOffsetY,
     setImageOffsetY,
     handleSizingModeChange,
-    handleBoundsLockToggle,
     onOpenAlignmentMode
   } = useMapSettings();
   
@@ -358,17 +357,6 @@ function SizingModeSection() {
       {sizingMode === 'density' && <DensityModeContent />}
       {sizingMode === 'measurement' && <MeasurementModeContent />}
       
-      {/* Lock bounds checkbox - after tabs */}
-      <label class="dmt-checkbox-label" style={{ marginTop: '16px', display: 'block' }}>
-        <input
-          type="checkbox"
-          checked={boundsLocked}
-          onChange={handleBoundsLockToggle}
-          class="dmt-checkbox"
-        />
-        <span>Lock bounds to image dimensions</span>
-      </label>
-      
       {/* Opacity slider */}
       <div style={{ marginTop: '16px' }}>
         <label class="dmt-form-label" style={{ marginBottom: '8px', display: 'block' }}>
@@ -402,12 +390,13 @@ function SizingModeSection() {
         </p>
       </div>
       
-      {/* Image offset controls */}
-      <div style={{ marginTop: '16px' }}>
-        <label class="dmt-form-label" style={{ marginBottom: '8px', display: 'block' }}>
-          Image Offset (pixels)
-        </label>
-        <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
+      {/* Image offset controls - collapsible, starts collapsed */}
+      <CollapsibleSection
+        title="Image Offset"
+        defaultOpen={false}
+        subtitle={`X: ${imageOffsetX}, Y: ${imageOffsetY}`}
+      >
+        <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '8px' }}>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>X:</span>
             <input
@@ -445,13 +434,12 @@ function SizingModeSection() {
             />
           </div>
         </div>
-        <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+        <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px' }}>
           Fine-tune image position relative to grid center
         </p>
         <button
           onClick={() => onOpenAlignmentMode?.(imageOffsetX, imageOffsetY)}
           style={{
-            marginTop: '8px',
             padding: '6px 12px',
             fontSize: '12px',
             fontWeight: '500',
@@ -467,10 +455,10 @@ function SizingModeSection() {
           onMouseEnter={(e) => e.target.style.background = 'var(--interactive-hover)'}
           onMouseLeave={(e) => e.target.style.background = 'var(--interactive-normal)'}
         >
-          <span>🔍</span>
+          <span>📍</span>
           <span>Adjust Position Interactively</span>
         </button>
-      </div>
+      </CollapsibleSection>
     </div>
   );
 }

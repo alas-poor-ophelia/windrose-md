@@ -3,6 +3,7 @@ const { requireModuleByName } = await dc.require(pathResolverPath);
 
 const { useCanvasInteraction } = await requireModuleByName("useCanvasInteraction.js");
 const { useEventHandlerRegistration } = await requireModuleByName("EventHandlerContext.jsx");
+const { useMapOperations } = await requireModuleByName("MapContext.jsx");
 
 /**
  * usePanZoomCoordinator.js
@@ -22,9 +23,18 @@ const usePanZoomCoordinator = ({
   canvasRef,
   mapData,
   geometry,
-  onViewStateChange,
   isFocused
 }) => {
+  // Get onMapDataUpdate from context to handle viewState changes
+  const { onMapDataUpdate } = useMapOperations();
+  
+  // Create local callback for viewState changes
+  const handleViewStateChange = dc.useCallback((newViewState) => {
+    if (onMapDataUpdate) {
+      onMapDataUpdate({ viewState: newViewState });
+    }
+  }, [onMapDataUpdate]);
+
   // Use canvas interaction hook for pan/zoom logic
   const {
     isPanning,
@@ -52,7 +62,7 @@ const usePanZoomCoordinator = ({
     setTouchPanStart,
     setInitialPinchDistance,
     setSpaceKeyPressed
-  } = useCanvasInteraction(canvasRef, mapData, geometry, onViewStateChange, isFocused);
+  } = useCanvasInteraction(canvasRef, mapData, geometry, handleViewStateChange, isFocused);
   
   // Register pan/zoom handlers with EventHandlerContext for event coordination
   const { registerHandlers, unregisterHandlers } = useEventHandlerRegistration();

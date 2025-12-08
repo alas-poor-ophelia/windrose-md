@@ -28,13 +28,12 @@ const { useEventCoordinator } = await requireModuleByName("useEventCoordinator.j
  * so the hooks have access to MapState, MapSelection, and EventHandler contexts.
  * Returns null (no visual rendering) - only manages behavioral coordination.
  */
-const Coordinators = ({ canvasRef, mapData, geometry, onViewStateChange, isFocused, isColorPickerOpen, isAlignmentMode }) => {
+const Coordinators = ({ canvasRef, mapData, geometry, isFocused, isColorPickerOpen, isAlignmentMode }) => {
   // Coordinator hooks need to be called inside the provider tree
   usePanZoomCoordinator({
     canvasRef,
     mapData,
     geometry,
-    onViewStateChange,
     isFocused
   });
 
@@ -52,7 +51,7 @@ const Coordinators = ({ canvasRef, mapData, geometry, onViewStateChange, isFocus
  * MapCanvasContent - Inner component that uses context hooks
  * Contains all the map canvas logic and interacts with shared selection state
  */
-const MapCanvasContent = ({ mapData, onCellsChange, onObjectsChange, onTextLabelsChange, onEdgesChange, currentTool, onViewStateChange, selectedObjectType, selectedColor, isColorPickerOpen, customColors, onAddCustomColor, onDeleteCustomColor, isFocused, isAnimating, theme, isAlignmentMode, children }) => {
+const MapCanvasContent = ({ mapData, onCellsChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onMapDataUpdate, currentTool, selectedObjectType, selectedColor, isColorPickerOpen, customColors, onAddCustomColor, onDeleteCustomColor, isFocused, isAnimating, theme, isAlignmentMode, children }) => {
   const canvasRef = dc.useRef(null);
   const containerRef = dc.useRef(null);
   const [canvasDimensions, setCanvasDimensions] = dc.useState({
@@ -114,7 +113,7 @@ const MapCanvasContent = ({ mapData, onCellsChange, onObjectsChange, onTextLabel
     screenToGrid,
     screenToWorld,
     getClientCoords
-  } = useCanvasInteraction(canvasRef, mapData, geometry, onViewStateChange, isFocused);
+  } = useCanvasInteraction(canvasRef, mapData, geometry, null, isFocused);
 
   dc.useEffect(() => {
     const container = containerRef.current;
@@ -315,8 +314,8 @@ const MapCanvasContent = ({ mapData, onCellsChange, onObjectsChange, onTextLabel
     onObjectsChange,
     onTextLabelsChange,
     onEdgesChange,
-    onViewStateChange
-  }), [onCellsChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onViewStateChange]);
+    onMapDataUpdate
+  }), [onCellsChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onMapDataUpdate]);
 
 
 
@@ -329,7 +328,6 @@ const MapCanvasContent = ({ mapData, onCellsChange, onObjectsChange, onTextLabel
             canvasRef={canvasRef}
             mapData={mapData}
             geometry={geometry}
-            onViewStateChange={onViewStateChange}
             isFocused={isFocused}
             isColorPickerOpen={isColorPickerOpen}
             isAlignmentMode={isAlignmentMode}

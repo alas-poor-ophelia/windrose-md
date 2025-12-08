@@ -18,7 +18,7 @@ const { DEFAULTS } = await requireModuleByName("dmtConstants.js");
 const { GridGeometry } = await requireModuleByName("GridGeometry.js");
 
 
-function useCanvasInteraction(canvasRef, mapData, geometry, onViewStateChange, focused) {
+function useCanvasInteraction(canvasRef, mapData, geometry, onViewStateChange = () => {}, focused) {
   // Pan state
   const [isPanning, setIsPanning] = dc.useState(false);
   const [isTouchPanning, setIsTouchPanning] = dc.useState(false);

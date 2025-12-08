@@ -65,10 +65,18 @@ function useMapData(mapId, mapName = '', mapType = 'grid') {
   }, [pendingData, mapId]);
   
   // Update map data and trigger debounced save
-  const updateMapData = dc.useCallback((newMapData) => {
-    setMapData(newMapData);
-    setPendingData(newMapData);
-    setSaveStatus('Unsaved changes');
+  // Supports both direct updates and functional updates:
+  //   updateMapData(newData)
+  //   updateMapData(currentData => ({ ...currentData, ...changes }))
+  const updateMapData = dc.useCallback((updaterOrData) => {
+    setMapData(prev => {
+      const newData = typeof updaterOrData === 'function' 
+        ? updaterOrData(prev) 
+        : updaterOrData;
+      setPendingData(newData);
+      setSaveStatus('Unsaved changes');
+      return newData;
+    });
   }, []);
   
   // Force immediate save (for when component unmounts or critical saves)

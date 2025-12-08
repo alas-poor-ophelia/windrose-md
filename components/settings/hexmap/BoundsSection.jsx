@@ -18,7 +18,8 @@ function BoundsSection() {
     hexBounds,
     boundsLocked,
     backgroundImagePath,
-    handleHexBoundsChange
+    handleHexBoundsChange,
+    handleBoundsLockToggle
   } = useMapSettings();
   
   // Generate display label for playable area (e.g., "A1 to Z20")
@@ -94,6 +95,19 @@ function BoundsSection() {
       <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '8px' }}>
         Playable area: {getPlayableAreaLabel()}
       </p>
+      
+      {/* Lock bounds checkbox - only show when background image is present */}
+      {backgroundImagePath && (
+        <label class="dmt-checkbox-label" style={{ marginTop: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <input
+            type="checkbox"
+            checked={boundsLocked}
+            onChange={handleBoundsLockToggle}
+            class="dmt-checkbox"
+          />
+          <span style={{ fontSize: '13px' }}>Lock bounds to image dimensions</span>
+        </label>
+      )}
     </div>
   );
 }

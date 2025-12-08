@@ -100,6 +100,7 @@ const CornerBracket = ({ position }) => {
 
 const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'grid' }) => {
   const { mapData, isLoading, saveStatus, updateMapData, forceSave } = useMapData(mapId, mapName, mapType);
+  
   const [currentTool, setCurrentTool] = dc.useState('draw');
   const [selectedObjectType, setSelectedObjectType] = dc.useState(null);
   const [selectedColor, setSelectedColor] = dc.useState(DEFAULT_COLOR);
@@ -465,14 +466,13 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     updateMapData(newMapData);
   };
 
-  // Handle view state change (zoom/pan) - NOT tracked in history
-  const handleViewStateChange = (newViewState) => {
-    if (!mapData) return;
-    const newMapData = {
-      ...mapData,
-      viewState: newViewState
-    };
-    updateMapData(newMapData);
+  // Generic map data update - for any field that doesn't need history tracking
+  // Uses functional update to get current mapData (avoids stale closure issues)
+  const handleMapDataUpdate = (updates) => {
+    updateMapData(current => {
+      if (!current) return current;
+      return { ...current, ...updates };
+    });
   };
 
   // Handle undo
@@ -547,7 +547,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   const handleCompassClick = () => {
     if (!mapData) return;
 
-    // Cycle through: 0ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â° -> 90ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â° -> 180ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â° -> 270ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â° -> 0ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°
+    // Cycle through: 0° -> 90° -> 180° -> 270° -> 0°
     const rotations = [0, 90, 180, 270];
     const currentIndex = rotations.indexOf(mapData.northDirection);
     const nextIndex = (currentIndex + 1) % rotations.length;
@@ -818,8 +818,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               onCellsChange={handleCellsChange}
               onObjectsChange={handleObjectsChange}
               onTextLabelsChange={handleTextLabelsChange}
+              onMapDataUpdate={handleMapDataUpdate}
               onEdgesChange={handleEdgesChange}
-              onViewStateChange={handleViewStateChange}
               currentTool={currentTool}
               isAlignmentMode={isAlignmentMode}
               selectedObjectType={selectedObjectType}

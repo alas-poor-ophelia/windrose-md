@@ -96,7 +96,8 @@ const SelectionToolbar = ({
   onColorClick,
   onResize,
   onDelete,
-  onScaleChange,  // NEW: handler for scale slider
+  onScaleChange,  // handler for scale slider
+  onDuplicate,    // handler for duplicating object
   
   // Text-specific handlers
   onEdit,
@@ -158,10 +159,10 @@ const SelectionToolbar = ({
   // Count buttons for this selection type
   let buttonCount = 0;
   if (isObject) {
-    buttonCount = 6; // Rotate, Label, Link Note, Color, Resize, Delete
+    buttonCount = 7; // Rotate, Label, Duplicate, Link Note, Color, Resize, Delete
     // Hide label button for note_pin objects
     if (selectedItem.data?.type === 'note_pin') {
-      buttonCount = 5;
+      buttonCount = 6;
     }
   } else if (isText) {
     buttonCount = 3; // Edit, Rotate, Delete
@@ -313,7 +314,7 @@ const SelectionToolbar = ({
               onClick={(e) => {
                 if (onRotate) onRotate(e);
               }}
-              title="Rotate 90Ãƒâ€š° (or press R)"
+              title="Rotate 90° (or press R)"
             >
               <dc.Icon icon="lucide-rotate-cw" />
             </button>
@@ -330,6 +331,17 @@ const SelectionToolbar = ({
                 <dc.Icon icon="lucide-sticky-note" />
               </button>
             )}
+            
+            {/* Duplicate */}
+            <button
+              className="dmt-toolbar-button"
+              onClick={(e) => {
+                if (onDuplicate) onDuplicate(e);
+              }}
+              title="Duplicate Object"
+            >
+              <dc.Icon icon="lucide-copy" />
+            </button>
             
             {/* Link Note */}
             <button
@@ -415,7 +427,7 @@ const SelectionToolbar = ({
             <button
               className="dmt-toolbar-button"
               onClick={onRotate}
-              title="Rotate 90Ãƒâ€š° (or press R)"
+              title="Rotate 90° (or press R)"
             >
               <dc.Icon icon="lucide-rotate-cw" />
             </button>

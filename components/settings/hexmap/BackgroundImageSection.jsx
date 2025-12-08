@@ -3,12 +3,14 @@
  * 
  * Background image configuration section for hex maps.
  * Handles image selection, opacity, and offset controls.
+ * Collapsible - starts open, auto-collapses when image is selected.
  */
 
 const pathResolverPath = dc.resolvePath("pathResolver.js");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
 const { useMapSettings } = await requireModuleByName("MapSettingsContext.jsx");
+const { CollapsibleSection } = await requireModuleByName("CollapsibleSection.jsx");
 
 /**
  * Background image section with image picker and visual controls
@@ -25,13 +27,34 @@ function BackgroundImageSection() {
     handleImageClear
   } = useMapSettings();
   
+  // Track if user has manually toggled (to override auto-collapse behavior)
+  const [userToggled, setUserToggled] = dc.useState(false);
+  const [isOpen, setIsOpen] = dc.useState(true);
+  
+  // Auto-collapse when image is selected (only if user hasn't manually toggled)
+  dc.useEffect(() => {
+    if (backgroundImagePath && !userToggled) {
+      setIsOpen(false);
+    }
+  }, [backgroundImagePath, userToggled]);
+  
+  const handleToggle = (newIsOpen) => {
+    setUserToggled(true);
+    setIsOpen(newIsOpen);
+  };
+  
+  // Generate subtitle showing selected image or status
+  const subtitle = backgroundImagePath 
+    ? backgroundImageDisplayName || 'Image selected'
+    : 'No image';
+  
   return (
-    <div class="dmt-form-group" style={{ 
-      borderBottom: '1px solid var(--background-modifier-border)', 
-      paddingBottom: '16px',
-      marginBottom: '20px'
-    }}>
-      <label class="dmt-form-label">Background Image</label>
+    <CollapsibleSection
+      title="Background Image"
+      isOpen={isOpen}
+      onToggle={handleToggle}
+      subtitle={subtitle}
+    >
       <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '10px' }}>
         Add an image to automatically size the hex grid
       </p>
@@ -117,13 +140,13 @@ function BackgroundImageSection() {
       
       {/* Show dimensions when image is selected */}
       {imageDimensions && (
-        <div style={{ marginBottom: '16px' }}>
+        <div>
           <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
             Detected: {imageDimensions.width} × {imageDimensions.height} px
           </p>
         </div>
       )}
-    </div>
+    </CollapsibleSection>
   );
 }
 

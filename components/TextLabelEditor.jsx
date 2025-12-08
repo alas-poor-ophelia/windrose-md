@@ -21,6 +21,7 @@ const TextLabelEditor = ({
 }) => {
   const [text, setText] = dc.useState(initialValue);
   const [fontSize, setFontSize] = dc.useState(initialFontSize);
+  const [fontSizeInput, setFontSizeInput] = dc.useState(String(initialFontSize)); // Raw input for typing
   const [fontFace, setFontFace] = dc.useState(initialFontFace);
   const [color, setColor] = dc.useState(initialColor);
   const [isColorPickerOpen, setIsColorPickerOpen] = dc.useState(false);
@@ -70,12 +71,21 @@ const TextLabelEditor = ({
     e.stopPropagation();
   };
   
-  // Handle font size change with validation
-  const handleFontSizeChange = (e) => {
-    const value = parseInt(e.target.value, 10);
-    if (!isNaN(value)) {
+  // Handle font size input change (no clamping during typing)
+  const handleFontSizeInputChange = (e) => {
+    setFontSizeInput(e.target.value);
+  };
+  
+  // Handle font size blur - clamp and apply
+  const handleFontSizeBlur = () => {
+    const value = parseInt(fontSizeInput, 10);
+    if (!isNaN(value) && value > 0) {
       const clamped = Math.max(FONT_SIZE_MIN, Math.min(FONT_SIZE_MAX, value));
       setFontSize(clamped);
+      setFontSizeInput(String(clamped));
+    } else {
+      // Invalid input - reset to current fontSize
+      setFontSizeInput(String(fontSize));
     }
   };
   
@@ -195,8 +205,9 @@ const TextLabelEditor = ({
             <input
               type="number"
               className="dmt-text-editor-number"
-              value={fontSize}
-              onChange={handleFontSizeChange}
+              value={fontSizeInput}
+              onChange={handleFontSizeInputChange}
+              onBlur={handleFontSizeBlur}
               min={FONT_SIZE_MIN}
               max={FONT_SIZE_MAX}
               step={FONT_SIZE_STEP}

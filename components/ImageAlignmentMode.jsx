@@ -28,7 +28,7 @@ function ImageAlignmentMode({ dc, isActive, offsetX, offsetY, onOffsetChange, on
       // Position in bottom-right, accounting for panel size
       const panelWidth = 280;
       const panelHeight = 200;
-      const padding = 20;
+      const padding = 80;
       
       setPanelPosition({
         x: window.innerWidth - panelWidth - padding,
@@ -289,7 +289,7 @@ function ImageAlignmentMode({ dc, isActive, offsetX, offsetY, onOffsetChange, on
             gap: '8px'
           }}
         >
-          <span style={{ fontSize: '16px' }}>📐</span>
+          <span style={{ fontSize: '16px' }}>📍</span>
           <span style={{ fontSize: '14px', fontWeight: '500', color: 'var(--text-normal)' }}>
             Image Alignment
           </span>

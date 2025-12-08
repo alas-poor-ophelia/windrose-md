@@ -9,20 +9,21 @@ const pathResolverPath = dc.resolvePath("pathResolver.js");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
 const { useMapSettings } = await requireModuleByName("MapSettingsContext.jsx");
+const { CollapsibleSection } = await requireModuleByName("CollapsibleSection.jsx");
 const { ColorPickerItem } = await requireModuleByName("AppearanceTab.jsx");
 
 /**
- * Coordinate display mode selector
+ * Coordinate display mode selector (content only, no wrapper)
  */
-function CoordinateModeSection() {
+function CoordinateModeContent() {
   const {
     coordinateDisplayMode,
     setCoordinateDisplayMode
   } = useMapSettings();
   
   return (
-    <div class="dmt-form-group" style={{ marginTop: '20px' }}>
-      <label class="dmt-form-label">Coordinate Display Mode</label>
+    <div style={{ marginBottom: '16px' }}>
+      <label class="dmt-form-label" style={{ marginBottom: '4px' }}>Display Mode</label>
       <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '10px' }}>
         How coordinates appear when pressing C
       </p>
@@ -67,17 +68,17 @@ function CoordinateModeSection() {
 }
 
 /**
- * Coordinate text color pickers
+ * Coordinate text color pickers (content only, no wrapper)
  */
-function CoordinateColorsSection() {
+function CoordinateColorsContent() {
   const {
     useGlobalSettings,
     THEME
   } = useMapSettings();
   
   return (
-    <div class="dmt-form-group" style={{ marginTop: '20px' }}>
-      <label class="dmt-form-label">Coordinate Text Colors</label>
+    <div>
+      <label class="dmt-form-label" style={{ marginBottom: '4px' }}>Text Colors</label>
       <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '10px' }}>
         {useGlobalSettings 
           ? 'Using global settings (enable custom colors in Appearance tab to override)' 
@@ -109,15 +110,24 @@ function CoordinateColorsSection() {
 }
 
 /**
- * Combined coordinate display section
+ * Combined coordinate display section - collapsible, starts collapsed
  */
 function CoordinateDisplaySection() {
+  const { coordinateDisplayMode } = useMapSettings();
+  
+  // Generate subtitle based on current mode
+  const subtitle = coordinateDisplayMode === 'rectangular' ? 'A1, B2, ...' : 'Ring-Position';
+  
   return (
-    <>
-      <CoordinateModeSection />
-      <CoordinateColorsSection />
-    </>
+    <CollapsibleSection
+      title="Coordinate Display"
+      defaultOpen={false}
+      subtitle={subtitle}
+    >
+      <CoordinateModeContent />
+      <CoordinateColorsContent />
+    </CollapsibleSection>
   );
 }
 
-return { CoordinateDisplaySection, CoordinateModeSection, CoordinateColorsSection };
+return { CoordinateDisplaySection, CoordinateModeContent, CoordinateColorsContent };

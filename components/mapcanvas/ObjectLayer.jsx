@@ -97,6 +97,7 @@ const ObjectLayer = ({
     handleObjectKeyDown,
     handleObjectRotation,
     handleObjectDeletion,
+    handleObjectDuplicate,
     handleNoteSubmit,
     handleObjectColorSelect,
     handleObjectColorReset,
@@ -417,6 +418,7 @@ const ObjectLayer = ({
           
           // Object handlers
           onRotate={handleObjectRotation}
+          onDuplicate={handleObjectDuplicate}
           onLabel={handleNoteButtonClick}
           onLinkNote={() => handleEditNoteLink(selectedItem?.id)}
           onColorClick={handleObjectColorButtonClick}

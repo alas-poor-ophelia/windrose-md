@@ -113,12 +113,18 @@ const TextLayer = ({
           currentLabel = mapData.textLabels.find(l => l.id === editingTextId);
         }
         
+        // Use saved settings for new labels, defaults for editing existing
+        const savedSettings = mapData?.lastTextLabelSettings;
+        const defaultFontSize = currentLabel?.fontSize || savedSettings?.fontSize || 16;
+        const defaultFontFace = currentLabel?.fontFace || savedSettings?.fontFace || 'sans';
+        const defaultColor = currentLabel?.color || savedSettings?.color || '#ffffff';
+        
         return (
           <TextLabelEditor
             initialValue={currentLabel?.content || ''}
-            initialFontSize={currentLabel?.fontSize || 16}
-            initialFontFace={currentLabel?.fontFace || 'sans'}
-            initialColor={currentLabel?.color || '#ffffff'}
+            initialFontSize={defaultFontSize}
+            initialFontFace={defaultFontFace}
+            initialColor={defaultColor}
             isEditing={!!editingTextId}
             customColors={customColors || []}
             onAddCustomColor={onAddCustomColor}
