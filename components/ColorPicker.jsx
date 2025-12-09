@@ -1,7 +1,7 @@
 // components/ColorPicker.jsx - With custom color delete functionality
 const pathResolverPath = dc.resolvePath("pathResolver.js");
 const { requireModuleByName } = await dc.require(pathResolverPath);
-const { COLOR_PALETTE, DEFAULT_COLOR } = await requireModuleByName("colorOperations.js");
+const { getColorPalette, DEFAULT_COLOR } = await requireModuleByName("colorOperations.js");
 
 const ColorPicker = ({ 
   isOpen, 
@@ -120,9 +120,11 @@ const ColorPicker = ({
   }, [deleteTargetId]);
   
   // Combine all colors into a single array for rendering
+  // getColorPalette() returns built-in + global custom colors from settings
+  const paletteColors = getColorPalette();
   const allColors = [
     { id: 'reset', color: null, label: 'Reset to default', isReset: true },
-    ...COLOR_PALETTE,
+    ...paletteColors,
     ...customColors.map(c => ({ ...c, isCustom: true })),
     // Add preview color if one exists
     ...(previewColor ? [{

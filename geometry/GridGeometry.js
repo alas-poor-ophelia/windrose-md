@@ -244,13 +244,17 @@ class GridGeometry extends BaseGeometry {
     
     // Use fillRect instead of stroke for iOS/CodeMirror compatibility
     // fillRect is immune to strokeStyle state corruption
-    ctx.fillStyle = lineColor;
+    // iOS defensive: Reset composite operation before drawing
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 1;
     
     // For centered lines, offset by half the line width
     const halfWidth = lineWidth / 2;
     
     // Draw vertical lines with symmetric padding
     for (let x = paddedStartX; x <= paddedEndX; x++) {
+      // iOS defensive: Set fillStyle for each line to work around state corruption
+      ctx.fillStyle = lineColor;
       const screenX = offsetX + x * scaledCellSize;
       // fillRect(x, y, width, height) - vertical line is narrow width, tall height
       ctx.fillRect(
@@ -263,6 +267,8 @@ class GridGeometry extends BaseGeometry {
     
     // Draw horizontal lines with symmetric padding
     for (let y = paddedStartY; y <= paddedEndY; y++) {
+      // iOS defensive: Set fillStyle for each line to work around state corruption
+      ctx.fillStyle = lineColor;
       const screenY = offsetY + y * scaledCellSize;
       // fillRect(x, y, width, height) - horizontal line is wide width, narrow height
       ctx.fillRect(

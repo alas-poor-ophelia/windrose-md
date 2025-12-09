@@ -1,19 +1,28 @@
 // utils/colorOperations.js - Color palette and utilities
 
+const pathResolverPath = dc.resolvePath("pathResolver.js");
+const { requireModuleByName } = await dc.require(pathResolverPath);
+const { getColorPaletteSettings, BUILT_IN_COLORS } = await requireModuleByName("settingsAccessor.js");
+
 const DEFAULT_COLOR = '#c4a57b'; // Tan/brown - the original default
 
-const COLOR_PALETTE = [
-  { id: 'default', color: '#c4a57b', label: 'Default (Tan)' },
-  { id: 'stone', color: '#808080', label: 'Stone Gray' },
-  { id: 'dark-stone', color: '#505050', label: 'Dark Gray' },
-  { id: 'water', color: '#4a9eff', label: 'Water Blue' },
-  { id: 'forest', color: '#4ade80', label: 'Forest Green' },
-  { id: 'danger', color: '#ef4444', label: 'Danger Red' },
-  { id: 'sand', color: '#fbbf24', label: 'Sand Yellow' },
-  { id: 'magic', color: '#a855f7', label: 'Magic Purple' },
-  { id: 'fire', color: '#fb923c', label: 'Fire Orange' },
-  { id: 'ice', color: '#14b8a6', label: 'Ice Teal' }
-];
+// Static fallback palette for backward compatibility
+// Components should prefer getColorPalette() for dynamic colors
+const COLOR_PALETTE = BUILT_IN_COLORS;
+
+/**
+ * Get the current color palette (including customizations from settings)
+ * This is the preferred way to get colors - it includes user customizations
+ * @returns {Array} Array of color objects { id, color, label, isBuiltIn?, isCustom?, isModified? }
+ */
+function getColorPalette() {
+  try {
+    return getColorPaletteSettings();
+  } catch (error) {
+    // Fallback to built-in colors
+    return BUILT_IN_COLORS;
+  }
+}
 
 /**
  * Get color for a cell (handles backward compatibility)
@@ -25,12 +34,13 @@ function getCellColor(cell) {
 }
 
 /**
- * Get color definition by hex value
+ * Get color definition by hex value from current palette
  * @param {string} colorHex - Hex color value
  * @returns {Object|null} Color definition or null
  */
 function getColorByHex(colorHex) {
-  return COLOR_PALETTE.find(c => c.color === colorHex) || null;
+  const palette = getColorPalette();
+  return palette.find(c => c.color === colorHex) || null;
 }
 
 /**
@@ -44,7 +54,8 @@ function isDefaultColor(colorHex) {
 
 return {
   DEFAULT_COLOR,
-  COLOR_PALETTE,
+  COLOR_PALETTE,      // Static fallback for backward compatibility
+  getColorPalette,    // Dynamic palette with user customizations (preferred)
   getCellColor,
   getColorByHex,
   isDefaultColor

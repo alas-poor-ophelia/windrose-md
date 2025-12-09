@@ -100,7 +100,6 @@ const CornerBracket = ({ position }) => {
 
 const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'grid' }) => {
   const { mapData, isLoading, saveStatus, updateMapData, forceSave } = useMapData(mapId, mapName, mapType);
-  
   const [currentTool, setCurrentTool] = dc.useState('draw');
   const [selectedObjectType, setSelectedObjectType] = dc.useState(null);
   const [selectedColor, setSelectedColor] = dc.useState(DEFAULT_COLOR);
@@ -316,6 +315,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   // Track if we're applying history (to avoid adding to history during undo/redo)
   const isApplyingHistoryRef = dc.useRef(false);
   const historyInitialized = dc.useRef(false);
+  const pendingHistoryApplicationRef = dc.useRef(false);
 
   // Initialize history when map data loads (only once)
   dc.useEffect(() => {
@@ -330,6 +330,15 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
       historyInitialized.current = true;
     }
   }, [mapData, isLoading]);
+
+  // Clear isApplyingHistoryRef after mapData updates from undo/redo
+  // This ensures the flag stays true during the entire React render cycle
+  dc.useEffect(() => {
+    if (pendingHistoryApplicationRef.current) {
+      pendingHistoryApplicationRef.current = false;
+      isApplyingHistoryRef.current = false;
+    }
+  }, [mapData]);
 
   // Handle map name change
   const handleNameChange = (newName) => {
@@ -466,13 +475,14 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     updateMapData(newMapData);
   };
 
-  // Generic map data update - for any field that doesn't need history tracking
-  // Uses functional update to get current mapData (avoids stale closure issues)
-  const handleMapDataUpdate = (updates) => {
-    updateMapData(current => {
-      if (!current) return current;
-      return { ...current, ...updates };
-    });
+  // Handle view state change (zoom/pan) - NOT tracked in history
+  const handleViewStateChange = (newViewState) => {
+    if (!mapData) return;
+    const newMapData = {
+      ...mapData,
+      viewState: newViewState
+    };
+    updateMapData(newMapData);
   };
 
   // Handle undo
@@ -480,6 +490,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     const previousState = undo();
     if (previousState && mapData) {
       isApplyingHistoryRef.current = true;
+      pendingHistoryApplicationRef.current = true;
       const newMapData = {
         ...mapData,
         cells: previousState.cells,
@@ -489,10 +500,6 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
         edges: previousState.edges || []
       };
       updateMapData(newMapData);
-      // Use setTimeout to ensure state update completes before re-enabling history
-      setTimeout(() => {
-        isApplyingHistoryRef.current = false;
-      }, 0);
     }
   };
 
@@ -501,6 +508,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     const nextState = redo();
     if (nextState && mapData) {
       isApplyingHistoryRef.current = true;
+      pendingHistoryApplicationRef.current = true;
       const newMapData = {
         ...mapData,
         cells: nextState.cells,
@@ -510,10 +518,6 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
         edges: nextState.edges || []
       };
       updateMapData(newMapData);
-      // Use setTimeout to ensure state update completes before re-enabling history
-      setTimeout(() => {
-        isApplyingHistoryRef.current = false;
-      }, 0);
     }
   };
 
@@ -547,7 +551,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   const handleCompassClick = () => {
     if (!mapData) return;
 
-    // Cycle through: 0° -> 90° -> 180° -> 270° -> 0°
+    // Cycle through: 0ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â° -> 90ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â° -> 180ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â° -> 270ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â° -> 0ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°
     const rotations = [0, 90, 180, 270];
     const currentIndex = rotations.indexOf(mapData.northDirection);
     const nextIndex = (currentIndex + 1) % rotations.length;
@@ -810,6 +814,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
             onToolChange={setCurrentTool}
             isCollapsed={mapData.sidebarCollapsed || false}
             onCollapseChange={handleSidebarCollapseChange}
+            mapType={mapData.mapType || 'grid'}
           />
 
           <div className="dmt-canvas-and-controls">
@@ -818,8 +823,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               onCellsChange={handleCellsChange}
               onObjectsChange={handleObjectsChange}
               onTextLabelsChange={handleTextLabelsChange}
-              onMapDataUpdate={handleMapDataUpdate}
               onEdgesChange={handleEdgesChange}
+              onViewStateChange={handleViewStateChange}
               currentTool={currentTool}
               isAlignmentMode={isAlignmentMode}
               selectedObjectType={selectedObjectType}
@@ -871,7 +876,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               <MapCanvas.MeasurementLayer
                 currentTool={currentTool}
                 globalSettings={effectiveSettings}
-                mapDistanceOverrides={mapData?.distanceSettings}
+                mapDistanceOverrides={mapData?.settings?.distanceSettings}
               />
             </MapCanvas>
           </div>

@@ -136,6 +136,10 @@ const useDrawingTools = (
             if (!processedEdges.has(edgeKey)) {
               const existingEdge = getEdgeAt(mapData.edges || [], edgeInfo.x, edgeInfo.y, edgeInfo.side);
               if (existingEdge) {
+                // Store initial edge state on first edge erase of this stroke
+                if (strokeInitialEdgesRef.current === null) {
+                  strokeInitialEdgesRef.current = [...(mapData.edges || [])];
+                }
                 setProcessedEdges(prev => new Set([...prev, edgeKey]));
                 const newEdges = removeEdge(mapData.edges || [], edgeInfo.x, edgeInfo.y, edgeInfo.side);
                 onEdgesChange(newEdges, isBatchedStroke);
@@ -437,8 +441,8 @@ const useDrawingTools = (
     setProcessedEdges(new Set()); // Also reset processed edges for erase strokes
     // Store initial cell state for batched history entry at stroke end
     strokeInitialStateRef.current = [...mapData.cells];
-    // Also store initial edge state for erase strokes that may remove edges
-    strokeInitialEdgesRef.current = mapData.edges ? [...mapData.edges] : [];
+    // Don't initialize edge state here - only when we actually erase an edge
+    strokeInitialEdgesRef.current = null;
     processCellDuringDrag(e, dragStart);
   };
   

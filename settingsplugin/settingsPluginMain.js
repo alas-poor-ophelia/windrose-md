@@ -11,13 +11,14 @@ return `// settingsPluginMain.js - Windrose MapDesigner Settings Plugin
  * TABLE OF CONTENTS
  * ============================================================================
  * 
- * Line ~25:   VERSION & IMPORTS
- * Line ~35:   DATA CONSTANTS (BUILT_IN_OBJECTS, CATEGORIES, QUICK_SYMBOLS)
- * Line ~100:  HELPER NAMESPACES (ObjectHelpers, DragHelpers, IconHelpers)
- * Line ~200:  STYLES (DMT_SETTINGS_STYLES)
- * Line ~520:  MODAL CLASSES (ObjectEditModal, CategoryEditModal, ExportModal, ImportModal)
- * Line ~900:  MAIN PLUGIN CLASS (WindroseMDSettingsPlugin)
- * Line ~1000: SETTINGS TAB CLASS (WindroseMDSettingsTab)
+ * Line ~30:    VERSION & IMPORTS
+ * Line ~40:    DATA CONSTANTS (BUILT_IN_OBJECTS, CATEGORIES, QUICK_SYMBOLS)
+ * Line ~65:    BUILT_IN_COLORS (color palette defaults)
+ * Line ~90:    HELPER NAMESPACES (ObjectHelpers, ColorHelpers, DragHelpers, IconHelpers, RPGAwesomeHelpers)
+ * Line ~365:   STYLES (DMT_SETTINGS_STYLES)
+ * Line ~1140:  MODAL CLASSES (ObjectEditModal, CategoryEditModal, ColorEditModal, ExportModal, ImportModal)
+ * Line ~2120:  MAIN PLUGIN CLASS (WindroseMDSettingsPlugin)
+ * Line ~2200:  SETTINGS TAB CLASS (WindroseMDSettingsTab)
  * 
  * ============================================================================
  */
@@ -48,20 +49,39 @@ const RA_CATEGORIES = {{RA_CATEGORIES}};
 
 // Quick symbols palette for object creation
 const QUICK_SYMBOLS = [
-  '★', '☆', '✦', '✧', '✪', '✫', '✯', '⚝',
+  '★', '☆', '✦', '✧', '✪', '✫', '✯', '⚑',
   '●', '○', '◆', '◇', '■', '□', '▲', '△', '▼', '▽',
   '♠', '♤', '♣', '♧', '♥', '♡', '♦', '♢',
-  '⚔', '⚒', '🗡', '🏹', '⚓', '⛏', '🔱',
+  '⚔', '⚒', '🗡', '🹏', '⚓', '⛏', '🔱',
   '☠', '⚠', '☢', '☣', '⚡', '🔥', '💧',
-  '⚑', '⚐', '⛳', '🚩', '➤', '➜', '⬤',
-  '⚙', '⚗', '🔮', '💎', '🗝', '📜', '🎭', '👁',
-  '🏛', '🏰', '⛪', '🗿', '⚱', '🏺', '🪔'
+  '⚒', '⚑', '⛳', '🚩', '➤', '➜', '⬤',
+  '⚙', '⚗', '🔮', '💎', '🗝', '📜', '🎭', '👑',
+  '🛡', '🏰', '⛪', '🗿', '⚱', '🺏', '🪔'
+];
+
+// =============================================================================
+// BUILT-IN COLOR PALETTE
+// Default colors for drawing and objects
+// =============================================================================
+
+const BUILT_IN_COLORS = [
+  { id: 'default', color: '#c4a57b', label: 'Default (Tan)' },
+  { id: 'stone', color: '#808080', label: 'Stone Gray' },
+  { id: 'dark-stone', color: '#505050', label: 'Dark Gray' },
+  { id: 'water', color: '#4a9eff', label: 'Water Blue' },
+  { id: 'forest', color: '#4ade80', label: 'Forest Green' },
+  { id: 'danger', color: '#ef4444', label: 'Danger Red' },
+  { id: 'sand', color: '#fbbf24', label: 'Sand Yellow' },
+  { id: 'magic', color: '#a855f7', label: 'Magic Purple' },
+  { id: 'fire', color: '#fb923c', label: 'Fire Orange' },
+  { id: 'ice', color: '#14b8a6', label: 'Ice Teal' }
 ];
 
 // =============================================================================
 // HELPER NAMESPACES
 // Pure functions for data transformation - no side effects, easy to test/debug
 // =============================================================================
+
 
 /**
  * Object resolution helpers
@@ -167,6 +187,61 @@ const ObjectHelpers = {
 };
 
 /**
+ * Color palette resolution helpers
+ * Transform raw settings into resolved color list
+ */
+const ColorHelpers = {
+  /**
+   * Get all resolved colors (built-in + custom, with overrides applied)
+   * @param {Object} settings - Plugin settings
+   * @returns {Array} Resolved color array with isBuiltIn, isModified flags
+   */
+  getResolved(settings) {
+    const { colorPaletteOverrides = {}, customPaletteColors = [] } = settings;
+    
+    const resolvedBuiltIns = BUILT_IN_COLORS
+      .filter(c => !colorPaletteOverrides[c.id]?.hidden)
+      .map((c, index) => {
+        const override = colorPaletteOverrides[c.id];
+        if (override) {
+          const { hidden, ...overrideProps } = override;
+          return { 
+            ...c, 
+            ...overrideProps, 
+            order: override.order ?? index,
+            isBuiltIn: true, 
+            isModified: true 
+          };
+        }
+        return { ...c, order: index, isBuiltIn: true, isModified: false };
+      });
+    
+    const resolvedCustom = customPaletteColors.map((c, index) => ({
+      ...c,
+      order: c.order ?? (100 + index),
+      isCustom: true,
+      isBuiltIn: false
+    }));
+    
+    return [...resolvedBuiltIns, ...resolvedCustom].sort((a, b) => a.order - b.order);
+  },
+  
+  /**
+   * Get hidden color IDs
+   * @param {Object} settings - Plugin settings
+   * @returns {Set} Set of hidden color IDs
+   */
+  getHidden(settings) {
+    const { colorPaletteOverrides = {} } = settings;
+    return new Set(
+      Object.entries(colorPaletteOverrides)
+        .filter(([id, override]) => override.hidden)
+        .map(([id]) => id)
+    );
+  }
+};
+
+/**
  * Drag and drop helpers
  */
 const DragHelpers = {
@@ -206,13 +281,14 @@ const IconHelpers = {
     } else {
       // Fallback: create a simple text representation
       const icons = {
-        'pencil': 'Ã¢Å“Å½',
-        'eye': 'Ã°Å¸â€˜Â',
-        'eye-off': 'Ã°Å¸Å¡Â«',
-        'rotate-ccw': 'Ã¢â€ Âº',
-        'trash-2': 'Ã°Å¸â€”â€˜',
-        'grip-vertical': 'Ã¢â€¹Â®Ã¢â€¹Â®',
-        'x': 'Ã¢Å“â€¢'
+        'pencil': '✎',
+        'eye': '👁',
+        'eye-off': '🚫',
+        'rotate-ccw': '↺',
+        'trash-2': '🗑',
+        'grip-vertical': '⋮⋮',
+        'x': '✕',
+        'search': '🔍'
       };
       el.textContent = icons[iconId] || '?';
     }
@@ -804,6 +880,258 @@ const DMT_SETTINGS_STYLES = \`
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
+
+  /* ===========================================
+   * Collapsible Sections
+   * =========================================== */
+  .dmt-settings-section {
+    margin: 0 0 8px 0;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  
+  .dmt-settings-section > summary {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+    background: var(--background-secondary);
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 15px;
+    list-style: none;
+    user-select: none;
+  }
+  
+  .dmt-settings-section > summary::-webkit-details-marker {
+    display: none;
+  }
+  
+  .dmt-settings-section > summary::before {
+    content: '▶';
+    font-size: 10px;
+    transition: transform 0.2s ease;
+    color: var(--text-muted);
+  }
+  
+  .dmt-settings-section[open] > summary::before {
+    transform: rotate(90deg);
+  }
+  
+  .dmt-settings-section > summary:hover {
+    background: var(--background-modifier-hover);
+  }
+  
+  .dmt-settings-section-content {
+    padding: 12px 16px;
+    border-top: 1px solid var(--background-modifier-border);
+  }
+  
+  .dmt-settings-section-content > .setting-item:first-child {
+    border-top: none;
+    padding-top: 0;
+  }
+  
+  /* ===========================================
+   * Settings Search
+   * =========================================== */
+  .dmt-settings-search-wrapper {
+    margin-bottom: 16px;
+    position: sticky;
+    top: 0;
+    background: var(--background-primary);
+    padding: 8px 0;
+    z-index: 10;
+  }
+  
+  .dmt-settings-search-box {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 6px;
+    background: var(--background-primary);
+  }
+  
+  .dmt-settings-search-box:focus-within {
+    border-color: var(--interactive-accent);
+  }
+  
+  .dmt-settings-search-box input {
+    flex: 1;
+    border: none;
+    background: transparent;
+    font-size: 14px;
+    outline: none;
+  }
+  
+  .dmt-settings-search-box .search-icon {
+    color: var(--text-muted);
+  }
+  
+  .dmt-settings-search-box .clear-btn {
+    background: transparent;
+    border: none;
+    padding: 2px 6px;
+    cursor: pointer;
+    color: var(--text-muted);
+    border-radius: 4px;
+  }
+  
+  .dmt-settings-search-box .clear-btn:hover {
+    background: var(--background-modifier-hover);
+    color: var(--text-normal);
+  }
+  
+  .dmt-settings-no-results {
+    text-align: center;
+    padding: 2em;
+    color: var(--text-muted);
+    font-style: italic;
+  }
+  
+  /* Hide non-matching settings during search */
+  .dmt-setting-hidden {
+    display: none !important;
+  }
+  
+  /* Highlight matching text */
+  .dmt-search-match {
+    background: var(--text-highlight-bg);
+    border-radius: 2px;
+  }
+  
+  /* ===========================================
+   * Color Palette Section
+   * =========================================== */
+  .dmt-color-list {
+    padding: 8px 0;
+  }
+  
+  .dmt-color-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 12px;
+    transition: background-color 0.15s ease;
+  }
+  
+  .dmt-color-row:hover {
+    background: var(--background-modifier-hover);
+  }
+  
+  .dmt-color-row-swatch {
+    width: 28px;
+    height: 28px;
+    border-radius: 4px;
+    border: 2px solid var(--background-modifier-border);
+    flex-shrink: 0;
+  }
+  
+  .dmt-color-row-label {
+    flex: 1;
+    min-width: 0;
+  }
+  
+  .dmt-color-row-name {
+    font-weight: 500;
+  }
+  
+  .dmt-color-row-modified,
+  .dmt-color-row-custom {
+    font-size: 0.85em;
+    color: var(--text-muted);
+    font-style: italic;
+  }
+  
+  .dmt-color-row-hex {
+    font-size: 0.85em;
+    color: var(--text-muted);
+    background: var(--background-secondary);
+    padding: 2px 6px;
+    border-radius: 3px;
+  }
+  
+  .dmt-color-row-actions {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+  
+  .dmt-settings-category-muted {
+    opacity: 0.7;
+  }
+  
+  .dmt-settings-empty-message {
+    padding: 16px;
+    text-align: center;
+    color: var(--text-muted);
+    font-style: italic;
+  }
+  
+  /* Color Edit Modal */
+  .dmt-color-edit-modal {
+    padding: 16px;
+  }
+  
+  .dmt-color-hex-input {
+    font-family: var(--font-monospace);
+    width: 90px !important;
+  }
+  
+  .dmt-color-original-info {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    margin: 12px 0;
+    background: var(--background-secondary);
+    border-radius: 4px;
+    font-size: 0.9em;
+    color: var(--text-muted);
+  }
+  
+  .dmt-color-mini-swatch {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border-radius: 3px;
+    border: 1px solid var(--background-modifier-border);
+    vertical-align: middle;
+  }
+  
+  .dmt-modal-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--background-modifier-border);
+  }
+  
+  .dmt-btn-icon {
+    background: transparent;
+    border: none;
+    padding: 4px;
+    border-radius: 4px;
+    cursor: pointer;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .dmt-btn-icon:hover {
+    background: var(--background-modifier-hover);
+    color: var(--text-normal);
+  }
+  
+  .dmt-btn-icon.dmt-btn-danger:hover {
+    background: var(--background-modifier-error);
+    color: var(--text-on-accent);
+  }
 \`;
 
 // =============================================================================
@@ -815,11 +1143,12 @@ const DMT_SETTINGS_STYLES = \`
  * Modal for creating/editing objects
  */
 class ObjectEditModal extends Modal {
-  constructor(app, plugin, existingObject, onSave) {
+  constructor(app, plugin, existingObject, onSave, mapType = 'grid') {
     super(app);
     this.plugin = plugin;
     this.existingObject = existingObject;
     this.onSave = onSave;
+    this.mapType = mapType;
     
     // Form state
     this.symbol = existingObject?.symbol || '';
@@ -1147,10 +1476,14 @@ class ObjectEditModal extends Modal {
       return;
     }
     
+    // Get the correct settings keys for this map type
+    const overridesKey = this.mapType === 'hex' ? 'hexObjectOverrides' : 'gridObjectOverrides';
+    const customObjectsKey = this.mapType === 'hex' ? 'customHexObjects' : 'customGridObjects';
+    
     if (this.existingObject?.isBuiltIn) {
       // Modifying a built-in: save as override
-      if (!this.plugin.settings.objectOverrides) {
-        this.plugin.settings.objectOverrides = {};
+      if (!this.plugin.settings[overridesKey]) {
+        this.plugin.settings[overridesKey] = {};
       }
       
       const original = BUILT_IN_OBJECTS.find(o => o.id === this.existingObject.id);
@@ -1171,26 +1504,29 @@ class ObjectEditModal extends Modal {
       if (this.category !== original.category) override.category = this.category;
       
       // Preserve hidden state if it exists
-      if (this.plugin.settings.objectOverrides[this.existingObject.id]?.hidden) {
+      if (this.plugin.settings[overridesKey][this.existingObject.id]?.hidden) {
         override.hidden = true;
       }
       
       // Preserve order if it exists
-      if (this.plugin.settings.objectOverrides[this.existingObject.id]?.order !== undefined) {
-        override.order = this.plugin.settings.objectOverrides[this.existingObject.id].order;
+      if (this.plugin.settings[overridesKey][this.existingObject.id]?.order !== undefined) {
+        override.order = this.plugin.settings[overridesKey][this.existingObject.id].order;
       }
       
       if (Object.keys(override).length > 0) {
-        this.plugin.settings.objectOverrides[this.existingObject.id] = override;
+        this.plugin.settings[overridesKey][this.existingObject.id] = override;
       } else {
-        delete this.plugin.settings.objectOverrides[this.existingObject.id];
+        delete this.plugin.settings[overridesKey][this.existingObject.id];
       }
     } else if (this.existingObject?.isCustom) {
       // Editing existing custom object
-      const idx = this.plugin.settings.customObjects.findIndex(o => o.id === this.existingObject.id);
+      if (!this.plugin.settings[customObjectsKey]) {
+        this.plugin.settings[customObjectsKey] = [];
+      }
+      const idx = this.plugin.settings[customObjectsKey].findIndex(o => o.id === this.existingObject.id);
       if (idx !== -1) {
         const updated = {
-          ...this.plugin.settings.customObjects[idx],
+          ...this.plugin.settings[customObjectsKey][idx],
           label: this.label.trim(),
           category: this.category
         };
@@ -1204,12 +1540,12 @@ class ObjectEditModal extends Modal {
           delete updated.iconClass;
         }
         
-        this.plugin.settings.customObjects[idx] = updated;
+        this.plugin.settings[customObjectsKey][idx] = updated;
       }
     } else {
       // Creating new custom object
-      if (!this.plugin.settings.customObjects) {
-        this.plugin.settings.customObjects = [];
+      if (!this.plugin.settings[customObjectsKey]) {
+        this.plugin.settings[customObjectsKey] = [];
       }
       
       const newObject = {
@@ -1225,7 +1561,7 @@ class ObjectEditModal extends Modal {
         newObject.symbol = this.symbol;
       }
       
-      this.plugin.settings.customObjects.push(newObject);
+      this.plugin.settings[customObjectsKey].push(newObject);
     }
     
     this.onSave();
@@ -1241,11 +1577,12 @@ class ObjectEditModal extends Modal {
  * Modal for creating/editing categories
  */
 class CategoryEditModal extends Modal {
-  constructor(app, plugin, existingCategory, onSave) {
+  constructor(app, plugin, existingCategory, onSave, mapType = 'grid') {
     super(app);
     this.plugin = plugin;
     this.existingCategory = existingCategory;
     this.onSave = onSave;
+    this.mapType = mapType;
     
     this.label = existingCategory?.label || '';
     this.order = existingCategory?.order ?? 100;
@@ -1306,15 +1643,18 @@ class CategoryEditModal extends Modal {
       return;
     }
     
-    if (!this.plugin.settings.customCategories) {
-      this.plugin.settings.customCategories = [];
+    // Get the correct settings key for this map type
+    const categoriesKey = this.mapType === 'hex' ? 'customHexCategories' : 'customGridCategories';
+    
+    if (!this.plugin.settings[categoriesKey]) {
+      this.plugin.settings[categoriesKey] = [];
     }
     
     if (this.existingCategory) {
-      const idx = this.plugin.settings.customCategories.findIndex(c => c.id === this.existingCategory.id);
+      const idx = this.plugin.settings[categoriesKey].findIndex(c => c.id === this.existingCategory.id);
       if (idx !== -1) {
-        this.plugin.settings.customCategories[idx] = {
-          ...this.plugin.settings.customCategories[idx],
+        this.plugin.settings[categoriesKey][idx] = {
+          ...this.plugin.settings[categoriesKey][idx],
           label: this.label.trim(),
           order: this.order
         };
@@ -1326,7 +1666,7 @@ class CategoryEditModal extends Modal {
         order: this.order
       };
       
-      this.plugin.settings.customCategories.push(newCategory);
+      this.plugin.settings[categoriesKey].push(newCategory);
     }
     
     this.onSave();
@@ -1339,12 +1679,157 @@ class CategoryEditModal extends Modal {
 }
 
 /**
+ * Modal for creating/editing palette colors
+ */
+class ColorEditModal extends Modal {
+  constructor(app, plugin, existingColor, onSave) {
+    super(app);
+    this.plugin = plugin;
+    this.existingColor = existingColor;
+    this.onSave = onSave;
+    this.isBuiltIn = existingColor?.isBuiltIn || false;
+  }
+  
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.addClass('dmt-color-edit-modal');
+    
+    const isEdit = !!this.existingColor;
+    const isBuiltIn = this.isBuiltIn;
+    
+    contentEl.createEl('h2', { 
+      text: isEdit 
+        ? (isBuiltIn ? \`Edit: \${this.existingColor.label}\` : 'Edit Custom Color')
+        : 'Add Custom Color' 
+    });
+    
+    // Get original built-in values if editing a built-in
+    const originalBuiltIn = isBuiltIn 
+      ? BUILT_IN_COLORS.find(c => c.id === this.existingColor.id)
+      : null;
+    
+    // Initialize form values
+    let colorValue = this.existingColor?.color || '#808080';
+    let labelValue = this.existingColor?.label || '';
+    
+    // Color picker
+    new Setting(contentEl)
+      .setName('Color')
+      .setDesc('Choose the color value')
+      .addColorPicker(picker => picker
+        .setValue(colorValue)
+        .onChange(value => {
+          colorValue = value;
+          hexInput.value = value;
+        }))
+      .addText(text => {
+        text.inputEl.addClass('dmt-color-hex-input');
+        text.setPlaceholder('#RRGGBB')
+          .setValue(colorValue)
+          .onChange(value => {
+            if (/^#[0-9A-Fa-f]{6}$/.test(value)) {
+              colorValue = value;
+            }
+          });
+        // Store reference for color picker sync
+        var hexInput = text.inputEl;
+      });
+    
+    // Label input
+    new Setting(contentEl)
+      .setName('Label')
+      .setDesc('Display name for this color')
+      .addText(text => text
+        .setPlaceholder('e.g., Ocean Blue')
+        .setValue(labelValue)
+        .onChange(value => {
+          labelValue = value;
+        }));
+    
+    // Show original values for built-ins
+    if (isBuiltIn && originalBuiltIn) {
+      const origInfo = contentEl.createEl('div', { cls: 'dmt-color-original-info' });
+      origInfo.createEl('span', { text: 'Original: ' });
+      const origSwatch = origInfo.createEl('span', { 
+        cls: 'dmt-color-mini-swatch',
+        attr: { style: \`background-color: \${originalBuiltIn.color}\` }
+      });
+      origInfo.createEl('span', { text: \` \${originalBuiltIn.label} (\${originalBuiltIn.color})\` });
+    }
+    
+    // Action buttons
+    const btnContainer = contentEl.createEl('div', { cls: 'dmt-modal-buttons' });
+    
+    const saveBtn = btnContainer.createEl('button', { 
+      text: 'Save', 
+      cls: 'mod-cta' 
+    });
+    saveBtn.addEventListener('click', async () => {
+      // Validate
+      if (!labelValue.trim()) {
+        alert('Please enter a label for this color.');
+        return;
+      }
+      if (!/^#[0-9A-Fa-f]{6}$/.test(colorValue)) {
+        alert('Please enter a valid hex color (e.g., #4A9EFF)');
+        return;
+      }
+      
+      if (isBuiltIn) {
+        // Save as override
+        if (!this.plugin.settings.colorPaletteOverrides) {
+          this.plugin.settings.colorPaletteOverrides = {};
+        }
+        const existingOverride = this.plugin.settings.colorPaletteOverrides[this.existingColor.id] || {};
+        this.plugin.settings.colorPaletteOverrides[this.existingColor.id] = {
+          ...existingOverride,
+          color: colorValue,
+          label: labelValue
+        };
+      } else if (isEdit) {
+        // Update existing custom color
+        const idx = this.plugin.settings.customPaletteColors.findIndex(c => c.id === this.existingColor.id);
+        if (idx !== -1) {
+          this.plugin.settings.customPaletteColors[idx] = {
+            ...this.plugin.settings.customPaletteColors[idx],
+            color: colorValue,
+            label: labelValue
+          };
+        }
+      } else {
+        // Add new custom color
+        if (!this.plugin.settings.customPaletteColors) {
+          this.plugin.settings.customPaletteColors = [];
+        }
+        this.plugin.settings.customPaletteColors.push({
+          id: 'custom-' + Date.now(),
+          color: colorValue,
+          label: labelValue
+        });
+      }
+      
+      this.onSave();
+      this.close();
+    });
+    
+    const cancelBtn = btnContainer.createEl('button', { text: 'Cancel' });
+    cancelBtn.addEventListener('click', () => this.close());
+  }
+  
+  onClose() {
+    this.contentEl.empty();
+  }
+}
+
+/**
  * Modal for exporting object customizations
  */
 class ExportModal extends Modal {
-  constructor(app, plugin) {
+  constructor(app, plugin, mapType = 'grid') {
     super(app);
     this.plugin = plugin;
+    this.mapType = mapType;
   }
   
   onOpen() {
@@ -1352,9 +1837,18 @@ class ExportModal extends Modal {
     contentEl.empty();
     contentEl.addClass('dmt-export-modal');
     
-    contentEl.createEl('h2', { text: 'Export Object Customizations' });
+    const mapTypeLabel = this.mapType === 'hex' ? 'Hex' : 'Grid';
+    contentEl.createEl('h2', { text: \`Export \${mapTypeLabel} Object Customizations\` });
     
-    const { objectOverrides = {}, customObjects = [], customCategories = [] } = this.plugin.settings;
+    // Get the correct settings keys for this map type
+    const overridesKey = this.mapType === 'hex' ? 'hexObjectOverrides' : 'gridObjectOverrides';
+    const customObjectsKey = this.mapType === 'hex' ? 'customHexObjects' : 'customGridObjects';
+    const categoriesKey = this.mapType === 'hex' ? 'customHexCategories' : 'customGridCategories';
+    
+    const objectOverrides = this.plugin.settings[overridesKey] || {};
+    const customObjects = this.plugin.settings[customObjectsKey] || [];
+    const customCategories = this.plugin.settings[categoriesKey] || [];
+    
     const hasOverrides = Object.keys(objectOverrides).length > 0;
     const hasCustom = customObjects.length > 0 || customCategories.length > 0;
     
@@ -1391,14 +1885,14 @@ class ExportModal extends Modal {
     
     if (!hasOverrides && !hasCustom) {
       contentEl.createEl('p', { 
-        text: 'No customizations to export. Modify built-in objects or create custom ones first.',
+        text: \`No customizations to export for \${mapTypeLabel} maps. Modify built-in objects or create custom ones first.\`,
         cls: 'dmt-export-empty'
       });
       return;
     }
     
     // Filename input
-    const defaultFilename = \`windrose-objects-\${new Date().toISOString().split('T')[0]}.json\`;
+    const defaultFilename = \`windrose-\${this.mapType}-objects-\${new Date().toISOString().split('T')[0]}.json\`;
     let filename = defaultFilename;
     
     new Setting(contentEl)
@@ -1417,7 +1911,8 @@ class ExportModal extends Modal {
           const exportData = {
             windroseMD_objectExport: true,
             exportedAt: new Date().toISOString(),
-            version: '1.0'
+            version: '1.0',
+            mapType: this.mapType
           };
           
           if (exportOverrides && hasOverrides) {
@@ -1461,10 +1956,11 @@ class ExportModal extends Modal {
  * Modal for importing object customizations
  */
 class ImportModal extends Modal {
-  constructor(app, plugin, onImport) {
+  constructor(app, plugin, onImport, mapType = 'grid') {
     super(app);
     this.plugin = plugin;
     this.onImport = onImport;
+    this.mapType = mapType;
     this.importData = null;
   }
   
@@ -1473,10 +1969,11 @@ class ImportModal extends Modal {
     contentEl.empty();
     contentEl.addClass('dmt-import-modal');
     
-    contentEl.createEl('h2', { text: 'Import Object Customizations' });
+    const mapTypeLabel = this.mapType === 'hex' ? 'Hex' : 'Grid';
+    contentEl.createEl('h2', { text: \`Import \${mapTypeLabel} Object Customizations\` });
     
     contentEl.createEl('p', { 
-      text: 'Select a Windrose MD object export file (.json) to import.',
+      text: \`Select a Windrose MD object export file (.json) to import into \${mapTypeLabel} maps.\`,
       cls: 'setting-item-description'
     });
     
@@ -1530,18 +2027,29 @@ class ImportModal extends Modal {
           });
         }
         
+        // Show original map type if present
+        if (data.mapType) {
+          const sourceType = data.mapType === 'hex' ? 'Hex' : 'Grid';
+          if (data.mapType !== this.mapType) {
+            previewArea.createEl('p', { 
+              text: \`Note: This was exported from \${sourceType} maps but will be imported to \${mapTypeLabel} maps.\`,
+              cls: 'dmt-import-note'
+            });
+          }
+        }
+        
         const overrideCount = data.objectOverrides ? Object.keys(data.objectOverrides).length : 0;
         const customObjCount = data.customObjects?.length || 0;
         const customCatCount = data.customCategories?.length || 0;
         
         if (overrideCount > 0) {
-          previewArea.createEl('p', { text: \`Ã¢â‚¬Â¢ \${overrideCount} built-in modification(s)\` });
+          previewArea.createEl('p', { text: \`• \${overrideCount} built-in modification(s)\` });
         }
         if (customObjCount > 0) {
-          previewArea.createEl('p', { text: \`Ã¢â‚¬Â¢ \${customObjCount} custom object(s)\` });
+          previewArea.createEl('p', { text: \`• \${customObjCount} custom object(s)\` });
         }
         if (customCatCount > 0) {
-          previewArea.createEl('p', { text: \`Ã¢â‚¬Â¢ \${customCatCount} custom category(ies)\` });
+          previewArea.createEl('p', { text: \`• \${customCatCount} custom category(ies)\` });
         }
         
         previewArea.style.display = 'block';
@@ -1584,49 +2092,54 @@ class ImportModal extends Modal {
         return;
       }
       
+      // Get the correct settings keys for this map type
+      const overridesKey = this.mapType === 'hex' ? 'hexObjectOverrides' : 'gridObjectOverrides';
+      const customObjectsKey = this.mapType === 'hex' ? 'customHexObjects' : 'customGridObjects';
+      const categoriesKey = this.mapType === 'hex' ? 'customHexCategories' : 'customGridCategories';
+      
       const data = this.importData;
       
       if (mergeMode === 'replace') {
-        // Clear existing
-        this.plugin.settings.objectOverrides = {};
-        this.plugin.settings.customObjects = [];
-        this.plugin.settings.customCategories = [];
+        // Clear existing for this map type
+        this.plugin.settings[overridesKey] = {};
+        this.plugin.settings[customObjectsKey] = [];
+        this.plugin.settings[categoriesKey] = [];
       }
       
       // Import overrides
       if (data.objectOverrides) {
-        if (!this.plugin.settings.objectOverrides) {
-          this.plugin.settings.objectOverrides = {};
+        if (!this.plugin.settings[overridesKey]) {
+          this.plugin.settings[overridesKey] = {};
         }
-        Object.assign(this.plugin.settings.objectOverrides, data.objectOverrides);
+        Object.assign(this.plugin.settings[overridesKey], data.objectOverrides);
       }
       
       // Import custom objects (avoid duplicates by ID)
       if (data.customObjects) {
-        if (!this.plugin.settings.customObjects) {
-          this.plugin.settings.customObjects = [];
+        if (!this.plugin.settings[customObjectsKey]) {
+          this.plugin.settings[customObjectsKey] = [];
         }
         for (const obj of data.customObjects) {
-          const existingIdx = this.plugin.settings.customObjects.findIndex(o => o.id === obj.id);
+          const existingIdx = this.plugin.settings[customObjectsKey].findIndex(o => o.id === obj.id);
           if (existingIdx !== -1) {
-            this.plugin.settings.customObjects[existingIdx] = obj;
+            this.plugin.settings[customObjectsKey][existingIdx] = obj;
           } else {
-            this.plugin.settings.customObjects.push(obj);
+            this.plugin.settings[customObjectsKey].push(obj);
           }
         }
       }
       
       // Import custom categories (avoid duplicates by ID)
       if (data.customCategories) {
-        if (!this.plugin.settings.customCategories) {
-          this.plugin.settings.customCategories = [];
+        if (!this.plugin.settings[categoriesKey]) {
+          this.plugin.settings[categoriesKey] = [];
         }
         for (const cat of data.customCategories) {
-          const existingIdx = this.plugin.settings.customCategories.findIndex(c => c.id === cat.id);
+          const existingIdx = this.plugin.settings[categoriesKey].findIndex(c => c.id === cat.id);
           if (existingIdx !== -1) {
-            this.plugin.settings.customCategories[existingIdx] = cat;
+            this.plugin.settings[categoriesKey][existingIdx] = cat;
           } else {
-            this.plugin.settings.customCategories.push(cat);
+            this.plugin.settings[categoriesKey].push(cat);
           }
         }
       }
@@ -1679,10 +2192,16 @@ class WindroseMDSettingsPlugin extends Plugin {
         distanceUnitHex: 'mi',
         gridDiagonalRule: 'alternating',
         distanceDisplayFormat: 'both',
-        // Object customization
-        objectOverrides: {},
-        customObjects: [],
-        customCategories: []
+        // Object customization - separate for hex and grid maps
+        hexObjectOverrides: {},
+        customHexObjects: [],
+        customHexCategories: [],
+        gridObjectOverrides: {},
+        customGridObjects: [],
+        customGridCategories: [],
+        // Color palette customization
+        colorPaletteOverrides: {},
+        customPaletteColors: []
       }, data || {});
     } catch (error) {
       console.warn('[DMT Settings] Error loading settings, using defaults:', error);
@@ -1708,9 +2227,16 @@ class WindroseMDSettingsPlugin extends Plugin {
         distanceUnitHex: 'mi',
         gridDiagonalRule: 'alternating',
         distanceDisplayFormat: 'both',
-        objectOverrides: {},
-        customObjects: [],
-        customCategories: []
+        // Object customization - separate for hex and grid maps
+        hexObjectOverrides: {},
+        customHexObjects: [],
+        customHexCategories: [],
+        gridObjectOverrides: {},
+        customGridObjects: [],
+        customGridCategories: [],
+        // Color palette customization
+        colorPaletteOverrides: {},
+        customPaletteColors: []
       };
     }
   }
@@ -1731,32 +2257,229 @@ class WindroseMDSettingsTab extends PluginSettingTab {
     this.settingsChanged = false;
     this.styleEl = null;
     this.objectFilter = '';
+    this.selectedMapType = 'grid'; // 'grid' or 'hex' for object editing
+  }
+  
+  // ---------------------------------------------------------------------------
+  // Helper: Get object settings for the selected map type
+  // Returns a normalized object { objectOverrides, customObjects, customCategories }
+  // ---------------------------------------------------------------------------
+  
+  getObjectSettingsForMapType() {
+    const settings = this.plugin.settings;
+    if (this.selectedMapType === 'hex') {
+      return {
+        objectOverrides: settings.hexObjectOverrides || {},
+        customObjects: settings.customHexObjects || [],
+        customCategories: settings.customHexCategories || []
+      };
+    } else {
+      return {
+        objectOverrides: settings.gridObjectOverrides || {},
+        customObjects: settings.customGridObjects || [],
+        customCategories: settings.customGridCategories || []
+      };
+    }
+  }
+  
+  // ---------------------------------------------------------------------------
+  // Helper: Update object settings for the selected map type
+  // ---------------------------------------------------------------------------
+  
+  updateObjectSettingsForMapType(updates) {
+    if (this.selectedMapType === 'hex') {
+      if (updates.objectOverrides !== undefined) {
+        this.plugin.settings.hexObjectOverrides = updates.objectOverrides;
+      }
+      if (updates.customObjects !== undefined) {
+        this.plugin.settings.customHexObjects = updates.customObjects;
+      }
+      if (updates.customCategories !== undefined) {
+        this.plugin.settings.customHexCategories = updates.customCategories;
+      }
+    } else {
+      if (updates.objectOverrides !== undefined) {
+        this.plugin.settings.gridObjectOverrides = updates.objectOverrides;
+      }
+      if (updates.customObjects !== undefined) {
+        this.plugin.settings.customGridObjects = updates.customObjects;
+      }
+      if (updates.customCategories !== undefined) {
+        this.plugin.settings.customGridCategories = updates.customCategories;
+      }
+    }
   }
 
+  // ---------------------------------------------------------------------------
+  // Helper: Create collapsible section with details/summary
+  // ---------------------------------------------------------------------------
+  
+  createCollapsibleSection(containerEl, title, renderFn, options = {}) {
+    const details = containerEl.createEl('details', { cls: 'dmt-settings-section' });
+    if (options.open) details.setAttribute('open', '');
+    
+    // Store section reference for search filtering
+    if (!this.sections) this.sections = [];
+    this.sections.push({ details, title });
+    
+    const summary = details.createEl('summary');
+    summary.createEl('span', { text: title });
+    
+    const contentEl = details.createEl('div', { cls: 'dmt-settings-section-content' });
+    
+    // Track settings within this section for search
+    const settingItems = [];
+    const originalCreateEl = contentEl.createEl.bind(contentEl);
+    
+    // Render the section content
+    renderFn(contentEl);
+    
+    // Collect all setting-item elements for search filtering
+    details.settingItems = Array.from(contentEl.querySelectorAll('.setting-item'));
+    
+    return details;
+  }
+  
+  // ---------------------------------------------------------------------------
+  // Helper: Render search bar
+  // ---------------------------------------------------------------------------
+  
+  renderSearchBar(containerEl) {
+    const wrapper = containerEl.createEl('div', { cls: 'dmt-settings-search-wrapper' });
+    const searchBox = wrapper.createEl('div', { cls: 'dmt-settings-search-box' });
+    
+    // Search icon
+    const searchIcon = searchBox.createEl('span', { cls: 'search-icon' });
+    IconHelpers.set(searchIcon, 'search');
+    
+    // Input
+    const input = searchBox.createEl('input', {
+      type: 'text',
+      placeholder: 'Search settings...'
+    });
+    
+    // Clear button (hidden initially)
+    const clearBtn = searchBox.createEl('button', { cls: 'clear-btn' });
+    clearBtn.style.display = 'none';
+    IconHelpers.set(clearBtn, 'x');
+    
+    // No results message (hidden initially)
+    this.noResultsEl = containerEl.createEl('div', { 
+      cls: 'dmt-settings-no-results',
+      text: 'No settings found matching your search.'
+    });
+    this.noResultsEl.style.display = 'none';
+    
+    // Search handler
+    const handleSearch = (query) => {
+      const q = query.toLowerCase().trim();
+      clearBtn.style.display = q ? 'block' : 'none';
+      
+      if (!q) {
+        // Clear search - show all, collapse sections
+        this.sections?.forEach(({ details }) => {
+          details.style.display = '';
+          details.settingItems?.forEach(item => {
+            item.classList.remove('dmt-setting-hidden');
+          });
+          details.removeAttribute('open');
+        });
+        this.noResultsEl.style.display = 'none';
+        return;
+      }
+      
+      let anyMatches = false;
+      
+      this.sections?.forEach(({ details, title }) => {
+        let sectionHasMatch = title.toLowerCase().includes(q);
+        
+        details.settingItems?.forEach(item => {
+          const nameEl = item.querySelector('.setting-item-name');
+          const descEl = item.querySelector('.setting-item-description');
+          const name = nameEl?.textContent?.toLowerCase() || '';
+          const desc = descEl?.textContent?.toLowerCase() || '';
+          
+          const matches = name.includes(q) || desc.includes(q);
+          
+          if (matches) {
+            item.classList.remove('dmt-setting-hidden');
+            sectionHasMatch = true;
+          } else {
+            item.classList.add('dmt-setting-hidden');
+          }
+        });
+        
+        if (sectionHasMatch) {
+          details.style.display = '';
+          details.setAttribute('open', '');
+          anyMatches = true;
+        } else {
+          details.style.display = 'none';
+        }
+      });
+      
+      this.noResultsEl.style.display = anyMatches ? 'none' : 'block';
+    };
+    
+    input.addEventListener('input', (e) => handleSearch(e.target.value));
+    clearBtn.addEventListener('click', () => {
+      input.value = '';
+      handleSearch('');
+      input.focus();
+    });
+  }
+  
   // ---------------------------------------------------------------------------
   // Main display method - orchestrates section rendering
   // ---------------------------------------------------------------------------
   
   display() {
     const { containerEl } = this;
+    
+    // Preserve which sections are currently open before rebuilding
+    const openSections = new Set();
+    if (this.sections) {
+      this.sections.forEach(({ details, title }) => {
+        if (details.hasAttribute('open')) {
+          openSections.add(title);
+        }
+      });
+    }
+    
     containerEl.empty();
     
-    this.injectStyles();
+    // Reset section tracking for search
+    this.sections = [];
     
-    this.renderHexSettings(containerEl);
-    this.renderColorSettings(containerEl);
-    this.renderMapBehaviorSettings(containerEl);
-    this.renderDistanceMeasurementSettings(containerEl);
-    this.renderObjectTypesSection(containerEl);
+    this.injectStyles();
+    this.renderSearchBar(containerEl);
+    
+    // Render collapsible sections (restore open state if previously open)
+    this.createCollapsibleSection(containerEl, 'Hex Map Settings', 
+      (el) => this.renderHexSettingsContent(el),
+      { open: openSections.has('Hex Map Settings') });
+    this.createCollapsibleSection(containerEl, 'Color Settings', 
+      (el) => this.renderColorSettingsContent(el),
+      { open: openSections.has('Color Settings') });
+    this.createCollapsibleSection(containerEl, 'Color Palette', 
+      (el) => this.renderColorPaletteContent(el),
+      { open: openSections.has('Color Palette') });
+    this.createCollapsibleSection(containerEl, 'Map Behavior', 
+      (el) => this.renderMapBehaviorSettingsContent(el),
+      { open: openSections.has('Map Behavior') });
+    this.createCollapsibleSection(containerEl, 'Distance Measurement', 
+      (el) => this.renderDistanceMeasurementSettingsContent(el),
+      { open: openSections.has('Distance Measurement') });
+    this.createCollapsibleSection(containerEl, 'Object Types', 
+      (el) => this.renderObjectTypesContent(el),
+      { open: openSections.has('Object Types') });
   }
 
   // ---------------------------------------------------------------------------
   // Section: Hex Map Settings
   // ---------------------------------------------------------------------------
   
-  renderHexSettings(containerEl) {
-    new Setting(containerEl).setName("Hex Map Settings").setHeading();
-
+  renderHexSettingsContent(containerEl) {
     // Hex Orientation
     new Setting(containerEl)
       .setName('Hex Grid Orientation')
@@ -1852,8 +2575,7 @@ class WindroseMDSettingsTab extends PluginSettingTab {
   // Section: Color Settings
   // ---------------------------------------------------------------------------
   
-  renderColorSettings(containerEl) {
-    new Setting(containerEl).setName("Color Settings").setHeading();
+  renderColorSettingsContent(containerEl) {
     containerEl.createEl('p', { 
       text: 'These settings control default colors and behavior for all WindroseMD maps in this vault.',
       cls: 'setting-item-description'
@@ -2008,12 +2730,186 @@ class WindroseMDSettingsTab extends PluginSettingTab {
   }
 
   // ---------------------------------------------------------------------------
+  // Section: Color Palette
+  // ---------------------------------------------------------------------------
+  
+  renderColorPaletteContent(containerEl) {
+    containerEl.createEl('p', { 
+      text: 'Customize the color palette used for drawing cells and objects. Edit built-in colors, add custom colors, or hide colors you don\\'t use.',
+      cls: 'setting-item-description'
+    });
+    
+    // Add Custom Color button
+    new Setting(containerEl)
+      .setName('Add Custom Color')
+      .setDesc('Create a new color for your palette')
+      .addButton(btn => btn
+        .setButtonText('+ Add Color')
+        .setCta()
+        .onClick(() => {
+          new ColorEditModal(this.app, this.plugin, null, async () => {
+            this.settingsChanged = true;
+            await this.plugin.saveSettings();
+            this.display();
+          }).open();
+        }));
+    
+    // Reset All Colors button  
+    new Setting(containerEl)
+      .setName('Reset Palette')
+      .setDesc('Restore all built-in colors to defaults and remove custom colors')
+      .addButton(btn => btn
+        .setButtonText('Reset All')
+        .setWarning()
+        .onClick(async () => {
+          if (confirm('Reset all colors to defaults? This will remove all customizations.')) {
+            this.plugin.settings.colorPaletteOverrides = {};
+            this.plugin.settings.customPaletteColors = [];
+            this.settingsChanged = true;
+            await this.plugin.saveSettings();
+            this.display();
+          }
+        }));
+    
+    // Render color list
+    this.renderColorList(containerEl);
+  }
+  
+  renderColorList(containerEl) {
+    const resolvedColors = ColorHelpers.getResolved(this.plugin.settings);
+    const hiddenColors = ColorHelpers.getHidden(this.plugin.settings);
+    
+    // Separate into visible and hidden
+    const visibleColors = resolvedColors.filter(c => !hiddenColors.has(c.id));
+    const hiddenBuiltIns = BUILT_IN_COLORS.filter(c => hiddenColors.has(c.id));
+    
+    // Visible colors container
+    const visibleContainer = containerEl.createEl('div', { cls: 'dmt-settings-category' });
+    const visibleHeader = visibleContainer.createEl('div', { cls: 'dmt-settings-category-header' });
+    visibleHeader.createEl('span', { text: \`Active Colors (\${visibleColors.length})\`, cls: 'dmt-settings-category-label' });
+    
+    const visibleList = visibleContainer.createEl('div', { cls: 'dmt-color-list' });
+    
+    visibleColors.forEach(color => {
+      this.renderColorRow(visibleList, color, false);
+    });
+    
+    if (visibleColors.length === 0) {
+      visibleList.createEl('div', { 
+        text: 'No colors visible. Use "Show" to restore hidden colors.',
+        cls: 'dmt-settings-empty-message'
+      });
+    }
+    
+    // Hidden colors (if any)
+    if (hiddenBuiltIns.length > 0) {
+      const hiddenContainer = containerEl.createEl('div', { cls: 'dmt-settings-category dmt-settings-category-muted' });
+      const hiddenHeader = hiddenContainer.createEl('div', { cls: 'dmt-settings-category-header' });
+      hiddenHeader.createEl('span', { text: \`Hidden Colors (\${hiddenBuiltIns.length})\`, cls: 'dmt-settings-category-label' });
+      
+      const hiddenList = hiddenContainer.createEl('div', { cls: 'dmt-color-list' });
+      
+      hiddenBuiltIns.forEach(color => {
+        // Build display version with override if exists
+        const override = this.plugin.settings.colorPaletteOverrides?.[color.id];
+        const displayColor = override ? { ...color, ...override, isBuiltIn: true, isModified: true } : { ...color, isBuiltIn: true };
+        this.renderColorRow(hiddenList, displayColor, true);
+      });
+    }
+  }
+  
+  renderColorRow(containerEl, color, isHidden) {
+    const row = containerEl.createEl('div', { cls: 'dmt-color-row' });
+    
+    // Color swatch
+    const swatch = row.createEl('div', { 
+      cls: 'dmt-color-row-swatch',
+      attr: { style: \`background-color: \${color.color}\` }
+    });
+    
+    // Label with modified indicator
+    const labelContainer = row.createEl('div', { cls: 'dmt-color-row-label' });
+    labelContainer.createEl('span', { text: color.label, cls: 'dmt-color-row-name' });
+    
+    if (color.isModified) {
+      labelContainer.createEl('span', { text: ' (modified)', cls: 'dmt-color-row-modified' });
+    }
+    if (color.isCustom) {
+      labelContainer.createEl('span', { text: ' (custom)', cls: 'dmt-color-row-custom' });
+    }
+    
+    // Hex value
+    row.createEl('code', { text: color.color, cls: 'dmt-color-row-hex' });
+    
+    // Actions
+    const actions = row.createEl('div', { cls: 'dmt-color-row-actions' });
+    
+    // Edit button
+    const editBtn = actions.createEl('button', { cls: 'dmt-btn-icon', attr: { 'aria-label': 'Edit color' } });
+    IconHelpers.set(editBtn, 'pencil');
+    editBtn.addEventListener('click', () => {
+      new ColorEditModal(this.app, this.plugin, color, async () => {
+        this.settingsChanged = true;
+        await this.plugin.saveSettings();
+        this.display();
+      }).open();
+    });
+    
+    // Show/Hide button (for built-in colors only)
+    if (color.isBuiltIn) {
+      const visBtn = actions.createEl('button', { cls: 'dmt-btn-icon', attr: { 'aria-label': isHidden ? 'Show color' : 'Hide color' } });
+      IconHelpers.set(visBtn, isHidden ? 'eye' : 'eye-off');
+      visBtn.addEventListener('click', async () => {
+        if (!this.plugin.settings.colorPaletteOverrides) {
+          this.plugin.settings.colorPaletteOverrides = {};
+        }
+        if (!this.plugin.settings.colorPaletteOverrides[color.id]) {
+          this.plugin.settings.colorPaletteOverrides[color.id] = {};
+        }
+        this.plugin.settings.colorPaletteOverrides[color.id].hidden = !isHidden;
+        
+        // Clean up empty override
+        if (Object.keys(this.plugin.settings.colorPaletteOverrides[color.id]).length === 1 
+            && !this.plugin.settings.colorPaletteOverrides[color.id].hidden) {
+          delete this.plugin.settings.colorPaletteOverrides[color.id];
+        }
+        
+        this.settingsChanged = true;
+        await this.plugin.saveSettings();
+        this.display();
+      });
+      
+      // Reset button (if modified)
+      if (color.isModified) {
+        const resetBtn = actions.createEl('button', { cls: 'dmt-btn-icon', attr: { 'aria-label': 'Reset to default' } });
+        IconHelpers.set(resetBtn, 'rotate-ccw');
+        resetBtn.addEventListener('click', async () => {
+          delete this.plugin.settings.colorPaletteOverrides[color.id];
+          this.settingsChanged = true;
+          await this.plugin.saveSettings();
+          this.display();
+        });
+      }
+    }
+    
+    // Delete button (for custom colors only)
+    if (color.isCustom) {
+      const delBtn = actions.createEl('button', { cls: 'dmt-btn-icon dmt-btn-danger', attr: { 'aria-label': 'Delete color' } });
+      IconHelpers.set(delBtn, 'trash-2');
+      delBtn.addEventListener('click', async () => {
+        this.plugin.settings.customPaletteColors = this.plugin.settings.customPaletteColors.filter(c => c.id !== color.id);
+        this.settingsChanged = true;
+        await this.plugin.saveSettings();
+        this.display();
+      });
+    }
+  }
+
+  // ---------------------------------------------------------------------------
   // Section: Map Behavior
   // ---------------------------------------------------------------------------
   
-  renderMapBehaviorSettings(containerEl) {
-    new Setting(containerEl).setName("Map Behavior").setHeading();
-
+  renderMapBehaviorSettingsContent(containerEl) {
     // Expanded by Default
     new Setting(containerEl)
       .setName('Start Maps Expanded')
@@ -2063,9 +2959,7 @@ class WindroseMDSettingsTab extends PluginSettingTab {
   // Section: Distance Measurement
   // ---------------------------------------------------------------------------
   
-  renderDistanceMeasurementSettings(containerEl) {
-    new Setting(containerEl).setName("Distance Measurement").setHeading();
-
+  renderDistanceMeasurementSettingsContent(containerEl) {
     // Grid: Distance per cell
     new Setting(containerEl)
       .setName('Grid Map: Distance per Cell')
@@ -2157,13 +3051,27 @@ class WindroseMDSettingsTab extends PluginSettingTab {
   // Section: Object Types
   // ---------------------------------------------------------------------------
   
-  renderObjectTypesSection(containerEl) {
-    new Setting(containerEl).setName("Object Types").setHeading();
-    
+  renderObjectTypesContent(containerEl) {
     containerEl.createEl('p', { 
       text: 'Customize map objects: modify built-in objects, create custom objects, or hide objects you don\\'t use.',
       cls: 'setting-item-description'
     });
+    
+    // Map Type selector dropdown
+    new Setting(containerEl)
+      .setName('Map Type')
+      .setDesc('Select which map type to configure objects for')
+      .addDropdown(dropdown => dropdown
+        .addOption('grid', 'Grid Maps')
+        .addOption('hex', 'Hex Maps')
+        .setValue(this.selectedMapType)
+        .onChange((value) => {
+          this.selectedMapType = value;
+          this.display();
+        }));
+    
+    // Get settings for the selected map type
+    const mapTypeSettings = this.getObjectSettingsForMapType();
     
     // Add Custom Object button
     new Setting(containerEl)
@@ -2177,7 +3085,7 @@ class WindroseMDSettingsTab extends PluginSettingTab {
             this.settingsChanged = true;
             await this.plugin.saveSettings();
             this.display();
-          }).open();
+          }, this.selectedMapType).open();
         }));
     
     // Add Custom Category button
@@ -2191,7 +3099,7 @@ class WindroseMDSettingsTab extends PluginSettingTab {
             this.settingsChanged = true;
             await this.plugin.saveSettings();
             this.display();
-          }).open();
+          }, this.selectedMapType).open();
         }));
     
     // Import/Export buttons
@@ -2204,43 +3112,45 @@ class WindroseMDSettingsTab extends PluginSettingTab {
           new ImportModal(this.app, this.plugin, async () => {
             this.settingsChanged = true;
             this.display();
-          }).open();
+          }, this.selectedMapType).open();
         }))
       .addButton(btn => btn
         .setButtonText('Export')
         .onClick(() => {
-          new ExportModal(this.app, this.plugin).open();
+          new ExportModal(this.app, this.plugin, this.selectedMapType).open();
         }));
     
-    // Get resolved data using helpers
-    const allCategories = ObjectHelpers.getCategories(this.plugin.settings);
-    const allObjects = ObjectHelpers.getResolved(this.plugin.settings);
-    const hiddenObjects = ObjectHelpers.getHidden(this.plugin.settings);
+    // Get resolved data using helpers with map-type-specific settings
+    const allCategories = ObjectHelpers.getCategories(mapTypeSettings);
+    const allObjects = ObjectHelpers.getResolved(mapTypeSettings);
+    const hiddenObjects = ObjectHelpers.getHidden(mapTypeSettings);
     
-    // Check if there are any customizations
-    const hasOverrides = Object.keys(this.plugin.settings.objectOverrides || {}).length > 0;
-    const hasCustomObjects = (this.plugin.settings.customObjects || []).length > 0;
-    const hasCustomCategories = (this.plugin.settings.customCategories || []).length > 0;
+    // Check if there are any customizations for this map type
+    const hasOverrides = Object.keys(mapTypeSettings.objectOverrides || {}).length > 0;
+    const hasCustomObjects = (mapTypeSettings.customObjects || []).length > 0;
+    const hasCustomCategories = (mapTypeSettings.customCategories || []).length > 0;
     const hasAnyCustomizations = hasOverrides || hasCustomObjects || hasCustomCategories;
     
     // Reset All button (only show if there are customizations)
     if (hasAnyCustomizations) {
       new Setting(containerEl)
         .setName('Reset All Customizations')
-        .setDesc('Remove all custom objects, categories, and modifications to built-in objects')
+        .setDesc(\`Remove all custom objects, categories, and modifications for \${this.selectedMapType} maps\`)
         .addButton(btn => btn
           .setButtonText('Reset All')
           .setWarning()
           .onClick(async () => {
             const counts = [];
-            if (hasOverrides) counts.push(\`\${Object.keys(this.plugin.settings.objectOverrides).length} modification(s)\`);
-            if (hasCustomObjects) counts.push(\`\${this.plugin.settings.customObjects.length} custom object(s)\`);
-            if (hasCustomCategories) counts.push(\`\${this.plugin.settings.customCategories.length} custom category(ies)\`);
+            if (hasOverrides) counts.push(\`\${Object.keys(mapTypeSettings.objectOverrides).length} modification(s)\`);
+            if (hasCustomObjects) counts.push(\`\${mapTypeSettings.customObjects.length} custom object(s)\`);
+            if (hasCustomCategories) counts.push(\`\${mapTypeSettings.customCategories.length} custom category(ies)\`);
             
-            if (confirm(\`This will remove \${counts.join(', ')}. Maps using custom objects will show "?" placeholders.\\n\\nContinue?\`)) {
-              this.plugin.settings.objectOverrides = {};
-              this.plugin.settings.customObjects = [];
-              this.plugin.settings.customCategories = [];
+            if (confirm(\`This will remove \${counts.join(', ')} for \${this.selectedMapType} maps. Maps using custom objects will show "?" placeholders.\\n\\nContinue?\`)) {
+              this.updateObjectSettingsForMapType({
+                objectOverrides: {},
+                customObjects: [],
+                customCategories: []
+              });
               this.settingsChanged = true;
               await this.plugin.saveSettings();
               this.display();
@@ -2355,7 +3265,10 @@ class WindroseMDSettingsTab extends PluginSettingTab {
             return;
           }
           if (confirm(\`Delete category "\${category.label}"?\`)) {
-            this.plugin.settings.customCategories = this.plugin.settings.customCategories.filter(c => c.id !== category.id);
+            const categoriesKey = this.selectedMapType === 'hex' ? 'customHexCategories' : 'customGridCategories';
+            if (this.plugin.settings[categoriesKey]) {
+              this.plugin.settings[categoriesKey] = this.plugin.settings[categoriesKey].filter(c => c.id !== category.id);
+            }
             this.settingsChanged = true;
             await this.plugin.saveSettings();
             this.display();
@@ -2429,11 +3342,15 @@ class WindroseMDSettingsTab extends PluginSettingTab {
     objectList.addEventListener('drop', async (e) => {
       e.preventDefault();
       
+      // Get the correct settings keys for the selected map type
+      const overridesKey = this.selectedMapType === 'hex' ? 'hexObjectOverrides' : 'gridObjectOverrides';
+      const customObjectsKey = this.selectedMapType === 'hex' ? 'customHexObjects' : 'customGridObjects';
+      
       // Get new order from DOM positions
       const rows = [...objectList.querySelectorAll('.dmt-settings-object-row')];
       
       // Get default ID order for this category
-      const defaultIdOrder = ObjectHelpers.getDefaultIdOrder(category.id, this.plugin.settings);
+      const defaultIdOrder = ObjectHelpers.getDefaultIdOrder(category.id, this.getObjectSettingsForMapType());
       
       // Apply new orders to settings
       rows.forEach((row, actualPosition) => {
@@ -2446,30 +3363,34 @@ class WindroseMDSettingsTab extends PluginSettingTab {
           
           if (actualPosition === defaultPosition) {
             // In default position - remove order override if present
-            if (this.plugin.settings.objectOverrides[id]) {
-              delete this.plugin.settings.objectOverrides[id].order;
-              if (Object.keys(this.plugin.settings.objectOverrides[id]).length === 0) {
-                delete this.plugin.settings.objectOverrides[id];
+            if (this.plugin.settings[overridesKey]?.[id]) {
+              delete this.plugin.settings[overridesKey][id].order;
+              if (Object.keys(this.plugin.settings[overridesKey][id]).length === 0) {
+                delete this.plugin.settings[overridesKey][id];
               }
             }
           } else {
             // Not in default position - save order override
-            if (!this.plugin.settings.objectOverrides[id]) {
-              this.plugin.settings.objectOverrides[id] = {};
+            if (!this.plugin.settings[overridesKey]) {
+              this.plugin.settings[overridesKey] = {};
             }
-            this.plugin.settings.objectOverrides[id].order = newOrder;
+            if (!this.plugin.settings[overridesKey][id]) {
+              this.plugin.settings[overridesKey][id] = {};
+            }
+            this.plugin.settings[overridesKey][id].order = newOrder;
           }
           
           // Update modified indicator in DOM immediately
           const labelEl = row.querySelector('.dmt-settings-object-label');
           if (labelEl) {
-            const override = this.plugin.settings.objectOverrides[id];
+            const override = this.plugin.settings[overridesKey]?.[id];
             const hasAnyOverride = override && Object.keys(override).length > 0;
             labelEl.classList.toggle('dmt-settings-modified', !!hasAnyOverride);
           }
         } else {
           // Custom objects - always save order
-          const customObj = this.plugin.settings.customObjects.find(o => o.id === id);
+          const customObjects = this.plugin.settings[customObjectsKey] || [];
+          const customObj = customObjects.find(o => o.id === id);
           if (customObj) {
             customObj.order = newOrder;
           }
@@ -2487,6 +3408,10 @@ class WindroseMDSettingsTab extends PluginSettingTab {
   
   renderObjectRow(container, obj, isHiddenSection = false, canDrag = false) {
     const row = container.createDiv({ cls: 'dmt-settings-object-row' });
+    
+    // Get the correct settings keys for the selected map type
+    const overridesKey = this.selectedMapType === 'hex' ? 'hexObjectOverrides' : 'gridObjectOverrides';
+    const customObjectsKey = this.selectedMapType === 'hex' ? 'customHexObjects' : 'customGridObjects';
     
     // Data attributes for drag/drop
     row.dataset.objectId = obj.id;
@@ -2544,7 +3469,7 @@ class WindroseMDSettingsTab extends PluginSettingTab {
         this.settingsChanged = true;
         await this.plugin.saveSettings();
         this.display();
-      }).open();
+      }, this.selectedMapType).open();
     };
     
     if (obj.isBuiltIn) {
@@ -2553,10 +3478,10 @@ class WindroseMDSettingsTab extends PluginSettingTab {
         const unhideBtn = actions.createEl('button', { cls: 'dmt-settings-icon-btn', attr: { 'aria-label': 'Unhide', title: 'Show in palette' } });
         IconHelpers.set(unhideBtn, 'eye');
         unhideBtn.onclick = async () => {
-          if (this.plugin.settings.objectOverrides[obj.id]) {
-            delete this.plugin.settings.objectOverrides[obj.id].hidden;
-            if (Object.keys(this.plugin.settings.objectOverrides[obj.id]).length === 0) {
-              delete this.plugin.settings.objectOverrides[obj.id];
+          if (this.plugin.settings[overridesKey]?.[obj.id]) {
+            delete this.plugin.settings[overridesKey][obj.id].hidden;
+            if (Object.keys(this.plugin.settings[overridesKey][obj.id]).length === 0) {
+              delete this.plugin.settings[overridesKey][obj.id];
             }
           }
           this.settingsChanged = true;
@@ -2568,10 +3493,13 @@ class WindroseMDSettingsTab extends PluginSettingTab {
         const hideBtn = actions.createEl('button', { cls: 'dmt-settings-icon-btn', attr: { 'aria-label': 'Hide', title: 'Hide from palette' } });
         IconHelpers.set(hideBtn, 'eye-off');
         hideBtn.onclick = async () => {
-          if (!this.plugin.settings.objectOverrides[obj.id]) {
-            this.plugin.settings.objectOverrides[obj.id] = {};
+          if (!this.plugin.settings[overridesKey]) {
+            this.plugin.settings[overridesKey] = {};
           }
-          this.plugin.settings.objectOverrides[obj.id].hidden = true;
+          if (!this.plugin.settings[overridesKey][obj.id]) {
+            this.plugin.settings[overridesKey][obj.id] = {};
+          }
+          this.plugin.settings[overridesKey][obj.id].hidden = true;
           this.settingsChanged = true;
           await this.plugin.saveSettings();
           this.display();
@@ -2584,7 +3512,9 @@ class WindroseMDSettingsTab extends PluginSettingTab {
         IconHelpers.set(resetBtn, 'rotate-ccw');
         resetBtn.onclick = async () => {
           if (confirm(\`Reset "\${obj.label}" to its default symbol and name?\`)) {
-            delete this.plugin.settings.objectOverrides[obj.id];
+            if (this.plugin.settings[overridesKey]) {
+              delete this.plugin.settings[overridesKey][obj.id];
+            }
             this.settingsChanged = true;
             await this.plugin.saveSettings();
             this.display();
@@ -2597,7 +3527,9 @@ class WindroseMDSettingsTab extends PluginSettingTab {
       IconHelpers.set(deleteBtn, 'trash-2');
       deleteBtn.onclick = async () => {
         if (confirm(\`Delete "\${obj.label}"? Maps using this object will show a "?" placeholder.\`)) {
-          this.plugin.settings.customObjects = this.plugin.settings.customObjects.filter(o => o.id !== obj.id);
+          if (this.plugin.settings[customObjectsKey]) {
+            this.plugin.settings[customObjectsKey] = this.plugin.settings[customObjectsKey].filter(o => o.id !== obj.id);
+          }
           this.settingsChanged = true;
           await this.plugin.saveSettings();
           this.display();

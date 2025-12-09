@@ -95,10 +95,11 @@ const BUILT_IN_CATEGORY_ORDER = {
  * Get effective object types list (built-ins + overrides + custom)
  * This is the main function consumers should use for listing available objects.
  * 
+ * @param {string} mapType - 'hex' or 'grid' (defaults to 'grid')
  * @returns {Array} Merged and filtered object types
  */
-function getResolvedObjectTypes() {
-  const settings = getObjectSettings();
+function getResolvedObjectTypes(mapType = 'grid') {
+  const settings = getObjectSettings(mapType);
   const { objectOverrides = {}, customObjects = [] } = settings;
   
   // Apply overrides to built-ins, filter out hidden ones
@@ -142,10 +143,11 @@ function getResolvedObjectTypes() {
 /**
  * Get effective categories list (built-ins + custom), sorted by order
  * 
+ * @param {string} mapType - 'hex' or 'grid' (defaults to 'grid')
  * @returns {Array} Merged and sorted categories
  */
-function getResolvedCategories() {
-  const settings = getObjectSettings();
+function getResolvedCategories(mapType = 'grid') {
+  const settings = getObjectSettings(mapType);
   const { customCategories = [] } = settings;
   
   // Add order to built-in categories
@@ -172,10 +174,11 @@ function getResolvedCategories() {
  * Get list of hidden built-in objects
  * Useful for showing a "hidden objects" section in settings
  * 
+ * @param {string} mapType - 'hex' or 'grid' (defaults to 'grid')
  * @returns {Array} Hidden object definitions
  */
-function getHiddenObjects() {
-  const settings = getObjectSettings();
+function getHiddenObjects(mapType = 'grid') {
+  const settings = getObjectSettings(mapType);
   const { objectOverrides = {} } = settings;
   
   return OBJECT_TYPES
@@ -192,9 +195,10 @@ function getHiddenObjects() {
  * Returns the resolved version (with overrides applied) or fallback for unknown
  * 
  * @param {string} typeId - The object type ID to look up
+ * @param {string} mapType - 'hex' or 'grid' (defaults to 'grid')
  * @returns {Object} Object type definition (never null - returns fallback for unknown)
  */
-function getObjectType(typeId) {
+function getObjectType(typeId, mapType = 'grid') {
   // Handle null/undefined
   if (!typeId) {
     return UNKNOWN_OBJECT_FALLBACK;
@@ -205,7 +209,7 @@ function getObjectType(typeId) {
     return UNKNOWN_OBJECT_FALLBACK;
   }
   
-  const settings = getObjectSettings();
+  const settings = getObjectSettings(mapType);
   const { objectOverrides = {}, customObjects = [] } = settings;
   
   // Check built-in objects first (including hidden ones - they still need to render)
@@ -247,10 +251,11 @@ function getObjectType(typeId) {
  * Check if an object type exists (built-in or custom, not hidden)
  * 
  * @param {string} typeId - The object type ID
+ * @param {string} mapType - 'hex' or 'grid' (defaults to 'grid')
  * @returns {boolean} True if type exists and is not hidden
  */
-function objectTypeExists(typeId) {
-  const objType = getObjectType(typeId);
+function objectTypeExists(typeId, mapType = 'grid') {
+  const objType = getObjectType(typeId, mapType);
   return objType.id !== '__unknown__' && !objType.isHidden;
 }
 

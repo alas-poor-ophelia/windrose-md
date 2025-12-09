@@ -51,13 +51,21 @@ const Coordinators = ({ canvasRef, mapData, geometry, isFocused, isColorPickerOp
  * MapCanvasContent - Inner component that uses context hooks
  * Contains all the map canvas logic and interacts with shared selection state
  */
-const MapCanvasContent = ({ mapData, onCellsChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onMapDataUpdate, currentTool, selectedObjectType, selectedColor, isColorPickerOpen, customColors, onAddCustomColor, onDeleteCustomColor, isFocused, isAnimating, theme, isAlignmentMode, children }) => {
+const MapCanvasContent = ({ mapData, onCellsChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onViewStateChange, currentTool, selectedObjectType, selectedColor, isColorPickerOpen, customColors, onAddCustomColor, onDeleteCustomColor, isFocused, isAnimating, theme, isAlignmentMode, children }) => {
   const canvasRef = dc.useRef(null);
   const containerRef = dc.useRef(null);
   const [canvasDimensions, setCanvasDimensions] = dc.useState({
     width: DEFAULTS.canvasSize.width,
     height: DEFAULTS.canvasSize.height
   });
+  
+  // Create onMapDataUpdate wrapper for viewState changes
+  // This bridges the old prop-based API with the new context-based approach
+  const onMapDataUpdate = dc.useCallback((updates) => {
+    if (updates.viewState && onViewStateChange) {
+      onViewStateChange(updates.viewState);
+    }
+  }, [onViewStateChange]);
 
   // Use shared selection from context (same state ObjectLayer uses)
   const {
@@ -315,7 +323,7 @@ const MapCanvasContent = ({ mapData, onCellsChange, onObjectsChange, onTextLabel
     onTextLabelsChange,
     onEdgesChange,
     onMapDataUpdate
-  }), [onCellsChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onMapDataUpdate]);
+  }), [onCellsChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onViewStateChange]);
 
 
 

@@ -160,6 +160,11 @@ function renderCanvas(canvas, mapData, geometry, selectedItem = null, isResizeMo
     zoom: zoom
   };
   
+  // iOS defensive: Explicitly reset any potentially corrupted canvas state before grid rendering
+  // This works around iOS canvas state corruption during memory pressure
+  ctx.globalAlpha = 1;
+  ctx.globalCompositeOperation = 'source-over';
+  
   // Draw grid lines using renderer
   renderer.renderGrid(ctx, geometry, rendererViewState, { width, height }, true, {
     lineColor: THEME.grid.lines,
@@ -611,6 +616,7 @@ function renderCanvas(canvas, mapData, geometry, selectedItem = null, isResizeMo
 }
 
 function useCanvasRenderer(canvasRef, mapData, geometry, selectedItem = null, isResizeMode = false, theme = null, showCoordinates = false, layerVisibility = null) {
+  // Main rendering effect - redraw when dependencies change
   dc.useEffect(() => {
     if (mapData && geometry && canvasRef.current) {
       renderCanvas(canvasRef.current, mapData, geometry, selectedItem, isResizeMode, theme, showCoordinates, layerVisibility);

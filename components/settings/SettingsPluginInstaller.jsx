@@ -14,7 +14,7 @@ const { OBJECT_TYPES, CATEGORIES } = await requireModuleByName("objectTypes.js")
 const { RA_ICONS, RA_CATEGORIES } = await requireModuleByName("rpgAwesomeIcons.js");
 
 // Plugin version from template
-const PACKAGED_PLUGIN_VERSION = '0.8.3';
+const PACKAGED_PLUGIN_VERSION = '0.9.8';
 
 // LocalStorage keys for tracking user preferences
 const STORAGE_KEYS = {
@@ -318,7 +318,7 @@ const SettingsPluginInstaller = ({ onInstall, onDecline, mode = 'auto' }) => {
     <div className="dmt-plugin-installer">
       <div className="dmt-plugin-installer-card">
         <div className="dmt-plugin-installer-icon">
-          <dc.Icon icon="lucide-settings" />
+          <dc.Icon icon="lucide-compass" />
         </div>
         <div className="dmt-plugin-installer-content">
           <h3>

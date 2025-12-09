@@ -8,7 +8,7 @@
  * <MapCanvas.MeasurementLayer
  *   currentTool={currentTool}
  *   globalSettings={globalSettings}
- *   mapDistanceOverrides={mapData.distanceSettings}
+ *   mapDistanceOverrides={mapData.settings.distanceSettings}
  * />
  */
 

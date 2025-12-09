@@ -4,6 +4,20 @@ const pathResolverPath = dc.resolvePath("pathResolver.js");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 const { THEME, DEFAULTS } = await requireModuleByName("dmtConstants.js");
 
+// Built-in color palette - matches settings plugin
+const BUILT_IN_COLORS = [
+  { id: 'default', color: '#c4a57b', label: 'Default (Tan)' },
+  { id: 'stone', color: '#808080', label: 'Stone Gray' },
+  { id: 'dark-stone', color: '#505050', label: 'Dark Gray' },
+  { id: 'water', color: '#4a9eff', label: 'Water Blue' },
+  { id: 'forest', color: '#4ade80', label: 'Forest Green' },
+  { id: 'danger', color: '#ef4444', label: 'Danger Red' },
+  { id: 'sand', color: '#fbbf24', label: 'Sand Yellow' },
+  { id: 'magic', color: '#a855f7', label: 'Magic Purple' },
+  { id: 'fire', color: '#fb923c', label: 'Fire Orange' },
+  { id: 'ice', color: '#14b8a6', label: 'Ice Teal' }
+];
+
 // Fallback settings based on theme constants
 const FALLBACK_SETTINGS = {
   version: '1.0.0',
@@ -145,11 +159,12 @@ const FALLBACK_OBJECT_SETTINGS = {
 };
 
 /**
- * Get object customization settings from the plugin
+ * Get object customization settings from the plugin for a specific map type
  * Returns object overrides, custom objects, and custom categories
+ * @param {string} mapType - 'hex' or 'grid' (defaults to 'grid')
  * @returns {Object} Object settings { objectOverrides, customObjects, customCategories }
  */
-function getObjectSettings() {
+function getObjectSettings(mapType = 'grid') {
   try {
     // Check if dc.app exists and is ready
     if (!dc || !dc.app || !dc.app.plugins) {
@@ -160,11 +175,20 @@ function getObjectSettings() {
     const plugin = dc.app.plugins.plugins['dungeon-map-tracker-settings'];
     
     if (plugin && plugin.settings) {
-      return {
-        objectOverrides: plugin.settings.objectOverrides || {},
-        customObjects: plugin.settings.customObjects || [],
-        customCategories: plugin.settings.customCategories || []
-      };
+      // Use map-type specific settings keys
+      if (mapType === 'hex') {
+        return {
+          objectOverrides: plugin.settings.hexObjectOverrides || {},
+          customObjects: plugin.settings.customHexObjects || [],
+          customCategories: plugin.settings.customHexCategories || []
+        };
+      } else {
+        return {
+          objectOverrides: plugin.settings.gridObjectOverrides || {},
+          customObjects: plugin.settings.customGridObjects || [],
+          customCategories: plugin.settings.customGridCategories || []
+        };
+      }
     }
   } catch (error) {
     console.warn('[settingsAccessor] Could not access object settings:', error);
@@ -173,4 +197,58 @@ function getObjectSettings() {
   return FALLBACK_OBJECT_SETTINGS;
 }
 
-return { getSettings, getSetting, isPluginAvailable, getTheme, getEffectiveSettings, getObjectSettings, FALLBACK_SETTINGS };
+/**
+ * Get color palette settings from the plugin
+ * Returns resolved color palette (built-in with overrides + custom colors)
+ * @returns {Array} Array of color objects { id, color, label, isBuiltIn, isCustom, isModified }
+ */
+function getColorPaletteSettings() {
+  try {
+    // Check if dc.app exists and is ready
+    if (!dc || !dc.app || !dc.app.plugins) {
+      return BUILT_IN_COLORS.map(c => ({ ...c, isBuiltIn: true, isModified: false }));
+    }
+    
+    // Try to get plugin settings
+    const plugin = dc.app.plugins.plugins['dungeon-map-tracker-settings'];
+    
+    if (plugin && plugin.settings) {
+      const { colorPaletteOverrides = {}, customPaletteColors = [] } = plugin.settings;
+      
+      // Resolve built-in colors with overrides
+      const resolvedBuiltIns = BUILT_IN_COLORS
+        .filter(c => !colorPaletteOverrides[c.id]?.hidden)
+        .map((c, index) => {
+          const override = colorPaletteOverrides[c.id];
+          if (override) {
+            const { hidden, ...overrideProps } = override;
+            return { 
+              ...c, 
+              ...overrideProps, 
+              order: override.order ?? index,
+              isBuiltIn: true, 
+              isModified: true 
+            };
+          }
+          return { ...c, order: index, isBuiltIn: true, isModified: false };
+        });
+      
+      // Add custom colors
+      const resolvedCustom = customPaletteColors.map((c, index) => ({
+        ...c,
+        order: c.order ?? (100 + index),
+        isCustom: true,
+        isBuiltIn: false
+      }));
+      
+      return [...resolvedBuiltIns, ...resolvedCustom].sort((a, b) => a.order - b.order);
+    }
+  } catch (error) {
+    console.warn('[settingsAccessor] Could not access color palette settings:', error);
+  }
+  
+  // Return default colors if plugin not available
+  return BUILT_IN_COLORS.map(c => ({ ...c, isBuiltIn: true, isModified: false }));
+}
+
+return { getSettings, getSetting, isPluginAvailable, getTheme, getEffectiveSettings, getObjectSettings, getColorPaletteSettings, FALLBACK_SETTINGS, BUILT_IN_COLORS };

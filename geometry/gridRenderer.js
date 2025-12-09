@@ -90,6 +90,7 @@ const gridRenderer = {
   /**
    * Render interior grid lines between adjacent painted cells
    * These are drawn on top of painted cells to restore grid visibility
+   * Uses fillRect instead of stroke for iOS/CodeMirror compatibility
    * @param {CanvasRenderingContext2D} ctx
    * @param {Array} cells - Array of {x, y, color}
    * @param {GridGeometry} geometry
@@ -104,6 +105,8 @@ const gridRenderer = {
     
     const { lineColor = '#666666', lineWidth = 1, interiorRatio = 0.5 } = style;
     const scaledSize = geometry.getScaledCellSize(viewState.zoom);
+    const actualLineWidth = Math.max(1, lineWidth * interiorRatio);
+    const halfWidth = actualLineWidth / 2;
     
     // Build lookup set for O(1) cell existence checks
     const cellSet = new Set(cells.map(c => `${c.x},${c.y}`));
@@ -111,9 +114,7 @@ const gridRenderer = {
     // Track which interior lines we've already drawn to avoid duplicates
     const drawnLines = new Set();
     
-    ctx.strokeStyle = lineColor;
-    ctx.lineWidth = Math.max(1, lineWidth * interiorRatio);
-    ctx.beginPath();
+    ctx.fillStyle = lineColor;
     
     for (const cell of cells) {
       const { screenX, screenY } = geometry.gridToScreen(
@@ -129,8 +130,13 @@ const gridRenderer = {
       if (cellSet.has(rightKey)) {
         const lineKey = `v:${cell.x + 1},${cell.y}`;
         if (!drawnLines.has(lineKey)) {
-          ctx.moveTo(screenX + scaledSize, screenY);
-          ctx.lineTo(screenX + scaledSize, screenY + scaledSize);
+          // Vertical line using fillRect
+          ctx.fillRect(
+            screenX + scaledSize - halfWidth,
+            screenY,
+            actualLineWidth,
+            scaledSize
+          );
           drawnLines.add(lineKey);
         }
       }
@@ -140,14 +146,17 @@ const gridRenderer = {
       if (cellSet.has(bottomKey)) {
         const lineKey = `h:${cell.x},${cell.y + 1}`;
         if (!drawnLines.has(lineKey)) {
-          ctx.moveTo(screenX, screenY + scaledSize);
-          ctx.lineTo(screenX + scaledSize, screenY + scaledSize);
+          // Horizontal line using fillRect
+          ctx.fillRect(
+            screenX,
+            screenY + scaledSize - halfWidth,
+            scaledSize,
+            actualLineWidth
+          );
           drawnLines.add(lineKey);
         }
       }
     }
-    
-    ctx.stroke();
   },
 
   /**
