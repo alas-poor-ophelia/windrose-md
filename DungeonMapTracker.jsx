@@ -8,7 +8,7 @@ const { requireModuleByName, getBasePath } = await dc.require(`${window.__dmtBas
 
 
 const css = await app.vault.cachedRead(
-  await app.vault.getFileByPath(`${getBasePath()}/css/DungeonMapTracker.css`)
+  await app.vault.getFileByPath(`${getBasePath()}/css/WindroseMD-CSS.css`)
 );
 
 const combinedCss = [
