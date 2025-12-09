@@ -3,6 +3,7 @@
 const pathResolverPath = dc.resolvePath("pathResolver.js");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 const { THEME, DEFAULTS } = await requireModuleByName("dmtConstants.js");
+const { WindroseCompass } = await requireModuleByName("WindroseCompass.jsx");
 
 // Import the plugin template as a string (allows bundling without Datacore trying to execute it)
 const SETTINGS_PLUGIN_TEMPLATE = await requireModuleByName("settingsPluginMain.js");
@@ -14,7 +15,7 @@ const { OBJECT_TYPES, CATEGORIES } = await requireModuleByName("objectTypes.js")
 const { RA_ICONS, RA_CATEGORIES } = await requireModuleByName("rpgAwesomeIcons.js");
 
 // Plugin version from template
-const PACKAGED_PLUGIN_VERSION = '0.9.8';
+const PACKAGED_PLUGIN_VERSION = '0.9.9';
 
 // LocalStorage keys for tracking user preferences
 const STORAGE_KEYS = {
@@ -318,7 +319,7 @@ const SettingsPluginInstaller = ({ onInstall, onDecline, mode = 'auto' }) => {
     <div className="dmt-plugin-installer">
       <div className="dmt-plugin-installer-card">
         <div className="dmt-plugin-installer-icon">
-          <dc.Icon icon="lucide-compass" />
+          <WindroseCompass size={84} />
         </div>
         <div className="dmt-plugin-installer-content">
           <h3>
