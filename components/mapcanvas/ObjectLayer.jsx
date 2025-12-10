@@ -19,6 +19,7 @@ const { TextInputModal } = await requireModuleByName("TextInputModal.jsx");
 const { NoteLinkModal } = await requireModuleByName("NoteLinkModal.jsx");
 const { SelectionToolbar } = await requireModuleByName("SelectionToolbar.jsx");
 const { calculateObjectScreenPosition } = await requireModuleByName("screenPositionUtils.js");
+const { getActiveLayer } = await requireModuleByName("layerAccessor.js");
 
 /**
  * ObjectLayer Component
@@ -65,7 +66,7 @@ const ObjectLayer = ({
   const handleScaleChange = dc.useCallback((newScale) => {
     if (!selectedItem || selectedItem.type !== 'object' || !mapData?.objects) return;
     
-    const updatedObjects = updateObject(mapData.objects, selectedItem.id, { scale: newScale });
+    const updatedObjects = updateObject(getActiveLayer(mapData).objects, selectedItem.id, { scale: newScale });
     contextOnObjectsChange(updatedObjects);
     
     // Update selected item data
@@ -221,7 +222,7 @@ const ObjectLayer = ({
   const handleNoteLinkSave = (notePath) => {
     if (!mapData || !editingNoteObjectId) return;
     
-    const updatedObjects = mapData.objects.map(obj => {
+    const updatedObjects = getActiveLayer(mapData).objects.map(obj => {
       if (obj.id === editingNoteObjectId) {
         return { ...obj, linkedNote: notePath };
       }
@@ -323,7 +324,7 @@ const ObjectLayer = ({
   };
   
   const selectedObject = selectedItem?.type === 'object' && mapData?.objects 
-    ? mapData.objects.find(obj => obj.id === selectedItem.id)
+    ? getActiveLayer(mapData).objects.find(obj => obj.id === selectedItem.id)
     : null;
   
   const indicatorPositions = edgeSnapMode && selectedObject && mapData?.mapType !== 'hex'
@@ -448,9 +449,9 @@ const ObjectLayer = ({
         <TextInputModal
           onSubmit={handleNoteModalSubmit}
           onCancel={handleNoteCancel}
-          title={`Note for ${mapData.objects.find(obj => obj.id === editingObjectId)?.label || 'Object'}`}
+          title={`Note for ${getActiveLayer(mapData).objects.find(obj => obj.id === editingObjectId)?.label || 'Object'}`}
           placeholder="Add a custom note..."
-          initialValue={mapData.objects.find(obj => obj.id === editingObjectId)?.customTooltip || ''}
+          initialValue={getActiveLayer(mapData).objects.find(obj => obj.id === editingObjectId)?.customTooltip || ''}
         />
       )}
       
@@ -462,12 +463,12 @@ const ObjectLayer = ({
           onSave={handleNoteLinkSave}
           currentNotePath={
             editingNoteObjectId
-              ? mapData.objects?.find(obj => obj.id === editingNoteObjectId)?.linkedNote || null
+              ? getActiveLayer(mapData).objects?.find(obj => obj.id === editingNoteObjectId)?.linkedNote || null
               : null
           }
           objectType={
             editingNoteObjectId
-              ? mapData.objects?.find(obj => obj.id === editingNoteObjectId)?.type || null
+              ? getActiveLayer(mapData).objects?.find(obj => obj.id === editingNoteObjectId)?.type || null
               : null
           }
         />

@@ -2,9 +2,14 @@ const pathResolverPath = dc.resolvePath("pathResolver.js");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
 
-const { DEFAULTS, DATA_FILE_PATH } = await requireModuleByName("dmtConstants.js");
+const { DEFAULTS, DATA_FILE_PATH, SCHEMA_VERSION } = await requireModuleByName("dmtConstants.js");
 const { offsetToAxial } = await requireModuleByName("offsetCoordinates.js");
 const { getSettings } = await requireModuleByName("settingsAccessor.js");
+const { 
+  migrateToLayerSchema, 
+  needsMigration, 
+  generateLayerId
+} = await requireModuleByName("layerAccessor.js");
 
 async function loadMapData(mapId, mapName = '', mapType = 'grid') {
   try {
@@ -108,6 +113,11 @@ async function loadMapData(mapId, mapName = '', mapType = 'grid') {
           }
         }
       }
+      // Migrate to layer schema if needed (v2)
+      if (needsMigration(data.maps[mapId])) {
+        data.maps[mapId] = migrateToLayerSchema(data.maps[mapId]);
+      }
+      
       return data.maps[mapId];
     } else {
       return createNewMap(mapId, mapName, mapType);
@@ -156,16 +166,16 @@ function createNewMap(mapId, mapName = '', mapType = 'grid') {
     throw new Error('DEFAULTS is undefined - constants.js import failed');
   }
   
-  // Base map structure shared by all map types
+  // Generate layer ID for initial layer
+  const initialLayerId = generateLayerId();
+  
+  // Base map structure with layer schema (v2)
   const baseMap = {
+    // Global settings
     name: mapName,  
     description: "",
     mapType: mapType,
     northDirection: 0,
-    cells: [],
-    edges: [],  // For edge painting (grid maps only)
-    objects: [],
-    textLabels: [],
     customColors: [],
     sidebarCollapsed: false,
     expandedState: false,
@@ -178,7 +188,25 @@ function createNewMap(mapId, mapName = '', mapType = 'grid') {
       rememberSidebarState: true,
       rememberExpandedState: false
     },
-    lastTextLabelSettings: null  // Stores {fontFace, fontSize, color} for new labels
+    lastTextLabelSettings: null,  // Stores {fontFace, fontSize, color} for new labels
+    
+    // Layer system (v2)
+    schemaVersion: SCHEMA_VERSION,
+    activeLayerId: initialLayerId,
+    layerPanelVisible: false,
+    layers: [
+      {
+        id: initialLayerId,
+        name: 'Layer 1',
+        order: 0,
+        visible: true,
+        cells: [],
+        edges: [],  // For edge painting (grid maps only)
+        objects: [],
+        textLabels: [],
+        fogOfWar: null  // Phase 2: Fog of War
+      }
+    ]
   };
   
   // Add type-specific properties

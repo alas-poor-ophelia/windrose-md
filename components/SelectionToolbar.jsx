@@ -11,6 +11,7 @@ const { requireModuleByName } = await dc.require(pathResolverPath);
 const { calculateObjectScreenPosition } = await requireModuleByName("screenPositionUtils.js");
 const { openNoteInNewTab } = await requireModuleByName("noteOperations.js");
 const { ColorPicker } = await requireModuleByName("ColorPicker.jsx");
+const { getActiveLayer } = await requireModuleByName("layerAccessor.js");
 
 /**
  * Calculate bounding box for a text label in screen coordinates
@@ -129,7 +130,7 @@ const SelectionToolbar = ({
   let bounds = null;
   
   if (isObject) {
-    const object = mapData.objects?.find(obj => obj.id === selectedItem.id);
+    const object = getActiveLayer(mapData).objects?.find(obj => obj.id === selectedItem.id);
     if (!object) return null;
     
     const pos = calculateObjectScreenPosition(object, canvasRef.current, mapData, geometry);
@@ -142,7 +143,7 @@ const SelectionToolbar = ({
       height: pos.objectHeight
     };
   } else if (isText) {
-    const label = mapData.textLabels?.find(l => l.id === selectedItem.id);
+    const label = getActiveLayer(mapData).textLabels?.find(l => l.id === selectedItem.id);
     if (!label) return null;
     
     bounds = calculateTextLabelBounds(label, canvasRef, mapData);
@@ -212,7 +213,7 @@ const SelectionToolbar = ({
   // During resize mode, show scale slider instead of action buttons
   if (isResizeMode && isObject) {
     // Read scale from actual object in mapData, not from selectedItem.data which may be stale
-    const actualObject = mapData.objects?.find(obj => obj.id === selectedItem.id);
+    const actualObject = getActiveLayer(mapData).objects?.find(obj => obj.id === selectedItem.id);
     const currentScale = actualObject?.scale ?? 1.0;
     const sliderWidth = 140;
     const sliderHeight = 36;
@@ -314,7 +315,7 @@ const SelectionToolbar = ({
               onClick={(e) => {
                 if (onRotate) onRotate(e);
               }}
-              title="Rotate 90° (or press R)"
+              title="Rotate 90Â° (or press R)"
             >
               <dc.Icon icon="lucide-rotate-cw" />
             </button>
@@ -427,7 +428,7 @@ const SelectionToolbar = ({
             <button
               className="dmt-toolbar-button"
               onClick={onRotate}
-              title="Rotate 90° (or press R)"
+              title="Rotate 90Â° (or press R)"
             >
               <dc.Icon icon="lucide-rotate-cw" />
             </button>

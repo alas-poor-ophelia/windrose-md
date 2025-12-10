@@ -32,6 +32,17 @@ const { DEFAULT_COLOR, getColorByHex, isDefaultColor } = await requireModuleByNa
 const { axialToOffset, isWithinOffsetBounds } = await requireModuleByName("offsetCoordinates.js");
 const { ImageAlignmentMode } = await requireModuleByName("ImageAlignmentMode.jsx");
 
+// Layer system support (Phase 1: Z-Layer Architecture)
+const { 
+  getActiveLayer, 
+  updateActiveLayer, 
+  addLayer, 
+  removeLayer, 
+  reorderLayers, 
+  setActiveLayer
+} = await requireModuleByName("layerAccessor.js");
+const { LayerControls } = await requireModuleByName("LayerControls.jsx");
+
 // RPGAwesome icon font support
 const { RA_ICONS } = await requireModuleByName("rpgAwesomeIcons.js");
 const { injectIconCSS } = await requireModuleByName("rpgAwesomeLoader.js");
@@ -114,6 +125,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   const [settingsVersion, setSettingsVersion] = dc.useState(0); // Incremented to force re-render on settings change
   const [showSettingsModal, setShowSettingsModal] = dc.useState(false);
   const [showVisibilityToolbar, setShowVisibilityToolbar] = dc.useState(false);
+  const [showLayerPanel, setShowLayerPanel] = dc.useState(false);
   
   // Image alignment mode state
   const [isAlignmentMode, setIsAlignmentMode] = dc.useState(false);
@@ -273,7 +285,9 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     redo,
     canUndo,
     canRedo,
-    resetHistory
+    resetHistory,
+    getHistoryState,
+    restoreHistoryState
   } = useHistory({ cells: [], name: "", objects: [], textLabels: [], edges: [] });
 
   const containerRef = dc.useRef(null);
@@ -315,30 +329,125 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   // Track if we're applying history (to avoid adding to history during undo/redo)
   const isApplyingHistoryRef = dc.useRef(false);
   const historyInitialized = dc.useRef(false);
-  const pendingHistoryApplicationRef = dc.useRef(false);
+  
+  // Cache history state per layer (keyed by layer ID)
+  const layerHistoryCache = dc.useRef({});
 
   // Initialize history when map data loads (only once)
   dc.useEffect(() => {
     if (mapData && !isLoading && !historyInitialized.current) {
+      const activeLayer = getActiveLayer(mapData);
       resetHistory({
-        cells: mapData.cells,
+        cells: activeLayer.cells,
         name: mapData.name,
-        objects: mapData.objects || [],
-        textLabels: mapData.textLabels || [],
-        edges: mapData.edges || []
+        objects: activeLayer.objects || [],
+        textLabels: activeLayer.textLabels || [],
+        edges: activeLayer.edges || []
       });
       historyInitialized.current = true;
     }
   }, [mapData, isLoading]);
 
-  // Clear isApplyingHistoryRef after mapData updates from undo/redo
-  // This ensures the flag stays true during the entire React render cycle
-  dc.useEffect(() => {
-    if (pendingHistoryApplicationRef.current) {
-      pendingHistoryApplicationRef.current = false;
-      isApplyingHistoryRef.current = false;
+  // ============================================================================
+  // LAYER MANAGEMENT HANDLERS (Z-Layer System)
+  // ============================================================================
+  
+  // Switch to a different layer
+  const handleLayerSelect = dc.useCallback((layerId) => {
+    if (!mapData || mapData.activeLayerId === layerId) return;
+    
+    // Save current layer's history before switching
+    const currentLayerId = mapData.activeLayerId;
+    layerHistoryCache.current[currentLayerId] = getHistoryState();
+    
+    const newMapData = setActiveLayer(mapData, layerId);
+    updateMapData(newMapData);
+    
+    // Restore new layer's history or initialize if none cached
+    const cachedHistory = layerHistoryCache.current[layerId];
+    if (cachedHistory) {
+      restoreHistoryState(cachedHistory);
+    } else {
+      // No cached history for this layer - initialize fresh
+      const newActiveLayer = getActiveLayer(newMapData);
+      historyInitialized.current = false;
+      resetHistory({
+        cells: newActiveLayer.cells,
+        name: newMapData.name,
+        objects: newActiveLayer.objects || [],
+        textLabels: newActiveLayer.textLabels || [],
+        edges: newActiveLayer.edges || []
+      });
+      historyInitialized.current = true;
     }
-  }, [mapData]);
+  }, [mapData, updateMapData, getHistoryState, restoreHistoryState, resetHistory]);
+  
+  // Add a new layer
+  const handleLayerAdd = dc.useCallback(() => {
+    if (!mapData) return;
+    
+    // Save current layer's history before switching
+    const currentLayerId = mapData.activeLayerId;
+    layerHistoryCache.current[currentLayerId] = getHistoryState();
+    
+    const newMapData = addLayer(mapData);
+    updateMapData(newMapData);
+    
+    // New layer always starts with fresh history
+    const newActiveLayer = getActiveLayer(newMapData);
+    historyInitialized.current = false;
+    resetHistory({
+      cells: newActiveLayer.cells,
+      name: newMapData.name,
+      objects: newActiveLayer.objects || [],
+      textLabels: newActiveLayer.textLabels || [],
+      edges: newActiveLayer.edges || []
+    });
+    historyInitialized.current = true;
+  }, [mapData, updateMapData, getHistoryState, resetHistory]);
+  
+  // Delete a layer
+  const handleLayerDelete = dc.useCallback((layerId) => {
+    if (!mapData) return;
+    
+    // removeLayer handles preventing deletion of last layer
+    const newMapData = removeLayer(mapData, layerId);
+    
+    // Only update if something changed
+    if (newMapData !== mapData) {
+      // Clear cached history for deleted layer
+      delete layerHistoryCache.current[layerId];
+      
+      updateMapData(newMapData);
+      
+      // If active layer changed, restore or init history for new active layer
+      if (newMapData.activeLayerId !== mapData.activeLayerId) {
+        const cachedHistory = layerHistoryCache.current[newMapData.activeLayerId];
+        if (cachedHistory) {
+          restoreHistoryState(cachedHistory);
+        } else {
+          const newActiveLayer = getActiveLayer(newMapData);
+          historyInitialized.current = false;
+          resetHistory({
+            cells: newActiveLayer.cells,
+            name: newMapData.name,
+            objects: newActiveLayer.objects || [],
+            textLabels: newActiveLayer.textLabels || [],
+            edges: newActiveLayer.edges || []
+          });
+          historyInitialized.current = true;
+        }
+      }
+    }
+  }, [mapData, updateMapData, restoreHistoryState, resetHistory]);
+  
+  // Reorder layers
+  const handleLayerReorder = dc.useCallback((layerId, newIndex) => {
+    if (!mapData) return;
+    
+    const newMapData = reorderLayers(mapData, layerId, newIndex);
+    updateMapData(newMapData);
+  }, [mapData, updateMapData]);
 
   // Handle map name change
   const handleNameChange = (newName) => {
@@ -346,12 +455,13 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
 
     const newMapData = { ...mapData, name: newName };
     updateMapData(newMapData);
+    const activeLayer = getActiveLayer(mapData);
     addToHistory({
-      cells: mapData.cells,
+      cells: activeLayer.cells,
       name: newName,
-      objects: mapData.objects || [],
-      textLabels: mapData.textLabels || [],
-      edges: mapData.edges || []
+      objects: activeLayer.objects || [],
+      textLabels: activeLayer.textLabels || [],
+      edges: activeLayer.edges || []
     });
   };
 
@@ -359,17 +469,18 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   const handleCellsChange = (newCells, suppressHistory = false) => {
     if (!mapData || isApplyingHistoryRef.current) return;
 
-    const newMapData = { ...mapData, cells: newCells };
+    const newMapData = updateActiveLayer(mapData, { cells: newCells });
     updateMapData(newMapData);
 
     // Only add to history if not suppressed (used for batched stroke updates)
     if (!suppressHistory) {
+      const activeLayer = getActiveLayer(mapData);
       addToHistory({
         cells: newCells,
         name: mapData.name,
-        objects: mapData.objects || [],
-        textLabels: mapData.textLabels || [],
-        edges: mapData.edges || []
+        objects: activeLayer.objects || [],
+        textLabels: activeLayer.textLabels || [],
+        edges: activeLayer.edges || []
       });
     }
   };
@@ -378,17 +489,18 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   const handleObjectsChange = (newObjects, suppressHistory = false) => {
     if (!mapData || isApplyingHistoryRef.current) return;
 
-    const newMapData = { ...mapData, objects: newObjects };
+    const newMapData = updateActiveLayer(mapData, { objects: newObjects });
     updateMapData(newMapData);
 
     // Only add to history if not suppressed (used for batched operations like resizing)
     if (!suppressHistory) {
+      const activeLayer = getActiveLayer(mapData);
       addToHistory({
-        cells: mapData.cells,
+        cells: activeLayer.cells,
         name: mapData.name,
         objects: newObjects,
-        textLabels: mapData.textLabels || [],
-        edges: mapData.edges || []
+        textLabels: activeLayer.textLabels || [],
+        edges: activeLayer.edges || []
       });
     }
   };
@@ -397,17 +509,18 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   const handleTextLabelsChange = (newTextLabels, suppressHistory = false) => {
     if (!mapData || isApplyingHistoryRef.current) return;
 
-    const newMapData = { ...mapData, textLabels: newTextLabels };
+    const newMapData = updateActiveLayer(mapData, { textLabels: newTextLabels });
     updateMapData(newMapData);
 
     // Only add to history if not suppressed (used for batched operations like dragging)
     if (!suppressHistory) {
+      const activeLayer = getActiveLayer(mapData);
       addToHistory({
-        cells: mapData.cells,
+        cells: activeLayer.cells,
         name: mapData.name,
-        objects: mapData.objects || [],
+        objects: activeLayer.objects || [],
         textLabels: newTextLabels,
-        edges: mapData.edges || []
+        edges: activeLayer.edges || []
       });
     }
   };
@@ -416,16 +529,17 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   const handleEdgesChange = (newEdges, suppressHistory = false) => {
     if (!mapData || isApplyingHistoryRef.current) return;
 
-    const newMapData = { ...mapData, edges: newEdges };
+    const newMapData = updateActiveLayer(mapData, { edges: newEdges });
     updateMapData(newMapData);
 
     // Only add to history if not suppressed (used for batched operations)
     if (!suppressHistory) {
+      const activeLayer = getActiveLayer(mapData);
       addToHistory({
-        cells: mapData.cells,
+        cells: activeLayer.cells,
         name: mapData.name,
-        objects: mapData.objects || [],
-        textLabels: mapData.textLabels || [],
+        objects: activeLayer.objects || [],
+        textLabels: activeLayer.textLabels || [],
         edges: newEdges
       });
     }
@@ -490,16 +604,21 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     const previousState = undo();
     if (previousState && mapData) {
       isApplyingHistoryRef.current = true;
-      pendingHistoryApplicationRef.current = true;
-      const newMapData = {
-        ...mapData,
-        cells: previousState.cells,
-        name: previousState.name,
-        objects: previousState.objects || [],
-        textLabels: previousState.textLabels || [],
-        edges: previousState.edges || []
-      };
+      // Apply layer-specific data to active layer, name stays at root
+      const newMapData = updateActiveLayer(
+        { ...mapData, name: previousState.name },
+        {
+          cells: previousState.cells,
+          objects: previousState.objects || [],
+          textLabels: previousState.textLabels || [],
+          edges: previousState.edges || []
+        }
+      );
       updateMapData(newMapData);
+      // Use setTimeout to ensure state update completes before re-enabling history
+      setTimeout(() => {
+        isApplyingHistoryRef.current = false;
+      }, 0);
     }
   };
 
@@ -508,16 +627,21 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     const nextState = redo();
     if (nextState && mapData) {
       isApplyingHistoryRef.current = true;
-      pendingHistoryApplicationRef.current = true;
-      const newMapData = {
-        ...mapData,
-        cells: nextState.cells,
-        name: nextState.name,
-        objects: nextState.objects || [],
-        textLabels: nextState.textLabels || [],
-        edges: nextState.edges || []
-      };
+      // Apply layer-specific data to active layer, name stays at root
+      const newMapData = updateActiveLayer(
+        { ...mapData, name: nextState.name },
+        {
+          cells: nextState.cells,
+          objects: nextState.objects || [],
+          textLabels: nextState.textLabels || [],
+          edges: nextState.edges || []
+        }
+      );
       updateMapData(newMapData);
+      // Use setTimeout to ensure state update completes before re-enabling history
+      setTimeout(() => {
+        isApplyingHistoryRef.current = false;
+      }, 0);
     }
   };
 
@@ -817,6 +941,18 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
             mapType={mapData.mapType || 'grid'}
           />
 
+          {/* Layer Controls Panel (Z-Layer System) */}
+          {showLayerPanel && (
+            <LayerControls
+              mapData={mapData}
+              onLayerSelect={handleLayerSelect}
+              onLayerAdd={handleLayerAdd}
+              onLayerDelete={handleLayerDelete}
+              onLayerReorder={handleLayerReorder}
+              sidebarCollapsed={mapData.sidebarCollapsed || false}
+            />
+          )}
+
           <div className="dmt-canvas-and-controls">
             <MapCanvas
               mapData={mapData}
@@ -891,6 +1027,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
             isExpanded={isExpanded}
             onToggleExpand={handleToggleExpand}
             mapType={mapData.mapType}
+            showLayerPanel={showLayerPanel}
+            onToggleLayerPanel={() => setShowLayerPanel(!showLayerPanel)}
             showVisibilityToolbar={showVisibilityToolbar}
             onToggleVisibilityToolbar={() => setShowVisibilityToolbar(!showVisibilityToolbar)}
           />
@@ -908,7 +1046,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                           currentTool === 'addObject' ? (selectedObjectType ? 'Click to place object' : 'Select an object from the sidebar') :
                             currentTool === 'addText' ? 'Click to add text label' :
                               'Select a tool'
-            } | Undo/redo available | Middle-click or two-finger drag to pan | Scroll to zoom | Click compass to rotate | {mapData.cells.length} cells filled | {(mapData.objects || []).length} objects placed | {(mapData.textLabels || []).length} text labels
+            } | Undo/redo available | Middle-click or two-finger drag to pan | Scroll to zoom | Click compass to rotate | {getActiveLayer(mapData).cells.length} cells filled | {(getActiveLayer(mapData).objects || []).length} objects placed | {(getActiveLayer(mapData).textLabels || []).length} text labels
           </div>
         )}
 
@@ -925,8 +1063,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
           currentPreferences={mapData.uiPreferences}
           currentHexBounds={mapData.mapType === 'hex' ? mapData.hexBounds : null}
           currentBackgroundImage={mapData.mapType === 'hex' ? mapData.backgroundImage : null}
-          currentCells={mapData.mapType === 'hex' ? (mapData.cells || []) : []}
-          currentObjects={mapData.mapType === 'hex' ? (mapData.objects || []) : []}
+          currentCells={mapData.mapType === 'hex' ? (getActiveLayer(mapData).cells || []) : []}
+          currentObjects={mapData.mapType === 'hex' ? (getActiveLayer(mapData).objects || []) : []}
         />
 
         {/* Image Alignment Mode */}

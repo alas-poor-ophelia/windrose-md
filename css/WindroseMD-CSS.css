@@ -651,6 +651,8 @@ button.dmt-zoom-btn,
 .is-tablet button.dmt-zoom-btn,
 button.dmt-expand-btn,
 .is-tablet button.dmt-expand-btn,
+button.dmt-layer-btn,
+.is-tablet button.dmt-layer-btn,
 button.dmt-orientation-btn,
 .is-tablet button.dmt-orientation-btn {
   width: 35px;
@@ -2628,3 +2630,192 @@ button.dmt-orientation-btn,
   text-align: right;
   font-family: var(--font-monospace);
 }
+
+/* ============================================
+   LAYER CONTROLS PANEL (Z-Layer System)
+   ============================================ */
+
+/* Invisible overlay to block clicks when context menu is open */
+.dmt-layer-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 149; /* Just below layer controls (150) */
+  background: transparent;
+  cursor: default;
+}
+
+.dmt-layer-controls {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  z-index: 150;
+  transition: left 0.3s ease;
+}
+
+.dmt-layer-controls.sidebar-open {
+  left: calc(110px + 8px); /* sidebar width + gap */
+}
+
+.dmt-layer-controls.sidebar-closed {
+  left: 8px;
+}
+
+/* Layer Button Wrapper (for drag handling) */
+.dmt-layer-btn-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+/* Layer Button */
+.is-tablet button.dmt-layer-btn,
+button.dmt-layer-btn {
+  width: 35px;
+  height: 35px;
+  min-width: 35px;
+  min-height: 35px;
+  max-width: 35px;
+  max-height: 35px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.7);
+  border: 2px solid rgba(196, 165, 123, 0.4);
+  color: var(--dmt-text-primary);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  position: relative;
+  user-select: none;
+}
+
+.dmt-layer-btn:hover {
+  border-color: rgba(196, 165, 123, 0.6);
+  background: rgba(0, 0, 0, 0.85);
+  transform: scale(1.05);
+}
+
+.dmt-layer-btn-active {
+  border-color: #c4a57b;
+  box-shadow: 0 0 8px rgba(196, 165, 123, 0.4);
+  background: rgba(196, 165, 123, 0.2);
+}
+
+.dmt-layer-btn-active:hover {
+  border-color: #c4a57b;
+  background: rgba(196, 165, 123, 0.3);
+}
+
+/* Layer Options Slide-out */
+.dmt-layer-options {
+  position: absolute;
+  left: 100%;
+  top: 0;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  padding-left: 4px;
+  gap: 4px;
+  opacity: 0;
+  transform: translateX(-10px);
+  pointer-events: none;
+  transition: all 0.2s ease;
+}
+
+.dmt-layer-options.expanded {
+  opacity: 1;
+  transform: translateX(0);
+  pointer-events: auto;
+}
+
+.is-tablet button.dmt-layer-option-btn,
+button.dmt-layer-option-btn {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  min-height: 28px;
+  max-width: 28px;
+  max-height: 28px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.8);
+  border: 2px solid rgba(196, 165, 123, 0.4);
+  color: var(--dmt-text-muted);
+  cursor: pointer;
+  display: flex;
+  flex: 0 0 auto;
+  padding: 0;
+  box-sizing: border-box;
+  overflow: hidden;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.dmt-layer-option-btn:hover {
+  color: var(--dmt-text-normal);
+  border-color: rgba(196, 165, 123, 0.6);
+}
+
+.dmt-layer-option-btn.delete:hover {
+  color: #e74c3c;
+  border-color: #e74c3c;
+  background: rgba(231, 76, 60, 0.1);
+}
+
+/* Add Layer Button */
+.is-tablet button.dmt-layer-add-btn,
+button.dmt-layer-add-btn {
+  width: 35px;
+  height: 35px;
+  min-width: 35px;
+  min-height: 35px;
+  max-width: 35px;
+  max-height: 35px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.5);
+  border: 2px dashed rgba(196, 165, 123, 0.4);
+  color: var(--dmt-text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  padding: 0;
+  box-sizing: border-box;
+  overflow: hidden;
+  transition: all 0.2s ease;
+  margin-top: 4px;
+}
+
+.dmt-layer-add-btn:hover {
+  background: rgba(0, 0, 0, 0.7);
+  border-color: rgba(196, 165, 123, 0.6);
+  border-style: solid;
+  color: var(--dmt-text-primary);
+  transform: scale(1.05);
+}
+
+.dmt-layer-add-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Drag states */
+.dmt-layer-btn.dragging {
+  opacity: 0.5;
+}
+
+.dmt-layer-btn.drag-over {
+  border-color: #c4a57b;
+  transform: scale(1.05);
+  box-shadow: 0 0 12px rgba(196, 165, 123, 0.5);
+}
+

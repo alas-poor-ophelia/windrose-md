@@ -73,6 +73,18 @@ function useHistory(initialState) {
     });
   }, []);
   
+  // Get full history state (for saving before layer switch)
+  const getHistoryState = dc.useCallback(() => {
+    return historyState;
+  }, [historyState]);
+  
+  // Set full history state (for restoring after layer switch)
+  const restoreHistoryState = dc.useCallback((savedState) => {
+    if (savedState && savedState.history && typeof savedState.currentIndex === 'number') {
+      setHistoryState(savedState);
+    }
+  }, []);
+  
   // Check if undo/redo are available
   const canUndo = historyState.currentIndex > 0;
   const canRedo = historyState.currentIndex < historyState.history.length - 1;
@@ -87,7 +99,9 @@ function useHistory(initialState) {
     redo,
     canUndo,
     canRedo,
-    resetHistory
+    resetHistory,
+    getHistoryState,
+    restoreHistoryState
   };
 }
 

@@ -14,6 +14,7 @@ const { hexRenderer } = await requireModuleByName("hexRenderer.js");
 const { getCachedImage } = await requireModuleByName("imageOperations.js");
 const { getSlotOffset, getMultiObjectScale, getObjectsInCell } = await requireModuleByName("hexSlotPositioner.js");
 const { offsetToAxial } = await requireModuleByName("offsetCoordinates.js");
+const { getActiveLayer } = await requireModuleByName("layerAccessor.js");
 
 /**
  * Get appropriate renderer for geometry type
@@ -32,6 +33,16 @@ function renderCanvas(canvas, mapData, geometry, selectedItem = null, isResizeMo
   
   // Get theme with current settings (use provided theme or fetch global)
   const THEME = theme || getTheme();
+  
+  // Extract active layer data (supports layer schema v2)
+  const activeLayer = getActiveLayer(mapData);
+
+  console.log('[render] activeLayer:', {
+  hasLayers: !!mapData?.layers,
+  activeLayerId: mapData?.activeLayerId,
+  cellCount: activeLayer?.cells?.length,
+  mapType: mapData?.mapType
+});
   
   const ctx = canvas.getContext('2d');
   const { width, height } = canvas;
@@ -165,6 +176,17 @@ function renderCanvas(canvas, mapData, geometry, selectedItem = null, isResizeMo
   ctx.globalAlpha = 1;
   ctx.globalCompositeOperation = 'source-over';
   
+  // iOS defensive: Reset clipping region - critical for grid rendering
+  // Grid extends beyond canvas bounds, so clip corruption breaks it completely
+  // Note: We preserve the current transform (rotation) while resetting clip
+  ctx.save();
+  ctx.beginPath();
+  // Create a very large clip region to ensure grid lines aren't clipped
+  const largeClip = Math.max(width, height) * 4;
+  ctx.rect(-largeClip, -largeClip, largeClip * 2, largeClip * 2);
+  ctx.clip();
+  ctx.restore();
+  
   // Draw grid lines using renderer
   renderer.renderGrid(ctx, geometry, rendererViewState, { width, height }, true, {
     lineColor: THEME.grid.lines,
@@ -172,12 +194,14 @@ function renderCanvas(canvas, mapData, geometry, selectedItem = null, isResizeMo
   });
   
   // Draw filled cells using renderer
-  if (mapData.cells && mapData.cells.length > 0) {
+  if (activeLayer.cells && activeLayer.cells.length > 0) {
     // Add color to cells that don't have it (for backward compatibility)
-    const cellsWithColor = mapData.cells.map(cell => ({
+    const cellsWithColor = activeLayer.cells.map(cell => ({
       ...cell,
       color: getCellColor(cell)
     }));
+    
+    console.log('[render] cellsWithColor sample:', cellsWithColor.slice(0, 3));
     
     // Render painted cells using renderer
     renderer.renderPaintedCells(ctx, cellsWithColor, geometry, rendererViewState);
@@ -209,8 +233,8 @@ function renderCanvas(canvas, mapData, geometry, selectedItem = null, isResizeMo
   
   // Draw painted edges (grid maps only, after cells/borders)
   // Edges are custom-colored grid lines that overlay the base grid
-  if (mapData.edges && mapData.edges.length > 0 && geometry instanceof GridGeometry) {
-    renderer.renderEdges(ctx, mapData.edges, geometry, rendererViewState, {
+  if (activeLayer.edges && activeLayer.edges.length > 0 && geometry instanceof GridGeometry) {
+    renderer.renderEdges(ctx, activeLayer.edges, geometry, rendererViewState, {
       lineWidth: 1,
       borderWidth: THEME.cells.borderWidth
     });
@@ -218,11 +242,11 @@ function renderCanvas(canvas, mapData, geometry, selectedItem = null, isResizeMo
   
   // Draw objects (after cells and borders, so they appear on top)
   // Skip when coordinate overlay is visible or objects layer is hidden
-  if (mapData.objects && mapData.objects.length > 0 && !showCoordinates && visibility.objects) {
+  if (activeLayer.objects && activeLayer.objects.length > 0 && !showCoordinates && visibility.objects) {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     
-    for (const obj of mapData.objects) {
+    for (const obj of activeLayer.objects) {
       const objType = getObjectType(obj.type);
       if (!objType) continue;
       
@@ -238,7 +262,7 @@ function renderCanvas(canvas, mapData, geometry, selectedItem = null, isResizeMo
       // For hex maps with multi-object support
       if (geometry instanceof HexGeometry) {
         // Count objects in same cell
-        const cellObjects = getObjectsInCell(mapData.objects, obj.position.x, obj.position.y);
+        const cellObjects = getObjectsInCell(activeLayer.objects, obj.position.x, obj.position.y);
         const objectCount = cellObjects.length;
         
         if (objectCount > 1) {
@@ -399,8 +423,8 @@ function renderCanvas(canvas, mapData, geometry, selectedItem = null, isResizeMo
   // Draw text labels (after objects, before selection indicators)
   // Text labels use world pixel coordinates, not grid coordinates
   // Skip when coordinate overlay is visible or text layer is hidden
-  if (mapData.textLabels && mapData.textLabels.length > 0 && !showCoordinates && visibility.textLabels) {
-    for (const label of mapData.textLabels) {
+  if (activeLayer.textLabels && activeLayer.textLabels.length > 0 && !showCoordinates && visibility.textLabels) {
+    for (const label of activeLayer.textLabels) {
       ctx.save();
       
       // Convert world coordinates to screen coordinates
@@ -436,8 +460,8 @@ function renderCanvas(canvas, mapData, geometry, selectedItem = null, isResizeMo
   
   // Draw selection indicator for text labels
   // Skip when coordinate overlay is visible or text layer is hidden
-  if (selectedItem && selectedItem.type === 'text' && mapData.textLabels && !showCoordinates && visibility.textLabels) {
-    const label = mapData.textLabels.find(l => l.id === selectedItem.id);
+  if (selectedItem && selectedItem.type === 'text' && activeLayer.textLabels && !showCoordinates && visibility.textLabels) {
+    const label = activeLayer.textLabels.find(l => l.id === selectedItem.id);
     if (label) {
       ctx.save();
       
@@ -487,8 +511,8 @@ function renderCanvas(canvas, mapData, geometry, selectedItem = null, isResizeMo
   
   // Draw selection indicator for objects
   // Skip when coordinate overlay is visible or objects layer is hidden
-  if (selectedItem && selectedItem.type === 'object' && mapData.objects && !showCoordinates && visibility.objects) {
-    const object = mapData.objects.find(obj => obj.id === selectedItem.id);
+  if (selectedItem && selectedItem.type === 'object' && activeLayer.objects && !showCoordinates && visibility.objects) {
+    const object = activeLayer.objects.find(obj => obj.id === selectedItem.id);
     if (object) {
       const size = object.size || { width: 1, height: 1 };
       const alignment = object.alignment || 'center';
@@ -501,7 +525,7 @@ function renderCanvas(canvas, mapData, geometry, selectedItem = null, isResizeMo
         const { worldX, worldY } = geometry.hexToWorld(object.position.x, object.position.y);
         
         // Count objects in same cell for multi-object support
-        const cellObjects = getObjectsInCell(mapData.objects, object.position.x, object.position.y);
+        const cellObjects = getObjectsInCell(activeLayer.objects, object.position.x, object.position.y);
         const objectCount = cellObjects.length;
         
         // Base object dimensions

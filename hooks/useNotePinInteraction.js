@@ -13,6 +13,7 @@ const { requireModuleByName } = await dc.require(pathResolverPath);
 
 const { useMapState, useMapOperations } = await requireModuleByName("MapContext.jsx");
 const { useMapSelection } = await requireModuleByName("MapSelectionContext.jsx");
+const { getActiveLayer } = await requireModuleByName("layerAccessor.js");
 
 /**
  * Hook for managing note pin interactions
@@ -58,13 +59,13 @@ const useNotePinInteraction = (
     }
     
     // Check if position is occupied
-    const existingObj = getObjectAtPosition(mapData.objects || [], gridX, gridY);
+    const existingObj = getObjectAtPosition(getActiveLayer(mapData).objects || [], gridX, gridY);
     if (existingObj) {
       return true; // Handled but blocked
     }
     
     // Place the Note Pin object (without linkedNote initially)
-    const newObjects = addObject(mapData.objects || [], 'note_pin', gridX, gridY);
+    const newObjects = addObject(getActiveLayer(mapData).objects || [], 'note_pin', gridX, gridY);
     
     // Find the newly created pin
     const newPin = newObjects[newObjects.length - 1];
@@ -99,7 +100,7 @@ const useNotePinInteraction = (
     const objectId = pendingNotePinId || editingNoteObjectId;
     if (!objectId) return;
     
-    const object = mapData.objects?.find(obj => obj.id === objectId);
+    const object = getActiveLayer(mapData).objects?.find(obj => obj.id === objectId);
     if (!object) return;
     
     const isNotePin = object.type === 'note_pin';
@@ -109,14 +110,14 @@ const useNotePinInteraction = (
       // Removing note link
       if (isNotePin) {
         // Note Pins are inseparable from notes - remove the entire pin
-        updatedObjects = removeObject(mapData.objects, objectId);
+        updatedObjects = removeObject(getActiveLayer(mapData).objects, objectId);
       } else {
         // Regular objects - just clear the linkedNote field
-        updatedObjects = updateObject(mapData.objects, objectId, { linkedNote: null });
+        updatedObjects = updateObject(getActiveLayer(mapData).objects, objectId, { linkedNote: null });
       }
     } else {
       // Adding/updating note link
-      updatedObjects = updateObject(mapData.objects, objectId, { linkedNote: notePath });
+      updatedObjects = updateObject(getActiveLayer(mapData).objects, objectId, { linkedNote: notePath });
     }
     
     onObjectsChange(updatedObjects);
@@ -140,7 +141,7 @@ const useNotePinInteraction = (
     
     if (pendingNotePinId && mapData) {
       // Remove the pending Note Pin since user canceled
-      const updatedObjects = removeObject(mapData.objects, pendingNotePinId);
+      const updatedObjects = removeObject(getActiveLayer(mapData).objects, pendingNotePinId);
       onObjectsChange(updatedObjects);
     }
     

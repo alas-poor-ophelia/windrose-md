@@ -17,6 +17,7 @@ const { requireModuleByName } = await dc.require(pathResolverPath);
 const { useMapState, useMapOperations } = await requireModuleByName("MapContext.jsx");
 const { addEdge, removeEdge, getEdgeAt, generateEdgeLine, mergeEdges } = await requireModuleByName("edgeOperations.js");
 const { eraseObjectAt } = await requireModuleByName("objectOperations.js");
+const { getActiveLayer } = await requireModuleByName("layerAccessor.js");
 
 /**
  * Hook for managing drawing tools
@@ -72,6 +73,9 @@ const useDrawingTools = (
   const toggleCell = (coords, shouldFill, dragStart = null) => {
     if (!mapData || !geometry) return;
     
+    // Get active layer data for reading
+    const activeLayer = getActiveLayer(mapData);
+    
     // Check bounds for hex maps (only applies to hex geometry with bounds set)
     // Handle both coordinate formats: {gridX, gridY} from screenToGrid and {q, r} from cells
     const q = coords.q !== undefined ? coords.q : coords.gridX;
@@ -84,14 +88,14 @@ const useDrawingTools = (
     // Check if we're in a batched stroke (suppress history for intermediate updates)
     const isBatchedStroke = strokeInitialStateRef.current !== null;
     
-    const existingCellIndex = mapData.cells.findIndex(
+    const existingCellIndex = activeLayer.cells.findIndex(
       cell => geometry.cellMatchesCoords(cell, coords)
     );
     
     if (shouldFill) {
       if (existingCellIndex !== -1) {
         // Cell exists - update its color and opacity (paint over)
-        const newCells = [...mapData.cells];
+        const newCells = [...activeLayer.cells];
         newCells[existingCellIndex] = {
           ...newCells[existingCellIndex],
           color: selectedColor,
@@ -102,7 +106,7 @@ const useDrawingTools = (
         // Cell doesn't exist - create new with selected color and opacity
         const newCell = geometry.createCellObject(coords, selectedColor);
         newCell.opacity = selectedOpacity;
-        const newCells = [...mapData.cells, newCell];
+        const newCells = [...activeLayer.cells, newCell];
         onCellsChange(newCells, isBatchedStroke);
       }
     } else if (!shouldFill) {
@@ -114,13 +118,13 @@ const useDrawingTools = (
         const canvas = canvasRef.current;
         const ctx = canvas ? canvas.getContext('2d') : null;
         const textLabel = getTextLabelAtPosition(
-          mapData.textLabels || [],
+          activeLayer.textLabels || [],
           worldCoords.worldX,
           worldCoords.worldY,
           ctx
         );
         if (textLabel) {
-          const newLabels = removeTextLabel(mapData.textLabels || [], textLabel.id);
+          const newLabels = removeTextLabel(activeLayer.textLabels || [], textLabel.id);
           onTextLabelsChange(newLabels);
           return;
         }
@@ -134,14 +138,14 @@ const useDrawingTools = (
             
             // Skip if already processed this edge during current stroke
             if (!processedEdges.has(edgeKey)) {
-              const existingEdge = getEdgeAt(mapData.edges || [], edgeInfo.x, edgeInfo.y, edgeInfo.side);
+              const existingEdge = getEdgeAt(activeLayer.edges || [], edgeInfo.x, edgeInfo.y, edgeInfo.side);
               if (existingEdge) {
                 // Store initial edge state on first edge erase of this stroke
                 if (strokeInitialEdgesRef.current === null) {
-                  strokeInitialEdgesRef.current = [...(mapData.edges || [])];
+                  strokeInitialEdgesRef.current = [...(activeLayer.edges || [])];
                 }
                 setProcessedEdges(prev => new Set([...prev, edgeKey]));
-                const newEdges = removeEdge(mapData.edges || [], edgeInfo.x, edgeInfo.y, edgeInfo.side);
+                const newEdges = removeEdge(activeLayer.edges || [], edgeInfo.x, edgeInfo.y, edgeInfo.side);
                 onEdgesChange(newEdges, isBatchedStroke);
                 return;
               }
@@ -153,17 +157,17 @@ const useDrawingTools = (
       // Then check for object (extract coordinates based on map type)
       const coordX = coords.gridX !== undefined ? coords.gridX : coords.q;
       const coordY = coords.gridY !== undefined ? coords.gridY : coords.r;
-      const obj = getObjectAtPosition(mapData.objects || [], coordX, coordY);
+      const obj = getObjectAtPosition(activeLayer.objects || [], coordX, coordY);
       if (obj) {
         // Use unified API - handles hex (one at a time) vs grid (all at position)
         const mapType = mapData.mapType || 'grid';
-        const result = eraseObjectAt(mapData.objects || [], coordX, coordY, mapType);
+        const result = eraseObjectAt(activeLayer.objects || [], coordX, coordY, mapType);
         if (result.success) {
           onObjectsChange(result.objects);
         }
       } else if (existingCellIndex !== -1) {
         // Finally remove cell if no text or object
-        const newCells = mapData.cells.filter(
+        const newCells = activeLayer.cells.filter(
           cell => !geometry.cellMatchesCoords(cell, coords)
         );
         onCellsChange(newCells, isBatchedStroke);
@@ -184,6 +188,9 @@ const useDrawingTools = (
     // Edge painting only works for grid geometry
     if (!(geometry instanceof GridGeometry)) return;
     
+    // Get active layer data for reading
+    const activeLayer = getActiveLayer(mapData);
+    
     // Use screenToEdge to detect which edge was clicked
     const edgeInfo = geometry.screenToEdge(worldX, worldY, 0.15);
     if (!edgeInfo) return; // Click was in cell center, not near an edge
@@ -195,11 +202,11 @@ const useDrawingTools = (
     
     if (shouldPaint) {
       // Paint the edge with selected color and opacity
-      const newEdges = addEdge(mapData.edges || [], x, y, side, selectedColor, selectedOpacity);
+      const newEdges = addEdge(activeLayer.edges || [], x, y, side, selectedColor, selectedOpacity);
       onEdgesChange(newEdges, isBatchedStroke);
     } else {
       // Erase the edge
-      const newEdges = removeEdge(mapData.edges || [], x, y, side);
+      const newEdges = removeEdge(activeLayer.edges || [], x, y, side);
       onEdgesChange(newEdges, isBatchedStroke);
     }
   };
@@ -235,10 +242,13 @@ const useDrawingTools = (
   const startEdgeDrawing = (e) => {
     if (!mapData) return;
     
+    // Get active layer data for reading
+    const activeLayer = getActiveLayer(mapData);
+    
     setIsDrawing(true);
     setProcessedEdges(new Set());
     // Store initial edge state for batched history entry at stroke end
-    strokeInitialEdgesRef.current = [...(mapData.edges || [])];
+    strokeInitialEdgesRef.current = [...(activeLayer.edges || [])];
     processEdgeDuringDrag(e);
   };
   
@@ -248,12 +258,15 @@ const useDrawingTools = (
   const stopEdgeDrawing = () => {
     if (!isDrawing) return;
     
+    // Get active layer data for reading
+    const activeLayer = getActiveLayer(mapData);
+    
     setIsDrawing(false);
     setProcessedEdges(new Set());
     
     // Add single history entry for the completed stroke
     if (strokeInitialEdgesRef.current !== null && mapData && onEdgesChange) {
-      onEdgesChange(mapData.edges || [], false);
+      onEdgesChange(activeLayer.edges || [], false);
       strokeInitialEdgesRef.current = null;
     }
   };
@@ -269,6 +282,9 @@ const useDrawingTools = (
   const fillEdgeLine = (x1, y1, x2, y2) => {
     if (!mapData || !onEdgesChange) return;
     if (!(geometry instanceof GridGeometry)) return;
+    
+    // Get active layer data for reading
+    const activeLayer = getActiveLayer(mapData);
     
     // Determine if this is more horizontal or vertical
     const dx = Math.abs(x2 - x1);
@@ -294,7 +310,7 @@ const useDrawingTools = (
     const newEdgesData = generateEdgeLine(lineX1, lineY1, lineX2, lineY2, selectedColor);
     
     // Merge with existing edges
-    const newEdges = mergeEdges(mapData.edges || [], newEdgesData);
+    const newEdges = mergeEdges(activeLayer.edges || [], newEdgesData);
     onEdgesChange(newEdges);
   };
   
@@ -305,10 +321,13 @@ const useDrawingTools = (
     if (!mapData) return;
     if (!geometry) return;
     
+    // Get active layer data for reading
+    const activeLayer = getActiveLayer(mapData);
+    
     // Use geometry from context (passed via MapState)
     const cellsInRect = geometry.getCellsInRectangle(x1, y1, x2, y2);
     
-    const newCells = [...mapData.cells];
+    const newCells = [...activeLayer.cells];
     
     for (const cellCoords of cellsInRect) {
       // Convert {x, y} coordinates to proper coords format for geometry
@@ -340,11 +359,15 @@ const useDrawingTools = (
     if (!mapData) return;
     
     if (!geometry) return;
+    
+    // Get active layer data for reading
+    const activeLayer = getActiveLayer(mapData);
+    
     // Use geometry from context (passed via MapState)
     const radius = geometry.getEuclideanDistance(centerX, centerY, edgeX, edgeY);
     const cellsInCircle = geometry.getCellsInCircle(centerX, centerY, radius);
     
-    const newCells = [...mapData.cells];
+    const newCells = [...activeLayer.cells];
     
     for (const cellCoords of cellsInCircle) {
       // Convert {x, y} coordinates to proper coords format for geometry
@@ -376,11 +399,15 @@ const useDrawingTools = (
     if (!mapData) return;
     
     if (!geometry) return;
+    
+    // Get active layer data for reading
+    const activeLayer = getActiveLayer(mapData);
+    
     // Use geometry from context (passed via MapState)
     const cellsInRect = geometry.getCellsInRectangle(x1, y1, x2, y2);
     
     // Remove all objects within the rectangle (grid coordinates)
-    const newObjects = removeObjectsInRectangle(mapData.objects || [], x1, y1, x2, y2);
+    const newObjects = removeObjectsInRectangle(activeLayer.objects || [], x1, y1, x2, y2);
     onObjectsChange(newObjects);
     
     // Remove all text labels within the rectangle (need to convert to world coordinates)
@@ -392,14 +419,14 @@ const useDrawingTools = (
     const { worldX: worldMinX, worldY: worldMinY } = geometry.gridToWorld(minX, minY);
     const { worldX: worldMaxX, worldY: worldMaxY } = geometry.gridToWorld(maxX + 1, maxY + 1);
     
-    const newTextLabels = (mapData.textLabels || []).filter(label => {
+    const newTextLabels = (activeLayer.textLabels || []).filter(label => {
       return !(label.position.x >= worldMinX && label.position.x <= worldMaxX && 
                label.position.y >= worldMinY && label.position.y <= worldMaxY);
     });
     onTextLabelsChange(newTextLabels);
     
     // Remove all cells within the rectangle - check against each cell coordinate
-    const newCells = mapData.cells.filter(cell => {
+    const newCells = activeLayer.cells.filter(cell => {
       // Check if this cell is within the rectangle bounds
       // For grid cells with {x, y}, check directly
       if (cell.x !== undefined) {
@@ -433,14 +460,18 @@ const useDrawingTools = (
     // Pass the current event coordinates for edge/text detection during erase
     toggleCell(coords, shouldFill, { clientX, clientY });
   };
+  
   const startDrawing = (e, dragStart = null) => {
     if (!mapData) return;
+    
+    // Get active layer data for reading
+    const activeLayer = getActiveLayer(mapData);
     
     setIsDrawing(true);
     setProcessedCells(new Set());
     setProcessedEdges(new Set()); // Also reset processed edges for erase strokes
     // Store initial cell state for batched history entry at stroke end
-    strokeInitialStateRef.current = [...mapData.cells];
+    strokeInitialStateRef.current = [...activeLayer.cells];
     // Don't initialize edge state here - only when we actually erase an edge
     strokeInitialEdgesRef.current = null;
     processCellDuringDrag(e, dragStart);
@@ -452,18 +483,21 @@ const useDrawingTools = (
   const stopDrawing = () => {
     if (!isDrawing) return;
     
+    // Get active layer data for reading
+    const activeLayer = getActiveLayer(mapData);
+    
     setIsDrawing(false);
     setProcessedCells(new Set());
     setProcessedEdges(new Set());
     
     // Add single history entry for the completed stroke (cells)
     if (strokeInitialStateRef.current !== null && mapData) {
-      onCellsChange(mapData.cells, false);
+      onCellsChange(activeLayer.cells, false);
       strokeInitialStateRef.current = null;
     }
     // Add single history entry for edges if any were erased
     if (strokeInitialEdgesRef.current !== null && mapData && onEdgesChange) {
-      onEdgesChange(mapData.edges || [], false);
+      onEdgesChange(activeLayer.edges || [], false);
       strokeInitialEdgesRef.current = null;
     }
   };

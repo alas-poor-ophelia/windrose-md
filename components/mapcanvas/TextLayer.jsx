@@ -7,6 +7,7 @@ const { useMapSelection } = await requireModuleByName("MapSelectionContext.jsx")
 const { TextLabelEditor } = await requireModuleByName("TextLabelEditor.jsx");
 const { useEventHandlerRegistration } = await requireModuleByName("EventHandlerContext.jsx");
 const { SelectionToolbar } = await requireModuleByName("SelectionToolbar.jsx");
+const { getActiveLayer } = await requireModuleByName("layerAccessor.js");
 
 /**
  * TextLayer.jsx
@@ -110,7 +111,7 @@ const TextLayer = ({
       {showTextModal && (() => {
         let currentLabel = null;
         if (editingTextId && mapData?.textLabels) {
-          currentLabel = mapData.textLabels.find(l => l.id === editingTextId);
+          currentLabel = getActiveLayer(mapData).textLabels.find(l => l.id === editingTextId);
         }
         
         // Use saved settings for new labels, defaults for editing existing

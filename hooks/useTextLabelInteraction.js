@@ -18,6 +18,7 @@ const { requireModuleByName } = await dc.require(pathResolverPath);
 const { applyInverseRotation } = await requireModuleByName("screenPositionUtils.js");
 const { useMapState, useMapOperations } = await requireModuleByName("MapContext.jsx");
 const { useMapSelection } = await requireModuleByName("MapSelectionContext.jsx");
+const { getActiveLayer } = await requireModuleByName("layerAccessor.js");
 
 /**
  * Hook for managing text label interactions
@@ -99,7 +100,7 @@ const useTextLabelInteraction = (
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
     const textLabel = getTextLabelAtPosition(
-      mapData.textLabels,
+      getActiveLayer(mapData).textLabels,
       worldCoords.worldX,
       worldCoords.worldY,
       ctx
@@ -107,7 +108,7 @@ const useTextLabelInteraction = (
     
     if (textLabel) {
       // Store initial text label state for batched history entry at drag end
-      dragInitialStateRef.current = [...(mapData.textLabels || [])];
+      dragInitialStateRef.current = [...(getActiveLayer(mapData).textLabels || [])];
       setSelectedItem({ type: 'text', id: textLabel.id, data: textLabel });
       setIsDraggingSelection(true);
       setDragStart({ x: clientX, y: clientY, worldX: worldCoords.worldX, worldY: worldCoords.worldY });
@@ -140,7 +141,7 @@ const useTextLabelInteraction = (
     
     // Update text label position (suppress history during drag)
     const updatedLabels = updateTextLabel(
-      mapData.textLabels,
+      getActiveLayer(mapData).textLabels,
       selectedItem.id,
       {
         position: {
@@ -175,14 +176,14 @@ const useTextLabelInteraction = (
       return;
     }
     
-    // Cycle through 0Â° -> 90Â° -> 180Â° -> 270Â° -> 0Â°
+    // Cycle through 0Ã‚Â° -> 90Ã‚Â° -> 180Ã‚Â° -> 270Ã‚Â° -> 0Ã‚Â°
     const rotations = [0, 90, 180, 270];
     const currentRotation = selectedItem.data.rotation || 0;
     const currentIndex = rotations.indexOf(currentRotation);
     const nextRotation = rotations[(currentIndex + 1) % 4];
     
     const updatedLabels = updateTextLabel(
-      mapData.textLabels,
+      getActiveLayer(mapData).textLabels,
       selectedItem.id,
       { rotation: nextRotation }
     );
@@ -207,7 +208,7 @@ const useTextLabelInteraction = (
     }
     
     const updatedLabels = removeTextLabel(
-      mapData.textLabels,
+      getActiveLayer(mapData).textLabels,
       selectedItem.id
     );
     onTextLabelsChange(updatedLabels);
@@ -253,7 +254,7 @@ const useTextLabelInteraction = (
     if (editingTextId) {
       // Update existing label
       const newLabels = updateTextLabel(
-        mapData.textLabels || [],
+        getActiveLayer(mapData).textLabels || [],
         editingTextId,
         {
           content: labelData.content.trim(),
@@ -266,7 +267,7 @@ const useTextLabelInteraction = (
     } else if (pendingTextPosition && mapData) {
       // Create new label
       const newLabels = addTextLabel(
-        mapData.textLabels || [],
+        getActiveLayer(mapData).textLabels || [],
         labelData.content.trim(),
         pendingTextPosition.x,
         pendingTextPosition.y,
@@ -359,7 +360,7 @@ const useTextLabelInteraction = (
       return { x: 0, y: 0 };
     }
     
-    const label = mapData.textLabels.find(l => l.id === selectedItem.id);
+    const label = getActiveLayer(mapData).textLabels.find(l => l.id === selectedItem.id);
     if (!label) return { x: 0, y: 0 };
     
     const canvas = canvasRef.current;
@@ -453,7 +454,7 @@ const useTextLabelInteraction = (
       
       // Add single history entry for the completed drag
       if (dragInitialStateRef.current !== null) {
-        onTextLabelsChange(mapData.textLabels, false);
+        onTextLabelsChange(getActiveLayer(mapData).textLabels, false);
         dragInitialStateRef.current = null;
       }
       return true;

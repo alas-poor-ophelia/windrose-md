@@ -20,6 +20,7 @@ const { useMapSelection } = await requireModuleByName("MapSelectionContext.jsx")
 const { calculateEdgeAlignment, getAlignmentOffset, placeObject, canPlaceObjectAt, removeObjectFromHex, generateObjectId } = await requireModuleByName("objectOperations.js");
 const { getClickedObjectInCell, getObjectsInCell, canAddObjectToCell, assignSlot } = await requireModuleByName("hexSlotPositioner.js");
 const { HexGeometry } = await requireModuleByName("HexGeometry.js");
+const { getActiveLayer } = await requireModuleByName("layerAccessor.js");
 
 /**
  * Hook for managing object interactions
@@ -261,7 +262,7 @@ const useObjectInteractions = (
     const mapType = mapData.mapType || 'grid';
     
     // Check if placement is allowed
-    if (!canPlaceObjectAt(mapData.objects || [], gridX, gridY, mapType)) {
+    if (!canPlaceObjectAt(getActiveLayer(mapData).objects || [], gridX, gridY, mapType)) {
       return true; // Handled but blocked (cell occupied/full)
     }
 
@@ -279,7 +280,7 @@ const useObjectInteractions = (
 
     // Place object using unified API
     const result = placeObject(
-      mapData.objects || [],
+      getActiveLayer(mapData).objects || [],
       selectedObjectType,
       gridX,
       gridY,
@@ -310,12 +311,12 @@ const useObjectInteractions = (
 
     // If in resize mode with selected object, check for corner clicks FIRST
     if (selectedItem?.type === 'object' && isResizeMode) {
-      const selectedObject = mapData.objects?.find(obj => obj.id === selectedItem.id);
+      const selectedObject = getActiveLayer(mapData).objects?.find(obj => obj.id === selectedItem.id);
       if (selectedObject) {
         const corner = getClickedCorner(clientX, clientY, selectedObject);
         if (corner) {
           // Store initial object state for batched history entry at resize end
-          resizeInitialStateRef.current = [...(mapData.objects || [])];
+          resizeInitialStateRef.current = [...(getActiveLayer(mapData).objects || [])];
           setIsResizing(true);
           setResizeCorner(corner);
           setDragStart({ x: clientX, y: clientY, gridX, gridY, object: { ...selectedObject } });
@@ -327,7 +328,7 @@ const useObjectInteractions = (
     // For hex maps with multi-object support: resolve click to specific object
     let object = null;
     if (mapData.mapType === 'hex' && geometry instanceof HexGeometry) {
-      const cellObjects = getObjectsInCell(mapData.objects || [], gridX, gridY);
+      const cellObjects = getObjectsInCell(getActiveLayer(mapData).objects || [], gridX, gridY);
       
       if (cellObjects.length > 1) {
         // Calculate click offset within hex (relative to hex center)
@@ -340,7 +341,7 @@ const useObjectInteractions = (
           const clickOffsetY = (worldCoords.worldY - hexCenterY) / hexWidth;
           
           object = getClickedObjectInCell(
-            mapData.objects || [],
+            getActiveLayer(mapData).objects || [],
             gridX,
             gridY,
             clickOffsetX,
@@ -353,7 +354,7 @@ const useObjectInteractions = (
       }
     } else {
       // Grid maps: use standard single-object lookup
-      object = getObjectAtPosition(mapData.objects || [], gridX, gridY);
+      object = getObjectAtPosition(getActiveLayer(mapData).objects || [], gridX, gridY);
     }
     
     if (object) {
@@ -384,7 +385,7 @@ const useObjectInteractions = (
         }
         
         // Start dragging
-        dragInitialStateRef.current = [...(mapData.objects || [])];
+        dragInitialStateRef.current = [...(getActiveLayer(mapData).objects || [])];
         setIsDraggingSelection(true);
         // Store the offset from where we clicked to the object's actual position
         // This ensures enlarged objects don't jump when first moved
@@ -399,7 +400,7 @@ const useObjectInteractions = (
         
         // Set up drag state so user can continue into a drag without releasing
         // Store the object reference in dragStart since selectedItem state update is async
-        dragInitialStateRef.current = [...(mapData.objects || [])];
+        dragInitialStateRef.current = [...(getActiveLayer(mapData).objects || [])];
         setIsDraggingSelection(true);
         const offsetX = gridX - object.position.x;
         const offsetY = gridY - object.position.y;
@@ -489,7 +490,7 @@ const useObjectInteractions = (
 
     // Only update if we've moved to a different grid cell
     if (gridX !== dragStart.gridX || gridY !== dragStart.gridY) {
-      const currentObject = mapData.objects?.find(o => o.id === objectId);
+      const currentObject = getActiveLayer(mapData).objects?.find(o => o.id === objectId);
       if (!currentObject) return true;
       
       const isMovingWithinSameCell = currentObject.position.x === targetX && currentObject.position.y === targetY;
@@ -497,7 +498,7 @@ const useObjectInteractions = (
       // For hex maps: handle multi-object cell logic
       if (mapData.mapType === 'hex' && !isMovingWithinSameCell) {
         // Check if target cell can accept this object
-        const targetCellObjects = getObjectsInCell(mapData.objects || [], targetX, targetY);
+        const targetCellObjects = getObjectsInCell(getActiveLayer(mapData).objects || [], targetX, targetY);
         
         if (targetCellObjects.length >= 4) {
           // Target cell is full - block the move
@@ -509,7 +510,7 @@ const useObjectInteractions = (
         const newSlot = assignSlot(targetSlots);
         
         // Remove from old cell with reorganization, then update position and slot
-        let updatedObjects = removeObjectFromHex(mapData.objects, objectId);
+        let updatedObjects = removeObjectFromHex(getActiveLayer(mapData).objects, objectId);
         
         // Re-add the moved object with new position and slot
         updatedObjects = [...updatedObjects, {
@@ -532,7 +533,7 @@ const useObjectInteractions = (
         }
       } else {
         // Grid maps or same-cell movement: use existing single-object logic
-        const existingObj = getObjectAtPosition(mapData.objects || [], targetX, targetY);
+        const existingObj = getObjectAtPosition(getActiveLayer(mapData).objects || [], targetX, targetY);
         
         if (!existingObj || existingObj.id === objectId) {
           // Determine alignment if in edge snap mode
@@ -548,7 +549,7 @@ const useObjectInteractions = (
           
           // Update object position and alignment (suppress history during drag)
           const updatedObjects = updateObject(
-            mapData.objects,
+            getActiveLayer(mapData).objects,
             objectId,
             { position: { x: targetX, y: targetY }, alignment }
           );
@@ -634,13 +635,13 @@ const useObjectInteractions = (
     let resizeSucceeded = false;
 
     // First attempt: both dimensions
-    if (isAreaFree(mapData.objects, newX, newY, newWidth, newHeight, selectedItem.id)) {
+    if (isAreaFree(getActiveLayer(mapData).objects, newX, newY, newWidth, newHeight, selectedItem.id)) {
       resizeSucceeded = true;
     }
 
     // If both dimensions failed, try just width (keep original height)
     if (!resizeSucceeded && newWidth !== originalSize.width) {
-      if (isAreaFree(mapData.objects, newX, originalPos.y, newWidth, originalSize.height, selectedItem.id)) {
+      if (isAreaFree(getActiveLayer(mapData).objects, newX, originalPos.y, newWidth, originalSize.height, selectedItem.id)) {
         finalWidth = newWidth;
         finalHeight = originalSize.height;
         finalX = newX;
@@ -651,7 +652,7 @@ const useObjectInteractions = (
 
     // If width also failed, try just height (keep original width)
     if (!resizeSucceeded && newHeight !== originalSize.height) {
-      if (isAreaFree(mapData.objects, originalPos.x, newY, originalSize.width, newHeight, selectedItem.id)) {
+      if (isAreaFree(getActiveLayer(mapData).objects, originalPos.x, newY, originalSize.width, newHeight, selectedItem.id)) {
         finalWidth = originalSize.width;
         finalHeight = newHeight;
         finalX = originalPos.x;
@@ -663,7 +664,7 @@ const useObjectInteractions = (
     // Apply the resize if any attempt succeeded
     if (resizeSucceeded) {
       const updatedObjects = updateObject(
-        mapData.objects,
+        getActiveLayer(mapData).objects,
         selectedItem.id,
         {
           position: { x: finalX, y: finalY },
@@ -692,7 +693,7 @@ const useObjectInteractions = (
    * @param {Object} e - Event object
    */
   const handleHoverUpdate = dc.useCallback((e) => {
-    if (!e.touches && mapData && mapData.objects) {
+    if (!e.touches && mapData && getActiveLayer(mapData).objects) {
       const { clientX, clientY } = getClientCoords(e);
       const coords = screenToGrid(clientX, clientY);
       if (coords) {
@@ -712,7 +713,7 @@ const useObjectInteractions = (
             const clickOffsetY = (worldCoords.worldY - hexCenter.worldY) / geometry.width;
             
             obj = getClickedObjectInCell(
-              mapData.objects,
+              getActiveLayer(mapData).objects,
               gridX, gridY,
               clickOffsetX, clickOffsetY,
               mapData.orientation || 'flat'
@@ -723,7 +724,7 @@ const useObjectInteractions = (
         // Fallback to simple position lookup if getClickedObjectInCell didn't find anything
         // or if not a hex map
         if (!obj) {
-          obj = getObjectAtPosition(mapData.objects, gridX, gridY);
+          obj = getObjectAtPosition(getActiveLayer(mapData).objects, gridX, gridY);
         }
         
         setHoveredObject(obj);
@@ -759,7 +760,7 @@ const useObjectInteractions = (
 
       // Add single history entry for the completed drag
       if (dragInitialStateRef.current !== null) {
-        onObjectsChange(mapData.objects, false);
+        onObjectsChange(getActiveLayer(mapData).objects, false);
         dragInitialStateRef.current = null;
       }
       return true;
@@ -779,7 +780,7 @@ const useObjectInteractions = (
 
       // Add single history entry for the completed resize
       if (resizeInitialStateRef.current !== null) {
-        onObjectsChange(mapData.objects, false);
+        onObjectsChange(getActiveLayer(mapData).objects, false);
         resizeInitialStateRef.current = null;
       }
       return true;
@@ -807,7 +808,7 @@ const useObjectInteractions = (
       const nextRotation = rotations[(currentIndex + 1) % 4];
       
       const updatedObjects = updateObject(
-        mapData.objects,
+        getActiveLayer(mapData).objects,
         selectedItem.id,
         { rotation: nextRotation }
       );
@@ -827,7 +828,7 @@ const useObjectInteractions = (
     // Deletion with Delete or Backspace
     if (e.key === 'Delete' || e.key === 'Backspace') {
       e.preventDefault();
-      const updatedObjects = removeObject(mapData.objects, selectedItem.id);
+      const updatedObjects = removeObject(getActiveLayer(mapData).objects, selectedItem.id);
       onObjectsChange(updatedObjects);
       setSelectedItem(null);
       setIsResizeMode(false);
@@ -861,7 +862,7 @@ const useObjectInteractions = (
     if (!coords) return false;
     
     const { gridX, gridY } = coords;
-    const selectedObject = mapData.objects.find(obj => obj.id === selectedItem.id);
+    const selectedObject = getActiveLayer(mapData).objects.find(obj => obj.id === selectedItem.id);
     if (!selectedObject) return false;
     
     // Check if cursor is over the selected object's cell
@@ -882,7 +883,7 @@ const useObjectInteractions = (
     
     // Only update if scale changed
     if (newScale !== currentScale) {
-      const updatedObjects = updateObject(mapData.objects, selectedItem.id, { scale: newScale });
+      const updatedObjects = updateObject(getActiveLayer(mapData).objects, selectedItem.id, { scale: newScale });
       onObjectsChange(updatedObjects);
       
       // Update selected item data
@@ -903,7 +904,7 @@ const useObjectInteractions = (
       return { x: 0, y: 0 };
     }
 
-    const object = mapData.objects.find(obj => obj.id === selectedItem.id);
+    const object = getActiveLayer(mapData).objects.find(obj => obj.id === selectedItem.id);
     if (!object) return { x: 0, y: 0 };
 
     const pos = calculateScreenPos(object, canvasRef.current, mapData, geometry);
@@ -928,7 +929,7 @@ const useObjectInteractions = (
       return { x: 0, y: 0 };
     }
 
-    const object = mapData.objects.find(obj => obj.id === selectedItem.id);
+    const object = getActiveLayer(mapData).objects.find(obj => obj.id === selectedItem.id);
     if (!object) return { x: 0, y: 0 };
 
     const pos = calculateScreenPos(object, canvasRef.current, mapData, geometry);
@@ -967,7 +968,7 @@ const useObjectInteractions = (
       return { x: 0, y: 0 };
     }
 
-    const object = mapData.objects.find(obj => obj.id === selectedItem.id);
+    const object = getActiveLayer(mapData).objects.find(obj => obj.id === selectedItem.id);
     if (!object) return { x: 0, y: 0 };
 
     const pos = calculateScreenPos(object, canvasRef.current, mapData, geometry);
@@ -993,7 +994,7 @@ const useObjectInteractions = (
       return { x: 0, y: 0 };
     }
 
-    const object = mapData.objects.find(obj => obj.id === selectedItem.id);
+    const object = getActiveLayer(mapData).objects.find(obj => obj.id === selectedItem.id);
     if (!object) return { x: 0, y: 0 };
 
     const pos = calculateScreenPos(object, canvasRef.current, mapData, geometry);
@@ -1030,7 +1031,7 @@ const useObjectInteractions = (
   const handleNoteSubmit = dc.useCallback((content, editingObjectId) => {
     if (editingObjectId && mapData) {
       const updatedObjects = updateObject(
-        mapData.objects,
+        getActiveLayer(mapData).objects,
         editingObjectId,
         { customTooltip: content && content.trim() ? content.trim() : undefined }
       );
@@ -1056,7 +1057,7 @@ const useObjectInteractions = (
   const handleObjectColorSelect = dc.useCallback((color) => {
     if (selectedItem?.type === 'object' && mapData) {
       const updatedObjects = updateObject(
-        mapData.objects,
+        getActiveLayer(mapData).objects,
         selectedItem.id,
         { color: color }
       );
@@ -1084,7 +1085,7 @@ const useObjectInteractions = (
   }, [handleObjectColorSelect]);
 
   /**
-   * Handle object rotation (cycles 0° -> 90° -> 180° -> 270° -> 0°)
+   * Handle object rotation (cycles 0Â° -> 90Â° -> 180Â° -> 270Â° -> 0Â°)
    */
   const handleObjectRotation = dc.useCallback(() => {
     if (!selectedItem || selectedItem.type !== 'object' || !mapData) {
@@ -1098,7 +1099,7 @@ const useObjectInteractions = (
     const nextRotation = rotations[(currentIndex + 1) % 4];
     
     const updatedObjects = updateObject(
-      mapData.objects,
+      getActiveLayer(mapData).objects,
       selectedItem.id,
       { rotation: nextRotation }
     );
@@ -1122,7 +1123,7 @@ const useObjectInteractions = (
       return;
     }
     
-    const updatedObjects = removeObject(mapData.objects, selectedItem.id);
+    const updatedObjects = removeObject(getActiveLayer(mapData).objects, selectedItem.id);
     onObjectsChange(updatedObjects);
     setSelectedItem(null);
   }, [selectedItem, mapData, removeObject, onObjectsChange, setSelectedItem]);
@@ -1135,7 +1136,7 @@ const useObjectInteractions = (
       return;
     }
     
-    const sourceObject = mapData.objects.find(obj => obj.id === selectedItem.id);
+    const sourceObject = getActiveLayer(mapData).objects.find(obj => obj.id === selectedItem.id);
     if (!sourceObject) return;
     
     const { mapType } = mapData;
@@ -1155,7 +1156,7 @@ const useObjectInteractions = (
           const checkX = sourceX + directions[dir][0] * ring;
           const checkY = sourceY + directions[dir][1] * (step + 1 - ring);
           
-          if (canPlaceObjectAt(mapData.objects, checkX, checkY, mapType)) {
+          if (canPlaceObjectAt(getActiveLayer(mapData).objects, checkX, checkY, mapType)) {
             targetX = checkX;
             targetY = checkY;
             found = true;
@@ -1171,7 +1172,7 @@ const useObjectInteractions = (
               const checkX = sourceX + dx;
               const checkY = sourceY + dy;
               
-              if (canPlaceObjectAt(mapData.objects, checkX, checkY, mapType)) {
+              if (canPlaceObjectAt(getActiveLayer(mapData).objects, checkX, checkY, mapType)) {
                 targetX = checkX;
                 targetY = checkY;
                 found = true;
@@ -1196,14 +1197,14 @@ const useObjectInteractions = (
     
     // For hex maps, assign a slot
     if (mapType === 'hex') {
-      const occupiedSlots = mapData.objects
+      const occupiedSlots = getActiveLayer(mapData).objects
         .filter(obj => obj.position.x === targetX && obj.position.y === targetY)
         .map(obj => obj.slot)
         .filter(s => s !== undefined);
       newObject.slot = assignSlot(occupiedSlots);
     }
     
-    const updatedObjects = [...mapData.objects, newObject];
+    const updatedObjects = [...getActiveLayer(mapData).objects, newObject];
     onObjectsChange(updatedObjects);
     
     // Select the new object

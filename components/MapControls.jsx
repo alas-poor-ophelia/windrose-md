@@ -2,7 +2,21 @@ const pathResolverPath = dc.resolvePath("pathResolver.js");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 const { WindroseCompass } = await requireModuleByName("WindroseCompass.jsx");
 
-const MapControls = ({ onZoomIn, onZoomOut, onCompassClick, northDirection, currentZoom, isExpanded, onToggleExpand, onSettingsClick, mapType, showVisibilityToolbar, onToggleVisibilityToolbar }) => {
+const MapControls = ({ 
+  onZoomIn, 
+  onZoomOut, 
+  onCompassClick, 
+  northDirection, 
+  currentZoom, 
+  isExpanded, 
+  onToggleExpand, 
+  onSettingsClick, 
+  mapType, 
+  showVisibilityToolbar, 
+  onToggleVisibilityToolbar,
+  showLayerPanel,
+  onToggleLayerPanel
+}) => {
     return (
       <div className="dmt-controls">
         {/* Expand/Collapse Button */}
@@ -46,6 +60,15 @@ const MapControls = ({ onZoomIn, onZoomOut, onCompassClick, northDirection, curr
             -
           </button>
         </div>
+        
+        {/* Layer Panel Toggle Button */}
+        <button
+          className={`dmt-expand-btn ${showLayerPanel ? 'dmt-expand-btn-active' : ''}`}
+          onClick={onToggleLayerPanel}
+          title="Toggle layer panel"
+        >
+          <dc.Icon icon="lucide-layers" />
+        </button>
         
         {/* Visibility Toggle Button */}
         <button

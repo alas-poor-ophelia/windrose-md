@@ -239,8 +239,10 @@ class GridGeometry extends BaseGeometry {
     const paddedStartY = startY - extraCells;
     const paddedEndY = endY + extraCells;
     
-    // Calculate how far to extend lines beyond the viewport
-    const lineExtension = diagonal * 1.5;
+    // iOS defensive: Limit line extension to prevent aggressive clipping
+    // During memory pressure, iOS may set restrictive clip regions
+    // Lines with coordinates far outside canvas bounds get completely clipped
+    const maxExtension = Math.max(width, height);
     
     // Use fillRect instead of stroke for iOS/CodeMirror compatibility
     // fillRect is immune to strokeStyle state corruption
@@ -256,12 +258,14 @@ class GridGeometry extends BaseGeometry {
       // iOS defensive: Set fillStyle for each line to work around state corruption
       ctx.fillStyle = lineColor;
       const screenX = offsetX + x * scaledCellSize;
+      
       // fillRect(x, y, width, height) - vertical line is narrow width, tall height
+      // iOS defensive: Use maxExtension instead of huge lineExtension
       ctx.fillRect(
         screenX - halfWidth,
-        -lineExtension,
+        -maxExtension,
         lineWidth,
-        height + lineExtension * 2
+        height + maxExtension * 2
       );
     }
     
@@ -270,15 +274,18 @@ class GridGeometry extends BaseGeometry {
       // iOS defensive: Set fillStyle for each line to work around state corruption
       ctx.fillStyle = lineColor;
       const screenY = offsetY + y * scaledCellSize;
+      
       // fillRect(x, y, width, height) - horizontal line is wide width, narrow height
+      // iOS defensive: Use maxExtension instead of huge lineExtension
       ctx.fillRect(
-        -lineExtension,
+        -maxExtension,
         screenY - halfWidth,
-        width + lineExtension * 2,
+        width + maxExtension * 2,
         lineWidth
       );
     }
   }
+
 
 
   
