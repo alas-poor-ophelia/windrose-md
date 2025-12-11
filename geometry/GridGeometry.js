@@ -576,6 +576,41 @@ class GridGeometry extends BaseGeometry {
       { x: gridX + 1, y: gridY + 1 }  // Bottom-right
     ];
   }
+
+  /**
+   * Get the bounding box of a cell in world coordinates
+   * Used for export operations to calculate content bounds
+   * @param {{x: number, y: number}} cell - Cell object with grid coordinates
+   * @returns {{minX: number, minY: number, maxX: number, maxY: number}} Bounding box
+   */
+  getCellBounds(cell) {
+    const x = cell.x * this.cellSize;
+    const y = cell.y * this.cellSize;
+    return {
+      minX: x,
+      minY: y,
+      maxX: x + this.cellSize,
+      maxY: y + this.cellSize
+    };
+  }
+
+  /**
+   * Get the bounding box of an object in world coordinates
+   * Used for export operations to calculate content bounds
+   * @param {{position: {x: number, y: number}, size?: {width: number, height: number}}} obj - Object with position and optional size
+   * @returns {{minX: number, minY: number, maxX: number, maxY: number}} Bounding box
+   */
+  getObjectBounds(obj) {
+    const size = obj.size || { width: 1, height: 1 };
+    const x = obj.position.x * this.cellSize;
+    const y = obj.position.y * this.cellSize;
+    return {
+      minX: x,
+      minY: y,
+      maxX: x + size.width * this.cellSize,
+      maxY: y + size.height * this.cellSize
+    };
+  }
 }
 
 return { GridGeometry };

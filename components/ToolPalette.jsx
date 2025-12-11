@@ -206,6 +206,7 @@ const ToolPalette = ({
   // Sub-menu state
   const [openSubMenu, setOpenSubMenu] = dc.useState(null);
   const [subToolSelections, setSubToolSelections] = dc.useState({
+    select: 'select',       // 'select' (click) | 'areaSelect' (two-click rectangle)
     draw: 'draw',           // 'draw' (cells) | 'edgeDraw' (edges)
     rectangle: 'rectangle'  // 'rectangle' (fill) | 'edgeLine'
   });
@@ -232,7 +233,8 @@ const ToolPalette = ({
           break;
         case 's':
         case 'v':
-          onToolChange('select');
+          // Use the currently selected sub-tool for select group
+          onToolChange(subToolSelections.select || 'select');
           break;
         case 'm':
           onToolChange('measure');
@@ -246,10 +248,17 @@ const ToolPalette = ({
     
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onToolChange, isFocused]);
+  }, [onToolChange, isFocused, subToolSelections]);
   
   // Tool groups with sub-tools
   const toolGroups = [
+    {
+      id: 'select',
+      subTools: [
+        { id: 'select', label: 'Click Select', title: 'Select/Move (S)', icon: 'lucide-hand' },
+        { id: 'areaSelect', label: 'Area Select', title: 'Area Select (click two corners)', icon: 'lucide-box-select' }
+      ]
+    },
     {
       id: 'draw',
       subTools: [
@@ -268,7 +277,6 @@ const ToolPalette = ({
   
   // Simple tools (no sub-menu)
   const simpleTools = [
-    { id: 'select', title: 'Select/Move Text & Objects (S)', icon: 'lucide-hand' },
     { id: 'erase', title: 'Erase (remove text/objects/cells/edges) (E)', icon: 'lucide-eraser' },
     { id: 'circle', title: 'Circle (click edge, then center)', icon: 'lucide-circle', gridOnly: true },
     { id: 'clearArea', title: 'Clear Area (click two corners to erase)', icon: 'lucide-square-x', gridOnly: true },
@@ -376,18 +384,22 @@ const ToolPalette = ({
       <ToolPaletteBracket position="bl" />
       <ToolPaletteBracket position="br" />
       
-      {/* Select tool */}
-      <button
-        className={`dmt-tool-btn ${currentTool === 'select' ? 'dmt-tool-btn-active' : ''}`}
-        onClick={() => onToolChange('select')}
-        title="Select/Move Text & Objects"
-      >
-        <dc.Icon icon="lucide-hand" />
-      </button>
+      {/* Select tool group (with sub-menu for area select) */}
+      <ToolButtonWithSubMenu
+        toolGroup={toolGroups[0]}
+        currentTool={currentTool}
+        currentSubTool={subToolSelections.select}
+        isSubMenuOpen={openSubMenu === 'select'}
+        onToolSelect={onToolChange}
+        onSubToolSelect={handleSubToolSelect}
+        onSubMenuOpen={handleSubMenuOpen}
+        onSubMenuClose={handleSubMenuClose}
+        mapType={mapType}
+      />
       
       {/* Draw tool group (with sub-menu) */}
       <ToolButtonWithSubMenu
-        toolGroup={toolGroups[0]}
+        toolGroup={toolGroups[1]}
         currentTool={currentTool}
         currentSubTool={subToolSelections.draw}
         isSubMenuOpen={openSubMenu === 'draw'}
@@ -441,7 +453,7 @@ const ToolPalette = ({
       {/* Rectangle tool group (with sub-menu) - grid only */}
       {mapType !== 'hex' && (
         <ToolButtonWithSubMenu
-          toolGroup={toolGroups[1]}
+          toolGroup={toolGroups[2]}
           currentTool={currentTool}
           currentSubTool={subToolSelections.rectangle}
           isSubMenuOpen={openSubMenu === 'rectangle'}
@@ -454,7 +466,7 @@ const ToolPalette = ({
       )}
       
       {/* Remaining simple tools */}
-      {visibleSimpleTools.filter(t => !['select', 'erase'].includes(t.id)).map(tool => (
+      {visibleSimpleTools.filter(t => t.id !== 'erase').map(tool => (
         <button
           key={tool.id}
           className={`dmt-tool-btn ${currentTool === tool.id ? 'dmt-tool-btn-active' : ''}`}

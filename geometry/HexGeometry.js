@@ -400,6 +400,7 @@ class HexGeometry extends BaseGeometry {
     // This works around strokeStyle state corruption in Obsidian's Live Preview mode
     ctx.fillStyle = lineColor;
     
+    let drawnCount = 0;
     // CRITICAL: Iterate in OFFSET space (rectangular)
     // This creates a rectangular grid instead of a parallelogram
     for (let col = minCol; col <= maxCol; col++) {
@@ -410,6 +411,7 @@ class HexGeometry extends BaseGeometry {
         // Only draw if within bounds (or no bounds set for infinite maps)
         if (!this.bounds || this.isWithinBounds(q, r)) {
           this.drawHexOutline(ctx, q, r, offsetX, offsetY, zoom, lineWidth);
+          drawnCount++;
         }
       }
     }
@@ -817,6 +819,51 @@ class HexGeometry extends BaseGeometry {
     }
     
     return cells;
+  }
+
+  /**
+   * Get the bounding box of a hex cell in world coordinates
+   * Used for export operations to calculate content bounds
+   * @param {{q: number, r: number}|{x: number, y: number}} cell - Cell object with axial coordinates (q,r) or (x,y)
+   * @returns {{minX: number, minY: number, maxX: number, maxY: number}} Bounding box
+   */
+  getCellBounds(cell) {
+    // Handle both {q,r} and {x,y} formats (x=q, y=r for API consistency)
+    const q = cell.q !== undefined ? cell.q : cell.x;
+    const r = cell.r !== undefined ? cell.r : cell.y;
+    
+    const center = this.hexToWorld(q, r);
+    // Return bounding box of hexagon
+    const halfWidth = this.width / 2;
+    const halfHeight = this.height / 2;
+    return {
+      minX: center.worldX - halfWidth,
+      minY: center.worldY - halfHeight,
+      maxX: center.worldX + halfWidth,
+      maxY: center.worldY + halfHeight
+    };
+  }
+
+  /**
+   * Get the bounding box of an object in world coordinates
+   * Used for export operations to calculate content bounds
+   * @param {{position: {x: number, y: number}, size?: {width: number, height: number}}} obj - Object with position and optional size
+   * @returns {{minX: number, minY: number, maxX: number, maxY: number}} Bounding box
+   */
+  getObjectBounds(obj) {
+    // Objects in hex maps use axial position (x=q, y=r)
+    const center = this.hexToWorld(obj.position.x, obj.position.y);
+    const size = obj.size || { width: 1, height: 1 };
+    
+    // Approximate bounds for multi-hex objects
+    const halfWidth = (this.width * size.width) / 2;
+    const halfHeight = (this.height * size.height) / 2;
+    return {
+      minX: center.worldX - halfWidth,
+      minY: center.worldY - halfHeight,
+      maxX: center.worldX + halfWidth,
+      maxY: center.worldY + halfHeight
+    };
   }
 }
 

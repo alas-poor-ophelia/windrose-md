@@ -71,7 +71,9 @@ function MapSettingsProvider({
   currentBackgroundImage = null,
   currentDistanceSettings = null,
   currentCells = [],
-  currentObjects = []
+  currentObjects = [],
+  mapData = null,
+  geometry = null
 }) {
   const globalSettings = getSettings();
   const isHexMap = mapType === 'hex';
@@ -356,6 +358,9 @@ function MapSettingsProvider({
   const contextValue = {
     // Props
     isOpen, onClose, onOpenAlignmentMode, mapType, orientation,
+    
+    // Map data for export
+    mapData, geometry,
     
     // External
     globalSettings, tabs, isHexMap,

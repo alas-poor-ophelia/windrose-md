@@ -41,9 +41,10 @@ const ObjectLayer = ({
 }) => {
   // Get shared state from Context
   const { canvasRef, containerRef, mapData, geometry, screenToGrid, screenToWorld, getClientCoords, GridGeometry } = useMapState();
-  const { getObjectAtPosition, addObject, updateObject, removeObject, isAreaFree, onObjectsChange: contextOnObjectsChange } = useMapOperations();
+  const { getObjectAtPosition, addObject, updateObject, removeObject, isAreaFree, onObjectsChange: contextOnObjectsChange, onTextLabelsChange, removeTextLabel } = useMapOperations();
   const { 
     selectedItem, setSelectedItem, 
+    selectedItems, isSelected, hasMultiSelection, selectionCount, selectItem, selectMultiple, clearSelection,
     isDraggingSelection, setIsDraggingSelection, 
     dragStart, setDragStart, 
     isResizeMode, setIsResizeMode,
@@ -52,7 +53,8 @@ const ObjectLayer = ({
     showNoteLinkModal, setShowNoteLinkModal,
     editingNoteObjectId, setEditingNoteObjectId,
     showCoordinates,
-    layerVisibility
+    layerVisibility,
+    updateSelectedItemsData
   } = useMapSelection();
   
   // Object note modal state
@@ -75,6 +77,140 @@ const ObjectLayer = ({
       setSelectedItem({ ...selectedItem, data: updatedObject });
     }
   }, [selectedItem, mapData, updateObject, contextOnObjectsChange, setSelectedItem]);
+  
+  // Multi-select operation handlers
+  
+  /**
+   * Rotate all selected objects by 90 degrees
+   */
+  const handleRotateAll = dc.useCallback(() => {
+    if (!hasMultiSelection || !mapData) return;
+    
+    const activeLayer = getActiveLayer(mapData);
+    let updatedObjects = [...(activeLayer.objects || [])];
+    let updatedTextLabels = [...(activeLayer.textLabels || [])];
+    
+    for (const item of selectedItems) {
+      if (item.type === 'object') {
+        const idx = updatedObjects.findIndex(o => o.id === item.id);
+        if (idx !== -1) {
+          const obj = updatedObjects[idx];
+          const currentRotation = obj.rotation || 0;
+          const nextRotation = (currentRotation + 90) % 360;
+          updatedObjects[idx] = { ...obj, rotation: nextRotation };
+        }
+      } else if (item.type === 'text') {
+        const idx = updatedTextLabels.findIndex(l => l.id === item.id);
+        if (idx !== -1) {
+          const label = updatedTextLabels[idx];
+          const currentRotation = label.rotation || 0;
+          const nextRotation = (currentRotation + 90) % 360;
+          updatedTextLabels[idx] = { ...label, rotation: nextRotation };
+        }
+      }
+    }
+    
+    // Apply changes - suppress history on first, add on second for single undo
+    onObjectsChange(updatedObjects, true);
+    onTextLabelsChange(updatedTextLabels, false);
+    
+    // Update selected items data
+    const updates = selectedItems.map(item => {
+      if (item.type === 'object') {
+        const obj = updatedObjects.find(o => o.id === item.id);
+        return obj ? { id: item.id, rotation: obj.rotation } : null;
+      } else {
+        const label = updatedTextLabels.find(l => l.id === item.id);
+        return label ? { id: item.id, rotation: label.rotation } : null;
+      }
+    }).filter(Boolean);
+    
+    updateSelectedItemsData(updates);
+  }, [hasMultiSelection, mapData, selectedItems, onObjectsChange, onTextLabelsChange, updateSelectedItemsData]);
+  
+  /**
+   * Duplicate all selected items
+   */
+  const handleDuplicateAll = dc.useCallback(() => {
+    if (!hasMultiSelection || !mapData) return;
+    
+    const activeLayer = getActiveLayer(mapData);
+    let updatedObjects = [...(activeLayer.objects || [])];
+    let updatedTextLabels = [...(activeLayer.textLabels || [])];
+    const newSelectedItems = [];
+    
+    // Find offset - try to place duplicates 1 cell to the right
+    const offsetX = 1;
+    const offsetY = 0;
+    
+    for (const item of selectedItems) {
+      if (item.type === 'object') {
+        const sourceObj = activeLayer.objects?.find(o => o.id === item.id);
+        if (!sourceObj) continue;
+        
+        // Create duplicate with offset position
+        const newId = `obj-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const newObj = {
+          ...sourceObj,
+          id: newId,
+          position: {
+            x: sourceObj.position.x + offsetX,
+            y: sourceObj.position.y + offsetY
+          }
+        };
+        updatedObjects.push(newObj);
+        newSelectedItems.push({ type: 'object', id: newId, data: newObj });
+      } else if (item.type === 'text') {
+        const sourceLabel = activeLayer.textLabels?.find(l => l.id === item.id);
+        if (!sourceLabel) continue;
+        
+        // Create duplicate with offset position (world coords)
+        const newId = `text-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const offsetWorld = (mapData.gridSize || 32) * 1; // 1 grid cell offset in world coords
+        const newLabel = {
+          ...sourceLabel,
+          id: newId,
+          position: {
+            x: sourceLabel.position.x + offsetWorld,
+            y: sourceLabel.position.y
+          }
+        };
+        updatedTextLabels.push(newLabel);
+        newSelectedItems.push({ type: 'text', id: newId, data: newLabel });
+      }
+    }
+    
+    // Apply changes - suppress history on first, add on second for single undo
+    onObjectsChange(updatedObjects, true);
+    onTextLabelsChange(updatedTextLabels, false);
+    
+    // Select the new duplicates
+    if (newSelectedItems.length > 0) {
+      selectMultiple(newSelectedItems);
+    }
+  }, [hasMultiSelection, mapData, selectedItems, contextOnObjectsChange, onTextLabelsChange, selectMultiple]);
+  
+  /**
+   * Delete all selected items
+   */
+  const handleDeleteAll = dc.useCallback(() => {
+    if (!hasMultiSelection || !mapData) return;
+    
+    const activeLayer = getActiveLayer(mapData);
+    const selectedObjectIds = new Set(selectedItems.filter(i => i.type === 'object').map(i => i.id));
+    const selectedTextIds = new Set(selectedItems.filter(i => i.type === 'text').map(i => i.id));
+    
+    // Filter out selected items
+    const updatedObjects = (activeLayer.objects || []).filter(obj => !selectedObjectIds.has(obj.id));
+    const updatedTextLabels = (activeLayer.textLabels || []).filter(label => !selectedTextIds.has(label.id));
+    
+    // Apply changes - suppress history on first, add on second to get single undo
+    onObjectsChange(updatedObjects, true); // suppress history
+    onTextLabelsChange(updatedTextLabels, false); // this one adds to history
+    
+    // Clear selection
+    clearSelection();
+  }, [hasMultiSelection, mapData, selectedItems, onObjectsChange, onTextLabelsChange, clearSelection]);
   
   // Note link modal state is now from MapSelectionContext (shared with NotePinLayer)
   
@@ -408,16 +544,19 @@ const ObjectLayer = ({
         </>
       )}
       
-      {/* Selection Toolbar for objects - only render when an object is selected and not dragging */}
-      {selectedItem?.type === 'object' && !isDraggingSelection && (
+      {/* Selection Toolbar - render for single object OR multi-select (not while dragging) */}
+      {((selectedItem?.type === 'object' || hasMultiSelection) && !isDraggingSelection) && (
         <SelectionToolbar
           selectedItem={selectedItem}
+          selectedItems={selectedItems}
+          hasMultiSelection={hasMultiSelection}
+          selectionCount={selectionCount}
           mapData={mapData}
           canvasRef={canvasRef}
           containerRef={containerRef}
           geometry={geometry}
           
-          // Object handlers
+          // Single-item object handlers
           onRotate={handleObjectRotation}
           onDuplicate={handleObjectDuplicate}
           onLabel={handleNoteButtonClick}
@@ -426,6 +565,11 @@ const ObjectLayer = ({
           onResize={handleResizeButtonClick}
           onDelete={handleObjectDeletion}
           onScaleChange={handleScaleChange}
+          
+          // Multi-select handlers
+          onRotateAll={handleRotateAll}
+          onDuplicateAll={handleDuplicateAll}
+          onDeleteAll={handleDeleteAll}
           
           // State
           isResizeMode={isResizeMode}

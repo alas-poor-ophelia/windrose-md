@@ -25,8 +25,11 @@ function getRenderer(geometry) {
   return geometry instanceof HexGeometry ? hexRenderer : gridRenderer;
 }
 
-function renderCanvas(canvas, mapData, geometry, selectedItem = null, isResizeMode = false, theme = null, showCoordinates = false, layerVisibility = null) {
+function renderCanvas(canvas, mapData, geometry, selectedItems = [], isResizeMode = false, theme = null, showCoordinates = false, layerVisibility = null) {
   if (!canvas) return;
+  
+  // Normalize selectedItems to array (backward compatibility)
+  const itemsArray = Array.isArray(selectedItems) ? selectedItems : (selectedItems ? [selectedItems] : []);
   
   // Default layer visibility
   const visibility = layerVisibility || { objects: true, textLabels: true, hexCoordinates: true };
@@ -36,13 +39,6 @@ function renderCanvas(canvas, mapData, geometry, selectedItem = null, isResizeMo
   
   // Extract active layer data (supports layer schema v2)
   const activeLayer = getActiveLayer(mapData);
-
-  console.log('[render] activeLayer:', {
-  hasLayers: !!mapData?.layers,
-  activeLayerId: mapData?.activeLayerId,
-  cellCount: activeLayer?.cells?.length,
-  mapType: mapData?.mapType
-});
   
   const ctx = canvas.getContext('2d');
   const { width, height } = canvas;
@@ -200,8 +196,6 @@ function renderCanvas(canvas, mapData, geometry, selectedItem = null, isResizeMo
       ...cell,
       color: getCellColor(cell)
     }));
-    
-    console.log('[render] cellsWithColor sample:', cellsWithColor.slice(0, 3));
     
     // Render painted cells using renderer
     renderer.renderPaintedCells(ctx, cellsWithColor, geometry, rendererViewState);
@@ -458,180 +452,189 @@ function renderCanvas(canvas, mapData, geometry, selectedItem = null, isResizeMo
     }
   }
   
-  // Draw selection indicator for text labels
+  // Draw selection indicators for text labels
   // Skip when coordinate overlay is visible or text layer is hidden
-  if (selectedItem && selectedItem.type === 'text' && activeLayer.textLabels && !showCoordinates && visibility.textLabels) {
-    const label = activeLayer.textLabels.find(l => l.id === selectedItem.id);
-    if (label) {
-      ctx.save();
-      
-      const { screenX, screenY } = geometry.worldToScreen(label.position.x, label.position.y, offsetX, offsetY, zoom);
-      
-      ctx.translate(screenX, screenY);
-      ctx.rotate((label.rotation * Math.PI) / 180);
-      
-      // Measure text to get bounding box
-      const fontSize = label.fontSize * zoom;
-      const fontFamily = getFontCss(label.fontFace || 'sans');
-      ctx.font = `${fontSize}px ${fontFamily}`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      const metrics = ctx.measureText(label.content);
-      const width = metrics.width;
-      const height = fontSize * 1.2;
-      
-      // Draw selection rectangle with dashed border
-      ctx.strokeStyle = '#4a9eff';
-      ctx.lineWidth = 2;
-      ctx.setLineDash([5, 3]);
-      ctx.strokeRect(
-        -width/2 - 4, 
-        -height/2 - 2, 
-        width + 8, 
-        height + 4
-      );
-      
-      // Draw corner handles
-      ctx.setLineDash([]);
-      ctx.fillStyle = '#4a9eff';
-      const handleSize = 6;
-      
-      // Top-left
-      ctx.fillRect(-width/2 - 4 - handleSize/2, -height/2 - 2 - handleSize/2, handleSize, handleSize);
-      // Top-right
-      ctx.fillRect(width/2 + 4 - handleSize/2, -height/2 - 2 - handleSize/2, handleSize, handleSize);
-      // Bottom-left
-      ctx.fillRect(-width/2 - 4 - handleSize/2, height/2 + 2 - handleSize/2, handleSize, handleSize);
-      // Bottom-right
-      ctx.fillRect(width/2 + 4 - handleSize/2, height/2 + 2 - handleSize/2, handleSize, handleSize);
-      
-      ctx.restore();
+  const selectedTextLabels = itemsArray.filter(item => item.type === 'text');
+  if (selectedTextLabels.length > 0 && activeLayer.textLabels && !showCoordinates && visibility.textLabels) {
+    for (const selectedItem of selectedTextLabels) {
+      const label = activeLayer.textLabels.find(l => l.id === selectedItem.id);
+      if (label) {
+        ctx.save();
+        
+        const { screenX, screenY } = geometry.worldToScreen(label.position.x, label.position.y, offsetX, offsetY, zoom);
+        
+        ctx.translate(screenX, screenY);
+        ctx.rotate((label.rotation * Math.PI) / 180);
+        
+        // Measure text to get bounding box
+        const fontSize = label.fontSize * zoom;
+        const fontFamily = getFontCss(label.fontFace || 'sans');
+        ctx.font = `${fontSize}px ${fontFamily}`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        const metrics = ctx.measureText(label.content);
+        const width = metrics.width;
+        const height = fontSize * 1.2;
+        
+        // Draw selection rectangle with dashed border
+        ctx.strokeStyle = '#4a9eff';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 3]);
+        ctx.strokeRect(
+          -width/2 - 4, 
+          -height/2 - 2, 
+          width + 8, 
+          height + 4
+        );
+        
+        // Draw corner handles
+        ctx.setLineDash([]);
+        ctx.fillStyle = '#4a9eff';
+        const handleSize = 6;
+        
+        // Top-left
+        ctx.fillRect(-width/2 - 4 - handleSize/2, -height/2 - 2 - handleSize/2, handleSize, handleSize);
+        // Top-right
+        ctx.fillRect(width/2 + 4 - handleSize/2, -height/2 - 2 - handleSize/2, handleSize, handleSize);
+        // Bottom-left
+        ctx.fillRect(-width/2 - 4 - handleSize/2, height/2 + 2 - handleSize/2, handleSize, handleSize);
+        // Bottom-right
+        ctx.fillRect(width/2 + 4 - handleSize/2, height/2 + 2 - handleSize/2, handleSize, handleSize);
+        
+        ctx.restore();
+      }
     }
   }
   
-  // Draw selection indicator for objects
+  // Draw selection indicators for objects
   // Skip when coordinate overlay is visible or objects layer is hidden
-  if (selectedItem && selectedItem.type === 'object' && activeLayer.objects && !showCoordinates && visibility.objects) {
-    const object = activeLayer.objects.find(obj => obj.id === selectedItem.id);
-    if (object) {
-      const size = object.size || { width: 1, height: 1 };
-      const alignment = object.alignment || 'center';
-      
-      // Calculate position and dimensions based on geometry type
-      let screenX, screenY, objectWidth, objectHeight, cellWidth, cellHeight;
-      
-      if (geometry instanceof HexGeometry) {
-        // For hex: calculate position accounting for multi-object slots
-        const { worldX, worldY } = geometry.hexToWorld(object.position.x, object.position.y);
+  const selectedObjects = itemsArray.filter(item => item.type === 'object');
+  if (selectedObjects.length > 0 && activeLayer.objects && !showCoordinates && visibility.objects) {
+    // Only show resize mode visuals for single selection
+    const showResizeOverlay = isResizeMode && selectedObjects.length === 1;
+    
+    for (const selectedItem of selectedObjects) {
+      const object = activeLayer.objects.find(obj => obj.id === selectedItem.id);
+      if (object) {
+        const size = object.size || { width: 1, height: 1 };
+        const alignment = object.alignment || 'center';
         
-        // Count objects in same cell for multi-object support
-        const cellObjects = getObjectsInCell(activeLayer.objects, object.position.x, object.position.y);
-        const objectCount = cellObjects.length;
+        // Calculate position and dimensions based on geometry type
+        let screenX, screenY, objectWidth, objectHeight, cellWidth, cellHeight;
         
-        // Base object dimensions
-        objectWidth = size.width * scaledSize;
-        objectHeight = size.height * scaledSize;
-        cellWidth = scaledSize;
-        cellHeight = scaledSize;
-        
-        // Apply multi-object scaling if needed
-        if (objectCount > 1) {
-          const multiScale = getMultiObjectScale(objectCount);
-          objectWidth *= multiScale;
-          objectHeight *= multiScale;
+        if (geometry instanceof HexGeometry) {
+          // For hex: calculate position accounting for multi-object slots
+          const { worldX, worldY } = geometry.hexToWorld(object.position.x, object.position.y);
+          
+          // Count objects in same cell for multi-object support
+          const cellObjects = getObjectsInCell(activeLayer.objects, object.position.x, object.position.y);
+          const objectCount = cellObjects.length;
+          
+          // Base object dimensions
+          objectWidth = size.width * scaledSize;
+          objectHeight = size.height * scaledSize;
+          cellWidth = scaledSize;
+          cellHeight = scaledSize;
+          
+          // Apply multi-object scaling if needed
+          if (objectCount > 1) {
+            const multiScale = getMultiObjectScale(objectCount);
+            objectWidth *= multiScale;
+            objectHeight *= multiScale;
+          }
+          
+          // Calculate center in screen space
+          let centerScreenX = offsetX + worldX * zoom;
+          let centerScreenY = offsetY + worldY * zoom;
+          
+          // Apply slot offset for multi-object cells
+          if (objectCount > 1) {
+            const effectiveSlot = object.slot ?? cellObjects.findIndex(o => o.id === object.id);
+            const { offsetX: slotOffsetX, offsetY: slotOffsetY } = getSlotOffset(
+              effectiveSlot,
+              objectCount,
+              mapData.orientation || 'flat'
+            );
+            // Offset is in hex-width units (2 * scaledSize)
+            const hexWidth = scaledSize * 2;
+            centerScreenX += slotOffsetX * hexWidth;
+            centerScreenY += slotOffsetY * hexWidth;
+          }
+          
+          // Apply alignment offset
+          if (alignment !== 'center') {
+            const halfCell = scaledSize / 2;
+            switch (alignment) {
+              case 'north': centerScreenY -= halfCell; break;
+              case 'south': centerScreenY += halfCell; break;
+              case 'east': centerScreenX += halfCell; break;
+              case 'west': centerScreenX -= halfCell; break;
+            }
+          }
+          
+          // Get top-left from center for rendering
+          screenX = centerScreenX - objectWidth / 2;
+          screenY = centerScreenY - objectHeight / 2;
+        } else {
+          // For grid: gridToScreen returns top-left directly
+          const gridPos = geometry.gridToScreen(object.position.x, object.position.y, offsetX, offsetY, zoom);
+          screenX = gridPos.screenX;
+          screenY = gridPos.screenY;
+          
+          // Apply alignment offset
+          if (alignment !== 'center') {
+            const halfCell = scaledSize / 2;
+            switch (alignment) {
+              case 'north': screenY -= halfCell; break;
+              case 'south': screenY += halfCell; break;
+              case 'east': screenX += halfCell; break;
+              case 'west': screenX -= halfCell; break;
+            }
+          }
+          
+          objectWidth = size.width * scaledSize;
+          objectHeight = size.height * scaledSize;
+          cellWidth = scaledSize;
+          cellHeight = scaledSize;
         }
         
-        // Calculate center in screen space
-        let centerScreenX = offsetX + worldX * zoom;
-        let centerScreenY = offsetY + worldY * zoom;
-        
-        // Apply slot offset for multi-object cells
-        if (objectCount > 1) {
-          const effectiveSlot = object.slot ?? cellObjects.findIndex(o => o.id === object.id);
-          const { offsetX: slotOffsetX, offsetY: slotOffsetY } = getSlotOffset(
-            effectiveSlot,
-            objectCount,
-            mapData.orientation || 'flat'
-          );
-          // Offset is in hex-width units (2 * scaledSize)
-          const hexWidth = scaledSize * 2;
-          centerScreenX += slotOffsetX * hexWidth;
-          centerScreenY += slotOffsetY * hexWidth;
-        }
-        
-        // Apply alignment offset
-        if (alignment !== 'center') {
-          const halfCell = scaledSize / 2;
-          switch (alignment) {
-            case 'north': centerScreenY -= halfCell; break;
-            case 'south': centerScreenY += halfCell; break;
-            case 'east': centerScreenX += halfCell; break;
-            case 'west': centerScreenX -= halfCell; break;
+        // Draw occupied cells overlay when in resize mode (single selection only)
+        if (showResizeOverlay) {
+          ctx.fillStyle = 'rgba(74, 158, 255, 0.15)';
+          for (let dx = 0; dx < size.width; dx++) {
+            for (let dy = 0; dy < size.height; dy++) {
+              const cellScreenX = screenX + dx * cellWidth;
+              const cellScreenY = screenY + dy * cellHeight;
+              ctx.fillRect(cellScreenX + 2, cellScreenY + 2, cellWidth - 4, cellHeight - 4);
+            }
           }
         }
         
-        // Get top-left from center for rendering
-        screenX = centerScreenX - objectWidth / 2;
-        screenY = centerScreenY - objectHeight / 2;
-      } else {
-        // For grid: gridToScreen returns top-left directly
-        const gridPos = geometry.gridToScreen(object.position.x, object.position.y, offsetX, offsetY, zoom);
-        screenX = gridPos.screenX;
-        screenY = gridPos.screenY;
+        // Draw selection rectangle with dashed border
+        ctx.strokeStyle = '#4a9eff';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 3]);
+        ctx.strokeRect(
+          screenX + 2,
+          screenY + 2,
+          objectWidth - 4,
+          objectHeight - 4
+        );
         
-        // Apply alignment offset
-        if (alignment !== 'center') {
-          const halfCell = scaledSize / 2;
-          switch (alignment) {
-            case 'north': screenY -= halfCell; break;
-            case 'south': screenY += halfCell; break;
-            case 'east': screenX += halfCell; break;
-            case 'west': screenX -= halfCell; break;
-          }
-        }
+        // Draw corner handles (larger in resize mode for better touch targets)
+        ctx.setLineDash([]);
+        ctx.fillStyle = '#4a9eff';
+        const handleSize = showResizeOverlay ? 14 : 8;
         
-        objectWidth = size.width * scaledSize;
-        objectHeight = size.height * scaledSize;
-        cellWidth = scaledSize;
-        cellHeight = scaledSize;
+        // Top-left
+        ctx.fillRect(screenX + 2 - handleSize/2, screenY + 2 - handleSize/2, handleSize, handleSize);
+        // Top-right
+        ctx.fillRect(screenX + objectWidth - 2 - handleSize/2, screenY + 2 - handleSize/2, handleSize, handleSize);
+        // Bottom-left
+        ctx.fillRect(screenX + 2 - handleSize/2, screenY + objectHeight - 2 - handleSize/2, handleSize, handleSize);
+        // Bottom-right
+        ctx.fillRect(screenX + objectWidth - 2 - handleSize/2, screenY + objectHeight - 2 - handleSize/2, handleSize, handleSize);
       }
-      
-      // Draw occupied cells overlay when in resize mode
-      if (isResizeMode) {
-        ctx.fillStyle = 'rgba(74, 158, 255, 0.15)';
-        for (let dx = 0; dx < size.width; dx++) {
-          for (let dy = 0; dy < size.height; dy++) {
-            const cellScreenX = screenX + dx * cellWidth;
-            const cellScreenY = screenY + dy * cellHeight;
-            ctx.fillRect(cellScreenX + 2, cellScreenY + 2, cellWidth - 4, cellHeight - 4);
-          }
-        }
-      }
-      
-      // Draw selection rectangle with dashed border
-      ctx.strokeStyle = '#4a9eff';
-      ctx.lineWidth = 2;
-      ctx.setLineDash([5, 3]);
-      ctx.strokeRect(
-        screenX + 2,
-        screenY + 2,
-        objectWidth - 4,
-        objectHeight - 4
-      );
-      
-      // Draw corner handles (larger in resize mode for better touch targets)
-      ctx.setLineDash([]);
-      ctx.fillStyle = '#4a9eff';
-      const handleSize = isResizeMode ? 14 : 8;
-      
-      // Top-left
-      ctx.fillRect(screenX + 2 - handleSize/2, screenY + 2 - handleSize/2, handleSize, handleSize);
-      // Top-right
-      ctx.fillRect(screenX + objectWidth - 2 - handleSize/2, screenY + 2 - handleSize/2, handleSize, handleSize);
-      // Bottom-left
-      ctx.fillRect(screenX + 2 - handleSize/2, screenY + objectHeight - 2 - handleSize/2, handleSize, handleSize);
-      // Bottom-right
-      ctx.fillRect(screenX + objectWidth - 2 - handleSize/2, screenY + objectHeight - 2 - handleSize/2, handleSize, handleSize);
     }
   }
   
@@ -639,13 +642,13 @@ function renderCanvas(canvas, mapData, geometry, selectedItem = null, isResizeMo
   ctx.restore();
 }
 
-function useCanvasRenderer(canvasRef, mapData, geometry, selectedItem = null, isResizeMode = false, theme = null, showCoordinates = false, layerVisibility = null) {
+function useCanvasRenderer(canvasRef, mapData, geometry, selectedItems = [], isResizeMode = false, theme = null, showCoordinates = false, layerVisibility = null) {
   // Main rendering effect - redraw when dependencies change
   dc.useEffect(() => {
     if (mapData && geometry && canvasRef.current) {
-      renderCanvas(canvasRef.current, mapData, geometry, selectedItem, isResizeMode, theme, showCoordinates, layerVisibility);
+      renderCanvas(canvasRef.current, mapData, geometry, selectedItems, isResizeMode, theme, showCoordinates, layerVisibility);
     }
-  }, [mapData, geometry, selectedItem, isResizeMode, theme, canvasRef, showCoordinates, layerVisibility]);
+  }, [mapData, geometry, selectedItems, isResizeMode, theme, canvasRef, showCoordinates, layerVisibility]);
 }
 
 return { useCanvasRenderer, renderCanvas };

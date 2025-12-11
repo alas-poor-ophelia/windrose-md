@@ -4,6 +4,7 @@ const { requireModuleByName } = await dc.require(pathResolverPath);
 const { useMapState } = await requireModuleByName("MapContext.jsx");
 const { useMapSelection } = await requireModuleByName("MapSelectionContext.jsx");
 const { useRegisteredHandlers } = await requireModuleByName("EventHandlerContext.jsx");
+const { useGroupDrag } = await requireModuleByName("useGroupDrag.js");
 
 /**
  * useEventCoordinator.js
@@ -20,9 +21,12 @@ const useEventCoordinator = ({
   isAlignmentMode = false
 }) => {
   // Get shared state from contexts
-  const { canvasRef, currentTool } = useMapState();
-  const { selectedItem, setSelectedItem, isDraggingSelection, setIsDraggingSelection, setDragStart, layerVisibility } = useMapSelection();
+  const { canvasRef, currentTool, screenToGrid, screenToWorld, getClientCoords } = useMapState();
+  const { selectedItem, setSelectedItem, isDraggingSelection, setIsDraggingSelection, dragStart, setDragStart, layerVisibility, hasMultiSelection, isSelected, isGroupDragging, clearSelection } = useMapSelection();
   const { getHandlers } = useRegisteredHandlers();
+  
+  // Group drag for multi-select
+  const { getClickedSelectedItem, startGroupDrag, handleGroupDrag, stopGroupDrag } = useGroupDrag();
   
   // Local state for multi-touch and pending actions
   const [recentMultiTouch, setRecentMultiTouch] = dc.useState(false);
@@ -32,6 +36,9 @@ const useEventCoordinator = ({
   // Track pan start position for click vs drag detection
   const panStartPositionRef = dc.useRef(null);
   const panMoveThreshold = 5; // pixels
+  
+  // Track pending area select start (for when empty space is clicked but drag may occur)
+  const areaSelectPendingRef = dc.useRef(null);
   
   /**
    * Handle pointer down events
@@ -168,6 +175,19 @@ const useEventCoordinator = ({
       
       // Route to appropriate handler based on current tool
       if (currentTool === 'select') {
+        // Multi-select: check if clicking on an already-selected item to start group drag
+        if (hasMultiSelection) {
+          const worldCoords = screenToWorld(clientX, clientY);
+          if (worldCoords) {
+            const clickedItem = getClickedSelectedItem(gridX, gridY, worldCoords.worldX, worldCoords.worldY);
+            if (clickedItem) {
+              // Start group drag
+              startGroupDrag(clientX, clientY, gridX, gridY);
+              return;
+            }
+          }
+        }
+        
         // Try object selection first (only if objects layer is visible)
         if (layerVisibility.objects && objectHandlers?.handleObjectSelection) {
           const objectHandled = objectHandlers.handleObjectSelection(clientX, clientY, gridX, gridY);
@@ -184,18 +204,71 @@ const useEventCoordinator = ({
         panStartPositionRef.current = { x: clientX, y: clientY };
         startPan(clientX, clientY);
         
+      } else if (currentTool === 'areaSelect') {
+        // Area select tool - handles both selection AND interaction with selected items
+        
+        // First: check if clicking on an already-selected item to start group drag
+        if (hasMultiSelection) {
+          const worldCoords = screenToWorld(clientX, clientY);
+          if (worldCoords) {
+            const clickedItem = getClickedSelectedItem(gridX, gridY, worldCoords.worldX, worldCoords.worldY);
+            if (clickedItem) {
+              // Start group drag - don't start new area selection
+              startGroupDrag(clientX, clientY, gridX, gridY);
+              return;
+            }
+          }
+          // Clicked on empty space while having selection - just clear, don't start new area select
+          clearSelection();
+          return;
+        }
+        
+        // No multi-selection - check if we're in the middle of an area select (first corner already placed)
+        const areaSelectHandlers = getHandlers('areaSelect');
+        if (areaSelectHandlers?.areaSelectStart) {
+          // Second click - complete the area selection
+          if (areaSelectHandlers.handleAreaSelectClick) {
+            areaSelectHandlers.handleAreaSelectClick(syntheticEvent);
+          }
+          return;
+        }
+        
+        // No multi-selection, no area select in progress - check if clicking on an object or text to select it
+        // Try object selection first (only if objects layer is visible)
+        if (layerVisibility.objects && objectHandlers?.handleObjectSelection) {
+          const objectHandled = objectHandlers.handleObjectSelection(clientX, clientY, gridX, gridY);
+          if (objectHandled) return;
+        }
+        
+        // Try text selection (only if text labels layer is visible)
+        if (layerVisibility.textLabels && textHandlers?.handleTextSelection) {
+          const textHandled = textHandlers.handleTextSelection(clientX, clientY);
+          if (textHandled) return;
+        }
+        
+        // Clicked on empty space with no selection - start panning
+        // Store the click position so we can start area select on pointer up if no drag occurred
+        panStartPositionRef.current = { x: clientX, y: clientY };
+        areaSelectPendingRef.current = { clientX, clientY, syntheticEvent };
+        startPan(clientX, clientY);
+        
       } else if (currentTool === 'draw' || currentTool === 'erase' || 
                  currentTool === 'rectangle' || currentTool === 'circle' || 
                  currentTool === 'clearArea' || currentTool === 'line' ||
                  currentTool === 'edgeDraw' || currentTool === 'edgeErase' || 
                  currentTool === 'edgeLine') {
-        // Drawing tools (including edge tools)
+        // Drawing tools (including edge tools) - clear any multi-selection
+        if (hasMultiSelection) clearSelection();
+        
         if (drawingHandlers?.handleDrawingPointerDown) {
           const eventToUse = isTouchEvent ? syntheticEvent : e;
           drawingHandlers.handleDrawingPointerDown(eventToUse, gridX, gridY);
         }
         
       } else if (currentTool === 'addObject') {
+        // Clear any multi-selection when adding objects
+        if (hasMultiSelection) clearSelection();
+        
         // Skip if objects layer is hidden
         if (!layerVisibility.objects) return;
         
@@ -211,6 +284,9 @@ const useEventCoordinator = ({
         }
         
       } else if (currentTool === 'addText') {
+        // Clear any multi-selection when adding text
+        if (hasMultiSelection) clearSelection();
+        
         // Skip if text labels layer is hidden
         if (!layerVisibility.textLabels) return;
         
@@ -219,6 +295,9 @@ const useEventCoordinator = ({
         }
         
       } else if (currentTool === 'measure') {
+        // Clear any multi-selection when measuring
+        if (hasMultiSelection) clearSelection();
+        
         // Distance measurement tool
         if (measureHandlers?.handleMeasureClick) {
           measureHandlers.handleMeasureClick(gridX, gridY, isTouchEvent);
@@ -238,7 +317,7 @@ const useEventCoordinator = ({
       // Mouse events execute immediately
       executeToolAction();
     }
-  }, [currentTool, isColorPickerOpen, showObjectColorPicker, recentMultiTouch, selectedItem, getHandlers, layerVisibility, isAlignmentMode]);
+  }, [currentTool, isColorPickerOpen, showObjectColorPicker, recentMultiTouch, selectedItem, hasMultiSelection, clearSelection, screenToWorld, getClickedSelectedItem, startGroupDrag, getHandlers, layerVisibility, isAlignmentMode]);
   
   /**
    * Handle pointer move events
@@ -308,7 +387,14 @@ const useEventCoordinator = ({
       return;
     }
     
-    // Handle dragging selection (respect layer visibility)
+    // Handle group drag (multi-select) - check dragStart.isGroupDrag flag directly
+    // since context's isGroupDragging may not have updated yet after startGroupDrag
+    if (isDraggingSelection && dragStart?.isGroupDrag) {
+      handleGroupDrag(e);
+      return;
+    }
+    
+    // Handle dragging selection (respect layer visibility) - single item
     if (isDraggingSelection && selectedItem) {
       if (selectedItem.type === 'object' && layerVisibility.objects && objectHandlers?.handleObjectDragging) {
         objectHandlers.handleObjectDragging(e);
@@ -351,7 +437,7 @@ const useEventCoordinator = ({
     if (layerVisibility.objects && objectHandlers?.handleHoverUpdate) {
       objectHandlers.handleHoverUpdate(e);
     }
-  }, [currentTool, isDraggingSelection, selectedItem, getHandlers, layerVisibility, isAlignmentMode]);
+  }, [currentTool, isDraggingSelection, dragStart, selectedItem, isGroupDragging, handleGroupDrag, getHandlers, layerVisibility, isAlignmentMode]);
   
   /**
    * Handle pointer up events
@@ -406,6 +492,25 @@ const useEventCoordinator = ({
         panStartPositionRef.current = null;
       }
       
+      // Check if this was a click (no movement) vs a drag with areaSelect tool
+      // If click, start area select; if drag, was panning (already handled)
+      if (currentTool === 'areaSelect' && areaSelectPendingRef.current) {
+        const { clientX, clientY } = getClientCoords(e);
+        const deltaX = Math.abs(clientX - areaSelectPendingRef.current.clientX);
+        const deltaY = Math.abs(clientY - areaSelectPendingRef.current.clientY);
+        
+        // If mouse/finger didn't move much, treat as area select click (start first corner)
+        if (deltaX < panMoveThreshold && deltaY < panMoveThreshold) {
+          const areaSelectHandlers = getHandlers('areaSelect');
+          if (areaSelectHandlers?.handleAreaSelectClick) {
+            areaSelectHandlers.handleAreaSelectClick(areaSelectPendingRef.current.syntheticEvent);
+          }
+        }
+        
+        areaSelectPendingRef.current = null;
+        panStartPositionRef.current = null;
+      }
+      
       return;
     }
     
@@ -417,7 +522,13 @@ const useEventCoordinator = ({
       return;
     }
     
-    // Handle dragging
+    // Handle group drag (multi-select)
+    if (isDraggingSelection && dragStart?.isGroupDrag) {
+      stopGroupDrag();
+      return;
+    }
+    
+    // Handle dragging (single item)
     if (isDraggingSelection) {
       if (selectedItem?.type === 'object' && objectHandlers?.stopObjectDragging) {
         objectHandlers.stopObjectDragging();
@@ -437,7 +548,7 @@ const useEventCoordinator = ({
         drawingHandlers.stopDrawing(e);
       }
     }
-  }, [currentTool, recentMultiTouch, isDraggingSelection, selectedItem, setSelectedItem, getHandlers, isAlignmentMode]);
+  }, [currentTool, recentMultiTouch, isDraggingSelection, dragStart, selectedItem, setSelectedItem, isGroupDragging, stopGroupDrag, getHandlers, isAlignmentMode]);
   
   /**
    * Handle pointer leave events
@@ -599,6 +710,11 @@ const useEventCoordinator = ({
         objectHandlers.stopObjectResizing();
       }
       
+      // Stop group drag if active
+      if (isDraggingSelection && dragStart?.isGroupDrag) {
+        stopGroupDrag();
+      }
+      
       if (objectHandlers?.stopObjectDragging) {
         objectHandlers.stopObjectDragging();
       }
@@ -629,7 +745,7 @@ const useEventCoordinator = ({
       window.removeEventListener('touchend', handleGlobalPointerUp);
       window.removeEventListener('mousemove', handleGlobalMouseMove);
     };
-  }, [isDraggingSelection, setIsDraggingSelection, setDragStart, getHandlers]);
+  }, [isDraggingSelection, dragStart, setIsDraggingSelection, setDragStart, isGroupDragging, stopGroupDrag, getHandlers]);
   
   /**
    * Handle keyboard events

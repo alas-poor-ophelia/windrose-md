@@ -2,13 +2,14 @@
  * PreferencesTab.jsx
  * 
  * Preferences settings tab for MapSettingsModal.
- * Handles state persistence options and canvas height configuration.
+ * Handles state persistence options, canvas height configuration, and map export.
  */
 
 const pathResolverPath = dc.resolvePath("pathResolver.js");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
 const { useMapSettings } = await requireModuleByName("MapSettingsContext.jsx");
+const { saveMapImageToVault } = await requireModuleByName("exportOperations.js");
 
 /**
  * Preferences tab content
@@ -19,14 +20,50 @@ function PreferencesTab() {
     useGlobalSettings,
     overrides,
     globalSettings,
-    handlePreferenceToggle
+    handlePreferenceToggle,
+    mapData,
+    geometry
   } = useMapSettings();
+  
+  // Export state
+  const [isExporting, setIsExporting] = dc.useState(false);
+  const [exportError, setExportError] = dc.useState(null);
+  const [exportSuccess, setExportSuccess] = dc.useState(null);
   
   // Local handler for canvas height changes (updates overrides state)
   const { handleColorChange } = useMapSettings(); // Reuse the overrides setter pattern
   
   const handleCanvasHeightChange = (field, value) => {
     handleColorChange(field, value === '' ? undefined : parseInt(value, 10));
+  };
+  
+  // Handle export button click
+  const handleExportImage = async () => {
+    if (!mapData || !geometry) {
+      setExportError('Map data not available');
+      return;
+    }
+    
+    setIsExporting(true);
+    setExportError(null);
+    setExportSuccess(null);
+    
+    try {
+      const result = await saveMapImageToVault(mapData, geometry);
+      
+      if (result.success) {
+        setExportSuccess(`Map saved to: ${result.path}`);
+        // Clear success message after 5 seconds
+        setTimeout(() => setExportSuccess(null), 5000);
+      } else {
+        setExportError(result.error || 'Export failed. Please try again.');
+      }
+    } catch (error) {
+      console.error('[PreferencesTab] Export error:', error);
+      setExportError(error.message || 'Export failed. Please try again.');
+    } finally {
+      setIsExporting(false);
+    }
   };
   
   return (
@@ -109,6 +146,53 @@ function PreferencesTab() {
             />
           </div>
         </div>
+      </div>
+      
+      {/* Export Section */}
+      <div style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px solid var(--background-modifier-border)' }}>
+        <h4 style={{ fontSize: '14px', fontWeight: 600, marginBottom: '8px' }}>Export</h4>
+        <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '12px' }}>
+          Export your map as a PNG image
+        </p>
+        
+        <button
+          class="windrose-btn"
+          onClick={handleExportImage}
+          disabled={isExporting}
+          style={{
+            padding: '6px 12px',
+            cursor: isExporting ? 'wait' : 'pointer',
+            opacity: isExporting ? 0.6 : 1
+          }}
+        >
+          {isExporting ? 'Exporting...' : 'Export as Image'}
+        </button>
+        
+        {exportError && (
+          <div style={{
+            marginTop: '8px',
+            padding: '8px',
+            backgroundColor: 'var(--background-modifier-error)',
+            color: 'var(--text-error)',
+            borderRadius: '4px',
+            fontSize: '12px'
+          }}>
+            {exportError}
+          </div>
+        )}
+        
+        {exportSuccess && (
+          <div style={{
+            marginTop: '8px',
+            padding: '8px',
+            backgroundColor: 'var(--background-modifier-success)',
+            color: 'var(--text-success)',
+            borderRadius: '4px',
+            fontSize: '12px'
+          }}>
+            {exportSuccess}
+          </div>
+        )}
       </div>
     </div>
   );

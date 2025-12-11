@@ -14,6 +14,210 @@ const { ColorPicker } = await requireModuleByName("ColorPicker.jsx");
 const { getActiveLayer } = await requireModuleByName("layerAccessor.js");
 
 /**
+ * Calculate bounding box that encompasses all selected items
+ */
+function calculateMultiSelectBounds(selectedItems, mapData, canvasRef, geometry) {
+  if (!selectedItems?.length || !canvasRef?.current || !mapData) return null;
+  
+  const canvas = canvasRef.current;
+  const { gridSize, viewState, northDirection } = mapData;
+  const { zoom, center } = viewState;
+  const scaledGridSize = gridSize * zoom;
+  
+  const centerX = canvas.width / 2;
+  const centerY = canvas.height / 2;
+  const offsetX = centerX - center.x * scaledGridSize;
+  const offsetY = centerY - center.y * scaledGridSize;
+  
+  // Account for canvas position within container
+  const rect = canvas.getBoundingClientRect();
+  const containerRect = canvas.parentElement.getBoundingClientRect();
+  const canvasOffsetX = rect.left - containerRect.left;
+  const canvasOffsetY = rect.top - containerRect.top;
+  const scaleX = rect.width / canvas.width;
+  const scaleY = rect.height / canvas.height;
+  
+  const activeLayer = getActiveLayer(mapData);
+  
+  let minScreenX = Infinity;
+  let minScreenY = Infinity;
+  let maxScreenX = -Infinity;
+  let maxScreenY = -Infinity;
+  
+  for (const item of selectedItems) {
+    if (item.type === 'object') {
+      const obj = activeLayer.objects?.find(o => o.id === item.id);
+      if (!obj) continue;
+      
+      const pos = calculateObjectScreenPosition(obj, canvas, mapData, geometry);
+      if (!pos) continue;
+      
+      const left = pos.screenX - pos.objectWidth / 2;
+      const right = pos.screenX + pos.objectWidth / 2;
+      const top = pos.screenY - pos.objectHeight / 2;
+      const bottom = pos.screenY + pos.objectHeight / 2;
+      
+      minScreenX = Math.min(minScreenX, left);
+      maxScreenX = Math.max(maxScreenX, right);
+      minScreenY = Math.min(minScreenY, top);
+      maxScreenY = Math.max(maxScreenY, bottom);
+    } else if (item.type === 'text') {
+      const label = activeLayer.textLabels?.find(l => l.id === item.id);
+      if (!label) continue;
+      
+      // Get label position in screen space
+      let screenX = offsetX + label.position.x * zoom;
+      let screenY = offsetY + label.position.y * zoom;
+      
+      // Apply canvas rotation if present
+      if (northDirection !== 0) {
+        const relX = screenX - centerX;
+        const relY = screenY - centerY;
+        const angleRad = (northDirection * Math.PI) / 180;
+        const rotatedX = relX * Math.cos(angleRad) - relY * Math.sin(angleRad);
+        const rotatedY = relX * Math.sin(angleRad) + relY * Math.cos(angleRad);
+        screenX = centerX + rotatedX;
+        screenY = centerY + rotatedY;
+      }
+      
+      // Approximate label bounds
+      const fontSize = (label.fontSize || 16) * zoom;
+      const approxWidth = fontSize * 3; // Rough estimate
+      const approxHeight = fontSize * 1.5;
+      
+      const left = (screenX * scaleX) + canvasOffsetX - approxWidth / 2;
+      const right = (screenX * scaleX) + canvasOffsetX + approxWidth / 2;
+      const top = (screenY * scaleY) + canvasOffsetY - approxHeight / 2;
+      const bottom = (screenY * scaleY) + canvasOffsetY + approxHeight / 2;
+      
+      minScreenX = Math.min(minScreenX, left);
+      maxScreenX = Math.max(maxScreenX, right);
+      minScreenY = Math.min(minScreenY, top);
+      maxScreenY = Math.max(maxScreenY, bottom);
+    }
+  }
+  
+  if (minScreenX === Infinity) return null;
+  
+  return {
+    screenX: (minScreenX + maxScreenX) / 2,
+    screenY: (minScreenY + maxScreenY) / 2,
+    width: maxScreenX - minScreenX,
+    height: maxScreenY - minScreenY,
+    top: minScreenY,
+    bottom: maxScreenY
+  };
+}
+
+/**
+ * MultiSelectToolbar Component
+ * Shows simplified toolbar for multiple selected items
+ */
+const MultiSelectToolbar = ({
+  selectedItems,
+  selectionCount,
+  mapData,
+  canvasRef,
+  containerRef,
+  geometry,
+  onRotateAll,
+  onDuplicateAll,
+  onDeleteAll
+}) => {
+  if (!selectedItems?.length || !mapData || !canvasRef?.current || !containerRef?.current) {
+    return null;
+  }
+  
+  // Calculate bounding box of all selected items
+  const bounds = calculateMultiSelectBounds(selectedItems, mapData, canvasRef, geometry);
+  if (!bounds) return null;
+  
+  // Calculate toolbar dimensions
+  const buttonSize = 44;
+  const buttonGap = 4;
+  const toolbarGap = 4;
+  const countBadgeWidth = 80;
+  
+  // Buttons: Count badge + Rotate All + Duplicate All + Delete All
+  const buttonCount = 3;
+  const toolbarWidth = countBadgeWidth + buttonGap + buttonCount * buttonSize + (buttonCount - 1) * buttonGap;
+  const toolbarHeight = buttonSize;
+  
+  // Get container bounds for edge detection
+  const containerRect = containerRef.current.getBoundingClientRect();
+  const containerHeight = containerRect.height;
+  
+  // Determine if we need to flip above
+  const spaceBelow = containerHeight - bounds.bottom;
+  const shouldFlipAbove = spaceBelow < toolbarHeight + toolbarGap + 20;
+  
+  // Calculate toolbar position
+  let toolbarX = bounds.screenX - toolbarWidth / 2;
+  let toolbarY;
+  
+  if (shouldFlipAbove) {
+    toolbarY = bounds.top - toolbarGap - toolbarHeight;
+  } else {
+    toolbarY = bounds.bottom + toolbarGap;
+  }
+  
+  // Clamp horizontal position to container bounds
+  const minX = 4;
+  const maxX = containerRect.width - toolbarWidth - 4;
+  toolbarX = Math.max(minX, Math.min(maxX, toolbarX));
+  
+  // Count objects and text labels
+  const objectCount = selectedItems.filter(i => i.type === 'object').length;
+  const textCount = selectedItems.filter(i => i.type === 'text').length;
+  
+  return (
+    <div 
+      className="dmt-selection-toolbar dmt-multi-select-toolbar"
+      style={{
+        position: 'absolute',
+        left: `${toolbarX}px`,
+        top: `${toolbarY}px`,
+        pointerEvents: 'auto',
+        zIndex: 150
+      }}
+    >
+      {/* Selection count badge */}
+      <div className="dmt-selection-count">
+        <dc.Icon icon="lucide-box-select" size={14} />
+        <span>{selectionCount || selectedItems.length} selected</span>
+      </div>
+      
+      {/* Rotate All */}
+      <button
+        className="dmt-toolbar-button"
+        onClick={onRotateAll}
+        title="Rotate All 90°"
+      >
+        <dc.Icon icon="lucide-rotate-cw" />
+      </button>
+      
+      {/* Duplicate All */}
+      <button
+        className="dmt-toolbar-button"
+        onClick={onDuplicateAll}
+        title="Duplicate All"
+      >
+        <dc.Icon icon="lucide-copy" />
+      </button>
+      
+      {/* Delete All */}
+      <button
+        className="dmt-toolbar-button dmt-toolbar-delete-button"
+        onClick={onDeleteAll}
+        title="Delete All"
+      >
+        <dc.Icon icon="lucide-trash-2" />
+      </button>
+    </div>
+  );
+};
+
+/**
  * Calculate bounding box for a text label in screen coordinates
  */
 function calculateTextLabelBounds(label, canvasRef, mapData) {
@@ -85,6 +289,9 @@ function calculateTextLabelBounds(label, canvasRef, mapData) {
 const SelectionToolbar = ({
   // Selection info
   selectedItem,
+  selectedItems,      // Array of all selected items for multi-select
+  hasMultiSelection,  // True when multiple items selected
+  selectionCount,     // Number of selected items
   mapData,
   canvasRef,
   containerRef,
@@ -99,6 +306,11 @@ const SelectionToolbar = ({
   onDelete,
   onScaleChange,  // handler for scale slider
   onDuplicate,    // handler for duplicating object
+  
+  // Multi-select handlers
+  onRotateAll,
+  onDuplicateAll,
+  onDeleteAll,
   
   // Text-specific handlers
   onEdit,
@@ -118,6 +330,23 @@ const SelectionToolbar = ({
   pendingCustomColorRef,
   colorButtonRef
 }) => {
+  // Handle multi-select mode
+  if (hasMultiSelection && selectedItems?.length > 1) {
+    return (
+      <MultiSelectToolbar
+        selectedItems={selectedItems}
+        selectionCount={selectionCount}
+        mapData={mapData}
+        canvasRef={canvasRef}
+        containerRef={containerRef}
+        geometry={geometry}
+        onRotateAll={onRotateAll}
+        onDuplicateAll={onDuplicateAll}
+        onDeleteAll={onDeleteAll}
+      />
+    );
+  }
+  
   // Don't render if no selection or missing dependencies
   if (!selectedItem || !mapData || !canvasRef?.current || !containerRef?.current) {
     return null;
@@ -315,7 +544,7 @@ const SelectionToolbar = ({
               onClick={(e) => {
                 if (onRotate) onRotate(e);
               }}
-              title="Rotate 90Â° (or press R)"
+              title="Rotate 90Ã‚Â° (or press R)"
             >
               <dc.Icon icon="lucide-rotate-cw" />
             </button>
@@ -428,7 +657,7 @@ const SelectionToolbar = ({
             <button
               className="dmt-toolbar-button"
               onClick={onRotate}
-              title="Rotate 90Â° (or press R)"
+              title="Rotate 90Ã‚Â° (or press R)"
             >
               <dc.Icon icon="lucide-rotate-cw" />
             </button>

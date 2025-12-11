@@ -1147,6 +1147,32 @@ button.dmt-orientation-btn,
   z-index: 150;
 }
 
+/* Multi-select toolbar styling */
+.dmt-multi-select-toolbar {
+  align-items: center;
+}
+
+.dmt-selection-count {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  height: 44px;
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.dmt-selection-count svg {
+  width: 14px;
+  height: 14px;
+  opacity: 0.9;
+}
+
 .dmt-toolbar-button {
   width: 44px;
   height: 44px;

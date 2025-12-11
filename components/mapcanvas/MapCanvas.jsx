@@ -18,6 +18,7 @@ const { NotePinLayer } = await requireModuleByName("NotePinLayer.jsx");
 const { EventHandlerProvider } = await requireModuleByName("EventHandlerContext.jsx");
 const { HexCoordinateLayer } = await requireModuleByName("HexCoordinateLayer.jsx");
 const { MeasurementLayer } = await requireModuleByName("MeasurementLayer.jsx");
+const { AreaSelectLayer } = await requireModuleByName("AreaSelectLayer.jsx");
 const { getSetting } = await requireModuleByName("settingsAccessor.js");
 const { usePanZoomCoordinator } = await requireModuleByName("usePanZoomCoordinator.js");
 const { useEventCoordinator } = await requireModuleByName("useEventCoordinator.js");
@@ -70,6 +71,7 @@ const MapCanvasContent = ({ mapData, onCellsChange, onObjectsChange, onTextLabel
   // Use shared selection from context (same state ObjectLayer uses)
   const {
     selectedItem, setSelectedItem,
+    selectedItems,
     isDraggingSelection, setIsDraggingSelection,
     dragStart, setDragStart,
     isResizeMode, setIsResizeMode,
@@ -163,7 +165,7 @@ const MapCanvasContent = ({ mapData, onCellsChange, onObjectsChange, onTextLabel
   }, [isAnimating]);
 
   // Render canvas whenever relevant state changes
-  useCanvasRenderer(canvasRef, mapData, geometry, selectedItem, isResizeMode, theme, showCoordinates, layerVisibility);
+  useCanvasRenderer(canvasRef, mapData, geometry, selectedItems, isResizeMode, theme, showCoordinates, layerVisibility);
 
   // Trigger redraw when canvas dimensions change (from expand/collapse)
   dc.useEffect(() => {
@@ -388,5 +390,6 @@ MapCanvas.TextLayer = TextLayer;
 MapCanvas.NotePinLayer = NotePinLayer;
 MapCanvas.HexCoordinateLayer = HexCoordinateLayer;
 MapCanvas.MeasurementLayer = MeasurementLayer;
+MapCanvas.AreaSelectLayer = AreaSelectLayer;
 
 return { MapCanvas };
