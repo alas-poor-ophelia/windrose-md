@@ -700,6 +700,59 @@ button.dmt-orientation-btn,
 }
 
 /* ============================================
+   CONTROLS DRAWER (Collapsible Animation)
+   ============================================ */
+
+/* Invisible overlay to capture taps outside controls (touch devices) */
+.dmt-controls-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 99; /* Just below controls (100) */
+  background: transparent;
+  cursor: default;
+}
+
+.dmt-controls-drawer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+  overflow: hidden;
+}
+
+/* Compass slides down to make room for expand button */
+.dmt-compass-animated {
+  transform: translateY(-43px);  /* Button height (35px) + gap (8px) */
+  transition: transform 180ms cubic-bezier(0.25, 0.1, 0.25, 1);  /* Near-linear with subtle ease-out */
+}
+
+.dmt-compass-revealed {
+  transform: translateY(0);
+}
+
+.dmt-drawer-item {
+  opacity: 0;
+  transform: translateY(-20px) scale(0.8);
+  pointer-events: none;
+  transition-property: opacity, transform;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Upward slide variant for items above the compass */
+.dmt-drawer-item-up {
+  transform: translateY(20px) scale(0.8);
+}
+
+.dmt-drawer-item-visible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+}
+
+/* ============================================
    OBJECT SIDEBAR
    ============================================ */
 
@@ -2458,7 +2511,7 @@ button.dmt-orientation-btn,
   position: absolute;
   top: 128px; /* Below MapHeader + ToolPalette + extra spacing for iPad/mobile (header ~44px + palette ~60px + container padding 12px + gap 12px) */
   left: 50%;
-  transform: translateX(-50%);
+  transform: translateX(-50%) translateY(-20px);
   display: flex;
   gap: 4px;
   padding: 4px;
@@ -2469,18 +2522,15 @@ button.dmt-orientation-btn,
   box-shadow:
     0 4px 12px rgba(0, 0, 0, 0.5),
     inset 0 0 0 1px rgba(196, 165, 123, 0.2);
-  animation: dmt-visibility-slide-in 0.15s ease-out;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 200ms ease-out, transform 200ms ease-out;
 }
 
-@keyframes dmt-visibility-slide-in {
-  from {
-    opacity: 0;
-    transform: translateX(-50%) translateY(-8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0);
-  }
+.dmt-visibility-toolbar-open {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+  pointer-events: auto;
 }
 
 .dmt-visibility-btn {
@@ -2650,12 +2700,20 @@ button.dmt-orientation-btn,
 .dmt-layer-controls {
   position: absolute;
   top: 50%;
-  transform: translateY(-50%);
+  transform: translateY(-50%) translateX(-20px);
   display: flex;
   flex-direction: column;
   gap: 4px;
   z-index: 150;
-  transition: left 0.3s ease;
+  opacity: 0;
+  pointer-events: none;
+  transition: left 0.3s ease, opacity 200ms ease-out, transform 200ms ease-out;
+}
+
+.dmt-layer-controls.dmt-layer-controls-open {
+  opacity: 1;
+  transform: translateY(-50%) translateX(0);
+  pointer-events: auto;
 }
 
 .dmt-layer-controls.sidebar-open {
@@ -2818,4 +2876,3 @@ button.dmt-layer-add-btn {
   transform: scale(1.05);
   box-shadow: 0 0 12px rgba(196, 165, 123, 0.5);
 }
-

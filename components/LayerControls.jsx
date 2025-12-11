@@ -31,7 +31,8 @@ const LayerControls = ({
   onLayerAdd,
   onLayerDelete,
   onLayerReorder,
-  sidebarCollapsed
+  sidebarCollapsed,
+  isOpen = true
 }) => {
   // Track which layer has options expanded
   const [expandedLayerId, setExpandedLayerId] = dc.useState(null);
@@ -193,7 +194,7 @@ const LayerControls = ({
       )}
       
       <div 
-        className={`dmt-layer-controls ${sidebarCollapsed ? 'sidebar-closed' : 'sidebar-open'}`}
+        className={`dmt-layer-controls ${sidebarCollapsed ? 'sidebar-closed' : 'sidebar-open'} ${isOpen ? 'dmt-layer-controls-open' : ''}`}
       >
         {/* Layer Buttons (top layer first visually) */}
       {reversedLayers.map((layer, visualIndex) => {

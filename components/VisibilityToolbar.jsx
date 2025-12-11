@@ -17,8 +17,6 @@ const VisibilityToolbar = ({
   onToggleLayer,
   mapType 
 }) => {
-  if (!isOpen) return null;
-  
   const layers = [
     { 
       id: 'objects', 
@@ -42,7 +40,7 @@ const VisibilityToolbar = ({
   const visibleLayers = layers.filter(layer => !layer.hexOnly || mapType === 'hex');
   
   return (
-    <div className="dmt-visibility-toolbar">
+    <div className={`dmt-visibility-toolbar ${isOpen ? 'dmt-visibility-toolbar-open' : ''}`}>
       {visibleLayers.map(layer => {
         const isVisible = layerVisibility[layer.id];
         

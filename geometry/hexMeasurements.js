@@ -16,8 +16,8 @@
  * - corner-to-corner: Distance between opposite vertices (point-to-point)
  * 
  * For both flat-top and pointy-top hexes:
- * - Edge-to-edge = 2 * hexSize
- * - Corner-to-corner = sqrt(3) * hexSize
+ * - Corner-to-corner = 2 * hexSize (vertex to opposite vertex)
+ * - Edge-to-edge = sqrt(3) * hexSize (flat side to opposite flat side)
  */
 
 // Measurement method constants
@@ -39,11 +39,11 @@ const MAX_FINE_TUNE_OFFSET = 3;    // Maximum fine-tune adjustment in pixels
  */
 function measurementToHexSize(size, method, orientation = 'flat') {
   if (method === MEASUREMENT_EDGE) {
-    // Edge-to-edge is always 2 * hexSize regardless of orientation
-    return size / 2;
-  } else {
-    // Corner-to-corner is sqrt(3) * hexSize regardless of orientation
+    // Edge-to-edge = sqrt(3) * hexSize, so hexSize = size / sqrt(3)
     return size / Math.sqrt(3);
+  } else {
+    // Corner-to-corner = 2 * hexSize, so hexSize = size / 2
+    return size / 2;
   }
 }
 
@@ -57,9 +57,11 @@ function measurementToHexSize(size, method, orientation = 'flat') {
  */
 function hexSizeToMeasurement(hexSize, method, orientation = 'flat') {
   if (method === MEASUREMENT_EDGE) {
-    return hexSize * 2;
-  } else {
+    // Edge-to-edge = sqrt(3) * hexSize
     return hexSize * Math.sqrt(3);
+  } else {
+    // Corner-to-corner = 2 * hexSize
+    return hexSize * 2;
   }
 }
 
@@ -207,7 +209,7 @@ function validateFineTune(baseHexSize, adjustedHexSize) {
   if (offset > MAX_FINE_TUNE_OFFSET) {
     return { 
       valid: false, 
-      error: `Fine-tune adjustment limited to ±${MAX_FINE_TUNE_OFFSET}px` 
+      error: `Fine-tune adjustment limited to Â±${MAX_FINE_TUNE_OFFSET}px` 
     };
   }
   return { valid: true, error: null };
