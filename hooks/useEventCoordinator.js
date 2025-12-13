@@ -53,6 +53,7 @@ const useEventCoordinator = ({
     const panZoomHandlers = getHandlers('panZoom');
     const measureHandlers = getHandlers('measure');
     const alignmentHandlers = getHandlers('imageAlignment');
+    const fogHandlers = getHandlers('fogOfWar');
     
     if (!panZoomHandlers) return;
     
@@ -159,6 +160,7 @@ const useEventCoordinator = ({
       type: eventType,
       clientX: clientX,
       clientY: clientY,
+      button: e.button ?? 0,  // Include button for click detection (default 0 for touch)
       preventDefault: () => {},
       stopPropagation: () => {},
       target: targetElement
@@ -170,6 +172,12 @@ const useEventCoordinator = ({
       if (spaceKeyPressed && !isTouchEvent) {
         panStartPositionRef.current = { x: clientX, y: clientY };
         startPan(clientX, clientY);
+        return;
+      }
+      
+      // Fog of War tools take precedence when active
+      if (fogHandlers?.handlePointerDown) {
+        fogHandlers.handlePointerDown(syntheticEvent);
         return;
       }
       
@@ -330,6 +338,7 @@ const useEventCoordinator = ({
     const panZoomHandlers = getHandlers('panZoom');
     const measureHandlers = getHandlers('measure');
     const alignmentHandlers = getHandlers('imageAlignment');
+    const fogHandlers = getHandlers('fogOfWar');
     
     if (!panZoomHandlers) return;
     
@@ -404,6 +413,12 @@ const useEventCoordinator = ({
       return;
     }
     
+    // Handle Fog of War tools
+    if (fogHandlers?.handlePointerMove) {
+      fogHandlers.handlePointerMove(e);
+      // Don't return - allow hover updates to still work
+    }
+    
     // Handle drawing tools (including edge tools)
     if (currentTool === 'draw' || currentTool === 'erase' || 
         currentTool === 'rectangle' || currentTool === 'circle' || 
@@ -449,6 +464,7 @@ const useEventCoordinator = ({
     const textHandlers = getHandlers('text');
     const panZoomHandlers = getHandlers('panZoom');
     const alignmentHandlers = getHandlers('imageAlignment');
+    const fogHandlers = getHandlers('fogOfWar');
     
     if (!panZoomHandlers) return;
     
@@ -547,6 +563,11 @@ const useEventCoordinator = ({
       if (drawingHandlers?.stopDrawing) {
         drawingHandlers.stopDrawing(e);
       }
+    }
+    
+    // Handle Fog of War tools
+    if (fogHandlers?.handlePointerUp) {
+      fogHandlers.handlePointerUp(e);
     }
   }, [currentTool, recentMultiTouch, isDraggingSelection, dragStart, selectedItem, setSelectedItem, isGroupDragging, stopGroupDrag, getHandlers, isAlignmentMode]);
   

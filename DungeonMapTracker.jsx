@@ -17,7 +17,10 @@ const combinedCss = [
 
 
 const { useMapData } = await requireModuleByName("useMapData.js");
-const { useHistory } = await requireModuleByName("useHistory.js");
+const { useLayerHistory } = await requireModuleByName("useLayerHistory.js");
+const { useToolState } = await requireModuleByName("useToolState.js");
+const { useFogOfWar } = await requireModuleByName("useFogOfWar.js");
+const { useDataHandlers } = await requireModuleByName("useDataHandlers.js");
 const { GridGeometry } = await requireModuleByName("GridGeometry.js");
 const { HexGeometry } = await requireModuleByName("HexGeometry.js");
 const { MapHeader } = await requireModuleByName("MapHeader.jsx");
@@ -30,19 +33,12 @@ const { SettingsPluginInstaller, shouldOfferUpgrade } = await requireModuleByNam
 const { MapSettingsModal } = await requireModuleByName("MapSettingsModal.jsx");
 const { getSetting, getTheme, getEffectiveSettings } = await requireModuleByName("settingsAccessor.js");
 const { DEFAULTS } = await requireModuleByName("dmtConstants.js");
-const { DEFAULT_COLOR, getColorByHex, isDefaultColor } = await requireModuleByName("colorOperations.js");
+const { getColorByHex, isDefaultColor } = await requireModuleByName("colorOperations.js");
 const { axialToOffset, isWithinOffsetBounds } = await requireModuleByName("offsetCoordinates.js");
 const { ImageAlignmentMode } = await requireModuleByName("ImageAlignmentMode.jsx");
 
 // Layer system support (Phase 1: Z-Layer Architecture)
-const { 
-  getActiveLayer, 
-  updateActiveLayer, 
-  addLayer, 
-  removeLayer, 
-  reorderLayers, 
-  setActiveLayer
-} = await requireModuleByName("layerAccessor.js");
+const { getActiveLayer } = await requireModuleByName("layerAccessor.js");
 const { LayerControls } = await requireModuleByName("LayerControls.jsx");
 
 // RPGAwesome icon font support
@@ -113,11 +109,16 @@ const CornerBracket = ({ position }) => {
 
 const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'grid' }) => {
   const { mapData, isLoading, saveStatus, updateMapData, forceSave } = useMapData(mapId, mapName, mapType);
-  const [currentTool, setCurrentTool] = dc.useState('draw');
-  const [selectedObjectType, setSelectedObjectType] = dc.useState(null);
-  const [selectedColor, setSelectedColor] = dc.useState(DEFAULT_COLOR);
-  const [selectedOpacity, setSelectedOpacity] = dc.useState(1);  // Opacity for painting (0-1)
-  const [isColorPickerOpen, setIsColorPickerOpen] = dc.useState(false);
+  
+  // Tool and color state (extracted to useToolState hook)
+  const {
+    currentTool, setCurrentTool,
+    selectedObjectType, setSelectedObjectType,
+    selectedColor, setSelectedColor,
+    selectedOpacity, setSelectedOpacity,
+    isColorPickerOpen, setIsColorPickerOpen
+  } = useToolState();
+  
   const [showFooter, setShowFooter] = dc.useState(false);
   const [isFocused, setIsFocused] = dc.useState(false);
   const [isExpanded, setIsExpanded] = dc.useState(false);
@@ -150,6 +151,37 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     }));
   }, []);
   
+  // Create geometry instance for coordinate conversions
+  // Same logic as MapCanvas for consistency
+  const geometry = dc.useMemo(() => {
+    if (!mapData) return null;
+
+    const currentMapType = mapData.mapType || DEFAULTS.mapType;
+
+    if (currentMapType === 'hex') {
+      const hexSize = mapData.hexSize || DEFAULTS.hexSize;
+      const orientation = mapData.orientation || DEFAULTS.hexOrientation;
+      const hexBounds = mapData.hexBounds || null;
+      return new HexGeometry(hexSize, orientation, hexBounds);
+    } else {
+      const gridSize = mapData.gridSize || DEFAULTS.gridSize;
+      return new GridGeometry(gridSize);
+    }
+  }, [mapData?.mapType, mapData?.gridSize, mapData?.hexSize, mapData?.orientation, mapData?.hexBounds]);
+  
+  // Fog of War state and handlers (extracted to useFogOfWar hook)
+  const {
+    showFogTools,
+    fogActiveTool,
+    currentFogState,
+    handleFogToolsToggle,
+    handleFogToolSelect,
+    handleFogVisibilityToggle,
+    handleFogFillAll,
+    handleFogClearAll,
+    handleFogChange
+  } = useFogOfWar({ mapData, geometry, updateMapData });
+
   // Get current theme with effective settings (global + map overrides)
   // This will be called on every render, fetching fresh settings each time
   const effectiveSettings = mapData ? getEffectiveSettings(mapData.settings) : null;
@@ -180,24 +212,6 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
         ? (effectiveSettings.canvasHeightMobile ?? 400)
         : (effectiveSettings.canvasHeight ?? 600))
     : (isTouchDevice ? 400 : 600);
-  
-  // Create geometry instance for export operations
-  // Same logic as MapCanvas for consistency
-  const geometry = dc.useMemo(() => {
-    if (!mapData) return null;
-
-    const currentMapType = mapData.mapType || DEFAULTS.mapType;
-
-    if (currentMapType === 'hex') {
-      const hexSize = mapData.hexSize || DEFAULTS.hexSize;
-      const orientation = mapData.orientation || DEFAULTS.hexOrientation;
-      const hexBounds = mapData.hexBounds || null;
-      return new HexGeometry(hexSize, orientation, hexBounds);
-    } else {
-      const gridSize = mapData.gridSize || DEFAULTS.gridSize;
-      return new GridGeometry(gridSize);
-    }
-  }, [mapData?.mapType, mapData?.gridSize, mapData?.hexSize, mapData?.orientation, mapData?.hexBounds]);
 
   // Check if settings plugin is installed
   dc.useEffect(() => {
@@ -297,18 +311,36 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     setShowPluginInstaller(false);
   };
 
-  // Initialize history with empty state (including objects, text labels, and edges)
+  // Layer and history management (extracted to useLayerHistory hook)
   const {
-    currentState: historyState,
-    addToHistory,
-    undo,
-    redo,
+    // Layer management
+    handleLayerSelect,
+    handleLayerAdd,
+    handleLayerDelete,
+    handleLayerReorder,
+    // History state
     canUndo,
     canRedo,
-    resetHistory,
-    getHistoryState,
-    restoreHistoryState
-  } = useHistory({ cells: [], name: "", objects: [], textLabels: [], edges: [] });
+    // History actions
+    handleUndo,
+    handleRedo,
+    // For data change handlers
+    addToHistory,
+    isApplyingHistory
+  } = useLayerHistory({ mapData, updateMapData, isLoading });
+
+  // Data change handlers (extracted to useDataHandlers hook)
+  const {
+    handleNameChange,
+    handleCellsChange,
+    handleObjectsChange,
+    handleTextLabelsChange,
+    handleEdgesChange,
+    handleAddCustomColor,
+    handleDeleteCustomColor,
+    handleViewStateChange,
+    handleSidebarCollapseChange
+  } = useDataHandlers({ mapData, updateMapData, addToHistory, isApplyingHistory });
 
   const containerRef = dc.useRef(null);
 
@@ -346,337 +378,6 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     };
   }, [isExpanded, isAnimating]);
 
-  // Track if we're applying history (to avoid adding to history during undo/redo)
-  const isApplyingHistoryRef = dc.useRef(false);
-  const historyInitialized = dc.useRef(false);
-  
-  // Cache history state per layer (keyed by layer ID)
-  const layerHistoryCache = dc.useRef({});
-
-  // Initialize history when map data loads (only once)
-  dc.useEffect(() => {
-    if (mapData && !isLoading && !historyInitialized.current) {
-      const activeLayer = getActiveLayer(mapData);
-      resetHistory({
-        cells: activeLayer.cells,
-        name: mapData.name,
-        objects: activeLayer.objects || [],
-        textLabels: activeLayer.textLabels || [],
-        edges: activeLayer.edges || []
-      });
-      historyInitialized.current = true;
-    }
-  }, [mapData, isLoading]);
-
-  // ============================================================================
-  // LAYER MANAGEMENT HANDLERS (Z-Layer System)
-  // ============================================================================
-  
-  // Switch to a different layer
-  const handleLayerSelect = dc.useCallback((layerId) => {
-    if (!mapData || mapData.activeLayerId === layerId) return;
-    
-    // Save current layer's history before switching
-    const currentLayerId = mapData.activeLayerId;
-    layerHistoryCache.current[currentLayerId] = getHistoryState();
-    
-    const newMapData = setActiveLayer(mapData, layerId);
-    updateMapData(newMapData);
-    
-    // Restore new layer's history or initialize if none cached
-    const cachedHistory = layerHistoryCache.current[layerId];
-    if (cachedHistory) {
-      restoreHistoryState(cachedHistory);
-    } else {
-      // No cached history for this layer - initialize fresh
-      const newActiveLayer = getActiveLayer(newMapData);
-      historyInitialized.current = false;
-      resetHistory({
-        cells: newActiveLayer.cells,
-        name: newMapData.name,
-        objects: newActiveLayer.objects || [],
-        textLabels: newActiveLayer.textLabels || [],
-        edges: newActiveLayer.edges || []
-      });
-      historyInitialized.current = true;
-    }
-  }, [mapData, updateMapData, getHistoryState, restoreHistoryState, resetHistory]);
-  
-  // Add a new layer
-  const handleLayerAdd = dc.useCallback(() => {
-    if (!mapData) return;
-    
-    // Save current layer's history before switching
-    const currentLayerId = mapData.activeLayerId;
-    layerHistoryCache.current[currentLayerId] = getHistoryState();
-    
-    const newMapData = addLayer(mapData);
-    updateMapData(newMapData);
-    
-    // New layer always starts with fresh history
-    const newActiveLayer = getActiveLayer(newMapData);
-    historyInitialized.current = false;
-    resetHistory({
-      cells: newActiveLayer.cells,
-      name: newMapData.name,
-      objects: newActiveLayer.objects || [],
-      textLabels: newActiveLayer.textLabels || [],
-      edges: newActiveLayer.edges || []
-    });
-    historyInitialized.current = true;
-  }, [mapData, updateMapData, getHistoryState, resetHistory]);
-  
-  // Delete a layer
-  const handleLayerDelete = dc.useCallback((layerId) => {
-    if (!mapData) return;
-    
-    // removeLayer handles preventing deletion of last layer
-    const newMapData = removeLayer(mapData, layerId);
-    
-    // Only update if something changed
-    if (newMapData !== mapData) {
-      // Clear cached history for deleted layer
-      delete layerHistoryCache.current[layerId];
-      
-      updateMapData(newMapData);
-      
-      // If active layer changed, restore or init history for new active layer
-      if (newMapData.activeLayerId !== mapData.activeLayerId) {
-        const cachedHistory = layerHistoryCache.current[newMapData.activeLayerId];
-        if (cachedHistory) {
-          restoreHistoryState(cachedHistory);
-        } else {
-          const newActiveLayer = getActiveLayer(newMapData);
-          historyInitialized.current = false;
-          resetHistory({
-            cells: newActiveLayer.cells,
-            name: newMapData.name,
-            objects: newActiveLayer.objects || [],
-            textLabels: newActiveLayer.textLabels || [],
-            edges: newActiveLayer.edges || []
-          });
-          historyInitialized.current = true;
-        }
-      }
-    }
-  }, [mapData, updateMapData, restoreHistoryState, resetHistory]);
-  
-  // Reorder layers
-  const handleLayerReorder = dc.useCallback((layerId, newIndex) => {
-    if (!mapData) return;
-    
-    const newMapData = reorderLayers(mapData, layerId, newIndex);
-    updateMapData(newMapData);
-  }, [mapData, updateMapData]);
-
-  // Handle map name change
-  const handleNameChange = (newName) => {
-    if (isApplyingHistoryRef.current) return;
-
-    const newMapData = { ...mapData, name: newName };
-    updateMapData(newMapData);
-    const activeLayer = getActiveLayer(mapData);
-    addToHistory({
-      cells: activeLayer.cells,
-      name: newName,
-      objects: activeLayer.objects || [],
-      textLabels: activeLayer.textLabels || [],
-      edges: activeLayer.edges || []
-    });
-  };
-
-  // Handle cells change (unified handler for all tools)
-  const handleCellsChange = (newCells, suppressHistory = false) => {
-    if (!mapData || isApplyingHistoryRef.current) return;
-
-    const newMapData = updateActiveLayer(mapData, { cells: newCells });
-    updateMapData(newMapData);
-
-    // Only add to history if not suppressed (used for batched stroke updates)
-    if (!suppressHistory) {
-      const activeLayer = getActiveLayer(mapData);
-      addToHistory({
-        cells: newCells,
-        name: mapData.name,
-        objects: activeLayer.objects || [],
-        textLabels: activeLayer.textLabels || [],
-        edges: activeLayer.edges || []
-      });
-    }
-  };
-
-  // Handle objects change
-  const handleObjectsChange = (newObjects, suppressHistory = false) => {
-    if (isApplyingHistoryRef.current) return;
-
-    // Use functional updater to ensure we have the latest mapData
-    updateMapData(currentMapData => {
-      if (!currentMapData) return currentMapData;
-      
-      const newMapData = updateActiveLayer(currentMapData, { objects: newObjects });
-      
-      // Handle history inside the updater to use correct state
-      if (!suppressHistory) {
-        const activeLayer = getActiveLayer(currentMapData);
-        addToHistory({
-          cells: activeLayer.cells,
-          name: currentMapData.name,
-          objects: newObjects,
-          textLabels: activeLayer.textLabels || [],
-          edges: activeLayer.edges || []
-        });
-      }
-      
-      return newMapData;
-    });
-  };
-
-  // Handle text labels change
-  const handleTextLabelsChange = (newTextLabels, suppressHistory = false) => {
-    if (isApplyingHistoryRef.current) return;
-
-    // Use functional updater to ensure we have the latest mapData
-    updateMapData(currentMapData => {
-      if (!currentMapData) return currentMapData;
-      
-      const newMapData = updateActiveLayer(currentMapData, { textLabels: newTextLabels });
-
-      // Handle history inside the updater to use correct state
-      if (!suppressHistory) {
-        const activeLayer = getActiveLayer(currentMapData);
-        addToHistory({
-          cells: activeLayer.cells,
-          name: currentMapData.name,
-          objects: activeLayer.objects || [],
-          textLabels: newTextLabels,
-          edges: activeLayer.edges || []
-        });
-      }
-      
-      return newMapData;
-    });
-  };
-
-  // Handle edges change (for edge painting feature)
-  const handleEdgesChange = (newEdges, suppressHistory = false) => {
-    if (!mapData || isApplyingHistoryRef.current) return;
-
-    const newMapData = updateActiveLayer(mapData, { edges: newEdges });
-    updateMapData(newMapData);
-
-    // Only add to history if not suppressed (used for batched operations)
-    if (!suppressHistory) {
-      const activeLayer = getActiveLayer(mapData);
-      addToHistory({
-        cells: activeLayer.cells,
-        name: mapData.name,
-        objects: activeLayer.objects || [],
-        textLabels: activeLayer.textLabels || [],
-        edges: newEdges
-      });
-    }
-  };
-
-  // Handle color change
-  const handleColorChange = (newColor) => {
-    setSelectedColor(newColor);
-  };
-
-  const handleAddCustomColor = (newColor) => {
-    if (!mapData) {
-      return;
-    }
-
-    // Generate a unique ID and label for the custom color
-    const customColorId = `custom-${Date.now()}`;
-    const customColorNumber = (mapData.customColors?.length || 0) + 1;
-    const customColorLabel = `Custom ${customColorNumber}`;
-
-    const newCustomColor = {
-      id: customColorId,
-      color: newColor,
-      label: customColorLabel
-    };
-
-    const newCustomColors = [...(mapData.customColors || []), newCustomColor];
-    const newMapData = {
-      ...mapData,
-      customColors: newCustomColors
-    };
-
-    updateMapData(newMapData);
-  };
-
-  const handleDeleteCustomColor = (colorId) => {
-    if (!mapData) {
-      return;
-    }
-
-    const newCustomColors = (mapData.customColors || []).filter(c => c.id !== colorId);
-    const newMapData = {
-      ...mapData,
-      customColors: newCustomColors
-    };
-
-    updateMapData(newMapData);
-  };
-
-  // Handle view state change (zoom/pan) - NOT tracked in history
-  const handleViewStateChange = (newViewState) => {
-    if (!mapData) return;
-    const newMapData = {
-      ...mapData,
-      viewState: newViewState
-    };
-    updateMapData(newMapData);
-  };
-
-  // Handle undo
-  const handleUndo = () => {
-    const previousState = undo();
-    if (previousState && mapData) {
-      isApplyingHistoryRef.current = true;
-      // Apply layer-specific data to active layer, name stays at root
-      const newMapData = updateActiveLayer(
-        { ...mapData, name: previousState.name },
-        {
-          cells: previousState.cells,
-          objects: previousState.objects || [],
-          textLabels: previousState.textLabels || [],
-          edges: previousState.edges || []
-        }
-      );
-      updateMapData(newMapData);
-      // Use setTimeout to ensure state update completes before re-enabling history
-      setTimeout(() => {
-        isApplyingHistoryRef.current = false;
-      }, 0);
-    }
-  };
-
-  // Handle redo
-  const handleRedo = () => {
-    const nextState = redo();
-    if (nextState && mapData) {
-      isApplyingHistoryRef.current = true;
-      // Apply layer-specific data to active layer, name stays at root
-      const newMapData = updateActiveLayer(
-        { ...mapData, name: nextState.name },
-        {
-          cells: nextState.cells,
-          objects: nextState.objects || [],
-          textLabels: nextState.textLabels || [],
-          edges: nextState.edges || []
-        }
-      );
-      updateMapData(newMapData);
-      // Use setTimeout to ensure state update completes before re-enabling history
-      setTimeout(() => {
-        isApplyingHistoryRef.current = false;
-      }, 0);
-    }
-  };
-
   // Zoom in (increase zoom by step)
   const handleZoomIn = () => {
     if (!mapData) return;
@@ -707,7 +408,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   const handleCompassClick = () => {
     if (!mapData) return;
 
-    // Cycle through: 0ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¦ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â° -> 90ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¦ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â° -> 180ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¦ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â° -> 270ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¦ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â° -> 0ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¦ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°
+    // Cycle through: 0 -> 90 -> 180 -> 270 -> 0 degrees
     const rotations = [0, 90, 180, 270];
     const currentIndex = rotations.indexOf(mapData.northDirection);
     const nextIndex = (currentIndex + 1) % rotations.length;
@@ -753,15 +454,6 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
       };
       updateMapData(newMapData);
     }
-  };
-
-  const handleSidebarCollapseChange = (isCollapsed) => {
-    if (!mapData) return;
-    const newMapData = {
-      ...mapData,
-      sidebarCollapsed: isCollapsed
-    };
-    updateMapData(newMapData);
   };
 
   const handleSettingsClick = () => {
@@ -939,7 +631,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
           canUndo={canUndo}
           canRedo={canRedo}
           selectedColor={selectedColor}
-          onColorChange={handleColorChange}
+          onColorChange={setSelectedColor}
           selectedOpacity={selectedOpacity}
           onOpacityChange={setSelectedOpacity}
           isColorPickerOpen={isColorPickerOpen}
@@ -956,6 +648,14 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
           layerVisibility={layerVisibility}
           onToggleLayer={handleToggleLayerVisibility}
           mapType={mapData.mapType}
+          // Fog of War props
+          fogOfWarState={currentFogState}
+          showFogTools={showFogTools}
+          onFogToolsToggle={handleFogToolsToggle}
+          onFogToolSelect={handleFogToolSelect}
+          onFogVisibilityToggle={handleFogVisibilityToggle}
+          onFogFillAll={handleFogFillAll}
+          onFogClearAll={handleFogClearAll}
         />
 
         <div
@@ -984,9 +684,11 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
             isOpen={showLayerPanel}
           />
 
+          {/* For hex maps, override northDirection to 0 for rendering while keeping real value for compass display */}
+          {/* This allows the compass to show and persist the north direction without actually rotating hex maps */}
           <div className="dmt-canvas-and-controls">
             <MapCanvas
-              mapData={mapData}
+              mapData={mapData.mapType === 'hex' ? { ...mapData, northDirection: 0 } : mapData}
               onCellsChange={handleCellsChange}
               onObjectsChange={handleObjectsChange}
               onTextLabelsChange={handleTextLabelsChange}
@@ -1040,6 +742,15 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 currentTool={currentTool}
                 selectedObjectType={selectedObjectType}
               />
+              
+              {/* FogOfWarLayer - handles fog painting/erasing interactions */}
+              {fogActiveTool && (
+                <MapCanvas.FogOfWarLayer
+                  activeTool={fogActiveTool}
+                  onFogChange={handleFogChange}
+                  onInitializeFog={(updatedMapData) => updateMapData(updatedMapData)}
+                />
+              )}
               
               {/* HexCoordinateLayer - displays coordinate labels when 'C' key is held */}
               <MapCanvas.HexCoordinateLayer />

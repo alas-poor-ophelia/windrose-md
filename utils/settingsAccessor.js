@@ -42,7 +42,12 @@ const FALLBACK_SETTINGS = {
   distanceUnitGrid: DEFAULTS.distance.unitGrid,
   distanceUnitHex: DEFAULTS.distance.unitHex,
   gridDiagonalRule: DEFAULTS.distance.gridDiagonalRule,
-  distanceDisplayFormat: DEFAULTS.distance.displayFormat
+  distanceDisplayFormat: DEFAULTS.distance.displayFormat,
+  
+  // Fog of War appearance settings
+  fogOfWarColor: THEME.fogOfWar.color,
+  fogOfWarOpacity: THEME.fogOfWar.opacity,
+  fogOfWarImage: null  // Optional: vault path to tileable image
 };
 
 /**
@@ -122,7 +127,12 @@ function getTheme() {
       size: THEME.compass.size
     },
     decorativeBorder: THEME.decorativeBorder,  // Hardcoded decorative border (not configurable)
-    coordinateKey: settings.coordinateKeyColor
+    coordinateKey: settings.coordinateKeyColor,
+    fogOfWar: {
+      color: settings.fogOfWarColor,
+      opacity: settings.fogOfWarOpacity,
+      image: settings.fogOfWarImage
+    }
   };
 }
 

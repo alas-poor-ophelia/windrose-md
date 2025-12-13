@@ -204,7 +204,7 @@ function createNewMap(mapId, mapName = '', mapType = 'grid') {
         edges: [],  // For edge painting (grid maps only)
         objects: [],
         textLabels: [],
-        fogOfWar: null  // Phase 2: Fog of War
+        fogOfWar: null  //Fog of War
       }
     ]
   };

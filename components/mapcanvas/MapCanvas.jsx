@@ -19,6 +19,7 @@ const { EventHandlerProvider } = await requireModuleByName("EventHandlerContext.
 const { HexCoordinateLayer } = await requireModuleByName("HexCoordinateLayer.jsx");
 const { MeasurementLayer } = await requireModuleByName("MeasurementLayer.jsx");
 const { AreaSelectLayer } = await requireModuleByName("AreaSelectLayer.jsx");
+const { FogOfWarLayer } = await requireModuleByName("FogOfWarLayer.jsx");
 const { getSetting } = await requireModuleByName("settingsAccessor.js");
 const { usePanZoomCoordinator } = await requireModuleByName("usePanZoomCoordinator.js");
 const { useEventCoordinator } = await requireModuleByName("useEventCoordinator.js");
@@ -391,5 +392,6 @@ MapCanvas.NotePinLayer = NotePinLayer;
 MapCanvas.HexCoordinateLayer = HexCoordinateLayer;
 MapCanvas.MeasurementLayer = MeasurementLayer;
 MapCanvas.AreaSelectLayer = AreaSelectLayer;
+MapCanvas.FogOfWarLayer = FogOfWarLayer;
 
 return { MapCanvas };

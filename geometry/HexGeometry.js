@@ -622,6 +622,46 @@ class HexGeometry extends BaseGeometry {
   }
   
   /**
+   * Convert axial hex coordinates to offset coordinates
+   * Offset coordinates provide a consistent integer-based addressing system
+   * for features like fog of war that need array-based storage.
+   * @param {number} gridX - Axial q coordinate (passed as gridX from worldToGrid)
+   * @param {number} gridY - Axial r coordinate (passed as gridY from worldToGrid)
+   * @returns {{col: number, row: number}} Offset coordinates
+   */
+  toOffsetCoords(gridX, gridY) {
+    // gridX/gridY are actually q/r from worldToGrid which returns {gridX: q, gridY: r}
+    return axialToOffset(gridX, gridY, this.orientation);
+  }
+  
+  /**
+   * Convert a cell object to offset coordinates
+   * Hex cells store axial (q, r) which need conversion to offset (col, row)
+   * @param {Object} cell - Cell object with q, r properties
+   * @returns {{col: number, row: number}} Offset coordinates
+   */
+  cellToOffsetCoords(cell) {
+    return axialToOffset(cell.q, cell.r, this.orientation);
+  }
+  
+  /**
+   * Check if this geometry has defined bounds
+   * Hex maps are bounded when hexBounds is configured
+   * @returns {boolean} True if bounds are defined
+   */
+  isBounded() {
+    return this.bounds !== null;
+  }
+  
+  /**
+   * Get the bounds for this geometry
+   * @returns {{maxCol: number, maxRow: number}|null} Bounds object or null
+   */
+  getBounds() {
+    return this.bounds;
+  }
+  
+  /**
    * Create a cell object in hex coordinate format
    * Abstraction layer for cell creation - isolates coordinate property naming
    * @param {{q: number, r: number}} coords - Hex coordinates from worldToGrid()

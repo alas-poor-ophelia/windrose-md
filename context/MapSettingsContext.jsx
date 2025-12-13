@@ -204,6 +204,27 @@ function MapSettingsProvider({
     });
   };
   
+  // Fog of War image handlers
+  const handleFogImageSearch = async (searchTerm) => {
+    if (!searchTerm?.trim()) {
+      dispatch({ type: Actions.SET_FOG_IMAGE_SEARCH_RESULTS, payload: [] });
+      return;
+    }
+    const allImages = await getImageDisplayNames();
+    const filtered = allImages.filter(name => name.toLowerCase().includes(searchTerm.toLowerCase()));
+    dispatch({ type: Actions.SET_FOG_IMAGE_SEARCH_RESULTS, payload: filtered.slice(0, 10) });
+  };
+  
+  const handleFogImageSelect = async (displayName) => {
+    const fullPath = await getFullPathFromDisplayName(displayName);
+    if (!fullPath) return;
+    
+    dispatch({
+      type: Actions.FOG_IMAGE_SELECTED,
+      payload: { path: fullPath, displayName }
+    });
+  };
+  
   // Core save logic - forceDelete bypasses orphan check
   const doSave = (forceDelete = false) => {
     dispatch({ type: Actions.SET_LOADING, payload: true });
@@ -348,7 +369,13 @@ function MapSettingsProvider({
     // Async
     handleImageSearch,
     handleImageSelect,
-    handleSave
+    handleSave,
+    
+    // Fog of War handlers
+    setFogImageDisplayName: (name) => dispatch({ type: Actions.SET_FOG_IMAGE_DISPLAY_NAME, payload: name }),
+    handleFogImageSearch,
+    handleFogImageSelect,
+    handleFogImageClear: () => dispatch({ type: Actions.CLEAR_FOG_IMAGE })
   };
   
   // ===========================================================================

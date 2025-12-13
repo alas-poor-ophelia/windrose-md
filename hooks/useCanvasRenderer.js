@@ -1,7 +1,7 @@
 const pathResolverPath = dc.resolvePath("pathResolver.js");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
-const { getTheme } = await requireModuleByName("settingsAccessor.js");
+const { getTheme, getEffectiveSettings } = await requireModuleByName("settingsAccessor.js");
 const { buildCellLookup, calculateBordersOptimized } = await requireModuleByName("borderCalculator.js");
 const { getObjectType } = await requireModuleByName("objectOperations.js");
 const { getRenderChar } = await requireModuleByName("objectTypeResolver.js");
@@ -13,8 +13,8 @@ const { gridRenderer } = await requireModuleByName("gridRenderer.js");
 const { hexRenderer } = await requireModuleByName("hexRenderer.js");
 const { getCachedImage } = await requireModuleByName("imageOperations.js");
 const { getSlotOffset, getMultiObjectScale, getObjectsInCell } = await requireModuleByName("hexSlotPositioner.js");
-const { offsetToAxial } = await requireModuleByName("offsetCoordinates.js");
-const { getActiveLayer } = await requireModuleByName("layerAccessor.js");
+const { offsetToAxial, axialToOffset } = await requireModuleByName("offsetCoordinates.js");
+const { getActiveLayer, isCellFogged } = await requireModuleByName("layerAccessor.js");
 
 /**
  * Get appropriate renderer for geometry type
@@ -449,6 +449,175 @@ function renderCanvas(canvas, mapData, geometry, selectedItems = [], isResizeMod
       ctx.fillText(label.content, 0, 0);
       
       ctx.restore();
+    }
+  }
+  
+  // =========================================================================
+  // FOG OF WAR RENDERING
+  // Renders after all content but before selection handles
+  // =========================================================================
+  if (activeLayer.fogOfWar && activeLayer.fogOfWar.enabled && activeLayer.fogOfWar.foggedCells?.length > 0) {
+    const fow = activeLayer.fogOfWar;
+    
+    // Get effective FoW settings (per-map override or global default)
+    const effectiveSettings = getEffectiveSettings(mapData.settings);
+    const fowColor = effectiveSettings.fogOfWarColor || '#000000';
+    const fowOpacity = effectiveSettings.fogOfWarOpacity ?? 0.9;
+    const fowImagePath = effectiveSettings.fogOfWarImage;
+    
+    // Determine fill style: pattern from image, or solid color
+    let fowFillStyle = null;
+    let useGlobalAlpha = false;
+    
+    if (fowImagePath) {
+      // Try to create pattern from tileable image
+      const fowImage = getCachedImage(fowImagePath);
+      if (fowImage && fowImage.complete && fowImage.naturalWidth > 0) {
+        try {
+          const pattern = ctx.createPattern(fowImage, 'repeat');
+          if (pattern) {
+            fowFillStyle = pattern;
+            useGlobalAlpha = true; // Apply opacity via globalAlpha for patterns
+          }
+        } catch (e) {
+          // Pattern creation failed, fall back to color
+          console.error('Failed to create FoW pattern:', e);
+        }
+      }
+    }
+    
+    // Fall back to solid color with opacity baked in
+    if (!fowFillStyle) {
+      // Parse hex color to RGB
+      const r = parseInt(fowColor.slice(1, 3), 16) || 0;
+      const g = parseInt(fowColor.slice(3, 5), 16) || 0;
+      const b = parseInt(fowColor.slice(5, 7), 16) || 0;
+      fowFillStyle = `rgba(${r}, ${g}, ${b}, ${fowOpacity})`;
+    }
+    
+    // Apply fill style
+    ctx.fillStyle = fowFillStyle;
+    
+    // If using pattern, apply opacity via globalAlpha
+    const previousGlobalAlpha = ctx.globalAlpha;
+    if (useGlobalAlpha) {
+      ctx.globalAlpha = fowOpacity;
+    }
+    
+    // Build a Set for O(1) lookup of fogged cells
+    const foggedSet = new Set(fow.foggedCells.map(c => `${c.col},${c.row}`));
+    
+    // Calculate visible bounds in grid/offset coordinates for viewport culling
+    let visibleMinCol, visibleMaxCol, visibleMinRow, visibleMaxRow;
+    
+    if (geometry instanceof HexGeometry) {
+      // For hex maps: calculate visible bounds based on viewport
+      // Convert screen corners to world coordinates, then to offset coordinates
+      const orientation = mapData.orientation || 'flat';
+      const hexSize = geometry.hexSize;
+      
+      // Get screen corners in world coordinates
+      const screenCorners = [
+        { x: 0, y: 0 },
+        { x: width, y: 0 },
+        { x: 0, y: height },
+        { x: width, y: height }
+      ];
+      
+      // Convert screen corners to world coordinates
+      const worldCorners = screenCorners.map(corner => ({
+        worldX: (corner.x - width/2) / zoom + center.x,
+        worldY: (corner.y - height/2) / zoom + center.y
+      }));
+      
+      // Find bounding box in world coordinates
+      const worldMinX = Math.min(...worldCorners.map(c => c.worldX)) - hexSize * 2;
+      const worldMaxX = Math.max(...worldCorners.map(c => c.worldX)) + hexSize * 2;
+      const worldMinY = Math.min(...worldCorners.map(c => c.worldY)) - hexSize * 2;
+      const worldMaxY = Math.max(...worldCorners.map(c => c.worldY)) + hexSize * 2;
+      
+      // Convert to hex coordinates (approximate bounds)
+      // We'll be conservative and iterate more cells than strictly necessary
+      const bounds = mapData.hexBounds || { maxCol: 100, maxRow: 100 };
+      visibleMinCol = 0;
+      visibleMaxCol = bounds.maxCol;
+      visibleMinRow = 0;
+      visibleMaxRow = bounds.maxRow;
+      
+    } else {
+      // For grid maps: simpler calculation
+      const gridSize = geometry.cellSize;
+      
+      // Convert viewport corners to grid coordinates
+      visibleMinCol = Math.floor((0 - offsetX) / scaledSize) - 1;
+      visibleMaxCol = Math.ceil((width - offsetX) / scaledSize) + 1;
+      visibleMinRow = Math.floor((0 - offsetY) / scaledSize) - 1;
+      visibleMaxRow = Math.ceil((height - offsetY) / scaledSize) + 1;
+      
+      // Clamp to reasonable bounds
+      const maxBound = mapData.dimensions ? Math.max(mapData.dimensions.width, mapData.dimensions.height) : 200;
+      visibleMinCol = Math.max(0, visibleMinCol);
+      visibleMaxCol = Math.min(maxBound, visibleMaxCol);
+      visibleMinRow = Math.max(0, visibleMinRow);
+      visibleMaxRow = Math.min(maxBound, visibleMaxRow);
+    }
+    
+    // Render fog for visible fogged cells
+    if (geometry instanceof HexGeometry) {
+      // Hex map fog rendering
+      const orientation = mapData.orientation || 'flat';
+      
+      for (const fogCell of fow.foggedCells) {
+        const { col, row } = fogCell;
+        
+        // Skip if outside visible bounds
+        if (col < visibleMinCol || col > visibleMaxCol || 
+            row < visibleMinRow || row > visibleMaxRow) {
+          continue;
+        }
+        
+        // Convert offset to axial coordinates
+        const { q, r } = offsetToAxial(col, row, orientation);
+        
+        // Get hex vertices in world coordinates
+        const vertices = geometry.getHexVertices(q, r);
+        
+        // Draw hex fog by tracing vertices
+        ctx.beginPath();
+        const first = geometry.worldToScreen(vertices[0].worldX, vertices[0].worldY, offsetX, offsetY, zoom);
+        ctx.moveTo(first.screenX, first.screenY);
+        
+        for (let i = 1; i < vertices.length; i++) {
+          const vertex = geometry.worldToScreen(vertices[i].worldX, vertices[i].worldY, offsetX, offsetY, zoom);
+          ctx.lineTo(vertex.screenX, vertex.screenY);
+        }
+        
+        ctx.closePath();
+        ctx.fill();
+      }
+    } else {
+      // Grid map fog rendering
+      for (const fogCell of fow.foggedCells) {
+        const { col, row } = fogCell;
+        
+        // Skip if outside visible bounds
+        if (col < visibleMinCol || col > visibleMaxCol || 
+            row < visibleMinRow || row > visibleMaxRow) {
+          continue;
+        }
+        
+        // Convert to screen coordinates
+        const screenX = offsetX + col * scaledSize;
+        const screenY = offsetY + row * scaledSize;
+        
+        // Draw cell fog
+        ctx.fillRect(screenX, screenY, scaledSize, scaledSize);
+      }
+    }
+    
+    // Restore globalAlpha if we modified it for pattern opacity
+    if (useGlobalAlpha) {
+      ctx.globalAlpha = previousGlobalAlpha;
     }
   }
   

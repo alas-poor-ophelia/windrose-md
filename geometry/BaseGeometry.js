@@ -327,6 +327,62 @@ class BaseGeometry {
   }
   
   /**
+   * Convert grid coordinates to offset coordinates (col, row)
+   * For grid geometry, this is a simple passthrough (gridX=col, gridY=row)
+   * For hex geometry, this converts axial (q, r) to offset (col, row)
+   * 
+   * Offset coordinates are useful for array-based storage like fog of war
+   * where we need consistent integer indices regardless of geometry type.
+   * 
+   * @abstract
+   * @param {number} gridX - Grid X coordinate (gridX for grid, q for hex)
+   * @param {number} gridY - Grid Y coordinate (gridY for grid, r for hex)
+   * @returns {{col: number, row: number}} Offset coordinates
+   * @throws {Error} If not implemented by subclass
+   */
+  toOffsetCoords(gridX, gridY) {
+    throw new Error('toOffsetCoords() must be implemented by subclass');
+  }
+  
+  /**
+   * Convert a cell object to offset coordinates (col, row)
+   * Extracts coordinates from a cell in the geometry's native format
+   * and converts to offset coordinates for uniform storage.
+   * 
+   * @abstract
+   * @param {Object} cell - Cell object in geometry's native format
+   * @returns {{col: number, row: number}} Offset coordinates
+   * @throws {Error} If not implemented by subclass
+   */
+  cellToOffsetCoords(cell) {
+    throw new Error('cellToOffsetCoords() must be implemented by subclass');
+  }
+  
+  /**
+   * Check if this geometry has defined bounds
+   * Bounded geometries have a finite set of valid cells.
+   * 
+   * @abstract
+   * @returns {boolean} True if geometry has bounds
+   * @throws {Error} If not implemented by subclass
+   */
+  isBounded() {
+    throw new Error('isBounded() must be implemented by subclass');
+  }
+  
+  /**
+   * Get the bounds for this geometry (if bounded)
+   * Returns null for unbounded geometries.
+   * 
+   * @abstract
+   * @returns {{maxCol: number, maxRow: number}|null} Bounds object or null
+   * @throws {Error} If not implemented by subclass
+   */
+  getBounds() {
+    throw new Error('getBounds() must be implemented by subclass');
+  }
+  
+  /**
    * Draw grid lines on canvas
    * @abstract
    * @param {CanvasRenderingContext2D} ctx - Canvas context

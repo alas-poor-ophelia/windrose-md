@@ -59,7 +59,12 @@ const Actions = {
   SHOW_RESIZE_CONFIRM: 'SHOW_RESIZE_CONFIRM',
   CONFIRM_RESIZE_DELETE: 'CONFIRM_RESIZE_DELETE',
   CANCEL_RESIZE: 'CANCEL_RESIZE',
-  CLEAR_DELETE_FLAG: 'CLEAR_DELETE_FLAG'
+  CLEAR_DELETE_FLAG: 'CLEAR_DELETE_FLAG',
+  // Fog of War image actions
+  SET_FOG_IMAGE_DISPLAY_NAME: 'SET_FOG_IMAGE_DISPLAY_NAME',
+  SET_FOG_IMAGE_SEARCH_RESULTS: 'SET_FOG_IMAGE_SEARCH_RESULTS',
+  FOG_IMAGE_SELECTED: 'FOG_IMAGE_SELECTED',
+  CLEAR_FOG_IMAGE: 'CLEAR_FOG_IMAGE'
 };
 
 // ============================================================================
@@ -147,7 +152,11 @@ function buildInitialState(props, globalSettings) {
       coordinateTextColor: currentSettings?.overrides?.coordinateTextColor ?? globalSettings.coordinateTextColor,
       coordinateTextShadow: currentSettings?.overrides?.coordinateTextShadow ?? globalSettings.coordinateTextShadow,
       canvasHeight: currentSettings?.overrides?.canvasHeight ?? globalSettings.canvasHeight ?? 600,
-      canvasHeightMobile: currentSettings?.overrides?.canvasHeightMobile ?? globalSettings.canvasHeightMobile ?? 400
+      canvasHeightMobile: currentSettings?.overrides?.canvasHeightMobile ?? globalSettings.canvasHeightMobile ?? 400,
+      // Fog of War appearance
+      fogOfWarColor: currentSettings?.overrides?.fogOfWarColor ?? globalSettings.fogOfWarColor,
+      fogOfWarOpacity: currentSettings?.overrides?.fogOfWarOpacity ?? globalSettings.fogOfWarOpacity,
+      fogOfWarImage: currentSettings?.overrides?.fogOfWarImage ?? globalSettings.fogOfWarImage
     },
     
     preferences: {
@@ -177,6 +186,12 @@ function buildInitialState(props, globalSettings) {
       : '',
     imageDimensions: null,
     imageSearchResults: [],
+    
+    // Fog of War image picker state
+    fogImageDisplayName: currentSettings?.overrides?.fogOfWarImage 
+      ? getDisplayNameFromPath(currentSettings.overrides.fogOfWarImage) 
+      : '',
+    fogImageSearchResults: [],
     
     gridDensity: currentBackgroundImage?.gridDensity ?? 'medium',
     customColumns: currentBackgroundImage?.customColumns ?? 24,
@@ -418,6 +433,35 @@ function settingsReducer(state, action) {
     
     case Actions.CLEAR_DELETE_FLAG:
       return { ...state, deleteOrphanedContent: false };
+    
+    // Fog of War image picker actions
+    case Actions.SET_FOG_IMAGE_DISPLAY_NAME:
+      return { ...state, fogImageDisplayName: action.payload };
+    
+    case Actions.SET_FOG_IMAGE_SEARCH_RESULTS:
+      return { ...state, fogImageSearchResults: action.payload };
+    
+    case Actions.FOG_IMAGE_SELECTED:
+      return {
+        ...state,
+        fogImageDisplayName: action.payload.displayName,
+        fogImageSearchResults: [],
+        overrides: {
+          ...state.overrides,
+          fogOfWarImage: action.payload.path
+        }
+      };
+    
+    case Actions.CLEAR_FOG_IMAGE:
+      return {
+        ...state,
+        fogImageDisplayName: '',
+        fogImageSearchResults: [],
+        overrides: {
+          ...state.overrides,
+          fogOfWarImage: null
+        }
+      };
     
     default:
       return state;

@@ -363,6 +363,45 @@ class GridGeometry extends BaseGeometry {
   }
   
   /**
+   * Convert grid coordinates to offset coordinates
+   * For grid geometry, this is a simple passthrough since gridX/gridY are already col/row
+   * @param {number} gridX - Grid X coordinate
+   * @param {number} gridY - Grid Y coordinate
+   * @returns {{col: number, row: number}} Offset coordinates
+   */
+  toOffsetCoords(gridX, gridY) {
+    return { col: gridX, row: gridY };
+  }
+  
+  /**
+   * Convert a cell object to offset coordinates
+   * Grid cells store (x, y) which map directly to (col, row)
+   * @param {Object} cell - Cell object with x, y properties
+   * @returns {{col: number, row: number}} Offset coordinates
+   */
+  cellToOffsetCoords(cell) {
+    return { col: cell.x, row: cell.y };
+  }
+  
+  /**
+   * Check if this geometry has defined bounds
+   * Grid maps are unbounded (infinite canvas)
+   * @returns {boolean} Always false for grid geometry
+   */
+  isBounded() {
+    return false;
+  }
+  
+  /**
+   * Get the bounds for this geometry
+   * Grid maps have no bounds
+   * @returns {null} Always null for grid geometry
+   */
+  getBounds() {
+    return null;
+  }
+  
+  /**
    * Get all grid cells within a rectangular area
    * @param {number} gridX1 - First corner X
    * @param {number} gridY1 - First corner Y

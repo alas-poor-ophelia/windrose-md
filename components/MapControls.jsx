@@ -73,10 +73,8 @@ const MapControls = ({
           startCollapseTimer(true);
         }
       } else {
-        // Controls already revealed - rotate compass (if allowed)
-        if (mapType !== 'hex') {
-          onCompassClick();
-        }
+        // Controls already revealed - rotate compass
+        onCompassClick();
         // Reset timer for touch users
         if (hasTouchCapability) {
           startCollapseTimer(true);
@@ -123,11 +121,11 @@ const MapControls = ({
     
     // Build compass tooltip based on state and capabilities
     const getCompassTitle = () => {
-      if (mapType === 'hex') {
-        return "Map rotation temporarily disabled (coordinate key feature in development)";
-      }
       if (!controlsRevealed && hasTouchCapability) {
         return "Tap to show controls";
+      }
+      if (mapType === 'hex') {
+        return `North indicator at ${northDirection}° (visual only, ${hasTouchCapability ? 'tap' : 'click'} to rotate)`;
       }
       return `North is at ${northDirection}° (${hasTouchCapability ? 'tap' : 'click'} to rotate)`;
     };
@@ -160,7 +158,7 @@ const MapControls = ({
           
           {/* Compass Rose - Always visible anchor, slides down on reveal */}
           <div 
-            className={`dmt-compass dmt-compass-animated ${mapType === 'hex' ? 'dmt-compass-disabled' : ''} ${controlsRevealed ? 'dmt-compass-revealed' : ''}`}
+            className={`dmt-compass dmt-compass-animated ${controlsRevealed ? 'dmt-compass-revealed' : ''}`}
             onClick={handleCompassClick}
             title={getCompassTitle()}
           >

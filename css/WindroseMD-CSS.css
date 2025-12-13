@@ -2620,6 +2620,146 @@ button.dmt-orientation-btn,
     color: var(--dmt-bg-primary);
   }
 }
+
+/* ==========================================================================
+   Fog of War UI
+   ========================================================================== */
+
+/* Separator between layer toggles and FoW section */
+.dmt-visibility-separator {
+  width: 1px;
+  height: 24px;
+  background: var(--dmt-border-secondary);
+  margin: 0 4px;
+}
+
+/* FoW section container */
+.dmt-fow-section {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* FoW toggle button (always visible) */
+/* FoW toggle button - with tablet overrides */
+.is-tablet button.dmt-fow-toggle-btn,
+button.dmt-fow-toggle-btn,
+.dmt-fow-toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background-color: var(--dmt-bg-secondary);
+  border: 1px solid var(--dmt-border-secondary);
+  border-radius: 3px;
+  color: var(--dmt-text-primary);
+  cursor: pointer;
+  padding: 4px 8px;
+  height: 32px;
+  min-height: 32px;
+  max-height: 32px;
+  transition: var(--dmt-transition);
+  white-space: nowrap;
+  
+  svg {
+    color: var(--dmt-border-primary);
+    width: 16px;
+    height: 16px;
+    min-width: 16px;
+    min-height: 16px;
+    flex-shrink: 0;
+  }
+  
+  &:hover {
+    background-color: var(--dmt-bg-tertiary);
+    border-color: var(--dmt-border-primary);
+  }
+  
+  &.expanded {
+    background-color: var(--dmt-bg-tertiary);
+    border-color: var(--dmt-border-primary);
+  }
+}
+
+.dmt-fow-label {
+  font-size: 11px;
+  color: var(--dmt-text-muted);
+}
+
+/* FoW tools panel (expandable) */
+.dmt-fow-tools-panel {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  overflow: hidden;
+  max-width: 0;
+  opacity: 0;
+  transition: max-width 200ms ease-out, opacity 200ms ease-out, margin 200ms ease-out;
+  
+  &.expanded {
+    max-width: 250px;
+    opacity: 1;
+    margin-left: 4px;
+    padding-left: 4px;
+    border-left: 1px solid var(--dmt-border-secondary);
+  }
+}
+
+/* Individual FoW tool buttons - with tablet overrides */
+.is-tablet button.dmt-fow-tool-btn,
+button.dmt-fow-tool-btn,
+.dmt-fow-tool-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--dmt-bg-secondary);
+  border: 1px solid var(--dmt-border-secondary);
+  border-radius: 3px;
+  color: var(--dmt-text-primary);
+  cursor: pointer;
+  padding: 4px;
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  min-height: 28px;
+  max-width: 28px;
+  max-height: 28px;
+  transition: var(--dmt-transition);
+  
+  svg {
+    color: var(--dmt-text-muted);
+    width: 16px;
+    height: 16px;
+  }
+  
+  &:hover:not(:disabled) {
+    background-color: var(--dmt-bg-tertiary);
+    border-color: var(--dmt-border-primary);
+    
+    svg {
+      color: var(--dmt-text-primary);
+    }
+  }
+  
+  &.active {
+    background-color: var(--dmt-border-primary);
+    border-color: #8b6842;
+    
+    svg {
+      color: var(--dmt-bg-primary);
+    }
+  }
+  
+  &.disabled,
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    
+    svg {
+      color: var(--dmt-text-muted);
+    }
+  }
+}
+
 /* ==========================================================================
    Scale Slider (shown during resize mode)
    ========================================================================== */

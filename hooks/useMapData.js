@@ -3,6 +3,7 @@ const { requireModuleByName } = await dc.require(pathResolverPath);
 
 const { loadMapData, saveMapData } = await requireModuleByName("fileOperations.js");
 const { preloadImage } = await requireModuleByName("imageOperations.js");
+const { getEffectiveSettings } = await requireModuleByName("settingsAccessor.js");
 
 
 function useMapData(mapId, mapName = '', mapType = 'grid') {
@@ -37,6 +38,20 @@ function useMapData(mapId, mapName = '', mapType = 'grid') {
       setBackgroundImageReady(false);
     }
   }, [mapData?.backgroundImage?.path]);
+  
+  // Preload fog of war image when map loads or settings change
+  // Using mapData?.settings as dependency ensures this runs on initial load
+  dc.useEffect(() => {
+    if (!mapData) return;
+    
+    // Get effective settings (handles global vs per-map)
+    const effectiveSettings = getEffectiveSettings(mapData.settings);
+    const fowImagePath = effectiveSettings.fogOfWarImage;
+    
+    if (fowImagePath) {
+      preloadImage(fowImagePath);
+    }
+  }, [mapData?.settings]);
   
   // Debounced save effect
   dc.useEffect(() => {

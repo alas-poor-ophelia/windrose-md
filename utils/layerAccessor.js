@@ -471,6 +471,300 @@ function needsMigration(mapData) {
 }
 
 // ============================================================================
+// FOG OF WAR FUNCTIONS
+// ============================================================================
+
+/**
+ * Initialize fog of war for a layer (first use)
+ * Creates the fogOfWar structure with empty foggedCells array
+ * @param {Object} mapData - The full map data object
+ * @param {string} layerId - The layer ID to initialize FoW for
+ * @returns {Object} New mapData with initialized fogOfWar on the layer
+ */
+function initializeFogOfWar(mapData, layerId) {
+  return updateLayer(mapData, layerId, {
+    fogOfWar: {
+      enabled: true,
+      foggedCells: [],
+      texture: null
+    }
+  });
+}
+
+/**
+ * Check if a cell is fogged
+ * @param {Object} layer - The layer object
+ * @param {number} col - Column (offset coordinate)
+ * @param {number} row - Row (offset coordinate)
+ * @returns {boolean} True if the cell is fogged
+ */
+function isCellFogged(layer, col, row) {
+  if (!layer.fogOfWar || !layer.fogOfWar.enabled) return false;
+  return layer.fogOfWar.foggedCells.some(c => c.col === col && c.row === row);
+}
+
+/**
+ * Add fog to a single cell
+ * @param {Object} layer - The layer object
+ * @param {number} col - Column (offset coordinate)
+ * @param {number} row - Row (offset coordinate)
+ * @returns {Object} New layer object with updated fogOfWar
+ */
+function fogCell(layer, col, row) {
+  if (!layer.fogOfWar) return layer;
+  if (isCellFogged(layer, col, row)) return layer; // Already fogged
+  
+  return {
+    ...layer,
+    fogOfWar: {
+      ...layer.fogOfWar,
+      foggedCells: [...layer.fogOfWar.foggedCells, { col, row }]
+    }
+  };
+}
+
+/**
+ * Remove fog from a single cell (reveal it)
+ * @param {Object} layer - The layer object
+ * @param {number} col - Column (offset coordinate)
+ * @param {number} row - Row (offset coordinate)
+ * @returns {Object} New layer object with updated fogOfWar
+ */
+function revealCell(layer, col, row) {
+  if (!layer.fogOfWar) return layer;
+  
+  return {
+    ...layer,
+    fogOfWar: {
+      ...layer.fogOfWar,
+      foggedCells: layer.fogOfWar.foggedCells.filter(
+        c => !(c.col === col && c.row === row)
+      )
+    }
+  };
+}
+
+/**
+ * Add fog to a rectangular area of cells
+ * @param {Object} layer - The layer object
+ * @param {number} startCol - Start column (inclusive)
+ * @param {number} startRow - Start row (inclusive)
+ * @param {number} endCol - End column (inclusive)
+ * @param {number} endRow - End row (inclusive)
+ * @returns {Object} New layer object with updated fogOfWar
+ */
+function fogRectangle(layer, startCol, startRow, endCol, endRow) {
+  if (!layer.fogOfWar) return layer;
+  
+  // Normalize coordinates (handle any corner order)
+  const minCol = Math.min(startCol, endCol);
+  const maxCol = Math.max(startCol, endCol);
+  const minRow = Math.min(startRow, endRow);
+  const maxRow = Math.max(startRow, endRow);
+  
+  // Build set of existing fogged cells for fast lookup
+  const existingSet = new Set(
+    layer.fogOfWar.foggedCells.map(c => `${c.col},${c.row}`)
+  );
+  
+  // Collect new cells to add
+  const newCells = [];
+  for (let col = minCol; col <= maxCol; col++) {
+    for (let row = minRow; row <= maxRow; row++) {
+      const key = `${col},${row}`;
+      if (!existingSet.has(key)) {
+        newCells.push({ col, row });
+      }
+    }
+  }
+  
+  if (newCells.length === 0) return layer;
+  
+  return {
+    ...layer,
+    fogOfWar: {
+      ...layer.fogOfWar,
+      foggedCells: [...layer.fogOfWar.foggedCells, ...newCells]
+    }
+  };
+}
+
+/**
+ * Remove fog from a rectangular area of cells (reveal them)
+ * @param {Object} layer - The layer object
+ * @param {number} startCol - Start column (inclusive)
+ * @param {number} startRow - Start row (inclusive)
+ * @param {number} endCol - End column (inclusive)
+ * @param {number} endRow - End row (inclusive)
+ * @returns {Object} New layer object with updated fogOfWar
+ */
+function revealRectangle(layer, startCol, startRow, endCol, endRow) {
+  if (!layer.fogOfWar) return layer;
+  
+  // Normalize coordinates
+  const minCol = Math.min(startCol, endCol);
+  const maxCol = Math.max(startCol, endCol);
+  const minRow = Math.min(startRow, endRow);
+  const maxRow = Math.max(startRow, endRow);
+  
+  return {
+    ...layer,
+    fogOfWar: {
+      ...layer.fogOfWar,
+      foggedCells: layer.fogOfWar.foggedCells.filter(c => 
+        c.col < minCol || c.col > maxCol || c.row < minRow || c.row > maxRow
+      )
+    }
+  };
+}
+
+/**
+ * Add fog to all cells within bounds
+ * @param {Object} layer - The layer object
+ * @param {Object} bounds - Bounds object with maxCol and maxRow (exclusive)
+ * @returns {Object} New layer object with all cells fogged
+ */
+function fogAll(layer, bounds) {
+  if (!layer.fogOfWar) return layer;
+  if (!bounds || bounds.maxCol === undefined || bounds.maxRow === undefined) {
+    console.warn('[fogAll] Invalid bounds provided');
+    return layer;
+  }
+  
+  const allCells = [];
+  for (let col = 0; col < bounds.maxCol; col++) {
+    for (let row = 0; row < bounds.maxRow; row++) {
+      allCells.push({ col, row });
+    }
+  }
+  
+  return {
+    ...layer,
+    fogOfWar: {
+      ...layer.fogOfWar,
+      foggedCells: allCells
+    }
+  };
+}
+
+/**
+ * Fog all painted cells on a layer
+ * For unbounded maps where we only want to fog cells that have been drawn
+ * @param {Object} layer - The layer object
+ * @param {Object} geometry - Geometry instance with cellToOffsetCoords method
+ * @returns {Object} New layer object with updated fogOfWar
+ */
+function fogPaintedCells(layer, geometry) {
+  if (!layer.fogOfWar) return layer;
+  if (!layer.cells || layer.cells.length === 0) return layer;
+  if (!geometry || typeof geometry.cellToOffsetCoords !== 'function') {
+    console.warn('[fogPaintedCells] Invalid geometry provided');
+    return layer;
+  }
+  
+  const existingFogged = new Set(
+    layer.fogOfWar.foggedCells.map(c => `${c.col},${c.row}`)
+  );
+  
+  const newCells = [];
+  for (const cell of layer.cells) {
+    const { col, row } = geometry.cellToOffsetCoords(cell);
+    const key = `${col},${row}`;
+    if (!existingFogged.has(key)) {
+      newCells.push({ col, row });
+      existingFogged.add(key);
+    }
+  }
+  
+  if (newCells.length === 0) return layer;
+  
+  return {
+    ...layer,
+    fogOfWar: {
+      ...layer.fogOfWar,
+      foggedCells: [...layer.fogOfWar.foggedCells, ...newCells]
+    }
+  };
+}
+
+/**
+ * Remove all fog from a layer (reveal everything)
+ * @param {Object} layer - The layer object
+ * @returns {Object} New layer object with no fog
+ */
+function revealAll(layer) {
+  if (!layer.fogOfWar) return layer;
+  
+  return {
+    ...layer,
+    fogOfWar: {
+      ...layer.fogOfWar,
+      foggedCells: []
+    }
+  };
+}
+
+/**
+ * Toggle fog visibility without changing fogged cells
+ * @param {Object} layer - The layer object
+ * @returns {Object} New layer object with toggled visibility
+ */
+function toggleFogVisibility(layer) {
+  if (!layer.fogOfWar) return layer;
+  
+  return {
+    ...layer,
+    fogOfWar: {
+      ...layer.fogOfWar,
+      enabled: !layer.fogOfWar.enabled
+    }
+  };
+}
+
+/**
+ * Set fog visibility explicitly
+ * @param {Object} layer - The layer object
+ * @param {boolean} enabled - Whether fog should be visible
+ * @returns {Object} New layer object with updated visibility
+ */
+function setFogVisibility(layer, enabled) {
+  if (!layer.fogOfWar) return layer;
+  
+  return {
+    ...layer,
+    fogOfWar: {
+      ...layer.fogOfWar,
+      enabled: !!enabled
+    }
+  };
+}
+
+/**
+ * Check if a layer has any fog data (regardless of visibility)
+ * @param {Object} layer - The layer object
+ * @returns {boolean} True if the layer has fog data
+ */
+function hasFogData(layer) {
+  return !!(layer.fogOfWar && layer.fogOfWar.foggedCells && layer.fogOfWar.foggedCells.length > 0);
+}
+
+/**
+ * Get fog state summary for UI display
+ * @param {Object} layer - The layer object
+ * @returns {Object} { initialized, enabled, cellCount }
+ */
+function getFogState(layer) {
+  if (!layer.fogOfWar) {
+    return { initialized: false, enabled: false, cellCount: 0 };
+  }
+  return {
+    initialized: true,
+    enabled: layer.fogOfWar.enabled,
+    cellCount: layer.fogOfWar.foggedCells?.length || 0
+  };
+}
+
+// ============================================================================
 // EXPORTS
 // ============================================================================
 
@@ -500,5 +794,20 @@ return {
   createBackup,
   validateMigration,
   migrateToLayerSchema,
-  needsMigration
+  needsMigration,
+  
+  // Fog of War
+  initializeFogOfWar,
+  isCellFogged,
+  fogCell,
+  revealCell,
+  fogRectangle,
+  revealRectangle,
+  fogAll,
+  fogPaintedCells,
+  revealAll,
+  toggleFogVisibility,
+  setFogVisibility,
+  hasFogData,
+  getFogState
 };
