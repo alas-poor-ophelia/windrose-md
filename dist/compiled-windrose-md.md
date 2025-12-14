@@ -1,9 +1,9 @@
 <!-- Compiled by Datacore Script Compiler -->
 <!-- Source: Projects/dungeon-map-tracker -->
 <!-- Main Component: DungeonMapTracker -->
-<!-- Compiled: 2025-12-09T05:26:58.020Z -->
-<!-- Files: 78 -->
-<!-- Version: 1.20. -->
+<!-- Compiled: 2025-12-14T22:41:58.630Z -->
+<!-- Files: 91 -->
+<!-- Version: 1.3.0 -->
 <!-- CSS Files: 1 -->
 
 # Demo
@@ -17,7 +17,6 @@ const { View: DungeonMapTracker } = await dc.require(dc.headerLink(dc.resolvePat
 
 return <DungeonMapTracker />;
 ```
-
 
 # dmtConstants
 
@@ -46,8 +45,18 @@ const THEME = {
   compass: {
     color: '#ffffff',
     size: 40
+  },
+  fogOfWar: {
+    color: '#000000',
+    opacity: 0.9,
+    blurEnabled: false,       // Enable soft edge blur effect
+    blurFactor: 0.99         // Blur radius as percentage of cell size (8%)
   }
 };
+
+// Schema version for data migration (Z-Layer Architecture)
+// Increment when mapData structure changes in a breaking way
+const SCHEMA_VERSION = 2;
 
 const DEFAULTS = {
   // Grid map defaults
@@ -61,8 +70,8 @@ const DEFAULTS = {
   hexSize: 80,              // Radius from center to vertex
   hexOrientation: 'flat',   // 'flat' or 'pointy'
   hexBounds: {
-    maxCol: 26,             // Default 27 columns (0-26) → A-AA for coordinate keys
-    maxRow: 20              // Default 21 rows (0-20) → 1-21 for coordinate keys
+    maxCol: 26,             // Default 27 columns (0-26) Ã¢â€ â€™ A-AA for coordinate keys
+    maxRow: 20              // Default 21 rows (0-20) Ã¢â€ â€™ 1-21 for coordinate keys
   },
   
   // Map type
@@ -94,7 +103,7 @@ const DEFAULTS = {
 // Dynamically resolve the correct JSON path
 const DATA_FILE_PATH = dc.resolvePath("windrose-md-data.json");
 
-return { THEME, DEFAULTS, DATA_FILE_PATH };
+return { THEME, DEFAULTS, DATA_FILE_PATH, SCHEMA_VERSION };
 ```
 
 # offsetCoordinates
@@ -270,7 +279,17 @@ const FALLBACK_SETTINGS = {
   distanceUnitGrid: DEFAULTS.distance.unitGrid,
   distanceUnitHex: DEFAULTS.distance.unitHex,
   gridDiagonalRule: DEFAULTS.distance.gridDiagonalRule,
-  distanceDisplayFormat: DEFAULTS.distance.displayFormat
+  distanceDisplayFormat: DEFAULTS.distance.displayFormat,
+  
+  // Fog of War appearance settings
+  fogOfWarColor: THEME.fogOfWar.color,
+  fogOfWarOpacity: THEME.fogOfWar.opacity,
+  fogOfWarImage: null,  // Optional: vault path to tileable image
+  fogOfWarBlurEnabled: THEME.fogOfWar.blurEnabled,
+  fogOfWarBlurFactor: THEME.fogOfWar.blurFactor,
+  
+  // Controls visibility
+  alwaysShowControls: false
 };
 
 /**
@@ -350,7 +369,14 @@ function getTheme() {
       size: THEME.compass.size
     },
     decorativeBorder: THEME.decorativeBorder,  // Hardcoded decorative border (not configurable)
-    coordinateKey: settings.coordinateKeyColor
+    coordinateKey: settings.coordinateKeyColor,
+    fogOfWar: {
+      color: settings.fogOfWarColor,
+      opacity: settings.fogOfWarOpacity,
+      image: settings.fogOfWarImage,
+      blurEnabled: settings.fogOfWarBlurEnabled,
+      blurFactor: settings.fogOfWarBlurFactor
+    }
   };
 }
 
@@ -482,12 +508,832 @@ function getColorPaletteSettings() {
 return { getSettings, getSetting, isPluginAvailable, getTheme, getEffectiveSettings, getObjectSettings, getColorPaletteSettings, FALLBACK_SETTINGS, BUILT_IN_COLORS };
 ```
 
+# layerAccessor
+
+```js
+/**
+ * layerAccessor.js
+ * Helper functions for accessing and manipulating layer data in Windrose maps.
+ * Part of Phase 1: Z-Layer Architecture
+ */
+
+const { SCHEMA_VERSION } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "dmtConstants"));
+
+// ============================================================================
+// UUID GENERATION
+// ============================================================================
+
+/**
+ * Generate a unique ID for a layer
+ * @returns {string} UUID string with 'layer-' prefix
+ */
+function generateLayerId() {
+  return 'layer-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+}
+
+// ============================================================================
+// LAYER ACCESS FUNCTIONS
+// ============================================================================
+
+/**
+ * Get the currently active layer data
+ * @param {Object} mapData - The full map data object
+ * @returns {Object} The active layer object, or a legacy fallback
+ */
+function getActiveLayer(mapData) {
+  if (!mapData?.layers || !mapData.activeLayerId) {
+    // Legacy fallback (should not happen after migration)
+    return {
+      id: 'legacy',
+      name: 'Layer 1',
+      order: 0,
+      visible: true,
+      cells: mapData?.cells || [],
+      edges: mapData?.edges || [],
+      objects: mapData?.objects || [],
+      textLabels: mapData?.textLabels || [],
+      fogOfWar: null
+    };
+  }
+  return mapData.layers.find(l => l.id === mapData.activeLayerId) || mapData.layers[0];
+}
+
+/**
+ * Get all layers sorted by order (ascending - lowest order first)
+ * @param {Object} mapData - The full map data object
+ * @returns {Array} Array of layer objects sorted by order
+ */
+function getLayersOrdered(mapData) {
+  if (!mapData?.layers) return [];
+  return [...mapData.layers].sort((a, b) => a.order - b.order);
+}
+
+/**
+ * Get layer by ID
+ * @param {Object} mapData - The full map data object
+ * @param {string} layerId - The layer ID to find
+ * @returns {Object|null} The layer object or null if not found
+ */
+function getLayerById(mapData, layerId) {
+  return mapData?.layers?.find(l => l.id === layerId) || null;
+}
+
+/**
+ * Get the index of a layer in the layers array
+ * @param {Object} mapData - The full map data object
+ * @param {string} layerId - The layer ID to find
+ * @returns {number} Index of the layer, or -1 if not found
+ */
+function getLayerIndex(mapData, layerId) {
+  if (!mapData?.layers) return -1;
+  return mapData.layers.findIndex(l => l.id === layerId);
+}
+
+// ============================================================================
+// LAYER MODIFICATION FUNCTIONS
+// ============================================================================
+
+/**
+ * Update a specific layer's data (immutable)
+ * @param {Object} mapData - The full map data object
+ * @param {string} layerId - The layer ID to update
+ * @param {Object} updates - Object with fields to update
+ * @returns {Object} New mapData with updated layer
+ */
+function updateLayer(mapData, layerId, updates) {
+  if (!mapData?.layers) return mapData;
+  
+  return {
+    ...mapData,
+    layers: mapData.layers.map(layer =>
+      layer.id === layerId ? { ...layer, ...updates } : layer
+    )
+  };
+}
+
+/**
+ * Update the active layer's data (convenience function)
+ * @param {Object} mapData - The full map data object
+ * @param {Object} updates - Object with fields to update
+ * @returns {Object} New mapData with updated active layer
+ */
+function updateActiveLayer(mapData, updates) {
+  if (!mapData?.activeLayerId) return mapData;
+  return updateLayer(mapData, mapData.activeLayerId, updates);
+}
+
+/**
+ * Set the active layer by ID
+ * @param {Object} mapData - The full map data object
+ * @param {string} layerId - The layer ID to make active
+ * @returns {Object} New mapData with updated activeLayerId
+ */
+function setActiveLayer(mapData, layerId) {
+  // Verify the layer exists
+  if (!getLayerById(mapData, layerId)) {
+    console.warn(`Cannot set active layer: layer ${layerId} not found`);
+    return mapData;
+  }
+  
+  return {
+    ...mapData,
+    activeLayerId: layerId
+  };
+}
+
+/**
+ * Add a new layer to the map
+ * @param {Object} mapData - The full map data object
+ * @param {string|null} name - Optional custom name for the layer
+ * @returns {Object} New mapData with added layer (and activeLayerId set to new layer)
+ */
+function addLayer(mapData, name = null) {
+  if (!mapData?.layers) return mapData;
+  
+  // Calculate new order (one higher than current max)
+  const maxOrder = mapData.layers.length > 0
+    ? Math.max(...mapData.layers.map(l => l.order))
+    : -1;
+  
+  const newLayer = {
+    id: generateLayerId(),
+    name: name || `Layer ${mapData.layers.length + 1}`,
+    order: maxOrder + 1,
+    visible: true,
+    cells: [],
+    edges: [],
+    objects: [],
+    textLabels: [],
+    fogOfWar: null
+  };
+  
+  return {
+    ...mapData,
+    layers: [...mapData.layers, newLayer],
+    activeLayerId: newLayer.id  // Auto-switch to new layer
+  };
+}
+
+/**
+ * Remove a layer from the map (prevents removing last layer)
+ * @param {Object} mapData - The full map data object
+ * @param {string} layerId - The layer ID to remove
+ * @returns {Object} New mapData without the specified layer
+ */
+function removeLayer(mapData, layerId) {
+  if (!mapData?.layers) return mapData;
+  
+  // Prevent removing the last layer
+  if (mapData.layers.length <= 1) {
+    console.warn('Cannot remove last layer');
+    return mapData;
+  }
+  
+  const newLayers = mapData.layers.filter(l => l.id !== layerId);
+  const wasActive = mapData.activeLayerId === layerId;
+  
+  // If we removed the active layer, switch to the first remaining layer
+  // (sorted by order for consistency)
+  let newActiveId = mapData.activeLayerId;
+  if (wasActive) {
+    const sortedRemaining = [...newLayers].sort((a, b) => a.order - b.order);
+    newActiveId = sortedRemaining[0].id;
+  }
+  
+  return {
+    ...mapData,
+    layers: newLayers,
+    activeLayerId: newActiveId
+  };
+}
+
+/**
+ * Reorder layers by moving a layer to a new position
+ * @param {Object} mapData - The full map data object
+ * @param {string} layerId - The layer ID to move
+ * @param {number} newIndex - The new index position (0-based, in sorted order)
+ * @returns {Object} New mapData with reordered layers
+ */
+function reorderLayers(mapData, layerId, newIndex) {
+  if (!mapData?.layers) return mapData;
+  
+  // Get layers sorted by current order
+  const sortedLayers = getLayersOrdered(mapData);
+  const currentIndex = sortedLayers.findIndex(l => l.id === layerId);
+  
+  if (currentIndex === -1) {
+    console.warn(`Cannot reorder: layer ${layerId} not found`);
+    return mapData;
+  }
+  
+  // Clamp newIndex to valid range
+  const clampedIndex = Math.max(0, Math.min(newIndex, sortedLayers.length - 1));
+  
+  if (currentIndex === clampedIndex) {
+    return mapData; // No change needed
+  }
+  
+  // Remove layer from current position and insert at new position
+  const [movedLayer] = sortedLayers.splice(currentIndex, 1);
+  sortedLayers.splice(clampedIndex, 0, movedLayer);
+  
+  // Reassign order values based on new positions
+  const reorderedLayers = sortedLayers.map((layer, index) => ({
+    ...layer,
+    order: index
+  }));
+  
+  return {
+    ...mapData,
+    layers: reorderedLayers
+  };
+}
+
+// ============================================================================
+// MIGRATION FUNCTIONS
+// ============================================================================
+
+/**
+ * Create an empty layer structure (for new layers or migration)
+ * @param {string} id - Layer ID
+ * @param {string} name - Layer name
+ * @param {number} order - Layer order
+ * @returns {Object} New layer object with empty content
+ */
+function createEmptyLayer(id, name, order) {
+  return {
+    id,
+    name,
+    order,
+    visible: true,
+    cells: [],
+    edges: [],
+    objects: [],
+    textLabels: [],
+    fogOfWar: null
+  };
+}
+
+/**
+ * Create a deep clone of map data for backup purposes
+ * @param {Object} mapData - Map data to clone
+ * @returns {Object} Deep cloned copy
+ */
+function createBackup(mapData) {
+  try {
+    return JSON.parse(JSON.stringify(mapData));
+  } catch (error) {
+    console.error('[layerAccessor] Failed to create backup:', error);
+    return null;
+  }
+}
+
+/**
+ * Validate that layer data was properly migrated
+ * @param {Object} originalData - Original map data before migration
+ * @param {Object} migratedData - Migrated map data
+ * @returns {Object} { valid: boolean, errors: string[] }
+ */
+function validateMigration(originalData, migratedData) {
+  const errors = [];
+  
+  // Check that layers array exists and has content
+  if (!migratedData.layers || !Array.isArray(migratedData.layers)) {
+    errors.push('Migration failed: layers array missing');
+    return { valid: false, errors };
+  }
+  
+  if (migratedData.layers.length === 0) {
+    errors.push('Migration failed: layers array is empty');
+    return { valid: false, errors };
+  }
+  
+  const layer = migratedData.layers[0];
+  
+  // Check that layer has required structure
+  if (!layer.id || typeof layer.id !== 'string') {
+    errors.push('Migration failed: layer missing valid id');
+  }
+  
+  // Verify data was actually copied (not just empty arrays when original had data)
+  const originalCells = originalData.cells || [];
+  const originalObjects = originalData.objects || [];
+  const originalTextLabels = originalData.textLabels || [];
+  const originalEdges = originalData.edges || [];
+  
+  const layerCells = layer.cells || [];
+  const layerObjects = layer.objects || [];
+  const layerTextLabels = layer.textLabels || [];
+  const layerEdges = layer.edges || [];
+  
+  // Check cell count matches
+  if (originalCells.length !== layerCells.length) {
+    errors.push(`Migration data loss: cells count mismatch (original: ${originalCells.length}, migrated: ${layerCells.length})`);
+  }
+  
+  // Check objects count matches
+  if (originalObjects.length !== layerObjects.length) {
+    errors.push(`Migration data loss: objects count mismatch (original: ${originalObjects.length}, migrated: ${layerObjects.length})`);
+  }
+  
+  // Check text labels count matches
+  if (originalTextLabels.length !== layerTextLabels.length) {
+    errors.push(`Migration data loss: textLabels count mismatch (original: ${originalTextLabels.length}, migrated: ${layerTextLabels.length})`);
+  }
+  
+  // Check edges count matches
+  if (originalEdges.length !== layerEdges.length) {
+    errors.push(`Migration data loss: edges count mismatch (original: ${originalEdges.length}, migrated: ${layerEdges.length})`);
+  }
+  
+  // Check schemaVersion is set correctly
+  if (migratedData.schemaVersion !== SCHEMA_VERSION) {
+    errors.push(`Migration failed: schemaVersion incorrect (expected: ${SCHEMA_VERSION}, got: ${migratedData.schemaVersion})`);
+  }
+  
+  return { 
+    valid: errors.length === 0, 
+    errors 
+  };
+}
+
+/**
+ * Migrate legacy (v1) map data to the new layer schema (v2)
+ * Includes backup creation and validation with automatic rollback on failure
+ * 
+ * @param {Object} legacyMapData - Map data in legacy format (cells/objects at root)
+ * @returns {Object} Map data in new layer format, or original data if migration fails
+ */
+function migrateToLayerSchema(legacyMapData) {
+  // Already migrated? Return as-is
+  if (legacyMapData.schemaVersion >= SCHEMA_VERSION && legacyMapData.layers) {
+    return legacyMapData;
+  }
+  
+  console.log('[layerAccessor] Starting migration to schema version', SCHEMA_VERSION);
+  
+  // Create backup BEFORE any modifications
+  const backup = createBackup(legacyMapData);
+  if (!backup) {
+    console.error('[layerAccessor] CRITICAL: Could not create backup, aborting migration');
+    return legacyMapData; // Return original unchanged
+  }
+  
+  try {
+    // Generate layer ID for the migrated content
+    const layerId = generateLayerId();
+    
+    // IMPORTANT: Extract data BEFORE creating migrated structure
+    // Use explicit array copying to ensure data is preserved
+    const cellsData = Array.isArray(legacyMapData.cells) 
+      ? [...legacyMapData.cells] 
+      : [];
+    const edgesData = Array.isArray(legacyMapData.edges) 
+      ? [...legacyMapData.edges] 
+      : [];
+    const objectsData = Array.isArray(legacyMapData.objects) 
+      ? [...legacyMapData.objects] 
+      : [];
+    const textLabelsData = Array.isArray(legacyMapData.textLabels) 
+      ? [...legacyMapData.textLabels] 
+      : [];
+    
+    console.log('[layerAccessor] Migrating data:', {
+      cells: cellsData.length,
+      edges: edgesData.length,
+      objects: objectsData.length,
+      textLabels: textLabelsData.length
+    });
+    
+    // Create the layer with copied data
+    const layerData = {
+      id: layerId,
+      name: 'Layer 1',
+      order: 0,
+      visible: true,
+      cells: cellsData,
+      edges: edgesData,
+      objects: objectsData,
+      textLabels: textLabelsData,
+      fogOfWar: null
+    };
+    
+    // Build migrated structure (spread original first, then override)
+    const migratedData = {
+      ...legacyMapData,
+      schemaVersion: SCHEMA_VERSION,
+      activeLayerId: layerId,
+      layerPanelVisible: false,
+      layers: [layerData]
+    };
+    
+    // Validate BEFORE removing legacy fields
+    const validation = validateMigration(backup, migratedData);
+    
+    if (!validation.valid) {
+      console.error('[layerAccessor] Migration validation failed:', validation.errors);
+      console.error('[layerAccessor] Restoring from backup');
+      return backup; // Return the backup (original data)
+    }
+    
+    // Only NOW remove legacy root-level layer data (after validation passed)
+    delete migratedData.cells;
+    delete migratedData.edges;
+    delete migratedData.objects;
+    delete migratedData.textLabels;
+    
+    // Store migration metadata for debugging
+    migratedData._migratedAt = new Date().toISOString();
+    
+    console.log('[layerAccessor] Migration successful to schema version', SCHEMA_VERSION);
+    
+    return migratedData;
+    
+  } catch (error) {
+    console.error('[layerAccessor] Migration failed with error:', error);
+    console.error('[layerAccessor] Restoring from backup');
+    return backup; // Return the backup (original data)
+  }
+}
+
+/**
+ * Check if map data needs migration
+ * @param {Object} mapData - Map data to check
+ * @returns {boolean} True if migration is needed
+ */
+function needsMigration(mapData) {
+  if (!mapData) return false;
+  
+  // Needs migration if no schemaVersion, or version is old, or no layers array
+  const needsIt = !mapData.schemaVersion || 
+                  mapData.schemaVersion < SCHEMA_VERSION || 
+                  !mapData.layers;
+  
+  if (needsIt) {
+    console.log('[layerAccessor] Map needs migration:', {
+      currentVersion: mapData.schemaVersion || 'none',
+      targetVersion: SCHEMA_VERSION,
+      hasLayers: !!mapData.layers
+    });
+  }
+  
+  return needsIt;
+}
+
+// ============================================================================
+// FOG OF WAR FUNCTIONS
+// ============================================================================
+
+/**
+ * Initialize fog of war for a layer (first use)
+ * Creates the fogOfWar structure with empty foggedCells array
+ * @param {Object} mapData - The full map data object
+ * @param {string} layerId - The layer ID to initialize FoW for
+ * @returns {Object} New mapData with initialized fogOfWar on the layer
+ */
+function initializeFogOfWar(mapData, layerId) {
+  return updateLayer(mapData, layerId, {
+    fogOfWar: {
+      enabled: true,
+      foggedCells: [],
+      texture: null
+    }
+  });
+}
+
+/**
+ * Check if a cell is fogged
+ * @param {Object} layer - The layer object
+ * @param {number} col - Column (offset coordinate)
+ * @param {number} row - Row (offset coordinate)
+ * @returns {boolean} True if the cell is fogged
+ */
+function isCellFogged(layer, col, row) {
+  if (!layer.fogOfWar || !layer.fogOfWar.enabled) return false;
+  return layer.fogOfWar.foggedCells.some(c => c.col === col && c.row === row);
+}
+
+/**
+ * Add fog to a single cell
+ * @param {Object} layer - The layer object
+ * @param {number} col - Column (offset coordinate)
+ * @param {number} row - Row (offset coordinate)
+ * @returns {Object} New layer object with updated fogOfWar
+ */
+function fogCell(layer, col, row) {
+  if (!layer.fogOfWar) return layer;
+  if (isCellFogged(layer, col, row)) return layer; // Already fogged
+  
+  return {
+    ...layer,
+    fogOfWar: {
+      ...layer.fogOfWar,
+      foggedCells: [...layer.fogOfWar.foggedCells, { col, row }]
+    }
+  };
+}
+
+/**
+ * Remove fog from a single cell (reveal it)
+ * @param {Object} layer - The layer object
+ * @param {number} col - Column (offset coordinate)
+ * @param {number} row - Row (offset coordinate)
+ * @returns {Object} New layer object with updated fogOfWar
+ */
+function revealCell(layer, col, row) {
+  if (!layer.fogOfWar) return layer;
+  
+  return {
+    ...layer,
+    fogOfWar: {
+      ...layer.fogOfWar,
+      foggedCells: layer.fogOfWar.foggedCells.filter(
+        c => !(c.col === col && c.row === row)
+      )
+    }
+  };
+}
+
+/**
+ * Add fog to a rectangular area of cells
+ * @param {Object} layer - The layer object
+ * @param {number} startCol - Start column (inclusive)
+ * @param {number} startRow - Start row (inclusive)
+ * @param {number} endCol - End column (inclusive)
+ * @param {number} endRow - End row (inclusive)
+ * @returns {Object} New layer object with updated fogOfWar
+ */
+function fogRectangle(layer, startCol, startRow, endCol, endRow) {
+  if (!layer.fogOfWar) return layer;
+  
+  // Normalize coordinates (handle any corner order)
+  const minCol = Math.min(startCol, endCol);
+  const maxCol = Math.max(startCol, endCol);
+  const minRow = Math.min(startRow, endRow);
+  const maxRow = Math.max(startRow, endRow);
+  
+  // Build set of existing fogged cells for fast lookup
+  const existingSet = new Set(
+    layer.fogOfWar.foggedCells.map(c => `${c.col},${c.row}`)
+  );
+  
+  // Collect new cells to add
+  const newCells = [];
+  for (let col = minCol; col <= maxCol; col++) {
+    for (let row = minRow; row <= maxRow; row++) {
+      const key = `${col},${row}`;
+      if (!existingSet.has(key)) {
+        newCells.push({ col, row });
+      }
+    }
+  }
+  
+  if (newCells.length === 0) return layer;
+  
+  return {
+    ...layer,
+    fogOfWar: {
+      ...layer.fogOfWar,
+      foggedCells: [...layer.fogOfWar.foggedCells, ...newCells]
+    }
+  };
+}
+
+/**
+ * Remove fog from a rectangular area of cells (reveal them)
+ * @param {Object} layer - The layer object
+ * @param {number} startCol - Start column (inclusive)
+ * @param {number} startRow - Start row (inclusive)
+ * @param {number} endCol - End column (inclusive)
+ * @param {number} endRow - End row (inclusive)
+ * @returns {Object} New layer object with updated fogOfWar
+ */
+function revealRectangle(layer, startCol, startRow, endCol, endRow) {
+  if (!layer.fogOfWar) return layer;
+  
+  // Normalize coordinates
+  const minCol = Math.min(startCol, endCol);
+  const maxCol = Math.max(startCol, endCol);
+  const minRow = Math.min(startRow, endRow);
+  const maxRow = Math.max(startRow, endRow);
+  
+  return {
+    ...layer,
+    fogOfWar: {
+      ...layer.fogOfWar,
+      foggedCells: layer.fogOfWar.foggedCells.filter(c => 
+        c.col < minCol || c.col > maxCol || c.row < minRow || c.row > maxRow
+      )
+    }
+  };
+}
+
+/**
+ * Add fog to all cells within bounds
+ * @param {Object} layer - The layer object
+ * @param {Object} bounds - Bounds object with maxCol and maxRow (exclusive)
+ * @returns {Object} New layer object with all cells fogged
+ */
+function fogAll(layer, bounds) {
+  if (!layer.fogOfWar) return layer;
+  if (!bounds || bounds.maxCol === undefined || bounds.maxRow === undefined) {
+    console.warn('[fogAll] Invalid bounds provided');
+    return layer;
+  }
+  
+  const allCells = [];
+  for (let col = 0; col < bounds.maxCol; col++) {
+    for (let row = 0; row < bounds.maxRow; row++) {
+      allCells.push({ col, row });
+    }
+  }
+  
+  return {
+    ...layer,
+    fogOfWar: {
+      ...layer.fogOfWar,
+      foggedCells: allCells
+    }
+  };
+}
+
+/**
+ * Fog all painted cells on a layer
+ * For unbounded maps where we only want to fog cells that have been drawn
+ * @param {Object} layer - The layer object
+ * @param {Object} geometry - Geometry instance with cellToOffsetCoords method
+ * @returns {Object} New layer object with updated fogOfWar
+ */
+function fogPaintedCells(layer, geometry) {
+  if (!layer.fogOfWar) return layer;
+  if (!layer.cells || layer.cells.length === 0) return layer;
+  if (!geometry || typeof geometry.cellToOffsetCoords !== 'function') {
+    console.warn('[fogPaintedCells] Invalid geometry provided');
+    return layer;
+  }
+  
+  const existingFogged = new Set(
+    layer.fogOfWar.foggedCells.map(c => `${c.col},${c.row}`)
+  );
+  
+  const newCells = [];
+  for (const cell of layer.cells) {
+    const { col, row } = geometry.cellToOffsetCoords(cell);
+    const key = `${col},${row}`;
+    if (!existingFogged.has(key)) {
+      newCells.push({ col, row });
+      existingFogged.add(key);
+    }
+  }
+  
+  if (newCells.length === 0) return layer;
+  
+  return {
+    ...layer,
+    fogOfWar: {
+      ...layer.fogOfWar,
+      foggedCells: [...layer.fogOfWar.foggedCells, ...newCells]
+    }
+  };
+}
+
+/**
+ * Remove all fog from a layer (reveal everything)
+ * @param {Object} layer - The layer object
+ * @returns {Object} New layer object with no fog
+ */
+function revealAll(layer) {
+  if (!layer.fogOfWar) return layer;
+  
+  return {
+    ...layer,
+    fogOfWar: {
+      ...layer.fogOfWar,
+      foggedCells: []
+    }
+  };
+}
+
+/**
+ * Toggle fog visibility without changing fogged cells
+ * @param {Object} layer - The layer object
+ * @returns {Object} New layer object with toggled visibility
+ */
+function toggleFogVisibility(layer) {
+  if (!layer.fogOfWar) return layer;
+  
+  return {
+    ...layer,
+    fogOfWar: {
+      ...layer.fogOfWar,
+      enabled: !layer.fogOfWar.enabled
+    }
+  };
+}
+
+/**
+ * Set fog visibility explicitly
+ * @param {Object} layer - The layer object
+ * @param {boolean} enabled - Whether fog should be visible
+ * @returns {Object} New layer object with updated visibility
+ */
+function setFogVisibility(layer, enabled) {
+  if (!layer.fogOfWar) return layer;
+  
+  return {
+    ...layer,
+    fogOfWar: {
+      ...layer.fogOfWar,
+      enabled: !!enabled
+    }
+  };
+}
+
+/**
+ * Check if a layer has any fog data (regardless of visibility)
+ * @param {Object} layer - The layer object
+ * @returns {boolean} True if the layer has fog data
+ */
+function hasFogData(layer) {
+  return !!(layer.fogOfWar && layer.fogOfWar.foggedCells && layer.fogOfWar.foggedCells.length > 0);
+}
+
+/**
+ * Get fog state summary for UI display
+ * @param {Object} layer - The layer object
+ * @returns {Object} { initialized, enabled, cellCount }
+ */
+function getFogState(layer) {
+  if (!layer.fogOfWar) {
+    return { initialized: false, enabled: false, cellCount: 0 };
+  }
+  return {
+    initialized: true,
+    enabled: layer.fogOfWar.enabled,
+    cellCount: layer.fogOfWar.foggedCells?.length || 0
+  };
+}
+
+// ============================================================================
+// EXPORTS
+// ============================================================================
+
+return {
+  // Constants (re-exported from dmtConstants for convenience)
+  SCHEMA_VERSION,
+  
+  // UUID generation
+  generateLayerId,
+  
+  // Layer access
+  getActiveLayer,
+  getLayersOrdered,
+  getLayerById,
+  getLayerIndex,
+  
+  // Layer modification
+  updateLayer,
+  updateActiveLayer,
+  setActiveLayer,
+  addLayer,
+  removeLayer,
+  reorderLayers,
+  
+  // Migration
+  createEmptyLayer,
+  createBackup,
+  validateMigration,
+  migrateToLayerSchema,
+  needsMigration,
+  
+  // Fog of War
+  initializeFogOfWar,
+  isCellFogged,
+  fogCell,
+  revealCell,
+  fogRectangle,
+  revealRectangle,
+  fogAll,
+  fogPaintedCells,
+  revealAll,
+  toggleFogVisibility,
+  setFogVisibility,
+  hasFogData,
+  getFogState
+};
+```
+
 # fileOperations
 
 ```js
-const { DEFAULTS, DATA_FILE_PATH } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "dmtConstants"));
+const { DEFAULTS, DATA_FILE_PATH, SCHEMA_VERSION } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "dmtConstants"));
 const { offsetToAxial } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "offsetCoordinates"));
 const { getSettings } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "settingsAccessor"));
+const { 
+  migrateToLayerSchema, 
+  needsMigration, 
+  generateLayerId
+} = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "layerAccessor"));
 
 async function loadMapData(mapId, mapName = '', mapType = 'grid') {
   try {
@@ -591,6 +1437,11 @@ async function loadMapData(mapId, mapName = '', mapType = 'grid') {
           }
         }
       }
+      // Migrate to layer schema if needed (v2)
+      if (needsMigration(data.maps[mapId])) {
+        data.maps[mapId] = migrateToLayerSchema(data.maps[mapId]);
+      }
+      
       return data.maps[mapId];
     } else {
       return createNewMap(mapId, mapName, mapType);
@@ -639,16 +1490,16 @@ function createNewMap(mapId, mapName = '', mapType = 'grid') {
     throw new Error('DEFAULTS is undefined - constants.js import failed');
   }
   
-  // Base map structure shared by all map types
+  // Generate layer ID for initial layer
+  const initialLayerId = generateLayerId();
+  
+  // Base map structure with layer schema (v2)
   const baseMap = {
+    // Global settings
     name: mapName,  
     description: "",
     mapType: mapType,
     northDirection: 0,
-    cells: [],
-    edges: [],  // For edge painting (grid maps only)
-    objects: [],
-    textLabels: [],
     customColors: [],
     sidebarCollapsed: false,
     expandedState: false,
@@ -661,7 +1512,25 @@ function createNewMap(mapId, mapName = '', mapType = 'grid') {
       rememberSidebarState: true,
       rememberExpandedState: false
     },
-    lastTextLabelSettings: null  // Stores {fontFace, fontSize, color} for new labels
+    lastTextLabelSettings: null,  // Stores {fontFace, fontSize, color} for new labels
+    
+    // Layer system (v2)
+    schemaVersion: SCHEMA_VERSION,
+    activeLayerId: initialLayerId,
+    layerPanelVisible: false,
+    layers: [
+      {
+        id: initialLayerId,
+        name: 'Layer 1',
+        order: 0,
+        visible: true,
+        cells: [],
+        edges: [],  // For edge painting (grid maps only)
+        objects: [],
+        textLabels: [],
+        fogOfWar: null  //Fog of War
+      }
+    ]
   };
   
   // Add type-specific properties
@@ -1012,6 +1881,7 @@ return {
 ```js
 const { loadMapData, saveMapData } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "fileOperations"));
 const { preloadImage } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "imageOperations"));
+const { getEffectiveSettings } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "settingsAccessor"));
 
 
 function useMapData(mapId, mapName = '', mapType = 'grid') {
@@ -1020,6 +1890,7 @@ function useMapData(mapId, mapName = '', mapType = 'grid') {
   const [saveStatus, setSaveStatus] = dc.useState('Saved');
   const [pendingData, setPendingData] = dc.useState(null);
   const [backgroundImageReady, setBackgroundImageReady] = dc.useState(false);
+  const [fowImageReady, setFowImageReady] = dc.useState(false);
   const saveTimerRef = dc.useRef(null);
   
 
@@ -1046,6 +1917,27 @@ function useMapData(mapId, mapName = '', mapType = 'grid') {
       setBackgroundImageReady(false);
     }
   }, [mapData?.backgroundImage?.path]);
+  
+  // Preload fog of war image when map loads or settings change
+  // Using mapData?.settings as dependency ensures this runs on initial load
+  dc.useEffect(() => {
+    if (!mapData) return;
+    
+    // Get effective settings (handles global vs per-map)
+    const effectiveSettings = getEffectiveSettings(mapData.settings);
+    const fowImagePath = effectiveSettings.fogOfWarImage;
+    
+    if (fowImagePath) {
+      setFowImageReady(false);
+      preloadImage(fowImagePath).then((img) => {
+        if (img) {
+          setFowImageReady(true);
+        }
+      });
+    } else {
+      setFowImageReady(false);
+    }
+  }, [mapData?.settings]);
   
   // Debounced save effect
   dc.useEffect(() => {
@@ -1113,7 +2005,7 @@ function useMapData(mapId, mapName = '', mapType = 'grid') {
     };
   }, [pendingData, mapId]);
   
-  return { mapData, isLoading, saveStatus, updateMapData, forceSave, backgroundImageReady };
+  return { mapData, isLoading, saveStatus, updateMapData, forceSave, backgroundImageReady, fowImageReady };
 }
 
 return { useMapData };
@@ -1194,6 +2086,18 @@ function useHistory(initialState) {
     });
   }, []);
   
+  // Get full history state (for saving before layer switch)
+  const getHistoryState = dc.useCallback(() => {
+    return historyState;
+  }, [historyState]);
+  
+  // Set full history state (for restoring after layer switch)
+  const restoreHistoryState = dc.useCallback((savedState) => {
+    if (savedState && savedState.history && typeof savedState.currentIndex === 'number') {
+      setHistoryState(savedState);
+    }
+  }, []);
+  
   // Check if undo/redo are available
   const canUndo = historyState.currentIndex > 0;
   const canRedo = historyState.currentIndex < historyState.history.length - 1;
@@ -1208,11 +2112,2883 @@ function useHistory(initialState) {
     redo,
     canUndo,
     canRedo,
-    resetHistory
+    resetHistory,
+    getHistoryState,
+    restoreHistoryState
   };
 }
 
 return { useHistory };
+```
+
+# useLayerHistory
+
+```js
+/**
+ * useLayerHistory.js
+ * 
+ * Manages layer switching with per-layer undo/redo history.
+ * This hook centralizes all history-related logic including:
+ * - Per-layer history caching (each layer has independent undo/redo stacks)
+ * - Layer select/add/delete handlers that preserve history state
+ * - Undo/redo operations
+ * - History tracking for data change handlers
+ * 
+ * The hook internally uses useHistory and manages the layer-specific caching,
+ * providing a clean API for the parent component.
+ */
+
+const { useHistory } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "useHistory"));
+const { 
+  getActiveLayer, 
+  updateActiveLayer,
+  addLayer, 
+  removeLayer, 
+  reorderLayers, 
+  setActiveLayer
+} = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "layerAccessor"));
+
+/**
+ * Hook for managing layer switching with per-layer history
+ * 
+ * @param {Object} options - Configuration options
+ * @param {Object} options.mapData - Current map data
+ * @param {Function} options.updateMapData - Function to update map data
+ * @param {boolean} options.isLoading - Whether map data is still loading
+ * @returns {Object} Layer and history state/actions
+ */
+function useLayerHistory({ mapData, updateMapData, isLoading }) {
+  // =========================================================================
+  // Core History Hook
+  // =========================================================================
+  
+  const {
+    currentState: historyState,
+    addToHistory: addToHistoryInternal,
+    undo: undoInternal,
+    redo: redoInternal,
+    canUndo,
+    canRedo,
+    resetHistory,
+    getHistoryState,
+    restoreHistoryState
+  } = useHistory({ cells: [], name: "", objects: [], textLabels: [], edges: [] });
+
+  // =========================================================================
+  // Refs for History Management
+  // =========================================================================
+  
+  // Track if we're applying history (to avoid adding to history during undo/redo)
+  const isApplyingHistoryRef = dc.useRef(false);
+  
+  // Track if history has been initialized for the current session
+  const historyInitialized = dc.useRef(false);
+  
+  // Cache history state per layer (keyed by layer ID)
+  const layerHistoryCache = dc.useRef({});
+
+  // =========================================================================
+  // History Initialization Effect
+  // =========================================================================
+  
+  // Initialize history when map data loads (only once)
+  dc.useEffect(() => {
+    if (mapData && !isLoading && !historyInitialized.current) {
+      const activeLayer = getActiveLayer(mapData);
+      resetHistory({
+        cells: activeLayer.cells,
+        name: mapData.name,
+        objects: activeLayer.objects || [],
+        textLabels: activeLayer.textLabels || [],
+        edges: activeLayer.edges || []
+      });
+      historyInitialized.current = true;
+    }
+  }, [mapData, isLoading, resetHistory]);
+
+  // =========================================================================
+  // Layer State Helpers
+  // =========================================================================
+  
+  /**
+   * Build a history state snapshot from layer data
+   */
+  const buildHistoryState = dc.useCallback((layer, name) => ({
+    cells: layer.cells || [],
+    name: name,
+    objects: layer.objects || [],
+    textLabels: layer.textLabels || [],
+    edges: layer.edges || []
+  }), []);
+
+  /**
+   * Save current layer's history to cache
+   */
+  const saveCurrentLayerHistory = dc.useCallback(() => {
+    if (!mapData) return;
+    const currentLayerId = mapData.activeLayerId;
+    layerHistoryCache.current[currentLayerId] = getHistoryState();
+  }, [mapData, getHistoryState]);
+
+  /**
+   * Restore or initialize history for a layer
+   */
+  const restoreOrInitLayerHistory = dc.useCallback((newMapData, layerId) => {
+    const cachedHistory = layerHistoryCache.current[layerId];
+    if (cachedHistory) {
+      restoreHistoryState(cachedHistory);
+    } else {
+      // No cached history for this layer - initialize fresh
+      const layer = getActiveLayer(newMapData);
+      historyInitialized.current = false;
+      resetHistory(buildHistoryState(layer, newMapData.name));
+      historyInitialized.current = true;
+    }
+  }, [restoreHistoryState, resetHistory, buildHistoryState]);
+
+  // =========================================================================
+  // Layer Management Handlers
+  // =========================================================================
+  
+  // Switch to a different layer
+  const handleLayerSelect = dc.useCallback((layerId) => {
+    if (!mapData || mapData.activeLayerId === layerId) return;
+    
+    // Save current layer's history before switching
+    saveCurrentLayerHistory();
+    
+    const newMapData = setActiveLayer(mapData, layerId);
+    updateMapData(newMapData);
+    
+    // Restore new layer's history or initialize if none cached
+    restoreOrInitLayerHistory(newMapData, layerId);
+  }, [mapData, updateMapData, saveCurrentLayerHistory, restoreOrInitLayerHistory]);
+  
+  // Add a new layer
+  const handleLayerAdd = dc.useCallback(() => {
+    if (!mapData) return;
+    
+    // Save current layer's history before switching
+    saveCurrentLayerHistory();
+    
+    const newMapData = addLayer(mapData);
+    updateMapData(newMapData);
+    
+    // New layer always starts with fresh history
+    const newActiveLayer = getActiveLayer(newMapData);
+    historyInitialized.current = false;
+    resetHistory(buildHistoryState(newActiveLayer, newMapData.name));
+    historyInitialized.current = true;
+  }, [mapData, updateMapData, saveCurrentLayerHistory, resetHistory, buildHistoryState]);
+  
+  // Delete a layer
+  const handleLayerDelete = dc.useCallback((layerId) => {
+    if (!mapData) return;
+    
+    // removeLayer handles preventing deletion of last layer
+    const newMapData = removeLayer(mapData, layerId);
+    
+    // Only update if something changed
+    if (newMapData !== mapData) {
+      // Clear cached history for deleted layer
+      delete layerHistoryCache.current[layerId];
+      
+      updateMapData(newMapData);
+      
+      // If active layer changed, restore or init history for new active layer
+      if (newMapData.activeLayerId !== mapData.activeLayerId) {
+        restoreOrInitLayerHistory(newMapData, newMapData.activeLayerId);
+      }
+    }
+  }, [mapData, updateMapData, restoreOrInitLayerHistory]);
+  
+  // Reorder layers (no history interaction needed)
+  const handleLayerReorder = dc.useCallback((layerId, newIndex) => {
+    if (!mapData) return;
+    
+    const newMapData = reorderLayers(mapData, layerId, newIndex);
+    updateMapData(newMapData);
+  }, [mapData, updateMapData]);
+
+  // =========================================================================
+  // Undo/Redo Handlers
+  // =========================================================================
+  
+  // Handle undo
+  const handleUndo = dc.useCallback(() => {
+    const previousState = undoInternal();
+    if (previousState && mapData) {
+      isApplyingHistoryRef.current = true;
+      // Apply layer-specific data to active layer, name stays at root
+      const newMapData = updateActiveLayer(
+        { ...mapData, name: previousState.name },
+        {
+          cells: previousState.cells,
+          objects: previousState.objects || [],
+          textLabels: previousState.textLabels || [],
+          edges: previousState.edges || []
+        }
+      );
+      updateMapData(newMapData);
+      // Use setTimeout to ensure state update completes before re-enabling history
+      setTimeout(() => {
+        isApplyingHistoryRef.current = false;
+      }, 0);
+    }
+  }, [undoInternal, mapData, updateMapData]);
+
+  // Handle redo
+  const handleRedo = dc.useCallback(() => {
+    const nextState = redoInternal();
+    if (nextState && mapData) {
+      isApplyingHistoryRef.current = true;
+      // Apply layer-specific data to active layer, name stays at root
+      const newMapData = updateActiveLayer(
+        { ...mapData, name: nextState.name },
+        {
+          cells: nextState.cells,
+          objects: nextState.objects || [],
+          textLabels: nextState.textLabels || [],
+          edges: nextState.edges || []
+        }
+      );
+      updateMapData(newMapData);
+      // Use setTimeout to ensure state update completes before re-enabling history
+      setTimeout(() => {
+        isApplyingHistoryRef.current = false;
+      }, 0);
+    }
+  }, [redoInternal, mapData, updateMapData]);
+
+  // =========================================================================
+  // History API for Data Handlers
+  // =========================================================================
+  
+  /**
+   * Check if we're currently applying history (undo/redo in progress)
+   * Data handlers should skip adding to history when this returns true
+   */
+  const isApplyingHistory = dc.useCallback(() => {
+    return isApplyingHistoryRef.current;
+  }, []);
+
+  /**
+   * Add a state to history (wrapper that checks isApplyingHistory)
+   * This is what data change handlers should call
+   */
+  const addToHistory = dc.useCallback((state) => {
+    if (!isApplyingHistoryRef.current) {
+      addToHistoryInternal(state);
+    }
+  }, [addToHistoryInternal]);
+
+  // =========================================================================
+  // Return Value
+  // =========================================================================
+
+  // Grouped layer actions
+  const layerActions = {
+    handleLayerSelect,
+    handleLayerAdd,
+    handleLayerDelete,
+    handleLayerReorder
+  };
+
+  // Grouped history actions
+  const historyActions = {
+    handleUndo,
+    handleRedo,
+    addToHistory,
+    isApplyingHistory
+  };
+
+  return {
+    // Layer management
+    layerActions,
+    handleLayerSelect,
+    handleLayerAdd,
+    handleLayerDelete,
+    handleLayerReorder,
+    
+    // History state
+    canUndo,
+    canRedo,
+    
+    // History actions
+    historyActions,
+    handleUndo,
+    handleRedo,
+    
+    // For data change handlers
+    addToHistory,
+    isApplyingHistory
+  };
+}
+
+return { useLayerHistory };
+```
+
+# colorOperations
+
+```js
+// utils/colorOperations.js - Color palette and utilities
+
+const { getColorPaletteSettings, BUILT_IN_COLORS } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "settingsAccessor"));
+
+const DEFAULT_COLOR = '#c4a57b'; // Tan/brown - the original default
+
+// Static fallback palette for backward compatibility
+// Components should prefer getColorPalette() for dynamic colors
+const COLOR_PALETTE = BUILT_IN_COLORS;
+
+/**
+ * Get the current color palette (including customizations from settings)
+ * This is the preferred way to get colors - it includes user customizations
+ * @returns {Array} Array of color objects { id, color, label, isBuiltIn?, isCustom?, isModified? }
+ */
+function getColorPalette() {
+  try {
+    return getColorPaletteSettings();
+  } catch (error) {
+    // Fallback to built-in colors
+    return BUILT_IN_COLORS;
+  }
+}
+
+/**
+ * Get color for a cell (handles backward compatibility)
+ * @param {Object} cell - Cell object
+ * @returns {string} Hex color
+ */
+function getCellColor(cell) {
+  return cell.color || DEFAULT_COLOR;
+}
+
+/**
+ * Get color definition by hex value from current palette
+ * @param {string} colorHex - Hex color value
+ * @returns {Object|null} Color definition or null
+ */
+function getColorByHex(colorHex) {
+  const palette = getColorPalette();
+  return palette.find(c => c.color === colorHex) || null;
+}
+
+/**
+ * Check if color is default
+ * @param {string} colorHex - Hex color value
+ * @returns {boolean} True if default color
+ */
+function isDefaultColor(colorHex) {
+  return !colorHex || colorHex === DEFAULT_COLOR;
+}
+
+return {
+  DEFAULT_COLOR,
+  COLOR_PALETTE,      // Static fallback for backward compatibility
+  getColorPalette,    // Dynamic palette with user customizations (preferred)
+  getCellColor,
+  getColorByHex,
+  isDefaultColor
+};
+```
+
+# useToolState
+
+```js
+/**
+ * useToolState.js
+ * 
+ * Manages tool selection and color/opacity state for DungeonMapTracker.
+ * Extracts related state into a cohesive unit for better organization.
+ * 
+ * State managed:
+ * - currentTool: Active drawing/interaction tool
+ * - selectedObjectType: Object type for placement tool
+ * - selectedColor: Active color for painting
+ * - selectedOpacity: Opacity for painting (0-1)
+ * - isColorPickerOpen: Whether color picker UI is visible
+ */
+
+const { DEFAULT_COLOR } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "colorOperations"));
+
+/**
+ * Hook for managing tool and color state
+ * 
+ * @param {Object} options - Configuration options
+ * @param {string} [options.initialTool='draw'] - Initial tool selection
+ * @param {string} [options.initialColor=DEFAULT_COLOR] - Initial color
+ * @param {number} [options.initialOpacity=1] - Initial opacity (0-1)
+ * @returns {Object} Tool state and actions
+ */
+function useToolState(options = {}) {
+  const {
+    initialTool = 'draw',
+    initialColor = DEFAULT_COLOR,
+    initialOpacity = 1
+  } = options;
+
+  // Tool selection state
+  const [currentTool, setCurrentTool] = dc.useState(initialTool);
+  const [selectedObjectType, setSelectedObjectType] = dc.useState(null);
+  
+  // Color and opacity state
+  const [selectedColor, setSelectedColor] = dc.useState(initialColor);
+  const [selectedOpacity, setSelectedOpacity] = dc.useState(initialOpacity);
+  const [isColorPickerOpen, setIsColorPickerOpen] = dc.useState(false);
+
+  // Grouped state object for easy destructuring
+  const toolState = {
+    currentTool,
+    selectedObjectType,
+    selectedColor,
+    selectedOpacity,
+    isColorPickerOpen
+  };
+
+  // Grouped actions object
+  const toolActions = {
+    setCurrentTool,
+    setSelectedObjectType,
+    setSelectedColor,
+    setSelectedOpacity,
+    setIsColorPickerOpen
+  };
+
+  return {
+    // Grouped access
+    toolState,
+    toolActions,
+    
+    // Direct access (for convenience when only a few values needed)
+    currentTool,
+    selectedObjectType,
+    selectedColor,
+    selectedOpacity,
+    isColorPickerOpen,
+    setCurrentTool,
+    setSelectedObjectType,
+    setSelectedColor,
+    setSelectedOpacity,
+    setIsColorPickerOpen
+  };
+}
+
+return { useToolState };
+```
+
+# useFogOfWar
+
+```js
+/**
+ * useFogOfWar.js
+ * 
+ * Manages Fog of War UI state and high-level operations for DungeonMapTracker.
+ * This is distinct from useFogTools.js which handles canvas-level interactions.
+ * 
+ * State managed:
+ * - showFogTools: Whether the fog tools panel is expanded
+ * - fogActiveTool: Currently selected fog tool ('paint' | 'erase' | 'rectangle' | null)
+ * 
+ * Computed:
+ * - currentFogState: Combined state from layer data + UI state
+ * 
+ * Operations provided:
+ * - Tool panel toggle and tool selection
+ * - Fog visibility toggle
+ * - Fill all / Clear all fog
+ * - Handle fog changes from FogOfWarLayer
+ */
+
+const { 
+  getActiveLayer, 
+  updateActiveLayer,
+  initializeFogOfWar,
+  fogAll,
+  fogPaintedCells,
+  revealAll,
+  toggleFogVisibility,
+  getFogState
+} = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "layerAccessor"));
+
+/**
+ * Hook for managing Fog of War UI state and high-level operations
+ * 
+ * @param {Object} options - Configuration options
+ * @param {Object} options.mapData - Current map data
+ * @param {Object} options.geometry - Geometry instance for bounds checking
+ * @param {Function} options.updateMapData - Function to update map data
+ * @returns {Object} Fog state and actions
+ */
+function useFogOfWar({ mapData, geometry, updateMapData }) {
+  // UI state for fog tools panel
+  const [showFogTools, setShowFogTools] = dc.useState(false);
+  const [fogActiveTool, setFogActiveTool] = dc.useState(null); // 'paint' | 'erase' | 'rectangle' | null
+
+  // =========================================================================
+  // Computed State
+  // =========================================================================
+  
+  // Get current fog state for UI (combines layer data + UI state)
+  const currentFogState = dc.useMemo(() => {
+    if (!mapData) return { initialized: false, enabled: false, activeTool: null };
+    const activeLayer = getActiveLayer(mapData);
+    const state = getFogState(activeLayer);
+    return {
+      ...state,
+      activeTool: fogActiveTool
+    };
+  }, [mapData, fogActiveTool]);
+
+  // =========================================================================
+  // Handlers
+  // =========================================================================
+  
+  // Toggle FoW tools panel visibility
+  const handleFogToolsToggle = dc.useCallback(() => {
+    setShowFogTools(prev => !prev);
+    // Clear active tool when closing panel
+    if (showFogTools) {
+      setFogActiveTool(null);
+    }
+  }, [showFogTools]);
+  
+  // Select a FoW tool
+  const handleFogToolSelect = dc.useCallback((tool) => {
+    // Toggle off if same tool selected
+    setFogActiveTool(prev => prev === tool ? null : tool);
+  }, []);
+  
+  // Toggle fog visibility (show/hide without changing fog data)
+  const handleFogVisibilityToggle = dc.useCallback(() => {
+    if (!mapData) return;
+    
+    const activeLayer = getActiveLayer(mapData);
+    if (!activeLayer.fogOfWar) return;
+    
+    const updatedLayer = toggleFogVisibility(activeLayer);
+    updateMapData(updateActiveLayer(mapData, { fogOfWar: updatedLayer.fogOfWar }));
+  }, [mapData, updateMapData]);
+  
+  // Fill all cells with fog
+  // For bounded maps (hex): fogs all cells within bounds
+  // For unbounded maps (grid): fogs only painted cells
+  const handleFogFillAll = dc.useCallback(() => {
+    if (!mapData || !geometry) return;
+    
+    let workingMapData = mapData;
+    let activeLayer = getActiveLayer(workingMapData);
+    
+    // Initialize FoW if needed
+    if (!activeLayer.fogOfWar) {
+      workingMapData = initializeFogOfWar(workingMapData, workingMapData.activeLayerId);
+      activeLayer = getActiveLayer(workingMapData);
+    }
+    
+    // Use geometry to determine fog strategy
+    let updatedLayer;
+    if (geometry.isBounded()) {
+      // Bounded maps: fog all cells within bounds
+      updatedLayer = fogAll(activeLayer, geometry.getBounds());
+    } else {
+      // Unbounded maps: fog only painted cells
+      if (!activeLayer.cells || activeLayer.cells.length === 0) {
+        console.warn('[FoW] No painted cells to fog');
+        return;
+      }
+      updatedLayer = fogPaintedCells(activeLayer, geometry);
+    }
+    
+    // Ensure fog is enabled
+    updateMapData(updateActiveLayer(workingMapData, {
+      fogOfWar: {
+        ...updatedLayer.fogOfWar,
+        enabled: true
+      }
+    }));
+  }, [mapData, geometry, updateMapData]);
+  
+  // Clear all fog
+  const handleFogClearAll = dc.useCallback(() => {
+    if (!mapData) return;
+    
+    const activeLayer = getActiveLayer(mapData);
+    if (!activeLayer.fogOfWar) return;
+    
+    const updatedLayer = revealAll(activeLayer);
+    updateMapData(updateActiveLayer(mapData, { fogOfWar: updatedLayer.fogOfWar }));
+  }, [mapData, updateMapData]);
+  
+  // Handle fog changes from FogOfWarLayer (for paint/erase/rectangle operations)
+  const handleFogChange = dc.useCallback((updatedFogOfWar) => {
+    if (!mapData) return;
+    updateMapData(updateActiveLayer(mapData, { fogOfWar: updatedFogOfWar }));
+  }, [mapData, updateMapData]);
+
+  // =========================================================================
+  // Return Value
+  // =========================================================================
+
+  // Grouped state object
+  const fogState = {
+    showFogTools,
+    fogActiveTool,
+    currentFogState
+  };
+
+  // Grouped actions object
+  const fogActions = {
+    handleFogToolsToggle,
+    handleFogToolSelect,
+    handleFogVisibilityToggle,
+    handleFogFillAll,
+    handleFogClearAll,
+    handleFogChange
+  };
+
+  return {
+    // Grouped access
+    fogState,
+    fogActions,
+    
+    // Direct access (for convenience)
+    showFogTools,
+    fogActiveTool,
+    currentFogState,
+    handleFogToolsToggle,
+    handleFogToolSelect,
+    handleFogVisibilityToggle,
+    handleFogFillAll,
+    handleFogClearAll,
+    handleFogChange
+  };
+}
+
+return { useFogOfWar };
+```
+
+# useDataHandlers
+
+```js
+/**
+ * useDataHandlers.js
+ * 
+ * Manages data change handlers for DungeonMapTracker.
+ * Provides handlers for updating layer data (cells, objects, textLabels, edges)
+ * and map-level data (name, custom colors).
+ * 
+ * All layer data handlers use functional updaters for consistency and to avoid
+ * stale closure issues. History tracking is integrated into each handler.
+ * 
+ * Handlers provided:
+ * - handleNameChange: Update map name
+ * - handleCellsChange: Update painted cells
+ * - handleObjectsChange: Update placed objects
+ * - handleTextLabelsChange: Update text labels
+ * - handleEdgesChange: Update painted edges
+ * - handleAddCustomColor: Add a custom color to the palette
+ * - handleDeleteCustomColor: Remove a custom color from the palette
+ * - handleViewStateChange: Update zoom/pan state (no history)
+ * - handleSidebarCollapseChange: Update sidebar collapsed state (no history)
+ */
+
+const { getActiveLayer, updateActiveLayer } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "layerAccessor"));
+
+/**
+ * Hook for managing data change handlers
+ * 
+ * @param {Object} options - Configuration options
+ * @param {Object} options.mapData - Current map data (used for non-functional-updater cases)
+ * @param {Function} options.updateMapData - Function to update map data (supports functional updaters)
+ * @param {Function} options.addToHistory - Function to add state to history
+ * @param {Function} options.isApplyingHistory - Function to check if undo/redo is in progress
+ * @returns {Object} Data change handlers
+ */
+function useDataHandlers({ mapData, updateMapData, addToHistory, isApplyingHistory }) {
+  
+  // =========================================================================
+  // Helper: Build history state from layer + name
+  // =========================================================================
+  
+  const buildHistoryState = dc.useCallback((layer, name, overrides = {}) => ({
+    cells: overrides.cells ?? layer.cells ?? [],
+    name: name,
+    objects: overrides.objects ?? layer.objects ?? [],
+    textLabels: overrides.textLabels ?? layer.textLabels ?? [],
+    edges: overrides.edges ?? layer.edges ?? []
+  }), []);
+
+  // =========================================================================
+  // Factory: Create layer data change handler
+  // =========================================================================
+  
+  /**
+   * Creates a handler for updating a specific layer data field.
+   * All handlers use functional updaters for consistency.
+   * 
+   * @param {string} field - The field to update ('cells', 'objects', 'textLabels', 'edges')
+   * @returns {Function} Handler function (newValue, suppressHistory?) => void
+   */
+  const createLayerDataHandler = dc.useCallback((field) => {
+    return (newValue, suppressHistory = false) => {
+      if (isApplyingHistory()) return;
+
+      updateMapData(currentMapData => {
+        if (!currentMapData) return currentMapData;
+        
+        const newMapData = updateActiveLayer(currentMapData, { [field]: newValue });
+        
+        if (!suppressHistory) {
+          const activeLayer = getActiveLayer(currentMapData);
+          addToHistory(buildHistoryState(activeLayer, currentMapData.name, { [field]: newValue }));
+        }
+        
+        return newMapData;
+      });
+    };
+  }, [updateMapData, addToHistory, isApplyingHistory, buildHistoryState]);
+
+  // =========================================================================
+  // Layer Data Handlers (using factory)
+  // =========================================================================
+  
+  const handleCellsChange = dc.useMemo(
+    () => createLayerDataHandler('cells'),
+    [createLayerDataHandler]
+  );
+  
+  const handleObjectsChange = dc.useMemo(
+    () => createLayerDataHandler('objects'),
+    [createLayerDataHandler]
+  );
+  
+  const handleTextLabelsChange = dc.useMemo(
+    () => createLayerDataHandler('textLabels'),
+    [createLayerDataHandler]
+  );
+  
+  const handleEdgesChange = dc.useMemo(
+    () => createLayerDataHandler('edges'),
+    [createLayerDataHandler]
+  );
+
+  // =========================================================================
+  // Map-Level Data Handlers
+  // =========================================================================
+  
+  // Handle map name change (updates root-level name, not layer data)
+  const handleNameChange = dc.useCallback((newName) => {
+    if (isApplyingHistory()) return;
+
+    updateMapData(currentMapData => {
+      if (!currentMapData) return currentMapData;
+      
+      const activeLayer = getActiveLayer(currentMapData);
+      addToHistory(buildHistoryState(activeLayer, newName));
+      
+      return { ...currentMapData, name: newName };
+    });
+  }, [updateMapData, addToHistory, isApplyingHistory, buildHistoryState]);
+
+  // Handle adding a custom color
+  const handleAddCustomColor = dc.useCallback((newColor) => {
+    updateMapData(currentMapData => {
+      if (!currentMapData) return currentMapData;
+      
+      const customColorId = `custom-${Date.now()}`;
+      const customColorNumber = (currentMapData.customColors?.length || 0) + 1;
+      const customColorLabel = `Custom ${customColorNumber}`;
+
+      // Color value may include alpha from native picker (e.g., #rrggbbaa format)
+      const newCustomColor = {
+        id: customColorId,
+        color: newColor,
+        label: customColorLabel
+      };
+
+      return {
+        ...currentMapData,
+        customColors: [...(currentMapData.customColors || []), newCustomColor]
+      };
+    });
+  }, [updateMapData]);
+
+  // Handle deleting a custom color
+  const handleDeleteCustomColor = dc.useCallback((colorId) => {
+    updateMapData(currentMapData => {
+      if (!currentMapData) return currentMapData;
+      
+      return {
+        ...currentMapData,
+        customColors: (currentMapData.customColors || []).filter(c => c.id !== colorId)
+      };
+    });
+  }, [updateMapData]);
+
+  // Handle updating a color's opacity (works for both per-map custom colors and palette colors)
+  const handleUpdateColorOpacity = dc.useCallback((colorId, newOpacity) => {
+    updateMapData(currentMapData => {
+      if (!currentMapData) return currentMapData;
+      
+      // Check if it's a per-map custom color
+      const isCustomColor = (currentMapData.customColors || []).some(c => c.id === colorId);
+      
+      if (isCustomColor) {
+        // Update existing custom color's opacity
+        return {
+          ...currentMapData,
+          customColors: currentMapData.customColors.map(c => 
+            c.id === colorId ? { ...c, opacity: newOpacity } : c
+          )
+        };
+      } else {
+        // Store as palette color override (per-map override for global palette colors)
+        return {
+          ...currentMapData,
+          paletteColorOpacityOverrides: {
+            ...(currentMapData.paletteColorOpacityOverrides || {}),
+            [colorId]: newOpacity
+          }
+        };
+      }
+    });
+  }, [updateMapData]);
+
+  // Handle view state change (zoom/pan) - NOT tracked in history
+  const handleViewStateChange = dc.useCallback((newViewState) => {
+    updateMapData(currentMapData => {
+      if (!currentMapData) return currentMapData;
+      return { ...currentMapData, viewState: newViewState };
+    });
+  }, [updateMapData]);
+
+  // Handle sidebar collapse state change - NOT tracked in history
+  const handleSidebarCollapseChange = dc.useCallback((collapsed) => {
+    updateMapData(currentMapData => {
+      if (!currentMapData) return currentMapData;
+      return { ...currentMapData, sidebarCollapsed: collapsed };
+    });
+  }, [updateMapData]);
+
+  // =========================================================================
+  // Return Value
+  // =========================================================================
+
+  // Grouped by category
+  const layerDataHandlers = {
+    handleCellsChange,
+    handleObjectsChange,
+    handleTextLabelsChange,
+    handleEdgesChange
+  };
+
+  const mapDataHandlers = {
+    handleNameChange,
+    handleAddCustomColor,
+    handleDeleteCustomColor,
+    handleUpdateColorOpacity,
+    handleViewStateChange,
+    handleSidebarCollapseChange
+  };
+
+  return {
+    // Grouped access
+    layerDataHandlers,
+    mapDataHandlers,
+    
+    // Direct access
+    handleNameChange,
+    handleCellsChange,
+    handleObjectsChange,
+    handleTextLabelsChange,
+    handleEdgesChange,
+    handleAddCustomColor,
+    handleDeleteCustomColor,
+    handleUpdateColorOpacity,
+    handleViewStateChange,
+    handleSidebarCollapseChange
+  };
+}
+
+return { useDataHandlers };
+```
+
+# BaseGeometry
+
+```js
+/**
+ * BaseGeometry.js
+ * 
+ * Abstract base class for geometry implementations (GridGeometry, HexGeometry).
+ * Defines the common interface that all geometry classes must implement,
+ * and provides shared utility methods.
+ * 
+ * This class uses JavaScript with TypeScript-style JSDoc annotations to:
+ * - Document the expected API contract
+ * - Provide IDE autocomplete and type checking
+ * - Enable runtime validation of abstract methods
+ * - Facilitate future TypeScript migration
+ * 
+ * COORDINATE SYSTEMS (implemented by subclasses):
+ * - Grid coordinates: Integer indices in the geometry's native coordinate system
+ *   (gridX, gridY) for GridGeometry, (q, r) for HexGeometry
+ * 
+ * - World coordinates: Float pixel coordinates in the map's coordinate system
+ *   Origin and scale defined by geometry implementation
+ * 
+ * - Screen coordinates: Pixel coordinates on the canvas
+ *   Includes viewport transforms (pan/zoom/rotation)
+ * 
+ * IMPLEMENTATION GUIDELINES:
+ * - Subclasses MUST implement all abstract methods defined below
+ * - Subclasses SHOULD provide consistent public APIs for polymorphic usage
+ * - Helper methods (e.g., offsetToWorld, getCellCenter) should exist in both
+ *   implementations, even if one is a simple passthrough, to enable code
+ *   that works with BaseGeometry references without type-checking
+ * 
+ * @abstract
+ */
+class BaseGeometry {
+  /**
+   * @throws {Error} If instantiated directly (must use subclass)
+   */
+  constructor() {
+    if (new.target === BaseGeometry) {
+      throw new Error('BaseGeometry is abstract and cannot be instantiated directly');
+    }
+  }
+  
+  // ============================================================================
+  // CONCRETE METHODS (Shared implementation for all geometry types)
+  // ============================================================================
+  
+  /**
+   * Apply iOS-safe stroke style to canvas context
+   * 
+   * iOS may corrupt stroke-related canvas state during memory pressure events
+   * (when app is backgrounded). This helper ensures all stroke properties are
+   * explicitly set to valid values before any stroke operations.
+   * 
+   * Usage pattern:
+   * ```javascript
+   * this.withStrokeStyle(ctx, { lineColor: '#333', lineWidth: 1 }, () => {
+   *   // All stroke operations here
+   *   ctx.beginPath();
+   *   ctx.moveTo(x1, y1);
+   *   ctx.lineTo(x2, y2);
+   *   ctx.stroke();
+   * });
+   * ```
+   * 
+   * @param {CanvasRenderingContext2D} ctx - Canvas context
+   * @param {Object} style - Stroke style options
+   * @param {string} style.lineColor - Stroke color (default: '#333333')
+   * @param {number} style.lineWidth - Line width (default: 1)
+   * @param {Function} callback - Function containing stroke operations
+   */
+  withStrokeStyle(ctx, style, callback) {
+    const { lineColor = '#333333', lineWidth = 1 } = style;
+    
+    // Save context state
+    ctx.save();
+    
+    // Explicitly reset ALL stroke-related properties
+    // This protects against iOS state corruption
+    ctx.strokeStyle = lineColor;
+    ctx.lineWidth = lineWidth;
+    ctx.lineCap = 'butt';
+    ctx.lineJoin = 'miter';
+    ctx.miterLimit = 10;
+    ctx.setLineDash([]);
+    ctx.lineDashOffset = 0;
+    
+    // Execute stroke operations
+    callback();
+    
+    // Restore context state
+    ctx.restore();
+  }
+  
+  /**
+   * Convert world coordinates to screen coordinates (for rendering)
+   * This is a pure coordinate transform that works identically for all geometry types
+   * 
+   * @param {number} worldX - World X coordinate
+   * @param {number} worldY - World Y coordinate
+   * @param {number} offsetX - Screen offset X (viewport pan)
+   * @param {number} offsetY - Screen offset Y (viewport pan)
+   * @param {number} zoom - Current zoom level
+   * @returns {{screenX: number, screenY: number}} Screen coordinates
+   */
+  worldToScreen(worldX, worldY, offsetX, offsetY, zoom) {
+    const screenX = offsetX + worldX * zoom;
+    const screenY = offsetY + worldY * zoom;
+    return { screenX, screenY };
+  }
+
+  /**
+   * Convert screen coordinates to world coordinates
+   * This is the inverse of worldToScreen and works identically for all geometry types
+   * Useful for calculating visible bounds and converting pointer events
+   * 
+   * @param {number} screenX - Screen X coordinate
+   * @param {number} screenY - Screen Y coordinate
+   * @param {number} zoom - Current zoom level
+   * @returns {{worldX: number, worldY: number}} World coordinates
+   */
+  screenToWorld(screenX, screenY, zoom) {
+    return {
+      worldX: screenX / zoom,
+      worldY: screenY / zoom
+    };
+  }
+  
+  // ============================================================================
+  // ABSTRACT METHODS (Must be implemented by subclasses)
+  // ============================================================================
+  
+  /**
+   * Convert world coordinates to grid coordinates
+   * @abstract
+   * @param {number} worldX - World X coordinate
+   * @param {number} worldY - World Y coordinate
+   * @returns {{gridX: number, gridY: number}} Grid coordinates (property names may vary by implementation)
+   * @throws {Error} If not implemented by subclass
+   */
+  worldToGrid(worldX, worldY) {
+    throw new Error('worldToGrid() must be implemented by subclass');
+  }
+  
+  /**
+   * Convert grid coordinates to world coordinates
+   * @abstract
+   * @param {number} x - Grid X coordinate (gridX for grid, q for hex)
+   * @param {number} y - Grid Y coordinate (gridY for grid, r for hex)
+   * @returns {{worldX: number, worldY: number}} World coordinates
+   * @throws {Error} If not implemented by subclass
+   */
+  gridToWorld(x, y) {
+    throw new Error('gridToWorld() must be implemented by subclass');
+  }
+  
+  /**
+   * Convert grid coordinates to screen coordinates
+   * @abstract
+   * @param {number} x - Grid X coordinate (gridX for grid, q for hex)
+   * @param {number} y - Grid Y coordinate (gridY for grid, r for hex)
+   * @param {number} offsetX - Screen offset X
+   * @param {number} offsetY - Screen offset Y
+   * @param {number} zoom - Current zoom level
+   * @returns {{screenX: number, screenY: number}} Screen coordinates
+   * @throws {Error} If not implemented by subclass
+   */
+  gridToScreen(x, y, offsetX, offsetY, zoom) {
+    throw new Error('gridToScreen() must be implemented by subclass');
+  }
+  
+  /**
+   * Get the scaled cell/hex size at current zoom level
+   * @abstract
+   * @param {number} zoom - Current zoom level
+   * @returns {number} Scaled size in screen pixels
+   * @throws {Error} If not implemented by subclass
+   */
+  getScaledCellSize(zoom) {
+    throw new Error('getScaledCellSize() must be implemented by subclass');
+  }
+  
+  /**
+   * Create a cell object in the geometry's native format
+   * @abstract
+   * @param {{gridX: number, gridY: number}|{q: number, r: number}|{x: number, y: number}} coords - Coordinates
+   * @param {string} color - Cell color
+   * @returns {Object} Cell object in native format
+   * @throws {Error} If not implemented by subclass
+   */
+  createCellObject(coords, color) {
+    throw new Error('createCellObject() must be implemented by subclass');
+  }
+  
+  /**
+   * Check if a cell matches given coordinates
+   * @abstract
+   * @param {Object} cell - Cell object to check
+   * @param {{gridX: number, gridY: number}|{q: number, r: number}|{x: number, y: number}} coords - Coordinates
+   * @returns {boolean} True if cell matches coordinates
+   * @throws {Error} If not implemented by subclass
+   */
+  cellMatchesCoords(cell, coords) {
+    throw new Error('cellMatchesCoords() must be implemented by subclass');
+  }
+  
+  /**
+   * Get all cells within a rectangular area
+   * @abstract
+   * @param {number} x1 - First corner X
+   * @param {number} y1 - First corner Y
+   * @param {number} x2 - Second corner X
+   * @param {number} y2 - Second corner Y
+   * @returns {Array<{x: number, y: number}>} Array of cell coordinates
+   * @throws {Error} If not implemented by subclass
+   */
+  getCellsInRectangle(x1, y1, x2, y2) {
+    throw new Error('getCellsInRectangle() must be implemented by subclass');
+  }
+  
+  /**
+   * Get all cells within a circular area
+   * @abstract
+   * @param {number} centerX - Center X coordinate
+   * @param {number} centerY - Center Y coordinate
+   * @param {number} radius - Radius in cells
+   * @returns {Array<{x: number, y: number}>} Array of cell coordinates
+   * @throws {Error} If not implemented by subclass
+   */
+  getCellsInCircle(centerX, centerY, radius) {
+    throw new Error('getCellsInCircle() must be implemented by subclass');
+  }
+  
+  /**
+   * Get all cells along a line between two cells
+   * @abstract
+   * @param {number} x1 - Start X coordinate
+   * @param {number} y1 - Start Y coordinate
+   * @param {number} x2 - End X coordinate
+   * @param {number} y2 - End Y coordinate
+   * @returns {Array<{x: number, y: number}>} Array of cell coordinates
+   * @throws {Error} If not implemented by subclass
+   */
+  getCellsInLine(x1, y1, x2, y2) {
+    throw new Error('getCellsInLine() must be implemented by subclass');
+  }
+  
+  /**
+   * Calculate distance between two cells
+   * @abstract
+   * @param {number} x1 - First cell X
+   * @param {number} y1 - First cell Y
+   * @param {number} x2 - Second cell X
+   * @param {number} y2 - Second cell Y
+   * @returns {number} Distance in cells
+   * @throws {Error} If not implemented by subclass
+   */
+  getEuclideanDistance(x1, y1, x2, y2) {
+    throw new Error('getEuclideanDistance() must be implemented by subclass');
+  }
+  
+  /**
+   * Calculate Manhattan distance between two cells
+   * @abstract
+   * @param {number} x1 - First cell X
+   * @param {number} y1 - First cell Y
+   * @param {number} x2 - Second cell X
+   * @param {number} y2 - Second cell Y
+   * @returns {number} Manhattan distance in cells
+   * @throws {Error} If not implemented by subclass
+   */
+  getManhattanDistance(x1, y1, x2, y2) {
+    throw new Error('getManhattanDistance() must be implemented by subclass');
+  }
+  
+  /**
+   * Calculate "game distance" between two cells with configurable rules
+   * For grid: supports different diagonal calculation rules (alternating, equal, euclidean)
+   * For hex: returns hex distance (options are ignored - hex has no diagonal ambiguity)
+   * @abstract
+   * @param {number} x1 - First cell X (gridX or q)
+   * @param {number} y1 - First cell Y (gridY or r)
+   * @param {number} x2 - Second cell X (gridX or q)
+   * @param {number} y2 - Second cell Y (gridY or r)
+   * @param {Object} options - Distance calculation options
+   * @param {string} options.diagonalRule - For grid: 'alternating' | 'equal' | 'euclidean'
+   * @returns {number} Distance in cells
+   * @throws {Error} If not implemented by subclass
+   */
+  getCellDistance(x1, y1, x2, y2, options = {}) {
+    throw new Error('getCellDistance() must be implemented by subclass');
+  }
+  
+  /**
+   * Get all neighboring cells
+   * @abstract
+   * @param {number} x - Cell X coordinate
+   * @param {number} y - Cell Y coordinate
+   * @returns {Array<{x: number, y: number}>} Array of neighbor coordinates
+   * @throws {Error} If not implemented by subclass
+   */
+  getNeighbors(x, y) {
+    throw new Error('getNeighbors() must be implemented by subclass');
+  }
+  
+  /**
+   * Check if coordinates are within bounds
+   * @abstract
+   * @param {number} x - X coordinate
+   * @param {number} y - Y coordinate
+   * @returns {boolean} True if within bounds
+   * @throws {Error} If not implemented by subclass
+   */
+  isWithinBounds(x, y) {
+    throw new Error('isWithinBounds() must be implemented by subclass');
+  }
+  
+  /**
+   * Clamp coordinates to bounds
+   * @abstract
+   * @param {number} x - X coordinate
+   * @param {number} y - Y coordinate
+   * @returns {{x: number, y: number}} Clamped coordinates (property names may vary)
+   * @throws {Error} If not implemented by subclass
+   */
+  clampToBounds(x, y) {
+    throw new Error('clampToBounds() must be implemented by subclass');
+  }
+  
+  /**
+   * Convert grid coordinates to offset coordinates (col, row)
+   * For grid geometry, this is a simple passthrough (gridX=col, gridY=row)
+   * For hex geometry, this converts axial (q, r) to offset (col, row)
+   * 
+   * Offset coordinates are useful for array-based storage like fog of war
+   * where we need consistent integer indices regardless of geometry type.
+   * 
+   * @abstract
+   * @param {number} gridX - Grid X coordinate (gridX for grid, q for hex)
+   * @param {number} gridY - Grid Y coordinate (gridY for grid, r for hex)
+   * @returns {{col: number, row: number}} Offset coordinates
+   * @throws {Error} If not implemented by subclass
+   */
+  toOffsetCoords(gridX, gridY) {
+    throw new Error('toOffsetCoords() must be implemented by subclass');
+  }
+  
+  /**
+   * Convert a cell object to offset coordinates (col, row)
+   * Extracts coordinates from a cell in the geometry's native format
+   * and converts to offset coordinates for uniform storage.
+   * 
+   * @abstract
+   * @param {Object} cell - Cell object in geometry's native format
+   * @returns {{col: number, row: number}} Offset coordinates
+   * @throws {Error} If not implemented by subclass
+   */
+  cellToOffsetCoords(cell) {
+    throw new Error('cellToOffsetCoords() must be implemented by subclass');
+  }
+  
+  /**
+   * Check if this geometry has defined bounds
+   * Bounded geometries have a finite set of valid cells.
+   * 
+   * @abstract
+   * @returns {boolean} True if geometry has bounds
+   * @throws {Error} If not implemented by subclass
+   */
+  isBounded() {
+    throw new Error('isBounded() must be implemented by subclass');
+  }
+  
+  /**
+   * Get the bounds for this geometry (if bounded)
+   * Returns null for unbounded geometries.
+   * 
+   * @abstract
+   * @returns {{maxCol: number, maxRow: number}|null} Bounds object or null
+   * @throws {Error} If not implemented by subclass
+   */
+  getBounds() {
+    throw new Error('getBounds() must be implemented by subclass');
+  }
+  
+  /**
+   * Draw grid lines on canvas
+   * @abstract
+   * @param {CanvasRenderingContext2D} ctx - Canvas context
+   * @param {number} offsetX - Screen offset X
+   * @param {number} offsetY - Screen offset Y
+   * @param {number} width - Canvas width
+   * @param {number} height - Canvas height
+   * @param {number} zoom - Current zoom level
+   * @param {Object} style - Grid style options
+   * @throws {Error} If not implemented by subclass
+   */
+  drawGrid(ctx, offsetX, offsetY, width, height, zoom, style) {
+    throw new Error('drawGrid() must be implemented by subclass');
+  }
+}
+
+return { BaseGeometry };
+```
+
+# GridGeometry
+
+```js
+/**
+ * GridGeometry.js
+ * 
+ * Handles all grid-specific geometric calculations and rendering.
+ * This class abstracts square grid mathematics, coordinate conversions,
+ * and basic rendering operations.
+ * 
+ * Extends BaseGeometry to implement the standard geometry interface
+ * for square grid-based maps.
+ * 
+ * COORDINATE SYSTEMS:
+ * - Grid coordinates (gridX, gridY): Integer cell indices
+ *   Used internally for all grid math and storage. Origin at (0,0) in top-left.
+ * 
+ * - World coordinates (worldX, worldY): Float pixel coordinates in the map's coordinate system
+ *   Used for positioning and measurements. Origin at (0,0) at top-left corner of cell (0,0).
+ * 
+ * - Screen coordinates (screenX, screenY): Pixel coordinates on the canvas
+ *   Used for rendering. Includes viewport transforms (pan/zoom/rotation).
+ * 
+ * COORDINATE NAMING CONVENTION:
+ * - Storage format: Cells stored as {x, y, color} using grid coordinates
+ * - API methods: Use (gridX, gridY) as parameter names for clarity
+ * - API returns: Collection methods return {x, y} where x=gridX, y=gridY
+ * - Objects: Store position as {x, y} using grid coordinates
+ * 
+ * IMPORTANT: For API consistency with HexGeometry, both classes:
+ * - Return {x, y} from collection methods (getCellsInRectangle, etc.)
+ * - Store cells/objects with {x, y} coordinate properties
+ * - Use their respective coordinate systems internally (grid vs axial)
+ * 
+ * @extends BaseGeometry
+ */
+
+// Import base geometry class
+const { BaseGeometry } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "BaseGeometry"));
+
+class GridGeometry extends BaseGeometry {
+  /**
+   * @param {number} cellSize - Base size of each grid cell in pixels (before zoom)
+   */
+  constructor(cellSize) {
+    super(); // Call base class constructor
+    this.cellSize = cellSize;
+  }
+  
+  /**
+   * Convert world coordinates to grid cell coordinates
+   * @param {number} worldX - World X coordinate
+   * @param {number} worldY - World Y coordinate
+   * @returns {{gridX: number, gridY: number}} Grid cell coordinates
+   */
+  worldToGrid(worldX, worldY) {
+    const gridX = Math.floor(worldX / this.cellSize);
+    const gridY = Math.floor(worldY / this.cellSize);
+    return { gridX, gridY };
+  }
+  
+  /**
+   * Convert grid cell coordinates to world coordinates (top-left corner of cell)
+   * @param {number} gridX - Grid X coordinate
+   * @param {number} gridY - Grid Y coordinate
+   * @returns {{worldX: number, worldY: number}} World coordinates
+   */
+  gridToWorld(gridX, gridY) {
+    const worldX = gridX * this.cellSize;
+    const worldY = gridY * this.cellSize;
+    return { worldX, worldY };
+  }
+  
+  /**
+   * Get the center point of a grid cell in world coordinates
+   * @param {number} gridX - Grid X coordinate
+   * @param {number} gridY - Grid Y coordinate
+   * @returns {{worldX: number, worldY: number}} World coordinates of cell center
+   */
+  getCellCenter(gridX, gridY) {
+    const worldX = (gridX + 0.5) * this.cellSize;
+    const worldY = (gridY + 0.5) * this.cellSize;
+    return { worldX, worldY };
+  }
+  
+  /**
+   * Convert offset coordinates to world coordinates
+   * 
+   * GRID-SPECIFIC IMPLEMENTATION (for BaseGeometry API consistency)
+   * 
+   * For GridGeometry, offset coordinates are identical to grid coordinates
+   * (no coordinate system conversion needed). This method exists for API
+   * consistency with HexGeometry, enabling polymorphic code that works
+   * with both geometry types.
+   * 
+   * @param {number} col - Column (equivalent to gridX)
+   * @param {number} row - Row (equivalent to gridY)
+   * @returns {{worldX: number, worldY: number}} World coordinates of cell center
+   */
+  offsetToWorld(col, row) {
+    return this.gridToWorld(col, row);
+  }
+  
+  /**
+   * Snap world coordinates to the nearest grid cell (top-left corner)
+   * @param {number} worldX - World X coordinate
+   * @param {number} worldY - World Y coordinate
+   * @returns {{worldX: number, worldY: number}} Snapped world coordinates
+   */
+  snapToGrid(worldX, worldY) {
+    const { gridX, gridY } = this.worldToGrid(worldX, worldY);
+    return this.gridToWorld(gridX, gridY);
+  }
+  
+  /**
+   * Snap world coordinates to the nearest grid cell center
+   * @param {number} worldX - World X coordinate
+   * @param {number} worldY - World Y coordinate
+   * @returns {{worldX: number, worldY: number}} Snapped world coordinates (cell center)
+   */
+  snapToCellCenter(worldX, worldY) {
+    const { gridX, gridY } = this.worldToGrid(worldX, worldY);
+    return this.getCellCenter(gridX, gridY);
+  }
+  
+  /**
+   * Calculate visible grid range for a given viewport
+   * @param {number} offsetX - Screen offset X
+   * @param {number} offsetY - Screen offset Y
+   * @param {number} width - Canvas width
+   * @param {number} height - Canvas height
+   * @param {number} zoom - Current zoom level
+   * @returns {{startX: number, endX: number, startY: number, endY: number}} Visible grid range
+   */
+  getVisibleGridRange(offsetX, offsetY, width, height, zoom) {
+    const scaledCellSize = this.cellSize * zoom;
+    
+    const startX = Math.floor(-offsetX / scaledCellSize);
+    const endX = Math.ceil((width - offsetX) / scaledCellSize);
+    const startY = Math.floor(-offsetY / scaledCellSize);
+    const endY = Math.ceil((height - offsetY) / scaledCellSize);
+    
+    return { startX, endX, startY, endY };
+  }
+  
+  /**
+   * Convert grid coordinates to screen coordinates (for rendering)
+   * @param {number} gridX - Grid X coordinate
+   * @param {number} gridY - Grid Y coordinate
+   * @param {number} offsetX - Screen offset X
+   * @param {number} offsetY - Screen offset Y
+   * @param {number} zoom - Current zoom level
+   * @returns {{screenX: number, screenY: number}} Screen coordinates
+   */
+  gridToScreen(gridX, gridY, offsetX, offsetY, zoom) {
+    const scaledCellSize = this.cellSize * zoom;
+    const screenX = offsetX + gridX * scaledCellSize;
+    const screenY = offsetY + gridY * scaledCellSize;
+    return { screenX, screenY };
+  }
+  
+  /**
+   * Determine which edge of a cell was clicked based on world coordinates
+   * 
+   * Used for edge painting - detects if a click was near a cell edge rather
+   * than in the cell center. Returns the cell coordinates and which side
+   * of that cell the click was near.
+   * 
+   * @param {number} worldX - World X coordinate (from screenToWorld)
+   * @param {number} worldY - World Y coordinate (from screenToWorld)
+   * @param {number} threshold - Distance from edge to count as hit (0-0.5, default 0.15)
+   *                             Expressed as fraction of cell size
+   * @returns {{ x: number, y: number, side: string } | null} 
+   *          Edge info with cell coords and side ('top'|'right'|'bottom'|'left'), 
+   *          or null if click was in cell center
+   */
+  screenToEdge(worldX, worldY, threshold = 0.15) {
+    // Get the cell coordinates
+    const cellX = Math.floor(worldX / this.cellSize);
+    const cellY = Math.floor(worldY / this.cellSize);
+    
+    // Calculate position within the cell (0-1 range)
+    const offsetX = (worldX / this.cellSize) - cellX;
+    const offsetY = (worldY / this.cellSize) - cellY;
+    
+    // Check proximity to each edge
+    // Priority order: top, bottom, left, right (for corner disambiguation)
+    // A click in a corner will prefer vertical edges (top/bottom)
+    if (offsetY < threshold) {
+      return { x: cellX, y: cellY, side: 'top' };
+    }
+    if (offsetY > 1 - threshold) {
+      return { x: cellX, y: cellY, side: 'bottom' };
+    }
+    if (offsetX < threshold) {
+      return { x: cellX, y: cellY, side: 'left' };
+    }
+    if (offsetX > 1 - threshold) {
+      return { x: cellX, y: cellY, side: 'right' };
+    }
+    
+    // Click was in cell center, not near any edge
+    return null;
+  }
+  
+  /**
+   * Draw grid lines on the canvas using fill-based rendering
+   * 
+   * NOTE: This uses ctx.fillRect() instead of ctx.stroke() to work around
+   * a rendering bug in Obsidian's Live Preview mode where CodeMirror's
+   * canvas operations can corrupt the strokeStyle state. Fill-based
+   * rendering is unaffected by this issue.
+   * 
+   * @param {CanvasRenderingContext2D} ctx - Canvas context
+   * @param {number} offsetX - Screen offset X
+   * @param {number} offsetY - Screen offset Y
+   * @param {number} width - Canvas width
+   * @param {number} height - Canvas height
+   * @param {number} zoom - Current zoom level
+   * @param {Object} style - Grid style options
+   * @param {string} style.lineColor - Grid line color
+   * @param {number} style.lineWidth - Grid line width
+   */
+  drawGrid(ctx, offsetX, offsetY, width, height, zoom, style = {}) {
+    const { lineColor = '#333333', lineWidth = 1 } = style;
+    const scaledCellSize = this.cellSize * zoom;
+    
+    // For rotation handling, calculate the visible range then add symmetric padding
+    const { startX, endX, startY, endY } = this.getVisibleGridRange(
+      offsetX, offsetY, width, height, zoom
+    );
+    
+    // Add extra padding in all directions to handle rotation
+    // Use 2x diagonal to ensure full coverage at any rotation angle
+    const diagonal = Math.sqrt(width * width + height * height);
+    const extraCells = Math.ceil(diagonal / scaledCellSize);
+    
+    const paddedStartX = startX - extraCells;
+    const paddedEndX = endX + extraCells;
+    const paddedStartY = startY - extraCells;
+    const paddedEndY = endY + extraCells;
+    
+    // iOS defensive: Limit line extension to prevent aggressive clipping
+    // During memory pressure, iOS may set restrictive clip regions
+    // Lines with coordinates far outside canvas bounds get completely clipped
+    const maxExtension = Math.max(width, height);
+    
+    // Use fillRect instead of stroke for iOS/CodeMirror compatibility
+    // fillRect is immune to strokeStyle state corruption
+    // iOS defensive: Reset composite operation before drawing
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 1;
+    
+    // For centered lines, offset by half the line width
+    const halfWidth = lineWidth / 2;
+    
+    // Draw vertical lines with symmetric padding
+    for (let x = paddedStartX; x <= paddedEndX; x++) {
+      // iOS defensive: Set fillStyle for each line to work around state corruption
+      ctx.fillStyle = lineColor;
+      const screenX = offsetX + x * scaledCellSize;
+      
+      // fillRect(x, y, width, height) - vertical line is narrow width, tall height
+      // iOS defensive: Use maxExtension instead of huge lineExtension
+      ctx.fillRect(
+        screenX - halfWidth,
+        -maxExtension,
+        lineWidth,
+        height + maxExtension * 2
+      );
+    }
+    
+    // Draw horizontal lines with symmetric padding
+    for (let y = paddedStartY; y <= paddedEndY; y++) {
+      // iOS defensive: Set fillStyle for each line to work around state corruption
+      ctx.fillStyle = lineColor;
+      const screenY = offsetY + y * scaledCellSize;
+      
+      // fillRect(x, y, width, height) - horizontal line is wide width, narrow height
+      // iOS defensive: Use maxExtension instead of huge lineExtension
+      ctx.fillRect(
+        -maxExtension,
+        screenY - halfWidth,
+        width + maxExtension * 2,
+        lineWidth
+      );
+    }
+  }
+
+
+
+  
+  /**
+   * Draw a filled cell on the canvas
+   * @param {CanvasRenderingContext2D} ctx - Canvas context
+   * @param {number} gridX - Grid X coordinate
+   * @param {number} gridY - Grid Y coordinate
+   * @param {number} offsetX - Screen offset X
+   * @param {number} offsetY - Screen offset Y
+   * @param {number} zoom - Current zoom level
+   * @param {string} color - Fill color
+   */
+  drawCell(ctx, gridX, gridY, offsetX, offsetY, zoom, color) {
+    const scaledCellSize = this.cellSize * zoom;
+    const { screenX, screenY } = this.gridToScreen(gridX, gridY, offsetX, offsetY, zoom);
+    
+    ctx.fillStyle = color;
+    ctx.fillRect(screenX, screenY, scaledCellSize, scaledCellSize);
+  }
+  
+  /**
+   * Draw multiple cells of the same color (optimized batch rendering)
+   * @param {CanvasRenderingContext2D} ctx - Canvas context
+   * @param {Array<{x: number, y: number}>} cells - Array of cell coordinates
+   * @param {number} offsetX - Screen offset X
+   * @param {number} offsetY - Screen offset Y
+   * @param {number} zoom - Current zoom level
+   * @param {string} color - Fill color
+   */
+  drawCells(ctx, cells, offsetX, offsetY, zoom, color) {
+    const scaledCellSize = this.cellSize * zoom;
+    ctx.fillStyle = color;
+    
+    for (const cell of cells) {
+      const { screenX, screenY } = this.gridToScreen(cell.x, cell.y, offsetX, offsetY, zoom);
+      ctx.fillRect(screenX, screenY, scaledCellSize, scaledCellSize);
+    }
+  }
+  
+  /**
+   * Get the size of a cell in screen pixels at current zoom
+   * @param {number} zoom - Current zoom level
+   * @returns {number} Scaled cell size
+   */
+  getScaledCellSize(zoom) {
+    return this.cellSize * zoom;
+  }
+  
+  /**
+   * Check if coordinates are within bounds
+   * GridGeometry is unbounded by default, always returns true
+   * Override this if you need bounded grid behavior
+   * @param {number} gridX - Grid X coordinate
+   * @param {number} gridY - Grid Y coordinate
+   * @returns {boolean} True (always, grid is unbounded)
+   */
+  isWithinBounds(gridX, gridY) {
+    // GridGeometry is unbounded - always return true
+    // If bounds are needed in the future, add a bounds property like HexGeometry
+    return true;
+  }
+  
+  /**
+   * Clamp coordinates to bounds
+   * GridGeometry is unbounded by default, returns input unchanged
+   * Override this if you need bounded grid behavior
+   * @param {number} gridX - Grid X coordinate
+   * @param {number} gridY - Grid Y coordinate
+   * @returns {{gridX: number, gridY: number}} Input coordinates unchanged
+   */
+  clampToBounds(gridX, gridY) {
+    // GridGeometry is unbounded - return input unchanged
+    return { gridX, gridY };
+  }
+  
+  /**
+   * Convert grid coordinates to offset coordinates
+   * For grid geometry, this is a simple passthrough since gridX/gridY are already col/row
+   * @param {number} gridX - Grid X coordinate
+   * @param {number} gridY - Grid Y coordinate
+   * @returns {{col: number, row: number}} Offset coordinates
+   */
+  toOffsetCoords(gridX, gridY) {
+    return { col: gridX, row: gridY };
+  }
+  
+  /**
+   * Convert a cell object to offset coordinates
+   * Grid cells store (x, y) which map directly to (col, row)
+   * @param {Object} cell - Cell object with x, y properties
+   * @returns {{col: number, row: number}} Offset coordinates
+   */
+  cellToOffsetCoords(cell) {
+    return { col: cell.x, row: cell.y };
+  }
+  
+  /**
+   * Check if this geometry has defined bounds
+   * Grid maps are unbounded (infinite canvas)
+   * @returns {boolean} Always false for grid geometry
+   */
+  isBounded() {
+    return false;
+  }
+  
+  /**
+   * Get the bounds for this geometry
+   * Grid maps have no bounds
+   * @returns {null} Always null for grid geometry
+   */
+  getBounds() {
+    return null;
+  }
+  
+  /**
+   * Get all grid cells within a rectangular area
+   * @param {number} gridX1 - First corner X
+   * @param {number} gridY1 - First corner Y
+   * @param {number} gridX2 - Second corner X
+   * @param {number} gridY2 - Second corner Y
+   * @returns {Array<{x: number, y: number}>} Array of cell coordinates
+   */
+  getCellsInRectangle(gridX1, gridY1, gridX2, gridY2) {
+    const minX = Math.min(gridX1, gridX2);
+    const maxX = Math.max(gridX1, gridX2);
+    const minY = Math.min(gridY1, gridY2);
+    const maxY = Math.max(gridY1, gridY2);
+    
+    const cells = [];
+    for (let x = minX; x <= maxX; x++) {
+      for (let y = minY; y <= maxY; y++) {
+        cells.push({ x, y });
+      }
+    }
+    
+    return cells;
+  }
+  
+  /**
+   * Get all grid cells within a circle
+   * @param {number} centerGridX - Center X in grid coordinates
+   * @param {number} centerGridY - Center Y in grid coordinates
+   * @param {number} radiusInCells - Radius in grid cells
+   * @returns {Array<{x: number, y: number}>} Array of cell coordinates
+   */
+  getCellsInCircle(centerGridX, centerGridY, radiusInCells) {
+    const cells = [];
+    const radiusSquared = radiusInCells * radiusInCells;
+    
+    // Bounding box for optimization
+    const minX = Math.floor(centerGridX - radiusInCells);
+    const maxX = Math.ceil(centerGridX + radiusInCells);
+    const minY = Math.floor(centerGridY - radiusInCells);
+    const maxY = Math.ceil(centerGridY + radiusInCells);
+    
+    for (let x = minX; x <= maxX; x++) {
+      for (let y = minY; y <= maxY; y++) {
+        // Check if cell center is within circle
+        const dx = x + 0.5 - centerGridX;
+        const dy = y + 0.5 - centerGridY;
+        const distSquared = dx * dx + dy * dy;
+        
+        if (distSquared <= radiusSquared) {
+          cells.push({ x, y });
+        }
+      }
+    }
+    
+    return cells;
+  }
+  
+  /**
+   * Get grid cells along a line (Bresenham's algorithm)
+   * @param {number} gridX1 - Start X
+   * @param {number} gridY1 - Start Y
+   * @param {number} gridX2 - End X
+   * @param {number} gridY2 - End Y
+   * @returns {Array<{x: number, y: number}>} Array of cell coordinates along the line
+   */
+  getCellsInLine(gridX1, gridY1, gridX2, gridY2) {
+    const cells = [];
+    
+    let x = gridX1;
+    let y = gridY1;
+    
+    const dx = Math.abs(gridX2 - gridX1);
+    const dy = Math.abs(gridY2 - gridY1);
+    const sx = gridX1 < gridX2 ? 1 : -1;
+    const sy = gridY1 < gridY2 ? 1 : -1;
+    let err = dx - dy;
+    
+    while (true) {
+      cells.push({ x, y });
+      
+      if (x === gridX2 && y === gridY2) break;
+      
+      const e2 = 2 * err;
+      if (e2 > -dy) {
+        err -= dy;
+        x += sx;
+      }
+      if (e2 < dx) {
+        err += dx;
+        y += sy;
+      }
+    }
+    
+    return cells;
+  }
+  
+  /**
+   * Calculate distance between two grid cells (Manhattan distance)
+   * @param {number} gridX1 - First cell X
+   * @param {number} gridY1 - First cell Y
+   * @param {number} gridX2 - Second cell X
+   * @param {number} gridY2 - Second cell Y
+   * @returns {number} Manhattan distance in cells
+   */
+  getManhattanDistance(gridX1, gridY1, gridX2, gridY2) {
+    return Math.abs(gridX2 - gridX1) + Math.abs(gridY2 - gridY1);
+  }
+  
+  /**
+   * Calculate distance between two grid cells (Euclidean distance)
+   * @param {number} gridX1 - First cell X
+   * @param {number} gridY1 - First cell Y
+   * @param {number} gridX2 - Second cell X
+   * @param {number} gridY2 - Second cell Y
+   * @returns {number} Euclidean distance in cells
+   */
+  getEuclideanDistance(gridX1, gridY1, gridX2, gridY2) {
+    const dx = gridX2 - gridX1;
+    const dy = gridY2 - gridY1;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+  
+  /**
+   * Calculate game distance between two grid cells with configurable diagonal rules
+   * @param {number} gridX1 - First cell X
+   * @param {number} gridY1 - First cell Y
+   * @param {number} gridX2 - Second cell X
+   * @param {number} gridY2 - Second cell Y
+   * @param {Object} options - Distance options
+   * @param {string} options.diagonalRule - 'alternating' | 'equal' | 'euclidean'
+   * @returns {number} Distance in cells
+   */
+  getCellDistance(gridX1, gridY1, gridX2, gridY2, options = {}) {
+    const { diagonalRule = 'alternating' } = options;
+    
+    const dx = Math.abs(gridX2 - gridX1);
+    const dy = Math.abs(gridY2 - gridY1);
+    
+    switch (diagonalRule) {
+      case 'equal':
+        // Chebyshev distance - every step (including diagonal) = 1
+        return Math.max(dx, dy);
+        
+      case 'euclidean':
+        // True geometric distance
+        return Math.sqrt(dx * dx + dy * dy);
+        
+      case 'alternating':
+      default:
+        // D&D 5e / Pathfinder style: 5-10-5-10
+        // Each diagonal costs 1.5 on average (first = 1, second = 2, etc.)
+        const straights = Math.abs(dx - dy);
+        const diagonals = Math.min(dx, dy);
+        return straights + diagonals + Math.floor(diagonals / 2);
+    }
+  }
+  
+  /**
+   * Create a cell object in grid coordinate format
+   * Abstraction layer for cell creation - isolates coordinate property naming
+   * @param {{gridX: number, gridY: number}} coords - Grid coordinates from worldToGrid()
+   * @param {string} color - Cell color
+   * @returns {{x: number, y: number, color: string}} Cell object
+   */
+  createCellObject(coords, color) {
+    return { x: coords.gridX, y: coords.gridY, color };
+  }
+  
+  /**
+   * Check if a cell matches given coordinates
+   * Abstraction layer for cell comparison - isolates coordinate property naming
+   * @param {{x: number, y: number}} cell - Cell object to check
+   * @param {{gridX: number, gridY: number}} coords - Grid coordinates from worldToGrid()
+   * @returns {boolean} True if cell matches coordinates
+   */
+  cellMatchesCoords(cell, coords) {
+    return cell.x === coords.gridX && cell.y === coords.gridY;
+  }
+
+  /**
+   * Get all neighboring cells (4-directional: up, down, left, right)
+   * @param {number} gridX - Grid X coordinate
+   * @param {number} gridY - Grid Y coordinate
+   * @returns {Array<{x: number, y: number}>} Array of neighbor coordinates
+   */
+  getNeighbors(gridX, gridY) {
+    // 4-directional neighbors (cardinal directions only)
+    return [
+      { x: gridX + 1, y: gridY },     // Right
+      { x: gridX - 1, y: gridY },     // Left
+      { x: gridX, y: gridY + 1 },     // Down
+      { x: gridX, y: gridY - 1 }      // Up
+    ];
+  }
+
+  /**
+   * Get all neighboring cells including diagonals (8-directional)
+   * @param {number} gridX - Grid X coordinate
+   * @param {number} gridY - Grid Y coordinate
+   * @returns {Array<{x: number, y: number}>} Array of neighbor coordinates
+   */
+  getNeighbors8(gridX, gridY) {
+    // 8-directional neighbors (including diagonals)
+    return [
+      { x: gridX + 1, y: gridY },     // Right
+      { x: gridX + 1, y: gridY - 1 }, // Top-right
+      { x: gridX, y: gridY - 1 },     // Up
+      { x: gridX - 1, y: gridY - 1 }, // Top-left
+      { x: gridX - 1, y: gridY },     // Left
+      { x: gridX - 1, y: gridY + 1 }, // Bottom-left
+      { x: gridX, y: gridY + 1 },     // Down
+      { x: gridX + 1, y: gridY + 1 }  // Bottom-right
+    ];
+  }
+
+  /**
+   * Get the bounding box of a cell in world coordinates
+   * Used for export operations to calculate content bounds
+   * @param {{x: number, y: number}} cell - Cell object with grid coordinates
+   * @returns {{minX: number, minY: number, maxX: number, maxY: number}} Bounding box
+   */
+  getCellBounds(cell) {
+    const x = cell.x * this.cellSize;
+    const y = cell.y * this.cellSize;
+    return {
+      minX: x,
+      minY: y,
+      maxX: x + this.cellSize,
+      maxY: y + this.cellSize
+    };
+  }
+
+  /**
+   * Get the bounding box of an object in world coordinates
+   * Used for export operations to calculate content bounds
+   * @param {{position: {x: number, y: number}, size?: {width: number, height: number}}} obj - Object with position and optional size
+   * @returns {{minX: number, minY: number, maxX: number, maxY: number}} Bounding box
+   */
+  getObjectBounds(obj) {
+    const size = obj.size || { width: 1, height: 1 };
+    const x = obj.position.x * this.cellSize;
+    const y = obj.position.y * this.cellSize;
+    return {
+      minX: x,
+      minY: y,
+      maxX: x + size.width * this.cellSize,
+      maxY: y + size.height * this.cellSize
+    };
+  }
+}
+
+return { GridGeometry };
+```
+
+# HexGeometry
+
+```js
+/**
+ * HexGeometry.js
+ * 
+ * Handles all hex-specific geometric calculations and rendering.
+ * This class abstracts hexagonal grid mathematics, coordinate conversions,
+ * and basic rendering operations.
+ * 
+ * Extends BaseGeometry to implement the standard geometry interface
+ * for hexagonal grid-based maps.
+ * 
+ * COORDINATE SYSTEMS:
+ * - Axial coordinates (q, r): Integer hex indices using axial coordinate system
+ *   Used internally for hex math and storage. Creates parallelogram when iterated.
+ * 
+ * - Offset coordinates (col, row): Integer indices in rectangular space
+ *   Used for bounds checking and rectangular iteration via offsetCoordinates.js
+ *   Makes rectangular grid display possible. Min is always (0,0).
+ * 
+ * - World coordinates (worldX, worldY): Float pixel coordinates in the map's coordinate system
+ *   Used for positioning and measurements. Origin at (0,0) in center of hex (0,0).
+ * 
+ * - Screen coordinates (screenX, screenY): Pixel coordinates on the canvas
+ *   Used for rendering. Includes viewport transforms (pan/zoom/rotation).
+ * 
+ * COORDINATE NAMING CONVENTION:
+ * - Storage format: Cells stored as {q, r, color} using axial coordinates
+ * - API methods: Use (q, r) as parameter names for clarity
+ * - API returns: Collection methods return {x, y} where x=q, y=r for consistency with GridGeometry
+ * - Objects: Store position as {x, y} where x=q, y=r (axial coordinates in hex map context)
+ * 
+ * Hex Size Definition:
+ * - hexSize is the radius from center to vertex
+ * - For flat-top: width = 2 * hexSize, height = sqrt(3) * hexSize
+ * - For pointy-top: width = sqrt(3) * hexSize, height = 2 * hexSize
+ * 
+ * @extends BaseGeometry
+ */
+
+// Import offset coordinate utilities for rectangular bounds and iteration
+const { BaseGeometry } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "BaseGeometry"));
+const { axialToOffset, offsetToAxial, isWithinOffsetBounds } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "offsetCoordinates"));
+
+class HexGeometry extends BaseGeometry {
+  /**
+   * @param {number} hexSize - Radius from hex center to vertex in pixels
+   * @param {string} orientation - Either 'flat' or 'pointy'
+   * @param {Object} bounds - Optional bounds {maxCol, maxRow} in offset coordinates (min is always 0,0)
+   */
+  constructor(hexSize, orientation = 'flat', bounds = null) {
+    super(); // Call base class constructor
+    this.hexSize = hexSize;
+    this.orientation = orientation;
+    this.bounds = bounds; // {maxCol: number, maxRow: number} or null for infinite
+    
+    // Precalculate commonly used values
+    this.sqrt3 = Math.sqrt(3);
+    
+    // Layout constants depend on orientation
+    if (orientation === 'flat') {
+      // Flat-top hexagon
+      this.width = hexSize * 2;           // Distance between parallel sides
+      this.height = hexSize * this.sqrt3; // Point-to-point height
+      this.horizSpacing = hexSize * 1.5;  // Horizontal distance between hex centers
+      this.vertSpacing = hexSize * this.sqrt3; // Vertical distance between hex centers
+    } else {
+      // Pointy-top hexagon
+      this.width = hexSize * this.sqrt3;
+      this.height = hexSize * 2;
+      this.horizSpacing = hexSize * this.sqrt3;
+      this.vertSpacing = hexSize * 1.5;
+    }
+  }
+  
+  /**
+   * Convert world (pixel) coordinates to axial hex coordinates
+   * Uses the standard axial coordinate system (q, r)
+   * @param {number} worldX - World X coordinate
+   * @param {number} worldY - World Y coordinate
+   * @returns {{q: number, r: number}} Axial hex coordinates
+   */
+  worldToHex(worldX, worldY) {
+    if (this.orientation === 'flat') {
+      // Flat-top conversion
+      const q = (worldX * (2/3)) / this.hexSize;
+      const r = ((-worldX / 3) + (this.sqrt3 / 3) * worldY) / this.hexSize;
+      return this.roundHex(q, r);
+    } else {
+      // Pointy-top conversion
+      const q = ((this.sqrt3 / 3) * worldX - (1/3) * worldY) / this.hexSize;
+      const r = ((2/3) * worldY) / this.hexSize;
+      return this.roundHex(q, r);
+    }
+  }
+  
+  /**
+   * Alias for worldToHex - provides consistent API with GridGeometry
+   * Returns gridX/gridY property names for consistency with GridGeometry
+   * (gridX = q, gridY = r for hex maps)
+   * @param {number} worldX - World X coordinate
+   * @param {number} worldY - World Y coordinate
+   * @returns {{gridX: number, gridY: number}} Grid coordinates (q as gridX, r as gridY)
+   */
+  worldToGrid(worldX, worldY) {
+    const { q, r } = this.worldToHex(worldX, worldY);
+    // Return with property names matching GridGeometry API
+    return { gridX: q, gridY: r };
+  }
+  
+  /**
+   * Round fractional hex coordinates to nearest integer hex
+   * Uses cube coordinate rounding for accuracy
+   * @param {number} q - Fractional q coordinate
+   * @param {number} r - Fractional r coordinate
+   * @returns {{q: number, r: number}} Rounded axial coordinates
+   */
+  roundHex(q, r) {
+    // Convert axial to cube coordinates
+    const x = q;
+    const z = r;
+    const y = -x - z;
+    
+    // Round each coordinate
+    let rx = Math.round(x);
+    let ry = Math.round(y);
+    let rz = Math.round(z);
+    
+    // Fix rounding errors (cube coords must sum to 0)
+    const xDiff = Math.abs(rx - x);
+    const yDiff = Math.abs(ry - y);
+    const zDiff = Math.abs(rz - z);
+    
+    if (xDiff > yDiff && xDiff > zDiff) {
+      rx = -ry - rz;
+    } else if (yDiff > zDiff) {
+      ry = -rx - rz;
+    } else {
+      rz = -rx - ry;
+    }
+    
+    // Convert back to axial
+    return { q: rx, r: rz };
+  }
+  
+  /**
+   * Convert axial hex coordinates to world (pixel) coordinates
+   * Returns the center point of the hex
+   * @param {number} q - Axial q coordinate
+   * @param {number} r - Axial r coordinate
+   * @returns {{worldX: number, worldY: number}} World coordinates of hex center
+   */
+  hexToWorld(q, r) {
+    if (this.orientation === 'flat') {
+      // Flat-top conversion
+      const worldX = this.hexSize * (3/2) * q;
+      const worldY = this.hexSize * (this.sqrt3 / 2 * q + this.sqrt3 * r);
+      return { worldX, worldY };
+    } else {
+      // Pointy-top conversion
+      const worldX = this.hexSize * (this.sqrt3 * q + this.sqrt3 / 2 * r);
+      const worldY = this.hexSize * (3/2) * r;
+      return { worldX, worldY };
+    }
+  }
+  
+  /**
+   * Alias for hexToWorld - provides consistent API with GridGeometry
+   * GridGeometry uses gridToWorld(), HexGeometry uses this alias
+   * @param {number} q - Axial q coordinate (or x for API consistency)
+   * @param {number} r - Axial r coordinate (or y for API consistency)
+   * @returns {{worldX: number, worldY: number}} World coordinates of hex center
+   */
+  gridToWorld(q, r) {
+    return this.hexToWorld(q, r);
+  }
+  
+  /**
+   * Get the center point of a hex in world coordinates
+   * @param {number} q - Axial q coordinate
+   * @param {number} r - Axial r coordinate
+   * @returns {{worldX: number, worldY: number}} World coordinates of hex center
+   */
+  getHexCenter(q, r) {
+    return this.hexToWorld(q, r);
+  }
+  
+  /**
+   * Convert offset coordinates to world coordinates
+   * 
+   * HEX-SPECIFIC IMPLEMENTATION (for BaseGeometry API consistency)
+   * 
+   * Offset coordinates (col, row) are used for rectangular bounds in hex maps.
+   * This method combines offsetToAxial + hexToWorld. GridGeometry implements
+   * the same method as a passthrough to gridToWorld() for polymorphic usage.
+   * 
+   * Primarily used for calculating grid center when positioning background images.
+   * 
+   * @param {number} col - Column in offset coordinates (0 to maxCol-1)
+   * @param {number} row - Row in offset coordinates (0 to maxRow-1)
+   * @returns {{worldX: number, worldY: number}} World coordinates of hex center
+   */
+  offsetToWorld(col, row) {
+    const { q, r } = offsetToAxial(col, row, this.orientation);
+    return this.hexToWorld(q, r);
+  }
+  
+  /**
+   * Get the six vertices of a hex in world coordinates
+   * Vertices are returned in clockwise order starting from the rightmost point (flat-top)
+   * or top point (pointy-top)
+   * @param {number} q - Axial q coordinate
+   * @param {number} r - Axial r coordinate
+   * @returns {Array<{worldX: number, worldY: number}>} Array of 6 vertex positions
+   */
+  getHexVertices(q, r) {
+    const center = this.hexToWorld(q, r);
+    const vertices = [];
+    
+    // Angle offset depends on orientation
+    const angleOffset = this.orientation === 'flat' ? 0 : 30;
+    
+    for (let i = 0; i < 6; i++) {
+      const angleDeg = 60 * i + angleOffset;
+      const angleRad = (Math.PI / 180) * angleDeg;
+      vertices.push({
+        worldX: center.worldX + this.hexSize * Math.cos(angleRad),
+        worldY: center.worldY + this.hexSize * Math.sin(angleRad)
+      });
+    }
+    
+    return vertices;
+  }
+  
+  /**
+   * Snap world coordinates to the nearest hex center
+   * @param {number} worldX - World X coordinate
+   * @param {number} worldY - World Y coordinate
+   * @returns {{worldX: number, worldY: number}} Snapped world coordinates (hex center)
+   */
+  snapToHexCenter(worldX, worldY) {
+    const { q, r } = this.worldToHex(worldX, worldY);
+    return this.getHexCenter(q, r);
+  }
+  
+  /**
+   * Calculate visible hex range for a given viewport
+   * Returns a bounding box in hex coordinates (may include negative values)
+   * @param {number} offsetX - Screen offset X
+   * @param {number} offsetY - Screen offset Y
+   * @param {number} width - Canvas width
+   * @param {number} height - Canvas height
+   * @param {number} zoom - Current zoom level
+   * @returns {{minQ: number, maxQ: number, minR: number, maxR: number}} Visible hex range
+   */
+  getVisibleHexRange(offsetX, offsetY, width, height, zoom) {
+    // Convert viewport corners to world coordinates
+    const topLeft = this.screenToWorld(-offsetX, -offsetY, zoom);
+    const topRight = this.screenToWorld(width - offsetX, -offsetY, zoom);
+    const bottomLeft = this.screenToWorld(-offsetX, height - offsetY, zoom);
+    const bottomRight = this.screenToWorld(width - offsetX, height - offsetY, zoom);
+    
+    // Convert corners to hex coordinates
+    const corners = [
+      this.worldToHex(topLeft.worldX, topLeft.worldY),
+      this.worldToHex(topRight.worldX, topRight.worldY),
+      this.worldToHex(bottomLeft.worldX, bottomLeft.worldY),
+      this.worldToHex(bottomRight.worldX, bottomRight.worldY)
+    ];
+    
+    // Find bounding box with some padding
+    const padding = 2;
+    const minQ = Math.min(...corners.map(c => c.q)) - padding;
+    const maxQ = Math.max(...corners.map(c => c.q)) + padding;
+    const minR = Math.min(...corners.map(c => c.r)) - padding;
+    const maxR = Math.max(...corners.map(c => c.r)) + padding;
+    
+    // Don't clamp here - return full visible range
+    // Bounds enforcement happens at the rendering level
+    return { minQ, maxQ, minR, maxR };
+  }
+  
+
+  /**
+   * Convert hex coordinates to screen coordinates (for rendering)
+   * Provides API consistency with GridGeometry.gridToScreen()
+   * Returns position offset such that adding objectSize/2 centers the object in the hex
+   * @param {number} q - Hex q coordinate (or x for API consistency)
+   * @param {number} r - Hex r coordinate (or y for API consistency)
+   * @param {number} offsetX - Screen offset X
+   * @param {number} offsetY - Screen offset Y
+   * @param {number} zoom - Current zoom level
+   * @returns {{screenX: number, screenY: number}} Screen coordinates
+   */
+  gridToScreen(q, r, offsetX, offsetY, zoom) {
+    // Get hex center in world coordinates
+    const { worldX, worldY } = this.hexToWorld(q, r);
+    
+    // Object rendering adds objectWidth/2 and objectHeight/2 to center the object
+    // where objectWidth = hexSize * zoom
+    // So we need to return: hexCenter - (hexSize/2, hexSize/2)
+    // This way: returned_position + hexSize/2 = hexCenter
+    const topLeftWorldX = worldX - (this.hexSize / 2);
+    const topLeftWorldY = worldY - (this.hexSize / 2);
+    
+    // Convert to screen coordinates
+    return this.worldToScreen(topLeftWorldX, topLeftWorldY, offsetX, offsetY, zoom);
+  }
+  
+  /**
+   * Draw hex grid on the canvas
+   * @param {CanvasRenderingContext2D} ctx - Canvas context
+   * @param {number} offsetX - Screen offset X
+   * @param {number} offsetY - Screen offset Y
+   * @param {number} width - Canvas width
+   * @param {number} height - Canvas height
+   * @param {number} zoom - Current zoom level
+   * @param {Object} style - Grid style options
+   * @param {string} style.lineColor - Grid line color
+   * @param {number} style.lineWidth - Grid line width
+   */
+  drawGrid(ctx, offsetX, offsetY, width, height, zoom, style = {}) {
+    const { lineColor = '#333333', lineWidth = 1 } = style;
+    
+    // Safety check: validate inputs to prevent runaway iteration
+    if (!isFinite(width) || !isFinite(height) || !isFinite(zoom) || 
+        !isFinite(offsetX) || !isFinite(offsetY) || zoom <= 0) {
+      console.warn('[HexGeometry.drawGrid] Invalid input values, skipping render');
+      return;
+    }
+    
+    let minCol, maxCol, minRow, maxRow;
+    
+    // For BOUNDED hex maps, use the bounds directly
+    // This is much more efficient and prevents runaway iteration
+    if (this.bounds) {
+      minCol = 0;
+      maxCol = this.bounds.maxCol - 1;
+      minRow = 0;
+      maxRow = this.bounds.maxRow - 1;
+    } else {
+      // For rotation handling, we need to calculate the visible range based on 
+      // an expanded viewport that covers the entire rotated canvas area
+      // Use 2x the diagonal to ensure we cover all rotations
+      const diagonal = Math.sqrt(width * width + height * height) * 2;
+      const expandedWidth = diagonal;
+      const expandedHeight = diagonal;
+      
+      const { minQ, maxQ, minR, maxR } = this.getVisibleHexRange(
+        offsetX, offsetY, expandedWidth, expandedHeight, zoom
+      );
+      
+      // Safety limit: prevent iteration over more than 10000 hexes in unbounded mode
+      const maxHexCount = 10000;
+      const axialRange = (maxQ - minQ + 1) * (maxR - minR + 1);
+      if (axialRange > maxHexCount) {
+        console.warn(`[HexGeometry.drawGrid] Visible range too large (${axialRange} hexes), limiting`);
+        // Fall back to a reasonable default visible area
+        const halfRange = Math.floor(Math.sqrt(maxHexCount) / 2);
+        const centerQ = Math.floor((minQ + maxQ) / 2);
+        const centerR = Math.floor((minR + maxR) / 2);
+        
+        // Convert limited axial range to offset
+        const corners = [
+          axialToOffset(centerQ - halfRange, centerR - halfRange, this.orientation),
+          axialToOffset(centerQ + halfRange, centerR + halfRange, this.orientation)
+        ];
+        minCol = Math.min(corners[0].col, corners[1].col);
+        maxCol = Math.max(corners[0].col, corners[1].col);
+        minRow = Math.min(corners[0].row, corners[1].row);
+        maxRow = Math.max(corners[0].row, corners[1].row);
+      } else {
+        // Convert axial visible range to offset coordinates
+        // Build bounding box without creating intermediate array (optimization)
+        minCol = Infinity;
+        maxCol = -Infinity;
+        minRow = Infinity;
+        maxRow = -Infinity;
+        
+        for (let q = minQ; q <= maxQ; q++) {
+          for (let r = minR; r <= maxR; r++) {
+            const { col, row } = axialToOffset(q, r, this.orientation);
+            if (col < minCol) minCol = col;
+            if (col > maxCol) maxCol = col;
+            if (row < minRow) minRow = row;
+            if (row > maxRow) maxRow = row;
+          }
+        }
+      }
+    }
+    
+    // Final safety check on iteration count
+    const totalHexes = (maxCol - minCol + 1) * (maxRow - minRow + 1);
+    if (totalHexes > 50000 || !isFinite(totalHexes)) {
+      console.warn(`[HexGeometry.drawGrid] Too many hexes to draw (${totalHexes}), aborting`);
+      return;
+    }
+    
+    // Use fillStyle instead of strokeStyle for fill-based hex outline rendering
+    // This works around strokeStyle state corruption in Obsidian's Live Preview mode
+    ctx.fillStyle = lineColor;
+    
+    let drawnCount = 0;
+    // CRITICAL: Iterate in OFFSET space (rectangular)
+    // This creates a rectangular grid instead of a parallelogram
+    for (let col = minCol; col <= maxCol; col++) {
+      for (let row = minRow; row <= maxRow; row++) {
+        // Convert offset coords to axial for drawing
+        const { q, r } = offsetToAxial(col, row, this.orientation);
+        
+        // Only draw if within bounds (or no bounds set for infinite maps)
+        if (!this.bounds || this.isWithinBounds(q, r)) {
+          this.drawHexOutline(ctx, q, r, offsetX, offsetY, zoom, lineWidth);
+          drawnCount++;
+        }
+      }
+    }
+  }
+
+  
+  /**
+   * Draw a line segment as a filled rectangle
+   * 
+   * Used to work around strokeStyle state corruption in Obsidian's Live Preview mode.
+   * Converts a line segment into a thin rectangle oriented along the line.
+   * 
+   * @param {CanvasRenderingContext2D} ctx - Canvas context
+   * @param {number} x1 - Start X (screen coordinates)
+   * @param {number} y1 - Start Y (screen coordinates)
+   * @param {number} x2 - End X (screen coordinates)
+   * @param {number} y2 - End Y (screen coordinates)
+   * @param {number} lineWidth - Width of the line
+   */
+  drawLineAsFill(ctx, x1, y1, x2, y2, lineWidth) {
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const length = Math.sqrt(dx * dx + dy * dy);
+    
+    if (length === 0) return;
+    
+    // Calculate perpendicular offset for line thickness
+    const nx = -dy / length * (lineWidth / 2);
+    const ny = dx / length * (lineWidth / 2);
+    
+    // Draw as a quadrilateral (4-point polygon)
+    ctx.beginPath();
+    ctx.moveTo(x1 + nx, y1 + ny);
+    ctx.lineTo(x2 + nx, y2 + ny);
+    ctx.lineTo(x2 - nx, y2 - ny);
+    ctx.lineTo(x1 - nx, y1 - ny);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  /**
+   * Draw a single hex outline using fill-based rendering
+   * 
+   * NOTE: This uses ctx.fill() with polygon shapes instead of ctx.stroke() to 
+   * work around a rendering bug in Obsidian's Live Preview mode where CodeMirror's
+   * canvas operations can corrupt the strokeStyle state.
+   * 
+   * @param {CanvasRenderingContext2D} ctx - Canvas context
+   * @param {number} q - Axial q coordinate
+   * @param {number} r - Axial r coordinate
+   * @param {number} offsetX - Screen offset X
+   * @param {number} offsetY - Screen offset Y
+   * @param {number} zoom - Current zoom level
+   * @param {number} lineWidth - Line width (optional, defaults to context lineWidth or 1)
+   */
+  drawHexOutline(ctx, q, r, offsetX, offsetY, zoom, lineWidth = null) {
+    const vertices = this.getHexVertices(q, r);
+    const width = lineWidth !== null ? lineWidth : (ctx.lineWidth || 1);
+    
+    // Convert all vertices to screen coordinates
+    const screenVertices = vertices.map(v => 
+      this.worldToScreen(v.worldX, v.worldY, offsetX, offsetY, zoom)
+    );
+    
+    // Draw each edge as a filled polygon
+    for (let i = 0; i < 6; i++) {
+      const v1 = screenVertices[i];
+      const v2 = screenVertices[(i + 1) % 6];
+      this.drawLineAsFill(ctx, v1.screenX, v1.screenY, v2.screenX, v2.screenY, width);
+    }
+  }
+  
+  /**
+   * Draw a filled hex on the canvas
+   * @param {CanvasRenderingContext2D} ctx - Canvas context
+   * @param {number} q - Axial q coordinate
+   * @param {number} r - Axial r coordinate
+   * @param {number} offsetX - Screen offset X
+   * @param {number} offsetY - Screen offset Y
+   * @param {number} zoom - Current zoom level
+   * @param {string} color - Fill color
+   */
+  drawHex(ctx, q, r, offsetX, offsetY, zoom, color) {
+    const vertices = this.getHexVertices(q, r);
+    
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    
+    // Convert first vertex to screen coordinates and move to it
+    const first = this.worldToScreen(vertices[0].worldX, vertices[0].worldY, offsetX, offsetY, zoom);
+    ctx.moveTo(first.screenX, first.screenY);
+    
+    // Draw lines to remaining vertices
+    for (let i = 1; i < vertices.length; i++) {
+      const vertex = this.worldToScreen(vertices[i].worldX, vertices[i].worldY, offsetX, offsetY, zoom);
+      ctx.lineTo(vertex.screenX, vertex.screenY);
+    }
+    
+    // Close the path and fill
+    ctx.closePath();
+    ctx.fill();
+  }
+  
+  /**
+   * Get the size of a hex in screen pixels at current zoom
+   * @param {number} zoom - Current zoom level
+   * @returns {number} Scaled hex size
+   */
+  getScaledHexSize(zoom) {
+    return this.hexSize * zoom;
+  }
+  
+  /**
+   * Alias for getScaledHexSize - provides consistent API with GridGeometry
+   * GridGeometry calls this "CellSize" while HexGeometry calls it "HexSize"
+   * @param {number} zoom - Current zoom level
+   * @returns {number} Scaled hex size
+   */
+  getScaledCellSize(zoom) {
+    return this.getScaledHexSize(zoom);
+  }
+
+  /**
+   * Calculate distance between two hexes (in hex units)
+   * Uses cube coordinate system for accurate hex distance
+   * @param {number} q1 - First hex q coordinate
+   * @param {number} r1 - First hex r coordinate
+   * @param {number} q2 - Second hex q coordinate
+   * @param {number} r2 - Second hex r coordinate
+   * @returns {number} Distance in hexes
+   */
+  getHexDistance(q1, r1, q2, r2) {
+    // Convert to cube coordinates
+    const x1 = q1;
+    const z1 = r1;
+    const y1 = -x1 - z1;
+    
+    const x2 = q2;
+    const z2 = r2;
+    const y2 = -x2 - z2;
+    
+    // Cube distance formula
+    return (Math.abs(x1 - x2) + Math.abs(y1 - y2) + Math.abs(z1 - z2)) / 2;
+  }
+  
+  /**
+   * Get all neighboring hexes
+   * @param {number} q - Axial q coordinate
+   * @param {number} r - Axial r coordinate
+   * @returns {Array<{q: number, r: number}>} Array of neighbor coordinates
+   */
+  getNeighbors(q, r) {
+    // Axial direction vectors (same for both orientations)
+    const directions = [
+      { q: 1, r: 0 },   // East
+      { q: 1, r: -1 },  // Northeast
+      { q: 0, r: -1 },  // Northwest
+      { q: -1, r: 0 },  // West
+      { q: -1, r: 1 },  // Southwest
+      { q: 0, r: 1 }    // Southeast
+    ];
+    
+    return directions.map(dir => ({
+      q: q + dir.q,
+      r: r + dir.r
+    }));
+  }
+  
+  /**
+   * Check if hex coordinates are within bounds
+   * Converts axial coords to offset and checks rectangular bounds
+   * If no bounds are set, always returns true
+   * @param {number} q - Axial q coordinate
+   * @param {number} r - Axial r coordinate
+   * @returns {boolean} True if coordinates are within bounds
+   */
+  isWithinBounds(q, r) {
+    if (!this.bounds) return true; // No bounds = infinite map
+    
+    // Convert axial to offset coordinates
+    const { col, row } = axialToOffset(q, r, this.orientation);
+    
+    // Check rectangular bounds (exclusive: maxCol=26 means 26 columns, indices 0-25)
+    return col >= 0 && col < this.bounds.maxCol && 
+           row >= 0 && row < this.bounds.maxRow;
+  }
+  
+  /**
+   * Clamp hex coordinates to bounds
+   * Converts to offset, clamps, then converts back to axial
+   * If no bounds are set, returns coordinates unchanged
+   * @param {number} q - Axial q coordinate
+   * @param {number} r - Axial r coordinate
+   * @returns {{q: number, r: number}} Clamped coordinates in axial
+   */
+  clampToBounds(q, r) {
+    if (!this.bounds) return { q, r }; // No bounds = infinite map
+    
+    // Convert to offset
+    const { col, row } = axialToOffset(q, r, this.orientation);
+    
+    // Clamp in offset space (max valid index is maxCol-1 since bounds are exclusive)
+    const clampedCol = Math.max(0, Math.min(this.bounds.maxCol - 1, col));
+    const clampedRow = Math.max(0, Math.min(this.bounds.maxRow - 1, row));
+    
+    // Convert back to axial
+    return offsetToAxial(clampedCol, clampedRow, this.orientation);
+  }
+  
+  /**
+   * Convert axial hex coordinates to offset coordinates
+   * Offset coordinates provide a consistent integer-based addressing system
+   * for features like fog of war that need array-based storage.
+   * @param {number} gridX - Axial q coordinate (passed as gridX from worldToGrid)
+   * @param {number} gridY - Axial r coordinate (passed as gridY from worldToGrid)
+   * @returns {{col: number, row: number}} Offset coordinates
+   */
+  toOffsetCoords(gridX, gridY) {
+    // gridX/gridY are actually q/r from worldToGrid which returns {gridX: q, gridY: r}
+    return axialToOffset(gridX, gridY, this.orientation);
+  }
+  
+  /**
+   * Convert a cell object to offset coordinates
+   * Hex cells store axial (q, r) which need conversion to offset (col, row)
+   * @param {Object} cell - Cell object with q, r properties
+   * @returns {{col: number, row: number}} Offset coordinates
+   */
+  cellToOffsetCoords(cell) {
+    return axialToOffset(cell.q, cell.r, this.orientation);
+  }
+  
+  /**
+   * Check if this geometry has defined bounds
+   * Hex maps are bounded when hexBounds is configured
+   * @returns {boolean} True if bounds are defined
+   */
+  isBounded() {
+    return this.bounds !== null;
+  }
+  
+  /**
+   * Get the bounds for this geometry
+   * @returns {{maxCol: number, maxRow: number}|null} Bounds object or null
+   */
+  getBounds() {
+    return this.bounds;
+  }
+  
+  /**
+   * Create a cell object in hex coordinate format
+   * Abstraction layer for cell creation - isolates coordinate property naming
+   * @param {{q: number, r: number}} coords - Hex coordinates from worldToGrid()
+   * @param {string} color - Cell color
+   * @returns {{q: number, r: number, color: string}} Cell object
+   */
+  createCellObject(coords, color) {
+    // Handle both {gridX, gridY} from screenToGrid and {q, r} from cells
+    const q = coords.q !== undefined ? coords.q : coords.gridX;
+    const r = coords.r !== undefined ? coords.r : coords.gridY;
+    return { q, r, color };
+  }
+  
+  /**
+   * Check if a cell matches given coordinates
+   * Abstraction layer for cell comparison - isolates coordinate property naming
+   * @param {{q: number, r: number}} cell - Cell object to check
+   * @param {{q: number, r: number}} coords - Hex coordinates from worldToGrid()
+   * @returns {boolean} True if cell matches coordinates
+   */
+  cellMatchesCoords(cell, coords) {
+    // Handle both {gridX, gridY} from screenToGrid and {q, r} from cells
+    const q = coords.q !== undefined ? coords.q : coords.gridX;
+    const r = coords.r !== undefined ? coords.r : coords.gridY;
+    return cell.q === q && cell.r === r;
+  }
+
+  /**
+   * Get all hexes within a rectangular area (defined by two corner hexes)
+   * Uses offset coordinates to iterate a rectangular bounds, then converts back to axial
+   * Returns cells in format {x, y} for API consistency with GridGeometry
+   * @param {number} q1 - First corner q coordinate
+   * @param {number} r1 - First corner r coordinate
+   * @param {number} q2 - Second corner q coordinate
+   * @param {number} r2 - Second corner r coordinate
+   * @returns {Array<{x: number, y: number}>} Array of hex coordinates in rectangle
+   */
+  getCellsInRectangle(q1, r1, q2, r2) {
+    // Convert both corners to offset coordinates
+    const offset1 = axialToOffset(q1, r1, this.orientation);
+    const offset2 = axialToOffset(q2, r2, this.orientation);
+    
+    // Find rectangular bounds in offset space
+    const minCol = Math.min(offset1.col, offset2.col);
+    const maxCol = Math.max(offset1.col, offset2.col);
+    const minRow = Math.min(offset1.row, offset2.row);
+    const maxRow = Math.max(offset1.row, offset2.row);
+    
+    // Iterate rectangle in offset space and convert back to axial
+    const cells = [];
+    for (let col = minCol; col <= maxCol; col++) {
+      for (let row = minRow; row <= maxRow; row++) {
+        const { q, r } = offsetToAxial(col, row, this.orientation);
+        
+        // Only include if within bounds (if bounds are set)
+        if (this.isWithinBounds(q, r)) {
+          // Return as {x, y} for API consistency with GridGeometry
+          cells.push({ x: q, y: r });
+        }
+      }
+    }
+    
+    return cells;
+  }
+
+  /**
+   * Get all hexes within a circular area (defined by center and radius in hex units)
+   * Uses hex distance calculation for accurate circular selection
+   * Returns cells in format {x, y} for API consistency with GridGeometry
+   * @param {number} centerQ - Center hex q coordinate
+   * @param {number} centerR - Center hex r coordinate
+   * @param {number} radiusInHexes - Radius in hex units
+   * @returns {Array<{x: number, y: number}>} Array of hex coordinates in circle
+   */
+  getCellsInCircle(centerQ, centerR, radiusInHexes) {
+    const cells = [];
+    
+    // Convert center to offset to establish rectangular search bounds
+    const centerOffset = axialToOffset(centerQ, centerR, this.orientation);
+    const minCol = Math.floor(centerOffset.col - radiusInHexes);
+    const maxCol = Math.ceil(centerOffset.col + radiusInHexes);
+    const minRow = Math.floor(centerOffset.row - radiusInHexes);
+    const maxRow = Math.ceil(centerOffset.row + radiusInHexes);
+    
+    // Iterate rectangular bounds and filter by hex distance
+    for (let col = minCol; col <= maxCol; col++) {
+      for (let row = minRow; row <= maxRow; row++) {
+        const { q, r } = offsetToAxial(col, row, this.orientation);
+        
+        // Only include if within bounds and within circular radius
+        if (this.isWithinBounds(q, r)) {
+          const distance = this.getHexDistance(centerQ, centerR, q, r);
+          if (distance <= radiusInHexes) {
+            // Return as {x, y} for API consistency with GridGeometry
+            cells.push({ x: q, y: r });
+          }
+        }
+      }
+    }
+    
+    return cells;
+  }
+
+  /**
+   * Calculate distance between two hexes
+   * Alias for getHexDistance() - provides API consistency with GridGeometry
+   * GridGeometry uses getEuclideanDistance(), hex maps use hex distance which is more natural
+   * @param {number} q1 - First hex q coordinate
+   * @param {number} r1 - First hex r coordinate
+   * @param {number} q2 - Second hex q coordinate
+   * @param {number} r2 - Second hex r coordinate
+   * @returns {number} Distance in hexes
+   */
+  getEuclideanDistance(q1, r1, q2, r2) {
+    // For hexes, use hex distance (which is more natural than Euclidean)
+    return this.getHexDistance(q1, r1, q2, r2);
+  }
+
+  /**
+   * Calculate Manhattan distance between two hexes
+   * For hexes, this is the same as hex distance
+   * Provided for API consistency with GridGeometry
+   * @param {number} q1 - First hex q coordinate
+   * @param {number} r1 - First hex r coordinate
+   * @param {number} q2 - Second hex q coordinate
+   * @param {number} r2 - Second hex r coordinate
+   * @returns {number} Distance in hexes
+   */
+  getManhattanDistance(q1, r1, q2, r2) {
+    // For hexes, Manhattan distance is the same as hex distance
+    return this.getHexDistance(q1, r1, q2, r2);
+  }
+
+  /**
+   * Calculate game distance between two hexes
+   * For hexes, this is simply the hex distance - no diagonal rules apply
+   * The options parameter is included for API consistency with GridGeometry
+   * @param {number} q1 - First hex q coordinate
+   * @param {number} r1 - First hex r coordinate
+   * @param {number} q2 - Second hex q coordinate
+   * @param {number} r2 - Second hex r coordinate
+   * @param {Object} options - Ignored for hex (included for API consistency)
+   * @returns {number} Distance in hexes
+   */
+  getCellDistance(q1, r1, q2, r2, options = {}) {
+    // Hex grids have no diagonal ambiguity - all neighbors are equidistant
+    return this.getHexDistance(q1, r1, q2, r2);
+  }
+
+  /**
+   * Get hexes along a line between two hexes
+   * Uses hex line traversal algorithm (linear interpolation in cube coordinates)
+   * Returns cells in format {x, y} for API consistency with GridGeometry
+   * @param {number} q1 - Start hex q coordinate
+   * @param {number} r1 - Start hex r coordinate
+   * @param {number} q2 - End hex q coordinate
+   * @param {number} r2 - End hex r coordinate
+   * @returns {Array<{x: number, y: number}>} Array of hex coordinates along the line
+   */
+  getCellsInLine(q1, r1, q2, r2) {
+    const distance = this.getHexDistance(q1, r1, q2, r2);
+    const cells = [];
+    
+    // If distance is 0, return just the start hex
+    if (distance === 0) {
+      return [{ x: q1, y: r1 }];
+    }
+    
+    // Use linear interpolation in cube coordinates
+    for (let i = 0; i <= distance; i++) {
+      const t = i / distance;
+      
+      // Interpolate in cube coordinates
+      const x1 = q1;
+      const z1 = r1;
+      const y1 = -x1 - z1;
+      
+      const x2 = q2;
+      const z2 = r2;
+      const y2 = -x2 - z2;
+      
+      // Linear interpolation
+      const x = x1 + (x2 - x1) * t;
+      const y = y1 + (y2 - y1) * t;
+      const z = z1 + (z2 - z1) * t;
+      
+      // Round to nearest hex
+      const rounded = this.roundHex(x, z);
+      
+      // Only include if within bounds
+      if (this.isWithinBounds(rounded.q, rounded.r)) {
+        // Return as {x, y} for API consistency with GridGeometry
+        cells.push({ x: rounded.q, y: rounded.r });
+      }
+    }
+    
+    return cells;
+  }
+
+  /**
+   * Get the bounding box of a hex cell in world coordinates
+   * Used for export operations to calculate content bounds
+   * @param {{q: number, r: number}|{x: number, y: number}} cell - Cell object with axial coordinates (q,r) or (x,y)
+   * @returns {{minX: number, minY: number, maxX: number, maxY: number}} Bounding box
+   */
+  getCellBounds(cell) {
+    // Handle both {q,r} and {x,y} formats (x=q, y=r for API consistency)
+    const q = cell.q !== undefined ? cell.q : cell.x;
+    const r = cell.r !== undefined ? cell.r : cell.y;
+    
+    const center = this.hexToWorld(q, r);
+    // Return bounding box of hexagon
+    const halfWidth = this.width / 2;
+    const halfHeight = this.height / 2;
+    return {
+      minX: center.worldX - halfWidth,
+      minY: center.worldY - halfHeight,
+      maxX: center.worldX + halfWidth,
+      maxY: center.worldY + halfHeight
+    };
+  }
+
+  /**
+   * Get the bounding box of an object in world coordinates
+   * Used for export operations to calculate content bounds
+   * @param {{position: {x: number, y: number}, size?: {width: number, height: number}}} obj - Object with position and optional size
+   * @returns {{minX: number, minY: number, maxX: number, maxY: number}} Bounding box
+   */
+  getObjectBounds(obj) {
+    // Objects in hex maps use axial position (x=q, y=r)
+    const center = this.hexToWorld(obj.position.x, obj.position.y);
+    const size = obj.size || { width: 1, height: 1 };
+    
+    // Approximate bounds for multi-hex objects
+    const halfWidth = (this.width * size.width) / 2;
+    const halfHeight = (this.height * size.height) / 2;
+    return {
+      minX: center.worldX - halfWidth,
+      minY: center.worldY - halfHeight,
+      maxX: center.worldX + halfWidth,
+      maxY: center.worldY + halfHeight
+    };
+  }
+}
+
+return { HexGeometry };
 ```
 
 # MapHeader
@@ -3260,71 +7036,6 @@ return {
 };
 ```
 
-# colorOperations
-
-```js
-// utils/colorOperations.js - Color palette and utilities
-
-const { getColorPaletteSettings, BUILT_IN_COLORS } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "settingsAccessor"));
-
-const DEFAULT_COLOR = '#c4a57b'; // Tan/brown - the original default
-
-// Static fallback palette for backward compatibility
-// Components should prefer getColorPalette() for dynamic colors
-const COLOR_PALETTE = BUILT_IN_COLORS;
-
-/**
- * Get the current color palette (including customizations from settings)
- * This is the preferred way to get colors - it includes user customizations
- * @returns {Array} Array of color objects { id, color, label, isBuiltIn?, isCustom?, isModified? }
- */
-function getColorPalette() {
-  try {
-    return getColorPaletteSettings();
-  } catch (error) {
-    // Fallback to built-in colors
-    return BUILT_IN_COLORS;
-  }
-}
-
-/**
- * Get color for a cell (handles backward compatibility)
- * @param {Object} cell - Cell object
- * @returns {string} Hex color
- */
-function getCellColor(cell) {
-  return cell.color || DEFAULT_COLOR;
-}
-
-/**
- * Get color definition by hex value from current palette
- * @param {string} colorHex - Hex color value
- * @returns {Object|null} Color definition or null
- */
-function getColorByHex(colorHex) {
-  const palette = getColorPalette();
-  return palette.find(c => c.color === colorHex) || null;
-}
-
-/**
- * Check if color is default
- * @param {string} colorHex - Hex color value
- * @returns {boolean} True if default color
- */
-function isDefaultColor(colorHex) {
-  return !colorHex || colorHex === DEFAULT_COLOR;
-}
-
-return {
-  DEFAULT_COLOR,
-  COLOR_PALETTE,      // Static fallback for backward compatibility
-  getColorPalette,    // Dynamic palette with user customizations (preferred)
-  getCellColor,
-  getColorByHex,
-  isDefaultColor
-};
-```
-
 # fontOptions
 
 ```js
@@ -3421,1760 +7132,6 @@ return {
     getFontCss,
     getFontOption
 };
-```
-
-# BaseGeometry
-
-```js
-/**
- * BaseGeometry.js
- * 
- * Abstract base class for geometry implementations (GridGeometry, HexGeometry).
- * Defines the common interface that all geometry classes must implement,
- * and provides shared utility methods.
- * 
- * This class uses JavaScript with TypeScript-style JSDoc annotations to:
- * - Document the expected API contract
- * - Provide IDE autocomplete and type checking
- * - Enable runtime validation of abstract methods
- * - Facilitate future TypeScript migration
- * 
- * COORDINATE SYSTEMS (implemented by subclasses):
- * - Grid coordinates: Integer indices in the geometry's native coordinate system
- *   (gridX, gridY) for GridGeometry, (q, r) for HexGeometry
- * 
- * - World coordinates: Float pixel coordinates in the map's coordinate system
- *   Origin and scale defined by geometry implementation
- * 
- * - Screen coordinates: Pixel coordinates on the canvas
- *   Includes viewport transforms (pan/zoom/rotation)
- * 
- * IMPLEMENTATION GUIDELINES:
- * - Subclasses MUST implement all abstract methods defined below
- * - Subclasses SHOULD provide consistent public APIs for polymorphic usage
- * - Helper methods (e.g., offsetToWorld, getCellCenter) should exist in both
- *   implementations, even if one is a simple passthrough, to enable code
- *   that works with BaseGeometry references without type-checking
- * 
- * @abstract
- */
-class BaseGeometry {
-  /**
-   * @throws {Error} If instantiated directly (must use subclass)
-   */
-  constructor() {
-    if (new.target === BaseGeometry) {
-      throw new Error('BaseGeometry is abstract and cannot be instantiated directly');
-    }
-  }
-  
-  // ============================================================================
-  // CONCRETE METHODS (Shared implementation for all geometry types)
-  // ============================================================================
-  
-  /**
-   * Apply iOS-safe stroke style to canvas context
-   * 
-   * iOS may corrupt stroke-related canvas state during memory pressure events
-   * (when app is backgrounded). This helper ensures all stroke properties are
-   * explicitly set to valid values before any stroke operations.
-   * 
-   * Usage pattern:
-   * ```javascript
-   * this.withStrokeStyle(ctx, { lineColor: '#333', lineWidth: 1 }, () => {
-   *   // All stroke operations here
-   *   ctx.beginPath();
-   *   ctx.moveTo(x1, y1);
-   *   ctx.lineTo(x2, y2);
-   *   ctx.stroke();
-   * });
-   * ```
-   * 
-   * @param {CanvasRenderingContext2D} ctx - Canvas context
-   * @param {Object} style - Stroke style options
-   * @param {string} style.lineColor - Stroke color (default: '#333333')
-   * @param {number} style.lineWidth - Line width (default: 1)
-   * @param {Function} callback - Function containing stroke operations
-   */
-  withStrokeStyle(ctx, style, callback) {
-    const { lineColor = '#333333', lineWidth = 1 } = style;
-    
-    // Save context state
-    ctx.save();
-    
-    // Explicitly reset ALL stroke-related properties
-    // This protects against iOS state corruption
-    ctx.strokeStyle = lineColor;
-    ctx.lineWidth = lineWidth;
-    ctx.lineCap = 'butt';
-    ctx.lineJoin = 'miter';
-    ctx.miterLimit = 10;
-    ctx.setLineDash([]);
-    ctx.lineDashOffset = 0;
-    
-    // Execute stroke operations
-    callback();
-    
-    // Restore context state
-    ctx.restore();
-  }
-  
-  /**
-   * Convert world coordinates to screen coordinates (for rendering)
-   * This is a pure coordinate transform that works identically for all geometry types
-   * 
-   * @param {number} worldX - World X coordinate
-   * @param {number} worldY - World Y coordinate
-   * @param {number} offsetX - Screen offset X (viewport pan)
-   * @param {number} offsetY - Screen offset Y (viewport pan)
-   * @param {number} zoom - Current zoom level
-   * @returns {{screenX: number, screenY: number}} Screen coordinates
-   */
-  worldToScreen(worldX, worldY, offsetX, offsetY, zoom) {
-    const screenX = offsetX + worldX * zoom;
-    const screenY = offsetY + worldY * zoom;
-    return { screenX, screenY };
-  }
-
-  /**
-   * Convert screen coordinates to world coordinates
-   * This is the inverse of worldToScreen and works identically for all geometry types
-   * Useful for calculating visible bounds and converting pointer events
-   * 
-   * @param {number} screenX - Screen X coordinate
-   * @param {number} screenY - Screen Y coordinate
-   * @param {number} zoom - Current zoom level
-   * @returns {{worldX: number, worldY: number}} World coordinates
-   */
-  screenToWorld(screenX, screenY, zoom) {
-    return {
-      worldX: screenX / zoom,
-      worldY: screenY / zoom
-    };
-  }
-  
-  // ============================================================================
-  // ABSTRACT METHODS (Must be implemented by subclasses)
-  // ============================================================================
-  
-  /**
-   * Convert world coordinates to grid coordinates
-   * @abstract
-   * @param {number} worldX - World X coordinate
-   * @param {number} worldY - World Y coordinate
-   * @returns {{gridX: number, gridY: number}} Grid coordinates (property names may vary by implementation)
-   * @throws {Error} If not implemented by subclass
-   */
-  worldToGrid(worldX, worldY) {
-    throw new Error('worldToGrid() must be implemented by subclass');
-  }
-  
-  /**
-   * Convert grid coordinates to world coordinates
-   * @abstract
-   * @param {number} x - Grid X coordinate (gridX for grid, q for hex)
-   * @param {number} y - Grid Y coordinate (gridY for grid, r for hex)
-   * @returns {{worldX: number, worldY: number}} World coordinates
-   * @throws {Error} If not implemented by subclass
-   */
-  gridToWorld(x, y) {
-    throw new Error('gridToWorld() must be implemented by subclass');
-  }
-  
-  /**
-   * Convert grid coordinates to screen coordinates
-   * @abstract
-   * @param {number} x - Grid X coordinate (gridX for grid, q for hex)
-   * @param {number} y - Grid Y coordinate (gridY for grid, r for hex)
-   * @param {number} offsetX - Screen offset X
-   * @param {number} offsetY - Screen offset Y
-   * @param {number} zoom - Current zoom level
-   * @returns {{screenX: number, screenY: number}} Screen coordinates
-   * @throws {Error} If not implemented by subclass
-   */
-  gridToScreen(x, y, offsetX, offsetY, zoom) {
-    throw new Error('gridToScreen() must be implemented by subclass');
-  }
-  
-  /**
-   * Get the scaled cell/hex size at current zoom level
-   * @abstract
-   * @param {number} zoom - Current zoom level
-   * @returns {number} Scaled size in screen pixels
-   * @throws {Error} If not implemented by subclass
-   */
-  getScaledCellSize(zoom) {
-    throw new Error('getScaledCellSize() must be implemented by subclass');
-  }
-  
-  /**
-   * Create a cell object in the geometry's native format
-   * @abstract
-   * @param {{gridX: number, gridY: number}|{q: number, r: number}|{x: number, y: number}} coords - Coordinates
-   * @param {string} color - Cell color
-   * @returns {Object} Cell object in native format
-   * @throws {Error} If not implemented by subclass
-   */
-  createCellObject(coords, color) {
-    throw new Error('createCellObject() must be implemented by subclass');
-  }
-  
-  /**
-   * Check if a cell matches given coordinates
-   * @abstract
-   * @param {Object} cell - Cell object to check
-   * @param {{gridX: number, gridY: number}|{q: number, r: number}|{x: number, y: number}} coords - Coordinates
-   * @returns {boolean} True if cell matches coordinates
-   * @throws {Error} If not implemented by subclass
-   */
-  cellMatchesCoords(cell, coords) {
-    throw new Error('cellMatchesCoords() must be implemented by subclass');
-  }
-  
-  /**
-   * Get all cells within a rectangular area
-   * @abstract
-   * @param {number} x1 - First corner X
-   * @param {number} y1 - First corner Y
-   * @param {number} x2 - Second corner X
-   * @param {number} y2 - Second corner Y
-   * @returns {Array<{x: number, y: number}>} Array of cell coordinates
-   * @throws {Error} If not implemented by subclass
-   */
-  getCellsInRectangle(x1, y1, x2, y2) {
-    throw new Error('getCellsInRectangle() must be implemented by subclass');
-  }
-  
-  /**
-   * Get all cells within a circular area
-   * @abstract
-   * @param {number} centerX - Center X coordinate
-   * @param {number} centerY - Center Y coordinate
-   * @param {number} radius - Radius in cells
-   * @returns {Array<{x: number, y: number}>} Array of cell coordinates
-   * @throws {Error} If not implemented by subclass
-   */
-  getCellsInCircle(centerX, centerY, radius) {
-    throw new Error('getCellsInCircle() must be implemented by subclass');
-  }
-  
-  /**
-   * Get all cells along a line between two cells
-   * @abstract
-   * @param {number} x1 - Start X coordinate
-   * @param {number} y1 - Start Y coordinate
-   * @param {number} x2 - End X coordinate
-   * @param {number} y2 - End Y coordinate
-   * @returns {Array<{x: number, y: number}>} Array of cell coordinates
-   * @throws {Error} If not implemented by subclass
-   */
-  getCellsInLine(x1, y1, x2, y2) {
-    throw new Error('getCellsInLine() must be implemented by subclass');
-  }
-  
-  /**
-   * Calculate distance between two cells
-   * @abstract
-   * @param {number} x1 - First cell X
-   * @param {number} y1 - First cell Y
-   * @param {number} x2 - Second cell X
-   * @param {number} y2 - Second cell Y
-   * @returns {number} Distance in cells
-   * @throws {Error} If not implemented by subclass
-   */
-  getEuclideanDistance(x1, y1, x2, y2) {
-    throw new Error('getEuclideanDistance() must be implemented by subclass');
-  }
-  
-  /**
-   * Calculate Manhattan distance between two cells
-   * @abstract
-   * @param {number} x1 - First cell X
-   * @param {number} y1 - First cell Y
-   * @param {number} x2 - Second cell X
-   * @param {number} y2 - Second cell Y
-   * @returns {number} Manhattan distance in cells
-   * @throws {Error} If not implemented by subclass
-   */
-  getManhattanDistance(x1, y1, x2, y2) {
-    throw new Error('getManhattanDistance() must be implemented by subclass');
-  }
-  
-  /**
-   * Calculate "game distance" between two cells with configurable rules
-   * For grid: supports different diagonal calculation rules (alternating, equal, euclidean)
-   * For hex: returns hex distance (options are ignored - hex has no diagonal ambiguity)
-   * @abstract
-   * @param {number} x1 - First cell X (gridX or q)
-   * @param {number} y1 - First cell Y (gridY or r)
-   * @param {number} x2 - Second cell X (gridX or q)
-   * @param {number} y2 - Second cell Y (gridY or r)
-   * @param {Object} options - Distance calculation options
-   * @param {string} options.diagonalRule - For grid: 'alternating' | 'equal' | 'euclidean'
-   * @returns {number} Distance in cells
-   * @throws {Error} If not implemented by subclass
-   */
-  getCellDistance(x1, y1, x2, y2, options = {}) {
-    throw new Error('getCellDistance() must be implemented by subclass');
-  }
-  
-  /**
-   * Get all neighboring cells
-   * @abstract
-   * @param {number} x - Cell X coordinate
-   * @param {number} y - Cell Y coordinate
-   * @returns {Array<{x: number, y: number}>} Array of neighbor coordinates
-   * @throws {Error} If not implemented by subclass
-   */
-  getNeighbors(x, y) {
-    throw new Error('getNeighbors() must be implemented by subclass');
-  }
-  
-  /**
-   * Check if coordinates are within bounds
-   * @abstract
-   * @param {number} x - X coordinate
-   * @param {number} y - Y coordinate
-   * @returns {boolean} True if within bounds
-   * @throws {Error} If not implemented by subclass
-   */
-  isWithinBounds(x, y) {
-    throw new Error('isWithinBounds() must be implemented by subclass');
-  }
-  
-  /**
-   * Clamp coordinates to bounds
-   * @abstract
-   * @param {number} x - X coordinate
-   * @param {number} y - Y coordinate
-   * @returns {{x: number, y: number}} Clamped coordinates (property names may vary)
-   * @throws {Error} If not implemented by subclass
-   */
-  clampToBounds(x, y) {
-    throw new Error('clampToBounds() must be implemented by subclass');
-  }
-  
-  /**
-   * Draw grid lines on canvas
-   * @abstract
-   * @param {CanvasRenderingContext2D} ctx - Canvas context
-   * @param {number} offsetX - Screen offset X
-   * @param {number} offsetY - Screen offset Y
-   * @param {number} width - Canvas width
-   * @param {number} height - Canvas height
-   * @param {number} zoom - Current zoom level
-   * @param {Object} style - Grid style options
-   * @throws {Error} If not implemented by subclass
-   */
-  drawGrid(ctx, offsetX, offsetY, width, height, zoom, style) {
-    throw new Error('drawGrid() must be implemented by subclass');
-  }
-}
-
-return { BaseGeometry };
-```
-
-# GridGeometry
-
-```js
-/**
- * GridGeometry.js
- * 
- * Handles all grid-specific geometric calculations and rendering.
- * This class abstracts square grid mathematics, coordinate conversions,
- * and basic rendering operations.
- * 
- * Extends BaseGeometry to implement the standard geometry interface
- * for square grid-based maps.
- * 
- * COORDINATE SYSTEMS:
- * - Grid coordinates (gridX, gridY): Integer cell indices
- *   Used internally for all grid math and storage. Origin at (0,0) in top-left.
- * 
- * - World coordinates (worldX, worldY): Float pixel coordinates in the map's coordinate system
- *   Used for positioning and measurements. Origin at (0,0) at top-left corner of cell (0,0).
- * 
- * - Screen coordinates (screenX, screenY): Pixel coordinates on the canvas
- *   Used for rendering. Includes viewport transforms (pan/zoom/rotation).
- * 
- * COORDINATE NAMING CONVENTION:
- * - Storage format: Cells stored as {x, y, color} using grid coordinates
- * - API methods: Use (gridX, gridY) as parameter names for clarity
- * - API returns: Collection methods return {x, y} where x=gridX, y=gridY
- * - Objects: Store position as {x, y} using grid coordinates
- * 
- * IMPORTANT: For API consistency with HexGeometry, both classes:
- * - Return {x, y} from collection methods (getCellsInRectangle, etc.)
- * - Store cells/objects with {x, y} coordinate properties
- * - Use their respective coordinate systems internally (grid vs axial)
- * 
- * @extends BaseGeometry
- */
-
-// Import base geometry class
-const { BaseGeometry } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "BaseGeometry"));
-
-class GridGeometry extends BaseGeometry {
-  /**
-   * @param {number} cellSize - Base size of each grid cell in pixels (before zoom)
-   */
-  constructor(cellSize) {
-    super(); // Call base class constructor
-    this.cellSize = cellSize;
-  }
-  
-  /**
-   * Convert world coordinates to grid cell coordinates
-   * @param {number} worldX - World X coordinate
-   * @param {number} worldY - World Y coordinate
-   * @returns {{gridX: number, gridY: number}} Grid cell coordinates
-   */
-  worldToGrid(worldX, worldY) {
-    const gridX = Math.floor(worldX / this.cellSize);
-    const gridY = Math.floor(worldY / this.cellSize);
-    return { gridX, gridY };
-  }
-  
-  /**
-   * Convert grid cell coordinates to world coordinates (top-left corner of cell)
-   * @param {number} gridX - Grid X coordinate
-   * @param {number} gridY - Grid Y coordinate
-   * @returns {{worldX: number, worldY: number}} World coordinates
-   */
-  gridToWorld(gridX, gridY) {
-    const worldX = gridX * this.cellSize;
-    const worldY = gridY * this.cellSize;
-    return { worldX, worldY };
-  }
-  
-  /**
-   * Get the center point of a grid cell in world coordinates
-   * @param {number} gridX - Grid X coordinate
-   * @param {number} gridY - Grid Y coordinate
-   * @returns {{worldX: number, worldY: number}} World coordinates of cell center
-   */
-  getCellCenter(gridX, gridY) {
-    const worldX = (gridX + 0.5) * this.cellSize;
-    const worldY = (gridY + 0.5) * this.cellSize;
-    return { worldX, worldY };
-  }
-  
-  /**
-   * Convert offset coordinates to world coordinates
-   * 
-   * GRID-SPECIFIC IMPLEMENTATION (for BaseGeometry API consistency)
-   * 
-   * For GridGeometry, offset coordinates are identical to grid coordinates
-   * (no coordinate system conversion needed). This method exists for API
-   * consistency with HexGeometry, enabling polymorphic code that works
-   * with both geometry types.
-   * 
-   * @param {number} col - Column (equivalent to gridX)
-   * @param {number} row - Row (equivalent to gridY)
-   * @returns {{worldX: number, worldY: number}} World coordinates of cell center
-   */
-  offsetToWorld(col, row) {
-    return this.gridToWorld(col, row);
-  }
-  
-  /**
-   * Snap world coordinates to the nearest grid cell (top-left corner)
-   * @param {number} worldX - World X coordinate
-   * @param {number} worldY - World Y coordinate
-   * @returns {{worldX: number, worldY: number}} Snapped world coordinates
-   */
-  snapToGrid(worldX, worldY) {
-    const { gridX, gridY } = this.worldToGrid(worldX, worldY);
-    return this.gridToWorld(gridX, gridY);
-  }
-  
-  /**
-   * Snap world coordinates to the nearest grid cell center
-   * @param {number} worldX - World X coordinate
-   * @param {number} worldY - World Y coordinate
-   * @returns {{worldX: number, worldY: number}} Snapped world coordinates (cell center)
-   */
-  snapToCellCenter(worldX, worldY) {
-    const { gridX, gridY } = this.worldToGrid(worldX, worldY);
-    return this.getCellCenter(gridX, gridY);
-  }
-  
-  /**
-   * Calculate visible grid range for a given viewport
-   * @param {number} offsetX - Screen offset X
-   * @param {number} offsetY - Screen offset Y
-   * @param {number} width - Canvas width
-   * @param {number} height - Canvas height
-   * @param {number} zoom - Current zoom level
-   * @returns {{startX: number, endX: number, startY: number, endY: number}} Visible grid range
-   */
-  getVisibleGridRange(offsetX, offsetY, width, height, zoom) {
-    const scaledCellSize = this.cellSize * zoom;
-    
-    const startX = Math.floor(-offsetX / scaledCellSize);
-    const endX = Math.ceil((width - offsetX) / scaledCellSize);
-    const startY = Math.floor(-offsetY / scaledCellSize);
-    const endY = Math.ceil((height - offsetY) / scaledCellSize);
-    
-    return { startX, endX, startY, endY };
-  }
-  
-  /**
-   * Convert grid coordinates to screen coordinates (for rendering)
-   * @param {number} gridX - Grid X coordinate
-   * @param {number} gridY - Grid Y coordinate
-   * @param {number} offsetX - Screen offset X
-   * @param {number} offsetY - Screen offset Y
-   * @param {number} zoom - Current zoom level
-   * @returns {{screenX: number, screenY: number}} Screen coordinates
-   */
-  gridToScreen(gridX, gridY, offsetX, offsetY, zoom) {
-    const scaledCellSize = this.cellSize * zoom;
-    const screenX = offsetX + gridX * scaledCellSize;
-    const screenY = offsetY + gridY * scaledCellSize;
-    return { screenX, screenY };
-  }
-  
-  /**
-   * Determine which edge of a cell was clicked based on world coordinates
-   * 
-   * Used for edge painting - detects if a click was near a cell edge rather
-   * than in the cell center. Returns the cell coordinates and which side
-   * of that cell the click was near.
-   * 
-   * @param {number} worldX - World X coordinate (from screenToWorld)
-   * @param {number} worldY - World Y coordinate (from screenToWorld)
-   * @param {number} threshold - Distance from edge to count as hit (0-0.5, default 0.15)
-   *                             Expressed as fraction of cell size
-   * @returns {{ x: number, y: number, side: string } | null} 
-   *          Edge info with cell coords and side ('top'|'right'|'bottom'|'left'), 
-   *          or null if click was in cell center
-   */
-  screenToEdge(worldX, worldY, threshold = 0.15) {
-    // Get the cell coordinates
-    const cellX = Math.floor(worldX / this.cellSize);
-    const cellY = Math.floor(worldY / this.cellSize);
-    
-    // Calculate position within the cell (0-1 range)
-    const offsetX = (worldX / this.cellSize) - cellX;
-    const offsetY = (worldY / this.cellSize) - cellY;
-    
-    // Check proximity to each edge
-    // Priority order: top, bottom, left, right (for corner disambiguation)
-    // A click in a corner will prefer vertical edges (top/bottom)
-    if (offsetY < threshold) {
-      return { x: cellX, y: cellY, side: 'top' };
-    }
-    if (offsetY > 1 - threshold) {
-      return { x: cellX, y: cellY, side: 'bottom' };
-    }
-    if (offsetX < threshold) {
-      return { x: cellX, y: cellY, side: 'left' };
-    }
-    if (offsetX > 1 - threshold) {
-      return { x: cellX, y: cellY, side: 'right' };
-    }
-    
-    // Click was in cell center, not near any edge
-    return null;
-  }
-  
-  /**
-   * Draw grid lines on the canvas using fill-based rendering
-   * 
-   * NOTE: This uses ctx.fillRect() instead of ctx.stroke() to work around
-   * a rendering bug in Obsidian's Live Preview mode where CodeMirror's
-   * canvas operations can corrupt the strokeStyle state. Fill-based
-   * rendering is unaffected by this issue.
-   * 
-   * @param {CanvasRenderingContext2D} ctx - Canvas context
-   * @param {number} offsetX - Screen offset X
-   * @param {number} offsetY - Screen offset Y
-   * @param {number} width - Canvas width
-   * @param {number} height - Canvas height
-   * @param {number} zoom - Current zoom level
-   * @param {Object} style - Grid style options
-   * @param {string} style.lineColor - Grid line color
-   * @param {number} style.lineWidth - Grid line width
-   */
-  drawGrid(ctx, offsetX, offsetY, width, height, zoom, style = {}) {
-    const { lineColor = '#333333', lineWidth = 1 } = style;
-    const scaledCellSize = this.cellSize * zoom;
-    
-    // For rotation handling, calculate the visible range then add symmetric padding
-    const { startX, endX, startY, endY } = this.getVisibleGridRange(
-      offsetX, offsetY, width, height, zoom
-    );
-    
-    // Add extra padding in all directions to handle rotation
-    // Use 2x diagonal to ensure full coverage at any rotation angle
-    const diagonal = Math.sqrt(width * width + height * height);
-    const extraCells = Math.ceil(diagonal / scaledCellSize);
-    
-    const paddedStartX = startX - extraCells;
-    const paddedEndX = endX + extraCells;
-    const paddedStartY = startY - extraCells;
-    const paddedEndY = endY + extraCells;
-    
-    // Calculate how far to extend lines beyond the viewport
-    const lineExtension = diagonal * 1.5;
-    
-    // Use fillRect instead of stroke for iOS/CodeMirror compatibility
-    // fillRect is immune to strokeStyle state corruption
-    // iOS defensive: Reset composite operation before drawing
-    ctx.globalCompositeOperation = 'source-over';
-    ctx.globalAlpha = 1;
-    
-    // For centered lines, offset by half the line width
-    const halfWidth = lineWidth / 2;
-    
-    // Draw vertical lines with symmetric padding
-    for (let x = paddedStartX; x <= paddedEndX; x++) {
-      // iOS defensive: Set fillStyle for each line to work around state corruption
-      ctx.fillStyle = lineColor;
-      const screenX = offsetX + x * scaledCellSize;
-      // fillRect(x, y, width, height) - vertical line is narrow width, tall height
-      ctx.fillRect(
-        screenX - halfWidth,
-        -lineExtension,
-        lineWidth,
-        height + lineExtension * 2
-      );
-    }
-    
-    // Draw horizontal lines with symmetric padding
-    for (let y = paddedStartY; y <= paddedEndY; y++) {
-      // iOS defensive: Set fillStyle for each line to work around state corruption
-      ctx.fillStyle = lineColor;
-      const screenY = offsetY + y * scaledCellSize;
-      // fillRect(x, y, width, height) - horizontal line is wide width, narrow height
-      ctx.fillRect(
-        -lineExtension,
-        screenY - halfWidth,
-        width + lineExtension * 2,
-        lineWidth
-      );
-    }
-  }
-
-
-  
-  /**
-   * Draw a filled cell on the canvas
-   * @param {CanvasRenderingContext2D} ctx - Canvas context
-   * @param {number} gridX - Grid X coordinate
-   * @param {number} gridY - Grid Y coordinate
-   * @param {number} offsetX - Screen offset X
-   * @param {number} offsetY - Screen offset Y
-   * @param {number} zoom - Current zoom level
-   * @param {string} color - Fill color
-   */
-  drawCell(ctx, gridX, gridY, offsetX, offsetY, zoom, color) {
-    const scaledCellSize = this.cellSize * zoom;
-    const { screenX, screenY } = this.gridToScreen(gridX, gridY, offsetX, offsetY, zoom);
-    
-    ctx.fillStyle = color;
-    ctx.fillRect(screenX, screenY, scaledCellSize, scaledCellSize);
-  }
-  
-  /**
-   * Draw multiple cells of the same color (optimized batch rendering)
-   * @param {CanvasRenderingContext2D} ctx - Canvas context
-   * @param {Array<{x: number, y: number}>} cells - Array of cell coordinates
-   * @param {number} offsetX - Screen offset X
-   * @param {number} offsetY - Screen offset Y
-   * @param {number} zoom - Current zoom level
-   * @param {string} color - Fill color
-   */
-  drawCells(ctx, cells, offsetX, offsetY, zoom, color) {
-    const scaledCellSize = this.cellSize * zoom;
-    ctx.fillStyle = color;
-    
-    for (const cell of cells) {
-      const { screenX, screenY } = this.gridToScreen(cell.x, cell.y, offsetX, offsetY, zoom);
-      ctx.fillRect(screenX, screenY, scaledCellSize, scaledCellSize);
-    }
-  }
-  
-  /**
-   * Get the size of a cell in screen pixels at current zoom
-   * @param {number} zoom - Current zoom level
-   * @returns {number} Scaled cell size
-   */
-  getScaledCellSize(zoom) {
-    return this.cellSize * zoom;
-  }
-  
-  /**
-   * Check if coordinates are within bounds
-   * GridGeometry is unbounded by default, always returns true
-   * Override this if you need bounded grid behavior
-   * @param {number} gridX - Grid X coordinate
-   * @param {number} gridY - Grid Y coordinate
-   * @returns {boolean} True (always, grid is unbounded)
-   */
-  isWithinBounds(gridX, gridY) {
-    // GridGeometry is unbounded - always return true
-    // If bounds are needed in the future, add a bounds property like HexGeometry
-    return true;
-  }
-  
-  /**
-   * Clamp coordinates to bounds
-   * GridGeometry is unbounded by default, returns input unchanged
-   * Override this if you need bounded grid behavior
-   * @param {number} gridX - Grid X coordinate
-   * @param {number} gridY - Grid Y coordinate
-   * @returns {{gridX: number, gridY: number}} Input coordinates unchanged
-   */
-  clampToBounds(gridX, gridY) {
-    // GridGeometry is unbounded - return input unchanged
-    return { gridX, gridY };
-  }
-  
-  /**
-   * Get all grid cells within a rectangular area
-   * @param {number} gridX1 - First corner X
-   * @param {number} gridY1 - First corner Y
-   * @param {number} gridX2 - Second corner X
-   * @param {number} gridY2 - Second corner Y
-   * @returns {Array<{x: number, y: number}>} Array of cell coordinates
-   */
-  getCellsInRectangle(gridX1, gridY1, gridX2, gridY2) {
-    const minX = Math.min(gridX1, gridX2);
-    const maxX = Math.max(gridX1, gridX2);
-    const minY = Math.min(gridY1, gridY2);
-    const maxY = Math.max(gridY1, gridY2);
-    
-    const cells = [];
-    for (let x = minX; x <= maxX; x++) {
-      for (let y = minY; y <= maxY; y++) {
-        cells.push({ x, y });
-      }
-    }
-    
-    return cells;
-  }
-  
-  /**
-   * Get all grid cells within a circle
-   * @param {number} centerGridX - Center X in grid coordinates
-   * @param {number} centerGridY - Center Y in grid coordinates
-   * @param {number} radiusInCells - Radius in grid cells
-   * @returns {Array<{x: number, y: number}>} Array of cell coordinates
-   */
-  getCellsInCircle(centerGridX, centerGridY, radiusInCells) {
-    const cells = [];
-    const radiusSquared = radiusInCells * radiusInCells;
-    
-    // Bounding box for optimization
-    const minX = Math.floor(centerGridX - radiusInCells);
-    const maxX = Math.ceil(centerGridX + radiusInCells);
-    const minY = Math.floor(centerGridY - radiusInCells);
-    const maxY = Math.ceil(centerGridY + radiusInCells);
-    
-    for (let x = minX; x <= maxX; x++) {
-      for (let y = minY; y <= maxY; y++) {
-        // Check if cell center is within circle
-        const dx = x + 0.5 - centerGridX;
-        const dy = y + 0.5 - centerGridY;
-        const distSquared = dx * dx + dy * dy;
-        
-        if (distSquared <= radiusSquared) {
-          cells.push({ x, y });
-        }
-      }
-    }
-    
-    return cells;
-  }
-  
-  /**
-   * Get grid cells along a line (Bresenham's algorithm)
-   * @param {number} gridX1 - Start X
-   * @param {number} gridY1 - Start Y
-   * @param {number} gridX2 - End X
-   * @param {number} gridY2 - End Y
-   * @returns {Array<{x: number, y: number}>} Array of cell coordinates along the line
-   */
-  getCellsInLine(gridX1, gridY1, gridX2, gridY2) {
-    const cells = [];
-    
-    let x = gridX1;
-    let y = gridY1;
-    
-    const dx = Math.abs(gridX2 - gridX1);
-    const dy = Math.abs(gridY2 - gridY1);
-    const sx = gridX1 < gridX2 ? 1 : -1;
-    const sy = gridY1 < gridY2 ? 1 : -1;
-    let err = dx - dy;
-    
-    while (true) {
-      cells.push({ x, y });
-      
-      if (x === gridX2 && y === gridY2) break;
-      
-      const e2 = 2 * err;
-      if (e2 > -dy) {
-        err -= dy;
-        x += sx;
-      }
-      if (e2 < dx) {
-        err += dx;
-        y += sy;
-      }
-    }
-    
-    return cells;
-  }
-  
-  /**
-   * Calculate distance between two grid cells (Manhattan distance)
-   * @param {number} gridX1 - First cell X
-   * @param {number} gridY1 - First cell Y
-   * @param {number} gridX2 - Second cell X
-   * @param {number} gridY2 - Second cell Y
-   * @returns {number} Manhattan distance in cells
-   */
-  getManhattanDistance(gridX1, gridY1, gridX2, gridY2) {
-    return Math.abs(gridX2 - gridX1) + Math.abs(gridY2 - gridY1);
-  }
-  
-  /**
-   * Calculate distance between two grid cells (Euclidean distance)
-   * @param {number} gridX1 - First cell X
-   * @param {number} gridY1 - First cell Y
-   * @param {number} gridX2 - Second cell X
-   * @param {number} gridY2 - Second cell Y
-   * @returns {number} Euclidean distance in cells
-   */
-  getEuclideanDistance(gridX1, gridY1, gridX2, gridY2) {
-    const dx = gridX2 - gridX1;
-    const dy = gridY2 - gridY1;
-    return Math.sqrt(dx * dx + dy * dy);
-  }
-  
-  /**
-   * Calculate game distance between two grid cells with configurable diagonal rules
-   * @param {number} gridX1 - First cell X
-   * @param {number} gridY1 - First cell Y
-   * @param {number} gridX2 - Second cell X
-   * @param {number} gridY2 - Second cell Y
-   * @param {Object} options - Distance options
-   * @param {string} options.diagonalRule - 'alternating' | 'equal' | 'euclidean'
-   * @returns {number} Distance in cells
-   */
-  getCellDistance(gridX1, gridY1, gridX2, gridY2, options = {}) {
-    const { diagonalRule = 'alternating' } = options;
-    
-    const dx = Math.abs(gridX2 - gridX1);
-    const dy = Math.abs(gridY2 - gridY1);
-    
-    switch (diagonalRule) {
-      case 'equal':
-        // Chebyshev distance - every step (including diagonal) = 1
-        return Math.max(dx, dy);
-        
-      case 'euclidean':
-        // True geometric distance
-        return Math.sqrt(dx * dx + dy * dy);
-        
-      case 'alternating':
-      default:
-        // D&D 5e / Pathfinder style: 5-10-5-10
-        // Each diagonal costs 1.5 on average (first = 1, second = 2, etc.)
-        const straights = Math.abs(dx - dy);
-        const diagonals = Math.min(dx, dy);
-        return straights + diagonals + Math.floor(diagonals / 2);
-    }
-  }
-  
-  /**
-   * Create a cell object in grid coordinate format
-   * Abstraction layer for cell creation - isolates coordinate property naming
-   * @param {{gridX: number, gridY: number}} coords - Grid coordinates from worldToGrid()
-   * @param {string} color - Cell color
-   * @returns {{x: number, y: number, color: string}} Cell object
-   */
-  createCellObject(coords, color) {
-    return { x: coords.gridX, y: coords.gridY, color };
-  }
-  
-  /**
-   * Check if a cell matches given coordinates
-   * Abstraction layer for cell comparison - isolates coordinate property naming
-   * @param {{x: number, y: number}} cell - Cell object to check
-   * @param {{gridX: number, gridY: number}} coords - Grid coordinates from worldToGrid()
-   * @returns {boolean} True if cell matches coordinates
-   */
-  cellMatchesCoords(cell, coords) {
-    return cell.x === coords.gridX && cell.y === coords.gridY;
-  }
-
-  /**
-   * Get all neighboring cells (4-directional: up, down, left, right)
-   * @param {number} gridX - Grid X coordinate
-   * @param {number} gridY - Grid Y coordinate
-   * @returns {Array<{x: number, y: number}>} Array of neighbor coordinates
-   */
-  getNeighbors(gridX, gridY) {
-    // 4-directional neighbors (cardinal directions only)
-    return [
-      { x: gridX + 1, y: gridY },     // Right
-      { x: gridX - 1, y: gridY },     // Left
-      { x: gridX, y: gridY + 1 },     // Down
-      { x: gridX, y: gridY - 1 }      // Up
-    ];
-  }
-
-  /**
-   * Get all neighboring cells including diagonals (8-directional)
-   * @param {number} gridX - Grid X coordinate
-   * @param {number} gridY - Grid Y coordinate
-   * @returns {Array<{x: number, y: number}>} Array of neighbor coordinates
-   */
-  getNeighbors8(gridX, gridY) {
-    // 8-directional neighbors (including diagonals)
-    return [
-      { x: gridX + 1, y: gridY },     // Right
-      { x: gridX + 1, y: gridY - 1 }, // Top-right
-      { x: gridX, y: gridY - 1 },     // Up
-      { x: gridX - 1, y: gridY - 1 }, // Top-left
-      { x: gridX - 1, y: gridY },     // Left
-      { x: gridX - 1, y: gridY + 1 }, // Bottom-left
-      { x: gridX, y: gridY + 1 },     // Down
-      { x: gridX + 1, y: gridY + 1 }  // Bottom-right
-    ];
-  }
-}
-
-return { GridGeometry };
-```
-
-# HexGeometry
-
-```js
-/**
- * HexGeometry.js
- * 
- * Handles all hex-specific geometric calculations and rendering.
- * This class abstracts hexagonal grid mathematics, coordinate conversions,
- * and basic rendering operations.
- * 
- * Extends BaseGeometry to implement the standard geometry interface
- * for hexagonal grid-based maps.
- * 
- * COORDINATE SYSTEMS:
- * - Axial coordinates (q, r): Integer hex indices using axial coordinate system
- *   Used internally for hex math and storage. Creates parallelogram when iterated.
- * 
- * - Offset coordinates (col, row): Integer indices in rectangular space
- *   Used for bounds checking and rectangular iteration via offsetCoordinates.js
- *   Makes rectangular grid display possible. Min is always (0,0).
- * 
- * - World coordinates (worldX, worldY): Float pixel coordinates in the map's coordinate system
- *   Used for positioning and measurements. Origin at (0,0) in center of hex (0,0).
- * 
- * - Screen coordinates (screenX, screenY): Pixel coordinates on the canvas
- *   Used for rendering. Includes viewport transforms (pan/zoom/rotation).
- * 
- * COORDINATE NAMING CONVENTION:
- * - Storage format: Cells stored as {q, r, color} using axial coordinates
- * - API methods: Use (q, r) as parameter names for clarity
- * - API returns: Collection methods return {x, y} where x=q, y=r for consistency with GridGeometry
- * - Objects: Store position as {x, y} where x=q, y=r (axial coordinates in hex map context)
- * 
- * Hex Size Definition:
- * - hexSize is the radius from center to vertex
- * - For flat-top: width = 2 * hexSize, height = sqrt(3) * hexSize
- * - For pointy-top: width = sqrt(3) * hexSize, height = 2 * hexSize
- * 
- * @extends BaseGeometry
- */
-
-// Import offset coordinate utilities for rectangular bounds and iteration
-const { BaseGeometry } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "BaseGeometry"));
-const { axialToOffset, offsetToAxial, isWithinOffsetBounds } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "offsetCoordinates"));
-
-class HexGeometry extends BaseGeometry {
-  /**
-   * @param {number} hexSize - Radius from hex center to vertex in pixels
-   * @param {string} orientation - Either 'flat' or 'pointy'
-   * @param {Object} bounds - Optional bounds {maxCol, maxRow} in offset coordinates (min is always 0,0)
-   */
-  constructor(hexSize, orientation = 'flat', bounds = null) {
-    super(); // Call base class constructor
-    this.hexSize = hexSize;
-    this.orientation = orientation;
-    this.bounds = bounds; // {maxCol: number, maxRow: number} or null for infinite
-    
-    // Precalculate commonly used values
-    this.sqrt3 = Math.sqrt(3);
-    
-    // Layout constants depend on orientation
-    if (orientation === 'flat') {
-      // Flat-top hexagon
-      this.width = hexSize * 2;           // Distance between parallel sides
-      this.height = hexSize * this.sqrt3; // Point-to-point height
-      this.horizSpacing = hexSize * 1.5;  // Horizontal distance between hex centers
-      this.vertSpacing = hexSize * this.sqrt3; // Vertical distance between hex centers
-    } else {
-      // Pointy-top hexagon
-      this.width = hexSize * this.sqrt3;
-      this.height = hexSize * 2;
-      this.horizSpacing = hexSize * this.sqrt3;
-      this.vertSpacing = hexSize * 1.5;
-    }
-  }
-  
-  /**
-   * Convert world (pixel) coordinates to axial hex coordinates
-   * Uses the standard axial coordinate system (q, r)
-   * @param {number} worldX - World X coordinate
-   * @param {number} worldY - World Y coordinate
-   * @returns {{q: number, r: number}} Axial hex coordinates
-   */
-  worldToHex(worldX, worldY) {
-    if (this.orientation === 'flat') {
-      // Flat-top conversion
-      const q = (worldX * (2/3)) / this.hexSize;
-      const r = ((-worldX / 3) + (this.sqrt3 / 3) * worldY) / this.hexSize;
-      return this.roundHex(q, r);
-    } else {
-      // Pointy-top conversion
-      const q = ((this.sqrt3 / 3) * worldX - (1/3) * worldY) / this.hexSize;
-      const r = ((2/3) * worldY) / this.hexSize;
-      return this.roundHex(q, r);
-    }
-  }
-  
-  /**
-   * Alias for worldToHex - provides consistent API with GridGeometry
-   * Returns gridX/gridY property names for consistency with GridGeometry
-   * (gridX = q, gridY = r for hex maps)
-   * @param {number} worldX - World X coordinate
-   * @param {number} worldY - World Y coordinate
-   * @returns {{gridX: number, gridY: number}} Grid coordinates (q as gridX, r as gridY)
-   */
-  worldToGrid(worldX, worldY) {
-    const { q, r } = this.worldToHex(worldX, worldY);
-    // Return with property names matching GridGeometry API
-    return { gridX: q, gridY: r };
-  }
-  
-  /**
-   * Round fractional hex coordinates to nearest integer hex
-   * Uses cube coordinate rounding for accuracy
-   * @param {number} q - Fractional q coordinate
-   * @param {number} r - Fractional r coordinate
-   * @returns {{q: number, r: number}} Rounded axial coordinates
-   */
-  roundHex(q, r) {
-    // Convert axial to cube coordinates
-    const x = q;
-    const z = r;
-    const y = -x - z;
-    
-    // Round each coordinate
-    let rx = Math.round(x);
-    let ry = Math.round(y);
-    let rz = Math.round(z);
-    
-    // Fix rounding errors (cube coords must sum to 0)
-    const xDiff = Math.abs(rx - x);
-    const yDiff = Math.abs(ry - y);
-    const zDiff = Math.abs(rz - z);
-    
-    if (xDiff > yDiff && xDiff > zDiff) {
-      rx = -ry - rz;
-    } else if (yDiff > zDiff) {
-      ry = -rx - rz;
-    } else {
-      rz = -rx - ry;
-    }
-    
-    // Convert back to axial
-    return { q: rx, r: rz };
-  }
-  
-  /**
-   * Convert axial hex coordinates to world (pixel) coordinates
-   * Returns the center point of the hex
-   * @param {number} q - Axial q coordinate
-   * @param {number} r - Axial r coordinate
-   * @returns {{worldX: number, worldY: number}} World coordinates of hex center
-   */
-  hexToWorld(q, r) {
-    if (this.orientation === 'flat') {
-      // Flat-top conversion
-      const worldX = this.hexSize * (3/2) * q;
-      const worldY = this.hexSize * (this.sqrt3 / 2 * q + this.sqrt3 * r);
-      return { worldX, worldY };
-    } else {
-      // Pointy-top conversion
-      const worldX = this.hexSize * (this.sqrt3 * q + this.sqrt3 / 2 * r);
-      const worldY = this.hexSize * (3/2) * r;
-      return { worldX, worldY };
-    }
-  }
-  
-  /**
-   * Alias for hexToWorld - provides consistent API with GridGeometry
-   * GridGeometry uses gridToWorld(), HexGeometry uses this alias
-   * @param {number} q - Axial q coordinate (or x for API consistency)
-   * @param {number} r - Axial r coordinate (or y for API consistency)
-   * @returns {{worldX: number, worldY: number}} World coordinates of hex center
-   */
-  gridToWorld(q, r) {
-    return this.hexToWorld(q, r);
-  }
-  
-  /**
-   * Get the center point of a hex in world coordinates
-   * @param {number} q - Axial q coordinate
-   * @param {number} r - Axial r coordinate
-   * @returns {{worldX: number, worldY: number}} World coordinates of hex center
-   */
-  getHexCenter(q, r) {
-    return this.hexToWorld(q, r);
-  }
-  
-  /**
-   * Convert offset coordinates to world coordinates
-   * 
-   * HEX-SPECIFIC IMPLEMENTATION (for BaseGeometry API consistency)
-   * 
-   * Offset coordinates (col, row) are used for rectangular bounds in hex maps.
-   * This method combines offsetToAxial + hexToWorld. GridGeometry implements
-   * the same method as a passthrough to gridToWorld() for polymorphic usage.
-   * 
-   * Primarily used for calculating grid center when positioning background images.
-   * 
-   * @param {number} col - Column in offset coordinates (0 to maxCol-1)
-   * @param {number} row - Row in offset coordinates (0 to maxRow-1)
-   * @returns {{worldX: number, worldY: number}} World coordinates of hex center
-   */
-  offsetToWorld(col, row) {
-    const { q, r } = offsetToAxial(col, row, this.orientation);
-    return this.hexToWorld(q, r);
-  }
-  
-  /**
-   * Get the six vertices of a hex in world coordinates
-   * Vertices are returned in clockwise order starting from the rightmost point (flat-top)
-   * or top point (pointy-top)
-   * @param {number} q - Axial q coordinate
-   * @param {number} r - Axial r coordinate
-   * @returns {Array<{worldX: number, worldY: number}>} Array of 6 vertex positions
-   */
-  getHexVertices(q, r) {
-    const center = this.hexToWorld(q, r);
-    const vertices = [];
-    
-    // Angle offset depends on orientation
-    const angleOffset = this.orientation === 'flat' ? 0 : 30;
-    
-    for (let i = 0; i < 6; i++) {
-      const angleDeg = 60 * i + angleOffset;
-      const angleRad = (Math.PI / 180) * angleDeg;
-      vertices.push({
-        worldX: center.worldX + this.hexSize * Math.cos(angleRad),
-        worldY: center.worldY + this.hexSize * Math.sin(angleRad)
-      });
-    }
-    
-    return vertices;
-  }
-  
-  /**
-   * Snap world coordinates to the nearest hex center
-   * @param {number} worldX - World X coordinate
-   * @param {number} worldY - World Y coordinate
-   * @returns {{worldX: number, worldY: number}} Snapped world coordinates (hex center)
-   */
-  snapToHexCenter(worldX, worldY) {
-    const { q, r } = this.worldToHex(worldX, worldY);
-    return this.getHexCenter(q, r);
-  }
-  
-  /**
-   * Calculate visible hex range for a given viewport
-   * Returns a bounding box in hex coordinates (may include negative values)
-   * @param {number} offsetX - Screen offset X
-   * @param {number} offsetY - Screen offset Y
-   * @param {number} width - Canvas width
-   * @param {number} height - Canvas height
-   * @param {number} zoom - Current zoom level
-   * @returns {{minQ: number, maxQ: number, minR: number, maxR: number}} Visible hex range
-   */
-  getVisibleHexRange(offsetX, offsetY, width, height, zoom) {
-    // Convert viewport corners to world coordinates
-    const topLeft = this.screenToWorld(-offsetX, -offsetY, zoom);
-    const topRight = this.screenToWorld(width - offsetX, -offsetY, zoom);
-    const bottomLeft = this.screenToWorld(-offsetX, height - offsetY, zoom);
-    const bottomRight = this.screenToWorld(width - offsetX, height - offsetY, zoom);
-    
-    // Convert corners to hex coordinates
-    const corners = [
-      this.worldToHex(topLeft.worldX, topLeft.worldY),
-      this.worldToHex(topRight.worldX, topRight.worldY),
-      this.worldToHex(bottomLeft.worldX, bottomLeft.worldY),
-      this.worldToHex(bottomRight.worldX, bottomRight.worldY)
-    ];
-    
-    // Find bounding box with some padding
-    const padding = 2;
-    const minQ = Math.min(...corners.map(c => c.q)) - padding;
-    const maxQ = Math.max(...corners.map(c => c.q)) + padding;
-    const minR = Math.min(...corners.map(c => c.r)) - padding;
-    const maxR = Math.max(...corners.map(c => c.r)) + padding;
-    
-    // Don't clamp here - return full visible range
-    // Bounds enforcement happens at the rendering level
-    return { minQ, maxQ, minR, maxR };
-  }
-  
-
-  /**
-   * Convert hex coordinates to screen coordinates (for rendering)
-   * Provides API consistency with GridGeometry.gridToScreen()
-   * Returns position offset such that adding objectSize/2 centers the object in the hex
-   * @param {number} q - Hex q coordinate (or x for API consistency)
-   * @param {number} r - Hex r coordinate (or y for API consistency)
-   * @param {number} offsetX - Screen offset X
-   * @param {number} offsetY - Screen offset Y
-   * @param {number} zoom - Current zoom level
-   * @returns {{screenX: number, screenY: number}} Screen coordinates
-   */
-  gridToScreen(q, r, offsetX, offsetY, zoom) {
-    // Get hex center in world coordinates
-    const { worldX, worldY } = this.hexToWorld(q, r);
-    
-    // Object rendering adds objectWidth/2 and objectHeight/2 to center the object
-    // where objectWidth = hexSize * zoom
-    // So we need to return: hexCenter - (hexSize/2, hexSize/2)
-    // This way: returned_position + hexSize/2 = hexCenter
-    const topLeftWorldX = worldX - (this.hexSize / 2);
-    const topLeftWorldY = worldY - (this.hexSize / 2);
-    
-    // Convert to screen coordinates
-    return this.worldToScreen(topLeftWorldX, topLeftWorldY, offsetX, offsetY, zoom);
-  }
-  
-  /**
-   * Draw hex grid on the canvas
-   * @param {CanvasRenderingContext2D} ctx - Canvas context
-   * @param {number} offsetX - Screen offset X
-   * @param {number} offsetY - Screen offset Y
-   * @param {number} width - Canvas width
-   * @param {number} height - Canvas height
-   * @param {number} zoom - Current zoom level
-   * @param {Object} style - Grid style options
-   * @param {string} style.lineColor - Grid line color
-   * @param {number} style.lineWidth - Grid line width
-   */
-  drawGrid(ctx, offsetX, offsetY, width, height, zoom, style = {}) {
-    const { lineColor = '#333333', lineWidth = 1 } = style;
-    
-    // Safety check: validate inputs to prevent runaway iteration
-    if (!isFinite(width) || !isFinite(height) || !isFinite(zoom) || 
-        !isFinite(offsetX) || !isFinite(offsetY) || zoom <= 0) {
-      console.warn('[HexGeometry.drawGrid] Invalid input values, skipping render');
-      return;
-    }
-    
-    let minCol, maxCol, minRow, maxRow;
-    
-    // For BOUNDED hex maps, use the bounds directly
-    // This is much more efficient and prevents runaway iteration
-    if (this.bounds) {
-      minCol = 0;
-      maxCol = this.bounds.maxCol - 1;
-      minRow = 0;
-      maxRow = this.bounds.maxRow - 1;
-    } else {
-      // For rotation handling, we need to calculate the visible range based on 
-      // an expanded viewport that covers the entire rotated canvas area
-      // Use 2x the diagonal to ensure we cover all rotations
-      const diagonal = Math.sqrt(width * width + height * height) * 2;
-      const expandedWidth = diagonal;
-      const expandedHeight = diagonal;
-      
-      const { minQ, maxQ, minR, maxR } = this.getVisibleHexRange(
-        offsetX, offsetY, expandedWidth, expandedHeight, zoom
-      );
-      
-      // Safety limit: prevent iteration over more than 10000 hexes in unbounded mode
-      const maxHexCount = 10000;
-      const axialRange = (maxQ - minQ + 1) * (maxR - minR + 1);
-      if (axialRange > maxHexCount) {
-        console.warn(`[HexGeometry.drawGrid] Visible range too large (${axialRange} hexes), limiting`);
-        // Fall back to a reasonable default visible area
-        const halfRange = Math.floor(Math.sqrt(maxHexCount) / 2);
-        const centerQ = Math.floor((minQ + maxQ) / 2);
-        const centerR = Math.floor((minR + maxR) / 2);
-        
-        // Convert limited axial range to offset
-        const corners = [
-          axialToOffset(centerQ - halfRange, centerR - halfRange, this.orientation),
-          axialToOffset(centerQ + halfRange, centerR + halfRange, this.orientation)
-        ];
-        minCol = Math.min(corners[0].col, corners[1].col);
-        maxCol = Math.max(corners[0].col, corners[1].col);
-        minRow = Math.min(corners[0].row, corners[1].row);
-        maxRow = Math.max(corners[0].row, corners[1].row);
-      } else {
-        // Convert axial visible range to offset coordinates
-        // Build bounding box without creating intermediate array (optimization)
-        minCol = Infinity;
-        maxCol = -Infinity;
-        minRow = Infinity;
-        maxRow = -Infinity;
-        
-        for (let q = minQ; q <= maxQ; q++) {
-          for (let r = minR; r <= maxR; r++) {
-            const { col, row } = axialToOffset(q, r, this.orientation);
-            if (col < minCol) minCol = col;
-            if (col > maxCol) maxCol = col;
-            if (row < minRow) minRow = row;
-            if (row > maxRow) maxRow = row;
-          }
-        }
-      }
-    }
-    
-    // Final safety check on iteration count
-    const totalHexes = (maxCol - minCol + 1) * (maxRow - minRow + 1);
-    if (totalHexes > 50000 || !isFinite(totalHexes)) {
-      console.warn(`[HexGeometry.drawGrid] Too many hexes to draw (${totalHexes}), aborting`);
-      return;
-    }
-    
-    // Use fillStyle instead of strokeStyle for fill-based hex outline rendering
-    // This works around strokeStyle state corruption in Obsidian's Live Preview mode
-    ctx.fillStyle = lineColor;
-    
-    // CRITICAL: Iterate in OFFSET space (rectangular)
-    // This creates a rectangular grid instead of a parallelogram
-    for (let col = minCol; col <= maxCol; col++) {
-      for (let row = minRow; row <= maxRow; row++) {
-        // Convert offset coords to axial for drawing
-        const { q, r } = offsetToAxial(col, row, this.orientation);
-        
-        // Only draw if within bounds (or no bounds set for infinite maps)
-        if (!this.bounds || this.isWithinBounds(q, r)) {
-          this.drawHexOutline(ctx, q, r, offsetX, offsetY, zoom, lineWidth);
-        }
-      }
-    }
-  }
-
-  
-  /**
-   * Draw a line segment as a filled rectangle
-   * 
-   * Used to work around strokeStyle state corruption in Obsidian's Live Preview mode.
-   * Converts a line segment into a thin rectangle oriented along the line.
-   * 
-   * @param {CanvasRenderingContext2D} ctx - Canvas context
-   * @param {number} x1 - Start X (screen coordinates)
-   * @param {number} y1 - Start Y (screen coordinates)
-   * @param {number} x2 - End X (screen coordinates)
-   * @param {number} y2 - End Y (screen coordinates)
-   * @param {number} lineWidth - Width of the line
-   */
-  drawLineAsFill(ctx, x1, y1, x2, y2, lineWidth) {
-    const dx = x2 - x1;
-    const dy = y2 - y1;
-    const length = Math.sqrt(dx * dx + dy * dy);
-    
-    if (length === 0) return;
-    
-    // Calculate perpendicular offset for line thickness
-    const nx = -dy / length * (lineWidth / 2);
-    const ny = dx / length * (lineWidth / 2);
-    
-    // Draw as a quadrilateral (4-point polygon)
-    ctx.beginPath();
-    ctx.moveTo(x1 + nx, y1 + ny);
-    ctx.lineTo(x2 + nx, y2 + ny);
-    ctx.lineTo(x2 - nx, y2 - ny);
-    ctx.lineTo(x1 - nx, y1 - ny);
-    ctx.closePath();
-    ctx.fill();
-  }
-
-  /**
-   * Draw a single hex outline using fill-based rendering
-   * 
-   * NOTE: This uses ctx.fill() with polygon shapes instead of ctx.stroke() to 
-   * work around a rendering bug in Obsidian's Live Preview mode where CodeMirror's
-   * canvas operations can corrupt the strokeStyle state.
-   * 
-   * @param {CanvasRenderingContext2D} ctx - Canvas context
-   * @param {number} q - Axial q coordinate
-   * @param {number} r - Axial r coordinate
-   * @param {number} offsetX - Screen offset X
-   * @param {number} offsetY - Screen offset Y
-   * @param {number} zoom - Current zoom level
-   * @param {number} lineWidth - Line width (optional, defaults to context lineWidth or 1)
-   */
-  drawHexOutline(ctx, q, r, offsetX, offsetY, zoom, lineWidth = null) {
-    const vertices = this.getHexVertices(q, r);
-    const width = lineWidth !== null ? lineWidth : (ctx.lineWidth || 1);
-    
-    // Convert all vertices to screen coordinates
-    const screenVertices = vertices.map(v => 
-      this.worldToScreen(v.worldX, v.worldY, offsetX, offsetY, zoom)
-    );
-    
-    // Draw each edge as a filled polygon
-    for (let i = 0; i < 6; i++) {
-      const v1 = screenVertices[i];
-      const v2 = screenVertices[(i + 1) % 6];
-      this.drawLineAsFill(ctx, v1.screenX, v1.screenY, v2.screenX, v2.screenY, width);
-    }
-  }
-  
-  /**
-   * Draw a filled hex on the canvas
-   * @param {CanvasRenderingContext2D} ctx - Canvas context
-   * @param {number} q - Axial q coordinate
-   * @param {number} r - Axial r coordinate
-   * @param {number} offsetX - Screen offset X
-   * @param {number} offsetY - Screen offset Y
-   * @param {number} zoom - Current zoom level
-   * @param {string} color - Fill color
-   */
-  drawHex(ctx, q, r, offsetX, offsetY, zoom, color) {
-    const vertices = this.getHexVertices(q, r);
-    
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    
-    // Convert first vertex to screen coordinates and move to it
-    const first = this.worldToScreen(vertices[0].worldX, vertices[0].worldY, offsetX, offsetY, zoom);
-    ctx.moveTo(first.screenX, first.screenY);
-    
-    // Draw lines to remaining vertices
-    for (let i = 1; i < vertices.length; i++) {
-      const vertex = this.worldToScreen(vertices[i].worldX, vertices[i].worldY, offsetX, offsetY, zoom);
-      ctx.lineTo(vertex.screenX, vertex.screenY);
-    }
-    
-    // Close the path and fill
-    ctx.closePath();
-    ctx.fill();
-  }
-  
-  /**
-   * Get the size of a hex in screen pixels at current zoom
-   * @param {number} zoom - Current zoom level
-   * @returns {number} Scaled hex size
-   */
-  getScaledHexSize(zoom) {
-    return this.hexSize * zoom;
-  }
-  
-  /**
-   * Alias for getScaledHexSize - provides consistent API with GridGeometry
-   * GridGeometry calls this "CellSize" while HexGeometry calls it "HexSize"
-   * @param {number} zoom - Current zoom level
-   * @returns {number} Scaled hex size
-   */
-  getScaledCellSize(zoom) {
-    return this.getScaledHexSize(zoom);
-  }
-
-  /**
-   * Calculate distance between two hexes (in hex units)
-   * Uses cube coordinate system for accurate hex distance
-   * @param {number} q1 - First hex q coordinate
-   * @param {number} r1 - First hex r coordinate
-   * @param {number} q2 - Second hex q coordinate
-   * @param {number} r2 - Second hex r coordinate
-   * @returns {number} Distance in hexes
-   */
-  getHexDistance(q1, r1, q2, r2) {
-    // Convert to cube coordinates
-    const x1 = q1;
-    const z1 = r1;
-    const y1 = -x1 - z1;
-    
-    const x2 = q2;
-    const z2 = r2;
-    const y2 = -x2 - z2;
-    
-    // Cube distance formula
-    return (Math.abs(x1 - x2) + Math.abs(y1 - y2) + Math.abs(z1 - z2)) / 2;
-  }
-  
-  /**
-   * Get all neighboring hexes
-   * @param {number} q - Axial q coordinate
-   * @param {number} r - Axial r coordinate
-   * @returns {Array<{q: number, r: number}>} Array of neighbor coordinates
-   */
-  getNeighbors(q, r) {
-    // Axial direction vectors (same for both orientations)
-    const directions = [
-      { q: 1, r: 0 },   // East
-      { q: 1, r: -1 },  // Northeast
-      { q: 0, r: -1 },  // Northwest
-      { q: -1, r: 0 },  // West
-      { q: -1, r: 1 },  // Southwest
-      { q: 0, r: 1 }    // Southeast
-    ];
-    
-    return directions.map(dir => ({
-      q: q + dir.q,
-      r: r + dir.r
-    }));
-  }
-  
-  /**
-   * Check if hex coordinates are within bounds
-   * Converts axial coords to offset and checks rectangular bounds
-   * If no bounds are set, always returns true
-   * @param {number} q - Axial q coordinate
-   * @param {number} r - Axial r coordinate
-   * @returns {boolean} True if coordinates are within bounds
-   */
-  isWithinBounds(q, r) {
-    if (!this.bounds) return true; // No bounds = infinite map
-    
-    // Convert axial to offset coordinates
-    const { col, row } = axialToOffset(q, r, this.orientation);
-    
-    // Check rectangular bounds (exclusive: maxCol=26 means 26 columns, indices 0-25)
-    return col >= 0 && col < this.bounds.maxCol && 
-           row >= 0 && row < this.bounds.maxRow;
-  }
-  
-  /**
-   * Clamp hex coordinates to bounds
-   * Converts to offset, clamps, then converts back to axial
-   * If no bounds are set, returns coordinates unchanged
-   * @param {number} q - Axial q coordinate
-   * @param {number} r - Axial r coordinate
-   * @returns {{q: number, r: number}} Clamped coordinates in axial
-   */
-  clampToBounds(q, r) {
-    if (!this.bounds) return { q, r }; // No bounds = infinite map
-    
-    // Convert to offset
-    const { col, row } = axialToOffset(q, r, this.orientation);
-    
-    // Clamp in offset space (max valid index is maxCol-1 since bounds are exclusive)
-    const clampedCol = Math.max(0, Math.min(this.bounds.maxCol - 1, col));
-    const clampedRow = Math.max(0, Math.min(this.bounds.maxRow - 1, row));
-    
-    // Convert back to axial
-    return offsetToAxial(clampedCol, clampedRow, this.orientation);
-  }
-  
-  /**
-   * Create a cell object in hex coordinate format
-   * Abstraction layer for cell creation - isolates coordinate property naming
-   * @param {{q: number, r: number}} coords - Hex coordinates from worldToGrid()
-   * @param {string} color - Cell color
-   * @returns {{q: number, r: number, color: string}} Cell object
-   */
-  createCellObject(coords, color) {
-    // Handle both {gridX, gridY} from screenToGrid and {q, r} from cells
-    const q = coords.q !== undefined ? coords.q : coords.gridX;
-    const r = coords.r !== undefined ? coords.r : coords.gridY;
-    return { q, r, color };
-  }
-  
-  /**
-   * Check if a cell matches given coordinates
-   * Abstraction layer for cell comparison - isolates coordinate property naming
-   * @param {{q: number, r: number}} cell - Cell object to check
-   * @param {{q: number, r: number}} coords - Hex coordinates from worldToGrid()
-   * @returns {boolean} True if cell matches coordinates
-   */
-  cellMatchesCoords(cell, coords) {
-    // Handle both {gridX, gridY} from screenToGrid and {q, r} from cells
-    const q = coords.q !== undefined ? coords.q : coords.gridX;
-    const r = coords.r !== undefined ? coords.r : coords.gridY;
-    return cell.q === q && cell.r === r;
-  }
-
-  /**
-   * Get all hexes within a rectangular area (defined by two corner hexes)
-   * Uses offset coordinates to iterate a rectangular bounds, then converts back to axial
-   * Returns cells in format {x, y} for API consistency with GridGeometry
-   * @param {number} q1 - First corner q coordinate
-   * @param {number} r1 - First corner r coordinate
-   * @param {number} q2 - Second corner q coordinate
-   * @param {number} r2 - Second corner r coordinate
-   * @returns {Array<{x: number, y: number}>} Array of hex coordinates in rectangle
-   */
-  getCellsInRectangle(q1, r1, q2, r2) {
-    // Convert both corners to offset coordinates
-    const offset1 = axialToOffset(q1, r1, this.orientation);
-    const offset2 = axialToOffset(q2, r2, this.orientation);
-    
-    // Find rectangular bounds in offset space
-    const minCol = Math.min(offset1.col, offset2.col);
-    const maxCol = Math.max(offset1.col, offset2.col);
-    const minRow = Math.min(offset1.row, offset2.row);
-    const maxRow = Math.max(offset1.row, offset2.row);
-    
-    // Iterate rectangle in offset space and convert back to axial
-    const cells = [];
-    for (let col = minCol; col <= maxCol; col++) {
-      for (let row = minRow; row <= maxRow; row++) {
-        const { q, r } = offsetToAxial(col, row, this.orientation);
-        
-        // Only include if within bounds (if bounds are set)
-        if (this.isWithinBounds(q, r)) {
-          // Return as {x, y} for API consistency with GridGeometry
-          cells.push({ x: q, y: r });
-        }
-      }
-    }
-    
-    return cells;
-  }
-
-  /**
-   * Get all hexes within a circular area (defined by center and radius in hex units)
-   * Uses hex distance calculation for accurate circular selection
-   * Returns cells in format {x, y} for API consistency with GridGeometry
-   * @param {number} centerQ - Center hex q coordinate
-   * @param {number} centerR - Center hex r coordinate
-   * @param {number} radiusInHexes - Radius in hex units
-   * @returns {Array<{x: number, y: number}>} Array of hex coordinates in circle
-   */
-  getCellsInCircle(centerQ, centerR, radiusInHexes) {
-    const cells = [];
-    
-    // Convert center to offset to establish rectangular search bounds
-    const centerOffset = axialToOffset(centerQ, centerR, this.orientation);
-    const minCol = Math.floor(centerOffset.col - radiusInHexes);
-    const maxCol = Math.ceil(centerOffset.col + radiusInHexes);
-    const minRow = Math.floor(centerOffset.row - radiusInHexes);
-    const maxRow = Math.ceil(centerOffset.row + radiusInHexes);
-    
-    // Iterate rectangular bounds and filter by hex distance
-    for (let col = minCol; col <= maxCol; col++) {
-      for (let row = minRow; row <= maxRow; row++) {
-        const { q, r } = offsetToAxial(col, row, this.orientation);
-        
-        // Only include if within bounds and within circular radius
-        if (this.isWithinBounds(q, r)) {
-          const distance = this.getHexDistance(centerQ, centerR, q, r);
-          if (distance <= radiusInHexes) {
-            // Return as {x, y} for API consistency with GridGeometry
-            cells.push({ x: q, y: r });
-          }
-        }
-      }
-    }
-    
-    return cells;
-  }
-
-  /**
-   * Calculate distance between two hexes
-   * Alias for getHexDistance() - provides API consistency with GridGeometry
-   * GridGeometry uses getEuclideanDistance(), hex maps use hex distance which is more natural
-   * @param {number} q1 - First hex q coordinate
-   * @param {number} r1 - First hex r coordinate
-   * @param {number} q2 - Second hex q coordinate
-   * @param {number} r2 - Second hex r coordinate
-   * @returns {number} Distance in hexes
-   */
-  getEuclideanDistance(q1, r1, q2, r2) {
-    // For hexes, use hex distance (which is more natural than Euclidean)
-    return this.getHexDistance(q1, r1, q2, r2);
-  }
-
-  /**
-   * Calculate Manhattan distance between two hexes
-   * For hexes, this is the same as hex distance
-   * Provided for API consistency with GridGeometry
-   * @param {number} q1 - First hex q coordinate
-   * @param {number} r1 - First hex r coordinate
-   * @param {number} q2 - Second hex q coordinate
-   * @param {number} r2 - Second hex r coordinate
-   * @returns {number} Distance in hexes
-   */
-  getManhattanDistance(q1, r1, q2, r2) {
-    // For hexes, Manhattan distance is the same as hex distance
-    return this.getHexDistance(q1, r1, q2, r2);
-  }
-
-  /**
-   * Calculate game distance between two hexes
-   * For hexes, this is simply the hex distance - no diagonal rules apply
-   * The options parameter is included for API consistency with GridGeometry
-   * @param {number} q1 - First hex q coordinate
-   * @param {number} r1 - First hex r coordinate
-   * @param {number} q2 - Second hex q coordinate
-   * @param {number} r2 - Second hex r coordinate
-   * @param {Object} options - Ignored for hex (included for API consistency)
-   * @returns {number} Distance in hexes
-   */
-  getCellDistance(q1, r1, q2, r2, options = {}) {
-    // Hex grids have no diagonal ambiguity - all neighbors are equidistant
-    return this.getHexDistance(q1, r1, q2, r2);
-  }
-
-  /**
-   * Get hexes along a line between two hexes
-   * Uses hex line traversal algorithm (linear interpolation in cube coordinates)
-   * Returns cells in format {x, y} for API consistency with GridGeometry
-   * @param {number} q1 - Start hex q coordinate
-   * @param {number} r1 - Start hex r coordinate
-   * @param {number} q2 - End hex q coordinate
-   * @param {number} r2 - End hex r coordinate
-   * @returns {Array<{x: number, y: number}>} Array of hex coordinates along the line
-   */
-  getCellsInLine(q1, r1, q2, r2) {
-    const distance = this.getHexDistance(q1, r1, q2, r2);
-    const cells = [];
-    
-    // If distance is 0, return just the start hex
-    if (distance === 0) {
-      return [{ x: q1, y: r1 }];
-    }
-    
-    // Use linear interpolation in cube coordinates
-    for (let i = 0; i <= distance; i++) {
-      const t = i / distance;
-      
-      // Interpolate in cube coordinates
-      const x1 = q1;
-      const z1 = r1;
-      const y1 = -x1 - z1;
-      
-      const x2 = q2;
-      const z2 = r2;
-      const y2 = -x2 - z2;
-      
-      // Linear interpolation
-      const x = x1 + (x2 - x1) * t;
-      const y = y1 + (y2 - y1) * t;
-      const z = z1 + (z2 - z1) * t;
-      
-      // Round to nearest hex
-      const rounded = this.roundHex(x, z);
-      
-      // Only include if within bounds
-      if (this.isWithinBounds(rounded.q, rounded.r)) {
-        // Return as {x, y} for API consistency with GridGeometry
-        cells.push({ x: rounded.q, y: rounded.r });
-      }
-    }
-    
-    return cells;
-  }
-}
-
-return { HexGeometry };
 ```
 
 # gridRenderer
@@ -5692,7 +7649,7 @@ return { hexRenderer };
 # useCanvasRenderer
 
 ```js
-const { getTheme } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "settingsAccessor"));
+const { getTheme, getEffectiveSettings } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "settingsAccessor"));
 const { buildCellLookup, calculateBordersOptimized } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "borderCalculator"));
 const { getObjectType } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "objectOperations"));
 const { getRenderChar } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "objectTypeResolver"));
@@ -5704,7 +7661,8 @@ const { gridRenderer } = await dc.require(dc.headerLink(dc.resolvePath("compiled
 const { hexRenderer } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "hexRenderer"));
 const { getCachedImage } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "imageOperations"));
 const { getSlotOffset, getMultiObjectScale, getObjectsInCell } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "hexSlotPositioner"));
-const { offsetToAxial } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "offsetCoordinates"));
+const { offsetToAxial, axialToOffset } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "offsetCoordinates"));
+const { getActiveLayer, isCellFogged } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "layerAccessor"));
 
 /**
  * Get appropriate renderer for geometry type
@@ -5715,14 +7673,20 @@ function getRenderer(geometry) {
   return geometry instanceof HexGeometry ? hexRenderer : gridRenderer;
 }
 
-function renderCanvas(canvas, mapData, geometry, selectedItem = null, isResizeMode = false, theme = null, showCoordinates = false, layerVisibility = null) {
+function renderCanvas(canvas, fogCanvas, mapData, geometry, selectedItems = [], isResizeMode = false, theme = null, showCoordinates = false, layerVisibility = null) {
   if (!canvas) return;
+  
+  // Normalize selectedItems to array (backward compatibility)
+  const itemsArray = Array.isArray(selectedItems) ? selectedItems : (selectedItems ? [selectedItems] : []);
   
   // Default layer visibility
   const visibility = layerVisibility || { objects: true, textLabels: true, hexCoordinates: true };
   
   // Get theme with current settings (use provided theme or fetch global)
   const THEME = theme || getTheme();
+  
+  // Extract active layer data (supports layer schema v2)
+  const activeLayer = getActiveLayer(mapData);
   
   const ctx = canvas.getContext('2d');
   const { width, height } = canvas;
@@ -5856,6 +7820,17 @@ function renderCanvas(canvas, mapData, geometry, selectedItem = null, isResizeMo
   ctx.globalAlpha = 1;
   ctx.globalCompositeOperation = 'source-over';
   
+  // iOS defensive: Reset clipping region - critical for grid rendering
+  // Grid extends beyond canvas bounds, so clip corruption breaks it completely
+  // Note: We preserve the current transform (rotation) while resetting clip
+  ctx.save();
+  ctx.beginPath();
+  // Create a very large clip region to ensure grid lines aren't clipped
+  const largeClip = Math.max(width, height) * 4;
+  ctx.rect(-largeClip, -largeClip, largeClip * 2, largeClip * 2);
+  ctx.clip();
+  ctx.restore();
+  
   // Draw grid lines using renderer
   renderer.renderGrid(ctx, geometry, rendererViewState, { width, height }, true, {
     lineColor: THEME.grid.lines,
@@ -5863,9 +7838,9 @@ function renderCanvas(canvas, mapData, geometry, selectedItem = null, isResizeMo
   });
   
   // Draw filled cells using renderer
-  if (mapData.cells && mapData.cells.length > 0) {
+  if (activeLayer.cells && activeLayer.cells.length > 0) {
     // Add color to cells that don't have it (for backward compatibility)
-    const cellsWithColor = mapData.cells.map(cell => ({
+    const cellsWithColor = activeLayer.cells.map(cell => ({
       ...cell,
       color: getCellColor(cell)
     }));
@@ -5900,8 +7875,8 @@ function renderCanvas(canvas, mapData, geometry, selectedItem = null, isResizeMo
   
   // Draw painted edges (grid maps only, after cells/borders)
   // Edges are custom-colored grid lines that overlay the base grid
-  if (mapData.edges && mapData.edges.length > 0 && geometry instanceof GridGeometry) {
-    renderer.renderEdges(ctx, mapData.edges, geometry, rendererViewState, {
+  if (activeLayer.edges && activeLayer.edges.length > 0 && geometry instanceof GridGeometry) {
+    renderer.renderEdges(ctx, activeLayer.edges, geometry, rendererViewState, {
       lineWidth: 1,
       borderWidth: THEME.cells.borderWidth
     });
@@ -5909,13 +7884,38 @@ function renderCanvas(canvas, mapData, geometry, selectedItem = null, isResizeMo
   
   // Draw objects (after cells and borders, so they appear on top)
   // Skip when coordinate overlay is visible or objects layer is hidden
-  if (mapData.objects && mapData.objects.length > 0 && !showCoordinates && visibility.objects) {
+  if (activeLayer.objects && activeLayer.objects.length > 0 && !showCoordinates && visibility.objects) {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     
-    for (const obj of mapData.objects) {
+    for (const obj of activeLayer.objects) {
       const objType = getObjectType(obj.type);
       if (!objType) continue;
+      
+      // Skip rendering if object's cell(s) are fogged
+      // For multi-cell objects, skip if ANY cell is fogged
+      if (activeLayer.fogOfWar?.enabled) {
+        const size = obj.size || { width: 1, height: 1 };
+        const baseOffset = geometry.toOffsetCoords(obj.position.x, obj.position.y);
+        
+        let isUnderFog = false;
+        
+        if (geometry instanceof HexGeometry) {
+          // Hex maps: objects occupy single hex, check just that cell
+          isUnderFog = isCellFogged(activeLayer, baseOffset.col, baseOffset.row);
+        } else {
+          // Grid maps: check all cells the object covers
+          for (let dx = 0; dx < size.width && !isUnderFog; dx++) {
+            for (let dy = 0; dy < size.height && !isUnderFog; dy++) {
+              if (isCellFogged(activeLayer, baseOffset.col + dx, baseOffset.row + dy)) {
+                isUnderFog = true;
+              }
+            }
+          }
+        }
+        
+        if (isUnderFog) continue;
+      }
       
       // Ensure size exists (backward compatibility)
       const size = obj.size || { width: 1, height: 1 };
@@ -5929,7 +7929,7 @@ function renderCanvas(canvas, mapData, geometry, selectedItem = null, isResizeMo
       // For hex maps with multi-object support
       if (geometry instanceof HexGeometry) {
         // Count objects in same cell
-        const cellObjects = getObjectsInCell(mapData.objects, obj.position.x, obj.position.y);
+        const cellObjects = getObjectsInCell(activeLayer.objects, obj.position.x, obj.position.y);
         const objectCount = cellObjects.length;
         
         if (objectCount > 1) {
@@ -6090,8 +8090,8 @@ function renderCanvas(canvas, mapData, geometry, selectedItem = null, isResizeMo
   // Draw text labels (after objects, before selection indicators)
   // Text labels use world pixel coordinates, not grid coordinates
   // Skip when coordinate overlay is visible or text layer is hidden
-  if (mapData.textLabels && mapData.textLabels.length > 0 && !showCoordinates && visibility.textLabels) {
-    for (const label of mapData.textLabels) {
+  if (activeLayer.textLabels && activeLayer.textLabels.length > 0 && !showCoordinates && visibility.textLabels) {
+    for (const label of activeLayer.textLabels) {
       ctx.save();
       
       // Convert world coordinates to screen coordinates
@@ -6125,180 +8125,700 @@ function renderCanvas(canvas, mapData, geometry, selectedItem = null, isResizeMo
     }
   }
   
-  // Draw selection indicator for text labels
-  // Skip when coordinate overlay is visible or text layer is hidden
-  if (selectedItem && selectedItem.type === 'text' && mapData.textLabels && !showCoordinates && visibility.textLabels) {
-    const label = mapData.textLabels.find(l => l.id === selectedItem.id);
-    if (label) {
-      ctx.save();
-      
-      const { screenX, screenY } = geometry.worldToScreen(label.position.x, label.position.y, offsetX, offsetY, zoom);
-      
-      ctx.translate(screenX, screenY);
-      ctx.rotate((label.rotation * Math.PI) / 180);
-      
-      // Measure text to get bounding box
-      const fontSize = label.fontSize * zoom;
-      const fontFamily = getFontCss(label.fontFace || 'sans');
-      ctx.font = `${fontSize}px ${fontFamily}`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      const metrics = ctx.measureText(label.content);
-      const width = metrics.width;
-      const height = fontSize * 1.2;
-      
-      // Draw selection rectangle with dashed border
-      ctx.strokeStyle = '#4a9eff';
-      ctx.lineWidth = 2;
-      ctx.setLineDash([5, 3]);
-      ctx.strokeRect(
-        -width/2 - 4, 
-        -height/2 - 2, 
-        width + 8, 
-        height + 4
-      );
-      
-      // Draw corner handles
-      ctx.setLineDash([]);
-      ctx.fillStyle = '#4a9eff';
-      const handleSize = 6;
-      
-      // Top-left
-      ctx.fillRect(-width/2 - 4 - handleSize/2, -height/2 - 2 - handleSize/2, handleSize, handleSize);
-      // Top-right
-      ctx.fillRect(width/2 + 4 - handleSize/2, -height/2 - 2 - handleSize/2, handleSize, handleSize);
-      // Bottom-left
-      ctx.fillRect(-width/2 - 4 - handleSize/2, height/2 + 2 - handleSize/2, handleSize, handleSize);
-      // Bottom-right
-      ctx.fillRect(width/2 + 4 - handleSize/2, height/2 + 2 - handleSize/2, handleSize, handleSize);
-      
-      ctx.restore();
+  // =========================================================================
+  // FOG OF WAR RENDERING
+  // Renders after all content but before selection handles
+  // Blur passes go to fogCanvas (CSS blur applied), solid fill to main canvas
+  // =========================================================================
+  
+  // Clear fog canvas if it exists but blur won't be used
+  if (fogCanvas) {
+    const fow = activeLayer.fogOfWar;
+    const effectiveSettings = getEffectiveSettings(mapData.settings);
+    const fowBlurEnabled = effectiveSettings?.fogOfWarBlurEnabled ?? false;
+    
+    if (!fow?.enabled || !fow?.foggedCells?.length || !fowBlurEnabled) {
+      // Clear fog canvas and remove CSS blur when not in use
+      const tempFogCtx = fogCanvas.getContext('2d');
+      tempFogCtx.clearRect(0, 0, fogCanvas.width, fogCanvas.height);
+      fogCanvas.style.filter = 'none';
     }
   }
   
-  // Draw selection indicator for objects
+  if (activeLayer.fogOfWar && activeLayer.fogOfWar.enabled && activeLayer.fogOfWar.foggedCells?.length > 0) {
+    const fow = activeLayer.fogOfWar;
+    
+    // Get effective FoW settings (per-map override or global default)
+    const effectiveSettings = getEffectiveSettings(mapData.settings);
+    const fowColor = effectiveSettings.fogOfWarColor || '#000000';
+    const fowOpacity = effectiveSettings.fogOfWarOpacity ?? 0.9;
+    const fowImagePath = effectiveSettings.fogOfWarImage;
+    const fowBlurEnabled = effectiveSettings.fogOfWarBlurEnabled ?? false;
+    const fowBlurFactor = effectiveSettings.fogOfWarBlurFactor ?? 0.08;
+    
+    // Determine fill style: pattern from image, or solid color
+    let fowFillStyle = null;
+    let useGlobalAlpha = false;
+    
+    if (fowImagePath) {
+      // Try to create pattern from tileable image
+      const fowImage = getCachedImage(fowImagePath);
+      if (fowImage && fowImage.complete && fowImage.naturalWidth > 0) {
+        try {
+          const pattern = ctx.createPattern(fowImage, 'repeat');
+          if (pattern) {
+            fowFillStyle = pattern;
+            useGlobalAlpha = true; // Apply opacity via globalAlpha for patterns
+          }
+        } catch (e) {
+          // Pattern creation failed, fall back to color
+        }
+      }
+    }
+    
+    // Fall back to solid color (opacity applied via globalAlpha, not baked in)
+    if (!fowFillStyle) {
+      fowFillStyle = fowColor;
+      useGlobalAlpha = true; // Use globalAlpha for opacity with solid colors too
+    }
+    
+    // Calculate blur radius
+    let blurRadius = 0;
+    if (fowBlurEnabled) {
+      const cellSize = geometry instanceof HexGeometry ? geometry.hexSize : geometry.cellSize;
+      blurRadius = cellSize * fowBlurFactor * zoom;
+    }
+    
+    // Set up fog canvas for blur passes if available and blur enabled
+    let fogCtx = null;
+    if (fogCanvas && fowBlurEnabled && blurRadius > 0) {
+      fogCtx = fogCanvas.getContext('2d');
+      
+      // Ensure fog canvas dimensions match main canvas
+      if (fogCanvas.width !== width || fogCanvas.height !== height) {
+        fogCanvas.width = width;
+        fogCanvas.height = height;
+      }
+      
+      // Set CSS blur amount on the fog canvas element
+      // This is what makes it work on iOS (unlike ctx.filter)
+      const cssBlurAmount = Math.max(4, blurRadius * 0.6); // Tighter CSS blur
+      fogCanvas.style.filter = `blur(${cssBlurAmount}px)`;
+      
+      // Clear fog canvas (before transform)
+      fogCtx.clearRect(0, 0, width, height);
+      
+      // Apply same transforms as main canvas
+      fogCtx.save();
+      fogCtx.translate(width / 2, height / 2);
+      fogCtx.rotate((northDirection * Math.PI) / 180);
+      fogCtx.translate(-width / 2, -height / 2);
+      
+      // Set up fill style on fog canvas - always start with fallback color
+      fogCtx.fillStyle = fowColor; // Default to fog color
+      
+      if (fowImagePath) {
+        // Try to use pattern if image is loaded
+        const fowImage = getCachedImage(fowImagePath);
+        if (fowImage && fowImage.complete && fowImage.naturalWidth > 0) {
+          const fogPattern = fogCtx.createPattern(fowImage, 'repeat');
+          if (fogPattern) {
+            fogCtx.fillStyle = fogPattern;
+          }
+        }
+      }
+    }
+    
+    // Apply fill style to main canvas
+    ctx.fillStyle = fowFillStyle;
+    
+    // Apply opacity via globalAlpha (used for both patterns and solid colors now)
+    const previousGlobalAlpha = ctx.globalAlpha;
+    if (useGlobalAlpha) {
+      ctx.globalAlpha = fowOpacity;
+    }
+    
+    // Calculate visible bounds in grid/offset coordinates for viewport culling
+    let visibleMinCol, visibleMaxCol, visibleMinRow, visibleMaxRow;
+    
+    if (geometry instanceof HexGeometry) {
+      // For hex maps: calculate visible bounds based on viewport
+      // Convert screen corners to world coordinates, then to offset coordinates
+      const orientation = mapData.orientation || 'flat';
+      const hexSize = geometry.hexSize;
+      
+      // Get screen corners in world coordinates
+      const screenCorners = [
+        { x: 0, y: 0 },
+        { x: width, y: 0 },
+        { x: 0, y: height },
+        { x: width, y: height }
+      ];
+      
+      // Convert screen corners to world coordinates
+      const worldCorners = screenCorners.map(corner => ({
+        worldX: (corner.x - width/2) / zoom + center.x,
+        worldY: (corner.y - height/2) / zoom + center.y
+      }));
+      
+      // Find bounding box in world coordinates
+      const worldMinX = Math.min(...worldCorners.map(c => c.worldX)) - hexSize * 2;
+      const worldMaxX = Math.max(...worldCorners.map(c => c.worldX)) + hexSize * 2;
+      const worldMinY = Math.min(...worldCorners.map(c => c.worldY)) - hexSize * 2;
+      const worldMaxY = Math.max(...worldCorners.map(c => c.worldY)) + hexSize * 2;
+      
+      // Convert to hex coordinates (approximate bounds)
+      const bounds = mapData.hexBounds || { maxCol: 100, maxRow: 100 };
+      visibleMinCol = 0;
+      visibleMaxCol = bounds.maxCol;
+      visibleMinRow = 0;
+      visibleMaxRow = bounds.maxRow;
+      
+    } else {
+      // For grid maps: simpler calculation
+      const gridSize = geometry.cellSize;
+      
+      // Convert viewport corners to grid coordinates
+      visibleMinCol = Math.floor((0 - offsetX) / scaledSize) - 1;
+      visibleMaxCol = Math.ceil((width - offsetX) / scaledSize) + 1;
+      visibleMinRow = Math.floor((0 - offsetY) / scaledSize) - 1;
+      visibleMaxRow = Math.ceil((height - offsetY) / scaledSize) + 1;
+      
+      // Clamp to reasonable bounds
+      const maxBound = mapData.dimensions ? Math.max(mapData.dimensions.width, mapData.dimensions.height) : 200;
+      visibleMinCol = Math.max(0, visibleMinCol);
+      visibleMaxCol = Math.min(maxBound, visibleMaxCol);
+      visibleMinRow = Math.max(0, visibleMinRow);
+      visibleMaxRow = Math.min(maxBound, visibleMaxRow);
+    }
+    
+    // Render fog for visible fogged cells
+    // Use combined path approach: trace all cells, then fill once
+    // This allows single shadow computation instead of per-cell
+    if (geometry instanceof HexGeometry) {
+      // Hex map fog rendering with expanded edge blur
+      const orientation = mapData.orientation || 'flat';
+      
+      // Build foggedSet for O(1) lookups
+      const foggedSet = new Set(fow.foggedCells.map(c => `${c.col},${c.row}`));
+      
+      // Collect visible fog cells and identify edge cells
+      const visibleFogCells = [];
+      const edgeCells = [];
+      
+      for (const fogCell of fow.foggedCells) {
+        const { col, row } = fogCell;
+        
+        // Skip if outside visible bounds
+        if (col < visibleMinCol || col > visibleMaxCol || 
+            row < visibleMinRow || row > visibleMaxRow) {
+          continue;
+        }
+        
+        visibleFogCells.push({ col, row });
+        
+        // Check if this is an edge cell (has at least one non-fogged neighbor)
+        const { q, r } = offsetToAxial(col, row, orientation);
+        const neighbors = geometry.getNeighbors(q, r);
+        const isEdge = neighbors.some(n => {
+          const { col: nCol, row: nRow } = axialToOffset(n.q, n.r, orientation);
+          return !foggedSet.has(`${nCol},${nRow}`);
+        });
+        
+        if (isEdge) {
+          edgeCells.push({ col, row, q, r });
+        }
+      }
+      
+      // Helper to trace hex path at a given scale (1.0 = normal size)
+      const traceHexPath = (q, r, scale = 1.0) => {
+        const vertices = geometry.getHexVertices(q, r);
+        
+        if (scale === 1.0) {
+          // Normal size - use vertices directly
+          const first = geometry.worldToScreen(vertices[0].worldX, vertices[0].worldY, offsetX, offsetY, zoom);
+          ctx.moveTo(first.screenX, first.screenY);
+          for (let i = 1; i < vertices.length; i++) {
+            const vertex = geometry.worldToScreen(vertices[i].worldX, vertices[i].worldY, offsetX, offsetY, zoom);
+            ctx.lineTo(vertex.screenX, vertex.screenY);
+          }
+        } else {
+          // Scaled - expand from center
+          const center = geometry.hexToWorld(q, r);
+          const screenCenter = geometry.worldToScreen(center.worldX, center.worldY, offsetX, offsetY, zoom);
+          
+          const scaledVertices = vertices.map(v => {
+            const screen = geometry.worldToScreen(v.worldX, v.worldY, offsetX, offsetY, zoom);
+            return {
+              screenX: screenCenter.screenX + (screen.screenX - screenCenter.screenX) * scale,
+              screenY: screenCenter.screenY + (screen.screenY - screenCenter.screenY) * scale
+            };
+          });
+          
+          ctx.moveTo(scaledVertices[0].screenX, scaledVertices[0].screenY);
+          for (let i = 1; i < scaledVertices.length; i++) {
+            ctx.lineTo(scaledVertices[i].screenX, scaledVertices[i].screenY);
+          }
+        }
+        ctx.closePath();
+      };
+      
+      // Helper to trace hex path on fog canvas (for blur passes)
+      const traceHexPathOnFog = (q, r, scale = 1.0) => {
+        if (!fogCtx) return;
+        
+        const vertices = geometry.getHexVertices(q, r);
+        
+        if (scale === 1.0) {
+          const first = geometry.worldToScreen(vertices[0].worldX, vertices[0].worldY, offsetX, offsetY, zoom);
+          fogCtx.moveTo(first.screenX, first.screenY);
+          for (let i = 1; i < vertices.length; i++) {
+            const vertex = geometry.worldToScreen(vertices[i].worldX, vertices[i].worldY, offsetX, offsetY, zoom);
+            fogCtx.lineTo(vertex.screenX, vertex.screenY);
+          }
+        } else {
+          const center = geometry.hexToWorld(q, r);
+          const screenCenter = geometry.worldToScreen(center.worldX, center.worldY, offsetX, offsetY, zoom);
+          
+          const scaledVertices = vertices.map(v => {
+            const screen = geometry.worldToScreen(v.worldX, v.worldY, offsetX, offsetY, zoom);
+            return {
+              screenX: screenCenter.screenX + (screen.screenX - screenCenter.screenX) * scale,
+              screenY: screenCenter.screenY + (screen.screenY - screenCenter.screenY) * scale
+            };
+          });
+          
+          fogCtx.moveTo(scaledVertices[0].screenX, scaledVertices[0].screenY);
+          for (let i = 1; i < scaledVertices.length; i++) {
+            fogCtx.lineTo(scaledVertices[i].screenX, scaledVertices[i].screenY);
+          }
+        }
+        fogCtx.closePath();
+      };
+      
+      // Blur passes: draw edge cells to fog canvas (CSS blur will smooth them)
+      // Render to fogCtx if available, otherwise use ctx with filter
+      if (fowBlurEnabled && blurRadius > 0 && edgeCells.length > 0) {
+        const baseOpacity = fowOpacity;
+        const numPasses = 8;
+        const maxExpansion = blurRadius / (geometry.hexSize * zoom); // Back to 1.0x - tighter radius
+        
+        // Use fog canvas if available (CSS blur), otherwise fall back to ctx.filter
+        const targetCtx = fogCtx || ctx;
+        const useFilterFallback = !fogCtx;
+        const filterBlurAmount = blurRadius / numPasses;
+        
+        for (let i = 0; i < numPasses; i++) {
+          const t = i / (numPasses - 1);
+          const scale = 1.0 + (maxExpansion * (1.0 - t));
+          // Higher starting opacity for visible bleed, tighter range
+          const opacity = 0.50 + (0.30 * t); // Range: 0.50 to 0.80
+          
+          // Only use ctx.filter as fallback (iOS doesn't support it)
+          if (useFilterFallback) {
+            const passBlur = filterBlurAmount * (1.5 - t);
+            targetCtx.filter = passBlur > 0.5 ? `blur(${passBlur}px)` : 'none';
+          }
+          
+          targetCtx.beginPath();
+          for (const { q, r } of edgeCells) {
+            if (fogCtx) {
+              traceHexPathOnFog(q, r, scale);
+            } else {
+              traceHexPath(q, r, scale);
+            }
+          }
+          targetCtx.globalAlpha = baseOpacity * opacity;
+          targetCtx.fill();
+        }
+        
+        // Reset filter if we used it as fallback
+        if (useFilterFallback) {
+          ctx.filter = 'none';
+        }
+        
+        // Restore opacity for final fill
+        ctx.globalAlpha = useGlobalAlpha ? fowOpacity : 1;
+      }
+      
+      // Final pass: all fog cells at normal size, full opacity (on main canvas)
+      ctx.beginPath();
+      for (const { col, row } of visibleFogCells) {
+        const { q, r } = offsetToAxial(col, row, orientation);
+        traceHexPath(q, r, 1.0);
+      }
+      ctx.fill();
+      
+      // Draw interior hex outlines on top of fog for cell visibility
+      if (visibleFogCells.length > 1) {
+        
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)'; // Subtle white lines
+        ctx.lineWidth = Math.max(1, 1 * zoom);
+        
+        for (const { col, row } of visibleFogCells) {
+          const { q, r } = offsetToAxial(col, row, orientation);
+          
+          // Check if this hex has any fogged neighbors (making it an interior edge)
+          const neighbors = geometry.getNeighbors(q, r);
+          const hasFoggedNeighbor = neighbors.some(n => {
+            const { col: nCol, row: nRow } = axialToOffset(n.q, n.r, orientation);
+            return foggedSet.has(`${nCol},${nRow}`);
+          });
+          
+          if (hasFoggedNeighbor) {
+            const vertices = geometry.getHexVertices(q, r);
+            
+            ctx.beginPath();
+            const first = geometry.worldToScreen(vertices[0].worldX, vertices[0].worldY, offsetX, offsetY, zoom);
+            ctx.moveTo(first.screenX, first.screenY);
+            
+            for (let i = 1; i < vertices.length; i++) {
+              const vertex = geometry.worldToScreen(vertices[i].worldX, vertices[i].worldY, offsetX, offsetY, zoom);
+              ctx.lineTo(vertex.screenX, vertex.screenY);
+            }
+            
+            ctx.closePath();
+            ctx.stroke();
+          }
+        }
+      }
+      
+    } else {
+      // Grid map fog rendering with expanded edge blur
+      
+      // Build foggedSet for O(1) lookups
+      const foggedSet = new Set(fow.foggedCells.map(c => `${c.col},${c.row}`));
+      
+      // Collect visible fog cells and identify edge cells
+      const visibleFogCells = [];
+      const edgeCells = [];
+      
+      for (const fogCell of fow.foggedCells) {
+        const { col, row } = fogCell;
+        
+        // Skip if outside visible bounds
+        if (col < visibleMinCol || col > visibleMaxCol || 
+            row < visibleMinRow || row > visibleMaxRow) {
+          continue;
+        }
+        
+        visibleFogCells.push({ col, row });
+        
+        // Check if this is an edge cell (has at least one non-fogged cardinal neighbor)
+        const isEdge = !foggedSet.has(`${col - 1},${row}`) ||  // left
+                       !foggedSet.has(`${col + 1},${row}`) ||  // right
+                       !foggedSet.has(`${col},${row - 1}`) ||  // top
+                       !foggedSet.has(`${col},${row + 1}`);    // bottom
+        
+        if (isEdge) {
+          edgeCells.push({ col, row });
+        }
+      }
+      
+      // Helper to add circle to path for soft blur effect
+      const addCircleToPath = (targetCtx, col, row, radius) => {
+        const centerX = offsetX + col * scaledSize + scaledSize / 2;
+        const centerY = offsetY + row * scaledSize + scaledSize / 2;
+        targetCtx.moveTo(centerX + radius, centerY);
+        targetCtx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+      };
+      
+      // Helper to add rect to path at a given scale (1.0 = normal size)
+      const addRectToPath = (col, row, scale = 1.0) => {
+        const centerX = offsetX + col * scaledSize + scaledSize / 2;
+        const centerY = offsetY + row * scaledSize + scaledSize / 2;
+        const size = scaledSize * scale;
+        const halfSize = size / 2;
+        ctx.rect(centerX - halfSize, centerY - halfSize, size, size);
+      };
+      
+      // Blur passes: draw edge cells as circles to fog canvas (CSS blur will smooth them)
+      // Render to fogCtx if available, otherwise use ctx with filter fallback
+      if (fowBlurEnabled && blurRadius > 0 && edgeCells.length > 0) {
+        const baseOpacity = fowOpacity;
+        const numPasses = 8;
+        
+        const cellRadius = scaledSize / 2;
+        const maxRadius = cellRadius + blurRadius; // Back to 1.0x - tighter radius
+        
+        // Use fog canvas if available (CSS blur), otherwise fall back to ctx.filter
+        const targetCtx = fogCtx || ctx;
+        const useFilterFallback = !fogCtx;
+        const filterBlurAmount = blurRadius / numPasses;
+        
+        for (let i = 0; i < numPasses; i++) {
+          const t = i / (numPasses - 1);
+          const radius = maxRadius - (blurRadius * t); // Back to 1.0x
+          // Higher starting opacity for visible bleed, tighter range
+          const opacity = 0.50 + (0.30 * t); // Range: 0.50 to 0.80
+          
+          // Only use ctx.filter as fallback (iOS doesn't support it)
+          if (useFilterFallback) {
+            const passBlur = filterBlurAmount * (1.5 - t);
+            targetCtx.filter = passBlur > 0.5 ? `blur(${passBlur}px)` : 'none';
+          }
+          
+          targetCtx.beginPath();
+          for (const { col, row } of edgeCells) {
+            addCircleToPath(targetCtx, col, row, radius);
+          }
+          targetCtx.globalAlpha = baseOpacity * opacity;
+          targetCtx.fill();
+        }
+        
+        // Reset filter if we used it as fallback
+        if (useFilterFallback) {
+          ctx.filter = 'none';
+        }
+        
+        // Restore opacity for final fill
+        ctx.globalAlpha = useGlobalAlpha ? fowOpacity : 1;
+      }
+      
+      // Final pass: all fog cells at normal size (squares), full opacity (on main canvas)
+      ctx.beginPath();
+      for (const { col, row } of visibleFogCells) {
+        addRectToPath(col, row, 1.0);
+      }
+      ctx.fill();
+      
+      // Draw interior grid lines on top of fog for cell visibility
+      if (visibleFogCells.length > 1) {
+        const drawnLines = new Set();
+        
+        const interiorLineWidth = Math.max(1, 1 * zoom * 0.5); // Thinner interior lines
+        const halfWidth = interiorLineWidth / 2;
+        
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.15)'; // Subtle white lines
+        
+        for (const { col, row } of visibleFogCells) {
+          const screenX = offsetX + col * scaledSize;
+          const screenY = offsetY + row * scaledSize;
+          
+          if (foggedSet.has(`${col + 1},${row}`)) {
+            const lineKey = `v:${col + 1},${row}`;
+            if (!drawnLines.has(lineKey)) {
+              ctx.fillRect(
+                screenX + scaledSize - halfWidth,
+                screenY,
+                interiorLineWidth,
+                scaledSize
+              );
+              drawnLines.add(lineKey);
+            }
+          }
+          
+          if (foggedSet.has(`${col},${row + 1}`)) {
+            const lineKey = `h:${col},${row + 1}`;
+            if (!drawnLines.has(lineKey)) {
+              ctx.fillRect(
+                screenX,
+                screenY + scaledSize - halfWidth,
+                scaledSize,
+                interiorLineWidth
+              );
+              drawnLines.add(lineKey);
+            }
+          }
+        }
+      }
+    }
+    
+    // Restore fog canvas context 
+    if (fogCtx) {
+      fogCtx.restore();
+    }
+    
+    // Restore globalAlpha if we modified it 
+    if (useGlobalAlpha) {
+      ctx.globalAlpha = previousGlobalAlpha;
+    }
+  
+  }
+  
+  // Draw selection indicators for text labels
+  // Skip when coordinate overlay is visible or text layer is hidden
+  const selectedTextLabels = itemsArray.filter(item => item.type === 'text');
+  if (selectedTextLabels.length > 0 && activeLayer.textLabels && !showCoordinates && visibility.textLabels) {
+    for (const selectedItem of selectedTextLabels) {
+      const label = activeLayer.textLabels.find(l => l.id === selectedItem.id);
+      if (label) {
+        ctx.save();
+        
+        const { screenX, screenY } = geometry.worldToScreen(label.position.x, label.position.y, offsetX, offsetY, zoom);
+        
+        ctx.translate(screenX, screenY);
+        ctx.rotate((label.rotation * Math.PI) / 180);
+        
+        // Measure text to get bounding box
+        const fontSize = label.fontSize * zoom;
+        const fontFamily = getFontCss(label.fontFace || 'sans');
+        ctx.font = `${fontSize}px ${fontFamily}`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        const metrics = ctx.measureText(label.content);
+        const width = metrics.width;
+        const height = fontSize * 1.2;
+        
+        // Draw selection rectangle with dashed border
+        ctx.strokeStyle = '#4a9eff';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 3]);
+        ctx.strokeRect(
+          -width/2 - 4, 
+          -height/2 - 2, 
+          width + 8, 
+          height + 4
+        );
+        
+        // Draw corner handles
+        ctx.setLineDash([]);
+        ctx.fillStyle = '#4a9eff';
+        const handleSize = 6;
+        
+        // Top-left
+        ctx.fillRect(-width/2 - 4 - handleSize/2, -height/2 - 2 - handleSize/2, handleSize, handleSize);
+        // Top-right
+        ctx.fillRect(width/2 + 4 - handleSize/2, -height/2 - 2 - handleSize/2, handleSize, handleSize);
+        // Bottom-left
+        ctx.fillRect(-width/2 - 4 - handleSize/2, height/2 + 2 - handleSize/2, handleSize, handleSize);
+        // Bottom-right
+        ctx.fillRect(width/2 + 4 - handleSize/2, height/2 + 2 - handleSize/2, handleSize, handleSize);
+        
+        ctx.restore();
+      }
+    }
+  }
+  
+  // Draw selection indicators for objects
   // Skip when coordinate overlay is visible or objects layer is hidden
-  if (selectedItem && selectedItem.type === 'object' && mapData.objects && !showCoordinates && visibility.objects) {
-    const object = mapData.objects.find(obj => obj.id === selectedItem.id);
-    if (object) {
-      const size = object.size || { width: 1, height: 1 };
-      const alignment = object.alignment || 'center';
-      
-      // Calculate position and dimensions based on geometry type
-      let screenX, screenY, objectWidth, objectHeight, cellWidth, cellHeight;
-      
-      if (geometry instanceof HexGeometry) {
-        // For hex: calculate position accounting for multi-object slots
-        const { worldX, worldY } = geometry.hexToWorld(object.position.x, object.position.y);
+  const selectedObjects = itemsArray.filter(item => item.type === 'object');
+  if (selectedObjects.length > 0 && activeLayer.objects && !showCoordinates && visibility.objects) {
+    // Only show resize mode visuals for single selection
+    const showResizeOverlay = isResizeMode && selectedObjects.length === 1;
+    
+    for (const selectedItem of selectedObjects) {
+      const object = activeLayer.objects.find(obj => obj.id === selectedItem.id);
+      if (object) {
+        const size = object.size || { width: 1, height: 1 };
+        const alignment = object.alignment || 'center';
         
-        // Count objects in same cell for multi-object support
-        const cellObjects = getObjectsInCell(mapData.objects, object.position.x, object.position.y);
-        const objectCount = cellObjects.length;
+        // Calculate position and dimensions based on geometry type
+        let screenX, screenY, objectWidth, objectHeight, cellWidth, cellHeight;
         
-        // Base object dimensions
-        objectWidth = size.width * scaledSize;
-        objectHeight = size.height * scaledSize;
-        cellWidth = scaledSize;
-        cellHeight = scaledSize;
-        
-        // Apply multi-object scaling if needed
-        if (objectCount > 1) {
-          const multiScale = getMultiObjectScale(objectCount);
-          objectWidth *= multiScale;
-          objectHeight *= multiScale;
+        if (geometry instanceof HexGeometry) {
+          // For hex: calculate position accounting for multi-object slots
+          const { worldX, worldY } = geometry.hexToWorld(object.position.x, object.position.y);
+          
+          // Count objects in same cell for multi-object support
+          const cellObjects = getObjectsInCell(activeLayer.objects, object.position.x, object.position.y);
+          const objectCount = cellObjects.length;
+          
+          // Base object dimensions
+          objectWidth = size.width * scaledSize;
+          objectHeight = size.height * scaledSize;
+          cellWidth = scaledSize;
+          cellHeight = scaledSize;
+          
+          // Apply multi-object scaling if needed
+          if (objectCount > 1) {
+            const multiScale = getMultiObjectScale(objectCount);
+            objectWidth *= multiScale;
+            objectHeight *= multiScale;
+          }
+          
+          // Calculate center in screen space
+          let centerScreenX = offsetX + worldX * zoom;
+          let centerScreenY = offsetY + worldY * zoom;
+          
+          // Apply slot offset for multi-object cells
+          if (objectCount > 1) {
+            const effectiveSlot = object.slot ?? cellObjects.findIndex(o => o.id === object.id);
+            const { offsetX: slotOffsetX, offsetY: slotOffsetY } = getSlotOffset(
+              effectiveSlot,
+              objectCount,
+              mapData.orientation || 'flat'
+            );
+            // Offset is in hex-width units (2 * scaledSize)
+            const hexWidth = scaledSize * 2;
+            centerScreenX += slotOffsetX * hexWidth;
+            centerScreenY += slotOffsetY * hexWidth;
+          }
+          
+          // Apply alignment offset
+          if (alignment !== 'center') {
+            const halfCell = scaledSize / 2;
+            switch (alignment) {
+              case 'north': centerScreenY -= halfCell; break;
+              case 'south': centerScreenY += halfCell; break;
+              case 'east': centerScreenX += halfCell; break;
+              case 'west': centerScreenX -= halfCell; break;
+            }
+          }
+          
+          // Get top-left from center for rendering
+          screenX = centerScreenX - objectWidth / 2;
+          screenY = centerScreenY - objectHeight / 2;
+        } else {
+          // For grid: gridToScreen returns top-left directly
+          const gridPos = geometry.gridToScreen(object.position.x, object.position.y, offsetX, offsetY, zoom);
+          screenX = gridPos.screenX;
+          screenY = gridPos.screenY;
+          
+          // Apply alignment offset
+          if (alignment !== 'center') {
+            const halfCell = scaledSize / 2;
+            switch (alignment) {
+              case 'north': screenY -= halfCell; break;
+              case 'south': screenY += halfCell; break;
+              case 'east': screenX += halfCell; break;
+              case 'west': screenX -= halfCell; break;
+            }
+          }
+          
+          objectWidth = size.width * scaledSize;
+          objectHeight = size.height * scaledSize;
+          cellWidth = scaledSize;
+          cellHeight = scaledSize;
         }
         
-        // Calculate center in screen space
-        let centerScreenX = offsetX + worldX * zoom;
-        let centerScreenY = offsetY + worldY * zoom;
-        
-        // Apply slot offset for multi-object cells
-        if (objectCount > 1) {
-          const effectiveSlot = object.slot ?? cellObjects.findIndex(o => o.id === object.id);
-          const { offsetX: slotOffsetX, offsetY: slotOffsetY } = getSlotOffset(
-            effectiveSlot,
-            objectCount,
-            mapData.orientation || 'flat'
-          );
-          // Offset is in hex-width units (2 * scaledSize)
-          const hexWidth = scaledSize * 2;
-          centerScreenX += slotOffsetX * hexWidth;
-          centerScreenY += slotOffsetY * hexWidth;
-        }
-        
-        // Apply alignment offset
-        if (alignment !== 'center') {
-          const halfCell = scaledSize / 2;
-          switch (alignment) {
-            case 'north': centerScreenY -= halfCell; break;
-            case 'south': centerScreenY += halfCell; break;
-            case 'east': centerScreenX += halfCell; break;
-            case 'west': centerScreenX -= halfCell; break;
+        // Draw occupied cells overlay when in resize mode (single selection only)
+        if (showResizeOverlay) {
+          ctx.fillStyle = 'rgba(74, 158, 255, 0.15)';
+          for (let dx = 0; dx < size.width; dx++) {
+            for (let dy = 0; dy < size.height; dy++) {
+              const cellScreenX = screenX + dx * cellWidth;
+              const cellScreenY = screenY + dy * cellHeight;
+              ctx.fillRect(cellScreenX + 2, cellScreenY + 2, cellWidth - 4, cellHeight - 4);
+            }
           }
         }
         
-        // Get top-left from center for rendering
-        screenX = centerScreenX - objectWidth / 2;
-        screenY = centerScreenY - objectHeight / 2;
-      } else {
-        // For grid: gridToScreen returns top-left directly
-        const gridPos = geometry.gridToScreen(object.position.x, object.position.y, offsetX, offsetY, zoom);
-        screenX = gridPos.screenX;
-        screenY = gridPos.screenY;
+        // Draw selection rectangle with dashed border
+        ctx.strokeStyle = '#4a9eff';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 3]);
+        ctx.strokeRect(
+          screenX + 2,
+          screenY + 2,
+          objectWidth - 4,
+          objectHeight - 4
+        );
         
-        // Apply alignment offset
-        if (alignment !== 'center') {
-          const halfCell = scaledSize / 2;
-          switch (alignment) {
-            case 'north': screenY -= halfCell; break;
-            case 'south': screenY += halfCell; break;
-            case 'east': screenX += halfCell; break;
-            case 'west': screenX -= halfCell; break;
-          }
-        }
+        // Draw corner handles
+        ctx.setLineDash([]);
+        ctx.fillStyle = '#4a9eff';
+        const handleSize = showResizeOverlay ? 14 : 8;
         
-        objectWidth = size.width * scaledSize;
-        objectHeight = size.height * scaledSize;
-        cellWidth = scaledSize;
-        cellHeight = scaledSize;
+        // Top-left
+        ctx.fillRect(screenX + 2 - handleSize/2, screenY + 2 - handleSize/2, handleSize, handleSize);
+        // Top-right
+        ctx.fillRect(screenX + objectWidth - 2 - handleSize/2, screenY + 2 - handleSize/2, handleSize, handleSize);
+        // Bottom-left
+        ctx.fillRect(screenX + 2 - handleSize/2, screenY + objectHeight - 2 - handleSize/2, handleSize, handleSize);
+        // Bottom-right
+        ctx.fillRect(screenX + objectWidth - 2 - handleSize/2, screenY + objectHeight - 2 - handleSize/2, handleSize, handleSize);
       }
-      
-      // Draw occupied cells overlay when in resize mode
-      if (isResizeMode) {
-        ctx.fillStyle = 'rgba(74, 158, 255, 0.15)';
-        for (let dx = 0; dx < size.width; dx++) {
-          for (let dy = 0; dy < size.height; dy++) {
-            const cellScreenX = screenX + dx * cellWidth;
-            const cellScreenY = screenY + dy * cellHeight;
-            ctx.fillRect(cellScreenX + 2, cellScreenY + 2, cellWidth - 4, cellHeight - 4);
-          }
-        }
-      }
-      
-      // Draw selection rectangle with dashed border
-      ctx.strokeStyle = '#4a9eff';
-      ctx.lineWidth = 2;
-      ctx.setLineDash([5, 3]);
-      ctx.strokeRect(
-        screenX + 2,
-        screenY + 2,
-        objectWidth - 4,
-        objectHeight - 4
-      );
-      
-      // Draw corner handles (larger in resize mode for better touch targets)
-      ctx.setLineDash([]);
-      ctx.fillStyle = '#4a9eff';
-      const handleSize = isResizeMode ? 14 : 8;
-      
-      // Top-left
-      ctx.fillRect(screenX + 2 - handleSize/2, screenY + 2 - handleSize/2, handleSize, handleSize);
-      // Top-right
-      ctx.fillRect(screenX + objectWidth - 2 - handleSize/2, screenY + 2 - handleSize/2, handleSize, handleSize);
-      // Bottom-left
-      ctx.fillRect(screenX + 2 - handleSize/2, screenY + objectHeight - 2 - handleSize/2, handleSize, handleSize);
-      // Bottom-right
-      ctx.fillRect(screenX + objectWidth - 2 - handleSize/2, screenY + objectHeight - 2 - handleSize/2, handleSize, handleSize);
     }
   }
   
@@ -6306,13 +8826,13 @@ function renderCanvas(canvas, mapData, geometry, selectedItem = null, isResizeMo
   ctx.restore();
 }
 
-function useCanvasRenderer(canvasRef, mapData, geometry, selectedItem = null, isResizeMode = false, theme = null, showCoordinates = false, layerVisibility = null) {
-  // Main rendering effect - redraw when dependencies change
+function useCanvasRenderer(canvasRef, fogCanvasRef, mapData, geometry, selectedItems = [], isResizeMode = false, theme = null, showCoordinates = false, layerVisibility = null) {
   dc.useEffect(() => {
     if (mapData && geometry && canvasRef.current) {
-      renderCanvas(canvasRef.current, mapData, geometry, selectedItem, isResizeMode, theme, showCoordinates, layerVisibility);
+      const fogCanvas = fogCanvasRef?.current || null;
+      renderCanvas(canvasRef.current, fogCanvas, mapData, geometry, selectedItems, isResizeMode, theme, showCoordinates, layerVisibility);
     }
-  }, [mapData, geometry, selectedItem, isResizeMode, theme, canvasRef, showCoordinates, layerVisibility]);
+  }, [mapData, geometry, selectedItems, isResizeMode, theme, canvasRef, fogCanvasRef, showCoordinates, layerVisibility]);
 }
 
 return { useCanvasRenderer, renderCanvas };
@@ -7475,9 +9995,13 @@ return {
 
 ```jsx
 /**
- * MapSelectionContext.js
+ * MapSelectionContext.jsx
  * Shared selection state for coordinating between layers
  * Allows multiple layers (ObjectLayer, TextLayer) to share selection state
+ * 
+ * Supports both single and multi-selection:
+ * - Single selection: click on object/text label
+ * - Multi-selection: area select tool (two-click rectangle)
  */
 
 const MapSelectionContext = dc.createContext(null);
@@ -7500,52 +10024,234 @@ function useMapSelection() {
  * Wraps children and provides selection coordination via Context
  */
 const MapSelectionProvider = ({ children, layerVisibility }) => {
-  const [selectedItem, setSelectedItem] = dc.useState(null);
+  // ============================================================================
+  // SELECTION STATE (refactored for multi-select support)
+  // ============================================================================
+  
+  // Primary selection state - array of selected items
+  // Each item: { type: 'object' | 'text', id: string, data: object }
+  const [selectedItems, setSelectedItems] = dc.useState([]);
+  
+  // Area select tool state - first corner position for two-click selection
+  // { worldX, worldY } when first corner placed, null otherwise
+  const [areaSelectStart, setAreaSelectStart] = dc.useState(null);
+  
+  // ============================================================================
+  // SELECTION HELPERS
+  // ============================================================================
+  
+  /**
+   * Select a single item (clears any existing selection)
+   * @param {Object} item - { type: 'object' | 'text', id: string, data: object }
+   */
+  const selectItem = dc.useCallback((item) => {
+    if (item) {
+      setSelectedItems([item]);
+    } else {
+      setSelectedItems([]);
+    }
+  }, []);
+  
+  /**
+   * Select multiple items (replaces existing selection)
+   * @param {Array} items - Array of { type, id, data } objects
+   */
+  const selectMultiple = dc.useCallback((items) => {
+    setSelectedItems(items || []);
+  }, []);
+  
+  /**
+   * Add item to current selection
+   * @param {Object} item - { type: 'object' | 'text', id: string, data: object }
+   */
+  const addToSelection = dc.useCallback((item) => {
+    if (!item) return;
+    setSelectedItems(prev => {
+      // Don't add duplicates
+      if (prev.some(i => i.id === item.id)) return prev;
+      return [...prev, item];
+    });
+  }, []);
+  
+  /**
+   * Remove item from current selection
+   * @param {string} id - Item ID to remove
+   */
+  const removeFromSelection = dc.useCallback((id) => {
+    setSelectedItems(prev => prev.filter(item => item.id !== id));
+  }, []);
+  
+  /**
+   * Clear all selection
+   */
+  const clearSelection = dc.useCallback(() => {
+    setSelectedItems([]);
+  }, []);
+  
+  /**
+   * Check if an item is selected
+   * @param {string} id - Item ID to check
+   * @returns {boolean}
+   */
+  const isSelected = dc.useCallback((id) => {
+    return selectedItems.some(item => item.id === id);
+  }, [selectedItems]);
+  
+  /**
+   * Update the data for selected items (used during drag to keep selection in sync)
+   * @param {Array} updates - Array of { id, ...newData } objects
+   */
+  const updateSelectedItemsData = dc.useCallback((updates) => {
+    if (!updates || updates.length === 0) return;
+    
+    const updateMap = new Map(updates.map(u => [u.id, u]));
+    
+    setSelectedItems(prev => prev.map(item => {
+      const update = updateMap.get(item.id);
+      if (update) {
+        return {
+          ...item,
+          data: { ...item.data, ...update }
+        };
+      }
+      return item;
+    }));
+  }, []);
+  
+  // ============================================================================
+  // COMPUTED PROPERTIES
+  // ============================================================================
+  
+  // Backward compatibility: single selected item (null if 0 or 2+ selected)
+  const selectedItem = selectedItems.length === 1 ? selectedItems[0] : null;
+  
+  // Multi-selection flag
+  const hasMultiSelection = selectedItems.length > 1;
+  
+  // Selection count
+  const selectionCount = selectedItems.length;
+  
+  // ============================================================================
+  // BACKWARD COMPATIBILITY - setSelectedItem wrapper
+  // ============================================================================
+  
+  /**
+   * Backward-compatible setter that wraps selectItem
+   * @param {Object|null} item - Single item or null to clear
+   */
+  const setSelectedItem = dc.useCallback((item) => {
+    selectItem(item);
+  }, [selectItem]);
+  
+  // ============================================================================
+  // DRAG STATE (extended for group drag)
+  // ============================================================================
+  
   const [isDraggingSelection, setIsDraggingSelection] = dc.useState(false);
   const [dragStart, setDragStart] = dc.useState(null);
   const [isResizeMode, setIsResizeMode] = dc.useState(false);
   
-  // Hover state (shared between layers for tooltips)
+  // Group drag: ref to store offsets for all selected items during multi-select drag
+  // Map<id, { type: 'object'|'text', gridOffsetX, gridOffsetY, worldOffsetX, worldOffsetY }>
+  const groupDragOffsetsRef = dc.useRef(new Map());
+  
+  // Initial state ref for batch history (stores objects and textLabels before drag)
+  const groupDragInitialStateRef = dc.useRef(null);
+  
+  // Computed: are we dragging a multi-selection?
+  const isGroupDragging = isDraggingSelection && hasMultiSelection;
+  
+  // ============================================================================
+  // HOVER STATE (unchanged)
+  // ============================================================================
+  
   const [hoveredObject, setHoveredObject] = dc.useState(null);
   const [mousePosition, setMousePosition] = dc.useState(null);
   
-  // Note pin modal state (shared for note_pin placement flow)
+  // ============================================================================
+  // NOTE PIN MODAL STATE (unchanged)
+  // ============================================================================
+  
   const [showNoteLinkModal, setShowNoteLinkModal] = dc.useState(false);
   const [pendingNotePinId, setPendingNotePinId] = dc.useState(null);
   const [editingNoteObjectId, setEditingNoteObjectId] = dc.useState(null);
   
-  // Coordinate overlay state (for hex maps - toggled by holding 'C' key)
+  // ============================================================================
+  // COORDINATE OVERLAY STATE (unchanged)
+  // ============================================================================
+  
   const [showCoordinates, setShowCoordinates] = dc.useState(false);
   
-  // Use the layerVisibility prop directly, with fallback
+  // ============================================================================
+  // LAYER VISIBILITY (unchanged)
+  // ============================================================================
+  
   const effectiveLayerVisibility = layerVisibility || {
     objects: true,
     textLabels: true,
     hexCoordinates: true
   };
   
-  // Create context value
+  // ============================================================================
+  // CONTEXT VALUE
+  // ============================================================================
+  
   const value = {
+    // Multi-select state (new)
+    selectedItems,
+    setSelectedItems,
+    hasMultiSelection,
+    selectionCount,
+    
+    // Selection helpers (new)
+    selectItem,
+    selectMultiple,
+    addToSelection,
+    removeFromSelection,
+    clearSelection,
+    isSelected,
+    updateSelectedItemsData,
+    
+    // Area select state (new)
+    areaSelectStart,
+    setAreaSelectStart,
+    
+    // Backward compatibility (existing API)
     selectedItem,
     setSelectedItem,
+    
+    // Drag state (extended for group drag)
     isDraggingSelection,
     setIsDraggingSelection,
     dragStart,
     setDragStart,
     isResizeMode,
     setIsResizeMode,
+    
+    // Group drag state (new)
+    groupDragOffsetsRef,
+    groupDragInitialStateRef,
+    isGroupDragging,
+    
+    // Hover state (unchanged)
     hoveredObject,
     setHoveredObject,
     mousePosition,
     setMousePosition,
+    
+    // Note pin modal state (unchanged)
     showNoteLinkModal,
     setShowNoteLinkModal,
     pendingNotePinId,
     setPendingNotePinId,
     editingNoteObjectId,
     setEditingNoteObjectId,
+    
+    // Coordinate overlay state (unchanged)
     showCoordinates,
     setShowCoordinates,
+    
+    // Layer visibility (unchanged)
     layerVisibility: effectiveLayerVisibility
   };
   
@@ -7685,6 +10391,7 @@ const { useMapSelection } = await dc.require(dc.headerLink(dc.resolvePath("compi
 const { calculateEdgeAlignment, getAlignmentOffset, placeObject, canPlaceObjectAt, removeObjectFromHex, generateObjectId } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "objectOperations"));
 const { getClickedObjectInCell, getObjectsInCell, canAddObjectToCell, assignSlot } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "hexSlotPositioner"));
 const { HexGeometry } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "HexGeometry"));
+const { getActiveLayer, isCellFogged } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "layerAccessor"));
 
 /**
  * Hook for managing object interactions
@@ -7926,7 +10633,7 @@ const useObjectInteractions = (
     const mapType = mapData.mapType || 'grid';
     
     // Check if placement is allowed
-    if (!canPlaceObjectAt(mapData.objects || [], gridX, gridY, mapType)) {
+    if (!canPlaceObjectAt(getActiveLayer(mapData).objects || [], gridX, gridY, mapType)) {
       return true; // Handled but blocked (cell occupied/full)
     }
 
@@ -7944,7 +10651,7 @@ const useObjectInteractions = (
 
     // Place object using unified API
     const result = placeObject(
-      mapData.objects || [],
+      getActiveLayer(mapData).objects || [],
       selectedObjectType,
       gridX,
       gridY,
@@ -7975,12 +10682,12 @@ const useObjectInteractions = (
 
     // If in resize mode with selected object, check for corner clicks FIRST
     if (selectedItem?.type === 'object' && isResizeMode) {
-      const selectedObject = mapData.objects?.find(obj => obj.id === selectedItem.id);
+      const selectedObject = getActiveLayer(mapData).objects?.find(obj => obj.id === selectedItem.id);
       if (selectedObject) {
         const corner = getClickedCorner(clientX, clientY, selectedObject);
         if (corner) {
           // Store initial object state for batched history entry at resize end
-          resizeInitialStateRef.current = [...(mapData.objects || [])];
+          resizeInitialStateRef.current = [...(getActiveLayer(mapData).objects || [])];
           setIsResizing(true);
           setResizeCorner(corner);
           setDragStart({ x: clientX, y: clientY, gridX, gridY, object: { ...selectedObject } });
@@ -7992,7 +10699,7 @@ const useObjectInteractions = (
     // For hex maps with multi-object support: resolve click to specific object
     let object = null;
     if (mapData.mapType === 'hex' && geometry instanceof HexGeometry) {
-      const cellObjects = getObjectsInCell(mapData.objects || [], gridX, gridY);
+      const cellObjects = getObjectsInCell(getActiveLayer(mapData).objects || [], gridX, gridY);
       
       if (cellObjects.length > 1) {
         // Calculate click offset within hex (relative to hex center)
@@ -8005,7 +10712,7 @@ const useObjectInteractions = (
           const clickOffsetY = (worldCoords.worldY - hexCenterY) / hexWidth;
           
           object = getClickedObjectInCell(
-            mapData.objects || [],
+            getActiveLayer(mapData).objects || [],
             gridX,
             gridY,
             clickOffsetX,
@@ -8018,7 +10725,18 @@ const useObjectInteractions = (
       }
     } else {
       // Grid maps: use standard single-object lookup
-      object = getObjectAtPosition(mapData.objects || [], gridX, gridY);
+      object = getObjectAtPosition(getActiveLayer(mapData).objects || [], gridX, gridY);
+    }
+    
+    // Don't allow clicking/selecting objects under fog
+    if (object) {
+      const activeLayer = getActiveLayer(mapData);
+      if (activeLayer.fogOfWar?.enabled) {
+        const objOffset = geometry.toOffsetCoords(object.position.x, object.position.y);
+        if (isCellFogged(activeLayer, objOffset.col, objOffset.row)) {
+          object = null;
+        }
+      }
     }
     
     if (object) {
@@ -8049,7 +10767,7 @@ const useObjectInteractions = (
         }
         
         // Start dragging
-        dragInitialStateRef.current = [...(mapData.objects || [])];
+        dragInitialStateRef.current = [...(getActiveLayer(mapData).objects || [])];
         setIsDraggingSelection(true);
         // Store the offset from where we clicked to the object's actual position
         // This ensures enlarged objects don't jump when first moved
@@ -8064,7 +10782,7 @@ const useObjectInteractions = (
         
         // Set up drag state so user can continue into a drag without releasing
         // Store the object reference in dragStart since selectedItem state update is async
-        dragInitialStateRef.current = [...(mapData.objects || [])];
+        dragInitialStateRef.current = [...(getActiveLayer(mapData).objects || [])];
         setIsDraggingSelection(true);
         const offsetX = gridX - object.position.x;
         const offsetY = gridY - object.position.y;
@@ -8154,7 +10872,7 @@ const useObjectInteractions = (
 
     // Only update if we've moved to a different grid cell
     if (gridX !== dragStart.gridX || gridY !== dragStart.gridY) {
-      const currentObject = mapData.objects?.find(o => o.id === objectId);
+      const currentObject = getActiveLayer(mapData).objects?.find(o => o.id === objectId);
       if (!currentObject) return true;
       
       const isMovingWithinSameCell = currentObject.position.x === targetX && currentObject.position.y === targetY;
@@ -8162,7 +10880,7 @@ const useObjectInteractions = (
       // For hex maps: handle multi-object cell logic
       if (mapData.mapType === 'hex' && !isMovingWithinSameCell) {
         // Check if target cell can accept this object
-        const targetCellObjects = getObjectsInCell(mapData.objects || [], targetX, targetY);
+        const targetCellObjects = getObjectsInCell(getActiveLayer(mapData).objects || [], targetX, targetY);
         
         if (targetCellObjects.length >= 4) {
           // Target cell is full - block the move
@@ -8174,7 +10892,7 @@ const useObjectInteractions = (
         const newSlot = assignSlot(targetSlots);
         
         // Remove from old cell with reorganization, then update position and slot
-        let updatedObjects = removeObjectFromHex(mapData.objects, objectId);
+        let updatedObjects = removeObjectFromHex(getActiveLayer(mapData).objects, objectId);
         
         // Re-add the moved object with new position and slot
         updatedObjects = [...updatedObjects, {
@@ -8197,7 +10915,7 @@ const useObjectInteractions = (
         }
       } else {
         // Grid maps or same-cell movement: use existing single-object logic
-        const existingObj = getObjectAtPosition(mapData.objects || [], targetX, targetY);
+        const existingObj = getObjectAtPosition(getActiveLayer(mapData).objects || [], targetX, targetY);
         
         if (!existingObj || existingObj.id === objectId) {
           // Determine alignment if in edge snap mode
@@ -8213,7 +10931,7 @@ const useObjectInteractions = (
           
           // Update object position and alignment (suppress history during drag)
           const updatedObjects = updateObject(
-            mapData.objects,
+            getActiveLayer(mapData).objects,
             objectId,
             { position: { x: targetX, y: targetY }, alignment }
           );
@@ -8299,13 +11017,13 @@ const useObjectInteractions = (
     let resizeSucceeded = false;
 
     // First attempt: both dimensions
-    if (isAreaFree(mapData.objects, newX, newY, newWidth, newHeight, selectedItem.id)) {
+    if (isAreaFree(getActiveLayer(mapData).objects, newX, newY, newWidth, newHeight, selectedItem.id)) {
       resizeSucceeded = true;
     }
 
     // If both dimensions failed, try just width (keep original height)
     if (!resizeSucceeded && newWidth !== originalSize.width) {
-      if (isAreaFree(mapData.objects, newX, originalPos.y, newWidth, originalSize.height, selectedItem.id)) {
+      if (isAreaFree(getActiveLayer(mapData).objects, newX, originalPos.y, newWidth, originalSize.height, selectedItem.id)) {
         finalWidth = newWidth;
         finalHeight = originalSize.height;
         finalX = newX;
@@ -8316,7 +11034,7 @@ const useObjectInteractions = (
 
     // If width also failed, try just height (keep original width)
     if (!resizeSucceeded && newHeight !== originalSize.height) {
-      if (isAreaFree(mapData.objects, originalPos.x, newY, originalSize.width, newHeight, selectedItem.id)) {
+      if (isAreaFree(getActiveLayer(mapData).objects, originalPos.x, newY, originalSize.width, newHeight, selectedItem.id)) {
         finalWidth = originalSize.width;
         finalHeight = newHeight;
         finalX = originalPos.x;
@@ -8328,7 +11046,7 @@ const useObjectInteractions = (
     // Apply the resize if any attempt succeeded
     if (resizeSucceeded) {
       const updatedObjects = updateObject(
-        mapData.objects,
+        getActiveLayer(mapData).objects,
         selectedItem.id,
         {
           position: { x: finalX, y: finalY },
@@ -8357,7 +11075,7 @@ const useObjectInteractions = (
    * @param {Object} e - Event object
    */
   const handleHoverUpdate = dc.useCallback((e) => {
-    if (!e.touches && mapData && mapData.objects) {
+    if (!e.touches && mapData && getActiveLayer(mapData).objects) {
       const { clientX, clientY } = getClientCoords(e);
       const coords = screenToGrid(clientX, clientY);
       if (coords) {
@@ -8377,7 +11095,7 @@ const useObjectInteractions = (
             const clickOffsetY = (worldCoords.worldY - hexCenter.worldY) / geometry.width;
             
             obj = getClickedObjectInCell(
-              mapData.objects,
+              getActiveLayer(mapData).objects,
               gridX, gridY,
               clickOffsetX, clickOffsetY,
               mapData.orientation || 'flat'
@@ -8388,7 +11106,18 @@ const useObjectInteractions = (
         // Fallback to simple position lookup if getClickedObjectInCell didn't find anything
         // or if not a hex map
         if (!obj) {
-          obj = getObjectAtPosition(mapData.objects, gridX, gridY);
+          obj = getObjectAtPosition(getActiveLayer(mapData).objects, gridX, gridY);
+        }
+        
+        // Don't show hover for objects under fog
+        if (obj) {
+          const activeLayer = getActiveLayer(mapData);
+          if (activeLayer.fogOfWar?.enabled) {
+            const objOffset = geometry.toOffsetCoords(obj.position.x, obj.position.y);
+            if (isCellFogged(activeLayer, objOffset.col, objOffset.row)) {
+              obj = null;
+            }
+          }
         }
         
         setHoveredObject(obj);
@@ -8424,7 +11153,7 @@ const useObjectInteractions = (
 
       // Add single history entry for the completed drag
       if (dragInitialStateRef.current !== null) {
-        onObjectsChange(mapData.objects, false);
+        onObjectsChange(getActiveLayer(mapData).objects, false);
         dragInitialStateRef.current = null;
       }
       return true;
@@ -8444,7 +11173,7 @@ const useObjectInteractions = (
 
       // Add single history entry for the completed resize
       if (resizeInitialStateRef.current !== null) {
-        onObjectsChange(mapData.objects, false);
+        onObjectsChange(getActiveLayer(mapData).objects, false);
         resizeInitialStateRef.current = null;
       }
       return true;
@@ -8472,7 +11201,7 @@ const useObjectInteractions = (
       const nextRotation = rotations[(currentIndex + 1) % 4];
       
       const updatedObjects = updateObject(
-        mapData.objects,
+        getActiveLayer(mapData).objects,
         selectedItem.id,
         { rotation: nextRotation }
       );
@@ -8492,7 +11221,7 @@ const useObjectInteractions = (
     // Deletion with Delete or Backspace
     if (e.key === 'Delete' || e.key === 'Backspace') {
       e.preventDefault();
-      const updatedObjects = removeObject(mapData.objects, selectedItem.id);
+      const updatedObjects = removeObject(getActiveLayer(mapData).objects, selectedItem.id);
       onObjectsChange(updatedObjects);
       setSelectedItem(null);
       setIsResizeMode(false);
@@ -8526,7 +11255,7 @@ const useObjectInteractions = (
     if (!coords) return false;
     
     const { gridX, gridY } = coords;
-    const selectedObject = mapData.objects.find(obj => obj.id === selectedItem.id);
+    const selectedObject = getActiveLayer(mapData).objects.find(obj => obj.id === selectedItem.id);
     if (!selectedObject) return false;
     
     // Check if cursor is over the selected object's cell
@@ -8547,7 +11276,7 @@ const useObjectInteractions = (
     
     // Only update if scale changed
     if (newScale !== currentScale) {
-      const updatedObjects = updateObject(mapData.objects, selectedItem.id, { scale: newScale });
+      const updatedObjects = updateObject(getActiveLayer(mapData).objects, selectedItem.id, { scale: newScale });
       onObjectsChange(updatedObjects);
       
       // Update selected item data
@@ -8568,7 +11297,7 @@ const useObjectInteractions = (
       return { x: 0, y: 0 };
     }
 
-    const object = mapData.objects.find(obj => obj.id === selectedItem.id);
+    const object = getActiveLayer(mapData).objects.find(obj => obj.id === selectedItem.id);
     if (!object) return { x: 0, y: 0 };
 
     const pos = calculateScreenPos(object, canvasRef.current, mapData, geometry);
@@ -8593,7 +11322,7 @@ const useObjectInteractions = (
       return { x: 0, y: 0 };
     }
 
-    const object = mapData.objects.find(obj => obj.id === selectedItem.id);
+    const object = getActiveLayer(mapData).objects.find(obj => obj.id === selectedItem.id);
     if (!object) return { x: 0, y: 0 };
 
     const pos = calculateScreenPos(object, canvasRef.current, mapData, geometry);
@@ -8632,7 +11361,7 @@ const useObjectInteractions = (
       return { x: 0, y: 0 };
     }
 
-    const object = mapData.objects.find(obj => obj.id === selectedItem.id);
+    const object = getActiveLayer(mapData).objects.find(obj => obj.id === selectedItem.id);
     if (!object) return { x: 0, y: 0 };
 
     const pos = calculateScreenPos(object, canvasRef.current, mapData, geometry);
@@ -8658,7 +11387,7 @@ const useObjectInteractions = (
       return { x: 0, y: 0 };
     }
 
-    const object = mapData.objects.find(obj => obj.id === selectedItem.id);
+    const object = getActiveLayer(mapData).objects.find(obj => obj.id === selectedItem.id);
     if (!object) return { x: 0, y: 0 };
 
     const pos = calculateScreenPos(object, canvasRef.current, mapData, geometry);
@@ -8695,7 +11424,7 @@ const useObjectInteractions = (
   const handleNoteSubmit = dc.useCallback((content, editingObjectId) => {
     if (editingObjectId && mapData) {
       const updatedObjects = updateObject(
-        mapData.objects,
+        getActiveLayer(mapData).objects,
         editingObjectId,
         { customTooltip: content && content.trim() ? content.trim() : undefined }
       );
@@ -8721,7 +11450,7 @@ const useObjectInteractions = (
   const handleObjectColorSelect = dc.useCallback((color) => {
     if (selectedItem?.type === 'object' && mapData) {
       const updatedObjects = updateObject(
-        mapData.objects,
+        getActiveLayer(mapData).objects,
         selectedItem.id,
         { color: color }
       );
@@ -8749,7 +11478,7 @@ const useObjectInteractions = (
   }, [handleObjectColorSelect]);
 
   /**
-   * Handle object rotation (cycles 0° -> 90° -> 180° -> 270° -> 0°)
+   * Handle object rotation (cycles 0Ã‚Â° -> 90Ã‚Â° -> 180Ã‚Â° -> 270Ã‚Â° -> 0Ã‚Â°)
    */
   const handleObjectRotation = dc.useCallback(() => {
     if (!selectedItem || selectedItem.type !== 'object' || !mapData) {
@@ -8763,7 +11492,7 @@ const useObjectInteractions = (
     const nextRotation = rotations[(currentIndex + 1) % 4];
     
     const updatedObjects = updateObject(
-      mapData.objects,
+      getActiveLayer(mapData).objects,
       selectedItem.id,
       { rotation: nextRotation }
     );
@@ -8787,7 +11516,7 @@ const useObjectInteractions = (
       return;
     }
     
-    const updatedObjects = removeObject(mapData.objects, selectedItem.id);
+    const updatedObjects = removeObject(getActiveLayer(mapData).objects, selectedItem.id);
     onObjectsChange(updatedObjects);
     setSelectedItem(null);
   }, [selectedItem, mapData, removeObject, onObjectsChange, setSelectedItem]);
@@ -8800,7 +11529,7 @@ const useObjectInteractions = (
       return;
     }
     
-    const sourceObject = mapData.objects.find(obj => obj.id === selectedItem.id);
+    const sourceObject = getActiveLayer(mapData).objects.find(obj => obj.id === selectedItem.id);
     if (!sourceObject) return;
     
     const { mapType } = mapData;
@@ -8820,7 +11549,7 @@ const useObjectInteractions = (
           const checkX = sourceX + directions[dir][0] * ring;
           const checkY = sourceY + directions[dir][1] * (step + 1 - ring);
           
-          if (canPlaceObjectAt(mapData.objects, checkX, checkY, mapType)) {
+          if (canPlaceObjectAt(getActiveLayer(mapData).objects, checkX, checkY, mapType)) {
             targetX = checkX;
             targetY = checkY;
             found = true;
@@ -8836,7 +11565,7 @@ const useObjectInteractions = (
               const checkX = sourceX + dx;
               const checkY = sourceY + dy;
               
-              if (canPlaceObjectAt(mapData.objects, checkX, checkY, mapType)) {
+              if (canPlaceObjectAt(getActiveLayer(mapData).objects, checkX, checkY, mapType)) {
                 targetX = checkX;
                 targetY = checkY;
                 found = true;
@@ -8861,14 +11590,14 @@ const useObjectInteractions = (
     
     // For hex maps, assign a slot
     if (mapType === 'hex') {
-      const occupiedSlots = mapData.objects
+      const occupiedSlots = getActiveLayer(mapData).objects
         .filter(obj => obj.position.x === targetX && obj.position.y === targetY)
         .map(obj => obj.slot)
         .filter(s => s !== undefined);
       newObject.slot = assignSlot(occupiedSlots);
     }
     
-    const updatedObjects = [...mapData.objects, newObject];
+    const updatedObjects = [...getActiveLayer(mapData).objects, newObject];
     onObjectsChange(updatedObjects);
     
     // Select the new object
@@ -9449,15 +12178,17 @@ return { NoteLinkModal };
 // components/ColorPicker.jsx - With custom color delete functionality
 const { getColorPalette, DEFAULT_COLOR } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "colorOperations"));
 
-const ColorPicker = ({ 
-  isOpen, 
-  selectedColor, 
-  onColorSelect, 
-  onClose, 
+const ColorPicker = ({
+  isOpen,
+  selectedColor,
+  onColorSelect,
+  onClose,
   onReset,
   customColors = [],
+  paletteColorOpacityOverrides = {},  // Per-map opacity overrides for palette colors
   onAddCustomColor,
   onDeleteCustomColor,
+  onUpdateColorOpacity,  // Callback to update any color's opacity (custom or palette)
   pendingCustomColorRef,
   title = 'Color',
   position = 'below', // 'below' or 'above'
@@ -9466,78 +12197,172 @@ const ColorPicker = ({
   onOpacityChange = null  // Callback when opacity changes, optional
 }) => {
   const [previewColor, setPreviewColor] = dc.useState(null);
-  const [deleteTargetId, setDeleteTargetId] = dc.useState(null);
+  const [editTargetId, setEditTargetId] = dc.useState(null);  // Which custom color is being edited
+  const [editingOpacity, setEditingOpacity] = dc.useState(1); // Opacity value while editing
   const colorInputRef = dc.useRef(null);
   const longPressTimerRef = dc.useRef(null);
-  
+  const editingOpacityRef = dc.useRef(editingOpacity);
+  const editTargetIdRef = dc.useRef(editTargetId);
+  const justOpenedEditRef = dc.useRef(false); // Prevents immediate close after opening
+  const longPressTriggeredRef = dc.useRef(false); // Prevents click after long press
+
+  // Keep refs in sync with state
+  editingOpacityRef.current = editingOpacity;
+  editTargetIdRef.current = editTargetId;
+
+  // Helper to save opacity changes
+  const saveOpacityChanges = dc.useCallback(() => {
+    const targetId = editTargetIdRef.current;
+    const currentOpacity = editingOpacityRef.current;
+
+
+    if (!targetId) {
+      return;
+    }
+
+    // Get the original opacity to check if it changed
+    const customColor = customColors.find(c => c.id === targetId);
+    const paletteOverride = paletteColorOpacityOverrides[targetId];
+    const originalOpacity = customColor?.opacity ?? paletteOverride ?? 1;
+
+
+    // Persist opacity change if it differs from original
+    if (onUpdateColorOpacity && currentOpacity !== originalOpacity) {
+      onUpdateColorOpacity(targetId, currentOpacity);
+    }
+
+    // Also apply to brush opacity
+    if (onOpacityChange) {
+      onOpacityChange(currentOpacity);
+    }
+  }, [customColors, paletteColorOpacityOverrides, onUpdateColorOpacity, onOpacityChange]);
+
+  // Helper to save and close edit panel
+  const saveAndCloseEditPanel = dc.useCallback(() => {
+    if (!editTargetIdRef.current) return;
+    if (justOpenedEditRef.current) return; // Don't close immediately after opening
+
+    saveOpacityChanges();
+    setEditTargetId(null);
+  }, [saveOpacityChanges]);
+
+  // Save when picker closes from outside (e.g., clicking outside entirely)
+  dc.useEffect(() => {
+    if (!isOpen && editTargetIdRef.current) {
+      saveOpacityChanges();
+      setEditTargetId(null);
+    }
+  }, [isOpen, saveOpacityChanges]);
+
   if (!isOpen) return null;
-  
-  // Prevent clicks inside picker from closing it
+
+  // Prevent clicks inside picker from closing it (the picker itself)
   const handlePickerClick = (e) => {
     e.stopPropagation();
   };
-  
-  // Prevent touch events from propagating to canvas (which would trigger panning)
+
+  // Handle mousedown - close edit panel if clicking outside it, but keep picker open
+  const handlePickerMouseDown = (e) => {
+    e.stopPropagation();
+
+    // If edit panel is open and click is outside it, close and save
+    if (editTargetId && !e.target.closest('.dmt-color-edit-panel')) {
+      if (!justOpenedEditRef.current) {
+        saveAndCloseEditPanel();
+      }
+    }
+  };
+
+  // Handle touch - close edit panel if touching outside it, prevent propagation to canvas
   const handlePickerTouch = (e) => {
     e.stopPropagation();
+
+    // If edit panel is open and touch is outside it, close and save
+    // But not if it was just opened (from long press)
+    if (editTargetId && !e.target.closest('.dmt-color-edit-panel')) {
+      if (!justOpenedEditRef.current) {
+        saveAndCloseEditPanel();
+      }
+    }
   };
-  
-  const handleColorClick = (colorHex) => {
-    onColorSelect(colorHex);
+
+  const handleColorClick = (colorDef) => {
+    // Skip if this click is from releasing a long press
+    if (longPressTriggeredRef.current) {
+      longPressTriggeredRef.current = false;
+      return;
+    }
+
+    onColorSelect(colorDef.color);
+
+    // Apply stored opacity if this color has one
+    if (onOpacityChange && colorDef.opacity !== undefined) {
+      onOpacityChange(colorDef.opacity);
+    }
   };
-  
+
   const handleReset = (e) => {
     e.stopPropagation();
     onReset();
   };
-  
-  // Handle live color preview
+
+  // Handle live color preview - value includes alpha from native picker
   const handleColorInput = (e) => {
     setPreviewColor(e.target.value);
     if (pendingCustomColorRef) {
       pendingCustomColorRef.current = e.target.value;
     }
   };
-  
-  // When the color input loses focus, SAVE THE PREVIEW
+
+  // When the color input loses focus, don't save yet - let the picker-close handler do it
   const handleColorBlur = (e) => {
-    if (previewColor && onAddCustomColor) {
-      // Convert preview to actual custom color
-      onAddCustomColor(previewColor);
-      onColorSelect(previewColor);
-      setPreviewColor(null);
-    }
+    // Actual save happens on picker close via ToolPalette
   };
-  
+
   // Handle click on the add button to show preview immediately
   const handleAddClick = () => {
     setPreviewColor('#888888');
+    if (pendingCustomColorRef) {
+      pendingCustomColorRef.current = '#888888';
+    }
   };
-  
-  // Handle right-click on custom color to show delete option
+
+  // Handle right-click on color to show edit options
   const handleColorContextMenu = (e, colorDef) => {
-    if (!colorDef.isCustom) return; // Only allow deleting custom colors
+    if (colorDef.isReset || colorDef.isAddButton || colorDef.isPreview) return;
     e.preventDefault();
     e.stopPropagation();
-    setDeleteTargetId(colorDef.id);
+
+    setEditTargetId(colorDef.id);
+    setEditingOpacity(colorDef.opacity ?? 1);
+    // Brief protection against immediate close
+    justOpenedEditRef.current = true;
+    setTimeout(() => { justOpenedEditRef.current = false; }, 100);
   };
-  
+
   // Handle long-press start for touch devices
   const handleLongPressStart = (colorDef) => {
-    if (!colorDef.isCustom) return;
+    if (colorDef.isReset || colorDef.isAddButton || colorDef.isPreview) return;
+    longPressTriggeredRef.current = false; // Reset at start
     longPressTimerRef.current = setTimeout(() => {
-      setDeleteTargetId(colorDef.id);
+      longPressTriggeredRef.current = true; // Mark that long press completed
+
+      setEditTargetId(colorDef.id);
+      setEditingOpacity(colorDef.opacity ?? 1);
+      // Protection against immediate close from touch release
+      justOpenedEditRef.current = true;
+      setTimeout(() => { justOpenedEditRef.current = false; }, 300);
     }, 500); // 500ms for long press
   };
-  
-  // Handle long-press cancel
+
+  // Handle long-press cancel (finger moved or lifted before 500ms)
   const handleLongPressCancel = () => {
     if (longPressTimerRef.current) {
       clearTimeout(longPressTimerRef.current);
       longPressTimerRef.current = null;
     }
   };
-  
+
   // Handle delete button click
   const handleDeleteClick = (e, colorId) => {
     e.preventDefault();
@@ -9545,32 +12370,30 @@ const ColorPicker = ({
     if (onDeleteCustomColor) {
       onDeleteCustomColor(colorId);
     }
-    setDeleteTargetId(null);
+    setEditTargetId(null);
   };
-  
-  // Close delete UI when clicking elsewhere
-  dc.useEffect(() => {
-    if (deleteTargetId) {
-      const handleClickOutside = () => {
-        setDeleteTargetId(null);
-      };
-      
-      document.addEventListener('mousedown', handleClickOutside);
-      document.addEventListener('touchstart', handleClickOutside);
-      
-      return () => {
-        document.removeEventListener('mousedown', handleClickOutside);
-        document.removeEventListener('touchstart', handleClickOutside);
-      };
-    }
-  }, [deleteTargetId]);
-  
+
+  // Handle opacity change while editing
+  const handleEditOpacityChange = (e, colorId) => {
+    e.stopPropagation();
+    const newOpacity = parseInt(e.target.value, 10) / 100;
+
+    setEditingOpacity(newOpacity);
+  };
+
   // Combine all colors into a single array for rendering
   // getColorPalette() returns built-in + global custom colors from settings
   const paletteColors = getColorPalette();
+
+  // Apply per-map opacity overrides to palette colors
+  const paletteColorsWithOverrides = paletteColors.map(c => {
+    const override = paletteColorOpacityOverrides[c.id];
+    return override !== undefined ? { ...c, opacity: override } : c;
+  });
+
   const allColors = [
     { id: 'reset', color: null, label: 'Reset to default', isReset: true },
-    ...paletteColors,
+    ...paletteColorsWithOverrides,
     ...customColors.map(c => ({ ...c, isCustom: true })),
     // Add preview color if one exists
     ...(previewColor ? [{
@@ -9581,22 +12404,23 @@ const ColorPicker = ({
     }] : []),
     { id: 'add-custom', color: null, label: 'Add custom color', isAddButton: true }
   ];
-  
+
   // Determine horizontal alignment
-  const horizontalStyle = align === 'right' 
+  const horizontalStyle = align === 'right'
     ? { right: '0', left: 'auto' }
     : { left: '0' };
-  
+
   return (
-    <div 
-      className="dmt-color-picker" 
+    <div
+      className="dmt-color-picker"
       onClick={handlePickerClick}
+      onMouseDown={handlePickerMouseDown}
       onTouchStart={handlePickerTouch}
       onTouchMove={handlePickerTouch}
       onTouchEnd={handlePickerTouch}
       style={{
         position: 'absolute',
-        ...(position === 'above' 
+        ...(position === 'above'
           ? { bottom: 'calc(100% + 8px)', top: 'auto' }
           : { top: 'calc(100% + 8px)' }
         ),
@@ -9607,7 +12431,7 @@ const ColorPicker = ({
       <div className="dmt-color-picker-header">
         <span className="dmt-color-picker-title">{title}</span>
       </div>
-      
+
       <div className="dmt-color-grid">
         {allColors.map(colorDef => {
           if (colorDef.isReset) {
@@ -9622,13 +12446,13 @@ const ColorPicker = ({
               </button>
             );
           } else if (colorDef.isPreview) {
-            // Render preview color swatch
+            // Render preview color swatch - color value includes alpha from native picker
             return (
               <div
                 key={colorDef.id}
                 className="dmt-color-swatch dmt-color-swatch-preview"
                 style={{ backgroundColor: colorDef.color }}
-                title={colorDef.label}
+                title="Selecting..."
               >
                 <span className="dmt-color-preview-spinner">
                   <dc.Icon icon="lucide-loader" />
@@ -9657,37 +12481,64 @@ const ColorPicker = ({
               </div>
             );
           } else {
-            // Regular color swatch with optional delete button
-            const isShowingDelete = deleteTargetId === colorDef.id;
-            
+            // Regular color swatch with optional edit panel
+            const isEditing = editTargetId === colorDef.id;
+            const displayOpacity = isEditing ? editingOpacity : (colorDef.opacity ?? 1);
+            const hasStoredOpacity = (colorDef.opacity ?? 1) < 1;
+
             return (
               <div key={colorDef.id} style={{ position: 'relative', display: 'inline-block' }}>
                 <button
-                  className={`dmt-color-swatch ${selectedColor === colorDef.color ? 'dmt-color-swatch-selected' : ''}`}
-                  style={{ backgroundColor: colorDef.color }}
-                  onClick={() => handleColorClick(colorDef.color)}
+                  className={`dmt-color-swatch interactive-child ${selectedColor === colorDef.color ? 'dmt-color-swatch-selected' : ''}`}
+                  style={{
+                    backgroundColor: colorDef.color,
+                    opacity: displayOpacity
+                  }}
+                  onClick={() => handleColorClick(colorDef)}
                   onContextMenu={(e) => handleColorContextMenu(e, colorDef)}
                   onTouchStart={() => handleLongPressStart(colorDef)}
                   onTouchEnd={handleLongPressCancel}
                   onTouchMove={handleLongPressCancel}
-                  onMouseDown={colorDef.isCustom ? handleLongPressCancel : undefined}
-                  title={colorDef.label}
+                  onMouseDown={handleLongPressCancel}
+                  title={colorDef.label + (hasStoredOpacity ? ` (${Math.round((colorDef.opacity ?? 1) * 100)}%)` : '')}
                 >
                   {selectedColor === colorDef.color && (
-                    <span className="dmt-color-checkmark">            
-                    <dc.Icon icon="lucide-check" />
+                    <span className="dmt-color-checkmark">
+                      <dc.Icon icon="lucide-check" />
                     </span>
                   )}
                 </button>
-                
-                {isShowingDelete && colorDef.isCustom && (
+
+                {/* Edit panel - opacity slider for all colors */}
+                {isEditing && (
                   <div
-                    className="dmt-color-delete-button"
-                    onClick={(e) => handleDeleteClick(e, colorDef.id)}
+                    className="dmt-color-edit-panel"
                     onMouseDown={(e) => e.stopPropagation()}
-                    title="Delete custom color"
+                    onTouchStart={(e) => e.stopPropagation()}
                   >
-                    <dc.Icon icon="lucide-trash-2" />
+                    <div className="dmt-color-edit-opacity">
+                      <span className="dmt-color-edit-opacity-label">Opacity</span>
+                      <input
+                        type="range"
+                        min="10"
+                        max="100"
+                        value={Math.round(editingOpacity * 100)}
+                        onChange={(e) => handleEditOpacityChange(e, colorDef.id)}
+                        onInput={(e) => handleEditOpacityChange(e, colorDef.id)}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onTouchStart={(e) => e.stopPropagation()}
+                      />
+                      <span className="dmt-color-edit-opacity-value">{Math.round(editingOpacity * 100)}%</span>
+                    </div>
+
+                    <button
+                      className="dmt-color-edit-delete"
+                      onClick={(e) => handleDeleteClick(e, colorDef.id)}
+                      title="Delete custom color"
+                    >
+                      <dc.Icon icon="lucide-trash-2" />
+                    </button>
+
                   </div>
                 )}
               </div>
@@ -9695,8 +12546,8 @@ const ColorPicker = ({
           }
         })}
       </div>
-      
-      {/* Opacity slider - only show when onOpacityChange is provided */}
+
+      {/* Opacity slider*/}
       {onOpacityChange && (
         <div className="dmt-color-opacity-section">
           <div className="dmt-color-opacity-header">
@@ -9733,6 +12584,211 @@ return { ColorPicker };
 const { calculateObjectScreenPosition } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "screenPositionUtils"));
 const { openNoteInNewTab } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "noteOperations"));
 const { ColorPicker } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "ColorPicker"));
+const { getActiveLayer } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "layerAccessor"));
+
+/**
+ * Calculate bounding box that encompasses all selected items
+ */
+function calculateMultiSelectBounds(selectedItems, mapData, canvasRef, geometry) {
+  if (!selectedItems?.length || !canvasRef?.current || !mapData) return null;
+  
+  const canvas = canvasRef.current;
+  const { gridSize, viewState, northDirection } = mapData;
+  const { zoom, center } = viewState;
+  const scaledGridSize = gridSize * zoom;
+  
+  const centerX = canvas.width / 2;
+  const centerY = canvas.height / 2;
+  const offsetX = centerX - center.x * scaledGridSize;
+  const offsetY = centerY - center.y * scaledGridSize;
+  
+  // Account for canvas position within container
+  const rect = canvas.getBoundingClientRect();
+  const containerRect = canvas.parentElement.getBoundingClientRect();
+  const canvasOffsetX = rect.left - containerRect.left;
+  const canvasOffsetY = rect.top - containerRect.top;
+  const scaleX = rect.width / canvas.width;
+  const scaleY = rect.height / canvas.height;
+  
+  const activeLayer = getActiveLayer(mapData);
+  
+  let minScreenX = Infinity;
+  let minScreenY = Infinity;
+  let maxScreenX = -Infinity;
+  let maxScreenY = -Infinity;
+  
+  for (const item of selectedItems) {
+    if (item.type === 'object') {
+      const obj = activeLayer.objects?.find(o => o.id === item.id);
+      if (!obj) continue;
+      
+      const pos = calculateObjectScreenPosition(obj, canvas, mapData, geometry);
+      if (!pos) continue;
+      
+      const left = pos.screenX - pos.objectWidth / 2;
+      const right = pos.screenX + pos.objectWidth / 2;
+      const top = pos.screenY - pos.objectHeight / 2;
+      const bottom = pos.screenY + pos.objectHeight / 2;
+      
+      minScreenX = Math.min(minScreenX, left);
+      maxScreenX = Math.max(maxScreenX, right);
+      minScreenY = Math.min(minScreenY, top);
+      maxScreenY = Math.max(maxScreenY, bottom);
+    } else if (item.type === 'text') {
+      const label = activeLayer.textLabels?.find(l => l.id === item.id);
+      if (!label) continue;
+      
+      // Get label position in screen space
+      let screenX = offsetX + label.position.x * zoom;
+      let screenY = offsetY + label.position.y * zoom;
+      
+      // Apply canvas rotation if present
+      if (northDirection !== 0) {
+        const relX = screenX - centerX;
+        const relY = screenY - centerY;
+        const angleRad = (northDirection * Math.PI) / 180;
+        const rotatedX = relX * Math.cos(angleRad) - relY * Math.sin(angleRad);
+        const rotatedY = relX * Math.sin(angleRad) + relY * Math.cos(angleRad);
+        screenX = centerX + rotatedX;
+        screenY = centerY + rotatedY;
+      }
+      
+      // Approximate label bounds
+      const fontSize = (label.fontSize || 16) * zoom;
+      const approxWidth = fontSize * 3; // Rough estimate
+      const approxHeight = fontSize * 1.5;
+      
+      const left = (screenX * scaleX) + canvasOffsetX - approxWidth / 2;
+      const right = (screenX * scaleX) + canvasOffsetX + approxWidth / 2;
+      const top = (screenY * scaleY) + canvasOffsetY - approxHeight / 2;
+      const bottom = (screenY * scaleY) + canvasOffsetY + approxHeight / 2;
+      
+      minScreenX = Math.min(minScreenX, left);
+      maxScreenX = Math.max(maxScreenX, right);
+      minScreenY = Math.min(minScreenY, top);
+      maxScreenY = Math.max(maxScreenY, bottom);
+    }
+  }
+  
+  if (minScreenX === Infinity) return null;
+  
+  return {
+    screenX: (minScreenX + maxScreenX) / 2,
+    screenY: (minScreenY + maxScreenY) / 2,
+    width: maxScreenX - minScreenX,
+    height: maxScreenY - minScreenY,
+    top: minScreenY,
+    bottom: maxScreenY
+  };
+}
+
+/**
+ * MultiSelectToolbar Component
+ * Shows simplified toolbar for multiple selected items
+ */
+const MultiSelectToolbar = ({
+  selectedItems,
+  selectionCount,
+  mapData,
+  canvasRef,
+  containerRef,
+  geometry,
+  onRotateAll,
+  onDuplicateAll,
+  onDeleteAll
+}) => {
+  if (!selectedItems?.length || !mapData || !canvasRef?.current || !containerRef?.current) {
+    return null;
+  }
+  
+  // Calculate bounding box of all selected items
+  const bounds = calculateMultiSelectBounds(selectedItems, mapData, canvasRef, geometry);
+  if (!bounds) return null;
+  
+  // Calculate toolbar dimensions
+  const buttonSize = 44;
+  const buttonGap = 4;
+  const toolbarGap = 4;
+  const countBadgeWidth = 80;
+  
+  // Buttons: Count badge + Rotate All + Duplicate All + Delete All
+  const buttonCount = 3;
+  const toolbarWidth = countBadgeWidth + buttonGap + buttonCount * buttonSize + (buttonCount - 1) * buttonGap;
+  const toolbarHeight = buttonSize;
+  
+  // Get container bounds for edge detection
+  const containerRect = containerRef.current.getBoundingClientRect();
+  const containerHeight = containerRect.height;
+  
+  // Determine if we need to flip above
+  const spaceBelow = containerHeight - bounds.bottom;
+  const shouldFlipAbove = spaceBelow < toolbarHeight + toolbarGap + 20;
+  
+  // Calculate toolbar position
+  let toolbarX = bounds.screenX - toolbarWidth / 2;
+  let toolbarY;
+  
+  if (shouldFlipAbove) {
+    toolbarY = bounds.top - toolbarGap - toolbarHeight;
+  } else {
+    toolbarY = bounds.bottom + toolbarGap;
+  }
+  
+  // Clamp horizontal position to container bounds
+  const minX = 4;
+  const maxX = containerRect.width - toolbarWidth - 4;
+  toolbarX = Math.max(minX, Math.min(maxX, toolbarX));
+  
+  // Count objects and text labels
+  const objectCount = selectedItems.filter(i => i.type === 'object').length;
+  const textCount = selectedItems.filter(i => i.type === 'text').length;
+  
+  return (
+    <div 
+      className="dmt-selection-toolbar dmt-multi-select-toolbar"
+      style={{
+        position: 'absolute',
+        left: `${toolbarX}px`,
+        top: `${toolbarY}px`,
+        pointerEvents: 'auto',
+        zIndex: 150
+      }}
+    >
+      {/* Selection count badge */}
+      <div className="dmt-selection-count">
+        <dc.Icon icon="lucide-box-select" size={14} />
+        <span>{selectionCount || selectedItems.length} selected</span>
+      </div>
+      
+      {/* Rotate All */}
+      <button
+        className="dmt-toolbar-button"
+        onClick={onRotateAll}
+        title="Rotate All 90°"
+      >
+        <dc.Icon icon="lucide-rotate-cw" />
+      </button>
+      
+      {/* Duplicate All */}
+      <button
+        className="dmt-toolbar-button"
+        onClick={onDuplicateAll}
+        title="Duplicate All"
+      >
+        <dc.Icon icon="lucide-copy" />
+      </button>
+      
+      {/* Delete All */}
+      <button
+        className="dmt-toolbar-button dmt-toolbar-delete-button"
+        onClick={onDeleteAll}
+        title="Delete All"
+      >
+        <dc.Icon icon="lucide-trash-2" />
+      </button>
+    </div>
+  );
+};
 
 /**
  * Calculate bounding box for a text label in screen coordinates
@@ -9806,6 +12862,9 @@ function calculateTextLabelBounds(label, canvasRef, mapData) {
 const SelectionToolbar = ({
   // Selection info
   selectedItem,
+  selectedItems,      // Array of all selected items for multi-select
+  hasMultiSelection,  // True when multiple items selected
+  selectionCount,     // Number of selected items
   mapData,
   canvasRef,
   containerRef,
@@ -9820,6 +12879,11 @@ const SelectionToolbar = ({
   onDelete,
   onScaleChange,  // handler for scale slider
   onDuplicate,    // handler for duplicating object
+  
+  // Multi-select handlers
+  onRotateAll,
+  onDuplicateAll,
+  onDeleteAll,
   
   // Text-specific handlers
   onEdit,
@@ -9839,6 +12903,23 @@ const SelectionToolbar = ({
   pendingCustomColorRef,
   colorButtonRef
 }) => {
+  // Handle multi-select mode
+  if (hasMultiSelection && selectedItems?.length > 1) {
+    return (
+      <MultiSelectToolbar
+        selectedItems={selectedItems}
+        selectionCount={selectionCount}
+        mapData={mapData}
+        canvasRef={canvasRef}
+        containerRef={containerRef}
+        geometry={geometry}
+        onRotateAll={onRotateAll}
+        onDuplicateAll={onDuplicateAll}
+        onDeleteAll={onDeleteAll}
+      />
+    );
+  }
+  
   // Don't render if no selection or missing dependencies
   if (!selectedItem || !mapData || !canvasRef?.current || !containerRef?.current) {
     return null;
@@ -9851,7 +12932,7 @@ const SelectionToolbar = ({
   let bounds = null;
   
   if (isObject) {
-    const object = mapData.objects?.find(obj => obj.id === selectedItem.id);
+    const object = getActiveLayer(mapData).objects?.find(obj => obj.id === selectedItem.id);
     if (!object) return null;
     
     const pos = calculateObjectScreenPosition(object, canvasRef.current, mapData, geometry);
@@ -9864,7 +12945,7 @@ const SelectionToolbar = ({
       height: pos.objectHeight
     };
   } else if (isText) {
-    const label = mapData.textLabels?.find(l => l.id === selectedItem.id);
+    const label = getActiveLayer(mapData).textLabels?.find(l => l.id === selectedItem.id);
     if (!label) return null;
     
     bounds = calculateTextLabelBounds(label, canvasRef, mapData);
@@ -9934,7 +13015,7 @@ const SelectionToolbar = ({
   // During resize mode, show scale slider instead of action buttons
   if (isResizeMode && isObject) {
     // Read scale from actual object in mapData, not from selectedItem.data which may be stale
-    const actualObject = mapData.objects?.find(obj => obj.id === selectedItem.id);
+    const actualObject = getActiveLayer(mapData).objects?.find(obj => obj.id === selectedItem.id);
     const currentScale = actualObject?.scale ?? 1.0;
     const sliderWidth = 140;
     const sliderHeight = 36;
@@ -10036,7 +13117,7 @@ const SelectionToolbar = ({
               onClick={(e) => {
                 if (onRotate) onRotate(e);
               }}
-              title="Rotate 90° (or press R)"
+              title="Rotate 90Ã‚Â° (or press R)"
             >
               <dc.Icon icon="lucide-rotate-cw" />
             </button>
@@ -10149,7 +13230,7 @@ const SelectionToolbar = ({
             <button
               className="dmt-toolbar-button"
               onClick={onRotate}
-              title="Rotate 90° (or press R)"
+              title="Rotate 90Ã‚Â° (or press R)"
             >
               <dc.Icon icon="lucide-rotate-cw" />
             </button>
@@ -10193,6 +13274,7 @@ const { TextInputModal } = await dc.require(dc.headerLink(dc.resolvePath("compil
 const { NoteLinkModal } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "NoteLinkModal"));
 const { SelectionToolbar } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "SelectionToolbar"));
 const { calculateObjectScreenPosition } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "screenPositionUtils"));
+const { getActiveLayer } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "layerAccessor"));
 
 /**
  * ObjectLayer Component
@@ -10214,9 +13296,10 @@ const ObjectLayer = ({
 }) => {
   // Get shared state from Context
   const { canvasRef, containerRef, mapData, geometry, screenToGrid, screenToWorld, getClientCoords, GridGeometry } = useMapState();
-  const { getObjectAtPosition, addObject, updateObject, removeObject, isAreaFree, onObjectsChange: contextOnObjectsChange } = useMapOperations();
+  const { getObjectAtPosition, addObject, updateObject, removeObject, isAreaFree, onObjectsChange: contextOnObjectsChange, onTextLabelsChange, removeTextLabel } = useMapOperations();
   const { 
     selectedItem, setSelectedItem, 
+    selectedItems, isSelected, hasMultiSelection, selectionCount, selectItem, selectMultiple, clearSelection,
     isDraggingSelection, setIsDraggingSelection, 
     dragStart, setDragStart, 
     isResizeMode, setIsResizeMode,
@@ -10225,7 +13308,8 @@ const ObjectLayer = ({
     showNoteLinkModal, setShowNoteLinkModal,
     editingNoteObjectId, setEditingNoteObjectId,
     showCoordinates,
-    layerVisibility
+    layerVisibility,
+    updateSelectedItemsData
   } = useMapSelection();
   
   // Object note modal state
@@ -10239,7 +13323,7 @@ const ObjectLayer = ({
   const handleScaleChange = dc.useCallback((newScale) => {
     if (!selectedItem || selectedItem.type !== 'object' || !mapData?.objects) return;
     
-    const updatedObjects = updateObject(mapData.objects, selectedItem.id, { scale: newScale });
+    const updatedObjects = updateObject(getActiveLayer(mapData).objects, selectedItem.id, { scale: newScale });
     contextOnObjectsChange(updatedObjects);
     
     // Update selected item data
@@ -10248,6 +13332,140 @@ const ObjectLayer = ({
       setSelectedItem({ ...selectedItem, data: updatedObject });
     }
   }, [selectedItem, mapData, updateObject, contextOnObjectsChange, setSelectedItem]);
+  
+  // Multi-select operation handlers
+  
+  /**
+   * Rotate all selected objects by 90 degrees
+   */
+  const handleRotateAll = dc.useCallback(() => {
+    if (!hasMultiSelection || !mapData) return;
+    
+    const activeLayer = getActiveLayer(mapData);
+    let updatedObjects = [...(activeLayer.objects || [])];
+    let updatedTextLabels = [...(activeLayer.textLabels || [])];
+    
+    for (const item of selectedItems) {
+      if (item.type === 'object') {
+        const idx = updatedObjects.findIndex(o => o.id === item.id);
+        if (idx !== -1) {
+          const obj = updatedObjects[idx];
+          const currentRotation = obj.rotation || 0;
+          const nextRotation = (currentRotation + 90) % 360;
+          updatedObjects[idx] = { ...obj, rotation: nextRotation };
+        }
+      } else if (item.type === 'text') {
+        const idx = updatedTextLabels.findIndex(l => l.id === item.id);
+        if (idx !== -1) {
+          const label = updatedTextLabels[idx];
+          const currentRotation = label.rotation || 0;
+          const nextRotation = (currentRotation + 90) % 360;
+          updatedTextLabels[idx] = { ...label, rotation: nextRotation };
+        }
+      }
+    }
+    
+    // Apply changes - suppress history on first, add on second for single undo
+    onObjectsChange(updatedObjects, true);
+    onTextLabelsChange(updatedTextLabels, false);
+    
+    // Update selected items data
+    const updates = selectedItems.map(item => {
+      if (item.type === 'object') {
+        const obj = updatedObjects.find(o => o.id === item.id);
+        return obj ? { id: item.id, rotation: obj.rotation } : null;
+      } else {
+        const label = updatedTextLabels.find(l => l.id === item.id);
+        return label ? { id: item.id, rotation: label.rotation } : null;
+      }
+    }).filter(Boolean);
+    
+    updateSelectedItemsData(updates);
+  }, [hasMultiSelection, mapData, selectedItems, onObjectsChange, onTextLabelsChange, updateSelectedItemsData]);
+  
+  /**
+   * Duplicate all selected items
+   */
+  const handleDuplicateAll = dc.useCallback(() => {
+    if (!hasMultiSelection || !mapData) return;
+    
+    const activeLayer = getActiveLayer(mapData);
+    let updatedObjects = [...(activeLayer.objects || [])];
+    let updatedTextLabels = [...(activeLayer.textLabels || [])];
+    const newSelectedItems = [];
+    
+    // Find offset - try to place duplicates 1 cell to the right
+    const offsetX = 1;
+    const offsetY = 0;
+    
+    for (const item of selectedItems) {
+      if (item.type === 'object') {
+        const sourceObj = activeLayer.objects?.find(o => o.id === item.id);
+        if (!sourceObj) continue;
+        
+        // Create duplicate with offset position
+        const newId = `obj-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const newObj = {
+          ...sourceObj,
+          id: newId,
+          position: {
+            x: sourceObj.position.x + offsetX,
+            y: sourceObj.position.y + offsetY
+          }
+        };
+        updatedObjects.push(newObj);
+        newSelectedItems.push({ type: 'object', id: newId, data: newObj });
+      } else if (item.type === 'text') {
+        const sourceLabel = activeLayer.textLabels?.find(l => l.id === item.id);
+        if (!sourceLabel) continue;
+        
+        // Create duplicate with offset position (world coords)
+        const newId = `text-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const offsetWorld = (mapData.gridSize || 32) * 1; // 1 grid cell offset in world coords
+        const newLabel = {
+          ...sourceLabel,
+          id: newId,
+          position: {
+            x: sourceLabel.position.x + offsetWorld,
+            y: sourceLabel.position.y
+          }
+        };
+        updatedTextLabels.push(newLabel);
+        newSelectedItems.push({ type: 'text', id: newId, data: newLabel });
+      }
+    }
+    
+    // Apply changes - suppress history on first, add on second for single undo
+    onObjectsChange(updatedObjects, true);
+    onTextLabelsChange(updatedTextLabels, false);
+    
+    // Select the new duplicates
+    if (newSelectedItems.length > 0) {
+      selectMultiple(newSelectedItems);
+    }
+  }, [hasMultiSelection, mapData, selectedItems, contextOnObjectsChange, onTextLabelsChange, selectMultiple]);
+  
+  /**
+   * Delete all selected items
+   */
+  const handleDeleteAll = dc.useCallback(() => {
+    if (!hasMultiSelection || !mapData) return;
+    
+    const activeLayer = getActiveLayer(mapData);
+    const selectedObjectIds = new Set(selectedItems.filter(i => i.type === 'object').map(i => i.id));
+    const selectedTextIds = new Set(selectedItems.filter(i => i.type === 'text').map(i => i.id));
+    
+    // Filter out selected items
+    const updatedObjects = (activeLayer.objects || []).filter(obj => !selectedObjectIds.has(obj.id));
+    const updatedTextLabels = (activeLayer.textLabels || []).filter(label => !selectedTextIds.has(label.id));
+    
+    // Apply changes - suppress history on first, add on second to get single undo
+    onObjectsChange(updatedObjects, true); // suppress history
+    onTextLabelsChange(updatedTextLabels, false); // this one adds to history
+    
+    // Clear selection
+    clearSelection();
+  }, [hasMultiSelection, mapData, selectedItems, onObjectsChange, onTextLabelsChange, clearSelection]);
   
   // Note link modal state is now from MapSelectionContext (shared with NotePinLayer)
   
@@ -10395,7 +13613,7 @@ const ObjectLayer = ({
   const handleNoteLinkSave = (notePath) => {
     if (!mapData || !editingNoteObjectId) return;
     
-    const updatedObjects = mapData.objects.map(obj => {
+    const updatedObjects = getActiveLayer(mapData).objects.map(obj => {
       if (obj.id === editingNoteObjectId) {
         return { ...obj, linkedNote: notePath };
       }
@@ -10497,7 +13715,7 @@ const ObjectLayer = ({
   };
   
   const selectedObject = selectedItem?.type === 'object' && mapData?.objects 
-    ? mapData.objects.find(obj => obj.id === selectedItem.id)
+    ? getActiveLayer(mapData).objects.find(obj => obj.id === selectedItem.id)
     : null;
   
   const indicatorPositions = edgeSnapMode && selectedObject && mapData?.mapType !== 'hex'
@@ -10581,16 +13799,19 @@ const ObjectLayer = ({
         </>
       )}
       
-      {/* Selection Toolbar for objects - only render when an object is selected and not dragging */}
-      {selectedItem?.type === 'object' && !isDraggingSelection && (
+      {/* Selection Toolbar - render for single object OR multi-select (not while dragging) */}
+      {((selectedItem?.type === 'object' || hasMultiSelection) && !isDraggingSelection) && (
         <SelectionToolbar
           selectedItem={selectedItem}
+          selectedItems={selectedItems}
+          hasMultiSelection={hasMultiSelection}
+          selectionCount={selectionCount}
           mapData={mapData}
           canvasRef={canvasRef}
           containerRef={containerRef}
           geometry={geometry}
           
-          // Object handlers
+          // Single-item object handlers
           onRotate={handleObjectRotation}
           onDuplicate={handleObjectDuplicate}
           onLabel={handleNoteButtonClick}
@@ -10599,6 +13820,11 @@ const ObjectLayer = ({
           onResize={handleResizeButtonClick}
           onDelete={handleObjectDeletion}
           onScaleChange={handleScaleChange}
+          
+          // Multi-select handlers
+          onRotateAll={handleRotateAll}
+          onDuplicateAll={handleDuplicateAll}
+          onDeleteAll={handleDeleteAll}
           
           // State
           isResizeMode={isResizeMode}
@@ -10622,9 +13848,9 @@ const ObjectLayer = ({
         <TextInputModal
           onSubmit={handleNoteModalSubmit}
           onCancel={handleNoteCancel}
-          title={`Note for ${mapData.objects.find(obj => obj.id === editingObjectId)?.label || 'Object'}`}
+          title={`Note for ${getActiveLayer(mapData).objects.find(obj => obj.id === editingObjectId)?.label || 'Object'}`}
           placeholder="Add a custom note..."
-          initialValue={mapData.objects.find(obj => obj.id === editingObjectId)?.customTooltip || ''}
+          initialValue={getActiveLayer(mapData).objects.find(obj => obj.id === editingObjectId)?.customTooltip || ''}
         />
       )}
       
@@ -10636,12 +13862,12 @@ const ObjectLayer = ({
           onSave={handleNoteLinkSave}
           currentNotePath={
             editingNoteObjectId
-              ? mapData.objects?.find(obj => obj.id === editingNoteObjectId)?.linkedNote || null
+              ? getActiveLayer(mapData).objects?.find(obj => obj.id === editingNoteObjectId)?.linkedNote || null
               : null
           }
           objectType={
             editingNoteObjectId
-              ? mapData.objects?.find(obj => obj.id === editingNoteObjectId)?.type || null
+              ? getActiveLayer(mapData).objects?.find(obj => obj.id === editingNoteObjectId)?.type || null
               : null
           }
         />
@@ -11017,6 +14243,7 @@ return {
 const { useMapState, useMapOperations } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "MapContext"));
 const { addEdge, removeEdge, getEdgeAt, generateEdgeLine, mergeEdges } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "edgeOperations"));
 const { eraseObjectAt } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "objectOperations"));
+const { getActiveLayer } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "layerAccessor"));
 
 /**
  * Hook for managing drawing tools
@@ -11072,6 +14299,9 @@ const useDrawingTools = (
   const toggleCell = (coords, shouldFill, dragStart = null) => {
     if (!mapData || !geometry) return;
     
+    // Get active layer data for reading
+    const activeLayer = getActiveLayer(mapData);
+    
     // Check bounds for hex maps (only applies to hex geometry with bounds set)
     // Handle both coordinate formats: {gridX, gridY} from screenToGrid and {q, r} from cells
     const q = coords.q !== undefined ? coords.q : coords.gridX;
@@ -11084,14 +14314,14 @@ const useDrawingTools = (
     // Check if we're in a batched stroke (suppress history for intermediate updates)
     const isBatchedStroke = strokeInitialStateRef.current !== null;
     
-    const existingCellIndex = mapData.cells.findIndex(
+    const existingCellIndex = activeLayer.cells.findIndex(
       cell => geometry.cellMatchesCoords(cell, coords)
     );
     
     if (shouldFill) {
       if (existingCellIndex !== -1) {
         // Cell exists - update its color and opacity (paint over)
-        const newCells = [...mapData.cells];
+        const newCells = [...activeLayer.cells];
         newCells[existingCellIndex] = {
           ...newCells[existingCellIndex],
           color: selectedColor,
@@ -11102,7 +14332,7 @@ const useDrawingTools = (
         // Cell doesn't exist - create new with selected color and opacity
         const newCell = geometry.createCellObject(coords, selectedColor);
         newCell.opacity = selectedOpacity;
-        const newCells = [...mapData.cells, newCell];
+        const newCells = [...activeLayer.cells, newCell];
         onCellsChange(newCells, isBatchedStroke);
       }
     } else if (!shouldFill) {
@@ -11114,13 +14344,13 @@ const useDrawingTools = (
         const canvas = canvasRef.current;
         const ctx = canvas ? canvas.getContext('2d') : null;
         const textLabel = getTextLabelAtPosition(
-          mapData.textLabels || [],
+          activeLayer.textLabels || [],
           worldCoords.worldX,
           worldCoords.worldY,
           ctx
         );
         if (textLabel) {
-          const newLabels = removeTextLabel(mapData.textLabels || [], textLabel.id);
+          const newLabels = removeTextLabel(activeLayer.textLabels || [], textLabel.id);
           onTextLabelsChange(newLabels);
           return;
         }
@@ -11134,14 +14364,14 @@ const useDrawingTools = (
             
             // Skip if already processed this edge during current stroke
             if (!processedEdges.has(edgeKey)) {
-              const existingEdge = getEdgeAt(mapData.edges || [], edgeInfo.x, edgeInfo.y, edgeInfo.side);
+              const existingEdge = getEdgeAt(activeLayer.edges || [], edgeInfo.x, edgeInfo.y, edgeInfo.side);
               if (existingEdge) {
                 // Store initial edge state on first edge erase of this stroke
                 if (strokeInitialEdgesRef.current === null) {
-                  strokeInitialEdgesRef.current = [...(mapData.edges || [])];
+                  strokeInitialEdgesRef.current = [...(activeLayer.edges || [])];
                 }
                 setProcessedEdges(prev => new Set([...prev, edgeKey]));
-                const newEdges = removeEdge(mapData.edges || [], edgeInfo.x, edgeInfo.y, edgeInfo.side);
+                const newEdges = removeEdge(activeLayer.edges || [], edgeInfo.x, edgeInfo.y, edgeInfo.side);
                 onEdgesChange(newEdges, isBatchedStroke);
                 return;
               }
@@ -11153,17 +14383,17 @@ const useDrawingTools = (
       // Then check for object (extract coordinates based on map type)
       const coordX = coords.gridX !== undefined ? coords.gridX : coords.q;
       const coordY = coords.gridY !== undefined ? coords.gridY : coords.r;
-      const obj = getObjectAtPosition(mapData.objects || [], coordX, coordY);
+      const obj = getObjectAtPosition(activeLayer.objects || [], coordX, coordY);
       if (obj) {
         // Use unified API - handles hex (one at a time) vs grid (all at position)
         const mapType = mapData.mapType || 'grid';
-        const result = eraseObjectAt(mapData.objects || [], coordX, coordY, mapType);
+        const result = eraseObjectAt(activeLayer.objects || [], coordX, coordY, mapType);
         if (result.success) {
           onObjectsChange(result.objects);
         }
       } else if (existingCellIndex !== -1) {
         // Finally remove cell if no text or object
-        const newCells = mapData.cells.filter(
+        const newCells = activeLayer.cells.filter(
           cell => !geometry.cellMatchesCoords(cell, coords)
         );
         onCellsChange(newCells, isBatchedStroke);
@@ -11184,6 +14414,9 @@ const useDrawingTools = (
     // Edge painting only works for grid geometry
     if (!(geometry instanceof GridGeometry)) return;
     
+    // Get active layer data for reading
+    const activeLayer = getActiveLayer(mapData);
+    
     // Use screenToEdge to detect which edge was clicked
     const edgeInfo = geometry.screenToEdge(worldX, worldY, 0.15);
     if (!edgeInfo) return; // Click was in cell center, not near an edge
@@ -11195,11 +14428,11 @@ const useDrawingTools = (
     
     if (shouldPaint) {
       // Paint the edge with selected color and opacity
-      const newEdges = addEdge(mapData.edges || [], x, y, side, selectedColor, selectedOpacity);
+      const newEdges = addEdge(activeLayer.edges || [], x, y, side, selectedColor, selectedOpacity);
       onEdgesChange(newEdges, isBatchedStroke);
     } else {
       // Erase the edge
-      const newEdges = removeEdge(mapData.edges || [], x, y, side);
+      const newEdges = removeEdge(activeLayer.edges || [], x, y, side);
       onEdgesChange(newEdges, isBatchedStroke);
     }
   };
@@ -11235,10 +14468,13 @@ const useDrawingTools = (
   const startEdgeDrawing = (e) => {
     if (!mapData) return;
     
+    // Get active layer data for reading
+    const activeLayer = getActiveLayer(mapData);
+    
     setIsDrawing(true);
     setProcessedEdges(new Set());
     // Store initial edge state for batched history entry at stroke end
-    strokeInitialEdgesRef.current = [...(mapData.edges || [])];
+    strokeInitialEdgesRef.current = [...(activeLayer.edges || [])];
     processEdgeDuringDrag(e);
   };
   
@@ -11248,12 +14484,15 @@ const useDrawingTools = (
   const stopEdgeDrawing = () => {
     if (!isDrawing) return;
     
+    // Get active layer data for reading
+    const activeLayer = getActiveLayer(mapData);
+    
     setIsDrawing(false);
     setProcessedEdges(new Set());
     
     // Add single history entry for the completed stroke
     if (strokeInitialEdgesRef.current !== null && mapData && onEdgesChange) {
-      onEdgesChange(mapData.edges || [], false);
+      onEdgesChange(activeLayer.edges || [], false);
       strokeInitialEdgesRef.current = null;
     }
   };
@@ -11269,6 +14508,9 @@ const useDrawingTools = (
   const fillEdgeLine = (x1, y1, x2, y2) => {
     if (!mapData || !onEdgesChange) return;
     if (!(geometry instanceof GridGeometry)) return;
+    
+    // Get active layer data for reading
+    const activeLayer = getActiveLayer(mapData);
     
     // Determine if this is more horizontal or vertical
     const dx = Math.abs(x2 - x1);
@@ -11294,7 +14536,7 @@ const useDrawingTools = (
     const newEdgesData = generateEdgeLine(lineX1, lineY1, lineX2, lineY2, selectedColor);
     
     // Merge with existing edges
-    const newEdges = mergeEdges(mapData.edges || [], newEdgesData);
+    const newEdges = mergeEdges(activeLayer.edges || [], newEdgesData);
     onEdgesChange(newEdges);
   };
   
@@ -11305,10 +14547,13 @@ const useDrawingTools = (
     if (!mapData) return;
     if (!geometry) return;
     
+    // Get active layer data for reading
+    const activeLayer = getActiveLayer(mapData);
+    
     // Use geometry from context (passed via MapState)
     const cellsInRect = geometry.getCellsInRectangle(x1, y1, x2, y2);
     
-    const newCells = [...mapData.cells];
+    const newCells = [...activeLayer.cells];
     
     for (const cellCoords of cellsInRect) {
       // Convert {x, y} coordinates to proper coords format for geometry
@@ -11340,11 +14585,15 @@ const useDrawingTools = (
     if (!mapData) return;
     
     if (!geometry) return;
+    
+    // Get active layer data for reading
+    const activeLayer = getActiveLayer(mapData);
+    
     // Use geometry from context (passed via MapState)
     const radius = geometry.getEuclideanDistance(centerX, centerY, edgeX, edgeY);
     const cellsInCircle = geometry.getCellsInCircle(centerX, centerY, radius);
     
-    const newCells = [...mapData.cells];
+    const newCells = [...activeLayer.cells];
     
     for (const cellCoords of cellsInCircle) {
       // Convert {x, y} coordinates to proper coords format for geometry
@@ -11376,11 +14625,15 @@ const useDrawingTools = (
     if (!mapData) return;
     
     if (!geometry) return;
+    
+    // Get active layer data for reading
+    const activeLayer = getActiveLayer(mapData);
+    
     // Use geometry from context (passed via MapState)
     const cellsInRect = geometry.getCellsInRectangle(x1, y1, x2, y2);
     
     // Remove all objects within the rectangle (grid coordinates)
-    const newObjects = removeObjectsInRectangle(mapData.objects || [], x1, y1, x2, y2);
+    const newObjects = removeObjectsInRectangle(activeLayer.objects || [], x1, y1, x2, y2);
     onObjectsChange(newObjects);
     
     // Remove all text labels within the rectangle (need to convert to world coordinates)
@@ -11392,14 +14645,14 @@ const useDrawingTools = (
     const { worldX: worldMinX, worldY: worldMinY } = geometry.gridToWorld(minX, minY);
     const { worldX: worldMaxX, worldY: worldMaxY } = geometry.gridToWorld(maxX + 1, maxY + 1);
     
-    const newTextLabels = (mapData.textLabels || []).filter(label => {
+    const newTextLabels = (activeLayer.textLabels || []).filter(label => {
       return !(label.position.x >= worldMinX && label.position.x <= worldMaxX && 
                label.position.y >= worldMinY && label.position.y <= worldMaxY);
     });
     onTextLabelsChange(newTextLabels);
     
     // Remove all cells within the rectangle - check against each cell coordinate
-    const newCells = mapData.cells.filter(cell => {
+    const newCells = activeLayer.cells.filter(cell => {
       // Check if this cell is within the rectangle bounds
       // For grid cells with {x, y}, check directly
       if (cell.x !== undefined) {
@@ -11433,14 +14686,18 @@ const useDrawingTools = (
     // Pass the current event coordinates for edge/text detection during erase
     toggleCell(coords, shouldFill, { clientX, clientY });
   };
+  
   const startDrawing = (e, dragStart = null) => {
     if (!mapData) return;
+    
+    // Get active layer data for reading
+    const activeLayer = getActiveLayer(mapData);
     
     setIsDrawing(true);
     setProcessedCells(new Set());
     setProcessedEdges(new Set()); // Also reset processed edges for erase strokes
     // Store initial cell state for batched history entry at stroke end
-    strokeInitialStateRef.current = [...mapData.cells];
+    strokeInitialStateRef.current = [...activeLayer.cells];
     // Don't initialize edge state here - only when we actually erase an edge
     strokeInitialEdgesRef.current = null;
     processCellDuringDrag(e, dragStart);
@@ -11452,18 +14709,21 @@ const useDrawingTools = (
   const stopDrawing = () => {
     if (!isDrawing) return;
     
+    // Get active layer data for reading
+    const activeLayer = getActiveLayer(mapData);
+    
     setIsDrawing(false);
     setProcessedCells(new Set());
     setProcessedEdges(new Set());
     
     // Add single history entry for the completed stroke (cells)
     if (strokeInitialStateRef.current !== null && mapData) {
-      onCellsChange(mapData.cells, false);
+      onCellsChange(activeLayer.cells, false);
       strokeInitialStateRef.current = null;
     }
     // Add single history entry for edges if any were erased
     if (strokeInitialEdgesRef.current !== null && mapData && onEdgesChange) {
-      onEdgesChange(mapData.edges || [], false);
+      onEdgesChange(activeLayer.edges || [], false);
       strokeInitialEdgesRef.current = null;
     }
   };
@@ -11956,6 +15216,7 @@ return { DrawingLayer };
 const { applyInverseRotation } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "screenPositionUtils"));
 const { useMapState, useMapOperations } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "MapContext"));
 const { useMapSelection } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "MapSelectionContext"));
+const { getActiveLayer } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "layerAccessor"));
 
 /**
  * Hook for managing text label interactions
@@ -12037,7 +15298,7 @@ const useTextLabelInteraction = (
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
     const textLabel = getTextLabelAtPosition(
-      mapData.textLabels,
+      getActiveLayer(mapData).textLabels,
       worldCoords.worldX,
       worldCoords.worldY,
       ctx
@@ -12045,7 +15306,7 @@ const useTextLabelInteraction = (
     
     if (textLabel) {
       // Store initial text label state for batched history entry at drag end
-      dragInitialStateRef.current = [...(mapData.textLabels || [])];
+      dragInitialStateRef.current = [...(getActiveLayer(mapData).textLabels || [])];
       setSelectedItem({ type: 'text', id: textLabel.id, data: textLabel });
       setIsDraggingSelection(true);
       setDragStart({ x: clientX, y: clientY, worldX: worldCoords.worldX, worldY: worldCoords.worldY });
@@ -12078,7 +15339,7 @@ const useTextLabelInteraction = (
     
     // Update text label position (suppress history during drag)
     const updatedLabels = updateTextLabel(
-      mapData.textLabels,
+      getActiveLayer(mapData).textLabels,
       selectedItem.id,
       {
         position: {
@@ -12113,14 +15374,14 @@ const useTextLabelInteraction = (
       return;
     }
     
-    // Cycle through 0Â° -> 90Â° -> 180Â° -> 270Â° -> 0Â°
+    // Cycle through 0Ã‚Â° -> 90Ã‚Â° -> 180Ã‚Â° -> 270Ã‚Â° -> 0Ã‚Â°
     const rotations = [0, 90, 180, 270];
     const currentRotation = selectedItem.data.rotation || 0;
     const currentIndex = rotations.indexOf(currentRotation);
     const nextRotation = rotations[(currentIndex + 1) % 4];
     
     const updatedLabels = updateTextLabel(
-      mapData.textLabels,
+      getActiveLayer(mapData).textLabels,
       selectedItem.id,
       { rotation: nextRotation }
     );
@@ -12145,7 +15406,7 @@ const useTextLabelInteraction = (
     }
     
     const updatedLabels = removeTextLabel(
-      mapData.textLabels,
+      getActiveLayer(mapData).textLabels,
       selectedItem.id
     );
     onTextLabelsChange(updatedLabels);
@@ -12191,7 +15452,7 @@ const useTextLabelInteraction = (
     if (editingTextId) {
       // Update existing label
       const newLabels = updateTextLabel(
-        mapData.textLabels || [],
+        getActiveLayer(mapData).textLabels || [],
         editingTextId,
         {
           content: labelData.content.trim(),
@@ -12204,7 +15465,7 @@ const useTextLabelInteraction = (
     } else if (pendingTextPosition && mapData) {
       // Create new label
       const newLabels = addTextLabel(
-        mapData.textLabels || [],
+        getActiveLayer(mapData).textLabels || [],
         labelData.content.trim(),
         pendingTextPosition.x,
         pendingTextPosition.y,
@@ -12297,7 +15558,7 @@ const useTextLabelInteraction = (
       return { x: 0, y: 0 };
     }
     
-    const label = mapData.textLabels.find(l => l.id === selectedItem.id);
+    const label = getActiveLayer(mapData).textLabels.find(l => l.id === selectedItem.id);
     if (!label) return { x: 0, y: 0 };
     
     const canvas = canvasRef.current;
@@ -12391,7 +15652,7 @@ const useTextLabelInteraction = (
       
       // Add single history entry for the completed drag
       if (dragInitialStateRef.current !== null) {
-        onTextLabelsChange(mapData.textLabels, false);
+        onTextLabelsChange(getActiveLayer(mapData).textLabels, false);
         dragInitialStateRef.current = null;
       }
       return true;
@@ -12745,6 +16006,7 @@ const { useMapSelection } = await dc.require(dc.headerLink(dc.resolvePath("compi
 const { TextLabelEditor } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "TextLabelEditor"));
 const { useEventHandlerRegistration } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "EventHandlerContext"));
 const { SelectionToolbar } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "SelectionToolbar"));
+const { getActiveLayer } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "layerAccessor"));
 
 /**
  * TextLayer.jsx
@@ -12848,7 +16110,7 @@ const TextLayer = ({
       {showTextModal && (() => {
         let currentLabel = null;
         if (editingTextId && mapData?.textLabels) {
-          currentLabel = mapData.textLabels.find(l => l.id === editingTextId);
+          currentLabel = getActiveLayer(mapData).textLabels.find(l => l.id === editingTextId);
         }
         
         // Use saved settings for new labels, defaults for editing existing
@@ -12894,6 +16156,7 @@ return { TextLayer };
 
 const { useMapState, useMapOperations } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "MapContext"));
 const { useMapSelection } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "MapSelectionContext"));
+const { getActiveLayer } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "layerAccessor"));
 
 /**
  * Hook for managing note pin interactions
@@ -12939,13 +16202,13 @@ const useNotePinInteraction = (
     }
     
     // Check if position is occupied
-    const existingObj = getObjectAtPosition(mapData.objects || [], gridX, gridY);
+    const existingObj = getObjectAtPosition(getActiveLayer(mapData).objects || [], gridX, gridY);
     if (existingObj) {
       return true; // Handled but blocked
     }
     
     // Place the Note Pin object (without linkedNote initially)
-    const newObjects = addObject(mapData.objects || [], 'note_pin', gridX, gridY);
+    const newObjects = addObject(getActiveLayer(mapData).objects || [], 'note_pin', gridX, gridY);
     
     // Find the newly created pin
     const newPin = newObjects[newObjects.length - 1];
@@ -12980,7 +16243,7 @@ const useNotePinInteraction = (
     const objectId = pendingNotePinId || editingNoteObjectId;
     if (!objectId) return;
     
-    const object = mapData.objects?.find(obj => obj.id === objectId);
+    const object = getActiveLayer(mapData).objects?.find(obj => obj.id === objectId);
     if (!object) return;
     
     const isNotePin = object.type === 'note_pin';
@@ -12990,14 +16253,14 @@ const useNotePinInteraction = (
       // Removing note link
       if (isNotePin) {
         // Note Pins are inseparable from notes - remove the entire pin
-        updatedObjects = removeObject(mapData.objects, objectId);
+        updatedObjects = removeObject(getActiveLayer(mapData).objects, objectId);
       } else {
         // Regular objects - just clear the linkedNote field
-        updatedObjects = updateObject(mapData.objects, objectId, { linkedNote: null });
+        updatedObjects = updateObject(getActiveLayer(mapData).objects, objectId, { linkedNote: null });
       }
     } else {
       // Adding/updating note link
-      updatedObjects = updateObject(mapData.objects, objectId, { linkedNote: notePath });
+      updatedObjects = updateObject(getActiveLayer(mapData).objects, objectId, { linkedNote: notePath });
     }
     
     onObjectsChange(updatedObjects);
@@ -13021,7 +16284,7 @@ const useNotePinInteraction = (
     
     if (pendingNotePinId && mapData) {
       // Remove the pending Note Pin since user canceled
-      const updatedObjects = removeObject(mapData.objects, pendingNotePinId);
+      const updatedObjects = removeObject(getActiveLayer(mapData).objects, pendingNotePinId);
       onObjectsChange(updatedObjects);
     }
     
@@ -14020,6 +17283,997 @@ const MeasurementLayer = ({
 return { MeasurementLayer };
 ```
 
+# multiSelectOperations
+
+```js
+/**
+ * multiSelectOperations.js
+ * 
+ * Utilities for multi-select functionality:
+ * - Finding items within a selection rectangle
+ * - Calculating bounds for objects and text labels
+ * - Batch update operations
+ */
+
+const { getActiveLayer } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "layerAccessor"));
+const { getFontCss } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "fontOptions"));
+
+/**
+ * Check if two rectangles overlap
+ * @param {number} minX1 - First rect min X
+ * @param {number} minY1 - First rect min Y
+ * @param {number} maxX1 - First rect max X
+ * @param {number} maxY1 - First rect max Y
+ * @param {Object} bounds - Second rect { minX, minY, maxX, maxY }
+ * @returns {boolean}
+ */
+function rectsOverlap(minX1, minY1, maxX1, maxY1, bounds) {
+  return !(bounds.maxX < minX1 || bounds.minX > maxX1 ||
+           bounds.maxY < minY1 || bounds.minY > maxY1);
+}
+
+/**
+ * Get the world-coordinate bounds of an object
+ * Objects use grid coordinates, so we need to convert based on geometry
+ * @param {Object} obj - Object with position and size
+ * @param {Object} geometry - Grid or Hex geometry
+ * @param {Object} mapData - Map data for configuration
+ * @returns {Object} { minX, minY, maxX, maxY } in world coordinates
+ */
+function getObjectWorldBounds(obj, geometry, mapData) {
+  const pos = obj.position;
+  const size = obj.size || { width: 1, height: 1 };
+  
+  // For grid maps: convert grid cell to world coords
+  // Grid cell (x, y) occupies world space from (x * cellSize, y * cellSize) 
+  // to ((x + width) * cellSize, (y + height) * cellSize)
+  if (geometry.constructor.name === 'GridGeometry') {
+    const cellSize = geometry.cellSize;
+    return {
+      minX: pos.x * cellSize,
+      minY: pos.y * cellSize,
+      maxX: (pos.x + size.width) * cellSize,
+      maxY: (pos.y + size.height) * cellSize
+    };
+  }
+  
+  // For hex maps: get hex center in world coords and create bounds around it
+  // Hex objects occupy their cell, so we use the hex bounding box
+  if (geometry.constructor.name === 'HexGeometry') {
+    const center = geometry.hexToWorld(pos.x, pos.y);
+    const hexSize = geometry.hexSize;
+    
+    // Approximate hex bounds as a rectangle
+    // For flat-top: width = 2 * size, height = sqrt(3) * size
+    // For pointy-top: width = sqrt(3) * size, height = 2 * size
+    const orientation = mapData.orientation || 'flat';
+    let halfWidth, halfHeight;
+    
+    if (orientation === 'flat') {
+      halfWidth = hexSize;
+      halfHeight = hexSize * Math.sqrt(3) / 2;
+    } else {
+      halfWidth = hexSize * Math.sqrt(3) / 2;
+      halfHeight = hexSize;
+    }
+    
+    return {
+      minX: center.worldX - halfWidth,
+      minY: center.worldY - halfHeight,
+      maxX: center.worldX + halfWidth,
+      maxY: center.worldY + halfHeight
+    };
+  }
+  
+  // Fallback for unknown geometry
+  return {
+    minX: pos.x,
+    minY: pos.y,
+    maxX: pos.x + 1,
+    maxY: pos.y + 1
+  };
+}
+
+/**
+ * Get the world-coordinate bounds of a text label
+ * Text labels already use world coordinates
+ * @param {Object} label - Text label with position, fontSize, content
+ * @param {CanvasRenderingContext2D} ctx - Canvas context for text measurement
+ * @returns {Object} { minX, minY, maxX, maxY } in world coordinates
+ */
+function getTextLabelWorldBounds(label, ctx) {
+  const pos = label.position;
+  const fontSize = label.fontSize || 16;
+  const fontFace = label.fontFace || 'sans';
+  const rotation = label.rotation || 0;
+  
+  // Measure text width
+  let textWidth, textHeight;
+  
+  if (ctx) {
+    const fontFamily = getFontCss(fontFace);
+    ctx.font = `${fontSize}px ${fontFamily}`;
+    const metrics = ctx.measureText(label.content || '');
+    textWidth = metrics.width;
+    textHeight = fontSize * 1.2;
+  } else {
+    // Estimate if no context available
+    textWidth = (label.content || '').length * fontSize * 0.6;
+    textHeight = fontSize * 1.2;
+  }
+  
+  // Add padding (same as selection box)
+  const paddingX = 4;
+  const paddingY = 2;
+  const boundingWidth = textWidth + paddingX * 2;
+  const boundingHeight = textHeight + paddingY * 2;
+  
+  // For rotated text, calculate the axis-aligned bounding box
+  if (rotation !== 0) {
+    const angleRad = (rotation * Math.PI) / 180;
+    const cos = Math.abs(Math.cos(angleRad));
+    const sin = Math.abs(Math.sin(angleRad));
+    const rotatedWidth = boundingWidth * cos + boundingHeight * sin;
+    const rotatedHeight = boundingWidth * sin + boundingHeight * cos;
+    
+    return {
+      minX: pos.x - rotatedWidth / 2,
+      minY: pos.y - rotatedHeight / 2,
+      maxX: pos.x + rotatedWidth / 2,
+      maxY: pos.y + rotatedHeight / 2
+    };
+  }
+  
+  // Non-rotated: simple bounding box centered on position
+  return {
+    minX: pos.x - boundingWidth / 2,
+    minY: pos.y - boundingHeight / 2,
+    maxX: pos.x + boundingWidth / 2,
+    maxY: pos.y + boundingHeight / 2
+  };
+}
+
+/**
+ * Find all objects and text labels within a world-coordinate rectangle
+ * @param {Object} mapData - Map data containing objects and textLabels
+ * @param {Object} corner1 - First corner { worldX, worldY }
+ * @param {Object} corner2 - Second corner { worldX, worldY }
+ * @param {Object} geometry - Grid or Hex geometry
+ * @param {CanvasRenderingContext2D} ctx - Canvas context for text measurement
+ * @returns {Array} Array of { type: 'object' | 'text', id, data }
+ */
+function getItemsInWorldRect(mapData, corner1, corner2, geometry, ctx) {
+  const activeLayer = getActiveLayer(mapData);
+  const items = [];
+  
+  // Normalize rectangle bounds
+  const minX = Math.min(corner1.worldX, corner2.worldX);
+  const maxX = Math.max(corner1.worldX, corner2.worldX);
+  const minY = Math.min(corner1.worldY, corner2.worldY);
+  const maxY = Math.max(corner1.worldY, corner2.worldY);
+  
+  // Check objects
+  const objects = activeLayer.objects || [];
+  for (const obj of objects) {
+    const objBounds = getObjectWorldBounds(obj, geometry, mapData);
+    if (rectsOverlap(minX, minY, maxX, maxY, objBounds)) {
+      items.push({ type: 'object', id: obj.id, data: obj });
+    }
+  }
+  
+  // Check text labels
+  const textLabels = activeLayer.textLabels || [];
+  for (const label of textLabels) {
+    const labelBounds = getTextLabelWorldBounds(label, ctx);
+    if (rectsOverlap(minX, minY, maxX, maxY, labelBounds)) {
+      items.push({ type: 'text', id: label.id, data: label });
+    }
+  }
+  
+  return items;
+}
+
+/**
+ * Calculate the combined bounding box for multiple selected items
+ * Used for positioning the multi-select toolbar
+ * @param {Array} selectedItems - Array of { type, id, data }
+ * @param {Object} geometry - Grid or Hex geometry
+ * @param {Object} mapData - Map data
+ * @param {CanvasRenderingContext2D} ctx - Canvas context
+ * @returns {Object} { minX, minY, maxX, maxY } in world coordinates
+ */
+function getSelectionBounds(selectedItems, geometry, mapData, ctx) {
+  if (!selectedItems || selectedItems.length === 0) {
+    return null;
+  }
+  
+  let minX = Infinity, minY = Infinity;
+  let maxX = -Infinity, maxY = -Infinity;
+  
+  for (const item of selectedItems) {
+    let bounds;
+    
+    if (item.type === 'object') {
+      bounds = getObjectWorldBounds(item.data, geometry, mapData);
+    } else if (item.type === 'text') {
+      bounds = getTextLabelWorldBounds(item.data, ctx);
+    }
+    
+    if (bounds) {
+      minX = Math.min(minX, bounds.minX);
+      minY = Math.min(minY, bounds.minY);
+      maxX = Math.max(maxX, bounds.maxX);
+      maxY = Math.max(maxY, bounds.maxY);
+    }
+  }
+  
+  if (minX === Infinity) {
+    return null;
+  }
+  
+  return { minX, minY, maxX, maxY };
+}
+
+/**
+ * Check if a position is within map bounds
+ * @param {number} gridX - Grid X coordinate
+ * @param {number} gridY - Grid Y coordinate
+ * @param {Object} geometry - Grid or Hex geometry
+ * @param {Object} mapData - Map data
+ * @returns {boolean}
+ */
+function isWithinBounds(gridX, gridY, geometry, mapData) {
+  if (!geometry) return true;
+  
+  // Use geometry's bounds check if available
+  if (geometry.isWithinBounds) {
+    return geometry.isWithinBounds(gridX, gridY);
+  }
+  
+  // For grid maps without explicit bounds, assume unbounded
+  return true;
+}
+
+/**
+ * Validate that all positions in a group move are within bounds
+ * @param {Array} updates - Array of { id, position: { x, y } }
+ * @param {Object} geometry - Grid or Hex geometry
+ * @param {Object} mapData - Map data
+ * @returns {boolean} True if all positions are valid
+ */
+function validateGroupMove(updates, geometry, mapData) {
+  for (const update of updates) {
+    if (update.position) {
+      if (!isWithinBounds(update.position.x, update.position.y, geometry, mapData)) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+return {
+  rectsOverlap,
+  getObjectWorldBounds,
+  getTextLabelWorldBounds,
+  getItemsInWorldRect,
+  getSelectionBounds,
+  isWithinBounds,
+  validateGroupMove
+};
+```
+
+# useAreaSelect
+
+```js
+/**
+ * useAreaSelect.js
+ * 
+ * Custom hook for managing area selection tool:
+ * - Two-click rectangle selection (matching other area tools)
+ * - First click places start corner marker
+ * - Second click completes selection of all items in rectangle
+ */
+
+const { useMapState, useMapOperations } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "MapContext"));
+const { useMapSelection } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "MapSelectionContext"));
+const { getItemsInWorldRect } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "multiSelectOperations"));
+const { getActiveLayer } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "layerAccessor"));
+
+/**
+ * Hook for managing area selection tool
+ * @param {string} currentTool - Current active tool
+ * @returns {Object} Area select handlers and state
+ */
+const useAreaSelect = (currentTool) => {
+  const {
+    canvasRef,
+    mapData,
+    geometry,
+    screenToWorld,
+    screenToGrid,
+    getClientCoords
+  } = useMapState();
+  
+  const {
+    areaSelectStart,
+    setAreaSelectStart,
+    selectMultiple,
+    clearSelection
+  } = useMapSelection();
+  
+  const isAreaSelectTool = currentTool === 'areaSelect';
+  
+  /**
+   * Handle click for area select tool
+   * First click: Set start corner
+   * Second click: Complete selection
+   * @param {Event} e - Pointer event
+   * @returns {boolean} True if handled
+   */
+  const handleAreaSelectClick = dc.useCallback((e) => {
+    if (!isAreaSelectTool || !mapData || !geometry) {
+      return false;
+    }
+    
+    const { clientX, clientY } = getClientCoords(e);
+    const worldCoords = screenToWorld(clientX, clientY);
+    const gridCoords = screenToGrid(clientX, clientY);
+    
+    if (!worldCoords || !gridCoords) {
+      return false;
+    }
+    
+    // First click - set start corner
+    if (!areaSelectStart) {
+      // Clear any existing selection when starting a new area select
+      clearSelection();
+      
+      setAreaSelectStart({
+        worldX: worldCoords.worldX,
+        worldY: worldCoords.worldY,
+        gridX: gridCoords.gridX,
+        gridY: gridCoords.gridY
+      });
+      return true;
+    }
+    
+    // Second click - complete selection
+    const corner1 = {
+      worldX: areaSelectStart.worldX,
+      worldY: areaSelectStart.worldY
+    };
+    const corner2 = {
+      worldX: worldCoords.worldX,
+      worldY: worldCoords.worldY
+    };
+    
+    // Get canvas context for text measurement
+    const ctx = canvasRef.current?.getContext('2d');
+    
+    // Find all items in the selection rectangle
+    const items = getItemsInWorldRect(mapData, corner1, corner2, geometry, ctx);
+    
+    // Update selection
+    if (items.length > 0) {
+      selectMultiple(items);
+    } else {
+      clearSelection();
+    }
+    
+    // Clear the start marker
+    setAreaSelectStart(null);
+    
+    return true;
+  }, [isAreaSelectTool, mapData, geometry, areaSelectStart, getClientCoords, 
+      screenToWorld, screenToGrid, canvasRef, setAreaSelectStart, selectMultiple, clearSelection]);
+  
+  /**
+   * Cancel area selection (e.g., on tool change or Escape)
+   */
+  const cancelAreaSelect = dc.useCallback(() => {
+    if (areaSelectStart) {
+      setAreaSelectStart(null);
+    }
+  }, [areaSelectStart, setAreaSelectStart]);
+  
+  /**
+   * Check if area selection is in progress (first corner placed)
+   */
+  const isAreaSelecting = !!areaSelectStart;
+  
+  return {
+    // State
+    areaSelectStart,
+    isAreaSelecting,
+    
+    // Handlers
+    handleAreaSelectClick,
+    cancelAreaSelect
+  };
+};
+
+return { useAreaSelect };
+```
+
+# AreaSelectLayer
+
+```jsx
+/**
+ * AreaSelectLayer.jsx
+ * 
+ * Handles area selection tool:
+ * - Registers handlers with EventHandlerContext
+ * - Renders start marker overlay (similar to rectangle tool)
+ * - Coordinates with MapSelectionContext for multi-select
+ */
+
+const { useAreaSelect } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "useAreaSelect"));
+const { useMapState } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "MapContext"));
+const { useMapSelection } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "MapSelectionContext"));
+const { useEventHandlerRegistration } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "EventHandlerContext"));
+
+/**
+ * AreaSelectLayer Component
+ * 
+ * @param {string} currentTool - Current active tool
+ */
+const AreaSelectLayer = ({ currentTool }) => {
+  const { canvasRef, mapData, geometry } = useMapState();
+  const { areaSelectStart, setAreaSelectStart } = useMapSelection();
+  
+  const {
+    handleAreaSelectClick,
+    cancelAreaSelect,
+    isAreaSelecting
+  } = useAreaSelect(currentTool);
+  
+  const { registerHandlers, unregisterHandlers } = useEventHandlerRegistration();
+  
+  // Register handlers with event coordinator
+  dc.useEffect(() => {
+    registerHandlers('areaSelect', {
+      handleAreaSelectClick,
+      cancelAreaSelect,
+      isAreaSelecting,
+      areaSelectStart
+    });
+    
+    return () => unregisterHandlers('areaSelect');
+  }, [registerHandlers, unregisterHandlers, handleAreaSelectClick, cancelAreaSelect, isAreaSelecting, areaSelectStart]);
+  
+  // Cancel area selection when tool changes away from areaSelect
+  dc.useEffect(() => {
+    if (currentTool !== 'areaSelect' && areaSelectStart) {
+      setAreaSelectStart(null);
+    }
+  }, [currentTool, areaSelectStart, setAreaSelectStart]);
+  
+  /**
+   * Render the start marker overlay
+   * Shows a highlighted cell at the first corner position
+   */
+  const renderStartMarker = () => {
+    if (!areaSelectStart || !canvasRef.current || !geometry || !mapData) {
+      return null;
+    }
+    
+    const canvas = canvasRef.current;
+    const { viewState, northDirection } = mapData;
+    const { zoom, center } = viewState;
+    const { width, height } = canvas;
+    
+    // Calculate viewport parameters based on geometry type
+    let scaledSize, offsetX, offsetY;
+    
+    if (geometry.constructor.name === 'GridGeometry') {
+      scaledSize = geometry.getScaledCellSize(zoom);
+      offsetX = width / 2 - center.x * scaledSize;
+      offsetY = height / 2 - center.y * scaledSize;
+    } else {
+      // Hex: center is in world pixel coordinates
+      scaledSize = geometry.getScaledHexSize ? geometry.getScaledHexSize(zoom) : zoom * 30;
+      offsetX = width / 2 - center.x * zoom;
+      offsetY = height / 2 - center.y * zoom;
+    }
+    
+    const containerRect = canvas.parentElement.getBoundingClientRect();
+    const canvasRect = canvas.getBoundingClientRect();
+    
+    const canvasOffsetX = canvasRect.left - containerRect.left;
+    const canvasOffsetY = canvasRect.top - containerRect.top;
+    
+    const displayScale = canvasRect.width / width;
+    
+    // Convert world coordinates to screen position
+    const worldX = areaSelectStart.worldX;
+    const worldY = areaSelectStart.worldY;
+    
+    // Get grid cell for the start position
+    const gridX = areaSelectStart.gridX;
+    const gridY = areaSelectStart.gridY;
+    
+    // Convert grid cell center to screen position
+    let screenX, screenY;
+    
+    if (geometry.constructor.name === 'GridGeometry') {
+      // Grid: use cell center
+      const cellWorldX = (gridX + 0.5) * geometry.cellSize;
+      const cellWorldY = (gridY + 0.5) * geometry.cellSize;
+      screenX = offsetX + cellWorldX * zoom;
+      screenY = offsetY + cellWorldY * zoom;
+    } else {
+      // Hex: use hex center from geometry
+      const hexCenter = geometry.hexToWorld(gridX, gridY);
+      screenX = offsetX + hexCenter.worldX * zoom;
+      screenY = offsetY + hexCenter.worldY * zoom;
+    }
+    
+    // Apply rotation around canvas center
+    if (northDirection !== 0) {
+      const centerX = width / 2;
+      const centerY = height / 2;
+      
+      screenX -= centerX;
+      screenY -= centerY;
+      
+      const angleRad = (northDirection * Math.PI) / 180;
+      const rotatedX = screenX * Math.cos(angleRad) - screenY * Math.sin(angleRad);
+      const rotatedY = screenX * Math.sin(angleRad) + screenY * Math.cos(angleRad);
+      
+      screenX = rotatedX + centerX;
+      screenY = rotatedY + centerY;
+    }
+    
+    // Scale to display coordinates
+    screenX *= displayScale;
+    screenY *= displayScale;
+    
+    // Calculate marker size
+    const displayScaledSize = scaledSize * displayScale;
+    const cellHalfSize = displayScaledSize / 2;
+    
+    // Position at cell top-left
+    const markerX = canvasOffsetX + screenX - cellHalfSize;
+    const markerY = canvasOffsetY + screenY - cellHalfSize;
+    
+    const highlightColor = '#4a9eff'; // Blue for area select
+    
+    return (
+      <div
+        key="area-select-start"
+        className="dmt-area-select-marker"
+        style={{
+          position: 'absolute',
+          left: `${markerX}px`,
+          top: `${markerY}px`,
+          width: `${displayScaledSize}px`,
+          height: `${displayScaledSize}px`,
+          border: `2px dashed ${highlightColor}`,
+          backgroundColor: 'rgba(74, 158, 255, 0.15)',
+          boxSizing: 'border-box',
+          pointerEvents: 'none',
+          zIndex: 100,
+          borderRadius: '2px'
+        }}
+      />
+    );
+  };
+  
+  return renderStartMarker();
+};
+
+return { AreaSelectLayer };
+```
+
+# useFogTools
+
+```js
+/**
+ * useFogTools.js
+ * 
+ * Custom hook for managing Fog of War tools (paint, erase, rectangle).
+ * Handles all fog-related state and operations including:
+ * - Paint tool (add fog) with cell tracking
+ * - Erase tool (reveal/remove fog) with cell tracking
+ * - Rectangle tool for fog/reveal rectangular areas
+ * 
+ * Follows the same pattern as useDrawingTools.js for consistency.
+ * Uses geometry abstraction for coordinate conversion.
+ */
+
+const { useMapState } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "MapContext"));
+const { 
+  getActiveLayer, 
+  initializeFogOfWar,
+  fogCell, 
+  revealCell,
+  fogRectangle,
+  revealRectangle 
+} = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "layerAccessor"));
+
+/**
+ * Hook for managing fog of war tools
+ * @param {string|null} activeTool - Current active fog tool: 'paint', 'erase', 'rectangle', or null
+ * @param {Function} onFogChange - Callback when fog data changes
+ * @param {Function} onInitializeFog - Callback to initialize fog structure if needed
+ */
+const useFogTools = (activeTool, onFogChange, onInitializeFog) => {
+  // Get required state from Context
+  const {
+    geometry,
+    mapData,
+    screenToGrid
+  } = useMapState();
+  
+  // Fog tool state
+  const [isDrawing, setIsDrawing] = dc.useState(false);
+  const [rectangleStart, setRectangleStart] = dc.useState(null);
+  const [lastCell, setLastCell] = dc.useState(null);
+  const [processedCells, setProcessedCells] = dc.useState(new Set());
+  
+  /**
+   * Convert screen coordinates to offset coordinates (col, row)
+   * Uses geometry abstraction for coordinate conversion
+   */
+  const screenToOffset = dc.useCallback((clientX, clientY) => {
+    if (!geometry || !mapData) return null;
+    
+    // screenToGrid expects raw client coordinates
+    const gridResult = screenToGrid(clientX, clientY);
+    if (!gridResult) return null;
+    
+    // Use geometry's toOffsetCoords for abstracted conversion
+    const { gridX, gridY } = gridResult;
+    return geometry.toOffsetCoords(gridX, gridY);
+  }, [geometry, mapData, screenToGrid]);
+  
+  /**
+   * Ensure fog is initialized before making changes
+   * Returns the active layer's fog data, initializing if needed
+   */
+  const ensureFogInitialized = dc.useCallback(() => {
+    if (!mapData) return null;
+    
+    const activeLayer = getActiveLayer(mapData);
+    if (activeLayer.fogOfWar) {
+      return activeLayer.fogOfWar;
+    }
+    
+    // Initialize fog and notify parent
+    const updatedMapData = initializeFogOfWar(mapData, mapData.activeLayerId);
+    if (onInitializeFog) {
+      onInitializeFog(updatedMapData);
+    }
+    
+    return getActiveLayer(updatedMapData).fogOfWar;
+  }, [mapData, onInitializeFog]);
+  
+  /**
+   * Apply fog/reveal to a single cell based on active tool
+   */
+  const applyToCell = dc.useCallback((col, row) => {
+    if (!mapData || !onFogChange) return;
+    
+    const fogData = ensureFogInitialized();
+    if (!fogData) return;
+    
+    const activeLayer = getActiveLayer(mapData);
+    let updatedLayer;
+    
+    if (activeTool === 'paint') {
+      updatedLayer = fogCell(activeLayer, col, row);
+    } else if (activeTool === 'erase') {
+      updatedLayer = revealCell(activeLayer, col, row);
+    } else {
+      return;
+    }
+    
+    if (updatedLayer) {
+      onFogChange(updatedLayer.fogOfWar);
+    }
+  }, [mapData, activeTool, onFogChange, ensureFogInitialized]);
+  
+  /**
+   * Apply fog/reveal to a rectangular area
+   * Rectangle tool defaults to reveal (erase) mode
+   */
+  const applyRectangle = dc.useCallback((startCol, startRow, endCol, endRow) => {
+    if (!mapData || !onFogChange) return;
+    
+    const fogData = ensureFogInitialized();
+    if (!fogData) return;
+    
+    const activeLayer = getActiveLayer(mapData);
+    
+    // Rectangle tool reveals (erases fog) by default
+    const updatedLayer = revealRectangle(activeLayer, startCol, startRow, endCol, endRow);
+    
+    if (updatedLayer) {
+      onFogChange(updatedLayer.fogOfWar);
+    }
+  }, [mapData, onFogChange, ensureFogInitialized]);
+  
+  /**
+   * Handle pointer down for fog tools
+   */
+  const handlePointerDown = dc.useCallback((e) => {
+    if (!activeTool || e.button !== 0) return; // Left click only
+    
+    const offset = screenToOffset(e.clientX, e.clientY);
+    if (!offset) return;
+    
+    const { col, row } = offset;
+    
+    if (activeTool === 'rectangle') {
+      if (!rectangleStart) {
+        // First click - set start corner
+        setRectangleStart({ col, row });
+      } else {
+        // Second click - complete rectangle
+        applyRectangle(rectangleStart.col, rectangleStart.row, col, row);
+        setRectangleStart(null);
+      }
+    } else if (activeTool === 'paint' || activeTool === 'erase') {
+      // Start drawing stroke
+      setIsDrawing(true);
+      setProcessedCells(new Set([`${col},${row}`]));
+      setLastCell({ col, row });
+      applyToCell(col, row);
+    }
+  }, [activeTool, screenToOffset, rectangleStart, applyToCell, applyRectangle]);
+  
+  /**
+   * Handle pointer move for fog tools (paint/erase drag)
+   */
+  const handlePointerMove = dc.useCallback((e) => {
+    if (!activeTool || !isDrawing) return;
+    if (activeTool === 'rectangle') return; // Rectangle doesn't use drag
+    
+    const offset = screenToOffset(e.clientX, e.clientY);
+    if (!offset) return;
+    
+    const { col, row } = offset;
+    const cellKey = `${col},${row}`;
+    
+    // Skip if we've already processed this cell in this stroke
+    if (processedCells.has(cellKey)) return;
+    
+    // Skip if same cell as last (shouldn't happen with processedCells, but extra safety)
+    if (lastCell && lastCell.col === col && lastCell.row === row) return;
+    
+    setProcessedCells(prev => new Set([...prev, cellKey]));
+    setLastCell({ col, row });
+    applyToCell(col, row);
+  }, [activeTool, isDrawing, screenToOffset, lastCell, processedCells, applyToCell]);
+  
+  /**
+   * Handle pointer up - end drawing stroke
+   */
+  const handlePointerUp = dc.useCallback(() => {
+    setIsDrawing(false);
+    setLastCell(null);
+    setProcessedCells(new Set());
+  }, []);
+  
+  /**
+   * Handle key events (Escape to cancel rectangle)
+   */
+  const handleKeyDown = dc.useCallback((e) => {
+    if (e.key === 'Escape' && rectangleStart) {
+      setRectangleStart(null);
+    }
+  }, [rectangleStart]);
+  
+  /**
+   * Cancel any in-progress operation
+   */
+  const cancelFog = dc.useCallback(() => {
+    setIsDrawing(false);
+    setRectangleStart(null);
+    setLastCell(null);
+    setProcessedCells(new Set());
+  }, []);
+  
+  return {
+    // State
+    isDrawing,
+    rectangleStart,
+    
+    // Handlers for EventHandlerContext registration
+    handlePointerDown,
+    handlePointerMove,
+    handlePointerUp,
+    handleKeyDown,
+    cancelFog,
+    
+    // Utility for preview rendering
+    screenToOffset
+  };
+};
+
+return { useFogTools };
+```
+
+# FogOfWarLayer
+
+```jsx
+/**
+ * FogOfWarLayer.jsx
+ * 
+ * Interaction layer for Fog of War painting and erasing.
+ * 
+ * This is a thin wrapper component that:
+ * - Uses useFogTools hook for all logic
+ * - Registers handlers with EventHandlerContext
+ * - Renders preview overlay for rectangle start point
+ * 
+ * Follows the same pattern as DrawingLayer.jsx for consistency.
+ */
+
+const { useFogTools } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "useFogTools"));
+const { useMapState } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "MapContext"));
+const { useEventHandlerRegistration } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "EventHandlerContext"));
+
+/**
+ * FogOfWarLayer Component
+ * @param {string|null} activeTool - Current FoW tool: 'paint', 'erase', 'rectangle', or null
+ * @param {Function} onFogChange - Callback when fog data changes: (updatedFogOfWar) => void
+ * @param {Function} onInitializeFog - Callback to initialize fog if needed
+ */
+const FogOfWarLayer = ({
+  activeTool,
+  onFogChange,
+  onInitializeFog
+}) => {
+  const { canvasRef, mapData, geometry } = useMapState();
+  const { registerHandlers, unregisterHandlers } = useEventHandlerRegistration();
+  
+  // Use the fog tools hook for all logic
+  const {
+    isDrawing,
+    rectangleStart,
+    handlePointerDown,
+    handlePointerMove,
+    handlePointerUp,
+    handleKeyDown,
+    cancelFog
+  } = useFogTools(activeTool, onFogChange, onInitializeFog);
+  
+  // Register event handlers when tool is active
+  dc.useEffect(() => {
+    if (!activeTool) {
+      unregisterHandlers('fogOfWar');
+      return;
+    }
+    
+    registerHandlers('fogOfWar', {
+      handlePointerDown,
+      handlePointerMove,
+      handlePointerUp,
+      handleKeyDown,
+      isDrawing,
+      rectangleStart
+    });
+    
+    return () => unregisterHandlers('fogOfWar');
+  }, [activeTool, registerHandlers, unregisterHandlers, 
+      handlePointerDown, handlePointerMove, handlePointerUp, handleKeyDown,
+      isDrawing, rectangleStart]);
+  
+  /**
+   * Render preview overlay for rectangle start point
+   */
+  const renderPreviewOverlay = () => {
+    if (!activeTool || !rectangleStart || !canvasRef.current || !geometry) {
+      return null;
+    }
+    
+    const canvas = canvasRef.current;
+    const { viewState, northDirection } = mapData;
+    const { zoom, center } = viewState;
+    const { width, height } = canvas;
+    
+    // Calculate viewport parameters based on geometry type
+    let scaledSize, offsetX, offsetY;
+    
+    if (geometry.constructor.name === 'GridGeometry') {
+      scaledSize = geometry.getScaledCellSize(zoom);
+      offsetX = width / 2 - center.x * scaledSize;
+      offsetY = height / 2 - center.y * scaledSize;
+    } else {
+      // Hex: center is in world pixel coordinates
+      offsetX = width / 2 - center.x * zoom;
+      offsetY = height / 2 - center.y * zoom;
+      scaledSize = geometry.getScaledCellSize(zoom);
+    }
+    
+    const containerRect = canvas.parentElement.getBoundingClientRect();
+    const canvasRect = canvas.getBoundingClientRect();
+    
+    const canvasOffsetX = canvasRect.left - containerRect.left;
+    const canvasOffsetY = canvasRect.top - containerRect.top;
+    
+    const displayScale = canvasRect.width / width;
+    
+    // Convert grid coordinates to screen position
+    // For fog, we store offset coords (col, row), need to convert back to screen
+    const { col, row } = rectangleStart;
+    
+    let screenX, screenY;
+    
+    if (geometry.constructor.name === 'GridGeometry') {
+      // Grid: col/row map directly to grid coords
+      const worldX = (col + 0.5) * geometry.cellSize;
+      const worldY = (row + 0.5) * geometry.cellSize;
+      screenX = offsetX + worldX * zoom;
+      screenY = offsetY + worldY * zoom;
+    } else {
+      // Hex: need to convert offset back to axial, then to world
+      // Import offsetToAxial for this conversion
+      const { offsetToAxial } = dc;
+      if (geometry.offsetToAxial) {
+        // If geometry has the method, use it
+        const axial = geometry.offsetToAxial(col, row);
+        const world = geometry.gridToWorld(axial.q, axial.r);
+        screenX = offsetX + world.worldX * zoom;
+        screenY = offsetY + world.worldY * zoom;
+      } else {
+        // Fallback: treat as grid coords
+        screenX = offsetX + col * scaledSize;
+        screenY = offsetY + row * scaledSize;
+      }
+    }
+    
+    // Apply rotation if needed
+    if (northDirection !== 0) {
+      const centerX = width / 2;
+      const centerY = height / 2;
+      
+      screenX -= centerX;
+      screenY -= centerY;
+      
+      const angleRad = (northDirection * Math.PI) / 180;
+      const rotatedX = screenX * Math.cos(angleRad) - screenY * Math.sin(angleRad);
+      const rotatedY = screenX * Math.sin(angleRad) + screenY * Math.cos(angleRad);
+      
+      screenX = rotatedX + centerX;
+      screenY = rotatedY + centerY;
+    }
+    
+    // Apply display scale and offset
+    const displayX = canvasOffsetX + screenX * displayScale;
+    const displayY = canvasOffsetY + screenY * displayScale;
+    const displaySize = scaledSize * displayScale;
+    
+    // Center on cell
+    const halfSize = displaySize / 2;
+    
+    return (
+      <div
+        className="dmt-fow-preview"
+        style={{
+          position: 'absolute',
+          left: `${displayX - halfSize}px`,
+          top: `${displayY - halfSize}px`,
+          width: `${displaySize}px`,
+          height: `${displaySize}px`,
+          border: '2px dashed #00ff00',
+          backgroundColor: 'rgba(0, 255, 0, 0.1)',
+          boxSizing: 'border-box',
+          pointerEvents: 'none',
+          zIndex: 100
+        }}
+      />
+    );
+  };
+  
+  return renderPreviewOverlay();
+};
+
+return { FogOfWarLayer };
+```
+
 # usePanZoomCoordinator
 
 ```js
@@ -14141,12 +18395,411 @@ const usePanZoomCoordinator = ({
 return { usePanZoomCoordinator };
 ```
 
+# useGroupDrag
+
+```js
+/**
+ * useGroupDrag.js
+ * 
+ * Custom hook for managing group drag operations during multi-select.
+ * Handles dragging multiple objects and text labels together as a group.
+ * 
+ * Features:
+ * - Stores position offsets for all selected items when drag starts
+ * - Applies movement delta to all items during drag
+ * - Validates all positions (blocks move if any item would go out of bounds)
+ * - Creates single history entry for the entire group move
+ */
+
+const { useMapState, useMapOperations } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "MapContext"));
+const { useMapSelection } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "MapSelectionContext"));
+const { getActiveLayer } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "layerAccessor"));
+const { HexGeometry } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "HexGeometry"));
+const { getObjectsInCell, assignSlot } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "hexSlotPositioner"));
+
+/**
+ * Hook for managing group drag operations
+ * @returns {Object} Group drag handlers and state
+ */
+const useGroupDrag = () => {
+  const {
+    geometry,
+    mapData,
+    screenToGrid,
+    screenToWorld,
+    getClientCoords
+  } = useMapState();
+
+  const {
+    onObjectsChange,
+    onTextLabelsChange
+  } = useMapOperations();
+
+  const {
+    selectedItems,
+    hasMultiSelection,
+    isSelected,
+    updateSelectedItemsData,
+    isDraggingSelection,
+    setIsDraggingSelection,
+    dragStart,
+    setDragStart,
+    groupDragOffsetsRef,
+    groupDragInitialStateRef,
+    isGroupDragging
+  } = useMapSelection();
+
+  /**
+   * Check if a click is on any selected item
+   * @param {number} gridX - Grid X coordinate
+   * @param {number} gridY - Grid Y coordinate
+   * @param {number} worldX - World X coordinate
+   * @param {number} worldY - World Y coordinate
+   * @returns {Object|null} The selected item that was clicked, or null
+   */
+  const getClickedSelectedItem = dc.useCallback((gridX, gridY, worldX, worldY) => {
+    
+    if (!hasMultiSelection || !mapData) {
+      return null;
+    }
+    
+    const activeLayer = getActiveLayer(mapData);
+    
+    // Check objects at this grid position
+    for (const item of selectedItems) {
+      if (item.type === 'object') {
+        const obj = activeLayer.objects?.find(o => o.id === item.id);
+        if (obj) {
+          const size = obj.size || { width: 1, height: 1 };
+          // Check if click is within object bounds
+          if (gridX >= obj.position.x && gridX < obj.position.x + size.width &&
+              gridY >= obj.position.y && gridY < obj.position.y + size.height) {
+            return item;
+          }
+        }
+      } else if (item.type === 'text') {
+        // For text labels, do a rough world-coordinate check
+        // Text labels use world coordinates, not grid
+        const label = activeLayer.textLabels?.find(l => l.id === item.id);
+        if (label) {
+          const labelWorldX = label.position.x;
+          const labelWorldY = label.position.y;
+          // Approximate hit area based on font size
+          const hitRadius = (label.fontSize || 16) * 2;
+          const dx = worldX - labelWorldX;
+          const dy = worldY - labelWorldY;
+          if (Math.abs(dx) < hitRadius && Math.abs(dy) < hitRadius) {
+            return item;
+          }
+        }
+      }
+    }
+    
+    return null;
+  }, [hasMultiSelection, selectedItems, mapData]);
+
+  /**
+   * Start group drag - store offsets for all selected items
+   * @param {number} clientX - Client X coordinate
+   * @param {number} clientY - Client Y coordinate
+   * @param {number} gridX - Grid X coordinate of click
+   * @param {number} gridY - Grid Y coordinate of click
+   * @returns {boolean} True if group drag was started
+   */
+  const startGroupDrag = dc.useCallback((clientX, clientY, gridX, gridY) => {
+    
+    if (!hasMultiSelection || !mapData) {
+      return false;
+    }
+    
+    const worldCoords = screenToWorld(clientX, clientY);
+    if (!worldCoords) return false;
+    
+    const activeLayer = getActiveLayer(mapData);
+    
+    // Store initial state for batch history
+    groupDragInitialStateRef.current = {
+      objects: [...(activeLayer.objects || [])],
+      textLabels: [...(activeLayer.textLabels || [])]
+    };
+    
+    // Calculate and store offsets for each selected item
+    const offsets = new Map();
+    
+    for (const item of selectedItems) {
+      if (item.type === 'object') {
+        const obj = activeLayer.objects?.find(o => o.id === item.id);
+        if (obj) {
+          offsets.set(item.id, {
+            type: 'object',
+            gridOffsetX: gridX - obj.position.x,
+            gridOffsetY: gridY - obj.position.y,
+            worldOffsetX: 0,
+            worldOffsetY: 0
+          });
+        }
+      } else if (item.type === 'text') {
+        const label = activeLayer.textLabels?.find(l => l.id === item.id);
+        if (label) {
+          offsets.set(item.id, {
+            type: 'text',
+            gridOffsetX: 0,
+            gridOffsetY: 0,
+            worldOffsetX: worldCoords.worldX - label.position.x,
+            worldOffsetY: worldCoords.worldY - label.position.y
+          });
+        }
+      }
+    }
+    
+    groupDragOffsetsRef.current = offsets;
+    
+    
+    // Set up drag state
+    setIsDraggingSelection(true);
+    setDragStart({
+      x: clientX,
+      y: clientY,
+      gridX,
+      gridY,
+      worldX: worldCoords.worldX,
+      worldY: worldCoords.worldY,
+      isGroupDrag: true
+    });
+    
+    return true;
+  }, [hasMultiSelection, selectedItems, mapData, screenToWorld, setIsDraggingSelection, setDragStart]);
+
+  /**
+   * Handle group drag movement
+   * @param {Event} e - Pointer event
+   * @returns {boolean} True if drag was handled
+   */
+  const handleGroupDrag = dc.useCallback((e) => {
+    
+    // Check dragStart.isGroupDrag directly since context state may not have updated yet
+    if (!isDraggingSelection || !dragStart?.isGroupDrag || !mapData) {
+      return false;
+    }
+    
+    const { clientX, clientY } = getClientCoords(e);
+    const gridCoords = screenToGrid(clientX, clientY);
+    const worldCoords = screenToWorld(clientX, clientY);
+    
+    if (!gridCoords || !worldCoords) return true;
+    
+    const { gridX, gridY } = gridCoords;
+    const { worldX, worldY } = worldCoords;
+    
+    // Calculate deltas
+    const gridDeltaX = gridX - dragStart.gridX;
+    const gridDeltaY = gridY - dragStart.gridY;
+    const worldDeltaX = worldX - dragStart.worldX;
+    const worldDeltaY = worldY - dragStart.worldY;
+    
+    // Skip if no movement
+    if (gridDeltaX === 0 && gridDeltaY === 0 && worldDeltaX === 0 && worldDeltaY === 0) {
+      return true;
+    }
+    
+    const activeLayer = getActiveLayer(mapData);
+    const offsets = groupDragOffsetsRef.current;
+    
+    // Calculate new positions for all items
+    const objectUpdates = [];
+    const textUpdates = [];
+    
+    for (const item of selectedItems) {
+      const offset = offsets.get(item.id);
+      if (!offset) continue;
+      
+      if (item.type === 'object') {
+        const obj = activeLayer.objects?.find(o => o.id === item.id);
+        if (obj) {
+          const newX = gridX - offset.gridOffsetX;
+          const newY = gridY - offset.gridOffsetY;
+          objectUpdates.push({
+            id: item.id,
+            oldObj: obj,
+            newPosition: { x: newX, y: newY }
+          });
+        }
+      } else if (item.type === 'text') {
+        const label = activeLayer.textLabels?.find(l => l.id === item.id);
+        if (label) {
+          const newX = worldX - offset.worldOffsetX;
+          const newY = worldY - offset.worldOffsetY;
+          textUpdates.push({
+            id: item.id,
+            oldLabel: label,
+            newPosition: { x: newX, y: newY }
+          });
+        }
+      }
+    }
+    
+    // Validate all object moves
+    // Check bounds for hex maps
+    if (geometry && geometry.isWithinBounds) {
+      for (const update of objectUpdates) {
+        if (!geometry.isWithinBounds(update.newPosition.x, update.newPosition.y)) {
+          // At least one object would be out of bounds - block entire move
+          return true;
+        }
+      }
+    }
+    
+    // Check for collisions with non-selected objects
+    // Get set of selected object IDs for quick lookup
+    const selectedObjectIds = new Set(
+      selectedItems.filter(item => item.type === 'object').map(item => item.id)
+    );
+    
+    // Get non-selected objects
+    const nonSelectedObjects = (activeLayer.objects || []).filter(
+      obj => !selectedObjectIds.has(obj.id)
+    );
+    
+    // Check each moved object against non-selected objects
+    for (const update of objectUpdates) {
+      const movingSize = update.oldObj.size || { width: 1, height: 1 };
+      const movingMinX = update.newPosition.x;
+      const movingMinY = update.newPosition.y;
+      const movingMaxX = movingMinX + movingSize.width;
+      const movingMaxY = movingMinY + movingSize.height;
+      
+      for (const staticObj of nonSelectedObjects) {
+        const staticSize = staticObj.size || { width: 1, height: 1 };
+        const staticMinX = staticObj.position.x;
+        const staticMinY = staticObj.position.y;
+        const staticMaxX = staticMinX + staticSize.width;
+        const staticMaxY = staticMinY + staticSize.height;
+        
+        // Check for overlap (axis-aligned bounding box intersection)
+        const overlapsX = movingMinX < staticMaxX && movingMaxX > staticMinX;
+        const overlapsY = movingMinY < staticMaxY && movingMaxY > staticMinY;
+        
+        if (overlapsX && overlapsY) {
+          // Collision detected - block entire move
+          return true;
+        }
+      }
+    }
+    
+    // Apply object updates
+    if (objectUpdates.length > 0) {
+      let updatedObjects = [...activeLayer.objects];
+      
+      for (const update of objectUpdates) {
+        const idx = updatedObjects.findIndex(o => o.id === update.id);
+        if (idx !== -1) {
+          updatedObjects[idx] = {
+            ...updatedObjects[idx],
+            position: update.newPosition
+          };
+        }
+      }
+      
+      onObjectsChange(updatedObjects, true); // Suppress history during drag
+    }
+    
+    // Apply text label updates
+    if (textUpdates.length > 0) {
+      let updatedLabels = [...activeLayer.textLabels];
+      
+      for (const update of textUpdates) {
+        const idx = updatedLabels.findIndex(l => l.id === update.id);
+        if (idx !== -1) {
+          updatedLabels[idx] = {
+            ...updatedLabels[idx],
+            position: update.newPosition
+          };
+        }
+      }
+      
+      onTextLabelsChange(updatedLabels, true); // Suppress history during drag
+    }
+    
+    // Update drag start for next frame
+    setDragStart({
+      ...dragStart,
+      gridX,
+      gridY,
+      worldX,
+      worldY
+    });
+    
+    // Update selected items data to keep in sync
+    const allUpdates = [
+      ...objectUpdates.map(u => ({ id: u.id, position: u.newPosition })),
+      ...textUpdates.map(u => ({ id: u.id, position: u.newPosition }))
+    ];
+    updateSelectedItemsData(allUpdates);
+    
+    return true;
+  }, [isDraggingSelection, dragStart, mapData, geometry, selectedItems, getClientCoords, 
+      screenToGrid, screenToWorld, onObjectsChange, onTextLabelsChange, setDragStart, updateSelectedItemsData]);
+
+  /**
+   * Stop group drag and finalize history
+   * @returns {boolean} True if group drag was stopped
+   */
+  const stopGroupDrag = dc.useCallback(() => {
+    
+    if (!isDraggingSelection || !dragStart?.isGroupDrag) {
+      return false;
+    }
+    
+    setIsDraggingSelection(false);
+    setDragStart(null);
+    
+    // Commit history entries for the completed drag
+    if (groupDragInitialStateRef.current !== null) {
+      const activeLayer = getActiveLayer(mapData);
+      
+      // Commit objects change (this will create history entry)
+      if (activeLayer.objects) {
+        onObjectsChange(activeLayer.objects, false);
+      }
+      
+      // Commit text labels change (this will create history entry)
+      // Note: This might create two history entries - we may want to batch them
+      // For now, this is acceptable behavior
+      if (activeLayer.textLabels) {
+        onTextLabelsChange(activeLayer.textLabels, false);
+      }
+      
+      groupDragInitialStateRef.current = null;
+    }
+    
+    // Clear offsets
+    groupDragOffsetsRef.current = new Map();
+    
+    return true;
+  }, [isDraggingSelection, dragStart, mapData, setIsDraggingSelection, setDragStart, onObjectsChange, onTextLabelsChange]);
+
+  return {
+    // State
+    isGroupDragging,
+    
+    // Handlers
+    getClickedSelectedItem,
+    startGroupDrag,
+    handleGroupDrag,
+    stopGroupDrag
+  };
+};
+
+return { useGroupDrag };
+```
+
 # useEventCoordinator
 
 ```js
 const { useMapState } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "MapContext"));
 const { useMapSelection } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "MapSelectionContext"));
 const { useRegisteredHandlers } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "EventHandlerContext"));
+const { useGroupDrag } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "useGroupDrag"));
 
 /**
  * useEventCoordinator.js
@@ -14163,9 +18816,12 @@ const useEventCoordinator = ({
   isAlignmentMode = false
 }) => {
   // Get shared state from contexts
-  const { canvasRef, currentTool } = useMapState();
-  const { selectedItem, setSelectedItem, isDraggingSelection, setIsDraggingSelection, setDragStart, layerVisibility } = useMapSelection();
+  const { canvasRef, currentTool, screenToGrid, screenToWorld, getClientCoords } = useMapState();
+  const { selectedItem, setSelectedItem, isDraggingSelection, setIsDraggingSelection, dragStart, setDragStart, layerVisibility, hasMultiSelection, isSelected, isGroupDragging, clearSelection } = useMapSelection();
   const { getHandlers } = useRegisteredHandlers();
+  
+  // Group drag for multi-select
+  const { getClickedSelectedItem, startGroupDrag, handleGroupDrag, stopGroupDrag } = useGroupDrag();
   
   // Local state for multi-touch and pending actions
   const [recentMultiTouch, setRecentMultiTouch] = dc.useState(false);
@@ -14175,6 +18831,9 @@ const useEventCoordinator = ({
   // Track pan start position for click vs drag detection
   const panStartPositionRef = dc.useRef(null);
   const panMoveThreshold = 5; // pixels
+  
+  // Track pending area select start (for when empty space is clicked but drag may occur)
+  const areaSelectPendingRef = dc.useRef(null);
   
   /**
    * Handle pointer down events
@@ -14189,6 +18848,7 @@ const useEventCoordinator = ({
     const panZoomHandlers = getHandlers('panZoom');
     const measureHandlers = getHandlers('measure');
     const alignmentHandlers = getHandlers('imageAlignment');
+    const fogHandlers = getHandlers('fogOfWar');
     
     if (!panZoomHandlers) return;
     
@@ -14295,6 +18955,7 @@ const useEventCoordinator = ({
       type: eventType,
       clientX: clientX,
       clientY: clientY,
+      button: e.button ?? 0,  // Include button for click detection (default 0 for touch)
       preventDefault: () => {},
       stopPropagation: () => {},
       target: targetElement
@@ -14309,8 +18970,27 @@ const useEventCoordinator = ({
         return;
       }
       
+      // Fog of War tools take precedence when active
+      if (fogHandlers?.handlePointerDown) {
+        fogHandlers.handlePointerDown(syntheticEvent);
+        return;
+      }
+      
       // Route to appropriate handler based on current tool
       if (currentTool === 'select') {
+        // Multi-select: check if clicking on an already-selected item to start group drag
+        if (hasMultiSelection) {
+          const worldCoords = screenToWorld(clientX, clientY);
+          if (worldCoords) {
+            const clickedItem = getClickedSelectedItem(gridX, gridY, worldCoords.worldX, worldCoords.worldY);
+            if (clickedItem) {
+              // Start group drag
+              startGroupDrag(clientX, clientY, gridX, gridY);
+              return;
+            }
+          }
+        }
+        
         // Try object selection first (only if objects layer is visible)
         if (layerVisibility.objects && objectHandlers?.handleObjectSelection) {
           const objectHandled = objectHandlers.handleObjectSelection(clientX, clientY, gridX, gridY);
@@ -14327,18 +19007,71 @@ const useEventCoordinator = ({
         panStartPositionRef.current = { x: clientX, y: clientY };
         startPan(clientX, clientY);
         
+      } else if (currentTool === 'areaSelect') {
+        // Area select tool - handles both selection AND interaction with selected items
+        
+        // First: check if clicking on an already-selected item to start group drag
+        if (hasMultiSelection) {
+          const worldCoords = screenToWorld(clientX, clientY);
+          if (worldCoords) {
+            const clickedItem = getClickedSelectedItem(gridX, gridY, worldCoords.worldX, worldCoords.worldY);
+            if (clickedItem) {
+              // Start group drag - don't start new area selection
+              startGroupDrag(clientX, clientY, gridX, gridY);
+              return;
+            }
+          }
+          // Clicked on empty space while having selection - just clear, don't start new area select
+          clearSelection();
+          return;
+        }
+        
+        // No multi-selection - check if we're in the middle of an area select (first corner already placed)
+        const areaSelectHandlers = getHandlers('areaSelect');
+        if (areaSelectHandlers?.areaSelectStart) {
+          // Second click - complete the area selection
+          if (areaSelectHandlers.handleAreaSelectClick) {
+            areaSelectHandlers.handleAreaSelectClick(syntheticEvent);
+          }
+          return;
+        }
+        
+        // No multi-selection, no area select in progress - check if clicking on an object or text to select it
+        // Try object selection first (only if objects layer is visible)
+        if (layerVisibility.objects && objectHandlers?.handleObjectSelection) {
+          const objectHandled = objectHandlers.handleObjectSelection(clientX, clientY, gridX, gridY);
+          if (objectHandled) return;
+        }
+        
+        // Try text selection (only if text labels layer is visible)
+        if (layerVisibility.textLabels && textHandlers?.handleTextSelection) {
+          const textHandled = textHandlers.handleTextSelection(clientX, clientY);
+          if (textHandled) return;
+        }
+        
+        // Clicked on empty space with no selection - start panning
+        // Store the click position so we can start area select on pointer up if no drag occurred
+        panStartPositionRef.current = { x: clientX, y: clientY };
+        areaSelectPendingRef.current = { clientX, clientY, syntheticEvent };
+        startPan(clientX, clientY);
+        
       } else if (currentTool === 'draw' || currentTool === 'erase' || 
                  currentTool === 'rectangle' || currentTool === 'circle' || 
                  currentTool === 'clearArea' || currentTool === 'line' ||
                  currentTool === 'edgeDraw' || currentTool === 'edgeErase' || 
                  currentTool === 'edgeLine') {
-        // Drawing tools (including edge tools)
+        // Drawing tools (including edge tools) - clear any multi-selection
+        if (hasMultiSelection) clearSelection();
+        
         if (drawingHandlers?.handleDrawingPointerDown) {
           const eventToUse = isTouchEvent ? syntheticEvent : e;
           drawingHandlers.handleDrawingPointerDown(eventToUse, gridX, gridY);
         }
         
       } else if (currentTool === 'addObject') {
+        // Clear any multi-selection when adding objects
+        if (hasMultiSelection) clearSelection();
+        
         // Skip if objects layer is hidden
         if (!layerVisibility.objects) return;
         
@@ -14354,6 +19087,9 @@ const useEventCoordinator = ({
         }
         
       } else if (currentTool === 'addText') {
+        // Clear any multi-selection when adding text
+        if (hasMultiSelection) clearSelection();
+        
         // Skip if text labels layer is hidden
         if (!layerVisibility.textLabels) return;
         
@@ -14362,6 +19098,9 @@ const useEventCoordinator = ({
         }
         
       } else if (currentTool === 'measure') {
+        // Clear any multi-selection when measuring
+        if (hasMultiSelection) clearSelection();
+        
         // Distance measurement tool
         if (measureHandlers?.handleMeasureClick) {
           measureHandlers.handleMeasureClick(gridX, gridY, isTouchEvent);
@@ -14381,7 +19120,7 @@ const useEventCoordinator = ({
       // Mouse events execute immediately
       executeToolAction();
     }
-  }, [currentTool, isColorPickerOpen, showObjectColorPicker, recentMultiTouch, selectedItem, getHandlers, layerVisibility, isAlignmentMode]);
+  }, [currentTool, isColorPickerOpen, showObjectColorPicker, recentMultiTouch, selectedItem, hasMultiSelection, clearSelection, screenToWorld, getClickedSelectedItem, startGroupDrag, getHandlers, layerVisibility, isAlignmentMode]);
   
   /**
    * Handle pointer move events
@@ -14394,6 +19133,7 @@ const useEventCoordinator = ({
     const panZoomHandlers = getHandlers('panZoom');
     const measureHandlers = getHandlers('measure');
     const alignmentHandlers = getHandlers('imageAlignment');
+    const fogHandlers = getHandlers('fogOfWar');
     
     if (!panZoomHandlers) return;
     
@@ -14451,7 +19191,14 @@ const useEventCoordinator = ({
       return;
     }
     
-    // Handle dragging selection (respect layer visibility)
+    // Handle group drag (multi-select) - check dragStart.isGroupDrag flag directly
+    // since context's isGroupDragging may not have updated yet after startGroupDrag
+    if (isDraggingSelection && dragStart?.isGroupDrag) {
+      handleGroupDrag(e);
+      return;
+    }
+    
+    // Handle dragging selection (respect layer visibility) - single item
     if (isDraggingSelection && selectedItem) {
       if (selectedItem.type === 'object' && layerVisibility.objects && objectHandlers?.handleObjectDragging) {
         objectHandlers.handleObjectDragging(e);
@@ -14459,6 +19206,12 @@ const useEventCoordinator = ({
         textHandlers.handleTextDragging(e);
       }
       return;
+    }
+    
+    // Handle Fog of War tools
+    if (fogHandlers?.handlePointerMove) {
+      fogHandlers.handlePointerMove(e);
+      // Don't return - allow hover updates to still work
     }
     
     // Handle drawing tools (including edge tools)
@@ -14494,7 +19247,7 @@ const useEventCoordinator = ({
     if (layerVisibility.objects && objectHandlers?.handleHoverUpdate) {
       objectHandlers.handleHoverUpdate(e);
     }
-  }, [currentTool, isDraggingSelection, selectedItem, getHandlers, layerVisibility, isAlignmentMode]);
+  }, [currentTool, isDraggingSelection, dragStart, selectedItem, isGroupDragging, handleGroupDrag, getHandlers, layerVisibility, isAlignmentMode]);
   
   /**
    * Handle pointer up events
@@ -14506,6 +19259,7 @@ const useEventCoordinator = ({
     const textHandlers = getHandlers('text');
     const panZoomHandlers = getHandlers('panZoom');
     const alignmentHandlers = getHandlers('imageAlignment');
+    const fogHandlers = getHandlers('fogOfWar');
     
     if (!panZoomHandlers) return;
     
@@ -14549,6 +19303,25 @@ const useEventCoordinator = ({
         panStartPositionRef.current = null;
       }
       
+      // Check if this was a click (no movement) vs a drag with areaSelect tool
+      // If click, start area select; if drag, was panning (already handled)
+      if (currentTool === 'areaSelect' && areaSelectPendingRef.current) {
+        const { clientX, clientY } = getClientCoords(e);
+        const deltaX = Math.abs(clientX - areaSelectPendingRef.current.clientX);
+        const deltaY = Math.abs(clientY - areaSelectPendingRef.current.clientY);
+        
+        // If mouse/finger didn't move much, treat as area select click (start first corner)
+        if (deltaX < panMoveThreshold && deltaY < panMoveThreshold) {
+          const areaSelectHandlers = getHandlers('areaSelect');
+          if (areaSelectHandlers?.handleAreaSelectClick) {
+            areaSelectHandlers.handleAreaSelectClick(areaSelectPendingRef.current.syntheticEvent);
+          }
+        }
+        
+        areaSelectPendingRef.current = null;
+        panStartPositionRef.current = null;
+      }
+      
       return;
     }
     
@@ -14560,7 +19333,13 @@ const useEventCoordinator = ({
       return;
     }
     
-    // Handle dragging
+    // Handle group drag (multi-select)
+    if (isDraggingSelection && dragStart?.isGroupDrag) {
+      stopGroupDrag();
+      return;
+    }
+    
+    // Handle dragging (single item)
     if (isDraggingSelection) {
       if (selectedItem?.type === 'object' && objectHandlers?.stopObjectDragging) {
         objectHandlers.stopObjectDragging();
@@ -14580,7 +19359,12 @@ const useEventCoordinator = ({
         drawingHandlers.stopDrawing(e);
       }
     }
-  }, [currentTool, recentMultiTouch, isDraggingSelection, selectedItem, setSelectedItem, getHandlers, isAlignmentMode]);
+    
+    // Handle Fog of War tools
+    if (fogHandlers?.handlePointerUp) {
+      fogHandlers.handlePointerUp(e);
+    }
+  }, [currentTool, recentMultiTouch, isDraggingSelection, dragStart, selectedItem, setSelectedItem, isGroupDragging, stopGroupDrag, getHandlers, isAlignmentMode]);
   
   /**
    * Handle pointer leave events
@@ -14742,6 +19526,11 @@ const useEventCoordinator = ({
         objectHandlers.stopObjectResizing();
       }
       
+      // Stop group drag if active
+      if (isDraggingSelection && dragStart?.isGroupDrag) {
+        stopGroupDrag();
+      }
+      
       if (objectHandlers?.stopObjectDragging) {
         objectHandlers.stopObjectDragging();
       }
@@ -14772,7 +19561,7 @@ const useEventCoordinator = ({
       window.removeEventListener('touchend', handleGlobalPointerUp);
       window.removeEventListener('mousemove', handleGlobalMouseMove);
     };
-  }, [isDraggingSelection, setIsDraggingSelection, setDragStart, getHandlers]);
+  }, [isDraggingSelection, dragStart, setIsDraggingSelection, setDragStart, isGroupDragging, stopGroupDrag, getHandlers]);
   
   /**
    * Handle keyboard events
@@ -14844,6 +19633,8 @@ const { NotePinLayer } = await dc.require(dc.headerLink(dc.resolvePath("compiled
 const { EventHandlerProvider } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "EventHandlerContext"));
 const { HexCoordinateLayer } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "HexCoordinateLayer"));
 const { MeasurementLayer } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "MeasurementLayer"));
+const { AreaSelectLayer } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "AreaSelectLayer"));
+const { FogOfWarLayer } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "FogOfWarLayer"));
 const { getSetting } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "settingsAccessor"));
 const { usePanZoomCoordinator } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "usePanZoomCoordinator"));
 const { useEventCoordinator } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "useEventCoordinator"));
@@ -14879,6 +19670,7 @@ const Coordinators = ({ canvasRef, mapData, geometry, isFocused, isColorPickerOp
  */
 const MapCanvasContent = ({ mapData, onCellsChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onViewStateChange, currentTool, selectedObjectType, selectedColor, isColorPickerOpen, customColors, onAddCustomColor, onDeleteCustomColor, isFocused, isAnimating, theme, isAlignmentMode, children }) => {
   const canvasRef = dc.useRef(null);
+  const fogCanvasRef = dc.useRef(null);  // Separate canvas for fog blur effect (CSS blur for iOS compat)
   const containerRef = dc.useRef(null);
   const [canvasDimensions, setCanvasDimensions] = dc.useState({
     width: DEFAULTS.canvasSize.width,
@@ -14896,6 +19688,7 @@ const MapCanvasContent = ({ mapData, onCellsChange, onObjectsChange, onTextLabel
   // Use shared selection from context (same state ObjectLayer uses)
   const {
     selectedItem, setSelectedItem,
+    selectedItems,
     isDraggingSelection, setIsDraggingSelection,
     dragStart, setDragStart,
     isResizeMode, setIsResizeMode,
@@ -14989,13 +19782,14 @@ const MapCanvasContent = ({ mapData, onCellsChange, onObjectsChange, onTextLabel
   }, [isAnimating]);
 
   // Render canvas whenever relevant state changes
-  useCanvasRenderer(canvasRef, mapData, geometry, selectedItem, isResizeMode, theme, showCoordinates, layerVisibility);
+  useCanvasRenderer(canvasRef, fogCanvasRef, mapData, geometry, selectedItems, isResizeMode, theme, showCoordinates, layerVisibility);
 
   // Trigger redraw when canvas dimensions change (from expand/collapse)
   dc.useEffect(() => {
     if (!canvasRef.current || !mapData || !geometry) return;
 
     const canvas = canvasRef.current;
+    const fogCanvas = fogCanvasRef.current;
 
     // During animation, preserve canvas content
     if (isAnimating) {
@@ -15009,13 +19803,19 @@ const MapCanvasContent = ({ mapData, onCellsChange, onObjectsChange, onTextLabel
       // Update canvas size
       canvas.width = canvasDimensions.width;
       canvas.height = canvasDimensions.height;
+      
+      // Also update fog canvas size
+      if (fogCanvas) {
+        fogCanvas.width = canvasDimensions.width;
+        fogCanvas.height = canvasDimensions.height;
+      }
 
       // Restore content (will stretch/compress during animation)
       const ctx = canvas.getContext('2d');
       ctx.drawImage(tempCanvas, 0, 0, canvas.width, canvas.height);
     } else {
       // After animation, do a proper redraw with correct dimensions
-      renderCanvas(canvas, mapData, geometry, selectedItem, isResizeMode, theme, showCoordinates, layerVisibility);
+      renderCanvas(canvas, fogCanvas, mapData, geometry, selectedItem, isResizeMode, theme, showCoordinates, layerVisibility);
     }
   }, [canvasDimensions.width, canvasDimensions.height, isAnimating, showCoordinates, layerVisibility]);
 
@@ -15168,15 +19968,30 @@ const MapCanvasContent = ({ mapData, onCellsChange, onObjectsChange, onTextLabel
           />
           
           <div className="dmt-canvas-container" ref={containerRef}>
-            {/* Main canvas */}
-            <canvas
-              ref={canvasRef}
-              width={canvasDimensions.width}
-              height={canvasDimensions.height}
-              className={getCursorClass()}
-              style={{ touchAction: 'none' }}
-            />
-            
+            {/* Wrapper for canvas alignment - fog canvas positions relative to this */}
+            <div style={{ position: 'relative', display: 'inline-block' }}>
+              {/* Main canvas */}
+              <canvas
+                ref={canvasRef}
+                width={canvasDimensions.width}
+                height={canvasDimensions.height}
+                className={getCursorClass()}
+                style={{ touchAction: 'none', display: 'block' }}
+              />
+              
+              {/* Fog blur overlay canvas */}
+              <canvas
+                ref={fogCanvasRef}
+                width={canvasDimensions.width}
+                height={canvasDimensions.height}
+                style={{ 
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  pointerEvents: 'none'
+                }}
+              />
+            </div>
 
             <LinkedNoteHoverOverlays
               canvasRef={canvasRef}
@@ -15214,6 +20029,8 @@ MapCanvas.TextLayer = TextLayer;
 MapCanvas.NotePinLayer = NotePinLayer;
 MapCanvas.HexCoordinateLayer = HexCoordinateLayer;
 MapCanvas.MeasurementLayer = MeasurementLayer;
+MapCanvas.AreaSelectLayer = AreaSelectLayer;
+MapCanvas.FogOfWarLayer = FogOfWarLayer;
 
 return { MapCanvas };
 ```
@@ -15526,69 +20343,242 @@ return { WindroseCompass };
 ```jsx
 const { WindroseCompass } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "WindroseCompass"));
 
-const MapControls = ({ onZoomIn, onZoomOut, onCompassClick, northDirection, currentZoom, isExpanded, onToggleExpand, onSettingsClick, mapType, showVisibilityToolbar, onToggleVisibilityToolbar }) => {
+// Timing constants - easy to tune
+const COLLAPSE_DELAY_DESKTOP_MS = 800;   // Desktop: time after mouse leaves
+const COLLAPSE_DELAY_TOUCH_MS = 3000;    // Touch: longer since no hover cue
+const ITEM_STAGGER_MS = 40;              // Delay between each item's animation start
+const ITEM_DURATION_MS = 180;            // How long each item takes to animate
+const DRAWER_ITEM_COUNT = 4;             // Number of items in the bottom drawer
+
+const MapControls = ({ 
+  onZoomIn, 
+  onZoomOut, 
+  onCompassClick, 
+  northDirection, 
+  currentZoom, 
+  isExpanded, 
+  onToggleExpand, 
+  onSettingsClick, 
+  mapType, 
+  showVisibilityToolbar, 
+  onToggleVisibilityToolbar,
+  showLayerPanel,
+  onToggleLayerPanel,
+  alwaysShowControls = false
+}) => {
+    // When alwaysShowControls is true, controls are always visible
+    const [controlsRevealed, setControlsRevealed] = dc.useState(alwaysShowControls);
+    const collapseTimerRef = dc.useRef(null);
+    
+    // Update revealed state when alwaysShowControls changes
+    dc.useEffect(() => {
+      if (alwaysShowControls) {
+        setControlsRevealed(true);
+        clearCollapseTimer();
+      }
+    }, [alwaysShowControls]);
+    
+    // Detect device capabilities separately
+    // Touch capability: needs tap-to-reveal and overlay
+    // Hover capability: can use hover to reveal
+    // iPad with trackpad has BOTH
+    const hasTouchCapability = dc.useMemo(() => {
+      return window.matchMedia('(pointer: coarse)').matches;
+    }, []);
+    
+    const clearCollapseTimer = () => {
+      if (collapseTimerRef.current) {
+        clearTimeout(collapseTimerRef.current);
+        collapseTimerRef.current = null;
+      }
+    };
+    
+    const startCollapseTimer = (forTouch = false) => {
+      // Don't collapse if always showing controls
+      if (alwaysShowControls) return;
+      
+      clearCollapseTimer();
+      const delay = forTouch ? COLLAPSE_DELAY_TOUCH_MS : COLLAPSE_DELAY_DESKTOP_MS;
+      collapseTimerRef.current = setTimeout(() => {
+        setControlsRevealed(false);
+      }, delay);
+    };
+    
+    // Hover handlers - work on any device with hover capability
+    const handleMouseEnter = () => {
+      clearCollapseTimer();
+      setControlsRevealed(true);
+    };
+    
+    const handleMouseLeave = () => {
+      startCollapseTimer(false); // desktop timing
+    };
+    
+    // Compass click - works on all devices
+    // If collapsed: reveal (tap-to-reveal for touch, or click-to-reveal)
+    // If revealed or always showing: rotate compass
+    const handleCompassClick = () => {
+      if (alwaysShowControls || controlsRevealed) {
+        // Controls already revealed or always showing - rotate compass
+        onCompassClick();
+        // Reset timer for touch users (only if not always showing)
+        if (hasTouchCapability && !alwaysShowControls) {
+          startCollapseTimer(true);
+        }
+      } else {
+        // Reveal controls
+        clearCollapseTimer();
+        setControlsRevealed(true);
+        // Start auto-collapse timer for touch interactions
+        if (hasTouchCapability) {
+          startCollapseTimer(true);
+        }
+      }
+    };
+    
+    // Touch: tap outside to dismiss (only if not always showing)
+    const handleOverlayClick = (e) => {
+      if (alwaysShowControls) return;
+      
+      e.stopPropagation();
+      e.preventDefault();
+      clearCollapseTimer();
+      setControlsRevealed(false);
+    };
+    
+    // Reset collapse timer when interacting with controls (touch)
+    const handleControlInteraction = (handler) => (e) => {
+      if (hasTouchCapability && controlsRevealed) {
+        startCollapseTimer(true);
+      }
+      handler(e);
+    };
+    
+    // Cleanup timer on unmount
+    dc.useEffect(() => {
+      return () => clearCollapseTimer();
+    }, []);
+    
+    // Stagger timing for bottom drawer items (indices 0-3)
+    const getDrawerItemStyle = (index) => ({
+      transitionDelay: controlsRevealed 
+        ? `${(index + 1) * ITEM_STAGGER_MS}ms`
+        : `${(DRAWER_ITEM_COUNT - index + 1) * ITEM_STAGGER_MS}ms`,
+      transitionDuration: `${ITEM_DURATION_MS}ms`
+    });
+    
+    // Expand button animates last on reveal, first on collapse
+    const getExpandStyle = () => ({
+      transitionDelay: controlsRevealed 
+        ? `${(DRAWER_ITEM_COUNT + 1) * ITEM_STAGGER_MS}ms`
+        : `0ms`,
+      transitionDuration: `${ITEM_DURATION_MS}ms`
+    });
+    
+    // Build compass tooltip based on state and capabilities
+    const getCompassTitle = () => {
+      if (!controlsRevealed && !alwaysShowControls && hasTouchCapability) {
+        return "Tap to show controls";
+      }
+      if (mapType === 'hex') {
+        return `North indicator at ${northDirection}° (visual only, ${hasTouchCapability ? 'tap' : 'click'} to rotate)`;
+      }
+      return `North is at ${northDirection}° (${hasTouchCapability ? 'tap' : 'click'} to rotate)`;
+    };
+    
     return (
-      <div className="dmt-controls">
-        {/* Expand/Collapse Button */}
-        <button
-          className="dmt-expand-btn"
-          onClick={onToggleExpand}
-          title={isExpanded ? "Collapse to normal width" : "Expand to full width"}
-        >
-          <dc.Icon icon={isExpanded ? "lucide-minimize" : "lucide-expand"} />
-        </button>
+      <>
+        {/* Invisible overlay to capture taps outside controls (touch capable devices, not when always showing) */}
+        {hasTouchCapability && controlsRevealed && !alwaysShowControls && (
+          <div 
+            className="dmt-controls-overlay"
+            onClick={handleOverlayClick}
+            onTouchStart={handleOverlayClick}
+          />
+        )}
         
-        {/* Compass Rose */}
         <div 
-          className={`dmt-compass ${mapType === 'hex' ? 'dmt-compass-disabled' : ''}`}
-          onClick={mapType === 'hex' ? () => {} : onCompassClick}
-          title={mapType === 'hex' 
-            ? "Map rotation temporarily disabled (coordinate key feature in development)"
-            : `North is at ${northDirection}° (click to rotate)`
-          }
+          className="dmt-controls"
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
         >
-          <WindroseCompass rotation={northDirection} className="dmt-compass-svg" />
-        </div>
-        
-        {/* Zoom Controls */}
-        <div className="dmt-zoom-controls">
+          {/* Expand/Collapse Button - Above compass, animates last */}
           <button
-            className="dmt-zoom-btn"
-            onClick={onZoomIn}
-            title="Zoom In"
+            className={`dmt-expand-btn dmt-drawer-item dmt-drawer-item-up ${controlsRevealed ? 'dmt-drawer-item-visible' : ''}`}
+            style={getExpandStyle()}
+            onClick={handleControlInteraction(onToggleExpand)}
+            title={isExpanded ? "Collapse to normal width" : "Expand to full width"}
           >
-            +
+            <dc.Icon icon={isExpanded ? "lucide-minimize" : "lucide-expand"} />
           </button>
-          <div className="dmt-zoom-level" title={`Zoom: ${Math.round(currentZoom * 100)}%`}>
-            {Math.round(currentZoom * 100)}%
+          
+          {/* Compass Rose - Always visible anchor, slides down on reveal */}
+          <div 
+            className={`dmt-compass dmt-compass-animated ${controlsRevealed ? 'dmt-compass-revealed' : ''}`}
+            onClick={handleCompassClick}
+            title={getCompassTitle()}
+          >
+            <WindroseCompass rotation={northDirection} className="dmt-compass-svg" />
           </div>
-          <button 
-            className="dmt-zoom-btn"
-            onClick={onZoomOut}
-            title="Zoom Out"
-          >
-            -
-          </button>
+          
+          {/* Collapsible controls container - Below compass */}
+          <div className={`dmt-controls-drawer ${controlsRevealed ? 'dmt-controls-drawer-open' : ''}`}>
+            {/* Zoom Controls */}
+            <div 
+              className={`dmt-zoom-controls dmt-drawer-item ${controlsRevealed ? 'dmt-drawer-item-visible' : ''}`}
+              style={getDrawerItemStyle(0)}
+            >
+              <button
+                className="dmt-zoom-btn"
+                onClick={handleControlInteraction(onZoomIn)}
+                title="Zoom In"
+              >
+                +
+              </button>
+              <div className="dmt-zoom-level" title={`Zoom: ${Math.round(currentZoom * 100)}%`}>
+                {Math.round(currentZoom * 100)}%
+              </div>
+              <button 
+                className="dmt-zoom-btn"
+                onClick={handleControlInteraction(onZoomOut)}
+                title="Zoom Out"
+              >
+                -
+              </button>
+            </div>
+            
+            {/* Layer Panel Toggle Button */}
+            <button
+              className={`dmt-expand-btn dmt-drawer-item ${showLayerPanel ? 'dmt-expand-btn-active' : ''} ${controlsRevealed ? 'dmt-drawer-item-visible' : ''}`}
+              style={getDrawerItemStyle(1)}
+              onClick={handleControlInteraction(onToggleLayerPanel)}
+              title="Toggle layer panel"
+            >
+              <dc.Icon icon="lucide-layers" />
+            </button>
+            
+            {/* Visibility Toggle Button */}
+            <button
+              className={`dmt-expand-btn dmt-drawer-item ${showVisibilityToolbar ? 'dmt-expand-btn-active' : ''} ${controlsRevealed ? 'dmt-drawer-item-visible' : ''}`}
+              style={getDrawerItemStyle(2)}
+              onClick={handleControlInteraction(onToggleVisibilityToolbar)}
+              title="Toggle layer visibility"
+            >
+              <dc.Icon icon="lucide-eye" />
+            </button>
+            
+            {/* Settings Button */}
+            <button
+              className={`dmt-expand-btn dmt-drawer-item ${controlsRevealed ? 'dmt-drawer-item-visible' : ''}`}
+              style={getDrawerItemStyle(3)}
+              onClick={handleControlInteraction(onSettingsClick)}
+              title="Map Settings"
+            >
+              <dc.Icon icon="lucide-settings" />
+            </button>
+          </div>
         </div>
-        
-        {/* Visibility Toggle Button */}
-        <button
-          className={`dmt-expand-btn ${showVisibilityToolbar ? 'dmt-expand-btn-active' : ''}`}
-          onClick={onToggleVisibilityToolbar}
-          title="Toggle layer visibility"
-        >
-          <dc.Icon icon="lucide-eye" />
-        </button>
-        
-        {/* Settings Button */}
-        <button
-          className="dmt-expand-btn"
-          onClick={onSettingsClick}
-          title="Map Settings"
-        >
-          <dc.Icon icon="lucide-settings" />
-        </button>
-      </div>
+      </>
     );
   };
   
@@ -15655,7 +20645,7 @@ const SubMenuFlyout = ({ subTools, currentSubTool, onSelect, onClose }) => {
       {subTools.map(subTool => (
         <button
           key={subTool.id}
-          className={`dmt-subtool-option ${currentSubTool === subTool.id ? 'dmt-subtool-option-active' : ''}`}
+          className={`dmt-subtool-option interactive-child ${currentSubTool === subTool.id ? 'dmt-subtool-option-active' : ''}`}
           onClick={(e) => {
             e.stopPropagation();
             onSelect(subTool.id);
@@ -15753,7 +20743,7 @@ const ToolButtonWithSubMenu = ({
   return (
     <div className="dmt-tool-btn-container" style={{ position: 'relative', display: 'inline-block' }}>
       <button
-        className={`dmt-tool-btn ${isActive ? 'dmt-tool-btn-active' : ''}`}
+        className={`dmt-tool-btn interactive-child ${isActive ? 'dmt-tool-btn-active' : ''}`}
         onPointerDown={handlePointerDown}
         onPointerUp={handlePointerUp}
         onPointerLeave={handlePointerLeave}
@@ -15762,7 +20752,7 @@ const ToolButtonWithSubMenu = ({
       >
         <dc.Icon icon={currentSubToolDef?.icon} />
         {hasMultipleSubTools && (
-          <span className="dmt-subtool-indicator">▼</span>
+          <span className="dmt-subtool-indicator interactive-child">▼</span>
         )}
       </button>
       
@@ -15792,8 +20782,10 @@ const ToolPalette = ({
   isColorPickerOpen,       
   onColorPickerOpenChange,
   customColors,
+  paletteColorOpacityOverrides = {},
   onAddCustomColor,
   onDeleteCustomColor,
+  onUpdateColorOpacity,
   mapType,
   isFocused = false
 }) => {
@@ -15803,6 +20795,7 @@ const ToolPalette = ({
   // Sub-menu state
   const [openSubMenu, setOpenSubMenu] = dc.useState(null);
   const [subToolSelections, setSubToolSelections] = dc.useState({
+    select: 'select',       // 'select' (click) | 'areaSelect' (two-click rectangle)
     draw: 'draw',           // 'draw' (cells) | 'edgeDraw' (edges)
     rectangle: 'rectangle'  // 'rectangle' (fill) | 'edgeLine'
   });
@@ -15829,7 +20822,8 @@ const ToolPalette = ({
           break;
         case 's':
         case 'v':
-          onToolChange('select');
+          // Use the currently selected sub-tool for select group
+          onToolChange(subToolSelections.select || 'select');
           break;
         case 'm':
           onToolChange('measure');
@@ -15843,10 +20837,17 @@ const ToolPalette = ({
     
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onToolChange, isFocused]);
+  }, [onToolChange, isFocused, subToolSelections]);
   
   // Tool groups with sub-tools
   const toolGroups = [
+    {
+      id: 'select',
+      subTools: [
+        { id: 'select', label: 'Click Select', title: 'Select/Move (S)', icon: 'lucide-hand' },
+        { id: 'areaSelect', label: 'Area Select', title: 'Area Select (click two corners)', icon: 'lucide-box-select' }
+      ]
+    },
     {
       id: 'draw',
       subTools: [
@@ -15865,7 +20866,6 @@ const ToolPalette = ({
   
   // Simple tools (no sub-menu)
   const simpleTools = [
-    { id: 'select', title: 'Select/Move Text & Objects (S)', icon: 'lucide-hand' },
     { id: 'erase', title: 'Erase (remove text/objects/cells/edges) (E)', icon: 'lucide-eraser' },
     { id: 'circle', title: 'Circle (click edge, then center)', icon: 'lucide-circle', gridOnly: true },
     { id: 'clearArea', title: 'Clear Area (click two corners to erase)', icon: 'lucide-square-x', gridOnly: true },
@@ -15944,9 +20944,11 @@ const ToolPalette = ({
         const buttonElement = e.target.closest('.dmt-color-tool-btn');
         
         if (!pickerElement && !buttonElement) {
+          // Save pending custom color if exists (color value may include alpha from native picker)
           if (pendingCustomColorRef.current) {
-            onAddCustomColor(pendingCustomColorRef.current);
-            onColorChange(pendingCustomColorRef.current);
+            const colorValue = pendingCustomColorRef.current;
+            onAddCustomColor(colorValue);
+            onColorChange(colorValue);
             pendingCustomColorRef.current = null;
           }
           handleCloseColorPicker();
@@ -15973,18 +20975,22 @@ const ToolPalette = ({
       <ToolPaletteBracket position="bl" />
       <ToolPaletteBracket position="br" />
       
-      {/* Select tool */}
-      <button
-        className={`dmt-tool-btn ${currentTool === 'select' ? 'dmt-tool-btn-active' : ''}`}
-        onClick={() => onToolChange('select')}
-        title="Select/Move Text & Objects"
-      >
-        <dc.Icon icon="lucide-hand" />
-      </button>
+      {/* Select tool group (with sub-menu for area select) */}
+      <ToolButtonWithSubMenu
+        toolGroup={toolGroups[0]}
+        currentTool={currentTool}
+        currentSubTool={subToolSelections.select}
+        isSubMenuOpen={openSubMenu === 'select'}
+        onToolSelect={onToolChange}
+        onSubToolSelect={handleSubToolSelect}
+        onSubMenuOpen={handleSubMenuOpen}
+        onSubMenuClose={handleSubMenuClose}
+        mapType={mapType}
+      />
       
       {/* Draw tool group (with sub-menu) */}
       <ToolButtonWithSubMenu
-        toolGroup={toolGroups[0]}
+        toolGroup={toolGroups[1]}
         currentTool={currentTool}
         currentSubTool={subToolSelections.draw}
         isSubMenuOpen={openSubMenu === 'draw'}
@@ -15999,7 +21005,7 @@ const ToolPalette = ({
       <div style={{ position: 'relative', display: 'inline-block' }}>
         <button
           ref={colorBtnRef}
-          className={`dmt-tool-btn dmt-color-tool-btn ${isColorPickerOpen ? 'dmt-tool-btn-active' : ''}`}
+          className={`dmt-tool-btn dmt-color-tool-btn interactive-child ${isColorPickerOpen ? 'dmt-tool-btn-active' : ''}`}
           onClick={toggleColorPicker}
           title="Choose color"
           style={{
@@ -16016,8 +21022,10 @@ const ToolPalette = ({
           onClose={handleCloseColorPicker}
           onReset={handleColorReset}
           customColors={customColors}
+          paletteColorOpacityOverrides={paletteColorOpacityOverrides}
           onAddCustomColor={onAddCustomColor}
           onDeleteCustomColor={onDeleteCustomColor}
+          onUpdateColorOpacity={onUpdateColorOpacity}
           position={null}
           pendingCustomColorRef={pendingCustomColorRef}
           title="Color"
@@ -16028,7 +21036,7 @@ const ToolPalette = ({
       
       {/* Erase tool */}
       <button
-        className={`dmt-tool-btn ${currentTool === 'erase' ? 'dmt-tool-btn-active' : ''}`}
+        className={`dmt-tool-btn interactive-child ${currentTool === 'erase' ? 'dmt-tool-btn-active' : ''}`}
         onClick={() => onToolChange('erase')}
         title="Erase (remove text/objects/cells/edges)"
       >
@@ -16038,7 +21046,7 @@ const ToolPalette = ({
       {/* Rectangle tool group (with sub-menu) - grid only */}
       {mapType !== 'hex' && (
         <ToolButtonWithSubMenu
-          toolGroup={toolGroups[1]}
+          toolGroup={toolGroups[2]}
           currentTool={currentTool}
           currentSubTool={subToolSelections.rectangle}
           isSubMenuOpen={openSubMenu === 'rectangle'}
@@ -16051,10 +21059,10 @@ const ToolPalette = ({
       )}
       
       {/* Remaining simple tools */}
-      {visibleSimpleTools.filter(t => !['select', 'erase'].includes(t.id)).map(tool => (
+      {visibleSimpleTools.filter(t => t.id !== 'erase').map(tool => (
         <button
           key={tool.id}
-          className={`dmt-tool-btn ${currentTool === tool.id ? 'dmt-tool-btn-active' : ''}`}
+          className={`dmt-tool-btn interactive-child ${currentTool === tool.id ? 'dmt-tool-btn-active' : ''}`}
           onClick={() => onToolChange(tool.id)}
           title={tool.title}
         >
@@ -16064,7 +21072,7 @@ const ToolPalette = ({
       
       <div className="dmt-history-controls">
         <button 
-          className="dmt-history-btn"
+          className="dmt-history-btn interactive-child"
           onClick={onUndo}
           disabled={!canUndo}
           title="Undo"
@@ -16072,7 +21080,7 @@ const ToolPalette = ({
           <dc.Icon icon="lucide-undo" />
         </button>
         <button 
-          className="dmt-history-btn"
+          className="dmt-history-btn interactive-child"
           onClick={onRedo}
           disabled={!canRedo}
           title="Redo"
@@ -16181,7 +21189,7 @@ const ObjectSidebar = ({ selectedObjectType, onObjectTypeSelect, onToolChange, i
   return (
     <div className="dmt-object-sidebar">
       {/* Hidden element to force early emoji font loading */}
-      <div className="dmt-font-preloader" aria-hidden="true">🔐🦪⬆️⬇️📍⚜️⚡🪐🧙‍♂️🗡️🏹⚔️⛏️🔱💀🎯🦡⚰️🛐🪔</div>
+      <div className="dmt-font-preloader" aria-hidden="true">🔍🦪⬆️⬇️🔍⚜️⚡🪐🧙‍♂️🗡️🹏⚔️⛏️📱💀🎯🦡⚰️🛏🪔</div>
       
       <div className="dmt-sidebar-header">
         Objects
@@ -16258,6 +21266,7 @@ return { ObjectSidebar };
  * VisibilityToolbar.jsx
  * Compact horizontal toolbar for toggling layer visibility
  * Overlays below the ToolPalette when eye button is clicked
+ * Extended with Fog of War tools panel
  */
 
 /**
@@ -16266,15 +21275,28 @@ return { ObjectSidebar };
  * @param {Object} layerVisibility - Current visibility state for each layer
  * @param {Function} onToggleLayer - Callback to toggle a layer's visibility
  * @param {string} mapType - 'grid' or 'hex' - hex coordinates only show for hex maps
+ * @param {Object} fogOfWarState - { initialized, enabled, activeTool } - FoW state from active layer
+ * @param {boolean} showFogTools - Whether FoW tools panel is expanded
+ * @param {Function} onFogToolsToggle - Toggle FoW tools panel visibility
+ * @param {Function} onFogToolSelect - Select a FoW tool ('paint', 'erase', 'rectangle', or null)
+ * @param {Function} onFogVisibilityToggle - Toggle fog visibility
+ * @param {Function} onFogFillAll - Fill all cells with fog
+ * @param {Function} onFogClearAll - Clear all fog
  */
 const VisibilityToolbar = ({ 
   isOpen, 
   layerVisibility, 
   onToggleLayer,
-  mapType 
+  mapType,
+  // Fog of War props
+  fogOfWarState = { initialized: false, enabled: false, activeTool: null },
+  showFogTools = false,
+  onFogToolsToggle,
+  onFogToolSelect,
+  onFogVisibilityToggle,
+  onFogFillAll,
+  onFogClearAll
 }) => {
-  if (!isOpen) return null;
-  
   const layers = [
     { 
       id: 'objects', 
@@ -16298,7 +21320,8 @@ const VisibilityToolbar = ({
   const visibleLayers = layers.filter(layer => !layer.hexOnly || mapType === 'hex');
   
   return (
-    <div className="dmt-visibility-toolbar">
+    <div className={`dmt-visibility-toolbar ${isOpen ? 'dmt-visibility-toolbar-open' : ''}`}>
+      {/* Existing layer visibility toggles */}
       {visibleLayers.map(layer => {
         const isVisible = layerVisibility[layer.id];
         
@@ -16328,6 +21351,80 @@ const VisibilityToolbar = ({
           </button>
         );
       })}
+      
+      {/* Separator */}
+      <div className="dmt-visibility-separator" />
+      
+      {/* Fog of War Section */}
+      <div className="dmt-fow-section">
+        {/* FoW Toggle Button - always visible */}
+        <button
+          className={`dmt-fow-toggle-btn ${showFogTools ? 'expanded' : ''}`}
+          onClick={onFogToolsToggle}
+          title="Fog of War tools"
+        >
+          <dc.Icon icon="lucide-cloud-fog" />
+          <span className="dmt-fow-label">Fog</span>
+        </button>
+        
+        {/* Expandable FoW Tools Panel */}
+        <div className={`dmt-fow-tools-panel ${showFogTools ? 'expanded' : ''}`}>
+          {/* Visibility toggle */}
+          <button
+            className={`dmt-fow-tool-btn ${!fogOfWarState.enabled ? 'disabled' : ''}`}
+            onClick={onFogVisibilityToggle}
+            title={fogOfWarState.enabled ? "Hide fog overlay" : "Show fog overlay"}
+            disabled={!fogOfWarState.initialized}
+          >
+            <dc.Icon icon={fogOfWarState.enabled ? "lucide-eye" : "lucide-eye-off"} />
+          </button>
+          
+          {/* Paint (add fog) */}
+          <button
+            className={`dmt-fow-tool-btn ${fogOfWarState.activeTool === 'paint' ? 'active' : ''}`}
+            onClick={() => onFogToolSelect && onFogToolSelect('paint')}
+            title="Paint fog onto cells"
+          >
+            <dc.Icon icon="lucide-paintbrush" />
+          </button>
+          
+          {/* Erase (reveal) */}
+          <button
+            className={`dmt-fow-tool-btn ${fogOfWarState.activeTool === 'erase' ? 'active' : ''}`}
+            onClick={() => onFogToolSelect && onFogToolSelect('erase')}
+            title="Erase fog (reveal cells)"
+          >
+            <dc.Icon icon="lucide-eraser" />
+          </button>
+          
+          {/* Rectangle */}
+          <button
+            className={`dmt-fow-tool-btn ${fogOfWarState.activeTool === 'rectangle' ? 'active' : ''}`}
+            onClick={() => onFogToolSelect && onFogToolSelect('rectangle')}
+            title="Rectangle tool - click two corners"
+          >
+            <dc.Icon icon="lucide-square" />
+          </button>
+          
+          {/* Fill All */}
+          <button
+            className="dmt-fow-tool-btn"
+            onClick={onFogFillAll}
+            title="Fill all painted cells with fog"
+          >
+            <dc.Icon icon="lucide-paint-bucket" />
+          </button>
+          
+          {/* Clear All */}
+          <button
+            className="dmt-fow-tool-btn"
+            onClick={onFogClearAll}
+            title="Clear all fog from layer"
+          >
+            <dc.Icon icon="lucide-x-square" />
+          </button>
+        </div>
+      </div>
     </div>
   );
 };
@@ -16392,11 +21489,11 @@ const QUICK_SYMBOLS = [
   '★', '☆', '✦', '✧', '✪', '✫', '✯', '⚑',
   '●', '○', '◆', '◇', '■', '□', '▲', '△', '▼', '▽',
   '♠', '♤', '♣', '♧', '♥', '♡', '♦', '♢',
-  '⚔', '⚒', '🗡', '🹏', '⚓', '⛏', '🔱',
+  '⚔', '⚒', '🗡', '🧹', '⚔', '⛏', '📱',
   '☠', '⚠', '☢', '☣', '⚡', '🔥', '💧',
-  '⚒', '⚑', '⛳', '🚩', '➤', '➜', '⬤',
+  '⚑', '⚒', '⛳', '🚩', '➤', '➜', '⬤',
   '⚙', '⚗', '🔮', '💎', '🗝', '📜', '🎭', '👑',
-  '🛡', '🏰', '⛪', '🗿', '⚱', '🺏', '🪔'
+  '🛡', '🏰', '⛪', '🗿', '⚱', '🏺', '🪔'
 ];
 
 // =============================================================================
@@ -17451,6 +22548,23 @@ const DMT_SETTINGS_STYLES = \`
     border-top: 1px solid var(--background-modifier-border);
   }
   
+  .dmt-opacity-control {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  
+  .dmt-opacity-control input[type="range"] {
+    width: 120px;
+  }
+  
+  .dmt-opacity-value {
+    min-width: 40px;
+    text-align: right;
+    font-size: 0.9em;
+    color: var(--text-muted);
+  }
+  
   .dmt-btn-icon {
     background: transparent;
     border: none;
@@ -18052,6 +23166,7 @@ class ColorEditModal extends Modal {
     // Initialize form values
     let colorValue = this.existingColor?.color || '#808080';
     let labelValue = this.existingColor?.label || '';
+    let opacityValue = this.existingColor?.opacity ?? 1;
     
     // Color picker
     new Setting(contentEl)
@@ -18086,6 +23201,26 @@ class ColorEditModal extends Modal {
         .onChange(value => {
           labelValue = value;
         }));
+    
+    // Opacity slider
+    const opacitySetting = new Setting(contentEl)
+      .setName('Opacity')
+      .setDesc('Default opacity when selecting this color');
+    
+    const opacityContainer = opacitySetting.controlEl.createEl('div', { cls: 'dmt-opacity-control' });
+    const opacitySlider = opacityContainer.createEl('input', {
+      type: 'range',
+      attr: { min: '10', max: '100', value: String(Math.round(opacityValue * 100)) }
+    });
+    const opacityDisplay = opacityContainer.createEl('span', { 
+      text: \`\${Math.round(opacityValue * 100)}%\`,
+      cls: 'dmt-opacity-value'
+    });
+    
+    opacitySlider.addEventListener('input', (e) => {
+      opacityValue = parseInt(e.target.value, 10) / 100;
+      opacityDisplay.textContent = \`\${Math.round(opacityValue * 100)}%\`;
+    });
     
     // Show original values for built-ins
     if (isBuiltIn && originalBuiltIn) {
@@ -18125,7 +23260,8 @@ class ColorEditModal extends Modal {
         this.plugin.settings.colorPaletteOverrides[this.existingColor.id] = {
           ...existingOverride,
           color: colorValue,
-          label: labelValue
+          label: labelValue,
+          opacity: opacityValue
         };
       } else if (isEdit) {
         // Update existing custom color
@@ -18134,7 +23270,8 @@ class ColorEditModal extends Modal {
           this.plugin.settings.customPaletteColors[idx] = {
             ...this.plugin.settings.customPaletteColors[idx],
             color: colorValue,
-            label: labelValue
+            label: labelValue,
+            opacity: opacityValue
           };
         }
       } else {
@@ -18145,7 +23282,8 @@ class ColorEditModal extends Modal {
         this.plugin.settings.customPaletteColors.push({
           id: 'custom-' + Date.now(),
           color: colorValue,
-          label: labelValue
+          label: labelValue,
+          opacity: opacityValue
         });
       }
       
@@ -18383,13 +23521,13 @@ class ImportModal extends Modal {
         const customCatCount = data.customCategories?.length || 0;
         
         if (overrideCount > 0) {
-          previewArea.createEl('p', { text: \`• \${overrideCount} built-in modification(s)\` });
+          previewArea.createEl('p', { text: \`â€¢ \${overrideCount} built-in modification(s)\` });
         }
         if (customObjCount > 0) {
-          previewArea.createEl('p', { text: \`• \${customObjCount} custom object(s)\` });
+          previewArea.createEl('p', { text: \`â€¢ \${customObjCount} custom object(s)\` });
         }
         if (customCatCount > 0) {
-          previewArea.createEl('p', { text: \`• \${customCatCount} custom category(ies)\` });
+          previewArea.createEl('p', { text: \`â€¢ \${customCatCount} custom category(ies)\` });
         }
         
         previewArea.style.display = 'block';
@@ -18541,7 +23679,12 @@ class WindroseMDSettingsPlugin extends Plugin {
         customGridCategories: [],
         // Color palette customization
         colorPaletteOverrides: {},
-        customPaletteColors: []
+        customPaletteColors: [],
+        // Fog of War defaults
+        fogOfWarBlurEnabled: false,
+        fogOfWarBlurFactor: 0.20,
+        // Controls visibility
+        alwaysShowControls: false
       }, data || {});
     } catch (error) {
       console.warn('[DMT Settings] Error loading settings, using defaults:', error);
@@ -18576,7 +23719,12 @@ class WindroseMDSettingsPlugin extends Plugin {
         customGridCategories: [],
         // Color palette customization
         colorPaletteOverrides: {},
-        customPaletteColors: []
+        customPaletteColors: [],
+        // Fog of War defaults
+        fogOfWarBlurEnabled: false,
+        fogOfWarBlurFactor: 0.20,
+        // Controls visibility
+        alwaysShowControls: false
       };
     }
   }
@@ -18804,6 +23952,9 @@ class WindroseMDSettingsTab extends PluginSettingTab {
     this.createCollapsibleSection(containerEl, 'Color Palette', 
       (el) => this.renderColorPaletteContent(el),
       { open: openSections.has('Color Palette') });
+    this.createCollapsibleSection(containerEl, 'Fog of War', 
+      (el) => this.renderFogOfWarSettingsContent(el),
+      { open: openSections.has('Fog of War') });
     this.createCollapsibleSection(containerEl, 'Map Behavior', 
       (el) => this.renderMapBehaviorSettingsContent(el),
       { open: openSections.has('Map Behavior') });
@@ -19161,10 +24312,11 @@ class WindroseMDSettingsTab extends PluginSettingTab {
   renderColorRow(containerEl, color, isHidden) {
     const row = containerEl.createEl('div', { cls: 'dmt-color-row' });
     
-    // Color swatch
+    // Color swatch - apply opacity if set
+    const swatchOpacity = color.opacity ?? 1;
     const swatch = row.createEl('div', { 
       cls: 'dmt-color-row-swatch',
-      attr: { style: \`background-color: \${color.color}\` }
+      attr: { style: \`background-color: \${color.color}; opacity: \${swatchOpacity}\` }
     });
     
     // Label with modified indicator
@@ -19178,8 +24330,11 @@ class WindroseMDSettingsTab extends PluginSettingTab {
       labelContainer.createEl('span', { text: ' (custom)', cls: 'dmt-color-row-custom' });
     }
     
-    // Hex value
-    row.createEl('code', { text: color.color, cls: 'dmt-color-row-hex' });
+    // Hex value + opacity if not 100%
+    const hexText = swatchOpacity < 1 
+      ? \`\${color.color} @ \${Math.round(swatchOpacity * 100)}%\`
+      : color.color;
+    row.createEl('code', { text: hexText, cls: 'dmt-color-row-hex' });
     
     // Actions
     const actions = row.createEl('div', { cls: 'dmt-color-row-actions' });
@@ -19246,6 +24401,57 @@ class WindroseMDSettingsTab extends PluginSettingTab {
   }
 
   // ---------------------------------------------------------------------------
+  // Section: Fog of War
+  // ---------------------------------------------------------------------------
+  
+  renderFogOfWarSettingsContent(containerEl) {
+    containerEl.createEl('p', { 
+      text: 'Default fog of war appearance settings for new maps. Individual maps can override these in their settings.',
+      cls: 'setting-item-description'
+    });
+    
+    // Soft Edges Toggle
+    new Setting(containerEl)
+      .setName('Soft Edges')
+      .setDesc('Enable a blur effect at fog boundaries for a softer, more atmospheric look')
+      .addToggle(toggle => toggle
+        .setValue(this.plugin.settings.fogOfWarBlurEnabled)
+        .onChange(async (value) => {
+          this.plugin.settings.fogOfWarBlurEnabled = value;
+          this.settingsChanged = true;
+          await this.plugin.saveSettings();
+          this.display(); // Refresh to show/hide blur intensity slider
+        }));
+    
+    // Blur Intensity Slider (only show when blur is enabled)
+    if (this.plugin.settings.fogOfWarBlurEnabled) {
+      const blurPercent = Math.round((this.plugin.settings.fogOfWarBlurFactor || 0.20) * 100);
+      
+      new Setting(containerEl)
+        .setName('Blur Intensity')
+        .setDesc(\`Size of blur effect as percentage of cell size (currently \${blurPercent}%)\`)
+        .addSlider(slider => slider
+          .setLimits(5, 50, 1)
+          .setValue(blurPercent)
+          .setDynamicTooltip()
+          .onChange(async (value) => {
+            this.plugin.settings.fogOfWarBlurFactor = value / 100;
+            this.settingsChanged = true;
+            await this.plugin.saveSettings();
+          }))
+        .addExtraButton(btn => btn
+          .setIcon('rotate-ccw')
+          .setTooltip('Reset to default (20%)')
+          .onClick(async () => {
+            this.plugin.settings.fogOfWarBlurFactor = 0.20;
+            this.settingsChanged = true;
+            await this.plugin.saveSettings();
+            this.display();
+          }));
+    }
+  }
+
+  // ---------------------------------------------------------------------------
   // Section: Map Behavior
   // ---------------------------------------------------------------------------
   
@@ -19258,6 +24464,18 @@ class WindroseMDSettingsTab extends PluginSettingTab {
         .setValue(this.plugin.settings.expandedByDefault)
         .onChange(async (value) => {
           this.plugin.settings.expandedByDefault = value;
+          this.settingsChanged = true;
+          await this.plugin.saveSettings();
+        }));
+
+    // Always Show Controls
+    new Setting(containerEl)
+      .setName('Always Show Controls')
+      .setDesc('Keep map controls visible at all times instead of auto-hiding')
+      .addToggle(toggle => toggle
+        .setValue(this.plugin.settings.alwaysShowControls)
+        .onChange(async (value) => {
+          this.plugin.settings.alwaysShowControls = value;
           this.settingsChanged = true;
           await this.plugin.saveSettings();
         }));
@@ -19930,7 +25148,7 @@ const { OBJECT_TYPES, CATEGORIES } = await dc.require(dc.headerLink(dc.resolvePa
 const { RA_ICONS, RA_CATEGORIES } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "rpgAwesomeIcons"));
 
 // Plugin version from template
-const PACKAGED_PLUGIN_VERSION = '0.9.9';
+const PACKAGED_PLUGIN_VERSION = '0.9.13';
 
 // LocalStorage keys for tracking user preferences
 const STORAGE_KEYS = {
@@ -20447,8 +25665,8 @@ return { ModalPortal };
  * - corner-to-corner: Distance between opposite vertices (point-to-point)
  * 
  * For both flat-top and pointy-top hexes:
- * - Edge-to-edge = 2 * hexSize
- * - Corner-to-corner = sqrt(3) * hexSize
+ * - Corner-to-corner = 2 * hexSize (vertex to opposite vertex)
+ * - Edge-to-edge = sqrt(3) * hexSize (flat side to opposite flat side)
  */
 
 // Measurement method constants
@@ -20470,11 +25688,11 @@ const MAX_FINE_TUNE_OFFSET = 3;    // Maximum fine-tune adjustment in pixels
  */
 function measurementToHexSize(size, method, orientation = 'flat') {
   if (method === MEASUREMENT_EDGE) {
-    // Edge-to-edge is always 2 * hexSize regardless of orientation
-    return size / 2;
-  } else {
-    // Corner-to-corner is sqrt(3) * hexSize regardless of orientation
+    // Edge-to-edge = sqrt(3) * hexSize, so hexSize = size / sqrt(3)
     return size / Math.sqrt(3);
+  } else {
+    // Corner-to-corner = 2 * hexSize, so hexSize = size / 2
+    return size / 2;
   }
 }
 
@@ -20488,9 +25706,11 @@ function measurementToHexSize(size, method, orientation = 'flat') {
  */
 function hexSizeToMeasurement(hexSize, method, orientation = 'flat') {
   if (method === MEASUREMENT_EDGE) {
-    return hexSize * 2;
-  } else {
+    // Edge-to-edge = sqrt(3) * hexSize
     return hexSize * Math.sqrt(3);
+  } else {
+    // Corner-to-corner = 2 * hexSize
+    return hexSize * 2;
   }
 }
 
@@ -20638,7 +25858,7 @@ function validateFineTune(baseHexSize, adjustedHexSize) {
   if (offset > MAX_FINE_TUNE_OFFSET) {
     return { 
       valid: false, 
-      error: `Fine-tune adjustment limited to ±${MAX_FINE_TUNE_OFFSET}px` 
+      error: `Fine-tune adjustment limited to Â±${MAX_FINE_TUNE_OFFSET}px` 
     };
   }
   return { valid: true, error: null };
@@ -20744,7 +25964,12 @@ const Actions = {
   SHOW_RESIZE_CONFIRM: 'SHOW_RESIZE_CONFIRM',
   CONFIRM_RESIZE_DELETE: 'CONFIRM_RESIZE_DELETE',
   CANCEL_RESIZE: 'CANCEL_RESIZE',
-  CLEAR_DELETE_FLAG: 'CLEAR_DELETE_FLAG'
+  CLEAR_DELETE_FLAG: 'CLEAR_DELETE_FLAG',
+  // Fog of War image actions
+  SET_FOG_IMAGE_DISPLAY_NAME: 'SET_FOG_IMAGE_DISPLAY_NAME',
+  SET_FOG_IMAGE_SEARCH_RESULTS: 'SET_FOG_IMAGE_SEARCH_RESULTS',
+  FOG_IMAGE_SELECTED: 'FOG_IMAGE_SELECTED',
+  CLEAR_FOG_IMAGE: 'CLEAR_FOG_IMAGE'
 };
 
 // ============================================================================
@@ -20832,7 +26057,15 @@ function buildInitialState(props, globalSettings) {
       coordinateTextColor: currentSettings?.overrides?.coordinateTextColor ?? globalSettings.coordinateTextColor,
       coordinateTextShadow: currentSettings?.overrides?.coordinateTextShadow ?? globalSettings.coordinateTextShadow,
       canvasHeight: currentSettings?.overrides?.canvasHeight ?? globalSettings.canvasHeight ?? 600,
-      canvasHeightMobile: currentSettings?.overrides?.canvasHeightMobile ?? globalSettings.canvasHeightMobile ?? 400
+      canvasHeightMobile: currentSettings?.overrides?.canvasHeightMobile ?? globalSettings.canvasHeightMobile ?? 400,
+      // Fog of War appearance
+      fogOfWarColor: currentSettings?.overrides?.fogOfWarColor ?? globalSettings.fogOfWarColor,
+      fogOfWarOpacity: currentSettings?.overrides?.fogOfWarOpacity ?? globalSettings.fogOfWarOpacity,
+      fogOfWarImage: currentSettings?.overrides?.fogOfWarImage ?? globalSettings.fogOfWarImage,
+      fogOfWarBlurEnabled: currentSettings?.overrides?.fogOfWarBlurEnabled ?? globalSettings.fogOfWarBlurEnabled,
+      fogOfWarBlurFactor: currentSettings?.overrides?.fogOfWarBlurFactor ?? globalSettings.fogOfWarBlurFactor,
+      // Controls visibility
+      alwaysShowControls: currentSettings?.overrides?.alwaysShowControls ?? globalSettings.alwaysShowControls ?? false
     },
     
     preferences: {
@@ -20862,6 +26095,12 @@ function buildInitialState(props, globalSettings) {
       : '',
     imageDimensions: null,
     imageSearchResults: [],
+    
+    // Fog of War image picker state
+    fogImageDisplayName: currentSettings?.overrides?.fogOfWarImage 
+      ? getDisplayNameFromPath(currentSettings.overrides.fogOfWarImage) 
+      : '',
+    fogImageSearchResults: [],
     
     gridDensity: currentBackgroundImage?.gridDensity ?? 'medium',
     customColumns: currentBackgroundImage?.customColumns ?? 24,
@@ -21104,6 +26343,35 @@ function settingsReducer(state, action) {
     case Actions.CLEAR_DELETE_FLAG:
       return { ...state, deleteOrphanedContent: false };
     
+    // Fog of War image picker actions
+    case Actions.SET_FOG_IMAGE_DISPLAY_NAME:
+      return { ...state, fogImageDisplayName: action.payload };
+    
+    case Actions.SET_FOG_IMAGE_SEARCH_RESULTS:
+      return { ...state, fogImageSearchResults: action.payload };
+    
+    case Actions.FOG_IMAGE_SELECTED:
+      return {
+        ...state,
+        fogImageDisplayName: action.payload.displayName,
+        fogImageSearchResults: [],
+        overrides: {
+          ...state.overrides,
+          fogOfWarImage: action.payload.path
+        }
+      };
+    
+    case Actions.CLEAR_FOG_IMAGE:
+      return {
+        ...state,
+        fogImageDisplayName: '',
+        fogImageSearchResults: [],
+        overrides: {
+          ...state.overrides,
+          fogOfWarImage: null
+        }
+      };
+    
     default:
       return state;
   }
@@ -21192,7 +26460,9 @@ function MapSettingsProvider({
   currentBackgroundImage = null,
   currentDistanceSettings = null,
   currentCells = [],
-  currentObjects = []
+  currentObjects = [],
+  mapData = null,
+  geometry = null
 }) {
   const globalSettings = getSettings();
   const isHexMap = mapType === 'hex';
@@ -21320,6 +26590,27 @@ function MapSettingsProvider({
     dispatch({
       type: Actions.IMAGE_SELECTED,
       payload: { path: fullPath, displayName, dimensions: dims, bounds }
+    });
+  };
+  
+  // Fog of War image handlers
+  const handleFogImageSearch = async (searchTerm) => {
+    if (!searchTerm?.trim()) {
+      dispatch({ type: Actions.SET_FOG_IMAGE_SEARCH_RESULTS, payload: [] });
+      return;
+    }
+    const allImages = await getImageDisplayNames();
+    const filtered = allImages.filter(name => name.toLowerCase().includes(searchTerm.toLowerCase()));
+    dispatch({ type: Actions.SET_FOG_IMAGE_SEARCH_RESULTS, payload: filtered.slice(0, 10) });
+  };
+  
+  const handleFogImageSelect = async (displayName) => {
+    const fullPath = await getFullPathFromDisplayName(displayName);
+    if (!fullPath) return;
+    
+    dispatch({
+      type: Actions.FOG_IMAGE_SELECTED,
+      payload: { path: fullPath, displayName }
     });
   };
   
@@ -21467,7 +26758,13 @@ function MapSettingsProvider({
     // Async
     handleImageSearch,
     handleImageSelect,
-    handleSave
+    handleSave,
+    
+    // Fog of War handlers
+    setFogImageDisplayName: (name) => dispatch({ type: Actions.SET_FOG_IMAGE_DISPLAY_NAME, payload: name }),
+    handleFogImageSearch,
+    handleFogImageSelect,
+    handleFogImageClear: () => dispatch({ type: Actions.CLEAR_FOG_IMAGE })
   };
   
   // ===========================================================================
@@ -21477,6 +26774,9 @@ function MapSettingsProvider({
   const contextValue = {
     // Props
     isOpen, onClose, onOpenAlignmentMode, mapType, orientation,
+    
+    // Map data for export
+    mapData, geometry,
     
     // External
     globalSettings, tabs, isHexMap,
@@ -21506,185 +26806,6 @@ function MapSettingsProvider({
 }
 
 return { MapSettingsContext, MapSettingsProvider, useMapSettings, GRID_DENSITY_PRESETS };
-```
-
-# AppearanceTab
-
-```jsx
-/**
- * AppearanceTab.jsx
- * 
- * Appearance settings tab for MapSettingsModal.
- * Handles color customization and grid line width.
- */
-
-const { ColorPicker } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "ColorPicker"));
-const { useMapSettings } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "MapSettingsContext"));
-
-/**
- * Individual color picker item for the 2x2 grid
- */
-function ColorPickerItem({ colorKey, label, defaultColor, align = 'left' }) {
-  const {
-    useGlobalSettings,
-    overrides,
-    activeColorPicker,
-    setActiveColorPicker,
-    pendingCustomColorRef,
-    handleColorChange,
-    globalSettings
-  } = useMapSettings();
-  
-  return (
-    <div class="dmt-color-grid-item">
-      <label class="dmt-form-label" style={{ marginBottom: '4px', fontSize: '12px' }}>{label}</label>
-      <div style={{ display: 'flex', gap: '6px', alignItems: 'center', position: 'relative' }}>
-        <button
-          class="dmt-color-button"
-          disabled={useGlobalSettings}
-          onClick={() => !useGlobalSettings && setActiveColorPicker(colorKey)}
-          style={{ 
-            backgroundColor: overrides[colorKey],
-            cursor: useGlobalSettings ? 'not-allowed' : 'pointer',
-            minWidth: '80px'
-          }}
-        >
-          <span class="dmt-color-button-label">{overrides[colorKey]}</span>
-        </button>
-        
-        <button
-          class="dmt-color-reset-btn"
-          disabled={useGlobalSettings}
-          onClick={() => !useGlobalSettings && handleColorChange(colorKey, defaultColor)}
-          title="Reset to default"
-          style={{ cursor: useGlobalSettings ? 'not-allowed' : 'pointer' }}
-        >
-          <dc.Icon icon="lucide-rotate-ccw" />
-        </button>
-        
-        <ColorPicker
-          isOpen={activeColorPicker === colorKey && !useGlobalSettings}
-          selectedColor={overrides[colorKey]}
-          onColorSelect={(color) => handleColorChange(colorKey, color)}
-          onClose={() => setActiveColorPicker(null)}
-          onReset={() => handleColorChange(colorKey, globalSettings[colorKey])}
-          customColors={[]}
-          pendingCustomColorRef={pendingCustomColorRef}
-          title={label}
-          position="below"
-          align={align}
-        />
-      </div>
-    </div>
-  );
-}
-
-/**
- * Appearance tab content
- */
-function AppearanceTab() {
-  const {
-    mapType,
-    useGlobalSettings,
-    overrides,
-    handleToggleUseGlobal,
-    handleLineWidthChange,
-    THEME
-  } = useMapSettings();
-  
-  return (
-    <div class="dmt-settings-tab-content">
-      <div class="dmt-form-group" style={{ marginBottom: '16px' }}>
-        <label class="dmt-checkbox-label">
-          <input
-            type="checkbox"
-            checked={!useGlobalSettings}
-            onChange={handleToggleUseGlobal}
-            class="dmt-checkbox"
-          />
-          <span>Use custom colors for this map</span>
-        </label>
-      </div>
-      
-      {/* 2x2 Color picker grid */}
-      <div 
-        class="dmt-color-grid" 
-        style={{ 
-          opacity: useGlobalSettings ? 0.5 : 1,
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
-          gap: '16px'
-        }}
-      >
-        <ColorPickerItem
-          colorKey="gridLineColor"
-          label="Grid Lines"
-          defaultColor={THEME.grid.lines}
-        />
-        <ColorPickerItem
-          colorKey="backgroundColor"
-          label="Background"
-          defaultColor={THEME.grid.background}
-          align="right"
-        />
-        <ColorPickerItem
-          colorKey="borderColor"
-          label="Cell Border"
-          defaultColor={THEME.cells.border}
-        />
-        <ColorPickerItem
-          colorKey="coordinateKeyColor"
-          label="Coord Key"
-          defaultColor={THEME.coordinateKey.color}
-          align="right"
-        />
-      </div>
-      
-      {/* Grid Line Width slider (grid maps only) */}
-      {mapType === 'grid' && (
-        <div 
-          class="dmt-form-group" 
-          style={{ 
-            marginTop: '20px',
-            opacity: useGlobalSettings ? 0.5 : 1
-          }}
-        >
-          <label class="dmt-form-label" style={{ marginBottom: '8px' }}>
-            Grid Line Width: {overrides.gridLineWidth ?? 1}px
-          </label>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <input
-              type="range"
-              min="1"
-              max="5"
-              value={overrides.gridLineWidth ?? 1}
-              onInput={(e) => handleLineWidthChange(e.target.value)}
-              disabled={useGlobalSettings}
-              style={{
-                flex: 1,
-                cursor: useGlobalSettings ? 'not-allowed' : 'pointer'
-              }}
-            />
-            <button
-              class="dmt-color-reset-btn"
-              disabled={useGlobalSettings}
-              onClick={() => !useGlobalSettings && handleLineWidthChange(1)}
-              title="Reset to default (1px)"
-              style={{ cursor: useGlobalSettings ? 'not-allowed' : 'pointer' }}
-            >
-              <dc.Icon icon="lucide-rotate-ccw" />
-            </button>
-          </div>
-          <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '6px' }}>
-            Thickness of the grid lines (1-5 pixels)
-          </p>
-        </div>
-      )}
-    </div>
-  );
-}
-
-return { AppearanceTab, ColorPickerItem };
 ```
 
 # CollapsibleSection
@@ -21794,6 +26915,522 @@ function CollapsibleSection({
 }
 
 return { CollapsibleSection };
+```
+
+# AppearanceTab
+
+```jsx
+/**
+ * AppearanceTab.jsx
+ * 
+ * Appearance settings tab for MapSettingsModal.
+ * Handles color customization and grid line width.
+ */
+
+const { ColorPicker } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "ColorPicker"));
+const { CollapsibleSection } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "CollapsibleSection"));
+const { useMapSettings } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "MapSettingsContext"));
+
+/**
+ * Individual color picker item for the 2x2 grid
+ */
+function ColorPickerItem({ colorKey, label, defaultColor, align = 'left' }) {
+  const {
+    useGlobalSettings,
+    overrides,
+    activeColorPicker,
+    setActiveColorPicker,
+    pendingCustomColorRef,
+    handleColorChange,
+    globalSettings
+  } = useMapSettings();
+  
+  return (
+    <div class="dmt-color-grid-item">
+      <label class="dmt-form-label" style={{ marginBottom: '4px', fontSize: '12px' }}>{label}</label>
+      <div style={{ display: 'flex', gap: '6px', alignItems: 'center', position: 'relative' }}>
+        <button
+          class="dmt-color-button"
+          disabled={useGlobalSettings}
+          onClick={() => !useGlobalSettings && setActiveColorPicker(colorKey)}
+          style={{ 
+            backgroundColor: overrides[colorKey],
+            cursor: useGlobalSettings ? 'not-allowed' : 'pointer',
+            minWidth: '80px'
+          }}
+        >
+          <span class="dmt-color-button-label">{overrides[colorKey]}</span>
+        </button>
+        
+        <button
+          class="dmt-color-reset-btn"
+          disabled={useGlobalSettings}
+          onClick={() => !useGlobalSettings && handleColorChange(colorKey, defaultColor)}
+          title="Reset to default"
+          style={{ cursor: useGlobalSettings ? 'not-allowed' : 'pointer' }}
+        >
+          <dc.Icon icon="lucide-rotate-ccw" />
+        </button>
+        
+        <ColorPicker
+          isOpen={activeColorPicker === colorKey && !useGlobalSettings}
+          selectedColor={overrides[colorKey]}
+          onColorSelect={(color) => handleColorChange(colorKey, color)}
+          onClose={() => setActiveColorPicker(null)}
+          onReset={() => handleColorChange(colorKey, globalSettings[colorKey])}
+          customColors={[]}
+          pendingCustomColorRef={pendingCustomColorRef}
+          title={label}
+          position="below"
+          align={align}
+        />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Fog of War appearance section
+ * Color, opacity, and optional tileable image
+ */
+function FogOfWarSection() {
+  const {
+    useGlobalSettings,
+    overrides,
+    activeColorPicker,
+    setActiveColorPicker,
+    pendingCustomColorRef,
+    handleColorChange,
+    globalSettings,
+    fogImageDisplayName,
+    fogImageSearchResults,
+    setFogImageDisplayName,
+    handleFogImageSearch,
+    handleFogImageSelect,
+    handleFogImageClear,
+    THEME
+  } = useMapSettings();
+  
+  // Track if user has manually toggled (to override auto-collapse behavior)
+  const [userToggled, setUserToggled] = dc.useState(false);
+  const [isOpen, setIsOpen] = dc.useState(false);
+  
+  const handleToggle = (newIsOpen) => {
+    setUserToggled(true);
+    setIsOpen(newIsOpen);
+  };
+  
+  // Generate subtitle showing current settings
+  const opacityPercent = Math.round((overrides.fogOfWarOpacity ?? 0.9) * 100);
+  const subtitle = overrides.fogOfWarImage 
+    ? `Image, ${opacityPercent}% opacity`
+    : `${overrides.fogOfWarColor ?? '#000000'}, ${opacityPercent}%`;
+  
+  return (
+    <CollapsibleSection
+      title="Fog of War"
+      isOpen={isOpen}
+      onToggle={handleToggle}
+      subtitle={subtitle}
+    >
+      <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '12px' }}>
+        Customize how hidden areas appear on the map
+      </p>
+      
+      {/* Color picker */}
+      <div style={{ marginBottom: '16px', opacity: useGlobalSettings ? 0.5 : 1 }}>
+        <label class="dmt-form-label" style={{ marginBottom: '4px', fontSize: '12px' }}>Fog Color</label>
+        <div style={{ display: 'flex', gap: '6px', alignItems: 'center', position: 'relative' }}>
+          <button
+            class="dmt-color-button"
+            disabled={useGlobalSettings}
+            onClick={() => !useGlobalSettings && setActiveColorPicker('fogOfWarColor')}
+            style={{ 
+              backgroundColor: overrides.fogOfWarColor ?? '#000000',
+              cursor: useGlobalSettings ? 'not-allowed' : 'pointer',
+              minWidth: '80px'
+            }}
+          >
+            <span class="dmt-color-button-label">{overrides.fogOfWarColor ?? '#000000'}</span>
+          </button>
+          
+          <button
+            class="dmt-color-reset-btn"
+            disabled={useGlobalSettings}
+            onClick={() => !useGlobalSettings && handleColorChange('fogOfWarColor', THEME.fogOfWar.color)}
+            title="Reset to default"
+            style={{ cursor: useGlobalSettings ? 'not-allowed' : 'pointer' }}
+          >
+            <dc.Icon icon="lucide-rotate-ccw" />
+          </button>
+          
+          <ColorPicker
+            isOpen={activeColorPicker === 'fogOfWarColor' && !useGlobalSettings}
+            selectedColor={overrides.fogOfWarColor ?? '#000000'}
+            onColorSelect={(color) => handleColorChange('fogOfWarColor', color)}
+            onClose={() => setActiveColorPicker(null)}
+            onReset={() => handleColorChange('fogOfWarColor', globalSettings.fogOfWarColor)}
+            customColors={[]}
+            pendingCustomColorRef={pendingCustomColorRef}
+            title="Fog Color"
+            position="below"
+            align="left"
+          />
+        </div>
+        <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+          Used if no image is set, or as fallback if image fails to load
+        </p>
+      </div>
+      
+      {/* Opacity slider */}
+      <div style={{ marginBottom: '16px', opacity: useGlobalSettings ? 0.5 : 1 }}>
+        <label class="dmt-form-label" style={{ marginBottom: '8px', display: 'block' }}>
+          Fog Opacity: {Math.round((overrides.fogOfWarOpacity ?? 0.9) * 100)}%
+        </label>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <input
+            type="range"
+            min="10"
+            max="100"
+            value={Math.round((overrides.fogOfWarOpacity ?? 0.9) * 100)}
+            onChange={(e) => !useGlobalSettings && handleColorChange('fogOfWarOpacity', parseInt(e.target.value, 10) / 100)}
+            disabled={useGlobalSettings}
+            style={{
+              flex: 1,
+              height: '6px',
+              cursor: useGlobalSettings ? 'not-allowed' : 'pointer',
+              accentColor: 'var(--interactive-accent)'
+            }}
+          />
+          <span style={{ 
+            fontSize: '12px', 
+            color: 'var(--text-muted)',
+            minWidth: '35px',
+            textAlign: 'right'
+          }}>
+            {Math.round((overrides.fogOfWarOpacity ?? 0.9) * 100)}%
+          </span>
+          <button
+            class="dmt-color-reset-btn"
+            disabled={useGlobalSettings}
+            onClick={() => !useGlobalSettings && handleColorChange('fogOfWarOpacity', 0.9)}
+            title="Reset to default (90%)"
+            style={{ cursor: useGlobalSettings ? 'not-allowed' : 'pointer' }}
+          >
+            <dc.Icon icon="lucide-rotate-ccw" />
+          </button>
+        </div>
+        <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+          Higher values make fog more opaque (10-100%)
+        </p>
+      </div>
+      
+      {/* Optional image picker */}
+      <div style={{ opacity: useGlobalSettings ? 0.5 : 1 }}>
+        <label class="dmt-form-label" style={{ marginBottom: '4px', fontSize: '12px' }}>
+          Fog Texture (optional)
+        </label>
+        <div style={{ position: 'relative', marginBottom: '8px' }}>
+          <input
+            type="text"
+            placeholder="Search for tileable image..."
+            value={fogImageDisplayName}
+            disabled={useGlobalSettings}
+            onChange={(e) => {
+              if (useGlobalSettings) return;
+              setFogImageDisplayName(e.target.value);
+              handleFogImageSearch(e.target.value);
+            }}
+            style={{
+              width: '100%',
+              padding: '8px 32px 8px 10px',
+              borderRadius: '4px',
+              border: '1px solid var(--background-modifier-border)',
+              background: 'var(--background-primary)',
+              color: 'var(--text-normal)',
+              fontSize: '14px',
+              cursor: useGlobalSettings ? 'not-allowed' : 'text'
+            }}
+          />
+          
+          {overrides.fogOfWarImage && !useGlobalSettings && (
+            <button
+              onClick={handleFogImageClear}
+              style={{
+                position: 'absolute',
+                right: '6px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                background: 'transparent',
+                border: 'none',
+                color: 'var(--text-muted)',
+                cursor: 'pointer',
+                padding: '4px',
+                fontSize: '16px',
+                lineHeight: '1'
+              }}
+              title="Clear image"
+            >
+              ×
+            </button>
+          )}
+          
+          {/* Autocomplete dropdown */}
+          {fogImageSearchResults.length > 0 && !useGlobalSettings && (
+            <div style={{
+              position: 'absolute',
+              top: '100%',
+              left: 0,
+              right: 0,
+              maxHeight: '200px',
+              overflowY: 'auto',
+              background: 'var(--background-primary)',
+              border: '1px solid var(--background-modifier-border)',
+              borderRadius: '4px',
+              marginTop: '2px',
+              zIndex: 1000,
+              boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+            }}>
+              {fogImageSearchResults.map((name, idx) => (
+                <div
+                  key={idx}
+                  onClick={() => handleFogImageSelect(name)}
+                  style={{
+                    padding: '8px 10px',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    borderBottom: idx < fogImageSearchResults.length - 1 ? '1px solid var(--background-modifier-border)' : 'none'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = 'var(--background-modifier-hover)'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                >
+                  {name}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+          Select a tileable image to use instead of solid color. Image will be tiled across fogged areas.
+        </p>
+      </div>
+      
+      {/* Soft edges toggle */}
+      <div style={{ marginTop: '16px', opacity: useGlobalSettings ? 0.5 : 1 }}>
+        <label class="dmt-checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: useGlobalSettings ? 'not-allowed' : 'pointer' }}>
+          <input
+            type="checkbox"
+            checked={overrides.fogOfWarBlurEnabled ?? false}
+            onChange={() => !useGlobalSettings && handleColorChange('fogOfWarBlurEnabled', !(overrides.fogOfWarBlurEnabled ?? false))}
+            disabled={useGlobalSettings}
+            class="dmt-checkbox"
+          />
+          <span>Soft edges</span>
+        </label>
+        <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px', marginLeft: '24px' }}>
+          Adds a subtle blur effect at fog boundaries for a softer look
+        </p>
+      </div>
+      
+      {/* Blur intensity slider - only show when soft edges enabled */}
+      {(overrides.fogOfWarBlurEnabled ?? false) && (
+        <div style={{ marginTop: '12px', marginLeft: '24px', opacity: useGlobalSettings ? 0.5 : 1 }}>
+          <label class="dmt-form-label" style={{ marginBottom: '8px', display: 'block', fontSize: '12px' }}>
+            Blur Intensity: {Math.round((overrides.fogOfWarBlurFactor ?? 0.20) * 100)}%
+          </label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <input
+              type="range"
+              min="5"
+              max="50"
+              value={Math.round((overrides.fogOfWarBlurFactor ?? 0.20) * 100)}
+              onChange={(e) => !useGlobalSettings && handleColorChange('fogOfWarBlurFactor', parseInt(e.target.value, 10) / 100)}
+              disabled={useGlobalSettings}
+              style={{
+                flex: 1,
+                height: '6px',
+                cursor: useGlobalSettings ? 'not-allowed' : 'pointer',
+                accentColor: 'var(--interactive-accent)'
+              }}
+            />
+            <span style={{ 
+              fontSize: '12px', 
+              color: 'var(--text-muted)',
+              minWidth: '35px',
+              textAlign: 'right'
+            }}>
+              {Math.round((overrides.fogOfWarBlurFactor ?? 0.20) * 100)}%
+            </span>
+            <button
+              class="dmt-color-reset-btn"
+              disabled={useGlobalSettings}
+              onClick={() => !useGlobalSettings && handleColorChange('fogOfWarBlurFactor', 0.20)}
+              title="Reset to default (8%)"
+              style={{ cursor: useGlobalSettings ? 'not-allowed' : 'pointer' }}
+            >
+              <dc.Icon icon="lucide-rotate-ccw" />
+            </button>
+          </div>
+          <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+            Size of blur as percentage of cell size (5-50%)
+          </p>
+        </div>
+      )}
+    </CollapsibleSection>
+  );
+}
+
+/**
+ * Appearance tab content
+ */
+function AppearanceTab() {
+  const {
+    mapType,
+    useGlobalSettings,
+    overrides,
+    globalSettings,
+    handleToggleUseGlobal,
+    handleLineWidthChange,
+    handleColorChange,
+    THEME
+  } = useMapSettings();
+  
+  return (
+    <div class="dmt-settings-tab-content">
+      <div class="dmt-form-group" style={{ marginBottom: '16px' }}>
+        <label class="dmt-checkbox-label">
+          <input
+            type="checkbox"
+            checked={!useGlobalSettings}
+            onChange={handleToggleUseGlobal}
+            class="dmt-checkbox"
+          />
+          <span>Use custom colors for this map</span>
+        </label>
+      </div>
+      
+      {/* 2x2 Color picker grid */}
+      <div 
+        class="dmt-color-grid" 
+        style={{ 
+          opacity: useGlobalSettings ? 0.5 : 1,
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          gap: '16px'
+        }}
+      >
+        <ColorPickerItem
+          colorKey="gridLineColor"
+          label="Grid Lines"
+          defaultColor={THEME.grid.lines}
+        />
+        <ColorPickerItem
+          colorKey="backgroundColor"
+          label="Background"
+          defaultColor={THEME.grid.background}
+          align="right"
+        />
+        <ColorPickerItem
+          colorKey="borderColor"
+          label="Cell Border"
+          defaultColor={THEME.cells.border}
+        />
+        <ColorPickerItem
+          colorKey="coordinateKeyColor"
+          label="Coord Key"
+          defaultColor={THEME.coordinateKey.color}
+          align="right"
+        />
+      </div>
+      
+      {/* Grid Line Width slider (grid maps only) */}
+      {mapType === 'grid' && (
+        <div 
+          class="dmt-form-group" 
+          style={{ 
+            marginTop: '20px',
+            opacity: useGlobalSettings ? 0.5 : 1
+          }}
+        >
+          <label class="dmt-form-label" style={{ marginBottom: '8px' }}>
+            Grid Line Width: {overrides.gridLineWidth ?? 1}px
+          </label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <input
+              type="range"
+              min="1"
+              max="5"
+              value={overrides.gridLineWidth ?? 1}
+              onInput={(e) => handleLineWidthChange(e.target.value)}
+              disabled={useGlobalSettings}
+              style={{
+                flex: 1,
+                cursor: useGlobalSettings ? 'not-allowed' : 'pointer'
+              }}
+            />
+            <button
+              class="dmt-color-reset-btn"
+              disabled={useGlobalSettings}
+              onClick={() => !useGlobalSettings && handleLineWidthChange(1)}
+              title="Reset to default (1px)"
+              style={{ cursor: useGlobalSettings ? 'not-allowed' : 'pointer' }}
+            >
+              <dc.Icon icon="lucide-rotate-ccw" />
+            </button>
+          </div>
+          <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '6px' }}>
+            Thickness of the grid lines (1-5 pixels)
+          </p>
+        </div>
+      )}
+      
+      {/* Fog of War appearance section */}
+      <div style={{ marginTop: '20px' }}>
+        <FogOfWarSection />
+      </div>
+      
+      {/* Canvas Height Settings */}
+      <div style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px solid var(--background-modifier-border)' }}>
+        <h4 style={{ fontSize: '14px', fontWeight: 600, marginBottom: '8px' }}>Canvas Size</h4>
+        <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '16px' }}>
+          Canvas height settings (leave blank to use global defaults)
+        </p>
+        
+        <div style={{ display: 'flex', gap: '12px', padding: '0 2px', opacity: useGlobalSettings ? 0.5 : 1 }}>
+          {/* Desktop Height */}
+          <div class="dmt-form-group" style={{ flex: 1, marginBottom: 0 }}>
+            <label class="dmt-form-label">Desktop (pixels)</label>
+            <input
+              type="number"
+              class="dmt-modal-input"
+              placeholder={String(globalSettings.canvasHeight ?? 600)}
+              value={useGlobalSettings ? '' : (overrides.canvasHeight ?? '')}
+              onChange={(e) => !useGlobalSettings && handleColorChange('canvasHeight', e.target.value === '' ? undefined : parseInt(e.target.value, 10))}
+              disabled={useGlobalSettings}
+              style={{ opacity: useGlobalSettings ? 0.5 : 1 }}
+            />
+          </div>
+          
+          {/* Mobile Height */}
+          <div class="dmt-form-group" style={{ flex: 1, marginBottom: 0 }}>
+            <label class="dmt-form-label">Mobile/Touch (pixels)</label>
+            <input
+              type="number"
+              class="dmt-modal-input"
+              placeholder={String(globalSettings.canvasHeightMobile ?? 400)}
+              value={useGlobalSettings ? '' : (overrides.canvasHeightMobile ?? '')}
+              onChange={(e) => !useGlobalSettings && handleColorChange('canvasHeightMobile', e.target.value === '' ? undefined : parseInt(e.target.value, 10))}
+              disabled={useGlobalSettings}
+              style={{ opacity: useGlobalSettings ? 0.5 : 1 }}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+return { AppearanceTab, ColorPickerItem, FogOfWarSection };
 ```
 
 # BackgroundImageSection
@@ -22851,6 +28488,305 @@ function MeasurementTab() {
 return { MeasurementTab };
 ```
 
+# exportOperations
+
+```js
+/**
+ * exportOperations.js
+ * 
+ * Functions for exporting map as image.
+ * Handles content bounds calculation, rendering to offscreen canvas,
+ * and triggering browser download.
+ */
+
+const { getActiveLayer } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "layerAccessor"));
+const { getFontCss } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "fontOptions"));
+
+/**
+ * Calculate the bounding box of a text label in world coordinates
+ * Uses canvas text measurement API to get accurate bounds
+ * @param {Object} label - Text label object
+ * @param {CanvasRenderingContext2D} ctx - Canvas context for text measurement
+ * @returns {{minX: number, minY: number, maxX: number, maxY: number}} Bounding box
+ */
+function getTextLabelBounds(label, ctx) {
+  // Set font for measurement
+  const fontSize = label.fontSize || 16;
+  const fontFace = label.fontFace || 'sans';
+  const fontFamily = getFontCss(fontFace);
+  ctx.font = `${fontSize}px ${fontFamily}`;
+  
+  // Measure text
+  const metrics = ctx.measureText(label.content);
+  const textWidth = metrics.width;
+  
+  // Estimate text height (approximation since canvas doesn't provide exact height)
+  // Use 1.2x fontSize as a reasonable approximation including ascenders/descenders
+  const textHeight = fontSize * 1.2;
+  
+  // Text labels use position.x and position.y
+  const worldX = label.position.x;
+  const worldY = label.position.y;
+  
+  // Text is positioned at its center point
+  // Calculate bounds around the center
+  const minX = worldX - textWidth / 2;
+  const minY = worldY - textHeight / 2;
+  const maxX = worldX + textWidth / 2;
+  const maxY = worldY + textHeight / 2;
+  
+  return { minX, minY, maxX, maxY };
+}
+
+/**
+ * Calculate the world-coordinate bounding box of all content on a layer
+ * @param {Object} mapData - Full map data
+ * @param {Object} layer - Layer object to analyze
+ * @param {Object} geometry - GridGeometry or HexGeometry instance
+ * @returns {{minX: number, minY: number, maxX: number, maxY: number}|null} Bounding box or null if no content
+ */
+function calculateContentBounds(mapData, layer, geometry) {
+  let minX = Infinity, minY = Infinity;
+  let maxX = -Infinity, maxY = -Infinity;
+  
+  let hasContent = false;
+  
+  // 1. Painted cells
+  if (layer.cells && layer.cells.length > 0) {
+    for (const cell of layer.cells) {
+      hasContent = true;
+      const bounds = geometry.getCellBounds(cell);
+      minX = Math.min(minX, bounds.minX);
+      minY = Math.min(minY, bounds.minY);
+      maxX = Math.max(maxX, bounds.maxX);
+      maxY = Math.max(maxY, bounds.maxY);
+    }
+  }
+  
+  // 2. Objects
+  if (layer.objects && layer.objects.length > 0) {
+    for (const obj of layer.objects) {
+      hasContent = true;
+      const bounds = geometry.getObjectBounds(obj);
+      minX = Math.min(minX, bounds.minX);
+      minY = Math.min(minY, bounds.minY);
+      maxX = Math.max(maxX, bounds.maxX);
+      maxY = Math.max(maxY, bounds.maxY);
+    }
+  }
+  
+  // 3. Text labels (need temporary canvas for measurement)
+  if (layer.textLabels && layer.textLabels.length > 0) {
+    // Create temporary canvas for text measurement
+    const tempCanvas = document.createElement('canvas');
+    const tempCtx = tempCanvas.getContext('2d');
+    
+    for (const label of layer.textLabels) {
+      hasContent = true;
+      const bounds = getTextLabelBounds(label, tempCtx);
+      minX = Math.min(minX, bounds.minX);
+      minY = Math.min(minY, bounds.minY);
+      maxX = Math.max(maxX, bounds.maxX);
+      maxY = Math.max(maxY, bounds.maxY);
+    }
+  }
+  
+  // 4. Painted edges (grid maps only) - edges are on cell boundaries, already covered by cells
+  // No need to calculate separate bounds for edges
+  
+  if (!hasContent) return null;
+  
+  return { minX, minY, maxX, maxY };
+}
+
+/**
+ * Render map content to a canvas context using the same rendering logic as the main canvas
+ * This is a simplified version that renders only the essential visible content
+ * @param {CanvasRenderingContext2D} ctx - Target canvas context
+ * @param {Object} params - Render parameters
+ * @param {Object} params.mapData - Full map data
+ * @param {Object} params.geometry - Geometry instance
+ * @param {Object} params.bounds - Export bounds {minX, minY, maxX, maxY}
+ * @param {number} params.width - Canvas width
+ * @param {number} params.height - Canvas height
+ */
+async function renderMapToCanvas(ctx, params) {
+  const { mapData, geometry, bounds, width, height } = params;
+  
+  // Import rendering dependencies
+  const { renderCanvas } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "useCanvasRenderer"));
+  const { HexGeometry } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "HexGeometry"));
+  
+  // Calculate viewport parameters for export
+  // We want zoom = 1.0 and center positioned to show the content bounds
+  const contentCenterX = (bounds.minX + bounds.maxX) / 2;
+  const contentCenterY = (bounds.minY + bounds.maxY) / 2;
+  
+  // For grid maps, center is in grid cell coordinates
+  // For hex maps, center is in world pixel coordinates
+  const { GridGeometry } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "GridGeometry"));
+  
+  let exportCenter;
+  if (geometry instanceof GridGeometry) {
+    // Convert world coords to grid coords for grid maps
+    const gridCoords = geometry.worldToGrid(contentCenterX, contentCenterY);
+    exportCenter = { x: gridCoords.gridX, y: gridCoords.gridY };
+  } else {
+    // Hex maps use world coordinates directly
+    exportCenter = { x: contentCenterX, y: contentCenterY };
+  }
+  
+  // Create temporary map data with export viewport
+  const exportMapData = {
+    ...mapData,
+    viewState: {
+      zoom: 1.0,
+      center: exportCenter
+    }
+  };
+  
+  // Create temporary canvas element for renderCanvas
+  const tempCanvas = document.createElement('canvas');
+  tempCanvas.width = width;
+  tempCanvas.height = height;
+  
+  // Get theme with map-specific overrides (same as UI does)
+  const { getEffectiveSettings } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "settingsAccessor"));
+  const effectiveSettings = getEffectiveSettings(mapData.settings);
+  
+  // Build theme object from effective settings (matching getTheme structure)
+  const theme = {
+    grid: {
+      lines: effectiveSettings.gridLineColor,
+      lineWidth: effectiveSettings.gridLineWidth,
+      background: effectiveSettings.backgroundColor
+    },
+    cells: {
+      fill: '#c4a57b', // Use default, not configurable per-map
+      border: effectiveSettings.borderColor,
+      borderWidth: 3
+    },
+    compass: {
+      color: '#c4a57b',
+      size: 100
+    },
+    decorativeBorder: {
+      color: '#8b7355',
+      width: 20,
+      pattern: 'fancy'
+    },
+    coordinateKey: effectiveSettings.coordinateKeyColor
+  };
+  
+  // Render using existing render function
+  renderCanvas(tempCanvas, exportMapData, geometry, [], false, theme, false, { objects: true, textLabels: true, hexCoordinates: false });
+  
+  // Copy to target context
+  ctx.drawImage(tempCanvas, 0, 0);
+}
+
+/**
+ * Export map as PNG image
+ * @param {Object} mapData - Full map data
+ * @param {Object} geometry - GridGeometry or HexGeometry instance
+ * @param {number} buffer - Padding around content in pixels (default: 20)
+ * @returns {Promise<Blob>} PNG blob
+ */
+async function exportMapAsImage(mapData, geometry, buffer = 20) {
+  const activeLayer = getActiveLayer(mapData);
+  
+  // Calculate content bounds
+  const bounds = calculateContentBounds(mapData, activeLayer, geometry);
+  
+  if (!bounds) {
+    throw new Error('No content to export');
+  }
+  
+  // Add buffer
+  const exportBounds = {
+    minX: bounds.minX - buffer,
+    minY: bounds.minY - buffer,
+    maxX: bounds.maxX + buffer,
+    maxY: bounds.maxY + buffer
+  };
+  
+  // Calculate canvas dimensions
+  const width = Math.ceil(exportBounds.maxX - exportBounds.minX);
+  const height = Math.ceil(exportBounds.maxY - exportBounds.minY);
+  
+  // Create offscreen canvas
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  
+  // Render map to canvas
+  await renderMapToCanvas(ctx, {
+    mapData,
+    geometry,
+    bounds: exportBounds,
+    width,
+    height
+  });
+  
+  // Convert to blob
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (blob) {
+        resolve(blob);
+      } else {
+        reject(new Error('Failed to create image blob'));
+      }
+    }, 'image/png');
+  });
+}
+
+/**
+ * Save exported image to vault root
+ * @param {Object} mapData - Full map data
+ * @param {Object} geometry - GridGeometry or HexGeometry instance
+ * @param {string} filename - Desired filename (default: 'map-{timestamp}.png')
+ * @returns {Promise<{success: boolean, path?: string, error?: string}>} Result object
+ */
+async function saveMapImageToVault(mapData, geometry, filename) {
+  try {
+    const blob = await exportMapAsImage(mapData, geometry);
+    
+    // Convert blob to array buffer
+    const arrayBuffer = await blob.arrayBuffer();
+    
+    // Generate filename with timestamp if not provided
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+    const finalFilename = filename || `${mapData.name || 'map'}-${timestamp}.png`;
+    
+    // Save to vault root
+    const path = `${finalFilename}`;
+    
+    // Check if file exists
+    const existingFile = app.vault.getAbstractFileByPath(path);
+    if (existingFile) {
+      // File exists, modify it
+      await app.vault.modifyBinary(existingFile, arrayBuffer);
+    } else {
+      // Create new file
+      await app.vault.createBinary(path, arrayBuffer);
+    }
+    
+    return { success: true, path };
+  } catch (error) {
+    console.error('[exportOperations] Export failed:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+return {
+  calculateContentBounds,
+  renderMapToCanvas,
+  exportMapAsImage,
+  saveMapImageToVault
+};
+```
+
 # PreferencesTab
 
 ```jsx
@@ -22858,10 +28794,11 @@ return { MeasurementTab };
  * PreferencesTab.jsx
  * 
  * Preferences settings tab for MapSettingsModal.
- * Handles state persistence options and canvas height configuration.
+ * Handles state persistence options, canvas height configuration, and map export.
  */
 
 const { useMapSettings } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "MapSettingsContext"));
+const { saveMapImageToVault } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "exportOperations"));
 
 /**
  * Preferences tab content
@@ -22872,15 +28809,48 @@ function PreferencesTab() {
     useGlobalSettings,
     overrides,
     globalSettings,
-    handlePreferenceToggle
+    handlePreferenceToggle,
+    handleColorChange,
+    mapData,
+    geometry
   } = useMapSettings();
   
-  // Local handler for canvas height changes (updates overrides state)
-  const { handleColorChange } = useMapSettings(); // Reuse the overrides setter pattern
+  // Export state
+  const [isExporting, setIsExporting] = dc.useState(false);
+  const [exportError, setExportError] = dc.useState(null);
+  const [exportSuccess, setExportSuccess] = dc.useState(null);
   
-  const handleCanvasHeightChange = (field, value) => {
-    handleColorChange(field, value === '' ? undefined : parseInt(value, 10));
+  // Handle export button click
+  const handleExportImage = async () => {
+    if (!mapData || !geometry) {
+      setExportError('Map data not available');
+      return;
+    }
+    
+    setIsExporting(true);
+    setExportError(null);
+    setExportSuccess(null);
+    
+    try {
+      const result = await saveMapImageToVault(mapData, geometry);
+      
+      if (result.success) {
+        setExportSuccess(`Map saved to: ${result.path}`);
+        // Clear success message after 5 seconds
+        setTimeout(() => setExportSuccess(null), 5000);
+      } else {
+        setExportError(result.error || 'Export failed. Please try again.');
+      }
+    } catch (error) {
+      console.error('[PreferencesTab] Export error:', error);
+      setExportError(error.message || 'Export failed. Please try again.');
+    } finally {
+      setIsExporting(false);
+    }
   };
+  
+  // Determine current state: map override > global setting > false
+  const alwaysShowControls = overrides.alwaysShowControls ?? globalSettings.alwaysShowControls ?? false;
   
   return (
     <div class="dmt-settings-tab-content">
@@ -22927,41 +28897,67 @@ function PreferencesTab() {
         </label>
       </div>
       
-      {/* Canvas Height Settings */}
+      {/* Always Show Controls - independent toggle */}
+      <div class="dmt-form-group">
+        <label class="dmt-checkbox-label">
+          <input
+            type="checkbox"
+            checked={alwaysShowControls}
+            onChange={(e) => handleColorChange('alwaysShowControls', e.target.checked)}
+            class="dmt-checkbox"
+          />
+          <span>Always show map controls</span>
+        </label>
+        <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px', marginLeft: '22px' }}>
+          Keep zoom, layers, and settings buttons visible instead of auto-hiding
+        </p>
+      </div>
+      
+      {/* Export Section */}
       <div style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px solid var(--background-modifier-border)' }}>
-        <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '16px' }}>
-          Canvas height settings (leave blank to use global defaults)
+        <h4 style={{ fontSize: '14px', fontWeight: 600, marginBottom: '8px' }}>Export</h4>
+        <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '12px' }}>
+          Export your map as a PNG image
         </p>
         
-        <div style={{ display: 'flex', gap: '12px', padding: '0 2px' }}>
-          {/* Desktop Height */}
-          <div class="dmt-form-group" style={{ flex: 1, marginBottom: 0 }}>
-            <label class="dmt-form-label">Desktop (pixels)</label>
-            <input
-              type="number"
-              class="dmt-modal-input"
-              placeholder={String(globalSettings.canvasHeight ?? 600)}
-              value={useGlobalSettings ? '' : (overrides.canvasHeight ?? '')}
-              onChange={(e) => handleCanvasHeightChange('canvasHeight', e.target.value)}
-              disabled={useGlobalSettings}
-              style={{ opacity: useGlobalSettings ? 0.5 : 1 }}
-            />
+        <button
+          class="windrose-btn"
+          onClick={handleExportImage}
+          disabled={isExporting}
+          style={{
+            padding: '6px 12px',
+            cursor: isExporting ? 'wait' : 'pointer',
+            opacity: isExporting ? 0.6 : 1
+          }}
+        >
+          {isExporting ? 'Exporting...' : 'Export as Image'}
+        </button>
+        
+        {exportError && (
+          <div style={{
+            marginTop: '8px',
+            padding: '8px',
+            backgroundColor: 'var(--background-modifier-error)',
+            color: 'var(--text-error)',
+            borderRadius: '4px',
+            fontSize: '12px'
+          }}>
+            {exportError}
           </div>
-          
-          {/* Mobile Height */}
-          <div class="dmt-form-group" style={{ flex: 1, marginBottom: 0 }}>
-            <label class="dmt-form-label">Mobile/Touch (pixels)</label>
-            <input
-              type="number"
-              class="dmt-modal-input"
-              placeholder={String(globalSettings.canvasHeightMobile ?? 400)}
-              value={useGlobalSettings ? '' : (overrides.canvasHeightMobile ?? '')}
-              onChange={(e) => handleCanvasHeightChange('canvasHeightMobile', e.target.value)}
-              disabled={useGlobalSettings}
-              style={{ opacity: useGlobalSettings ? 0.5 : 1 }}
-            />
+        )}
+        
+        {exportSuccess && (
+          <div style={{
+            marginTop: '8px',
+            padding: '8px',
+            backgroundColor: 'var(--background-modifier-success)',
+            color: 'var(--text-success)',
+            borderRadius: '4px',
+            fontSize: '12px'
+          }}>
+            {exportSuccess}
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
@@ -23940,6 +29936,267 @@ function ImageAlignmentMode({ dc, isActive, offsetX, offsetY, onOffsetChange, on
 return { ImageAlignmentMode };
 ```
 
+# LayerControls
+
+```jsx
+/**
+ * LayerControls.jsx
+ * 
+ * Floating panel for z-layer management.
+ * Provides controls for:
+ * - Switching between layers (click)
+ * - Adding new layers (+)
+ * - Deleting layers (long-press/right-click options)
+ * - Reordering layers (drag)
+ */
+
+const { getLayersOrdered } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "layerAccessor"));
+
+/**
+ * LayerControls Component
+ * 
+ * @param {Object} props
+ * @param {Object} props.mapData - Full map data object
+ * @param {Function} props.onLayerSelect - (layerId) => void
+ * @param {Function} props.onLayerAdd - () => void
+ * @param {Function} props.onLayerDelete - (layerId) => void
+ * @param {Function} props.onLayerReorder - (layerId, newIndex) => void
+ * @param {boolean} props.sidebarCollapsed - Whether object sidebar is collapsed
+ */
+const LayerControls = ({
+  mapData,
+  onLayerSelect,
+  onLayerAdd,
+  onLayerDelete,
+  onLayerReorder,
+  sidebarCollapsed,
+  isOpen = true
+}) => {
+  // Track which layer has options expanded
+  const [expandedLayerId, setExpandedLayerId] = dc.useState(null);
+  
+  // Drag state for reordering
+  const [dragState, setDragState] = dc.useState(null);
+  const [dragOverIndex, setDragOverIndex] = dc.useState(null);
+  
+  // Long-press timer for touch devices
+  const longPressTimerRef = dc.useRef(null);
+  const longPressTriggeredRef = dc.useRef(false);
+  
+  // Get layers sorted by order (highest order = top of visual stack, shown at top of list)
+  const layers = getLayersOrdered(mapData);
+  const reversedLayers = [...layers].reverse(); // Display top layer at top
+  const activeLayerId = mapData?.activeLayerId;
+  
+  // Close options when clicking the overlay or pressing Escape
+  const handleOverlayClick = (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setExpandedLayerId(null);
+  };
+  
+  dc.useEffect(() => {
+    if (!expandedLayerId) return;
+    
+    const handleEscape = (e) => {
+      if (e.key === 'Escape') {
+        setExpandedLayerId(null);
+      }
+    };
+    
+    document.addEventListener('keydown', handleEscape);
+    
+    return () => {
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [expandedLayerId]);
+  
+  // Handle layer button click (switch to layer)
+  const handleLayerClick = (layerId, e) => {
+    e.stopPropagation();
+    
+    // Don't switch if we just triggered a long-press
+    if (longPressTriggeredRef.current) {
+      longPressTriggeredRef.current = false;
+      return;
+    }
+    
+    // If options are expanded for this layer, close them
+    if (expandedLayerId === layerId) {
+      setExpandedLayerId(null);
+      return;
+    }
+    
+    // Close any open options
+    setExpandedLayerId(null);
+    
+    // Switch to this layer
+    if (layerId !== activeLayerId) {
+      onLayerSelect(layerId);
+    }
+  };
+  
+  // Handle right-click to show options
+  const handleContextMenu = (layerId, e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setExpandedLayerId(expandedLayerId === layerId ? null : layerId);
+  };
+  
+  // Handle long-press start (touch devices)
+  const handleTouchStart = (layerId, e) => {
+    longPressTriggeredRef.current = false;
+    
+    longPressTimerRef.current = setTimeout(() => {
+      longPressTriggeredRef.current = true;
+      setExpandedLayerId(expandedLayerId === layerId ? null : layerId);
+    }, 500);
+  };
+  
+  // Handle long-press end
+  const handleTouchEnd = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
+  
+  // Handle delete layer
+  const handleDelete = (layerId, e) => {
+    e.stopPropagation();
+    
+    // Can't delete last layer
+    if (layers.length <= 1) {
+      return;
+    }
+    
+    setExpandedLayerId(null);
+    onLayerDelete(layerId);
+  };
+  
+  // Drag handlers for reordering
+  const handleDragStart = (layerId, index, e) => {
+    setDragState({ layerId, index });
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', layerId);
+  };
+  
+  const handleDragOver = (index, e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverIndex(index);
+  };
+  
+  const handleDragLeave = () => {
+    setDragOverIndex(null);
+  };
+  
+  const handleDrop = (targetIndex, e) => {
+    e.preventDefault();
+    
+    if (dragState && dragState.index !== targetIndex) {
+      // Convert visual index back to layer order index
+      // Visual list is reversed, so we need to convert
+      const visualLength = reversedLayers.length;
+      const fromOrderIndex = visualLength - 1 - dragState.index;
+      const toOrderIndex = visualLength - 1 - targetIndex;
+      
+      onLayerReorder(dragState.layerId, toOrderIndex);
+    }
+    
+    setDragState(null);
+    setDragOverIndex(null);
+  };
+  
+  const handleDragEnd = () => {
+    setDragState(null);
+    setDragOverIndex(null);
+  };
+  
+  // Get display number for layer (1-indexed, top layer = highest number)
+  const getLayerDisplayNumber = (layer) => {
+    return layer.order + 1;
+  };
+  
+  return (
+    <>
+      {/* Invisible overlay to capture clicks when context menu is open */}
+      {expandedLayerId && (
+        <div 
+          className="dmt-layer-overlay"
+          onClick={handleOverlayClick}
+          onContextMenu={handleOverlayClick}
+          onMouseDown={handleOverlayClick}
+          onTouchStart={handleOverlayClick}
+        />
+      )}
+      
+      <div 
+        className={`dmt-layer-controls ${sidebarCollapsed ? 'sidebar-closed' : 'sidebar-open'} ${isOpen ? 'dmt-layer-controls-open' : ''}`}
+      >
+        {/* Layer Buttons (top layer first visually) */}
+      {reversedLayers.map((layer, visualIndex) => {
+        const isActive = layer.id === activeLayerId;
+        const isExpanded = layer.id === expandedLayerId;
+        const isDragging = dragState?.layerId === layer.id;
+        const isDragOver = dragOverIndex === visualIndex && dragState?.layerId !== layer.id;
+        const canDelete = layers.length > 1;
+        
+        return (
+          <div
+            key={layer.id}
+            className="dmt-layer-btn-wrapper"
+            draggable
+            onDragStart={(e) => handleDragStart(layer.id, visualIndex, e)}
+            onDragOver={(e) => handleDragOver(visualIndex, e)}
+            onDragLeave={handleDragLeave}
+            onDrop={(e) => handleDrop(visualIndex, e)}
+            onDragEnd={handleDragEnd}
+          >
+            <button
+              className={`dmt-layer-btn ${isActive ? 'dmt-layer-btn-active' : ''} ${isDragging ? 'dragging' : ''} ${isDragOver ? 'drag-over' : ''}`}
+              onClick={(e) => handleLayerClick(layer.id, e)}
+              onContextMenu={(e) => handleContextMenu(layer.id, e)}
+              onTouchStart={(e) => handleTouchStart(layer.id, e)}
+              onTouchEnd={handleTouchEnd}
+              onTouchCancel={handleTouchEnd}
+              title={`${layer.name}${isActive ? ' (active)' : ''} - Right-click for options`}
+            >
+              {getLayerDisplayNumber(layer)}
+            </button>
+            
+            {/* Options Slide-out */}
+            <div className={`dmt-layer-options ${isExpanded ? 'expanded' : ''}`}>
+              {canDelete && (
+                <button
+                  className="dmt-layer-option-btn delete"
+                  onClick={(e) => handleDelete(layer.id, e)}
+                  title="Delete layer"
+                >
+                  <dc.Icon icon="lucide-trash-2" size={14} />
+                </button>
+              )}
+            </div>
+          </div>
+        );
+      })}
+      
+      {/* Add Layer Button (at bottom) */}
+      <button
+        className="dmt-layer-add-btn"
+        onClick={onLayerAdd}
+        title="Add new layer"
+      >
+        <dc.Icon icon="lucide-plus" size={16} />
+      </button>
+    </div>
+    </>
+  );
+};
+
+return { LayerControls };
+```
+
 # rpgAwesomeLoader
 
 ```js
@@ -24110,7 +30367,12 @@ const combinedCss = [
 
 
 const { useMapData } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "useMapData"));
-const { useHistory } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "useHistory"));
+const { useLayerHistory } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "useLayerHistory"));
+const { useToolState } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "useToolState"));
+const { useFogOfWar } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "useFogOfWar"));
+const { useDataHandlers } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "useDataHandlers"));
+const { GridGeometry } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "GridGeometry"));
+const { HexGeometry } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "HexGeometry"));
 const { MapHeader } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "MapHeader"));
 const { MapCanvas } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "MapCanvas"));
 const { MapControls } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "MapControls"));
@@ -24121,9 +30383,13 @@ const { SettingsPluginInstaller, shouldOfferUpgrade } = await dc.require(dc.head
 const { MapSettingsModal } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "MapSettingsModal"));
 const { getSetting, getTheme, getEffectiveSettings } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "settingsAccessor"));
 const { DEFAULTS } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "dmtConstants"));
-const { DEFAULT_COLOR, getColorByHex, isDefaultColor } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "colorOperations"));
+const { getColorByHex, isDefaultColor } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "colorOperations"));
 const { axialToOffset, isWithinOffsetBounds } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "offsetCoordinates"));
 const { ImageAlignmentMode } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "ImageAlignmentMode"));
+
+// Layer system support (Phase 1: Z-Layer Architecture)
+const { getActiveLayer } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "layerAccessor"));
+const { LayerControls } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "LayerControls"));
 
 // RPGAwesome icon font support
 const { RA_ICONS } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "rpgAwesomeIcons"));
@@ -24192,12 +30458,17 @@ const CornerBracket = ({ position }) => {
 };
 
 const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'grid' }) => {
-  const { mapData, isLoading, saveStatus, updateMapData, forceSave } = useMapData(mapId, mapName, mapType);
-  const [currentTool, setCurrentTool] = dc.useState('draw');
-  const [selectedObjectType, setSelectedObjectType] = dc.useState(null);
-  const [selectedColor, setSelectedColor] = dc.useState(DEFAULT_COLOR);
-  const [selectedOpacity, setSelectedOpacity] = dc.useState(1);  // Opacity for painting (0-1)
-  const [isColorPickerOpen, setIsColorPickerOpen] = dc.useState(false);
+  const { mapData, isLoading, saveStatus, updateMapData, forceSave, fowImageReady } = useMapData(mapId, mapName, mapType);
+  
+  // Tool and color state (extracted to useToolState hook)
+  const {
+    currentTool, setCurrentTool,
+    selectedObjectType, setSelectedObjectType,
+    selectedColor, setSelectedColor,
+    selectedOpacity, setSelectedOpacity,
+    isColorPickerOpen, setIsColorPickerOpen
+  } = useToolState();
+  
   const [showFooter, setShowFooter] = dc.useState(false);
   const [isFocused, setIsFocused] = dc.useState(false);
   const [isExpanded, setIsExpanded] = dc.useState(false);
@@ -24207,6 +30478,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   const [settingsVersion, setSettingsVersion] = dc.useState(0); // Incremented to force re-render on settings change
   const [showSettingsModal, setShowSettingsModal] = dc.useState(false);
   const [showVisibilityToolbar, setShowVisibilityToolbar] = dc.useState(false);
+  const [showLayerPanel, setShowLayerPanel] = dc.useState(false);
   
   // Image alignment mode state
   const [isAlignmentMode, setIsAlignmentMode] = dc.useState(false);
@@ -24229,6 +30501,37 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     }));
   }, []);
   
+  // Create geometry instance for coordinate conversions
+  // Same logic as MapCanvas for consistency
+  const geometry = dc.useMemo(() => {
+    if (!mapData) return null;
+
+    const currentMapType = mapData.mapType || DEFAULTS.mapType;
+
+    if (currentMapType === 'hex') {
+      const hexSize = mapData.hexSize || DEFAULTS.hexSize;
+      const orientation = mapData.orientation || DEFAULTS.hexOrientation;
+      const hexBounds = mapData.hexBounds || null;
+      return new HexGeometry(hexSize, orientation, hexBounds);
+    } else {
+      const gridSize = mapData.gridSize || DEFAULTS.gridSize;
+      return new GridGeometry(gridSize);
+    }
+  }, [mapData?.mapType, mapData?.gridSize, mapData?.hexSize, mapData?.orientation, mapData?.hexBounds]);
+  
+  // Fog of War state and handlers (extracted to useFogOfWar hook)
+  const {
+    showFogTools,
+    fogActiveTool,
+    currentFogState,
+    handleFogToolsToggle,
+    handleFogToolSelect,
+    handleFogVisibilityToggle,
+    handleFogFillAll,
+    handleFogClearAll,
+    handleFogChange
+  } = useFogOfWar({ mapData, geometry, updateMapData });
+
   // Get current theme with effective settings (global + map overrides)
   // This will be called on every render, fetching fresh settings each time
   const effectiveSettings = mapData ? getEffectiveSettings(mapData.settings) : null;
@@ -24326,6 +30629,24 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     return () => clearTimeout(timer);
   }, [showPluginInstaller, mapData]); // Run when installer status or map data changes
 
+  // Initialize opacity from mapData when loaded
+  dc.useEffect(() => {
+    if (!mapData) return;
+    
+    if (mapData.lastSelectedOpacity !== undefined) {
+      setSelectedOpacity(mapData.lastSelectedOpacity);
+    }
+  }, [mapData?.lastSelectedOpacity]);
+
+  // Handler to update opacity and persist to mapData
+  const handleOpacityChange = dc.useCallback((newOpacity) => {
+    setSelectedOpacity(newOpacity);
+    updateMapData(currentMapData => ({
+      ...currentMapData,
+      lastSelectedOpacity: newOpacity
+    }));
+  }, [updateMapData]);
+
   // Listen for settings changes and force re-render
   dc.useEffect(() => {
     const handleSettingsChange = () => {
@@ -24358,16 +30679,37 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     setShowPluginInstaller(false);
   };
 
-  // Initialize history with empty state (including objects, text labels, and edges)
+  // Layer and history management (extracted to useLayerHistory hook)
   const {
-    currentState: historyState,
-    addToHistory,
-    undo,
-    redo,
+    // Layer management
+    handleLayerSelect,
+    handleLayerAdd,
+    handleLayerDelete,
+    handleLayerReorder,
+    // History state
     canUndo,
     canRedo,
-    resetHistory
-  } = useHistory({ cells: [], name: "", objects: [], textLabels: [], edges: [] });
+    // History actions
+    handleUndo,
+    handleRedo,
+    // For data change handlers
+    addToHistory,
+    isApplyingHistory
+  } = useLayerHistory({ mapData, updateMapData, isLoading });
+
+  // Data change handlers (extracted to useDataHandlers hook)
+  const {
+    handleNameChange,
+    handleCellsChange,
+    handleObjectsChange,
+    handleTextLabelsChange,
+    handleEdgesChange,
+    handleAddCustomColor,
+    handleDeleteCustomColor,
+    handleUpdateColorOpacity,
+    handleViewStateChange,
+    handleSidebarCollapseChange
+  } = useDataHandlers({ mapData, updateMapData, addToHistory, isApplyingHistory });
 
   const containerRef = dc.useRef(null);
 
@@ -24405,215 +30747,6 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     };
   }, [isExpanded, isAnimating]);
 
-  // Track if we're applying history (to avoid adding to history during undo/redo)
-  const isApplyingHistoryRef = dc.useRef(false);
-  const historyInitialized = dc.useRef(false);
-  const pendingHistoryApplicationRef = dc.useRef(false);
-
-  // Initialize history when map data loads (only once)
-  dc.useEffect(() => {
-    if (mapData && !isLoading && !historyInitialized.current) {
-      resetHistory({
-        cells: mapData.cells,
-        name: mapData.name,
-        objects: mapData.objects || [],
-        textLabels: mapData.textLabels || [],
-        edges: mapData.edges || []
-      });
-      historyInitialized.current = true;
-    }
-  }, [mapData, isLoading]);
-
-  // Clear isApplyingHistoryRef after mapData updates from undo/redo
-  // This ensures the flag stays true during the entire React render cycle
-  dc.useEffect(() => {
-    if (pendingHistoryApplicationRef.current) {
-      pendingHistoryApplicationRef.current = false;
-      isApplyingHistoryRef.current = false;
-    }
-  }, [mapData]);
-
-  // Handle map name change
-  const handleNameChange = (newName) => {
-    if (isApplyingHistoryRef.current) return;
-
-    const newMapData = { ...mapData, name: newName };
-    updateMapData(newMapData);
-    addToHistory({
-      cells: mapData.cells,
-      name: newName,
-      objects: mapData.objects || [],
-      textLabels: mapData.textLabels || [],
-      edges: mapData.edges || []
-    });
-  };
-
-  // Handle cells change (unified handler for all tools)
-  const handleCellsChange = (newCells, suppressHistory = false) => {
-    if (!mapData || isApplyingHistoryRef.current) return;
-
-    const newMapData = { ...mapData, cells: newCells };
-    updateMapData(newMapData);
-
-    // Only add to history if not suppressed (used for batched stroke updates)
-    if (!suppressHistory) {
-      addToHistory({
-        cells: newCells,
-        name: mapData.name,
-        objects: mapData.objects || [],
-        textLabels: mapData.textLabels || [],
-        edges: mapData.edges || []
-      });
-    }
-  };
-
-  // Handle objects change
-  const handleObjectsChange = (newObjects, suppressHistory = false) => {
-    if (!mapData || isApplyingHistoryRef.current) return;
-
-    const newMapData = { ...mapData, objects: newObjects };
-    updateMapData(newMapData);
-
-    // Only add to history if not suppressed (used for batched operations like resizing)
-    if (!suppressHistory) {
-      addToHistory({
-        cells: mapData.cells,
-        name: mapData.name,
-        objects: newObjects,
-        textLabels: mapData.textLabels || [],
-        edges: mapData.edges || []
-      });
-    }
-  };
-
-  // Handle text labels change
-  const handleTextLabelsChange = (newTextLabels, suppressHistory = false) => {
-    if (!mapData || isApplyingHistoryRef.current) return;
-
-    const newMapData = { ...mapData, textLabels: newTextLabels };
-    updateMapData(newMapData);
-
-    // Only add to history if not suppressed (used for batched operations like dragging)
-    if (!suppressHistory) {
-      addToHistory({
-        cells: mapData.cells,
-        name: mapData.name,
-        objects: mapData.objects || [],
-        textLabels: newTextLabels,
-        edges: mapData.edges || []
-      });
-    }
-  };
-
-  // Handle edges change (for edge painting feature)
-  const handleEdgesChange = (newEdges, suppressHistory = false) => {
-    if (!mapData || isApplyingHistoryRef.current) return;
-
-    const newMapData = { ...mapData, edges: newEdges };
-    updateMapData(newMapData);
-
-    // Only add to history if not suppressed (used for batched operations)
-    if (!suppressHistory) {
-      addToHistory({
-        cells: mapData.cells,
-        name: mapData.name,
-        objects: mapData.objects || [],
-        textLabels: mapData.textLabels || [],
-        edges: newEdges
-      });
-    }
-  };
-
-  // Handle color change
-  const handleColorChange = (newColor) => {
-    setSelectedColor(newColor);
-  };
-
-  const handleAddCustomColor = (newColor) => {
-    if (!mapData) {
-      return;
-    }
-
-    // Generate a unique ID and label for the custom color
-    const customColorId = `custom-${Date.now()}`;
-    const customColorNumber = (mapData.customColors?.length || 0) + 1;
-    const customColorLabel = `Custom ${customColorNumber}`;
-
-    const newCustomColor = {
-      id: customColorId,
-      color: newColor,
-      label: customColorLabel
-    };
-
-    const newCustomColors = [...(mapData.customColors || []), newCustomColor];
-    const newMapData = {
-      ...mapData,
-      customColors: newCustomColors
-    };
-
-    updateMapData(newMapData);
-  };
-
-  const handleDeleteCustomColor = (colorId) => {
-    if (!mapData) {
-      return;
-    }
-
-    const newCustomColors = (mapData.customColors || []).filter(c => c.id !== colorId);
-    const newMapData = {
-      ...mapData,
-      customColors: newCustomColors
-    };
-
-    updateMapData(newMapData);
-  };
-
-  // Handle view state change (zoom/pan) - NOT tracked in history
-  const handleViewStateChange = (newViewState) => {
-    if (!mapData) return;
-    const newMapData = {
-      ...mapData,
-      viewState: newViewState
-    };
-    updateMapData(newMapData);
-  };
-
-  // Handle undo
-  const handleUndo = () => {
-    const previousState = undo();
-    if (previousState && mapData) {
-      isApplyingHistoryRef.current = true;
-      pendingHistoryApplicationRef.current = true;
-      const newMapData = {
-        ...mapData,
-        cells: previousState.cells,
-        name: previousState.name,
-        objects: previousState.objects || [],
-        textLabels: previousState.textLabels || [],
-        edges: previousState.edges || []
-      };
-      updateMapData(newMapData);
-    }
-  };
-
-  // Handle redo
-  const handleRedo = () => {
-    const nextState = redo();
-    if (nextState && mapData) {
-      isApplyingHistoryRef.current = true;
-      pendingHistoryApplicationRef.current = true;
-      const newMapData = {
-        ...mapData,
-        cells: nextState.cells,
-        name: nextState.name,
-        objects: nextState.objects || [],
-        textLabels: nextState.textLabels || [],
-        edges: nextState.edges || []
-      };
-      updateMapData(newMapData);
-    }
-  };
-
   // Zoom in (increase zoom by step)
   const handleZoomIn = () => {
     if (!mapData) return;
@@ -24644,7 +30777,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   const handleCompassClick = () => {
     if (!mapData) return;
 
-    // Cycle through: 0ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â° -> 90ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â° -> 180ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â° -> 270ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â° -> 0ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°
+    // Cycle through: 0 -> 90 -> 180 -> 270 -> 0 degrees
     const rotations = [0, 90, 180, 270];
     const currentIndex = rotations.indexOf(mapData.northDirection);
     const nextIndex = (currentIndex + 1) % rotations.length;
@@ -24690,15 +30823,6 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
       };
       updateMapData(newMapData);
     }
-  };
-
-  const handleSidebarCollapseChange = (isCollapsed) => {
-    if (!mapData) return;
-    const newMapData = {
-      ...mapData,
-      sidebarCollapsed: isCollapsed
-    };
-    updateMapData(newMapData);
   };
 
   const handleSettingsClick = () => {
@@ -24876,14 +31000,16 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
           canUndo={canUndo}
           canRedo={canRedo}
           selectedColor={selectedColor}
-          onColorChange={handleColorChange}
+          onColorChange={setSelectedColor}
           selectedOpacity={selectedOpacity}
-          onOpacityChange={setSelectedOpacity}
+          onOpacityChange={handleOpacityChange}
           isColorPickerOpen={isColorPickerOpen}
           onColorPickerOpenChange={setIsColorPickerOpen}
           customColors={mapData.customColors || []}
+          paletteColorOpacityOverrides={mapData.paletteColorOpacityOverrides || {}}
           onAddCustomColor={handleAddCustomColor}
           onDeleteCustomColor={handleDeleteCustomColor}
+          onUpdateColorOpacity={handleUpdateColorOpacity}
           mapType={mapData.mapType}
           isFocused={isFocused}
         />
@@ -24893,6 +31019,14 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
           layerVisibility={layerVisibility}
           onToggleLayer={handleToggleLayerVisibility}
           mapType={mapData.mapType}
+          // Fog of War props
+          fogOfWarState={currentFogState}
+          showFogTools={showFogTools}
+          onFogToolsToggle={handleFogToolsToggle}
+          onFogToolSelect={handleFogToolSelect}
+          onFogVisibilityToggle={handleFogVisibilityToggle}
+          onFogFillAll={handleFogFillAll}
+          onFogClearAll={handleFogClearAll}
         />
 
         <div
@@ -24910,9 +31044,22 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
             mapType={mapData.mapType || 'grid'}
           />
 
+          {/* Layer Controls Panel (Z-Layer System) */}
+          <LayerControls
+            mapData={mapData}
+            onLayerSelect={handleLayerSelect}
+            onLayerAdd={handleLayerAdd}
+            onLayerDelete={handleLayerDelete}
+            onLayerReorder={handleLayerReorder}
+            sidebarCollapsed={mapData.sidebarCollapsed || false}
+            isOpen={showLayerPanel}
+          />
+
+          {/* For hex maps, override northDirection to 0 for rendering while keeping real value for compass display */}
+          {/* This allows the compass to show and persist the north direction without actually rotating hex maps */}
           <div className="dmt-canvas-and-controls">
             <MapCanvas
-              mapData={mapData}
+              mapData={mapData.mapType === 'hex' ? { ...mapData, northDirection: 0 } : mapData}
               onCellsChange={handleCellsChange}
               onObjectsChange={handleObjectsChange}
               onTextLabelsChange={handleTextLabelsChange}
@@ -24948,6 +31095,11 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 onDeleteCustomColor={handleDeleteCustomColor}
               />
               
+              {/* AreaSelectLayer - handles area selection tool for multi-select */}
+              <MapCanvas.AreaSelectLayer
+                currentTool={currentTool}
+              />
+              
               {/* TextLayer - handles text label interactions */}
               <MapCanvas.TextLayer
                 currentTool={currentTool}
@@ -24961,6 +31113,15 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 currentTool={currentTool}
                 selectedObjectType={selectedObjectType}
               />
+              
+              {/* FogOfWarLayer - handles fog painting/erasing interactions */}
+              {fogActiveTool && (
+                <MapCanvas.FogOfWarLayer
+                  activeTool={fogActiveTool}
+                  onFogChange={handleFogChange}
+                  onInitializeFog={(updatedMapData) => updateMapData(updatedMapData)}
+                />
+              )}
               
               {/* HexCoordinateLayer - displays coordinate labels when 'C' key is held */}
               <MapCanvas.HexCoordinateLayer />
@@ -24984,8 +31145,11 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
             isExpanded={isExpanded}
             onToggleExpand={handleToggleExpand}
             mapType={mapData.mapType}
+            showLayerPanel={showLayerPanel}
+            onToggleLayerPanel={() => setShowLayerPanel(!showLayerPanel)}
             showVisibilityToolbar={showVisibilityToolbar}
             onToggleVisibilityToolbar={() => setShowVisibilityToolbar(!showVisibilityToolbar)}
+            alwaysShowControls={effectiveSettings?.alwaysShowControls ?? false}
           />
         </div>
 
@@ -25001,7 +31165,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                           currentTool === 'addObject' ? (selectedObjectType ? 'Click to place object' : 'Select an object from the sidebar') :
                             currentTool === 'addText' ? 'Click to add text label' :
                               'Select a tool'
-            } | Undo/redo available | Middle-click or two-finger drag to pan | Scroll to zoom | Click compass to rotate | {mapData.cells.length} cells filled | {(mapData.objects || []).length} objects placed | {(mapData.textLabels || []).length} text labels
+            } | Undo/redo available | Middle-click or two-finger drag to pan | Scroll to zoom | Click compass to rotate | {getActiveLayer(mapData).cells.length} cells filled | {(getActiveLayer(mapData).objects || []).length} objects placed | {(getActiveLayer(mapData).textLabels || []).length} text labels
           </div>
         )}
 
@@ -25018,8 +31182,10 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
           currentPreferences={mapData.uiPreferences}
           currentHexBounds={mapData.mapType === 'hex' ? mapData.hexBounds : null}
           currentBackgroundImage={mapData.mapType === 'hex' ? mapData.backgroundImage : null}
-          currentCells={mapData.mapType === 'hex' ? (mapData.cells || []) : []}
-          currentObjects={mapData.mapType === 'hex' ? (mapData.objects || []) : []}
+          currentCells={mapData.mapType === 'hex' ? (getActiveLayer(mapData).cells || []) : []}
+          currentObjects={mapData.mapType === 'hex' ? (getActiveLayer(mapData).objects || []) : []}
+          mapData={mapData}
+          geometry={geometry}
         />
 
         {/* Image Alignment Mode */}
@@ -25483,6 +31649,7 @@ const css = `
   font-size: 16px;
   transition: var(--dmt-transition);
   min-width: 32px;
+  max-width: 42px;
   height: 32px;
   display: flex;
   align-items: center;
@@ -25530,6 +31697,12 @@ const css = `
   opacity: 0.6;
   pointer-events: none;
   line-height: 1;
+}
+
+/* Buttons with sub-tools should be narrower to fit on iPad */
+.dmt-tool-btn-container .dmt-tool-btn {
+  min-width: 28px;
+  padding: 6px 5px;
 }
 
 .dmt-tool-btn-active .dmt-subtool-indicator {
@@ -25714,6 +31887,8 @@ button.dmt-zoom-btn,
 .is-tablet button.dmt-zoom-btn,
 button.dmt-expand-btn,
 .is-tablet button.dmt-expand-btn,
+button.dmt-layer-btn,
+.is-tablet button.dmt-layer-btn,
 button.dmt-orientation-btn,
 .is-tablet button.dmt-orientation-btn {
   width: 35px;
@@ -25758,6 +31933,59 @@ button.dmt-orientation-btn,
   border-radius: 6px;
   width: 38px;
   box-sizing: border-box;
+}
+
+/* ============================================
+   CONTROLS DRAWER (Collapsible Animation)
+   ============================================ */
+
+/* Invisible overlay to capture taps outside controls (touch devices) */
+.dmt-controls-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 99; /* Just below controls (100) */
+  background: transparent;
+  cursor: default;
+}
+
+.dmt-controls-drawer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+  overflow: hidden;
+}
+
+/* Compass slides down to make room for expand button */
+.dmt-compass-animated {
+  transform: translateY(-43px);  /* Button height (35px) + gap (8px) */
+  transition: transform 180ms cubic-bezier(0.25, 0.1, 0.25, 1);  /* Near-linear with subtle ease-out */
+}
+
+.dmt-compass-revealed {
+  transform: translateY(0);
+}
+
+.dmt-drawer-item {
+  opacity: 0;
+  transform: translateY(-20px) scale(0.8);
+  pointer-events: none;
+  transition-property: opacity, transform;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Upward slide variant for items above the compass */
+.dmt-drawer-item-up {
+  transform: translateY(20px) scale(0.8);
+}
+
+.dmt-drawer-item-visible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
 }
 
 /* ============================================
@@ -25918,7 +32146,7 @@ button.dmt-orientation-btn,
   justify-content: center;
   padding: 8px;
   margin: 2px 0;
-  background: transparent;
+  background: var(--background-secondary);
   border: 1px solid transparent;
   border-radius: 4px;
   cursor: pointer;
@@ -25928,20 +32156,20 @@ button.dmt-orientation-btn,
   box-sizing: border-box;
 
   &:hover {
-    background-color: var(--dmt-bg-secondary);
-    border-color: var(--dmt-border-secondary);
+    background-color: var(--background-secondary-alt);
+    border-color: var(--background-modifier-border);
   }
 
   &.dmt-object-item-selected {
-    background-color: var(--dmt-bg-tertiary);
+    background-color: var(--background-modifier-hover);
     border-color: var(--dmt-border-primary);
 
     &:hover {
-      background-color: #454545;
+      background-color: var(--background-modifier-hover);
     }
 
     .dmt-object-label {
-      color: var(--dmt-text-primary);
+      color: var(--text-normal);
       font-weight: 500;
     }
   }
@@ -26153,6 +32381,32 @@ button.dmt-orientation-btn,
   gap: 4px;
   padding: 0;
   z-index: 150;
+}
+
+/* Multi-select toolbar styling */
+.dmt-multi-select-toolbar {
+  align-items: center;
+}
+
+.dmt-selection-count {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  height: 44px;
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.dmt-selection-count svg {
+  width: 14px;
+  height: 14px;
+  opacity: 0.9;
 }
 
 .dmt-toolbar-button {
@@ -26886,6 +33140,93 @@ button.dmt-orientation-btn,
   }
 }
 
+/* Custom color edit panel (right-click/long-press) */
+.dmt-color-edit-panel {
+  position: absolute;
+  left: calc(100% + 4px);
+  top: 50%;
+  transform: translateY(-50%);
+  background: var(--dmt-bg-secondary);
+  border: 1px solid var(--dmt-border-secondary);
+  border-radius: 6px;
+  padding: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  z-index: 150;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  white-space: nowrap;
+}
+
+.dmt-color-edit-opacity {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dmt-color-edit-opacity-label {
+  font-size: 11px;
+  color: var(--dmt-text-secondary);
+}
+
+.dmt-color-edit-opacity-value {
+  font-size: 11px;
+  color: var(--dmt-text-primary);
+  min-width: 32px;
+  text-align: right;
+}
+
+.dmt-color-edit-opacity input[type="range"] {
+  width: 80px;
+  height: 4px;
+  cursor: pointer;
+  appearance: none;
+  background: var(--dmt-bg-tertiary);
+  border-radius: 2px;
+  
+  &::-webkit-slider-thumb {
+    appearance: none;
+    width: 12px;
+    height: 12px;
+    background: var(--dmt-border-primary);
+    border-radius: 50%;
+    cursor: pointer;
+  }
+  
+  &::-moz-range-thumb {
+    width: 12px;
+    height: 12px;
+    background: var(--dmt-border-primary);
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+  }
+}
+
+.dmt-color-edit-delete {
+  width: 24px;
+  height: 24px;
+  background-color: rgba(239, 68, 68, 0.8);
+  border: none;
+  border-radius: 4px;
+  color: var(--dmt-text-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: var(--dmt-transition);
+  padding: 0;
+  
+  svg {
+    width: 14px;
+    height: 14px;
+  }
+  
+  &:hover {
+    background-color: rgba(239, 68, 68, 1);
+  }
+}
+
 /* Color picker opacity slider */
 .dmt-color-opacity-section {
   margin-top: 12px;
@@ -27519,7 +33860,7 @@ button.dmt-orientation-btn,
   position: absolute;
   top: 128px; /* Below MapHeader + ToolPalette + extra spacing for iPad/mobile (header ~44px + palette ~60px + container padding 12px + gap 12px) */
   left: 50%;
-  transform: translateX(-50%);
+  transform: translateX(-50%) translateY(-20px);
   display: flex;
   gap: 4px;
   padding: 4px;
@@ -27530,18 +33871,15 @@ button.dmt-orientation-btn,
   box-shadow:
     0 4px 12px rgba(0, 0, 0, 0.5),
     inset 0 0 0 1px rgba(196, 165, 123, 0.2);
-  animation: dmt-visibility-slide-in 0.15s ease-out;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 200ms ease-out, transform 200ms ease-out;
 }
 
-@keyframes dmt-visibility-slide-in {
-  from {
-    opacity: 0;
-    transform: translateX(-50%) translateY(-8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0);
-  }
+.dmt-visibility-toolbar-open {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+  pointer-events: auto;
 }
 
 .dmt-visibility-btn {
@@ -27605,6 +33943,146 @@ button.dmt-orientation-btn,
     color: var(--dmt-bg-primary);
   }
 }
+
+/* ==========================================================================
+   Fog of War UI
+   ========================================================================== */
+
+/* Separator between layer toggles and FoW section */
+.dmt-visibility-separator {
+  width: 1px;
+  height: 24px;
+  background: var(--dmt-border-secondary);
+  margin: 0 4px;
+}
+
+/* FoW section container */
+.dmt-fow-section {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* FoW toggle button (always visible) */
+/* FoW toggle button - with tablet overrides */
+.is-tablet button.dmt-fow-toggle-btn,
+button.dmt-fow-toggle-btn,
+.dmt-fow-toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background-color: var(--dmt-bg-secondary);
+  border: 1px solid var(--dmt-border-secondary);
+  border-radius: 3px;
+  color: var(--dmt-text-primary);
+  cursor: pointer;
+  padding: 4px 8px;
+  height: 32px;
+  min-height: 32px;
+  max-height: 32px;
+  transition: var(--dmt-transition);
+  white-space: nowrap;
+  
+  svg {
+    color: var(--dmt-border-primary);
+    width: 16px;
+    height: 16px;
+    min-width: 16px;
+    min-height: 16px;
+    flex-shrink: 0;
+  }
+  
+  &:hover {
+    background-color: var(--dmt-bg-tertiary);
+    border-color: var(--dmt-border-primary);
+  }
+  
+  &.expanded {
+    background-color: var(--dmt-bg-tertiary);
+    border-color: var(--dmt-border-primary);
+  }
+}
+
+.dmt-fow-label {
+  font-size: 11px;
+  color: var(--dmt-text-muted);
+}
+
+/* FoW tools panel (expandable) */
+.dmt-fow-tools-panel {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  overflow: hidden;
+  max-width: 0;
+  opacity: 0;
+  transition: max-width 200ms ease-out, opacity 200ms ease-out, margin 200ms ease-out;
+  
+  &.expanded {
+    max-width: 250px;
+    opacity: 1;
+    margin-left: 4px;
+    padding-left: 4px;
+    border-left: 1px solid var(--dmt-border-secondary);
+  }
+}
+
+/* Individual FoW tool buttons - with tablet overrides */
+.is-tablet button.dmt-fow-tool-btn,
+button.dmt-fow-tool-btn,
+.dmt-fow-tool-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--dmt-bg-secondary);
+  border: 1px solid var(--dmt-border-secondary);
+  border-radius: 3px;
+  color: var(--dmt-text-primary);
+  cursor: pointer;
+  padding: 4px;
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  min-height: 28px;
+  max-width: 28px;
+  max-height: 28px;
+  transition: var(--dmt-transition);
+  
+  svg {
+    color: var(--dmt-text-muted);
+    width: 16px;
+    height: 16px;
+  }
+  
+  &:hover:not(:disabled) {
+    background-color: var(--dmt-bg-tertiary);
+    border-color: var(--dmt-border-primary);
+    
+    svg {
+      color: var(--dmt-text-primary);
+    }
+  }
+  
+  &.active {
+    background-color: var(--dmt-border-primary);
+    border-color: #8b6842;
+    
+    svg {
+      color: var(--dmt-bg-primary);
+    }
+  }
+  
+  &.disabled,
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    
+    svg {
+      color: var(--dmt-text-muted);
+    }
+  }
+}
+
 /* ==========================================================================
    Scale Slider (shown during resize mode)
    ========================================================================== */
@@ -27690,6 +34168,202 @@ button.dmt-orientation-btn,
   min-width: 36px;
   text-align: right;
   font-family: var(--font-monospace);
+}
+
+/* ============================================
+   LAYER CONTROLS PANEL (Z-Layer System)
+   ============================================ */
+
+/* Invisible overlay to block clicks when context menu is open */
+.dmt-layer-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 149; /* Just below layer controls (150) */
+  background: transparent;
+  cursor: default;
+}
+
+.dmt-layer-controls {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%) translateX(-20px);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  z-index: 150;
+  opacity: 0;
+  pointer-events: none;
+  transition: left 0.3s ease, opacity 200ms ease-out, transform 200ms ease-out;
+}
+
+.dmt-layer-controls.dmt-layer-controls-open {
+  opacity: 1;
+  transform: translateY(-50%) translateX(0);
+  pointer-events: auto;
+}
+
+.dmt-layer-controls.sidebar-open {
+  left: calc(110px + 8px); /* sidebar width + gap */
+}
+
+.dmt-layer-controls.sidebar-closed {
+  left: 8px;
+}
+
+/* Layer Button Wrapper (for drag handling) */
+.dmt-layer-btn-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+/* Layer Button */
+.is-tablet button.dmt-layer-btn,
+button.dmt-layer-btn {
+  width: 35px;
+  height: 35px;
+  min-width: 35px;
+  min-height: 35px;
+  max-width: 35px;
+  max-height: 35px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.7);
+  border: 2px solid rgba(196, 165, 123, 0.4);
+  color: var(--dmt-text-primary);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  position: relative;
+  user-select: none;
+}
+
+.dmt-layer-btn:hover {
+  border-color: rgba(196, 165, 123, 0.6);
+  background: rgba(0, 0, 0, 0.85);
+  transform: scale(1.05);
+}
+
+.dmt-layer-btn-active {
+  border-color: #c4a57b;
+  box-shadow: 0 0 8px rgba(196, 165, 123, 0.4);
+  background: rgba(196, 165, 123, 0.2);
+}
+
+.dmt-layer-btn-active:hover {
+  border-color: #c4a57b;
+  background: rgba(196, 165, 123, 0.3);
+}
+
+/* Layer Options Slide-out */
+.dmt-layer-options {
+  position: absolute;
+  left: 100%;
+  top: 0;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  padding-left: 4px;
+  gap: 4px;
+  opacity: 0;
+  transform: translateX(-10px);
+  pointer-events: none;
+  transition: all 0.2s ease;
+}
+
+.dmt-layer-options.expanded {
+  opacity: 1;
+  transform: translateX(0);
+  pointer-events: auto;
+}
+
+.is-tablet button.dmt-layer-option-btn,
+button.dmt-layer-option-btn {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  min-height: 28px;
+  max-width: 28px;
+  max-height: 28px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.8);
+  border: 2px solid rgba(196, 165, 123, 0.4);
+  color: var(--dmt-text-muted);
+  cursor: pointer;
+  display: flex;
+  flex: 0 0 auto;
+  padding: 0;
+  box-sizing: border-box;
+  overflow: hidden;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.dmt-layer-option-btn:hover {
+  color: var(--dmt-text-normal);
+  border-color: rgba(196, 165, 123, 0.6);
+}
+
+.dmt-layer-option-btn.delete:hover {
+  color: #e74c3c;
+  border-color: #e74c3c;
+  background: rgba(231, 76, 60, 0.1);
+}
+
+/* Add Layer Button */
+.is-tablet button.dmt-layer-add-btn,
+button.dmt-layer-add-btn {
+  width: 35px;
+  height: 35px;
+  min-width: 35px;
+  min-height: 35px;
+  max-width: 35px;
+  max-height: 35px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.5);
+  border: 2px dashed rgba(196, 165, 123, 0.4);
+  color: var(--dmt-text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  padding: 0;
+  box-sizing: border-box;
+  overflow: hidden;
+  transition: all 0.2s ease;
+  margin-top: 4px;
+}
+
+.dmt-layer-add-btn:hover {
+  background: rgba(0, 0, 0, 0.7);
+  border-color: rgba(196, 165, 123, 0.6);
+  border-style: solid;
+  color: var(--dmt-text-primary);
+  transform: scale(1.05);
+}
+
+.dmt-layer-add-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Drag states */
+.dmt-layer-btn.dragging {
+  opacity: 0.5;
+}
+
+.dmt-layer-btn.drag-over {
+  border-color: #c4a57b;
+  transform: scale(1.05);
+  box-shadow: 0 0 12px rgba(196, 165, 123, 0.5);
 }
 `;
 
