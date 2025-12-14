@@ -20,7 +20,7 @@ const { useMapSelection } = await requireModuleByName("MapSelectionContext.jsx")
 const { calculateEdgeAlignment, getAlignmentOffset, placeObject, canPlaceObjectAt, removeObjectFromHex, generateObjectId } = await requireModuleByName("objectOperations.js");
 const { getClickedObjectInCell, getObjectsInCell, canAddObjectToCell, assignSlot } = await requireModuleByName("hexSlotPositioner.js");
 const { HexGeometry } = await requireModuleByName("HexGeometry.js");
-const { getActiveLayer } = await requireModuleByName("layerAccessor.js");
+const { getActiveLayer, isCellFogged } = await requireModuleByName("layerAccessor.js");
 
 /**
  * Hook for managing object interactions
@@ -355,6 +355,17 @@ const useObjectInteractions = (
     } else {
       // Grid maps: use standard single-object lookup
       object = getObjectAtPosition(getActiveLayer(mapData).objects || [], gridX, gridY);
+    }
+    
+    // Don't allow clicking/selecting objects under fog
+    if (object) {
+      const activeLayer = getActiveLayer(mapData);
+      if (activeLayer.fogOfWar?.enabled) {
+        const objOffset = geometry.toOffsetCoords(object.position.x, object.position.y);
+        if (isCellFogged(activeLayer, objOffset.col, objOffset.row)) {
+          object = null;
+        }
+      }
     }
     
     if (object) {
@@ -727,6 +738,17 @@ const useObjectInteractions = (
           obj = getObjectAtPosition(getActiveLayer(mapData).objects, gridX, gridY);
         }
         
+        // Don't show hover for objects under fog
+        if (obj) {
+          const activeLayer = getActiveLayer(mapData);
+          if (activeLayer.fogOfWar?.enabled) {
+            const objOffset = geometry.toOffsetCoords(obj.position.x, obj.position.y);
+            if (isCellFogged(activeLayer, objOffset.col, objOffset.row)) {
+              obj = null;
+            }
+          }
+        }
+        
         setHoveredObject(obj);
 
         // Calculate position relative to container for absolute positioning
@@ -1085,7 +1107,7 @@ const useObjectInteractions = (
   }, [handleObjectColorSelect]);
 
   /**
-   * Handle object rotation (cycles 0Â° -> 90Â° -> 180Â° -> 270Â° -> 0Â°)
+   * Handle object rotation (cycles 0Ã‚Â° -> 90Ã‚Â° -> 180Ã‚Â° -> 270Ã‚Â° -> 0Ã‚Â°)
    */
   const handleObjectRotation = dc.useCallback(() => {
     if (!selectedItem || selectedItem.type !== 'object' || !mapData) {

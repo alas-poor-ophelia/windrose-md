@@ -92,7 +92,7 @@ const ObjectSidebar = ({ selectedObjectType, onObjectTypeSelect, onToolChange, i
   return (
     <div className="dmt-object-sidebar">
       {/* Hidden element to force early emoji font loading */}
-      <div className="dmt-font-preloader" aria-hidden="true">🔐🦪⬆️⬇️📍⚜️⚡🪐🧙‍♂️🗡️🏹⚔️⛏️🔱💀🎯🦡⚰️🛐🪔</div>
+      <div className="dmt-font-preloader" aria-hidden="true">🔍🦪⬆️⬇️🔍⚜️⚡🪐🧙‍♂️🗡️🹏⚔️⛏️📱💀🎯🦡⚰️🛏🪔</div>
       
       <div className="dmt-sidebar-header">
         Objects

@@ -108,7 +108,7 @@ const CornerBracket = ({ position }) => {
 };
 
 const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'grid' }) => {
-  const { mapData, isLoading, saveStatus, updateMapData, forceSave } = useMapData(mapId, mapName, mapType);
+  const { mapData, isLoading, saveStatus, updateMapData, forceSave, fowImageReady } = useMapData(mapId, mapName, mapType);
   
   // Tool and color state (extracted to useToolState hook)
   const {
@@ -778,6 +778,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
             onToggleLayerPanel={() => setShowLayerPanel(!showLayerPanel)}
             showVisibilityToolbar={showVisibilityToolbar}
             onToggleVisibilityToolbar={() => setShowVisibilityToolbar(!showVisibilityToolbar)}
+            alwaysShowControls={effectiveSettings?.alwaysShowControls ?? false}
           />
         </div>
 

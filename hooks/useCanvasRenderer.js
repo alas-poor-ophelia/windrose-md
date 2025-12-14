@@ -25,7 +25,7 @@ function getRenderer(geometry) {
   return geometry instanceof HexGeometry ? hexRenderer : gridRenderer;
 }
 
-function renderCanvas(canvas, mapData, geometry, selectedItems = [], isResizeMode = false, theme = null, showCoordinates = false, layerVisibility = null) {
+function renderCanvas(canvas, fogCanvas, mapData, geometry, selectedItems = [], isResizeMode = false, theme = null, showCoordinates = false, layerVisibility = null) {
   if (!canvas) return;
   
   // Normalize selectedItems to array (backward compatibility)
@@ -244,6 +244,31 @@ function renderCanvas(canvas, mapData, geometry, selectedItems = [], isResizeMod
       const objType = getObjectType(obj.type);
       if (!objType) continue;
       
+      // Skip rendering if object's cell(s) are fogged
+      // For multi-cell objects, skip if ANY cell is fogged
+      if (activeLayer.fogOfWar?.enabled) {
+        const size = obj.size || { width: 1, height: 1 };
+        const baseOffset = geometry.toOffsetCoords(obj.position.x, obj.position.y);
+        
+        let isUnderFog = false;
+        
+        if (geometry instanceof HexGeometry) {
+          // Hex maps: objects occupy single hex, check just that cell
+          isUnderFog = isCellFogged(activeLayer, baseOffset.col, baseOffset.row);
+        } else {
+          // Grid maps: check all cells the object covers
+          for (let dx = 0; dx < size.width && !isUnderFog; dx++) {
+            for (let dy = 0; dy < size.height && !isUnderFog; dy++) {
+              if (isCellFogged(activeLayer, baseOffset.col + dx, baseOffset.row + dy)) {
+                isUnderFog = true;
+              }
+            }
+          }
+        }
+        
+        if (isUnderFog) continue;
+      }
+      
       // Ensure size exists (backward compatibility)
       const size = obj.size || { width: 1, height: 1 };
       
@@ -455,7 +480,23 @@ function renderCanvas(canvas, mapData, geometry, selectedItems = [], isResizeMod
   // =========================================================================
   // FOG OF WAR RENDERING
   // Renders after all content but before selection handles
+  // Blur passes go to fogCanvas (CSS blur applied), solid fill to main canvas
   // =========================================================================
+  
+  // Clear fog canvas if it exists but blur won't be used
+  if (fogCanvas) {
+    const fow = activeLayer.fogOfWar;
+    const effectiveSettings = getEffectiveSettings(mapData.settings);
+    const fowBlurEnabled = effectiveSettings?.fogOfWarBlurEnabled ?? false;
+    
+    if (!fow?.enabled || !fow?.foggedCells?.length || !fowBlurEnabled) {
+      // Clear fog canvas and remove CSS blur when not in use
+      const tempFogCtx = fogCanvas.getContext('2d');
+      tempFogCtx.clearRect(0, 0, fogCanvas.width, fogCanvas.height);
+      fogCanvas.style.filter = 'none';
+    }
+  }
+  
   if (activeLayer.fogOfWar && activeLayer.fogOfWar.enabled && activeLayer.fogOfWar.foggedCells?.length > 0) {
     const fow = activeLayer.fogOfWar;
     
@@ -464,6 +505,8 @@ function renderCanvas(canvas, mapData, geometry, selectedItems = [], isResizeMod
     const fowColor = effectiveSettings.fogOfWarColor || '#000000';
     const fowOpacity = effectiveSettings.fogOfWarOpacity ?? 0.9;
     const fowImagePath = effectiveSettings.fogOfWarImage;
+    const fowBlurEnabled = effectiveSettings.fogOfWarBlurEnabled ?? false;
+    const fowBlurFactor = effectiveSettings.fogOfWarBlurFactor ?? 0.08;
     
     // Determine fill style: pattern from image, or solid color
     let fowFillStyle = null;
@@ -481,31 +524,71 @@ function renderCanvas(canvas, mapData, geometry, selectedItems = [], isResizeMod
           }
         } catch (e) {
           // Pattern creation failed, fall back to color
-          console.error('Failed to create FoW pattern:', e);
         }
       }
     }
     
-    // Fall back to solid color with opacity baked in
+    // Fall back to solid color (opacity applied via globalAlpha, not baked in)
     if (!fowFillStyle) {
-      // Parse hex color to RGB
-      const r = parseInt(fowColor.slice(1, 3), 16) || 0;
-      const g = parseInt(fowColor.slice(3, 5), 16) || 0;
-      const b = parseInt(fowColor.slice(5, 7), 16) || 0;
-      fowFillStyle = `rgba(${r}, ${g}, ${b}, ${fowOpacity})`;
+      fowFillStyle = fowColor;
+      useGlobalAlpha = true; // Use globalAlpha for opacity with solid colors too
     }
     
-    // Apply fill style
+    // Calculate blur radius
+    let blurRadius = 0;
+    if (fowBlurEnabled) {
+      const cellSize = geometry instanceof HexGeometry ? geometry.hexSize : geometry.cellSize;
+      blurRadius = cellSize * fowBlurFactor * zoom;
+    }
+    
+    // Set up fog canvas for blur passes if available and blur enabled
+    let fogCtx = null;
+    if (fogCanvas && fowBlurEnabled && blurRadius > 0) {
+      fogCtx = fogCanvas.getContext('2d');
+      
+      // Ensure fog canvas dimensions match main canvas
+      if (fogCanvas.width !== width || fogCanvas.height !== height) {
+        fogCanvas.width = width;
+        fogCanvas.height = height;
+      }
+      
+      // Set CSS blur amount on the fog canvas element
+      // This is what makes it work on iOS (unlike ctx.filter)
+      const cssBlurAmount = Math.max(4, blurRadius * 0.6); // Tighter CSS blur
+      fogCanvas.style.filter = `blur(${cssBlurAmount}px)`;
+      
+      // Clear fog canvas (before transform)
+      fogCtx.clearRect(0, 0, width, height);
+      
+      // Apply EXACTLY the same transforms as main canvas
+      fogCtx.save();
+      fogCtx.translate(width / 2, height / 2);
+      fogCtx.rotate((northDirection * Math.PI) / 180);
+      fogCtx.translate(-width / 2, -height / 2);
+      
+      // Set up fill style on fog canvas - always start with fallback color
+      fogCtx.fillStyle = fowColor; // Default to fog color
+      
+      if (fowImagePath) {
+        // Try to use pattern if image is loaded
+        const fowImage = getCachedImage(fowImagePath);
+        if (fowImage && fowImage.complete && fowImage.naturalWidth > 0) {
+          const fogPattern = fogCtx.createPattern(fowImage, 'repeat');
+          if (fogPattern) {
+            fogCtx.fillStyle = fogPattern;
+          }
+        }
+      }
+    }
+    
+    // Apply fill style to main canvas
     ctx.fillStyle = fowFillStyle;
     
-    // If using pattern, apply opacity via globalAlpha
+    // Apply opacity via globalAlpha (used for both patterns and solid colors now)
     const previousGlobalAlpha = ctx.globalAlpha;
     if (useGlobalAlpha) {
       ctx.globalAlpha = fowOpacity;
     }
-    
-    // Build a Set for O(1) lookup of fogged cells
-    const foggedSet = new Set(fow.foggedCells.map(c => `${c.col},${c.row}`));
     
     // Calculate visible bounds in grid/offset coordinates for viewport culling
     let visibleMinCol, visibleMaxCol, visibleMinRow, visibleMaxRow;
@@ -563,9 +646,18 @@ function renderCanvas(canvas, mapData, geometry, selectedItems = [], isResizeMod
     }
     
     // Render fog for visible fogged cells
+    // Use combined path approach: trace all cells, then fill once
+    // This allows single shadow computation instead of per-cell
     if (geometry instanceof HexGeometry) {
-      // Hex map fog rendering
+      // Hex map fog rendering with expanded edge blur
       const orientation = mapData.orientation || 'flat';
+      
+      // Build foggedSet for O(1) lookups
+      const foggedSet = new Set(fow.foggedCells.map(c => `${c.col},${c.row}`));
+      
+      // Collect visible fog cells and identify edge cells
+      const visibleFogCells = [];
+      const edgeCells = [];
       
       for (const fogCell of fow.foggedCells) {
         const { col, row } = fogCell;
@@ -576,27 +668,186 @@ function renderCanvas(canvas, mapData, geometry, selectedItems = [], isResizeMod
           continue;
         }
         
-        // Convert offset to axial coordinates
-        const { q, r } = offsetToAxial(col, row, orientation);
+        visibleFogCells.push({ col, row });
         
-        // Get hex vertices in world coordinates
+        // Check if this is an edge cell (has at least one non-fogged neighbor)
+        const { q, r } = offsetToAxial(col, row, orientation);
+        const neighbors = geometry.getNeighbors(q, r);
+        const isEdge = neighbors.some(n => {
+          const { col: nCol, row: nRow } = axialToOffset(n.q, n.r, orientation);
+          return !foggedSet.has(`${nCol},${nRow}`);
+        });
+        
+        if (isEdge) {
+          edgeCells.push({ col, row, q, r });
+        }
+      }
+      
+      // Helper to trace hex path at a given scale (1.0 = normal size)
+      const traceHexPath = (q, r, scale = 1.0) => {
         const vertices = geometry.getHexVertices(q, r);
         
-        // Draw hex fog by tracing vertices
-        ctx.beginPath();
-        const first = geometry.worldToScreen(vertices[0].worldX, vertices[0].worldY, offsetX, offsetY, zoom);
-        ctx.moveTo(first.screenX, first.screenY);
+        if (scale === 1.0) {
+          // Normal size - use vertices directly
+          const first = geometry.worldToScreen(vertices[0].worldX, vertices[0].worldY, offsetX, offsetY, zoom);
+          ctx.moveTo(first.screenX, first.screenY);
+          for (let i = 1; i < vertices.length; i++) {
+            const vertex = geometry.worldToScreen(vertices[i].worldX, vertices[i].worldY, offsetX, offsetY, zoom);
+            ctx.lineTo(vertex.screenX, vertex.screenY);
+          }
+        } else {
+          // Scaled - expand from center
+          const center = geometry.hexToWorld(q, r);
+          const screenCenter = geometry.worldToScreen(center.worldX, center.worldY, offsetX, offsetY, zoom);
+          
+          const scaledVertices = vertices.map(v => {
+            const screen = geometry.worldToScreen(v.worldX, v.worldY, offsetX, offsetY, zoom);
+            return {
+              screenX: screenCenter.screenX + (screen.screenX - screenCenter.screenX) * scale,
+              screenY: screenCenter.screenY + (screen.screenY - screenCenter.screenY) * scale
+            };
+          });
+          
+          ctx.moveTo(scaledVertices[0].screenX, scaledVertices[0].screenY);
+          for (let i = 1; i < scaledVertices.length; i++) {
+            ctx.lineTo(scaledVertices[i].screenX, scaledVertices[i].screenY);
+          }
+        }
+        ctx.closePath();
+      };
+      
+      // Helper to trace hex path on fog canvas (for blur passes)
+      const traceHexPathOnFog = (q, r, scale = 1.0) => {
+        if (!fogCtx) return;
         
-        for (let i = 1; i < vertices.length; i++) {
-          const vertex = geometry.worldToScreen(vertices[i].worldX, vertices[i].worldY, offsetX, offsetY, zoom);
-          ctx.lineTo(vertex.screenX, vertex.screenY);
+        const vertices = geometry.getHexVertices(q, r);
+        
+        if (scale === 1.0) {
+          const first = geometry.worldToScreen(vertices[0].worldX, vertices[0].worldY, offsetX, offsetY, zoom);
+          fogCtx.moveTo(first.screenX, first.screenY);
+          for (let i = 1; i < vertices.length; i++) {
+            const vertex = geometry.worldToScreen(vertices[i].worldX, vertices[i].worldY, offsetX, offsetY, zoom);
+            fogCtx.lineTo(vertex.screenX, vertex.screenY);
+          }
+        } else {
+          const center = geometry.hexToWorld(q, r);
+          const screenCenter = geometry.worldToScreen(center.worldX, center.worldY, offsetX, offsetY, zoom);
+          
+          const scaledVertices = vertices.map(v => {
+            const screen = geometry.worldToScreen(v.worldX, v.worldY, offsetX, offsetY, zoom);
+            return {
+              screenX: screenCenter.screenX + (screen.screenX - screenCenter.screenX) * scale,
+              screenY: screenCenter.screenY + (screen.screenY - screenCenter.screenY) * scale
+            };
+          });
+          
+          fogCtx.moveTo(scaledVertices[0].screenX, scaledVertices[0].screenY);
+          for (let i = 1; i < scaledVertices.length; i++) {
+            fogCtx.lineTo(scaledVertices[i].screenX, scaledVertices[i].screenY);
+          }
+        }
+        fogCtx.closePath();
+      };
+      
+      // Blur passes: draw edge cells to fog canvas (CSS blur will smooth them)
+      // Render to fogCtx if available, otherwise use ctx with filter
+      if (fowBlurEnabled && blurRadius > 0 && edgeCells.length > 0) {
+        const baseOpacity = fowOpacity;
+        const numPasses = 8;
+        const maxExpansion = blurRadius / (geometry.hexSize * zoom); // Back to 1.0x - tighter radius
+        
+        // Use fog canvas if available (CSS blur), otherwise fall back to ctx.filter
+        const targetCtx = fogCtx || ctx;
+        const useFilterFallback = !fogCtx;
+        const filterBlurAmount = blurRadius / numPasses;
+        
+        for (let i = 0; i < numPasses; i++) {
+          const t = i / (numPasses - 1);
+          const scale = 1.0 + (maxExpansion * (1.0 - t));
+          // Higher starting opacity for visible bleed, tighter range
+          const opacity = 0.50 + (0.30 * t); // Range: 0.50 to 0.80
+          
+          // Only use ctx.filter as fallback (iOS doesn't support it)
+          if (useFilterFallback) {
+            const passBlur = filterBlurAmount * (1.5 - t);
+            targetCtx.filter = passBlur > 0.5 ? `blur(${passBlur}px)` : 'none';
+          }
+          
+          targetCtx.beginPath();
+          for (const { q, r } of edgeCells) {
+            if (fogCtx) {
+              traceHexPathOnFog(q, r, scale);
+            } else {
+              traceHexPath(q, r, scale);
+            }
+          }
+          targetCtx.globalAlpha = baseOpacity * opacity;
+          targetCtx.fill();
         }
         
-        ctx.closePath();
-        ctx.fill();
+        // Reset filter if we used it as fallback
+        if (useFilterFallback) {
+          ctx.filter = 'none';
+        }
+        
+        // Restore opacity for final fill
+        ctx.globalAlpha = useGlobalAlpha ? fowOpacity : 1;
       }
+      
+      // Final pass: all fog cells at normal size, full opacity (on main canvas)
+      ctx.beginPath();
+      for (const { col, row } of visibleFogCells) {
+        const { q, r } = offsetToAxial(col, row, orientation);
+        traceHexPath(q, r, 1.0);
+      }
+      ctx.fill();
+      
+      // Draw interior hex outlines on top of fog for cell visibility
+      // Use subtle lines so users can see cell boundaries for revealing
+      if (visibleFogCells.length > 1) {
+        // foggedSet already created at top of hex section
+        
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)'; // Subtle white lines
+        ctx.lineWidth = Math.max(1, 1 * zoom);
+        
+        for (const { col, row } of visibleFogCells) {
+          const { q, r } = offsetToAxial(col, row, orientation);
+          
+          // Check if this hex has any fogged neighbors (making it an interior edge)
+          const neighbors = geometry.getNeighbors(q, r);
+          const hasFoggedNeighbor = neighbors.some(n => {
+            const { col: nCol, row: nRow } = axialToOffset(n.q, n.r, orientation);
+            return foggedSet.has(`${nCol},${nRow}`);
+          });
+          
+          if (hasFoggedNeighbor) {
+            const vertices = geometry.getHexVertices(q, r);
+            
+            ctx.beginPath();
+            const first = geometry.worldToScreen(vertices[0].worldX, vertices[0].worldY, offsetX, offsetY, zoom);
+            ctx.moveTo(first.screenX, first.screenY);
+            
+            for (let i = 1; i < vertices.length; i++) {
+              const vertex = geometry.worldToScreen(vertices[i].worldX, vertices[i].worldY, offsetX, offsetY, zoom);
+              ctx.lineTo(vertex.screenX, vertex.screenY);
+            }
+            
+            ctx.closePath();
+            ctx.stroke();
+          }
+        }
+      }
+      
     } else {
-      // Grid map fog rendering
+      // Grid map fog rendering with expanded edge blur
+      
+      // Build foggedSet for O(1) lookups
+      const foggedSet = new Set(fow.foggedCells.map(c => `${c.col},${c.row}`));
+      
+      // Collect visible fog cells and identify edge cells
+      const visibleFogCells = [];
+      const edgeCells = [];
+      
       for (const fogCell of fow.foggedCells) {
         const { col, row } = fogCell;
         
@@ -606,19 +857,143 @@ function renderCanvas(canvas, mapData, geometry, selectedItems = [], isResizeMod
           continue;
         }
         
-        // Convert to screen coordinates
-        const screenX = offsetX + col * scaledSize;
-        const screenY = offsetY + row * scaledSize;
+        visibleFogCells.push({ col, row });
         
-        // Draw cell fog
-        ctx.fillRect(screenX, screenY, scaledSize, scaledSize);
+        // Check if this is an edge cell (has at least one non-fogged cardinal neighbor)
+        const isEdge = !foggedSet.has(`${col - 1},${row}`) ||  // left
+                       !foggedSet.has(`${col + 1},${row}`) ||  // right
+                       !foggedSet.has(`${col},${row - 1}`) ||  // top
+                       !foggedSet.has(`${col},${row + 1}`);    // bottom
+        
+        if (isEdge) {
+          edgeCells.push({ col, row });
+        }
       }
+      
+      // Helper to add circle to path for soft blur effect
+      const addCircleToPath = (targetCtx, col, row, radius) => {
+        const centerX = offsetX + col * scaledSize + scaledSize / 2;
+        const centerY = offsetY + row * scaledSize + scaledSize / 2;
+        targetCtx.moveTo(centerX + radius, centerY);
+        targetCtx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+      };
+      
+      // Helper to add rect to path at a given scale (1.0 = normal size)
+      const addRectToPath = (col, row, scale = 1.0) => {
+        const centerX = offsetX + col * scaledSize + scaledSize / 2;
+        const centerY = offsetY + row * scaledSize + scaledSize / 2;
+        const size = scaledSize * scale;
+        const halfSize = size / 2;
+        ctx.rect(centerX - halfSize, centerY - halfSize, size, size);
+      };
+      
+      // Blur passes: draw edge cells as circles to fog canvas (CSS blur will smooth them)
+      // Render to fogCtx if available, otherwise use ctx with filter fallback
+      if (fowBlurEnabled && blurRadius > 0 && edgeCells.length > 0) {
+        const baseOpacity = fowOpacity;
+        const numPasses = 8;
+        
+        const cellRadius = scaledSize / 2;
+        const maxRadius = cellRadius + blurRadius; // Back to 1.0x - tighter radius
+        
+        // Use fog canvas if available (CSS blur), otherwise fall back to ctx.filter
+        const targetCtx = fogCtx || ctx;
+        const useFilterFallback = !fogCtx;
+        const filterBlurAmount = blurRadius / numPasses;
+        
+        for (let i = 0; i < numPasses; i++) {
+          const t = i / (numPasses - 1);
+          const radius = maxRadius - (blurRadius * t); // Back to 1.0x
+          // Higher starting opacity for visible bleed, tighter range
+          const opacity = 0.50 + (0.30 * t); // Range: 0.50 to 0.80
+          
+          // Only use ctx.filter as fallback (iOS doesn't support it)
+          if (useFilterFallback) {
+            const passBlur = filterBlurAmount * (1.5 - t);
+            targetCtx.filter = passBlur > 0.5 ? `blur(${passBlur}px)` : 'none';
+          }
+          
+          targetCtx.beginPath();
+          for (const { col, row } of edgeCells) {
+            addCircleToPath(targetCtx, col, row, radius);
+          }
+          targetCtx.globalAlpha = baseOpacity * opacity;
+          targetCtx.fill();
+        }
+        
+        // Reset filter if we used it as fallback
+        if (useFilterFallback) {
+          ctx.filter = 'none';
+        }
+        
+        // Restore opacity for final fill
+        ctx.globalAlpha = useGlobalAlpha ? fowOpacity : 1;
+      }
+      
+      // Final pass: all fog cells at normal size (squares), full opacity (on main canvas)
+      ctx.beginPath();
+      for (const { col, row } of visibleFogCells) {
+        addRectToPath(col, row, 1.0);
+      }
+      ctx.fill();
+      
+      // Draw interior grid lines on top of fog for cell visibility
+      // Similar to gridRenderer.renderInteriorGridLines pattern
+      if (visibleFogCells.length > 1) {
+        const drawnLines = new Set();
+        
+        const interiorLineWidth = Math.max(1, 1 * zoom * 0.5); // Thinner interior lines
+        const halfWidth = interiorLineWidth / 2;
+        
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.15)'; // Subtle white lines
+        
+        for (const { col, row } of visibleFogCells) {
+          const screenX = offsetX + col * scaledSize;
+          const screenY = offsetY + row * scaledSize;
+          
+          // Check right neighbor - draw vertical line between them
+          if (foggedSet.has(`${col + 1},${row}`)) {
+            const lineKey = `v:${col + 1},${row}`;
+            if (!drawnLines.has(lineKey)) {
+              ctx.fillRect(
+                screenX + scaledSize - halfWidth,
+                screenY,
+                interiorLineWidth,
+                scaledSize
+              );
+              drawnLines.add(lineKey);
+            }
+          }
+          
+          // Check bottom neighbor - draw horizontal line between them
+          if (foggedSet.has(`${col},${row + 1}`)) {
+            const lineKey = `h:${col},${row + 1}`;
+            if (!drawnLines.has(lineKey)) {
+              ctx.fillRect(
+                screenX,
+                screenY + scaledSize - halfWidth,
+                scaledSize,
+                interiorLineWidth
+              );
+              drawnLines.add(lineKey);
+            }
+          }
+        }
+      }
+    }
+    
+    // Restore fog canvas context if we used it
+    if (fogCtx) {
+      fogCtx.restore();
     }
     
     // Restore globalAlpha if we modified it for pattern opacity
     if (useGlobalAlpha) {
       ctx.globalAlpha = previousGlobalAlpha;
     }
+    
+    // Note: Shadow properties are restored inside hex/grid branches
+    // before drawing interior lines (so blur doesn't affect those)
   }
   
   // Draw selection indicators for text labels
@@ -811,13 +1186,14 @@ function renderCanvas(canvas, mapData, geometry, selectedItems = [], isResizeMod
   ctx.restore();
 }
 
-function useCanvasRenderer(canvasRef, mapData, geometry, selectedItems = [], isResizeMode = false, theme = null, showCoordinates = false, layerVisibility = null) {
+function useCanvasRenderer(canvasRef, fogCanvasRef, mapData, geometry, selectedItems = [], isResizeMode = false, theme = null, showCoordinates = false, layerVisibility = null) {
   // Main rendering effect - redraw when dependencies change
   dc.useEffect(() => {
     if (mapData && geometry && canvasRef.current) {
-      renderCanvas(canvasRef.current, mapData, geometry, selectedItems, isResizeMode, theme, showCoordinates, layerVisibility);
+      const fogCanvas = fogCanvasRef?.current || null;
+      renderCanvas(canvasRef.current, fogCanvas, mapData, geometry, selectedItems, isResizeMode, theme, showCoordinates, layerVisibility);
     }
-  }, [mapData, geometry, selectedItems, isResizeMode, theme, canvasRef, showCoordinates, layerVisibility]);
+  }, [mapData, geometry, selectedItems, isResizeMode, theme, canvasRef, fogCanvasRef, showCoordinates, layerVisibility]);
 }
 
 return { useCanvasRenderer, renderCanvas };

@@ -47,7 +47,12 @@ const FALLBACK_SETTINGS = {
   // Fog of War appearance settings
   fogOfWarColor: THEME.fogOfWar.color,
   fogOfWarOpacity: THEME.fogOfWar.opacity,
-  fogOfWarImage: null  // Optional: vault path to tileable image
+  fogOfWarImage: null,  // Optional: vault path to tileable image
+  fogOfWarBlurEnabled: THEME.fogOfWar.blurEnabled,
+  fogOfWarBlurFactor: THEME.fogOfWar.blurFactor,
+  
+  // Controls visibility
+  alwaysShowControls: false
 };
 
 /**
@@ -131,7 +136,9 @@ function getTheme() {
     fogOfWar: {
       color: settings.fogOfWarColor,
       opacity: settings.fogOfWarOpacity,
-      image: settings.fogOfWarImage
+      image: settings.fogOfWarImage,
+      blurEnabled: settings.fogOfWarBlurEnabled,
+      blurFactor: settings.fogOfWarBlurFactor
     }
   };
 }

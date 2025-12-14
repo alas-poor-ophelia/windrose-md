@@ -28,7 +28,9 @@ const THEME = {
   },
   fogOfWar: {
     color: '#000000',
-    opacity: 0.9
+    opacity: 0.9,
+    blurEnabled: false,       // Enable soft edge blur effect
+    blurFactor: 0.99         // Blur radius as percentage of cell size (8%)
   }
 };
 

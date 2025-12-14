@@ -55,6 +55,7 @@ const Coordinators = ({ canvasRef, mapData, geometry, isFocused, isColorPickerOp
  */
 const MapCanvasContent = ({ mapData, onCellsChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onViewStateChange, currentTool, selectedObjectType, selectedColor, isColorPickerOpen, customColors, onAddCustomColor, onDeleteCustomColor, isFocused, isAnimating, theme, isAlignmentMode, children }) => {
   const canvasRef = dc.useRef(null);
+  const fogCanvasRef = dc.useRef(null);  // Separate canvas for fog blur effect (CSS blur for iOS compat)
   const containerRef = dc.useRef(null);
   const [canvasDimensions, setCanvasDimensions] = dc.useState({
     width: DEFAULTS.canvasSize.width,
@@ -166,13 +167,14 @@ const MapCanvasContent = ({ mapData, onCellsChange, onObjectsChange, onTextLabel
   }, [isAnimating]);
 
   // Render canvas whenever relevant state changes
-  useCanvasRenderer(canvasRef, mapData, geometry, selectedItems, isResizeMode, theme, showCoordinates, layerVisibility);
+  useCanvasRenderer(canvasRef, fogCanvasRef, mapData, geometry, selectedItems, isResizeMode, theme, showCoordinates, layerVisibility);
 
   // Trigger redraw when canvas dimensions change (from expand/collapse)
   dc.useEffect(() => {
     if (!canvasRef.current || !mapData || !geometry) return;
 
     const canvas = canvasRef.current;
+    const fogCanvas = fogCanvasRef.current;
 
     // During animation, preserve canvas content
     if (isAnimating) {
@@ -186,13 +188,19 @@ const MapCanvasContent = ({ mapData, onCellsChange, onObjectsChange, onTextLabel
       // Update canvas size
       canvas.width = canvasDimensions.width;
       canvas.height = canvasDimensions.height;
+      
+      // Also update fog canvas size
+      if (fogCanvas) {
+        fogCanvas.width = canvasDimensions.width;
+        fogCanvas.height = canvasDimensions.height;
+      }
 
       // Restore content (will stretch/compress during animation)
       const ctx = canvas.getContext('2d');
       ctx.drawImage(tempCanvas, 0, 0, canvas.width, canvas.height);
     } else {
       // After animation, do a proper redraw with correct dimensions
-      renderCanvas(canvas, mapData, geometry, selectedItem, isResizeMode, theme, showCoordinates, layerVisibility);
+      renderCanvas(canvas, fogCanvas, mapData, geometry, selectedItem, isResizeMode, theme, showCoordinates, layerVisibility);
     }
   }, [canvasDimensions.width, canvasDimensions.height, isAnimating, showCoordinates, layerVisibility]);
 
@@ -345,15 +353,31 @@ const MapCanvasContent = ({ mapData, onCellsChange, onObjectsChange, onTextLabel
           />
           
           <div className="dmt-canvas-container" ref={containerRef}>
-            {/* Main canvas */}
-            <canvas
-              ref={canvasRef}
-              width={canvasDimensions.width}
-              height={canvasDimensions.height}
-              className={getCursorClass()}
-              style={{ touchAction: 'none' }}
-            />
-            
+            {/* Wrapper for canvas alignment - fog canvas positions relative to this */}
+            <div style={{ position: 'relative', display: 'inline-block' }}>
+              {/* Main canvas */}
+              <canvas
+                ref={canvasRef}
+                width={canvasDimensions.width}
+                height={canvasDimensions.height}
+                className={getCursorClass()}
+                style={{ touchAction: 'none', display: 'block' }}
+              />
+              
+              {/* Fog blur overlay canvas - uses CSS filter for iOS compatibility */}
+              <canvas
+                ref={fogCanvasRef}
+                width={canvasDimensions.width}
+                height={canvasDimensions.height}
+                style={{ 
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  pointerEvents: 'none'
+                  // CSS filter blur is set dynamically by useCanvasRenderer
+                }}
+              />
+            </div>
 
             <LinkedNoteHoverOverlays
               canvasRef={canvasRef}

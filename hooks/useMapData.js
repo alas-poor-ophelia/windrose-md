@@ -12,6 +12,7 @@ function useMapData(mapId, mapName = '', mapType = 'grid') {
   const [saveStatus, setSaveStatus] = dc.useState('Saved');
   const [pendingData, setPendingData] = dc.useState(null);
   const [backgroundImageReady, setBackgroundImageReady] = dc.useState(false);
+  const [fowImageReady, setFowImageReady] = dc.useState(false);
   const saveTimerRef = dc.useRef(null);
   
 
@@ -49,7 +50,14 @@ function useMapData(mapId, mapName = '', mapType = 'grid') {
     const fowImagePath = effectiveSettings.fogOfWarImage;
     
     if (fowImagePath) {
-      preloadImage(fowImagePath);
+      setFowImageReady(false);
+      preloadImage(fowImagePath).then((img) => {
+        if (img) {
+          setFowImageReady(true);
+        }
+      });
+    } else {
+      setFowImageReady(false);
     }
   }, [mapData?.settings]);
   
@@ -119,7 +127,7 @@ function useMapData(mapId, mapName = '', mapType = 'grid') {
     };
   }, [pendingData, mapId]);
   
-  return { mapData, isLoading, saveStatus, updateMapData, forceSave, backgroundImageReady };
+  return { mapData, isLoading, saveStatus, updateMapData, forceSave, backgroundImageReady, fowImageReady };
 }
 
 return { useMapData };

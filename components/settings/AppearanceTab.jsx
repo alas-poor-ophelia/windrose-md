@@ -295,6 +295,68 @@ function FogOfWarSection() {
           Select a tileable image to use instead of solid color. Image will be tiled across fogged areas.
         </p>
       </div>
+      
+      {/* Soft edges toggle */}
+      <div style={{ marginTop: '16px', opacity: useGlobalSettings ? 0.5 : 1 }}>
+        <label class="dmt-checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: useGlobalSettings ? 'not-allowed' : 'pointer' }}>
+          <input
+            type="checkbox"
+            checked={overrides.fogOfWarBlurEnabled ?? false}
+            onChange={() => !useGlobalSettings && handleColorChange('fogOfWarBlurEnabled', !(overrides.fogOfWarBlurEnabled ?? false))}
+            disabled={useGlobalSettings}
+            class="dmt-checkbox"
+          />
+          <span>Soft edges</span>
+        </label>
+        <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px', marginLeft: '24px' }}>
+          Adds a subtle blur effect at fog boundaries for a softer look
+        </p>
+      </div>
+      
+      {/* Blur intensity slider - only show when soft edges enabled */}
+      {(overrides.fogOfWarBlurEnabled ?? false) && (
+        <div style={{ marginTop: '12px', marginLeft: '24px', opacity: useGlobalSettings ? 0.5 : 1 }}>
+          <label class="dmt-form-label" style={{ marginBottom: '8px', display: 'block', fontSize: '12px' }}>
+            Blur Intensity: {Math.round((overrides.fogOfWarBlurFactor ?? 0.20) * 100)}%
+          </label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <input
+              type="range"
+              min="5"
+              max="50"
+              value={Math.round((overrides.fogOfWarBlurFactor ?? 0.20) * 100)}
+              onChange={(e) => !useGlobalSettings && handleColorChange('fogOfWarBlurFactor', parseInt(e.target.value, 10) / 100)}
+              disabled={useGlobalSettings}
+              style={{
+                flex: 1,
+                height: '6px',
+                cursor: useGlobalSettings ? 'not-allowed' : 'pointer',
+                accentColor: 'var(--interactive-accent)'
+              }}
+            />
+            <span style={{ 
+              fontSize: '12px', 
+              color: 'var(--text-muted)',
+              minWidth: '35px',
+              textAlign: 'right'
+            }}>
+              {Math.round((overrides.fogOfWarBlurFactor ?? 0.20) * 100)}%
+            </span>
+            <button
+              class="dmt-color-reset-btn"
+              disabled={useGlobalSettings}
+              onClick={() => !useGlobalSettings && handleColorChange('fogOfWarBlurFactor', 0.20)}
+              title="Reset to default (8%)"
+              style={{ cursor: useGlobalSettings ? 'not-allowed' : 'pointer' }}
+            >
+              <dc.Icon icon="lucide-rotate-ccw" />
+            </button>
+          </div>
+          <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+            Size of blur as percentage of cell size (5-50%)
+          </p>
+        </div>
+      )}
     </CollapsibleSection>
   );
 }
@@ -307,8 +369,10 @@ function AppearanceTab() {
     mapType,
     useGlobalSettings,
     overrides,
+    globalSettings,
     handleToggleUseGlobal,
     handleLineWidthChange,
+    handleColorChange,
     THEME
   } = useMapSettings();
   
@@ -404,6 +468,44 @@ function AppearanceTab() {
       {/* Fog of War appearance section */}
       <div style={{ marginTop: '20px' }}>
         <FogOfWarSection />
+      </div>
+      
+      {/* Canvas Height Settings */}
+      <div style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px solid var(--background-modifier-border)' }}>
+        <h4 style={{ fontSize: '14px', fontWeight: 600, marginBottom: '8px' }}>Canvas Size</h4>
+        <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '16px' }}>
+          Canvas height settings (leave blank to use global defaults)
+        </p>
+        
+        <div style={{ display: 'flex', gap: '12px', padding: '0 2px', opacity: useGlobalSettings ? 0.5 : 1 }}>
+          {/* Desktop Height */}
+          <div class="dmt-form-group" style={{ flex: 1, marginBottom: 0 }}>
+            <label class="dmt-form-label">Desktop (pixels)</label>
+            <input
+              type="number"
+              class="dmt-modal-input"
+              placeholder={String(globalSettings.canvasHeight ?? 600)}
+              value={useGlobalSettings ? '' : (overrides.canvasHeight ?? '')}
+              onChange={(e) => !useGlobalSettings && handleColorChange('canvasHeight', e.target.value === '' ? undefined : parseInt(e.target.value, 10))}
+              disabled={useGlobalSettings}
+              style={{ opacity: useGlobalSettings ? 0.5 : 1 }}
+            />
+          </div>
+          
+          {/* Mobile Height */}
+          <div class="dmt-form-group" style={{ flex: 1, marginBottom: 0 }}>
+            <label class="dmt-form-label">Mobile/Touch (pixels)</label>
+            <input
+              type="number"
+              class="dmt-modal-input"
+              placeholder={String(globalSettings.canvasHeightMobile ?? 400)}
+              value={useGlobalSettings ? '' : (overrides.canvasHeightMobile ?? '')}
+              onChange={(e) => !useGlobalSettings && handleColorChange('canvasHeightMobile', e.target.value === '' ? undefined : parseInt(e.target.value, 10))}
+              disabled={useGlobalSettings}
+              style={{ opacity: useGlobalSettings ? 0.5 : 1 }}
+            />
+          </div>
+        </div>
       </div>
     </div>
   );

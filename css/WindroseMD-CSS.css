@@ -469,6 +469,12 @@
   line-height: 1;
 }
 
+/* Buttons with sub-tools should be narrower to fit on iPad */
+.dmt-tool-btn-container .dmt-tool-btn {
+  min-width: 28px;
+  padding: 6px 5px;
+}
+
 .dmt-tool-btn-active .dmt-subtool-indicator {
   opacity: 0.9;
   color: var(--dmt-bg-primary);
@@ -910,7 +916,7 @@ button.dmt-orientation-btn,
   justify-content: center;
   padding: 8px;
   margin: 2px 0;
-  background: transparent;
+  background: var(--background-secondary);
   border: 1px solid transparent;
   border-radius: 4px;
   cursor: pointer;
@@ -920,20 +926,20 @@ button.dmt-orientation-btn,
   box-sizing: border-box;
 
   &:hover {
-    background-color: var(--dmt-bg-secondary);
-    border-color: var(--dmt-border-secondary);
+    background-color: var(--background-secondary-alt);
+    border-color: var(--background-modifier-border);
   }
 
   &.dmt-object-item-selected {
-    background-color: var(--dmt-bg-tertiary);
+    background-color: var(--background-modifier-hover);
     border-color: var(--dmt-border-primary);
 
     &:hover {
-      background-color: #454545;
+      background-color: var(--background-modifier-hover);
     }
 
     .dmt-object-label {
-      color: var(--dmt-text-primary);
+      color: var(--text-normal);
       font-weight: 500;
     }
   }

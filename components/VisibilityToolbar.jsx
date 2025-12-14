@@ -148,7 +148,7 @@ const VisibilityToolbar = ({
             onClick={onFogFillAll}
             title="Fill all painted cells with fog"
           >
-            <dc.Icon icon="lucide-grid-2x2" />
+            <dc.Icon icon="lucide-paint-bucket" />
           </button>
           
           {/* Clear All */}

@@ -22,10 +22,20 @@ const MapControls = ({
   showVisibilityToolbar, 
   onToggleVisibilityToolbar,
   showLayerPanel,
-  onToggleLayerPanel
+  onToggleLayerPanel,
+  alwaysShowControls = false
 }) => {
-    const [controlsRevealed, setControlsRevealed] = dc.useState(false);
+    // When alwaysShowControls is true, controls are always visible
+    const [controlsRevealed, setControlsRevealed] = dc.useState(alwaysShowControls);
     const collapseTimerRef = dc.useRef(null);
+    
+    // Update revealed state when alwaysShowControls changes
+    dc.useEffect(() => {
+      if (alwaysShowControls) {
+        setControlsRevealed(true);
+        clearCollapseTimer();
+      }
+    }, [alwaysShowControls]);
     
     // Detect device capabilities separately
     // Touch capability: needs tap-to-reveal and overlay
@@ -43,6 +53,9 @@ const MapControls = ({
     };
     
     const startCollapseTimer = (forTouch = false) => {
+      // Don't collapse if always showing controls
+      if (alwaysShowControls) return;
+      
       clearCollapseTimer();
       const delay = forTouch ? COLLAPSE_DELAY_TOUCH_MS : COLLAPSE_DELAY_DESKTOP_MS;
       collapseTimerRef.current = setTimeout(() => {
@@ -62,9 +75,16 @@ const MapControls = ({
     
     // Compass click - works on all devices
     // If collapsed: reveal (tap-to-reveal for touch, or click-to-reveal)
-    // If revealed: rotate compass
+    // If revealed or always showing: rotate compass
     const handleCompassClick = () => {
-      if (!controlsRevealed) {
+      if (alwaysShowControls || controlsRevealed) {
+        // Controls already revealed or always showing - rotate compass
+        onCompassClick();
+        // Reset timer for touch users (only if not always showing)
+        if (hasTouchCapability && !alwaysShowControls) {
+          startCollapseTimer(true);
+        }
+      } else {
         // Reveal controls
         clearCollapseTimer();
         setControlsRevealed(true);
@@ -72,18 +92,13 @@ const MapControls = ({
         if (hasTouchCapability) {
           startCollapseTimer(true);
         }
-      } else {
-        // Controls already revealed - rotate compass
-        onCompassClick();
-        // Reset timer for touch users
-        if (hasTouchCapability) {
-          startCollapseTimer(true);
-        }
       }
     };
     
-    // Touch: tap outside to dismiss
+    // Touch: tap outside to dismiss (only if not always showing)
     const handleOverlayClick = (e) => {
+      if (alwaysShowControls) return;
+      
       e.stopPropagation();
       e.preventDefault();
       clearCollapseTimer();
@@ -121,7 +136,7 @@ const MapControls = ({
     
     // Build compass tooltip based on state and capabilities
     const getCompassTitle = () => {
-      if (!controlsRevealed && hasTouchCapability) {
+      if (!controlsRevealed && !alwaysShowControls && hasTouchCapability) {
         return "Tap to show controls";
       }
       if (mapType === 'hex') {
@@ -132,8 +147,8 @@ const MapControls = ({
     
     return (
       <>
-        {/* Invisible overlay to capture taps outside controls (touch capable devices) */}
-        {hasTouchCapability && controlsRevealed && (
+        {/* Invisible overlay to capture taps outside controls (touch capable devices, not when always showing) */}
+        {hasTouchCapability && controlsRevealed && !alwaysShowControls && (
           <div 
             className="dmt-controls-overlay"
             onClick={handleOverlayClick}

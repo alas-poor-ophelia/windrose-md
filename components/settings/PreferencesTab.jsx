@@ -21,6 +21,7 @@ function PreferencesTab() {
     overrides,
     globalSettings,
     handlePreferenceToggle,
+    handleColorChange,
     mapData,
     geometry
   } = useMapSettings();
@@ -29,13 +30,6 @@ function PreferencesTab() {
   const [isExporting, setIsExporting] = dc.useState(false);
   const [exportError, setExportError] = dc.useState(null);
   const [exportSuccess, setExportSuccess] = dc.useState(null);
-  
-  // Local handler for canvas height changes (updates overrides state)
-  const { handleColorChange } = useMapSettings(); // Reuse the overrides setter pattern
-  
-  const handleCanvasHeightChange = (field, value) => {
-    handleColorChange(field, value === '' ? undefined : parseInt(value, 10));
-  };
   
   // Handle export button click
   const handleExportImage = async () => {
@@ -65,6 +59,9 @@ function PreferencesTab() {
       setIsExporting(false);
     }
   };
+  
+  // Determine current state: map override > global setting > false
+  const alwaysShowControls = overrides.alwaysShowControls ?? globalSettings.alwaysShowControls ?? false;
   
   return (
     <div class="dmt-settings-tab-content">
@@ -111,41 +108,20 @@ function PreferencesTab() {
         </label>
       </div>
       
-      {/* Canvas Height Settings */}
-      <div style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px solid var(--background-modifier-border)' }}>
-        <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '16px' }}>
-          Canvas height settings (leave blank to use global defaults)
+      {/* Always Show Controls - independent toggle */}
+      <div class="dmt-form-group">
+        <label class="dmt-checkbox-label">
+          <input
+            type="checkbox"
+            checked={alwaysShowControls}
+            onChange={(e) => handleColorChange('alwaysShowControls', e.target.checked)}
+            class="dmt-checkbox"
+          />
+          <span>Always show map controls</span>
+        </label>
+        <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px', marginLeft: '22px' }}>
+          Keep zoom, layers, and settings buttons visible instead of auto-hiding
         </p>
-        
-        <div style={{ display: 'flex', gap: '12px', padding: '0 2px' }}>
-          {/* Desktop Height */}
-          <div class="dmt-form-group" style={{ flex: 1, marginBottom: 0 }}>
-            <label class="dmt-form-label">Desktop (pixels)</label>
-            <input
-              type="number"
-              class="dmt-modal-input"
-              placeholder={String(globalSettings.canvasHeight ?? 600)}
-              value={useGlobalSettings ? '' : (overrides.canvasHeight ?? '')}
-              onChange={(e) => handleCanvasHeightChange('canvasHeight', e.target.value)}
-              disabled={useGlobalSettings}
-              style={{ opacity: useGlobalSettings ? 0.5 : 1 }}
-            />
-          </div>
-          
-          {/* Mobile Height */}
-          <div class="dmt-form-group" style={{ flex: 1, marginBottom: 0 }}>
-            <label class="dmt-form-label">Mobile/Touch (pixels)</label>
-            <input
-              type="number"
-              class="dmt-modal-input"
-              placeholder={String(globalSettings.canvasHeightMobile ?? 400)}
-              value={useGlobalSettings ? '' : (overrides.canvasHeightMobile ?? '')}
-              onChange={(e) => handleCanvasHeightChange('canvasHeightMobile', e.target.value)}
-              disabled={useGlobalSettings}
-              style={{ opacity: useGlobalSettings ? 0.5 : 1 }}
-            />
-          </div>
-        </div>
       </div>
       
       {/* Export Section */}

@@ -52,11 +52,11 @@ const QUICK_SYMBOLS = [
   '★', '☆', '✦', '✧', '✪', '✫', '✯', '⚑',
   '●', '○', '◆', '◇', '■', '□', '▲', '△', '▼', '▽',
   '♠', '♤', '♣', '♧', '♥', '♡', '♦', '♢',
-  '⚔', '⚒', '🗡', '🹏', '⚓', '⛏', '🔱',
+  '⚔', '⚒', '🗡', '🧹', '⚔', '⛏', '📱',
   '☠', '⚠', '☢', '☣', '⚡', '🔥', '💧',
-  '⚒', '⚑', '⛳', '🚩', '➤', '➜', '⬤',
+  '⚑', '⚒', '⛳', '🚩', '➤', '➜', '⬤',
   '⚙', '⚗', '🔮', '💎', '🗝', '📜', '🎭', '👑',
-  '🛡', '🏰', '⛪', '🗿', '⚱', '🺏', '🪔'
+  '🛡', '🏰', '⛪', '🗿', '⚱', '🏺', '🪔'
 ];
 
 // =============================================================================
@@ -909,7 +909,7 @@ const DMT_SETTINGS_STYLES = \`
   }
   
   .dmt-settings-section > summary::before {
-    content: '▶';
+    content: 'â–¶';
     font-size: 10px;
     transition: transform 0.2s ease;
     color: var(--text-muted);
@@ -2043,13 +2043,13 @@ class ImportModal extends Modal {
         const customCatCount = data.customCategories?.length || 0;
         
         if (overrideCount > 0) {
-          previewArea.createEl('p', { text: \`• \${overrideCount} built-in modification(s)\` });
+          previewArea.createEl('p', { text: \`â€¢ \${overrideCount} built-in modification(s)\` });
         }
         if (customObjCount > 0) {
-          previewArea.createEl('p', { text: \`• \${customObjCount} custom object(s)\` });
+          previewArea.createEl('p', { text: \`â€¢ \${customObjCount} custom object(s)\` });
         }
         if (customCatCount > 0) {
-          previewArea.createEl('p', { text: \`• \${customCatCount} custom category(ies)\` });
+          previewArea.createEl('p', { text: \`â€¢ \${customCatCount} custom category(ies)\` });
         }
         
         previewArea.style.display = 'block';
@@ -2201,7 +2201,12 @@ class WindroseMDSettingsPlugin extends Plugin {
         customGridCategories: [],
         // Color palette customization
         colorPaletteOverrides: {},
-        customPaletteColors: []
+        customPaletteColors: [],
+        // Fog of War defaults
+        fogOfWarBlurEnabled: false,
+        fogOfWarBlurFactor: 0.20,
+        // Controls visibility
+        alwaysShowControls: false
       }, data || {});
     } catch (error) {
       console.warn('[DMT Settings] Error loading settings, using defaults:', error);
@@ -2236,7 +2241,12 @@ class WindroseMDSettingsPlugin extends Plugin {
         customGridCategories: [],
         // Color palette customization
         colorPaletteOverrides: {},
-        customPaletteColors: []
+        customPaletteColors: [],
+        // Fog of War defaults
+        fogOfWarBlurEnabled: false,
+        fogOfWarBlurFactor: 0.20,
+        // Controls visibility
+        alwaysShowControls: false
       };
     }
   }
@@ -2464,6 +2474,9 @@ class WindroseMDSettingsTab extends PluginSettingTab {
     this.createCollapsibleSection(containerEl, 'Color Palette', 
       (el) => this.renderColorPaletteContent(el),
       { open: openSections.has('Color Palette') });
+    this.createCollapsibleSection(containerEl, 'Fog of War', 
+      (el) => this.renderFogOfWarSettingsContent(el),
+      { open: openSections.has('Fog of War') });
     this.createCollapsibleSection(containerEl, 'Map Behavior', 
       (el) => this.renderMapBehaviorSettingsContent(el),
       { open: openSections.has('Map Behavior') });
@@ -2906,6 +2919,57 @@ class WindroseMDSettingsTab extends PluginSettingTab {
   }
 
   // ---------------------------------------------------------------------------
+  // Section: Fog of War
+  // ---------------------------------------------------------------------------
+  
+  renderFogOfWarSettingsContent(containerEl) {
+    containerEl.createEl('p', { 
+      text: 'Default fog of war appearance settings for new maps. Individual maps can override these in their settings.',
+      cls: 'setting-item-description'
+    });
+    
+    // Soft Edges Toggle
+    new Setting(containerEl)
+      .setName('Soft Edges')
+      .setDesc('Enable a blur effect at fog boundaries for a softer, more atmospheric look')
+      .addToggle(toggle => toggle
+        .setValue(this.plugin.settings.fogOfWarBlurEnabled)
+        .onChange(async (value) => {
+          this.plugin.settings.fogOfWarBlurEnabled = value;
+          this.settingsChanged = true;
+          await this.plugin.saveSettings();
+          this.display(); // Refresh to show/hide blur intensity slider
+        }));
+    
+    // Blur Intensity Slider (only show when blur is enabled)
+    if (this.plugin.settings.fogOfWarBlurEnabled) {
+      const blurPercent = Math.round((this.plugin.settings.fogOfWarBlurFactor || 0.20) * 100);
+      
+      new Setting(containerEl)
+        .setName('Blur Intensity')
+        .setDesc(\`Size of blur effect as percentage of cell size (currently \${blurPercent}%)\`)
+        .addSlider(slider => slider
+          .setLimits(5, 50, 1)
+          .setValue(blurPercent)
+          .setDynamicTooltip()
+          .onChange(async (value) => {
+            this.plugin.settings.fogOfWarBlurFactor = value / 100;
+            this.settingsChanged = true;
+            await this.plugin.saveSettings();
+          }))
+        .addExtraButton(btn => btn
+          .setIcon('rotate-ccw')
+          .setTooltip('Reset to default (20%)')
+          .onClick(async () => {
+            this.plugin.settings.fogOfWarBlurFactor = 0.20;
+            this.settingsChanged = true;
+            await this.plugin.saveSettings();
+            this.display();
+          }));
+    }
+  }
+
+  // ---------------------------------------------------------------------------
   // Section: Map Behavior
   // ---------------------------------------------------------------------------
   
@@ -2918,6 +2982,18 @@ class WindroseMDSettingsTab extends PluginSettingTab {
         .setValue(this.plugin.settings.expandedByDefault)
         .onChange(async (value) => {
           this.plugin.settings.expandedByDefault = value;
+          this.settingsChanged = true;
+          await this.plugin.saveSettings();
+        }));
+
+    // Always Show Controls
+    new Setting(containerEl)
+      .setName('Always Show Controls')
+      .setDesc('Keep map controls visible at all times instead of auto-hiding')
+      .addToggle(toggle => toggle
+        .setValue(this.plugin.settings.alwaysShowControls)
+        .onChange(async (value) => {
+          this.plugin.settings.alwaysShowControls = value;
           this.settingsChanged = true;
           await this.plugin.saveSettings();
         }));

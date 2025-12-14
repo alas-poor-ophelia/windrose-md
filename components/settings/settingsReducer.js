@@ -156,7 +156,11 @@ function buildInitialState(props, globalSettings) {
       // Fog of War appearance
       fogOfWarColor: currentSettings?.overrides?.fogOfWarColor ?? globalSettings.fogOfWarColor,
       fogOfWarOpacity: currentSettings?.overrides?.fogOfWarOpacity ?? globalSettings.fogOfWarOpacity,
-      fogOfWarImage: currentSettings?.overrides?.fogOfWarImage ?? globalSettings.fogOfWarImage
+      fogOfWarImage: currentSettings?.overrides?.fogOfWarImage ?? globalSettings.fogOfWarImage,
+      fogOfWarBlurEnabled: currentSettings?.overrides?.fogOfWarBlurEnabled ?? globalSettings.fogOfWarBlurEnabled,
+      fogOfWarBlurFactor: currentSettings?.overrides?.fogOfWarBlurFactor ?? globalSettings.fogOfWarBlurFactor,
+      // Controls visibility
+      alwaysShowControls: currentSettings?.overrides?.alwaysShowControls ?? globalSettings.alwaysShowControls ?? false
     },
     
     preferences: {
