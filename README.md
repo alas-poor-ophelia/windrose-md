@@ -38,33 +38,46 @@ That said, it also works fully on desktop Obsidian, with the added convenience o
 ![Hex Map](docs/images/hex-map-docs-screenshot.png)
 
 **Objects**
-
 - ~40 object types across categories: navigation (doors, stairs, portals), hazards (traps, pits), dungeon features (chests, altars, furniture), encounters (monsters, NPCs, bosses), and general markers.
 - Full object customization: Rename, rearrange, delete, change the icon of any default object, as well as adding your own custom objects and categories. Supports any unicode character (so long as you have a supporting font), as well as the bundled RPG Awesome icon set.
 - Resize objects, rotate them, change their scale, change their colors (including being able to assign custom ones), add notes, forget what the heck ♅ means (don't worry, there's tooltips). You can also move them around.
+- Maintain separate object listings for Hex and Grid maps.
+- Export and import icon sets to make easy backups, or share your vision with others.
 - Objects can be placed in the center of a grid space, or hold ALT while placing or dragging an object to enter Snap to Edges mode, which allows you to place objects on grid lines.
 - Link any object to an Obsidian note—hover to preview, ctrl/cmd+click to open
 
 ![Map Objects](docs/images/objects-docs-screenshot.png)
 
 **Text Labels**
-
 - Place labels anywhere—no grid limitations
 - Drag, rotate, edit in place
 - Customize font, color, size, etc etc (with live preview)
+  
+**Map Layers**
+- Add multiple layers to your map, to represent different levels, alternate states, whatever you want.
+
+![Layers screenshot](docs/images/docs-layers-screenshot.png)
+
+**Fog of War**
+- Add fog of war to your hex or grid maps, using either a color of your choice, or import your own tileable image from your vault.
+- Optional and configurable edge blurring effect makes for a more immersive fog effect.
+- Add or remove fog from individual cells, fill areas, or add or remove fog from the entire map.
+
+![Fog of War screenshot](docs/images/docs-fog-of-war-screenshot.png)
 
 **Navigation**
-
 - Space+drag or two-finger pan (or hold scroll wheel)
 - Scroll wheel or pinch to zoom
 - Rotate the whole map (the "Windrose") 
 
 **Configuration**
-- Comes with its own optional plugin, which can be installed and updated with the click of a (couple) buttons. This plugin allows you to set global defaults for things like colors, hex map orientation, etc. It is 100% optional, and you will not be asked again if you decline. NOTE: Currently hex map orientation will be very annoying to swap without the plugin, but can still be changed. This will be updated soon.
+- Comes with its own optional plugin, which can be installed and updated with the click of a (couple) buttons. This plugin allows you to set global defaults for things like colors, hex map orientation, etc. It is 100% optional, and you will not be asked again if you decline. 
 - Each map has per map settings, including local overrides for any global settings, fiddly UI preferences you probably won’t need, and additional hex map options to configure size or background image. 
 
 ## Installation
 Windrose is distributed as a “[compiled](https://github.com/alas-poor-ophelia/datacore-compiler/)” Datacore script, which just means it’s been all packaged up in a single Markdown file, for nice and easy use.
+
+**NOTE**: As of version 1.3.0, an example royalty free fog of war image is included with the release. Feel free to use this, or find your own.  *(credit for tile goes to "Finding-The-Time" on DeviantArt)*
 
 **IMPORTANT: As of version 1.1.0, the extra fonts are included as a separate file in the zip which must be added to your CSS snippets. This is to keep vault size down if you don't care about the extra fonts, allow better support inside the plugin, and allow easier customization for new fonts (more relevant for future releases.)
 
@@ -73,7 +86,8 @@ There is also an optional but STRONGLY recommended Templater template included. 
 1. Download the latest release from the Release page.
 2. Copy `compiled-windrose-md.md` anywhere into an Obsidian vault, and the optional (but strongly recommended) Map Designer Template into your Templater templates folder (if using).
 3. Install Datacore and Templater (if using) from Community Plugins.
-4. Note that on its first run, Windrose will create a `windrose-map-data.json` file in your vault’s root. You may move this file wherever you want in your vault, but you may only have one file of this name in your vault, and this will hold all your map data, so don’t lose it.
+4. **Optional**: copy fog of war image to somewhere in your vault, if you plan to use it.
+5. Note that on its first run, Windrose will create a `windrose-map-data.json` file in your vault’s root. You may move this file wherever you want in your vault, but you may only have one file of this name in your vault, and this will hold all your map data, so don’t lose it.
 
 ## Usage
 

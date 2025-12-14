@@ -279,6 +279,24 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     return () => clearTimeout(timer);
   }, [showPluginInstaller, mapData]); // Run when installer status or map data changes
 
+  // Initialize opacity from mapData when loaded
+  dc.useEffect(() => {
+    if (!mapData) return;
+    
+    if (mapData.lastSelectedOpacity !== undefined) {
+      setSelectedOpacity(mapData.lastSelectedOpacity);
+    }
+  }, [mapData?.lastSelectedOpacity]);
+
+  // Handler to update opacity and persist to mapData
+  const handleOpacityChange = dc.useCallback((newOpacity) => {
+    setSelectedOpacity(newOpacity);
+    updateMapData(currentMapData => ({
+      ...currentMapData,
+      lastSelectedOpacity: newOpacity
+    }));
+  }, [updateMapData]);
+
   // Listen for settings changes and force re-render
   dc.useEffect(() => {
     const handleSettingsChange = () => {
@@ -338,6 +356,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     handleEdgesChange,
     handleAddCustomColor,
     handleDeleteCustomColor,
+    handleUpdateColorOpacity,
     handleViewStateChange,
     handleSidebarCollapseChange
   } = useDataHandlers({ mapData, updateMapData, addToHistory, isApplyingHistory });
@@ -633,12 +652,14 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
           selectedColor={selectedColor}
           onColorChange={setSelectedColor}
           selectedOpacity={selectedOpacity}
-          onOpacityChange={setSelectedOpacity}
+          onOpacityChange={handleOpacityChange}
           isColorPickerOpen={isColorPickerOpen}
           onColorPickerOpenChange={setIsColorPickerOpen}
           customColors={mapData.customColors || []}
+          paletteColorOpacityOverrides={mapData.paletteColorOpacityOverrides || {}}
           onAddCustomColor={handleAddCustomColor}
           onDeleteCustomColor={handleDeleteCustomColor}
+          onUpdateColorOpacity={handleUpdateColorOpacity}
           mapType={mapData.mapType}
           isFocused={isFocused}
         />

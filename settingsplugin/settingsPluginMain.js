@@ -909,7 +909,7 @@ const DMT_SETTINGS_STYLES = \`
   }
   
   .dmt-settings-section > summary::before {
-    content: 'â–¶';
+    content: '▶';
     font-size: 10px;
     transition: transform 0.2s ease;
     color: var(--text-muted);
@@ -1109,6 +1109,23 @@ const DMT_SETTINGS_STYLES = \`
     margin-top: 16px;
     padding-top: 16px;
     border-top: 1px solid var(--background-modifier-border);
+  }
+  
+  .dmt-opacity-control {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  
+  .dmt-opacity-control input[type="range"] {
+    width: 120px;
+  }
+  
+  .dmt-opacity-value {
+    min-width: 40px;
+    text-align: right;
+    font-size: 0.9em;
+    color: var(--text-muted);
   }
   
   .dmt-btn-icon {
@@ -1712,6 +1729,7 @@ class ColorEditModal extends Modal {
     // Initialize form values
     let colorValue = this.existingColor?.color || '#808080';
     let labelValue = this.existingColor?.label || '';
+    let opacityValue = this.existingColor?.opacity ?? 1;
     
     // Color picker
     new Setting(contentEl)
@@ -1746,6 +1764,26 @@ class ColorEditModal extends Modal {
         .onChange(value => {
           labelValue = value;
         }));
+    
+    // Opacity slider
+    const opacitySetting = new Setting(contentEl)
+      .setName('Opacity')
+      .setDesc('Default opacity when selecting this color');
+    
+    const opacityContainer = opacitySetting.controlEl.createEl('div', { cls: 'dmt-opacity-control' });
+    const opacitySlider = opacityContainer.createEl('input', {
+      type: 'range',
+      attr: { min: '10', max: '100', value: String(Math.round(opacityValue * 100)) }
+    });
+    const opacityDisplay = opacityContainer.createEl('span', { 
+      text: \`\${Math.round(opacityValue * 100)}%\`,
+      cls: 'dmt-opacity-value'
+    });
+    
+    opacitySlider.addEventListener('input', (e) => {
+      opacityValue = parseInt(e.target.value, 10) / 100;
+      opacityDisplay.textContent = \`\${Math.round(opacityValue * 100)}%\`;
+    });
     
     // Show original values for built-ins
     if (isBuiltIn && originalBuiltIn) {
@@ -1785,7 +1823,8 @@ class ColorEditModal extends Modal {
         this.plugin.settings.colorPaletteOverrides[this.existingColor.id] = {
           ...existingOverride,
           color: colorValue,
-          label: labelValue
+          label: labelValue,
+          opacity: opacityValue
         };
       } else if (isEdit) {
         // Update existing custom color
@@ -1794,7 +1833,8 @@ class ColorEditModal extends Modal {
           this.plugin.settings.customPaletteColors[idx] = {
             ...this.plugin.settings.customPaletteColors[idx],
             color: colorValue,
-            label: labelValue
+            label: labelValue,
+            opacity: opacityValue
           };
         }
       } else {
@@ -1805,7 +1845,8 @@ class ColorEditModal extends Modal {
         this.plugin.settings.customPaletteColors.push({
           id: 'custom-' + Date.now(),
           color: colorValue,
-          label: labelValue
+          label: labelValue,
+          opacity: opacityValue
         });
       }
       
@@ -2834,10 +2875,11 @@ class WindroseMDSettingsTab extends PluginSettingTab {
   renderColorRow(containerEl, color, isHidden) {
     const row = containerEl.createEl('div', { cls: 'dmt-color-row' });
     
-    // Color swatch
+    // Color swatch - apply opacity if set
+    const swatchOpacity = color.opacity ?? 1;
     const swatch = row.createEl('div', { 
       cls: 'dmt-color-row-swatch',
-      attr: { style: \`background-color: \${color.color}\` }
+      attr: { style: \`background-color: \${color.color}; opacity: \${swatchOpacity}\` }
     });
     
     // Label with modified indicator
@@ -2851,8 +2893,11 @@ class WindroseMDSettingsTab extends PluginSettingTab {
       labelContainer.createEl('span', { text: ' (custom)', cls: 'dmt-color-row-custom' });
     }
     
-    // Hex value
-    row.createEl('code', { text: color.color, cls: 'dmt-color-row-hex' });
+    // Hex value + opacity if not 100%
+    const hexText = swatchOpacity < 1 
+      ? \`\${color.color} @ \${Math.round(swatchOpacity * 100)}%\`
+      : color.color;
+    row.createEl('code', { text: hexText, cls: 'dmt-color-row-hex' });
     
     // Actions
     const actions = row.createEl('div', { cls: 'dmt-color-row-actions' });

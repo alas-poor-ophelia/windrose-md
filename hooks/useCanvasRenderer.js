@@ -560,7 +560,7 @@ function renderCanvas(canvas, fogCanvas, mapData, geometry, selectedItems = [], 
       // Clear fog canvas (before transform)
       fogCtx.clearRect(0, 0, width, height);
       
-      // Apply EXACTLY the same transforms as main canvas
+      // Apply same transforms as main canvas
       fogCtx.save();
       fogCtx.translate(width / 2, height / 2);
       fogCtx.rotate((northDirection * Math.PI) / 180);
@@ -620,7 +620,6 @@ function renderCanvas(canvas, fogCanvas, mapData, geometry, selectedItems = [], 
       const worldMaxY = Math.max(...worldCorners.map(c => c.worldY)) + hexSize * 2;
       
       // Convert to hex coordinates (approximate bounds)
-      // We'll be conservative and iterate more cells than strictly necessary
       const bounds = mapData.hexBounds || { maxCol: 100, maxRow: 100 };
       visibleMinCol = 0;
       visibleMaxCol = bounds.maxCol;
@@ -803,9 +802,7 @@ function renderCanvas(canvas, fogCanvas, mapData, geometry, selectedItems = [], 
       ctx.fill();
       
       // Draw interior hex outlines on top of fog for cell visibility
-      // Use subtle lines so users can see cell boundaries for revealing
       if (visibleFogCells.length > 1) {
-        // foggedSet already created at top of hex section
         
         ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)'; // Subtle white lines
         ctx.lineWidth = Math.max(1, 1 * zoom);
@@ -938,7 +935,6 @@ function renderCanvas(canvas, fogCanvas, mapData, geometry, selectedItems = [], 
       ctx.fill();
       
       // Draw interior grid lines on top of fog for cell visibility
-      // Similar to gridRenderer.renderInteriorGridLines pattern
       if (visibleFogCells.length > 1) {
         const drawnLines = new Set();
         
@@ -951,7 +947,6 @@ function renderCanvas(canvas, fogCanvas, mapData, geometry, selectedItems = [], 
           const screenX = offsetX + col * scaledSize;
           const screenY = offsetY + row * scaledSize;
           
-          // Check right neighbor - draw vertical line between them
           if (foggedSet.has(`${col + 1},${row}`)) {
             const lineKey = `v:${col + 1},${row}`;
             if (!drawnLines.has(lineKey)) {
@@ -965,7 +960,6 @@ function renderCanvas(canvas, fogCanvas, mapData, geometry, selectedItems = [], 
             }
           }
           
-          // Check bottom neighbor - draw horizontal line between them
           if (foggedSet.has(`${col},${row + 1}`)) {
             const lineKey = `h:${col},${row + 1}`;
             if (!drawnLines.has(lineKey)) {
@@ -982,18 +976,16 @@ function renderCanvas(canvas, fogCanvas, mapData, geometry, selectedItems = [], 
       }
     }
     
-    // Restore fog canvas context if we used it
+    // Restore fog canvas context 
     if (fogCtx) {
       fogCtx.restore();
     }
     
-    // Restore globalAlpha if we modified it for pattern opacity
+    // Restore globalAlpha if we modified it 
     if (useGlobalAlpha) {
       ctx.globalAlpha = previousGlobalAlpha;
     }
-    
-    // Note: Shadow properties are restored inside hex/grid branches
-    // before drawing interior lines (so blur doesn't affect those)
+  
   }
   
   // Draw selection indicators for text labels
@@ -1165,7 +1157,7 @@ function renderCanvas(canvas, fogCanvas, mapData, geometry, selectedItems = [], 
           objectHeight - 4
         );
         
-        // Draw corner handles (larger in resize mode for better touch targets)
+        // Draw corner handles
         ctx.setLineDash([]);
         ctx.fillStyle = '#4a9eff';
         const handleSize = showResizeOverlay ? 14 : 8;
@@ -1187,7 +1179,6 @@ function renderCanvas(canvas, fogCanvas, mapData, geometry, selectedItems = [], 
 }
 
 function useCanvasRenderer(canvasRef, fogCanvasRef, mapData, geometry, selectedItems = [], isResizeMode = false, theme = null, showCoordinates = false, layerVisibility = null) {
-  // Main rendering effect - redraw when dependencies change
   dc.useEffect(() => {
     if (mapData && geometry && canvasRef.current) {
       const fogCanvas = fogCanvasRef?.current || null;

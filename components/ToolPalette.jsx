@@ -58,7 +58,7 @@ const SubMenuFlyout = ({ subTools, currentSubTool, onSelect, onClose }) => {
       {subTools.map(subTool => (
         <button
           key={subTool.id}
-          className={`dmt-subtool-option ${currentSubTool === subTool.id ? 'dmt-subtool-option-active' : ''}`}
+          className={`dmt-subtool-option interactive-child ${currentSubTool === subTool.id ? 'dmt-subtool-option-active' : ''}`}
           onClick={(e) => {
             e.stopPropagation();
             onSelect(subTool.id);
@@ -156,7 +156,7 @@ const ToolButtonWithSubMenu = ({
   return (
     <div className="dmt-tool-btn-container" style={{ position: 'relative', display: 'inline-block' }}>
       <button
-        className={`dmt-tool-btn ${isActive ? 'dmt-tool-btn-active' : ''}`}
+        className={`dmt-tool-btn interactive-child ${isActive ? 'dmt-tool-btn-active' : ''}`}
         onPointerDown={handlePointerDown}
         onPointerUp={handlePointerUp}
         onPointerLeave={handlePointerLeave}
@@ -165,7 +165,7 @@ const ToolButtonWithSubMenu = ({
       >
         <dc.Icon icon={currentSubToolDef?.icon} />
         {hasMultipleSubTools && (
-          <span className="dmt-subtool-indicator">▼</span>
+          <span className="dmt-subtool-indicator interactive-child">▼</span>
         )}
       </button>
       
@@ -195,8 +195,10 @@ const ToolPalette = ({
   isColorPickerOpen,       
   onColorPickerOpenChange,
   customColors,
+  paletteColorOpacityOverrides = {},
   onAddCustomColor,
   onDeleteCustomColor,
+  onUpdateColorOpacity,
   mapType,
   isFocused = false
 }) => {
@@ -355,9 +357,11 @@ const ToolPalette = ({
         const buttonElement = e.target.closest('.dmt-color-tool-btn');
         
         if (!pickerElement && !buttonElement) {
+          // Save pending custom color if exists (color value may include alpha from native picker)
           if (pendingCustomColorRef.current) {
-            onAddCustomColor(pendingCustomColorRef.current);
-            onColorChange(pendingCustomColorRef.current);
+            const colorValue = pendingCustomColorRef.current;
+            onAddCustomColor(colorValue);
+            onColorChange(colorValue);
             pendingCustomColorRef.current = null;
           }
           handleCloseColorPicker();
@@ -414,7 +418,7 @@ const ToolPalette = ({
       <div style={{ position: 'relative', display: 'inline-block' }}>
         <button
           ref={colorBtnRef}
-          className={`dmt-tool-btn dmt-color-tool-btn ${isColorPickerOpen ? 'dmt-tool-btn-active' : ''}`}
+          className={`dmt-tool-btn dmt-color-tool-btn interactive-child ${isColorPickerOpen ? 'dmt-tool-btn-active' : ''}`}
           onClick={toggleColorPicker}
           title="Choose color"
           style={{
@@ -431,8 +435,10 @@ const ToolPalette = ({
           onClose={handleCloseColorPicker}
           onReset={handleColorReset}
           customColors={customColors}
+          paletteColorOpacityOverrides={paletteColorOpacityOverrides}
           onAddCustomColor={onAddCustomColor}
           onDeleteCustomColor={onDeleteCustomColor}
+          onUpdateColorOpacity={onUpdateColorOpacity}
           position={null}
           pendingCustomColorRef={pendingCustomColorRef}
           title="Color"
@@ -443,7 +449,7 @@ const ToolPalette = ({
       
       {/* Erase tool */}
       <button
-        className={`dmt-tool-btn ${currentTool === 'erase' ? 'dmt-tool-btn-active' : ''}`}
+        className={`dmt-tool-btn interactive-child ${currentTool === 'erase' ? 'dmt-tool-btn-active' : ''}`}
         onClick={() => onToolChange('erase')}
         title="Erase (remove text/objects/cells/edges)"
       >
@@ -469,7 +475,7 @@ const ToolPalette = ({
       {visibleSimpleTools.filter(t => t.id !== 'erase').map(tool => (
         <button
           key={tool.id}
-          className={`dmt-tool-btn ${currentTool === tool.id ? 'dmt-tool-btn-active' : ''}`}
+          className={`dmt-tool-btn interactive-child ${currentTool === tool.id ? 'dmt-tool-btn-active' : ''}`}
           onClick={() => onToolChange(tool.id)}
           title={tool.title}
         >
@@ -479,7 +485,7 @@ const ToolPalette = ({
       
       <div className="dmt-history-controls">
         <button 
-          className="dmt-history-btn"
+          className="dmt-history-btn interactive-child"
           onClick={onUndo}
           disabled={!canUndo}
           title="Undo"
@@ -487,7 +493,7 @@ const ToolPalette = ({
           <dc.Icon icon="lucide-undo" />
         </button>
         <button 
-          className="dmt-history-btn"
+          className="dmt-history-btn interactive-child"
           onClick={onRedo}
           disabled={!canRedo}
           title="Redo"

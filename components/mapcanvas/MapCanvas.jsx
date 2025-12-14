@@ -364,7 +364,7 @@ const MapCanvasContent = ({ mapData, onCellsChange, onObjectsChange, onTextLabel
                 style={{ touchAction: 'none', display: 'block' }}
               />
               
-              {/* Fog blur overlay canvas - uses CSS filter for iOS compatibility */}
+              {/* Fog blur overlay canvas */}
               <canvas
                 ref={fogCanvasRef}
                 width={canvasDimensions.width}
@@ -374,7 +374,6 @@ const MapCanvasContent = ({ mapData, onCellsChange, onObjectsChange, onTextLabel
                   top: 0,
                   left: 0,
                   pointerEvents: 'none'
-                  // CSS filter blur is set dynamically by useCanvasRenderer
                 }}
               />
             </div>

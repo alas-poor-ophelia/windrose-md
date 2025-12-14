@@ -130,6 +130,7 @@ function useDataHandlers({ mapData, updateMapData, addToHistory, isApplyingHisto
       const customColorNumber = (currentMapData.customColors?.length || 0) + 1;
       const customColorLabel = `Custom ${customColorNumber}`;
 
+      // Color value may include alpha from native picker (e.g., #rrggbbaa format)
       const newCustomColor = {
         id: customColorId,
         color: newColor,
@@ -152,6 +153,35 @@ function useDataHandlers({ mapData, updateMapData, addToHistory, isApplyingHisto
         ...currentMapData,
         customColors: (currentMapData.customColors || []).filter(c => c.id !== colorId)
       };
+    });
+  }, [updateMapData]);
+
+  // Handle updating a color's opacity (works for both per-map custom colors and palette colors)
+  const handleUpdateColorOpacity = dc.useCallback((colorId, newOpacity) => {
+    updateMapData(currentMapData => {
+      if (!currentMapData) return currentMapData;
+      
+      // Check if it's a per-map custom color
+      const isCustomColor = (currentMapData.customColors || []).some(c => c.id === colorId);
+      
+      if (isCustomColor) {
+        // Update existing custom color's opacity
+        return {
+          ...currentMapData,
+          customColors: currentMapData.customColors.map(c => 
+            c.id === colorId ? { ...c, opacity: newOpacity } : c
+          )
+        };
+      } else {
+        // Store as palette color override (per-map override for global palette colors)
+        return {
+          ...currentMapData,
+          paletteColorOpacityOverrides: {
+            ...(currentMapData.paletteColorOpacityOverrides || {}),
+            [colorId]: newOpacity
+          }
+        };
+      }
     });
   }, [updateMapData]);
 
@@ -187,6 +217,7 @@ function useDataHandlers({ mapData, updateMapData, addToHistory, isApplyingHisto
     handleNameChange,
     handleAddCustomColor,
     handleDeleteCustomColor,
+    handleUpdateColorOpacity,
     handleViewStateChange,
     handleSidebarCollapseChange
   };
@@ -204,6 +235,7 @@ function useDataHandlers({ mapData, updateMapData, addToHistory, isApplyingHisto
     handleEdgesChange,
     handleAddCustomColor,
     handleDeleteCustomColor,
+    handleUpdateColorOpacity,
     handleViewStateChange,
     handleSidebarCollapseChange
   };

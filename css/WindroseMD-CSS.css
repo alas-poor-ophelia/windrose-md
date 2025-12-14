@@ -420,6 +420,7 @@
   font-size: 16px;
   transition: var(--dmt-transition);
   min-width: 32px;
+  max-width: 42px;
   height: 32px;
   display: flex;
   align-items: center;
@@ -1907,6 +1908,93 @@ button.dmt-orientation-btn,
 
   &:active {
     transform: translateY(-50%) scale(0.95);
+  }
+}
+
+/* Custom color edit panel (right-click/long-press) */
+.dmt-color-edit-panel {
+  position: absolute;
+  left: calc(100% + 4px);
+  top: 50%;
+  transform: translateY(-50%);
+  background: var(--dmt-bg-secondary);
+  border: 1px solid var(--dmt-border-secondary);
+  border-radius: 6px;
+  padding: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  z-index: 150;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  white-space: nowrap;
+}
+
+.dmt-color-edit-opacity {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dmt-color-edit-opacity-label {
+  font-size: 11px;
+  color: var(--dmt-text-secondary);
+}
+
+.dmt-color-edit-opacity-value {
+  font-size: 11px;
+  color: var(--dmt-text-primary);
+  min-width: 32px;
+  text-align: right;
+}
+
+.dmt-color-edit-opacity input[type="range"] {
+  width: 80px;
+  height: 4px;
+  cursor: pointer;
+  appearance: none;
+  background: var(--dmt-bg-tertiary);
+  border-radius: 2px;
+  
+  &::-webkit-slider-thumb {
+    appearance: none;
+    width: 12px;
+    height: 12px;
+    background: var(--dmt-border-primary);
+    border-radius: 50%;
+    cursor: pointer;
+  }
+  
+  &::-moz-range-thumb {
+    width: 12px;
+    height: 12px;
+    background: var(--dmt-border-primary);
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+  }
+}
+
+.dmt-color-edit-delete {
+  width: 24px;
+  height: 24px;
+  background-color: rgba(239, 68, 68, 0.8);
+  border: none;
+  border-radius: 4px;
+  color: var(--dmt-text-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: var(--dmt-transition);
+  padding: 0;
+  
+  svg {
+    width: 14px;
+    height: 14px;
+  }
+  
+  &:hover {
+    background-color: rgba(239, 68, 68, 1);
   }
 }
 
