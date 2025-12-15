@@ -16,8 +16,8 @@ const { getActiveLayer } = await requireModuleByName("layerAccessor.js");
 /**
  * Calculate bounding box that encompasses all selected items
  */
-function calculateMultiSelectBounds(selectedItems, mapData, canvasRef, geometry) {
-  if (!selectedItems?.length || !canvasRef?.current || !mapData) return null;
+function calculateMultiSelectBounds(selectedItems, mapData, canvasRef, containerRef, geometry) {
+  if (!selectedItems?.length || !canvasRef?.current || !containerRef?.current || !mapData) return null;
   
   const canvas = canvasRef.current;
   const { gridSize, viewState, northDirection } = mapData;
@@ -29,9 +29,9 @@ function calculateMultiSelectBounds(selectedItems, mapData, canvasRef, geometry)
   const offsetX = centerX - center.x * scaledGridSize;
   const offsetY = centerY - center.y * scaledGridSize;
   
-  // Account for canvas position within container
+  // Account for canvas position within container - use containerRef for consistency
   const rect = canvas.getBoundingClientRect();
-  const containerRect = canvas.parentElement.getBoundingClientRect();
+  const containerRect = containerRef.current.getBoundingClientRect();
   const canvasOffsetX = rect.left - containerRect.left;
   const canvasOffsetY = rect.top - containerRect.top;
   const scaleX = rect.width / canvas.width;
@@ -49,7 +49,7 @@ function calculateMultiSelectBounds(selectedItems, mapData, canvasRef, geometry)
       const obj = activeLayer.objects?.find(o => o.id === item.id);
       if (!obj) continue;
       
-      const pos = calculateObjectScreenPosition(obj, canvas, mapData, geometry);
+      const pos = calculateObjectScreenPosition(obj, canvas, mapData, geometry, containerRef);
       if (!pos) continue;
       
       const left = pos.screenX - pos.objectWidth / 2;
@@ -129,7 +129,7 @@ const MultiSelectToolbar = ({
   }
   
   // Calculate bounding box of all selected items
-  const bounds = calculateMultiSelectBounds(selectedItems, mapData, canvasRef, geometry);
+  const bounds = calculateMultiSelectBounds(selectedItems, mapData, canvasRef, containerRef, geometry);
   if (!bounds) return null;
   
   // Calculate toolbar dimensions
@@ -191,7 +191,7 @@ const MultiSelectToolbar = ({
       <button
         className="dmt-toolbar-button"
         onClick={onRotateAll}
-        title="Rotate All 90°"
+        title="Rotate All 90Â°"
       >
         <dc.Icon icon="lucide-rotate-cw" />
       </button>
@@ -220,8 +220,8 @@ const MultiSelectToolbar = ({
 /**
  * Calculate bounding box for a text label in screen coordinates
  */
-function calculateTextLabelBounds(label, canvasRef, mapData) {
-  if (!label || !canvasRef.current || !mapData) return null;
+function calculateTextLabelBounds(label, canvasRef, containerRef, mapData) {
+  if (!label || !canvasRef.current || !containerRef?.current || !mapData) return null;
   
   const canvas = canvasRef.current;
   const { gridSize, viewState, northDirection } = mapData;
@@ -263,9 +263,9 @@ function calculateTextLabelBounds(label, canvasRef, mapData) {
   const rotatedWidth = textWidth * cos + textHeight * sin;
   const rotatedHeight = textWidth * sin + textHeight * cos;
   
-  // Account for canvas position within container
+  // Account for canvas position within container - use containerRef for consistency
   const rect = canvas.getBoundingClientRect();
-  const containerRect = canvas.parentElement.getBoundingClientRect();
+  const containerRect = containerRef.current.getBoundingClientRect();
   const canvasOffsetX = rect.left - containerRect.left;
   const canvasOffsetY = rect.top - containerRect.top;
   const scaleX = rect.width / canvas.width;
@@ -362,7 +362,7 @@ const SelectionToolbar = ({
     const object = getActiveLayer(mapData).objects?.find(obj => obj.id === selectedItem.id);
     if (!object) return null;
     
-    const pos = calculateObjectScreenPosition(object, canvasRef.current, mapData, geometry);
+    const pos = calculateObjectScreenPosition(object, canvasRef.current, mapData, geometry, containerRef);
     if (!pos) return null;
     
     bounds = {
@@ -375,7 +375,7 @@ const SelectionToolbar = ({
     const label = getActiveLayer(mapData).textLabels?.find(l => l.id === selectedItem.id);
     if (!label) return null;
     
-    bounds = calculateTextLabelBounds(label, canvasRef, mapData);
+    bounds = calculateTextLabelBounds(label, canvasRef, containerRef, mapData);
     if (!bounds) return null;
   }
   
@@ -544,7 +544,7 @@ const SelectionToolbar = ({
               onClick={(e) => {
                 if (onRotate) onRotate(e);
               }}
-              title="Rotate 90Ã‚Â° (or press R)"
+              title="Rotate 90Ãƒâ€šÃ‚Â° (or press R)"
             >
               <dc.Icon icon="lucide-rotate-cw" />
             </button>
@@ -657,7 +657,7 @@ const SelectionToolbar = ({
             <button
               className="dmt-toolbar-button"
               onClick={onRotate}
-              title="Rotate 90Ã‚Â° (or press R)"
+              title="Rotate 90Ãƒâ€šÃ‚Â° (or press R)"
             >
               <dc.Icon icon="lucide-rotate-cw" />
             </button>

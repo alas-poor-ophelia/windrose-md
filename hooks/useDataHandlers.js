@@ -201,6 +201,14 @@ function useDataHandlers({ mapData, updateMapData, addToHistory, isApplyingHisto
     });
   }, [updateMapData]);
 
+  // Handle text label settings change (persists last used font/size/color) - NOT tracked in history
+  const handleTextLabelSettingsChange = dc.useCallback((settings) => {
+    updateMapData(currentMapData => {
+      if (!currentMapData) return currentMapData;
+      return { ...currentMapData, lastTextLabelSettings: settings };
+    });
+  }, [updateMapData]);
+
   // =========================================================================
   // Return Value
   // =========================================================================
@@ -219,7 +227,8 @@ function useDataHandlers({ mapData, updateMapData, addToHistory, isApplyingHisto
     handleDeleteCustomColor,
     handleUpdateColorOpacity,
     handleViewStateChange,
-    handleSidebarCollapseChange
+    handleSidebarCollapseChange,
+    handleTextLabelSettingsChange
   };
 
   return {
@@ -237,7 +246,8 @@ function useDataHandlers({ mapData, updateMapData, addToHistory, isApplyingHisto
     handleDeleteCustomColor,
     handleUpdateColorOpacity,
     handleViewStateChange,
-    handleSidebarCollapseChange
+    handleSidebarCollapseChange,
+    handleTextLabelSettingsChange
   };
 }
 

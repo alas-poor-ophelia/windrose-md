@@ -53,7 +53,7 @@ const Coordinators = ({ canvasRef, mapData, geometry, isFocused, isColorPickerOp
  * MapCanvasContent - Inner component that uses context hooks
  * Contains all the map canvas logic and interacts with shared selection state
  */
-const MapCanvasContent = ({ mapData, onCellsChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onViewStateChange, currentTool, selectedObjectType, selectedColor, isColorPickerOpen, customColors, onAddCustomColor, onDeleteCustomColor, isFocused, isAnimating, theme, isAlignmentMode, children }) => {
+const MapCanvasContent = ({ mapData, onCellsChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onViewStateChange, onTextLabelSettingsChange, currentTool, selectedObjectType, selectedColor, isColorPickerOpen, customColors, onAddCustomColor, onDeleteCustomColor, isFocused, isAnimating, theme, isAlignmentMode, children }) => {
   const canvasRef = dc.useRef(null);
   const fogCanvasRef = dc.useRef(null);  // Separate canvas for fog blur effect (CSS blur for iOS compat)
   const containerRef = dc.useRef(null);
@@ -62,13 +62,16 @@ const MapCanvasContent = ({ mapData, onCellsChange, onObjectsChange, onTextLabel
     height: DEFAULTS.canvasSize.height
   });
   
-  // Create onMapDataUpdate wrapper for viewState changes
+  // Create onMapDataUpdate wrapper for map-level changes
   // This bridges the old prop-based API with the new context-based approach
   const onMapDataUpdate = dc.useCallback((updates) => {
     if (updates.viewState && onViewStateChange) {
       onViewStateChange(updates.viewState);
     }
-  }, [onViewStateChange]);
+    if (updates.lastTextLabelSettings && onTextLabelSettingsChange) {
+      onTextLabelSettingsChange(updates.lastTextLabelSettings);
+    }
+  }, [onViewStateChange, onTextLabelSettingsChange]);
 
   // Use shared selection from context (same state ObjectLayer uses)
   const {
@@ -334,7 +337,7 @@ const MapCanvasContent = ({ mapData, onCellsChange, onObjectsChange, onTextLabel
     onTextLabelsChange,
     onEdgesChange,
     onMapDataUpdate
-  }), [onCellsChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onViewStateChange]);
+  }), [onCellsChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onViewStateChange, onTextLabelSettingsChange]);
 
 
 

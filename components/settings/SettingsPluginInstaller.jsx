@@ -5,17 +5,13 @@ const { requireModuleByName } = await dc.require(pathResolverPath);
 const { THEME, DEFAULTS } = await requireModuleByName("dmtConstants.js");
 const { WindroseCompass } = await requireModuleByName("WindroseCompass.jsx");
 
-// Import the plugin template as a string (allows bundling without Datacore trying to execute it)
 const SETTINGS_PLUGIN_TEMPLATE = await requireModuleByName("settingsPluginMain.js");
 
-// Import object types for template injection (single source of truth)
 const { OBJECT_TYPES, CATEGORIES } = await requireModuleByName("objectTypes.js");
-
-// Import RPGAwesome icon data for template injection
 const { RA_ICONS, RA_CATEGORIES } = await requireModuleByName("rpgAwesomeIcons.js");
 
 // Plugin version from template
-const PACKAGED_PLUGIN_VERSION = '0.9.13';
+const PACKAGED_PLUGIN_VERSION = '0.9.16';
 
 // LocalStorage keys for tracking user preferences
 const STORAGE_KEYS = {
@@ -194,7 +190,6 @@ const SettingsPluginInstaller = ({ onInstall, onDecline, mode = 'auto' }) => {
         JSON.stringify(defaultData, null, 2)
       );
 
-      // Add plugin to community-plugins.json so it persists across reloads
       try {
         const communityPluginsPath = '.obsidian/community-plugins.json';
         let enabledPlugins = [];
@@ -253,7 +248,7 @@ const SettingsPluginInstaller = ({ onInstall, onDecline, mode = 'auto' }) => {
       const mainJs = generateMainJs();
       await adapter.write(`${pluginDir}/main.js`, mainJs);
 
-      // DO NOT overwrite data.json - preserve user settings!
+      // DO NOT overwrite data.json - preserve user settings
 
       // Reload the plugin
       try {

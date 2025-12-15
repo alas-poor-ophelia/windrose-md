@@ -12,13 +12,13 @@ return `// settingsPluginMain.js - Windrose MapDesigner Settings Plugin
  * ============================================================================
  * 
  * Line ~30:    VERSION & IMPORTS
- * Line ~40:    DATA CONSTANTS (BUILT_IN_OBJECTS, CATEGORIES, QUICK_SYMBOLS)
- * Line ~65:    BUILT_IN_COLORS (color palette defaults)
- * Line ~90:    HELPER NAMESPACES (ObjectHelpers, ColorHelpers, DragHelpers, IconHelpers, RPGAwesomeHelpers)
+ * Line ~35:    DATA CONSTANTS (BUILT_IN_OBJECTS, CATEGORIES, QUICK_SYMBOLS)
+ * Line ~67:    BUILT_IN_COLORS (color palette defaults)
+ * Line ~80:    HELPER NAMESPACES (ObjectHelpers, ColorHelpers, DragHelpers, IconHelpers, RPGAwesomeHelpers)
  * Line ~365:   STYLES (DMT_SETTINGS_STYLES)
- * Line ~1140:  MODAL CLASSES (ObjectEditModal, CategoryEditModal, ColorEditModal, ExportModal, ImportModal)
- * Line ~2120:  MAIN PLUGIN CLASS (WindroseMDSettingsPlugin)
- * Line ~2200:  SETTINGS TAB CLASS (WindroseMDSettingsTab)
+ * Line ~1205:  MODAL CLASSES (InsertMapModal, ObjectEditModal, CategoryEditModal, ColorEditModal, ExportModal, ImportModal)
+ * Line ~2395:  MAIN PLUGIN CLASS (WindroseMDSettingsPlugin)
+ * Line ~2520:  SETTINGS TAB CLASS (WindroseMDSettingsTab)
  * 
  * ============================================================================
  */
@@ -52,9 +52,9 @@ const QUICK_SYMBOLS = [
   '★', '☆', '✦', '✧', '✪', '✫', '✯', '⚑',
   '●', '○', '◆', '◇', '■', '□', '▲', '△', '▼', '▽',
   '♠', '♤', '♣', '♧', '♥', '♡', '♦', '♢',
-  '⚔', '⚒', '🗡', '🧹', '⚔', '⛏', '📱',
+  '⚔', '⚒', '🗡', '🧹', '⚓', '⛏', '📱',
   '☠', '⚠', '☢', '☣', '⚡', '🔥', '💧',
-  '⚑', '⚒', '⛳', '🚩', '➤', '➜', '⬤',
+  '⚑', '⚐', '⛳', '🚩', '➤', '➜', '⬤',
   '⚙', '⚗', '🔮', '💎', '🗝', '📜', '🎭', '👑',
   '🛡', '🏰', '⛪', '🗿', '⚱', '🏺', '🪔'
 ];
@@ -1149,12 +1149,206 @@ const DMT_SETTINGS_STYLES = \`
     background: var(--background-modifier-error);
     color: var(--text-on-accent);
   }
+  
+  /* Insert Map Modal */
+  .dmt-insert-map-modal {
+    padding: 16px;
+  }
+  
+  .dmt-map-type-selection {
+    margin-top: 16px;
+  }
+  
+  .dmt-map-type-buttons {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+  }
+  
+  .dmt-map-type-btn {
+    flex: 1;
+    padding: 12px 16px;
+    border: 2px solid var(--background-modifier-border);
+    border-radius: 6px;
+    background: var(--background-primary);
+    color: var(--text-normal);
+    cursor: pointer;
+    font-size: 1em;
+    transition: all 0.15s ease;
+  }
+  
+  .dmt-map-type-btn:hover {
+    border-color: var(--interactive-accent);
+    background: var(--background-secondary);
+  }
+  
+  .dmt-map-type-btn.selected {
+    border-color: var(--interactive-accent);
+    background: var(--interactive-accent);
+    color: var(--text-on-accent);
+  }
+  
+  @keyframes dmt-shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-4px); }
+    75% { transform: translateX(4px); }
+  }
+  
+  .dmt-shake {
+    animation: dmt-shake 0.3s ease;
+  }
 \`;
 
 // =============================================================================
 // MODAL CLASSES
 // Each modal is self-contained with its own state and rendering logic
 // =============================================================================
+
+/**
+ * Modal for inserting a new map block into the editor
+ */
+class InsertMapModal extends Modal {
+  constructor(app, onInsert) {
+    super(app);
+    this.onInsert = onInsert;
+    this.mapName = '';
+    this.mapType = null; // 'grid' or 'hex'
+  }
+  
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.addClass('dmt-insert-map-modal');
+    
+    // Inject modal-specific styles if not already present
+    if (!document.getElementById('dmt-insert-map-styles')) {
+      const styleEl = document.createElement('style');
+      styleEl.id = 'dmt-insert-map-styles';
+      styleEl.textContent = \`
+        .dmt-insert-map-modal { padding: 16px; }
+        .dmt-map-type-selection { margin-top: 16px; }
+        .dmt-map-type-buttons { display: flex; gap: 8px; margin-top: 8px; }
+        .dmt-map-type-btn {
+          flex: 1;
+          padding: 12px 16px;
+          border: 2px solid var(--background-modifier-border);
+          border-radius: 6px;
+          background: var(--background-primary);
+          color: var(--text-normal);
+          cursor: pointer;
+          font-size: 1em;
+          transition: all 0.15s ease;
+        }
+        .dmt-map-type-btn:hover {
+          border-color: var(--interactive-accent);
+          background: var(--background-secondary);
+        }
+        .dmt-map-type-btn.selected {
+          border-color: var(--interactive-accent);
+          background: var(--interactive-accent);
+          color: var(--text-on-accent);
+        }
+        .dmt-modal-buttons {
+          display: flex;
+          justify-content: flex-end;
+          gap: 8px;
+          margin-top: 16px;
+          padding-top: 16px;
+          border-top: 1px solid var(--background-modifier-border);
+        }
+        @keyframes dmt-shake {
+          0%, 100% { transform: translateX(0); }
+          25% { transform: translateX(-4px); }
+          75% { transform: translateX(4px); }
+        }
+        .dmt-shake { animation: dmt-shake 0.3s ease; }
+      \`;
+      document.head.appendChild(styleEl);
+    }
+    
+    contentEl.createEl('h2', { text: 'Insert New Map' });
+    
+    // Map name input
+    new Setting(contentEl)
+      .setName('Map name')
+      .setDesc('A display name for this map (can be left blank)')
+      .addText(text => {
+        this.nameInput = text;
+        text
+          .setPlaceholder('e.g., Goblin Cave Level 1')
+          .onChange(value => {
+            this.mapName = value;
+          });
+        // Focus the input after modal opens
+        setTimeout(() => text.inputEl.focus(), 10);
+      });
+    
+    // Map type selection
+    const typeContainer = contentEl.createDiv({ cls: 'dmt-map-type-selection' });
+    typeContainer.createEl('div', { text: 'Map type', cls: 'setting-item-name' });
+    typeContainer.createEl('div', { 
+      text: 'Choose the grid style for this map', 
+      cls: 'setting-item-description' 
+    });
+    
+    const buttonRow = typeContainer.createDiv({ cls: 'dmt-map-type-buttons' });
+    
+    const gridBtn = buttonRow.createEl('button', { 
+      text: 'Grid',
+      cls: 'dmt-map-type-btn',
+      attr: { type: 'button' }
+    });
+    
+    const hexBtn = buttonRow.createEl('button', { 
+      text: 'Hex',
+      cls: 'dmt-map-type-btn',
+      attr: { type: 'button' }
+    });
+    
+    gridBtn.onclick = () => {
+      this.mapType = 'grid';
+      gridBtn.addClass('selected');
+      hexBtn.removeClass('selected');
+    };
+    
+    hexBtn.onclick = () => {
+      this.mapType = 'hex';
+      hexBtn.addClass('selected');
+      gridBtn.removeClass('selected');
+    };
+    
+    // Buttons
+    const buttonContainer = contentEl.createDiv({ cls: 'dmt-modal-buttons' });
+    
+    const cancelBtn = buttonContainer.createEl('button', { text: 'Cancel' });
+    cancelBtn.onclick = () => this.close();
+    
+    const insertBtn = buttonContainer.createEl('button', { text: 'Insert', cls: 'mod-cta' });
+    insertBtn.onclick = () => {
+      if (!this.mapType) {
+        // Brief visual feedback that type is required
+        buttonRow.addClass('dmt-shake');
+        setTimeout(() => buttonRow.removeClass('dmt-shake'), 300);
+        return;
+      }
+      this.onInsert(this.mapName, this.mapType);
+      this.close();
+    };
+    
+    // Handle Enter key to submit (if type is selected)
+    contentEl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && this.mapType) {
+        e.preventDefault();
+        this.onInsert(this.mapName, this.mapType);
+        this.close();
+      }
+    });
+  }
+  
+  onClose() {
+    this.contentEl.empty();
+  }
+}
 
 /**
  * Modal for creating/editing objects
@@ -2084,13 +2278,13 @@ class ImportModal extends Modal {
         const customCatCount = data.customCategories?.length || 0;
         
         if (overrideCount > 0) {
-          previewArea.createEl('p', { text: \`â€¢ \${overrideCount} built-in modification(s)\` });
+          previewArea.createEl('p', { text: \`• \${overrideCount} built-in modification(s)\` });
         }
         if (customObjCount > 0) {
-          previewArea.createEl('p', { text: \`â€¢ \${customObjCount} custom object(s)\` });
+          previewArea.createEl('p', { text: \`• \${customObjCount} custom object(s)\` });
         }
         if (customCatCount > 0) {
-          previewArea.createEl('p', { text: \`â€¢ \${customCatCount} custom category(ies)\` });
+          previewArea.createEl('p', { text: \`• \${customCatCount} custom category(ies)\` });
         }
         
         previewArea.style.display = 'block';
@@ -2204,6 +2398,32 @@ class WindroseMDSettingsPlugin extends Plugin {
   async onload() {
     await this.loadSettings();
     this.addSettingTab(new WindroseMDSettingsTab(this.app, this));
+    
+    // Register command to insert a new map
+    this.addCommand({
+      id: 'insert-new-map',
+      name: 'Insert new map',
+      editorCallback: (editor, view) => {
+        new InsertMapModal(this.app, (mapName, mapType) => {
+          const mapId = 'map-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+          
+          const codeBlock = [
+            '\`\`\`datacorejsx',
+            '',
+            'const { View: DungeonMapTracker } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md.md"), "DungeonMapTracker"));',
+            '',
+            \`const mapId = "\${mapId}";\`,
+            \`const mapName = "\${mapName}";\`,
+            \`const mapType = "\${mapType}";\`,
+            '',
+            'return <DungeonMapTracker mapId={mapId} mapName={mapName} mapType={mapType} />;',
+            '\`\`\`'
+          ].join('\\n');
+          
+          editor.replaceSelection(codeBlock);
+        }).open();
+      }
+    });
   }
 
   onunload() {}

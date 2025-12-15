@@ -790,8 +790,8 @@ const useEventCoordinator = ({
       }
       
       // Try text label handlers
-      if (textHandlers?.handleTextLabelKeyDown) {
-        const handled = textHandlers.handleTextLabelKeyDown(e);
+      if (textHandlers?.handleTextKeyDown) {
+        const handled = textHandlers.handleTextKeyDown(e);
         if (handled) return;
       }
     };

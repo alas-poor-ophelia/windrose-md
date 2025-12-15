@@ -14,6 +14,7 @@ function useMapData(mapId, mapName = '', mapType = 'grid') {
   const [backgroundImageReady, setBackgroundImageReady] = dc.useState(false);
   const [fowImageReady, setFowImageReady] = dc.useState(false);
   const saveTimerRef = dc.useRef(null);
+  const saveVersionRef = dc.useRef(0); // Track version to prevent race conditions
   
 
   //Load map data on mount
@@ -70,13 +71,27 @@ function useMapData(mapId, mapName = '', mapType = 'grid') {
       clearTimeout(saveTimerRef.current);
     }
     
+    // Increment version for this pending data
+    const currentVersion = ++saveVersionRef.current;
+    
     // Set new timer for 2 seconds
     saveTimerRef.current = setTimeout(async () => {
       setSaveStatus('Saving...');
       const success = await saveMapData(mapId, pendingData);
-      setSaveStatus(success ? 'Saved' : 'Save failed');
-      setPendingData(null);
-      saveTimerRef.current = null;
+      
+      // Only clear pendingData if no new changes came in during the async save
+      // (if version changed, another change was made and will trigger its own save)
+      if (saveVersionRef.current === currentVersion) {
+        setSaveStatus(success ? 'Saved' : 'Save failed');
+        setPendingData(null);
+        saveTimerRef.current = null;
+      } else {
+        // New changes came in during save - they'll be saved by their own timer
+        // Just update status to indicate we're not fully saved yet
+        if (success) {
+          setSaveStatus('Unsaved changes');
+        }
+      }
     }, 2000);
     
     // Cleanup function
@@ -109,10 +124,23 @@ function useMapData(mapId, mapName = '', mapType = 'grid') {
         clearTimeout(saveTimerRef.current);
         saveTimerRef.current = null;
       }
+      
+      // Capture current version before async operation
+      const versionAtSaveStart = saveVersionRef.current;
+      
       setSaveStatus('Saving...');
       const success = await saveMapData(mapId, pendingData);
-      setSaveStatus(success ? 'Saved' : 'Save failed');
-      setPendingData(null);
+      
+      // Only clear if no new changes came in during the save
+      if (saveVersionRef.current === versionAtSaveStart) {
+        setSaveStatus(success ? 'Saved' : 'Save failed');
+        setPendingData(null);
+      } else {
+        // New changes came in - don't clear pendingData
+        if (success) {
+          setSaveStatus('Unsaved changes');
+        }
+      }
     }
   }, [pendingData, mapId]);
   

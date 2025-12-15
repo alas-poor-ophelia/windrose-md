@@ -358,7 +358,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     handleDeleteCustomColor,
     handleUpdateColorOpacity,
     handleViewStateChange,
-    handleSidebarCollapseChange
+    handleSidebarCollapseChange,
+    handleTextLabelSettingsChange
   } = useDataHandlers({ mapData, updateMapData, addToHistory, isApplyingHistory });
 
   const containerRef = dc.useRef(null);
@@ -715,6 +716,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               onTextLabelsChange={handleTextLabelsChange}
               onEdgesChange={handleEdgesChange}
               onViewStateChange={handleViewStateChange}
+              onTextLabelSettingsChange={handleTextLabelSettingsChange}
               currentTool={currentTool}
               isAlignmentMode={isAlignmentMode}
               selectedObjectType={selectedObjectType}

@@ -1196,7 +1196,7 @@ button.dmt-orientation-btn,
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 
   &:hover {
-    background: var(--background-modifier-hover);
+    background: var(--background-primary-alt, var(--background-secondary));
     border-color: var(--text-accent);
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);

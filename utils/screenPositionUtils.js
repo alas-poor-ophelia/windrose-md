@@ -6,9 +6,10 @@
  * @param {HTMLCanvasElement} canvas - Canvas reference
  * @param {Object} mapData - Map data with gridSize, viewState, northDirection, mapType
  * @param {Object} geometry - Geometry instance (GridGeometry or HexGeometry)
+ * @param {Object} [containerRef] - Optional container ref for accurate positioning (falls back to canvas.parentElement)
  * @returns {Object|null} { screenX, screenY, objectWidth, objectHeight } or null if inputs invalid
  */
-function calculateObjectScreenPosition(object, canvas, mapData, geometry) {
+function calculateObjectScreenPosition(object, canvas, mapData, geometry, containerRef = null) {
   if (!mapData || !canvas || !geometry) {
     return null;
   }
@@ -81,8 +82,9 @@ function calculateObjectScreenPosition(object, canvas, mapData, geometry) {
   }
   
   // Account for canvas position within centered container
+  // Use containerRef if provided, otherwise fall back to canvas.parentElement for backward compatibility
   const rect = canvas.getBoundingClientRect();
-  const containerRect = canvas.parentElement.getBoundingClientRect();
+  const containerRect = (containerRef?.current || canvas.parentElement).getBoundingClientRect();
   
   // Calculate canvas offset within container (due to flex centering)
   const canvasOffsetX = rect.left - containerRect.left;

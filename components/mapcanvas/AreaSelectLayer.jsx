@@ -21,8 +21,8 @@ const { useEventHandlerRegistration } = await requireModuleByName("EventHandlerC
  * @param {string} currentTool - Current active tool
  */
 const AreaSelectLayer = ({ currentTool }) => {
-  const { canvasRef, mapData, geometry } = useMapState();
-  const { areaSelectStart, setAreaSelectStart } = useMapSelection();
+  const { canvasRef, containerRef, mapData, geometry } = useMapState();
+  const { areaSelectStart, setAreaSelectStart, clearSelection } = useMapSelection();
   
   const {
     handleAreaSelectClick,
@@ -49,14 +49,18 @@ const AreaSelectLayer = ({ currentTool }) => {
     if (currentTool !== 'areaSelect' && areaSelectStart) {
       setAreaSelectStart(null);
     }
-  }, [currentTool, areaSelectStart, setAreaSelectStart]);
+    // Clear selection when switching away from select/areaSelect tools
+    if (currentTool !== 'areaSelect' && currentTool !== 'select') {
+      clearSelection();
+    }
+  }, [currentTool, areaSelectStart, setAreaSelectStart, clearSelection]);
   
   /**
    * Render the start marker overlay
    * Shows a highlighted cell at the first corner position
    */
   const renderStartMarker = () => {
-    if (!areaSelectStart || !canvasRef.current || !geometry || !mapData) {
+    if (!areaSelectStart || !canvasRef.current || !containerRef?.current || !geometry || !mapData) {
       return null;
     }
     
@@ -79,7 +83,8 @@ const AreaSelectLayer = ({ currentTool }) => {
       offsetY = height / 2 - center.y * zoom;
     }
     
-    const containerRect = canvas.parentElement.getBoundingClientRect();
+    // Use containerRef for proper positioning relative to parent container
+    const containerRect = containerRef.current.getBoundingClientRect();
     const canvasRect = canvas.getBoundingClientRect();
     
     const canvasOffsetX = canvasRect.left - containerRect.left;
