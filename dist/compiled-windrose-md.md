@@ -1,9 +1,9 @@
 <!-- Compiled by Datacore Script Compiler -->
 <!-- Source: Projects/dungeon-map-tracker -->
 <!-- Main Component: DungeonMapTracker -->
-<!-- Compiled: 2025-12-14T22:41:58.630Z -->
+<!-- Compiled: 2025-12-15T21:36:45.514Z -->
 <!-- Files: 91 -->
-<!-- Version: 1.3.0 -->
+<!-- Version: 1.3.1 -->
 <!-- CSS Files: 1 -->
 
 # Demo
@@ -17,6 +17,7 @@ const { View: DungeonMapTracker } = await dc.require(dc.headerLink(dc.resolvePat
 
 return <DungeonMapTracker />;
 ```
+
 
 # dmtConstants
 
@@ -1892,6 +1893,7 @@ function useMapData(mapId, mapName = '', mapType = 'grid') {
   const [backgroundImageReady, setBackgroundImageReady] = dc.useState(false);
   const [fowImageReady, setFowImageReady] = dc.useState(false);
   const saveTimerRef = dc.useRef(null);
+  const saveVersionRef = dc.useRef(0); // Track version to prevent race conditions
   
 
   //Load map data on mount
@@ -1948,13 +1950,27 @@ function useMapData(mapId, mapName = '', mapType = 'grid') {
       clearTimeout(saveTimerRef.current);
     }
     
+    // Increment version for this pending data
+    const currentVersion = ++saveVersionRef.current;
+    
     // Set new timer for 2 seconds
     saveTimerRef.current = setTimeout(async () => {
       setSaveStatus('Saving...');
       const success = await saveMapData(mapId, pendingData);
-      setSaveStatus(success ? 'Saved' : 'Save failed');
-      setPendingData(null);
-      saveTimerRef.current = null;
+      
+      // Only clear pendingData if no new changes came in during the async save
+      // (if version changed, another change was made and will trigger its own save)
+      if (saveVersionRef.current === currentVersion) {
+        setSaveStatus(success ? 'Saved' : 'Save failed');
+        setPendingData(null);
+        saveTimerRef.current = null;
+      } else {
+        // New changes came in during save - they'll be saved by their own timer
+        // Just update status to indicate we're not fully saved yet
+        if (success) {
+          setSaveStatus('Unsaved changes');
+        }
+      }
     }, 2000);
     
     // Cleanup function
@@ -1987,10 +2003,23 @@ function useMapData(mapId, mapName = '', mapType = 'grid') {
         clearTimeout(saveTimerRef.current);
         saveTimerRef.current = null;
       }
+      
+      // Capture current version before async operation
+      const versionAtSaveStart = saveVersionRef.current;
+      
       setSaveStatus('Saving...');
       const success = await saveMapData(mapId, pendingData);
-      setSaveStatus(success ? 'Saved' : 'Save failed');
-      setPendingData(null);
+      
+      // Only clear if no new changes came in during the save
+      if (saveVersionRef.current === versionAtSaveStart) {
+        setSaveStatus(success ? 'Saved' : 'Save failed');
+        setPendingData(null);
+      } else {
+        // New changes came in - don't clear pendingData
+        if (success) {
+          setSaveStatus('Unsaved changes');
+        }
+      }
     }
   }, [pendingData, mapId]);
   
@@ -2970,6 +2999,14 @@ function useDataHandlers({ mapData, updateMapData, addToHistory, isApplyingHisto
     });
   }, [updateMapData]);
 
+  // Handle text label settings change (persists last used font/size/color) - NOT tracked in history
+  const handleTextLabelSettingsChange = dc.useCallback((settings) => {
+    updateMapData(currentMapData => {
+      if (!currentMapData) return currentMapData;
+      return { ...currentMapData, lastTextLabelSettings: settings };
+    });
+  }, [updateMapData]);
+
   // =========================================================================
   // Return Value
   // =========================================================================
@@ -2988,7 +3025,8 @@ function useDataHandlers({ mapData, updateMapData, addToHistory, isApplyingHisto
     handleDeleteCustomColor,
     handleUpdateColorOpacity,
     handleViewStateChange,
-    handleSidebarCollapseChange
+    handleSidebarCollapseChange,
+    handleTextLabelSettingsChange
   };
 
   return {
@@ -3006,7 +3044,8 @@ function useDataHandlers({ mapData, updateMapData, addToHistory, isApplyingHisto
     handleDeleteCustomColor,
     handleUpdateColorOpacity,
     handleViewStateChange,
-    handleSidebarCollapseChange
+    handleSidebarCollapseChange,
+    handleTextLabelSettingsChange
   };
 }
 
@@ -9487,9 +9526,10 @@ return {
  * @param {HTMLCanvasElement} canvas - Canvas reference
  * @param {Object} mapData - Map data with gridSize, viewState, northDirection, mapType
  * @param {Object} geometry - Geometry instance (GridGeometry or HexGeometry)
+ * @param {Object} [containerRef] - Optional container ref for accurate positioning (falls back to canvas.parentElement)
  * @returns {Object|null} { screenX, screenY, objectWidth, objectHeight } or null if inputs invalid
  */
-function calculateObjectScreenPosition(object, canvas, mapData, geometry) {
+function calculateObjectScreenPosition(object, canvas, mapData, geometry, containerRef = null) {
   if (!mapData || !canvas || !geometry) {
     return null;
   }
@@ -9562,8 +9602,9 @@ function calculateObjectScreenPosition(object, canvas, mapData, geometry) {
   }
   
   // Account for canvas position within centered container
+  // Use containerRef if provided, otherwise fall back to canvas.parentElement for backward compatibility
   const rect = canvas.getBoundingClientRect();
-  const containerRect = canvas.parentElement.getBoundingClientRect();
+  const containerRect = (containerRef?.current || canvas.parentElement).getBoundingClientRect();
   
   // Calculate canvas offset within container (due to flex centering)
   const canvasOffsetX = rect.left - containerRect.left;
@@ -12589,8 +12630,8 @@ const { getActiveLayer } = await dc.require(dc.headerLink(dc.resolvePath("compil
 /**
  * Calculate bounding box that encompasses all selected items
  */
-function calculateMultiSelectBounds(selectedItems, mapData, canvasRef, geometry) {
-  if (!selectedItems?.length || !canvasRef?.current || !mapData) return null;
+function calculateMultiSelectBounds(selectedItems, mapData, canvasRef, containerRef, geometry) {
+  if (!selectedItems?.length || !canvasRef?.current || !containerRef?.current || !mapData) return null;
   
   const canvas = canvasRef.current;
   const { gridSize, viewState, northDirection } = mapData;
@@ -12602,9 +12643,9 @@ function calculateMultiSelectBounds(selectedItems, mapData, canvasRef, geometry)
   const offsetX = centerX - center.x * scaledGridSize;
   const offsetY = centerY - center.y * scaledGridSize;
   
-  // Account for canvas position within container
+  // Account for canvas position within container - use containerRef for consistency
   const rect = canvas.getBoundingClientRect();
-  const containerRect = canvas.parentElement.getBoundingClientRect();
+  const containerRect = containerRef.current.getBoundingClientRect();
   const canvasOffsetX = rect.left - containerRect.left;
   const canvasOffsetY = rect.top - containerRect.top;
   const scaleX = rect.width / canvas.width;
@@ -12622,7 +12663,7 @@ function calculateMultiSelectBounds(selectedItems, mapData, canvasRef, geometry)
       const obj = activeLayer.objects?.find(o => o.id === item.id);
       if (!obj) continue;
       
-      const pos = calculateObjectScreenPosition(obj, canvas, mapData, geometry);
+      const pos = calculateObjectScreenPosition(obj, canvas, mapData, geometry, containerRef);
       if (!pos) continue;
       
       const left = pos.screenX - pos.objectWidth / 2;
@@ -12702,7 +12743,7 @@ const MultiSelectToolbar = ({
   }
   
   // Calculate bounding box of all selected items
-  const bounds = calculateMultiSelectBounds(selectedItems, mapData, canvasRef, geometry);
+  const bounds = calculateMultiSelectBounds(selectedItems, mapData, canvasRef, containerRef, geometry);
   if (!bounds) return null;
   
   // Calculate toolbar dimensions
@@ -12764,7 +12805,7 @@ const MultiSelectToolbar = ({
       <button
         className="dmt-toolbar-button"
         onClick={onRotateAll}
-        title="Rotate All 90°"
+        title="Rotate All 90Â°"
       >
         <dc.Icon icon="lucide-rotate-cw" />
       </button>
@@ -12793,8 +12834,8 @@ const MultiSelectToolbar = ({
 /**
  * Calculate bounding box for a text label in screen coordinates
  */
-function calculateTextLabelBounds(label, canvasRef, mapData) {
-  if (!label || !canvasRef.current || !mapData) return null;
+function calculateTextLabelBounds(label, canvasRef, containerRef, mapData) {
+  if (!label || !canvasRef.current || !containerRef?.current || !mapData) return null;
   
   const canvas = canvasRef.current;
   const { gridSize, viewState, northDirection } = mapData;
@@ -12836,9 +12877,9 @@ function calculateTextLabelBounds(label, canvasRef, mapData) {
   const rotatedWidth = textWidth * cos + textHeight * sin;
   const rotatedHeight = textWidth * sin + textHeight * cos;
   
-  // Account for canvas position within container
+  // Account for canvas position within container - use containerRef for consistency
   const rect = canvas.getBoundingClientRect();
-  const containerRect = canvas.parentElement.getBoundingClientRect();
+  const containerRect = containerRef.current.getBoundingClientRect();
   const canvasOffsetX = rect.left - containerRect.left;
   const canvasOffsetY = rect.top - containerRect.top;
   const scaleX = rect.width / canvas.width;
@@ -12935,7 +12976,7 @@ const SelectionToolbar = ({
     const object = getActiveLayer(mapData).objects?.find(obj => obj.id === selectedItem.id);
     if (!object) return null;
     
-    const pos = calculateObjectScreenPosition(object, canvasRef.current, mapData, geometry);
+    const pos = calculateObjectScreenPosition(object, canvasRef.current, mapData, geometry, containerRef);
     if (!pos) return null;
     
     bounds = {
@@ -12948,7 +12989,7 @@ const SelectionToolbar = ({
     const label = getActiveLayer(mapData).textLabels?.find(l => l.id === selectedItem.id);
     if (!label) return null;
     
-    bounds = calculateTextLabelBounds(label, canvasRef, mapData);
+    bounds = calculateTextLabelBounds(label, canvasRef, containerRef, mapData);
     if (!bounds) return null;
   }
   
@@ -13117,7 +13158,7 @@ const SelectionToolbar = ({
               onClick={(e) => {
                 if (onRotate) onRotate(e);
               }}
-              title="Rotate 90Ã‚Â° (or press R)"
+              title="Rotate 90Ãƒâ€šÃ‚Â° (or press R)"
             >
               <dc.Icon icon="lucide-rotate-cw" />
             </button>
@@ -13230,7 +13271,7 @@ const SelectionToolbar = ({
             <button
               className="dmt-toolbar-button"
               onClick={onRotate}
-              title="Rotate 90Ã‚Â° (or press R)"
+              title="Rotate 90Ãƒâ€šÃ‚Â° (or press R)"
             >
               <dc.Icon icon="lucide-rotate-cw" />
             </button>
@@ -17719,8 +17760,8 @@ const { useEventHandlerRegistration } = await dc.require(dc.headerLink(dc.resolv
  * @param {string} currentTool - Current active tool
  */
 const AreaSelectLayer = ({ currentTool }) => {
-  const { canvasRef, mapData, geometry } = useMapState();
-  const { areaSelectStart, setAreaSelectStart } = useMapSelection();
+  const { canvasRef, containerRef, mapData, geometry } = useMapState();
+  const { areaSelectStart, setAreaSelectStart, clearSelection } = useMapSelection();
   
   const {
     handleAreaSelectClick,
@@ -17747,14 +17788,18 @@ const AreaSelectLayer = ({ currentTool }) => {
     if (currentTool !== 'areaSelect' && areaSelectStart) {
       setAreaSelectStart(null);
     }
-  }, [currentTool, areaSelectStart, setAreaSelectStart]);
+    // Clear selection when switching away from select/areaSelect tools
+    if (currentTool !== 'areaSelect' && currentTool !== 'select') {
+      clearSelection();
+    }
+  }, [currentTool, areaSelectStart, setAreaSelectStart, clearSelection]);
   
   /**
    * Render the start marker overlay
    * Shows a highlighted cell at the first corner position
    */
   const renderStartMarker = () => {
-    if (!areaSelectStart || !canvasRef.current || !geometry || !mapData) {
+    if (!areaSelectStart || !canvasRef.current || !containerRef?.current || !geometry || !mapData) {
       return null;
     }
     
@@ -17777,7 +17822,8 @@ const AreaSelectLayer = ({ currentTool }) => {
       offsetY = height / 2 - center.y * zoom;
     }
     
-    const containerRect = canvas.parentElement.getBoundingClientRect();
+    // Use containerRef for proper positioning relative to parent container
+    const containerRect = containerRef.current.getBoundingClientRect();
     const canvasRect = canvas.getBoundingClientRect();
     
     const canvasOffsetX = canvasRect.left - containerRect.left;
@@ -19585,8 +19631,8 @@ const useEventCoordinator = ({
       }
       
       // Try text label handlers
-      if (textHandlers?.handleTextLabelKeyDown) {
-        const handled = textHandlers.handleTextLabelKeyDown(e);
+      if (textHandlers?.handleTextKeyDown) {
+        const handled = textHandlers.handleTextKeyDown(e);
         if (handled) return;
       }
     };
@@ -19668,7 +19714,7 @@ const Coordinators = ({ canvasRef, mapData, geometry, isFocused, isColorPickerOp
  * MapCanvasContent - Inner component that uses context hooks
  * Contains all the map canvas logic and interacts with shared selection state
  */
-const MapCanvasContent = ({ mapData, onCellsChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onViewStateChange, currentTool, selectedObjectType, selectedColor, isColorPickerOpen, customColors, onAddCustomColor, onDeleteCustomColor, isFocused, isAnimating, theme, isAlignmentMode, children }) => {
+const MapCanvasContent = ({ mapData, onCellsChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onViewStateChange, onTextLabelSettingsChange, currentTool, selectedObjectType, selectedColor, isColorPickerOpen, customColors, onAddCustomColor, onDeleteCustomColor, isFocused, isAnimating, theme, isAlignmentMode, children }) => {
   const canvasRef = dc.useRef(null);
   const fogCanvasRef = dc.useRef(null);  // Separate canvas for fog blur effect (CSS blur for iOS compat)
   const containerRef = dc.useRef(null);
@@ -19677,13 +19723,16 @@ const MapCanvasContent = ({ mapData, onCellsChange, onObjectsChange, onTextLabel
     height: DEFAULTS.canvasSize.height
   });
   
-  // Create onMapDataUpdate wrapper for viewState changes
+  // Create onMapDataUpdate wrapper for map-level changes
   // This bridges the old prop-based API with the new context-based approach
   const onMapDataUpdate = dc.useCallback((updates) => {
     if (updates.viewState && onViewStateChange) {
       onViewStateChange(updates.viewState);
     }
-  }, [onViewStateChange]);
+    if (updates.lastTextLabelSettings && onTextLabelSettingsChange) {
+      onTextLabelSettingsChange(updates.lastTextLabelSettings);
+    }
+  }, [onViewStateChange, onTextLabelSettingsChange]);
 
   // Use shared selection from context (same state ObjectLayer uses)
   const {
@@ -19949,7 +19998,7 @@ const MapCanvasContent = ({ mapData, onCellsChange, onObjectsChange, onTextLabel
     onTextLabelsChange,
     onEdgesChange,
     onMapDataUpdate
-  }), [onCellsChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onViewStateChange]);
+  }), [onCellsChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onViewStateChange, onTextLabelSettingsChange]);
 
 
 
@@ -21449,13 +21498,13 @@ return `// settingsPluginMain.js - Windrose MapDesigner Settings Plugin
  * ============================================================================
  * 
  * Line ~30:    VERSION & IMPORTS
- * Line ~40:    DATA CONSTANTS (BUILT_IN_OBJECTS, CATEGORIES, QUICK_SYMBOLS)
- * Line ~65:    BUILT_IN_COLORS (color palette defaults)
- * Line ~90:    HELPER NAMESPACES (ObjectHelpers, ColorHelpers, DragHelpers, IconHelpers, RPGAwesomeHelpers)
+ * Line ~35:    DATA CONSTANTS (BUILT_IN_OBJECTS, CATEGORIES, QUICK_SYMBOLS)
+ * Line ~67:    BUILT_IN_COLORS (color palette defaults)
+ * Line ~80:    HELPER NAMESPACES (ObjectHelpers, ColorHelpers, DragHelpers, IconHelpers, RPGAwesomeHelpers)
  * Line ~365:   STYLES (DMT_SETTINGS_STYLES)
- * Line ~1140:  MODAL CLASSES (ObjectEditModal, CategoryEditModal, ColorEditModal, ExportModal, ImportModal)
- * Line ~2120:  MAIN PLUGIN CLASS (WindroseMDSettingsPlugin)
- * Line ~2200:  SETTINGS TAB CLASS (WindroseMDSettingsTab)
+ * Line ~1205:  MODAL CLASSES (InsertMapModal, ObjectEditModal, CategoryEditModal, ColorEditModal, ExportModal, ImportModal)
+ * Line ~2395:  MAIN PLUGIN CLASS (WindroseMDSettingsPlugin)
+ * Line ~2520:  SETTINGS TAB CLASS (WindroseMDSettingsTab)
  * 
  * ============================================================================
  */
@@ -21489,9 +21538,9 @@ const QUICK_SYMBOLS = [
   '★', '☆', '✦', '✧', '✪', '✫', '✯', '⚑',
   '●', '○', '◆', '◇', '■', '□', '▲', '△', '▼', '▽',
   '♠', '♤', '♣', '♧', '♥', '♡', '♦', '♢',
-  '⚔', '⚒', '🗡', '🧹', '⚔', '⛏', '📱',
+  '⚔', '⚒', '🗡', '🧹', '⚓', '⛏', '📱',
   '☠', '⚠', '☢', '☣', '⚡', '🔥', '💧',
-  '⚑', '⚒', '⛳', '🚩', '➤', '➜', '⬤',
+  '⚑', '⚐', '⛳', '🚩', '➤', '➜', '⬤',
   '⚙', '⚗', '🔮', '💎', '🗝', '📜', '🎭', '👑',
   '🛡', '🏰', '⛪', '🗿', '⚱', '🏺', '🪔'
 ];
@@ -22586,12 +22635,206 @@ const DMT_SETTINGS_STYLES = \`
     background: var(--background-modifier-error);
     color: var(--text-on-accent);
   }
+  
+  /* Insert Map Modal */
+  .dmt-insert-map-modal {
+    padding: 16px;
+  }
+  
+  .dmt-map-type-selection {
+    margin-top: 16px;
+  }
+  
+  .dmt-map-type-buttons {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+  }
+  
+  .dmt-map-type-btn {
+    flex: 1;
+    padding: 12px 16px;
+    border: 2px solid var(--background-modifier-border);
+    border-radius: 6px;
+    background: var(--background-primary);
+    color: var(--text-normal);
+    cursor: pointer;
+    font-size: 1em;
+    transition: all 0.15s ease;
+  }
+  
+  .dmt-map-type-btn:hover {
+    border-color: var(--interactive-accent);
+    background: var(--background-secondary);
+  }
+  
+  .dmt-map-type-btn.selected {
+    border-color: var(--interactive-accent);
+    background: var(--interactive-accent);
+    color: var(--text-on-accent);
+  }
+  
+  @keyframes dmt-shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-4px); }
+    75% { transform: translateX(4px); }
+  }
+  
+  .dmt-shake {
+    animation: dmt-shake 0.3s ease;
+  }
 \`;
 
 // =============================================================================
 // MODAL CLASSES
 // Each modal is self-contained with its own state and rendering logic
 // =============================================================================
+
+/**
+ * Modal for inserting a new map block into the editor
+ */
+class InsertMapModal extends Modal {
+  constructor(app, onInsert) {
+    super(app);
+    this.onInsert = onInsert;
+    this.mapName = '';
+    this.mapType = null; // 'grid' or 'hex'
+  }
+  
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.addClass('dmt-insert-map-modal');
+    
+    // Inject modal-specific styles if not already present
+    if (!document.getElementById('dmt-insert-map-styles')) {
+      const styleEl = document.createElement('style');
+      styleEl.id = 'dmt-insert-map-styles';
+      styleEl.textContent = \`
+        .dmt-insert-map-modal { padding: 16px; }
+        .dmt-map-type-selection { margin-top: 16px; }
+        .dmt-map-type-buttons { display: flex; gap: 8px; margin-top: 8px; }
+        .dmt-map-type-btn {
+          flex: 1;
+          padding: 12px 16px;
+          border: 2px solid var(--background-modifier-border);
+          border-radius: 6px;
+          background: var(--background-primary);
+          color: var(--text-normal);
+          cursor: pointer;
+          font-size: 1em;
+          transition: all 0.15s ease;
+        }
+        .dmt-map-type-btn:hover {
+          border-color: var(--interactive-accent);
+          background: var(--background-secondary);
+        }
+        .dmt-map-type-btn.selected {
+          border-color: var(--interactive-accent);
+          background: var(--interactive-accent);
+          color: var(--text-on-accent);
+        }
+        .dmt-modal-buttons {
+          display: flex;
+          justify-content: flex-end;
+          gap: 8px;
+          margin-top: 16px;
+          padding-top: 16px;
+          border-top: 1px solid var(--background-modifier-border);
+        }
+        @keyframes dmt-shake {
+          0%, 100% { transform: translateX(0); }
+          25% { transform: translateX(-4px); }
+          75% { transform: translateX(4px); }
+        }
+        .dmt-shake { animation: dmt-shake 0.3s ease; }
+      \`;
+      document.head.appendChild(styleEl);
+    }
+    
+    contentEl.createEl('h2', { text: 'Insert New Map' });
+    
+    // Map name input
+    new Setting(contentEl)
+      .setName('Map name')
+      .setDesc('A display name for this map (can be left blank)')
+      .addText(text => {
+        this.nameInput = text;
+        text
+          .setPlaceholder('e.g., Goblin Cave Level 1')
+          .onChange(value => {
+            this.mapName = value;
+          });
+        // Focus the input after modal opens
+        setTimeout(() => text.inputEl.focus(), 10);
+      });
+    
+    // Map type selection
+    const typeContainer = contentEl.createDiv({ cls: 'dmt-map-type-selection' });
+    typeContainer.createEl('div', { text: 'Map type', cls: 'setting-item-name' });
+    typeContainer.createEl('div', { 
+      text: 'Choose the grid style for this map', 
+      cls: 'setting-item-description' 
+    });
+    
+    const buttonRow = typeContainer.createDiv({ cls: 'dmt-map-type-buttons' });
+    
+    const gridBtn = buttonRow.createEl('button', { 
+      text: 'Grid',
+      cls: 'dmt-map-type-btn',
+      attr: { type: 'button' }
+    });
+    
+    const hexBtn = buttonRow.createEl('button', { 
+      text: 'Hex',
+      cls: 'dmt-map-type-btn',
+      attr: { type: 'button' }
+    });
+    
+    gridBtn.onclick = () => {
+      this.mapType = 'grid';
+      gridBtn.addClass('selected');
+      hexBtn.removeClass('selected');
+    };
+    
+    hexBtn.onclick = () => {
+      this.mapType = 'hex';
+      hexBtn.addClass('selected');
+      gridBtn.removeClass('selected');
+    };
+    
+    // Buttons
+    const buttonContainer = contentEl.createDiv({ cls: 'dmt-modal-buttons' });
+    
+    const cancelBtn = buttonContainer.createEl('button', { text: 'Cancel' });
+    cancelBtn.onclick = () => this.close();
+    
+    const insertBtn = buttonContainer.createEl('button', { text: 'Insert', cls: 'mod-cta' });
+    insertBtn.onclick = () => {
+      if (!this.mapType) {
+        // Brief visual feedback that type is required
+        buttonRow.addClass('dmt-shake');
+        setTimeout(() => buttonRow.removeClass('dmt-shake'), 300);
+        return;
+      }
+      this.onInsert(this.mapName, this.mapType);
+      this.close();
+    };
+    
+    // Handle Enter key to submit (if type is selected)
+    contentEl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && this.mapType) {
+        e.preventDefault();
+        this.onInsert(this.mapName, this.mapType);
+        this.close();
+      }
+    });
+  }
+  
+  onClose() {
+    this.contentEl.empty();
+  }
+}
 
 /**
  * Modal for creating/editing objects
@@ -23521,13 +23764,13 @@ class ImportModal extends Modal {
         const customCatCount = data.customCategories?.length || 0;
         
         if (overrideCount > 0) {
-          previewArea.createEl('p', { text: \`â€¢ \${overrideCount} built-in modification(s)\` });
+          previewArea.createEl('p', { text: \`• \${overrideCount} built-in modification(s)\` });
         }
         if (customObjCount > 0) {
-          previewArea.createEl('p', { text: \`â€¢ \${customObjCount} custom object(s)\` });
+          previewArea.createEl('p', { text: \`• \${customObjCount} custom object(s)\` });
         }
         if (customCatCount > 0) {
-          previewArea.createEl('p', { text: \`â€¢ \${customCatCount} custom category(ies)\` });
+          previewArea.createEl('p', { text: \`• \${customCatCount} custom category(ies)\` });
         }
         
         previewArea.style.display = 'block';
@@ -23641,6 +23884,32 @@ class WindroseMDSettingsPlugin extends Plugin {
   async onload() {
     await this.loadSettings();
     this.addSettingTab(new WindroseMDSettingsTab(this.app, this));
+    
+    // Register command to insert a new map
+    this.addCommand({
+      id: 'insert-new-map',
+      name: 'Insert new map',
+      editorCallback: (editor, view) => {
+        new InsertMapModal(this.app, (mapName, mapType) => {
+          const mapId = 'map-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+          
+          const codeBlock = [
+            '\`\`\`datacorejsx',
+            '',
+            'const { View: DungeonMapTracker } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md.md"), "DungeonMapTracker"));',
+            '',
+            \`const mapId = "\${mapId}";\`,
+            \`const mapName = "\${mapName}";\`,
+            \`const mapType = "\${mapType}";\`,
+            '',
+            'return <DungeonMapTracker mapId={mapId} mapName={mapName} mapType={mapType} />;',
+            '\`\`\`'
+          ].join('\\n');
+          
+          editor.replaceSelection(codeBlock);
+        }).open();
+      }
+    });
   }
 
   onunload() {}
@@ -25138,17 +25407,13 @@ module.exports = WindroseMDSettingsPlugin;`;
 const { THEME, DEFAULTS } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "dmtConstants"));
 const { WindroseCompass } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "WindroseCompass"));
 
-// Import the plugin template as a string (allows bundling without Datacore trying to execute it)
 const SETTINGS_PLUGIN_TEMPLATE = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "settingsPluginMain"));
 
-// Import object types for template injection (single source of truth)
 const { OBJECT_TYPES, CATEGORIES } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "objectTypes"));
-
-// Import RPGAwesome icon data for template injection
 const { RA_ICONS, RA_CATEGORIES } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "rpgAwesomeIcons"));
 
 // Plugin version from template
-const PACKAGED_PLUGIN_VERSION = '0.9.13';
+const PACKAGED_PLUGIN_VERSION = '0.9.16';
 
 // LocalStorage keys for tracking user preferences
 const STORAGE_KEYS = {
@@ -25327,7 +25592,6 @@ const SettingsPluginInstaller = ({ onInstall, onDecline, mode = 'auto' }) => {
         JSON.stringify(defaultData, null, 2)
       );
 
-      // Add plugin to community-plugins.json so it persists across reloads
       try {
         const communityPluginsPath = '.obsidian/community-plugins.json';
         let enabledPlugins = [];
@@ -25386,7 +25650,7 @@ const SettingsPluginInstaller = ({ onInstall, onDecline, mode = 'auto' }) => {
       const mainJs = generateMainJs();
       await adapter.write(`${pluginDir}/main.js`, mainJs);
 
-      // DO NOT overwrite data.json - preserve user settings!
+      // DO NOT overwrite data.json - preserve user settings
 
       // Reload the plugin
       try {
@@ -30708,7 +30972,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     handleDeleteCustomColor,
     handleUpdateColorOpacity,
     handleViewStateChange,
-    handleSidebarCollapseChange
+    handleSidebarCollapseChange,
+    handleTextLabelSettingsChange
   } = useDataHandlers({ mapData, updateMapData, addToHistory, isApplyingHistory });
 
   const containerRef = dc.useRef(null);
@@ -31065,6 +31330,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               onTextLabelsChange={handleTextLabelsChange}
               onEdgesChange={handleEdgesChange}
               onViewStateChange={handleViewStateChange}
+              onTextLabelSettingsChange={handleTextLabelSettingsChange}
               currentTool={currentTool}
               isAlignmentMode={isAlignmentMode}
               selectedObjectType={selectedObjectType}
@@ -32425,7 +32691,7 @@ button.dmt-orientation-btn,
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 
   &:hover {
-    background: var(--background-modifier-hover);
+    background: var(--background-primary-alt, var(--background-secondary));
     border-color: var(--text-accent);
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
