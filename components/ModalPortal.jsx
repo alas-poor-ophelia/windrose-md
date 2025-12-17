@@ -3,11 +3,13 @@
  * 
  * This renders children normally, then uses DOM manipulation to move the rendered
  * content to a portal container in document.body, fixing mobile viewport issues.
+ * 
  */
 
 const ModalPortal = ({ children }) => {
   const wrapperRef = dc.useRef(null);
   const portalContainerRef = dc.useRef(null);
+  const [isInPortal, setIsInPortal] = dc.useState(false);
   
   // Create portal container on mount
   dc.useEffect(() => {
@@ -33,6 +35,8 @@ const ModalPortal = ({ children }) => {
     if (wrapperRef.current && portalContainerRef.current) {
       // Move the wrapper element to the portal
       portalContainerRef.current.appendChild(wrapperRef.current);
+      // Mark as in portal to make visible
+      setIsInPortal(true);
     }
     
     return () => {
@@ -44,8 +48,13 @@ const ModalPortal = ({ children }) => {
   }, []);
   
   // Render wrapper that will be moved to portal
+  // Hidden until moved to prevent visual jump
   return (
-    <div ref={wrapperRef} className="dmt-modal-portal-content">
+    <div 
+      ref={wrapperRef} 
+      className="dmt-modal-portal-content"
+      style={{ visibility: isInPortal ? 'visible' : 'hidden' }}
+    >
       {children}
     </div>
   );

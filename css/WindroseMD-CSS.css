@@ -3136,3 +3136,130 @@ button.dmt-layer-add-btn {
   transform: scale(1.05);
   box-shadow: 0 0 12px rgba(196, 165, 123, 0.5);
 }
+
+/* ==========================================================================
+   RE-ROLL DUNGEON
+   ========================================================================== */
+
+/* Re-roll button - positioned to the left of MapControls */
+.dmt-reroll-btn {
+  position: absolute;
+  top: 12px;
+  /* Position relative to right edge, offset from MapControls (80px width + 4px right + 12px gap) */
+  right: 96px;
+  z-index: 100;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, rgba(139, 90, 43, 0.6), rgba(101, 67, 33, 0.6)) !important;
+  border: 2px solid rgba(196, 165, 123, 0.6) !important;
+  border-radius: 6px;
+  color: #c4a57b;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.dmt-reroll-btn:hover {
+  background: linear-gradient(135deg, rgba(139, 90, 43, 0.8), rgba(101, 67, 33, 0.8)) !important;
+  border-color: #c4a57b !important;
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.dmt-reroll-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* Tablet adjustments */
+.is-tablet .dmt-reroll-btn {
+  width: 44px;
+  height: 44px;
+  right: 100px; /* Slightly more space on tablet */
+}
+
+.is-tablet .dmt-reroll-btn svg {
+  width: 22px;
+  height: 22px;
+}
+
+/* Re-roll confirmation dialog overlay */
+.dmt-reroll-confirm-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  backdrop-filter: blur(2px);
+}
+
+/* Re-roll confirmation dialog */
+.dmt-reroll-confirm-dialog {
+  background: var(--background-primary);
+  border: 2px solid rgba(196, 165, 123, 0.5);
+  border-radius: 8px;
+  padding: 24px;
+  max-width: 400px;
+  width: 90%;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.dmt-reroll-confirm-dialog h3 {
+  margin: 0 0 12px 0;
+  color: var(--text-normal);
+  font-size: 1.2em;
+}
+
+.dmt-reroll-confirm-dialog p {
+  margin: 0 0 12px 0;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.dmt-reroll-warning {
+  color: var(--text-error, #e74c3c) !important;
+  font-weight: 500;
+}
+
+.dmt-reroll-confirm-buttons {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+
+.dmt-btn {
+  padding: 8px 16px;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  font-size: 0.95em;
+  transition: all 0.15s ease;
+}
+
+.dmt-btn-secondary {
+  background: var(--background-modifier-border);
+  color: var(--text-normal);
+}
+
+.dmt-btn-secondary:hover {
+  background: var(--background-modifier-border-hover);
+}
+
+.dmt-btn-primary {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+.dmt-btn-primary:hover {
+  background: var(--interactive-accent-hover);
+}

@@ -36,6 +36,7 @@ const { DEFAULTS } = await requireModuleByName("dmtConstants.js");
 const { getColorByHex, isDefaultColor } = await requireModuleByName("colorOperations.js");
 const { axialToOffset, isWithinOffsetBounds } = await requireModuleByName("offsetCoordinates.js");
 const { ImageAlignmentMode } = await requireModuleByName("ImageAlignmentMode.jsx");
+const { ModalPortal } = await requireModuleByName("ModalPortal.jsx");
 
 // Layer system support (Phase 1: Z-Layer Architecture)
 const { getActiveLayer } = await requireModuleByName("layerAccessor.js");
@@ -44,6 +45,8 @@ const { LayerControls } = await requireModuleByName("LayerControls.jsx");
 // RPGAwesome icon font support
 const { RA_ICONS } = await requireModuleByName("rpgAwesomeIcons.js");
 const { injectIconCSS } = await requireModuleByName("rpgAwesomeLoader.js");
+
+
 
 // Inject RPGAwesome icon CSS classes on module load
 injectIconCSS(RA_ICONS);
@@ -784,6 +787,9 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 globalSettings={effectiveSettings}
                 mapDistanceOverrides={mapData?.settings?.distanceSettings}
               />
+              
+              {/* Re-roll button for generated dungeons */}
+              <MapCanvas.RerollDungeonButton />
             </MapCanvas>
           </div>
 

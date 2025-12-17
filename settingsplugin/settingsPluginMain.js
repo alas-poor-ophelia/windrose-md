@@ -1,6 +1,6 @@
 // settingsPluginMain.js - Template for Windrose MapDesigner Settings Plugin
 // Returns the plugin source as a string for templating by SettingsPluginInstaller
-// This wrapper allows the file to be dc.require()'d without Datacore trying to execute it as an Obsidian plugin
+// This wrapper allows the file to be dc.require()'d without Datacore trying to execute it as a standard script
 
 return `// settingsPluginMain.js - Windrose MapDesigner Settings Plugin
 // This file is generated from a template by SettingsPluginInstaller
@@ -49,14 +49,14 @@ const RA_CATEGORIES = {{RA_CATEGORIES}};
 
 // Quick symbols palette for object creation
 const QUICK_SYMBOLS = [
-  '★', '☆', '✦', '✧', '✪', '✫', '✯', '⚑',
+  '★', '☆', '✦', '✧', '✪', '✫', '✯', '⚒',
   '●', '○', '◆', '◇', '■', '□', '▲', '△', '▼', '▽',
   '♠', '♤', '♣', '♧', '♥', '♡', '♦', '♢',
-  '⚔', '⚒', '🗡', '🧹', '⚓', '⛏', '📱',
+  '⚔', '⚒', '🗡', '🧹', '⚔', '⛏', '📱',
   '☠', '⚠', '☢', '☣', '⚡', '🔥', '💧',
-  '⚑', '⚐', '⛳', '🚩', '➤', '➜', '⬤',
+  '⚒', '⚐', '⛳', '🚩', '➤', '➜', '⬤',
   '⚙', '⚗', '🔮', '💎', '🗝', '📜', '🎭', '👑',
-  '🛡', '🏰', '⛪', '🗿', '⚱', '🏺', '🪔'
+  '🛡', '🏰', '⛪', '🗿', '⚱', '🺺', '🪔'
 ];
 
 // =============================================================================
@@ -355,6 +355,237 @@ const RPGAwesomeHelpers = {
    */
   getInfo(iconClass) {
     return RA_ICONS[iconClass] || null;
+  }
+};
+
+// =============================================================================
+// DUNGEON GENERATOR
+// Procedural dungeon generation for random dungeon maps
+// =============================================================================
+
+const DungeonGenerator = {
+  // Presets for dungeon sizes
+  PRESETS: {
+    small: {
+      gridWidth: 25,
+      gridHeight: 25,
+      roomCount: { min: 4, max: 6 },
+      roomSize: { minWidth: 3, maxWidth: 6, minHeight: 3, maxHeight: 6 },
+      padding: 2,
+      corridorWidth: 1
+    },
+    medium: {
+      gridWidth: 40,
+      gridHeight: 40,
+      roomCount: { min: 6, max: 10 },
+      roomSize: { minWidth: 4, maxWidth: 8, minHeight: 4, maxHeight: 8 },
+      padding: 2,
+      corridorWidth: 1
+    },
+    large: {
+      gridWidth: 60,
+      gridHeight: 60,
+      roomCount: { min: 10, max: 15 },
+      roomSize: { minWidth: 4, maxWidth: 10, minHeight: 4, maxHeight: 10 },
+      padding: 3,
+      corridorWidth: 1
+    }
+  },
+  
+  // Default floor color (matches THEME.cells.fill)
+  DEFAULT_FLOOR_COLOR: '#c4a57b',
+  
+  // Random integer between min and max (inclusive)
+  randomInt(min, max) {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+  },
+  
+  // Check if two rectangles overlap (with padding)
+  rectanglesOverlap(a, b, padding = 0) {
+    return !(
+      a.x + a.width + padding <= b.x ||
+      b.x + b.width + padding <= a.x ||
+      a.y + a.height + padding <= b.y ||
+      b.y + b.height + padding <= a.y
+    );
+  },
+  
+  // Get room center point
+  getRoomCenter(room) {
+    return {
+      x: Math.floor(room.x + room.width / 2),
+      y: Math.floor(room.y + room.height / 2)
+    };
+  },
+  
+  // Phase 1: Generate rooms with collision detection
+  generateRooms(config) {
+    const { gridWidth, gridHeight, roomCount, roomSize, padding } = config;
+    
+    const targetCount = this.randomInt(roomCount.min, roomCount.max);
+    const rooms = [];
+    const maxAttempts = targetCount * 50;
+    let attempts = 0;
+    
+    while (rooms.length < targetCount && attempts < maxAttempts) {
+      attempts++;
+      
+      const width = this.randomInt(roomSize.minWidth, roomSize.maxWidth);
+      const height = this.randomInt(roomSize.minHeight, roomSize.maxHeight);
+      
+      const margin = padding + 1;
+      const maxX = gridWidth - width - margin;
+      const maxY = gridHeight - height - margin;
+      
+      if (maxX < margin || maxY < margin) continue;
+      
+      const x = this.randomInt(margin, maxX);
+      const y = this.randomInt(margin, maxY);
+      
+      const newRoom = { id: rooms.length, x, y, width, height };
+      
+      const hasOverlap = rooms.some(existing => 
+        this.rectanglesOverlap(newRoom, existing, padding)
+      );
+      
+      if (!hasOverlap) {
+        rooms.push(newRoom);
+      }
+    }
+    
+    return rooms;
+  },
+  
+  // Phase 2: Build connection graph (simple chain)
+  buildConnectionGraph(rooms) {
+    if (rooms.length < 2) return [];
+    
+    const sortedRooms = [...rooms].sort((a, b) => {
+      const centerA = this.getRoomCenter(a);
+      const centerB = this.getRoomCenter(b);
+      if (centerA.x !== centerB.x) return centerA.x - centerB.x;
+      return centerA.y - centerB.y;
+    });
+    
+    const connections = [];
+    for (let i = 0; i < sortedRooms.length - 1; i++) {
+      connections.push([sortedRooms[i], sortedRooms[i + 1]]);
+    }
+    
+    return connections;
+  },
+  
+  // Phase 3: Carve L-shaped corridor between two rooms
+  carveCorridorBetween(roomA, roomB, width = 1) {
+    const centerA = this.getRoomCenter(roomA);
+    const centerB = this.getRoomCenter(roomB);
+    
+    const cells = [];
+    const halfWidth = Math.floor(width / 2);
+    const horizontalFirst = Math.random() < 0.5;
+    
+    const startX = Math.min(centerA.x, centerB.x);
+    const endX = Math.max(centerA.x, centerB.x);
+    const startY = Math.min(centerA.y, centerB.y);
+    const endY = Math.max(centerA.y, centerB.y);
+    
+    if (horizontalFirst) {
+      // Horizontal segment at A's y level
+      for (let x = startX; x <= endX; x++) {
+        for (let w = -halfWidth; w <= halfWidth; w++) {
+          cells.push({ x, y: centerA.y + w });
+        }
+      }
+      // Vertical segment at B's x level
+      for (let y = startY; y <= endY; y++) {
+        for (let w = -halfWidth; w <= halfWidth; w++) {
+          cells.push({ x: centerB.x + w, y });
+        }
+      }
+    } else {
+      // Vertical segment at A's x level
+      for (let y = startY; y <= endY; y++) {
+        for (let w = -halfWidth; w <= halfWidth; w++) {
+          cells.push({ x: centerA.x + w, y });
+        }
+      }
+      // Horizontal segment at B's y level
+      for (let x = startX; x <= endX; x++) {
+        for (let w = -halfWidth; w <= halfWidth; w++) {
+          cells.push({ x, y: centerB.y + w });
+        }
+      }
+    }
+    
+    return cells;
+  },
+  
+  // Carve all corridors
+  carveCorridors(connections, corridorWidth = 1) {
+    const allCells = [];
+    for (const [roomA, roomB] of connections) {
+      allCells.push(...this.carveCorridorBetween(roomA, roomB, corridorWidth));
+    }
+    return allCells;
+  },
+  
+  // Get all cells for a room
+  getRoomCells(room) {
+    const cells = [];
+    for (let x = room.x; x < room.x + room.width; x++) {
+      for (let y = room.y; y < room.y + room.height; y++) {
+        cells.push({ x, y });
+      }
+    }
+    return cells;
+  },
+  
+  // Phase 4: Generate final cell array
+  generateCells(rooms, corridorCells, color) {
+    const cellMap = new Map();
+    
+    // Add room cells
+    for (const room of rooms) {
+      for (const cell of this.getRoomCells(room)) {
+        cellMap.set(cell.x + ',' + cell.y, { x: cell.x, y: cell.y, color });
+      }
+    }
+    
+    // Add corridor cells (deduplicates via Map)
+    for (const cell of corridorCells) {
+      cellMap.set(cell.x + ',' + cell.y, { x: cell.x, y: cell.y, color });
+    }
+    
+    return Array.from(cellMap.values());
+  },
+  
+  // Main orchestrator
+  generate(preset = 'medium', options = {}) {
+    const baseConfig = this.PRESETS[preset] || this.PRESETS.medium;
+    const config = {
+      ...baseConfig,
+      ...options,
+      roomCount: { ...baseConfig.roomCount, ...options.roomCount },
+      roomSize: { ...baseConfig.roomSize, ...options.roomSize }
+    };
+    
+    const color = options.color || this.DEFAULT_FLOOR_COLOR;
+    
+    const rooms = this.generateRooms(config);
+    const connections = this.buildConnectionGraph(rooms);
+    const corridorCells = this.carveCorridors(connections, config.corridorWidth);
+    const cells = this.generateCells(rooms, corridorCells, color);
+    
+    return {
+      cells,
+      metadata: {
+        rooms,
+        gridWidth: config.gridWidth,
+        gridHeight: config.gridHeight,
+        preset,
+        roomCount: rooms.length
+      }
+    };
   }
 };
 
@@ -1340,6 +1571,215 @@ class InsertMapModal extends Modal {
       if (e.key === 'Enter' && this.mapType) {
         e.preventDefault();
         this.onInsert(this.mapName, this.mapType);
+        this.close();
+      }
+    });
+  }
+  
+  onClose() {
+    this.contentEl.empty();
+  }
+}
+
+/**
+ * Modal for inserting a randomly generated dungeon map
+ */
+class InsertDungeonModal extends Modal {
+  constructor(app, onInsert) {
+    super(app);
+    this.onInsert = onInsert;
+    this.mapName = '';
+    this.dungeonSize = null; // 'small', 'medium', or 'large'
+    this.distancePerCell = 5;
+    this.distanceUnit = 'ft';
+  }
+  
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.addClass('dmt-insert-dungeon-modal');
+    
+    // Inject modal-specific styles if not already present
+    if (!document.getElementById('dmt-insert-dungeon-styles')) {
+      const styleEl = document.createElement('style');
+      styleEl.id = 'dmt-insert-dungeon-styles';
+      styleEl.textContent = \`
+        .dmt-insert-dungeon-modal { padding: 16px; min-width: 400px; }
+        .dmt-dungeon-size-selection { margin-top: 16px; }
+        .dmt-dungeon-size-buttons { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+        .dmt-dungeon-size-btn {
+          flex: 1;
+          padding: 12px 16px;
+          border: 2px solid var(--background-modifier-border);
+          border-radius: 6px;
+          background: var(--background-primary);
+          color: var(--text-normal);
+          cursor: pointer;
+          font-size: 1em;
+          font-weight: 500;
+          transition: all 0.15s ease;
+          text-align: center;
+        }
+        .dmt-dungeon-size-btn:hover {
+          border-color: var(--interactive-accent);
+          background: var(--background-secondary);
+        }
+        .dmt-dungeon-size-btn.selected {
+          border-color: var(--interactive-accent);
+          background: var(--interactive-accent);
+          color: var(--text-on-accent);
+        }
+
+        .dmt-dungeon-distance-row {
+          display: flex;
+          gap: 8px;
+          align-items: center;
+          margin-top: 8px;
+        }
+        .dmt-dungeon-distance-row input[type="number"] {
+          width: 80px;
+        }
+        .dmt-dungeon-distance-row input[type="text"] {
+          width: 60px;
+        }
+        .dmt-modal-buttons {
+          display: flex;
+          justify-content: flex-end;
+          gap: 8px;
+          margin-top: 16px;
+          padding-top: 16px;
+          border-top: 1px solid var(--background-modifier-border);
+        }
+        @keyframes dmt-shake {
+          0%, 100% { transform: translateX(0); }
+          25% { transform: translateX(-4px); }
+          75% { transform: translateX(4px); }
+        }
+        .dmt-shake { animation: dmt-shake 0.3s ease; }
+      \`;
+      document.head.appendChild(styleEl);
+    }
+    
+    contentEl.createEl('h2', { text: 'Generate Random Dungeon' });
+    
+    // Map name input
+    new Setting(contentEl)
+      .setName('Map name')
+      .setDesc('A display name for this dungeon map (can be left blank)')
+      .addText(text => {
+        this.nameInput = text;
+        text
+          .setPlaceholder('e.g., Goblin Cave Level 1')
+          .onChange(value => {
+            this.mapName = value;
+          });
+        // Focus the input after modal opens
+        setTimeout(() => text.inputEl.focus(), 10);
+      });
+    
+    // Dungeon size selection
+    const sizeContainer = contentEl.createDiv({ cls: 'dmt-dungeon-size-selection' });
+    sizeContainer.createEl('div', { text: 'Dungeon size', cls: 'setting-item-name' });
+    sizeContainer.createEl('div', { 
+      text: 'Choose the overall size of the generated dungeon', 
+      cls: 'setting-item-description' 
+    });
+    
+    const buttonRow = sizeContainer.createDiv({ cls: 'dmt-dungeon-size-buttons' });
+    
+    const presetInfo = {
+      small: { label: 'Small', desc: '4-6 rooms' },
+      medium: { label: 'Medium', desc: '6-10 rooms' },
+      large: { label: 'Large', desc: '10-15 rooms' }
+    };
+    
+    const buttons = {};
+    
+    for (const [preset, info] of Object.entries(presetInfo)) {
+      const btn = buttonRow.createEl('button', { 
+        cls: 'dmt-dungeon-size-btn',
+        text: info.label,
+        attr: { type: 'button', title: info.desc }
+      });
+      buttons[preset] = btn;
+      
+      btn.onclick = () => {
+        this.dungeonSize = preset;
+        Object.values(buttons).forEach(b => b.removeClass('selected'));
+        btn.addClass('selected');
+      };
+    }
+    
+    // Distance measurement settings
+    const distContainer = contentEl.createDiv({ cls: 'dmt-dungeon-size-selection' });
+    distContainer.createEl('div', { text: 'Distance measurement', cls: 'setting-item-name' });
+    distContainer.createEl('div', { 
+      text: 'Set the scale for distance measurement on this map', 
+      cls: 'setting-item-description' 
+    });
+    
+    const distRow = distContainer.createDiv({ cls: 'dmt-dungeon-distance-row' });
+    
+    const distInput = distRow.createEl('input', {
+      type: 'number',
+      value: String(this.distancePerCell),
+      attr: { min: '1', step: '1' }
+    });
+    distInput.addEventListener('change', (e) => {
+      this.distancePerCell = parseInt(e.target.value) || 5;
+    });
+    
+    distRow.createEl('span', { text: 'per cell, unit:' });
+    
+    const unitInput = distRow.createEl('input', {
+      type: 'text',
+      value: this.distanceUnit
+    });
+    unitInput.addEventListener('change', (e) => {
+      this.distanceUnit = e.target.value || 'ft';
+    });
+    
+    // Buttons
+    const buttonContainer = contentEl.createDiv({ cls: 'dmt-modal-buttons' });
+    
+    const cancelBtn = buttonContainer.createEl('button', { text: 'Cancel' });
+    cancelBtn.onclick = () => this.close();
+    
+    const generateBtn = buttonContainer.createEl('button', { text: 'Generate', cls: 'mod-cta' });
+    generateBtn.onclick = async () => {
+      if (!this.dungeonSize) {
+        // Brief visual feedback that size is required
+        buttonRow.addClass('dmt-shake');
+        setTimeout(() => buttonRow.removeClass('dmt-shake'), 300);
+        return;
+      }
+      
+      // Generate the dungeon
+      const result = DungeonGenerator.generate(this.dungeonSize);
+      
+      // Wait for the callback (which saves to JSON) before closing
+      await this.onInsert(this.mapName, result.cells, result.objects, {
+        distancePerCell: this.distancePerCell,
+        distanceUnit: this.distanceUnit,
+        preset: this.dungeonSize,
+        roomCount: result.metadata.roomCount,
+        doorCount: result.metadata.doorCount
+      });
+      this.close();
+    };
+    
+    // Handle Enter key to submit (if size is selected)
+    contentEl.addEventListener('keydown', async (e) => {
+      if (e.key === 'Enter' && this.dungeonSize) {
+        e.preventDefault();
+        const result = DungeonGenerator.generate(this.dungeonSize);
+        await this.onInsert(this.mapName, result.cells, result.objects, {
+          distancePerCell: this.distancePerCell,
+          distanceUnit: this.distanceUnit,
+          preset: this.dungeonSize,
+          roomCount: result.metadata.roomCount,
+          doorCount: result.metadata.doorCount
+        });
         this.close();
       }
     });
@@ -2424,9 +2864,150 @@ class WindroseMDSettingsPlugin extends Plugin {
         }).open();
       }
     });
+    
+    // Register command to generate a random dungeon
+    this.addCommand({
+      id: 'insert-random-dungeon',
+      name: 'Generate random dungeon',
+      editorCallback: async (editor, view) => {
+        new InsertDungeonModal(this.app, async (mapName, cells, objects, options) => {
+          const mapId = 'map-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+          
+          // Save the generated dungeon directly to JSON
+          await this.saveDungeonToJson(mapId, mapName, cells, objects, options);
+          
+          // Insert a clean codeblock (no embedded cell data)
+          const codeBlock = [
+            '\`\`\`datacorejsx',
+            '',
+            'const { View: DungeonMapTracker } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md.md"), "DungeonMapTracker"));',
+            '',
+            \`const mapId = "\${mapId}";\`,
+            \`const mapName = "\${mapName}";\`,
+            'const mapType = "grid";',
+            '',
+            'return <DungeonMapTracker mapId={mapId} mapName={mapName} mapType={mapType} />;',
+            '\`\`\`'
+          ].join('\\n');
+          
+          editor.replaceSelection(codeBlock);
+        }).open();
+      }
+    });
   }
 
   onunload() {}
+
+  /**
+   * Save a generated dungeon directly to the JSON data file
+   */
+  async saveDungeonToJson(mapId, mapName, cells, objects, options) {
+    // Path matches pathResolver.js getJsonPath()
+    const DATA_FILE_PATH = 'Garden/90 - Data/12 - Meta/JSON/dungeon-maps-data.json';
+    const SCHEMA_VERSION = 2;
+    
+    try {
+      let allData = { maps: {} };
+      
+      // Load existing data
+      const file = this.app.vault.getAbstractFileByPath(DATA_FILE_PATH);
+      if (file) {
+        const content = await this.app.vault.read(file);
+        allData = JSON.parse(content);
+      }
+      
+      if (!allData.maps) allData.maps = {};
+      
+      // Generate layer ID
+      const layerId = 'layer-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+      
+      // Calculate viewport center from generated cells (in grid cell coordinates)
+      let centerX = 5, centerY = 5;
+      const gridSize = 32;
+      if (cells.length > 0) {
+        const minX = Math.min(...cells.map(c => c.x));
+        const maxX = Math.max(...cells.map(c => c.x));
+        const minY = Math.min(...cells.map(c => c.y));
+        const maxY = Math.max(...cells.map(c => c.y));
+        // Center is in grid cell coordinates, NOT pixels
+        centerX = (minX + maxX) / 2;
+        centerY = (minY + maxY) / 2;
+      }
+      
+      // Create the map data structure
+      const mapData = {
+        name: mapName,
+        description: "",
+        mapType: "grid",
+        northDirection: 0,
+        customColors: [],
+        sidebarCollapsed: false,
+        expandedState: false,
+        // Store generation settings for re-roll feature
+        generationSettings: {
+          preset: options.preset,
+          distancePerCell: options.distancePerCell || 5,
+          distanceUnit: options.distanceUnit || 'ft'
+        },
+        settings: {
+          useGlobalSettings: false,
+          overrides: {
+            distancePerCellGrid: options.distancePerCell || 5,
+            distanceUnitGrid: options.distanceUnit || 'ft'
+          }
+        },
+        uiPreferences: {
+          rememberPanZoom: true,
+          rememberSidebarState: true,
+          rememberExpandedState: false
+        },
+        lastTextLabelSettings: null,
+        schemaVersion: SCHEMA_VERSION,
+        activeLayerId: layerId,
+        layerPanelVisible: false,
+        layers: [{
+          id: layerId,
+          name: 'Layer 1',
+          order: 0,
+          visible: true,
+          cells: cells,
+          edges: [],
+          objects: objects || [],
+          textLabels: [],
+          fogOfWar: null
+        }],
+        gridSize: gridSize,
+        dimensions: { width: 300, height: 300 },
+        viewState: {
+          zoom: 1.5,
+          center: { x: centerX, y: centerY }
+        }
+      };
+      
+      // Save to allData
+      allData.maps[mapId] = mapData;
+      
+      // Write back to file
+      const jsonString = JSON.stringify(allData, null, 2);
+      if (file) {
+        await this.app.vault.modify(file, jsonString);
+      } else {
+        // Create directory if needed
+        const dirPath = DATA_FILE_PATH.substring(0, DATA_FILE_PATH.lastIndexOf('/'));
+        try {
+          await this.app.vault.createFolder(dirPath);
+        } catch (e) {
+          // Folder may already exist
+        }
+        await this.app.vault.create(DATA_FILE_PATH, jsonString);
+      }
+      
+      console.log('[Windrose] Saved generated dungeon:', mapId, 'with', cells.length, 'cells and', (objects || []).length, 'objects');
+    } catch (error) {
+      console.error('[Windrose] Failed to save dungeon:', error);
+      throw error;
+    }
+  }
 
   async loadSettings() {
     try {
