@@ -1,17 +1,13 @@
-## Version 1.3.1
-Fast follow bug fixes.
+## Version 1.4.0
+The "Pathfinding sucks" release. Not Pathfinder; Path _finding_. But this is a fun one, I think?
 
 ### Features
-- Plugin now adds an "Insert new map" command. Search the command palette for "Windrose" (or "map"). 
-	- This technically makes the Templater script optional. I will continue shipping the Templater script for the next few releases at least. I may eventually phase it out of active release, but there's no reason at this point it can't keep working as an optional download, worst case.
+- You can now **generate random maps.**.
+	- Grid only, these are dungeon maps, I have no idea what a random world map would look like asides noise (which for now is the dedicated "purpose" of hex maps).
+	- Access via a new Plugin command "Generate random dungeon". Plugin only for now. Opens a modal that allows you to choose a size and name for your random dungeon, and then inserts it into your active note at your cursor.
+	- At least attempts to place logical doors, and a few other objects. This is meant as a **baseline** though, something you can change and doodle on with the standard Windrose tools, rather than a full dungeon, ready to run.
+	  
 
-### Improvements
-- The hover color on selected object/text actions was using the `--background-modifier-hover` attribute, which was a bit _too_ transparent, given that the selection toolbar has no background behind the buttons. That's now using `var(--background-primary-alt, var(--background-secondary))` and will just be solid for now. 
-
-### Bug Fixes
-- Fixed an issue where the preview box for multi select was placing itself in reference to the wrong container after a refactor and would appear out of place.
-- Fixed an issue where multi-selections were not clearing when a new tool was switched to.
-- Fixed a regression on persisting Text Label settings.
-- Fixed an issue where the selection toolbar could show up in the wrong position on some platforms.
-- Fixed a regression with Text Labels not rotating with the "R" keyboard shortcut.
-- Possibly fixed a longstanding issue where reloading Obsidian, or triggering a sync on another device when an object was actively selected could delete that object due to a race condition.
+And a couple important notes:
+1. This dungeon generation is pure math and graph theory, no AI involved. Windrose will **never** have AI features.
+2. I realize that the plugin is becoming increasingly "mandatory", which it was not at first. I'm keeping a careful eye on this and working on formalizing a direction for the future. So far no one has vocalized a complaint, so I don't think it's a big issue with the current user base, but I am compelled to acknowledge the discrepancy between earlier words and current actions.
