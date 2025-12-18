@@ -37,7 +37,8 @@ jobs:
           zip -r ../windrose-md-v${{ steps.version.outputs.version }}.zip \
             compiled-windrose-md.md \
             "WindroseMD Map Block.md" \
-            "WindroseMD - FONTS (Snippet).css"
+            "WindroseMD - FONTS (Snippet).css" \
+            "Fog of war.jpg"
           cd ..
       
       - name: Create GitHub Release
