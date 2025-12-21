@@ -31,7 +31,7 @@ const RerollDungeonButton = () => {
   };
   
   const handleConfirm = () => {
-    const result = generateDungeon(settings.preset);
+    const result = generateDungeon(settings.preset, undefined, settings.configOverrides || {});
     // Replace cells and objects on active layer with new generated content
     // suppressHistory = false so this can be undone
     onCellsChange(result.cells, false);
@@ -43,12 +43,14 @@ const RerollDungeonButton = () => {
     setShowConfirm(false);
   };
   
+  const styleName = settings.configOverrides?.style || 'classic';
+  
   return (
     <>
       <button
         className="dmt-tool-btn dmt-reroll-btn interactive-child"
         onClick={handleClick}
-        title={`Re-roll dungeon (${settings.preset})`}
+        title={`Re-roll dungeon (${styleName} ${settings.preset})`}
       >
         <dc.Icon icon="lucide-dices" />
       </button>

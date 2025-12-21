@@ -16,43 +16,107 @@
 
 const DUNGEON_PRESETS = {
   small: {
-    gridWidth: 25,
-    gridHeight: 25,
-    roomCount: { min: 4, max: 6 },
-    roomSize: { minWidth: 3, maxWidth: 6, minHeight: 3, maxHeight: 6 },
-    padding: 2,
+    // "Tight Lair" - cramped goblin den, linear flow, get in and get out
+    gridWidth: 20,
+    gridHeight: 20,
+    roomCount: { min: 3, max: 5 },
+    roomSize: { minWidth: 3, maxWidth: 5, minHeight: 3, maxHeight: 5 },
+    padding: 1,
     corridorWidth: 1,
-    circleChance: 0.3,
-    loopChance: 0.05,
+    corridorStyle: 'straight',
+    circleChance: 0.15,
+    complexRoomChance: 0.1,
+    loopChance: 0,
     doorChance: 0.7,
     secretDoorChance: 0.05,
     wideCorridorChance: 0
   },
   medium: {
+    // "Complex" - classic dungeon, multiple paths, exploration, some grand halls
     gridWidth: 40,
     gridHeight: 40,
-    roomCount: { min: 6, max: 10 },
+    roomCount: { min: 8, max: 12 },
     roomSize: { minWidth: 4, maxWidth: 8, minHeight: 4, maxHeight: 8 },
     padding: 2,
     corridorWidth: 1,
+    corridorStyle: 'straight',
     circleChance: 0.3,
-    loopChance: 0.05,
+    complexRoomChance: 0.15,
+    loopChance: 0.15,
     doorChance: 0.7,
     secretDoorChance: 0.05,
-    wideCorridorChance: 0
+    wideCorridorChance: 0.25
   },
   large: {
+    // "Grand" - fortress/temple scale, grand corridors, many chambers, sprawling
     gridWidth: 60,
     gridHeight: 60,
     roomCount: { min: 10, max: 15 },
     roomSize: { minWidth: 4, maxWidth: 10, minHeight: 4, maxHeight: 10 },
     padding: 3,
     corridorWidth: 1,
+    corridorStyle: 'straight',
     circleChance: 0.3,
-    loopChance: 0.05,
+    complexRoomChance: 0.15,
+    loopChance: 0.08,
     doorChance: 0.7,
     secretDoorChance: 0.05,
-    wideCorridorChance: 0.4
+    wideCorridorChance: 0.5
+  }
+};
+
+// =============================================================================
+// DUNGEON STYLES
+// Styles are overlay configurations applied on top of size presets.
+// They define the "flavor" of the dungeon independent of its size.
+// =============================================================================
+
+const DUNGEON_STYLES = {
+  classic: {
+    // Default balanced dungeon - no overrides needed
+    name: 'Classic',
+    description: 'Balanced mix of rooms and corridors',
+    overrides: {}
+  },
+  cavern: {
+    name: 'Cavern',
+    description: 'Natural cave system with organic passages',
+    overrides: {
+      circleChance: 0.6,
+      complexRoomChance: 0.05,
+      corridorStyle: 'organic',
+      doorChance: 0,
+      secretDoorChance: 0,
+      loopChance: 0.2,
+      roomSizeBias: 0.3
+    }
+  },
+  fortress: {
+    name: 'Fortress',
+    description: 'Military structure with wide corridors and many doors',
+    overrides: {
+      circleChance: 0,
+      complexRoomChance: 0.25,
+      corridorStyle: 'straight',
+      doorChance: 0.95,
+      secretDoorChance: 0.02,
+      wideCorridorChance: 0.7,
+      roomSizeBias: -0.2
+    }
+  },
+  crypt: {
+    name: 'Crypt',
+    description: 'Tight passages with hidden chambers',
+    overrides: {
+      circleChance: 0.1,
+      complexRoomChance: 0.1,
+      corridorStyle: 'straight',
+      doorChance: 0.5,
+      secretDoorChance: 0.2,
+      loopChance: 0.02,
+      wideCorridorChance: 0,
+      roomSizeBias: -0.4
+    }
   }
 };
 
@@ -64,6 +128,25 @@ const DEFAULT_FLOOR_COLOR = '#c4a57b';
 
 function randomInt(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+/**
+ * Generate a random integer with bias toward min or max.
+ * @param {number} min - Minimum value
+ * @param {number} max - Maximum value  
+ * @param {number} bias - Bias from -1 (favor min/compact) to 1 (favor max/spacious), 0 = uniform
+ */
+function biasedRandomInt(min, max, bias = 0) {
+  if (bias === 0) return randomInt(min, max);
+  
+  // Use power curve to skew distribution
+  // bias > 0: skew toward max (spacious)
+  // bias < 0: skew toward min (compact)
+  const t = Math.random();
+  const exponent = bias > 0 ? 1 / (1 + bias * 2) : 1 + Math.abs(bias) * 2;
+  const skewed = Math.pow(t, exponent);
+  
+  return Math.floor(min + skewed * (max - min + 1));
 }
 
 function rectanglesOverlap(a, b, padding = 0) {
@@ -106,6 +189,14 @@ function isCellInRoom(x, y, room) {
     return dx * dx + dy * dy <= room.radius * room.radius;
   }
   
+  if (room.shape === 'composite') {
+    // Check if cell is in any of the room's parts
+    return room.parts.some(part => 
+      x >= part.x && x < part.x + part.width &&
+      y >= part.y && y < part.y + part.height
+    );
+  }
+  
   return true;
 }
 
@@ -123,6 +214,178 @@ function generateObjectId() {
 }
 
 // =============================================================================
+// COMPOSITE ROOM GENERATION (L and T shapes)
+// =============================================================================
+
+/**
+ * Generate an L-shaped room from two overlapping rectangles.
+ * The L can be in any of 4 orientations.
+ * @param {number} x - Base x position
+ * @param {number} y - Base y position  
+ * @param {Object} roomSize - {minWidth, maxWidth, minHeight, maxHeight}
+ * @param {number} bias - Room size bias (-1 to 1)
+ * @returns {Object} Room with shape='composite' and parts array
+ */
+function generateLShapedRoom(x, y, roomSize, bias = 0) {
+  // Generate two rectangles that will form the L
+  // First rectangle is the "stem", second is the "foot"
+  const stemWidth = biasedRandomInt(roomSize.minWidth, roomSize.maxWidth, bias);
+  const stemHeight = biasedRandomInt(Math.max(roomSize.minHeight, 4), roomSize.maxHeight + 2, bias);
+  
+  const footWidth = biasedRandomInt(roomSize.minWidth, roomSize.maxWidth + 2, bias);
+  const footHeight = biasedRandomInt(Math.max(2, Math.floor(roomSize.minHeight / 2)), Math.floor(roomSize.maxHeight / 2) + 1, bias);
+  
+  // Choose orientation (which corner the L bends toward)
+  const orientation = randomInt(0, 3);
+  
+  let parts;
+  switch (orientation) {
+    case 0: // └ shape - foot extends right from bottom of stem
+      parts = [
+        { x: x, y: y, width: stemWidth, height: stemHeight },
+        { x: x + stemWidth - Math.min(2, stemWidth - 1), y: y + stemHeight - footHeight, width: footWidth, height: footHeight }
+      ];
+      break;
+    case 1: // ┘ shape - foot extends left from bottom of stem
+      parts = [
+        { x: x + footWidth - Math.min(2, footWidth - 1), y: y, width: stemWidth, height: stemHeight },
+        { x: x, y: y + stemHeight - footHeight, width: footWidth, height: footHeight }
+      ];
+      break;
+    case 2: // ┐ shape - foot extends left from top of stem  
+      parts = [
+        { x: x + footWidth - Math.min(2, footWidth - 1), y: y + footHeight - Math.min(2, footHeight - 1), width: stemWidth, height: stemHeight },
+        { x: x, y: y, width: footWidth, height: footHeight }
+      ];
+      break;
+    case 3: // ┌ shape - foot extends right from top of stem
+    default:
+      parts = [
+        { x: x, y: y + footHeight - Math.min(2, footHeight - 1), width: stemWidth, height: stemHeight },
+        { x: x + stemWidth - Math.min(2, stemWidth - 1), y: y, width: footWidth, height: footHeight }
+      ];
+      break;
+  }
+  
+  // Calculate bounding box
+  const minX = Math.min(...parts.map(p => p.x));
+  const minY = Math.min(...parts.map(p => p.y));
+  const maxX = Math.max(...parts.map(p => p.x + p.width));
+  const maxY = Math.max(...parts.map(p => p.y + p.height));
+  
+  // Normalize parts to be relative to bounding box origin
+  const normalizedParts = parts.map(p => ({
+    x: p.x - minX + x,
+    y: p.y - minY + y,
+    width: p.width,
+    height: p.height
+  }));
+  
+  return {
+    x: x,
+    y: y,
+    width: maxX - minX,
+    height: maxY - minY,
+    shape: 'composite',
+    compositeType: 'L',
+    parts: normalizedParts
+  };
+}
+
+/**
+ * Generate a T-shaped room from two overlapping rectangles.
+ * The T can be in any of 4 orientations.
+ * @param {number} x - Base x position
+ * @param {number} y - Base y position
+ * @param {Object} roomSize - {minWidth, maxWidth, minHeight, maxHeight}
+ * @param {number} bias - Room size bias (-1 to 1)
+ * @returns {Object} Room with shape='composite' and parts array
+ */
+function generateTShapedRoom(x, y, roomSize, bias = 0) {
+  // T-shape needs a minimum size to look good
+  const stemWidth = biasedRandomInt(Math.max(2, roomSize.minWidth - 1), Math.max(3, roomSize.maxWidth - 2), bias);
+  const stemHeight = biasedRandomInt(Math.max(roomSize.minHeight, 4), roomSize.maxHeight + 2, bias);
+  
+  const capWidth = biasedRandomInt(roomSize.minWidth + 2, roomSize.maxWidth + 4, bias);
+  const capHeight = biasedRandomInt(2, Math.floor(roomSize.maxHeight / 2) + 1, bias);
+  
+  // Choose orientation
+  const orientation = randomInt(0, 3);
+  
+  let parts;
+  const stemOffset = Math.floor((capWidth - stemWidth) / 2);
+  
+  switch (orientation) {
+    case 0: // ┴ shape - cap on bottom
+      parts = [
+        { x: x + stemOffset, y: y, width: stemWidth, height: stemHeight },
+        { x: x, y: y + stemHeight - Math.min(2, capHeight), width: capWidth, height: capHeight }
+      ];
+      break;
+    case 1: // ┬ shape - cap on top
+      parts = [
+        { x: x + stemOffset, y: y + capHeight - Math.min(2, capHeight), width: stemWidth, height: stemHeight },
+        { x: x, y: y, width: capWidth, height: capHeight }
+      ];
+      break;
+    case 2: // ┤ shape - cap on left (rotated T)
+      parts = [
+        { x: x + capHeight - Math.min(2, capHeight), y: y + stemOffset, width: stemHeight, height: stemWidth },
+        { x: x, y: y, width: capHeight, height: capWidth }
+      ];
+      break;
+    case 3: // ├ shape - cap on right (rotated T)
+    default:
+      parts = [
+        { x: x, y: y + stemOffset, width: stemHeight, height: stemWidth },
+        { x: x + stemHeight - Math.min(2, capHeight), y: y, width: capHeight, height: capWidth }
+      ];
+      break;
+  }
+  
+  // Calculate bounding box
+  const minX = Math.min(...parts.map(p => p.x));
+  const minY = Math.min(...parts.map(p => p.y));
+  const maxX = Math.max(...parts.map(p => p.x + p.width));
+  const maxY = Math.max(...parts.map(p => p.y + p.height));
+  
+  // Normalize parts to bounding box origin
+  const normalizedParts = parts.map(p => ({
+    x: p.x - minX + x,
+    y: p.y - minY + y,
+    width: p.width,
+    height: p.height
+  }));
+  
+  return {
+    x: x,
+    y: y,
+    width: maxX - minX,
+    height: maxY - minY,
+    shape: 'composite',
+    compositeType: 'T',
+    parts: normalizedParts
+  };
+}
+
+/**
+ * Generate a composite (L or T shaped) room.
+ * 70% chance of L-shape, 30% chance of T-shape.
+ * @param {number} x - Base x position
+ * @param {number} y - Base y position
+ * @param {Object} roomSize - {minWidth, maxWidth, minHeight, maxHeight}
+ * @param {number} bias - Room size bias
+ * @returns {Object} Composite room
+ */
+function generateCompositeRoom(x, y, roomSize, bias = 0) {
+  if (Math.random() < 0.7) {
+    return generateLShapedRoom(x, y, roomSize, bias);
+  } else {
+    return generateTShapedRoom(x, y, roomSize, bias);
+  }
+}
+
+// =============================================================================
 // PHASE 1: ROOM GENERATION
 // =============================================================================
 
@@ -133,7 +396,9 @@ function generateRooms(config) {
     roomCount,
     roomSize,
     padding,
-    circleChance = 0
+    circleChance = 0,
+    complexRoomChance = 0,
+    roomSizeBias = 0
   } = config;
   
   const targetCount = randomInt(roomCount.min, roomCount.max);
@@ -144,13 +409,17 @@ function generateRooms(config) {
   while (rooms.length < targetCount && attempts < maxAttempts) {
     attempts++;
     
-    const isCircle = Math.random() < circleChance;
+    // Determine room type: circle, composite (L/T), or rectangle
+    const roll = Math.random();
+    const isCircle = roll < circleChance;
+    const isComposite = !isCircle && roll < circleChance + complexRoomChance;
+    
     let newRoom;
     
     if (isCircle) {
       const minRadius = Math.floor(Math.min(roomSize.minWidth, roomSize.minHeight) / 2);
       const maxRadius = Math.floor(Math.max(roomSize.maxWidth, roomSize.maxHeight) / 2);
-      const radius = randomInt(Math.max(2, minRadius), Math.max(3, maxRadius));
+      const radius = biasedRandomInt(Math.max(2, minRadius), Math.max(3, maxRadius), roomSizeBias);
       const diameter = radius * 2;
       
       const margin = padding + 1;
@@ -170,9 +439,31 @@ function generateRooms(config) {
         shape: 'circle',
         radius
       };
+    } else if (isComposite) {
+      // Generate composite room, then check if it fits
+      const margin = padding + 1;
+      
+      // Estimate max bounds for composite (they can be larger than normal rooms)
+      const estimatedMaxSize = roomSize.maxWidth + roomSize.maxHeight;
+      const maxX = gridWidth - estimatedMaxSize - margin;
+      const maxY = gridHeight - estimatedMaxSize - margin;
+      
+      if (maxX < margin || maxY < margin) continue;
+      
+      const x = randomInt(margin, maxX);
+      const y = randomInt(margin, maxY);
+      
+      newRoom = generateCompositeRoom(x, y, roomSize, roomSizeBias);
+      newRoom.id = rooms.length;
+      
+      // Verify the room fits within grid bounds
+      if (newRoom.x + newRoom.width > gridWidth - margin ||
+          newRoom.y + newRoom.height > gridHeight - margin) {
+        continue;
+      }
     } else {
-      const width = randomInt(roomSize.minWidth, roomSize.maxWidth);
-      const height = randomInt(roomSize.minHeight, roomSize.maxHeight);
+      const width = biasedRandomInt(roomSize.minWidth, roomSize.maxWidth, roomSizeBias);
+      const height = biasedRandomInt(roomSize.minHeight, roomSize.maxHeight, roomSizeBias);
       
       const margin = padding + 1;
       const maxX = gridWidth - width - margin;
@@ -673,12 +964,18 @@ function wouldRunAdjacentToRoom(centerA, centerB, horizontalFirst, allRooms, roo
   return false;
 }
 
-function carveCorridors(connections, corridorWidth = 1, allRooms = []) {
+function carveCorridors(connections, corridorWidth = 1, allRooms = [], corridorStyle = 'straight') {
   const allCorridorCells = [];
   const corridorsByConnection = [];
   
   for (const [roomA, roomB] of connections) {
-    const result = carveCorridorBetween(roomA, roomB, corridorWidth, allRooms);
+    let result = carveCorridorBetween(roomA, roomB, corridorWidth, allRooms);
+    
+    // Apply wobble for organic style
+    if (corridorStyle === 'organic') {
+      result = addCorridorWobble(result, allRooms, roomA, roomB);
+    }
+    
     allCorridorCells.push(...result.cells);
     corridorsByConnection.push({
       roomA,
@@ -690,6 +987,304 @@ function carveCorridors(connections, corridorWidth = 1, allRooms = []) {
   }
   
   return { cells: allCorridorCells, byConnection: corridorsByConnection };
+}
+
+// =============================================================================
+// ORGANIC CORRIDOR GENERATION (Wobble/Wander)
+// =============================================================================
+
+/**
+ * Check if a wobble at position (x,y) would cause adjacency issues.
+ * @param {number} x - X coordinate
+ * @param {number} y - Y coordinate
+ * @param {Array} allRooms - All rooms in the dungeon
+ * @param {Object} roomA - Source room (allowed to be adjacent)
+ * @param {Object} roomB - Dest room (allowed to be adjacent)
+ * @param {Set} existingCells - Set of "x,y" keys for existing corridor cells
+ * @returns {boolean} True if wobble would cause issues
+ */
+function wouldWobbleCauseIssues(x, y, allRooms, roomA, roomB, existingCells) {
+  // Check adjacency to rooms other than source/dest
+  for (const room of allRooms) {
+    if (room.id === roomA.id || room.id === roomB.id) continue;
+    
+    // Don't wobble into another room
+    if (isCellInRoomRect(x, y, room)) return true;
+    
+    // Don't wobble adjacent to another room
+    if (isCellAdjacentToRoom(x, y, room)) return true;
+  }
+  
+  return false;
+}
+
+/**
+ * Determine the direction of a path segment (horizontal, vertical, or turning).
+ * @param {Object} prev - Previous point {x, y}
+ * @param {Object} curr - Current point {x, y}
+ * @param {Object} next - Next point {x, y}
+ * @returns {string} 'horizontal', 'vertical', or 'turn'
+ */
+function getSegmentDirection(prev, curr, next) {
+  if (!prev || !next) return 'end';
+  
+  const fromPrev = { dx: curr.x - prev.x, dy: curr.y - prev.y };
+  const toNext = { dx: next.x - curr.x, dy: next.y - curr.y };
+  
+  // Check if direction changes (it's a turn)
+  if ((fromPrev.dx !== 0 && toNext.dy !== 0) || (fromPrev.dy !== 0 && toNext.dx !== 0)) {
+    return 'turn';
+  }
+  
+  if (fromPrev.dx !== 0 || toNext.dx !== 0) return 'horizontal';
+  if (fromPrev.dy !== 0 || toNext.dy !== 0) return 'vertical';
+  
+  return 'unknown';
+}
+
+/**
+ * Find straight runs in the ordered path (sequences of 4+ cells in same direction).
+ * @param {Array} orderedPath - Array of {x, y} points
+ * @returns {Array} Array of {startIdx, endIdx, direction} for each straight run
+ */
+function findStraightRuns(orderedPath) {
+  const runs = [];
+  if (orderedPath.length < 4) return runs;
+  
+  let runStart = 0;
+  let runDirection = null;
+  
+  for (let i = 1; i < orderedPath.length; i++) {
+    const prev = orderedPath[i - 1];
+    const curr = orderedPath[i];
+    
+    const dx = curr.x - prev.x;
+    const dy = curr.y - prev.y;
+    const direction = dx !== 0 ? 'horizontal' : 'vertical';
+    
+    if (direction !== runDirection) {
+      // End previous run if it was long enough
+      if (runDirection && i - runStart >= 4) {
+        runs.push({ startIdx: runStart, endIdx: i - 1, direction: runDirection });
+      }
+      runStart = i - 1;
+      runDirection = direction;
+    }
+  }
+  
+  // Check final run
+  if (runDirection && orderedPath.length - runStart >= 4) {
+    runs.push({ startIdx: runStart, endIdx: orderedPath.length - 1, direction: runDirection });
+  }
+  
+  return runs;
+}
+
+/**
+ * Apply wobble to a straight corridor, making it more organic.
+ * @param {Object} corridorResult - Result from carveCorridorBetween
+ * @param {Array} allRooms - All rooms for collision checking
+ * @param {Object} roomA - Source room
+ * @param {Object} roomB - Destination room
+ * @returns {Object} Modified corridor result with wobbled path
+ */
+function addCorridorWobble(corridorResult, allRooms, roomA, roomB) {
+  const { orderedPath, width } = corridorResult;
+  
+  // Don't wobble very short corridors
+  if (orderedPath.length < 6) return corridorResult;
+  
+  // Find straight runs that are candidates for wobble
+  const runs = findStraightRuns(orderedPath);
+  if (runs.length === 0) return corridorResult;
+  
+  // Create a mutable copy of the path
+  const wobbledPath = orderedPath.map(p => ({ ...p }));
+  
+  // Build set of existing cells for self-intersection check
+  const existingCells = new Set(corridorResult.cells.map(c => `${c.x},${c.y}`));
+  
+  // Wobble settings
+  const wobbleChance = 0.25; // Chance to start a wobble
+  const wobblePersist = 0.7; // Chance to continue wobbling in same direction
+  
+  for (const run of runs) {
+    // Don't wobble the first 2 or last 2 cells of a run (keep entries/exits clean)
+    const safeStart = run.startIdx + 2;
+    const safeEnd = run.endIdx - 2;
+    
+    if (safeEnd <= safeStart) continue;
+    
+    let currentWobble = 0; // -1, 0, or 1
+    
+    for (let i = safeStart; i <= safeEnd; i++) {
+      const point = wobbledPath[i];
+      
+      // Decide whether to change wobble state
+      if (currentWobble === 0) {
+        // Maybe start wobbling
+        if (Math.random() < wobbleChance) {
+          currentWobble = Math.random() < 0.5 ? 1 : -1;
+        }
+      } else {
+        // Maybe stop or continue wobbling
+        if (Math.random() > wobblePersist) {
+          currentWobble = 0;
+        }
+      }
+      
+      if (currentWobble !== 0) {
+        // Calculate the wobbled position
+        let newX = point.x;
+        let newY = point.y;
+        
+        if (run.direction === 'horizontal') {
+          newY = point.y + currentWobble;
+        } else {
+          newX = point.x + currentWobble;
+        }
+        
+        // Check if wobble is safe
+        if (!wouldWobbleCauseIssues(newX, newY, allRooms, roomA, roomB, existingCells)) {
+          point.x = newX;
+          point.y = newY;
+        } else {
+          // Can't wobble here, reset wobble state
+          currentWobble = 0;
+        }
+      }
+    }
+  }
+  
+  // Rebuild cells from wobbled path, filling diagonal gaps
+  const newCells = rebuildCellsFromPath(wobbledPath, width, allRooms, roomA, roomB);
+  
+  return {
+    cells: newCells,
+    orderedPath: wobbledPath,
+    width
+  };
+}
+
+/**
+ * Check if adding a fill cell at (x,y) would cause issues with room adjacency.
+ * @returns {boolean} True if fill would cause problems
+ */
+function wouldFillCauseIssues(x, y, allRooms, roomA, roomB) {
+  for (const room of allRooms) {
+    if (room.id === roomA.id || room.id === roomB.id) continue;
+    
+    // Don't fill into another room
+    if (isCellInRoomRect(x, y, room)) return true;
+    
+    // Don't fill adjacent to another room
+    if (isCellAdjacentToRoom(x, y, room)) return true;
+  }
+  return false;
+}
+
+/**
+ * Rebuild the full cells array from a (possibly wobbled) centerline path.
+ * Fills in diagonal gaps to ensure all cells are orthogonally connected.
+ * @param {Array} path - Array of {x, y} centerline points
+ * @param {number} width - Corridor width
+ * @param {Array} allRooms - All rooms for fill safety checking
+ * @param {Object} roomA - Source room
+ * @param {Object} roomB - Destination room
+ * @returns {Array} Array of {x, y} cells
+ */
+function rebuildCellsFromPath(path, width, allRooms = [], roomA = null, roomB = null) {
+  const cellSet = new Set();
+  const cells = [];
+  
+  const startOffset = -Math.floor((width - 1) / 2);
+  const endOffset = Math.floor(width / 2);
+  
+  /**
+   * Add a cell and its width expansion to the cell set
+   */
+  const addCellWithWidth = (x, y, expandDir) => {
+    if (expandDir === 'vertical' || expandDir === 'both') {
+      for (let w = startOffset; w <= endOffset; w++) {
+        const key = `${x},${y + w}`;
+        if (!cellSet.has(key)) {
+          cellSet.add(key);
+          cells.push({ x: x, y: y + w });
+        }
+      }
+    }
+    if (expandDir === 'horizontal' || expandDir === 'both') {
+      for (let w = startOffset; w <= endOffset; w++) {
+        const key = `${x + w},${y}`;
+        if (!cellSet.has(key)) {
+          cellSet.add(key);
+          cells.push({ x: x + w, y: y });
+        }
+      }
+    }
+  };
+  
+  for (let i = 0; i < path.length; i++) {
+    const curr = path[i];
+    const prev = path[i - 1];
+    const next = path[i + 1];
+    
+    // Check for diagonal step from prev to curr - need to fill the gap
+    if (prev) {
+      const dx = curr.x - prev.x;
+      const dy = curr.y - prev.y;
+      
+      if (dx !== 0 && dy !== 0) {
+        // Diagonal step detected - add fill cell(s) to connect orthogonally
+        // Two options: (prev.x, curr.y) or (curr.x, prev.y)
+        const fill1 = { x: prev.x, y: curr.y };
+        const fill2 = { x: curr.x, y: prev.y };
+        
+        // Check which fills are safe
+        const fill1Safe = !roomA || !wouldFillCauseIssues(fill1.x, fill1.y, allRooms, roomA, roomB);
+        const fill2Safe = !roomA || !wouldFillCauseIssues(fill2.x, fill2.y, allRooms, roomA, roomB);
+        
+        // Add safe fill(s) - prefer adding both for a smoother corner if both are safe
+        if (fill1Safe && fill2Safe) {
+          // Add both for a nice filled corner
+          addCellWithWidth(fill1.x, fill1.y, 'both');
+          addCellWithWidth(fill2.x, fill2.y, 'both');
+        } else if (fill1Safe) {
+          addCellWithWidth(fill1.x, fill1.y, 'both');
+        } else if (fill2Safe) {
+          addCellWithWidth(fill2.x, fill2.y, 'both');
+        }
+        // If neither is safe, we skip the fill - corridor may have a gap
+        // but this shouldn't happen often since we validate wobbles
+      }
+    }
+    
+    // Determine segment direction for width expansion
+    let direction = 'both'; // Default: expand in both directions for corners
+    
+    if (prev && next) {
+      const fromPrev = { dx: curr.x - prev.x, dy: curr.y - prev.y };
+      const toNext = { dx: next.x - curr.x, dy: next.y - curr.y };
+      
+      // If moving horizontally, expand vertically
+      if (fromPrev.dx !== 0 && toNext.dx !== 0 && fromPrev.dy === 0 && toNext.dy === 0) {
+        direction = 'vertical';
+      }
+      // If moving vertically, expand horizontally
+      else if (fromPrev.dy !== 0 && toNext.dy !== 0 && fromPrev.dx === 0 && toNext.dx === 0) {
+        direction = 'horizontal';
+      }
+    } else if (prev) {
+      direction = (prev.x !== curr.x) ? 'vertical' : 'horizontal';
+    } else if (next) {
+      direction = (next.x !== curr.x) ? 'vertical' : 'horizontal';
+    }
+    
+    // Add cells for this path point
+    addCellWithWidth(curr.x, curr.y, direction);
+  }
+  
+  return cells;
 }
 
 // =============================================================================
@@ -992,8 +1587,18 @@ function generateCells(rooms, corridorCells, color = DEFAULT_FLOOR_COLOR) {
 // MAIN GENERATION FUNCTION
 // =============================================================================
 
-function generateDungeon(presetName = 'medium', color = DEFAULT_FLOOR_COLOR) {
-  const config = DUNGEON_PRESETS[presetName] || DUNGEON_PRESETS.medium;
+function generateDungeon(presetName = 'medium', color = DEFAULT_FLOOR_COLOR, configOverrides = {}) {
+  const baseConfig = DUNGEON_PRESETS[presetName] || DUNGEON_PRESETS.medium;
+  
+  // Apply style overrides if a style is specified
+  let styleOverrides = {};
+  if (configOverrides.style && DUNGEON_STYLES[configOverrides.style]) {
+    styleOverrides = DUNGEON_STYLES[configOverrides.style].overrides;
+  }
+  
+  // Merge: base preset <- style overrides <- user overrides
+  // This allows user to tweak a style's defaults
+  const config = { ...baseConfig, ...styleOverrides, ...configOverrides };
   
   // Phase 1: Generate rooms
   const rooms = generateRooms(config);
@@ -1004,7 +1609,8 @@ function generateDungeon(presetName = 'medium', color = DEFAULT_FLOOR_COLOR) {
   // Phase 3: Carve corridors
   const useWideCorridors = Math.random() < (config.wideCorridorChance || 0);
   const corridorWidth = useWideCorridors ? 2 : (config.corridorWidth || 1);
-  const corridorResult = carveCorridors(connections, corridorWidth, rooms);
+  const corridorStyle = config.corridorStyle || 'straight';
+  const corridorResult = carveCorridors(connections, corridorWidth, rooms, corridorStyle);
   const corridorCells = corridorResult.cells;
   const corridorsByConnection = corridorResult.byConnection;
   
@@ -1054,6 +1660,7 @@ function generateDungeon(presetName = 'medium', color = DEFAULT_FLOOR_COLOR) {
 return {
   generateDungeon,
   DUNGEON_PRESETS,
+  DUNGEON_STYLES,
   DEFAULT_FLOOR_COLOR,
   
   // Individual phases

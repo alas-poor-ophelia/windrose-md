@@ -1,17 +1,26 @@
 // SettingsPluginInstaller.jsx - Inline prompt for settings plugin installation
+console.log("[SettingsPluginInstaller] Initializing installer component");
 
 const pathResolverPath = dc.resolvePath("pathResolver.js");
+console.log("[SettingsPluginInstaller] Resolving pathResolver at:", pathResolverPath);
 const { requireModuleByName } = await dc.require(pathResolverPath);
+console.log("[SettingsPluginInstaller] Loaded pathResolver module");
 const { THEME, DEFAULTS } = await requireModuleByName("dmtConstants.js");
 const { WindroseCompass } = await requireModuleByName("WindroseCompass.jsx");
 
-const SETTINGS_PLUGIN_TEMPLATE = await requireModuleByName("settingsPluginMain.js");
+// Use the assembler to get the plugin template and CSS
+const { assembleSettingsPlugin, getStylesCSS, ASSEMBLER_VERSION } = await requireModuleByName("settingsPluginAssembler.js");
+const SETTINGS_PLUGIN_TEMPLATE = assembleSettingsPlugin();
+const SETTINGS_PLUGIN_CSS = getStylesCSS();
+
+console.log('[SettingsPluginInstaller] Using assembler version:', ASSEMBLER_VERSION);
 
 const { OBJECT_TYPES, CATEGORIES } = await requireModuleByName("objectTypes.js");
 const { RA_ICONS, RA_CATEGORIES } = await requireModuleByName("rpgAwesomeIcons.js");
+const QUICK_SYMBOLS = await requireModuleByName("settingsPlugin-quickSymbols.js");
 
 // Plugin version from template
-const PACKAGED_PLUGIN_VERSION = '0.10.2';
+const PACKAGED_PLUGIN_VERSION = '0.11.12';
 
 // LocalStorage keys for tracking user preferences
 const STORAGE_KEYS = {
@@ -43,8 +52,8 @@ function compareVersions(v1, v2) {
  */
 function getInstalledPluginVersion() {
   try {
-    const plugin = dc.app.plugins.plugins['dungeon-map-tracker-settings'];
-    return plugin?.manifest?.version || null;
+    // Use manifests object directly - plugin.manifest may be undefined even when plugin exists
+    return dc.app.plugins.manifests['dungeon-map-tracker-settings']?.version || null;
   } catch (error) {
     return null;
   }
@@ -128,7 +137,8 @@ function generateMainJs() {
     .replace('{{BUILT_IN_CATEGORIES}}', JSON.stringify(CATEGORIES, null, 2))
     .replace('{{CATEGORY_ORDER}}', JSON.stringify(categoryOrder, null, 2))
     .replace('{{RA_ICONS}}', escapeUnicode(JSON.stringify(RA_ICONS, null, 2)))
-    .replace('{{RA_CATEGORIES}}', JSON.stringify(RA_CATEGORIES, null, 2));
+    .replace('{{RA_CATEGORIES}}', JSON.stringify(RA_CATEGORIES, null, 2))
+    .replace('{{QUICK_SYMBOLS}}', JSON.stringify(QUICK_SYMBOLS));
 }
 
 const SettingsPluginInstaller = ({ onInstall, onDecline, mode = 'auto' }) => {
@@ -169,6 +179,14 @@ const SettingsPluginInstaller = ({ onInstall, onDecline, mode = 'auto' }) => {
       // Write main.js from template
       const mainJs = generateMainJs();
       await adapter.write(`${pluginDir}/main.js`, mainJs);
+
+      // Write styles.css for Obsidian to load automatically
+      if (SETTINGS_PLUGIN_CSS) {
+        await adapter.write(`${pluginDir}/styles.css`, SETTINGS_PLUGIN_CSS);
+        console.log('[SettingsPluginInstaller] Wrote styles.css');
+      } else {
+        console.warn('[SettingsPluginInstaller] No CSS content available - inline styles will be used');
+      }
 
       // Create initial data.json with defaults from dmtConstants
       const defaultData = {
@@ -247,6 +265,12 @@ const SettingsPluginInstaller = ({ onInstall, onDecline, mode = 'auto' }) => {
       // Write updated main.js from template
       const mainJs = generateMainJs();
       await adapter.write(`${pluginDir}/main.js`, mainJs);
+
+      // Write/update styles.css for Obsidian to load automatically
+      if (SETTINGS_PLUGIN_CSS) {
+        await adapter.write(`${pluginDir}/styles.css`, SETTINGS_PLUGIN_CSS);
+        console.log('[SettingsPluginInstaller] Updated styles.css');
+      }
 
       // DO NOT overwrite data.json - preserve user settings
 
