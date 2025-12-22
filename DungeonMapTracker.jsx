@@ -38,7 +38,6 @@ const { axialToOffset, isWithinOffsetBounds } = await requireModuleByName("offse
 const { ImageAlignmentMode } = await requireModuleByName("ImageAlignmentMode.jsx");
 const { ModalPortal } = await requireModuleByName("ModalPortal.jsx");
 
-// Layer system support (Phase 1: Z-Layer Architecture)
 const { getActiveLayer } = await requireModuleByName("layerAccessor.js");
 const { LayerControls } = await requireModuleByName("LayerControls.jsx");
 

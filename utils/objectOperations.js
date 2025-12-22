@@ -71,7 +71,7 @@ function addObject(objects, typeId, x, y) {
     position: { x, y },
     size: { width: 1, height: 1 },
     label: objectType.label,
-    linkedNote: null,  // Phase 1: Note integration - path to linked note
+    linkedNote: null,  
     alignment: 'center'  // Default: 'center' | 'north' | 'south' | 'east' | 'west'
   };
   

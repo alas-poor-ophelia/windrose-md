@@ -1,10 +1,8 @@
 // SettingsPluginInstaller.jsx - Inline prompt for settings plugin installation
-console.log("[SettingsPluginInstaller] Initializing installer component");
-
 const pathResolverPath = dc.resolvePath("pathResolver.js");
-console.log("[SettingsPluginInstaller] Resolving pathResolver at:", pathResolverPath);
+
 const { requireModuleByName } = await dc.require(pathResolverPath);
-console.log("[SettingsPluginInstaller] Loaded pathResolver module");
+
 const { THEME, DEFAULTS } = await requireModuleByName("dmtConstants.js");
 const { WindroseCompass } = await requireModuleByName("WindroseCompass.jsx");
 
@@ -13,14 +11,13 @@ const { assembleSettingsPlugin, getStylesCSS, ASSEMBLER_VERSION } = await requir
 const SETTINGS_PLUGIN_TEMPLATE = assembleSettingsPlugin();
 const SETTINGS_PLUGIN_CSS = getStylesCSS();
 
-console.log('[SettingsPluginInstaller] Using assembler version:', ASSEMBLER_VERSION);
 
 const { OBJECT_TYPES, CATEGORIES } = await requireModuleByName("objectTypes.js");
 const { RA_ICONS, RA_CATEGORIES } = await requireModuleByName("rpgAwesomeIcons.js");
 const QUICK_SYMBOLS = await requireModuleByName("settingsPlugin-quickSymbols.js");
 
 // Plugin version from template
-const PACKAGED_PLUGIN_VERSION = '0.11.12';
+const PACKAGED_PLUGIN_VERSION = '0.12.6';
 
 // LocalStorage keys for tracking user preferences
 const STORAGE_KEYS = {
@@ -96,10 +93,10 @@ function shouldOfferUpgrade() {
 function generateManifest() {
   return {
     id: 'dungeon-map-tracker-settings',
-    name: 'Windrose MapDesigner Settings',
+    name: 'Windrose MapDesigner',
     version: PACKAGED_PLUGIN_VERSION,
     minAppVersion: '0.15.0',
-    description: 'Global settings for Windrose MapDesigner - customize default colors, hex orientation, and visual preferences.',
+    description: 'Global settings and commands for Windrose MapDesigner - customize default colors, hex orientation, and visual preferences.',
     author: 'Windrose MD',
     isDesktopOnly: false
   };
@@ -183,7 +180,6 @@ const SettingsPluginInstaller = ({ onInstall, onDecline, mode = 'auto' }) => {
       // Write styles.css for Obsidian to load automatically
       if (SETTINGS_PLUGIN_CSS) {
         await adapter.write(`${pluginDir}/styles.css`, SETTINGS_PLUGIN_CSS);
-        console.log('[SettingsPluginInstaller] Wrote styles.css');
       } else {
         console.warn('[SettingsPluginInstaller] No CSS content available - inline styles will be used');
       }
@@ -269,7 +265,6 @@ const SettingsPluginInstaller = ({ onInstall, onDecline, mode = 'auto' }) => {
       // Write/update styles.css for Obsidian to load automatically
       if (SETTINGS_PLUGIN_CSS) {
         await adapter.write(`${pluginDir}/styles.css`, SETTINGS_PLUGIN_CSS);
-        console.log('[SettingsPluginInstaller] Updated styles.css');
       }
 
       // DO NOT overwrite data.json - preserve user settings

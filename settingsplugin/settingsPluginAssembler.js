@@ -20,7 +20,8 @@ const HELPER_FILES = [
   'settingsPlugin-ColorHelpers.js',
   'settingsPlugin-DragHelpers.js',
   'settingsPlugin-IconHelpers.js',
-  'settingsPlugin-RPGAwesomeHelpers.js'
+  'settingsPlugin-RPGAwesomeHelpers.js',
+  'settingsPlugin-DungeonEssenceVisualizer.js'
 ];
 
 // Modal files to load (order doesn't matter - each is self-contained)
