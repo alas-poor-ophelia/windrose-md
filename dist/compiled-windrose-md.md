@@ -1,9 +1,9 @@
 <!-- Compiled by Datacore Script Compiler -->
 <!-- Source: Projects/dungeon-map-tracker -->
 <!-- Main Component: DungeonMapTracker -->
-<!-- Compiled: 2025-12-18T05:31:12.859Z -->
-<!-- Files: 93 -->
-<!-- Version: 1.4.1 -->
+<!-- Compiled: 2025-12-22T22:10:24.246Z -->
+<!-- Files: 95 -->
+<!-- Version: 1.4.2 -->
 <!-- CSS Files: 1 -->
 
 # Demo
@@ -6595,7 +6595,7 @@ function addObject(objects, typeId, x, y) {
     position: { x, y },
     size: { width: 1, height: 1 },
     label: objectType.label,
-    linkedNote: null,  // Phase 1: Note integration - path to linked note
+    linkedNote: null,  
     alignment: 'center'  // Default: 'center' | 'north' | 'south' | 'east' | 'west'
   };
   
@@ -18342,43 +18342,107 @@ return { FogOfWarLayer };
 
 const DUNGEON_PRESETS = {
   small: {
-    gridWidth: 25,
-    gridHeight: 25,
-    roomCount: { min: 4, max: 6 },
-    roomSize: { minWidth: 3, maxWidth: 6, minHeight: 3, maxHeight: 6 },
-    padding: 2,
+    // "Tight Lair" - cramped goblin den, linear flow, get in and get out
+    gridWidth: 20,
+    gridHeight: 20,
+    roomCount: { min: 3, max: 5 },
+    roomSize: { minWidth: 3, maxWidth: 5, minHeight: 3, maxHeight: 5 },
+    padding: 1,
     corridorWidth: 1,
-    circleChance: 0.3,
-    loopChance: 0.05,
+    corridorStyle: 'straight',
+    circleChance: 0.15,
+    complexRoomChance: 0.1,
+    loopChance: 0,
     doorChance: 0.7,
     secretDoorChance: 0.05,
     wideCorridorChance: 0
   },
   medium: {
+    // "Complex" - classic dungeon, multiple paths, exploration, some grand halls
     gridWidth: 40,
     gridHeight: 40,
-    roomCount: { min: 6, max: 10 },
+    roomCount: { min: 8, max: 12 },
     roomSize: { minWidth: 4, maxWidth: 8, minHeight: 4, maxHeight: 8 },
     padding: 2,
     corridorWidth: 1,
+    corridorStyle: 'straight',
     circleChance: 0.3,
-    loopChance: 0.05,
+    complexRoomChance: 0.15,
+    loopChance: 0.15,
     doorChance: 0.7,
     secretDoorChance: 0.05,
-    wideCorridorChance: 0
+    wideCorridorChance: 0.25
   },
   large: {
+    // "Grand" - fortress/temple scale, grand corridors, many chambers, sprawling
     gridWidth: 60,
     gridHeight: 60,
     roomCount: { min: 10, max: 15 },
     roomSize: { minWidth: 4, maxWidth: 10, minHeight: 4, maxHeight: 10 },
     padding: 3,
     corridorWidth: 1,
+    corridorStyle: 'straight',
     circleChance: 0.3,
-    loopChance: 0.05,
+    complexRoomChance: 0.15,
+    loopChance: 0.08,
     doorChance: 0.7,
     secretDoorChance: 0.05,
-    wideCorridorChance: 0.4
+    wideCorridorChance: 0.5
+  }
+};
+
+// =============================================================================
+// DUNGEON STYLES
+// Styles are overlay configurations applied on top of size presets.
+// They define the "flavor" of the dungeon independent of its size.
+// =============================================================================
+
+const DUNGEON_STYLES = {
+  classic: {
+    // Default balanced dungeon - no overrides needed
+    name: 'Classic',
+    description: 'Balanced mix of rooms and corridors',
+    overrides: {}
+  },
+  cavern: {
+    name: 'Cavern',
+    description: 'Natural cave system with organic passages',
+    overrides: {
+      circleChance: 0.6,
+      complexRoomChance: 0.05,
+      corridorStyle: 'organic',
+      doorChance: 0,
+      secretDoorChance: 0,
+      loopChance: 0.2,
+      roomSizeBias: 0.3
+    }
+  },
+  fortress: {
+    name: 'Fortress',
+    description: 'Military structure with wide corridors and many doors',
+    overrides: {
+      circleChance: 0,
+      complexRoomChance: 0.25,
+      corridorStyle: 'straight',
+      doorChance: 0.95,
+      secretDoorChance: 0.02,
+      wideCorridorChance: 0.7,
+      roomSizeBias: -0.2
+    }
+  },
+  crypt: {
+    name: 'Crypt',
+    description: 'Tight passages with hidden chambers',
+    overrides: {
+      circleChance: 0.1,
+      complexRoomChance: 0.1,
+      corridorStyle: 'straight',
+      doorChance: 0.5,
+      secretDoorChance: 0.2,
+      loopChance: 0.02,
+      wideCorridorChance: 0,
+      roomSizeBias: -0.4
+    }
   }
 };
 
@@ -18390,6 +18454,25 @@ const DEFAULT_FLOOR_COLOR = '#c4a57b';
 
 function randomInt(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+/**
+ * Generate a random integer with bias toward min or max.
+ * @param {number} min - Minimum value
+ * @param {number} max - Maximum value  
+ * @param {number} bias - Bias from -1 (favor min/compact) to 1 (favor max/spacious), 0 = uniform
+ */
+function biasedRandomInt(min, max, bias = 0) {
+  if (bias === 0) return randomInt(min, max);
+  
+  // Use power curve to skew distribution
+  // bias > 0: skew toward max (spacious)
+  // bias < 0: skew toward min (compact)
+  const t = Math.random();
+  const exponent = bias > 0 ? 1 / (1 + bias * 2) : 1 + Math.abs(bias) * 2;
+  const skewed = Math.pow(t, exponent);
+  
+  return Math.floor(min + skewed * (max - min + 1));
 }
 
 function rectanglesOverlap(a, b, padding = 0) {
@@ -18432,6 +18515,14 @@ function isCellInRoom(x, y, room) {
     return dx * dx + dy * dy <= room.radius * room.radius;
   }
   
+  if (room.shape === 'composite') {
+    // Check if cell is in any of the room's parts
+    return room.parts.some(part => 
+      x >= part.x && x < part.x + part.width &&
+      y >= part.y && y < part.y + part.height
+    );
+  }
+  
   return true;
 }
 
@@ -18449,6 +18540,178 @@ function generateObjectId() {
 }
 
 // =============================================================================
+// COMPOSITE ROOM GENERATION (L and T shapes)
+// =============================================================================
+
+/**
+ * Generate an L-shaped room from two overlapping rectangles.
+ * The L can be in any of 4 orientations.
+ * @param {number} x - Base x position
+ * @param {number} y - Base y position  
+ * @param {Object} roomSize - {minWidth, maxWidth, minHeight, maxHeight}
+ * @param {number} bias - Room size bias (-1 to 1)
+ * @returns {Object} Room with shape='composite' and parts array
+ */
+function generateLShapedRoom(x, y, roomSize, bias = 0) {
+  // Generate two rectangles that will form the L
+  // First rectangle is the "stem", second is the "foot"
+  const stemWidth = biasedRandomInt(roomSize.minWidth, roomSize.maxWidth, bias);
+  const stemHeight = biasedRandomInt(Math.max(roomSize.minHeight, 4), roomSize.maxHeight + 2, bias);
+  
+  const footWidth = biasedRandomInt(roomSize.minWidth, roomSize.maxWidth + 2, bias);
+  const footHeight = biasedRandomInt(Math.max(2, Math.floor(roomSize.minHeight / 2)), Math.floor(roomSize.maxHeight / 2) + 1, bias);
+  
+  // Choose orientation (which corner the L bends toward)
+  const orientation = randomInt(0, 3);
+  
+  let parts;
+  switch (orientation) {
+    case 0: // └ shape - foot extends right from bottom of stem
+      parts = [
+        { x: x, y: y, width: stemWidth, height: stemHeight },
+        { x: x + stemWidth - Math.min(2, stemWidth - 1), y: y + stemHeight - footHeight, width: footWidth, height: footHeight }
+      ];
+      break;
+    case 1: // ┘ shape - foot extends left from bottom of stem
+      parts = [
+        { x: x + footWidth - Math.min(2, footWidth - 1), y: y, width: stemWidth, height: stemHeight },
+        { x: x, y: y + stemHeight - footHeight, width: footWidth, height: footHeight }
+      ];
+      break;
+    case 2: // ┐ shape - foot extends left from top of stem  
+      parts = [
+        { x: x + footWidth - Math.min(2, footWidth - 1), y: y + footHeight - Math.min(2, footHeight - 1), width: stemWidth, height: stemHeight },
+        { x: x, y: y, width: footWidth, height: footHeight }
+      ];
+      break;
+    case 3: // ┌ shape - foot extends right from top of stem
+    default:
+      parts = [
+        { x: x, y: y + footHeight - Math.min(2, footHeight - 1), width: stemWidth, height: stemHeight },
+        { x: x + stemWidth - Math.min(2, stemWidth - 1), y: y, width: footWidth, height: footHeight }
+      ];
+      break;
+  }
+  
+  // Calculate bounding box
+  const minX = Math.min(...parts.map(p => p.x));
+  const minY = Math.min(...parts.map(p => p.y));
+  const maxX = Math.max(...parts.map(p => p.x + p.width));
+  const maxY = Math.max(...parts.map(p => p.y + p.height));
+  
+  // Normalize parts to be relative to bounding box origin
+  const normalizedParts = parts.map(p => ({
+    x: p.x - minX + x,
+    y: p.y - minY + y,
+    width: p.width,
+    height: p.height
+  }));
+  
+  return {
+    x: x,
+    y: y,
+    width: maxX - minX,
+    height: maxY - minY,
+    shape: 'composite',
+    compositeType: 'L',
+    parts: normalizedParts
+  };
+}
+
+/**
+ * Generate a T-shaped room from two overlapping rectangles.
+ * The T can be in any of 4 orientations.
+ * @param {number} x - Base x position
+ * @param {number} y - Base y position
+ * @param {Object} roomSize - {minWidth, maxWidth, minHeight, maxHeight}
+ * @param {number} bias - Room size bias (-1 to 1)
+ * @returns {Object} Room with shape='composite' and parts array
+ */
+function generateTShapedRoom(x, y, roomSize, bias = 0) {
+  // T-shape needs a minimum size to look good
+  const stemWidth = biasedRandomInt(Math.max(2, roomSize.minWidth - 1), Math.max(3, roomSize.maxWidth - 2), bias);
+  const stemHeight = biasedRandomInt(Math.max(roomSize.minHeight, 4), roomSize.maxHeight + 2, bias);
+  
+  const capWidth = biasedRandomInt(roomSize.minWidth + 2, roomSize.maxWidth + 4, bias);
+  const capHeight = biasedRandomInt(2, Math.floor(roomSize.maxHeight / 2) + 1, bias);
+  
+  // Choose orientation
+  const orientation = randomInt(0, 3);
+  
+  let parts;
+  const stemOffset = Math.floor((capWidth - stemWidth) / 2);
+  
+  switch (orientation) {
+    case 0: // ┴ shape - cap on bottom
+      parts = [
+        { x: x + stemOffset, y: y, width: stemWidth, height: stemHeight },
+        { x: x, y: y + stemHeight - Math.min(2, capHeight), width: capWidth, height: capHeight }
+      ];
+      break;
+    case 1: // ┬ shape - cap on top
+      parts = [
+        { x: x + stemOffset, y: y + capHeight - Math.min(2, capHeight), width: stemWidth, height: stemHeight },
+        { x: x, y: y, width: capWidth, height: capHeight }
+      ];
+      break;
+    case 2: // ┤ shape - cap on left (rotated T)
+      parts = [
+        { x: x + capHeight - Math.min(2, capHeight), y: y + stemOffset, width: stemHeight, height: stemWidth },
+        { x: x, y: y, width: capHeight, height: capWidth }
+      ];
+      break;
+    case 3: // ├ shape - cap on right (rotated T)
+    default:
+      parts = [
+        { x: x, y: y + stemOffset, width: stemHeight, height: stemWidth },
+        { x: x + stemHeight - Math.min(2, capHeight), y: y, width: capHeight, height: capWidth }
+      ];
+      break;
+  }
+  
+  // Calculate bounding box
+  const minX = Math.min(...parts.map(p => p.x));
+  const minY = Math.min(...parts.map(p => p.y));
+  const maxX = Math.max(...parts.map(p => p.x + p.width));
+  const maxY = Math.max(...parts.map(p => p.y + p.height));
+  
+  // Normalize parts to bounding box origin
+  const normalizedParts = parts.map(p => ({
+    x: p.x - minX + x,
+    y: p.y - minY + y,
+    width: p.width,
+    height: p.height
+  }));
+  
+  return {
+    x: x,
+    y: y,
+    width: maxX - minX,
+    height: maxY - minY,
+    shape: 'composite',
+    compositeType: 'T',
+    parts: normalizedParts
+  };
+}
+
+/**
+ * Generate a composite (L or T shaped) room.
+ * 70% chance of L-shape, 30% chance of T-shape.
+ * @param {number} x - Base x position
+ * @param {number} y - Base y position
+ * @param {Object} roomSize - {minWidth, maxWidth, minHeight, maxHeight}
+ * @param {number} bias - Room size bias
+ * @returns {Object} Composite room
+ */
+function generateCompositeRoom(x, y, roomSize, bias = 0) {
+  if (Math.random() < 0.7) {
+    return generateLShapedRoom(x, y, roomSize, bias);
+  } else {
+    return generateTShapedRoom(x, y, roomSize, bias);
+  }
+}
+
+// =============================================================================
 // PHASE 1: ROOM GENERATION
 // =============================================================================
 
@@ -18459,7 +18722,9 @@ function generateRooms(config) {
     roomCount,
     roomSize,
     padding,
-    circleChance = 0
+    circleChance = 0,
+    complexRoomChance = 0,
+    roomSizeBias = 0
   } = config;
   
   const targetCount = randomInt(roomCount.min, roomCount.max);
@@ -18470,13 +18735,17 @@ function generateRooms(config) {
   while (rooms.length < targetCount && attempts < maxAttempts) {
     attempts++;
     
-    const isCircle = Math.random() < circleChance;
+    // Determine room type: circle, composite (L/T), or rectangle
+    const roll = Math.random();
+    const isCircle = roll < circleChance;
+    const isComposite = !isCircle && roll < circleChance + complexRoomChance;
+    
     let newRoom;
     
     if (isCircle) {
       const minRadius = Math.floor(Math.min(roomSize.minWidth, roomSize.minHeight) / 2);
       const maxRadius = Math.floor(Math.max(roomSize.maxWidth, roomSize.maxHeight) / 2);
-      const radius = randomInt(Math.max(2, minRadius), Math.max(3, maxRadius));
+      const radius = biasedRandomInt(Math.max(2, minRadius), Math.max(3, maxRadius), roomSizeBias);
       const diameter = radius * 2;
       
       const margin = padding + 1;
@@ -18496,9 +18765,31 @@ function generateRooms(config) {
         shape: 'circle',
         radius
       };
+    } else if (isComposite) {
+      // Generate composite room, then check if it fits
+      const margin = padding + 1;
+      
+      // Estimate max bounds for composite (they can be larger than normal rooms)
+      const estimatedMaxSize = roomSize.maxWidth + roomSize.maxHeight;
+      const maxX = gridWidth - estimatedMaxSize - margin;
+      const maxY = gridHeight - estimatedMaxSize - margin;
+      
+      if (maxX < margin || maxY < margin) continue;
+      
+      const x = randomInt(margin, maxX);
+      const y = randomInt(margin, maxY);
+      
+      newRoom = generateCompositeRoom(x, y, roomSize, roomSizeBias);
+      newRoom.id = rooms.length;
+      
+      // Verify the room fits within grid bounds
+      if (newRoom.x + newRoom.width > gridWidth - margin ||
+          newRoom.y + newRoom.height > gridHeight - margin) {
+        continue;
+      }
     } else {
-      const width = randomInt(roomSize.minWidth, roomSize.maxWidth);
-      const height = randomInt(roomSize.minHeight, roomSize.maxHeight);
+      const width = biasedRandomInt(roomSize.minWidth, roomSize.maxWidth, roomSizeBias);
+      const height = biasedRandomInt(roomSize.minHeight, roomSize.maxHeight, roomSizeBias);
       
       const margin = padding + 1;
       const maxX = gridWidth - width - margin;
@@ -18999,12 +19290,18 @@ function wouldRunAdjacentToRoom(centerA, centerB, horizontalFirst, allRooms, roo
   return false;
 }
 
-function carveCorridors(connections, corridorWidth = 1, allRooms = []) {
+function carveCorridors(connections, corridorWidth = 1, allRooms = [], corridorStyle = 'straight') {
   const allCorridorCells = [];
   const corridorsByConnection = [];
   
   for (const [roomA, roomB] of connections) {
-    const result = carveCorridorBetween(roomA, roomB, corridorWidth, allRooms);
+    let result = carveCorridorBetween(roomA, roomB, corridorWidth, allRooms);
+    
+    // Apply wobble for organic style
+    if (corridorStyle === 'organic') {
+      result = addCorridorWobble(result, allRooms, roomA, roomB);
+    }
+    
     allCorridorCells.push(...result.cells);
     corridorsByConnection.push({
       roomA,
@@ -19016,6 +19313,304 @@ function carveCorridors(connections, corridorWidth = 1, allRooms = []) {
   }
   
   return { cells: allCorridorCells, byConnection: corridorsByConnection };
+}
+
+// =============================================================================
+// ORGANIC CORRIDOR GENERATION (Wobble/Wander)
+// =============================================================================
+
+/**
+ * Check if a wobble at position (x,y) would cause adjacency issues.
+ * @param {number} x - X coordinate
+ * @param {number} y - Y coordinate
+ * @param {Array} allRooms - All rooms in the dungeon
+ * @param {Object} roomA - Source room (allowed to be adjacent)
+ * @param {Object} roomB - Dest room (allowed to be adjacent)
+ * @param {Set} existingCells - Set of "x,y" keys for existing corridor cells
+ * @returns {boolean} True if wobble would cause issues
+ */
+function wouldWobbleCauseIssues(x, y, allRooms, roomA, roomB, existingCells) {
+  // Check adjacency to rooms other than source/dest
+  for (const room of allRooms) {
+    if (room.id === roomA.id || room.id === roomB.id) continue;
+    
+    // Don't wobble into another room
+    if (isCellInRoomRect(x, y, room)) return true;
+    
+    // Don't wobble adjacent to another room
+    if (isCellAdjacentToRoom(x, y, room)) return true;
+  }
+  
+  return false;
+}
+
+/**
+ * Determine the direction of a path segment (horizontal, vertical, or turning).
+ * @param {Object} prev - Previous point {x, y}
+ * @param {Object} curr - Current point {x, y}
+ * @param {Object} next - Next point {x, y}
+ * @returns {string} 'horizontal', 'vertical', or 'turn'
+ */
+function getSegmentDirection(prev, curr, next) {
+  if (!prev || !next) return 'end';
+  
+  const fromPrev = { dx: curr.x - prev.x, dy: curr.y - prev.y };
+  const toNext = { dx: next.x - curr.x, dy: next.y - curr.y };
+  
+  // Check if direction changes (it's a turn)
+  if ((fromPrev.dx !== 0 && toNext.dy !== 0) || (fromPrev.dy !== 0 && toNext.dx !== 0)) {
+    return 'turn';
+  }
+  
+  if (fromPrev.dx !== 0 || toNext.dx !== 0) return 'horizontal';
+  if (fromPrev.dy !== 0 || toNext.dy !== 0) return 'vertical';
+  
+  return 'unknown';
+}
+
+/**
+ * Find straight runs in the ordered path (sequences of 4+ cells in same direction).
+ * @param {Array} orderedPath - Array of {x, y} points
+ * @returns {Array} Array of {startIdx, endIdx, direction} for each straight run
+ */
+function findStraightRuns(orderedPath) {
+  const runs = [];
+  if (orderedPath.length < 4) return runs;
+  
+  let runStart = 0;
+  let runDirection = null;
+  
+  for (let i = 1; i < orderedPath.length; i++) {
+    const prev = orderedPath[i - 1];
+    const curr = orderedPath[i];
+    
+    const dx = curr.x - prev.x;
+    const dy = curr.y - prev.y;
+    const direction = dx !== 0 ? 'horizontal' : 'vertical';
+    
+    if (direction !== runDirection) {
+      // End previous run if it was long enough
+      if (runDirection && i - runStart >= 4) {
+        runs.push({ startIdx: runStart, endIdx: i - 1, direction: runDirection });
+      }
+      runStart = i - 1;
+      runDirection = direction;
+    }
+  }
+  
+  // Check final run
+  if (runDirection && orderedPath.length - runStart >= 4) {
+    runs.push({ startIdx: runStart, endIdx: orderedPath.length - 1, direction: runDirection });
+  }
+  
+  return runs;
+}
+
+/**
+ * Apply wobble to a straight corridor, making it more organic.
+ * @param {Object} corridorResult - Result from carveCorridorBetween
+ * @param {Array} allRooms - All rooms for collision checking
+ * @param {Object} roomA - Source room
+ * @param {Object} roomB - Destination room
+ * @returns {Object} Modified corridor result with wobbled path
+ */
+function addCorridorWobble(corridorResult, allRooms, roomA, roomB) {
+  const { orderedPath, width } = corridorResult;
+  
+  // Don't wobble very short corridors
+  if (orderedPath.length < 6) return corridorResult;
+  
+  // Find straight runs that are candidates for wobble
+  const runs = findStraightRuns(orderedPath);
+  if (runs.length === 0) return corridorResult;
+  
+  // Create a mutable copy of the path
+  const wobbledPath = orderedPath.map(p => ({ ...p }));
+  
+  // Build set of existing cells for self-intersection check
+  const existingCells = new Set(corridorResult.cells.map(c => `${c.x},${c.y}`));
+  
+  // Wobble settings
+  const wobbleChance = 0.25; // Chance to start a wobble
+  const wobblePersist = 0.7; // Chance to continue wobbling in same direction
+  
+  for (const run of runs) {
+    // Don't wobble the first 2 or last 2 cells of a run (keep entries/exits clean)
+    const safeStart = run.startIdx + 2;
+    const safeEnd = run.endIdx - 2;
+    
+    if (safeEnd <= safeStart) continue;
+    
+    let currentWobble = 0; // -1, 0, or 1
+    
+    for (let i = safeStart; i <= safeEnd; i++) {
+      const point = wobbledPath[i];
+      
+      // Decide whether to change wobble state
+      if (currentWobble === 0) {
+        // Maybe start wobbling
+        if (Math.random() < wobbleChance) {
+          currentWobble = Math.random() < 0.5 ? 1 : -1;
+        }
+      } else {
+        // Maybe stop or continue wobbling
+        if (Math.random() > wobblePersist) {
+          currentWobble = 0;
+        }
+      }
+      
+      if (currentWobble !== 0) {
+        // Calculate the wobbled position
+        let newX = point.x;
+        let newY = point.y;
+        
+        if (run.direction === 'horizontal') {
+          newY = point.y + currentWobble;
+        } else {
+          newX = point.x + currentWobble;
+        }
+        
+        // Check if wobble is safe
+        if (!wouldWobbleCauseIssues(newX, newY, allRooms, roomA, roomB, existingCells)) {
+          point.x = newX;
+          point.y = newY;
+        } else {
+          // Can't wobble here, reset wobble state
+          currentWobble = 0;
+        }
+      }
+    }
+  }
+  
+  // Rebuild cells from wobbled path, filling diagonal gaps
+  const newCells = rebuildCellsFromPath(wobbledPath, width, allRooms, roomA, roomB);
+  
+  return {
+    cells: newCells,
+    orderedPath: wobbledPath,
+    width
+  };
+}
+
+/**
+ * Check if adding a fill cell at (x,y) would cause issues with room adjacency.
+ * @returns {boolean} True if fill would cause problems
+ */
+function wouldFillCauseIssues(x, y, allRooms, roomA, roomB) {
+  for (const room of allRooms) {
+    if (room.id === roomA.id || room.id === roomB.id) continue;
+    
+    // Don't fill into another room
+    if (isCellInRoomRect(x, y, room)) return true;
+    
+    // Don't fill adjacent to another room
+    if (isCellAdjacentToRoom(x, y, room)) return true;
+  }
+  return false;
+}
+
+/**
+ * Rebuild the full cells array from a (possibly wobbled) centerline path.
+ * Fills in diagonal gaps to ensure all cells are orthogonally connected.
+ * @param {Array} path - Array of {x, y} centerline points
+ * @param {number} width - Corridor width
+ * @param {Array} allRooms - All rooms for fill safety checking
+ * @param {Object} roomA - Source room
+ * @param {Object} roomB - Destination room
+ * @returns {Array} Array of {x, y} cells
+ */
+function rebuildCellsFromPath(path, width, allRooms = [], roomA = null, roomB = null) {
+  const cellSet = new Set();
+  const cells = [];
+  
+  const startOffset = -Math.floor((width - 1) / 2);
+  const endOffset = Math.floor(width / 2);
+  
+  /**
+   * Add a cell and its width expansion to the cell set
+   */
+  const addCellWithWidth = (x, y, expandDir) => {
+    if (expandDir === 'vertical' || expandDir === 'both') {
+      for (let w = startOffset; w <= endOffset; w++) {
+        const key = `${x},${y + w}`;
+        if (!cellSet.has(key)) {
+          cellSet.add(key);
+          cells.push({ x: x, y: y + w });
+        }
+      }
+    }
+    if (expandDir === 'horizontal' || expandDir === 'both') {
+      for (let w = startOffset; w <= endOffset; w++) {
+        const key = `${x + w},${y}`;
+        if (!cellSet.has(key)) {
+          cellSet.add(key);
+          cells.push({ x: x + w, y: y });
+        }
+      }
+    }
+  };
+  
+  for (let i = 0; i < path.length; i++) {
+    const curr = path[i];
+    const prev = path[i - 1];
+    const next = path[i + 1];
+    
+    // Check for diagonal step from prev to curr - need to fill the gap
+    if (prev) {
+      const dx = curr.x - prev.x;
+      const dy = curr.y - prev.y;
+      
+      if (dx !== 0 && dy !== 0) {
+        // Diagonal step detected - add fill cell(s) to connect orthogonally
+        // Two options: (prev.x, curr.y) or (curr.x, prev.y)
+        const fill1 = { x: prev.x, y: curr.y };
+        const fill2 = { x: curr.x, y: prev.y };
+        
+        // Check which fills are safe
+        const fill1Safe = !roomA || !wouldFillCauseIssues(fill1.x, fill1.y, allRooms, roomA, roomB);
+        const fill2Safe = !roomA || !wouldFillCauseIssues(fill2.x, fill2.y, allRooms, roomA, roomB);
+        
+        // Add safe fill(s) - prefer adding both for a smoother corner if both are safe
+        if (fill1Safe && fill2Safe) {
+          // Add both for a nice filled corner
+          addCellWithWidth(fill1.x, fill1.y, 'both');
+          addCellWithWidth(fill2.x, fill2.y, 'both');
+        } else if (fill1Safe) {
+          addCellWithWidth(fill1.x, fill1.y, 'both');
+        } else if (fill2Safe) {
+          addCellWithWidth(fill2.x, fill2.y, 'both');
+        }
+        // If neither is safe, we skip the fill - corridor may have a gap
+        // but this shouldn't happen often since we validate wobbles
+      }
+    }
+    
+    // Determine segment direction for width expansion
+    let direction = 'both'; // Default: expand in both directions for corners
+    
+    if (prev && next) {
+      const fromPrev = { dx: curr.x - prev.x, dy: curr.y - prev.y };
+      const toNext = { dx: next.x - curr.x, dy: next.y - curr.y };
+      
+      // If moving horizontally, expand vertically
+      if (fromPrev.dx !== 0 && toNext.dx !== 0 && fromPrev.dy === 0 && toNext.dy === 0) {
+        direction = 'vertical';
+      }
+      // If moving vertically, expand horizontally
+      else if (fromPrev.dy !== 0 && toNext.dy !== 0 && fromPrev.dx === 0 && toNext.dx === 0) {
+        direction = 'horizontal';
+      }
+    } else if (prev) {
+      direction = (prev.x !== curr.x) ? 'vertical' : 'horizontal';
+    } else if (next) {
+      direction = (next.x !== curr.x) ? 'vertical' : 'horizontal';
+    }
+    
+    // Add cells for this path point
+    addCellWithWidth(curr.x, curr.y, direction);
+  }
+  
+  return cells;
 }
 
 // =============================================================================
@@ -19318,8 +19913,18 @@ function generateCells(rooms, corridorCells, color = DEFAULT_FLOOR_COLOR) {
 // MAIN GENERATION FUNCTION
 // =============================================================================
 
-function generateDungeon(presetName = 'medium', color = DEFAULT_FLOOR_COLOR) {
-  const config = DUNGEON_PRESETS[presetName] || DUNGEON_PRESETS.medium;
+function generateDungeon(presetName = 'medium', color = DEFAULT_FLOOR_COLOR, configOverrides = {}) {
+  const baseConfig = DUNGEON_PRESETS[presetName] || DUNGEON_PRESETS.medium;
+  
+  // Apply style overrides if a style is specified
+  let styleOverrides = {};
+  if (configOverrides.style && DUNGEON_STYLES[configOverrides.style]) {
+    styleOverrides = DUNGEON_STYLES[configOverrides.style].overrides;
+  }
+  
+  // Merge: base preset <- style overrides <- user overrides
+  // This allows user to tweak a style's defaults
+  const config = { ...baseConfig, ...styleOverrides, ...configOverrides };
   
   // Phase 1: Generate rooms
   const rooms = generateRooms(config);
@@ -19330,7 +19935,8 @@ function generateDungeon(presetName = 'medium', color = DEFAULT_FLOOR_COLOR) {
   // Phase 3: Carve corridors
   const useWideCorridors = Math.random() < (config.wideCorridorChance || 0);
   const corridorWidth = useWideCorridors ? 2 : (config.corridorWidth || 1);
-  const corridorResult = carveCorridors(connections, corridorWidth, rooms);
+  const corridorStyle = config.corridorStyle || 'straight';
+  const corridorResult = carveCorridors(connections, corridorWidth, rooms, corridorStyle);
   const corridorCells = corridorResult.cells;
   const corridorsByConnection = corridorResult.byConnection;
   
@@ -19380,6 +19986,7 @@ function generateDungeon(presetName = 'medium', color = DEFAULT_FLOOR_COLOR) {
 return {
   generateDungeon,
   DUNGEON_PRESETS,
+  DUNGEON_STYLES,
   DEFAULT_FLOOR_COLOR,
   
   // Individual phases
@@ -19505,7 +20112,7 @@ const RerollDungeonButton = () => {
   };
   
   const handleConfirm = () => {
-    const result = generateDungeon(settings.preset);
+    const result = generateDungeon(settings.preset, undefined, settings.configOverrides || {});
     // Replace cells and objects on active layer with new generated content
     // suppressHistory = false so this can be undone
     onCellsChange(result.cells, false);
@@ -19517,12 +20124,14 @@ const RerollDungeonButton = () => {
     setShowConfirm(false);
   };
   
+  const styleName = settings.configOverrides?.style || 'classic';
+  
   return (
     <>
       <button
         className="dmt-tool-btn dmt-reroll-btn interactive-child"
         onClick={handleClick}
-        title={`Re-roll dungeon (${settings.preset})`}
+        title={`Re-roll dungeon (${styleName} ${settings.preset})`}
       >
         <dc.Icon icon="lucide-dices" />
       </button>
@@ -22735,11 +23344,11 @@ return `// settingsPluginMain.js - Windrose MapDesigner Settings Plugin
  * Line ~30:    VERSION & IMPORTS
  * Line ~35:    DATA CONSTANTS (BUILT_IN_OBJECTS, CATEGORIES, QUICK_SYMBOLS)
  * Line ~67:    BUILT_IN_COLORS (color palette defaults)
- * Line ~80:    HELPER NAMESPACES (ObjectHelpers, ColorHelpers, DragHelpers, IconHelpers, RPGAwesomeHelpers)
- * Line ~365:   STYLES (DMT_SETTINGS_STYLES)
- * Line ~1205:  MODAL CLASSES (InsertMapModal, ObjectEditModal, CategoryEditModal, ColorEditModal, ExportModal, ImportModal)
- * Line ~2395:  MAIN PLUGIN CLASS (WindroseMDSettingsPlugin)
- * Line ~2520:  SETTINGS TAB CLASS (WindroseMDSettingsTab)
+ * Line ~76:    HELPER_NAMESPACES - Injected at assembly time
+ * Line ~83:    MODAL_CLASSES - Injected at assembly time
+ * Line ~85:    MAIN PLUGIN CLASS (WindroseMDSettingsPlugin)
+ * Line ~450:   SETTINGS TAB CLASS (WindroseMDSettingsTab)
+ *              - TAB_RENDER_METHODS - Injected at assembly time
  * 
  * ============================================================================
  */
@@ -22768,17 +23377,8 @@ const RA_ICONS = {{RA_ICONS}};
 
 const RA_CATEGORIES = {{RA_CATEGORIES}};
 
-// Quick symbols palette for object creation
-const QUICK_SYMBOLS = [
-  '★', '☆', '✦', '✧', '✪', '✫', '✯', '⚒',
-  '●', '○', '◆', '◇', '■', '□', '▲', '△',
-  '▼', '▽', '♠', '♤', '♣', '♧', '♥', '♡',
-  '♦', '♢', '⚔', '⚒', '🗡', '🧹', '⚔', '⛏',
-  '📱', '☠', '⚠', '☢', '☣', '⚡', '🔥', '💧',
-  '⚒', '⚐', '⛳', '🚩', '➤', '➜', '⬤', '⚙',
-  '⚗', '🔮', '💎', '🗝', '📜', '🎭', '👑', '🛡',
-  '🏰', '⛪', '🗿', '⚱', '🏺', '🪔'
-];
+// Quick symbols palette - injected at install time
+const QUICK_SYMBOLS = {{QUICK_SYMBOLS}};
 
 // =============================================================================
 // BUILT-IN COLOR PALETTE
@@ -22798,2544 +23398,20 @@ const BUILT_IN_COLORS = [
   { id: 'ice', color: '#14b8a6', label: 'Ice Teal' }
 ];
 
+
 // =============================================================================
 // HELPER NAMESPACES
-// Pure functions for data transformation - no side effects, easy to test/debug
+// Injected at assembly time from settingsPlugin-*Helpers.js files
 // =============================================================================
 
-
-/**
- * Object resolution helpers
- * Transform raw settings into resolved object/category lists
- */
-const ObjectHelpers = {
-  /**
-   * Get all resolved object types (built-in + custom, with overrides applied)
-   * @param {Object} settings - Plugin settings
-   * @returns {Array} Resolved object array with isBuiltIn, isModified flags
-   */
-  getResolved(settings) {
-    const { objectOverrides = {}, customObjects = [] } = settings;
-    
-    const resolvedBuiltIns = BUILT_IN_OBJECTS
-      .filter(obj => !objectOverrides[obj.id]?.hidden)
-      .map((obj, index) => {
-        const override = objectOverrides[obj.id];
-        const defaultOrder = index * 10;
-        if (override) {
-          const { hidden, ...overrideProps } = override;
-          return { 
-            ...obj, 
-            ...overrideProps, 
-            order: override.order ?? defaultOrder, 
-            isBuiltIn: true, 
-            isModified: true 
-          };
-        }
-        return { ...obj, order: defaultOrder, isBuiltIn: true, isModified: false };
-      });
-    
-    const resolvedCustom = customObjects.map((obj, index) => ({
-      ...obj,
-      order: obj.order ?? (1000 + index * 10),
-      isCustom: true,
-      isBuiltIn: false
-    }));
-    
-    return [...resolvedBuiltIns, ...resolvedCustom];
-  },
-  
-  /**
-   * Get all resolved categories (built-in + custom, sorted by order)
-   * @param {Object} settings - Plugin settings
-   * @returns {Array} Sorted category array with isBuiltIn flag
-   */
-  getCategories(settings) {
-    const { customCategories = [] } = settings;
-    
-    const resolvedBuiltIns = BUILT_IN_CATEGORIES.map(c => ({
-      ...c,
-      isBuiltIn: true,
-      order: CATEGORY_ORDER[c.id] ?? 50
-    }));
-    
-    const resolvedCustom = customCategories.map(c => ({
-      ...c,
-      isCustom: true,
-      isBuiltIn: false,
-      order: c.order ?? 100
-    }));
-    
-    return [...resolvedBuiltIns, ...resolvedCustom].sort((a, b) => (a.order ?? 50) - (b.order ?? 50));
-  },
-  
-  /**
-   * Get hidden built-in objects
-   * @param {Object} settings - Plugin settings
-   * @returns {Array} Hidden objects with isBuiltIn, isHidden flags
-   */
-  getHidden(settings) {
-    const { objectOverrides = {} } = settings;
-    return BUILT_IN_OBJECTS
-      .filter(obj => objectOverrides[obj.id]?.hidden)
-      .map(obj => ({ ...obj, isBuiltIn: true, isHidden: true }));
-  },
-  
-  /**
-   * Get all categories including notes (for dropdowns)
-   * @param {Object} settings - Plugin settings
-   * @returns {Array} All categories
-   */
-  getAllCategories(settings) {
-    const { customCategories = [] } = settings;
-    const builtIn = BUILT_IN_CATEGORIES.map(c => ({ ...c, isBuiltIn: true }));
-    const custom = customCategories.map(c => ({ ...c, isCustom: true }));
-    return [...builtIn, ...custom];
-  },
-  
-  /**
-   * Get default ID order for a category (for drag/drop comparison)
-   * @param {string} categoryId - Category ID
-   * @param {Object} settings - Plugin settings
-   * @returns {Array} Array of object IDs in default order
-   */
-  getDefaultIdOrder(categoryId, settings) {
-    const { objectOverrides = {} } = settings;
-    return BUILT_IN_OBJECTS
-      .filter(o => o.category === categoryId && !objectOverrides[o.id]?.hidden)
-      .map(o => o.id);
-  }
-};
-
-/**
- * Color palette resolution helpers
- * Transform raw settings into resolved color list
- */
-const ColorHelpers = {
-  /**
-   * Get all resolved colors (built-in + custom, with overrides applied)
-   * @param {Object} settings - Plugin settings
-   * @returns {Array} Resolved color array with isBuiltIn, isModified flags
-   */
-  getResolved(settings) {
-    const { colorPaletteOverrides = {}, customPaletteColors = [] } = settings;
-    
-    const resolvedBuiltIns = BUILT_IN_COLORS
-      .filter(c => !colorPaletteOverrides[c.id]?.hidden)
-      .map((c, index) => {
-        const override = colorPaletteOverrides[c.id];
-        if (override) {
-          const { hidden, ...overrideProps } = override;
-          return { 
-            ...c, 
-            ...overrideProps, 
-            order: override.order ?? index,
-            isBuiltIn: true, 
-            isModified: true 
-          };
-        }
-        return { ...c, order: index, isBuiltIn: true, isModified: false };
-      });
-    
-    const resolvedCustom = customPaletteColors.map((c, index) => ({
-      ...c,
-      order: c.order ?? (100 + index),
-      isCustom: true,
-      isBuiltIn: false
-    }));
-    
-    return [...resolvedBuiltIns, ...resolvedCustom].sort((a, b) => a.order - b.order);
-  },
-  
-  /**
-   * Get hidden color IDs
-   * @param {Object} settings - Plugin settings
-   * @returns {Set} Set of hidden color IDs
-   */
-  getHidden(settings) {
-    const { colorPaletteOverrides = {} } = settings;
-    return new Set(
-      Object.entries(colorPaletteOverrides)
-        .filter(([id, override]) => override.hidden)
-        .map(([id]) => id)
-    );
-  }
-};
-
-/**
- * Drag and drop helpers
- */
-const DragHelpers = {
-  /**
-   * Find element to insert before during drag operation
-   * @param {HTMLElement} container - Container element
-   * @param {number} y - Mouse Y position
-   * @returns {HTMLElement|undefined} Element to insert before
-   */
-  getAfterElement(container, y) {
-    const draggableElements = [...container.querySelectorAll('.dmt-settings-object-row:not(.dmt-dragging)')];
-    
-    return draggableElements.reduce((closest, child) => {
-      const box = child.getBoundingClientRect();
-      const offset = y - box.top - box.height / 2;
-      if (offset < 0 && offset > closest.offset) {
-        return { offset: offset, element: child };
-      } else {
-        return closest;
-      }
-    }, { offset: Number.NEGATIVE_INFINITY }).element;
-  }
-};
-
-/**
- * Icon helpers
- */
-const IconHelpers = {
-  /**
-   * Set icon on element with fallback
-   * @param {HTMLElement} el - Target element
-   * @param {string} iconId - Lucide icon ID
-   */
-  set(el, iconId) {
-    if (typeof setIcon !== 'undefined') {
-      setIcon(el, iconId);
-    } else {
-      // Fallback: create a simple text representation
-      const icons = {
-        'pencil': '✎',
-        'eye': '👁',
-        'eye-off': '🚫',
-        'rotate-ccw': '↺',
-        'trash-2': '🗑',
-        'grip-vertical': '⋮⋮',
-        'x': '✕',
-        'search': '🔍'
-      };
-      el.textContent = icons[iconId] || '?';
-    }
-  }
-};
-
-/**
- * RPGAwesome icon helpers
- */
-const RPGAwesomeHelpers = {
-  /**
-   * Get icons filtered by category
-   * @param {string} categoryId - Category ID or 'all'
-   * @returns {Array} Array of { iconClass, char, label, category }
-   */
-  getByCategory(categoryId) {
-    const icons = Object.entries(RA_ICONS).map(([iconClass, data]) => ({
-      iconClass,
-      ...data
-    }));
-    
-    if (categoryId === 'all') return icons;
-    return icons.filter(i => i.category === categoryId);
-  },
-  
-  /**
-   * Search icons by label
-   * @param {string} query - Search query
-   * @returns {Array} Matching icons
-   */
-  search(query) {
-    const q = query.toLowerCase().trim();
-    if (!q) return this.getByCategory('all');
-    
-    return Object.entries(RA_ICONS)
-      .filter(([iconClass, data]) => 
-        iconClass.toLowerCase().includes(q) || 
-        data.label.toLowerCase().includes(q)
-      )
-      .map(([iconClass, data]) => ({ iconClass, ...data }));
-  },
-  
-  /**
-   * Get sorted categories for tab display
-   * @returns {Array} Array of { id, label, order }
-   */
-  getCategories() {
-    return [...RA_CATEGORIES].sort((a, b) => a.order - b.order);
-  },
-  
-  /**
-   * Validate an icon class exists
-   * @param {string} iconClass - Icon class to validate
-   * @returns {boolean}
-   */
-  isValid(iconClass) {
-    return iconClass && RA_ICONS.hasOwnProperty(iconClass);
-  },
-  
-  /**
-   * Get icon info
-   * @param {string} iconClass - Icon class
-   * @returns {Object|null} Icon data or null
-   */
-  getInfo(iconClass) {
-    return RA_ICONS[iconClass] || null;
-  }
-};
-
-// =============================================================================
-// STYLES
-// All CSS for the settings UI - injected into document.head when tab is shown
-// =============================================================================
-
-const DMT_SETTINGS_STYLES = \`
-  /* Subheadings */
-  .dmt-settings-subheading {
-    font-size: 14px;
-    font-weight: 600;
-    color: var(--text-muted);
-    margin: 1.5em 0 0.5em 0;
-    padding-bottom: 4px;
-    border-bottom: 1px solid var(--background-modifier-border);
-  }
-  
-  /* Search/Filter */
-  .dmt-settings-search-container {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 1em;
-  }
-  
-  .dmt-settings-search-input {
-    flex: 1;
-    padding: 8px 12px;
-    border: 1px solid var(--background-modifier-border);
-    border-radius: 4px;
-    background: var(--background-primary);
-    font-size: 14px;
-  }
-  
-  .dmt-settings-search-input:focus {
-    border-color: var(--interactive-accent);
-    outline: none;
-  }
-  
-  .dmt-settings-search-clear {
-    background: transparent;
-    border: none;
-    padding: 6px;
-    border-radius: 4px;
-    cursor: pointer;
-    color: var(--text-muted);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  
-  .dmt-settings-search-clear:hover {
-    background: var(--background-modifier-hover);
-    color: var(--text-normal);
-  }
-  
-  .dmt-settings-no-results {
-    text-align: center;
-    padding: 2em;
-    color: var(--text-muted);
-    font-style: italic;
-  }
-  
-  /* Category containers */
-  .dmt-settings-category {
-    margin: 1em 0;
-    border: 1px solid var(--background-modifier-border);
-    border-radius: 8px;
-    overflow: hidden;
-  }
-  
-  .dmt-settings-category-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 8px 12px;
-    background: var(--background-secondary);
-    border-bottom: 1px solid var(--background-modifier-border);
-  }
-  
-  .dmt-settings-category-label {
-    font-weight: 600;
-    font-size: 0.95em;
-  }
-  
-  .dmt-settings-category-actions {
-    display: flex;
-    gap: 4px;
-  }
-  
-  /* Object rows */
-  .dmt-settings-object-list {
-    padding: 4px 0;
-  }
-  
-  .dmt-settings-object-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 6px 12px;
-    transition: background-color 0.15s ease;
-  }
-  
-  .dmt-settings-object-row:hover {
-    background: var(--background-modifier-hover);
-  }
-  
-  .dmt-drag-handle {
-    color: var(--text-muted);
-    cursor: grab;
-    padding: 0 4px;
-    font-size: 1em;
-    opacity: 0.4;
-    user-select: none;
-    flex-shrink: 0;
-  }
-  
-  .dmt-settings-object-row:hover .dmt-drag-handle {
-    opacity: 1;
-  }
-  
-  .dmt-dragging {
-    opacity: 0.5;
-    background: var(--interactive-accent) !important;
-    border-radius: 4px;
-  }
-  
-  .dmt-settings-object-symbol {
-    font-family: 'Noto Emoji', 'Noto Sans Symbols 2', sans-serif;
-    font-size: 1.4em;
-    width: 32px;
-    text-align: center;
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  
-  .dmt-settings-object-symbol .ra {
-    font-size: 1.2em;
-    line-height: 1;
-  }
-  
-  .dmt-settings-object-label {
-    flex: 1;
-    min-width: 0;
-  }
-  
-  .dmt-settings-object-label.dmt-settings-modified {
-    font-style: italic;
-    color: var(--text-accent);
-  }
-  
-  .dmt-settings-object-label.dmt-settings-modified::after {
-    content: '▶';
-    font-size: 0.8em;
-    opacity: 0.7;
-  }
-  
-  .dmt-settings-object-actions {
-    display: flex;
-    gap: 4px;
-    flex-shrink: 0;
-  }
-  
-  .dmt-settings-icon-btn {
-    background: transparent;
-    border: none;
-    padding: 4px 6px;
-    border-radius: 4px;
-    cursor: pointer;
-    color: var(--text-muted);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  
-  .dmt-settings-icon-btn:hover {
-    background: var(--background-modifier-hover);
-    color: var(--text-normal);
-  }
-  
-  .dmt-settings-icon-btn-danger:hover {
-    color: var(--text-error);
-  }
-  
-  /* Hidden section */
-  .dmt-settings-hidden-section {
-    margin-top: 2em;
-    padding-top: 1em;
-    border-top: 1px solid var(--background-modifier-border);
-  }
-  
-  .dmt-settings-hidden-list {
-    margin-top: 8px;
-    opacity: 0.7;
-  }
-  
-  .dmt-settings-hidden-list .dmt-settings-object-row {
-    background: var(--background-secondary);
-  }
-  
-  /* Modal Styles */
-  .dmt-object-edit-modal,
-  .dmt-category-edit-modal {
-    padding: 0;
-  }
-  
-  .dmt-symbol-input {
-    font-family: 'Noto Emoji', 'Noto Sans Symbols 2', sans-serif;
-    font-size: 1.5em;
-    width: 80px;
-    text-align: center;
-    padding: 8px;
-  }
-  
-  .dmt-symbol-preview {
-    font-family: 'Noto Emoji', 'Noto Sans Symbols 2', sans-serif;
-    font-size: 2em;
-    width: 48px;
-    height: 48px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--background-secondary);
-    border-radius: 8px;
-    margin-left: 8px;
-  }
-  
-  .dmt-quick-symbols {
-    margin: 1em 0;
-  }
-  
-  .dmt-quick-symbols-label {
-    display: block;
-    font-size: 0.9em;
-    color: var(--text-muted);
-    margin-bottom: 8px;
-  }
-  
-  .dmt-quick-symbols-grid {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
-    max-height: 150px;
-    overflow-y: auto;
-    padding: 4px;
-    background: var(--background-secondary);
-    border-radius: 8px;
-  }
-  
-  .dmt-quick-symbol-btn {
-    font-family: 'Noto Emoji', 'Noto Sans Symbols 2', sans-serif;
-    width: 32px;
-    height: 32px;
-    font-size: 1.2em;
-    border: 1px solid var(--background-modifier-border);
-    background: var(--background-primary);
-    border-radius: 4px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  
-  .dmt-quick-symbol-btn:hover {
-    background: var(--background-modifier-hover);
-    border-color: var(--interactive-accent);
-  }
-  
-  .dmt-modal-buttons {
-    display: flex;
-    justify-content: flex-end;
-    gap: 8px;
-    margin-top: 1.5em;
-    padding-top: 1em;
-    border-top: 1px solid var(--background-modifier-border);
-  }
-  
-  /* Import/Export Modal Styles */
-  .dmt-export-modal,
-  .dmt-import-modal {
-    padding: 0;
-  }
-  
-  .dmt-export-empty {
-    text-align: center;
-    padding: 1em;
-    color: var(--text-muted);
-    font-style: italic;
-  }
-  
-  .dmt-import-file-container {
-    margin: 1em 0;
-  }
-  
-  .dmt-import-file-container input[type="file"] {
-    width: 100%;
-    padding: 1em;
-    border: 2px dashed var(--background-modifier-border);
-    border-radius: 8px;
-    background: var(--background-secondary);
-    cursor: pointer;
-  }
-  
-  .dmt-import-file-container input[type="file"]:hover {
-    border-color: var(--interactive-accent);
-  }
-  
-  .dmt-import-preview {
-    margin: 1em 0;
-    padding: 1em;
-    background: var(--background-secondary);
-    border-radius: 8px;
-  }
-  
-  .dmt-import-preview p {
-    margin: 0.25em 0;
-  }
-  
-  .dmt-import-date {
-    font-size: 0.85em;
-    color: var(--text-muted);
-  }
-  
-  .dmt-import-error {
-    color: var(--text-error);
-    font-weight: 500;
-  }
-  
-  .dmt-import-options {
-    margin-top: 1em;
-  }
-  
-  /* Icon Type Toggle */
-  .dmt-icon-type-toggle {
-    display: flex;
-    gap: 8px;
-    margin-bottom: 1em;
-  }
-  
-  .dmt-icon-type-btn {
-    flex: 1;
-    padding: 8px 12px;
-    border: 1px solid var(--background-modifier-border);
-    background: var(--background-primary);
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 14px;
-    transition: all 0.15s ease;
-  }
-  
-  .dmt-icon-type-btn:hover {
-    background: var(--background-modifier-hover);
-  }
-  
-  .dmt-icon-type-btn.active {
-    background: var(--interactive-accent);
-    color: var(--text-on-accent);
-    border-color: var(--interactive-accent);
-  }
-  
-  /* Icon Picker Container */
-  .dmt-icon-picker {
-    border: 1px solid var(--background-modifier-border);
-    border-radius: 8px;
-    background: var(--background-secondary);
-    margin-bottom: 1em;
-  }
-  
-  .dmt-icon-picker-search {
-    padding: 8px;
-    border-bottom: 1px solid var(--background-modifier-border);
-  }
-  
-  .dmt-icon-picker-search input {
-    width: 100%;
-    padding: 6px 10px;
-    border: 1px solid var(--background-modifier-border);
-    border-radius: 4px;
-    background: var(--background-primary);
-    font-size: 14px;
-  }
-  
-  .dmt-icon-picker-search input:focus {
-    border-color: var(--interactive-accent);
-    outline: none;
-  }
-  
-  /* Category Tabs */
-  .dmt-icon-picker-tabs {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
-    padding: 8px;
-    border-bottom: 1px solid var(--background-modifier-border);
-    background: var(--background-primary-alt);
-  }
-  
-  .dmt-icon-picker-tab {
-    padding: 4px 8px;
-    border: 1px solid transparent;
-    background: transparent;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 12px;
-    color: var(--text-muted);
-    transition: all 0.15s ease;
-  }
-  
-  .dmt-icon-picker-tab:hover {
-    background: var(--background-modifier-hover);
-    color: var(--text-normal);
-  }
-  
-  .dmt-icon-picker-tab.active {
-    background: var(--interactive-accent);
-    color: var(--text-on-accent);
-  }
-  
-  /* Icon Grid */
-  .dmt-icon-picker-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
-    gap: 4px;
-    padding: 8px;
-    max-height: 200px;
-    overflow-y: auto;
-  }
-  
-  .dmt-icon-picker-icon {
-    width: 40px;
-    height: 40px;
-    border: 1px solid var(--background-modifier-border);
-    background: var(--background-primary);
-    border-radius: 4px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 20px;
-    transition: all 0.15s ease;
-  }
-  
-  .dmt-icon-picker-icon:hover {
-    background: var(--background-modifier-hover);
-    border-color: var(--interactive-accent);
-    transform: scale(1.1);
-  }
-  
-  .dmt-icon-picker-icon.selected {
-    background: var(--interactive-accent);
-    color: var(--text-on-accent);
-    border-color: var(--interactive-accent);
-  }
-  
-  .dmt-icon-picker-icon .ra {
-    font-size: 20px;
-    line-height: 1;
-  }
-  
-  .dmt-icon-picker-empty {
-    padding: 2em;
-    text-align: center;
-    color: var(--text-muted);
-    font-style: italic;
-  }
-  
-  /* Selected Icon Preview */
-  .dmt-icon-preview-row {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 8px;
-    border-top: 1px solid var(--background-modifier-border);
-    background: var(--background-primary);
-  }
-  
-  .dmt-icon-preview-large {
-    width: 48px;
-    height: 48px;
-    border: 1px solid var(--background-modifier-border);
-    border-radius: 4px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 28px;
-    background: var(--background-secondary);
-  }
-  
-  .dmt-icon-preview-large .ra {
-    font-size: 28px;
-    line-height: 1;
-  }
-  
-  .dmt-icon-preview-info {
-    flex: 1;
-  }
-  
-  .dmt-icon-preview-label {
-    font-weight: 500;
-    margin-bottom: 2px;
-  }
-  
-  .dmt-icon-preview-class {
-    font-size: 12px;
-    color: var(--text-muted);
-    font-family: var(--font-monospace);
-  }
-  
-  /* RPGAwesome icon font - must be bundled in DungeonMapTracker - FONTS.css */
-  /* Font-family name must be exactly 'rpgawesome' */
-  .ra {
-    font-family: 'rpgawesome' !important;
-    font-style: normal;
-    font-variant: normal;
-    font-weight: normal;
-    line-height: 1;
-    speak: never;
-    text-transform: none;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-  }
-
-  /* ===========================================
-   * Collapsible Sections
-   * =========================================== */
-  .dmt-settings-section {
-    margin: 0 0 8px 0;
-    border: 1px solid var(--background-modifier-border);
-    border-radius: 6px;
-    overflow: hidden;
-  }
-  
-  .dmt-settings-section > summary {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 12px 16px;
-    background: var(--background-secondary);
-    cursor: pointer;
-    font-weight: 600;
-    font-size: 15px;
-    list-style: none;
-    user-select: none;
-  }
-  
-  .dmt-settings-section > summary::-webkit-details-marker {
-    display: none;
-  }
-  
-  .dmt-settings-section > summary::before {
-    content: '▶';
-    font-size: 10px;
-    transition: transform 0.2s ease;
-    color: var(--text-muted);
-  }
-  
-  .dmt-settings-section[open] > summary::before {
-    transform: rotate(90deg);
-  }
-  
-  .dmt-settings-section > summary:hover {
-    background: var(--background-modifier-hover);
-  }
-  
-  .dmt-settings-section-content {
-    padding: 12px 16px;
-    border-top: 1px solid var(--background-modifier-border);
-  }
-  
-  .dmt-settings-section-content > .setting-item:first-child {
-    border-top: none;
-    padding-top: 0;
-  }
-  
-  /* ===========================================
-   * Settings Search
-   * =========================================== */
-  .dmt-settings-search-wrapper {
-    margin-bottom: 16px;
-    position: sticky;
-    top: 0;
-    background: var(--background-primary);
-    padding: 8px 0;
-    z-index: 10;
-  }
-  
-  .dmt-settings-search-box {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 12px;
-    border: 1px solid var(--background-modifier-border);
-    border-radius: 6px;
-    background: var(--background-primary);
-  }
-  
-  .dmt-settings-search-box:focus-within {
-    border-color: var(--interactive-accent);
-  }
-  
-  .dmt-settings-search-box input {
-    flex: 1;
-    border: none;
-    background: transparent;
-    font-size: 14px;
-    outline: none;
-  }
-  
-  .dmt-settings-search-box .search-icon {
-    color: var(--text-muted);
-  }
-  
-  .dmt-settings-search-box .clear-btn {
-    background: transparent;
-    border: none;
-    padding: 2px 6px;
-    cursor: pointer;
-    color: var(--text-muted);
-    border-radius: 4px;
-  }
-  
-  .dmt-settings-search-box .clear-btn:hover {
-    background: var(--background-modifier-hover);
-    color: var(--text-normal);
-  }
-  
-  .dmt-settings-no-results {
-    text-align: center;
-    padding: 2em;
-    color: var(--text-muted);
-    font-style: italic;
-  }
-  
-  /* Hide non-matching settings during search */
-  .dmt-setting-hidden {
-    display: none !important;
-  }
-  
-  /* Highlight matching text */
-  .dmt-search-match {
-    background: var(--text-highlight-bg);
-    border-radius: 2px;
-  }
-  
-  /* ===========================================
-   * Color Palette Section
-   * =========================================== */
-  .dmt-color-list {
-    padding: 8px 0;
-  }
-  
-  .dmt-color-row {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 8px 12px;
-    transition: background-color 0.15s ease;
-  }
-  
-  .dmt-color-row:hover {
-    background: var(--background-modifier-hover);
-  }
-  
-  .dmt-color-row-swatch {
-    width: 28px;
-    height: 28px;
-    border-radius: 4px;
-    border: 2px solid var(--background-modifier-border);
-    flex-shrink: 0;
-  }
-  
-  .dmt-color-row-label {
-    flex: 1;
-    min-width: 0;
-  }
-  
-  .dmt-color-row-name {
-    font-weight: 500;
-  }
-  
-  .dmt-color-row-modified,
-  .dmt-color-row-custom {
-    font-size: 0.85em;
-    color: var(--text-muted);
-    font-style: italic;
-  }
-  
-  .dmt-color-row-hex {
-    font-size: 0.85em;
-    color: var(--text-muted);
-    background: var(--background-secondary);
-    padding: 2px 6px;
-    border-radius: 3px;
-  }
-  
-  .dmt-color-row-actions {
-    display: flex;
-    gap: 4px;
-    flex-shrink: 0;
-  }
-  
-  .dmt-settings-category-muted {
-    opacity: 0.7;
-  }
-  
-  .dmt-settings-empty-message {
-    padding: 16px;
-    text-align: center;
-    color: var(--text-muted);
-    font-style: italic;
-  }
-  
-  /* Color Edit Modal */
-  .dmt-color-edit-modal {
-    padding: 16px;
-  }
-  
-  .dmt-color-hex-input {
-    font-family: var(--font-monospace);
-    width: 90px !important;
-  }
-  
-  .dmt-color-original-info {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 8px 12px;
-    margin: 12px 0;
-    background: var(--background-secondary);
-    border-radius: 4px;
-    font-size: 0.9em;
-    color: var(--text-muted);
-  }
-  
-  .dmt-color-mini-swatch {
-    display: inline-block;
-    width: 16px;
-    height: 16px;
-    border-radius: 3px;
-    border: 1px solid var(--background-modifier-border);
-    vertical-align: middle;
-  }
-  
-  .dmt-modal-buttons {
-    display: flex;
-    justify-content: flex-end;
-    gap: 8px;
-    margin-top: 16px;
-    padding-top: 16px;
-    border-top: 1px solid var(--background-modifier-border);
-  }
-  
-  .dmt-opacity-control {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  
-  .dmt-opacity-control input[type="range"] {
-    width: 120px;
-  }
-  
-  .dmt-opacity-value {
-    min-width: 40px;
-    text-align: right;
-    font-size: 0.9em;
-    color: var(--text-muted);
-  }
-  
-  .dmt-btn-icon {
-    background: transparent;
-    border: none;
-    padding: 4px;
-    border-radius: 4px;
-    cursor: pointer;
-    color: var(--text-muted);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  
-  .dmt-btn-icon:hover {
-    background: var(--background-modifier-hover);
-    color: var(--text-normal);
-  }
-  
-  .dmt-btn-icon.dmt-btn-danger:hover {
-    background: var(--background-modifier-error);
-    color: var(--text-on-accent);
-  }
-  
-  /* Insert Map Modal */
-  .dmt-insert-map-modal {
-    padding: 16px;
-  }
-  
-  .dmt-map-type-selection {
-    margin-top: 16px;
-  }
-  
-  .dmt-map-type-buttons {
-    display: flex;
-    gap: 8px;
-    margin-top: 8px;
-  }
-  
-  .dmt-map-type-btn {
-    flex: 1;
-    padding: 12px 16px;
-    border: 2px solid var(--background-modifier-border);
-    border-radius: 6px;
-    background: var(--background-primary);
-    color: var(--text-normal);
-    cursor: pointer;
-    font-size: 1em;
-    transition: all 0.15s ease;
-  }
-  
-  .dmt-map-type-btn:hover {
-    border-color: var(--interactive-accent);
-    background: var(--background-secondary);
-  }
-  
-  .dmt-map-type-btn.selected {
-    border-color: var(--interactive-accent);
-    background: var(--interactive-accent);
-    color: var(--text-on-accent);
-  }
-  
-  @keyframes dmt-shake {
-    0%, 100% { transform: translateX(0); }
-    25% { transform: translateX(-4px); }
-    75% { transform: translateX(4px); }
-  }
-  
-  .dmt-shake {
-    animation: dmt-shake 0.3s ease;
-  }
-\`;
+{{HELPER_NAMESPACES}}
 
 // =============================================================================
 // MODAL CLASSES
-// Each modal is self-contained with its own state and rendering logic
+// Injected at assembly time from settingsPlugin-*Modal.js files
 // =============================================================================
 
-/**
- * Modal for inserting a new map block into the editor
- */
-class InsertMapModal extends Modal {
-  constructor(app, onInsert) {
-    super(app);
-    this.onInsert = onInsert;
-    this.mapName = '';
-    this.mapType = null; // 'grid' or 'hex'
-  }
-  
-  onOpen() {
-    const { contentEl } = this;
-    contentEl.empty();
-    contentEl.addClass('dmt-insert-map-modal');
-    
-    // Inject modal-specific styles if not already present
-    if (!document.getElementById('dmt-insert-map-styles')) {
-      const styleEl = document.createElement('style');
-      styleEl.id = 'dmt-insert-map-styles';
-      styleEl.textContent = \`
-        .dmt-insert-map-modal { padding: 16px; }
-        .dmt-map-type-selection { margin-top: 16px; }
-        .dmt-map-type-buttons { display: flex; gap: 8px; margin-top: 8px; }
-        .dmt-map-type-btn {
-          flex: 1;
-          padding: 12px 16px;
-          border: 2px solid var(--background-modifier-border);
-          border-radius: 6px;
-          background: var(--background-primary);
-          color: var(--text-normal);
-          cursor: pointer;
-          font-size: 1em;
-          transition: all 0.15s ease;
-        }
-        .dmt-map-type-btn:hover {
-          border-color: var(--interactive-accent);
-          background: var(--background-secondary);
-        }
-        .dmt-map-type-btn.selected {
-          border-color: var(--interactive-accent);
-          background: var(--interactive-accent);
-          color: var(--text-on-accent);
-        }
-        .dmt-modal-buttons {
-          display: flex;
-          justify-content: flex-end;
-          gap: 8px;
-          margin-top: 16px;
-          padding-top: 16px;
-          border-top: 1px solid var(--background-modifier-border);
-        }
-        @keyframes dmt-shake {
-          0%, 100% { transform: translateX(0); }
-          25% { transform: translateX(-4px); }
-          75% { transform: translateX(4px); }
-        }
-        .dmt-shake { animation: dmt-shake 0.3s ease; }
-      \`;
-      document.head.appendChild(styleEl);
-    }
-    
-    contentEl.createEl('h2', { text: 'Insert New Map' });
-    
-    // Map name input
-    new Setting(contentEl)
-      .setName('Map name')
-      .setDesc('A display name for this map (can be left blank)')
-      .addText(text => {
-        this.nameInput = text;
-        text
-          .setPlaceholder('e.g., Goblin Cave Level 1')
-          .onChange(value => {
-            this.mapName = value;
-          });
-        // Focus the input after modal opens
-        setTimeout(() => text.inputEl.focus(), 10);
-      });
-    
-    // Map type selection
-    const typeContainer = contentEl.createDiv({ cls: 'dmt-map-type-selection' });
-    typeContainer.createEl('div', { text: 'Map type', cls: 'setting-item-name' });
-    typeContainer.createEl('div', { 
-      text: 'Choose the grid style for this map', 
-      cls: 'setting-item-description' 
-    });
-    
-    const buttonRow = typeContainer.createDiv({ cls: 'dmt-map-type-buttons' });
-    
-    const gridBtn = buttonRow.createEl('button', { 
-      text: 'Grid',
-      cls: 'dmt-map-type-btn',
-      attr: { type: 'button' }
-    });
-    
-    const hexBtn = buttonRow.createEl('button', { 
-      text: 'Hex',
-      cls: 'dmt-map-type-btn',
-      attr: { type: 'button' }
-    });
-    
-    gridBtn.onclick = () => {
-      this.mapType = 'grid';
-      gridBtn.addClass('selected');
-      hexBtn.removeClass('selected');
-    };
-    
-    hexBtn.onclick = () => {
-      this.mapType = 'hex';
-      hexBtn.addClass('selected');
-      gridBtn.removeClass('selected');
-    };
-    
-    // Buttons
-    const buttonContainer = contentEl.createDiv({ cls: 'dmt-modal-buttons' });
-    
-    const cancelBtn = buttonContainer.createEl('button', { text: 'Cancel' });
-    cancelBtn.onclick = () => this.close();
-    
-    const insertBtn = buttonContainer.createEl('button', { text: 'Insert', cls: 'mod-cta' });
-    insertBtn.onclick = () => {
-      if (!this.mapType) {
-        // Brief visual feedback that type is required
-        buttonRow.addClass('dmt-shake');
-        setTimeout(() => buttonRow.removeClass('dmt-shake'), 300);
-        return;
-      }
-      this.onInsert(this.mapName, this.mapType);
-      this.close();
-    };
-    
-    // Handle Enter key to submit (if type is selected)
-    contentEl.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && this.mapType) {
-        e.preventDefault();
-        this.onInsert(this.mapName, this.mapType);
-        this.close();
-      }
-    });
-  }
-  
-  onClose() {
-    this.contentEl.empty();
-  }
-}
-
-/**
- * Modal for inserting a randomly generated dungeon map
- */
-class InsertDungeonModal extends Modal {
-  constructor(app, plugin, onInsert) {
-    super(app);
-    this.plugin = plugin;
-    this.onInsert = onInsert;
-    this.mapName = '';
-    this.dungeonSize = null; // 'small', 'medium', or 'large'
-    this.distancePerCell = 5;
-    this.distanceUnit = 'ft';
-  }
-  
-  onOpen() {
-    const { contentEl } = this;
-    contentEl.empty();
-    contentEl.addClass('dmt-insert-dungeon-modal');
-    
-    // Inject modal-specific styles if not already present
-    if (!document.getElementById('dmt-insert-dungeon-styles')) {
-      const styleEl = document.createElement('style');
-      styleEl.id = 'dmt-insert-dungeon-styles';
-      styleEl.textContent = \`
-        .dmt-insert-dungeon-modal { padding: 16px; min-width: 400px; }
-        .dmt-dungeon-size-selection { margin-top: 16px; }
-        .dmt-dungeon-size-buttons { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
-        .dmt-dungeon-size-btn {
-          flex: 1;
-          padding: 12px 16px;
-          border: 2px solid var(--background-modifier-border);
-          border-radius: 6px;
-          background: var(--background-primary);
-          color: var(--text-normal);
-          cursor: pointer;
-          font-size: 1em;
-          font-weight: 500;
-          transition: all 0.15s ease;
-          text-align: center;
-        }
-        .dmt-dungeon-size-btn:hover {
-          border-color: var(--interactive-accent);
-          background: var(--background-secondary);
-        }
-        .dmt-dungeon-size-btn.selected {
-          border-color: var(--interactive-accent);
-          background: var(--interactive-accent);
-          color: var(--text-on-accent);
-        }
-
-        .dmt-dungeon-distance-row {
-          display: flex;
-          gap: 8px;
-          align-items: center;
-          margin-top: 8px;
-        }
-        .dmt-dungeon-distance-row input[type="number"] {
-          width: 80px;
-        }
-        .dmt-dungeon-distance-row input[type="text"] {
-          width: 60px;
-        }
-        .dmt-modal-buttons {
-          display: flex;
-          justify-content: flex-end;
-          gap: 8px;
-          margin-top: 16px;
-          padding-top: 16px;
-          border-top: 1px solid var(--background-modifier-border);
-        }
-        @keyframes dmt-shake {
-          0%, 100% { transform: translateX(0); }
-          25% { transform: translateX(-4px); }
-          75% { transform: translateX(4px); }
-        }
-        .dmt-shake { animation: dmt-shake 0.3s ease; }
-      \`;
-      document.head.appendChild(styleEl);
-    }
-    
-    contentEl.createEl('h2', { text: 'Generate Random Dungeon' });
-    
-    // Map name input
-    new Setting(contentEl)
-      .setName('Map name')
-      .setDesc('A display name for this dungeon map (can be left blank)')
-      .addText(text => {
-        this.nameInput = text;
-        text
-          .setPlaceholder('e.g., Goblin Cave Level 1')
-          .onChange(value => {
-            this.mapName = value;
-          });
-        // Focus the input after modal opens
-        setTimeout(() => text.inputEl.focus(), 10);
-      });
-    
-    // Dungeon size selection
-    const sizeContainer = contentEl.createDiv({ cls: 'dmt-dungeon-size-selection' });
-    sizeContainer.createEl('div', { text: 'Dungeon size', cls: 'setting-item-name' });
-    sizeContainer.createEl('div', { 
-      text: 'Choose the overall size of the generated dungeon', 
-      cls: 'setting-item-description' 
-    });
-    
-    const buttonRow = sizeContainer.createDiv({ cls: 'dmt-dungeon-size-buttons' });
-    
-    const presetInfo = {
-      small: { label: 'Small', desc: '4-6 rooms' },
-      medium: { label: 'Medium', desc: '6-10 rooms' },
-      large: { label: 'Large', desc: '10-15 rooms' }
-    };
-    
-    const buttons = {};
-    
-    for (const [preset, info] of Object.entries(presetInfo)) {
-      const btn = buttonRow.createEl('button', { 
-        cls: 'dmt-dungeon-size-btn',
-        text: info.label,
-        attr: { type: 'button', title: info.desc }
-      });
-      buttons[preset] = btn;
-      
-      btn.onclick = () => {
-        this.dungeonSize = preset;
-        Object.values(buttons).forEach(b => b.removeClass('selected'));
-        btn.addClass('selected');
-      };
-    }
-    
-    // Distance measurement settings
-    const distContainer = contentEl.createDiv({ cls: 'dmt-dungeon-size-selection' });
-    distContainer.createEl('div', { text: 'Distance measurement', cls: 'setting-item-name' });
-    distContainer.createEl('div', { 
-      text: 'Set the scale for distance measurement on this map', 
-      cls: 'setting-item-description' 
-    });
-    
-    const distRow = distContainer.createDiv({ cls: 'dmt-dungeon-distance-row' });
-    
-    const distInput = distRow.createEl('input', {
-      type: 'number',
-      value: String(this.distancePerCell),
-      attr: { min: '1', step: '1' }
-    });
-    distInput.addEventListener('change', (e) => {
-      this.distancePerCell = parseInt(e.target.value) || 5;
-    });
-    
-    distRow.createEl('span', { text: 'per cell, unit:' });
-    
-    const unitInput = distRow.createEl('input', {
-      type: 'text',
-      value: this.distanceUnit
-    });
-    unitInput.addEventListener('change', (e) => {
-      this.distanceUnit = e.target.value || 'ft';
-    });
-    
-    // Buttons
-    const buttonContainer = contentEl.createDiv({ cls: 'dmt-modal-buttons' });
-    
-    const cancelBtn = buttonContainer.createEl('button', { text: 'Cancel' });
-    cancelBtn.onclick = () => this.close();
-    
-    const generateBtn = buttonContainer.createEl('button', { text: 'Generate', cls: 'mod-cta' });
-    generateBtn.onclick = async () => {
-      if (!this.dungeonSize) {
-        // Brief visual feedback that size is required
-        buttonRow.addClass('dmt-shake');
-        setTimeout(() => buttonRow.removeClass('dmt-shake'), 300);
-        return;
-      }
-      
-      // Load generator and generate the dungeon
-      try {
-        const generator = await this.plugin.loadDungeonGenerator();
-        const result = generator.generateDungeon(this.dungeonSize);
-      
-      // Wait for the callback (which saves to JSON) before closing
-      await this.onInsert(this.mapName, result.cells, result.objects, {
-          distancePerCell: this.distancePerCell,
-          distanceUnit: this.distanceUnit,
-          preset: this.dungeonSize,
-          roomCount: result.metadata.roomCount,
-          doorCount: result.metadata.doorCount
-        });
-        this.close();
-      } catch (err) {
-        console.error('[Windrose] Dungeon generation failed:', err);
-        alert('Failed to generate dungeon: ' + err.message);
-      }
-    };
-    
-    // Handle Enter key to submit (if size is selected)
-    contentEl.addEventListener('keydown', async (e) => {
-      if (e.key === 'Enter' && this.dungeonSize) {
-        e.preventDefault();
-        try {
-          const generator = await this.plugin.loadDungeonGenerator();
-          const result = generator.generateDungeon(this.dungeonSize);
-          await this.onInsert(this.mapName, result.cells, result.objects, {
-            distancePerCell: this.distancePerCell,
-            distanceUnit: this.distanceUnit,
-            preset: this.dungeonSize,
-            roomCount: result.metadata.roomCount,
-            doorCount: result.metadata.doorCount
-          });
-          this.close();
-        } catch (err) {
-          console.error('[Windrose] Dungeon generation failed:', err);
-          alert('Failed to generate dungeon: ' + err.message);
-        }
-      }
-    });
-  }
-  
-  onClose() {
-    this.contentEl.empty();
-  }
-}
-
-/**
- * Modal for creating/editing objects
- */
-class ObjectEditModal extends Modal {
-  constructor(app, plugin, existingObject, onSave, mapType = 'grid') {
-    super(app);
-    this.plugin = plugin;
-    this.existingObject = existingObject;
-    this.onSave = onSave;
-    this.mapType = mapType;
-    
-    // Form state
-    this.symbol = existingObject?.symbol || '';
-    this.iconClass = existingObject?.iconClass || '';
-    this.label = existingObject?.label || '';
-    this.category = existingObject?.category || 'features';
-    
-    // UI state - determine initial mode based on existing object
-    this.useIcon = !!existingObject?.iconClass;
-    this.iconSearchQuery = '';
-    this.iconCategory = 'all';
-  }
-  
-  onOpen() {
-    const { contentEl } = this;
-    contentEl.empty();
-    contentEl.addClass('dmt-object-edit-modal');
-    
-    const isEditing = !!this.existingObject;
-    
-    contentEl.createEl('h2', { text: isEditing ? 'Edit Object' : 'Create Custom Object' });
-    
-    // Icon type toggle
-    const toggleContainer = contentEl.createDiv({ cls: 'dmt-icon-type-toggle' });
-    
-    const unicodeBtn = toggleContainer.createEl('button', { 
-      text: 'Unicode Symbol',
-      cls: 'dmt-icon-type-btn' + (this.useIcon ? '' : ' active'),
-      attr: { type: 'button' }
-    });
-    
-    const iconBtn = toggleContainer.createEl('button', { 
-      text: 'RPGAwesome Icon',
-      cls: 'dmt-icon-type-btn' + (this.useIcon ? ' active' : ''),
-      attr: { type: 'button' }
-    });
-    
-    // Container for symbol input (shown when useIcon is false)
-    this.symbolContainer = contentEl.createDiv({ cls: 'dmt-symbol-container' });
-    
-    // Container for icon picker (shown when useIcon is true)
-    this.iconPickerContainer = contentEl.createDiv({ cls: 'dmt-icon-picker-container' });
-    
-    // Toggle handlers
-    unicodeBtn.onclick = () => {
-      if (!this.useIcon) return;
-      this.useIcon = false;
-      unicodeBtn.addClass('active');
-      iconBtn.removeClass('active');
-      this.renderSymbolInput();
-      this.renderIconPicker();
-    };
-    
-    iconBtn.onclick = () => {
-      if (this.useIcon) return;
-      this.useIcon = true;
-      iconBtn.addClass('active');
-      unicodeBtn.removeClass('active');
-      this.renderSymbolInput();
-      this.renderIconPicker();
-    };
-    
-    // Initial render of symbol/icon sections
-    this.renderSymbolInput();
-    this.renderIconPicker();
-    
-    // Label input
-    new Setting(contentEl)
-      .setName('Label')
-      .setDesc('Display name for this object')
-      .addText(text => text
-        .setValue(this.label)
-        .setPlaceholder('e.g., Treasure Chest')
-        .onChange(value => {
-          this.label = value;
-        }));
-    
-    // Category dropdown
-    const allCategories = ObjectHelpers.getAllCategories(this.plugin.settings);
-    new Setting(contentEl)
-      .setName('Category')
-      .setDesc('Group this object belongs to')
-      .addDropdown(dropdown => {
-        for (const cat of allCategories) {
-          dropdown.addOption(cat.id, cat.label);
-        }
-        dropdown.setValue(this.category);
-        dropdown.onChange(value => {
-          this.category = value;
-        });
-      });
-    
-    // Buttons
-    const buttonContainer = contentEl.createDiv({ cls: 'dmt-modal-buttons' });
-    
-    const cancelBtn = buttonContainer.createEl('button', { text: 'Cancel' });
-    cancelBtn.onclick = () => this.close();
-    
-    const saveBtn = buttonContainer.createEl('button', { text: 'Save', cls: 'mod-cta' });
-    saveBtn.onclick = () => this.save();
-  }
-  
-  renderSymbolInput() {
-    const container = this.symbolContainer;
-    container.empty();
-    
-    if (this.useIcon) {
-      container.style.display = 'none';
-      return;
-    }
-    container.style.display = 'block';
-    
-    // Symbol input with preview
-    const symbolSetting = new Setting(container)
-      .setName('Symbol')
-      .setDesc('Paste any Unicode character or emoji');
-    
-    const symbolInput = symbolSetting.controlEl.createEl('input', {
-      type: 'text',
-      cls: 'dmt-symbol-input',
-      value: this.symbol,
-      attr: { placeholder: 'Paste symbol...' }
-    });
-    symbolInput.addEventListener('input', (e) => {
-      this.symbol = e.target.value.trim();
-      this.updateSymbolPreview();
-    });
-    
-    // Focus the symbol input after a short delay
-    setTimeout(() => symbolInput.focus(), 50);
-    
-    // Symbol preview
-    const previewEl = symbolSetting.controlEl.createDiv({ cls: 'dmt-symbol-preview' });
-    previewEl.textContent = this.symbol || '?';
-    this.symbolPreviewEl = previewEl;
-    this.symbolInputEl = symbolInput;
-    
-    // Quick symbols
-    const quickSymbolsContainer = container.createDiv({ cls: 'dmt-quick-symbols' });
-    quickSymbolsContainer.createEl('label', { text: 'Quick Symbols', cls: 'dmt-quick-symbols-label' });
-    const symbolGrid = quickSymbolsContainer.createDiv({ cls: 'dmt-quick-symbols-grid' });
-    
-    for (const sym of QUICK_SYMBOLS) {
-      const symBtn = symbolGrid.createEl('button', { 
-        text: sym, 
-        cls: 'dmt-quick-symbol-btn',
-        attr: { type: 'button' }
-      });
-      symBtn.onclick = () => {
-        this.symbol = sym;
-        symbolInput.value = sym;
-        this.updateSymbolPreview();
-      };
-    }
-  }
-  
-  renderIconPicker() {
-    const container = this.iconPickerContainer;
-    container.empty();
-    
-    if (!this.useIcon) {
-      container.style.display = 'none';
-      return;
-    }
-    container.style.display = 'block';
-    
-    const picker = container.createDiv({ cls: 'dmt-icon-picker' });
-    
-    // Search input
-    const searchContainer = picker.createDiv({ cls: 'dmt-icon-picker-search' });
-    const searchInput = searchContainer.createEl('input', {
-      type: 'text',
-      value: this.iconSearchQuery,
-      attr: { placeholder: 'Search icons...' }
-    });
-    searchInput.addEventListener('input', (e) => {
-      this.iconSearchQuery = e.target.value;
-      this.renderIconGrid();
-    });
-    
-    // Category tabs
-    const tabsContainer = picker.createDiv({ cls: 'dmt-icon-picker-tabs' });
-    
-    // "All" tab
-    const allTab = tabsContainer.createEl('button', {
-      text: 'All',
-      cls: 'dmt-icon-picker-tab' + (this.iconCategory === 'all' ? ' active' : ''),
-      attr: { type: 'button' }
-    });
-    allTab.onclick = () => {
-      this.iconCategory = 'all';
-      this.renderIconTabs(tabsContainer);
-      this.renderIconGrid();
-    };
-    
-    // Category tabs
-    const categories = RPGAwesomeHelpers.getCategories();
-    for (const cat of categories) {
-      const tab = tabsContainer.createEl('button', {
-        text: cat.label,
-        cls: 'dmt-icon-picker-tab' + (this.iconCategory === cat.id ? ' active' : ''),
-        attr: { type: 'button', 'data-category': cat.id }
-      });
-      tab.onclick = () => {
-        this.iconCategory = cat.id;
-        this.renderIconTabs(tabsContainer);
-        this.renderIconGrid();
-      };
-    }
-    this.tabsContainer = tabsContainer;
-    
-    // Icon grid
-    this.iconGridContainer = picker.createDiv({ cls: 'dmt-icon-picker-grid' });
-    this.renderIconGrid();
-    
-    // Selected icon preview
-    this.iconPreviewContainer = picker.createDiv({ cls: 'dmt-icon-preview-row' });
-    this.updateIconPreview();
-  }
-  
-  renderIconTabs(container) {
-    // Update active state on all tabs
-    const tabs = container.querySelectorAll('.dmt-icon-picker-tab');
-    tabs.forEach(tab => {
-      const catId = tab.getAttribute('data-category') || 'all';
-      if (catId === this.iconCategory) {
-        tab.addClass('active');
-      } else {
-        tab.removeClass('active');
-      }
-    });
-  }
-  
-  renderIconGrid() {
-    const container = this.iconGridContainer;
-    if (!container) return;
-    container.empty();
-    
-    // Get icons based on search or category
-    let icons;
-    if (this.iconSearchQuery.trim()) {
-      icons = RPGAwesomeHelpers.search(this.iconSearchQuery);
-    } else {
-      icons = RPGAwesomeHelpers.getByCategory(this.iconCategory);
-    }
-    
-    if (icons.length === 0) {
-      container.createDiv({ cls: 'dmt-icon-picker-empty', text: 'No icons found' });
-      return;
-    }
-    
-    // Render icon buttons
-    for (const icon of icons) {
-      const iconBtn = container.createEl('button', {
-        cls: 'dmt-icon-picker-icon' + (this.iconClass === icon.iconClass ? ' selected' : ''),
-        attr: { 
-          type: 'button',
-          title: icon.label
-        }
-      });
-      
-      // Create the icon span with the character
-      const iconSpan = iconBtn.createEl('span', { cls: 'ra' });
-      iconSpan.textContent = icon.char;
-      
-      iconBtn.onclick = () => {
-        this.iconClass = icon.iconClass;
-        // Update selection state
-        container.querySelectorAll('.dmt-icon-picker-icon').forEach(btn => btn.removeClass('selected'));
-        iconBtn.addClass('selected');
-        this.updateIconPreview();
-      };
-    }
-  }
-  
-  updateSymbolPreview() {
-    if (this.symbolPreviewEl) {
-      this.symbolPreviewEl.textContent = this.symbol || '?';
-    }
-  }
-  
-  updateIconPreview() {
-    const container = this.iconPreviewContainer;
-    if (!container) return;
-    container.empty();
-    
-    if (!this.iconClass) {
-      container.createDiv({ cls: 'dmt-icon-preview-info', text: 'Select an icon above' });
-      return;
-    }
-    
-    const iconInfo = RPGAwesomeHelpers.getInfo(this.iconClass);
-    if (!iconInfo) {
-      container.createDiv({ cls: 'dmt-icon-preview-info', text: 'Invalid icon selected' });
-      return;
-    }
-    
-    // Large preview
-    const previewBox = container.createDiv({ cls: 'dmt-icon-preview-large' });
-    const iconSpan = previewBox.createEl('span', { cls: 'ra' });
-    iconSpan.textContent = iconInfo.char;
-    
-    // Info
-    const infoBox = container.createDiv({ cls: 'dmt-icon-preview-info' });
-    infoBox.createDiv({ cls: 'dmt-icon-preview-label', text: iconInfo.label });
-    infoBox.createDiv({ cls: 'dmt-icon-preview-class', text: this.iconClass });
-  }
-  
-  save() {
-    // Validate based on mode
-    if (this.useIcon) {
-      if (!this.iconClass || !RPGAwesomeHelpers.isValid(this.iconClass)) {
-        alert('Please select a valid icon');
-        return;
-      }
-    } else {
-      if (!this.symbol || this.symbol.length === 0 || this.symbol.length > 8) {
-        alert('Please enter a valid symbol (1-8 characters)');
-        return;
-      }
-    }
-    
-    if (!this.label || this.label.trim().length === 0) {
-      alert('Please enter a label');
-      return;
-    }
-    
-    // Get the correct settings keys for this map type
-    const overridesKey = this.mapType === 'hex' ? 'hexObjectOverrides' : 'gridObjectOverrides';
-    const customObjectsKey = this.mapType === 'hex' ? 'customHexObjects' : 'customGridObjects';
-    
-    if (this.existingObject?.isBuiltIn) {
-      // Modifying a built-in: save as override
-      if (!this.plugin.settings[overridesKey]) {
-        this.plugin.settings[overridesKey] = {};
-      }
-      
-      const original = BUILT_IN_OBJECTS.find(o => o.id === this.existingObject.id);
-      const override = {};
-      
-      // Handle symbol/iconClass based on mode
-      if (this.useIcon) {
-        if (this.iconClass !== original.iconClass) override.iconClass = this.iconClass;
-        // Clear symbol override if switching to icon
-        if (original.symbol && !this.iconClass) override.symbol = null;
-      } else {
-        if (this.symbol !== original.symbol) override.symbol = this.symbol;
-        // Clear iconClass override if switching to symbol
-        if (original.iconClass) override.iconClass = null;
-      }
-      
-      if (this.label !== original.label) override.label = this.label;
-      if (this.category !== original.category) override.category = this.category;
-      
-      // Preserve hidden state if it exists
-      if (this.plugin.settings[overridesKey][this.existingObject.id]?.hidden) {
-        override.hidden = true;
-      }
-      
-      // Preserve order if it exists
-      if (this.plugin.settings[overridesKey][this.existingObject.id]?.order !== undefined) {
-        override.order = this.plugin.settings[overridesKey][this.existingObject.id].order;
-      }
-      
-      if (Object.keys(override).length > 0) {
-        this.plugin.settings[overridesKey][this.existingObject.id] = override;
-      } else {
-        delete this.plugin.settings[overridesKey][this.existingObject.id];
-      }
-    } else if (this.existingObject?.isCustom) {
-      // Editing existing custom object
-      if (!this.plugin.settings[customObjectsKey]) {
-        this.plugin.settings[customObjectsKey] = [];
-      }
-      const idx = this.plugin.settings[customObjectsKey].findIndex(o => o.id === this.existingObject.id);
-      if (idx !== -1) {
-        const updated = {
-          ...this.plugin.settings[customObjectsKey][idx],
-          label: this.label.trim(),
-          category: this.category
-        };
-        
-        // Set symbol or iconClass based on mode
-        if (this.useIcon) {
-          updated.iconClass = this.iconClass;
-          delete updated.symbol;
-        } else {
-          updated.symbol = this.symbol;
-          delete updated.iconClass;
-        }
-        
-        this.plugin.settings[customObjectsKey][idx] = updated;
-      }
-    } else {
-      // Creating new custom object
-      if (!this.plugin.settings[customObjectsKey]) {
-        this.plugin.settings[customObjectsKey] = [];
-      }
-      
-      const newObject = {
-        id: 'custom-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9),
-        label: this.label.trim(),
-        category: this.category
-      };
-      
-      // Set symbol or iconClass based on mode
-      if (this.useIcon) {
-        newObject.iconClass = this.iconClass;
-      } else {
-        newObject.symbol = this.symbol;
-      }
-      
-      this.plugin.settings[customObjectsKey].push(newObject);
-    }
-    
-    this.onSave();
-    this.close();
-  }
-  
-  onClose() {
-    this.contentEl.empty();
-  }
-}
-
-/**
- * Modal for creating/editing categories
- */
-class CategoryEditModal extends Modal {
-  constructor(app, plugin, existingCategory, onSave, mapType = 'grid') {
-    super(app);
-    this.plugin = plugin;
-    this.existingCategory = existingCategory;
-    this.onSave = onSave;
-    this.mapType = mapType;
-    
-    this.label = existingCategory?.label || '';
-    this.order = existingCategory?.order ?? 100;
-  }
-  
-  onOpen() {
-    const { contentEl } = this;
-    contentEl.empty();
-    contentEl.addClass('dmt-category-edit-modal');
-    
-    const isEditing = !!this.existingCategory;
-    
-    contentEl.createEl('h2', { text: isEditing ? 'Edit Category' : 'Create Custom Category' });
-    
-    let nameInputEl = null;
-    new Setting(contentEl)
-      .setName('Name')
-      .setDesc('Display name for this category')
-      .addText(text => {
-        nameInputEl = text.inputEl;
-        text.setValue(this.label)
-          .setPlaceholder('e.g., Alchemy')
-          .onChange(value => {
-            this.label = value;
-          });
-      });
-    
-    // Focus the name input after a short delay
-    if (nameInputEl) {
-      setTimeout(() => nameInputEl.focus(), 50);
-    }
-    
-    new Setting(contentEl)
-      .setName('Sort Order')
-      .setDesc('Lower numbers appear first (built-ins use 0-50)')
-      .addText(text => text
-        .setValue(String(this.order))
-        .setPlaceholder('100')
-        .onChange(value => {
-          const num = parseInt(value, 10);
-          if (!isNaN(num)) {
-            this.order = num;
-          }
-        }));
-    
-    const buttonContainer = contentEl.createDiv({ cls: 'dmt-modal-buttons' });
-    
-    const cancelBtn = buttonContainer.createEl('button', { text: 'Cancel' });
-    cancelBtn.onclick = () => this.close();
-    
-    const saveBtn = buttonContainer.createEl('button', { text: 'Save', cls: 'mod-cta' });
-    saveBtn.onclick = () => this.save();
-  }
-  
-  save() {
-    if (!this.label || this.label.trim().length === 0) {
-      alert('Please enter a category name');
-      return;
-    }
-    
-    // Get the correct settings key for this map type
-    const categoriesKey = this.mapType === 'hex' ? 'customHexCategories' : 'customGridCategories';
-    
-    if (!this.plugin.settings[categoriesKey]) {
-      this.plugin.settings[categoriesKey] = [];
-    }
-    
-    if (this.existingCategory) {
-      const idx = this.plugin.settings[categoriesKey].findIndex(c => c.id === this.existingCategory.id);
-      if (idx !== -1) {
-        this.plugin.settings[categoriesKey][idx] = {
-          ...this.plugin.settings[categoriesKey][idx],
-          label: this.label.trim(),
-          order: this.order
-        };
-      }
-    } else {
-      const newCategory = {
-        id: 'custom-cat-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9),
-        label: this.label.trim(),
-        order: this.order
-      };
-      
-      this.plugin.settings[categoriesKey].push(newCategory);
-    }
-    
-    this.onSave();
-    this.close();
-  }
-  
-  onClose() {
-    this.contentEl.empty();
-  }
-}
-
-/**
- * Modal for creating/editing palette colors
- */
-class ColorEditModal extends Modal {
-  constructor(app, plugin, existingColor, onSave) {
-    super(app);
-    this.plugin = plugin;
-    this.existingColor = existingColor;
-    this.onSave = onSave;
-    this.isBuiltIn = existingColor?.isBuiltIn || false;
-  }
-  
-  onOpen() {
-    const { contentEl } = this;
-    contentEl.empty();
-    contentEl.addClass('dmt-color-edit-modal');
-    
-    const isEdit = !!this.existingColor;
-    const isBuiltIn = this.isBuiltIn;
-    
-    contentEl.createEl('h2', { 
-      text: isEdit 
-        ? (isBuiltIn ? \`Edit: \${this.existingColor.label}\` : 'Edit Custom Color')
-        : 'Add Custom Color' 
-    });
-    
-    // Get original built-in values if editing a built-in
-    const originalBuiltIn = isBuiltIn 
-      ? BUILT_IN_COLORS.find(c => c.id === this.existingColor.id)
-      : null;
-    
-    // Initialize form values
-    let colorValue = this.existingColor?.color || '#808080';
-    let labelValue = this.existingColor?.label || '';
-    let opacityValue = this.existingColor?.opacity ?? 1;
-    
-    // Color picker
-    new Setting(contentEl)
-      .setName('Color')
-      .setDesc('Choose the color value')
-      .addColorPicker(picker => picker
-        .setValue(colorValue)
-        .onChange(value => {
-          colorValue = value;
-          hexInput.value = value;
-        }))
-      .addText(text => {
-        text.inputEl.addClass('dmt-color-hex-input');
-        text.setPlaceholder('#RRGGBB')
-          .setValue(colorValue)
-          .onChange(value => {
-            if (/^#[0-9A-Fa-f]{6}$/.test(value)) {
-              colorValue = value;
-            }
-          });
-        // Store reference for color picker sync
-        var hexInput = text.inputEl;
-      });
-    
-    // Label input
-    new Setting(contentEl)
-      .setName('Label')
-      .setDesc('Display name for this color')
-      .addText(text => text
-        .setPlaceholder('e.g., Ocean Blue')
-        .setValue(labelValue)
-        .onChange(value => {
-          labelValue = value;
-        }));
-    
-    // Opacity slider
-    const opacitySetting = new Setting(contentEl)
-      .setName('Opacity')
-      .setDesc('Default opacity when selecting this color');
-    
-    const opacityContainer = opacitySetting.controlEl.createEl('div', { cls: 'dmt-opacity-control' });
-    const opacitySlider = opacityContainer.createEl('input', {
-      type: 'range',
-      attr: { min: '10', max: '100', value: String(Math.round(opacityValue * 100)) }
-    });
-    const opacityDisplay = opacityContainer.createEl('span', { 
-      text: \`\${Math.round(opacityValue * 100)}%\`,
-      cls: 'dmt-opacity-value'
-    });
-    
-    opacitySlider.addEventListener('input', (e) => {
-      opacityValue = parseInt(e.target.value, 10) / 100;
-      opacityDisplay.textContent = \`\${Math.round(opacityValue * 100)}%\`;
-    });
-    
-    // Show original values for built-ins
-    if (isBuiltIn && originalBuiltIn) {
-      const origInfo = contentEl.createEl('div', { cls: 'dmt-color-original-info' });
-      origInfo.createEl('span', { text: 'Original: ' });
-      const origSwatch = origInfo.createEl('span', { 
-        cls: 'dmt-color-mini-swatch',
-        attr: { style: \`background-color: \${originalBuiltIn.color}\` }
-      });
-      origInfo.createEl('span', { text: \` \${originalBuiltIn.label} (\${originalBuiltIn.color})\` });
-    }
-    
-    // Action buttons
-    const btnContainer = contentEl.createEl('div', { cls: 'dmt-modal-buttons' });
-    
-    const saveBtn = btnContainer.createEl('button', { 
-      text: 'Save', 
-      cls: 'mod-cta' 
-    });
-    saveBtn.addEventListener('click', async () => {
-      // Validate
-      if (!labelValue.trim()) {
-        alert('Please enter a label for this color.');
-        return;
-      }
-      if (!/^#[0-9A-Fa-f]{6}$/.test(colorValue)) {
-        alert('Please enter a valid hex color (e.g., #4A9EFF)');
-        return;
-      }
-      
-      if (isBuiltIn) {
-        // Save as override
-        if (!this.plugin.settings.colorPaletteOverrides) {
-          this.plugin.settings.colorPaletteOverrides = {};
-        }
-        const existingOverride = this.plugin.settings.colorPaletteOverrides[this.existingColor.id] || {};
-        this.plugin.settings.colorPaletteOverrides[this.existingColor.id] = {
-          ...existingOverride,
-          color: colorValue,
-          label: labelValue,
-          opacity: opacityValue
-        };
-      } else if (isEdit) {
-        // Update existing custom color
-        const idx = this.plugin.settings.customPaletteColors.findIndex(c => c.id === this.existingColor.id);
-        if (idx !== -1) {
-          this.plugin.settings.customPaletteColors[idx] = {
-            ...this.plugin.settings.customPaletteColors[idx],
-            color: colorValue,
-            label: labelValue,
-            opacity: opacityValue
-          };
-        }
-      } else {
-        // Add new custom color
-        if (!this.plugin.settings.customPaletteColors) {
-          this.plugin.settings.customPaletteColors = [];
-        }
-        this.plugin.settings.customPaletteColors.push({
-          id: 'custom-' + Date.now(),
-          color: colorValue,
-          label: labelValue,
-          opacity: opacityValue
-        });
-      }
-      
-      this.onSave();
-      this.close();
-    });
-    
-    const cancelBtn = btnContainer.createEl('button', { text: 'Cancel' });
-    cancelBtn.addEventListener('click', () => this.close());
-  }
-  
-  onClose() {
-    this.contentEl.empty();
-  }
-}
-
-/**
- * Modal for exporting object customizations
- */
-class ExportModal extends Modal {
-  constructor(app, plugin, mapType = 'grid') {
-    super(app);
-    this.plugin = plugin;
-    this.mapType = mapType;
-  }
-  
-  onOpen() {
-    const { contentEl } = this;
-    contentEl.empty();
-    contentEl.addClass('dmt-export-modal');
-    
-    const mapTypeLabel = this.mapType === 'hex' ? 'Hex' : 'Grid';
-    contentEl.createEl('h2', { text: \`Export \${mapTypeLabel} Object Customizations\` });
-    
-    // Get the correct settings keys for this map type
-    const overridesKey = this.mapType === 'hex' ? 'hexObjectOverrides' : 'gridObjectOverrides';
-    const customObjectsKey = this.mapType === 'hex' ? 'customHexObjects' : 'customGridObjects';
-    const categoriesKey = this.mapType === 'hex' ? 'customHexCategories' : 'customGridCategories';
-    
-    const objectOverrides = this.plugin.settings[overridesKey] || {};
-    const customObjects = this.plugin.settings[customObjectsKey] || [];
-    const customCategories = this.plugin.settings[categoriesKey] || [];
-    
-    const hasOverrides = Object.keys(objectOverrides).length > 0;
-    const hasCustom = customObjects.length > 0 || customCategories.length > 0;
-    
-    // Selection checkboxes
-    let exportOverrides = hasOverrides;
-    let exportCustom = hasCustom;
-    
-    // Explain what will be exported
-    if (hasOverrides || hasCustom) {
-      contentEl.createEl('p', { 
-        text: 'Select what to include in the export file:',
-        cls: 'setting-item-description'
-      });
-    }
-    
-    if (hasOverrides) {
-      new Setting(contentEl)
-        .setName(\`Built-in modifications (\${Object.keys(objectOverrides).length})\`)
-        .setDesc('Changes to symbol, label, or order of built-in objects')
-        .addToggle(toggle => toggle
-          .setValue(exportOverrides)
-          .onChange(v => { exportOverrides = v; }));
-    }
-    
-    if (hasCustom) {
-      const customCount = customObjects.length + customCategories.length;
-      new Setting(contentEl)
-        .setName(\`Custom objects & categories (\${customCount})\`)
-        .setDesc(\`\${customObjects.length} object(s), \${customCategories.length} category(ies)\`)
-        .addToggle(toggle => toggle
-          .setValue(exportCustom)
-          .onChange(v => { exportCustom = v; }));
-    }
-    
-    if (!hasOverrides && !hasCustom) {
-      contentEl.createEl('p', { 
-        text: \`No customizations to export for \${mapTypeLabel} maps. Modify built-in objects or create custom ones first.\`,
-        cls: 'dmt-export-empty'
-      });
-      return;
-    }
-    
-    // Filename input
-    const defaultFilename = \`windrose-\${this.mapType}-objects-\${new Date().toISOString().split('T')[0]}.json\`;
-    let filename = defaultFilename;
-    
-    new Setting(contentEl)
-      .setName('Filename')
-      .setDesc('Will be saved to your vault root')
-      .addText(text => text
-        .setValue(filename)
-        .onChange(v => { filename = v; }));
-    
-    // Export button
-    new Setting(contentEl)
-      .addButton(btn => btn
-        .setButtonText('Export to Vault')
-        .setCta()
-        .onClick(async () => {
-          const exportData = {
-            windroseMD_objectExport: true,
-            exportedAt: new Date().toISOString(),
-            version: '1.0',
-            mapType: this.mapType
-          };
-          
-          if (exportOverrides && hasOverrides) {
-            exportData.objectOverrides = objectOverrides;
-          }
-          if (exportCustom && hasCustom) {
-            if (customObjects.length > 0) exportData.customObjects = customObjects;
-            if (customCategories.length > 0) exportData.customCategories = customCategories;
-          }
-          
-          // Save to vault
-          const json = JSON.stringify(exportData, null, 2);
-          const finalFilename = filename.endsWith('.json') ? filename : filename + '.json';
-          
-          try {
-            // Check if file exists
-            const existingFile = this.app.vault.getAbstractFileByPath(finalFilename);
-            if (existingFile) {
-              if (!confirm(\`File "\${finalFilename}" already exists. Overwrite?\`)) {
-                return;
-              }
-              await this.app.vault.modify(existingFile, json);
-            } else {
-              await this.app.vault.create(finalFilename, json);
-            }
-            
-            alert(\`Exported to: \${finalFilename}\`);
-            this.close();
-          } catch (err) {
-            alert(\`Export failed: \${err.message}\`);
-          }
-        }));
-  }
-  
-  onClose() {
-    this.contentEl.empty();
-  }
-}
-
-/**
- * Modal for importing object customizations
- */
-class ImportModal extends Modal {
-  constructor(app, plugin, onImport, mapType = 'grid') {
-    super(app);
-    this.plugin = plugin;
-    this.onImport = onImport;
-    this.mapType = mapType;
-    this.importData = null;
-  }
-  
-  onOpen() {
-    const { contentEl } = this;
-    contentEl.empty();
-    contentEl.addClass('dmt-import-modal');
-    
-    const mapTypeLabel = this.mapType === 'hex' ? 'Hex' : 'Grid';
-    contentEl.createEl('h2', { text: \`Import \${mapTypeLabel} Object Customizations\` });
-    
-    contentEl.createEl('p', { 
-      text: \`Select a Windrose MD object export file (.json) to import into \${mapTypeLabel} maps.\`,
-      cls: 'setting-item-description'
-    });
-    
-    // File picker
-    const fileContainer = contentEl.createDiv({ cls: 'dmt-import-file-container' });
-    const fileInput = fileContainer.createEl('input', {
-      type: 'file',
-      attr: { accept: '.json' }
-    });
-    
-    // Preview area (hidden until file selected)
-    const previewArea = contentEl.createDiv({ cls: 'dmt-import-preview' });
-    previewArea.style.display = 'none';
-    
-    // Import options (hidden until file validated)
-    const optionsArea = contentEl.createDiv({ cls: 'dmt-import-options' });
-    optionsArea.style.display = 'none';
-    
-    let mergeMode = 'merge'; // 'merge' or 'replace'
-    
-    fileInput.addEventListener('change', async (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      
-      try {
-        const text = await file.text();
-        const data = JSON.parse(text);
-        
-        // Validate it's a Windrose export
-        if (!data.windroseMD_objectExport) {
-          previewArea.empty();
-          previewArea.createEl('p', { 
-            text: 'This file is not a valid Windrose MD object export.',
-            cls: 'dmt-import-error'
-          });
-          previewArea.style.display = 'block';
-          optionsArea.style.display = 'none';
-          this.importData = null;
-          return;
-        }
-        
-        this.importData = data;
-        
-        // Show preview
-        previewArea.empty();
-        previewArea.createEl('p', { text: 'Valid Windrose MD export file' });
-        if (data.exportedAt) {
-          previewArea.createEl('p', { 
-            text: \`Exported: \${new Date(data.exportedAt).toLocaleString()}\`,
-            cls: 'dmt-import-date'
-          });
-        }
-        
-        // Show original map type if present
-        if (data.mapType) {
-          const sourceType = data.mapType === 'hex' ? 'Hex' : 'Grid';
-          if (data.mapType !== this.mapType) {
-            previewArea.createEl('p', { 
-              text: \`Note: This was exported from \${sourceType} maps but will be imported to \${mapTypeLabel} maps.\`,
-              cls: 'dmt-import-note'
-            });
-          }
-        }
-        
-        const overrideCount = data.objectOverrides ? Object.keys(data.objectOverrides).length : 0;
-        const customObjCount = data.customObjects?.length || 0;
-        const customCatCount = data.customCategories?.length || 0;
-        
-        if (overrideCount > 0) {
-          previewArea.createEl('p', { text: \`• \${overrideCount} built-in modification(s)\` });
-        }
-        if (customObjCount > 0) {
-          previewArea.createEl('p', { text: \`• \${customObjCount} custom object(s)\` });
-        }
-        if (customCatCount > 0) {
-          previewArea.createEl('p', { text: \`• \${customCatCount} custom category(ies)\` });
-        }
-        
-        previewArea.style.display = 'block';
-        
-        // Show import options
-        optionsArea.empty();
-        new Setting(optionsArea)
-          .setName('Import Mode')
-          .setDesc('How to handle existing customizations')
-          .addDropdown(dropdown => dropdown
-            .addOption('merge', 'Merge (keep existing, add new)')
-            .addOption('replace', 'Replace (remove existing first)')
-            .setValue(mergeMode)
-            .onChange(v => { mergeMode = v; }));
-        
-        optionsArea.style.display = 'block';
-        
-      } catch (err) {
-        previewArea.empty();
-        previewArea.createEl('p', { 
-          text: \`Error reading file: \${err.message}\`,
-          cls: 'dmt-import-error'
-        });
-        previewArea.style.display = 'block';
-        optionsArea.style.display = 'none';
-        this.importData = null;
-      }
-    });
-    
-    // Buttons
-    const buttonContainer = contentEl.createDiv({ cls: 'dmt-modal-buttons' });
-    
-    const cancelBtn = buttonContainer.createEl('button', { text: 'Cancel' });
-    cancelBtn.onclick = () => this.close();
-    
-    const importBtn = buttonContainer.createEl('button', { text: 'Import', cls: 'mod-cta' });
-    importBtn.onclick = async () => {
-      if (!this.importData) {
-        alert('Please select a valid export file first.');
-        return;
-      }
-      
-      // Get the correct settings keys for this map type
-      const overridesKey = this.mapType === 'hex' ? 'hexObjectOverrides' : 'gridObjectOverrides';
-      const customObjectsKey = this.mapType === 'hex' ? 'customHexObjects' : 'customGridObjects';
-      const categoriesKey = this.mapType === 'hex' ? 'customHexCategories' : 'customGridCategories';
-      
-      const data = this.importData;
-      
-      if (mergeMode === 'replace') {
-        // Clear existing for this map type
-        this.plugin.settings[overridesKey] = {};
-        this.plugin.settings[customObjectsKey] = [];
-        this.plugin.settings[categoriesKey] = [];
-      }
-      
-      // Import overrides
-      if (data.objectOverrides) {
-        if (!this.plugin.settings[overridesKey]) {
-          this.plugin.settings[overridesKey] = {};
-        }
-        Object.assign(this.plugin.settings[overridesKey], data.objectOverrides);
-      }
-      
-      // Import custom objects (avoid duplicates by ID)
-      if (data.customObjects) {
-        if (!this.plugin.settings[customObjectsKey]) {
-          this.plugin.settings[customObjectsKey] = [];
-        }
-        for (const obj of data.customObjects) {
-          const existingIdx = this.plugin.settings[customObjectsKey].findIndex(o => o.id === obj.id);
-          if (existingIdx !== -1) {
-            this.plugin.settings[customObjectsKey][existingIdx] = obj;
-          } else {
-            this.plugin.settings[customObjectsKey].push(obj);
-          }
-        }
-      }
-      
-      // Import custom categories (avoid duplicates by ID)
-      if (data.customCategories) {
-        if (!this.plugin.settings[categoriesKey]) {
-          this.plugin.settings[categoriesKey] = [];
-        }
-        for (const cat of data.customCategories) {
-          const existingIdx = this.plugin.settings[categoriesKey].findIndex(c => c.id === cat.id);
-          if (existingIdx !== -1) {
-            this.plugin.settings[categoriesKey][existingIdx] = cat;
-          } else {
-            this.plugin.settings[categoriesKey].push(cat);
-          }
-        }
-      }
-      
-      await this.plugin.saveSettings();
-      this.onImport();
-      this.close();
-    };
-  }
-  
-  onClose() {
-    this.contentEl.empty();
-  }
-}
-
-// =============================================================================
-// MAIN PLUGIN CLASS
-// =============================================================================
+{{MODAL_CLASSES}}
 
 class WindroseMDSettingsPlugin extends Plugin {
   async onload() {
@@ -25434,12 +23510,34 @@ class WindroseMDSettingsPlugin extends Plugin {
   }
 
   /**
-   * Load the dungeon generator module from the compiled Windrose markdown file.
-   * Finds compiled-windrose-md.md, extracts the dungeonGenerator code block, and executes it.
+   * Load the dungeon generator module.
+   * In debug mode (WINDROSE-DEBUG.json with dungeonGeneratorPath), loads from a .js file directly.
+   * Otherwise, extracts from compiled-windrose-md.md.
    * @returns {Promise<Object>} The dungeon generator module exports
    */
   async loadDungeonGenerator() {
-    // Find the compiled markdown file
+    // 1. Check for debug override
+    const debugFile = this.app.vault.getAbstractFileByPath('WINDROSE-DEBUG.json');
+    if (debugFile) {
+      try {
+        const debugContent = await this.app.vault.read(debugFile);
+        const config = JSON.parse(debugContent);
+        if (config.dungeonGeneratorPath) {
+          console.log('[Windrose DEBUG] Loading generator from:', config.dungeonGeneratorPath);
+          const generatorFile = this.app.vault.getAbstractFileByPath(config.dungeonGeneratorPath);
+          if (!generatorFile) {
+            throw new Error('Debug dungeonGeneratorPath not found: ' + config.dungeonGeneratorPath);
+          }
+          const code = await this.app.vault.read(generatorFile);
+          const moduleFunc = new Function(code);
+          return moduleFunc();
+        }
+      } catch (e) {
+        console.warn('[Windrose] Debug generator load failed, falling back to compiled:', e.message);
+      }
+    }
+    
+    // 2. Production: Load from compiled markdown
     const allFiles = this.app.vault.getFiles();
     const compiledFile = allFiles.find(f => f.name === 'compiled-windrose-md.md');
     
@@ -25524,6 +23622,7 @@ class WindroseMDSettingsPlugin extends Plugin {
         // Store generation settings for re-roll feature
         generationSettings: {
           preset: options.preset,
+          configOverrides: options.configOverrides || {},
           distancePerCell: options.distancePerCell || 5,
           distanceUnit: options.distanceUnit || 'ft'
         },
@@ -25685,7 +23784,6 @@ class WindroseMDSettingsTab extends PluginSettingTab {
     super(app, plugin);
     this.plugin = plugin;
     this.settingsChanged = false;
-    this.styleEl = null;
     this.objectFilter = '';
     this.selectedMapType = 'grid'; // 'grid' or 'hex' for object editing
   }
@@ -25774,95 +23872,11 @@ class WindroseMDSettingsTab extends PluginSettingTab {
   // Helper: Render search bar
   // ---------------------------------------------------------------------------
   
-  renderSearchBar(containerEl) {
-    const wrapper = containerEl.createEl('div', { cls: 'dmt-settings-search-wrapper' });
-    const searchBox = wrapper.createEl('div', { cls: 'dmt-settings-search-box' });
-    
-    // Search icon
-    const searchIcon = searchBox.createEl('span', { cls: 'search-icon' });
-    IconHelpers.set(searchIcon, 'search');
-    
-    // Input
-    const input = searchBox.createEl('input', {
-      type: 'text',
-      placeholder: 'Search settings...'
-    });
-    
-    // Clear button (hidden initially)
-    const clearBtn = searchBox.createEl('button', { cls: 'clear-btn' });
-    clearBtn.style.display = 'none';
-    IconHelpers.set(clearBtn, 'x');
-    
-    // No results message (hidden initially)
-    this.noResultsEl = containerEl.createEl('div', { 
-      cls: 'dmt-settings-no-results',
-      text: 'No settings found matching your search.'
-    });
-    this.noResultsEl.style.display = 'none';
-    
-    // Search handler
-    const handleSearch = (query) => {
-      const q = query.toLowerCase().trim();
-      clearBtn.style.display = q ? 'block' : 'none';
-      
-      if (!q) {
-        // Clear search - show all, collapse sections
-        this.sections?.forEach(({ details }) => {
-          details.style.display = '';
-          details.settingItems?.forEach(item => {
-            item.classList.remove('dmt-setting-hidden');
-          });
-          details.removeAttribute('open');
-        });
-        this.noResultsEl.style.display = 'none';
-        return;
-      }
-      
-      let anyMatches = false;
-      
-      this.sections?.forEach(({ details, title }) => {
-        let sectionHasMatch = title.toLowerCase().includes(q);
-        
-        details.settingItems?.forEach(item => {
-          const nameEl = item.querySelector('.setting-item-name');
-          const descEl = item.querySelector('.setting-item-description');
-          const name = nameEl?.textContent?.toLowerCase() || '';
-          const desc = descEl?.textContent?.toLowerCase() || '';
-          
-          const matches = name.includes(q) || desc.includes(q);
-          
-          if (matches) {
-            item.classList.remove('dmt-setting-hidden');
-            sectionHasMatch = true;
-          } else {
-            item.classList.add('dmt-setting-hidden');
-          }
-        });
-        
-        if (sectionHasMatch) {
-          details.style.display = '';
-          details.setAttribute('open', '');
-          anyMatches = true;
-        } else {
-          details.style.display = 'none';
-        }
-      });
-      
-      this.noResultsEl.style.display = anyMatches ? 'none' : 'block';
-    };
-    
-    input.addEventListener('input', (e) => handleSearch(e.target.value));
-    clearBtn.addEventListener('click', () => {
-      input.value = '';
-      handleSearch('');
-      input.focus();
-    });
-  }
-  
+
   // ---------------------------------------------------------------------------
   // Main display method - orchestrates section rendering
   // ---------------------------------------------------------------------------
-  
+
   display() {
     const { containerEl } = this;
     
@@ -25881,7 +23895,6 @@ class WindroseMDSettingsTab extends PluginSettingTab {
     // Reset section tracking for search
     this.sections = [];
     
-    this.injectStyles();
     this.renderSearchBar(containerEl);
     
     // Render collapsible sections (restore open state if previously open)
@@ -25908,1149 +23921,6 @@ class WindroseMDSettingsTab extends PluginSettingTab {
       { open: openSections.has('Object Types') });
   }
 
-  // ---------------------------------------------------------------------------
-  // Section: Hex Map Settings
-  // ---------------------------------------------------------------------------
-  
-  renderHexSettingsContent(containerEl) {
-    // Hex Orientation
-    new Setting(containerEl)
-      .setName('Hex Grid Orientation')
-      .setDesc('Default orientation for hex grids (flat-top or pointy-top)')
-      .addDropdown(dropdown => dropdown
-        .addOption('flat', 'Flat-Top')
-        .addOption('pointy', 'Pointy-Top')
-        .setValue(this.plugin.settings.hexOrientation)
-        .onChange(async (value) => {
-          this.plugin.settings.hexOrientation = value;
-          this.settingsChanged = true;
-          await this.plugin.saveSettings();
-        }));
-
-    // Coordinate Key Mode
-    new Setting(containerEl)
-      .setName('Coordinate Overlay Mode')
-      .setDesc('How the C key activates coordinate labels: hold to show temporarily, or toggle on/off')
-      .addDropdown(dropdown => dropdown
-        .addOption('hold', 'Hold to Show')
-        .addOption('toggle', 'Toggle On/Off')
-        .setValue(this.plugin.settings.coordinateKeyMode || 'hold')
-        .onChange(async (value) => {
-          this.plugin.settings.coordinateKeyMode = value;
-          this.settingsChanged = true;
-          await this.plugin.saveSettings();
-        }));
-
-    // Coordinate Text Color
-    new Setting(containerEl)
-      .setName('Coordinate Text Color')
-      .setDesc('Primary color for hex coordinate overlay text (hex format: #RRGGBB)')
-      .addColorPicker(color => color
-        .setValue(this.plugin.settings.coordinateTextColor)
-        .onChange(async (value) => {
-          this.plugin.settings.coordinateTextColor = value;
-          this.settingsChanged = true;
-          await this.plugin.saveSettings();
-        }))
-      .addText(text => text
-        .setPlaceholder('{{DEFAULT_COORDINATE_TEXT_COLOR}}')
-        .setValue(this.plugin.settings.coordinateTextColor)
-        .onChange(async (value) => {
-          if (/^#[0-9A-Fa-f]{6}$/.test(value)) {
-            this.plugin.settings.coordinateTextColor = value;
-            this.settingsChanged = true;
-            await this.plugin.saveSettings();
-          }
-        }))
-      .addExtraButton(btn => btn
-        .setIcon('rotate-ccw')
-        .setTooltip('Reset to default')
-        .onClick(async () => {
-          this.plugin.settings.coordinateTextColor = '{{DEFAULT_COORDINATE_TEXT_COLOR}}';
-          this.settingsChanged = true;
-          await this.plugin.saveSettings();
-          this.display();
-        }));
-
-    // Coordinate Text Shadow
-    new Setting(containerEl)
-      .setName('Coordinate Text Shadow')
-      .setDesc('Shadow/outline color for hex coordinate overlay text (hex format: #RRGGBB)')
-      .addColorPicker(color => color
-        .setValue(this.plugin.settings.coordinateTextShadow)
-        .onChange(async (value) => {
-          this.plugin.settings.coordinateTextShadow = value;
-          this.settingsChanged = true;
-          await this.plugin.saveSettings();
-        }))
-      .addText(text => text
-        .setPlaceholder('{{DEFAULT_COORDINATE_TEXT_SHADOW}}')
-        .setValue(this.plugin.settings.coordinateTextShadow)
-        .onChange(async (value) => {
-          if (/^#[0-9A-Fa-f]{6}$/.test(value)) {
-            this.plugin.settings.coordinateTextShadow = value;
-            this.settingsChanged = true;
-            await this.plugin.saveSettings();
-          }
-        }))
-      .addExtraButton(btn => btn
-        .setIcon('rotate-ccw')
-        .setTooltip('Reset to default')
-        .onClick(async () => {
-          this.plugin.settings.coordinateTextShadow = '{{DEFAULT_COORDINATE_TEXT_SHADOW}}';
-          this.settingsChanged = true;
-          await this.plugin.saveSettings();
-          this.display();
-        }));
-  }
-
-  // ---------------------------------------------------------------------------
-  // Section: Color Settings
-  // ---------------------------------------------------------------------------
-  
-  renderColorSettingsContent(containerEl) {
-    containerEl.createEl('p', { 
-      text: 'These settings control default colors and behavior for all WindroseMD maps in this vault.',
-      cls: 'setting-item-description'
-    });
-    
-    // Grid Line Color
-    new Setting(containerEl)
-      .setName('Grid Line Color')
-      .setDesc('Color for grid lines (hex format: #RRGGBB)')
-      .addColorPicker(color => color
-        .setValue(this.plugin.settings.gridLineColor)
-        .onChange(async (value) => {
-          this.plugin.settings.gridLineColor = value;
-          this.settingsChanged = true;
-          await this.plugin.saveSettings();
-        }))
-      .addText(text => text
-        .setPlaceholder('{{DEFAULT_GRID_LINE_COLOR}}')
-        .setValue(this.plugin.settings.gridLineColor)
-        .onChange(async (value) => {
-          if (/^#[0-9A-Fa-f]{6}$/.test(value)) {
-            this.plugin.settings.gridLineColor = value;
-            this.settingsChanged = true;
-            await this.plugin.saveSettings();
-          }
-        }))
-      .addExtraButton(btn => btn
-        .setIcon('rotate-ccw')
-        .setTooltip('Reset to default')
-        .onClick(async () => {
-          this.plugin.settings.gridLineColor = '{{DEFAULT_GRID_LINE_COLOR}}';
-          this.settingsChanged = true;
-          await this.plugin.saveSettings();
-          this.display();
-        }));
-
-    // Grid Line Width (grid maps only)
-    new Setting(containerEl)
-      .setName('Grid Line Width')
-      .setDesc('Thickness of grid lines in pixels (1-5). Applies to grid maps only.')
-      .addSlider(slider => slider
-        .setLimits(1, 5, 1)
-        .setValue(this.plugin.settings.gridLineWidth ?? 1)
-        .setDynamicTooltip()
-        .onChange(async (value) => {
-          this.plugin.settings.gridLineWidth = value;
-          this.settingsChanged = true;
-          await this.plugin.saveSettings();
-        }))
-      .addExtraButton(btn => btn
-        .setIcon('rotate-ccw')
-        .setTooltip('Reset to default (1px)')
-        .onClick(async () => {
-          this.plugin.settings.gridLineWidth = 1;
-          this.settingsChanged = true;
-          await this.plugin.saveSettings();
-          this.display();
-        }));
-
-    // Background Color
-    new Setting(containerEl)
-      .setName('Background Color')
-      .setDesc('Canvas background color (hex format: #RRGGBB)')
-      .addColorPicker(color => color
-        .setValue(this.plugin.settings.backgroundColor)
-        .onChange(async (value) => {
-          this.plugin.settings.backgroundColor = value;
-          this.settingsChanged = true;
-          await this.plugin.saveSettings();
-        }))
-      .addText(text => text
-        .setPlaceholder('{{DEFAULT_BACKGROUND_COLOR}}')
-        .setValue(this.plugin.settings.backgroundColor)
-        .onChange(async (value) => {
-          if (/^#[0-9A-Fa-f]{6}$/.test(value)) {
-            this.plugin.settings.backgroundColor = value;
-            this.settingsChanged = true;
-            await this.plugin.saveSettings();
-          }
-        }))
-      .addExtraButton(btn => btn
-        .setIcon('rotate-ccw')
-        .setTooltip('Reset to default')
-        .onClick(async () => {
-          this.plugin.settings.backgroundColor = '{{DEFAULT_BACKGROUND_COLOR}}';
-          this.settingsChanged = true;
-          await this.plugin.saveSettings();
-          this.display();
-        }));
-
-    // Border Color
-    new Setting(containerEl)
-      .setName('Border Color')
-      .setDesc('Color for painted cell borders (hex format: #RRGGBB)')
-      .addColorPicker(color => color
-        .setValue(this.plugin.settings.borderColor)
-        .onChange(async (value) => {
-          this.plugin.settings.borderColor = value;
-          this.settingsChanged = true;
-          await this.plugin.saveSettings();
-        }))
-      .addText(text => text
-        .setPlaceholder('{{DEFAULT_BORDER_COLOR}}')
-        .setValue(this.plugin.settings.borderColor)
-        .onChange(async (value) => {
-          if (/^#[0-9A-Fa-f]{6}$/.test(value)) {
-            this.plugin.settings.borderColor = value;
-            this.settingsChanged = true;
-            await this.plugin.saveSettings();
-          }
-        }))
-      .addExtraButton(btn => btn
-        .setIcon('rotate-ccw')
-        .setTooltip('Reset to default')
-        .onClick(async () => {
-          this.plugin.settings.borderColor = '{{DEFAULT_BORDER_COLOR}}';
-          this.settingsChanged = true;
-          await this.plugin.saveSettings();
-          this.display();
-        }));
-
-    // Coordinate Key Color
-    new Setting(containerEl)
-      .setName('Coordinate Key Color')
-      .setDesc('Background color for coordinate key indicator (hex format: #RRGGBB)')
-      .addColorPicker(color => color
-        .setValue(this.plugin.settings.coordinateKeyColor)
-        .onChange(async (value) => {
-          this.plugin.settings.coordinateKeyColor = value;
-          this.settingsChanged = true;
-          await this.plugin.saveSettings();
-        }))
-      .addText(text => text
-        .setPlaceholder('{{DEFAULT_COORDINATE_KEY_COLOR}}')
-        .setValue(this.plugin.settings.coordinateKeyColor)
-        .onChange(async (value) => {
-          if (/^#[0-9A-Fa-f]{6}$/.test(value)) {
-            this.plugin.settings.coordinateKeyColor = value;
-            this.settingsChanged = true;
-            await this.plugin.saveSettings();
-          }
-        }))
-      .addExtraButton(btn => btn
-        .setIcon('rotate-ccw')
-        .setTooltip('Reset to default')
-        .onClick(async () => {
-          this.plugin.settings.coordinateKeyColor = '{{DEFAULT_COORDINATE_KEY_COLOR}}';
-          this.settingsChanged = true;
-          await this.plugin.saveSettings();
-          this.display();
-        }));
-  }
-
-  // ---------------------------------------------------------------------------
-  // Section: Color Palette
-  // ---------------------------------------------------------------------------
-  
-  renderColorPaletteContent(containerEl) {
-    containerEl.createEl('p', { 
-      text: 'Customize the color palette used for drawing cells and objects. Edit built-in colors, add custom colors, or hide colors you don\\'t use.',
-      cls: 'setting-item-description'
-    });
-    
-    // Add Custom Color button
-    new Setting(containerEl)
-      .setName('Add Custom Color')
-      .setDesc('Create a new color for your palette')
-      .addButton(btn => btn
-        .setButtonText('+ Add Color')
-        .setCta()
-        .onClick(() => {
-          new ColorEditModal(this.app, this.plugin, null, async () => {
-            this.settingsChanged = true;
-            await this.plugin.saveSettings();
-            this.display();
-          }).open();
-        }));
-    
-    // Reset All Colors button  
-    new Setting(containerEl)
-      .setName('Reset Palette')
-      .setDesc('Restore all built-in colors to defaults and remove custom colors')
-      .addButton(btn => btn
-        .setButtonText('Reset All')
-        .setWarning()
-        .onClick(async () => {
-          if (confirm('Reset all colors to defaults? This will remove all customizations.')) {
-            this.plugin.settings.colorPaletteOverrides = {};
-            this.plugin.settings.customPaletteColors = [];
-            this.settingsChanged = true;
-            await this.plugin.saveSettings();
-            this.display();
-          }
-        }));
-    
-    // Render color list
-    this.renderColorList(containerEl);
-  }
-  
-  renderColorList(containerEl) {
-    const resolvedColors = ColorHelpers.getResolved(this.plugin.settings);
-    const hiddenColors = ColorHelpers.getHidden(this.plugin.settings);
-    
-    // Separate into visible and hidden
-    const visibleColors = resolvedColors.filter(c => !hiddenColors.has(c.id));
-    const hiddenBuiltIns = BUILT_IN_COLORS.filter(c => hiddenColors.has(c.id));
-    
-    // Visible colors container
-    const visibleContainer = containerEl.createEl('div', { cls: 'dmt-settings-category' });
-    const visibleHeader = visibleContainer.createEl('div', { cls: 'dmt-settings-category-header' });
-    visibleHeader.createEl('span', { text: \`Active Colors (\${visibleColors.length})\`, cls: 'dmt-settings-category-label' });
-    
-    const visibleList = visibleContainer.createEl('div', { cls: 'dmt-color-list' });
-    
-    visibleColors.forEach(color => {
-      this.renderColorRow(visibleList, color, false);
-    });
-    
-    if (visibleColors.length === 0) {
-      visibleList.createEl('div', { 
-        text: 'No colors visible. Use "Show" to restore hidden colors.',
-        cls: 'dmt-settings-empty-message'
-      });
-    }
-    
-    // Hidden colors (if any)
-    if (hiddenBuiltIns.length > 0) {
-      const hiddenContainer = containerEl.createEl('div', { cls: 'dmt-settings-category dmt-settings-category-muted' });
-      const hiddenHeader = hiddenContainer.createEl('div', { cls: 'dmt-settings-category-header' });
-      hiddenHeader.createEl('span', { text: \`Hidden Colors (\${hiddenBuiltIns.length})\`, cls: 'dmt-settings-category-label' });
-      
-      const hiddenList = hiddenContainer.createEl('div', { cls: 'dmt-color-list' });
-      
-      hiddenBuiltIns.forEach(color => {
-        // Build display version with override if exists
-        const override = this.plugin.settings.colorPaletteOverrides?.[color.id];
-        const displayColor = override ? { ...color, ...override, isBuiltIn: true, isModified: true } : { ...color, isBuiltIn: true };
-        this.renderColorRow(hiddenList, displayColor, true);
-      });
-    }
-  }
-  
-  renderColorRow(containerEl, color, isHidden) {
-    const row = containerEl.createEl('div', { cls: 'dmt-color-row' });
-    
-    // Color swatch - apply opacity if set
-    const swatchOpacity = color.opacity ?? 1;
-    const swatch = row.createEl('div', { 
-      cls: 'dmt-color-row-swatch',
-      attr: { style: \`background-color: \${color.color}; opacity: \${swatchOpacity}\` }
-    });
-    
-    // Label with modified indicator
-    const labelContainer = row.createEl('div', { cls: 'dmt-color-row-label' });
-    labelContainer.createEl('span', { text: color.label, cls: 'dmt-color-row-name' });
-    
-    if (color.isModified) {
-      labelContainer.createEl('span', { text: ' (modified)', cls: 'dmt-color-row-modified' });
-    }
-    if (color.isCustom) {
-      labelContainer.createEl('span', { text: ' (custom)', cls: 'dmt-color-row-custom' });
-    }
-    
-    // Hex value + opacity if not 100%
-    const hexText = swatchOpacity < 1 
-      ? \`\${color.color} @ \${Math.round(swatchOpacity * 100)}%\`
-      : color.color;
-    row.createEl('code', { text: hexText, cls: 'dmt-color-row-hex' });
-    
-    // Actions
-    const actions = row.createEl('div', { cls: 'dmt-color-row-actions' });
-    
-    // Edit button
-    const editBtn = actions.createEl('button', { cls: 'dmt-btn-icon', attr: { 'aria-label': 'Edit color' } });
-    IconHelpers.set(editBtn, 'pencil');
-    editBtn.addEventListener('click', () => {
-      new ColorEditModal(this.app, this.plugin, color, async () => {
-        this.settingsChanged = true;
-        await this.plugin.saveSettings();
-        this.display();
-      }).open();
-    });
-    
-    // Show/Hide button (for built-in colors only)
-    if (color.isBuiltIn) {
-      const visBtn = actions.createEl('button', { cls: 'dmt-btn-icon', attr: { 'aria-label': isHidden ? 'Show color' : 'Hide color' } });
-      IconHelpers.set(visBtn, isHidden ? 'eye' : 'eye-off');
-      visBtn.addEventListener('click', async () => {
-        if (!this.plugin.settings.colorPaletteOverrides) {
-          this.plugin.settings.colorPaletteOverrides = {};
-        }
-        if (!this.plugin.settings.colorPaletteOverrides[color.id]) {
-          this.plugin.settings.colorPaletteOverrides[color.id] = {};
-        }
-        this.plugin.settings.colorPaletteOverrides[color.id].hidden = !isHidden;
-        
-        // Clean up empty override
-        if (Object.keys(this.plugin.settings.colorPaletteOverrides[color.id]).length === 1 
-            && !this.plugin.settings.colorPaletteOverrides[color.id].hidden) {
-          delete this.plugin.settings.colorPaletteOverrides[color.id];
-        }
-        
-        this.settingsChanged = true;
-        await this.plugin.saveSettings();
-        this.display();
-      });
-      
-      // Reset button (if modified)
-      if (color.isModified) {
-        const resetBtn = actions.createEl('button', { cls: 'dmt-btn-icon', attr: { 'aria-label': 'Reset to default' } });
-        IconHelpers.set(resetBtn, 'rotate-ccw');
-        resetBtn.addEventListener('click', async () => {
-          delete this.plugin.settings.colorPaletteOverrides[color.id];
-          this.settingsChanged = true;
-          await this.plugin.saveSettings();
-          this.display();
-        });
-      }
-    }
-    
-    // Delete button (for custom colors only)
-    if (color.isCustom) {
-      const delBtn = actions.createEl('button', { cls: 'dmt-btn-icon dmt-btn-danger', attr: { 'aria-label': 'Delete color' } });
-      IconHelpers.set(delBtn, 'trash-2');
-      delBtn.addEventListener('click', async () => {
-        this.plugin.settings.customPaletteColors = this.plugin.settings.customPaletteColors.filter(c => c.id !== color.id);
-        this.settingsChanged = true;
-        await this.plugin.saveSettings();
-        this.display();
-      });
-    }
-  }
-
-  // ---------------------------------------------------------------------------
-  // Section: Fog of War
-  // ---------------------------------------------------------------------------
-  
-  renderFogOfWarSettingsContent(containerEl) {
-    containerEl.createEl('p', { 
-      text: 'Default fog of war appearance settings for new maps. Individual maps can override these in their settings.',
-      cls: 'setting-item-description'
-    });
-    
-    // Soft Edges Toggle
-    new Setting(containerEl)
-      .setName('Soft Edges')
-      .setDesc('Enable a blur effect at fog boundaries for a softer, more atmospheric look')
-      .addToggle(toggle => toggle
-        .setValue(this.plugin.settings.fogOfWarBlurEnabled)
-        .onChange(async (value) => {
-          this.plugin.settings.fogOfWarBlurEnabled = value;
-          this.settingsChanged = true;
-          await this.plugin.saveSettings();
-          this.display(); // Refresh to show/hide blur intensity slider
-        }));
-    
-    // Blur Intensity Slider (only show when blur is enabled)
-    if (this.plugin.settings.fogOfWarBlurEnabled) {
-      const blurPercent = Math.round((this.plugin.settings.fogOfWarBlurFactor || 0.20) * 100);
-      
-      new Setting(containerEl)
-        .setName('Blur Intensity')
-        .setDesc(\`Size of blur effect as percentage of cell size (currently \${blurPercent}%)\`)
-        .addSlider(slider => slider
-          .setLimits(5, 50, 1)
-          .setValue(blurPercent)
-          .setDynamicTooltip()
-          .onChange(async (value) => {
-            this.plugin.settings.fogOfWarBlurFactor = value / 100;
-            this.settingsChanged = true;
-            await this.plugin.saveSettings();
-          }))
-        .addExtraButton(btn => btn
-          .setIcon('rotate-ccw')
-          .setTooltip('Reset to default (20%)')
-          .onClick(async () => {
-            this.plugin.settings.fogOfWarBlurFactor = 0.20;
-            this.settingsChanged = true;
-            await this.plugin.saveSettings();
-            this.display();
-          }));
-    }
-  }
-
-  // ---------------------------------------------------------------------------
-  // Section: Map Behavior
-  // ---------------------------------------------------------------------------
-  
-  renderMapBehaviorSettingsContent(containerEl) {
-    // Expanded by Default
-    new Setting(containerEl)
-      .setName('Start Maps Expanded')
-      .setDesc('When enabled, maps will start in expanded (fullscreen) mode by default')
-      .addToggle(toggle => toggle
-        .setValue(this.plugin.settings.expandedByDefault)
-        .onChange(async (value) => {
-          this.plugin.settings.expandedByDefault = value;
-          this.settingsChanged = true;
-          await this.plugin.saveSettings();
-        }));
-
-    // Always Show Controls
-    new Setting(containerEl)
-      .setName('Always Show Controls')
-      .setDesc('Keep map controls visible at all times instead of auto-hiding')
-      .addToggle(toggle => toggle
-        .setValue(this.plugin.settings.alwaysShowControls)
-        .onChange(async (value) => {
-          this.plugin.settings.alwaysShowControls = value;
-          this.settingsChanged = true;
-          await this.plugin.saveSettings();
-        }));
-
-    // Canvas Height (Desktop)
-    new Setting(containerEl)
-      .setName('Canvas Height (Desktop)')
-      .setDesc('Default height in pixels for map canvas on desktop devices')
-      .addText(text => text
-        .setPlaceholder('600')
-        .setValue(String(this.plugin.settings.canvasHeight))
-        .onChange(async (value) => {
-          const num = parseInt(value);
-          if (!isNaN(num)) {
-            this.plugin.settings.canvasHeight = num;
-            this.settingsChanged = true;
-            await this.plugin.saveSettings();
-          }
-        }));
-
-    // Canvas Height (Mobile)
-    new Setting(containerEl)
-      .setName('Canvas Height (Mobile/Touch)')
-      .setDesc('Default height in pixels for map canvas on mobile and touch devices')
-      .addText(text => text
-        .setPlaceholder('400')
-        .setValue(String(this.plugin.settings.canvasHeightMobile))
-        .onChange(async (value) => {
-          const num = parseInt(value);
-          if (!isNaN(num)) {
-            this.plugin.settings.canvasHeightMobile = num;
-            this.settingsChanged = true;
-            await this.plugin.saveSettings();
-          }
-        }));
-  }
-
-  // ---------------------------------------------------------------------------
-  // Section: Distance Measurement
-  // ---------------------------------------------------------------------------
-  
-  renderDistanceMeasurementSettingsContent(containerEl) {
-    // Grid: Distance per cell
-    new Setting(containerEl)
-      .setName('Grid Map: Distance per Cell')
-      .setDesc('Distance each cell represents on grid maps (default: 5 ft for D&D)')
-      .addText(text => text
-        .setPlaceholder('5')
-        .setValue(String(this.plugin.settings.distancePerCellGrid))
-        .onChange(async (value) => {
-          const num = parseFloat(value);
-          if (!isNaN(num) && num > 0) {
-            this.plugin.settings.distancePerCellGrid = num;
-            this.settingsChanged = true;
-            await this.plugin.saveSettings();
-          }
-        }))
-      .addDropdown(dropdown => dropdown
-        .addOption('ft', 'feet')
-        .addOption('m', 'meters')
-        .addOption('mi', 'miles')
-        .addOption('km', 'kilometers')
-        .addOption('yd', 'yards')
-        .setValue(this.plugin.settings.distanceUnitGrid)
-        .onChange(async (value) => {
-          this.plugin.settings.distanceUnitGrid = value;
-          this.settingsChanged = true;
-          await this.plugin.saveSettings();
-        }));
-
-    // Hex: Distance per cell
-    new Setting(containerEl)
-      .setName('Hex Map: Distance per Hex')
-      .setDesc('Distance each hex represents on hex maps (default: 6 miles for world maps)')
-      .addText(text => text
-        .setPlaceholder('6')
-        .setValue(String(this.plugin.settings.distancePerCellHex))
-        .onChange(async (value) => {
-          const num = parseFloat(value);
-          if (!isNaN(num) && num > 0) {
-            this.plugin.settings.distancePerCellHex = num;
-            this.settingsChanged = true;
-            await this.plugin.saveSettings();
-          }
-        }))
-      .addDropdown(dropdown => dropdown
-        .addOption('mi', 'miles')
-        .addOption('km', 'kilometers')
-        .addOption('ft', 'feet')
-        .addOption('m', 'meters')
-        .addOption('yd', 'yards')
-        .setValue(this.plugin.settings.distanceUnitHex)
-        .onChange(async (value) => {
-          this.plugin.settings.distanceUnitHex = value;
-          this.settingsChanged = true;
-          await this.plugin.saveSettings();
-        }));
-
-    // Grid diagonal rule
-    new Setting(containerEl)
-      .setName('Grid Diagonal Movement')
-      .setDesc('How to calculate diagonal distance on grid maps')
-      .addDropdown(dropdown => dropdown
-        .addOption('alternating', 'Alternating (5-10-5-10, D&D 5e)')
-        .addOption('equal', 'Equal (Chebyshev, all moves = 1)')
-        .addOption('euclidean', 'True Distance (Euclidean)')
-        .setValue(this.plugin.settings.gridDiagonalRule)
-        .onChange(async (value) => {
-          this.plugin.settings.gridDiagonalRule = value;
-          this.settingsChanged = true;
-          await this.plugin.saveSettings();
-        }));
-
-    // Display format
-    new Setting(containerEl)
-      .setName('Distance Display Format')
-      .setDesc('How to display measured distances')
-      .addDropdown(dropdown => dropdown
-        .addOption('both', 'Cells and Units (e.g., "3 cells (15 ft)")')
-        .addOption('cells', 'Cells Only (e.g., "3 cells")')
-        .addOption('units', 'Units Only (e.g., "15 ft")')
-        .setValue(this.plugin.settings.distanceDisplayFormat)
-        .onChange(async (value) => {
-          this.plugin.settings.distanceDisplayFormat = value;
-          this.settingsChanged = true;
-          await this.plugin.saveSettings();
-        }));
-  }
-
-  // ---------------------------------------------------------------------------
-  // Section: Object Types
-  // ---------------------------------------------------------------------------
-  
-  renderObjectTypesContent(containerEl) {
-    containerEl.createEl('p', { 
-      text: 'Customize map objects: modify built-in objects, create custom objects, or hide objects you don\\'t use.',
-      cls: 'setting-item-description'
-    });
-    
-    // Map Type selector dropdown
-    new Setting(containerEl)
-      .setName('Map Type')
-      .setDesc('Select which map type to configure objects for')
-      .addDropdown(dropdown => dropdown
-        .addOption('grid', 'Grid Maps')
-        .addOption('hex', 'Hex Maps')
-        .setValue(this.selectedMapType)
-        .onChange((value) => {
-          this.selectedMapType = value;
-          this.display();
-        }));
-    
-    // Get settings for the selected map type
-    const mapTypeSettings = this.getObjectSettingsForMapType();
-    
-    // Add Custom Object button
-    new Setting(containerEl)
-      .setName('Add Custom Object')
-      .setDesc('Create a new map object with your own symbol')
-      .addButton(btn => btn
-        .setButtonText('+ Add Object')
-        .setCta()
-        .onClick(() => {
-          new ObjectEditModal(this.app, this.plugin, null, async () => {
-            this.settingsChanged = true;
-            await this.plugin.saveSettings();
-            this.display();
-          }, this.selectedMapType).open();
-        }));
-    
-    // Add Custom Category button
-    new Setting(containerEl)
-      .setName('Add Custom Category')
-      .setDesc('Create a new category to organize objects')
-      .addButton(btn => btn
-        .setButtonText('+ Add Category')
-        .onClick(() => {
-          new CategoryEditModal(this.app, this.plugin, null, async () => {
-            this.settingsChanged = true;
-            await this.plugin.saveSettings();
-            this.display();
-          }, this.selectedMapType).open();
-        }));
-    
-    // Import/Export buttons
-    new Setting(containerEl)
-      .setName('Import / Export')
-      .setDesc('Share object configurations as JSON files')
-      .addButton(btn => btn
-        .setButtonText('Import')
-        .onClick(() => {
-          new ImportModal(this.app, this.plugin, async () => {
-            this.settingsChanged = true;
-            this.display();
-          }, this.selectedMapType).open();
-        }))
-      .addButton(btn => btn
-        .setButtonText('Export')
-        .onClick(() => {
-          new ExportModal(this.app, this.plugin, this.selectedMapType).open();
-        }));
-    
-    // Get resolved data using helpers with map-type-specific settings
-    const allCategories = ObjectHelpers.getCategories(mapTypeSettings);
-    const allObjects = ObjectHelpers.getResolved(mapTypeSettings);
-    const hiddenObjects = ObjectHelpers.getHidden(mapTypeSettings);
-    
-    // Check if there are any customizations for this map type
-    const hasOverrides = Object.keys(mapTypeSettings.objectOverrides || {}).length > 0;
-    const hasCustomObjects = (mapTypeSettings.customObjects || []).length > 0;
-    const hasCustomCategories = (mapTypeSettings.customCategories || []).length > 0;
-    const hasAnyCustomizations = hasOverrides || hasCustomObjects || hasCustomCategories;
-    
-    // Reset All button (only show if there are customizations)
-    if (hasAnyCustomizations) {
-      new Setting(containerEl)
-        .setName('Reset All Customizations')
-        .setDesc(\`Remove all custom objects, categories, and modifications for \${this.selectedMapType} maps\`)
-        .addButton(btn => btn
-          .setButtonText('Reset All')
-          .setWarning()
-          .onClick(async () => {
-            const counts = [];
-            if (hasOverrides) counts.push(\`\${Object.keys(mapTypeSettings.objectOverrides).length} modification(s)\`);
-            if (hasCustomObjects) counts.push(\`\${mapTypeSettings.customObjects.length} custom object(s)\`);
-            if (hasCustomCategories) counts.push(\`\${mapTypeSettings.customCategories.length} custom category(ies)\`);
-            
-            if (confirm(\`This will remove \${counts.join(', ')} for \${this.selectedMapType} maps. Maps using custom objects will show "?" placeholders.\\n\\nContinue?\`)) {
-              this.updateObjectSettingsForMapType({
-                objectOverrides: {},
-                customObjects: [],
-                customCategories: []
-              });
-              this.settingsChanged = true;
-              await this.plugin.saveSettings();
-              this.display();
-            }
-          }));
-    }
-    
-    // Search/filter input
-    const searchContainer = containerEl.createDiv({ cls: 'dmt-settings-search-container' });
-    const searchInput = searchContainer.createEl('input', {
-      type: 'text',
-      cls: 'dmt-settings-search-input',
-      attr: { placeholder: 'Filter objects...' },
-      value: this.objectFilter || ''
-    });
-    searchInput.addEventListener('input', (e) => {
-      this.objectFilter = e.target.value.toLowerCase().trim();
-      this.renderObjectList(objectListContainer, allCategories, allObjects, hiddenObjects);
-    });
-    
-    if (this.objectFilter) {
-      const clearBtn = searchContainer.createEl('button', {
-        cls: 'dmt-settings-search-clear',
-        attr: { 'aria-label': 'Clear filter', title: 'Clear filter' }
-      });
-      IconHelpers.set(clearBtn, 'x');
-      clearBtn.onclick = () => {
-        this.objectFilter = '';
-        searchInput.value = '';
-        this.renderObjectList(objectListContainer, allCategories, allObjects, hiddenObjects);
-      };
-    }
-    
-    // Object list container (for filtered re-renders)
-    const objectListContainer = containerEl.createDiv({ cls: 'dmt-settings-object-list-container' });
-    this.renderObjectList(objectListContainer, allCategories, allObjects, hiddenObjects);
-  }
-
-  // ---------------------------------------------------------------------------
-  // Object list rendering (called by renderObjectTypesSection)
-  // ---------------------------------------------------------------------------
-  
-  renderObjectList(container, allCategories, allObjects, hiddenObjects) {
-    container.empty();
-    
-    const filter = this.objectFilter || '';
-    const isDraggable = !filter; // Disable drag when filtering
-    
-    // Filter objects if search term present
-    const filteredObjects = filter
-      ? allObjects.filter(obj => 
-          obj.label.toLowerCase().includes(filter) || 
-          (obj.symbol && obj.symbol.toLowerCase().includes(filter)) ||
-          (obj.iconClass && obj.iconClass.toLowerCase().includes(filter)))
-      : allObjects;
-    
-    const filteredHidden = filter
-      ? hiddenObjects.filter(obj =>
-          obj.label.toLowerCase().includes(filter) ||
-          (obj.symbol && obj.symbol.toLowerCase().includes(filter)) ||
-          (obj.iconClass && obj.iconClass.toLowerCase().includes(filter)))
-      : hiddenObjects;
-    
-    // Show "no results" message if filter returns nothing
-    if (filter && filteredObjects.length === 0 && filteredHidden.length === 0) {
-      container.createDiv({ 
-        cls: 'dmt-settings-no-results',
-        text: \`No objects matching "\${filter}"\`
-      });
-      return;
-    }
-    
-    // Render each category (skip 'notes' - note_pin is handled specially in the map UI)
-    for (const category of allCategories) {
-      if (category.id === 'notes') continue;
-      
-      let categoryObjects = filteredObjects.filter(obj => obj.category === category.id);
-      if (categoryObjects.length === 0 && category.isBuiltIn) continue;
-      if (categoryObjects.length === 0 && filter) continue;
-      
-      // Sort by order
-      categoryObjects = categoryObjects.slice().sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-      
-      const categoryContainer = container.createDiv({ cls: 'dmt-settings-category' });
-      
-      // Category header with object count
-      const categoryHeader = categoryContainer.createDiv({ cls: 'dmt-settings-category-header' });
-      const labelText = category.label + (categoryObjects.length > 0 ? \` (\${categoryObjects.length})\` : '');
-      categoryHeader.createSpan({ text: labelText, cls: 'dmt-settings-category-label' });
-      
-      // Edit/Delete for custom categories
-      if (category.isCustom) {
-        const categoryActions = categoryHeader.createDiv({ cls: 'dmt-settings-category-actions' });
-        
-        const editBtn = categoryActions.createEl('button', { cls: 'dmt-settings-icon-btn', attr: { 'aria-label': 'Edit category', title: 'Edit category' } });
-        IconHelpers.set(editBtn, 'pencil');
-        editBtn.onclick = () => {
-          new CategoryEditModal(this.app, this.plugin, category, async () => {
-            this.settingsChanged = true;
-            await this.plugin.saveSettings();
-            this.display();
-          }).open();
-        };
-        
-        // Get unfiltered count for delete validation
-        const allCategoryObjects = allObjects.filter(obj => obj.category === category.id);
-        const deleteBtn = categoryActions.createEl('button', { cls: 'dmt-settings-icon-btn dmt-settings-icon-btn-danger', attr: { 'aria-label': 'Delete category', title: 'Delete category' } });
-        IconHelpers.set(deleteBtn, 'trash-2');
-        deleteBtn.onclick = async () => {
-          if (allCategoryObjects.length > 0) {
-            alert(\`Cannot delete "\${category.label}" - it contains \${allCategoryObjects.length} object(s). Move or delete them first.\`);
-            return;
-          }
-          if (confirm(\`Delete category "\${category.label}"?\`)) {
-            const categoriesKey = this.selectedMapType === 'hex' ? 'customHexCategories' : 'customGridCategories';
-            if (this.plugin.settings[categoriesKey]) {
-              this.plugin.settings[categoriesKey] = this.plugin.settings[categoriesKey].filter(c => c.id !== category.id);
-            }
-            this.settingsChanged = true;
-            await this.plugin.saveSettings();
-            this.display();
-          }
-        };
-      }
-      
-      // Object list with drag/drop support
-      const objectList = categoryContainer.createDiv({ cls: 'dmt-settings-object-list' });
-      objectList.dataset.categoryId = category.id;
-      
-      // Only enable drag/drop when not filtering
-      if (!filter) {
-        this.setupDragDropForList(objectList, category);
-      }
-      
-      for (const obj of categoryObjects) {
-        this.renderObjectRow(objectList, obj, false, !filter);
-      }
-    }
-    
-    // Hidden objects section
-    if (filteredHidden.length > 0) {
-      const hiddenContainer = container.createDiv({ cls: 'dmt-settings-hidden-section' });
-      
-      const hiddenHeader = new Setting(hiddenContainer)
-        .setName(\`Hidden Objects (\${filteredHidden.length})\`)
-        .setDesc('Built-in objects you\\'ve hidden from the palette');
-      
-      const hiddenList = hiddenContainer.createDiv({ cls: 'dmt-settings-object-list dmt-settings-hidden-list' });
-      hiddenList.style.display = 'none';
-      
-      hiddenHeader.addButton(btn => btn
-        .setButtonText('Show')
-        .onClick(() => {
-          const isVisible = hiddenList.style.display !== 'none';
-          hiddenList.style.display = isVisible ? 'none' : 'block';
-          btn.setButtonText(isVisible ? 'Show' : 'Hide');
-        }));
-      
-      for (const obj of filteredHidden) {
-        this.renderObjectRow(hiddenList, obj, true);
-      }
-    }
-  }
-
-  // ---------------------------------------------------------------------------
-  // Drag/drop setup for object lists
-  // ---------------------------------------------------------------------------
-  
-  setupDragDropForList(objectList, category) {
-    objectList.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      e.dataTransfer.dropEffect = 'move';
-      
-      const dragging = objectList.querySelector('.dmt-dragging');
-      if (!dragging) return;
-      
-      const afterElement = DragHelpers.getAfterElement(objectList, e.clientY);
-      if (afterElement == null) {
-        objectList.appendChild(dragging);
-      } else {
-        objectList.insertBefore(dragging, afterElement);
-      }
-    });
-    
-    objectList.addEventListener('dragenter', (e) => {
-      e.preventDefault();
-    });
-    
-    objectList.addEventListener('drop', async (e) => {
-      e.preventDefault();
-      
-      // Get the correct settings keys for the selected map type
-      const overridesKey = this.selectedMapType === 'hex' ? 'hexObjectOverrides' : 'gridObjectOverrides';
-      const customObjectsKey = this.selectedMapType === 'hex' ? 'customHexObjects' : 'customGridObjects';
-      
-      // Get new order from DOM positions
-      const rows = [...objectList.querySelectorAll('.dmt-settings-object-row')];
-      
-      // Get default ID order for this category
-      const defaultIdOrder = ObjectHelpers.getDefaultIdOrder(category.id, this.getObjectSettingsForMapType());
-      
-      // Apply new orders to settings
-      rows.forEach((row, actualPosition) => {
-        const id = row.dataset.objectId;
-        const isBuiltIn = row.dataset.isBuiltIn === 'true';
-        const newOrder = actualPosition * 10;
-        
-        if (isBuiltIn) {
-          const defaultPosition = defaultIdOrder.indexOf(id);
-          
-          if (actualPosition === defaultPosition) {
-            // In default position - remove order override if present
-            if (this.plugin.settings[overridesKey]?.[id]) {
-              delete this.plugin.settings[overridesKey][id].order;
-              if (Object.keys(this.plugin.settings[overridesKey][id]).length === 0) {
-                delete this.plugin.settings[overridesKey][id];
-              }
-            }
-          } else {
-            // Not in default position - save order override
-            if (!this.plugin.settings[overridesKey]) {
-              this.plugin.settings[overridesKey] = {};
-            }
-            if (!this.plugin.settings[overridesKey][id]) {
-              this.plugin.settings[overridesKey][id] = {};
-            }
-            this.plugin.settings[overridesKey][id].order = newOrder;
-          }
-          
-          // Update modified indicator in DOM immediately
-          const labelEl = row.querySelector('.dmt-settings-object-label');
-          if (labelEl) {
-            const override = this.plugin.settings[overridesKey]?.[id];
-            const hasAnyOverride = override && Object.keys(override).length > 0;
-            labelEl.classList.toggle('dmt-settings-modified', !!hasAnyOverride);
-          }
-        } else {
-          // Custom objects - always save order
-          const customObjects = this.plugin.settings[customObjectsKey] || [];
-          const customObj = customObjects.find(o => o.id === id);
-          if (customObj) {
-            customObj.order = newOrder;
-          }
-        }
-      });
-      
-      this.settingsChanged = true;
-      await this.plugin.saveSettings();
-    });
-  }
-
-  // ---------------------------------------------------------------------------
-  // Single object row rendering
-  // ---------------------------------------------------------------------------
-  
-  renderObjectRow(container, obj, isHiddenSection = false, canDrag = false) {
-    const row = container.createDiv({ cls: 'dmt-settings-object-row' });
-    
-    // Get the correct settings keys for the selected map type
-    const overridesKey = this.selectedMapType === 'hex' ? 'hexObjectOverrides' : 'gridObjectOverrides';
-    const customObjectsKey = this.selectedMapType === 'hex' ? 'customHexObjects' : 'customGridObjects';
-    
-    // Data attributes for drag/drop
-    row.dataset.objectId = obj.id;
-    row.dataset.isBuiltIn = String(!!obj.isBuiltIn);
-    row.dataset.originalOrder = String(obj.order ?? 0);
-    
-    // Drag handle (only if draggable and not in hidden section)
-    if (canDrag && !isHiddenSection) {
-      row.setAttribute('draggable', 'true');
-      row.classList.add('dmt-draggable');
-      
-      const dragHandle = row.createSpan({ cls: 'dmt-drag-handle' });
-      IconHelpers.set(dragHandle, 'grip-vertical');
-      
-      row.style.userSelect = 'none';
-      row.style.webkitUserSelect = 'none';
-      
-      row.addEventListener('dragstart', (e) => {
-        e.dataTransfer.setData('text/plain', obj.id);
-        e.dataTransfer.effectAllowed = 'move';
-        setTimeout(() => {
-          row.classList.add('dmt-dragging');
-        }, 0);
-      });
-      
-      row.addEventListener('dragend', (e) => {
-        row.classList.remove('dmt-dragging');
-      });
-    }
-    
-    // Symbol or Icon
-    const symbolEl = row.createSpan({ cls: 'dmt-settings-object-symbol' });
-    if (obj.iconClass && RPGAwesomeHelpers.isValid(obj.iconClass)) {
-      const iconInfo = RPGAwesomeHelpers.getInfo(obj.iconClass);
-      const iconSpan = symbolEl.createEl('span', { cls: 'ra' });
-      iconSpan.textContent = iconInfo.char;
-    } else {
-      symbolEl.textContent = obj.symbol || '?';
-    }
-    
-    // Label
-    const labelEl = row.createSpan({ text: obj.label, cls: 'dmt-settings-object-label' });
-    if (obj.isModified) {
-      labelEl.addClass('dmt-settings-modified');
-    }
-    
-    // Actions
-    const actions = row.createDiv({ cls: 'dmt-settings-object-actions' });
-    
-    // Edit button
-    const editBtn = actions.createEl('button', { cls: 'dmt-settings-icon-btn', attr: { 'aria-label': 'Edit', title: 'Edit object' } });
-    IconHelpers.set(editBtn, 'pencil');
-    editBtn.onclick = () => {
-      new ObjectEditModal(this.app, this.plugin, obj, async () => {
-        this.settingsChanged = true;
-        await this.plugin.saveSettings();
-        this.display();
-      }, this.selectedMapType).open();
-    };
-    
-    if (obj.isBuiltIn) {
-      if (isHiddenSection) {
-        // Unhide button
-        const unhideBtn = actions.createEl('button', { cls: 'dmt-settings-icon-btn', attr: { 'aria-label': 'Unhide', title: 'Show in palette' } });
-        IconHelpers.set(unhideBtn, 'eye');
-        unhideBtn.onclick = async () => {
-          if (this.plugin.settings[overridesKey]?.[obj.id]) {
-            delete this.plugin.settings[overridesKey][obj.id].hidden;
-            if (Object.keys(this.plugin.settings[overridesKey][obj.id]).length === 0) {
-              delete this.plugin.settings[overridesKey][obj.id];
-            }
-          }
-          this.settingsChanged = true;
-          await this.plugin.saveSettings();
-          this.display();
-        };
-      } else {
-        // Hide button
-        const hideBtn = actions.createEl('button', { cls: 'dmt-settings-icon-btn', attr: { 'aria-label': 'Hide', title: 'Hide from palette' } });
-        IconHelpers.set(hideBtn, 'eye-off');
-        hideBtn.onclick = async () => {
-          if (!this.plugin.settings[overridesKey]) {
-            this.plugin.settings[overridesKey] = {};
-          }
-          if (!this.plugin.settings[overridesKey][obj.id]) {
-            this.plugin.settings[overridesKey][obj.id] = {};
-          }
-          this.plugin.settings[overridesKey][obj.id].hidden = true;
-          this.settingsChanged = true;
-          await this.plugin.saveSettings();
-          this.display();
-        };
-      }
-      
-      // Reset button (only for modified)
-      if (obj.isModified) {
-        const resetBtn = actions.createEl('button', { cls: 'dmt-settings-icon-btn', attr: { 'aria-label': 'Reset to default', title: 'Reset to default' } });
-        IconHelpers.set(resetBtn, 'rotate-ccw');
-        resetBtn.onclick = async () => {
-          if (confirm(\`Reset "\${obj.label}" to its default symbol and name?\`)) {
-            if (this.plugin.settings[overridesKey]) {
-              delete this.plugin.settings[overridesKey][obj.id];
-            }
-            this.settingsChanged = true;
-            await this.plugin.saveSettings();
-            this.display();
-          }
-        };
-      }
-    } else {
-      // Delete button for custom objects
-      const deleteBtn = actions.createEl('button', { cls: 'dmt-settings-icon-btn dmt-settings-icon-btn-danger', attr: { 'aria-label': 'Delete', title: 'Delete object' } });
-      IconHelpers.set(deleteBtn, 'trash-2');
-      deleteBtn.onclick = async () => {
-        if (confirm(\`Delete "\${obj.label}"? Maps using this object will show a "?" placeholder.\`)) {
-          if (this.plugin.settings[customObjectsKey]) {
-            this.plugin.settings[customObjectsKey] = this.plugin.settings[customObjectsKey].filter(o => o.id !== obj.id);
-          }
-          this.settingsChanged = true;
-          await this.plugin.saveSettings();
-          this.display();
-        }
-      };
-    }
-  }
-
-  // ---------------------------------------------------------------------------
-  // Styles injection
-  // ---------------------------------------------------------------------------
-  
-  injectStyles() {
-    if (this.styleEl) {
-      this.styleEl.remove();
-    }
-    
-    this.styleEl = document.createElement('style');
-    this.styleEl.textContent = DMT_SETTINGS_STYLES;
-    document.head.appendChild(this.styleEl);
-  }
   
   hide() {
     // Only dispatch event if settings were actually changed
@@ -27061,32 +23931,264 @@ class WindroseMDSettingsTab extends PluginSettingTab {
       this.settingsChanged = false;
     }
     
-    // Clean up injected styles
-    if (this.styleEl) {
-      this.styleEl.remove();
-      this.styleEl = null;
-    }
   }
 }
 
+// =============================================================================
+// TAB RENDER MIXINS
+// Methods injected into WindroseMDSettingsTab prototype at assembly time
+// =============================================================================
+
+{{TAB_RENDER_METHODS}}
+
+// Mix in the render methods to WindroseMDSettingsTab
+Object.assign(WindroseMDSettingsTab.prototype, TabRenderCoreMethods);
+Object.assign(WindroseMDSettingsTab.prototype, TabRenderSettingsMethods);
+Object.assign(WindroseMDSettingsTab.prototype, TabRenderColorsMethods);
+Object.assign(WindroseMDSettingsTab.prototype, TabRenderObjectsMethods);
+
 module.exports = WindroseMDSettingsPlugin;`;
+```
+
+# settingsPluginAssembler
+
+```js
+// settingsPluginAssembler.js
+// Orchestrator for assembling the Windrose MapDesigner Settings Plugin
+// 
+// Phase 4: Assembles helpers and modals from separate files, CSS is external
+//
+// Usage:
+//   const { assembleSettingsPlugin, getStylesCSS } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "settingsPluginAssembler"));
+//   const pluginTemplate = assembleSettingsPlugin();
+//   const stylesCSS = getStylesCSS();
+
+// Load the base template
+const BASE_TEMPLATE = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "settingsPluginMain"));
+
+// Helper files to load (order doesn't matter - no dependencies between them)
+const HELPER_FILES = [
+  'settingsPlugin-ObjectHelpers.js',
+  'settingsPlugin-ColorHelpers.js',
+  'settingsPlugin-DragHelpers.js',
+  'settingsPlugin-IconHelpers.js',
+  'settingsPlugin-RPGAwesomeHelpers.js',
+  'settingsPlugin-DungeonEssenceVisualizer.js'
+];
+
+// Modal files to load (order doesn't matter - each is self-contained)
+const MODAL_FILES = [
+  'settingsPlugin-InsertMapModal.js',
+  'settingsPlugin-InsertDungeonModal.js',
+  'settingsPlugin-ObjectEditModal.js',
+  'settingsPlugin-CategoryEditModal.js',
+  'settingsPlugin-ColorEditModal.js',
+  'settingsPlugin-ExportModal.js',
+  'settingsPlugin-ImportModal.js'
+];
+
+// Tab render method files (order matters - they're class methods)
+const TAB_RENDER_FILES = [
+  'settingsPlugin-TabRenderCore.js',
+  'settingsPlugin-TabRenderSettings.js',
+  'settingsPlugin-TabRenderColors.js',
+  'settingsPlugin-TabRenderObjects.js'
+];
+
+// Track missing files for error reporting
+const missingFiles = [];
+
+/**
+ * Load a source file and strip header comments
+ * @param {string} filename - File name to load
+ * @returns {Promise<string>} File content with headers stripped
+ */
+async function loadSourceFile(filename) {
+  try {
+    const files = dc.app.vault.getFiles();
+    const file = files.find(f => f.path.endsWith(filename));
+    if (file) {
+      const content = await dc.app.vault.read(file);
+      // Strip the header comments (lines starting with //)
+      const lines = content.split('\n');
+      let startLine = 0;
+      for (let i = 0; i < lines.length; i++) {
+        if (!lines[i].startsWith('//') && lines[i].trim() !== '') {
+          startLine = i;
+          break;
+        }
+      }
+      console.log(`[settingsPluginAssembler] Loaded ${filename} (${lines.length} lines)`);
+      return lines.slice(startLine).join('\n');
+    }
+    console.error(`[settingsPluginAssembler] MISSING FILE: ${filename}`);
+    missingFiles.push(filename);
+    return '';
+  } catch (e) {
+    console.error(`[settingsPluginAssembler] Error loading ${filename}:`, e);
+    missingFiles.push(filename);
+    return '';
+  }
+}
+
+/**
+ * Load multiple source files and concatenate
+ * @param {string[]} filenames - Array of filenames
+ * @returns {Promise<string>} Concatenated content
+ */
+async function loadAndConcatenate(filenames) {
+  let result = '';
+  for (const filename of filenames) {
+    const content = await loadSourceFile(filename);
+    if (content) {
+      result += content + '\n\n';
+    }
+  }
+  return result.trim();
+}
+
+// Load all source files
+const HELPERS_CONTENT = await loadAndConcatenate(HELPER_FILES);
+const MODALS_CONTENT = await loadAndConcatenate(MODAL_FILES);
+const TAB_RENDER_CONTENT = await loadAndConcatenate(TAB_RENDER_FILES);
+
+console.log(`[settingsPluginAssembler] Helpers content length: ${HELPERS_CONTENT.length}`);
+console.log(`[settingsPluginAssembler] Modals content length: ${MODALS_CONTENT.length}`);
+console.log(`[settingsPluginAssembler] Tab render content length: ${TAB_RENDER_CONTENT.length}`);
+
+// Check for missing files and warn
+if (missingFiles.length > 0) {
+  console.error(`[settingsPluginAssembler] CRITICAL: ${missingFiles.length} source files missing!`);
+  console.error(`[settingsPluginAssembler] Missing: ${missingFiles.join(', ')}`);
+  console.error(`[settingsPluginAssembler] The plugin will NOT work correctly.`);
+  console.error(`[settingsPluginAssembler] Please ensure all settingsPlugin-*.js files are in your vault.`);
+}
+
+// Load the CSS file content
+let STYLES_CSS_CONTENT = '';
+try {
+  const files = dc.app.vault.getFiles();
+  const cssFile = files.find(f => f.path.endsWith('settingsPlugin-styles.css'));
+  
+  if (cssFile) {
+    STYLES_CSS_CONTENT = await dc.app.vault.read(cssFile);
+    console.log('[settingsPluginAssembler] Loaded CSS file:', cssFile.path);
+  } else {
+    console.warn('[settingsPluginAssembler] CSS file not found in vault');
+  }
+} catch (e) {
+  console.warn('[settingsPluginAssembler] Could not load CSS file:', e);
+}
+
+/**
+ * Get the CSS content for the settings plugin
+ * @returns {string} CSS content to write to styles.css
+ */
+function getStylesCSS() {
+  return STYLES_CSS_CONTENT;
+}
+
+/**
+ * Assemble the settings plugin JavaScript
+ * 
+ * Phase 4: Injects helpers and modals from separate files
+ *          CSS is loaded by Obsidian from styles.css only
+ * 
+ * @returns {string} The plugin template string (with {{PLACEHOLDER}} markers)
+ */
+function assembleSettingsPlugin() {
+  // Validate that we have content to inject
+  if (!HELPERS_CONTENT) {
+    throw new Error('[settingsPluginAssembler] HELPERS_CONTENT is empty! Missing helper files: ' + 
+      HELPER_FILES.join(', '));
+  }
+  if (!MODALS_CONTENT) {
+    throw new Error('[settingsPluginAssembler] MODALS_CONTENT is empty! Missing modal files: ' + 
+      MODAL_FILES.join(', '));
+  }
+  if (!TAB_RENDER_CONTENT) {
+    throw new Error('[settingsPluginAssembler] TAB_RENDER_CONTENT is empty! Missing tab render files: ' + 
+      TAB_RENDER_FILES.join(', '));
+  }
+  
+  // Use function replacer to avoid $ pattern interpretation in replacement strings
+  // (template literals like ${var} in the source files would otherwise cause issues)
+  let result = BASE_TEMPLATE
+    .replace(/\{\{HELPER_NAMESPACES\}\}/g, () => HELPERS_CONTENT)
+    .replace(/\{\{MODAL_CLASSES\}\}/g, () => MODALS_CONTENT)
+    .replace(/\{\{TAB_RENDER_METHODS\}\}/g, () => TAB_RENDER_CONTENT);
+  
+  // Verify placeholders were replaced
+  if (result.includes('{{HELPER_NAMESPACES}}')) {
+    throw new Error('[settingsPluginAssembler] Failed to replace {{HELPER_NAMESPACES}} placeholder!');
+  }
+  if (result.includes('{{MODAL_CLASSES}}')) {
+    throw new Error('[settingsPluginAssembler] Failed to replace {{MODAL_CLASSES}} placeholder!');
+  }
+  if (result.includes('{{TAB_RENDER_METHODS}}')) {
+    throw new Error('[settingsPluginAssembler] Failed to replace {{TAB_RENDER_METHODS}} placeholder!');
+  }
+  
+  console.log(`[settingsPluginAssembler] Assembly complete. Output: ${result.length} chars`);
+  return result;
+}
+
+// Export the assembler functions
+return {
+  assembleSettingsPlugin,
+  getStylesCSS,
+  // Export for debugging/version checking
+  ASSEMBLER_VERSION: '1.4.0-phase5',
+  // Flags for assembly mode
+  CSS_MODE: 'external-only',
+  HELPERS_MODE: 'assembled',
+  MODALS_MODE: 'assembled',
+  TAB_RENDER_MODE: 'assembled',
+  // Export for diagnostics
+  missingFiles
+};
+```
+
+# settingsPlugin-quickSymbols
+
+```js
+// settingsPlugin-quickSymbols.js
+// Quick symbols palette for object creation in the settings plugin
+// Separated to prevent unicode corruption during automated edits
+
+const QUICK_SYMBOLS = [
+  '★', '☆', '✦', '✧', '✪', '✫', '✯', '⚒',
+  '●', '○', '◆', '◇', '■', '□', '▲', '△',
+  '▼', '▽', '♠', '♤', '♣', '♧', '♥', '♡',
+  '♦', '♢', '⚔', '⚒', '🗡', '🧹', '⚔', '⛏',
+  '📱', '☠', '⚠', '☢', '☣', '⚡', '🔥', '💧',
+  '⚒', '⚐', '⛳', '🚩', '➤', '➜', '⬤', '⚙',
+  '⚗', '🔮', '💎', '🗝', '📜', '🎭', '👑', '🛡',
+  '🏰', '⛪', '🗿', '⚱', '🏺', '🪔'
+];
+
+return QUICK_SYMBOLS;
 ```
 
 # SettingsPluginInstaller
 
 ```jsx
 // SettingsPluginInstaller.jsx - Inline prompt for settings plugin installation
-
 const { THEME, DEFAULTS } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "dmtConstants"));
 const { WindroseCompass } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "WindroseCompass"));
 
-const SETTINGS_PLUGIN_TEMPLATE = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "settingsPluginMain"));
+// Use the assembler to get the plugin template and CSS
+const { assembleSettingsPlugin, getStylesCSS, ASSEMBLER_VERSION } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "settingsPluginAssembler"));
+const SETTINGS_PLUGIN_TEMPLATE = assembleSettingsPlugin();
+const SETTINGS_PLUGIN_CSS = getStylesCSS();
+
 
 const { OBJECT_TYPES, CATEGORIES } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "objectTypes"));
 const { RA_ICONS, RA_CATEGORIES } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "rpgAwesomeIcons"));
+const QUICK_SYMBOLS = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "settingsPlugin-quickSymbols"));
 
 // Plugin version from template
-const PACKAGED_PLUGIN_VERSION = '0.10.2';
+const PACKAGED_PLUGIN_VERSION = '0.12.6';
 
 // LocalStorage keys for tracking user preferences
 const STORAGE_KEYS = {
@@ -27118,8 +24220,8 @@ function compareVersions(v1, v2) {
  */
 function getInstalledPluginVersion() {
   try {
-    const plugin = dc.app.plugins.plugins['dungeon-map-tracker-settings'];
-    return plugin?.manifest?.version || null;
+    // Use manifests object directly - plugin.manifest may be undefined even when plugin exists
+    return dc.app.plugins.manifests['dungeon-map-tracker-settings']?.version || null;
   } catch (error) {
     return null;
   }
@@ -27162,10 +24264,10 @@ function shouldOfferUpgrade() {
 function generateManifest() {
   return {
     id: 'dungeon-map-tracker-settings',
-    name: 'Windrose MapDesigner Settings',
+    name: 'Windrose MapDesigner',
     version: PACKAGED_PLUGIN_VERSION,
     minAppVersion: '0.15.0',
-    description: 'Global settings for Windrose MapDesigner - customize default colors, hex orientation, and visual preferences.',
+    description: 'Global settings and commands for Windrose MapDesigner - customize default colors, hex orientation, and visual preferences.',
     author: 'Windrose MD',
     isDesktopOnly: false
   };
@@ -27203,7 +24305,8 @@ function generateMainJs() {
     .replace('{{BUILT_IN_CATEGORIES}}', JSON.stringify(CATEGORIES, null, 2))
     .replace('{{CATEGORY_ORDER}}', JSON.stringify(categoryOrder, null, 2))
     .replace('{{RA_ICONS}}', escapeUnicode(JSON.stringify(RA_ICONS, null, 2)))
-    .replace('{{RA_CATEGORIES}}', JSON.stringify(RA_CATEGORIES, null, 2));
+    .replace('{{RA_CATEGORIES}}', JSON.stringify(RA_CATEGORIES, null, 2))
+    .replace('{{QUICK_SYMBOLS}}', JSON.stringify(QUICK_SYMBOLS));
 }
 
 const SettingsPluginInstaller = ({ onInstall, onDecline, mode = 'auto' }) => {
@@ -27244,6 +24347,13 @@ const SettingsPluginInstaller = ({ onInstall, onDecline, mode = 'auto' }) => {
       // Write main.js from template
       const mainJs = generateMainJs();
       await adapter.write(`${pluginDir}/main.js`, mainJs);
+
+      // Write styles.css for Obsidian to load automatically
+      if (SETTINGS_PLUGIN_CSS) {
+        await adapter.write(`${pluginDir}/styles.css`, SETTINGS_PLUGIN_CSS);
+      } else {
+        console.warn('[SettingsPluginInstaller] No CSS content available - inline styles will be used');
+      }
 
       // Create initial data.json with defaults from dmtConstants
       const defaultData = {
@@ -27322,6 +24432,11 @@ const SettingsPluginInstaller = ({ onInstall, onDecline, mode = 'auto' }) => {
       // Write updated main.js from template
       const mainJs = generateMainJs();
       await adapter.write(`${pluginDir}/main.js`, mainJs);
+
+      // Write/update styles.css for Obsidian to load automatically
+      if (SETTINGS_PLUGIN_CSS) {
+        await adapter.write(`${pluginDir}/styles.css`, SETTINGS_PLUGIN_CSS);
+      }
 
       // DO NOT overwrite data.json - preserve user settings
 
@@ -32266,7 +29381,6 @@ const { axialToOffset, isWithinOffsetBounds } = await dc.require(dc.headerLink(d
 const { ImageAlignmentMode } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "ImageAlignmentMode"));
 const { ModalPortal } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "ModalPortal"));
 
-// Layer system support (Phase 1: Z-Layer Architecture)
 const { getActiveLayer } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "layerAccessor"));
 const { LayerControls } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "LayerControls"));
 

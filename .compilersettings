@@ -1,0 +1,10 @@
+{
+  "mainComponent": "DungeonMapTracker",
+  "outputName": "compiled-windrose-md.md",
+  "outputDir": "Projects/dungeon-map-tracker/dist",
+  "includeDemo": false,
+  "minifyEnabled": false,
+  "obfuscateEnabled": false,
+  "version": "1.4.2",
+  "additionalFiles": []
+}
