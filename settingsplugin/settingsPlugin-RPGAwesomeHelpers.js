@@ -1,4 +1,4 @@
-// settingsPlugin-RPGAwesomeHelpers.js
+return `// settingsPlugin-RPGAwesomeHelpers.js
 // RPGAwesome icon helpers for the icon picker UI
 // This file is concatenated into the settings plugin template by the assembler
 
@@ -63,4 +63,4 @@ const RPGAwesomeHelpers = {
   getInfo(iconClass) {
     return RA_ICONS[iconClass] || null;
   }
-};
+};`;

@@ -1,4 +1,4 @@
-// settingsPlugin-ExportModal.js
+return `// settingsPlugin-ExportModal.js
 // Modal for exporting object customizations
 // This file is concatenated into the settings plugin template by the assembler
 
@@ -18,7 +18,7 @@ class ExportModal extends Modal {
     contentEl.addClass('dmt-export-modal');
     
     const mapTypeLabel = this.mapType === 'hex' ? 'Hex' : 'Grid';
-    contentEl.createEl('h2', { text: `Export ${mapTypeLabel} Object Customizations` });
+    contentEl.createEl('h2', { text: \`Export \${mapTypeLabel} Object Customizations\` });
     
     // Get the correct settings keys for this map type
     const overridesKey = this.mapType === 'hex' ? 'hexObjectOverrides' : 'gridObjectOverrides';
@@ -46,7 +46,7 @@ class ExportModal extends Modal {
     
     if (hasOverrides) {
       new Setting(contentEl)
-        .setName(`Built-in modifications (${Object.keys(objectOverrides).length})`)
+        .setName(\`Built-in modifications (\${Object.keys(objectOverrides).length})\`)
         .setDesc('Changes to symbol, label, or order of built-in objects')
         .addToggle(toggle => toggle
           .setValue(exportOverrides)
@@ -56,8 +56,8 @@ class ExportModal extends Modal {
     if (hasCustom) {
       const customCount = customObjects.length + customCategories.length;
       new Setting(contentEl)
-        .setName(`Custom objects & categories (${customCount})`)
-        .setDesc(`${customObjects.length} object(s), ${customCategories.length} category(ies)`)
+        .setName(\`Custom objects & categories (\${customCount})\`)
+        .setDesc(\`\${customObjects.length} object(s), \${customCategories.length} category(ies)\`)
         .addToggle(toggle => toggle
           .setValue(exportCustom)
           .onChange(v => { exportCustom = v; }));
@@ -65,14 +65,14 @@ class ExportModal extends Modal {
     
     if (!hasOverrides && !hasCustom) {
       contentEl.createEl('p', { 
-        text: `No customizations to export for ${mapTypeLabel} maps. Modify built-in objects or create custom ones first.`,
+        text: \`No customizations to export for \${mapTypeLabel} maps. Modify built-in objects or create custom ones first.\`,
         cls: 'dmt-export-empty'
       });
       return;
     }
     
     // Filename input
-    const defaultFilename = `windrose-${this.mapType}-objects-${new Date().toISOString().split('T')[0]}.json`;
+    const defaultFilename = \`windrose-\${this.mapType}-objects-\${new Date().toISOString().split('T')[0]}.json\`;
     let filename = defaultFilename;
     
     new Setting(contentEl)
@@ -111,7 +111,7 @@ class ExportModal extends Modal {
             // Check if file exists
             const existingFile = this.app.vault.getAbstractFileByPath(finalFilename);
             if (existingFile) {
-              if (!confirm(`File "${finalFilename}" already exists. Overwrite?`)) {
+              if (!confirm(\`File "\${finalFilename}" already exists. Overwrite?\`)) {
                 return;
               }
               await this.app.vault.modify(existingFile, json);
@@ -119,10 +119,10 @@ class ExportModal extends Modal {
               await this.app.vault.create(finalFilename, json);
             }
             
-            alert(`Exported to: ${finalFilename}`);
+            alert(\`Exported to: \${finalFilename}\`);
             this.close();
           } catch (err) {
-            alert(`Export failed: ${err.message}`);
+            alert(\`Export failed: \${err.message}\`);
           }
         }));
   }
@@ -131,3 +131,4 @@ class ExportModal extends Modal {
     this.contentEl.empty();
   }
 }
+`;

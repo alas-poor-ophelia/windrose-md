@@ -349,7 +349,6 @@ class WindroseMDSettingsPlugin extends Plugin {
         await this.app.vault.create(dataFilePath, jsonString);
       }
       
-      console.log('[Windrose] Saved generated dungeon:', mapId, 'with', cells.length, 'cells and', (objects || []).length, 'doors');
     } catch (error) {
       console.error('[Windrose] Failed to save dungeon:', error);
       throw error;

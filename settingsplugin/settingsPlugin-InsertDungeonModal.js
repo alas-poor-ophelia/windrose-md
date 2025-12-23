@@ -1,4 +1,4 @@
-// settingsPlugin-InsertDungeonModal.js
+return `// settingsPlugin-InsertDungeonModal.js
 // Modal for generating a random dungeon
 // This file is concatenated into the settings plugin template by the assembler
 
@@ -55,38 +55,6 @@ class InsertDungeonModal extends Modal {
   updateVisualizer() {
     if (this.visualizer) {
       this.visualizer.updateSettings(this.getVisualizerSettings());
-    }
-  }
-  
-  // Generate dungeon and call the insert callback
-  async generateAndInsert() {
-    if (!this.dungeonSize) return false;
-    
-    try {
-      const generator = await this.plugin.loadDungeonGenerator();
-      
-      // Build config overrides (only include non-null values)
-      const overrides = {};
-      for (const [key, val] of Object.entries(this.configOverrides)) {
-        if (val !== null) overrides[key] = val;
-      }
-      
-      const result = generator.generateDungeon(this.dungeonSize, undefined, overrides);
-      
-      await this.onInsert(this.mapName, result.cells, result.objects, {
-        distancePerCell: this.distancePerCell,
-        distanceUnit: this.distanceUnit,
-        preset: this.dungeonSize,
-        configOverrides: overrides,
-        roomCount: result.metadata.roomCount,
-        doorCount: result.metadata.doorCount
-      });
-      this.close();
-      return true;
-    } catch (err) {
-      console.error('[Windrose] Dungeon generation failed:', err);
-      alert('Failed to generate dungeon: ' + err.message);
-      return false;
     }
   }
   
@@ -233,7 +201,7 @@ class InsertDungeonModal extends Modal {
     const advancedContainer = contentEl.createDiv({ cls: 'dmt-dungeon-advanced' });
     
     const advancedHeader = advancedContainer.createDiv({ cls: 'dmt-dungeon-advanced-header' });
-    const chevron = advancedHeader.createSpan({ cls: 'dmt-dungeon-advanced-chevron', text: 'â–¶' });
+    const chevron = advancedHeader.createSpan({ cls: 'dmt-dungeon-advanced-chevron', text: '▶' });
     advancedHeader.createSpan({ text: 'Advanced Options' });
     
     const advancedContent = advancedContainer.createDiv({ cls: 'dmt-dungeon-advanced-content' });
@@ -242,7 +210,7 @@ class InsertDungeonModal extends Modal {
     advancedHeader.onclick = () => {
       this.advancedOpen = !this.advancedOpen;
       advancedContent.style.display = this.advancedOpen ? 'block' : 'none';
-      chevron.textContent = this.advancedOpen ? 'â–¼' : 'â–¶';
+      chevron.textContent = this.advancedOpen ? '▼' : '▶';
     };
     
     // Helper to create a slider row
@@ -273,7 +241,7 @@ class InsertDungeonModal extends Modal {
     };
     
     // Percentage formatter
-    const pct = (v) => `${Math.round(v * 100)}%`;
+    const pct = (v) => \`\${Math.round(v * 100)}%\`;
     // Bias formatter  
     const biasLabel = (v) => {
       if (v < -0.3) return 'Compact';
@@ -317,14 +285,62 @@ class InsertDungeonModal extends Modal {
         setTimeout(() => buttonRow.removeClass('dmt-shake'), 300);
         return;
       }
-      await this.generateAndInsert();
+      
+      // Load generator and generate the dungeon
+      try {
+        const generator = await this.plugin.loadDungeonGenerator();
+        
+        // Build config overrides (only include non-null values)
+        const overrides = {};
+        for (const [key, val] of Object.entries(this.configOverrides)) {
+          if (val !== null) overrides[key] = val;
+        }
+        
+        const result = generator.generateDungeon(this.dungeonSize, undefined, overrides);
+      
+      // Wait for the callback (which saves to JSON) before closing
+      await this.onInsert(this.mapName, result.cells, result.objects, {
+          distancePerCell: this.distancePerCell,
+          distanceUnit: this.distanceUnit,
+          preset: this.dungeonSize,
+          configOverrides: overrides,
+          roomCount: result.metadata.roomCount,
+          doorCount: result.metadata.doorCount
+        });
+        this.close();
+      } catch (err) {
+        console.error('[Windrose] Dungeon generation failed:', err);
+        alert('Failed to generate dungeon: ' + err.message);
+      }
     };
     
     // Handle Enter key to submit (if size is selected)
     contentEl.addEventListener('keydown', async (e) => {
       if (e.key === 'Enter' && this.dungeonSize) {
         e.preventDefault();
-        await this.generateAndInsert();
+        try {
+          const generator = await this.plugin.loadDungeonGenerator();
+          
+          // Build config overrides (only include non-null values)
+          const overrides = {};
+          for (const [key, val] of Object.entries(this.configOverrides)) {
+            if (val !== null) overrides[key] = val;
+          }
+          
+          const result = generator.generateDungeon(this.dungeonSize, undefined, overrides);
+          await this.onInsert(this.mapName, result.cells, result.objects, {
+            distancePerCell: this.distancePerCell,
+            distanceUnit: this.distanceUnit,
+            preset: this.dungeonSize,
+            configOverrides: overrides,
+            roomCount: result.metadata.roomCount,
+            doorCount: result.metadata.doorCount
+          });
+          this.close();
+        } catch (err) {
+          console.error('[Windrose] Dungeon generation failed:', err);
+          alert('Failed to generate dungeon: ' + err.message);
+        }
       }
     });
   }
@@ -336,4 +352,4 @@ class InsertDungeonModal extends Modal {
     }
     this.contentEl.empty();
   }
-}
+}`;

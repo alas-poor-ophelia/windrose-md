@@ -1,4 +1,4 @@
-// settingsPlugin-CategoryEditModal.js
+return `// settingsPlugin-CategoryEditModal.js
 // Modal for editing category properties
 // This file is concatenated into the settings plugin template by the assembler
 
@@ -106,3 +106,4 @@ class CategoryEditModal extends Modal {
     this.contentEl.empty();
   }
 }
+`;

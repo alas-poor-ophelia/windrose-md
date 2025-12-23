@@ -1,4 +1,4 @@
-// settingsPlugin-TabRenderSettings.js
+return `// settingsPlugin-TabRenderSettings.js
 // WindroseMDSettingsTab render methods - Settings sections
 // This file is concatenated into the settings plugin template by the assembler
 
@@ -272,7 +272,7 @@ const TabRenderSettingsMethods = {
       
       new Setting(containerEl)
         .setName('Blur Intensity')
-        .setDesc(`Size of blur effect as percentage of cell size (currently ${blurPercent}%)`)
+        .setDesc(\`Size of blur effect as percentage of cell size (currently \${blurPercent}%)\`)
         .addSlider(slider => slider
           .setLimits(5, 50, 1)
           .setValue(blurPercent)
@@ -438,4 +438,4 @@ const TabRenderSettingsMethods = {
         }));
   }
 
-};
+};`;

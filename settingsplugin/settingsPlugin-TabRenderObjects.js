@@ -1,11 +1,11 @@
-// settingsPlugin-TabRenderObjects.js
+return `// settingsPlugin-TabRenderObjects.js
 // WindroseMDSettingsTab render methods - Object types
 // This file is concatenated into the settings plugin template by the assembler
 
 const TabRenderObjectsMethods = {
   renderObjectTypesContent(containerEl) {
     containerEl.createEl('p', { 
-      text: 'Customize map objects: modify built-in objects, create custom objects, or hide objects you don\'t use.',
+      text: 'Customize map objects: modify built-in objects, create custom objects, or hide objects you don\\'t use.',
       cls: 'setting-item-description'
     });
     
@@ -87,17 +87,17 @@ const TabRenderObjectsMethods = {
     if (hasAnyCustomizations) {
       new Setting(containerEl)
         .setName('Reset All Customizations')
-        .setDesc(`Remove all custom objects, categories, and modifications for ${this.selectedMapType} maps`)
+        .setDesc(\`Remove all custom objects, categories, and modifications for \${this.selectedMapType} maps\`)
         .addButton(btn => btn
           .setButtonText('Reset All')
           .setWarning()
           .onClick(async () => {
             const counts = [];
-            if (hasOverrides) counts.push(`${Object.keys(mapTypeSettings.objectOverrides).length} modification(s)`);
-            if (hasCustomObjects) counts.push(`${mapTypeSettings.customObjects.length} custom object(s)`);
-            if (hasCustomCategories) counts.push(`${mapTypeSettings.customCategories.length} custom category(ies)`);
+            if (hasOverrides) counts.push(\`\${Object.keys(mapTypeSettings.objectOverrides).length} modification(s)\`);
+            if (hasCustomObjects) counts.push(\`\${mapTypeSettings.customObjects.length} custom object(s)\`);
+            if (hasCustomCategories) counts.push(\`\${mapTypeSettings.customCategories.length} custom category(ies)\`);
             
-            if (confirm(`This will remove ${counts.join(', ')} for ${this.selectedMapType} maps. Maps using custom objects will show "?" placeholders.\\n\\nContinue?`)) {
+            if (confirm(\`This will remove \${counts.join(', ')} for \${this.selectedMapType} maps. Maps using custom objects will show "?" placeholders.\\\\n\\\\nContinue?\`)) {
               this.updateObjectSettingsForMapType({
                 objectOverrides: {},
                 customObjects: [],
@@ -165,7 +165,7 @@ const TabRenderObjectsMethods = {
     if (filter && filteredObjects.length === 0 && filteredHidden.length === 0) {
       container.createDiv({ 
         cls: 'dmt-settings-no-results',
-        text: `No objects matching "${filter}"`
+        text: \`No objects matching "\${filter}"\`
       });
       return;
     }
@@ -185,7 +185,7 @@ const TabRenderObjectsMethods = {
       
       // Category header with object count
       const categoryHeader = categoryContainer.createDiv({ cls: 'dmt-settings-category-header' });
-      const labelText = category.label + (categoryObjects.length > 0 ? ` (${categoryObjects.length})` : '');
+      const labelText = category.label + (categoryObjects.length > 0 ? \` (\${categoryObjects.length})\` : '');
       categoryHeader.createSpan({ text: labelText, cls: 'dmt-settings-category-label' });
       
       // Edit/Delete for custom categories
@@ -208,10 +208,10 @@ const TabRenderObjectsMethods = {
         IconHelpers.set(deleteBtn, 'trash-2');
         deleteBtn.onclick = async () => {
           if (allCategoryObjects.length > 0) {
-            alert(`Cannot delete "${category.label}" - it contains ${allCategoryObjects.length} object(s). Move or delete them first.`);
+            alert(\`Cannot delete "\${category.label}" - it contains \${allCategoryObjects.length} object(s). Move or delete them first.\`);
             return;
           }
-          if (confirm(`Delete category "${category.label}"?`)) {
+          if (confirm(\`Delete category "\${category.label}"?\`)) {
             const categoriesKey = this.selectedMapType === 'hex' ? 'customHexCategories' : 'customGridCategories';
             if (this.plugin.settings[categoriesKey]) {
               this.plugin.settings[categoriesKey] = this.plugin.settings[categoriesKey].filter(c => c.id !== category.id);
@@ -242,8 +242,8 @@ const TabRenderObjectsMethods = {
       const hiddenContainer = container.createDiv({ cls: 'dmt-settings-hidden-section' });
       
       const hiddenHeader = new Setting(hiddenContainer)
-        .setName(`Hidden Objects (${filteredHidden.length})`)
-        .setDesc('Built-in objects you\'ve hidden from the palette');
+        .setName(\`Hidden Objects (\${filteredHidden.length})\`)
+        .setDesc('Built-in objects you\\'ve hidden from the palette');
       
       const hiddenList = hiddenContainer.createDiv({ cls: 'dmt-settings-object-list dmt-settings-hidden-list' });
       hiddenList.style.display = 'none';
@@ -453,7 +453,7 @@ const TabRenderObjectsMethods = {
         const resetBtn = actions.createEl('button', { cls: 'dmt-settings-icon-btn', attr: { 'aria-label': 'Reset to default', title: 'Reset to default' } });
         IconHelpers.set(resetBtn, 'rotate-ccw');
         resetBtn.onclick = async () => {
-          if (confirm(`Reset "${obj.label}" to its default symbol and name?`)) {
+          if (confirm(\`Reset "\${obj.label}" to its default symbol and name?\`)) {
             if (this.plugin.settings[overridesKey]) {
               delete this.plugin.settings[overridesKey][obj.id];
             }
@@ -468,7 +468,7 @@ const TabRenderObjectsMethods = {
       const deleteBtn = actions.createEl('button', { cls: 'dmt-settings-icon-btn dmt-settings-icon-btn-danger', attr: { 'aria-label': 'Delete', title: 'Delete object' } });
       IconHelpers.set(deleteBtn, 'trash-2');
       deleteBtn.onclick = async () => {
-        if (confirm(`Delete "${obj.label}"? Maps using this object will show a "?" placeholder.`)) {
+        if (confirm(\`Delete "\${obj.label}"? Maps using this object will show a "?" placeholder.\`)) {
           if (this.plugin.settings[customObjectsKey]) {
             this.plugin.settings[customObjectsKey] = this.plugin.settings[customObjectsKey].filter(o => o.id !== obj.id);
           }
@@ -480,4 +480,4 @@ const TabRenderObjectsMethods = {
     }
   }
 
-};
+};`;

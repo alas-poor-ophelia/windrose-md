@@ -1,4 +1,4 @@
-// settingsPlugin-InsertMapModal.js
+return `// settingsPlugin-InsertMapModal.js
 // Modal for inserting a new map block into the editor
 // This file is concatenated into the settings plugin template by the assembler
 
@@ -102,3 +102,4 @@ class InsertMapModal extends Modal {
     this.contentEl.empty();
   }
 }
+`;

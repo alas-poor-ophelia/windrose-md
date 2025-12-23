@@ -1,4 +1,4 @@
-// settingsPlugin-ImportModal.js
+return `// settingsPlugin-ImportModal.js
 // Modal for importing object customizations
 // This file is concatenated into the settings plugin template by the assembler
 
@@ -20,10 +20,10 @@ class ImportModal extends Modal {
     contentEl.addClass('dmt-import-modal');
     
     const mapTypeLabel = this.mapType === 'hex' ? 'Hex' : 'Grid';
-    contentEl.createEl('h2', { text: `Import ${mapTypeLabel} Object Customizations` });
+    contentEl.createEl('h2', { text: \`Import \${mapTypeLabel} Object Customizations\` });
     
     contentEl.createEl('p', { 
-      text: `Select a Windrose MD object export file (.json) to import into ${mapTypeLabel} maps.`,
+      text: \`Select a Windrose MD object export file (.json) to import into \${mapTypeLabel} maps.\`,
       cls: 'setting-item-description'
     });
     
@@ -72,7 +72,7 @@ class ImportModal extends Modal {
         previewArea.createEl('p', { text: 'Valid Windrose MD export file' });
         if (data.exportedAt) {
           previewArea.createEl('p', { 
-            text: `Exported: ${new Date(data.exportedAt).toLocaleString()}`,
+            text: \`Exported: \${new Date(data.exportedAt).toLocaleString()}\`,
             cls: 'dmt-import-date'
           });
         }
@@ -82,7 +82,7 @@ class ImportModal extends Modal {
           const sourceType = data.mapType === 'hex' ? 'Hex' : 'Grid';
           if (data.mapType !== this.mapType) {
             previewArea.createEl('p', { 
-              text: `Note: This was exported from ${sourceType} maps but will be imported to ${mapTypeLabel} maps.`,
+              text: \`Note: This was exported from \${sourceType} maps but will be imported to \${mapTypeLabel} maps.\`,
               cls: 'dmt-import-note'
             });
           }
@@ -93,13 +93,13 @@ class ImportModal extends Modal {
         const customCatCount = data.customCategories?.length || 0;
         
         if (overrideCount > 0) {
-          previewArea.createEl('p', { text: `â€¢ ${overrideCount} built-in modification(s)` });
+          previewArea.createEl('p', { text: \`Ã¢â‚¬Â¢ \${overrideCount} built-in modification(s)\` });
         }
         if (customObjCount > 0) {
-          previewArea.createEl('p', { text: `â€¢ ${customObjCount} custom object(s)` });
+          previewArea.createEl('p', { text: \`Ã¢â‚¬Â¢ \${customObjCount} custom object(s)\` });
         }
         if (customCatCount > 0) {
-          previewArea.createEl('p', { text: `â€¢ ${customCatCount} custom category(ies)` });
+          previewArea.createEl('p', { text: \`Ã¢â‚¬Â¢ \${customCatCount} custom category(ies)\` });
         }
         
         previewArea.style.display = 'block';
@@ -120,7 +120,7 @@ class ImportModal extends Modal {
       } catch (err) {
         previewArea.empty();
         previewArea.createEl('p', { 
-          text: `Error reading file: ${err.message}`,
+          text: \`Error reading file: \${err.message}\`,
           cls: 'dmt-import-error'
         });
         previewArea.style.display = 'block';
@@ -204,3 +204,4 @@ class ImportModal extends Modal {
     this.contentEl.empty();
   }
 }
+`;

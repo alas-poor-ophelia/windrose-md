@@ -1,8 +1,8 @@
 <!-- Compiled by Datacore Script Compiler -->
 <!-- Source: Projects/dungeon-map-tracker -->
 <!-- Main Component: DungeonMapTracker -->
-<!-- Compiled: 2025-12-22T22:10:24.246Z -->
-<!-- Files: 95 -->
+<!-- Compiled: 2025-12-23T04:52:38.560Z -->
+<!-- Files: 113 -->
 <!-- Version: 1.4.2 -->
 <!-- CSS Files: 1 -->
 
@@ -23325,6 +23325,27 @@ const VisibilityToolbar = ({
 return { VisibilityToolbar };
 ```
 
+# settingsPlugin-quickSymbols
+
+```js
+return `// settingsPlugin-quickSymbols.js
+// Quick symbols palette for object creation in the settings plugin
+// Separated to prevent unicode corruption during automated edits
+
+const QUICK_SYMBOLS = [
+  '★', '☆', '✦', '✧', '✪', '✫', '✯', '⚒',
+  '●', '○', '◆', '◇', '■', '□', '▲', '△',
+  '▼', '▽', '♠', '♤', '♣', '♧', '♥', '♡',
+  '♦', '♢', '⚔', '⚒', '🗡', '🧹', '⚔', '⛏',
+  '📱', '☠', '⚠', '☢', '☣', '⚡', '🔥', '💧',
+  '⚒', '⚐', '⛳', '🚩', '➤', '➜', '⬤', '⚙',
+  '⚗', '🔮', '💎', '🗝', '📜', '🎭', '👑', '🛡',
+  '🏰', '⛪', '🗿', '⚱', '🏺', '🪔'
+];
+
+return QUICK_SYMBOLS;`;
+```
+
 # settingsPluginMain
 
 ```js
@@ -23950,224 +23971,5015 @@ Object.assign(WindroseMDSettingsTab.prototype, TabRenderObjectsMethods);
 module.exports = WindroseMDSettingsPlugin;`;
 ```
 
+# settingsPlugin-ObjectHelpers
+
+```js
+return `// settingsPlugin-ObjectHelpers.js
+// Object resolution helpers - transforms raw settings into resolved object/category lists
+// This file is concatenated into the settings plugin template by the assembler
+
+/**
+ * Object resolution helpers
+ * Transform raw settings into resolved object/category lists
+ */
+const ObjectHelpers = {
+  /**
+   * Get all resolved object types (built-in + custom, with overrides applied)
+   * @param {Object} settings - Plugin settings
+   * @returns {Array} Resolved object array with isBuiltIn, isModified flags
+   */
+  getResolved(settings) {
+    const { objectOverrides = {}, customObjects = [] } = settings;
+    
+    const resolvedBuiltIns = BUILT_IN_OBJECTS
+      .filter(obj => !objectOverrides[obj.id]?.hidden)
+      .map((obj, index) => {
+        const override = objectOverrides[obj.id];
+        const defaultOrder = index * 10;
+        if (override) {
+          const { hidden, ...overrideProps } = override;
+          return { 
+            ...obj, 
+            ...overrideProps, 
+            order: override.order ?? defaultOrder, 
+            isBuiltIn: true, 
+            isModified: true 
+          };
+        }
+        return { ...obj, order: defaultOrder, isBuiltIn: true, isModified: false };
+      });
+    
+    const resolvedCustom = customObjects.map((obj, index) => ({
+      ...obj,
+      order: obj.order ?? (1000 + index * 10),
+      isCustom: true,
+      isBuiltIn: false
+    }));
+    
+    return [...resolvedBuiltIns, ...resolvedCustom];
+  },
+  
+  /**
+   * Get all resolved categories (built-in + custom, sorted by order)
+   * @param {Object} settings - Plugin settings
+   * @returns {Array} Sorted category array with isBuiltIn flag
+   */
+  getCategories(settings) {
+    const { customCategories = [] } = settings;
+    
+    const resolvedBuiltIns = BUILT_IN_CATEGORIES.map(c => ({
+      ...c,
+      isBuiltIn: true,
+      order: CATEGORY_ORDER[c.id] ?? 50
+    }));
+    
+    const resolvedCustom = customCategories.map(c => ({
+      ...c,
+      isCustom: true,
+      isBuiltIn: false,
+      order: c.order ?? 100
+    }));
+    
+    return [...resolvedBuiltIns, ...resolvedCustom].sort((a, b) => (a.order ?? 50) - (b.order ?? 50));
+  },
+  
+  /**
+   * Get hidden built-in objects
+   * @param {Object} settings - Plugin settings
+   * @returns {Array} Hidden objects with isBuiltIn, isHidden flags
+   */
+  getHidden(settings) {
+    const { objectOverrides = {} } = settings;
+    return BUILT_IN_OBJECTS
+      .filter(obj => objectOverrides[obj.id]?.hidden)
+      .map(obj => ({ ...obj, isBuiltIn: true, isHidden: true }));
+  },
+  
+  /**
+   * Get all categories including notes (for dropdowns)
+   * @param {Object} settings - Plugin settings
+   * @returns {Array} All categories
+   */
+  getAllCategories(settings) {
+    const { customCategories = [] } = settings;
+    const builtIn = BUILT_IN_CATEGORIES.map(c => ({ ...c, isBuiltIn: true }));
+    const custom = customCategories.map(c => ({ ...c, isCustom: true }));
+    return [...builtIn, ...custom];
+  },
+  
+  /**
+   * Get default ID order for a category (for drag/drop comparison)
+   * @param {string} categoryId - Category ID
+   * @param {Object} settings - Plugin settings
+   * @returns {Array} Array of object IDs in default order
+   */
+  getDefaultIdOrder(categoryId, settings) {
+    const { objectOverrides = {} } = settings;
+    return BUILT_IN_OBJECTS
+      .filter(o => o.category === categoryId && !objectOverrides[o.id]?.hidden)
+      .map(o => o.id);
+  }
+};`;
+```
+
+# settingsPlugin-ColorHelpers
+
+```js
+return `// settingsPlugin-ColorHelpers.js
+// Color palette resolution helpers - transforms raw settings into resolved color list
+// This file is concatenated into the settings plugin template by the assembler
+
+/**
+ * Color palette resolution helpers
+ * Transform raw settings into resolved color list
+ */
+const ColorHelpers = {
+  /**
+   * Get all resolved colors (built-in + custom, with overrides applied)
+   * @param {Object} settings - Plugin settings
+   * @returns {Array} Resolved color array with isBuiltIn, isModified flags
+   */
+  getResolved(settings) {
+    const { colorPaletteOverrides = {}, customPaletteColors = [] } = settings;
+    
+    const resolvedBuiltIns = BUILT_IN_COLORS
+      .filter(c => !colorPaletteOverrides[c.id]?.hidden)
+      .map((c, index) => {
+        const override = colorPaletteOverrides[c.id];
+        if (override) {
+          const { hidden, ...overrideProps } = override;
+          return { 
+            ...c, 
+            ...overrideProps, 
+            order: override.order ?? index,
+            isBuiltIn: true, 
+            isModified: true 
+          };
+        }
+        return { ...c, order: index, isBuiltIn: true, isModified: false };
+      });
+    
+    const resolvedCustom = customPaletteColors.map((c, index) => ({
+      ...c,
+      order: c.order ?? (100 + index),
+      isCustom: true,
+      isBuiltIn: false
+    }));
+    
+    return [...resolvedBuiltIns, ...resolvedCustom].sort((a, b) => a.order - b.order);
+  },
+  
+  /**
+   * Get hidden color IDs
+   * @param {Object} settings - Plugin settings
+   * @returns {Set} Set of hidden color IDs
+   */
+  getHidden(settings) {
+    const { colorPaletteOverrides = {} } = settings;
+    return new Set(
+      Object.entries(colorPaletteOverrides)
+        .filter(([id, override]) => override.hidden)
+        .map(([id]) => id)
+    );
+  }
+};`;
+```
+
+# settingsPlugin-DragHelpers
+
+```js
+return `// settingsPlugin-DragHelpers.js
+// Drag and drop helpers for reordering objects in the settings UI
+// This file is concatenated into the settings plugin template by the assembler
+
+/**
+ * Drag and drop helpers
+ */
+const DragHelpers = {
+  /**
+   * Find element to insert before during drag operation
+   * @param {HTMLElement} container - Container element
+   * @param {number} y - Mouse Y position
+   * @returns {HTMLElement|undefined} Element to insert before
+   */
+  getAfterElement(container, y) {
+    const draggableElements = [...container.querySelectorAll('.dmt-settings-object-row:not(.dmt-dragging)')];
+    
+    return draggableElements.reduce((closest, child) => {
+      const box = child.getBoundingClientRect();
+      const offset = y - box.top - box.height / 2;
+      if (offset < 0 && offset > closest.offset) {
+        return { offset: offset, element: child };
+      } else {
+        return closest;
+      }
+    }, { offset: Number.NEGATIVE_INFINITY }).element;
+  }
+};`;
+```
+
+# settingsPlugin-IconHelpers
+
+```js
+return `// settingsPlugin-IconHelpers.js
+// Icon helpers for setting Lucide icons with fallback
+// This file is concatenated into the settings plugin template by the assembler
+
+/**
+ * Icon helpers
+ */
+const IconHelpers = {
+  /**
+   * Set icon on element with fallback
+   * @param {HTMLElement} el - Target element
+   * @param {string} iconId - Lucide icon ID
+   */
+  set(el, iconId) {
+    if (typeof setIcon !== 'undefined') {
+      setIcon(el, iconId);
+    } else {
+      // Fallback: create a simple text representation
+      const icons = {
+        'pencil': '✎',
+        'eye': '👁',
+        'eye-off': '🚫',
+        'rotate-ccw': '↺',
+        'trash-2': '🗑',
+        'grip-vertical': '⋮⋮',
+        'x': '✕',
+        'search': '🔍'
+      };
+      el.textContent = icons[iconId] || '?';
+    }
+  }
+};`;
+```
+
+# settingsPlugin-RPGAwesomeHelpers
+
+```js
+return `// settingsPlugin-RPGAwesomeHelpers.js
+// RPGAwesome icon helpers for the icon picker UI
+// This file is concatenated into the settings plugin template by the assembler
+
+/**
+ * RPGAwesome icon helpers
+ */
+const RPGAwesomeHelpers = {
+  /**
+   * Get icons filtered by category
+   * @param {string} categoryId - Category ID or 'all'
+   * @returns {Array} Array of { iconClass, char, label, category }
+   */
+  getByCategory(categoryId) {
+    const icons = Object.entries(RA_ICONS).map(([iconClass, data]) => ({
+      iconClass,
+      ...data
+    }));
+    
+    if (categoryId === 'all') return icons;
+    return icons.filter(i => i.category === categoryId);
+  },
+  
+  /**
+   * Search icons by label
+   * @param {string} query - Search query
+   * @returns {Array} Matching icons
+   */
+  search(query) {
+    const q = query.toLowerCase().trim();
+    if (!q) return this.getByCategory('all');
+    
+    return Object.entries(RA_ICONS)
+      .filter(([iconClass, data]) => 
+        iconClass.toLowerCase().includes(q) || 
+        data.label.toLowerCase().includes(q)
+      )
+      .map(([iconClass, data]) => ({ iconClass, ...data }));
+  },
+  
+  /**
+   * Get sorted categories for tab display
+   * @returns {Array} Array of { id, label, order }
+   */
+  getCategories() {
+    return [...RA_CATEGORIES].sort((a, b) => a.order - b.order);
+  },
+  
+  /**
+   * Validate an icon class exists
+   * @param {string} iconClass - Icon class to validate
+   * @returns {boolean}
+   */
+  isValid(iconClass) {
+    return iconClass && RA_ICONS.hasOwnProperty(iconClass);
+  },
+  
+  /**
+   * Get icon info
+   * @param {string} iconClass - Icon class
+   * @returns {Object|null} Icon data or null
+   */
+  getInfo(iconClass) {
+    return RA_ICONS[iconClass] || null;
+  }
+};`;
+```
+
+# settingsPlugin-DungeonEssenceVisualizer
+
+```js
+return `// settingsPlugin-DungeonEssenceVisualizer.js
+// Ambient visualization for the Insert Dungeon modal
+// Shows abstract "dungeon being born" animation
+// This file is concatenated into the settings plugin template by the assembler
+
+/**
+ * DungeonEssenceVisualizer - Vanilla JS Canvas Animation
+ * Creates an ambient visualization of dungeon generation
+ */
+class DungeonEssenceVisualizer {
+  constructor(container, options = {}) {
+    this.container = container;
+    this.height = options.height || 150;
+    this.settings = {
+      size: 'medium',
+      circleChance: 0.3,
+      loopChance: 0.15,
+      corridorStyle: 'straight',
+      ...options.settings
+    };
+    
+    // Create canvas
+    this.canvas = document.createElement('canvas');
+    this.canvas.style.display = 'block';
+    this.canvas.style.width = '100%';
+    this.container.appendChild(this.canvas);
+    
+    // Create stamp overlay container
+    this.stampOverlay = document.createElement('div');
+    this.stampOverlay.style.cssText = \`
+      position: absolute;
+      pointer-events: none;
+      opacity: 0;
+      filter: saturate(0.4);
+      transition: opacity 0.3s ease;
+    \`;
+    this.stampOverlay.innerHTML = this.getWindroseSVG();
+    this.container.style.position = 'relative';
+    this.container.appendChild(this.stampOverlay);
+    
+    this.ctx = this.canvas.getContext('2d');
+    this.animationId = null;
+    this.state = null;
+    
+    // Sample colors from CSS
+    this.sampleColors();
+    
+    // Setup resize observer
+    this.resizeObserver = new ResizeObserver(() => this.handleResize());
+    this.resizeObserver.observe(this.container);
+    
+    // Initial size
+    this.handleResize();
+  }
+  
+  sampleColors() {
+    const style = getComputedStyle(document.body);
+    this.colors = {
+      node: style.getPropertyValue('--text-muted').trim() || '#888',
+      nodePulse: style.getPropertyValue('--interactive-accent').trim() || '#7c5cbf',
+      line: style.getPropertyValue('--text-faint').trim() || '#666',
+      lineSolid: style.getPropertyValue('--text-muted').trim() || '#888'
+    };
+  }
+  
+  getWindroseSVG() {
+    // Simplified WindroseCompass SVG for the stamp
+    return \`
+      <svg viewBox="0 0 100 100" style="width: 100%; height: 100%;">
+        <defs>
+          <filter id="dmt-stamp-shadow" x="-50%" y="-50%" width="200%" height="200%">
+            <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="rgba(0, 0, 0, 0.6)"/>
+          </filter>
+        </defs>
+        <g filter="url(#dmt-stamp-shadow)">
+          <circle cx="50" cy="50" r="28" fill="rgba(0, 0, 0, 0.7)" stroke="rgba(196, 165, 123, 0.4)" stroke-width="2"/>
+          <circle cx="50" cy="50" r="45" fill="none" stroke="rgba(196, 165, 123, 0.3)" stroke-width="0.8"/>
+          
+          <!-- Cardinal lines -->
+          <line x1="50" y1="2" x2="50" y2="22" stroke="rgba(196, 165, 123, 0.8)" stroke-width="2.5" stroke-linecap="round"/>
+          <line x1="50" y1="78" x2="50" y2="98" stroke="rgba(196, 165, 123, 0.5)" stroke-width="1.5" stroke-linecap="round"/>
+          <line x1="78" y1="50" x2="98" y2="50" stroke="rgba(196, 165, 123, 0.5)" stroke-width="1.5" stroke-linecap="round"/>
+          <line x1="2" y1="50" x2="22" y2="50" stroke="rgba(196, 165, 123, 0.5)" stroke-width="1.5" stroke-linecap="round"/>
+          
+          <!-- Compass star -->
+          <path d="M 50 8 L 58 50 L 50 47 L 42 50 Z" fill="#c4a57b" stroke="#8b6842" stroke-width="0.8"/>
+          <path d="M 50 92 L 56 50 L 50 53 L 44 50 Z" fill="rgba(196, 165, 123, 0.7)" stroke="rgba(139, 104, 66, 0.7)" stroke-width="0.5"/>
+          <path d="M 92 50 L 50 44 L 53 50 L 50 56 Z" fill="rgba(196, 165, 123, 0.7)" stroke="rgba(139, 104, 66, 0.7)" stroke-width="0.5"/>
+          <path d="M 8 50 L 50 44 L 47 50 L 50 56 Z" fill="rgba(196, 165, 123, 0.7)" stroke="rgba(139, 104, 66, 0.7)" stroke-width="0.5"/>
+          
+          <!-- N letter -->
+          <text x="50" y="62" text-anchor="middle" font-size="28" font-weight="bold" fill="#c4a57b" font-family="serif">N</text>
+          
+          <!-- Red north arrow -->
+          <path d="M 50 14 L 45 24 L 50 20 L 55 24 Z" fill="#e74c3c" stroke="#c0392b" stroke-width="0.5"/>
+        </g>
+      </svg>
+    \`;
+  }
+  
+  handleResize() {
+    const rect = this.container.getBoundingClientRect();
+    const width = Math.floor(rect.width);
+    if (width < 10) return;
+    
+    this.width = width;
+    this.canvas.width = width;
+    this.canvas.height = this.height;
+    
+    // Update stamp size
+    const stampSize = Math.min(65, Math.max(45, width * 0.12));
+    this.stampSize = stampSize;
+    this.stampOverlay.style.width = stampSize + 'px';
+    this.stampOverlay.style.height = stampSize + 'px';
+    
+    // Restart animation with new dimensions
+    if (this.animationId) {
+      this.stop();
+      this.start();
+    }
+  }
+  
+  /**
+   * Update animation settings
+   * 
+   * Behavior by setting type:
+   * - corridorStyle: Updates on-the-fly (affects line drawing)
+   * - circleChance: Takes effect on next animation cycle (affects node generation)
+   * - loopChance: Takes effect on next animation cycle (affects connection generation)
+   * - size: Restarts animation immediately (affects node count significantly)
+   */
+  updateSettings(newSettings) {
+    const sizeChanged = newSettings.size && newSettings.size !== this.settings.size;
+    this.settings = { ...this.settings, ...newSettings };
+    
+    // Size changes warrant an immediate restart since node count changes dramatically
+    if (sizeChanged && this.animationId) {
+      this.restartAnimation();
+    }
+  }
+  
+  /**
+   * Restart the animation with current settings
+   */
+  restartAnimation() {
+    if (!this.animationId) return;
+    
+    this.hideStamp();
+    this.initState();
+  }
+  
+  // Apply style overrides (from DUNGEON_STYLES)
+  applyStyle(styleName) {
+    const styleOverrides = {
+      classic: {},
+      cavern: { circleChance: 0.6, corridorStyle: 'organic', loopChance: 0.2 },
+      fortress: { circleChance: 0, corridorStyle: 'straight', loopChance: 0.08 },
+      crypt: { circleChance: 0.1, corridorStyle: 'straight', loopChance: 0.02 }
+    };
+    
+    const overrides = styleOverrides[styleName] || {};
+    this.updateSettings(overrides);
+  }
+  
+  start() {
+    if (this.animationId) return;
+    
+    this.initState();
+    this.lastTime = performance.now();
+    this.animationId = requestAnimationFrame((t) => this.render(t));
+  }
+  
+  stop() {
+    if (this.animationId) {
+      cancelAnimationFrame(this.animationId);
+      this.animationId = null;
+    }
+    this.hideStamp();
+  }
+  
+  destroy() {
+    this.stop();
+    this.resizeObserver.disconnect();
+    this.container.removeChild(this.canvas);
+    this.container.removeChild(this.stampOverlay);
+  }
+  
+  // === Animation State ===
+  
+  initState() {
+    const nodeCount = this.settings.size === 'small' ? 5 : 
+                      this.settings.size === 'large' ? 12 : 8;
+    
+    this.state = {
+      phase: 'JOURNEY',
+      phaseTime: 0,
+      journeyStep: 0,
+      nodes: [],
+      connections: [],
+      loopConnections: [],
+      circledNode: null,
+      fadeOpacity: 1,
+      camera: {
+        x: 0, y: 0, zoom: 2.2,
+        targetX: 0, targetY: 0, targetZoom: 2.2,
+        velX: 0, velY: 0, velZoom: 0
+      },
+      discoveredNodes: new Set()
+    };
+    
+    this.generateNodes(nodeCount);
+    this.buildMST();
+    this.buildLoops();
+    
+    // Set initial camera
+    if (this.state.nodes.length > 0) {
+      const first = this.state.nodes[0];
+      this.state.camera.x = this.state.camera.targetX = first.x;
+      this.state.camera.y = this.state.camera.targetY = first.y;
+    }
+  }
+  
+  generateNodes(count) {
+    const nodes = [];
+    const padding = 30;
+    const bottomPadding = 55; // Extra space at bottom for title overlay
+    const minDist = 35;
+    const { width, height } = this;
+    
+    for (let i = 0; i < count; i++) {
+      let attempts = 0;
+      let placed = false;
+      
+      while (!placed && attempts < 50) {
+        const x = padding + Math.random() * (width - padding * 2);
+        const y = padding + Math.random() * (height - padding - bottomPadding);
+        
+        const tooClose = nodes.some(n => {
+          const dx = n.x - x;
+          const dy = n.y - y;
+          return Math.sqrt(dx * dx + dy * dy) < minDist;
+        });
+        
+        if (!tooClose) {
+          const isCircle = Math.random() < this.settings.circleChance;
+          nodes.push({
+            x, y,
+            shape: isCircle ? 'circle' : 'rect',
+            size: 5 + Math.random() * 3,
+            opacity: 0,
+            discovered: i === 0,
+            arrivalPulse: 0
+          });
+          placed = true;
+        }
+        attempts++;
+      }
+    }
+    
+    if (nodes.length > 0) {
+      nodes[0].opacity = 1;
+      this.state.discoveredNodes.add(0);
+      this.state.circledNode = nodes.length - 1;
+    }
+    
+    this.state.nodes = nodes;
+  }
+  
+  buildMST() {
+    const nodes = this.state.nodes;
+    if (nodes.length < 2) {
+      this.state.connections = [];
+      return;
+    }
+    
+    const connections = [];
+    const connected = new Set([0]);
+    const unconnected = new Set(nodes.map((_, i) => i).filter(i => i !== 0));
+    
+    while (unconnected.size > 0) {
+      let bestDist = Infinity;
+      let bestEdge = null;
+      
+      for (const from of connected) {
+        for (const to of unconnected) {
+          const dx = nodes[to].x - nodes[from].x;
+          const dy = nodes[to].y - nodes[from].y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          
+          if (dist < bestDist) {
+            bestDist = dist;
+            bestEdge = { from, to, distance: dist };
+          }
+        }
+      }
+      
+      if (bestEdge) {
+        connections.push({ ...bestEdge, progress: 0 });
+        connected.add(bestEdge.to);
+        unconnected.delete(bestEdge.to);
+      } else {
+        break;
+      }
+    }
+    
+    this.state.connections = connections;
+  }
+  
+  buildLoops() {
+    const { nodes, connections } = this.state;
+    const loops = [];
+    const existingPairs = new Set(
+      connections.map(c => \`\${Math.min(c.from, c.to)}-\${Math.max(c.from, c.to)}\`)
+    );
+    
+    for (let i = 0; i < nodes.length; i++) {
+      for (let j = i + 1; j < nodes.length; j++) {
+        const key = \`\${i}-\${j}\`;
+        if (!existingPairs.has(key) && Math.random() < this.settings.loopChance) {
+          loops.push({ from: i, to: j, progress: 0 });
+        }
+      }
+    }
+    
+    this.state.loopConnections = loops;
+  }
+  
+  // === Easing & Math ===
+  
+  lerp(a, b, t) { return a + (b - a) * t; }
+  
+  easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
+  easeInOutCubic(t) { return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; }
+  
+  easeHandTraced(t) {
+    if (t < 0.15) return t * t * 4.44;
+    if (t > 0.85) return 1 - Math.pow(1 - t, 2) * 4.44;
+    return 0.1 + ((t - 0.15) / 0.7) * 0.8;
+  }
+  
+  smoothDamp(current, target, velocity, smoothTime, dt) {
+    const omega = 2 / smoothTime;
+    const x = omega * dt;
+    const exp = 1 / (1 + x + 0.48 * x * x + 0.235 * x * x * x);
+    const change = current - target;
+    const temp = (velocity + omega * change) * dt;
+    const newVel = (velocity - omega * temp) * exp;
+    return { value: target + (change + temp) * exp, velocity: newVel };
+  }
+  
+  // === Stamp Control ===
+  
+  showStamp(screenX, screenY) {
+    this.stampOverlay.style.left = screenX + 'px';
+    this.stampOverlay.style.top = screenY + 'px';
+    this.stampOverlay.style.transform = 'translate(-50%, -50%)';
+    this.stampOverlay.style.animation = 'none';
+    // Trigger reflow
+    this.stampOverlay.offsetHeight;
+    this.stampOverlay.style.animation = 'dmt-windrose-stamp 0.35s ease-out forwards';
+    this.stampOverlay.style.opacity = '0.75';
+  }
+  
+  hideStamp() {
+    this.stampOverlay.style.opacity = '0';
+    this.stampOverlay.style.animation = 'none';
+  }
+  
+  // === Rendering ===
+  
+  render(time) {
+    const dt = time - this.lastTime;
+    this.lastTime = time;
+    const dtSeconds = dt / 1000;
+    
+    const { state, ctx, width, height } = this;
+    state.phaseTime += dt;
+    
+    // Clear
+    ctx.clearRect(0, 0, width, height);
+    
+    // Smooth camera
+    const camSmooth = 0.4;
+    let result = this.smoothDamp(state.camera.x, state.camera.targetX, state.camera.velX, camSmooth, dtSeconds);
+    state.camera.x = result.value; state.camera.velX = result.velocity;
+    
+    result = this.smoothDamp(state.camera.y, state.camera.targetY, state.camera.velY, camSmooth, dtSeconds);
+    state.camera.y = result.value; state.camera.velY = result.velocity;
+    
+    result = this.smoothDamp(state.camera.zoom, state.camera.targetZoom, state.camera.velZoom, camSmooth * 1.2, dtSeconds);
+    state.camera.zoom = result.value; state.camera.velZoom = result.velocity;
+    
+    // Apply camera
+    ctx.save();
+    ctx.translate(width / 2, height / 2);
+    ctx.scale(state.camera.zoom, state.camera.zoom);
+    ctx.translate(-state.camera.x, -state.camera.y);
+    ctx.globalAlpha = state.fadeOpacity;
+    
+    // Phase logic
+    this.updatePhase(dt);
+    
+    // Draw connections
+    state.connections.forEach(conn => {
+      if (conn.progress > 0) {
+        const from = state.nodes[conn.from];
+        const to = state.nodes[conn.to];
+        this.drawLine(from, to, conn.progress, false);
+      }
+    });
+    
+    // Draw loops
+    state.loopConnections.forEach(conn => {
+      if (conn.progress > 0) {
+        const from = state.nodes[conn.from];
+        const to = state.nodes[conn.to];
+        this.drawLine(from, to, conn.progress, true);
+      }
+    });
+    
+    // Draw nodes
+    state.nodes.forEach((node, i) => {
+      if (!node.discovered || node.opacity <= 0) return;
+      this.drawNode(node);
+    });
+    
+    ctx.restore();
+    
+    this.animationId = requestAnimationFrame((t) => this.render(t));
+  }
+  
+  updatePhase(dt) {
+    const { state, width, height } = this;
+    const BASE_JOURNEY_TIME = 350;
+    const JOURNEY_VARIANCE = 200;
+    const PAUSE_TIME = 180;
+    
+    switch (state.phase) {
+      case 'JOURNEY': {
+        const conn = state.connections[state.journeyStep];
+        if (!conn) {
+          state.phase = 'REVEAL';
+          state.phaseTime = 0;
+          break;
+        }
+        
+        const variance = Math.sin(state.journeyStep * 7.3 + conn.distance * 0.5) * JOURNEY_VARIANCE;
+        const connTime = BASE_JOURNEY_TIME + conn.distance * 2 + variance;
+        const totalTime = connTime + PAUSE_TIME;
+        
+        if (state.phaseTime < connTime) {
+          const progress = this.easeHandTraced(state.phaseTime / connTime);
+          conn.progress = progress;
+          
+          const from = state.nodes[conn.from];
+          const to = state.nodes[conn.to];
+          state.camera.targetX = this.lerp(from.x, to.x, progress);
+          state.camera.targetY = this.lerp(from.y, to.y, progress);
+          
+          const exploreProgress = state.journeyStep / state.connections.length;
+          state.camera.targetZoom = this.lerp(2.0, 1.3, exploreProgress);
+          
+          if (progress > 0.8 && !state.nodes[conn.to].discovered) {
+            state.nodes[conn.to].discovered = true;
+            state.nodes[conn.to].arrivalPulse = 1;
+            state.discoveredNodes.add(conn.to);
+          }
+        } else {
+          conn.progress = 1;
+          state.nodes[conn.to].opacity = Math.min(1, state.nodes[conn.to].opacity + 0.15);
+          
+          if (state.phaseTime >= totalTime) {
+            state.journeyStep++;
+            state.phaseTime = 0;
+          }
+        }
+        break;
+      }
+      
+      case 'REVEAL': {
+        const revealTime = 800;
+        const progress = Math.min(1, state.phaseTime / revealTime);
+        
+        // Calculate graph center
+        const nodes = state.nodes;
+        const minX = Math.min(...nodes.map(n => n.x));
+        const maxX = Math.max(...nodes.map(n => n.x));
+        const minY = Math.min(...nodes.map(n => n.y));
+        const maxY = Math.max(...nodes.map(n => n.y));
+        
+        state.camera.targetX = (minX + maxX) / 2;
+        state.camera.targetY = (minY + maxY) / 2;
+        state.camera.targetZoom = 1.0;
+        
+        nodes.forEach(n => { if (n.discovered) n.opacity = Math.min(1, n.opacity + 0.1); });
+        
+        if (progress >= 1) {
+          state.phase = 'LOOPING';
+          state.phaseTime = 0;
+        }
+        break;
+      }
+      
+      case 'LOOPING': {
+        const loopTime = 600;
+        const progress = state.phaseTime / loopTime;
+        
+        state.loopConnections.forEach((conn, i) => {
+          conn.progress = Math.max(0, Math.min(1, (progress - i * 0.15) * 2));
+        });
+        
+        if (progress >= 1 + state.loopConnections.length * 0.1) {
+          state.phase = 'STAMPING';
+          state.phaseTime = 0;
+        }
+        break;
+      }
+      
+      case 'STAMPING': {
+        if (state.phaseTime < 20 && state.circledNode !== null) {
+          const node = state.nodes[state.circledNode];
+          if (node) {
+            const screenX = (node.x - state.camera.x) * state.camera.zoom + width / 2;
+            const screenY = (node.y - state.camera.y) * state.camera.zoom + height / 2;
+            this.showStamp(screenX, screenY);
+          }
+        }
+        
+        if (state.phaseTime >= 500) {
+          state.phase = 'HOLDING';
+          state.phaseTime = 0;
+        }
+        break;
+      }
+      
+      case 'HOLDING': {
+        if (state.phaseTime >= 1500) {
+          state.phase = 'FADING';
+          state.phaseTime = 0;
+        }
+        break;
+      }
+      
+      case 'FADING': {
+        if (state.phaseTime < 20) {
+          this.hideStamp();
+        }
+        
+        const fadeTime = 700;
+        const progress = state.phaseTime / fadeTime;
+        state.fadeOpacity = 1 - this.easeInOutCubic(progress);
+        
+        if (progress >= 1) {
+          state.phase = 'WAITING';
+          state.phaseTime = 0;
+        }
+        break;
+      }
+      
+      case 'WAITING': {
+        if (state.phaseTime >= 300) {
+          // Reset
+          const nodeCount = this.settings.size === 'small' ? 5 : 
+                            this.settings.size === 'large' ? 12 : 8;
+          
+          state.phase = 'JOURNEY';
+          state.phaseTime = 0;
+          state.journeyStep = 0;
+          state.fadeOpacity = 1;
+          state.discoveredNodes.clear();
+          
+          this.generateNodes(nodeCount);
+          this.buildMST();
+          this.buildLoops();
+          
+          if (state.nodes.length > 0) {
+            const first = state.nodes[0];
+            state.camera.x = state.camera.targetX = first.x;
+            state.camera.y = state.camera.targetY = first.y;
+            state.camera.zoom = state.camera.targetZoom = 2.2;
+            state.camera.velX = state.camera.velY = state.camera.velZoom = 0;
+          }
+        }
+        break;
+      }
+    }
+  }
+  
+  drawLine(from, to, progress, isLoop) {
+    if (progress <= 0) return;
+    
+    const { ctx, colors, settings } = this;
+    
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const len = Math.sqrt(dx * dx + dy * dy);
+    if (len === 0) return;
+    
+    const nx = dx / len;
+    const ny = dy / len;
+    
+    // Clip to node edges
+    const startPad = from.size + 3;
+    const endPad = to.size + 3;
+    const x1 = from.x + nx * startPad;
+    const y1 = from.y + ny * startPad;
+    const x2 = to.x - nx * endPad;
+    const y2 = to.y - ny * endPad;
+    
+    const clippedLen = len - startPad - endPad;
+    if (clippedLen <= 0) return;
+    
+    const wobbleAmount = settings.corridorStyle === 'organic' ? 3 : 0;
+    
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    
+    const segments = Math.max(5, Math.floor(clippedLen / 8));
+    for (let i = 1; i <= segments; i++) {
+      const t = i / segments;
+      if (t > progress) break;
+      
+      const px = x1 + (x2 - x1) * t;
+      const py = y1 + (y2 - y1) * t;
+      
+      const wobble = Math.sin(t * Math.PI * 4 + len * 0.1) * wobbleAmount * (0.3 + t * 0.7);
+      ctx.lineTo(px - ny * wobble, py + nx * wobble);
+    }
+    
+    ctx.lineWidth = isLoop ? 1.5 : 2.5;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    
+    if (isLoop) {
+      ctx.setLineDash([4, 5]);
+    } else {
+      ctx.setLineDash([]);
+    }
+    
+    const alpha = isLoop ? 0.5 : (0.5 + progress * 0.4);
+    ctx.strokeStyle = colors.lineSolid + Math.floor(alpha * 255).toString(16).padStart(2, '0');
+    ctx.stroke();
+    
+    // Pen head
+    if (progress < 1 && !isLoop) {
+      const headX = x1 + (x2 - x1) * progress;
+      const headY = y1 + (y2 - y1) * progress;
+      
+      ctx.beginPath();
+      ctx.arc(headX, headY, 5, 0, Math.PI * 2);
+      ctx.fillStyle = colors.nodePulse + '33';
+      ctx.fill();
+      
+      ctx.beginPath();
+      ctx.arc(headX, headY, 2.5, 0, Math.PI * 2);
+      ctx.fillStyle = colors.nodePulse + 'aa';
+      ctx.fill();
+    }
+    
+    ctx.setLineDash([]);
+  }
+  
+  drawNode(node) {
+    const { ctx, colors, state } = this;
+    const nodeAlpha = state.fadeOpacity * node.opacity;
+    
+    // Arrival pulse
+    if (node.arrivalPulse > 0) {
+      const pulseRadius = node.size + 10 * node.arrivalPulse;
+      ctx.globalAlpha = nodeAlpha * node.arrivalPulse * 0.5;
+      ctx.beginPath();
+      ctx.arc(node.x, node.y, pulseRadius, 0, Math.PI * 2);
+      ctx.strokeStyle = colors.nodePulse;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      node.arrivalPulse = Math.max(0, node.arrivalPulse - 0.025);
+    }
+    
+    // Shadow
+    ctx.globalAlpha = nodeAlpha * 0.25;
+    const shadowOffset = 2;
+    if (node.shape === 'circle') {
+      ctx.beginPath();
+      ctx.arc(node.x + shadowOffset, node.y + shadowOffset, node.size + 1, 0, Math.PI * 2);
+      ctx.fillStyle = colors.node;
+      ctx.fill();
+    } else {
+      ctx.fillStyle = colors.node;
+      ctx.fillRect(node.x - node.size + shadowOffset, node.y - node.size + shadowOffset, node.size * 2, node.size * 2);
+    }
+    
+    ctx.globalAlpha = nodeAlpha;
+    
+    // Node shape
+    if (node.shape === 'circle') {
+      // Hollow ring
+      ctx.beginPath();
+      ctx.arc(node.x, node.y, node.size, 0, Math.PI * 2);
+      ctx.strokeStyle = colors.node;
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+      
+      // Subtle fill
+      ctx.beginPath();
+      ctx.arc(node.x, node.y, node.size - 1.5, 0, Math.PI * 2);
+      ctx.fillStyle = colors.node + '20';
+      ctx.fill();
+    } else {
+      // Filled square with outline
+      const s = node.size;
+      ctx.fillStyle = colors.node + '40';
+      ctx.fillRect(node.x - s, node.y - s, s * 2, s * 2);
+      
+      ctx.strokeStyle = colors.node;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(node.x - s, node.y - s, s * 2, s * 2);
+    }
+  }
+}
+`;
+```
+
+# settingsPlugin-InsertMapModal
+
+```js
+return `// settingsPlugin-InsertMapModal.js
+// Modal for inserting a new map block into the editor
+// This file is concatenated into the settings plugin template by the assembler
+
+/**
+ * Modal for inserting a new map block into the editor
+ */
+class InsertMapModal extends Modal {
+  constructor(app, onInsert) {
+    super(app);
+    this.onInsert = onInsert;
+    this.mapName = '';
+    this.mapType = null; // 'grid' or 'hex'
+  }
+  
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.addClass('dmt-insert-map-modal');
+    
+    
+    contentEl.createEl('h2', { text: 'Insert New Map' });
+    
+    // Map name input
+    new Setting(contentEl)
+      .setName('Map name')
+      .setDesc('A display name for this map (can be left blank)')
+      .addText(text => {
+        this.nameInput = text;
+        text
+          .setPlaceholder('e.g., Goblin Cave Level 1')
+          .onChange(value => {
+            this.mapName = value;
+          });
+        // Focus the input after modal opens
+        setTimeout(() => text.inputEl.focus(), 10);
+      });
+    
+    // Map type selection
+    const typeContainer = contentEl.createDiv({ cls: 'dmt-map-type-selection' });
+    typeContainer.createEl('div', { text: 'Map type', cls: 'setting-item-name' });
+    typeContainer.createEl('div', { 
+      text: 'Choose the grid style for this map', 
+      cls: 'setting-item-description' 
+    });
+    
+    const buttonRow = typeContainer.createDiv({ cls: 'dmt-map-type-buttons' });
+    
+    const gridBtn = buttonRow.createEl('button', { 
+      text: 'Grid',
+      cls: 'dmt-map-type-btn',
+      attr: { type: 'button' }
+    });
+    
+    const hexBtn = buttonRow.createEl('button', { 
+      text: 'Hex',
+      cls: 'dmt-map-type-btn',
+      attr: { type: 'button' }
+    });
+    
+    gridBtn.onclick = () => {
+      this.mapType = 'grid';
+      gridBtn.addClass('selected');
+      hexBtn.removeClass('selected');
+    };
+    
+    hexBtn.onclick = () => {
+      this.mapType = 'hex';
+      hexBtn.addClass('selected');
+      gridBtn.removeClass('selected');
+    };
+    
+    // Buttons
+    const buttonContainer = contentEl.createDiv({ cls: 'dmt-modal-buttons' });
+    
+    const cancelBtn = buttonContainer.createEl('button', { text: 'Cancel' });
+    cancelBtn.onclick = () => this.close();
+    
+    const insertBtn = buttonContainer.createEl('button', { text: 'Insert', cls: 'mod-cta' });
+    insertBtn.onclick = () => {
+      if (!this.mapType) {
+        // Brief visual feedback that type is required
+        buttonRow.addClass('dmt-shake');
+        setTimeout(() => buttonRow.removeClass('dmt-shake'), 300);
+        return;
+      }
+      this.onInsert(this.mapName, this.mapType);
+      this.close();
+    };
+    
+    // Handle Enter key to submit (if type is selected)
+    contentEl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && this.mapType) {
+        e.preventDefault();
+        this.onInsert(this.mapName, this.mapType);
+        this.close();
+      }
+    });
+  }
+  
+  onClose() {
+    this.contentEl.empty();
+  }
+}
+`;
+```
+
+# settingsPlugin-InsertDungeonModal
+
+```js
+return `// settingsPlugin-InsertDungeonModal.js
+// Modal for generating a random dungeon
+// This file is concatenated into the settings plugin template by the assembler
+
+/**
+ * Modal for generating a random dungeon
+ */
+class InsertDungeonModal extends Modal {
+  constructor(app, plugin, onInsert) {
+    super(app);
+    this.plugin = plugin;
+    this.onInsert = onInsert;
+    this.mapName = '';
+    this.dungeonSize = null; // 'small', 'medium', or 'large'
+    this.distancePerCell = 5;
+    this.distanceUnit = 'ft';
+    this.advancedOpen = false;
+    this.dungeonStyle = 'classic'; // Default style
+    this.visualizer = null; // DungeonEssenceVisualizer instance
+    // Config overrides - null means use preset default
+    this.configOverrides = {
+      circleChance: null,
+      loopChance: null,
+      doorChance: null,
+      secretDoorChance: null,
+      wideCorridorChance: null,
+      roomSizeBias: null,
+      corridorStyle: null,
+      style: null
+    };
+  }
+  
+  // Get effective settings for visualizer (merge style + overrides)
+  getVisualizerSettings() {
+    // Base settings from style
+    const styleSettings = {
+      classic: { circleChance: 0.3, corridorStyle: 'straight', loopChance: 0.15 },
+      cavern: { circleChance: 0.6, corridorStyle: 'organic', loopChance: 0.2 },
+      fortress: { circleChance: 0, corridorStyle: 'straight', loopChance: 0.08 },
+      crypt: { circleChance: 0.1, corridorStyle: 'straight', loopChance: 0.02 }
+    };
+    
+    const base = styleSettings[this.dungeonStyle] || styleSettings.classic;
+    
+    // Apply any explicit overrides
+    const settings = { ...base, size: this.dungeonSize || 'medium' };
+    if (this.configOverrides.circleChance !== null) settings.circleChance = this.configOverrides.circleChance;
+    if (this.configOverrides.loopChance !== null) settings.loopChance = this.configOverrides.loopChance;
+    if (this.configOverrides.corridorStyle !== null) settings.corridorStyle = this.configOverrides.corridorStyle;
+    
+    return settings;
+  }
+  
+  // Update visualizer with current settings
+  updateVisualizer() {
+    if (this.visualizer) {
+      this.visualizer.updateSettings(this.getVisualizerSettings());
+    }
+  }
+  
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.addClass('dmt-insert-dungeon-modal');
+    
+    // === Header with Visualizer ===
+    const headerContainer = contentEl.createDiv({ cls: 'dmt-dungeon-header' });
+    
+    // Visualizer canvas container
+    const visualizerContainer = headerContainer.createDiv({ cls: 'dmt-dungeon-visualizer' });
+    
+    // Title overlay at bottom of visualizer
+    const titleOverlay = headerContainer.createDiv({ cls: 'dmt-dungeon-title-overlay' });
+    titleOverlay.createEl('h2', { text: 'Generate Random Dungeon' });
+    
+    // Initialize visualizer
+    this.visualizer = new DungeonEssenceVisualizer(visualizerContainer, {
+      height: 180,
+      settings: this.getVisualizerSettings()
+    });
+    this.visualizer.start();
+    
+    // Map name input
+    new Setting(contentEl)
+      .setName('Map name')
+      .setDesc('A display name for this dungeon map (can be left blank)')
+      .addText(text => {
+        this.nameInput = text;
+        text
+          .setPlaceholder('e.g., Goblin Cave Level 1')
+          .onChange(value => {
+            this.mapName = value;
+          });
+        // Focus the input after modal opens
+        setTimeout(() => text.inputEl.focus(), 10);
+      });
+    
+    // Dungeon style selection
+    const styleContainer = contentEl.createDiv({ cls: 'dmt-dungeon-style-selection' });
+    styleContainer.createEl('div', { text: 'Style', cls: 'setting-item-name' });
+    styleContainer.createEl('div', { 
+      text: 'Choose the architectural style of the dungeon', 
+      cls: 'setting-item-description' 
+    });
+    
+    const styleRow = styleContainer.createDiv({ cls: 'dmt-dungeon-style-buttons' });
+    
+    const styleInfo = {
+      classic: { label: 'Classic', desc: 'Balanced mix of rooms and corridors' },
+      cavern: { label: 'Cavern', desc: 'Natural caves with organic passages' },
+      fortress: { label: 'Fortress', desc: 'Military structure, wide corridors' },
+      crypt: { label: 'Crypt', desc: 'Tight passages, hidden chambers' }
+    };
+    
+    const styleButtons = {};
+    
+    for (const [style, info] of Object.entries(styleInfo)) {
+      const btn = styleRow.createEl('button', { 
+        cls: 'dmt-dungeon-style-btn',
+        text: info.label,
+        attr: { type: 'button', title: info.desc }
+      });
+      styleButtons[style] = btn;
+      
+      btn.onclick = () => {
+        this.dungeonStyle = style;
+        this.configOverrides.style = style === 'classic' ? null : style;
+        Object.values(styleButtons).forEach(b => b.removeClass('selected'));
+        btn.addClass('selected');
+        this.updateVisualizer();
+      };
+    }
+    
+    // Default to classic selected
+    styleButtons.classic.addClass('selected');
+    
+    // Dungeon size selection
+    const sizeContainer = contentEl.createDiv({ cls: 'dmt-dungeon-size-selection' });
+    sizeContainer.createEl('div', { text: 'Dungeon size', cls: 'setting-item-name' });
+    sizeContainer.createEl('div', { 
+      text: 'Choose the overall size of the generated dungeon', 
+      cls: 'setting-item-description' 
+    });
+    
+    const buttonRow = sizeContainer.createDiv({ cls: 'dmt-dungeon-size-buttons' });
+    
+    const presetInfo = {
+      small: { label: 'Small', desc: '3-5 rooms, tight layout' },
+      medium: { label: 'Medium', desc: '8-12 rooms, multiple paths' },
+      large: { label: 'Large', desc: '10-15 rooms, grand scale' }
+    };
+    
+    const buttons = {};
+    
+    for (const [preset, info] of Object.entries(presetInfo)) {
+      const btn = buttonRow.createEl('button', { 
+        cls: 'dmt-dungeon-size-btn',
+        text: info.label,
+        attr: { type: 'button', title: info.desc }
+      });
+      buttons[preset] = btn;
+      
+      btn.onclick = () => {
+        this.dungeonSize = preset;
+        Object.values(buttons).forEach(b => b.removeClass('selected'));
+        btn.addClass('selected');
+        this.updateVisualizer();
+      };
+    }
+    
+    // Distance measurement settings
+    const distContainer = contentEl.createDiv({ cls: 'dmt-dungeon-size-selection' });
+    distContainer.createEl('div', { text: 'Distance measurement', cls: 'setting-item-name' });
+    distContainer.createEl('div', { 
+      text: 'Set the scale for distance measurement on this map', 
+      cls: 'setting-item-description' 
+    });
+    
+    const distRow = distContainer.createDiv({ cls: 'dmt-dungeon-distance-row' });
+    
+    const distInput = distRow.createEl('input', {
+      type: 'number',
+      value: String(this.distancePerCell),
+      attr: { min: '1', step: '1' }
+    });
+    distInput.addEventListener('change', (e) => {
+      this.distancePerCell = parseInt(e.target.value) || 5;
+    });
+    
+    distRow.createEl('span', { text: 'per cell, unit:' });
+    
+    const unitInput = distRow.createEl('input', {
+      type: 'text',
+      value: this.distanceUnit
+    });
+    unitInput.addEventListener('change', (e) => {
+      this.distanceUnit = e.target.value || 'ft';
+    });
+    
+    // Advanced options (collapsed by default)
+    const advancedContainer = contentEl.createDiv({ cls: 'dmt-dungeon-advanced' });
+    
+    const advancedHeader = advancedContainer.createDiv({ cls: 'dmt-dungeon-advanced-header' });
+    const chevron = advancedHeader.createSpan({ cls: 'dmt-dungeon-advanced-chevron', text: '▶' });
+    advancedHeader.createSpan({ text: 'Advanced Options' });
+    
+    const advancedContent = advancedContainer.createDiv({ cls: 'dmt-dungeon-advanced-content' });
+    advancedContent.style.display = 'none';
+    
+    advancedHeader.onclick = () => {
+      this.advancedOpen = !this.advancedOpen;
+      advancedContent.style.display = this.advancedOpen ? 'block' : 'none';
+      chevron.textContent = this.advancedOpen ? '▼' : '▶';
+    };
+    
+    // Helper to create a slider row
+    const createSlider = (container, label, key, min, max, step, defaultVal, formatFn) => {
+      const row = container.createDiv({ cls: 'dmt-dungeon-slider-row' });
+      row.createEl('label', { text: label });
+      
+      const sliderContainer = row.createDiv({ cls: 'dmt-dungeon-slider-container' });
+      const slider = sliderContainer.createEl('input', {
+        type: 'range',
+        attr: { min: String(min), max: String(max), step: String(step) }
+      });
+      slider.value = String(defaultVal);
+      
+      const valueDisplay = sliderContainer.createSpan({ 
+        cls: 'dmt-dungeon-slider-value',
+        text: formatFn(defaultVal)
+      });
+      
+      slider.addEventListener('input', (e) => {
+        const val = parseFloat(e.target.value);
+        valueDisplay.textContent = formatFn(val);
+        this.configOverrides[key] = val;
+        this.updateVisualizer();
+      });
+      
+      return { slider, valueDisplay };
+    };
+    
+    // Percentage formatter
+    const pct = (v) => \`\${Math.round(v * 100)}%\`;
+    // Bias formatter  
+    const biasLabel = (v) => {
+      if (v < -0.3) return 'Compact';
+      if (v > 0.3) return 'Spacious';
+      return 'Normal';
+    };
+    
+    createSlider(advancedContent, 'Circular Rooms', 'circleChance', 0, 1, 0.05, 0.3, pct);
+    createSlider(advancedContent, 'Extra Connections', 'loopChance', 0, 0.5, 0.05, 0.15, pct);
+    createSlider(advancedContent, 'Door Frequency', 'doorChance', 0, 1, 0.05, 0.7, pct);
+    createSlider(advancedContent, 'Secret Doors', 'secretDoorChance', 0, 1, 0.05, 0.05, pct);
+    createSlider(advancedContent, 'Wide Corridors', 'wideCorridorChance', 0, 1, 0.05, 0.25, pct);
+    createSlider(advancedContent, 'Room Size Bias', 'roomSizeBias', -1, 1, 0.1, 0, biasLabel);
+    
+    // Corridor style toggle
+    const corridorRow = advancedContent.createDiv({ cls: 'dmt-dungeon-slider-row' });
+    corridorRow.createEl('label', { text: 'Corridor Style' });
+    const corridorToggleContainer = corridorRow.createDiv({ cls: 'dmt-dungeon-toggle-container' });
+    
+    const corridorSelect = corridorToggleContainer.createEl('select', { cls: 'dmt-dungeon-select' });
+    corridorSelect.createEl('option', { value: 'straight', text: 'Straight' });
+    corridorSelect.createEl('option', { value: 'organic', text: 'Organic' });
+    corridorSelect.value = 'straight';
+    
+    corridorSelect.addEventListener('change', (e) => {
+      this.configOverrides.corridorStyle = e.target.value;
+      this.updateVisualizer();
+    });
+    
+    // Buttons
+    const buttonContainer = contentEl.createDiv({ cls: 'dmt-modal-buttons' });
+    
+    const cancelBtn = buttonContainer.createEl('button', { text: 'Cancel' });
+    cancelBtn.onclick = () => this.close();
+    
+    const generateBtn = buttonContainer.createEl('button', { text: 'Generate', cls: 'mod-cta' });
+    generateBtn.onclick = async () => {
+      if (!this.dungeonSize) {
+        // Brief visual feedback that size is required
+        buttonRow.addClass('dmt-shake');
+        setTimeout(() => buttonRow.removeClass('dmt-shake'), 300);
+        return;
+      }
+      
+      // Load generator and generate the dungeon
+      try {
+        const generator = await this.plugin.loadDungeonGenerator();
+        
+        // Build config overrides (only include non-null values)
+        const overrides = {};
+        for (const [key, val] of Object.entries(this.configOverrides)) {
+          if (val !== null) overrides[key] = val;
+        }
+        
+        const result = generator.generateDungeon(this.dungeonSize, undefined, overrides);
+      
+      // Wait for the callback (which saves to JSON) before closing
+      await this.onInsert(this.mapName, result.cells, result.objects, {
+          distancePerCell: this.distancePerCell,
+          distanceUnit: this.distanceUnit,
+          preset: this.dungeonSize,
+          configOverrides: overrides,
+          roomCount: result.metadata.roomCount,
+          doorCount: result.metadata.doorCount
+        });
+        this.close();
+      } catch (err) {
+        console.error('[Windrose] Dungeon generation failed:', err);
+        alert('Failed to generate dungeon: ' + err.message);
+      }
+    };
+    
+    // Handle Enter key to submit (if size is selected)
+    contentEl.addEventListener('keydown', async (e) => {
+      if (e.key === 'Enter' && this.dungeonSize) {
+        e.preventDefault();
+        try {
+          const generator = await this.plugin.loadDungeonGenerator();
+          
+          // Build config overrides (only include non-null values)
+          const overrides = {};
+          for (const [key, val] of Object.entries(this.configOverrides)) {
+            if (val !== null) overrides[key] = val;
+          }
+          
+          const result = generator.generateDungeon(this.dungeonSize, undefined, overrides);
+          await this.onInsert(this.mapName, result.cells, result.objects, {
+            distancePerCell: this.distancePerCell,
+            distanceUnit: this.distanceUnit,
+            preset: this.dungeonSize,
+            configOverrides: overrides,
+            roomCount: result.metadata.roomCount,
+            doorCount: result.metadata.doorCount
+          });
+          this.close();
+        } catch (err) {
+          console.error('[Windrose] Dungeon generation failed:', err);
+          alert('Failed to generate dungeon: ' + err.message);
+        }
+      }
+    });
+  }
+  
+  onClose() {
+    if (this.visualizer) {
+      this.visualizer.destroy();
+      this.visualizer = null;
+    }
+    this.contentEl.empty();
+  }
+}`;
+```
+
+# settingsPlugin-ObjectEditModal
+
+```js
+return `// settingsPlugin-ObjectEditModal.js
+// Modal for editing object properties (symbol, label, category)
+// This file is concatenated into the settings plugin template by the assembler
+
+/**
+ * Modal for editing object properties (symbol, label, category)
+ */
+class ObjectEditModal extends Modal {
+  constructor(app, plugin, existingObject, onSave, mapType = 'grid') {
+    super(app);
+    this.plugin = plugin;
+    this.existingObject = existingObject;
+    this.onSave = onSave;
+    this.mapType = mapType;
+    
+    // Form state
+    this.symbol = existingObject?.symbol || '';
+    this.iconClass = existingObject?.iconClass || '';
+    this.label = existingObject?.label || '';
+    this.category = existingObject?.category || 'features';
+    
+    // UI state - determine initial mode based on existing object
+    this.useIcon = !!existingObject?.iconClass;
+    this.iconSearchQuery = '';
+    this.iconCategory = 'all';
+  }
+  
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.addClass('dmt-object-edit-modal');
+    
+    const isEditing = !!this.existingObject;
+    
+    contentEl.createEl('h2', { text: isEditing ? 'Edit Object' : 'Create Custom Object' });
+    
+    // Icon type toggle
+    const toggleContainer = contentEl.createDiv({ cls: 'dmt-icon-type-toggle' });
+    
+    const unicodeBtn = toggleContainer.createEl('button', { 
+      text: 'Unicode Symbol',
+      cls: 'dmt-icon-type-btn' + (this.useIcon ? '' : ' active'),
+      attr: { type: 'button' }
+    });
+    
+    const iconBtn = toggleContainer.createEl('button', { 
+      text: 'RPGAwesome Icon',
+      cls: 'dmt-icon-type-btn' + (this.useIcon ? ' active' : ''),
+      attr: { type: 'button' }
+    });
+    
+    // Container for symbol input (shown when useIcon is false)
+    this.symbolContainer = contentEl.createDiv({ cls: 'dmt-symbol-container' });
+    
+    // Container for icon picker (shown when useIcon is true)
+    this.iconPickerContainer = contentEl.createDiv({ cls: 'dmt-icon-picker-container' });
+    
+    // Toggle handlers
+    unicodeBtn.onclick = () => {
+      if (!this.useIcon) return;
+      this.useIcon = false;
+      unicodeBtn.addClass('active');
+      iconBtn.removeClass('active');
+      this.renderSymbolInput();
+      this.renderIconPicker();
+    };
+    
+    iconBtn.onclick = () => {
+      if (this.useIcon) return;
+      this.useIcon = true;
+      iconBtn.addClass('active');
+      unicodeBtn.removeClass('active');
+      this.renderSymbolInput();
+      this.renderIconPicker();
+    };
+    
+    // Initial render of symbol/icon sections
+    this.renderSymbolInput();
+    this.renderIconPicker();
+    
+    // Label input
+    new Setting(contentEl)
+      .setName('Label')
+      .setDesc('Display name for this object')
+      .addText(text => text
+        .setValue(this.label)
+        .setPlaceholder('e.g., Treasure Chest')
+        .onChange(value => {
+          this.label = value;
+        }));
+    
+    // Category dropdown
+    const allCategories = ObjectHelpers.getAllCategories(this.plugin.settings);
+    new Setting(contentEl)
+      .setName('Category')
+      .setDesc('Group this object belongs to')
+      .addDropdown(dropdown => {
+        for (const cat of allCategories) {
+          dropdown.addOption(cat.id, cat.label);
+        }
+        dropdown.setValue(this.category);
+        dropdown.onChange(value => {
+          this.category = value;
+        });
+      });
+    
+    // Buttons
+    const buttonContainer = contentEl.createDiv({ cls: 'dmt-modal-buttons' });
+    
+    const cancelBtn = buttonContainer.createEl('button', { text: 'Cancel' });
+    cancelBtn.onclick = () => this.close();
+    
+    const saveBtn = buttonContainer.createEl('button', { text: 'Save', cls: 'mod-cta' });
+    saveBtn.onclick = () => this.save();
+  }
+  
+  renderSymbolInput() {
+    const container = this.symbolContainer;
+    container.empty();
+    
+    if (this.useIcon) {
+      container.style.display = 'none';
+      return;
+    }
+    container.style.display = 'block';
+    
+    // Symbol input with preview
+    const symbolSetting = new Setting(container)
+      .setName('Symbol')
+      .setDesc('Paste any Unicode character or emoji');
+    
+    const symbolInput = symbolSetting.controlEl.createEl('input', {
+      type: 'text',
+      cls: 'dmt-symbol-input',
+      value: this.symbol,
+      attr: { placeholder: 'Paste symbol...' }
+    });
+    symbolInput.addEventListener('input', (e) => {
+      this.symbol = e.target.value.trim();
+      this.updateSymbolPreview();
+    });
+    
+    // Focus the symbol input after a short delay
+    setTimeout(() => symbolInput.focus(), 50);
+    
+    // Symbol preview
+    const previewEl = symbolSetting.controlEl.createDiv({ cls: 'dmt-symbol-preview' });
+    previewEl.textContent = this.symbol || '?';
+    this.symbolPreviewEl = previewEl;
+    this.symbolInputEl = symbolInput;
+    
+    // Quick symbols
+    const quickSymbolsContainer = container.createDiv({ cls: 'dmt-quick-symbols' });
+    quickSymbolsContainer.createEl('label', { text: 'Quick Symbols', cls: 'dmt-quick-symbols-label' });
+    const symbolGrid = quickSymbolsContainer.createDiv({ cls: 'dmt-quick-symbols-grid' });
+    
+    for (const sym of QUICK_SYMBOLS) {
+      const symBtn = symbolGrid.createEl('button', { 
+        text: sym, 
+        cls: 'dmt-quick-symbol-btn',
+        attr: { type: 'button' }
+      });
+      symBtn.onclick = () => {
+        this.symbol = sym;
+        symbolInput.value = sym;
+        this.updateSymbolPreview();
+      };
+    }
+  }
+  
+  renderIconPicker() {
+    const container = this.iconPickerContainer;
+    container.empty();
+    
+    if (!this.useIcon) {
+      container.style.display = 'none';
+      return;
+    }
+    container.style.display = 'block';
+    
+    const picker = container.createDiv({ cls: 'dmt-icon-picker' });
+    
+    // Search input
+    const searchContainer = picker.createDiv({ cls: 'dmt-icon-picker-search' });
+    const searchInput = searchContainer.createEl('input', {
+      type: 'text',
+      value: this.iconSearchQuery,
+      attr: { placeholder: 'Search icons...' }
+    });
+    searchInput.addEventListener('input', (e) => {
+      this.iconSearchQuery = e.target.value;
+      this.renderIconGrid();
+    });
+    
+    // Category tabs
+    const tabsContainer = picker.createDiv({ cls: 'dmt-icon-picker-tabs' });
+    
+    // "All" tab
+    const allTab = tabsContainer.createEl('button', {
+      text: 'All',
+      cls: 'dmt-icon-picker-tab' + (this.iconCategory === 'all' ? ' active' : ''),
+      attr: { type: 'button' }
+    });
+    allTab.onclick = () => {
+      this.iconCategory = 'all';
+      this.renderIconTabs(tabsContainer);
+      this.renderIconGrid();
+    };
+    
+    // Category tabs
+    const categories = RPGAwesomeHelpers.getCategories();
+    for (const cat of categories) {
+      const tab = tabsContainer.createEl('button', {
+        text: cat.label,
+        cls: 'dmt-icon-picker-tab' + (this.iconCategory === cat.id ? ' active' : ''),
+        attr: { type: 'button', 'data-category': cat.id }
+      });
+      tab.onclick = () => {
+        this.iconCategory = cat.id;
+        this.renderIconTabs(tabsContainer);
+        this.renderIconGrid();
+      };
+    }
+    this.tabsContainer = tabsContainer;
+    
+    // Icon grid
+    this.iconGridContainer = picker.createDiv({ cls: 'dmt-icon-picker-grid' });
+    this.renderIconGrid();
+    
+    // Selected icon preview
+    this.iconPreviewContainer = picker.createDiv({ cls: 'dmt-icon-preview-row' });
+    this.updateIconPreview();
+  }
+  
+  renderIconTabs(container) {
+    // Update active state on all tabs
+    const tabs = container.querySelectorAll('.dmt-icon-picker-tab');
+    tabs.forEach(tab => {
+      const catId = tab.getAttribute('data-category') || 'all';
+      if (catId === this.iconCategory) {
+        tab.addClass('active');
+      } else {
+        tab.removeClass('active');
+      }
+    });
+  }
+  
+  renderIconGrid() {
+    const container = this.iconGridContainer;
+    if (!container) return;
+    container.empty();
+    
+    // Get icons based on search or category
+    let icons;
+    if (this.iconSearchQuery.trim()) {
+      icons = RPGAwesomeHelpers.search(this.iconSearchQuery);
+    } else {
+      icons = RPGAwesomeHelpers.getByCategory(this.iconCategory);
+    }
+    
+    if (icons.length === 0) {
+      container.createDiv({ cls: 'dmt-icon-picker-empty', text: 'No icons found' });
+      return;
+    }
+    
+    // Render icon buttons
+    for (const icon of icons) {
+      const iconBtn = container.createEl('button', {
+        cls: 'dmt-icon-picker-icon' + (this.iconClass === icon.iconClass ? ' selected' : ''),
+        attr: { 
+          type: 'button',
+          title: icon.label
+        }
+      });
+      
+      // Create the icon span with the character
+      const iconSpan = iconBtn.createEl('span', { cls: 'ra' });
+      iconSpan.textContent = icon.char;
+      
+      iconBtn.onclick = () => {
+        this.iconClass = icon.iconClass;
+        // Update selection state
+        container.querySelectorAll('.dmt-icon-picker-icon').forEach(btn => btn.removeClass('selected'));
+        iconBtn.addClass('selected');
+        this.updateIconPreview();
+      };
+    }
+  }
+  
+  updateSymbolPreview() {
+    if (this.symbolPreviewEl) {
+      this.symbolPreviewEl.textContent = this.symbol || '?';
+    }
+  }
+  
+  updateIconPreview() {
+    const container = this.iconPreviewContainer;
+    if (!container) return;
+    container.empty();
+    
+    if (!this.iconClass) {
+      container.createDiv({ cls: 'dmt-icon-preview-info', text: 'Select an icon above' });
+      return;
+    }
+    
+    const iconInfo = RPGAwesomeHelpers.getInfo(this.iconClass);
+    if (!iconInfo) {
+      container.createDiv({ cls: 'dmt-icon-preview-info', text: 'Invalid icon selected' });
+      return;
+    }
+    
+    // Large preview
+    const previewBox = container.createDiv({ cls: 'dmt-icon-preview-large' });
+    const iconSpan = previewBox.createEl('span', { cls: 'ra' });
+    iconSpan.textContent = iconInfo.char;
+    
+    // Info
+    const infoBox = container.createDiv({ cls: 'dmt-icon-preview-info' });
+    infoBox.createDiv({ cls: 'dmt-icon-preview-label', text: iconInfo.label });
+    infoBox.createDiv({ cls: 'dmt-icon-preview-class', text: this.iconClass });
+  }
+  
+  save() {
+    // Validate based on mode
+    if (this.useIcon) {
+      if (!this.iconClass || !RPGAwesomeHelpers.isValid(this.iconClass)) {
+        alert('Please select a valid icon');
+        return;
+      }
+    } else {
+      if (!this.symbol || this.symbol.length === 0 || this.symbol.length > 8) {
+        alert('Please enter a valid symbol (1-8 characters)');
+        return;
+      }
+    }
+    
+    if (!this.label || this.label.trim().length === 0) {
+      alert('Please enter a label');
+      return;
+    }
+    
+    // Get the correct settings keys for this map type
+    const overridesKey = this.mapType === 'hex' ? 'hexObjectOverrides' : 'gridObjectOverrides';
+    const customObjectsKey = this.mapType === 'hex' ? 'customHexObjects' : 'customGridObjects';
+    
+    if (this.existingObject?.isBuiltIn) {
+      // Modifying a built-in: save as override
+      if (!this.plugin.settings[overridesKey]) {
+        this.plugin.settings[overridesKey] = {};
+      }
+      
+      const original = BUILT_IN_OBJECTS.find(o => o.id === this.existingObject.id);
+      const override = {};
+      
+      // Handle symbol/iconClass based on mode
+      if (this.useIcon) {
+        if (this.iconClass !== original.iconClass) override.iconClass = this.iconClass;
+        // Clear symbol override if switching to icon
+        if (original.symbol && !this.iconClass) override.symbol = null;
+      } else {
+        if (this.symbol !== original.symbol) override.symbol = this.symbol;
+        // Clear iconClass override if switching to symbol
+        if (original.iconClass) override.iconClass = null;
+      }
+      
+      if (this.label !== original.label) override.label = this.label;
+      if (this.category !== original.category) override.category = this.category;
+      
+      // Preserve hidden state if it exists
+      if (this.plugin.settings[overridesKey][this.existingObject.id]?.hidden) {
+        override.hidden = true;
+      }
+      
+      // Preserve order if it exists
+      if (this.plugin.settings[overridesKey][this.existingObject.id]?.order !== undefined) {
+        override.order = this.plugin.settings[overridesKey][this.existingObject.id].order;
+      }
+      
+      if (Object.keys(override).length > 0) {
+        this.plugin.settings[overridesKey][this.existingObject.id] = override;
+      } else {
+        delete this.plugin.settings[overridesKey][this.existingObject.id];
+      }
+    } else if (this.existingObject?.isCustom) {
+      // Editing existing custom object
+      if (!this.plugin.settings[customObjectsKey]) {
+        this.plugin.settings[customObjectsKey] = [];
+      }
+      const idx = this.plugin.settings[customObjectsKey].findIndex(o => o.id === this.existingObject.id);
+      if (idx !== -1) {
+        const updated = {
+          ...this.plugin.settings[customObjectsKey][idx],
+          label: this.label.trim(),
+          category: this.category
+        };
+        
+        // Set symbol or iconClass based on mode
+        if (this.useIcon) {
+          updated.iconClass = this.iconClass;
+          delete updated.symbol;
+        } else {
+          updated.symbol = this.symbol;
+          delete updated.iconClass;
+        }
+        
+        this.plugin.settings[customObjectsKey][idx] = updated;
+      }
+    } else {
+      // Creating new custom object
+      if (!this.plugin.settings[customObjectsKey]) {
+        this.plugin.settings[customObjectsKey] = [];
+      }
+      
+      const newObject = {
+        id: 'custom-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9),
+        label: this.label.trim(),
+        category: this.category
+      };
+      
+      // Set symbol or iconClass based on mode
+      if (this.useIcon) {
+        newObject.iconClass = this.iconClass;
+      } else {
+        newObject.symbol = this.symbol;
+      }
+      
+      this.plugin.settings[customObjectsKey].push(newObject);
+    }
+    
+    this.onSave();
+    this.close();
+  }
+  
+  onClose() {
+    this.contentEl.empty();
+  }
+}
+`;
+```
+
+# settingsPlugin-CategoryEditModal
+
+```js
+return `// settingsPlugin-CategoryEditModal.js
+// Modal for editing category properties
+// This file is concatenated into the settings plugin template by the assembler
+
+/**
+ * Modal for editing category properties
+ */
+class CategoryEditModal extends Modal {
+  constructor(app, plugin, existingCategory, onSave, mapType = 'grid') {
+    super(app);
+    this.plugin = plugin;
+    this.existingCategory = existingCategory;
+    this.onSave = onSave;
+    this.mapType = mapType;
+    
+    this.label = existingCategory?.label || '';
+    this.order = existingCategory?.order ?? 100;
+  }
+  
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.addClass('dmt-category-edit-modal');
+    
+    const isEditing = !!this.existingCategory;
+    
+    contentEl.createEl('h2', { text: isEditing ? 'Edit Category' : 'Create Custom Category' });
+    
+    let nameInputEl = null;
+    new Setting(contentEl)
+      .setName('Name')
+      .setDesc('Display name for this category')
+      .addText(text => {
+        nameInputEl = text.inputEl;
+        text.setValue(this.label)
+          .setPlaceholder('e.g., Alchemy')
+          .onChange(value => {
+            this.label = value;
+          });
+      });
+    
+    // Focus the name input after a short delay
+    if (nameInputEl) {
+      setTimeout(() => nameInputEl.focus(), 50);
+    }
+    
+    new Setting(contentEl)
+      .setName('Sort Order')
+      .setDesc('Lower numbers appear first (built-ins use 0-50)')
+      .addText(text => text
+        .setValue(String(this.order))
+        .setPlaceholder('100')
+        .onChange(value => {
+          const num = parseInt(value, 10);
+          if (!isNaN(num)) {
+            this.order = num;
+          }
+        }));
+    
+    const buttonContainer = contentEl.createDiv({ cls: 'dmt-modal-buttons' });
+    
+    const cancelBtn = buttonContainer.createEl('button', { text: 'Cancel' });
+    cancelBtn.onclick = () => this.close();
+    
+    const saveBtn = buttonContainer.createEl('button', { text: 'Save', cls: 'mod-cta' });
+    saveBtn.onclick = () => this.save();
+  }
+  
+  save() {
+    if (!this.label || this.label.trim().length === 0) {
+      alert('Please enter a category name');
+      return;
+    }
+    
+    // Get the correct settings key for this map type
+    const categoriesKey = this.mapType === 'hex' ? 'customHexCategories' : 'customGridCategories';
+    
+    if (!this.plugin.settings[categoriesKey]) {
+      this.plugin.settings[categoriesKey] = [];
+    }
+    
+    if (this.existingCategory) {
+      const idx = this.plugin.settings[categoriesKey].findIndex(c => c.id === this.existingCategory.id);
+      if (idx !== -1) {
+        this.plugin.settings[categoriesKey][idx] = {
+          ...this.plugin.settings[categoriesKey][idx],
+          label: this.label.trim(),
+          order: this.order
+        };
+      }
+    } else {
+      const newCategory = {
+        id: 'custom-cat-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9),
+        label: this.label.trim(),
+        order: this.order
+      };
+      
+      this.plugin.settings[categoriesKey].push(newCategory);
+    }
+    
+    this.onSave();
+    this.close();
+  }
+  
+  onClose() {
+    this.contentEl.empty();
+  }
+}
+`;
+```
+
+# settingsPlugin-ColorEditModal
+
+```js
+return `// settingsPlugin-ColorEditModal.js
+// Modal for editing color palette entries
+// This file is concatenated into the settings plugin template by the assembler
+
+/**
+ * Modal for editing color palette entries
+ */
+class ColorEditModal extends Modal {
+  constructor(app, plugin, existingColor, onSave) {
+    super(app);
+    this.plugin = plugin;
+    this.existingColor = existingColor;
+    this.onSave = onSave;
+    this.isBuiltIn = existingColor?.isBuiltIn || false;
+  }
+  
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.addClass('dmt-color-edit-modal');
+    
+    const isEdit = !!this.existingColor;
+    const isBuiltIn = this.isBuiltIn;
+    
+    contentEl.createEl('h2', { 
+      text: isEdit 
+        ? (isBuiltIn ? \`Edit: \${this.existingColor.label}\` : 'Edit Custom Color')
+        : 'Add Custom Color' 
+    });
+    
+    // Get original built-in values if editing a built-in
+    const originalBuiltIn = isBuiltIn 
+      ? BUILT_IN_COLORS.find(c => c.id === this.existingColor.id)
+      : null;
+    
+    // Initialize form values
+    let colorValue = this.existingColor?.color || '#808080';
+    let labelValue = this.existingColor?.label || '';
+    let opacityValue = this.existingColor?.opacity ?? 1;
+    
+    // Color picker
+    new Setting(contentEl)
+      .setName('Color')
+      .setDesc('Choose the color value')
+      .addColorPicker(picker => picker
+        .setValue(colorValue)
+        .onChange(value => {
+          colorValue = value;
+          hexInput.value = value;
+        }))
+      .addText(text => {
+        text.inputEl.addClass('dmt-color-hex-input');
+        text.setPlaceholder('#RRGGBB')
+          .setValue(colorValue)
+          .onChange(value => {
+            if (/^#[0-9A-Fa-f]{6}$/.test(value)) {
+              colorValue = value;
+            }
+          });
+        // Store reference for color picker sync
+        var hexInput = text.inputEl;
+      });
+    
+    // Label input
+    new Setting(contentEl)
+      .setName('Label')
+      .setDesc('Display name for this color')
+      .addText(text => text
+        .setPlaceholder('e.g., Ocean Blue')
+        .setValue(labelValue)
+        .onChange(value => {
+          labelValue = value;
+        }));
+    
+    // Opacity slider
+    const opacitySetting = new Setting(contentEl)
+      .setName('Opacity')
+      .setDesc('Default opacity when selecting this color');
+    
+    const opacityContainer = opacitySetting.controlEl.createEl('div', { cls: 'dmt-opacity-control' });
+    const opacitySlider = opacityContainer.createEl('input', {
+      type: 'range',
+      attr: { min: '10', max: '100', value: String(Math.round(opacityValue * 100)) }
+    });
+    const opacityDisplay = opacityContainer.createEl('span', { 
+      text: \`\${Math.round(opacityValue * 100)}%\`,
+      cls: 'dmt-opacity-value'
+    });
+    
+    opacitySlider.addEventListener('input', (e) => {
+      opacityValue = parseInt(e.target.value, 10) / 100;
+      opacityDisplay.textContent = \`\${Math.round(opacityValue * 100)}%\`;
+    });
+    
+    // Show original values for built-ins
+    if (isBuiltIn && originalBuiltIn) {
+      const origInfo = contentEl.createEl('div', { cls: 'dmt-color-original-info' });
+      origInfo.createEl('span', { text: 'Original: ' });
+      const origSwatch = origInfo.createEl('span', { 
+        cls: 'dmt-color-mini-swatch',
+        attr: { style: \`background-color: \${originalBuiltIn.color}\` }
+      });
+      origInfo.createEl('span', { text: \` \${originalBuiltIn.label} (\${originalBuiltIn.color})\` });
+    }
+    
+    // Action buttons
+    const btnContainer = contentEl.createEl('div', { cls: 'dmt-modal-buttons' });
+    
+    const saveBtn = btnContainer.createEl('button', { 
+      text: 'Save', 
+      cls: 'mod-cta' 
+    });
+    saveBtn.addEventListener('click', async () => {
+      // Validate
+      if (!labelValue.trim()) {
+        alert('Please enter a label for this color.');
+        return;
+      }
+      if (!/^#[0-9A-Fa-f]{6}$/.test(colorValue)) {
+        alert('Please enter a valid hex color (e.g., #4A9EFF)');
+        return;
+      }
+      
+      if (isBuiltIn) {
+        // Save as override
+        if (!this.plugin.settings.colorPaletteOverrides) {
+          this.plugin.settings.colorPaletteOverrides = {};
+        }
+        const existingOverride = this.plugin.settings.colorPaletteOverrides[this.existingColor.id] || {};
+        this.plugin.settings.colorPaletteOverrides[this.existingColor.id] = {
+          ...existingOverride,
+          color: colorValue,
+          label: labelValue,
+          opacity: opacityValue
+        };
+      } else if (isEdit) {
+        // Update existing custom color
+        const idx = this.plugin.settings.customPaletteColors.findIndex(c => c.id === this.existingColor.id);
+        if (idx !== -1) {
+          this.plugin.settings.customPaletteColors[idx] = {
+            ...this.plugin.settings.customPaletteColors[idx],
+            color: colorValue,
+            label: labelValue,
+            opacity: opacityValue
+          };
+        }
+      } else {
+        // Add new custom color
+        if (!this.plugin.settings.customPaletteColors) {
+          this.plugin.settings.customPaletteColors = [];
+        }
+        this.plugin.settings.customPaletteColors.push({
+          id: 'custom-' + Date.now(),
+          color: colorValue,
+          label: labelValue,
+          opacity: opacityValue
+        });
+      }
+      
+      this.onSave();
+      this.close();
+    });
+    
+    const cancelBtn = btnContainer.createEl('button', { text: 'Cancel' });
+    cancelBtn.addEventListener('click', () => this.close());
+  }
+  
+  onClose() {
+    this.contentEl.empty();
+  }
+}
+`;
+```
+
+# settingsPlugin-ExportModal
+
+```js
+return `// settingsPlugin-ExportModal.js
+// Modal for exporting object customizations
+// This file is concatenated into the settings plugin template by the assembler
+
+/**
+ * Modal for exporting object customizations
+ */
+class ExportModal extends Modal {
+  constructor(app, plugin, mapType = 'grid') {
+    super(app);
+    this.plugin = plugin;
+    this.mapType = mapType;
+  }
+  
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.addClass('dmt-export-modal');
+    
+    const mapTypeLabel = this.mapType === 'hex' ? 'Hex' : 'Grid';
+    contentEl.createEl('h2', { text: \`Export \${mapTypeLabel} Object Customizations\` });
+    
+    // Get the correct settings keys for this map type
+    const overridesKey = this.mapType === 'hex' ? 'hexObjectOverrides' : 'gridObjectOverrides';
+    const customObjectsKey = this.mapType === 'hex' ? 'customHexObjects' : 'customGridObjects';
+    const categoriesKey = this.mapType === 'hex' ? 'customHexCategories' : 'customGridCategories';
+    
+    const objectOverrides = this.plugin.settings[overridesKey] || {};
+    const customObjects = this.plugin.settings[customObjectsKey] || [];
+    const customCategories = this.plugin.settings[categoriesKey] || [];
+    
+    const hasOverrides = Object.keys(objectOverrides).length > 0;
+    const hasCustom = customObjects.length > 0 || customCategories.length > 0;
+    
+    // Selection checkboxes
+    let exportOverrides = hasOverrides;
+    let exportCustom = hasCustom;
+    
+    // Explain what will be exported
+    if (hasOverrides || hasCustom) {
+      contentEl.createEl('p', { 
+        text: 'Select what to include in the export file:',
+        cls: 'setting-item-description'
+      });
+    }
+    
+    if (hasOverrides) {
+      new Setting(contentEl)
+        .setName(\`Built-in modifications (\${Object.keys(objectOverrides).length})\`)
+        .setDesc('Changes to symbol, label, or order of built-in objects')
+        .addToggle(toggle => toggle
+          .setValue(exportOverrides)
+          .onChange(v => { exportOverrides = v; }));
+    }
+    
+    if (hasCustom) {
+      const customCount = customObjects.length + customCategories.length;
+      new Setting(contentEl)
+        .setName(\`Custom objects & categories (\${customCount})\`)
+        .setDesc(\`\${customObjects.length} object(s), \${customCategories.length} category(ies)\`)
+        .addToggle(toggle => toggle
+          .setValue(exportCustom)
+          .onChange(v => { exportCustom = v; }));
+    }
+    
+    if (!hasOverrides && !hasCustom) {
+      contentEl.createEl('p', { 
+        text: \`No customizations to export for \${mapTypeLabel} maps. Modify built-in objects or create custom ones first.\`,
+        cls: 'dmt-export-empty'
+      });
+      return;
+    }
+    
+    // Filename input
+    const defaultFilename = \`windrose-\${this.mapType}-objects-\${new Date().toISOString().split('T')[0]}.json\`;
+    let filename = defaultFilename;
+    
+    new Setting(contentEl)
+      .setName('Filename')
+      .setDesc('Will be saved to your vault root')
+      .addText(text => text
+        .setValue(filename)
+        .onChange(v => { filename = v; }));
+    
+    // Export button
+    new Setting(contentEl)
+      .addButton(btn => btn
+        .setButtonText('Export to Vault')
+        .setCta()
+        .onClick(async () => {
+          const exportData = {
+            windroseMD_objectExport: true,
+            exportedAt: new Date().toISOString(),
+            version: '1.0',
+            mapType: this.mapType
+          };
+          
+          if (exportOverrides && hasOverrides) {
+            exportData.objectOverrides = objectOverrides;
+          }
+          if (exportCustom && hasCustom) {
+            if (customObjects.length > 0) exportData.customObjects = customObjects;
+            if (customCategories.length > 0) exportData.customCategories = customCategories;
+          }
+          
+          // Save to vault
+          const json = JSON.stringify(exportData, null, 2);
+          const finalFilename = filename.endsWith('.json') ? filename : filename + '.json';
+          
+          try {
+            // Check if file exists
+            const existingFile = this.app.vault.getAbstractFileByPath(finalFilename);
+            if (existingFile) {
+              if (!confirm(\`File "\${finalFilename}" already exists. Overwrite?\`)) {
+                return;
+              }
+              await this.app.vault.modify(existingFile, json);
+            } else {
+              await this.app.vault.create(finalFilename, json);
+            }
+            
+            alert(\`Exported to: \${finalFilename}\`);
+            this.close();
+          } catch (err) {
+            alert(\`Export failed: \${err.message}\`);
+          }
+        }));
+  }
+  
+  onClose() {
+    this.contentEl.empty();
+  }
+}
+`;
+```
+
+# settingsPlugin-ImportModal
+
+```js
+return `// settingsPlugin-ImportModal.js
+// Modal for importing object customizations
+// This file is concatenated into the settings plugin template by the assembler
+
+/**
+ * Modal for importing object customizations
+ */
+class ImportModal extends Modal {
+  constructor(app, plugin, onImport, mapType = 'grid') {
+    super(app);
+    this.plugin = plugin;
+    this.onImport = onImport;
+    this.mapType = mapType;
+    this.importData = null;
+  }
+  
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.addClass('dmt-import-modal');
+    
+    const mapTypeLabel = this.mapType === 'hex' ? 'Hex' : 'Grid';
+    contentEl.createEl('h2', { text: \`Import \${mapTypeLabel} Object Customizations\` });
+    
+    contentEl.createEl('p', { 
+      text: \`Select a Windrose MD object export file (.json) to import into \${mapTypeLabel} maps.\`,
+      cls: 'setting-item-description'
+    });
+    
+    // File picker
+    const fileContainer = contentEl.createDiv({ cls: 'dmt-import-file-container' });
+    const fileInput = fileContainer.createEl('input', {
+      type: 'file',
+      attr: { accept: '.json' }
+    });
+    
+    // Preview area (hidden until file selected)
+    const previewArea = contentEl.createDiv({ cls: 'dmt-import-preview' });
+    previewArea.style.display = 'none';
+    
+    // Import options (hidden until file validated)
+    const optionsArea = contentEl.createDiv({ cls: 'dmt-import-options' });
+    optionsArea.style.display = 'none';
+    
+    let mergeMode = 'merge'; // 'merge' or 'replace'
+    
+    fileInput.addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      
+      try {
+        const text = await file.text();
+        const data = JSON.parse(text);
+        
+        // Validate it's a Windrose export
+        if (!data.windroseMD_objectExport) {
+          previewArea.empty();
+          previewArea.createEl('p', { 
+            text: 'This file is not a valid Windrose MD object export.',
+            cls: 'dmt-import-error'
+          });
+          previewArea.style.display = 'block';
+          optionsArea.style.display = 'none';
+          this.importData = null;
+          return;
+        }
+        
+        this.importData = data;
+        
+        // Show preview
+        previewArea.empty();
+        previewArea.createEl('p', { text: 'Valid Windrose MD export file' });
+        if (data.exportedAt) {
+          previewArea.createEl('p', { 
+            text: \`Exported: \${new Date(data.exportedAt).toLocaleString()}\`,
+            cls: 'dmt-import-date'
+          });
+        }
+        
+        // Show original map type if present
+        if (data.mapType) {
+          const sourceType = data.mapType === 'hex' ? 'Hex' : 'Grid';
+          if (data.mapType !== this.mapType) {
+            previewArea.createEl('p', { 
+              text: \`Note: This was exported from \${sourceType} maps but will be imported to \${mapTypeLabel} maps.\`,
+              cls: 'dmt-import-note'
+            });
+          }
+        }
+        
+        const overrideCount = data.objectOverrides ? Object.keys(data.objectOverrides).length : 0;
+        const customObjCount = data.customObjects?.length || 0;
+        const customCatCount = data.customCategories?.length || 0;
+        
+        if (overrideCount > 0) {
+          previewArea.createEl('p', { text: \`Ã¢â‚¬Â¢ \${overrideCount} built-in modification(s)\` });
+        }
+        if (customObjCount > 0) {
+          previewArea.createEl('p', { text: \`Ã¢â‚¬Â¢ \${customObjCount} custom object(s)\` });
+        }
+        if (customCatCount > 0) {
+          previewArea.createEl('p', { text: \`Ã¢â‚¬Â¢ \${customCatCount} custom category(ies)\` });
+        }
+        
+        previewArea.style.display = 'block';
+        
+        // Show import options
+        optionsArea.empty();
+        new Setting(optionsArea)
+          .setName('Import Mode')
+          .setDesc('How to handle existing customizations')
+          .addDropdown(dropdown => dropdown
+            .addOption('merge', 'Merge (keep existing, add new)')
+            .addOption('replace', 'Replace (remove existing first)')
+            .setValue(mergeMode)
+            .onChange(v => { mergeMode = v; }));
+        
+        optionsArea.style.display = 'block';
+        
+      } catch (err) {
+        previewArea.empty();
+        previewArea.createEl('p', { 
+          text: \`Error reading file: \${err.message}\`,
+          cls: 'dmt-import-error'
+        });
+        previewArea.style.display = 'block';
+        optionsArea.style.display = 'none';
+        this.importData = null;
+      }
+    });
+    
+    // Buttons
+    const buttonContainer = contentEl.createDiv({ cls: 'dmt-modal-buttons' });
+    
+    const cancelBtn = buttonContainer.createEl('button', { text: 'Cancel' });
+    cancelBtn.onclick = () => this.close();
+    
+    const importBtn = buttonContainer.createEl('button', { text: 'Import', cls: 'mod-cta' });
+    importBtn.onclick = async () => {
+      if (!this.importData) {
+        alert('Please select a valid export file first.');
+        return;
+      }
+      
+      // Get the correct settings keys for this map type
+      const overridesKey = this.mapType === 'hex' ? 'hexObjectOverrides' : 'gridObjectOverrides';
+      const customObjectsKey = this.mapType === 'hex' ? 'customHexObjects' : 'customGridObjects';
+      const categoriesKey = this.mapType === 'hex' ? 'customHexCategories' : 'customGridCategories';
+      
+      const data = this.importData;
+      
+      if (mergeMode === 'replace') {
+        // Clear existing for this map type
+        this.plugin.settings[overridesKey] = {};
+        this.plugin.settings[customObjectsKey] = [];
+        this.plugin.settings[categoriesKey] = [];
+      }
+      
+      // Import overrides
+      if (data.objectOverrides) {
+        if (!this.plugin.settings[overridesKey]) {
+          this.plugin.settings[overridesKey] = {};
+        }
+        Object.assign(this.plugin.settings[overridesKey], data.objectOverrides);
+      }
+      
+      // Import custom objects (avoid duplicates by ID)
+      if (data.customObjects) {
+        if (!this.plugin.settings[customObjectsKey]) {
+          this.plugin.settings[customObjectsKey] = [];
+        }
+        for (const obj of data.customObjects) {
+          const existingIdx = this.plugin.settings[customObjectsKey].findIndex(o => o.id === obj.id);
+          if (existingIdx !== -1) {
+            this.plugin.settings[customObjectsKey][existingIdx] = obj;
+          } else {
+            this.plugin.settings[customObjectsKey].push(obj);
+          }
+        }
+      }
+      
+      // Import custom categories (avoid duplicates by ID)
+      if (data.customCategories) {
+        if (!this.plugin.settings[categoriesKey]) {
+          this.plugin.settings[categoriesKey] = [];
+        }
+        for (const cat of data.customCategories) {
+          const existingIdx = this.plugin.settings[categoriesKey].findIndex(c => c.id === cat.id);
+          if (existingIdx !== -1) {
+            this.plugin.settings[categoriesKey][existingIdx] = cat;
+          } else {
+            this.plugin.settings[categoriesKey].push(cat);
+          }
+        }
+      }
+      
+      await this.plugin.saveSettings();
+      this.onImport();
+      this.close();
+    };
+  }
+  
+  onClose() {
+    this.contentEl.empty();
+  }
+}
+`;
+```
+
+# settingsPlugin-TabRenderCore
+
+```js
+return `// settingsPlugin-TabRenderCore.js
+// WindroseMDSettingsTab render methods - Core (search bar)
+// This file is concatenated into the settings plugin template by the assembler
+
+const TabRenderCoreMethods = {
+  renderSearchBar(containerEl) {
+    const wrapper = containerEl.createEl('div', { cls: 'dmt-settings-search-wrapper' });
+    const searchBox = wrapper.createEl('div', { cls: 'dmt-settings-search-box' });
+    
+    // Search icon
+    const searchIcon = searchBox.createEl('span', { cls: 'search-icon' });
+    IconHelpers.set(searchIcon, 'search');
+    
+    // Input
+    const input = searchBox.createEl('input', {
+      type: 'text',
+      placeholder: 'Search settings...'
+    });
+    
+    // Clear button (hidden initially)
+    const clearBtn = searchBox.createEl('button', { cls: 'clear-btn' });
+    clearBtn.style.display = 'none';
+    IconHelpers.set(clearBtn, 'x');
+    
+    // No results message (hidden initially)
+    this.noResultsEl = containerEl.createEl('div', { 
+      cls: 'dmt-settings-no-results',
+      text: 'No settings found matching your search.'
+    });
+    this.noResultsEl.style.display = 'none';
+    
+    // Search handler
+    const handleSearch = (query) => {
+      const q = query.toLowerCase().trim();
+      clearBtn.style.display = q ? 'block' : 'none';
+      
+      if (!q) {
+        // Clear search - show all, collapse sections
+        this.sections?.forEach(({ details }) => {
+          details.style.display = '';
+          details.settingItems?.forEach(item => {
+            item.classList.remove('dmt-setting-hidden');
+          });
+          details.removeAttribute('open');
+        });
+        this.noResultsEl.style.display = 'none';
+        return;
+      }
+      
+      let anyMatches = false;
+      
+      this.sections?.forEach(({ details, title }) => {
+        let sectionHasMatch = title.toLowerCase().includes(q);
+        
+        details.settingItems?.forEach(item => {
+          const nameEl = item.querySelector('.setting-item-name');
+          const descEl = item.querySelector('.setting-item-description');
+          const name = nameEl?.textContent?.toLowerCase() || '';
+          const desc = descEl?.textContent?.toLowerCase() || '';
+          
+          const matches = name.includes(q) || desc.includes(q);
+          
+          if (matches) {
+            item.classList.remove('dmt-setting-hidden');
+            sectionHasMatch = true;
+          } else {
+            item.classList.add('dmt-setting-hidden');
+          }
+        });
+        
+        if (sectionHasMatch) {
+          details.style.display = '';
+          details.setAttribute('open', '');
+          anyMatches = true;
+        } else {
+          details.style.display = 'none';
+        }
+      });
+      
+      this.noResultsEl.style.display = anyMatches ? 'none' : 'block';
+    };
+    
+    input.addEventListener('input', (e) => handleSearch(e.target.value));
+    clearBtn.addEventListener('click', () => {
+      input.value = '';
+      handleSearch('');
+      input.focus();
+    });
+  }
+
+};`;
+```
+
+# settingsPlugin-TabRenderSettings
+
+```js
+return `// settingsPlugin-TabRenderSettings.js
+// WindroseMDSettingsTab render methods - Settings sections
+// This file is concatenated into the settings plugin template by the assembler
+
+const TabRenderSettingsMethods = {
+  renderHexSettingsContent(containerEl) {
+    // Hex Orientation
+    new Setting(containerEl)
+      .setName('Hex Grid Orientation')
+      .setDesc('Default orientation for hex grids (flat-top or pointy-top)')
+      .addDropdown(dropdown => dropdown
+        .addOption('flat', 'Flat-Top')
+        .addOption('pointy', 'Pointy-Top')
+        .setValue(this.plugin.settings.hexOrientation)
+        .onChange(async (value) => {
+          this.plugin.settings.hexOrientation = value;
+          this.settingsChanged = true;
+          await this.plugin.saveSettings();
+        }));
+
+    // Coordinate Key Mode
+    new Setting(containerEl)
+      .setName('Coordinate Overlay Mode')
+      .setDesc('How the C key activates coordinate labels: hold to show temporarily, or toggle on/off')
+      .addDropdown(dropdown => dropdown
+        .addOption('hold', 'Hold to Show')
+        .addOption('toggle', 'Toggle On/Off')
+        .setValue(this.plugin.settings.coordinateKeyMode || 'hold')
+        .onChange(async (value) => {
+          this.plugin.settings.coordinateKeyMode = value;
+          this.settingsChanged = true;
+          await this.plugin.saveSettings();
+        }));
+
+    // Coordinate Text Color
+    new Setting(containerEl)
+      .setName('Coordinate Text Color')
+      .setDesc('Primary color for hex coordinate overlay text (hex format: #RRGGBB)')
+      .addColorPicker(color => color
+        .setValue(this.plugin.settings.coordinateTextColor)
+        .onChange(async (value) => {
+          this.plugin.settings.coordinateTextColor = value;
+          this.settingsChanged = true;
+          await this.plugin.saveSettings();
+        }))
+      .addText(text => text
+        .setPlaceholder('{{DEFAULT_COORDINATE_TEXT_COLOR}}')
+        .setValue(this.plugin.settings.coordinateTextColor)
+        .onChange(async (value) => {
+          if (/^#[0-9A-Fa-f]{6}$/.test(value)) {
+            this.plugin.settings.coordinateTextColor = value;
+            this.settingsChanged = true;
+            await this.plugin.saveSettings();
+          }
+        }))
+      .addExtraButton(btn => btn
+        .setIcon('rotate-ccw')
+        .setTooltip('Reset to default')
+        .onClick(async () => {
+          this.plugin.settings.coordinateTextColor = '{{DEFAULT_COORDINATE_TEXT_COLOR}}';
+          this.settingsChanged = true;
+          await this.plugin.saveSettings();
+          this.display();
+        }));
+
+    // Coordinate Text Shadow
+    new Setting(containerEl)
+      .setName('Coordinate Text Shadow')
+      .setDesc('Shadow/outline color for hex coordinate overlay text (hex format: #RRGGBB)')
+      .addColorPicker(color => color
+        .setValue(this.plugin.settings.coordinateTextShadow)
+        .onChange(async (value) => {
+          this.plugin.settings.coordinateTextShadow = value;
+          this.settingsChanged = true;
+          await this.plugin.saveSettings();
+        }))
+      .addText(text => text
+        .setPlaceholder('{{DEFAULT_COORDINATE_TEXT_SHADOW}}')
+        .setValue(this.plugin.settings.coordinateTextShadow)
+        .onChange(async (value) => {
+          if (/^#[0-9A-Fa-f]{6}$/.test(value)) {
+            this.plugin.settings.coordinateTextShadow = value;
+            this.settingsChanged = true;
+            await this.plugin.saveSettings();
+          }
+        }))
+      .addExtraButton(btn => btn
+        .setIcon('rotate-ccw')
+        .setTooltip('Reset to default')
+        .onClick(async () => {
+          this.plugin.settings.coordinateTextShadow = '{{DEFAULT_COORDINATE_TEXT_SHADOW}}';
+          this.settingsChanged = true;
+          await this.plugin.saveSettings();
+          this.display();
+        }));
+  },
+  renderColorSettingsContent(containerEl) {
+    containerEl.createEl('p', { 
+      text: 'These settings control default colors and behavior for all WindroseMD maps in this vault.',
+      cls: 'setting-item-description'
+    });
+    
+    // Grid Line Color
+    new Setting(containerEl)
+      .setName('Grid Line Color')
+      .setDesc('Color for grid lines (hex format: #RRGGBB)')
+      .addColorPicker(color => color
+        .setValue(this.plugin.settings.gridLineColor)
+        .onChange(async (value) => {
+          this.plugin.settings.gridLineColor = value;
+          this.settingsChanged = true;
+          await this.plugin.saveSettings();
+        }))
+      .addText(text => text
+        .setPlaceholder('{{DEFAULT_GRID_LINE_COLOR}}')
+        .setValue(this.plugin.settings.gridLineColor)
+        .onChange(async (value) => {
+          if (/^#[0-9A-Fa-f]{6}$/.test(value)) {
+            this.plugin.settings.gridLineColor = value;
+            this.settingsChanged = true;
+            await this.plugin.saveSettings();
+          }
+        }))
+      .addExtraButton(btn => btn
+        .setIcon('rotate-ccw')
+        .setTooltip('Reset to default')
+        .onClick(async () => {
+          this.plugin.settings.gridLineColor = '{{DEFAULT_GRID_LINE_COLOR}}';
+          this.settingsChanged = true;
+          await this.plugin.saveSettings();
+          this.display();
+        }));
+
+    // Grid Line Width (grid maps only)
+    new Setting(containerEl)
+      .setName('Grid Line Width')
+      .setDesc('Thickness of grid lines in pixels (1-5). Applies to grid maps only.')
+      .addSlider(slider => slider
+        .setLimits(1, 5, 1)
+        .setValue(this.plugin.settings.gridLineWidth ?? 1)
+        .setDynamicTooltip()
+        .onChange(async (value) => {
+          this.plugin.settings.gridLineWidth = value;
+          this.settingsChanged = true;
+          await this.plugin.saveSettings();
+        }))
+      .addExtraButton(btn => btn
+        .setIcon('rotate-ccw')
+        .setTooltip('Reset to default (1px)')
+        .onClick(async () => {
+          this.plugin.settings.gridLineWidth = 1;
+          this.settingsChanged = true;
+          await this.plugin.saveSettings();
+          this.display();
+        }));
+
+    // Background Color
+    new Setting(containerEl)
+      .setName('Background Color')
+      .setDesc('Canvas background color (hex format: #RRGGBB)')
+      .addColorPicker(color => color
+        .setValue(this.plugin.settings.backgroundColor)
+        .onChange(async (value) => {
+          this.plugin.settings.backgroundColor = value;
+          this.settingsChanged = true;
+          await this.plugin.saveSettings();
+        }))
+      .addText(text => text
+        .setPlaceholder('{{DEFAULT_BACKGROUND_COLOR}}')
+        .setValue(this.plugin.settings.backgroundColor)
+        .onChange(async (value) => {
+          if (/^#[0-9A-Fa-f]{6}$/.test(value)) {
+            this.plugin.settings.backgroundColor = value;
+            this.settingsChanged = true;
+            await this.plugin.saveSettings();
+          }
+        }))
+      .addExtraButton(btn => btn
+        .setIcon('rotate-ccw')
+        .setTooltip('Reset to default')
+        .onClick(async () => {
+          this.plugin.settings.backgroundColor = '{{DEFAULT_BACKGROUND_COLOR}}';
+          this.settingsChanged = true;
+          await this.plugin.saveSettings();
+          this.display();
+        }));
+
+    // Border Color
+    new Setting(containerEl)
+      .setName('Border Color')
+      .setDesc('Color for painted cell borders (hex format: #RRGGBB)')
+      .addColorPicker(color => color
+        .setValue(this.plugin.settings.borderColor)
+        .onChange(async (value) => {
+          this.plugin.settings.borderColor = value;
+          this.settingsChanged = true;
+          await this.plugin.saveSettings();
+        }))
+      .addText(text => text
+        .setPlaceholder('{{DEFAULT_BORDER_COLOR}}')
+        .setValue(this.plugin.settings.borderColor)
+        .onChange(async (value) => {
+          if (/^#[0-9A-Fa-f]{6}$/.test(value)) {
+            this.plugin.settings.borderColor = value;
+            this.settingsChanged = true;
+            await this.plugin.saveSettings();
+          }
+        }))
+      .addExtraButton(btn => btn
+        .setIcon('rotate-ccw')
+        .setTooltip('Reset to default')
+        .onClick(async () => {
+          this.plugin.settings.borderColor = '{{DEFAULT_BORDER_COLOR}}';
+          this.settingsChanged = true;
+          await this.plugin.saveSettings();
+          this.display();
+        }));
+
+    // Coordinate Key Color
+    new Setting(containerEl)
+      .setName('Coordinate Key Color')
+      .setDesc('Background color for coordinate key indicator (hex format: #RRGGBB)')
+      .addColorPicker(color => color
+        .setValue(this.plugin.settings.coordinateKeyColor)
+        .onChange(async (value) => {
+          this.plugin.settings.coordinateKeyColor = value;
+          this.settingsChanged = true;
+          await this.plugin.saveSettings();
+        }))
+      .addText(text => text
+        .setPlaceholder('{{DEFAULT_COORDINATE_KEY_COLOR}}')
+        .setValue(this.plugin.settings.coordinateKeyColor)
+        .onChange(async (value) => {
+          if (/^#[0-9A-Fa-f]{6}$/.test(value)) {
+            this.plugin.settings.coordinateKeyColor = value;
+            this.settingsChanged = true;
+            await this.plugin.saveSettings();
+          }
+        }))
+      .addExtraButton(btn => btn
+        .setIcon('rotate-ccw')
+        .setTooltip('Reset to default')
+        .onClick(async () => {
+          this.plugin.settings.coordinateKeyColor = '{{DEFAULT_COORDINATE_KEY_COLOR}}';
+          this.settingsChanged = true;
+          await this.plugin.saveSettings();
+          this.display();
+        }));
+  },
+  renderFogOfWarSettingsContent(containerEl) {
+    containerEl.createEl('p', { 
+      text: 'Default fog of war appearance settings for new maps. Individual maps can override these in their settings.',
+      cls: 'setting-item-description'
+    });
+    
+    // Soft Edges Toggle
+    new Setting(containerEl)
+      .setName('Soft Edges')
+      .setDesc('Enable a blur effect at fog boundaries for a softer, more atmospheric look')
+      .addToggle(toggle => toggle
+        .setValue(this.plugin.settings.fogOfWarBlurEnabled)
+        .onChange(async (value) => {
+          this.plugin.settings.fogOfWarBlurEnabled = value;
+          this.settingsChanged = true;
+          await this.plugin.saveSettings();
+          this.display(); // Refresh to show/hide blur intensity slider
+        }));
+    
+    // Blur Intensity Slider (only show when blur is enabled)
+    if (this.plugin.settings.fogOfWarBlurEnabled) {
+      const blurPercent = Math.round((this.plugin.settings.fogOfWarBlurFactor || 0.20) * 100);
+      
+      new Setting(containerEl)
+        .setName('Blur Intensity')
+        .setDesc(\`Size of blur effect as percentage of cell size (currently \${blurPercent}%)\`)
+        .addSlider(slider => slider
+          .setLimits(5, 50, 1)
+          .setValue(blurPercent)
+          .setDynamicTooltip()
+          .onChange(async (value) => {
+            this.plugin.settings.fogOfWarBlurFactor = value / 100;
+            this.settingsChanged = true;
+            await this.plugin.saveSettings();
+          }))
+        .addExtraButton(btn => btn
+          .setIcon('rotate-ccw')
+          .setTooltip('Reset to default (20%)')
+          .onClick(async () => {
+            this.plugin.settings.fogOfWarBlurFactor = 0.20;
+            this.settingsChanged = true;
+            await this.plugin.saveSettings();
+            this.display();
+          }));
+    }
+  },
+  renderMapBehaviorSettingsContent(containerEl) {
+    // Expanded by Default
+    new Setting(containerEl)
+      .setName('Start Maps Expanded')
+      .setDesc('When enabled, maps will start in expanded (fullscreen) mode by default')
+      .addToggle(toggle => toggle
+        .setValue(this.plugin.settings.expandedByDefault)
+        .onChange(async (value) => {
+          this.plugin.settings.expandedByDefault = value;
+          this.settingsChanged = true;
+          await this.plugin.saveSettings();
+        }));
+
+    // Always Show Controls
+    new Setting(containerEl)
+      .setName('Always Show Controls')
+      .setDesc('Keep map controls visible at all times instead of auto-hiding')
+      .addToggle(toggle => toggle
+        .setValue(this.plugin.settings.alwaysShowControls)
+        .onChange(async (value) => {
+          this.plugin.settings.alwaysShowControls = value;
+          this.settingsChanged = true;
+          await this.plugin.saveSettings();
+        }));
+
+    // Canvas Height (Desktop)
+    new Setting(containerEl)
+      .setName('Canvas Height (Desktop)')
+      .setDesc('Default height in pixels for map canvas on desktop devices')
+      .addText(text => text
+        .setPlaceholder('600')
+        .setValue(String(this.plugin.settings.canvasHeight))
+        .onChange(async (value) => {
+          const num = parseInt(value);
+          if (!isNaN(num)) {
+            this.plugin.settings.canvasHeight = num;
+            this.settingsChanged = true;
+            await this.plugin.saveSettings();
+          }
+        }));
+
+    // Canvas Height (Mobile)
+    new Setting(containerEl)
+      .setName('Canvas Height (Mobile/Touch)')
+      .setDesc('Default height in pixels for map canvas on mobile and touch devices')
+      .addText(text => text
+        .setPlaceholder('400')
+        .setValue(String(this.plugin.settings.canvasHeightMobile))
+        .onChange(async (value) => {
+          const num = parseInt(value);
+          if (!isNaN(num)) {
+            this.plugin.settings.canvasHeightMobile = num;
+            this.settingsChanged = true;
+            await this.plugin.saveSettings();
+          }
+        }));
+  },
+  renderDistanceMeasurementSettingsContent(containerEl) {
+    // Grid: Distance per cell
+    new Setting(containerEl)
+      .setName('Grid Map: Distance per Cell')
+      .setDesc('Distance each cell represents on grid maps (default: 5 ft for D&D)')
+      .addText(text => text
+        .setPlaceholder('5')
+        .setValue(String(this.plugin.settings.distancePerCellGrid))
+        .onChange(async (value) => {
+          const num = parseFloat(value);
+          if (!isNaN(num) && num > 0) {
+            this.plugin.settings.distancePerCellGrid = num;
+            this.settingsChanged = true;
+            await this.plugin.saveSettings();
+          }
+        }))
+      .addDropdown(dropdown => dropdown
+        .addOption('ft', 'feet')
+        .addOption('m', 'meters')
+        .addOption('mi', 'miles')
+        .addOption('km', 'kilometers')
+        .addOption('yd', 'yards')
+        .setValue(this.plugin.settings.distanceUnitGrid)
+        .onChange(async (value) => {
+          this.plugin.settings.distanceUnitGrid = value;
+          this.settingsChanged = true;
+          await this.plugin.saveSettings();
+        }));
+
+    // Hex: Distance per cell
+    new Setting(containerEl)
+      .setName('Hex Map: Distance per Hex')
+      .setDesc('Distance each hex represents on hex maps (default: 6 miles for world maps)')
+      .addText(text => text
+        .setPlaceholder('6')
+        .setValue(String(this.plugin.settings.distancePerCellHex))
+        .onChange(async (value) => {
+          const num = parseFloat(value);
+          if (!isNaN(num) && num > 0) {
+            this.plugin.settings.distancePerCellHex = num;
+            this.settingsChanged = true;
+            await this.plugin.saveSettings();
+          }
+        }))
+      .addDropdown(dropdown => dropdown
+        .addOption('mi', 'miles')
+        .addOption('km', 'kilometers')
+        .addOption('ft', 'feet')
+        .addOption('m', 'meters')
+        .addOption('yd', 'yards')
+        .setValue(this.plugin.settings.distanceUnitHex)
+        .onChange(async (value) => {
+          this.plugin.settings.distanceUnitHex = value;
+          this.settingsChanged = true;
+          await this.plugin.saveSettings();
+        }));
+
+    // Grid diagonal rule
+    new Setting(containerEl)
+      .setName('Grid Diagonal Movement')
+      .setDesc('How to calculate diagonal distance on grid maps')
+      .addDropdown(dropdown => dropdown
+        .addOption('alternating', 'Alternating (5-10-5-10, D&D 5e)')
+        .addOption('equal', 'Equal (Chebyshev, all moves = 1)')
+        .addOption('euclidean', 'True Distance (Euclidean)')
+        .setValue(this.plugin.settings.gridDiagonalRule)
+        .onChange(async (value) => {
+          this.plugin.settings.gridDiagonalRule = value;
+          this.settingsChanged = true;
+          await this.plugin.saveSettings();
+        }));
+
+    // Display format
+    new Setting(containerEl)
+      .setName('Distance Display Format')
+      .setDesc('How to display measured distances')
+      .addDropdown(dropdown => dropdown
+        .addOption('both', 'Cells and Units (e.g., "3 cells (15 ft)")')
+        .addOption('cells', 'Cells Only (e.g., "3 cells")')
+        .addOption('units', 'Units Only (e.g., "15 ft")')
+        .setValue(this.plugin.settings.distanceDisplayFormat)
+        .onChange(async (value) => {
+          this.plugin.settings.distanceDisplayFormat = value;
+          this.settingsChanged = true;
+          await this.plugin.saveSettings();
+        }));
+  }
+
+};`;
+```
+
+# settingsPlugin-TabRenderColors
+
+```js
+return `// settingsPlugin-TabRenderColors.js
+// WindroseMDSettingsTab render methods - Color palette
+// This file is concatenated into the settings plugin template by the assembler
+
+const TabRenderColorsMethods = {
+  renderColorPaletteContent(containerEl) {
+    containerEl.createEl('p', { 
+      text: 'Customize the color palette used for drawing cells and objects. Edit built-in colors, add custom colors, or hide colors you don\\'t use.',
+      cls: 'setting-item-description'
+    });
+    
+    // Add Custom Color button
+    new Setting(containerEl)
+      .setName('Add Custom Color')
+      .setDesc('Create a new color for your palette')
+      .addButton(btn => btn
+        .setButtonText('+ Add Color')
+        .setCta()
+        .onClick(() => {
+          new ColorEditModal(this.app, this.plugin, null, async () => {
+            this.settingsChanged = true;
+            await this.plugin.saveSettings();
+            this.display();
+          }).open();
+        }));
+    
+    // Reset All Colors button  
+    new Setting(containerEl)
+      .setName('Reset Palette')
+      .setDesc('Restore all built-in colors to defaults and remove custom colors')
+      .addButton(btn => btn
+        .setButtonText('Reset All')
+        .setWarning()
+        .onClick(async () => {
+          if (confirm('Reset all colors to defaults? This will remove all customizations.')) {
+            this.plugin.settings.colorPaletteOverrides = {};
+            this.plugin.settings.customPaletteColors = [];
+            this.settingsChanged = true;
+            await this.plugin.saveSettings();
+            this.display();
+          }
+        }));
+    
+    // Render color list
+    this.renderColorList(containerEl);
+  },
+  renderColorList(containerEl) {
+    const resolvedColors = ColorHelpers.getResolved(this.plugin.settings);
+    const hiddenColors = ColorHelpers.getHidden(this.plugin.settings);
+    
+    // Separate into visible and hidden
+    const visibleColors = resolvedColors.filter(c => !hiddenColors.has(c.id));
+    const hiddenBuiltIns = BUILT_IN_COLORS.filter(c => hiddenColors.has(c.id));
+    
+    // Visible colors container
+    const visibleContainer = containerEl.createEl('div', { cls: 'dmt-settings-category' });
+    const visibleHeader = visibleContainer.createEl('div', { cls: 'dmt-settings-category-header' });
+    visibleHeader.createEl('span', { text: \`Active Colors (\${visibleColors.length})\`, cls: 'dmt-settings-category-label' });
+    
+    const visibleList = visibleContainer.createEl('div', { cls: 'dmt-color-list' });
+    
+    visibleColors.forEach(color => {
+      this.renderColorRow(visibleList, color, false);
+    });
+    
+    if (visibleColors.length === 0) {
+      visibleList.createEl('div', { 
+        text: 'No colors visible. Use "Show" to restore hidden colors.',
+        cls: 'dmt-settings-empty-message'
+      });
+    }
+    
+    // Hidden colors (if any)
+    if (hiddenBuiltIns.length > 0) {
+      const hiddenContainer = containerEl.createEl('div', { cls: 'dmt-settings-category dmt-settings-category-muted' });
+      const hiddenHeader = hiddenContainer.createEl('div', { cls: 'dmt-settings-category-header' });
+      hiddenHeader.createEl('span', { text: \`Hidden Colors (\${hiddenBuiltIns.length})\`, cls: 'dmt-settings-category-label' });
+      
+      const hiddenList = hiddenContainer.createEl('div', { cls: 'dmt-color-list' });
+      
+      hiddenBuiltIns.forEach(color => {
+        // Build display version with override if exists
+        const override = this.plugin.settings.colorPaletteOverrides?.[color.id];
+        const displayColor = override ? { ...color, ...override, isBuiltIn: true, isModified: true } : { ...color, isBuiltIn: true };
+        this.renderColorRow(hiddenList, displayColor, true);
+      });
+    }
+  },
+  renderColorRow(containerEl, color, isHidden) {
+    const row = containerEl.createEl('div', { cls: 'dmt-color-row' });
+    
+    // Color swatch - apply opacity if set
+    const swatchOpacity = color.opacity ?? 1;
+    const swatch = row.createEl('div', { 
+      cls: 'dmt-color-row-swatch',
+      attr: { style: \`background-color: \${color.color}; opacity: \${swatchOpacity}\` }
+    });
+    
+    // Label with modified indicator
+    const labelContainer = row.createEl('div', { cls: 'dmt-color-row-label' });
+    labelContainer.createEl('span', { text: color.label, cls: 'dmt-color-row-name' });
+    
+    if (color.isModified) {
+      labelContainer.createEl('span', { text: ' (modified)', cls: 'dmt-color-row-modified' });
+    }
+    if (color.isCustom) {
+      labelContainer.createEl('span', { text: ' (custom)', cls: 'dmt-color-row-custom' });
+    }
+    
+    // Hex value + opacity if not 100%
+    const hexText = swatchOpacity < 1 
+      ? \`\${color.color} @ \${Math.round(swatchOpacity * 100)}%\`
+      : color.color;
+    row.createEl('code', { text: hexText, cls: 'dmt-color-row-hex' });
+    
+    // Actions
+    const actions = row.createEl('div', { cls: 'dmt-color-row-actions' });
+    
+    // Edit button
+    const editBtn = actions.createEl('button', { cls: 'dmt-btn-icon', attr: { 'aria-label': 'Edit color' } });
+    IconHelpers.set(editBtn, 'pencil');
+    editBtn.addEventListener('click', () => {
+      new ColorEditModal(this.app, this.plugin, color, async () => {
+        this.settingsChanged = true;
+        await this.plugin.saveSettings();
+        this.display();
+      }).open();
+    });
+    
+    // Show/Hide button (for built-in colors only)
+    if (color.isBuiltIn) {
+      const visBtn = actions.createEl('button', { cls: 'dmt-btn-icon', attr: { 'aria-label': isHidden ? 'Show color' : 'Hide color' } });
+      IconHelpers.set(visBtn, isHidden ? 'eye' : 'eye-off');
+      visBtn.addEventListener('click', async () => {
+        if (!this.plugin.settings.colorPaletteOverrides) {
+          this.plugin.settings.colorPaletteOverrides = {};
+        }
+        if (!this.plugin.settings.colorPaletteOverrides[color.id]) {
+          this.plugin.settings.colorPaletteOverrides[color.id] = {};
+        }
+        this.plugin.settings.colorPaletteOverrides[color.id].hidden = !isHidden;
+        
+        // Clean up empty override
+        if (Object.keys(this.plugin.settings.colorPaletteOverrides[color.id]).length === 1 
+            && !this.plugin.settings.colorPaletteOverrides[color.id].hidden) {
+          delete this.plugin.settings.colorPaletteOverrides[color.id];
+        }
+        
+        this.settingsChanged = true;
+        await this.plugin.saveSettings();
+        this.display();
+      });
+      
+      // Reset button (if modified)
+      if (color.isModified) {
+        const resetBtn = actions.createEl('button', { cls: 'dmt-btn-icon', attr: { 'aria-label': 'Reset to default' } });
+        IconHelpers.set(resetBtn, 'rotate-ccw');
+        resetBtn.addEventListener('click', async () => {
+          delete this.plugin.settings.colorPaletteOverrides[color.id];
+          this.settingsChanged = true;
+          await this.plugin.saveSettings();
+          this.display();
+        });
+      }
+    }
+    
+    // Delete button (for custom colors only)
+    if (color.isCustom) {
+      const delBtn = actions.createEl('button', { cls: 'dmt-btn-icon dmt-btn-danger', attr: { 'aria-label': 'Delete color' } });
+      IconHelpers.set(delBtn, 'trash-2');
+      delBtn.addEventListener('click', async () => {
+        this.plugin.settings.customPaletteColors = this.plugin.settings.customPaletteColors.filter(c => c.id !== color.id);
+        this.settingsChanged = true;
+        await this.plugin.saveSettings();
+        this.display();
+      });
+    }
+  }
+
+};`;
+```
+
+# settingsPlugin-TabRenderObjects
+
+```js
+return `// settingsPlugin-TabRenderObjects.js
+// WindroseMDSettingsTab render methods - Object types
+// This file is concatenated into the settings plugin template by the assembler
+
+const TabRenderObjectsMethods = {
+  renderObjectTypesContent(containerEl) {
+    containerEl.createEl('p', { 
+      text: 'Customize map objects: modify built-in objects, create custom objects, or hide objects you don\\'t use.',
+      cls: 'setting-item-description'
+    });
+    
+    // Map Type selector dropdown
+    new Setting(containerEl)
+      .setName('Map Type')
+      .setDesc('Select which map type to configure objects for')
+      .addDropdown(dropdown => dropdown
+        .addOption('grid', 'Grid Maps')
+        .addOption('hex', 'Hex Maps')
+        .setValue(this.selectedMapType)
+        .onChange((value) => {
+          this.selectedMapType = value;
+          this.display();
+        }));
+    
+    // Get settings for the selected map type
+    const mapTypeSettings = this.getObjectSettingsForMapType();
+    
+    // Add Custom Object button
+    new Setting(containerEl)
+      .setName('Add Custom Object')
+      .setDesc('Create a new map object with your own symbol')
+      .addButton(btn => btn
+        .setButtonText('+ Add Object')
+        .setCta()
+        .onClick(() => {
+          new ObjectEditModal(this.app, this.plugin, null, async () => {
+            this.settingsChanged = true;
+            await this.plugin.saveSettings();
+            this.display();
+          }, this.selectedMapType).open();
+        }));
+    
+    // Add Custom Category button
+    new Setting(containerEl)
+      .setName('Add Custom Category')
+      .setDesc('Create a new category to organize objects')
+      .addButton(btn => btn
+        .setButtonText('+ Add Category')
+        .onClick(() => {
+          new CategoryEditModal(this.app, this.plugin, null, async () => {
+            this.settingsChanged = true;
+            await this.plugin.saveSettings();
+            this.display();
+          }, this.selectedMapType).open();
+        }));
+    
+    // Import/Export buttons
+    new Setting(containerEl)
+      .setName('Import / Export')
+      .setDesc('Share object configurations as JSON files')
+      .addButton(btn => btn
+        .setButtonText('Import')
+        .onClick(() => {
+          new ImportModal(this.app, this.plugin, async () => {
+            this.settingsChanged = true;
+            this.display();
+          }, this.selectedMapType).open();
+        }))
+      .addButton(btn => btn
+        .setButtonText('Export')
+        .onClick(() => {
+          new ExportModal(this.app, this.plugin, this.selectedMapType).open();
+        }));
+    
+    // Get resolved data using helpers with map-type-specific settings
+    const allCategories = ObjectHelpers.getCategories(mapTypeSettings);
+    const allObjects = ObjectHelpers.getResolved(mapTypeSettings);
+    const hiddenObjects = ObjectHelpers.getHidden(mapTypeSettings);
+    
+    // Check if there are any customizations for this map type
+    const hasOverrides = Object.keys(mapTypeSettings.objectOverrides || {}).length > 0;
+    const hasCustomObjects = (mapTypeSettings.customObjects || []).length > 0;
+    const hasCustomCategories = (mapTypeSettings.customCategories || []).length > 0;
+    const hasAnyCustomizations = hasOverrides || hasCustomObjects || hasCustomCategories;
+    
+    // Reset All button (only show if there are customizations)
+    if (hasAnyCustomizations) {
+      new Setting(containerEl)
+        .setName('Reset All Customizations')
+        .setDesc(\`Remove all custom objects, categories, and modifications for \${this.selectedMapType} maps\`)
+        .addButton(btn => btn
+          .setButtonText('Reset All')
+          .setWarning()
+          .onClick(async () => {
+            const counts = [];
+            if (hasOverrides) counts.push(\`\${Object.keys(mapTypeSettings.objectOverrides).length} modification(s)\`);
+            if (hasCustomObjects) counts.push(\`\${mapTypeSettings.customObjects.length} custom object(s)\`);
+            if (hasCustomCategories) counts.push(\`\${mapTypeSettings.customCategories.length} custom category(ies)\`);
+            
+            if (confirm(\`This will remove \${counts.join(', ')} for \${this.selectedMapType} maps. Maps using custom objects will show "?" placeholders.\\\\n\\\\nContinue?\`)) {
+              this.updateObjectSettingsForMapType({
+                objectOverrides: {},
+                customObjects: [],
+                customCategories: []
+              });
+              this.settingsChanged = true;
+              await this.plugin.saveSettings();
+              this.display();
+            }
+          }));
+    }
+    
+    // Search/filter input
+    const searchContainer = containerEl.createDiv({ cls: 'dmt-settings-search-container' });
+    const searchInput = searchContainer.createEl('input', {
+      type: 'text',
+      cls: 'dmt-settings-search-input',
+      attr: { placeholder: 'Filter objects...' },
+      value: this.objectFilter || ''
+    });
+    searchInput.addEventListener('input', (e) => {
+      this.objectFilter = e.target.value.toLowerCase().trim();
+      this.renderObjectList(objectListContainer, allCategories, allObjects, hiddenObjects);
+    });
+    
+    if (this.objectFilter) {
+      const clearBtn = searchContainer.createEl('button', {
+        cls: 'dmt-settings-search-clear',
+        attr: { 'aria-label': 'Clear filter', title: 'Clear filter' }
+      });
+      IconHelpers.set(clearBtn, 'x');
+      clearBtn.onclick = () => {
+        this.objectFilter = '';
+        searchInput.value = '';
+        this.renderObjectList(objectListContainer, allCategories, allObjects, hiddenObjects);
+      };
+    }
+    
+    // Object list container (for filtered re-renders)
+    const objectListContainer = containerEl.createDiv({ cls: 'dmt-settings-object-list-container' });
+    this.renderObjectList(objectListContainer, allCategories, allObjects, hiddenObjects);
+  },
+  renderObjectList(container, allCategories, allObjects, hiddenObjects) {
+    container.empty();
+    
+    const filter = this.objectFilter || '';
+    const isDraggable = !filter; // Disable drag when filtering
+    
+    // Filter objects if search term present
+    const filteredObjects = filter
+      ? allObjects.filter(obj => 
+          obj.label.toLowerCase().includes(filter) || 
+          (obj.symbol && obj.symbol.toLowerCase().includes(filter)) ||
+          (obj.iconClass && obj.iconClass.toLowerCase().includes(filter)))
+      : allObjects;
+    
+    const filteredHidden = filter
+      ? hiddenObjects.filter(obj =>
+          obj.label.toLowerCase().includes(filter) ||
+          (obj.symbol && obj.symbol.toLowerCase().includes(filter)) ||
+          (obj.iconClass && obj.iconClass.toLowerCase().includes(filter)))
+      : hiddenObjects;
+    
+    // Show "no results" message if filter returns nothing
+    if (filter && filteredObjects.length === 0 && filteredHidden.length === 0) {
+      container.createDiv({ 
+        cls: 'dmt-settings-no-results',
+        text: \`No objects matching "\${filter}"\`
+      });
+      return;
+    }
+    
+    // Render each category (skip 'notes' - note_pin is handled specially in the map UI)
+    for (const category of allCategories) {
+      if (category.id === 'notes') continue;
+      
+      let categoryObjects = filteredObjects.filter(obj => obj.category === category.id);
+      if (categoryObjects.length === 0 && category.isBuiltIn) continue;
+      if (categoryObjects.length === 0 && filter) continue;
+      
+      // Sort by order
+      categoryObjects = categoryObjects.slice().sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+      
+      const categoryContainer = container.createDiv({ cls: 'dmt-settings-category' });
+      
+      // Category header with object count
+      const categoryHeader = categoryContainer.createDiv({ cls: 'dmt-settings-category-header' });
+      const labelText = category.label + (categoryObjects.length > 0 ? \` (\${categoryObjects.length})\` : '');
+      categoryHeader.createSpan({ text: labelText, cls: 'dmt-settings-category-label' });
+      
+      // Edit/Delete for custom categories
+      if (category.isCustom) {
+        const categoryActions = categoryHeader.createDiv({ cls: 'dmt-settings-category-actions' });
+        
+        const editBtn = categoryActions.createEl('button', { cls: 'dmt-settings-icon-btn', attr: { 'aria-label': 'Edit category', title: 'Edit category' } });
+        IconHelpers.set(editBtn, 'pencil');
+        editBtn.onclick = () => {
+          new CategoryEditModal(this.app, this.plugin, category, async () => {
+            this.settingsChanged = true;
+            await this.plugin.saveSettings();
+            this.display();
+          }).open();
+        };
+        
+        // Get unfiltered count for delete validation
+        const allCategoryObjects = allObjects.filter(obj => obj.category === category.id);
+        const deleteBtn = categoryActions.createEl('button', { cls: 'dmt-settings-icon-btn dmt-settings-icon-btn-danger', attr: { 'aria-label': 'Delete category', title: 'Delete category' } });
+        IconHelpers.set(deleteBtn, 'trash-2');
+        deleteBtn.onclick = async () => {
+          if (allCategoryObjects.length > 0) {
+            alert(\`Cannot delete "\${category.label}" - it contains \${allCategoryObjects.length} object(s). Move or delete them first.\`);
+            return;
+          }
+          if (confirm(\`Delete category "\${category.label}"?\`)) {
+            const categoriesKey = this.selectedMapType === 'hex' ? 'customHexCategories' : 'customGridCategories';
+            if (this.plugin.settings[categoriesKey]) {
+              this.plugin.settings[categoriesKey] = this.plugin.settings[categoriesKey].filter(c => c.id !== category.id);
+            }
+            this.settingsChanged = true;
+            await this.plugin.saveSettings();
+            this.display();
+          }
+        };
+      }
+      
+      // Object list with drag/drop support
+      const objectList = categoryContainer.createDiv({ cls: 'dmt-settings-object-list' });
+      objectList.dataset.categoryId = category.id;
+      
+      // Only enable drag/drop when not filtering
+      if (!filter) {
+        this.setupDragDropForList(objectList, category);
+      }
+      
+      for (const obj of categoryObjects) {
+        this.renderObjectRow(objectList, obj, false, !filter);
+      }
+    }
+    
+    // Hidden objects section
+    if (filteredHidden.length > 0) {
+      const hiddenContainer = container.createDiv({ cls: 'dmt-settings-hidden-section' });
+      
+      const hiddenHeader = new Setting(hiddenContainer)
+        .setName(\`Hidden Objects (\${filteredHidden.length})\`)
+        .setDesc('Built-in objects you\\'ve hidden from the palette');
+      
+      const hiddenList = hiddenContainer.createDiv({ cls: 'dmt-settings-object-list dmt-settings-hidden-list' });
+      hiddenList.style.display = 'none';
+      
+      hiddenHeader.addButton(btn => btn
+        .setButtonText('Show')
+        .onClick(() => {
+          const isVisible = hiddenList.style.display !== 'none';
+          hiddenList.style.display = isVisible ? 'none' : 'block';
+          btn.setButtonText(isVisible ? 'Show' : 'Hide');
+        }));
+      
+      for (const obj of filteredHidden) {
+        this.renderObjectRow(hiddenList, obj, true);
+      }
+    }
+  },
+
+  // ---------------------------------------------------------------------------
+  // Drag/drop setup for object lists
+  // ---------------------------------------------------------------------------
+  
+  setupDragDropForList(objectList, category) {
+    objectList.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      
+      const dragging = objectList.querySelector('.dmt-dragging');
+      if (!dragging) return;
+      
+      const afterElement = DragHelpers.getAfterElement(objectList, e.clientY);
+      if (afterElement == null) {
+        objectList.appendChild(dragging);
+      } else {
+        objectList.insertBefore(dragging, afterElement);
+      }
+    });
+    
+    objectList.addEventListener('dragenter', (e) => {
+      e.preventDefault();
+    });
+    
+    objectList.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      
+      // Get the correct settings keys for the selected map type
+      const overridesKey = this.selectedMapType === 'hex' ? 'hexObjectOverrides' : 'gridObjectOverrides';
+      const customObjectsKey = this.selectedMapType === 'hex' ? 'customHexObjects' : 'customGridObjects';
+      
+      // Get new order from DOM positions
+      const rows = [...objectList.querySelectorAll('.dmt-settings-object-row')];
+      
+      // Get default ID order for this category
+      const defaultIdOrder = ObjectHelpers.getDefaultIdOrder(category.id, this.getObjectSettingsForMapType());
+      
+      // Apply new orders to settings
+      rows.forEach((row, actualPosition) => {
+        const id = row.dataset.objectId;
+        const isBuiltIn = row.dataset.isBuiltIn === 'true';
+        const newOrder = actualPosition * 10;
+        
+        if (isBuiltIn) {
+          const defaultPosition = defaultIdOrder.indexOf(id);
+          
+          if (actualPosition === defaultPosition) {
+            // In default position - remove order override if present
+            if (this.plugin.settings[overridesKey]?.[id]) {
+              delete this.plugin.settings[overridesKey][id].order;
+              if (Object.keys(this.plugin.settings[overridesKey][id]).length === 0) {
+                delete this.plugin.settings[overridesKey][id];
+              }
+            }
+          } else {
+            // Not in default position - save order override
+            if (!this.plugin.settings[overridesKey]) {
+              this.plugin.settings[overridesKey] = {};
+            }
+            if (!this.plugin.settings[overridesKey][id]) {
+              this.plugin.settings[overridesKey][id] = {};
+            }
+            this.plugin.settings[overridesKey][id].order = newOrder;
+          }
+          
+          // Update modified indicator in DOM immediately
+          const labelEl = row.querySelector('.dmt-settings-object-label');
+          if (labelEl) {
+            const override = this.plugin.settings[overridesKey]?.[id];
+            const hasAnyOverride = override && Object.keys(override).length > 0;
+            labelEl.classList.toggle('dmt-settings-modified', !!hasAnyOverride);
+          }
+        } else {
+          // Custom objects - always save order
+          const customObjects = this.plugin.settings[customObjectsKey] || [];
+          const customObj = customObjects.find(o => o.id === id);
+          if (customObj) {
+            customObj.order = newOrder;
+          }
+        }
+      });
+      
+      this.settingsChanged = true;
+      await this.plugin.saveSettings();
+    });
+  },
+  renderObjectRow(container, obj, isHiddenSection = false, canDrag = false) {
+    const row = container.createDiv({ cls: 'dmt-settings-object-row' });
+    
+    // Get the correct settings keys for the selected map type
+    const overridesKey = this.selectedMapType === 'hex' ? 'hexObjectOverrides' : 'gridObjectOverrides';
+    const customObjectsKey = this.selectedMapType === 'hex' ? 'customHexObjects' : 'customGridObjects';
+    
+    // Data attributes for drag/drop
+    row.dataset.objectId = obj.id;
+    row.dataset.isBuiltIn = String(!!obj.isBuiltIn);
+    row.dataset.originalOrder = String(obj.order ?? 0);
+    
+    // Drag handle (only if draggable and not in hidden section)
+    if (canDrag && !isHiddenSection) {
+      row.setAttribute('draggable', 'true');
+      row.classList.add('dmt-draggable');
+      
+      const dragHandle = row.createSpan({ cls: 'dmt-drag-handle' });
+      IconHelpers.set(dragHandle, 'grip-vertical');
+      
+      row.style.userSelect = 'none';
+      row.style.webkitUserSelect = 'none';
+      
+      row.addEventListener('dragstart', (e) => {
+        e.dataTransfer.setData('text/plain', obj.id);
+        e.dataTransfer.effectAllowed = 'move';
+        setTimeout(() => {
+          row.classList.add('dmt-dragging');
+        }, 0);
+      });
+      
+      row.addEventListener('dragend', (e) => {
+        row.classList.remove('dmt-dragging');
+      });
+    }
+    
+    // Symbol or Icon
+    const symbolEl = row.createSpan({ cls: 'dmt-settings-object-symbol' });
+    if (obj.iconClass && RPGAwesomeHelpers.isValid(obj.iconClass)) {
+      const iconInfo = RPGAwesomeHelpers.getInfo(obj.iconClass);
+      const iconSpan = symbolEl.createEl('span', { cls: 'ra' });
+      iconSpan.textContent = iconInfo.char;
+    } else {
+      symbolEl.textContent = obj.symbol || '?';
+    }
+    
+    // Label
+    const labelEl = row.createSpan({ text: obj.label, cls: 'dmt-settings-object-label' });
+    if (obj.isModified) {
+      labelEl.addClass('dmt-settings-modified');
+    }
+    
+    // Actions
+    const actions = row.createDiv({ cls: 'dmt-settings-object-actions' });
+    
+    // Edit button
+    const editBtn = actions.createEl('button', { cls: 'dmt-settings-icon-btn', attr: { 'aria-label': 'Edit', title: 'Edit object' } });
+    IconHelpers.set(editBtn, 'pencil');
+    editBtn.onclick = () => {
+      new ObjectEditModal(this.app, this.plugin, obj, async () => {
+        this.settingsChanged = true;
+        await this.plugin.saveSettings();
+        this.display();
+      }, this.selectedMapType).open();
+    };
+    
+    if (obj.isBuiltIn) {
+      if (isHiddenSection) {
+        // Unhide button
+        const unhideBtn = actions.createEl('button', { cls: 'dmt-settings-icon-btn', attr: { 'aria-label': 'Unhide', title: 'Show in palette' } });
+        IconHelpers.set(unhideBtn, 'eye');
+        unhideBtn.onclick = async () => {
+          if (this.plugin.settings[overridesKey]?.[obj.id]) {
+            delete this.plugin.settings[overridesKey][obj.id].hidden;
+            if (Object.keys(this.plugin.settings[overridesKey][obj.id]).length === 0) {
+              delete this.plugin.settings[overridesKey][obj.id];
+            }
+          }
+          this.settingsChanged = true;
+          await this.plugin.saveSettings();
+          this.display();
+        };
+      } else {
+        // Hide button
+        const hideBtn = actions.createEl('button', { cls: 'dmt-settings-icon-btn', attr: { 'aria-label': 'Hide', title: 'Hide from palette' } });
+        IconHelpers.set(hideBtn, 'eye-off');
+        hideBtn.onclick = async () => {
+          if (!this.plugin.settings[overridesKey]) {
+            this.plugin.settings[overridesKey] = {};
+          }
+          if (!this.plugin.settings[overridesKey][obj.id]) {
+            this.plugin.settings[overridesKey][obj.id] = {};
+          }
+          this.plugin.settings[overridesKey][obj.id].hidden = true;
+          this.settingsChanged = true;
+          await this.plugin.saveSettings();
+          this.display();
+        };
+      }
+      
+      // Reset button (only for modified)
+      if (obj.isModified) {
+        const resetBtn = actions.createEl('button', { cls: 'dmt-settings-icon-btn', attr: { 'aria-label': 'Reset to default', title: 'Reset to default' } });
+        IconHelpers.set(resetBtn, 'rotate-ccw');
+        resetBtn.onclick = async () => {
+          if (confirm(\`Reset "\${obj.label}" to its default symbol and name?\`)) {
+            if (this.plugin.settings[overridesKey]) {
+              delete this.plugin.settings[overridesKey][obj.id];
+            }
+            this.settingsChanged = true;
+            await this.plugin.saveSettings();
+            this.display();
+          }
+        };
+      }
+    } else {
+      // Delete button for custom objects
+      const deleteBtn = actions.createEl('button', { cls: 'dmt-settings-icon-btn dmt-settings-icon-btn-danger', attr: { 'aria-label': 'Delete', title: 'Delete object' } });
+      IconHelpers.set(deleteBtn, 'trash-2');
+      deleteBtn.onclick = async () => {
+        if (confirm(\`Delete "\${obj.label}"? Maps using this object will show a "?" placeholder.\`)) {
+          if (this.plugin.settings[customObjectsKey]) {
+            this.plugin.settings[customObjectsKey] = this.plugin.settings[customObjectsKey].filter(o => o.id !== obj.id);
+          }
+          this.settingsChanged = true;
+          await this.plugin.saveSettings();
+          this.display();
+        }
+      };
+    }
+  }
+
+};`;
+```
+
+# settingsPlugin-styles
+
+```js
+return `/* settingsPlugin-styles.css
+ * Windrose MapDesigner Settings Plugin Styles
+ * This file is automatically loaded by Obsidian when the plugin is enabled.
+ * Generated by settingsPluginAssembler.js
+ */
+
+/* ===========================================
+ * Subheadings
+ * =========================================== */
+.dmt-settings-subheading {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin: 1.5em 0 0.5em 0;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+/* ===========================================
+ * Search/Filter
+ * =========================================== */
+.dmt-settings-search-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 1em;
+}
+
+.dmt-settings-search-input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  background: var(--background-primary);
+  font-size: 14px;
+}
+
+.dmt-settings-search-input:focus {
+  border-color: var(--interactive-accent);
+  outline: none;
+}
+
+.dmt-settings-search-clear {
+  background: transparent;
+  border: none;
+  padding: 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dmt-settings-search-clear:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.dmt-settings-no-results {
+  text-align: center;
+  padding: 2em;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* ===========================================
+ * Category Containers
+ * =========================================== */
+.dmt-settings-category {
+  margin: 1em 0;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.dmt-settings-category-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: var(--background-secondary);
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.dmt-settings-category-label {
+  font-weight: 600;
+  font-size: 0.95em;
+}
+
+.dmt-settings-category-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.dmt-settings-category-muted {
+  opacity: 0.7;
+}
+
+.dmt-settings-empty-message {
+  padding: 16px;
+  text-align: center;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* ===========================================
+ * Object Rows
+ * =========================================== */
+.dmt-settings-object-list {
+  padding: 4px 0;
+}
+
+.dmt-settings-object-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  transition: background-color 0.15s ease;
+}
+
+.dmt-settings-object-row:hover {
+  background: var(--background-modifier-hover);
+}
+
+.dmt-drag-handle {
+  color: var(--text-muted);
+  cursor: grab;
+  padding: 0 4px;
+  font-size: 1em;
+  opacity: 0.4;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.dmt-settings-object-row:hover .dmt-drag-handle {
+  opacity: 1;
+}
+
+.dmt-dragging {
+  opacity: 0.5;
+  background: var(--interactive-accent) !important;
+  border-radius: 4px;
+}
+
+.dmt-settings-object-symbol {
+  font-family: 'Noto Emoji', 'Noto Sans Symbols 2', sans-serif;
+  font-size: 1.4em;
+  width: 32px;
+  text-align: center;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dmt-settings-object-symbol .ra {
+  font-size: 1.2em;
+  line-height: 1;
+}
+
+.dmt-settings-object-label {
+  flex: 1;
+  min-width: 0;
+}
+
+.dmt-settings-object-label.dmt-settings-modified {
+  font-style: italic;
+  color: var(--text-accent);
+}
+
+.dmt-settings-object-label.dmt-settings-modified::after {
+  content: ' •';
+  font-size: 0.8em;
+  opacity: 0.7;
+}
+
+.dmt-settings-object-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+/* ===========================================
+ * Icon Buttons
+ * =========================================== */
+.dmt-settings-icon-btn {
+  background: transparent;
+  border: none;
+  padding: 4px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dmt-settings-icon-btn:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.dmt-settings-icon-btn-danger:hover {
+  color: var(--text-error);
+}
+
+.dmt-btn-icon {
+  background: transparent;
+  border: none;
+  padding: 4px;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dmt-btn-icon:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.dmt-btn-icon.dmt-btn-danger:hover {
+  background: var(--background-modifier-error);
+  color: var(--text-on-accent);
+}
+
+/* ===========================================
+ * Hidden Section
+ * =========================================== */
+.dmt-settings-hidden-section {
+  margin-top: 2em;
+  padding-top: 1em;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.dmt-settings-hidden-list {
+  margin-top: 8px;
+  opacity: 0.7;
+}
+
+.dmt-settings-hidden-list .dmt-settings-object-row {
+  background: var(--background-secondary);
+}
+
+/* ===========================================
+ * Modal Base Styles
+ * =========================================== */
+.dmt-object-edit-modal,
+.dmt-category-edit-modal {
+  padding: 0;
+}
+
+.dmt-modal-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 1.5em;
+  padding-top: 1em;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+/* ===========================================
+ * Symbol Input & Preview
+ * =========================================== */
+.dmt-symbol-input {
+  font-family: 'Noto Emoji', 'Noto Sans Symbols 2', sans-serif;
+  font-size: 1.5em;
+  width: 80px;
+  text-align: center;
+  padding: 8px;
+}
+
+.dmt-symbol-preview {
+  font-family: 'Noto Emoji', 'Noto Sans Symbols 2', sans-serif;
+  font-size: 2em;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--background-secondary);
+  border-radius: 8px;
+  margin-left: 8px;
+}
+
+/* ===========================================
+ * Quick Symbols Grid
+ * =========================================== */
+.dmt-quick-symbols {
+  margin: 1em 0;
+}
+
+.dmt-quick-symbols-label {
+  display: block;
+  font-size: 0.9em;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.dmt-quick-symbols-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  max-height: 150px;
+  overflow-y: auto;
+  padding: 4px;
+  background: var(--background-secondary);
+  border-radius: 8px;
+}
+
+.dmt-quick-symbol-btn {
+  font-family: 'Noto Emoji', 'Noto Sans Symbols 2', sans-serif;
+  width: 32px;
+  height: 32px;
+  font-size: 1.2em;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dmt-quick-symbol-btn:hover {
+  background: var(--background-modifier-hover);
+  border-color: var(--interactive-accent);
+}
+
+/* ===========================================
+ * Import/Export Modal Styles
+ * =========================================== */
+.dmt-export-modal,
+.dmt-import-modal {
+  padding: 0;
+}
+
+.dmt-export-empty {
+  text-align: center;
+  padding: 1em;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.dmt-import-file-container {
+  margin: 1em 0;
+}
+
+.dmt-import-file-container input[type="file"] {
+  width: 100%;
+  padding: 1em;
+  border: 2px dashed var(--background-modifier-border);
+  border-radius: 8px;
+  background: var(--background-secondary);
+  cursor: pointer;
+}
+
+.dmt-import-file-container input[type="file"]:hover {
+  border-color: var(--interactive-accent);
+}
+
+.dmt-import-preview {
+  margin: 1em 0;
+  padding: 1em;
+  background: var(--background-secondary);
+  border-radius: 8px;
+}
+
+.dmt-import-preview p {
+  margin: 0.25em 0;
+}
+
+.dmt-import-date {
+  font-size: 0.85em;
+  color: var(--text-muted);
+}
+
+.dmt-import-note {
+  font-size: 0.9em;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.dmt-import-error {
+  color: var(--text-error);
+  font-weight: 500;
+}
+
+.dmt-import-options {
+  margin-top: 1em;
+}
+
+/* ===========================================
+ * Icon Type Toggle
+ * =========================================== */
+.dmt-icon-type-toggle {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 1em;
+}
+
+.dmt-icon-type-btn {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.15s ease;
+}
+
+.dmt-icon-type-btn:hover {
+  background: var(--background-modifier-hover);
+}
+
+.dmt-icon-type-btn.active {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-color: var(--interactive-accent);
+}
+
+/* ===========================================
+ * Icon Picker Container
+ * =========================================== */
+.dmt-icon-picker {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  background: var(--background-secondary);
+  margin-bottom: 1em;
+}
+
+.dmt-icon-picker-search {
+  padding: 8px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.dmt-icon-picker-search input {
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  background: var(--background-primary);
+  font-size: 14px;
+}
+
+.dmt-icon-picker-search input:focus {
+  border-color: var(--interactive-accent);
+  outline: none;
+}
+
+/* ===========================================
+ * Category Tabs (Icon Picker)
+ * =========================================== */
+.dmt-icon-picker-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 8px;
+  border-bottom: 1px solid var(--background-modifier-border);
+  background: var(--background-primary-alt);
+}
+
+.dmt-icon-picker-tab {
+  padding: 4px 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text-muted);
+  transition: all 0.15s ease;
+}
+
+.dmt-icon-picker-tab:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.dmt-icon-picker-tab.active {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+/* ===========================================
+ * Icon Grid
+ * =========================================== */
+.dmt-icon-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
+  gap: 4px;
+  padding: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.dmt-icon-picker-icon {
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  transition: all 0.15s ease;
+}
+
+.dmt-icon-picker-icon:hover {
+  background: var(--background-modifier-hover);
+  border-color: var(--interactive-accent);
+  transform: scale(1.1);
+}
+
+.dmt-icon-picker-icon.selected {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-color: var(--interactive-accent);
+}
+
+.dmt-icon-picker-icon .ra {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.dmt-icon-picker-empty {
+  padding: 2em;
+  text-align: center;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* ===========================================
+ * Selected Icon Preview
+ * =========================================== */
+.dmt-icon-preview-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px;
+  border-top: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+}
+
+.dmt-icon-preview-large {
+  width: 48px;
+  height: 48px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  background: var(--background-secondary);
+}
+
+.dmt-icon-preview-large .ra {
+  font-size: 28px;
+  line-height: 1;
+}
+
+.dmt-icon-preview-info {
+  flex: 1;
+}
+
+.dmt-icon-preview-label {
+  font-weight: 500;
+  margin-bottom: 2px;
+}
+
+.dmt-icon-preview-class {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-family: var(--font-monospace);
+}
+
+/* ===========================================
+ * RPGAwesome Icon Font
+ * Font-family name must be exactly 'rpgawesome'
+ * Font is bundled in DungeonMapTracker FONTS.css
+ * =========================================== */
+.ra {
+  font-family: 'rpgawesome' !important;
+  font-style: normal;
+  font-variant: normal;
+  font-weight: normal;
+  line-height: 1;
+  speak: never;
+  text-transform: none;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ===========================================
+ * Collapsible Sections
+ * =========================================== */
+.dmt-settings-section {
+  margin: 0 0 8px 0;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.dmt-settings-section > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: var(--background-secondary);
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 15px;
+  list-style: none;
+  user-select: none;
+}
+
+.dmt-settings-section > summary::-webkit-details-marker {
+  display: none;
+}
+
+.dmt-settings-section > summary::before {
+  content: '▶';
+  font-size: 10px;
+  transition: transform 0.2s ease;
+  color: var(--text-muted);
+}
+
+.dmt-settings-section[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.dmt-settings-section > summary:hover {
+  background: var(--background-modifier-hover);
+}
+
+.dmt-settings-section-content {
+  padding: 12px 16px;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.dmt-settings-section-content > .setting-item:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+
+/* ===========================================
+ * Settings Search
+ * =========================================== */
+.dmt-settings-search-wrapper {
+  margin-bottom: 16px;
+  position: sticky;
+  top: 0;
+  background: var(--background-primary);
+  padding: 8px 0;
+  z-index: 10;
+}
+
+.dmt-settings-search-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  background: var(--background-primary);
+}
+
+.dmt-settings-search-box:focus-within {
+  border-color: var(--interactive-accent);
+}
+
+.dmt-settings-search-box input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-size: 14px;
+  outline: none;
+}
+
+.dmt-settings-search-box .search-icon {
+  color: var(--text-muted);
+}
+
+.dmt-settings-search-box .clear-btn {
+  background: transparent;
+  border: none;
+  padding: 2px 6px;
+  cursor: pointer;
+  color: var(--text-muted);
+  border-radius: 4px;
+}
+
+.dmt-settings-search-box .clear-btn:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+/* Hide non-matching settings during search */
+.dmt-setting-hidden {
+  display: none !important;
+}
+
+/* Highlight matching text */
+.dmt-search-match {
+  background: var(--text-highlight-bg);
+  border-radius: 2px;
+}
+
+/* ===========================================
+ * Color Palette Section
+ * =========================================== */
+.dmt-color-list {
+  padding: 8px 0;
+}
+
+.dmt-color-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  transition: background-color 0.15s ease;
+}
+
+.dmt-color-row:hover {
+  background: var(--background-modifier-hover);
+}
+
+.dmt-color-row-swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  border: 2px solid var(--background-modifier-border);
+  flex-shrink: 0;
+}
+
+.dmt-color-row-label {
+  flex: 1;
+  min-width: 0;
+}
+
+.dmt-color-row-name {
+  font-weight: 500;
+}
+
+.dmt-color-row-modified,
+.dmt-color-row-custom {
+  font-size: 0.85em;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.dmt-color-row-hex {
+  font-size: 0.85em;
+  color: var(--text-muted);
+  background: var(--background-secondary);
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+.dmt-color-row-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+/* ===========================================
+ * Color Edit Modal
+ * =========================================== */
+.dmt-color-edit-modal {
+  padding: 16px;
+}
+
+.dmt-color-hex-input {
+  font-family: var(--font-monospace);
+  width: 90px !important;
+}
+
+.dmt-color-original-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  margin: 12px 0;
+  background: var(--background-secondary);
+  border-radius: 4px;
+  font-size: 0.9em;
+  color: var(--text-muted);
+}
+
+.dmt-color-mini-swatch {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  border: 1px solid var(--background-modifier-border);
+  vertical-align: middle;
+}
+
+.dmt-opacity-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dmt-opacity-control input[type="range"] {
+  width: 120px;
+}
+
+.dmt-opacity-value {
+  min-width: 40px;
+  text-align: right;
+  font-size: 0.9em;
+  color: var(--text-muted);
+}
+
+/* ===========================================
+ * Insert Map Modal
+ * =========================================== */
+.dmt-insert-map-modal {
+  padding: 16px;
+}
+
+.dmt-map-type-selection {
+  margin-top: 16px;
+}
+
+.dmt-map-type-buttons {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.dmt-map-type-btn {
+  flex: 1;
+  padding: 12px 16px;
+  border: 2px solid var(--background-modifier-border);
+  border-radius: 6px;
+  background: var(--background-primary);
+  color: var(--text-normal);
+  cursor: pointer;
+  font-size: 1em;
+  transition: all 0.15s ease;
+}
+
+.dmt-map-type-btn:hover {
+  border-color: var(--interactive-accent);
+  background: var(--background-secondary);
+}
+
+.dmt-map-type-btn.selected {
+  border-color: var(--interactive-accent);
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+/* ===========================================
+ * Insert Dungeon Modal
+ * =========================================== */
+.dmt-insert-dungeon-modal {
+  padding: 16px;
+  min-width: 400px;
+}
+
+/* Soften the modal container's border and shadow */
+.modal:has(.dmt-insert-dungeon-modal) {
+  border: 1px solid var(--background-modifier-border);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+
+/* Header with Visualizer */
+.dmt-dungeon-header {
+  position: relative;
+  margin: -16px -16px 0 -16px; /* Extend to modal edges, no bottom margin */
+  overflow: hidden;
+}
+
+.dmt-dungeon-visualizer {
+  width: 100%;
+  height: 180px;
+  position: relative;
+}
+
+.dmt-dungeon-visualizer canvas {
+  display: block;
+}
+
+.dmt-dungeon-title-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 20px 16px 8px 16px;
+  background: linear-gradient(to bottom, transparent 0%, var(--modal-background) 60%);
+}
+
+.dmt-dungeon-title-overlay h2 {
+  margin: 0;
+  font-size: 1.3em;
+  color: var(--text-normal);
+}
+
+/* Space after header before first setting - this also serves as visual separator */
+.dmt-dungeon-header + .setting-item {
+  margin-top: 16px;
+  border-top: none !important;
+}
+
+/* Stamp animation for visualizer */
+@keyframes dmt-windrose-stamp {
+  0% {
+    transform: translate(-50%, -50%) scale(1.6) rotate(-18deg);
+    opacity: 0;
+  }
+  50% {
+    opacity: 0.8;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1) rotate(0deg);
+    opacity: 0.75;
+  }
+}
+
+.dmt-dungeon-size-selection {
+  margin-top: 16px;
+}
+
+.dmt-dungeon-size-buttons {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.dmt-dungeon-size-btn {
+  flex: 1;
+  padding: 12px 16px;
+  border: 2px solid var(--background-modifier-border);
+  border-radius: 6px;
+  background: var(--background-primary);
+  color: var(--text-normal);
+  cursor: pointer;
+  font-size: 1em;
+  font-weight: 500;
+  transition: all 0.15s ease;
+  text-align: center;
+}
+
+.dmt-dungeon-size-btn:hover {
+  border-color: var(--interactive-accent);
+  background: var(--background-secondary);
+}
+
+.dmt-dungeon-size-btn.selected {
+  border-color: var(--interactive-accent);
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+.dmt-dungeon-style-selection {
+  margin-top: 16px;
+}
+
+.dmt-dungeon-style-buttons {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.dmt-dungeon-style-btn {
+  flex: 1;
+  min-width: 70px;
+  padding: 10px 12px;
+  border: 2px solid var(--background-modifier-border);
+  border-radius: 6px;
+  background: var(--background-primary);
+  color: var(--text-normal);
+  cursor: pointer;
+  font-size: 0.9em;
+  font-weight: 500;
+  transition: all 0.15s ease;
+  text-align: center;
+}
+
+.dmt-dungeon-style-btn:hover {
+  border-color: var(--interactive-accent);
+  background: var(--background-secondary);
+}
+
+.dmt-dungeon-style-btn.selected {
+  border-color: var(--interactive-accent);
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+.dmt-dungeon-distance-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.dmt-dungeon-distance-row input[type="number"] {
+  width: 80px;
+}
+
+.dmt-dungeon-distance-row input[type="text"] {
+  width: 60px;
+}
+
+/* Advanced options section */
+.dmt-dungeon-advanced {
+  margin-top: 16px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.dmt-dungeon-advanced-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--background-secondary);
+  cursor: pointer;
+  user-select: none;
+  font-weight: 500;
+}
+
+.dmt-dungeon-advanced-header:hover {
+  background: var(--background-modifier-hover);
+}
+
+.dmt-dungeon-advanced-chevron {
+  font-size: 0.75em;
+  color: var(--text-muted);
+}
+
+.dmt-dungeon-advanced-content {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.dmt-dungeon-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.dmt-dungeon-slider-row label {
+  flex: 0 0 130px;
+  font-size: 0.9em;
+  color: var(--text-normal);
+}
+
+.dmt-dungeon-slider-container {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.dmt-dungeon-slider-container input[type="range"] {
+  flex: 1;
+  height: 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: var(--background-modifier-border);
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.dmt-dungeon-slider-container input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--interactive-accent);
+  cursor: pointer;
+}
+
+.dmt-dungeon-slider-container input[type="range"]::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--interactive-accent);
+  border: none;
+  cursor: pointer;
+}
+
+.dmt-dungeon-slider-value {
+  flex: 0 0 60px;
+  text-align: right;
+  font-size: 0.85em;
+  color: var(--text-muted);
+  font-family: var(--font-monospace);
+}
+
+.dmt-dungeon-toggle-container {
+  flex: 1;
+  display: flex;
+  align-items: center;
+}
+
+.dmt-dungeon-select {
+  padding: 4px 8px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  background: var(--background-primary);
+  color: var(--text-normal);
+  font-size: 0.9em;
+  cursor: pointer;
+}
+
+/* ===========================================
+ * Animations
+ * =========================================== */
+@keyframes dmt-shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  75% { transform: translateX(4px); }
+}
+
+.dmt-shake {
+  animation: dmt-shake 0.3s ease;
+}`;
+```
+
 # settingsPluginAssembler
 
 ```js
 // settingsPluginAssembler.js
-// Orchestrator for assembling the Windrose MapDesigner Settings Plugin
-// 
-// Phase 4: Assembles helpers and modals from separate files, CSS is external
-//
-// Usage:
-//   const { assembleSettingsPlugin, getStylesCSS } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "settingsPluginAssembler"));
-//   const pluginTemplate = assembleSettingsPlugin();
-//   const stylesCSS = getStylesCSS();
+// Assembles the Windrose MapDesigner Settings Plugin from component files
 
-// Load the base template
+// Load all component files directly
 const BASE_TEMPLATE = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "settingsPluginMain"));
 
-// Helper files to load (order doesn't matter - no dependencies between them)
-const HELPER_FILES = [
-  'settingsPlugin-ObjectHelpers.js',
-  'settingsPlugin-ColorHelpers.js',
-  'settingsPlugin-DragHelpers.js',
-  'settingsPlugin-IconHelpers.js',
-  'settingsPlugin-RPGAwesomeHelpers.js',
-  'settingsPlugin-DungeonEssenceVisualizer.js'
-];
+const ObjectHelpers = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "settingsPlugin-ObjectHelpers"));
+const ColorHelpers = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "settingsPlugin-ColorHelpers"));
+const DragHelpers = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "settingsPlugin-DragHelpers"));
+const IconHelpers = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "settingsPlugin-IconHelpers"));
+const RPGAwesomeHelpers = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "settingsPlugin-RPGAwesomeHelpers"));
+const DungeonEssenceVisualizer = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "settingsPlugin-DungeonEssenceVisualizer"));
 
-// Modal files to load (order doesn't matter - each is self-contained)
-const MODAL_FILES = [
-  'settingsPlugin-InsertMapModal.js',
-  'settingsPlugin-InsertDungeonModal.js',
-  'settingsPlugin-ObjectEditModal.js',
-  'settingsPlugin-CategoryEditModal.js',
-  'settingsPlugin-ColorEditModal.js',
-  'settingsPlugin-ExportModal.js',
-  'settingsPlugin-ImportModal.js'
-];
+const InsertMapModal = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "settingsPlugin-InsertMapModal"));
+const InsertDungeonModal = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "settingsPlugin-InsertDungeonModal"));
+const ObjectEditModal = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "settingsPlugin-ObjectEditModal"));
+const CategoryEditModal = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "settingsPlugin-CategoryEditModal"));
+const ColorEditModal = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "settingsPlugin-ColorEditModal"));
+const ExportModal = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "settingsPlugin-ExportModal"));
+const ImportModal = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "settingsPlugin-ImportModal"));
 
-// Tab render method files (order matters - they're class methods)
-const TAB_RENDER_FILES = [
-  'settingsPlugin-TabRenderCore.js',
-  'settingsPlugin-TabRenderSettings.js',
-  'settingsPlugin-TabRenderColors.js',
-  'settingsPlugin-TabRenderObjects.js'
-];
+const TabRenderCore = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "settingsPlugin-TabRenderCore"));
+const TabRenderSettings = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "settingsPlugin-TabRenderSettings"));
+const TabRenderColors = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "settingsPlugin-TabRenderColors"));
+const TabRenderObjects = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "settingsPlugin-TabRenderObjects"));
 
-// Track missing files for error reporting
-const missingFiles = [];
+const STYLES_CSS = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "settingsPlugin-styles"));
 
-/**
- * Load a source file and strip header comments
- * @param {string} filename - File name to load
- * @returns {Promise<string>} File content with headers stripped
- */
-async function loadSourceFile(filename) {
-  try {
-    const files = dc.app.vault.getFiles();
-    const file = files.find(f => f.path.endsWith(filename));
-    if (file) {
-      const content = await dc.app.vault.read(file);
-      // Strip the header comments (lines starting with //)
-      const lines = content.split('\n');
-      let startLine = 0;
-      for (let i = 0; i < lines.length; i++) {
-        if (!lines[i].startsWith('//') && lines[i].trim() !== '') {
-          startLine = i;
-          break;
-        }
-      }
-      console.log(`[settingsPluginAssembler] Loaded ${filename} (${lines.length} lines)`);
-      return lines.slice(startLine).join('\n');
-    }
-    console.error(`[settingsPluginAssembler] MISSING FILE: ${filename}`);
-    missingFiles.push(filename);
-    return '';
-  } catch (e) {
-    console.error(`[settingsPluginAssembler] Error loading ${filename}:`, e);
-    missingFiles.push(filename);
-    return '';
-  }
-}
+// Concatenate content
+const HELPERS_CONTENT = [
+  ObjectHelpers, ColorHelpers, DragHelpers, IconHelpers, RPGAwesomeHelpers, DungeonEssenceVisualizer
+].join('\n\n');
 
-/**
- * Load multiple source files and concatenate
- * @param {string[]} filenames - Array of filenames
- * @returns {Promise<string>} Concatenated content
- */
-async function loadAndConcatenate(filenames) {
-  let result = '';
-  for (const filename of filenames) {
-    const content = await loadSourceFile(filename);
-    if (content) {
-      result += content + '\n\n';
-    }
-  }
-  return result.trim();
-}
+const MODALS_CONTENT = [
+  InsertMapModal, InsertDungeonModal, ObjectEditModal, CategoryEditModal, ColorEditModal, ExportModal, ImportModal
+].join('\n\n');
 
-// Load all source files
-const HELPERS_CONTENT = await loadAndConcatenate(HELPER_FILES);
-const MODALS_CONTENT = await loadAndConcatenate(MODAL_FILES);
-const TAB_RENDER_CONTENT = await loadAndConcatenate(TAB_RENDER_FILES);
+const TAB_RENDER_CONTENT = [
+  TabRenderCore, TabRenderSettings, TabRenderColors, TabRenderObjects
+].join('\n\n');
 
-console.log(`[settingsPluginAssembler] Helpers content length: ${HELPERS_CONTENT.length}`);
-console.log(`[settingsPluginAssembler] Modals content length: ${MODALS_CONTENT.length}`);
-console.log(`[settingsPluginAssembler] Tab render content length: ${TAB_RENDER_CONTENT.length}`);
-
-// Check for missing files and warn
-if (missingFiles.length > 0) {
-  console.error(`[settingsPluginAssembler] CRITICAL: ${missingFiles.length} source files missing!`);
-  console.error(`[settingsPluginAssembler] Missing: ${missingFiles.join(', ')}`);
-  console.error(`[settingsPluginAssembler] The plugin will NOT work correctly.`);
-  console.error(`[settingsPluginAssembler] Please ensure all settingsPlugin-*.js files are in your vault.`);
-}
-
-// Load the CSS file content
-let STYLES_CSS_CONTENT = '';
-try {
-  const files = dc.app.vault.getFiles();
-  const cssFile = files.find(f => f.path.endsWith('settingsPlugin-styles.css'));
-  
-  if (cssFile) {
-    STYLES_CSS_CONTENT = await dc.app.vault.read(cssFile);
-    console.log('[settingsPluginAssembler] Loaded CSS file:', cssFile.path);
-  } else {
-    console.warn('[settingsPluginAssembler] CSS file not found in vault');
-  }
-} catch (e) {
-  console.warn('[settingsPluginAssembler] Could not load CSS file:', e);
-}
-
-/**
- * Get the CSS content for the settings plugin
- * @returns {string} CSS content to write to styles.css
- */
-function getStylesCSS() {
-  return STYLES_CSS_CONTENT;
-}
-
-/**
- * Assemble the settings plugin JavaScript
- * 
- * Phase 4: Injects helpers and modals from separate files
- *          CSS is loaded by Obsidian from styles.css only
- * 
- * @returns {string} The plugin template string (with {{PLACEHOLDER}} markers)
- */
+// Assembly function
 function assembleSettingsPlugin() {
-  // Validate that we have content to inject
-  if (!HELPERS_CONTENT) {
-    throw new Error('[settingsPluginAssembler] HELPERS_CONTENT is empty! Missing helper files: ' + 
-      HELPER_FILES.join(', '));
-  }
-  if (!MODALS_CONTENT) {
-    throw new Error('[settingsPluginAssembler] MODALS_CONTENT is empty! Missing modal files: ' + 
-      MODAL_FILES.join(', '));
-  }
-  if (!TAB_RENDER_CONTENT) {
-    throw new Error('[settingsPluginAssembler] TAB_RENDER_CONTENT is empty! Missing tab render files: ' + 
-      TAB_RENDER_FILES.join(', '));
-  }
-  
-  // Use function replacer to avoid $ pattern interpretation in replacement strings
-  // (template literals like ${var} in the source files would otherwise cause issues)
-  let result = BASE_TEMPLATE
+  return BASE_TEMPLATE
     .replace(/\{\{HELPER_NAMESPACES\}\}/g, () => HELPERS_CONTENT)
     .replace(/\{\{MODAL_CLASSES\}\}/g, () => MODALS_CONTENT)
     .replace(/\{\{TAB_RENDER_METHODS\}\}/g, () => TAB_RENDER_CONTENT);
-  
-  // Verify placeholders were replaced
-  if (result.includes('{{HELPER_NAMESPACES}}')) {
-    throw new Error('[settingsPluginAssembler] Failed to replace {{HELPER_NAMESPACES}} placeholder!');
-  }
-  if (result.includes('{{MODAL_CLASSES}}')) {
-    throw new Error('[settingsPluginAssembler] Failed to replace {{MODAL_CLASSES}} placeholder!');
-  }
-  if (result.includes('{{TAB_RENDER_METHODS}}')) {
-    throw new Error('[settingsPluginAssembler] Failed to replace {{TAB_RENDER_METHODS}} placeholder!');
-  }
-  
-  console.log(`[settingsPluginAssembler] Assembly complete. Output: ${result.length} chars`);
-  return result;
 }
 
-// Export the assembler functions
+function getStylesCSS() {
+  return STYLES_CSS;
+}
+
 return {
   assembleSettingsPlugin,
   getStylesCSS,
-  // Export for debugging/version checking
-  ASSEMBLER_VERSION: '1.4.0-phase5',
-  // Flags for assembly mode
-  CSS_MODE: 'external-only',
-  HELPERS_MODE: 'assembled',
-  MODALS_MODE: 'assembled',
-  TAB_RENDER_MODE: 'assembled',
-  // Export for diagnostics
-  missingFiles
+  ASSEMBLER_VERSION: '2.0.0'
 };
-```
-
-# settingsPlugin-quickSymbols
-
-```js
-// settingsPlugin-quickSymbols.js
-// Quick symbols palette for object creation in the settings plugin
-// Separated to prevent unicode corruption during automated edits
-
-const QUICK_SYMBOLS = [
-  '★', '☆', '✦', '✧', '✪', '✫', '✯', '⚒',
-  '●', '○', '◆', '◇', '■', '□', '▲', '△',
-  '▼', '▽', '♠', '♤', '♣', '♧', '♥', '♡',
-  '♦', '♢', '⚔', '⚒', '🗡', '🧹', '⚔', '⛏',
-  '📱', '☠', '⚠', '☢', '☣', '⚡', '🔥', '💧',
-  '⚒', '⚐', '⛳', '🚩', '➤', '➜', '⬤', '⚙',
-  '⚗', '🔮', '💎', '🗝', '📜', '🎭', '👑', '🛡',
-  '🏰', '⛪', '🗿', '⚱', '🏺', '🪔'
-];
-
-return QUICK_SYMBOLS;
 ```
 
 # SettingsPluginInstaller
@@ -24177,18 +28989,15 @@ return QUICK_SYMBOLS;
 const { THEME, DEFAULTS } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "dmtConstants"));
 const { WindroseCompass } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "WindroseCompass"));
 
-// Use the assembler to get the plugin template and CSS
-const { assembleSettingsPlugin, getStylesCSS, ASSEMBLER_VERSION } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "settingsPluginAssembler"));
-const SETTINGS_PLUGIN_TEMPLATE = assembleSettingsPlugin();
-const SETTINGS_PLUGIN_CSS = getStylesCSS();
-
+// NOTE: Assembler is lazy-loaded only when install/upgrade is triggered
+// This avoids running assembly on every app load
 
 const { OBJECT_TYPES, CATEGORIES } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "objectTypes"));
 const { RA_ICONS, RA_CATEGORIES } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "rpgAwesomeIcons"));
 const QUICK_SYMBOLS = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "settingsPlugin-quickSymbols"));
 
 // Plugin version from template
-const PACKAGED_PLUGIN_VERSION = '0.12.6';
+const PACKAGED_PLUGIN_VERSION = '0.12.9';
 
 // LocalStorage keys for tracking user preferences
 const STORAGE_KEYS = {
@@ -24286,13 +29095,22 @@ function escapeUnicode(str) {
 
 /**
  * Generate main.js content from template with injected constants
+ * Assembles fresh each time to ensure upgrades get latest code
+ * Returns both the main.js content and styles.css content
  */
-function generateMainJs() {
+async function generatePluginFiles() {
+  // Lazy-load assembler only when actually installing/upgrading
+  const { assembleSettingsPlugin, getStylesCSS } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "settingsPluginAssembler"));
+  
+  // Assemble the plugin fresh (loads all source files)
+  const SETTINGS_PLUGIN_TEMPLATE = await assembleSettingsPlugin();
+  const stylesCSS = await getStylesCSS();
+  
   // Build category order map from CATEGORIES
   const categoryOrder = {};
   CATEGORIES.forEach(c => { categoryOrder[c.id] = c.order; });
   
-  return SETTINGS_PLUGIN_TEMPLATE
+  const mainJs = SETTINGS_PLUGIN_TEMPLATE
     .replace(/\{\{PLUGIN_VERSION\}\}/g, PACKAGED_PLUGIN_VERSION)
     .replace(/\{\{DEFAULT_HEX_ORIENTATION\}\}/g, DEFAULTS.hexOrientation)
     .replace(/\{\{DEFAULT_GRID_LINE_COLOR\}\}/g, THEME.grid.lines)
@@ -24307,6 +29125,8 @@ function generateMainJs() {
     .replace('{{RA_ICONS}}', escapeUnicode(JSON.stringify(RA_ICONS, null, 2)))
     .replace('{{RA_CATEGORIES}}', JSON.stringify(RA_CATEGORIES, null, 2))
     .replace('{{QUICK_SYMBOLS}}', JSON.stringify(QUICK_SYMBOLS));
+  
+  return { mainJs, stylesCSS };
 }
 
 const SettingsPluginInstaller = ({ onInstall, onDecline, mode = 'auto' }) => {
@@ -24345,12 +29165,12 @@ const SettingsPluginInstaller = ({ onInstall, onDecline, mode = 'auto' }) => {
       );
 
       // Write main.js from template
-      const mainJs = generateMainJs();
+      const { mainJs, stylesCSS } = await generatePluginFiles();
       await adapter.write(`${pluginDir}/main.js`, mainJs);
 
       // Write styles.css for Obsidian to load automatically
-      if (SETTINGS_PLUGIN_CSS) {
-        await adapter.write(`${pluginDir}/styles.css`, SETTINGS_PLUGIN_CSS);
+      if (stylesCSS) {
+        await adapter.write(`${pluginDir}/styles.css`, stylesCSS);
       } else {
         console.warn('[SettingsPluginInstaller] No CSS content available - inline styles will be used');
       }
@@ -24430,12 +29250,12 @@ const SettingsPluginInstaller = ({ onInstall, onDecline, mode = 'auto' }) => {
       );
 
       // Write updated main.js from template
-      const mainJs = generateMainJs();
+      const { mainJs, stylesCSS } = await generatePluginFiles();
       await adapter.write(`${pluginDir}/main.js`, mainJs);
 
       // Write/update styles.css for Obsidian to load automatically
-      if (SETTINGS_PLUGIN_CSS) {
-        await adapter.write(`${pluginDir}/styles.css`, SETTINGS_PLUGIN_CSS);
+      if (stylesCSS) {
+        await adapter.write(`${pluginDir}/styles.css`, stylesCSS);
       }
 
       // DO NOT overwrite data.json - preserve user settings

@@ -1,4 +1,4 @@
-// settingsPlugin-IconHelpers.js
+return `// settingsPlugin-IconHelpers.js
 // Icon helpers for setting Lucide icons with fallback
 // This file is concatenated into the settings plugin template by the assembler
 
@@ -29,4 +29,4 @@ const IconHelpers = {
       el.textContent = icons[iconId] || '?';
     }
   }
-};
+};`;

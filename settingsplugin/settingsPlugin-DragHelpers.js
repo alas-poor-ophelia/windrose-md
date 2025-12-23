@@ -1,4 +1,4 @@
-// settingsPlugin-DragHelpers.js
+return `// settingsPlugin-DragHelpers.js
 // Drag and drop helpers for reordering objects in the settings UI
 // This file is concatenated into the settings plugin template by the assembler
 
@@ -25,4 +25,4 @@ const DragHelpers = {
       }
     }, { offset: Number.NEGATIVE_INFINITY }).element;
   }
-};
+};`;

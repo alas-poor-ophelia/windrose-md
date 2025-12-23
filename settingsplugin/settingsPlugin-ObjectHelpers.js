@@ -1,4 +1,4 @@
-// settingsPlugin-ObjectHelpers.js
+return `// settingsPlugin-ObjectHelpers.js
 // Object resolution helpers - transforms raw settings into resolved object/category lists
 // This file is concatenated into the settings plugin template by the assembler
 
@@ -103,4 +103,4 @@ const ObjectHelpers = {
       .filter(o => o.category === categoryId && !objectOverrides[o.id]?.hidden)
       .map(o => o.id);
   }
-};
+};`;

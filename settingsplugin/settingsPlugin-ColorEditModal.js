@@ -1,4 +1,4 @@
-// settingsPlugin-ColorEditModal.js
+return `// settingsPlugin-ColorEditModal.js
 // Modal for editing color palette entries
 // This file is concatenated into the settings plugin template by the assembler
 
@@ -24,7 +24,7 @@ class ColorEditModal extends Modal {
     
     contentEl.createEl('h2', { 
       text: isEdit 
-        ? (isBuiltIn ? `Edit: ${this.existingColor.label}` : 'Edit Custom Color')
+        ? (isBuiltIn ? \`Edit: \${this.existingColor.label}\` : 'Edit Custom Color')
         : 'Add Custom Color' 
     });
     
@@ -83,13 +83,13 @@ class ColorEditModal extends Modal {
       attr: { min: '10', max: '100', value: String(Math.round(opacityValue * 100)) }
     });
     const opacityDisplay = opacityContainer.createEl('span', { 
-      text: `${Math.round(opacityValue * 100)}%`,
+      text: \`\${Math.round(opacityValue * 100)}%\`,
       cls: 'dmt-opacity-value'
     });
     
     opacitySlider.addEventListener('input', (e) => {
       opacityValue = parseInt(e.target.value, 10) / 100;
-      opacityDisplay.textContent = `${Math.round(opacityValue * 100)}%`;
+      opacityDisplay.textContent = \`\${Math.round(opacityValue * 100)}%\`;
     });
     
     // Show original values for built-ins
@@ -98,9 +98,9 @@ class ColorEditModal extends Modal {
       origInfo.createEl('span', { text: 'Original: ' });
       const origSwatch = origInfo.createEl('span', { 
         cls: 'dmt-color-mini-swatch',
-        attr: { style: `background-color: ${originalBuiltIn.color}` }
+        attr: { style: \`background-color: \${originalBuiltIn.color}\` }
       });
-      origInfo.createEl('span', { text: ` ${originalBuiltIn.label} (${originalBuiltIn.color})` });
+      origInfo.createEl('span', { text: \` \${originalBuiltIn.label} (\${originalBuiltIn.color})\` });
     }
     
     // Action buttons
@@ -169,3 +169,4 @@ class ColorEditModal extends Modal {
     this.contentEl.empty();
   }
 }
+`;

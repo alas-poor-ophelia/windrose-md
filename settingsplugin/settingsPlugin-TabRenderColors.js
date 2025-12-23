@@ -1,11 +1,11 @@
-// settingsPlugin-TabRenderColors.js
+return `// settingsPlugin-TabRenderColors.js
 // WindroseMDSettingsTab render methods - Color palette
 // This file is concatenated into the settings plugin template by the assembler
 
 const TabRenderColorsMethods = {
   renderColorPaletteContent(containerEl) {
     containerEl.createEl('p', { 
-      text: 'Customize the color palette used for drawing cells and objects. Edit built-in colors, add custom colors, or hide colors you don\'t use.',
+      text: 'Customize the color palette used for drawing cells and objects. Edit built-in colors, add custom colors, or hide colors you don\\'t use.',
       cls: 'setting-item-description'
     });
     
@@ -55,7 +55,7 @@ const TabRenderColorsMethods = {
     // Visible colors container
     const visibleContainer = containerEl.createEl('div', { cls: 'dmt-settings-category' });
     const visibleHeader = visibleContainer.createEl('div', { cls: 'dmt-settings-category-header' });
-    visibleHeader.createEl('span', { text: `Active Colors (${visibleColors.length})`, cls: 'dmt-settings-category-label' });
+    visibleHeader.createEl('span', { text: \`Active Colors (\${visibleColors.length})\`, cls: 'dmt-settings-category-label' });
     
     const visibleList = visibleContainer.createEl('div', { cls: 'dmt-color-list' });
     
@@ -74,7 +74,7 @@ const TabRenderColorsMethods = {
     if (hiddenBuiltIns.length > 0) {
       const hiddenContainer = containerEl.createEl('div', { cls: 'dmt-settings-category dmt-settings-category-muted' });
       const hiddenHeader = hiddenContainer.createEl('div', { cls: 'dmt-settings-category-header' });
-      hiddenHeader.createEl('span', { text: `Hidden Colors (${hiddenBuiltIns.length})`, cls: 'dmt-settings-category-label' });
+      hiddenHeader.createEl('span', { text: \`Hidden Colors (\${hiddenBuiltIns.length})\`, cls: 'dmt-settings-category-label' });
       
       const hiddenList = hiddenContainer.createEl('div', { cls: 'dmt-color-list' });
       
@@ -93,7 +93,7 @@ const TabRenderColorsMethods = {
     const swatchOpacity = color.opacity ?? 1;
     const swatch = row.createEl('div', { 
       cls: 'dmt-color-row-swatch',
-      attr: { style: `background-color: ${color.color}; opacity: ${swatchOpacity}` }
+      attr: { style: \`background-color: \${color.color}; opacity: \${swatchOpacity}\` }
     });
     
     // Label with modified indicator
@@ -109,7 +109,7 @@ const TabRenderColorsMethods = {
     
     // Hex value + opacity if not 100%
     const hexText = swatchOpacity < 1 
-      ? `${color.color} @ ${Math.round(swatchOpacity * 100)}%`
+      ? \`\${color.color} @ \${Math.round(swatchOpacity * 100)}%\`
       : color.color;
     row.createEl('code', { text: hexText, cls: 'dmt-color-row-hex' });
     
@@ -177,4 +177,4 @@ const TabRenderColorsMethods = {
     }
   }
 
-};
+};`;

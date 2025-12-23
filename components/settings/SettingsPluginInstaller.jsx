@@ -6,18 +6,15 @@ const { requireModuleByName } = await dc.require(pathResolverPath);
 const { THEME, DEFAULTS } = await requireModuleByName("dmtConstants.js");
 const { WindroseCompass } = await requireModuleByName("WindroseCompass.jsx");
 
-// Use the assembler to get the plugin template and CSS
-const { assembleSettingsPlugin, getStylesCSS, ASSEMBLER_VERSION } = await requireModuleByName("settingsPluginAssembler.js");
-const SETTINGS_PLUGIN_TEMPLATE = assembleSettingsPlugin();
-const SETTINGS_PLUGIN_CSS = getStylesCSS();
-
+// NOTE: Assembler is lazy-loaded only when install/upgrade is triggered
+// This avoids running assembly on every app load
 
 const { OBJECT_TYPES, CATEGORIES } = await requireModuleByName("objectTypes.js");
 const { RA_ICONS, RA_CATEGORIES } = await requireModuleByName("rpgAwesomeIcons.js");
 const QUICK_SYMBOLS = await requireModuleByName("settingsPlugin-quickSymbols.js");
 
 // Plugin version from template
-const PACKAGED_PLUGIN_VERSION = '0.12.6';
+const PACKAGED_PLUGIN_VERSION = '0.12.9';
 
 // LocalStorage keys for tracking user preferences
 const STORAGE_KEYS = {
@@ -115,13 +112,22 @@ function escapeUnicode(str) {
 
 /**
  * Generate main.js content from template with injected constants
+ * Assembles fresh each time to ensure upgrades get latest code
+ * Returns both the main.js content and styles.css content
  */
-function generateMainJs() {
+async function generatePluginFiles() {
+  // Lazy-load assembler only when actually installing/upgrading
+  const { assembleSettingsPlugin, getStylesCSS } = await requireModuleByName("settingsPluginAssembler.js");
+  
+  // Assemble the plugin fresh (loads all source files)
+  const SETTINGS_PLUGIN_TEMPLATE = await assembleSettingsPlugin();
+  const stylesCSS = await getStylesCSS();
+  
   // Build category order map from CATEGORIES
   const categoryOrder = {};
   CATEGORIES.forEach(c => { categoryOrder[c.id] = c.order; });
   
-  return SETTINGS_PLUGIN_TEMPLATE
+  const mainJs = SETTINGS_PLUGIN_TEMPLATE
     .replace(/\{\{PLUGIN_VERSION\}\}/g, PACKAGED_PLUGIN_VERSION)
     .replace(/\{\{DEFAULT_HEX_ORIENTATION\}\}/g, DEFAULTS.hexOrientation)
     .replace(/\{\{DEFAULT_GRID_LINE_COLOR\}\}/g, THEME.grid.lines)
@@ -136,6 +142,8 @@ function generateMainJs() {
     .replace('{{RA_ICONS}}', escapeUnicode(JSON.stringify(RA_ICONS, null, 2)))
     .replace('{{RA_CATEGORIES}}', JSON.stringify(RA_CATEGORIES, null, 2))
     .replace('{{QUICK_SYMBOLS}}', JSON.stringify(QUICK_SYMBOLS));
+  
+  return { mainJs, stylesCSS };
 }
 
 const SettingsPluginInstaller = ({ onInstall, onDecline, mode = 'auto' }) => {
@@ -174,12 +182,12 @@ const SettingsPluginInstaller = ({ onInstall, onDecline, mode = 'auto' }) => {
       );
 
       // Write main.js from template
-      const mainJs = generateMainJs();
+      const { mainJs, stylesCSS } = await generatePluginFiles();
       await adapter.write(`${pluginDir}/main.js`, mainJs);
 
       // Write styles.css for Obsidian to load automatically
-      if (SETTINGS_PLUGIN_CSS) {
-        await adapter.write(`${pluginDir}/styles.css`, SETTINGS_PLUGIN_CSS);
+      if (stylesCSS) {
+        await adapter.write(`${pluginDir}/styles.css`, stylesCSS);
       } else {
         console.warn('[SettingsPluginInstaller] No CSS content available - inline styles will be used');
       }
@@ -259,12 +267,12 @@ const SettingsPluginInstaller = ({ onInstall, onDecline, mode = 'auto' }) => {
       );
 
       // Write updated main.js from template
-      const mainJs = generateMainJs();
+      const { mainJs, stylesCSS } = await generatePluginFiles();
       await adapter.write(`${pluginDir}/main.js`, mainJs);
 
       // Write/update styles.css for Obsidian to load automatically
-      if (SETTINGS_PLUGIN_CSS) {
-        await adapter.write(`${pluginDir}/styles.css`, SETTINGS_PLUGIN_CSS);
+      if (stylesCSS) {
+        await adapter.write(`${pluginDir}/styles.css`, stylesCSS);
       }
 
       // DO NOT overwrite data.json - preserve user settings

@@ -1,4 +1,4 @@
-// settingsPlugin-ColorHelpers.js
+return `// settingsPlugin-ColorHelpers.js
 // Color palette resolution helpers - transforms raw settings into resolved color list
 // This file is concatenated into the settings plugin template by the assembler
 
@@ -55,4 +55,4 @@ const ColorHelpers = {
         .map(([id]) => id)
     );
   }
-};
+};`;

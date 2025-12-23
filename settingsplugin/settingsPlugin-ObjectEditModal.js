@@ -1,4 +1,4 @@
-// settingsPlugin-ObjectEditModal.js
+return `// settingsPlugin-ObjectEditModal.js
 // Modal for editing object properties (symbol, label, category)
 // This file is concatenated into the settings plugin template by the assembler
 
@@ -435,3 +435,4 @@ class ObjectEditModal extends Modal {
     this.contentEl.empty();
   }
 }
+`;

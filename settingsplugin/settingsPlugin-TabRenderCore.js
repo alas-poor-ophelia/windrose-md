@@ -1,4 +1,4 @@
-// settingsPlugin-TabRenderCore.js
+return `// settingsPlugin-TabRenderCore.js
 // WindroseMDSettingsTab render methods - Core (search bar)
 // This file is concatenated into the settings plugin template by the assembler
 
@@ -88,4 +88,4 @@ const TabRenderCoreMethods = {
     });
   }
 
-};
+};`;

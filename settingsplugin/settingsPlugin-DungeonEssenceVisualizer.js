@@ -1,4 +1,4 @@
-// settingsPlugin-DungeonEssenceVisualizer.js
+return `// settingsPlugin-DungeonEssenceVisualizer.js
 // Ambient visualization for the Insert Dungeon modal
 // Shows abstract "dungeon being born" animation
 // This file is concatenated into the settings plugin template by the assembler
@@ -27,13 +27,13 @@ class DungeonEssenceVisualizer {
     
     // Create stamp overlay container
     this.stampOverlay = document.createElement('div');
-    this.stampOverlay.style.cssText = `
+    this.stampOverlay.style.cssText = \`
       position: absolute;
       pointer-events: none;
       opacity: 0;
       filter: saturate(0.4);
       transition: opacity 0.3s ease;
-    `;
+    \`;
     this.stampOverlay.innerHTML = this.getWindroseSVG();
     this.container.style.position = 'relative';
     this.container.appendChild(this.stampOverlay);
@@ -65,7 +65,7 @@ class DungeonEssenceVisualizer {
   
   getWindroseSVG() {
     // Simplified WindroseCompass SVG for the stamp
-    return `
+    return \`
       <svg viewBox="0 0 100 100" style="width: 100%; height: 100%;">
         <defs>
           <filter id="dmt-stamp-shadow" x="-50%" y="-50%" width="200%" height="200%">
@@ -95,7 +95,7 @@ class DungeonEssenceVisualizer {
           <path d="M 50 14 L 45 24 L 50 20 L 55 24 Z" fill="#e74c3c" stroke="#c0392b" stroke-width="0.5"/>
         </g>
       </svg>
-    `;
+    \`;
   }
   
   handleResize() {
@@ -310,12 +310,12 @@ class DungeonEssenceVisualizer {
     const { nodes, connections } = this.state;
     const loops = [];
     const existingPairs = new Set(
-      connections.map(c => `${Math.min(c.from, c.to)}-${Math.max(c.from, c.to)}`)
+      connections.map(c => \`\${Math.min(c.from, c.to)}-\${Math.max(c.from, c.to)}\`)
     );
     
     for (let i = 0; i < nodes.length; i++) {
       for (let j = i + 1; j < nodes.length; j++) {
-        const key = `${i}-${j}`;
+        const key = \`\${i}-\${j}\`;
         if (!existingPairs.has(key) && Math.random() < this.settings.loopChance) {
           loops.push({ from: i, to: j, progress: 0 });
         }
@@ -717,3 +717,4 @@ class DungeonEssenceVisualizer {
     }
   }
 }
+`;
