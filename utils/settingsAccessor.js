@@ -52,7 +52,11 @@ const FALLBACK_SETTINGS = {
   fogOfWarBlurFactor: THEME.fogOfWar.blurFactor,
   
   // Controls visibility
-  alwaysShowControls: false
+  alwaysShowControls: false,
+  
+  // Shape preview settings (Input & Controls)
+  shapePreviewKbm: true,      // Live preview on hover for keyboard/mouse (default ON)
+  shapePreviewTouch: false    // 3-tap confirmation flow for touch (default OFF)
 };
 
 /**

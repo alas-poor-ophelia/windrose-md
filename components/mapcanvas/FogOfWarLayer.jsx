@@ -17,6 +17,7 @@ const { requireModuleByName } = await dc.require(pathResolverPath);
 const { useFogTools } = await requireModuleByName("useFogTools.js");
 const { useMapState } = await requireModuleByName("MapContext.jsx");
 const { useEventHandlerRegistration } = await requireModuleByName("EventHandlerContext.jsx");
+const { GridGeometry } = await requireModuleByName("GridGeometry.js");
 
 /**
  * FogOfWarLayer Component
@@ -29,7 +30,7 @@ const FogOfWarLayer = ({
   onFogChange,
   onInitializeFog
 }) => {
-  const { canvasRef, mapData, geometry } = useMapState();
+  const { canvasRef, containerRef, mapData, geometry } = useMapState();
   const { registerHandlers, unregisterHandlers } = useEventHandlerRegistration();
   
   // Use the fog tools hook for all logic
@@ -68,7 +69,7 @@ const FogOfWarLayer = ({
    * Render preview overlay for rectangle start point
    */
   const renderPreviewOverlay = () => {
-    if (!activeTool || !rectangleStart || !canvasRef.current || !geometry) {
+    if (!activeTool || !rectangleStart || !canvasRef.current || !containerRef?.current || !geometry) {
       return null;
     }
     
@@ -78,9 +79,11 @@ const FogOfWarLayer = ({
     const { width, height } = canvas;
     
     // Calculate viewport parameters based on geometry type
+    // Use instanceof for reliable type detection
     let scaledSize, offsetX, offsetY;
     
-    if (geometry.constructor.name === 'GridGeometry') {
+    const isGrid = geometry instanceof GridGeometry;
+    if (isGrid) {
       scaledSize = geometry.getScaledCellSize(zoom);
       offsetX = width / 2 - center.x * scaledSize;
       offsetY = height / 2 - center.y * scaledSize;
@@ -91,7 +94,8 @@ const FogOfWarLayer = ({
       scaledSize = geometry.getScaledCellSize(zoom);
     }
     
-    const containerRect = canvas.parentElement.getBoundingClientRect();
+    // Use containerRef for proper positioning relative to dmt-canvas-container
+    const containerRect = containerRef.current.getBoundingClientRect();
     const canvasRect = canvas.getBoundingClientRect();
     
     const canvasOffsetX = canvasRect.left - containerRect.left;
@@ -105,7 +109,7 @@ const FogOfWarLayer = ({
     
     let screenX, screenY;
     
-    if (geometry.constructor.name === 'GridGeometry') {
+    if (isGrid) {
       // Grid: col/row map directly to grid coords
       const worldX = (col + 0.5) * geometry.cellSize;
       const worldY = (row + 0.5) * geometry.cellSize;
@@ -113,8 +117,6 @@ const FogOfWarLayer = ({
       screenY = offsetY + worldY * zoom;
     } else {
       // Hex: need to convert offset back to axial, then to world
-      // Import offsetToAxial for this conversion
-      const { offsetToAxial } = dc;
       if (geometry.offsetToAxial) {
         // If geometry has the method, use it
         const axial = geometry.offsetToAxial(col, row);

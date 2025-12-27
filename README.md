@@ -1,4 +1,4 @@
-WIndrose MapDesigner (WindroseMD) is a simple TTRPG-focused mapping tool for Obsidian, built on [Datacore](https://github.com/blacksmithgu/datacore). It started as something like graph paper in Obsidian and then... grew? Supports both traditional grid based maps as well as hex maps, with a bevy of customization options, an emphasis on (what I think is) thoughtful design, and first class mobile/touch compatability.
+WIndrose MapDesigner (WindroseMD) is a simple TTRPG-focused mapping tool for Obsidian, built on [Datacore](https://github.com/blacksmithgu/datacore). It started as something like graph paper in Obsidian and then... grew? Supports both traditional grid based maps as well as hex maps, with a bevy of customization options, an emphasis on (what I think is) thoughtful design, and first class mobile/touch compatibility.
 
 Low tech enough to run in your text editor, high tech enough to... make you forget you're in your text editor?
 

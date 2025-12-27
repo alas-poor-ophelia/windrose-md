@@ -737,6 +737,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 currentTool={currentTool}
                 selectedColor={selectedColor}
                 selectedOpacity={selectedOpacity}
+                globalSettings={effectiveSettings}
+                mapDistanceOverrides={mapData?.settings?.distanceSettings}
               />
               
               {/* ObjectLayer - handles object placement and interactions */}

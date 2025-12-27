@@ -2,51 +2,71 @@ const pathResolverPath = dc.resolvePath("pathResolver.js");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
 const { useDrawingTools } = await requireModuleByName("useDrawingTools.js");
-const { useMapState, useMapOperations } = await requireModuleByName("MapContext.jsx");
+const { useMapState } = await requireModuleByName("MapContext.jsx");
 const { useEventHandlerRegistration } = await requireModuleByName("EventHandlerContext.jsx");
+const { ShapePreviewOverlay } = await requireModuleByName("ShapePreviewOverlay.jsx");
+const { getSettings } = await requireModuleByName("settingsAccessor.js");
+const { getEffectiveDistanceSettings } = await requireModuleByName("distanceOperations.js");
 
 /**
  * DrawingLayer.jsx
- * FIX v3: Use inverse screenToGrid transformation instead of gridToScreen
+ * 
+ * Handles drawing tool interactions and preview overlays.
+ * Supports live shape preview for KBM (hover) and touch (3-tap confirmation).
  */
 const DrawingLayer = ({
   currentTool,
   selectedColor,
   selectedOpacity = 1,
-  onDrawingStateChange
+  onDrawingStateChange,
+  globalSettings,
+  mapDistanceOverrides
 }) => {
   const { 
-    canvasRef, 
+    canvasRef,
+    containerRef,
     mapData, 
-    screenToGrid, 
-    screenToWorld, 
-    getClientCoords, 
     GridGeometry,
     geometry
   } = useMapState();
   
-  const { 
-    getTextLabelAtPosition, 
-    removeTextLabel, 
-    getObjectAtPosition, 
-    removeObjectAtPosition, 
-    removeObjectsInRectangle 
-  } = useMapOperations();
+  // Get preview settings from plugin settings
+  const previewSettings = dc.useMemo(() => {
+    const settings = globalSettings || getSettings();
+    return {
+      kbmEnabled: settings.shapePreviewKbm !== false, // Default true
+      touchEnabled: settings.shapePreviewTouch === true // Default false
+    };
+  }, [globalSettings]);
+  
+  // Get distance settings for dimension display
+  const distanceSettings = dc.useMemo(() => {
+    const mapType = mapData?.mapType || 'grid';
+    const settings = globalSettings || getSettings();
+    return getEffectiveDistanceSettings(mapType, settings, mapDistanceOverrides);
+  }, [mapData?.mapType, globalSettings, mapDistanceOverrides]);
   
   const {
     isDrawing,
     rectangleStart,
     circleStart,
     edgeLineStart,
+    shapeHoverPosition,
+    touchConfirmPending,
+    pendingEndPoint,
     handleDrawingPointerDown,
     handleDrawingPointerMove,
     stopDrawing,
     stopEdgeDrawing,
-    cancelDrawing
+    cancelDrawing,
+    updateShapeHover,
+    updateEdgeLineHover,
+    cancelShapePreview
   } = useDrawingTools(
     currentTool,
     selectedColor,
-    selectedOpacity
+    selectedOpacity,
+    previewSettings
   );
   
   // Combined stop function that handles both cell and edge drawing
@@ -57,6 +77,22 @@ const DrawingLayer = ({
       stopDrawing();
     }
   }, [currentTool, stopDrawing, stopEdgeDrawing]);
+  
+  // Handle escape key to cancel
+  const handleKeyDown = dc.useCallback((e) => {
+    if (e.key === 'Escape' && (rectangleStart || circleStart || edgeLineStart || touchConfirmPending)) {
+      cancelShapePreview();
+    }
+  }, [rectangleStart, circleStart, edgeLineStart, touchConfirmPending, cancelShapePreview]);
+  
+  // Register keyboard handler
+  dc.useEffect(() => {
+    document.addEventListener('keydown', handleKeyDown);
+    
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [handleKeyDown]);
   
   const { registerHandlers, unregisterHandlers } = useEventHandlerRegistration();
   
@@ -69,11 +105,21 @@ const DrawingLayer = ({
       isDrawing,
       rectangleStart,
       circleStart,
-      edgeLineStart
+      edgeLineStart,
+      // Shape preview handlers
+      updateShapeHover,
+      updateEdgeLineHover,
+      shapeHoverPosition,
+      touchConfirmPending,
+      cancelShapePreview,
+      previewEnabled: previewSettings.kbmEnabled
     });
     
     return () => unregisterHandlers('drawing');
-  }, [registerHandlers, unregisterHandlers, handleDrawingPointerDown, handleDrawingPointerMove, handleStopDrawing, cancelDrawing, isDrawing, rectangleStart, circleStart, edgeLineStart]);
+  }, [registerHandlers, unregisterHandlers, handleDrawingPointerDown, handleDrawingPointerMove, 
+      handleStopDrawing, cancelDrawing, isDrawing, rectangleStart, circleStart, edgeLineStart,
+      updateShapeHover, updateEdgeLineHover, shapeHoverPosition, touchConfirmPending, 
+      cancelShapePreview, previewSettings.kbmEnabled]);
   
   dc.useEffect(() => {
     if (onDrawingStateChange) {
@@ -82,18 +128,25 @@ const DrawingLayer = ({
         rectangleStart,
         circleStart,
         edgeLineStart,
+        shapeHoverPosition,
+        touchConfirmPending,
         handlers: {
           handleDrawingPointerDown,
           handleDrawingPointerMove,
           stopDrawing: handleStopDrawing,
-          cancelDrawing
+          cancelDrawing,
+          cancelShapePreview
         }
       });
     }
-  }, [isDrawing, rectangleStart, circleStart, edgeLineStart, onDrawingStateChange, handleStopDrawing]);
+  }, [isDrawing, rectangleStart, circleStart, edgeLineStart, shapeHoverPosition, 
+      touchConfirmPending, onDrawingStateChange, handleStopDrawing, cancelShapePreview]);
   
-  const renderPreviewOverlay = () => {
-    if (!canvasRef.current || !geometry) return null;
+  /**
+   * Render the start marker overlay (small indicator on first click point)
+   */
+  const renderStartMarker = () => {
+    if (!canvasRef.current || !containerRef?.current || !geometry) return null;
     
     const canvas = canvasRef.current;
     const { viewState, northDirection } = mapData;
@@ -103,56 +156,45 @@ const DrawingLayer = ({
     // Calculate viewport parameters based on geometry type
     let scaledSize, offsetX, offsetY;
     
-    if (geometry.constructor.name === 'GridGeometry') {
+    const isGrid = geometry instanceof GridGeometry;
+    if (isGrid) {
       scaledSize = geometry.getScaledCellSize(zoom);
       offsetX = width / 2 - center.x * scaledSize;
       offsetY = height / 2 - center.y * scaledSize;
     } else {
-      // Hex: center is in world pixel coordinates, not hex coordinates
+      scaledSize = geometry.hexSize * zoom;
       offsetX = width / 2 - center.x * zoom;
       offsetY = height / 2 - center.y * zoom;
     }
     
-    const containerRect = canvas.parentElement.getBoundingClientRect();
+    const containerRect = containerRef.current.getBoundingClientRect();
     const canvasRect = canvas.getBoundingClientRect();
-    
     const canvasOffsetX = canvasRect.left - containerRect.left;
     const canvasOffsetY = canvasRect.top - containerRect.top;
-    
     const displayScale = canvasRect.width / width;
     
-    // NEW APPROACH: Use the inverse of screenToGrid transformation
-    // This ensures perfect symmetry with how clicks are converted to grid cells
     const gridToCanvasPosition = (gridX, gridY) => {
-      // Convert grid to world coordinates (cell center for better accuracy)
       const worldX = (gridX + 0.5) * geometry.cellSize;
       const worldY = (gridY + 0.5) * geometry.cellSize;
       
-      // Convert world to canvas coordinates (non-rotated)
       let screenX = offsetX + worldX * zoom;
       let screenY = offsetY + worldY * zoom;
       
-      // Apply rotation around canvas center (matching canvas rendering)
       if (northDirection !== 0) {
         const centerX = width / 2;
         const centerY = height / 2;
-        
         screenX -= centerX;
         screenY -= centerY;
-        
         const angleRad = (northDirection * Math.PI) / 180;
         const rotatedX = screenX * Math.cos(angleRad) - screenY * Math.sin(angleRad);
         const rotatedY = screenX * Math.sin(angleRad) + screenY * Math.cos(angleRad);
-        
         screenX = rotatedX + centerX;
         screenY = rotatedY + centerY;
       }
       
-      // Scale to display coordinates
       screenX *= displayScale;
       screenY *= displayScale;
       
-      // Add canvas offset and adjust back to top-left corner
       const cellHalfSize = (scaledSize * displayScale) / 2;
       return { 
         x: canvasOffsetX + screenX - cellHalfSize, 
@@ -160,34 +202,25 @@ const DrawingLayer = ({
       };
     };
     
-    // Convert grid intersection point to canvas position
-    // Unlike gridToCanvasPosition, this targets the corner/intersection, not cell center
     const intersectionToCanvasPosition = (intX, intY) => {
-      // Intersection point - no +0.5 offset since we want the corner
       const worldX = intX * geometry.cellSize;
       const worldY = intY * geometry.cellSize;
       
-      // Convert world to canvas coordinates (non-rotated)
       let screenX = offsetX + worldX * zoom;
       let screenY = offsetY + worldY * zoom;
       
-      // Apply rotation around canvas center (matching canvas rendering)
       if (northDirection !== 0) {
         const centerX = width / 2;
         const centerY = height / 2;
-        
         screenX -= centerX;
         screenY -= centerY;
-        
         const angleRad = (northDirection * Math.PI) / 180;
         const rotatedX = screenX * Math.cos(angleRad) - screenY * Math.sin(angleRad);
         const rotatedY = screenX * Math.sin(angleRad) + screenY * Math.cos(angleRad);
-        
         screenX = rotatedX + centerX;
         screenY = rotatedY + centerY;
       }
       
-      // Scale to display coordinates
       screenX *= displayScale;
       screenY *= displayScale;
       
@@ -200,15 +233,18 @@ const DrawingLayer = ({
     const overlays = [];
     const displayScaledSize = scaledSize * displayScale;
     
-    // Rectangle start indicator  
-    if (rectangleStart) {
+    // Only show start marker if we don't have a full shape preview showing
+    const showFullPreview = shapeHoverPosition && previewSettings.kbmEnabled;
+    const showTouchPreview = touchConfirmPending && pendingEndPoint;
+    
+    // Rectangle start indicator (only if not showing full preview)
+    if (rectangleStart && !showFullPreview && !showTouchPreview) {
       const pos = gridToCanvasPosition(rectangleStart.x, rectangleStart.y);
-      
       const highlightColor = currentTool === 'clearArea' ? '#ff0000' : '#00ff00';
       
       overlays.push(
         <div
-          key="rectangle-preview"
+          key="rectangle-start"
           className="dmt-drawing-preview"
           style={{
             position: 'absolute',
@@ -225,14 +261,14 @@ const DrawingLayer = ({
       );
     }
     
-    if (circleStart) {
+    // Circle start indicator (only if not showing full preview)
+    if (circleStart && !showFullPreview && !showTouchPreview) {
       const pos = gridToCanvasPosition(circleStart.x, circleStart.y);
-      
       const highlightColor = '#00aaff';
       
       overlays.push(
         <div
-          key="circle-preview"
+          key="circle-start"
           className="dmt-drawing-preview"
           style={{
             position: 'absolute',
@@ -249,19 +285,17 @@ const DrawingLayer = ({
       );
     }
     
-    // Edge line start indicator - X marker at grid intersection
-    if (edgeLineStart) {
-      // Use intersection positioning since edgeLineStart stores intersection coords
+    // Edge line start indicator - X marker (only if not showing full preview)
+    if (edgeLineStart && !showFullPreview && !showTouchPreview) {
       const pos = intersectionToCanvasPosition(edgeLineStart.x, edgeLineStart.y);
-      
-      const highlightColor = '#ff9500'; // Orange for edge line
-      const markerSize = Math.max(16, displayScaledSize * 0.4); // Scale with zoom but min 16px
+      const highlightColor = '#ff9500';
+      const markerSize = Math.max(16, displayScaledSize * 0.4);
       const halfMarker = markerSize / 2;
       const strokeWidth = Math.max(2, markerSize / 8);
       
       overlays.push(
         <svg
-          key="edgeline-preview"
+          key="edgeline-start"
           className="dmt-drawing-preview"
           style={{
             position: 'absolute',
@@ -275,7 +309,6 @@ const DrawingLayer = ({
           }}
           viewBox={`0 0 ${markerSize} ${markerSize}`}
         >
-          {/* X mark centered on intersection */}
           <line
             x1={strokeWidth}
             y1={strokeWidth}
@@ -301,7 +334,59 @@ const DrawingLayer = ({
     return overlays.length > 0 ? <>{overlays}</> : null;
   };
   
-  return renderPreviewOverlay();
+  /**
+   * Render the full shape preview overlay
+   */
+  const renderShapePreview = () => {
+    // Determine the end point - either hover position or pending touch end point
+    const endPoint = touchConfirmPending ? pendingEndPoint : shapeHoverPosition;
+    
+    // Check if we should show the preview
+    const shouldShowPreview = endPoint && (
+      (previewSettings.kbmEnabled && shapeHoverPosition && !touchConfirmPending) ||
+      (touchConfirmPending && pendingEndPoint)
+    );
+    
+    if (!shouldShowPreview) return null;
+    
+    // Determine shape type
+    let shapeType = null;
+    let startPoint = null;
+    
+    if (circleStart) {
+      shapeType = 'circle';
+      startPoint = circleStart;
+    } else if (rectangleStart) {
+      shapeType = currentTool === 'clearArea' ? 'clearArea' : 'rectangle';
+      startPoint = rectangleStart;
+    } else if (edgeLineStart) {
+      shapeType = 'edgeLine';
+      startPoint = edgeLineStart;
+    }
+    
+    if (!shapeType || !startPoint) return null;
+    
+    return (
+      <ShapePreviewOverlay
+        shapeType={shapeType}
+        startPoint={startPoint}
+        endPoint={endPoint}
+        geometry={geometry}
+        mapData={mapData}
+        canvasRef={canvasRef}
+        containerRef={containerRef}
+        distanceSettings={distanceSettings}
+        isConfirmable={touchConfirmPending}
+      />
+    );
+  };
+  
+  return (
+    <>
+      {renderStartMarker()}
+      {renderShapePreview()}
+    </>
+  );
 };
 
 return { DrawingLayer };

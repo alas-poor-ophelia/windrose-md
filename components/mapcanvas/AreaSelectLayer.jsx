@@ -14,6 +14,7 @@ const { useAreaSelect } = await requireModuleByName("useAreaSelect.js");
 const { useMapState } = await requireModuleByName("MapContext.jsx");
 const { useMapSelection } = await requireModuleByName("MapSelectionContext.jsx");
 const { useEventHandlerRegistration } = await requireModuleByName("EventHandlerContext.jsx");
+const { GridGeometry } = await requireModuleByName("GridGeometry.js");
 
 /**
  * AreaSelectLayer Component
@@ -70,9 +71,11 @@ const AreaSelectLayer = ({ currentTool }) => {
     const { width, height } = canvas;
     
     // Calculate viewport parameters based on geometry type
+    // Use instanceof for reliable type detection
     let scaledSize, offsetX, offsetY;
     
-    if (geometry.constructor.name === 'GridGeometry') {
+    const isGrid = geometry instanceof GridGeometry;
+    if (isGrid) {
       scaledSize = geometry.getScaledCellSize(zoom);
       offsetX = width / 2 - center.x * scaledSize;
       offsetY = height / 2 - center.y * scaledSize;
@@ -92,10 +95,6 @@ const AreaSelectLayer = ({ currentTool }) => {
     
     const displayScale = canvasRect.width / width;
     
-    // Convert world coordinates to screen position
-    const worldX = areaSelectStart.worldX;
-    const worldY = areaSelectStart.worldY;
-    
     // Get grid cell for the start position
     const gridX = areaSelectStart.gridX;
     const gridY = areaSelectStart.gridY;
@@ -103,7 +102,7 @@ const AreaSelectLayer = ({ currentTool }) => {
     // Convert grid cell center to screen position
     let screenX, screenY;
     
-    if (geometry.constructor.name === 'GridGeometry') {
+    if (isGrid) {
       // Grid: use cell center
       const cellWorldX = (gridX + 0.5) * geometry.cellSize;
       const cellWorldY = (gridY + 0.5) * geometry.cellSize;

@@ -21,7 +21,7 @@ const useEventCoordinator = ({
   isAlignmentMode = false
 }) => {
   // Get shared state from contexts
-  const { canvasRef, currentTool, screenToGrid, screenToWorld, getClientCoords } = useMapState();
+  const { canvasRef, currentTool, screenToGrid, screenToWorld, getClientCoords, geometry } = useMapState();
   const { selectedItem, setSelectedItem, isDraggingSelection, setIsDraggingSelection, dragStart, setDragStart, layerVisibility, hasMultiSelection, isSelected, isGroupDragging, clearSelection } = useMapSelection();
   const { getHandlers } = useRegisteredHandlers();
   
@@ -428,6 +428,38 @@ const useEventCoordinator = ({
       if (drawingHandlers?.handleDrawingPointerMove) {
         drawingHandlers.handleDrawingPointerMove(e);
       }
+      
+      // Track hover position for shape preview (KBM mode)
+      // Only track if preview is enabled and not a touch event
+      const isTouch = e.touches !== undefined || e.pointerType === 'touch';
+      if (!isTouch && drawingHandlers?.previewEnabled && drawingHandlers?.updateShapeHover) {
+        const { screenToGrid, screenToWorld } = panZoomHandlers;
+        
+        // For edge line tool, track intersection position
+        if (currentTool === 'edgeLine' && drawingHandlers.edgeLineStart && screenToWorld) {
+          const worldCoords = screenToWorld(clientX, clientY);
+          if (worldCoords && geometry) {
+            const cellSize = geometry.cellSize;
+            const nearestX = Math.round(worldCoords.worldX / cellSize);
+            const nearestY = Math.round(worldCoords.worldY / cellSize);
+            if (drawingHandlers.updateEdgeLineHover) {
+              drawingHandlers.updateEdgeLineHover(nearestX, nearestY);
+            }
+          }
+        }
+        // For rectangle/circle/clearArea, track cell position
+        else if ((currentTool === 'rectangle' || currentTool === 'clearArea' || currentTool === 'circle') && screenToGrid) {
+          const hasStart = (currentTool === 'circle' && drawingHandlers.circleStart) ||
+                           ((currentTool === 'rectangle' || currentTool === 'clearArea') && drawingHandlers.rectangleStart);
+          if (hasStart) {
+            const coords = screenToGrid(clientX, clientY);
+            const gridX = coords.gridX !== undefined ? coords.gridX : coords.q;
+            const gridY = coords.gridY !== undefined ? coords.gridY : coords.r;
+            drawingHandlers.updateShapeHover(gridX, gridY);
+          }
+        }
+      }
+      
       // Update hover only if objects visible
       if (layerVisibility.objects && objectHandlers?.handleHoverUpdate) {
         objectHandlers.handleHoverUpdate(e);
@@ -452,7 +484,7 @@ const useEventCoordinator = ({
     if (layerVisibility.objects && objectHandlers?.handleHoverUpdate) {
       objectHandlers.handleHoverUpdate(e);
     }
-  }, [currentTool, isDraggingSelection, dragStart, selectedItem, isGroupDragging, handleGroupDrag, getHandlers, layerVisibility, isAlignmentMode]);
+  }, [currentTool, isDraggingSelection, dragStart, selectedItem, isGroupDragging, handleGroupDrag, getHandlers, layerVisibility, isAlignmentMode, geometry]);
   
   /**
    * Handle pointer up events
@@ -653,6 +685,18 @@ const useEventCoordinator = ({
     textHandlers.handleCanvasDoubleClick(e);
   }, [getHandlers]);
   
+  /**
+   * Handle right-click: prevent context menu and cancel any shape preview
+   */
+  const handleContextMenu = dc.useCallback((e) => {
+    e.preventDefault();
+    const drawingHandlers = getHandlers('drawing');
+    // Cancel any in-progress shape preview
+    if (drawingHandlers?.cancelShapePreview) {
+      drawingHandlers.cancelShapePreview();
+    }
+  }, [getHandlers]);
+  
   // Attach event listeners to canvas
   dc.useEffect(() => {
     const canvas = canvasRef.current;
@@ -680,7 +724,7 @@ const useEventCoordinator = ({
     canvas.addEventListener('mouseleave', handlePointerLeave);
     canvas.addEventListener('wheel', handleWheel);
     canvas.addEventListener('dblclick', handleCanvasDoubleClick);
-    canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+    canvas.addEventListener('contextmenu', handleContextMenu);
     
     return () => {
       canvas.removeEventListener('mousedown', handleMouseDown);
@@ -692,7 +736,7 @@ const useEventCoordinator = ({
       canvas.removeEventListener('mouseleave', handlePointerLeave);
       canvas.removeEventListener('wheel', handleWheel);
       canvas.removeEventListener('dblclick', handleCanvasDoubleClick);
-      canvas.removeEventListener('contextmenu', (e) => e.preventDefault());
+      canvas.removeEventListener('contextmenu', handleContextMenu);
     };
   }, [
     canvasRef,
@@ -703,7 +747,8 @@ const useEventCoordinator = ({
     handlePanStart,
     handlePanEnd,
     handleWheel,
-    handleCanvasDoubleClick
+    handleCanvasDoubleClick,
+    handleContextMenu
   ]);
   
   // Add global pointer up listener for cleanup

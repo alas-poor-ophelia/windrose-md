@@ -18,17 +18,28 @@ const { useMapState, useMapOperations } = await requireModuleByName("MapContext.
 const { addEdge, removeEdge, getEdgeAt, generateEdgeLine, mergeEdges } = await requireModuleByName("edgeOperations.js");
 const { eraseObjectAt } = await requireModuleByName("objectOperations.js");
 const { getActiveLayer } = await requireModuleByName("layerAccessor.js");
+const { 
+  setCell: accessorSetCell, 
+  removeCell: accessorRemoveCell,
+  setCells,
+  removeCellsInBounds,
+  getCellIndex
+} = await requireModuleByName("cellAccessor.js");
 
 /**
  * Hook for managing drawing tools
  * @param {string} currentTool - Current active tool
  * @param {string} selectedColor - Currently selected color
  * @param {number} selectedOpacity - Currently selected opacity (0-1)
+ * @param {Object} previewSettings - Shape preview settings
+ * @param {boolean} previewSettings.kbmEnabled - Enable hover preview for keyboard/mouse
+ * @param {boolean} previewSettings.touchEnabled - Enable 3-tap confirmation for touch
  */
 const useDrawingTools = (
   currentTool,
   selectedColor,
-  selectedOpacity = 1
+  selectedOpacity = 1,
+  previewSettings = { kbmEnabled: true, touchEnabled: false }
 ) => {
   // Get all required state and operations from Context
   const {
@@ -61,6 +72,11 @@ const useDrawingTools = (
   const [circleStart, setCircleStart] = dc.useState(null);
   const [edgeLineStart, setEdgeLineStart] = dc.useState(null); // For edge line tool (two-click)
   
+  // Shape preview state (for KBM hover and touch confirmation)
+  const [shapeHoverPosition, setShapeHoverPosition] = dc.useState(null);
+  const [touchConfirmPending, setTouchConfirmPending] = dc.useState(false);
+  const [pendingEndPoint, setPendingEndPoint] = dc.useState(null);
+  
   // Track initial state at start of drag stroke for batched history
   // This allows immediate visual updates while creating a single undo entry
   const strokeInitialStateRef = dc.useRef(null);
@@ -88,28 +104,11 @@ const useDrawingTools = (
     // Check if we're in a batched stroke (suppress history for intermediate updates)
     const isBatchedStroke = strokeInitialStateRef.current !== null;
     
-    const existingCellIndex = activeLayer.cells.findIndex(
-      cell => geometry.cellMatchesCoords(cell, coords)
-    );
-    
     if (shouldFill) {
-      if (existingCellIndex !== -1) {
-        // Cell exists - update its color and opacity (paint over)
-        const newCells = [...activeLayer.cells];
-        newCells[existingCellIndex] = {
-          ...newCells[existingCellIndex],
-          color: selectedColor,
-          opacity: selectedOpacity
-        };
-        onCellsChange(newCells, isBatchedStroke);
-      } else {
-        // Cell doesn't exist - create new with selected color and opacity
-        const newCell = geometry.createCellObject(coords, selectedColor);
-        newCell.opacity = selectedOpacity;
-        const newCells = [...activeLayer.cells, newCell];
-        onCellsChange(newCells, isBatchedStroke);
-      }
-    } else if (!shouldFill) {
+      // Use accessor to set cell (handles both create and update)
+      const newCells = accessorSetCell(activeLayer.cells, coords, selectedColor, selectedOpacity, geometry);
+      onCellsChange(newCells, isBatchedStroke);
+    } else {
       // When erasing: check text first, then objects, then edges, then cells
       // First check for text label (requires world coordinates)
       const { clientX, clientY } = dragStart || { clientX: 0, clientY: 0 };
@@ -165,11 +164,9 @@ const useDrawingTools = (
         if (result.success) {
           onObjectsChange(result.objects);
         }
-      } else if (existingCellIndex !== -1) {
+      } else if (getCellIndex(activeLayer.cells, coords, geometry) !== -1) {
         // Finally remove cell if no text or object
-        const newCells = activeLayer.cells.filter(
-          cell => !geometry.cellMatchesCoords(cell, coords)
-        );
+        const newCells = accessorRemoveCell(activeLayer.cells, coords, geometry);
         onCellsChange(newCells, isBatchedStroke);
       }
     }
@@ -327,28 +324,15 @@ const useDrawingTools = (
     // Use geometry from context (passed via MapState)
     const cellsInRect = geometry.getCellsInRectangle(x1, y1, x2, y2);
     
-    const newCells = [...activeLayer.cells];
+    // Build batch updates array
+    const cellUpdates = cellsInRect.map(cellCoords => ({
+      coords: { gridX: cellCoords.x, gridY: cellCoords.y },
+      color: selectedColor,
+      opacity: selectedOpacity
+    }));
     
-    for (const cellCoords of cellsInRect) {
-      // Convert {x, y} coordinates to proper coords format for geometry
-      const coords = { gridX: cellCoords.x, gridY: cellCoords.y };
-      const existingIndex = newCells.findIndex(c => geometry.cellMatchesCoords(c, coords));
-      
-      if (existingIndex !== -1) {
-        // Cell exists - update its color and opacity (paint over)
-        newCells[existingIndex] = {
-          ...newCells[existingIndex],
-          color: selectedColor,
-          opacity: selectedOpacity
-        };
-      } else {
-        // Cell doesn't exist - create new with opacity
-        const newCell = geometry.createCellObject(coords, selectedColor);
-        newCell.opacity = selectedOpacity;
-        newCells.push(newCell);
-      }
-    }
-    
+    // Use batch setter for efficiency
+    const newCells = setCells(activeLayer.cells, cellUpdates, geometry);
     onCellsChange(newCells);
   };
   
@@ -367,28 +351,15 @@ const useDrawingTools = (
     const radius = geometry.getEuclideanDistance(centerX, centerY, edgeX, edgeY);
     const cellsInCircle = geometry.getCellsInCircle(centerX, centerY, radius);
     
-    const newCells = [...activeLayer.cells];
+    // Build batch updates array
+    const cellUpdates = cellsInCircle.map(cellCoords => ({
+      coords: { gridX: cellCoords.x, gridY: cellCoords.y },
+      color: selectedColor,
+      opacity: selectedOpacity
+    }));
     
-    for (const cellCoords of cellsInCircle) {
-      // Convert {x, y} coordinates to proper coords format for geometry
-      const coords = { gridX: cellCoords.x, gridY: cellCoords.y };
-      const existingIndex = newCells.findIndex(c => geometry.cellMatchesCoords(c, coords));
-      
-      if (existingIndex !== -1) {
-        // Cell exists - update its color and opacity (paint over)
-        newCells[existingIndex] = {
-          ...newCells[existingIndex],
-          color: selectedColor,
-          opacity: selectedOpacity
-        };
-      } else {
-        // Cell doesn't exist - create new with opacity
-        const newCell = geometry.createCellObject(coords, selectedColor);
-        newCell.opacity = selectedOpacity;
-        newCells.push(newCell);
-      }
-    }
-    
+    // Use batch setter for efficiency
+    const newCells = setCells(activeLayer.cells, cellUpdates, geometry);
     onCellsChange(newCells);
   };
   
@@ -402,9 +373,6 @@ const useDrawingTools = (
     
     // Get active layer data for reading
     const activeLayer = getActiveLayer(mapData);
-    
-    // Use geometry from context (passed via MapState)
-    const cellsInRect = geometry.getCellsInRectangle(x1, y1, x2, y2);
     
     // Remove all objects within the rectangle (grid coordinates)
     const newObjects = removeObjectsInRectangle(activeLayer.objects || [], x1, y1, x2, y2);
@@ -425,17 +393,8 @@ const useDrawingTools = (
     });
     onTextLabelsChange(newTextLabels);
     
-    // Remove all cells within the rectangle - check against each cell coordinate
-    const newCells = activeLayer.cells.filter(cell => {
-      // Check if this cell is within the rectangle bounds
-      // For grid cells with {x, y}, check directly
-      if (cell.x !== undefined) {
-        return !(cell.x >= minX && cell.x <= maxX && cell.y >= minY && cell.y <= maxY);
-      }
-      // For hex cells with {q, r}, this tool shouldn't be available anyway
-      return true;
-    });
-    
+    // Remove all cells within the rectangle using accessor
+    const newCells = removeCellsInBounds(activeLayer.cells, x1, y1, x2, y2, geometry);
     onCellsChange(newCells);
   };
   
@@ -502,32 +461,189 @@ const useDrawingTools = (
     }
   };
   
+  // ============================================================================
+  // SHAPE PREVIEW METHODS
+  // ============================================================================
+  
+  /**
+   * Update hover position for shape preview (KBM mode)
+   * Called during mouse move when a shape tool has a start point set
+   * @param {number} gridX - Grid X coordinate
+   * @param {number} gridY - Grid Y coordinate
+   */
+  const updateShapeHover = dc.useCallback((gridX, gridY) => {
+    // Only update if we have a start point and not in touch confirm mode
+    if (touchConfirmPending) return;
+    
+    const hasStart = (currentTool === 'circle' && circleStart) ||
+                     ((currentTool === 'rectangle' || currentTool === 'clearArea') && rectangleStart) ||
+                     (currentTool === 'edgeLine' && edgeLineStart);
+    
+    if (hasStart) {
+      setShapeHoverPosition({ x: gridX, y: gridY });
+    }
+  }, [currentTool, circleStart, rectangleStart, edgeLineStart, touchConfirmPending]);
+  
+  /**
+   * Update hover position for edge line tool (uses intersection coords)
+   * @param {number} intX - Intersection X coordinate
+   * @param {number} intY - Intersection Y coordinate
+   */
+  const updateEdgeLineHover = dc.useCallback((intX, intY) => {
+    if (touchConfirmPending) return;
+    if (currentTool === 'edgeLine' && edgeLineStart) {
+      setShapeHoverPosition({ x: intX, y: intY });
+    }
+  }, [currentTool, edgeLineStart, touchConfirmPending]);
+  
+  /**
+   * Check if a point is inside the shape bounds (for touch confirmation)
+   * @param {number} x - X coordinate to check
+   * @param {number} y - Y coordinate to check
+   * @returns {boolean} True if point is inside shape bounds
+   */
+  const isPointInShapeBounds = dc.useCallback((x, y) => {
+    if (!pendingEndPoint) return false;
+    
+    if (currentTool === 'circle' && circleStart) {
+      // For circle, check if point is within the radius
+      const dx = pendingEndPoint.x - circleStart.x;
+      const dy = pendingEndPoint.y - circleStart.y;
+      const radius = Math.sqrt(dx * dx + dy * dy);
+      
+      const distFromCenter = Math.sqrt(
+        Math.pow(x - circleStart.x, 2) + Math.pow(y - circleStart.y, 2)
+      );
+      return distFromCenter <= radius;
+    }
+    
+    if ((currentTool === 'rectangle' || currentTool === 'clearArea') && rectangleStart) {
+      // For rectangle, check if point is within bounds
+      const minX = Math.min(rectangleStart.x, pendingEndPoint.x);
+      const maxX = Math.max(rectangleStart.x, pendingEndPoint.x);
+      const minY = Math.min(rectangleStart.y, pendingEndPoint.y);
+      const maxY = Math.max(rectangleStart.y, pendingEndPoint.y);
+      
+      return x >= minX && x <= maxX && y >= minY && y <= maxY;
+    }
+    
+    if (currentTool === 'edgeLine' && edgeLineStart) {
+      // For edge line, be lenient - accept taps near either end or on the line
+      // This is harder to calculate precisely, so just check if within bounding box
+      const minX = Math.min(edgeLineStart.x, pendingEndPoint.x) - 1;
+      const maxX = Math.max(edgeLineStart.x, pendingEndPoint.x) + 1;
+      const minY = Math.min(edgeLineStart.y, pendingEndPoint.y) - 1;
+      const maxY = Math.max(edgeLineStart.y, pendingEndPoint.y) + 1;
+      
+      return x >= minX && x <= maxX && y >= minY && y <= maxY;
+    }
+    
+    return false;
+  }, [currentTool, circleStart, rectangleStart, edgeLineStart, pendingEndPoint]);
+  
+  /**
+   * Confirm and commit the touch preview shape
+   */
+  const confirmTouchShape = dc.useCallback(() => {
+    if (!touchConfirmPending || !pendingEndPoint) return;
+    
+    if (currentTool === 'circle' && circleStart) {
+      fillCircle(pendingEndPoint.x, pendingEndPoint.y, circleStart.x, circleStart.y);
+      setCircleStart(null);
+    } else if (currentTool === 'rectangle' && rectangleStart) {
+      fillRectangle(rectangleStart.x, rectangleStart.y, pendingEndPoint.x, pendingEndPoint.y);
+      setRectangleStart(null);
+    } else if (currentTool === 'clearArea' && rectangleStart) {
+      clearRectangle(rectangleStart.x, rectangleStart.y, pendingEndPoint.x, pendingEndPoint.y);
+      setRectangleStart(null);
+    } else if (currentTool === 'edgeLine' && edgeLineStart) {
+      fillEdgeLine(edgeLineStart.x, edgeLineStart.y, pendingEndPoint.x, pendingEndPoint.y);
+      setEdgeLineStart(null);
+    }
+    
+    // Clear preview state
+    setTouchConfirmPending(false);
+    setPendingEndPoint(null);
+    setShapeHoverPosition(null);
+  }, [touchConfirmPending, pendingEndPoint, currentTool, circleStart, rectangleStart, edgeLineStart,
+      fillCircle, fillRectangle, clearRectangle, fillEdgeLine]);
+  
+  /**
+   * Cancel shape preview (for escape key, right-click, or tap outside)
+   */
+  const cancelShapePreview = dc.useCallback(() => {
+    setRectangleStart(null);
+    setCircleStart(null);
+    setEdgeLineStart(null);
+    setShapeHoverPosition(null);
+    setTouchConfirmPending(false);
+    setPendingEndPoint(null);
+  }, []);
+  
   /**
    * Handle pointer down for drawing tools
    * Returns true if the event was handled by drawing tools
+   * @param {Event} e - Pointer/touch event
+   * @param {number} gridX - Grid X coordinate
+   * @param {number} gridY - Grid Y coordinate
    */
   const handleDrawingPointerDown = (e, gridX, gridY) => {
     if (!mapData) return false;
     
+    // Ignore right-clicks - they're handled by contextmenu for cancellation
+    if (e.button === 2) return false;
+    
+    // Detect if this is a touch event
+    const isTouch = e.touches !== undefined || e.pointerType === 'touch';
+    const touchPreviewEnabled = previewSettings.touchEnabled && isTouch;
+    
     // Handle rectangle and circle tools
     if (currentTool === 'rectangle' || currentTool === 'clearArea' || currentTool === 'circle') {
+      
+      // If we're in touch confirmation mode, check if tap is inside or outside
+      if (touchConfirmPending && pendingEndPoint) {
+        if (isPointInShapeBounds(gridX, gridY)) {
+          confirmTouchShape();
+        } else {
+          cancelShapePreview();
+        }
+        return true;
+      }
+      
       if (currentTool === 'circle') {
         if (!circleStart) {
+          // First tap/click: set start point
           setCircleStart({ x: gridX, y: gridY });
+          setShapeHoverPosition(null);
+        } else if (touchPreviewEnabled) {
+          // Touch with preview: second tap shows preview, doesn't commit yet
+          setPendingEndPoint({ x: gridX, y: gridY });
+          setTouchConfirmPending(true);
+          setShapeHoverPosition({ x: gridX, y: gridY });
         } else {
-          fillCircle(circleStart.x, circleStart.y, gridX, gridY);
+          // Mouse or touch without preview: commit immediately
+          fillCircle(gridX, gridY, circleStart.x, circleStart.y);
           setCircleStart(null);
+          setShapeHoverPosition(null);
         }
       } else if (!rectangleStart) {
-        const { clientX, clientY } = getClientCoords(e);
+        // First tap/click: set start point
         setRectangleStart({ x: gridX, y: gridY });
+        setShapeHoverPosition(null);
+      } else if (touchPreviewEnabled) {
+        // Touch with preview: second tap shows preview, doesn't commit yet
+        setPendingEndPoint({ x: gridX, y: gridY });
+        setTouchConfirmPending(true);
+        setShapeHoverPosition({ x: gridX, y: gridY });
       } else {
+        // Mouse or touch without preview: commit immediately
         if (currentTool === 'rectangle') {
           fillRectangle(rectangleStart.x, rectangleStart.y, gridX, gridY);
         } else {
           clearRectangle(rectangleStart.x, rectangleStart.y, gridX, gridY);
         }
         setRectangleStart(null);
+        setShapeHoverPosition(null);
       }
       return true;
     }
@@ -547,11 +663,30 @@ const useDrawingTools = (
       const nearestX = Math.round(worldCoords.worldX / cellSize);
       const nearestY = Math.round(worldCoords.worldY / cellSize);
       
+      // If we're in touch confirmation mode, check if tap is inside or outside
+      if (touchConfirmPending && pendingEndPoint) {
+        if (isPointInShapeBounds(nearestX, nearestY)) {
+          confirmTouchShape();
+        } else {
+          cancelShapePreview();
+        }
+        return true;
+      }
+      
       if (!edgeLineStart) {
+        // First tap/click: set start point
         setEdgeLineStart({ x: nearestX, y: nearestY });
+        setShapeHoverPosition(null);
+      } else if (touchPreviewEnabled) {
+        // Touch with preview: second tap shows preview
+        setPendingEndPoint({ x: nearestX, y: nearestY });
+        setTouchConfirmPending(true);
+        setShapeHoverPosition({ x: nearestX, y: nearestY });
       } else {
+        // Mouse or touch without preview: commit immediately
         fillEdgeLine(edgeLineStart.x, edgeLineStart.y, nearestX, nearestY);
         setEdgeLineStart(null);
+        setShapeHoverPosition(null);
       }
       return true;
     }
@@ -610,6 +745,9 @@ const useDrawingTools = (
     setRectangleStart(null);
     setCircleStart(null);
     setEdgeLineStart(null);
+    setShapeHoverPosition(null);
+    setTouchConfirmPending(false);
+    setPendingEndPoint(null);
     cancelDrawing();
   };
   
@@ -624,6 +762,11 @@ const useDrawingTools = (
     rectangleStart,
     circleStart,
     edgeLineStart,
+    
+    // Shape preview state
+    shapeHoverPosition,
+    touchConfirmPending,
+    pendingEndPoint,
     
     // Cell Functions
     toggleCell,
@@ -647,13 +790,23 @@ const useDrawingTools = (
     cancelDrawing,
     resetDrawingState,
     
+    // Shape preview functions
+    updateShapeHover,
+    updateEdgeLineHover,
+    isPointInShapeBounds,
+    confirmTouchShape,
+    cancelShapePreview,
+    
     // Setters (for advanced use cases)
     setIsDrawing,
     setProcessedCells,
     setProcessedEdges,
     setRectangleStart,
     setCircleStart,
-    setEdgeLineStart
+    setEdgeLineStart,
+    setShapeHoverPosition,
+    setTouchConfirmPending,
+    setPendingEndPoint
   };
 };
 

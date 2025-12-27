@@ -12,6 +12,8 @@ const { requireModuleByName } = await dc.require(pathResolverPath);
 
 const { getActiveLayer } = await requireModuleByName("layerAccessor.js");
 const { getFontCss } = await requireModuleByName("fontOptions.js");
+const { GridGeometry } = await requireModuleByName("GridGeometry.js");
+const { HexGeometry } = await requireModuleByName("HexGeometry.js");
 
 /**
  * Check if two rectangles overlap
@@ -42,7 +44,7 @@ function getObjectWorldBounds(obj, geometry, mapData) {
   // For grid maps: convert grid cell to world coords
   // Grid cell (x, y) occupies world space from (x * cellSize, y * cellSize) 
   // to ((x + width) * cellSize, (y + height) * cellSize)
-  if (geometry.constructor.name === 'GridGeometry') {
+  if (geometry instanceof GridGeometry) {
     const cellSize = geometry.cellSize;
     return {
       minX: pos.x * cellSize,
@@ -54,7 +56,7 @@ function getObjectWorldBounds(obj, geometry, mapData) {
   
   // For hex maps: get hex center in world coords and create bounds around it
   // Hex objects occupy their cell, so we use the hex bounding box
-  if (geometry.constructor.name === 'HexGeometry') {
+  if (geometry instanceof HexGeometry) {
     const center = geometry.hexToWorld(pos.x, pos.y);
     const hexSize = geometry.hexSize;
     
