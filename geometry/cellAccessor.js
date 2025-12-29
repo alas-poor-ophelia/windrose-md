@@ -21,6 +21,9 @@ const { requireModuleByName } = await dc.require(pathResolverPath);
 const { GridGeometry } = await requireModuleByName("GridGeometry.js");
 const { HexGeometry } = await requireModuleByName("HexGeometry.js");
 
+// Import segment constants for partial cell painting
+const { SEGMENT_NAMES } = await requireModuleByName("dmtConstants.js");
+
 // ============================================================================
 // GEOMETRY TYPE DETECTION
 // ============================================================================
@@ -281,33 +284,322 @@ function removeCellsInBounds(cells, x1, y1, x2, y2, geometry) {
 }
 
 // ============================================================================
-// FUTURE: SEGMENT SUPPORT (Stub)
-// These functions prepare for partial cell painting with triangle segments
+// SEGMENT SUPPORT - Partial cell painting with triangle segments
 // ============================================================================
 
 /**
  * Check if cell has partial fill (segments)
- * Currently always false; will detect segment-based cells in future
  * @param {Object} cell - Cell object
  * @returns {boolean} True if cell uses segment-based rendering
  */
 function hasSegments(cell) {
-  return cell.segments !== undefined;
+  return cell && cell.segments !== undefined && Object.keys(cell.segments).length > 0;
+}
+
+/**
+ * Check if cell is a simple (full) cell
+ * @param {Object} cell - Cell object
+ * @returns {boolean} True if cell is a simple cell (no segments property)
+ */
+function isSimpleCell(cell) {
+  return cell && cell.color && !hasSegments(cell);
 }
 
 /**
  * Get fill color for cell (handles both simple and segment cells)
- * For segment cells, returns dominant color or null if mixed
+ * Segment cells always have a single color for all segments
  * @param {Object} cell - Cell object
- * @returns {string|null} Color string or null for mixed segment cells
+ * @returns {string|null} Color string or null if no cell
  */
 function getCellFill(cell) {
-  if (hasSegments(cell)) {
-    // Future: analyze segments to find dominant color
-    // For now, return null to indicate mixed
-    return null;
-  }
+  if (!cell) return null;
   return cell.color;
+}
+
+/**
+ * Get array of filled segment names for a cell
+ * Simple cells return all 8 segments; segment cells return only filled ones
+ * @param {Object} cell - Cell object
+ * @returns {Array<string>} Array of segment names ['nw', 'n', ...]
+ */
+function getFilledSegments(cell) {
+  if (!cell) return [];
+  if (isSimpleCell(cell)) {
+    // Simple cell = all 8 segments filled
+    return [...SEGMENT_NAMES];
+  }
+  if (hasSegments(cell)) {
+    return Object.keys(cell.segments).filter(seg => cell.segments[seg]);
+  }
+  return [];
+}
+
+/**
+ * Normalize cell by collapsing full segment cells to simple cells
+ * If all 8 segments are filled, convert to simple cell (remove segments property)
+ * If no segments are filled, return null (cell should be removed)
+ * @param {Object} cell - Cell object
+ * @returns {Object|null} Normalized cell, or null if cell should be removed
+ */
+function normalizeCell(cell) {
+  if (!cell) return cell;
+  
+  // If cell has segments property (even if empty), check segment count
+  if (cell.segments !== undefined) {
+    const filledCount = Object.keys(cell.segments).filter(seg => cell.segments[seg]).length;
+    
+    if (filledCount === 8) {
+      // All segments filled - collapse to simple cell
+      const { segments, ...simpleCell } = cell;
+      return simpleCell;
+    }
+    
+    if (filledCount === 0) {
+      // No segments filled - this cell should be removed
+      return null;
+    }
+  }
+  
+  return cell;
+}
+
+/**
+ * Set segments on a cell (add or update)
+ * If cell doesn't exist, creates a new segment cell
+ * If cell exists, adds segments and updates color
+ * Auto-collapses to simple cell if all 8 segments are filled
+ * 
+ * @param {Array} cells - Current cells array
+ * @param {Object} coords - Coordinates in any supported format
+ * @param {Array<string>} segmentList - Array of segment names to fill ['nw', 'n', ...]
+ * @param {string} color - Cell color
+ * @param {number} opacity - Cell opacity (0-1)
+ * @param {Object} geometry - Geometry instance
+ * @returns {Array} New cells array
+ */
+function setSegments(cells, coords, segmentList, color, opacity, geometry) {
+  // Grid-only feature check
+  if (!isGridGeometry(geometry)) {
+    console.warn('setSegments: Segment painting is only supported for grid maps');
+    return cells;
+  }
+  
+  const index = getCellIndex(cells, coords, geometry);
+  
+  if (index !== -1) {
+    // Cell exists - update it
+    const existingCell = cells[index];
+    const newCells = [...cells];
+    
+    if (isSimpleCell(existingCell)) {
+      // Converting simple cell to segment cell?
+      // If adding all 8 segments, just update color (keep it simple)
+      if (segmentList.length === 8) {
+        newCells[index] = { ...existingCell, color, opacity };
+        return newCells;
+      }
+      // Otherwise, we'd need to convert to segment cell - but spec says
+      // painting on simple cell doesn't remove segments, so we just update color
+      newCells[index] = { ...existingCell, color, opacity };
+      return newCells;
+    }
+    
+    // Existing segment cell - merge segments and update color
+    const mergedSegments = { ...existingCell.segments };
+    for (const seg of segmentList) {
+      if (SEGMENT_NAMES.includes(seg)) {
+        mergedSegments[seg] = true;
+      }
+    }
+    
+    let newCell = { ...existingCell, segments: mergedSegments, color, opacity };
+    newCell = normalizeCell(newCell);
+    
+    if (newCell === null) {
+      // All segments removed - remove cell entirely
+      return cells.filter((_, i) => i !== index);
+    }
+    
+    newCells[index] = newCell;
+    return newCells;
+  }
+  
+  // Cell doesn't exist - create new segment cell
+  const norm = normalizeCoords(coords, geometry);
+  const newSegments = {};
+  for (const seg of segmentList) {
+    if (SEGMENT_NAMES.includes(seg)) {
+      newSegments[seg] = true;
+    }
+  }
+  
+  // If all 8 segments, create simple cell instead
+  if (Object.keys(newSegments).length === 8) {
+    const simpleCell = { ...norm, color, opacity };
+    return [...cells, simpleCell];
+  }
+  
+  // Create segment cell
+  if (Object.keys(newSegments).length === 0) {
+    return cells; // No valid segments to add
+  }
+  
+  const segmentCell = { ...norm, segments: newSegments, color, opacity };
+  return [...cells, segmentCell];
+}
+
+/**
+ * Remove segments from a cell
+ * If all segments are removed, removes the cell entirely
+ * 
+ * @param {Array} cells - Current cells array
+ * @param {Object} coords - Coordinates in any supported format
+ * @param {Array<string>} segmentList - Array of segment names to remove
+ * @param {Object} geometry - Geometry instance
+ * @returns {Array} New cells array
+ */
+function removeSegments(cells, coords, segmentList, geometry) {
+  // Grid-only feature check
+  if (!isGridGeometry(geometry)) {
+    console.warn('removeSegments: Segment painting is only supported for grid maps');
+    return cells;
+  }
+  
+  const index = getCellIndex(cells, coords, geometry);
+  if (index === -1) return cells; // Cell doesn't exist
+  
+  const existingCell = cells[index];
+  const newCells = [...cells];
+  
+  if (isSimpleCell(existingCell)) {
+    // Simple cell - convert to segment cell with specified segments removed
+    const remainingSegments = {};
+    for (const seg of SEGMENT_NAMES) {
+      if (!segmentList.includes(seg)) {
+        remainingSegments[seg] = true;
+      }
+    }
+    
+    if (Object.keys(remainingSegments).length === 0) {
+      // All segments removed - remove cell
+      return cells.filter((_, i) => i !== index);
+    }
+    
+    // Create segment cell with remaining segments
+    const norm = getCellCoords(existingCell, geometry);
+    const segmentCell = { 
+      ...norm, 
+      segments: remainingSegments, 
+      color: existingCell.color, 
+      opacity: existingCell.opacity ?? 1 
+    };
+    newCells[index] = segmentCell;
+    return newCells;
+  }
+  
+  // Existing segment cell - remove specified segments
+  const updatedSegments = { ...existingCell.segments };
+  for (const seg of segmentList) {
+    delete updatedSegments[seg];
+  }
+  
+  if (Object.keys(updatedSegments).length === 0) {
+    // All segments removed - remove cell
+    return cells.filter((_, i) => i !== index);
+  }
+  
+  newCells[index] = { ...existingCell, segments: updatedSegments };
+  return newCells;
+}
+
+/**
+ * Check if neighbor segment is filled (for border calculation)
+ * Handles both simple cells (all segments filled) and segment cells
+ * 
+ * @param {Map} cellMap - Cell lookup map from buildCellMap
+ * @param {number} x - Cell X coordinate
+ * @param {number} y - Cell Y coordinate
+ * @param {string} segment - Segment name to check
+ * @param {Object} geometry - Geometry instance
+ * @returns {boolean} True if the segment is filled in the neighbor
+ */
+function neighborSegmentFilled(cellMap, x, y, segment, geometry) {
+  // Use cellKey for consistent lookup (matches how buildCellMap creates keys)
+  const key = cellKey({ x, y }, geometry);
+  const neighbor = cellMap.get(key);
+  
+  if (!neighbor) return false;
+  if (isSimpleCell(neighbor)) return true; // Simple cell = all segments filled
+  if (hasSegments(neighbor)) return !!neighbor.segments[segment];
+  
+  return false;
+}
+
+/**
+ * Determine which segment a point falls into based on position within a cell
+ * Uses angle from center to determine which of 8 pie-slice segments contains the point
+ * 
+ * Segment layout (angles from center, 0Â° = right, counterclockwise):
+ *   nw: 112.5Â° to 157.5Â°    n: 67.5Â° to 112.5Â°
+ *   w:  157.5Â° to 202.5Â°    ne: 22.5Â° to 67.5Â°
+ *   sw: 202.5Â° to 247.5Â°    e: -22.5Â° to 22.5Â° (337.5Â° to 22.5Â°)
+ *   s:  247.5Â° to 292.5Â°    se: 292.5Â° to 337.5Â°
+ * 
+ * @param {number} localX - X position within cell (0 to 1, where 0.5 is center)
+ * @param {number} localY - Y position within cell (0 to 1, where 0.5 is center)
+ * @returns {string} Segment name ('nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w')
+ */
+function getSegmentAtPosition(localX, localY) {
+  // Calculate position relative to center (center is at 0.5, 0.5)
+  const dx = localX - 0.5;
+  const dy = localY - 0.5;
+  
+  // Get angle in radians, then convert to degrees
+  // atan2 returns angle from -Ï€ to Ï€, where 0 is right (positive X)
+  // Canvas Y increases downward, so we negate dy to get standard math coords
+  let angle = Math.atan2(-dy, dx) * (180 / Math.PI);
+  
+  // Normalize to 0-360 range
+  if (angle < 0) angle += 360;
+  
+  // Map angle to segment (each segment is 45Â°)
+  // Segments are centered on 45Â° increments:
+  // e: 0Â°, ne: 45Â°, n: 90Â°, nw: 135Â°, w: 180Â°, sw: 225Â°, s: 270Â°, se: 315Â°
+  // Each segment spans Â±22.5Â° from its center
+  
+  if (angle >= 337.5 || angle < 22.5) return 'e';
+  if (angle >= 22.5 && angle < 67.5) return 'ne';
+  if (angle >= 67.5 && angle < 112.5) return 'n';
+  if (angle >= 112.5 && angle < 157.5) return 'nw';
+  if (angle >= 157.5 && angle < 202.5) return 'w';
+  if (angle >= 202.5 && angle < 247.5) return 'sw';
+  if (angle >= 247.5 && angle < 292.5) return 's';
+  if (angle >= 292.5 && angle < 337.5) return 'se';
+  
+  // Fallback (shouldn't happen)
+  return 'n';
+}
+
+/**
+ * Calculate local position within a cell from screen coordinates
+ * Returns values from 0 to 1 where (0,0) is top-left and (1,1) is bottom-right
+ * 
+ * @param {number} screenX - Screen X coordinate
+ * @param {number} screenY - Screen Y coordinate
+ * @param {number} cellScreenX - Cell's top-left screen X
+ * @param {number} cellScreenY - Cell's top-left screen Y
+ * @param {number} cellSize - Cell size in screen pixels
+ * @returns {{localX: number, localY: number}} Local coordinates (0-1)
+ */
+function getLocalCellPosition(screenX, screenY, cellScreenX, cellScreenY, cellSize) {
+  const localX = (screenX - cellScreenX) / cellSize;
+  const localY = (screenY - cellScreenY) / cellSize;
+  
+  // Clamp to 0-1 range
+  return {
+    localX: Math.max(0, Math.min(1, localX)),
+    localY: Math.max(0, Math.min(1, localY))
+  };
 }
 
 // ============================================================================
@@ -337,7 +629,15 @@ return {
   removeCells,
   removeCellsInBounds,
   
-  // Future segment support
+  // Segment support (partial cell painting)
   hasSegments,
-  getCellFill
+  isSimpleCell,
+  getCellFill,
+  getFilledSegments,
+  normalizeCell,
+  setSegments,
+  removeSegments,
+  neighborSegmentFilled,
+  getSegmentAtPosition,
+  getLocalCellPosition
 };

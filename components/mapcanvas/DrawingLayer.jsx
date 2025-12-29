@@ -5,6 +5,8 @@ const { useDrawingTools } = await requireModuleByName("useDrawingTools.js");
 const { useMapState } = await requireModuleByName("MapContext.jsx");
 const { useEventHandlerRegistration } = await requireModuleByName("EventHandlerContext.jsx");
 const { ShapePreviewOverlay } = await requireModuleByName("ShapePreviewOverlay.jsx");
+const { SegmentPickerOverlay } = await requireModuleByName("SegmentPickerOverlay.jsx");
+const { SegmentHoverOverlay } = await requireModuleByName("SegmentHoverOverlay.jsx");
 const { getSettings } = await requireModuleByName("settingsAccessor.js");
 const { getEffectiveDistanceSettings } = await requireModuleByName("distanceOperations.js");
 
@@ -58,10 +60,23 @@ const DrawingLayer = ({
     handleDrawingPointerMove,
     stopDrawing,
     stopEdgeDrawing,
+    stopSegmentDrawing,
     cancelDrawing,
     updateShapeHover,
     updateEdgeLineHover,
-    cancelShapePreview
+    cancelShapePreview,
+    // Segment picker (mobile/touch UI)
+    segmentPickerOpen,
+    segmentPickerCell,
+    segmentPickerExistingCell,
+    closeSegmentPicker,
+    applySegmentSelection,
+    savedSegments,
+    rememberSegments,
+    // Segment hover (desktop preview)
+    segmentHoverInfo,
+    updateSegmentHover,
+    clearSegmentHover
   } = useDrawingTools(
     currentTool,
     selectedColor,
@@ -73,17 +88,23 @@ const DrawingLayer = ({
   const handleStopDrawing = dc.useCallback(() => {
     if (currentTool === 'edgeDraw' || currentTool === 'edgeErase') {
       stopEdgeDrawing();
+    } else if (currentTool === 'segmentDraw') {
+      stopSegmentDrawing();
     } else {
       stopDrawing();
     }
-  }, [currentTool, stopDrawing, stopEdgeDrawing]);
+  }, [currentTool, stopDrawing, stopEdgeDrawing, stopSegmentDrawing]);
   
   // Handle escape key to cancel
   const handleKeyDown = dc.useCallback((e) => {
-    if (e.key === 'Escape' && (rectangleStart || circleStart || edgeLineStart || touchConfirmPending)) {
-      cancelShapePreview();
+    if (e.key === 'Escape') {
+      if (segmentPickerOpen) {
+        closeSegmentPicker();
+      } else if (rectangleStart || circleStart || edgeLineStart || touchConfirmPending) {
+        cancelShapePreview();
+      }
     }
-  }, [rectangleStart, circleStart, edgeLineStart, touchConfirmPending, cancelShapePreview]);
+  }, [rectangleStart, circleStart, edgeLineStart, touchConfirmPending, cancelShapePreview, segmentPickerOpen, closeSegmentPicker]);
   
   // Register keyboard handler
   dc.useEffect(() => {
@@ -112,14 +133,17 @@ const DrawingLayer = ({
       shapeHoverPosition,
       touchConfirmPending,
       cancelShapePreview,
-      previewEnabled: previewSettings.kbmEnabled
+      previewEnabled: previewSettings.kbmEnabled,
+      // Segment hover handlers
+      updateSegmentHover,
+      clearSegmentHover
     });
     
     return () => unregisterHandlers('drawing');
   }, [registerHandlers, unregisterHandlers, handleDrawingPointerDown, handleDrawingPointerMove, 
       handleStopDrawing, cancelDrawing, isDrawing, rectangleStart, circleStart, edgeLineStart,
       updateShapeHover, updateEdgeLineHover, shapeHoverPosition, touchConfirmPending, 
-      cancelShapePreview, previewSettings.kbmEnabled]);
+      cancelShapePreview, previewSettings.kbmEnabled, updateSegmentHover, clearSegmentHover]);
   
   dc.useEffect(() => {
     if (onDrawingStateChange) {
@@ -385,6 +409,31 @@ const DrawingLayer = ({
     <>
       {renderStartMarker()}
       {renderShapePreview()}
+      
+      {/* Segment Hover Overlay (desktop preview for segment painting) */}
+      {currentTool === 'segmentDraw' && segmentHoverInfo && (
+        <SegmentHoverOverlay
+          hoverInfo={segmentHoverInfo}
+          selectedColor={selectedColor}
+          geometry={geometry}
+          mapData={mapData}
+          canvasRef={canvasRef}
+          containerRef={containerRef}
+        />
+      )}
+      
+      {/* Segment Picker Overlay (mobile/touch UI for segment painting) */}
+      <SegmentPickerOverlay
+        isOpen={segmentPickerOpen}
+        cellCoords={segmentPickerCell}
+        existingCell={segmentPickerExistingCell}
+        selectedColor={selectedColor}
+        selectedOpacity={selectedOpacity}
+        onConfirm={applySegmentSelection}
+        onCancel={closeSegmentPicker}
+        savedSegments={savedSegments}
+        initialRememberState={rememberSegments}
+      />
     </>
   );
 };

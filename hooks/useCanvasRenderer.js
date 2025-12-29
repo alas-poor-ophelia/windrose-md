@@ -11,6 +11,7 @@ const { GridGeometry } = await requireModuleByName("GridGeometry.js");
 const { HexGeometry } = await requireModuleByName("HexGeometry.js");
 const { gridRenderer } = await requireModuleByName("gridRenderer.js");
 const { hexRenderer } = await requireModuleByName("hexRenderer.js");
+const { segmentRenderer } = await requireModuleByName("segmentRenderer.js");
 const { getCachedImage } = await requireModuleByName("imageOperations.js");
 const { getSlotOffset, getMultiObjectScale, getObjectsInCell } = await requireModuleByName("hexSlotPositioner.js");
 const { offsetToAxial, axialToOffset } = await requireModuleByName("offsetCoordinates.js");
@@ -197,32 +198,65 @@ function renderCanvas(canvas, fogCanvas, mapData, geometry, selectedItems = [], 
       color: getCellColor(cell)
     }));
     
-    // Render painted cells using renderer
-    renderer.renderPaintedCells(ctx, cellsWithColor, geometry, rendererViewState);
+    // Separate cells into simple (full) and segment (partial) cells
+    const { simpleCells, segmentCells } = segmentRenderer.separateCellsByType(cellsWithColor);
     
-    // Render interior grid lines on top of painted cells (grid only)
+    // 1. Render simple cells (batch-optimized by color)
+    if (simpleCells.length > 0) {
+      renderer.renderPaintedCells(ctx, simpleCells, geometry, rendererViewState);
+    }
+    
+    // 2. Render segment cells (triangle-based rendering)
+    if (segmentCells.length > 0 && geometry instanceof GridGeometry) {
+      segmentRenderer.renderSegmentCells(ctx, segmentCells, geometry, rendererViewState);
+    }
+    
+    // 3. Render interior grid lines on top of painted cells (grid only)
     // These are slightly thinner than exterior lines for visual distinction
-    if (renderer.renderInteriorGridLines) {
-      renderer.renderInteriorGridLines(ctx, cellsWithColor, geometry, rendererViewState, {
+    // Note: Only needed for simple cells; segment cells have internal borders
+    if (renderer.renderInteriorGridLines && simpleCells.length > 0) {
+      renderer.renderInteriorGridLines(ctx, simpleCells, geometry, rendererViewState, {
         lineColor: THEME.grid.lines,
         lineWidth: THEME.grid.lineWidth || 1,
         interiorRatio: 0.5
       });
     }
     
-    // Render smart borders using renderer (grid only - hex renderer no-ops this)
-    renderer.renderCellBorders(
-      ctx,
-      cellsWithColor,
-      geometry,
-      rendererViewState,
-      buildCellLookup,
-      calculateBordersOptimized,
-      {
-        border: THEME.cells.border,
-        borderWidth: THEME.cells.borderWidth
-      }
-    );
+    // Build a shared cell lookup from ALL cells (simple + segment)
+    // This ensures border calculations see all neighbors correctly
+    const allCellsLookup = buildCellLookup(cellsWithColor);
+    
+    // 4. Render smart borders for simple cells (grid only - hex renderer no-ops this)
+    // Use the all-cells lookup so simple cells don't draw borders against segment cells
+    if (simpleCells.length > 0) {
+      renderer.renderCellBorders(
+        ctx,
+        simpleCells,
+        geometry,
+        rendererViewState,
+        () => allCellsLookup,  // Return pre-built lookup instead of building from subset
+        calculateBordersOptimized,
+        {
+          border: THEME.cells.border,
+          borderWidth: THEME.cells.borderWidth
+        }
+      );
+    }
+    
+    // 5. Render borders for segment cells (internal + external)
+    if (segmentCells.length > 0 && geometry instanceof GridGeometry) {
+      segmentRenderer.renderSegmentBorders(
+        ctx,
+        segmentCells,
+        cellsWithColor,  // All cells for neighbor lookup
+        geometry,
+        rendererViewState,
+        {
+          border: THEME.cells.border,
+          borderWidth: THEME.cells.borderWidth
+        }
+      );
+    }
   }
   
   // Draw painted edges (grid maps only, after cells/borders)

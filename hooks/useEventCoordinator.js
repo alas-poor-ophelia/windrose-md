@@ -264,13 +264,13 @@ const useEventCoordinator = ({
                  currentTool === 'rectangle' || currentTool === 'circle' || 
                  currentTool === 'clearArea' || currentTool === 'line' ||
                  currentTool === 'edgeDraw' || currentTool === 'edgeErase' || 
-                 currentTool === 'edgeLine') {
+                 currentTool === 'edgeLine' || currentTool === 'segmentDraw') {
         // Drawing tools (including edge tools) - clear any multi-selection
         if (hasMultiSelection) clearSelection();
         
         if (drawingHandlers?.handleDrawingPointerDown) {
           const eventToUse = isTouchEvent ? syntheticEvent : e;
-          drawingHandlers.handleDrawingPointerDown(eventToUse, gridX, gridY);
+          drawingHandlers.handleDrawingPointerDown(eventToUse, gridX, gridY, isTouchEvent);
         }
         
       } else if (currentTool === 'addObject') {
@@ -424,7 +424,8 @@ const useEventCoordinator = ({
         currentTool === 'rectangle' || currentTool === 'circle' || 
         currentTool === 'line' || currentTool === 'clearArea' ||
         currentTool === 'edgeDraw' || currentTool === 'edgeErase' || 
-        currentTool === 'edgeLine') {
+        currentTool === 'edgeLine' || currentTool === 'segmentDraw') {
+      
       if (drawingHandlers?.handleDrawingPointerMove) {
         drawingHandlers.handleDrawingPointerMove(e);
       }
@@ -456,6 +457,24 @@ const useEventCoordinator = ({
             const gridX = coords.gridX !== undefined ? coords.gridX : coords.q;
             const gridY = coords.gridY !== undefined ? coords.gridY : coords.r;
             drawingHandlers.updateShapeHover(gridX, gridY);
+          }
+        }
+      }
+      
+      // Track segment hover for segment paint tool (desktop only)
+      if (!isTouch && currentTool === 'segmentDraw' && drawingHandlers?.updateSegmentHover) {
+        // Note: screenToWorld comes from useMapState context (line 24), not panZoomHandlers
+        if (screenToWorld && geometry) {
+          const worldCoords = screenToWorld(clientX, clientY);
+          if (worldCoords) {
+            const cellSize = geometry.cellSize;
+            // Get cell coordinates
+            const cellX = Math.floor(worldCoords.worldX / cellSize);
+            const cellY = Math.floor(worldCoords.worldY / cellSize);
+            // Get local position within cell (0-1)
+            const localX = (worldCoords.worldX / cellSize) - cellX;
+            const localY = (worldCoords.worldY / cellSize) - cellY;
+            drawingHandlers.updateSegmentHover(cellX, cellY, localX, localY);
           }
         }
       }
@@ -591,7 +610,7 @@ const useEventCoordinator = ({
         currentTool === 'rectangle' || currentTool === 'circle' || 
         currentTool === 'line' || currentTool === 'clearArea' ||
         currentTool === 'edgeDraw' || currentTool === 'edgeErase' || 
-        currentTool === 'edgeLine') {
+        currentTool === 'edgeLine' || currentTool === 'segmentDraw') {
       if (drawingHandlers?.stopDrawing) {
         drawingHandlers.stopDrawing(e);
       }
@@ -622,7 +641,7 @@ const useEventCoordinator = ({
         currentTool === 'rectangle' || currentTool === 'circle' || 
         currentTool === 'line' || currentTool === 'clearArea' ||
         currentTool === 'edgeDraw' || currentTool === 'edgeErase' || 
-        currentTool === 'edgeLine') {
+        currentTool === 'edgeLine' || currentTool === 'segmentDraw') {
       if (drawingHandlers?.cancelDrawing) {
         drawingHandlers.cancelDrawing();
       }

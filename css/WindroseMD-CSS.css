@@ -500,6 +500,7 @@
   padding: 4px;
   display: flex;
   flex-direction: column;
+  align-items: stretch;
   gap: 2px;
   z-index: 1001;
   box-shadow: 
@@ -511,6 +512,7 @@
 .dmt-subtool-option {
   display: flex;
   align-items: center;
+  justify-content: flex-start;
   gap: 8px;
   padding: 8px 12px;
   border: none;
@@ -521,11 +523,15 @@
   white-space: nowrap;
   font-size: 13px;
   transition: var(--dmt-transition);
+  width: 100%;
+  text-align: left;
+  box-sizing: border-box;
 
   svg {
     width: 16px;
     height: 16px;
     color: var(--dmt-border-primary);
+    flex-shrink: 0;
   }
 
   &:hover {

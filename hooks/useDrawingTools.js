@@ -23,7 +23,11 @@ const {
   removeCell: accessorRemoveCell,
   setCells,
   removeCellsInBounds,
-  getCellIndex
+  getCellIndex,
+  setSegments,
+  removeSegments,
+  getSegmentAtPosition,
+  getLocalCellPosition
 } = await requireModuleByName("cellAccessor.js");
 
 /**
@@ -68,6 +72,7 @@ const useDrawingTools = (
   const [isDrawing, setIsDrawing] = dc.useState(false);
   const [processedCells, setProcessedCells] = dc.useState(new Set());
   const [processedEdges, setProcessedEdges] = dc.useState(new Set()); // Track processed edges for edge paint
+  const [processedSegments, setProcessedSegments] = dc.useState(new Set()); // Track processed segments for segment paint
   const [rectangleStart, setRectangleStart] = dc.useState(null);
   const [circleStart, setCircleStart] = dc.useState(null);
   const [edgeLineStart, setEdgeLineStart] = dc.useState(null); // For edge line tool (two-click)
@@ -76,6 +81,18 @@ const useDrawingTools = (
   const [shapeHoverPosition, setShapeHoverPosition] = dc.useState(null);
   const [touchConfirmPending, setTouchConfirmPending] = dc.useState(false);
   const [pendingEndPoint, setPendingEndPoint] = dc.useState(null);
+  
+  // Segment picker state (for mobile/touch segment painting)
+  const [segmentPickerOpen, setSegmentPickerOpen] = dc.useState(false);
+  const [segmentPickerCell, setSegmentPickerCell] = dc.useState(null); // {x, y} cell coords
+  const [segmentPickerExistingCell, setSegmentPickerExistingCell] = dc.useState(null); // existing cell data
+  
+  // "Remember selection" feature - saves segments to pre-populate new cells
+  const [savedSegments, setSavedSegments] = dc.useState([]); // Array of segment names
+  const [rememberSegments, setRememberSegments] = dc.useState(true); // Checkbox state (default checked)
+  
+  // Segment hover state (for desktop hover preview)
+  const [segmentHoverInfo, setSegmentHoverInfo] = dc.useState(null); // {cellX, cellY, segment}
   
   // Track initial state at start of drag stroke for batched history
   // This allows immediate visual updates while creating a single undo entry
@@ -266,6 +283,195 @@ const useDrawingTools = (
       onEdgesChange(activeLayer.edges || [], false);
       strokeInitialEdgesRef.current = null;
     }
+  };
+  
+  // ============================================================================
+  // SEGMENT DRAWING (Partial Cell Painting)
+  // ============================================================================
+  
+  /**
+   * Paint a single segment in a cell
+   * Determines which triangle segment the pointer is in and paints it
+   * 
+   * @param {number} worldX - World X coordinate
+   * @param {number} worldY - World Y coordinate
+   */
+  const toggleSegment = (worldX, worldY) => {
+    if (!mapData || !geometry) return;
+    
+    // Segment painting only works for grid geometry
+    if (!(geometry instanceof GridGeometry)) return;
+    
+    // Get active layer data for reading
+    const activeLayer = getActiveLayer(mapData);
+    
+    // Get the grid cell coordinates
+    const gridCoords = geometry.worldToGrid(worldX, worldY);
+    const cellX = gridCoords.gridX;
+    const cellY = gridCoords.gridY;
+    
+    // Calculate local position within the cell (0-1)
+    const cellWorldX = cellX * geometry.cellSize;
+    const cellWorldY = cellY * geometry.cellSize;
+    const localX = (worldX - cellWorldX) / geometry.cellSize;
+    const localY = (worldY - cellWorldY) / geometry.cellSize;
+    
+    // Determine which segment this position falls into
+    const segment = getSegmentAtPosition(localX, localY);
+    
+    // Create unique key for tracking during drag
+    const segmentKey = `${cellX},${cellY},${segment}`;
+    
+    if (processedSegments.has(segmentKey)) return;
+    
+    setProcessedSegments(prev => new Set([...prev, segmentKey]));
+    
+    // Check if we're in a batched stroke
+    const isBatchedStroke = strokeInitialStateRef.current !== null;
+    
+    // Paint the segment
+    const newCells = setSegments(
+      activeLayer.cells, 
+      { gridX: cellX, gridY: cellY }, 
+      [segment], 
+      selectedColor, 
+      selectedOpacity, 
+      geometry
+    );
+    onCellsChange(newCells, isBatchedStroke);
+  };
+  
+  /**
+   * Process segment during drag (for segmentDraw tool)
+   */
+  const processSegmentDuringDrag = (e) => {
+    if (!geometry || !(geometry instanceof GridGeometry)) return;
+    
+    const { clientX, clientY } = getClientCoords(e);
+    const worldCoords = screenToWorld(clientX, clientY);
+    if (!worldCoords) return;
+    
+    toggleSegment(worldCoords.worldX, worldCoords.worldY);
+  };
+  
+  /**
+   * Start segment drawing stroke
+   */
+  const startSegmentDrawing = (e) => {
+    if (!mapData) return;
+    
+    // Get active layer data for reading
+    const activeLayer = getActiveLayer(mapData);
+    
+    setIsDrawing(true);
+    setProcessedSegments(new Set());
+    // Store initial cell state for batched history entry at stroke end
+    strokeInitialStateRef.current = [...activeLayer.cells];
+    processSegmentDuringDrag(e);
+  };
+  
+  /**
+   * Stop segment drawing stroke and create history entry
+   */
+  const stopSegmentDrawing = () => {
+    if (!isDrawing) return;
+    
+    // Get active layer data for reading
+    const activeLayer = getActiveLayer(mapData);
+    
+    setIsDrawing(false);
+    setProcessedSegments(new Set());
+    
+    // Add single history entry for the completed stroke
+    if (strokeInitialStateRef.current !== null && mapData) {
+      onCellsChange(activeLayer.cells, false);
+      strokeInitialStateRef.current = null;
+    }
+  };
+  
+  // ============================================================================
+  // SEGMENT PICKER (Mobile/Touch UI for segment painting)
+  // ============================================================================
+  
+  /**
+   * Open the segment picker for a specific cell
+   * Called on touch devices when tapping a cell with segmentDraw tool
+   * 
+   * @param {number} cellX - Cell X coordinate
+   * @param {number} cellY - Cell Y coordinate
+   */
+  const openSegmentPicker = (cellX, cellY) => {
+    if (!mapData || !geometry) return;
+    
+    // Get active layer data
+    const activeLayer = getActiveLayer(mapData);
+    
+    // Find existing cell at this position
+    const existingCell = activeLayer.cells.find(c => c.x === cellX && c.y === cellY);
+    
+    setSegmentPickerCell({ x: cellX, y: cellY });
+    setSegmentPickerExistingCell(existingCell || null);
+    setSegmentPickerOpen(true);
+  };
+  
+  /**
+   * Close the segment picker without applying changes
+   */
+  const closeSegmentPicker = () => {
+    setSegmentPickerOpen(false);
+    setSegmentPickerCell(null);
+    setSegmentPickerExistingCell(null);
+  };
+  
+  /**
+   * Apply segment selection from the picker
+   * Called when user confirms their selection in the picker UI
+   * 
+   * Note: This REPLACES the cell's segments entirely, unlike the drag-painting
+   * which adds segments. This allows the picker to toggle segments off.
+   * 
+   * @param {Array<string>} selectedSegments - Array of segment names to fill
+   * @param {boolean} shouldRemember - Whether to save these segments for future cells
+   */
+  const applySegmentSelection = (selectedSegments, shouldRemember = true) => {
+    if (!mapData || !geometry || !segmentPickerCell) return;
+    
+    // Save segments for future cells if "remember" is checked
+    if (shouldRemember) {
+      setSavedSegments(selectedSegments);
+      setRememberSegments(true);
+    } else {
+      setRememberSegments(false);
+    }
+    
+    // Get active layer data
+    const activeLayer = getActiveLayer(mapData);
+    
+    // First, remove any existing cell at this position
+    let newCells = activeLayer.cells.filter(c => 
+      !(c.x === segmentPickerCell.x && c.y === segmentPickerCell.y)
+    );
+    
+    // If segments are selected, create a new cell
+    if (selectedSegments.length > 0) {
+      const coords = { gridX: segmentPickerCell.x, gridY: segmentPickerCell.y };
+      
+      // Use setSegments on the filtered array (without existing cell)
+      // This will create a fresh cell with exactly the selected segments
+      newCells = setSegments(
+        newCells,
+        coords,
+        selectedSegments,
+        selectedColor,
+        selectedOpacity,
+        geometry
+      );
+    }
+    
+    onCellsChange(newCells);
+    
+    // Close the picker
+    closeSegmentPicker();
   };
   
   /**
@@ -497,6 +703,51 @@ const useDrawingTools = (
   }, [currentTool, edgeLineStart, touchConfirmPending]);
   
   /**
+   * Update hover state for segment painting tool
+   * Called during mouse move when segment paint tool is active
+   * 
+   * @param {number} cellX - Cell X coordinate
+   * @param {number} cellY - Cell Y coordinate
+   * @param {number} localX - Local X position within cell (0-1)
+   * @param {number} localY - Local Y position within cell (0-1)
+   */
+  const updateSegmentHover = dc.useCallback((cellX, cellY, localX, localY) => {
+    // Don't show hover while actively drawing
+    if (isDrawing) {
+      setSegmentHoverInfo(null);
+      return;
+    }
+    
+    if (currentTool !== 'segmentDraw') {
+      setSegmentHoverInfo(null);
+      return;
+    }
+    
+    // Determine which segment is under the cursor
+    const segment = getSegmentAtPosition(localX, localY);
+    
+    if (segment) {
+      setSegmentHoverInfo({ cellX, cellY, segment });
+    } else {
+      setSegmentHoverInfo(null);
+    }
+  }, [currentTool, isDrawing]);
+  
+  // Clear segment hover when tool changes away from segmentDraw
+  dc.useEffect(() => {
+    if (currentTool !== 'segmentDraw') {
+      setSegmentHoverInfo(null);
+    }
+  }, [currentTool]);
+  
+  /**
+   * Clear segment hover (e.g., when mouse leaves canvas)
+   */
+  const clearSegmentHover = dc.useCallback(() => {
+    setSegmentHoverInfo(null);
+  }, []);
+  
+  /**
    * Check if a point is inside the shape bounds (for touch confirmation)
    * @param {number} x - X coordinate to check
    * @param {number} y - Y coordinate to check
@@ -587,14 +838,14 @@ const useDrawingTools = (
    * @param {number} gridX - Grid X coordinate
    * @param {number} gridY - Grid Y coordinate
    */
-  const handleDrawingPointerDown = (e, gridX, gridY) => {
+  const handleDrawingPointerDown = (e, gridX, gridY, isTouchEvent = false) => {
     if (!mapData) return false;
     
     // Ignore right-clicks - they're handled by contextmenu for cancellation
     if (e.button === 2) return false;
     
-    // Detect if this is a touch event
-    const isTouch = e.touches !== undefined || e.pointerType === 'touch';
+    // Use passed isTouchEvent flag (from event coordinator) or fallback to event detection
+    const isTouch = isTouchEvent || e.touches !== undefined || e.pointerType === 'touch';
     const touchPreviewEnabled = previewSettings.touchEnabled && isTouch;
     
     // Handle rectangle and circle tools
@@ -697,6 +948,20 @@ const useDrawingTools = (
       return true;
     }
     
+    // Handle segment paint tool (grid maps only)
+    if (currentTool === 'segmentDraw') {
+      if (isTouch) {
+        // Touch: Open the segment picker for this cell
+        if (geometry instanceof GridGeometry) {
+          openSegmentPicker(gridX, gridY);
+        }
+      } else {
+        // Mouse/pen: Use direct segment drawing
+        startSegmentDrawing(e);
+      }
+      return true;
+    }
+    
     // Handle paint/erase tools
     if (currentTool === 'draw' || currentTool === 'erase') {
       startDrawing(e);
@@ -717,6 +982,12 @@ const useDrawingTools = (
       return true;
     }
     
+    // Handle segment paint during drag
+    if (isDrawing && currentTool === 'segmentDraw') {
+      processSegmentDuringDrag(e);
+      return true;
+    }
+    
     // Handle cell paint/erase during drag
     if (isDrawing && (currentTool === 'draw' || currentTool === 'erase')) {
       processCellDuringDrag(e, dragStart);
@@ -733,6 +1004,7 @@ const useDrawingTools = (
       setIsDrawing(false);
       setProcessedCells(new Set());
       setProcessedEdges(new Set());
+      setProcessedSegments(new Set());
       strokeInitialStateRef.current = null;
       strokeInitialEdgesRef.current = null;
     }
@@ -784,6 +1056,22 @@ const useDrawingTools = (
     stopEdgeDrawing,
     fillEdgeLine,
     
+    // Segment Functions (partial cell painting)
+    toggleSegment,
+    processSegmentDuringDrag,
+    startSegmentDrawing,
+    stopSegmentDrawing,
+    
+    // Segment Picker (mobile/touch UI)
+    segmentPickerOpen,
+    segmentPickerCell,
+    segmentPickerExistingCell,
+    openSegmentPicker,
+    closeSegmentPicker,
+    applySegmentSelection,
+    savedSegments,
+    rememberSegments,
+    
     // Handler Functions
     handleDrawingPointerDown,
     handleDrawingPointerMove,
@@ -797,10 +1085,16 @@ const useDrawingTools = (
     confirmTouchShape,
     cancelShapePreview,
     
+    // Segment hover (desktop preview)
+    segmentHoverInfo,
+    updateSegmentHover,
+    clearSegmentHover,
+    
     // Setters (for advanced use cases)
     setIsDrawing,
     setProcessedCells,
     setProcessedEdges,
+    setProcessedSegments,
     setRectangleStart,
     setCircleStart,
     setEdgeLineStart,

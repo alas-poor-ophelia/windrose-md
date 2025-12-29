@@ -350,31 +350,6 @@ const TabRenderSettingsMethods = {
           }
         }));
   },
-  renderInputControlsSettingsContent(containerEl) {
-    // Shape Preview - KBM (Keyboard/Mouse)
-    new Setting(containerEl)
-      .setName('Shape Preview (Keyboard/Mouse)')
-      .setDesc('Show live preview of rectangle, circle, and clear area shapes while hovering before the second click')
-      .addToggle(toggle => toggle
-        .setValue(this.plugin.settings.shapePreviewKbm)
-        .onChange(async (value) => {
-          this.plugin.settings.shapePreviewKbm = value;
-          this.settingsChanged = true;
-          await this.plugin.saveSettings();
-        }));
-
-    // Shape Preview - Touch
-    new Setting(containerEl)
-      .setName('Shape Preview (Touch)')
-      .setDesc('Enable 3-tap confirmation for shape tools on touch devices: tap start, tap end to preview, tap inside preview to confirm (tap outside to cancel)')
-      .addToggle(toggle => toggle
-        .setValue(this.plugin.settings.shapePreviewTouch)
-        .onChange(async (value) => {
-          this.plugin.settings.shapePreviewTouch = value;
-          this.settingsChanged = true;
-          await this.plugin.saveSettings();
-        }));
-  },
   renderDistanceMeasurementSettingsContent(containerEl) {
     // Grid: Distance per cell
     new Setting(containerEl)

@@ -189,7 +189,8 @@ async function renderMapToCanvas(ctx, params) {
   };
   
   // Render using existing render function
-  renderCanvas(tempCanvas, exportMapData, geometry, [], false, theme, false, { objects: true, textLabels: true, hexCoordinates: false });
+  // Pass null for fogCanvas since we don't want fog in exports
+  renderCanvas(tempCanvas, null, exportMapData, geometry, [], false, theme, false, { objects: true, textLabels: true, hexCoordinates: false });
   
   // Copy to target context
   ctx.drawImage(tempCanvas, 0, 0);

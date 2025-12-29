@@ -394,10 +394,7 @@ class WindroseMDSettingsPlugin extends Plugin {
         fogOfWarBlurEnabled: false,
         fogOfWarBlurFactor: 0.20,
         // Controls visibility
-        alwaysShowControls: false,
-        // Shape preview settings (Input & Controls)
-        shapePreviewKbm: true,
-        shapePreviewTouch: false
+        alwaysShowControls: false
       }, data || {});
     } catch (error) {
       console.warn('[DMT Settings] Error loading settings, using defaults:', error);
@@ -437,10 +434,7 @@ class WindroseMDSettingsPlugin extends Plugin {
         fogOfWarBlurEnabled: false,
         fogOfWarBlurFactor: 0.20,
         // Controls visibility
-        alwaysShowControls: false,
-        // Shape preview settings (Input & Controls)
-        shapePreviewKbm: true,
-        shapePreviewTouch: false
+        alwaysShowControls: false
       };
     }
   }
@@ -588,9 +582,6 @@ class WindroseMDSettingsTab extends PluginSettingTab {
     this.createCollapsibleSection(containerEl, 'Map Behavior', 
       (el) => this.renderMapBehaviorSettingsContent(el),
       { open: openSections.has('Map Behavior') });
-    this.createCollapsibleSection(containerEl, 'Input & Controls', 
-      (el) => this.renderInputControlsSettingsContent(el),
-      { open: openSections.has('Input & Controls') });
     this.createCollapsibleSection(containerEl, 'Distance Measurement', 
       (el) => this.renderDistanceMeasurementSettingsContent(el),
       { open: openSections.has('Distance Measurement') });

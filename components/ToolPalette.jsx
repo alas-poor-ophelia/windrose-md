@@ -265,6 +265,7 @@ const ToolPalette = ({
       id: 'draw',
       subTools: [
         { id: 'draw', label: 'Paint Cells', title: 'Draw (fill cells) (D)', icon: 'lucide-paintbrush' },
+        { id: 'segmentDraw', label: 'Paint Segments', title: 'Paint Segments (partial cells)', icon: 'lucide-triangle', gridOnly: true },
         { id: 'edgeDraw', label: 'Paint Edges', title: 'Paint Edges (grid lines)', icon: 'lucide-pencil-ruler', gridOnly: true }
       ]
     },
