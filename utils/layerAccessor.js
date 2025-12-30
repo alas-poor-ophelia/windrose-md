@@ -7,7 +7,7 @@
 const pathResolverPath = dc.resolvePath("pathResolver.js");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
-const { SCHEMA_VERSION } = await requireModuleByName("dmtConstants.js");
+const { SCHEMA_VERSION } = await requireModuleByName("dmtConstants.ts");
 
 // ============================================================================
 // UUID GENERATION

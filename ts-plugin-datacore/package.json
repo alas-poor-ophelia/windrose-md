@@ -1,0 +1,6 @@
+{
+  "name": "ts-plugin-datacore",
+  "version": "1.0.0",
+  "description": "TypeScript plugin that filters Datacore-specific diagnostic errors",
+  "main": "index.js"
+}

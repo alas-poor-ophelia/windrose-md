@@ -2,7 +2,7 @@ const pathResolverPath = dc.resolvePath("pathResolver.js");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
 
-const { DEFAULTS, DATA_FILE_PATH, SCHEMA_VERSION } = await requireModuleByName("dmtConstants.js");
+const { DEFAULTS, DATA_FILE_PATH, SCHEMA_VERSION } = await requireModuleByName("dmtConstants.ts");
 const { offsetToAxial } = await requireModuleByName("offsetCoordinates.js");
 const { getSettings } = await requireModuleByName("settingsAccessor.js");
 const { 

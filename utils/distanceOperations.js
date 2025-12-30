@@ -8,7 +8,7 @@
 
 const pathResolverPath = dc.resolvePath("pathResolver.js");
 const { requireModuleByName } = await dc.require(pathResolverPath);
-const { DEFAULTS } = await requireModuleByName("dmtConstants.js");
+const { DEFAULTS } = await requireModuleByName("dmtConstants.ts");
 
 /**
  * Format a distance measurement for display

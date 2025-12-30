@@ -356,7 +356,8 @@
 .dmt-canvas-cleararea,
 .dmt-canvas-add-object,
 .dmt-canvas-add-text,
-.dmt-canvas-measure {
+.dmt-canvas-measure,
+.dmt-canvas-diagonal-fill {
   cursor: crosshair;
 }
 

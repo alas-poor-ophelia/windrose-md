@@ -28,7 +28,7 @@ const {
   removeSegments,
   getSegmentAtPosition,
   getLocalCellPosition
-} = await requireModuleByName("cellAccessor.js");
+} = await requireModuleByName("cellAccessor.ts");
 
 /**
  * Hook for managing drawing tools
@@ -332,7 +332,7 @@ const useDrawingTools = (
     // Paint the segment
     const newCells = setSegments(
       activeLayer.cells, 
-      { gridX: cellX, gridY: cellY }, 
+      { x: cellX, y: cellY }, 
       [segment], 
       selectedColor, 
       selectedOpacity, 
@@ -454,7 +454,7 @@ const useDrawingTools = (
     
     // If segments are selected, create a new cell
     if (selectedSegments.length > 0) {
-      const coords = { gridX: segmentPickerCell.x, gridY: segmentPickerCell.y };
+      const coords = { x: segmentPickerCell.x, y: segmentPickerCell.y };
       
       // Use setSegments on the filtered array (without existing cell)
       // This will create a fresh cell with exactly the selected segments
@@ -532,7 +532,7 @@ const useDrawingTools = (
     
     // Build batch updates array
     const cellUpdates = cellsInRect.map(cellCoords => ({
-      coords: { gridX: cellCoords.x, gridY: cellCoords.y },
+      coords: cellCoords,
       color: selectedColor,
       opacity: selectedOpacity
     }));
@@ -559,7 +559,7 @@ const useDrawingTools = (
     
     // Build batch updates array
     const cellUpdates = cellsInCircle.map(cellCoords => ({
-      coords: { gridX: cellCoords.x, gridY: cellCoords.y },
+      coords: cellCoords,
       color: selectedColor,
       opacity: selectedOpacity
     }));

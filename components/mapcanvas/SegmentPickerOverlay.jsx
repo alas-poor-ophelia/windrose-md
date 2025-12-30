@@ -13,7 +13,7 @@ const pathResolverPath = dc.resolvePath("pathResolver.js");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
 const { ModalPortal } = await requireModuleByName("ModalPortal.jsx");
-const { SEGMENT_NAMES, SEGMENT_VERTICES, SEGMENT_TRIANGLES } = await requireModuleByName("dmtConstants.js");
+const { SEGMENT_NAMES, SEGMENT_VERTICES, SEGMENT_TRIANGLES } = await requireModuleByName("dmtConstants.ts");
 
 /**
  * Calculate triangle path for SVG rendering

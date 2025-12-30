@@ -2,7 +2,7 @@
 
 const pathResolverPath = dc.resolvePath("pathResolver.js");
 const { requireModuleByName } = await dc.require(pathResolverPath);
-const { THEME, DEFAULTS } = await requireModuleByName("dmtConstants.js");
+const { THEME, DEFAULTS } = await requireModuleByName("dmtConstants.ts");
 
 // Built-in color palette - matches settings plugin
 const BUILT_IN_COLORS = [

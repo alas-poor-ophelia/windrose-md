@@ -39,7 +39,7 @@
 // Import offset coordinate utilities for rectangular bounds and iteration
 const pathResolverPath = dc.resolvePath("pathResolver.js");
 const { requireModuleByName } = await dc.require(pathResolverPath);
-const { BaseGeometry } = await requireModuleByName("BaseGeometry.js");
+const { BaseGeometry } = await requireModuleByName("BaseGeometry.ts");
 const { axialToOffset, offsetToAxial, isWithinOffsetBounds } = await requireModuleByName("offsetCoordinates.js");
 
 class HexGeometry extends BaseGeometry {

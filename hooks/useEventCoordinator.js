@@ -52,6 +52,7 @@ const useEventCoordinator = ({
     const notePinHandlers = getHandlers('notePin');
     const panZoomHandlers = getHandlers('panZoom');
     const measureHandlers = getHandlers('measure');
+    const diagonalFillHandlers = getHandlers('diagonalFill');
     const alignmentHandlers = getHandlers('imageAlignment');
     const fogHandlers = getHandlers('fogOfWar');
     
@@ -310,6 +311,14 @@ const useEventCoordinator = ({
         if (measureHandlers?.handleMeasureClick) {
           measureHandlers.handleMeasureClick(gridX, gridY, isTouchEvent);
         }
+      } else if (currentTool === 'diagonalFill') {
+        // Clear any multi-selection when using diagonal fill
+        if (hasMultiSelection) clearSelection();
+        
+        // Diagonal fill tool
+        if (diagonalFillHandlers?.handleDiagonalFillClick) {
+          diagonalFillHandlers.handleDiagonalFillClick(e, isTouchEvent);
+        }
       }
     };
     
@@ -337,6 +346,7 @@ const useEventCoordinator = ({
     const textHandlers = getHandlers('text');
     const panZoomHandlers = getHandlers('panZoom');
     const measureHandlers = getHandlers('measure');
+    const diagonalFillHandlers = getHandlers('diagonalFill');
     const alignmentHandlers = getHandlers('imageAlignment');
     const fogHandlers = getHandlers('fogOfWar');
     
@@ -496,6 +506,12 @@ const useEventCoordinator = ({
         const gridY = coords.gridY !== undefined ? coords.gridY : coords.r;
         measureHandlers.handleMeasureMove(gridX, gridY);
       }
+      return;
+    }
+    
+    // Handle diagonal fill tool - hover preview updates
+    if (currentTool === 'diagonalFill' && diagonalFillHandlers?.handleDiagonalFillMove) {
+      diagonalFillHandlers.handleDiagonalFillMove(e);
       return;
     }
     
@@ -846,6 +862,15 @@ const useEventCoordinator = ({
       // Get registered handlers
       const objectHandlers = getHandlers('object');
       const textHandlers = getHandlers('text');
+      const diagonalFillHandlers = getHandlers('diagonalFill');
+      
+      // Handle Escape key for diagonal fill tool
+      if (e.key === 'Escape' && currentTool === 'diagonalFill') {
+        if (diagonalFillHandlers?.cancelFill) {
+          diagonalFillHandlers.cancelFill();
+          return;
+        }
+      }
       
       // Try object handlers first (for rotation, deletion, etc.)
       if (objectHandlers?.handleObjectKeyDown) {
@@ -865,7 +890,7 @@ const useEventCoordinator = ({
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [getHandlers]);
+  }, [getHandlers, currentTool]);
   
   // Clean up pending tool timeout on unmount
   dc.useEffect(() => {

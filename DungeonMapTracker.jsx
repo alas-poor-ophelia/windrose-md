@@ -32,7 +32,7 @@ const { VisibilityToolbar } = await requireModuleByName("VisibilityToolbar.jsx")
 const { SettingsPluginInstaller, shouldOfferUpgrade } = await requireModuleByName("SettingsPluginInstaller.jsx");
 const { MapSettingsModal } = await requireModuleByName("MapSettingsModal.jsx");
 const { getSetting, getTheme, getEffectiveSettings } = await requireModuleByName("settingsAccessor.js");
-const { DEFAULTS } = await requireModuleByName("dmtConstants.js");
+const { DEFAULTS } = await requireModuleByName("dmtConstants.ts");
 const { getColorByHex, isDefaultColor } = await requireModuleByName("colorOperations.js");
 const { axialToOffset, isWithinOffsetBounds } = await requireModuleByName("offsetCoordinates.js");
 const { ImageAlignmentMode } = await requireModuleByName("ImageAlignmentMode.jsx");
@@ -785,6 +785,11 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 currentTool={currentTool}
                 globalSettings={effectiveSettings}
                 mapDistanceOverrides={mapData?.settings?.distanceSettings}
+              />
+              
+              {/* DiagonalFillOverlay - diagonal fill tool preview */}
+              <MapCanvas.DiagonalFillOverlay
+                currentTool={currentTool}
               />
               
               {/* Re-roll button for generated dungeons */}

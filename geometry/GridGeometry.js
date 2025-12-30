@@ -35,7 +35,7 @@
 // Import base geometry class
 const pathResolverPath = dc.resolvePath("pathResolver.js");
 const { requireModuleByName } = await dc.require(pathResolverPath);
-const { BaseGeometry } = await requireModuleByName("BaseGeometry.js");
+const { BaseGeometry } = await requireModuleByName("BaseGeometry.ts");
 
 class GridGeometry extends BaseGeometry {
   /**

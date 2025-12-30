@@ -273,7 +273,8 @@ const ToolPalette = ({
       id: 'rectangle',
       subTools: [
         { id: 'rectangle', label: 'Fill Rectangle', title: 'Rectangle (click two corners)', icon: 'lucide-square', gridOnly: true },
-        { id: 'edgeLine', label: 'Edge Line', title: 'Edge Line (click two points)', icon: 'lucide-git-commit-horizontal', gridOnly: true }
+        { id: 'edgeLine', label: 'Edge Line', title: 'Edge Line (click two points)', icon: 'lucide-git-commit-horizontal', gridOnly: true },
+        { id: 'diagonalFill', label: 'Diagonal Fill', title: 'Fill diagonal gaps (click two corners)', icon: 'lucide-slash', gridOnly: true }
       ]
     }
   ];

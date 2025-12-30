@@ -21,7 +21,7 @@ const {
 
 // Dependencies for async operations and constants
 const { getSettings } = await requireModuleByName("settingsAccessor.js");
-const { THEME } = await requireModuleByName("dmtConstants.js");
+const { THEME } = await requireModuleByName("dmtConstants.ts");
 const { 
   getImageDisplayNames, 
   getFullPathFromDisplayName, 

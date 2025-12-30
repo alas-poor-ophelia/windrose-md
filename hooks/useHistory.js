@@ -1,7 +1,7 @@
 const pathResolverPath = dc.resolvePath("pathResolver.js");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
-const { DEFAULTS } = await requireModuleByName("dmtConstants.js");
+const { DEFAULTS } = await requireModuleByName("dmtConstants.ts");
 
 function useHistory(initialState) {
   // Combine history and index into single state for better synchronization

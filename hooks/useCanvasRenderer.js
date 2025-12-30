@@ -213,9 +213,12 @@ function renderCanvas(canvas, fogCanvas, mapData, geometry, selectedItems = [], 
     
     // 3. Render interior grid lines on top of painted cells (grid only)
     // These are slightly thinner than exterior lines for visual distinction
-    // Note: Only needed for simple cells; segment cells have internal borders
-    if (renderer.renderInteriorGridLines && simpleCells.length > 0) {
-      renderer.renderInteriorGridLines(ctx, simpleCells, geometry, rendererViewState, {
+    // Pass ALL cells (simple + segment) so grid lines are drawn between:
+    // - Two simple cells
+    // - A simple cell and a segment cell  
+    // - Two segment cells
+    if (renderer.renderInteriorGridLines && cellsWithColor.length > 0) {
+      renderer.renderInteriorGridLines(ctx, cellsWithColor, geometry, rendererViewState, {
         lineColor: THEME.grid.lines,
         lineWidth: THEME.grid.lineWidth || 1,
         interiorRatio: 0.5

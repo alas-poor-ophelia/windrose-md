@@ -22,12 +22,12 @@ const { requireModuleByName } = await dc.require(pathResolverPath);
 const { 
   SEGMENT_VERTICES, 
   SEGMENT_TRIANGLES
-} = await requireModuleByName("dmtConstants.js");
+} = await requireModuleByName("dmtConstants.ts");
 
 const { 
   hasSegments,
   buildCellMap
-} = await requireModuleByName("cellAccessor.js");
+} = await requireModuleByName("cellAccessor.ts");
 
 const {
   getInternalBorders,
@@ -182,7 +182,7 @@ function renderSegmentCells(ctx, cells, geometry, viewState) {
 /**
  * Draw an internal border line (center to boundary point)
  * These are diagonal lines showing where filled segments meet empty segments
- * within the same cell (e.g., TL→Center→BR for a diagonal fill).
+ * within the same cell (e.g., TLâ†’Centerâ†’BR for a diagonal fill).
  * Uses fillRect for iOS compatibility (same as existing border rendering)
  * 
  * @param {CanvasRenderingContext2D} ctx
@@ -291,7 +291,7 @@ function renderSegmentBorders(ctx, segmentCells, allCells, geometry, viewState, 
     const vertices = getCellVertices(screenX, screenY, cellSize);
     
     // Draw internal borders (diagonal lines where filled meets empty within cell)
-    // These create the diagonal boundaries like TL→Center→BR
+    // These create the diagonal boundaries like TLâ†’Centerâ†’BR
     const internalBorders = getInternalBorders(cell);
     for (const { from, to } of internalBorders) {
       drawInternalBorder(ctx, vertices, from, to, borderWidth);

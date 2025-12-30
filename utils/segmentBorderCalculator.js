@@ -16,7 +16,7 @@ const {
   SEGMENT_NAMES,
   SEGMENT_INTERNAL_ADJACENCY,
   SEGMENT_CROSS_CELL_ADJACENCY
-} = await requireModuleByName("dmtConstants.js");
+} = await requireModuleByName("dmtConstants.ts");
 
 const { 
   hasSegments, 
@@ -25,7 +25,7 @@ const {
   buildCellMap,
   cellKey,
   neighborSegmentFilled
-} = await requireModuleByName("cellAccessor.js");
+} = await requireModuleByName("cellAccessor.ts");
 
 // ============================================================================
 // INTERNAL BORDER CALCULATION
@@ -90,10 +90,12 @@ function getExternalBorders(cell, cellMap, geometry) {
     const neighborX = cell.x + adjacency.dx;
     const neighborY = cell.y + adjacency.dy;
     
-    // Check if neighbor segment is filled
+    // Check if neighbor segment is filled (using Point-based API)
     const neighborFilled = neighborSegmentFilled(
-      cellMap, neighborX, neighborY, 
-      adjacency.neighborSegment, geometry
+      cellMap, 
+      { x: neighborX, y: neighborY }, 
+      adjacency.neighborSegment, 
+      geometry
     );
     
     // Need border if neighbor segment is not filled

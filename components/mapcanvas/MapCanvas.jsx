@@ -4,7 +4,7 @@ const { requireModuleByName } = await dc.require(pathResolverPath);
 const { useCanvasRenderer, renderCanvas } = await requireModuleByName("useCanvasRenderer.js");
 const { useCanvasInteraction } = await requireModuleByName("useCanvasInteraction.js");
 const { GridGeometry } = await requireModuleByName("GridGeometry.js");
-const { DEFAULTS } = await requireModuleByName("dmtConstants.js");
+const { DEFAULTS } = await requireModuleByName("dmtConstants.ts");
 const { getObjectAtPosition, addObject, removeObject, removeObjectAtPosition, removeObjectsInRectangle, updateObject, isAreaFree, canResizeObject } = await requireModuleByName("objectOperations.js");
 const { addTextLabel, getTextLabelAtPosition, removeTextLabel, updateTextLabel } = await requireModuleByName("textLabelOperations.js");
 const { HexGeometry } = await requireModuleByName("HexGeometry.js");
@@ -18,6 +18,7 @@ const { NotePinLayer } = await requireModuleByName("NotePinLayer.jsx");
 const { EventHandlerProvider } = await requireModuleByName("EventHandlerContext.jsx");
 const { HexCoordinateLayer } = await requireModuleByName("HexCoordinateLayer.jsx");
 const { MeasurementLayer } = await requireModuleByName("MeasurementLayer.jsx");
+const { DiagonalFillOverlay } = await requireModuleByName("DiagonalFillOverlay.jsx");
 const { AreaSelectLayer } = await requireModuleByName("AreaSelectLayer.jsx");
 const { FogOfWarLayer } = await requireModuleByName("FogOfWarLayer.jsx");
 const { RerollDungeonButton } = await requireModuleByName("RerollDungeonButton.jsx");
@@ -273,6 +274,7 @@ const MapCanvasContent = ({ mapData, onCellsChange, onObjectsChange, onTextLabel
     if (isDraggingSelection) return 'dmt-canvas-selecting';
     if (currentTool === 'select') return 'dmt-canvas-select';
     if (currentTool === 'measure') return 'dmt-canvas-measure';
+    if (currentTool === 'diagonalFill') return 'dmt-canvas-diagonal-fill';
     if (currentTool === 'addObject') {
       return selectedObjectType ? 'dmt-canvas-add-object' : 'dmt-canvas';
     }
@@ -418,6 +420,7 @@ MapCanvas.TextLayer = TextLayer;
 MapCanvas.NotePinLayer = NotePinLayer;
 MapCanvas.HexCoordinateLayer = HexCoordinateLayer;
 MapCanvas.MeasurementLayer = MeasurementLayer;
+MapCanvas.DiagonalFillOverlay = DiagonalFillOverlay;
 MapCanvas.AreaSelectLayer = AreaSelectLayer;
 MapCanvas.FogOfWarLayer = FogOfWarLayer;
 MapCanvas.RerollDungeonButton = RerollDungeonButton;
