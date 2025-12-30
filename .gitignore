@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+
+# TypeScript generated
+types/generated/
+*.tsbuildinfo
+
+# npm
+npm-debug.log*
+.npm
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE (except project-specific .vscode/settings.json)
+.idea/
+*.swp
+*.swo
+
+# src is a symlink to vault - don't track it here
+# (the actual source files are tracked in the vault's own repo if any)
+src

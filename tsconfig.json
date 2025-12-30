@@ -1,0 +1,47 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "declaration": true,
+    "declarationDir": "./types/generated",
+    "emitDeclarationOnly": false,
+    "jsx": "react-jsx",
+    "jsxImportSource": "preact",
+    "types": [
+      "obsidian-typings"
+    ],
+    "baseUrl": ".",
+    "paths": {
+      "@types/*": [
+        "./types/*"
+      ],
+      "@blacksmithgu/datacore": [
+        "./node_modules/@blacksmithgu/datacore"
+      ]
+    },
+    "plugins": [
+      {
+        "name": "ts-plugin-datacore"
+      }
+    ]
+  },
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "types/generated"
+  ]
+}

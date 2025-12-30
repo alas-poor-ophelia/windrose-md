@@ -1,0 +1,10 @@
+{
+  "id": "windrose-md",
+  "name": "Windrose MapDesigner",
+  "version": "1.5.0",
+  "minAppVersion": "1.4.11",
+  "description": "Dungeon mapping tool for tabletop RPGs, built on Datacore",
+  "author": "alas, poor ophelia (lashiel in discord)",
+  "authorUrl": "",
+  "isDesktopOnly": false
+}
