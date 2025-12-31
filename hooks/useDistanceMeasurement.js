@@ -8,7 +8,7 @@
 
 const pathResolverPath = dc.resolvePath("pathResolver.js");
 const { requireModuleByName } = await dc.require(pathResolverPath);
-const { formatDistance, getEffectiveDistanceSettings } = await requireModuleByName("distanceOperations.js");
+const { formatDistance, getEffectiveDistanceSettings } = await requireModuleByName("distanceOperations.ts");
 
 /**
  * Hook for managing distance measurement state

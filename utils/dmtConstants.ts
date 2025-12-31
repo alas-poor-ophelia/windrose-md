@@ -3,6 +3,7 @@
 
 // Type-only imports
 import type { SegmentName } from '#types/core/cell.types';
+import type { HexBounds } from '#types/core/map.types';
 
 // =============================================================================
 // Type Definitions
@@ -64,12 +65,6 @@ interface Theme {
 interface Dimensions {
   width: number;
   height: number;
-}
-
-/** Hex map bounds (column/row limits) */
-interface HexBounds {
-  maxCol: number;
-  maxRow: number;
 }
 
 /** Canvas size in pixels */

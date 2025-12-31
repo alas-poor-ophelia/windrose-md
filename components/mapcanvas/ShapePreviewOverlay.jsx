@@ -13,7 +13,7 @@ const pathResolverPath = dc.resolvePath("pathResolver.js");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
 const { GridGeometry } = await requireModuleByName("GridGeometry.ts");
-const { formatDistance } = await requireModuleByName("distanceOperations.js");
+const { formatDistance } = await requireModuleByName("distanceOperations.ts");
 
 /**
  * Convert cell coordinates to screen coordinates

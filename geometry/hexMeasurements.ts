@@ -239,7 +239,7 @@ function validateFineTune(baseHexSize: number, adjustedHexSize: number): Validat
   if (offset > MAX_FINE_TUNE_OFFSET) {
     return { 
       valid: false, 
-      error: `Fine-tune adjustment limited to ±${MAX_FINE_TUNE_OFFSET}px` 
+      error: `Fine-tune adjustment limited to Â±${MAX_FINE_TUNE_OFFSET}px` 
     };
   }
   return { valid: true, error: null };

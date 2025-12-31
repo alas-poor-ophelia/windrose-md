@@ -16807,7 +16807,7 @@ return { HexCoordinateLayer };
 
 ```js
 /**
- * distanceOperations.js
+ * distanceOperations.ts
  * 
  * Utilities for distance measurement formatting and settings resolution.
  * Used by the distance measurement tool to format display output and

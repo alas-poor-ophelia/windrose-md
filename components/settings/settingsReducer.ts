@@ -7,12 +7,13 @@
  */
 
 // Type-only imports
-import type { MapType } from '#types/core/map.types';
+import type { MapType, HexBounds } from '#types/core/map.types';
 import type { 
   HexOrientation, 
   DiagonalRule, 
   DistanceDisplayFormat,
-  HexColor
+  HexColor,
+  SettingsTabId
 } from '#types/settings/settings.types';
 import type { Cell } from '#types/core/cell.types';
 import type { MapObject } from '#types/objects/object.types';
@@ -51,12 +52,6 @@ const { getDisplayNameFromPath } = await requireModuleByName("imageOperations.js
 // Type Definitions
 // ===========================================
 
-/** Hex grid bounds */
-interface HexBounds {
-  maxCol: number;
-  maxRow: number;
-}
-
 /** Image dimensions */
 interface ImageDimensions {
   width: number;
@@ -72,9 +67,6 @@ interface GridDensityPreset {
   label: string;
   description: string;
 }
-
-/** Settings tab identifier */
-type SettingsTab = 'appearance' | 'grid' | 'measurement' | 'preferences';
 
 /** Sizing mode for background image */
 type SizingMode = 'density' | 'measurement';
@@ -155,7 +147,7 @@ interface ImageSearchResult {
 
 /** Complete settings modal state */
 interface SettingsModalState {
-  activeTab: SettingsTab;
+  activeTab: SettingsTabId;
   
   // Global settings toggle
   useGlobalSettings: boolean;
@@ -273,7 +265,7 @@ interface GlobalSettings {
 
 /** Props for buildInitialState */
 interface BuildInitialStateProps {
-  initialTab?: SettingsTab;
+  initialTab?: SettingsTabId;
   mapType: MapType;
   currentSettings?: CurrentSettings;
   currentPreferences?: SettingsPreferences;
@@ -338,7 +330,7 @@ interface InitializeAction {
 
 interface SetTabAction {
   type: typeof Actions.SET_TAB;
-  payload: SettingsTab;
+  payload: SettingsTabId;
 }
 
 interface ToggleUseGlobalAction {

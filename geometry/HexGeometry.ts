@@ -41,6 +41,7 @@ import type {
   DistanceOptions,
   Cell
 } from '#types/core/geometry.types';
+import type { HexBounds } from '#types/core/map.types';
 
 // Datacore imports
 const pathResolverPath = dc.resolvePath("pathResolver.js");
@@ -76,12 +77,6 @@ interface VisibleHexRange {
   maxQ: number;
   minR: number;
   maxR: number;
-}
-
-/** Hex bounds in offset coordinates */
-interface HexBounds {
-  maxCol: number;
-  maxRow: number;
 }
 
 class HexGeometry extends BaseGeometry {

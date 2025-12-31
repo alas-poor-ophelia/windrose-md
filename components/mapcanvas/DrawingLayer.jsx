@@ -8,7 +8,7 @@ const { ShapePreviewOverlay } = await requireModuleByName("ShapePreviewOverlay.j
 const { SegmentPickerOverlay } = await requireModuleByName("SegmentPickerOverlay.jsx");
 const { SegmentHoverOverlay } = await requireModuleByName("SegmentHoverOverlay.jsx");
 const { getSettings } = await requireModuleByName("settingsAccessor.ts");
-const { getEffectiveDistanceSettings } = await requireModuleByName("distanceOperations.js");
+const { getEffectiveDistanceSettings } = await requireModuleByName("distanceOperations.ts");
 
 /**
  * DrawingLayer.jsx
