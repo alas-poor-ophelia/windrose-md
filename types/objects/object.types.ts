@@ -3,7 +3,7 @@
  * Path: types/objects/object.types.ts
  * 
  * Object placement and manipulation types.
- * Populated during Phase 1 (Tier 3 migration - objectTypes.js, objectOperations.js).
+ * Populated during Phase 1 (Tier 3 migration - objectTypes.ts, objectOperations.js).
  */
 
 import type { Point } from '../core/geometry.types';
@@ -26,7 +26,7 @@ export type ObjectCategory =
 // Object Definition
 // ===========================================
 
-/** Object type definition (from objectTypes.js) */
+/** Object type definition (from objectTypes.ts) */
 export interface ObjectTypeDef {
   id: string;
   name: string;

@@ -3,70 +3,159 @@
  * Path: types/core/cell.types.ts
  * 
  * Cell and segment data structures for map storage.
- * Populated during Phase 1 (Tier 1 migration - cellAccessor.js).
+ * 
+ * COORDINATE MODEL:
+ * Storage uses native coordinates for each geometry:
+ * - Grid cells: {x, y}
+ * - Hex cells: {q, r}
+ * 
+ * The cellAccessor module provides a Point-based API that abstracts
+ * this difference. Higher-level code works with Point {x, y} and
+ * cellAccessor handles translation to/from native storage format.
+ * 
+ * SEGMENT SYSTEM (Grid only):
+ * Grid cells can be fully painted (SimpleCell) or partially painted (SegmentCell).
+ * Segment cells divide the cell into 8 triangular "pie slice" segments.
+ * Hex cells do not support segments.
  */
 
-import type { GridCoords, AxialCoords } from './geometry.types';
+import type { Point } from './geometry.types';
 
 // ===========================================
-// Segment System
+// Segment System (Grid maps only)
 // ===========================================
 
 /** 
- * Segment identifiers for partial cell painting.
- * Each cell can be divided into 8 triangular segments.
+ * Segment name identifiers for partial cell painting.
+ * Each cell is divided into 8 triangular segments like pie slices.
+ * Named by compass direction from center.
  */
-export type SegmentId = 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'nw';
+export type SegmentName = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w';
 
-/** Segment paint state within a cell */
-export type SegmentMap = Partial<Record<SegmentId, boolean>>;
+/** 
+ * Segment fill state map.
+ * Keys are segment names, values are `true` if filled.
+ * Missing keys mean unfilled.
+ */
+export type SegmentMap = Partial<Record<SegmentName, true>>;
 
 // ===========================================
-// Cell Types
+// Grid Cell Types (storage: x, y)
 // ===========================================
 
-/** Base cell properties shared by all cell types */
-interface CellBase {
+/** Base properties for grid cells */
+interface GridCellBase {
+  x: number;
+  y: number;
   color: string;
   opacity?: number;
 }
 
-/** Simple painted cell (full cell, no segments) */
-export interface SimpleCell extends CellBase {
-  type?: 'simple';  // Optional for backwards compatibility
+/** Simple grid cell - fully painted, no segments */
+export interface SimpleGridCell extends GridCellBase {
+  segments?: undefined;
 }
 
-/** Cell with segment-level painting */
-export interface SegmentCell extends CellBase {
-  type: 'segment';
+/** Segment grid cell - partially painted */
+export interface SegmentGridCell extends GridCellBase {
   segments: SegmentMap;
 }
 
-/** Union type for all cell variants */
-export type Cell = SimpleCell | SegmentCell;
+/** Any grid cell */
+export type GridCell = SimpleGridCell | SegmentGridCell;
+
+// ===========================================
+// Hex Cell Type (storage: q, r)
+// ===========================================
+
+/** Hex cell - no segment support */
+export interface HexCell {
+  q: number;
+  r: number;
+  color: string;
+  opacity?: number;
+}
+
+// ===========================================
+// Unified Cell Type (Storage)
+// ===========================================
+
+/** 
+ * Union type for any cell in storage.
+ * Use type guards to narrow: isGridCell(), isHexCell()
+ */
+export type Cell = GridCell | HexCell;
+
+// ===========================================
+// Type Guards
+// ===========================================
+
+/** Check if cell is a grid cell (has x, y) */
+export function isGridCell(cell: Cell): cell is GridCell {
+  return 'x' in cell && 'y' in cell;
+}
+
+/** Check if cell is a hex cell (has q, r) */
+export function isHexCell(cell: Cell): cell is HexCell {
+  return 'q' in cell && 'r' in cell;
+}
+
+/** Check if cell has partial fill (segments with entries) */
+export function hasSegments(cell: Cell): cell is SegmentGridCell {
+  return isGridCell(cell) && 
+    cell.segments !== undefined && 
+    Object.keys(cell.segments).length > 0;
+}
+
+/** Check if cell is simple (fully painted, no segments) */
+export function isSimpleCell(cell: Cell): boolean {
+  return !hasSegments(cell);
+}
 
 // ===========================================
 // Cell Maps (Storage)
 // ===========================================
 
-/** Key format for cell storage: "x,y" or "q,r" */
+/** String key for cell lookup: "x,y" or "q,r" */
 export type CellKey = string;
 
-/** Map of cell keys to cell data */
+/** Map of cell keys to cell data for O(1) lookup */
 export type CellMap = Map<CellKey, Cell>;
 
-/** Legacy object-based cell storage (for migration) */
-export type CellRecord = Record<CellKey, Cell>;
-
 // ===========================================
-// Cell Operations
+// Input Types (flexible formats)
 // ===========================================
 
-/** Result of cell lookup */
-export interface CellLookupResult {
-  exists: boolean;
-  cell: Cell | null;
-  coords: GridCoords | AxialCoords;
+/** 
+ * Coordinates in any supported input format.
+ * cellAccessor normalizes these to Point or native format as needed.
+ */
+export interface AnyCoords {
+  x?: number;
+  y?: number;
+  q?: number;
+  r?: number;
+  gridX?: number;
+  gridY?: number;
+  col?: number;
+  row?: number;
 }
 
-// TODO: Add more cell operation types during cellAccessor.js migration
+/** Cell update for batch operations */
+export interface CellUpdate {
+  coords: Point;
+  color: string;
+  opacity: number;
+}
+
+/** Local position within a cell (0-1 range) */
+export interface LocalCellPosition {
+  localX: number;
+  localY: number;
+}
+
+// ===========================================
+// Re-export Point for convenience
+// ===========================================
+
+export type { Point };

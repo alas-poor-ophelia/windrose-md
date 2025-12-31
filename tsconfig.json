@@ -17,22 +17,14 @@
     "emitDeclarationOnly": false,
     "jsx": "react-jsx",
     "jsxImportSource": "preact",
-    "types": [
-      "obsidian-typings"
-    ],
+    "types": ["obsidian-typings"],
     "baseUrl": ".",
     "paths": {
-      "@types/*": [
-        "./types/*"
-      ],
-      "@blacksmithgu/datacore": [
-        "./node_modules/@blacksmithgu/datacore"
-      ]
+      "#types/*": ["./types/*"],
+      "@blacksmithgu/datacore": ["./node_modules/@blacksmithgu/datacore"]
     },
     "plugins": [
-      {
-        "name": "ts-plugin-datacore"
-      }
+      { "name": "ts-plugin-datacore" }
     ]
   },
   "include": [
