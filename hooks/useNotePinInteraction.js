@@ -13,7 +13,7 @@ const { requireModuleByName } = await dc.require(pathResolverPath);
 
 const { useMapState, useMapOperations } = await requireModuleByName("MapContext.jsx");
 const { useMapSelection } = await requireModuleByName("MapSelectionContext.jsx");
-const { getActiveLayer } = await requireModuleByName("layerAccessor.js");
+const { getActiveLayer } = await requireModuleByName("layerAccessor.ts");
 
 /**
  * Hook for managing note pin interactions

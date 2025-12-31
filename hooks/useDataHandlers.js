@@ -23,7 +23,7 @@
 const pathResolverPath = dc.resolvePath("pathResolver.js");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
-const { getActiveLayer, updateActiveLayer } = await requireModuleByName("layerAccessor.js");
+const { getActiveLayer, updateActiveLayer } = await requireModuleByName("layerAccessor.ts");
 
 /**
  * Hook for managing data change handlers

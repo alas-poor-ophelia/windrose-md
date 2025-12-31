@@ -12,7 +12,7 @@
 const pathResolverPath = dc.resolvePath("pathResolver.js");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
-const { getLayersOrdered } = await requireModuleByName("layerAccessor.js");
+const { getLayersOrdered } = await requireModuleByName("layerAccessor.ts");
 
 /**
  * LayerControls Component

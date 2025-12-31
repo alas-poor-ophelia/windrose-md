@@ -4,12 +4,12 @@ const { requireModuleByName } = await dc.require(pathResolverPath);
 
 const { DEFAULTS, DATA_FILE_PATH, SCHEMA_VERSION } = await requireModuleByName("dmtConstants.ts");
 const { offsetToAxial } = await requireModuleByName("offsetCoordinates.js");
-const { getSettings } = await requireModuleByName("settingsAccessor.js");
+const { getSettings } = await requireModuleByName("settingsAccessor.ts");
 const { 
   migrateToLayerSchema, 
   needsMigration, 
   generateLayerId
-} = await requireModuleByName("layerAccessor.js");
+} = await requireModuleByName("layerAccessor.ts");
 
 async function loadMapData(mapId, mapName = '', mapType = 'grid') {
   try {

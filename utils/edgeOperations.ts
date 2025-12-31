@@ -1,5 +1,5 @@
 /**
- * edgeOperations.js
+ * edgeOperations.ts
  * 
  * Pure functions for edge manipulation in grid maps.
  * Edges represent painted grid lines between cells.
@@ -9,8 +9,9 @@
  *   id: string,      // Unique identifier
  *   x: number,       // Cell x coordinate
  *   y: number,       // Cell y coordinate
- *   side: string,    // 'top' | 'right' | 'bottom' | 'left'
- *   color: string    // Hex color code
+ *   side: string,    // 'right' | 'bottom' (normalized form)
+ *   color: string,   // Hex color code
+ *   opacity?: number // Optional opacity (0-1)
  * }
  * 
  * NORMALIZATION:
@@ -23,17 +24,60 @@
  * - 'top' edges become 'bottom' edges of the cell above (y-1)
  */
 
+// Type-only imports
+import type { HexColor } from '#types/settings/settings.types';
+
+// ===========================================
+// Type Definitions
+// ===========================================
+
+/** Raw edge side (user input) */
+export type EdgeSideInput = 'top' | 'right' | 'bottom' | 'left';
+
+/** Normalized edge side (storage) */
+export type EdgeSideNormalized = 'right' | 'bottom';
+
+/** Unique edge identifier */
+export type EdgeId = string;
+
+/** Edge data structure */
+export interface Edge {
+  id: EdgeId;
+  x: number;
+  y: number;
+  side: EdgeSideNormalized;
+  color: HexColor;
+  opacity?: number;
+}
+
+/** Normalized edge coordinates (without id) */
+export interface NormalizedEdge {
+  x: number;
+  y: number;
+  side: EdgeSideNormalized;
+}
+
+/** Edge for generation (without id) */
+export interface EdgeTemplate {
+  x: number;
+  y: number;
+  side: EdgeSideNormalized;
+  color: HexColor | null;
+}
+
+/** Partial edge for updates */
+export type EdgeUpdate = Partial<Omit<Edge, 'id'>>;
+
+// ===========================================
+// Normalization
+// ===========================================
+
 /**
  * Normalize edge to canonical representation.
  * Converts 'left' to 'right' of adjacent cell, 'top' to 'bottom' of adjacent cell.
  * This ensures each physical edge has exactly one storage representation.
- * 
- * @param {number} x - Cell x coordinate
- * @param {number} y - Cell y coordinate
- * @param {string} side - 'top' | 'right' | 'bottom' | 'left'
- * @returns {{ x: number, y: number, side: string }} Normalized edge coordinates
  */
-function normalizeEdge(x, y, side) {
+function normalizeEdge(x: number, y: number, side: EdgeSideInput): NormalizedEdge {
   switch (side) {
     case 'left':
       // Left edge of (x,y) = Right edge of (x-1,y)
@@ -43,27 +87,34 @@ function normalizeEdge(x, y, side) {
       return { x, y: y - 1, side: 'bottom' };
     default:
       // 'right' and 'bottom' are already canonical
-      return { x, y, side };
+      return { x, y, side: side as EdgeSideNormalized };
   }
 }
 
+// ===========================================
+// ID Generation
+// ===========================================
+
 /**
  * Generate unique edge ID
- * @returns {string} Unique identifier for edge
  */
-function generateEdgeId() {
+function generateEdgeId(): EdgeId {
   return 'edge-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
 }
 
+// ===========================================
+// Single Edge Operations
+// ===========================================
+
 /**
  * Find edge at position (handles normalization internally)
- * @param {Array} edges - Edges array
- * @param {number} x - Cell x coordinate
- * @param {number} y - Cell y coordinate
- * @param {string} side - Edge side ('top' | 'right' | 'bottom' | 'left')
- * @returns {Object|null} Edge object if found, null otherwise
  */
-function getEdgeAt(edges, x, y, side) {
+function getEdgeAt(
+  edges: Edge[] | null | undefined,
+  x: number,
+  y: number,
+  side: EdgeSideInput
+): Edge | null {
   if (!edges || !Array.isArray(edges)) return null;
   
   const normalized = normalizeEdge(x, y, side);
@@ -76,15 +127,15 @@ function getEdgeAt(edges, x, y, side) {
 
 /**
  * Add edge or update color if edge already exists
- * @param {Array} edges - Current edges array
- * @param {number} x - Cell x coordinate
- * @param {number} y - Cell y coordinate
- * @param {string} side - Edge side ('top' | 'right' | 'bottom' | 'left')
- * @param {string} color - Edge color (hex code)
- * @param {number} opacity - Edge opacity (0-1, optional, defaults to 1)
- * @returns {Array} New edges array with added/updated edge
  */
-function addEdge(edges, x, y, side, color, opacity = 1) {
+function addEdge(
+  edges: Edge[] | null | undefined,
+  x: number,
+  y: number,
+  side: EdgeSideInput,
+  color: HexColor,
+  opacity: number = 1
+): Edge[] {
   // Validate inputs - return unchanged array if invalid
   if (typeof x !== 'number' || typeof y !== 'number' || !side || !color) {
     return edges || [];
@@ -114,13 +165,13 @@ function addEdge(edges, x, y, side, color, opacity = 1) {
 
 /**
  * Remove edge at position
- * @param {Array} edges - Current edges array
- * @param {number} x - Cell x coordinate
- * @param {number} y - Cell y coordinate
- * @param {string} side - Edge side ('top' | 'right' | 'bottom' | 'left')
- * @returns {Array} New edges array without the specified edge
  */
-function removeEdge(edges, x, y, side) {
+function removeEdge(
+  edges: Edge[] | null | undefined,
+  x: number,
+  y: number,
+  side: EdgeSideInput
+): Edge[] {
   if (!edges || !Array.isArray(edges)) return [];
   
   const normalized = normalizeEdge(x, y, side);
@@ -133,23 +184,20 @@ function removeEdge(edges, x, y, side) {
 
 /**
  * Remove edge by ID
- * @param {Array} edges - Current edges array
- * @param {string} edgeId - Edge ID to remove
- * @returns {Array} New edges array without the specified edge
  */
-function removeEdgeById(edges, edgeId) {
+function removeEdgeById(edges: Edge[] | null | undefined, edgeId: EdgeId): Edge[] {
   if (!edges || !Array.isArray(edges)) return [];
   return edges.filter(e => e.id !== edgeId);
 }
 
 /**
  * Update edge properties by ID
- * @param {Array} edges - Current edges array
- * @param {string} edgeId - Edge ID to update
- * @param {Object} updates - Properties to update
- * @returns {Array} New edges array with updated edge
  */
-function updateEdge(edges, edgeId, updates) {
+function updateEdge(
+  edges: Edge[] | null | undefined,
+  edgeId: EdgeId,
+  updates: EdgeUpdate
+): Edge[] {
   if (!edges || !Array.isArray(edges)) return [];
   
   return edges.map(e => {
@@ -160,23 +208,26 @@ function updateEdge(edges, edgeId, updates) {
   });
 }
 
+// ===========================================
+// Line Operations (Edge Line Tool)
+// ===========================================
+
 /**
- * Generate edges for a horizontal or vertical line between two intersection points
+ * Generate edges for a horizontal or vertical line between two intersection points.
  * Used for the edge line tool to paint multiple edges at once.
  * 
  * Intersection points are at grid corners (where 4 cells meet).
  * - A vertical line from (x, y1) to (x, y2) paints 'right' edges of column x-1
  * - A horizontal line from (x1, y) to (x2, y) paints 'bottom' edges of row y-1
- * 
- * @param {number} startX - Start intersection x coordinate
- * @param {number} startY - Start intersection y coordinate
- * @param {number} endX - End intersection x coordinate
- * @param {number} endY - End intersection y coordinate
- * @param {string} color - Edge color (hex code)
- * @returns {Array} Array of edge objects (without IDs - add IDs when merging)
  */
-function generateEdgeLine(startX, startY, endX, endY, color) {
-  const result = [];
+function generateEdgeLine(
+  startX: number,
+  startY: number,
+  endX: number,
+  endY: number,
+  color: HexColor | null
+): EdgeTemplate[] {
+  const result: EdgeTemplate[] = [];
   
   if (startX === endX) {
     // Vertical line at intersection column startX
@@ -219,18 +270,16 @@ function generateEdgeLine(startX, startY, endX, endY, color) {
 }
 
 /**
- * Merge new edges into existing edges array
+ * Merge new edges into existing edges array.
  * Handles duplicates by updating color of existing edges.
- * 
- * @param {Array} edges - Current edges array
- * @param {Array} newEdges - Edges to add (from generateEdgeLine, without IDs)
- * @returns {Array} Merged edges array
  */
-function mergeEdges(edges, newEdges) {
+function mergeEdges(edges: Edge[] | null | undefined, newEdges: EdgeTemplate[]): Edge[] {
   let result = [...(edges || [])];
   
   for (const edge of newEdges) {
-    result = addEdge(result, edge.x, edge.y, edge.side, edge.color);
+    if (edge.color !== null) {
+      result = addEdge(result, edge.x, edge.y, edge.side, edge.color);
+    }
   }
   
   return result;
@@ -238,15 +287,14 @@ function mergeEdges(edges, newEdges) {
 
 /**
  * Remove edges along a line between two intersection points
- * 
- * @param {Array} edges - Current edges array
- * @param {number} startX - Start intersection x coordinate
- * @param {number} startY - Start intersection y coordinate
- * @param {number} endX - End intersection x coordinate
- * @param {number} endY - End intersection y coordinate
- * @returns {Array} Edges array with line edges removed
  */
-function removeEdgeLine(edges, startX, startY, endX, endY) {
+function removeEdgeLine(
+  edges: Edge[] | null | undefined,
+  startX: number,
+  startY: number,
+  endX: number,
+  endY: number
+): Edge[] {
   // Generate the edges that would be in this line (color doesn't matter for removal)
   const lineEdges = generateEdgeLine(startX, startY, endX, endY, null);
   
@@ -258,16 +306,19 @@ function removeEdgeLine(edges, startX, startY, endX, endY) {
   return result;
 }
 
+// ===========================================
+// Query Operations
+// ===========================================
+
 /**
- * Get all edges adjacent to a specific cell
+ * Get all edges adjacent to a specific cell.
  * Useful for highlighting or bulk operations.
- * 
- * @param {Array} edges - Edges array
- * @param {number} x - Cell x coordinate
- * @param {number} y - Cell y coordinate
- * @returns {Array} Edges touching this cell (may include edges "owned" by adjacent cells)
  */
-function getEdgesForCell(edges, x, y) {
+function getEdgesForCell(
+  edges: Edge[] | null | undefined,
+  x: number,
+  y: number
+): Edge[] {
   if (!edges || !Array.isArray(edges)) return [];
   
   return edges.filter(e => {
@@ -285,13 +336,20 @@ function getEdgesForCell(edges, x, y) {
   });
 }
 
+// ===========================================
+// Bulk Operations
+// ===========================================
+
 /**
  * Clear all edges from the array
- * @returns {Array} Empty array
  */
-function clearAllEdges() {
+function clearAllEdges(): Edge[] {
   return [];
 }
+
+// ===========================================
+// Exports
+// ===========================================
 
 return {
   // Normalization

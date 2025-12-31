@@ -1,11 +1,41 @@
-// settingsAccessor.js - Utility to access plugin settings with fallback defaults
+/**
+ * settingsAccessor.ts
+ * Utility to access plugin settings with fallback defaults
+ */
 
+// Type-only imports
+import type {
+  PluginSettings,
+  ResolvedTheme,
+  BuiltInColor,
+  ObjectSettings,
+  ResolvedColorEntry,
+  MapSpecificSettings,
+  HexOrientation,
+  DiagonalRule,
+  DistanceDisplayFormat,
+  CoordinateKeyMode,
+  HexColor
+} from '#types/settings/settings.types';
+import type { Theme, Defaults } from '../utils/dmtConstants';
+
+// Datacore imports
 const pathResolverPath = dc.resolvePath("pathResolver.js");
-const { requireModuleByName } = await dc.require(pathResolverPath);
-const { THEME, DEFAULTS } = await requireModuleByName("dmtConstants.ts");
+const { requireModuleByName } = await dc.require(pathResolverPath) as {
+  requireModuleByName: (name: string) => Promise<unknown>
+};
 
-// Built-in color palette - matches settings plugin
-const BUILT_IN_COLORS = [
+const { THEME, DEFAULTS } = await requireModuleByName("dmtConstants.ts") as {
+  THEME: Theme;
+  DEFAULTS: Defaults;
+};
+
+// ===========================================
+// Constants
+// ===========================================
+
+/** Built-in color palette - matches settings plugin */
+const BUILT_IN_COLORS: BuiltInColor[] = [
   { id: 'default', color: '#c4a57b', label: 'Default (Tan)' },
   { id: 'stone', color: '#808080', label: 'Stone Gray' },
   { id: 'dark-stone', color: '#505050', label: 'Dark Gray' },
@@ -18,10 +48,10 @@ const BUILT_IN_COLORS = [
   { id: 'ice', color: '#14b8a6', label: 'Ice Teal' }
 ];
 
-// Fallback settings based on theme constants
-const FALLBACK_SETTINGS = {
+/** Fallback settings based on theme constants */
+const FALLBACK_SETTINGS: PluginSettings = {
   version: '1.0.0',
-  hexOrientation: DEFAULTS.hexOrientation,
+  hexOrientation: DEFAULTS.hexOrientation as HexOrientation,
   gridLineColor: THEME.grid.lines,
   gridLineWidth: THEME.grid.lineWidth,
   backgroundColor: THEME.grid.background,
@@ -29,48 +59,76 @@ const FALLBACK_SETTINGS = {
   coordinateKeyColor: THEME.coordinateKey.color,
   coordinateTextColor: THEME.coordinateText.color,
   coordinateTextShadow: THEME.coordinateText.shadow,
-  coordinateKeyMode: 'hold', // 'hold' or 'toggle'
+  coordinateKeyMode: 'hold' as CoordinateKeyMode,
   expandedByDefault: false,
   
   // Canvas dimensions
-  canvasHeight: 600,  // Desktop/default canvas height in pixels
-  canvasHeightMobile: 400,  // Mobile/touch device canvas height in pixels
+  canvasHeight: 600,
+  canvasHeightMobile: 400,
   
   // Distance measurement settings
   distancePerCellGrid: DEFAULTS.distance.perCellGrid,
   distancePerCellHex: DEFAULTS.distance.perCellHex,
   distanceUnitGrid: DEFAULTS.distance.unitGrid,
   distanceUnitHex: DEFAULTS.distance.unitHex,
-  gridDiagonalRule: DEFAULTS.distance.gridDiagonalRule,
-  distanceDisplayFormat: DEFAULTS.distance.displayFormat,
+  gridDiagonalRule: DEFAULTS.distance.gridDiagonalRule as DiagonalRule,
+  distanceDisplayFormat: DEFAULTS.distance.displayFormat as DistanceDisplayFormat,
   
   // Fog of War appearance settings
   fogOfWarColor: THEME.fogOfWar.color,
   fogOfWarOpacity: THEME.fogOfWar.opacity,
-  fogOfWarImage: null,  // Optional: vault path to tileable image
+  fogOfWarImage: null,
   fogOfWarBlurEnabled: THEME.fogOfWar.blurEnabled,
   fogOfWarBlurFactor: THEME.fogOfWar.blurFactor,
   
   // Controls visibility
   alwaysShowControls: false,
   
-  // Shape preview settings (Input & Controls)
-  shapePreviewKbm: true,      // Live preview on hover for keyboard/mouse (default ON)
-  shapePreviewTouch: false    // 3-tap confirmation flow for touch (default OFF)
+  // Shape preview settings
+  shapePreviewKbm: true,
+  shapePreviewTouch: false
 };
+
+/** Default object customization settings */
+const FALLBACK_OBJECT_SETTINGS: ObjectSettings = {
+  objectOverrides: {},
+  customObjects: [],
+  customCategories: []
+};
+
+// ===========================================
+// Type for Obsidian plugin access
+// ===========================================
+
+interface PluginInstance {
+  settings?: Partial<PluginSettings>;
+}
+
+interface PluginsCollection {
+  plugins: Record<string, PluginInstance>;
+}
+
+interface ObsidianApp {
+  plugins: PluginsCollection;
+}
+
+// ===========================================
+// Settings Access Functions
+// ===========================================
 
 /**
  * Get settings from the plugin, or return fallback defaults if plugin not available
  */
-function getSettings() {
+function getSettings(): PluginSettings {
   try {
     // Check if dc.app exists and is ready
-    if (!dc || !dc.app || !dc.app.plugins) {
+    if (!dc || !(dc as { app?: ObsidianApp }).app || !(dc as { app: ObsidianApp }).app.plugins) {
       return FALLBACK_SETTINGS;
     }
     
     // Try to get plugin settings
-    const plugin = dc.app.plugins.plugins['dungeon-map-tracker-settings'];
+    const app = (dc as { app: ObsidianApp }).app;
+    const plugin = app.plugins.plugins['dungeon-map-tracker-settings'];
     
     if (plugin && plugin.settings) {
       // Merge with fallbacks to ensure all keys exist
@@ -87,7 +145,7 @@ function getSettings() {
 /**
  * Get a specific setting value
  */
-function getSetting(key) {
+function getSetting<K extends keyof PluginSettings>(key: K): PluginSettings[K] {
   try {
     const settings = getSettings();
     return settings[key];
@@ -100,12 +158,13 @@ function getSetting(key) {
 /**
  * Check if the settings plugin is installed and enabled
  */
-function isPluginAvailable() {
+function isPluginAvailable(): boolean {
   try {
-    if (!dc || !dc.app || !dc.app.plugins) {
+    if (!dc || !(dc as { app?: ObsidianApp }).app || !(dc as { app: ObsidianApp }).app.plugins) {
       return false;
     }
-    const plugin = dc.app.plugins.plugins['dungeon-map-tracker-settings'];
+    const app = (dc as { app: ObsidianApp }).app;
+    const plugin = app.plugins.plugins['dungeon-map-tracker-settings'];
     return !!(plugin && plugin.settings);
   } catch (error) {
     return false;
@@ -114,10 +173,10 @@ function isPluginAvailable() {
 
 /**
  * Get complete theme object with configurable values from settings
- * and non-configurable values from constants
- * This is the facade/wrapper that components should use
+ * and non-configurable values from constants.
+ * This is the facade/wrapper that components should use.
  */
-function getTheme() {
+function getTheme(): ResolvedTheme {
   const settings = getSettings();
   
   return {
@@ -128,14 +187,20 @@ function getTheme() {
     },
     cells: {
       fill: THEME.cells.fill,
-      border: settings.borderColor,  // Configurable cell/wall border color
+      border: settings.borderColor,
       borderWidth: THEME.cells.borderWidth
     },
     compass: {
       color: THEME.compass.color,
       size: THEME.compass.size
     },
-    decorativeBorder: THEME.decorativeBorder,  // Hardcoded decorative border (not configurable)
+    // Note: decorativeBorder is defined inline where needed (e.g., exportOperations)
+    // not in THEME constants
+    decorativeBorder: {
+      color: '#8b7355',
+      width: 20,
+      dashArray: ''
+    },
     coordinateKey: settings.coordinateKeyColor,
     fogOfWar: {
       color: settings.fogOfWarColor,
@@ -149,11 +214,11 @@ function getTheme() {
 
 /**
  * Get effective settings for a map, merging map-specific overrides with global settings
- * @param {Object} mapSettings - Map-specific settings object { useGlobalSettings, overrides }
- * @param {Object} globalSettings - Optional global settings (will be fetched if not provided)
- * @returns {Object} - Merged settings object
  */
-function getEffectiveSettings(mapSettings, globalSettings = null) {
+function getEffectiveSettings(
+  mapSettings: MapSpecificSettings | null | undefined,
+  globalSettings: PluginSettings | null = null
+): PluginSettings {
   // Get global settings if not provided
   const globals = globalSettings || getSettings();
   
@@ -170,30 +235,19 @@ function getEffectiveSettings(mapSettings, globalSettings = null) {
 }
 
 /**
- * Default object customization settings
- * Used when settings plugin is not available or doesn't have object settings
- */
-const FALLBACK_OBJECT_SETTINGS = {
-  objectOverrides: {},
-  customObjects: [],
-  customCategories: []
-};
-
-/**
  * Get object customization settings from the plugin for a specific map type
  * Returns object overrides, custom objects, and custom categories
- * @param {string} mapType - 'hex' or 'grid' (defaults to 'grid')
- * @returns {Object} Object settings { objectOverrides, customObjects, customCategories }
  */
-function getObjectSettings(mapType = 'grid') {
+function getObjectSettings(mapType: 'hex' | 'grid' = 'grid'): ObjectSettings {
   try {
     // Check if dc.app exists and is ready
-    if (!dc || !dc.app || !dc.app.plugins) {
+    if (!dc || !(dc as { app?: ObsidianApp }).app || !(dc as { app: ObsidianApp }).app.plugins) {
       return FALLBACK_OBJECT_SETTINGS;
     }
     
     // Try to get plugin settings
-    const plugin = dc.app.plugins.plugins['dungeon-map-tracker-settings'];
+    const app = (dc as { app: ObsidianApp }).app;
+    const plugin = app.plugins.plugins['dungeon-map-tracker-settings'];
     
     if (plugin && plugin.settings) {
       // Use map-type specific settings keys
@@ -221,23 +275,28 @@ function getObjectSettings(mapType = 'grid') {
 /**
  * Get color palette settings from the plugin
  * Returns resolved color palette (built-in with overrides + custom colors)
- * @returns {Array} Array of color objects { id, color, label, isBuiltIn, isCustom, isModified }
  */
-function getColorPaletteSettings() {
+function getColorPaletteSettings(): ResolvedColorEntry[] {
   try {
     // Check if dc.app exists and is ready
-    if (!dc || !dc.app || !dc.app.plugins) {
-      return BUILT_IN_COLORS.map(c => ({ ...c, isBuiltIn: true, isModified: false }));
+    if (!dc || !(dc as { app?: ObsidianApp }).app || !(dc as { app: ObsidianApp }).app.plugins) {
+      return BUILT_IN_COLORS.map(c => ({ 
+        ...c, 
+        order: 0,
+        isBuiltIn: true, 
+        isModified: false 
+      }));
     }
     
     // Try to get plugin settings
-    const plugin = dc.app.plugins.plugins['dungeon-map-tracker-settings'];
+    const app = (dc as { app: ObsidianApp }).app;
+    const plugin = app.plugins.plugins['dungeon-map-tracker-settings'];
     
     if (plugin && plugin.settings) {
       const { colorPaletteOverrides = {}, customPaletteColors = [] } = plugin.settings;
       
       // Resolve built-in colors with overrides
-      const resolvedBuiltIns = BUILT_IN_COLORS
+      const resolvedBuiltIns: ResolvedColorEntry[] = BUILT_IN_COLORS
         .filter(c => !colorPaletteOverrides[c.id]?.hidden)
         .map((c, index) => {
           const override = colorPaletteOverrides[c.id];
@@ -255,7 +314,7 @@ function getColorPaletteSettings() {
         });
       
       // Add custom colors
-      const resolvedCustom = customPaletteColors.map((c, index) => ({
+      const resolvedCustom: ResolvedColorEntry[] = (customPaletteColors || []).map((c, index) => ({
         ...c,
         order: c.order ?? (100 + index),
         isCustom: true,
@@ -269,7 +328,26 @@ function getColorPaletteSettings() {
   }
   
   // Return default colors if plugin not available
-  return BUILT_IN_COLORS.map(c => ({ ...c, isBuiltIn: true, isModified: false }));
+  return BUILT_IN_COLORS.map((c, index) => ({ 
+    ...c, 
+    order: index,
+    isBuiltIn: true, 
+    isModified: false 
+  }));
 }
 
-return { getSettings, getSetting, isPluginAvailable, getTheme, getEffectiveSettings, getObjectSettings, getColorPaletteSettings, FALLBACK_SETTINGS, BUILT_IN_COLORS };
+// ===========================================
+// Exports
+// ===========================================
+
+return { 
+  getSettings, 
+  getSetting, 
+  isPluginAvailable, 
+  getTheme, 
+  getEffectiveSettings, 
+  getObjectSettings, 
+  getColorPaletteSettings, 
+  FALLBACK_SETTINGS, 
+  BUILT_IN_COLORS 
+};

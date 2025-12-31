@@ -13,7 +13,7 @@ const { requireModuleByName } = await dc.require(pathResolverPath) as {
   requireModuleByName: (name: string) => Promise<unknown>
 };
 
-const { getColorPaletteSettings, BUILT_IN_COLORS } = await requireModuleByName("settingsAccessor.js") as {
+const { getColorPaletteSettings, BUILT_IN_COLORS } = await requireModuleByName("settingsAccessor.ts") as {
   getColorPaletteSettings: () => ColorDefinition[];
   BUILT_IN_COLORS: ColorDefinition[];
 };

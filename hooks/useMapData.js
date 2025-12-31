@@ -3,7 +3,7 @@ const { requireModuleByName } = await dc.require(pathResolverPath);
 
 const { loadMapData, saveMapData } = await requireModuleByName("fileOperations.js");
 const { preloadImage } = await requireModuleByName("imageOperations.js");
-const { getEffectiveSettings } = await requireModuleByName("settingsAccessor.js");
+const { getEffectiveSettings } = await requireModuleByName("settingsAccessor.ts");
 
 
 function useMapData(mapId, mapName = '', mapType = 'grid') {

@@ -9,9 +9,9 @@ const pathResolverPath = dc.resolvePath("pathResolver.js");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
 const { calculateObjectScreenPosition } = await requireModuleByName("screenPositionUtils.js");
-const { openNoteInNewTab } = await requireModuleByName("noteOperations.js");
+const { openNoteInNewTab } = await requireModuleByName("noteOperations.ts");
 const { ColorPicker } = await requireModuleByName("ColorPicker.jsx");
-const { getActiveLayer } = await requireModuleByName("layerAccessor.js");
+const { getActiveLayer } = await requireModuleByName("layerAccessor.ts");
 
 /**
  * Calculate bounding box that encompasses all selected items

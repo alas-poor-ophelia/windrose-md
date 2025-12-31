@@ -1,9 +1,9 @@
 const pathResolverPath = dc.resolvePath("pathResolver.js");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
-const { getTheme, getEffectiveSettings } = await requireModuleByName("settingsAccessor.js");
+const { getTheme, getEffectiveSettings } = await requireModuleByName("settingsAccessor.ts");
 const { buildCellLookup, calculateBordersOptimized } = await requireModuleByName("borderCalculator.js");
-const { getObjectType } = await requireModuleByName("objectOperations.js");
+const { getObjectType } = await requireModuleByName("objectOperations.ts");
 const { getRenderChar } = await requireModuleByName("objectTypeResolver.js");
 const { getCellColor } = await requireModuleByName("colorOperations.ts");
 const { getFontCss } = await requireModuleByName("fontOptions.js");
@@ -15,7 +15,7 @@ const { segmentRenderer } = await requireModuleByName("segmentRenderer.ts");
 const { getCachedImage } = await requireModuleByName("imageOperations.js");
 const { getSlotOffset, getMultiObjectScale, getObjectsInCell } = await requireModuleByName("hexSlotPositioner.js");
 const { offsetToAxial, axialToOffset } = await requireModuleByName("offsetCoordinates.js");
-const { getActiveLayer, isCellFogged } = await requireModuleByName("layerAccessor.js");
+const { getActiveLayer, isCellFogged } = await requireModuleByName("layerAccessor.ts");
 
 /**
  * Get appropriate renderer for geometry type

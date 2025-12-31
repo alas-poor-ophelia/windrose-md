@@ -5,7 +5,7 @@ const {
   getNoteDisplayNames,
   getFullPathFromDisplayName,
   getDisplayNameFromPath
-} = await requireModuleByName("noteOperations.js");
+} = await requireModuleByName("noteOperations.ts");
 
 const { getObjectType } = await requireModuleByName("objectTypeResolver.js");
 

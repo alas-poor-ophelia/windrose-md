@@ -36,6 +36,7 @@ import type {
   ScreenCoords,
   OffsetCoords,
   GridBounds,
+  BoundingBox,
   GridStyle,
   DistanceOptions,
   Cell
@@ -75,14 +76,6 @@ interface VisibleHexRange {
   maxQ: number;
   minR: number;
   maxR: number;
-}
-
-/** Bounding box in world coordinates */
-interface BoundingBox {
-  minX: number;
-  minY: number;
-  maxX: number;
-  maxY: number;
 }
 
 /** Hex bounds in offset coordinates */

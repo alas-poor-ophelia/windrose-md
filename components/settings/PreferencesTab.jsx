@@ -9,7 +9,7 @@ const pathResolverPath = dc.resolvePath("pathResolver.js");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
 const { useMapSettings } = await requireModuleByName("MapSettingsContext.jsx");
-const { saveMapImageToVault } = await requireModuleByName("exportOperations.js");
+const { saveMapImageToVault } = await requireModuleByName("exportOperations.ts");
 
 /**
  * Preferences tab content

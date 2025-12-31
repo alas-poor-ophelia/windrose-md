@@ -6,7 +6,7 @@ const { TextLabelEditor } = await requireModuleByName("TextLabelEditor.jsx");
 const { TextInputModal } = await requireModuleByName("TextInputModal.jsx");
 const { NoteLinkModal } = await requireModuleByName("NoteLinkModal.jsx");
 const { ColorPicker } = await requireModuleByName("ColorPicker.jsx");
-const { openNoteInNewTab } = await requireModuleByName("noteOperations.js");
+const { openNoteInNewTab } = await requireModuleByName("noteOperations.ts");
 
 // Sub-component: Text Label Control Buttons
 const TextLabelControls = ({ 

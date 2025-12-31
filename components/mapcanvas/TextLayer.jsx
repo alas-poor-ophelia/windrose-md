@@ -7,7 +7,7 @@ const { useMapSelection } = await requireModuleByName("MapSelectionContext.jsx")
 const { TextLabelEditor } = await requireModuleByName("TextLabelEditor.jsx");
 const { useEventHandlerRegistration } = await requireModuleByName("EventHandlerContext.jsx");
 const { SelectionToolbar } = await requireModuleByName("SelectionToolbar.jsx");
-const { getActiveLayer } = await requireModuleByName("layerAccessor.js");
+const { getActiveLayer } = await requireModuleByName("layerAccessor.ts");
 
 /**
  * TextLayer.jsx

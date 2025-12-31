@@ -2,7 +2,7 @@
  * MapSettingsContext.jsx
  * 
  * React context provider for MapSettingsModal.
- * Manages state via useReducer (logic in settingsReducer.js),
+ * Manages state via useReducer (logic in settingsReducer.ts),
  * handles effects, and provides handler API to consumers.
  */
 
@@ -17,10 +17,10 @@ const {
   buildInitialState,
   calculateBoundsFromSettings,
   getOrphanedContentInfo
-} = await requireModuleByName("settingsReducer.js");
+} = await requireModuleByName("settingsReducer.ts");
 
 // Dependencies for async operations and constants
-const { getSettings } = await requireModuleByName("settingsAccessor.js");
+const { getSettings } = await requireModuleByName("settingsAccessor.ts");
 const { THEME } = await requireModuleByName("dmtConstants.ts");
 const { 
   getImageDisplayNames, 
@@ -36,7 +36,7 @@ const {
   MEASUREMENT_EDGE,
   MEASUREMENT_CORNER,
   getFineTuneRange
-} = await requireModuleByName("hexMeasurements.js");
+} = await requireModuleByName("hexMeasurements.ts");
 
 // ============================================================================
 // CONTEXT

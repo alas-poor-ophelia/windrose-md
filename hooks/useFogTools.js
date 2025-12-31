@@ -22,7 +22,7 @@ const {
   revealCell,
   fogRectangle,
   revealRectangle 
-} = await requireModuleByName("layerAccessor.js");
+} = await requireModuleByName("layerAccessor.ts");
 
 /**
  * Hook for managing fog of war tools

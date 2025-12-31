@@ -30,7 +30,7 @@ const {
   revealAll,
   toggleFogVisibility,
   getFogState
-} = await requireModuleByName("layerAccessor.js");
+} = await requireModuleByName("layerAccessor.ts");
 
 /**
  * Hook for managing Fog of War UI state and high-level operations

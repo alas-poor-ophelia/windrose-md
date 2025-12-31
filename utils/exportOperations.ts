@@ -1,25 +1,53 @@
 /**
- * exportOperations.js
+ * exportOperations.ts
  * 
  * Functions for exporting map as image.
  * Handles content bounds calculation, rendering to offscreen canvas,
  * and triggering browser download.
  */
 
-const pathResolverPath = dc.resolvePath("pathResolver.js");
-const { requireModuleByName } = await dc.require(pathResolverPath);
+// Type-only imports
+import type { Point, BoundingBox } from '#types/core/geometry.types';
+import type { MapData, MapLayer } from '#types/core/map.types';
+import type { Cell } from '#types/core/cell.types';
+import type { MapObject } from '#types/objects/object.types';
+import type { TextLabel, FontFace } from './textLabelOperations';
+import type { HexColor } from '#types/settings/settings.types';
+import type {
+  ExportGeometry,
+  RenderParams,
+  ExportResult,
+  ExportTheme,
+  ExportVisibilityOptions
+} from '#types/core/export.types';
+import type { App, TFile } from 'obsidian';
 
-const { getActiveLayer } = await requireModuleByName("layerAccessor.js");
-const { getFontCss } = await requireModuleByName("fontOptions.js");
+// Datacore imports
+const pathResolverPath = dc.resolvePath("pathResolver.js");
+const { requireModuleByName } = await dc.require(pathResolverPath) as {
+  requireModuleByName: (name: string) => Promise<unknown>
+};
+
+const { getActiveLayer } = await requireModuleByName("layerAccessor.ts") as {
+  getActiveLayer: (mapData: MapData) => MapLayer
+};
+
+const { getFontCss } = await requireModuleByName("fontOptions.js") as {
+  getFontCss: (fontFace: FontFace) => string
+};
+
+// Obsidian app reference
+declare const app: App;
+
+// ===========================================
+// Text Label Bounds
+// ===========================================
 
 /**
- * Calculate the bounding box of a text label in world coordinates
- * Uses canvas text measurement API to get accurate bounds
- * @param {Object} label - Text label object
- * @param {CanvasRenderingContext2D} ctx - Canvas context for text measurement
- * @returns {{minX: number, minY: number, maxX: number, maxY: number}} Bounding box
+ * Calculate the bounding box of a text label in world coordinates.
+ * Uses canvas text measurement API to get accurate bounds.
  */
-function getTextLabelBounds(label, ctx) {
+function getTextLabelBounds(label: TextLabel, ctx: CanvasRenderingContext2D): BoundingBox {
   // Set font for measurement
   const fontSize = label.fontSize || 16;
   const fontFace = label.fontFace || 'sans';
@@ -31,7 +59,6 @@ function getTextLabelBounds(label, ctx) {
   const textWidth = metrics.width;
   
   // Estimate text height (approximation since canvas doesn't provide exact height)
-  // Use 1.2x fontSize as a reasonable approximation including ascenders/descenders
   const textHeight = fontSize * 1.2;
   
   // Text labels use position.x and position.y
@@ -39,7 +66,6 @@ function getTextLabelBounds(label, ctx) {
   const worldY = label.position.y;
   
   // Text is positioned at its center point
-  // Calculate bounds around the center
   const minX = worldX - textWidth / 2;
   const minY = worldY - textHeight / 2;
   const maxX = worldX + textWidth / 2;
@@ -48,14 +74,18 @@ function getTextLabelBounds(label, ctx) {
   return { minX, minY, maxX, maxY };
 }
 
+// ===========================================
+// Content Bounds Calculation
+// ===========================================
+
 /**
  * Calculate the world-coordinate bounding box of all content on a layer
- * @param {Object} mapData - Full map data
- * @param {Object} layer - Layer object to analyze
- * @param {Object} geometry - GridGeometry or HexGeometry instance
- * @returns {{minX: number, minY: number, maxX: number, maxY: number}|null} Bounding box or null if no content
  */
-function calculateContentBounds(mapData, layer, geometry) {
+function calculateContentBounds(
+  mapData: MapData,
+  layer: MapLayer,
+  geometry: ExportGeometry
+): BoundingBox | null {
   let minX = Infinity, minY = Infinity;
   let maxX = -Infinity, maxY = -Infinity;
   
@@ -77,7 +107,7 @@ function calculateContentBounds(mapData, layer, geometry) {
   if (layer.objects && layer.objects.length > 0) {
     for (const obj of layer.objects) {
       hasContent = true;
-      const bounds = geometry.getObjectBounds(obj);
+      const bounds = geometry.getObjectBounds(obj as unknown as MapObject);
       minX = Math.min(minX, bounds.minX);
       minY = Math.min(minY, bounds.minY);
       maxX = Math.max(maxX, bounds.maxX);
@@ -87,58 +117,65 @@ function calculateContentBounds(mapData, layer, geometry) {
   
   // 3. Text labels (need temporary canvas for measurement)
   if (layer.textLabels && layer.textLabels.length > 0) {
-    // Create temporary canvas for text measurement
     const tempCanvas = document.createElement('canvas');
     const tempCtx = tempCanvas.getContext('2d');
     
-    for (const label of layer.textLabels) {
-      hasContent = true;
-      const bounds = getTextLabelBounds(label, tempCtx);
-      minX = Math.min(minX, bounds.minX);
-      minY = Math.min(minY, bounds.minY);
-      maxX = Math.max(maxX, bounds.maxX);
-      maxY = Math.max(maxY, bounds.maxY);
+    if (tempCtx) {
+      for (const label of layer.textLabels) {
+        hasContent = true;
+        const bounds = getTextLabelBounds(label as unknown as TextLabel, tempCtx);
+        minX = Math.min(minX, bounds.minX);
+        minY = Math.min(minY, bounds.minY);
+        maxX = Math.max(maxX, bounds.maxX);
+        maxY = Math.max(maxY, bounds.maxY);
+      }
     }
   }
-  
-  // 4. Painted edges (grid maps only) - edges are on cell boundaries, already covered by cells
-  // No need to calculate separate bounds for edges
   
   if (!hasContent) return null;
   
   return { minX, minY, maxX, maxY };
 }
 
+// ===========================================
+// Canvas Rendering
+// ===========================================
+
 /**
- * Render map content to a canvas context using the same rendering logic as the main canvas
- * This is a simplified version that renders only the essential visible content
- * @param {CanvasRenderingContext2D} ctx - Target canvas context
- * @param {Object} params - Render parameters
- * @param {Object} params.mapData - Full map data
- * @param {Object} params.geometry - Geometry instance
- * @param {Object} params.bounds - Export bounds {minX, minY, maxX, maxY}
- * @param {number} params.width - Canvas width
- * @param {number} params.height - Canvas height
+ * Render map content to a canvas context using the same rendering logic as the main canvas.
  */
-async function renderMapToCanvas(ctx, params) {
+async function renderMapToCanvas(
+  ctx: CanvasRenderingContext2D,
+  params: RenderParams
+): Promise<void> {
   const { mapData, geometry, bounds, width, height } = params;
   
   // Import rendering dependencies
-  const { renderCanvas } = await requireModuleByName("useCanvasRenderer.js");
-  const { HexGeometry } = await requireModuleByName("HexGeometry.ts");
+  const { renderCanvas } = await requireModuleByName("useCanvasRenderer.js") as {
+    renderCanvas: (
+      canvas: HTMLCanvasElement,
+      fogCanvas: HTMLCanvasElement | null,
+      mapData: MapData,
+      geometry: ExportGeometry,
+      selection: unknown[],
+      isSelected: boolean,
+      theme: ExportTheme,
+      showPreview: boolean,
+      visibility: ExportVisibilityOptions
+    ) => void
+  };
+  
+  const { GridGeometry } = await requireModuleByName("GridGeometry.ts") as {
+    GridGeometry: new () => ExportGeometry
+  };
   
   // Calculate viewport parameters for export
-  // We want zoom = 1.0 and center positioned to show the content bounds
   const contentCenterX = (bounds.minX + bounds.maxX) / 2;
   const contentCenterY = (bounds.minY + bounds.maxY) / 2;
   
-  // For grid maps, center is in grid cell coordinates
-  // For hex maps, center is in world pixel coordinates
-  const { GridGeometry } = await requireModuleByName("GridGeometry.ts");
-  
-  let exportCenter;
-  if (geometry instanceof GridGeometry) {
-    // Convert world coords to grid coords for grid maps
+  let exportCenter: Point;
+  if (geometry.worldToGrid) {
+    // Grid maps: convert world coords to grid coords
     const gridCoords = geometry.worldToGrid(contentCenterX, contentCenterY);
     exportCenter = { x: gridCoords.x, y: gridCoords.y };
   } else {
@@ -146,35 +183,41 @@ async function renderMapToCanvas(ctx, params) {
     exportCenter = { x: contentCenterX, y: contentCenterY };
   }
   
-  // Create temporary map data with export viewport
-  const exportMapData = {
-    ...mapData,
-    viewState: {
-      zoom: 1.0,
-      center: exportCenter
-    }
-  };
-  
-  // Create temporary canvas element for renderCanvas
+  // Create temporary canvas for rendering
   const tempCanvas = document.createElement('canvas');
   tempCanvas.width = width;
   tempCanvas.height = height;
   
-  // Get theme with map-specific overrides (same as UI does)
-  const { getEffectiveSettings } = await requireModuleByName("settingsAccessor.js");
-  const effectiveSettings = getEffectiveSettings(mapData.settings);
+  // Create export-specific map data
+  const exportMapData: MapData = {
+    ...mapData,
+    // Override viewport for export
+  };
   
-  // Build theme object from effective settings (matching getTheme structure)
-  const theme = {
+  // Get effective settings for theming
+  const { getSettings } = await requireModuleByName("settingsAccessor.ts") as {
+    getSettings: () => { 
+      gridLineColor: HexColor;
+      gridLineWidth: number;
+      backgroundColor: HexColor;
+      borderColor: HexColor;
+      coordinateKeyColor: HexColor;
+    }
+  };
+  
+  const effectiveSettings = getSettings();
+  
+  // Build export theme
+  const theme: ExportTheme = {
     grid: {
       lines: effectiveSettings.gridLineColor,
       lineWidth: effectiveSettings.gridLineWidth,
       background: effectiveSettings.backgroundColor
     },
     cells: {
-      fill: '#c4a57b', // Use default, not configurable per-map
+      fill: '#c4a57b',
       border: effectiveSettings.borderColor,
-      borderWidth: 3
+      borderWidth: 2
     },
     compass: {
       color: '#c4a57b',
@@ -189,21 +232,34 @@ async function renderMapToCanvas(ctx, params) {
   };
   
   // Render using existing render function
-  // Pass null for fogCanvas since we don't want fog in exports
-  renderCanvas(tempCanvas, null, exportMapData, geometry, [], false, theme, false, { objects: true, textLabels: true, hexCoordinates: false });
+  renderCanvas(
+    tempCanvas,
+    null,
+    exportMapData,
+    geometry,
+    [],
+    false,
+    theme,
+    false,
+    { objects: true, textLabels: true, hexCoordinates: false }
+  );
   
   // Copy to target context
   ctx.drawImage(tempCanvas, 0, 0);
 }
 
+// ===========================================
+// Image Export
+// ===========================================
+
 /**
  * Export map as PNG image
- * @param {Object} mapData - Full map data
- * @param {Object} geometry - GridGeometry or HexGeometry instance
- * @param {number} buffer - Padding around content in pixels (default: 20)
- * @returns {Promise<Blob>} PNG blob
  */
-async function exportMapAsImage(mapData, geometry, buffer = 20) {
+async function exportMapAsImage(
+  mapData: MapData,
+  geometry: ExportGeometry,
+  buffer: number = 20
+): Promise<Blob> {
   const activeLayer = getActiveLayer(mapData);
   
   // Calculate content bounds
@@ -214,7 +270,7 @@ async function exportMapAsImage(mapData, geometry, buffer = 20) {
   }
   
   // Add buffer
-  const exportBounds = {
+  const exportBounds: BoundingBox = {
     minX: bounds.minX - buffer,
     minY: bounds.minY - buffer,
     maxX: bounds.maxX + buffer,
@@ -230,6 +286,10 @@ async function exportMapAsImage(mapData, geometry, buffer = 20) {
   canvas.width = width;
   canvas.height = height;
   const ctx = canvas.getContext('2d');
+  
+  if (!ctx) {
+    throw new Error('Failed to create canvas context');
+  }
   
   // Render map to canvas
   await renderMapToCanvas(ctx, {
@@ -254,12 +314,12 @@ async function exportMapAsImage(mapData, geometry, buffer = 20) {
 
 /**
  * Save exported image to vault root
- * @param {Object} mapData - Full map data
- * @param {Object} geometry - GridGeometry or HexGeometry instance
- * @param {string} filename - Desired filename (default: 'map-{timestamp}.png')
- * @returns {Promise<{success: boolean, path?: string, error?: string}>} Result object
  */
-async function saveMapImageToVault(mapData, geometry, filename) {
+async function saveMapImageToVault(
+  mapData: MapData,
+  geometry: ExportGeometry,
+  filename?: string
+): Promise<ExportResult> {
   try {
     const blob = await exportMapAsImage(mapData, geometry);
     
@@ -268,7 +328,8 @@ async function saveMapImageToVault(mapData, geometry, filename) {
     
     // Generate filename with timestamp if not provided
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-    const finalFilename = filename || `${mapData.name || 'map'}-${timestamp}.png`;
+    const mapName = (mapData as MapData & { name?: string }).name || 'map';
+    const finalFilename = filename || `${mapName}-${timestamp}.png`;
     
     // Save to vault root
     const path = `${finalFilename}`;
@@ -277,7 +338,7 @@ async function saveMapImageToVault(mapData, geometry, filename) {
     const existingFile = app.vault.getAbstractFileByPath(path);
     if (existingFile) {
       // File exists, modify it
-      await app.vault.modifyBinary(existingFile, arrayBuffer);
+      await app.vault.modifyBinary(existingFile as TFile, arrayBuffer);
     } else {
       // Create new file
       await app.vault.createBinary(path, arrayBuffer);
@@ -286,9 +347,13 @@ async function saveMapImageToVault(mapData, geometry, filename) {
     return { success: true, path };
   } catch (error) {
     console.error('[exportOperations] Export failed:', error);
-    return { success: false, error: error.message };
+    return { success: false, error: (error as Error).message };
   }
 }
+
+// ===========================================
+// Exports
+// ===========================================
 
 return {
   calculateContentBounds,

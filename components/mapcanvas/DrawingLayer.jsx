@@ -7,7 +7,7 @@ const { useEventHandlerRegistration } = await requireModuleByName("EventHandlerC
 const { ShapePreviewOverlay } = await requireModuleByName("ShapePreviewOverlay.jsx");
 const { SegmentPickerOverlay } = await requireModuleByName("SegmentPickerOverlay.jsx");
 const { SegmentHoverOverlay } = await requireModuleByName("SegmentHoverOverlay.jsx");
-const { getSettings } = await requireModuleByName("settingsAccessor.js");
+const { getSettings } = await requireModuleByName("settingsAccessor.ts");
 const { getEffectiveDistanceSettings } = await requireModuleByName("distanceOperations.js");
 
 /**

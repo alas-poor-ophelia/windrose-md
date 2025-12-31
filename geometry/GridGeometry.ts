@@ -30,6 +30,7 @@ import type {
   ScreenCoords,
   OffsetCoords,
   GridBounds,
+  BoundingBox,
   GridStyle,
   DistanceOptions,
   Cell
@@ -65,14 +66,6 @@ interface EdgeInfo {
   x: number;
   y: number;
   side: 'top' | 'right' | 'bottom' | 'left';
-}
-
-/** Bounding box in world coordinates */
-interface BoundingBox {
-  minX: number;
-  minY: number;
-  maxX: number;
-  maxY: number;
 }
 
 class GridGeometry extends BaseGeometry {

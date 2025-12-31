@@ -239,7 +239,7 @@ return {
 # settingsAccessor
 
 ```js
-// settingsAccessor.js - Utility to access plugin settings with fallback defaults
+// settingsAccessor.ts - Utility to access plugin settings with fallback defaults
 
 const { THEME, DEFAULTS } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "dmtConstants"));
 
@@ -514,7 +514,7 @@ return { getSettings, getSetting, isPluginAvailable, getTheme, getEffectiveSetti
 
 ```js
 /**
- * layerAccessor.js
+ * layerAccessor.ts
  * Helper functions for accessing and manipulating layer data in Windrose maps.
  * Part of Phase 1: Z-Layer Architecture
  */
@@ -13945,7 +13945,7 @@ return { ObjectLayer };
 
 ```js
 /**
- * edgeOperations.js
+ * edgeOperations.ts
  * 
  * Pure functions for edge manipulation in grid maps.
  * Edges represent painted grid lines between cells.
@@ -17329,7 +17329,7 @@ return { MeasurementLayer };
 
 ```js
 /**
- * multiSelectOperations.js
+ * multiSelectOperations.ts
  * 
  * Utilities for multi-select functionality:
  * - Finding items within a selection rectangle
@@ -29461,7 +29461,7 @@ return {
 
 ```js
 /**
- * hexMeasurements.js
+ * hexMeasurements.ts
  * 
  * Pure functions for hex measurement conversions and grid sizing calculations.
  * Handles conversions between different measurement methods (edge-to-edge, 
@@ -29720,7 +29720,7 @@ return {
 
 ```js
 /**
- * settingsReducer.js
+ * settingsReducer.ts
  * 
  * Pure state management for MapSettingsModal.
  * Contains action types, reducer function, and state initialization logic.
@@ -30207,7 +30207,7 @@ return {
  * MapSettingsContext.jsx
  * 
  * React context provider for MapSettingsModal.
- * Manages state via useReducer (logic in settingsReducer.js),
+ * Manages state via useReducer (logic in settingsReducer.ts),
  * handles effects, and provides handler API to consumers.
  */
 
@@ -32305,7 +32305,7 @@ return { MeasurementTab };
 
 ```js
 /**
- * exportOperations.js
+ * exportOperations.ts
  * 
  * Functions for exporting map as image.
  * Handles content bounds calculation, rendering to offscreen canvas,

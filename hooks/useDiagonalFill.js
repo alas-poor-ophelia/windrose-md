@@ -16,7 +16,7 @@ const pathResolverPath = dc.resolvePath("pathResolver.js");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
 const { useMapState, useMapOperations } = await requireModuleByName("MapContext.jsx");
-const { getActiveLayer } = await requireModuleByName("layerAccessor.js");
+const { getActiveLayer } = await requireModuleByName("layerAccessor.ts");
 const { buildCellMap, setSegments } = await requireModuleByName("cellAccessor.ts");
 
 const {
@@ -29,7 +29,7 @@ const {
   getValidCornersAlongDiagonal,
   getInheritedColor,
   getSegmentsForCorner
-} = await requireModuleByName("diagonalFillOperations.js");
+} = await requireModuleByName("diagonalFillOperations.ts");
 
 /**
  * Hook for diagonal fill tool

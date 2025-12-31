@@ -15,9 +15,9 @@ const pathResolverPath = dc.resolvePath("pathResolver.js");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
 const { useMapState, useMapOperations } = await requireModuleByName("MapContext.jsx");
-const { addEdge, removeEdge, getEdgeAt, generateEdgeLine, mergeEdges } = await requireModuleByName("edgeOperations.js");
-const { eraseObjectAt } = await requireModuleByName("objectOperations.js");
-const { getActiveLayer } = await requireModuleByName("layerAccessor.js");
+const { addEdge, removeEdge, getEdgeAt, generateEdgeLine, mergeEdges } = await requireModuleByName("edgeOperations.ts");
+const { eraseObjectAt } = await requireModuleByName("objectOperations.ts");
+const { getActiveLayer } = await requireModuleByName("layerAccessor.ts");
 const { 
   setCell: accessorSetCell, 
   removeCell: accessorRemoveCell,

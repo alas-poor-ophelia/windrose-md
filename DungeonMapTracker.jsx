@@ -31,14 +31,14 @@ const { ObjectSidebar } = await requireModuleByName("ObjectSidebar.jsx");
 const { VisibilityToolbar } = await requireModuleByName("VisibilityToolbar.jsx");
 const { SettingsPluginInstaller, shouldOfferUpgrade } = await requireModuleByName("SettingsPluginInstaller.jsx");
 const { MapSettingsModal } = await requireModuleByName("MapSettingsModal.jsx");
-const { getSetting, getTheme, getEffectiveSettings } = await requireModuleByName("settingsAccessor.js");
+const { getSetting, getTheme, getEffectiveSettings } = await requireModuleByName("settingsAccessor.ts");
 const { DEFAULTS } = await requireModuleByName("dmtConstants.ts");
 const { getColorByHex, isDefaultColor } = await requireModuleByName("colorOperations.ts");
 const { axialToOffset, isWithinOffsetBounds } = await requireModuleByName("offsetCoordinates.js");
 const { ImageAlignmentMode } = await requireModuleByName("ImageAlignmentMode.jsx");
 const { ModalPortal } = await requireModuleByName("ModalPortal.jsx");
 
-const { getActiveLayer } = await requireModuleByName("layerAccessor.js");
+const { getActiveLayer } = await requireModuleByName("layerAccessor.ts");
 const { LayerControls } = await requireModuleByName("LayerControls.jsx");
 
 // RPGAwesome icon font support

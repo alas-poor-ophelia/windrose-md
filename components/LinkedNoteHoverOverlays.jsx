@@ -3,7 +3,7 @@ const pathResolverPath = dc.resolvePath("pathResolver.js");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
 const { calculateObjectScreenPosition } = await requireModuleByName("screenPositionUtils.js");
-const { openNoteInNewTab } = await requireModuleByName("noteOperations.js");
+const { openNoteInNewTab } = await requireModuleByName("noteOperations.ts");
 
 const LinkedNoteHoverOverlays = ({ canvasRef, mapData, selectedItem, geometry }) => {
   // Don't render anything if prerequisites aren't met

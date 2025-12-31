@@ -19,7 +19,7 @@ const { TextInputModal } = await requireModuleByName("TextInputModal.jsx");
 const { NoteLinkModal } = await requireModuleByName("NoteLinkModal.jsx");
 const { SelectionToolbar } = await requireModuleByName("SelectionToolbar.jsx");
 const { calculateObjectScreenPosition } = await requireModuleByName("screenPositionUtils.js");
-const { getActiveLayer } = await requireModuleByName("layerAccessor.js");
+const { getActiveLayer } = await requireModuleByName("layerAccessor.ts");
 
 /**
  * ObjectLayer Component

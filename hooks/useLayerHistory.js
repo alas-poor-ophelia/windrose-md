@@ -23,7 +23,7 @@ const {
   removeLayer, 
   reorderLayers, 
   setActiveLayer
-} = await requireModuleByName("layerAccessor.js");
+} = await requireModuleByName("layerAccessor.ts");
 
 /**
  * Hook for managing layer switching with per-layer history

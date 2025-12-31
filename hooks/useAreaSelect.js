@@ -12,8 +12,8 @@ const { requireModuleByName } = await dc.require(pathResolverPath);
 
 const { useMapState, useMapOperations } = await requireModuleByName("MapContext.jsx");
 const { useMapSelection } = await requireModuleByName("MapSelectionContext.jsx");
-const { getItemsInWorldRect } = await requireModuleByName("multiSelectOperations.js");
-const { getActiveLayer } = await requireModuleByName("layerAccessor.js");
+const { getItemsInWorldRect } = await requireModuleByName("multiSelectOperations.ts");
+const { getActiveLayer } = await requireModuleByName("layerAccessor.ts");
 
 /**
  * Hook for managing area selection tool

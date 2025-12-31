@@ -17,10 +17,10 @@ const { requireModuleByName } = await dc.require(pathResolverPath);
 const { calculateObjectScreenPosition: calculateScreenPos, applyInverseRotation } = await requireModuleByName("screenPositionUtils.js");
 const { useMapState, useMapOperations } = await requireModuleByName("MapContext.jsx");
 const { useMapSelection } = await requireModuleByName("MapSelectionContext.jsx");
-const { calculateEdgeAlignment, getAlignmentOffset, placeObject, canPlaceObjectAt, removeObjectFromHex, generateObjectId } = await requireModuleByName("objectOperations.js");
+const { calculateEdgeAlignment, getAlignmentOffset, placeObject, canPlaceObjectAt, removeObjectFromHex, generateObjectId } = await requireModuleByName("objectOperations.ts");
 const { getClickedObjectInCell, getObjectsInCell, canAddObjectToCell, assignSlot } = await requireModuleByName("hexSlotPositioner.js");
 const { HexGeometry } = await requireModuleByName("HexGeometry.ts");
-const { getActiveLayer, isCellFogged } = await requireModuleByName("layerAccessor.js");
+const { getActiveLayer, isCellFogged } = await requireModuleByName("layerAccessor.ts");
 
 /**
  * Hook for managing object interactions
