@@ -55,6 +55,14 @@ export interface GridBounds {
   maxRow: number;
 }
 
+/** Bounding box in world coordinates */
+export interface BoundingBox {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+}
+
 // ===========================================
 // Style Types
 // ===========================================

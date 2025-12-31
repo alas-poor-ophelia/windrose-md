@@ -3,7 +3,7 @@
  * Path: types/objects/note.types.ts
  * 
  * Note pins and text labels for map annotations.
- * Populated during noteOperations.js and textLabelOperations.js migration.
+ * Populated during noteOperations.ts and textLabelOperations.ts migration.
  */
 
 import type { Point } from '../core/geometry.types';
@@ -24,6 +24,16 @@ export interface NotePin {
   label?: string;
   color?: HexColor;
   icon?: string;
+}
+
+// ===========================================
+// Note Index
+// ===========================================
+
+/** Note index entry for vault note lookup */
+export interface NoteIndexEntry {
+  path: string;           // Full path with .md extension
+  displayName: string;    // Name without extension
 }
 
 // ===========================================
@@ -53,4 +63,4 @@ export interface TextLabel {
   rotation?: number;
 }
 
-// TODO: Expand during textLabelOperations.js migration
+// TODO: Expand during textLabelOperations.ts migration

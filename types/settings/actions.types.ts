@@ -3,7 +3,7 @@
  * Path: types/settings/actions.types.ts
  * 
  * Discriminated union of all settings reducer actions.
- * Populated during settingsReducer.js migration.
+ * Populated during settingsReducer.ts migration.
  */
 
 import type { SettingsTabId, SettingsState } from './settings.types';
@@ -84,7 +84,7 @@ export interface ResetSettingsAction {
 
 /**
  * Discriminated union of all settings actions.
- * TODO: Complete during settingsReducer.js migration.
+ * TODO: Complete during settingsReducer.ts migration.
  */
 export type SettingsAction =
   | SetActiveTabAction

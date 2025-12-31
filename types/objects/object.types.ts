@@ -3,10 +3,11 @@
  * Path: types/objects/object.types.ts
  * 
  * Object placement and manipulation types.
- * Populated during Phase 1 (Tier 3 migration - objectTypes.ts, objectOperations.js).
+ * Updated during Tier 3 migration (objectOperations.ts).
  */
 
 import type { Point } from '../core/geometry.types';
+import type { MapType } from '../core/map.types';
 
 // ===========================================
 // Object Categories
@@ -23,17 +24,37 @@ export type ObjectCategory =
   | 'custom';
 
 // ===========================================
-// Object Definition
+// Object Alignment
 // ===========================================
 
-/** Object type definition (from objectTypes.ts) */
+/** Object alignment within a cell (grid maps) */
+export type ObjectAlignment = 'center' | 'north' | 'south' | 'east' | 'west';
+
+// ===========================================
+// Object Type Definition
+// ===========================================
+
+/** Object type definition (from objectTypes/objectTypeResolver) */
 export interface ObjectTypeDef {
   id: string;
   name: string;
+  label?: string;
   category: ObjectCategory;
   symbol: string;
-  defaultSize: number;
-  rotatable: boolean;
+  defaultSize?: number;
+  rotatable?: boolean;
+  isUnknown?: boolean;
+  isCustom?: boolean;
+}
+
+// ===========================================
+// Object Size
+// ===========================================
+
+/** Object size in grid cells */
+export interface ObjectSize {
+  width: number;
+  height: number;
 }
 
 // ===========================================
@@ -46,25 +67,69 @@ export type ObjectId = string;
 /** A placed object on the map */
 export interface MapObject {
   id: ObjectId;
-  typeId: string;
+  type: string;           // typeId reference
   position: Point;
-  size: number;
-  rotation: number;
+  size: ObjectSize;
+  label?: string;
+  linkedNote?: string | null;
+  alignment?: ObjectAlignment;
+  slot?: number;          // Hex maps: slot position (0-3)
+  scale?: number;         // Rendering scale (0.25-1.3)
+  rotation?: number;      // Rotation in degrees
   color?: string;
   opacity?: number;
   locked?: boolean;
   layerId?: string;
 }
 
+/** Partial object for updates */
+export type ObjectUpdate = Partial<Omit<MapObject, 'id'>>;
+
 // ===========================================
-// Object Operations
+// Operation Results
 // ===========================================
 
-/** Object placement result */
-export interface PlaceObjectResult {
+/** Result of object placement operation */
+export interface PlacementResult {
+  objects: MapObject[];
   success: boolean;
-  object: MapObject | null;
   error?: string;
+  object?: MapObject;
 }
 
-// TODO: Expand during objectOperations.js migration
+/** Result of object removal operation */
+export interface RemovalResult {
+  objects: MapObject[];
+  success: boolean;
+  removed?: MapObject;
+}
+
+// ===========================================
+// Placement Options
+// ===========================================
+
+/** Options for placeObject unified API */
+export interface PlacementOptions {
+  mapType: MapType;
+  alignment?: ObjectAlignment;
+}
+
+// ===========================================
+// Alignment Offset
+// ===========================================
+
+/** Position offset for alignment rendering */
+export interface AlignmentOffset {
+  offsetX: number;
+  offsetY: number;
+}
+
+// ===========================================
+// Hex Slot Types
+// ===========================================
+
+/** Slot position for multi-object hex cells (0-3) */
+export type HexSlot = 0 | 1 | 2 | 3;
+
+/** Maximum objects per hex cell */
+export const MAX_OBJECTS_PER_HEX = 4;
