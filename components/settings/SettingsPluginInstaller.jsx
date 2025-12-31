@@ -9,7 +9,7 @@ const { WindroseCompass } = await requireModuleByName("WindroseCompass.jsx");
 // NOTE: Assembler is lazy-loaded only when install/upgrade is triggered
 // This avoids running assembly on every app load
 
-const { OBJECT_TYPES, CATEGORIES } = await requireModuleByName("objectTypes.js");
+const { OBJECT_TYPES, CATEGORIES } = await requireModuleByName("objectTypes.ts");
 const { RA_ICONS, RA_CATEGORIES } = await requireModuleByName("rpgAwesomeIcons.js");
 const QUICK_SYMBOLS = await requireModuleByName("settingsPlugin-quickSymbols.js");
 

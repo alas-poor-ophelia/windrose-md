@@ -3,11 +3,11 @@ const { requireModuleByName } = await dc.require(pathResolverPath);
 
 const { useCanvasRenderer, renderCanvas } = await requireModuleByName("useCanvasRenderer.js");
 const { useCanvasInteraction } = await requireModuleByName("useCanvasInteraction.js");
-const { GridGeometry } = await requireModuleByName("GridGeometry.js");
+const { GridGeometry } = await requireModuleByName("GridGeometry.ts");
 const { DEFAULTS } = await requireModuleByName("dmtConstants.ts");
 const { getObjectAtPosition, addObject, removeObject, removeObjectAtPosition, removeObjectsInRectangle, updateObject, isAreaFree, canResizeObject } = await requireModuleByName("objectOperations.js");
 const { addTextLabel, getTextLabelAtPosition, removeTextLabel, updateTextLabel } = await requireModuleByName("textLabelOperations.js");
-const { HexGeometry } = await requireModuleByName("HexGeometry.js");
+const { HexGeometry } = await requireModuleByName("HexGeometry.ts");
 const { LinkedNoteHoverOverlays } = await requireModuleByName("LinkedNoteHoverOverlays.jsx");
 const { MapStateProvider, MapOperationsProvider } = await requireModuleByName("MapContext.jsx");
 const { MapSelectionProvider, useMapSelection } = await requireModuleByName("MapSelectionContext.jsx");

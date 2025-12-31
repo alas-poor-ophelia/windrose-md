@@ -56,8 +56,8 @@ const useFogTools = (activeTool, onFogChange, onInitializeFog) => {
     if (!gridResult) return null;
     
     // Use geometry's toOffsetCoords for abstracted conversion
-    const { gridX, gridY } = gridResult;
-    return geometry.toOffsetCoords(gridX, gridY);
+    const { x, y } = gridResult;
+    return geometry.toOffsetCoords(x, y);
   }, [geometry, mapData, screenToGrid]);
   
   /**

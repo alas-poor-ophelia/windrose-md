@@ -125,7 +125,7 @@ async function renderMapToCanvas(ctx, params) {
   
   // Import rendering dependencies
   const { renderCanvas } = await requireModuleByName("useCanvasRenderer.js");
-  const { HexGeometry } = await requireModuleByName("HexGeometry.js");
+  const { HexGeometry } = await requireModuleByName("HexGeometry.ts");
   
   // Calculate viewport parameters for export
   // We want zoom = 1.0 and center positioned to show the content bounds
@@ -134,13 +134,13 @@ async function renderMapToCanvas(ctx, params) {
   
   // For grid maps, center is in grid cell coordinates
   // For hex maps, center is in world pixel coordinates
-  const { GridGeometry } = await requireModuleByName("GridGeometry.js");
+  const { GridGeometry } = await requireModuleByName("GridGeometry.ts");
   
   let exportCenter;
   if (geometry instanceof GridGeometry) {
     // Convert world coords to grid coords for grid maps
     const gridCoords = geometry.worldToGrid(contentCenterX, contentCenterY);
-    exportCenter = { x: gridCoords.gridX, y: gridCoords.gridY };
+    exportCenter = { x: gridCoords.x, y: gridCoords.y };
   } else {
     // Hex maps use world coordinates directly
     exportCenter = { x: contentCenterX, y: contentCenterY };

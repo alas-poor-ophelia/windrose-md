@@ -5,7 +5,7 @@ const { requireModuleByName } = await dc.require(pathResolverPath);
 
 const { FONT_OPTIONS, DEFAULT_FONT, DEFAULT_FONT_SIZE, DEFAULT_TEXT_COLOR, FONT_SIZE_MIN, FONT_SIZE_MAX, FONT_SIZE_STEP, getFontOption } = await requireModuleByName("fontOptions.js");
 const { ColorPicker } = await requireModuleByName("ColorPicker.jsx");
-const { COLOR_PALETTE } = await requireModuleByName("colorOperations.js");
+const { COLOR_PALETTE } = await requireModuleByName("colorOperations.ts");
 
 const TextLabelEditor = ({ 
   initialValue = '', 

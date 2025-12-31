@@ -1,22 +1,47 @@
 /**
- * gridRenderer.js
+ * gridRenderer.ts
  * Pure functions for rendering grid-based maps
  * 
  * All functions are stateless and side-effect free (except canvas drawing)
  * Designed to work with GridGeometry instances
+ * 
+ * RENDERING NOTE: Many functions use ctx.fillRect() instead of ctx.stroke()
+ * to work around a rendering bug in Obsidian's Live Preview mode where
+ * CodeMirror's canvas operations can corrupt the strokeStyle state.
  */
+
+// Type-only imports
+import type { Point, GridStyle } from '#types/core/geometry.types';
+import type {
+  ViewState,
+  CanvasDimensions,
+  RenderCell,
+  Edge,
+  InteriorGridStyle,
+  EdgeStyle,
+  BorderTheme,
+  CellLookup,
+  BuildCellLookupFn,
+  CalculateBordersFn,
+  IGridRenderer
+} from '#types/core/rendering.types';
+
+// ===========================================
+// Grid Renderer Module
+// ===========================================
 
 const gridRenderer = {
   /**
    * Render grid overlay lines
-   * @param {CanvasRenderingContext2D} ctx
-   * @param {GridGeometry} geometry
-   * @param {Object} viewState - {x, y, zoom}
-   * @param {Object} canvasDimensions - {width, height}
-   * @param {boolean} showGrid
-   * @param {Object} style - Grid style options
    */
-  renderGrid(ctx, geometry, viewState, canvasDimensions, showGrid, style = {}) {
+  renderGrid(
+    ctx: CanvasRenderingContext2D,
+    geometry: IGridRenderer,
+    viewState: ViewState,
+    canvasDimensions: CanvasDimensions,
+    showGrid: boolean,
+    style: GridStyle = {}
+  ): void {
     if (!showGrid) return;
     
     const { lineColor = '#333333', lineWidth = 1 } = style;
@@ -35,19 +60,20 @@ const gridRenderer = {
 
   /**
    * Render painted cells
-   * @param {CanvasRenderingContext2D} ctx
-   * @param {Array} cells - Array of {x, y, color, opacity?}
-   * @param {GridGeometry} geometry
-   * @param {Object} viewState - {x, y, zoom}
    */
-  renderPaintedCells(ctx, cells, geometry, viewState) {
+  renderPaintedCells(
+    ctx: CanvasRenderingContext2D,
+    cells: RenderCell[],
+    geometry: IGridRenderer,
+    viewState: ViewState
+  ): void {
     if (!cells || cells.length === 0) return;
     
     const scaledSize = geometry.getScaledCellSize(viewState.zoom);
     
     // Separate cells by whether they have custom opacity
-    const fullOpacityCells = [];
-    const customOpacityCells = [];
+    const fullOpacityCells: RenderCell[] = [];
+    const customOpacityCells: RenderCell[] = [];
     
     for (const cell of cells) {
       const opacity = cell.opacity ?? 1;
@@ -60,7 +86,7 @@ const gridRenderer = {
     
     // Draw full opacity cells grouped by color (efficient batch rendering)
     if (fullOpacityCells.length > 0) {
-      const cellsByColor = {};
+      const cellsByColor: Record<string, RenderCell[]> = {};
       for (const cell of fullOpacityCells) {
         const color = cell.color;
         if (!cellsByColor[color]) {
@@ -91,16 +117,14 @@ const gridRenderer = {
    * Render interior grid lines between adjacent painted cells
    * These are drawn on top of painted cells to restore grid visibility
    * Uses fillRect instead of stroke for iOS/CodeMirror compatibility
-   * @param {CanvasRenderingContext2D} ctx
-   * @param {Array} cells - Array of {x, y, color}
-   * @param {GridGeometry} geometry
-   * @param {Object} viewState - {x, y, zoom}
-   * @param {Object} style - Grid style options
-   * @param {string} style.lineColor - Grid line color
-   * @param {number} style.lineWidth - Base grid line width
-   * @param {number} style.interiorRatio - Ratio for interior lines (default 0.5)
    */
-  renderInteriorGridLines(ctx, cells, geometry, viewState, style = {}) {
+  renderInteriorGridLines(
+    ctx: CanvasRenderingContext2D,
+    cells: RenderCell[],
+    geometry: IGridRenderer,
+    viewState: ViewState,
+    style: InteriorGridStyle = {}
+  ): void {
     if (!cells || cells.length === 0) return;
     
     const { lineColor = '#666666', lineWidth = 1, interiorRatio = 0.5 } = style;
@@ -112,7 +136,7 @@ const gridRenderer = {
     const cellSet = new Set(cells.map(c => `${c.x},${c.y}`));
     
     // Track which interior lines we've already drawn to avoid duplicates
-    const drawnLines = new Set();
+    const drawnLines = new Set<string>();
     
     ctx.fillStyle = lineColor;
     
@@ -164,22 +188,21 @@ const gridRenderer = {
    * 
    * Edges are rendered after cells and before cell borders, appearing
    * as colored overlays on specific grid lines.
-   * 
-   * @param {CanvasRenderingContext2D} ctx
-   * @param {Array} edges - Array of {x, y, side, color, opacity?} where side is 'right' or 'bottom'
-   * @param {GridGeometry} geometry
-   * @param {Object} viewState - {x, y, zoom}
-   * @param {Object} style - Edge style options
-   * @param {number} style.lineWidth - Base line width (will be scaled for visibility)
    */
-  renderEdges(ctx, edges, geometry, viewState, style = {}) {
+  renderEdges(
+    ctx: CanvasRenderingContext2D,
+    edges: Edge[],
+    geometry: IGridRenderer,
+    viewState: ViewState,
+    style: EdgeStyle = {}
+  ): void {
     if (!edges || edges.length === 0) return;
     
     const scaledSize = geometry.getScaledCellSize(viewState.zoom);
     // Edge thickness: slightly thicker than grid lines for visibility
     // Use 2.5x grid line width, clamped between 2 and borderWidth
-    const baseWidth = style.lineWidth || 1;
-    const edgeWidth = Math.min(Math.max(2, baseWidth * 2.5), style.borderWidth || 4);
+    const baseWidth = style.lineWidth ?? 1;
+    const edgeWidth = Math.min(Math.max(2, baseWidth * 2.5), style.borderWidth ?? 4);
     const halfWidth = edgeWidth / 2;
     
     for (const edge of edges) {
@@ -236,16 +259,16 @@ const gridRenderer = {
    * NOTE: This uses ctx.fillRect() instead of ctx.stroke() to work around
    * a rendering bug in Obsidian's Live Preview mode where CodeMirror's
    * canvas operations can corrupt the strokeStyle state.
-   * 
-   * @param {CanvasRenderingContext2D} ctx
-   * @param {Array} cells - Array of {x, y, color}
-   * @param {GridGeometry} geometry
-   * @param {Object} viewState - {x, y, zoom}
-   * @param {Function} buildCellLookup - Function to build cell lookup map
-   * @param {Function} calculateBorders - Function to calculate borders for a cell
-   * @param {Object} theme - Border styling from theme
    */
-  renderCellBorders(ctx, cells, geometry, viewState, buildCellLookup, calculateBorders, theme) {
+  renderCellBorders(
+    ctx: CanvasRenderingContext2D,
+    cells: RenderCell[],
+    geometry: IGridRenderer,
+    viewState: ViewState,
+    buildCellLookup: BuildCellLookupFn,
+    calculateBorders: CalculateBordersFn,
+    theme: BorderTheme
+  ): void {
     if (!cells || cells.length === 0) return;
     
     const scaledSize = geometry.getScaledCellSize(viewState.zoom);
@@ -314,14 +337,14 @@ const gridRenderer = {
    * NOTE: This uses ctx.fillRect() instead of ctx.strokeRect() to work around
    * a rendering bug in Obsidian's Live Preview mode where CodeMirror's
    * canvas operations can corrupt the strokeStyle state.
-   * 
-   * @param {CanvasRenderingContext2D} ctx
-   * @param {Object} cell - {x, y}
-   * @param {GridGeometry} geometry
-   * @param {Object} viewState - {x, y, zoom}
-   * @param {boolean} isResizeMode
    */
-  renderCellHighlight(ctx, cell, geometry, viewState, isResizeMode) {
+  renderCellHighlight(
+    ctx: CanvasRenderingContext2D,
+    cell: Point,
+    geometry: IGridRenderer,
+    viewState: ViewState,
+    isResizeMode: boolean
+  ): void {
     const scaledSize = geometry.getScaledCellSize(viewState.zoom);
     
     const { screenX, screenY } = geometry.gridToScreen(

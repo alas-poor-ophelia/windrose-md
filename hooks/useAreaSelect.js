@@ -67,8 +67,8 @@ const useAreaSelect = (currentTool) => {
       setAreaSelectStart({
         worldX: worldCoords.worldX,
         worldY: worldCoords.worldY,
-        gridX: gridCoords.gridX,
-        gridY: gridCoords.gridY
+        x: gridCoords.x,
+        y: gridCoords.y
       });
       return true;
     }

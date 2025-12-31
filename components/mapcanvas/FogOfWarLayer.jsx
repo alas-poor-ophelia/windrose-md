@@ -17,7 +17,7 @@ const { requireModuleByName } = await dc.require(pathResolverPath);
 const { useFogTools } = await requireModuleByName("useFogTools.js");
 const { useMapState } = await requireModuleByName("MapContext.jsx");
 const { useEventHandlerRegistration } = await requireModuleByName("EventHandlerContext.jsx");
-const { GridGeometry } = await requireModuleByName("GridGeometry.js");
+const { GridGeometry } = await requireModuleByName("GridGeometry.ts");
 
 /**
  * FogOfWarLayer Component

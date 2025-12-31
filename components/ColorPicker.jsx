@@ -1,7 +1,7 @@
 // components/ColorPicker.jsx - With custom color delete functionality
 const pathResolverPath = dc.resolvePath("pathResolver.js");
 const { requireModuleByName } = await dc.require(pathResolverPath);
-const { getColorPalette, DEFAULT_COLOR } = await requireModuleByName("colorOperations.js");
+const { getColorPalette, DEFAULT_COLOR } = await requireModuleByName("colorOperations.ts");
 
 const ColorPicker = ({
   isOpen,

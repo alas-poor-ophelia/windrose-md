@@ -1,5 +1,5 @@
 /**
- * segmentBorderCalculator.js
+ * segmentBorderCalculator.ts
  * 
  * Border calculation for segment-based cells (partial cell painting).
  * Determines which borders need to be drawn based on:
@@ -9,14 +9,31 @@
  * PRINCIPLE: Draw borders wherever filled meets empty.
  */
 
+// Type-only imports
+import type { Point } from '#types/core/geometry.types';
+import type { SegmentGridCell, Cell, CellMap, SegmentName } from '#types/core/cell.types';
+import type { IGridRenderer } from '#types/core/rendering.types';
+import type {
+  VertexName,
+  InternalEdgeKey,
+  CrossCellAdjacency
+} from '../utils/dmtConstants';
+
+// Datacore imports
 const pathResolverPath = dc.resolvePath("pathResolver.js");
-const { requireModuleByName } = await dc.require(pathResolverPath);
+const { requireModuleByName } = await dc.require(pathResolverPath) as {
+  requireModuleByName: (name: string) => Promise<unknown>
+};
 
 const { 
   SEGMENT_NAMES,
   SEGMENT_INTERNAL_ADJACENCY,
   SEGMENT_CROSS_CELL_ADJACENCY
-} = await requireModuleByName("dmtConstants.ts");
+} = await requireModuleByName("dmtConstants.ts") as {
+  SEGMENT_NAMES: readonly SegmentName[];
+  SEGMENT_INTERNAL_ADJACENCY: Record<InternalEdgeKey, [SegmentName, SegmentName]>;
+  SEGMENT_CROSS_CELL_ADJACENCY: Record<SegmentName, CrossCellAdjacency>;
+};
 
 const { 
   hasSegments, 
@@ -25,7 +42,36 @@ const {
   buildCellMap,
   cellKey,
   neighborSegmentFilled
-} = await requireModuleByName("cellAccessor.ts");
+} = await requireModuleByName("cellAccessor.ts") as {
+  hasSegments: (cell: Cell) => cell is SegmentGridCell;
+  isSimpleCell: (cell: Cell) => boolean;
+  getFilledSegments: (cell: Cell) => SegmentName[];
+  buildCellMap: (cells: Cell[], geometry: IGridRenderer) => CellMap;
+  cellKey: (x: number, y: number) => string;
+  neighborSegmentFilled: (cellMap: CellMap, coords: Point, segment: SegmentName, geometry: IGridRenderer) => boolean;
+};
+
+// ===========================================
+// Local Type Definitions
+// ===========================================
+
+/** Internal border edge (center to boundary point) */
+export interface InternalBorder {
+  from: string;
+  to: string;
+}
+
+/** External border edge (along cell boundary) */
+export interface ExternalBorder {
+  segment: SegmentName;
+  neighborSegment: SegmentName;
+}
+
+/** Combined border calculation result */
+export interface SegmentBorders {
+  internal: InternalBorder[];
+  external: ExternalBorder[];
+}
 
 // ============================================================================
 // INTERNAL BORDER CALCULATION
@@ -35,12 +81,9 @@ const {
  * Calculate which internal borders need to be drawn for a segment cell.
  * Internal borders are lines from center to boundary points where
  * filled segments meet empty segments within the same cell.
- * 
- * @param {Object} cell - Segment cell with {segments: {...}}
- * @returns {Array<{from: string, to: string}>} Array of internal edge definitions
  */
-function getInternalBorders(cell) {
-  const borders = [];
+function getInternalBorders(cell: SegmentGridCell): InternalBorder[] {
+  const borders: InternalBorder[] = [];
   const filledSet = new Set(getFilledSegments(cell));
   
   // Check each internal edge (center to boundary point)
@@ -75,14 +118,13 @@ function getInternalBorders(cell) {
  * No border when:
  * - Neighbor is simple (full) cell, OR
  * - Neighbor is segment cell AND adjacent segment is filled
- * 
- * @param {Object} cell - Segment cell with {x, y, segments: {...}}
- * @param {Map} cellMap - Cell lookup map from buildCellMap
- * @param {Object} geometry - Geometry instance
- * @returns {Array<{segment: string, needsBorder: boolean}>} Segments needing external border
  */
-function getExternalBorders(cell, cellMap, geometry) {
-  const borders = [];
+function getExternalBorders(
+  cell: SegmentGridCell,
+  cellMap: CellMap,
+  geometry: IGridRenderer
+): ExternalBorder[] {
+  const borders: ExternalBorder[] = [];
   const filledSegments = getFilledSegments(cell);
   
   for (const segment of filledSegments) {
@@ -113,13 +155,12 @@ function getExternalBorders(cell, cellMap, geometry) {
 
 /**
  * Get all borders (internal + external) for a segment cell
- * 
- * @param {Object} cell - Segment cell
- * @param {Map} cellMap - Cell lookup map
- * @param {Object} geometry - Geometry instance
- * @returns {{internal: Array, external: Array}} Border definitions
  */
-function getSegmentBorders(cell, cellMap, geometry) {
+function getSegmentBorders(
+  cell: SegmentGridCell,
+  cellMap: CellMap,
+  geometry: IGridRenderer
+): SegmentBorders {
   return {
     internal: getInternalBorders(cell),
     external: getExternalBorders(cell, cellMap, geometry)

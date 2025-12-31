@@ -12,8 +12,8 @@ const { requireModuleByName } = await dc.require(pathResolverPath);
 
 const { getActiveLayer } = await requireModuleByName("layerAccessor.js");
 const { getFontCss } = await requireModuleByName("fontOptions.js");
-const { GridGeometry } = await requireModuleByName("GridGeometry.js");
-const { HexGeometry } = await requireModuleByName("HexGeometry.js");
+const { GridGeometry } = await requireModuleByName("GridGeometry.ts");
+const { HexGeometry } = await requireModuleByName("HexGeometry.ts");
 
 /**
  * Check if two rectangles overlap

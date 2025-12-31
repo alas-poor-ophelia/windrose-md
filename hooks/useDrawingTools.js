@@ -110,9 +110,9 @@ const useDrawingTools = (
     const activeLayer = getActiveLayer(mapData);
     
     // Check bounds for hex maps (only applies to hex geometry with bounds set)
-    // Handle both coordinate formats: {gridX, gridY} from screenToGrid and {q, r} from cells
-    const q = coords.q !== undefined ? coords.q : coords.gridX;
-    const r = coords.r !== undefined ? coords.r : coords.gridY;
+    // Handle both coordinate formats: {x, y} from screenToGrid and {q, r} from cells
+    const q = coords.q !== undefined ? coords.q : coords.x;
+    const r = coords.r !== undefined ? coords.r : coords.y;
     
     if (geometry.isWithinBounds && !geometry.isWithinBounds(q, r)) {
       return; // Silently reject cells outside bounds
@@ -171,8 +171,8 @@ const useDrawingTools = (
       }
       
       // Then check for object (extract coordinates based on map type)
-      const coordX = coords.gridX !== undefined ? coords.gridX : coords.q;
-      const coordY = coords.gridY !== undefined ? coords.gridY : coords.r;
+      const coordX = coords.x !== undefined ? coords.x : coords.q;
+      const coordY = coords.y !== undefined ? coords.y : coords.r;
       const obj = getObjectAtPosition(activeLayer.objects || [], coordX, coordY);
       if (obj) {
         // Use unified API - handles hex (one at a time) vs grid (all at position)
@@ -307,8 +307,8 @@ const useDrawingTools = (
     
     // Get the grid cell coordinates
     const gridCoords = geometry.worldToGrid(worldX, worldY);
-    const cellX = gridCoords.gridX;
-    const cellY = gridCoords.gridY;
+    const cellX = gridCoords.x;
+    const cellY = gridCoords.y;
     
     // Calculate local position within the cell (0-1)
     const cellWorldX = cellX * geometry.cellSize;
@@ -613,8 +613,8 @@ const useDrawingTools = (
     if (!coords) return;
     
     // Generate cell key based on coordinate type
-    const cellKey = coords.gridX !== undefined 
-      ? `${coords.gridX},${coords.gridY}` 
+    const cellKey = coords.x !== undefined 
+      ? `${coords.x},${coords.y}` 
       : `${coords.q},${coords.r}`;
     
     if (processedCells.has(cellKey)) return;

@@ -148,13 +148,13 @@ const useDiagonalFill = (currentTool) => {
     const gridCoords = screenToGrid(clientX, clientY);
     if (!gridCoords) return false;
     
-    const { gridX, gridY } = gridCoords;
+    const { x, y } = gridCoords;
     
     // Calculate local position within cell for corner detection
     const cellSize = geometry.cellSize;
     const { localX, localY } = getLocalPosition(
       worldCoords.worldX, worldCoords.worldY,
-      gridX, gridY, cellSize
+      x, y, cellSize
     );
     
     const corner = getNearestCorner(localX, localY);
@@ -163,7 +163,7 @@ const useDiagonalFill = (currentTool) => {
     if (isTouch && isEndLocked && fillEnd) {
       // Check if tap is near the end point (confirm) or away (cancel)
       const distToEnd = Math.sqrt(
-        Math.pow(gridX - fillEnd.x, 2) + Math.pow(gridY - fillEnd.y, 2)
+        Math.pow(x - fillEnd.x, 2) + Math.pow(y - fillEnd.y, 2)
       );
       
       if (distToEnd <= 1.5) {
@@ -183,25 +183,25 @@ const useDiagonalFill = (currentTool) => {
     if (!fillStart) {
       // Find the valid concave corner for this cell
       // Use click position as hint, but auto-detect if that corner isn't valid
-      const validCorner = findValidCornerForCell(cellMap, gridX, gridY, corner);
+      const validCorner = findValidCornerForCell(cellMap, x, y, corner);
       
       if (!validCorner) {
         return false; // No valid concave corner in this cell
       }
       
-      setFillStart({ x: gridX, y: gridY, corner: validCorner });
+      setFillStart({ x: x, y: y, corner: validCorner });
       setPreviewEnd(null);
       return true;
     }
     
     // Have start point - set end point
     // Validate the diagonal path
-    const validation = validateDiagonalPath(cellMap, fillStart, gridX, gridY);
+    const validation = validateDiagonalPath(cellMap, fillStart, x, y);
     
     if (!validation || !validation.valid) {
       // Invalid end point - on touch, try generous snapping
       if (isTouch) {
-        const snapped = findNearestValidCorner(cellMap, gridX, gridY, fillStart.corner, 3);
+        const snapped = findNearestValidCorner(cellMap, x, y, fillStart.corner, 3);
         if (snapped) {
           const revalidation = validateDiagonalPath(cellMap, fillStart, snapped.x, snapped.y);
           if (revalidation && revalidation.valid) {
@@ -253,10 +253,10 @@ const useDiagonalFill = (currentTool) => {
       return;
     }
     
-    const { gridX, gridY } = gridCoords;
+    const { x, y } = gridCoords;
     
     // Validate path to this position
-    const validation = validateDiagonalPath(cellMap, fillStart, gridX, gridY);
+    const validation = validateDiagonalPath(cellMap, fillStart, x, y);
     
     if (validation && validation.valid) {
       setPreviewEnd({ x: validation.endX, y: validation.endY });

@@ -3,7 +3,7 @@
 const pathResolverPath = dc.resolvePath("pathResolver.js");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
-const { DEFAULT_COLOR } = await requireModuleByName("colorOperations.js");
+const { DEFAULT_COLOR } = await requireModuleByName("colorOperations.ts");
 const { ColorPicker } = await requireModuleByName("ColorPicker.jsx");
 
 // Tool Palette Corner Bracket (outward-facing, simplified)

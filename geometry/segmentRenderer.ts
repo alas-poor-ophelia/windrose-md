@@ -1,5 +1,5 @@
 /**
- * segmentRenderer.js
+ * segmentRenderer.ts
  * 
  * Renders segment-based cells (partial cell painting with 8-triangle subdivision).
  * Segment cells use triangular regions radiating from the cell center to allow
@@ -16,23 +16,71 @@
  * - Triangle vertices defined by SEGMENT_VERTICES ratios
  */
 
+// Type-only imports
+import type { Point } from '#types/core/geometry.types';
+import type { SegmentGridCell, Cell, CellMap, SegmentName } from '#types/core/cell.types';
+import type { ViewState, BorderTheme, IGridRenderer } from '#types/core/rendering.types';
+import type {
+  VertexName,
+  VertexRatio
+} from '../utils/dmtConstants';
+
+// Datacore imports
 const pathResolverPath = dc.resolvePath("pathResolver.js");
-const { requireModuleByName } = await dc.require(pathResolverPath);
+const { requireModuleByName } = await dc.require(pathResolverPath) as {
+  requireModuleByName: (name: string) => Promise<unknown>
+};
 
 const { 
   SEGMENT_VERTICES, 
   SEGMENT_TRIANGLES
-} = await requireModuleByName("dmtConstants.ts");
+} = await requireModuleByName("dmtConstants.ts") as {
+  SEGMENT_VERTICES: Record<VertexName, VertexRatio>;
+  SEGMENT_TRIANGLES: Record<SegmentName, [VertexName, VertexName, VertexName]>;
+};
 
 const { 
   hasSegments,
   buildCellMap
-} = await requireModuleByName("cellAccessor.ts");
+} = await requireModuleByName("cellAccessor.ts") as {
+  hasSegments: (cell: Cell) => cell is SegmentGridCell;
+  buildCellMap: (cells: Cell[], geometry: IGridRenderer) => CellMap;
+};
 
 const {
   getInternalBorders,
   getExternalBorders
-} = await requireModuleByName("segmentBorderCalculator.js");
+} = await requireModuleByName("segmentBorderCalculator.ts") as {
+  getInternalBorders: (cell: SegmentGridCell) => InternalBorder[];
+  getExternalBorders: (cell: SegmentGridCell, cellMap: CellMap, geometry: IGridRenderer) => ExternalBorder[];
+};
+
+// ===========================================
+// Local Type Definitions
+// ===========================================
+
+/** Pre-calculated vertex positions for a cell */
+interface CellVertices {
+  [key: string]: Point;
+}
+
+/** Internal border edge (center to boundary point) */
+interface InternalBorder {
+  from: VertexName;
+  to: VertexName;
+}
+
+/** External border edge (along cell boundary) */
+interface ExternalBorder {
+  segment: SegmentName;
+  neighborSegment: SegmentName;
+}
+
+/** Result of separating cells by type */
+interface SeparatedCells {
+  simpleCells: Cell[];
+  segmentCells: SegmentGridCell[];
+}
 
 // ============================================================================
 // TRIANGLE GEOMETRY HELPERS
@@ -40,13 +88,13 @@ const {
 
 /**
  * Calculate actual pixel coordinates for a vertex within a cell
- * @param {string} vertexName - Vertex name from SEGMENT_VERTICES (TL, TM, TR, etc.)
- * @param {number} screenX - Cell's screen X position (top-left)
- * @param {number} screenY - Cell's screen Y position (top-left)
- * @param {number} cellSize - Scaled cell size in pixels
- * @returns {{x: number, y: number}} Pixel coordinates
  */
-function getVertexPosition(vertexName, screenX, screenY, cellSize) {
+function getVertexPosition(
+  vertexName: VertexName,
+  screenX: number,
+  screenY: number,
+  cellSize: number
+): Point {
   const vertex = SEGMENT_VERTICES[vertexName];
   return {
     x: screenX + vertex.xRatio * cellSize,
@@ -57,13 +105,13 @@ function getVertexPosition(vertexName, screenX, screenY, cellSize) {
 /**
  * Get all vertex positions for a cell
  * Cached calculation for efficiency when rendering multiple segments
- * @param {number} screenX - Cell's screen X position
- * @param {number} screenY - Cell's screen Y position  
- * @param {number} cellSize - Scaled cell size
- * @returns {Object} Map of vertex name to {x, y} position
  */
-function getCellVertices(screenX, screenY, cellSize) {
-  const vertices = {};
+function getCellVertices(
+  screenX: number,
+  screenY: number,
+  cellSize: number
+): CellVertices {
+  const vertices: CellVertices = {};
   for (const [name, ratios] of Object.entries(SEGMENT_VERTICES)) {
     vertices[name] = {
       x: screenX + ratios.xRatio * cellSize,
@@ -75,11 +123,12 @@ function getCellVertices(screenX, screenY, cellSize) {
 
 /**
  * Draw a single triangle segment as part of a path (no fill - caller handles fill)
- * @param {CanvasRenderingContext2D} ctx
- * @param {Object} vertices - Pre-calculated vertex positions from getCellVertices
- * @param {string} segmentName - Segment name (nw, n, ne, etc.)
  */
-function addTriangleToPath(ctx, vertices, segmentName) {
+function addTriangleToPath(
+  ctx: CanvasRenderingContext2D,
+  vertices: CellVertices,
+  segmentName: SegmentName
+): void {
   const [v1Name, v2Name, v3Name] = SEGMENT_TRIANGLES[segmentName];
   const v1 = vertices[v1Name];
   const v2 = vertices[v2Name];
@@ -93,11 +142,12 @@ function addTriangleToPath(ctx, vertices, segmentName) {
 
 /**
  * Draw a single triangle segment (standalone, with fill)
- * @param {CanvasRenderingContext2D} ctx
- * @param {Object} vertices - Pre-calculated vertex positions from getCellVertices
- * @param {string} segmentName - Segment name (nw, n, ne, etc.)
  */
-function drawTriangle(ctx, vertices, segmentName) {
+function drawTriangle(
+  ctx: CanvasRenderingContext2D,
+  vertices: CellVertices,
+  segmentName: SegmentName
+): void {
   ctx.beginPath();
   addTriangleToPath(ctx, vertices, segmentName);
   ctx.fill();
@@ -111,13 +161,13 @@ function drawTriangle(ctx, vertices, segmentName) {
  * Render a single segment cell
  * Uses a single combined path for all filled segments to avoid anti-aliasing
  * gaps between adjacent triangles.
- * 
- * @param {CanvasRenderingContext2D} ctx
- * @param {Object} cell - Segment cell with {x, y, segments, color, opacity}
- * @param {Object} geometry - GridGeometry instance
- * @param {Object} viewState - {x, y, zoom}
  */
-function renderSegmentCell(ctx, cell, geometry, viewState) {
+function renderSegmentCell(
+  ctx: CanvasRenderingContext2D,
+  cell: SegmentGridCell,
+  geometry: IGridRenderer,
+  viewState: ViewState
+): void {
   const cellSize = geometry.getScaledCellSize(viewState.zoom);
   const { screenX, screenY } = geometry.gridToScreen(
     cell.x, cell.y, 
@@ -137,7 +187,9 @@ function renderSegmentCell(ctx, cell, geometry, viewState) {
   
   // Build a single combined path for all filled segments
   // This eliminates anti-aliasing gaps between adjacent triangles
-  const filledSegments = Object.keys(cell.segments).filter(seg => cell.segments[seg]);
+  const filledSegments = (Object.keys(cell.segments) as SegmentName[]).filter(
+    seg => cell.segments[seg]
+  );
   
   ctx.beginPath();
   for (const segmentName of filledSegments) {
@@ -158,13 +210,13 @@ function renderSegmentCell(ctx, cell, geometry, viewState) {
  * - Could batch by color to reduce fillStyle changes
  * - Could cache vertex calculations for static cells
  * - Could use Path2D objects for complex patterns
- * 
- * @param {CanvasRenderingContext2D} ctx
- * @param {Array} cells - Array of segment cells (already filtered)
- * @param {Object} geometry - GridGeometry instance
- * @param {Object} viewState - {x, y, zoom}
  */
-function renderSegmentCells(ctx, cells, geometry, viewState) {
+function renderSegmentCells(
+  ctx: CanvasRenderingContext2D,
+  cells: SegmentGridCell[],
+  geometry: IGridRenderer,
+  viewState: ViewState
+): void {
   if (!cells || cells.length === 0) return;
   
   // FUTURE OPTIMIZATION: Could group by color here and batch
@@ -182,16 +234,16 @@ function renderSegmentCells(ctx, cells, geometry, viewState) {
 /**
  * Draw an internal border line (center to boundary point)
  * These are diagonal lines showing where filled segments meet empty segments
- * within the same cell (e.g., TLâ†’Centerâ†’BR for a diagonal fill).
+ * within the same cell (e.g., TL→Center→BR for a diagonal fill).
  * Uses fillRect for iOS compatibility (same as existing border rendering)
- * 
- * @param {CanvasRenderingContext2D} ctx
- * @param {Object} vertices - Pre-calculated vertex positions
- * @param {string} fromVertex - Start vertex name (usually 'C' for center)
- * @param {string} toVertex - End vertex name
- * @param {number} borderWidth - Border line width
  */
-function drawInternalBorder(ctx, vertices, fromVertex, toVertex, borderWidth) {
+function drawInternalBorder(
+  ctx: CanvasRenderingContext2D,
+  vertices: CellVertices,
+  fromVertex: string,
+  toVertex: string,
+  borderWidth: number
+): void {
   const from = vertices[fromVertex];
   const to = vertices[toVertex];
   
@@ -221,13 +273,13 @@ function drawInternalBorder(ctx, vertices, fromVertex, toVertex, borderWidth) {
  * Draw an external border segment (along cell edge)
  * External borders are half-edge length since each segment only touches
  * half of a cell edge.
- * 
- * @param {CanvasRenderingContext2D} ctx
- * @param {Object} vertices - Pre-calculated vertex positions
- * @param {string} segmentName - Segment name to draw border for
- * @param {number} borderWidth - Border line width
  */
-function drawExternalBorder(ctx, vertices, segmentName, borderWidth) {
+function drawExternalBorder(
+  ctx: CanvasRenderingContext2D,
+  vertices: CellVertices,
+  segmentName: SegmentName,
+  borderWidth: number
+): void {
   // Get the two boundary vertices for this segment (excluding center)
   const [, v1Name, v2Name] = SEGMENT_TRIANGLES[segmentName];
   
@@ -264,15 +316,15 @@ function drawExternalBorder(ctx, vertices, segmentName, borderWidth) {
 
 /**
  * Render borders for all segment cells
- * 
- * @param {CanvasRenderingContext2D} ctx
- * @param {Array} segmentCells - Array of segment cells (already filtered)
- * @param {Array} allCells - All cells (for neighbor lookup)
- * @param {Object} geometry - GridGeometry instance
- * @param {Object} viewState - {x, y, zoom}
- * @param {Object} theme - {border: color, borderWidth: number}
  */
-function renderSegmentBorders(ctx, segmentCells, allCells, geometry, viewState, theme) {
+function renderSegmentBorders(
+  ctx: CanvasRenderingContext2D,
+  segmentCells: SegmentGridCell[],
+  allCells: Cell[],
+  geometry: IGridRenderer,
+  viewState: ViewState,
+  theme: BorderTheme
+): void {
   if (!segmentCells || segmentCells.length === 0) return;
   
   const cellSize = geometry.getScaledCellSize(viewState.zoom);
@@ -291,7 +343,7 @@ function renderSegmentBorders(ctx, segmentCells, allCells, geometry, viewState, 
     const vertices = getCellVertices(screenX, screenY, cellSize);
     
     // Draw internal borders (diagonal lines where filled meets empty within cell)
-    // These create the diagonal boundaries like TLâ†’Centerâ†’BR
+    // These create the diagonal boundaries like TL→Center→BR
     const internalBorders = getInternalBorders(cell);
     for (const { from, to } of internalBorders) {
       drawInternalBorder(ctx, vertices, from, to, borderWidth);
@@ -311,12 +363,10 @@ function renderSegmentBorders(ctx, segmentCells, allCells, geometry, viewState, 
 
 /**
  * Separate cells into simple and segment cells
- * @param {Array} cells - All cells
- * @returns {{simpleCells: Array, segmentCells: Array}}
  */
-function separateCellsByType(cells) {
-  const simpleCells = [];
-  const segmentCells = [];
+function separateCellsByType(cells: Cell[]): SeparatedCells {
+  const simpleCells: Cell[] = [];
+  const segmentCells: SegmentGridCell[] = [];
   
   for (const cell of cells) {
     if (hasSegments(cell)) {
@@ -345,6 +395,14 @@ const segmentRenderer = {
   renderSegmentCell,
   getCellVertices,
   drawTriangle
+};
+
+// Export types for consumers
+export type {
+  CellVertices,
+  InternalBorder,
+  ExternalBorder,
+  SeparatedCells
 };
 
 return { segmentRenderer };

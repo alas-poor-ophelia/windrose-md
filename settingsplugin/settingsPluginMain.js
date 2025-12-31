@@ -33,7 +33,7 @@ const { Plugin, PluginSettingTab, Setting, Modal, setIcon } = require('obsidian'
 
 // =============================================================================
 // DATA CONSTANTS
-// Injected from objectTypes.js at install time - single source of truth
+// Injected from objectTypes.ts at install time - single source of truth
 // =============================================================================
 
 const BUILT_IN_OBJECTS = {{BUILT_IN_OBJECTS}};

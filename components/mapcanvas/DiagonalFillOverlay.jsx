@@ -15,7 +15,7 @@
 const pathResolverPath = dc.resolvePath("pathResolver.js");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
-const { GridGeometry } = await requireModuleByName("GridGeometry.js");
+const { GridGeometry } = await requireModuleByName("GridGeometry.ts");
 const { useDiagonalFill } = await requireModuleByName("useDiagonalFill.js");
 const { useMapState } = await requireModuleByName("MapContext.jsx");
 const { useEventHandlerRegistration } = await requireModuleByName("EventHandlerContext.jsx");

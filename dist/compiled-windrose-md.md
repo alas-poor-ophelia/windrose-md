@@ -2461,7 +2461,7 @@ return { useLayerHistory };
 # colorOperations
 
 ```js
-// utils/colorOperations.js - Color palette and utilities
+// utils/colorOperations.ts - Color palette and utilities
 
 const { getColorPaletteSettings, BUILT_IN_COLORS } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "settingsAccessor"));
 
@@ -3464,7 +3464,7 @@ return { BaseGeometry };
 
 ```js
 /**
- * GridGeometry.js
+ * GridGeometry.ts
  * 
  * Handles all grid-specific geometric calculations and rendering.
  * This class abstracts square grid mathematics, coordinate conversions,
@@ -4122,7 +4122,7 @@ return { GridGeometry };
 
 ```js
 /**
- * HexGeometry.js
+ * HexGeometry.ts
  * 
  * Handles all hex-specific geometric calculations and rendering.
  * This class abstracts hexagonal grid mathematics, coordinate conversions,
@@ -5172,7 +5172,7 @@ function cellExists(cells, x, y) {
 # objectTypes
 
 ```js
-// utils/objectTypes.js - Object type definitions for dungeon mapping
+// utils/objectTypes.ts - Object type definitions for dungeon mapping
 
 const OBJECT_TYPES = [
     // Notes
@@ -7178,7 +7178,7 @@ return {
 
 ```js
 /**
- * gridRenderer.js
+ * gridRenderer.ts
  * Pure functions for rendering grid-based maps
  * 
  * All functions are stateless and side-effect free (except canvas drawing)
@@ -7571,7 +7571,7 @@ return { gridRenderer };
 
 ```js
 /**
- * hexRenderer.js
+ * hexRenderer.ts
  * Pure functions for rendering hexagonal maps
  * 
  * All functions are stateless and side-effect free (except canvas drawing)
@@ -23384,7 +23384,7 @@ const { Plugin, PluginSettingTab, Setting, Modal, setIcon } = require('obsidian'
 
 // =============================================================================
 // DATA CONSTANTS
-// Injected from objectTypes.js at install time - single source of truth
+// Injected from objectTypes.ts at install time - single source of truth
 // =============================================================================
 
 const BUILT_IN_OBJECTS = {{BUILT_IN_OBJECTS}};

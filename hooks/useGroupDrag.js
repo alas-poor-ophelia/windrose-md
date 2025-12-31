@@ -17,7 +17,7 @@ const { requireModuleByName } = await dc.require(pathResolverPath);
 const { useMapState, useMapOperations } = await requireModuleByName("MapContext.jsx");
 const { useMapSelection } = await requireModuleByName("MapSelectionContext.jsx");
 const { getActiveLayer } = await requireModuleByName("layerAccessor.js");
-const { HexGeometry } = await requireModuleByName("HexGeometry.js");
+const { HexGeometry } = await requireModuleByName("HexGeometry.ts");
 const { getObjectsInCell, assignSlot } = await requireModuleByName("hexSlotPositioner.js");
 
 /**
@@ -60,7 +60,7 @@ const useGroupDrag = () => {
    * @param {number} worldY - World Y coordinate
    * @returns {Object|null} The selected item that was clicked, or null
    */
-  const getClickedSelectedItem = dc.useCallback((gridX, gridY, worldX, worldY) => {
+  const getClickedSelectedItem = dc.useCallback((x, y, worldX, worldY) => {
     
     if (!hasMultiSelection || !mapData) {
       return null;
@@ -191,12 +191,12 @@ const useGroupDrag = () => {
     
     if (!gridCoords || !worldCoords) return true;
     
-    const { gridX, gridY } = gridCoords;
+    const { x, y } = gridCoords;
     const { worldX, worldY } = worldCoords;
     
     // Calculate deltas
-    const gridDeltaX = gridX - dragStart.gridX;
-    const gridDeltaY = gridY - dragStart.gridY;
+    const gridDeltaX = x - dragStart.gridX;
+    const gridDeltaY = y - dragStart.gridY;
     const worldDeltaX = worldX - dragStart.worldX;
     const worldDeltaY = worldY - dragStart.worldY;
     

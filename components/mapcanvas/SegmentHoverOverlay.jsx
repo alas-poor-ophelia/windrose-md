@@ -8,7 +8,7 @@
 const pathResolverPath = dc.resolvePath("pathResolver.js");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
-const { GridGeometry } = await requireModuleByName("GridGeometry.js");
+const { GridGeometry } = await requireModuleByName("GridGeometry.ts");
 const { SEGMENT_VERTICES, SEGMENT_TRIANGLES } = await requireModuleByName("dmtConstants.ts");
 
 /**

@@ -15,7 +15,7 @@
 const pathResolverPath = dc.resolvePath("pathResolver.js");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
-const { DEFAULT_COLOR } = await requireModuleByName("colorOperations.js");
+const { DEFAULT_COLOR } = await requireModuleByName("colorOperations.ts");
 
 /**
  * Hook for managing tool and color state

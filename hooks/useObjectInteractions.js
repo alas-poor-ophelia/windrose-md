@@ -19,7 +19,7 @@ const { useMapState, useMapOperations } = await requireModuleByName("MapContext.
 const { useMapSelection } = await requireModuleByName("MapSelectionContext.jsx");
 const { calculateEdgeAlignment, getAlignmentOffset, placeObject, canPlaceObjectAt, removeObjectFromHex, generateObjectId } = await requireModuleByName("objectOperations.js");
 const { getClickedObjectInCell, getObjectsInCell, canAddObjectToCell, assignSlot } = await requireModuleByName("hexSlotPositioner.js");
-const { HexGeometry } = await requireModuleByName("HexGeometry.js");
+const { HexGeometry } = await requireModuleByName("HexGeometry.ts");
 const { getActiveLayer, isCellFogged } = await requireModuleByName("layerAccessor.js");
 
 /**
@@ -490,17 +490,17 @@ const useObjectInteractions = (
     const coords = screenToGrid(clientX, clientY);
     if (!coords) return true;
 
-    const { gridX, gridY } = coords;
+    const { x, y } = coords;
     
 
     // Calculate target position using the stored offset
     const offsetX = dragStart.offsetX || 0;
     const offsetY = dragStart.offsetY || 0;
-    const targetX = gridX - offsetX;
-    const targetY = gridY - offsetY;
+    const targetX = x - offsetX;
+    const targetY = y - offsetY;
 
     // Only update if we've moved to a different grid cell
-    if (gridX !== dragStart.gridX || gridY !== dragStart.gridY) {
+    if (x !== dragStart.gridX || y !== dragStart.gridY) {
       const currentObject = getActiveLayer(mapData).objects?.find(o => o.id === objectId);
       if (!currentObject) return true;
       
@@ -533,7 +533,7 @@ const useObjectInteractions = (
         onObjectsChange(updatedObjects, true); // Suppress history during drag
         
         // Update drag start and selected item
-        setDragStart({ x: clientX, y: clientY, gridX, gridY, offsetX, offsetY, objectId });
+        setDragStart({ x: clientX, y: clientY, gridX: x, gridY: y, offsetX, offsetY, objectId });
         const movedObject = updatedObjects.find(obj => obj.id === objectId);
         if (movedObject) {
           setSelectedItem({
@@ -567,7 +567,7 @@ const useObjectInteractions = (
           onObjectsChange(updatedObjects, true); // Suppress history
 
           // Update drag start and selected item data for next frame (preserve offset and objectId)
-          setDragStart({ x: clientX, y: clientY, gridX, gridY, offsetX, offsetY, objectId });
+          setDragStart({ x: clientX, y: clientY, gridX: x, gridY: y, offsetX, offsetY, objectId });
           const updatedObject = updatedObjects.find(obj => obj.id === objectId);
           if (updatedObject) {
             setSelectedItem({
@@ -600,7 +600,7 @@ const useObjectInteractions = (
     const coords = screenToGrid(clientX, clientY);
     if (!coords) return true;
 
-    const { gridX, gridY } = coords;
+    const { x, y } = coords;
     const originalObject = dragStart.object;
     const originalPos = originalObject.position;
     const originalSize = originalObject.size || { width: 1, height: 1 };
@@ -613,24 +613,24 @@ const useObjectInteractions = (
 
     switch (resizeCorner) {
       case 'tl': // Top-left: adjust position and size
-        newX = Math.min(gridX, originalPos.x + originalSize.width - 1);
-        newY = Math.min(gridY, originalPos.y + originalSize.height - 1);
+        newX = Math.min(x, originalPos.x + originalSize.width - 1);
+        newY = Math.min(y, originalPos.y + originalSize.height - 1);
         newWidth = originalPos.x + originalSize.width - newX;
         newHeight = originalPos.y + originalSize.height - newY;
         break;
       case 'tr': // Top-right: adjust Y and width
-        newY = Math.min(gridY, originalPos.y + originalSize.height - 1);
-        newWidth = Math.max(1, gridX - originalPos.x + 1);
+        newY = Math.min(y, originalPos.y + originalSize.height - 1);
+        newWidth = Math.max(1, x - originalPos.x + 1);
         newHeight = originalPos.y + originalSize.height - newY;
         break;
       case 'bl': // Bottom-left: adjust X and height
-        newX = Math.min(gridX, originalPos.x + originalSize.width - 1);
+        newX = Math.min(x, originalPos.x + originalSize.width - 1);
         newWidth = originalPos.x + originalSize.width - newX;
-        newHeight = Math.max(1, gridY - originalPos.y + 1);
+        newHeight = Math.max(1, y - originalPos.y + 1);
         break;
       case 'br': // Bottom-right: just increase size
-        newWidth = Math.max(1, gridX - originalPos.x + 1);
-        newHeight = Math.max(1, gridY - originalPos.y + 1);
+        newWidth = Math.max(1, x - originalPos.x + 1);
+        newHeight = Math.max(1, y - originalPos.y + 1);
         break;
     }
 
@@ -710,8 +710,8 @@ const useObjectInteractions = (
       if (coords) {
         let obj = null;
         
-        // coords always has gridX and gridY for both hex and grid maps
-        const { gridX, gridY } = coords;
+        // coords always has x and y for both hex and grid maps
+        const { x, y } = coords;
         
         // For hex maps, try using getClickedObjectInCell to handle multi-object cells
         if (mapData.mapType === 'hex' && geometry instanceof HexGeometry) {
@@ -719,13 +719,13 @@ const useObjectInteractions = (
           const worldCoords = screenToWorld(clientX, clientY);
           if (worldCoords) {
             // Calculate click offset from hex center
-            const hexCenter = geometry.gridToWorld(gridX, gridY);
+            const hexCenter = geometry.gridToWorld(x, y);
             const clickOffsetX = (worldCoords.worldX - hexCenter.worldX) / geometry.width;
             const clickOffsetY = (worldCoords.worldY - hexCenter.worldY) / geometry.width;
             
             obj = getClickedObjectInCell(
               getActiveLayer(mapData).objects,
-              gridX, gridY,
+              x, y,
               clickOffsetX, clickOffsetY,
               mapData.orientation || 'flat'
             );
@@ -735,7 +735,7 @@ const useObjectInteractions = (
         // Fallback to simple position lookup if getClickedObjectInCell didn't find anything
         // or if not a hex map
         if (!obj) {
-          obj = getObjectAtPosition(getActiveLayer(mapData).objects, gridX, gridY);
+          obj = getObjectAtPosition(getActiveLayer(mapData).objects, x, y);
         }
         
         // Don't show hover for objects under fog
@@ -883,15 +883,15 @@ const useObjectInteractions = (
     const coords = screenToGrid(e.clientX, e.clientY);
     if (!coords) return false;
     
-    const { gridX, gridY } = coords;
+    const { x, y } = coords;
     const selectedObject = getActiveLayer(mapData).objects.find(obj => obj.id === selectedItem.id);
     if (!selectedObject) return false;
     
     // Check if cursor is over the selected object's cell
-    const isOverObject = gridX >= selectedObject.position.x && 
-                         gridX < selectedObject.position.x + (selectedObject.size?.width || 1) &&
-                         gridY >= selectedObject.position.y && 
-                         gridY < selectedObject.position.y + (selectedObject.size?.height || 1);
+    const isOverObject = x >= selectedObject.position.x && 
+                     x < selectedObject.position.x + (selectedObject.size?.width || 1) &&
+                     y >= selectedObject.position.y && 
+                     y < selectedObject.position.y + (selectedObject.size?.height || 1);
     
     if (!isOverObject) return false;
     
@@ -1107,7 +1107,7 @@ const useObjectInteractions = (
   }, [handleObjectColorSelect]);
 
   /**
-   * Handle object rotation (cycles 0Ã‚Â° -> 90Ã‚Â° -> 180Ã‚Â° -> 270Ã‚Â° -> 0Ã‚Â°)
+   * Handle object rotation (cycles 0Ãƒâ€šÃ‚Â° -> 90Ãƒâ€šÃ‚Â° -> 180Ãƒâ€šÃ‚Â° -> 270Ãƒâ€šÃ‚Â° -> 0Ãƒâ€šÃ‚Â°)
    */
   const handleObjectRotation = dc.useCallback(() => {
     if (!selectedItem || selectedItem.type !== 'object' || !mapData) {

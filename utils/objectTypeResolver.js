@@ -13,7 +13,7 @@
 const pathResolverPath = dc.resolvePath("pathResolver.js");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
-const { OBJECT_TYPES, CATEGORIES } = await requireModuleByName("objectTypes.js");
+const { OBJECT_TYPES, CATEGORIES } = await requireModuleByName("objectTypes.ts");
 const { getObjectSettings } = await requireModuleByName("settingsAccessor.js");
 const { RA_ICONS, getIconChar, getIconInfo } = await requireModuleByName("rpgAwesomeIcons.js");
 

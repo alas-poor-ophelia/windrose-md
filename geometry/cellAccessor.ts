@@ -12,7 +12,12 @@
  * 
  * Higher-level code (hooks, components) only sees Point.
  * Storage and geometry internals use native coordinates.
+ * 
+ * NOTE: Some functions are exported for API completeness even if not currently
+ * used externally (normalizeCoords, getCellCoords, cellExists, removeCells, getCellFill).
  */
+
+/* eslint-disable @typescript-eslint/no-unused-vars */
 
 // Type-only imports - stripped at runtime
 import type { Point } from '#types/core/geometry.types';
@@ -53,10 +58,10 @@ const { requireModuleByName } = await dc.require(pathResolverPath) as {
 };
 
 // Import geometry classes for instanceof checks
-const { GridGeometry } = await requireModuleByName("GridGeometry.js") as {
+const { GridGeometry } = await requireModuleByName("GridGeometry.ts") as {
   GridGeometry: new (...args: unknown[]) => IGeometry
 };
-const { HexGeometry } = await requireModuleByName("HexGeometry.js") as {
+const { HexGeometry } = await requireModuleByName("HexGeometry.ts") as {
   HexGeometry: new (...args: unknown[]) => IGeometry
 };
 
@@ -324,7 +329,7 @@ function removeCellsInBounds(
   y1: number,
   x2: number,
   y2: number,
-  geometry: IGeometry
+  _geometry: IGeometry
 ): Cell[] {
   const minX = Math.min(x1, x2);
   const maxX = Math.max(x1, x2);

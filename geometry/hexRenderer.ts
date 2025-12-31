@@ -1,22 +1,40 @@
 /**
- * hexRenderer.js
+ * hexRenderer.ts
  * Pure functions for rendering hexagonal maps
  * 
  * All functions are stateless and side-effect free (except canvas drawing)
  * Designed to work with HexGeometry instances
  */
 
+// Type-only imports
+import type { Point, GridStyle } from '#types/core/geometry.types';
+import type {
+  ViewState,
+  CanvasDimensions,
+  RenderHexCell,
+  BorderTheme,
+  CellLookup,
+  BuildCellLookupFn,
+  CalculateBordersFn,
+  IHexRenderer
+} from '#types/core/rendering.types';
+
+// ===========================================
+// Hex Renderer Module
+// ===========================================
+
 const hexRenderer = {
   /**
    * Render hex grid overlay
-   * @param {CanvasRenderingContext2D} ctx
-   * @param {HexGeometry} geometry
-   * @param {Object} viewState - {x, y, zoom}
-   * @param {Object} canvasDimensions - {width, height}
-   * @param {boolean} showGrid
-   * @param {Object} style - Grid style options
    */
-  renderGrid(ctx, geometry, viewState, canvasDimensions, showGrid, style = {}) {
+  renderGrid(
+    ctx: CanvasRenderingContext2D,
+    geometry: IHexRenderer,
+    viewState: ViewState,
+    canvasDimensions: CanvasDimensions,
+    showGrid: boolean,
+    style: GridStyle = {}
+  ): void {
     if (!showGrid) return;
     
     const { lineColor = '#333333', lineWidth = 1 } = style;
@@ -35,15 +53,16 @@ const hexRenderer = {
 
   /**
    * Render painted hexes
-   * @param {CanvasRenderingContext2D} ctx
-   * @param {Array} cells - Array of {q, r, color, opacity?}
-   * @param {HexGeometry} geometry
-   * @param {Object} viewState - {x, y, zoom}
    */
-  renderPaintedCells(ctx, cells, geometry, viewState) {
+  renderPaintedCells(
+    ctx: CanvasRenderingContext2D,
+    cells: RenderHexCell[],
+    geometry: IHexRenderer,
+    viewState: ViewState
+  ): void {
     if (!cells || cells.length === 0) return;
     
-    cells.forEach(cell => {
+    for (const cell of cells) {
       // Apply opacity if specified
       const opacity = cell.opacity ?? 1;
       if (opacity < 1) {
@@ -64,50 +83,52 @@ const hexRenderer = {
       if (opacity < 1) {
         ctx.globalAlpha = 1;
       }
-    });
+    }
   },
 
   /**
    * Render smart borders for painted hexes
    * NOTE: Hex maps don't use smart borders like grid maps
    * This is a no-op for API consistency with gridRenderer
-   * @param {CanvasRenderingContext2D} ctx
-   * @param {Array} cells
-   * @param {HexGeometry} geometry
-   * @param {Object} viewState
-   * @param {Function} buildCellLookup
-   * @param {Function} calculateBorders
-   * @param {Object} theme
    */
-  renderCellBorders(ctx, cells, geometry, viewState, buildCellLookup, calculateBorders, theme) {
+  renderCellBorders(
+    _ctx: CanvasRenderingContext2D,
+    _cells: RenderHexCell[],
+    _geometry: IHexRenderer,
+    _viewState: ViewState,
+    _buildCellLookup: BuildCellLookupFn<RenderHexCell>,
+    _calculateBorders: CalculateBordersFn,
+    _theme: BorderTheme
+  ): void {
     // Hex rendering already draws complete hex shapes, no separate borders needed
     // This method exists for API consistency with gridRenderer
   },
 
   /**
    * Render selection highlight for a hex
-   * @param {CanvasRenderingContext2D} ctx
-   * @param {Object} cell - {q, r}
-   * @param {HexGeometry} geometry
-   * @param {Object} viewState - {x, y, zoom}
-   * @param {boolean} isResizeMode
    */
-  renderCellHighlight(ctx, cell, geometry, viewState, isResizeMode) {
+  renderCellHighlight(
+    ctx: CanvasRenderingContext2D,
+    cell: Point,
+    geometry: IHexRenderer,
+    viewState: ViewState,
+    isResizeMode: boolean
+  ): void {
     // Selection border (thicker for hex to be visible)
     // Use fillStyle since drawHexOutline now uses fill-based rendering
     ctx.fillStyle = isResizeMode ? '#ff6b6b' : '#4dabf7';
     const lineWidth = 3;
     
+    // cell.x maps to q, cell.y maps to r for hex coordinates
     geometry.drawHexOutline(
       ctx,
-      cell.q,
-      cell.r,
+      cell.x,
+      cell.y,
       viewState.x,
       viewState.y,
       viewState.zoom,
       lineWidth
     );
-    
   }
 };
 

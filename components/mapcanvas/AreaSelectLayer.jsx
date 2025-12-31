@@ -14,7 +14,7 @@ const { useAreaSelect } = await requireModuleByName("useAreaSelect.js");
 const { useMapState } = await requireModuleByName("MapContext.jsx");
 const { useMapSelection } = await requireModuleByName("MapSelectionContext.jsx");
 const { useEventHandlerRegistration } = await requireModuleByName("EventHandlerContext.jsx");
-const { GridGeometry } = await requireModuleByName("GridGeometry.js");
+const { GridGeometry } = await requireModuleByName("GridGeometry.ts");
 
 /**
  * AreaSelectLayer Component
@@ -96,8 +96,8 @@ const AreaSelectLayer = ({ currentTool }) => {
     const displayScale = canvasRect.width / width;
     
     // Get grid cell for the start position
-    const gridX = areaSelectStart.gridX;
-    const gridY = areaSelectStart.gridY;
+    const gridX = areaSelectStart.x;
+    const gridY = areaSelectStart.y;
     
     // Convert grid cell center to screen position
     let screenX, screenY;

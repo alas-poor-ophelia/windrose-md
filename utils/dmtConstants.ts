@@ -1,6 +1,9 @@
 // Path: dmtConstants.ts
 // Converted from dmtConstants.js - Theme, defaults, and dynamic path resolution
 
+// Type-only imports
+import type { SegmentName } from '#types/core/cell.types';
+
 // =============================================================================
 // Type Definitions
 // =============================================================================
@@ -119,8 +122,7 @@ interface Defaults {
 // Segment System Types
 // =============================================================================
 
-/** Segment identifier (8 triangular segments per cell) */
-type SegmentName = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w';
+// SegmentName imported from '#types/core/cell.types' (canonical source)
 
 /** Vertex identifier for segment triangle definitions */
 type VertexName = 'TL' | 'TR' | 'BR' | 'BL' | 'TM' | 'RM' | 'BM' | 'LM' | 'C';
