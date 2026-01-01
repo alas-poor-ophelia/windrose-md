@@ -15,7 +15,7 @@
 const pathResolverPath = dc.resolvePath("pathResolver.js");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
-const { useHistory } = await requireModuleByName("useHistory.js");
+const { useHistory } = await requireModuleByName("useHistory.ts");
 const { 
   getActiveLayer, 
   updateActiveLayer,

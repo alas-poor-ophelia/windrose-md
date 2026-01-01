@@ -16,9 +16,9 @@ const combinedCss = [
 ].join('\n');
 
 
-const { useMapData } = await requireModuleByName("useMapData.js");
+const { useMapData } = await requireModuleByName("useMapData.ts");
 const { useLayerHistory } = await requireModuleByName("useLayerHistory.js");
-const { useToolState } = await requireModuleByName("useToolState.js");
+const { useToolState } = await requireModuleByName("useToolState.ts");
 const { useFogOfWar } = await requireModuleByName("useFogOfWar.js");
 const { useDataHandlers } = await requireModuleByName("useDataHandlers.js");
 const { GridGeometry } = await requireModuleByName("GridGeometry.ts");
