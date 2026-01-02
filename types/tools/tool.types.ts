@@ -1,10 +1,12 @@
 /**
  * Tool Type Definitions
  * Path: types/tools/tool.types.ts
- * 
+ *
  * Tool state and selection types.
  * Populated during useToolState.js migration.
  */
+
+import type { ObjectTypeId } from '../objects/object.types';
 
 // ===========================================
 // Tool Identifiers
@@ -12,19 +14,30 @@
 
 /** Available tools in the palette */
 export type ToolId =
+  // Selection & Navigation
   | 'select'
-  | 'paint'
+  | 'areaSelect'
+  // Drawing tools
+  | 'draw'
   | 'erase'
-  | 'fill'
   | 'eyedropper'
-  | 'shape'
-  | 'segment'
-  | 'object'
-  | 'text'
-  | 'note'
+  // Shape tools
+  | 'rectangle'
+  | 'circle'
+  | 'clearArea'
+  // Edge/segment tools
+  | 'edgeDraw'
+  | 'edgeErase'
+  | 'edgeLine'
+  | 'segmentDraw'
+  // Object tools
+  | 'addObject'
+  | 'addText'
+  | 'addNote'
+  // Utility tools
   | 'measure'
   | 'fog'
-  | 'pan';
+  | 'fogErase';
 
 // ===========================================
 // Tool State
@@ -44,6 +57,56 @@ export interface ToolOptions {
 }
 
 // ===========================================
+// useToolState Hook Types
+// ===========================================
+
+/** Options for useToolState hook */
+export interface UseToolStateOptions {
+  initialTool?: ToolId;
+  initialColor?: string;
+  initialOpacity?: number;
+}
+
+/** Grouped tool state values */
+export interface ToolStateValues {
+  currentTool: ToolId;
+  selectedObjectType: ObjectTypeId | null;
+  selectedColor: string;
+  selectedOpacity: number;
+  isColorPickerOpen: boolean;
+}
+
+/** Grouped tool state actions */
+export interface ToolStateActions {
+  setCurrentTool: (tool: ToolId) => void;
+  setSelectedObjectType: (type: ObjectTypeId | null) => void;
+  setSelectedColor: (color: string) => void;
+  setSelectedOpacity: (opacity: number) => void;
+  setIsColorPickerOpen: (open: boolean) => void;
+}
+
+/** Return type for useToolState hook */
+export interface UseToolStateResult {
+  // Grouped state
+  toolState: ToolStateValues;
+  toolActions: ToolStateActions;
+
+  // Direct access (convenience)
+  currentTool: ToolId;
+  selectedObjectType: ObjectTypeId | null;
+  selectedColor: string;
+  selectedOpacity: number;
+  isColorPickerOpen: boolean;
+
+  // Direct setters
+  setCurrentTool: (tool: ToolId) => void;
+  setSelectedObjectType: (type: ObjectTypeId | null) => void;
+  setSelectedColor: (color: string) => void;
+  setSelectedOpacity: (opacity: number) => void;
+  setIsColorPickerOpen: (open: boolean) => void;
+}
+
+// ===========================================
 // Tool Actions
 // ===========================================
 
@@ -55,5 +118,3 @@ export interface ToolSwitchAction {
     preservePrevious?: boolean;
   };
 }
-
-// TODO: Expand during useToolState.js migration

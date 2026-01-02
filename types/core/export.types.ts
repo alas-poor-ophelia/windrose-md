@@ -1,7 +1,6 @@
 /**
  * Export Type Definitions
- * Path: types/core/export.types.ts
- * 
+ *
  * Types for map export functionality - image generation, rendering parameters,
  * and file operations.
  */
@@ -40,7 +39,6 @@ export interface RenderParams {
 // Export Result
 // ===========================================
 
-/** Export operation result */
 export interface ExportResult {
   success: boolean;
   path?: string;

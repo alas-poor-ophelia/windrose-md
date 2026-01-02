@@ -1,7 +1,6 @@
 /**
  * Map Object Type Definitions
- * Path: types/objects/object.types.ts
- * 
+ *
  * Object placement and manipulation types.
  * Updated during Tier 3 migration (objectOperations.ts).
  */
@@ -34,9 +33,12 @@ export type ObjectAlignment = 'center' | 'north' | 'south' | 'east' | 'west';
 // Object Type Definition
 // ===========================================
 
+/** Object type identifier (e.g., "door", "chest", "trap") */
+export type ObjectTypeId = string;
+
 /** Object type definition (from objectTypes/objectTypeResolver) */
 export interface ObjectTypeDef {
-  id: string;
+  id: ObjectTypeId;
   name: string;
   label?: string;
   category: ObjectCategory;
@@ -51,7 +53,6 @@ export interface ObjectTypeDef {
 // Object Size
 // ===========================================
 
-/** Object size in grid cells */
 export interface ObjectSize {
   width: number;
   height: number;
@@ -64,7 +65,6 @@ export interface ObjectSize {
 /** Unique object instance ID */
 export type ObjectId = string;
 
-/** A placed object on the map */
 export interface MapObject {
   id: ObjectId;
   type: string;           // typeId reference
@@ -82,7 +82,6 @@ export interface MapObject {
   layerId?: string;
 }
 
-/** Partial object for updates */
 export type ObjectUpdate = Partial<Omit<MapObject, 'id'>>;
 
 // ===========================================
@@ -118,7 +117,6 @@ export interface PlacementOptions {
 // Alignment Offset
 // ===========================================
 
-/** Position offset for alignment rendering */
 export interface AlignmentOffset {
   offsetX: number;
   offsetY: number;

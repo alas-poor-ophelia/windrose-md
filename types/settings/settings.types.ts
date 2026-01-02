@@ -1,7 +1,6 @@
 /**
  * Settings Type Definitions
- * Path: types/settings/settings.types.ts
- * 
+ *
  * Settings state shape and configuration types.
  * Updated during Tier 3 migration (settingsAccessor.ts).
  */
@@ -135,13 +134,11 @@ export interface CellThemeSettings {
   borderWidth: number;
 }
 
-/** Compass theme */
 export interface CompassThemeSettings {
   color: HexColor;
   size: number;
 }
 
-/** Fog of war theme */
 export interface FogOfWarThemeSettings {
   color: HexColor;
   opacity: number;
@@ -174,14 +171,12 @@ export interface ResolvedTheme {
 // Color Palette Types
 // ===========================================
 
-/** Built-in color entry */
 export interface BuiltInColor {
   id: string;
   color: HexColor;
   label: string;
 }
 
-/** Color override for built-in colors */
 export interface ColorOverride {
   color?: HexColor;
   label?: string;
@@ -189,7 +184,6 @@ export interface ColorOverride {
   hidden?: boolean;
 }
 
-/** Custom color entry */
 export interface CustomColor {
   id: string;
   color: HexColor;
@@ -212,14 +206,12 @@ export interface ResolvedColorEntry {
 // Object Customization Types
 // ===========================================
 
-/** Override for a built-in object type */
 export interface ObjectOverride {
   color?: HexColor;
   hidden?: boolean;
   scale?: number;
 }
 
-/** Custom object definition */
 export interface CustomObject {
   id: string;
   name: string;
@@ -229,14 +221,12 @@ export interface CustomObject {
   scale?: number;
 }
 
-/** Custom category definition */
 export interface CustomCategory {
   id: string;
   name: string;
   order?: number;
 }
 
-/** Object settings return type */
 export interface ObjectSettings {
   objectOverrides: Record<string, ObjectOverride>;
   customObjects: CustomObject[];
@@ -247,7 +237,6 @@ export interface ObjectSettings {
 // Map-Specific Settings
 // ===========================================
 
-/** Map-specific settings structure */
 export interface MapSpecificSettings {
   useGlobalSettings: boolean;
   overrides?: Partial<PluginSettings>;

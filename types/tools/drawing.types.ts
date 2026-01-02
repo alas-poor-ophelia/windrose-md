@@ -6,7 +6,7 @@
  * Populated during useDrawingTools.js migration.
  */
 
-import type { Point, GridCoords } from '../core/geometry.types';
+import type { Point } from '../core/geometry.types';
 import type { HexColor, Opacity } from '../core/common.types';
 
 // ===========================================
@@ -30,8 +30,8 @@ export interface DrawingState {
   isDrawing: boolean;
   startPoint: Point | null;
   currentPoint: Point | null;
-  startCell: GridCoords | null;
-  previewCells: GridCoords[];
+  startCell: Point | null;
+  previewCells: Point[];
 }
 
 // ===========================================
@@ -52,9 +52,9 @@ export interface BrushConfig {
 /** Shape being previewed before commit */
 export interface ShapePreview {
   mode: ShapeMode;
-  cells: GridCoords[];
-  startCell: GridCoords;
-  endCell: GridCoords;
+  cells: Point[];
+  startCell: Point;
+  endCell: Point;
 }
 
 // TODO: Expand during useDrawingTools.js migration

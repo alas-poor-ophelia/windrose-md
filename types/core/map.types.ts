@@ -1,23 +1,78 @@
 /**
  * Map Data Type Definitions
- * Path: types/core/map.types.ts
- * 
+ *
  * Top-level map data structures, layer definitions, and fog of war.
  * Updated during Tier 3 migration (layerAccessor.ts).
  */
 
 import type { Cell } from './cell.types';
 import type { Point } from './geometry.types';
+import type { HexOrientation } from '../settings/settings.types';
 
 // ===========================================
 // Map Types
 // ===========================================
 
-/** Supported map/grid types */
 export type MapType = 'grid' | 'hex';
 
-/** Schema version for data migration */
 export type SchemaVersion = number;
+
+// ===========================================
+// View State
+// ===========================================
+
+export interface ViewState {
+  zoom: number;
+  center: Point;
+}
+
+// ===========================================
+// UI Preferences
+// ===========================================
+
+export interface UIPreferences {
+  rememberPanZoom: boolean;
+  rememberSidebarState: boolean;
+  rememberExpandedState: boolean;
+}
+
+// ===========================================
+// Map-Specific Settings
+// ===========================================
+
+export interface MapSettings {
+  useGlobalSettings: boolean;
+  overrides: Record<string, unknown>;
+}
+
+// ===========================================
+// Background Image (Hex Maps)
+// ===========================================
+
+export type GridDensity = 'sparse' | 'medium' | 'dense' | 'custom';
+export type SizingMode = 'density' | 'measurement';
+export type MeasurementMethod = 'edge' | 'corner';
+
+export interface BackgroundImage {
+  path: string | null;
+  lockBounds: boolean;
+  gridDensity: GridDensity;
+  customColumns: number;
+  sizingMode: SizingMode;
+  measurementMethod: MeasurementMethod;
+  measurementSize: number;
+  fineTuneOffset: number;
+}
+
+// ===========================================
+// Text Label Settings
+// ===========================================
+
+export interface TextLabelSettings {
+  fontFace: string;
+  fontSize: number;
+  color: string;
+}
 
 // ===========================================
 // Fog of War
@@ -47,7 +102,6 @@ export interface FogState {
 // Edge (painted grid lines)
 // ===========================================
 
-/** A painted edge on the grid */
 export interface Edge {
   x: number;
   y: number;
@@ -60,7 +114,6 @@ export interface Edge {
 // Text Labels
 // ===========================================
 
-/** Text label on the map */
 export interface TextLabel {
   id: string;
   text: string;
@@ -117,31 +170,56 @@ export interface MapLayer {
 
 /**
  * Complete map data structure (v2 schema with layers).
+ * Note: Many fields are optional because they're populated by fileOperations
+ * during load but may not be present during migration from legacy schemas.
  */
 export interface MapData {
   // Schema & identification
   schemaVersion: SchemaVersion;
   mapType: MapType;
-  
+
+  // Map metadata (optional - defaults exist in fileOperations)
+  name?: string;
+  description?: string;
+  northDirection?: number;
+
   // Layer management
   activeLayerId: LayerId;
   layerPanelVisible: boolean;
   layers: MapLayer[];
-  
-  // Grid/hex settings
-  cellSize?: number;
-  hexSize?: number;
-  hexOrientation?: 'flat' | 'pointy';
-  
-  // Map dimensions (grid)
+
+  // View state (pan/zoom) - optional, defaults calculated based on map type
+  viewState?: ViewState;
+
+  // Map dimensions - optional, defaults from DEFAULTS
   dimensions?: MapDimensions;
-  
-  // Hex bounds
+
+  // Grid-specific settings
+  gridSize?: number;
+
+  // Hex-specific settings
+  hexSize?: number;
+  orientation?: HexOrientation;
   hexBounds?: HexBounds;
-  
+  backgroundImage?: BackgroundImage;
+
+  // Per-map settings (optional - defaults to global settings)
+  settings?: MapSettings;
+
+  // UI state persistence (optional - defaults exist)
+  uiPreferences?: UIPreferences;
+  sidebarCollapsed?: boolean;
+  expandedState?: boolean;
+
+  // Custom colors for this map
+  customColors?: string[];
+
+  // Remembered text label settings
+  lastTextLabelSettings?: TextLabelSettings | null;
+
   // Note pins (global, not per-layer)
   notePins?: NotePin[];
-  
+
   // Migration metadata
   _migratedAt?: string;
 }
@@ -188,7 +266,6 @@ export interface FogBounds {
 // Note Pins
 // ===========================================
 
-/** Note pin on the map */
 export interface NotePin {
   id: string;
   position: Point;
@@ -211,5 +288,4 @@ export interface MigrationValidation {
 // Layer Updates
 // ===========================================
 
-/** Partial layer update for updateLayer function */
 export type LayerUpdate = Partial<Omit<MapLayer, 'id'>>;

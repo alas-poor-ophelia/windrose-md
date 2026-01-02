@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cat:*)",
+      "Bash(ls \"C:\\\\Dev\\\\windrose\\\\types\\\\core\"\" && echo -e \"n=== File count ===\" && ls -1 \"C:Devwindrosetypescore\"\")",
+      "Bash(git show:*)",
+      "Bash(git diff:*)",
+      "Skill(review-comments)"
+    ]
+  }
+}
