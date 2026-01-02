@@ -513,7 +513,9 @@ const useDrawingTools = (
 
     const activeLayer = getActiveLayer(mapData);
 
-    const radius = geometry.getEuclideanDistance(centerX, centerY, edgeX, edgeY);
+    // Use Chebyshev distance (max of |dx|, |dy|) so diagonal drags
+    // give the same radius as orthogonal drags of the same cell count
+    const radius = Math.max(Math.abs(edgeX - centerX), Math.abs(edgeY - centerY));
     const cellsInCircle = geometry.getCellsInCircle(centerX, centerY, radius);
 
     const cellUpdates: CellUpdate[] = cellsInCircle.map((cellCoords: Point) => ({

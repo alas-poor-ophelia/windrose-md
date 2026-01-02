@@ -382,28 +382,32 @@ class GridGeometry extends BaseGeometry {
   
   /**
    * Get all grid cells within a circle
+   *
+   * Supports float center coordinates for proper midpoint-centered circles.
+   * The circle includes cells whose grid coordinates fall within the radius.
    */
   getCellsInCircle(centerX: number, centerY: number, radiusInCells: number): Point[] {
     const cells: Point[] = [];
     const radiusSquared = radiusInCells * radiusInCells;
-    
+
     const minX = Math.floor(centerX - radiusInCells);
     const maxX = Math.ceil(centerX + radiusInCells);
     const minY = Math.floor(centerY - radiusInCells);
     const maxY = Math.ceil(centerY + radiusInCells);
-    
+
     for (let x = minX; x <= maxX; x++) {
       for (let y = minY; y <= maxY; y++) {
-        const dx = x + 0.5 - centerX;
-        const dy = y + 0.5 - centerY;
+        // Distance from cell's grid coordinate to the (possibly float) center
+        const dx = x - centerX;
+        const dy = y - centerY;
         const distSquared = dx * dx + dy * dy;
-        
+
         if (distSquared <= radiusSquared) {
           cells.push({ x, y });
         }
       }
     }
-    
+
     return cells;
   }
   

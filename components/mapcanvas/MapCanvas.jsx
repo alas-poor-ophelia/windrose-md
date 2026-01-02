@@ -1,7 +1,7 @@
 const pathResolverPath = dc.resolvePath("pathResolver.js");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
-const { useCanvasRenderer, renderCanvas } = await requireModuleByName("useCanvasRenderer.js");
+const { useCanvasRenderer, renderCanvas } = await requireModuleByName("useCanvasRenderer.ts");
 const { useCanvasInteraction } = await requireModuleByName("useCanvasInteraction.ts");
 const { GridGeometry } = await requireModuleByName("GridGeometry.ts");
 const { DEFAULTS } = await requireModuleByName("dmtConstants.ts");
@@ -23,8 +23,8 @@ const { AreaSelectLayer } = await requireModuleByName("AreaSelectLayer.jsx");
 const { FogOfWarLayer } = await requireModuleByName("FogOfWarLayer.jsx");
 const { RerollDungeonButton } = await requireModuleByName("RerollDungeonButton.jsx");
 const { getSetting } = await requireModuleByName("settingsAccessor.ts");
-const { usePanZoomCoordinator } = await requireModuleByName("usePanZoomCoordinator.js");
-const { useEventCoordinator } = await requireModuleByName("useEventCoordinator.js");
+const { usePanZoomCoordinator } = await requireModuleByName("usePanZoomCoordinator.ts");
+const { useEventCoordinator } = await requireModuleByName("useEventCoordinator.ts");
 
 /**
  * Coordinators - Internal component that calls coordinator hooks

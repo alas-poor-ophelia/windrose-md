@@ -1,7 +1,7 @@
 const pathResolverPath = dc.resolvePath("pathResolver.js");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
-const { useTextLabelInteraction } = await requireModuleByName("useTextLabelInteraction.js");
+const { useTextLabelInteraction } = await requireModuleByName("useTextLabelInteraction.ts");
 const { useMapState, useMapOperations } = await requireModuleByName("MapContext.jsx");
 const { useMapSelection } = await requireModuleByName("MapSelectionContext.jsx");
 const { TextLabelEditor } = await requireModuleByName("TextLabelEditor.jsx");

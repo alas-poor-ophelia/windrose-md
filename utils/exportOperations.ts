@@ -151,7 +151,7 @@ async function renderMapToCanvas(
   const { mapData, geometry, bounds, width, height } = params;
   
   // Import rendering dependencies
-  const { renderCanvas } = await requireModuleByName("useCanvasRenderer.js") as {
+  const { renderCanvas } = await requireModuleByName("useCanvasRenderer.ts") as {
     renderCanvas: (
       canvas: HTMLCanvasElement,
       fogCanvas: HTMLCanvasElement | null,

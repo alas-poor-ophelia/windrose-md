@@ -1,7 +1,7 @@
 const pathResolverPath = dc.resolvePath("pathResolver.js");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
-const { useNotePinInteraction } = await requireModuleByName("useNotePinInteraction.js");
+const { useNotePinInteraction } = await requireModuleByName("useNotePinInteraction.ts");
 const { useMapState, useMapOperations } = await requireModuleByName("MapContext.jsx");
 const { useMapSelection } = await requireModuleByName("MapSelectionContext.jsx");
 const { NoteLinkModal } = await requireModuleByName("NoteLinkModal.jsx");

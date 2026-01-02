@@ -39,6 +39,13 @@ DungeonMapTracker.md
 *.tmp
 *.log
 
+# Claude Code files
+CLAUDE.md
+**/CLAUDE.md
+
+# Specs (handled separately)
+docs/specs/
+
 # src is a symlink to vault - don't track it here
 # (the actual source files are tracked in the vault's own repo if any)
 src

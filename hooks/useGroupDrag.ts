@@ -1,9 +1,9 @@
 /**
- * useGroupDrag.js
- * 
+ * useGroupDrag.ts
+ *
  * Custom hook for managing group drag operations during multi-select.
  * Handles dragging multiple objects and text labels together as a group.
- * 
+ *
  * Features:
  * - Stores position offsets for all selected items when drag starts
  * - Applies movement delta to all items during drag
@@ -11,20 +11,92 @@
  * - Creates single history entry for the entire group move
  */
 
-const pathResolverPath = dc.resolvePath("pathResolver.js");
-const { requireModuleByName } = await dc.require(pathResolverPath);
+// Type-only imports
+import type { Point, IGeometry } from '#types/core/geometry.types';
+import type { MapData, MapLayer } from '#types/core/map.types';
+import type { MapObject } from '#types/objects/object.types';
+import type { TextLabel } from '#types/core/textLabel.types';
+import type {
+  SelectedItem,
+  DragOffset,
+  DragOffsetsMap,
+  GroupDragInitialState,
+  ObjectDragUpdate,
+  TextDragUpdate,
+  PositionUpdate,
+  UseGroupDragResult,
+} from '#types/hooks/groupDrag.types';
 
-const { useMapState, useMapOperations } = await requireModuleByName("MapContext.jsx");
-const { useMapSelection } = await requireModuleByName("MapSelectionContext.jsx");
-const { getActiveLayer } = await requireModuleByName("layerAccessor.ts");
-const { HexGeometry } = await requireModuleByName("HexGeometry.ts");
-const { getObjectsInCell, assignSlot } = await requireModuleByName("hexSlotPositioner.js");
+// Datacore imports
+const pathResolverPath = dc.resolvePath("pathResolver.js");
+const { requireModuleByName } = await dc.require(pathResolverPath) as {
+  requireModuleByName: (name: string) => Promise<unknown>
+};
+
+// Context types
+interface MapStateValue {
+  geometry: (IGeometry & { isWithinBounds?: (x: number, y: number) => boolean }) | null;
+  mapData: MapData | null;
+  screenToGrid: (clientX: number, clientY: number) => Point | null;
+  screenToWorld: (clientX: number, clientY: number) => { worldX: number; worldY: number } | null;
+  getClientCoords: (e: PointerEvent | MouseEvent | TouchEvent) => { clientX: number; clientY: number };
+}
+
+interface MapOperationsValue {
+  onObjectsChange: (objects: MapObject[], skipHistory?: boolean) => void;
+  onTextLabelsChange: (labels: TextLabel[], skipHistory?: boolean) => void;
+}
+
+interface DragStart {
+  x: number;
+  y: number;
+  gridX: number;
+  gridY: number;
+  worldX: number;
+  worldY: number;
+  isGroupDrag?: boolean;
+}
+
+interface MapSelectionValue {
+  selectedItems: SelectedItem[];
+  hasMultiSelection: boolean;
+  isSelected: (type: string, id: string) => boolean;
+  updateSelectedItemsData: (updates: PositionUpdate[]) => void;
+  isDraggingSelection: boolean;
+  setIsDraggingSelection: (value: boolean) => void;
+  dragStart: DragStart | null;
+  setDragStart: (value: DragStart | null) => void;
+  groupDragOffsetsRef: { current: DragOffsetsMap };
+  groupDragInitialStateRef: { current: GroupDragInitialState | null };
+  isGroupDragging: boolean;
+}
+
+const { useMapState, useMapOperations } = await requireModuleByName("MapContext.jsx") as {
+  useMapState: () => MapStateValue;
+  useMapOperations: () => MapOperationsValue;
+};
+
+const { useMapSelection } = await requireModuleByName("MapSelectionContext.jsx") as {
+  useMapSelection: () => MapSelectionValue;
+};
+
+const { getActiveLayer } = await requireModuleByName("layerAccessor.ts") as {
+  getActiveLayer: (mapData: MapData) => MapLayer;
+};
+
+const { HexGeometry } = await requireModuleByName("HexGeometry.ts") as {
+  HexGeometry: unknown;
+};
+
+const { getObjectsInCell, assignSlot } = await requireModuleByName("hexSlotPositioner.js") as {
+  getObjectsInCell: unknown;
+  assignSlot: unknown;
+};
 
 /**
  * Hook for managing group drag operations
- * @returns {Object} Group drag handlers and state
  */
-const useGroupDrag = () => {
+const useGroupDrag = (): UseGroupDragResult => {
   const {
     geometry,
     mapData,
@@ -52,42 +124,33 @@ const useGroupDrag = () => {
     isGroupDragging
   } = useMapSelection();
 
-  /**
-   * Check if a click is on any selected item
-   * @param {number} gridX - Grid X coordinate
-   * @param {number} gridY - Grid Y coordinate
-   * @param {number} worldX - World X coordinate
-   * @param {number} worldY - World Y coordinate
-   * @returns {Object|null} The selected item that was clicked, or null
-   */
-  const getClickedSelectedItem = dc.useCallback((x, y, worldX, worldY) => {
-    
+  const getClickedSelectedItem = dc.useCallback((
+    x: number,
+    y: number,
+    worldX: number,
+    worldY: number
+  ): SelectedItem | null => {
     if (!hasMultiSelection || !mapData) {
       return null;
     }
-    
+
     const activeLayer = getActiveLayer(mapData);
-    
-    // Check objects at this grid position
+
     for (const item of selectedItems) {
       if (item.type === 'object') {
-        const obj = activeLayer.objects?.find(o => o.id === item.id);
+        const obj = activeLayer.objects?.find((o: MapObject) => o.id === item.id);
         if (obj) {
           const size = obj.size || { width: 1, height: 1 };
-          // Check if click is within object bounds
-          if (gridX >= obj.position.x && gridX < obj.position.x + size.width &&
-              gridY >= obj.position.y && gridY < obj.position.y + size.height) {
+          if (x >= obj.position.x && x < obj.position.x + size.width &&
+              y >= obj.position.y && y < obj.position.y + size.height) {
             return item;
           }
         }
       } else if (item.type === 'text') {
-        // For text labels, do a rough world-coordinate check
-        // Text labels use world coordinates, not grid
-        const label = activeLayer.textLabels?.find(l => l.id === item.id);
+        const label = activeLayer.textLabels?.find((l: TextLabel) => l.id === item.id);
         if (label) {
           const labelWorldX = label.position.x;
           const labelWorldY = label.position.y;
-          // Approximate hit area based on font size
           const hitRadius = (label.fontSize || 16) * 2;
           const dx = worldX - labelWorldX;
           const dy = worldY - labelWorldY;
@@ -97,41 +160,35 @@ const useGroupDrag = () => {
         }
       }
     }
-    
+
     return null;
   }, [hasMultiSelection, selectedItems, mapData]);
 
-  /**
-   * Start group drag - store offsets for all selected items
-   * @param {number} clientX - Client X coordinate
-   * @param {number} clientY - Client Y coordinate
-   * @param {number} gridX - Grid X coordinate of click
-   * @param {number} gridY - Grid Y coordinate of click
-   * @returns {boolean} True if group drag was started
-   */
-  const startGroupDrag = dc.useCallback((clientX, clientY, gridX, gridY) => {
-    
+  const startGroupDrag = dc.useCallback((
+    clientX: number,
+    clientY: number,
+    gridX: number,
+    gridY: number
+  ): boolean => {
     if (!hasMultiSelection || !mapData) {
       return false;
     }
-    
+
     const worldCoords = screenToWorld(clientX, clientY);
     if (!worldCoords) return false;
-    
+
     const activeLayer = getActiveLayer(mapData);
-    
-    // Store initial state for batch history
+
     groupDragInitialStateRef.current = {
       objects: [...(activeLayer.objects || [])],
       textLabels: [...(activeLayer.textLabels || [])]
     };
-    
-    // Calculate and store offsets for each selected item
-    const offsets = new Map();
-    
+
+    const offsets: DragOffsetsMap = new Map();
+
     for (const item of selectedItems) {
       if (item.type === 'object') {
-        const obj = activeLayer.objects?.find(o => o.id === item.id);
+        const obj = activeLayer.objects?.find((o: MapObject) => o.id === item.id);
         if (obj) {
           offsets.set(item.id, {
             type: 'object',
@@ -142,7 +199,7 @@ const useGroupDrag = () => {
           });
         }
       } else if (item.type === 'text') {
-        const label = activeLayer.textLabels?.find(l => l.id === item.id);
+        const label = activeLayer.textLabels?.find((l: TextLabel) => l.id === item.id);
         if (label) {
           offsets.set(item.id, {
             type: 'text',
@@ -154,11 +211,9 @@ const useGroupDrag = () => {
         }
       }
     }
-    
+
     groupDragOffsetsRef.current = offsets;
-    
-    
-    // Set up drag state
+
     setIsDraggingSelection(true);
     setDragStart({
       x: clientX,
@@ -169,55 +224,47 @@ const useGroupDrag = () => {
       worldY: worldCoords.worldY,
       isGroupDrag: true
     });
-    
+
     return true;
   }, [hasMultiSelection, selectedItems, mapData, screenToWorld, setIsDraggingSelection, setDragStart]);
 
-  /**
-   * Handle group drag movement
-   * @param {Event} e - Pointer event
-   * @returns {boolean} True if drag was handled
-   */
-  const handleGroupDrag = dc.useCallback((e) => {
-    
-    // Check dragStart.isGroupDrag directly since context state may not have updated yet
+  const handleGroupDrag = dc.useCallback((e: PointerEvent | MouseEvent | TouchEvent): boolean => {
     if (!isDraggingSelection || !dragStart?.isGroupDrag || !mapData) {
       return false;
     }
-    
+
     const { clientX, clientY } = getClientCoords(e);
     const gridCoords = screenToGrid(clientX, clientY);
     const worldCoords = screenToWorld(clientX, clientY);
-    
+
     if (!gridCoords || !worldCoords) return true;
-    
+
     const { x, y } = gridCoords;
+    const gridX = x;
+    const gridY = y;
     const { worldX, worldY } = worldCoords;
-    
-    // Calculate deltas
+
     const gridDeltaX = x - dragStart.gridX;
     const gridDeltaY = y - dragStart.gridY;
     const worldDeltaX = worldX - dragStart.worldX;
     const worldDeltaY = worldY - dragStart.worldY;
-    
-    // Skip if no movement
+
     if (gridDeltaX === 0 && gridDeltaY === 0 && worldDeltaX === 0 && worldDeltaY === 0) {
       return true;
     }
-    
+
     const activeLayer = getActiveLayer(mapData);
     const offsets = groupDragOffsetsRef.current;
-    
-    // Calculate new positions for all items
-    const objectUpdates = [];
-    const textUpdates = [];
-    
+
+    const objectUpdates: ObjectDragUpdate[] = [];
+    const textUpdates: TextDragUpdate[] = [];
+
     for (const item of selectedItems) {
       const offset = offsets.get(item.id);
       if (!offset) continue;
-      
+
       if (item.type === 'object') {
-        const obj = activeLayer.objects?.find(o => o.id === item.id);
+        const obj = activeLayer.objects?.find((o: MapObject) => o.id === item.id);
         if (obj) {
           const newX = gridX - offset.gridOffsetX;
           const newY = gridY - offset.gridOffsetY;
@@ -228,7 +275,7 @@ const useGroupDrag = () => {
           });
         }
       } else if (item.type === 'text') {
-        const label = activeLayer.textLabels?.find(l => l.id === item.id);
+        const label = activeLayer.textLabels?.find((l: TextLabel) => l.id === item.id);
         if (label) {
           const newX = worldX - offset.worldOffsetX;
           const newY = worldY - offset.worldOffsetY;
@@ -240,61 +287,51 @@ const useGroupDrag = () => {
         }
       }
     }
-    
-    // Validate all object moves
-    // Check bounds for hex maps
+
     if (geometry && geometry.isWithinBounds) {
       for (const update of objectUpdates) {
         if (!geometry.isWithinBounds(update.newPosition.x, update.newPosition.y)) {
-          // At least one object would be out of bounds - block entire move
           return true;
         }
       }
     }
-    
-    // Check for collisions with non-selected objects
-    // Get set of selected object IDs for quick lookup
+
     const selectedObjectIds = new Set(
       selectedItems.filter(item => item.type === 'object').map(item => item.id)
     );
-    
-    // Get non-selected objects
+
     const nonSelectedObjects = (activeLayer.objects || []).filter(
-      obj => !selectedObjectIds.has(obj.id)
+      (obj: MapObject) => !selectedObjectIds.has(obj.id)
     );
-    
-    // Check each moved object against non-selected objects
+
     for (const update of objectUpdates) {
       const movingSize = update.oldObj.size || { width: 1, height: 1 };
       const movingMinX = update.newPosition.x;
       const movingMinY = update.newPosition.y;
       const movingMaxX = movingMinX + movingSize.width;
       const movingMaxY = movingMinY + movingSize.height;
-      
+
       for (const staticObj of nonSelectedObjects) {
         const staticSize = staticObj.size || { width: 1, height: 1 };
         const staticMinX = staticObj.position.x;
         const staticMinY = staticObj.position.y;
         const staticMaxX = staticMinX + staticSize.width;
         const staticMaxY = staticMinY + staticSize.height;
-        
-        // Check for overlap (axis-aligned bounding box intersection)
+
         const overlapsX = movingMinX < staticMaxX && movingMaxX > staticMinX;
         const overlapsY = movingMinY < staticMaxY && movingMaxY > staticMinY;
-        
+
         if (overlapsX && overlapsY) {
-          // Collision detected - block entire move
           return true;
         }
       }
     }
-    
-    // Apply object updates
+
     if (objectUpdates.length > 0) {
-      let updatedObjects = [...activeLayer.objects];
-      
+      const updatedObjects = [...activeLayer.objects];
+
       for (const update of objectUpdates) {
-        const idx = updatedObjects.findIndex(o => o.id === update.id);
+        const idx = updatedObjects.findIndex((o: MapObject) => o.id === update.id);
         if (idx !== -1) {
           updatedObjects[idx] = {
             ...updatedObjects[idx],
@@ -302,16 +339,15 @@ const useGroupDrag = () => {
           };
         }
       }
-      
-      onObjectsChange(updatedObjects, true); // Suppress history during drag
+
+      onObjectsChange(updatedObjects, true);
     }
-    
-    // Apply text label updates
+
     if (textUpdates.length > 0) {
-      let updatedLabels = [...activeLayer.textLabels];
-      
+      const updatedLabels = [...activeLayer.textLabels];
+
       for (const update of textUpdates) {
-        const idx = updatedLabels.findIndex(l => l.id === update.id);
+        const idx = updatedLabels.findIndex((l: TextLabel) => l.id === update.id);
         if (idx !== -1) {
           updatedLabels[idx] = {
             ...updatedLabels[idx],
@@ -319,11 +355,10 @@ const useGroupDrag = () => {
           };
         }
       }
-      
-      onTextLabelsChange(updatedLabels, true); // Suppress history during drag
+
+      onTextLabelsChange(updatedLabels, true);
     }
-    
-    // Update drag start for next frame
+
     setDragStart({
       ...dragStart,
       gridX,
@@ -331,61 +366,46 @@ const useGroupDrag = () => {
       worldX,
       worldY
     });
-    
-    // Update selected items data to keep in sync
-    const allUpdates = [
+
+    const allUpdates: PositionUpdate[] = [
       ...objectUpdates.map(u => ({ id: u.id, position: u.newPosition })),
       ...textUpdates.map(u => ({ id: u.id, position: u.newPosition }))
     ];
     updateSelectedItemsData(allUpdates);
-    
+
     return true;
-  }, [isDraggingSelection, dragStart, mapData, geometry, selectedItems, getClientCoords, 
+  }, [isDraggingSelection, dragStart, mapData, geometry, selectedItems, getClientCoords,
       screenToGrid, screenToWorld, onObjectsChange, onTextLabelsChange, setDragStart, updateSelectedItemsData]);
 
-  /**
-   * Stop group drag and finalize history
-   * @returns {boolean} True if group drag was stopped
-   */
-  const stopGroupDrag = dc.useCallback(() => {
-    
+  const stopGroupDrag = dc.useCallback((): boolean => {
     if (!isDraggingSelection || !dragStart?.isGroupDrag) {
       return false;
     }
-    
+
     setIsDraggingSelection(false);
     setDragStart(null);
-    
-    // Commit history entries for the completed drag
+
     if (groupDragInitialStateRef.current !== null) {
-      const activeLayer = getActiveLayer(mapData);
-      
-      // Commit objects change (this will create history entry)
+      const activeLayer = getActiveLayer(mapData!);
+
       if (activeLayer.objects) {
         onObjectsChange(activeLayer.objects, false);
       }
-      
-      // Commit text labels change (this will create history entry)
-      // Note: This might create two history entries - we may want to batch them
-      // For now, this is acceptable behavior
+
       if (activeLayer.textLabels) {
         onTextLabelsChange(activeLayer.textLabels, false);
       }
-      
+
       groupDragInitialStateRef.current = null;
     }
-    
-    // Clear offsets
+
     groupDragOffsetsRef.current = new Map();
-    
+
     return true;
   }, [isDraggingSelection, dragStart, mapData, setIsDraggingSelection, setDragStart, onObjectsChange, onTextLabelsChange]);
 
   return {
-    // State
     isGroupDragging,
-    
-    // Handlers
     getClickedSelectedItem,
     startGroupDrag,
     handleGroupDrag,

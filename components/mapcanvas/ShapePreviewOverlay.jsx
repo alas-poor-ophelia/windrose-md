@@ -258,10 +258,11 @@ const ShapePreviewOverlay = ({
       y: centerScreen.y * displayScale + canvasOffsetY
     };
     
-    // Calculate radius in cells (Euclidean distance)
+    // Calculate radius in cells using Chebyshev distance (max of |dx|, |dy|)
+    // This makes diagonal drags give the same radius as orthogonal drags
     const dx = endPoint.x - startPoint.x;
     const dy = endPoint.y - startPoint.y;
-    const radiusCells = Math.sqrt(dx * dx + dy * dy);
+    const radiusCells = Math.max(Math.abs(dx), Math.abs(dy));
     
     // Convert radius to screen pixels
     const radiusScreen = radiusCells * scaledCellSize;
