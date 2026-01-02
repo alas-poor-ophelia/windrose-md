@@ -2,7 +2,7 @@ const pathResolverPath = dc.resolvePath("pathResolver.js");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
 const { useCanvasRenderer, renderCanvas } = await requireModuleByName("useCanvasRenderer.js");
-const { useCanvasInteraction } = await requireModuleByName("useCanvasInteraction.js");
+const { useCanvasInteraction } = await requireModuleByName("useCanvasInteraction.ts");
 const { GridGeometry } = await requireModuleByName("GridGeometry.ts");
 const { DEFAULTS } = await requireModuleByName("dmtConstants.ts");
 const { getObjectAtPosition, addObject, removeObject, removeObjectAtPosition, removeObjectsInRectangle, updateObject, isAreaFree, canResizeObject } = await requireModuleByName("objectOperations.ts");

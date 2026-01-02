@@ -1,7 +1,7 @@
 const pathResolverPath = dc.resolvePath("pathResolver.js");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
-const { useDrawingTools } = await requireModuleByName("useDrawingTools.js");
+const { useDrawingTools } = await requireModuleByName("useDrawingTools.ts");
 const { useMapState } = await requireModuleByName("MapContext.jsx");
 const { useEventHandlerRegistration } = await requireModuleByName("EventHandlerContext.jsx");
 const { ShapePreviewOverlay } = await requireModuleByName("ShapePreviewOverlay.jsx");

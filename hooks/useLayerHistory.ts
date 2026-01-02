@@ -1,44 +1,78 @@
 /**
- * useLayerHistory.js
- * 
+ * useLayerHistory.ts
+ *
  * Manages layer switching with per-layer undo/redo history.
  * This hook centralizes all history-related logic including:
  * - Per-layer history caching (each layer has independent undo/redo stacks)
  * - Layer select/add/delete handlers that preserve history state
  * - Undo/redo operations
  * - History tracking for data change handlers
- * 
+ *
  * The hook internally uses useHistory and manages the layer-specific caching,
  * providing a clean API for the parent component.
  */
 
-const pathResolverPath = dc.resolvePath("pathResolver.js");
-const { requireModuleByName } = await dc.require(pathResolverPath);
+// Type-only imports
+import type { MapData, MapLayer, LayerId } from '#types/core/map.types';
+import type { HistoryState, UseHistoryResult } from '#types/hooks/history.types';
+import type {
+  LayerHistorySnapshot,
+  LayerHistoryCache,
+  UseLayerHistoryOptions,
+  LayerActions,
+  HistoryActions,
+  UseLayerHistoryResult,
+} from '#types/hooks/layerHistory.types';
 
-const { useHistory } = await requireModuleByName("useHistory.ts");
-const { 
-  getActiveLayer, 
+// Datacore imports
+const pathResolverPath = dc.resolvePath("pathResolver.js");
+const { requireModuleByName } = await dc.require(pathResolverPath) as {
+  requireModuleByName: (name: string) => Promise<unknown>
+};
+
+const { useHistory } = await requireModuleByName("useHistory.ts") as {
+  useHistory: <T>(initialState: T) => UseHistoryResult<T>
+};
+
+const {
+  getActiveLayer,
   updateActiveLayer,
-  addLayer, 
-  removeLayer, 
-  reorderLayers, 
+  addLayer,
+  removeLayer,
+  reorderLayers,
   setActiveLayer
-} = await requireModuleByName("layerAccessor.ts");
+} = await requireModuleByName("layerAccessor.ts") as {
+  getActiveLayer: (mapData: MapData) => MapLayer;
+  updateActiveLayer: (mapData: MapData, updates: Partial<MapLayer>) => MapData;
+  addLayer: (mapData: MapData) => MapData;
+  removeLayer: (mapData: MapData, layerId: LayerId) => MapData;
+  reorderLayers: (mapData: MapData, layerId: LayerId, newIndex: number) => MapData;
+  setActiveLayer: (mapData: MapData, layerId: LayerId) => MapData;
+};
 
 /**
  * Hook for managing layer switching with per-layer history
- * 
- * @param {Object} options - Configuration options
- * @param {Object} options.mapData - Current map data
- * @param {Function} options.updateMapData - Function to update map data
- * @param {boolean} options.isLoading - Whether map data is still loading
- * @returns {Object} Layer and history state/actions
+ *
+ * @param options - Configuration options
+ * @returns Layer and history state/actions
  */
-function useLayerHistory({ mapData, updateMapData, isLoading }) {
+function useLayerHistory({
+  mapData,
+  updateMapData,
+  isLoading
+}: UseLayerHistoryOptions): UseLayerHistoryResult {
   // =========================================================================
   // Core History Hook
   // =========================================================================
-  
+
+  const initialSnapshot: LayerHistorySnapshot = {
+    cells: [],
+    name: "",
+    objects: [],
+    textLabels: [],
+    edges: []
+  };
+
   const {
     currentState: historyState,
     addToHistory: addToHistoryInternal,
@@ -49,32 +83,32 @@ function useLayerHistory({ mapData, updateMapData, isLoading }) {
     resetHistory,
     getHistoryState,
     restoreHistoryState
-  } = useHistory({ cells: [], name: "", objects: [], textLabels: [], edges: [] });
+  } = useHistory<LayerHistorySnapshot>(initialSnapshot);
 
   // =========================================================================
   // Refs for History Management
   // =========================================================================
-  
+
   // Track if we're applying history (to avoid adding to history during undo/redo)
-  const isApplyingHistoryRef = dc.useRef(false);
-  
+  const isApplyingHistoryRef = dc.useRef<boolean>(false);
+
   // Track if history has been initialized for the current session
-  const historyInitialized = dc.useRef(false);
-  
+  const historyInitialized = dc.useRef<boolean>(false);
+
   // Cache history state per layer (keyed by layer ID)
-  const layerHistoryCache = dc.useRef({});
+  const layerHistoryCache = dc.useRef<LayerHistoryCache>({});
 
   // =========================================================================
   // History Initialization Effect
   // =========================================================================
-  
+
   // Initialize history when map data loads (only once)
   dc.useEffect(() => {
     if (mapData && !isLoading && !historyInitialized.current) {
       const activeLayer = getActiveLayer(mapData);
       resetHistory({
         cells: activeLayer.cells,
-        name: mapData.name,
+        name: mapData.name || '',
         objects: activeLayer.objects || [],
         textLabels: activeLayer.textLabels || [],
         edges: activeLayer.edges || []
@@ -86,22 +120,25 @@ function useLayerHistory({ mapData, updateMapData, isLoading }) {
   // =========================================================================
   // Layer State Helpers
   // =========================================================================
-  
+
   /**
    * Build a history state snapshot from layer data
    */
-  const buildHistoryState = dc.useCallback((layer, name) => ({
-    cells: layer.cells || [],
-    name: name,
-    objects: layer.objects || [],
-    textLabels: layer.textLabels || [],
-    edges: layer.edges || []
-  }), []);
+  const buildHistoryState = dc.useCallback(
+    (layer: MapLayer, name: string): LayerHistorySnapshot => ({
+      cells: layer.cells || [],
+      name: name,
+      objects: layer.objects || [],
+      textLabels: layer.textLabels || [],
+      edges: layer.edges || []
+    }),
+    []
+  );
 
   /**
    * Save current layer's history to cache
    */
-  const saveCurrentLayerHistory = dc.useCallback(() => {
+  const saveCurrentLayerHistory = dc.useCallback((): void => {
     if (!mapData) return;
     const currentLayerId = mapData.activeLayerId;
     layerHistoryCache.current[currentLayerId] = getHistoryState();
@@ -110,89 +147,98 @@ function useLayerHistory({ mapData, updateMapData, isLoading }) {
   /**
    * Restore or initialize history for a layer
    */
-  const restoreOrInitLayerHistory = dc.useCallback((newMapData, layerId) => {
-    const cachedHistory = layerHistoryCache.current[layerId];
-    if (cachedHistory) {
-      restoreHistoryState(cachedHistory);
-    } else {
-      // No cached history for this layer - initialize fresh
-      const layer = getActiveLayer(newMapData);
-      historyInitialized.current = false;
-      resetHistory(buildHistoryState(layer, newMapData.name));
-      historyInitialized.current = true;
-    }
-  }, [restoreHistoryState, resetHistory, buildHistoryState]);
+  const restoreOrInitLayerHistory = dc.useCallback(
+    (newMapData: MapData, layerId: LayerId): void => {
+      const cachedHistory = layerHistoryCache.current[layerId];
+      if (cachedHistory) {
+        restoreHistoryState(cachedHistory);
+      } else {
+        // No cached history for this layer - initialize fresh
+        const layer = getActiveLayer(newMapData);
+        historyInitialized.current = false;
+        resetHistory(buildHistoryState(layer, newMapData.name || ''));
+        historyInitialized.current = true;
+      }
+    },
+    [restoreHistoryState, resetHistory, buildHistoryState]
+  );
 
   // =========================================================================
   // Layer Management Handlers
   // =========================================================================
-  
-  // Switch to a different layer
-  const handleLayerSelect = dc.useCallback((layerId) => {
-    if (!mapData || mapData.activeLayerId === layerId) return;
-    
-    // Save current layer's history before switching
-    saveCurrentLayerHistory();
-    
-    const newMapData = setActiveLayer(mapData, layerId);
-    updateMapData(newMapData);
-    
-    // Restore new layer's history or initialize if none cached
-    restoreOrInitLayerHistory(newMapData, layerId);
-  }, [mapData, updateMapData, saveCurrentLayerHistory, restoreOrInitLayerHistory]);
-  
+
+  const handleLayerSelect = dc.useCallback(
+    (layerId: LayerId): void => {
+      if (!mapData || mapData.activeLayerId === layerId) return;
+
+      // Save current layer's history before switching
+      saveCurrentLayerHistory();
+
+      const newMapData = setActiveLayer(mapData, layerId);
+      updateMapData(newMapData);
+
+      // Restore new layer's history or initialize if none cached
+      restoreOrInitLayerHistory(newMapData, layerId);
+    },
+    [mapData, updateMapData, saveCurrentLayerHistory, restoreOrInitLayerHistory]
+  );
+
   // Add a new layer
-  const handleLayerAdd = dc.useCallback(() => {
+  const handleLayerAdd = dc.useCallback((): void => {
     if (!mapData) return;
-    
+
     // Save current layer's history before switching
     saveCurrentLayerHistory();
-    
+
     const newMapData = addLayer(mapData);
     updateMapData(newMapData);
-    
+
     // New layer always starts with fresh history
     const newActiveLayer = getActiveLayer(newMapData);
     historyInitialized.current = false;
-    resetHistory(buildHistoryState(newActiveLayer, newMapData.name));
+    resetHistory(buildHistoryState(newActiveLayer, newMapData.name || ''));
     historyInitialized.current = true;
   }, [mapData, updateMapData, saveCurrentLayerHistory, resetHistory, buildHistoryState]);
-  
-  // Delete a layer
-  const handleLayerDelete = dc.useCallback((layerId) => {
-    if (!mapData) return;
-    
-    // removeLayer handles preventing deletion of last layer
-    const newMapData = removeLayer(mapData, layerId);
-    
-    // Only update if something changed
-    if (newMapData !== mapData) {
-      // Clear cached history for deleted layer
-      delete layerHistoryCache.current[layerId];
-      
-      updateMapData(newMapData);
-      
-      // If active layer changed, restore or init history for new active layer
-      if (newMapData.activeLayerId !== mapData.activeLayerId) {
-        restoreOrInitLayerHistory(newMapData, newMapData.activeLayerId);
+
+  const handleLayerDelete = dc.useCallback(
+    (layerId: LayerId): void => {
+      if (!mapData) return;
+
+      // removeLayer handles preventing deletion of last layer
+      const newMapData = removeLayer(mapData, layerId);
+
+      // Only update if something changed
+      if (newMapData !== mapData) {
+        // Clear cached history for deleted layer
+        delete layerHistoryCache.current[layerId];
+
+        updateMapData(newMapData);
+
+        // If active layer changed, restore or init history for new active layer
+        if (newMapData.activeLayerId !== mapData.activeLayerId) {
+          restoreOrInitLayerHistory(newMapData, newMapData.activeLayerId);
+        }
       }
-    }
-  }, [mapData, updateMapData, restoreOrInitLayerHistory]);
-  
+    },
+    [mapData, updateMapData, restoreOrInitLayerHistory]
+  );
+
   // Reorder layers (no history interaction needed)
-  const handleLayerReorder = dc.useCallback((layerId, newIndex) => {
-    if (!mapData) return;
-    
-    const newMapData = reorderLayers(mapData, layerId, newIndex);
-    updateMapData(newMapData);
-  }, [mapData, updateMapData]);
+  const handleLayerReorder = dc.useCallback(
+    (layerId: LayerId, newIndex: number): void => {
+      if (!mapData) return;
+
+      const newMapData = reorderLayers(mapData, layerId, newIndex);
+      updateMapData(newMapData);
+    },
+    [mapData, updateMapData]
+  );
 
   // =========================================================================
   // Undo/Redo Handlers
   // =========================================================================
-  
-  // Handle undo
-  const handleUndo = dc.useCallback(() => {
+
+  const handleUndo = dc.useCallback((): void => {
     const previousState = undoInternal();
     if (previousState && mapData) {
       isApplyingHistoryRef.current = true;
@@ -214,8 +260,7 @@ function useLayerHistory({ mapData, updateMapData, isLoading }) {
     }
   }, [undoInternal, mapData, updateMapData]);
 
-  // Handle redo
-  const handleRedo = dc.useCallback(() => {
+  const handleRedo = dc.useCallback((): void => {
     const nextState = redoInternal();
     if (nextState && mapData) {
       isApplyingHistoryRef.current = true;
@@ -240,12 +285,12 @@ function useLayerHistory({ mapData, updateMapData, isLoading }) {
   // =========================================================================
   // History API for Data Handlers
   // =========================================================================
-  
+
   /**
    * Check if we're currently applying history (undo/redo in progress)
    * Data handlers should skip adding to history when this returns true
    */
-  const isApplyingHistory = dc.useCallback(() => {
+  const isApplyingHistory = dc.useCallback((): boolean => {
     return isApplyingHistoryRef.current;
   }, []);
 
@@ -253,26 +298,27 @@ function useLayerHistory({ mapData, updateMapData, isLoading }) {
    * Add a state to history (wrapper that checks isApplyingHistory)
    * This is what data change handlers should call
    */
-  const addToHistory = dc.useCallback((state) => {
-    if (!isApplyingHistoryRef.current) {
-      addToHistoryInternal(state);
-    }
-  }, [addToHistoryInternal]);
+  const addToHistory = dc.useCallback(
+    (state: LayerHistorySnapshot): void => {
+      if (!isApplyingHistoryRef.current) {
+        addToHistoryInternal(state);
+      }
+    },
+    [addToHistoryInternal]
+  );
 
   // =========================================================================
   // Return Value
   // =========================================================================
 
-  // Grouped layer actions
-  const layerActions = {
+  const layerActions: LayerActions = {
     handleLayerSelect,
     handleLayerAdd,
     handleLayerDelete,
     handleLayerReorder
   };
 
-  // Grouped history actions
-  const historyActions = {
+  const historyActions: HistoryActions = {
     handleUndo,
     handleRedo,
     addToHistory,
@@ -280,23 +326,16 @@ function useLayerHistory({ mapData, updateMapData, isLoading }) {
   };
 
   return {
-    // Layer management
     layerActions,
     handleLayerSelect,
     handleLayerAdd,
     handleLayerDelete,
     handleLayerReorder,
-    
-    // History state
     canUndo,
     canRedo,
-    
-    // History actions
     historyActions,
     handleUndo,
     handleRedo,
-    
-    // For data change handlers
     addToHistory,
     isApplyingHistory
   };

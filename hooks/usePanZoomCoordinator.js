@@ -1,7 +1,7 @@
 const pathResolverPath = dc.resolvePath("pathResolver.js");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
-const { useCanvasInteraction } = await requireModuleByName("useCanvasInteraction.js");
+const { useCanvasInteraction } = await requireModuleByName("useCanvasInteraction.ts");
 const { useEventHandlerRegistration } = await requireModuleByName("EventHandlerContext.jsx");
 const { useMapOperations } = await requireModuleByName("MapContext.jsx");
 

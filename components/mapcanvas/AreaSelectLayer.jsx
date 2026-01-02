@@ -10,7 +10,7 @@
 const pathResolverPath = dc.resolvePath("pathResolver.js");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
-const { useAreaSelect } = await requireModuleByName("useAreaSelect.js");
+const { useAreaSelect } = await requireModuleByName("useAreaSelect.ts");
 const { useMapState } = await requireModuleByName("MapContext.jsx");
 const { useMapSelection } = await requireModuleByName("MapSelectionContext.jsx");
 const { useEventHandlerRegistration } = await requireModuleByName("EventHandlerContext.jsx");

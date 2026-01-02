@@ -1,16 +1,16 @@
 /**
- * useFogOfWar.js
- * 
+ * useFogOfWar.ts
+ *
  * Manages Fog of War UI state and high-level operations for DungeonMapTracker.
- * This is distinct from useFogTools.js which handles canvas-level interactions.
- * 
+ * This is distinct from useFogTools.ts which handles canvas-level interactions.
+ *
  * State managed:
  * - showFogTools: Whether the fog tools panel is expanded
  * - fogActiveTool: Currently selected fog tool ('paint' | 'erase' | 'rectangle' | null)
- * 
+ *
  * Computed:
  * - currentFogState: Combined state from layer data + UI state
- * 
+ *
  * Operations provided:
  * - Tool panel toggle and tool selection
  * - Fog visibility toggle
@@ -18,11 +18,26 @@
  * - Handle fog changes from FogOfWarLayer
  */
 
-const pathResolverPath = dc.resolvePath("pathResolver.js");
-const { requireModuleByName } = await dc.require(pathResolverPath);
+// Type-only imports
+import type { MapData, MapLayer, FogOfWar, FogState } from '#types/core/map.types';
+import type { IGeometry, GridBounds } from '#types/core/geometry.types';
+import type {
+  FogToolId,
+  CurrentFogState,
+  UseFogOfWarOptions,
+  FogStateValues,
+  FogActions,
+  UseFogOfWarResult,
+} from '#types/hooks/fog.types';
 
-const { 
-  getActiveLayer, 
+// Datacore imports
+const pathResolverPath = dc.resolvePath("pathResolver.js");
+const { requireModuleByName } = await dc.require(pathResolverPath) as {
+  requireModuleByName: (name: string) => Promise<unknown>
+};
+
+const {
+  getActiveLayer,
   updateActiveLayer,
   initializeFogOfWar,
   fogAll,
@@ -30,29 +45,40 @@ const {
   revealAll,
   toggleFogVisibility,
   getFogState
-} = await requireModuleByName("layerAccessor.ts");
+} = await requireModuleByName("layerAccessor.ts") as {
+  getActiveLayer: (mapData: MapData) => MapLayer;
+  updateActiveLayer: (mapData: MapData, updates: Partial<MapLayer>) => MapData;
+  initializeFogOfWar: (mapData: MapData, layerId: string) => MapData;
+  fogAll: (layer: MapLayer, bounds: GridBounds) => MapLayer;
+  fogPaintedCells: (layer: MapLayer, geometry: IGeometry) => MapLayer;
+  revealAll: (layer: MapLayer) => MapLayer;
+  toggleFogVisibility: (layer: MapLayer) => MapLayer;
+  getFogState: (layer: MapLayer) => FogState;
+};
 
 /**
  * Hook for managing Fog of War UI state and high-level operations
- * 
- * @param {Object} options - Configuration options
- * @param {Object} options.mapData - Current map data
- * @param {Object} options.geometry - Geometry instance for bounds checking
- * @param {Function} options.updateMapData - Function to update map data
- * @returns {Object} Fog state and actions
+ *
+ * @param options - Configuration options
+ * @returns Fog state and actions
  */
-function useFogOfWar({ mapData, geometry, updateMapData }) {
-  // UI state for fog tools panel
-  const [showFogTools, setShowFogTools] = dc.useState(false);
-  const [fogActiveTool, setFogActiveTool] = dc.useState(null); // 'paint' | 'erase' | 'rectangle' | null
+function useFogOfWar({
+  mapData,
+  geometry,
+  updateMapData
+}: UseFogOfWarOptions): UseFogOfWarResult {
+  const [showFogTools, setShowFogTools] = dc.useState<boolean>(false);
+  const [fogActiveTool, setFogActiveTool] = dc.useState<FogToolId | null>(null);
 
   // =========================================================================
   // Computed State
   // =========================================================================
-  
+
   // Get current fog state for UI (combines layer data + UI state)
-  const currentFogState = dc.useMemo(() => {
-    if (!mapData) return { initialized: false, enabled: false, activeTool: null };
+  const currentFogState = dc.useMemo((): CurrentFogState => {
+    if (!mapData) {
+      return { initialized: false, enabled: false, activeTool: null };
+    }
     const activeLayer = getActiveLayer(mapData);
     const state = getFogState(activeLayer);
     return {
@@ -64,53 +90,51 @@ function useFogOfWar({ mapData, geometry, updateMapData }) {
   // =========================================================================
   // Handlers
   // =========================================================================
-  
-  // Toggle FoW tools panel visibility
-  const handleFogToolsToggle = dc.useCallback(() => {
-    setShowFogTools(prev => !prev);
+
+  const handleFogToolsToggle = dc.useCallback((): void => {
+    setShowFogTools((prev: boolean) => !prev);
     // Clear active tool when closing panel
     if (showFogTools) {
       setFogActiveTool(null);
     }
   }, [showFogTools]);
-  
-  // Select a FoW tool
-  const handleFogToolSelect = dc.useCallback((tool) => {
-    // Toggle off if same tool selected
-    setFogActiveTool(prev => prev === tool ? null : tool);
+
+  const handleFogToolSelect = dc.useCallback((tool: FogToolId): void => {
+    setFogActiveTool((prev: FogToolId | null) => prev === tool ? null : tool);
   }, []);
-  
-  // Toggle fog visibility (show/hide without changing fog data)
-  const handleFogVisibilityToggle = dc.useCallback(() => {
+
+  const handleFogVisibilityToggle = dc.useCallback((): void => {
     if (!mapData) return;
-    
+
     const activeLayer = getActiveLayer(mapData);
     if (!activeLayer.fogOfWar) return;
-    
+
     const updatedLayer = toggleFogVisibility(activeLayer);
     updateMapData(updateActiveLayer(mapData, { fogOfWar: updatedLayer.fogOfWar }));
   }, [mapData, updateMapData]);
-  
+
   // Fill all cells with fog
   // For bounded maps (hex): fogs all cells within bounds
   // For unbounded maps (grid): fogs only painted cells
-  const handleFogFillAll = dc.useCallback(() => {
+  const handleFogFillAll = dc.useCallback((): void => {
     if (!mapData || !geometry) return;
-    
+
     let workingMapData = mapData;
     let activeLayer = getActiveLayer(workingMapData);
-    
+
     // Initialize FoW if needed
     if (!activeLayer.fogOfWar) {
       workingMapData = initializeFogOfWar(workingMapData, workingMapData.activeLayerId);
       activeLayer = getActiveLayer(workingMapData);
     }
-    
+
     // Use geometry to determine fog strategy
-    let updatedLayer;
+    let updatedLayer: MapLayer;
     if (geometry.isBounded()) {
       // Bounded maps: fog all cells within bounds
-      updatedLayer = fogAll(activeLayer, geometry.getBounds());
+      const bounds = geometry.getBounds();
+      if (!bounds) return;
+      updatedLayer = fogAll(activeLayer, bounds);
     } else {
       // Unbounded maps: fog only painted cells
       if (!activeLayer.cells || activeLayer.cells.length === 0) {
@@ -119,29 +143,28 @@ function useFogOfWar({ mapData, geometry, updateMapData }) {
       }
       updatedLayer = fogPaintedCells(activeLayer, geometry);
     }
-    
+
     // Ensure fog is enabled
     updateMapData(updateActiveLayer(workingMapData, {
       fogOfWar: {
-        ...updatedLayer.fogOfWar,
+        ...updatedLayer.fogOfWar!,
         enabled: true
       }
     }));
   }, [mapData, geometry, updateMapData]);
-  
-  // Clear all fog
-  const handleFogClearAll = dc.useCallback(() => {
+
+  const handleFogClearAll = dc.useCallback((): void => {
     if (!mapData) return;
-    
+
     const activeLayer = getActiveLayer(mapData);
     if (!activeLayer.fogOfWar) return;
-    
+
     const updatedLayer = revealAll(activeLayer);
     updateMapData(updateActiveLayer(mapData, { fogOfWar: updatedLayer.fogOfWar }));
   }, [mapData, updateMapData]);
-  
+
   // Handle fog changes from FogOfWarLayer (for paint/erase/rectangle operations)
-  const handleFogChange = dc.useCallback((updatedFogOfWar) => {
+  const handleFogChange = dc.useCallback((updatedFogOfWar: FogOfWar): void => {
     if (!mapData) return;
     updateMapData(updateActiveLayer(mapData, { fogOfWar: updatedFogOfWar }));
   }, [mapData, updateMapData]);
@@ -150,15 +173,13 @@ function useFogOfWar({ mapData, geometry, updateMapData }) {
   // Return Value
   // =========================================================================
 
-  // Grouped state object
-  const fogState = {
+  const fogState: FogStateValues = {
     showFogTools,
     fogActiveTool,
     currentFogState
   };
 
-  // Grouped actions object
-  const fogActions = {
+  const fogActions: FogActions = {
     handleFogToolsToggle,
     handleFogToolSelect,
     handleFogVisibilityToggle,
@@ -168,11 +189,8 @@ function useFogOfWar({ mapData, geometry, updateMapData }) {
   };
 
   return {
-    // Grouped access
     fogState,
     fogActions,
-    
-    // Direct access (for convenience)
     showFogTools,
     fogActiveTool,
     currentFogState,
