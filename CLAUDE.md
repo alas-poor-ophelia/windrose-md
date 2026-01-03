@@ -170,7 +170,23 @@ When editing files with unicode (degree signs, emojis, special characters):
 
 ## Testing Approach
 
-No automated tests - use systematic visual verification:
+### E2E Tests (in dev root)
+Automated E2E tests using `obsidian-testing-framework` + Vitest + Playwright:
+```bash
+cd /c/Dev/windrose  # dev root, not src/
+npm run test:e2e
+```
+
+Test coverage includes:
+- Grid/Hex map loading and controls
+- Drawing tools (paint, erase, rectangle, circle)
+- Object placement and overlay positioning
+- Pan/zoom stability
+
+Test fixtures: `tests/fixtures/test-vault/_testing/`
+
+### Manual Verification
+For features not yet covered by E2E tests:
 - Test on desktop (Windows/macOS)
 - Test on iPad (touch primary)
 - Check console for errors
