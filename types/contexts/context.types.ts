@@ -6,101 +6,77 @@
  * Populated during Tier 6a (Context component) migration.
  */
 
-import type { SettingsState, SettingsTabId } from '../settings/settings.types';
-import type { SettingsAction } from '../settings/actions.types';
-import type { ObjectId } from '../objects/object.types';
-import type { GridCoords } from '../core/geometry.types';
-import type { HexColor } from '../core/common.types';
+import type { MapObject } from '../objects/object.types';
+import type { TextLabel } from '../objects/note.types';
+import type { IGeometry, Point } from '../core/geometry.types';
+import type { MapData } from '../core/map.types';
+import type { Cell } from '../core/cell.types';
 
 // ===========================================
-// MapSettingsContext
+// Context Types - YAGNI Pattern
 // ===========================================
-
-/** MapSettingsContext value shape */
-export interface MapSettingsContextValue {
-  // State
-  state: SettingsState;
-  
-  // Dispatch (raw)
-  dispatch: (action: SettingsAction) => void;
-  
-  // Action helpers (typed wrappers around dispatch)
-  setActiveTab: (tab: SettingsTabId) => void;
-  setCellSize: (size: number) => void;
-  setBackgroundColor: (color: HexColor) => void;
-  setGridColor: (color: HexColor) => void;
-  toggleGrid: () => void;
-  toggleCoordinates: () => void;
-  // ... more to be added
-}
-
+//
+// Context value types are defined inline in their respective component files.
+// Hooks provide full type inference, so explicit imports are rarely needed.
+//
+// If you need to type a variable explicitly, import from the component:
+//   import type { MapSettingsContextValue } from 'context/MapSettingsContext';
+//   import type { MapSelectionContextValue } from 'context/MapSelectionContext';
+//   import type { EventHandlerContextValue } from 'context/EventHandlerContext';
+//
 // ===========================================
-// MapSelectionContext
-// ===========================================
-
-/** Selection types */
-export type SelectionType = 'cell' | 'object' | 'text' | 'note' | 'area';
-
-/** MapSelectionContext value shape */
-export interface MapSelectionContextValue {
-  // Selection state
-  selectedCells: GridCoords[];
-  selectedObjects: ObjectId[];
-  selectionType: SelectionType | null;
-  
-  // Selection actions
-  selectCell: (coords: GridCoords, additive?: boolean) => void;
-  selectObject: (id: ObjectId, additive?: boolean) => void;
-  selectArea: (start: GridCoords, end: GridCoords) => void;
-  clearSelection: () => void;
-  
-  // Multi-select
-  isMultiSelectMode: boolean;
-  toggleMultiSelect: () => void;
-}
-
-// ===========================================
-// EventHandlerContext
-// ===========================================
-
-/** EventHandlerContext value shape */
-export interface EventHandlerContextValue {
-  // Canvas event handlers
-  handleCanvasClick: (e: MouseEvent) => void;
-  handleCanvasMouseDown: (e: MouseEvent) => void;
-  handleCanvasMouseMove: (e: MouseEvent) => void;
-  handleCanvasMouseUp: (e: MouseEvent) => void;
-  handleCanvasWheel: (e: WheelEvent) => void;
-  
-  // Touch handlers (for mobile)
-  handleTouchStart: (e: TouchEvent) => void;
-  handleTouchMove: (e: TouchEvent) => void;
-  handleTouchEnd: (e: TouchEvent) => void;
-  
-  // Keyboard handlers
-  handleKeyDown: (e: KeyboardEvent) => void;
-  handleKeyUp: (e: KeyboardEvent) => void;
-}
 
 // ===========================================
 // MapContext (Main)
 // ===========================================
 
-/**
- * Main MapContext value shape.
- * TODO: Define during MapContext.jsx migration.
- */
-export interface MapContextValue {
-  // Map data
-  // mapData: MapData;
-  
-  // Geometry
-  // geometry: IGeometry;
-  
-  // Refs
-  // canvasRef: RefObject<HTMLCanvasElement>;
-  
-  // ... more to be added
+/** Edge info from geometry */
+export interface EdgeInfo {
+  x: number;
+  y: number;
+  side: string;
 }
 
-// TODO: Expand all contexts during Tier 6a migration
+/** Edge type for edge drawing */
+export interface Edge {
+  x: number;
+  y: number;
+  side: string;
+  color: string;
+  opacity?: number;
+}
+
+/** Extended geometry interface with grid-specific methods */
+export interface ExtendedGeometry extends IGeometry {
+  cellSize: number;
+  screenToEdge?: (worldX: number, worldY: number, threshold: number) => EdgeInfo | null;
+  worldToGrid?: (worldX: number, worldY: number) => Point;
+}
+
+/** MapStateContext value shape */
+export interface MapStateContextValue {
+  geometry: ExtendedGeometry | null;
+  canvasRef: React.RefObject<HTMLCanvasElement>;
+  mapData: MapData | null;
+  screenToGrid: (clientX: number, clientY: number) => Point | null;
+  screenToWorld: (clientX: number, clientY: number) => { worldX: number; worldY: number } | null;
+  getClientCoords: (e: PointerEvent | MouseEvent | TouchEvent) => { clientX: number; clientY: number };
+  currentTool?: string;
+  GridGeometry?: new (cellSize: number) => ExtendedGeometry;
+}
+
+/** MapOperationsContext value shape */
+export interface MapOperationsContextValue {
+  onCellsChange: (cells: Cell[], skipHistory?: boolean) => void;
+  onObjectsChange: (objects: MapObject[]) => void;
+  onTextLabelsChange: (labels: TextLabel[]) => void;
+  onEdgesChange: (edges: Edge[], skipHistory?: boolean) => void;
+  onNotePinsChange?: (pins: unknown[]) => void;
+  onMapDataUpdate?: (updater: (data: MapData | null) => MapData | null) => void;
+  getTextLabelAtPosition: (labels: TextLabel[], worldX: number, worldY: number, ctx: CanvasRenderingContext2D | null) => TextLabel | null;
+  removeTextLabel: (labels: TextLabel[], id: string) => TextLabel[];
+  getObjectAtPosition: (objects: MapObject[], x: number, y: number) => MapObject | null;
+  removeObjectAtPosition: (objects: MapObject[], x: number, y: number) => MapObject[];
+  removeObjectsInRectangle: (objects: MapObject[], x1: number, y1: number, x2: number, y2: number) => MapObject[];
+  getNotePinAtPosition?: (pins: unknown[], worldX: number, worldY: number, cellSize: number) => unknown | null;
+}

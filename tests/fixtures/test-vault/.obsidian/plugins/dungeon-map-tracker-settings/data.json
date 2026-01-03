@@ -1,0 +1,13 @@
+{
+  "version": "1.0.0",
+  "hexOrientation": "flat",
+  "gridLineColor": "#666666",
+  "gridLineWidth": 1,
+  "backgroundColor": "#1a1a1a",
+  "borderColor": "#8b6842",
+  "coordinateKeyColor": "#c4a57b",
+  "expandedByDefault": false,
+  "objectOverrides": {},
+  "customObjects": [],
+  "customCategories": []
+}

@@ -19,7 +19,7 @@
     "eslint": "^9.17.0",
     "eslint-plugin-obsidianmd": "^0.1.9",
     "obsidian": "^1.11.0",
-    "obsidian-testing-framework": "^0.1.5",
+    "obsidian-testing-framework": "^0.1.6",
     "obsidian-typings": "^4.50.0",
     "patch-package": "^8.0.1",
     "preact": "^10.25.0",

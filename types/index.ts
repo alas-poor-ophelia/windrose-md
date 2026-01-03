@@ -144,12 +144,15 @@ export type {
 // ===========================================
 // Context Types
 // ===========================================
+// Note: Context value types (MapSettingsContextValue, MapSelectionContextValue,
+// EventHandlerContextValue) are defined inline in their component files.
+// Import directly from component if needed - hooks provide type inference.
 export type {
-  SelectionType,
-  MapSettingsContextValue,
-  MapSelectionContextValue,
-  EventHandlerContextValue,
-  MapContextValue,
+  EdgeInfo,
+  Edge,
+  ExtendedGeometry,
+  MapStateContextValue,
+  MapOperationsContextValue,
 } from './contexts/context.types';
 
 // ===========================================

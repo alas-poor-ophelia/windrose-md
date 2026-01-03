@@ -5,7 +5,21 @@
       "Bash(ls \"C:\\\\Dev\\\\windrose\\\\types\\\\core\"\" && echo -e \"n=== File count ===\" && ls -1 \"C:Devwindrosetypescore\"\")",
       "Bash(git show:*)",
       "Bash(git diff:*)",
-      "Skill(review-comments)"
+      "Skill(review-comments)",
+      "Bash(ls:*)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo \"$CLAUDE_TOOL_INPUT_FILE_PATH\" | grep -q 'tests/e2e' && npm run test:e2e || true"
+          }
+        ]
+      }
     ]
   }
 }

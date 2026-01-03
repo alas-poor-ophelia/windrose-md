@@ -1,0 +1,61 @@
+{
+  "maps": {
+    "smoke-test-map-001": {
+      "name": "Smoke Test Map",
+      "description": "",
+      "mapType": "grid",
+      "northDirection": 0,
+      "customColors": [],
+      "sidebarCollapsed": false,
+      "expandedState": false,
+      "settings": {
+        "useGlobalSettings": true,
+        "overrides": {}
+      },
+      "uiPreferences": {
+        "rememberPanZoom": true,
+        "rememberSidebarState": true,
+        "rememberExpandedState": false
+      },
+      "lastTextLabelSettings": null,
+      "schemaVersion": 2,
+      "activeLayerId": "layer-1767408840937-tetzsvedd",
+      "layerPanelVisible": false,
+      "layers": [
+        {
+          "id": "layer-1767408840937-tetzsvedd",
+          "name": "Layer 1",
+          "order": 0,
+          "visible": true,
+          "cells": [
+            {
+              "x": 143,
+              "y": 143,
+              "color": "#c4a57b",
+              "opacity": 1
+            }
+          ],
+          "edges": [],
+          "objects": [],
+          "textLabels": [],
+          "fogOfWar": null
+        }
+      ],
+      "gridSize": 32,
+      "dimensions": {
+        "width": 300,
+        "height": 300
+      },
+      "viewState": {
+        "zoom": 1.5,
+        "center": {
+          "x": 143.75000000000006,
+          "y": 143.75000000000006
+        }
+      },
+      "objects": [],
+      "textLabels": [],
+      "edges": []
+    }
+  }
+}

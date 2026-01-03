@@ -25,4 +25,4 @@ src
 # Test outputs
 playwright-report/
 test-results/
-tests/fixtures/test-vault/
+tests/fixtures/test-vault/nul
