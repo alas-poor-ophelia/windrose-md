@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "_testing/smoke-test-hex.md",
+                "file": "_testing/smoke-test-map.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "smoke-test-hex"
+              "title": "smoke-test-map"
             }
           }
         ]
@@ -168,17 +168,17 @@
   },
   "active": "13aafd55d6dc8ff5",
   "lastOpenFiles": [
-    "_testing/smoke-test-map.md",
     "_testing/smoke-test-hex.md",
-    "Projects/dungeon-map-tracker/context/sedhMoXlq",
-    "Projects/dungeon-map-tracker/context/sed7PqAf7",
-    "Projects/dungeon-map-tracker/context/sedz4024j",
-    "Projects/dungeon-map-tracker/context/sedIZJNnI",
-    "Projects/dungeon-map-tracker/components/settings/sed4lAkLo",
-    "Projects/dungeon-map-tracker/components/settings/sedp1o5HQ",
-    "Projects/dungeon-map-tracker/components/settings/sedsyEUEj",
-    "Projects/dungeon-map-tracker/components/settings/sedmM8l5j",
-    "Projects/dungeon-map-tracker/components/settings/hexmap/seda7L0Wj",
-    "Projects/dungeon-map-tracker/components/settings/hexmap/sedJCEKxW"
+    "_testing/smoke-test-map.md",
+    "Projects/dungeon-map-tracker/components/settings/hexmap/SizingModeSection.tsx",
+    "Projects/dungeon-map-tracker/components/settings/hexmap/CoordinatedDisplaySection.tsx",
+    "Projects/dungeon-map-tracker/components/settings/hexmap/CoordinateDisplaySection.tsx",
+    "Projects/dungeon-map-tracker/components/settings/hexmap/BoundsSection.tsx",
+    "Projects/dungeon-map-tracker/components/settings/hexmap/BoundsSection.tsx.tmp.38400.1767432555589",
+    "Projects/dungeon-map-tracker/components/settings/hexmap/BackgroundImageSection.tsx",
+    "Projects/dungeon-map-tracker/components/settings/hexmap/HexGridTab.tsx",
+    "Projects/dungeon-map-tracker/components/settings/SettingsPluginInstaller.tsx",
+    "Projects/dungeon-map-tracker/components/settings/ResizeConfirmDialog.tsx",
+    "Projects/dungeon-map-tracker/components/settings/PreferencesTab.tsx"
   ]
 }

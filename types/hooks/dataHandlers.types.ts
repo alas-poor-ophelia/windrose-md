@@ -20,7 +20,7 @@ import type { HexColor } from '../core/common.types';
 export interface UseDataHandlersOptions {
   mapData: MapData | null;
   updateMapData: (updater: (current: MapData | null) => MapData | null) => void;
-  addToHistory: (state: HistoryState) => void;
+  addToHistory: (state: MapHistorySnapshot) => void;
   isApplyingHistory: () => boolean;
 }
 
@@ -28,8 +28,8 @@ export interface UseDataHandlersOptions {
 // History State
 // ===========================================
 
-/** State snapshot for history tracking */
-export interface HistoryState {
+/** State snapshot for map data history tracking */
+export interface MapHistorySnapshot {
   cells: Cell[];
   name: string;
   objects: MapObject[];

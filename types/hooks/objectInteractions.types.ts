@@ -6,9 +6,7 @@
  * selection, dragging, resizing, and UI interactions.
  */
 
-import type { Point } from '../core/geometry.types';
 import type { MapObject } from '../objects/object.types';
-import type { ToolId } from '../tools/tool.types';
 
 // ===========================================
 // Resize Types

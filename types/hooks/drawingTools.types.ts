@@ -8,7 +8,6 @@
 
 import type { Point } from '../core/geometry.types';
 import type { Cell, SegmentName } from '../core/cell.types';
-import type { ToolId } from '../tools/tool.types';
 
 // ===========================================
 // Preview Settings

@@ -5,8 +5,7 @@
  * Types for useAreaSelect hook - two-click rectangle selection tool.
  */
 
-import type { Point, WorldCoords } from '../core/geometry.types';
-import type { ToolId } from '../tools/tool.types';
+// Note: Point/WorldCoords/ToolId available via index.ts if needed
 
 // ===========================================
 // Area Select Start Marker

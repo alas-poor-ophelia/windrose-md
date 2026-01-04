@@ -6,7 +6,7 @@
  * including grid, cells, objects, text labels, fog of war, and selections.
  */
 
-import type { MapData, MapLayer } from '../core/map.types';
+import type { MapData } from '../core/map.types';
 import type { IGeometry } from '../core/geometry.types';
 import type { MapObject } from '../objects/object.types';
 import type { TextLabel } from '../objects/note.types';

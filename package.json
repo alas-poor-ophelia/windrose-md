@@ -6,7 +6,7 @@
   "scripts": {
     "lint": "eslint . --ext .ts,.tsx,.js,.jsx",
     "lint:fix": "eslint . --ext .ts,.tsx,.js,.jsx --fix",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit -p tsconfig.check.json",
     "check": "npm run typecheck && npm run lint",
     "test:e2e": "vitest run",
     "postinstall": "patch-package"

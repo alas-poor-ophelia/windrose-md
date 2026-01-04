@@ -7,7 +7,7 @@
  * - useFogTools: Canvas-level fog painting interactions
  */
 
-import type { MapData, FogOfWar, MapLayer } from '../core/map.types';
+import type { MapData, FogOfWar } from '../core/map.types';
 import type { OffsetCoords, IGeometry } from '../core/geometry.types';
 
 // ===========================================

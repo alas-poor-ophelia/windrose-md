@@ -5,7 +5,6 @@
  * Types for useDistanceMeasurement hook - measures distances between cells.
  */
 
-import type { MapType } from '../core/map.types';
 import type { DiagonalRule, DistanceDisplayFormat } from '../settings/settings.types';
 
 // ===========================================

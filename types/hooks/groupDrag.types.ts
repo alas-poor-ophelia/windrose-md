@@ -8,7 +8,7 @@
 
 import type { Point } from '../core/geometry.types';
 import type { MapObject } from '../objects/object.types';
-import type { TextLabel } from '../core/textLabel.types';
+import type { TextLabel } from '../objects/note.types';
 
 // ===========================================
 // Selected Item Types

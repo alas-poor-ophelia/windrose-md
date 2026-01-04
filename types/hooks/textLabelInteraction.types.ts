@@ -6,8 +6,7 @@
  * selection, dragging, rotation, deletion, and editing.
  */
 
-import type { ToolId } from '../tools/tool.types';
-import type { TextLabel, TextLabelId } from '../objects/note.types';
+import type { TextLabelId } from '../objects/note.types';
 
 // ===========================================
 // Position Types

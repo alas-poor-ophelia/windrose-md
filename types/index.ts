@@ -358,7 +358,7 @@ export type {
 
 export type {
   UseDataHandlersOptions,
-  HistoryState,
+  MapHistorySnapshot,
   CustomColor,
   LayerDataChangeHandler,
   HandleCellsChange,
@@ -379,7 +379,7 @@ export type {
 
 export type {
   UseImageAlignmentOptions,
-  DragOffset,
+  ImageDragOffset,
   DragClientPosition,
   ImageDragHandlerResult,
   UseImageAlignmentResult,

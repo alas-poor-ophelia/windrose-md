@@ -70,6 +70,28 @@ export default [
   },
   
   // ===========================================
+  // Test files (E2E tests)
+  // ===========================================
+  {
+    files: ["tests/**/*.ts"],
+    languageOptions: {
+      parser: tsparser,
+      parserOptions: {
+        project: "./tsconfig.json",
+        ecmaVersion: 2022,
+        sourceType: "module"
+      }
+    },
+    plugins: {
+      "@typescript-eslint": tsPlugin
+    },
+    rules: {
+      "@typescript-eslint/no-explicit-any": "off", // Tests use any for page objects
+      "no-console": "off" // Console is fine in tests
+    }
+  },
+
+  // ===========================================
   // Type definition files
   // ===========================================
   {

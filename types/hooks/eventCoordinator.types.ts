@@ -7,7 +7,6 @@
  */
 
 import type { Point } from '../core/geometry.types';
-import type { ToolId } from '../tools/tool.types';
 
 // ===========================================
 // Hook Options

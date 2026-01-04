@@ -6,7 +6,8 @@
       "Bash(git show:*)",
       "Bash(git diff:*)",
       "Skill(review-comments)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(git -C \"C:\\\\Dev\\\\windrose\" log --oneline -15)"
     ]
   },
   "hooks": {

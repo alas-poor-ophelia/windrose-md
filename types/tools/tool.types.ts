@@ -25,6 +25,7 @@ export type ToolId =
   | 'rectangle'
   | 'circle'
   | 'clearArea'
+  | 'diagonalFill'
   // Edge/segment tools
   | 'edgeDraw'
   | 'edgeErase'

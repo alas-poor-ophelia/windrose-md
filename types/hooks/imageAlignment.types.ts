@@ -28,8 +28,8 @@ export interface UseImageAlignmentOptions {
 // Drag State Types
 // ===========================================
 
-/** Offset position */
-export interface DragOffset {
+/** Image drag offset position */
+export interface ImageDragOffset {
   x: number;
   y: number;
 }

@@ -50,7 +50,6 @@ export interface Edge {
 export interface ExtendedGeometry extends IGeometry {
   cellSize: number;
   screenToEdge?: (worldX: number, worldY: number, threshold: number) => EdgeInfo | null;
-  worldToGrid?: (worldX: number, worldY: number) => Point;
 }
 
 /** MapStateContext value shape */

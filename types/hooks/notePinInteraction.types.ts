@@ -6,8 +6,7 @@
  * note link modal state, and note link save/cancel operations.
  */
 
-import type { ToolId } from '../tools/tool.types';
-import type { ObjectTypeId } from '../objects/object.types';
+// Note: ToolId/ObjectTypeId available via index.ts if needed
 
 // ===========================================
 // Handler Functions

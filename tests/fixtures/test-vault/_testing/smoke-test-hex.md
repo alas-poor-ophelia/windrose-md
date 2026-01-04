@@ -1,4 +1,4 @@
-# Smoke Test Map (Hex)
+joyabl# Smoke Test Map (Hex)
 
 This map is used for automated E2E testing of Windrose hex maps. Do not delete.
 
