@@ -11,6 +11,7 @@ import type { TextLabel } from '../objects/note.types';
 import type { IGeometry, Point } from '../core/geometry.types';
 import type { MapData } from '../core/map.types';
 import type { Cell } from '../core/cell.types';
+import type { BorderSide } from '../core/rendering.types';
 
 // ===========================================
 // Context Types - YAGNI Pattern
@@ -34,14 +35,14 @@ import type { Cell } from '../core/cell.types';
 export interface EdgeInfo {
   x: number;
   y: number;
-  side: string;
+  side: BorderSide;
 }
 
 /** Edge type for edge drawing */
 export interface Edge {
   x: number;
   y: number;
-  side: string;
+  side: BorderSide;
   color: string;
   opacity?: number;
 }

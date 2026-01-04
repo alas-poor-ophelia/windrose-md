@@ -48,6 +48,31 @@ export type CoordinateFormat = 'xy' | 'axial' | 'offset' | 'none';
 export type GridLineStyle = 'solid' | 'dashed' | 'dotted';
 
 // ===========================================
+// Image and Grid Sizing
+// ===========================================
+
+/** Image dimensions for background image calculations */
+export interface ImageDimensions {
+  width: number;
+  height: number;
+}
+
+/** Grid calculation result from image sizing */
+export interface GridCalculation {
+  columns: number;
+  rows: number;
+  hexSize: number;
+  hexWidth?: number;  // Optional - only used in some contexts
+}
+
+/** Grid density preset for hex maps */
+export interface GridDensityPreset {
+  columns: number;
+  label: string;
+  description: string;
+}
+
+// ===========================================
 // Plugin Settings (Global)
 // ===========================================
 
@@ -206,27 +231,56 @@ export interface ResolvedColorEntry {
 // Object Customization Types
 // ===========================================
 
+// Re-export consolidated types from objects module
+export type {
+  ObjectType,
+  ObjectTypeDefinition,
+  Category,
+  CategoryDefinition,
+  RenderChar,
+  ValidationResult,
+} from '../objects/object.types';
+
+/**
+ * Override settings for built-in objects.
+ * Used to customize appearance or hide built-in objects.
+ */
 export interface ObjectOverride {
-  color?: HexColor;
-  hidden?: boolean;
-  scale?: number;
+  hidden?: boolean;           // Hide this object from the palette
+  symbol?: string;            // Override Unicode symbol
+  iconClass?: string;         // Override RPGAwesome icon class
+  label?: string;             // Override display name
+  category?: string;          // Move to different category
+  order?: number;             // Custom sort order
 }
 
+/**
+ * Custom object definition (user-created objects).
+ * Stored in plugin settings.
+ */
 export interface CustomObject {
   id: string;
-  name: string;
-  category: string;
-  symbol: string;
-  color?: HexColor;
-  scale?: number;
+  symbol?: string;            // Unicode symbol (required if no iconClass)
+  iconClass?: string;         // RPGAwesome icon class (required if no symbol)
+  label: string;              // Display name
+  category: string;           // Category ID
+  order?: number;             // Sort order
 }
 
+/**
+ * Custom category definition (user-created categories).
+ * Stored in plugin settings.
+ */
 export interface CustomCategory {
   id: string;
-  name: string;
-  order?: number;
+  label: string;              // Display name
+  order?: number;             // Sort order
 }
 
+/**
+ * Object settings structure returned by getObjectSettings().
+ * Normalized view of grid/hex object customizations.
+ */
 export interface ObjectSettings {
   objectOverrides: Record<string, ObjectOverride>;
   customObjects: CustomObject[];

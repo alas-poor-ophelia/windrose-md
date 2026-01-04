@@ -6,8 +6,11 @@
  * and coordinate transformation for the canvas.
  */
 
-import type { Point } from '../core/geometry.types';
+import type { Point, WorldCoords } from '../core/geometry.types';
 import type { ViewState } from '../core/map.types';
+
+// Re-export WorldCoords for backwards compatibility
+export type { WorldCoords };
 
 // ===========================================
 // Pan State Types
@@ -35,12 +38,6 @@ export interface TouchCenter {
 export interface ClientCoords {
   clientX: number;
   clientY: number;
-}
-
-/** World coordinates result */
-export interface WorldCoords {
-  worldX: number;
-  worldY: number;
 }
 
 // ===========================================

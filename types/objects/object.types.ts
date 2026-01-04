@@ -13,13 +13,13 @@ import type { MapType } from '../core/map.types';
 // ===========================================
 
 /** Object category for grouping in UI */
-export type ObjectCategory = 
-  | 'structures'
-  | 'doors'
-  | 'furniture'
+export type ObjectCategory =
+  | 'notes'
+  | 'navigation'
   | 'hazards'
-  | 'nature'
-  | 'symbols'
+  | 'features'
+  | 'encounters'
+  | 'markers'
   | 'custom';
 
 // ===========================================
@@ -30,13 +30,42 @@ export type ObjectCategory =
 export type ObjectAlignment = 'center' | 'north' | 'south' | 'east' | 'west';
 
 // ===========================================
-// Object Type Definition
+// Object Type Definitions
 // ===========================================
 
 /** Object type identifier (e.g., "door", "chest", "trap") */
 export type ObjectTypeId = string;
 
-/** Object type definition (from objectTypes/objectTypeResolver) */
+/**
+ * Base object type definition (built-in objects from objectTypes.ts)
+ * These are the raw definitions before resolution.
+ */
+export interface ObjectType {
+  id: ObjectTypeId;
+  symbol: string;
+  label: string;
+  category: string;
+}
+
+/**
+ * Resolved object type definition (from objectTypeResolver)
+ * Extends base type with iconClass support and resolution metadata.
+ */
+export interface ObjectTypeDefinition {
+  id: ObjectTypeId;
+  symbol?: string;           // Unicode symbol (optional if iconClass set)
+  iconClass?: string;        // RPGAwesome icon class (optional if symbol set)
+  label: string;
+  category: string;
+  order?: number;            // Sort order in UI
+  isBuiltIn?: boolean;       // True for built-in objects
+  isModified?: boolean;      // True if built-in was customized
+  isCustom?: boolean;        // True for user-created objects
+  isHidden?: boolean;        // True if hidden via override
+  isUnknown?: boolean;       // True for unknown/deleted object fallback
+}
+
+/** @deprecated Use ObjectTypeDefinition instead */
 export interface ObjectTypeDef {
   id: ObjectTypeId;
   name: string;
@@ -47,6 +76,50 @@ export interface ObjectTypeDef {
   rotatable?: boolean;
   isUnknown?: boolean;
   isCustom?: boolean;
+}
+
+// ===========================================
+// Category Definitions
+// ===========================================
+
+/**
+ * Base category definition (built-in categories from objectTypes.ts)
+ */
+export interface Category {
+  id: string;
+  label: string;
+}
+
+/**
+ * Resolved category definition (from objectTypeResolver)
+ * Extends base type with resolution metadata.
+ */
+export interface CategoryDefinition {
+  id: string;
+  label: string;
+  order?: number;            // Sort order in UI
+  isBuiltIn?: boolean;       // True for built-in categories
+  isCustom?: boolean;        // True for user-created categories
+}
+
+// ===========================================
+// Render Helpers
+// ===========================================
+
+/** Result of getRenderChar() - the character to display for an object */
+export interface RenderChar {
+  char: string;              // The character/icon to render
+  isIcon: boolean;           // True if char is from RPGAwesome font
+}
+
+// ===========================================
+// Validation
+// ===========================================
+
+/** Result of object definition validation */
+export interface ValidationResult {
+  valid: boolean;
+  errors: string[];
 }
 
 // ===========================================

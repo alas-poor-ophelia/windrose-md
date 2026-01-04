@@ -76,7 +76,6 @@ export type {
 export type {
   ObjectCategory,
   ObjectAlignment,
-  ObjectTypeDef,
   ObjectTypeId,
   ObjectSize,
   ObjectId,
@@ -87,6 +86,16 @@ export type {
   PlacementOptions,
   AlignmentOffset,
   HexSlot,
+  // Object type definitions
+  ObjectType,
+  ObjectTypeDefinition,
+  ObjectTypeDef, // deprecated
+  // Category definitions
+  Category,
+  CategoryDefinition,
+  // Helpers
+  RenderChar,
+  ValidationResult,
 } from './objects/object.types';
 
 export type {
@@ -97,6 +106,13 @@ export type {
   FontWeight,
   TextLabel,
 } from './objects/note.types';
+
+export type {
+  IconCategory,
+  IconData,
+  IconMap,
+  IconWithClass,
+} from './objects/icon.types';
 
 // ===========================================
 // Tool Types
@@ -124,6 +140,14 @@ export type {
   GridLineStyle,
   SettingsState,
   UserPreferences,
+  ImageDimensions,
+  GridCalculation,
+  GridDensityPreset,
+  // Object customization (re-exported from objects for convenience)
+  ObjectOverride,
+  CustomObject,
+  CustomCategory,
+  ObjectSettings,
 } from './settings/settings.types';
 
 export type {
