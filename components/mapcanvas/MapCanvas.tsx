@@ -1,3 +1,21 @@
+import type { ComponentChildren } from 'preact';
+import type {
+  MapData,
+  Cell,
+  MapObject,
+  TextLabel,
+  Edge,
+  ViewState,
+  TextLabelSettings,
+  ToolId,
+  ObjectTypeId,
+  IGeometry,
+  Point,
+  LayerVisibility,
+  SelectedItem,
+} from '#types/index';
+import type { ResolvedTheme } from '#types/settings/settings.types';
+
 const pathResolverPath = dc.resolvePath("pathResolver.ts");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
@@ -26,13 +44,78 @@ const { getSetting } = await requireModuleByName("settingsAccessor.ts");
 const { usePanZoomCoordinator } = await requireModuleByName("usePanZoomCoordinator.ts");
 const { useEventCoordinator } = await requireModuleByName("useEventCoordinator.ts");
 
+// ===========================================
+// Local Type Definitions
+// ===========================================
+
+interface CanvasDimensions {
+  width: number;
+  height: number;
+}
+
+interface DrawingLayerState {
+  isDrawing: boolean;
+  rectangleStart: Point | null;
+  circleStart: Point | null;
+}
+
+interface PanZoomLayerState {
+  isPanning: boolean;
+  isTouchPanning: boolean;
+  spaceKeyPressed: boolean;
+}
+
+interface CoordinatorsProps {
+  canvasRef: React.RefObject<HTMLCanvasElement>;
+  mapData: MapData | null;
+  geometry: IGeometry | null;
+  isFocused: boolean;
+  isColorPickerOpen: boolean;
+  isAlignmentMode: boolean;
+}
+
+interface MapCanvasContentProps {
+  mapData: MapData | null;
+  onCellsChange: (cells: Cell[], skipHistory?: boolean) => void;
+  onObjectsChange: (objects: MapObject[]) => void;
+  onTextLabelsChange: (labels: TextLabel[]) => void;
+  onEdgesChange: (edges: Edge[], skipHistory?: boolean) => void;
+  onViewStateChange: (viewState: ViewState) => void;
+  onTextLabelSettingsChange: (settings: TextLabelSettings) => void;
+  currentTool: ToolId;
+  selectedObjectType: ObjectTypeId | undefined;
+  selectedColor: string;
+  isColorPickerOpen: boolean;
+  customColors: string[];
+  onAddCustomColor: (color: string) => void;
+  onDeleteCustomColor: (color: string) => void;
+  isFocused: boolean;
+  isAnimating: boolean;
+  theme: ResolvedTheme;
+  isAlignmentMode: boolean;
+  children: ComponentChildren;
+}
+
+interface MapCanvasProps extends MapCanvasContentProps {
+  layerVisibility: LayerVisibility;
+}
+
+interface MapDataUpdate {
+  viewState?: ViewState;
+  lastTextLabelSettings?: TextLabelSettings;
+}
+
+// ===========================================
+// Components
+// ===========================================
+
 /**
  * Coordinators - Internal component that calls coordinator hooks
  * This component must be rendered inside the Context provider tree
  * so the hooks have access to MapState, MapSelection, and EventHandler contexts.
  * Returns null (no visual rendering) - only manages behavioral coordination.
  */
-const Coordinators = ({ canvasRef, mapData, geometry, isFocused, isColorPickerOpen, isAlignmentMode }) => {
+const Coordinators = ({ canvasRef, mapData, geometry, isFocused, isColorPickerOpen, isAlignmentMode }: CoordinatorsProps): null => {
   // Coordinator hooks need to be called inside the provider tree
   usePanZoomCoordinator({
     canvasRef,
@@ -55,18 +138,18 @@ const Coordinators = ({ canvasRef, mapData, geometry, isFocused, isColorPickerOp
  * MapCanvasContent - Inner component that uses context hooks
  * Contains all the map canvas logic and interacts with shared selection state
  */
-const MapCanvasContent = ({ mapData, onCellsChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onViewStateChange, onTextLabelSettingsChange, currentTool, selectedObjectType, selectedColor, isColorPickerOpen, customColors, onAddCustomColor, onDeleteCustomColor, isFocused, isAnimating, theme, isAlignmentMode, children }) => {
-  const canvasRef = dc.useRef(null);
-  const fogCanvasRef = dc.useRef(null);  // Separate canvas for fog blur effect (CSS blur for iOS compat)
-  const containerRef = dc.useRef(null);
-  const [canvasDimensions, setCanvasDimensions] = dc.useState({
+const MapCanvasContent = ({ mapData, onCellsChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onViewStateChange, onTextLabelSettingsChange, currentTool, selectedObjectType, selectedColor, isColorPickerOpen, customColors, onAddCustomColor, onDeleteCustomColor, isFocused, isAnimating, theme, isAlignmentMode, children }: MapCanvasContentProps): React.ReactElement => {
+  const canvasRef = dc.useRef<HTMLCanvasElement | null>(null);
+  const fogCanvasRef = dc.useRef<HTMLCanvasElement | null>(null);  // Separate canvas for fog blur effect (CSS blur for iOS compat)
+  const containerRef = dc.useRef<HTMLDivElement | null>(null);
+  const [canvasDimensions, setCanvasDimensions] = dc.useState<CanvasDimensions>({
     width: DEFAULTS.canvasSize.width,
     height: DEFAULTS.canvasSize.height
   });
-  
+
   // Create onMapDataUpdate wrapper for map-level changes
   // This bridges the old prop-based API with the new context-based approach
-  const onMapDataUpdate = dc.useCallback((updates) => {
+  const onMapDataUpdate = dc.useCallback((updates: MapDataUpdate) => {
     if (updates.viewState && onViewStateChange) {
       onViewStateChange(updates.viewState);
     }
@@ -94,21 +177,21 @@ const MapCanvasContent = ({ mapData, onCellsChange, onObjectsChange, onTextLabel
   // Orientation animation state
 
   // Refs to hold layer state for cursor coordination
-  const drawingLayerStateRef = dc.useRef({ isDrawing: false, rectangleStart: null, circleStart: null });
-  const panZoomLayerStateRef = dc.useRef({ isPanning: false, isTouchPanning: false, spaceKeyPressed: false });
+  const drawingLayerStateRef = dc.useRef<DrawingLayerState>({ isDrawing: false, rectangleStart: null, circleStart: null });
+  const panZoomLayerStateRef = dc.useRef<PanZoomLayerState>({ isPanning: false, isTouchPanning: false, spaceKeyPressed: false });
 
   // Callbacks for layers to expose their state
-  const handleDrawingStateChange = dc.useCallback((drawingState) => {
+  const handleDrawingStateChange = dc.useCallback((drawingState: DrawingLayerState) => {
     drawingLayerStateRef.current = drawingState;
   }, []);
 
-  const handlePanZoomStateChange = dc.useCallback((panZoomState) => {
+  const handlePanZoomStateChange = dc.useCallback((panZoomState: PanZoomLayerState) => {
     panZoomLayerStateRef.current = panZoomState;
   }, []);
 
   // Create geometry instance based on map type
   // Return null during loading to prevent errors
-  const geometry = dc.useMemo(() => {
+  const geometry = dc.useMemo((): IGeometry | null => {
     if (!mapData) return null;
 
     const mapType = mapData.mapType || DEFAULTS.mapType;
@@ -136,7 +219,7 @@ const MapCanvasContent = ({ mapData, onCellsChange, onObjectsChange, onTextLabel
     const container = containerRef.current;
     if (!container) return;
 
-    const updateCanvasSize = () => {
+    const updateCanvasSize = (): void => {
       const rect = container.getBoundingClientRect();
       setCanvasDimensions({
         width: Math.max(rect.width, DEFAULTS.canvasSize.width),
@@ -188,12 +271,14 @@ const MapCanvasContent = ({ mapData, onCellsChange, onObjectsChange, onTextLabel
       tempCanvas.width = canvas.width;
       tempCanvas.height = canvas.height;
       const tempCtx = tempCanvas.getContext('2d');
-      tempCtx.drawImage(canvas, 0, 0);
+      if (tempCtx) {
+        tempCtx.drawImage(canvas, 0, 0);
+      }
 
       // Update canvas size
       canvas.width = canvasDimensions.width;
       canvas.height = canvasDimensions.height;
-      
+
       // Also update fog canvas size
       if (fogCanvas) {
         fogCanvas.width = canvasDimensions.width;
@@ -202,7 +287,9 @@ const MapCanvasContent = ({ mapData, onCellsChange, onObjectsChange, onTextLabel
 
       // Restore content (will stretch/compress during animation)
       const ctx = canvas.getContext('2d');
-      ctx.drawImage(tempCanvas, 0, 0, canvas.width, canvas.height);
+      if (ctx) {
+        ctx.drawImage(tempCanvas, 0, 0, canvas.width, canvas.height);
+      }
     } else {
       // After animation, do a proper redraw with correct dimensions
       renderCanvas(canvas, fogCanvas, mapData, geometry, selectedItem, isResizeMode, theme, showCoordinates, layerVisibility);
@@ -213,7 +300,7 @@ const MapCanvasContent = ({ mapData, onCellsChange, onObjectsChange, onTextLabel
   dc.useEffect(() => {
     // Get the coordinate key mode from settings ('hold' or 'toggle')
     const keyMode = getSetting('coordinateKeyMode') || 'hold';
-    
+
     // Only attach listeners if focused and on a hex map
     if (!isFocused || mapData?.mapType !== 'hex') {
       // Always hide coordinates on non-hex maps
@@ -224,16 +311,17 @@ const MapCanvasContent = ({ mapData, onCellsChange, onObjectsChange, onTextLabel
       }
       return;
     }
-    
-    const handleKeyDown = (e) => {
+
+    const handleKeyDown = (e: KeyboardEvent): void => {
       // Only track 'C' key when focused, and only if not typing in an input
+      const target = e.target as HTMLElement;
       if (e.key.toLowerCase() === 'c' && !e.shiftKey && !e.ctrlKey && !e.metaKey &&
-          e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+          target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') {
         // Ignore key repeat events in toggle mode
         if (e.repeat && keyMode === 'toggle') return;
-        
+
         e.preventDefault();
-        
+
         if (keyMode === 'toggle') {
           // Toggle mode: flip the state
           setShowCoordinates(!showCoordinates);
@@ -243,8 +331,8 @@ const MapCanvasContent = ({ mapData, onCellsChange, onObjectsChange, onTextLabel
         }
       }
     };
-    
-    const handleKeyUp = (e) => {
+
+    const handleKeyUp = (e: KeyboardEvent): void => {
       if (e.key.toLowerCase() === 'c') {
         // Only hide on keyup in 'hold' mode
         if (keyMode === 'hold') {
@@ -252,7 +340,7 @@ const MapCanvasContent = ({ mapData, onCellsChange, onObjectsChange, onTextLabel
         }
       }
     };
-    
+
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
     return () => {
@@ -262,14 +350,14 @@ const MapCanvasContent = ({ mapData, onCellsChange, onObjectsChange, onTextLabel
   }, [isFocused, mapData?.mapType, showCoordinates, setShowCoordinates]);
 
   // Determine cursor class based on current tool and interaction state
-  const getCursorClass = () => {
+  const getCursorClass = (): string => {
     // Get state
     const effectiveDrawingState = drawingLayerStateRef.current;
     const effectivePanZoomState = panZoomLayerStateRef.current;
 
     // Space key override - show grab cursor
     if (effectivePanZoomState.spaceKeyPressed && !effectivePanZoomState.isPanning) return 'dmt-canvas-space-grab';
-    
+
     if (effectivePanZoomState.isPanning || effectivePanZoomState.isTouchPanning) return 'dmt-canvas-panning';
     if (isDraggingSelection) return 'dmt-canvas-selecting';
     if (currentTool === 'select') return 'dmt-canvas-select';
@@ -357,7 +445,7 @@ const MapCanvasContent = ({ mapData, onCellsChange, onObjectsChange, onTextLabel
             isColorPickerOpen={isColorPickerOpen}
             isAlignmentMode={isAlignmentMode}
           />
-          
+
           <div className="dmt-canvas-container" ref={containerRef}>
             {/* Wrapper for canvas alignment - fog canvas positions relative to this */}
             <div style={{ position: 'relative', display: 'inline-block' }}>
@@ -369,13 +457,13 @@ const MapCanvasContent = ({ mapData, onCellsChange, onObjectsChange, onTextLabel
                 className={getCursorClass()}
                 style={{ touchAction: 'none', display: 'block' }}
               />
-              
+
               {/* Fog blur overlay canvas */}
               <canvas
                 ref={fogCanvasRef}
                 width={canvasDimensions.width}
                 height={canvasDimensions.height}
-                style={{ 
+                style={{
                   position: 'absolute',
                   top: 0,
                   left: 0,
@@ -401,7 +489,7 @@ const MapCanvasContent = ({ mapData, onCellsChange, onObjectsChange, onTextLabel
   );
 };
 
-const MapCanvas = (props) => {
+const MapCanvas = (props: MapCanvasProps): React.ReactElement => {
   const { children, layerVisibility, ...restProps } = props;
 
   return (

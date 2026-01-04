@@ -1,4 +1,24 @@
-// DungeonMapTracker.jsx - Main component with undo/redo, objects, text labels, and color support
+// DungeonMapTracker.tsx - Main component with undo/redo, objects, text labels, and color support
+
+import type {
+  MapData,
+  MapType,
+  ViewState,
+  IGeometry,
+  ToolId,
+  ObjectTypeId,
+  Cell,
+  MapObject,
+  TextLabel,
+  Edge,
+  TextLabelSettings,
+  FogToolId,
+  LayerVisibility,
+  BackgroundImage,
+  UIPreferences,
+  MapSettings,
+} from '#types/index';
+import type { ResolvedTheme } from '#types/settings/settings.types';
 
 // ============================================================================
 // IMPORTS
@@ -24,7 +44,7 @@ const { useDataHandlers } = await requireModuleByName("useDataHandlers.ts");
 const { GridGeometry } = await requireModuleByName("GridGeometry.ts");
 const { HexGeometry } = await requireModuleByName("HexGeometry.ts");
 const { MapHeader } = await requireModuleByName("MapHeader.jsx");
-const { MapCanvas } = await requireModuleByName("MapCanvas.jsx");
+const { MapCanvas } = await requireModuleByName("MapCanvas.tsx");
 const { MapControls } = await requireModuleByName("MapControls.jsx");
 const { ToolPalette } = await requireModuleByName("ToolPalette.tsx");
 const { ObjectSidebar } = await requireModuleByName("ObjectSidebar.jsx");
@@ -50,13 +70,39 @@ const { injectIconCSS } = await requireModuleByName("rpgAwesomeLoader.ts");
 // Inject RPGAwesome icon CSS classes on module load
 injectIconCSS(RA_ICONS);
 
+// ============================================================================
+// LOCAL TYPE DEFINITIONS
+// ============================================================================
+
+interface DungeonMapTrackerProps {
+  mapId?: string;
+  mapName?: string;
+  mapType?: MapType;
+}
+
+interface LayerVisibilityState {
+  objects: boolean;
+  textLabels: boolean;
+  hexCoordinates: boolean;
+}
+
+type CornerPosition = 'tl' | 'tr' | 'bl' | 'br';
+
+interface CornerBracketProps {
+  position: CornerPosition;
+}
+
+interface HexBounds {
+  maxCol: number;
+  maxRow: number;
+}
 
 // ============================================================================
 // MAIN COMPONENT
 // ============================================================================
 
 // Corner Bracket SVG Component
-const CornerBracket = ({ position }) => {
+const CornerBracket = ({ position }: CornerBracketProps): React.ReactElement => {
   return (
     <svg
       className={`dmt-corner-bracket dmt-corner-bracket-${position}`}
@@ -109,9 +155,9 @@ const CornerBracket = ({ position }) => {
   );
 };
 
-const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'grid' }) => {
+const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'grid' }: DungeonMapTrackerProps): React.ReactElement => {
   const { mapData, isLoading, saveStatus, updateMapData, forceSave, fowImageReady } = useMapData(mapId, mapName, mapType);
-  
+
   // Tool and color state (extracted to useToolState hook)
   const {
     currentTool, setCurrentTool,
@@ -120,42 +166,42 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     selectedOpacity, setSelectedOpacity,
     isColorPickerOpen, setIsColorPickerOpen
   } = useToolState();
-  
+
   const [showFooter, setShowFooter] = dc.useState(false);
   const [isFocused, setIsFocused] = dc.useState(false);
   const [isExpanded, setIsExpanded] = dc.useState(false);
   const [isAnimating, setIsAnimating] = dc.useState(false);
-  const [pluginInstalled, setPluginInstalled] = dc.useState(null); // null = checking, true/false = result
+  const [pluginInstalled, setPluginInstalled] = dc.useState<boolean | null>(null); // null = checking, true/false = result
   const [showPluginInstaller, setShowPluginInstaller] = dc.useState(false);
   const [settingsVersion, setSettingsVersion] = dc.useState(0); // Incremented to force re-render on settings change
   const [showSettingsModal, setShowSettingsModal] = dc.useState(false);
   const [showVisibilityToolbar, setShowVisibilityToolbar] = dc.useState(false);
   const [showLayerPanel, setShowLayerPanel] = dc.useState(false);
-  
+
   // Image alignment mode state
   const [isAlignmentMode, setIsAlignmentMode] = dc.useState(false);
   const [alignmentOffsetX, setAlignmentOffsetX] = dc.useState(0);
   const [alignmentOffsetY, setAlignmentOffsetY] = dc.useState(0);
   const [returningFromAlignment, setReturningFromAlignment] = dc.useState(false);
-  
+
   // Layer visibility state (session-only, resets on reload)
-  const [layerVisibility, setLayerVisibility] = dc.useState({
+  const [layerVisibility, setLayerVisibility] = dc.useState<LayerVisibilityState>({
     objects: true,
     textLabels: true,
     hexCoordinates: false
   });
-  
+
   // Toggle a specific layer's visibility
-  const handleToggleLayerVisibility = dc.useCallback((layerId) => {
-    setLayerVisibility(prev => ({
+  const handleToggleLayerVisibility = dc.useCallback((layerId: keyof LayerVisibilityState) => {
+    setLayerVisibility((prev: LayerVisibilityState) => ({
       ...prev,
       [layerId]: !prev[layerId]
     }));
   }, []);
-  
+
   // Create geometry instance for coordinate conversions
   // Same logic as MapCanvas for consistency
-  const geometry = dc.useMemo(() => {
+  const geometry = dc.useMemo((): IGeometry | null => {
     if (!mapData) return null;
 
     const currentMapType = mapData.mapType || DEFAULTS.mapType;
@@ -170,7 +216,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
       return new GridGeometry(gridSize);
     }
   }, [mapData?.mapType, mapData?.gridSize, mapData?.hexSize, mapData?.orientation, mapData?.hexBounds]);
-  
+
   // Fog of War state and handlers (extracted to useFogOfWar hook)
   const {
     showFogTools,
@@ -187,7 +233,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   // Get current theme with effective settings (global + map overrides)
   // This will be called on every render, fetching fresh settings each time
   const effectiveSettings = mapData ? getEffectiveSettings(mapData.settings) : null;
-  const theme = effectiveSettings ? {
+  const theme: ResolvedTheme = effectiveSettings ? {
     grid: {
       lines: effectiveSettings.gridLineColor,
       lineWidth: effectiveSettings.gridLineWidth,
@@ -208,16 +254,16 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   const isTouchDevice = dc.useMemo(() => {
     return window.matchMedia('(hover: none) and (pointer: coarse)').matches;
   }, []);
-  
-  const canvasHeight = effectiveSettings 
-    ? (isTouchDevice 
+
+  const canvasHeight = effectiveSettings
+    ? (isTouchDevice
         ? (effectiveSettings.canvasHeightMobile ?? 400)
         : (effectiveSettings.canvasHeight ?? 600))
     : (isTouchDevice ? 400 : 600);
 
   // Check if settings plugin is installed
   dc.useEffect(() => {
-    async function checkPlugin() {
+    async function checkPlugin(): Promise<void> {
       try {
         const pluginDir = '.obsidian/plugins/dungeon-map-tracker-settings';
         const exists = await dc.app.vault.adapter.exists(pluginDir);
@@ -233,19 +279,19 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   // Determine if we should show the plugin installer (install or upgrade mode)
   dc.useEffect(() => {
     if (pluginInstalled === null || !mapData) return; // Still checking or data not loaded
-    
+
     // Check if we should show installer for new install
     if (!pluginInstalled && !mapData.settingsPluginDeclined) {
       setShowPluginInstaller(true);
       return;
     }
-    
+
     // Check if we should show installer for upgrade
     if (pluginInstalled && shouldOfferUpgrade()) {
       setShowPluginInstaller(true);
       return;
     }
-    
+
     // Otherwise, hide installer
     setShowPluginInstaller(false);
   }, [pluginInstalled, mapData]);
@@ -253,7 +299,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   // Initialize expanded state from settings or saved state (only if not showing installer)
   dc.useEffect(() => {
     if (showPluginInstaller || !mapData) return; // Don't apply if showing installer or no data
-    
+
     // Small delay to ensure plugins are loaded
     const timer = setTimeout(() => {
       try {
@@ -277,23 +323,23 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
         // Continue with default (not expanded)
       }
     }, 100);
-    
+
     return () => clearTimeout(timer);
   }, [showPluginInstaller, mapData]); // Run when installer status or map data changes
 
   // Initialize opacity from mapData when loaded
   dc.useEffect(() => {
     if (!mapData) return;
-    
+
     if (mapData.lastSelectedOpacity !== undefined) {
       setSelectedOpacity(mapData.lastSelectedOpacity);
     }
   }, [mapData?.lastSelectedOpacity]);
 
   // Handler to update opacity and persist to mapData
-  const handleOpacityChange = dc.useCallback((newOpacity) => {
+  const handleOpacityChange = dc.useCallback((newOpacity: number) => {
     setSelectedOpacity(newOpacity);
-    updateMapData(currentMapData => ({
+    updateMapData((currentMapData: MapData) => ({
       ...currentMapData,
       lastSelectedOpacity: newOpacity
     }));
@@ -301,27 +347,27 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
 
   // Listen for settings changes and force re-render
   dc.useEffect(() => {
-    const handleSettingsChange = () => {
+    const handleSettingsChange = (): void => {
       // Increment settingsVersion to force component re-render
       // This causes getTheme() to be called again with fresh settings
-      setSettingsVersion(prev => prev + 1);
+      setSettingsVersion((prev: number) => prev + 1);
     };
-    
+
     window.addEventListener('dmt-settings-changed', handleSettingsChange);
-    
+
     return () => {
       window.removeEventListener('dmt-settings-changed', handleSettingsChange);
     };
   }, []);
 
   // Handle plugin installation
-  const handlePluginInstall = () => {
+  const handlePluginInstall = (): void => {
     setPluginInstalled(true);
     setShowPluginInstaller(false);
   };
 
   // Handle plugin decline
-  const handlePluginDecline = () => {
+  const handlePluginDecline = (): void => {
     if (mapData) {
       updateMapData({
         ...mapData,
@@ -364,16 +410,16 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     handleTextLabelSettingsChange
   } = useDataHandlers({ mapData, updateMapData, addToHistory, isApplyingHistory });
 
-  const containerRef = dc.useRef(null);
+  const containerRef = dc.useRef<HTMLDivElement | null>(null);
 
   // Effect to manage parent element classes
   dc.useEffect(() => {
     if (!containerRef.current) return;
-    
+
     const container = containerRef.current;
-    
+
     // Walk up to find cm-embed-block
-    let cmEmbedBlock = container.parentElement;
+    let cmEmbedBlock: HTMLElement | null = container.parentElement;
     while (cmEmbedBlock && !cmEmbedBlock.classList.contains('cm-embed-block')) {
       cmEmbedBlock = cmEmbedBlock.parentElement;
       if (cmEmbedBlock?.classList.contains('cm-editor')) {
@@ -381,18 +427,18 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
         break;
       }
     }
-    
+
     // Manage classes on container
     container.classList.toggle('dmt-expanded', isExpanded);
     container.classList.toggle('dmt-animating', isAnimating);
-    
+
     // Manage classes on parent if found
     if (cmEmbedBlock) {
       cmEmbedBlock.classList.add('dmt-cm-parent');
       cmEmbedBlock.classList.toggle('dmt-cm-expanded', isExpanded);
       cmEmbedBlock.classList.toggle('dmt-cm-animating', isAnimating);
     }
-    
+
     // Cleanup
     return () => {
       container.classList.remove('dmt-expanded', 'dmt-animating');
@@ -401,7 +447,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   }, [isExpanded, isAnimating]);
 
   // Zoom in (increase zoom by step)
-  const handleZoomIn = () => {
+  const handleZoomIn = (): void => {
     if (!mapData) return;
     const newZoom = Math.min(
       DEFAULTS.maxZoom,
@@ -414,7 +460,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   };
 
   // Zoom out (decrease zoom by step)
-  const handleZoomOut = () => {
+  const handleZoomOut = (): void => {
     if (!mapData) return;
     const newZoom = Math.max(
       DEFAULTS.minZoom,
@@ -427,7 +473,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   };
 
   // Compass click - cycle through rotations
-  const handleCompassClick = () => {
+  const handleCompassClick = (): void => {
     if (!mapData) return;
 
     // Cycle through: 0 -> 90 -> 180 -> 270 -> 0 degrees
@@ -443,31 +489,31 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     updateMapData(newMapData);
   };
 
-  const animationTimeoutRef = dc.useRef(null);
+  const animationTimeoutRef = dc.useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const handleToggleExpand = () => {
-    
+  const handleToggleExpand = (): void => {
+
     // Clear any pending animation timeout
     if (animationTimeoutRef.current) {
       clearTimeout(animationTimeoutRef.current);
       animationTimeoutRef.current = null;
     }
-    
+
     const newExpandedState = !isExpanded;
-    
+
     if (newExpandedState) {
       setIsExpanded(true);
       setIsAnimating(false);
     } else {
       setIsAnimating(true);
       setIsExpanded(false);
-      
+
       animationTimeoutRef.current = setTimeout(() => {
         setIsAnimating(false);
         animationTimeoutRef.current = null;
       }, 300);
     }
-    
+
     // Save expanded state if preference is enabled
     if (mapData && mapData.uiPreferences?.rememberExpandedState) {
       const newMapData = {
@@ -478,80 +524,86 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     }
   };
 
-  const handleSettingsClick = () => {
+  const handleSettingsClick = (): void => {
     setShowSettingsModal(true);
   };
 
-  const handleSettingsSave = (settingsData, preferencesData, hexBounds = null, backgroundImage = undefined, hexSize = null, deleteOrphanedContent = false) => {
+  const handleSettingsSave = (
+    settingsData: MapSettings,
+    preferencesData: UIPreferences,
+    hexBounds: HexBounds | null = null,
+    backgroundImage: BackgroundImage | undefined = undefined,
+    hexSize: number | null = null,
+    deleteOrphanedContent: boolean = false
+  ): void => {
     if (!mapData) return;
-    
-    const newMapData = {
+
+    const newMapData: MapData = {
       ...mapData,
       settings: settingsData,
       uiPreferences: preferencesData
     };
-    
+
     // Only update hexBounds for hex maps
     if (hexBounds !== null && mapData.mapType === 'hex') {
       newMapData.hexBounds = hexBounds;
-      
+
       // If requested, delete content that would be outside the new bounds
       if (deleteOrphanedContent) {
         const orientation = mapData.orientation || 'flat';
-        
+
         // Filter cells to keep only those within new bounds
         if (newMapData.cells && newMapData.cells.length > 0) {
-          newMapData.cells = newMapData.cells.filter(cell => {
+          newMapData.cells = newMapData.cells.filter((cell: Cell) => {
             const { col, row } = axialToOffset(cell.q, cell.r, orientation);
             return isWithinOffsetBounds(col, row, hexBounds);
           });
         }
-        
+
         // Filter objects to keep only those within new bounds
         if (newMapData.objects && newMapData.objects.length > 0) {
-          newMapData.objects = newMapData.objects.filter(obj => {
+          newMapData.objects = newMapData.objects.filter((obj: MapObject) => {
             const { col, row } = axialToOffset(obj.position.x, obj.position.y, orientation);
             return isWithinOffsetBounds(col, row, hexBounds);
           });
         }
       }
     }
-    
+
     // Only update backgroundImage for hex maps
     if (backgroundImage !== undefined && mapData.mapType === 'hex') {
       newMapData.backgroundImage = backgroundImage;
     }
-    
+
     // Update hexSize if calculated from background image
     if (hexSize !== null && mapData.mapType === 'hex') {
       newMapData.hexSize = hexSize;
-    } else {
-      }
-    
+    }
+
     updateMapData(newMapData);
-    
+
     // Force re-render to apply new settings
-    setSettingsVersion(prev => prev + 1);
+    setSettingsVersion((prev: number) => prev + 1);
   };
 
 
-  const handleSettingsClose = () => {
+  const handleSettingsClose = (): void => {
     setShowSettingsModal(false);
     setReturningFromAlignment(false); // Reset flag when modal closes
   };
 
   // Image alignment mode handlers
-  const handleOpenAlignmentMode = dc.useCallback((currentX, currentY) => {
+  const handleOpenAlignmentMode = dc.useCallback((currentX: number, currentY: number) => {
     setAlignmentOffsetX(currentX);
     setAlignmentOffsetY(currentY);
     setIsAlignmentMode(true);
     setShowSettingsModal(false); // Hide settings modal
   }, []);
 
-  const handleAlignmentOffsetChange = dc.useCallback((newX, newY) => {
+  const handleAlignmentOffsetChange = dc.useCallback((newX: number, newY: number) => {
     setAlignmentOffsetX(newX);
     setAlignmentOffsetY(newY);
-    
+
     // Update the map data immediately for visual feedback
     if (mapData && mapData.backgroundImage) {
       updateMapData({
@@ -565,18 +617,18 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     }
   }, [mapData, updateMapData]);
 
-  const handleAlignmentApply = dc.useCallback((finalX, finalY) => {
+  const handleAlignmentApply = dc.useCallback((finalX: number, finalY: number) => {
     // Offset values are already in mapData from handleAlignmentOffsetChange
     setIsAlignmentMode(false);
     setReturningFromAlignment(true); // Flag that we're returning from alignment
     setShowSettingsModal(true); // Reopen settings modal
   }, []);
 
-  const handleAlignmentCancel = dc.useCallback((originalX, originalY) => {
+  const handleAlignmentCancel = dc.useCallback((originalX: number, originalY: number) => {
     // Revert to original offset
     setAlignmentOffsetX(originalX);
     setAlignmentOffsetY(originalY);
-    
+
     if (mapData && mapData.backgroundImage) {
       updateMapData({
         ...mapData,
@@ -587,7 +639,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
         }
       });
     }
-    
+
     setIsAlignmentMode(false);
     setReturningFromAlignment(true); // Flag that we're returning from alignment
     setShowSettingsModal(true); // Reopen settings modal
@@ -608,7 +660,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
       <>
         <style>{combinedCss}</style>
         <div ref={containerRef} className={`dmt-container interactive-child`}>
-          <SettingsPluginInstaller 
+          <SettingsPluginInstaller
             onInstall={handlePluginInstall}
             onDecline={handlePluginDecline}
           />
@@ -618,7 +670,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   }
 
   // Get color display name
-  const getColorDisplayName = () => {
+  const getColorDisplayName = (): string => {
     if (isDefaultColor(selectedColor)) return 'Default';
     const colorDef = getColorByHex(selectedColor);
     return colorDef ? colorDef.label : selectedColor;
@@ -628,8 +680,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   return (
     <>
       <style>{combinedCss}</style>
-      <div 
-        ref={containerRef} 
+      <div
+        ref={containerRef}
         className={`dmt-container interactive-child`}
       >
         {/* Decorative corner brackets */}
@@ -738,7 +790,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 selectedColor={selectedColor}
                 selectedOpacity={selectedOpacity}
               />
-              
+
               {/* ObjectLayer - handles object placement and interactions */}
               <MapCanvas.ObjectLayer
                 currentTool={currentTool}
@@ -748,12 +800,12 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 onAddCustomColor={handleAddCustomColor}
                 onDeleteCustomColor={handleDeleteCustomColor}
               />
-              
+
               {/* AreaSelectLayer - handles area selection tool for multi-select */}
               <MapCanvas.AreaSelectLayer
                 currentTool={currentTool}
               />
-              
+
               {/* TextLayer - handles text label interactions */}
               <MapCanvas.TextLayer
                 currentTool={currentTool}
@@ -761,22 +813,22 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 onAddCustomColor={handleAddCustomColor}
                 onDeleteCustomColor={handleDeleteCustomColor}
               />
-              
+
               {/* NotePinLayer - handles note pin placement */}
               <MapCanvas.NotePinLayer
                 currentTool={currentTool}
                 selectedObjectType={selectedObjectType}
               />
-              
+
               {/* FogOfWarLayer - handles fog painting/erasing interactions */}
               {fogActiveTool && (
                 <MapCanvas.FogOfWarLayer
                   activeTool={fogActiveTool}
                   onFogChange={handleFogChange}
-                  onInitializeFog={(updatedMapData) => updateMapData(updatedMapData)}
+                  onInitializeFog={(updatedMapData: MapData) => updateMapData(updatedMapData)}
                 />
               )}
-              
+
               {/* HexCoordinateLayer - displays coordinate labels when 'C' key is held */}
               <MapCanvas.HexCoordinateLayer />
 
@@ -786,12 +838,12 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 globalSettings={effectiveSettings}
                 mapDistanceOverrides={mapData?.settings?.distanceSettings}
               />
-              
+
               {/* DiagonalFillOverlay - diagonal fill tool preview */}
               <MapCanvas.DiagonalFillOverlay
                 currentTool={currentTool}
               />
-              
+
               {/* Re-roll button for generated dungeons */}
               <MapCanvas.RerollDungeonButton />
             </MapCanvas>
