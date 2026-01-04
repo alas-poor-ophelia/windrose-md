@@ -5,12 +5,12 @@
  * Consolidates all action buttons into a single horizontal toolbar with context-aware buttons.
  */
 
-const pathResolverPath = dc.resolvePath("pathResolver.js");
+const pathResolverPath = dc.resolvePath("pathResolver.ts");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
-const { calculateObjectScreenPosition } = await requireModuleByName("screenPositionUtils.js");
+const { calculateObjectScreenPosition } = await requireModuleByName("screenPositionUtils.ts");
 const { openNoteInNewTab } = await requireModuleByName("noteOperations.ts");
-const { ColorPicker } = await requireModuleByName("ColorPicker.jsx");
+const { ColorPicker } = await requireModuleByName("ColorPicker.tsx");
 const { getActiveLayer } = await requireModuleByName("layerAccessor.ts");
 
 /**

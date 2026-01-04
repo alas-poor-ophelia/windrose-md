@@ -1,24 +1,20 @@
 /**
  * objectTypes.ts
- * 
+ *
  * Object type definitions for dungeon mapping.
  * Defines available object symbols and their categories.
  */
 
-// ===========================================
-// Types
-// ===========================================
-
-/** Object type definition */
-export interface ObjectType {
+// Types defined in #types/objects/object.types.ts
+// Duplicated here for datacore runtime compatibility
+interface ObjectType {
   id: string;
   symbol: string;
   label: string;
   category: string;
 }
 
-/** Category definition */
-export interface Category {
+interface Category {
   id: string;
   label: string;
 }

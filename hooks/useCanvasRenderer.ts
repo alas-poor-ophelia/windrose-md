@@ -21,27 +21,27 @@ import type {
 } from '#types/hooks/canvasRenderer.types';
 
 // Datacore imports
-const pathResolverPath = dc.resolvePath("pathResolver.js");
+const pathResolverPath = dc.resolvePath("pathResolver.ts");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
 const { getTheme, getEffectiveSettings } = await requireModuleByName("settingsAccessor.ts") as {
   getTheme: () => RendererTheme;
   getEffectiveSettings: (settings: MapData['settings']) => Record<string, unknown>;
 };
-const { buildCellLookup, calculateBordersOptimized } = await requireModuleByName("borderCalculator.js") as {
+const { buildCellLookup, calculateBordersOptimized } = await requireModuleByName("borderCalculator.ts") as {
   buildCellLookup: (cells: Cell[]) => CellMap;
   calculateBordersOptimized: (cell: Cell, lookup: CellMap) => { top: boolean; right: boolean; bottom: boolean; left: boolean };
 };
 const { getObjectType } = await requireModuleByName("objectOperations.ts") as {
   getObjectType: (typeId: string) => ObjectTypeDef | null;
 };
-const { getRenderChar } = await requireModuleByName("objectTypeResolver.js") as {
+const { getRenderChar } = await requireModuleByName("objectTypeResolver.ts") as {
   getRenderChar: (objType: ObjectTypeDef) => { char: string; isIcon: boolean };
 };
 const { getCellColor } = await requireModuleByName("colorOperations.ts") as {
   getCellColor: (cell: Cell) => string;
 };
-const { getFontCss } = await requireModuleByName("fontOptions.js") as {
+const { getFontCss } = await requireModuleByName("fontOptions.ts") as {
   getFontCss: (fontFace: string) => string;
 };
 const { GridGeometry } = await requireModuleByName("GridGeometry.ts") as {
@@ -75,15 +75,15 @@ const { segmentRenderer } = await requireModuleByName("segmentRenderer.ts") as {
     renderSegmentBorders: (ctx: CanvasRenderingContext2D, segmentCells: Cell[], allCells: Cell[], geometry: IGeometry, viewState: RendererViewState, options: { border: string; borderWidth: number }) => void;
   };
 };
-const { getCachedImage } = await requireModuleByName("imageOperations.js") as {
+const { getCachedImage } = await requireModuleByName("imageOperations.ts") as {
   getCachedImage: (path: string) => HTMLImageElement | null;
 };
-const { getSlotOffset, getMultiObjectScale, getObjectsInCell } = await requireModuleByName("hexSlotPositioner.js") as {
+const { getSlotOffset, getMultiObjectScale, getObjectsInCell } = await requireModuleByName("hexSlotPositioner.ts") as {
   getSlotOffset: (slot: number, count: number, orientation: string) => { offsetX: number; offsetY: number };
   getMultiObjectScale: (count: number) => number;
   getObjectsInCell: (objects: MapObject[], x: number, y: number) => MapObject[];
 };
-const { offsetToAxial, axialToOffset } = await requireModuleByName("offsetCoordinates.js") as {
+const { offsetToAxial, axialToOffset } = await requireModuleByName("offsetCoordinates.ts") as {
   offsetToAxial: (col: number, row: number, orientation: string) => { q: number; r: number };
   axialToOffset: (q: number, r: number, orientation: string) => { col: number; row: number };
 };

@@ -7,25 +7,27 @@
  */
 
 // Type-only imports
-import type { MapType, HexBounds } from '#types/core/map.types';
-import type { 
-  HexOrientation, 
-  DiagonalRule, 
+import type { MapType, HexBounds, MeasurementMethod } from '#types/core/map.types';
+import type {
+  HexOrientation,
+  DiagonalRule,
   DistanceDisplayFormat,
   HexColor,
-  SettingsTabId
+  SettingsTabId,
+  ImageDimensions,
+  GridCalculation,
+  GridDensityPreset,
 } from '#types/settings/settings.types';
 import type { Cell } from '#types/core/cell.types';
 import type { MapObject } from '#types/objects/object.types';
-import type { MeasurementMethod, GridCalculation } from '../../geometry/hexMeasurements';
 
 // Datacore imports
-const pathResolverPath = dc.resolvePath("pathResolver.js");
+const pathResolverPath = dc.resolvePath("pathResolver.ts");
 const { requireModuleByName } = await dc.require(pathResolverPath) as {
   requireModuleByName: (name: string) => Promise<unknown>
 };
 
-const { axialToOffset, isWithinOffsetBounds } = await requireModuleByName("offsetCoordinates.js") as {
+const { axialToOffset, isWithinOffsetBounds } = await requireModuleByName("offsetCoordinates.ts") as {
   axialToOffset: (q: number, r: number, orientation: HexOrientation) => { col: number; row: number };
   isWithinOffsetBounds: (col: number, row: number, bounds: HexBounds) => boolean;
 };
@@ -44,7 +46,7 @@ const {
   MEASUREMENT_CORNER: MeasurementMethod;
 };
 
-const { getDisplayNameFromPath } = await requireModuleByName("imageOperations.js") as {
+const { getDisplayNameFromPath } = await requireModuleByName("imageOperations.ts") as {
   getDisplayNameFromPath: (path: string) => string;
 };
 
@@ -52,21 +54,8 @@ const { getDisplayNameFromPath } = await requireModuleByName("imageOperations.js
 // Type Definitions
 // ===========================================
 
-/** Image dimensions */
-interface ImageDimensions {
-  width: number;
-  height: number;
-}
-
 /** Grid density preset key */
 type GridDensityKey = 'sparse' | 'medium' | 'dense' | 'custom';
-
-/** Grid density preset definition */
-interface GridDensityPreset {
-  columns: number;
-  label: string;
-  description: string;
-}
 
 /** Sizing mode for background image */
 type SizingMode = 'density' | 'measurement';

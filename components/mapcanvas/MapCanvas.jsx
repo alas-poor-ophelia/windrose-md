@@ -1,4 +1,4 @@
-const pathResolverPath = dc.resolvePath("pathResolver.js");
+const pathResolverPath = dc.resolvePath("pathResolver.ts");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
 const { useCanvasRenderer, renderCanvas } = await requireModuleByName("useCanvasRenderer.ts");
@@ -9,18 +9,18 @@ const { getObjectAtPosition, addObject, removeObject, removeObjectAtPosition, re
 const { addTextLabel, getTextLabelAtPosition, removeTextLabel, updateTextLabel } = await requireModuleByName("textLabelOperations.ts");
 const { HexGeometry } = await requireModuleByName("HexGeometry.ts");
 const { LinkedNoteHoverOverlays } = await requireModuleByName("LinkedNoteHoverOverlays.jsx");
-const { MapStateProvider, MapOperationsProvider } = await requireModuleByName("MapContext.jsx");
-const { MapSelectionProvider, useMapSelection } = await requireModuleByName("MapSelectionContext.jsx");
-const { ObjectLayer } = await requireModuleByName("ObjectLayer.jsx");
-const { DrawingLayer } = await requireModuleByName("DrawingLayer.jsx");
-const { TextLayer } = await requireModuleByName("TextLayer.jsx");
-const { NotePinLayer } = await requireModuleByName("NotePinLayer.jsx");
-const { EventHandlerProvider } = await requireModuleByName("EventHandlerContext.jsx");
+const { MapStateProvider, MapOperationsProvider } = await requireModuleByName("MapContext.tsx");
+const { MapSelectionProvider, useMapSelection } = await requireModuleByName("MapSelectionContext.tsx");
+const { ObjectLayer } = await requireModuleByName("ObjectLayer.tsx");
+const { DrawingLayer } = await requireModuleByName("DrawingLayer.tsx");
+const { TextLayer } = await requireModuleByName("TextLayer.tsx");
+const { NotePinLayer } = await requireModuleByName("NotePinLayer.tsx");
+const { EventHandlerProvider } = await requireModuleByName("EventHandlerContext.tsx");
 const { HexCoordinateLayer } = await requireModuleByName("HexCoordinateLayer.jsx");
-const { MeasurementLayer } = await requireModuleByName("MeasurementLayer.jsx");
-const { DiagonalFillOverlay } = await requireModuleByName("DiagonalFillOverlay.jsx");
-const { AreaSelectLayer } = await requireModuleByName("AreaSelectLayer.jsx");
-const { FogOfWarLayer } = await requireModuleByName("FogOfWarLayer.jsx");
+const { MeasurementLayer } = await requireModuleByName("MeasurementLayer.tsx");
+const { DiagonalFillOverlay } = await requireModuleByName("DiagonalFillOverlay.tsx");
+const { AreaSelectLayer } = await requireModuleByName("AreaSelectLayer.tsx");
+const { FogOfWarLayer } = await requireModuleByName("FogOfWarLayer.tsx");
 const { RerollDungeonButton } = await requireModuleByName("RerollDungeonButton.jsx");
 const { getSetting } = await requireModuleByName("settingsAccessor.ts");
 const { usePanZoomCoordinator } = await requireModuleByName("usePanZoomCoordinator.ts");

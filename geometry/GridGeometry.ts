@@ -35,9 +35,10 @@ import type {
   DistanceOptions,
   Cell
 } from '#types/core/geometry.types';
+import type { EdgeInfo } from '#types/contexts/context.types';
 
 // Datacore imports
-const pathResolverPath = dc.resolvePath("pathResolver.js");
+const pathResolverPath = dc.resolvePath("pathResolver.ts");
 const { requireModuleByName } = await dc.require(pathResolverPath) as {
   requireModuleByName: (name: string) => Promise<unknown>
 };
@@ -59,13 +60,6 @@ interface VisibleGridRange {
   endX: number;
   startY: number;
   endY: number;
-}
-
-/** Edge detection result */
-interface EdgeInfo {
-  x: number;
-  y: number;
-  side: 'top' | 'right' | 'bottom' | 'left';
 }
 
 class GridGeometry extends BaseGeometry {

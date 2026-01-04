@@ -24,7 +24,7 @@ import type {
 } from '#types/hooks/fog.types';
 
 // Datacore imports
-const pathResolverPath = dc.resolvePath("pathResolver.js");
+const pathResolverPath = dc.resolvePath("pathResolver.ts");
 const { requireModuleByName } = await dc.require(pathResolverPath) as {
   requireModuleByName: (name: string) => Promise<unknown>
 };
@@ -36,7 +36,7 @@ interface MapStateValue {
   screenToGrid: (clientX: number, clientY: number) => Point | null;
 }
 
-const { useMapState } = await requireModuleByName("MapContext.jsx") as {
+const { useMapState } = await requireModuleByName("MapContext.tsx") as {
   useMapState: () => MapStateValue;
 };
 

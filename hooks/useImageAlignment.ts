@@ -18,10 +18,10 @@ import type {
 } from '#types/hooks/imageAlignment.types';
 
 // Datacore imports
-const pathResolverPath = dc.resolvePath("pathResolver.js");
+const pathResolverPath = dc.resolvePath("pathResolver.ts");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
-const { useEventHandlerRegistration } = await requireModuleByName("EventHandlerContext.jsx") as {
+const { useEventHandlerRegistration } = await requireModuleByName("EventHandlerContext.tsx") as {
   useEventHandlerRegistration: () => {
     registerHandlers: (layer: string, handlers: Record<string, unknown>) => void;
     unregisterHandlers: (layer: string) => void;

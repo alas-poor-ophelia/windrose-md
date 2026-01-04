@@ -1,4 +1,4 @@
-const pathResolverPath = dc.resolvePath("pathResolver.js");
+const pathResolverPath = dc.resolvePath("pathResolver.ts");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
 const { 
@@ -7,7 +7,7 @@ const {
   getDisplayNameFromPath
 } = await requireModuleByName("noteOperations.ts");
 
-const { getObjectType } = await requireModuleByName("objectTypeResolver.js");
+const { getObjectType } = await requireModuleByName("objectTypeResolver.ts");
 
 /**
  * Modal for linking notes to objects

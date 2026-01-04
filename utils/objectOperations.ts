@@ -3,109 +3,29 @@
  * Operations for managing map objects - placement, removal, updates.
  */
 
-// Type-only imports
-import type { Point } from '#types/core/geometry.types';
 import type { MapType } from '#types/core/map.types';
-
-// ===========================================
-// Local Type Definitions
-// (Until object.types.ts is updated with these)
-// ===========================================
-
-/** Unique object instance ID */
-type ObjectId = string;
-
-/** Object category for grouping in UI */
-type ObjectCategory = 
-  | 'structures'
-  | 'doors'
-  | 'furniture'
-  | 'hazards'
-  | 'nature'
-  | 'symbols'
-  | 'custom';
-
-/** Object alignment within a cell (grid maps) */
-type ObjectAlignment = 'center' | 'north' | 'south' | 'east' | 'west';
-
-/** Object type definition */
-interface ObjectTypeDef {
-  id: string;
-  name: string;
-  label?: string;
-  category: ObjectCategory;
-  symbol: string;
-  defaultSize?: number;
-  rotatable?: boolean;
-  isUnknown?: boolean;
-  isCustom?: boolean;
-}
-
-/** Object size in grid cells */
-interface ObjectSize {
-  width: number;
-  height: number;
-}
-
-/** A placed object on the map */
-interface MapObject {
-  id: ObjectId;
-  type: string;
-  position: Point;
-  size: ObjectSize;
-  label?: string;
-  linkedNote?: string | null;
-  alignment?: ObjectAlignment;
-  slot?: number;
-  scale?: number;
-  rotation?: number;
-  color?: string;
-  opacity?: number;
-  locked?: boolean;
-  layerId?: string;
-}
-
-/** Partial object for updates */
-type ObjectUpdate = Partial<Omit<MapObject, 'id'>>;
-
-/** Result of object placement operation */
-interface PlacementResult {
-  objects: MapObject[];
-  success: boolean;
-  error?: string;
-  object?: MapObject;
-}
-
-/** Result of object removal operation */
-interface RemovalResult {
-  objects: MapObject[];
-  success: boolean;
-  removed?: MapObject;
-}
-
-/** Options for placeObject unified API */
-interface PlacementOptions {
-  mapType: MapType;
-  alignment?: ObjectAlignment;
-}
-
-/** Position offset for alignment rendering */
-interface AlignmentOffset {
-  offsetX: number;
-  offsetY: number;
-}
-
-/** Slot position for multi-object hex cells */
-type HexSlot = 0 | 1 | 2 | 3;
+import type {
+  ObjectId,
+  ObjectAlignment,
+  ObjectTypeDef,
+  ObjectSize,
+  MapObject,
+  ObjectUpdate,
+  PlacementResult,
+  RemovalResult,
+  PlacementOptions,
+  AlignmentOffset,
+  HexSlot,
+} from '#types/objects/object.types';
 
 // Datacore imports
-const pathResolverPath = dc.resolvePath("pathResolver.js");
+const pathResolverPath = dc.resolvePath("pathResolver.ts");
 const { requireModuleByName } = await dc.require(pathResolverPath) as {
   requireModuleByName: (name: string) => Promise<unknown>
 };
 
 // Import getObjectType from the resolver (handles overrides, custom objects, fallback)
-const { getObjectType } = await requireModuleByName("objectTypeResolver.js") as {
+const { getObjectType } = await requireModuleByName("objectTypeResolver.ts") as {
   getObjectType: (typeId: string) => ObjectTypeDef
 };
 
@@ -115,7 +35,7 @@ const {
   canAddObjectToCell, 
   getOccupiedSlots,
   reorganizeAfterRemoval 
-} = await requireModuleByName("hexSlotPositioner.js") as {
+} = await requireModuleByName("hexSlotPositioner.ts") as {
   assignSlot: (occupiedSlots: HexSlot[]) => HexSlot | -1;
   getObjectsInCell: (objects: MapObject[], x: number, y: number) => MapObject[];
   canAddObjectToCell: (objects: MapObject[], x: number, y: number) => boolean;

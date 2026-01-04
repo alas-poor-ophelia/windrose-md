@@ -1,4 +1,4 @@
-const pathResolverPath = dc.resolvePath("pathResolver.js");
+const pathResolverPath = dc.resolvePath("pathResolver.ts");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 const { WindroseCompass } = await requireModuleByName("WindroseCompass.jsx");
 

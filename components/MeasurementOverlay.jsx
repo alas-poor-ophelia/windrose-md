@@ -7,7 +7,7 @@
  * anchored near the target cell.
  */
 
-const pathResolverPath = dc.resolvePath("pathResolver.js");
+const pathResolverPath = dc.resolvePath("pathResolver.ts");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
 const { GridGeometry } = await requireModuleByName("GridGeometry.ts");

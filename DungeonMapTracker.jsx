@@ -4,7 +4,7 @@
 // IMPORTS
 // ============================================================================
 
-const { requireModuleByName, getBasePath } = await dc.require(`${window.__dmtBasePath}/utils/pathResolver.js`);
+const { requireModuleByName, getBasePath } = await dc.require(`${window.__dmtBasePath}/utils/pathResolver.ts`);
 
 
 const css = await app.vault.cachedRead(
@@ -26,24 +26,24 @@ const { HexGeometry } = await requireModuleByName("HexGeometry.ts");
 const { MapHeader } = await requireModuleByName("MapHeader.jsx");
 const { MapCanvas } = await requireModuleByName("MapCanvas.jsx");
 const { MapControls } = await requireModuleByName("MapControls.jsx");
-const { ToolPalette } = await requireModuleByName("ToolPalette.jsx");
+const { ToolPalette } = await requireModuleByName("ToolPalette.tsx");
 const { ObjectSidebar } = await requireModuleByName("ObjectSidebar.jsx");
-const { VisibilityToolbar } = await requireModuleByName("VisibilityToolbar.jsx");
-const { SettingsPluginInstaller, shouldOfferUpgrade } = await requireModuleByName("SettingsPluginInstaller.jsx");
-const { MapSettingsModal } = await requireModuleByName("MapSettingsModal.jsx");
+const { VisibilityToolbar } = await requireModuleByName("VisibilityToolbar.tsx");
+const { SettingsPluginInstaller, shouldOfferUpgrade } = await requireModuleByName("SettingsPluginInstaller.tsx");
+const { MapSettingsModal } = await requireModuleByName("MapSettingsModal.tsx");
 const { getSetting, getTheme, getEffectiveSettings } = await requireModuleByName("settingsAccessor.ts");
 const { DEFAULTS } = await requireModuleByName("dmtConstants.ts");
 const { getColorByHex, isDefaultColor } = await requireModuleByName("colorOperations.ts");
-const { axialToOffset, isWithinOffsetBounds } = await requireModuleByName("offsetCoordinates.js");
+const { axialToOffset, isWithinOffsetBounds } = await requireModuleByName("offsetCoordinates.ts");
 const { ImageAlignmentMode } = await requireModuleByName("ImageAlignmentMode.jsx");
-const { ModalPortal } = await requireModuleByName("ModalPortal.jsx");
+const { ModalPortal } = await requireModuleByName("ModalPortal.tsx");
 
 const { getActiveLayer } = await requireModuleByName("layerAccessor.ts");
-const { LayerControls } = await requireModuleByName("LayerControls.jsx");
+const { LayerControls } = await requireModuleByName("LayerControls.tsx");
 
 // RPGAwesome icon font support
-const { RA_ICONS } = await requireModuleByName("rpgAwesomeIcons.js");
-const { injectIconCSS } = await requireModuleByName("rpgAwesomeLoader.js");
+const { RA_ICONS } = await requireModuleByName("rpgAwesomeIcons.ts");
+const { injectIconCSS } = await requireModuleByName("rpgAwesomeLoader.ts");
 
 
 

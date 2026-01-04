@@ -31,9 +31,10 @@ import type {
   DragStartContext,
   UseDrawingToolsResult,
 } from '#types/hooks/drawingTools.types';
+import type { EdgeInfo } from '#types/contexts/context.types';
 
 // Datacore imports
-const pathResolverPath = dc.resolvePath("pathResolver.js");
+const pathResolverPath = dc.resolvePath("pathResolver.ts");
 const { requireModuleByName } = await dc.require(pathResolverPath) as {
   requireModuleByName: (name: string) => Promise<unknown>
 };
@@ -57,12 +58,6 @@ interface GridGeometryConstructor {
   };
 }
 
-interface EdgeInfo {
-  x: number;
-  y: number;
-  side: string;
-}
-
 interface MapOperationsValue {
   onCellsChange: (cells: Cell[], skipHistory?: boolean) => void;
   onObjectsChange: (objects: MapObject[]) => void;
@@ -75,7 +70,7 @@ interface MapOperationsValue {
   removeObjectsInRectangle: (objects: MapObject[], x1: number, y1: number, x2: number, y2: number) => MapObject[];
 }
 
-const { useMapState, useMapOperations } = await requireModuleByName("MapContext.jsx") as {
+const { useMapState, useMapOperations } = await requireModuleByName("MapContext.tsx") as {
   useMapState: () => MapStateValue;
   useMapOperations: () => MapOperationsValue;
 };

@@ -26,10 +26,10 @@ import type {
 } from '#types/hooks/textLabelInteraction.types';
 
 // Datacore imports
-const pathResolverPath = dc.resolvePath("pathResolver.js");
+const pathResolverPath = dc.resolvePath("pathResolver.ts");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
-const { applyInverseRotation } = await requireModuleByName("screenPositionUtils.js") as {
+const { applyInverseRotation } = await requireModuleByName("screenPositionUtils.ts") as {
   applyInverseRotation: (x: number, y: number, angle: number, centerX: number, centerY: number) => { x: number; y: number };
 };
 
@@ -45,7 +45,7 @@ interface WorldCoords {
   worldY: number;
 }
 
-const { useMapState, useMapOperations } = await requireModuleByName("MapContext.jsx") as {
+const { useMapState, useMapOperations } = await requireModuleByName("MapContext.tsx") as {
   useMapState: () => {
     canvasRef: React.RefObject<HTMLCanvasElement>;
     mapData: MapData | null;
@@ -62,7 +62,7 @@ const { useMapState, useMapOperations } = await requireModuleByName("MapContext.
   };
 };
 
-const { useMapSelection } = await requireModuleByName("MapSelectionContext.jsx") as {
+const { useMapSelection } = await requireModuleByName("MapSelectionContext.tsx") as {
   useMapSelection: () => {
     selectedItem: SelectedItem | null;
     setSelectedItem: (item: SelectedItem | null) => void;

@@ -1,7 +1,7 @@
 // settingsPluginAssembler.js
 // Assembles the Windrose MapDesigner Settings Plugin from component files
 
-const pathResolverPath = dc.resolvePath("pathResolver.js");
+const pathResolverPath = dc.resolvePath("pathResolver.ts");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
 // Load all component files directly

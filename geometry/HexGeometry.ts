@@ -44,7 +44,7 @@ import type {
 import type { HexBounds } from '#types/core/map.types';
 
 // Datacore imports
-const pathResolverPath = dc.resolvePath("pathResolver.js");
+const pathResolverPath = dc.resolvePath("pathResolver.ts");
 const { requireModuleByName } = await dc.require(pathResolverPath) as {
   requireModuleByName: (name: string) => Promise<unknown>
 };
@@ -53,7 +53,7 @@ const { BaseGeometry } = await requireModuleByName("BaseGeometry.ts") as {
   BaseGeometry: new () => InstanceType<typeof BaseGeometryClass>
 };
 
-const { axialToOffset, offsetToAxial, isWithinOffsetBounds } = await requireModuleByName("offsetCoordinates.js") as {
+const { axialToOffset, offsetToAxial, isWithinOffsetBounds } = await requireModuleByName("offsetCoordinates.ts") as {
   axialToOffset: (q: number, r: number, orientation: string) => OffsetCoords;
   offsetToAxial: (col: number, row: number, orientation: string) => { q: number; r: number };
   isWithinOffsetBounds: (col: number, row: number, maxCol: number, maxRow: number) => boolean;

@@ -10,13 +10,13 @@
 // Type-only imports
 import type { Point } from '#types/core/geometry.types';
 import type { MapData, MapLayer } from '#types/core/map.types';
-import type { MapObject } from '#types/objects/object.types';
+import type { MapObject, ObjectSize } from '#types/objects/object.types';
 import type { TextLabel, FontFace } from './textLabelOperations';
 import type { IGeometry } from '#types/core/geometry.types';
 import type { HexOrientation } from '#types/settings/settings.types';
 
 // Datacore imports
-const pathResolverPath = dc.resolvePath("pathResolver.js");
+const pathResolverPath = dc.resolvePath("pathResolver.ts");
 const { requireModuleByName } = await dc.require(pathResolverPath) as {
   requireModuleByName: (name: string) => Promise<unknown>
 };
@@ -25,7 +25,7 @@ const { getActiveLayer } = await requireModuleByName("layerAccessor.ts") as {
   getActiveLayer: (mapData: MapData) => MapLayer
 };
 
-const { getFontCss } = await requireModuleByName("fontOptions.js") as {
+const { getFontCss } = await requireModuleByName("fontOptions.ts") as {
   getFontCss: (fontFace: FontFace) => string
 };
 
@@ -40,12 +40,6 @@ const { HexGeometry } = await requireModuleByName("HexGeometry.ts") as {
 // ===========================================
 // Type Definitions
 // ===========================================
-
-/** Object size in grid cells (local definition until object.types.ts updated) */
-interface ObjectSize {
-  width: number;
-  height: number;
-}
 
 /** World-coordinate bounding box */
 export interface WorldBounds {

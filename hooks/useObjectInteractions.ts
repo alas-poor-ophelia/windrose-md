@@ -26,7 +26,7 @@ import type {
 import type { SelectedItem } from '#types/hooks/groupDrag.types';
 
 // Datacore imports
-const pathResolverPath = dc.resolvePath("pathResolver.js");
+const pathResolverPath = dc.resolvePath("pathResolver.ts");
 const { requireModuleByName } = await dc.require(pathResolverPath) as {
   requireModuleByName: (name: string) => Promise<unknown>
 };
@@ -85,17 +85,17 @@ interface ScreenPositionResult {
   objectHeight: number;
 }
 
-const { calculateObjectScreenPosition: calculateScreenPos, applyInverseRotation } = await requireModuleByName("screenPositionUtils.js") as {
+const { calculateObjectScreenPosition: calculateScreenPos, applyInverseRotation } = await requireModuleByName("screenPositionUtils.ts") as {
   calculateObjectScreenPosition: (object: MapObject, canvas: HTMLCanvasElement, mapData: MapData, geometry: IGeometry) => ScreenPositionResult | null;
   applyInverseRotation: (x: number, y: number, width: number, height: number, angle: number) => { x: number; y: number };
 };
 
-const { useMapState, useMapOperations } = await requireModuleByName("MapContext.jsx") as {
+const { useMapState, useMapOperations } = await requireModuleByName("MapContext.tsx") as {
   useMapState: () => MapStateValue;
   useMapOperations: () => MapOperationsValue;
 };
 
-const { useMapSelection } = await requireModuleByName("MapSelectionContext.jsx") as {
+const { useMapSelection } = await requireModuleByName("MapSelectionContext.tsx") as {
   useMapSelection: () => MapSelectionValue;
 };
 
@@ -108,7 +108,7 @@ const { calculateEdgeAlignment, getAlignmentOffset, placeObject, canPlaceObjectA
   generateObjectId: () => string;
 };
 
-const { getClickedObjectInCell, getObjectsInCell, canAddObjectToCell, assignSlot } = await requireModuleByName("hexSlotPositioner.js") as {
+const { getClickedObjectInCell, getObjectsInCell, canAddObjectToCell, assignSlot } = await requireModuleByName("hexSlotPositioner.ts") as {
   getClickedObjectInCell: (objects: MapObject[], x: number, y: number, offsetX: number, offsetY: number, orientation: string) => MapObject | null;
   getObjectsInCell: (objects: MapObject[], x: number, y: number) => MapObject[];
   canAddObjectToCell: (objects: MapObject[], x: number, y: number) => boolean;

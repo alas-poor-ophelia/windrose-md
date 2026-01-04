@@ -3,14 +3,18 @@
 
 // Type-only imports
 import type { SegmentName } from '#types/core/cell.types';
-import type { HexBounds } from '#types/core/map.types';
+import type { HexBounds, MapType } from '#types/core/map.types';
+import type { HexColor } from '#types/core/common.types';
+import type {
+  HexOrientation,
+  DiagonalRule,
+  DistanceDisplayFormat,
+} from '#types/settings/settings.types';
+import type { CornerName } from '#types/hooks/diagonalFill.types';
 
 // =============================================================================
 // Type Definitions
 // =============================================================================
-
-/** Hex color string (e.g., "#ff0000") */
-type HexColor = string;
 
 /** Grid visual theme settings */
 interface GridTheme {
@@ -72,18 +76,6 @@ interface CanvasSize {
   width: number;
   height: number;
 }
-
-/** Hex orientation options */
-type HexOrientation = 'flat' | 'pointy';
-
-/** Map type options */
-type MapType = 'grid' | 'hex';
-
-/** Grid diagonal measurement rules */
-type DiagonalRule = 'alternating' | 'equal' | 'euclidean';
-
-/** Distance display format options */
-type DistanceDisplayFormat = 'cells' | 'units' | 'both';
 
 /** Distance measurement settings */
 interface DistanceDefaults {
@@ -157,9 +149,6 @@ interface ExternalEdge {
 // Diagonal Fill Tool Types
 // =============================================================================
 
-/** Corner identifier */
-type CornerName = 'TL' | 'TR' | 'BR' | 'BL';
-
 /** Neighbor offset for corner validation */
 interface NeighborOffset {
   dx: number;
@@ -173,7 +162,7 @@ type DiagonalDirection = 'TL-BR' | 'TR-BL';
 // Datacore Imports
 // =============================================================================
 
-const pathResolverPath = dc.resolvePath("pathResolver.js");
+const pathResolverPath = dc.resolvePath("pathResolver.ts");
 const pathResolverImport = await dc.require(pathResolverPath) as { getJsonPath: () => string };
 const { getJsonPath } = pathResolverImport;
 

@@ -25,17 +25,17 @@ import type {
 } from '#types/hooks/mapData.types';
 
 // Datacore imports
-const pathResolverPath = dc.resolvePath("pathResolver.js");
+const pathResolverPath = dc.resolvePath("pathResolver.ts");
 const { requireModuleByName } = await dc.require(pathResolverPath) as {
   requireModuleByName: (name: string) => Promise<unknown>
 };
 
-const { loadMapData, saveMapData } = await requireModuleByName("fileOperations.js") as {
+const { loadMapData, saveMapData } = await requireModuleByName("fileOperations.ts") as {
   loadMapData: (mapId: string, mapName: string, mapType: MapType) => Promise<MapData>;
   saveMapData: (mapId: string, mapData: MapData) => Promise<boolean>;
 };
 
-const { preloadImage } = await requireModuleByName("imageOperations.js") as {
+const { preloadImage } = await requireModuleByName("imageOperations.ts") as {
   preloadImage: (path: string) => Promise<HTMLImageElement | null>;
 };
 

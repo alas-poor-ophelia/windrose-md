@@ -20,7 +20,7 @@
  * - Edge-to-edge = sqrt(3) * hexSize (flat side to opposite flat side)
  */
 
-import type { HexOrientation } from '#types/settings/settings.types';
+import type { HexOrientation, GridCalculation } from '#types/settings/settings.types';
 
 // ===========================================
 // Type Definitions
@@ -28,13 +28,6 @@ import type { HexOrientation } from '#types/settings/settings.types';
 
 /** Measurement method */
 export type MeasurementMethod = 'edge' | 'corner';
-
-/** Grid calculation result */
-export interface GridCalculation {
-  columns: number;
-  rows: number;
-  hexSize: number;
-}
 
 /** Validation result */
 export interface ValidationResult {

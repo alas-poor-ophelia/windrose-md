@@ -42,7 +42,7 @@ const BUILT_IN_CATEGORIES = {{BUILT_IN_CATEGORIES}};
 
 const CATEGORY_ORDER = {{CATEGORY_ORDER}};
 
-// RPGAwesome icon data - injected from rpgAwesomeIcons.js at install time
+// RPGAwesome icon data - injected from rpgAwesomeIcons.ts at install time
 const RA_ICONS = {{RA_ICONS}};
 
 const RA_CATEGORIES = {{RA_CATEGORIES}};

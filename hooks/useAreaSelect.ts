@@ -18,7 +18,7 @@ import type {
 } from '#types/hooks/areaSelect.types';
 
 // Datacore imports
-const pathResolverPath = dc.resolvePath("pathResolver.js");
+const pathResolverPath = dc.resolvePath("pathResolver.ts");
 const { requireModuleByName } = await dc.require(pathResolverPath) as {
   requireModuleByName: (name: string) => Promise<unknown>
 };
@@ -40,12 +40,12 @@ interface MapSelectionValue {
   clearSelection: () => void;
 }
 
-const { useMapState, useMapOperations } = await requireModuleByName("MapContext.jsx") as {
+const { useMapState, useMapOperations } = await requireModuleByName("MapContext.tsx") as {
   useMapState: () => MapStateValue;
   useMapOperations: () => unknown;
 };
 
-const { useMapSelection } = await requireModuleByName("MapSelectionContext.jsx") as {
+const { useMapSelection } = await requireModuleByName("MapSelectionContext.tsx") as {
   useMapSelection: () => MapSelectionValue;
 };
 

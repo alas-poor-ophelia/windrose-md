@@ -21,7 +21,7 @@ import type { UseCanvasInteractionResult } from '#types/hooks/canvasInteraction.
 import type { PanZoomHandlers } from '#types/hooks/eventCoordinator.types';
 
 // Datacore imports
-const pathResolverPath = dc.resolvePath("pathResolver.js");
+const pathResolverPath = dc.resolvePath("pathResolver.ts");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
 const { useCanvasInteraction } = await requireModuleByName("useCanvasInteraction.ts") as {
@@ -34,14 +34,14 @@ const { useCanvasInteraction } = await requireModuleByName("useCanvasInteraction
   ) => UseCanvasInteractionResult;
 };
 
-const { useEventHandlerRegistration } = await requireModuleByName("EventHandlerContext.jsx") as {
+const { useEventHandlerRegistration } = await requireModuleByName("EventHandlerContext.tsx") as {
   useEventHandlerRegistration: () => {
     registerHandlers: (layer: string, handlers: Record<string, unknown>) => void;
     unregisterHandlers: (layer: string) => void;
   };
 };
 
-const { useMapOperations } = await requireModuleByName("MapContext.jsx") as {
+const { useMapOperations } = await requireModuleByName("MapContext.tsx") as {
   useMapOperations: () => {
     onMapDataUpdate: ((updates: { viewState?: ViewState }) => void) | null;
   };

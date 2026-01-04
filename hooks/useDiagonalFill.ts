@@ -28,7 +28,7 @@ import type {
 } from '#types/hooks/diagonalFill.types';
 
 // Datacore imports
-const pathResolverPath = dc.resolvePath("pathResolver.js");
+const pathResolverPath = dc.resolvePath("pathResolver.ts");
 const { requireModuleByName } = await dc.require(pathResolverPath) as {
   requireModuleByName: (name: string) => Promise<unknown>
 };
@@ -46,7 +46,7 @@ interface MapOperationsValue {
   onCellsChange: (cells: Cell[], skipHistory?: boolean) => void;
 }
 
-const { useMapState, useMapOperations } = await requireModuleByName("MapContext.jsx") as {
+const { useMapState, useMapOperations } = await requireModuleByName("MapContext.tsx") as {
   useMapState: () => MapStateValue;
   useMapOperations: () => MapOperationsValue;
 };

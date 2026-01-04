@@ -1,8 +1,8 @@
-const pathResolverPath = dc.resolvePath("pathResolver.js");
+const pathResolverPath = dc.resolvePath("pathResolver.ts");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
 // Use resolver for dynamic object types (supports overrides and custom objects)
-const { getResolvedObjectTypes, getResolvedCategories, hasIconClass } = await requireModuleByName("objectTypeResolver.js");
+const { getResolvedObjectTypes, getResolvedCategories, hasIconClass } = await requireModuleByName("objectTypeResolver.ts");
 
 // Ornamental Arrow SVG - Double Chevron Design
 const OrnamentalArrow = ({ direction = "right" }) => {

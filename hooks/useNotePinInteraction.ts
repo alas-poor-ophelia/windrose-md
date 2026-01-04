@@ -18,10 +18,10 @@ import type {
 } from '#types/hooks/notePinInteraction.types';
 
 // Datacore imports
-const pathResolverPath = dc.resolvePath("pathResolver.js");
+const pathResolverPath = dc.resolvePath("pathResolver.ts");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
-const { useMapState, useMapOperations } = await requireModuleByName("MapContext.jsx") as {
+const { useMapState, useMapOperations } = await requireModuleByName("MapContext.tsx") as {
   useMapState: () => {
     mapData: MapData | null;
   };
@@ -34,7 +34,7 @@ const { useMapState, useMapOperations } = await requireModuleByName("MapContext.
   };
 };
 
-const { useMapSelection } = await requireModuleByName("MapSelectionContext.jsx") as {
+const { useMapSelection } = await requireModuleByName("MapSelectionContext.tsx") as {
   useMapSelection: () => {
     showNoteLinkModal: boolean;
     setShowNoteLinkModal: (show: boolean) => void;

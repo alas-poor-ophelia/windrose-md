@@ -23,7 +23,7 @@ import type {
 import type { App, TFile } from 'obsidian';
 
 // Datacore imports
-const pathResolverPath = dc.resolvePath("pathResolver.js");
+const pathResolverPath = dc.resolvePath("pathResolver.ts");
 const { requireModuleByName } = await dc.require(pathResolverPath) as {
   requireModuleByName: (name: string) => Promise<unknown>
 };
@@ -32,7 +32,7 @@ const { getActiveLayer } = await requireModuleByName("layerAccessor.ts") as {
   getActiveLayer: (mapData: MapData) => MapLayer
 };
 
-const { getFontCss } = await requireModuleByName("fontOptions.js") as {
+const { getFontCss } = await requireModuleByName("fontOptions.ts") as {
   getFontCss: (fontFace: FontFace) => string
 };
 
