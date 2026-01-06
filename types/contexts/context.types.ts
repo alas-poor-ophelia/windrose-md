@@ -7,7 +7,7 @@
  */
 
 import type { MapObject } from '../objects/object.types';
-import type { TextLabel } from '../objects/note.types';
+import type { TextLabel, NotePin } from '../objects/note.types';
 import type { IGeometry, Point } from '../core/geometry.types';
 import type { MapData } from '../core/map.types';
 import type { Cell } from '../core/cell.types';
@@ -71,12 +71,12 @@ export interface MapOperationsContextValue {
   onObjectsChange: (objects: MapObject[]) => void;
   onTextLabelsChange: (labels: TextLabel[]) => void;
   onEdgesChange: (edges: Edge[], skipHistory?: boolean) => void;
-  onNotePinsChange?: (pins: unknown[]) => void;
+  onNotePinsChange?: (pins: NotePin[]) => void;
   onMapDataUpdate?: (updater: (data: MapData | null) => MapData | null) => void;
   getTextLabelAtPosition: (labels: TextLabel[], worldX: number, worldY: number, ctx: CanvasRenderingContext2D | null) => TextLabel | null;
   removeTextLabel: (labels: TextLabel[], id: string) => TextLabel[];
   getObjectAtPosition: (objects: MapObject[], x: number, y: number) => MapObject | null;
   removeObjectAtPosition: (objects: MapObject[], x: number, y: number) => MapObject[];
   removeObjectsInRectangle: (objects: MapObject[], x1: number, y1: number, x2: number, y2: number) => MapObject[];
-  getNotePinAtPosition?: (pins: unknown[], worldX: number, worldY: number, cellSize: number) => unknown | null;
+  getNotePinAtPosition?: (pins: NotePin[], worldX: number, worldY: number, cellSize: number) => NotePin | null;
 }

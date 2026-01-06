@@ -11,6 +11,7 @@ import type { Cell } from '../core/cell.types';
 import type { MapObject } from '../objects/object.types';
 import type { TextLabel } from '../objects/note.types';
 import type { HexColor } from '../core/common.types';
+import type { Edge } from '../contexts/context.types';
 
 // ===========================================
 // Hook Options
@@ -34,7 +35,7 @@ export interface MapHistorySnapshot {
   name: string;
   objects: MapObject[];
   textLabels: TextLabel[];
-  edges: unknown[];
+  edges: Edge[];
 }
 
 // ===========================================
@@ -66,7 +67,7 @@ export type HandleObjectsChange = LayerDataChangeHandler<MapObject[]>;
 export type HandleTextLabelsChange = LayerDataChangeHandler<TextLabel[]>;
 
 /** Handle edges change */
-export type HandleEdgesChange = LayerDataChangeHandler<unknown[]>;
+export type HandleEdgesChange = LayerDataChangeHandler<Edge[]>;
 
 /** Handle map name change */
 export type HandleNameChange = (newName: string) => void;

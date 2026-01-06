@@ -5,7 +5,7 @@ This map is used for automated E2E testing of Windrose hex maps. Do not delete.
 ```datacorejsx
 window.__dmtBasePath = "Projects/dungeon-map-tracker";
 
-const { DungeonMapTracker } = await dc.require("Projects/dungeon-map-tracker/DungeonMapTracker.jsx");
+const { DungeonMapTracker } = await dc.require("Projects/dungeon-map-tracker/DungeonMapTracker.tsx");
 
 const mapId = "smoke-test-hex-001";
 const mapName = "Smoke Test Hex Map";

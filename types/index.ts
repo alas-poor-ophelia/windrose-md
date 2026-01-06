@@ -89,7 +89,6 @@ export type {
   // Object type definitions
   ObjectType,
   ObjectTypeDefinition,
-  ObjectTypeDef, // deprecated
   // Category definitions
   Category,
   CategoryDefinition,
@@ -307,6 +306,7 @@ export type {
   FogHandlers,
   AreaSelectHandlers,
   HandlerLayerName,
+  HandlerTypeMap,
   GetHandlers,
 } from './hooks/eventCoordinator.types';
 

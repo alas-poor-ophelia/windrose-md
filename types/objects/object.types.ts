@@ -44,7 +44,7 @@ export interface ObjectType {
   id: ObjectTypeId;
   symbol: string;
   label: string;
-  category: string;
+  category: ObjectCategory;
 }
 
 /**
@@ -56,7 +56,7 @@ export interface ObjectTypeDefinition {
   symbol?: string;           // Unicode symbol (optional if iconClass set)
   iconClass?: string;        // RPGAwesome icon class (optional if symbol set)
   label: string;
-  category: string;
+  category: ObjectCategory;
   order?: number;            // Sort order in UI
   isBuiltIn?: boolean;       // True for built-in objects
   isModified?: boolean;      // True if built-in was customized
@@ -140,7 +140,7 @@ export type ObjectId = string;
 
 export interface MapObject {
   id: ObjectId;
-  type: string;           // typeId reference
+  type: ObjectTypeId;     // typeId reference
   position: Point;
   size: ObjectSize;
   label?: string;

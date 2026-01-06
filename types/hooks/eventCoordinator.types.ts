@@ -179,5 +179,18 @@ export type HandlerLayerName =
   | 'fogOfWar'
   | 'areaSelect';
 
-/** Handler getter function type */
-export type GetHandlers = (layer: HandlerLayerName) => unknown;
+/** Handler type mapping for each layer */
+export interface HandlerTypeMap {
+  drawing: RegisteredDrawingHandlers;
+  object: ObjectHandlers;
+  text: TextHandlers;
+  notePin: NotePinHandlers;
+  panZoom: PanZoomHandlers;
+  measure: MeasureHandlers;
+  imageAlignment: AlignmentHandlers;
+  fogOfWar: FogHandlers;
+  areaSelect: AreaSelectHandlers;
+}
+
+/** Type-safe handler getter function */
+export type GetHandlers = <T extends HandlerLayerName>(layer: T) => HandlerTypeMap[T];
