@@ -6,6 +6,11 @@
   "minifyEnabled": false,
   "obfuscateEnabled": false,
   "version": "1.5.0",
-  "additionalFiles": [],
+  "additionalFiles": [
+    {
+      "path": "Projects/dungeon-map-tracker/generation/dungeonGenerator.js",
+      "compileIntoBuild": false
+    }
+  ],
   "postScript": "Projects/dungeon-map-tracker/finalize-release.js"
 }
