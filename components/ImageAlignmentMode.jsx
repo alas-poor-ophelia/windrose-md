@@ -1,7 +1,7 @@
-const pathResolverPath = dc.resolvePath("pathResolver.js");
+const pathResolverPath = dc.resolvePath("pathResolver.ts");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
-const { ModalPortal } = await requireModuleByName("ModalPortal.jsx");
+const { ModalPortal } = await requireModuleByName("ModalPortal.tsx");
 
 /**
  * Image Alignment Mode - Interactive image positioning control panel

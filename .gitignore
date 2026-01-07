@@ -1,3 +1,14 @@
+# Dependencies
+node_modules/
+
+# TypeScript generated
+types/generated/
+*.tsbuildinfo
+
+# npm
+npm-debug.log*
+.npm
+
 # OS-specific files
 .DS_Store
 Thumbs.db
@@ -30,3 +41,12 @@ DungeonMapTracker.md
 
 # Generated docs                                                                                    
 docs/specs
+
+# Agentic
+CLAUDE.md
+**/CLAUDE.md
+
+# Specs (handled separately)
+docs/specs/
+
+

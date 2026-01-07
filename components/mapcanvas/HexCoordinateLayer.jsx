@@ -9,13 +9,13 @@
  * Only renders for hex maps when showCoordinates is true (toggled by 'C' key)
  */
 
-const pathResolverPath = dc.resolvePath("pathResolver.js");
+const pathResolverPath = dc.resolvePath("pathResolver.ts");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
-const { useMapState } = await requireModuleByName("MapContext.jsx");
-const { useMapSelection } = await requireModuleByName("MapSelectionContext.jsx");
-const { axialToOffset, offsetToAxial, columnToLabel, rowToLabel } = await requireModuleByName("offsetCoordinates.js");
-const { getEffectiveSettings } = await requireModuleByName("settingsAccessor.js");
+const { useMapState } = await requireModuleByName("MapContext.tsx");
+const { useMapSelection } = await requireModuleByName("MapSelectionContext.tsx");
+const { axialToOffset, offsetToAxial, columnToLabel, rowToLabel } = await requireModuleByName("offsetCoordinates.ts");
+const { getEffectiveSettings } = await requireModuleByName("settingsAccessor.ts");
 
 /**
  * Calculate the ring (distance from origin) for a hex in axial coordinates

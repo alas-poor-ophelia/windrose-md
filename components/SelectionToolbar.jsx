@@ -5,13 +5,13 @@
  * Consolidates all action buttons into a single horizontal toolbar with context-aware buttons.
  */
 
-const pathResolverPath = dc.resolvePath("pathResolver.js");
+const pathResolverPath = dc.resolvePath("pathResolver.ts");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
-const { calculateObjectScreenPosition } = await requireModuleByName("screenPositionUtils.js");
-const { openNoteInNewTab } = await requireModuleByName("noteOperations.js");
-const { ColorPicker } = await requireModuleByName("ColorPicker.jsx");
-const { getActiveLayer } = await requireModuleByName("layerAccessor.js");
+const { calculateObjectScreenPosition } = await requireModuleByName("screenPositionUtils.ts");
+const { openNoteInNewTab } = await requireModuleByName("noteOperations.ts");
+const { ColorPicker } = await requireModuleByName("ColorPicker.tsx");
+const { getActiveLayer } = await requireModuleByName("layerAccessor.ts");
 
 /**
  * Calculate bounding box that encompasses all selected items
@@ -191,7 +191,7 @@ const MultiSelectToolbar = ({
       <button
         className="dmt-toolbar-button"
         onClick={onRotateAll}
-        title="Rotate All 90Â°"
+        title="Rotate All 90°"
       >
         <dc.Icon icon="lucide-rotate-cw" />
       </button>
@@ -544,7 +544,7 @@ const SelectionToolbar = ({
               onClick={(e) => {
                 if (onRotate) onRotate(e);
               }}
-              title="Rotate 90Ãƒâ€šÃ‚Â° (or press R)"
+              title="Rotate 90° (or press R)"
             >
               <dc.Icon icon="lucide-rotate-cw" />
             </button>
@@ -657,7 +657,7 @@ const SelectionToolbar = ({
             <button
               className="dmt-toolbar-button"
               onClick={onRotate}
-              title="Rotate 90Ãƒâ€šÃ‚Â° (or press R)"
+              title="Rotate 90° (or press R)"
             >
               <dc.Icon icon="lucide-rotate-cw" />
             </button>

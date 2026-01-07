@@ -7,10 +7,10 @@
  * anchored near the target cell.
  */
 
-const pathResolverPath = dc.resolvePath("pathResolver.js");
+const pathResolverPath = dc.resolvePath("pathResolver.ts");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
-const { GridGeometry } = await requireModuleByName("GridGeometry.js");
+const { GridGeometry } = await requireModuleByName("GridGeometry.ts");
 
 /**
  * Convert cell coordinates to screen coordinates
@@ -108,11 +108,22 @@ const MeasurementOverlay = ({
   const canvasRect = canvas.getBoundingClientRect();
   const displayScale = canvasRect.width / canvasWidth;
   
-  // Get canvas offset within its container (SVG is positioned relative to container)
-  const containerRect = canvas.parentElement?.getBoundingClientRect();
+  // Find the flex container (dmt-canvas-container) that the SVG is positioned relative to
+  // Canvas may be nested inside wrapper divs, so traverse up to find the actual container
+  let flexContainer = canvas.parentElement;
+  let traversalCount = 0;
+  while (flexContainer?.classList && !flexContainer.classList.contains('dmt-canvas-container')) {
+    flexContainer = flexContainer.parentElement;
+    traversalCount++;
+    if (traversalCount > 10) {
+      console.warn('[MeasurementOverlay] Could not find dmt-canvas-container after 10 levels');
+      break;
+    }
+  }
+  const containerRect = flexContainer?.getBoundingClientRect();
   const canvasOffsetX = containerRect ? canvasRect.left - containerRect.left : 0;
   const canvasOffsetY = containerRect ? canvasRect.top - containerRect.top : 0;
-  
+
   // Calculate screen coordinates for origin and target
   const originScreen = cellToScreen(
     measureOrigin.x, measureOrigin.y,
@@ -132,7 +143,7 @@ const MeasurementOverlay = ({
     x: targetScreen.x * displayScale + canvasOffsetX,
     y: targetScreen.y * displayScale + canvasOffsetY
   };
-  
+
   const tooltipX = scaledTarget.x + 15;
   const tooltipY = scaledTarget.y - 30;
   

@@ -6,12 +6,12 @@
  * Only renders if the map has generationSettings.
  */
 
-const pathResolverPath = dc.resolvePath("pathResolver.js");
+const pathResolverPath = dc.resolvePath("pathResolver.ts");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
-const { useMapState, useMapOperations } = await requireModuleByName("MapContext.jsx");
+const { useMapState, useMapOperations } = await requireModuleByName("MapContext.tsx");
 const { generateDungeon } = await requireModuleByName("dungeonGenerator.js");
-const { ModalPortal } = await requireModuleByName("ModalPortal.jsx");
+const { ModalPortal } = await requireModuleByName("ModalPortal.tsx");
 
 const RerollDungeonButton = () => {
   const { mapData } = useMapState();

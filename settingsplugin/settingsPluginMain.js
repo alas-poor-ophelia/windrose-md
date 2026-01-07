@@ -33,7 +33,7 @@ const { Plugin, PluginSettingTab, Setting, Modal, setIcon } = require('obsidian'
 
 // =============================================================================
 // DATA CONSTANTS
-// Injected from objectTypes.js at install time - single source of truth
+// Injected from objectTypes.ts at install time - single source of truth
 // =============================================================================
 
 const BUILT_IN_OBJECTS = {{BUILT_IN_OBJECTS}};
@@ -42,7 +42,7 @@ const BUILT_IN_CATEGORIES = {{BUILT_IN_CATEGORIES}};
 
 const CATEGORY_ORDER = {{CATEGORY_ORDER}};
 
-// RPGAwesome icon data - injected from rpgAwesomeIcons.js at install time
+// RPGAwesome icon data - injected from rpgAwesomeIcons.ts at install time
 const RA_ICONS = {{RA_ICONS}};
 
 const RA_CATEGORIES = {{RA_CATEGORIES}};

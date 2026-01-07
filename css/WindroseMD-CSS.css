@@ -356,7 +356,8 @@
 .dmt-canvas-cleararea,
 .dmt-canvas-add-object,
 .dmt-canvas-add-text,
-.dmt-canvas-measure {
+.dmt-canvas-measure,
+.dmt-canvas-diagonal-fill {
   cursor: crosshair;
 }
 
@@ -500,6 +501,7 @@
   padding: 4px;
   display: flex;
   flex-direction: column;
+  align-items: stretch;
   gap: 2px;
   z-index: 1001;
   box-shadow: 
@@ -511,6 +513,7 @@
 .dmt-subtool-option {
   display: flex;
   align-items: center;
+  justify-content: flex-start;
   gap: 8px;
   padding: 8px 12px;
   border: none;
@@ -521,11 +524,15 @@
   white-space: nowrap;
   font-size: 13px;
   transition: var(--dmt-transition);
+  width: 100%;
+  text-align: left;
+  box-sizing: border-box;
 
   svg {
     width: 16px;
     height: 16px;
     color: var(--dmt-border-primary);
+    flex-shrink: 0;
   }
 
   &:hover {
@@ -2968,12 +2975,40 @@ button.dmt-fow-tool-btn,
   opacity: 0;
   pointer-events: none;
   transition: left 0.3s ease, opacity 200ms ease-out, transform 200ms ease-out;
+  /* Constrain height to canvas and enable scrolling */
+  max-height: calc(100% - 80px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  /* Padding for slide-out options menu (so it doesn't get clipped) */
+  padding-right: 40px;
+  margin-right: -40px;
+  /* Custom scrollbar styling */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(196, 165, 123, 0.4) transparent;
 }
 
 .dmt-layer-controls.dmt-layer-controls-open {
   opacity: 1;
   transform: translateY(-50%) translateX(0);
   pointer-events: auto;
+}
+
+/* Webkit scrollbar styling for layer controls */
+.dmt-layer-controls::-webkit-scrollbar {
+  width: 4px;
+}
+
+.dmt-layer-controls::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.dmt-layer-controls::-webkit-scrollbar-thumb {
+  background: rgba(196, 165, 123, 0.4);
+  border-radius: 2px;
+}
+
+.dmt-layer-controls::-webkit-scrollbar-thumb:hover {
+  background: rgba(196, 165, 123, 0.6);
 }
 
 .dmt-layer-controls.sidebar-open {

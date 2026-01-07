@@ -1,9 +1,9 @@
 // components/LinkedNoteHoverOverlays.jsx - Invisible hover links for objects with linked notes
-const pathResolverPath = dc.resolvePath("pathResolver.js");
+const pathResolverPath = dc.resolvePath("pathResolver.ts");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
-const { calculateObjectScreenPosition } = await requireModuleByName("screenPositionUtils.js");
-const { openNoteInNewTab } = await requireModuleByName("noteOperations.js");
+const { calculateObjectScreenPosition } = await requireModuleByName("screenPositionUtils.ts");
+const { openNoteInNewTab } = await requireModuleByName("noteOperations.ts");
 
 const LinkedNoteHoverOverlays = ({ canvasRef, mapData, selectedItem, geometry }) => {
   // Don't render anything if prerequisites aren't met

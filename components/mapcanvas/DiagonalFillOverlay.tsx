@@ -1,0 +1,316 @@
+/**
+ * DiagonalFillOverlay.tsx
+ *
+ * Overlay component for diagonal fill tool.
+ * Manages tool state via useDiagonalFill hook, registers event handlers,
+ * and renders SVG preview showing where the diagonal fill will be applied.
+ *
+ * The diagonal fill tool fills "concave corners" along staircase diagonals
+ * by painting 4 segments (half-cell) in each gap, creating smooth diagonal edges.
+ */
+
+import type { ToolId } from '#types/tools/tool.types';
+import type { Point } from '#types/core/geometry.types';
+import type { IGeometry } from '#types/core/geometry.types';
+
+const pathResolverPath = dc.resolvePath("pathResolver.ts");
+const { requireModuleByName } = await dc.require(pathResolverPath);
+
+const { GridGeometry } = await requireModuleByName("GridGeometry.ts");
+const { useDiagonalFill } = await requireModuleByName("useDiagonalFill.ts");
+const { useMapState } = await requireModuleByName("MapContext.tsx");
+const { useEventHandlerRegistration } = await requireModuleByName("EventHandlerContext.tsx");
+
+/** Corner names for cell corners */
+type CornerName = 'TL' | 'TR' | 'BR' | 'BL';
+
+/** Fill start point with corner info */
+interface FillStartPoint {
+  x: number;
+  y: number;
+  corner: CornerName;
+}
+
+/** Fill end point */
+interface FillEndPoint {
+  x: number;
+  y: number;
+}
+
+/** Map data structure */
+interface MapData {
+  viewState: {
+    zoom: number;
+    center: Point;
+  };
+  northDirection?: number;
+}
+
+/** Grid geometry with cellSize property */
+interface GridGeometryInstance extends IGeometry {
+  cellSize: number;
+}
+
+/** Props for DiagonalFillOverlay component */
+export interface DiagonalFillOverlayProps {
+  /** Current active tool */
+  currentTool: ToolId;
+}
+
+/** Props for CornerIndicator component */
+interface CornerIndicatorProps {
+  x: number;
+  y: number;
+  corner: CornerName;
+  size?: number;
+}
+
+/**
+ * Convert cell corner to screen coordinates
+ */
+function cornerToScreen(
+  cellX: number,
+  cellY: number,
+  corner: CornerName,
+  geometry: GridGeometryInstance,
+  mapData: MapData,
+  canvasWidth: number,
+  canvasHeight: number
+): Point {
+  const { zoom, center } = mapData.viewState;
+  const northDirection = mapData.northDirection || 0;
+  const cellSize = geometry.cellSize;
+
+  const cornerWorldOffsets: Record<CornerName, Point> = {
+    'TL': { x: 0, y: 0 },
+    'TR': { x: 1, y: 0 },
+    'BR': { x: 1, y: 1 },
+    'BL': { x: 0, y: 1 }
+  };
+
+  const cornerOffset = cornerWorldOffsets[corner];
+  const worldX = (cellX + cornerOffset.x) * cellSize;
+  const worldY = (cellY + cornerOffset.y) * cellSize;
+
+  const scaledCellSize = geometry.getScaledCellSize(zoom);
+  const offsetX = canvasWidth / 2 - center.x * scaledCellSize;
+  const offsetY = canvasHeight / 2 - center.y * scaledCellSize;
+
+  let screenX = offsetX + worldX * zoom;
+  let screenY = offsetY + worldY * zoom;
+
+  if (northDirection !== 0) {
+    const centerX = canvasWidth / 2;
+    const centerY = canvasHeight / 2;
+
+    screenX -= centerX;
+    screenY -= centerY;
+
+    const angleRad = (northDirection * Math.PI) / 180;
+    const rotatedX = screenX * Math.cos(angleRad) - screenY * Math.sin(angleRad);
+    const rotatedY = screenX * Math.sin(angleRad) + screenY * Math.cos(angleRad);
+
+    screenX = rotatedX + centerX;
+    screenY = rotatedY + centerY;
+  }
+
+  return { x: screenX, y: screenY };
+}
+
+/**
+ * Small triangle indicator showing which corner was clicked
+ */
+const CornerIndicator = ({ x, y, corner, size = 12 }: CornerIndicatorProps): React.ReactElement | null => {
+  const halfSize = size / 2;
+
+  const trianglePoints: Record<CornerName, string> = {
+    'TL': `${x},${y} ${x - halfSize},${y - size} ${x - size},${y - halfSize}`,
+    'TR': `${x},${y} ${x + halfSize},${y - size} ${x + size},${y - halfSize}`,
+    'BR': `${x},${y} ${x + halfSize},${y + size} ${x + size},${y + halfSize}`,
+    'BL': `${x},${y} ${x - halfSize},${y + size} ${x - size},${y + halfSize}`
+  };
+
+  const points = trianglePoints[corner];
+  if (!points) return null;
+
+  return (
+    <polygon
+      points={points}
+      fill="rgba(0, 212, 255, 0.6)"
+      stroke="#00d4ff"
+      strokeWidth={1}
+    />
+  );
+};
+
+const DiagonalFillOverlay = ({ currentTool }: DiagonalFillOverlayProps): React.ReactElement | null => {
+  const {
+    mapData,
+    geometry,
+    canvasRef
+  } = useMapState();
+
+  const {
+    fillStart,
+    fillEnd,
+    isEndLocked,
+    previewEnd,
+    handleDiagonalFillClick,
+    handleDiagonalFillMove,
+    cancelFill
+  } = useDiagonalFill(currentTool);
+
+  const { registerHandlers, unregisterHandlers } = useEventHandlerRegistration();
+
+  dc.useEffect(() => {
+    registerHandlers('diagonalFill', {
+      handleDiagonalFillClick,
+      handleDiagonalFillMove,
+      cancelFill,
+      fillStart
+    });
+    return () => unregisterHandlers('diagonalFill');
+  }, [registerHandlers, unregisterHandlers, handleDiagonalFillClick, handleDiagonalFillMove, cancelFill, fillStart]);
+
+  if (currentTool !== 'diagonalFill' || !fillStart || !geometry || !mapData || !canvasRef?.current) {
+    return null;
+  }
+
+  if (!(geometry instanceof GridGeometry)) {
+    return null;
+  }
+
+  const displayEnd: FillEndPoint | null = fillEnd || previewEnd;
+
+  const canvas = canvasRef.current;
+  const { width: canvasWidth, height: canvasHeight } = canvas;
+  const canvasRect = canvas.getBoundingClientRect();
+  const displayScale = canvasRect.width / canvasWidth;
+
+  let flexContainer: HTMLElement | null = canvas.parentElement;
+  while (flexContainer && !flexContainer.classList.contains('dmt-canvas-container')) {
+    flexContainer = flexContainer.parentElement;
+  }
+  const containerRect = flexContainer?.getBoundingClientRect();
+  const canvasOffsetX = containerRect ? canvasRect.left - containerRect.left : 0;
+  const canvasOffsetY = containerRect ? canvasRect.top - containerRect.top : 0;
+
+  const startScreen = cornerToScreen(
+    fillStart.x,
+    fillStart.y,
+    fillStart.corner,
+    geometry as GridGeometryInstance,
+    mapData,
+    canvasWidth,
+    canvasHeight
+  );
+
+  const scaledStart = {
+    x: startScreen.x * displayScale + canvasOffsetX,
+    y: startScreen.y * displayScale + canvasOffsetY
+  };
+
+  let scaledEnd: Point | null = null;
+  if (displayEnd) {
+    const endScreen = cornerToScreen(
+      displayEnd.x,
+      displayEnd.y,
+      fillStart.corner,
+      geometry as GridGeometryInstance,
+      mapData,
+      canvasWidth,
+      canvasHeight
+    );
+
+    scaledEnd = {
+      x: endScreen.x * displayScale + canvasOffsetX,
+      y: endScreen.y * displayScale + canvasOffsetY
+    };
+  }
+
+  return (
+    <svg
+      className="dmt-diagonal-fill-overlay"
+      style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        width: '100%',
+        height: '100%',
+        pointerEvents: 'none',
+        zIndex: 100,
+        overflow: 'visible'
+      }}
+    >
+      {scaledEnd && (
+        <line
+          x1={scaledStart.x}
+          y1={scaledStart.y}
+          x2={scaledEnd.x}
+          y2={scaledEnd.y}
+          stroke="#00d4ff"
+          strokeWidth={2.5}
+          strokeDasharray={isEndLocked ? "none" : "8,4"}
+          strokeLinecap="round"
+        />
+      )}
+
+      <circle
+        cx={scaledStart.x}
+        cy={scaledStart.y}
+        r={8}
+        fill="rgba(0, 212, 255, 0.8)"
+        stroke="#00d4ff"
+        strokeWidth={2}
+      />
+
+      <CornerIndicator
+        x={scaledStart.x}
+        y={scaledStart.y}
+        corner={fillStart.corner}
+        size={12}
+      />
+
+      {scaledEnd && (
+        <>
+          <circle
+            cx={scaledEnd.x}
+            cy={scaledEnd.y}
+            r={isEndLocked ? 7 : 5}
+            fill={isEndLocked ? "rgba(0, 212, 255, 0.9)" : "rgba(0, 212, 255, 0.6)"}
+            stroke="#00d4ff"
+            strokeWidth={isEndLocked ? 2 : 1.5}
+          />
+
+          {isEndLocked && (
+            <g transform={`translate(${scaledEnd.x + 15}, ${scaledEnd.y - 20})`}>
+              <rect
+                x={0}
+                y={-12}
+                width={70}
+                height={24}
+                rx={4}
+                fill="rgba(26, 26, 26, 0.95)"
+                stroke="#00d4ff"
+                strokeWidth={1}
+              />
+              <text
+                x={35}
+                y={4}
+                textAnchor="middle"
+                fill="#ffffff"
+                fontSize={11}
+                fontFamily="var(--font-interface, -apple-system, BlinkMacSystemFont, sans-serif)"
+                fontWeight="500"
+              >
+                Tap to fill
+              </text>
+            </g>
+          )}
+        </>
+      )}
+    </svg>
+  );
+};
+
+return { DiagonalFillOverlay };
