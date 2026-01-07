@@ -27,3 +27,6 @@ DungeonMapTracker.md
 # Temporary files
 *.tmp
 *.log
+
+# Generated docs                                                                                    
+docs/specs
