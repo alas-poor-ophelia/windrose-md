@@ -2975,12 +2975,40 @@ button.dmt-fow-tool-btn,
   opacity: 0;
   pointer-events: none;
   transition: left 0.3s ease, opacity 200ms ease-out, transform 200ms ease-out;
+  /* Constrain height to canvas and enable scrolling */
+  max-height: calc(100% - 80px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  /* Padding for slide-out options menu (so it doesn't get clipped) */
+  padding-right: 40px;
+  margin-right: -40px;
+  /* Custom scrollbar styling */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(196, 165, 123, 0.4) transparent;
 }
 
 .dmt-layer-controls.dmt-layer-controls-open {
   opacity: 1;
   transform: translateY(-50%) translateX(0);
   pointer-events: auto;
+}
+
+/* Webkit scrollbar styling for layer controls */
+.dmt-layer-controls::-webkit-scrollbar {
+  width: 4px;
+}
+
+.dmt-layer-controls::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.dmt-layer-controls::-webkit-scrollbar-thumb {
+  background: rgba(196, 165, 123, 0.4);
+  border-radius: 2px;
+}
+
+.dmt-layer-controls::-webkit-scrollbar-thumb:hover {
+  background: rgba(196, 165, 123, 0.6);
 }
 
 .dmt-layer-controls.sidebar-open {

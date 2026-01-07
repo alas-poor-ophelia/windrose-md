@@ -60,44 +60,17 @@ const {
 } = await requireModuleByName("hexMeasurements.ts");
 
 // ===========================================
-// Types
+// Local Types (context-specific, not in #types/)
 // ===========================================
 
-/** Map type identifier */
-export type MapType = 'grid' | 'hex';
-
-/** Settings tab identifiers */
-export type SettingsTabId = 'appearance' | 'hexgrid' | 'measurement' | 'preferences';
-
-/** Tab definition */
+/** Tab definition for settings modal */
 export interface SettingsTab {
   id: SettingsTabId;
   label: string;
 }
 
-/** Grid density preset identifiers */
-export type GridDensity = 'sparse' | 'medium' | 'dense' | 'custom';
-
-/** Sizing mode for hex background images */
-export type SizingMode = 'density' | 'measurement';
-
-/** Measurement method for hex sizing */
-export type MeasurementMethod = 'edge' | 'corner';
-
-/** Coordinate display mode */
+/** Coordinate display mode for hex maps */
 export type CoordinateDisplayMode = 'none' | 'offset' | 'axial';
-
-/** Hex bounds configuration */
-export interface HexBounds {
-  maxCol: number;
-  maxRow: number;
-}
-
-/** Image dimensions */
-export interface ImageDimensions {
-  width: number;
-  height: number;
-}
 
 /** Background image configuration */
 export interface BackgroundImageConfig {

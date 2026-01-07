@@ -191,7 +191,7 @@ const MultiSelectToolbar = ({
       <button
         className="dmt-toolbar-button"
         onClick={onRotateAll}
-        title="Rotate All 90Â°"
+        title="Rotate All 90°"
       >
         <dc.Icon icon="lucide-rotate-cw" />
       </button>
@@ -544,7 +544,7 @@ const SelectionToolbar = ({
               onClick={(e) => {
                 if (onRotate) onRotate(e);
               }}
-              title="Rotate 90Ãƒâ€šÃ‚Â° (or press R)"
+              title="Rotate 90° (or press R)"
             >
               <dc.Icon icon="lucide-rotate-cw" />
             </button>
@@ -657,7 +657,7 @@ const SelectionToolbar = ({
             <button
               className="dmt-toolbar-button"
               onClick={onRotate}
-              title="Rotate 90Ãƒâ€šÃ‚Â° (or press R)"
+              title="Rotate 90° (or press R)"
             >
               <dc.Icon icon="lucide-rotate-cw" />
             </button>

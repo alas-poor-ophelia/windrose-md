@@ -123,19 +123,7 @@ const MeasurementOverlay = ({
   const containerRect = flexContainer?.getBoundingClientRect();
   const canvasOffsetX = containerRect ? canvasRect.left - containerRect.left : 0;
   const canvasOffsetY = containerRect ? canvasRect.top - containerRect.top : 0;
-  
-  // DEBUG: Log coordinate calculations
-  console.log('[MeasurementOverlay] Debug:', {
-    traversalCount,
-    foundContainer: flexContainer?.classList?.contains('dmt-canvas-container'),
-    containerClass: flexContainer?.className,
-    canvasRect: { left: canvasRect.left, top: canvasRect.top, width: canvasRect.width, height: canvasRect.height },
-    containerRect: containerRect ? { left: containerRect.left, top: containerRect.top, width: containerRect.width, height: containerRect.height } : null,
-    offset: { x: canvasOffsetX, y: canvasOffsetY },
-    displayScale,
-    canvasDimensions: { width: canvasWidth, height: canvasHeight }
-  });
-  
+
   // Calculate screen coordinates for origin and target
   const originScreen = cellToScreen(
     measureOrigin.x, measureOrigin.y,
@@ -155,17 +143,7 @@ const MeasurementOverlay = ({
     x: targetScreen.x * displayScale + canvasOffsetX,
     y: targetScreen.y * displayScale + canvasOffsetY
   };
-  
-  // DEBUG: Log final coordinates
-  console.log('[MeasurementOverlay] Coordinates:', {
-    measureOrigin,
-    currentTarget,
-    originScreen,
-    targetScreen,
-    scaledOrigin,
-    scaledTarget
-  });
-  
+
   const tooltipX = scaledTarget.x + 15;
   const tooltipY = scaledTarget.y - 30;
   
