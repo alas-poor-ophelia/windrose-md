@@ -7,9 +7,11 @@
 
 import { describe, it, expect } from "vitest";
 
-import { getInternalBorders } from "../../../src/utils/segmentBorderCalculator.ts";
+import { getInternalBorders, getExternalBorders } from "../../../src/utils/segmentBorderCalculator.ts";
+import { buildCellMap } from "../../../src/geometry/cellAccessor.ts";
+import { GridGeometry } from "../../../src/geometry/GridGeometry.ts";
 
-import type { SegmentGridCell, SegmentName } from "#types/core/cell.types";
+import type { SegmentGridCell, SegmentName, Cell } from "#types/core/cell.types";
 
 // Helper to create a segment cell with specified filled segments
 function createSegmentCell(
@@ -247,6 +249,235 @@ describe("segmentBorderCalculator", () => {
       expect(ne.length).toBe(2);
       expect(se.length).toBe(2);
       expect(sw.length).toBe(2);
+    });
+  });
+
+  // ===========================================================================
+  // getExternalBorders
+  // ===========================================================================
+
+  describe("getExternalBorders", () => {
+    const geometry = new GridGeometry(32);
+
+    it("returns external borders for isolated segment cell", () => {
+      const cell = createSegmentCell(["nw"], 5, 5);
+      const cellMap = buildCellMap([cell], geometry);
+      const borders = getExternalBorders(cell, cellMap, geometry);
+
+      // nw has external edge on top-left of top edge
+      // No neighbors, so border should be drawn
+      expect(borders).toHaveLength(1);
+      expect(borders[0].segment).toBe("nw");
+    });
+
+    it("returns no external border when neighbor segment is filled", () => {
+      // Cell A at (5,5) with nw filled
+      // Cell B at (5,4) with s filled (directly above, bottom-left touches nw's top-left)
+      const cellA = createSegmentCell(["nw"], 5, 5);
+      const cellB = createSegmentCell(["s"], 5, 4);
+      const cellMap = buildCellMap([cellA, cellB], geometry);
+
+      const bordersA = getExternalBorders(cellA, cellMap, geometry);
+
+      // nw should check north neighbor's s segment - which is filled
+      expect(bordersA).toHaveLength(0);
+    });
+
+    it("returns external border when neighbor exists but segment is empty", () => {
+      // Cell A at (5,5) with nw filled
+      // Cell B at (5,4) with se filled (NOT s, which nw needs)
+      const cellA = createSegmentCell(["nw"], 5, 5);
+      const cellB = createSegmentCell(["se"], 5, 4);
+      const cellMap = buildCellMap([cellA, cellB], geometry);
+
+      const bordersA = getExternalBorders(cellA, cellMap, geometry);
+
+      // nw checks for s in north neighbor - se is filled but not s
+      expect(bordersA).toHaveLength(1);
+      expect(bordersA[0].segment).toBe("nw");
+    });
+
+    // =========================================================================
+    // REGRESSION TESTS: Cross-cell adjacency for connected half-cells
+    // These test the fix for swapped neighbor segments on bottom/left edges
+    // =========================================================================
+
+    describe("connected half-cells (regression tests)", () => {
+      it("vertical corridor with WEST half - no border between cells", () => {
+        // Painting west half of vertically adjacent cells
+        // West half segments: nw, w, sw, s
+        const westHalf: SegmentName[] = ["nw", "w", "sw", "s"];
+
+        const cellA = createSegmentCell(westHalf, 5, 5); // upper cell
+        const cellB = createSegmentCell(westHalf, 5, 6); // lower cell
+
+        const cellMap = buildCellMap([cellA, cellB], geometry);
+
+        const bordersA = getExternalBorders(cellA, cellMap, geometry);
+        const bordersB = getExternalBorders(cellB, cellMap, geometry);
+
+        // Cell A's 's' segment should connect to Cell B's 'nw' segment (both filled)
+        // So 's' should NOT appear in Cell A's external borders
+        const aBorderSegments = bordersA.map((b) => b.segment);
+        expect(aBorderSegments).not.toContain("s");
+
+        // Cell B's 'nw' segment should connect to Cell A's 's' segment (both filled)
+        // So 'nw' should NOT appear in Cell B's external borders
+        const bBorderSegments = bordersB.map((b) => b.segment);
+        expect(bBorderSegments).not.toContain("nw");
+      });
+
+      it("vertical corridor with EAST half - no border between cells", () => {
+        // Painting east half of vertically adjacent cells
+        // East half segments: n, ne, e, se
+        const eastHalf: SegmentName[] = ["n", "ne", "e", "se"];
+
+        const cellA = createSegmentCell(eastHalf, 5, 5); // upper cell
+        const cellB = createSegmentCell(eastHalf, 5, 6); // lower cell
+
+        const cellMap = buildCellMap([cellA, cellB], geometry);
+
+        const bordersA = getExternalBorders(cellA, cellMap, geometry);
+        const bordersB = getExternalBorders(cellB, cellMap, geometry);
+
+        // Cell A's 'se' segment should connect to Cell B's 'n' segment
+        const aBorderSegments = bordersA.map((b) => b.segment);
+        expect(aBorderSegments).not.toContain("se");
+
+        // Cell B's 'n' segment should connect to Cell A's 'se' segment
+        const bBorderSegments = bordersB.map((b) => b.segment);
+        expect(bBorderSegments).not.toContain("n");
+      });
+
+      it("horizontal corridor with NORTH half - no border between cells", () => {
+        // Painting north half of horizontally adjacent cells
+        // North half segments: nw, n (top edge segments)
+        const northHalf: SegmentName[] = ["nw", "n"];
+
+        const cellA = createSegmentCell(northHalf, 5, 5); // left cell
+        const cellB = createSegmentCell(northHalf, 6, 5); // right cell
+
+        const cellMap = buildCellMap([cellA, cellB], geometry);
+
+        const bordersA = getExternalBorders(cellA, cellMap, geometry);
+        const bordersB = getExternalBorders(cellB, cellMap, geometry);
+
+        // These cells don't share a painted edge (north half doesn't touch east/west neighbors)
+        // So they SHOULD have external borders on their east/west sides
+        // This test verifies we don't incorrectly suppress borders
+        const aBorderSegments = bordersA.map((b) => b.segment);
+        const bBorderSegments = bordersB.map((b) => b.segment);
+
+        // Cell A's nw and n are on TOP edge, not RIGHT edge - no connection to Cell B
+        // Cell B's nw and n are on TOP edge, not LEFT edge - no connection to Cell A
+        expect(aBorderSegments).toContain("nw");
+        expect(aBorderSegments).toContain("n");
+        expect(bBorderSegments).toContain("nw");
+        expect(bBorderSegments).toContain("n");
+      });
+
+      it("horizontal corridor with right-edge segments - no border between cells", () => {
+        // Cell A has ne, e (right edge segments)
+        // Cell B (to the right) has w, sw (left edge segments that connect)
+        const cellA = createSegmentCell(["ne", "e"], 5, 5);
+        const cellB = createSegmentCell(["w", "sw"], 6, 5);
+
+        const cellMap = buildCellMap([cellA, cellB], geometry);
+
+        const bordersA = getExternalBorders(cellA, cellMap, geometry);
+        const bordersB = getExternalBorders(cellB, cellMap, geometry);
+
+        // Cell A's 'ne' connects to Cell B's 'w' (both filled)
+        // Cell A's 'e' connects to Cell B's 'sw' (both filled)
+        const aBorderSegments = bordersA.map((b) => b.segment);
+        expect(aBorderSegments).not.toContain("ne");
+        expect(aBorderSegments).not.toContain("e");
+
+        // Cell B's 'w' connects to Cell A's 'ne' (both filled)
+        // Cell B's 'sw' connects to Cell A's 'e' (both filled)
+        const bBorderSegments = bordersB.map((b) => b.segment);
+        expect(bBorderSegments).not.toContain("w");
+        expect(bBorderSegments).not.toContain("sw");
+      });
+
+      it("specific regression: s checks nw in south neighbor (not n)", () => {
+        // This tests the specific fix: s's neighborSegment was 'n', should be 'nw'
+        // s external edge: bottom-left half (BM→BL)
+        // Should connect to south neighbor's top-left half (nw: TL→TM)
+
+        const cellA = createSegmentCell(["s"], 5, 5);
+        const cellB = createSegmentCell(["nw"], 5, 6); // south neighbor
+
+        const cellMap = buildCellMap([cellA, cellB], geometry);
+        const bordersA = getExternalBorders(cellA, cellMap, geometry);
+
+        // With fix: s checks nw → nw is filled → no border
+        // Without fix: s checks n → n is empty → border drawn (BUG)
+        expect(bordersA).toHaveLength(0);
+      });
+
+      it("specific regression: se checks n in south neighbor (not nw)", () => {
+        // This tests the specific fix: se's neighborSegment was 'nw', should be 'n'
+        // se external edge: bottom-right half (BR→BM)
+        // Should connect to south neighbor's top-right half (n: TM→TR)
+
+        const cellA = createSegmentCell(["se"], 5, 5);
+        const cellB = createSegmentCell(["n"], 5, 6); // south neighbor
+
+        const cellMap = buildCellMap([cellA, cellB], geometry);
+        const bordersA = getExternalBorders(cellA, cellMap, geometry);
+
+        // With fix: se checks n → n is filled → no border
+        // Without fix: se checks nw → nw is empty → border drawn (BUG)
+        expect(bordersA).toHaveLength(0);
+      });
+
+      it("specific regression: sw checks e in west neighbor (not ne)", () => {
+        // This tests the specific fix: sw's neighborSegment was 'ne', should be 'e'
+        // sw external edge: left-bottom half (BL→LM)
+        // Should connect to west neighbor's right-bottom half (e: RM→BR)
+
+        const cellA = createSegmentCell(["sw"], 5, 5);
+        const cellB = createSegmentCell(["e"], 4, 5); // west neighbor
+
+        const cellMap = buildCellMap([cellA, cellB], geometry);
+        const bordersA = getExternalBorders(cellA, cellMap, geometry);
+
+        // With fix: sw checks e → e is filled → no border
+        // Without fix: sw checks ne → ne is empty → border drawn (BUG)
+        expect(bordersA).toHaveLength(0);
+      });
+
+      it("specific regression: w checks ne in west neighbor (not e)", () => {
+        // This tests the specific fix: w's neighborSegment was 'e', should be 'ne'
+        // w external edge: left-top half (LM→TL)
+        // Should connect to west neighbor's right-top half (ne: TR→RM)
+
+        const cellA = createSegmentCell(["w"], 5, 5);
+        const cellB = createSegmentCell(["ne"], 4, 5); // west neighbor
+
+        const cellMap = buildCellMap([cellA, cellB], geometry);
+        const bordersA = getExternalBorders(cellA, cellMap, geometry);
+
+        // With fix: w checks ne → ne is filled → no border
+        // Without fix: w checks e → e is empty → border drawn (BUG)
+        expect(bordersA).toHaveLength(0);
+      });
+    });
+
+    describe("simple cell neighbors", () => {
+      it("returns no border when neighbor is a simple (full) cell", () => {
+        const segmentCell = createSegmentCell(["ne", "e"], 5, 5);
+        const simpleCell: Cell = { x: 6, y: 5, color: "#ff0000" }; // full cell to the right
+
+        const cellMap = buildCellMap([segmentCell, simpleCell], geometry);
+        const borders = getExternalBorders(segmentCell, cellMap, geometry);
+
+        // ne and e connect to the simple cell (all segments filled)
+        const borderSegments = borders.map((b) => b.segment);
+        expect(borderSegments).not.toContain("ne");
+        expect(borderSegments).not.toContain("e");
+      });
     });
   });
 });

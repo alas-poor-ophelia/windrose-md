@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "_testing/smoke-test-map.md",
+                "file": "_testing/smoke-test-hex.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "smoke-test-map"
+              "title": "smoke-test-hex"
             }
           }
         ]
@@ -168,17 +168,24 @@
   },
   "active": "13aafd55d6dc8ff5",
   "lastOpenFiles": [
-    "_testing/smoke-test-hex.md",
     "_testing/smoke-test-map.md",
-    "Projects/dungeon-map-tracker/components/settings/hexmap/SizingModeSection.tsx",
-    "Projects/dungeon-map-tracker/components/settings/hexmap/CoordinatedDisplaySection.tsx",
-    "Projects/dungeon-map-tracker/components/settings/hexmap/CoordinateDisplaySection.tsx",
-    "Projects/dungeon-map-tracker/components/settings/hexmap/BoundsSection.tsx",
-    "Projects/dungeon-map-tracker/components/settings/hexmap/BoundsSection.tsx.tmp.38400.1767432555589",
-    "Projects/dungeon-map-tracker/components/settings/hexmap/BackgroundImageSection.tsx",
-    "Projects/dungeon-map-tracker/components/settings/hexmap/HexGridTab.tsx",
-    "Projects/dungeon-map-tracker/components/settings/SettingsPluginInstaller.tsx",
-    "Projects/dungeon-map-tracker/components/settings/ResizeConfirmDialog.tsx",
-    "Projects/dungeon-map-tracker/components/settings/PreferencesTab.tsx"
+    "_testing/smoke-test-hex.md",
+    "Projects/dungeon-map-tracker/utils/textLabelOperations.ts",
+    "Projects/dungeon-map-tracker/utils/settingsAccessor.ts",
+    "Projects/dungeon-map-tracker/hooks/useDataHandlers.ts",
+    "Projects/dungeon-map-tracker/hooks/useCanvasRenderer.ts",
+    "Projects/dungeon-map-tracker/hooks/useCanvasInteraction.ts",
+    "Projects/dungeon-map-tracker/hooks/useAreaSelect.ts",
+    "Projects/dungeon-map-tracker/hooks/CLAUDE.md",
+    "Projects/dungeon-map-tracker/geometry/segmentRenderer.ts",
+    "Projects/dungeon-map-tracker/geometry/offsetCoordinates.ts",
+    "Projects/dungeon-map-tracker/geometry/hexRenderer.ts",
+    "Projects/dungeon-map-tracker/geometry/hexMeasurements.ts",
+    "Projects/dungeon-map-tracker/docs/specs/completed/partial_cell_painting_spec.md",
+    "Projects/dungeon-map-tracker/docs/specs/completed/Map_Canvas_Composition_Refactor.md",
+    "Projects/dungeon-map-tracker/geometry/CLAUDE.md",
+    "Projects/dungeon-map-tracker/components/mapcanvas/CLAUDE.md",
+    "Projects/dungeon-map-tracker/CLAUDE.md",
+    "Pasted image 20260105221401.png"
   ]
 }

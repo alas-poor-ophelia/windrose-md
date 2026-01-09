@@ -163,6 +163,14 @@ export interface AreaSelectHandlers {
   handleAreaSelectClick?: (e: Event | SyntheticPointerEvent) => void;
 }
 
+/** Diagonal fill handlers */
+export interface DiagonalFillHandlers {
+  handleDiagonalFillClick?: (e: PointerEvent | MouseEvent | TouchEvent, isTouch?: boolean) => boolean;
+  handleDiagonalFillMove?: (e: PointerEvent | MouseEvent) => void;
+  cancelFill?: () => void;
+  fillStart?: { x: number; y: number; corner: string } | null;
+}
+
 // ===========================================
 // Handler Registry
 // ===========================================
@@ -177,7 +185,8 @@ export type HandlerLayerName =
   | 'measure'
   | 'imageAlignment'
   | 'fogOfWar'
-  | 'areaSelect';
+  | 'areaSelect'
+  | 'diagonalFill';
 
 /** Handler type mapping for each layer */
 export interface HandlerTypeMap {
@@ -190,6 +199,7 @@ export interface HandlerTypeMap {
   imageAlignment: AlignmentHandlers;
   fogOfWar: FogHandlers;
   areaSelect: AreaSelectHandlers;
+  diagonalFill: DiagonalFillHandlers;
 }
 
 /** Type-safe handler getter function */

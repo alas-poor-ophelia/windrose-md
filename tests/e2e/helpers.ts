@@ -105,6 +105,21 @@ export async function selectToolByTitle(page: any, titlePattern: string): Promis
   await page.waitForTimeout(100);
 }
 
+/** Select a sub-tool from a tool group's flyout menu */
+export async function selectSubTool(page: any, parentToolTitle: string, subToolLabel: string): Promise<void> {
+  // Right-click the parent tool button to open the flyout (sub-menu opens via context menu)
+  const parentBtn = page.locator(`.dmt-tool-btn[title*="${parentToolTitle}"]`);
+  await parentBtn.waitFor({ state: "visible", timeout: 5000 });
+  await parentBtn.click({ button: 'right' });
+  await page.waitForTimeout(200);
+
+  // Click the sub-tool option in the flyout
+  const subToolOption = page.locator(`.dmt-subtool-menu .dmt-subtool-option`).filter({ hasText: subToolLabel });
+  await subToolOption.waitFor({ state: "visible", timeout: 3000 });
+  await subToolOption.click();
+  await page.waitForTimeout(100);
+}
+
 // ===========================================
 // History Controls Helpers
 // ===========================================

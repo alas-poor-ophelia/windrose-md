@@ -8,7 +8,10 @@
     "lint:fix": "eslint . --ext .ts,.tsx,.js,.jsx --fix",
     "typecheck": "tsc --noEmit -p tsconfig.check.json",
     "check": "npm run typecheck && npm run lint",
+    "test:unit": "vitest run --config vitest.unit.config.ts",
+    "test:unit:watch": "vitest --config vitest.unit.config.ts",
     "test:e2e": "vitest run",
+    "test": "npm run test:unit && npm run test:e2e",
     "postinstall": "patch-package"
   },
   "devDependencies": {

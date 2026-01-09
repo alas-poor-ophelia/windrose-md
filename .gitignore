@@ -26,3 +26,6 @@ src
 playwright-report/
 test-results/
 tests/fixtures/test-vault/nul
+
+# Generated docs
+docs/specs
