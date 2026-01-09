@@ -339,10 +339,10 @@ const SEGMENT_CROSS_CELL_ADJACENCY: Record<SegmentName, CrossCellAdjacency> = {
   n:  { dx: 0, dy: -1, neighborSegment: 'se' },
   ne: { dx: 1, dy: 0, neighborSegment: 'w' },
   e:  { dx: 1, dy: 0, neighborSegment: 'sw' },
-  se: { dx: 0, dy: 1, neighborSegment: 'nw' },
-  s:  { dx: 0, dy: 1, neighborSegment: 'n' },
-  sw: { dx: -1, dy: 0, neighborSegment: 'ne' },
-  w:  { dx: -1, dy: 0, neighborSegment: 'e' }
+  se: { dx: 0, dy: 1, neighborSegment: 'n' },
+  s:  { dx: 0, dy: 1, neighborSegment: 'nw' },
+  sw: { dx: -1, dy: 0, neighborSegment: 'e' },
+  w:  { dx: -1, dy: 0, neighborSegment: 'ne' }
 };
 
 /**

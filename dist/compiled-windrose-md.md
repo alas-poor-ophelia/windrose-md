@@ -1,9 +1,9 @@
 <!-- Compiled by Datacore Script Compiler -->
 <!-- Source: Projects/dungeon-map-tracker -->
 <!-- Main Component: DungeonMapTracker -->
-<!-- Compiled: 2026-01-07T02:20:00.269Z -->
+<!-- Compiled: 2026-01-09T02:26:36.378Z -->
 <!-- Files: 121 -->
-<!-- Version: 1.5.0 -->
+<!-- Version: 1.5.0.1 -->
 <!-- CSS Files: 1 -->
 
 # Demo
@@ -359,10 +359,10 @@ const SEGMENT_CROSS_CELL_ADJACENCY: Record<SegmentName, CrossCellAdjacency> = {
   n:  { dx: 0, dy: -1, neighborSegment: 'se' },
   ne: { dx: 1, dy: 0, neighborSegment: 'w' },
   e:  { dx: 1, dy: 0, neighborSegment: 'sw' },
-  se: { dx: 0, dy: 1, neighborSegment: 'nw' },
-  s:  { dx: 0, dy: 1, neighborSegment: 'n' },
-  sw: { dx: -1, dy: 0, neighborSegment: 'ne' },
-  w:  { dx: -1, dy: 0, neighborSegment: 'e' }
+  se: { dx: 0, dy: 1, neighborSegment: 'n' },
+  s:  { dx: 0, dy: 1, neighborSegment: 'nw' },
+  sw: { dx: -1, dy: 0, neighborSegment: 'e' },
+  w:  { dx: -1, dy: 0, neighborSegment: 'ne' }
 };
 
 /**
@@ -12099,7 +12099,8 @@ export type HandlerLayerType =
   | 'areaSelect'
   | 'measure'
   | 'alignment'
-  | 'imageAlignment';
+  | 'imageAlignment'
+  | 'diagonalFill';
 
 /** Generic handler function type */
 export type HandlerFunction = (...args: unknown[]) => unknown;
@@ -25621,6 +25622,7 @@ import type {
   AlignmentHandlers,
   FogHandlers,
   AreaSelectHandlers,
+  DiagonalFillHandlers,
   HandlerLayerName,
 } from '#types/hooks/eventCoordinator.types';
 import type { SelectedItem } from '#types/hooks/groupDrag.types';
@@ -25722,6 +25724,7 @@ const useEventCoordinator = ({
     const measureHandlers = getHandlers('measure') as MeasureHandlers | null;
     const alignmentHandlers = getHandlers('imageAlignment') as AlignmentHandlers | null;
     const fogHandlers = getHandlers('fogOfWar') as FogHandlers | null;
+    const diagonalFillHandlers = getHandlers('diagonalFill') as DiagonalFillHandlers | null;
 
     if (!panZoomHandlers) return;
 
@@ -25938,6 +25941,13 @@ const useEventCoordinator = ({
         if (measureHandlers?.handleMeasureClick) {
           measureHandlers.handleMeasureClick(gridX, gridY, isTouchEvent);
         }
+
+      } else if (currentTool === 'diagonalFill') {
+        if (hasMultiSelection) clearSelection();
+
+        if (diagonalFillHandlers?.handleDiagonalFillClick) {
+          diagonalFillHandlers.handleDiagonalFillClick(e, isTouchEvent);
+        }
       }
     };
 
@@ -25961,6 +25971,7 @@ const useEventCoordinator = ({
     const measureHandlers = getHandlers('measure') as MeasureHandlers | null;
     const alignmentHandlers = getHandlers('imageAlignment') as AlignmentHandlers | null;
     const fogHandlers = getHandlers('fogOfWar') as FogHandlers | null;
+    const diagonalFillHandlers = getHandlers('diagonalFill') as DiagonalFillHandlers | null;
 
     if (!panZoomHandlers) return;
 
@@ -26103,6 +26114,11 @@ const useEventCoordinator = ({
       return;
     }
 
+    if (currentTool === 'diagonalFill' && diagonalFillHandlers?.handleDiagonalFillMove) {
+      diagonalFillHandlers.handleDiagonalFillMove(e as MouseEvent);
+      return;
+    }
+
     if (layerVisibility.objects && objectHandlers?.handleHoverUpdate) {
       objectHandlers.handleHoverUpdate(e);
     }
@@ -26208,6 +26224,7 @@ const useEventCoordinator = ({
 
   const handlePointerLeave = dc.useCallback((e: MouseEvent): void => {
     const drawingHandlers = getHandlers('drawing') as DrawingHandlers | null;
+    const diagonalFillHandlers = getHandlers('diagonalFill') as DiagonalFillHandlers | null;
 
     if (pendingToolTimeoutRef.current) {
       clearTimeout(pendingToolTimeoutRef.current);
@@ -26223,6 +26240,10 @@ const useEventCoordinator = ({
       if (drawingHandlers?.cancelDrawing) {
         drawingHandlers.cancelDrawing();
       }
+    }
+
+    if (currentTool === 'diagonalFill' && diagonalFillHandlers?.cancelFill) {
+      diagonalFillHandlers.cancelFill();
     }
   }, [currentTool, getHandlers]);
 

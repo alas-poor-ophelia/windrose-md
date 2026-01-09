@@ -27,6 +27,7 @@ import type {
   AlignmentHandlers,
   FogHandlers,
   AreaSelectHandlers,
+  DiagonalFillHandlers,
   HandlerLayerName,
 } from '#types/hooks/eventCoordinator.types';
 import type { SelectedItem } from '#types/hooks/groupDrag.types';
@@ -133,6 +134,7 @@ const useEventCoordinator = ({
     const measureHandlers = getHandlers('measure') as MeasureHandlers | null;
     const alignmentHandlers = getHandlers('imageAlignment') as AlignmentHandlers | null;
     const fogHandlers = getHandlers('fogOfWar') as FogHandlers | null;
+    const diagonalFillHandlers = getHandlers('diagonalFill') as DiagonalFillHandlers | null;
 
     if (!panZoomHandlers) return;
 
@@ -349,6 +351,13 @@ const useEventCoordinator = ({
         if (measureHandlers?.handleMeasureClick) {
           measureHandlers.handleMeasureClick(gridX, gridY, isTouchEvent);
         }
+
+      } else if (currentTool === 'diagonalFill') {
+        if (hasMultiSelection) clearSelection();
+
+        if (diagonalFillHandlers?.handleDiagonalFillClick) {
+          diagonalFillHandlers.handleDiagonalFillClick(e, isTouchEvent);
+        }
       }
     };
 
@@ -372,6 +381,7 @@ const useEventCoordinator = ({
     const measureHandlers = getHandlers('measure') as MeasureHandlers | null;
     const alignmentHandlers = getHandlers('imageAlignment') as AlignmentHandlers | null;
     const fogHandlers = getHandlers('fogOfWar') as FogHandlers | null;
+    const diagonalFillHandlers = getHandlers('diagonalFill') as DiagonalFillHandlers | null;
 
     if (!panZoomHandlers) return;
 
@@ -514,6 +524,11 @@ const useEventCoordinator = ({
       return;
     }
 
+    if (currentTool === 'diagonalFill' && diagonalFillHandlers?.handleDiagonalFillMove) {
+      diagonalFillHandlers.handleDiagonalFillMove(e as MouseEvent);
+      return;
+    }
+
     if (layerVisibility.objects && objectHandlers?.handleHoverUpdate) {
       objectHandlers.handleHoverUpdate(e);
     }
@@ -619,6 +634,7 @@ const useEventCoordinator = ({
 
   const handlePointerLeave = dc.useCallback((e: MouseEvent): void => {
     const drawingHandlers = getHandlers('drawing') as DrawingHandlers | null;
+    const diagonalFillHandlers = getHandlers('diagonalFill') as DiagonalFillHandlers | null;
 
     if (pendingToolTimeoutRef.current) {
       clearTimeout(pendingToolTimeoutRef.current);
@@ -634,6 +650,10 @@ const useEventCoordinator = ({
       if (drawingHandlers?.cancelDrawing) {
         drawingHandlers.cancelDrawing();
       }
+    }
+
+    if (currentTool === 'diagonalFill' && diagonalFillHandlers?.cancelFill) {
+      diagonalFillHandlers.cancelFill();
     }
   }, [currentTool, getHandlers]);
 
