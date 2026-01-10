@@ -92,6 +92,28 @@ export default [
   },
 
   // ===========================================
+  // Scripts (release automation, etc.)
+  // ===========================================
+  {
+    files: ["scripts/**/*.ts"],
+    languageOptions: {
+      parser: tsparser,
+      parserOptions: {
+        project: "./tsconfig.json",
+        ecmaVersion: 2022,
+        sourceType: "module"
+      }
+    },
+    plugins: {
+      "@typescript-eslint": tsPlugin
+    },
+    rules: {
+      "@typescript-eslint/no-explicit-any": "off", // Scripts use any for Obsidian internals
+      "no-console": "off" // Console output is the UI for CLI scripts
+    }
+  },
+
+  // ===========================================
   // Type definition files
   // ===========================================
   {
