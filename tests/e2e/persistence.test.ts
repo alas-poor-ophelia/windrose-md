@@ -249,6 +249,10 @@ test("Drawing on specific layer adds cells to that layer only", async ({ page })
   // Get initial cell count on the active layer
   const initialLayerCellCount = await getLayerCellCount(page, mapId, activeLayerId!);
 
+  // Close the layer panel by clicking the toggle again so canvas receives mouse events
+  await openLayerPanel(page);
+  await page.waitForTimeout(200);
+
   // Select draw tool and paint
   await waitForToolPalette(page);
 
@@ -260,10 +264,15 @@ test("Drawing on specific layer adds cells to that layer only", async ({ page })
   const canvasBox = await canvas.boundingBox();
   expect(canvasBox).not.toBeNull();
 
-  // Draw at center
+  // Draw at canvas center with a drag stroke (center is always within visible grid)
   const centerX = canvasBox!.x + canvasBox!.width / 2;
   const centerY = canvasBox!.y + canvasBox!.height / 2;
-  await page.mouse.click(centerX, centerY);
+
+  // Short drag from center
+  await page.mouse.move(centerX - 30, centerY);
+  await page.mouse.down();
+  await page.mouse.move(centerX + 30, centerY, { steps: 5 });
+  await page.mouse.up();
   await page.waitForTimeout(500);
 
   // Wait for autosave

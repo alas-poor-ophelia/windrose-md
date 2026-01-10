@@ -5,6 +5,9 @@ import { expect } from "vitest";
 // Re-export for convenience
 export { test, expect, doWithApp };
 
+// Test mode: "dev" uses uncompiled source, "compiled" uses compiled artifact
+const TEST_MODE = process.env.WINDROSE_TEST_MODE || "dev";
+
 // ===========================================
 // Error Tracking
 // ===========================================
@@ -35,26 +38,97 @@ export async function navigateToMap(page: any, mapPath: string): Promise<void> {
       throw new Error(`Test file ${path} not found in vault`);
     }
   }, mapPath);
+  // Brief wait for Obsidian to switch views and Datacore to start rendering
+  await page.waitForTimeout(300);
 }
 
 /** Wait for Windrose container to be ready, with Datacore error detection */
 export async function waitForContainer(page: any, timeout: number = 10000): Promise<any> {
   const container = page.locator(".dmt-container");
-  const errorBox = page.locator(".datacore-error-box");
 
-  // Brief wait for Datacore to initialize (errors appear immediately if they occur)
-  await page.waitForTimeout(500);
-
-  // Fast check: did an error already appear?
-  if (await errorBox.count() > 0 && await errorBox.isVisible()) {
-    const errorPre = page.locator(".datacore-error-pre");
-    const errorText = await errorPre.textContent() || "Unknown Datacore error";
-    throw new Error(`Datacore script failed:\n${errorText}`);
+  // First, wait for a markdown view to be present (indicates Obsidian has loaded the file)
+  const markdownView = page.locator(".markdown-reading-view, .markdown-source-view");
+  try {
+    await markdownView.first().waitFor({ state: "visible", timeout: 5000 });
+  } catch {
+    // View not found - proceed anyway
   }
 
-  // No error, wait for container normally
-  await container.waitFor({ state: "visible", timeout });
-  return container;
+  // Wait for either the container or an error to appear
+  // Use a race between success and error conditions
+  const startTime = Date.now();
+
+  while (Date.now() - startTime < timeout) {
+    // Check if container is visible (success)
+    if (await container.count() > 0 && await container.isVisible()) {
+      return container;
+    }
+
+    // Check for Datacore error box
+    const errorBox = page.locator(".datacore-error-box");
+    if (await errorBox.count() > 0 && await errorBox.isVisible()) {
+      // Get the error text
+      try {
+        const errorText = await errorBox.first().innerText({ timeout: 500 });
+        const trimmed = errorText?.trim() || "";
+
+        // Ignore loading states - these are not errors
+        if (trimmed.includes("View is rendering") || trimmed.includes("Loading")) {
+          // Still loading, wait and continue
+          await page.waitForTimeout(200);
+          continue;
+        }
+
+        // This is a real error
+        if (trimmed) {
+          throw new Error(`Datacore script failed:\n${trimmed}`);
+        }
+      } catch (e: any) {
+        if (e.message.includes("Datacore script failed")) throw e;
+        // Couldn't read error, might be transient
+      }
+    }
+
+    // Brief wait before next check
+    await page.waitForTimeout(100);
+  }
+
+  // Timeout reached - do final check
+  if (await container.count() > 0 && await container.isVisible()) {
+    return container;
+  }
+
+  // Check for error one more time
+  const errorBox = page.locator(".datacore-error-box");
+  if (await errorBox.count() > 0 && await errorBox.isVisible()) {
+    try {
+      const errorText = await errorBox.first().innerText({ timeout: 500 });
+      if (errorText?.trim()) {
+        throw new Error(`Datacore script failed:\n${errorText.trim()}`);
+      }
+    } catch (e: any) {
+      if (e.message.includes("Datacore script failed")) throw e;
+    }
+    throw new Error("Datacore script failed: Error box visible but couldn't read error details");
+  }
+
+  // Get diagnostic info
+  const containerCount = await container.count();
+  const diagErrorBox = page.locator(".datacore-error-box");
+  const errorCount = await diagErrorBox.count();
+  let diagErrorText = "";
+  if (errorCount > 0) {
+    try {
+      diagErrorText = await diagErrorBox.first().innerText({ timeout: 500 });
+    } catch {
+      diagErrorText = "(couldn't read error text)";
+    }
+  }
+
+  throw new Error(
+    `Timeout waiting for .dmt-container after ${timeout}ms. ` +
+    `Container count: ${containerCount}, Error boxes: ${errorCount}, Error text: "${diagErrorText}"`
+  );
 }
 
 // ===========================================
@@ -248,10 +322,15 @@ export async function getTotalCellCount(page: any, mapId: string): Promise<numbe
 // Test Constants
 // ===========================================
 
-export const TEST_MAPS = {
-  grid: "_testing/smoke-test-map.md",
-  hex: "_testing/smoke-test-hex.md"
-} as const;
+export const TEST_MAPS = TEST_MODE === "compiled"
+  ? {
+      grid: "_testing/smoke-test-compiled.md",
+      hex: "_testing/smoke-test-hex-compiled.md"
+    } as const
+  : {
+      grid: "_testing/smoke-test-map.md",
+      hex: "_testing/smoke-test-hex.md"
+    } as const;
 
 export const MAP_IDS = {
   grid: "smoke-test-map-001"

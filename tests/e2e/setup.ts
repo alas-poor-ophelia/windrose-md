@@ -5,7 +5,7 @@
  * This ensures tests use the latest built files while keeping the test vault isolated.
  */
 
-import { existsSync, symlinkSync, unlinkSync, mkdirSync, cpSync } from "fs";
+import { existsSync, symlinkSync, unlinkSync, mkdirSync, cpSync, readFileSync, writeFileSync } from "fs";
 import path from "path";
 
 const TEST_VAULT = path.resolve(__dirname, "../fixtures/test-vault");
@@ -33,8 +33,61 @@ const symlinks: SymlinkConfig[] = [
   },
 ];
 
+// Files to copy directly (for compiled artifacts that need Datacore indexing)
+interface CopyConfig {
+  source: string;
+  target: string;
+  /** Base path to rewrite dc.resolvePath calls */
+  basePath?: string;
+}
+
+const copies: CopyConfig[] = [
+  // Compiled Windrose artifact - copy to native vault location for Datacore to index
+  {
+    source: path.join(MAIN_VAULT, "Projects", "dungeon-map-tracker", "dist", "compiled-windrose-md.md"),
+    target: path.join(TEST_VAULT, "_compiled", "compiled-windrose-md.md"),
+    basePath: "_compiled",
+  },
+];
+
+/**
+ * Post-process compiled artifact to fix internal path references.
+ * Updates dc.resolvePath calls to use the correct base path.
+ */
+function postProcessCompiledArtifact(targetPath: string, basePath: string): void {
+  let content = readFileSync(targetPath, "utf-8");
+
+  // Update dc.resolvePath("compiled-windrose-md") to use the base path
+  content = content.replace(
+    /dc\.resolvePath\("compiled-windrose-md"\)/g,
+    `dc.resolvePath("${basePath}/compiled-windrose-md")`
+  );
+
+  writeFileSync(targetPath, content);
+}
+
 export async function setup() {
   console.log("Setting up test vault symlinks...");
+
+  // Copy compiled artifacts first (for Datacore indexing)
+  for (const copy of copies) {
+    const parentDir = path.dirname(copy.target);
+    if (!existsSync(parentDir)) {
+      mkdirSync(parentDir, { recursive: true });
+    }
+    if (existsSync(copy.source)) {
+      cpSync(copy.source, copy.target);
+      console.log(`  Copied: ${copy.source} -> ${copy.target}`);
+
+      // Apply post-processing if basePath is specified
+      if (copy.basePath) {
+        postProcessCompiledArtifact(copy.target, copy.basePath);
+        console.log(`  Post-processed for base path: ${copy.basePath}`);
+      }
+    } else {
+      console.warn(`  Compiled artifact not found: ${copy.source}`);
+    }
+  }
 
   for (const link of symlinks) {
     // Remove existing symlink/file if present
