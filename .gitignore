@@ -25,7 +25,17 @@ src
 # Test outputs
 playwright-report/
 test-results/
+
+# Windows NUL device artifacts (created by some tools)
+nul
 tests/fixtures/test-vault/nul
+
+# Generated test artifacts
+tests/fixtures/test-vault/_compiled/
+tests/fixtures/test-vault/windrose-md-data.json
 
 # Generated docs
 docs/specs
+
+# Planning artifacts
+PLAN.md
