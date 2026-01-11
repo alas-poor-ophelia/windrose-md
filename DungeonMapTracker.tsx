@@ -158,6 +158,10 @@ const CornerBracket = ({ position }: CornerBracketProps): React.ReactElement => 
 const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'grid' }: DungeonMapTrackerProps): React.ReactElement => {
   const { mapData, isLoading, saveStatus, updateMapData, forceSave, fowImageReady } = useMapData(mapId, mapName, mapType);
 
+  // Get current file path for deep linking
+  const currentFile = dc.useCurrentFile();
+  const notePath = currentFile?.$path || '';
+
   // Tool and color state (extracted to useToolState hook)
   const {
     currentTool, setCurrentTool,
@@ -394,6 +398,42 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     addToHistory,
     isApplyingHistory
   } = useLayerHistory({ mapData, updateMapData, isLoading });
+
+  // Listen for deep link navigation events
+  dc.useEffect(() => {
+    const handleNavigateTo = (event: CustomEvent): void => {
+      const { mapId: targetMapId, x, y, zoom, layerId } = event.detail;
+
+      // Only respond if this is our map
+      if (targetMapId !== mapId) return;
+
+      // Switch to target layer if it exists and is different
+      if (mapData?.layers && layerId) {
+        const targetLayer = mapData.layers.find((l: { id: string }) => l.id === layerId);
+        if (targetLayer && mapData.activeLayerId !== layerId) {
+          handleLayerSelect(layerId);
+        }
+      }
+
+      // Update view to center on target coordinates at specified zoom
+      updateMapData((currentMapData: MapData) => ({
+        ...currentMapData,
+        viewState: {
+          ...currentMapData.viewState,
+          center: { x, y },
+          zoom: Math.max(1.15, Math.min(1.20, zoom)) // Clamp to 115-120% as per spec
+        }
+      }));
+
+      new Notice(`Navigated to location on ${mapData?.name || 'map'}`);
+    };
+
+    window.addEventListener('dmt-navigate-to', handleNavigateTo as EventListener);
+
+    return () => {
+      window.removeEventListener('dmt-navigate-to', handleNavigateTo as EventListener);
+    };
+  }, [mapId, mapData, updateMapData, handleLayerSelect]);
 
   // Data change handlers (extracted to useDataHandlers hook)
   const {
@@ -764,6 +804,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
           {/* This allows the compass to show and persist the north direction without actually rotating hex maps */}
           <div className="dmt-canvas-and-controls">
             <MapCanvas
+              mapId={mapId}
+              notePath={notePath}
               mapData={mapData.mapType === 'hex' ? { ...mapData, northDirection: 0 } : mapData}
               onCellsChange={handleCellsChange}
               onObjectsChange={handleObjectsChange}

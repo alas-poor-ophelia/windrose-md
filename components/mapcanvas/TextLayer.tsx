@@ -23,6 +23,7 @@ const { TextLabelEditor } = await requireModuleByName("TextLabelEditor.jsx");
 const { useEventHandlerRegistration } = await requireModuleByName("EventHandlerContext.tsx");
 const { SelectionToolbar } = await requireModuleByName("SelectionToolbar.jsx");
 const { getActiveLayer } = await requireModuleByName("layerAccessor.ts");
+const { generateDeepLinkMarkdown } = await requireModuleByName("deepLinkHandler.ts");
 
 /** Text label data structure */
 interface TextLabel {
@@ -53,7 +54,7 @@ const TextLayer = ({
   onAddCustomColor,
   onDeleteCustomColor
 }: TextLayerProps): React.ReactElement | null => {
-  const { mapData, canvasRef, containerRef, geometry } = useMapState();
+  const { mapData, mapId, notePath, canvasRef, containerRef, geometry } = useMapState();
   const { selectedItem, showCoordinates, layerVisibility, isDraggingSelection } = useMapSelection();
 
   const {
@@ -74,6 +75,32 @@ const TextLayer = ({
   } = useTextLabelInteraction(currentTool, onAddCustomColor, customColors);
 
   const { registerHandlers, unregisterHandlers } = useEventHandlerRegistration();
+
+  const handleCopyLink = dc.useCallback(() => {
+    if (!selectedItem || selectedItem.type !== 'text' || !mapData || !mapId || !notePath) return;
+
+    const activeLayer = getActiveLayer(mapData);
+    const label = activeLayer.textLabels?.find((l: TextLabel) => l.id === selectedItem.id);
+    if (!label) return;
+
+    const zoom = mapData.viewState?.zoom ?? 1.0;
+    const layerId = mapData.activeLayerId || activeLayer?.id || 'layer_001';
+    const displayText = label.content || 'Text';
+
+    // Text labels use world coordinates, convert to grid
+    const gridSize = mapData.gridSize || 32;
+    const x = label.position.x / gridSize;
+    const y = label.position.y / gridSize;
+
+    const markdown = generateDeepLinkMarkdown(displayText, notePath, mapId, x, y, zoom, layerId);
+
+    navigator.clipboard.writeText(markdown).then(() => {
+      new Notice('Deep link copied to clipboard');
+    }).catch((err: Error) => {
+      console.error('Failed to copy link:', err);
+      new Notice('Failed to copy link');
+    });
+  }, [selectedItem, mapData, mapId, notePath]);
 
   dc.useEffect(() => {
     registerHandlers('text', {
@@ -110,6 +137,7 @@ const TextLayer = ({
           geometry={geometry}
           onEdit={handleEditClick}
           onRotate={handleRotateClick}
+          onCopyLink={handleCopyLink}
           onDelete={handleTextDeletion}
           isResizeMode={false}
           showColorPicker={false}

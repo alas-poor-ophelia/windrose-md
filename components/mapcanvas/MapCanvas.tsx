@@ -75,6 +75,8 @@ interface CoordinatorsProps {
 }
 
 interface MapCanvasContentProps {
+  mapId?: string;
+  notePath?: string;
   mapData: MapData | null;
   onCellsChange: (cells: Cell[], skipHistory?: boolean) => void;
   onObjectsChange: (objects: MapObject[]) => void;
@@ -138,7 +140,7 @@ const Coordinators = ({ canvasRef, mapData, geometry, isFocused, isColorPickerOp
  * MapCanvasContent - Inner component that uses context hooks
  * Contains all the map canvas logic and interacts with shared selection state
  */
-const MapCanvasContent = ({ mapData, onCellsChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onViewStateChange, onTextLabelSettingsChange, currentTool, selectedObjectType, selectedColor, isColorPickerOpen, customColors, onAddCustomColor, onDeleteCustomColor, isFocused, isAnimating, theme, isAlignmentMode, children }: MapCanvasContentProps): React.ReactElement => {
+const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onViewStateChange, onTextLabelSettingsChange, currentTool, selectedObjectType, selectedColor, isColorPickerOpen, customColors, onAddCustomColor, onDeleteCustomColor, isFocused, isAnimating, theme, isAlignmentMode, children }: MapCanvasContentProps): React.ReactElement => {
   const canvasRef = dc.useRef<HTMLCanvasElement | null>(null);
   const fogCanvasRef = dc.useRef<HTMLCanvasElement | null>(null);  // Separate canvas for fog blur effect (CSS blur for iOS compat)
   const containerRef = dc.useRef<HTMLDivElement | null>(null);
@@ -389,6 +391,8 @@ const MapCanvasContent = ({ mapData, onCellsChange, onObjectsChange, onTextLabel
     canvasRef,
     containerRef,
     mapData,
+    mapId,
+    notePath,
     geometry,
     currentTool,
     selectedColor,
@@ -401,7 +405,7 @@ const MapCanvasContent = ({ mapData, onCellsChange, onObjectsChange, onTextLabel
     // State change callbacks for layers
     onDrawingStateChange: handleDrawingStateChange,
     onPanZoomStateChange: handlePanZoomStateChange
-  }), [canvasRef, containerRef, mapData, geometry, currentTool, selectedColor,
+  }), [canvasRef, containerRef, mapData, mapId, notePath, geometry, currentTool, selectedColor,
     selectedObjectType, screenToGrid, screenToWorld, getClientCoords,
     handleDrawingStateChange, handlePanZoomStateChange]);
 

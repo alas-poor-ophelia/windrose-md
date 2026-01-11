@@ -114,6 +114,58 @@ class WindroseMDSettingsPlugin extends Plugin {
       }
     });
     
+    // Register Obsidian protocol handler for deep links
+    // Format: obsidian://windrose?notePath|mapId,x,y,zoom,layerId
+    this.registerObsidianProtocolHandler('windrose', async (params) => {
+      // The data comes as URL search params - we need to parse the raw query
+      // params.action = 'windrose', and the rest is in the query string
+      const rawQuery = Object.keys(params).find(key => key.includes('|'));
+      if (!rawQuery) {
+        console.error('[Windrose] Invalid deep link format');
+        return;
+      }
+
+      const pipeIndex = rawQuery.indexOf('|');
+      if (pipeIndex === -1) {
+        console.error('[Windrose] Missing pipe separator in deep link');
+        return;
+      }
+
+      const notePath = rawQuery.slice(0, pipeIndex);
+      const coordData = rawQuery.slice(pipeIndex + 1);
+      const parts = coordData.split(',');
+
+      if (parts.length !== 5) {
+        console.error('[Windrose] Invalid coordinate data in deep link');
+        return;
+      }
+
+      const [mapId, x, y, zoom, layerId] = parts;
+
+      try {
+        // Remove .md extension if present for openLinkText
+        const linkPath = notePath.replace(/\\.md$/, '');
+        await this.app.workspace.openLinkText(linkPath, '', false);
+
+        // Small delay to let the note render before navigating
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('dmt-navigate-to', {
+            detail: {
+              mapId,
+              x: parseFloat(x),
+              y: parseFloat(y),
+              zoom: parseFloat(zoom),
+              layerId,
+              timestamp: Date.now()
+            }
+          }));
+        }, 100);
+      } catch (err) {
+        console.error('[Windrose] Failed to open note:', err);
+        new Notice('Failed to open map note');
+      }
+    });
+
     // Register command to generate a random dungeon
     this.addCommand({
       id: 'insert-random-dungeon',

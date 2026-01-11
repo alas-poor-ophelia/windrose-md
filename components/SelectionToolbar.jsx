@@ -301,6 +301,7 @@ const SelectionToolbar = ({
   onRotate,
   onLabel,
   onLinkNote,
+  onCopyLink,     // handler for copying deep link to clipboard
   onColorClick,
   onResize,
   onDelete,
@@ -389,13 +390,13 @@ const SelectionToolbar = ({
   // Count buttons for this selection type
   let buttonCount = 0;
   if (isObject) {
-    buttonCount = 7; // Rotate, Label, Duplicate, Link Note, Color, Resize, Delete
+    buttonCount = 8; // Rotate, Label, Duplicate, Link Note, Copy Link, Color, Resize, Delete
     // Hide label button for note_pin objects
     if (selectedItem.data?.type === 'note_pin') {
-      buttonCount = 6;
+      buttonCount = 7;
     }
   } else if (isText) {
-    buttonCount = 3; // Edit, Rotate, Delete
+    buttonCount = 4; // Edit, Rotate, Copy Link, Delete
   }
   
   const toolbarWidth = buttonCount * buttonSize + (buttonCount - 1) * buttonGap;
@@ -583,7 +584,18 @@ const SelectionToolbar = ({
             >
               <dc.Icon icon="lucide-scroll-text" />
             </button>
-            
+
+            {/* Copy Link */}
+            <button
+              className="dmt-toolbar-button"
+              onClick={(e) => {
+                if (onCopyLink) onCopyLink(e);
+              }}
+              title="Copy link to clipboard"
+            >
+              <dc.Icon icon="lucide-link" />
+            </button>
+
             {/* Color */}
             <div style={{ position: 'relative', display: 'inline-block' }}>
               <button
@@ -652,7 +664,7 @@ const SelectionToolbar = ({
             >
               <dc.Icon icon="lucide-pencil" />
             </button>
-            
+
             {/* Rotate */}
             <button
               className="dmt-toolbar-button"
@@ -661,7 +673,18 @@ const SelectionToolbar = ({
             >
               <dc.Icon icon="lucide-rotate-cw" />
             </button>
-            
+
+            {/* Copy Link */}
+            <button
+              className="dmt-toolbar-button"
+              onClick={(e) => {
+                if (onCopyLink) onCopyLink(e);
+              }}
+              title="Copy link to clipboard"
+            >
+              <dc.Icon icon="lucide-link" />
+            </button>
+
             {/* Delete */}
             <button
               className="dmt-toolbar-button dmt-toolbar-delete-button"

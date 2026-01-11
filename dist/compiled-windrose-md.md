@@ -1,7 +1,7 @@
 <!-- Compiled by Datacore Script Compiler -->
 <!-- Source: Projects/dungeon-map-tracker -->
 <!-- Main Component: DungeonMapTracker -->
-<!-- Compiled: 2026-01-09T02:26:36.378Z -->
+<!-- Compiled: 2026-01-10T07:09:21.999Z -->
 <!-- Files: 121 -->
 <!-- Version: 1.5.0.1 -->
 <!-- CSS Files: 1 -->

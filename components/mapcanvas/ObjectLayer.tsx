@@ -12,6 +12,7 @@
 import type { JSX } from 'preact';
 import type { ToolId } from '#types/tools/tool.types';
 import type { ObjectTypeId, MapObject } from '#types/objects/object.types';
+import type { TextLabel } from '#types/objects/note.types';
 import type { HexColor } from '#types/core/common.types';
 import type { CustomColor } from '../ColorPicker.tsx';
 
@@ -27,6 +28,7 @@ const { NoteLinkModal } = await requireModuleByName("NoteLinkModal.jsx");
 const { SelectionToolbar } = await requireModuleByName("SelectionToolbar.jsx");
 const { calculateObjectScreenPosition } = await requireModuleByName("screenPositionUtils.ts");
 const { getActiveLayer } = await requireModuleByName("layerAccessor.ts");
+const { generateDeepLinkMarkdown } = await requireModuleByName("deepLinkHandler.ts");
 
 /** Selected item from context */
 interface SelectedItem {
@@ -67,7 +69,7 @@ const ObjectLayer = ({
   onAddCustomColor,
   onDeleteCustomColor
 }: ObjectLayerProps): React.ReactElement | null => {
-  const { canvasRef, containerRef, mapData, geometry, screenToGrid, screenToWorld, getClientCoords, GridGeometry } = useMapState();
+  const { canvasRef, containerRef, mapData, mapId, notePath, geometry, screenToGrid, screenToWorld, getClientCoords, GridGeometry } = useMapState();
   const { getObjectAtPosition, addObject, updateObject, removeObject, isAreaFree, onObjectsChange: contextOnObjectsChange, onTextLabelsChange, removeTextLabel } = useMapOperations();
   const {
     selectedItem, setSelectedItem,
@@ -212,6 +214,43 @@ const ObjectLayer = ({
 
     clearSelection();
   }, [hasMultiSelection, mapData, selectedItems, onObjectsChange, onTextLabelsChange, clearSelection]);
+
+  const handleCopyLink = dc.useCallback(() => {
+    if (!selectedItem || !mapData || !mapId || !notePath) return;
+
+    const activeLayer = getActiveLayer(mapData);
+    const zoom = mapData.viewState?.zoom ?? 1.0;
+    const layerId = mapData.activeLayerId || activeLayer?.id || 'layer_001';
+
+    let displayText = 'Map Location';
+    let x = 0;
+    let y = 0;
+
+    if (selectedItem.type === 'object') {
+      const obj = activeLayer.objects?.find((o: MapObject) => o.id === selectedItem.id);
+      if (!obj) return;
+      displayText = obj.label || obj.customTooltip || 'Object';
+      x = obj.position.x;
+      y = obj.position.y;
+    } else if (selectedItem.type === 'text') {
+      const label = activeLayer.textLabels?.find((l: TextLabel) => l.id === selectedItem.id);
+      if (!label) return;
+      displayText = label.content || 'Text';
+      // Text labels use world coordinates, convert to grid
+      const gridSize = mapData.gridSize || 32;
+      x = label.position.x / gridSize;
+      y = label.position.y / gridSize;
+    }
+
+    const markdown = generateDeepLinkMarkdown(displayText, notePath, mapId, x, y, zoom, layerId);
+
+    navigator.clipboard.writeText(markdown).then(() => {
+      new Notice('Deep link copied to clipboard');
+    }).catch((err: Error) => {
+      console.error('Failed to copy link:', err);
+      new Notice('Failed to copy link');
+    });
+  }, [selectedItem, mapData, mapId, notePath]);
 
   const {
     isResizing,
@@ -515,6 +554,7 @@ const ObjectLayer = ({
           onDuplicate={handleObjectDuplicate}
           onLabel={handleNoteButtonClick}
           onLinkNote={() => handleEditNoteLink(selectedItem?.id)}
+          onCopyLink={handleCopyLink}
           onColorClick={handleObjectColorButtonClick}
           onResize={handleResizeButtonClick}
           onDelete={handleObjectDeletion}
