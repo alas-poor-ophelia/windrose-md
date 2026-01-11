@@ -62,13 +62,15 @@ const hexRenderer = {
   ): void {
     if (!cells || cells.length === 0) return;
     
+    const previousAlpha = ctx.globalAlpha;
+
     for (const cell of cells) {
-      // Apply opacity if specified
+      // Apply opacity if specified (multiply with current globalAlpha)
       const opacity = cell.opacity ?? 1;
       if (opacity < 1) {
-        ctx.globalAlpha = opacity;
+        ctx.globalAlpha = previousAlpha * opacity;
       }
-      
+
       geometry.drawHex(
         ctx,
         cell.q,
@@ -78,10 +80,10 @@ const hexRenderer = {
         viewState.zoom,
         cell.color
       );
-      
-      // Reset opacity
+
+      // Restore previous opacity
       if (opacity < 1) {
-        ctx.globalAlpha = 1;
+        ctx.globalAlpha = previousAlpha;
       }
     }
   },

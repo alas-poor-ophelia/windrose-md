@@ -181,25 +181,26 @@ function renderSegmentCell(
   // Set fill style
   ctx.fillStyle = cell.color;
   const opacity = cell.opacity ?? 1;
+  const previousAlpha = ctx.globalAlpha;
   if (opacity < 1) {
-    ctx.globalAlpha = opacity;
+    ctx.globalAlpha = previousAlpha * opacity;
   }
-  
+
   // Build a single combined path for all filled segments
   // This eliminates anti-aliasing gaps between adjacent triangles
   const filledSegments = (Object.keys(cell.segments) as SegmentName[]).filter(
     seg => cell.segments[seg]
   );
-  
+
   ctx.beginPath();
   for (const segmentName of filledSegments) {
     addTriangleToPath(ctx, vertices, segmentName);
   }
   ctx.fill();
-  
-  // Reset opacity
+
+  // Restore previous opacity
   if (opacity < 1) {
-    ctx.globalAlpha = 1;
+    ctx.globalAlpha = previousAlpha;
   }
 }
 

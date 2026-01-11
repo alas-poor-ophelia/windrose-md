@@ -90,6 +90,32 @@ function getLayerIndex(mapData: MapData | null | undefined, layerId: LayerId): n
   return mapData.layers.findIndex(l => l.id === layerId);
 }
 
+/**
+ * Get the layer directly below the specified layer (by order).
+ * Returns null if no layer exists below (i.e., this is the bottom layer).
+ */
+function getLayerBelow(mapData: MapData | null | undefined, layerId: LayerId): MapLayer | null {
+  if (!mapData?.layers) return null;
+
+  const layer = getLayerById(mapData, layerId);
+  if (!layer) return null;
+
+  // Find the layer with the highest order that is still less than this layer's order
+  const sortedLayers = getLayersOrdered(mapData);
+  let layerBelow: MapLayer | null = null;
+
+  for (const candidate of sortedLayers) {
+    if (candidate.order < layer.order) {
+      // This candidate is below our layer; keep the highest one
+      if (!layerBelow || candidate.order > layerBelow.order) {
+        layerBelow = candidate;
+      }
+    }
+  }
+
+  return layerBelow;
+}
+
 // ============================================================================
 // LAYER MODIFICATION FUNCTIONS
 // ============================================================================
@@ -728,6 +754,7 @@ return {
   getLayersOrdered,
   getLayerById,
   getLayerIndex,
+  getLayerBelow,
   
   // Layer modification
   updateLayer,

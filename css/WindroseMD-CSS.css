@@ -2979,36 +2979,22 @@ button.dmt-fow-tool-btn,
   max-height: calc(100% - 80px);
   overflow-y: auto;
   overscroll-behavior: contain;
-  /* Padding for slide-out options menu (so it doesn't get clipped) */
-  padding-right: 40px;
-  margin-right: -40px;
-  /* Custom scrollbar styling */
-  scrollbar-width: thin;
-  scrollbar-color: rgba(196, 165, 123, 0.4) transparent;
+  /* Padding for slide-out options menu and slider popup */
+  padding-right: 200px;
+  margin-right: -200px;
+  /* Hide scrollbar but keep scroll functionality */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.dmt-layer-controls::-webkit-scrollbar {
+  display: none;
 }
 
 .dmt-layer-controls.dmt-layer-controls-open {
   opacity: 1;
   transform: translateY(-50%) translateX(0);
   pointer-events: auto;
-}
-
-/* Webkit scrollbar styling for layer controls */
-.dmt-layer-controls::-webkit-scrollbar {
-  width: 4px;
-}
-
-.dmt-layer-controls::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.dmt-layer-controls::-webkit-scrollbar-thumb {
-  background: rgba(196, 165, 123, 0.4);
-  border-radius: 2px;
-}
-
-.dmt-layer-controls::-webkit-scrollbar-thumb:hover {
-  background: rgba(196, 165, 123, 0.6);
 }
 
 .dmt-layer-controls.sidebar-open {
@@ -3121,6 +3107,84 @@ button.dmt-layer-option-btn {
   color: #e74c3c;
   border-color: #e74c3c;
   background: rgba(231, 76, 60, 0.1);
+}
+
+/* Layer Transparency Toggle */
+.dmt-layer-transparency-wrapper {
+  position: relative;
+}
+
+.dmt-layer-option-btn.transparency.active {
+  color: #4a9eff;
+  border-color: #4a9eff;
+  background: rgba(74, 158, 255, 0.15);
+  box-shadow: 0 0 8px rgba(74, 158, 255, 0.4);
+}
+
+.dmt-layer-option-btn.transparency:hover {
+  color: #4a9eff;
+  border-color: rgba(74, 158, 255, 0.6);
+}
+
+.dmt-opacity-slider-popup {
+  position: absolute;
+  left: calc(100% + 8px);
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(20, 20, 20, 0.95);
+  border: 1px solid rgba(196, 165, 123, 0.4);
+  border-radius: 6px;
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  z-index: 200;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  white-space: nowrap;
+}
+
+.dmt-opacity-slider-popup::before {
+  content: '';
+  position: absolute;
+  right: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 6px solid transparent;
+  border-right-color: rgba(196, 165, 123, 0.4);
+}
+
+.dmt-opacity-slider {
+  width: 70px;
+  height: 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.dmt-opacity-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  background: #4a9eff;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.dmt-opacity-slider::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  background: #4a9eff;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+}
+
+.dmt-opacity-value {
+  color: var(--dmt-text-muted);
+  font-size: 11px;
 }
 
 /* Add Layer Button */

@@ -23,7 +23,7 @@ const { TextLabelEditor } = await requireModuleByName("TextLabelEditor.jsx");
 const { useEventHandlerRegistration } = await requireModuleByName("EventHandlerContext.tsx");
 const { SelectionToolbar } = await requireModuleByName("SelectionToolbar.jsx");
 const { getActiveLayer } = await requireModuleByName("layerAccessor.ts");
-const { generateDeepLinkMarkdown } = await requireModuleByName("deepLinkHandler.ts");
+const { copyDeepLinkToClipboard } = await requireModuleByName("deepLinkHandler.ts");
 
 /** Text label data structure */
 interface TextLabel {
@@ -92,14 +92,7 @@ const TextLayer = ({
     const x = label.position.x / gridSize;
     const y = label.position.y / gridSize;
 
-    const markdown = generateDeepLinkMarkdown(displayText, notePath, mapId, x, y, zoom, layerId);
-
-    navigator.clipboard.writeText(markdown).then(() => {
-      new Notice('Deep link copied to clipboard');
-    }).catch((err: Error) => {
-      console.error('Failed to copy link:', err);
-      new Notice('Failed to copy link');
-    });
+    copyDeepLinkToClipboard(displayText, notePath, mapId, x, y, zoom, layerId);
   }, [selectedItem, mapData, mapId, notePath]);
 
   dc.useEffect(() => {

@@ -36,14 +36,18 @@ const { useHistory } = await requireModuleByName("useHistory.ts") as {
 
 const {
   getActiveLayer,
+  getLayerById,
   updateActiveLayer,
+  updateLayer,
   addLayer,
   removeLayer,
   reorderLayers,
   setActiveLayer
 } = await requireModuleByName("layerAccessor.ts") as {
   getActiveLayer: (mapData: MapData) => MapLayer;
+  getLayerById: (mapData: MapData, layerId: LayerId) => MapLayer | null;
   updateActiveLayer: (mapData: MapData, updates: Partial<MapLayer>) => MapData;
+  updateLayer: (mapData: MapData, layerId: LayerId, updates: Partial<MapLayer>) => MapData;
   addLayer: (mapData: MapData) => MapData;
   removeLayer: (mapData: MapData, layerId: LayerId) => MapData;
   reorderLayers: (mapData: MapData, layerId: LayerId, newIndex: number) => MapData;
@@ -234,6 +238,38 @@ function useLayerHistory({
     [mapData, updateMapData]
   );
 
+  // Toggle show layer below for a specific layer
+  const handleToggleShowLayerBelow = dc.useCallback(
+    (layerId: LayerId): void => {
+      if (!mapData) return;
+
+      const layer = getLayerById(mapData, layerId);
+      if (!layer) return;
+
+      const newMapData = updateLayer(mapData, layerId, {
+        showLayerBelow: !layer.showLayerBelow
+      });
+      updateMapData(newMapData);
+    },
+    [mapData, updateMapData]
+  );
+
+  // Set layer below opacity for a specific layer
+  const handleSetLayerBelowOpacity = dc.useCallback(
+    (layerId: LayerId, opacity: number): void => {
+      if (!mapData) return;
+
+      // Clamp opacity to valid range
+      const clampedOpacity = Math.max(0.1, Math.min(0.5, opacity));
+
+      const newMapData = updateLayer(mapData, layerId, {
+        layerBelowOpacity: clampedOpacity
+      });
+      updateMapData(newMapData);
+    },
+    [mapData, updateMapData]
+  );
+
   // =========================================================================
   // Undo/Redo Handlers
   // =========================================================================
@@ -315,7 +351,9 @@ function useLayerHistory({
     handleLayerSelect,
     handleLayerAdd,
     handleLayerDelete,
-    handleLayerReorder
+    handleLayerReorder,
+    handleToggleShowLayerBelow,
+    handleSetLayerBelowOpacity
   };
 
   const historyActions: HistoryActions = {
@@ -331,6 +369,8 @@ function useLayerHistory({
     handleLayerAdd,
     handleLayerDelete,
     handleLayerReorder,
+    handleToggleShowLayerBelow,
+    handleSetLayerBelowOpacity,
     canUndo,
     canRedo,
     historyActions,

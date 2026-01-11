@@ -102,14 +102,15 @@ const gridRenderer = {
     
     // Draw cells with custom opacity individually
     if (customOpacityCells.length > 0) {
+      const previousAlpha = ctx.globalAlpha;
       for (const cell of customOpacityCells) {
         const opacity = cell.opacity ?? 1;
-        ctx.globalAlpha = opacity;
+        ctx.globalAlpha = previousAlpha * opacity;
         ctx.fillStyle = cell.color;
         const { screenX, screenY } = geometry.gridToScreen(cell.x, cell.y, viewState.x, viewState.y, viewState.zoom);
         ctx.fillRect(screenX, screenY, scaledSize, scaledSize);
       }
-      ctx.globalAlpha = 1; // Reset
+      ctx.globalAlpha = previousAlpha;
     }
   },
 
@@ -219,14 +220,15 @@ const gridRenderer = {
         viewState.zoom
       );
       
-      // Apply opacity if specified
-      const opacity = edge.opacity ?? 1;
-      if (opacity < 1) {
-        ctx.globalAlpha = opacity;
+      // Apply opacity if specified (multiply with current globalAlpha)
+      const edgeOpacity = edge.opacity ?? 1;
+      const previousAlpha = ctx.globalAlpha;
+      if (edgeOpacity < 1) {
+        ctx.globalAlpha = previousAlpha * edgeOpacity;
       }
-      
+
       ctx.fillStyle = edge.color;
-      
+
       // Edges are stored normalized as 'right' or 'bottom' only
       if (edge.side === 'right') {
         // Right edge of cell (x,y) - vertical line at x+1 boundary
@@ -245,10 +247,10 @@ const gridRenderer = {
           edgeWidth
         );
       }
-      
-      // Reset opacity
-      if (opacity < 1) {
-        ctx.globalAlpha = 1;
+
+      // Restore previous opacity
+      if (edgeOpacity < 1) {
+        ctx.globalAlpha = previousAlpha;
       }
     }
   },

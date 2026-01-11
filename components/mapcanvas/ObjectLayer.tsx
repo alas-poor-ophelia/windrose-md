@@ -28,7 +28,7 @@ const { NoteLinkModal } = await requireModuleByName("NoteLinkModal.jsx");
 const { SelectionToolbar } = await requireModuleByName("SelectionToolbar.jsx");
 const { calculateObjectScreenPosition } = await requireModuleByName("screenPositionUtils.ts");
 const { getActiveLayer } = await requireModuleByName("layerAccessor.ts");
-const { generateDeepLinkMarkdown } = await requireModuleByName("deepLinkHandler.ts");
+const { copyDeepLinkToClipboard } = await requireModuleByName("deepLinkHandler.ts");
 
 /** Selected item from context */
 interface SelectedItem {
@@ -242,14 +242,7 @@ const ObjectLayer = ({
       y = label.position.y / gridSize;
     }
 
-    const markdown = generateDeepLinkMarkdown(displayText, notePath, mapId, x, y, zoom, layerId);
-
-    navigator.clipboard.writeText(markdown).then(() => {
-      new Notice('Deep link copied to clipboard');
-    }).catch((err: Error) => {
-      console.error('Failed to copy link:', err);
-      new Notice('Failed to copy link');
-    });
+    copyDeepLinkToClipboard(displayText, notePath, mapId, x, y, zoom, layerId);
   }, [selectedItem, mapData, mapId, notePath]);
 
   const {

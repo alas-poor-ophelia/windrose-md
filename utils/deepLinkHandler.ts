@@ -1,13 +1,7 @@
 /**
- * deepLinkHandler.ts
- *
  * Deep link parsing and generation for Windrose maps.
- * Handles windrose: protocol URLs for navigating to specific map locations.
+ * Format: obsidian://windrose?notePath|mapId,x,y,zoom,layerId
  */
-
-// ===========================================
-// Types
-// ===========================================
 
 /** Parsed deep link data */
 export interface DeepLinkData {
@@ -24,26 +18,13 @@ export interface NavigationEventDetail extends DeepLinkData {
   timestamp: number;
 }
 
-// ===========================================
-// Constants
-// ===========================================
-
 /** Protocol prefix for Windrose deep links (uses Obsidian's protocol handler) */
 const PROTOCOL = 'obsidian://windrose?';
 
 /** Custom event name for map navigation */
 const NAVIGATION_EVENT = 'dmt-navigate-to';
 
-// ===========================================
-// Functions
-// ===========================================
-
-/**
- * Parse a deep link URL into structured data.
- * Format: windrose:notePath|mapId,x,y,zoom,layerId
- * @param url The deep link URL to parse
- * @returns Parsed data or null if invalid
- */
+/** Parse a deep link URL into structured data */
 function parseDeepLink(url: string): DeepLinkData | null {
   if (!url || typeof url !== 'string') {
     return null;
@@ -54,8 +35,6 @@ function parseDeepLink(url: string): DeepLinkData | null {
   }
 
   const dataStr = url.slice(PROTOCOL.length);
-
-  // Split notePath from coordinate data (using | as delimiter)
   const pipeIndex = dataStr.indexOf('|');
   if (pipeIndex === -1) {
     return null;
@@ -71,17 +50,14 @@ function parseDeepLink(url: string): DeepLinkData | null {
 
   const [mapId, xStr, yStr, zoomStr, layerId] = parts;
 
-  // Validate notePath, mapId and layerId are non-empty
   if (!notePath || !mapId || !layerId) {
     return null;
   }
 
-  // Parse numeric values
   const x = parseFloat(xStr);
   const y = parseFloat(yStr);
   const zoom = parseFloat(zoomStr);
 
-  // Validate numeric values
   if (isNaN(x) || isNaN(y) || isNaN(zoom)) {
     return null;
   }
@@ -98,7 +74,6 @@ function parseDeepLink(url: string): DeepLinkData | null {
 
 /**
  * Generate a deep link URL from map location data.
- * Format: windrose:notePath|mapId,x,y,zoom,layerId
  * @param notePath Path to the note containing the map
  * @param mapId The map identifier
  * @param x X coordinate
@@ -115,7 +90,7 @@ function generateDeepLink(
   zoom: number,
   layerId: string
 ): string {
-  // Round coordinates to 2 decimal places for clean URLs
+  // Round to 2 decimal places for clean URLs
   const roundedX = Math.round(x * 100) / 100;
   const roundedY = Math.round(y * 100) / 100;
   const roundedZoom = Math.round(zoom * 100) / 100;
@@ -150,6 +125,35 @@ function generateDeepLinkMarkdown(
 }
 
 /**
+ * Copy a deep link to clipboard and show a Notice.
+ * @param displayText Text to show for the link
+ * @param notePath Path to the note containing the map
+ * @param mapId The map identifier
+ * @param x X coordinate
+ * @param y Y coordinate
+ * @param zoom Zoom level
+ * @param layerId Layer identifier
+ */
+function copyDeepLinkToClipboard(
+  displayText: string,
+  notePath: string,
+  mapId: string,
+  x: number,
+  y: number,
+  zoom: number,
+  layerId: string
+): void {
+  const markdown = generateDeepLinkMarkdown(displayText, notePath, mapId, x, y, zoom, layerId);
+
+  navigator.clipboard.writeText(markdown).then(() => {
+    new Notice('Deep link copied to clipboard');
+  }).catch((err: Error) => {
+    console.error('Failed to copy link:', err);
+    new Notice('Failed to copy link');
+  });
+}
+
+/**
  * Emit a navigation event for map components to handle.
  * @param data Navigation target data
  */
@@ -163,15 +167,12 @@ function emitNavigationEvent(data: DeepLinkData): void {
   window.dispatchEvent(event);
 }
 
-// ===========================================
-// Exports
-// ===========================================
-
 return {
   PROTOCOL,
   NAVIGATION_EVENT,
   parseDeepLink,
   generateDeepLink,
   generateDeepLinkMarkdown,
+  copyDeepLinkToClipboard,
   emitNavigationEvent
 };

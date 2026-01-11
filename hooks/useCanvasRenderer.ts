@@ -87,8 +87,9 @@ const { offsetToAxial, axialToOffset } = await requireModuleByName("offsetCoordi
   offsetToAxial: (col: number, row: number, orientation: string) => { q: number; r: number };
   axialToOffset: (q: number, r: number, orientation: string) => { col: number; row: number };
 };
-const { getActiveLayer, isCellFogged } = await requireModuleByName("layerAccessor.ts") as {
+const { getActiveLayer, getLayerBelow, isCellFogged } = await requireModuleByName("layerAccessor.ts") as {
   getActiveLayer: (mapData: MapData) => MapLayer;
+  getLayerBelow: (mapData: MapData, layerId: string) => MapLayer | null;
   isCellFogged: (layer: MapLayer, col: number, row: number) => boolean;
 };
 
@@ -97,6 +98,103 @@ const { getActiveLayer, isCellFogged } = await requireModuleByName("layerAccesso
  */
 function getRenderer(geometry: IGeometry): Renderer {
   return geometry instanceof HexGeometry ? hexRenderer : gridRenderer;
+}
+
+/** Options for rendering layer content */
+interface RenderLayerContentOptions {
+  opacity?: number;
+}
+
+/**
+ * Render a layer's cells, borders, and edges (but not objects or text labels).
+ * Used for both active layer rendering and ghost layer transparency.
+ */
+function renderLayerCellsAndEdges(
+  ctx: CanvasRenderingContext2D,
+  layer: MapLayer,
+  geometry: IGeometry,
+  viewState: RendererViewState,
+  theme: RendererTheme,
+  renderer: Renderer,
+  options: RenderLayerContentOptions = {}
+): void {
+  const { opacity = 1 } = options;
+
+  // Apply opacity if needed
+  const previousAlpha = ctx.globalAlpha;
+  if (opacity < 1) {
+    ctx.globalAlpha = opacity;
+  }
+
+  // Draw filled cells
+  if (layer.cells && layer.cells.length > 0) {
+    const cellsWithColor = layer.cells.map(cell => ({
+      ...cell,
+      color: getCellColor(cell)
+    }));
+
+    const { simpleCells, segmentCells } = segmentRenderer.separateCellsByType(cellsWithColor);
+
+    if (simpleCells.length > 0) {
+      renderer.renderPaintedCells(ctx, simpleCells, geometry, viewState);
+    }
+
+    if (segmentCells.length > 0 && geometry instanceof GridGeometry) {
+      segmentRenderer.renderSegmentCells(ctx, segmentCells, geometry, viewState);
+    }
+
+    if (renderer.renderInteriorGridLines && cellsWithColor.length > 0) {
+      renderer.renderInteriorGridLines(ctx, cellsWithColor, geometry, viewState, {
+        lineColor: theme.grid.lines,
+        lineWidth: theme.grid.lineWidth || 1,
+        interiorRatio: 0.5
+      });
+    }
+
+    const allCellsLookup = buildCellLookup(cellsWithColor);
+
+    if (simpleCells.length > 0) {
+      renderer.renderCellBorders(
+        ctx,
+        simpleCells,
+        geometry,
+        viewState,
+        () => allCellsLookup,
+        calculateBordersOptimized,
+        {
+          border: theme.cells.border,
+          borderWidth: theme.cells.borderWidth
+        }
+      );
+    }
+
+    if (segmentCells.length > 0 && geometry instanceof GridGeometry) {
+      segmentRenderer.renderSegmentBorders(
+        ctx,
+        segmentCells,
+        cellsWithColor,
+        geometry,
+        viewState,
+        {
+          border: theme.cells.border,
+          borderWidth: theme.cells.borderWidth
+        }
+      );
+    }
+  }
+
+  // Draw painted edges (grid maps only)
+  if (layer.edges && layer.edges.length > 0 && geometry instanceof GridGeometry && renderer.renderEdges) {
+    renderer.renderEdges(ctx, layer.edges, geometry, viewState, {
+      lineWidth: 1,
+      borderWidth: theme.cells.borderWidth
+    });
+  }
+
+  // Restore opacity
+  if (opacity < 1) {
+    ctx.globalAlpha = previousAlpha;
+  }
 }
 
 const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, selectedItems = [], isResizeMode = false, theme = null, showCoordinates = false, layerVisibility = null) => {
@@ -239,70 +337,19 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
     lineWidth: THEME.grid.lineWidth || 1
   });
 
-  // Draw filled cells
-  if (activeLayer.cells && activeLayer.cells.length > 0) {
-    const cellsWithColor = activeLayer.cells.map(cell => ({
-      ...cell,
-      color: getCellColor(cell)
-    }));
-
-    const { simpleCells, segmentCells } = segmentRenderer.separateCellsByType(cellsWithColor);
-
-    if (simpleCells.length > 0) {
-      renderer.renderPaintedCells(ctx, simpleCells, geometry, rendererViewState);
-    }
-
-    if (segmentCells.length > 0 && geometry instanceof GridGeometry) {
-      segmentRenderer.renderSegmentCells(ctx, segmentCells, geometry, rendererViewState);
-    }
-
-    if (renderer.renderInteriorGridLines && cellsWithColor.length > 0) {
-      renderer.renderInteriorGridLines(ctx, cellsWithColor, geometry, rendererViewState, {
-        lineColor: THEME.grid.lines,
-        lineWidth: THEME.grid.lineWidth || 1,
-        interiorRatio: 0.5
+  // Draw ghost layer (layer below) if enabled
+  if (activeLayer.showLayerBelow) {
+    const layerBelow = getLayerBelow(mapData, activeLayer.id);
+    if (layerBelow) {
+      const ghostOpacity = activeLayer.layerBelowOpacity ?? 0.25;
+      renderLayerCellsAndEdges(ctx, layerBelow, geometry, rendererViewState, THEME, renderer, {
+        opacity: ghostOpacity
       });
     }
-
-    const allCellsLookup = buildCellLookup(cellsWithColor);
-
-    if (simpleCells.length > 0) {
-      renderer.renderCellBorders(
-        ctx,
-        simpleCells,
-        geometry,
-        rendererViewState,
-        () => allCellsLookup,
-        calculateBordersOptimized,
-        {
-          border: THEME.cells.border,
-          borderWidth: THEME.cells.borderWidth
-        }
-      );
-    }
-
-    if (segmentCells.length > 0 && geometry instanceof GridGeometry) {
-      segmentRenderer.renderSegmentBorders(
-        ctx,
-        segmentCells,
-        cellsWithColor,
-        geometry,
-        rendererViewState,
-        {
-          border: THEME.cells.border,
-          borderWidth: THEME.cells.borderWidth
-        }
-      );
-    }
   }
 
-  // Draw painted edges (grid maps only)
-  if (activeLayer.edges && activeLayer.edges.length > 0 && geometry instanceof GridGeometry && renderer.renderEdges) {
-    renderer.renderEdges(ctx, activeLayer.edges, geometry, rendererViewState, {
-      lineWidth: 1,
-      borderWidth: THEME.cells.borderWidth
-    });
-  }
+  // Draw active layer cells and edges
+  renderLayerCellsAndEdges(ctx, activeLayer, geometry, rendererViewState, THEME, renderer);
 
   // Draw objects
   if (activeLayer.objects && activeLayer.objects.length > 0 && !showCoordinates && visibility.objects) {

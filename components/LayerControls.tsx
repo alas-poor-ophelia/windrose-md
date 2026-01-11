@@ -31,6 +31,10 @@ export interface LayerControlsProps {
   onLayerDelete: (layerId: string) => void;
   /** Callback to reorder a layer */
   onLayerReorder: (layerId: string, newIndex: number) => void;
+  /** Callback to toggle show layer below */
+  onToggleShowLayerBelow: (layerId: string) => void;
+  /** Callback to set layer below opacity */
+  onSetLayerBelowOpacity: (layerId: string, opacity: number) => void;
   /** Whether object sidebar is collapsed */
   sidebarCollapsed: boolean;
   /** Whether the layer controls panel is open */
@@ -43,15 +47,19 @@ const LayerControls = ({
   onLayerAdd,
   onLayerDelete,
   onLayerReorder,
+  onToggleShowLayerBelow,
+  onSetLayerBelowOpacity,
   sidebarCollapsed,
   isOpen = true
 }: LayerControlsProps): React.ReactElement => {
   const [expandedLayerId, setExpandedLayerId] = dc.useState<string | null>(null);
   const [dragState, setDragState] = dc.useState<DragState | null>(null);
   const [dragOverIndex, setDragOverIndex] = dc.useState<number | null>(null);
+  const [sliderHoveredLayerId, setSliderHoveredLayerId] = dc.useState<string | null>(null);
 
   const longPressTimerRef = dc.useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressTriggeredRef = dc.useRef(false);
+  const sliderHideTimeoutRef = dc.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const layers = getLayersOrdered(mapData) as MapLayer[];
   const reversedLayers = [...layers].reverse();
@@ -171,6 +179,30 @@ const LayerControls = ({
     return layer.order + 1;
   };
 
+  const handleTransparencyToggle = (layerId: string, e: JSX.TargetedMouseEvent<HTMLButtonElement>): void => {
+    e.stopPropagation();
+    onToggleShowLayerBelow(layerId);
+  };
+
+  const handleOpacityChange = (layerId: string, e: JSX.TargetedEvent<HTMLInputElement>): void => {
+    const value = parseFloat((e.target as HTMLInputElement).value);
+    onSetLayerBelowOpacity(layerId, value);
+  };
+
+  const handleSliderAreaEnter = (layerId: string): void => {
+    if (sliderHideTimeoutRef.current) {
+      clearTimeout(sliderHideTimeoutRef.current);
+      sliderHideTimeoutRef.current = null;
+    }
+    setSliderHoveredLayerId(layerId);
+  };
+
+  const handleSliderAreaLeave = (): void => {
+    sliderHideTimeoutRef.current = setTimeout(() => {
+      setSliderHoveredLayerId(null);
+    }, 150);
+  };
+
   return (
     <>
       {expandedLayerId && (
@@ -226,6 +258,39 @@ const LayerControls = ({
                     <dc.Icon icon="lucide-trash-2" />
                   </button>
                 )}
+                <div
+                  className="dmt-layer-transparency-wrapper"
+                  onMouseEnter={() => handleSliderAreaEnter(layer.id)}
+                  onMouseLeave={handleSliderAreaLeave}
+                >
+                  <button
+                    className={`dmt-layer-option-btn transparency ${layer.showLayerBelow ? 'active' : ''}`}
+                    onClick={(e) => handleTransparencyToggle(layer.id, e)}
+                    title={layer.showLayerBelow ? 'Hide layer below' : 'Show layer below'}
+                  >
+                    <dc.Icon icon="lucide-layers" />
+                  </button>
+                  {sliderHoveredLayerId === layer.id && layer.showLayerBelow && (
+                    <div
+                      className="dmt-opacity-slider-popup"
+                      onMouseEnter={() => handleSliderAreaEnter(layer.id)}
+                      onMouseLeave={handleSliderAreaLeave}
+                    >
+                      <input
+                        type="range"
+                        min="0.1"
+                        max="0.5"
+                        step="0.05"
+                        value={layer.layerBelowOpacity ?? 0.25}
+                        onChange={(e) => handleOpacityChange(layer.id, e)}
+                        className="dmt-opacity-slider"
+                      />
+                      <span className="dmt-opacity-value">
+                        {Math.round((layer.layerBelowOpacity ?? 0.25) * 100)}%
+                      </span>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           );

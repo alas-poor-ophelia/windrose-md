@@ -388,6 +388,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     handleLayerAdd,
     handleLayerDelete,
     handleLayerReorder,
+    handleToggleShowLayerBelow,
+    handleSetLayerBelowOpacity,
     // History state
     canUndo,
     canRedo,
@@ -415,13 +417,14 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
         }
       }
 
-      // Update view to center on target coordinates at specified zoom
+      // Navigate to a comfortable viewing zoom regardless of what the link stored
+      const DEEP_LINK_ZOOM = 1.175;
       updateMapData((currentMapData: MapData) => ({
         ...currentMapData,
         viewState: {
           ...currentMapData.viewState,
           center: { x, y },
-          zoom: Math.max(1.15, Math.min(1.20, zoom)) // Clamp to 115-120% as per spec
+          zoom: DEEP_LINK_ZOOM
         }
       }));
 
@@ -796,6 +799,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
             onLayerAdd={handleLayerAdd}
             onLayerDelete={handleLayerDelete}
             onLayerReorder={handleLayerReorder}
+            onToggleShowLayerBelow={handleToggleShowLayerBelow}
+            onSetLayerBelowOpacity={handleSetLayerBelowOpacity}
             sidebarCollapsed={mapData.sidebarCollapsed || false}
             isOpen={showLayerPanel}
           />

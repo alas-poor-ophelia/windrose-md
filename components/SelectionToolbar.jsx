@@ -301,7 +301,7 @@ const SelectionToolbar = ({
   onRotate,
   onLabel,
   onLinkNote,
-  onCopyLink,     // handler for copying deep link to clipboard
+  onCopyLink,
   onColorClick,
   onResize,
   onDelete,
