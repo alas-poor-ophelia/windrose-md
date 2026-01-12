@@ -12,34 +12,32 @@ Guides you through the complete release process for Windrose.
 Before running this skill:
 1. All source changes should be committed
 2. Know the new version number
-3. Have a summary of changes for CHANGELOG.md
+3. Changelog for this version should already be written in `DungeonMapTracker.md`
 
 The Datacore Compiler command ID is already configured: `dc-compiler:compile-projects-dungeon-map-tracker--compilersettings`
 
 ## Release Process
 
-### Step 1: Update Version Files
+### Step 1: Extract and Confirm Changelog
+
+1. Read `DungeonMapTracker.md` in the source repo (`C:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker`)
+2. Find the changelog section for the version being released (under `# Changelog`, look for `## Version X.Y.Z` or similar header)
+3. Extract the full changelog content for this version (everything from the version header until the next version header or end of changelog section)
+4. Present the extracted changelog to the user and ask them to confirm it looks correct before proceeding
+
+**Important:** The user writes changelogs manually in `DungeonMapTracker.md`. Do NOT generate or modify changelog content - only extract what's already there.
+
+### Step 2: Update Version Files
 
 Update these files in the source repo (`C:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker`):
 
 1. **`dist/VERSION`** - Single line with version number (e.g., `1.5.1`)
 
-2. **`dist/CHANGELOG.md`** - Add entry at top:
-   ```markdown
-   ## Version X.Y.Z
-   ### New Features
-   - Feature description
-
-   ### Bug Fixes
-   - Bug fix description
-
-   ### Changes
-   - Other changes
-   ```
+2. **`dist/CHANGELOG.md`** - Copy the changelog content (confirmed in Step 1) to the top of this file
 
 3. **`.compilersettings`** - Update the `"version"` field to match
 
-### Step 2: Commit Version Updates
+### Step 3: Commit Version Updates
 
 ```bash
 cd "C:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker"
@@ -47,7 +45,7 @@ git add dist/VERSION dist/CHANGELOG.md .compilersettings
 git commit -m "Bump version to X.Y.Z"
 ```
 
-### Step 3: Run Release Pipeline
+### Step 4: Run Release Pipeline
 
 From the dev harness directory:
 
@@ -70,7 +68,7 @@ npm run release
 **Environment variables:**
 - `WINDROSE_COMPILER_COMMAND` - Datacore Compiler command ID
 
-### Step 4: Verify Release
+### Step 5: Verify Release
 
 After `npm run release` succeeds:
 1. Check GitHub Actions for release workflow status

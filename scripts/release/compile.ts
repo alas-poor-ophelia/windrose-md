@@ -150,6 +150,66 @@ async function waitForApp(page: Page, timeout: number = 30000): Promise<void> {
 }
 
 /**
+ * Wait for a specific command to become available.
+ * dc-compiler scans the vault for .compilersettings files and registers commands dynamically,
+ * which can take time after plugins are enabled.
+ */
+async function waitForCommand(
+  page: Page,
+  commandId: string,
+  timeout: number = 30000
+): Promise<{ available: boolean; allCommands: string[] }> {
+  const startTime = Date.now();
+  let lastCommandCount = 0;
+
+  while (Date.now() - startTime < timeout) {
+    const result = await page.evaluate((cmdId: string) => {
+      const app = (window as any).app;
+      const commands = app?.commands?.commands || {};
+      const commandKeys = Object.keys(commands);
+      return {
+        exists: !!commands[cmdId],
+        count: commandKeys.length,
+        dcCompilerCommands: commandKeys.filter(
+          (k) => k.startsWith("dc-compiler:") || k.includes("datacore")
+        ),
+      };
+    }, commandId);
+
+    if (result.exists) {
+      return { available: true, allCommands: result.dcCompilerCommands };
+    }
+
+    // Log progress if command count changed
+    if (result.count !== lastCommandCount) {
+      console.log(
+        `  Commands registered: ${result.count}, dc-compiler commands: ${result.dcCompilerCommands.length}`
+      );
+      lastCommandCount = result.count;
+    }
+
+    await page.waitForTimeout(500);
+  }
+
+  // Final check - return what we have
+  const finalResult = await page.evaluate((cmdId: string) => {
+    const app = (window as any).app;
+    const commands = app?.commands?.commands || {};
+    return {
+      exists: !!commands[cmdId],
+      dcCompilerCommands: Object.keys(commands).filter(
+        (k) => k.startsWith("dc-compiler:") || k.includes("datacore")
+      ),
+    };
+  }, commandId);
+
+  return {
+    available: finalResult.exists,
+    allCommands: finalResult.dcCompilerCommands,
+  };
+}
+
+/**
  * Compile Windrose by launching Obsidian and executing the compiler command.
  */
 export async function compileViaObsidian(
@@ -198,31 +258,25 @@ export async function compileViaObsidian(
     console.log("  Waiting for Obsidian to be ready...");
     await waitForApp(page);
 
-    // Wait a bit more for Datacore to initialize
-    await page.waitForTimeout(3000);
+    // Wait for the specific compile command to become available
+    // dc-compiler needs time to scan the vault for .compilersettings files
+    console.log(`  Waiting for command: ${commandId}`);
+    const commandResult = await waitForCommand(page, commandId, 30000);
 
-    // Execute compile command
-    console.log(`  Executing command: ${commandId}`);
-    const commandExists = await page.evaluate(async (cmdId: string) => {
-      const app = (window as any).app;
-      const command = app.commands.commands[cmdId];
-      if (!command) {
-        return { exists: false, available: Object.keys(app.commands.commands) };
-      }
-      await app.commands.executeCommandById(cmdId);
-      return { exists: true };
-    }, commandId);
-
-    if (!commandExists.exists) {
-      const available = (commandExists as any).available as string[];
-      const compilerCommands = available.filter(
-        (c) => c.includes("compiler") || c.includes("datacore")
-      );
+    if (!commandResult.available) {
       throw new Error(
-        `Command "${commandId}" not found. ` +
-          `Available compiler commands: ${compilerCommands.join(", ") || "none"}`
+        `Command "${commandId}" not found after 30s. ` +
+          `Available dc-compiler commands: ${commandResult.allCommands.join(", ") || "none"}`
       );
     }
+
+    console.log(`  Command available, executing...`);
+
+    // Execute the compile command
+    await page.evaluate(async (cmdId: string) => {
+      const app = (window as any).app;
+      await app.commands.executeCommandById(cmdId);
+    }, commandId);
 
     // Poll for output file update
     console.log("  Waiting for compilation to complete...");
