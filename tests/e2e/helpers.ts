@@ -8,6 +8,9 @@ export { test, expect, doWithApp };
 // Test mode: "dev" uses uncompiled source, "compiled" uses compiled artifact
 const TEST_MODE = process.env.WINDROSE_TEST_MODE || "dev";
 
+// Compiled mode needs longer timeouts for initial Datacore indexing
+const CONTAINER_TIMEOUT = TEST_MODE === "compiled" ? 60000 : 10000;
+
 // ===========================================
 // Error Tracking
 // ===========================================
@@ -38,13 +41,58 @@ export async function navigateToMap(page: any, mapPath: string): Promise<void> {
       throw new Error(`Test file ${path} not found in vault`);
     }
   }, mapPath);
+
   // Brief wait for Obsidian to switch views and Datacore to start rendering
   await page.waitForTimeout(300);
 }
 
+// ===========================================
+// Plugin Installer Helpers
+// ===========================================
+
+/**
+ * Handle the Settings Plugin Installer if it appears.
+ * This installer blocks the main canvas when a plugin install/upgrade is offered.
+ * Clicks through the install/upgrade flow and enables the plugin.
+ * Only needs to run once per test run since the plugin persists.
+ */
+export async function handlePluginInstallerIfPresent(page: any, timeout: number = 5000): Promise<boolean> {
+  const installer = page.locator(".dmt-plugin-installer");
+
+  // Quick check if installer is visible
+  try {
+    const isVisible = await installer.isVisible({ timeout: 500 });
+    if (!isVisible) return false;
+  } catch {
+    return false; // Not visible or doesn't exist
+  }
+
+  console.log("[Test Helper] Plugin installer detected, handling install/upgrade flow...");
+
+  // Click the primary action button (Install Plugin / Update Plugin)
+  const primaryBtn = installer.locator(".dmt-plugin-installer-btn-primary");
+  await primaryBtn.waitFor({ state: "visible", timeout: 3000 });
+  await primaryBtn.click();
+
+  // Wait for success modal to appear
+  const successModal = page.locator(".dmt-plugin-success-modal-overlay");
+  await successModal.waitFor({ state: "visible", timeout: timeout });
+
+  // Click the primary button in success modal (Enable Now / Continue)
+  const modalPrimaryBtn = successModal.locator(".dmt-plugin-installer-btn-primary");
+  await modalPrimaryBtn.waitFor({ state: "visible", timeout: 3000 });
+  await modalPrimaryBtn.click();
+
+  // Wait for modal to close and container to start rendering
+  await page.waitForTimeout(500);
+
+  console.log("[Test Helper] Plugin installer flow completed");
+  return true;
+}
+
 /** Wait for Windrose container to be ready, with Datacore error detection */
-export async function waitForContainer(page: any, timeout: number = 10000): Promise<any> {
-  const container = page.locator(".dmt-container");
+export async function waitForContainer(page: any, timeout: number = CONTAINER_TIMEOUT): Promise<any> {
+  const container = page.locator(".dmt-container").first();
 
   // First, wait for a markdown view to be present (indicates Obsidian has loaded the file)
   const markdownView = page.locator(".markdown-reading-view, .markdown-source-view");
@@ -54,14 +102,31 @@ export async function waitForContainer(page: any, timeout: number = 10000): Prom
     // View not found - proceed anyway
   }
 
+  // Handle plugin installer if it appears (blocks the main canvas until handled)
+  // Wait briefly for container to appear first
+  await page.waitForTimeout(500);
+  await handlePluginInstallerIfPresent(page, 10000);
+
   // Wait for either the container or an error to appear
   // Use a race between success and error conditions
   const startTime = Date.now();
+  let datacoreReadyLogged = false;
 
   while (Date.now() - startTime < timeout) {
     // Check if container is visible (success)
     if (await container.count() > 0 && await container.isVisible()) {
       return container;
+    }
+
+    // Check for "Datacore is getting ready" message - this means we need to wait longer
+    const datacoreReady = page.locator('text=/Datacore is getting ready/i');
+    if (await datacoreReady.count() > 0) {
+      if (!datacoreReadyLogged) {
+        console.log("[Test Helper] Datacore is indexing, waiting...");
+        datacoreReadyLogged = true;
+      }
+      await page.waitForTimeout(1000);
+      continue;
     }
 
     // Check for Datacore error box
@@ -73,7 +138,7 @@ export async function waitForContainer(page: any, timeout: number = 10000): Prom
         const trimmed = errorText?.trim() || "";
 
         // Ignore loading states - these are not errors
-        if (trimmed.includes("View is rendering") || trimmed.includes("Loading")) {
+        if (trimmed.includes("View is rendering") || trimmed.includes("Loading") || trimmed.includes("getting ready")) {
           // Still loading, wait and continue
           await page.waitForTimeout(200);
           continue;
@@ -125,9 +190,19 @@ export async function waitForContainer(page: any, timeout: number = 10000): Prom
     }
   }
 
+  // Capture screenshot for debugging
+  const screenshotPath = `tests/e2e/screenshots/container-timeout-${Date.now()}.png`;
+  try {
+    await page.screenshot({ path: screenshotPath, fullPage: true });
+    console.log(`[Debug] Screenshot saved to ${screenshotPath}`);
+  } catch (e) {
+    console.log(`[Debug] Failed to capture screenshot: ${e}`);
+  }
+
   throw new Error(
     `Timeout waiting for .dmt-container after ${timeout}ms. ` +
-    `Container count: ${containerCount}, Error boxes: ${errorCount}, Error text: "${diagErrorText}"`
+    `Container count: ${containerCount}, Error boxes: ${errorCount}, Error text: "${diagErrorText}". ` +
+    `Screenshot: ${screenshotPath}`
   );
 }
 
@@ -316,6 +391,69 @@ export async function getTotalCellCount(page: any, mapId: string): Promise<numbe
 
     return map.layers.reduce((sum: number, layer: any) => sum + (layer.cells?.length ?? 0), 0);
   }, mapId);
+}
+
+// ===========================================
+// Layer Context Menu Helpers
+// ===========================================
+
+/** Helper to right-click a layer button to open context menu */
+export async function openLayerContextMenu(page: any, layerIndex: number): Promise<void> {
+  // Open layer panel first
+  await openLayerPanel(page);
+  await page.waitForTimeout(300);
+
+  // Find the layer button by index (layers are in reverse order in UI - bottom layer is last)
+  const layerBtn = page.locator('.dmt-layer-btn').nth(layerIndex);
+  await layerBtn.waitFor({ state: "visible", timeout: 5000 });
+  await layerBtn.click({ button: 'right' });
+  await page.waitForTimeout(200);
+}
+
+/** Helper to click the transparency toggle for a specific layer */
+export async function clickTransparencyToggle(page: any, layerIndex: number = 1): Promise<void> {
+  // Scope to the specific layer's transparency button
+  const layerWrapper = page.locator('.dmt-layer-btn-wrapper').nth(layerIndex);
+  const transparencyBtn = layerWrapper.locator('.dmt-layer-option-btn.transparency');
+  await transparencyBtn.waitFor({ state: "visible", timeout: 3000 });
+  await transparencyBtn.click();
+  await page.waitForTimeout(200);
+}
+
+/** Helper to check if transparency toggle is active for a specific layer */
+export async function isTransparencyToggleActive(page: any, layerIndex: number = 1): Promise<boolean> {
+  const layerWrapper = page.locator('.dmt-layer-btn-wrapper').nth(layerIndex);
+  const activeBtn = layerWrapper.locator('.dmt-layer-option-btn.transparency.active');
+  return await activeBtn.count() > 0;
+}
+
+/** Helper to hover over transparency button for a specific layer */
+export async function hoverTransparencyButton(page: any, layerIndex: number = 1): Promise<void> {
+  const layerWrapper = page.locator('.dmt-layer-btn-wrapper').nth(layerIndex);
+  const wrapper = layerWrapper.locator('.dmt-layer-transparency-wrapper');
+  await wrapper.hover();
+  await page.waitForTimeout(200);
+}
+
+/** Helper to get layer transparency settings from JSON data */
+export async function getLayerTransparency(page: any, mapId: string, layerId: string): Promise<{ showLayerBelow: boolean; layerBelowOpacity: number } | null> {
+  return await doWithApp(page, async (app: any, params: { mapId: string; layerId: string }) => {
+    const dataFile = app.vault.getAbstractFileByPath("Garden/90 - Data/12 - Meta/JSON/dungeon-maps-data.json");
+    if (!dataFile) return null;
+
+    const content = await app.vault.read(dataFile);
+    const data = JSON.parse(content);
+    const map = data.maps?.[params.mapId];
+    if (!map) return null;
+
+    const layer = map.layers?.find((l: any) => l.id === params.layerId);
+    if (!layer) return null;
+
+    return {
+      showLayerBelow: layer.showLayerBelow ?? false,
+      layerBelowOpacity: layer.layerBelowOpacity ?? 0.25
+    };
+  }, { mapId, layerId });
 }
 
 // ===========================================

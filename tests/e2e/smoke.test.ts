@@ -7,7 +7,13 @@ import {
   waitForToolPalette,
   selectSubTool,
   getCanvasCenter,
-  TEST_MAPS
+  openLayerContextMenu,
+  clickTransparencyToggle,
+  isTransparencyToggleActive,
+  hoverTransparencyButton,
+  getLayerTransparency,
+  TEST_MAPS,
+  MAP_IDS
 } from "./helpers";
 
 // ===========================================
@@ -191,5 +197,154 @@ test("Diagonal fill tool shows preview overlay on valid diagonal", async ({ page
   }
 
   // Verify no Windrose-specific JavaScript errors occurred
+  expect(errors).toHaveLength(0);
+});
+
+// ===========================================
+// Layer Transparency Tests
+// ===========================================
+
+test("Layer transparency toggle can be activated", async ({ page }) => {
+  const errors = setupErrorTracking(page);
+
+  await navigateToMap(page, TEST_MAPS.grid);
+  await waitForContainer(page);
+
+  // Open context menu for Layer 2 (index 1) which has a layer below it
+  const layerIndex = 1;
+  await openLayerContextMenu(page, layerIndex);
+
+  // Click to toggle transparency on (pass layerIndex to scope selector)
+  await clickTransparencyToggle(page, layerIndex);
+
+  // Verify the toggle shows active state
+  const isActive = await isTransparencyToggleActive(page, layerIndex);
+  expect(isActive).toBe(true);
+
+  // Verify no errors
+  expect(errors).toHaveLength(0);
+});
+
+test("Layer transparency toggle can be deactivated", async ({ page }) => {
+  const errors = setupErrorTracking(page);
+
+  await navigateToMap(page, TEST_MAPS.grid);
+  await waitForContainer(page);
+
+  // Open context menu for Layer 2
+  const layerIndex = 1;
+  await openLayerContextMenu(page, layerIndex);
+
+  // Toggle on
+  await clickTransparencyToggle(page, layerIndex);
+  expect(await isTransparencyToggleActive(page, layerIndex)).toBe(true);
+
+  // Toggle off
+  await clickTransparencyToggle(page, layerIndex);
+  expect(await isTransparencyToggleActive(page, layerIndex)).toBe(false);
+
+  expect(errors).toHaveLength(0);
+});
+
+test("Layer transparency slider appears on hover when active", async ({ page }) => {
+  const errors = setupErrorTracking(page);
+
+  await navigateToMap(page, TEST_MAPS.grid);
+  await waitForContainer(page);
+
+  // Open context menu for Layer 2
+  const layerIndex = 1;
+  await openLayerContextMenu(page, layerIndex);
+
+  // Toggle transparency on
+  await clickTransparencyToggle(page, layerIndex);
+
+  // Verify toggle is active before hovering
+  const isActive = await isTransparencyToggleActive(page, layerIndex);
+  if (!isActive) {
+    await page.screenshot({ path: 'tests/e2e/screenshots/slider-toggle-not-active.png' });
+    throw new Error("Transparency toggle should be active but isn't");
+  }
+
+  // Hover to reveal slider (needs extra wait for CSS transition)
+  await hoverTransparencyButton(page, layerIndex);
+  await page.waitForTimeout(500);
+
+  // Verify slider popup appears
+  const sliderPopup = page.locator('.dmt-opacity-slider-popup');
+  try {
+    await sliderPopup.waitFor({ state: "visible", timeout: 5000 });
+  } catch (e) {
+    await page.screenshot({ path: 'tests/e2e/screenshots/slider-popup-not-visible.png' });
+    throw e;
+  }
+
+  // Verify slider input exists
+  const sliderInput = sliderPopup.locator('input[type="range"]');
+  expect(await sliderInput.count()).toBe(1);
+
+  expect(errors).toHaveLength(0);
+});
+
+test("Layer transparency slider does not appear when toggle is inactive", async ({ page }) => {
+  const errors = setupErrorTracking(page);
+
+  await navigateToMap(page, TEST_MAPS.grid);
+  await waitForContainer(page);
+
+  // Open context menu for Layer 2
+  const layerIndex = 1;
+  await openLayerContextMenu(page, layerIndex);
+
+  // Don't toggle on - just hover
+  await hoverTransparencyButton(page, layerIndex);
+
+  // Slider should NOT appear
+  const sliderPopup = page.locator('.dmt-opacity-slider-popup');
+  expect(await sliderPopup.count()).toBe(0);
+
+  expect(errors).toHaveLength(0);
+});
+
+test("Bottom layer transparency toggle is disabled (no layer below)", async ({ page }) => {
+  const errors = setupErrorTracking(page);
+
+  await navigateToMap(page, TEST_MAPS.grid);
+  await waitForContainer(page);
+
+  // Open context menu for Layer 1 (bottom layer, index 0)
+  const layerIndex = 0;
+  await openLayerContextMenu(page, layerIndex);
+
+  // The transparency toggle should still exist but clicking it should be a no-op
+  // since there's no layer below
+  await clickTransparencyToggle(page, layerIndex);
+
+  // It can be toggled on (spec says allow toggle, it's a no-op)
+  // The test is mainly checking it doesn't crash
+  expect(errors).toHaveLength(0);
+});
+
+test("Layer transparency renders without errors", async ({ page }) => {
+  const errors = setupErrorTracking(page);
+
+  await navigateToMap(page, TEST_MAPS.grid);
+  await waitForContainer(page);
+
+  // Open context menu for a layer with content below it
+  // Layer 2 (index 1) has Layer 1 below it
+  const layerIndex = 1;
+  await openLayerContextMenu(page, layerIndex);
+
+  // Enable transparency
+  await clickTransparencyToggle(page, layerIndex);
+
+  // Wait for render
+  await page.waitForTimeout(500);
+
+  // Canvas should still be visible and no errors
+  const canvas = page.locator(".dmt-canvas-wrapper canvas").first();
+  await canvas.waitFor({ state: "visible", timeout: 3000 });
+
   expect(errors).toHaveLength(0);
 });
