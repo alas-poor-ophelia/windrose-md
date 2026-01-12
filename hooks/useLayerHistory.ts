@@ -270,6 +270,24 @@ function useLayerHistory({
     [mapData, updateMapData]
   );
 
+  const handleUpdateLayerDisplay = dc.useCallback(
+    (layerId: LayerId, newName: string, icon: string | null): void => {
+      if (!mapData) return;
+
+      const updates: Partial<MapLayer> = { name: newName };
+      if (icon !== null) {
+        updates.icon = icon;
+      } else {
+        // If icon is null, we need to remove it - use undefined
+        updates.icon = undefined;
+      }
+
+      const newMapData = updateLayer(mapData, layerId, updates);
+      updateMapData(newMapData);
+    },
+    [mapData, updateMapData]
+  );
+
   // =========================================================================
   // Undo/Redo Handlers
   // =========================================================================
@@ -353,7 +371,8 @@ function useLayerHistory({
     handleLayerDelete,
     handleLayerReorder,
     handleToggleShowLayerBelow,
-    handleSetLayerBelowOpacity
+    handleSetLayerBelowOpacity,
+    handleUpdateLayerDisplay
   };
 
   const historyActions: HistoryActions = {
@@ -371,6 +390,7 @@ function useLayerHistory({
     handleLayerReorder,
     handleToggleShowLayerBelow,
     handleSetLayerBelowOpacity,
+    handleUpdateLayerDisplay,
     canUndo,
     canRedo,
     historyActions,

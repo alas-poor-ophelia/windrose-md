@@ -35,11 +35,18 @@ export interface LayerControlsProps {
   onToggleShowLayerBelow: (layerId: string) => void;
   /** Callback to set layer below opacity */
   onSetLayerBelowOpacity: (layerId: string, opacity: number) => void;
+  /** Callback to open layer edit modal */
+  onEditLayer: (layerId: string) => void;
   /** Whether object sidebar is collapsed */
   sidebarCollapsed: boolean;
   /** Whether the layer controls panel is open */
   isOpen?: boolean;
 }
+
+const { getIconInfo } = await requireModuleByName("rpgAwesomeIcons.ts");
+
+const LAYER_NAME_MAX_LENGTH = 25;
+const LAYER_NAME_TRUNCATE_AT = 22;
 
 const LayerControls = ({
   mapData,
@@ -49,6 +56,7 @@ const LayerControls = ({
   onLayerReorder,
   onToggleShowLayerBelow,
   onSetLayerBelowOpacity,
+  onEditLayer,
   sidebarCollapsed,
   isOpen = true
 }: LayerControlsProps): React.ReactElement => {
@@ -175,8 +183,52 @@ const LayerControls = ({
     setDragOverIndex(null);
   };
 
-  const getLayerDisplayNumber = (layer: MapLayer): number => {
-    return layer.order + 1;
+  const getLayerNumber = (layer: MapLayer): string => {
+    return String(layer.order + 1);
+  };
+
+  const isDefaultName = (layer: MapLayer): boolean => {
+    const num = getLayerNumber(layer);
+    return !layer.name || layer.name === num;
+  };
+
+  const getLayerDisplayName = (layer: MapLayer): string => {
+    if (isDefaultName(layer)) {
+      return getLayerNumber(layer);
+    }
+    return layer.name.length > LAYER_NAME_MAX_LENGTH
+      ? layer.name.slice(0, LAYER_NAME_TRUNCATE_AT) + '...'
+      : layer.name;
+  };
+
+  const shouldShowPill = (layer: MapLayer): boolean => {
+    return !isDefaultName(layer) || !!layer.icon;
+  };
+
+  const getLayerIcon = (layer: MapLayer): { char: string; isRpgAwesome: boolean } | null => {
+    if (!layer.icon) return null;
+    if (layer.icon.startsWith('ra-')) {
+      const info = getIconInfo(layer.icon);
+      return info ? { char: info.char, isRpgAwesome: true } : null;
+    }
+    return { char: layer.icon, isRpgAwesome: false };
+  };
+
+  const layerDisplayInfo = dc.useMemo(() => {
+    return new Map(layers.map(layer => [
+      layer.id,
+      {
+        isPill: shouldShowPill(layer),
+        icon: getLayerIcon(layer),
+        displayName: getLayerDisplayName(layer)
+      }
+    ]));
+  }, [layers]);
+
+  const handleEdit = (layerId: string, e: JSX.TargetedMouseEvent<HTMLButtonElement>): void => {
+    e.stopPropagation();
+    setExpandedLayerId(null);
+    onEditLayer(layerId);
   };
 
   const handleTransparencyToggle = (layerId: string, e: JSX.TargetedMouseEvent<HTMLButtonElement>): void => {
@@ -236,19 +288,36 @@ const LayerControls = ({
               onDrop={(e) => handleDrop(visualIndex, e)}
               onDragEnd={handleDragEnd}
             >
-              <button
-                className={`dmt-layer-btn ${isActive ? 'dmt-layer-btn-active' : ''} ${isDragging ? 'dragging' : ''} ${isDragOver ? 'drag-over' : ''}`}
-                onClick={(e) => handleLayerClick(layer.id, e)}
-                onContextMenu={(e) => handleContextMenu(layer.id, e)}
-                onTouchStart={() => handleTouchStart(layer.id)}
-                onTouchEnd={handleTouchEnd}
-                onTouchCancel={handleTouchEnd}
-                title={`${layer.name}${isActive ? ' (active)' : ''} - Right-click for options`}
-              >
-                {getLayerDisplayNumber(layer)}
-              </button>
+              {(() => {
+                const info = layerDisplayInfo.get(layer.id)!;
+                return (
+                  <button
+                    className={`dmt-layer-btn ${info.isPill ? 'dmt-layer-btn-pill' : ''} ${isActive ? 'dmt-layer-btn-active' : ''} ${isDragging ? 'dragging' : ''} ${isDragOver ? 'drag-over' : ''}`}
+                    onClick={(e) => handleLayerClick(layer.id, e)}
+                    onContextMenu={(e) => handleContextMenu(layer.id, e)}
+                    onTouchStart={() => handleTouchStart(layer.id)}
+                    onTouchEnd={handleTouchEnd}
+                    onTouchCancel={handleTouchEnd}
+                    title={`${layer.name}${isActive ? ' (active)' : ''} - Right-click for options`}
+                  >
+                    {info.icon && (
+                      <span className={`dmt-layer-icon ${info.icon.isRpgAwesome ? 'ra' : ''}`}>
+                        {info.icon.char}
+                      </span>
+                    )}
+                    <span className="dmt-layer-name">{info.displayName}</span>
+                  </button>
+                );
+              })()}
 
               <div className={`dmt-layer-options ${isExpanded ? 'expanded' : ''}`}>
+                <button
+                  className="dmt-layer-option-btn edit"
+                  onClick={(e) => handleEdit(layer.id, e)}
+                  title="Edit layer"
+                >
+                  <dc.Icon icon="lucide-pencil" />
+                </button>
                 {canDelete && (
                   <button
                     className="dmt-layer-option-btn delete"
