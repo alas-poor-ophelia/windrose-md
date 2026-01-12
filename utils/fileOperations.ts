@@ -228,7 +228,7 @@ function createNewMap(mapId: string, mapName: string = '', mapType: MapType = 'g
   // Initial layer
   const initialLayer: Layer = {
     id: initialLayerId,
-    name: 'Layer 1',
+    name: '1',
     order: 0,
     visible: true,
     cells: [],

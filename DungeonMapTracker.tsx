@@ -59,8 +59,9 @@ const { axialToOffset, isWithinOffsetBounds } = await requireModuleByName("offse
 const { ImageAlignmentMode } = await requireModuleByName("ImageAlignmentMode.jsx");
 const { ModalPortal } = await requireModuleByName("ModalPortal.tsx");
 
-const { getActiveLayer } = await requireModuleByName("layerAccessor.ts");
+const { getActiveLayer, getLayerById } = await requireModuleByName("layerAccessor.ts");
 const { LayerControls } = await requireModuleByName("LayerControls.tsx");
+const { LayerEditModal } = await requireModuleByName("LayerEditModal.tsx");
 
 // RPGAwesome icon font support
 const { RA_ICONS } = await requireModuleByName("rpgAwesomeIcons.ts");
@@ -182,6 +183,10 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   const [showSettingsModal, setShowSettingsModal] = dc.useState(false);
   const [showVisibilityToolbar, setShowVisibilityToolbar] = dc.useState(false);
   const [showLayerPanel, setShowLayerPanel] = dc.useState(false);
+  const [editingLayerId, setEditingLayerId] = dc.useState<string | null>(null);
+const editingLayer = dc.useMemo(() => {
+    return editingLayerId ? getLayerById(mapData, editingLayerId) : null;
+  }, [editingLayerId, mapData]);
 
   // Image alignment mode state
   const [isAlignmentMode, setIsAlignmentMode] = dc.useState(false);
@@ -391,6 +396,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     handleLayerReorder,
     handleToggleShowLayerBelow,
     handleSetLayerBelowOpacity,
+    handleUpdateLayerDisplay,
     // History state
     canUndo,
     canRedo,
@@ -854,6 +860,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
             onLayerReorder={handleLayerReorder}
             onToggleShowLayerBelow={handleToggleShowLayerBelow}
             onSetLayerBelowOpacity={handleSetLayerBelowOpacity}
+            onEditLayer={setEditingLayerId}
             sidebarCollapsed={mapData.sidebarCollapsed || false}
             isOpen={showLayerPanel}
           />
@@ -1013,6 +1020,21 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
             onApply={handleAlignmentApply}
             onCancel={handleAlignmentCancel}
           />
+        )}
+
+        
+        {editingLayer && (
+          <ModalPortal>
+            <LayerEditModal
+              layer={editingLayer}
+              defaultName={String(editingLayer.order + 1)}
+              onSave={(name, icon) => {
+                handleUpdateLayerDisplay(editingLayerId!, name, icon);
+                setEditingLayerId(null);
+              }}
+              onCancel={() => setEditingLayerId(null)}
+            />
+          </ModalPortal>
         )}
       </div>
     </>

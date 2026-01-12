@@ -37,7 +37,7 @@ const { DEFAULT_COLOR } = await requireModuleByName("colorOperations.ts") as {
  */
 function useToolState(options: UseToolStateOptions = {}): UseToolStateResult {
   const {
-    initialTool = 'draw',
+    initialTool = 'select',
     initialColor = DEFAULT_COLOR,
     initialOpacity = 1
   } = options;

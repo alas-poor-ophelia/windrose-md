@@ -3061,6 +3061,7 @@ button.dmt-fow-tool-btn,
   position: relative;
   display: flex;
   align-items: center;
+  width: fit-content;
 }
 
 /* Layer Button */
@@ -3285,6 +3286,314 @@ button.dmt-layer-add-btn {
   border-color: #c4a57b;
   transform: scale(1.05);
   box-shadow: 0 0 12px rgba(196, 165, 123, 0.5);
+}
+
+/* Layer Button - Pill Mode (for named layers) */
+.is-tablet button.dmt-layer-btn.dmt-layer-btn-pill,
+button.dmt-layer-btn.dmt-layer-btn-pill {
+  width: auto;
+  max-width: 180px;
+  min-width: 35px;
+  border-radius: 17.5px;
+  padding: 0 12px;
+  gap: 4px;
+}
+
+.dmt-layer-icon {
+  font-size: 14px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.dmt-layer-icon.ra {
+  font-family: 'rpgawesome' !important;
+  font-style: normal;
+  -webkit-font-feature-settings: normal;
+  font-feature-settings: normal;
+  font-variant: normal;
+  text-transform: none;
+  line-height: 1;
+  -webkit-font-smoothing: antialiased;
+}
+
+.dmt-layer-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Edit button styling */
+.dmt-layer-option-btn.edit:hover {
+  color: #4a9eff;
+  border-color: #4a9eff;
+  background: rgba(74, 158, 255, 0.1);
+}
+
+/* ==========================================================================
+   LAYER EDIT MODAL
+   ========================================================================== */
+
+.dmt-layer-edit-modal {
+  max-width: 400px;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.dmt-layer-edit-section {
+  margin-bottom: 16px;
+}
+
+.dmt-layer-edit-label {
+  display: block;
+  font-size: 12px;
+  color: var(--dmt-text-muted);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Icon mode toggle */
+.dmt-icon-mode-toggle {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.dmt-icon-mode-btn {
+  flex: 1;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(196, 165, 123, 0.3);
+  border-radius: 4px;
+  color: var(--dmt-text-muted);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.dmt-icon-mode-btn:hover {
+  border-color: rgba(196, 165, 123, 0.5);
+  color: var(--dmt-text-normal);
+}
+
+.dmt-icon-mode-btn.active {
+  background: rgba(196, 165, 123, 0.2);
+  border-color: #c4a57b;
+  color: var(--dmt-text-primary);
+}
+
+/* Symbol picker */
+.dmt-symbol-input-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.dmt-symbol-input {
+  flex: 1;
+  padding: 8px 12px;
+  font-size: 16px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(196, 165, 123, 0.3);
+  border-radius: 4px;
+  color: var(--dmt-text-primary);
+}
+
+.dmt-symbol-input:focus {
+  outline: none;
+  border-color: #c4a57b;
+}
+
+.dmt-symbol-preview {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(196, 165, 123, 0.3);
+  border-radius: 4px;
+  font-size: 20px;
+}
+
+.dmt-quick-symbols-grid {
+  display: grid;
+  grid-template-columns: repeat(9, 1fr);
+  gap: 4px;
+}
+
+.dmt-quick-symbol-btn {
+  width: 100%;
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(196, 165, 123, 0.2);
+  border-radius: 4px;
+  font-size: 14px;
+  color: var(--dmt-text-normal);
+  cursor: pointer;
+  transition: all 0.1s ease;
+}
+
+.dmt-quick-symbol-btn:hover {
+  background: rgba(196, 165, 123, 0.15);
+  border-color: rgba(196, 165, 123, 0.4);
+}
+
+.dmt-quick-symbol-btn.selected {
+  background: rgba(196, 165, 123, 0.25);
+  border-color: #c4a57b;
+}
+
+/* Icon picker */
+.dmt-icon-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dmt-icon-search {
+  width: 100%;
+  padding: 8px 12px;
+  font-size: 13px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(196, 165, 123, 0.3);
+  border-radius: 4px;
+  color: var(--dmt-text-primary);
+}
+
+.dmt-icon-search:focus {
+  outline: none;
+  border-color: #c4a57b;
+}
+
+.dmt-icon-category-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.dmt-icon-category-tab {
+  padding: 4px 8px;
+  font-size: 10px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(196, 165, 123, 0.2);
+  border-radius: 3px;
+  color: var(--dmt-text-muted);
+  cursor: pointer;
+  transition: all 0.1s ease;
+}
+
+.dmt-icon-category-tab:hover {
+  border-color: rgba(196, 165, 123, 0.4);
+  color: var(--dmt-text-normal);
+}
+
+.dmt-icon-category-tab.active {
+  background: rgba(196, 165, 123, 0.2);
+  border-color: #c4a57b;
+  color: var(--dmt-text-primary);
+}
+
+.dmt-icon-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 4px;
+  max-height: 180px;
+  overflow-y: auto;
+  padding: 4px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+}
+
+.dmt-icon-grid-btn {
+  width: 100%;
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.1s ease;
+}
+
+.dmt-icon-grid-btn .ra {
+  font-size: 16px;
+  color: var(--dmt-text-normal);
+}
+
+.dmt-icon-grid-btn:hover {
+  background: rgba(196, 165, 123, 0.15);
+  border-color: rgba(196, 165, 123, 0.3);
+}
+
+.dmt-icon-grid-btn.selected {
+  background: rgba(196, 165, 123, 0.25);
+  border-color: #c4a57b;
+}
+
+.dmt-icon-grid-more {
+  grid-column: 1 / -1;
+  text-align: center;
+  font-size: 11px;
+  color: var(--dmt-text-muted);
+  padding: 8px;
+}
+
+.dmt-icon-grid-empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  font-size: 12px;
+  color: var(--dmt-text-muted);
+  padding: 16px;
+}
+
+/* Layer preview */
+.dmt-layer-preview {
+  display: flex;
+  justify-content: center;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 6px;
+}
+
+.dmt-layer-preview-btn {
+  min-width: 35px;
+  height: 35px;
+  padding: 0 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  background: rgba(0, 0, 0, 0.7);
+  border: 2px solid rgba(196, 165, 123, 0.6);
+  border-radius: 17.5px;
+  color: var(--dmt-text-primary);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.dmt-layer-preview-btn:not(.pill) {
+  width: 35px;
+  border-radius: 50%;
+  padding: 0;
+}
+
+.dmt-layer-preview-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.dmt-layer-preview-icon.ra {
+  font-family: 'rpgawesome' !important;
+}
+
+.dmt-layer-preview-name {
+  white-space: nowrap;
 }
 
 /* ==========================================================================

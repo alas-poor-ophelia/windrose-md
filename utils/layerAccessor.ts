@@ -54,7 +54,7 @@ function getActiveLayer(mapData: MapData | null | undefined): MapLayer {
     // Legacy fallback (should not happen after migration)
     return {
       id: 'legacy',
-      name: 'Layer 1',
+      name: '1',
       order: 0,
       visible: true,
       cells: (mapData as LegacyMapData)?.cells || [],
@@ -171,7 +171,7 @@ function addLayer(mapData: MapData, name: string | null = null): MapData {
   
   const newLayer: MapLayer = {
     id: generateLayerId(),
-    name: name || `Layer ${mapData.layers.length + 1}`,
+    name: name || String(mapData.layers.length + 1),
     order: maxOrder + 1,
     visible: true,
     cells: [],
@@ -403,7 +403,7 @@ function migrateToLayerSchema(legacyMapData: LegacyMapData): MapData | LegacyMap
     // Create the layer with copied data
     const layerData: MapLayer = {
       id: layerId,
-      name: 'Layer 1',
+      name: '1',
       order: 0,
       visible: true,
       cells: cellsData,
