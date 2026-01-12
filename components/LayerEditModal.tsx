@@ -1,5 +1,6 @@
+/**
  * LayerEditModal.tsx
- *
+ */
 
 import type { JSX } from 'preact';
 import type { MapLayer } from '#types/core/map.types';
