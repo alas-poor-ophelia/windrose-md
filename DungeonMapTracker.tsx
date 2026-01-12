@@ -17,6 +17,7 @@ import type {
   BackgroundImage,
   UIPreferences,
   MapSettings,
+  ObjectLink,
 } from '#types/index';
 import type { ResolvedTheme } from '#types/settings/settings.types';
 
@@ -437,6 +438,58 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
       window.removeEventListener('dmt-navigate-to', handleNavigateTo as EventListener);
     };
   }, [mapId, mapData, updateMapData, handleLayerSelect]);
+
+  // Listen for cross-layer object link events
+  dc.useEffect(() => {
+    type LinkUpdate = { layerId: string; objectId: string; link?: ObjectLink };
+
+    const updateObjectLinksAcrossLayers = (updates: LinkUpdate[]): void => {
+      updateMapData((currentMapData: MapData) => ({
+        ...currentMapData,
+        layers: currentMapData.layers.map((layer: { id: string; objects?: MapObject[] }) => {
+          const layerUpdates = updates.filter(u => u.layerId === layer.id);
+          if (layerUpdates.length === 0 || !layer.objects) return layer;
+
+          return {
+            ...layer,
+            objects: layer.objects.map((obj: MapObject) => {
+              const update = layerUpdates.find(u => u.objectId === obj.id);
+              if (!update) return obj;
+              if (update.link !== undefined) {
+                return { ...obj, linkedObject: update.link };
+              }
+              const { linkedObject: _removed, ...rest } = obj;
+              return rest as MapObject;
+            })
+          };
+        })
+      }));
+    };
+
+    const handleCreateObjectLink = (event: CustomEvent): void => {
+      const { sourceLayerId, sourceObjectId, sourceLink, targetLayerId, targetObjectId, targetLink } = event.detail;
+      updateObjectLinksAcrossLayers([
+        { layerId: sourceLayerId, objectId: sourceObjectId, link: sourceLink },
+        { layerId: targetLayerId, objectId: targetObjectId, link: targetLink }
+      ]);
+    };
+
+    const handleRemoveObjectLink = (event: CustomEvent): void => {
+      const { sourceLayerId, sourceObjectId, targetLayerId, targetObjectId } = event.detail;
+      updateObjectLinksAcrossLayers([
+        { layerId: sourceLayerId, objectId: sourceObjectId },
+        { layerId: targetLayerId, objectId: targetObjectId }
+      ]);
+    };
+
+    window.addEventListener('dmt-create-object-link', handleCreateObjectLink as EventListener);
+    window.addEventListener('dmt-remove-object-link', handleRemoveObjectLink as EventListener);
+
+    return () => {
+      window.removeEventListener('dmt-create-object-link', handleCreateObjectLink as EventListener);
+      window.removeEventListener('dmt-remove-object-link', handleRemoveObjectLink as EventListener);
+    };
+  }, [updateMapData]);
 
   // Data change handlers (extracted to useDataHandlers hook)
   const {

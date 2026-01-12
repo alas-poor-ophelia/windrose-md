@@ -21,6 +21,7 @@ const { requireModuleByName } = await dc.require(pathResolverPath);
 
 const { useMapState, useMapOperations } = await requireModuleByName("MapContext.tsx");
 const { useMapSelection } = await requireModuleByName("MapSelectionContext.tsx");
+const { useLinkingMode } = await requireModuleByName("ObjectLinkingContext.tsx");
 const { useEventHandlerRegistration } = await requireModuleByName("EventHandlerContext.tsx");
 const { useObjectInteractions } = await requireModuleByName("useObjectInteractions.ts");
 const { TextInputModal } = await requireModuleByName("TextInputModal.tsx");
@@ -29,6 +30,7 @@ const { SelectionToolbar } = await requireModuleByName("SelectionToolbar.jsx");
 const { calculateObjectScreenPosition } = await requireModuleByName("screenPositionUtils.ts");
 const { getActiveLayer } = await requireModuleByName("layerAccessor.ts");
 const { copyDeepLinkToClipboard } = await requireModuleByName("deepLinkHandler.ts");
+const { LinkingModeBanner } = await requireModuleByName("LinkingModeBanner.tsx");
 
 /** Selected item from context */
 interface SelectedItem {
@@ -85,6 +87,31 @@ const ObjectLayer = ({
     layerVisibility,
     updateSelectedItemsData
   } = useMapSelection();
+
+  const { isLinkingMode, linkingFrom, startLinking, cancelLinking } = useLinkingMode();
+
+  // Helper for bidirectional link updates (handles same-layer vs cross-layer)
+  const applyLinkUpdate = dc.useCallback((
+    updates: Array<{ layerId: string; objectId: string; transform: (obj: MapObject) => MapObject }>,
+    crossLayerEvent: { name: string; detail: Record<string, unknown> }
+  ): void => {
+    if (!mapData) return;
+
+    const allOnActiveLayer = updates.every(u => u.layerId === mapData.activeLayerId);
+
+    if (allOnActiveLayer) {
+      const activeLayer = getActiveLayer(mapData);
+      const updatedObjects = activeLayer.objects?.map((obj: MapObject) => {
+        const update = updates.find(u => u.objectId === obj.id);
+        return update ? update.transform(obj) : obj;
+      });
+      if (updatedObjects) {
+        onObjectsChange(updatedObjects);
+      }
+    } else {
+      window.dispatchEvent(new CustomEvent(crossLayerEvent.name, { detail: crossLayerEvent.detail }));
+    }
+  }, [mapData, onObjectsChange]);
 
   const [showNoteModal, setShowNoteModal] = dc.useState(false);
   const [editingObjectId, setEditingObjectId] = dc.useState<string | null>(null);
@@ -273,10 +300,83 @@ const ObjectLayer = ({
 
   const { registerHandlers, unregisterHandlers } = useEventHandlerRegistration();
 
+  // Wrap handleObjectSelection to intercept clicks when in linking mode
+  const wrappedHandleObjectSelection = dc.useCallback((
+    clientX: number,
+    clientY: number,
+    gridX: number,
+    gridY: number
+  ): boolean => {
+    if (isLinkingMode && linkingFrom && mapData) {
+      // In linking mode - try to find target object
+      const activeLayer = getActiveLayer(mapData);
+      const targetObject = activeLayer.objects?.find((obj: MapObject) => {
+        return obj.position.x === gridX && obj.position.y === gridY;
+      });
+
+      if (targetObject) {
+        // Prevent self-linking
+        if (targetObject.id === linkingFrom.objectId && mapData.activeLayerId === linkingFrom.layerId) {
+          new Notice('Cannot link an object to itself');
+          return true;
+        }
+
+        // Complete the bidirectional link
+        const sourceToTargetLink = {
+          layerId: mapData.activeLayerId,
+          objectId: targetObject.id,
+          position: targetObject.position,
+          objectType: targetObject.type
+        };
+
+        const targetToSourceLink = {
+          layerId: linkingFrom.layerId,
+          objectId: linkingFrom.objectId,
+          position: linkingFrom.position,
+          objectType: linkingFrom.objectType
+        };
+
+        applyLinkUpdate(
+          [
+            { layerId: linkingFrom.layerId, objectId: linkingFrom.objectId, transform: (obj) => ({ ...obj, linkedObject: sourceToTargetLink }) },
+            { layerId: mapData.activeLayerId, objectId: targetObject.id, transform: (obj) => ({ ...obj, linkedObject: targetToSourceLink }) }
+          ],
+          {
+            name: 'dmt-create-object-link',
+            detail: {
+              sourceLayerId: linkingFrom.layerId,
+              sourceObjectId: linkingFrom.objectId,
+              sourceLink: sourceToTargetLink,
+              targetLayerId: mapData.activeLayerId,
+              targetObjectId: targetObject.id,
+              targetLink: targetToSourceLink
+            }
+          }
+        );
+
+        // Clear linking mode
+        cancelLinking();
+        new Notice('Objects linked');
+
+        // Select the target object with updated data
+        setSelectedItem({
+          type: 'object',
+          id: targetObject.id,
+          data: { ...targetObject, linkedObject: targetToSourceLink }
+        });
+
+        return true;
+      }
+    }
+
+    // Not in linking mode or no target found - use normal selection
+    return handleObjectSelection(clientX, clientY, gridX, gridY);
+  }, [isLinkingMode, linkingFrom, mapData, handleObjectSelection, applyLinkUpdate, cancelLinking, setSelectedItem]);
+
   dc.useEffect(() => {
     registerHandlers('object', {
       handleObjectPlacement,
-      handleObjectSelection,
+      handleObjectSelection: wrappedHandleObjectSelection,
       handleObjectDragging,
       handleObjectResizing,
       stopObjectDragging,
@@ -293,7 +393,7 @@ const ObjectLayer = ({
     return () => unregisterHandlers('object');
   }, [
     registerHandlers, unregisterHandlers,
-    handleObjectPlacement, handleObjectSelection,
+    handleObjectPlacement, wrappedHandleObjectSelection,
     handleObjectDragging, handleObjectResizing,
     stopObjectDragging, stopObjectResizing,
     handleHoverUpdate, handleObjectWheel, handleObjectKeyDown,
@@ -389,6 +489,98 @@ const ObjectLayer = ({
     setEditingNoteObjectId(null);
   };
 
+  const handleLinkObject = dc.useCallback(() => {
+    if (!selectedItem || selectedItem.type !== 'object' || !mapData) return;
+
+    const activeLayer = getActiveLayer(mapData);
+    const obj = activeLayer.objects?.find((o: MapObject) => o.id === selectedItem.id);
+    if (!obj) return;
+
+    startLinking({
+      layerId: mapData.activeLayerId,
+      objectId: obj.id,
+      position: obj.position,
+      objectType: obj.type
+    });
+  }, [selectedItem, mapData, startLinking]);
+
+  const handleFollowLink = dc.useCallback(() => {
+    if (!selectedItem || selectedItem.type !== 'object' || !mapData || !mapId || !notePath) return;
+
+    const obj = selectedItem.data as MapObject;
+    if (!obj?.linkedObject) return;
+
+    const { layerId, objectId } = obj.linkedObject;
+
+    const targetLayer = mapData.layers.find(l => l.id === layerId);
+    if (!targetLayer) {
+      new Notice('Linked layer no longer exists');
+      return;
+    }
+
+    const targetObject = targetLayer.objects?.find((o: MapObject) => o.id === objectId);
+    if (!targetObject) {
+      new Notice('Linked object no longer exists');
+      return;
+    }
+
+    // Navigate to the target (DungeonMapTracker handles layer switching + panning)
+    window.dispatchEvent(new CustomEvent('dmt-navigate-to', {
+      detail: {
+        notePath,
+        mapId,
+        x: targetObject.position.x,
+        y: targetObject.position.y,
+        zoom: 1.175,
+        layerId,
+        timestamp: Date.now()
+      }
+    }));
+
+    // Select the target object immediately (we already have its data)
+    setSelectedItem({
+      type: 'object',
+      id: targetObject.id,
+      data: targetObject
+    });
+  }, [selectedItem, mapData, mapId, notePath, setSelectedItem]);
+
+  const handleRemoveLink = dc.useCallback(() => {
+    if (!selectedItem || selectedItem.type !== 'object' || !mapData) return;
+
+    const obj = selectedItem.data as MapObject;
+    if (!obj?.linkedObject) return;
+
+    const { layerId: targetLayerId, objectId: targetObjectId } = obj.linkedObject;
+    const sourceLayerId = mapData.activeLayerId;
+    const sourceObjectId = selectedItem.id;
+
+    const removeLinkedObject = (o: MapObject): MapObject => {
+      const { linkedObject: _removed, ...rest } = o;
+      return rest as MapObject;
+    };
+
+    applyLinkUpdate(
+      [
+        { layerId: sourceLayerId, objectId: sourceObjectId, transform: removeLinkedObject },
+        { layerId: targetLayerId, objectId: targetObjectId, transform: removeLinkedObject }
+      ],
+      {
+        name: 'dmt-remove-object-link',
+        detail: { sourceLayerId, sourceObjectId, targetLayerId, targetObjectId }
+      }
+    );
+
+    const { linkedObject: _removed, ...restData } = obj;
+    setSelectedItem({
+      type: 'object',
+      id: selectedItem.id,
+      data: restData as MapObject
+    });
+
+    new Notice('Link removed');
+  }, [selectedItem, mapData, applyLinkUpdate, setSelectedItem]);
+
   dc.useEffect(() => {
     if (!showObjectColorPicker) return;
 
@@ -464,6 +656,14 @@ const ObjectLayer = ({
 
   return (
     <>
+      {/* Linking Mode Banner */}
+      {isLinkingMode && linkingFrom && (
+        <LinkingModeBanner
+          linkingFrom={linkingFrom}
+          onCancel={cancelLinking}
+        />
+      )}
+
       {edgeSnapMode && selectedItem?.type === 'object' && indicatorPositions && (
         <>
           <div
@@ -547,6 +747,9 @@ const ObjectLayer = ({
           onDuplicate={handleObjectDuplicate}
           onLabel={handleNoteButtonClick}
           onLinkNote={() => handleEditNoteLink(selectedItem?.id)}
+          onLinkObject={handleLinkObject}
+          onFollowLink={handleFollowLink}
+          onRemoveLink={handleRemoveLink}
           onCopyLink={handleCopyLink}
           onColorClick={handleObjectColorButtonClick}
           onResize={handleResizeButtonClick}

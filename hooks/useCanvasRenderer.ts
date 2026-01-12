@@ -501,6 +501,30 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
         ctx.lineWidth = 1;
         ctx.stroke();
       }
+
+      // Draw link indicator for inter-object links
+      if (obj.linkedObject) {
+        const linkSize = Math.max(6, scaledSize * 0.15);
+        const linkX = screenX + 2;
+        const linkY = screenY + 2;
+
+        ctx.fillStyle = '#10b981';
+        ctx.beginPath();
+        ctx.arc(linkX + linkSize / 2, linkY + linkSize / 2, linkSize / 2, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // Draw chain link icon
+        const iconSize = linkSize * 0.6;
+        ctx.font = `${iconSize}px 'Noto Emoji', 'Noto Sans Symbols 2', monospace`;
+        ctx.fillStyle = '#ffffff';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('\u{1F517}', linkX + linkSize / 2, linkY + linkSize / 2);
+      }
     }
   }
 
