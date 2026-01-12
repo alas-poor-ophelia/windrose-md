@@ -301,6 +301,9 @@ const SelectionToolbar = ({
   onRotate,
   onLabel,
   onLinkNote,
+  onLinkObject,
+  onFollowLink,
+  onRemoveLink,
   onCopyLink,
   onColorClick,
   onResize,
@@ -386,21 +389,40 @@ const SelectionToolbar = ({
   const buttonSize = 44;
   const buttonGap = 4;
   const toolbarGap = 4; // Gap between selection and toolbar
-  
-  // Count buttons for this selection type
-  let buttonCount = 0;
-  if (isObject) {
-    buttonCount = 8; // Rotate, Label, Duplicate, Link Note, Copy Link, Color, Resize, Delete
-    // Hide label button for note_pin objects
-    if (selectedItem.data?.type === 'note_pin') {
-      buttonCount = 7;
-    }
-  } else if (isText) {
-    buttonCount = 4; // Edit, Rotate, Copy Link, Delete
-  }
-  
-  const toolbarWidth = buttonCount * buttonSize + (buttonCount - 1) * buttonGap;
-  const toolbarHeight = buttonSize;
+  const buttonsPerRow = 5;
+
+  // Build button definitions based on selection type
+  const hasLinkedObject = !!(isObject && selectedItem.data?.linkedObject);
+  const isNotePin = selectedItem.data?.type === 'note_pin';
+
+  const objectButtons = isObject ? [
+    { id: 'rotate', icon: 'lucide-rotate-cw', title: 'Rotate 90° (or press R)', onClick: onRotate },
+    { id: 'label', icon: 'lucide-sticky-note', title: 'Add/Edit Label', onClick: onLabel, visible: !isNotePin },
+    { id: 'duplicate', icon: 'lucide-copy', title: 'Duplicate Object', onClick: onDuplicate },
+    { id: 'linkNote', icon: 'lucide-scroll-text', title: selectedItem.data?.linkedNote ? 'Edit linked note' : 'Link note', onClick: onLinkNote },
+    { id: 'linkObject', icon: 'lucide-link-2', title: hasLinkedObject ? 'Edit object link' : 'Link to object', onClick: onLinkObject, active: hasLinkedObject },
+    { id: 'followLink', icon: 'lucide-arrow-right-circle', title: 'Go to linked object', onClick: onFollowLink, visible: hasLinkedObject },
+    { id: 'removeLink', icon: 'lucide-unlink', title: 'Remove object link', onClick: onRemoveLink, visible: hasLinkedObject },
+    { id: 'copyLink', icon: 'lucide-link', title: 'Copy link to clipboard', onClick: onCopyLink },
+    { id: 'color', icon: 'lucide-palette', title: 'Change Object Color', onClick: onColorClick, isColorButton: true },
+    { id: 'resize', icon: 'lucide-scaling', title: 'Resize Object', onClick: onResize },
+    { id: 'delete', icon: 'lucide-trash-2', title: 'Delete (or press Delete/Backspace)', onClick: onDelete, isDelete: true }
+  ].filter(btn => btn.visible !== false) : [];
+
+  const textButtons = isText ? [
+    { id: 'edit', icon: 'lucide-pencil', title: 'Edit Text Label', onClick: onEdit },
+    { id: 'rotate', icon: 'lucide-rotate-cw', title: 'Rotate 90° (or press R)', onClick: onRotate },
+    { id: 'copyLink', icon: 'lucide-link', title: 'Copy link to clipboard', onClick: onCopyLink },
+    { id: 'delete', icon: 'lucide-trash-2', title: 'Delete (or press Delete/Backspace)', onClick: onDelete, isDelete: true }
+  ] : [];
+
+  const buttons = isObject ? objectButtons : textButtons;
+  const buttonCount = buttons.length;
+  const rowCount = Math.ceil(buttonCount / buttonsPerRow);
+  const buttonsInFirstRow = Math.min(buttonCount, buttonsPerRow);
+
+  const toolbarWidth = buttonsInFirstRow * buttonSize + (buttonsInFirstRow - 1) * buttonGap;
+  const toolbarHeight = rowCount * buttonSize + (rowCount - 1) * buttonGap;
   
   // Get container bounds for edge detection
   const containerRect = containerRef.current.getBoundingClientRect();
@@ -526,175 +548,66 @@ const SelectionToolbar = ({
       )}
       
       {/* Toolbar */}
-      <div 
+      <div
         className="dmt-selection-toolbar"
         style={{
           position: 'absolute',
           left: `${toolbarX}px`,
           top: `${toolbarY}px`,
+          width: `${toolbarWidth}px`,
           pointerEvents: 'auto',
           zIndex: 150
         }}
       >
-        {/* Object buttons */}
-        {isObject && (
-          <>
-            {/* Rotate */}
-            <button
-              className="dmt-toolbar-button"
-              onClick={(e) => {
-                if (onRotate) onRotate(e);
-              }}
-              title="Rotate 90° (or press R)"
-            >
-              <dc.Icon icon="lucide-rotate-cw" />
-            </button>
-            
-            {/* Label (not for note_pin) */}
-            {selectedItem.data?.type !== 'note_pin' && (
-              <button
-                className="dmt-toolbar-button"
-                onClick={(e) => {
-                  if (onLabel) onLabel(e);
-                }}
-                title="Add/Edit Label"
-              >
-                <dc.Icon icon="lucide-sticky-note" />
-              </button>
-            )}
-            
-            {/* Duplicate */}
-            <button
-              className="dmt-toolbar-button"
-              onClick={(e) => {
-                if (onDuplicate) onDuplicate(e);
-              }}
-              title="Duplicate Object"
-            >
-              <dc.Icon icon="lucide-copy" />
-            </button>
-            
-            {/* Link Note */}
-            <button
-              className="dmt-toolbar-button"
-              onClick={(e) => {
-                if (onLinkNote) onLinkNote(e);
-              }}
-              title={selectedItem.data?.linkedNote ? "Edit linked note" : "Link note"}
-            >
-              <dc.Icon icon="lucide-scroll-text" />
-            </button>
+        {buttons.map((btn) => {
+          if (btn.isColorButton) {
+            return (
+              <div key={btn.id} style={{ position: 'relative', display: 'inline-block' }}>
+                <button
+                  ref={colorButtonRef}
+                  className="dmt-toolbar-button dmt-toolbar-color-button"
+                  onClick={(e) => btn.onClick?.(e)}
+                  title={btn.title}
+                  style={{ backgroundColor: currentColor || '#ffffff' }}
+                >
+                  <dc.Icon icon={btn.icon} />
+                </button>
+                {showColorPicker && (
+                  <ColorPicker
+                    isOpen={showColorPicker}
+                    selectedColor={currentColor || '#ffffff'}
+                    onColorSelect={onColorSelect}
+                    onClose={onColorPickerClose}
+                    onReset={onColorReset}
+                    customColors={customColors || []}
+                    onAddCustomColor={onAddCustomColor}
+                    onDeleteCustomColor={onDeleteCustomColor}
+                    pendingCustomColorRef={pendingCustomColorRef}
+                    title="Object Color"
+                    position="above"
+                  />
+                )}
+              </div>
+            );
+          }
 
-            {/* Copy Link */}
-            <button
-              className="dmt-toolbar-button"
-              onClick={(e) => {
-                if (onCopyLink) onCopyLink(e);
-              }}
-              title="Copy link to clipboard"
-            >
-              <dc.Icon icon="lucide-link" />
-            </button>
+          const className = [
+            'dmt-toolbar-button',
+            btn.isDelete && 'dmt-toolbar-delete-button',
+            btn.active && 'dmt-toolbar-button-active'
+          ].filter(Boolean).join(' ');
 
-            {/* Color */}
-            <div style={{ position: 'relative', display: 'inline-block' }}>
-              <button
-                ref={colorButtonRef}
-                className="dmt-toolbar-button dmt-toolbar-color-button"
-                onClick={(e) => {
-                  if (onColorClick) onColorClick(e);
-                }}
-                title="Change Object Color"
-                style={{
-                  backgroundColor: currentColor || '#ffffff'
-                }}
-              >
-                <dc.Icon icon="lucide-palette" />
-              </button>
-              
-              {showColorPicker && (
-                <ColorPicker
-                  isOpen={showColorPicker}
-                  selectedColor={currentColor || '#ffffff'}
-                  onColorSelect={onColorSelect}
-                  onClose={onColorPickerClose}
-                  onReset={onColorReset}
-                  customColors={customColors || []}
-                  onAddCustomColor={onAddCustomColor}
-                  onDeleteCustomColor={onDeleteCustomColor}
-                  pendingCustomColorRef={pendingCustomColorRef}
-                  title="Object Color"
-                  position="above"
-                />
-              )}
-            </div>
-            
-            {/* Resize */}
+          return (
             <button
-              className="dmt-toolbar-button"
-              onClick={(e) => {
-                if (onResize) onResize(e);
-              }}
-              title="Resize Object"
+              key={btn.id}
+              className={className}
+              onClick={(e) => btn.onClick?.(e)}
+              title={btn.title}
             >
-              <dc.Icon icon="lucide-scaling" />
+              <dc.Icon icon={btn.icon} />
             </button>
-            
-            {/* Delete */}
-            <button
-              className="dmt-toolbar-button dmt-toolbar-delete-button"
-              onClick={(e) => {
-                if (onDelete) onDelete(e);
-              }}
-              title="Delete (or press Delete/Backspace)"
-            >
-              <dc.Icon icon="lucide-trash-2" />
-            </button>
-          </>
-        )}
-        
-        {/* Text label buttons */}
-        {isText && (
-          <>
-            {/* Edit */}
-            <button
-              className="dmt-toolbar-button"
-              onClick={onEdit}
-              title="Edit Text Label"
-            >
-              <dc.Icon icon="lucide-pencil" />
-            </button>
-
-            {/* Rotate */}
-            <button
-              className="dmt-toolbar-button"
-              onClick={onRotate}
-              title="Rotate 90° (or press R)"
-            >
-              <dc.Icon icon="lucide-rotate-cw" />
-            </button>
-
-            {/* Copy Link */}
-            <button
-              className="dmt-toolbar-button"
-              onClick={(e) => {
-                if (onCopyLink) onCopyLink(e);
-              }}
-              title="Copy link to clipboard"
-            >
-              <dc.Icon icon="lucide-link" />
-            </button>
-
-            {/* Delete */}
-            <button
-              className="dmt-toolbar-button dmt-toolbar-delete-button"
-              onClick={onDelete}
-              title="Delete (or press Delete/Backspace)"
-            >
-              <dc.Icon icon="lucide-trash-2" />
-            </button>
-          </>
-        )}
+          );
+        })}
       </div>
     </>
   );

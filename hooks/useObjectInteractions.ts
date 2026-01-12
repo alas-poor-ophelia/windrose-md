@@ -443,7 +443,7 @@ const useObjectInteractions = (
         setDragStart({ x: clientX, y: clientY, gridX, gridY, offsetX, offsetY });
         setIsResizeMode(false);
       } else {
-        setSelectedItem({ type: 'object', id: object.id });
+        setSelectedItem({ type: 'object', id: object.id, data: object });
         setIsResizeMode(false);
 
         dragInitialStateRef.current = [...(getActiveLayer(mapData!).objects || [])];

@@ -29,6 +29,7 @@ const { HexGeometry } = await requireModuleByName("HexGeometry.ts");
 const { LinkedNoteHoverOverlays } = await requireModuleByName("LinkedNoteHoverOverlays.jsx");
 const { MapStateProvider, MapOperationsProvider } = await requireModuleByName("MapContext.tsx");
 const { MapSelectionProvider, useMapSelection } = await requireModuleByName("MapSelectionContext.tsx");
+const { ObjectLinkingProvider } = await requireModuleByName("ObjectLinkingContext.tsx");
 const { ObjectLayer } = await requireModuleByName("ObjectLayer.tsx");
 const { DrawingLayer } = await requireModuleByName("DrawingLayer.tsx");
 const { TextLayer } = await requireModuleByName("TextLayer.tsx");
@@ -498,9 +499,11 @@ const MapCanvas = (props: MapCanvasProps): React.ReactElement => {
 
   return (
     <MapSelectionProvider layerVisibility={layerVisibility}>
-      <MapCanvasContent {...restProps}>
-        {children}
-      </MapCanvasContent>
+      <ObjectLinkingProvider>
+        <MapCanvasContent {...restProps}>
+          {children}
+        </MapCanvasContent>
+      </ObjectLinkingProvider>
     </MapSelectionProvider>
   );
 };
