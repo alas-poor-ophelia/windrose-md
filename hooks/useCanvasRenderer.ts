@@ -41,6 +41,11 @@ const { getRenderChar } = await requireModuleByName("objectTypeResolver.ts") as 
 const { getCellColor } = await requireModuleByName("colorOperations.ts") as {
   getCellColor: (cell: Cell) => string;
 };
+const { renderNoteLinkBadge, renderTooltipIndicator, renderObjectLinkIndicator } = await requireModuleByName("badgeRenderer.ts") as {
+  renderNoteLinkBadge: (ctx: CanvasRenderingContext2D, position: { screenX: number; screenY: number; objectWidth: number; objectHeight: number }, config: { scaledSize: number }) => void;
+  renderTooltipIndicator: (ctx: CanvasRenderingContext2D, position: { screenX: number; screenY: number; objectWidth: number; objectHeight: number }, config: { scaledSize: number }) => void;
+  renderObjectLinkIndicator: (ctx: CanvasRenderingContext2D, position: { screenX: number; screenY: number; objectWidth: number; objectHeight: number }, config: { scaledSize: number }) => void;
+};
 const { getFontCss } = await requireModuleByName("fontOptions.ts") as {
   getFontCss: (fontFace: string) => string;
 };
@@ -468,62 +473,17 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
 
       // Draw note badge if object has linkedNote
       if (obj.linkedNote && obj.type !== 'note_pin') {
-        const maxBadgeSize = Math.min(objectWidth, objectHeight) * 0.3;
-        const badgeSize = Math.min(maxBadgeSize, Math.max(8, scaledSize * 0.25));
-        const badgeX = screenX + objectWidth - badgeSize - 3;
-        const badgeY = screenY + 3;
-
-        ctx.fillStyle = 'rgba(74, 158, 255, 0.9)';
-        ctx.beginPath();
-        ctx.arc(badgeX + badgeSize / 2, badgeY + badgeSize / 2, badgeSize / 2, 0, Math.PI * 2);
-        ctx.fill();
-
-        const badgeFontSize = badgeSize * 0.7;
-        ctx.font = `${badgeFontSize}px 'Noto Emoji', 'Noto Sans Symbols 2', monospace`;
-        ctx.fillStyle = '#ffffff';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('\u{1F4DC}', badgeX + badgeSize / 2, badgeY + badgeSize / 2);
+        renderNoteLinkBadge(ctx, { screenX, screenY, objectWidth, objectHeight }, { scaledSize });
       }
 
       // Draw note indicator for custom tooltip
       if (obj.customTooltip) {
-        const indicatorSize = Math.max(4, scaledSize * 0.12);
-        const indicatorX = screenX + objectWidth - indicatorSize - 2;
-        const indicatorY = screenY + objectHeight - indicatorSize - 2;
-
-        ctx.fillStyle = '#4a9eff';
-        ctx.beginPath();
-        ctx.arc(indicatorX + indicatorSize / 2, indicatorY + indicatorSize / 2, indicatorSize / 2, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 1;
-        ctx.stroke();
+        renderTooltipIndicator(ctx, { screenX, screenY, objectWidth, objectHeight }, { scaledSize });
       }
 
       // Draw link indicator for inter-object links
       if (obj.linkedObject) {
-        const linkSize = Math.max(6, scaledSize * 0.15);
-        const linkX = screenX + 2;
-        const linkY = screenY + 2;
-
-        ctx.fillStyle = '#10b981';
-        ctx.beginPath();
-        ctx.arc(linkX + linkSize / 2, linkY + linkSize / 2, linkSize / 2, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 1;
-        ctx.stroke();
-
-        // Draw chain link icon
-        const iconSize = linkSize * 0.6;
-        ctx.font = `${iconSize}px 'Noto Emoji', 'Noto Sans Symbols 2', monospace`;
-        ctx.fillStyle = '#ffffff';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('\u{1F517}', linkX + linkSize / 2, linkY + linkSize / 2);
+        renderObjectLinkIndicator(ctx, { screenX, screenY, objectWidth, objectHeight }, { scaledSize });
       }
     }
   }
