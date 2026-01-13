@@ -46,6 +46,9 @@ const { renderNoteLinkBadge, renderTooltipIndicator, renderObjectLinkIndicator }
   renderTooltipIndicator: (ctx: CanvasRenderingContext2D, position: { screenX: number; screenY: number; objectWidth: number; objectHeight: number }, config: { scaledSize: number }) => void;
   renderObjectLinkIndicator: (ctx: CanvasRenderingContext2D, position: { screenX: number; screenY: number; objectWidth: number; objectHeight: number }, config: { scaledSize: number }) => void;
 };
+const { renderTextLabels } = await requireModuleByName("textLabelRenderer.ts") as {
+  renderTextLabels: (labels: TextLabel[], context: { ctx: CanvasRenderingContext2D; zoom: number; getFontCss: (fontFace: string) => string }, geometry: { worldToScreen: (x: number, y: number, offsetX: number, offsetY: number, zoom: number) => { screenX: number; screenY: number } }, viewState: { offsetX: number; offsetY: number; zoom: number }) => void;
+};
 const { getFontCss } = await requireModuleByName("fontOptions.ts") as {
   getFontCss: (fontFace: string) => string;
 };
@@ -490,30 +493,12 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
 
   // Draw text labels
   if (activeLayer.textLabels && activeLayer.textLabels.length > 0 && !showCoordinates && visibility.textLabels) {
-    for (const label of activeLayer.textLabels) {
-      ctx.save();
-
-      const { screenX, screenY } = geometry.worldToScreen(label.position.x, label.position.y, offsetX, offsetY, zoom);
-
-      ctx.translate(screenX, screenY);
-      ctx.rotate(((label.rotation || 0) * Math.PI) / 180);
-
-      const fontSize = label.fontSize * zoom;
-      const fontFamily = getFontCss(label.fontFace || 'sans');
-      ctx.font = `${fontSize}px ${fontFamily}`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-
-      ctx.strokeStyle = '#000000';
-      ctx.lineWidth = 3;
-      ctx.lineJoin = 'round';
-      ctx.strokeText(label.content, 0, 0);
-
-      ctx.fillStyle = label.color || '#ffffff';
-      ctx.fillText(label.content, 0, 0);
-
-      ctx.restore();
-    }
+    renderTextLabels(
+      activeLayer.textLabels,
+      { ctx, zoom, getFontCss },
+      geometry,
+      { offsetX, offsetY, zoom }
+    );
   }
 
   // =========================================================================
