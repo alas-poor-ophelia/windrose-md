@@ -71,6 +71,7 @@ const MODULE_MAP: Record<string, string> = {
   'textLabelRenderer.ts': './geometry/textLabelRenderer.ts',
   'backgroundRenderer.ts': './geometry/backgroundRenderer.ts',
   'gridFogRenderer.ts': './geometry/gridFogRenderer.ts',
+  'hexFogRenderer.ts': './geometry/hexFogRenderer.ts',
 };
 
 export function datacoreTransformer(options: TransformOptions = {}): Plugin {
