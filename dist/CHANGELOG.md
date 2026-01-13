@@ -13,8 +13,3 @@ Dungeon/grid enhancements continue.
 ### Improvements
 - Selection toolbar now wraps into rows, as it was getting quite long.
 - The default tool when first loading a map is now the Select tool instead of Draw. I guess debatably an improvement, but it made more sense to me at this point.
-
-## Version 1.5.0.1
-### Bug Fixes
-- Fix issue where diagonal fill tool wasn't working because I forgot about it when refactoring the event coordinator.
-- Fix a visual bug where external borders were drawn in place of internal borders for some sets of segmented cells due to a coordinate mismatch.
