@@ -52,6 +52,9 @@ const { renderTextLabels } = await requireModuleByName("textLabelRenderer.ts") a
 const { renderHexBackgroundImage } = await requireModuleByName("backgroundRenderer.ts") as {
   renderHexBackgroundImage: (bgImage: HTMLImageElement, config: { path: string; offsetX?: number; offsetY?: number; opacity?: number }, hexBounds: { maxCol: number; maxRow: number }, hexGeometry: { hexSize: number; sqrt3: number; hexToWorld: (q: number, r: number) => { worldX: number; worldY: number } }, orientation: string, context: { ctx: CanvasRenderingContext2D; offsetX: number; offsetY: number; zoom: number }, offsetToAxial: (col: number, row: number, orientation: string) => { q: number; r: number }) => void;
 };
+const { renderGridFog } = await requireModuleByName("gridFogRenderer.ts") as {
+  renderGridFog: (fogCells: Array<{ col: number; row: number }>, context: { ctx: CanvasRenderingContext2D; fogCtx: CanvasRenderingContext2D | null; offsetX: number; offsetY: number; scaledSize: number }, options: { fowOpacity: number; fowBlurEnabled: boolean; blurRadius: number; useGlobalAlpha: boolean }, visibleBounds: { minCol: number; maxCol: number; minRow: number; maxRow: number }, zoom: number) => void;
+};
 const { getFontCss } = await requireModuleByName("fontOptions.ts") as {
   getFontCss: (fontFace: string) => string;
 };
@@ -748,120 +751,13 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
 
     } else {
       // Grid map fog rendering
-      const foggedSet = new Set(fow.foggedCells.map(c => `${c.col},${c.row}`));
-
-      const visibleFogCells: Array<{ col: number; row: number }> = [];
-      const edgeCells: Array<{ col: number; row: number }> = [];
-
-      for (const fogCell of fow.foggedCells) {
-        const { col, row } = fogCell;
-
-        if (col < visibleMinCol || col > visibleMaxCol ||
-            row < visibleMinRow || row > visibleMaxRow) {
-          continue;
-        }
-
-        visibleFogCells.push({ col, row });
-
-        const isEdge = !foggedSet.has(`${col - 1},${row}`) ||
-                       !foggedSet.has(`${col + 1},${row}`) ||
-                       !foggedSet.has(`${col},${row - 1}`) ||
-                       !foggedSet.has(`${col},${row + 1}`);
-
-        if (isEdge) {
-          edgeCells.push({ col, row });
-        }
-      }
-
-      const addCircleToPath = (targetCtx: CanvasRenderingContext2D, col: number, row: number, radius: number) => {
-        const centerX = offsetX + col * scaledSize + scaledSize / 2;
-        const centerY = offsetY + row * scaledSize + scaledSize / 2;
-        targetCtx.moveTo(centerX + radius, centerY);
-        targetCtx.arc(centerX, centerY, radius, 0, Math.PI * 2);
-      };
-
-      const addRectToPath = (col: number, row: number, scale = 1.0) => {
-        const centerX = offsetX + col * scaledSize + scaledSize / 2;
-        const centerY = offsetY + row * scaledSize + scaledSize / 2;
-        const size = scaledSize * scale;
-        const halfSize = size / 2;
-        ctx.rect(centerX - halfSize, centerY - halfSize, size, size);
-      };
-
-      // Blur passes
-      if (fowBlurEnabled && blurRadius > 0 && edgeCells.length > 0) {
-        const baseOpacity = fowOpacity;
-        const numPasses = 8;
-
-        const cellRadius = scaledSize / 2;
-        const maxRadius = cellRadius + blurRadius;
-
-        const targetCtx = fogCtx || ctx;
-        const useFilterFallback = !fogCtx;
-        const filterBlurAmount = blurRadius / numPasses;
-
-        for (let i = 0; i < numPasses; i++) {
-          const t = i / (numPasses - 1);
-          const radius = maxRadius - (blurRadius * t);
-          const opacity = 0.50 + (0.30 * t);
-
-          if (useFilterFallback) {
-            const passBlur = filterBlurAmount * (1.5 - t);
-            targetCtx.filter = passBlur > 0.5 ? `blur(${passBlur}px)` : 'none';
-          }
-
-          targetCtx.beginPath();
-          for (const { col, row } of edgeCells) {
-            addCircleToPath(targetCtx, col, row, radius);
-          }
-          targetCtx.globalAlpha = baseOpacity * opacity;
-          targetCtx.fill();
-        }
-
-        if (useFilterFallback) {
-          ctx.filter = 'none';
-        }
-
-        ctx.globalAlpha = useGlobalAlpha ? fowOpacity : 1;
-      }
-
-      // Final pass
-      ctx.beginPath();
-      for (const { col, row } of visibleFogCells) {
-        addRectToPath(col, row, 1.0);
-      }
-      ctx.fill();
-
-      // Draw interior grid lines
-      if (visibleFogCells.length > 1) {
-        const drawnLines = new Set<string>();
-
-        const interiorLineWidth = Math.max(1, 1 * zoom * 0.5);
-        const halfWidth = interiorLineWidth / 2;
-
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
-
-        for (const { col, row } of visibleFogCells) {
-          const screenX = offsetX + col * scaledSize;
-          const screenY = offsetY + row * scaledSize;
-
-          if (foggedSet.has(`${col + 1},${row}`)) {
-            const lineKey = `v:${col + 1},${row}`;
-            if (!drawnLines.has(lineKey)) {
-              ctx.fillRect(screenX + scaledSize - halfWidth, screenY, interiorLineWidth, scaledSize);
-              drawnLines.add(lineKey);
-            }
-          }
-
-          if (foggedSet.has(`${col},${row + 1}`)) {
-            const lineKey = `h:${col},${row + 1}`;
-            if (!drawnLines.has(lineKey)) {
-              ctx.fillRect(screenX, screenY + scaledSize - halfWidth, scaledSize, interiorLineWidth);
-              drawnLines.add(lineKey);
-            }
-          }
-        }
-      }
+      renderGridFog(
+        fow.foggedCells,
+        { ctx, fogCtx, offsetX, offsetY, scaledSize },
+        { fowOpacity, fowBlurEnabled, blurRadius, useGlobalAlpha },
+        { minCol: visibleMinCol, maxCol: visibleMaxCol, minRow: visibleMinRow, maxRow: visibleMaxRow },
+        zoom
+      );
     }
 
     // Restore fog canvas context
