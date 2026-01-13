@@ -37,6 +37,7 @@ const MODULE_MAP: Record<string, string> = {
   'segmentRenderer.ts': './geometry/segmentRenderer.ts',
 
   // Utils
+  'rotationOperations.ts': './utils/rotationOperations.ts',
   'colorOperations.ts': './utils/colorOperations.ts',
   'deepLinkHandler.ts': './utils/deepLinkHandler.ts',
   'frameDetection.ts': './utils/frameDetection.ts',
@@ -64,6 +65,9 @@ const MODULE_MAP: Record<string, string> = {
   'BaseGeometry.ts': './geometry/BaseGeometry.ts',
   'offsetCoordinates.ts': './geometry/offsetCoordinates.ts',
   'hexMeasurements.ts': './geometry/hexMeasurements.ts',
+
+  // Renderers
+  'badgeRenderer.ts': './geometry/badgeRenderer.ts',
 };
 
 export function datacoreTransformer(options: TransformOptions = {}): Plugin {
