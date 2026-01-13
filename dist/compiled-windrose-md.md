@@ -1,9 +1,9 @@
 <!-- Compiled by Datacore Script Compiler -->
 <!-- Source: Projects/dungeon-map-tracker -->
 <!-- Main Component: DungeonMapTracker -->
-<!-- Compiled: 2026-01-10T07:09:21.999Z -->
-<!-- Files: 121 -->
-<!-- Version: 1.5.0.1 -->
+<!-- Compiled: 2026-01-13T04:31:38.722Z -->
+<!-- Files: 125 -->
+<!-- Version: 1.5.1 -->
 <!-- CSS Files: 1 -->
 
 # Demo
@@ -1004,7 +1004,7 @@ function getActiveLayer(mapData: MapData | null | undefined): MapLayer {
     // Legacy fallback (should not happen after migration)
     return {
       id: 'legacy',
-      name: 'Layer 1',
+      name: '1',
       order: 0,
       visible: true,
       cells: (mapData as LegacyMapData)?.cells || [],
@@ -1038,6 +1038,32 @@ function getLayerById(mapData: MapData | null | undefined, layerId: LayerId): Ma
 function getLayerIndex(mapData: MapData | null | undefined, layerId: LayerId): number {
   if (!mapData?.layers) return -1;
   return mapData.layers.findIndex(l => l.id === layerId);
+}
+
+/**
+ * Get the layer directly below the specified layer (by order).
+ * Returns null if no layer exists below (i.e., this is the bottom layer).
+ */
+function getLayerBelow(mapData: MapData | null | undefined, layerId: LayerId): MapLayer | null {
+  if (!mapData?.layers) return null;
+
+  const layer = getLayerById(mapData, layerId);
+  if (!layer) return null;
+
+  // Find the layer with the highest order that is still less than this layer's order
+  const sortedLayers = getLayersOrdered(mapData);
+  let layerBelow: MapLayer | null = null;
+
+  for (const candidate of sortedLayers) {
+    if (candidate.order < layer.order) {
+      // This candidate is below our layer; keep the highest one
+      if (!layerBelow || candidate.order > layerBelow.order) {
+        layerBelow = candidate;
+      }
+    }
+  }
+
+  return layerBelow;
 }
 
 // ============================================================================
@@ -1095,7 +1121,7 @@ function addLayer(mapData: MapData, name: string | null = null): MapData {
   
   const newLayer: MapLayer = {
     id: generateLayerId(),
-    name: name || `Layer ${mapData.layers.length + 1}`,
+    name: name || String(mapData.layers.length + 1),
     order: maxOrder + 1,
     visible: true,
     cells: [],
@@ -1327,7 +1353,7 @@ function migrateToLayerSchema(legacyMapData: LegacyMapData): MapData | LegacyMap
     // Create the layer with copied data
     const layerData: MapLayer = {
       id: layerId,
-      name: 'Layer 1',
+      name: '1',
       order: 0,
       visible: true,
       cells: cellsData,
@@ -1678,6 +1704,7 @@ return {
   getLayersOrdered,
   getLayerById,
   getLayerIndex,
+  getLayerBelow,
   
   // Layer modification
   updateLayer,
@@ -1941,7 +1968,7 @@ function createNewMap(mapId: string, mapName: string = '', mapType: MapType = 'g
   // Initial layer
   const initialLayer: Layer = {
     id: initialLayerId,
-    name: 'Layer 1',
+    name: '1',
     order: 0,
     visible: true,
     cells: [],
@@ -2712,14 +2739,18 @@ const { useHistory } = await dc.require(dc.headerLink(dc.resolvePath("compiled-w
 
 const {
   getActiveLayer,
+  getLayerById,
   updateActiveLayer,
+  updateLayer,
   addLayer,
   removeLayer,
   reorderLayers,
   setActiveLayer
 } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "layerAccessor")) as {
   getActiveLayer: (mapData: MapData) => MapLayer;
+  getLayerById: (mapData: MapData, layerId: LayerId) => MapLayer | null;
   updateActiveLayer: (mapData: MapData, updates: Partial<MapLayer>) => MapData;
+  updateLayer: (mapData: MapData, layerId: LayerId, updates: Partial<MapLayer>) => MapData;
   addLayer: (mapData: MapData) => MapData;
   removeLayer: (mapData: MapData, layerId: LayerId) => MapData;
   reorderLayers: (mapData: MapData, layerId: LayerId, newIndex: number) => MapData;
@@ -2910,6 +2941,56 @@ function useLayerHistory({
     [mapData, updateMapData]
   );
 
+  // Toggle show layer below for a specific layer
+  const handleToggleShowLayerBelow = dc.useCallback(
+    (layerId: LayerId): void => {
+      if (!mapData) return;
+
+      const layer = getLayerById(mapData, layerId);
+      if (!layer) return;
+
+      const newMapData = updateLayer(mapData, layerId, {
+        showLayerBelow: !layer.showLayerBelow
+      });
+      updateMapData(newMapData);
+    },
+    [mapData, updateMapData]
+  );
+
+  // Set layer below opacity for a specific layer
+  const handleSetLayerBelowOpacity = dc.useCallback(
+    (layerId: LayerId, opacity: number): void => {
+      if (!mapData) return;
+
+      // Clamp opacity to valid range
+      const clampedOpacity = Math.max(0.1, Math.min(0.5, opacity));
+
+      const newMapData = updateLayer(mapData, layerId, {
+        layerBelowOpacity: clampedOpacity
+      });
+      updateMapData(newMapData);
+    },
+    [mapData, updateMapData]
+  );
+
+  const handleUpdateLayerDisplay = dc.useCallback(
+    (layerId: LayerId, newName: string, icon: string | null): void => {
+      if (!mapData) return;
+
+      const updates: Partial<MapLayer> = { name: newName };
+      if (icon !== null) {
+        updates.icon = icon;
+      } else {
+        // If icon is null, we need to remove it - use undefined
+        updates.icon = undefined;
+      }
+
+      const newMapData = updateLayer(mapData, layerId, updates);
+      updateMapData(newMapData);
+    },
+    [mapData, updateMapData]
+  );
+
   // =========================================================================
   // Undo/Redo Handlers
   // =========================================================================
@@ -2991,7 +3072,10 @@ function useLayerHistory({
     handleLayerSelect,
     handleLayerAdd,
     handleLayerDelete,
-    handleLayerReorder
+    handleLayerReorder,
+    handleToggleShowLayerBelow,
+    handleSetLayerBelowOpacity,
+    handleUpdateLayerDisplay
   };
 
   const historyActions: HistoryActions = {
@@ -3007,6 +3091,9 @@ function useLayerHistory({
     handleLayerAdd,
     handleLayerDelete,
     handleLayerReorder,
+    handleToggleShowLayerBelow,
+    handleSetLayerBelowOpacity,
+    handleUpdateLayerDisplay,
     canUndo,
     canRedo,
     historyActions,
@@ -3156,7 +3243,7 @@ const { DEFAULT_COLOR } = await dc.require(dc.headerLink(dc.resolvePath("compile
  */
 function useToolState(options: UseToolStateOptions = {}): UseToolStateResult {
   const {
-    initialTool = 'draw',
+    initialTool = 'select',
     initialColor = DEFAULT_COLOR,
     initialOpacity = 1
   } = options;
@@ -7612,14 +7699,15 @@ const gridRenderer = {
     
     // Draw cells with custom opacity individually
     if (customOpacityCells.length > 0) {
+      const previousAlpha = ctx.globalAlpha;
       for (const cell of customOpacityCells) {
         const opacity = cell.opacity ?? 1;
-        ctx.globalAlpha = opacity;
+        ctx.globalAlpha = previousAlpha * opacity;
         ctx.fillStyle = cell.color;
         const { screenX, screenY } = geometry.gridToScreen(cell.x, cell.y, viewState.x, viewState.y, viewState.zoom);
         ctx.fillRect(screenX, screenY, scaledSize, scaledSize);
       }
-      ctx.globalAlpha = 1; // Reset
+      ctx.globalAlpha = previousAlpha;
     }
   },
 
@@ -7729,14 +7817,15 @@ const gridRenderer = {
         viewState.zoom
       );
       
-      // Apply opacity if specified
-      const opacity = edge.opacity ?? 1;
-      if (opacity < 1) {
-        ctx.globalAlpha = opacity;
+      // Apply opacity if specified (multiply with current globalAlpha)
+      const edgeOpacity = edge.opacity ?? 1;
+      const previousAlpha = ctx.globalAlpha;
+      if (edgeOpacity < 1) {
+        ctx.globalAlpha = previousAlpha * edgeOpacity;
       }
-      
+
       ctx.fillStyle = edge.color;
-      
+
       // Edges are stored normalized as 'right' or 'bottom' only
       if (edge.side === 'right') {
         // Right edge of cell (x,y) - vertical line at x+1 boundary
@@ -7755,10 +7844,10 @@ const gridRenderer = {
           edgeWidth
         );
       }
-      
-      // Reset opacity
-      if (opacity < 1) {
-        ctx.globalAlpha = 1;
+
+      // Restore previous opacity
+      if (edgeOpacity < 1) {
+        ctx.globalAlpha = previousAlpha;
       }
     }
   },
@@ -7988,13 +8077,15 @@ const hexRenderer = {
   ): void {
     if (!cells || cells.length === 0) return;
     
+    const previousAlpha = ctx.globalAlpha;
+
     for (const cell of cells) {
-      // Apply opacity if specified
+      // Apply opacity if specified (multiply with current globalAlpha)
       const opacity = cell.opacity ?? 1;
       if (opacity < 1) {
-        ctx.globalAlpha = opacity;
+        ctx.globalAlpha = previousAlpha * opacity;
       }
-      
+
       geometry.drawHex(
         ctx,
         cell.q,
@@ -8004,10 +8095,10 @@ const hexRenderer = {
         viewState.zoom,
         cell.color
       );
-      
-      // Reset opacity
+
+      // Restore previous opacity
       if (opacity < 1) {
-        ctx.globalAlpha = 1;
+        ctx.globalAlpha = previousAlpha;
       }
     }
   },
@@ -9098,25 +9189,26 @@ function renderSegmentCell(
   // Set fill style
   ctx.fillStyle = cell.color;
   const opacity = cell.opacity ?? 1;
+  const previousAlpha = ctx.globalAlpha;
   if (opacity < 1) {
-    ctx.globalAlpha = opacity;
+    ctx.globalAlpha = previousAlpha * opacity;
   }
-  
+
   // Build a single combined path for all filled segments
   // This eliminates anti-aliasing gaps between adjacent triangles
   const filledSegments = (Object.keys(cell.segments) as SegmentName[]).filter(
     seg => cell.segments[seg]
   );
-  
+
   ctx.beginPath();
   for (const segmentName of filledSegments) {
     addTriangleToPath(ctx, vertices, segmentName);
   }
   ctx.fill();
-  
-  // Reset opacity
+
+  // Restore previous opacity
   if (opacity < 1) {
-    ctx.globalAlpha = 1;
+    ctx.globalAlpha = previousAlpha;
   }
 }
 
@@ -9414,8 +9506,9 @@ const { offsetToAxial, axialToOffset } = await dc.require(dc.headerLink(dc.resol
   offsetToAxial: (col: number, row: number, orientation: string) => { q: number; r: number };
   axialToOffset: (q: number, r: number, orientation: string) => { col: number; row: number };
 };
-const { getActiveLayer, isCellFogged } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "layerAccessor")) as {
+const { getActiveLayer, getLayerBelow, isCellFogged } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "layerAccessor")) as {
   getActiveLayer: (mapData: MapData) => MapLayer;
+  getLayerBelow: (mapData: MapData, layerId: string) => MapLayer | null;
   isCellFogged: (layer: MapLayer, col: number, row: number) => boolean;
 };
 
@@ -9424,6 +9517,103 @@ const { getActiveLayer, isCellFogged } = await dc.require(dc.headerLink(dc.resol
  */
 function getRenderer(geometry: IGeometry): Renderer {
   return geometry instanceof HexGeometry ? hexRenderer : gridRenderer;
+}
+
+/** Options for rendering layer content */
+interface RenderLayerContentOptions {
+  opacity?: number;
+}
+
+/**
+ * Render a layer's cells, borders, and edges (but not objects or text labels).
+ * Used for both active layer rendering and ghost layer transparency.
+ */
+function renderLayerCellsAndEdges(
+  ctx: CanvasRenderingContext2D,
+  layer: MapLayer,
+  geometry: IGeometry,
+  viewState: RendererViewState,
+  theme: RendererTheme,
+  renderer: Renderer,
+  options: RenderLayerContentOptions = {}
+): void {
+  const { opacity = 1 } = options;
+
+  // Apply opacity if needed
+  const previousAlpha = ctx.globalAlpha;
+  if (opacity < 1) {
+    ctx.globalAlpha = opacity;
+  }
+
+  // Draw filled cells
+  if (layer.cells && layer.cells.length > 0) {
+    const cellsWithColor = layer.cells.map(cell => ({
+      ...cell,
+      color: getCellColor(cell)
+    }));
+
+    const { simpleCells, segmentCells } = segmentRenderer.separateCellsByType(cellsWithColor);
+
+    if (simpleCells.length > 0) {
+      renderer.renderPaintedCells(ctx, simpleCells, geometry, viewState);
+    }
+
+    if (segmentCells.length > 0 && geometry instanceof GridGeometry) {
+      segmentRenderer.renderSegmentCells(ctx, segmentCells, geometry, viewState);
+    }
+
+    if (renderer.renderInteriorGridLines && cellsWithColor.length > 0) {
+      renderer.renderInteriorGridLines(ctx, cellsWithColor, geometry, viewState, {
+        lineColor: theme.grid.lines,
+        lineWidth: theme.grid.lineWidth || 1,
+        interiorRatio: 0.5
+      });
+    }
+
+    const allCellsLookup = buildCellLookup(cellsWithColor);
+
+    if (simpleCells.length > 0) {
+      renderer.renderCellBorders(
+        ctx,
+        simpleCells,
+        geometry,
+        viewState,
+        () => allCellsLookup,
+        calculateBordersOptimized,
+        {
+          border: theme.cells.border,
+          borderWidth: theme.cells.borderWidth
+        }
+      );
+    }
+
+    if (segmentCells.length > 0 && geometry instanceof GridGeometry) {
+      segmentRenderer.renderSegmentBorders(
+        ctx,
+        segmentCells,
+        cellsWithColor,
+        geometry,
+        viewState,
+        {
+          border: theme.cells.border,
+          borderWidth: theme.cells.borderWidth
+        }
+      );
+    }
+  }
+
+  // Draw painted edges (grid maps only)
+  if (layer.edges && layer.edges.length > 0 && geometry instanceof GridGeometry && renderer.renderEdges) {
+    renderer.renderEdges(ctx, layer.edges, geometry, viewState, {
+      lineWidth: 1,
+      borderWidth: theme.cells.borderWidth
+    });
+  }
+
+  // Restore opacity
+  if (opacity < 1) {
+    ctx.globalAlpha = previousAlpha;
+  }
 }
 
 const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, selectedItems = [], isResizeMode = false, theme = null, showCoordinates = false, layerVisibility = null) => {
@@ -9566,70 +9756,19 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
     lineWidth: THEME.grid.lineWidth || 1
   });
 
-  // Draw filled cells
-  if (activeLayer.cells && activeLayer.cells.length > 0) {
-    const cellsWithColor = activeLayer.cells.map(cell => ({
-      ...cell,
-      color: getCellColor(cell)
-    }));
-
-    const { simpleCells, segmentCells } = segmentRenderer.separateCellsByType(cellsWithColor);
-
-    if (simpleCells.length > 0) {
-      renderer.renderPaintedCells(ctx, simpleCells, geometry, rendererViewState);
-    }
-
-    if (segmentCells.length > 0 && geometry instanceof GridGeometry) {
-      segmentRenderer.renderSegmentCells(ctx, segmentCells, geometry, rendererViewState);
-    }
-
-    if (renderer.renderInteriorGridLines && cellsWithColor.length > 0) {
-      renderer.renderInteriorGridLines(ctx, cellsWithColor, geometry, rendererViewState, {
-        lineColor: THEME.grid.lines,
-        lineWidth: THEME.grid.lineWidth || 1,
-        interiorRatio: 0.5
+  // Draw ghost layer (layer below) if enabled
+  if (activeLayer.showLayerBelow) {
+    const layerBelow = getLayerBelow(mapData, activeLayer.id);
+    if (layerBelow) {
+      const ghostOpacity = activeLayer.layerBelowOpacity ?? 0.25;
+      renderLayerCellsAndEdges(ctx, layerBelow, geometry, rendererViewState, THEME, renderer, {
+        opacity: ghostOpacity
       });
     }
-
-    const allCellsLookup = buildCellLookup(cellsWithColor);
-
-    if (simpleCells.length > 0) {
-      renderer.renderCellBorders(
-        ctx,
-        simpleCells,
-        geometry,
-        rendererViewState,
-        () => allCellsLookup,
-        calculateBordersOptimized,
-        {
-          border: THEME.cells.border,
-          borderWidth: THEME.cells.borderWidth
-        }
-      );
-    }
-
-    if (segmentCells.length > 0 && geometry instanceof GridGeometry) {
-      segmentRenderer.renderSegmentBorders(
-        ctx,
-        segmentCells,
-        cellsWithColor,
-        geometry,
-        rendererViewState,
-        {
-          border: THEME.cells.border,
-          borderWidth: THEME.cells.borderWidth
-        }
-      );
-    }
   }
 
-  // Draw painted edges (grid maps only)
-  if (activeLayer.edges && activeLayer.edges.length > 0 && geometry instanceof GridGeometry && renderer.renderEdges) {
-    renderer.renderEdges(ctx, activeLayer.edges, geometry, rendererViewState, {
-      lineWidth: 1,
-      borderWidth: THEME.cells.borderWidth
-    });
-  }
+  // Draw active layer cells and edges
+  renderLayerCellsAndEdges(ctx, activeLayer, geometry, rendererViewState, THEME, renderer);
 
   // Draw objects
   if (activeLayer.objects && activeLayer.objects.length > 0 && !showCoordinates && visibility.objects) {
@@ -9780,6 +9919,30 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
         ctx.strokeStyle = '#ffffff';
         ctx.lineWidth = 1;
         ctx.stroke();
+      }
+
+      // Draw link indicator for inter-object links
+      if (obj.linkedObject) {
+        const linkSize = Math.max(6, scaledSize * 0.15);
+        const linkX = screenX + 2;
+        const linkY = screenY + 2;
+
+        ctx.fillStyle = '#10b981';
+        ctx.beginPath();
+        ctx.arc(linkX + linkSize / 2, linkY + linkSize / 2, linkSize / 2, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // Draw chain link icon
+        const iconSize = linkSize * 0.6;
+        ctx.font = `${iconSize}px 'Noto Emoji', 'Noto Sans Symbols 2', monospace`;
+        ctx.fillStyle = '#ffffff';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('\u{1F517}', linkX + linkSize / 2, linkY + linkSize / 2);
       }
     }
   }
@@ -12070,6 +12233,97 @@ return { MapSelectionProvider, useMapSelection };
 
 ```
 
+# ObjectLinkingContext
+
+```tsx
+/**
+ * ObjectLinkingContext.tsx
+ * State management for the inter-object linking workflow.
+ * Tracks when user is in "linking mode" and which object they're linking from.
+ */
+
+import type { Point } from '#types/core/geometry.types';
+
+// ===========================================
+// Types
+// ===========================================
+
+/** Source object info when starting a link */
+export interface LinkingSource {
+  layerId: string;
+  objectId: string;
+  position: Point;
+  objectType: string;
+}
+
+/** ObjectLinkingContext value shape */
+export interface ObjectLinkingContextValue {
+  isLinkingMode: boolean;
+  linkingFrom: LinkingSource | null;
+  startLinking: (source: LinkingSource) => void;
+  cancelLinking: () => void;
+}
+
+// ===========================================
+// Context
+// ===========================================
+
+const ObjectLinkingContext = dc.createContext<ObjectLinkingContextValue | null>(null);
+
+/**
+ * Hook to access linking state
+ * @returns Linking state and actions
+ * @throws If used outside ObjectLinkingProvider
+ */
+function useLinkingMode(): ObjectLinkingContextValue {
+  const context = dc.useContext(ObjectLinkingContext);
+  if (!context) {
+    throw new Error('useLinkingMode must be used within ObjectLinkingProvider');
+  }
+  return context;
+}
+
+// ===========================================
+// Provider
+// ===========================================
+
+interface ObjectLinkingProviderProps {
+  children: React.ReactNode;
+}
+
+/**
+ * Provider component for linking workflow state.
+ * Wraps children and provides linking coordination via Context.
+ */
+const ObjectLinkingProvider: React.FC<ObjectLinkingProviderProps> = ({ children }) => {
+  const [linkingFrom, setLinkingFrom] = dc.useState<LinkingSource | null>(null);
+
+  const startLinking = dc.useCallback((source: LinkingSource): void => {
+    setLinkingFrom(source);
+  }, []);
+
+  const cancelLinking = dc.useCallback((): void => {
+    setLinkingFrom(null);
+  }, []);
+
+  const value = dc.useMemo((): ObjectLinkingContextValue => ({
+    isLinkingMode: linkingFrom !== null,
+    linkingFrom,
+    startLinking,
+    cancelLinking
+  }), [linkingFrom, startLinking, cancelLinking]);
+
+  return (
+    <ObjectLinkingContext.Provider value={value}>
+      {children}
+    </ObjectLinkingContext.Provider>
+  );
+};
+
+return { ObjectLinkingProvider, useLinkingMode };
+
+```
+
 # EventHandlerContext
 
 ```tsx
@@ -12671,7 +12925,7 @@ const useObjectInteractions = (
         setDragStart({ x: clientX, y: clientY, gridX, gridY, offsetX, offsetY });
         setIsResizeMode(false);
       } else {
-        setSelectedItem({ type: 'object', id: object.id });
+        setSelectedItem({ type: 'object', id: object.id, data: object });
         setIsResizeMode(false);
 
         dragInitialStateRef.current = [...(getActiveLayer(mapData!).objects || [])];
@@ -14638,6 +14892,10 @@ const SelectionToolbar = ({
   onRotate,
   onLabel,
   onLinkNote,
+  onLinkObject,
+  onFollowLink,
+  onRemoveLink,
+  onCopyLink,
   onColorClick,
   onResize,
   onDelete,
@@ -14722,21 +14980,40 @@ const SelectionToolbar = ({
   const buttonSize = 44;
   const buttonGap = 4;
   const toolbarGap = 4; // Gap between selection and toolbar
-  
-  // Count buttons for this selection type
-  let buttonCount = 0;
-  if (isObject) {
-    buttonCount = 7; // Rotate, Label, Duplicate, Link Note, Color, Resize, Delete
-    // Hide label button for note_pin objects
-    if (selectedItem.data?.type === 'note_pin') {
-      buttonCount = 6;
-    }
-  } else if (isText) {
-    buttonCount = 3; // Edit, Rotate, Delete
-  }
-  
-  const toolbarWidth = buttonCount * buttonSize + (buttonCount - 1) * buttonGap;
-  const toolbarHeight = buttonSize;
+  const buttonsPerRow = 5;
+
+  // Build button definitions based on selection type
+  const hasLinkedObject = !!(isObject && selectedItem.data?.linkedObject);
+  const isNotePin = selectedItem.data?.type === 'note_pin';
+
+  const objectButtons = isObject ? [
+    { id: 'rotate', icon: 'lucide-rotate-cw', title: 'Rotate 90° (or press R)', onClick: onRotate },
+    { id: 'label', icon: 'lucide-sticky-note', title: 'Add/Edit Label', onClick: onLabel, visible: !isNotePin },
+    { id: 'duplicate', icon: 'lucide-copy', title: 'Duplicate Object', onClick: onDuplicate },
+    { id: 'linkNote', icon: 'lucide-scroll-text', title: selectedItem.data?.linkedNote ? 'Edit linked note' : 'Link note', onClick: onLinkNote },
+    { id: 'linkObject', icon: 'lucide-link-2', title: hasLinkedObject ? 'Edit object link' : 'Link to object', onClick: onLinkObject, active: hasLinkedObject },
+    { id: 'followLink', icon: 'lucide-arrow-right-circle', title: 'Go to linked object', onClick: onFollowLink, visible: hasLinkedObject },
+    { id: 'removeLink', icon: 'lucide-unlink', title: 'Remove object link', onClick: onRemoveLink, visible: hasLinkedObject },
+    { id: 'copyLink', icon: 'lucide-link', title: 'Copy link to clipboard', onClick: onCopyLink },
+    { id: 'color', icon: 'lucide-palette', title: 'Change Object Color', onClick: onColorClick, isColorButton: true },
+    { id: 'resize', icon: 'lucide-scaling', title: 'Resize Object', onClick: onResize },
+    { id: 'delete', icon: 'lucide-trash-2', title: 'Delete (or press Delete/Backspace)', onClick: onDelete, isDelete: true }
+  ].filter(btn => btn.visible !== false) : [];
+
+  const textButtons = isText ? [
+    { id: 'edit', icon: 'lucide-pencil', title: 'Edit Text Label', onClick: onEdit },
+    { id: 'rotate', icon: 'lucide-rotate-cw', title: 'Rotate 90° (or press R)', onClick: onRotate },
+    { id: 'copyLink', icon: 'lucide-link', title: 'Copy link to clipboard', onClick: onCopyLink },
+    { id: 'delete', icon: 'lucide-trash-2', title: 'Delete (or press Delete/Backspace)', onClick: onDelete, isDelete: true }
+  ] : [];
+
+  const buttons = isObject ? objectButtons : textButtons;
+  const buttonCount = buttons.length;
+  const rowCount = Math.ceil(buttonCount / buttonsPerRow);
+  const buttonsInFirstRow = Math.min(buttonCount, buttonsPerRow);
+
+  const toolbarWidth = buttonsInFirstRow * buttonSize + (buttonsInFirstRow - 1) * buttonGap;
+  const toolbarHeight = rowCount * buttonSize + (rowCount - 1) * buttonGap;
   
   // Get container bounds for edge detection
   const containerRect = containerRef.current.getBoundingClientRect();
@@ -14862,159 +15139,304 @@ const SelectionToolbar = ({
       )}
       
       {/* Toolbar */}
-      <div 
+      <div
         className="dmt-selection-toolbar"
         style={{
           position: 'absolute',
           left: `${toolbarX}px`,
           top: `${toolbarY}px`,
+          width: `${toolbarWidth}px`,
           pointerEvents: 'auto',
           zIndex: 150
         }}
       >
-        {/* Object buttons */}
-        {isObject && (
-          <>
-            {/* Rotate */}
+        {buttons.map((btn) => {
+          if (btn.isColorButton) {
+            return (
+              <div key={btn.id} style={{ position: 'relative', display: 'inline-block' }}>
+                <button
+                  ref={colorButtonRef}
+                  className="dmt-toolbar-button dmt-toolbar-color-button"
+                  onClick={(e) => btn.onClick?.(e)}
+                  title={btn.title}
+                  style={{ backgroundColor: currentColor || '#ffffff' }}
+                >
+                  <dc.Icon icon={btn.icon} />
+                </button>
+                {showColorPicker && (
+                  <ColorPicker
+                    isOpen={showColorPicker}
+                    selectedColor={currentColor || '#ffffff'}
+                    onColorSelect={onColorSelect}
+                    onClose={onColorPickerClose}
+                    onReset={onColorReset}
+                    customColors={customColors || []}
+                    onAddCustomColor={onAddCustomColor}
+                    onDeleteCustomColor={onDeleteCustomColor}
+                    pendingCustomColorRef={pendingCustomColorRef}
+                    title="Object Color"
+                    position="above"
+                  />
+                )}
+              </div>
+            );
+          }
+
+          const className = [
+            'dmt-toolbar-button',
+            btn.isDelete && 'dmt-toolbar-delete-button',
+            btn.active && 'dmt-toolbar-button-active'
+          ].filter(Boolean).join(' ');
+
+          return (
             <button
-              className="dmt-toolbar-button"
-              onClick={(e) => {
-                if (onRotate) onRotate(e);
-              }}
-              title="Rotate 90° (or press R)"
+              key={btn.id}
+              className={className}
+              onClick={(e) => btn.onClick?.(e)}
+              title={btn.title}
             >
-              <dc.Icon icon="lucide-rotate-cw" />
+              <dc.Icon icon={btn.icon} />
             </button>
-            
-            {/* Label (not for note_pin) */}
-            {selectedItem.data?.type !== 'note_pin' && (
-              <button
-                className="dmt-toolbar-button"
-                onClick={(e) => {
-                  if (onLabel) onLabel(e);
-                }}
-                title="Add/Edit Label"
-              >
-                <dc.Icon icon="lucide-sticky-note" />
-              </button>
-            )}
-            
-            {/* Duplicate */}
-            <button
-              className="dmt-toolbar-button"
-              onClick={(e) => {
-                if (onDuplicate) onDuplicate(e);
-              }}
-              title="Duplicate Object"
-            >
-              <dc.Icon icon="lucide-copy" />
-            </button>
-            
-            {/* Link Note */}
-            <button
-              className="dmt-toolbar-button"
-              onClick={(e) => {
-                if (onLinkNote) onLinkNote(e);
-              }}
-              title={selectedItem.data?.linkedNote ? "Edit linked note" : "Link note"}
-            >
-              <dc.Icon icon="lucide-scroll-text" />
-            </button>
-            
-            {/* Color */}
-            <div style={{ position: 'relative', display: 'inline-block' }}>
-              <button
-                ref={colorButtonRef}
-                className="dmt-toolbar-button dmt-toolbar-color-button"
-                onClick={(e) => {
-                  if (onColorClick) onColorClick(e);
-                }}
-                title="Change Object Color"
-                style={{
-                  backgroundColor: currentColor || '#ffffff'
-                }}
-              >
-                <dc.Icon icon="lucide-palette" />
-              </button>
-              
-              {showColorPicker && (
-                <ColorPicker
-                  isOpen={showColorPicker}
-                  selectedColor={currentColor || '#ffffff'}
-                  onColorSelect={onColorSelect}
-                  onClose={onColorPickerClose}
-                  onReset={onColorReset}
-                  customColors={customColors || []}
-                  onAddCustomColor={onAddCustomColor}
-                  onDeleteCustomColor={onDeleteCustomColor}
-                  pendingCustomColorRef={pendingCustomColorRef}
-                  title="Object Color"
-                  position="above"
-                />
-              )}
-            </div>
-            
-            {/* Resize */}
-            <button
-              className="dmt-toolbar-button"
-              onClick={(e) => {
-                if (onResize) onResize(e);
-              }}
-              title="Resize Object"
-            >
-              <dc.Icon icon="lucide-scaling" />
-            </button>
-            
-            {/* Delete */}
-            <button
-              className="dmt-toolbar-button dmt-toolbar-delete-button"
-              onClick={(e) => {
-                if (onDelete) onDelete(e);
-              }}
-              title="Delete (or press Delete/Backspace)"
-            >
-              <dc.Icon icon="lucide-trash-2" />
-            </button>
-          </>
-        )}
-        
-        {/* Text label buttons */}
-        {isText && (
-          <>
-            {/* Edit */}
-            <button
-              className="dmt-toolbar-button"
-              onClick={onEdit}
-              title="Edit Text Label"
-            >
-              <dc.Icon icon="lucide-pencil" />
-            </button>
-            
-            {/* Rotate */}
-            <button
-              className="dmt-toolbar-button"
-              onClick={onRotate}
-              title="Rotate 90° (or press R)"
-            >
-              <dc.Icon icon="lucide-rotate-cw" />
-            </button>
-            
-            {/* Delete */}
-            <button
-              className="dmt-toolbar-button dmt-toolbar-delete-button"
-              onClick={onDelete}
-              title="Delete (or press Delete/Backspace)"
-            >
-              <dc.Icon icon="lucide-trash-2" />
-            </button>
-          </>
-        )}
+          );
+        })}
       </div>
     </>
   );
 };
 
 return { SelectionToolbar };
+```
+
+# deepLinkHandler
+
+```ts
+/**
+ * Deep link parsing and generation for Windrose maps.
+ * Format: obsidian://windrose?notePath|mapId,x,y,zoom,layerId
+ */
+
+/** Parsed deep link data */
+export interface DeepLinkData {
+  notePath: string;
+  mapId: string;
+  x: number;
+  y: number;
+  zoom: number;
+  layerId: string;
+}
+
+/** Navigation event detail (extends DeepLinkData with timestamp) */
+export interface NavigationEventDetail extends DeepLinkData {
+  timestamp: number;
+}
+
+/** Protocol prefix for Windrose deep links (uses Obsidian's protocol handler) */
+const PROTOCOL = 'obsidian://windrose?';
+
+/** Custom event name for map navigation */
+const NAVIGATION_EVENT = 'dmt-navigate-to';
+
+/** Parse a deep link URL into structured data */
+function parseDeepLink(url: string): DeepLinkData | null {
+  if (!url || typeof url !== 'string') {
+    return null;
+  }
+
+  if (!url.startsWith(PROTOCOL)) {
+    return null;
+  }
+
+  const dataStr = url.slice(PROTOCOL.length);
+  const pipeIndex = dataStr.indexOf('|');
+  if (pipeIndex === -1) {
+    return null;
+  }
+
+  const notePath = dataStr.slice(0, pipeIndex);
+  const coordData = dataStr.slice(pipeIndex + 1);
+  const parts = coordData.split(',');
+
+  if (parts.length !== 5) {
+    return null;
+  }
+
+  const [mapId, xStr, yStr, zoomStr, layerId] = parts;
+
+  if (!notePath || !mapId || !layerId) {
+    return null;
+  }
+
+  const x = parseFloat(xStr);
+  const y = parseFloat(yStr);
+  const zoom = parseFloat(zoomStr);
+
+  if (isNaN(x) || isNaN(y) || isNaN(zoom)) {
+    return null;
+  }
+
+  return {
+    notePath,
+    mapId,
+    x,
+    y,
+    zoom,
+    layerId
+  };
+}
+
+/**
+ * Generate a deep link URL from map location data.
+ * @param notePath Path to the note containing the map
+ * @param mapId The map identifier
+ * @param x X coordinate
+ * @param y Y coordinate
+ * @param zoom Zoom level
+ * @param layerId Layer identifier
+ * @returns Deep link URL
+ */
+function generateDeepLink(
+  notePath: string,
+  mapId: string,
+  x: number,
+  y: number,
+  zoom: number,
+  layerId: string
+): string {
+  // Round to 2 decimal places for clean URLs
+  const roundedX = Math.round(x * 100) / 100;
+  const roundedY = Math.round(y * 100) / 100;
+  const roundedZoom = Math.round(zoom * 100) / 100;
+
+  return `${PROTOCOL}${notePath}|${mapId},${roundedX},${roundedY},${roundedZoom},${layerId}`;
+}
+
+/**
+ * Generate a markdown link with display text.
+ * @param displayText Text to show for the link
+ * @param notePath Path to the note containing the map
+ * @param mapId The map identifier
+ * @param x X coordinate
+ * @param y Y coordinate
+ * @param zoom Zoom level
+ * @param layerId Layer identifier
+ * @returns Markdown link syntax
+ */
+function generateDeepLinkMarkdown(
+  displayText: string,
+  notePath: string,
+  mapId: string,
+  x: number,
+  y: number,
+  zoom: number,
+  layerId: string
+): string {
+  // Escape brackets in display text (remove them to avoid breaking markdown)
+  const escapedText = displayText.replace(/[\[\]]/g, '');
+  const url = generateDeepLink(notePath, mapId, x, y, zoom, layerId);
+  return `[${escapedText}](${url})`;
+}
+
+/**
+ * Copy a deep link to clipboard and show a Notice.
+ * @param displayText Text to show for the link
+ * @param notePath Path to the note containing the map
+ * @param mapId The map identifier
+ * @param x X coordinate
+ * @param y Y coordinate
+ * @param zoom Zoom level
+ * @param layerId Layer identifier
+ */
+function copyDeepLinkToClipboard(
+  displayText: string,
+  notePath: string,
+  mapId: string,
+  x: number,
+  y: number,
+  zoom: number,
+  layerId: string
+): void {
+  const markdown = generateDeepLinkMarkdown(displayText, notePath, mapId, x, y, zoom, layerId);
+
+  navigator.clipboard.writeText(markdown).then(() => {
+    new Notice('Deep link copied to clipboard');
+  }).catch((err: Error) => {
+    console.error('Failed to copy link:', err);
+    new Notice('Failed to copy link');
+  });
+}
+
+/**
+ * Emit a navigation event for map components to handle.
+ * @param data Navigation target data
+ */
+function emitNavigationEvent(data: DeepLinkData): void {
+  const detail: NavigationEventDetail = {
+    ...data,
+    timestamp: Date.now()
+  };
+
+  const event = new CustomEvent(NAVIGATION_EVENT, { detail });
+  window.dispatchEvent(event);
+}
+
+return {
+  PROTOCOL,
+  NAVIGATION_EVENT,
+  parseDeepLink,
+  generateDeepLink,
+  generateDeepLinkMarkdown,
+  copyDeepLinkToClipboard,
+  emitNavigationEvent
+};
+
+```
+
+# LinkingModeBanner
+
+```tsx
+import type { LinkingSource } from '../context/ObjectLinkingContext.tsx';
+
+const { getObjectType } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "objectTypeResolver"));
+
+interface LinkingModeBannerProps {
+  linkingFrom: LinkingSource;
+  onCancel: () => void;
+}
+
+const LinkingModeBanner = ({ linkingFrom, onCancel }: LinkingModeBannerProps): React.ReactElement => {
+  const objectDef = getObjectType(linkingFrom.objectType);
+  const objectLabel = objectDef?.label || linkingFrom.objectType;
+
+  dc.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onCancel();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onCancel]);
+
+  return (
+    <div className="dmt-linking-banner">
+      <div className="dmt-linking-banner-content">
+        <dc.Icon icon="lucide-link-2" />
+        <span>Linking from <strong>{objectLabel}</strong> - click target object</span>
+        <button
+          className="dmt-linking-banner-cancel"
+          onClick={onCancel}
+          title="Cancel (Esc)"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+};
+
+return { LinkingModeBanner };
+
 ```
 
 # ObjectLayer
@@ -15034,11 +15456,13 @@ return { SelectionToolbar };
 import type { JSX } from 'preact';
 import type { ToolId } from '#types/tools/tool.types';
 import type { ObjectTypeId, MapObject } from '#types/objects/object.types';
+import type { TextLabel } from '#types/objects/note.types';
 import type { HexColor } from '#types/core/common.types';
 import type { CustomColor } from '../ColorPicker.tsx';
 
 const { useMapState, useMapOperations } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "MapContext"));
 const { useMapSelection } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "MapSelectionContext"));
+const { useLinkingMode } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "ObjectLinkingContext"));
 const { useEventHandlerRegistration } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "EventHandlerContext"));
 const { useObjectInteractions } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "useObjectInteractions"));
 const { TextInputModal } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "TextInputModal"));
@@ -15046,6 +15470,8 @@ const { NoteLinkModal } = await dc.require(dc.headerLink(dc.resolvePath("compile
 const { SelectionToolbar } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "SelectionToolbar"));
 const { calculateObjectScreenPosition } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "screenPositionUtils"));
 const { getActiveLayer } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "layerAccessor"));
+const { copyDeepLinkToClipboard } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "deepLinkHandler"));
+const { LinkingModeBanner } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "LinkingModeBanner"));
 
 /** Selected item from context */
 interface SelectedItem {
@@ -15086,7 +15512,7 @@ const ObjectLayer = ({
   onAddCustomColor,
   onDeleteCustomColor
 }: ObjectLayerProps): React.ReactElement | null => {
-  const { canvasRef, containerRef, mapData, geometry, screenToGrid, screenToWorld, getClientCoords, GridGeometry } = useMapState();
+  const { canvasRef, containerRef, mapData, mapId, notePath, geometry, screenToGrid, screenToWorld, getClientCoords, GridGeometry } = useMapState();
   const { getObjectAtPosition, addObject, updateObject, removeObject, isAreaFree, onObjectsChange: contextOnObjectsChange, onTextLabelsChange, removeTextLabel } = useMapOperations();
   const {
     selectedItem, setSelectedItem,
@@ -15102,6 +15528,31 @@ const ObjectLayer = ({
     layerVisibility,
     updateSelectedItemsData
   } = useMapSelection();
+
+  const { isLinkingMode, linkingFrom, startLinking, cancelLinking } = useLinkingMode();
+
+  // Helper for bidirectional link updates (handles same-layer vs cross-layer)
+  const applyLinkUpdate = dc.useCallback((
+    updates: Array<{ layerId: string; objectId: string; transform: (obj: MapObject) => MapObject }>,
+    crossLayerEvent: { name: string; detail: Record<string, unknown> }
+  ): void => {
+    if (!mapData) return;
+
+    const allOnActiveLayer = updates.every(u => u.layerId === mapData.activeLayerId);
+
+    if (allOnActiveLayer) {
+      const activeLayer = getActiveLayer(mapData);
+      const updatedObjects = activeLayer.objects?.map((obj: MapObject) => {
+        const update = updates.find(u => u.objectId === obj.id);
+        return update ? update.transform(obj) : obj;
+      });
+      if (updatedObjects) {
+        onObjectsChange(updatedObjects);
+      }
+    } else {
+      window.dispatchEvent(new CustomEvent(crossLayerEvent.name, { detail: crossLayerEvent.detail }));
+    }
+  }, [mapData, onObjectsChange]);
 
   const [showNoteModal, setShowNoteModal] = dc.useState(false);
   const [editingObjectId, setEditingObjectId] = dc.useState<string | null>(null);
@@ -15232,6 +15683,36 @@ const ObjectLayer = ({
     clearSelection();
   }, [hasMultiSelection, mapData, selectedItems, onObjectsChange, onTextLabelsChange, clearSelection]);
 
+  const handleCopyLink = dc.useCallback(() => {
+    if (!selectedItem || !mapData || !mapId || !notePath) return;
+
+    const activeLayer = getActiveLayer(mapData);
+    const zoom = mapData.viewState?.zoom ?? 1.0;
+    const layerId = mapData.activeLayerId || activeLayer?.id || 'layer_001';
+
+    let displayText = 'Map Location';
+    let x = 0;
+    let y = 0;
+
+    if (selectedItem.type === 'object') {
+      const obj = activeLayer.objects?.find((o: MapObject) => o.id === selectedItem.id);
+      if (!obj) return;
+      displayText = obj.label || obj.customTooltip || 'Object';
+      x = obj.position.x;
+      y = obj.position.y;
+    } else if (selectedItem.type === 'text') {
+      const label = activeLayer.textLabels?.find((l: TextLabel) => l.id === selectedItem.id);
+      if (!label) return;
+      displayText = label.content || 'Text';
+      // Text labels use world coordinates, convert to grid
+      const gridSize = mapData.gridSize || 32;
+      x = label.position.x / gridSize;
+      y = label.position.y / gridSize;
+    }
+
+    copyDeepLinkToClipboard(displayText, notePath, mapId, x, y, zoom, layerId);
+  }, [selectedItem, mapData, mapId, notePath]);
+
   const {
     isResizing,
     resizeCorner,
@@ -15260,10 +15741,83 @@ const ObjectLayer = ({
 
   const { registerHandlers, unregisterHandlers } = useEventHandlerRegistration();
 
+  // Wrap handleObjectSelection to intercept clicks when in linking mode
+  const wrappedHandleObjectSelection = dc.useCallback((
+    clientX: number,
+    clientY: number,
+    gridX: number,
+    gridY: number
+  ): boolean => {
+    if (isLinkingMode && linkingFrom && mapData) {
+      // In linking mode - try to find target object
+      const activeLayer = getActiveLayer(mapData);
+      const targetObject = activeLayer.objects?.find((obj: MapObject) => {
+        return obj.position.x === gridX && obj.position.y === gridY;
+      });
+
+      if (targetObject) {
+        // Prevent self-linking
+        if (targetObject.id === linkingFrom.objectId && mapData.activeLayerId === linkingFrom.layerId) {
+          new Notice('Cannot link an object to itself');
+          return true;
+        }
+
+        // Complete the bidirectional link
+        const sourceToTargetLink = {
+          layerId: mapData.activeLayerId,
+          objectId: targetObject.id,
+          position: targetObject.position,
+          objectType: targetObject.type
+        };
+
+        const targetToSourceLink = {
+          layerId: linkingFrom.layerId,
+          objectId: linkingFrom.objectId,
+          position: linkingFrom.position,
+          objectType: linkingFrom.objectType
+        };
+
+        applyLinkUpdate(
+          [
+            { layerId: linkingFrom.layerId, objectId: linkingFrom.objectId, transform: (obj) => ({ ...obj, linkedObject: sourceToTargetLink }) },
+            { layerId: mapData.activeLayerId, objectId: targetObject.id, transform: (obj) => ({ ...obj, linkedObject: targetToSourceLink }) }
+          ],
+          {
+            name: 'dmt-create-object-link',
+            detail: {
+              sourceLayerId: linkingFrom.layerId,
+              sourceObjectId: linkingFrom.objectId,
+              sourceLink: sourceToTargetLink,
+              targetLayerId: mapData.activeLayerId,
+              targetObjectId: targetObject.id,
+              targetLink: targetToSourceLink
+            }
+          }
+        );
+
+        // Clear linking mode
+        cancelLinking();
+        new Notice('Objects linked');
+
+        // Select the target object with updated data
+        setSelectedItem({
+          type: 'object',
+          id: targetObject.id,
+          data: { ...targetObject, linkedObject: targetToSourceLink }
+        });
+
+        return true;
+      }
+    }
+
+    // Not in linking mode or no target found - use normal selection
+    return handleObjectSelection(clientX, clientY, gridX, gridY);
+  }, [isLinkingMode, linkingFrom, mapData, handleObjectSelection, applyLinkUpdate, cancelLinking, setSelectedItem]);
+
   dc.useEffect(() => {
     registerHandlers('object', {
       handleObjectPlacement,
-      handleObjectSelection,
+      handleObjectSelection: wrappedHandleObjectSelection,
       handleObjectDragging,
       handleObjectResizing,
       stopObjectDragging,
@@ -15280,7 +15834,7 @@ const ObjectLayer = ({
     return () => unregisterHandlers('object');
   }, [
     registerHandlers, unregisterHandlers,
-    handleObjectPlacement, handleObjectSelection,
+    handleObjectPlacement, wrappedHandleObjectSelection,
     handleObjectDragging, handleObjectResizing,
     stopObjectDragging, stopObjectResizing,
     handleHoverUpdate, handleObjectWheel, handleObjectKeyDown,
@@ -15376,6 +15930,98 @@ const ObjectLayer = ({
     setEditingNoteObjectId(null);
   };
 
+  const handleLinkObject = dc.useCallback(() => {
+    if (!selectedItem || selectedItem.type !== 'object' || !mapData) return;
+
+    const activeLayer = getActiveLayer(mapData);
+    const obj = activeLayer.objects?.find((o: MapObject) => o.id === selectedItem.id);
+    if (!obj) return;
+
+    startLinking({
+      layerId: mapData.activeLayerId,
+      objectId: obj.id,
+      position: obj.position,
+      objectType: obj.type
+    });
+  }, [selectedItem, mapData, startLinking]);
+
+  const handleFollowLink = dc.useCallback(() => {
+    if (!selectedItem || selectedItem.type !== 'object' || !mapData || !mapId || !notePath) return;
+
+    const obj = selectedItem.data as MapObject;
+    if (!obj?.linkedObject) return;
+
+    const { layerId, objectId } = obj.linkedObject;
+
+    const targetLayer = mapData.layers.find(l => l.id === layerId);
+    if (!targetLayer) {
+      new Notice('Linked layer no longer exists');
+      return;
+    }
+
+    const targetObject = targetLayer.objects?.find((o: MapObject) => o.id === objectId);
+    if (!targetObject) {
+      new Notice('Linked object no longer exists');
+      return;
+    }
+
+    // Navigate to the target (DungeonMapTracker handles layer switching + panning)
+    window.dispatchEvent(new CustomEvent('dmt-navigate-to', {
+      detail: {
+        notePath,
+        mapId,
+        x: targetObject.position.x,
+        y: targetObject.position.y,
+        zoom: 1.175,
+        layerId,
+        timestamp: Date.now()
+      }
+    }));
+
+    // Select the target object immediately (we already have its data)
+    setSelectedItem({
+      type: 'object',
+      id: targetObject.id,
+      data: targetObject
+    });
+  }, [selectedItem, mapData, mapId, notePath, setSelectedItem]);
+
+  const handleRemoveLink = dc.useCallback(() => {
+    if (!selectedItem || selectedItem.type !== 'object' || !mapData) return;
+
+    const obj = selectedItem.data as MapObject;
+    if (!obj?.linkedObject) return;
+
+    const { layerId: targetLayerId, objectId: targetObjectId } = obj.linkedObject;
+    const sourceLayerId = mapData.activeLayerId;
+    const sourceObjectId = selectedItem.id;
+
+    const removeLinkedObject = (o: MapObject): MapObject => {
+      const { linkedObject: _removed, ...rest } = o;
+      return rest as MapObject;
+    };
+
+    applyLinkUpdate(
+      [
+        { layerId: sourceLayerId, objectId: sourceObjectId, transform: removeLinkedObject },
+        { layerId: targetLayerId, objectId: targetObjectId, transform: removeLinkedObject }
+      ],
+      {
+        name: 'dmt-remove-object-link',
+        detail: { sourceLayerId, sourceObjectId, targetLayerId, targetObjectId }
+      }
+    );
+
+    const { linkedObject: _removed, ...restData } = obj;
+    setSelectedItem({
+      type: 'object',
+      id: selectedItem.id,
+      data: restData as MapObject
+    });
+
+    new Notice('Link removed');
+  }, [selectedItem, mapData, applyLinkUpdate, setSelectedItem]);
+
   dc.useEffect(() => {
     if (!showObjectColorPicker) return;
 
@@ -15451,6 +16097,14 @@ const ObjectLayer = ({
 
   return (
     <>
+      {/* Linking Mode Banner */}
+      {isLinkingMode && linkingFrom && (
+        <LinkingModeBanner
+          linkingFrom={linkingFrom}
+          onCancel={cancelLinking}
+        />
+      )}
+
       {edgeSnapMode && selectedItem?.type === 'object' && indicatorPositions && (
         <>
           <div
@@ -15534,6 +16188,10 @@ const ObjectLayer = ({
           onDuplicate={handleObjectDuplicate}
           onLabel={handleNoteButtonClick}
           onLinkNote={() => handleEditNoteLink(selectedItem?.id)}
+          onLinkObject={handleLinkObject}
+          onFollowLink={handleFollowLink}
+          onRemoveLink={handleRemoveLink}
+          onCopyLink={handleCopyLink}
           onColorClick={handleObjectColorButtonClick}
           onResize={handleResizeButtonClick}
           onDelete={handleObjectDeletion}
@@ -19632,6 +20290,7 @@ const { TextLabelEditor } = await dc.require(dc.headerLink(dc.resolvePath("compi
 const { useEventHandlerRegistration } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "EventHandlerContext"));
 const { SelectionToolbar } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "SelectionToolbar"));
 const { getActiveLayer } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "layerAccessor"));
+const { copyDeepLinkToClipboard } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "deepLinkHandler"));
 
 /** Text label data structure */
 interface TextLabel {
@@ -19662,7 +20321,7 @@ const TextLayer = ({
   onAddCustomColor,
   onDeleteCustomColor
 }: TextLayerProps): React.ReactElement | null => {
-  const { mapData, canvasRef, containerRef, geometry } = useMapState();
+  const { mapData, mapId, notePath, canvasRef, containerRef, geometry } = useMapState();
   const { selectedItem, showCoordinates, layerVisibility, isDraggingSelection } = useMapSelection();
 
   const {
@@ -19683,6 +20342,25 @@ const TextLayer = ({
   } = useTextLabelInteraction(currentTool, onAddCustomColor, customColors);
 
   const { registerHandlers, unregisterHandlers } = useEventHandlerRegistration();
+
+  const handleCopyLink = dc.useCallback(() => {
+    if (!selectedItem || selectedItem.type !== 'text' || !mapData || !mapId || !notePath) return;
+
+    const activeLayer = getActiveLayer(mapData);
+    const label = activeLayer.textLabels?.find((l: TextLabel) => l.id === selectedItem.id);
+    if (!label) return;
+
+    const zoom = mapData.viewState?.zoom ?? 1.0;
+    const layerId = mapData.activeLayerId || activeLayer?.id || 'layer_001';
+    const displayText = label.content || 'Text';
+
+    // Text labels use world coordinates, convert to grid
+    const gridSize = mapData.gridSize || 32;
+    const x = label.position.x / gridSize;
+    const y = label.position.y / gridSize;
+
+    copyDeepLinkToClipboard(displayText, notePath, mapId, x, y, zoom, layerId);
+  }, [selectedItem, mapData, mapId, notePath]);
 
   dc.useEffect(() => {
     registerHandlers('text', {
@@ -19719,6 +20397,7 @@ const TextLayer = ({
           geometry={geometry}
           onEdit={handleEditClick}
           onRotate={handleRotateClick}
+          onCopyLink={handleCopyLink}
           onDelete={handleTextDeletion}
           isResizeMode={false}
           showColorPicker={false}
@@ -26484,6 +27163,7 @@ const { HexGeometry } = await dc.require(dc.headerLink(dc.resolvePath("compiled-
 const { LinkedNoteHoverOverlays } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "LinkedNoteHoverOverlays"));
 const { MapStateProvider, MapOperationsProvider } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "MapContext"));
 const { MapSelectionProvider, useMapSelection } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "MapSelectionContext"));
+const { ObjectLinkingProvider } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "ObjectLinkingContext"));
 const { ObjectLayer } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "ObjectLayer"));
 const { DrawingLayer } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "DrawingLayer"));
 const { TextLayer } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "TextLayer"));
@@ -26530,6 +27210,8 @@ interface CoordinatorsProps {
 }
 
 interface MapCanvasContentProps {
+  mapId?: string;
+  notePath?: string;
   mapData: MapData | null;
   onCellsChange: (cells: Cell[], skipHistory?: boolean) => void;
   onObjectsChange: (objects: MapObject[]) => void;
@@ -26593,7 +27275,7 @@ const Coordinators = ({ canvasRef, mapData, geometry, isFocused, isColorPickerOp
  * MapCanvasContent - Inner component that uses context hooks
  * Contains all the map canvas logic and interacts with shared selection state
  */
-const MapCanvasContent = ({ mapData, onCellsChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onViewStateChange, onTextLabelSettingsChange, currentTool, selectedObjectType, selectedColor, isColorPickerOpen, customColors, onAddCustomColor, onDeleteCustomColor, isFocused, isAnimating, theme, isAlignmentMode, children }: MapCanvasContentProps): React.ReactElement => {
+const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onViewStateChange, onTextLabelSettingsChange, currentTool, selectedObjectType, selectedColor, isColorPickerOpen, customColors, onAddCustomColor, onDeleteCustomColor, isFocused, isAnimating, theme, isAlignmentMode, children }: MapCanvasContentProps): React.ReactElement => {
   const canvasRef = dc.useRef<HTMLCanvasElement | null>(null);
   const fogCanvasRef = dc.useRef<HTMLCanvasElement | null>(null);  // Separate canvas for fog blur effect (CSS blur for iOS compat)
   const containerRef = dc.useRef<HTMLDivElement | null>(null);
@@ -26844,6 +27526,8 @@ const MapCanvasContent = ({ mapData, onCellsChange, onObjectsChange, onTextLabel
     canvasRef,
     containerRef,
     mapData,
+    mapId,
+    notePath,
     geometry,
     currentTool,
     selectedColor,
@@ -26856,7 +27540,7 @@ const MapCanvasContent = ({ mapData, onCellsChange, onObjectsChange, onTextLabel
     // State change callbacks for layers
     onDrawingStateChange: handleDrawingStateChange,
     onPanZoomStateChange: handlePanZoomStateChange
-  }), [canvasRef, containerRef, mapData, geometry, currentTool, selectedColor,
+  }), [canvasRef, containerRef, mapData, mapId, notePath, geometry, currentTool, selectedColor,
     selectedObjectType, screenToGrid, screenToWorld, getClientCoords,
     handleDrawingStateChange, handlePanZoomStateChange]);
 
@@ -26949,9 +27633,11 @@ const MapCanvas = (props: MapCanvasProps): React.ReactElement => {
 
   return (
     <MapSelectionProvider layerVisibility={layerVisibility}>
-      <MapCanvasContent {...restProps}>
-        {children}
-      </MapCanvasContent>
+      <ObjectLinkingProvider>
+        <MapCanvasContent {...restProps}>
+          {children}
+        </MapCanvasContent>
+      </ObjectLinkingProvider>
     </MapSelectionProvider>
   );
 };
@@ -28599,6 +29285,58 @@ class WindroseMDSettingsPlugin extends Plugin {
       }
     });
     
+    // Register Obsidian protocol handler for deep links
+    // Format: obsidian://windrose?notePath|mapId,x,y,zoom,layerId
+    this.registerObsidianProtocolHandler('windrose', async (params) => {
+      // The data comes as URL search params - we need to parse the raw query
+      // params.action = 'windrose', and the rest is in the query string
+      const rawQuery = Object.keys(params).find(key => key.includes('|'));
+      if (!rawQuery) {
+        console.error('[Windrose] Invalid deep link format');
+        return;
+      }
+
+      const pipeIndex = rawQuery.indexOf('|');
+      if (pipeIndex === -1) {
+        console.error('[Windrose] Missing pipe separator in deep link');
+        return;
+      }
+
+      const notePath = rawQuery.slice(0, pipeIndex);
+      const coordData = rawQuery.slice(pipeIndex + 1);
+      const parts = coordData.split(',');
+
+      if (parts.length !== 5) {
+        console.error('[Windrose] Invalid coordinate data in deep link');
+        return;
+      }
+
+      const [mapId, x, y, zoom, layerId] = parts;
+
+      try {
+        // Remove .md extension if present for openLinkText
+        const linkPath = notePath.replace(/\\.md$/, '');
+        await this.app.workspace.openLinkText(linkPath, '', false);
+
+        // Small delay to let the note render before navigating
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('dmt-navigate-to', {
+            detail: {
+              mapId,
+              x: parseFloat(x),
+              y: parseFloat(y),
+              zoom: parseFloat(zoom),
+              layerId,
+              timestamp: Date.now()
+            }
+          }));
+        }, 100);
+      } catch (err) {
+        console.error('[Windrose] Failed to open note:', err);
+        new Notice('Failed to open map note');
+      }
+    });
+
     // Register command to generate a random dungeon
     this.addCommand({
       id: 'insert-random-dungeon',
@@ -34137,7 +34875,7 @@ const { RA_ICONS, RA_CATEGORIES } = await dc.require(dc.headerLink(dc.resolvePat
 const QUICK_SYMBOLS = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "settingsPlugin-quickSymbols"));
 
 /** Plugin version from template */
-const PACKAGED_PLUGIN_VERSION = '0.12.9';
+const PACKAGED_PLUGIN_VERSION = '0.13.3';
 
 /** LocalStorage keys for tracking user preferences */
 const STORAGE_KEYS = {
@@ -40030,11 +40768,22 @@ export interface LayerControlsProps {
   onLayerDelete: (layerId: string) => void;
   /** Callback to reorder a layer */
   onLayerReorder: (layerId: string, newIndex: number) => void;
+  /** Callback to toggle show layer below */
+  onToggleShowLayerBelow: (layerId: string) => void;
+  /** Callback to set layer below opacity */
+  onSetLayerBelowOpacity: (layerId: string, opacity: number) => void;
+  /** Callback to open layer edit modal */
+  onEditLayer: (layerId: string) => void;
   /** Whether object sidebar is collapsed */
   sidebarCollapsed: boolean;
   /** Whether the layer controls panel is open */
   isOpen?: boolean;
 }
+
+const { getIconInfo } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "rpgAwesomeIcons"));
+
+const LAYER_NAME_MAX_LENGTH = 25;
+const LAYER_NAME_TRUNCATE_AT = 22;
 
 const LayerControls = ({
   mapData,
@@ -40042,15 +40791,20 @@ const LayerControls = ({
   onLayerAdd,
   onLayerDelete,
   onLayerReorder,
+  onToggleShowLayerBelow,
+  onSetLayerBelowOpacity,
+  onEditLayer,
   sidebarCollapsed,
   isOpen = true
 }: LayerControlsProps): React.ReactElement => {
   const [expandedLayerId, setExpandedLayerId] = dc.useState<string | null>(null);
   const [dragState, setDragState] = dc.useState<DragState | null>(null);
   const [dragOverIndex, setDragOverIndex] = dc.useState<number | null>(null);
+  const [sliderHoveredLayerId, setSliderHoveredLayerId] = dc.useState<string | null>(null);
 
   const longPressTimerRef = dc.useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressTriggeredRef = dc.useRef(false);
+  const sliderHideTimeoutRef = dc.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const layers = getLayersOrdered(mapData) as MapLayer[];
   const reversedLayers = [...layers].reverse();
@@ -40166,8 +40920,76 @@ const LayerControls = ({
     setDragOverIndex(null);
   };
 
-  const getLayerDisplayNumber = (layer: MapLayer): number => {
-    return layer.order + 1;
+  const getLayerNumber = (layer: MapLayer): string => {
+    return String(layer.order + 1);
+  };
+
+  const isDefaultName = (layer: MapLayer): boolean => {
+    const num = getLayerNumber(layer);
+    return !layer.name || layer.name === num;
+  };
+
+  const getLayerDisplayName = (layer: MapLayer): string => {
+    if (isDefaultName(layer)) {
+      return getLayerNumber(layer);
+    }
+    return layer.name.length > LAYER_NAME_MAX_LENGTH
+      ? layer.name.slice(0, LAYER_NAME_TRUNCATE_AT) + '...'
+      : layer.name;
+  };
+
+  const shouldShowPill = (layer: MapLayer): boolean => {
+    return !isDefaultName(layer) || !!layer.icon;
+  };
+
+  const getLayerIcon = (layer: MapLayer): { char: string; isRpgAwesome: boolean } | null => {
+    if (!layer.icon) return null;
+    if (layer.icon.startsWith('ra-')) {
+      const info = getIconInfo(layer.icon);
+      return info ? { char: info.char, isRpgAwesome: true } : null;
+    }
+    return { char: layer.icon, isRpgAwesome: false };
+  };
+
+  const layerDisplayInfo = dc.useMemo(() => {
+    return new Map(layers.map(layer => [
+      layer.id,
+      {
+        isPill: shouldShowPill(layer),
+        icon: getLayerIcon(layer),
+        displayName: getLayerDisplayName(layer)
+      }
+    ]));
+  }, [layers]);
+
+  const handleEdit = (layerId: string, e: JSX.TargetedMouseEvent<HTMLButtonElement>): void => {
+    e.stopPropagation();
+    setExpandedLayerId(null);
+    onEditLayer(layerId);
+  };
+
+  const handleTransparencyToggle = (layerId: string, e: JSX.TargetedMouseEvent<HTMLButtonElement>): void => {
+    e.stopPropagation();
+    onToggleShowLayerBelow(layerId);
+  };
+
+  const handleOpacityChange = (layerId: string, e: JSX.TargetedEvent<HTMLInputElement>): void => {
+    const value = parseFloat((e.target as HTMLInputElement).value);
+    onSetLayerBelowOpacity(layerId, value);
+  };
+
+  const handleSliderAreaEnter = (layerId: string): void => {
+    if (sliderHideTimeoutRef.current) {
+      clearTimeout(sliderHideTimeoutRef.current);
+      sliderHideTimeoutRef.current = null;
+    }
+    setSliderHoveredLayerId(layerId);
+  };
+
+  const handleSliderAreaLeave = (): void => {
+    sliderHideTimeoutRef.current = setTimeout(() => {
+      setSliderHoveredLayerId(null);
+    }, 150);
   };
 
   return (
@@ -40203,19 +41025,36 @@ const LayerControls = ({
               onDrop={(e) => handleDrop(visualIndex, e)}
               onDragEnd={handleDragEnd}
             >
-              <button
-                className={`dmt-layer-btn ${isActive ? 'dmt-layer-btn-active' : ''} ${isDragging ? 'dragging' : ''} ${isDragOver ? 'drag-over' : ''}`}
-                onClick={(e) => handleLayerClick(layer.id, e)}
-                onContextMenu={(e) => handleContextMenu(layer.id, e)}
-                onTouchStart={() => handleTouchStart(layer.id)}
-                onTouchEnd={handleTouchEnd}
-                onTouchCancel={handleTouchEnd}
-                title={`${layer.name}${isActive ? ' (active)' : ''} - Right-click for options`}
-              >
-                {getLayerDisplayNumber(layer)}
-              </button>
+              {(() => {
+                const info = layerDisplayInfo.get(layer.id)!;
+                return (
+                  <button
+                    className={`dmt-layer-btn ${info.isPill ? 'dmt-layer-btn-pill' : ''} ${isActive ? 'dmt-layer-btn-active' : ''} ${isDragging ? 'dragging' : ''} ${isDragOver ? 'drag-over' : ''}`}
+                    onClick={(e) => handleLayerClick(layer.id, e)}
+                    onContextMenu={(e) => handleContextMenu(layer.id, e)}
+                    onTouchStart={() => handleTouchStart(layer.id)}
+                    onTouchEnd={handleTouchEnd}
+                    onTouchCancel={handleTouchEnd}
+                    title={`${layer.name}${isActive ? ' (active)' : ''} - Right-click for options`}
+                  >
+                    {info.icon && (
+                      <span className={`dmt-layer-icon ${info.icon.isRpgAwesome ? 'ra' : ''}`}>
+                        {info.icon.char}
+                      </span>
+                    )}
+                    <span className="dmt-layer-name">{info.displayName}</span>
+                  </button>
+                );
+              })()}
 
               <div className={`dmt-layer-options ${isExpanded ? 'expanded' : ''}`}>
+                <button
+                  className="dmt-layer-option-btn edit"
+                  onClick={(e) => handleEdit(layer.id, e)}
+                  title="Edit layer"
+                >
+                  <dc.Icon icon="lucide-pencil" />
+                </button>
                 {canDelete && (
                   <button
                     className="dmt-layer-option-btn delete"
@@ -40225,6 +41064,39 @@ const LayerControls = ({
                     <dc.Icon icon="lucide-trash-2" />
                   </button>
                 )}
+                <div
+                  className="dmt-layer-transparency-wrapper"
+                  onMouseEnter={() => handleSliderAreaEnter(layer.id)}
+                  onMouseLeave={handleSliderAreaLeave}
+                >
+                  <button
+                    className={`dmt-layer-option-btn transparency ${layer.showLayerBelow ? 'active' : ''}`}
+                    onClick={(e) => handleTransparencyToggle(layer.id, e)}
+                    title={layer.showLayerBelow ? 'Hide layer below' : 'Show layer below'}
+                  >
+                    <dc.Icon icon="lucide-layers" />
+                  </button>
+                  {sliderHoveredLayerId === layer.id && layer.showLayerBelow && (
+                    <div
+                      className="dmt-opacity-slider-popup"
+                      onMouseEnter={() => handleSliderAreaEnter(layer.id)}
+                      onMouseLeave={handleSliderAreaLeave}
+                    >
+                      <input
+                        type="range"
+                        min="0.1"
+                        max="0.5"
+                        step="0.05"
+                        value={layer.layerBelowOpacity ?? 0.25}
+                        onChange={(e) => handleOpacityChange(layer.id, e)}
+                        className="dmt-opacity-slider"
+                      />
+                      <span className="dmt-opacity-value">
+                        {Math.round((layer.layerBelowOpacity ?? 0.25) * 100)}%
+                      </span>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           );
@@ -40243,6 +41115,327 @@ const LayerControls = ({
 };
 
 return { LayerControls };
+
+```
+
+# LayerEditModal
+
+```tsx
+/**
+ * LayerEditModal.tsx
+ */
+
+import type { JSX } from 'preact';
+import type { MapLayer } from '#types/core/map.types';
+import type { IconWithClass, IconMap, IconCategory } from '#types/objects/icon.types';
+
+const {
+  RA_CATEGORIES,
+  RA_ICONS,
+  getIconInfo,
+  getIconsByCategory,
+  searchIcons
+} = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "rpgAwesomeIcons")) as {
+  RA_CATEGORIES: IconCategory[];
+  RA_ICONS: IconMap;
+  getIconInfo: (iconClass: string) => { char: string; label: string; category: string } | null;
+  getIconsByCategory: (categoryId: string) => IconWithClass[];
+  searchIcons: (query: string) => IconWithClass[];
+};
+
+const LAYER_NAME_MAX_LENGTH = 25;
+const LAYER_NAME_TRUNCATE_AT = 22;
+const ICON_GRID_MAX_VISIBLE = 100;
+
+const QUICK_SYMBOLS = [
+  '1', '2', '3', '4', '5', '6', '7', '8', '9',
+  '★', '☆', '●', '○', '◆', '◇', '■', '□',
+  '▲', '△', '▼', '▽', '⚔', '🏰', '⛪', '🗝',
+  '🚪', '⬆', '⬇', '🔥', '💧', '🌳', '⚡', '💀'
+];
+
+type IconMode = 'none' | 'symbol' | 'rpgawesome';
+
+/** Props for LayerEditModal */
+export interface LayerEditModalProps {
+  /** The layer being edited */
+  layer: MapLayer;
+  /** Default name to show when name matches layer order */
+  defaultName: string;
+  /** Callback when save is clicked */
+  onSave: (name: string, icon: string | null) => void;
+  /** Callback when modal is cancelled */
+  onCancel: () => void;
+}
+
+const LayerEditModal = ({
+  layer,
+  defaultName,
+  onSave,
+  onCancel
+}: LayerEditModalProps): React.ReactElement => {
+  const isDefaultLayerName = !layer.name || layer.name === defaultName;
+  const initialName = isDefaultLayerName ? '' : layer.name;
+  const initialIcon = layer.icon || null;
+  const initialMode: IconMode = initialIcon
+    ? (initialIcon.startsWith('ra-') ? 'rpgawesome' : 'symbol')
+    : 'none';
+
+  const [name, setName] = dc.useState(initialName);
+  const [iconMode, setIconMode] = dc.useState<IconMode>(initialMode);
+  const [symbol, setSymbol] = dc.useState(
+    initialIcon && !initialIcon.startsWith('ra-') ? initialIcon : ''
+  );
+  const [iconClass, setIconClass] = dc.useState(
+    initialIcon && initialIcon.startsWith('ra-') ? initialIcon : ''
+  );
+  const [searchQuery, setSearchQuery] = dc.useState('');
+  const [iconCategory, setIconCategory] = dc.useState('all');
+
+  const nameInputRef = dc.useRef<HTMLInputElement>(null);
+
+  dc.useEffect(() => {
+    if (nameInputRef.current) {
+      nameInputRef.current.focus();
+      nameInputRef.current.select();
+    }
+  }, []);
+
+  const handleKeyDown = (e: JSX.TargetedKeyboardEvent<HTMLInputElement>): void => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleSave();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      onCancel();
+    }
+  };
+
+  const handleSave = (): void => {
+    // Read from input ref directly to avoid stale state when Enter is pressed quickly
+    const currentName = nameInputRef.current?.value ?? name;
+    const finalName = currentName.trim() || defaultName;
+    let finalIcon: string | null = null;
+
+    if (iconMode === 'symbol' && symbol) {
+      finalIcon = symbol;
+    } else if (iconMode === 'rpgawesome' && iconClass) {
+      finalIcon = iconClass;
+    }
+
+    onSave(finalName, finalIcon);
+  };
+
+  const handleModalClick = (e: JSX.TargetedMouseEvent<HTMLDivElement>): void => {
+    e.stopPropagation();
+  };
+
+  const getDisplayName = (): string => {
+    return name.trim() || defaultName;
+  };
+
+  const getDisplayIcon = (): string | null => {
+    if (iconMode === 'symbol' && symbol) return symbol;
+    if (iconMode === 'rpgawesome' && iconClass) {
+      const info = getIconInfo(iconClass);
+      return info?.char || null;
+    }
+    return null;
+  };
+
+  const filteredIcons = dc.useMemo((): IconWithClass[] => {
+    if (searchQuery.trim()) {
+      return searchIcons(searchQuery);
+    }
+    if (iconCategory === 'all') {
+      return Object.entries(RA_ICONS).map(([cls, data]) => ({
+        iconClass: cls,
+        ...data
+      }));
+    }
+    return getIconsByCategory(iconCategory);
+  }, [searchQuery, iconCategory]);
+
+  return (
+    <div className="dmt-modal-overlay" onMouseDown={onCancel}>
+      <div
+        className="dmt-modal-content dmt-layer-edit-modal"
+        onMouseDown={handleModalClick}
+      >
+        <h3 className="dmt-modal-title">Edit Layer</h3>
+
+        {/* Name input */}
+        <div className="dmt-layer-edit-section">
+          <label className="dmt-layer-edit-label">Name</label>
+          <input
+            ref={nameInputRef}
+            type="text"
+            className="dmt-modal-input"
+            value={name}
+            onChange={(e) => setName((e.target as HTMLInputElement).value)}
+            onKeyDown={handleKeyDown}
+            placeholder={defaultName}
+          />
+        </div>
+
+        {/* Icon mode toggle */}
+        <div className="dmt-layer-edit-section">
+          <label className="dmt-layer-edit-label">Icon (optional)</label>
+          <div className="dmt-icon-mode-toggle">
+            <button
+              type="button"
+              className={`dmt-icon-mode-btn ${iconMode === 'none' ? 'active' : ''}`}
+              onClick={() => setIconMode('none')}
+            >
+              None
+            </button>
+            <button
+              type="button"
+              className={`dmt-icon-mode-btn ${iconMode === 'symbol' ? 'active' : ''}`}
+              onClick={() => setIconMode('symbol')}
+            >
+              Symbol
+            </button>
+            <button
+              type="button"
+              className={`dmt-icon-mode-btn ${iconMode === 'rpgawesome' ? 'active' : ''}`}
+              onClick={() => setIconMode('rpgawesome')}
+            >
+              RPGAwesome
+            </button>
+          </div>
+        </div>
+
+        {/* Symbol picker */}
+        {iconMode === 'symbol' && (
+          <div className="dmt-layer-edit-section">
+            <div className="dmt-symbol-input-row">
+              <input
+                type="text"
+                className="dmt-symbol-input"
+                value={symbol}
+                onChange={(e) => setSymbol((e.target as HTMLInputElement).value)}
+                placeholder="Type or select..."
+                maxLength={8}
+              />
+              <div className="dmt-symbol-preview">
+                {symbol || '?'}
+              </div>
+            </div>
+            <div className="dmt-quick-symbols-grid">
+              {QUICK_SYMBOLS.map((sym) => (
+                <button
+                  key={sym}
+                  type="button"
+                  className={`dmt-quick-symbol-btn ${symbol === sym ? 'selected' : ''}`}
+                  onClick={() => setSymbol(sym)}
+                >
+                  {sym}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* RPGAwesome picker */}
+        {iconMode === 'rpgawesome' && (
+          <div className="dmt-layer-edit-section dmt-icon-picker">
+            <input
+              type="text"
+              className="dmt-icon-search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery((e.target as HTMLInputElement).value)}
+              placeholder="Search icons..."
+            />
+            <div className="dmt-icon-category-tabs">
+              <button
+                type="button"
+                className={`dmt-icon-category-tab ${iconCategory === 'all' ? 'active' : ''}`}
+                onClick={() => setIconCategory('all')}
+              >
+                All
+              </button>
+              {RA_CATEGORIES.map((cat: { id: string; label: string }) => (
+                <button
+                  key={cat.id}
+                  type="button"
+                  className={`dmt-icon-category-tab ${iconCategory === cat.id ? 'active' : ''}`}
+                  onClick={() => setIconCategory(cat.id)}
+                >
+                  {cat.label}
+                </button>
+              ))}
+            </div>
+            <div className="dmt-icon-grid">
+              {filteredIcons.slice(0, ICON_GRID_MAX_VISIBLE).map((icon) => (
+                <button
+                  key={icon.iconClass}
+                  type="button"
+                  className={`dmt-icon-grid-btn ${iconClass === icon.iconClass ? 'selected' : ''}`}
+                  onClick={() => setIconClass(icon.iconClass)}
+                  title={icon.label}
+                >
+                  <span className="ra">{icon.char}</span>
+                </button>
+              ))}
+              {filteredIcons.length > ICON_GRID_MAX_VISIBLE && (
+                <div className="dmt-icon-grid-more">
+                  +{filteredIcons.length - ICON_GRID_MAX_VISIBLE} more...
+                </div>
+              )}
+              {filteredIcons.length === 0 && (
+                <div className="dmt-icon-grid-empty">No icons found</div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Preview */}
+        <div className="dmt-layer-edit-section">
+          <label className="dmt-layer-edit-label">Preview</label>
+          <div className="dmt-layer-preview">
+            <div className={`dmt-layer-preview-btn ${getDisplayIcon() || getDisplayName().length > 2 ? 'pill' : ''}`}>
+              {getDisplayIcon() && (
+                <span className={iconMode === 'rpgawesome' ? 'ra dmt-layer-preview-icon' : 'dmt-layer-preview-icon'}>
+                  {getDisplayIcon()}
+                </span>
+              )}
+              <span className="dmt-layer-preview-name">
+                {getDisplayName().length > LAYER_NAME_MAX_LENGTH
+                  ? getDisplayName().slice(0, LAYER_NAME_TRUNCATE_AT) + '...'
+                  : getDisplayName()}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Buttons */}
+        <div className="dmt-modal-buttons">
+          <button
+            type="button"
+            className="dmt-modal-btn dmt-modal-btn-cancel"
+            onClick={onCancel}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="dmt-modal-btn dmt-modal-btn-submit"
+            onClick={handleSave}
+          >
+            Save
+          </button>
+        </div>
+
+        <div className="dmt-modal-hint">
+          Press Enter to save, Esc to cancel
+        </div>
+      </div>
+    </div>
+  );
+};
+
+return { LayerEditModal };
 
 ```
 
@@ -40410,6 +41603,7 @@ import type {
   BackgroundImage,
   UIPreferences,
   MapSettings,
+  ObjectLink,
 } from '#types/index';
 import type { ResolvedTheme } from '#types/settings/settings.types';
 
@@ -40446,8 +41640,9 @@ const { axialToOffset, isWithinOffsetBounds } = await dc.require(dc.headerLink(d
 const { ImageAlignmentMode } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "ImageAlignmentMode"));
 const { ModalPortal } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "ModalPortal"));
 
-const { getActiveLayer } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "layerAccessor"));
+const { getActiveLayer, getLayerById } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "layerAccessor"));
 const { LayerControls } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "LayerControls"));
+const { LayerEditModal } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "LayerEditModal"));
 
 // RPGAwesome icon font support
 const { RA_ICONS } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "rpgAwesomeIcons"));
@@ -40546,6 +41741,10 @@ const CornerBracket = ({ position }: CornerBracketProps): React.ReactElement => 
 const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'grid' }: DungeonMapTrackerProps): React.ReactElement => {
   const { mapData, isLoading, saveStatus, updateMapData, forceSave, fowImageReady } = useMapData(mapId, mapName, mapType);
 
+  // Get current file path for deep linking
+  const currentFile = dc.useCurrentFile();
+  const notePath = currentFile?.$path || '';
+
   // Tool and color state (extracted to useToolState hook)
   const {
     currentTool, setCurrentTool,
@@ -40565,6 +41764,10 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   const [showSettingsModal, setShowSettingsModal] = dc.useState(false);
   const [showVisibilityToolbar, setShowVisibilityToolbar] = dc.useState(false);
   const [showLayerPanel, setShowLayerPanel] = dc.useState(false);
+  const [editingLayerId, setEditingLayerId] = dc.useState<string | null>(null);
+const editingLayer = dc.useMemo(() => {
+    return editingLayerId ? getLayerById(mapData, editingLayerId) : null;
+  }, [editingLayerId, mapData]);
 
   // Image alignment mode state
   const [isAlignmentMode, setIsAlignmentMode] = dc.useState(false);
@@ -40772,6 +41975,9 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     handleLayerAdd,
     handleLayerDelete,
     handleLayerReorder,
+    handleToggleShowLayerBelow,
+    handleSetLayerBelowOpacity,
+    handleUpdateLayerDisplay,
     // History state
     canUndo,
     canRedo,
@@ -40782,6 +41988,95 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     addToHistory,
     isApplyingHistory
   } = useLayerHistory({ mapData, updateMapData, isLoading });
+
+  // Listen for deep link navigation events
+  dc.useEffect(() => {
+    const handleNavigateTo = (event: CustomEvent): void => {
+      const { mapId: targetMapId, x, y, zoom, layerId } = event.detail;
+
+      // Only respond if this is our map
+      if (targetMapId !== mapId) return;
+
+      // Switch to target layer if it exists and is different
+      if (mapData?.layers && layerId) {
+        const targetLayer = mapData.layers.find((l: { id: string }) => l.id === layerId);
+        if (targetLayer && mapData.activeLayerId !== layerId) {
+          handleLayerSelect(layerId);
+        }
+      }
+
+      // Navigate to a comfortable viewing zoom regardless of what the link stored
+      const DEEP_LINK_ZOOM = 1.175;
+      updateMapData((currentMapData: MapData) => ({
+        ...currentMapData,
+        viewState: {
+          ...currentMapData.viewState,
+          center: { x, y },
+          zoom: DEEP_LINK_ZOOM
+        }
+      }));
+
+      new Notice(`Navigated to location on ${mapData?.name || 'map'}`);
+    };
+
+    window.addEventListener('dmt-navigate-to', handleNavigateTo as EventListener);
+
+    return () => {
+      window.removeEventListener('dmt-navigate-to', handleNavigateTo as EventListener);
+    };
+  }, [mapId, mapData, updateMapData, handleLayerSelect]);
+
+  // Listen for cross-layer object link events
+  dc.useEffect(() => {
+    type LinkUpdate = { layerId: string; objectId: string; link?: ObjectLink };
+
+    const updateObjectLinksAcrossLayers = (updates: LinkUpdate[]): void => {
+      updateMapData((currentMapData: MapData) => ({
+        ...currentMapData,
+        layers: currentMapData.layers.map((layer: { id: string; objects?: MapObject[] }) => {
+          const layerUpdates = updates.filter(u => u.layerId === layer.id);
+          if (layerUpdates.length === 0 || !layer.objects) return layer;
+
+          return {
+            ...layer,
+            objects: layer.objects.map((obj: MapObject) => {
+              const update = layerUpdates.find(u => u.objectId === obj.id);
+              if (!update) return obj;
+              if (update.link !== undefined) {
+                return { ...obj, linkedObject: update.link };
+              }
+              const { linkedObject: _removed, ...rest } = obj;
+              return rest as MapObject;
+            })
+          };
+        })
+      }));
+    };
+
+    const handleCreateObjectLink = (event: CustomEvent): void => {
+      const { sourceLayerId, sourceObjectId, sourceLink, targetLayerId, targetObjectId, targetLink } = event.detail;
+      updateObjectLinksAcrossLayers([
+        { layerId: sourceLayerId, objectId: sourceObjectId, link: sourceLink },
+        { layerId: targetLayerId, objectId: targetObjectId, link: targetLink }
+      ]);
+    };
+
+    const handleRemoveObjectLink = (event: CustomEvent): void => {
+      const { sourceLayerId, sourceObjectId, targetLayerId, targetObjectId } = event.detail;
+      updateObjectLinksAcrossLayers([
+        { layerId: sourceLayerId, objectId: sourceObjectId },
+        { layerId: targetLayerId, objectId: targetObjectId }
+      ]);
+    };
+
+    window.addEventListener('dmt-create-object-link', handleCreateObjectLink as EventListener);
+    window.addEventListener('dmt-remove-object-link', handleRemoveObjectLink as EventListener);
+
+    return () => {
+      window.removeEventListener('dmt-create-object-link', handleCreateObjectLink as EventListener);
+      window.removeEventListener('dmt-remove-object-link', handleRemoveObjectLink as EventListener);
+    };
+  }, [updateMapData]);
 
   // Data change handlers (extracted to useDataHandlers hook)
   const {
@@ -41144,6 +42439,9 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
             onLayerAdd={handleLayerAdd}
             onLayerDelete={handleLayerDelete}
             onLayerReorder={handleLayerReorder}
+            onToggleShowLayerBelow={handleToggleShowLayerBelow}
+            onSetLayerBelowOpacity={handleSetLayerBelowOpacity}
+            onEditLayer={setEditingLayerId}
             sidebarCollapsed={mapData.sidebarCollapsed || false}
             isOpen={showLayerPanel}
           />
@@ -41152,6 +42450,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
           {/* This allows the compass to show and persist the north direction without actually rotating hex maps */}
           <div className="dmt-canvas-and-controls">
             <MapCanvas
+              mapId={mapId}
+              notePath={notePath}
               mapData={mapData.mapType === 'hex' ? { ...mapData, northDirection: 0 } : mapData}
               onCellsChange={handleCellsChange}
               onObjectsChange={handleObjectsChange}
@@ -41301,6 +42601,21 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
             onApply={handleAlignmentApply}
             onCancel={handleAlignmentCancel}
           />
+        )}
+
+        
+        {editingLayer && (
+          <ModalPortal>
+            <LayerEditModal
+              layer={editingLayer}
+              defaultName={String(editingLayer.order + 1)}
+              onSave={(name, icon) => {
+                handleUpdateLayerDisplay(editingLayerId!, name, icon);
+                setEditingLayerId(null);
+              }}
+              onCancel={() => setEditingLayerId(null)}
+            />
+          </ModalPortal>
         )}
       </div>
     </>
@@ -42486,7 +43801,8 @@ button.dmt-orientation-btn,
 /* Selection Toolbar */
 .dmt-selection-toolbar {
   display: flex;
-  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: 4px;
   padding: 0;
   z-index: 150;
@@ -42588,12 +43904,62 @@ button.dmt-orientation-btn,
   pointer-events: auto;  /* Changed: We handle clicks in JS now */
   overflow: hidden;
   cursor: default;  /* Show default cursor instead of pointer */
-  
+
   /* Hide dc.Link text visually but keep it functional for hover */
   & > * {
     color: transparent !important;
     text-indent: -9999px !important;
   }
+}
+
+/* Linking mode banner */
+.dmt-linking-banner {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 200;
+  pointer-events: auto;
+}
+
+.dmt-linking-banner-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  padding: 8px 12px;
+  border-radius: 6px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.dmt-linking-banner-content svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.dmt-linking-banner-cancel {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: inherit;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  margin-left: 4px;
+}
+
+.dmt-linking-banner-cancel:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* Active state for linked object button */
+.dmt-toolbar-button-active {
+  background-color: var(--interactive-accent) !important;
+  color: var(--text-on-accent) !important;
 }
 
 /* ============================================
@@ -44310,36 +45676,22 @@ button.dmt-fow-tool-btn,
   max-height: calc(100% - 80px);
   overflow-y: auto;
   overscroll-behavior: contain;
-  /* Padding for slide-out options menu (so it doesn't get clipped) */
-  padding-right: 40px;
-  margin-right: -40px;
-  /* Custom scrollbar styling */
-  scrollbar-width: thin;
-  scrollbar-color: rgba(196, 165, 123, 0.4) transparent;
+  /* Padding for slide-out options menu and slider popup */
+  padding-right: 200px;
+  margin-right: -200px;
+  /* Hide scrollbar but keep scroll functionality */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.dmt-layer-controls::-webkit-scrollbar {
+  display: none;
 }
 
 .dmt-layer-controls.dmt-layer-controls-open {
   opacity: 1;
   transform: translateY(-50%) translateX(0);
   pointer-events: auto;
-}
-
-/* Webkit scrollbar styling for layer controls */
-.dmt-layer-controls::-webkit-scrollbar {
-  width: 4px;
-}
-
-.dmt-layer-controls::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.dmt-layer-controls::-webkit-scrollbar-thumb {
-  background: rgba(196, 165, 123, 0.4);
-  border-radius: 2px;
-}
-
-.dmt-layer-controls::-webkit-scrollbar-thumb:hover {
-  background: rgba(196, 165, 123, 0.6);
 }
 
 .dmt-layer-controls.sidebar-open {
@@ -44355,6 +45707,7 @@ button.dmt-fow-tool-btn,
   position: relative;
   display: flex;
   align-items: center;
+  width: fit-content;
 }
 
 /* Layer Button */
@@ -44454,6 +45807,84 @@ button.dmt-layer-option-btn {
   background: rgba(231, 76, 60, 0.1);
 }
 
+/* Layer Transparency Toggle */
+.dmt-layer-transparency-wrapper {
+  position: relative;
+}
+
+.dmt-layer-option-btn.transparency.active {
+  color: #4a9eff;
+  border-color: #4a9eff;
+  background: rgba(74, 158, 255, 0.15);
+  box-shadow: 0 0 8px rgba(74, 158, 255, 0.4);
+}
+
+.dmt-layer-option-btn.transparency:hover {
+  color: #4a9eff;
+  border-color: rgba(74, 158, 255, 0.6);
+}
+
+.dmt-opacity-slider-popup {
+  position: absolute;
+  left: calc(100% + 8px);
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(20, 20, 20, 0.95);
+  border: 1px solid rgba(196, 165, 123, 0.4);
+  border-radius: 6px;
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  z-index: 200;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  white-space: nowrap;
+}
+
+.dmt-opacity-slider-popup::before {
+  content: '';
+  position: absolute;
+  right: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 6px solid transparent;
+  border-right-color: rgba(196, 165, 123, 0.4);
+}
+
+.dmt-opacity-slider {
+  width: 70px;
+  height: 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.dmt-opacity-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  background: #4a9eff;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.dmt-opacity-slider::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  background: #4a9eff;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+}
+
+.dmt-opacity-value {
+  color: var(--dmt-text-muted);
+  font-size: 11px;
+}
+
 /* Add Layer Button */
 .is-tablet button.dmt-layer-add-btn,
 button.dmt-layer-add-btn {
@@ -44501,6 +45932,314 @@ button.dmt-layer-add-btn {
   border-color: #c4a57b;
   transform: scale(1.05);
   box-shadow: 0 0 12px rgba(196, 165, 123, 0.5);
+}
+
+/* Layer Button - Pill Mode (for named layers) */
+.is-tablet button.dmt-layer-btn.dmt-layer-btn-pill,
+button.dmt-layer-btn.dmt-layer-btn-pill {
+  width: auto;
+  max-width: 180px;
+  min-width: 35px;
+  border-radius: 17.5px;
+  padding: 0 12px;
+  gap: 4px;
+}
+
+.dmt-layer-icon {
+  font-size: 14px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.dmt-layer-icon.ra {
+  font-family: 'rpgawesome' !important;
+  font-style: normal;
+  -webkit-font-feature-settings: normal;
+  font-feature-settings: normal;
+  font-variant: normal;
+  text-transform: none;
+  line-height: 1;
+  -webkit-font-smoothing: antialiased;
+}
+
+.dmt-layer-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Edit button styling */
+.dmt-layer-option-btn.edit:hover {
+  color: #4a9eff;
+  border-color: #4a9eff;
+  background: rgba(74, 158, 255, 0.1);
+}
+
+/* ==========================================================================
+   LAYER EDIT MODAL
+   ========================================================================== */
+
+.dmt-layer-edit-modal {
+  max-width: 400px;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.dmt-layer-edit-section {
+  margin-bottom: 16px;
+}
+
+.dmt-layer-edit-label {
+  display: block;
+  font-size: 12px;
+  color: var(--dmt-text-muted);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Icon mode toggle */
+.dmt-icon-mode-toggle {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.dmt-icon-mode-btn {
+  flex: 1;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(196, 165, 123, 0.3);
+  border-radius: 4px;
+  color: var(--dmt-text-muted);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.dmt-icon-mode-btn:hover {
+  border-color: rgba(196, 165, 123, 0.5);
+  color: var(--dmt-text-normal);
+}
+
+.dmt-icon-mode-btn.active {
+  background: rgba(196, 165, 123, 0.2);
+  border-color: #c4a57b;
+  color: var(--dmt-text-primary);
+}
+
+/* Symbol picker */
+.dmt-symbol-input-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.dmt-symbol-input {
+  flex: 1;
+  padding: 8px 12px;
+  font-size: 16px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(196, 165, 123, 0.3);
+  border-radius: 4px;
+  color: var(--dmt-text-primary);
+}
+
+.dmt-symbol-input:focus {
+  outline: none;
+  border-color: #c4a57b;
+}
+
+.dmt-symbol-preview {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(196, 165, 123, 0.3);
+  border-radius: 4px;
+  font-size: 20px;
+}
+
+.dmt-quick-symbols-grid {
+  display: grid;
+  grid-template-columns: repeat(9, 1fr);
+  gap: 4px;
+}
+
+.dmt-quick-symbol-btn {
+  width: 100%;
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(196, 165, 123, 0.2);
+  border-radius: 4px;
+  font-size: 14px;
+  color: var(--dmt-text-normal);
+  cursor: pointer;
+  transition: all 0.1s ease;
+}
+
+.dmt-quick-symbol-btn:hover {
+  background: rgba(196, 165, 123, 0.15);
+  border-color: rgba(196, 165, 123, 0.4);
+}
+
+.dmt-quick-symbol-btn.selected {
+  background: rgba(196, 165, 123, 0.25);
+  border-color: #c4a57b;
+}
+
+/* Icon picker */
+.dmt-icon-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dmt-icon-search {
+  width: 100%;
+  padding: 8px 12px;
+  font-size: 13px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(196, 165, 123, 0.3);
+  border-radius: 4px;
+  color: var(--dmt-text-primary);
+}
+
+.dmt-icon-search:focus {
+  outline: none;
+  border-color: #c4a57b;
+}
+
+.dmt-icon-category-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.dmt-icon-category-tab {
+  padding: 4px 8px;
+  font-size: 10px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(196, 165, 123, 0.2);
+  border-radius: 3px;
+  color: var(--dmt-text-muted);
+  cursor: pointer;
+  transition: all 0.1s ease;
+}
+
+.dmt-icon-category-tab:hover {
+  border-color: rgba(196, 165, 123, 0.4);
+  color: var(--dmt-text-normal);
+}
+
+.dmt-icon-category-tab.active {
+  background: rgba(196, 165, 123, 0.2);
+  border-color: #c4a57b;
+  color: var(--dmt-text-primary);
+}
+
+.dmt-icon-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 4px;
+  max-height: 180px;
+  overflow-y: auto;
+  padding: 4px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+}
+
+.dmt-icon-grid-btn {
+  width: 100%;
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.1s ease;
+}
+
+.dmt-icon-grid-btn .ra {
+  font-size: 16px;
+  color: var(--dmt-text-normal);
+}
+
+.dmt-icon-grid-btn:hover {
+  background: rgba(196, 165, 123, 0.15);
+  border-color: rgba(196, 165, 123, 0.3);
+}
+
+.dmt-icon-grid-btn.selected {
+  background: rgba(196, 165, 123, 0.25);
+  border-color: #c4a57b;
+}
+
+.dmt-icon-grid-more {
+  grid-column: 1 / -1;
+  text-align: center;
+  font-size: 11px;
+  color: var(--dmt-text-muted);
+  padding: 8px;
+}
+
+.dmt-icon-grid-empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  font-size: 12px;
+  color: var(--dmt-text-muted);
+  padding: 16px;
+}
+
+/* Layer preview */
+.dmt-layer-preview {
+  display: flex;
+  justify-content: center;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 6px;
+}
+
+.dmt-layer-preview-btn {
+  min-width: 35px;
+  height: 35px;
+  padding: 0 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  background: rgba(0, 0, 0, 0.7);
+  border: 2px solid rgba(196, 165, 123, 0.6);
+  border-radius: 17.5px;
+  color: var(--dmt-text-primary);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.dmt-layer-preview-btn:not(.pill) {
+  width: 35px;
+  border-radius: 50%;
+  padding: 0;
+}
+
+.dmt-layer-preview-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.dmt-layer-preview-icon.ra {
+  font-family: 'rpgawesome' !important;
+}
+
+.dmt-layer-preview-name {
+  white-space: nowrap;
 }
 
 /* ==========================================================================
