@@ -69,6 +69,7 @@ const MODULE_MAP: Record<string, string> = {
   // Renderers
   'badgeRenderer.ts': './geometry/badgeRenderer.ts',
   'textLabelRenderer.ts': './geometry/textLabelRenderer.ts',
+  'backgroundRenderer.ts': './geometry/backgroundRenderer.ts',
 };
 
 export function datacoreTransformer(options: TransformOptions = {}): Plugin {
