@@ -65,6 +65,9 @@ const { getFogSettings, renderFog } = await requireModuleByName("fogRenderer.ts"
 const { renderObjects } = await requireModuleByName("objectRenderer.ts") as {
   renderObjects: (layer: MapLayer, context: { ctx: CanvasRenderingContext2D; offsetX: number; offsetY: number; zoom: number; scaledSize: number }, geometry: IGeometry, isHexMap: boolean, orientation: string, deps: { getObjectType: typeof getObjectType; getRenderChar: typeof getRenderChar; isCellFogged: typeof isCellFogged; getObjectsInCell: typeof getObjectsInCell; getSlotOffset: typeof getSlotOffset; getMultiObjectScale: typeof getMultiObjectScale; renderNoteLinkBadge: typeof renderNoteLinkBadge; renderTooltipIndicator: typeof renderTooltipIndicator; renderObjectLinkIndicator: typeof renderObjectLinkIndicator }) => void;
 };
+const { renderSelections } = await requireModuleByName("selectionRenderer.ts") as {
+  renderSelections: (selectedItems: RendererSelectedItem[], textLabels: TextLabel[] | undefined, objects: MapObject[] | undefined, context: { ctx: CanvasRenderingContext2D; offsetX: number; offsetY: number; zoom: number; scaledSize: number }, geometry: IGeometry, hexGeometry: { hexToWorld: (q: number, r: number) => { worldX: number; worldY: number } } | null, isHexMap: boolean, isResizeMode: boolean, orientation: string, showCoordinates: boolean, visibility: { textLabels?: boolean; objects?: boolean }, deps: { getFontCss: typeof getFontCss; getObjectsInCell: typeof getObjectsInCell; getSlotOffset: typeof getSlotOffset; getMultiObjectScale: typeof getMultiObjectScale }) => void;
+};
 const { getFontCss } = await requireModuleByName("fontOptions.ts") as {
   getFontCss: (fontFace: string) => string;
 };
@@ -405,156 +408,28 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
     );
   }
 
-  // Draw selection indicators for text labels
-  const selectedTextLabels = itemsArray.filter(item => item.type === 'text');
-  if (selectedTextLabels.length > 0 && activeLayer.textLabels && !showCoordinates && visibility.textLabels) {
-    for (const selectedItem of selectedTextLabels) {
-      const label = activeLayer.textLabels.find(l => l.id === selectedItem.id);
-      if (label) {
-        ctx.save();
-
-        const { screenX, screenY } = geometry.worldToScreen(label.position.x, label.position.y, offsetX, offsetY, zoom);
-
-        ctx.translate(screenX, screenY);
-        ctx.rotate(((label.rotation || 0) * Math.PI) / 180);
-
-        const fontSize = label.fontSize * zoom;
-        const fontFamily = getFontCss(label.fontFace || 'sans');
-        ctx.font = `${fontSize}px ${fontFamily}`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        const metrics = ctx.measureText(label.content);
-        const textWidth = metrics.width;
-        const textHeight = fontSize * 1.2;
-
-        ctx.strokeStyle = '#4a9eff';
-        ctx.lineWidth = 2;
-        ctx.setLineDash([5, 3]);
-        ctx.strokeRect(-textWidth/2 - 4, -textHeight/2 - 2, textWidth + 8, textHeight + 4);
-
-        ctx.setLineDash([]);
-        ctx.fillStyle = '#4a9eff';
-        const handleSize = 6;
-
-        ctx.fillRect(-textWidth/2 - 4 - handleSize/2, -textHeight/2 - 2 - handleSize/2, handleSize, handleSize);
-        ctx.fillRect(textWidth/2 + 4 - handleSize/2, -textHeight/2 - 2 - handleSize/2, handleSize, handleSize);
-        ctx.fillRect(-textWidth/2 - 4 - handleSize/2, textHeight/2 + 2 - handleSize/2, handleSize, handleSize);
-        ctx.fillRect(textWidth/2 + 4 - handleSize/2, textHeight/2 + 2 - handleSize/2, handleSize, handleSize);
-
-        ctx.restore();
-      }
+  // Draw selection indicators
+  const isHexMapForSelection = geometry instanceof HexGeometry;
+  const hexGeomForSelection = isHexMapForSelection ? geometry as InstanceType<typeof HexGeometry> : null;
+  renderSelections(
+    itemsArray,
+    activeLayer.textLabels,
+    activeLayer.objects,
+    { ctx, offsetX, offsetY, zoom, scaledSize },
+    geometry,
+    hexGeomForSelection,
+    isHexMapForSelection,
+    isResizeMode,
+    mapData.orientation || 'flat',
+    showCoordinates,
+    visibility,
+    {
+      getFontCss,
+      getObjectsInCell,
+      getSlotOffset,
+      getMultiObjectScale,
     }
-  }
-
-  // Draw selection indicators for objects
-  const selectedObjects = itemsArray.filter(item => item.type === 'object');
-  if (selectedObjects.length > 0 && activeLayer.objects && !showCoordinates && visibility.objects) {
-    const showResizeOverlay = isResizeMode && selectedObjects.length === 1;
-
-    for (const selectedItem of selectedObjects) {
-      const object = activeLayer.objects.find(obj => obj.id === selectedItem.id);
-      if (object) {
-        const size = object.size || { width: 1, height: 1 };
-        const alignment = object.alignment || 'center';
-
-        let screenX: number, screenY: number, objectWidth: number, objectHeight: number, cellWidth: number, cellHeight: number;
-
-        if (geometry instanceof HexGeometry) {
-          const hexGeom = geometry as InstanceType<typeof HexGeometry>;
-          const { worldX, worldY } = hexGeom.hexToWorld(object.position.x, object.position.y);
-
-          const cellObjects = getObjectsInCell(activeLayer.objects, object.position.x, object.position.y);
-          const objectCount = cellObjects.length;
-
-          objectWidth = size.width * scaledSize;
-          objectHeight = size.height * scaledSize;
-          cellWidth = scaledSize;
-          cellHeight = scaledSize;
-
-          if (objectCount > 1) {
-            const multiScale = getMultiObjectScale(objectCount);
-            objectWidth *= multiScale;
-            objectHeight *= multiScale;
-          }
-
-          let centerScreenX = offsetX + worldX * zoom;
-          let centerScreenY = offsetY + worldY * zoom;
-
-          if (objectCount > 1) {
-            const effectiveSlot = object.slot ?? cellObjects.findIndex(o => o.id === object.id);
-            const { offsetX: slotOffsetX, offsetY: slotOffsetY } = getSlotOffset(
-              effectiveSlot,
-              objectCount,
-              mapData.orientation || 'flat'
-            );
-            const hexWidth = scaledSize * 2;
-            centerScreenX += slotOffsetX * hexWidth;
-            centerScreenY += slotOffsetY * hexWidth;
-          }
-
-          if (alignment !== 'center') {
-            const halfCell = scaledSize / 2;
-            switch (alignment) {
-              case 'north': centerScreenY -= halfCell; break;
-              case 'south': centerScreenY += halfCell; break;
-              case 'east': centerScreenX += halfCell; break;
-              case 'west': centerScreenX -= halfCell; break;
-            }
-          }
-
-          screenX = centerScreenX - objectWidth / 2;
-          screenY = centerScreenY - objectHeight / 2;
-        } else {
-          const gridPos = geometry.gridToScreen(object.position.x, object.position.y, offsetX, offsetY, zoom);
-          screenX = gridPos.screenX;
-          screenY = gridPos.screenY;
-
-          if (alignment !== 'center') {
-            const halfCell = scaledSize / 2;
-            switch (alignment) {
-              case 'north': screenY -= halfCell; break;
-              case 'south': screenY += halfCell; break;
-              case 'east': screenX += halfCell; break;
-              case 'west': screenX -= halfCell; break;
-            }
-          }
-
-          objectWidth = size.width * scaledSize;
-          objectHeight = size.height * scaledSize;
-          cellWidth = scaledSize;
-          cellHeight = scaledSize;
-        }
-
-        // Draw occupied cells overlay in resize mode
-        if (showResizeOverlay) {
-          ctx.fillStyle = 'rgba(74, 158, 255, 0.15)';
-          for (let dx = 0; dx < size.width; dx++) {
-            for (let dy = 0; dy < size.height; dy++) {
-              const cellScreenX = screenX + dx * cellWidth;
-              const cellScreenY = screenY + dy * cellHeight;
-              ctx.fillRect(cellScreenX + 2, cellScreenY + 2, cellWidth - 4, cellHeight - 4);
-            }
-          }
-        }
-
-        // Draw selection rectangle
-        ctx.strokeStyle = '#4a9eff';
-        ctx.lineWidth = 2;
-        ctx.setLineDash([5, 3]);
-        ctx.strokeRect(screenX + 2, screenY + 2, objectWidth - 4, objectHeight - 4);
-
-        // Draw corner handles
-        ctx.setLineDash([]);
-        ctx.fillStyle = '#4a9eff';
-        const handleSize = showResizeOverlay ? 14 : 8;
-
-        ctx.fillRect(screenX + 2 - handleSize/2, screenY + 2 - handleSize/2, handleSize, handleSize);
-        ctx.fillRect(screenX + objectWidth - 2 - handleSize/2, screenY + 2 - handleSize/2, handleSize, handleSize);
-        ctx.fillRect(screenX + 2 - handleSize/2, screenY + objectHeight - 2 - handleSize/2, handleSize, handleSize);
-        ctx.fillRect(screenX + objectWidth - 2 - handleSize/2, screenY + objectHeight - 2 - handleSize/2, handleSize, handleSize);
-      }
-    }
-  }
+  );
 
   // Restore context
   ctx.restore();
