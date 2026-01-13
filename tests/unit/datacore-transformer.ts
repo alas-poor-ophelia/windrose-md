@@ -72,6 +72,7 @@ const MODULE_MAP: Record<string, string> = {
   'backgroundRenderer.ts': './geometry/backgroundRenderer.ts',
   'gridFogRenderer.ts': './geometry/gridFogRenderer.ts',
   'hexFogRenderer.ts': './geometry/hexFogRenderer.ts',
+  'fogRenderer.ts': './geometry/fogRenderer.ts',
 };
 
 export function datacoreTransformer(options: TransformOptions = {}): Plugin {
