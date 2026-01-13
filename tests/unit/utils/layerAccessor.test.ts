@@ -13,6 +13,7 @@ import {
   getLayersOrdered,
   getLayerById,
   getLayerIndex,
+  getLayerBelow,
   updateLayer,
   updateActiveLayer,
   setActiveLayer,
@@ -111,7 +112,7 @@ describe("layerAccessor", () => {
     it("returns legacy fallback for null mapData", () => {
       const active = getActiveLayer(null);
       expect(active.id).toBe("legacy");
-      expect(active.name).toBe("Layer 1");
+      expect(active.name).toBe("1");
     });
 
     it("returns legacy fallback for undefined mapData", () => {
@@ -166,6 +167,76 @@ describe("layerAccessor", () => {
     it("returns -1 when not found", () => {
       const mapData = createMapData([], "layer-1");
       expect(getLayerIndex(mapData, "nonexistent")).toBe(-1);
+    });
+  });
+
+  describe("getLayerBelow", () => {
+    it("returns layer with next lower order", () => {
+      const layer1 = createLayer("layer-1", "Floor 1", 0);
+      const layer2 = createLayer("layer-2", "Floor 2", 1);
+      const layer3 = createLayer("layer-3", "Floor 3", 2);
+      const mapData = createMapData([layer1, layer2, layer3], "layer-3");
+
+      const below = getLayerBelow(mapData, "layer-3");
+      expect(below?.id).toBe("layer-2");
+    });
+
+    it("returns closest layer below even with gaps in order", () => {
+      const layer1 = createLayer("layer-1", "Floor 1", 0);
+      const layer2 = createLayer("layer-2", "Floor 2", 5);
+      const layer3 = createLayer("layer-3", "Floor 3", 10);
+      const mapData = createMapData([layer1, layer2, layer3], "layer-3");
+
+      const below = getLayerBelow(mapData, "layer-3");
+      expect(below?.id).toBe("layer-2");
+    });
+
+    it("returns null for bottom layer", () => {
+      const layer1 = createLayer("layer-1", "Floor 1", 0);
+      const layer2 = createLayer("layer-2", "Floor 2", 1);
+      const mapData = createMapData([layer1, layer2], "layer-1");
+
+      const below = getLayerBelow(mapData, "layer-1");
+      expect(below).toBeNull();
+    });
+
+    it("returns null when layer not found", () => {
+      const layer1 = createLayer("layer-1", "Floor 1", 0);
+      const mapData = createMapData([layer1], "layer-1");
+
+      const below = getLayerBelow(mapData, "nonexistent");
+      expect(below).toBeNull();
+    });
+
+    it("returns null for null mapData", () => {
+      expect(getLayerBelow(null, "layer-1")).toBeNull();
+    });
+
+    it("returns null for undefined mapData", () => {
+      expect(getLayerBelow(undefined, "layer-1")).toBeNull();
+    });
+
+    it("returns null when no layers array", () => {
+      const mapData = { schemaVersion: 2 } as MapData;
+      expect(getLayerBelow(mapData, "layer-1")).toBeNull();
+    });
+
+    it("handles single layer correctly", () => {
+      const layer1 = createLayer("layer-1", "Only Layer", 0);
+      const mapData = createMapData([layer1], "layer-1");
+
+      expect(getLayerBelow(mapData, "layer-1")).toBeNull();
+    });
+
+    it("works correctly with layers stored in different order than order property", () => {
+      // Layers stored in array in different order than their order property
+      const layer3 = createLayer("layer-3", "Floor 3", 2);
+      const layer1 = createLayer("layer-1", "Floor 1", 0);
+      const layer2 = createLayer("layer-2", "Floor 2", 1);
+      const mapData = createMapData([layer3, layer1, layer2], "layer-2");
+
+      const below = getLayerBelow(mapData, "layer-2");
+      expect(below?.id).toBe("layer-1");
     });
   });
 
@@ -234,7 +305,7 @@ describe("layerAccessor", () => {
 
       expect(updated.layers).toHaveLength(2);
       expect(updated.layers[1].order).toBe(1);
-      expect(updated.layers[1].name).toBe("Layer 2");
+      expect(updated.layers[1].name).toBe("2");
     });
 
     it("auto-switches to new layer", () => {

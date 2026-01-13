@@ -9,8 +9,16 @@ import { existsSync, symlinkSync, unlinkSync, mkdirSync, cpSync, readFileSync, w
 import path from "path";
 
 const TEST_VAULT = path.resolve(__dirname, "../fixtures/test-vault");
+const FIXTURES_DIR = path.resolve(__dirname, "../fixtures");
 const PROJECT_ROOT = path.resolve(__dirname, "../..");
 const MAIN_VAULT = "C:\\Users\\whipl\\OneDrive\\Documents\\Absalom";
+
+// Path to the clean fixture and its target locations
+// Dev mode: Garden/90 - Data/12 - Meta/JSON/dungeon-maps-data.json
+// Compiled mode: windrose-md-data.json (at vault root)
+const CLEAN_FIXTURE = path.join(FIXTURES_DIR, "dungeon-maps-data.clean.json");
+const DEV_FIXTURE_TARGET = path.join(TEST_VAULT, "Garden/90 - Data/12 - Meta/JSON/dungeon-maps-data.json");
+const COMPILED_FIXTURE_TARGET = path.join(TEST_VAULT, "windrose-md-data.json");
 
 interface SymlinkConfig {
   source: string;
@@ -67,6 +75,27 @@ function postProcessCompiledArtifact(targetPath: string, basePath: string): void
 }
 
 export async function setup() {
+  console.log("Setting up test vault...");
+
+  // Reset the JSON fixtures to a clean state before tests run
+  // This ensures tests don't inherit state from previous runs
+  // Both dev and compiled mode fixtures need to be reset
+  if (existsSync(CLEAN_FIXTURE)) {
+    // Reset dev mode fixture
+    const devParentDir = path.dirname(DEV_FIXTURE_TARGET);
+    if (!existsSync(devParentDir)) {
+      mkdirSync(devParentDir, { recursive: true });
+    }
+    cpSync(CLEAN_FIXTURE, DEV_FIXTURE_TARGET);
+    console.log("  Reset: dungeon-maps-data.json (dev mode) to clean state");
+
+    // Reset compiled mode fixture
+    cpSync(CLEAN_FIXTURE, COMPILED_FIXTURE_TARGET);
+    console.log("  Reset: windrose-md-data.json (compiled mode) to clean state");
+  } else {
+    console.warn("  Warning: Clean fixture not found, tests may have stale state");
+  }
+
   console.log("Setting up test vault symlinks...");
 
   // Copy compiled artifacts first (for Datacore indexing)

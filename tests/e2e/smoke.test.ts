@@ -252,36 +252,16 @@ test("Layer transparency slider appears on hover when active", async ({ page }) 
   await navigateToMap(page, TEST_MAPS.grid);
   await waitForContainer(page);
 
-  // Open context menu for Layer 2
+  // Open layer panel for Layer 2
   const layerIndex = 1;
   await openLayerContextMenu(page, layerIndex);
 
-  // Check if layer buttons are visible
-  const layerBtns = page.locator('.dmt-layer-btn');
-  const btnCount = await layerBtns.count();
-  console.log(`[Debug] Layer buttons visible: ${btnCount}`);
-
-  // Check initial state - if already active, the JSON has residual state
-  const wasAlreadyActive = await isTransparencyToggleActive(page, layerIndex);
-  console.log(`[Debug] Toggle was already active: ${wasAlreadyActive}`);
-
-  // If not active, click to activate. If already active, we're good.
-  if (!wasAlreadyActive) {
+  // Ensure toggle is active (explicitly set state, don't assume initial state)
+  if (!await isTransparencyToggleActive(page, layerIndex)) {
     await clickTransparencyToggle(page, layerIndex);
     await page.waitForTimeout(200);
   }
-
-  // Verify toggle is now active
-  const isActive = await isTransparencyToggleActive(page, layerIndex);
-  if (!isActive) {
-    await page.screenshot({ path: 'tests/e2e/screenshots/slider-toggle-not-active.png' });
-    // Debug info
-    const layerWrappers = page.locator('.dmt-layer-btn-wrapper');
-    const targetWrapper = layerWrappers.nth(layerIndex);
-    const transparencyBtns = targetWrapper.locator('.dmt-layer-option-btn.transparency');
-    const btnClasses = await transparencyBtns.first().getAttribute('class');
-    throw new Error(`Transparency toggle should be active but isn't. Classes: "${btnClasses}"`);
-  }
+  expect(await isTransparencyToggleActive(page, layerIndex)).toBe(true);
 
   // Hover to reveal slider (needs extra wait for CSS transition)
   await hoverTransparencyButton(page, layerIndex);
@@ -289,12 +269,7 @@ test("Layer transparency slider appears on hover when active", async ({ page }) 
 
   // Verify slider popup appears
   const sliderPopup = page.locator('.dmt-opacity-slider-popup');
-  try {
-    await sliderPopup.waitFor({ state: "visible", timeout: 5000 });
-  } catch (e) {
-    await page.screenshot({ path: 'tests/e2e/screenshots/slider-popup-not-visible.png' });
-    throw e;
-  }
+  await sliderPopup.waitFor({ state: "visible", timeout: 5000 });
 
   // Verify slider input exists
   const sliderInput = sliderPopup.locator('input[type="range"]');
@@ -309,27 +284,18 @@ test("Layer transparency slider does not appear when toggle is inactive", async 
   await navigateToMap(page, TEST_MAPS.grid);
   await waitForContainer(page);
 
-  // Open context menu for Layer 2
+  // Open layer panel for Layer 2
   const layerIndex = 1;
   await openLayerContextMenu(page, layerIndex);
 
-  // Check initial state - might be active from previous test
-  const isActiveInitially = await isTransparencyToggleActive(page, layerIndex);
-  console.log(`[Debug] Toggle initially active: ${isActiveInitially}`);
-
-  // If active, click to deactivate first
-  if (isActiveInitially) {
+  // Ensure toggle is inactive (explicitly set state, don't assume initial state)
+  if (await isTransparencyToggleActive(page, layerIndex)) {
     await clickTransparencyToggle(page, layerIndex);
     await page.waitForTimeout(200);
   }
+  expect(await isTransparencyToggleActive(page, layerIndex)).toBe(false);
 
-  // Verify toggle is now inactive
-  const isActiveNow = await isTransparencyToggleActive(page, layerIndex);
-  if (isActiveNow) {
-    throw new Error("Toggle should be inactive but is still active");
-  }
-
-  // Now hover - slider should NOT appear since toggle is off
+  // Hover - slider should NOT appear since toggle is off
   await hoverTransparencyButton(page, layerIndex);
 
   // Slider should NOT appear

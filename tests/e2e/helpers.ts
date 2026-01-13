@@ -11,6 +11,17 @@ const TEST_MODE = process.env.WINDROSE_TEST_MODE || "dev";
 // Compiled mode needs longer timeouts for initial Datacore indexing
 const CONTAINER_TIMEOUT = TEST_MODE === "compiled" ? 60000 : 10000;
 
+// Autosave wait time - needs to be longer than the app's autosave delay (2s)
+// Compiled mode may be slower due to larger bundle size
+export const AUTOSAVE_WAIT = TEST_MODE === "compiled" ? 4000 : 3000;
+
+// Data file path differs between dev and compiled modes
+// Dev: uses project-relative path in Garden folder
+// Compiled: uses vault-root windrose-md-data.json
+export const DATA_FILE_PATH = TEST_MODE === "compiled"
+  ? "windrose-md-data.json"
+  : "Garden/90 - Data/12 - Meta/JSON/dungeon-maps-data.json";
+
 // ===========================================
 // Error Tracking
 // ===========================================
@@ -352,8 +363,8 @@ export async function openLayerPanel(page: any): Promise<void> {
 
 /** Helper to read cell count from a specific layer in the JSON data file */
 export async function getLayerCellCount(page: any, mapId: string, layerId: string): Promise<number> {
-  return await doWithApp(page, async (app: any, params: { mapId: string; layerId: string }) => {
-    const dataFile = app.vault.getAbstractFileByPath("Garden/90 - Data/12 - Meta/JSON/dungeon-maps-data.json");
+  return await doWithApp(page, async (app: any, params: { mapId: string; layerId: string; dataPath: string }) => {
+    const dataFile = app.vault.getAbstractFileByPath(params.dataPath);
     if (!dataFile) return -1;
 
     const content = await app.vault.read(dataFile);
@@ -363,34 +374,34 @@ export async function getLayerCellCount(page: any, mapId: string, layerId: strin
 
     const layer = map.layers?.find((l: any) => l.id === params.layerId);
     return layer?.cells?.length ?? 0;
-  }, { mapId, layerId });
+  }, { mapId, layerId, dataPath: DATA_FILE_PATH });
 }
 
 /** Helper to get the active layer ID from the map data */
 export async function getActiveLayerId(page: any, mapId: string): Promise<string | null> {
-  return await doWithApp(page, async (app: any, id: string) => {
-    const dataFile = app.vault.getAbstractFileByPath("Garden/90 - Data/12 - Meta/JSON/dungeon-maps-data.json");
+  return await doWithApp(page, async (app: any, params: { mapId: string; dataPath: string }) => {
+    const dataFile = app.vault.getAbstractFileByPath(params.dataPath);
     if (!dataFile) return null;
 
     const content = await app.vault.read(dataFile);
     const data = JSON.parse(content);
-    return data.maps?.[id]?.activeLayerId ?? null;
-  }, mapId);
+    return data.maps?.[params.mapId]?.activeLayerId ?? null;
+  }, { mapId, dataPath: DATA_FILE_PATH });
 }
 
 /** Helper to get total cell count across all layers */
 export async function getTotalCellCount(page: any, mapId: string): Promise<number> {
-  return await doWithApp(page, async (app: any, id: string) => {
-    const dataFile = app.vault.getAbstractFileByPath("Garden/90 - Data/12 - Meta/JSON/dungeon-maps-data.json");
+  return await doWithApp(page, async (app: any, params: { mapId: string; dataPath: string }) => {
+    const dataFile = app.vault.getAbstractFileByPath(params.dataPath);
     if (!dataFile) return -1;
 
     const content = await app.vault.read(dataFile);
     const data = JSON.parse(content);
-    const map = data.maps?.[id];
+    const map = data.maps?.[params.mapId];
     if (!map?.layers) return -1;
 
     return map.layers.reduce((sum: number, layer: any) => sum + (layer.cells?.length ?? 0), 0);
-  }, mapId);
+  }, { mapId, dataPath: DATA_FILE_PATH });
 }
 
 // ===========================================
@@ -443,8 +454,8 @@ export async function hoverTransparencyButton(page: any, layerIndex: number = 1)
 
 /** Helper to get layer transparency settings from JSON data */
 export async function getLayerTransparency(page: any, mapId: string, layerId: string): Promise<{ showLayerBelow: boolean; layerBelowOpacity: number } | null> {
-  return await doWithApp(page, async (app: any, params: { mapId: string; layerId: string }) => {
-    const dataFile = app.vault.getAbstractFileByPath("Garden/90 - Data/12 - Meta/JSON/dungeon-maps-data.json");
+  return await doWithApp(page, async (app: any, params: { mapId: string; layerId: string; dataPath: string }) => {
+    const dataFile = app.vault.getAbstractFileByPath(params.dataPath);
     if (!dataFile) return null;
 
     const content = await app.vault.read(dataFile);
@@ -459,7 +470,7 @@ export async function getLayerTransparency(page: any, mapId: string, layerId: st
       showLayerBelow: layer.showLayerBelow ?? false,
       layerBelowOpacity: layer.layerBelowOpacity ?? 0.25
     };
-  }, { mapId, layerId });
+  }, { mapId, layerId, dataPath: DATA_FILE_PATH });
 }
 
 // ===========================================

@@ -38,6 +38,9 @@ const MODULE_MAP: Record<string, string> = {
 
   // Utils
   'colorOperations.ts': './utils/colorOperations.ts',
+  'deepLinkHandler.ts': './utils/deepLinkHandler.ts',
+  'frameDetection.ts': './utils/frameDetection.ts',
+  'imageOperations.ts': './utils/imageOperations.ts',
   'distanceOperations.ts': './utils/distanceOperations.ts',
   'diagonalFillOperations.ts': './utils/diagonalFillOperations.ts',
   'edgeOperations.ts': './utils/edgeOperations.ts',
