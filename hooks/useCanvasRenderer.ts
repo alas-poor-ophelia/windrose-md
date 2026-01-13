@@ -55,6 +55,9 @@ const { renderHexBackgroundImage } = await requireModuleByName("backgroundRender
 const { renderGridFog } = await requireModuleByName("gridFogRenderer.ts") as {
   renderGridFog: (fogCells: Array<{ col: number; row: number }>, context: { ctx: CanvasRenderingContext2D; fogCtx: CanvasRenderingContext2D | null; offsetX: number; offsetY: number; scaledSize: number }, options: { fowOpacity: number; fowBlurEnabled: boolean; blurRadius: number; useGlobalAlpha: boolean }, visibleBounds: { minCol: number; maxCol: number; minRow: number; maxRow: number }, zoom: number) => void;
 };
+const { renderHexFog } = await requireModuleByName("hexFogRenderer.ts") as {
+  renderHexFog: (fogCells: Array<{ col: number; row: number }>, context: { ctx: CanvasRenderingContext2D; fogCtx: CanvasRenderingContext2D | null; offsetX: number; offsetY: number; zoom: number }, options: { fowOpacity: number; fowBlurEnabled: boolean; blurRadius: number; useGlobalAlpha: boolean }, visibleBounds: { minCol: number; maxCol: number; minRow: number; maxRow: number }, hexGeometry: { hexSize: number; getHexVertices: (q: number, r: number) => Array<{ worldX: number; worldY: number }>; hexToWorld: (q: number, r: number) => { worldX: number; worldY: number }; getNeighbors: (q: number, r: number) => Array<{ q: number; r: number }> }, geometry: { worldToScreen: (worldX: number, worldY: number, offsetX: number, offsetY: number, zoom: number) => { screenX: number; screenY: number } }, orientation: string, offsetToAxial: (col: number, row: number, orientation: string) => { q: number; r: number }, axialToOffset: (q: number, r: number, orientation: string) => { col: number; row: number }) => void;
+};
 const { getFontCss } = await requireModuleByName("fontOptions.ts") as {
   getFontCss: (fontFace: string) => string;
 };
@@ -580,175 +583,17 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
       const hexGeom = geometry as InstanceType<typeof HexGeometry>;
       const orientation = mapData.orientation || 'flat';
 
-      const foggedSet = new Set(fow.foggedCells.map(c => `${c.col},${c.row}`));
-
-      const visibleFogCells: Array<{ col: number; row: number }> = [];
-      const edgeCells: Array<{ col: number; row: number; q: number; r: number }> = [];
-
-      for (const fogCell of fow.foggedCells) {
-        const { col, row } = fogCell;
-
-        if (col < visibleMinCol || col > visibleMaxCol ||
-            row < visibleMinRow || row > visibleMaxRow) {
-          continue;
-        }
-
-        visibleFogCells.push({ col, row });
-
-        const { q, r } = offsetToAxial(col, row, orientation);
-        const neighbors = hexGeom.getNeighbors(q, r);
-        const isEdge = neighbors.some(n => {
-          const { col: nCol, row: nRow } = axialToOffset(n.q, n.r, orientation);
-          return !foggedSet.has(`${nCol},${nRow}`);
-        });
-
-        if (isEdge) {
-          edgeCells.push({ col, row, q, r });
-        }
-      }
-
-      // Helper to trace hex path
-      const traceHexPath = (q: number, r: number, scale = 1.0) => {
-        const vertices = hexGeom.getHexVertices(q, r);
-
-        if (scale === 1.0) {
-          const first = geometry.worldToScreen(vertices[0].worldX, vertices[0].worldY, offsetX, offsetY, zoom);
-          ctx.moveTo(first.screenX, first.screenY);
-          for (let i = 1; i < vertices.length; i++) {
-            const vertex = geometry.worldToScreen(vertices[i].worldX, vertices[i].worldY, offsetX, offsetY, zoom);
-            ctx.lineTo(vertex.screenX, vertex.screenY);
-          }
-        } else {
-          const center = hexGeom.hexToWorld(q, r);
-          const screenCenter = geometry.worldToScreen(center.worldX, center.worldY, offsetX, offsetY, zoom);
-
-          const scaledVertices = vertices.map(v => {
-            const screen = geometry.worldToScreen(v.worldX, v.worldY, offsetX, offsetY, zoom);
-            return {
-              screenX: screenCenter.screenX + (screen.screenX - screenCenter.screenX) * scale,
-              screenY: screenCenter.screenY + (screen.screenY - screenCenter.screenY) * scale
-            };
-          });
-
-          ctx.moveTo(scaledVertices[0].screenX, scaledVertices[0].screenY);
-          for (let i = 1; i < scaledVertices.length; i++) {
-            ctx.lineTo(scaledVertices[i].screenX, scaledVertices[i].screenY);
-          }
-        }
-        ctx.closePath();
-      };
-
-      const traceHexPathOnFog = (q: number, r: number, scale = 1.0) => {
-        if (!fogCtx) return;
-
-        const vertices = hexGeom.getHexVertices(q, r);
-
-        if (scale === 1.0) {
-          const first = geometry.worldToScreen(vertices[0].worldX, vertices[0].worldY, offsetX, offsetY, zoom);
-          fogCtx.moveTo(first.screenX, first.screenY);
-          for (let i = 1; i < vertices.length; i++) {
-            const vertex = geometry.worldToScreen(vertices[i].worldX, vertices[i].worldY, offsetX, offsetY, zoom);
-            fogCtx.lineTo(vertex.screenX, vertex.screenY);
-          }
-        } else {
-          const center = hexGeom.hexToWorld(q, r);
-          const screenCenter = geometry.worldToScreen(center.worldX, center.worldY, offsetX, offsetY, zoom);
-
-          const scaledVertices = vertices.map(v => {
-            const screen = geometry.worldToScreen(v.worldX, v.worldY, offsetX, offsetY, zoom);
-            return {
-              screenX: screenCenter.screenX + (screen.screenX - screenCenter.screenX) * scale,
-              screenY: screenCenter.screenY + (screen.screenY - screenCenter.screenY) * scale
-            };
-          });
-
-          fogCtx.moveTo(scaledVertices[0].screenX, scaledVertices[0].screenY);
-          for (let i = 1; i < scaledVertices.length; i++) {
-            fogCtx.lineTo(scaledVertices[i].screenX, scaledVertices[i].screenY);
-          }
-        }
-        fogCtx.closePath();
-      };
-
-      // Blur passes
-      if (fowBlurEnabled && blurRadius > 0 && edgeCells.length > 0) {
-        const baseOpacity = fowOpacity;
-        const numPasses = 8;
-        const maxExpansion = blurRadius / (hexGeom.hexSize * zoom);
-
-        const targetCtx = fogCtx || ctx;
-        const useFilterFallback = !fogCtx;
-        const filterBlurAmount = blurRadius / numPasses;
-
-        for (let i = 0; i < numPasses; i++) {
-          const t = i / (numPasses - 1);
-          const scale = 1.0 + (maxExpansion * (1.0 - t));
-          const opacity = 0.50 + (0.30 * t);
-
-          if (useFilterFallback) {
-            const passBlur = filterBlurAmount * (1.5 - t);
-            targetCtx.filter = passBlur > 0.5 ? `blur(${passBlur}px)` : 'none';
-          }
-
-          targetCtx.beginPath();
-          for (const { q, r } of edgeCells) {
-            if (fogCtx) {
-              traceHexPathOnFog(q, r, scale);
-            } else {
-              traceHexPath(q, r, scale);
-            }
-          }
-          targetCtx.globalAlpha = baseOpacity * opacity;
-          targetCtx.fill();
-        }
-
-        if (useFilterFallback) {
-          ctx.filter = 'none';
-        }
-
-        ctx.globalAlpha = useGlobalAlpha ? fowOpacity : 1;
-      }
-
-      // Final pass: all fog cells
-      ctx.beginPath();
-      for (const { col, row } of visibleFogCells) {
-        const { q, r } = offsetToAxial(col, row, orientation);
-        traceHexPath(q, r, 1.0);
-      }
-      ctx.fill();
-
-      // Draw interior hex outlines
-      if (visibleFogCells.length > 1) {
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
-        ctx.lineWidth = Math.max(1, 1 * zoom);
-
-        for (const { col, row } of visibleFogCells) {
-          const { q, r } = offsetToAxial(col, row, orientation);
-
-          const neighbors = hexGeom.getNeighbors(q, r);
-          const hasFoggedNeighbor = neighbors.some(n => {
-            const { col: nCol, row: nRow } = axialToOffset(n.q, n.r, orientation);
-            return foggedSet.has(`${nCol},${nRow}`);
-          });
-
-          if (hasFoggedNeighbor) {
-            const vertices = hexGeom.getHexVertices(q, r);
-
-            ctx.beginPath();
-            const first = geometry.worldToScreen(vertices[0].worldX, vertices[0].worldY, offsetX, offsetY, zoom);
-            ctx.moveTo(first.screenX, first.screenY);
-
-            for (let i = 1; i < vertices.length; i++) {
-              const vertex = geometry.worldToScreen(vertices[i].worldX, vertices[i].worldY, offsetX, offsetY, zoom);
-              ctx.lineTo(vertex.screenX, vertex.screenY);
-            }
-
-            ctx.closePath();
-            ctx.stroke();
-          }
-        }
-      }
-
+      renderHexFog(
+        fow.foggedCells,
+        { ctx, fogCtx, offsetX, offsetY, zoom },
+        { fowOpacity, fowBlurEnabled, blurRadius, useGlobalAlpha },
+        { minCol: visibleMinCol, maxCol: visibleMaxCol, minRow: visibleMinRow, maxRow: visibleMaxRow },
+        hexGeom,
+        geometry,
+        orientation,
+        offsetToAxial,
+        axialToOffset
+      );
     } else {
       // Grid map fog rendering
       renderGridFog(
