@@ -44,7 +44,7 @@ const TextLabelControls = ({
           top: calculateRotateButtonPosition().y,
           pointerEvents: 'auto'
         }}
-        title="Rotate 90° (or press R)"
+        title="Rotate 45° (or press R)"
       >
         <dc.Icon icon="lucide-rotate-cw" />
       </div>

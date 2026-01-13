@@ -396,7 +396,7 @@ const SelectionToolbar = ({
   const isNotePin = selectedItem.data?.type === 'note_pin';
 
   const objectButtons = isObject ? [
-    { id: 'rotate', icon: 'lucide-rotate-cw', title: 'Rotate 90° (or press R)', onClick: onRotate },
+    { id: 'rotate', icon: 'lucide-rotate-cw', title: 'Rotate 45° (or press R)', onClick: onRotate },
     { id: 'label', icon: 'lucide-sticky-note', title: 'Add/Edit Label', onClick: onLabel, visible: !isNotePin },
     { id: 'duplicate', icon: 'lucide-copy', title: 'Duplicate Object', onClick: onDuplicate },
     { id: 'linkNote', icon: 'lucide-scroll-text', title: selectedItem.data?.linkedNote ? 'Edit linked note' : 'Link note', onClick: onLinkNote },
@@ -411,7 +411,7 @@ const SelectionToolbar = ({
 
   const textButtons = isText ? [
     { id: 'edit', icon: 'lucide-pencil', title: 'Edit Text Label', onClick: onEdit },
-    { id: 'rotate', icon: 'lucide-rotate-cw', title: 'Rotate 90° (or press R)', onClick: onRotate },
+    { id: 'rotate', icon: 'lucide-rotate-cw', title: 'Rotate 45° (or press R)', onClick: onRotate },
     { id: 'copyLink', icon: 'lucide-link', title: 'Copy link to clipboard', onClick: onCopyLink },
     { id: 'delete', icon: 'lucide-trash-2', title: 'Delete (or press Delete/Backspace)', onClick: onDelete, isDelete: true }
   ] : [];

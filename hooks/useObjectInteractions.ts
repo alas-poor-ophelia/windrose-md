@@ -31,6 +31,11 @@ const { requireModuleByName } = await dc.require(pathResolverPath) as {
   requireModuleByName: (name: string) => Promise<unknown>
 };
 
+const rotationOpsPath = dc.resolvePath("utils/rotationOperations.ts");
+const { getNextRotation } = await dc.require(rotationOpsPath) as {
+  getNextRotation: (currentRotation: number) => number
+};
+
 // Context types
 interface MapStateValue {
   geometry: (IGeometry & {
@@ -789,11 +794,9 @@ const useObjectInteractions = (
 
     if (e.key === 'r' || e.key === 'R') {
       e.preventDefault();
-      const rotations = [0, 90, 180, 270];
       const currentObject = getActiveLayer(mapData!).objects?.find((obj: MapObject) => obj.id === selectedItem.id);
       const currentRotation = currentObject?.rotation || 0;
-      const currentIndex = rotations.indexOf(currentRotation);
-      const nextRotation = rotations[(currentIndex + 1) % 4];
+      const nextRotation = getNextRotation(currentRotation);
 
       const updatedObjects = updateObject(
         getActiveLayer(mapData!).objects,
@@ -995,11 +998,9 @@ const useObjectInteractions = (
       return;
     }
 
-    const rotations = [0, 90, 180, 270];
     const currentObject = getActiveLayer(mapData).objects?.find((obj: MapObject) => obj.id === selectedItem.id);
     const currentRotation = currentObject?.rotation || 0;
-    const currentIndex = rotations.indexOf(currentRotation);
-    const nextRotation = rotations[(currentIndex + 1) % 4];
+    const nextRotation = getNextRotation(currentRotation);
 
     const updatedObjects = updateObject(
       getActiveLayer(mapData).objects,

@@ -32,6 +32,11 @@ const { getActiveLayer } = await requireModuleByName("layerAccessor.ts");
 const { copyDeepLinkToClipboard } = await requireModuleByName("deepLinkHandler.ts");
 const { LinkingModeBanner } = await requireModuleByName("LinkingModeBanner.tsx");
 
+const rotationOpsPath = dc.resolvePath("utils/rotationOperations.ts");
+const { rotateByIncrement } = await dc.require(rotationOpsPath) as {
+  rotateByIncrement: (currentRotation: number) => number
+};
+
 /** Selected item from context */
 interface SelectedItem {
   type: 'object' | 'text' | 'notePin';
@@ -142,7 +147,7 @@ const ObjectLayer = ({
         if (idx !== -1) {
           const obj = updatedObjects[idx];
           const currentRotation = obj.rotation || 0;
-          const nextRotation = (currentRotation + 90) % 360;
+          const nextRotation = rotateByIncrement(currentRotation);
           updatedObjects[idx] = { ...obj, rotation: nextRotation };
         }
       } else if (item.type === 'text') {
@@ -150,7 +155,7 @@ const ObjectLayer = ({
         if (idx !== -1) {
           const label = updatedTextLabels[idx];
           const currentRotation = label.rotation || 0;
-          const nextRotation = (currentRotation + 90) % 360;
+          const nextRotation = rotateByIncrement(currentRotation);
           updatedTextLabels[idx] = { ...label, rotation: nextRotation };
         }
       }

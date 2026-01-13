@@ -33,6 +33,11 @@ const { applyInverseRotation } = await requireModuleByName("screenPositionUtils.
   applyInverseRotation: (x: number, y: number, angle: number, centerX: number, centerY: number) => { x: number; y: number };
 };
 
+const rotationOpsPath = dc.resolvePath("utils/rotationOperations.ts");
+const { getNextRotation } = await dc.require(rotationOpsPath) as {
+  getNextRotation: (currentRotation: number) => number
+};
+
 // Inline context types for not-yet-migrated contexts
 interface SelectedItem {
   type: 'object' | 'text';
@@ -219,7 +224,7 @@ const useTextLabelInteraction = (
   }, [isDraggingSelection, selectedItem, dragStart, mapData, getClientCoords, screenToWorld, updateTextLabel, onTextLabelsChange, setDragStart, setSelectedItem]);
 
   /**
-   * Handle text label rotation
+   * Handle text label rotation (45° increments)
    */
   const handleTextRotation = dc.useCallback((): void => {
     if (!selectedItem || selectedItem.type !== 'text' || !mapData) {
@@ -227,12 +232,8 @@ const useTextLabelInteraction = (
     }
 
     const selectedData = selectedItem.data as TextLabel;
-
-    // Cycle through 0° -> 90° -> 180° -> 270° -> 0°
-    const rotations = [0, 90, 180, 270];
     const currentRotation = selectedData.rotation || 0;
-    const currentIndex = rotations.indexOf(currentRotation);
-    const nextRotation = rotations[(currentIndex + 1) % 4];
+    const nextRotation = getNextRotation(currentRotation);
 
     const updatedLabels = updateTextLabel(
       getActiveLayer(mapData).textLabels,
