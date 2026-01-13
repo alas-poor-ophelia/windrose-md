@@ -49,6 +49,9 @@ const { renderNoteLinkBadge, renderTooltipIndicator, renderObjectLinkIndicator }
 const { renderTextLabels } = await requireModuleByName("textLabelRenderer.ts") as {
   renderTextLabels: (labels: TextLabel[], context: { ctx: CanvasRenderingContext2D; zoom: number; getFontCss: (fontFace: string) => string }, geometry: { worldToScreen: (x: number, y: number, offsetX: number, offsetY: number, zoom: number) => { screenX: number; screenY: number } }, viewState: { offsetX: number; offsetY: number; zoom: number }) => void;
 };
+const { renderHexBackgroundImage } = await requireModuleByName("backgroundRenderer.ts") as {
+  renderHexBackgroundImage: (bgImage: HTMLImageElement, config: { path: string; offsetX?: number; offsetY?: number; opacity?: number }, hexBounds: { maxCol: number; maxRow: number }, hexGeometry: { hexSize: number; sqrt3: number; hexToWorld: (q: number, r: number) => { worldX: number; worldY: number } }, orientation: string, context: { ctx: CanvasRenderingContext2D; offsetX: number; offsetY: number; zoom: number }, offsetToAxial: (col: number, row: number, orientation: string) => { q: number; r: number }) => void;
+};
 const { getFontCss } = await requireModuleByName("fontOptions.ts") as {
   getFontCss: (fontFace: string) => string;
 };
@@ -261,62 +264,15 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   if (geometry instanceof HexGeometry && mapData.backgroundImage?.path) {
     const bgImage = getCachedImage(mapData.backgroundImage.path);
     if (bgImage && bgImage.complete && mapData.hexBounds) {
-      const orientation = mapData.orientation || 'flat';
-      const hexGeom = geometry as InstanceType<typeof HexGeometry>;
-
-      let minWorldX = Infinity, maxWorldX = -Infinity;
-      let minWorldY = Infinity, maxWorldY = -Infinity;
-
-      const corners = [
-        { col: 0, row: 0 },
-        { col: mapData.hexBounds.maxCol - 1, row: 0 },
-        { col: 0, row: mapData.hexBounds.maxRow - 1 },
-        { col: mapData.hexBounds.maxCol - 1, row: mapData.hexBounds.maxRow - 1 }
-      ];
-
-      for (const corner of corners) {
-        const { q, r } = offsetToAxial(corner.col, corner.row, orientation);
-        const worldPos = hexGeom.hexToWorld(q, r);
-
-        if (worldPos.worldX < minWorldX) minWorldX = worldPos.worldX;
-        if (worldPos.worldX > maxWorldX) maxWorldX = worldPos.worldX;
-        if (worldPos.worldY < minWorldY) minWorldY = worldPos.worldY;
-        if (worldPos.worldY > maxWorldY) maxWorldY = worldPos.worldY;
-      }
-
-      const hexExtentX = hexGeom.hexSize;
-      const hexExtentY = hexGeom.hexSize * hexGeom.sqrt3 / 2;
-
-      minWorldX -= hexExtentX;
-      maxWorldX += hexExtentX;
-      minWorldY -= hexExtentY;
-      maxWorldY += hexExtentY;
-
-      const worldCenterX = (minWorldX + maxWorldX) / 2;
-      const worldCenterY = (minWorldY + maxWorldY) / 2;
-
-      const imgWidth = bgImage.naturalWidth;
-      const imgHeight = bgImage.naturalHeight;
-
-      const imgOffsetX = mapData.backgroundImage.offsetX ?? 0;
-      const imgOffsetY = mapData.backgroundImage.offsetY ?? 0;
-
-      const screenCenterX = offsetX + worldCenterX * zoom;
-      const screenCenterY = offsetY + worldCenterY * zoom;
-      const screenX = screenCenterX - (imgWidth * zoom) / 2 + (imgOffsetX * zoom);
-      const screenY = screenCenterY - (imgHeight * zoom) / 2 + (imgOffsetY * zoom);
-
-      const opacity = mapData.backgroundImage.opacity ?? 1;
-      if (opacity < 1) {
-        ctx.save();
-        ctx.globalAlpha = opacity;
-      }
-
-      ctx.drawImage(bgImage, screenX, screenY, imgWidth * zoom, imgHeight * zoom);
-
-      if (opacity < 1) {
-        ctx.restore();
-      }
+      renderHexBackgroundImage(
+        bgImage,
+        mapData.backgroundImage,
+        mapData.hexBounds,
+        geometry as InstanceType<typeof HexGeometry>,
+        mapData.orientation || 'flat',
+        { ctx, offsetX, offsetY, zoom },
+        offsetToAxial
+      );
     }
   }
 
