@@ -62,6 +62,9 @@ const { getFogSettings, renderFog } = await requireModuleByName("fogRenderer.ts"
   getFogSettings: (effectiveSettings: Record<string, unknown>) => { fowColor: string; fowOpacity: number; fowImagePath?: string; fowBlurEnabled: boolean; fowBlurFactor: number };
   renderFog: (fow: { enabled: boolean; foggedCells?: Array<{ col: number; row: number }> }, context: { ctx: CanvasRenderingContext2D; fogCanvas: HTMLCanvasElement | null; width: number; height: number; offsetX: number; offsetY: number; zoom: number; scaledSize: number; northDirection: number }, settings: { fowColor: string; fowOpacity: number; fowImagePath?: string; fowBlurEnabled: boolean; fowBlurFactor: number }, mapBounds: { hexBounds?: { maxCol: number; maxRow: number }; dimensions?: { width: number; height: number } }, isHexMap: boolean, hexGeometry: { hexSize: number; getHexVertices: (q: number, r: number) => Array<{ worldX: number; worldY: number }>; hexToWorld: (q: number, r: number) => { worldX: number; worldY: number }; getNeighbors: (q: number, r: number) => Array<{ q: number; r: number }> } | null, gridGeometry: { cellSize: number } | null, geometry: { worldToScreen: (worldX: number, worldY: number, offsetX: number, offsetY: number, zoom: number) => { screenX: number; screenY: number } }, orientation: string, getCachedImage: (path: string) => HTMLImageElement | null, renderGridFog: typeof renderGridFog, renderHexFog: typeof renderHexFog, offsetToAxial: (col: number, row: number, orientation: string) => { q: number; r: number }, axialToOffset: (q: number, r: number, orientation: string) => { col: number; row: number }) => void;
 };
+const { renderObjects } = await requireModuleByName("objectRenderer.ts") as {
+  renderObjects: (layer: MapLayer, context: { ctx: CanvasRenderingContext2D; offsetX: number; offsetY: number; zoom: number; scaledSize: number }, geometry: IGeometry, isHexMap: boolean, orientation: string, deps: { getObjectType: typeof getObjectType; getRenderChar: typeof getRenderChar; isCellFogged: typeof isCellFogged; getObjectsInCell: typeof getObjectsInCell; getSlotOffset: typeof getSlotOffset; getMultiObjectScale: typeof getMultiObjectScale; renderNoteLinkBadge: typeof renderNoteLinkBadge; renderTooltipIndicator: typeof renderTooltipIndicator; renderObjectLinkIndicator: typeof renderObjectLinkIndicator }) => void;
+};
 const { getFontCss } = await requireModuleByName("fontOptions.ts") as {
   getFontCss: (fontFace: string) => string;
 };
@@ -327,134 +330,25 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
 
   // Draw objects
   if (activeLayer.objects && activeLayer.objects.length > 0 && !showCoordinates && visibility.objects) {
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-
-    for (const obj of activeLayer.objects) {
-      const objType = getObjectType(obj.type);
-      if (!objType) continue;
-
-      // Skip if fogged
-      if (activeLayer.fogOfWar?.enabled) {
-        const size = obj.size || { width: 1, height: 1 };
-        const baseOffset = geometry.toOffsetCoords(obj.position.x, obj.position.y);
-
-        let isUnderFog = false;
-
-        if (geometry instanceof HexGeometry) {
-          isUnderFog = isCellFogged(activeLayer, baseOffset.col, baseOffset.row);
-        } else {
-          for (let dx = 0; dx < size.width && !isUnderFog; dx++) {
-            for (let dy = 0; dy < size.height && !isUnderFog; dy++) {
-              if (isCellFogged(activeLayer, baseOffset.col + dx, baseOffset.row + dy)) {
-                isUnderFog = true;
-              }
-            }
-          }
-        }
-
-        if (isUnderFog) continue;
+    const isHexMap = geometry instanceof HexGeometry;
+    renderObjects(
+      activeLayer,
+      { ctx, offsetX, offsetY, zoom, scaledSize },
+      geometry,
+      isHexMap,
+      mapData.orientation || 'flat',
+      {
+        getObjectType,
+        getRenderChar,
+        isCellFogged,
+        getObjectsInCell,
+        getSlotOffset,
+        getMultiObjectScale,
+        renderNoteLinkBadge,
+        renderTooltipIndicator,
+        renderObjectLinkIndicator,
       }
-
-      const size = obj.size || { width: 1, height: 1 };
-
-      let { screenX, screenY } = geometry.gridToScreen(obj.position.x, obj.position.y, offsetX, offsetY, zoom);
-
-      let objectWidth = size.width * scaledSize;
-      let objectHeight = size.height * scaledSize;
-
-      // Multi-object support for hex maps
-      if (geometry instanceof HexGeometry) {
-        const cellObjects = getObjectsInCell(activeLayer.objects, obj.position.x, obj.position.y);
-        const objectCount = cellObjects.length;
-
-        if (objectCount > 1) {
-          const multiScale = getMultiObjectScale(objectCount);
-          objectWidth *= multiScale;
-          objectHeight *= multiScale;
-
-          let effectiveSlot = obj.slot;
-          if (effectiveSlot === undefined || effectiveSlot === null) {
-            effectiveSlot = cellObjects.findIndex(o => o.id === obj.id);
-          }
-
-          const { offsetX: slotOffsetX, offsetY: slotOffsetY } = getSlotOffset(
-            effectiveSlot,
-            objectCount,
-            mapData.orientation || 'flat'
-          );
-
-          const hexCenterX = screenX + scaledSize / 2;
-          const hexCenterY = screenY + scaledSize / 2;
-          const hexWidth = scaledSize * 2;
-          const objectCenterX = hexCenterX + slotOffsetX * hexWidth;
-          const objectCenterY = hexCenterY + slotOffsetY * hexWidth;
-
-          screenX = objectCenterX - objectWidth / 2;
-          screenY = objectCenterY - objectHeight / 2;
-        }
-      }
-
-      // Apply alignment offset
-      const alignment = obj.alignment || 'center';
-      if (alignment !== 'center') {
-        const halfCell = scaledSize / 2;
-        switch (alignment) {
-          case 'north': screenY -= halfCell; break;
-          case 'south': screenY += halfCell; break;
-          case 'east': screenX += halfCell; break;
-          case 'west': screenX -= halfCell; break;
-        }
-      }
-
-      const centerX = screenX + objectWidth / 2;
-      const centerY = screenY + objectHeight / 2;
-
-      const objectScale = obj.scale ?? 1.0;
-      const fontSize = Math.min(objectWidth, objectHeight) * 0.8 * objectScale;
-
-      const rotation = obj.rotation || 0;
-      if (rotation !== 0) {
-        ctx.save();
-        ctx.translate(centerX, centerY);
-        ctx.rotate((rotation * Math.PI) / 180);
-        ctx.translate(-centerX, -centerY);
-      }
-
-      const { char: renderChar, isIcon } = getRenderChar(objType);
-
-      if (isIcon) {
-        ctx.font = `${fontSize}px rpgawesome`;
-      } else {
-        ctx.font = `${fontSize}px 'Noto Emoji', 'Noto Sans Symbols 2', monospace`;
-      }
-
-      ctx.strokeStyle = '#000000';
-      ctx.lineWidth = Math.max(2, fontSize * 0.08);
-      ctx.strokeText(renderChar, centerX, centerY);
-
-      ctx.fillStyle = obj.color || '#ffffff';
-      ctx.fillText(renderChar, centerX, centerY);
-
-      if (rotation !== 0) {
-        ctx.restore();
-      }
-
-      // Draw note badge if object has linkedNote
-      if (obj.linkedNote && obj.type !== 'note_pin') {
-        renderNoteLinkBadge(ctx, { screenX, screenY, objectWidth, objectHeight }, { scaledSize });
-      }
-
-      // Draw note indicator for custom tooltip
-      if (obj.customTooltip) {
-        renderTooltipIndicator(ctx, { screenX, screenY, objectWidth, objectHeight }, { scaledSize });
-      }
-
-      // Draw link indicator for inter-object links
-      if (obj.linkedObject) {
-        renderObjectLinkIndicator(ctx, { screenX, screenY, objectWidth, objectHeight }, { scaledSize });
-      }
-    }
+    );
   }
 
   // Draw text labels
