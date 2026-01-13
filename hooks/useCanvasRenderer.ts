@@ -58,6 +58,10 @@ const { renderGridFog } = await requireModuleByName("gridFogRenderer.ts") as {
 const { renderHexFog } = await requireModuleByName("hexFogRenderer.ts") as {
   renderHexFog: (fogCells: Array<{ col: number; row: number }>, context: { ctx: CanvasRenderingContext2D; fogCtx: CanvasRenderingContext2D | null; offsetX: number; offsetY: number; zoom: number }, options: { fowOpacity: number; fowBlurEnabled: boolean; blurRadius: number; useGlobalAlpha: boolean }, visibleBounds: { minCol: number; maxCol: number; minRow: number; maxRow: number }, hexGeometry: { hexSize: number; getHexVertices: (q: number, r: number) => Array<{ worldX: number; worldY: number }>; hexToWorld: (q: number, r: number) => { worldX: number; worldY: number }; getNeighbors: (q: number, r: number) => Array<{ q: number; r: number }> }, geometry: { worldToScreen: (worldX: number, worldY: number, offsetX: number, offsetY: number, zoom: number) => { screenX: number; screenY: number } }, orientation: string, offsetToAxial: (col: number, row: number, orientation: string) => { q: number; r: number }, axialToOffset: (q: number, r: number, orientation: string) => { col: number; row: number }) => void;
 };
+const { getFogSettings, renderFog } = await requireModuleByName("fogRenderer.ts") as {
+  getFogSettings: (effectiveSettings: Record<string, unknown>) => { fowColor: string; fowOpacity: number; fowImagePath?: string; fowBlurEnabled: boolean; fowBlurFactor: number };
+  renderFog: (fow: { enabled: boolean; foggedCells?: Array<{ col: number; row: number }> }, context: { ctx: CanvasRenderingContext2D; fogCanvas: HTMLCanvasElement | null; width: number; height: number; offsetX: number; offsetY: number; zoom: number; scaledSize: number; northDirection: number }, settings: { fowColor: string; fowOpacity: number; fowImagePath?: string; fowBlurEnabled: boolean; fowBlurFactor: number }, mapBounds: { hexBounds?: { maxCol: number; maxRow: number }; dimensions?: { width: number; height: number } }, isHexMap: boolean, hexGeometry: { hexSize: number; getHexVertices: (q: number, r: number) => Array<{ worldX: number; worldY: number }>; hexToWorld: (q: number, r: number) => { worldX: number; worldY: number }; getNeighbors: (q: number, r: number) => Array<{ q: number; r: number }> } | null, gridGeometry: { cellSize: number } | null, geometry: { worldToScreen: (worldX: number, worldY: number, offsetX: number, offsetY: number, zoom: number) => { screenX: number; screenY: number } }, orientation: string, getCachedImage: (path: string) => HTMLImageElement | null, renderGridFog: typeof renderGridFog, renderHexFog: typeof renderHexFog, offsetToAxial: (col: number, row: number, orientation: string) => { q: number; r: number }, axialToOffset: (q: number, r: number, orientation: string) => { col: number; row: number }) => void;
+};
 const { getFontCss } = await requireModuleByName("fontOptions.ts") as {
   getFontCss: (fontFace: string) => string;
 };
@@ -483,137 +487,28 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   }
 
   if (activeLayer.fogOfWar && activeLayer.fogOfWar.enabled && activeLayer.fogOfWar.foggedCells?.length) {
-    const fow = activeLayer.fogOfWar;
-
     const effectiveSettings = getEffectiveSettings(mapData.settings) as Record<string, unknown>;
-    const fowColor = (effectiveSettings.fogOfWarColor as string) || '#000000';
-    const fowOpacity = (effectiveSettings.fogOfWarOpacity as number) ?? 0.9;
-    const fowImagePath = effectiveSettings.fogOfWarImage as string | undefined;
-    const fowBlurEnabled = (effectiveSettings.fogOfWarBlurEnabled as boolean) ?? false;
-    const fowBlurFactor = (effectiveSettings.fogOfWarBlurFactor as number) ?? 0.08;
+    const fogSettings = getFogSettings(effectiveSettings);
+    const isHexMap = geometry instanceof HexGeometry;
+    const hexGeom = isHexMap ? geometry as InstanceType<typeof HexGeometry> : null;
+    const gridGeom = !isHexMap ? geometry as InstanceType<typeof GridGeometry> : null;
 
-    let fowFillStyle: string | CanvasPattern = fowColor;
-    let useGlobalAlpha = true;
-
-    if (fowImagePath) {
-      const fowImage = getCachedImage(fowImagePath);
-      if (fowImage && fowImage.complete && fowImage.naturalWidth > 0) {
-        try {
-          const pattern = ctx.createPattern(fowImage, 'repeat');
-          if (pattern) {
-            fowFillStyle = pattern;
-          }
-        } catch (e) {
-          // Pattern creation failed
-        }
-      }
-    }
-
-    let blurRadius = 0;
-    if (fowBlurEnabled) {
-      const cellSize = geometry instanceof HexGeometry ? (geometry as InstanceType<typeof HexGeometry>).hexSize : (geometry as InstanceType<typeof GridGeometry>).cellSize;
-      blurRadius = cellSize * fowBlurFactor * zoom;
-    }
-
-    let fogCtx: CanvasRenderingContext2D | null = null;
-    if (fogCanvas && fowBlurEnabled && blurRadius > 0) {
-      fogCtx = fogCanvas.getContext('2d');
-
-      if (fogCtx) {
-        if (fogCanvas.width !== width || fogCanvas.height !== height) {
-          fogCanvas.width = width;
-          fogCanvas.height = height;
-        }
-
-        const cssBlurAmount = Math.max(4, blurRadius * 0.6);
-        fogCanvas.style.filter = `blur(${cssBlurAmount}px)`;
-
-        fogCtx.clearRect(0, 0, width, height);
-
-        fogCtx.save();
-        fogCtx.translate(width / 2, height / 2);
-        fogCtx.rotate((northDirection * Math.PI) / 180);
-        fogCtx.translate(-width / 2, -height / 2);
-
-        fogCtx.fillStyle = fowColor;
-
-        if (fowImagePath) {
-          const fowImage = getCachedImage(fowImagePath);
-          if (fowImage && fowImage.complete && fowImage.naturalWidth > 0) {
-            const fogPattern = fogCtx.createPattern(fowImage, 'repeat');
-            if (fogPattern) {
-              fogCtx.fillStyle = fogPattern;
-            }
-          }
-        }
-      }
-    }
-
-    ctx.fillStyle = fowFillStyle;
-
-    const previousGlobalAlpha = ctx.globalAlpha;
-    if (useGlobalAlpha) {
-      ctx.globalAlpha = fowOpacity;
-    }
-
-    // Calculate visible bounds
-    let visibleMinCol: number, visibleMaxCol: number, visibleMinRow: number, visibleMaxRow: number;
-
-    if (geometry instanceof HexGeometry) {
-      const bounds = mapData.hexBounds || { maxCol: 100, maxRow: 100 };
-      visibleMinCol = 0;
-      visibleMaxCol = bounds.maxCol;
-      visibleMinRow = 0;
-      visibleMaxRow = bounds.maxRow;
-    } else {
-      visibleMinCol = Math.floor((0 - offsetX) / scaledSize) - 1;
-      visibleMaxCol = Math.ceil((width - offsetX) / scaledSize) + 1;
-      visibleMinRow = Math.floor((0 - offsetY) / scaledSize) - 1;
-      visibleMaxRow = Math.ceil((height - offsetY) / scaledSize) + 1;
-
-      const maxBound = mapData.dimensions ? Math.max(mapData.dimensions.width, mapData.dimensions.height) : 200;
-      visibleMinCol = Math.max(0, visibleMinCol);
-      visibleMaxCol = Math.min(maxBound, visibleMaxCol);
-      visibleMinRow = Math.max(0, visibleMinRow);
-      visibleMaxRow = Math.min(maxBound, visibleMaxRow);
-    }
-
-    // Render fog cells
-    if (geometry instanceof HexGeometry) {
-      const hexGeom = geometry as InstanceType<typeof HexGeometry>;
-      const orientation = mapData.orientation || 'flat';
-
-      renderHexFog(
-        fow.foggedCells,
-        { ctx, fogCtx, offsetX, offsetY, zoom },
-        { fowOpacity, fowBlurEnabled, blurRadius, useGlobalAlpha },
-        { minCol: visibleMinCol, maxCol: visibleMaxCol, minRow: visibleMinRow, maxRow: visibleMaxRow },
-        hexGeom,
-        geometry,
-        orientation,
-        offsetToAxial,
-        axialToOffset
-      );
-    } else {
-      // Grid map fog rendering
-      renderGridFog(
-        fow.foggedCells,
-        { ctx, fogCtx, offsetX, offsetY, scaledSize },
-        { fowOpacity, fowBlurEnabled, blurRadius, useGlobalAlpha },
-        { minCol: visibleMinCol, maxCol: visibleMaxCol, minRow: visibleMinRow, maxRow: visibleMaxRow },
-        zoom
-      );
-    }
-
-    // Restore fog canvas context
-    if (fogCtx) {
-      fogCtx.restore();
-    }
-
-    // Restore globalAlpha
-    if (useGlobalAlpha) {
-      ctx.globalAlpha = previousGlobalAlpha;
-    }
+    renderFog(
+      activeLayer.fogOfWar,
+      { ctx, fogCanvas, width, height, offsetX, offsetY, zoom, scaledSize, northDirection },
+      fogSettings,
+      { hexBounds: mapData.hexBounds, dimensions: mapData.dimensions },
+      isHexMap,
+      hexGeom,
+      gridGeom,
+      geometry,
+      mapData.orientation || 'flat',
+      getCachedImage,
+      renderGridFog,
+      renderHexFog,
+      offsetToAxial,
+      axialToOffset
+    );
   }
 
   // Draw selection indicators for text labels
