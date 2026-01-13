@@ -256,14 +256,31 @@ test("Layer transparency slider appears on hover when active", async ({ page }) 
   const layerIndex = 1;
   await openLayerContextMenu(page, layerIndex);
 
-  // Toggle transparency on
-  await clickTransparencyToggle(page, layerIndex);
+  // Check if layer buttons are visible
+  const layerBtns = page.locator('.dmt-layer-btn');
+  const btnCount = await layerBtns.count();
+  console.log(`[Debug] Layer buttons visible: ${btnCount}`);
 
-  // Verify toggle is active before hovering
+  // Check initial state - if already active, the JSON has residual state
+  const wasAlreadyActive = await isTransparencyToggleActive(page, layerIndex);
+  console.log(`[Debug] Toggle was already active: ${wasAlreadyActive}`);
+
+  // If not active, click to activate. If already active, we're good.
+  if (!wasAlreadyActive) {
+    await clickTransparencyToggle(page, layerIndex);
+    await page.waitForTimeout(200);
+  }
+
+  // Verify toggle is now active
   const isActive = await isTransparencyToggleActive(page, layerIndex);
   if (!isActive) {
     await page.screenshot({ path: 'tests/e2e/screenshots/slider-toggle-not-active.png' });
-    throw new Error("Transparency toggle should be active but isn't");
+    // Debug info
+    const layerWrappers = page.locator('.dmt-layer-btn-wrapper');
+    const targetWrapper = layerWrappers.nth(layerIndex);
+    const transparencyBtns = targetWrapper.locator('.dmt-layer-option-btn.transparency');
+    const btnClasses = await transparencyBtns.first().getAttribute('class');
+    throw new Error(`Transparency toggle should be active but isn't. Classes: "${btnClasses}"`);
   }
 
   // Hover to reveal slider (needs extra wait for CSS transition)
@@ -296,7 +313,23 @@ test("Layer transparency slider does not appear when toggle is inactive", async 
   const layerIndex = 1;
   await openLayerContextMenu(page, layerIndex);
 
-  // Don't toggle on - just hover
+  // Check initial state - might be active from previous test
+  const isActiveInitially = await isTransparencyToggleActive(page, layerIndex);
+  console.log(`[Debug] Toggle initially active: ${isActiveInitially}`);
+
+  // If active, click to deactivate first
+  if (isActiveInitially) {
+    await clickTransparencyToggle(page, layerIndex);
+    await page.waitForTimeout(200);
+  }
+
+  // Verify toggle is now inactive
+  const isActiveNow = await isTransparencyToggleActive(page, layerIndex);
+  if (isActiveNow) {
+    throw new Error("Toggle should be inactive but is still active");
+  }
+
+  // Now hover - slider should NOT appear since toggle is off
   await hoverTransparencyButton(page, layerIndex);
 
   // Slider should NOT appear

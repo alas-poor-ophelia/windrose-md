@@ -416,8 +416,14 @@ export async function clickTransparencyToggle(page: any, layerIndex: number = 1)
   const layerWrapper = page.locator('.dmt-layer-btn-wrapper').nth(layerIndex);
   const transparencyBtn = layerWrapper.locator('.dmt-layer-option-btn.transparency');
   await transparencyBtn.waitFor({ state: "visible", timeout: 3000 });
-  await transparencyBtn.click();
-  await page.waitForTimeout(200);
+
+  // Ensure button is in viewport and clickable
+  await transparencyBtn.scrollIntoViewIfNeeded();
+  await page.waitForTimeout(100);
+
+  // Click with force option to ensure click registers
+  await transparencyBtn.click({ force: true });
+  await page.waitForTimeout(300);
 }
 
 /** Helper to check if transparency toggle is active for a specific layer */

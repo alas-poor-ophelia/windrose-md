@@ -19,7 +19,7 @@
       },
       "lastTextLabelSettings": null,
       "schemaVersion": 2,
-      "activeLayerId": "layer-1768067464935-ytt51c2eh",
+      "activeLayerId": "layer-2",
       "layerPanelVisible": false,
       "layers": [
         {
@@ -41,7 +41,7 @@
           "fogOfWar": null
         },
         {
-          "id": "layer-1768035704998-crxza9wrq",
+          "id": "layer-2",
           "name": "Layer 2",
           "order": 1,
           "visible": true,
@@ -57,33 +57,16 @@
               "y": 149,
               "color": "#c4a57b",
               "opacity": 1
-            },
-            {
-              "x": 145,
-              "y": 145,
-              "color": "#c4a57b",
-              "opacity": 1
-            },
-            {
-              "x": 147,
-              "y": 146,
-              "color": "#c4a57b",
-              "opacity": 1
-            },
-            {
-              "x": 142,
-              "y": 141,
-              "color": "#c4a57b",
-              "opacity": 1
             }
           ],
           "edges": [],
           "objects": [],
           "textLabels": [],
-          "fogOfWar": null
+          "fogOfWar": null,
+          "showLayerBelow": false
         },
         {
-          "id": "layer-1768035820026-sz13a8cee",
+          "id": "layer-3",
           "name": "Layer 3",
           "order": 2,
           "visible": true,
@@ -91,402 +74,8 @@
           "edges": [],
           "objects": [],
           "textLabels": [],
-          "fogOfWar": null
-        },
-        {
-          "id": "layer-1768065927686-j4frdsoyd",
-          "name": "Layer 4",
-          "order": 3,
-          "visible": true,
-          "cells": [
-            {
-              "x": 147,
-              "y": 148,
-              "color": "#c4a57b",
-              "opacity": 1
-            },
-            {
-              "x": 148,
-              "y": 148,
-              "color": "#c4a57b",
-              "opacity": 1
-            },
-            {
-              "x": 149,
-              "y": 148,
-              "color": "#c4a57b",
-              "opacity": 1
-            },
-            {
-              "x": 144,
-              "y": 143,
-              "color": "#c4a57b",
-              "opacity": 1
-            },
-            {
-              "x": 145,
-              "y": 145,
-              "color": "#c4a57b",
-              "opacity": 1
-            }
-          ],
-          "edges": [],
-          "objects": [],
-          "textLabels": [],
-          "fogOfWar": null
-        },
-        {
-          "id": "layer-1768066059745-3cdq9i1z8",
-          "name": "Layer 5",
-          "order": 4,
-          "visible": true,
-          "cells": [],
-          "edges": [],
-          "objects": [],
-          "textLabels": [],
-          "fogOfWar": null
-        },
-        {
-          "id": "layer-1768066290201-ss1by6af1",
-          "name": "Layer 6",
-          "order": 5,
-          "visible": true,
-          "cells": [
-            {
-              "x": 145,
-              "y": 146,
-              "color": "#c4a57b",
-              "opacity": 1
-            },
-            {
-              "x": 146,
-              "y": 146,
-              "color": "#c4a57b",
-              "opacity": 1
-            },
-            {
-              "x": 147,
-              "y": 146,
-              "color": "#c4a57b",
-              "opacity": 1
-            },
-            {
-              "x": 142,
-              "y": 142,
-              "color": "#c4a57b",
-              "opacity": 1
-            },
-            {
-              "x": 144,
-              "y": 143,
-              "color": "#c4a57b",
-              "opacity": 1
-            },
-            {
-              "x": 139,
-              "y": 138,
-              "color": "#c4a57b",
-              "opacity": 1
-            }
-          ],
-          "edges": [],
-          "objects": [],
-          "textLabels": [],
-          "fogOfWar": null
-        },
-        {
-          "id": "layer-1768066402070-l56u8vgjy",
-          "name": "Layer 7",
-          "order": 6,
-          "visible": true,
-          "cells": [],
-          "edges": [],
-          "objects": [],
-          "textLabels": [],
-          "fogOfWar": null
-        },
-        {
-          "id": "layer-1768066506163-0xcgab5dg",
-          "name": "Layer 8",
-          "order": 7,
-          "visible": true,
-          "cells": [
-            {
-              "x": 144,
-              "y": 145,
-              "color": "#c4a57b",
-              "opacity": 1
-            },
-            {
-              "x": 145,
-              "y": 145,
-              "color": "#c4a57b",
-              "opacity": 1
-            },
-            {
-              "x": 146,
-              "y": 145,
-              "color": "#c4a57b",
-              "opacity": 1
-            },
-            {
-              "x": 141,
-              "y": 140,
-              "color": "#c4a57b",
-              "opacity": 1
-            },
-            {
-              "x": 142,
-              "y": 142,
-              "color": "#c4a57b",
-              "opacity": 1
-            },
-            {
-              "x": 137,
-              "y": 136,
-              "color": "#c4a57b",
-              "opacity": 1
-            }
-          ],
-          "edges": [],
-          "objects": [],
-          "textLabels": [],
-          "fogOfWar": null
-        },
-        {
-          "id": "layer-1768066629748-0qr7z2pso",
-          "name": "Layer 9",
-          "order": 8,
-          "visible": true,
-          "cells": [],
-          "edges": [],
-          "objects": [],
-          "textLabels": [],
-          "fogOfWar": null
-        },
-        {
-          "id": "layer-1768066795418-ymy6trzkw",
-          "name": "Layer 10",
-          "order": 9,
-          "visible": true,
-          "cells": [
-            {
-              "x": 142,
-              "y": 143,
-              "color": "#c4a57b",
-              "opacity": 1
-            },
-            {
-              "x": 143,
-              "y": 143,
-              "color": "#c4a57b",
-              "opacity": 1
-            },
-            {
-              "x": 144,
-              "y": 143,
-              "color": "#c4a57b",
-              "opacity": 1
-            },
-            {
-              "x": 139,
-              "y": 139,
-              "color": "#c4a57b",
-              "opacity": 1
-            },
-            {
-              "x": 141,
-              "y": 140,
-              "color": "#c4a57b",
-              "opacity": 1
-            },
-            {
-              "x": 135,
-              "y": 135,
-              "color": "#c4a57b",
-              "opacity": 1
-            }
-          ],
-          "edges": [],
-          "objects": [],
-          "textLabels": [],
-          "fogOfWar": null
-        },
-        {
-          "id": "layer-1768066915450-zqc2go6ft",
-          "name": "Layer 11",
-          "order": 10,
-          "visible": true,
-          "cells": [],
-          "edges": [],
-          "objects": [],
-          "textLabels": [],
-          "fogOfWar": null
-        },
-        {
-          "id": "layer-1768066996900-08npnjnmp",
-          "name": "Layer 12",
-          "order": 11,
-          "visible": true,
-          "cells": [
-            {
-              "x": 141,
-              "y": 142,
-              "color": "#c4a57b",
-              "opacity": 1
-            },
-            {
-              "x": 142,
-              "y": 142,
-              "color": "#c4a57b",
-              "opacity": 1
-            },
-            {
-              "x": 143,
-              "y": 142,
-              "color": "#c4a57b",
-              "opacity": 1
-            },
-            {
-              "x": 138,
-              "y": 137,
-              "color": "#c4a57b",
-              "opacity": 1
-            },
-            {
-              "x": 139,
-              "y": 139,
-              "color": "#c4a57b",
-              "opacity": 1
-            },
-            {
-              "x": 134,
-              "y": 133,
-              "color": "#c4a57b",
-              "opacity": 1
-            }
-          ],
-          "edges": [],
-          "objects": [],
-          "textLabels": [],
-          "fogOfWar": null
-        },
-        {
-          "id": "layer-1768067161185-gctsncaug",
-          "name": "Layer 13",
-          "order": 12,
-          "visible": true,
-          "cells": [],
-          "edges": [],
-          "objects": [],
-          "textLabels": [],
-          "fogOfWar": null
-        },
-        {
-          "id": "layer-1768067273111-v1598zhoj",
-          "name": "Layer 14",
-          "order": 13,
-          "visible": true,
-          "cells": [
-            {
-              "x": 139,
-              "y": 140,
-              "color": "#c4a57b",
-              "opacity": 1
-            },
-            {
-              "x": 140,
-              "y": 140,
-              "color": "#c4a57b",
-              "opacity": 1
-            },
-            {
-              "x": 141,
-              "y": 140,
-              "color": "#c4a57b",
-              "opacity": 1
-            },
-            {
-              "x": 136,
-              "y": 135,
-              "color": "#c4a57b",
-              "opacity": 1
-            },
-            {
-              "x": 138,
-              "y": 137,
-              "color": "#c4a57b",
-              "opacity": 1
-            },
-            {
-              "x": 132,
-              "y": 132,
-              "color": "#c4a57b",
-              "opacity": 1
-            }
-          ],
-          "edges": [],
-          "objects": [],
-          "textLabels": [],
-          "fogOfWar": null
-        },
-        {
-          "id": "layer-1768067386171-3qf1fg1eh",
-          "name": "Layer 15",
-          "order": 14,
-          "visible": true,
-          "cells": [],
-          "edges": [],
-          "objects": [],
-          "textLabels": [],
-          "fogOfWar": null
-        },
-        {
-          "id": "layer-1768067464935-ytt51c2eh",
-          "name": "Layer 16",
-          "order": 15,
-          "visible": true,
-          "cells": [
-            {
-              "x": 138,
-              "y": 139,
-              "color": "#c4a57b",
-              "opacity": 1
-            },
-            {
-              "x": 139,
-              "y": 139,
-              "color": "#c4a57b",
-              "opacity": 1
-            },
-            {
-              "x": 134,
-              "y": 134,
-              "color": "#c4a57b",
-              "opacity": 1
-            },
-            {
-              "x": 136,
-              "y": 135,
-              "color": "#c4a57b",
-              "opacity": 1
-            }
-          ],
-          "edges": [],
-          "objects": [],
-          "textLabels": [],
-          "fogOfWar": null
-        },
-        {
-          "id": "layer-1768067584551-oqt83kosr",
-          "name": "Layer 17",
-          "order": 16,
-          "visible": true,
-          "cells": [],
-          "edges": [],
-          "objects": [],
-          "textLabels": [],
-          "fogOfWar": null
+          "fogOfWar": null,
+          "showLayerBelow": false
         }
       ],
       "gridSize": 32,
@@ -497,8 +86,8 @@
       "viewState": {
         "zoom": 1,
         "center": {
-          "x": 137.5,
-          "y": 137.5
+          "x": 131.25,
+          "y": 131.25
         }
       },
       "objects": [],
