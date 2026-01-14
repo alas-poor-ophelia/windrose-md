@@ -166,6 +166,32 @@ export async function setup() {
 }
 
 export async function teardown() {
-  // Optional: clean up symlinks after tests
-  // For now, leave them in place for debugging
+  // Clean up obsidian-test-* temp directories created by obsidian-testing-framework
+  // These accumulate quickly (~50MB each) and are not needed after tests complete
+  const os = await import("os");
+  const fs = await import("fs/promises");
+
+  const tempDir = os.tmpdir();
+  console.log("Cleaning up test artifacts...");
+
+  try {
+    const entries = await fs.readdir(tempDir);
+    const testDirs = entries.filter(name => name.startsWith("obsidian-test-"));
+
+    if (testDirs.length > 0) {
+      console.log(`  Found ${testDirs.length} obsidian-test-* directories to clean`);
+
+      for (const dir of testDirs) {
+        const fullPath = path.join(tempDir, dir);
+        try {
+          await fs.rm(fullPath, { recursive: true, force: true });
+        } catch (e) {
+          // Ignore errors for individual directories (may be in use)
+        }
+      }
+      console.log("  Cleanup complete");
+    }
+  } catch (e) {
+    console.warn("  Cleanup warning:", e);
+  }
 }
