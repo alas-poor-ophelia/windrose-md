@@ -311,6 +311,19 @@ function renderFog(
   }
 }
 
+/**
+ * Clears the fog canvas when fog is disabled or not needed.
+ */
+function clearFogCanvas(fogCanvas: HTMLCanvasElement | null): void {
+  if (!fogCanvas) return;
+
+  const fogCtx = fogCanvas.getContext('2d');
+  if (fogCtx) {
+    fogCtx.clearRect(0, 0, fogCanvas.width, fogCanvas.height);
+    fogCanvas.style.filter = 'none';
+  }
+}
+
 return {
   getFogSettings,
   createFogFillStyle,
@@ -318,5 +331,6 @@ return {
   setupFogCanvas,
   calculateGridVisibleBounds,
   calculateHexVisibleBounds,
+  clearFogCanvas,
   renderFog,
 };

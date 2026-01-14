@@ -58,8 +58,9 @@ const { renderGridFog } = await requireModuleByName("gridFogRenderer.ts") as {
 const { renderHexFog } = await requireModuleByName("hexFogRenderer.ts") as {
   renderHexFog: (fogCells: Array<{ col: number; row: number }>, context: { ctx: CanvasRenderingContext2D; fogCtx: CanvasRenderingContext2D | null; offsetX: number; offsetY: number; zoom: number }, options: { fowOpacity: number; fowBlurEnabled: boolean; blurRadius: number; useGlobalAlpha: boolean }, visibleBounds: { minCol: number; maxCol: number; minRow: number; maxRow: number }, hexGeometry: { hexSize: number; getHexVertices: (q: number, r: number) => Array<{ worldX: number; worldY: number }>; hexToWorld: (q: number, r: number) => { worldX: number; worldY: number }; getNeighbors: (q: number, r: number) => Array<{ q: number; r: number }> }, geometry: { worldToScreen: (worldX: number, worldY: number, offsetX: number, offsetY: number, zoom: number) => { screenX: number; screenY: number } }, orientation: string, offsetToAxial: (col: number, row: number, orientation: string) => { q: number; r: number }, axialToOffset: (q: number, r: number, orientation: string) => { col: number; row: number }) => void;
 };
-const { getFogSettings, renderFog } = await requireModuleByName("fogRenderer.ts") as {
+const { getFogSettings, clearFogCanvas, renderFog } = await requireModuleByName("fogRenderer.ts") as {
   getFogSettings: (effectiveSettings: Record<string, unknown>) => { fowColor: string; fowOpacity: number; fowImagePath?: string; fowBlurEnabled: boolean; fowBlurFactor: number };
+  clearFogCanvas: (fogCanvas: HTMLCanvasElement | null) => void;
   renderFog: (fow: { enabled: boolean; foggedCells?: Array<{ col: number; row: number }> }, context: { ctx: CanvasRenderingContext2D; fogCanvas: HTMLCanvasElement | null; width: number; height: number; offsetX: number; offsetY: number; zoom: number; scaledSize: number; northDirection: number }, settings: { fowColor: string; fowOpacity: number; fowImagePath?: string; fowBlurEnabled: boolean; fowBlurFactor: number }, mapBounds: { hexBounds?: { maxCol: number; maxRow: number }; dimensions?: { width: number; height: number } }, isHexMap: boolean, hexGeometry: { hexSize: number; getHexVertices: (q: number, r: number) => Array<{ worldX: number; worldY: number }>; hexToWorld: (q: number, r: number) => { worldX: number; worldY: number }; getNeighbors: (q: number, r: number) => Array<{ q: number; r: number }> } | null, gridGeometry: { cellSize: number } | null, geometry: { worldToScreen: (worldX: number, worldY: number, offsetX: number, offsetY: number, zoom: number) => { screenX: number; screenY: number } }, orientation: string, getCachedImage: (path: string) => HTMLImageElement | null, renderGridFog: typeof renderGridFog, renderHexFog: typeof renderHexFog, offsetToAxial: (col: number, row: number, orientation: string) => { q: number; r: number }, axialToOffset: (q: number, r: number, orientation: string) => { col: number; row: number }) => void;
 };
 const { renderObjects } = await requireModuleByName("objectRenderer.ts") as {
@@ -368,23 +369,16 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   // FOG OF WAR RENDERING
   // =========================================================================
 
-  // Clear fog canvas if not needed
-  if (fogCanvas) {
-    const fow = activeLayer.fogOfWar;
-    const effectiveSettings = getEffectiveSettings(mapData.settings) as Record<string, unknown>;
-    const fowBlurEnabled = (effectiveSettings?.fogOfWarBlurEnabled as boolean) ?? false;
+  const fow = activeLayer.fogOfWar;
+  const effectiveSettings = getEffectiveSettings(mapData.settings) as Record<string, unknown>;
+  const fowBlurEnabled = (effectiveSettings?.fogOfWarBlurEnabled as boolean) ?? false;
 
-    if (!fow?.enabled || !fow?.foggedCells?.length || !fowBlurEnabled) {
-      const tempFogCtx = fogCanvas.getContext('2d');
-      if (tempFogCtx) {
-        tempFogCtx.clearRect(0, 0, fogCanvas.width, fogCanvas.height);
-        fogCanvas.style.filter = 'none';
-      }
-    }
+  // Clear fog canvas if fog not needed
+  if (!fow?.enabled || !fow?.foggedCells?.length || !fowBlurEnabled) {
+    clearFogCanvas(fogCanvas);
   }
 
-  if (activeLayer.fogOfWar && activeLayer.fogOfWar.enabled && activeLayer.fogOfWar.foggedCells?.length) {
-    const effectiveSettings = getEffectiveSettings(mapData.settings) as Record<string, unknown>;
+  if (fow && fow.enabled && fow.foggedCells?.length) {
     const fogSettings = getFogSettings(effectiveSettings);
     const isHexMap = geometry instanceof HexGeometry;
     const hexGeom = isHexMap ? geometry as InstanceType<typeof HexGeometry> : null;
