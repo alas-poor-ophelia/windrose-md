@@ -80,6 +80,7 @@ interface VisibleHexRange {
 }
 
 class HexGeometry extends BaseGeometry {
+  readonly type = 'hex' as const;
   hexSize: number;
   orientation: 'flat' | 'pointy';
   bounds: HexBounds | null;

@@ -32,6 +32,44 @@ import type {
 
 const gridRenderer = {
   /**
+   * Whether this renderer supports segment (partial cell) rendering.
+   * Grid maps support segments, hex maps do not.
+   */
+  supportsSegments: true,
+
+  /**
+   * Calculate the scaled cell size for the current zoom level.
+   */
+  getScaledSize(geometry: IGridRenderer, zoom: number): number {
+    return geometry.getScaledCellSize(zoom);
+  },
+
+  /**
+   * Calculate viewport offset for grid maps.
+   * Grid maps multiply center by scaled cell size.
+   */
+  calculateViewportOffset(
+    geometry: IGridRenderer,
+    center: { x: number; y: number },
+    canvasSize: { width: number; height: number },
+    zoom: number
+  ): { offsetX: number; offsetY: number } {
+    const scaledSize = geometry.getScaledCellSize(zoom);
+    return {
+      offsetX: canvasSize.width / 2 - center.x * scaledSize,
+      offsetY: canvasSize.height / 2 - center.y * scaledSize,
+    };
+  },
+
+  /**
+   * Render background image for grid maps.
+   * Grid maps don't support background images - this is a no-op.
+   */
+  renderBackgroundImage(): void {
+    // Grid maps don't render background images
+  },
+
+  /**
    * Render grid overlay lines
    */
   renderGrid(

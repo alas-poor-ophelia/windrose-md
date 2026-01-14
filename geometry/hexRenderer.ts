@@ -19,11 +19,91 @@ import type {
   IHexRenderer
 } from '#types/core/rendering.types';
 
+// Datacore imports for background image rendering
+const pathResolverPath = dc.resolvePath("pathResolver.ts");
+const { requireModuleByName } = await dc.require(pathResolverPath) as {
+  requireModuleByName: (name: string) => Promise<unknown>
+};
+
+const { renderHexBackgroundImage } = await requireModuleByName("backgroundRenderer.ts") as {
+  renderHexBackgroundImage: (
+    bgImage: HTMLImageElement,
+    config: { path: string; offsetX?: number; offsetY?: number; opacity?: number },
+    hexBounds: { maxCol: number; maxRow: number },
+    hexGeometry: { hexSize: number; sqrt3: number; hexToWorld: (q: number, r: number) => { worldX: number; worldY: number } },
+    orientation: string,
+    context: { ctx: CanvasRenderingContext2D; offsetX: number; offsetY: number; zoom: number },
+    offsetToAxial: (col: number, row: number, orientation: string) => { q: number; r: number }
+  ) => void;
+};
+
+const { offsetToAxial } = await requireModuleByName("offsetCoordinates.ts") as {
+  offsetToAxial: (col: number, row: number, orientation: string) => { q: number; r: number };
+};
+
 // ===========================================
 // Hex Renderer Module
 // ===========================================
 
 const hexRenderer = {
+  /**
+   * Whether this renderer supports segment (partial cell) rendering.
+   * Hex maps do not support segments.
+   */
+  supportsSegments: false,
+
+  /**
+   * Calculate the scaled cell size for the current zoom level.
+   */
+  getScaledSize(geometry: IHexRenderer, zoom: number): number {
+    return geometry.getScaledCellSize(zoom);
+  },
+
+  /**
+   * Calculate viewport offset for hex maps.
+   * Hex maps multiply center by zoom only (center is in world coordinates).
+   */
+  calculateViewportOffset(
+    _geometry: IHexRenderer,
+    center: { x: number; y: number },
+    canvasSize: { width: number; height: number },
+    zoom: number
+  ): { offsetX: number; offsetY: number } {
+    return {
+      offsetX: canvasSize.width / 2 - center.x * zoom,
+      offsetY: canvasSize.height / 2 - center.y * zoom,
+    };
+  },
+
+  /**
+   * Render background image for hex maps.
+   * Centers the image based on hex grid bounds.
+   */
+  renderBackgroundImage(
+    ctx: CanvasRenderingContext2D,
+    geometry: IHexRenderer,
+    bgImage: HTMLImageElement | null,
+    bgConfig: { path: string; offsetX?: number; offsetY?: number; opacity?: number } | undefined,
+    hexBounds: { maxCol: number; maxRow: number } | undefined,
+    orientation: string,
+    offsetX: number,
+    offsetY: number,
+    zoom: number
+  ): void {
+    if (!bgImage || !bgConfig?.path || !hexBounds) return;
+    if (!bgImage.complete) return;
+
+    renderHexBackgroundImage(
+      bgImage,
+      bgConfig,
+      hexBounds,
+      geometry as unknown as { hexSize: number; sqrt3: number; hexToWorld: (q: number, r: number) => { worldX: number; worldY: number } },
+      orientation,
+      { ctx, offsetX, offsetY, zoom },
+      offsetToAxial
+    );
+  },
+
   /**
    * Render hex grid overlay
    */

@@ -63,6 +63,7 @@ interface VisibleGridRange {
 }
 
 class GridGeometry extends BaseGeometry {
+  readonly type = 'grid' as const;
   cellSize: number;
 
   /**

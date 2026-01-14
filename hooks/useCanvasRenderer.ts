@@ -87,6 +87,17 @@ const { HexGeometry } = await requireModuleByName("HexGeometry.ts") as {
 };
 
 interface Renderer {
+  // Polymorphic properties
+  supportsSegments: boolean;
+
+  // Polymorphic methods for viewport calculation
+  getScaledSize: (geometry: IGeometry, zoom: number) => number;
+  calculateViewportOffset: (geometry: IGeometry, center: { x: number; y: number }, canvasSize: { width: number; height: number }, zoom: number) => { offsetX: number; offsetY: number };
+
+  // Optional background image rendering (hex only)
+  renderBackgroundImage: (ctx: CanvasRenderingContext2D, geometry: IGeometry, bgImage: HTMLImageElement | null, bgConfig: { path: string; offsetX?: number; offsetY?: number; opacity?: number } | undefined, hexBounds: { maxCol: number; maxRow: number } | undefined, orientation: string, offsetX: number, offsetY: number, zoom: number) => void;
+
+  // Grid/cell rendering
   renderGrid: (ctx: CanvasRenderingContext2D, geometry: IGeometry, viewState: RendererViewState, dimensions: { width: number; height: number }, showGrid: boolean, options: { lineColor: string; lineWidth: number }) => void;
   renderPaintedCells: (ctx: CanvasRenderingContext2D, cells: Cell[], geometry: IGeometry, viewState: RendererViewState) => void;
   renderCellBorders: (ctx: CanvasRenderingContext2D, cells: Cell[], geometry: IGeometry, viewState: RendererViewState, getLookup: () => CellMap, calculateBorders: typeof calculateBordersOptimized, options: { border: string; borderWidth: number }) => void;
@@ -122,10 +133,11 @@ const { getActiveLayer, getLayerBelow, isCellFogged } = await requireModuleByNam
 };
 
 /**
- * Get appropriate renderer for geometry type
+ * Get appropriate renderer for geometry type.
+ * Uses geometry.type discriminator instead of instanceof.
  */
 function getRenderer(geometry: IGeometry): Renderer {
-  return geometry instanceof HexGeometry ? hexRenderer : gridRenderer;
+  return geometry.type === 'hex' ? hexRenderer : gridRenderer;
 }
 
 /** Options for rendering layer content */
@@ -167,7 +179,7 @@ function renderLayerCellsAndEdges(
       renderer.renderPaintedCells(ctx, simpleCells, geometry, viewState);
     }
 
-    if (segmentCells.length > 0 && geometry instanceof GridGeometry) {
+    if (segmentCells.length > 0 && renderer.supportsSegments) {
       segmentRenderer.renderSegmentCells(ctx, segmentCells, geometry, viewState);
     }
 
@@ -196,7 +208,7 @@ function renderLayerCellsAndEdges(
       );
     }
 
-    if (segmentCells.length > 0 && geometry instanceof GridGeometry) {
+    if (segmentCells.length > 0 && renderer.supportsSegments) {
       segmentRenderer.renderSegmentBorders(
         ctx,
         segmentCells,
@@ -212,7 +224,7 @@ function renderLayerCellsAndEdges(
   }
 
   // Draw painted edges (grid maps only)
-  if (layer.edges && layer.edges.length > 0 && geometry instanceof GridGeometry && renderer.renderEdges) {
+  if (layer.edges && layer.edges.length > 0 && renderer.supportsSegments && renderer.renderEdges) {
     renderer.renderEdges(ctx, layer.edges, geometry, viewState, {
       lineWidth: 1,
       borderWidth: theme.cells.borderWidth
@@ -262,36 +274,28 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   // Get appropriate renderer for this geometry
   const renderer = getRenderer(geometry);
 
-  // Calculate viewport based on geometry type
-  let scaledSize: number, offsetX: number, offsetY: number;
+  // Calculate viewport using renderer's polymorphic method
+  const scaledSize = renderer.getScaledSize(geometry, zoom);
+  const { offsetX, offsetY } = renderer.calculateViewportOffset(
+    geometry,
+    center,
+    { width, height },
+    zoom
+  );
 
-  if (geometry instanceof GridGeometry) {
-    scaledSize = geometry.getScaledCellSize(zoom);
-    // Grid: center is in grid cell coordinates, multiply by cell size
-    offsetX = width / 2 - center.x * scaledSize;
-    offsetY = height / 2 - center.y * scaledSize;
-  } else {
-    // HexGeometry: center is in world pixel coordinates, multiply by zoom only
-    scaledSize = (geometry as InstanceType<typeof HexGeometry>).getScaledHexSize(zoom);
-    offsetX = width / 2 - center.x * zoom;
-    offsetY = height / 2 - center.y * zoom;
-  }
-
-  // Draw background image for hex maps (if available)
-  if (geometry instanceof HexGeometry && mapData.backgroundImage?.path) {
-    const bgImage = getCachedImage(mapData.backgroundImage.path);
-    if (bgImage && bgImage.complete && mapData.hexBounds) {
-      renderHexBackgroundImage(
-        bgImage,
-        mapData.backgroundImage,
-        mapData.hexBounds,
-        geometry as InstanceType<typeof HexGeometry>,
-        mapData.orientation || 'flat',
-        { ctx, offsetX, offsetY, zoom },
-        offsetToAxial
-      );
-    }
-  }
+  // Draw background image (hex maps only - grid renderer is no-op)
+  const bgImage = mapData.backgroundImage?.path ? getCachedImage(mapData.backgroundImage.path) : null;
+  renderer.renderBackgroundImage(
+    ctx,
+    geometry,
+    bgImage,
+    mapData.backgroundImage,
+    mapData.hexBounds,
+    mapData.orientation || 'flat',
+    offsetX,
+    offsetY,
+    zoom
+  );
 
   // Create renderer viewState object
   const rendererViewState: RendererViewState = {
@@ -334,7 +338,7 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
 
   // Draw objects
   if (activeLayer.objects && activeLayer.objects.length > 0 && !showCoordinates && visibility.objects) {
-    const isHexMap = geometry instanceof HexGeometry;
+    const isHexMap = geometry.type === 'hex';
     renderObjects(
       activeLayer,
       { ctx, offsetX, offsetY, zoom, scaledSize },
@@ -380,7 +384,7 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
 
   if (fow && fow.enabled && fow.foggedCells?.length) {
     const fogSettings = getFogSettings(effectiveSettings);
-    const isHexMap = geometry instanceof HexGeometry;
+    const isHexMap = geometry.type === 'hex';
     const hexGeom = isHexMap ? geometry as InstanceType<typeof HexGeometry> : null;
     const gridGeom = !isHexMap ? geometry as InstanceType<typeof GridGeometry> : null;
 
@@ -403,7 +407,7 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   }
 
   // Draw selection indicators
-  const isHexMapForSelection = geometry instanceof HexGeometry;
+  const isHexMapForSelection = geometry.type === 'hex';
   const hexGeomForSelection = isHexMapForSelection ? geometry as InstanceType<typeof HexGeometry> : null;
   renderSelections(
     itemsArray,
