@@ -112,15 +112,20 @@ export type { Cell };
 
 /**
  * IGeometry - Abstract interface for grid/hex geometry operations.
- * 
+ *
  * All coordinate parameters and return values use normalized Point (x, y).
  * Implementations interpret these in their native coordinate system:
  * - GridGeometry: x = gridX, y = gridY
  * - HexGeometry: x = q, y = r (axial)
- * 
+ *
  * This allows polymorphic code that works with any geometry type.
  */
 export interface IGeometry {
+  /**
+   * Geometry type discriminator for polymorphic dispatch.
+   * Use this instead of instanceof checks.
+   */
+  readonly type: 'grid' | 'hex';
   // ===========================================
   // Coordinate Conversions
   // ===========================================
