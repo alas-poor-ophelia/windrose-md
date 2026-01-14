@@ -14,6 +14,7 @@ import {
   setupFogCanvas,
   calculateGridVisibleBounds,
   calculateHexVisibleBounds,
+  clearFogCanvas,
   renderFog,
 } from "../../../src/geometry/fogRenderer.ts";
 
@@ -476,6 +477,40 @@ describe("fogRenderer", () => {
       );
 
       expect(ctx.globalAlpha).toBe(0.5);
+    });
+  });
+
+  // ===========================================================================
+  // clearFogCanvas
+  // ===========================================================================
+
+  describe("clearFogCanvas", () => {
+    it("does nothing when fogCanvas is null", () => {
+      // Should not throw
+      clearFogCanvas(null);
+    });
+
+    it("clears the fog canvas and removes filter", () => {
+      const fogCanvas = createMockFogCanvas();
+      const fogCtx = fogCanvas.getContext('2d');
+      fogCanvas.style.filter = 'blur(10px)';
+
+      clearFogCanvas(fogCanvas);
+
+      expect(fogCtx?.clearRect).toHaveBeenCalledWith(0, 0, 800, 600);
+      expect(fogCanvas.style.filter).toBe('none');
+    });
+
+    it("handles canvas without context gracefully", () => {
+      const fogCanvas = {
+        width: 800,
+        height: 600,
+        style: { filter: 'blur(5px)' },
+        getContext: vi.fn(() => null),
+      } as unknown as HTMLCanvasElement;
+
+      // Should not throw
+      clearFogCanvas(fogCanvas);
     });
   });
 });
