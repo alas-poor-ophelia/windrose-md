@@ -5,7 +5,7 @@
   "includeDemo": false,
   "minifyEnabled": false,
   "obfuscateEnabled": false,
-  "version": "1.5.1",
+  "version": "1.5.2",
   "additionalFiles": [],
   "postScript": "Projects/dungeon-map-tracker/finalize-release.js"
 }
