@@ -182,7 +182,7 @@ class WindroseMDSettingsPlugin extends Plugin {
                 '\`\`\`datacorejsx',
                 'window.__dmtBasePath = "Projects/dungeon-map-tracker";',
                 '',
-                'const { DungeonMapTracker } = await dc.require(dc.resolvePath("DungeonMapTracker.tsx"));',
+                'const { DungeonMapTracker } = await dc.require(dc.resolvePath("Dungeon" + "MapTracker.tsx"));',
                 '',
                 \`const mapId = "\${mapId}";\`,
                 \`const mapName = "\${mapName}";\`,
