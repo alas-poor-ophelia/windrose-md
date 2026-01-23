@@ -21,13 +21,34 @@ function getBasePath(): string {
   return window.__dmtBasePath;
 }
 
+// Default dev path
+const DEFAULT_DATA_PATH = "Garden/90 - Data/12 - Meta/JSON/dungeon-maps-data.json";
+
+// Resolve data file path at module load time
+// Priority: 1) WINDROSE-DEBUG.json override, 2) Hardcoded dev default
+let resolvedDataPath: string = DEFAULT_DATA_PATH;
+
+try {
+  const debugFile = app.vault.getAbstractFileByPath('WINDROSE-DEBUG.json');
+  if (debugFile) {
+    const content = await app.vault.read(debugFile);
+    const config = JSON.parse(content);
+    if (config.dataFilePath) {
+      resolvedDataPath = config.dataFilePath;
+    }
+  }
+} catch (e) {
+  console.warn('[pathResolver] Failed to load WINDROSE-DEBUG.json:', (e as Error).message);
+}
+
 /**
- * Get the JSON data file path
+ * Get the JSON data file path.
+ * Returns the resolved path from WINDROSE-DEBUG.json or the default.
  */
 function getJsonPath(): string {
-  // Note: basePath call validates initialization but path is currently hardcoded
+  // Validate base path is initialized
   getBasePath();
-  return "Garden/90 - Data/12 - Meta/JSON/dungeon-maps-data.json";
+  return resolvedDataPath;
 }
 
 /**

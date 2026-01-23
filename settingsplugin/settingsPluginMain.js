@@ -173,24 +173,37 @@ class WindroseMDSettingsPlugin extends Plugin {
       editorCallback: async (editor, view) => {
         new InsertDungeonModal(this.app, this, async (mapName, cells, objects, options) => {
           const mapId = 'map-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
-          
-          // Save the generated dungeon directly to JSON
           await this.saveDungeonToJson(mapId, mapName, cells, objects, options);
-          
-          // Insert a clean codeblock (no embedded cell data)
-          const codeBlock = [
-            '\`\`\`datacorejsx',
-            '',
-            'const { View: DungeonMapTracker } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md.md"), "DungeonMapTracker"));',
-            '',
-            \`const mapId = "\${mapId}";\`,
-            \`const mapName = "\${mapName}";\`,
-            'const mapType = "grid";',
-            '',
-            'return <DungeonMapTracker mapId={mapId} mapName={mapName} mapType={mapType} />;',
-            '\`\`\`'
-          ].join('\\n');
-          
+
+          // Debug mode uses source entry point instead of compiled
+          const debugFile = this.app.vault.getAbstractFileByPath('WINDROSE-DEBUG.json');
+          const codeBlock = debugFile
+            ? [
+                '\`\`\`datacorejsx',
+                'window.__dmtBasePath = "Projects/dungeon-map-tracker";',
+                '',
+                'const { DungeonMapTracker } = await dc.require(dc.resolvePath("DungeonMapTracker.tsx"));',
+                '',
+                \`const mapId = "\${mapId}";\`,
+                \`const mapName = "\${mapName}";\`,
+                'const mapType = "grid";',
+                '',
+                'return <DungeonMapTracker mapId={mapId} mapName={mapName} mapType={mapType} />;',
+                '\`\`\`'
+              ].join('\\n')
+            : [
+                '\`\`\`datacorejsx',
+                '',
+                'const { View: DungeonMapTracker } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md.md"), "DungeonMapTracker"));',
+                '',
+                \`const mapId = "\${mapId}";\`,
+                \`const mapName = "\${mapName}";\`,
+                'const mapType = "grid";',
+                '',
+                'return <DungeonMapTracker mapId={mapId} mapName={mapName} mapType={mapType} />;',
+                '\`\`\`'
+              ].join('\\n');
+
           editor.replaceSelection(codeBlock);
         }).open();
       }
@@ -294,6 +307,70 @@ class WindroseMDSettingsPlugin extends Plugin {
       return moduleFunc();
     } catch (e) {
       throw new Error('Failed to load dungeon generator: ' + e.message);
+    }
+  }
+
+  /**
+   * Load the object placer module for dungeon stocking.
+   * In debug mode (WINDROSE-DEBUG.json with objectPlacerPath), loads from a .js file directly.
+   * Otherwise, extracts from compiled-windrose-md.md.
+   * @returns {Promise<Object>} The object placer module exports
+   */
+  async loadObjectPlacer() {
+    // 1. Check for debug override
+    const debugFile = this.app.vault.getAbstractFileByPath('WINDROSE-DEBUG.json');
+    if (debugFile) {
+      try {
+        const debugContent = await this.app.vault.read(debugFile);
+        const config = JSON.parse(debugContent);
+        if (config.objectPlacerPath) {
+          console.log('[Windrose DEBUG] Loading objectPlacer from:', config.objectPlacerPath);
+          const placerFile = this.app.vault.getAbstractFileByPath(config.objectPlacerPath);
+          if (!placerFile) {
+            throw new Error('Debug objectPlacerPath not found: ' + config.objectPlacerPath);
+          }
+          const code = await this.app.vault.read(placerFile);
+          const moduleFunc = new Function(code);
+          return moduleFunc();
+        }
+      } catch (e) {
+        console.warn('[Windrose] Debug objectPlacer load failed, falling back to compiled:', e.message);
+      }
+    }
+
+    // 2. Production: Load from compiled markdown
+    const allFiles = this.app.vault.getFiles();
+    const compiledFile = allFiles.find(f => f.name === 'compiled-windrose-md.md');
+
+    if (!compiledFile) {
+      throw new Error(
+        'Could not find compiled-windrose-md.md in your vault. ' +
+        'Please ensure Windrose MapDesigner is properly installed.'
+      );
+    }
+
+    // Read the file content
+    const fileContent = await this.app.vault.read(compiledFile);
+
+    // Extract the objectPlacer code block
+    const headerPattern = /^# objectPlacer\\s*\\n+\`\`\`(?:js|javascript)?\\n([\\s\\S]*?)\\n\`\`\`/m;
+    const match = fileContent.match(headerPattern);
+
+    if (!match) {
+      throw new Error(
+        'Could not find objectPlacer section in compiled-windrose-md.md. ' +
+        'The file may be corrupted or from an incompatible version.'
+      );
+    }
+
+    const code = match[1];
+
+    // Execute the code to get exports
+    try {
+      const moduleFunc = new Function(code);
+      return moduleFunc();
+    } catch (e) {
+      throw new Error('Failed to load object placer: ' + e.message);
     }
   }
 

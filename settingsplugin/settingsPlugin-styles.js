@@ -1120,6 +1120,35 @@ return `/* settingsPlugin-styles.css
 }
 
 /* ===========================================
+ * Dungeon Modal Section Headers
+ * =========================================== */
+.dmt-dungeon-section-header {
+  font-size: 0.85em;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.dmt-dungeon-subsection {
+  font-size: 0.8em;
+  font-weight: 500;
+  color: var(--text-muted);
+  margin-top: 8px;
+  padding-left: 4px;
+}
+
+.dmt-checkbox-hint {
+  font-size: 0.8em;
+  color: var(--text-muted);
+  margin-left: 142px;
+  margin-top: 2px;
+}
+
+/* ===========================================
  * Animations
  * =========================================== */
 @keyframes dmt-shake {

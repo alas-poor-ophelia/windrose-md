@@ -11,6 +11,7 @@ const { requireModuleByName } = await dc.require(pathResolverPath);
 
 const { useMapState, useMapOperations } = await requireModuleByName("MapContext.tsx");
 const { generateDungeon } = await requireModuleByName("dungeonGenerator.js");
+const { stockDungeon } = await requireModuleByName("objectPlacer.js");
 const { ModalPortal } = await requireModuleByName("ModalPortal.tsx");
 
 const RerollDungeonButton = () => {
@@ -32,10 +33,30 @@ const RerollDungeonButton = () => {
   
   const handleConfirm = () => {
     const result = generateDungeon(settings.preset, undefined, settings.configOverrides || {});
-    // Replace cells and objects on active layer with new generated content
+    const stockResult = stockDungeon(
+      result.metadata.rooms,
+      result.metadata.corridorResult,
+      result.metadata.doorPositions,
+      result.metadata.style || 'classic',
+      {
+        objectDensity: settings.configOverrides?.objectDensity ?? 1.0,
+        monsterWeight: settings.configOverrides?.monsterWeight,
+        emptyWeight: settings.configOverrides?.emptyWeight,
+        featureWeight: settings.configOverrides?.featureWeight,
+        trapWeight: settings.configOverrides?.trapWeight,
+        useTemplates: settings.configOverrides?.useTemplates
+      },
+      {
+        entryRoomId: result.metadata.entryRoomId,
+        exitRoomId: result.metadata.exitRoomId,
+        waterRoomIds: result.metadata.waterRoomIds
+      }
+    );
+    const allObjects = [...result.objects, ...stockResult.objects];
+
     // suppressHistory = false so this can be undone
     onCellsChange(result.cells, false);
-    onObjectsChange(result.objects, false);
+    onObjectsChange(allObjects, false);
     setShowConfirm(false);
   };
   

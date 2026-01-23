@@ -29,7 +29,8 @@ const DUNGEON_PRESETS = {
     loopChance: 0,
     doorChance: 0.7,
     secretDoorChance: 0.05,
-    wideCorridorChance: 0
+    wideCorridorChance: 0,
+    diagonalCorridorChance: 0
   },
   medium: {
     // "Complex" - classic dungeon, multiple paths, exploration, some grand halls
@@ -45,7 +46,8 @@ const DUNGEON_PRESETS = {
     loopChance: 0.15,
     doorChance: 0.7,
     secretDoorChance: 0.05,
-    wideCorridorChance: 0.25
+    wideCorridorChance: 0.25,
+    diagonalCorridorChance: 0.5
   },
   large: {
     // "Grand" - fortress/temple scale, grand corridors, many chambers, sprawling
@@ -61,7 +63,8 @@ const DUNGEON_PRESETS = {
     loopChance: 0.08,
     doorChance: 0.7,
     secretDoorChance: 0.05,
-    wideCorridorChance: 0.5
+    wideCorridorChance: 0.5,
+    diagonalCorridorChance: 0.5
   }
 };
 
@@ -76,7 +79,10 @@ const DUNGEON_STYLES = {
     // Default balanced dungeon - no overrides needed
     name: 'Classic',
     description: 'Balanced mix of rooms and corridors',
-    overrides: {}
+    overrides: {
+      waterChance: 0.15,
+      diagonalCorridorChance: 0.5
+    }
   },
   cavern: {
     name: 'Cavern',
@@ -88,7 +94,9 @@ const DUNGEON_STYLES = {
       doorChance: 0,
       secretDoorChance: 0,
       loopChance: 0.2,
-      roomSizeBias: 0.3
+      roomSizeBias: 0.3,
+      waterChance: 0.35,
+      diagonalCorridorChance: 0.7  // More organic paths
     }
   },
   fortress: {
@@ -101,7 +109,9 @@ const DUNGEON_STYLES = {
       doorChance: 0.95,
       secretDoorChance: 0.02,
       wideCorridorChance: 0.7,
-      roomSizeBias: -0.2
+      roomSizeBias: -0.2,
+      waterChance: 0.05,
+      diagonalCorridorChance: 0.2  // Military = more ordered
     }
   },
   crypt: {
@@ -115,12 +125,16 @@ const DUNGEON_STYLES = {
       secretDoorChance: 0.2,
       loopChance: 0.02,
       wideCorridorChance: 0,
-      roomSizeBias: -0.4
+      roomSizeBias: -0.4,
+      waterChance: 0.20,
+      diagonalCorridorChance: 0.3
     }
   }
 };
 
 const DEFAULT_FLOOR_COLOR = '#c4a57b';
+const DEFAULT_WATER_COLOR = '#4a90d9';
+const DEFAULT_WATER_OPACITY = 0.6;
 
 // =============================================================================
 // UTILITY FUNCTIONS
@@ -1288,52 +1302,326 @@ function rebuildCellsFromPath(path, width, allRooms = [], roomA = null, roomB = 
 }
 
 // =============================================================================
+// DIAGONAL CORRIDOR GENERATION
+// =============================================================================
+
+/**
+ * Segment mapping for diagonal directions.
+ * Each diagonal direction fills 4 segments (matching CORNER_SEGMENT_FILL pattern).
+ */
+const DIAGONAL_SEGMENTS = {
+  // NE direction (moving right and up) - matches TR corner
+  ne: { nw: true, n: true, ne: true, e: true },
+  // SE direction (moving right and down) - matches BR corner
+  se: { ne: true, e: true, se: true, s: true },
+  // SW direction (moving left and down) - matches BL corner
+  sw: { se: true, s: true, sw: true, w: true },
+  // NW direction (moving left and up) - matches TL corner
+  nw: { sw: true, w: true, nw: true, n: true }
+};
+
+/**
+ * Determine the primary diagonal direction from one point to another.
+ * @param {number} dx - X difference (positive = moving right)
+ * @param {number} dy - Y difference (positive = moving down)
+ * @returns {string|null} Diagonal direction ('ne', 'se', 'sw', 'nw') or null if not diagonal
+ */
+function getDiagonalDirection(dx, dy) {
+  if (dx === 0 || dy === 0) return null;
+  if (dx > 0 && dy < 0) return 'ne';  // Right and up
+  if (dx > 0 && dy > 0) return 'se';  // Right and down
+  if (dx < 0 && dy > 0) return 'sw';  // Left and down
+  if (dx < 0 && dy < 0) return 'nw';  // Left and up
+  return null;
+}
+
+/**
+ * Check if rooms are positioned to allow a clean diagonal path.
+ * Diagonals work best when rooms are offset both horizontally and vertically.
+ * @returns {boolean} True if diagonal corridor is appropriate
+ */
+function canUseDiagonalCorridor(roomA, roomB, allRooms) {
+  const centerA = getRoomCenter(roomA);
+  const centerB = getRoomCenter(roomB);
+
+  const dx = Math.abs(centerB.x - centerA.x);
+  const dy = Math.abs(centerB.y - centerA.y);
+
+  // Need at least 3 cells of offset in both directions for a visible diagonal
+  if (dx < 3 || dy < 3) return false;
+
+  // Check if diagonal path would cross another room
+  const diagonalDir = getDiagonalDirection(centerB.x - centerA.x, centerB.y - centerA.y);
+  if (!diagonalDir) return false;
+
+  // Sample points along diagonal path
+  const steps = Math.min(dx, dy);
+  const stepX = (centerB.x - centerA.x) / steps;
+  const stepY = (centerB.y - centerA.y) / steps;
+
+  for (let i = 1; i < steps; i++) {
+    const testX = Math.round(centerA.x + stepX * i);
+    const testY = Math.round(centerA.y + stepY * i);
+
+    for (const room of allRooms) {
+      if (room.id === roomA.id || room.id === roomB.id) continue;
+      if (isCellInRoomRect(testX, testY, room)) return false;
+    }
+  }
+
+  return true;
+}
+
+/**
+ * Create a segment cell for diagonal corridor.
+ * @param {number} x - Cell X coordinate
+ * @param {number} y - Cell Y coordinate
+ * @param {string} diagonalDir - Diagonal direction ('ne', 'se', 'sw', 'nw')
+ * @param {string} color - Cell color
+ * @returns {Object} Cell with segments property
+ */
+function createDiagonalSegmentCell(x, y, diagonalDir, color) {
+  return {
+    x,
+    y,
+    color,
+    segments: { ...DIAGONAL_SEGMENTS[diagonalDir] }
+  };
+}
+
+/**
+ * Carve a diagonal corridor between two rooms.
+ * Uses segment cells for 45-degree paths, transitioning to full cells at room boundaries.
+ * @param {Object} roomA - Source room
+ * @param {Object} roomB - Destination room
+ * @param {number} width - Corridor width (1 or 2)
+ * @param {Array} allRooms - All rooms for collision checking
+ * @param {string} color - Floor color
+ * @returns {Object} { cells: Array, orderedPath: Array, width: number, hasDiagonals: boolean }
+ */
+function carveDiagonalCorridor(roomA, roomB, width, allRooms, color) {
+  const centerA = getRoomCenter(roomA);
+  const centerB = getRoomCenter(roomB);
+
+  const dx = centerB.x - centerA.x;
+  const dy = centerB.y - centerA.y;
+  const xDir = dx > 0 ? 1 : -1;
+  const yDir = dy > 0 ? 1 : -1;
+  const diagonalDir = getDiagonalDirection(dx, dy);
+
+  const cells = [];
+  const orderedPath = [];
+  const cellSet = new Set();
+
+  const addCell = (cell) => {
+    const key = cellKey(cell.x, cell.y);
+    if (!cellSet.has(key)) {
+      cellSet.add(key);
+      cells.push(cell);
+    }
+  };
+
+  let currentX = centerA.x;
+  let currentY = centerA.y;
+
+  // Phase 1: Exit room A with orthogonal cells
+  while (isCellInRoomRect(currentX, currentY, roomA) ||
+         isCellInRoomRect(currentX + xDir, currentY, roomA)) {
+    orderedPath.push({ x: currentX, y: currentY });
+    addCell({ x: currentX, y: currentY, color });
+    if (width === 2) {
+      // Add adjacent cell for width
+      if (dy !== 0) addCell({ x: currentX + 1, y: currentY, color });
+      else addCell({ x: currentX, y: currentY + 1, color });
+    }
+    currentX += xDir;
+    if (currentX === centerB.x) break;
+  }
+
+  // Phase 2: Diagonal corridor with full cells at diagonal positions and segment cells in crooks
+  // Crooks fill the triangular gaps between diagonal full cells with wedge-shaped segments
+  const diagonalSteps = Math.min(Math.abs(centerB.x - currentX), Math.abs(centerB.y - currentY));
+
+  // Crook segment patterns based on diagonal direction
+  // Each direction needs specific segment wedges to create smooth 45° walls
+  const CROOK_SEGMENTS = {
+    se: { horizontal: 'sw', vertical: 'ne' },
+    nw: { horizontal: 'ne', vertical: 'sw' },
+    ne: { horizontal: 'nw', vertical: 'se' },
+    sw: { horizontal: 'se', vertical: 'nw' }
+  };
+  const crookPattern = CROOK_SEGMENTS[diagonalDir];
+
+  for (let i = 0; i < diagonalSteps; i++) {
+    // Check if we're entering room B - add entry crook and stop diagonal
+    if (isCellInRoomRect(currentX, currentY, roomB)) {
+      // Add diagonal segment at room entry to smooth the diagonal wall termination
+      addCell(createDiagonalSegmentCell(currentX, currentY, diagonalDir, color));
+      break;
+    }
+
+    orderedPath.push({ x: currentX, y: currentY });
+
+    // Place full cell at diagonal position
+    addCell({ x: currentX, y: currentY, color });
+
+    // Place segment cells in the crooks (triangular gaps)
+    // Horizontal crook: adjacent in x direction
+    addCell(createDiagonalSegmentCell(currentX + xDir, currentY, crookPattern.horizontal, color));
+    // Vertical crook: adjacent in y direction
+    addCell(createDiagonalSegmentCell(currentX, currentY + yDir, crookPattern.vertical, color));
+
+    if (width === 2) {
+      // Width 2: Add parallel diagonal track
+      // Full cell on parallel diagonal
+      const parallelX = (diagonalDir === 'ne' || diagonalDir === 'se') ? currentX + 1 : currentX - 1;
+      const parallelY = (diagonalDir === 'se' || diagonalDir === 'sw') ? currentY + 1 : currentY - 1;
+      addCell({ x: parallelX, y: parallelY, color });
+    }
+
+    currentX += xDir;
+    currentY += yDir;
+  }
+
+  // Transition crook: fill the gap where diagonal meets orthogonal
+  if (diagonalSteps > 0 && !isCellInRoomRect(currentX, currentY, roomB)) {
+    const remainingX = centerB.x - currentX;
+    const remainingY = centerB.y - currentY;
+
+    if (remainingX !== 0 && remainingY === 0) {
+      // Continuing horizontally only - add vertical crook behind current position
+      addCell(createDiagonalSegmentCell(currentX - xDir, currentY, crookPattern.vertical, color));
+    } else if (remainingY !== 0 && remainingX === 0) {
+      // Continuing vertically only - add horizontal crook behind current position
+      addCell(createDiagonalSegmentCell(currentX, currentY - yDir, crookPattern.horizontal, color));
+    }
+  }
+
+  // Phase 3: Finish with orthogonal to room B center
+  while (currentX !== centerB.x || currentY !== centerB.y) {
+    orderedPath.push({ x: currentX, y: currentY });
+    addCell({ x: currentX, y: currentY, color });
+    if (width === 2) {
+      if (currentX !== centerB.x) addCell({ x: currentX, y: currentY + 1, color });
+      else addCell({ x: currentX + 1, y: currentY, color });
+    }
+
+    if (currentX !== centerB.x) currentX += xDir;
+    else if (currentY !== centerB.y) currentY += yDir;
+    else break;
+  }
+
+  // Add final cell
+  orderedPath.push({ x: centerB.x, y: centerB.y });
+  addCell({ x: centerB.x, y: centerB.y, color });
+
+  return {
+    cells,
+    orderedPath,
+    width,
+    hasDiagonals: true
+  };
+}
+
+/**
+ * Carve corridors with diagonal style option.
+ * @param {Array} connections - Room connection pairs
+ * @param {number} corridorWidth - Base corridor width
+ * @param {Array} allRooms - All rooms
+ * @param {string} corridorStyle - 'straight', 'organic', or 'diagonal'
+ * @param {number} diagonalChance - Probability of using diagonal (0-1)
+ * @param {string} color - Floor color
+ * @returns {Object} { cells: Array, byConnection: Array }
+ */
+function carveCorridorsWithDiagonals(connections, corridorWidth, allRooms, corridorStyle, diagonalChance, color) {
+  const allCorridorCells = [];
+  const corridorsByConnection = [];
+
+  for (const [roomA, roomB] of connections) {
+    let result;
+    let usedDiagonal = false;
+
+    // Try diagonal if style allows and rooms are suitable
+    if (corridorStyle === 'diagonal' || (corridorStyle !== 'organic' && diagonalChance > 0)) {
+      const tryDiagonal = corridorStyle === 'diagonal' || Math.random() < diagonalChance;
+
+      if (tryDiagonal && canUseDiagonalCorridor(roomA, roomB, allRooms)) {
+        result = carveDiagonalCorridor(roomA, roomB, corridorWidth, allRooms, color);
+        usedDiagonal = true;
+      }
+    }
+
+    // Fall back to standard corridor
+    if (!usedDiagonal) {
+      result = carveCorridorBetween(roomA, roomB, corridorWidth, allRooms);
+
+      // Apply wobble for organic style
+      if (corridorStyle === 'organic') {
+        result = addCorridorWobble(result, allRooms, roomA, roomB);
+      }
+    }
+
+    allCorridorCells.push(...result.cells);
+    corridorsByConnection.push({
+      roomA,
+      roomB,
+      cells: result.cells,
+      orderedPath: result.orderedPath,
+      width: result.width,
+      hasDiagonals: usedDiagonal
+    });
+  }
+
+  return { cells: allCorridorCells, byConnection: corridorsByConnection };
+}
+
+// =============================================================================
 // PHASE 3.5: DOOR DETECTION
 // =============================================================================
 
 /**
  * Find door candidates by walking corridors and detecting room boundary crossings.
- * Uses rectangular bounds to avoid circular room corner issues.
+ * Uses actual room shape (isCellInRoom) for accurate detection with composite/circular rooms.
  */
 function findDoorCandidatesForConnection(roomA, roomB, orderedPath, corridorWidth) {
   const candidates = [];
-  
+
   if (orderedPath.length < 2) return candidates;
-  
-  let prevInA = isCellInRoomRect(orderedPath[0].x, orderedPath[0].y, roomA);
-  let prevInB = isCellInRoomRect(orderedPath[0].x, orderedPath[0].y, roomB);
-  
+
+  let prevInA = isCellInRoom(orderedPath[0].x, orderedPath[0].y, roomA);
+  let prevInB = isCellInRoom(orderedPath[0].x, orderedPath[0].y, roomB);
+
   for (let i = 1; i < orderedPath.length; i++) {
     const curr = orderedPath[i];
     const prev = orderedPath[i - 1];
-    
-    const currInA = isCellInRoomRect(curr.x, curr.y, roomA);
-    const currInB = isCellInRoomRect(curr.x, curr.y, roomB);
-    
+
+    const currInA = isCellInRoom(curr.x, curr.y, roomA);
+    const currInB = isCellInRoom(curr.x, curr.y, roomB);
+
     // Exiting room A
     if (prevInA && !currInA) {
       const dx = curr.x - prev.x;
       const dy = curr.y - prev.y;
       const type = (dy === 0) ? 'door-vertical' : 'door-horizontal';
       const alignment = getAlignmentFromDelta(-dx, -dy);
-      
+
       addDoorsForWidth(candidates, curr, type, alignment, roomA.id, corridorWidth, dx, dy);
     }
-    
+
     // Entering room B
     if (!prevInB && currInB) {
       const dx = curr.x - prev.x;
       const dy = curr.y - prev.y;
       const type = (dy === 0) ? 'door-vertical' : 'door-horizontal';
       const alignment = getAlignmentFromDelta(dx, dy);
-      
+
       addDoorsForWidth(candidates, prev, type, alignment, roomB.id, corridorWidth, dx, dy);
     }
-    
+
     prevInA = currInA;
     prevInB = currInB;
   }
-  
+
   return candidates;
 }
 
@@ -1555,13 +1843,71 @@ function generateStairObjects(entryRoom, exitRoom) {
 }
 
 // =============================================================================
+// PHASE 3.7: WATER FEATURE GENERATION
+// =============================================================================
+
+/**
+ * Select rooms to contain water based on waterChance.
+ * Avoids entry/exit rooms.
+ * @param {Array} rooms - All rooms
+ * @param {number} waterChance - Probability (0-1) for each room to contain water
+ * @param {number|null} entryRoomId - Entry room ID to exclude
+ * @param {number|null} exitRoomId - Exit room ID to exclude
+ * @returns {Array} Array of room IDs selected for water
+ */
+function selectWaterRooms(rooms, waterChance, entryRoomId, exitRoomId) {
+  const waterRoomIds = [];
+
+  for (const room of rooms) {
+    // Skip entry/exit rooms
+    if (room.id === entryRoomId || room.id === exitRoomId) continue;
+
+    // Roll for water
+    if (Math.random() < waterChance) {
+      waterRoomIds.push(room.id);
+    }
+  }
+
+  return waterRoomIds;
+}
+
+/**
+ * Generate water cells for selected rooms.
+ * Water is rendered as cells with a distinct blue color and reduced opacity.
+ * @param {Array} rooms - All rooms
+ * @param {Array} waterRoomIds - IDs of rooms to fill with water
+ * @param {string} waterColor - Color for water cells
+ * @param {number} waterOpacity - Opacity for water cells (0-1)
+ * @returns {Array} Array of water cell objects {x, y, color, opacity}
+ */
+function generateWaterCells(rooms, waterRoomIds, waterColor, waterOpacity) {
+  const waterCells = [];
+  const waterRoomSet = new Set(waterRoomIds);
+
+  for (const room of rooms) {
+    if (!waterRoomSet.has(room.id)) continue;
+
+    // Fill entire room with water
+    for (let x = room.x; x < room.x + room.width; x++) {
+      for (let y = room.y; y < room.y + room.height; y++) {
+        if (isCellInRoom(x, y, room)) {
+          waterCells.push({ x, y, color: waterColor, opacity: waterOpacity });
+        }
+      }
+    }
+  }
+
+  return waterCells;
+}
+
+// =============================================================================
 // PHASE 4: CELL GENERATION
 // =============================================================================
 
 function generateCells(rooms, corridorCells, color = DEFAULT_FLOOR_COLOR) {
   const cellMap = new Map();
-  
-  // Add room cells
+
+  // Add room cells (always full cells)
   for (const room of rooms) {
     for (let x = room.x; x < room.x + room.width; x++) {
       for (let y = room.y; y < room.y + room.height; y++) {
@@ -1571,15 +1917,29 @@ function generateCells(rooms, corridorCells, color = DEFAULT_FLOOR_COLOR) {
       }
     }
   }
-  
-  // Add corridor cells
+
+  // Add corridor cells (may include segment cells from diagonals)
   for (const cell of corridorCells) {
     const key = cellKey(cell.x, cell.y);
-    if (!cellMap.has(key)) {
-      cellMap.set(key, { x: cell.x, y: cell.y, color });
+    const existing = cellMap.get(key);
+
+    if (!existing) {
+      // No existing cell - add corridor cell as-is (may be segment or full)
+      if (cell.segments) {
+        cellMap.set(key, { x: cell.x, y: cell.y, color: cell.color || color, segments: cell.segments });
+      } else {
+        cellMap.set(key, { x: cell.x, y: cell.y, color: cell.color || color });
+      }
+    } else if (cell.segments && !existing.segments) {
+      // Existing is full cell, corridor has segments - keep full cell (room wins)
+      // No change needed
+    } else if (!cell.segments && existing.segments) {
+      // Corridor is full cell, existing has segments - upgrade to full cell
+      cellMap.set(key, { x: cell.x, y: cell.y, color: existing.color });
     }
+    // If both have segments or both are full, existing wins (first write wins)
   }
-  
+
   return Array.from(cellMap.values());
 }
 
@@ -1610,7 +1970,15 @@ function generateDungeon(presetName = 'medium', color = DEFAULT_FLOOR_COLOR, con
   const useWideCorridors = Math.random() < (config.wideCorridorChance || 0);
   const corridorWidth = useWideCorridors ? 2 : (config.corridorWidth || 1);
   const corridorStyle = config.corridorStyle || 'straight';
-  const corridorResult = carveCorridors(connections, corridorWidth, rooms, corridorStyle);
+  const diagonalChance = config.diagonalCorridorChance ?? 0;
+
+  // Use diagonal-aware carving if diagonal corridors are enabled
+  let corridorResult;
+  if (diagonalChance > 0 || corridorStyle === 'diagonal') {
+    corridorResult = carveCorridorsWithDiagonals(connections, corridorWidth, rooms, corridorStyle, diagonalChance, color);
+  } else {
+    corridorResult = carveCorridors(connections, corridorWidth, rooms, corridorStyle);
+  }
   const corridorCells = corridorResult.cells;
   const corridorsByConnection = corridorResult.byConnection;
   
@@ -1625,16 +1993,33 @@ function generateDungeon(presetName = 'medium', color = DEFAULT_FLOOR_COLOR, con
   // Phase 3b: Generate entry/exit stairs
   const { entry, exit } = findEntryExitRooms(rooms);
   const stairObjects = generateStairObjects(entry, exit);
-  
+
+  // Phase 3c: Generate water features
+  const waterChance = config.waterChance ?? 0;
+  const waterColor = config.waterColor ?? DEFAULT_WATER_COLOR;
+  const waterOpacity = config.waterOpacity ?? DEFAULT_WATER_OPACITY;
+  const waterRoomIds = selectWaterRooms(rooms, waterChance, entry?.id, exit?.id);
+  const waterCells = generateWaterCells(rooms, waterRoomIds, waterColor, waterOpacity);
+
   // Combine all objects
   const objects = [...doorObjects, ...stairObjects];
-  
-  // Phase 4: Generate cells
-  const cells = generateCells(rooms, corridorCells, color);
-  
+
+  // Phase 4: Generate cells (floor first, then overlay water)
+  const floorCells = generateCells(rooms, corridorCells, color);
+
+  // Merge water cells - water overlays floor cells
+  const cellMap = new Map();
+  for (const cell of floorCells) {
+    cellMap.set(cellKey(cell.x, cell.y), cell);
+  }
+  for (const cell of waterCells) {
+    cellMap.set(cellKey(cell.x, cell.y), cell);
+  }
+  const cells = Array.from(cellMap.values());
+
   // Count secret doors for metadata
   const secretDoorCount = doorObjects.filter(o => o.type === 'secret-door').length;
-  
+
   return {
     cells,
     objects,
@@ -1647,8 +2032,14 @@ function generateDungeon(presetName = 'medium', color = DEFAULT_FLOOR_COLOR, con
       doorCount: doorObjects.length,
       secretDoorCount,
       hasWideCorridors: useWideCorridors,
+      hasDiagonalCorridors: corridorsByConnection.some(c => c.hasDiagonals),
       entryRoomId: entry?.id,
-      exitRoomId: exit?.id
+      exitRoomId: exit?.id,
+      waterRoomIds,
+      // Data for objectPlacer (dungeon stocking)
+      corridorResult,
+      doorPositions,
+      style: config.style || 'classic'
     }
   };
 }
@@ -1662,13 +2053,20 @@ return {
   DUNGEON_PRESETS,
   DUNGEON_STYLES,
   DEFAULT_FLOOR_COLOR,
-  
+  DEFAULT_WATER_COLOR,
+  DEFAULT_WATER_OPACITY,
+  DIAGONAL_SEGMENTS,
+
   // Individual phases
   generateRooms,
   buildConnectionGraph,
   carveCorridors,
+  carveCorridorsWithDiagonals,
+  carveDiagonalCorridor,
   generateCells,
-  
+  selectWaterRooms,
+  generateWaterCells,
+
   // Utilities
   getRoomCenter,
   getRoomCells,
@@ -1677,6 +2075,8 @@ return {
   isCellInRoomRect,
   isCellAdjacentToRoom,
   carveCorridorBetween,
+  canUseDiagonalCorridor,
+  getDiagonalDirection,
   findDoorCandidates,
   findDoorPositions,
   generateDoorObjects,
