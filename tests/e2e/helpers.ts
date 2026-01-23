@@ -16,11 +16,11 @@ const CONTAINER_TIMEOUT = TEST_MODE === "compiled" ? 60000 : 10000;
 export const AUTOSAVE_WAIT = TEST_MODE === "compiled" ? 4000 : 3000;
 
 // Data file path differs between dev and compiled modes
-// Dev: uses project-relative path in Garden folder
+// Dev: uses dedicated _test-data folder (isolated from manual testing)
 // Compiled: uses vault-root windrose-md-data.json
 export const DATA_FILE_PATH = TEST_MODE === "compiled"
   ? "windrose-md-data.json"
-  : "Garden/90 - Data/12 - Meta/JSON/dungeon-maps-data.json";
+  : "_test-data/dungeon-maps-data.json";
 
 // ===========================================
 // Error Tracking
@@ -488,5 +488,6 @@ export const TEST_MAPS = TEST_MODE === "compiled"
     } as const;
 
 export const MAP_IDS = {
-  grid: "smoke-test-map-001"
+  grid: "smoke-test-map-001",
+  dungeonTest: "dungeon-test-map-001"
 } as const;

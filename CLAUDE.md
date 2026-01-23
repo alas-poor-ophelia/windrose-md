@@ -64,3 +64,7 @@ Full integration tests that launch real Obsidian instances via `obsidian-testing
 | Component rendering | Optional | ✅ Required |
 | Tool interactions | Optional | ✅ Required |
 | Before committing | ✅ Required | ✅ Required |
+
+## Git Commits
+
+**No AI attribution in commits.** Do not include "Co-Authored-By: Claude", "Generated with Claude Code", "via Happy", or any other AI/LLM signatures. Keep commit messages clean and professional.

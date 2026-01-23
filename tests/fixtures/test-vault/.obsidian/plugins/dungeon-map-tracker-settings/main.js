@@ -23,7 +23,7 @@
 // VERSION & IMPORTS
 // =============================================================================
 
-const PLUGIN_VERSION = '0.12.9';
+const PLUGIN_VERSION = '0.14.2';
 
 const { Plugin, PluginSettingTab, Setting, Modal, setIcon } = require('obsidian');
 
@@ -59,19 +59,19 @@ const BUILT_IN_OBJECTS = [
   },
   {
     "id": "ladder",
-    "symbol": "⚍",
+    "symbol": "☍",
     "label": "Ladder",
     "category": "navigation"
   },
   {
     "id": "door-vertical",
-    "symbol": "║",
+    "symbol": "╏",
     "label": "Door (Vertical)",
     "category": "navigation"
   },
   {
     "id": "door-horizontal",
-    "symbol": "═",
+    "symbol": "╍",
     "label": "Door (Horizontal)",
     "category": "navigation"
   },
@@ -209,7 +209,7 @@ const BUILT_IN_OBJECTS = [
   },
   {
     "id": "plant",
-    "symbol": "❊",
+    "symbol": "⊕",
     "label": "Plant",
     "category": "features"
   },
@@ -306,7 +306,7 @@ const BUILT_IN_CATEGORIES = [
 
 const CATEGORY_ORDER = {};
 
-// RPGAwesome icon data - injected from rpgAwesomeIcons.js at install time
+// RPGAwesome icon data - injected from rpgAwesomeIcons.ts at install time
 const RA_ICONS = {
   "ra-acid": {
     "char": "\ue900",
@@ -4045,7 +4045,15 @@ class InsertDungeonModal extends Modal {
       wideCorridorChance: null,
       roomSizeBias: null,
       corridorStyle: null,
-      style: null
+      diagonalCorridorChance: null,
+      style: null,
+      objectDensity: null,
+      monsterWeight: null,
+      emptyWeight: null,
+      featureWeight: null,
+      trapWeight: null,
+      useTemplates: null,
+      waterChance: null
     };
   }
   
@@ -4076,7 +4084,46 @@ class InsertDungeonModal extends Modal {
       this.visualizer.updateSettings(this.getVisualizerSettings());
     }
   }
-  
+
+  async generateAndInsertDungeon() {
+    const generator = await this.plugin.loadDungeonGenerator();
+    const overrides = {};
+    for (const [key, val] of Object.entries(this.configOverrides)) {
+      if (val !== null) overrides[key] = val;
+    }
+
+    const result = generator.generateDungeon(this.dungeonSize, undefined, overrides);
+
+    const objectPlacer = await this.plugin.loadObjectPlacer();
+    const stockResult = objectPlacer.stockDungeon(
+      result.metadata.rooms,
+      result.metadata.corridorResult,
+      result.metadata.doorPositions,
+      result.metadata.style || 'classic',
+      {
+        objectDensity: overrides.objectDensity ?? 1.0,
+        monsterWeight: overrides.monsterWeight,
+        emptyWeight: overrides.emptyWeight,
+        featureWeight: overrides.featureWeight,
+        trapWeight: overrides.trapWeight,
+        useTemplates: overrides.useTemplates
+      },
+      { entryRoomId: result.metadata.entryRoomId, exitRoomId: result.metadata.exitRoomId }
+    );
+
+    const allObjects = [...result.objects, ...stockResult.objects];
+
+    await this.onInsert(this.mapName, result.cells, allObjects, {
+      distancePerCell: this.distancePerCell,
+      distanceUnit: this.distanceUnit,
+      preset: this.dungeonSize,
+      configOverrides: overrides,
+      roomCount: result.metadata.roomCount,
+      doorCount: result.metadata.doorCount
+    });
+    this.close();
+  }
+
   onOpen() {
     const { contentEl } = this;
     contentEl.empty();
@@ -4275,22 +4322,57 @@ class InsertDungeonModal extends Modal {
     createSlider(advancedContent, 'Wide Corridors', 'wideCorridorChance', 0, 1, 0.05, 0.25, pct);
     createSlider(advancedContent, 'Room Size Bias', 'roomSizeBias', -1, 1, 0.1, 0, biasLabel);
     
-    // Corridor style toggle
     const corridorRow = advancedContent.createDiv({ cls: 'dmt-dungeon-slider-row' });
     corridorRow.createEl('label', { text: 'Corridor Style' });
     const corridorToggleContainer = corridorRow.createDiv({ cls: 'dmt-dungeon-toggle-container' });
-    
+
     const corridorSelect = corridorToggleContainer.createEl('select', { cls: 'dmt-dungeon-select' });
     corridorSelect.createEl('option', { value: 'straight', text: 'Straight' });
     corridorSelect.createEl('option', { value: 'organic', text: 'Organic' });
+    corridorSelect.createEl('option', { value: 'diagonal', text: 'Diagonal' });
     corridorSelect.value = 'straight';
-    
+
     corridorSelect.addEventListener('change', (e) => {
       this.configOverrides.corridorStyle = e.target.value;
       this.updateVisualizer();
     });
-    
-    // Buttons
+
+    const diagonalLabel = (v) => v === 0 ? 'None' : `${Math.round(v * 100)}%`;
+    createSlider(advancedContent, 'Diagonal Corridors', 'diagonalCorridorChance', 0, 1, 0.1, 0.5, diagonalLabel);
+
+    advancedContent.createEl('div', { cls: 'dmt-dungeon-section-header', text: 'Environment' });
+
+    const waterLabel = (v) => v === 0 ? 'None' : `${Math.round(v * 100)}%`;
+    createSlider(advancedContent, 'Water Features', 'waterChance', 0, 0.5, 0.05, 0.15, waterLabel);
+
+    advancedContent.createEl('div', { cls: 'dmt-dungeon-section-header', text: 'Object Placement' });
+
+    const densityLabel = (v) => v < 0.75 ? 'Sparse' : v > 1.25 ? 'Dense' : 'Normal';
+    createSlider(advancedContent, 'Object Density', 'objectDensity', 0.5, 2, 0.1, 1.0, densityLabel);
+
+    const templateRow = advancedContent.createDiv({ cls: 'dmt-dungeon-slider-row' });
+    templateRow.createEl('label', { text: 'Room Templates' });
+    const templateToggleContainer = templateRow.createDiv({ cls: 'dmt-dungeon-toggle-container' });
+    const templateCheckbox = templateToggleContainer.createEl('input', {
+      type: 'checkbox',
+      attr: { id: 'dmt-template-toggle' }
+    });
+    templateCheckbox.checked = true;
+    templateToggleContainer.createEl('label', {
+      attr: { for: 'dmt-template-toggle' },
+      text: 'Library, Shrine, Barracks, etc.',
+      cls: 'dmt-checkbox-label'
+    });
+    templateCheckbox.addEventListener('change', (e) => {
+      this.configOverrides.useTemplates = e.target.checked;
+    });
+
+    advancedContent.createEl('div', { cls: 'dmt-dungeon-subsection', text: 'Room Categories' });
+    createSlider(advancedContent, 'Monsters', 'monsterWeight', 0, 1, 0.05, 0.33, pct);
+    createSlider(advancedContent, 'Empty Rooms', 'emptyWeight', 0, 1, 0.05, 0.33, pct);
+    createSlider(advancedContent, 'Features', 'featureWeight', 0, 1, 0.05, 0.17, pct);
+    createSlider(advancedContent, 'Traps', 'trapWeight', 0, 1, 0.05, 0.17, pct);
+
     const buttonContainer = contentEl.createDiv({ cls: 'dmt-modal-buttons' });
     
     const cancelBtn = buttonContainer.createEl('button', { text: 'Cancel' });
@@ -4299,63 +4381,23 @@ class InsertDungeonModal extends Modal {
     const generateBtn = buttonContainer.createEl('button', { text: 'Generate', cls: 'mod-cta' });
     generateBtn.onclick = async () => {
       if (!this.dungeonSize) {
-        // Brief visual feedback that size is required
         buttonRow.addClass('dmt-shake');
         setTimeout(() => buttonRow.removeClass('dmt-shake'), 300);
         return;
       }
-      
-      // Load generator and generate the dungeon
       try {
-        const generator = await this.plugin.loadDungeonGenerator();
-        
-        // Build config overrides (only include non-null values)
-        const overrides = {};
-        for (const [key, val] of Object.entries(this.configOverrides)) {
-          if (val !== null) overrides[key] = val;
-        }
-        
-        const result = generator.generateDungeon(this.dungeonSize, undefined, overrides);
-      
-      // Wait for the callback (which saves to JSON) before closing
-      await this.onInsert(this.mapName, result.cells, result.objects, {
-          distancePerCell: this.distancePerCell,
-          distanceUnit: this.distanceUnit,
-          preset: this.dungeonSize,
-          configOverrides: overrides,
-          roomCount: result.metadata.roomCount,
-          doorCount: result.metadata.doorCount
-        });
-        this.close();
+        await this.generateAndInsertDungeon();
       } catch (err) {
         console.error('[Windrose] Dungeon generation failed:', err);
         alert('Failed to generate dungeon: ' + err.message);
       }
     };
     
-    // Handle Enter key to submit (if size is selected)
     contentEl.addEventListener('keydown', async (e) => {
       if (e.key === 'Enter' && this.dungeonSize) {
         e.preventDefault();
         try {
-          const generator = await this.plugin.loadDungeonGenerator();
-          
-          // Build config overrides (only include non-null values)
-          const overrides = {};
-          for (const [key, val] of Object.entries(this.configOverrides)) {
-            if (val !== null) overrides[key] = val;
-          }
-          
-          const result = generator.generateDungeon(this.dungeonSize, undefined, overrides);
-          await this.onInsert(this.mapName, result.cells, result.objects, {
-            distancePerCell: this.distancePerCell,
-            distanceUnit: this.distanceUnit,
-            preset: this.dungeonSize,
-            configOverrides: overrides,
-            roomCount: result.metadata.roomCount,
-            doorCount: result.metadata.doorCount
-          });
-          this.close();
+          await this.generateAndInsertDungeon();
         } catch (err) {
           console.error('[Windrose] Dungeon generation failed:', err);
           alert('Failed to generate dungeon: ' + err.message);
@@ -5469,6 +5511,58 @@ class WindroseMDSettingsPlugin extends Plugin {
       }
     });
     
+    // Register Obsidian protocol handler for deep links
+    // Format: obsidian://windrose?notePath|mapId,x,y,zoom,layerId
+    this.registerObsidianProtocolHandler('windrose', async (params) => {
+      // The data comes as URL search params - we need to parse the raw query
+      // params.action = 'windrose', and the rest is in the query string
+      const rawQuery = Object.keys(params).find(key => key.includes('|'));
+      if (!rawQuery) {
+        console.error('[Windrose] Invalid deep link format');
+        return;
+      }
+
+      const pipeIndex = rawQuery.indexOf('|');
+      if (pipeIndex === -1) {
+        console.error('[Windrose] Missing pipe separator in deep link');
+        return;
+      }
+
+      const notePath = rawQuery.slice(0, pipeIndex);
+      const coordData = rawQuery.slice(pipeIndex + 1);
+      const parts = coordData.split(',');
+
+      if (parts.length !== 5) {
+        console.error('[Windrose] Invalid coordinate data in deep link');
+        return;
+      }
+
+      const [mapId, x, y, zoom, layerId] = parts;
+
+      try {
+        // Remove .md extension if present for openLinkText
+        const linkPath = notePath.replace(/\.md$/, '');
+        await this.app.workspace.openLinkText(linkPath, '', false);
+
+        // Small delay to let the note render before navigating
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('dmt-navigate-to', {
+            detail: {
+              mapId,
+              x: parseFloat(x),
+              y: parseFloat(y),
+              zoom: parseFloat(zoom),
+              layerId,
+              timestamp: Date.now()
+            }
+          }));
+        }, 100);
+      } catch (err) {
+        console.error('[Windrose] Failed to open note:', err);
+        new Notice('Failed to open map note');
+      }
+    });
+
     // Register command to generate a random dungeon
     this.addCommand({
       id: 'insert-random-dungeon',
@@ -5601,6 +5695,65 @@ class WindroseMDSettingsPlugin extends Plugin {
   }
 
   /**
+   * Load the object placer module for dungeon stocking.
+   * In debug mode (WINDROSE-DEBUG.json with objectPlacerPath), loads from a .js file directly.
+   * Otherwise, extracts from compiled-windrose-md.md.
+   * @returns {Promise<Object>} The object placer module exports
+   */
+  async loadObjectPlacer() {
+    const debugFile = this.app.vault.getAbstractFileByPath('WINDROSE-DEBUG.json');
+    if (debugFile) {
+      try {
+        const debugContent = await this.app.vault.read(debugFile);
+        const config = JSON.parse(debugContent);
+        if (config.objectPlacerPath) {
+          console.log('[Windrose DEBUG] Loading objectPlacer from:', config.objectPlacerPath);
+          const placerFile = this.app.vault.getAbstractFileByPath(config.objectPlacerPath);
+          if (!placerFile) {
+            throw new Error('Debug objectPlacerPath not found: ' + config.objectPlacerPath);
+          }
+          const code = await this.app.vault.read(placerFile);
+          const moduleFunc = new Function(code);
+          return moduleFunc();
+        }
+      } catch (e) {
+        console.warn('[Windrose] Debug objectPlacer load failed, falling back to compiled:', e.message);
+      }
+    }
+
+    const allFiles = this.app.vault.getFiles();
+    const compiledFile = allFiles.find(f => f.name === 'compiled-windrose-md.md');
+
+    if (!compiledFile) {
+      throw new Error(
+        'Could not find compiled-windrose-md.md in your vault. ' +
+        'Please ensure Windrose MapDesigner is properly installed.'
+      );
+    }
+
+    const fileContent = await this.app.vault.read(compiledFile);
+
+    const headerPattern = /^# objectPlacer\s*\n+```(?:js|javascript)?\n([\s\S]*?)\n```/m;
+    const match = fileContent.match(headerPattern);
+
+    if (!match) {
+      throw new Error(
+        'Could not find objectPlacer section in compiled-windrose-md.md. ' +
+        'The file may be corrupted or from an incompatible version.'
+      );
+    }
+
+    const code = match[1];
+
+    try {
+      const moduleFunc = new Function(code);
+      return moduleFunc();
+    } catch (e) {
+      throw new Error('Failed to load object placer: ' + e.message);
+    }
+  }
+
+  /**
    * Save a generated dungeon directly to the JSON data file
    */
   async saveDungeonToJson(mapId, mapName, cells, objects, options) {
@@ -5704,7 +5857,6 @@ class WindroseMDSettingsPlugin extends Plugin {
         await this.app.vault.create(dataFilePath, jsonString);
       }
       
-      console.log('[Windrose] Saved generated dungeon:', mapId, 'with', cells.length, 'cells and', (objects || []).length, 'doors');
     } catch (error) {
       console.error('[Windrose] Failed to save dungeon:', error);
       throw error;
@@ -5715,7 +5867,7 @@ class WindroseMDSettingsPlugin extends Plugin {
     try {
       const data = await this.loadData();
       this.settings = Object.assign({
-        version: '0.12.9',
+        version: '0.14.2',
         hexOrientation: 'flat',
         gridLineColor: '#666666',
         gridLineWidth: 1,
@@ -5755,7 +5907,7 @@ class WindroseMDSettingsPlugin extends Plugin {
     } catch (error) {
       console.warn('[DMT Settings] Error loading settings, using defaults:', error);
       this.settings = {
-        version: '0.12.9',
+        version: '0.14.2',
         hexOrientation: 'flat',
         gridLineColor: '#666666',
         gridLineWidth: 1,

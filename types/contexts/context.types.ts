@@ -58,6 +58,8 @@ export interface MapStateContextValue {
   geometry: ExtendedGeometry | null;
   canvasRef: React.RefObject<HTMLCanvasElement>;
   mapData: MapData | null;
+  mapId?: string;
+  notePath?: string;
   screenToGrid: (clientX: number, clientY: number) => Point | null;
   screenToWorld: (clientX: number, clientY: number) => { worldX: number; worldY: number } | null;
   getClientCoords: (e: PointerEvent | MouseEvent | TouchEvent) => { clientX: number; clientY: number };

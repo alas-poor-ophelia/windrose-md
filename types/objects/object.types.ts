@@ -144,7 +144,9 @@ export interface MapObject {
   position: Point;
   size: ObjectSize;
   label?: string;
+  customTooltip?: string; // Custom tooltip text (shown on hover)
   linkedNote?: string | null;
+  linkedObject?: ObjectLink | null;
   alignment?: ObjectAlignment;
   slot?: number;          // Hex maps: slot position (0-3)
   scale?: number;         // Rendering scale (0.25-1.3)
@@ -204,3 +206,15 @@ export type HexSlot = 0 | 1 | 2 | 3;
 
 /** Maximum objects per hex cell */
 export const MAX_OBJECTS_PER_HEX = 4;
+
+// ===========================================
+// Object Linking
+// ===========================================
+
+/** Reference to a linked object within the same map (cross-layer navigation) */
+export interface ObjectLink {
+  layerId: string;
+  objectId: string;
+  position: Point;
+  objectType?: string;
+}

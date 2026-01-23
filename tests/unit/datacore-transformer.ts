@@ -75,6 +75,10 @@ const MODULE_MAP: Record<string, string> = {
   'fogRenderer.ts': './geometry/fogRenderer.ts',
   'objectRenderer.ts': './geometry/objectRenderer.ts',
   'selectionRenderer.ts': './geometry/selectionRenderer.ts',
+
+  // Generation
+  'dungeonGenerator.js': './generation/dungeonGenerator.js',
+  'objectPlacer.js': './generation/objectPlacer.js',
 };
 
 export function datacoreTransformer(options: TransformOptions = {}): Plugin {

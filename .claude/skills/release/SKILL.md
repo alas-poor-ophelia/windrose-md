@@ -22,10 +22,15 @@ The Datacore Compiler command ID is already configured: `dc-compiler:compile-pro
 
 1. Read `DungeonMapTracker.md` in the source repo (`C:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker`)
 2. Find the changelog section for the version being released (under `# Changelog`, look for `## Version X.Y.Z` or similar header)
-3. Extract the full changelog content for this version (everything from the version header until the next version header or end of changelog section)
-4. Present the extracted changelog to the user and ask them to confirm it looks correct before proceeding
+3. Extract the full changelog content for this version - **IMPORTANT: Stop at the next `## Version` header**. Only include content from the target version's header until (but not including) the next version header.
+4. Present the extracted changelog to the user in a markdown code block (triple backticks) so they can preview the exact formatting that will be used
+5. Ask them to confirm it looks correct before proceeding
 
-**Important:** The user writes changelogs manually in `DungeonMapTracker.md`. Do NOT generate or modify changelog content - only extract what's already there.
+**Important:** The user writes changelogs manually in `DungeonMapTracker.md`. Do NOT generate or modify changelog content - only extract what's already there. Be strict about version boundaries - each version section ends where the next one begins.
+
+## Commit Messages
+
+**CRITICAL:** Do NOT include any AI/LLM attribution in commit messages. No "Co-Authored-By: Claude", no "Generated with Claude Code", no "via Happy", nothing. Keep commit messages clean and professional - just describe what the commit does.
 
 ### Step 2: Update Version Files
 
@@ -59,8 +64,14 @@ npm run release:dry
 npm run release
 ```
 
+The release pipeline now performs these steps:
+1. Compile via Obsidian's Datacore Compiler
+2. Run E2E tests against compiled artifact
+3. Commit and push the compiled artifact to the source repo
+4. Create and push version tag (triggers GitHub Actions release)
+
 **Available flags:**
-- `--dry-run` - Compile and test, but don't create/push tag
+- `--dry-run` - Compile and test, but don't commit/tag
 - `--skip-compile` - Skip compilation (use existing compiled artifact)
 - `--skip-tests` - Skip E2E tests
 - `--command=<id>` - Override the Datacore Compiler command ID
@@ -133,7 +144,15 @@ set WINDROSE_TEST_MODE=compiled
 npm run test:e2e
 ```
 
-### 3. Tag Manually
+### 3. Commit and Push Artifact
+```bash
+cd "C:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker"
+git add dist/compiled-windrose-md.md dist/VERSION
+git commit -m "Release X.Y.Z: compiled artifact"
+git push
+```
+
+### 4. Tag Manually
 ```bash
 cd "C:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker"
 git tag -a vX.Y.Z -m "Release X.Y.Z"
@@ -143,10 +162,10 @@ git push origin vX.Y.Z
 ## Quick Commands
 
 ```bash
-# Full release (compile + test + tag)
+# Full release (compile + test + commit + tag)
 npm run release
 
-# Dry run (compile + test, no tag)
+# Dry run (compile + test, no commit/tag)
 npm run release:dry
 
 # Just compile

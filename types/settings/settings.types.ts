@@ -179,6 +179,14 @@ export interface DecorativeBorderTheme {
   dashArray: string;
 }
 
+/** Frame settings for map decoration */
+export interface FrameSettings {
+  enabled: boolean;
+  style?: string;
+  color?: HexColor;
+  width?: number;
+}
+
 /**
  * Complete resolved theme object.
  * Returned by getTheme() - merges settings with constants.

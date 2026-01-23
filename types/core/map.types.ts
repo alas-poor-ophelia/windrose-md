@@ -7,7 +7,7 @@
 
 import type { Cell } from './cell.types';
 import type { Point } from './geometry.types';
-import type { HexOrientation } from '../settings/settings.types';
+import type { HexOrientation, FrameSettings } from '../settings/settings.types';
 
 // ===========================================
 // Map Types
@@ -43,6 +43,7 @@ export interface UIPreferences {
 export interface MapSettings {
   useGlobalSettings: boolean;
   overrides: Record<string, unknown>;
+  frame?: FrameSettings;
 }
 
 // ===========================================
@@ -162,6 +163,12 @@ export interface MapLayer {
   objects: MapObjectRef[];
   textLabels: TextLabel[];
   fogOfWar: FogOfWar | null;
+  /** Show the layer below this one at reduced opacity (for alignment) */
+  showLayerBelow?: boolean;
+  /** Opacity for layer below (0.1-0.5, default 0.25) */
+  layerBelowOpacity?: number;
+  /** Optional icon for the layer (RPGAwesome class e.g. 'ra-sword', or Unicode char) */
+  icon?: string;
 }
 
 // ===========================================

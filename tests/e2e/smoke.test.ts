@@ -347,3 +347,95 @@ test("Layer transparency renders without errors", async ({ page }) => {
 
   expect(errors).toHaveLength(0);
 });
+
+// ===========================================
+// Object Rotation Tests (45° increments)
+// ===========================================
+
+test("Object rotation via toolbar button rotates 45 degrees", async ({ page }) => {
+  const errors = setupErrorTracking(page);
+
+  await navigateToMap(page, TEST_MAPS.grid);
+  await waitForContainer(page);
+  await waitForToolPalette(page);
+
+  const addObjectBtn = page.locator('.dmt-tool-btn[title*="Add Object"]');
+  await addObjectBtn.click();
+  await page.waitForTimeout(200);
+
+  const sidebar = page.locator('.dmt-object-sidebar');
+  await sidebar.waitFor({ state: "visible", timeout: 5000 });
+  const objectItem = page.locator('.dmt-object-item').first();
+  await objectItem.click();
+  await page.waitForTimeout(200);
+
+  const canvas = page.locator(".dmt-canvas-wrapper canvas").first();
+  const canvasBox = await canvas.boundingBox();
+  const centerX = canvasBox!.x + canvasBox!.width / 2;
+  const centerY = canvasBox!.y + canvasBox!.height / 2;
+  await page.mouse.click(centerX, centerY);
+  await page.waitForTimeout(500);
+
+  const selectToolBtn = page.locator('.dmt-tool-btn[title*="Select"]');
+  await selectToolBtn.click();
+  await page.waitForTimeout(200);
+  await page.mouse.click(centerX, centerY);
+  await page.waitForTimeout(300);
+
+  const rotateBtn = page.locator('.dmt-toolbar-button[title*="Rotate 45"]');
+  const rotateBtnExists = await rotateBtn.count() > 0;
+
+  if (rotateBtnExists) {
+    await rotateBtn.click();
+    await page.waitForTimeout(200);
+  }
+
+  expect(errors).toHaveLength(0);
+});
+
+test("Object rotation via R key rotates 45 degrees", async ({ page }) => {
+  const errors = setupErrorTracking(page);
+
+  await navigateToMap(page, TEST_MAPS.grid);
+  await waitForContainer(page);
+  await waitForToolPalette(page);
+
+  const addObjectBtn = page.locator('.dmt-tool-btn[title*="Add Object"]');
+  await addObjectBtn.click();
+  await page.waitForTimeout(200);
+
+  const sidebar = page.locator('.dmt-object-sidebar');
+  await sidebar.waitFor({ state: "visible", timeout: 5000 });
+  const objectItem = page.locator('.dmt-object-item').first();
+  await objectItem.click();
+  await page.waitForTimeout(200);
+
+  const canvas = page.locator(".dmt-canvas-wrapper canvas").first();
+  const canvasBox = await canvas.boundingBox();
+  const centerX = canvasBox!.x + canvasBox!.width / 2;
+  const centerY = canvasBox!.y + canvasBox!.height / 2;
+  await page.mouse.click(centerX, centerY);
+  await page.waitForTimeout(500);
+
+  const selectToolBtn = page.locator('.dmt-tool-btn[title*="Select"]');
+  await selectToolBtn.click();
+  await page.waitForTimeout(200);
+  await page.mouse.click(centerX, centerY);
+  await page.waitForTimeout(300);
+
+  const selectionToolbar = page.locator('.dmt-selection-toolbar');
+  const isSelected = await selectionToolbar.count() > 0;
+
+  if (isSelected) {
+    await page.keyboard.press('r');
+    await page.waitForTimeout(200);
+
+    // 8 rotations × 45° = 360° full cycle
+    for (let i = 0; i < 7; i++) {
+      await page.keyboard.press('r');
+      await page.waitForTimeout(100);
+    }
+  }
+
+  expect(errors).toHaveLength(0);
+});

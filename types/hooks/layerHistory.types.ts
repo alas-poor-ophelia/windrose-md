@@ -69,6 +69,12 @@ export interface LayerActions {
   handleLayerDelete: (layerId: LayerId) => void;
   /** Reorder layers */
   handleLayerReorder: (layerId: LayerId, newIndex: number) => void;
+  /** Toggle show layer below for a layer */
+  handleToggleShowLayerBelow: (layerId: LayerId) => void;
+  /** Set layer below opacity for a layer */
+  handleSetLayerBelowOpacity: (layerId: LayerId, opacity: number) => void;
+  /** Update layer display (name and/or icon) */
+  handleUpdateLayerDisplay: (layerId: LayerId, name: string, icon: string | null) => void;
 }
 
 // ===========================================
@@ -105,6 +111,9 @@ export interface UseLayerHistoryResult {
   handleLayerAdd: () => void;
   handleLayerDelete: (layerId: LayerId) => void;
   handleLayerReorder: (layerId: LayerId, newIndex: number) => void;
+  handleToggleShowLayerBelow: (layerId: LayerId) => void;
+  handleSetLayerBelowOpacity: (layerId: LayerId, opacity: number) => void;
+  handleUpdateLayerDisplay: (layerId: LayerId, name: string, icon: string | null) => void;
 
   // History state
   canUndo: boolean;

@@ -14,11 +14,16 @@ const PROJECT_ROOT = path.resolve(__dirname, "../..");
 const MAIN_VAULT = "C:\\Users\\whipl\\OneDrive\\Documents\\Absalom";
 
 // Path to the clean fixture and its target locations
-// Dev mode: Garden/90 - Data/12 - Meta/JSON/dungeon-maps-data.json
+// Dev mode: _test-data/dungeon-maps-data.json (isolated test-only location)
 // Compiled mode: windrose-md-data.json (at vault root)
 const CLEAN_FIXTURE = path.join(FIXTURES_DIR, "dungeon-maps-data.clean.json");
-const DEV_FIXTURE_TARGET = path.join(TEST_VAULT, "Garden/90 - Data/12 - Meta/JSON/dungeon-maps-data.json");
+const TEST_DATA_DIR = path.join(TEST_VAULT, "_test-data");
+const DEV_FIXTURE_TARGET = path.join(TEST_DATA_DIR, "dungeon-maps-data.json");
 const COMPILED_FIXTURE_TARGET = path.join(TEST_VAULT, "windrose-md-data.json");
+
+// Generation test file that gets modified during tests and needs reset
+const GENERATION_TEST_CLEAN = path.join(FIXTURES_DIR, "dungeon-generation-test.clean.md");
+const GENERATION_TEST_TARGET = path.join(TEST_VAULT, "_testing/dungeon-generation-test.md");
 
 interface SymlinkConfig {
   source: string;
@@ -81,19 +86,24 @@ export async function setup() {
   // This ensures tests don't inherit state from previous runs
   // Both dev and compiled mode fixtures need to be reset
   if (existsSync(CLEAN_FIXTURE)) {
-    // Reset dev mode fixture
-    const devParentDir = path.dirname(DEV_FIXTURE_TARGET);
-    if (!existsSync(devParentDir)) {
-      mkdirSync(devParentDir, { recursive: true });
+    // Reset dev mode fixture (in dedicated _test-data directory)
+    if (!existsSync(TEST_DATA_DIR)) {
+      mkdirSync(TEST_DATA_DIR, { recursive: true });
     }
     cpSync(CLEAN_FIXTURE, DEV_FIXTURE_TARGET);
-    console.log("  Reset: dungeon-maps-data.json (dev mode) to clean state");
+    console.log("  Reset: _test-data/dungeon-maps-data.json (dev mode) to clean state");
 
     // Reset compiled mode fixture
     cpSync(CLEAN_FIXTURE, COMPILED_FIXTURE_TARGET);
     console.log("  Reset: windrose-md-data.json (compiled mode) to clean state");
   } else {
     console.warn("  Warning: Clean fixture not found, tests may have stale state");
+  }
+
+  // Reset the generation test file (gets modified by dungeon generation tests)
+  if (existsSync(GENERATION_TEST_CLEAN)) {
+    cpSync(GENERATION_TEST_CLEAN, GENERATION_TEST_TARGET);
+    console.log("  Reset: dungeon-generation-test.md to clean state");
   }
 
   console.log("Setting up test vault symlinks...");
@@ -166,13 +176,20 @@ export async function setup() {
 }
 
 export async function teardown() {
+  console.log("Cleaning up test artifacts...");
+
+  // Reset the test data file to prevent accumulation across test runs
+  if (existsSync(CLEAN_FIXTURE) && existsSync(TEST_DATA_DIR)) {
+    cpSync(CLEAN_FIXTURE, DEV_FIXTURE_TARGET);
+    console.log("  Reset: _test-data/dungeon-maps-data.json to clean state");
+  }
+
   // Clean up obsidian-test-* temp directories created by obsidian-testing-framework
   // These accumulate quickly (~50MB each) and are not needed after tests complete
   const os = await import("os");
   const fs = await import("fs/promises");
 
   const tempDir = os.tmpdir();
-  console.log("Cleaning up test artifacts...");
 
   try {
     const entries = await fs.readdir(tempDir);
