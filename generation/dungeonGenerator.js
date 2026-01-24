@@ -1626,6 +1626,14 @@ function findDoorCandidatesForConnection(roomA, roomB, orderedPath, corridorWidt
 }
 
 function getAlignmentFromDelta(dx, dy) {
+  // Handle diagonal directions first
+  if (dx !== 0 && dy !== 0) {
+    if (dx > 0 && dy < 0) return 'ne';
+    if (dx > 0 && dy > 0) return 'se';
+    if (dx < 0 && dy > 0) return 'sw';
+    if (dx < 0 && dy < 0) return 'nw';
+  }
+  // Cardinal directions
   if (dy < 0) return 'north';
   if (dy > 0) return 'south';
   if (dx < 0) return 'west';
@@ -1636,10 +1644,10 @@ function getAlignmentFromDelta(dx, dy) {
 function addDoorsForWidth(candidates, baseCell, type, alignment, roomId, width, pathDx, pathDy) {
   const startOffset = -Math.floor((width - 1) / 2);
   const endOffset = Math.floor(width / 2);
-  
+
   // Spread perpendicular to path direction
   const spreadX = pathDy !== 0; // Vertical path = spread horizontally
-  
+
   for (let w = startOffset; w <= endOffset; w++) {
     candidates.push({
       x: spreadX ? baseCell.x + w : baseCell.x,
@@ -1653,22 +1661,56 @@ function addDoorsForWidth(candidates, baseCell, type, alignment, roomId, width, 
   }
 }
 
-function findDoorCandidates(corridorsByConnection) {
+/**
+ * Check if a cell is on the perimeter of a room (not an interior cell).
+ * A perimeter cell is one where at least one orthogonal neighbor is outside the room.
+ */
+function isCellOnRoomPerimeter(x, y, room) {
+  if (!isCellInRoom(x, y, room)) return false;
+
+  // Check if any orthogonal neighbor is outside the room
+  return !isCellInRoom(x - 1, y, room) ||
+         !isCellInRoom(x + 1, y, room) ||
+         !isCellInRoom(x, y - 1, room) ||
+         !isCellInRoom(x, y + 1, room);
+}
+
+/**
+ * Validate a door position to filter out floating doors.
+ * A valid door must be adjacent to its associated room (touching from outside).
+ * @param {Object} pos - Door position with x, y, roomId
+ * @param {Array} rooms - All rooms to find the associated room
+ * @returns {boolean} True if door position is valid
+ */
+function isValidDoorPosition(pos, rooms) {
+  const room = rooms.find(r => r.id === pos.roomId);
+  if (!room) return false;
+
+  // Door should be adjacent to its room (touching from outside)
+  // Check if any orthogonal neighbor is inside the room
+  return isCellInRoom(pos.x - 1, pos.y, room) ||
+         isCellInRoom(pos.x + 1, pos.y, room) ||
+         isCellInRoom(pos.x, pos.y - 1, room) ||
+         isCellInRoom(pos.x, pos.y + 1, room);
+}
+
+function findDoorCandidates(corridorsByConnection, rooms) {
   const allCandidates = [];
   const globalProcessed = new Set();
-  
+
   for (const { roomA, roomB, orderedPath, width } of corridorsByConnection) {
     const candidates = findDoorCandidatesForConnection(roomA, roomB, orderedPath, width);
-    
+
     for (const candidate of candidates) {
       const key = `${candidate.x},${candidate.y},${candidate.alignment}`;
-      if (!globalProcessed.has(key)) {
+      // Validate door position to filter out floating doors
+      if (!globalProcessed.has(key) && isValidDoorPosition(candidate, rooms)) {
         allCandidates.push(candidate);
         globalProcessed.add(key);
       }
     }
   }
-  
+
   return allCandidates;
 }
 
@@ -1722,8 +1764,8 @@ function groupDoorCandidates(candidates) {
   return finalGroups;
 }
 
-function findDoorPositions(corridorsByConnection, doorChance = 0.7, secretDoorChance = 0.05) {
-  const candidates = findDoorCandidates(corridorsByConnection);
+function findDoorPositions(corridorsByConnection, rooms, doorChance = 0.7, secretDoorChance = 0.05) {
+  const candidates = findDoorCandidates(corridorsByConnection, rooms);
   const groups = groupDoorCandidates(candidates);
   
   const doorPositions = [];
@@ -1749,15 +1791,27 @@ function findDoorPositions(corridorsByConnection, doorChance = 0.7, secretDoorCh
 }
 
 function generateDoorObjects(doorPositions) {
-  return doorPositions.map(pos => ({
-    id: generateObjectId(),
-    type: pos.isSecret ? 'secret-door' : pos.type,
-    position: { x: pos.x, y: pos.y },
-    alignment: pos.alignment,
-    scale: pos.scale || 1,
-    rotation: (pos.type === 'door-vertical' && pos.isSecret && 
-               (pos.alignment === 'east' || pos.alignment === 'west')) ? 90 : 0
-  }));
+  return doorPositions.map(pos => {
+    // Calculate rotation based on alignment
+    let rotation = 0;
+    if (pos.alignment === 'ne' || pos.alignment === 'sw') {
+      rotation = 45;
+    } else if (pos.alignment === 'nw' || pos.alignment === 'se') {
+      rotation = -45;
+    } else if (pos.type === 'door-vertical' && pos.isSecret &&
+               (pos.alignment === 'east' || pos.alignment === 'west')) {
+      rotation = 90;
+    }
+
+    return {
+      id: generateObjectId(),
+      type: pos.isSecret ? 'secret-door' : pos.type,
+      position: { x: pos.x, y: pos.y },
+      alignment: pos.alignment,
+      scale: pos.scale || 1,
+      rotation
+    };
+  });
 }
 
 // =============================================================================
@@ -1984,8 +2038,9 @@ function generateDungeon(presetName = 'medium', color = DEFAULT_FLOOR_COLOR, con
   
   // Phase 3a: Find door positions
   const doorPositions = findDoorPositions(
-    corridorsByConnection, 
-    config.doorChance ?? 0.7, 
+    corridorsByConnection,
+    rooms,
+    config.doorChance ?? 0.7,
     config.secretDoorChance ?? 0
   );
   const doorObjects = generateDoorObjects(doorPositions);

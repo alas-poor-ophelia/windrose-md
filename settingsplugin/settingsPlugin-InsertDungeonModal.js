@@ -90,7 +90,9 @@ class InsertDungeonModal extends Modal {
       trapWeight: null,
       useTemplates: null,
       // Water features
-      waterChance: null
+      waterChance: null,
+      // Fog of war
+      autoFogEnabled: false
     };
   }
   
@@ -398,6 +400,30 @@ class InsertDungeonModal extends Modal {
     createSlider(advancedContent, 'Features', 'featureWeight', 0, 1, 0.05, 0.17, pct);
     createSlider(advancedContent, 'Traps', 'trapWeight', 0, 1, 0.05, 0.17, pct);
 
+    // Auto-fog section
+    advancedContent.createEl('div', { cls: 'dmt-dungeon-section-header', text: 'Solo Play' });
+
+    const fogRow = advancedContent.createDiv({ cls: 'dmt-dungeon-slider-row' });
+    fogRow.createEl('label', { text: 'Auto-Fog Dungeon' });
+    const fogToggleContainer = fogRow.createDiv({ cls: 'dmt-dungeon-toggle-container' });
+    const fogCheckbox = fogToggleContainer.createEl('input', {
+      type: 'checkbox',
+      attr: { id: 'dmt-fog-toggle' }
+    });
+    fogCheckbox.checked = false;
+    fogToggleContainer.createEl('label', {
+      attr: { for: 'dmt-fog-toggle' },
+      text: 'Enable',
+      cls: 'dmt-checkbox-label'
+    });
+    fogCheckbox.addEventListener('change', (e) => {
+      this.configOverrides.autoFogEnabled = e.target.checked;
+    });
+    advancedContent.createEl('div', {
+      cls: 'dmt-checkbox-hint',
+      text: 'Cover dungeon with fog, revealing only the entrance room'
+    });
+
     // Buttons
     const buttonContainer = contentEl.createDiv({ cls: 'dmt-modal-buttons' });
     
@@ -433,7 +459,16 @@ class InsertDungeonModal extends Modal {
           preset: this.dungeonSize,
           configOverrides: overrides,
           roomCount: result.metadata.roomCount,
-          doorCount: result.metadata.doorCount
+          doorCount: result.metadata.doorCount,
+          stockingMetadata: {
+            rooms: result.metadata.rooms,
+            corridorResult: result.metadata.corridorResult,
+            doorPositions: result.metadata.doorPositions,
+            entryRoomId: result.metadata.entryRoomId,
+            exitRoomId: result.metadata.exitRoomId,
+            waterRoomIds: result.metadata.waterRoomIds,
+            style: result.metadata.style
+          }
         });
         this.close();
       } catch (err) {
@@ -441,7 +476,7 @@ class InsertDungeonModal extends Modal {
         alert('Failed to generate dungeon: ' + err.message);
       }
     };
-    
+
     // Handle Enter key to submit (if size is selected)
     contentEl.addEventListener('keydown', async (e) => {
       if (e.key === 'Enter' && this.dungeonSize) {
@@ -465,7 +500,16 @@ class InsertDungeonModal extends Modal {
             preset: this.dungeonSize,
             configOverrides: overrides,
             roomCount: result.metadata.roomCount,
-            doorCount: result.metadata.doorCount
+            doorCount: result.metadata.doorCount,
+            stockingMetadata: {
+              rooms: result.metadata.rooms,
+              corridorResult: result.metadata.corridorResult,
+              doorPositions: result.metadata.doorPositions,
+              entryRoomId: result.metadata.entryRoomId,
+              exitRoomId: result.metadata.exitRoomId,
+              waterRoomIds: result.metadata.waterRoomIds,
+              style: result.metadata.style
+            }
           });
           this.close();
         } catch (err) {
@@ -475,7 +519,7 @@ class InsertDungeonModal extends Modal {
       }
     });
   }
-  
+
   onClose() {
     if (this.visualizer) {
       this.visualizer.destroy();

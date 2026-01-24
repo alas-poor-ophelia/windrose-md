@@ -375,6 +375,62 @@ class WindroseMDSettingsPlugin extends Plugin {
   }
 
   /**
+   * Build fog of war data for auto-fog feature.
+   * Fogs all cells except entry room cells.
+   */
+  buildFogOfWar(cells, options) {
+    const autoFogEnabled = options?.configOverrides?.autoFogEnabled;
+    if (!autoFogEnabled) return null;
+
+    const stockingMeta = options?.stockingMetadata;
+    if (!stockingMeta?.rooms || !cells?.length) return null;
+
+    // Find entry room
+    const entryRoomId = stockingMeta.entryRoomId;
+    const entryRoom = stockingMeta.rooms.find(r => r.id === entryRoomId);
+
+    // Build set of entry room cells to exclude from fog
+    const entryRoomCells = new Set();
+    if (entryRoom) {
+      for (let x = entryRoom.x; x < entryRoom.x + entryRoom.width; x++) {
+        for (let y = entryRoom.y; y < entryRoom.y + entryRoom.height; y++) {
+          // For circular rooms, check if cell is actually in room
+          if (entryRoom.shape === 'circle') {
+            const centerX = entryRoom.x + entryRoom.radius;
+            const centerY = entryRoom.y + entryRoom.radius;
+            const dx = x + 0.5 - centerX;
+            const dy = y + 0.5 - centerY;
+            if (dx * dx + dy * dy <= entryRoom.radius * entryRoom.radius) {
+              entryRoomCells.add(\`\${x},\${y}\`);
+            }
+          } else if (entryRoom.shape === 'composite') {
+            // Check if cell is in any of the room's parts
+            for (const part of entryRoom.parts) {
+              if (x >= part.x && x < part.x + part.width &&
+                  y >= part.y && y < part.y + part.height) {
+                entryRoomCells.add(\`\${x},\${y}\`);
+                break;
+              }
+            }
+          } else {
+            entryRoomCells.add(\`\${x},\${y}\`);
+          }
+        }
+      }
+    }
+
+    // Fog all cells except entry room
+    const foggedCells = cells
+      .filter(c => !entryRoomCells.has(\`\${c.x},\${c.y}\`))
+      .map(c => ({ col: c.x, row: c.y }));
+
+    return {
+      enabled: true,
+      foggedCells
+    };
+  }
+
+  /**
    * Save a generated dungeon directly to the JSON data file
    */
   async saveDungeonToJson(mapId, mapName, cells, objects, options) {
@@ -423,7 +479,8 @@ class WindroseMDSettingsPlugin extends Plugin {
           preset: options.preset,
           configOverrides: options.configOverrides || {},
           distancePerCell: options.distancePerCell || 5,
-          distanceUnit: options.distanceUnit || 'ft'
+          distanceUnit: options.distanceUnit || 'ft',
+          stockingMetadata: options.stockingMetadata || null
         },
         settings: {
           useGlobalSettings: false,
@@ -450,7 +507,7 @@ class WindroseMDSettingsPlugin extends Plugin {
           edges: [],
           objects: objects || [],
           textLabels: [],
-          fogOfWar: null
+          fogOfWar: this.buildFogOfWar(cells, options)
         }],
         gridSize: gridSize,
         dimensions: { width: 300, height: 300 },
