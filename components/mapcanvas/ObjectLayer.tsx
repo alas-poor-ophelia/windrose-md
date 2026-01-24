@@ -32,8 +32,7 @@ const { getActiveLayer } = await requireModuleByName("layerAccessor.ts");
 const { copyDeepLinkToClipboard } = await requireModuleByName("deepLinkHandler.ts");
 const { LinkingModeBanner } = await requireModuleByName("LinkingModeBanner.tsx");
 
-const rotationOpsPath = dc.resolvePath("utils/rotationOperations.ts");
-const { rotateByIncrement } = await dc.require(rotationOpsPath) as {
+const { rotateByIncrement } = await dc.require(dc.resolvePath("utils/rotationOperations.ts")) as {
   rotateByIncrement: (currentRotation: number) => number
 };
 

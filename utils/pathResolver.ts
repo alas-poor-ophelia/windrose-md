@@ -21,8 +21,8 @@ function getBasePath(): string {
   return window.__dmtBasePath;
 }
 
-// Default dev path
-const DEFAULT_DATA_PATH = "Garden/90 - Data/12 - Meta/JSON/dungeon-maps-data.json";
+// Default data path (used in production/compiled mode)
+const DEFAULT_DATA_PATH = "windrose-md-data.json";
 
 // Resolve data file path at module load time
 // Priority: 1) WINDROSE-DEBUG.json override, 2) Hardcoded dev default
