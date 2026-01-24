@@ -1,9 +1,9 @@
 <!-- Compiled by Datacore Script Compiler -->
 <!-- Source: Projects/dungeon-map-tracker -->
 <!-- Main Component: DungeonMapTracker -->
-<!-- Compiled: 2026-01-13T04:31:38.722Z -->
-<!-- Files: 125 -->
-<!-- Version: 1.5.1 -->
+<!-- Compiled: 2026-01-24T04:35:03.971Z -->
+<!-- Files: 135 -->
+<!-- Version: 1.5.2 -->
 <!-- CSS Files: 1 -->
 
 # Demo
@@ -4138,6 +4138,7 @@ interface VisibleGridRange {
 }
 
 class GridGeometry extends BaseGeometry {
+  readonly type = 'grid' as const;
   cellSize: number;
 
   /**
@@ -4728,6 +4729,7 @@ interface VisibleHexRange {
 }
 
 class HexGeometry extends BaseGeometry {
+  readonly type = 'hex' as const;
   hexSize: number;
   orientation: 'flat' | 'pointy';
   bounds: HexBounds | null;
@@ -7490,6 +7492,1907 @@ return {
 };
 ```
 
+# badgeRenderer
+
+```ts
+/**
+ * Badge Renderer Module
+ *
+ * Renders indicator badges on map objects:
+ * - Note link badge (linked to Obsidian note)
+ * - Custom tooltip indicator
+ * - Object link indicator (inter-object linking)
+ *
+ * All functions are pure - they draw to the provided canvas context
+ * without side effects.
+ */
+
+interface BadgePosition {
+  screenX: number;
+  screenY: number;
+  objectWidth: number;
+  objectHeight: number;
+}
+
+interface BadgeConfig {
+  scaledSize: number;
+}
+
+/**
+ * Renders a note link badge in the top-right corner of an object.
+ * Shows a blue circle with a scroll emoji for objects linked to notes.
+ */
+function renderNoteLinkBadge(
+  ctx: CanvasRenderingContext2D,
+  position: BadgePosition,
+  config: BadgeConfig
+): void {
+  const { screenX, screenY, objectWidth, objectHeight } = position;
+  const { scaledSize } = config;
+
+  const maxBadgeSize = Math.min(objectWidth, objectHeight) * 0.3;
+  const badgeSize = Math.min(maxBadgeSize, Math.max(8, scaledSize * 0.25));
+  const badgeX = screenX + objectWidth - badgeSize - 3;
+  const badgeY = screenY + 3;
+
+  ctx.fillStyle = 'rgba(74, 158, 255, 0.9)';
+  ctx.beginPath();
+  ctx.arc(badgeX + badgeSize / 2, badgeY + badgeSize / 2, badgeSize / 2, 0, Math.PI * 2);
+  ctx.fill();
+
+  const badgeFontSize = badgeSize * 0.7;
+  ctx.font = `${badgeFontSize}px 'Noto Emoji', 'Noto Sans Symbols 2', monospace`;
+  ctx.fillStyle = '#ffffff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('\u{1F4DC}', badgeX + badgeSize / 2, badgeY + badgeSize / 2);
+}
+
+/**
+ * Renders a custom tooltip indicator in the bottom-right corner.
+ * Shows a small blue dot with white border for objects with custom tooltips.
+ */
+function renderTooltipIndicator(
+  ctx: CanvasRenderingContext2D,
+  position: BadgePosition,
+  config: BadgeConfig
+): void {
+  const { screenX, screenY, objectWidth, objectHeight } = position;
+  const { scaledSize } = config;
+
+  const indicatorSize = Math.max(4, scaledSize * 0.12);
+  const indicatorX = screenX + objectWidth - indicatorSize - 2;
+  const indicatorY = screenY + objectHeight - indicatorSize - 2;
+
+  ctx.fillStyle = '#4a9eff';
+  ctx.beginPath();
+  ctx.arc(indicatorX + indicatorSize / 2, indicatorY + indicatorSize / 2, indicatorSize / 2, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+}
+
+/**
+ * Renders an object link indicator in the top-left corner.
+ * Shows a green circle with chain link emoji for inter-object links.
+ */
+function renderObjectLinkIndicator(
+  ctx: CanvasRenderingContext2D,
+  position: BadgePosition,
+  config: BadgeConfig
+): void {
+  const { screenX, screenY } = position;
+  const { scaledSize } = config;
+
+  const linkSize = Math.max(6, scaledSize * 0.15);
+  const linkX = screenX + 2;
+  const linkY = screenY + 2;
+
+  ctx.fillStyle = '#10b981';
+  ctx.beginPath();
+  ctx.arc(linkX + linkSize / 2, linkY + linkSize / 2, linkSize / 2, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // Draw chain link icon
+  const iconSize = linkSize * 0.6;
+  ctx.font = `${iconSize}px 'Noto Emoji', 'Noto Sans Symbols 2', monospace`;
+  ctx.fillStyle = '#ffffff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('\u{1F517}', linkX + linkSize / 2, linkY + linkSize / 2);
+}
+
+return {
+  renderNoteLinkBadge,
+  renderTooltipIndicator,
+  renderObjectLinkIndicator
+};
+
+```
+
+# textLabelRenderer
+
+```ts
+/**
+ * Text Label Renderer Module
+ *
+ * Renders text labels on the map canvas with rotation support,
+ * stroke outline for readability, and customizable fonts.
+ */
+
+import type { TextLabel } from '#types/objects/note.types';
+
+interface TextLabelRenderContext {
+  ctx: CanvasRenderingContext2D;
+  zoom: number;
+  getFontCss: (fontFace: string) => string;
+}
+
+interface ScreenPosition {
+  screenX: number;
+  screenY: number;
+}
+
+/**
+ * Renders a single text label at the given screen position.
+ * Handles rotation, font styling, and stroke outline for readability.
+ */
+function renderTextLabel(
+  label: TextLabel,
+  position: ScreenPosition,
+  context: TextLabelRenderContext
+): void {
+  const { ctx, zoom, getFontCss } = context;
+  const { screenX, screenY } = position;
+
+  ctx.save();
+
+  ctx.translate(screenX, screenY);
+  ctx.rotate(((label.rotation || 0) * Math.PI) / 180);
+
+  const fontSize = label.fontSize * zoom;
+  const fontFamily = getFontCss(label.fontFace || 'sans');
+  ctx.font = `${fontSize}px ${fontFamily}`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  // Draw stroke outline for readability
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = 3;
+  ctx.lineJoin = 'round';
+  ctx.strokeText(label.content, 0, 0);
+
+  // Draw fill
+  ctx.fillStyle = label.color || '#ffffff';
+  ctx.fillText(label.content, 0, 0);
+
+  ctx.restore();
+}
+
+/**
+ * Renders all text labels for a layer.
+ * Skips rendering if showCoordinates is enabled or textLabels visibility is off.
+ */
+function renderTextLabels(
+  labels: TextLabel[],
+  context: TextLabelRenderContext,
+  geometry: { worldToScreen: (x: number, y: number, offsetX: number, offsetY: number, zoom: number) => ScreenPosition },
+  viewState: { offsetX: number; offsetY: number; zoom: number }
+): void {
+  const { offsetX, offsetY, zoom } = viewState;
+
+  for (const label of labels) {
+    const position = geometry.worldToScreen(
+      label.position.x,
+      label.position.y,
+      offsetX,
+      offsetY,
+      zoom
+    );
+    renderTextLabel(label, position, context);
+  }
+}
+
+return {
+  renderTextLabel,
+  renderTextLabels
+};
+
+```
+
+# backgroundRenderer
+
+```ts
+/**
+ * Background Renderer Module
+ *
+ * Renders background images for hex maps, handling proper positioning,
+ * scaling, and opacity based on hex grid bounds.
+ */
+
+interface HexBounds {
+  maxCol: number;
+  maxRow: number;
+}
+
+interface BackgroundImageConfig {
+  path: string;
+  offsetX?: number;
+  offsetY?: number;
+  opacity?: number;
+}
+
+interface HexGeometryLike {
+  hexSize: number;
+  sqrt3: number;
+  hexToWorld: (q: number, r: number) => { worldX: number; worldY: number };
+}
+
+interface RenderBackgroundContext {
+  ctx: CanvasRenderingContext2D;
+  offsetX: number;
+  offsetY: number;
+  zoom: number;
+}
+
+/**
+ * Renders a background image for a hex map.
+ * Centers the image based on hex grid bounds and applies offset/opacity settings.
+ *
+ * @param bgImage - The loaded HTMLImageElement
+ * @param config - Background image configuration (path, offsets, opacity)
+ * @param hexBounds - The hex grid bounds (maxCol, maxRow)
+ * @param hexGeometry - The hex geometry instance
+ * @param orientation - Hex orientation ('flat' or 'pointy')
+ * @param context - Render context with canvas context and view state
+ * @param offsetToAxial - Function to convert offset coords to axial
+ */
+function renderHexBackgroundImage(
+  bgImage: HTMLImageElement,
+  config: BackgroundImageConfig,
+  hexBounds: HexBounds,
+  hexGeometry: HexGeometryLike,
+  orientation: string,
+  context: RenderBackgroundContext,
+  offsetToAxial: (col: number, row: number, orientation: string) => { q: number; r: number }
+): void {
+  const { ctx, offsetX, offsetY, zoom } = context;
+
+  // Calculate world bounds from hex grid corners
+  let minWorldX = Infinity, maxWorldX = -Infinity;
+  let minWorldY = Infinity, maxWorldY = -Infinity;
+
+  const corners = [
+    { col: 0, row: 0 },
+    { col: hexBounds.maxCol - 1, row: 0 },
+    { col: 0, row: hexBounds.maxRow - 1 },
+    { col: hexBounds.maxCol - 1, row: hexBounds.maxRow - 1 }
+  ];
+
+  for (const corner of corners) {
+    const { q, r } = offsetToAxial(corner.col, corner.row, orientation);
+    const worldPos = hexGeometry.hexToWorld(q, r);
+
+    if (worldPos.worldX < minWorldX) minWorldX = worldPos.worldX;
+    if (worldPos.worldX > maxWorldX) maxWorldX = worldPos.worldX;
+    if (worldPos.worldY < minWorldY) minWorldY = worldPos.worldY;
+    if (worldPos.worldY > maxWorldY) maxWorldY = worldPos.worldY;
+  }
+
+  // Add hex extent padding
+  const hexExtentX = hexGeometry.hexSize;
+  const hexExtentY = hexGeometry.hexSize * hexGeometry.sqrt3 / 2;
+
+  minWorldX -= hexExtentX;
+  maxWorldX += hexExtentX;
+  minWorldY -= hexExtentY;
+  maxWorldY += hexExtentY;
+
+  // Calculate center of world bounds
+  const worldCenterX = (minWorldX + maxWorldX) / 2;
+  const worldCenterY = (minWorldY + maxWorldY) / 2;
+
+  // Get image dimensions
+  const imgWidth = bgImage.naturalWidth;
+  const imgHeight = bgImage.naturalHeight;
+
+  // Apply image offsets
+  const imgOffsetX = config.offsetX ?? 0;
+  const imgOffsetY = config.offsetY ?? 0;
+
+  // Calculate screen position
+  const screenCenterX = offsetX + worldCenterX * zoom;
+  const screenCenterY = offsetY + worldCenterY * zoom;
+  const screenX = screenCenterX - (imgWidth * zoom) / 2 + (imgOffsetX * zoom);
+  const screenY = screenCenterY - (imgHeight * zoom) / 2 + (imgOffsetY * zoom);
+
+  // Apply opacity if needed
+  const opacity = config.opacity ?? 1;
+  if (opacity < 1) {
+    ctx.save();
+    ctx.globalAlpha = opacity;
+  }
+
+  // Draw the background image
+  ctx.drawImage(bgImage, screenX, screenY, imgWidth * zoom, imgHeight * zoom);
+
+  // Restore opacity
+  if (opacity < 1) {
+    ctx.restore();
+  }
+}
+
+return {
+  renderHexBackgroundImage
+};
+
+```
+
+# gridFogRenderer
+
+```ts
+/**
+ * Grid Fog Renderer Module
+ *
+ * Renders fog of war for grid (square) maps with optional blur effects.
+ * Handles edge cell detection, multi-pass blur rendering, and interior grid lines.
+ */
+
+interface FogCell {
+  col: number;
+  row: number;
+}
+
+interface GridFogRenderContext {
+  ctx: CanvasRenderingContext2D;
+  fogCtx: CanvasRenderingContext2D | null;
+  offsetX: number;
+  offsetY: number;
+  scaledSize: number;
+}
+
+interface GridFogRenderOptions {
+  fowOpacity: number;
+  fowBlurEnabled: boolean;
+  blurRadius: number;
+  useGlobalAlpha: boolean;
+}
+
+/**
+ * Identifies which fog cells are edge cells (adjacent to non-fogged cells).
+ */
+function identifyEdgeCells(
+  fogCells: FogCell[],
+  foggedSet: Set<string>,
+  visibleBounds: { minCol: number; maxCol: number; minRow: number; maxRow: number }
+): { visibleFogCells: FogCell[]; edgeCells: FogCell[] } {
+  const { minCol, maxCol, minRow, maxRow } = visibleBounds;
+  const visibleFogCells: FogCell[] = [];
+  const edgeCells: FogCell[] = [];
+
+  for (const fogCell of fogCells) {
+    const { col, row } = fogCell;
+
+    // Skip cells outside visible bounds
+    if (col < minCol || col > maxCol || row < minRow || row > maxRow) {
+      continue;
+    }
+
+    visibleFogCells.push({ col, row });
+
+    // Check if this is an edge cell (has at least one non-fogged neighbor)
+    const isEdge = !foggedSet.has(`${col - 1},${row}`) ||
+                   !foggedSet.has(`${col + 1},${row}`) ||
+                   !foggedSet.has(`${col},${row - 1}`) ||
+                   !foggedSet.has(`${col},${row + 1}`);
+
+    if (isEdge) {
+      edgeCells.push({ col, row });
+    }
+  }
+
+  return { visibleFogCells, edgeCells };
+}
+
+/**
+ * Renders blur passes for edge cells (the soft fog edge effect).
+ */
+function renderBlurPasses(
+  edgeCells: FogCell[],
+  context: GridFogRenderContext,
+  options: GridFogRenderOptions
+): void {
+  const { ctx, fogCtx, offsetX, offsetY, scaledSize } = context;
+  const { fowOpacity, blurRadius } = options;
+
+  if (edgeCells.length === 0 || blurRadius <= 0) return;
+
+  const baseOpacity = fowOpacity;
+  const numPasses = 8;
+  const cellRadius = scaledSize / 2;
+  const maxRadius = cellRadius + blurRadius;
+
+  const targetCtx = fogCtx || ctx;
+  const useFilterFallback = !fogCtx;
+  const filterBlurAmount = blurRadius / numPasses;
+
+  for (let i = 0; i < numPasses; i++) {
+    const t = i / (numPasses - 1);
+    const radius = maxRadius - (blurRadius * t);
+    const opacity = 0.50 + (0.30 * t);
+
+    if (useFilterFallback) {
+      const passBlur = filterBlurAmount * (1.5 - t);
+      targetCtx.filter = passBlur > 0.5 ? `blur(${passBlur}px)` : 'none';
+    }
+
+    targetCtx.beginPath();
+    for (const { col, row } of edgeCells) {
+      const centerX = offsetX + col * scaledSize + scaledSize / 2;
+      const centerY = offsetY + row * scaledSize + scaledSize / 2;
+      targetCtx.moveTo(centerX + radius, centerY);
+      targetCtx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+    }
+    targetCtx.globalAlpha = baseOpacity * opacity;
+    targetCtx.fill();
+  }
+
+  if (useFilterFallback) {
+    ctx.filter = 'none';
+  }
+}
+
+/**
+ * Renders the solid fog rectangles for all visible fog cells.
+ */
+function renderFogCells(
+  visibleFogCells: FogCell[],
+  context: GridFogRenderContext
+): void {
+  const { ctx, offsetX, offsetY, scaledSize } = context;
+
+  ctx.beginPath();
+  for (const { col, row } of visibleFogCells) {
+    const centerX = offsetX + col * scaledSize + scaledSize / 2;
+    const centerY = offsetY + row * scaledSize + scaledSize / 2;
+    const halfSize = scaledSize / 2;
+    ctx.rect(centerX - halfSize, centerY - halfSize, scaledSize, scaledSize);
+  }
+  ctx.fill();
+}
+
+/**
+ * Renders subtle interior grid lines between adjacent fog cells.
+ */
+function renderInteriorGridLines(
+  visibleFogCells: FogCell[],
+  foggedSet: Set<string>,
+  context: GridFogRenderContext,
+  zoom: number
+): void {
+  const { ctx, offsetX, offsetY, scaledSize } = context;
+
+  if (visibleFogCells.length <= 1) return;
+
+  const drawnLines = new Set<string>();
+  const interiorLineWidth = Math.max(1, 1 * zoom * 0.5);
+  const halfWidth = interiorLineWidth / 2;
+
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+
+  for (const { col, row } of visibleFogCells) {
+    const screenX = offsetX + col * scaledSize;
+    const screenY = offsetY + row * scaledSize;
+
+    // Right edge (vertical line)
+    if (foggedSet.has(`${col + 1},${row}`)) {
+      const lineKey = `v:${col + 1},${row}`;
+      if (!drawnLines.has(lineKey)) {
+        ctx.fillRect(screenX + scaledSize - halfWidth, screenY, interiorLineWidth, scaledSize);
+        drawnLines.add(lineKey);
+      }
+    }
+
+    // Bottom edge (horizontal line)
+    if (foggedSet.has(`${col},${row + 1}`)) {
+      const lineKey = `h:${col},${row + 1}`;
+      if (!drawnLines.has(lineKey)) {
+        ctx.fillRect(screenX, screenY + scaledSize - halfWidth, scaledSize, interiorLineWidth);
+        drawnLines.add(lineKey);
+      }
+    }
+  }
+}
+
+/**
+ * Main entry point for rendering grid fog of war.
+ * Orchestrates edge detection, blur passes, solid fog, and interior lines.
+ */
+function renderGridFog(
+  fogCells: FogCell[],
+  context: GridFogRenderContext,
+  options: GridFogRenderOptions,
+  visibleBounds: { minCol: number; maxCol: number; minRow: number; maxRow: number },
+  zoom: number
+): void {
+  const foggedSet = new Set(fogCells.map(c => `${c.col},${c.row}`));
+
+  // Identify visible and edge cells
+  const { visibleFogCells, edgeCells } = identifyEdgeCells(
+    fogCells,
+    foggedSet,
+    visibleBounds
+  );
+
+  // Render blur passes for edge cells
+  if (options.fowBlurEnabled && options.blurRadius > 0) {
+    renderBlurPasses(edgeCells, context, options);
+    context.ctx.globalAlpha = options.useGlobalAlpha ? options.fowOpacity : 1;
+  }
+
+  // Render solid fog cells
+  renderFogCells(visibleFogCells, context);
+
+  // Render interior grid lines
+  renderInteriorGridLines(visibleFogCells, foggedSet, context, zoom);
+}
+
+return {
+  identifyEdgeCells,
+  renderBlurPasses,
+  renderFogCells,
+  renderInteriorGridLines,
+  renderGridFog
+};
+
+```
+
+# hexFogRenderer
+
+```ts
+/**
+ * Hex Fog Renderer Module
+ *
+ * Renders fog of war for hex maps with optional blur effects.
+ * Handles edge cell detection, multi-pass blur rendering, and interior hex outlines.
+ */
+
+interface FogCell {
+  col: number;
+  row: number;
+}
+
+interface EdgeCell extends FogCell {
+  q: number;
+  r: number;
+}
+
+interface HexGeometryLike {
+  hexSize: number;
+  getHexVertices: (q: number, r: number) => Array<{ worldX: number; worldY: number }>;
+  hexToWorld: (q: number, r: number) => { worldX: number; worldY: number };
+  getNeighbors: (q: number, r: number) => Array<{ q: number; r: number }>;
+}
+
+interface GeometryLike {
+  worldToScreen: (worldX: number, worldY: number, offsetX: number, offsetY: number, zoom: number) => { screenX: number; screenY: number };
+}
+
+interface HexFogRenderContext {
+  ctx: CanvasRenderingContext2D;
+  fogCtx: CanvasRenderingContext2D | null;
+  offsetX: number;
+  offsetY: number;
+  zoom: number;
+}
+
+interface HexFogRenderOptions {
+  fowOpacity: number;
+  fowBlurEnabled: boolean;
+  blurRadius: number;
+  useGlobalAlpha: boolean;
+}
+
+/**
+ * Identifies which fog cells are edge cells (adjacent to non-fogged cells).
+ */
+function identifyHexEdgeCells(
+  fogCells: FogCell[],
+  foggedSet: Set<string>,
+  visibleBounds: { minCol: number; maxCol: number; minRow: number; maxRow: number },
+  hexGeometry: HexGeometryLike,
+  orientation: string,
+  offsetToAxial: (col: number, row: number, orientation: string) => { q: number; r: number },
+  axialToOffset: (q: number, r: number, orientation: string) => { col: number; row: number }
+): { visibleFogCells: FogCell[]; edgeCells: EdgeCell[] } {
+  const { minCol, maxCol, minRow, maxRow } = visibleBounds;
+  const visibleFogCells: FogCell[] = [];
+  const edgeCells: EdgeCell[] = [];
+
+  for (const fogCell of fogCells) {
+    const { col, row } = fogCell;
+
+    // Skip cells outside visible bounds
+    if (col < minCol || col > maxCol || row < minRow || row > maxRow) {
+      continue;
+    }
+
+    visibleFogCells.push({ col, row });
+
+    // Check if this is an edge cell (has at least one non-fogged neighbor)
+    const { q, r } = offsetToAxial(col, row, orientation);
+    const neighbors = hexGeometry.getNeighbors(q, r);
+    const isEdge = neighbors.some(n => {
+      const { col: nCol, row: nRow } = axialToOffset(n.q, n.r, orientation);
+      return !foggedSet.has(`${nCol},${nRow}`);
+    });
+
+    if (isEdge) {
+      edgeCells.push({ col, row, q, r });
+    }
+  }
+
+  return { visibleFogCells, edgeCells };
+}
+
+/**
+ * Traces a hex path on the given canvas context.
+ */
+function traceHexPath(
+  ctx: CanvasRenderingContext2D,
+  q: number,
+  r: number,
+  scale: number,
+  hexGeometry: HexGeometryLike,
+  geometry: GeometryLike,
+  context: { offsetX: number; offsetY: number; zoom: number }
+): void {
+  const { offsetX, offsetY, zoom } = context;
+  const vertices = hexGeometry.getHexVertices(q, r);
+
+  if (scale === 1.0) {
+    const first = geometry.worldToScreen(vertices[0].worldX, vertices[0].worldY, offsetX, offsetY, zoom);
+    ctx.moveTo(first.screenX, first.screenY);
+    for (let i = 1; i < vertices.length; i++) {
+      const vertex = geometry.worldToScreen(vertices[i].worldX, vertices[i].worldY, offsetX, offsetY, zoom);
+      ctx.lineTo(vertex.screenX, vertex.screenY);
+    }
+  } else {
+    const center = hexGeometry.hexToWorld(q, r);
+    const screenCenter = geometry.worldToScreen(center.worldX, center.worldY, offsetX, offsetY, zoom);
+
+    const scaledVertices = vertices.map(v => {
+      const screen = geometry.worldToScreen(v.worldX, v.worldY, offsetX, offsetY, zoom);
+      return {
+        screenX: screenCenter.screenX + (screen.screenX - screenCenter.screenX) * scale,
+        screenY: screenCenter.screenY + (screen.screenY - screenCenter.screenY) * scale
+      };
+    });
+
+    ctx.moveTo(scaledVertices[0].screenX, scaledVertices[0].screenY);
+    for (let i = 1; i < scaledVertices.length; i++) {
+      ctx.lineTo(scaledVertices[i].screenX, scaledVertices[i].screenY);
+    }
+  }
+  ctx.closePath();
+}
+
+/**
+ * Renders blur passes for edge cells (the soft fog edge effect).
+ */
+function renderHexBlurPasses(
+  edgeCells: EdgeCell[],
+  context: HexFogRenderContext,
+  options: HexFogRenderOptions,
+  hexGeometry: HexGeometryLike,
+  geometry: GeometryLike
+): void {
+  const { ctx, fogCtx, offsetX, offsetY, zoom } = context;
+  const { fowOpacity, blurRadius } = options;
+
+  if (edgeCells.length === 0 || blurRadius <= 0) return;
+
+  const baseOpacity = fowOpacity;
+  const numPasses = 8;
+  const maxExpansion = blurRadius / (hexGeometry.hexSize * zoom);
+
+  const targetCtx = fogCtx || ctx;
+  const useFilterFallback = !fogCtx;
+  const filterBlurAmount = blurRadius / numPasses;
+
+  for (let i = 0; i < numPasses; i++) {
+    const t = i / (numPasses - 1);
+    const scale = 1.0 + (maxExpansion * (1.0 - t));
+    const opacity = 0.50 + (0.30 * t);
+
+    if (useFilterFallback) {
+      const passBlur = filterBlurAmount * (1.5 - t);
+      targetCtx.filter = passBlur > 0.5 ? `blur(${passBlur}px)` : 'none';
+    }
+
+    targetCtx.beginPath();
+    for (const { q, r } of edgeCells) {
+      traceHexPath(targetCtx, q, r, scale, hexGeometry, geometry, { offsetX, offsetY, zoom });
+    }
+    targetCtx.globalAlpha = baseOpacity * opacity;
+    targetCtx.fill();
+  }
+
+  if (useFilterFallback) {
+    ctx.filter = 'none';
+  }
+}
+
+/**
+ * Renders the solid fog hexes for all visible fog cells.
+ */
+function renderHexFogCells(
+  visibleFogCells: FogCell[],
+  context: HexFogRenderContext,
+  hexGeometry: HexGeometryLike,
+  geometry: GeometryLike,
+  orientation: string,
+  offsetToAxial: (col: number, row: number, orientation: string) => { q: number; r: number }
+): void {
+  const { ctx, offsetX, offsetY, zoom } = context;
+
+  ctx.beginPath();
+  for (const { col, row } of visibleFogCells) {
+    const { q, r } = offsetToAxial(col, row, orientation);
+    traceHexPath(ctx, q, r, 1.0, hexGeometry, geometry, { offsetX, offsetY, zoom });
+  }
+  ctx.fill();
+}
+
+/**
+ * Renders subtle interior hex outlines between adjacent fog cells.
+ */
+function renderInteriorHexOutlines(
+  visibleFogCells: FogCell[],
+  foggedSet: Set<string>,
+  context: HexFogRenderContext,
+  hexGeometry: HexGeometryLike,
+  geometry: GeometryLike,
+  orientation: string,
+  offsetToAxial: (col: number, row: number, orientation: string) => { q: number; r: number },
+  axialToOffset: (q: number, r: number, orientation: string) => { col: number; row: number }
+): void {
+  const { ctx, offsetX, offsetY, zoom } = context;
+
+  if (visibleFogCells.length <= 1) return;
+
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+  ctx.lineWidth = Math.max(1, 1 * zoom);
+
+  for (const { col, row } of visibleFogCells) {
+    const { q, r } = offsetToAxial(col, row, orientation);
+
+    const neighbors = hexGeometry.getNeighbors(q, r);
+    const hasFoggedNeighbor = neighbors.some(n => {
+      const { col: nCol, row: nRow } = axialToOffset(n.q, n.r, orientation);
+      return foggedSet.has(`${nCol},${nRow}`);
+    });
+
+    if (hasFoggedNeighbor) {
+      const vertices = hexGeometry.getHexVertices(q, r);
+
+      ctx.beginPath();
+      const first = geometry.worldToScreen(vertices[0].worldX, vertices[0].worldY, offsetX, offsetY, zoom);
+      ctx.moveTo(first.screenX, first.screenY);
+
+      for (let i = 1; i < vertices.length; i++) {
+        const vertex = geometry.worldToScreen(vertices[i].worldX, vertices[i].worldY, offsetX, offsetY, zoom);
+        ctx.lineTo(vertex.screenX, vertex.screenY);
+      }
+
+      ctx.closePath();
+      ctx.stroke();
+    }
+  }
+}
+
+/**
+ * Main entry point for rendering hex fog of war.
+ * Orchestrates edge detection, blur passes, solid fog, and interior outlines.
+ */
+function renderHexFog(
+  fogCells: FogCell[],
+  context: HexFogRenderContext,
+  options: HexFogRenderOptions,
+  visibleBounds: { minCol: number; maxCol: number; minRow: number; maxRow: number },
+  hexGeometry: HexGeometryLike,
+  geometry: GeometryLike,
+  orientation: string,
+  offsetToAxial: (col: number, row: number, orientation: string) => { q: number; r: number },
+  axialToOffset: (q: number, r: number, orientation: string) => { col: number; row: number }
+): void {
+  const foggedSet = new Set(fogCells.map(c => `${c.col},${c.row}`));
+
+  // Identify visible and edge cells
+  const { visibleFogCells, edgeCells } = identifyHexEdgeCells(
+    fogCells,
+    foggedSet,
+    visibleBounds,
+    hexGeometry,
+    orientation,
+    offsetToAxial,
+    axialToOffset
+  );
+
+  // Render blur passes for edge cells
+  if (options.fowBlurEnabled && options.blurRadius > 0) {
+    renderHexBlurPasses(edgeCells, context, options, hexGeometry, geometry);
+    context.ctx.globalAlpha = options.useGlobalAlpha ? options.fowOpacity : 1;
+  }
+
+  // Render solid fog cells
+  renderHexFogCells(visibleFogCells, context, hexGeometry, geometry, orientation, offsetToAxial);
+
+  // Render interior hex outlines
+  renderInteriorHexOutlines(
+    visibleFogCells,
+    foggedSet,
+    context,
+    hexGeometry,
+    geometry,
+    orientation,
+    offsetToAxial,
+    axialToOffset
+  );
+}
+
+return {
+  identifyHexEdgeCells,
+  traceHexPath,
+  renderHexBlurPasses,
+  renderHexFogCells,
+  renderInteriorHexOutlines,
+  renderHexFog
+};
+
+```
+
+# fogRenderer
+
+```ts
+/**
+ * Fog Renderer Module (Orchestrator)
+ *
+ * Orchestrates fog of war rendering for both hex and grid maps.
+ * Handles fog settings, fill style setup, blur configuration, and dispatches
+ * to the appropriate grid or hex fog renderer.
+ */
+
+interface FogCell {
+  col: number;
+  row: number;
+}
+
+interface FogOfWar {
+  enabled: boolean;
+  foggedCells?: FogCell[];
+}
+
+interface FogSettings {
+  fowColor: string;
+  fowOpacity: number;
+  fowImagePath?: string;
+  fowBlurEnabled: boolean;
+  fowBlurFactor: number;
+}
+
+interface FogRenderContext {
+  ctx: CanvasRenderingContext2D;
+  fogCanvas: HTMLCanvasElement | null;
+  width: number;
+  height: number;
+  offsetX: number;
+  offsetY: number;
+  zoom: number;
+  scaledSize: number;
+  northDirection: number;
+}
+
+interface GridGeometryLike {
+  cellSize: number;
+}
+
+interface HexGeometryLike {
+  hexSize: number;
+  getHexVertices: (q: number, r: number) => Array<{ worldX: number; worldY: number }>;
+  hexToWorld: (q: number, r: number) => { worldX: number; worldY: number };
+  getNeighbors: (q: number, r: number) => Array<{ q: number; r: number }>;
+}
+
+interface GeometryLike {
+  worldToScreen: (worldX: number, worldY: number, offsetX: number, offsetY: number, zoom: number) => { screenX: number; screenY: number };
+}
+
+interface MapBounds {
+  hexBounds?: { maxCol: number; maxRow: number };
+  dimensions?: { width: number; height: number };
+}
+
+type RenderGridFogFn = (
+  fogCells: FogCell[],
+  context: { ctx: CanvasRenderingContext2D; fogCtx: CanvasRenderingContext2D | null; offsetX: number; offsetY: number; scaledSize: number },
+  options: { fowOpacity: number; fowBlurEnabled: boolean; blurRadius: number; useGlobalAlpha: boolean },
+  visibleBounds: { minCol: number; maxCol: number; minRow: number; maxRow: number },
+  zoom: number
+) => void;
+
+type RenderHexFogFn = (
+  fogCells: FogCell[],
+  context: { ctx: CanvasRenderingContext2D; fogCtx: CanvasRenderingContext2D | null; offsetX: number; offsetY: number; zoom: number },
+  options: { fowOpacity: number; fowBlurEnabled: boolean; blurRadius: number; useGlobalAlpha: boolean },
+  visibleBounds: { minCol: number; maxCol: number; minRow: number; maxRow: number },
+  hexGeometry: HexGeometryLike,
+  geometry: GeometryLike,
+  orientation: string,
+  offsetToAxial: (col: number, row: number, orientation: string) => { q: number; r: number },
+  axialToOffset: (q: number, r: number, orientation: string) => { col: number; row: number }
+) => void;
+
+/**
+ * Extracts fog settings from effective settings object.
+ */
+function getFogSettings(effectiveSettings: Record<string, unknown>): FogSettings {
+  return {
+    fowColor: (effectiveSettings.fogOfWarColor as string) || '#000000',
+    fowOpacity: (effectiveSettings.fogOfWarOpacity as number) ?? 0.9,
+    fowImagePath: effectiveSettings.fogOfWarImage as string | undefined,
+    fowBlurEnabled: (effectiveSettings.fogOfWarBlurEnabled as boolean) ?? false,
+    fowBlurFactor: (effectiveSettings.fogOfWarBlurFactor as number) ?? 0.08,
+  };
+}
+
+/**
+ * Creates fog fill style - either solid color or image pattern.
+ */
+function createFogFillStyle(
+  ctx: CanvasRenderingContext2D,
+  fowColor: string,
+  fowImagePath: string | undefined,
+  getCachedImage: (path: string) => HTMLImageElement | null
+): { fillStyle: string | CanvasPattern; useGlobalAlpha: boolean } {
+  let fillStyle: string | CanvasPattern = fowColor;
+  const useGlobalAlpha = true;
+
+  if (fowImagePath) {
+    const fowImage = getCachedImage(fowImagePath);
+    if (fowImage && fowImage.complete && fowImage.naturalWidth > 0) {
+      try {
+        const pattern = ctx.createPattern(fowImage, 'repeat');
+        if (pattern) {
+          fillStyle = pattern;
+        }
+      } catch (_e) {
+        // Pattern creation failed, use solid color
+      }
+    }
+  }
+
+  return { fillStyle, useGlobalAlpha };
+}
+
+/**
+ * Calculates blur radius based on cell size and blur factor.
+ */
+function calculateBlurRadius(
+  fowBlurEnabled: boolean,
+  fowBlurFactor: number,
+  cellSize: number,
+  zoom: number
+): number {
+  if (!fowBlurEnabled) return 0;
+  return cellSize * fowBlurFactor * zoom;
+}
+
+/**
+ * Sets up the fog canvas for blur effects.
+ * Returns the fog context if blur is enabled and canvas is available.
+ */
+function setupFogCanvas(
+  fogCanvas: HTMLCanvasElement | null,
+  fowBlurEnabled: boolean,
+  blurRadius: number,
+  width: number,
+  height: number,
+  northDirection: number,
+  fowColor: string,
+  fowImagePath: string | undefined,
+  getCachedImage: (path: string) => HTMLImageElement | null
+): CanvasRenderingContext2D | null {
+  if (!fogCanvas || !fowBlurEnabled || blurRadius <= 0) return null;
+
+  const fogCtx = fogCanvas.getContext('2d');
+  if (!fogCtx) return null;
+
+  if (fogCanvas.width !== width || fogCanvas.height !== height) {
+    fogCanvas.width = width;
+    fogCanvas.height = height;
+  }
+
+  const cssBlurAmount = Math.max(4, blurRadius * 0.6);
+  fogCanvas.style.filter = `blur(${cssBlurAmount}px)`;
+
+  fogCtx.clearRect(0, 0, width, height);
+
+  fogCtx.save();
+  fogCtx.translate(width / 2, height / 2);
+  fogCtx.rotate((northDirection * Math.PI) / 180);
+  fogCtx.translate(-width / 2, -height / 2);
+
+  fogCtx.fillStyle = fowColor;
+
+  if (fowImagePath) {
+    const fowImage = getCachedImage(fowImagePath);
+    if (fowImage && fowImage.complete && fowImage.naturalWidth > 0) {
+      const fogPattern = fogCtx.createPattern(fowImage, 'repeat');
+      if (fogPattern) {
+        fogCtx.fillStyle = fogPattern;
+      }
+    }
+  }
+
+  return fogCtx;
+}
+
+/**
+ * Calculates visible bounds for grid maps.
+ */
+function calculateGridVisibleBounds(
+  width: number,
+  height: number,
+  offsetX: number,
+  offsetY: number,
+  scaledSize: number,
+  dimensions?: { width: number; height: number }
+): { minCol: number; maxCol: number; minRow: number; maxRow: number } {
+  let visibleMinCol = Math.floor((0 - offsetX) / scaledSize) - 1;
+  let visibleMaxCol = Math.ceil((width - offsetX) / scaledSize) + 1;
+  let visibleMinRow = Math.floor((0 - offsetY) / scaledSize) - 1;
+  let visibleMaxRow = Math.ceil((height - offsetY) / scaledSize) + 1;
+
+  const maxBound = dimensions ? Math.max(dimensions.width, dimensions.height) : 200;
+  visibleMinCol = Math.max(0, visibleMinCol);
+  visibleMaxCol = Math.min(maxBound, visibleMaxCol);
+  visibleMinRow = Math.max(0, visibleMinRow);
+  visibleMaxRow = Math.min(maxBound, visibleMaxRow);
+
+  return { minCol: visibleMinCol, maxCol: visibleMaxCol, minRow: visibleMinRow, maxRow: visibleMaxRow };
+}
+
+/**
+ * Calculates visible bounds for hex maps.
+ */
+function calculateHexVisibleBounds(
+  hexBounds?: { maxCol: number; maxRow: number }
+): { minCol: number; maxCol: number; minRow: number; maxRow: number } {
+  const bounds = hexBounds || { maxCol: 100, maxRow: 100 };
+  return {
+    minCol: 0,
+    maxCol: bounds.maxCol,
+    minRow: 0,
+    maxRow: bounds.maxRow,
+  };
+}
+
+/**
+ * Main entry point for rendering fog of war.
+ * Handles all setup and dispatches to the appropriate renderer.
+ */
+function renderFog(
+  fow: FogOfWar,
+  context: FogRenderContext,
+  settings: FogSettings,
+  mapBounds: MapBounds,
+  isHexMap: boolean,
+  hexGeometry: HexGeometryLike | null,
+  gridGeometry: GridGeometryLike | null,
+  geometry: GeometryLike,
+  orientation: string,
+  getCachedImage: (path: string) => HTMLImageElement | null,
+  renderGridFog: RenderGridFogFn,
+  renderHexFog: RenderHexFogFn,
+  offsetToAxial: (col: number, row: number, orientation: string) => { q: number; r: number },
+  axialToOffset: (q: number, r: number, orientation: string) => { col: number; row: number }
+): void {
+  if (!fow.enabled || !fow.foggedCells?.length) return;
+
+  const { ctx, fogCanvas, width, height, offsetX, offsetY, zoom, scaledSize, northDirection } = context;
+  const { fowColor, fowOpacity, fowImagePath, fowBlurEnabled, fowBlurFactor } = settings;
+
+  // Create fill style
+  const { fillStyle, useGlobalAlpha } = createFogFillStyle(ctx, fowColor, fowImagePath, getCachedImage);
+
+  // Calculate blur radius
+  const cellSize = isHexMap && hexGeometry ? hexGeometry.hexSize : (gridGeometry?.cellSize ?? 32);
+  const blurRadius = calculateBlurRadius(fowBlurEnabled, fowBlurFactor, cellSize, zoom);
+
+  // Setup fog canvas for blur
+  const fogCtx = setupFogCanvas(
+    fogCanvas,
+    fowBlurEnabled,
+    blurRadius,
+    width,
+    height,
+    northDirection,
+    fowColor,
+    fowImagePath,
+    getCachedImage
+  );
+
+  // Set main context fill style
+  ctx.fillStyle = fillStyle;
+
+  const previousGlobalAlpha = ctx.globalAlpha;
+  if (useGlobalAlpha) {
+    ctx.globalAlpha = fowOpacity;
+  }
+
+  // Calculate visible bounds and render
+  if (isHexMap && hexGeometry) {
+    const visibleBounds = calculateHexVisibleBounds(mapBounds.hexBounds);
+
+    renderHexFog(
+      fow.foggedCells,
+      { ctx, fogCtx, offsetX, offsetY, zoom },
+      { fowOpacity, fowBlurEnabled, blurRadius, useGlobalAlpha },
+      visibleBounds,
+      hexGeometry,
+      geometry,
+      orientation,
+      offsetToAxial,
+      axialToOffset
+    );
+  } else {
+    const visibleBounds = calculateGridVisibleBounds(width, height, offsetX, offsetY, scaledSize, mapBounds.dimensions);
+
+    renderGridFog(
+      fow.foggedCells,
+      { ctx, fogCtx, offsetX, offsetY, scaledSize },
+      { fowOpacity, fowBlurEnabled, blurRadius, useGlobalAlpha },
+      visibleBounds,
+      zoom
+    );
+  }
+
+  // Cleanup
+  if (fogCtx) {
+    fogCtx.restore();
+  }
+
+  if (useGlobalAlpha) {
+    ctx.globalAlpha = previousGlobalAlpha;
+  }
+}
+
+/**
+ * Clears the fog canvas when fog is disabled or not needed.
+ */
+function clearFogCanvas(fogCanvas: HTMLCanvasElement | null): void {
+  if (!fogCanvas) return;
+
+  const fogCtx = fogCanvas.getContext('2d');
+  if (fogCtx) {
+    fogCtx.clearRect(0, 0, fogCanvas.width, fogCanvas.height);
+    fogCanvas.style.filter = 'none';
+  }
+}
+
+return {
+  getFogSettings,
+  createFogFillStyle,
+  calculateBlurRadius,
+  setupFogCanvas,
+  calculateGridVisibleBounds,
+  calculateHexVisibleBounds,
+  clearFogCanvas,
+  renderFog,
+};
+
+```
+
+# objectRenderer
+
+```ts
+/**
+ * Object Renderer Module
+ *
+ * Renders map objects (icons, characters, tokens) on the canvas.
+ * Handles fog visibility, multi-object hex slots, rotation, and badge indicators.
+ */
+
+interface MapObject {
+  id: string;
+  type: string;
+  position: { x: number; y: number };
+  size?: { width: number; height: number };
+  color?: string;
+  rotation?: number;
+  scale?: number;
+  alignment?: 'center' | 'north' | 'south' | 'east' | 'west';
+  slot?: number;
+  linkedNote?: string;
+  customTooltip?: string;
+  linkedObject?: string;
+}
+
+interface ObjectTypeDef {
+  id: string;
+  char?: string;
+  icon?: string;
+}
+
+interface MapLayer {
+  objects: MapObject[];
+  fogOfWar?: {
+    enabled: boolean;
+  };
+}
+
+interface GeometryLike {
+  toOffsetCoords: (x: number, y: number) => { col: number; row: number };
+  gridToScreen: (x: number, y: number, offsetX: number, offsetY: number, zoom: number) => { screenX: number; screenY: number };
+}
+
+interface ObjectRenderContext {
+  ctx: CanvasRenderingContext2D;
+  offsetX: number;
+  offsetY: number;
+  zoom: number;
+  scaledSize: number;
+}
+
+interface ObjectRenderDeps {
+  getObjectType: (typeId: string) => ObjectTypeDef | null;
+  getRenderChar: (objType: ObjectTypeDef) => { char: string; isIcon: boolean };
+  isCellFogged: (layer: MapLayer, col: number, row: number) => boolean;
+  getObjectsInCell: (objects: MapObject[], x: number, y: number) => MapObject[];
+  getSlotOffset: (slot: number, count: number, orientation: string) => { offsetX: number; offsetY: number };
+  getMultiObjectScale: (count: number) => number;
+  renderNoteLinkBadge: (ctx: CanvasRenderingContext2D, position: { screenX: number; screenY: number; objectWidth: number; objectHeight: number }, config: { scaledSize: number }) => void;
+  renderTooltipIndicator: (ctx: CanvasRenderingContext2D, position: { screenX: number; screenY: number; objectWidth: number; objectHeight: number }, config: { scaledSize: number }) => void;
+  renderObjectLinkIndicator: (ctx: CanvasRenderingContext2D, position: { screenX: number; screenY: number; objectWidth: number; objectHeight: number }, config: { scaledSize: number }) => void;
+}
+
+/**
+ * Checks if an object is hidden under fog of war.
+ */
+function isObjectUnderFog(
+  obj: MapObject,
+  layer: MapLayer,
+  geometry: GeometryLike,
+  isHexMap: boolean,
+  isCellFogged: (layer: MapLayer, col: number, row: number) => boolean
+): boolean {
+  if (!layer.fogOfWar?.enabled) return false;
+
+  const size = obj.size || { width: 1, height: 1 };
+  const baseOffset = geometry.toOffsetCoords(obj.position.x, obj.position.y);
+
+  if (isHexMap) {
+    return isCellFogged(layer, baseOffset.col, baseOffset.row);
+  }
+
+  // Grid maps: check all cells the object occupies
+  for (let dx = 0; dx < size.width; dx++) {
+    for (let dy = 0; dy < size.height; dy++) {
+      if (isCellFogged(layer, baseOffset.col + dx, baseOffset.row + dy)) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Calculates object screen position, handling multi-object hex slots.
+ */
+function calculateObjectPosition(
+  obj: MapObject,
+  allObjects: MapObject[],
+  geometry: GeometryLike,
+  context: ObjectRenderContext,
+  isHexMap: boolean,
+  orientation: string,
+  deps: Pick<ObjectRenderDeps, 'getObjectsInCell' | 'getSlotOffset' | 'getMultiObjectScale'>
+): { screenX: number; screenY: number; objectWidth: number; objectHeight: number } {
+  const { offsetX, offsetY, zoom, scaledSize } = context;
+  const size = obj.size || { width: 1, height: 1 };
+
+  let { screenX, screenY } = geometry.gridToScreen(obj.position.x, obj.position.y, offsetX, offsetY, zoom);
+  let objectWidth = size.width * scaledSize;
+  let objectHeight = size.height * scaledSize;
+
+  // Multi-object support for hex maps
+  if (isHexMap) {
+    const cellObjects = deps.getObjectsInCell(allObjects, obj.position.x, obj.position.y);
+    const objectCount = cellObjects.length;
+
+    if (objectCount > 1) {
+      const multiScale = deps.getMultiObjectScale(objectCount);
+      objectWidth *= multiScale;
+      objectHeight *= multiScale;
+
+      let effectiveSlot = obj.slot;
+      if (effectiveSlot === undefined || effectiveSlot === null) {
+        effectiveSlot = cellObjects.findIndex(o => o.id === obj.id);
+      }
+
+      const { offsetX: slotOffsetX, offsetY: slotOffsetY } = deps.getSlotOffset(
+        effectiveSlot,
+        objectCount,
+        orientation
+      );
+
+      const hexCenterX = screenX + scaledSize / 2;
+      const hexCenterY = screenY + scaledSize / 2;
+      const hexWidth = scaledSize * 2;
+      const objectCenterX = hexCenterX + slotOffsetX * hexWidth;
+      const objectCenterY = hexCenterY + slotOffsetY * hexWidth;
+
+      screenX = objectCenterX - objectWidth / 2;
+      screenY = objectCenterY - objectHeight / 2;
+    }
+  }
+
+  // Apply alignment offset
+  const alignment = obj.alignment || 'center';
+  if (alignment !== 'center') {
+    const halfCell = scaledSize / 2;
+    switch (alignment) {
+      case 'north': screenY -= halfCell; break;
+      case 'south': screenY += halfCell; break;
+      case 'east': screenX += halfCell; break;
+      case 'west': screenX -= halfCell; break;
+    }
+  }
+
+  return { screenX, screenY, objectWidth, objectHeight };
+}
+
+/**
+ * Renders a single object on the canvas.
+ */
+function renderSingleObject(
+  ctx: CanvasRenderingContext2D,
+  obj: MapObject,
+  objType: ObjectTypeDef,
+  position: { screenX: number; screenY: number; objectWidth: number; objectHeight: number },
+  scaledSize: number,
+  getRenderChar: (objType: ObjectTypeDef) => { char: string; isIcon: boolean }
+): void {
+  const { screenX, screenY, objectWidth, objectHeight } = position;
+
+  const centerX = screenX + objectWidth / 2;
+  const centerY = screenY + objectHeight / 2;
+
+  const objectScale = obj.scale ?? 1.0;
+  const fontSize = Math.min(objectWidth, objectHeight) * 0.8 * objectScale;
+
+  const rotation = obj.rotation || 0;
+  if (rotation !== 0) {
+    ctx.save();
+    ctx.translate(centerX, centerY);
+    ctx.rotate((rotation * Math.PI) / 180);
+    ctx.translate(-centerX, -centerY);
+  }
+
+  const { char: renderChar, isIcon } = getRenderChar(objType);
+
+  if (isIcon) {
+    ctx.font = `${fontSize}px rpgawesome`;
+  } else {
+    ctx.font = `${fontSize}px 'Noto Emoji', 'Noto Sans Symbols 2', monospace`;
+  }
+
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = Math.max(2, fontSize * 0.08);
+  ctx.strokeText(renderChar, centerX, centerY);
+
+  ctx.fillStyle = obj.color || '#ffffff';
+  ctx.fillText(renderChar, centerX, centerY);
+
+  if (rotation !== 0) {
+    ctx.restore();
+  }
+}
+
+/**
+ * Renders object badge indicators (note link, tooltip, object link).
+ */
+function renderObjectBadges(
+  ctx: CanvasRenderingContext2D,
+  obj: MapObject,
+  position: { screenX: number; screenY: number; objectWidth: number; objectHeight: number },
+  scaledSize: number,
+  deps: Pick<ObjectRenderDeps, 'renderNoteLinkBadge' | 'renderTooltipIndicator' | 'renderObjectLinkIndicator'>
+): void {
+  // Draw note badge if object has linkedNote
+  if (obj.linkedNote && obj.type !== 'note_pin') {
+    deps.renderNoteLinkBadge(ctx, position, { scaledSize });
+  }
+
+  // Draw note indicator for custom tooltip
+  if (obj.customTooltip) {
+    deps.renderTooltipIndicator(ctx, position, { scaledSize });
+  }
+
+  // Draw link indicator for inter-object links
+  if (obj.linkedObject) {
+    deps.renderObjectLinkIndicator(ctx, position, { scaledSize });
+  }
+}
+
+/**
+ * Main entry point for rendering all objects on the map.
+ */
+function renderObjects(
+  layer: MapLayer,
+  context: ObjectRenderContext,
+  geometry: GeometryLike,
+  isHexMap: boolean,
+  orientation: string,
+  deps: ObjectRenderDeps
+): void {
+  if (!layer.objects || layer.objects.length === 0) return;
+
+  const { ctx, scaledSize } = context;
+
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  for (const obj of layer.objects) {
+    const objType = deps.getObjectType(obj.type);
+    if (!objType) continue;
+
+    // Skip if under fog
+    if (isObjectUnderFog(obj, layer, geometry, isHexMap, deps.isCellFogged)) {
+      continue;
+    }
+
+    // Calculate position
+    const position = calculateObjectPosition(
+      obj,
+      layer.objects,
+      geometry,
+      context,
+      isHexMap,
+      orientation,
+      deps
+    );
+
+    // Render the object
+    renderSingleObject(ctx, obj, objType, position, scaledSize, deps.getRenderChar);
+
+    // Render badges
+    renderObjectBadges(ctx, obj, position, scaledSize, deps);
+  }
+}
+
+return {
+  isObjectUnderFog,
+  calculateObjectPosition,
+  renderSingleObject,
+  renderObjectBadges,
+  renderObjects,
+};
+
+```
+
+# selectionRenderer
+
+```ts
+/**
+ * Selection Renderer Module
+ *
+ * Renders selection indicators for text labels and objects.
+ * Handles selection rectangles, corner handles, and resize mode overlays.
+ */
+
+interface TextLabel {
+  id: string;
+  content: string;
+  position: { x: number; y: number };
+  fontSize: number;
+  fontFace?: string;
+  rotation?: number;
+}
+
+interface MapObject {
+  id: string;
+  type: string;
+  position: { x: number; y: number };
+  size?: { width: number; height: number };
+  alignment?: 'center' | 'north' | 'south' | 'east' | 'west';
+  slot?: number;
+}
+
+interface SelectedItem {
+  id: string;
+  type: 'text' | 'object';
+}
+
+interface GeometryLike {
+  worldToScreen: (worldX: number, worldY: number, offsetX: number, offsetY: number, zoom: number) => { screenX: number; screenY: number };
+  gridToScreen: (x: number, y: number, offsetX: number, offsetY: number, zoom: number) => { screenX: number; screenY: number };
+}
+
+interface HexGeometryLike {
+  hexToWorld: (q: number, r: number) => { worldX: number; worldY: number };
+}
+
+interface SelectionRenderContext {
+  ctx: CanvasRenderingContext2D;
+  offsetX: number;
+  offsetY: number;
+  zoom: number;
+  scaledSize: number;
+}
+
+interface SelectionRenderDeps {
+  getFontCss: (fontFace: string) => string;
+  getObjectsInCell: (objects: MapObject[], x: number, y: number) => MapObject[];
+  getSlotOffset: (slot: number, count: number, orientation: string) => { offsetX: number; offsetY: number };
+  getMultiObjectScale: (count: number) => number;
+}
+
+const SELECTION_COLOR = '#4a9eff';
+const SELECTION_LINE_WIDTH = 2;
+const SELECTION_DASH = [5, 3];
+const HANDLE_SIZE_NORMAL = 8;
+const HANDLE_SIZE_RESIZE = 14;
+
+/**
+ * Renders selection indicator for a single text label.
+ */
+function renderTextLabelSelection(
+  ctx: CanvasRenderingContext2D,
+  label: TextLabel,
+  geometry: GeometryLike,
+  context: SelectionRenderContext,
+  getFontCss: (fontFace: string) => string
+): void {
+  const { offsetX, offsetY, zoom } = context;
+
+  ctx.save();
+
+  const { screenX, screenY } = geometry.worldToScreen(label.position.x, label.position.y, offsetX, offsetY, zoom);
+
+  ctx.translate(screenX, screenY);
+  ctx.rotate(((label.rotation || 0) * Math.PI) / 180);
+
+  const fontSize = label.fontSize * zoom;
+  const fontFamily = getFontCss(label.fontFace || 'sans');
+  ctx.font = `${fontSize}px ${fontFamily}`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const metrics = ctx.measureText(label.content);
+  const textWidth = metrics.width;
+  const textHeight = fontSize * 1.2;
+
+  // Draw dashed selection rectangle
+  ctx.strokeStyle = SELECTION_COLOR;
+  ctx.lineWidth = SELECTION_LINE_WIDTH;
+  ctx.setLineDash(SELECTION_DASH);
+  ctx.strokeRect(-textWidth/2 - 4, -textHeight/2 - 2, textWidth + 8, textHeight + 4);
+
+  // Draw corner handles
+  ctx.setLineDash([]);
+  ctx.fillStyle = SELECTION_COLOR;
+  const handleSize = 6;
+
+  ctx.fillRect(-textWidth/2 - 4 - handleSize/2, -textHeight/2 - 2 - handleSize/2, handleSize, handleSize);
+  ctx.fillRect(textWidth/2 + 4 - handleSize/2, -textHeight/2 - 2 - handleSize/2, handleSize, handleSize);
+  ctx.fillRect(-textWidth/2 - 4 - handleSize/2, textHeight/2 + 2 - handleSize/2, handleSize, handleSize);
+  ctx.fillRect(textWidth/2 + 4 - handleSize/2, textHeight/2 + 2 - handleSize/2, handleSize, handleSize);
+
+  ctx.restore();
+}
+
+/**
+ * Renders selection indicators for all selected text labels.
+ */
+function renderTextLabelSelections(
+  selectedItems: SelectedItem[],
+  textLabels: TextLabel[],
+  context: SelectionRenderContext,
+  geometry: GeometryLike,
+  getFontCss: (fontFace: string) => string
+): void {
+  const selectedTextLabels = selectedItems.filter(item => item.type === 'text');
+  if (selectedTextLabels.length === 0 || !textLabels) return;
+
+  for (const selectedItem of selectedTextLabels) {
+    const label = textLabels.find(l => l.id === selectedItem.id);
+    if (label) {
+      renderTextLabelSelection(context.ctx, label, geometry, context, getFontCss);
+    }
+  }
+}
+
+/**
+ * Calculates object selection position for hex maps.
+ */
+function calculateHexObjectSelectionPosition(
+  object: MapObject,
+  allObjects: MapObject[],
+  hexGeometry: HexGeometryLike,
+  context: SelectionRenderContext,
+  orientation: string,
+  deps: Pick<SelectionRenderDeps, 'getObjectsInCell' | 'getSlotOffset' | 'getMultiObjectScale'>
+): { screenX: number; screenY: number; objectWidth: number; objectHeight: number; cellWidth: number; cellHeight: number } {
+  const { offsetX, offsetY, zoom, scaledSize } = context;
+  const size = object.size || { width: 1, height: 1 };
+  const alignment = object.alignment || 'center';
+
+  const { worldX, worldY } = hexGeometry.hexToWorld(object.position.x, object.position.y);
+
+  const cellObjects = deps.getObjectsInCell(allObjects, object.position.x, object.position.y);
+  const objectCount = cellObjects.length;
+
+  let objectWidth = size.width * scaledSize;
+  let objectHeight = size.height * scaledSize;
+  const cellWidth = scaledSize;
+  const cellHeight = scaledSize;
+
+  if (objectCount > 1) {
+    const multiScale = deps.getMultiObjectScale(objectCount);
+    objectWidth *= multiScale;
+    objectHeight *= multiScale;
+  }
+
+  let centerScreenX = offsetX + worldX * zoom;
+  let centerScreenY = offsetY + worldY * zoom;
+
+  if (objectCount > 1) {
+    const effectiveSlot = object.slot ?? cellObjects.findIndex(o => o.id === object.id);
+    const { offsetX: slotOffsetX, offsetY: slotOffsetY } = deps.getSlotOffset(
+      effectiveSlot,
+      objectCount,
+      orientation
+    );
+    const hexWidth = scaledSize * 2;
+    centerScreenX += slotOffsetX * hexWidth;
+    centerScreenY += slotOffsetY * hexWidth;
+  }
+
+  if (alignment !== 'center') {
+    const halfCell = scaledSize / 2;
+    switch (alignment) {
+      case 'north': centerScreenY -= halfCell; break;
+      case 'south': centerScreenY += halfCell; break;
+      case 'east': centerScreenX += halfCell; break;
+      case 'west': centerScreenX -= halfCell; break;
+    }
+  }
+
+  const screenX = centerScreenX - objectWidth / 2;
+  const screenY = centerScreenY - objectHeight / 2;
+
+  return { screenX, screenY, objectWidth, objectHeight, cellWidth, cellHeight };
+}
+
+/**
+ * Calculates object selection position for grid maps.
+ */
+function calculateGridObjectSelectionPosition(
+  object: MapObject,
+  geometry: GeometryLike,
+  context: SelectionRenderContext
+): { screenX: number; screenY: number; objectWidth: number; objectHeight: number; cellWidth: number; cellHeight: number } {
+  const { offsetX, offsetY, zoom, scaledSize } = context;
+  const size = object.size || { width: 1, height: 1 };
+  const alignment = object.alignment || 'center';
+
+  const gridPos = geometry.gridToScreen(object.position.x, object.position.y, offsetX, offsetY, zoom);
+  let screenX = gridPos.screenX;
+  let screenY = gridPos.screenY;
+
+  if (alignment !== 'center') {
+    const halfCell = scaledSize / 2;
+    switch (alignment) {
+      case 'north': screenY -= halfCell; break;
+      case 'south': screenY += halfCell; break;
+      case 'east': screenX += halfCell; break;
+      case 'west': screenX -= halfCell; break;
+    }
+  }
+
+  const objectWidth = size.width * scaledSize;
+  const objectHeight = size.height * scaledSize;
+  const cellWidth = scaledSize;
+  const cellHeight = scaledSize;
+
+  return { screenX, screenY, objectWidth, objectHeight, cellWidth, cellHeight };
+}
+
+/**
+ * Renders resize mode overlay showing occupied cells.
+ */
+function renderResizeOverlay(
+  ctx: CanvasRenderingContext2D,
+  object: MapObject,
+  screenX: number,
+  screenY: number,
+  cellWidth: number,
+  cellHeight: number
+): void {
+  const size = object.size || { width: 1, height: 1 };
+
+  ctx.fillStyle = 'rgba(74, 158, 255, 0.15)';
+  for (let dx = 0; dx < size.width; dx++) {
+    for (let dy = 0; dy < size.height; dy++) {
+      const cellScreenX = screenX + dx * cellWidth;
+      const cellScreenY = screenY + dy * cellHeight;
+      ctx.fillRect(cellScreenX + 2, cellScreenY + 2, cellWidth - 4, cellHeight - 4);
+    }
+  }
+}
+
+/**
+ * Renders selection rectangle and corner handles for an object.
+ */
+function renderObjectSelectionRectangle(
+  ctx: CanvasRenderingContext2D,
+  screenX: number,
+  screenY: number,
+  objectWidth: number,
+  objectHeight: number,
+  isResizeMode: boolean
+): void {
+  // Draw selection rectangle
+  ctx.strokeStyle = SELECTION_COLOR;
+  ctx.lineWidth = SELECTION_LINE_WIDTH;
+  ctx.setLineDash(SELECTION_DASH);
+  ctx.strokeRect(screenX + 2, screenY + 2, objectWidth - 4, objectHeight - 4);
+
+  // Draw corner handles
+  ctx.setLineDash([]);
+  ctx.fillStyle = SELECTION_COLOR;
+  const handleSize = isResizeMode ? HANDLE_SIZE_RESIZE : HANDLE_SIZE_NORMAL;
+
+  ctx.fillRect(screenX + 2 - handleSize/2, screenY + 2 - handleSize/2, handleSize, handleSize);
+  ctx.fillRect(screenX + objectWidth - 2 - handleSize/2, screenY + 2 - handleSize/2, handleSize, handleSize);
+  ctx.fillRect(screenX + 2 - handleSize/2, screenY + objectHeight - 2 - handleSize/2, handleSize, handleSize);
+  ctx.fillRect(screenX + objectWidth - 2 - handleSize/2, screenY + objectHeight - 2 - handleSize/2, handleSize, handleSize);
+}
+
+/**
+ * Renders selection indicator for a single object.
+ */
+function renderObjectSelection(
+  ctx: CanvasRenderingContext2D,
+  object: MapObject,
+  allObjects: MapObject[],
+  geometry: GeometryLike,
+  hexGeometry: HexGeometryLike | null,
+  context: SelectionRenderContext,
+  isHexMap: boolean,
+  isResizeMode: boolean,
+  orientation: string,
+  deps: Pick<SelectionRenderDeps, 'getObjectsInCell' | 'getSlotOffset' | 'getMultiObjectScale'>
+): void {
+  let position: { screenX: number; screenY: number; objectWidth: number; objectHeight: number; cellWidth: number; cellHeight: number };
+
+  if (isHexMap && hexGeometry) {
+    position = calculateHexObjectSelectionPosition(object, allObjects, hexGeometry, context, orientation, deps);
+  } else {
+    position = calculateGridObjectSelectionPosition(object, geometry, context);
+  }
+
+  const { screenX, screenY, objectWidth, objectHeight, cellWidth, cellHeight } = position;
+
+  // Draw occupied cells overlay in resize mode
+  if (isResizeMode) {
+    renderResizeOverlay(ctx, object, screenX, screenY, cellWidth, cellHeight);
+  }
+
+  // Draw selection rectangle and handles
+  renderObjectSelectionRectangle(ctx, screenX, screenY, objectWidth, objectHeight, isResizeMode);
+}
+
+/**
+ * Renders selection indicators for all selected objects.
+ */
+function renderObjectSelections(
+  selectedItems: SelectedItem[],
+  objects: MapObject[],
+  context: SelectionRenderContext,
+  geometry: GeometryLike,
+  hexGeometry: HexGeometryLike | null,
+  isHexMap: boolean,
+  isResizeMode: boolean,
+  orientation: string,
+  deps: Pick<SelectionRenderDeps, 'getObjectsInCell' | 'getSlotOffset' | 'getMultiObjectScale'>
+): void {
+  const selectedObjects = selectedItems.filter(item => item.type === 'object');
+  if (selectedObjects.length === 0 || !objects) return;
+
+  const showResizeOverlay = isResizeMode && selectedObjects.length === 1;
+
+  for (const selectedItem of selectedObjects) {
+    const object = objects.find(obj => obj.id === selectedItem.id);
+    if (object) {
+      renderObjectSelection(
+        context.ctx,
+        object,
+        objects,
+        geometry,
+        hexGeometry,
+        context,
+        isHexMap,
+        showResizeOverlay,
+        orientation,
+        deps
+      );
+    }
+  }
+}
+
+/**
+ * Main entry point for rendering all selection indicators.
+ */
+function renderSelections(
+  selectedItems: SelectedItem[],
+  textLabels: TextLabel[] | undefined,
+  objects: MapObject[] | undefined,
+  context: SelectionRenderContext,
+  geometry: GeometryLike,
+  hexGeometry: HexGeometryLike | null,
+  isHexMap: boolean,
+  isResizeMode: boolean,
+  orientation: string,
+  showCoordinates: boolean,
+  visibility: { textLabels?: boolean; objects?: boolean },
+  deps: SelectionRenderDeps
+): void {
+  if (selectedItems.length === 0 || showCoordinates) return;
+
+  // Render text label selections
+  if (textLabels && visibility.textLabels !== false) {
+    renderTextLabelSelections(selectedItems, textLabels, context, geometry, deps.getFontCss);
+  }
+
+  // Render object selections
+  if (objects && visibility.objects !== false) {
+    renderObjectSelections(
+      selectedItems,
+      objects,
+      context,
+      geometry,
+      hexGeometry,
+      isHexMap,
+      isResizeMode,
+      orientation,
+      deps
+    );
+  }
+}
+
+return {
+  renderTextLabelSelection,
+  renderTextLabelSelections,
+  calculateHexObjectSelectionPosition,
+  calculateGridObjectSelectionPosition,
+  renderResizeOverlay,
+  renderObjectSelectionRectangle,
+  renderObjectSelection,
+  renderObjectSelections,
+  renderSelections,
+};
+
+```
+
 # fontOptions
 
 ```ts
@@ -7628,6 +9531,44 @@ import type {
 // ===========================================
 
 const gridRenderer = {
+  /**
+   * Whether this renderer supports segment (partial cell) rendering.
+   * Grid maps support segments, hex maps do not.
+   */
+  supportsSegments: true,
+
+  /**
+   * Calculate the scaled cell size for the current zoom level.
+   */
+  getScaledSize(geometry: IGridRenderer, zoom: number): number {
+    return geometry.getScaledCellSize(zoom);
+  },
+
+  /**
+   * Calculate viewport offset for grid maps.
+   * Grid maps multiply center by scaled cell size.
+   */
+  calculateViewportOffset(
+    geometry: IGridRenderer,
+    center: { x: number; y: number },
+    canvasSize: { width: number; height: number },
+    zoom: number
+  ): { offsetX: number; offsetY: number } {
+    const scaledSize = geometry.getScaledCellSize(zoom);
+    return {
+      offsetX: canvasSize.width / 2 - center.x * scaledSize,
+      offsetY: canvasSize.height / 2 - center.y * scaledSize,
+    };
+  },
+
+  /**
+   * Render background image for grid maps.
+   * Grid maps don't support background images - this is a no-op.
+   */
+  renderBackgroundImage(): void {
+    // Grid maps don't render background images
+  },
+
   /**
    * Render grid overlay lines
    */
@@ -8034,11 +9975,86 @@ import type {
   IHexRenderer
 } from '#types/core/rendering.types';
 
+// Datacore imports for background image rendering
+const { renderHexBackgroundImage } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "backgroundRenderer")) as {
+  renderHexBackgroundImage: (
+    bgImage: HTMLImageElement,
+    config: { path: string; offsetX?: number; offsetY?: number; opacity?: number },
+    hexBounds: { maxCol: number; maxRow: number },
+    hexGeometry: { hexSize: number; sqrt3: number; hexToWorld: (q: number, r: number) => { worldX: number; worldY: number } },
+    orientation: string,
+    context: { ctx: CanvasRenderingContext2D; offsetX: number; offsetY: number; zoom: number },
+    offsetToAxial: (col: number, row: number, orientation: string) => { q: number; r: number }
+  ) => void;
+};
+
+const { offsetToAxial } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "offsetCoordinates")) as {
+  offsetToAxial: (col: number, row: number, orientation: string) => { q: number; r: number };
+};
+
 // ===========================================
 // Hex Renderer Module
 // ===========================================
 
 const hexRenderer = {
+  /**
+   * Whether this renderer supports segment (partial cell) rendering.
+   * Hex maps do not support segments.
+   */
+  supportsSegments: false,
+
+  /**
+   * Calculate the scaled cell size for the current zoom level.
+   */
+  getScaledSize(geometry: IHexRenderer, zoom: number): number {
+    return geometry.getScaledCellSize(zoom);
+  },
+
+  /**
+   * Calculate viewport offset for hex maps.
+   * Hex maps multiply center by zoom only (center is in world coordinates).
+   */
+  calculateViewportOffset(
+    _geometry: IHexRenderer,
+    center: { x: number; y: number },
+    canvasSize: { width: number; height: number },
+    zoom: number
+  ): { offsetX: number; offsetY: number } {
+    return {
+      offsetX: canvasSize.width / 2 - center.x * zoom,
+      offsetY: canvasSize.height / 2 - center.y * zoom,
+    };
+  },
+
+  /**
+   * Render background image for hex maps.
+   * Centers the image based on hex grid bounds.
+   */
+  renderBackgroundImage(
+    ctx: CanvasRenderingContext2D,
+    geometry: IHexRenderer,
+    bgImage: HTMLImageElement | null,
+    bgConfig: { path: string; offsetX?: number; offsetY?: number; opacity?: number } | undefined,
+    hexBounds: { maxCol: number; maxRow: number } | undefined,
+    orientation: string,
+    offsetX: number,
+    offsetY: number,
+    zoom: number
+  ): void {
+    if (!bgImage || !bgConfig?.path || !hexBounds) return;
+    if (!bgImage.complete) return;
+
+    renderHexBackgroundImage(
+      bgImage,
+      bgConfig,
+      hexBounds,
+      geometry as unknown as { hexSize: number; sqrt3: number; hexToWorld: (q: number, r: number) => { worldX: number; worldY: number } },
+      orientation,
+      { ctx, offsetX, offsetY, zoom },
+      offsetToAxial
+    );
+  },
+
   /**
    * Render hex grid overlay
    */
@@ -9460,6 +11476,34 @@ const { getRenderChar } = await dc.require(dc.headerLink(dc.resolvePath("compile
 const { getCellColor } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "colorOperations")) as {
   getCellColor: (cell: Cell) => string;
 };
+const { renderNoteLinkBadge, renderTooltipIndicator, renderObjectLinkIndicator } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "badgeRenderer")) as {
+  renderNoteLinkBadge: (ctx: CanvasRenderingContext2D, position: { screenX: number; screenY: number; objectWidth: number; objectHeight: number }, config: { scaledSize: number }) => void;
+  renderTooltipIndicator: (ctx: CanvasRenderingContext2D, position: { screenX: number; screenY: number; objectWidth: number; objectHeight: number }, config: { scaledSize: number }) => void;
+  renderObjectLinkIndicator: (ctx: CanvasRenderingContext2D, position: { screenX: number; screenY: number; objectWidth: number; objectHeight: number }, config: { scaledSize: number }) => void;
+};
+const { renderTextLabels } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "textLabelRenderer")) as {
+  renderTextLabels: (labels: TextLabel[], context: { ctx: CanvasRenderingContext2D; zoom: number; getFontCss: (fontFace: string) => string }, geometry: { worldToScreen: (x: number, y: number, offsetX: number, offsetY: number, zoom: number) => { screenX: number; screenY: number } }, viewState: { offsetX: number; offsetY: number; zoom: number }) => void;
+};
+const { renderHexBackgroundImage } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "backgroundRenderer")) as {
+  renderHexBackgroundImage: (bgImage: HTMLImageElement, config: { path: string; offsetX?: number; offsetY?: number; opacity?: number }, hexBounds: { maxCol: number; maxRow: number }, hexGeometry: { hexSize: number; sqrt3: number; hexToWorld: (q: number, r: number) => { worldX: number; worldY: number } }, orientation: string, context: { ctx: CanvasRenderingContext2D; offsetX: number; offsetY: number; zoom: number }, offsetToAxial: (col: number, row: number, orientation: string) => { q: number; r: number }) => void;
+};
+const { renderGridFog } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "gridFogRenderer")) as {
+  renderGridFog: (fogCells: Array<{ col: number; row: number }>, context: { ctx: CanvasRenderingContext2D; fogCtx: CanvasRenderingContext2D | null; offsetX: number; offsetY: number; scaledSize: number }, options: { fowOpacity: number; fowBlurEnabled: boolean; blurRadius: number; useGlobalAlpha: boolean }, visibleBounds: { minCol: number; maxCol: number; minRow: number; maxRow: number }, zoom: number) => void;
+};
+const { renderHexFog } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "hexFogRenderer")) as {
+  renderHexFog: (fogCells: Array<{ col: number; row: number }>, context: { ctx: CanvasRenderingContext2D; fogCtx: CanvasRenderingContext2D | null; offsetX: number; offsetY: number; zoom: number }, options: { fowOpacity: number; fowBlurEnabled: boolean; blurRadius: number; useGlobalAlpha: boolean }, visibleBounds: { minCol: number; maxCol: number; minRow: number; maxRow: number }, hexGeometry: { hexSize: number; getHexVertices: (q: number, r: number) => Array<{ worldX: number; worldY: number }>; hexToWorld: (q: number, r: number) => { worldX: number; worldY: number }; getNeighbors: (q: number, r: number) => Array<{ q: number; r: number }> }, geometry: { worldToScreen: (worldX: number, worldY: number, offsetX: number, offsetY: number, zoom: number) => { screenX: number; screenY: number } }, orientation: string, offsetToAxial: (col: number, row: number, orientation: string) => { q: number; r: number }, axialToOffset: (q: number, r: number, orientation: string) => { col: number; row: number }) => void;
+};
+const { getFogSettings, clearFogCanvas, renderFog } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "fogRenderer")) as {
+  getFogSettings: (effectiveSettings: Record<string, unknown>) => { fowColor: string; fowOpacity: number; fowImagePath?: string; fowBlurEnabled: boolean; fowBlurFactor: number };
+  clearFogCanvas: (fogCanvas: HTMLCanvasElement | null) => void;
+  renderFog: (fow: { enabled: boolean; foggedCells?: Array<{ col: number; row: number }> }, context: { ctx: CanvasRenderingContext2D; fogCanvas: HTMLCanvasElement | null; width: number; height: number; offsetX: number; offsetY: number; zoom: number; scaledSize: number; northDirection: number }, settings: { fowColor: string; fowOpacity: number; fowImagePath?: string; fowBlurEnabled: boolean; fowBlurFactor: number }, mapBounds: { hexBounds?: { maxCol: number; maxRow: number }; dimensions?: { width: number; height: number } }, isHexMap: boolean, hexGeometry: { hexSize: number; getHexVertices: (q: number, r: number) => Array<{ worldX: number; worldY: number }>; hexToWorld: (q: number, r: number) => { worldX: number; worldY: number }; getNeighbors: (q: number, r: number) => Array<{ q: number; r: number }> } | null, gridGeometry: { cellSize: number } | null, geometry: { worldToScreen: (worldX: number, worldY: number, offsetX: number, offsetY: number, zoom: number) => { screenX: number; screenY: number } }, orientation: string, getCachedImage: (path: string) => HTMLImageElement | null, renderGridFog: typeof renderGridFog, renderHexFog: typeof renderHexFog, offsetToAxial: (col: number, row: number, orientation: string) => { q: number; r: number }, axialToOffset: (q: number, r: number, orientation: string) => { col: number; row: number }) => void;
+};
+const { renderObjects } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "objectRenderer")) as {
+  renderObjects: (layer: MapLayer, context: { ctx: CanvasRenderingContext2D; offsetX: number; offsetY: number; zoom: number; scaledSize: number }, geometry: IGeometry, isHexMap: boolean, orientation: string, deps: { getObjectType: typeof getObjectType; getRenderChar: typeof getRenderChar; isCellFogged: typeof isCellFogged; getObjectsInCell: typeof getObjectsInCell; getSlotOffset: typeof getSlotOffset; getMultiObjectScale: typeof getMultiObjectScale; renderNoteLinkBadge: typeof renderNoteLinkBadge; renderTooltipIndicator: typeof renderTooltipIndicator; renderObjectLinkIndicator: typeof renderObjectLinkIndicator }) => void;
+};
+const { renderSelections } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "selectionRenderer")) as {
+  renderSelections: (selectedItems: RendererSelectedItem[], textLabels: TextLabel[] | undefined, objects: MapObject[] | undefined, context: { ctx: CanvasRenderingContext2D; offsetX: number; offsetY: number; zoom: number; scaledSize: number }, geometry: IGeometry, hexGeometry: { hexToWorld: (q: number, r: number) => { worldX: number; worldY: number } } | null, isHexMap: boolean, isResizeMode: boolean, orientation: string, showCoordinates: boolean, visibility: { textLabels?: boolean; objects?: boolean }, deps: { getFontCss: typeof getFontCss; getObjectsInCell: typeof getObjectsInCell; getSlotOffset: typeof getSlotOffset; getMultiObjectScale: typeof getMultiObjectScale }) => void;
+};
 const { getFontCss } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "fontOptions")) as {
   getFontCss: (fontFace: string) => string;
 };
@@ -9478,6 +11522,17 @@ const { HexGeometry } = await dc.require(dc.headerLink(dc.resolvePath("compiled-
 };
 
 interface Renderer {
+  // Polymorphic properties
+  supportsSegments: boolean;
+
+  // Polymorphic methods for viewport calculation
+  getScaledSize: (geometry: IGeometry, zoom: number) => number;
+  calculateViewportOffset: (geometry: IGeometry, center: { x: number; y: number }, canvasSize: { width: number; height: number }, zoom: number) => { offsetX: number; offsetY: number };
+
+  // Optional background image rendering (hex only)
+  renderBackgroundImage: (ctx: CanvasRenderingContext2D, geometry: IGeometry, bgImage: HTMLImageElement | null, bgConfig: { path: string; offsetX?: number; offsetY?: number; opacity?: number } | undefined, hexBounds: { maxCol: number; maxRow: number } | undefined, orientation: string, offsetX: number, offsetY: number, zoom: number) => void;
+
+  // Grid/cell rendering
   renderGrid: (ctx: CanvasRenderingContext2D, geometry: IGeometry, viewState: RendererViewState, dimensions: { width: number; height: number }, showGrid: boolean, options: { lineColor: string; lineWidth: number }) => void;
   renderPaintedCells: (ctx: CanvasRenderingContext2D, cells: Cell[], geometry: IGeometry, viewState: RendererViewState) => void;
   renderCellBorders: (ctx: CanvasRenderingContext2D, cells: Cell[], geometry: IGeometry, viewState: RendererViewState, getLookup: () => CellMap, calculateBorders: typeof calculateBordersOptimized, options: { border: string; borderWidth: number }) => void;
@@ -9513,10 +11568,11 @@ const { getActiveLayer, getLayerBelow, isCellFogged } = await dc.require(dc.head
 };
 
 /**
- * Get appropriate renderer for geometry type
+ * Get appropriate renderer for geometry type.
+ * Uses geometry.type discriminator instead of instanceof.
  */
 function getRenderer(geometry: IGeometry): Renderer {
-  return geometry instanceof HexGeometry ? hexRenderer : gridRenderer;
+  return geometry.type === 'hex' ? hexRenderer : gridRenderer;
 }
 
 /** Options for rendering layer content */
@@ -9558,7 +11614,7 @@ function renderLayerCellsAndEdges(
       renderer.renderPaintedCells(ctx, simpleCells, geometry, viewState);
     }
 
-    if (segmentCells.length > 0 && geometry instanceof GridGeometry) {
+    if (segmentCells.length > 0 && renderer.supportsSegments) {
       segmentRenderer.renderSegmentCells(ctx, segmentCells, geometry, viewState);
     }
 
@@ -9587,7 +11643,7 @@ function renderLayerCellsAndEdges(
       );
     }
 
-    if (segmentCells.length > 0 && geometry instanceof GridGeometry) {
+    if (segmentCells.length > 0 && renderer.supportsSegments) {
       segmentRenderer.renderSegmentBorders(
         ctx,
         segmentCells,
@@ -9603,7 +11659,7 @@ function renderLayerCellsAndEdges(
   }
 
   // Draw painted edges (grid maps only)
-  if (layer.edges && layer.edges.length > 0 && geometry instanceof GridGeometry && renderer.renderEdges) {
+  if (layer.edges && layer.edges.length > 0 && renderer.supportsSegments && renderer.renderEdges) {
     renderer.renderEdges(ctx, layer.edges, geometry, viewState, {
       lineWidth: 1,
       borderWidth: theme.cells.borderWidth
@@ -9653,83 +11709,28 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   // Get appropriate renderer for this geometry
   const renderer = getRenderer(geometry);
 
-  // Calculate viewport based on geometry type
-  let scaledSize: number, offsetX: number, offsetY: number;
+  // Calculate viewport using renderer's polymorphic method
+  const scaledSize = renderer.getScaledSize(geometry, zoom);
+  const { offsetX, offsetY } = renderer.calculateViewportOffset(
+    geometry,
+    center,
+    { width, height },
+    zoom
+  );
 
-  if (geometry instanceof GridGeometry) {
-    scaledSize = geometry.getScaledCellSize(zoom);
-    // Grid: center is in grid cell coordinates, multiply by cell size
-    offsetX = width / 2 - center.x * scaledSize;
-    offsetY = height / 2 - center.y * scaledSize;
-  } else {
-    // HexGeometry: center is in world pixel coordinates, multiply by zoom only
-    scaledSize = (geometry as InstanceType<typeof HexGeometry>).getScaledHexSize(zoom);
-    offsetX = width / 2 - center.x * zoom;
-    offsetY = height / 2 - center.y * zoom;
-  }
-
-  // Draw background image for hex maps (if available)
-  if (geometry instanceof HexGeometry && mapData.backgroundImage?.path) {
-    const bgImage = getCachedImage(mapData.backgroundImage.path);
-    if (bgImage && bgImage.complete && mapData.hexBounds) {
-      const orientation = mapData.orientation || 'flat';
-      const hexGeom = geometry as InstanceType<typeof HexGeometry>;
-
-      let minWorldX = Infinity, maxWorldX = -Infinity;
-      let minWorldY = Infinity, maxWorldY = -Infinity;
-
-      const corners = [
-        { col: 0, row: 0 },
-        { col: mapData.hexBounds.maxCol - 1, row: 0 },
-        { col: 0, row: mapData.hexBounds.maxRow - 1 },
-        { col: mapData.hexBounds.maxCol - 1, row: mapData.hexBounds.maxRow - 1 }
-      ];
-
-      for (const corner of corners) {
-        const { q, r } = offsetToAxial(corner.col, corner.row, orientation);
-        const worldPos = hexGeom.hexToWorld(q, r);
-
-        if (worldPos.worldX < minWorldX) minWorldX = worldPos.worldX;
-        if (worldPos.worldX > maxWorldX) maxWorldX = worldPos.worldX;
-        if (worldPos.worldY < minWorldY) minWorldY = worldPos.worldY;
-        if (worldPos.worldY > maxWorldY) maxWorldY = worldPos.worldY;
-      }
-
-      const hexExtentX = hexGeom.hexSize;
-      const hexExtentY = hexGeom.hexSize * hexGeom.sqrt3 / 2;
-
-      minWorldX -= hexExtentX;
-      maxWorldX += hexExtentX;
-      minWorldY -= hexExtentY;
-      maxWorldY += hexExtentY;
-
-      const worldCenterX = (minWorldX + maxWorldX) / 2;
-      const worldCenterY = (minWorldY + maxWorldY) / 2;
-
-      const imgWidth = bgImage.naturalWidth;
-      const imgHeight = bgImage.naturalHeight;
-
-      const imgOffsetX = mapData.backgroundImage.offsetX ?? 0;
-      const imgOffsetY = mapData.backgroundImage.offsetY ?? 0;
-
-      const screenCenterX = offsetX + worldCenterX * zoom;
-      const screenCenterY = offsetY + worldCenterY * zoom;
-      const screenX = screenCenterX - (imgWidth * zoom) / 2 + (imgOffsetX * zoom);
-      const screenY = screenCenterY - (imgHeight * zoom) / 2 + (imgOffsetY * zoom);
-
-      const opacity = mapData.backgroundImage.opacity ?? 1;
-      if (opacity < 1) {
-        ctx.save();
-        ctx.globalAlpha = opacity;
-      }
-
-      ctx.drawImage(bgImage, screenX, screenY, imgWidth * zoom, imgHeight * zoom);
-
-      if (opacity < 1) {
-        ctx.restore();
-      }
-    }
-  }
+  // Draw background image (hex maps only - grid renderer is no-op)
+  const bgImage = mapData.backgroundImage?.path ? getCachedImage(mapData.backgroundImage.path) : null;
+  renderer.renderBackgroundImage(
+    ctx,
+    geometry,
+    bgImage,
+    mapData.backgroundImage,
+    mapData.hexBounds,
+    mapData.orientation || 'flat',
+    offsetX,
+    offsetY,
+    zoom
+  );
 
   // Create renderer viewState object
   const rendererViewState: RendererViewState = {
@@ -9772,777 +11773,96 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
 
   // Draw objects
   if (activeLayer.objects && activeLayer.objects.length > 0 && !showCoordinates && visibility.objects) {
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-
-    for (const obj of activeLayer.objects) {
-      const objType = getObjectType(obj.type);
-      if (!objType) continue;
-
-      // Skip if fogged
-      if (activeLayer.fogOfWar?.enabled) {
-        const size = obj.size || { width: 1, height: 1 };
-        const baseOffset = geometry.toOffsetCoords(obj.position.x, obj.position.y);
-
-        let isUnderFog = false;
-
-        if (geometry instanceof HexGeometry) {
-          isUnderFog = isCellFogged(activeLayer, baseOffset.col, baseOffset.row);
-        } else {
-          for (let dx = 0; dx < size.width && !isUnderFog; dx++) {
-            for (let dy = 0; dy < size.height && !isUnderFog; dy++) {
-              if (isCellFogged(activeLayer, baseOffset.col + dx, baseOffset.row + dy)) {
-                isUnderFog = true;
-              }
-            }
-          }
-        }
-
-        if (isUnderFog) continue;
+    const isHexMap = geometry.type === 'hex';
+    renderObjects(
+      activeLayer,
+      { ctx, offsetX, offsetY, zoom, scaledSize },
+      geometry,
+      isHexMap,
+      mapData.orientation || 'flat',
+      {
+        getObjectType,
+        getRenderChar,
+        isCellFogged,
+        getObjectsInCell,
+        getSlotOffset,
+        getMultiObjectScale,
+        renderNoteLinkBadge,
+        renderTooltipIndicator,
+        renderObjectLinkIndicator,
       }
-
-      const size = obj.size || { width: 1, height: 1 };
-
-      let { screenX, screenY } = geometry.gridToScreen(obj.position.x, obj.position.y, offsetX, offsetY, zoom);
-
-      let objectWidth = size.width * scaledSize;
-      let objectHeight = size.height * scaledSize;
-
-      // Multi-object support for hex maps
-      if (geometry instanceof HexGeometry) {
-        const cellObjects = getObjectsInCell(activeLayer.objects, obj.position.x, obj.position.y);
-        const objectCount = cellObjects.length;
-
-        if (objectCount > 1) {
-          const multiScale = getMultiObjectScale(objectCount);
-          objectWidth *= multiScale;
-          objectHeight *= multiScale;
-
-          let effectiveSlot = obj.slot;
-          if (effectiveSlot === undefined || effectiveSlot === null) {
-            effectiveSlot = cellObjects.findIndex(o => o.id === obj.id);
-          }
-
-          const { offsetX: slotOffsetX, offsetY: slotOffsetY } = getSlotOffset(
-            effectiveSlot,
-            objectCount,
-            mapData.orientation || 'flat'
-          );
-
-          const hexCenterX = screenX + scaledSize / 2;
-          const hexCenterY = screenY + scaledSize / 2;
-          const hexWidth = scaledSize * 2;
-          const objectCenterX = hexCenterX + slotOffsetX * hexWidth;
-          const objectCenterY = hexCenterY + slotOffsetY * hexWidth;
-
-          screenX = objectCenterX - objectWidth / 2;
-          screenY = objectCenterY - objectHeight / 2;
-        }
-      }
-
-      // Apply alignment offset
-      const alignment = obj.alignment || 'center';
-      if (alignment !== 'center') {
-        const halfCell = scaledSize / 2;
-        switch (alignment) {
-          case 'north': screenY -= halfCell; break;
-          case 'south': screenY += halfCell; break;
-          case 'east': screenX += halfCell; break;
-          case 'west': screenX -= halfCell; break;
-        }
-      }
-
-      const centerX = screenX + objectWidth / 2;
-      const centerY = screenY + objectHeight / 2;
-
-      const objectScale = obj.scale ?? 1.0;
-      const fontSize = Math.min(objectWidth, objectHeight) * 0.8 * objectScale;
-
-      const rotation = obj.rotation || 0;
-      if (rotation !== 0) {
-        ctx.save();
-        ctx.translate(centerX, centerY);
-        ctx.rotate((rotation * Math.PI) / 180);
-        ctx.translate(-centerX, -centerY);
-      }
-
-      const { char: renderChar, isIcon } = getRenderChar(objType);
-
-      if (isIcon) {
-        ctx.font = `${fontSize}px rpgawesome`;
-      } else {
-        ctx.font = `${fontSize}px 'Noto Emoji', 'Noto Sans Symbols 2', monospace`;
-      }
-
-      ctx.strokeStyle = '#000000';
-      ctx.lineWidth = Math.max(2, fontSize * 0.08);
-      ctx.strokeText(renderChar, centerX, centerY);
-
-      ctx.fillStyle = obj.color || '#ffffff';
-      ctx.fillText(renderChar, centerX, centerY);
-
-      if (rotation !== 0) {
-        ctx.restore();
-      }
-
-      // Draw note badge if object has linkedNote
-      if (obj.linkedNote && obj.type !== 'note_pin') {
-        const maxBadgeSize = Math.min(objectWidth, objectHeight) * 0.3;
-        const badgeSize = Math.min(maxBadgeSize, Math.max(8, scaledSize * 0.25));
-        const badgeX = screenX + objectWidth - badgeSize - 3;
-        const badgeY = screenY + 3;
-
-        ctx.fillStyle = 'rgba(74, 158, 255, 0.9)';
-        ctx.beginPath();
-        ctx.arc(badgeX + badgeSize / 2, badgeY + badgeSize / 2, badgeSize / 2, 0, Math.PI * 2);
-        ctx.fill();
-
-        const badgeFontSize = badgeSize * 0.7;
-        ctx.font = `${badgeFontSize}px 'Noto Emoji', 'Noto Sans Symbols 2', monospace`;
-        ctx.fillStyle = '#ffffff';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('\u{1F4DC}', badgeX + badgeSize / 2, badgeY + badgeSize / 2);
-      }
-
-      // Draw note indicator for custom tooltip
-      if (obj.customTooltip) {
-        const indicatorSize = Math.max(4, scaledSize * 0.12);
-        const indicatorX = screenX + objectWidth - indicatorSize - 2;
-        const indicatorY = screenY + objectHeight - indicatorSize - 2;
-
-        ctx.fillStyle = '#4a9eff';
-        ctx.beginPath();
-        ctx.arc(indicatorX + indicatorSize / 2, indicatorY + indicatorSize / 2, indicatorSize / 2, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 1;
-        ctx.stroke();
-      }
-
-      // Draw link indicator for inter-object links
-      if (obj.linkedObject) {
-        const linkSize = Math.max(6, scaledSize * 0.15);
-        const linkX = screenX + 2;
-        const linkY = screenY + 2;
-
-        ctx.fillStyle = '#10b981';
-        ctx.beginPath();
-        ctx.arc(linkX + linkSize / 2, linkY + linkSize / 2, linkSize / 2, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 1;
-        ctx.stroke();
-
-        // Draw chain link icon
-        const iconSize = linkSize * 0.6;
-        ctx.font = `${iconSize}px 'Noto Emoji', 'Noto Sans Symbols 2', monospace`;
-        ctx.fillStyle = '#ffffff';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('\u{1F517}', linkX + linkSize / 2, linkY + linkSize / 2);
-      }
-    }
+    );
   }
 
   // Draw text labels
   if (activeLayer.textLabels && activeLayer.textLabels.length > 0 && !showCoordinates && visibility.textLabels) {
-    for (const label of activeLayer.textLabels) {
-      ctx.save();
-
-      const { screenX, screenY } = geometry.worldToScreen(label.position.x, label.position.y, offsetX, offsetY, zoom);
-
-      ctx.translate(screenX, screenY);
-      ctx.rotate(((label.rotation || 0) * Math.PI) / 180);
-
-      const fontSize = label.fontSize * zoom;
-      const fontFamily = getFontCss(label.fontFace || 'sans');
-      ctx.font = `${fontSize}px ${fontFamily}`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-
-      ctx.strokeStyle = '#000000';
-      ctx.lineWidth = 3;
-      ctx.lineJoin = 'round';
-      ctx.strokeText(label.content, 0, 0);
-
-      ctx.fillStyle = label.color || '#ffffff';
-      ctx.fillText(label.content, 0, 0);
-
-      ctx.restore();
-    }
+    renderTextLabels(
+      activeLayer.textLabels,
+      { ctx, zoom, getFontCss },
+      geometry,
+      { offsetX, offsetY, zoom }
+    );
   }
 
   // =========================================================================
   // FOG OF WAR RENDERING
   // =========================================================================
 
-  // Clear fog canvas if not needed
-  if (fogCanvas) {
-    const fow = activeLayer.fogOfWar;
-    const effectiveSettings = getEffectiveSettings(mapData.settings) as Record<string, unknown>;
-    const fowBlurEnabled = (effectiveSettings?.fogOfWarBlurEnabled as boolean) ?? false;
+  const fow = activeLayer.fogOfWar;
+  const effectiveSettings = getEffectiveSettings(mapData.settings) as Record<string, unknown>;
+  const fowBlurEnabled = (effectiveSettings?.fogOfWarBlurEnabled as boolean) ?? false;
 
-    if (!fow?.enabled || !fow?.foggedCells?.length || !fowBlurEnabled) {
-      const tempFogCtx = fogCanvas.getContext('2d');
-      if (tempFogCtx) {
-        tempFogCtx.clearRect(0, 0, fogCanvas.width, fogCanvas.height);
-        fogCanvas.style.filter = 'none';
-      }
-    }
+  // Clear fog canvas if fog not needed
+  if (!fow?.enabled || !fow?.foggedCells?.length || !fowBlurEnabled) {
+    clearFogCanvas(fogCanvas);
   }
 
-  if (activeLayer.fogOfWar && activeLayer.fogOfWar.enabled && activeLayer.fogOfWar.foggedCells?.length) {
-    const fow = activeLayer.fogOfWar;
-
-    const effectiveSettings = getEffectiveSettings(mapData.settings) as Record<string, unknown>;
-    const fowColor = (effectiveSettings.fogOfWarColor as string) || '#000000';
-    const fowOpacity = (effectiveSettings.fogOfWarOpacity as number) ?? 0.9;
-    const fowImagePath = effectiveSettings.fogOfWarImage as string | undefined;
-    const fowBlurEnabled = (effectiveSettings.fogOfWarBlurEnabled as boolean) ?? false;
-    const fowBlurFactor = (effectiveSettings.fogOfWarBlurFactor as number) ?? 0.08;
-
-    let fowFillStyle: string | CanvasPattern = fowColor;
-    let useGlobalAlpha = true;
-
-    if (fowImagePath) {
-      const fowImage = getCachedImage(fowImagePath);
-      if (fowImage && fowImage.complete && fowImage.naturalWidth > 0) {
-        try {
-          const pattern = ctx.createPattern(fowImage, 'repeat');
-          if (pattern) {
-            fowFillStyle = pattern;
-          }
-        } catch (e) {
-          // Pattern creation failed
-        }
-      }
-    }
-
-    let blurRadius = 0;
-    if (fowBlurEnabled) {
-      const cellSize = geometry instanceof HexGeometry ? (geometry as InstanceType<typeof HexGeometry>).hexSize : (geometry as InstanceType<typeof GridGeometry>).cellSize;
-      blurRadius = cellSize * fowBlurFactor * zoom;
-    }
-
-    let fogCtx: CanvasRenderingContext2D | null = null;
-    if (fogCanvas && fowBlurEnabled && blurRadius > 0) {
-      fogCtx = fogCanvas.getContext('2d');
-
-      if (fogCtx) {
-        if (fogCanvas.width !== width || fogCanvas.height !== height) {
-          fogCanvas.width = width;
-          fogCanvas.height = height;
-        }
-
-        const cssBlurAmount = Math.max(4, blurRadius * 0.6);
-        fogCanvas.style.filter = `blur(${cssBlurAmount}px)`;
-
-        fogCtx.clearRect(0, 0, width, height);
-
-        fogCtx.save();
-        fogCtx.translate(width / 2, height / 2);
-        fogCtx.rotate((northDirection * Math.PI) / 180);
-        fogCtx.translate(-width / 2, -height / 2);
-
-        fogCtx.fillStyle = fowColor;
-
-        if (fowImagePath) {
-          const fowImage = getCachedImage(fowImagePath);
-          if (fowImage && fowImage.complete && fowImage.naturalWidth > 0) {
-            const fogPattern = fogCtx.createPattern(fowImage, 'repeat');
-            if (fogPattern) {
-              fogCtx.fillStyle = fogPattern;
-            }
-          }
-        }
-      }
-    }
-
-    ctx.fillStyle = fowFillStyle;
-
-    const previousGlobalAlpha = ctx.globalAlpha;
-    if (useGlobalAlpha) {
-      ctx.globalAlpha = fowOpacity;
-    }
-
-    // Calculate visible bounds
-    let visibleMinCol: number, visibleMaxCol: number, visibleMinRow: number, visibleMaxRow: number;
-
-    if (geometry instanceof HexGeometry) {
-      const bounds = mapData.hexBounds || { maxCol: 100, maxRow: 100 };
-      visibleMinCol = 0;
-      visibleMaxCol = bounds.maxCol;
-      visibleMinRow = 0;
-      visibleMaxRow = bounds.maxRow;
-    } else {
-      visibleMinCol = Math.floor((0 - offsetX) / scaledSize) - 1;
-      visibleMaxCol = Math.ceil((width - offsetX) / scaledSize) + 1;
-      visibleMinRow = Math.floor((0 - offsetY) / scaledSize) - 1;
-      visibleMaxRow = Math.ceil((height - offsetY) / scaledSize) + 1;
-
-      const maxBound = mapData.dimensions ? Math.max(mapData.dimensions.width, mapData.dimensions.height) : 200;
-      visibleMinCol = Math.max(0, visibleMinCol);
-      visibleMaxCol = Math.min(maxBound, visibleMaxCol);
-      visibleMinRow = Math.max(0, visibleMinRow);
-      visibleMaxRow = Math.min(maxBound, visibleMaxRow);
-    }
-
-    // Render fog cells
-    if (geometry instanceof HexGeometry) {
-      const hexGeom = geometry as InstanceType<typeof HexGeometry>;
-      const orientation = mapData.orientation || 'flat';
-
-      const foggedSet = new Set(fow.foggedCells.map(c => `${c.col},${c.row}`));
-
-      const visibleFogCells: Array<{ col: number; row: number }> = [];
-      const edgeCells: Array<{ col: number; row: number; q: number; r: number }> = [];
-
-      for (const fogCell of fow.foggedCells) {
-        const { col, row } = fogCell;
-
-        if (col < visibleMinCol || col > visibleMaxCol ||
-            row < visibleMinRow || row > visibleMaxRow) {
-          continue;
-        }
-
-        visibleFogCells.push({ col, row });
-
-        const { q, r } = offsetToAxial(col, row, orientation);
-        const neighbors = hexGeom.getNeighbors(q, r);
-        const isEdge = neighbors.some(n => {
-          const { col: nCol, row: nRow } = axialToOffset(n.q, n.r, orientation);
-          return !foggedSet.has(`${nCol},${nRow}`);
-        });
-
-        if (isEdge) {
-          edgeCells.push({ col, row, q, r });
-        }
-      }
-
-      // Helper to trace hex path
-      const traceHexPath = (q: number, r: number, scale = 1.0) => {
-        const vertices = hexGeom.getHexVertices(q, r);
-
-        if (scale === 1.0) {
-          const first = geometry.worldToScreen(vertices[0].worldX, vertices[0].worldY, offsetX, offsetY, zoom);
-          ctx.moveTo(first.screenX, first.screenY);
-          for (let i = 1; i < vertices.length; i++) {
-            const vertex = geometry.worldToScreen(vertices[i].worldX, vertices[i].worldY, offsetX, offsetY, zoom);
-            ctx.lineTo(vertex.screenX, vertex.screenY);
-          }
-        } else {
-          const center = hexGeom.hexToWorld(q, r);
-          const screenCenter = geometry.worldToScreen(center.worldX, center.worldY, offsetX, offsetY, zoom);
-
-          const scaledVertices = vertices.map(v => {
-            const screen = geometry.worldToScreen(v.worldX, v.worldY, offsetX, offsetY, zoom);
-            return {
-              screenX: screenCenter.screenX + (screen.screenX - screenCenter.screenX) * scale,
-              screenY: screenCenter.screenY + (screen.screenY - screenCenter.screenY) * scale
-            };
-          });
-
-          ctx.moveTo(scaledVertices[0].screenX, scaledVertices[0].screenY);
-          for (let i = 1; i < scaledVertices.length; i++) {
-            ctx.lineTo(scaledVertices[i].screenX, scaledVertices[i].screenY);
-          }
-        }
-        ctx.closePath();
-      };
-
-      const traceHexPathOnFog = (q: number, r: number, scale = 1.0) => {
-        if (!fogCtx) return;
-
-        const vertices = hexGeom.getHexVertices(q, r);
-
-        if (scale === 1.0) {
-          const first = geometry.worldToScreen(vertices[0].worldX, vertices[0].worldY, offsetX, offsetY, zoom);
-          fogCtx.moveTo(first.screenX, first.screenY);
-          for (let i = 1; i < vertices.length; i++) {
-            const vertex = geometry.worldToScreen(vertices[i].worldX, vertices[i].worldY, offsetX, offsetY, zoom);
-            fogCtx.lineTo(vertex.screenX, vertex.screenY);
-          }
-        } else {
-          const center = hexGeom.hexToWorld(q, r);
-          const screenCenter = geometry.worldToScreen(center.worldX, center.worldY, offsetX, offsetY, zoom);
-
-          const scaledVertices = vertices.map(v => {
-            const screen = geometry.worldToScreen(v.worldX, v.worldY, offsetX, offsetY, zoom);
-            return {
-              screenX: screenCenter.screenX + (screen.screenX - screenCenter.screenX) * scale,
-              screenY: screenCenter.screenY + (screen.screenY - screenCenter.screenY) * scale
-            };
-          });
-
-          fogCtx.moveTo(scaledVertices[0].screenX, scaledVertices[0].screenY);
-          for (let i = 1; i < scaledVertices.length; i++) {
-            fogCtx.lineTo(scaledVertices[i].screenX, scaledVertices[i].screenY);
-          }
-        }
-        fogCtx.closePath();
-      };
-
-      // Blur passes
-      if (fowBlurEnabled && blurRadius > 0 && edgeCells.length > 0) {
-        const baseOpacity = fowOpacity;
-        const numPasses = 8;
-        const maxExpansion = blurRadius / (hexGeom.hexSize * zoom);
-
-        const targetCtx = fogCtx || ctx;
-        const useFilterFallback = !fogCtx;
-        const filterBlurAmount = blurRadius / numPasses;
-
-        for (let i = 0; i < numPasses; i++) {
-          const t = i / (numPasses - 1);
-          const scale = 1.0 + (maxExpansion * (1.0 - t));
-          const opacity = 0.50 + (0.30 * t);
-
-          if (useFilterFallback) {
-            const passBlur = filterBlurAmount * (1.5 - t);
-            targetCtx.filter = passBlur > 0.5 ? `blur(${passBlur}px)` : 'none';
-          }
-
-          targetCtx.beginPath();
-          for (const { q, r } of edgeCells) {
-            if (fogCtx) {
-              traceHexPathOnFog(q, r, scale);
-            } else {
-              traceHexPath(q, r, scale);
-            }
-          }
-          targetCtx.globalAlpha = baseOpacity * opacity;
-          targetCtx.fill();
-        }
-
-        if (useFilterFallback) {
-          ctx.filter = 'none';
-        }
-
-        ctx.globalAlpha = useGlobalAlpha ? fowOpacity : 1;
-      }
-
-      // Final pass: all fog cells
-      ctx.beginPath();
-      for (const { col, row } of visibleFogCells) {
-        const { q, r } = offsetToAxial(col, row, orientation);
-        traceHexPath(q, r, 1.0);
-      }
-      ctx.fill();
-
-      // Draw interior hex outlines
-      if (visibleFogCells.length > 1) {
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
-        ctx.lineWidth = Math.max(1, 1 * zoom);
-
-        for (const { col, row } of visibleFogCells) {
-          const { q, r } = offsetToAxial(col, row, orientation);
-
-          const neighbors = hexGeom.getNeighbors(q, r);
-          const hasFoggedNeighbor = neighbors.some(n => {
-            const { col: nCol, row: nRow } = axialToOffset(n.q, n.r, orientation);
-            return foggedSet.has(`${nCol},${nRow}`);
-          });
-
-          if (hasFoggedNeighbor) {
-            const vertices = hexGeom.getHexVertices(q, r);
-
-            ctx.beginPath();
-            const first = geometry.worldToScreen(vertices[0].worldX, vertices[0].worldY, offsetX, offsetY, zoom);
-            ctx.moveTo(first.screenX, first.screenY);
-
-            for (let i = 1; i < vertices.length; i++) {
-              const vertex = geometry.worldToScreen(vertices[i].worldX, vertices[i].worldY, offsetX, offsetY, zoom);
-              ctx.lineTo(vertex.screenX, vertex.screenY);
-            }
-
-            ctx.closePath();
-            ctx.stroke();
-          }
-        }
-      }
-
-    } else {
-      // Grid map fog rendering
-      const foggedSet = new Set(fow.foggedCells.map(c => `${c.col},${c.row}`));
-
-      const visibleFogCells: Array<{ col: number; row: number }> = [];
-      const edgeCells: Array<{ col: number; row: number }> = [];
-
-      for (const fogCell of fow.foggedCells) {
-        const { col, row } = fogCell;
-
-        if (col < visibleMinCol || col > visibleMaxCol ||
-            row < visibleMinRow || row > visibleMaxRow) {
-          continue;
-        }
-
-        visibleFogCells.push({ col, row });
-
-        const isEdge = !foggedSet.has(`${col - 1},${row}`) ||
-                       !foggedSet.has(`${col + 1},${row}`) ||
-                       !foggedSet.has(`${col},${row - 1}`) ||
-                       !foggedSet.has(`${col},${row + 1}`);
-
-        if (isEdge) {
-          edgeCells.push({ col, row });
-        }
-      }
-
-      const addCircleToPath = (targetCtx: CanvasRenderingContext2D, col: number, row: number, radius: number) => {
-        const centerX = offsetX + col * scaledSize + scaledSize / 2;
-        const centerY = offsetY + row * scaledSize + scaledSize / 2;
-        targetCtx.moveTo(centerX + radius, centerY);
-        targetCtx.arc(centerX, centerY, radius, 0, Math.PI * 2);
-      };
-
-      const addRectToPath = (col: number, row: number, scale = 1.0) => {
-        const centerX = offsetX + col * scaledSize + scaledSize / 2;
-        const centerY = offsetY + row * scaledSize + scaledSize / 2;
-        const size = scaledSize * scale;
-        const halfSize = size / 2;
-        ctx.rect(centerX - halfSize, centerY - halfSize, size, size);
-      };
-
-      // Blur passes
-      if (fowBlurEnabled && blurRadius > 0 && edgeCells.length > 0) {
-        const baseOpacity = fowOpacity;
-        const numPasses = 8;
-
-        const cellRadius = scaledSize / 2;
-        const maxRadius = cellRadius + blurRadius;
-
-        const targetCtx = fogCtx || ctx;
-        const useFilterFallback = !fogCtx;
-        const filterBlurAmount = blurRadius / numPasses;
-
-        for (let i = 0; i < numPasses; i++) {
-          const t = i / (numPasses - 1);
-          const radius = maxRadius - (blurRadius * t);
-          const opacity = 0.50 + (0.30 * t);
-
-          if (useFilterFallback) {
-            const passBlur = filterBlurAmount * (1.5 - t);
-            targetCtx.filter = passBlur > 0.5 ? `blur(${passBlur}px)` : 'none';
-          }
-
-          targetCtx.beginPath();
-          for (const { col, row } of edgeCells) {
-            addCircleToPath(targetCtx, col, row, radius);
-          }
-          targetCtx.globalAlpha = baseOpacity * opacity;
-          targetCtx.fill();
-        }
-
-        if (useFilterFallback) {
-          ctx.filter = 'none';
-        }
-
-        ctx.globalAlpha = useGlobalAlpha ? fowOpacity : 1;
-      }
-
-      // Final pass
-      ctx.beginPath();
-      for (const { col, row } of visibleFogCells) {
-        addRectToPath(col, row, 1.0);
-      }
-      ctx.fill();
-
-      // Draw interior grid lines
-      if (visibleFogCells.length > 1) {
-        const drawnLines = new Set<string>();
-
-        const interiorLineWidth = Math.max(1, 1 * zoom * 0.5);
-        const halfWidth = interiorLineWidth / 2;
-
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
-
-        for (const { col, row } of visibleFogCells) {
-          const screenX = offsetX + col * scaledSize;
-          const screenY = offsetY + row * scaledSize;
-
-          if (foggedSet.has(`${col + 1},${row}`)) {
-            const lineKey = `v:${col + 1},${row}`;
-            if (!drawnLines.has(lineKey)) {
-              ctx.fillRect(screenX + scaledSize - halfWidth, screenY, interiorLineWidth, scaledSize);
-              drawnLines.add(lineKey);
-            }
-          }
-
-          if (foggedSet.has(`${col},${row + 1}`)) {
-            const lineKey = `h:${col},${row + 1}`;
-            if (!drawnLines.has(lineKey)) {
-              ctx.fillRect(screenX, screenY + scaledSize - halfWidth, scaledSize, interiorLineWidth);
-              drawnLines.add(lineKey);
-            }
-          }
-        }
-      }
-    }
-
-    // Restore fog canvas context
-    if (fogCtx) {
-      fogCtx.restore();
-    }
-
-    // Restore globalAlpha
-    if (useGlobalAlpha) {
-      ctx.globalAlpha = previousGlobalAlpha;
-    }
+  if (fow && fow.enabled && fow.foggedCells?.length) {
+    const fogSettings = getFogSettings(effectiveSettings);
+    const isHexMap = geometry.type === 'hex';
+    const hexGeom = isHexMap ? geometry as InstanceType<typeof HexGeometry> : null;
+    const gridGeom = !isHexMap ? geometry as InstanceType<typeof GridGeometry> : null;
+
+    renderFog(
+      activeLayer.fogOfWar,
+      { ctx, fogCanvas, width, height, offsetX, offsetY, zoom, scaledSize, northDirection },
+      fogSettings,
+      { hexBounds: mapData.hexBounds, dimensions: mapData.dimensions },
+      isHexMap,
+      hexGeom,
+      gridGeom,
+      geometry,
+      mapData.orientation || 'flat',
+      getCachedImage,
+      renderGridFog,
+      renderHexFog,
+      offsetToAxial,
+      axialToOffset
+    );
   }
 
-  // Draw selection indicators for text labels
-  const selectedTextLabels = itemsArray.filter(item => item.type === 'text');
-  if (selectedTextLabels.length > 0 && activeLayer.textLabels && !showCoordinates && visibility.textLabels) {
-    for (const selectedItem of selectedTextLabels) {
-      const label = activeLayer.textLabels.find(l => l.id === selectedItem.id);
-      if (label) {
-        ctx.save();
-
-        const { screenX, screenY } = geometry.worldToScreen(label.position.x, label.position.y, offsetX, offsetY, zoom);
-
-        ctx.translate(screenX, screenY);
-        ctx.rotate(((label.rotation || 0) * Math.PI) / 180);
-
-        const fontSize = label.fontSize * zoom;
-        const fontFamily = getFontCss(label.fontFace || 'sans');
-        ctx.font = `${fontSize}px ${fontFamily}`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        const metrics = ctx.measureText(label.content);
-        const textWidth = metrics.width;
-        const textHeight = fontSize * 1.2;
-
-        ctx.strokeStyle = '#4a9eff';
-        ctx.lineWidth = 2;
-        ctx.setLineDash([5, 3]);
-        ctx.strokeRect(-textWidth/2 - 4, -textHeight/2 - 2, textWidth + 8, textHeight + 4);
-
-        ctx.setLineDash([]);
-        ctx.fillStyle = '#4a9eff';
-        const handleSize = 6;
-
-        ctx.fillRect(-textWidth/2 - 4 - handleSize/2, -textHeight/2 - 2 - handleSize/2, handleSize, handleSize);
-        ctx.fillRect(textWidth/2 + 4 - handleSize/2, -textHeight/2 - 2 - handleSize/2, handleSize, handleSize);
-        ctx.fillRect(-textWidth/2 - 4 - handleSize/2, textHeight/2 + 2 - handleSize/2, handleSize, handleSize);
-        ctx.fillRect(textWidth/2 + 4 - handleSize/2, textHeight/2 + 2 - handleSize/2, handleSize, handleSize);
-
-        ctx.restore();
-      }
+  // Draw selection indicators
+  const isHexMapForSelection = geometry.type === 'hex';
+  const hexGeomForSelection = isHexMapForSelection ? geometry as InstanceType<typeof HexGeometry> : null;
+  renderSelections(
+    itemsArray,
+    activeLayer.textLabels,
+    activeLayer.objects,
+    { ctx, offsetX, offsetY, zoom, scaledSize },
+    geometry,
+    hexGeomForSelection,
+    isHexMapForSelection,
+    isResizeMode,
+    mapData.orientation || 'flat',
+    showCoordinates,
+    visibility,
+    {
+      getFontCss,
+      getObjectsInCell,
+      getSlotOffset,
+      getMultiObjectScale,
     }
-  }
-
-  // Draw selection indicators for objects
-  const selectedObjects = itemsArray.filter(item => item.type === 'object');
-  if (selectedObjects.length > 0 && activeLayer.objects && !showCoordinates && visibility.objects) {
-    const showResizeOverlay = isResizeMode && selectedObjects.length === 1;
-
-    for (const selectedItem of selectedObjects) {
-      const object = activeLayer.objects.find(obj => obj.id === selectedItem.id);
-      if (object) {
-        const size = object.size || { width: 1, height: 1 };
-        const alignment = object.alignment || 'center';
-
-        let screenX: number, screenY: number, objectWidth: number, objectHeight: number, cellWidth: number, cellHeight: number;
-
-        if (geometry instanceof HexGeometry) {
-          const hexGeom = geometry as InstanceType<typeof HexGeometry>;
-          const { worldX, worldY } = hexGeom.hexToWorld(object.position.x, object.position.y);
-
-          const cellObjects = getObjectsInCell(activeLayer.objects, object.position.x, object.position.y);
-          const objectCount = cellObjects.length;
-
-          objectWidth = size.width * scaledSize;
-          objectHeight = size.height * scaledSize;
-          cellWidth = scaledSize;
-          cellHeight = scaledSize;
-
-          if (objectCount > 1) {
-            const multiScale = getMultiObjectScale(objectCount);
-            objectWidth *= multiScale;
-            objectHeight *= multiScale;
-          }
-
-          let centerScreenX = offsetX + worldX * zoom;
-          let centerScreenY = offsetY + worldY * zoom;
-
-          if (objectCount > 1) {
-            const effectiveSlot = object.slot ?? cellObjects.findIndex(o => o.id === object.id);
-            const { offsetX: slotOffsetX, offsetY: slotOffsetY } = getSlotOffset(
-              effectiveSlot,
-              objectCount,
-              mapData.orientation || 'flat'
-            );
-            const hexWidth = scaledSize * 2;
-            centerScreenX += slotOffsetX * hexWidth;
-            centerScreenY += slotOffsetY * hexWidth;
-          }
-
-          if (alignment !== 'center') {
-            const halfCell = scaledSize / 2;
-            switch (alignment) {
-              case 'north': centerScreenY -= halfCell; break;
-              case 'south': centerScreenY += halfCell; break;
-              case 'east': centerScreenX += halfCell; break;
-              case 'west': centerScreenX -= halfCell; break;
-            }
-          }
-
-          screenX = centerScreenX - objectWidth / 2;
-          screenY = centerScreenY - objectHeight / 2;
-        } else {
-          const gridPos = geometry.gridToScreen(object.position.x, object.position.y, offsetX, offsetY, zoom);
-          screenX = gridPos.screenX;
-          screenY = gridPos.screenY;
-
-          if (alignment !== 'center') {
-            const halfCell = scaledSize / 2;
-            switch (alignment) {
-              case 'north': screenY -= halfCell; break;
-              case 'south': screenY += halfCell; break;
-              case 'east': screenX += halfCell; break;
-              case 'west': screenX -= halfCell; break;
-            }
-          }
-
-          objectWidth = size.width * scaledSize;
-          objectHeight = size.height * scaledSize;
-          cellWidth = scaledSize;
-          cellHeight = scaledSize;
-        }
-
-        // Draw occupied cells overlay in resize mode
-        if (showResizeOverlay) {
-          ctx.fillStyle = 'rgba(74, 158, 255, 0.15)';
-          for (let dx = 0; dx < size.width; dx++) {
-            for (let dy = 0; dy < size.height; dy++) {
-              const cellScreenX = screenX + dx * cellWidth;
-              const cellScreenY = screenY + dy * cellHeight;
-              ctx.fillRect(cellScreenX + 2, cellScreenY + 2, cellWidth - 4, cellHeight - 4);
-            }
-          }
-        }
-
-        // Draw selection rectangle
-        ctx.strokeStyle = '#4a9eff';
-        ctx.lineWidth = 2;
-        ctx.setLineDash([5, 3]);
-        ctx.strokeRect(screenX + 2, screenY + 2, objectWidth - 4, objectHeight - 4);
-
-        // Draw corner handles
-        ctx.setLineDash([]);
-        ctx.fillStyle = '#4a9eff';
-        const handleSize = showResizeOverlay ? 14 : 8;
-
-        ctx.fillRect(screenX + 2 - handleSize/2, screenY + 2 - handleSize/2, handleSize, handleSize);
-        ctx.fillRect(screenX + objectWidth - 2 - handleSize/2, screenY + 2 - handleSize/2, handleSize, handleSize);
-        ctx.fillRect(screenX + 2 - handleSize/2, screenY + objectHeight - 2 - handleSize/2, handleSize, handleSize);
-        ctx.fillRect(screenX + objectWidth - 2 - handleSize/2, screenY + objectHeight - 2 - handleSize/2, handleSize, handleSize);
-      }
-    }
-  }
+  );
 
   // Restore context
   ctx.restore();
@@ -12324,6 +13644,38 @@ return { ObjectLinkingProvider, useLinkingMode };
 
 ```
 
+# rotationOperations
+
+```ts
+// Standard rotation positions (45° increments)
+const ROTATION_STEPS = [0, 45, 90, 135, 180, 225, 270, 315] as const;
+const ROTATION_INCREMENT = 45;
+
+/**
+ * Get the next rotation value in the cycle.
+ * Handles non-standard values by snapping to 0°.
+ */
+function getNextRotation(currentRotation: number): number {
+	const currentIndex = ROTATION_STEPS.indexOf(currentRotation as typeof ROTATION_STEPS[number]);
+	if (currentIndex === -1) {
+		// Non-standard value, snap to 0°
+		return ROTATION_STEPS[0];
+	}
+	return ROTATION_STEPS[(currentIndex + 1) % ROTATION_STEPS.length];
+}
+
+/**
+ * Rotate by increment (for bulk operations).
+ * Works with any current value, not just standard positions.
+ */
+function rotateByIncrement(currentRotation: number): number {
+	return (currentRotation + ROTATION_INCREMENT) % 360;
+}
+
+return { ROTATION_STEPS, ROTATION_INCREMENT, getNextRotation, rotateByIncrement };
+
+```
+
 # EventHandlerContext
 
 ```tsx
@@ -12513,6 +13865,10 @@ import type {
 import type { SelectedItem } from '#types/hooks/groupDrag.types';
 
 // Datacore imports
+const { getNextRotation } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "rotationOperations")) as {
+  getNextRotation: (currentRotation: number) => number
+};
+
 // Context types
 interface MapStateValue {
   geometry: (IGeometry & {
@@ -13271,11 +14627,9 @@ const useObjectInteractions = (
 
     if (e.key === 'r' || e.key === 'R') {
       e.preventDefault();
-      const rotations = [0, 90, 180, 270];
       const currentObject = getActiveLayer(mapData!).objects?.find((obj: MapObject) => obj.id === selectedItem.id);
       const currentRotation = currentObject?.rotation || 0;
-      const currentIndex = rotations.indexOf(currentRotation);
-      const nextRotation = rotations[(currentIndex + 1) % 4];
+      const nextRotation = getNextRotation(currentRotation);
 
       const updatedObjects = updateObject(
         getActiveLayer(mapData!).objects,
@@ -13477,11 +14831,9 @@ const useObjectInteractions = (
       return;
     }
 
-    const rotations = [0, 90, 180, 270];
     const currentObject = getActiveLayer(mapData).objects?.find((obj: MapObject) => obj.id === selectedItem.id);
     const currentRotation = currentObject?.rotation || 0;
-    const currentIndex = rotations.indexOf(currentRotation);
-    const nextRotation = rotations[(currentIndex + 1) % 4];
+    const nextRotation = getNextRotation(currentRotation);
 
     const updatedObjects = updateObject(
       getActiveLayer(mapData).objects,
@@ -14987,7 +16339,7 @@ const SelectionToolbar = ({
   const isNotePin = selectedItem.data?.type === 'note_pin';
 
   const objectButtons = isObject ? [
-    { id: 'rotate', icon: 'lucide-rotate-cw', title: 'Rotate 90° (or press R)', onClick: onRotate },
+    { id: 'rotate', icon: 'lucide-rotate-cw', title: 'Rotate 45° (or press R)', onClick: onRotate },
     { id: 'label', icon: 'lucide-sticky-note', title: 'Add/Edit Label', onClick: onLabel, visible: !isNotePin },
     { id: 'duplicate', icon: 'lucide-copy', title: 'Duplicate Object', onClick: onDuplicate },
     { id: 'linkNote', icon: 'lucide-scroll-text', title: selectedItem.data?.linkedNote ? 'Edit linked note' : 'Link note', onClick: onLinkNote },
@@ -15002,7 +16354,7 @@ const SelectionToolbar = ({
 
   const textButtons = isText ? [
     { id: 'edit', icon: 'lucide-pencil', title: 'Edit Text Label', onClick: onEdit },
-    { id: 'rotate', icon: 'lucide-rotate-cw', title: 'Rotate 90° (or press R)', onClick: onRotate },
+    { id: 'rotate', icon: 'lucide-rotate-cw', title: 'Rotate 45° (or press R)', onClick: onRotate },
     { id: 'copyLink', icon: 'lucide-link', title: 'Copy link to clipboard', onClick: onCopyLink },
     { id: 'delete', icon: 'lucide-trash-2', title: 'Delete (or press Delete/Backspace)', onClick: onDelete, isDelete: true }
   ] : [];
@@ -15473,6 +16825,10 @@ const { getActiveLayer } = await dc.require(dc.headerLink(dc.resolvePath("compil
 const { copyDeepLinkToClipboard } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "deepLinkHandler"));
 const { LinkingModeBanner } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "LinkingModeBanner"));
 
+const { rotateByIncrement } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "rotationOperations")) as {
+  rotateByIncrement: (currentRotation: number) => number
+};
+
 /** Selected item from context */
 interface SelectedItem {
   type: 'object' | 'text' | 'notePin';
@@ -15583,7 +16939,7 @@ const ObjectLayer = ({
         if (idx !== -1) {
           const obj = updatedObjects[idx];
           const currentRotation = obj.rotation || 0;
-          const nextRotation = (currentRotation + 90) % 360;
+          const nextRotation = rotateByIncrement(currentRotation);
           updatedObjects[idx] = { ...obj, rotation: nextRotation };
         }
       } else if (item.type === 'text') {
@@ -15591,7 +16947,7 @@ const ObjectLayer = ({
         if (idx !== -1) {
           const label = updatedTextLabels[idx];
           const currentRotation = label.rotation || 0;
-          const nextRotation = (currentRotation + 90) % 360;
+          const nextRotation = rotateByIncrement(currentRotation);
           updatedTextLabels[idx] = { ...label, rotation: nextRotation };
         }
       }
@@ -19452,6 +20808,10 @@ const { applyInverseRotation } = await dc.require(dc.headerLink(dc.resolvePath("
   applyInverseRotation: (x: number, y: number, angle: number, centerX: number, centerY: number) => { x: number; y: number };
 };
 
+const { getNextRotation } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "rotationOperations")) as {
+  getNextRotation: (currentRotation: number) => number
+};
+
 // Inline context types for not-yet-migrated contexts
 interface SelectedItem {
   type: 'object' | 'text';
@@ -19638,7 +20998,7 @@ const useTextLabelInteraction = (
   }, [isDraggingSelection, selectedItem, dragStart, mapData, getClientCoords, screenToWorld, updateTextLabel, onTextLabelsChange, setDragStart, setSelectedItem]);
 
   /**
-   * Handle text label rotation
+   * Handle text label rotation (45° increments)
    */
   const handleTextRotation = dc.useCallback((): void => {
     if (!selectedItem || selectedItem.type !== 'text' || !mapData) {
@@ -19646,12 +21006,8 @@ const useTextLabelInteraction = (
     }
 
     const selectedData = selectedItem.data as TextLabel;
-
-    // Cycle through 0° -> 90° -> 180° -> 270° -> 0°
-    const rotations = [0, 90, 180, 270];
     const currentRotation = selectedData.rotation || 0;
-    const currentIndex = rotations.indexOf(currentRotation);
-    const nextRotation = rotations[(currentIndex + 1) % 4];
+    const nextRotation = getNextRotation(currentRotation);
 
     const updatedLabels = updateTextLabel(
       getActiveLayer(mapData).textLabels,
@@ -23960,7 +25316,8 @@ const DUNGEON_PRESETS = {
     loopChance: 0,
     doorChance: 0.7,
     secretDoorChance: 0.05,
-    wideCorridorChance: 0
+    wideCorridorChance: 0,
+    diagonalCorridorChance: 0
   },
   medium: {
     // "Complex" - classic dungeon, multiple paths, exploration, some grand halls
@@ -23976,7 +25333,8 @@ const DUNGEON_PRESETS = {
     loopChance: 0.15,
     doorChance: 0.7,
     secretDoorChance: 0.05,
-    wideCorridorChance: 0.25
+    wideCorridorChance: 0.25,
+    diagonalCorridorChance: 0.5
   },
   large: {
     // "Grand" - fortress/temple scale, grand corridors, many chambers, sprawling
@@ -23992,7 +25350,8 @@ const DUNGEON_PRESETS = {
     loopChance: 0.08,
     doorChance: 0.7,
     secretDoorChance: 0.05,
-    wideCorridorChance: 0.5
+    wideCorridorChance: 0.5,
+    diagonalCorridorChance: 0.5
   }
 };
 
@@ -24007,7 +25366,10 @@ const DUNGEON_STYLES = {
     // Default balanced dungeon - no overrides needed
     name: 'Classic',
     description: 'Balanced mix of rooms and corridors',
-    overrides: {}
+    overrides: {
+      waterChance: 0.15,
+      diagonalCorridorChance: 0.5
+    }
   },
   cavern: {
     name: 'Cavern',
@@ -24019,7 +25381,9 @@ const DUNGEON_STYLES = {
       doorChance: 0,
       secretDoorChance: 0,
       loopChance: 0.2,
-      roomSizeBias: 0.3
+      roomSizeBias: 0.3,
+      waterChance: 0.35,
+      diagonalCorridorChance: 0.7  // More organic paths
     }
   },
   fortress: {
@@ -24032,7 +25396,9 @@ const DUNGEON_STYLES = {
       doorChance: 0.95,
       secretDoorChance: 0.02,
       wideCorridorChance: 0.7,
-      roomSizeBias: -0.2
+      roomSizeBias: -0.2,
+      waterChance: 0.05,
+      diagonalCorridorChance: 0.2  // Military = more ordered
     }
   },
   crypt: {
@@ -24046,12 +25412,16 @@ const DUNGEON_STYLES = {
       secretDoorChance: 0.2,
       loopChance: 0.02,
       wideCorridorChance: 0,
-      roomSizeBias: -0.4
+      roomSizeBias: -0.4,
+      waterChance: 0.20,
+      diagonalCorridorChance: 0.3
     }
   }
 };
 
 const DEFAULT_FLOOR_COLOR = '#c4a57b';
+const DEFAULT_WATER_COLOR = '#4a90d9';
+const DEFAULT_WATER_OPACITY = 0.6;
 
 // =============================================================================
 // UTILITY FUNCTIONS
@@ -25219,52 +26589,326 @@ function rebuildCellsFromPath(path, width, allRooms = [], roomA = null, roomB = 
 }
 
 // =============================================================================
+// DIAGONAL CORRIDOR GENERATION
+// =============================================================================
+
+/**
+ * Segment mapping for diagonal directions.
+ * Each diagonal direction fills 4 segments (matching CORNER_SEGMENT_FILL pattern).
+ */
+const DIAGONAL_SEGMENTS = {
+  // NE direction (moving right and up) - matches TR corner
+  ne: { nw: true, n: true, ne: true, e: true },
+  // SE direction (moving right and down) - matches BR corner
+  se: { ne: true, e: true, se: true, s: true },
+  // SW direction (moving left and down) - matches BL corner
+  sw: { se: true, s: true, sw: true, w: true },
+  // NW direction (moving left and up) - matches TL corner
+  nw: { sw: true, w: true, nw: true, n: true }
+};
+
+/**
+ * Determine the primary diagonal direction from one point to another.
+ * @param {number} dx - X difference (positive = moving right)
+ * @param {number} dy - Y difference (positive = moving down)
+ * @returns {string|null} Diagonal direction ('ne', 'se', 'sw', 'nw') or null if not diagonal
+ */
+function getDiagonalDirection(dx, dy) {
+  if (dx === 0 || dy === 0) return null;
+  if (dx > 0 && dy < 0) return 'ne';  // Right and up
+  if (dx > 0 && dy > 0) return 'se';  // Right and down
+  if (dx < 0 && dy > 0) return 'sw';  // Left and down
+  if (dx < 0 && dy < 0) return 'nw';  // Left and up
+  return null;
+}
+
+/**
+ * Check if rooms are positioned to allow a clean diagonal path.
+ * Diagonals work best when rooms are offset both horizontally and vertically.
+ * @returns {boolean} True if diagonal corridor is appropriate
+ */
+function canUseDiagonalCorridor(roomA, roomB, allRooms) {
+  const centerA = getRoomCenter(roomA);
+  const centerB = getRoomCenter(roomB);
+
+  const dx = Math.abs(centerB.x - centerA.x);
+  const dy = Math.abs(centerB.y - centerA.y);
+
+  // Need at least 3 cells of offset in both directions for a visible diagonal
+  if (dx < 3 || dy < 3) return false;
+
+  // Check if diagonal path would cross another room
+  const diagonalDir = getDiagonalDirection(centerB.x - centerA.x, centerB.y - centerA.y);
+  if (!diagonalDir) return false;
+
+  // Sample points along diagonal path
+  const steps = Math.min(dx, dy);
+  const stepX = (centerB.x - centerA.x) / steps;
+  const stepY = (centerB.y - centerA.y) / steps;
+
+  for (let i = 1; i < steps; i++) {
+    const testX = Math.round(centerA.x + stepX * i);
+    const testY = Math.round(centerA.y + stepY * i);
+
+    for (const room of allRooms) {
+      if (room.id === roomA.id || room.id === roomB.id) continue;
+      if (isCellInRoomRect(testX, testY, room)) return false;
+    }
+  }
+
+  return true;
+}
+
+/**
+ * Create a segment cell for diagonal corridor.
+ * @param {number} x - Cell X coordinate
+ * @param {number} y - Cell Y coordinate
+ * @param {string} diagonalDir - Diagonal direction ('ne', 'se', 'sw', 'nw')
+ * @param {string} color - Cell color
+ * @returns {Object} Cell with segments property
+ */
+function createDiagonalSegmentCell(x, y, diagonalDir, color) {
+  return {
+    x,
+    y,
+    color,
+    segments: { ...DIAGONAL_SEGMENTS[diagonalDir] }
+  };
+}
+
+/**
+ * Carve a diagonal corridor between two rooms.
+ * Uses segment cells for 45-degree paths, transitioning to full cells at room boundaries.
+ * @param {Object} roomA - Source room
+ * @param {Object} roomB - Destination room
+ * @param {number} width - Corridor width (1 or 2)
+ * @param {Array} allRooms - All rooms for collision checking
+ * @param {string} color - Floor color
+ * @returns {Object} { cells: Array, orderedPath: Array, width: number, hasDiagonals: boolean }
+ */
+function carveDiagonalCorridor(roomA, roomB, width, allRooms, color) {
+  const centerA = getRoomCenter(roomA);
+  const centerB = getRoomCenter(roomB);
+
+  const dx = centerB.x - centerA.x;
+  const dy = centerB.y - centerA.y;
+  const xDir = dx > 0 ? 1 : -1;
+  const yDir = dy > 0 ? 1 : -1;
+  const diagonalDir = getDiagonalDirection(dx, dy);
+
+  const cells = [];
+  const orderedPath = [];
+  const cellSet = new Set();
+
+  const addCell = (cell) => {
+    const key = cellKey(cell.x, cell.y);
+    if (!cellSet.has(key)) {
+      cellSet.add(key);
+      cells.push(cell);
+    }
+  };
+
+  let currentX = centerA.x;
+  let currentY = centerA.y;
+
+  // Phase 1: Exit room A with orthogonal cells
+  while (isCellInRoomRect(currentX, currentY, roomA) ||
+         isCellInRoomRect(currentX + xDir, currentY, roomA)) {
+    orderedPath.push({ x: currentX, y: currentY });
+    addCell({ x: currentX, y: currentY, color });
+    if (width === 2) {
+      // Add adjacent cell for width
+      if (dy !== 0) addCell({ x: currentX + 1, y: currentY, color });
+      else addCell({ x: currentX, y: currentY + 1, color });
+    }
+    currentX += xDir;
+    if (currentX === centerB.x) break;
+  }
+
+  // Phase 2: Diagonal corridor with full cells at diagonal positions and segment cells in crooks
+  // Crooks fill the triangular gaps between diagonal full cells with wedge-shaped segments
+  const diagonalSteps = Math.min(Math.abs(centerB.x - currentX), Math.abs(centerB.y - currentY));
+
+  // Crook segment patterns based on diagonal direction
+  // Each direction needs specific segment wedges to create smooth 45° walls
+  const CROOK_SEGMENTS = {
+    se: { horizontal: 'sw', vertical: 'ne' },
+    nw: { horizontal: 'ne', vertical: 'sw' },
+    ne: { horizontal: 'nw', vertical: 'se' },
+    sw: { horizontal: 'se', vertical: 'nw' }
+  };
+  const crookPattern = CROOK_SEGMENTS[diagonalDir];
+
+  for (let i = 0; i < diagonalSteps; i++) {
+    // Check if we're entering room B - add entry crook and stop diagonal
+    if (isCellInRoomRect(currentX, currentY, roomB)) {
+      // Add diagonal segment at room entry to smooth the diagonal wall termination
+      addCell(createDiagonalSegmentCell(currentX, currentY, diagonalDir, color));
+      break;
+    }
+
+    orderedPath.push({ x: currentX, y: currentY });
+
+    // Place full cell at diagonal position
+    addCell({ x: currentX, y: currentY, color });
+
+    // Place segment cells in the crooks (triangular gaps)
+    // Horizontal crook: adjacent in x direction
+    addCell(createDiagonalSegmentCell(currentX + xDir, currentY, crookPattern.horizontal, color));
+    // Vertical crook: adjacent in y direction
+    addCell(createDiagonalSegmentCell(currentX, currentY + yDir, crookPattern.vertical, color));
+
+    if (width === 2) {
+      // Width 2: Add parallel diagonal track
+      // Full cell on parallel diagonal
+      const parallelX = (diagonalDir === 'ne' || diagonalDir === 'se') ? currentX + 1 : currentX - 1;
+      const parallelY = (diagonalDir === 'se' || diagonalDir === 'sw') ? currentY + 1 : currentY - 1;
+      addCell({ x: parallelX, y: parallelY, color });
+    }
+
+    currentX += xDir;
+    currentY += yDir;
+  }
+
+  // Transition crook: fill the gap where diagonal meets orthogonal
+  if (diagonalSteps > 0 && !isCellInRoomRect(currentX, currentY, roomB)) {
+    const remainingX = centerB.x - currentX;
+    const remainingY = centerB.y - currentY;
+
+    if (remainingX !== 0 && remainingY === 0) {
+      // Continuing horizontally only - add vertical crook behind current position
+      addCell(createDiagonalSegmentCell(currentX - xDir, currentY, crookPattern.vertical, color));
+    } else if (remainingY !== 0 && remainingX === 0) {
+      // Continuing vertically only - add horizontal crook behind current position
+      addCell(createDiagonalSegmentCell(currentX, currentY - yDir, crookPattern.horizontal, color));
+    }
+  }
+
+  // Phase 3: Finish with orthogonal to room B center
+  while (currentX !== centerB.x || currentY !== centerB.y) {
+    orderedPath.push({ x: currentX, y: currentY });
+    addCell({ x: currentX, y: currentY, color });
+    if (width === 2) {
+      if (currentX !== centerB.x) addCell({ x: currentX, y: currentY + 1, color });
+      else addCell({ x: currentX + 1, y: currentY, color });
+    }
+
+    if (currentX !== centerB.x) currentX += xDir;
+    else if (currentY !== centerB.y) currentY += yDir;
+    else break;
+  }
+
+  // Add final cell
+  orderedPath.push({ x: centerB.x, y: centerB.y });
+  addCell({ x: centerB.x, y: centerB.y, color });
+
+  return {
+    cells,
+    orderedPath,
+    width,
+    hasDiagonals: true
+  };
+}
+
+/**
+ * Carve corridors with diagonal style option.
+ * @param {Array} connections - Room connection pairs
+ * @param {number} corridorWidth - Base corridor width
+ * @param {Array} allRooms - All rooms
+ * @param {string} corridorStyle - 'straight', 'organic', or 'diagonal'
+ * @param {number} diagonalChance - Probability of using diagonal (0-1)
+ * @param {string} color - Floor color
+ * @returns {Object} { cells: Array, byConnection: Array }
+ */
+function carveCorridorsWithDiagonals(connections, corridorWidth, allRooms, corridorStyle, diagonalChance, color) {
+  const allCorridorCells = [];
+  const corridorsByConnection = [];
+
+  for (const [roomA, roomB] of connections) {
+    let result;
+    let usedDiagonal = false;
+
+    // Try diagonal if style allows and rooms are suitable
+    if (corridorStyle === 'diagonal' || (corridorStyle !== 'organic' && diagonalChance > 0)) {
+      const tryDiagonal = corridorStyle === 'diagonal' || Math.random() < diagonalChance;
+
+      if (tryDiagonal && canUseDiagonalCorridor(roomA, roomB, allRooms)) {
+        result = carveDiagonalCorridor(roomA, roomB, corridorWidth, allRooms, color);
+        usedDiagonal = true;
+      }
+    }
+
+    // Fall back to standard corridor
+    if (!usedDiagonal) {
+      result = carveCorridorBetween(roomA, roomB, corridorWidth, allRooms);
+
+      // Apply wobble for organic style
+      if (corridorStyle === 'organic') {
+        result = addCorridorWobble(result, allRooms, roomA, roomB);
+      }
+    }
+
+    allCorridorCells.push(...result.cells);
+    corridorsByConnection.push({
+      roomA,
+      roomB,
+      cells: result.cells,
+      orderedPath: result.orderedPath,
+      width: result.width,
+      hasDiagonals: usedDiagonal
+    });
+  }
+
+  return { cells: allCorridorCells, byConnection: corridorsByConnection };
+}
+
+// =============================================================================
 // PHASE 3.5: DOOR DETECTION
 // =============================================================================
 
 /**
  * Find door candidates by walking corridors and detecting room boundary crossings.
- * Uses rectangular bounds to avoid circular room corner issues.
+ * Uses actual room shape (isCellInRoom) for accurate detection with composite/circular rooms.
  */
 function findDoorCandidatesForConnection(roomA, roomB, orderedPath, corridorWidth) {
   const candidates = [];
-  
+
   if (orderedPath.length < 2) return candidates;
-  
-  let prevInA = isCellInRoomRect(orderedPath[0].x, orderedPath[0].y, roomA);
-  let prevInB = isCellInRoomRect(orderedPath[0].x, orderedPath[0].y, roomB);
-  
+
+  let prevInA = isCellInRoom(orderedPath[0].x, orderedPath[0].y, roomA);
+  let prevInB = isCellInRoom(orderedPath[0].x, orderedPath[0].y, roomB);
+
   for (let i = 1; i < orderedPath.length; i++) {
     const curr = orderedPath[i];
     const prev = orderedPath[i - 1];
-    
-    const currInA = isCellInRoomRect(curr.x, curr.y, roomA);
-    const currInB = isCellInRoomRect(curr.x, curr.y, roomB);
-    
+
+    const currInA = isCellInRoom(curr.x, curr.y, roomA);
+    const currInB = isCellInRoom(curr.x, curr.y, roomB);
+
     // Exiting room A
     if (prevInA && !currInA) {
       const dx = curr.x - prev.x;
       const dy = curr.y - prev.y;
       const type = (dy === 0) ? 'door-vertical' : 'door-horizontal';
       const alignment = getAlignmentFromDelta(-dx, -dy);
-      
+
       addDoorsForWidth(candidates, curr, type, alignment, roomA.id, corridorWidth, dx, dy);
     }
-    
+
     // Entering room B
     if (!prevInB && currInB) {
       const dx = curr.x - prev.x;
       const dy = curr.y - prev.y;
       const type = (dy === 0) ? 'door-vertical' : 'door-horizontal';
       const alignment = getAlignmentFromDelta(dx, dy);
-      
+
       addDoorsForWidth(candidates, prev, type, alignment, roomB.id, corridorWidth, dx, dy);
     }
-    
+
     prevInA = currInA;
     prevInB = currInB;
   }
-  
+
   return candidates;
 }
 
@@ -25486,13 +27130,71 @@ function generateStairObjects(entryRoom, exitRoom) {
 }
 
 // =============================================================================
+// PHASE 3.7: WATER FEATURE GENERATION
+// =============================================================================
+
+/**
+ * Select rooms to contain water based on waterChance.
+ * Avoids entry/exit rooms.
+ * @param {Array} rooms - All rooms
+ * @param {number} waterChance - Probability (0-1) for each room to contain water
+ * @param {number|null} entryRoomId - Entry room ID to exclude
+ * @param {number|null} exitRoomId - Exit room ID to exclude
+ * @returns {Array} Array of room IDs selected for water
+ */
+function selectWaterRooms(rooms, waterChance, entryRoomId, exitRoomId) {
+  const waterRoomIds = [];
+
+  for (const room of rooms) {
+    // Skip entry/exit rooms
+    if (room.id === entryRoomId || room.id === exitRoomId) continue;
+
+    // Roll for water
+    if (Math.random() < waterChance) {
+      waterRoomIds.push(room.id);
+    }
+  }
+
+  return waterRoomIds;
+}
+
+/**
+ * Generate water cells for selected rooms.
+ * Water is rendered as cells with a distinct blue color and reduced opacity.
+ * @param {Array} rooms - All rooms
+ * @param {Array} waterRoomIds - IDs of rooms to fill with water
+ * @param {string} waterColor - Color for water cells
+ * @param {number} waterOpacity - Opacity for water cells (0-1)
+ * @returns {Array} Array of water cell objects {x, y, color, opacity}
+ */
+function generateWaterCells(rooms, waterRoomIds, waterColor, waterOpacity) {
+  const waterCells = [];
+  const waterRoomSet = new Set(waterRoomIds);
+
+  for (const room of rooms) {
+    if (!waterRoomSet.has(room.id)) continue;
+
+    // Fill entire room with water
+    for (let x = room.x; x < room.x + room.width; x++) {
+      for (let y = room.y; y < room.y + room.height; y++) {
+        if (isCellInRoom(x, y, room)) {
+          waterCells.push({ x, y, color: waterColor, opacity: waterOpacity });
+        }
+      }
+    }
+  }
+
+  return waterCells;
+}
+
+// =============================================================================
 // PHASE 4: CELL GENERATION
 // =============================================================================
 
 function generateCells(rooms, corridorCells, color = DEFAULT_FLOOR_COLOR) {
   const cellMap = new Map();
-  
-  // Add room cells
+
+  // Add room cells (always full cells)
   for (const room of rooms) {
     for (let x = room.x; x < room.x + room.width; x++) {
       for (let y = room.y; y < room.y + room.height; y++) {
@@ -25502,15 +27204,29 @@ function generateCells(rooms, corridorCells, color = DEFAULT_FLOOR_COLOR) {
       }
     }
   }
-  
-  // Add corridor cells
+
+  // Add corridor cells (may include segment cells from diagonals)
   for (const cell of corridorCells) {
     const key = cellKey(cell.x, cell.y);
-    if (!cellMap.has(key)) {
-      cellMap.set(key, { x: cell.x, y: cell.y, color });
+    const existing = cellMap.get(key);
+
+    if (!existing) {
+      // No existing cell - add corridor cell as-is (may be segment or full)
+      if (cell.segments) {
+        cellMap.set(key, { x: cell.x, y: cell.y, color: cell.color || color, segments: cell.segments });
+      } else {
+        cellMap.set(key, { x: cell.x, y: cell.y, color: cell.color || color });
+      }
+    } else if (cell.segments && !existing.segments) {
+      // Existing is full cell, corridor has segments - keep full cell (room wins)
+      // No change needed
+    } else if (!cell.segments && existing.segments) {
+      // Corridor is full cell, existing has segments - upgrade to full cell
+      cellMap.set(key, { x: cell.x, y: cell.y, color: existing.color });
     }
+    // If both have segments or both are full, existing wins (first write wins)
   }
-  
+
   return Array.from(cellMap.values());
 }
 
@@ -25541,7 +27257,15 @@ function generateDungeon(presetName = 'medium', color = DEFAULT_FLOOR_COLOR, con
   const useWideCorridors = Math.random() < (config.wideCorridorChance || 0);
   const corridorWidth = useWideCorridors ? 2 : (config.corridorWidth || 1);
   const corridorStyle = config.corridorStyle || 'straight';
-  const corridorResult = carveCorridors(connections, corridorWidth, rooms, corridorStyle);
+  const diagonalChance = config.diagonalCorridorChance ?? 0;
+
+  // Use diagonal-aware carving if diagonal corridors are enabled
+  let corridorResult;
+  if (diagonalChance > 0 || corridorStyle === 'diagonal') {
+    corridorResult = carveCorridorsWithDiagonals(connections, corridorWidth, rooms, corridorStyle, diagonalChance, color);
+  } else {
+    corridorResult = carveCorridors(connections, corridorWidth, rooms, corridorStyle);
+  }
   const corridorCells = corridorResult.cells;
   const corridorsByConnection = corridorResult.byConnection;
   
@@ -25556,16 +27280,33 @@ function generateDungeon(presetName = 'medium', color = DEFAULT_FLOOR_COLOR, con
   // Phase 3b: Generate entry/exit stairs
   const { entry, exit } = findEntryExitRooms(rooms);
   const stairObjects = generateStairObjects(entry, exit);
-  
+
+  // Phase 3c: Generate water features
+  const waterChance = config.waterChance ?? 0;
+  const waterColor = config.waterColor ?? DEFAULT_WATER_COLOR;
+  const waterOpacity = config.waterOpacity ?? DEFAULT_WATER_OPACITY;
+  const waterRoomIds = selectWaterRooms(rooms, waterChance, entry?.id, exit?.id);
+  const waterCells = generateWaterCells(rooms, waterRoomIds, waterColor, waterOpacity);
+
   // Combine all objects
   const objects = [...doorObjects, ...stairObjects];
-  
-  // Phase 4: Generate cells
-  const cells = generateCells(rooms, corridorCells, color);
-  
+
+  // Phase 4: Generate cells (floor first, then overlay water)
+  const floorCells = generateCells(rooms, corridorCells, color);
+
+  // Merge water cells - water overlays floor cells
+  const cellMap = new Map();
+  for (const cell of floorCells) {
+    cellMap.set(cellKey(cell.x, cell.y), cell);
+  }
+  for (const cell of waterCells) {
+    cellMap.set(cellKey(cell.x, cell.y), cell);
+  }
+  const cells = Array.from(cellMap.values());
+
   // Count secret doors for metadata
   const secretDoorCount = doorObjects.filter(o => o.type === 'secret-door').length;
-  
+
   return {
     cells,
     objects,
@@ -25578,8 +27319,14 @@ function generateDungeon(presetName = 'medium', color = DEFAULT_FLOOR_COLOR, con
       doorCount: doorObjects.length,
       secretDoorCount,
       hasWideCorridors: useWideCorridors,
+      hasDiagonalCorridors: corridorsByConnection.some(c => c.hasDiagonals),
       entryRoomId: entry?.id,
-      exitRoomId: exit?.id
+      exitRoomId: exit?.id,
+      waterRoomIds,
+      // Data for objectPlacer (dungeon stocking)
+      corridorResult,
+      doorPositions,
+      style: config.style || 'classic'
     }
   };
 }
@@ -25593,13 +27340,20 @@ return {
   DUNGEON_PRESETS,
   DUNGEON_STYLES,
   DEFAULT_FLOOR_COLOR,
-  
+  DEFAULT_WATER_COLOR,
+  DEFAULT_WATER_OPACITY,
+  DIAGONAL_SEGMENTS,
+
   // Individual phases
   generateRooms,
   buildConnectionGraph,
   carveCorridors,
+  carveCorridorsWithDiagonals,
+  carveDiagonalCorridor,
   generateCells,
-  
+  selectWaterRooms,
+  generateWaterCells,
+
   // Utilities
   getRoomCenter,
   getRoomCells,
@@ -25608,12 +27362,1133 @@ return {
   isCellInRoomRect,
   isCellAdjacentToRoom,
   carveCorridorBetween,
+  canUseDiagonalCorridor,
+  getDiagonalDirection,
   findDoorCandidates,
   findDoorPositions,
   generateDoorObjects,
   findEntryExitRooms,
   generateStairObjects
 };
+```
+
+# objectPlacer
+
+```js
+/**
+ * objectPlacer.js
+ *
+ * Dungeon stocking module for Windrose MapDesigner.
+ * Places objects (monsters, traps, treasure, features) in generated dungeons
+ * using B/X-style random tables with configurable weights.
+ */
+
+// =============================================================================
+// TYPE DEFINITIONS (JSDoc)
+// =============================================================================
+
+/**
+ * @typedef {Object} CellPosition
+ * @property {number} x - Grid X coordinate
+ * @property {number} y - Grid Y coordinate
+ */
+
+/**
+ * @typedef {Object} PlacementZones
+ * @property {CellPosition[]} center - Center area cells
+ * @property {CellPosition[]} corners - Corner cells
+ * @property {CellPosition[]} walls - Wall-adjacent cells
+ * @property {CellPosition[]} doorAdjacent - Cells near doors (excluded from placement)
+ * @property {CellPosition[]} scattered - All valid cells for random placement
+ */
+
+/**
+ * @typedef {Object} PlacementContext
+ * @property {string} [category] - Room category ('monster', 'trap', 'feature', 'empty')
+ * @property {boolean} [isTreasure] - Whether this is a treasure object
+ * @property {string} [templateName] - Template name if using a room template
+ * @property {boolean} [isCorridor] - Whether placed in a corridor
+ */
+
+/**
+ * @typedef {Object} PlacedObject
+ * @property {string} id - Unique object ID
+ * @property {string} type - Object type ID
+ * @property {CellPosition} position - Grid position
+ * @property {{width: number, height: number}} size - Object size in cells
+ * @property {string} alignment - Cell alignment
+ * @property {number} scale - Render scale
+ * @property {number} rotation - Rotation in degrees
+ * @property {string} label - Display label
+ * @property {string} [customTooltip] - Tooltip text (if applicable)
+ */
+
+/**
+ * @typedef {Object} RoomDefinition
+ * @property {number} id - Room ID
+ * @property {number} x - Top-left X
+ * @property {number} y - Top-left Y
+ * @property {number} width - Room width
+ * @property {number} height - Room height
+ * @property {string} [shape] - Room shape ('rectangle', 'circle', 'composite')
+ */
+
+// =============================================================================
+// CONSTANTS
+// =============================================================================
+
+const ROOM_CATEGORIES = {
+  MONSTER: 'monster',
+  EMPTY: 'empty',
+  FEATURE: 'feature',
+  TRAP: 'trap'
+};
+
+/**
+ * Default stocking configuration based on B/X D&D.
+ * Monster: 33%, Empty: 33%, Feature: 17%, Trap: 17%
+ */
+const STOCKING_CONFIG = {
+  categoryWeights: {
+    monster: 0.33,
+    empty: 0.33,
+    feature: 0.17,
+    trap: 0.17
+  },
+  // Secondary treasure roll by category (B/X style)
+  treasureChance: {
+    monster: 0.50,  // Monster rooms: 3-in-6 treasure
+    trap: 0.33,     // Trap rooms: 2-in-6 treasure (bait)
+    empty: 0.17,    // Empty rooms: 1-in-6 hidden treasure
+    feature: 0.0    // Feature rooms don't get secondary treasure
+  },
+  // Room size thresholds (in cells)
+  sizeThresholds: {
+    small: 6,   // 3-6 cells: 1-2 objects
+    medium: 15  // 7-15 cells: 2-4 objects, 16+: 4-6 objects
+  },
+  // Corridor trap settings
+  corridorTrapRatio: 0.6  // 60% of traps go in corridors
+};
+
+// =============================================================================
+// STYLE-SPECIFIC OBJECT POOLS
+// =============================================================================
+
+const STYLE_OBJECT_POOLS = {
+  classic: {
+    monsters: ['monster', 'guard'],
+    treasures: ['chest', 'sack'],
+    features: ['table', 'chair', 'statue', 'crate', 'altar'],
+    traps: ['trap', 'pit', 'hazard']
+  },
+  cavern: {
+    monsters: ['monster'],
+    treasures: ['chest', 'sack'],
+    features: ['plant', 'flower', 'fountain', 'statue'],
+    traps: ['pit', 'hazard']
+  },
+  fortress: {
+    monsters: ['monster', 'guard', 'guard'],  // Weighted toward guards
+    treasures: ['chest', 'crate'],
+    features: ['table', 'chair', 'bed', 'anvil', 'statue', 'crate'],
+    traps: ['trap', 'pit']
+  },
+  crypt: {
+    monsters: ['monster', 'boss-alt'],  // Undead theme
+    treasures: ['chest', 'sack'],
+    features: ['coffin', 'altar', 'statue', 'cage'],
+    traps: ['trap', 'hazard', 'poison']
+  }
+};
+
+// =============================================================================
+// WATER ROOM PLACEMENT RULES
+// =============================================================================
+
+/**
+ * Water room object placement configuration.
+ * Water rooms have restricted object placement - objects must be on shores/edges.
+ */
+const WATER_PLACEMENT_RULES = {
+  // Objects allowed on island/center (30% chance of center feature)
+  centerFeatures: ['fountain', 'statue'],
+  // Objects allowed on shore (outer ring of room)
+  shoreObjects: ['chest', 'monster', 'sack'],
+  // Objects excluded from water rooms entirely
+  excluded: ['table', 'chair', 'bed', 'coffin', 'book', 'crate', 'trap', 'pit', 'guard'],
+  // Budget reduction factor for water rooms
+  budgetDivisor: 12,
+  // Chance of placing a center feature (island)
+  centerFeatureChance: 0.3,
+  // Cavern style allows monsters in deep water (aquatic creatures)
+  deepWaterMonsterStyles: ['cavern']
+};
+
+// =============================================================================
+// ROOM TEMPLATES
+// =============================================================================
+
+const ROOM_TEMPLATES = {
+  library: {
+    name: 'Library',
+    objects: [
+      { type: 'book', count: { min: 2, max: 4 }, placement: 'walls' },
+      { type: 'table', count: { min: 0, max: 1 }, placement: 'center' }
+    ],
+    minRoomSize: 9
+  },
+  storage: {
+    name: 'Storage',
+    objects: [
+      { type: 'crate', count: { min: 2, max: 5 }, placement: 'scattered' },
+      { type: 'sack', count: { min: 0, max: 2 }, placement: 'corners' }
+    ],
+    minRoomSize: 6
+  },
+  shrine: {
+    name: 'Shrine',
+    objects: [
+      { type: 'altar', count: { min: 1, max: 1 }, placement: 'center' },
+      { type: 'statue', count: { min: 0, max: 2 }, placement: 'flanking' }
+    ],
+    minRoomSize: 9
+  },
+  barracks: {
+    name: 'Barracks',
+    objects: [
+      { type: 'bed', count: { min: 2, max: 4 }, placement: 'walls' },
+      { type: 'table', count: { min: 0, max: 1 }, placement: 'center' },
+      { type: 'chest', count: { min: 0, max: 1 }, placement: 'corners' }
+    ],
+    minRoomSize: 12
+  },
+  treasury: {
+    name: 'Treasury',
+    objects: [
+      { type: 'chest', count: { min: 2, max: 4 }, placement: 'walls' },
+      { type: 'sack', count: { min: 0, max: 2 }, placement: 'scattered' }
+    ],
+    minRoomSize: 6
+  },
+  guardRoom: {
+    name: 'Guard Room',
+    objects: [
+      { type: 'guard', count: { min: 1, max: 3 }, placement: 'scattered' },
+      { type: 'table', count: { min: 0, max: 1 }, placement: 'center' }
+    ],
+    minRoomSize: 9
+  }
+};
+
+// =============================================================================
+// PLACEMENT PREFERENCES
+// =============================================================================
+
+const PLACEMENT_PREFERENCES = {
+  // Monsters can be anywhere
+  monster: ['scattered', 'center'],
+  guard: ['scattered', 'center'],
+  boss: ['center'],
+  'boss-alt': ['center'],
+
+  // Treasure near walls/corners
+  chest: ['corners', 'walls'],
+  sack: ['corners', 'walls', 'scattered'],
+
+  // Furniture has specific preferences
+  altar: ['center'],
+  statue: ['corners', 'walls', 'center'],
+  table: ['center'],
+  chair: ['center', 'scattered'],
+  bed: ['walls', 'corners'],
+  coffin: ['walls', 'center'],
+  book: ['walls'],
+  crate: ['corners', 'walls', 'scattered'],
+  cauldron: ['center'],
+  fountain: ['center'],
+  anvil: ['walls', 'corners'],
+  cage: ['walls', 'corners'],
+
+  // Nature
+  plant: ['corners', 'scattered'],
+  flower: ['scattered'],
+
+  // Hazards
+  trap: ['center', 'scattered'],
+  pit: ['center'],
+  hazard: ['scattered'],
+  poison: ['scattered']
+};
+
+// =============================================================================
+// UTILITY FUNCTIONS
+// =============================================================================
+
+function randomInt(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function generateObjectId() {
+  return 'obj-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+}
+
+function cellKey(x, y) {
+  return `${x},${y}`;
+}
+
+/**
+ * Select a random item from an array.
+ */
+function selectFromPool(pool) {
+  if (!pool || pool.length === 0) return null;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+/**
+ * Roll a weighted category selection.
+ * @param {Object} weights - Object with category names as keys and weights as values
+ * @returns {string} Selected category name
+ */
+function rollWeightedCategory(weights) {
+  const entries = Object.entries(weights);
+  const total = entries.reduce((sum, [, w]) => sum + w, 0);
+
+  if (total === 0) return ROOM_CATEGORIES.EMPTY;
+
+  let roll = Math.random() * total;
+
+  for (const [category, weight] of entries) {
+    roll -= weight;
+    if (roll <= 0) return category;
+  }
+
+  return entries[entries.length - 1][0];
+}
+
+/**
+ * Normalize weights to sum to 1.0.
+ */
+function normalizeWeights(weights) {
+  const sum = Object.values(weights).reduce((a, b) => a + b, 0);
+  if (sum === 0) {
+    return {
+      monster: 0.25,
+      empty: 0.25,
+      feature: 0.25,
+      trap: 0.25
+    };
+  }
+
+  const normalized = {};
+  for (const [key, val] of Object.entries(weights)) {
+    normalized[key] = val / sum;
+  }
+  return normalized;
+}
+
+// =============================================================================
+// TOOLTIP GENERATION
+// =============================================================================
+
+/**
+ * Object type labels for display.
+ */
+const OBJECT_LABELS = {
+  // Monsters
+  monster: 'Monster',
+  guard: 'Guard',
+  boss: 'Boss',
+  'boss-alt': 'Boss',
+
+  // Treasures
+  chest: 'Chest',
+  sack: 'Sack',
+  crate: 'Crate',
+
+  // Furniture
+  altar: 'Altar',
+  statue: 'Statue',
+  table: 'Table',
+  chair: 'Chair',
+  bed: 'Bed',
+  coffin: 'Coffin',
+  book: 'Bookshelf',
+  cauldron: 'Cauldron',
+  fountain: 'Fountain',
+  anvil: 'Anvil',
+  cage: 'Cage',
+
+  // Nature
+  plant: 'Plant',
+  flower: 'Flowers',
+
+  // Hazards
+  trap: 'Trap',
+  pit: 'Pit',
+  hazard: 'Hazard',
+  poison: 'Poison'
+};
+
+/**
+ * Get display label for an object type.
+ * @param {string} objectType - The object type ID
+ * @returns {string} Human-readable label
+ */
+function getObjectLabel(objectType) {
+  return OBJECT_LABELS[objectType] || objectType.charAt(0).toUpperCase() + objectType.slice(1);
+}
+
+/**
+ * Generate contextual tooltip for a placed object.
+ * @param {string} objectType - The object type ID
+ * @param {Object} context - Placement context
+ * @param {string} context.category - Room category (monster, trap, feature, empty)
+ * @param {boolean} context.isTreasure - Whether this is a treasure object
+ * @param {string} context.templateName - Template name if applicable
+ * @param {boolean} context.isCorridor - Whether placed in corridor
+ * @returns {string} Tooltip text
+ */
+function getObjectTooltip(objectType, context = {}) {
+  const { category, isTreasure, templateName, isCorridor } = context;
+
+  // Corridor traps
+  if (isCorridor) {
+    return 'Corridor trap';
+  }
+
+  // Treasure objects get special tooltips based on room category
+  if (isTreasure) {
+    if (category === 'monster') {
+      return 'Guarded treasure';
+    }
+    if (category === 'trap') {
+      return 'Trapped treasure (bait)';
+    }
+    if (category === 'empty') {
+      return 'Hidden treasure';
+    }
+  }
+
+  // Monster category
+  if (category === 'monster') {
+    if (objectType === 'guard') {
+      return 'Guard post';
+    }
+    return 'Monster lair';
+  }
+
+  // Trap category
+  if (category === 'trap') {
+    return 'Trapped area';
+  }
+
+  // Feature category with template
+  if (templateName) {
+    return `${templateName} furnishing`;
+  }
+
+  // Feature category without template
+  if (category === 'feature') {
+    return 'Room feature';
+  }
+
+  // Default
+  return null;
+}
+
+// =============================================================================
+// ROOM ANALYSIS
+// =============================================================================
+
+/**
+ * Get all cells belonging to a room.
+ */
+function getRoomCells(room) {
+  const cells = [];
+  for (let x = room.x; x < room.x + room.width; x++) {
+    for (let y = room.y; y < room.y + room.height; y++) {
+      if (isCellInRoom(x, y, room)) {
+        cells.push({ x, y });
+      }
+    }
+  }
+  return cells;
+}
+
+/**
+ * Check if a cell is inside a room (respects shape).
+ */
+function isCellInRoom(x, y, room) {
+  if (x < room.x || x >= room.x + room.width ||
+      y < room.y || y >= room.y + room.height) {
+    return false;
+  }
+
+  if (room.shape === 'circle') {
+    const centerX = room.x + room.radius;
+    const centerY = room.y + room.radius;
+    const dx = x + 0.5 - centerX;
+    const dy = y + 0.5 - centerY;
+    return dx * dx + dy * dy <= room.radius * room.radius;
+  }
+
+  if (room.shape === 'composite') {
+    return room.parts.some(part =>
+      x >= part.x && x < part.x + part.width &&
+      y >= part.y && y < part.y + part.height
+    );
+  }
+
+  return true;
+}
+
+/**
+ * Calculate object budget based on room size and density multiplier.
+ */
+function getObjectBudget(roomSize, densityMultiplier = 1.0) {
+  let base;
+
+  if (roomSize <= STOCKING_CONFIG.sizeThresholds.small) {
+    // Small rooms: 1-2 objects
+    base = randomInt(1, 2);
+  } else if (roomSize <= STOCKING_CONFIG.sizeThresholds.medium) {
+    // Medium rooms: 2-4 objects
+    base = randomInt(2, 4);
+  } else {
+    // Large rooms: 4-6 objects
+    base = randomInt(4, 6);
+  }
+
+  return Math.max(1, Math.round(base * densityMultiplier));
+}
+
+// =============================================================================
+// PLACEMENT ZONE IDENTIFICATION
+// =============================================================================
+
+/**
+ * Identify placement zones within a room.
+ * @param {Array} roomCells - All cells in the room
+ * @param {Object} room - Room object with bounds
+ * @param {Array} doorPositions - Door positions to avoid
+ * @returns {Object} Zones: center, corners, walls, scattered, doorAdjacent
+ */
+function identifyPlacementZones(roomCells, room, doorPositions = []) {
+  const zones = {
+    center: [],
+    corners: [],
+    walls: [],
+    doorAdjacent: [],
+    scattered: []
+  };
+
+  // Build door position set for quick lookup
+  const doorCells = new Set(doorPositions.map(d => cellKey(d.x, d.y)));
+  const doorAdjacentCells = new Set();
+
+  // Mark cells adjacent to doors
+  for (const door of doorPositions) {
+    for (const [dx, dy] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
+      doorAdjacentCells.add(cellKey(door.x + dx, door.y + dy));
+    }
+  }
+
+  // Calculate room bounds for zone classification
+  const minX = room.x;
+  const maxX = room.x + room.width - 1;
+  const minY = room.y;
+  const maxY = room.y + room.height - 1;
+
+  // Classify each cell
+  for (const cell of roomCells) {
+    const key = cellKey(cell.x, cell.y);
+
+    // Skip door cells and adjacent cells
+    if (doorCells.has(key)) {
+      zones.doorAdjacent.push(cell);
+      continue;
+    }
+    if (doorAdjacentCells.has(key)) {
+      zones.doorAdjacent.push(cell);
+      continue;
+    }
+
+    const isCorner = isCornerCell(cell, minX, maxX, minY, maxY);
+    const isWall = isWallCell(cell, minX, maxX, minY, maxY);
+    const isCenter = !isWall;
+
+    if (isCorner) {
+      zones.corners.push(cell);
+    } else if (isWall) {
+      zones.walls.push(cell);
+    } else if (isCenter) {
+      zones.center.push(cell);
+    }
+
+    // All valid cells go in scattered
+    zones.scattered.push(cell);
+  }
+
+  return zones;
+}
+
+/**
+ * Check if a cell is in a corner of the room.
+ */
+function isCornerCell(cell, minX, maxX, minY, maxY) {
+  const nearLeft = cell.x <= minX + 1;
+  const nearRight = cell.x >= maxX - 1;
+  const nearTop = cell.y <= minY + 1;
+  const nearBottom = cell.y >= maxY - 1;
+
+  return (nearLeft || nearRight) && (nearTop || nearBottom);
+}
+
+/**
+ * Check if a cell is along a wall (edge) but not a corner.
+ */
+function isWallCell(cell, minX, maxX, minY, maxY) {
+  return cell.x === minX || cell.x === maxX ||
+         cell.y === minY || cell.y === maxY;
+}
+
+// =============================================================================
+// OBJECT PLACEMENT
+// =============================================================================
+
+/**
+ * Place a single object at a valid position.
+ * @param {PlacementZones} zones - Placement zones
+ * @param {string} objectType - Object type ID
+ * @param {Set<string>} occupiedCells - Set of occupied cell keys
+ * @param {string|null} preferredZone - Preferred zone ('center', 'corners', 'walls', 'scattered')
+ * @param {PlacementContext} context - Placement context for tooltip generation
+ * @returns {PlacedObject|null} Object definition or null if no valid position
+ */
+function placeObject(zones, objectType, occupiedCells, preferredZone = null, context = {}) {
+  // Determine zone preference order
+  const preferences = preferredZone
+    ? [preferredZone, 'scattered']
+    : (PLACEMENT_PREFERENCES[objectType] || ['scattered']);
+
+  for (const zoneName of preferences) {
+    const zone = zones[zoneName];
+    if (!zone || zone.length === 0) continue;
+
+    // Find available cells in this zone
+    const available = zone.filter(cell => !occupiedCells.has(cellKey(cell.x, cell.y)));
+    if (available.length === 0) continue;
+
+    // Select a random cell
+    const cell = available[Math.floor(Math.random() * available.length)];
+    occupiedCells.add(cellKey(cell.x, cell.y));
+
+    // Generate label and tooltip
+    const label = getObjectLabel(objectType);
+    const customTooltip = getObjectTooltip(objectType, context);
+
+    const obj = {
+      id: generateObjectId(),
+      type: objectType,
+      position: { x: cell.x, y: cell.y },
+      size: { width: 1, height: 1 },
+      alignment: 'center',
+      scale: 1,
+      rotation: 0,
+      label
+    };
+
+    // Only add customTooltip if we have one
+    if (customTooltip) {
+      obj.customTooltip = customTooltip;
+    }
+
+    return obj;
+  }
+
+  return null;
+}
+
+/**
+ * Place multiple objects from a pool.
+ * @param {PlacementZones} zones - Placement zones
+ * @param {string[]} pool - Object type pool to select from
+ * @param {number} count - Number of objects to place
+ * @param {Set<string>} occupiedCells - Set of occupied cell keys
+ * @param {string|null} preferredZone - Optional preferred zone
+ * @param {PlacementContext} context - Placement context for tooltip generation
+ * @returns {PlacedObject[]} Placed objects
+ */
+function placeObjects(zones, pool, count, occupiedCells, preferredZone = null, context = {}) {
+  const placed = [];
+
+  for (let i = 0; i < count; i++) {
+    const objectType = selectFromPool(pool);
+    if (!objectType) continue;
+
+    const obj = placeObject(zones, objectType, occupiedCells, preferredZone, context);
+    if (obj) {
+      placed.push(obj);
+    }
+  }
+
+  return placed;
+}
+
+// =============================================================================
+// ROOM TEMPLATES
+// =============================================================================
+
+/**
+ * Select a valid template for the given room size.
+ */
+function selectValidTemplate(roomSize) {
+  const validTemplates = Object.entries(ROOM_TEMPLATES)
+    .filter(([, template]) => roomSize >= template.minRoomSize);
+
+  if (validTemplates.length === 0) return null;
+
+  const [, template] = validTemplates[Math.floor(Math.random() * validTemplates.length)];
+  return template;
+}
+
+/**
+ * @typedef {Object} TemplateObjectSpec
+ * @property {string} type - Object type ID
+ * @property {{min: number, max: number}} count - Count range
+ * @property {string} placement - Preferred placement zone
+ */
+
+/**
+ * @typedef {Object} RoomTemplate
+ * @property {string} name - Template display name
+ * @property {TemplateObjectSpec[]} objects - Objects to place
+ * @property {number} minRoomSize - Minimum room size for this template
+ */
+
+/**
+ * Apply a room template, placing all its objects.
+ * @param {RoomTemplate} template - Room template definition
+ * @param {PlacementZones} zones - Placement zones
+ * @param {Set<string>} occupiedCells - Set of occupied cell keys
+ * @returns {PlacedObject[]} Placed objects
+ */
+function applyRoomTemplate(template, zones, occupiedCells) {
+  const placed = [];
+  const context = { category: 'feature', templateName: template.name };
+
+  for (const spec of template.objects) {
+    const count = randomInt(spec.count.min, spec.count.max);
+
+    for (let i = 0; i < count; i++) {
+      const obj = placeObject(zones, spec.type, occupiedCells, spec.placement, context);
+      if (obj) {
+        placed.push(obj);
+      }
+    }
+  }
+
+  return placed;
+}
+
+// =============================================================================
+// CORRIDOR TRAP PLACEMENT
+// =============================================================================
+
+/**
+ * Find cells that are only in corridors (not in any room).
+ */
+function findCorridorOnlyCells(corridorCells, rooms) {
+  return corridorCells.filter(cell => {
+    for (const room of rooms) {
+      if (isCellInRoom(cell.x, cell.y, room)) {
+        return false;
+      }
+    }
+    return true;
+  });
+}
+
+/**
+ * Select a position for a corridor trap.
+ */
+function selectCorridorTrapPosition(corridorCells, occupiedCells) {
+  const available = corridorCells.filter(cell =>
+    !occupiedCells.has(cellKey(cell.x, cell.y))
+  );
+
+  if (available.length === 0) return null;
+
+  return available[Math.floor(Math.random() * available.length)];
+}
+
+// =============================================================================
+// WATER ROOM OBJECT PLACEMENT
+// =============================================================================
+
+/**
+ * Identify shore cells (outer ring) vs deep water cells (center) in a room.
+ * Shore cells are any cells on the edge of the room or within 1 cell of the edge.
+ * @param {Array} roomCells - All cells in the room
+ * @param {Object} room - Room object with bounds
+ * @returns {Object} { shore: CellPosition[], deepWater: CellPosition[] }
+ */
+function identifyWaterZones(roomCells, room) {
+  const shore = [];
+  const deepWater = [];
+
+  const minX = room.x;
+  const maxX = room.x + room.width - 1;
+  const minY = room.y;
+  const maxY = room.y + room.height - 1;
+
+  for (const cell of roomCells) {
+    // Shore = outer ring (edge or 1 cell from edge)
+    const distFromEdge = Math.min(
+      cell.x - minX,
+      maxX - cell.x,
+      cell.y - minY,
+      maxY - cell.y
+    );
+
+    if (distFromEdge <= 1) {
+      shore.push(cell);
+    } else {
+      deepWater.push(cell);
+    }
+  }
+
+  return { shore, deepWater };
+}
+
+/**
+ * Stock a water room with appropriate objects.
+ * Water rooms have special placement rules:
+ * - Most objects on shore only (outer ring)
+ * - 30% chance of center island feature
+ * - Reduced object budget
+ * - Cavern style allows aquatic monsters in deep water
+ *
+ * @param {Object} room - Room definition
+ * @param {Array} roomCells - All cells in the room
+ * @param {Object} roomDoors - Door positions in this room
+ * @param {string} style - Dungeon style
+ * @param {Set<string>} occupiedCells - Set of occupied cell keys
+ * @returns {Object} { objects: PlacedObject[], assignment: { category, isWater: true } }
+ */
+function stockWaterRoom(room, roomCells, roomDoors, style, occupiedCells) {
+  const objects = [];
+  const waterZones = identifyWaterZones(roomCells, room);
+
+  // Calculate reduced budget for water rooms
+  const budget = Math.max(1, Math.floor(roomCells.length / WATER_PLACEMENT_RULES.budgetDivisor));
+
+  // Build door-adjacent exclusion set
+  const doorAdjacentCells = new Set();
+  for (const door of roomDoors) {
+    doorAdjacentCells.add(cellKey(door.x, door.y));
+    for (const [dx, dy] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
+      doorAdjacentCells.add(cellKey(door.x + dx, door.y + dy));
+    }
+  }
+
+  // Filter shore cells to exclude door-adjacent
+  const availableShore = waterZones.shore.filter(
+    cell => !doorAdjacentCells.has(cellKey(cell.x, cell.y))
+  );
+
+  // 30% chance of center island feature (fountain or statue)
+  if (waterZones.deepWater.length > 0 && Math.random() < WATER_PLACEMENT_RULES.centerFeatureChance) {
+    const centerCells = waterZones.deepWater.filter(
+      cell => !occupiedCells.has(cellKey(cell.x, cell.y))
+    );
+    if (centerCells.length > 0) {
+      const cell = centerCells[Math.floor(Math.random() * centerCells.length)];
+      const featureType = selectFromPool(WATER_PLACEMENT_RULES.centerFeatures);
+      occupiedCells.add(cellKey(cell.x, cell.y));
+      objects.push({
+        id: generateObjectId(),
+        type: featureType,
+        position: { x: cell.x, y: cell.y },
+        size: { width: 1, height: 1 },
+        alignment: 'center',
+        scale: 1,
+        rotation: 0,
+        label: getObjectLabel(featureType),
+        customTooltip: 'Island feature'
+      });
+    }
+  }
+
+  // Cavern style: chance of aquatic monster in deep water
+  if (WATER_PLACEMENT_RULES.deepWaterMonsterStyles.includes(style)) {
+    if (waterZones.deepWater.length > 0 && Math.random() < 0.3) {
+      const deepCells = waterZones.deepWater.filter(
+        cell => !occupiedCells.has(cellKey(cell.x, cell.y))
+      );
+      if (deepCells.length > 0) {
+        const cell = deepCells[Math.floor(Math.random() * deepCells.length)];
+        occupiedCells.add(cellKey(cell.x, cell.y));
+        objects.push({
+          id: generateObjectId(),
+          type: 'monster',
+          position: { x: cell.x, y: cell.y },
+          size: { width: 1, height: 1 },
+          alignment: 'center',
+          scale: 1,
+          rotation: 0,
+          label: getObjectLabel('monster'),
+          customTooltip: 'Aquatic creature'
+        });
+      }
+    }
+  }
+
+  // Place remaining objects on shore
+  const shorePool = WATER_PLACEMENT_RULES.shoreObjects;
+  for (let i = 0; i < budget && availableShore.length > 0; i++) {
+    const available = availableShore.filter(
+      cell => !occupiedCells.has(cellKey(cell.x, cell.y))
+    );
+    if (available.length === 0) break;
+
+    const cell = available[Math.floor(Math.random() * available.length)];
+    const objectType = selectFromPool(shorePool);
+    occupiedCells.add(cellKey(cell.x, cell.y));
+
+    objects.push({
+      id: generateObjectId(),
+      type: objectType,
+      position: { x: cell.x, y: cell.y },
+      size: { width: 1, height: 1 },
+      alignment: 'center',
+      scale: 1,
+      rotation: 0,
+      label: getObjectLabel(objectType),
+      customTooltip: 'Shore placement'
+    });
+  }
+
+  return {
+    objects,
+    assignment: { category: 'water', isWater: true, hasSecondaryTreasure: false }
+  };
+}
+
+// =============================================================================
+// MAIN STOCKING FUNCTION
+// =============================================================================
+
+/**
+ * Stock a dungeon with objects using B/X-style random tables.
+ *
+ * @param {Array} rooms - Generated rooms
+ * @param {Object} corridorResult - Corridor generation result (cells, byConnection)
+ * @param {Array} doorPositions - Door positions (to avoid placement)
+ * @param {string} style - Dungeon style ('classic', 'cavern', 'fortress', 'crypt')
+ * @param {Object} config - Stocking configuration
+ * @param {Object} options - Additional options (entryRoomId, exitRoomId, waterRoomIds)
+ * @returns {Object} { objects: MapObject[], roomAssignments: {} }
+ */
+function stockDungeon(rooms, corridorResult, doorPositions, style = 'classic', config = {}, options = {}) {
+  const stockedObjects = [];
+  const roomAssignments = {};
+  const occupiedCells = new Set();
+
+  // Get style-specific object pool
+  const objectPool = STYLE_OBJECT_POOLS[style] || STYLE_OBJECT_POOLS.classic;
+
+  // Build water room lookup set
+  const waterRoomSet = new Set(options.waterRoomIds || []);
+
+  // Merge config with defaults
+  const categoryWeights = normalizeWeights({
+    monster: config.monsterWeight ?? STOCKING_CONFIG.categoryWeights.monster,
+    empty: config.emptyWeight ?? STOCKING_CONFIG.categoryWeights.empty,
+    feature: config.featureWeight ?? STOCKING_CONFIG.categoryWeights.feature,
+    trap: config.trapWeight ?? STOCKING_CONFIG.categoryWeights.trap
+  });
+
+  const densityMultiplier = config.objectDensity ?? 1.0;
+  const useTemplates = config.useTemplates !== false;
+  const corridorTrapChance = config.corridorTrapChance ?? 0.1;
+
+  // Mark existing object positions as occupied (doors, stairs)
+  for (const door of doorPositions) {
+    occupiedCells.add(cellKey(door.x, door.y));
+  }
+
+  // Stock each room
+  for (const room of rooms) {
+    // Skip entry/exit rooms (they have stairs)
+    if (room.id === options.entryRoomId || room.id === options.exitRoomId) {
+      roomAssignments[room.id] = { category: 'entry_exit', hasSecondaryTreasure: false };
+      continue;
+    }
+
+    // Get room cells for zone identification
+    const roomCells = getRoomCells(room);
+
+    // Filter door positions to just this room
+    const roomDoors = doorPositions.filter(d =>
+      d.x >= room.x && d.x < room.x + room.width &&
+      d.y >= room.y && d.y < room.y + room.height
+    );
+
+    // Handle water rooms specially
+    if (waterRoomSet.has(room.id)) {
+      const waterResult = stockWaterRoom(room, roomCells, roomDoors, style, occupiedCells);
+      stockedObjects.push(...waterResult.objects);
+      roomAssignments[room.id] = waterResult.assignment;
+      continue;
+    }
+
+    // Roll room category for non-water rooms
+    const category = rollWeightedCategory(categoryWeights);
+    roomAssignments[room.id] = { category, hasSecondaryTreasure: false };
+
+    const roomSize = roomCells.length;
+    const zones = identifyPlacementZones(roomCells, room, roomDoors);
+
+    // Calculate object budget
+    const objectBudget = getObjectBudget(roomSize, densityMultiplier);
+
+    // Place objects based on category
+    switch (category) {
+      case ROOM_CATEGORIES.MONSTER: {
+        // Place monsters (60% of budget)
+        const monsterCount = Math.max(1, Math.ceil(objectBudget * 0.6));
+        const monsterContext = { category: 'monster' };
+        const monsters = placeObjects(zones, objectPool.monsters, monsterCount, occupiedCells, null, monsterContext);
+        stockedObjects.push(...monsters);
+
+        // Secondary treasure roll (B/X: 3-in-6 for monster rooms)
+        if (Math.random() < STOCKING_CONFIG.treasureChance.monster) {
+          roomAssignments[room.id].hasSecondaryTreasure = true;
+          const treasureCount = Math.max(1, Math.floor(objectBudget * 0.3));
+          const treasureContext = { category: 'monster', isTreasure: true };
+          const treasure = placeObjects(zones, objectPool.treasures, treasureCount, occupiedCells, 'corners', treasureContext);
+          stockedObjects.push(...treasure);
+        }
+        break;
+      }
+
+      case ROOM_CATEGORIES.TRAP: {
+        // Place trap(s)
+        const trapCount = randomInt(1, 2);
+        const trapContext = { category: 'trap' };
+        const traps = placeObjects(zones, objectPool.traps, trapCount, occupiedCells, null, trapContext);
+        stockedObjects.push(...traps);
+
+        // Secondary treasure roll (B/X: 2-in-6 for trap rooms - it's bait!)
+        if (Math.random() < STOCKING_CONFIG.treasureChance.trap) {
+          roomAssignments[room.id].hasSecondaryTreasure = true;
+          const treasureContext = { category: 'trap', isTreasure: true };
+          const treasure = placeObjects(zones, objectPool.treasures, 1, occupiedCells, 'center', treasureContext);
+          stockedObjects.push(...treasure);
+        }
+        break;
+      }
+
+      case ROOM_CATEGORIES.FEATURE: {
+        // 50% chance to use a template if room is large enough
+        if (useTemplates && Math.random() < 0.5 && roomSize >= 9) {
+          const template = selectValidTemplate(roomSize);
+          if (template) {
+            const templateObjects = applyRoomTemplate(template, zones, occupiedCells);
+            stockedObjects.push(...templateObjects);
+            roomAssignments[room.id].template = template.name;
+            break;
+          }
+        }
+
+        // Otherwise place random features
+        const featureCount = objectBudget;
+        const featureContext = { category: 'feature' };
+        const features = placeObjects(zones, objectPool.features, featureCount, occupiedCells, null, featureContext);
+        stockedObjects.push(...features);
+        break;
+      }
+
+      case ROOM_CATEGORIES.EMPTY:
+      default: {
+        // Usually empty, but small chance of hidden treasure (B/X: 1-in-6)
+        if (Math.random() < STOCKING_CONFIG.treasureChance.empty) {
+          roomAssignments[room.id].hasSecondaryTreasure = true;
+          const treasureContext = { category: 'empty', isTreasure: true };
+          const treasure = placeObjects(zones, objectPool.treasures, 1, occupiedCells, 'corners', treasureContext);
+          stockedObjects.push(...treasure);
+        }
+        break;
+      }
+    }
+  }
+
+  // Place corridor traps
+  if (corridorTrapChance > 0 && corridorResult && corridorResult.cells) {
+    const corridorOnlyCells = findCorridorOnlyCells(corridorResult.cells, rooms);
+
+    // Calculate corridor trap count based on corridor length and chance
+    const corridorTrapCount = Math.floor(corridorOnlyCells.length * corridorTrapChance / 10);
+
+    for (let i = 0; i < corridorTrapCount; i++) {
+      const cell = selectCorridorTrapPosition(corridorOnlyCells, occupiedCells);
+      if (cell) {
+        occupiedCells.add(cellKey(cell.x, cell.y));
+        const trapType = selectFromPool(objectPool.traps);
+        stockedObjects.push({
+          id: generateObjectId(),
+          type: trapType,
+          position: { x: cell.x, y: cell.y },
+          size: { width: 1, height: 1 },
+          alignment: 'center',
+          scale: 1,
+          rotation: 0,
+          label: getObjectLabel(trapType),
+          customTooltip: 'Corridor trap'
+        });
+      }
+    }
+  }
+
+  return {
+    objects: stockedObjects,
+    roomAssignments
+  };
+}
+
+// =============================================================================
+// EXPORTS
+// =============================================================================
+
+return {
+  // Main entry point
+  stockDungeon,
+
+  // Constants
+  ROOM_CATEGORIES,
+  STOCKING_CONFIG,
+  STYLE_OBJECT_POOLS,
+  ROOM_TEMPLATES,
+  PLACEMENT_PREFERENCES,
+
+  // Utilities (exported for testing)
+  rollWeightedCategory,
+  normalizeWeights,
+  getObjectBudget,
+  identifyPlacementZones,
+  selectValidTemplate,
+  applyRoomTemplate,
+  placeObject,
+  placeObjects,
+  findCorridorOnlyCells,
+
+  // Re-exports from dungeonGenerator needed by stockDungeon
+  getRoomCells,
+  isCellInRoom
+};
+
 ```
 
 # RerollDungeonButton
@@ -25629,6 +28504,7 @@ return {
 
 const { useMapState, useMapOperations } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "MapContext"));
 const { generateDungeon } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "dungeonGenerator"));
+const { stockDungeon } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "objectPlacer"));
 const { ModalPortal } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "ModalPortal"));
 
 const RerollDungeonButton = () => {
@@ -25650,10 +28526,30 @@ const RerollDungeonButton = () => {
   
   const handleConfirm = () => {
     const result = generateDungeon(settings.preset, undefined, settings.configOverrides || {});
-    // Replace cells and objects on active layer with new generated content
+    const stockResult = stockDungeon(
+      result.metadata.rooms,
+      result.metadata.corridorResult,
+      result.metadata.doorPositions,
+      result.metadata.style || 'classic',
+      {
+        objectDensity: settings.configOverrides?.objectDensity ?? 1.0,
+        monsterWeight: settings.configOverrides?.monsterWeight,
+        emptyWeight: settings.configOverrides?.emptyWeight,
+        featureWeight: settings.configOverrides?.featureWeight,
+        trapWeight: settings.configOverrides?.trapWeight,
+        useTemplates: settings.configOverrides?.useTemplates
+      },
+      {
+        entryRoomId: result.metadata.entryRoomId,
+        exitRoomId: result.metadata.exitRoomId,
+        waterRoomIds: result.metadata.waterRoomIds
+      }
+    );
+    const allObjects = [...result.objects, ...stockResult.objects];
+
     // suppressHistory = false so this can be undone
     onCellsChange(result.cells, false);
-    onObjectsChange(result.objects, false);
+    onObjectsChange(allObjects, false);
     setShowConfirm(false);
   };
   
@@ -29344,24 +32240,37 @@ class WindroseMDSettingsPlugin extends Plugin {
       editorCallback: async (editor, view) => {
         new InsertDungeonModal(this.app, this, async (mapName, cells, objects, options) => {
           const mapId = 'map-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
-          
-          // Save the generated dungeon directly to JSON
           await this.saveDungeonToJson(mapId, mapName, cells, objects, options);
-          
-          // Insert a clean codeblock (no embedded cell data)
-          const codeBlock = [
-            '\`\`\`datacorejsx',
-            '',
-            'const { View: DungeonMapTracker } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md.md"), "DungeonMapTracker"));',
-            '',
-            \`const mapId = "\${mapId}";\`,
-            \`const mapName = "\${mapName}";\`,
-            'const mapType = "grid";',
-            '',
-            'return <DungeonMapTracker mapId={mapId} mapName={mapName} mapType={mapType} />;',
-            '\`\`\`'
-          ].join('\\n');
-          
+
+          // Debug mode uses source entry point instead of compiled
+          const debugFile = this.app.vault.getAbstractFileByPath('WINDROSE-DEBUG.json');
+          const codeBlock = debugFile
+            ? [
+                '\`\`\`datacorejsx',
+                'window.__dmtBasePath = "Projects/dungeon-map-tracker";',
+                '',
+                'const { DungeonMapTracker } = await dc.require(dc.resolvePath("Dungeon" + "MapTracker.tsx"));',
+                '',
+                \`const mapId = "\${mapId}";\`,
+                \`const mapName = "\${mapName}";\`,
+                'const mapType = "grid";',
+                '',
+                'return <DungeonMapTracker mapId={mapId} mapName={mapName} mapType={mapType} />;',
+                '\`\`\`'
+              ].join('\\n')
+            : [
+                '\`\`\`datacorejsx',
+                '',
+                'const { View: DungeonMapTracker } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md.md"), "DungeonMapTracker"));',
+                '',
+                \`const mapId = "\${mapId}";\`,
+                \`const mapName = "\${mapName}";\`,
+                'const mapType = "grid";',
+                '',
+                'return <DungeonMapTracker mapId={mapId} mapName={mapName} mapType={mapType} />;',
+                '\`\`\`'
+              ].join('\\n');
+
           editor.replaceSelection(codeBlock);
         }).open();
       }
@@ -29465,6 +32374,70 @@ class WindroseMDSettingsPlugin extends Plugin {
       return moduleFunc();
     } catch (e) {
       throw new Error('Failed to load dungeon generator: ' + e.message);
+    }
+  }
+
+  /**
+   * Load the object placer module for dungeon stocking.
+   * In debug mode (WINDROSE-DEBUG.json with objectPlacerPath), loads from a .js file directly.
+   * Otherwise, extracts from compiled-windrose-md.md.
+   * @returns {Promise<Object>} The object placer module exports
+   */
+  async loadObjectPlacer() {
+    // 1. Check for debug override
+    const debugFile = this.app.vault.getAbstractFileByPath('WINDROSE-DEBUG.json');
+    if (debugFile) {
+      try {
+        const debugContent = await this.app.vault.read(debugFile);
+        const config = JSON.parse(debugContent);
+        if (config.objectPlacerPath) {
+          console.log('[Windrose DEBUG] Loading objectPlacer from:', config.objectPlacerPath);
+          const placerFile = this.app.vault.getAbstractFileByPath(config.objectPlacerPath);
+          if (!placerFile) {
+            throw new Error('Debug objectPlacerPath not found: ' + config.objectPlacerPath);
+          }
+          const code = await this.app.vault.read(placerFile);
+          const moduleFunc = new Function(code);
+          return moduleFunc();
+        }
+      } catch (e) {
+        console.warn('[Windrose] Debug objectPlacer load failed, falling back to compiled:', e.message);
+      }
+    }
+
+    // 2. Production: Load from compiled markdown
+    const allFiles = this.app.vault.getFiles();
+    const compiledFile = allFiles.find(f => f.name === 'compiled-windrose-md.md');
+
+    if (!compiledFile) {
+      throw new Error(
+        'Could not find compiled-windrose-md.md in your vault. ' +
+        'Please ensure Windrose MapDesigner is properly installed.'
+      );
+    }
+
+    // Read the file content
+    const fileContent = await this.app.vault.read(compiledFile);
+
+    // Extract the objectPlacer code block
+    const headerPattern = /^# objectPlacer\\s*\\n+\`\`\`(?:js|javascript)?\\n([\\s\\S]*?)\\n\`\`\`/m;
+    const match = fileContent.match(headerPattern);
+
+    if (!match) {
+      throw new Error(
+        'Could not find objectPlacer section in compiled-windrose-md.md. ' +
+        'The file may be corrupted or from an incompatible version.'
+      );
+    }
+
+    const code = match[1];
+
+    // Execute the code to get exports
+    try {
+      const moduleFunc = new Function(code);
+      return moduleFunc();
+    } catch (e) {
+      throw new Error('Failed to load object placer: ' + e.message);
     }
   }
 
@@ -30999,9 +33972,60 @@ return `// settingsPlugin-InsertDungeonModal.js
 // Modal for generating a random dungeon
 // This file is concatenated into the settings plugin template by the assembler
 
+// Style defaults at module scope - avoids recreation on each call
+const DUNGEON_STYLE_DEFAULTS = {
+  classic: {
+    circleChance: 0.3, corridorStyle: 'straight', loopChance: 0.15,
+    waterChance: 0.15, doorChance: 0.7, secretDoorChance: 0.05,
+    wideCorridorChance: 0.25, roomSizeBias: 0, diagonalCorridorChance: 0.5
+  },
+  cavern: {
+    circleChance: 0.6, corridorStyle: 'organic', loopChance: 0.2,
+    waterChance: 0.35, doorChance: 0.3, secretDoorChance: 0.08,
+    wideCorridorChance: 0.4, roomSizeBias: 0.3, diagonalCorridorChance: 0.7
+  },
+  fortress: {
+    circleChance: 0, corridorStyle: 'straight', loopChance: 0.08,
+    waterChance: 0.05, doorChance: 0.9, secretDoorChance: 0.03,
+    wideCorridorChance: 0.5, roomSizeBias: 0.2, diagonalCorridorChance: 0.2
+  },
+  crypt: {
+    circleChance: 0.1, corridorStyle: 'straight', loopChance: 0.02,
+    waterChance: 0.1, doorChance: 0.8, secretDoorChance: 0.15,
+    wideCorridorChance: 0.1, roomSizeBias: -0.3, diagonalCorridorChance: 0.3
+  }
+};
+
 /**
- * Modal for generating a random dungeon
+ * Stock a generated dungeon with objects using the objectPlacer module.
+ * @param {Object} objectPlacer - The loaded objectPlacer module
+ * @param {Object} result - The dungeon generation result
+ * @param {Object} overrides - Config overrides from the modal
+ * @returns {Object} Stock result with objects array
  */
+async function stockGeneratedDungeon(plugin, result, overrides) {
+  const objectPlacer = await plugin.loadObjectPlacer();
+  return objectPlacer.stockDungeon(
+    result.metadata.rooms,
+    result.metadata.corridorResult,
+    result.metadata.doorPositions,
+    result.metadata.style || 'classic',
+    {
+      objectDensity: overrides.objectDensity ?? 1.0,
+      monsterWeight: overrides.monsterWeight,
+      emptyWeight: overrides.emptyWeight,
+      featureWeight: overrides.featureWeight,
+      trapWeight: overrides.trapWeight,
+      useTemplates: overrides.useTemplates
+    },
+    {
+      entryRoomId: result.metadata.entryRoomId,
+      exitRoomId: result.metadata.exitRoomId,
+      waterRoomIds: result.metadata.waterRoomIds
+    }
+  );
+}
+
 class InsertDungeonModal extends Modal {
   constructor(app, plugin, onInsert) {
     super(app);
@@ -31014,6 +34038,9 @@ class InsertDungeonModal extends Modal {
     this.advancedOpen = false;
     this.dungeonStyle = 'classic'; // Default style
     this.visualizer = null; // DungeonEssenceVisualizer instance
+    // Slider references for syncing with style changes
+    this.sliderRefs = {};
+    this.corridorSelect = null;
     // Config overrides - null means use preset default
     this.configOverrides = {
       circleChance: null,
@@ -31023,21 +34050,22 @@ class InsertDungeonModal extends Modal {
       wideCorridorChance: null,
       roomSizeBias: null,
       corridorStyle: null,
-      style: null
+      diagonalCorridorChance: null,
+      style: null,
+      // Object placement settings
+      objectDensity: null,
+      monsterWeight: null,
+      emptyWeight: null,
+      featureWeight: null,
+      trapWeight: null,
+      useTemplates: null,
+      // Water features
+      waterChance: null
     };
   }
   
-  // Get effective settings for visualizer (merge style + overrides)
   getVisualizerSettings() {
-    // Base settings from style
-    const styleSettings = {
-      classic: { circleChance: 0.3, corridorStyle: 'straight', loopChance: 0.15 },
-      cavern: { circleChance: 0.6, corridorStyle: 'organic', loopChance: 0.2 },
-      fortress: { circleChance: 0, corridorStyle: 'straight', loopChance: 0.08 },
-      crypt: { circleChance: 0.1, corridorStyle: 'straight', loopChance: 0.02 }
-    };
-    
-    const base = styleSettings[this.dungeonStyle] || styleSettings.classic;
+    const base = DUNGEON_STYLE_DEFAULTS[this.dungeonStyle] || DUNGEON_STYLE_DEFAULTS.classic;
     
     // Apply any explicit overrides
     const settings = { ...base, size: this.dungeonSize || 'medium' };
@@ -31053,6 +34081,28 @@ class InsertDungeonModal extends Modal {
     if (this.visualizer) {
       this.visualizer.updateSettings(this.getVisualizerSettings());
     }
+  }
+
+  syncSlidersToStyle() {
+    const defaults = DUNGEON_STYLE_DEFAULTS[this.dungeonStyle] || DUNGEON_STYLE_DEFAULTS.classic;
+
+    // Update each slider to the style default
+    for (const [key, ref] of Object.entries(this.sliderRefs)) {
+      if (defaults[key] !== undefined) {
+        ref.slider.value = String(defaults[key]);
+        ref.valueDisplay.textContent = ref.formatFn(defaults[key]);
+        // Clear override so generator uses style default
+        this.configOverrides[key] = null;
+      }
+    }
+
+    // Update corridor style select
+    if (this.corridorSelect && defaults.corridorStyle) {
+      this.corridorSelect.value = defaults.corridorStyle;
+      this.configOverrides.corridorStyle = null;
+    }
+
+    this.updateVisualizer();
   }
   
   onOpen() {
@@ -31124,7 +34174,7 @@ class InsertDungeonModal extends Modal {
         this.configOverrides.style = style === 'classic' ? null : style;
         Object.values(styleButtons).forEach(b => b.removeClass('selected'));
         btn.addClass('selected');
-        this.updateVisualizer();
+        this.syncSlidersToStyle();
       };
     }
     
@@ -31214,26 +34264,29 @@ class InsertDungeonModal extends Modal {
     const createSlider = (container, label, key, min, max, step, defaultVal, formatFn) => {
       const row = container.createDiv({ cls: 'dmt-dungeon-slider-row' });
       row.createEl('label', { text: label });
-      
+
       const sliderContainer = row.createDiv({ cls: 'dmt-dungeon-slider-container' });
       const slider = sliderContainer.createEl('input', {
         type: 'range',
         attr: { min: String(min), max: String(max), step: String(step) }
       });
       slider.value = String(defaultVal);
-      
-      const valueDisplay = sliderContainer.createSpan({ 
+
+      const valueDisplay = sliderContainer.createSpan({
         cls: 'dmt-dungeon-slider-value',
         text: formatFn(defaultVal)
       });
-      
+
       slider.addEventListener('input', (e) => {
         const val = parseFloat(e.target.value);
         valueDisplay.textContent = formatFn(val);
         this.configOverrides[key] = val;
         this.updateVisualizer();
       });
-      
+
+      // Store reference for style sync
+      this.sliderRefs[key] = { slider, valueDisplay, formatFn };
+
       return { slider, valueDisplay };
     };
     
@@ -31257,17 +34310,64 @@ class InsertDungeonModal extends Modal {
     const corridorRow = advancedContent.createDiv({ cls: 'dmt-dungeon-slider-row' });
     corridorRow.createEl('label', { text: 'Corridor Style' });
     const corridorToggleContainer = corridorRow.createDiv({ cls: 'dmt-dungeon-toggle-container' });
-    
+
     const corridorSelect = corridorToggleContainer.createEl('select', { cls: 'dmt-dungeon-select' });
     corridorSelect.createEl('option', { value: 'straight', text: 'Straight' });
     corridorSelect.createEl('option', { value: 'organic', text: 'Organic' });
+    corridorSelect.createEl('option', { value: 'diagonal', text: 'Diagonal' });
     corridorSelect.value = 'straight';
-    
+    this.corridorSelect = corridorSelect; // Store reference for style sync
+
     corridorSelect.addEventListener('change', (e) => {
       this.configOverrides.corridorStyle = e.target.value;
       this.updateVisualizer();
     });
-    
+
+    // Diagonal corridor chance slider
+    const diagonalLabel = (v) => v === 0 ? 'None' : \`\${Math.round(v * 100)}%\`;
+    createSlider(advancedContent, 'Diagonal Corridors', 'diagonalCorridorChance', 0, 1, 0.1, 0.5, diagonalLabel);
+
+    // Environment section
+    advancedContent.createEl('div', { cls: 'dmt-dungeon-section-header', text: 'Environment' });
+
+    const waterLabel = (v) => v === 0 ? 'None' : \`\${Math.round(v * 100)}%\`;
+    createSlider(advancedContent, 'Water Features', 'waterChance', 0, 0.5, 0.05, 0.15, waterLabel);
+
+    // Object placement section
+    advancedContent.createEl('div', { cls: 'dmt-dungeon-section-header', text: 'Object Placement' });
+
+    const densityLabel = (v) => v < 0.75 ? 'Sparse' : v > 1.25 ? 'Dense' : 'Normal';
+    createSlider(advancedContent, 'Object Density', 'objectDensity', 0.5, 2, 0.1, 1.0, densityLabel);
+
+    // Room templates toggle
+    const templateRow = advancedContent.createDiv({ cls: 'dmt-dungeon-slider-row' });
+    templateRow.createEl('label', { text: 'Room Templates' });
+    const templateToggleContainer = templateRow.createDiv({ cls: 'dmt-dungeon-toggle-container' });
+    const templateCheckbox = templateToggleContainer.createEl('input', {
+      type: 'checkbox',
+      attr: { id: 'dmt-template-toggle' }
+    });
+    templateCheckbox.checked = true; // Default to enabled
+    templateToggleContainer.createEl('label', {
+      attr: { for: 'dmt-template-toggle' },
+      text: 'Enable',
+      cls: 'dmt-checkbox-label'
+    });
+    templateCheckbox.addEventListener('change', (e) => {
+      this.configOverrides.useTemplates = e.target.checked;
+    });
+    // Hint text below checkbox row
+    advancedContent.createEl('div', {
+      cls: 'dmt-checkbox-hint',
+      text: 'Generates themed rooms (library, shrine, barracks) with appropriate objects'
+    });
+
+    advancedContent.createEl('div', { cls: 'dmt-dungeon-subsection', text: 'Room Categories' });
+    createSlider(advancedContent, 'Monsters', 'monsterWeight', 0, 1, 0.05, 0.33, pct);
+    createSlider(advancedContent, 'Empty Rooms', 'emptyWeight', 0, 1, 0.05, 0.33, pct);
+    createSlider(advancedContent, 'Features', 'featureWeight', 0, 1, 0.05, 0.17, pct);
+    createSlider(advancedContent, 'Traps', 'trapWeight', 0, 1, 0.05, 0.17, pct);
+
     // Buttons
     const buttonContainer = contentEl.createDiv({ cls: 'dmt-modal-buttons' });
     
@@ -31282,21 +34382,22 @@ class InsertDungeonModal extends Modal {
         setTimeout(() => buttonRow.removeClass('dmt-shake'), 300);
         return;
       }
-      
-      // Load generator and generate the dungeon
+
+      // Load generator
       try {
         const generator = await this.plugin.loadDungeonGenerator();
-        
+
         // Build config overrides (only include non-null values)
         const overrides = {};
         for (const [key, val] of Object.entries(this.configOverrides)) {
           if (val !== null) overrides[key] = val;
         }
-        
+
         const result = generator.generateDungeon(this.dungeonSize, undefined, overrides);
-      
-      // Wait for the callback (which saves to JSON) before closing
-      await this.onInsert(this.mapName, result.cells, result.objects, {
+        const stockResult = await stockGeneratedDungeon(this.plugin, result, overrides);
+        const allObjects = [...result.objects, ...stockResult.objects];
+
+        await this.onInsert(this.mapName, result.cells, allObjects, {
           distancePerCell: this.distancePerCell,
           distanceUnit: this.distanceUnit,
           preset: this.dungeonSize,
@@ -31317,15 +34418,18 @@ class InsertDungeonModal extends Modal {
         e.preventDefault();
         try {
           const generator = await this.plugin.loadDungeonGenerator();
-          
+
           // Build config overrides (only include non-null values)
           const overrides = {};
           for (const [key, val] of Object.entries(this.configOverrides)) {
             if (val !== null) overrides[key] = val;
           }
-          
+
           const result = generator.generateDungeon(this.dungeonSize, undefined, overrides);
-          await this.onInsert(this.mapName, result.cells, result.objects, {
+          const stockResult = await stockGeneratedDungeon(this.plugin, result, overrides);
+          const allObjects = [...result.objects, ...stockResult.objects];
+
+          await this.onInsert(this.mapName, result.cells, allObjects, {
             distancePerCell: this.distancePerCell,
             distanceUnit: this.distanceUnit,
             preset: this.dungeonSize,
@@ -31347,6 +34451,8 @@ class InsertDungeonModal extends Modal {
       this.visualizer.destroy();
       this.visualizer = null;
     }
+    this.sliderRefs = {};
+    this.corridorSelect = null;
     this.contentEl.empty();
   }
 }`;
@@ -34777,6 +37883,35 @@ return `/* settingsPlugin-styles.css
 }
 
 /* ===========================================
+ * Dungeon Modal Section Headers
+ * =========================================== */
+.dmt-dungeon-section-header {
+  font-size: 0.85em;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.dmt-dungeon-subsection {
+  font-size: 0.8em;
+  font-weight: 500;
+  color: var(--text-muted);
+  margin-top: 8px;
+  padding-left: 4px;
+}
+
+.dmt-checkbox-hint {
+  font-size: 0.8em;
+  color: var(--text-muted);
+  margin-left: 142px;
+  margin-top: 2px;
+}
+
+/* ===========================================
  * Animations
  * =========================================== */
 @keyframes dmt-shake {
@@ -34875,7 +38010,7 @@ const { RA_ICONS, RA_CATEGORIES } = await dc.require(dc.headerLink(dc.resolvePat
 const QUICK_SYMBOLS = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "settingsPlugin-quickSymbols"));
 
 /** Plugin version from template */
-const PACKAGED_PLUGIN_VERSION = '0.13.3';
+const PACKAGED_PLUGIN_VERSION = '0.14.5.8';
 
 /** LocalStorage keys for tracking user preferences */
 const STORAGE_KEYS = {
