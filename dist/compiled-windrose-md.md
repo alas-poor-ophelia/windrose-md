@@ -1,9 +1,9 @@
 <!-- Compiled by Datacore Script Compiler -->
 <!-- Source: Projects/dungeon-map-tracker -->
 <!-- Main Component: DungeonMapTracker -->
-<!-- Compiled: 2026-01-24T04:35:03.971Z -->
+<!-- Compiled: 2026-01-25T05:21:41.292Z -->
 <!-- Files: 135 -->
-<!-- Version: 1.5.2 -->
+<!-- Version: 1.5.3 -->
 <!-- CSS Files: 1 -->
 
 # Demo
@@ -26913,6 +26913,8 @@ function findDoorCandidatesForConnection(roomA, roomB, orderedPath, corridorWidt
 }
 
 function getAlignmentFromDelta(dx, dy) {
+  // Always use cardinal directions (no diagonal door rotation)
+  // For diagonal movement, pick the dominant axis or default to vertical
   if (dy < 0) return 'north';
   if (dy > 0) return 'south';
   if (dx < 0) return 'west';
@@ -26923,10 +26925,10 @@ function getAlignmentFromDelta(dx, dy) {
 function addDoorsForWidth(candidates, baseCell, type, alignment, roomId, width, pathDx, pathDy) {
   const startOffset = -Math.floor((width - 1) / 2);
   const endOffset = Math.floor(width / 2);
-  
+
   // Spread perpendicular to path direction
   const spreadX = pathDy !== 0; // Vertical path = spread horizontally
-  
+
   for (let w = startOffset; w <= endOffset; w++) {
     candidates.push({
       x: spreadX ? baseCell.x + w : baseCell.x,
@@ -26940,23 +26942,352 @@ function addDoorsForWidth(candidates, baseCell, type, alignment, roomId, width, 
   }
 }
 
-function findDoorCandidates(corridorsByConnection) {
+/**
+ * Check if a cell is on the perimeter of a room (not an interior cell).
+ * A perimeter cell is one where at least one orthogonal neighbor is outside the room.
+ */
+function isCellOnRoomPerimeter(x, y, room) {
+  if (!isCellInRoom(x, y, room)) return false;
+
+  // Check if any orthogonal neighbor is outside the room
+  return !isCellInRoom(x - 1, y, room) ||
+         !isCellInRoom(x + 1, y, room) ||
+         !isCellInRoom(x, y - 1, room) ||
+         !isCellInRoom(x, y + 1, room);
+}
+
+/**
+ * Validate a door position to filter out floating doors.
+ * A valid door must be adjacent to its associated room (touching from outside).
+ * @param {Object} pos - Door position with x, y, roomId
+ * @param {Array<Object>} rooms - All rooms to find the associated room
+ * @param {Set<string>} [corridorCellSet] - Set of corridor cell keys for intersection check
+ * @param {Set<string>} [segmentCellSet] - Set of diagonal segment cell keys to exclude
+ * @returns {boolean} True if door position is valid
+ */
+function isValidDoorPosition(pos, rooms, corridorCellSet = null, segmentCellSet = null) {
+  const room = rooms.find(r => r.id === pos.roomId);
+  if (!room) return false;
+
+  // Door should be adjacent to its room (touching from outside)
+  const adjacentToRoom = isCellInRoom(pos.x - 1, pos.y, room) ||
+                         isCellInRoom(pos.x + 1, pos.y, room) ||
+                         isCellInRoom(pos.x, pos.y - 1, room) ||
+                         isCellInRoom(pos.x, pos.y + 1, room);
+  if (!adjacentToRoom) return false;
+
+  const posKey = `${pos.x},${pos.y}`;
+
+  // Doors should not be placed on diagonal segment cells
+  if (segmentCellSet && segmentCellSet.has(posKey)) {
+    return false;
+  }
+
+  // Door must be in a corridor cell (not floating in void)
+  if (corridorCellSet) {
+    if (!corridorCellSet.has(posKey)) {
+      return false;
+    }
+
+    // Must not be at corridor intersection (floating door)
+    if (isAtCorridorIntersection(pos, corridorCellSet, rooms)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+/**
+ * Check if a position is at a corridor intersection (4-way cross).
+ * Doors at intersections tend to "float" and look wrong.
+ * @param {{x: number, y: number}} pos - Position to check
+ * @param {Set<string>} corridorCellSet - Set of corridor cell keys ("x,y")
+ * @param {Array<Object>} rooms - All rooms to check if position is inside one
+ * @returns {boolean} True if position is at a 4-way corridor intersection
+ */
+function isAtCorridorIntersection(pos, corridorCellSet, rooms) {
+  // If position is inside a room, it's not at a corridor intersection
+  if (rooms.some(r => isCellInRoom(pos.x, pos.y, r))) return false;
+
+  const hasN = corridorCellSet.has(`${pos.x},${pos.y - 1}`);
+  const hasS = corridorCellSet.has(`${pos.x},${pos.y + 1}`);
+  const hasE = corridorCellSet.has(`${pos.x + 1},${pos.y}`);
+  const hasW = corridorCellSet.has(`${pos.x - 1},${pos.y}`);
+
+  // Intersection = corridor extends in both perpendicular directions
+  return (hasN && hasS) && (hasE && hasW);
+}
+
+/**
+ * Find all valid door candidate positions from corridor connections.
+ * @param {Array<Object>} corridorsByConnection - Corridor data with roomA, roomB, orderedPath, width
+ * @param {Array<Object>} rooms - All dungeon rooms
+ * @param {Set<string>} [corridorCellSet] - Set of corridor cell keys for validation
+ * @param {Set<string>} [segmentCellSet] - Set of diagonal segment cell keys to exclude
+ * @returns {Array<Object>} Valid door candidate positions
+ */
+function findDoorCandidates(corridorsByConnection, rooms, corridorCellSet = null, segmentCellSet = null) {
   const allCandidates = [];
   const globalProcessed = new Set();
-  
+
   for (const { roomA, roomB, orderedPath, width } of corridorsByConnection) {
     const candidates = findDoorCandidatesForConnection(roomA, roomB, orderedPath, width);
-    
+
     for (const candidate of candidates) {
       const key = `${candidate.x},${candidate.y},${candidate.alignment}`;
-      if (!globalProcessed.has(key)) {
+      // Validate door position to filter out floating doors
+      if (!globalProcessed.has(key) && isValidDoorPosition(candidate, rooms, corridorCellSet, segmentCellSet)) {
         allCandidates.push(candidate);
         globalProcessed.add(key);
       }
     }
   }
-  
+
   return allCandidates;
+}
+
+/**
+ * Check if a cell is orthogonally adjacent to a room.
+ * @param {number} x - Cell x coordinate
+ * @param {number} y - Cell y coordinate
+ * @param {Object} room - Room to check adjacency against
+ * @returns {boolean} True if cell has at least one orthogonal neighbor inside the room
+ */
+function isCellAdjacentToRoomForOpening(x, y, room) {
+  return isCellInRoom(x - 1, y, room) || isCellInRoom(x + 1, y, room) ||
+         isCellInRoom(x, y - 1, room) || isCellInRoom(x, y + 1, room);
+}
+
+/**
+ * Calculate the width of a room opening at a door position.
+ * Scans perpendicular to the door alignment to find contiguous corridor cells adjacent to the room.
+ * @param {{x: number, y: number}} doorPos - Starting door position
+ * @param {Object} room - Room the door opens into
+ * @param {Set<string>} carvedCellSet - Set of all carved cell keys (rooms + corridors)
+ * @param {string} alignment - Door alignment ('north', 'south', 'east', 'west')
+ * @param {Set<string>} [corridorCellSet] - Optional corridor-only cell set for accuracy
+ * @returns {{width: number, cells: Array<{x: number, y: number}>}} Opening width and cells
+ */
+function calculateRoomOpeningWidth(doorPos, room, carvedCellSet, alignment, corridorCellSet) {
+  // Determine scan direction (perpendicular to alignment)
+  const scanDir = (alignment === 'north' || alignment === 'south')
+    ? { dx: 1, dy: 0 }  // scan horizontally
+    : { dx: 0, dy: 1 }; // scan vertically
+
+  const openingCells = [{ x: doorPos.x, y: doorPos.y }];
+
+  // Use corridorCellSet if available for more accurate detection
+  const cellSet = corridorCellSet || carvedCellSet;
+
+  for (let i = 1; i < 10; i++) {
+    const testX = doorPos.x + scanDir.dx * i;
+    const testY = doorPos.y + scanDir.dy * i;
+    const key = `${testX},${testY}`;
+    // Cell must be in corridor (not room) and adjacent to the room
+    if (cellSet.has(key) && !isCellInRoom(testX, testY, room) && isCellAdjacentToRoomForOpening(testX, testY, room)) {
+      openingCells.push({ x: testX, y: testY });
+    } else break;
+  }
+
+  for (let i = 1; i < 10; i++) {
+    const testX = doorPos.x - scanDir.dx * i;
+    const testY = doorPos.y - scanDir.dy * i;
+    const key = `${testX},${testY}`;
+    // Cell must be in corridor (not room) and adjacent to the room
+    if (cellSet.has(key) && !isCellInRoom(testX, testY, room) && isCellAdjacentToRoomForOpening(testX, testY, room)) {
+      openingCells.unshift({ x: testX, y: testY }); // Add to front to maintain order
+    } else break;
+  }
+
+  return { width: openingCells.length, cells: openingCells };
+}
+
+/**
+ * Generate wall edges for cells that need to be closed off.
+ * Creates edges on the room-facing side of corridor cells.
+ * @param {Array<{x: number, y: number}>} cells - Cells to generate edges for
+ * @param {string} alignment - Door alignment determining edge placement direction
+ * @returns {Array<{x: number, y: number, side: string, color: string}>} Wall edge definitions
+ */
+function generateWallEdgesForCells(cells, alignment) {
+  const edges = [];
+  const wallColor = '#333333';
+
+  for (const cell of cells) {
+    if (alignment === 'north') {
+      // Wall on north side of corridor cell = bottom edge of cell above
+      edges.push({ x: cell.x, y: cell.y - 1, side: 'bottom', color: wallColor });
+    } else if (alignment === 'south') {
+      // Wall on south side of corridor cell = bottom edge of this cell
+      edges.push({ x: cell.x, y: cell.y, side: 'bottom', color: wallColor });
+    } else if (alignment === 'east') {
+      // Wall on east side of corridor cell = right edge of this cell
+      edges.push({ x: cell.x, y: cell.y, side: 'right', color: wallColor });
+    } else if (alignment === 'west') {
+      // Wall on west side of corridor cell = right edge of cell to the left
+      edges.push({ x: cell.x - 1, y: cell.y, side: 'right', color: wallColor });
+    }
+  }
+
+  return edges;
+}
+
+/**
+ * Generate wall edges for all corridor cells adjacent to rooms.
+ * This ensures the entire room perimeter is closed off except where doors are.
+ * @param {Array<Object>} rooms - All dungeon rooms
+ * @param {Set<string>} corridorCellSet - Set of corridor cell keys ("x,y")
+ * @param {Array<{x: number, y: number}>} doorPositions - Door positions to skip
+ * @returns {Array<{x: number, y: number, side: string, color: string}>} Deduplicated wall edges
+ */
+function generateAllRoomBoundaryEdges(rooms, corridorCellSet, doorPositions) {
+  const edges = [];
+  const wallColor = '#333333';
+
+  const doorSet = new Set(doorPositions.map(d => `${d.x},${d.y}`));
+
+  // For each corridor cell, check if it's adjacent to any room
+  for (const cellKey of corridorCellSet) {
+    const [x, y] = cellKey.split(',').map(Number);
+
+    // Skip if this cell has a door
+    if (doorSet.has(cellKey)) continue;
+
+    // Check each direction for adjacent rooms
+    for (const room of rooms) {
+      // North neighbor in room = add bottom edge to cell above (which is in room)
+      if (isCellInRoom(x, y - 1, room) && !isCellInRoom(x, y, room)) {
+        edges.push({ x, y: y - 1, side: 'bottom', color: wallColor });
+      }
+      // South neighbor in room = add bottom edge to this cell
+      if (isCellInRoom(x, y + 1, room) && !isCellInRoom(x, y, room)) {
+        edges.push({ x, y, side: 'bottom', color: wallColor });
+      }
+      // West neighbor in room = add right edge to cell to the left (which is in room)
+      if (isCellInRoom(x - 1, y, room) && !isCellInRoom(x, y, room)) {
+        edges.push({ x: x - 1, y, side: 'right', color: wallColor });
+      }
+      // East neighbor in room = add right edge to this cell
+      if (isCellInRoom(x + 1, y, room) && !isCellInRoom(x, y, room)) {
+        edges.push({ x, y, side: 'right', color: wallColor });
+      }
+    }
+  }
+
+  const edgeSet = new Set();
+  const uniqueEdges = [];
+  for (const edge of edges) {
+    const key = `${edge.x},${edge.y},${edge.side}`;
+    if (!edgeSet.has(key)) {
+      edgeSet.add(key);
+      uniqueEdges.push(edge);
+    }
+  }
+
+  return uniqueEdges;
+}
+
+/**
+ * Find rooms that have no doors and add a secret door by converting one edge.
+ * @param {Array<Object>} rooms - All dungeon rooms
+ * @param {Array<{x: number, y: number}>} doorPositions - Existing door positions
+ * @param {Array<Object>} wallEdges - Wall edges that can be converted to secret doors
+ * @param {Set<string>} corridorCellSet - Set of corridor cell keys
+ * @returns {{updatedEdges: Array<Object>, secretDoorObjects: Array<Object>}} Updated edges with secret doors
+ */
+function addSecretDoorsToIsolatedRooms(rooms, doorPositions, wallEdges, corridorCellSet) {
+  // A room has a door if ANY door position is adjacent to that room
+  // (doors connect two rooms, but roomId only stores one of them)
+  function roomHasDoor(room) {
+    for (const door of doorPositions) {
+      // Check if door is adjacent to this room
+      if (isCellAdjacentToRoomForOpening(door.x, door.y, room)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  const isolatedRooms = rooms.filter(r => !roomHasDoor(r));
+
+  if (isolatedRooms.length === 0) {
+    return { updatedEdges: wallEdges, secretDoorObjects: [] };
+  }
+
+  const existingDoorPositions = new Set(doorPositions.map(d => `${d.x},${d.y}`));
+
+  const secretDoorObjects = [];
+  const edgesToRemove = new Set();
+
+  for (const room of isolatedRooms) {
+    const roomEdges = [];
+
+    for (let i = 0; i < wallEdges.length; i++) {
+      const edge = wallEdges[i];
+
+      // Check if this edge borders the room
+      // For 'bottom' edge at (x, y): the cell above (x, y) or below (x, y+1) should be in room
+      // For 'right' edge at (x, y): the cell left (x, y) or right (x+1, y) should be in room
+      let bordersRoom = false;
+      let corridorCell = null;
+      let alignment = null;
+
+      if (edge.side === 'bottom') {
+        // Bottom edge: room could be above (y) or below (y+1)
+        if (isCellInRoom(edge.x, edge.y, room)) {
+          bordersRoom = true;
+          corridorCell = { x: edge.x, y: edge.y + 1 };
+          alignment = 'south';
+        } else if (isCellInRoom(edge.x, edge.y + 1, room)) {
+          bordersRoom = true;
+          corridorCell = { x: edge.x, y: edge.y };
+          alignment = 'north';
+        }
+      } else if (edge.side === 'right') {
+        // Right edge: room could be left (x) or right (x+1)
+        if (isCellInRoom(edge.x, edge.y, room)) {
+          bordersRoom = true;
+          corridorCell = { x: edge.x + 1, y: edge.y };
+          alignment = 'east';
+        } else if (isCellInRoom(edge.x + 1, edge.y, room)) {
+          bordersRoom = true;
+          corridorCell = { x: edge.x, y: edge.y };
+          alignment = 'west';
+        }
+      }
+
+      if (bordersRoom && corridorCell) {
+        // Verify the corridor cell is actually in the corridor
+        const corridorKey = `${corridorCell.x},${corridorCell.y}`;
+        // Skip if there's already a door at this position
+        if (corridorCellSet.has(corridorKey) && !existingDoorPositions.has(corridorKey)) {
+          roomEdges.push({ index: i, edge, corridorCell, alignment });
+        }
+      }
+    }
+
+    // Pick a random edge to convert to secret door
+    if (roomEdges.length > 0) {
+      const chosen = roomEdges[Math.floor(Math.random() * roomEdges.length)];
+
+      edgesToRemove.add(chosen.index);
+
+      // Create secret door object
+      secretDoorObjects.push({
+        id: generateObjectId(),
+        type: 'secret-door',
+        position: { x: chosen.corridorCell.x, y: chosen.corridorCell.y },
+        alignment: chosen.alignment,
+        scale: 1,
+        rotation: 0
+      });
+    }
+  }
+
+  const updatedEdges = wallEdges.filter((_, i) => !edgesToRemove.has(i));
+
+  return { updatedEdges, secretDoorObjects };
 }
 
 /**
@@ -27009,20 +27340,74 @@ function groupDoorCandidates(candidates) {
   return finalGroups;
 }
 
-function findDoorPositions(corridorsByConnection, doorChance = 0.7, secretDoorChance = 0.05) {
-  const candidates = findDoorCandidates(corridorsByConnection);
+/**
+ * Find door positions and generate wall edges for wide openings.
+ * @param {Array<Object>} corridorsByConnection - Corridor data with roomA, roomB, orderedPath, width
+ * @param {Array<Object>} rooms - All dungeon rooms
+ * @param {number} [doorChance=0.7] - Probability of placing a door at each entrance
+ * @param {number} [secretDoorChance=0.05] - Probability that a door is secret
+ * @param {Set<string>} [carvedCellSet] - Set of all carved cell keys for opening width
+ * @param {Set<string>} [corridorCellSet] - Set of corridor cell keys for validation
+ * @param {Set<string>} [segmentCellSet] - Set of diagonal segment cell keys to exclude
+ * @returns {{doorPositions: Array<Object>, wallEdges: Array<Object>}} Door positions and wall edges
+ */
+function findDoorPositions(corridorsByConnection, rooms, doorChance = 0.7, secretDoorChance = 0.05, carvedCellSet = null, corridorCellSet = null, segmentCellSet = null) {
+  const candidates = findDoorCandidates(corridorsByConnection, rooms, corridorCellSet, segmentCellSet);
   const groups = groupDoorCandidates(candidates);
-  
+
   const doorPositions = [];
-  
+  const wallEdges = [];
+
   for (const group of groups) {
     // Roll once per entrance group
     if (Math.random() > doorChance) continue;
-    
+
     // Roll once for secret door for this entrance
     const isSecret = Math.random() < secretDoorChance;
-    
-    // Mark all doors in group with same secret status
+
+    // If we have carvedCellSet, calculate actual opening width
+    if (carvedCellSet && group.length > 0) {
+      const firstDoor = group[0];
+      const room = rooms.find(r => r.id === firstDoor.roomId);
+
+      if (room) {
+        const opening = calculateRoomOpeningWidth(firstDoor, room, carvedCellSet, firstDoor.alignment, corridorCellSet);
+
+        if (opening.width > 2) {
+          // Wide opening: place max 2 doors in center, wall edges for the rest
+          const centerIdx = Math.floor(opening.cells.length / 2);
+          const doorCount = Math.min(2, opening.cells.length);
+          const startIdx = centerIdx - Math.floor(doorCount / 2);
+          const endIdx = startIdx + doorCount;
+
+          // Add doors for center cells
+          for (let i = startIdx; i < endIdx; i++) {
+            const cell = opening.cells[i];
+            doorPositions.push({
+              x: cell.x,
+              y: cell.y,
+              type: firstDoor.type,
+              alignment: firstDoor.alignment,
+              roomId: firstDoor.roomId,
+              isSecret,
+              scale: doorCount >= 2 ? 1.2 : 1
+            });
+          }
+
+          // Generate wall edges for cells outside door area
+          const cellsForWalls = [
+            ...opening.cells.slice(0, startIdx),
+            ...opening.cells.slice(endIdx)
+          ];
+          const edges = generateWallEdgesForCells(cellsForWalls, firstDoor.alignment);
+          wallEdges.push(...edges);
+
+          continue; // Skip normal group processing
+        }
+      }
+    }
+
+    // Normal processing: mark all doors in group with same secret status
     for (const door of group) {
       doorPositions.push({
         ...door,
@@ -27031,20 +27416,29 @@ function findDoorPositions(corridorsByConnection, doorChance = 0.7, secretDoorCh
       });
     }
   }
-  
-  return doorPositions;
+
+  return { doorPositions, wallEdges };
 }
 
 function generateDoorObjects(doorPositions) {
-  return doorPositions.map(pos => ({
-    id: generateObjectId(),
-    type: pos.isSecret ? 'secret-door' : pos.type,
-    position: { x: pos.x, y: pos.y },
-    alignment: pos.alignment,
-    scale: pos.scale || 1,
-    rotation: (pos.type === 'door-vertical' && pos.isSecret && 
-               (pos.alignment === 'east' || pos.alignment === 'west')) ? 90 : 0
-  }));
+  return doorPositions.map(pos => {
+    // Calculate rotation based on alignment
+    let rotation = 0;
+    // Secret doors on vertical passages need rotation
+    if (pos.type === 'door-vertical' && pos.isSecret &&
+        (pos.alignment === 'east' || pos.alignment === 'west')) {
+      rotation = 90;
+    }
+
+    return {
+      id: generateObjectId(),
+      type: pos.isSecret ? 'secret-door' : pos.type,
+      position: { x: pos.x, y: pos.y },
+      alignment: pos.alignment,
+      scale: pos.scale || 1,
+      rotation
+    };
+  });
 }
 
 // =============================================================================
@@ -27268,15 +27662,50 @@ function generateDungeon(presetName = 'medium', color = DEFAULT_FLOOR_COLOR, con
   }
   const corridorCells = corridorResult.cells;
   const corridorsByConnection = corridorResult.byConnection;
-  
-  // Phase 3a: Find door positions
-  const doorPositions = findDoorPositions(
-    corridorsByConnection, 
-    config.doorChance ?? 0.7, 
-    config.secretDoorChance ?? 0
+
+  // Build cell sets for door validation and opening width calculation
+  const corridorCellSet = new Set(corridorCells.map(c => `${c.x},${c.y}`));
+
+  // Track segment cells (diagonal corridor cells) - doors shouldn't be placed on these
+  const segmentCellSet = new Set(
+    corridorCells.filter(c => c.segments).map(c => `${c.x},${c.y}`)
   );
-  const doorObjects = generateDoorObjects(doorPositions);
-  
+
+  // Build carved cell set (rooms + corridors) for opening width calculation
+  const carvedCellSet = new Set(corridorCellSet);
+  for (const room of rooms) {
+    for (let x = room.x; x < room.x + room.width; x++) {
+      for (let y = room.y; y < room.y + room.height; y++) {
+        if (isCellInRoom(x, y, room)) {
+          carvedCellSet.add(`${x},${y}`);
+        }
+      }
+    }
+  }
+
+  // Phase 3a: Find door positions and wall edges
+  const doorResult = findDoorPositions(
+    corridorsByConnection,
+    rooms,
+    config.doorChance ?? 0.7,
+    config.secretDoorChance ?? 0,
+    carvedCellSet,
+    corridorCellSet,
+    segmentCellSet
+  );
+  const doorPositions = doorResult.doorPositions;
+  let doorObjects = generateDoorObjects(doorPositions);
+
+  // Generate wall edges for ALL corridor cells adjacent to rooms (except where doors are)
+  let wallEdges = generateAllRoomBoundaryEdges(rooms, corridorCellSet, doorPositions);
+
+  // Add secret doors to any rooms that ended up with no doors (emergent generation)
+  const isolatedRoomResult = addSecretDoorsToIsolatedRooms(rooms, doorPositions, wallEdges, corridorCellSet);
+  wallEdges = isolatedRoomResult.updatedEdges;
+  if (isolatedRoomResult.secretDoorObjects.length > 0) {
+    doorObjects = [...doorObjects, ...isolatedRoomResult.secretDoorObjects];
+  }
+
   // Phase 3b: Generate entry/exit stairs
   const { entry, exit } = findEntryExitRooms(rooms);
   const stairObjects = generateStairObjects(entry, exit);
@@ -27310,6 +27739,7 @@ function generateDungeon(presetName = 'medium', color = DEFAULT_FLOOR_COLOR, con
   return {
     cells,
     objects,
+    edges: wallEdges,
     metadata: {
       rooms,
       connections: connections.map(([a, b]) => [a.id, b.id]),
@@ -27368,7 +27798,14 @@ return {
   findDoorPositions,
   generateDoorObjects,
   findEntryExitRooms,
-  generateStairObjects
+  generateStairObjects,
+
+  // Door/edge utilities (for testing)
+  isAtCorridorIntersection,
+  isCellAdjacentToRoomForOpening,
+  calculateRoomOpeningWidth,
+  generateWallEdgesForCells,
+  generateAllRoomBoundaryEdges
 };
 ```
 
@@ -28496,7 +28933,7 @@ return {
 ```jsx
 /**
  * RerollDungeonButton.jsx
- * 
+ *
  * Button component for re-rolling generated dungeons.
  * Uses MapContext to access mapData and cell operations.
  * Only renders if the map has generationSettings.
@@ -28507,24 +28944,31 @@ const { generateDungeon } = await dc.require(dc.headerLink(dc.resolvePath("compi
 const { stockDungeon } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "objectPlacer"));
 const { ModalPortal } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "ModalPortal"));
 
+// Structural object types that should be preserved during objects-only reroll
+const STRUCTURAL_TYPES = new Set([
+  'door-horizontal', 'door-vertical', 'secret-door',
+  'stairs-up', 'stairs-down'
+]);
+
 const RerollDungeonButton = () => {
-  const { mapData } = useMapState();
-  const { onCellsChange, onObjectsChange } = useMapOperations();
-  
+  const { mapData, currentLayer } = useMapState();
+  const { onCellsChange, onObjectsChange, onEdgesChange } = useMapOperations();
+
   const [showConfirm, setShowConfirm] = dc.useState(false);
-  
+
   // Don't render if no generation settings
   if (!mapData?.generationSettings?.preset) {
     return null;
   }
-  
+
   const settings = mapData.generationSettings;
-  
+  const hasStockingMetadata = Boolean(settings.stockingMetadata?.rooms);
+
   const handleClick = () => {
     setShowConfirm(true);
   };
-  
-  const handleConfirm = () => {
+
+  const handleRerollAll = () => {
     const result = generateDungeon(settings.preset, undefined, settings.configOverrides || {});
     const stockResult = stockDungeon(
       result.metadata.rooms,
@@ -28550,15 +28994,54 @@ const RerollDungeonButton = () => {
     // suppressHistory = false so this can be undone
     onCellsChange(result.cells, false);
     onObjectsChange(allObjects, false);
+    onEdgesChange(result.edges || [], false);
     setShowConfirm(false);
   };
-  
+
+  const handleRerollObjectsOnly = () => {
+    const meta = settings.stockingMetadata;
+    if (!meta?.rooms) {
+      setShowConfirm(false);
+      return;
+    }
+
+    // Get current objects and filter to keep only structural ones
+    const layer = mapData.layers?.[currentLayer];
+    const currentObjects = layer?.objects || [];
+    const structuralObjects = currentObjects.filter(obj => STRUCTURAL_TYPES.has(obj.type));
+
+    // Generate new stocking objects using saved metadata
+    const stockResult = stockDungeon(
+      meta.rooms,
+      meta.corridorResult,
+      meta.doorPositions,
+      meta.style || 'classic',
+      {
+        objectDensity: settings.configOverrides?.objectDensity ?? 1.0,
+        monsterWeight: settings.configOverrides?.monsterWeight,
+        emptyWeight: settings.configOverrides?.emptyWeight,
+        featureWeight: settings.configOverrides?.featureWeight,
+        trapWeight: settings.configOverrides?.trapWeight,
+        useTemplates: settings.configOverrides?.useTemplates
+      },
+      {
+        entryRoomId: meta.entryRoomId,
+        exitRoomId: meta.exitRoomId,
+        waterRoomIds: meta.waterRoomIds
+      }
+    );
+
+    const allObjects = [...structuralObjects, ...stockResult.objects];
+    onObjectsChange(allObjects, false);
+    setShowConfirm(false);
+  };
+
   const handleCancel = () => {
     setShowConfirm(false);
   };
-  
+
   const styleName = settings.configOverrides?.style || 'classic';
-  
+
   return (
     <>
       <button
@@ -28568,22 +29051,42 @@ const RerollDungeonButton = () => {
       >
         <dc.Icon icon="lucide-dices" />
       </button>
-      
+
       {showConfirm && (
         <ModalPortal>
           <div className="dmt-reroll-confirm-overlay" onClick={handleCancel}>
             <div className="dmt-reroll-confirm-dialog" onClick={e => e.stopPropagation()}>
               <h3>Re-roll Dungeon?</h3>
-              <p>This will replace all cells and objects on the current layer with a new randomly generated dungeon.</p>
-              <p className="dmt-reroll-warning">This action cannot be undone.</p>
-              <div className="dmt-reroll-confirm-buttons">
-                <button className="dmt-btn dmt-btn-secondary" onClick={handleCancel}>
-                  Cancel
-                </button>
-                <button className="dmt-btn dmt-btn-primary" onClick={handleConfirm}>
-                  Re-roll
-                </button>
-              </div>
+              {hasStockingMetadata ? (
+                <>
+                  <p>Choose what to regenerate:</p>
+                  <p className="dmt-reroll-warning">This action cannot be undone.</p>
+                  <div className="dmt-reroll-confirm-buttons dmt-reroll-three-buttons">
+                    <button className="dmt-btn dmt-btn-secondary" onClick={handleCancel}>
+                      Cancel
+                    </button>
+                    <button className="dmt-btn dmt-btn-tertiary" onClick={handleRerollObjectsOnly} title="Keep the map layout, only regenerate monsters, features, and traps">
+                      Objects Only
+                    </button>
+                    <button className="dmt-btn dmt-btn-primary" onClick={handleRerollAll}>
+                      Entire Dungeon
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p>This will replace all cells and objects on the current layer with a new randomly generated dungeon.</p>
+                  <p className="dmt-reroll-warning">This action cannot be undone.</p>
+                  <div className="dmt-reroll-confirm-buttons">
+                    <button className="dmt-btn dmt-btn-secondary" onClick={handleCancel}>
+                      Cancel
+                    </button>
+                    <button className="dmt-btn dmt-btn-primary" onClick={handleRerollAll}>
+                      Re-roll
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </ModalPortal>
@@ -28593,6 +29096,7 @@ const RerollDungeonButton = () => {
 };
 
 return { RerollDungeonButton };
+
 ```
 
 # usePanZoomCoordinator
@@ -32238,9 +32742,9 @@ class WindroseMDSettingsPlugin extends Plugin {
       id: 'insert-random-dungeon',
       name: 'Generate random dungeon',
       editorCallback: async (editor, view) => {
-        new InsertDungeonModal(this.app, this, async (mapName, cells, objects, options) => {
+        new InsertDungeonModal(this.app, this, async (mapName, cells, objects, edges, options) => {
           const mapId = 'map-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
-          await this.saveDungeonToJson(mapId, mapName, cells, objects, options);
+          await this.saveDungeonToJson(mapId, mapName, cells, objects, edges, options);
 
           // Debug mode uses source entry point instead of compiled
           const debugFile = this.app.vault.getAbstractFileByPath('WINDROSE-DEBUG.json');
@@ -32442,9 +32946,65 @@ class WindroseMDSettingsPlugin extends Plugin {
   }
 
   /**
+   * Build fog of war data for auto-fog feature.
+   * Fogs all cells except entry room cells.
+   */
+  buildFogOfWar(cells, options) {
+    const autoFogEnabled = options?.configOverrides?.autoFogEnabled;
+    if (!autoFogEnabled) return null;
+
+    const stockingMeta = options?.stockingMetadata;
+    if (!stockingMeta?.rooms || !cells?.length) return null;
+
+    // Find entry room
+    const entryRoomId = stockingMeta.entryRoomId;
+    const entryRoom = stockingMeta.rooms.find(r => r.id === entryRoomId);
+
+    // Build set of entry room cells to exclude from fog
+    const entryRoomCells = new Set();
+    if (entryRoom) {
+      for (let x = entryRoom.x; x < entryRoom.x + entryRoom.width; x++) {
+        for (let y = entryRoom.y; y < entryRoom.y + entryRoom.height; y++) {
+          // For circular rooms, check if cell is actually in room
+          if (entryRoom.shape === 'circle') {
+            const centerX = entryRoom.x + entryRoom.radius;
+            const centerY = entryRoom.y + entryRoom.radius;
+            const dx = x + 0.5 - centerX;
+            const dy = y + 0.5 - centerY;
+            if (dx * dx + dy * dy <= entryRoom.radius * entryRoom.radius) {
+              entryRoomCells.add(\`\${x},\${y}\`);
+            }
+          } else if (entryRoom.shape === 'composite') {
+            // Check if cell is in any of the room's parts
+            for (const part of entryRoom.parts) {
+              if (x >= part.x && x < part.x + part.width &&
+                  y >= part.y && y < part.y + part.height) {
+                entryRoomCells.add(\`\${x},\${y}\`);
+                break;
+              }
+            }
+          } else {
+            entryRoomCells.add(\`\${x},\${y}\`);
+          }
+        }
+      }
+    }
+
+    // Fog all cells except entry room
+    const foggedCells = cells
+      .filter(c => !entryRoomCells.has(\`\${c.x},\${c.y}\`))
+      .map(c => ({ col: c.x, row: c.y }));
+
+    return {
+      enabled: true,
+      foggedCells
+    };
+  }
+
+  /**
    * Save a generated dungeon directly to the JSON data file
    */
-  async saveDungeonToJson(mapId, mapName, cells, objects, options) {
+  async saveDungeonToJson(mapId, mapName, cells, objects, edges, options) {
     const SCHEMA_VERSION = 2;
     
     try {
@@ -32490,7 +33050,8 @@ class WindroseMDSettingsPlugin extends Plugin {
           preset: options.preset,
           configOverrides: options.configOverrides || {},
           distancePerCell: options.distancePerCell || 5,
-          distanceUnit: options.distanceUnit || 'ft'
+          distanceUnit: options.distanceUnit || 'ft',
+          stockingMetadata: options.stockingMetadata || null
         },
         settings: {
           useGlobalSettings: false,
@@ -32514,10 +33075,10 @@ class WindroseMDSettingsPlugin extends Plugin {
           order: 0,
           visible: true,
           cells: cells,
-          edges: [],
+          edges: edges || [],
           objects: objects || [],
           textLabels: [],
-          fogOfWar: null
+          fogOfWar: this.buildFogOfWar(cells, options)
         }],
         gridSize: gridSize,
         dimensions: { width: 300, height: 300 },
@@ -34060,7 +34621,9 @@ class InsertDungeonModal extends Modal {
       trapWeight: null,
       useTemplates: null,
       // Water features
-      waterChance: null
+      waterChance: null,
+      // Fog of war
+      autoFogEnabled: false
     };
   }
   
@@ -34368,6 +34931,30 @@ class InsertDungeonModal extends Modal {
     createSlider(advancedContent, 'Features', 'featureWeight', 0, 1, 0.05, 0.17, pct);
     createSlider(advancedContent, 'Traps', 'trapWeight', 0, 1, 0.05, 0.17, pct);
 
+    // Auto-fog section
+    advancedContent.createEl('div', { cls: 'dmt-dungeon-section-header', text: 'Solo Play' });
+
+    const fogRow = advancedContent.createDiv({ cls: 'dmt-dungeon-slider-row' });
+    fogRow.createEl('label', { text: 'Auto-Fog Dungeon' });
+    const fogToggleContainer = fogRow.createDiv({ cls: 'dmt-dungeon-toggle-container' });
+    const fogCheckbox = fogToggleContainer.createEl('input', {
+      type: 'checkbox',
+      attr: { id: 'dmt-fog-toggle' }
+    });
+    fogCheckbox.checked = false;
+    fogToggleContainer.createEl('label', {
+      attr: { for: 'dmt-fog-toggle' },
+      text: 'Enable',
+      cls: 'dmt-checkbox-label'
+    });
+    fogCheckbox.addEventListener('change', (e) => {
+      this.configOverrides.autoFogEnabled = e.target.checked;
+    });
+    advancedContent.createEl('div', {
+      cls: 'dmt-checkbox-hint',
+      text: 'Cover dungeon with fog, revealing only the entrance room'
+    });
+
     // Buttons
     const buttonContainer = contentEl.createDiv({ cls: 'dmt-modal-buttons' });
     
@@ -34397,13 +34984,22 @@ class InsertDungeonModal extends Modal {
         const stockResult = await stockGeneratedDungeon(this.plugin, result, overrides);
         const allObjects = [...result.objects, ...stockResult.objects];
 
-        await this.onInsert(this.mapName, result.cells, allObjects, {
+        await this.onInsert(this.mapName, result.cells, allObjects, result.edges || [], {
           distancePerCell: this.distancePerCell,
           distanceUnit: this.distanceUnit,
           preset: this.dungeonSize,
           configOverrides: overrides,
           roomCount: result.metadata.roomCount,
-          doorCount: result.metadata.doorCount
+          doorCount: result.metadata.doorCount,
+          stockingMetadata: {
+            rooms: result.metadata.rooms,
+            corridorResult: result.metadata.corridorResult,
+            doorPositions: result.metadata.doorPositions,
+            entryRoomId: result.metadata.entryRoomId,
+            exitRoomId: result.metadata.exitRoomId,
+            waterRoomIds: result.metadata.waterRoomIds,
+            style: result.metadata.style
+          }
         });
         this.close();
       } catch (err) {
@@ -34411,7 +35007,7 @@ class InsertDungeonModal extends Modal {
         alert('Failed to generate dungeon: ' + err.message);
       }
     };
-    
+
     // Handle Enter key to submit (if size is selected)
     contentEl.addEventListener('keydown', async (e) => {
       if (e.key === 'Enter' && this.dungeonSize) {
@@ -34429,13 +35025,22 @@ class InsertDungeonModal extends Modal {
           const stockResult = await stockGeneratedDungeon(this.plugin, result, overrides);
           const allObjects = [...result.objects, ...stockResult.objects];
 
-          await this.onInsert(this.mapName, result.cells, allObjects, {
+          await this.onInsert(this.mapName, result.cells, allObjects, result.edges || [], {
             distancePerCell: this.distancePerCell,
             distanceUnit: this.distanceUnit,
             preset: this.dungeonSize,
             configOverrides: overrides,
             roomCount: result.metadata.roomCount,
-            doorCount: result.metadata.doorCount
+            doorCount: result.metadata.doorCount,
+            stockingMetadata: {
+              rooms: result.metadata.rooms,
+              corridorResult: result.metadata.corridorResult,
+              doorPositions: result.metadata.doorPositions,
+              entryRoomId: result.metadata.entryRoomId,
+              exitRoomId: result.metadata.exitRoomId,
+              waterRoomIds: result.metadata.waterRoomIds,
+              style: result.metadata.style
+            }
           });
           this.close();
         } catch (err) {
@@ -34445,7 +35050,7 @@ class InsertDungeonModal extends Modal {
       }
     });
   }
-  
+
   onClose() {
     if (this.visualizer) {
       this.visualizer.destroy();
@@ -38010,7 +38615,7 @@ const { RA_ICONS, RA_CATEGORIES } = await dc.require(dc.headerLink(dc.resolvePat
 const QUICK_SYMBOLS = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "settingsPlugin-quickSymbols"));
 
 /** Plugin version from template */
-const PACKAGED_PLUGIN_VERSION = '0.14.5.8';
+const PACKAGED_PLUGIN_VERSION = '0.14.6.4';
 
 /** LocalStorage keys for tracking user preferences */
 const STORAGE_KEYS = {
@@ -49448,8 +50053,7 @@ button.dmt-layer-btn.dmt-layer-btn-pill {
   border: 2px solid rgba(196, 165, 123, 0.5);
   border-radius: 8px;
   padding: 24px;
-  max-width: 400px;
-  width: 90%;
+  max-width: 90vw;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
 }
 
@@ -49472,9 +50076,14 @@ button.dmt-layer-btn.dmt-layer-btn-pill {
 
 .dmt-reroll-confirm-buttons {
   display: flex;
+  flex-wrap: wrap;
   gap: 12px;
   justify-content: flex-end;
   margin-top: 20px;
+}
+
+.dmt-reroll-confirm-buttons.dmt-reroll-three-buttons {
+  justify-content: center;
 }
 
 .dmt-btn {
