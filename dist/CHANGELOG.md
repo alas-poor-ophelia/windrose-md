@@ -1,12 +1,9 @@
-## Version 1.5.2
-This one took a bit longer, but here we are.
+## Version 1.5.3
+### New Features
+- Add an "auto fog of war" option to the Advanced Section for map generation, which will place fog of war over everything but the entrance room. Remove fog of war tiles from the visibility menu accessed of of the Windrose map menu (hover the compass).
 
-### Features
-- Additional object rotation options: objects can now be rotated to 45 degree angles. Objects are still rotated the same way (`R` on keyboard, or button in the selection toolbar).
-- Several improvements/additions to the random dungeon generation.
-	- Dungeon Stocking
-		- When generating a dungeon, you may now choose to "stock" it with objects like enemies, traps, and treasure.
-		- You can adjust this with a series of sliders for overall percentage, and tune the percent chance of each type of object.
-		- Optional "room styles": Barracks, Library, Shrine. Just a chance for some preset object combinations to show up as room types.
-	- Diagonal corridors. Random dungeons can now have diagonal corridors (via the segmented cell feature). Chance is tuneable under settings
-	- Water. Dungeons can now have "water", which is just blue painted tiles. Caverns have a chance of spawning underwater monsters and treasure if using Dungeon Stocking.
+### Improvements
+- Added option to reroll only dungeon stocked objects to the reroll button dialog. This will preserve the map layout but reroll objects.
+
+### Bug Fixes
+- Fixed hopefully a majority of the "floating door" bugs. In some cases, the fix for this is to generate edges to create clearer cut boundaries. This results in some thinner interior walls. This is technically a bandaid for a larger corridor carving issue, but I think it's kind of interesting actually.
