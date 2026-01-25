@@ -3667,8 +3667,7 @@ button.dmt-layer-btn.dmt-layer-btn-pill {
   border: 2px solid rgba(196, 165, 123, 0.5);
   border-radius: 8px;
   padding: 24px;
-  max-width: 400px;
-  width: 90%;
+  max-width: 90vw;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
 }
 
@@ -3691,9 +3690,14 @@ button.dmt-layer-btn.dmt-layer-btn-pill {
 
 .dmt-reroll-confirm-buttons {
   display: flex;
+  flex-wrap: wrap;
   gap: 12px;
   justify-content: flex-end;
   margin-top: 20px;
+}
+
+.dmt-reroll-confirm-buttons.dmt-reroll-three-buttons {
+  justify-content: center;
 }
 
 .dmt-btn {

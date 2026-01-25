@@ -171,9 +171,9 @@ class WindroseMDSettingsPlugin extends Plugin {
       id: 'insert-random-dungeon',
       name: 'Generate random dungeon',
       editorCallback: async (editor, view) => {
-        new InsertDungeonModal(this.app, this, async (mapName, cells, objects, options) => {
+        new InsertDungeonModal(this.app, this, async (mapName, cells, objects, edges, options) => {
           const mapId = 'map-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
-          await this.saveDungeonToJson(mapId, mapName, cells, objects, options);
+          await this.saveDungeonToJson(mapId, mapName, cells, objects, edges, options);
 
           // Debug mode uses source entry point instead of compiled
           const debugFile = this.app.vault.getAbstractFileByPath('WINDROSE-DEBUG.json');
@@ -433,7 +433,7 @@ class WindroseMDSettingsPlugin extends Plugin {
   /**
    * Save a generated dungeon directly to the JSON data file
    */
-  async saveDungeonToJson(mapId, mapName, cells, objects, options) {
+  async saveDungeonToJson(mapId, mapName, cells, objects, edges, options) {
     const SCHEMA_VERSION = 2;
     
     try {
@@ -504,7 +504,7 @@ class WindroseMDSettingsPlugin extends Plugin {
           order: 0,
           visible: true,
           cells: cells,
-          edges: [],
+          edges: edges || [],
           objects: objects || [],
           textLabels: [],
           fogOfWar: this.buildFogOfWar(cells, options)

@@ -1626,14 +1626,8 @@ function findDoorCandidatesForConnection(roomA, roomB, orderedPath, corridorWidt
 }
 
 function getAlignmentFromDelta(dx, dy) {
-  // Handle diagonal directions first
-  if (dx !== 0 && dy !== 0) {
-    if (dx > 0 && dy < 0) return 'ne';
-    if (dx > 0 && dy > 0) return 'se';
-    if (dx < 0 && dy > 0) return 'sw';
-    if (dx < 0 && dy < 0) return 'nw';
-  }
-  // Cardinal directions
+  // Always use cardinal directions (no diagonal door rotation)
+  // For diagonal movement, pick the dominant axis or default to vertical
   if (dy < 0) return 'north';
   if (dy > 0) return 'south';
   if (dx < 0) return 'west';
@@ -1679,22 +1673,74 @@ function isCellOnRoomPerimeter(x, y, room) {
  * Validate a door position to filter out floating doors.
  * A valid door must be adjacent to its associated room (touching from outside).
  * @param {Object} pos - Door position with x, y, roomId
- * @param {Array} rooms - All rooms to find the associated room
+ * @param {Array<Object>} rooms - All rooms to find the associated room
+ * @param {Set<string>} [corridorCellSet] - Set of corridor cell keys for intersection check
+ * @param {Set<string>} [segmentCellSet] - Set of diagonal segment cell keys to exclude
  * @returns {boolean} True if door position is valid
  */
-function isValidDoorPosition(pos, rooms) {
+function isValidDoorPosition(pos, rooms, corridorCellSet = null, segmentCellSet = null) {
   const room = rooms.find(r => r.id === pos.roomId);
   if (!room) return false;
 
   // Door should be adjacent to its room (touching from outside)
-  // Check if any orthogonal neighbor is inside the room
-  return isCellInRoom(pos.x - 1, pos.y, room) ||
-         isCellInRoom(pos.x + 1, pos.y, room) ||
-         isCellInRoom(pos.x, pos.y - 1, room) ||
-         isCellInRoom(pos.x, pos.y + 1, room);
+  const adjacentToRoom = isCellInRoom(pos.x - 1, pos.y, room) ||
+                         isCellInRoom(pos.x + 1, pos.y, room) ||
+                         isCellInRoom(pos.x, pos.y - 1, room) ||
+                         isCellInRoom(pos.x, pos.y + 1, room);
+  if (!adjacentToRoom) return false;
+
+  const posKey = `${pos.x},${pos.y}`;
+
+  // Doors should not be placed on diagonal segment cells
+  if (segmentCellSet && segmentCellSet.has(posKey)) {
+    return false;
+  }
+
+  // Door must be in a corridor cell (not floating in void)
+  if (corridorCellSet) {
+    if (!corridorCellSet.has(posKey)) {
+      return false;
+    }
+
+    // Must not be at corridor intersection (floating door)
+    if (isAtCorridorIntersection(pos, corridorCellSet, rooms)) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
-function findDoorCandidates(corridorsByConnection, rooms) {
+/**
+ * Check if a position is at a corridor intersection (4-way cross).
+ * Doors at intersections tend to "float" and look wrong.
+ * @param {{x: number, y: number}} pos - Position to check
+ * @param {Set<string>} corridorCellSet - Set of corridor cell keys ("x,y")
+ * @param {Array<Object>} rooms - All rooms to check if position is inside one
+ * @returns {boolean} True if position is at a 4-way corridor intersection
+ */
+function isAtCorridorIntersection(pos, corridorCellSet, rooms) {
+  // If position is inside a room, it's not at a corridor intersection
+  if (rooms.some(r => isCellInRoom(pos.x, pos.y, r))) return false;
+
+  const hasN = corridorCellSet.has(`${pos.x},${pos.y - 1}`);
+  const hasS = corridorCellSet.has(`${pos.x},${pos.y + 1}`);
+  const hasE = corridorCellSet.has(`${pos.x + 1},${pos.y}`);
+  const hasW = corridorCellSet.has(`${pos.x - 1},${pos.y}`);
+
+  // Intersection = corridor extends in both perpendicular directions
+  return (hasN && hasS) && (hasE && hasW);
+}
+
+/**
+ * Find all valid door candidate positions from corridor connections.
+ * @param {Array<Object>} corridorsByConnection - Corridor data with roomA, roomB, orderedPath, width
+ * @param {Array<Object>} rooms - All dungeon rooms
+ * @param {Set<string>} [corridorCellSet] - Set of corridor cell keys for validation
+ * @param {Set<string>} [segmentCellSet] - Set of diagonal segment cell keys to exclude
+ * @returns {Array<Object>} Valid door candidate positions
+ */
+function findDoorCandidates(corridorsByConnection, rooms, corridorCellSet = null, segmentCellSet = null) {
   const allCandidates = [];
   const globalProcessed = new Set();
 
@@ -1704,7 +1750,7 @@ function findDoorCandidates(corridorsByConnection, rooms) {
     for (const candidate of candidates) {
       const key = `${candidate.x},${candidate.y},${candidate.alignment}`;
       // Validate door position to filter out floating doors
-      if (!globalProcessed.has(key) && isValidDoorPosition(candidate, rooms)) {
+      if (!globalProcessed.has(key) && isValidDoorPosition(candidate, rooms, corridorCellSet, segmentCellSet)) {
         allCandidates.push(candidate);
         globalProcessed.add(key);
       }
@@ -1712,6 +1758,249 @@ function findDoorCandidates(corridorsByConnection, rooms) {
   }
 
   return allCandidates;
+}
+
+/**
+ * Check if a cell is orthogonally adjacent to a room.
+ * @param {number} x - Cell x coordinate
+ * @param {number} y - Cell y coordinate
+ * @param {Object} room - Room to check adjacency against
+ * @returns {boolean} True if cell has at least one orthogonal neighbor inside the room
+ */
+function isCellAdjacentToRoomForOpening(x, y, room) {
+  return isCellInRoom(x - 1, y, room) || isCellInRoom(x + 1, y, room) ||
+         isCellInRoom(x, y - 1, room) || isCellInRoom(x, y + 1, room);
+}
+
+/**
+ * Calculate the width of a room opening at a door position.
+ * Scans perpendicular to the door alignment to find contiguous corridor cells adjacent to the room.
+ * @param {{x: number, y: number}} doorPos - Starting door position
+ * @param {Object} room - Room the door opens into
+ * @param {Set<string>} carvedCellSet - Set of all carved cell keys (rooms + corridors)
+ * @param {string} alignment - Door alignment ('north', 'south', 'east', 'west')
+ * @param {Set<string>} [corridorCellSet] - Optional corridor-only cell set for accuracy
+ * @returns {{width: number, cells: Array<{x: number, y: number}>}} Opening width and cells
+ */
+function calculateRoomOpeningWidth(doorPos, room, carvedCellSet, alignment, corridorCellSet) {
+  // Determine scan direction (perpendicular to alignment)
+  const scanDir = (alignment === 'north' || alignment === 'south')
+    ? { dx: 1, dy: 0 }  // scan horizontally
+    : { dx: 0, dy: 1 }; // scan vertically
+
+  const openingCells = [{ x: doorPos.x, y: doorPos.y }];
+
+  // Use corridorCellSet if available for more accurate detection
+  const cellSet = corridorCellSet || carvedCellSet;
+
+  for (let i = 1; i < 10; i++) {
+    const testX = doorPos.x + scanDir.dx * i;
+    const testY = doorPos.y + scanDir.dy * i;
+    const key = `${testX},${testY}`;
+    // Cell must be in corridor (not room) and adjacent to the room
+    if (cellSet.has(key) && !isCellInRoom(testX, testY, room) && isCellAdjacentToRoomForOpening(testX, testY, room)) {
+      openingCells.push({ x: testX, y: testY });
+    } else break;
+  }
+
+  for (let i = 1; i < 10; i++) {
+    const testX = doorPos.x - scanDir.dx * i;
+    const testY = doorPos.y - scanDir.dy * i;
+    const key = `${testX},${testY}`;
+    // Cell must be in corridor (not room) and adjacent to the room
+    if (cellSet.has(key) && !isCellInRoom(testX, testY, room) && isCellAdjacentToRoomForOpening(testX, testY, room)) {
+      openingCells.unshift({ x: testX, y: testY }); // Add to front to maintain order
+    } else break;
+  }
+
+  return { width: openingCells.length, cells: openingCells };
+}
+
+/**
+ * Generate wall edges for cells that need to be closed off.
+ * Creates edges on the room-facing side of corridor cells.
+ * @param {Array<{x: number, y: number}>} cells - Cells to generate edges for
+ * @param {string} alignment - Door alignment determining edge placement direction
+ * @returns {Array<{x: number, y: number, side: string, color: string}>} Wall edge definitions
+ */
+function generateWallEdgesForCells(cells, alignment) {
+  const edges = [];
+  const wallColor = '#333333';
+
+  for (const cell of cells) {
+    if (alignment === 'north') {
+      // Wall on north side of corridor cell = bottom edge of cell above
+      edges.push({ x: cell.x, y: cell.y - 1, side: 'bottom', color: wallColor });
+    } else if (alignment === 'south') {
+      // Wall on south side of corridor cell = bottom edge of this cell
+      edges.push({ x: cell.x, y: cell.y, side: 'bottom', color: wallColor });
+    } else if (alignment === 'east') {
+      // Wall on east side of corridor cell = right edge of this cell
+      edges.push({ x: cell.x, y: cell.y, side: 'right', color: wallColor });
+    } else if (alignment === 'west') {
+      // Wall on west side of corridor cell = right edge of cell to the left
+      edges.push({ x: cell.x - 1, y: cell.y, side: 'right', color: wallColor });
+    }
+  }
+
+  return edges;
+}
+
+/**
+ * Generate wall edges for all corridor cells adjacent to rooms.
+ * This ensures the entire room perimeter is closed off except where doors are.
+ * @param {Array<Object>} rooms - All dungeon rooms
+ * @param {Set<string>} corridorCellSet - Set of corridor cell keys ("x,y")
+ * @param {Array<{x: number, y: number}>} doorPositions - Door positions to skip
+ * @returns {Array<{x: number, y: number, side: string, color: string}>} Deduplicated wall edges
+ */
+function generateAllRoomBoundaryEdges(rooms, corridorCellSet, doorPositions) {
+  const edges = [];
+  const wallColor = '#333333';
+
+  const doorSet = new Set(doorPositions.map(d => `${d.x},${d.y}`));
+
+  // For each corridor cell, check if it's adjacent to any room
+  for (const cellKey of corridorCellSet) {
+    const [x, y] = cellKey.split(',').map(Number);
+
+    // Skip if this cell has a door
+    if (doorSet.has(cellKey)) continue;
+
+    // Check each direction for adjacent rooms
+    for (const room of rooms) {
+      // North neighbor in room = add bottom edge to cell above (which is in room)
+      if (isCellInRoom(x, y - 1, room) && !isCellInRoom(x, y, room)) {
+        edges.push({ x, y: y - 1, side: 'bottom', color: wallColor });
+      }
+      // South neighbor in room = add bottom edge to this cell
+      if (isCellInRoom(x, y + 1, room) && !isCellInRoom(x, y, room)) {
+        edges.push({ x, y, side: 'bottom', color: wallColor });
+      }
+      // West neighbor in room = add right edge to cell to the left (which is in room)
+      if (isCellInRoom(x - 1, y, room) && !isCellInRoom(x, y, room)) {
+        edges.push({ x: x - 1, y, side: 'right', color: wallColor });
+      }
+      // East neighbor in room = add right edge to this cell
+      if (isCellInRoom(x + 1, y, room) && !isCellInRoom(x, y, room)) {
+        edges.push({ x, y, side: 'right', color: wallColor });
+      }
+    }
+  }
+
+  const edgeSet = new Set();
+  const uniqueEdges = [];
+  for (const edge of edges) {
+    const key = `${edge.x},${edge.y},${edge.side}`;
+    if (!edgeSet.has(key)) {
+      edgeSet.add(key);
+      uniqueEdges.push(edge);
+    }
+  }
+
+  return uniqueEdges;
+}
+
+/**
+ * Find rooms that have no doors and add a secret door by converting one edge.
+ * @param {Array<Object>} rooms - All dungeon rooms
+ * @param {Array<{x: number, y: number}>} doorPositions - Existing door positions
+ * @param {Array<Object>} wallEdges - Wall edges that can be converted to secret doors
+ * @param {Set<string>} corridorCellSet - Set of corridor cell keys
+ * @returns {{updatedEdges: Array<Object>, secretDoorObjects: Array<Object>}} Updated edges with secret doors
+ */
+function addSecretDoorsToIsolatedRooms(rooms, doorPositions, wallEdges, corridorCellSet) {
+  // A room has a door if ANY door position is adjacent to that room
+  // (doors connect two rooms, but roomId only stores one of them)
+  function roomHasDoor(room) {
+    for (const door of doorPositions) {
+      // Check if door is adjacent to this room
+      if (isCellAdjacentToRoomForOpening(door.x, door.y, room)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  const isolatedRooms = rooms.filter(r => !roomHasDoor(r));
+
+  if (isolatedRooms.length === 0) {
+    return { updatedEdges: wallEdges, secretDoorObjects: [] };
+  }
+
+  const existingDoorPositions = new Set(doorPositions.map(d => `${d.x},${d.y}`));
+
+  const secretDoorObjects = [];
+  const edgesToRemove = new Set();
+
+  for (const room of isolatedRooms) {
+    const roomEdges = [];
+
+    for (let i = 0; i < wallEdges.length; i++) {
+      const edge = wallEdges[i];
+
+      // Check if this edge borders the room
+      // For 'bottom' edge at (x, y): the cell above (x, y) or below (x, y+1) should be in room
+      // For 'right' edge at (x, y): the cell left (x, y) or right (x+1, y) should be in room
+      let bordersRoom = false;
+      let corridorCell = null;
+      let alignment = null;
+
+      if (edge.side === 'bottom') {
+        // Bottom edge: room could be above (y) or below (y+1)
+        if (isCellInRoom(edge.x, edge.y, room)) {
+          bordersRoom = true;
+          corridorCell = { x: edge.x, y: edge.y + 1 };
+          alignment = 'south';
+        } else if (isCellInRoom(edge.x, edge.y + 1, room)) {
+          bordersRoom = true;
+          corridorCell = { x: edge.x, y: edge.y };
+          alignment = 'north';
+        }
+      } else if (edge.side === 'right') {
+        // Right edge: room could be left (x) or right (x+1)
+        if (isCellInRoom(edge.x, edge.y, room)) {
+          bordersRoom = true;
+          corridorCell = { x: edge.x + 1, y: edge.y };
+          alignment = 'east';
+        } else if (isCellInRoom(edge.x + 1, edge.y, room)) {
+          bordersRoom = true;
+          corridorCell = { x: edge.x, y: edge.y };
+          alignment = 'west';
+        }
+      }
+
+      if (bordersRoom && corridorCell) {
+        // Verify the corridor cell is actually in the corridor
+        const corridorKey = `${corridorCell.x},${corridorCell.y}`;
+        // Skip if there's already a door at this position
+        if (corridorCellSet.has(corridorKey) && !existingDoorPositions.has(corridorKey)) {
+          roomEdges.push({ index: i, edge, corridorCell, alignment });
+        }
+      }
+    }
+
+    // Pick a random edge to convert to secret door
+    if (roomEdges.length > 0) {
+      const chosen = roomEdges[Math.floor(Math.random() * roomEdges.length)];
+
+      edgesToRemove.add(chosen.index);
+
+      // Create secret door object
+      secretDoorObjects.push({
+        id: generateObjectId(),
+        type: 'secret-door',
+        position: { x: chosen.corridorCell.x, y: chosen.corridorCell.y },
+        alignment: chosen.alignment,
+        scale: 1,
+        rotation: 0
+      });
+    }
+  }
+
+  const updatedEdges = wallEdges.filter((_, i) => !edgesToRemove.has(i));
+
+  return { updatedEdges, secretDoorObjects };
 }
 
 /**
@@ -1764,20 +2053,74 @@ function groupDoorCandidates(candidates) {
   return finalGroups;
 }
 
-function findDoorPositions(corridorsByConnection, rooms, doorChance = 0.7, secretDoorChance = 0.05) {
-  const candidates = findDoorCandidates(corridorsByConnection, rooms);
+/**
+ * Find door positions and generate wall edges for wide openings.
+ * @param {Array<Object>} corridorsByConnection - Corridor data with roomA, roomB, orderedPath, width
+ * @param {Array<Object>} rooms - All dungeon rooms
+ * @param {number} [doorChance=0.7] - Probability of placing a door at each entrance
+ * @param {number} [secretDoorChance=0.05] - Probability that a door is secret
+ * @param {Set<string>} [carvedCellSet] - Set of all carved cell keys for opening width
+ * @param {Set<string>} [corridorCellSet] - Set of corridor cell keys for validation
+ * @param {Set<string>} [segmentCellSet] - Set of diagonal segment cell keys to exclude
+ * @returns {{doorPositions: Array<Object>, wallEdges: Array<Object>}} Door positions and wall edges
+ */
+function findDoorPositions(corridorsByConnection, rooms, doorChance = 0.7, secretDoorChance = 0.05, carvedCellSet = null, corridorCellSet = null, segmentCellSet = null) {
+  const candidates = findDoorCandidates(corridorsByConnection, rooms, corridorCellSet, segmentCellSet);
   const groups = groupDoorCandidates(candidates);
-  
+
   const doorPositions = [];
-  
+  const wallEdges = [];
+
   for (const group of groups) {
     // Roll once per entrance group
     if (Math.random() > doorChance) continue;
-    
+
     // Roll once for secret door for this entrance
     const isSecret = Math.random() < secretDoorChance;
-    
-    // Mark all doors in group with same secret status
+
+    // If we have carvedCellSet, calculate actual opening width
+    if (carvedCellSet && group.length > 0) {
+      const firstDoor = group[0];
+      const room = rooms.find(r => r.id === firstDoor.roomId);
+
+      if (room) {
+        const opening = calculateRoomOpeningWidth(firstDoor, room, carvedCellSet, firstDoor.alignment, corridorCellSet);
+
+        if (opening.width > 2) {
+          // Wide opening: place max 2 doors in center, wall edges for the rest
+          const centerIdx = Math.floor(opening.cells.length / 2);
+          const doorCount = Math.min(2, opening.cells.length);
+          const startIdx = centerIdx - Math.floor(doorCount / 2);
+          const endIdx = startIdx + doorCount;
+
+          // Add doors for center cells
+          for (let i = startIdx; i < endIdx; i++) {
+            const cell = opening.cells[i];
+            doorPositions.push({
+              x: cell.x,
+              y: cell.y,
+              type: firstDoor.type,
+              alignment: firstDoor.alignment,
+              roomId: firstDoor.roomId,
+              isSecret,
+              scale: doorCount >= 2 ? 1.2 : 1
+            });
+          }
+
+          // Generate wall edges for cells outside door area
+          const cellsForWalls = [
+            ...opening.cells.slice(0, startIdx),
+            ...opening.cells.slice(endIdx)
+          ];
+          const edges = generateWallEdgesForCells(cellsForWalls, firstDoor.alignment);
+          wallEdges.push(...edges);
+
+          continue; // Skip normal group processing
+        }
+      }
+    }
+
+    // Normal processing: mark all doors in group with same secret status
     for (const door of group) {
       doorPositions.push({
         ...door,
@@ -1786,20 +2129,17 @@ function findDoorPositions(corridorsByConnection, rooms, doorChance = 0.7, secre
       });
     }
   }
-  
-  return doorPositions;
+
+  return { doorPositions, wallEdges };
 }
 
 function generateDoorObjects(doorPositions) {
   return doorPositions.map(pos => {
     // Calculate rotation based on alignment
     let rotation = 0;
-    if (pos.alignment === 'ne' || pos.alignment === 'sw') {
-      rotation = 45;
-    } else if (pos.alignment === 'nw' || pos.alignment === 'se') {
-      rotation = -45;
-    } else if (pos.type === 'door-vertical' && pos.isSecret &&
-               (pos.alignment === 'east' || pos.alignment === 'west')) {
+    // Secret doors on vertical passages need rotation
+    if (pos.type === 'door-vertical' && pos.isSecret &&
+        (pos.alignment === 'east' || pos.alignment === 'west')) {
       rotation = 90;
     }
 
@@ -2035,16 +2375,50 @@ function generateDungeon(presetName = 'medium', color = DEFAULT_FLOOR_COLOR, con
   }
   const corridorCells = corridorResult.cells;
   const corridorsByConnection = corridorResult.byConnection;
-  
-  // Phase 3a: Find door positions
-  const doorPositions = findDoorPositions(
+
+  // Build cell sets for door validation and opening width calculation
+  const corridorCellSet = new Set(corridorCells.map(c => `${c.x},${c.y}`));
+
+  // Track segment cells (diagonal corridor cells) - doors shouldn't be placed on these
+  const segmentCellSet = new Set(
+    corridorCells.filter(c => c.segments).map(c => `${c.x},${c.y}`)
+  );
+
+  // Build carved cell set (rooms + corridors) for opening width calculation
+  const carvedCellSet = new Set(corridorCellSet);
+  for (const room of rooms) {
+    for (let x = room.x; x < room.x + room.width; x++) {
+      for (let y = room.y; y < room.y + room.height; y++) {
+        if (isCellInRoom(x, y, room)) {
+          carvedCellSet.add(`${x},${y}`);
+        }
+      }
+    }
+  }
+
+  // Phase 3a: Find door positions and wall edges
+  const doorResult = findDoorPositions(
     corridorsByConnection,
     rooms,
     config.doorChance ?? 0.7,
-    config.secretDoorChance ?? 0
+    config.secretDoorChance ?? 0,
+    carvedCellSet,
+    corridorCellSet,
+    segmentCellSet
   );
-  const doorObjects = generateDoorObjects(doorPositions);
-  
+  const doorPositions = doorResult.doorPositions;
+  let doorObjects = generateDoorObjects(doorPositions);
+
+  // Generate wall edges for ALL corridor cells adjacent to rooms (except where doors are)
+  let wallEdges = generateAllRoomBoundaryEdges(rooms, corridorCellSet, doorPositions);
+
+  // Add secret doors to any rooms that ended up with no doors (emergent generation)
+  const isolatedRoomResult = addSecretDoorsToIsolatedRooms(rooms, doorPositions, wallEdges, corridorCellSet);
+  wallEdges = isolatedRoomResult.updatedEdges;
+  if (isolatedRoomResult.secretDoorObjects.length > 0) {
+    doorObjects = [...doorObjects, ...isolatedRoomResult.secretDoorObjects];
+  }
+
   // Phase 3b: Generate entry/exit stairs
   const { entry, exit } = findEntryExitRooms(rooms);
   const stairObjects = generateStairObjects(entry, exit);
@@ -2078,6 +2452,7 @@ function generateDungeon(presetName = 'medium', color = DEFAULT_FLOOR_COLOR, con
   return {
     cells,
     objects,
+    edges: wallEdges,
     metadata: {
       rooms,
       connections: connections.map(([a, b]) => [a.id, b.id]),
@@ -2136,5 +2511,12 @@ return {
   findDoorPositions,
   generateDoorObjects,
   findEntryExitRooms,
-  generateStairObjects
+  generateStairObjects,
+
+  // Door/edge utilities (for testing)
+  isAtCorridorIntersection,
+  isCellAdjacentToRoomForOpening,
+  calculateRoomOpeningWidth,
+  generateWallEdgesForCells,
+  generateAllRoomBoundaryEdges
 };

@@ -22,7 +22,7 @@ const STRUCTURAL_TYPES = new Set([
 
 const RerollDungeonButton = () => {
   const { mapData, currentLayer } = useMapState();
-  const { onCellsChange, onObjectsChange } = useMapOperations();
+  const { onCellsChange, onObjectsChange, onEdgesChange } = useMapOperations();
 
   const [showConfirm, setShowConfirm] = dc.useState(false);
 
@@ -64,6 +64,7 @@ const RerollDungeonButton = () => {
     // suppressHistory = false so this can be undone
     onCellsChange(result.cells, false);
     onObjectsChange(allObjects, false);
+    onEdgesChange(result.edges || [], false);
     setShowConfirm(false);
   };
 

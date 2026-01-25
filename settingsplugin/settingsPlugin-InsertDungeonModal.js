@@ -453,7 +453,7 @@ class InsertDungeonModal extends Modal {
         const stockResult = await stockGeneratedDungeon(this.plugin, result, overrides);
         const allObjects = [...result.objects, ...stockResult.objects];
 
-        await this.onInsert(this.mapName, result.cells, allObjects, {
+        await this.onInsert(this.mapName, result.cells, allObjects, result.edges || [], {
           distancePerCell: this.distancePerCell,
           distanceUnit: this.distanceUnit,
           preset: this.dungeonSize,
@@ -494,7 +494,7 @@ class InsertDungeonModal extends Modal {
           const stockResult = await stockGeneratedDungeon(this.plugin, result, overrides);
           const allObjects = [...result.objects, ...stockResult.objects];
 
-          await this.onInsert(this.mapName, result.cells, allObjects, {
+          await this.onInsert(this.mapName, result.cells, allObjects, result.edges || [], {
             distancePerCell: this.distancePerCell,
             distanceUnit: this.distanceUnit,
             preset: this.dungeonSize,
