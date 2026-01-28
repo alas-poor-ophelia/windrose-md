@@ -1,3 +1,8 @@
+## Version 1.5.4
+### Bug Fixes
+- Fix an issue where the secret doors placed as part of the "open isolated rooms" loop did not respect secret door quota/setting from initial generation.
+- Fix an issue where when rerolling only objects on a generated map, entrance/exit stairs got lost.
+
 ## Version 1.5.3
 ### New Features
 - Add an "auto fog of war" option to the Advanced Section for map generation, which will place fog of war over everything but the entrance room. Remove fog of war tiles from the visibility menu accessed of of the Windrose map menu (hover the compass).
