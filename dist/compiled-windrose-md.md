@@ -1,9 +1,9 @@
 <!-- Compiled by Datacore Script Compiler -->
 <!-- Source: Projects/dungeon-map-tracker -->
 <!-- Main Component: DungeonMapTracker -->
-<!-- Compiled: 2026-01-25T05:21:41.292Z -->
-<!-- Files: 135 -->
-<!-- Version: 1.5.3 -->
+<!-- Compiled: 2026-01-28T03:13:19.669Z -->
+<!-- Files: 138 -->
+<!-- Version: 1.5.4 -->
 <!-- CSS Files: 1 -->
 
 # Demo
@@ -2777,7 +2777,8 @@ function useLayerHistory({
     name: "",
     objects: [],
     textLabels: [],
-    edges: []
+    edges: [],
+    curves: []
   };
 
   const {
@@ -2818,7 +2819,8 @@ function useLayerHistory({
         name: mapData.name || '',
         objects: activeLayer.objects || [],
         textLabels: activeLayer.textLabels || [],
-        edges: activeLayer.edges || []
+        edges: activeLayer.edges || [],
+        curves: activeLayer.curves || []
       });
       historyInitialized.current = true;
     }
@@ -2837,7 +2839,8 @@ function useLayerHistory({
       name: name,
       objects: layer.objects || [],
       textLabels: layer.textLabels || [],
-      edges: layer.edges || []
+      edges: layer.edges || [],
+      curves: layer.curves || []
     }),
     []
   );
@@ -3006,7 +3009,8 @@ function useLayerHistory({
           cells: previousState.cells,
           objects: previousState.objects || [],
           textLabels: previousState.textLabels || [],
-          edges: previousState.edges || []
+          edges: previousState.edges || [],
+          curves: previousState.curves || []
         }
       );
       updateMapData(newMapData);
@@ -3028,7 +3032,8 @@ function useLayerHistory({
           cells: nextState.cells,
           objects: nextState.objects || [],
           textLabels: nextState.textLabels || [],
-          edges: nextState.edges || []
+          edges: nextState.edges || [],
+          curves: nextState.curves || []
         }
       );
       updateMapData(newMapData);
@@ -3519,6 +3524,7 @@ return { useFogOfWar };
 // Type-only imports
 import type { MapData, MapLayer, ViewState, TextLabelSettings } from '#types/core/map.types';
 import type { Cell } from '#types/core/cell.types';
+import type { Curve } from '#types/core/curve.types';
 import type { MapObject } from '#types/objects/object.types';
 import type { TextLabel } from '#types/objects/note.types';
 import type { HexColor } from '#types/core/common.types';
@@ -3560,14 +3566,15 @@ function useDataHandlers({
     name: name,
     objects: overrides.objects ?? layer.objects ?? [],
     textLabels: overrides.textLabels ?? layer.textLabels ?? [],
-    edges: overrides.edges ?? layer.edges ?? []
+    edges: overrides.edges ?? layer.edges ?? [],
+    curves: overrides.curves ?? layer.curves ?? []
   }), []);
 
   // =========================================================================
   // Factory: Create layer data change handler
   // =========================================================================
 
-  type LayerField = 'cells' | 'objects' | 'textLabels' | 'edges';
+  type LayerField = 'cells' | 'objects' | 'textLabels' | 'edges' | 'curves';
 
   const createLayerDataHandler = dc.useCallback(<T,>(field: LayerField) => {
     return (newValue: T, suppressHistory = false): void => {
@@ -3609,6 +3616,11 @@ function useDataHandlers({
 
   const handleEdgesChange = dc.useMemo(
     () => createLayerDataHandler<unknown[]>('edges'),
+    [createLayerDataHandler]
+  );
+
+  const handleCurvesChange = dc.useMemo(
+    () => createLayerDataHandler<Curve[]>('curves'),
     [createLayerDataHandler]
   );
 
@@ -3722,7 +3734,8 @@ function useDataHandlers({
     handleCellsChange,
     handleObjectsChange,
     handleTextLabelsChange,
-    handleEdgesChange
+    handleEdgesChange,
+    handleCurvesChange
   };
 
   const mapDataHandlers: MapDataHandlers = {
@@ -3746,6 +3759,7 @@ function useDataHandlers({
     handleObjectsChange,
     handleTextLabelsChange,
     handleEdgesChange,
+    handleCurvesChange,
     handleAddCustomColor,
     handleDeleteCustomColor,
     handleUpdateColorOpacity,
@@ -9393,6 +9407,702 @@ return {
 
 ```
 
+# curveMath
+
+```ts
+/**
+ * curveMath.ts
+ *
+ * Pure math functions for curve operations:
+ * - Point simplification (Ramer-Douglas-Peucker algorithm)
+ * - Catmull-Rom spline to Bezier conversion
+ * - Distance/hit testing calculations
+ * - Bounding box calculation
+ *
+ * All functions are stateless and side-effect free.
+ */
+
+import type { CurvePoint, BezierSegment, CurveBounds } from '#types/core/curve.types';
+
+// ===========================================================================
+// Point Simplification (Ramer-Douglas-Peucker)
+// ===========================================================================
+
+/**
+ * Simplify a path using the Ramer-Douglas-Peucker algorithm.
+ *
+ * This reduces the number of points in a path while preserving its shape.
+ * Points that are within epsilon distance of the line between their
+ * neighbors are removed.
+ *
+ * @param points - Array of points to simplify
+ * @param epsilon - Distance threshold (larger = more simplification)
+ * @returns Simplified array of points
+ */
+function simplifyPath(points: CurvePoint[], epsilon: number): CurvePoint[] {
+  if (points.length < 3) {
+    return [...points];
+  }
+
+  return rdpSimplify(points, 0, points.length - 1, epsilon);
+}
+
+/**
+ * Recursive RDP implementation.
+ */
+function rdpSimplify(
+  points: CurvePoint[],
+  startIdx: number,
+  endIdx: number,
+  epsilon: number
+): CurvePoint[] {
+  // Find the point with maximum distance from the line
+  let maxDist = 0;
+  let maxIdx = startIdx;
+
+  const start = points[startIdx];
+  const end = points[endIdx];
+
+  for (let i = startIdx + 1; i < endIdx; i++) {
+    const dist = perpendicularDistance(points[i], start, end);
+    if (dist > maxDist) {
+      maxDist = dist;
+      maxIdx = i;
+    }
+  }
+
+  // If max distance is greater than epsilon, recursively simplify
+  if (maxDist > epsilon) {
+    // Recursive call on both sides
+    const left = rdpSimplify(points, startIdx, maxIdx, epsilon);
+    const right = rdpSimplify(points, maxIdx, endIdx, epsilon);
+
+    // Concatenate results (exclude duplicate point at maxIdx)
+    return [...left.slice(0, -1), ...right];
+  }
+
+  // All points between start and end are within epsilon
+  return [start, end];
+}
+
+/**
+ * Calculate perpendicular distance from a point to a line segment.
+ */
+function perpendicularDistance(
+  point: CurvePoint,
+  lineStart: CurvePoint,
+  lineEnd: CurvePoint
+): number {
+  const dx = lineEnd[0] - lineStart[0];
+  const dy = lineEnd[1] - lineStart[1];
+  const lenSq = dx * dx + dy * dy;
+
+  if (lenSq === 0) {
+    // Start and end are the same point
+    return Math.hypot(point[0] - lineStart[0], point[1] - lineStart[1]);
+  }
+
+  // Calculate cross product to get area of parallelogram
+  const cross = Math.abs(
+    (point[0] - lineStart[0]) * dy - (point[1] - lineStart[1]) * dx
+  );
+
+  // Divide by base length to get height (perpendicular distance)
+  return cross / Math.sqrt(lenSq);
+}
+
+// ===========================================================================
+// Catmull-Rom to Bezier Conversion
+// ===========================================================================
+
+/**
+ * Convert Catmull-Rom spline control points to cubic Bezier segments.
+ *
+ * Catmull-Rom splines pass through all control points, making them
+ * ideal for freehand drawing. This converts them to Bezier curves
+ * for Canvas rendering.
+ *
+ * @param points - Control points the curve passes through
+ * @param tension - Smoothness factor (0 = sharp corners, 1 = very smooth)
+ * @param closed - Whether the curve forms a closed loop
+ * @returns Array of cubic Bezier segments
+ */
+function catmullRomToBezier(
+  points: CurvePoint[],
+  tension: number,
+  closed: boolean
+): BezierSegment[] {
+  if (points.length < 2) {
+    return [];
+  }
+
+  if (points.length === 2) {
+    // Two points = straight line, use linear interpolation
+    return [{
+      start: points[0],
+      cp1: [
+        points[0][0] + (points[1][0] - points[0][0]) / 3,
+        points[0][1] + (points[1][1] - points[0][1]) / 3,
+      ],
+      cp2: [
+        points[0][0] + (points[1][0] - points[0][0]) * 2 / 3,
+        points[0][1] + (points[1][1] - points[0][1]) * 2 / 3,
+      ],
+      end: points[1],
+    }];
+  }
+
+  const segments: BezierSegment[] = [];
+  const n = points.length;
+
+  // Alpha factor for Catmull-Rom to Bezier conversion
+  // Higher tension = more influence from tangent vectors
+  const alpha = tension / 6;
+
+  const numSegments = closed ? n : n - 1;
+
+  for (let i = 0; i < numSegments; i++) {
+    // Get the four control points for this segment
+    // For Catmull-Rom, we need point before, current, next, and after next
+    const p0 = points[closed ? (i - 1 + n) % n : Math.max(0, i - 1)];
+    const p1 = points[i];
+    const p2 = points[(i + 1) % n];
+    const p3 = points[closed ? (i + 2) % n : Math.min(n - 1, i + 2)];
+
+    // Calculate Bezier control points using Catmull-Rom formulas
+    const cp1: CurvePoint = [
+      p1[0] + alpha * (p2[0] - p0[0]),
+      p1[1] + alpha * (p2[1] - p0[1]),
+    ];
+
+    const cp2: CurvePoint = [
+      p2[0] - alpha * (p3[0] - p1[0]),
+      p2[1] - alpha * (p3[1] - p1[1]),
+    ];
+
+    segments.push({
+      start: p1,
+      cp1,
+      cp2,
+      end: p2,
+    });
+  }
+
+  return segments;
+}
+
+// ===========================================================================
+// Bounding Box Calculation
+// ===========================================================================
+
+/**
+ * Calculate axis-aligned bounding box for a set of points.
+ *
+ * @param points - Points to calculate bounds for
+ * @returns Bounding box or null if no points
+ */
+function getCurveBounds(points: CurvePoint[]): CurveBounds | null {
+  if (points.length === 0) {
+    return null;
+  }
+
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+
+  for (const [x, y] of points) {
+    minX = Math.min(minX, x);
+    minY = Math.min(minY, y);
+    maxX = Math.max(maxX, x);
+    maxY = Math.max(maxY, y);
+  }
+
+  return { minX, minY, maxX, maxY };
+}
+
+// ===========================================================================
+// Distance Calculations
+// ===========================================================================
+
+/**
+ * Calculate distance from a point to a line segment.
+ *
+ * Returns the shortest distance from the point to any point on the
+ * line segment (not the infinite line).
+ *
+ * @param point - The query point
+ * @param lineStart - Start of line segment
+ * @param lineEnd - End of line segment
+ * @returns Distance from point to nearest point on segment
+ */
+function distanceToLineSegment(
+  point: CurvePoint,
+  lineStart: CurvePoint,
+  lineEnd: CurvePoint
+): number {
+  const [px, py] = point;
+  const [x1, y1] = lineStart;
+  const [x2, y2] = lineEnd;
+
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const lenSq = dx * dx + dy * dy;
+
+  if (lenSq === 0) {
+    // Segment is a point
+    return Math.hypot(px - x1, py - y1);
+  }
+
+  // Calculate projection parameter t
+  // t = 0 -> closest to start, t = 1 -> closest to end
+  let t = ((px - x1) * dx + (py - y1) * dy) / lenSq;
+  t = Math.max(0, Math.min(1, t)); // Clamp to segment
+
+  // Calculate closest point on segment
+  const closestX = x1 + t * dx;
+  const closestY = y1 + t * dy;
+
+  return Math.hypot(px - closestX, py - closestY);
+}
+
+// ===========================================================================
+// Bezier Curve Evaluation
+// ===========================================================================
+
+/**
+ * Evaluate a cubic Bezier curve at parameter t.
+ *
+ * Uses De Casteljau's algorithm for numerical stability.
+ *
+ * @param segment - Bezier segment to evaluate
+ * @param t - Parameter (0 = start, 1 = end)
+ * @returns Point on curve at parameter t
+ */
+function evaluateBezier(segment: BezierSegment, t: number): CurvePoint {
+  // Clamp t to [0, 1]
+  const tc = Math.max(0, Math.min(1, t));
+  const mt = 1 - tc;
+
+  // Cubic Bezier formula: B(t) = (1-t)³P0 + 3(1-t)²tP1 + 3(1-t)t²P2 + t³P3
+  const mt2 = mt * mt;
+  const mt3 = mt2 * mt;
+  const t2 = tc * tc;
+  const t3 = t2 * tc;
+
+  const x =
+    mt3 * segment.start[0] +
+    3 * mt2 * tc * segment.cp1[0] +
+    3 * mt * t2 * segment.cp2[0] +
+    t3 * segment.end[0];
+
+  const y =
+    mt3 * segment.start[1] +
+    3 * mt2 * tc * segment.cp1[1] +
+    3 * mt * t2 * segment.cp2[1] +
+    t3 * segment.end[1];
+
+  return [x, y];
+}
+
+// ===========================================================================
+// Hit Testing
+// ===========================================================================
+
+/**
+ * Find the closest point on a Bezier segment to a query point.
+ *
+ * Uses iterative subdivision for reasonable accuracy.
+ *
+ * @param segment - Bezier segment to test
+ * @param point - Query point
+ * @returns Closest point, distance, and parameter t
+ */
+function closestPointOnBezier(
+  segment: BezierSegment,
+  point: CurvePoint
+): { point: CurvePoint; distance: number; t: number } {
+  const SUBDIVISIONS = 20;
+  let minDist = Infinity;
+  let minT = 0;
+  let minPoint: CurvePoint = segment.start;
+
+  // Sample the curve at regular intervals
+  for (let i = 0; i <= SUBDIVISIONS; i++) {
+    const t = i / SUBDIVISIONS;
+    const curvePoint = evaluateBezier(segment, t);
+    const dist = Math.hypot(
+      point[0] - curvePoint[0],
+      point[1] - curvePoint[1]
+    );
+
+    if (dist < minDist) {
+      minDist = dist;
+      minT = t;
+      minPoint = curvePoint;
+    }
+  }
+
+  // Refine with binary search around the best t
+  let low = Math.max(0, minT - 1 / SUBDIVISIONS);
+  let high = Math.min(1, minT + 1 / SUBDIVISIONS);
+
+  for (let i = 0; i < 10; i++) {
+    const mid1 = low + (high - low) / 3;
+    const mid2 = low + (high - low) * 2 / 3;
+
+    const p1 = evaluateBezier(segment, mid1);
+    const p2 = evaluateBezier(segment, mid2);
+
+    const d1 = Math.hypot(point[0] - p1[0], point[1] - p1[1]);
+    const d2 = Math.hypot(point[0] - p2[0], point[1] - p2[1]);
+
+    if (d1 < d2) {
+      high = mid2;
+      if (d1 < minDist) {
+        minDist = d1;
+        minT = mid1;
+        minPoint = p1;
+      }
+    } else {
+      low = mid1;
+      if (d2 < minDist) {
+        minDist = d2;
+        minT = mid2;
+        minPoint = p2;
+      }
+    }
+  }
+
+  return {
+    point: minPoint,
+    distance: minDist,
+    t: minT,
+  };
+}
+
+/**
+ * Check if a point is within threshold distance of a curve.
+ *
+ * @param curvePoints - Control points of the curve
+ * @param point - Query point
+ * @param threshold - Maximum distance to consider "near"
+ * @param tension - Curve smoothing (for Catmull-Rom conversion)
+ * @returns True if point is near curve
+ */
+function isPointNearCurve(
+  curvePoints: CurvePoint[],
+  point: CurvePoint,
+  threshold: number,
+  tension: number
+): boolean {
+  if (curvePoints.length === 0) {
+    return false;
+  }
+
+  if (curvePoints.length === 1) {
+    const dist = Math.hypot(
+      point[0] - curvePoints[0][0],
+      point[1] - curvePoints[0][1]
+    );
+    return dist <= threshold;
+  }
+
+  // Convert to Bezier and check each segment
+  const segments = catmullRomToBezier(curvePoints, tension, false);
+
+  for (const segment of segments) {
+    const { distance } = closestPointOnBezier(segment, point);
+    if (distance <= threshold) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+// ===========================================================================
+// Exports (Datacore module format)
+// ===========================================================================
+
+return {
+  simplifyPath,
+  catmullRomToBezier,
+  getCurveBounds,
+  distanceToLineSegment,
+  closestPointOnBezier,
+  isPointNearCurve,
+  evaluateBezier,
+};
+
+```
+
+# curveRenderer
+
+```ts
+/**
+ * curveRenderer.ts
+ *
+ * Renders freehand curves on the canvas.
+ * Curves are stored as Catmull-Rom control points and rendered as Bezier curves.
+ *
+ * RENDERING NOTES:
+ * - Curves are stored in world coordinates (pixel units)
+ * - Rendering uses offset-based view state for consistency with other renderers
+ * - Stroke width can optionally scale with zoom
+ * - Uses lineCap/lineJoin = 'round' for smooth appearance
+ */
+
+// Type-only imports
+import type { Curve, CurveRenderOptions, BezierSegment, CurvePoint } from '#types/core/curve.types';
+
+/**
+ * View state used by renderers (offset-based).
+ * x, y are offset values, zoom is the scale factor.
+ */
+interface RendererViewState {
+  x: number;  // Offset X (already calculated from center)
+  y: number;  // Offset Y (already calculated from center)
+  zoom: number;
+}
+
+// Datacore imports
+const { catmullRomToBezier } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "curveMath")) as {
+  catmullRomToBezier: (points: CurvePoint[], tension: number, closed: boolean) => BezierSegment[];
+};
+
+// Default render options
+const DEFAULT_OPTIONS: CurveRenderOptions = {
+  lineCap: 'round',
+  lineJoin: 'round',
+  scaleStrokeWithZoom: true,
+};
+
+/**
+ * Render a single curve on the canvas.
+ *
+ * @param ctx - Canvas rendering context
+ * @param curve - Curve to render
+ * @param viewState - Renderer view state with offset and zoom
+ * @param options - Rendering options
+ */
+function renderCurve(
+  ctx: CanvasRenderingContext2D,
+  curve: Curve,
+  viewState: RendererViewState,
+  options: CurveRenderOptions = {}
+): void {
+  const opts = { ...DEFAULT_OPTIONS, ...options };
+  const { points, color, opacity = 1, strokeWidth = 2, smoothing = 0.5, closed = false, filled = false } = curve;
+
+  if (points.length < 2) {
+    return;
+  }
+
+  // Convert Catmull-Rom control points to Bezier segments
+  const segments = catmullRomToBezier(points, smoothing, closed);
+
+  if (segments.length === 0) {
+    return;
+  }
+
+  // Calculate screen coordinates using offset-based view state
+  // This is the same formula used by other renderers (gridRenderer, hexRenderer)
+  // worldPoint * zoom + offset = screenPoint
+  const toScreen = (x: number, y: number) => ({
+    x: x * viewState.zoom + viewState.x,
+    y: y * viewState.zoom + viewState.y,
+  });
+
+  // Begin path
+  ctx.beginPath();
+
+  // Move to start of first segment
+  const start = toScreen(segments[0].start[0], segments[0].start[1]);
+  ctx.moveTo(start.x, start.y);
+
+  // Draw each Bezier segment
+  for (const segment of segments) {
+    const cp1 = toScreen(segment.cp1[0], segment.cp1[1]);
+    const cp2 = toScreen(segment.cp2[0], segment.cp2[1]);
+    const end = toScreen(segment.end[0], segment.end[1]);
+    ctx.bezierCurveTo(cp1.x, cp1.y, cp2.x, cp2.y, end.x, end.y);
+  }
+
+  // Close path if needed
+  if (closed) {
+    ctx.closePath();
+  }
+
+  // Set up stroke style
+  const previousAlpha = ctx.globalAlpha;
+  ctx.globalAlpha = previousAlpha * opacity;
+
+  // Calculate stroke width (optionally scaled with zoom)
+  const scaledWidth = opts.scaleStrokeWithZoom
+    ? strokeWidth * viewState.zoom
+    : strokeWidth;
+
+  // Fill if closed and filled
+  if (closed && filled) {
+    ctx.fillStyle = color;
+    ctx.fill();
+  }
+
+  // Stroke the curve
+  ctx.strokeStyle = color;
+  ctx.lineWidth = scaledWidth;
+  ctx.lineCap = opts.lineCap!;
+  ctx.lineJoin = opts.lineJoin!;
+  ctx.stroke();
+
+  // Restore alpha
+  ctx.globalAlpha = previousAlpha;
+}
+
+/**
+ * Render all curves on the canvas.
+ *
+ * @param ctx - Canvas rendering context
+ * @param curves - Curves to render
+ * @param viewState - Renderer view state with offset and zoom
+ * @param options - Rendering options
+ */
+function renderCurves(
+  ctx: CanvasRenderingContext2D,
+  curves: Curve[] | null | undefined,
+  viewState: RendererViewState,
+  options: CurveRenderOptions = {}
+): void {
+  if (!curves || curves.length === 0) {
+    return;
+  }
+
+  for (const curve of curves) {
+    renderCurve(ctx, curve, viewState, options);
+  }
+}
+
+/**
+ * Render a preview curve during drawing (before it's finalized).
+ * Uses slightly different styling for visual feedback.
+ *
+ * @param ctx - Canvas rendering context
+ * @param points - Raw points being drawn
+ * @param color - Stroke color
+ * @param strokeWidth - Line width
+ * @param viewState - Renderer view state with offset and zoom
+ */
+function renderCurvePreview(
+  ctx: CanvasRenderingContext2D,
+  points: [number, number][],
+  color: string,
+  strokeWidth: number,
+  viewState: RendererViewState
+): void {
+  if (points.length < 2) {
+    return;
+  }
+
+  // For preview, draw as simple polyline (smoother performance during drawing)
+  const toScreen = (x: number, y: number) => ({
+    x: x * viewState.zoom + viewState.x,
+    y: y * viewState.zoom + viewState.y,
+  });
+
+  ctx.beginPath();
+  const start = toScreen(points[0][0], points[0][1]);
+  ctx.moveTo(start.x, start.y);
+
+  for (let i = 1; i < points.length; i++) {
+    const pt = toScreen(points[i][0], points[i][1]);
+    ctx.lineTo(pt.x, pt.y);
+  }
+
+  ctx.strokeStyle = color;
+  ctx.lineWidth = strokeWidth * viewState.zoom;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.stroke();
+}
+
+/**
+ * Render selection highlight for a curve.
+ *
+ * @param ctx - Canvas rendering context
+ * @param curve - Curve to highlight
+ * @param viewState - Renderer view state with offset and zoom
+ * @param highlightColor - Color for the highlight
+ */
+function renderCurveHighlight(
+  ctx: CanvasRenderingContext2D,
+  curve: Curve,
+  viewState: RendererViewState,
+  highlightColor: string = '#4dabf7'
+): void {
+  const { points, smoothing = 0.5, closed = false } = curve;
+
+  if (points.length < 2) {
+    return;
+  }
+
+  const segments = catmullRomToBezier(points, smoothing, closed);
+
+  if (segments.length === 0) {
+    return;
+  }
+
+  const toScreen = (x: number, y: number) => ({
+    x: x * viewState.zoom + viewState.x,
+    y: y * viewState.zoom + viewState.y,
+  });
+
+  // Draw thicker outline in highlight color
+  ctx.beginPath();
+  const start = toScreen(segments[0].start[0], segments[0].start[1]);
+  ctx.moveTo(start.x, start.y);
+
+  for (const segment of segments) {
+    const cp1 = toScreen(segment.cp1[0], segment.cp1[1]);
+    const cp2 = toScreen(segment.cp2[0], segment.cp2[1]);
+    const end = toScreen(segment.end[0], segment.end[1]);
+    ctx.bezierCurveTo(cp1.x, cp1.y, cp2.x, cp2.y, end.x, end.y);
+  }
+
+  if (closed) {
+    ctx.closePath();
+  }
+
+  ctx.strokeStyle = highlightColor;
+  ctx.lineWidth = ((curve.strokeWidth ?? 2) + 4) * viewState.zoom;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.stroke();
+
+  // Draw control point indicators
+  ctx.fillStyle = highlightColor;
+  const handleSize = 6;
+  for (const point of points) {
+    const screen = toScreen(point[0], point[1]);
+    ctx.beginPath();
+    ctx.arc(screen.x, screen.y, handleSize, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+// ===========================================================================
+// Exports (Datacore module format)
+// ===========================================================================
+
+return {
+  renderCurve,
+  renderCurves,
+  renderCurvePreview,
+  renderCurveHighlight,
+};
+
+```
+
 # fontOptions
 
 ```ts
@@ -11504,6 +12214,9 @@ const { renderObjects } = await dc.require(dc.headerLink(dc.resolvePath("compile
 const { renderSelections } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "selectionRenderer")) as {
   renderSelections: (selectedItems: RendererSelectedItem[], textLabels: TextLabel[] | undefined, objects: MapObject[] | undefined, context: { ctx: CanvasRenderingContext2D; offsetX: number; offsetY: number; zoom: number; scaledSize: number }, geometry: IGeometry, hexGeometry: { hexToWorld: (q: number, r: number) => { worldX: number; worldY: number } } | null, isHexMap: boolean, isResizeMode: boolean, orientation: string, showCoordinates: boolean, visibility: { textLabels?: boolean; objects?: boolean }, deps: { getFontCss: typeof getFontCss; getObjectsInCell: typeof getObjectsInCell; getSlotOffset: typeof getSlotOffset; getMultiObjectScale: typeof getMultiObjectScale }) => void;
 };
+const { renderCurves } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "curveRenderer")) as {
+  renderCurves: (ctx: CanvasRenderingContext2D, curves: Array<{ id: string; points: [number, number][]; color: string; opacity?: number; strokeWidth?: number; smoothing?: number; closed?: boolean; filled?: boolean }> | null | undefined, viewState: RendererViewState) => void;
+};
 const { getFontCss } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "fontOptions")) as {
   getFontCss: (fontFace: string) => string;
 };
@@ -11770,6 +12483,11 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
 
   // Draw active layer cells and edges
   renderLayerCellsAndEdges(ctx, activeLayer, geometry, rendererViewState, THEME, renderer);
+
+  // Draw freehand curves
+  if (activeLayer.curves && activeLayer.curves.length > 0) {
+    renderCurves(ctx, activeLayer.curves, rendererViewState);
+  }
 
   // Draw objects
   if (activeLayer.objects && activeLayer.objects.length > 0 && !showCoordinates && visibility.objects) {
@@ -18005,6 +18723,221 @@ return {
 };
 ```
 
+# curveOperations
+
+```ts
+/**
+ * curveOperations.ts
+ *
+ * Pure functions for curve CRUD operations.
+ * Similar pattern to edgeOperations.ts.
+ *
+ * CURVE DATA STRUCTURE:
+ * {
+ *   id: string,           // Unique identifier
+ *   points: CurvePoint[], // Control points [[x,y], ...]
+ *   color: string,        // Hex color code
+ *   opacity?: number,     // Optional opacity (0-1)
+ *   strokeWidth?: number, // Line width
+ *   smoothing?: number,   // Catmull-Rom tension
+ *   closed?: boolean      // Whether curve is closed
+ * }
+ */
+
+// Type-only imports
+import type {
+  Curve,
+  CurveId,
+  CurvePoint,
+  CurveTemplate,
+  CurveUpdate,
+  CurveBounds,
+} from '#types/core/curve.types';
+
+// Datacore imports
+const { getCurveBounds, isPointNearCurve } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "curveMath")) as {
+  getCurveBounds: (points: CurvePoint[]) => CurveBounds | null;
+  isPointNearCurve: (points: CurvePoint[], point: CurvePoint, threshold: number, tension: number) => boolean;
+};
+
+// ===========================================================================
+// ID Generation
+// ===========================================================================
+
+/**
+ * Generate a unique curve ID
+ */
+function generateCurveId(): CurveId {
+  return 'curve-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+}
+
+// ===========================================================================
+// CRUD Operations
+// ===========================================================================
+
+/**
+ * Add a new curve to the array.
+ * Generates a unique ID for the curve.
+ *
+ * @param curves - Existing curves array (or null/undefined)
+ * @param template - Curve data without ID
+ * @returns New array with the added curve
+ */
+function addCurve(
+  curves: Curve[] | null | undefined,
+  template: CurveTemplate
+): Curve[] {
+  const curveArray = curves || [];
+
+  const newCurve: Curve = {
+    id: generateCurveId(),
+    ...template,
+  };
+
+  return [...curveArray, newCurve];
+}
+
+/**
+ * Remove a curve by ID.
+ *
+ * @param curves - Existing curves array
+ * @param curveId - ID of curve to remove
+ * @returns New array without the removed curve
+ */
+function removeCurve(
+  curves: Curve[] | null | undefined,
+  curveId: CurveId
+): Curve[] {
+  if (!curves || !Array.isArray(curves)) return [];
+  return curves.filter(c => c.id !== curveId);
+}
+
+/**
+ * Update curve properties by ID.
+ *
+ * @param curves - Existing curves array
+ * @param curveId - ID of curve to update
+ * @param updates - Partial curve properties to update
+ * @returns New array with the updated curve
+ */
+function updateCurve(
+  curves: Curve[] | null | undefined,
+  curveId: CurveId,
+  updates: CurveUpdate
+): Curve[] {
+  if (!curves || !Array.isArray(curves)) return [];
+
+  return curves.map(curve => {
+    if (curve.id === curveId) {
+      return { ...curve, ...updates };
+    }
+    return curve;
+  });
+}
+
+/**
+ * Get a curve by ID.
+ *
+ * @param curves - Curves array to search
+ * @param curveId - ID to find
+ * @returns The curve or null if not found
+ */
+function getCurveById(
+  curves: Curve[] | null | undefined,
+  curveId: CurveId
+): Curve | null {
+  if (!curves || !Array.isArray(curves)) return null;
+  return curves.find(c => c.id === curveId) || null;
+}
+
+// ===========================================================================
+// Query Operations
+// ===========================================================================
+
+/**
+ * Get all curves that overlap with a bounding box.
+ *
+ * @param curves - Curves to search
+ * @param bounds - Bounding box to check
+ * @returns Curves that overlap the bounds
+ */
+function getCurvesInBounds(
+  curves: Curve[] | null | undefined,
+  bounds: CurveBounds
+): Curve[] {
+  if (!curves || !Array.isArray(curves)) return [];
+
+  return curves.filter(curve => {
+    const curveBounds = getCurveBounds(curve.points);
+    if (!curveBounds) return false;
+
+    // Check if bounding boxes overlap
+    return !(
+      curveBounds.maxX < bounds.minX ||
+      curveBounds.minX > bounds.maxX ||
+      curveBounds.maxY < bounds.minY ||
+      curveBounds.minY > bounds.maxY
+    );
+  });
+}
+
+/**
+ * Find the first curve near a point (for selection).
+ *
+ * @param curves - Curves to search
+ * @param point - Query point [x, y]
+ * @param threshold - Maximum distance to consider "near"
+ * @param tension - Curve smoothing (for Catmull-Rom)
+ * @returns First curve within threshold or null
+ */
+function getCurveAtPoint(
+  curves: Curve[] | null | undefined,
+  point: CurvePoint,
+  threshold: number,
+  tension: number
+): Curve | null {
+  if (!curves || !Array.isArray(curves)) return null;
+
+  for (const curve of curves) {
+    const curveTension = curve.smoothing ?? tension;
+    if (isPointNearCurve(curve.points, point, threshold, curveTension)) {
+      return curve;
+    }
+  }
+
+  return null;
+}
+
+// ===========================================================================
+// Bulk Operations
+// ===========================================================================
+
+/**
+ * Clear all curves.
+ *
+ * @returns Empty array
+ */
+function clearAllCurves(): Curve[] {
+  return [];
+}
+
+// ===========================================================================
+// Exports (Datacore module format)
+// ===========================================================================
+
+return {
+  generateCurveId,
+  addCurve,
+  removeCurve,
+  updateCurve,
+  getCurveById,
+  getCurvesInBounds,
+  getCurveAtPoint,
+  clearAllCurves,
+};
+
+```
+
 # useDrawingTools
 
 ```ts
@@ -18029,6 +18962,7 @@ import type { MapData, MapLayer } from '#types/core/map.types';
 import type { Edge } from '#types/core/edge.types';
 import type { MapObject } from '#types/objects/object.types';
 import type { TextLabel } from '#types/core/textLabel.types';
+import type { Curve, CurvePoint, CurveTemplate } from '#types/core/curve.types';
 import type {
   PreviewSettings,
   RectangleStart,
@@ -18068,6 +19002,7 @@ interface MapOperationsValue {
   onObjectsChange: (objects: MapObject[]) => void;
   onTextLabelsChange: (labels: TextLabel[]) => void;
   onEdgesChange: (edges: Edge[], skipHistory?: boolean) => void;
+  onCurvesChange?: (curves: Curve[], skipHistory?: boolean) => void;
   getTextLabelAtPosition: (labels: TextLabel[], worldX: number, worldY: number, ctx: CanvasRenderingContext2D | null) => TextLabel | null;
   removeTextLabel: (labels: TextLabel[], id: string) => TextLabel[];
   getObjectAtPosition: (objects: MapObject[], x: number, y: number) => MapObject | null;
@@ -18099,6 +19034,16 @@ const { eraseObjectAt } = await dc.require(dc.headerLink(dc.resolvePath("compile
 
 const { getActiveLayer } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "layerAccessor")) as {
   getActiveLayer: (mapData: MapData) => MapLayer;
+};
+
+const { simplifyPath } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "curveMath")) as {
+  simplifyPath: (points: CurvePoint[], epsilon: number) => CurvePoint[];
+};
+
+const { addCurve, removeCurve, getCurveAtPoint } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "curveOperations")) as {
+  addCurve: (curves: Curve[], template: CurveTemplate) => Curve[];
+  removeCurve: (curves: Curve[], curveId: string) => Curve[];
+  getCurveAtPoint: (curves: Curve[], point: CurvePoint, threshold: number, tension: number) => Curve | null;
 };
 
 interface CellUpdate {
@@ -18153,6 +19098,7 @@ const useDrawingTools = (
     onObjectsChange,
     onTextLabelsChange,
     onEdgesChange,
+    onCurvesChange,
     getTextLabelAtPosition,
     removeTextLabel,
     getObjectAtPosition,
@@ -18180,9 +19126,14 @@ const useDrawingTools = (
 
   const [segmentHoverInfo, setSegmentHoverInfo] = dc.useState<SegmentHoverInfo | null>(null);
 
+  // Freehand drawing state
+  const [isFreehandDrawing, setIsFreehandDrawing] = dc.useState<boolean>(false);
+  const [freehandPreviewPoints, setFreehandPreviewPoints] = dc.useState<CurvePoint[]>([]);
+
   // Track initial state for batched history
   const strokeInitialStateRef = dc.useRef<Cell[] | null>(null);
   const strokeInitialEdgesRef = dc.useRef<Edge[] | null>(null);
+  const strokeInitialCurvesRef = dc.useRef<Curve[] | null>(null);
 
   const toggleCell = (coords: Point, shouldFill: boolean, dragStart: DragStartContext | null = null): void => {
     if (!mapData || !geometry) return;
@@ -18237,6 +19188,23 @@ const useDrawingTools = (
                 onEdgesChange(newEdges, isBatchedStroke);
                 return;
               }
+            }
+          }
+        }
+
+        // Check for curves to erase
+        if (onCurvesChange) {
+          const curves = activeLayer.curves || [];
+          if (curves.length > 0) {
+            const point: CurvePoint = [worldCoords.worldX, worldCoords.worldY];
+            const curveAtPoint = getCurveAtPoint(curves, point, 10, 0.5);
+            if (curveAtPoint) {
+              if (strokeInitialCurvesRef.current === null) {
+                strokeInitialCurvesRef.current = [...curves];
+              }
+              const newCurves = removeCurve(curves, curveAtPoint.id);
+              onCurvesChange(newCurves, isBatchedStroke);
+              return;
             }
           }
         }
@@ -18457,6 +19425,122 @@ const useDrawingTools = (
     onCellsChange(newCells);
 
     closeSegmentPicker();
+  };
+
+  // ===========================================
+  // Freehand Drawing Operations
+  // ===========================================
+
+  /** Minimum distance between captured points (world units) */
+  const MIN_POINT_DISTANCE = 3;
+  /** RDP simplification epsilon */
+  const SIMPLIFY_EPSILON = 2;
+  /** Minimum points needed to create a curve */
+  const MIN_CURVE_POINTS = 3;
+  /** Default stroke width for curves */
+  const DEFAULT_STROKE_WIDTH = 2;
+  /** Default smoothing factor */
+  const DEFAULT_SMOOTHING = 0.5;
+
+  const startFreehandDrawing = (e: PointerEvent | MouseEvent | TouchEvent): void => {
+    if (!mapData || !onCurvesChange) return;
+
+    const { clientX, clientY } = getClientCoords(e);
+    const world = screenToWorld(clientX, clientY);
+    if (!world) return;
+
+    const activeLayer = getActiveLayer(mapData);
+    strokeInitialCurvesRef.current = [...(activeLayer.curves || [])];
+
+    const point: CurvePoint = [world.worldX, world.worldY];
+    setFreehandPreviewPoints([point]);
+    setIsFreehandDrawing(true);
+  };
+
+  const continueFreehandDrawing = (e: PointerEvent | MouseEvent | TouchEvent): void => {
+    if (!isFreehandDrawing) return;
+
+    const { clientX, clientY } = getClientCoords(e);
+    const world = screenToWorld(clientX, clientY);
+    if (!world) return;
+
+    const point: CurvePoint = [world.worldX, world.worldY];
+
+    setFreehandPreviewPoints((prev) => {
+      if (prev.length === 0) return [point];
+
+      const lastPoint = prev[prev.length - 1];
+      const dist = Math.hypot(point[0] - lastPoint[0], point[1] - lastPoint[1]);
+
+      if (dist >= MIN_POINT_DISTANCE) {
+        return [...prev, point];
+      }
+      return prev;
+    });
+  };
+
+  const finishFreehandDrawing = (): void => {
+    if (!isFreehandDrawing || !mapData || !onCurvesChange) {
+      cancelFreehandDrawing();
+      return;
+    }
+
+    // Need enough points to make a curve
+    if (freehandPreviewPoints.length < MIN_CURVE_POINTS) {
+      cancelFreehandDrawing();
+      return;
+    }
+
+    // Simplify the path
+    const simplifiedPoints = simplifyPath(freehandPreviewPoints, SIMPLIFY_EPSILON);
+
+    // Need at least 2 points after simplification
+    if (simplifiedPoints.length < 2) {
+      cancelFreehandDrawing();
+      return;
+    }
+
+    // Check if shape should auto-close (end point near start point)
+    const CLOSE_THRESHOLD = 15; // World units
+    const startPoint = simplifiedPoints[0];
+    const endPoint = simplifiedPoints[simplifiedPoints.length - 1];
+    const closingDistance = Math.hypot(
+      endPoint[0] - startPoint[0],
+      endPoint[1] - startPoint[1]
+    );
+    const isClosedShape = closingDistance < CLOSE_THRESHOLD && simplifiedPoints.length >= 3;
+
+    // Create curve template
+    const template: CurveTemplate = {
+      points: simplifiedPoints,
+      color: selectedColor,
+      opacity: selectedOpacity,
+      strokeWidth: DEFAULT_STROKE_WIDTH,
+      smoothing: DEFAULT_SMOOTHING,
+      closed: isClosedShape,
+      filled: isClosedShape,
+    };
+
+    // Get current curves from active layer
+    const activeLayer = getActiveLayer(mapData);
+    const currentCurves = activeLayer.curves || [];
+
+    // Add new curve
+    const newCurves = addCurve(currentCurves, template);
+
+    // Update map data (not skipping history since this is the final action)
+    onCurvesChange(newCurves, false);
+
+    // Reset state
+    setIsFreehandDrawing(false);
+    setFreehandPreviewPoints([]);
+    strokeInitialCurvesRef.current = null;
+  };
+
+  const cancelFreehandDrawing = (): void => {
+    setIsFreehandDrawing(false);
+    setFreehandPreviewPoints([]);
+    strokeInitialCurvesRef.current = null;
   };
 
   const fillEdgeLine = (x1: number, y1: number, x2: number, y2: number): void => {
@@ -18829,6 +19913,11 @@ const useDrawingTools = (
       return true;
     }
 
+    if (currentTool === 'freehandDraw') {
+      startFreehandDrawing(e);
+      return true;
+    }
+
     if (currentTool === 'draw' || currentTool === 'erase') {
       startDrawing(e);
       return true;
@@ -18848,6 +19937,11 @@ const useDrawingTools = (
       return true;
     }
 
+    if (isFreehandDrawing && currentTool === 'freehandDraw') {
+      continueFreehandDrawing(e);
+      return true;
+    }
+
     if (isDrawing && (currentTool === 'draw' || currentTool === 'erase')) {
       processCellDuringDrag(e, dragStart);
       return true;
@@ -18863,6 +19957,9 @@ const useDrawingTools = (
       setProcessedSegments(new Set());
       strokeInitialStateRef.current = null;
       strokeInitialEdgesRef.current = null;
+    }
+    if (isFreehandDrawing) {
+      cancelFreehandDrawing();
     }
   };
 
@@ -18932,6 +20029,14 @@ const useDrawingTools = (
     segmentHoverInfo,
     updateSegmentHover,
     clearSegmentHover,
+
+    // Freehand drawing
+    isFreehandDrawing,
+    freehandPreviewPoints,
+    startFreehandDrawing,
+    continueFreehandDrawing,
+    finishFreehandDrawing,
+    cancelFreehandDrawing,
 
     setIsDrawing,
     setProcessedCells,
@@ -20434,7 +21539,12 @@ const DrawingLayer = ({
     rememberSegments,
     segmentHoverInfo,
     updateSegmentHover,
-    clearSegmentHover
+    clearSegmentHover,
+    // Freehand drawing
+    isFreehandDrawing,
+    freehandPreviewPoints,
+    finishFreehandDrawing,
+    cancelFreehandDrawing
   } = useDrawingTools(currentTool, selectedColor, selectedOpacity, previewSettings);
 
   const handleStopDrawing = dc.useCallback(() => {
@@ -20442,20 +21552,24 @@ const DrawingLayer = ({
       stopEdgeDrawing();
     } else if (currentTool === 'segmentDraw') {
       stopSegmentDrawing();
+    } else if (currentTool === 'freehandDraw') {
+      finishFreehandDrawing();
     } else {
       stopDrawing();
     }
-  }, [currentTool, stopDrawing, stopEdgeDrawing, stopSegmentDrawing]);
+  }, [currentTool, stopDrawing, stopEdgeDrawing, stopSegmentDrawing, finishFreehandDrawing]);
 
   const handleKeyDown = dc.useCallback((e: KeyboardEvent) => {
     if (e.key === 'Escape') {
       if (segmentPickerOpen) {
         closeSegmentPicker();
+      } else if (isFreehandDrawing) {
+        cancelFreehandDrawing();
       } else if (rectangleStart || circleStart || edgeLineStart || touchConfirmPending) {
         cancelShapePreview();
       }
     }
-  }, [rectangleStart, circleStart, edgeLineStart, touchConfirmPending, cancelShapePreview, segmentPickerOpen, closeSegmentPicker]);
+  }, [rectangleStart, circleStart, edgeLineStart, touchConfirmPending, cancelShapePreview, segmentPickerOpen, closeSegmentPicker, isFreehandDrawing, cancelFreehandDrawing]);
 
   dc.useEffect(() => {
     document.addEventListener('keydown', handleKeyDown);
@@ -20471,6 +21585,7 @@ const DrawingLayer = ({
       stopDrawing: handleStopDrawing,
       cancelDrawing,
       isDrawing,
+      isFreehandDrawing,
       rectangleStart,
       circleStart,
       edgeLineStart,
@@ -20486,7 +21601,7 @@ const DrawingLayer = ({
 
     return () => unregisterHandlers('drawing');
   }, [registerHandlers, unregisterHandlers, handleDrawingPointerDown, handleDrawingPointerMove,
-    handleStopDrawing, cancelDrawing, isDrawing, rectangleStart, circleStart, edgeLineStart,
+    handleStopDrawing, cancelDrawing, isDrawing, isFreehandDrawing, rectangleStart, circleStart, edgeLineStart,
     updateShapeHover, updateEdgeLineHover, shapeHoverPosition, touchConfirmPending,
     cancelShapePreview, previewSettings.kbmEnabled, updateSegmentHover, clearSegmentHover]);
 
@@ -27189,27 +28304,33 @@ function generateAllRoomBoundaryEdges(rooms, corridorCellSet, doorPositions) {
 }
 
 /**
+ * Find rooms that have no adjacent doors.
+ * @param {Array<Object>} rooms - All dungeon rooms
+ * @param {Array<{x: number, y: number}>} doorPositions - Existing door positions
+ * @returns {Array<Object>} Rooms with no adjacent doors
+ */
+function getIsolatedRooms(rooms, doorPositions) {
+  return rooms.filter(room => {
+    for (const door of doorPositions) {
+      if (isCellAdjacentToRoomForOpening(door.x, door.y, room)) {
+        return false;
+      }
+    }
+    return true;
+  });
+}
+
+/**
  * Find rooms that have no doors and add a secret door by converting one edge.
  * @param {Array<Object>} rooms - All dungeon rooms
  * @param {Array<{x: number, y: number}>} doorPositions - Existing door positions
  * @param {Array<Object>} wallEdges - Wall edges that can be converted to secret doors
  * @param {Set<string>} corridorCellSet - Set of corridor cell keys
+ * @param {number} secretDoorQuota - Remaining quota of secret doors to create for isolated rooms
  * @returns {{updatedEdges: Array<Object>, secretDoorObjects: Array<Object>}} Updated edges with secret doors
  */
-function addSecretDoorsToIsolatedRooms(rooms, doorPositions, wallEdges, corridorCellSet) {
-  // A room has a door if ANY door position is adjacent to that room
-  // (doors connect two rooms, but roomId only stores one of them)
-  function roomHasDoor(room) {
-    for (const door of doorPositions) {
-      // Check if door is adjacent to this room
-      if (isCellAdjacentToRoomForOpening(door.x, door.y, room)) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  const isolatedRooms = rooms.filter(r => !roomHasDoor(r));
+function addSecretDoorsToIsolatedRooms(rooms, doorPositions, wallEdges, corridorCellSet, secretDoorQuota = Infinity) {
+  const isolatedRooms = getIsolatedRooms(rooms, doorPositions);
 
   if (isolatedRooms.length === 0) {
     return { updatedEdges: wallEdges, secretDoorObjects: [] };
@@ -27219,6 +28340,7 @@ function addSecretDoorsToIsolatedRooms(rooms, doorPositions, wallEdges, corridor
 
   const secretDoorObjects = [];
   const edgesToRemove = new Set();
+  let secretDoorsCreated = 0;
 
   for (const room of isolatedRooms) {
     const roomEdges = [];
@@ -27267,21 +28389,23 @@ function addSecretDoorsToIsolatedRooms(rooms, doorPositions, wallEdges, corridor
       }
     }
 
-    // Pick a random edge to convert to secret door
+    // Pick a random edge to create opening (and possibly secret door)
     if (roomEdges.length > 0) {
       const chosen = roomEdges[Math.floor(Math.random() * roomEdges.length)];
 
       edgesToRemove.add(chosen.index);
 
-      // Create secret door object
-      secretDoorObjects.push({
-        id: generateObjectId(),
-        type: 'secret-door',
-        position: { x: chosen.corridorCell.x, y: chosen.corridorCell.y },
-        alignment: chosen.alignment,
-        scale: 1,
-        rotation: 0
-      });
+      if (secretDoorsCreated < secretDoorQuota) {
+        secretDoorObjects.push({
+          id: generateObjectId(),
+          type: 'secret-door',
+          position: { x: chosen.corridorCell.x, y: chosen.corridorCell.y },
+          alignment: chosen.alignment,
+          scale: 1,
+          rotation: 0
+        });
+        secretDoorsCreated++;
+      }
     }
   }
 
@@ -27700,7 +28824,16 @@ function generateDungeon(presetName = 'medium', color = DEFAULT_FLOOR_COLOR, con
   let wallEdges = generateAllRoomBoundaryEdges(rooms, corridorCellSet, doorPositions);
 
   // Add secret doors to any rooms that ended up with no doors (emergent generation)
-  const isolatedRoomResult = addSecretDoorsToIsolatedRooms(rooms, doorPositions, wallEdges, corridorCellSet);
+  // Calculate remaining secret door quota based on user's secretDoorChance
+  const existingSecretDoorCount = doorObjects.filter(o => o.type === 'secret-door').length;
+  const isolatedRoomCount = getIsolatedRooms(rooms, doorPositions).length;
+  const totalDoorCount = doorObjects.length + isolatedRoomCount;
+  const targetSecretDoorCount = Math.round(totalDoorCount * (config.secretDoorChance ?? 0));
+  const remainingSecretQuota = Math.max(0, targetSecretDoorCount - existingSecretDoorCount);
+
+  const isolatedRoomResult = addSecretDoorsToIsolatedRooms(
+    rooms, doorPositions, wallEdges, corridorCellSet, remainingSecretQuota
+  );
   wallEdges = isolatedRoomResult.updatedEdges;
   if (isolatedRoomResult.secretDoorObjects.length > 0) {
     doorObjects = [...doorObjects, ...isolatedRoomResult.secretDoorObjects];
@@ -28951,7 +30084,7 @@ const STRUCTURAL_TYPES = new Set([
 ]);
 
 const RerollDungeonButton = () => {
-  const { mapData, currentLayer } = useMapState();
+  const { mapData } = useMapState();
   const { onCellsChange, onObjectsChange, onEdgesChange } = useMapOperations();
 
   const [showConfirm, setShowConfirm] = dc.useState(false);
@@ -29006,15 +30139,21 @@ const RerollDungeonButton = () => {
     }
 
     // Get current objects and filter to keep only structural ones
-    const layer = mapData.layers?.[currentLayer];
+    const layer = mapData?.layers?.find(l => l.id === mapData.activeLayerId);
     const currentObjects = layer?.objects || [];
     const structuralObjects = currentObjects.filter(obj => STRUCTURAL_TYPES.has(obj.type));
+
+    const stairPositions = structuralObjects
+      .filter(obj => obj.type === 'stairs-up' || obj.type === 'stairs-down')
+      .map(obj => ({ x: obj.position.x, y: obj.position.y }));
+
+    const occupiedPositions = [...(meta.doorPositions || []), ...stairPositions];
 
     // Generate new stocking objects using saved metadata
     const stockResult = stockDungeon(
       meta.rooms,
       meta.corridorResult,
-      meta.doorPositions,
+      occupiedPositions,
       meta.style || 'classic',
       {
         objectDensity: settings.configOverrides?.objectDensity ?? 1.0,
@@ -29983,7 +31122,8 @@ const useEventCoordinator = ({
                  currentTool === 'rectangle' || currentTool === 'circle' ||
                  currentTool === 'clearArea' ||
                  currentTool === 'edgeDraw' || currentTool === 'edgeErase' ||
-                 currentTool === 'edgeLine' || currentTool === 'segmentDraw') {
+                 currentTool === 'edgeLine' || currentTool === 'segmentDraw' ||
+                 currentTool === 'freehandDraw') {
         if (hasMultiSelection) clearSelection();
 
         if (drawingHandlers?.handleDrawingPointerDown) {
@@ -30127,7 +31267,8 @@ const useEventCoordinator = ({
         currentTool === 'rectangle' || currentTool === 'circle' ||
         currentTool === 'clearArea' ||
         currentTool === 'edgeDraw' || currentTool === 'edgeErase' ||
-        currentTool === 'edgeLine' || currentTool === 'segmentDraw') {
+        currentTool === 'edgeLine' || currentTool === 'segmentDraw' ||
+        currentTool === 'freehandDraw') {
 
       if (drawingHandlers?.handleDrawingPointerMove) {
         drawingHandlers.handleDrawingPointerMove(e);
@@ -30290,7 +31431,8 @@ const useEventCoordinator = ({
         currentTool === 'rectangle' || currentTool === 'circle' ||
         currentTool === 'clearArea' ||
         currentTool === 'edgeDraw' || currentTool === 'edgeErase' ||
-        currentTool === 'edgeLine' || currentTool === 'segmentDraw') {
+        currentTool === 'edgeLine' || currentTool === 'segmentDraw' ||
+        currentTool === 'freehandDraw') {
       if (drawingHandlers?.stopDrawing) {
         drawingHandlers.stopDrawing(e);
       }
@@ -30315,7 +31457,8 @@ const useEventCoordinator = ({
         currentTool === 'rectangle' || currentTool === 'circle' ||
         currentTool === 'clearArea' ||
         currentTool === 'edgeDraw' || currentTool === 'edgeErase' ||
-        currentTool === 'edgeLine' || currentTool === 'segmentDraw') {
+        currentTool === 'edgeLine' || currentTool === 'segmentDraw' ||
+        currentTool === 'freehandDraw') {
       if (drawingHandlers?.cancelDrawing) {
         drawingHandlers.cancelDrawing();
       }
@@ -30438,7 +31581,7 @@ const useEventCoordinator = ({
       const textHandlers = getHandlers('text') as TextHandlers | null;
       const panZoomHandlers = getHandlers('panZoom') as PanZoomHandlers | null;
 
-      if (drawingHandlers?.isDrawing && drawingHandlers?.stopDrawing) {
+      if ((drawingHandlers?.isDrawing || drawingHandlers?.isFreehandDrawing) && drawingHandlers?.stopDrawing) {
         drawingHandlers.stopDrawing();
       }
 
@@ -30617,6 +31760,7 @@ interface MapCanvasContentProps {
   onObjectsChange: (objects: MapObject[]) => void;
   onTextLabelsChange: (labels: TextLabel[]) => void;
   onEdgesChange: (edges: Edge[], skipHistory?: boolean) => void;
+  onCurvesChange?: (curves: unknown[], skipHistory?: boolean) => void;
   onViewStateChange: (viewState: ViewState) => void;
   onTextLabelSettingsChange: (settings: TextLabelSettings) => void;
   currentTool: ToolId;
@@ -30675,7 +31819,7 @@ const Coordinators = ({ canvasRef, mapData, geometry, isFocused, isColorPickerOp
  * MapCanvasContent - Inner component that uses context hooks
  * Contains all the map canvas logic and interacts with shared selection state
  */
-const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onViewStateChange, onTextLabelSettingsChange, currentTool, selectedObjectType, selectedColor, isColorPickerOpen, customColors, onAddCustomColor, onDeleteCustomColor, isFocused, isAnimating, theme, isAlignmentMode, children }: MapCanvasContentProps): React.ReactElement => {
+const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onCurvesChange, onViewStateChange, onTextLabelSettingsChange, currentTool, selectedObjectType, selectedColor, isColorPickerOpen, customColors, onAddCustomColor, onDeleteCustomColor, isFocused, isAnimating, theme, isAlignmentMode, children }: MapCanvasContentProps): React.ReactElement => {
   const canvasRef = dc.useRef<HTMLCanvasElement | null>(null);
   const fogCanvasRef = dc.useRef<HTMLCanvasElement | null>(null);  // Separate canvas for fog blur effect (CSS blur for iOS compat)
   const containerRef = dc.useRef<HTMLDivElement | null>(null);
@@ -30966,8 +32110,9 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onObjectsCh
     onObjectsChange,
     onTextLabelsChange,
     onEdgesChange,
+    onCurvesChange,
     onMapDataUpdate
-  }), [onCellsChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onViewStateChange, onTextLabelSettingsChange]);
+  }), [onCellsChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onCurvesChange, onViewStateChange, onTextLabelSettingsChange]);
 
 
 
@@ -31944,6 +33089,7 @@ const ToolPalette = ({
       id: 'draw',
       subTools: [
         { id: 'draw' as ToolId, label: 'Paint Cells', title: 'Draw (fill cells) (D)', icon: 'lucide-paintbrush' },
+        { id: 'freehandDraw' as ToolId, label: 'Freehand', title: 'Freehand Draw (curves)', icon: 'lucide-pencil' },
         { id: 'segmentDraw' as ToolId, label: 'Paint Segments', title: 'Paint Segments (partial cells)', icon: 'lucide-triangle', gridOnly: true },
         { id: 'edgeDraw' as ToolId, label: 'Paint Edges', title: 'Paint Edges (grid lines)', icon: 'lucide-pencil-ruler', gridOnly: true }
       ]
@@ -45825,6 +46971,7 @@ const editingLayer = dc.useMemo(() => {
     handleObjectsChange,
     handleTextLabelsChange,
     handleEdgesChange,
+    handleCurvesChange,
     handleAddCustomColor,
     handleDeleteCustomColor,
     handleUpdateColorOpacity,
@@ -46197,6 +47344,7 @@ const editingLayer = dc.useMemo(() => {
               onObjectsChange={handleObjectsChange}
               onTextLabelsChange={handleTextLabelsChange}
               onEdgesChange={handleEdgesChange}
+              onCurvesChange={handleCurvesChange}
               onViewStateChange={handleViewStateChange}
               onTextLabelSettingsChange={handleTextLabelSettingsChange}
               currentTool={currentTool}
