@@ -21,7 +21,7 @@ const STRUCTURAL_TYPES = new Set([
 ]);
 
 const RerollDungeonButton = () => {
-  const { mapData, currentLayer } = useMapState();
+  const { mapData } = useMapState();
   const { onCellsChange, onObjectsChange, onEdgesChange } = useMapOperations();
 
   const [showConfirm, setShowConfirm] = dc.useState(false);
@@ -76,15 +76,21 @@ const RerollDungeonButton = () => {
     }
 
     // Get current objects and filter to keep only structural ones
-    const layer = mapData.layers?.[currentLayer];
+    const layer = mapData?.layers?.find(l => l.id === mapData.activeLayerId);
     const currentObjects = layer?.objects || [];
     const structuralObjects = currentObjects.filter(obj => STRUCTURAL_TYPES.has(obj.type));
+
+    const stairPositions = structuralObjects
+      .filter(obj => obj.type === 'stairs-up' || obj.type === 'stairs-down')
+      .map(obj => ({ x: obj.position.x, y: obj.position.y }));
+
+    const occupiedPositions = [...(meta.doorPositions || []), ...stairPositions];
 
     // Generate new stocking objects using saved metadata
     const stockResult = stockDungeon(
       meta.rooms,
       meta.corridorResult,
-      meta.doorPositions,
+      occupiedPositions,
       meta.style || 'classic',
       {
         objectDensity: settings.configOverrides?.objectDensity ?? 1.0,

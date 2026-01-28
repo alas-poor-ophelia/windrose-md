@@ -1902,27 +1902,33 @@ function generateAllRoomBoundaryEdges(rooms, corridorCellSet, doorPositions) {
 }
 
 /**
+ * Find rooms that have no adjacent doors.
+ * @param {Array<Object>} rooms - All dungeon rooms
+ * @param {Array<{x: number, y: number}>} doorPositions - Existing door positions
+ * @returns {Array<Object>} Rooms with no adjacent doors
+ */
+function getIsolatedRooms(rooms, doorPositions) {
+  return rooms.filter(room => {
+    for (const door of doorPositions) {
+      if (isCellAdjacentToRoomForOpening(door.x, door.y, room)) {
+        return false;
+      }
+    }
+    return true;
+  });
+}
+
+/**
  * Find rooms that have no doors and add a secret door by converting one edge.
  * @param {Array<Object>} rooms - All dungeon rooms
  * @param {Array<{x: number, y: number}>} doorPositions - Existing door positions
  * @param {Array<Object>} wallEdges - Wall edges that can be converted to secret doors
  * @param {Set<string>} corridorCellSet - Set of corridor cell keys
+ * @param {number} secretDoorQuota - Remaining quota of secret doors to create for isolated rooms
  * @returns {{updatedEdges: Array<Object>, secretDoorObjects: Array<Object>}} Updated edges with secret doors
  */
-function addSecretDoorsToIsolatedRooms(rooms, doorPositions, wallEdges, corridorCellSet) {
-  // A room has a door if ANY door position is adjacent to that room
-  // (doors connect two rooms, but roomId only stores one of them)
-  function roomHasDoor(room) {
-    for (const door of doorPositions) {
-      // Check if door is adjacent to this room
-      if (isCellAdjacentToRoomForOpening(door.x, door.y, room)) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  const isolatedRooms = rooms.filter(r => !roomHasDoor(r));
+function addSecretDoorsToIsolatedRooms(rooms, doorPositions, wallEdges, corridorCellSet, secretDoorQuota = Infinity) {
+  const isolatedRooms = getIsolatedRooms(rooms, doorPositions);
 
   if (isolatedRooms.length === 0) {
     return { updatedEdges: wallEdges, secretDoorObjects: [] };
@@ -1932,6 +1938,7 @@ function addSecretDoorsToIsolatedRooms(rooms, doorPositions, wallEdges, corridor
 
   const secretDoorObjects = [];
   const edgesToRemove = new Set();
+  let secretDoorsCreated = 0;
 
   for (const room of isolatedRooms) {
     const roomEdges = [];
@@ -1980,21 +1987,23 @@ function addSecretDoorsToIsolatedRooms(rooms, doorPositions, wallEdges, corridor
       }
     }
 
-    // Pick a random edge to convert to secret door
+    // Pick a random edge to create opening (and possibly secret door)
     if (roomEdges.length > 0) {
       const chosen = roomEdges[Math.floor(Math.random() * roomEdges.length)];
 
       edgesToRemove.add(chosen.index);
 
-      // Create secret door object
-      secretDoorObjects.push({
-        id: generateObjectId(),
-        type: 'secret-door',
-        position: { x: chosen.corridorCell.x, y: chosen.corridorCell.y },
-        alignment: chosen.alignment,
-        scale: 1,
-        rotation: 0
-      });
+      if (secretDoorsCreated < secretDoorQuota) {
+        secretDoorObjects.push({
+          id: generateObjectId(),
+          type: 'secret-door',
+          position: { x: chosen.corridorCell.x, y: chosen.corridorCell.y },
+          alignment: chosen.alignment,
+          scale: 1,
+          rotation: 0
+        });
+        secretDoorsCreated++;
+      }
     }
   }
 
@@ -2413,7 +2422,16 @@ function generateDungeon(presetName = 'medium', color = DEFAULT_FLOOR_COLOR, con
   let wallEdges = generateAllRoomBoundaryEdges(rooms, corridorCellSet, doorPositions);
 
   // Add secret doors to any rooms that ended up with no doors (emergent generation)
-  const isolatedRoomResult = addSecretDoorsToIsolatedRooms(rooms, doorPositions, wallEdges, corridorCellSet);
+  // Calculate remaining secret door quota based on user's secretDoorChance
+  const existingSecretDoorCount = doorObjects.filter(o => o.type === 'secret-door').length;
+  const isolatedRoomCount = getIsolatedRooms(rooms, doorPositions).length;
+  const totalDoorCount = doorObjects.length + isolatedRoomCount;
+  const targetSecretDoorCount = Math.round(totalDoorCount * (config.secretDoorChance ?? 0));
+  const remainingSecretQuota = Math.max(0, targetSecretDoorCount - existingSecretDoorCount);
+
+  const isolatedRoomResult = addSecretDoorsToIsolatedRooms(
+    rooms, doorPositions, wallEdges, corridorCellSet, remainingSecretQuota
+  );
   wallEdges = isolatedRoomResult.updatedEdges;
   if (isolatedRoomResult.secretDoorObjects.length > 0) {
     doorObjects = [...doorObjects, ...isolatedRoomResult.secretDoorObjects];
