@@ -98,6 +98,27 @@ This shows:
 - What imports are being generated
 - What exports are being created
 
+### What Transforms vs What Doesn't
+
+**Transforms successfully:**
+- `requireModuleByName("ModuleName.ts")` → ES import (if in MODULE_MAP)
+- `return { foo, bar }` at file end → `export { foo, bar }`
+- pathResolver bootstrap patterns → Removed
+
+**Does NOT transform:**
+- `dc.require(dynamicPath)` with variable path → Path must be a string literal
+- `dc.useState`, `dc.useCallback`, etc. → Mocked but not functional (don't unit test hooks)
+- Modules not in MODULE_MAP → Warning, likely runtime error
+
+### Common Failure Patterns
+
+| Error | Cause | Fix |
+|-------|-------|-----|
+| `Cannot find module 'X'` | Module not in MODULE_MAP | Add to MODULE_MAP in datacore-transformer.ts |
+| `X is not defined` | Function not exported from source | Check `return { ... }` includes the function |
+| `X is not a function` | Wrong destructure from import | Check spelling, ensure export exists |
+| Test hangs/timeouts | Possible circular dependency | Check import chains |
+
 ## Test Organization
 
 ```
