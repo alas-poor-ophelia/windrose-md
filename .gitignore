@@ -25,6 +25,7 @@ src
 # Test outputs
 playwright-report/
 test-results/
+tests/e2e/screenshots/
 
 # Windows NUL device artifacts (created by some tools)
 nul

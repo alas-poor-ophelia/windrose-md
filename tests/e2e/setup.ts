@@ -82,6 +82,24 @@ function postProcessCompiledArtifact(targetPath: string, basePath: string): void
 export async function setup() {
   console.log("Setting up test vault...");
 
+  // Clean up debug screenshots from previous test runs
+  // Done at setup (not teardown) so screenshots remain observable after failures
+  const screenshotsDir = path.resolve(__dirname, "screenshots");
+  if (existsSync(screenshotsDir)) {
+    const fs = await import("fs/promises");
+    try {
+      const files = await fs.readdir(screenshotsDir);
+      if (files.length > 0) {
+        for (const file of files) {
+          await fs.unlink(path.join(screenshotsDir, file));
+        }
+        console.log(`  Cleaned ${files.length} screenshots from previous run`);
+      }
+    } catch (e) {
+      // Ignore errors
+    }
+  }
+
   // Reset the JSON fixtures to a clean state before tests run
   // This ensures tests don't inherit state from previous runs
   // Both dev and compiled mode fixtures need to be reset
