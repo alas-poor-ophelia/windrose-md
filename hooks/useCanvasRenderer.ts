@@ -69,6 +69,9 @@ const { renderObjects } = await requireModuleByName("objectRenderer.ts") as {
 const { renderSelections } = await requireModuleByName("selectionRenderer.ts") as {
   renderSelections: (selectedItems: RendererSelectedItem[], textLabels: TextLabel[] | undefined, objects: MapObject[] | undefined, context: { ctx: CanvasRenderingContext2D; offsetX: number; offsetY: number; zoom: number; scaledSize: number }, geometry: IGeometry, hexGeometry: { hexToWorld: (q: number, r: number) => { worldX: number; worldY: number } } | null, isHexMap: boolean, isResizeMode: boolean, orientation: string, showCoordinates: boolean, visibility: { textLabels?: boolean; objects?: boolean }, deps: { getFontCss: typeof getFontCss; getObjectsInCell: typeof getObjectsInCell; getSlotOffset: typeof getSlotOffset; getMultiObjectScale: typeof getMultiObjectScale }) => void;
 };
+const { renderCurves } = await requireModuleByName("curveRenderer.ts") as {
+  renderCurves: (ctx: CanvasRenderingContext2D, curves: Array<{ id: string; points: [number, number][]; color: string; opacity?: number; strokeWidth?: number; smoothing?: number; closed?: boolean; filled?: boolean }> | null | undefined, viewState: RendererViewState) => void;
+};
 const { getFontCss } = await requireModuleByName("fontOptions.ts") as {
   getFontCss: (fontFace: string) => string;
 };
@@ -335,6 +338,11 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
 
   // Draw active layer cells and edges
   renderLayerCellsAndEdges(ctx, activeLayer, geometry, rendererViewState, THEME, renderer);
+
+  // Draw freehand curves
+  if (activeLayer.curves && activeLayer.curves.length > 0) {
+    renderCurves(ctx, activeLayer.curves, rendererViewState);
+  }
 
   // Draw objects
   if (activeLayer.objects && activeLayer.objects.length > 0 && !showCoordinates && visibility.objects) {

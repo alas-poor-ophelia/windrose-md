@@ -74,7 +74,8 @@ function useLayerHistory({
     name: "",
     objects: [],
     textLabels: [],
-    edges: []
+    edges: [],
+    curves: []
   };
 
   const {
@@ -115,7 +116,8 @@ function useLayerHistory({
         name: mapData.name || '',
         objects: activeLayer.objects || [],
         textLabels: activeLayer.textLabels || [],
-        edges: activeLayer.edges || []
+        edges: activeLayer.edges || [],
+        curves: activeLayer.curves || []
       });
       historyInitialized.current = true;
     }
@@ -134,7 +136,8 @@ function useLayerHistory({
       name: name,
       objects: layer.objects || [],
       textLabels: layer.textLabels || [],
-      edges: layer.edges || []
+      edges: layer.edges || [],
+      curves: layer.curves || []
     }),
     []
   );
@@ -303,7 +306,8 @@ function useLayerHistory({
           cells: previousState.cells,
           objects: previousState.objects || [],
           textLabels: previousState.textLabels || [],
-          edges: previousState.edges || []
+          edges: previousState.edges || [],
+          curves: previousState.curves || []
         }
       );
       updateMapData(newMapData);
@@ -325,7 +329,8 @@ function useLayerHistory({
           cells: nextState.cells,
           objects: nextState.objects || [],
           textLabels: nextState.textLabels || [],
-          edges: nextState.edges || []
+          edges: nextState.edges || [],
+          curves: nextState.curves || []
         }
       );
       updateMapData(newMapData);

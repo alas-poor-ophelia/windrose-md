@@ -314,7 +314,8 @@ const useEventCoordinator = ({
                  currentTool === 'rectangle' || currentTool === 'circle' ||
                  currentTool === 'clearArea' ||
                  currentTool === 'edgeDraw' || currentTool === 'edgeErase' ||
-                 currentTool === 'edgeLine' || currentTool === 'segmentDraw') {
+                 currentTool === 'edgeLine' || currentTool === 'segmentDraw' ||
+                 currentTool === 'freehandDraw') {
         if (hasMultiSelection) clearSelection();
 
         if (drawingHandlers?.handleDrawingPointerDown) {
@@ -458,7 +459,8 @@ const useEventCoordinator = ({
         currentTool === 'rectangle' || currentTool === 'circle' ||
         currentTool === 'clearArea' ||
         currentTool === 'edgeDraw' || currentTool === 'edgeErase' ||
-        currentTool === 'edgeLine' || currentTool === 'segmentDraw') {
+        currentTool === 'edgeLine' || currentTool === 'segmentDraw' ||
+        currentTool === 'freehandDraw') {
 
       if (drawingHandlers?.handleDrawingPointerMove) {
         drawingHandlers.handleDrawingPointerMove(e);
@@ -621,7 +623,8 @@ const useEventCoordinator = ({
         currentTool === 'rectangle' || currentTool === 'circle' ||
         currentTool === 'clearArea' ||
         currentTool === 'edgeDraw' || currentTool === 'edgeErase' ||
-        currentTool === 'edgeLine' || currentTool === 'segmentDraw') {
+        currentTool === 'edgeLine' || currentTool === 'segmentDraw' ||
+        currentTool === 'freehandDraw') {
       if (drawingHandlers?.stopDrawing) {
         drawingHandlers.stopDrawing(e);
       }
@@ -646,7 +649,8 @@ const useEventCoordinator = ({
         currentTool === 'rectangle' || currentTool === 'circle' ||
         currentTool === 'clearArea' ||
         currentTool === 'edgeDraw' || currentTool === 'edgeErase' ||
-        currentTool === 'edgeLine' || currentTool === 'segmentDraw') {
+        currentTool === 'edgeLine' || currentTool === 'segmentDraw' ||
+        currentTool === 'freehandDraw') {
       if (drawingHandlers?.cancelDrawing) {
         drawingHandlers.cancelDrawing();
       }
@@ -769,7 +773,7 @@ const useEventCoordinator = ({
       const textHandlers = getHandlers('text') as TextHandlers | null;
       const panZoomHandlers = getHandlers('panZoom') as PanZoomHandlers | null;
 
-      if (drawingHandlers?.isDrawing && drawingHandlers?.stopDrawing) {
+      if ((drawingHandlers?.isDrawing || drawingHandlers?.isFreehandDrawing) && drawingHandlers?.stopDrawing) {
         drawingHandlers.stopDrawing();
       }
 

@@ -117,7 +117,12 @@ const DrawingLayer = ({
     rememberSegments,
     segmentHoverInfo,
     updateSegmentHover,
-    clearSegmentHover
+    clearSegmentHover,
+    // Freehand drawing
+    isFreehandDrawing,
+    freehandPreviewPoints,
+    finishFreehandDrawing,
+    cancelFreehandDrawing
   } = useDrawingTools(currentTool, selectedColor, selectedOpacity, previewSettings);
 
   const handleStopDrawing = dc.useCallback(() => {
@@ -125,20 +130,24 @@ const DrawingLayer = ({
       stopEdgeDrawing();
     } else if (currentTool === 'segmentDraw') {
       stopSegmentDrawing();
+    } else if (currentTool === 'freehandDraw') {
+      finishFreehandDrawing();
     } else {
       stopDrawing();
     }
-  }, [currentTool, stopDrawing, stopEdgeDrawing, stopSegmentDrawing]);
+  }, [currentTool, stopDrawing, stopEdgeDrawing, stopSegmentDrawing, finishFreehandDrawing]);
 
   const handleKeyDown = dc.useCallback((e: KeyboardEvent) => {
     if (e.key === 'Escape') {
       if (segmentPickerOpen) {
         closeSegmentPicker();
+      } else if (isFreehandDrawing) {
+        cancelFreehandDrawing();
       } else if (rectangleStart || circleStart || edgeLineStart || touchConfirmPending) {
         cancelShapePreview();
       }
     }
-  }, [rectangleStart, circleStart, edgeLineStart, touchConfirmPending, cancelShapePreview, segmentPickerOpen, closeSegmentPicker]);
+  }, [rectangleStart, circleStart, edgeLineStart, touchConfirmPending, cancelShapePreview, segmentPickerOpen, closeSegmentPicker, isFreehandDrawing, cancelFreehandDrawing]);
 
   dc.useEffect(() => {
     document.addEventListener('keydown', handleKeyDown);
@@ -154,6 +163,7 @@ const DrawingLayer = ({
       stopDrawing: handleStopDrawing,
       cancelDrawing,
       isDrawing,
+      isFreehandDrawing,
       rectangleStart,
       circleStart,
       edgeLineStart,
@@ -169,7 +179,7 @@ const DrawingLayer = ({
 
     return () => unregisterHandlers('drawing');
   }, [registerHandlers, unregisterHandlers, handleDrawingPointerDown, handleDrawingPointerMove,
-    handleStopDrawing, cancelDrawing, isDrawing, rectangleStart, circleStart, edgeLineStart,
+    handleStopDrawing, cancelDrawing, isDrawing, isFreehandDrawing, rectangleStart, circleStart, edgeLineStart,
     updateShapeHover, updateEdgeLineHover, shapeHoverPosition, touchConfirmPending,
     cancelShapePreview, previewSettings.kbmEnabled, updateSegmentHover, clearSegmentHover]);
 

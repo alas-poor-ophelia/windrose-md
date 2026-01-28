@@ -504,6 +504,7 @@ const editingLayer = dc.useMemo(() => {
     handleObjectsChange,
     handleTextLabelsChange,
     handleEdgesChange,
+    handleCurvesChange,
     handleAddCustomColor,
     handleDeleteCustomColor,
     handleUpdateColorOpacity,
@@ -876,6 +877,7 @@ const editingLayer = dc.useMemo(() => {
               onObjectsChange={handleObjectsChange}
               onTextLabelsChange={handleTextLabelsChange}
               onEdgesChange={handleEdgesChange}
+              onCurvesChange={handleCurvesChange}
               onViewStateChange={handleViewStateChange}
               onTextLabelSettingsChange={handleTextLabelSettingsChange}
               currentTool={currentTool}

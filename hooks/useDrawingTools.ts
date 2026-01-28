@@ -19,6 +19,7 @@ import type { MapData, MapLayer } from '#types/core/map.types';
 import type { Edge } from '#types/core/edge.types';
 import type { MapObject } from '#types/objects/object.types';
 import type { TextLabel } from '#types/core/textLabel.types';
+import type { Curve, CurvePoint, CurveTemplate } from '#types/core/curve.types';
 import type {
   PreviewSettings,
   RectangleStart,
@@ -63,6 +64,7 @@ interface MapOperationsValue {
   onObjectsChange: (objects: MapObject[]) => void;
   onTextLabelsChange: (labels: TextLabel[]) => void;
   onEdgesChange: (edges: Edge[], skipHistory?: boolean) => void;
+  onCurvesChange?: (curves: Curve[], skipHistory?: boolean) => void;
   getTextLabelAtPosition: (labels: TextLabel[], worldX: number, worldY: number, ctx: CanvasRenderingContext2D | null) => TextLabel | null;
   removeTextLabel: (labels: TextLabel[], id: string) => TextLabel[];
   getObjectAtPosition: (objects: MapObject[], x: number, y: number) => MapObject | null;
@@ -94,6 +96,16 @@ const { eraseObjectAt } = await requireModuleByName("objectOperations.ts") as {
 
 const { getActiveLayer } = await requireModuleByName("layerAccessor.ts") as {
   getActiveLayer: (mapData: MapData) => MapLayer;
+};
+
+const { simplifyPath } = await requireModuleByName("curveMath.ts") as {
+  simplifyPath: (points: CurvePoint[], epsilon: number) => CurvePoint[];
+};
+
+const { addCurve, removeCurve, getCurveAtPoint } = await requireModuleByName("curveOperations.ts") as {
+  addCurve: (curves: Curve[], template: CurveTemplate) => Curve[];
+  removeCurve: (curves: Curve[], curveId: string) => Curve[];
+  getCurveAtPoint: (curves: Curve[], point: CurvePoint, threshold: number, tension: number) => Curve | null;
 };
 
 interface CellUpdate {
@@ -148,6 +160,7 @@ const useDrawingTools = (
     onObjectsChange,
     onTextLabelsChange,
     onEdgesChange,
+    onCurvesChange,
     getTextLabelAtPosition,
     removeTextLabel,
     getObjectAtPosition,
@@ -175,9 +188,14 @@ const useDrawingTools = (
 
   const [segmentHoverInfo, setSegmentHoverInfo] = dc.useState<SegmentHoverInfo | null>(null);
 
+  // Freehand drawing state
+  const [isFreehandDrawing, setIsFreehandDrawing] = dc.useState<boolean>(false);
+  const [freehandPreviewPoints, setFreehandPreviewPoints] = dc.useState<CurvePoint[]>([]);
+
   // Track initial state for batched history
   const strokeInitialStateRef = dc.useRef<Cell[] | null>(null);
   const strokeInitialEdgesRef = dc.useRef<Edge[] | null>(null);
+  const strokeInitialCurvesRef = dc.useRef<Curve[] | null>(null);
 
   const toggleCell = (coords: Point, shouldFill: boolean, dragStart: DragStartContext | null = null): void => {
     if (!mapData || !geometry) return;
@@ -232,6 +250,23 @@ const useDrawingTools = (
                 onEdgesChange(newEdges, isBatchedStroke);
                 return;
               }
+            }
+          }
+        }
+
+        // Check for curves to erase
+        if (onCurvesChange) {
+          const curves = activeLayer.curves || [];
+          if (curves.length > 0) {
+            const point: CurvePoint = [worldCoords.worldX, worldCoords.worldY];
+            const curveAtPoint = getCurveAtPoint(curves, point, 10, 0.5);
+            if (curveAtPoint) {
+              if (strokeInitialCurvesRef.current === null) {
+                strokeInitialCurvesRef.current = [...curves];
+              }
+              const newCurves = removeCurve(curves, curveAtPoint.id);
+              onCurvesChange(newCurves, isBatchedStroke);
+              return;
             }
           }
         }
@@ -452,6 +487,122 @@ const useDrawingTools = (
     onCellsChange(newCells);
 
     closeSegmentPicker();
+  };
+
+  // ===========================================
+  // Freehand Drawing Operations
+  // ===========================================
+
+  /** Minimum distance between captured points (world units) */
+  const MIN_POINT_DISTANCE = 3;
+  /** RDP simplification epsilon */
+  const SIMPLIFY_EPSILON = 2;
+  /** Minimum points needed to create a curve */
+  const MIN_CURVE_POINTS = 3;
+  /** Default stroke width for curves */
+  const DEFAULT_STROKE_WIDTH = 2;
+  /** Default smoothing factor */
+  const DEFAULT_SMOOTHING = 0.5;
+
+  const startFreehandDrawing = (e: PointerEvent | MouseEvent | TouchEvent): void => {
+    if (!mapData || !onCurvesChange) return;
+
+    const { clientX, clientY } = getClientCoords(e);
+    const world = screenToWorld(clientX, clientY);
+    if (!world) return;
+
+    const activeLayer = getActiveLayer(mapData);
+    strokeInitialCurvesRef.current = [...(activeLayer.curves || [])];
+
+    const point: CurvePoint = [world.worldX, world.worldY];
+    setFreehandPreviewPoints([point]);
+    setIsFreehandDrawing(true);
+  };
+
+  const continueFreehandDrawing = (e: PointerEvent | MouseEvent | TouchEvent): void => {
+    if (!isFreehandDrawing) return;
+
+    const { clientX, clientY } = getClientCoords(e);
+    const world = screenToWorld(clientX, clientY);
+    if (!world) return;
+
+    const point: CurvePoint = [world.worldX, world.worldY];
+
+    setFreehandPreviewPoints((prev) => {
+      if (prev.length === 0) return [point];
+
+      const lastPoint = prev[prev.length - 1];
+      const dist = Math.hypot(point[0] - lastPoint[0], point[1] - lastPoint[1]);
+
+      if (dist >= MIN_POINT_DISTANCE) {
+        return [...prev, point];
+      }
+      return prev;
+    });
+  };
+
+  const finishFreehandDrawing = (): void => {
+    if (!isFreehandDrawing || !mapData || !onCurvesChange) {
+      cancelFreehandDrawing();
+      return;
+    }
+
+    // Need enough points to make a curve
+    if (freehandPreviewPoints.length < MIN_CURVE_POINTS) {
+      cancelFreehandDrawing();
+      return;
+    }
+
+    // Simplify the path
+    const simplifiedPoints = simplifyPath(freehandPreviewPoints, SIMPLIFY_EPSILON);
+
+    // Need at least 2 points after simplification
+    if (simplifiedPoints.length < 2) {
+      cancelFreehandDrawing();
+      return;
+    }
+
+    // Check if shape should auto-close (end point near start point)
+    const CLOSE_THRESHOLD = 15; // World units
+    const startPoint = simplifiedPoints[0];
+    const endPoint = simplifiedPoints[simplifiedPoints.length - 1];
+    const closingDistance = Math.hypot(
+      endPoint[0] - startPoint[0],
+      endPoint[1] - startPoint[1]
+    );
+    const isClosedShape = closingDistance < CLOSE_THRESHOLD && simplifiedPoints.length >= 3;
+
+    // Create curve template
+    const template: CurveTemplate = {
+      points: simplifiedPoints,
+      color: selectedColor,
+      opacity: selectedOpacity,
+      strokeWidth: DEFAULT_STROKE_WIDTH,
+      smoothing: DEFAULT_SMOOTHING,
+      closed: isClosedShape,
+      filled: isClosedShape,
+    };
+
+    // Get current curves from active layer
+    const activeLayer = getActiveLayer(mapData);
+    const currentCurves = activeLayer.curves || [];
+
+    // Add new curve
+    const newCurves = addCurve(currentCurves, template);
+
+    // Update map data (not skipping history since this is the final action)
+    onCurvesChange(newCurves, false);
+
+    // Reset state
+    setIsFreehandDrawing(false);
+    setFreehandPreviewPoints([]);
+    strokeInitialCurvesRef.current = null;
+  };
+
+  const cancelFreehandDrawing = (): void => {
+    setIsFreehandDrawing(false);
+    setFreehandPreviewPoints([]);
+    strokeInitialCurvesRef.current = null;
   };
 
   const fillEdgeLine = (x1: number, y1: number, x2: number, y2: number): void => {
@@ -824,6 +975,11 @@ const useDrawingTools = (
       return true;
     }
 
+    if (currentTool === 'freehandDraw') {
+      startFreehandDrawing(e);
+      return true;
+    }
+
     if (currentTool === 'draw' || currentTool === 'erase') {
       startDrawing(e);
       return true;
@@ -843,6 +999,11 @@ const useDrawingTools = (
       return true;
     }
 
+    if (isFreehandDrawing && currentTool === 'freehandDraw') {
+      continueFreehandDrawing(e);
+      return true;
+    }
+
     if (isDrawing && (currentTool === 'draw' || currentTool === 'erase')) {
       processCellDuringDrag(e, dragStart);
       return true;
@@ -858,6 +1019,9 @@ const useDrawingTools = (
       setProcessedSegments(new Set());
       strokeInitialStateRef.current = null;
       strokeInitialEdgesRef.current = null;
+    }
+    if (isFreehandDrawing) {
+      cancelFreehandDrawing();
     }
   };
 
@@ -927,6 +1091,14 @@ const useDrawingTools = (
     segmentHoverInfo,
     updateSegmentHover,
     clearSegmentHover,
+
+    // Freehand drawing
+    isFreehandDrawing,
+    freehandPreviewPoints,
+    startFreehandDrawing,
+    continueFreehandDrawing,
+    finishFreehandDrawing,
+    cancelFreehandDrawing,
 
     setIsDrawing,
     setProcessedCells,

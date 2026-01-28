@@ -334,6 +334,7 @@ const ToolPalette = ({
       id: 'draw',
       subTools: [
         { id: 'draw' as ToolId, label: 'Paint Cells', title: 'Draw (fill cells) (D)', icon: 'lucide-paintbrush' },
+        { id: 'freehandDraw' as ToolId, label: 'Freehand', title: 'Freehand Draw (curves)', icon: 'lucide-pencil' },
         { id: 'segmentDraw' as ToolId, label: 'Paint Segments', title: 'Paint Segments (partial cells)', icon: 'lucide-triangle', gridOnly: true },
         { id: 'edgeDraw' as ToolId, label: 'Paint Edges', title: 'Paint Edges (grid lines)', icon: 'lucide-pencil-ruler', gridOnly: true }
       ]

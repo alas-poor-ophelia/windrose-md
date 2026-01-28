@@ -12,6 +12,7 @@
 // Type-only imports
 import type { MapData, MapLayer, ViewState, TextLabelSettings } from '#types/core/map.types';
 import type { Cell } from '#types/core/cell.types';
+import type { Curve } from '#types/core/curve.types';
 import type { MapObject } from '#types/objects/object.types';
 import type { TextLabel } from '#types/objects/note.types';
 import type { HexColor } from '#types/core/common.types';
@@ -56,14 +57,15 @@ function useDataHandlers({
     name: name,
     objects: overrides.objects ?? layer.objects ?? [],
     textLabels: overrides.textLabels ?? layer.textLabels ?? [],
-    edges: overrides.edges ?? layer.edges ?? []
+    edges: overrides.edges ?? layer.edges ?? [],
+    curves: overrides.curves ?? layer.curves ?? []
   }), []);
 
   // =========================================================================
   // Factory: Create layer data change handler
   // =========================================================================
 
-  type LayerField = 'cells' | 'objects' | 'textLabels' | 'edges';
+  type LayerField = 'cells' | 'objects' | 'textLabels' | 'edges' | 'curves';
 
   const createLayerDataHandler = dc.useCallback(<T,>(field: LayerField) => {
     return (newValue: T, suppressHistory = false): void => {
@@ -105,6 +107,11 @@ function useDataHandlers({
 
   const handleEdgesChange = dc.useMemo(
     () => createLayerDataHandler<unknown[]>('edges'),
+    [createLayerDataHandler]
+  );
+
+  const handleCurvesChange = dc.useMemo(
+    () => createLayerDataHandler<Curve[]>('curves'),
     [createLayerDataHandler]
   );
 
@@ -218,7 +225,8 @@ function useDataHandlers({
     handleCellsChange,
     handleObjectsChange,
     handleTextLabelsChange,
-    handleEdgesChange
+    handleEdgesChange,
+    handleCurvesChange
   };
 
   const mapDataHandlers: MapDataHandlers = {
@@ -242,6 +250,7 @@ function useDataHandlers({
     handleObjectsChange,
     handleTextLabelsChange,
     handleEdgesChange,
+    handleCurvesChange,
     handleAddCustomColor,
     handleDeleteCustomColor,
     handleUpdateColorOpacity,

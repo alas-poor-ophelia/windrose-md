@@ -83,6 +83,7 @@ interface MapCanvasContentProps {
   onObjectsChange: (objects: MapObject[]) => void;
   onTextLabelsChange: (labels: TextLabel[]) => void;
   onEdgesChange: (edges: Edge[], skipHistory?: boolean) => void;
+  onCurvesChange?: (curves: unknown[], skipHistory?: boolean) => void;
   onViewStateChange: (viewState: ViewState) => void;
   onTextLabelSettingsChange: (settings: TextLabelSettings) => void;
   currentTool: ToolId;
@@ -141,7 +142,7 @@ const Coordinators = ({ canvasRef, mapData, geometry, isFocused, isColorPickerOp
  * MapCanvasContent - Inner component that uses context hooks
  * Contains all the map canvas logic and interacts with shared selection state
  */
-const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onViewStateChange, onTextLabelSettingsChange, currentTool, selectedObjectType, selectedColor, isColorPickerOpen, customColors, onAddCustomColor, onDeleteCustomColor, isFocused, isAnimating, theme, isAlignmentMode, children }: MapCanvasContentProps): React.ReactElement => {
+const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onCurvesChange, onViewStateChange, onTextLabelSettingsChange, currentTool, selectedObjectType, selectedColor, isColorPickerOpen, customColors, onAddCustomColor, onDeleteCustomColor, isFocused, isAnimating, theme, isAlignmentMode, children }: MapCanvasContentProps): React.ReactElement => {
   const canvasRef = dc.useRef<HTMLCanvasElement | null>(null);
   const fogCanvasRef = dc.useRef<HTMLCanvasElement | null>(null);  // Separate canvas for fog blur effect (CSS blur for iOS compat)
   const containerRef = dc.useRef<HTMLDivElement | null>(null);
@@ -432,8 +433,9 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onObjectsCh
     onObjectsChange,
     onTextLabelsChange,
     onEdgesChange,
+    onCurvesChange,
     onMapDataUpdate
-  }), [onCellsChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onViewStateChange, onTextLabelSettingsChange]);
+  }), [onCellsChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onCurvesChange, onViewStateChange, onTextLabelSettingsChange]);
 
 
 
