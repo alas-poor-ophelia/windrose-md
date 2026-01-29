@@ -1,9 +1,9 @@
 <!-- Compiled by Datacore Script Compiler -->
 <!-- Source: Projects/dungeon-map-tracker -->
 <!-- Main Component: DungeonMapTracker -->
-<!-- Compiled: 2026-01-28T03:13:19.669Z -->
-<!-- Files: 138 -->
-<!-- Version: 1.5.4 -->
+<!-- Compiled: 2026-01-29T21:07:01.774Z -->
+<!-- Files: 136 -->
+<!-- Version: 1.5.5 -->
 <!-- CSS Files: 1 -->
 
 # Demo
@@ -2357,6 +2357,1152 @@ return {
 
 ```
 
+# objectTypes
+
+```ts
+/**
+ * objectTypes.ts
+ *
+ * Object type definitions for dungeon mapping.
+ * Defines available object symbols and their categories.
+ */
+
+// Types defined in #types/objects/object.types.ts
+// Duplicated here for datacore runtime compatibility
+interface ObjectType {
+  id: string;
+  symbol: string;
+  label: string;
+  category: string;
+}
+
+interface Category {
+  id: string;
+  label: string;
+}
+
+// ===========================================
+// Constants
+// ===========================================
+
+const OBJECT_TYPES: readonly ObjectType[] = [
+  // Notes
+  { id: 'note_pin', symbol: '📌', label: 'Note Pin', category: 'notes' },
+
+  // Navigation
+  { id: 'entrance', symbol: '⬤', label: 'Entrance/Exit', category: 'navigation' },
+  { id: 'stairs-up', symbol: '▲', label: 'Stairs Up', category: 'navigation' },
+  { id: 'stairs-down', symbol: '▼', label: 'Stairs Down', category: 'navigation' },
+  { id: 'ladder', symbol: '☍', label: 'Ladder', category: 'navigation' },
+  { id: 'door-vertical', symbol: '╏', label: 'Door (Vertical)', category: 'navigation' },
+  { id: 'door-horizontal', symbol: '╍', label: 'Door (Horizontal)', category: 'navigation' },
+  { id: 'secret-door', symbol: '≡', label: 'Secret Door', category: 'navigation' },
+  { id: 'portal', symbol: '⊛', label: 'Portal/Teleport', category: 'navigation' },
+  
+  // Hazards
+  { id: 'trap', symbol: '✱', label: 'Trap', category: 'hazards' },
+  { id: 'hazard', symbol: '⚠', label: 'Hazard', category: 'hazards' },
+  { id: 'pit', symbol: '◊', label: 'Pit', category: 'hazards' },
+  { id: 'poison', symbol: '☠', label: 'Poison', category: 'hazards' },
+  
+  // Features
+  { id: 'chest', symbol: '🪎', label: 'Chest/Treasure', category: 'features' },
+  { id: 'crate', symbol: '📦', label: 'Crate/Barrel', category: 'features' },
+  { id: 'sack', symbol: '💰', label: 'Sack/Bag', category: 'features' },
+  { id: 'altar', symbol: '⛧', label: 'Altar', category: 'features' },
+  { id: 'coffin', symbol: '⚰', label: 'Coffin', category: 'features' },
+  { id: 'statue', symbol: '♜', label: 'Statue', category: 'features' },
+  { id: 'cage', symbol: '⛓', label: 'Chains/Cage', category: 'features' },
+  { id: 'book', symbol: '🕮', label: 'Book/Shelf', category: 'features' },
+  { id: 'table', symbol: '▭', label: 'Table', category: 'features' },
+  { id: 'chair', symbol: '🪑', label: 'Chair', category: 'features' },
+  { id: 'bed', symbol: '🛏', label: 'Bed', category: 'features' },
+  { id: 'anvil', symbol: '⚒', label: 'Anvil/Forge', category: 'features' },
+  { id: 'cauldron', symbol: '⚗', label: 'Cauldron', category: 'features' },
+  { id: 'fountain', symbol: '⛲', label: 'Fountain', category: 'features' },
+  { id: 'lever', symbol: '⚡', label: 'Lever/Switch', category: 'features' },
+  { id: 'flower', symbol: '⚘', label: 'Flower', category: 'features' },
+  { id: 'plant', symbol: '⊕', label: 'Plant', category: 'features' },
+  { id: 'tree-dec', symbol: '🌳', label: 'Tree', category: 'features' },
+  { id: 'tree-ev', symbol: '🌲', label: 'Tree', category: 'features' },
+  { id: 'tree-lfls', symbol: '🪾', label: 'Tree', category: 'features' },
+  
+  // Encounters
+  { id: 'monster', symbol: '♅', label: 'Monster/Enemy', category: 'encounters' },
+  { id: 'boss', symbol: '♛', label: 'Boss', category: 'encounters' },
+  { id: 'boss-alt', symbol: '💀', label: 'Boss (alt)', category: 'encounters' },
+  { id: 'npc', symbol: '☺', label: 'NPC', category: 'encounters' },
+  { id: 'npc-alt', symbol: '🧝', label: 'NPC', category: 'encounters' },
+  { id: 'guard', symbol: '⚔', label: 'Guard', category: 'encounters' },
+  
+  // Markers
+  { id: 'poi', symbol: '◉', label: 'Point of Interest', category: 'markers' },
+  { id: 'flag', symbol: '⚑', label: 'Note/Flag', category: 'markers' }
+] as const;
+
+const CATEGORIES: readonly Category[] = [
+  { id: 'navigation', label: 'Navigation' },
+  { id: 'hazards', label: 'Hazards' },
+  { id: 'features', label: 'Features' },
+  { id: 'encounters', label: 'Encounters' },
+  { id: 'markers', label: 'Markers' }
+] as const;
+
+// ===========================================
+// Exports
+// ===========================================
+
+return { OBJECT_TYPES, CATEGORIES };
+```
+
+# rpgAwesomeIcons
+
+```ts
+/**
+ * rpgAwesomeIcons.ts - Icon mapping and categories for RPGAwesome font
+ * Generated from official rpg-awesome npm package v0.2.0
+ * Source: scss/_variables.scss
+ * License: SIL OFL 1.1 (Font), MIT (CSS)
+ * Total icons: 496
+ */
+
+import type { IconCategory, IconData, IconMap, IconWithClass } from '#types/objects/icon.types';
+
+/**
+ * Icon categories for filtering in the picker UI
+ */
+const RA_CATEGORIES: IconCategory[] = [
+  { id: 'weapons', label: 'Weapons', order: 10 },
+  { id: 'armor', label: 'Armor & Defense', order: 20 },
+  { id: 'creatures', label: 'Creatures', order: 30 },
+  { id: 'potions', label: 'Potions', order: 40 },
+  { id: 'magic', label: 'Magic', order: 50 },
+  { id: 'food', label: 'Food & Drink', order: 60 },
+  { id: 'plants', label: 'Plants', order: 70 },
+  { id: 'astrology', label: 'Astrology', order: 80 },
+  { id: 'cards-dice', label: 'Cards & Dice', order: 90 },
+  { id: 'electronics', label: 'Electronics', order: 100 },
+  { id: 'dangers', label: 'Dangers', order: 110 },
+  { id: 'player', label: 'Player', order: 120 },
+  { id: 'inventory', label: 'Inventory', order: 130 },
+  { id: 'rpg', label: 'RPG & Misc', order: 140 },
+];
+
+/**
+ * Icon definitions - char is the actual Unicode character for canvas rendering
+ * Codepoints are from the official _variables.scss file
+ */
+const RA_ICONS: IconMap = {
+  'ra-acid': { char: '\ue900', label: 'Acid', category: 'dangers' },
+  'ra-acorn': { char: '\ue901', label: 'Acorn', category: 'food' },
+  'ra-alien-fire': { char: '\ue902', label: 'Alien Fire', category: 'magic' },
+  'ra-all-for-one': { char: '\ue903', label: 'All For One', category: 'rpg' },
+  'ra-alligator-clip': { char: '\ue904', label: 'Alligator Clip', category: 'inventory' },
+  'ra-ammo-bag': { char: '\ue905', label: 'Ammo Bag', category: 'inventory' },
+  'ra-anchor': { char: '\ue906', label: 'Anchor', category: 'rpg' },
+  'ra-angel-wings': { char: '\ue907', label: 'Angel Wings', category: 'rpg' },
+  'ra-ankh': { char: '\ue908', label: 'Ankh', category: 'rpg' },
+  'ra-anvil': { char: '\ue909', label: 'Anvil', category: 'rpg' },
+  'ra-apple': { char: '\ue90a', label: 'Apple', category: 'food' },
+  'ra-aquarius': { char: '\ue90b', label: 'Aquarius', category: 'astrology' },
+  'ra-arcane-mask': { char: '\ue90c', label: 'Arcane Mask', category: 'armor' },
+  'ra-archer': { char: '\ue90d', label: 'Archer', category: 'weapons' },
+  'ra-archery-target': { char: '\ue90e', label: 'Archery Target', category: 'weapons' },
+  'ra-arena': { char: '\ue90f', label: 'Arena', category: 'rpg' },
+  'ra-aries': { char: '\ue910', label: 'Aries', category: 'astrology' },
+  'ra-arrow-cluster': { char: '\ue911', label: 'Arrow Cluster', category: 'weapons' },
+  'ra-arrow-flights': { char: '\ue912', label: 'Arrow Flights', category: 'weapons' },
+  'ra-arson': { char: '\ue913', label: 'Arson', category: 'dangers' },
+  'ra-aura': { char: '\ue914', label: 'Aura', category: 'magic' },
+  'ra-aware': { char: '\ue915', label: 'Aware', category: 'player' },
+  'ra-axe': { char: '\ue917', label: 'Axe', category: 'weapons' },
+  'ra-axe-swing': { char: '\ue916', label: 'Axe Swing', category: 'weapons' },
+  'ra-ball': { char: '\ue918', label: 'Ball', category: 'inventory' },
+  'ra-barbed-arrow': { char: '\ue919', label: 'Barbed Arrow', category: 'weapons' },
+  'ra-barrier': { char: '\ue91a', label: 'Barrier', category: 'armor' },
+  'ra-bat-sword': { char: '\ue91b', label: 'Bat Sword', category: 'weapons' },
+  'ra-battered-axe': { char: '\ue91c', label: 'Battered Axe', category: 'weapons' },
+  'ra-batteries': { char: '\ue91d', label: 'Batteries', category: 'electronics' },
+  'ra-battery-0': { char: '\ue91e', label: 'Battery 0', category: 'electronics' },
+  'ra-battery-100': { char: '\ue922', label: 'Battery 100', category: 'electronics' },
+  'ra-battery-25': { char: '\ue91f', label: 'Battery 25', category: 'electronics' },
+  'ra-battery-50': { char: '\ue920', label: 'Battery 50', category: 'electronics' },
+  'ra-battery-75': { char: '\ue921', label: 'Battery 75', category: 'electronics' },
+  'ra-battery-black': { char: '\ue923', label: 'Battery Black', category: 'electronics' },
+  'ra-battery-negative': { char: '\ue924', label: 'Battery Negative', category: 'electronics' },
+  'ra-battery-positive': { char: '\ue925', label: 'Battery Positive', category: 'electronics' },
+  'ra-battery-white': { char: '\ue926', label: 'Battery White', category: 'electronics' },
+  'ra-batwings': { char: '\ue927', label: 'Batwings', category: 'rpg' },
+  'ra-beam-wake': { char: '\ue928', label: 'Beam Wake', category: 'rpg' },
+  'ra-bear-trap': { char: '\ue929', label: 'Bear Trap', category: 'dangers' },
+  'ra-beer': { char: '\ue92a', label: 'Beer', category: 'food' },
+  'ra-beetle': { char: '\ue92b', label: 'Beetle', category: 'creatures' },
+  'ra-bell': { char: '\ue92c', label: 'Bell', category: 'inventory' },
+  'ra-biohazard': { char: '\ue92d', label: 'Biohazard', category: 'dangers' },
+  'ra-bird-claw': { char: '\ue92e', label: 'Bird Claw', category: 'creatures' },
+  'ra-bird-mask': { char: '\ue92f', label: 'Bird Mask', category: 'armor' },
+  'ra-blade-bite': { char: '\ue930', label: 'Blade Bite', category: 'dangers' },
+  'ra-blast': { char: '\ue931', label: 'Blast', category: 'dangers' },
+  'ra-blaster': { char: '\ue932', label: 'Blaster', category: 'weapons' },
+  'ra-bleeding-eye': { char: '\ue933', label: 'Bleeding Eye', category: 'dangers' },
+  'ra-bleeding-hearts': { char: '\ue934', label: 'Bleeding Hearts', category: 'dangers' },
+  'ra-bolt-shield': { char: '\ue935', label: 'Bolt Shield', category: 'armor' },
+  'ra-bomb-explosion': { char: '\ue936', label: 'Bomb Explosion', category: 'dangers' },
+  'ra-bombs': { char: '\ue937', label: 'Bombs', category: 'weapons' },
+  'ra-bone-bite': { char: '\ue938', label: 'Bone Bite', category: 'dangers' },
+  'ra-bone-knife': { char: '\ue939', label: 'Bone Knife', category: 'weapons' },
+  'ra-book': { char: '\ue93a', label: 'Book', category: 'inventory' },
+  'ra-boomerang': { char: '\ue93b', label: 'Boomerang', category: 'weapons' },
+  'ra-boot-stomp': { char: '\ue93c', label: 'Boot Stomp', category: 'armor' },
+  'ra-bottle-vapors': { char: '\ue93d', label: 'Bottle Vapors', category: 'potions' },
+  'ra-bottled-bolt': { char: '\ue93e', label: 'Bottled Bolt', category: 'potions' },
+  'ra-bottom-right': { char: '\ue93f', label: 'Bottom Right', category: 'cards-dice' },
+  'ra-bowie-knife': { char: '\ue940', label: 'Bowie Knife', category: 'weapons' },
+  'ra-bowling-pin': { char: '\ue941', label: 'Bowling Pin', category: 'inventory' },
+  'ra-brain-freeze': { char: '\ue942', label: 'Brain Freeze', category: 'magic' },
+  'ra-brandy-bottle': { char: '\ue943', label: 'Brandy Bottle', category: 'food' },
+  'ra-bridge': { char: '\ue944', label: 'Bridge', category: 'rpg' },
+  'ra-broadhead-arrow': { char: '\ue945', label: 'Broadhead Arrow', category: 'weapons' },
+  'ra-broadsword': { char: '\ue946', label: 'Broadsword', category: 'weapons' },
+  'ra-broken-bone': { char: '\ue947', label: 'Broken Bone', category: 'dangers' },
+  'ra-broken-bottle': { char: '\ue948', label: 'Broken Bottle', category: 'potions' },
+  'ra-broken-heart': { char: '\ue949', label: 'Broken Heart', category: 'dangers' },
+  'ra-broken-shield': { char: '\ue94a', label: 'Broken Shield', category: 'armor' },
+  'ra-broken-skull': { char: '\ue94b', label: 'Broken Skull', category: 'dangers' },
+  'ra-bubbling-potion': { char: '\ue94c', label: 'Bubbling Potion', category: 'potions' },
+  'ra-bullets': { char: '\ue94d', label: 'Bullets', category: 'weapons' },
+  'ra-burning-book': { char: '\ue94e', label: 'Burning Book', category: 'magic' },
+  'ra-burning-embers': { char: '\ue94f', label: 'Burning Embers', category: 'magic' },
+  'ra-burning-eye': { char: '\ue950', label: 'Burning Eye', category: 'magic' },
+  'ra-burning-meteor': { char: '\ue951', label: 'Burning Meteor', category: 'magic' },
+  'ra-burst-blob': { char: '\ue952', label: 'Burst Blob', category: 'magic' },
+  'ra-butterfly': { char: '\ue953', label: 'Butterfly', category: 'creatures' },
+  'ra-campfire': { char: '\ue954', label: 'Campfire', category: 'rpg' },
+  'ra-cancel': { char: '\ue955', label: 'Cancel', category: 'cards-dice' },
+  'ra-cancer': { char: '\ue956', label: 'Cancer', category: 'astrology' },
+  'ra-candle': { char: '\ue958', label: 'Candle', category: 'inventory' },
+  'ra-candle-fire': { char: '\ue957', label: 'Candle Fire', category: 'inventory' },
+  'ra-cannon-shot': { char: '\ue959', label: 'Cannon Shot', category: 'weapons' },
+  'ra-capitol': { char: '\ue95a', label: 'Capitol', category: 'rpg' },
+  'ra-capricorn': { char: '\ue95b', label: 'Capricorn', category: 'astrology' },
+  'ra-carrot': { char: '\ue95c', label: 'Carrot', category: 'food' },
+  'ra-castle-emblem': { char: '\ue95d', label: 'Castle Emblem', category: 'rpg' },
+  'ra-castle-flag': { char: '\ue95e', label: 'Castle Flag', category: 'inventory' },
+  'ra-cat': { char: '\ue95f', label: 'Cat', category: 'creatures' },
+  'ra-chain': { char: '\ue960', label: 'Chain', category: 'inventory' },
+  'ra-cheese': { char: '\ue961', label: 'Cheese', category: 'food' },
+  'ra-chemical-arrow': { char: '\ue962', label: 'Chemical Arrow', category: 'weapons' },
+  'ra-chessboard': { char: '\ue963', label: 'Chessboard', category: 'cards-dice' },
+  'ra-chicken-leg': { char: '\ue964', label: 'Chicken Leg', category: 'food' },
+  'ra-circle-of-circles': { char: '\ue965', label: 'Circle Of Circles', category: 'rpg' },
+  'ra-circular-saw': { char: '\ue966', label: 'Circular Saw', category: 'weapons' },
+  'ra-circular-shield': { char: '\ue967', label: 'Circular Shield', category: 'armor' },
+  'ra-cloak-and-dagger': { char: '\ue968', label: 'Cloak And Dagger', category: 'weapons' },
+  'ra-clockwork': { char: '\ue969', label: 'Clockwork', category: 'electronics' },
+  'ra-clover': { char: '\ue96a', label: 'Clover', category: 'plants' },
+  'ra-clovers': { char: '\ue96c', label: 'Clovers', category: 'cards-dice' },
+  'ra-clovers-card': { char: '\ue96b', label: 'Clovers Card', category: 'cards-dice' },
+  'ra-cluster-bomb': { char: '\ue96d', label: 'Cluster Bomb', category: 'weapons' },
+  'ra-coffee-mug': { char: '\ue96e', label: 'Coffee Mug', category: 'food' },
+  'ra-cog': { char: '\ue970', label: 'Cog', category: 'electronics' },
+  'ra-cog-wheel': { char: '\ue96f', label: 'Cog Wheel', category: 'electronics' },
+  'ra-cold-heart': { char: '\ue971', label: 'Cold Heart', category: 'magic' },
+  'ra-compass': { char: '\ue972', label: 'Compass', category: 'inventory' },
+  'ra-corked-tube': { char: '\ue973', label: 'Corked Tube', category: 'potions' },
+  'ra-crab-claw': { char: '\ue974', label: 'Crab Claw', category: 'creatures' },
+  'ra-cracked-helm': { char: '\ue975', label: 'Cracked Helm', category: 'armor' },
+  'ra-cracked-shield': { char: '\ue976', label: 'Cracked Shield', category: 'armor' },
+  'ra-croc-sword': { char: '\ue977', label: 'Croc Sword', category: 'weapons' },
+  'ra-crossbow': { char: '\ue978', label: 'Crossbow', category: 'weapons' },
+  'ra-crossed-axes': { char: '\ue979', label: 'Crossed Axes', category: 'weapons' },
+  'ra-crossed-bones': { char: '\ue97a', label: 'Crossed Bones', category: 'dangers' },
+  'ra-crossed-pistols': { char: '\ue97b', label: 'Crossed Pistols', category: 'weapons' },
+  'ra-crossed-sabres': { char: '\ue97c', label: 'Crossed Sabres', category: 'weapons' },
+  'ra-crossed-swords': { char: '\ue97d', label: 'Crossed Swords', category: 'weapons' },
+  'ra-crown': { char: '\ue97f', label: 'Crown', category: 'armor' },
+  'ra-crown-of-thorns': { char: '\ue97e', label: 'Crown Of Thorns', category: 'armor' },
+  'ra-crowned-heart': { char: '\ue980', label: 'Crowned Heart', category: 'player' },
+  'ra-crush': { char: '\ue981', label: 'Crush', category: 'dangers' },
+  'ra-crystal-ball': { char: '\ue982', label: 'Crystal Ball', category: 'magic' },
+  'ra-crystal-cluster': { char: '\ue983', label: 'Crystal Cluster', category: 'magic' },
+  'ra-crystal-wand': { char: '\ue984', label: 'Crystal Wand', category: 'magic' },
+  'ra-crystals': { char: '\ue985', label: 'Crystals', category: 'magic' },
+  'ra-cubes': { char: '\ue986', label: 'Cubes', category: 'rpg' },
+  'ra-cut-palm': { char: '\ue987', label: 'Cut Palm', category: 'player' },
+  'ra-cycle': { char: '\ue988', label: 'Cycle', category: 'rpg' },
+  'ra-daggers': { char: '\ue989', label: 'Daggers', category: 'weapons' },
+  'ra-daisy': { char: '\ue98a', label: 'Daisy', category: 'plants' },
+  'ra-dead-tree': { char: '\ue98b', label: 'Dead Tree', category: 'plants' },
+  'ra-death-skull': { char: '\ue98c', label: 'Death Skull', category: 'dangers' },
+  'ra-decapitation': { char: '\ue98d', label: 'Decapitation', category: 'dangers' },
+  'ra-defibrillate': { char: '\ue98e', label: 'Defibrillate', category: 'electronics' },
+  'ra-demolish': { char: '\ue98f', label: 'Demolish', category: 'dangers' },
+  'ra-dervish-swords': { char: '\ue990', label: 'Dervish Swords', category: 'weapons' },
+  'ra-desert-skull': { char: '\ue991', label: 'Desert Skull', category: 'dangers' },
+  'ra-diamond': { char: '\ue992', label: 'Diamond', category: 'magic' },
+  'ra-diamonds': { char: '\ue994', label: 'Diamonds', category: 'cards-dice' },
+  'ra-diamonds-card': { char: '\ue993', label: 'Diamonds Card', category: 'cards-dice' },
+  'ra-dice-five': { char: '\ue995', label: 'Dice Five', category: 'cards-dice' },
+  'ra-dice-four': { char: '\ue996', label: 'Dice Four', category: 'cards-dice' },
+  'ra-dice-one': { char: '\ue997', label: 'Dice One', category: 'cards-dice' },
+  'ra-dice-six': { char: '\ue998', label: 'Dice Six', category: 'cards-dice' },
+  'ra-dice-three': { char: '\ue999', label: 'Dice Three', category: 'cards-dice' },
+  'ra-dice-two': { char: '\ue99a', label: 'Dice Two', category: 'cards-dice' },
+  'ra-dinosaur': { char: '\ue99b', label: 'Dinosaur', category: 'creatures' },
+  'ra-divert': { char: '\ue99c', label: 'Divert', category: 'magic' },
+  'ra-diving-dagger': { char: '\ue99d', label: 'Diving Dagger', category: 'weapons' },
+  'ra-double-team': { char: '\ue99e', label: 'Double Team', category: 'player' },
+  'ra-doubled': { char: '\ue99f', label: 'Doubled', category: 'magic' },
+  'ra-dragon': { char: '\ue9a2', label: 'Dragon', category: 'creatures' },
+  'ra-dragon-breath': { char: '\ue9a0', label: 'Dragon Breath', category: 'magic' },
+  'ra-dragon-wing': { char: '\ue9a1', label: 'Dragon Wing', category: 'creatures' },
+  'ra-dragonfly': { char: '\ue9a3', label: 'Dragonfly', category: 'creatures' },
+  'ra-drill': { char: '\ue9a4', label: 'Drill', category: 'weapons' },
+  'ra-dripping-blade': { char: '\ue9a5', label: 'Dripping Blade', category: 'weapons' },
+  'ra-dripping-knife': { char: '\ue9a6', label: 'Dripping Knife', category: 'weapons' },
+  'ra-dripping-sword': { char: '\ue9a7', label: 'Dripping Sword', category: 'weapons' },
+  'ra-droplet': { char: '\ue9a9', label: 'Droplet', category: 'magic' },
+  'ra-droplet-splash': { char: '\ue9a8', label: 'Droplet Splash', category: 'magic' },
+  'ra-droplets': { char: '\ue9aa', label: 'Droplets', category: 'rpg' },
+  'ra-duel': { char: '\ue9ab', label: 'Duel', category: 'weapons' },
+  'ra-egg': { char: '\ue9ad', label: 'Egg', category: 'food' },
+  'ra-egg-pod': { char: '\ue9ac', label: 'Egg Pod', category: 'food' },
+  'ra-eggplant': { char: '\ue9ae', label: 'Eggplant', category: 'food' },
+  'ra-emerald': { char: '\ue9af', label: 'Emerald', category: 'magic' },
+  'ra-energise': { char: '\ue9b0', label: 'Energise', category: 'electronics' },
+  'ra-explosion': { char: '\ue9b1', label: 'Explosion', category: 'dangers' },
+  'ra-explosive-materials': { char: '\ue9b2', label: 'Explosive Materials', category: 'weapons' },
+  'ra-eye-monster': { char: '\ue9b3', label: 'Eye Monster', category: 'creatures' },
+  'ra-eye-shield': { char: '\ue9b4', label: 'Eye Shield', category: 'armor' },
+  'ra-eyeball': { char: '\ue9b5', label: 'Eyeball', category: 'magic' },
+  'ra-fairy': { char: '\ue9b7', label: 'Fairy', category: 'creatures' },
+  'ra-fairy-wand': { char: '\ue9b6', label: 'Fairy Wand', category: 'magic' },
+  'ra-fall-down': { char: '\ue9b8', label: 'Fall Down', category: 'dangers' },
+  'ra-falling': { char: '\ue9b9', label: 'Falling', category: 'player' },
+  'ra-fast-ship': { char: '\ue9ba', label: 'Fast Ship', category: 'electronics' },
+  'ra-feather-wing': { char: '\ue9bb', label: 'Feather Wing', category: 'rpg' },
+  'ra-feathered-wing': { char: '\ue9bc', label: 'Feathered Wing', category: 'rpg' },
+  'ra-fedora': { char: '\ue9bd', label: 'Fedora', category: 'armor' },
+  'ra-fire': { char: '\ue9c3', label: 'Fire', category: 'magic' },
+  'ra-fire-bomb': { char: '\ue9be', label: 'Fire Bomb', category: 'weapons' },
+  'ra-fire-breath': { char: '\ue9bf', label: 'Fire Breath', category: 'magic' },
+  'ra-fire-ring': { char: '\ue9c0', label: 'Fire Ring', category: 'magic' },
+  'ra-fire-shield': { char: '\ue9c1', label: 'Fire Shield', category: 'armor' },
+  'ra-fire-symbol': { char: '\ue9c2', label: 'Fire Symbol', category: 'magic' },
+  'ra-fireball-sword': { char: '\ue9c4', label: 'Fireball Sword', category: 'weapons' },
+  'ra-fish': { char: '\ue9c5', label: 'Fish', category: 'creatures' },
+  'ra-fizzing-flask': { char: '\ue9c6', label: 'Fizzing Flask', category: 'potions' },
+  'ra-flame-symbol': { char: '\ue9c7', label: 'Flame Symbol', category: 'magic' },
+  'ra-flaming-arrow': { char: '\ue9c8', label: 'Flaming Arrow', category: 'weapons' },
+  'ra-flaming-claw': { char: '\ue9c9', label: 'Flaming Claw', category: 'weapons' },
+  'ra-flaming-trident': { char: '\ue9ca', label: 'Flaming Trident', category: 'weapons' },
+  'ra-flask': { char: '\ue9cb', label: 'Flask', category: 'potions' },
+  'ra-flat-hammer': { char: '\ue9cc', label: 'Flat Hammer', category: 'weapons' },
+  'ra-flower': { char: '\ue9cd', label: 'Flower', category: 'plants' },
+  'ra-flowers': { char: '\ue9ce', label: 'Flowers', category: 'plants' },
+  'ra-fluffy-swirl': { char: '\ue9cf', label: 'Fluffy Swirl', category: 'rpg' },
+  'ra-focused-lightning': { char: '\ue9d0', label: 'Focused Lightning', category: 'magic' },
+  'ra-food-chain': { char: '\ue9d1', label: 'Food Chain', category: 'dangers' },
+  'ra-footprint': { char: '\ue9d2', label: 'Footprint', category: 'player' },
+  'ra-forging': { char: '\ue9d3', label: 'Forging', category: 'rpg' },
+  'ra-forward': { char: '\ue9d4', label: 'Forward', category: 'rpg' },
+  'ra-fox': { char: '\ue9d5', label: 'Fox', category: 'creatures' },
+  'ra-frost-emblem': { char: '\ue9d6', label: 'Frost Emblem', category: 'magic' },
+  'ra-frostfire': { char: '\ue9d7', label: 'Frostfire', category: 'magic' },
+  'ra-frozen-arrow': { char: '\ue9d8', label: 'Frozen Arrow', category: 'weapons' },
+  'ra-gamepad-cross': { char: '\ue9d9', label: 'Gamepad Cross', category: 'electronics' },
+  'ra-gavel': { char: '\ue9da', label: 'Gavel', category: 'weapons' },
+  'ra-gear-hammer': { char: '\ue9db', label: 'Gear Hammer', category: 'weapons' },
+  'ra-gear-heart': { char: '\ue9dc', label: 'Gear Heart', category: 'electronics' },
+  'ra-gears': { char: '\ue9dd', label: 'Gears', category: 'electronics' },
+  'ra-gecko': { char: '\ue9de', label: 'Gecko', category: 'creatures' },
+  'ra-gem': { char: '\ue9e0', label: 'Gem', category: 'magic' },
+  'ra-gem-pendant': { char: '\ue9df', label: 'Gem Pendant', category: 'magic' },
+  'ra-gemini': { char: '\ue9e1', label: 'Gemini', category: 'astrology' },
+  'ra-glass-heart': { char: '\ue9e2', label: 'Glass Heart', category: 'player' },
+  'ra-gloop': { char: '\ue9e3', label: 'Gloop', category: 'magic' },
+  'ra-gold-bar': { char: '\ue9e4', label: 'Gold Bar', category: 'magic' },
+  'ra-grappling-hook': { char: '\ue9e5', label: 'Grappling Hook', category: 'weapons' },
+  'ra-grass': { char: '\ue9e7', label: 'Grass', category: 'plants' },
+  'ra-grass-patch': { char: '\ue9e6', label: 'Grass Patch', category: 'plants' },
+  'ra-grenade': { char: '\ue9e8', label: 'Grenade', category: 'weapons' },
+  'ra-groundbreaker': { char: '\ue9e9', label: 'Groundbreaker', category: 'rpg' },
+  'ra-guarded-tower': { char: '\ue9ea', label: 'Guarded Tower', category: 'rpg' },
+  'ra-guillotine': { char: '\ue9eb', label: 'Guillotine', category: 'weapons' },
+  'ra-halberd': { char: '\ue9ec', label: 'Halberd', category: 'weapons' },
+  'ra-hammer': { char: '\ue9ee', label: 'Hammer', category: 'weapons' },
+  'ra-hammer-drop': { char: '\ue9ed', label: 'Hammer Drop', category: 'weapons' },
+  'ra-hand': { char: '\ue9f1', label: 'Hand', category: 'player' },
+  'ra-hand-emblem': { char: '\ue9ef', label: 'Hand Emblem', category: 'player' },
+  'ra-hand-saw': { char: '\ue9f0', label: 'Hand Saw', category: 'weapons' },
+  'ra-harpoon-trident': { char: '\ue9f2', label: 'Harpoon Trident', category: 'weapons' },
+  'ra-health': { char: '\ue9f5', label: 'Health', category: 'magic' },
+  'ra-health-decrease': { char: '\ue9f3', label: 'Health Decrease', category: 'magic' },
+  'ra-health-increase': { char: '\ue9f4', label: 'Health Increase', category: 'magic' },
+  'ra-heart-bottle': { char: '\ue9f6', label: 'Heart Bottle', category: 'potions' },
+  'ra-heart-tower': { char: '\ue9f7', label: 'Heart Tower', category: 'rpg' },
+  'ra-heartburn': { char: '\ue9f8', label: 'Heartburn', category: 'dangers' },
+  'ra-hearts': { char: '\ue9fa', label: 'Hearts', category: 'cards-dice' },
+  'ra-hearts-card': { char: '\ue9f9', label: 'Hearts Card', category: 'cards-dice' },
+  'ra-heat-haze': { char: '\ue9fb', label: 'Heat Haze', category: 'rpg' },
+  'ra-heavy-fall': { char: '\ue9fc', label: 'Heavy Fall', category: 'dangers' },
+  'ra-heavy-shield': { char: '\ue9fd', label: 'Heavy Shield', category: 'armor' },
+  'ra-helmet': { char: '\ue9fe', label: 'Helmet', category: 'armor' },
+  'ra-help': { char: '\ue9ff', label: 'Help', category: 'rpg' },
+  'ra-hive-emblem': { char: '\uea00', label: 'Hive Emblem', category: 'rpg' },
+  'ra-hole-ladder': { char: '\uea01', label: 'Hole Ladder', category: 'rpg' },
+  'ra-honeycomb': { char: '\uea02', label: 'Honeycomb', category: 'food' },
+  'ra-hood': { char: '\uea03', label: 'Hood', category: 'armor' },
+  'ra-horn-call': { char: '\uea04', label: 'Horn Call', category: 'rpg' },
+  'ra-horns': { char: '\uea05', label: 'Horns', category: 'rpg' },
+  'ra-horseshoe': { char: '\uea06', label: 'Horseshoe', category: 'inventory' },
+  'ra-hospital-cross': { char: '\uea07', label: 'Hospital Cross', category: 'magic' },
+  'ra-hot-surface': { char: '\uea08', label: 'Hot Surface', category: 'magic' },
+  'ra-hourglass': { char: '\uea09', label: 'Hourglass', category: 'inventory' },
+  'ra-hydra': { char: '\uea0b', label: 'Hydra', category: 'creatures' },
+  'ra-hydra-shot': { char: '\uea0a', label: 'Hydra Shot', category: 'magic' },
+  'ra-ice-cube': { char: '\uea0c', label: 'Ice Cube', category: 'food' },
+  'ra-implosion': { char: '\uea0d', label: 'Implosion', category: 'dangers' },
+  'ra-incense': { char: '\uea0e', label: 'Incense', category: 'magic' },
+  'ra-insect-jaws': { char: '\uea0f', label: 'Insect Jaws', category: 'creatures' },
+  'ra-interdiction': { char: '\uea10', label: 'Interdiction', category: 'rpg' },
+  'ra-jetpack': { char: '\uea11', label: 'Jetpack', category: 'electronics' },
+  'ra-jigsaw-piece': { char: '\uea12', label: 'Jigsaw Piece', category: 'inventory' },
+  'ra-kaleidoscope': { char: '\uea13', label: 'Kaleidoscope', category: 'magic' },
+  'ra-kettlebell': { char: '\uea14', label: 'Kettlebell', category: 'inventory' },
+  'ra-key': { char: '\uea16', label: 'Key', category: 'inventory' },
+  'ra-key-basic': { char: '\uea15', label: 'Key Basic', category: 'inventory' },
+  'ra-kitchen-knives': { char: '\uea17', label: 'Kitchen Knives', category: 'weapons' },
+  'ra-knife': { char: '\uea19', label: 'Knife', category: 'weapons' },
+  'ra-knife-fork': { char: '\uea18', label: 'Knife Fork', category: 'food' },
+  'ra-knight-helmet': { char: '\uea1a', label: 'Knight Helmet', category: 'armor' },
+  'ra-kunai': { char: '\uea1b', label: 'Kunai', category: 'weapons' },
+  'ra-lantern-flame': { char: '\uea1c', label: 'Lantern Flame', category: 'inventory' },
+  'ra-large-hammer': { char: '\uea1d', label: 'Large Hammer', category: 'weapons' },
+  'ra-laser-blast': { char: '\uea1e', label: 'Laser Blast', category: 'weapons' },
+  'ra-laser-site': { char: '\uea1f', label: 'Laser Site', category: 'electronics' },
+  'ra-lava': { char: '\uea20', label: 'Lava', category: 'magic' },
+  'ra-leaf': { char: '\uea21', label: 'Leaf', category: 'plants' },
+  'ra-leo': { char: '\uea22', label: 'Leo', category: 'astrology' },
+  'ra-level-four': { char: '\uea24', label: 'Level Four', category: 'magic' },
+  'ra-level-four-advanced': { char: '\uea23', label: 'Level Four Advanced', category: 'magic' },
+  'ra-level-three': { char: '\uea26', label: 'Level Three', category: 'magic' },
+  'ra-level-three-advanced': { char: '\uea25', label: 'Level Three Advanced', category: 'magic' },
+  'ra-level-two': { char: '\uea28', label: 'Level Two', category: 'magic' },
+  'ra-level-two-advanced': { char: '\uea27', label: 'Level Two Advanced', category: 'magic' },
+  'ra-lever': { char: '\uea29', label: 'Lever', category: 'electronics' },
+  'ra-libra': { char: '\uea2a', label: 'Libra', category: 'astrology' },
+  'ra-light-bulb': { char: '\uea2b', label: 'Light Bulb', category: 'electronics' },
+  'ra-lighthouse': { char: '\uea2c', label: 'Lighthouse', category: 'electronics' },
+  'ra-lightning': { char: '\uea31', label: 'Lightning', category: 'magic' },
+  'ra-lightning-bolt': { char: '\uea2d', label: 'Lightning Bolt', category: 'magic' },
+  'ra-lightning-storm': { char: '\uea2e', label: 'Lightning Storm', category: 'magic' },
+  'ra-lightning-sword': { char: '\uea2f', label: 'Lightning Sword', category: 'weapons' },
+  'ra-lightning-trio': { char: '\uea30', label: 'Lightning Trio', category: 'magic' },
+  'ra-lion': { char: '\uea32', label: 'Lion', category: 'creatures' },
+  'ra-lit-candelabra': { char: '\uea33', label: 'Lit Candelabra', category: 'inventory' },
+  'ra-load': { char: '\uea34', label: 'Load', category: 'electronics' },
+  'ra-locked-fortress': { char: '\uea35', label: 'Locked Fortress', category: 'rpg' },
+  'ra-love-howl': { char: '\uea36', label: 'Love Howl', category: 'creatures' },
+  'ra-maggot': { char: '\uea37', label: 'Maggot', category: 'creatures' },
+  'ra-magnet': { char: '\uea38', label: 'Magnet', category: 'electronics' },
+  'ra-mass-driver': { char: '\uea39', label: 'Mass Driver', category: 'weapons' },
+  'ra-match': { char: '\uea3a', label: 'Match', category: 'inventory' },
+  'ra-meat': { char: '\uea3c', label: 'Meat', category: 'food' },
+  'ra-meat-hook': { char: '\uea3b', label: 'Meat Hook', category: 'weapons' },
+  'ra-medical-pack': { char: '\uea3d', label: 'Medical Pack', category: 'inventory' },
+  'ra-metal-gate': { char: '\uea3e', label: 'Metal Gate', category: 'rpg' },
+  'ra-microphone': { char: '\uea3f', label: 'Microphone', category: 'electronics' },
+  'ra-mine-wagon': { char: '\uea40', label: 'Mine Wagon', category: 'rpg' },
+  'ra-mining-diamonds': { char: '\uea41', label: 'Mining Diamonds', category: 'magic' },
+  'ra-mirror': { char: '\uea42', label: 'Mirror', category: 'inventory' },
+  'ra-monster-skull': { char: '\uea43', label: 'Monster Skull', category: 'creatures' },
+  'ra-moon-sun': { char: '\uea45', label: 'Moon Sun', category: 'astrology' },
+  'ra-mountains': { char: '\uea44', label: 'Mountains', category: 'rpg' },
+  'ra-mp5': { char: '\uea46', label: 'Mp5', category: 'weapons' },
+  'ra-muscle-fat': { char: '\uea47', label: 'Muscle Fat', category: 'player' },
+  'ra-muscle-up': { char: '\uea48', label: 'Muscle Up', category: 'player' },
+  'ra-musket': { char: '\uea49', label: 'Musket', category: 'weapons' },
+  'ra-nails': { char: '\uea4a', label: 'Nails', category: 'inventory' },
+  'ra-nodular': { char: '\uea4b', label: 'Nodular', category: 'rpg' },
+  'ra-noose': { char: '\uea4c', label: 'Noose', category: 'dangers' },
+  'ra-nuclear': { char: '\uea4d', label: 'Nuclear', category: 'electronics' },
+  'ra-ocarina': { char: '\uea4e', label: 'Ocarina', category: 'inventory' },
+  'ra-ocean-emblem': { char: '\uea4f', label: 'Ocean Emblem', category: 'rpg' },
+  'ra-octopus': { char: '\uea50', label: 'Octopus', category: 'creatures' },
+  'ra-omega': { char: '\uea51', label: 'Omega', category: 'rpg' },
+  'ra-on-target': { char: '\uea52', label: 'On Target', category: 'rpg' },
+  'ra-ophiuchus': { char: '\uea53', label: 'Ophiuchus', category: 'astrology' },
+  'ra-overhead': { char: '\uea54', label: 'Overhead', category: 'rpg' },
+  'ra-overmind': { char: '\uea55', label: 'Overmind', category: 'rpg' },
+  'ra-palm-tree': { char: '\uea56', label: 'Palm Tree', category: 'plants' },
+  'ra-pawn': { char: '\uea57', label: 'Pawn', category: 'cards-dice' },
+  'ra-pawprint': { char: '\uea58', label: 'Pawprint', category: 'player' },
+  'ra-perspective-dice-five': { char: '\uea59', label: 'Perspective Dice Five', category: 'cards-dice' },
+  'ra-perspective-dice-four': { char: '\uea5a', label: 'Perspective Dice Four', category: 'cards-dice' },
+  'ra-perspective-dice-one': { char: '\uea5b', label: 'Perspective Dice One', category: 'cards-dice' },
+  'ra-perspective-dice-random': { char: '\uea5c', label: 'Perspective Dice Random', category: 'cards-dice' },
+  'ra-perspective-dice-six': { char: '\uea5e', label: 'Perspective Dice Six', category: 'cards-dice' },
+  'ra-perspective-dice-three': { char: '\uea5f', label: 'Perspective Dice Three', category: 'cards-dice' },
+  'ra-perspective-dice-two': { char: '\uea5d', label: 'Perspective Dice Two', category: 'cards-dice' },
+  'ra-pill': { char: '\uea60', label: 'Pill', category: 'inventory' },
+  'ra-pills': { char: '\uea61', label: 'Pills', category: 'inventory' },
+  'ra-pine-tree': { char: '\uea62', label: 'Pine Tree', category: 'plants' },
+  'ra-ping-pong': { char: '\uea63', label: 'Ping Pong', category: 'inventory' },
+  'ra-pisces': { char: '\uea64', label: 'Pisces', category: 'astrology' },
+  'ra-plain-dagger': { char: '\uea65', label: 'Plain Dagger', category: 'weapons' },
+  'ra-player': { char: '\uea6f', label: 'Player', category: 'player' },
+  'ra-player-despair': { char: '\uea66', label: 'Player Despair', category: 'player' },
+  'ra-player-dodge': { char: '\uea67', label: 'Player Dodge', category: 'player' },
+  'ra-player-king': { char: '\uea68', label: 'Player King', category: 'player' },
+  'ra-player-lift': { char: '\uea69', label: 'Player Lift', category: 'player' },
+  'ra-player-pain': { char: '\uea6a', label: 'Player Pain', category: 'player' },
+  'ra-player-pyromaniac': { char: '\uea6b', label: 'Player Pyromaniac', category: 'player' },
+  'ra-player-shot': { char: '\uea6c', label: 'Player Shot', category: 'player' },
+  'ra-player-teleport': { char: '\uea6d', label: 'Player Teleport', category: 'player' },
+  'ra-player-thunder-struck': { char: '\uea6e', label: 'Player Thunder Struck', category: 'player' },
+  'ra-podium': { char: '\uea70', label: 'Podium', category: 'rpg' },
+  'ra-poison-cloud': { char: '\uea71', label: 'Poison Cloud', category: 'dangers' },
+  'ra-potion': { char: '\uea72', label: 'Potion', category: 'potions' },
+  'ra-pyramids': { char: '\uea73', label: 'Pyramids', category: 'rpg' },
+  'ra-queen-crown': { char: '\uea74', label: 'Queen Crown', category: 'armor' },
+  'ra-quill-ink': { char: '\uea75', label: 'Quill Ink', category: 'inventory' },
+  'ra-rabbit': { char: '\uea76', label: 'Rabbit', category: 'creatures' },
+  'ra-radar-dish': { char: '\uea77', label: 'Radar Dish', category: 'electronics' },
+  'ra-radial-balance': { char: '\uea78', label: 'Radial Balance', category: 'rpg' },
+  'ra-radioactive': { char: '\uea79', label: 'Radioactive', category: 'electronics' },
+  'ra-raven': { char: '\uea7a', label: 'Raven', category: 'creatures' },
+  'ra-reactor': { char: '\uea7b', label: 'Reactor', category: 'electronics' },
+  'ra-recycle': { char: '\uea7c', label: 'Recycle', category: 'electronics' },
+  'ra-regeneration': { char: '\uea7d', label: 'Regeneration', category: 'electronics' },
+  'ra-relic-blade': { char: '\uea7e', label: 'Relic Blade', category: 'weapons' },
+  'ra-repair': { char: '\uea7f', label: 'Repair', category: 'electronics' },
+  'ra-reverse': { char: '\uea80', label: 'Reverse', category: 'rpg' },
+  'ra-revolver': { char: '\uea81', label: 'Revolver', category: 'weapons' },
+  'ra-rifle': { char: '\uea82', label: 'Rifle', category: 'weapons' },
+  'ra-ringing-bell': { char: '\uea83', label: 'Ringing Bell', category: 'inventory' },
+  'ra-roast-chicken': { char: '\uea84', label: 'Roast Chicken', category: 'food' },
+  'ra-robot-arm': { char: '\uea85', label: 'Robot Arm', category: 'electronics' },
+  'ra-round-bottom-flask': { char: '\uea86', label: 'Round Bottom Flask', category: 'potions' },
+  'ra-round-shield': { char: '\uea87', label: 'Round Shield', category: 'armor' },
+  'ra-rss': { char: '\uea88', label: 'Rss', category: 'electronics' },
+  'ra-rune-stone': { char: '\uea89', label: 'Rune Stone', category: 'magic' },
+  'ra-sagittarius': { char: '\uea8a', label: 'Sagittarius', category: 'astrology' },
+  'ra-sapphire': { char: '\uea8b', label: 'Sapphire', category: 'magic' },
+  'ra-satellite': { char: '\uea8c', label: 'Satellite', category: 'electronics' },
+  'ra-save': { char: '\uea8d', label: 'Save', category: 'electronics' },
+  'ra-scorpio': { char: '\uea8e', label: 'Scorpio', category: 'astrology' },
+  'ra-scroll-unfurled': { char: '\uea8f', label: 'Scroll Unfurled', category: 'magic' },
+  'ra-scythe': { char: '\uea90', label: 'Scythe', category: 'weapons' },
+  'ra-sea-serpent': { char: '\uea91', label: 'Sea Serpent', category: 'creatures' },
+  'ra-seagull': { char: '\uea92', label: 'Seagull', category: 'creatures' },
+  'ra-shark': { char: '\uea93', label: 'Shark', category: 'creatures' },
+  'ra-sheep': { char: '\uea94', label: 'Sheep', category: 'creatures' },
+  'ra-sheriff': { char: '\uea95', label: 'Sheriff', category: 'inventory' },
+  'ra-shield': { char: '\uea96', label: 'Shield', category: 'armor' },
+  'ra-ship-emblem': { char: '\uea97', label: 'Ship Emblem', category: 'inventory' },
+  'ra-shoe-prints': { char: '\uea98', label: 'Shoe Prints', category: 'player' },
+  'ra-shot-through-the-heart': { char: '\uea99', label: 'Shot Through The Heart', category: 'dangers' },
+  'ra-shotgun-shell': { char: '\uea9a', label: 'Shotgun Shell', category: 'weapons' },
+  'ra-shovel': { char: '\uea9b', label: 'Shovel', category: 'weapons' },
+  'ra-shuriken': { char: '\uea9c', label: 'Shuriken', category: 'weapons' },
+  'ra-sickle': { char: '\uea9d', label: 'Sickle', category: 'weapons' },
+  'ra-sideswipe': { char: '\uea9e', label: 'Sideswipe', category: 'rpg' },
+  'ra-site': { char: '\uea9f', label: 'Site', category: 'rpg' },
+  'ra-skull': { char: '\ueaa1', label: 'Skull', category: 'dangers' },
+  'ra-skull-trophy': { char: '\ueaa0', label: 'Skull Trophy', category: 'dangers' },
+  'ra-slash-ring': { char: '\ueaa2', label: 'Slash Ring', category: 'inventory' },
+  'ra-small-fire': { char: '\ueaa3', label: 'Small Fire', category: 'magic' },
+  'ra-snail': { char: '\ueaa4', label: 'Snail', category: 'creatures' },
+  'ra-snake': { char: '\ueaa5', label: 'Snake', category: 'creatures' },
+  'ra-snorkel': { char: '\ueaa6', label: 'Snorkel', category: 'inventory' },
+  'ra-snowflake': { char: '\ueaa7', label: 'Snowflake', category: 'magic' },
+  'ra-soccer-ball': { char: '\ueaa8', label: 'Soccer Ball', category: 'inventory' },
+  'ra-spades': { char: '\ueaaa', label: 'Spades', category: 'cards-dice' },
+  'ra-spades-card': { char: '\ueaa9', label: 'Spades Card', category: 'cards-dice' },
+  'ra-spawn-node': { char: '\ueaab', label: 'Spawn Node', category: 'rpg' },
+  'ra-spear-head': { char: '\ueaac', label: 'Spear Head', category: 'weapons' },
+  'ra-speech-bubble': { char: '\ueaad', label: 'Speech Bubble', category: 'electronics' },
+  'ra-speech-bubbles': { char: '\ueaae', label: 'Speech Bubbles', category: 'electronics' },
+  'ra-spider-face': { char: '\ueaaf', label: 'Spider Face', category: 'creatures' },
+  'ra-spikeball': { char: '\ueab0', label: 'Spikeball', category: 'dangers' },
+  'ra-spiked-mace': { char: '\ueab1', label: 'Spiked Mace', category: 'weapons' },
+  'ra-spiked-tentacle': { char: '\ueab2', label: 'Spiked Tentacle', category: 'creatures' },
+  'ra-spinning-sword': { char: '\ueab3', label: 'Spinning Sword', category: 'weapons' },
+  'ra-spiral-shell': { char: '\ueab4', label: 'Spiral Shell', category: 'creatures' },
+  'ra-splash': { char: '\ueab5', label: 'Splash', category: 'rpg' },
+  'ra-spray-can': { char: '\ueab6', label: 'Spray Can', category: 'inventory' },
+  'ra-sprout': { char: '\ueab8', label: 'Sprout', category: 'plants' },
+  'ra-sprout-emblem': { char: '\ueab7', label: 'Sprout Emblem', category: 'plants' },
+  'ra-stopwatch': { char: '\ueab9', label: 'Stopwatch', category: 'inventory' },
+  'ra-suckered-tentacle': { char: '\ueaba', label: 'Suckered Tentacle', category: 'creatures' },
+  'ra-suits': { char: '\ueabb', label: 'Suits', category: 'cards-dice' },
+  'ra-sun': { char: '\ueabd', label: 'Sun', category: 'magic' },
+  'ra-sun-symbol': { char: '\ueabc', label: 'Sun Symbol', category: 'magic' },
+  'ra-sunbeams': { char: '\ueabe', label: 'Sunbeams', category: 'magic' },
+  'ra-super-mushroom': { char: '\ueabf', label: 'Super Mushroom', category: 'plants' },
+  'ra-supersonic-arrow': { char: '\ueac0', label: 'Supersonic Arrow', category: 'weapons' },
+  'ra-surveillance-camera': { char: '\ueac1', label: 'Surveillance Camera', category: 'electronics' },
+  'ra-sword': { char: '\ue946', label: 'Sword', category: 'weapons' },
+  'ra-syringe': { char: '\ueac2', label: 'Syringe', category: 'inventory' },
+  'ra-target-arrows': { char: '\ueac3', label: 'Target Arrows', category: 'weapons' },
+  'ra-target-laser': { char: '\ueac4', label: 'Target Laser', category: 'rpg' },
+  'ra-targeted': { char: '\ueac5', label: 'Targeted', category: 'rpg' },
+  'ra-taurus': { char: '\ueac6', label: 'Taurus', category: 'astrology' },
+  'ra-telescope': { char: '\ueac7', label: 'Telescope', category: 'electronics' },
+  'ra-tentacle': { char: '\ueac8', label: 'Tentacle', category: 'creatures' },
+  'ra-tesla': { char: '\ueac9', label: 'Tesla', category: 'electronics' },
+  'ra-thorn-arrow': { char: '\ueaca', label: 'Thorn Arrow', category: 'weapons' },
+  'ra-thorny-vine': { char: '\ueacb', label: 'Thorny Vine', category: 'plants' },
+  'ra-three-keys': { char: '\ueacc', label: 'Three Keys', category: 'inventory' },
+  'ra-tic-tac-toe': { char: '\ueacd', label: 'Tic Tac Toe', category: 'inventory' },
+  'ra-toast': { char: '\ueace', label: 'Toast', category: 'food' },
+  'ra-tombstone': { char: '\ueacf', label: 'Tombstone', category: 'dangers' },
+  'ra-tooth': { char: '\uead0', label: 'Tooth', category: 'inventory' },
+  'ra-torch': { char: '\uead1', label: 'Torch', category: 'inventory' },
+  'ra-tower': { char: '\uead2', label: 'Tower', category: 'rpg' },
+  'ra-trail': { char: '\uead3', label: 'Trail', category: 'rpg' },
+  'ra-trefoil-lily': { char: '\uead4', label: 'Trefoil Lily', category: 'plants' },
+  'ra-trident': { char: '\uead5', label: 'Trident', category: 'weapons' },
+  'ra-triforce': { char: '\uead6', label: 'Triforce', category: 'magic' },
+  'ra-trophy': { char: '\uead7', label: 'Trophy', category: 'inventory' },
+  'ra-turd': { char: '\uead8', label: 'Turd', category: 'inventory' },
+  'ra-two-dragons': { char: '\uead9', label: 'Two Dragons', category: 'creatures' },
+  'ra-two-hearts': { char: '\ueada', label: 'Two Hearts', category: 'magic' },
+  'ra-uncertainty': { char: '\ueadb', label: 'Uncertainty', category: 'rpg' },
+  'ra-underhand': { char: '\ueadc', label: 'Underhand', category: 'rpg' },
+  'ra-unplugged': { char: '\ueadd', label: 'Unplugged', category: 'electronics' },
+  'ra-vase': { char: '\ueade', label: 'Vase', category: 'potions' },
+  'ra-venomous-snake': { char: '\ueadf', label: 'Venomous Snake', category: 'creatures' },
+  'ra-vest': { char: '\ueae0', label: 'Vest', category: 'armor' },
+  'ra-vial': { char: '\ueae1', label: 'Vial', category: 'potions' },
+  'ra-vine-whip': { char: '\ueae2', label: 'Vine Whip', category: 'weapons' },
+  'ra-virgo': { char: '\ueae3', label: 'Virgo', category: 'astrology' },
+  'ra-water-drop': { char: '\ueae4', label: 'Water Drop', category: 'magic' },
+  'ra-wifi': { char: '\ueae5', label: 'Wifi', category: 'electronics' },
+  'ra-wireless-signal': { char: '\ueae6', label: 'Wireless Signal', category: 'electronics' },
+  'ra-wolf-head': { char: '\ueae7', label: 'Wolf Head', category: 'creatures' },
+  'ra-wolf-howl': { char: '\ueae8', label: 'Wolf Howl', category: 'creatures' },
+  'ra-wooden-sign': { char: '\ueae9', label: 'Wooden Sign', category: 'inventory' },
+  'ra-wrench': { char: '\ueaea', label: 'Wrench', category: 'inventory' },
+  'ra-wyvern': { char: '\ueaeb', label: 'Wyvern', category: 'creatures' },
+  'ra-x-mark': { char: '\ueaec', label: 'X Mark', category: 'dangers' },
+  'ra-zebra-shield': { char: '\ueaed', label: 'Zebra Shield', category: 'armor' },
+  'ra-zigzag-leaf': { char: '\ueaee', label: 'Zigzag Leaf', category: 'plants' },
+};
+
+/**
+ * Get the character for an icon class
+ */
+function getIconChar(iconClass: string): string | null {
+  const icon = RA_ICONS[iconClass];
+  return icon ? icon.char : null;
+}
+
+/**
+ * Get full info for an icon
+ */
+function getIconInfo(iconClass: string): IconData | null {
+  return RA_ICONS[iconClass] || null;
+}
+
+/**
+ * Get all icons in a category
+ */
+function getIconsByCategory(categoryId: string): IconWithClass[] {
+  return Object.entries(RA_ICONS)
+    .filter(([_, data]) => data.category === categoryId)
+    .map(([iconClass, data]) => ({ iconClass, ...data }));
+}
+
+/**
+ * Search icons by label or class name
+ */
+function searchIcons(query: string): IconWithClass[] {
+  const lowerQuery = query.toLowerCase();
+  return Object.entries(RA_ICONS)
+    .filter(([iconClass, data]) =>
+      iconClass.toLowerCase().includes(lowerQuery) ||
+      data.label.toLowerCase().includes(lowerQuery)
+    )
+    .map(([iconClass, data]) => ({ iconClass, ...data }));
+}
+
+/**
+ * Get all icon class names
+ */
+function getAllIconClasses(): string[] {
+  return Object.keys(RA_ICONS);
+}
+
+return {
+  RA_CATEGORIES,
+  RA_ICONS,
+  getIconChar,
+  getIconInfo,
+  getIconsByCategory,
+  searchIcons,
+  getAllIconClasses
+};
+
+```
+
+# objectTypeResolver
+
+```ts
+/**
+ * objectTypeResolver.ts
+ *
+ * Resolves object types by merging built-in definitions with user customizations.
+ * Handles:
+ * - Object overrides (modified built-ins)
+ * - Hidden objects
+ * - Custom objects
+ * - Custom categories
+ * - Unknown object fallback
+ */
+
+import type { MapType } from '#types/core/map.types';
+import type { IconData, IconMap } from '#types/objects/icon.types';
+
+// Types from #types/objects/object.types.ts and #types/settings/settings.types.ts
+// Duplicated here for datacore runtime compatibility (path aliases not resolved at runtime)
+
+/** Base object type (from objectTypes.ts) */
+interface ObjectType {
+  id: string;
+  symbol: string;
+  label: string;
+  category: string;
+}
+
+/** Resolved object type definition */
+interface ObjectTypeDefinition {
+  id: string;
+  symbol?: string;
+  iconClass?: string;
+  imagePath?: string;  // Vault image path for custom image objects
+  label: string;
+  category: string;
+  order?: number;
+  isBuiltIn?: boolean;
+  isModified?: boolean;
+  isCustom?: boolean;
+  isHidden?: boolean;
+  isUnknown?: boolean;
+}
+
+/** Base category (from objectTypes.ts) */
+interface Category {
+  id: string;
+  label: string;
+}
+
+/** Resolved category definition */
+interface CategoryDefinition {
+  id: string;
+  label: string;
+  order?: number;
+  isBuiltIn?: boolean;
+  isCustom?: boolean;
+}
+
+/** Object override settings */
+interface ObjectOverride {
+  hidden?: boolean;
+  symbol?: string;
+  iconClass?: string;
+  label?: string;
+  category?: string;
+  order?: number;
+}
+
+/** Object settings from settings accessor */
+interface ObjectSettings {
+  objectOverrides?: Record<string, ObjectOverride>;
+  customObjects?: ObjectTypeDefinition[];
+  customCategories?: CategoryDefinition[];
+}
+
+/** Render character result */
+interface RenderChar {
+  char: string;
+  isIcon: boolean;
+  isImage?: boolean;    // True if rendering via image (imagePath)
+  imagePath?: string;   // Vault image path for image rendering
+}
+
+/** Validation result */
+interface ValidationResult {
+  valid: boolean;
+  errors: string[];
+}
+
+/** Object types module */
+interface ObjectTypesModule {
+  OBJECT_TYPES: ObjectType[];
+  CATEGORIES: Category[];
+}
+
+/** Settings accessor module */
+interface SettingsAccessorModule {
+  getObjectSettings: (mapType: MapType) => ObjectSettings;
+}
+
+/** RPG Awesome icons module */
+interface RPGAwesomeIconsModule {
+  RA_ICONS: IconMap;
+  getIconChar: (iconClass: string) => string | null;
+  getIconInfo: (iconClass: string) => IconData | null;
+}
+
+const { OBJECT_TYPES, CATEGORIES } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "objectTypes")) as ObjectTypesModule;
+const { getObjectSettings } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "settingsAccessor")) as SettingsAccessorModule;
+const { RA_ICONS, getIconChar, getIconInfo } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "rpgAwesomeIcons")) as RPGAwesomeIconsModule;
+
+/**
+ * Fallback for unknown/deleted object types
+ * Used when a map references an object type that no longer exists
+ */
+const UNKNOWN_OBJECT_FALLBACK: ObjectTypeDefinition = {
+  id: '__unknown__',
+  symbol: '?',
+  label: 'Unknown Object',
+  category: 'markers',
+  isUnknown: true
+};
+
+/**
+ * Check if an object type uses an RPGAwesome icon
+ */
+function hasIconClass(objectType: ObjectTypeDefinition | null | undefined): boolean {
+  return objectType != null && typeof objectType.iconClass === 'string' && objectType.iconClass.length > 0;
+}
+
+/**
+ * Check if an object type uses a custom image
+ */
+function hasImagePath(objectType: ObjectTypeDefinition | null | undefined): boolean {
+  return objectType != null && typeof objectType.imagePath === 'string' && objectType.imagePath.length > 0;
+}
+
+/**
+ * Get the render character for an object type
+ * Handles imagePath (custom image), iconClass (RPGAwesome), and symbol (Unicode) with fallback
+ */
+function getRenderChar(objectType: ObjectTypeDefinition | null | undefined): RenderChar {
+  if (!objectType) {
+    return { char: '?', isIcon: false };
+  }
+
+  // Check for custom image first (highest priority)
+  if (hasImagePath(objectType)) {
+    return { char: '', isIcon: false, isImage: true, imagePath: objectType.imagePath };
+  }
+
+  // If iconClass is set, try to get the icon character
+  if (hasIconClass(objectType)) {
+    const iconChar = getIconChar(objectType.iconClass!);
+    if (iconChar) {
+      return { char: iconChar, isIcon: true };
+    }
+    // iconClass was set but invalid - fall through to symbol/fallback
+    console.warn(`[objectTypeResolver] Invalid iconClass: ${objectType.iconClass}`);
+  }
+
+  // Use symbol if available
+  if (objectType.symbol) {
+    return { char: objectType.symbol, isIcon: false };
+  }
+
+  // Final fallback
+  return { char: '?', isIcon: false };
+}
+
+/**
+ * Validate an iconClass value
+ */
+function isValidIconClass(iconClass: string | null | undefined): boolean {
+  if (!iconClass || typeof iconClass !== 'string') return false;
+  return Object.prototype.hasOwnProperty.call(RA_ICONS, iconClass);
+}
+
+/**
+ * Default category order for built-in categories
+ */
+const BUILT_IN_CATEGORY_ORDER: Record<string, number> = {
+  'notes': 0,
+  'navigation': 10,
+  'hazards': 20,
+  'features': 30,
+  'encounters': 40,
+  'markers': 50
+};
+
+/**
+ * Get effective object types list (built-ins + overrides + custom)
+ * This is the main function consumers should use for listing available objects.
+ */
+function getResolvedObjectTypes(mapType: MapType = 'grid'): ObjectTypeDefinition[] {
+  const settings = getObjectSettings(mapType);
+  const { objectOverrides = {}, customObjects = [] } = settings;
+
+  // Apply overrides to built-ins, filter out hidden ones
+  // Built-in objects get default order based on their index in OBJECT_TYPES
+  const resolvedBuiltIns = OBJECT_TYPES
+    .filter(obj => !objectOverrides[obj.id]?.hidden)
+    .map((obj, index) => {
+      const override = objectOverrides[obj.id];
+      const defaultOrder = index * 10; // Leave gaps for reordering
+      if (override) {
+        // Merge override properties (excluding 'hidden' which is handled above)
+        const { hidden, ...overrideProps } = override;
+        return {
+          ...obj,
+          ...overrideProps,
+          order: override.order ?? defaultOrder,
+          isBuiltIn: true,
+          isModified: true
+        };
+      }
+      return {
+        ...obj,
+        order: defaultOrder,
+        isBuiltIn: true,
+        isModified: false
+      };
+    });
+
+  // Add custom objects with their flag
+  // Custom objects use their order or a high default to appear at the end
+  const resolvedCustom = customObjects.map((obj, index) => ({
+    ...obj,
+    order: obj.order ?? (1000 + index * 10),
+    isCustom: true,
+    isBuiltIn: false
+  }));
+
+  return [...resolvedBuiltIns, ...resolvedCustom];
+}
+
+/**
+ * Get effective categories list (built-ins + custom), sorted by order
+ */
+function getResolvedCategories(mapType: MapType = 'grid'): CategoryDefinition[] {
+  const settings = getObjectSettings(mapType);
+  const { customCategories = [] } = settings;
+
+  // Add order to built-in categories
+  const resolvedBuiltIns = CATEGORIES.map(c => ({
+    ...c,
+    isBuiltIn: true,
+    order: BUILT_IN_CATEGORY_ORDER[c.id] ?? 50
+  }));
+
+  // Add custom categories with their flags
+  const resolvedCustom = customCategories.map(c => ({
+    ...c,
+    isCustom: true,
+    isBuiltIn: false,
+    order: c.order ?? 100 // Default custom categories to end
+  }));
+
+  // Combine and sort by order
+  return [...resolvedBuiltIns, ...resolvedCustom]
+    .sort((a, b) => (a.order ?? 50) - (b.order ?? 50));
+}
+
+/**
+ * Get list of hidden built-in objects
+ * Useful for showing a "hidden objects" section in settings
+ */
+function getHiddenObjects(mapType: MapType = 'grid'): ObjectTypeDefinition[] {
+  const settings = getObjectSettings(mapType);
+  const { objectOverrides = {} } = settings;
+
+  return OBJECT_TYPES
+    .filter(obj => objectOverrides[obj.id]?.hidden)
+    .map(obj => ({
+      ...obj,
+      isBuiltIn: true,
+      isHidden: true
+    }));
+}
+
+/**
+ * Get a single object type by ID
+ * Returns the resolved version (with overrides applied) or fallback for unknown
+ */
+function getObjectType(typeId: string | null | undefined, mapType: MapType = 'grid'): ObjectTypeDefinition {
+  // Handle null/undefined
+  if (!typeId) {
+    return UNKNOWN_OBJECT_FALLBACK;
+  }
+
+  // Special case: return the fallback directly if requested
+  if (typeId === '__unknown__') {
+    return UNKNOWN_OBJECT_FALLBACK;
+  }
+
+  const settings = getObjectSettings(mapType);
+  const { objectOverrides = {}, customObjects = [] } = settings;
+
+  // Check built-in objects first (including hidden ones - they still need to render)
+  const builtIn = OBJECT_TYPES.find(t => t.id === typeId);
+  if (builtIn) {
+    const override = objectOverrides[typeId];
+    if (override) {
+      const { hidden, ...overrideProps } = override;
+      return {
+        ...builtIn,
+        ...overrideProps,
+        isBuiltIn: true,
+        isModified: true,
+        isHidden: hidden || false
+      };
+    }
+    return {
+      ...builtIn,
+      isBuiltIn: true,
+      isModified: false
+    };
+  }
+
+  // Check custom objects
+  const custom = customObjects.find(t => t.id === typeId);
+  if (custom) {
+    return {
+      ...custom,
+      isCustom: true,
+      isBuiltIn: false
+    };
+  }
+
+  // Not found - return fallback
+  return UNKNOWN_OBJECT_FALLBACK;
+}
+
+/**
+ * Check if an object type exists (built-in or custom, not hidden)
+ */
+function objectTypeExists(typeId: string, mapType: MapType = 'grid'): boolean {
+  const objType = getObjectType(typeId, mapType);
+  return objType.id !== '__unknown__' && !objType.isHidden;
+}
+
+/**
+ * Get the original (unmodified) built-in object definition
+ * Used for "reset to default" functionality
+ */
+function getOriginalBuiltIn(typeId: string): ObjectTypeDefinition | null {
+  const builtIn = OBJECT_TYPES.find(t => t.id === typeId);
+  return builtIn ? { ...builtIn, isBuiltIn: true } : null;
+}
+
+/**
+ * Generate a unique ID for a custom object
+ */
+function generateCustomObjectId(): string {
+  return 'custom-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+}
+
+/**
+ * Generate a unique ID for a custom category
+ */
+function generateCustomCategoryId(): string {
+  return 'custom-cat-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+}
+
+/**
+ * Validate a symbol string
+ * Returns true if the symbol is valid (non-empty, reasonable length)
+ */
+function isValidSymbol(symbol: string | null | undefined): boolean {
+  if (!symbol || typeof symbol !== 'string') return false;
+  // Allow 1-4 characters (some emoji are multi-codepoint)
+  const trimmed = symbol.trim();
+  return trimmed.length >= 1 && trimmed.length <= 8;
+}
+
+/**
+ * Validate an image path
+ * Returns true if the path is a non-empty string
+ */
+function isValidImagePath(imagePath: string | null | undefined): boolean {
+  return typeof imagePath === 'string' && imagePath.trim().length > 0;
+}
+
+/**
+ * Validate an object definition
+ * Objects can have a symbol (Unicode), iconClass (RPGAwesome), or imagePath (custom image)
+ */
+function validateObjectDefinition(obj: Partial<ObjectTypeDefinition>): ValidationResult {
+  const errors: string[] = [];
+
+  const hasSymbol = obj.symbol && isValidSymbol(obj.symbol);
+  const hasIcon = obj.iconClass && isValidIconClass(obj.iconClass);
+  const hasImage = obj.imagePath && isValidImagePath(obj.imagePath);
+
+  // Must have at least one of symbol, iconClass, or imagePath
+  if (!hasSymbol && !hasIcon && !hasImage) {
+    if (obj.iconClass && !hasIcon) {
+      errors.push('Invalid icon selection');
+    } else if (obj.symbol && !hasSymbol) {
+      errors.push('Symbol must be 1-8 characters');
+    } else if (obj.imagePath && !hasImage) {
+      errors.push('Invalid image path');
+    } else {
+      errors.push('Either a symbol, icon, or image is required');
+    }
+  }
+
+  if (!obj.label || typeof obj.label !== 'string' || obj.label.trim().length === 0) {
+    errors.push('Label is required');
+  }
+
+  if (!obj.category || typeof obj.category !== 'string') {
+    errors.push('Category is required');
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors
+  };
+}
+
+// Export all functions
+return {
+  // Core resolution
+  getResolvedObjectTypes,
+  getResolvedCategories,
+  getObjectType,
+  getHiddenObjects,
+
+  // Icon/symbol/image helpers
+  hasIconClass,
+  hasImagePath,
+  getRenderChar,
+  isValidIconClass,
+  isValidImagePath,
+
+  // Utilities
+  objectTypeExists,
+  getOriginalBuiltIn,
+  generateCustomObjectId,
+  generateCustomCategoryId,
+  isValidSymbol,
+  validateObjectDefinition,
+
+  // Constants
+  UNKNOWN_OBJECT_FALLBACK,
+  BUILT_IN_CATEGORY_ORDER,
+
+  // Re-export icon data for convenience
+  RA_ICONS
+};
+
+```
+
 # useMapData
 
 ```ts
@@ -2400,6 +3546,11 @@ const { getEffectiveSettings } = await dc.require(dc.headerLink(dc.resolvePath("
   getEffectiveSettings: (mapSettings: MapData['settings']) => PluginSettings;
 };
 
+const { getResolvedObjectTypes, hasImagePath } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "objectTypeResolver")) as {
+  getResolvedObjectTypes: (mapType: MapType) => Array<{ id: string; imagePath?: string }>;
+  hasImagePath: (obj: { imagePath?: string }) => boolean;
+};
+
 /**
  * Hook for managing map data loading, saving, and state.
  *
@@ -2419,6 +3570,7 @@ function useMapData(
   const [pendingData, setPendingData] = dc.useState<MapData | null>(null);
   const [backgroundImageReady, setBackgroundImageReady] = dc.useState<boolean>(false);
   const [fowImageReady, setFowImageReady] = dc.useState<boolean>(false);
+  const [settingsVersion, setSettingsVersion] = dc.useState<number>(0);
   const saveTimerRef = dc.useRef<ReturnType<typeof setTimeout> | null>(null);
   const saveVersionRef = dc.useRef<number>(0);
 
@@ -2464,6 +3616,33 @@ function useMapData(
       setFowImageReady(false);
     }
   }, [mapData?.settings]);
+
+  // Preload custom object images when map loads or settings change
+  dc.useEffect(() => {
+    if (!mapData) return;
+
+    const objectTypes = getResolvedObjectTypes(mapData.mapType);
+    const imageObjects = objectTypes.filter(hasImagePath);
+
+    for (const objType of imageObjects) {
+      if (objType.imagePath) {
+        preloadImage(objType.imagePath);
+      }
+    }
+  }, [mapData?.mapType, settingsVersion]);
+
+  // Listen for settings changes to trigger image preload
+  dc.useEffect(() => {
+    const handleSettingsChange = (): void => {
+      setSettingsVersion((prev: number) => prev + 1);
+    };
+
+    window.addEventListener('dmt-settings-changed', handleSettingsChange);
+
+    return () => {
+      window.removeEventListener('dmt-settings-changed', handleSettingsChange);
+    };
+  }, []);
 
   // Debounced save effect
   dc.useEffect(() => {
@@ -2777,8 +3956,7 @@ function useLayerHistory({
     name: "",
     objects: [],
     textLabels: [],
-    edges: [],
-    curves: []
+    edges: []
   };
 
   const {
@@ -2819,8 +3997,7 @@ function useLayerHistory({
         name: mapData.name || '',
         objects: activeLayer.objects || [],
         textLabels: activeLayer.textLabels || [],
-        edges: activeLayer.edges || [],
-        curves: activeLayer.curves || []
+        edges: activeLayer.edges || []
       });
       historyInitialized.current = true;
     }
@@ -2839,8 +4016,7 @@ function useLayerHistory({
       name: name,
       objects: layer.objects || [],
       textLabels: layer.textLabels || [],
-      edges: layer.edges || [],
-      curves: layer.curves || []
+      edges: layer.edges || []
     }),
     []
   );
@@ -3009,8 +4185,7 @@ function useLayerHistory({
           cells: previousState.cells,
           objects: previousState.objects || [],
           textLabels: previousState.textLabels || [],
-          edges: previousState.edges || [],
-          curves: previousState.curves || []
+          edges: previousState.edges || []
         }
       );
       updateMapData(newMapData);
@@ -3032,8 +4207,7 @@ function useLayerHistory({
           cells: nextState.cells,
           objects: nextState.objects || [],
           textLabels: nextState.textLabels || [],
-          edges: nextState.edges || [],
-          curves: nextState.curves || []
+          edges: nextState.edges || []
         }
       );
       updateMapData(newMapData);
@@ -3524,7 +4698,6 @@ return { useFogOfWar };
 // Type-only imports
 import type { MapData, MapLayer, ViewState, TextLabelSettings } from '#types/core/map.types';
 import type { Cell } from '#types/core/cell.types';
-import type { Curve } from '#types/core/curve.types';
 import type { MapObject } from '#types/objects/object.types';
 import type { TextLabel } from '#types/objects/note.types';
 import type { HexColor } from '#types/core/common.types';
@@ -3566,15 +4739,14 @@ function useDataHandlers({
     name: name,
     objects: overrides.objects ?? layer.objects ?? [],
     textLabels: overrides.textLabels ?? layer.textLabels ?? [],
-    edges: overrides.edges ?? layer.edges ?? [],
-    curves: overrides.curves ?? layer.curves ?? []
+    edges: overrides.edges ?? layer.edges ?? []
   }), []);
 
   // =========================================================================
   // Factory: Create layer data change handler
   // =========================================================================
 
-  type LayerField = 'cells' | 'objects' | 'textLabels' | 'edges' | 'curves';
+  type LayerField = 'cells' | 'objects' | 'textLabels' | 'edges';
 
   const createLayerDataHandler = dc.useCallback(<T,>(field: LayerField) => {
     return (newValue: T, suppressHistory = false): void => {
@@ -3616,11 +4788,6 @@ function useDataHandlers({
 
   const handleEdgesChange = dc.useMemo(
     () => createLayerDataHandler<unknown[]>('edges'),
-    [createLayerDataHandler]
-  );
-
-  const handleCurvesChange = dc.useMemo(
-    () => createLayerDataHandler<Curve[]>('curves'),
     [createLayerDataHandler]
   );
 
@@ -3734,8 +4901,7 @@ function useDataHandlers({
     handleCellsChange,
     handleObjectsChange,
     handleTextLabelsChange,
-    handleEdgesChange,
-    handleCurvesChange
+    handleEdgesChange
   };
 
   const mapDataHandlers: MapDataHandlers = {
@@ -3759,7 +4925,6 @@ function useDataHandlers({
     handleObjectsChange,
     handleTextLabelsChange,
     handleEdgesChange,
-    handleCurvesChange,
     handleAddCustomColor,
     handleDeleteCustomColor,
     handleUpdateColorOpacity,
@@ -5593,1124 +6758,6 @@ return {
 
 ```
 
-# objectTypes
-
-```ts
-/**
- * objectTypes.ts
- *
- * Object type definitions for dungeon mapping.
- * Defines available object symbols and their categories.
- */
-
-// Types defined in #types/objects/object.types.ts
-// Duplicated here for datacore runtime compatibility
-interface ObjectType {
-  id: string;
-  symbol: string;
-  label: string;
-  category: string;
-}
-
-interface Category {
-  id: string;
-  label: string;
-}
-
-// ===========================================
-// Constants
-// ===========================================
-
-const OBJECT_TYPES: readonly ObjectType[] = [
-  // Notes
-  { id: 'note_pin', symbol: '📌', label: 'Note Pin', category: 'notes' },
-
-  // Navigation
-  { id: 'entrance', symbol: '⬤', label: 'Entrance/Exit', category: 'navigation' },
-  { id: 'stairs-up', symbol: '▲', label: 'Stairs Up', category: 'navigation' },
-  { id: 'stairs-down', symbol: '▼', label: 'Stairs Down', category: 'navigation' },
-  { id: 'ladder', symbol: '☍', label: 'Ladder', category: 'navigation' },
-  { id: 'door-vertical', symbol: '╏', label: 'Door (Vertical)', category: 'navigation' },
-  { id: 'door-horizontal', symbol: '╍', label: 'Door (Horizontal)', category: 'navigation' },
-  { id: 'secret-door', symbol: '≡', label: 'Secret Door', category: 'navigation' },
-  { id: 'portal', symbol: '⊛', label: 'Portal/Teleport', category: 'navigation' },
-  
-  // Hazards
-  { id: 'trap', symbol: '✱', label: 'Trap', category: 'hazards' },
-  { id: 'hazard', symbol: '⚠', label: 'Hazard', category: 'hazards' },
-  { id: 'pit', symbol: '◊', label: 'Pit', category: 'hazards' },
-  { id: 'poison', symbol: '☠', label: 'Poison', category: 'hazards' },
-  
-  // Features
-  { id: 'chest', symbol: '🪎', label: 'Chest/Treasure', category: 'features' },
-  { id: 'crate', symbol: '📦', label: 'Crate/Barrel', category: 'features' },
-  { id: 'sack', symbol: '💰', label: 'Sack/Bag', category: 'features' },
-  { id: 'altar', symbol: '⛧', label: 'Altar', category: 'features' },
-  { id: 'coffin', symbol: '⚰', label: 'Coffin', category: 'features' },
-  { id: 'statue', symbol: '♜', label: 'Statue', category: 'features' },
-  { id: 'cage', symbol: '⛓', label: 'Chains/Cage', category: 'features' },
-  { id: 'book', symbol: '🕮', label: 'Book/Shelf', category: 'features' },
-  { id: 'table', symbol: '▭', label: 'Table', category: 'features' },
-  { id: 'chair', symbol: '🪑', label: 'Chair', category: 'features' },
-  { id: 'bed', symbol: '🛏', label: 'Bed', category: 'features' },
-  { id: 'anvil', symbol: '⚒', label: 'Anvil/Forge', category: 'features' },
-  { id: 'cauldron', symbol: '⚗', label: 'Cauldron', category: 'features' },
-  { id: 'fountain', symbol: '⛲', label: 'Fountain', category: 'features' },
-  { id: 'lever', symbol: '⚡', label: 'Lever/Switch', category: 'features' },
-  { id: 'flower', symbol: '⚘', label: 'Flower', category: 'features' },
-  { id: 'plant', symbol: '⊕', label: 'Plant', category: 'features' },
-  { id: 'tree-dec', symbol: '🌳', label: 'Tree', category: 'features' },
-  { id: 'tree-ev', symbol: '🌲', label: 'Tree', category: 'features' },
-  { id: 'tree-lfls', symbol: '🪾', label: 'Tree', category: 'features' },
-  
-  // Encounters
-  { id: 'monster', symbol: '♅', label: 'Monster/Enemy', category: 'encounters' },
-  { id: 'boss', symbol: '♛', label: 'Boss', category: 'encounters' },
-  { id: 'boss-alt', symbol: '💀', label: 'Boss (alt)', category: 'encounters' },
-  { id: 'npc', symbol: '☺', label: 'NPC', category: 'encounters' },
-  { id: 'npc-alt', symbol: '🧝', label: 'NPC', category: 'encounters' },
-  { id: 'guard', symbol: '⚔', label: 'Guard', category: 'encounters' },
-  
-  // Markers
-  { id: 'poi', symbol: '◉', label: 'Point of Interest', category: 'markers' },
-  { id: 'flag', symbol: '⚑', label: 'Note/Flag', category: 'markers' }
-] as const;
-
-const CATEGORIES: readonly Category[] = [
-  { id: 'navigation', label: 'Navigation' },
-  { id: 'hazards', label: 'Hazards' },
-  { id: 'features', label: 'Features' },
-  { id: 'encounters', label: 'Encounters' },
-  { id: 'markers', label: 'Markers' }
-] as const;
-
-// ===========================================
-// Exports
-// ===========================================
-
-return { OBJECT_TYPES, CATEGORIES };
-```
-
-# rpgAwesomeIcons
-
-```ts
-/**
- * rpgAwesomeIcons.ts - Icon mapping and categories for RPGAwesome font
- * Generated from official rpg-awesome npm package v0.2.0
- * Source: scss/_variables.scss
- * License: SIL OFL 1.1 (Font), MIT (CSS)
- * Total icons: 496
- */
-
-import type { IconCategory, IconData, IconMap, IconWithClass } from '#types/objects/icon.types';
-
-/**
- * Icon categories for filtering in the picker UI
- */
-const RA_CATEGORIES: IconCategory[] = [
-  { id: 'weapons', label: 'Weapons', order: 10 },
-  { id: 'armor', label: 'Armor & Defense', order: 20 },
-  { id: 'creatures', label: 'Creatures', order: 30 },
-  { id: 'potions', label: 'Potions', order: 40 },
-  { id: 'magic', label: 'Magic', order: 50 },
-  { id: 'food', label: 'Food & Drink', order: 60 },
-  { id: 'plants', label: 'Plants', order: 70 },
-  { id: 'astrology', label: 'Astrology', order: 80 },
-  { id: 'cards-dice', label: 'Cards & Dice', order: 90 },
-  { id: 'electronics', label: 'Electronics', order: 100 },
-  { id: 'dangers', label: 'Dangers', order: 110 },
-  { id: 'player', label: 'Player', order: 120 },
-  { id: 'inventory', label: 'Inventory', order: 130 },
-  { id: 'rpg', label: 'RPG & Misc', order: 140 },
-];
-
-/**
- * Icon definitions - char is the actual Unicode character for canvas rendering
- * Codepoints are from the official _variables.scss file
- */
-const RA_ICONS: IconMap = {
-  'ra-acid': { char: '\ue900', label: 'Acid', category: 'dangers' },
-  'ra-acorn': { char: '\ue901', label: 'Acorn', category: 'food' },
-  'ra-alien-fire': { char: '\ue902', label: 'Alien Fire', category: 'magic' },
-  'ra-all-for-one': { char: '\ue903', label: 'All For One', category: 'rpg' },
-  'ra-alligator-clip': { char: '\ue904', label: 'Alligator Clip', category: 'inventory' },
-  'ra-ammo-bag': { char: '\ue905', label: 'Ammo Bag', category: 'inventory' },
-  'ra-anchor': { char: '\ue906', label: 'Anchor', category: 'rpg' },
-  'ra-angel-wings': { char: '\ue907', label: 'Angel Wings', category: 'rpg' },
-  'ra-ankh': { char: '\ue908', label: 'Ankh', category: 'rpg' },
-  'ra-anvil': { char: '\ue909', label: 'Anvil', category: 'rpg' },
-  'ra-apple': { char: '\ue90a', label: 'Apple', category: 'food' },
-  'ra-aquarius': { char: '\ue90b', label: 'Aquarius', category: 'astrology' },
-  'ra-arcane-mask': { char: '\ue90c', label: 'Arcane Mask', category: 'armor' },
-  'ra-archer': { char: '\ue90d', label: 'Archer', category: 'weapons' },
-  'ra-archery-target': { char: '\ue90e', label: 'Archery Target', category: 'weapons' },
-  'ra-arena': { char: '\ue90f', label: 'Arena', category: 'rpg' },
-  'ra-aries': { char: '\ue910', label: 'Aries', category: 'astrology' },
-  'ra-arrow-cluster': { char: '\ue911', label: 'Arrow Cluster', category: 'weapons' },
-  'ra-arrow-flights': { char: '\ue912', label: 'Arrow Flights', category: 'weapons' },
-  'ra-arson': { char: '\ue913', label: 'Arson', category: 'dangers' },
-  'ra-aura': { char: '\ue914', label: 'Aura', category: 'magic' },
-  'ra-aware': { char: '\ue915', label: 'Aware', category: 'player' },
-  'ra-axe': { char: '\ue917', label: 'Axe', category: 'weapons' },
-  'ra-axe-swing': { char: '\ue916', label: 'Axe Swing', category: 'weapons' },
-  'ra-ball': { char: '\ue918', label: 'Ball', category: 'inventory' },
-  'ra-barbed-arrow': { char: '\ue919', label: 'Barbed Arrow', category: 'weapons' },
-  'ra-barrier': { char: '\ue91a', label: 'Barrier', category: 'armor' },
-  'ra-bat-sword': { char: '\ue91b', label: 'Bat Sword', category: 'weapons' },
-  'ra-battered-axe': { char: '\ue91c', label: 'Battered Axe', category: 'weapons' },
-  'ra-batteries': { char: '\ue91d', label: 'Batteries', category: 'electronics' },
-  'ra-battery-0': { char: '\ue91e', label: 'Battery 0', category: 'electronics' },
-  'ra-battery-100': { char: '\ue922', label: 'Battery 100', category: 'electronics' },
-  'ra-battery-25': { char: '\ue91f', label: 'Battery 25', category: 'electronics' },
-  'ra-battery-50': { char: '\ue920', label: 'Battery 50', category: 'electronics' },
-  'ra-battery-75': { char: '\ue921', label: 'Battery 75', category: 'electronics' },
-  'ra-battery-black': { char: '\ue923', label: 'Battery Black', category: 'electronics' },
-  'ra-battery-negative': { char: '\ue924', label: 'Battery Negative', category: 'electronics' },
-  'ra-battery-positive': { char: '\ue925', label: 'Battery Positive', category: 'electronics' },
-  'ra-battery-white': { char: '\ue926', label: 'Battery White', category: 'electronics' },
-  'ra-batwings': { char: '\ue927', label: 'Batwings', category: 'rpg' },
-  'ra-beam-wake': { char: '\ue928', label: 'Beam Wake', category: 'rpg' },
-  'ra-bear-trap': { char: '\ue929', label: 'Bear Trap', category: 'dangers' },
-  'ra-beer': { char: '\ue92a', label: 'Beer', category: 'food' },
-  'ra-beetle': { char: '\ue92b', label: 'Beetle', category: 'creatures' },
-  'ra-bell': { char: '\ue92c', label: 'Bell', category: 'inventory' },
-  'ra-biohazard': { char: '\ue92d', label: 'Biohazard', category: 'dangers' },
-  'ra-bird-claw': { char: '\ue92e', label: 'Bird Claw', category: 'creatures' },
-  'ra-bird-mask': { char: '\ue92f', label: 'Bird Mask', category: 'armor' },
-  'ra-blade-bite': { char: '\ue930', label: 'Blade Bite', category: 'dangers' },
-  'ra-blast': { char: '\ue931', label: 'Blast', category: 'dangers' },
-  'ra-blaster': { char: '\ue932', label: 'Blaster', category: 'weapons' },
-  'ra-bleeding-eye': { char: '\ue933', label: 'Bleeding Eye', category: 'dangers' },
-  'ra-bleeding-hearts': { char: '\ue934', label: 'Bleeding Hearts', category: 'dangers' },
-  'ra-bolt-shield': { char: '\ue935', label: 'Bolt Shield', category: 'armor' },
-  'ra-bomb-explosion': { char: '\ue936', label: 'Bomb Explosion', category: 'dangers' },
-  'ra-bombs': { char: '\ue937', label: 'Bombs', category: 'weapons' },
-  'ra-bone-bite': { char: '\ue938', label: 'Bone Bite', category: 'dangers' },
-  'ra-bone-knife': { char: '\ue939', label: 'Bone Knife', category: 'weapons' },
-  'ra-book': { char: '\ue93a', label: 'Book', category: 'inventory' },
-  'ra-boomerang': { char: '\ue93b', label: 'Boomerang', category: 'weapons' },
-  'ra-boot-stomp': { char: '\ue93c', label: 'Boot Stomp', category: 'armor' },
-  'ra-bottle-vapors': { char: '\ue93d', label: 'Bottle Vapors', category: 'potions' },
-  'ra-bottled-bolt': { char: '\ue93e', label: 'Bottled Bolt', category: 'potions' },
-  'ra-bottom-right': { char: '\ue93f', label: 'Bottom Right', category: 'cards-dice' },
-  'ra-bowie-knife': { char: '\ue940', label: 'Bowie Knife', category: 'weapons' },
-  'ra-bowling-pin': { char: '\ue941', label: 'Bowling Pin', category: 'inventory' },
-  'ra-brain-freeze': { char: '\ue942', label: 'Brain Freeze', category: 'magic' },
-  'ra-brandy-bottle': { char: '\ue943', label: 'Brandy Bottle', category: 'food' },
-  'ra-bridge': { char: '\ue944', label: 'Bridge', category: 'rpg' },
-  'ra-broadhead-arrow': { char: '\ue945', label: 'Broadhead Arrow', category: 'weapons' },
-  'ra-broadsword': { char: '\ue946', label: 'Broadsword', category: 'weapons' },
-  'ra-broken-bone': { char: '\ue947', label: 'Broken Bone', category: 'dangers' },
-  'ra-broken-bottle': { char: '\ue948', label: 'Broken Bottle', category: 'potions' },
-  'ra-broken-heart': { char: '\ue949', label: 'Broken Heart', category: 'dangers' },
-  'ra-broken-shield': { char: '\ue94a', label: 'Broken Shield', category: 'armor' },
-  'ra-broken-skull': { char: '\ue94b', label: 'Broken Skull', category: 'dangers' },
-  'ra-bubbling-potion': { char: '\ue94c', label: 'Bubbling Potion', category: 'potions' },
-  'ra-bullets': { char: '\ue94d', label: 'Bullets', category: 'weapons' },
-  'ra-burning-book': { char: '\ue94e', label: 'Burning Book', category: 'magic' },
-  'ra-burning-embers': { char: '\ue94f', label: 'Burning Embers', category: 'magic' },
-  'ra-burning-eye': { char: '\ue950', label: 'Burning Eye', category: 'magic' },
-  'ra-burning-meteor': { char: '\ue951', label: 'Burning Meteor', category: 'magic' },
-  'ra-burst-blob': { char: '\ue952', label: 'Burst Blob', category: 'magic' },
-  'ra-butterfly': { char: '\ue953', label: 'Butterfly', category: 'creatures' },
-  'ra-campfire': { char: '\ue954', label: 'Campfire', category: 'rpg' },
-  'ra-cancel': { char: '\ue955', label: 'Cancel', category: 'cards-dice' },
-  'ra-cancer': { char: '\ue956', label: 'Cancer', category: 'astrology' },
-  'ra-candle': { char: '\ue958', label: 'Candle', category: 'inventory' },
-  'ra-candle-fire': { char: '\ue957', label: 'Candle Fire', category: 'inventory' },
-  'ra-cannon-shot': { char: '\ue959', label: 'Cannon Shot', category: 'weapons' },
-  'ra-capitol': { char: '\ue95a', label: 'Capitol', category: 'rpg' },
-  'ra-capricorn': { char: '\ue95b', label: 'Capricorn', category: 'astrology' },
-  'ra-carrot': { char: '\ue95c', label: 'Carrot', category: 'food' },
-  'ra-castle-emblem': { char: '\ue95d', label: 'Castle Emblem', category: 'rpg' },
-  'ra-castle-flag': { char: '\ue95e', label: 'Castle Flag', category: 'inventory' },
-  'ra-cat': { char: '\ue95f', label: 'Cat', category: 'creatures' },
-  'ra-chain': { char: '\ue960', label: 'Chain', category: 'inventory' },
-  'ra-cheese': { char: '\ue961', label: 'Cheese', category: 'food' },
-  'ra-chemical-arrow': { char: '\ue962', label: 'Chemical Arrow', category: 'weapons' },
-  'ra-chessboard': { char: '\ue963', label: 'Chessboard', category: 'cards-dice' },
-  'ra-chicken-leg': { char: '\ue964', label: 'Chicken Leg', category: 'food' },
-  'ra-circle-of-circles': { char: '\ue965', label: 'Circle Of Circles', category: 'rpg' },
-  'ra-circular-saw': { char: '\ue966', label: 'Circular Saw', category: 'weapons' },
-  'ra-circular-shield': { char: '\ue967', label: 'Circular Shield', category: 'armor' },
-  'ra-cloak-and-dagger': { char: '\ue968', label: 'Cloak And Dagger', category: 'weapons' },
-  'ra-clockwork': { char: '\ue969', label: 'Clockwork', category: 'electronics' },
-  'ra-clover': { char: '\ue96a', label: 'Clover', category: 'plants' },
-  'ra-clovers': { char: '\ue96c', label: 'Clovers', category: 'cards-dice' },
-  'ra-clovers-card': { char: '\ue96b', label: 'Clovers Card', category: 'cards-dice' },
-  'ra-cluster-bomb': { char: '\ue96d', label: 'Cluster Bomb', category: 'weapons' },
-  'ra-coffee-mug': { char: '\ue96e', label: 'Coffee Mug', category: 'food' },
-  'ra-cog': { char: '\ue970', label: 'Cog', category: 'electronics' },
-  'ra-cog-wheel': { char: '\ue96f', label: 'Cog Wheel', category: 'electronics' },
-  'ra-cold-heart': { char: '\ue971', label: 'Cold Heart', category: 'magic' },
-  'ra-compass': { char: '\ue972', label: 'Compass', category: 'inventory' },
-  'ra-corked-tube': { char: '\ue973', label: 'Corked Tube', category: 'potions' },
-  'ra-crab-claw': { char: '\ue974', label: 'Crab Claw', category: 'creatures' },
-  'ra-cracked-helm': { char: '\ue975', label: 'Cracked Helm', category: 'armor' },
-  'ra-cracked-shield': { char: '\ue976', label: 'Cracked Shield', category: 'armor' },
-  'ra-croc-sword': { char: '\ue977', label: 'Croc Sword', category: 'weapons' },
-  'ra-crossbow': { char: '\ue978', label: 'Crossbow', category: 'weapons' },
-  'ra-crossed-axes': { char: '\ue979', label: 'Crossed Axes', category: 'weapons' },
-  'ra-crossed-bones': { char: '\ue97a', label: 'Crossed Bones', category: 'dangers' },
-  'ra-crossed-pistols': { char: '\ue97b', label: 'Crossed Pistols', category: 'weapons' },
-  'ra-crossed-sabres': { char: '\ue97c', label: 'Crossed Sabres', category: 'weapons' },
-  'ra-crossed-swords': { char: '\ue97d', label: 'Crossed Swords', category: 'weapons' },
-  'ra-crown': { char: '\ue97f', label: 'Crown', category: 'armor' },
-  'ra-crown-of-thorns': { char: '\ue97e', label: 'Crown Of Thorns', category: 'armor' },
-  'ra-crowned-heart': { char: '\ue980', label: 'Crowned Heart', category: 'player' },
-  'ra-crush': { char: '\ue981', label: 'Crush', category: 'dangers' },
-  'ra-crystal-ball': { char: '\ue982', label: 'Crystal Ball', category: 'magic' },
-  'ra-crystal-cluster': { char: '\ue983', label: 'Crystal Cluster', category: 'magic' },
-  'ra-crystal-wand': { char: '\ue984', label: 'Crystal Wand', category: 'magic' },
-  'ra-crystals': { char: '\ue985', label: 'Crystals', category: 'magic' },
-  'ra-cubes': { char: '\ue986', label: 'Cubes', category: 'rpg' },
-  'ra-cut-palm': { char: '\ue987', label: 'Cut Palm', category: 'player' },
-  'ra-cycle': { char: '\ue988', label: 'Cycle', category: 'rpg' },
-  'ra-daggers': { char: '\ue989', label: 'Daggers', category: 'weapons' },
-  'ra-daisy': { char: '\ue98a', label: 'Daisy', category: 'plants' },
-  'ra-dead-tree': { char: '\ue98b', label: 'Dead Tree', category: 'plants' },
-  'ra-death-skull': { char: '\ue98c', label: 'Death Skull', category: 'dangers' },
-  'ra-decapitation': { char: '\ue98d', label: 'Decapitation', category: 'dangers' },
-  'ra-defibrillate': { char: '\ue98e', label: 'Defibrillate', category: 'electronics' },
-  'ra-demolish': { char: '\ue98f', label: 'Demolish', category: 'dangers' },
-  'ra-dervish-swords': { char: '\ue990', label: 'Dervish Swords', category: 'weapons' },
-  'ra-desert-skull': { char: '\ue991', label: 'Desert Skull', category: 'dangers' },
-  'ra-diamond': { char: '\ue992', label: 'Diamond', category: 'magic' },
-  'ra-diamonds': { char: '\ue994', label: 'Diamonds', category: 'cards-dice' },
-  'ra-diamonds-card': { char: '\ue993', label: 'Diamonds Card', category: 'cards-dice' },
-  'ra-dice-five': { char: '\ue995', label: 'Dice Five', category: 'cards-dice' },
-  'ra-dice-four': { char: '\ue996', label: 'Dice Four', category: 'cards-dice' },
-  'ra-dice-one': { char: '\ue997', label: 'Dice One', category: 'cards-dice' },
-  'ra-dice-six': { char: '\ue998', label: 'Dice Six', category: 'cards-dice' },
-  'ra-dice-three': { char: '\ue999', label: 'Dice Three', category: 'cards-dice' },
-  'ra-dice-two': { char: '\ue99a', label: 'Dice Two', category: 'cards-dice' },
-  'ra-dinosaur': { char: '\ue99b', label: 'Dinosaur', category: 'creatures' },
-  'ra-divert': { char: '\ue99c', label: 'Divert', category: 'magic' },
-  'ra-diving-dagger': { char: '\ue99d', label: 'Diving Dagger', category: 'weapons' },
-  'ra-double-team': { char: '\ue99e', label: 'Double Team', category: 'player' },
-  'ra-doubled': { char: '\ue99f', label: 'Doubled', category: 'magic' },
-  'ra-dragon': { char: '\ue9a2', label: 'Dragon', category: 'creatures' },
-  'ra-dragon-breath': { char: '\ue9a0', label: 'Dragon Breath', category: 'magic' },
-  'ra-dragon-wing': { char: '\ue9a1', label: 'Dragon Wing', category: 'creatures' },
-  'ra-dragonfly': { char: '\ue9a3', label: 'Dragonfly', category: 'creatures' },
-  'ra-drill': { char: '\ue9a4', label: 'Drill', category: 'weapons' },
-  'ra-dripping-blade': { char: '\ue9a5', label: 'Dripping Blade', category: 'weapons' },
-  'ra-dripping-knife': { char: '\ue9a6', label: 'Dripping Knife', category: 'weapons' },
-  'ra-dripping-sword': { char: '\ue9a7', label: 'Dripping Sword', category: 'weapons' },
-  'ra-droplet': { char: '\ue9a9', label: 'Droplet', category: 'magic' },
-  'ra-droplet-splash': { char: '\ue9a8', label: 'Droplet Splash', category: 'magic' },
-  'ra-droplets': { char: '\ue9aa', label: 'Droplets', category: 'rpg' },
-  'ra-duel': { char: '\ue9ab', label: 'Duel', category: 'weapons' },
-  'ra-egg': { char: '\ue9ad', label: 'Egg', category: 'food' },
-  'ra-egg-pod': { char: '\ue9ac', label: 'Egg Pod', category: 'food' },
-  'ra-eggplant': { char: '\ue9ae', label: 'Eggplant', category: 'food' },
-  'ra-emerald': { char: '\ue9af', label: 'Emerald', category: 'magic' },
-  'ra-energise': { char: '\ue9b0', label: 'Energise', category: 'electronics' },
-  'ra-explosion': { char: '\ue9b1', label: 'Explosion', category: 'dangers' },
-  'ra-explosive-materials': { char: '\ue9b2', label: 'Explosive Materials', category: 'weapons' },
-  'ra-eye-monster': { char: '\ue9b3', label: 'Eye Monster', category: 'creatures' },
-  'ra-eye-shield': { char: '\ue9b4', label: 'Eye Shield', category: 'armor' },
-  'ra-eyeball': { char: '\ue9b5', label: 'Eyeball', category: 'magic' },
-  'ra-fairy': { char: '\ue9b7', label: 'Fairy', category: 'creatures' },
-  'ra-fairy-wand': { char: '\ue9b6', label: 'Fairy Wand', category: 'magic' },
-  'ra-fall-down': { char: '\ue9b8', label: 'Fall Down', category: 'dangers' },
-  'ra-falling': { char: '\ue9b9', label: 'Falling', category: 'player' },
-  'ra-fast-ship': { char: '\ue9ba', label: 'Fast Ship', category: 'electronics' },
-  'ra-feather-wing': { char: '\ue9bb', label: 'Feather Wing', category: 'rpg' },
-  'ra-feathered-wing': { char: '\ue9bc', label: 'Feathered Wing', category: 'rpg' },
-  'ra-fedora': { char: '\ue9bd', label: 'Fedora', category: 'armor' },
-  'ra-fire': { char: '\ue9c3', label: 'Fire', category: 'magic' },
-  'ra-fire-bomb': { char: '\ue9be', label: 'Fire Bomb', category: 'weapons' },
-  'ra-fire-breath': { char: '\ue9bf', label: 'Fire Breath', category: 'magic' },
-  'ra-fire-ring': { char: '\ue9c0', label: 'Fire Ring', category: 'magic' },
-  'ra-fire-shield': { char: '\ue9c1', label: 'Fire Shield', category: 'armor' },
-  'ra-fire-symbol': { char: '\ue9c2', label: 'Fire Symbol', category: 'magic' },
-  'ra-fireball-sword': { char: '\ue9c4', label: 'Fireball Sword', category: 'weapons' },
-  'ra-fish': { char: '\ue9c5', label: 'Fish', category: 'creatures' },
-  'ra-fizzing-flask': { char: '\ue9c6', label: 'Fizzing Flask', category: 'potions' },
-  'ra-flame-symbol': { char: '\ue9c7', label: 'Flame Symbol', category: 'magic' },
-  'ra-flaming-arrow': { char: '\ue9c8', label: 'Flaming Arrow', category: 'weapons' },
-  'ra-flaming-claw': { char: '\ue9c9', label: 'Flaming Claw', category: 'weapons' },
-  'ra-flaming-trident': { char: '\ue9ca', label: 'Flaming Trident', category: 'weapons' },
-  'ra-flask': { char: '\ue9cb', label: 'Flask', category: 'potions' },
-  'ra-flat-hammer': { char: '\ue9cc', label: 'Flat Hammer', category: 'weapons' },
-  'ra-flower': { char: '\ue9cd', label: 'Flower', category: 'plants' },
-  'ra-flowers': { char: '\ue9ce', label: 'Flowers', category: 'plants' },
-  'ra-fluffy-swirl': { char: '\ue9cf', label: 'Fluffy Swirl', category: 'rpg' },
-  'ra-focused-lightning': { char: '\ue9d0', label: 'Focused Lightning', category: 'magic' },
-  'ra-food-chain': { char: '\ue9d1', label: 'Food Chain', category: 'dangers' },
-  'ra-footprint': { char: '\ue9d2', label: 'Footprint', category: 'player' },
-  'ra-forging': { char: '\ue9d3', label: 'Forging', category: 'rpg' },
-  'ra-forward': { char: '\ue9d4', label: 'Forward', category: 'rpg' },
-  'ra-fox': { char: '\ue9d5', label: 'Fox', category: 'creatures' },
-  'ra-frost-emblem': { char: '\ue9d6', label: 'Frost Emblem', category: 'magic' },
-  'ra-frostfire': { char: '\ue9d7', label: 'Frostfire', category: 'magic' },
-  'ra-frozen-arrow': { char: '\ue9d8', label: 'Frozen Arrow', category: 'weapons' },
-  'ra-gamepad-cross': { char: '\ue9d9', label: 'Gamepad Cross', category: 'electronics' },
-  'ra-gavel': { char: '\ue9da', label: 'Gavel', category: 'weapons' },
-  'ra-gear-hammer': { char: '\ue9db', label: 'Gear Hammer', category: 'weapons' },
-  'ra-gear-heart': { char: '\ue9dc', label: 'Gear Heart', category: 'electronics' },
-  'ra-gears': { char: '\ue9dd', label: 'Gears', category: 'electronics' },
-  'ra-gecko': { char: '\ue9de', label: 'Gecko', category: 'creatures' },
-  'ra-gem': { char: '\ue9e0', label: 'Gem', category: 'magic' },
-  'ra-gem-pendant': { char: '\ue9df', label: 'Gem Pendant', category: 'magic' },
-  'ra-gemini': { char: '\ue9e1', label: 'Gemini', category: 'astrology' },
-  'ra-glass-heart': { char: '\ue9e2', label: 'Glass Heart', category: 'player' },
-  'ra-gloop': { char: '\ue9e3', label: 'Gloop', category: 'magic' },
-  'ra-gold-bar': { char: '\ue9e4', label: 'Gold Bar', category: 'magic' },
-  'ra-grappling-hook': { char: '\ue9e5', label: 'Grappling Hook', category: 'weapons' },
-  'ra-grass': { char: '\ue9e7', label: 'Grass', category: 'plants' },
-  'ra-grass-patch': { char: '\ue9e6', label: 'Grass Patch', category: 'plants' },
-  'ra-grenade': { char: '\ue9e8', label: 'Grenade', category: 'weapons' },
-  'ra-groundbreaker': { char: '\ue9e9', label: 'Groundbreaker', category: 'rpg' },
-  'ra-guarded-tower': { char: '\ue9ea', label: 'Guarded Tower', category: 'rpg' },
-  'ra-guillotine': { char: '\ue9eb', label: 'Guillotine', category: 'weapons' },
-  'ra-halberd': { char: '\ue9ec', label: 'Halberd', category: 'weapons' },
-  'ra-hammer': { char: '\ue9ee', label: 'Hammer', category: 'weapons' },
-  'ra-hammer-drop': { char: '\ue9ed', label: 'Hammer Drop', category: 'weapons' },
-  'ra-hand': { char: '\ue9f1', label: 'Hand', category: 'player' },
-  'ra-hand-emblem': { char: '\ue9ef', label: 'Hand Emblem', category: 'player' },
-  'ra-hand-saw': { char: '\ue9f0', label: 'Hand Saw', category: 'weapons' },
-  'ra-harpoon-trident': { char: '\ue9f2', label: 'Harpoon Trident', category: 'weapons' },
-  'ra-health': { char: '\ue9f5', label: 'Health', category: 'magic' },
-  'ra-health-decrease': { char: '\ue9f3', label: 'Health Decrease', category: 'magic' },
-  'ra-health-increase': { char: '\ue9f4', label: 'Health Increase', category: 'magic' },
-  'ra-heart-bottle': { char: '\ue9f6', label: 'Heart Bottle', category: 'potions' },
-  'ra-heart-tower': { char: '\ue9f7', label: 'Heart Tower', category: 'rpg' },
-  'ra-heartburn': { char: '\ue9f8', label: 'Heartburn', category: 'dangers' },
-  'ra-hearts': { char: '\ue9fa', label: 'Hearts', category: 'cards-dice' },
-  'ra-hearts-card': { char: '\ue9f9', label: 'Hearts Card', category: 'cards-dice' },
-  'ra-heat-haze': { char: '\ue9fb', label: 'Heat Haze', category: 'rpg' },
-  'ra-heavy-fall': { char: '\ue9fc', label: 'Heavy Fall', category: 'dangers' },
-  'ra-heavy-shield': { char: '\ue9fd', label: 'Heavy Shield', category: 'armor' },
-  'ra-helmet': { char: '\ue9fe', label: 'Helmet', category: 'armor' },
-  'ra-help': { char: '\ue9ff', label: 'Help', category: 'rpg' },
-  'ra-hive-emblem': { char: '\uea00', label: 'Hive Emblem', category: 'rpg' },
-  'ra-hole-ladder': { char: '\uea01', label: 'Hole Ladder', category: 'rpg' },
-  'ra-honeycomb': { char: '\uea02', label: 'Honeycomb', category: 'food' },
-  'ra-hood': { char: '\uea03', label: 'Hood', category: 'armor' },
-  'ra-horn-call': { char: '\uea04', label: 'Horn Call', category: 'rpg' },
-  'ra-horns': { char: '\uea05', label: 'Horns', category: 'rpg' },
-  'ra-horseshoe': { char: '\uea06', label: 'Horseshoe', category: 'inventory' },
-  'ra-hospital-cross': { char: '\uea07', label: 'Hospital Cross', category: 'magic' },
-  'ra-hot-surface': { char: '\uea08', label: 'Hot Surface', category: 'magic' },
-  'ra-hourglass': { char: '\uea09', label: 'Hourglass', category: 'inventory' },
-  'ra-hydra': { char: '\uea0b', label: 'Hydra', category: 'creatures' },
-  'ra-hydra-shot': { char: '\uea0a', label: 'Hydra Shot', category: 'magic' },
-  'ra-ice-cube': { char: '\uea0c', label: 'Ice Cube', category: 'food' },
-  'ra-implosion': { char: '\uea0d', label: 'Implosion', category: 'dangers' },
-  'ra-incense': { char: '\uea0e', label: 'Incense', category: 'magic' },
-  'ra-insect-jaws': { char: '\uea0f', label: 'Insect Jaws', category: 'creatures' },
-  'ra-interdiction': { char: '\uea10', label: 'Interdiction', category: 'rpg' },
-  'ra-jetpack': { char: '\uea11', label: 'Jetpack', category: 'electronics' },
-  'ra-jigsaw-piece': { char: '\uea12', label: 'Jigsaw Piece', category: 'inventory' },
-  'ra-kaleidoscope': { char: '\uea13', label: 'Kaleidoscope', category: 'magic' },
-  'ra-kettlebell': { char: '\uea14', label: 'Kettlebell', category: 'inventory' },
-  'ra-key': { char: '\uea16', label: 'Key', category: 'inventory' },
-  'ra-key-basic': { char: '\uea15', label: 'Key Basic', category: 'inventory' },
-  'ra-kitchen-knives': { char: '\uea17', label: 'Kitchen Knives', category: 'weapons' },
-  'ra-knife': { char: '\uea19', label: 'Knife', category: 'weapons' },
-  'ra-knife-fork': { char: '\uea18', label: 'Knife Fork', category: 'food' },
-  'ra-knight-helmet': { char: '\uea1a', label: 'Knight Helmet', category: 'armor' },
-  'ra-kunai': { char: '\uea1b', label: 'Kunai', category: 'weapons' },
-  'ra-lantern-flame': { char: '\uea1c', label: 'Lantern Flame', category: 'inventory' },
-  'ra-large-hammer': { char: '\uea1d', label: 'Large Hammer', category: 'weapons' },
-  'ra-laser-blast': { char: '\uea1e', label: 'Laser Blast', category: 'weapons' },
-  'ra-laser-site': { char: '\uea1f', label: 'Laser Site', category: 'electronics' },
-  'ra-lava': { char: '\uea20', label: 'Lava', category: 'magic' },
-  'ra-leaf': { char: '\uea21', label: 'Leaf', category: 'plants' },
-  'ra-leo': { char: '\uea22', label: 'Leo', category: 'astrology' },
-  'ra-level-four': { char: '\uea24', label: 'Level Four', category: 'magic' },
-  'ra-level-four-advanced': { char: '\uea23', label: 'Level Four Advanced', category: 'magic' },
-  'ra-level-three': { char: '\uea26', label: 'Level Three', category: 'magic' },
-  'ra-level-three-advanced': { char: '\uea25', label: 'Level Three Advanced', category: 'magic' },
-  'ra-level-two': { char: '\uea28', label: 'Level Two', category: 'magic' },
-  'ra-level-two-advanced': { char: '\uea27', label: 'Level Two Advanced', category: 'magic' },
-  'ra-lever': { char: '\uea29', label: 'Lever', category: 'electronics' },
-  'ra-libra': { char: '\uea2a', label: 'Libra', category: 'astrology' },
-  'ra-light-bulb': { char: '\uea2b', label: 'Light Bulb', category: 'electronics' },
-  'ra-lighthouse': { char: '\uea2c', label: 'Lighthouse', category: 'electronics' },
-  'ra-lightning': { char: '\uea31', label: 'Lightning', category: 'magic' },
-  'ra-lightning-bolt': { char: '\uea2d', label: 'Lightning Bolt', category: 'magic' },
-  'ra-lightning-storm': { char: '\uea2e', label: 'Lightning Storm', category: 'magic' },
-  'ra-lightning-sword': { char: '\uea2f', label: 'Lightning Sword', category: 'weapons' },
-  'ra-lightning-trio': { char: '\uea30', label: 'Lightning Trio', category: 'magic' },
-  'ra-lion': { char: '\uea32', label: 'Lion', category: 'creatures' },
-  'ra-lit-candelabra': { char: '\uea33', label: 'Lit Candelabra', category: 'inventory' },
-  'ra-load': { char: '\uea34', label: 'Load', category: 'electronics' },
-  'ra-locked-fortress': { char: '\uea35', label: 'Locked Fortress', category: 'rpg' },
-  'ra-love-howl': { char: '\uea36', label: 'Love Howl', category: 'creatures' },
-  'ra-maggot': { char: '\uea37', label: 'Maggot', category: 'creatures' },
-  'ra-magnet': { char: '\uea38', label: 'Magnet', category: 'electronics' },
-  'ra-mass-driver': { char: '\uea39', label: 'Mass Driver', category: 'weapons' },
-  'ra-match': { char: '\uea3a', label: 'Match', category: 'inventory' },
-  'ra-meat': { char: '\uea3c', label: 'Meat', category: 'food' },
-  'ra-meat-hook': { char: '\uea3b', label: 'Meat Hook', category: 'weapons' },
-  'ra-medical-pack': { char: '\uea3d', label: 'Medical Pack', category: 'inventory' },
-  'ra-metal-gate': { char: '\uea3e', label: 'Metal Gate', category: 'rpg' },
-  'ra-microphone': { char: '\uea3f', label: 'Microphone', category: 'electronics' },
-  'ra-mine-wagon': { char: '\uea40', label: 'Mine Wagon', category: 'rpg' },
-  'ra-mining-diamonds': { char: '\uea41', label: 'Mining Diamonds', category: 'magic' },
-  'ra-mirror': { char: '\uea42', label: 'Mirror', category: 'inventory' },
-  'ra-monster-skull': { char: '\uea43', label: 'Monster Skull', category: 'creatures' },
-  'ra-moon-sun': { char: '\uea45', label: 'Moon Sun', category: 'astrology' },
-  'ra-mountains': { char: '\uea44', label: 'Mountains', category: 'rpg' },
-  'ra-mp5': { char: '\uea46', label: 'Mp5', category: 'weapons' },
-  'ra-muscle-fat': { char: '\uea47', label: 'Muscle Fat', category: 'player' },
-  'ra-muscle-up': { char: '\uea48', label: 'Muscle Up', category: 'player' },
-  'ra-musket': { char: '\uea49', label: 'Musket', category: 'weapons' },
-  'ra-nails': { char: '\uea4a', label: 'Nails', category: 'inventory' },
-  'ra-nodular': { char: '\uea4b', label: 'Nodular', category: 'rpg' },
-  'ra-noose': { char: '\uea4c', label: 'Noose', category: 'dangers' },
-  'ra-nuclear': { char: '\uea4d', label: 'Nuclear', category: 'electronics' },
-  'ra-ocarina': { char: '\uea4e', label: 'Ocarina', category: 'inventory' },
-  'ra-ocean-emblem': { char: '\uea4f', label: 'Ocean Emblem', category: 'rpg' },
-  'ra-octopus': { char: '\uea50', label: 'Octopus', category: 'creatures' },
-  'ra-omega': { char: '\uea51', label: 'Omega', category: 'rpg' },
-  'ra-on-target': { char: '\uea52', label: 'On Target', category: 'rpg' },
-  'ra-ophiuchus': { char: '\uea53', label: 'Ophiuchus', category: 'astrology' },
-  'ra-overhead': { char: '\uea54', label: 'Overhead', category: 'rpg' },
-  'ra-overmind': { char: '\uea55', label: 'Overmind', category: 'rpg' },
-  'ra-palm-tree': { char: '\uea56', label: 'Palm Tree', category: 'plants' },
-  'ra-pawn': { char: '\uea57', label: 'Pawn', category: 'cards-dice' },
-  'ra-pawprint': { char: '\uea58', label: 'Pawprint', category: 'player' },
-  'ra-perspective-dice-five': { char: '\uea59', label: 'Perspective Dice Five', category: 'cards-dice' },
-  'ra-perspective-dice-four': { char: '\uea5a', label: 'Perspective Dice Four', category: 'cards-dice' },
-  'ra-perspective-dice-one': { char: '\uea5b', label: 'Perspective Dice One', category: 'cards-dice' },
-  'ra-perspective-dice-random': { char: '\uea5c', label: 'Perspective Dice Random', category: 'cards-dice' },
-  'ra-perspective-dice-six': { char: '\uea5e', label: 'Perspective Dice Six', category: 'cards-dice' },
-  'ra-perspective-dice-three': { char: '\uea5f', label: 'Perspective Dice Three', category: 'cards-dice' },
-  'ra-perspective-dice-two': { char: '\uea5d', label: 'Perspective Dice Two', category: 'cards-dice' },
-  'ra-pill': { char: '\uea60', label: 'Pill', category: 'inventory' },
-  'ra-pills': { char: '\uea61', label: 'Pills', category: 'inventory' },
-  'ra-pine-tree': { char: '\uea62', label: 'Pine Tree', category: 'plants' },
-  'ra-ping-pong': { char: '\uea63', label: 'Ping Pong', category: 'inventory' },
-  'ra-pisces': { char: '\uea64', label: 'Pisces', category: 'astrology' },
-  'ra-plain-dagger': { char: '\uea65', label: 'Plain Dagger', category: 'weapons' },
-  'ra-player': { char: '\uea6f', label: 'Player', category: 'player' },
-  'ra-player-despair': { char: '\uea66', label: 'Player Despair', category: 'player' },
-  'ra-player-dodge': { char: '\uea67', label: 'Player Dodge', category: 'player' },
-  'ra-player-king': { char: '\uea68', label: 'Player King', category: 'player' },
-  'ra-player-lift': { char: '\uea69', label: 'Player Lift', category: 'player' },
-  'ra-player-pain': { char: '\uea6a', label: 'Player Pain', category: 'player' },
-  'ra-player-pyromaniac': { char: '\uea6b', label: 'Player Pyromaniac', category: 'player' },
-  'ra-player-shot': { char: '\uea6c', label: 'Player Shot', category: 'player' },
-  'ra-player-teleport': { char: '\uea6d', label: 'Player Teleport', category: 'player' },
-  'ra-player-thunder-struck': { char: '\uea6e', label: 'Player Thunder Struck', category: 'player' },
-  'ra-podium': { char: '\uea70', label: 'Podium', category: 'rpg' },
-  'ra-poison-cloud': { char: '\uea71', label: 'Poison Cloud', category: 'dangers' },
-  'ra-potion': { char: '\uea72', label: 'Potion', category: 'potions' },
-  'ra-pyramids': { char: '\uea73', label: 'Pyramids', category: 'rpg' },
-  'ra-queen-crown': { char: '\uea74', label: 'Queen Crown', category: 'armor' },
-  'ra-quill-ink': { char: '\uea75', label: 'Quill Ink', category: 'inventory' },
-  'ra-rabbit': { char: '\uea76', label: 'Rabbit', category: 'creatures' },
-  'ra-radar-dish': { char: '\uea77', label: 'Radar Dish', category: 'electronics' },
-  'ra-radial-balance': { char: '\uea78', label: 'Radial Balance', category: 'rpg' },
-  'ra-radioactive': { char: '\uea79', label: 'Radioactive', category: 'electronics' },
-  'ra-raven': { char: '\uea7a', label: 'Raven', category: 'creatures' },
-  'ra-reactor': { char: '\uea7b', label: 'Reactor', category: 'electronics' },
-  'ra-recycle': { char: '\uea7c', label: 'Recycle', category: 'electronics' },
-  'ra-regeneration': { char: '\uea7d', label: 'Regeneration', category: 'electronics' },
-  'ra-relic-blade': { char: '\uea7e', label: 'Relic Blade', category: 'weapons' },
-  'ra-repair': { char: '\uea7f', label: 'Repair', category: 'electronics' },
-  'ra-reverse': { char: '\uea80', label: 'Reverse', category: 'rpg' },
-  'ra-revolver': { char: '\uea81', label: 'Revolver', category: 'weapons' },
-  'ra-rifle': { char: '\uea82', label: 'Rifle', category: 'weapons' },
-  'ra-ringing-bell': { char: '\uea83', label: 'Ringing Bell', category: 'inventory' },
-  'ra-roast-chicken': { char: '\uea84', label: 'Roast Chicken', category: 'food' },
-  'ra-robot-arm': { char: '\uea85', label: 'Robot Arm', category: 'electronics' },
-  'ra-round-bottom-flask': { char: '\uea86', label: 'Round Bottom Flask', category: 'potions' },
-  'ra-round-shield': { char: '\uea87', label: 'Round Shield', category: 'armor' },
-  'ra-rss': { char: '\uea88', label: 'Rss', category: 'electronics' },
-  'ra-rune-stone': { char: '\uea89', label: 'Rune Stone', category: 'magic' },
-  'ra-sagittarius': { char: '\uea8a', label: 'Sagittarius', category: 'astrology' },
-  'ra-sapphire': { char: '\uea8b', label: 'Sapphire', category: 'magic' },
-  'ra-satellite': { char: '\uea8c', label: 'Satellite', category: 'electronics' },
-  'ra-save': { char: '\uea8d', label: 'Save', category: 'electronics' },
-  'ra-scorpio': { char: '\uea8e', label: 'Scorpio', category: 'astrology' },
-  'ra-scroll-unfurled': { char: '\uea8f', label: 'Scroll Unfurled', category: 'magic' },
-  'ra-scythe': { char: '\uea90', label: 'Scythe', category: 'weapons' },
-  'ra-sea-serpent': { char: '\uea91', label: 'Sea Serpent', category: 'creatures' },
-  'ra-seagull': { char: '\uea92', label: 'Seagull', category: 'creatures' },
-  'ra-shark': { char: '\uea93', label: 'Shark', category: 'creatures' },
-  'ra-sheep': { char: '\uea94', label: 'Sheep', category: 'creatures' },
-  'ra-sheriff': { char: '\uea95', label: 'Sheriff', category: 'inventory' },
-  'ra-shield': { char: '\uea96', label: 'Shield', category: 'armor' },
-  'ra-ship-emblem': { char: '\uea97', label: 'Ship Emblem', category: 'inventory' },
-  'ra-shoe-prints': { char: '\uea98', label: 'Shoe Prints', category: 'player' },
-  'ra-shot-through-the-heart': { char: '\uea99', label: 'Shot Through The Heart', category: 'dangers' },
-  'ra-shotgun-shell': { char: '\uea9a', label: 'Shotgun Shell', category: 'weapons' },
-  'ra-shovel': { char: '\uea9b', label: 'Shovel', category: 'weapons' },
-  'ra-shuriken': { char: '\uea9c', label: 'Shuriken', category: 'weapons' },
-  'ra-sickle': { char: '\uea9d', label: 'Sickle', category: 'weapons' },
-  'ra-sideswipe': { char: '\uea9e', label: 'Sideswipe', category: 'rpg' },
-  'ra-site': { char: '\uea9f', label: 'Site', category: 'rpg' },
-  'ra-skull': { char: '\ueaa1', label: 'Skull', category: 'dangers' },
-  'ra-skull-trophy': { char: '\ueaa0', label: 'Skull Trophy', category: 'dangers' },
-  'ra-slash-ring': { char: '\ueaa2', label: 'Slash Ring', category: 'inventory' },
-  'ra-small-fire': { char: '\ueaa3', label: 'Small Fire', category: 'magic' },
-  'ra-snail': { char: '\ueaa4', label: 'Snail', category: 'creatures' },
-  'ra-snake': { char: '\ueaa5', label: 'Snake', category: 'creatures' },
-  'ra-snorkel': { char: '\ueaa6', label: 'Snorkel', category: 'inventory' },
-  'ra-snowflake': { char: '\ueaa7', label: 'Snowflake', category: 'magic' },
-  'ra-soccer-ball': { char: '\ueaa8', label: 'Soccer Ball', category: 'inventory' },
-  'ra-spades': { char: '\ueaaa', label: 'Spades', category: 'cards-dice' },
-  'ra-spades-card': { char: '\ueaa9', label: 'Spades Card', category: 'cards-dice' },
-  'ra-spawn-node': { char: '\ueaab', label: 'Spawn Node', category: 'rpg' },
-  'ra-spear-head': { char: '\ueaac', label: 'Spear Head', category: 'weapons' },
-  'ra-speech-bubble': { char: '\ueaad', label: 'Speech Bubble', category: 'electronics' },
-  'ra-speech-bubbles': { char: '\ueaae', label: 'Speech Bubbles', category: 'electronics' },
-  'ra-spider-face': { char: '\ueaaf', label: 'Spider Face', category: 'creatures' },
-  'ra-spikeball': { char: '\ueab0', label: 'Spikeball', category: 'dangers' },
-  'ra-spiked-mace': { char: '\ueab1', label: 'Spiked Mace', category: 'weapons' },
-  'ra-spiked-tentacle': { char: '\ueab2', label: 'Spiked Tentacle', category: 'creatures' },
-  'ra-spinning-sword': { char: '\ueab3', label: 'Spinning Sword', category: 'weapons' },
-  'ra-spiral-shell': { char: '\ueab4', label: 'Spiral Shell', category: 'creatures' },
-  'ra-splash': { char: '\ueab5', label: 'Splash', category: 'rpg' },
-  'ra-spray-can': { char: '\ueab6', label: 'Spray Can', category: 'inventory' },
-  'ra-sprout': { char: '\ueab8', label: 'Sprout', category: 'plants' },
-  'ra-sprout-emblem': { char: '\ueab7', label: 'Sprout Emblem', category: 'plants' },
-  'ra-stopwatch': { char: '\ueab9', label: 'Stopwatch', category: 'inventory' },
-  'ra-suckered-tentacle': { char: '\ueaba', label: 'Suckered Tentacle', category: 'creatures' },
-  'ra-suits': { char: '\ueabb', label: 'Suits', category: 'cards-dice' },
-  'ra-sun': { char: '\ueabd', label: 'Sun', category: 'magic' },
-  'ra-sun-symbol': { char: '\ueabc', label: 'Sun Symbol', category: 'magic' },
-  'ra-sunbeams': { char: '\ueabe', label: 'Sunbeams', category: 'magic' },
-  'ra-super-mushroom': { char: '\ueabf', label: 'Super Mushroom', category: 'plants' },
-  'ra-supersonic-arrow': { char: '\ueac0', label: 'Supersonic Arrow', category: 'weapons' },
-  'ra-surveillance-camera': { char: '\ueac1', label: 'Surveillance Camera', category: 'electronics' },
-  'ra-sword': { char: '\ue946', label: 'Sword', category: 'weapons' },
-  'ra-syringe': { char: '\ueac2', label: 'Syringe', category: 'inventory' },
-  'ra-target-arrows': { char: '\ueac3', label: 'Target Arrows', category: 'weapons' },
-  'ra-target-laser': { char: '\ueac4', label: 'Target Laser', category: 'rpg' },
-  'ra-targeted': { char: '\ueac5', label: 'Targeted', category: 'rpg' },
-  'ra-taurus': { char: '\ueac6', label: 'Taurus', category: 'astrology' },
-  'ra-telescope': { char: '\ueac7', label: 'Telescope', category: 'electronics' },
-  'ra-tentacle': { char: '\ueac8', label: 'Tentacle', category: 'creatures' },
-  'ra-tesla': { char: '\ueac9', label: 'Tesla', category: 'electronics' },
-  'ra-thorn-arrow': { char: '\ueaca', label: 'Thorn Arrow', category: 'weapons' },
-  'ra-thorny-vine': { char: '\ueacb', label: 'Thorny Vine', category: 'plants' },
-  'ra-three-keys': { char: '\ueacc', label: 'Three Keys', category: 'inventory' },
-  'ra-tic-tac-toe': { char: '\ueacd', label: 'Tic Tac Toe', category: 'inventory' },
-  'ra-toast': { char: '\ueace', label: 'Toast', category: 'food' },
-  'ra-tombstone': { char: '\ueacf', label: 'Tombstone', category: 'dangers' },
-  'ra-tooth': { char: '\uead0', label: 'Tooth', category: 'inventory' },
-  'ra-torch': { char: '\uead1', label: 'Torch', category: 'inventory' },
-  'ra-tower': { char: '\uead2', label: 'Tower', category: 'rpg' },
-  'ra-trail': { char: '\uead3', label: 'Trail', category: 'rpg' },
-  'ra-trefoil-lily': { char: '\uead4', label: 'Trefoil Lily', category: 'plants' },
-  'ra-trident': { char: '\uead5', label: 'Trident', category: 'weapons' },
-  'ra-triforce': { char: '\uead6', label: 'Triforce', category: 'magic' },
-  'ra-trophy': { char: '\uead7', label: 'Trophy', category: 'inventory' },
-  'ra-turd': { char: '\uead8', label: 'Turd', category: 'inventory' },
-  'ra-two-dragons': { char: '\uead9', label: 'Two Dragons', category: 'creatures' },
-  'ra-two-hearts': { char: '\ueada', label: 'Two Hearts', category: 'magic' },
-  'ra-uncertainty': { char: '\ueadb', label: 'Uncertainty', category: 'rpg' },
-  'ra-underhand': { char: '\ueadc', label: 'Underhand', category: 'rpg' },
-  'ra-unplugged': { char: '\ueadd', label: 'Unplugged', category: 'electronics' },
-  'ra-vase': { char: '\ueade', label: 'Vase', category: 'potions' },
-  'ra-venomous-snake': { char: '\ueadf', label: 'Venomous Snake', category: 'creatures' },
-  'ra-vest': { char: '\ueae0', label: 'Vest', category: 'armor' },
-  'ra-vial': { char: '\ueae1', label: 'Vial', category: 'potions' },
-  'ra-vine-whip': { char: '\ueae2', label: 'Vine Whip', category: 'weapons' },
-  'ra-virgo': { char: '\ueae3', label: 'Virgo', category: 'astrology' },
-  'ra-water-drop': { char: '\ueae4', label: 'Water Drop', category: 'magic' },
-  'ra-wifi': { char: '\ueae5', label: 'Wifi', category: 'electronics' },
-  'ra-wireless-signal': { char: '\ueae6', label: 'Wireless Signal', category: 'electronics' },
-  'ra-wolf-head': { char: '\ueae7', label: 'Wolf Head', category: 'creatures' },
-  'ra-wolf-howl': { char: '\ueae8', label: 'Wolf Howl', category: 'creatures' },
-  'ra-wooden-sign': { char: '\ueae9', label: 'Wooden Sign', category: 'inventory' },
-  'ra-wrench': { char: '\ueaea', label: 'Wrench', category: 'inventory' },
-  'ra-wyvern': { char: '\ueaeb', label: 'Wyvern', category: 'creatures' },
-  'ra-x-mark': { char: '\ueaec', label: 'X Mark', category: 'dangers' },
-  'ra-zebra-shield': { char: '\ueaed', label: 'Zebra Shield', category: 'armor' },
-  'ra-zigzag-leaf': { char: '\ueaee', label: 'Zigzag Leaf', category: 'plants' },
-};
-
-/**
- * Get the character for an icon class
- */
-function getIconChar(iconClass: string): string | null {
-  const icon = RA_ICONS[iconClass];
-  return icon ? icon.char : null;
-}
-
-/**
- * Get full info for an icon
- */
-function getIconInfo(iconClass: string): IconData | null {
-  return RA_ICONS[iconClass] || null;
-}
-
-/**
- * Get all icons in a category
- */
-function getIconsByCategory(categoryId: string): IconWithClass[] {
-  return Object.entries(RA_ICONS)
-    .filter(([_, data]) => data.category === categoryId)
-    .map(([iconClass, data]) => ({ iconClass, ...data }));
-}
-
-/**
- * Search icons by label or class name
- */
-function searchIcons(query: string): IconWithClass[] {
-  const lowerQuery = query.toLowerCase();
-  return Object.entries(RA_ICONS)
-    .filter(([iconClass, data]) =>
-      iconClass.toLowerCase().includes(lowerQuery) ||
-      data.label.toLowerCase().includes(lowerQuery)
-    )
-    .map(([iconClass, data]) => ({ iconClass, ...data }));
-}
-
-/**
- * Get all icon class names
- */
-function getAllIconClasses(): string[] {
-  return Object.keys(RA_ICONS);
-}
-
-return {
-  RA_CATEGORIES,
-  RA_ICONS,
-  getIconChar,
-  getIconInfo,
-  getIconsByCategory,
-  searchIcons,
-  getAllIconClasses
-};
-
-```
-
-# objectTypeResolver
-
-```ts
-/**
- * objectTypeResolver.ts
- *
- * Resolves object types by merging built-in definitions with user customizations.
- * Handles:
- * - Object overrides (modified built-ins)
- * - Hidden objects
- * - Custom objects
- * - Custom categories
- * - Unknown object fallback
- */
-
-import type { MapType } from '#types/core/map.types';
-import type { IconData, IconMap } from '#types/objects/icon.types';
-
-// Types from #types/objects/object.types.ts and #types/settings/settings.types.ts
-// Duplicated here for datacore runtime compatibility (path aliases not resolved at runtime)
-
-/** Base object type (from objectTypes.ts) */
-interface ObjectType {
-  id: string;
-  symbol: string;
-  label: string;
-  category: string;
-}
-
-/** Resolved object type definition */
-interface ObjectTypeDefinition {
-  id: string;
-  symbol?: string;
-  iconClass?: string;
-  label: string;
-  category: string;
-  order?: number;
-  isBuiltIn?: boolean;
-  isModified?: boolean;
-  isCustom?: boolean;
-  isHidden?: boolean;
-  isUnknown?: boolean;
-}
-
-/** Base category (from objectTypes.ts) */
-interface Category {
-  id: string;
-  label: string;
-}
-
-/** Resolved category definition */
-interface CategoryDefinition {
-  id: string;
-  label: string;
-  order?: number;
-  isBuiltIn?: boolean;
-  isCustom?: boolean;
-}
-
-/** Object override settings */
-interface ObjectOverride {
-  hidden?: boolean;
-  symbol?: string;
-  iconClass?: string;
-  label?: string;
-  category?: string;
-  order?: number;
-}
-
-/** Object settings from settings accessor */
-interface ObjectSettings {
-  objectOverrides?: Record<string, ObjectOverride>;
-  customObjects?: ObjectTypeDefinition[];
-  customCategories?: CategoryDefinition[];
-}
-
-/** Render character result */
-interface RenderChar {
-  char: string;
-  isIcon: boolean;
-}
-
-/** Validation result */
-interface ValidationResult {
-  valid: boolean;
-  errors: string[];
-}
-
-/** Object types module */
-interface ObjectTypesModule {
-  OBJECT_TYPES: ObjectType[];
-  CATEGORIES: Category[];
-}
-
-/** Settings accessor module */
-interface SettingsAccessorModule {
-  getObjectSettings: (mapType: MapType) => ObjectSettings;
-}
-
-/** RPG Awesome icons module */
-interface RPGAwesomeIconsModule {
-  RA_ICONS: IconMap;
-  getIconChar: (iconClass: string) => string | null;
-  getIconInfo: (iconClass: string) => IconData | null;
-}
-
-const { OBJECT_TYPES, CATEGORIES } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "objectTypes")) as ObjectTypesModule;
-const { getObjectSettings } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "settingsAccessor")) as SettingsAccessorModule;
-const { RA_ICONS, getIconChar, getIconInfo } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "rpgAwesomeIcons")) as RPGAwesomeIconsModule;
-
-/**
- * Fallback for unknown/deleted object types
- * Used when a map references an object type that no longer exists
- */
-const UNKNOWN_OBJECT_FALLBACK: ObjectTypeDefinition = {
-  id: '__unknown__',
-  symbol: '?',
-  label: 'Unknown Object',
-  category: 'markers',
-  isUnknown: true
-};
-
-/**
- * Check if an object type uses an RPGAwesome icon
- */
-function hasIconClass(objectType: ObjectTypeDefinition | null | undefined): boolean {
-  return objectType != null && typeof objectType.iconClass === 'string' && objectType.iconClass.length > 0;
-}
-
-/**
- * Get the render character for an object type
- * Handles both iconClass (RPGAwesome) and symbol (Unicode) with fallback
- */
-function getRenderChar(objectType: ObjectTypeDefinition | null | undefined): RenderChar {
-  if (!objectType) {
-    return { char: '?', isIcon: false };
-  }
-
-  // If iconClass is set, try to get the icon character
-  if (hasIconClass(objectType)) {
-    const iconChar = getIconChar(objectType.iconClass!);
-    if (iconChar) {
-      return { char: iconChar, isIcon: true };
-    }
-    // iconClass was set but invalid - fall through to symbol/fallback
-    console.warn(`[objectTypeResolver] Invalid iconClass: ${objectType.iconClass}`);
-  }
-
-  // Use symbol if available
-  if (objectType.symbol) {
-    return { char: objectType.symbol, isIcon: false };
-  }
-
-  // Final fallback
-  return { char: '?', isIcon: false };
-}
-
-/**
- * Validate an iconClass value
- */
-function isValidIconClass(iconClass: string | null | undefined): boolean {
-  if (!iconClass || typeof iconClass !== 'string') return false;
-  return Object.prototype.hasOwnProperty.call(RA_ICONS, iconClass);
-}
-
-/**
- * Default category order for built-in categories
- */
-const BUILT_IN_CATEGORY_ORDER: Record<string, number> = {
-  'notes': 0,
-  'navigation': 10,
-  'hazards': 20,
-  'features': 30,
-  'encounters': 40,
-  'markers': 50
-};
-
-/**
- * Get effective object types list (built-ins + overrides + custom)
- * This is the main function consumers should use for listing available objects.
- */
-function getResolvedObjectTypes(mapType: MapType = 'grid'): ObjectTypeDefinition[] {
-  const settings = getObjectSettings(mapType);
-  const { objectOverrides = {}, customObjects = [] } = settings;
-
-  // Apply overrides to built-ins, filter out hidden ones
-  // Built-in objects get default order based on their index in OBJECT_TYPES
-  const resolvedBuiltIns = OBJECT_TYPES
-    .filter(obj => !objectOverrides[obj.id]?.hidden)
-    .map((obj, index) => {
-      const override = objectOverrides[obj.id];
-      const defaultOrder = index * 10; // Leave gaps for reordering
-      if (override) {
-        // Merge override properties (excluding 'hidden' which is handled above)
-        const { hidden, ...overrideProps } = override;
-        return {
-          ...obj,
-          ...overrideProps,
-          order: override.order ?? defaultOrder,
-          isBuiltIn: true,
-          isModified: true
-        };
-      }
-      return {
-        ...obj,
-        order: defaultOrder,
-        isBuiltIn: true,
-        isModified: false
-      };
-    });
-
-  // Add custom objects with their flag
-  // Custom objects use their order or a high default to appear at the end
-  const resolvedCustom = customObjects.map((obj, index) => ({
-    ...obj,
-    order: obj.order ?? (1000 + index * 10),
-    isCustom: true,
-    isBuiltIn: false
-  }));
-
-  return [...resolvedBuiltIns, ...resolvedCustom];
-}
-
-/**
- * Get effective categories list (built-ins + custom), sorted by order
- */
-function getResolvedCategories(mapType: MapType = 'grid'): CategoryDefinition[] {
-  const settings = getObjectSettings(mapType);
-  const { customCategories = [] } = settings;
-
-  // Add order to built-in categories
-  const resolvedBuiltIns = CATEGORIES.map(c => ({
-    ...c,
-    isBuiltIn: true,
-    order: BUILT_IN_CATEGORY_ORDER[c.id] ?? 50
-  }));
-
-  // Add custom categories with their flags
-  const resolvedCustom = customCategories.map(c => ({
-    ...c,
-    isCustom: true,
-    isBuiltIn: false,
-    order: c.order ?? 100 // Default custom categories to end
-  }));
-
-  // Combine and sort by order
-  return [...resolvedBuiltIns, ...resolvedCustom]
-    .sort((a, b) => (a.order ?? 50) - (b.order ?? 50));
-}
-
-/**
- * Get list of hidden built-in objects
- * Useful for showing a "hidden objects" section in settings
- */
-function getHiddenObjects(mapType: MapType = 'grid'): ObjectTypeDefinition[] {
-  const settings = getObjectSettings(mapType);
-  const { objectOverrides = {} } = settings;
-
-  return OBJECT_TYPES
-    .filter(obj => objectOverrides[obj.id]?.hidden)
-    .map(obj => ({
-      ...obj,
-      isBuiltIn: true,
-      isHidden: true
-    }));
-}
-
-/**
- * Get a single object type by ID
- * Returns the resolved version (with overrides applied) or fallback for unknown
- */
-function getObjectType(typeId: string | null | undefined, mapType: MapType = 'grid'): ObjectTypeDefinition {
-  // Handle null/undefined
-  if (!typeId) {
-    return UNKNOWN_OBJECT_FALLBACK;
-  }
-
-  // Special case: return the fallback directly if requested
-  if (typeId === '__unknown__') {
-    return UNKNOWN_OBJECT_FALLBACK;
-  }
-
-  const settings = getObjectSettings(mapType);
-  const { objectOverrides = {}, customObjects = [] } = settings;
-
-  // Check built-in objects first (including hidden ones - they still need to render)
-  const builtIn = OBJECT_TYPES.find(t => t.id === typeId);
-  if (builtIn) {
-    const override = objectOverrides[typeId];
-    if (override) {
-      const { hidden, ...overrideProps } = override;
-      return {
-        ...builtIn,
-        ...overrideProps,
-        isBuiltIn: true,
-        isModified: true,
-        isHidden: hidden || false
-      };
-    }
-    return {
-      ...builtIn,
-      isBuiltIn: true,
-      isModified: false
-    };
-  }
-
-  // Check custom objects
-  const custom = customObjects.find(t => t.id === typeId);
-  if (custom) {
-    return {
-      ...custom,
-      isCustom: true,
-      isBuiltIn: false
-    };
-  }
-
-  // Not found - return fallback
-  return UNKNOWN_OBJECT_FALLBACK;
-}
-
-/**
- * Check if an object type exists (built-in or custom, not hidden)
- */
-function objectTypeExists(typeId: string, mapType: MapType = 'grid'): boolean {
-  const objType = getObjectType(typeId, mapType);
-  return objType.id !== '__unknown__' && !objType.isHidden;
-}
-
-/**
- * Get the original (unmodified) built-in object definition
- * Used for "reset to default" functionality
- */
-function getOriginalBuiltIn(typeId: string): ObjectTypeDefinition | null {
-  const builtIn = OBJECT_TYPES.find(t => t.id === typeId);
-  return builtIn ? { ...builtIn, isBuiltIn: true } : null;
-}
-
-/**
- * Generate a unique ID for a custom object
- */
-function generateCustomObjectId(): string {
-  return 'custom-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
-}
-
-/**
- * Generate a unique ID for a custom category
- */
-function generateCustomCategoryId(): string {
-  return 'custom-cat-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
-}
-
-/**
- * Validate a symbol string
- * Returns true if the symbol is valid (non-empty, reasonable length)
- */
-function isValidSymbol(symbol: string | null | undefined): boolean {
-  if (!symbol || typeof symbol !== 'string') return false;
-  // Allow 1-4 characters (some emoji are multi-codepoint)
-  const trimmed = symbol.trim();
-  return trimmed.length >= 1 && trimmed.length <= 8;
-}
-
-/**
- * Validate an object definition
- * Objects can have either a symbol (Unicode) OR an iconClass (RPGAwesome), or both
- */
-function validateObjectDefinition(obj: Partial<ObjectTypeDefinition>): ValidationResult {
-  const errors: string[] = [];
-
-  const hasSymbol = obj.symbol && isValidSymbol(obj.symbol);
-  const hasIcon = obj.iconClass && isValidIconClass(obj.iconClass);
-
-  // Must have at least one of symbol or iconClass
-  if (!hasSymbol && !hasIcon) {
-    if (obj.iconClass && !hasIcon) {
-      errors.push('Invalid icon selection');
-    } else if (obj.symbol && !hasSymbol) {
-      errors.push('Symbol must be 1-8 characters');
-    } else {
-      errors.push('Either a symbol or an icon is required');
-    }
-  }
-
-  if (!obj.label || typeof obj.label !== 'string' || obj.label.trim().length === 0) {
-    errors.push('Label is required');
-  }
-
-  if (!obj.category || typeof obj.category !== 'string') {
-    errors.push('Category is required');
-  }
-
-  return {
-    valid: errors.length === 0,
-    errors
-  };
-}
-
-// Export all functions
-return {
-  // Core resolution
-  getResolvedObjectTypes,
-  getResolvedCategories,
-  getObjectType,
-  getHiddenObjects,
-
-  // Icon/symbol helpers
-  hasIconClass,
-  getRenderChar,
-  isValidIconClass,
-
-  // Utilities
-  objectTypeExists,
-  getOriginalBuiltIn,
-  generateCustomObjectId,
-  generateCustomCategoryId,
-  isValidSymbol,
-  validateObjectDefinition,
-
-  // Constants
-  UNKNOWN_OBJECT_FALLBACK,
-  BUILT_IN_CATEGORY_ORDER,
-
-  // Re-export icon data for convenience
-  RA_ICONS
-};
-
-```
-
 # hexSlotPositioner
 
 ```ts
@@ -7726,8 +7773,8 @@ return {
 /**
  * Background Renderer Module
  *
- * Renders background images for hex maps, handling proper positioning,
- * scaling, and opacity based on hex grid bounds.
+ * Renders background images for grid and hex maps, handling proper positioning,
+ * scaling, and opacity based on map bounds.
  */
 
 interface HexBounds {
@@ -7740,6 +7787,7 @@ interface BackgroundImageConfig {
   offsetX?: number;
   offsetY?: number;
   opacity?: number;
+  imageGridSize?: number;  // Grid maps: pixel size of grid cells on background image
 }
 
 interface HexGeometryLike {
@@ -7842,8 +7890,81 @@ function renderHexBackgroundImage(
   }
 }
 
+interface GridDimensions {
+  width: number;   // Grid width in cells
+  height: number;  // Grid height in cells
+}
+
+/**
+ * Renders a background image for a grid map.
+ * Centers the image based on grid dimensions and applies offset/opacity/scaling.
+ *
+ * @param bgImage - The loaded HTMLImageElement
+ * @param config - Background image configuration (path, offsets, opacity, imageGridSize)
+ * @param dimensions - Grid dimensions in cells (width, height)
+ * @param cellSize - The grid cell size in pixels
+ * @param context - Render context with canvas context and view state
+ */
+function renderGridBackgroundImage(
+  bgImage: HTMLImageElement,
+  config: BackgroundImageConfig,
+  dimensions: GridDimensions,
+  cellSize: number,
+  context: RenderBackgroundContext
+): void {
+  const { ctx, offsetX, offsetY, zoom } = context;
+
+  // Calculate world bounds from grid dimensions (simpler than hex)
+  const worldWidth = dimensions.width * cellSize;
+  const worldHeight = dimensions.height * cellSize;
+  const worldCenterX = worldWidth / 2;
+  const worldCenterY = worldHeight / 2;
+
+  // Get image dimensions
+  const imgWidth = bgImage.naturalWidth;
+  const imgHeight = bgImage.naturalHeight;
+
+  // Calculate image scale factor
+  // If imageGridSize is specified, scale image so its grid matches Windrose's grid
+  // Scale = cellSize / imageGridSize
+  // (e.g., if image has 40px grid and Windrose uses 32px, scale = 0.8)
+  const imageScale = config.imageGridSize && config.imageGridSize > 0
+    ? cellSize / config.imageGridSize
+    : 1.0;
+
+  // Apply image offsets
+  const imgOffsetX = config.offsetX ?? 0;
+  const imgOffsetY = config.offsetY ?? 0;
+
+  // Calculate scaled image dimensions
+  const scaledImgWidth = imgWidth * imageScale;
+  const scaledImgHeight = imgHeight * imageScale;
+
+  // Calculate screen position (center image on grid bounds)
+  const screenCenterX = offsetX + worldCenterX * zoom;
+  const screenCenterY = offsetY + worldCenterY * zoom;
+  const screenX = screenCenterX - (scaledImgWidth * zoom) / 2 + (imgOffsetX * zoom);
+  const screenY = screenCenterY - (scaledImgHeight * zoom) / 2 + (imgOffsetY * zoom);
+
+  // Apply opacity if needed
+  const opacity = config.opacity ?? 1;
+  if (opacity < 1) {
+    ctx.save();
+    ctx.globalAlpha = opacity;
+  }
+
+  // Draw the background image
+  ctx.drawImage(bgImage, screenX, screenY, scaledImgWidth * zoom, scaledImgHeight * zoom);
+
+  // Restore opacity
+  if (opacity < 1) {
+    ctx.restore();
+  }
+}
+
 return {
-  renderHexBackgroundImage
+  renderHexBackgroundImage,
+  renderGridBackgroundImage
 };
 
 ```
@@ -8765,9 +8886,17 @@ interface ObjectRenderContext {
   scaledSize: number;
 }
 
+/** Render character result from objectTypeResolver */
+interface RenderChar {
+  char: string;
+  isIcon: boolean;
+  isImage?: boolean;
+  imagePath?: string;
+}
+
 interface ObjectRenderDeps {
   getObjectType: (typeId: string) => ObjectTypeDef | null;
-  getRenderChar: (objType: ObjectTypeDef) => { char: string; isIcon: boolean };
+  getRenderChar: (objType: ObjectTypeDef) => RenderChar;
   isCellFogged: (layer: MapLayer, col: number, row: number) => boolean;
   getObjectsInCell: (objects: MapObject[], x: number, y: number) => MapObject[];
   getSlotOffset: (slot: number, count: number, orientation: string) => { offsetX: number; offsetY: number };
@@ -8775,6 +8904,7 @@ interface ObjectRenderDeps {
   renderNoteLinkBadge: (ctx: CanvasRenderingContext2D, position: { screenX: number; screenY: number; objectWidth: number; objectHeight: number }, config: { scaledSize: number }) => void;
   renderTooltipIndicator: (ctx: CanvasRenderingContext2D, position: { screenX: number; screenY: number; objectWidth: number; objectHeight: number }, config: { scaledSize: number }) => void;
   renderObjectLinkIndicator: (ctx: CanvasRenderingContext2D, position: { screenX: number; screenY: number; objectWidth: number; objectHeight: number }, config: { scaledSize: number }) => void;
+  getCachedImage?: (path: string) => HTMLImageElement | null;
 }
 
 /**
@@ -8876,6 +9006,7 @@ function calculateObjectPosition(
 
 /**
  * Renders a single object on the canvas.
+ * Handles three rendering modes: custom images, RPGAwesome icons, and Unicode symbols.
  */
 function renderSingleObject(
   ctx: CanvasRenderingContext2D,
@@ -8883,7 +9014,8 @@ function renderSingleObject(
   objType: ObjectTypeDef,
   position: { screenX: number; screenY: number; objectWidth: number; objectHeight: number },
   scaledSize: number,
-  getRenderChar: (objType: ObjectTypeDef) => { char: string; isIcon: boolean }
+  getRenderChar: (objType: ObjectTypeDef) => RenderChar,
+  getCachedImage?: (path: string) => HTMLImageElement | null
 ): void {
   const { screenX, screenY, objectWidth, objectHeight } = position;
 
@@ -8891,9 +9023,44 @@ function renderSingleObject(
   const centerY = screenY + objectHeight / 2;
 
   const objectScale = obj.scale ?? 1.0;
+  const rotation = obj.rotation || 0;
+
+  const renderInfo = getRenderChar(objType);
+
+  // Handle custom image rendering
+  if (renderInfo.isImage && renderInfo.imagePath && getCachedImage) {
+    const img = getCachedImage(renderInfo.imagePath);
+    if (img && img.complete) {
+      // Calculate image size (fits within object bounds with 90% fill)
+      const imgSize = Math.min(objectWidth, objectHeight) * 0.9 * objectScale;
+
+      ctx.save();
+
+      // Apply rotation if needed
+      if (rotation !== 0) {
+        ctx.translate(centerX, centerY);
+        ctx.rotate((rotation * Math.PI) / 180);
+        ctx.translate(-centerX, -centerY);
+      }
+
+      // Draw the image centered
+      ctx.drawImage(
+        img,
+        centerX - imgSize / 2,
+        centerY - imgSize / 2,
+        imgSize,
+        imgSize
+      );
+
+      ctx.restore();
+      return;
+    }
+    // Image not loaded yet - fall through to render placeholder
+  }
+
+  // Font-based rendering (icons and Unicode symbols)
   const fontSize = Math.min(objectWidth, objectHeight) * 0.8 * objectScale;
 
-  const rotation = obj.rotation || 0;
   if (rotation !== 0) {
     ctx.save();
     ctx.translate(centerX, centerY);
@@ -8901,9 +9068,7 @@ function renderSingleObject(
     ctx.translate(-centerX, -centerY);
   }
 
-  const { char: renderChar, isIcon } = getRenderChar(objType);
-
-  if (isIcon) {
+  if (renderInfo.isIcon) {
     ctx.font = `${fontSize}px rpgawesome`;
   } else {
     ctx.font = `${fontSize}px 'Noto Emoji', 'Noto Sans Symbols 2', monospace`;
@@ -8911,10 +9076,10 @@ function renderSingleObject(
 
   ctx.strokeStyle = '#000000';
   ctx.lineWidth = Math.max(2, fontSize * 0.08);
-  ctx.strokeText(renderChar, centerX, centerY);
+  ctx.strokeText(renderInfo.char, centerX, centerY);
 
   ctx.fillStyle = obj.color || '#ffffff';
-  ctx.fillText(renderChar, centerX, centerY);
+  ctx.fillText(renderInfo.char, centerX, centerY);
 
   if (rotation !== 0) {
     ctx.restore();
@@ -8986,7 +9151,7 @@ function renderObjects(
     );
 
     // Render the object
-    renderSingleObject(ctx, obj, objType, position, scaledSize, deps.getRenderChar);
+    renderSingleObject(ctx, obj, objType, position, scaledSize, deps.getRenderChar, deps.getCachedImage);
 
     // Render badges
     renderObjectBadges(ctx, obj, position, scaledSize, deps);
@@ -9407,702 +9572,6 @@ return {
 
 ```
 
-# curveMath
-
-```ts
-/**
- * curveMath.ts
- *
- * Pure math functions for curve operations:
- * - Point simplification (Ramer-Douglas-Peucker algorithm)
- * - Catmull-Rom spline to Bezier conversion
- * - Distance/hit testing calculations
- * - Bounding box calculation
- *
- * All functions are stateless and side-effect free.
- */
-
-import type { CurvePoint, BezierSegment, CurveBounds } from '#types/core/curve.types';
-
-// ===========================================================================
-// Point Simplification (Ramer-Douglas-Peucker)
-// ===========================================================================
-
-/**
- * Simplify a path using the Ramer-Douglas-Peucker algorithm.
- *
- * This reduces the number of points in a path while preserving its shape.
- * Points that are within epsilon distance of the line between their
- * neighbors are removed.
- *
- * @param points - Array of points to simplify
- * @param epsilon - Distance threshold (larger = more simplification)
- * @returns Simplified array of points
- */
-function simplifyPath(points: CurvePoint[], epsilon: number): CurvePoint[] {
-  if (points.length < 3) {
-    return [...points];
-  }
-
-  return rdpSimplify(points, 0, points.length - 1, epsilon);
-}
-
-/**
- * Recursive RDP implementation.
- */
-function rdpSimplify(
-  points: CurvePoint[],
-  startIdx: number,
-  endIdx: number,
-  epsilon: number
-): CurvePoint[] {
-  // Find the point with maximum distance from the line
-  let maxDist = 0;
-  let maxIdx = startIdx;
-
-  const start = points[startIdx];
-  const end = points[endIdx];
-
-  for (let i = startIdx + 1; i < endIdx; i++) {
-    const dist = perpendicularDistance(points[i], start, end);
-    if (dist > maxDist) {
-      maxDist = dist;
-      maxIdx = i;
-    }
-  }
-
-  // If max distance is greater than epsilon, recursively simplify
-  if (maxDist > epsilon) {
-    // Recursive call on both sides
-    const left = rdpSimplify(points, startIdx, maxIdx, epsilon);
-    const right = rdpSimplify(points, maxIdx, endIdx, epsilon);
-
-    // Concatenate results (exclude duplicate point at maxIdx)
-    return [...left.slice(0, -1), ...right];
-  }
-
-  // All points between start and end are within epsilon
-  return [start, end];
-}
-
-/**
- * Calculate perpendicular distance from a point to a line segment.
- */
-function perpendicularDistance(
-  point: CurvePoint,
-  lineStart: CurvePoint,
-  lineEnd: CurvePoint
-): number {
-  const dx = lineEnd[0] - lineStart[0];
-  const dy = lineEnd[1] - lineStart[1];
-  const lenSq = dx * dx + dy * dy;
-
-  if (lenSq === 0) {
-    // Start and end are the same point
-    return Math.hypot(point[0] - lineStart[0], point[1] - lineStart[1]);
-  }
-
-  // Calculate cross product to get area of parallelogram
-  const cross = Math.abs(
-    (point[0] - lineStart[0]) * dy - (point[1] - lineStart[1]) * dx
-  );
-
-  // Divide by base length to get height (perpendicular distance)
-  return cross / Math.sqrt(lenSq);
-}
-
-// ===========================================================================
-// Catmull-Rom to Bezier Conversion
-// ===========================================================================
-
-/**
- * Convert Catmull-Rom spline control points to cubic Bezier segments.
- *
- * Catmull-Rom splines pass through all control points, making them
- * ideal for freehand drawing. This converts them to Bezier curves
- * for Canvas rendering.
- *
- * @param points - Control points the curve passes through
- * @param tension - Smoothness factor (0 = sharp corners, 1 = very smooth)
- * @param closed - Whether the curve forms a closed loop
- * @returns Array of cubic Bezier segments
- */
-function catmullRomToBezier(
-  points: CurvePoint[],
-  tension: number,
-  closed: boolean
-): BezierSegment[] {
-  if (points.length < 2) {
-    return [];
-  }
-
-  if (points.length === 2) {
-    // Two points = straight line, use linear interpolation
-    return [{
-      start: points[0],
-      cp1: [
-        points[0][0] + (points[1][0] - points[0][0]) / 3,
-        points[0][1] + (points[1][1] - points[0][1]) / 3,
-      ],
-      cp2: [
-        points[0][0] + (points[1][0] - points[0][0]) * 2 / 3,
-        points[0][1] + (points[1][1] - points[0][1]) * 2 / 3,
-      ],
-      end: points[1],
-    }];
-  }
-
-  const segments: BezierSegment[] = [];
-  const n = points.length;
-
-  // Alpha factor for Catmull-Rom to Bezier conversion
-  // Higher tension = more influence from tangent vectors
-  const alpha = tension / 6;
-
-  const numSegments = closed ? n : n - 1;
-
-  for (let i = 0; i < numSegments; i++) {
-    // Get the four control points for this segment
-    // For Catmull-Rom, we need point before, current, next, and after next
-    const p0 = points[closed ? (i - 1 + n) % n : Math.max(0, i - 1)];
-    const p1 = points[i];
-    const p2 = points[(i + 1) % n];
-    const p3 = points[closed ? (i + 2) % n : Math.min(n - 1, i + 2)];
-
-    // Calculate Bezier control points using Catmull-Rom formulas
-    const cp1: CurvePoint = [
-      p1[0] + alpha * (p2[0] - p0[0]),
-      p1[1] + alpha * (p2[1] - p0[1]),
-    ];
-
-    const cp2: CurvePoint = [
-      p2[0] - alpha * (p3[0] - p1[0]),
-      p2[1] - alpha * (p3[1] - p1[1]),
-    ];
-
-    segments.push({
-      start: p1,
-      cp1,
-      cp2,
-      end: p2,
-    });
-  }
-
-  return segments;
-}
-
-// ===========================================================================
-// Bounding Box Calculation
-// ===========================================================================
-
-/**
- * Calculate axis-aligned bounding box for a set of points.
- *
- * @param points - Points to calculate bounds for
- * @returns Bounding box or null if no points
- */
-function getCurveBounds(points: CurvePoint[]): CurveBounds | null {
-  if (points.length === 0) {
-    return null;
-  }
-
-  let minX = Infinity;
-  let minY = Infinity;
-  let maxX = -Infinity;
-  let maxY = -Infinity;
-
-  for (const [x, y] of points) {
-    minX = Math.min(minX, x);
-    minY = Math.min(minY, y);
-    maxX = Math.max(maxX, x);
-    maxY = Math.max(maxY, y);
-  }
-
-  return { minX, minY, maxX, maxY };
-}
-
-// ===========================================================================
-// Distance Calculations
-// ===========================================================================
-
-/**
- * Calculate distance from a point to a line segment.
- *
- * Returns the shortest distance from the point to any point on the
- * line segment (not the infinite line).
- *
- * @param point - The query point
- * @param lineStart - Start of line segment
- * @param lineEnd - End of line segment
- * @returns Distance from point to nearest point on segment
- */
-function distanceToLineSegment(
-  point: CurvePoint,
-  lineStart: CurvePoint,
-  lineEnd: CurvePoint
-): number {
-  const [px, py] = point;
-  const [x1, y1] = lineStart;
-  const [x2, y2] = lineEnd;
-
-  const dx = x2 - x1;
-  const dy = y2 - y1;
-  const lenSq = dx * dx + dy * dy;
-
-  if (lenSq === 0) {
-    // Segment is a point
-    return Math.hypot(px - x1, py - y1);
-  }
-
-  // Calculate projection parameter t
-  // t = 0 -> closest to start, t = 1 -> closest to end
-  let t = ((px - x1) * dx + (py - y1) * dy) / lenSq;
-  t = Math.max(0, Math.min(1, t)); // Clamp to segment
-
-  // Calculate closest point on segment
-  const closestX = x1 + t * dx;
-  const closestY = y1 + t * dy;
-
-  return Math.hypot(px - closestX, py - closestY);
-}
-
-// ===========================================================================
-// Bezier Curve Evaluation
-// ===========================================================================
-
-/**
- * Evaluate a cubic Bezier curve at parameter t.
- *
- * Uses De Casteljau's algorithm for numerical stability.
- *
- * @param segment - Bezier segment to evaluate
- * @param t - Parameter (0 = start, 1 = end)
- * @returns Point on curve at parameter t
- */
-function evaluateBezier(segment: BezierSegment, t: number): CurvePoint {
-  // Clamp t to [0, 1]
-  const tc = Math.max(0, Math.min(1, t));
-  const mt = 1 - tc;
-
-  // Cubic Bezier formula: B(t) = (1-t)³P0 + 3(1-t)²tP1 + 3(1-t)t²P2 + t³P3
-  const mt2 = mt * mt;
-  const mt3 = mt2 * mt;
-  const t2 = tc * tc;
-  const t3 = t2 * tc;
-
-  const x =
-    mt3 * segment.start[0] +
-    3 * mt2 * tc * segment.cp1[0] +
-    3 * mt * t2 * segment.cp2[0] +
-    t3 * segment.end[0];
-
-  const y =
-    mt3 * segment.start[1] +
-    3 * mt2 * tc * segment.cp1[1] +
-    3 * mt * t2 * segment.cp2[1] +
-    t3 * segment.end[1];
-
-  return [x, y];
-}
-
-// ===========================================================================
-// Hit Testing
-// ===========================================================================
-
-/**
- * Find the closest point on a Bezier segment to a query point.
- *
- * Uses iterative subdivision for reasonable accuracy.
- *
- * @param segment - Bezier segment to test
- * @param point - Query point
- * @returns Closest point, distance, and parameter t
- */
-function closestPointOnBezier(
-  segment: BezierSegment,
-  point: CurvePoint
-): { point: CurvePoint; distance: number; t: number } {
-  const SUBDIVISIONS = 20;
-  let minDist = Infinity;
-  let minT = 0;
-  let minPoint: CurvePoint = segment.start;
-
-  // Sample the curve at regular intervals
-  for (let i = 0; i <= SUBDIVISIONS; i++) {
-    const t = i / SUBDIVISIONS;
-    const curvePoint = evaluateBezier(segment, t);
-    const dist = Math.hypot(
-      point[0] - curvePoint[0],
-      point[1] - curvePoint[1]
-    );
-
-    if (dist < minDist) {
-      minDist = dist;
-      minT = t;
-      minPoint = curvePoint;
-    }
-  }
-
-  // Refine with binary search around the best t
-  let low = Math.max(0, minT - 1 / SUBDIVISIONS);
-  let high = Math.min(1, minT + 1 / SUBDIVISIONS);
-
-  for (let i = 0; i < 10; i++) {
-    const mid1 = low + (high - low) / 3;
-    const mid2 = low + (high - low) * 2 / 3;
-
-    const p1 = evaluateBezier(segment, mid1);
-    const p2 = evaluateBezier(segment, mid2);
-
-    const d1 = Math.hypot(point[0] - p1[0], point[1] - p1[1]);
-    const d2 = Math.hypot(point[0] - p2[0], point[1] - p2[1]);
-
-    if (d1 < d2) {
-      high = mid2;
-      if (d1 < minDist) {
-        minDist = d1;
-        minT = mid1;
-        minPoint = p1;
-      }
-    } else {
-      low = mid1;
-      if (d2 < minDist) {
-        minDist = d2;
-        minT = mid2;
-        minPoint = p2;
-      }
-    }
-  }
-
-  return {
-    point: minPoint,
-    distance: minDist,
-    t: minT,
-  };
-}
-
-/**
- * Check if a point is within threshold distance of a curve.
- *
- * @param curvePoints - Control points of the curve
- * @param point - Query point
- * @param threshold - Maximum distance to consider "near"
- * @param tension - Curve smoothing (for Catmull-Rom conversion)
- * @returns True if point is near curve
- */
-function isPointNearCurve(
-  curvePoints: CurvePoint[],
-  point: CurvePoint,
-  threshold: number,
-  tension: number
-): boolean {
-  if (curvePoints.length === 0) {
-    return false;
-  }
-
-  if (curvePoints.length === 1) {
-    const dist = Math.hypot(
-      point[0] - curvePoints[0][0],
-      point[1] - curvePoints[0][1]
-    );
-    return dist <= threshold;
-  }
-
-  // Convert to Bezier and check each segment
-  const segments = catmullRomToBezier(curvePoints, tension, false);
-
-  for (const segment of segments) {
-    const { distance } = closestPointOnBezier(segment, point);
-    if (distance <= threshold) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
-// ===========================================================================
-// Exports (Datacore module format)
-// ===========================================================================
-
-return {
-  simplifyPath,
-  catmullRomToBezier,
-  getCurveBounds,
-  distanceToLineSegment,
-  closestPointOnBezier,
-  isPointNearCurve,
-  evaluateBezier,
-};
-
-```
-
-# curveRenderer
-
-```ts
-/**
- * curveRenderer.ts
- *
- * Renders freehand curves on the canvas.
- * Curves are stored as Catmull-Rom control points and rendered as Bezier curves.
- *
- * RENDERING NOTES:
- * - Curves are stored in world coordinates (pixel units)
- * - Rendering uses offset-based view state for consistency with other renderers
- * - Stroke width can optionally scale with zoom
- * - Uses lineCap/lineJoin = 'round' for smooth appearance
- */
-
-// Type-only imports
-import type { Curve, CurveRenderOptions, BezierSegment, CurvePoint } from '#types/core/curve.types';
-
-/**
- * View state used by renderers (offset-based).
- * x, y are offset values, zoom is the scale factor.
- */
-interface RendererViewState {
-  x: number;  // Offset X (already calculated from center)
-  y: number;  // Offset Y (already calculated from center)
-  zoom: number;
-}
-
-// Datacore imports
-const { catmullRomToBezier } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "curveMath")) as {
-  catmullRomToBezier: (points: CurvePoint[], tension: number, closed: boolean) => BezierSegment[];
-};
-
-// Default render options
-const DEFAULT_OPTIONS: CurveRenderOptions = {
-  lineCap: 'round',
-  lineJoin: 'round',
-  scaleStrokeWithZoom: true,
-};
-
-/**
- * Render a single curve on the canvas.
- *
- * @param ctx - Canvas rendering context
- * @param curve - Curve to render
- * @param viewState - Renderer view state with offset and zoom
- * @param options - Rendering options
- */
-function renderCurve(
-  ctx: CanvasRenderingContext2D,
-  curve: Curve,
-  viewState: RendererViewState,
-  options: CurveRenderOptions = {}
-): void {
-  const opts = { ...DEFAULT_OPTIONS, ...options };
-  const { points, color, opacity = 1, strokeWidth = 2, smoothing = 0.5, closed = false, filled = false } = curve;
-
-  if (points.length < 2) {
-    return;
-  }
-
-  // Convert Catmull-Rom control points to Bezier segments
-  const segments = catmullRomToBezier(points, smoothing, closed);
-
-  if (segments.length === 0) {
-    return;
-  }
-
-  // Calculate screen coordinates using offset-based view state
-  // This is the same formula used by other renderers (gridRenderer, hexRenderer)
-  // worldPoint * zoom + offset = screenPoint
-  const toScreen = (x: number, y: number) => ({
-    x: x * viewState.zoom + viewState.x,
-    y: y * viewState.zoom + viewState.y,
-  });
-
-  // Begin path
-  ctx.beginPath();
-
-  // Move to start of first segment
-  const start = toScreen(segments[0].start[0], segments[0].start[1]);
-  ctx.moveTo(start.x, start.y);
-
-  // Draw each Bezier segment
-  for (const segment of segments) {
-    const cp1 = toScreen(segment.cp1[0], segment.cp1[1]);
-    const cp2 = toScreen(segment.cp2[0], segment.cp2[1]);
-    const end = toScreen(segment.end[0], segment.end[1]);
-    ctx.bezierCurveTo(cp1.x, cp1.y, cp2.x, cp2.y, end.x, end.y);
-  }
-
-  // Close path if needed
-  if (closed) {
-    ctx.closePath();
-  }
-
-  // Set up stroke style
-  const previousAlpha = ctx.globalAlpha;
-  ctx.globalAlpha = previousAlpha * opacity;
-
-  // Calculate stroke width (optionally scaled with zoom)
-  const scaledWidth = opts.scaleStrokeWithZoom
-    ? strokeWidth * viewState.zoom
-    : strokeWidth;
-
-  // Fill if closed and filled
-  if (closed && filled) {
-    ctx.fillStyle = color;
-    ctx.fill();
-  }
-
-  // Stroke the curve
-  ctx.strokeStyle = color;
-  ctx.lineWidth = scaledWidth;
-  ctx.lineCap = opts.lineCap!;
-  ctx.lineJoin = opts.lineJoin!;
-  ctx.stroke();
-
-  // Restore alpha
-  ctx.globalAlpha = previousAlpha;
-}
-
-/**
- * Render all curves on the canvas.
- *
- * @param ctx - Canvas rendering context
- * @param curves - Curves to render
- * @param viewState - Renderer view state with offset and zoom
- * @param options - Rendering options
- */
-function renderCurves(
-  ctx: CanvasRenderingContext2D,
-  curves: Curve[] | null | undefined,
-  viewState: RendererViewState,
-  options: CurveRenderOptions = {}
-): void {
-  if (!curves || curves.length === 0) {
-    return;
-  }
-
-  for (const curve of curves) {
-    renderCurve(ctx, curve, viewState, options);
-  }
-}
-
-/**
- * Render a preview curve during drawing (before it's finalized).
- * Uses slightly different styling for visual feedback.
- *
- * @param ctx - Canvas rendering context
- * @param points - Raw points being drawn
- * @param color - Stroke color
- * @param strokeWidth - Line width
- * @param viewState - Renderer view state with offset and zoom
- */
-function renderCurvePreview(
-  ctx: CanvasRenderingContext2D,
-  points: [number, number][],
-  color: string,
-  strokeWidth: number,
-  viewState: RendererViewState
-): void {
-  if (points.length < 2) {
-    return;
-  }
-
-  // For preview, draw as simple polyline (smoother performance during drawing)
-  const toScreen = (x: number, y: number) => ({
-    x: x * viewState.zoom + viewState.x,
-    y: y * viewState.zoom + viewState.y,
-  });
-
-  ctx.beginPath();
-  const start = toScreen(points[0][0], points[0][1]);
-  ctx.moveTo(start.x, start.y);
-
-  for (let i = 1; i < points.length; i++) {
-    const pt = toScreen(points[i][0], points[i][1]);
-    ctx.lineTo(pt.x, pt.y);
-  }
-
-  ctx.strokeStyle = color;
-  ctx.lineWidth = strokeWidth * viewState.zoom;
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-  ctx.stroke();
-}
-
-/**
- * Render selection highlight for a curve.
- *
- * @param ctx - Canvas rendering context
- * @param curve - Curve to highlight
- * @param viewState - Renderer view state with offset and zoom
- * @param highlightColor - Color for the highlight
- */
-function renderCurveHighlight(
-  ctx: CanvasRenderingContext2D,
-  curve: Curve,
-  viewState: RendererViewState,
-  highlightColor: string = '#4dabf7'
-): void {
-  const { points, smoothing = 0.5, closed = false } = curve;
-
-  if (points.length < 2) {
-    return;
-  }
-
-  const segments = catmullRomToBezier(points, smoothing, closed);
-
-  if (segments.length === 0) {
-    return;
-  }
-
-  const toScreen = (x: number, y: number) => ({
-    x: x * viewState.zoom + viewState.x,
-    y: y * viewState.zoom + viewState.y,
-  });
-
-  // Draw thicker outline in highlight color
-  ctx.beginPath();
-  const start = toScreen(segments[0].start[0], segments[0].start[1]);
-  ctx.moveTo(start.x, start.y);
-
-  for (const segment of segments) {
-    const cp1 = toScreen(segment.cp1[0], segment.cp1[1]);
-    const cp2 = toScreen(segment.cp2[0], segment.cp2[1]);
-    const end = toScreen(segment.end[0], segment.end[1]);
-    ctx.bezierCurveTo(cp1.x, cp1.y, cp2.x, cp2.y, end.x, end.y);
-  }
-
-  if (closed) {
-    ctx.closePath();
-  }
-
-  ctx.strokeStyle = highlightColor;
-  ctx.lineWidth = ((curve.strokeWidth ?? 2) + 4) * viewState.zoom;
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-  ctx.stroke();
-
-  // Draw control point indicators
-  ctx.fillStyle = highlightColor;
-  const handleSize = 6;
-  for (const point of points) {
-    const screen = toScreen(point[0], point[1]);
-    ctx.beginPath();
-    ctx.arc(screen.x, screen.y, handleSize, 0, Math.PI * 2);
-    ctx.fill();
-  }
-}
-
-// ===========================================================================
-// Exports (Datacore module format)
-// ===========================================================================
-
-return {
-  renderCurve,
-  renderCurves,
-  renderCurvePreview,
-  renderCurveHighlight,
-};
-
-```
-
 # fontOptions
 
 ```ts
@@ -10273,10 +9742,47 @@ const gridRenderer = {
 
   /**
    * Render background image for grid maps.
-   * Grid maps don't support background images - this is a no-op.
+   * Centers the image based on grid dimensions and applies offset/opacity/scaling.
+   *
+   * @param ctx - Canvas rendering context
+   * @param geometry - Grid geometry instance
+   * @param bgImage - The loaded HTMLImageElement (or null)
+   * @param bgConfig - Background image configuration
+   * @param dimensions - Grid dimensions in cells (width, height)
+   * @param _orientation - Hex orientation (unused for grid maps, included for interface compatibility)
+   * @param offsetX - Viewport X offset
+   * @param offsetY - Viewport Y offset
+   * @param zoom - Current zoom level
+   * @param renderGridBackgroundImage - Render function from backgroundRenderer
    */
-  renderBackgroundImage(): void {
-    // Grid maps don't render background images
+  renderBackgroundImage(
+    ctx: CanvasRenderingContext2D,
+    geometry: IGridRenderer,
+    bgImage: HTMLImageElement | null,
+    bgConfig: { path: string; offsetX?: number; offsetY?: number; opacity?: number; imageGridSize?: number } | undefined,
+    dimensions: { width: number; height: number } | undefined,
+    _orientation: string,
+    offsetX: number,
+    offsetY: number,
+    zoom: number,
+    renderGridBackgroundImage: (
+      bgImage: HTMLImageElement,
+      config: { path: string; offsetX?: number; offsetY?: number; opacity?: number; imageGridSize?: number },
+      dimensions: { width: number; height: number },
+      cellSize: number,
+      context: { ctx: CanvasRenderingContext2D; offsetX: number; offsetY: number; zoom: number }
+    ) => void
+  ): void {
+    if (!bgImage || !bgConfig?.path || !dimensions) return;
+    if (!bgImage.complete) return;
+
+    renderGridBackgroundImage(
+      bgImage,
+      bgConfig,
+      dimensions,
+      geometry.cellSize,
+      { ctx, offsetX, offsetY, zoom }
+    );
   },
 
   /**
@@ -12194,8 +11700,9 @@ const { renderNoteLinkBadge, renderTooltipIndicator, renderObjectLinkIndicator }
 const { renderTextLabels } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "textLabelRenderer")) as {
   renderTextLabels: (labels: TextLabel[], context: { ctx: CanvasRenderingContext2D; zoom: number; getFontCss: (fontFace: string) => string }, geometry: { worldToScreen: (x: number, y: number, offsetX: number, offsetY: number, zoom: number) => { screenX: number; screenY: number } }, viewState: { offsetX: number; offsetY: number; zoom: number }) => void;
 };
-const { renderHexBackgroundImage } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "backgroundRenderer")) as {
+const { renderHexBackgroundImage, renderGridBackgroundImage } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "backgroundRenderer")) as {
   renderHexBackgroundImage: (bgImage: HTMLImageElement, config: { path: string; offsetX?: number; offsetY?: number; opacity?: number }, hexBounds: { maxCol: number; maxRow: number }, hexGeometry: { hexSize: number; sqrt3: number; hexToWorld: (q: number, r: number) => { worldX: number; worldY: number } }, orientation: string, context: { ctx: CanvasRenderingContext2D; offsetX: number; offsetY: number; zoom: number }, offsetToAxial: (col: number, row: number, orientation: string) => { q: number; r: number }) => void;
+  renderGridBackgroundImage: (bgImage: HTMLImageElement, config: { path: string; offsetX?: number; offsetY?: number; opacity?: number; imageGridSize?: number }, dimensions: { width: number; height: number }, cellSize: number, context: { ctx: CanvasRenderingContext2D; offsetX: number; offsetY: number; zoom: number }) => void;
 };
 const { renderGridFog } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "gridFogRenderer")) as {
   renderGridFog: (fogCells: Array<{ col: number; row: number }>, context: { ctx: CanvasRenderingContext2D; fogCtx: CanvasRenderingContext2D | null; offsetX: number; offsetY: number; scaledSize: number }, options: { fowOpacity: number; fowBlurEnabled: boolean; blurRadius: number; useGlobalAlpha: boolean }, visibleBounds: { minCol: number; maxCol: number; minRow: number; maxRow: number }, zoom: number) => void;
@@ -12209,13 +11716,10 @@ const { getFogSettings, clearFogCanvas, renderFog } = await dc.require(dc.header
   renderFog: (fow: { enabled: boolean; foggedCells?: Array<{ col: number; row: number }> }, context: { ctx: CanvasRenderingContext2D; fogCanvas: HTMLCanvasElement | null; width: number; height: number; offsetX: number; offsetY: number; zoom: number; scaledSize: number; northDirection: number }, settings: { fowColor: string; fowOpacity: number; fowImagePath?: string; fowBlurEnabled: boolean; fowBlurFactor: number }, mapBounds: { hexBounds?: { maxCol: number; maxRow: number }; dimensions?: { width: number; height: number } }, isHexMap: boolean, hexGeometry: { hexSize: number; getHexVertices: (q: number, r: number) => Array<{ worldX: number; worldY: number }>; hexToWorld: (q: number, r: number) => { worldX: number; worldY: number }; getNeighbors: (q: number, r: number) => Array<{ q: number; r: number }> } | null, gridGeometry: { cellSize: number } | null, geometry: { worldToScreen: (worldX: number, worldY: number, offsetX: number, offsetY: number, zoom: number) => { screenX: number; screenY: number } }, orientation: string, getCachedImage: (path: string) => HTMLImageElement | null, renderGridFog: typeof renderGridFog, renderHexFog: typeof renderHexFog, offsetToAxial: (col: number, row: number, orientation: string) => { q: number; r: number }, axialToOffset: (q: number, r: number, orientation: string) => { col: number; row: number }) => void;
 };
 const { renderObjects } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "objectRenderer")) as {
-  renderObjects: (layer: MapLayer, context: { ctx: CanvasRenderingContext2D; offsetX: number; offsetY: number; zoom: number; scaledSize: number }, geometry: IGeometry, isHexMap: boolean, orientation: string, deps: { getObjectType: typeof getObjectType; getRenderChar: typeof getRenderChar; isCellFogged: typeof isCellFogged; getObjectsInCell: typeof getObjectsInCell; getSlotOffset: typeof getSlotOffset; getMultiObjectScale: typeof getMultiObjectScale; renderNoteLinkBadge: typeof renderNoteLinkBadge; renderTooltipIndicator: typeof renderTooltipIndicator; renderObjectLinkIndicator: typeof renderObjectLinkIndicator }) => void;
+  renderObjects: (layer: MapLayer, context: { ctx: CanvasRenderingContext2D; offsetX: number; offsetY: number; zoom: number; scaledSize: number }, geometry: IGeometry, isHexMap: boolean, orientation: string, deps: { getObjectType: typeof getObjectType; getRenderChar: typeof getRenderChar; isCellFogged: typeof isCellFogged; getObjectsInCell: typeof getObjectsInCell; getSlotOffset: typeof getSlotOffset; getMultiObjectScale: typeof getMultiObjectScale; renderNoteLinkBadge: typeof renderNoteLinkBadge; renderTooltipIndicator: typeof renderTooltipIndicator; renderObjectLinkIndicator: typeof renderObjectLinkIndicator; getCachedImage?: typeof getCachedImage }) => void;
 };
 const { renderSelections } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "selectionRenderer")) as {
   renderSelections: (selectedItems: RendererSelectedItem[], textLabels: TextLabel[] | undefined, objects: MapObject[] | undefined, context: { ctx: CanvasRenderingContext2D; offsetX: number; offsetY: number; zoom: number; scaledSize: number }, geometry: IGeometry, hexGeometry: { hexToWorld: (q: number, r: number) => { worldX: number; worldY: number } } | null, isHexMap: boolean, isResizeMode: boolean, orientation: string, showCoordinates: boolean, visibility: { textLabels?: boolean; objects?: boolean }, deps: { getFontCss: typeof getFontCss; getObjectsInCell: typeof getObjectsInCell; getSlotOffset: typeof getSlotOffset; getMultiObjectScale: typeof getMultiObjectScale }) => void;
-};
-const { renderCurves } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "curveRenderer")) as {
-  renderCurves: (ctx: CanvasRenderingContext2D, curves: Array<{ id: string; points: [number, number][]; color: string; opacity?: number; strokeWidth?: number; smoothing?: number; closed?: boolean; filled?: boolean }> | null | undefined, viewState: RendererViewState) => void;
 };
 const { getFontCss } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "fontOptions")) as {
   getFontCss: (fontFace: string) => string;
@@ -12242,8 +11746,19 @@ interface Renderer {
   getScaledSize: (geometry: IGeometry, zoom: number) => number;
   calculateViewportOffset: (geometry: IGeometry, center: { x: number; y: number }, canvasSize: { width: number; height: number }, zoom: number) => { offsetX: number; offsetY: number };
 
-  // Optional background image rendering (hex only)
-  renderBackgroundImage: (ctx: CanvasRenderingContext2D, geometry: IGeometry, bgImage: HTMLImageElement | null, bgConfig: { path: string; offsetX?: number; offsetY?: number; opacity?: number } | undefined, hexBounds: { maxCol: number; maxRow: number } | undefined, orientation: string, offsetX: number, offsetY: number, zoom: number) => void;
+  // Background image rendering (both grid and hex)
+  renderBackgroundImage: (
+    ctx: CanvasRenderingContext2D,
+    geometry: IGeometry,
+    bgImage: HTMLImageElement | null,
+    bgConfig: { path: string; offsetX?: number; offsetY?: number; opacity?: number; imageGridSize?: number } | undefined,
+    boundsOrDimensions: { maxCol: number; maxRow: number } | { width: number; height: number } | undefined,
+    orientation: string,
+    offsetX: number,
+    offsetY: number,
+    zoom: number,
+    renderGridBackgroundImage?: typeof renderGridBackgroundImage
+  ) => void;
 
   // Grid/cell rendering
   renderGrid: (ctx: CanvasRenderingContext2D, geometry: IGeometry, viewState: RendererViewState, dimensions: { width: number; height: number }, showGrid: boolean, options: { lineColor: string; lineWidth: number }) => void;
@@ -12431,18 +11946,23 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
     zoom
   );
 
-  // Draw background image (hex maps only - grid renderer is no-op)
+  // Draw background image (both grid and hex maps)
   const bgImage = mapData.backgroundImage?.path ? getCachedImage(mapData.backgroundImage.path) : null;
+  const isHexMapForBg = geometry.type === 'hex';
+  const boundsOrDimensions = isHexMapForBg
+    ? mapData.hexBounds
+    : mapData.dimensions || { width: 300, height: 300 };
   renderer.renderBackgroundImage(
     ctx,
     geometry,
     bgImage,
     mapData.backgroundImage,
-    mapData.hexBounds,
+    boundsOrDimensions,
     mapData.orientation || 'flat',
     offsetX,
     offsetY,
-    zoom
+    zoom,
+    renderGridBackgroundImage
   );
 
   // Create renderer viewState object
@@ -12484,11 +12004,6 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   // Draw active layer cells and edges
   renderLayerCellsAndEdges(ctx, activeLayer, geometry, rendererViewState, THEME, renderer);
 
-  // Draw freehand curves
-  if (activeLayer.curves && activeLayer.curves.length > 0) {
-    renderCurves(ctx, activeLayer.curves, rendererViewState);
-  }
-
   // Draw objects
   if (activeLayer.objects && activeLayer.objects.length > 0 && !showCoordinates && visibility.objects) {
     const isHexMap = geometry.type === 'hex';
@@ -12508,6 +12023,7 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
         renderNoteLinkBadge,
         renderTooltipIndicator,
         renderObjectLinkIndicator,
+        getCachedImage,
       }
     );
   }
@@ -18723,221 +18239,6 @@ return {
 };
 ```
 
-# curveOperations
-
-```ts
-/**
- * curveOperations.ts
- *
- * Pure functions for curve CRUD operations.
- * Similar pattern to edgeOperations.ts.
- *
- * CURVE DATA STRUCTURE:
- * {
- *   id: string,           // Unique identifier
- *   points: CurvePoint[], // Control points [[x,y], ...]
- *   color: string,        // Hex color code
- *   opacity?: number,     // Optional opacity (0-1)
- *   strokeWidth?: number, // Line width
- *   smoothing?: number,   // Catmull-Rom tension
- *   closed?: boolean      // Whether curve is closed
- * }
- */
-
-// Type-only imports
-import type {
-  Curve,
-  CurveId,
-  CurvePoint,
-  CurveTemplate,
-  CurveUpdate,
-  CurveBounds,
-} from '#types/core/curve.types';
-
-// Datacore imports
-const { getCurveBounds, isPointNearCurve } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "curveMath")) as {
-  getCurveBounds: (points: CurvePoint[]) => CurveBounds | null;
-  isPointNearCurve: (points: CurvePoint[], point: CurvePoint, threshold: number, tension: number) => boolean;
-};
-
-// ===========================================================================
-// ID Generation
-// ===========================================================================
-
-/**
- * Generate a unique curve ID
- */
-function generateCurveId(): CurveId {
-  return 'curve-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
-}
-
-// ===========================================================================
-// CRUD Operations
-// ===========================================================================
-
-/**
- * Add a new curve to the array.
- * Generates a unique ID for the curve.
- *
- * @param curves - Existing curves array (or null/undefined)
- * @param template - Curve data without ID
- * @returns New array with the added curve
- */
-function addCurve(
-  curves: Curve[] | null | undefined,
-  template: CurveTemplate
-): Curve[] {
-  const curveArray = curves || [];
-
-  const newCurve: Curve = {
-    id: generateCurveId(),
-    ...template,
-  };
-
-  return [...curveArray, newCurve];
-}
-
-/**
- * Remove a curve by ID.
- *
- * @param curves - Existing curves array
- * @param curveId - ID of curve to remove
- * @returns New array without the removed curve
- */
-function removeCurve(
-  curves: Curve[] | null | undefined,
-  curveId: CurveId
-): Curve[] {
-  if (!curves || !Array.isArray(curves)) return [];
-  return curves.filter(c => c.id !== curveId);
-}
-
-/**
- * Update curve properties by ID.
- *
- * @param curves - Existing curves array
- * @param curveId - ID of curve to update
- * @param updates - Partial curve properties to update
- * @returns New array with the updated curve
- */
-function updateCurve(
-  curves: Curve[] | null | undefined,
-  curveId: CurveId,
-  updates: CurveUpdate
-): Curve[] {
-  if (!curves || !Array.isArray(curves)) return [];
-
-  return curves.map(curve => {
-    if (curve.id === curveId) {
-      return { ...curve, ...updates };
-    }
-    return curve;
-  });
-}
-
-/**
- * Get a curve by ID.
- *
- * @param curves - Curves array to search
- * @param curveId - ID to find
- * @returns The curve or null if not found
- */
-function getCurveById(
-  curves: Curve[] | null | undefined,
-  curveId: CurveId
-): Curve | null {
-  if (!curves || !Array.isArray(curves)) return null;
-  return curves.find(c => c.id === curveId) || null;
-}
-
-// ===========================================================================
-// Query Operations
-// ===========================================================================
-
-/**
- * Get all curves that overlap with a bounding box.
- *
- * @param curves - Curves to search
- * @param bounds - Bounding box to check
- * @returns Curves that overlap the bounds
- */
-function getCurvesInBounds(
-  curves: Curve[] | null | undefined,
-  bounds: CurveBounds
-): Curve[] {
-  if (!curves || !Array.isArray(curves)) return [];
-
-  return curves.filter(curve => {
-    const curveBounds = getCurveBounds(curve.points);
-    if (!curveBounds) return false;
-
-    // Check if bounding boxes overlap
-    return !(
-      curveBounds.maxX < bounds.minX ||
-      curveBounds.minX > bounds.maxX ||
-      curveBounds.maxY < bounds.minY ||
-      curveBounds.minY > bounds.maxY
-    );
-  });
-}
-
-/**
- * Find the first curve near a point (for selection).
- *
- * @param curves - Curves to search
- * @param point - Query point [x, y]
- * @param threshold - Maximum distance to consider "near"
- * @param tension - Curve smoothing (for Catmull-Rom)
- * @returns First curve within threshold or null
- */
-function getCurveAtPoint(
-  curves: Curve[] | null | undefined,
-  point: CurvePoint,
-  threshold: number,
-  tension: number
-): Curve | null {
-  if (!curves || !Array.isArray(curves)) return null;
-
-  for (const curve of curves) {
-    const curveTension = curve.smoothing ?? tension;
-    if (isPointNearCurve(curve.points, point, threshold, curveTension)) {
-      return curve;
-    }
-  }
-
-  return null;
-}
-
-// ===========================================================================
-// Bulk Operations
-// ===========================================================================
-
-/**
- * Clear all curves.
- *
- * @returns Empty array
- */
-function clearAllCurves(): Curve[] {
-  return [];
-}
-
-// ===========================================================================
-// Exports (Datacore module format)
-// ===========================================================================
-
-return {
-  generateCurveId,
-  addCurve,
-  removeCurve,
-  updateCurve,
-  getCurveById,
-  getCurvesInBounds,
-  getCurveAtPoint,
-  clearAllCurves,
-};
-
-```
-
 # useDrawingTools
 
 ```ts
@@ -18962,7 +18263,6 @@ import type { MapData, MapLayer } from '#types/core/map.types';
 import type { Edge } from '#types/core/edge.types';
 import type { MapObject } from '#types/objects/object.types';
 import type { TextLabel } from '#types/core/textLabel.types';
-import type { Curve, CurvePoint, CurveTemplate } from '#types/core/curve.types';
 import type {
   PreviewSettings,
   RectangleStart,
@@ -19002,7 +18302,6 @@ interface MapOperationsValue {
   onObjectsChange: (objects: MapObject[]) => void;
   onTextLabelsChange: (labels: TextLabel[]) => void;
   onEdgesChange: (edges: Edge[], skipHistory?: boolean) => void;
-  onCurvesChange?: (curves: Curve[], skipHistory?: boolean) => void;
   getTextLabelAtPosition: (labels: TextLabel[], worldX: number, worldY: number, ctx: CanvasRenderingContext2D | null) => TextLabel | null;
   removeTextLabel: (labels: TextLabel[], id: string) => TextLabel[];
   getObjectAtPosition: (objects: MapObject[], x: number, y: number) => MapObject | null;
@@ -19034,16 +18333,6 @@ const { eraseObjectAt } = await dc.require(dc.headerLink(dc.resolvePath("compile
 
 const { getActiveLayer } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "layerAccessor")) as {
   getActiveLayer: (mapData: MapData) => MapLayer;
-};
-
-const { simplifyPath } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "curveMath")) as {
-  simplifyPath: (points: CurvePoint[], epsilon: number) => CurvePoint[];
-};
-
-const { addCurve, removeCurve, getCurveAtPoint } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "curveOperations")) as {
-  addCurve: (curves: Curve[], template: CurveTemplate) => Curve[];
-  removeCurve: (curves: Curve[], curveId: string) => Curve[];
-  getCurveAtPoint: (curves: Curve[], point: CurvePoint, threshold: number, tension: number) => Curve | null;
 };
 
 interface CellUpdate {
@@ -19098,7 +18387,6 @@ const useDrawingTools = (
     onObjectsChange,
     onTextLabelsChange,
     onEdgesChange,
-    onCurvesChange,
     getTextLabelAtPosition,
     removeTextLabel,
     getObjectAtPosition,
@@ -19126,14 +18414,9 @@ const useDrawingTools = (
 
   const [segmentHoverInfo, setSegmentHoverInfo] = dc.useState<SegmentHoverInfo | null>(null);
 
-  // Freehand drawing state
-  const [isFreehandDrawing, setIsFreehandDrawing] = dc.useState<boolean>(false);
-  const [freehandPreviewPoints, setFreehandPreviewPoints] = dc.useState<CurvePoint[]>([]);
-
   // Track initial state for batched history
   const strokeInitialStateRef = dc.useRef<Cell[] | null>(null);
   const strokeInitialEdgesRef = dc.useRef<Edge[] | null>(null);
-  const strokeInitialCurvesRef = dc.useRef<Curve[] | null>(null);
 
   const toggleCell = (coords: Point, shouldFill: boolean, dragStart: DragStartContext | null = null): void => {
     if (!mapData || !geometry) return;
@@ -19188,23 +18471,6 @@ const useDrawingTools = (
                 onEdgesChange(newEdges, isBatchedStroke);
                 return;
               }
-            }
-          }
-        }
-
-        // Check for curves to erase
-        if (onCurvesChange) {
-          const curves = activeLayer.curves || [];
-          if (curves.length > 0) {
-            const point: CurvePoint = [worldCoords.worldX, worldCoords.worldY];
-            const curveAtPoint = getCurveAtPoint(curves, point, 10, 0.5);
-            if (curveAtPoint) {
-              if (strokeInitialCurvesRef.current === null) {
-                strokeInitialCurvesRef.current = [...curves];
-              }
-              const newCurves = removeCurve(curves, curveAtPoint.id);
-              onCurvesChange(newCurves, isBatchedStroke);
-              return;
             }
           }
         }
@@ -19425,122 +18691,6 @@ const useDrawingTools = (
     onCellsChange(newCells);
 
     closeSegmentPicker();
-  };
-
-  // ===========================================
-  // Freehand Drawing Operations
-  // ===========================================
-
-  /** Minimum distance between captured points (world units) */
-  const MIN_POINT_DISTANCE = 3;
-  /** RDP simplification epsilon */
-  const SIMPLIFY_EPSILON = 2;
-  /** Minimum points needed to create a curve */
-  const MIN_CURVE_POINTS = 3;
-  /** Default stroke width for curves */
-  const DEFAULT_STROKE_WIDTH = 2;
-  /** Default smoothing factor */
-  const DEFAULT_SMOOTHING = 0.5;
-
-  const startFreehandDrawing = (e: PointerEvent | MouseEvent | TouchEvent): void => {
-    if (!mapData || !onCurvesChange) return;
-
-    const { clientX, clientY } = getClientCoords(e);
-    const world = screenToWorld(clientX, clientY);
-    if (!world) return;
-
-    const activeLayer = getActiveLayer(mapData);
-    strokeInitialCurvesRef.current = [...(activeLayer.curves || [])];
-
-    const point: CurvePoint = [world.worldX, world.worldY];
-    setFreehandPreviewPoints([point]);
-    setIsFreehandDrawing(true);
-  };
-
-  const continueFreehandDrawing = (e: PointerEvent | MouseEvent | TouchEvent): void => {
-    if (!isFreehandDrawing) return;
-
-    const { clientX, clientY } = getClientCoords(e);
-    const world = screenToWorld(clientX, clientY);
-    if (!world) return;
-
-    const point: CurvePoint = [world.worldX, world.worldY];
-
-    setFreehandPreviewPoints((prev) => {
-      if (prev.length === 0) return [point];
-
-      const lastPoint = prev[prev.length - 1];
-      const dist = Math.hypot(point[0] - lastPoint[0], point[1] - lastPoint[1]);
-
-      if (dist >= MIN_POINT_DISTANCE) {
-        return [...prev, point];
-      }
-      return prev;
-    });
-  };
-
-  const finishFreehandDrawing = (): void => {
-    if (!isFreehandDrawing || !mapData || !onCurvesChange) {
-      cancelFreehandDrawing();
-      return;
-    }
-
-    // Need enough points to make a curve
-    if (freehandPreviewPoints.length < MIN_CURVE_POINTS) {
-      cancelFreehandDrawing();
-      return;
-    }
-
-    // Simplify the path
-    const simplifiedPoints = simplifyPath(freehandPreviewPoints, SIMPLIFY_EPSILON);
-
-    // Need at least 2 points after simplification
-    if (simplifiedPoints.length < 2) {
-      cancelFreehandDrawing();
-      return;
-    }
-
-    // Check if shape should auto-close (end point near start point)
-    const CLOSE_THRESHOLD = 15; // World units
-    const startPoint = simplifiedPoints[0];
-    const endPoint = simplifiedPoints[simplifiedPoints.length - 1];
-    const closingDistance = Math.hypot(
-      endPoint[0] - startPoint[0],
-      endPoint[1] - startPoint[1]
-    );
-    const isClosedShape = closingDistance < CLOSE_THRESHOLD && simplifiedPoints.length >= 3;
-
-    // Create curve template
-    const template: CurveTemplate = {
-      points: simplifiedPoints,
-      color: selectedColor,
-      opacity: selectedOpacity,
-      strokeWidth: DEFAULT_STROKE_WIDTH,
-      smoothing: DEFAULT_SMOOTHING,
-      closed: isClosedShape,
-      filled: isClosedShape,
-    };
-
-    // Get current curves from active layer
-    const activeLayer = getActiveLayer(mapData);
-    const currentCurves = activeLayer.curves || [];
-
-    // Add new curve
-    const newCurves = addCurve(currentCurves, template);
-
-    // Update map data (not skipping history since this is the final action)
-    onCurvesChange(newCurves, false);
-
-    // Reset state
-    setIsFreehandDrawing(false);
-    setFreehandPreviewPoints([]);
-    strokeInitialCurvesRef.current = null;
-  };
-
-  const cancelFreehandDrawing = (): void => {
-    setIsFreehandDrawing(false);
-    setFreehandPreviewPoints([]);
-    strokeInitialCurvesRef.current = null;
   };
 
   const fillEdgeLine = (x1: number, y1: number, x2: number, y2: number): void => {
@@ -19913,11 +19063,6 @@ const useDrawingTools = (
       return true;
     }
 
-    if (currentTool === 'freehandDraw') {
-      startFreehandDrawing(e);
-      return true;
-    }
-
     if (currentTool === 'draw' || currentTool === 'erase') {
       startDrawing(e);
       return true;
@@ -19937,11 +19082,6 @@ const useDrawingTools = (
       return true;
     }
 
-    if (isFreehandDrawing && currentTool === 'freehandDraw') {
-      continueFreehandDrawing(e);
-      return true;
-    }
-
     if (isDrawing && (currentTool === 'draw' || currentTool === 'erase')) {
       processCellDuringDrag(e, dragStart);
       return true;
@@ -19957,9 +19097,6 @@ const useDrawingTools = (
       setProcessedSegments(new Set());
       strokeInitialStateRef.current = null;
       strokeInitialEdgesRef.current = null;
-    }
-    if (isFreehandDrawing) {
-      cancelFreehandDrawing();
     }
   };
 
@@ -20029,14 +19166,6 @@ const useDrawingTools = (
     segmentHoverInfo,
     updateSegmentHover,
     clearSegmentHover,
-
-    // Freehand drawing
-    isFreehandDrawing,
-    freehandPreviewPoints,
-    startFreehandDrawing,
-    continueFreehandDrawing,
-    finishFreehandDrawing,
-    cancelFreehandDrawing,
 
     setIsDrawing,
     setProcessedCells,
@@ -21539,12 +20668,7 @@ const DrawingLayer = ({
     rememberSegments,
     segmentHoverInfo,
     updateSegmentHover,
-    clearSegmentHover,
-    // Freehand drawing
-    isFreehandDrawing,
-    freehandPreviewPoints,
-    finishFreehandDrawing,
-    cancelFreehandDrawing
+    clearSegmentHover
   } = useDrawingTools(currentTool, selectedColor, selectedOpacity, previewSettings);
 
   const handleStopDrawing = dc.useCallback(() => {
@@ -21552,24 +20676,20 @@ const DrawingLayer = ({
       stopEdgeDrawing();
     } else if (currentTool === 'segmentDraw') {
       stopSegmentDrawing();
-    } else if (currentTool === 'freehandDraw') {
-      finishFreehandDrawing();
     } else {
       stopDrawing();
     }
-  }, [currentTool, stopDrawing, stopEdgeDrawing, stopSegmentDrawing, finishFreehandDrawing]);
+  }, [currentTool, stopDrawing, stopEdgeDrawing, stopSegmentDrawing]);
 
   const handleKeyDown = dc.useCallback((e: KeyboardEvent) => {
     if (e.key === 'Escape') {
       if (segmentPickerOpen) {
         closeSegmentPicker();
-      } else if (isFreehandDrawing) {
-        cancelFreehandDrawing();
       } else if (rectangleStart || circleStart || edgeLineStart || touchConfirmPending) {
         cancelShapePreview();
       }
     }
-  }, [rectangleStart, circleStart, edgeLineStart, touchConfirmPending, cancelShapePreview, segmentPickerOpen, closeSegmentPicker, isFreehandDrawing, cancelFreehandDrawing]);
+  }, [rectangleStart, circleStart, edgeLineStart, touchConfirmPending, cancelShapePreview, segmentPickerOpen, closeSegmentPicker]);
 
   dc.useEffect(() => {
     document.addEventListener('keydown', handleKeyDown);
@@ -21585,7 +20705,6 @@ const DrawingLayer = ({
       stopDrawing: handleStopDrawing,
       cancelDrawing,
       isDrawing,
-      isFreehandDrawing,
       rectangleStart,
       circleStart,
       edgeLineStart,
@@ -21601,7 +20720,7 @@ const DrawingLayer = ({
 
     return () => unregisterHandlers('drawing');
   }, [registerHandlers, unregisterHandlers, handleDrawingPointerDown, handleDrawingPointerMove,
-    handleStopDrawing, cancelDrawing, isDrawing, isFreehandDrawing, rectangleStart, circleStart, edgeLineStart,
+    handleStopDrawing, cancelDrawing, isDrawing, rectangleStart, circleStart, edgeLineStart,
     updateShapeHover, updateEdgeLineHover, shapeHoverPosition, touchConfirmPending,
     cancelShapePreview, previewSettings.kbmEnabled, updateSegmentHover, clearSegmentHover]);
 
@@ -31122,8 +30241,7 @@ const useEventCoordinator = ({
                  currentTool === 'rectangle' || currentTool === 'circle' ||
                  currentTool === 'clearArea' ||
                  currentTool === 'edgeDraw' || currentTool === 'edgeErase' ||
-                 currentTool === 'edgeLine' || currentTool === 'segmentDraw' ||
-                 currentTool === 'freehandDraw') {
+                 currentTool === 'edgeLine' || currentTool === 'segmentDraw') {
         if (hasMultiSelection) clearSelection();
 
         if (drawingHandlers?.handleDrawingPointerDown) {
@@ -31267,8 +30385,7 @@ const useEventCoordinator = ({
         currentTool === 'rectangle' || currentTool === 'circle' ||
         currentTool === 'clearArea' ||
         currentTool === 'edgeDraw' || currentTool === 'edgeErase' ||
-        currentTool === 'edgeLine' || currentTool === 'segmentDraw' ||
-        currentTool === 'freehandDraw') {
+        currentTool === 'edgeLine' || currentTool === 'segmentDraw') {
 
       if (drawingHandlers?.handleDrawingPointerMove) {
         drawingHandlers.handleDrawingPointerMove(e);
@@ -31431,8 +30548,7 @@ const useEventCoordinator = ({
         currentTool === 'rectangle' || currentTool === 'circle' ||
         currentTool === 'clearArea' ||
         currentTool === 'edgeDraw' || currentTool === 'edgeErase' ||
-        currentTool === 'edgeLine' || currentTool === 'segmentDraw' ||
-        currentTool === 'freehandDraw') {
+        currentTool === 'edgeLine' || currentTool === 'segmentDraw') {
       if (drawingHandlers?.stopDrawing) {
         drawingHandlers.stopDrawing(e);
       }
@@ -31457,8 +30573,7 @@ const useEventCoordinator = ({
         currentTool === 'rectangle' || currentTool === 'circle' ||
         currentTool === 'clearArea' ||
         currentTool === 'edgeDraw' || currentTool === 'edgeErase' ||
-        currentTool === 'edgeLine' || currentTool === 'segmentDraw' ||
-        currentTool === 'freehandDraw') {
+        currentTool === 'edgeLine' || currentTool === 'segmentDraw') {
       if (drawingHandlers?.cancelDrawing) {
         drawingHandlers.cancelDrawing();
       }
@@ -31581,7 +30696,7 @@ const useEventCoordinator = ({
       const textHandlers = getHandlers('text') as TextHandlers | null;
       const panZoomHandlers = getHandlers('panZoom') as PanZoomHandlers | null;
 
-      if ((drawingHandlers?.isDrawing || drawingHandlers?.isFreehandDrawing) && drawingHandlers?.stopDrawing) {
+      if (drawingHandlers?.isDrawing && drawingHandlers?.stopDrawing) {
         drawingHandlers.stopDrawing();
       }
 
@@ -31760,7 +30875,6 @@ interface MapCanvasContentProps {
   onObjectsChange: (objects: MapObject[]) => void;
   onTextLabelsChange: (labels: TextLabel[]) => void;
   onEdgesChange: (edges: Edge[], skipHistory?: boolean) => void;
-  onCurvesChange?: (curves: unknown[], skipHistory?: boolean) => void;
   onViewStateChange: (viewState: ViewState) => void;
   onTextLabelSettingsChange: (settings: TextLabelSettings) => void;
   currentTool: ToolId;
@@ -31819,7 +30933,7 @@ const Coordinators = ({ canvasRef, mapData, geometry, isFocused, isColorPickerOp
  * MapCanvasContent - Inner component that uses context hooks
  * Contains all the map canvas logic and interacts with shared selection state
  */
-const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onCurvesChange, onViewStateChange, onTextLabelSettingsChange, currentTool, selectedObjectType, selectedColor, isColorPickerOpen, customColors, onAddCustomColor, onDeleteCustomColor, isFocused, isAnimating, theme, isAlignmentMode, children }: MapCanvasContentProps): React.ReactElement => {
+const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onViewStateChange, onTextLabelSettingsChange, currentTool, selectedObjectType, selectedColor, isColorPickerOpen, customColors, onAddCustomColor, onDeleteCustomColor, isFocused, isAnimating, theme, isAlignmentMode, children }: MapCanvasContentProps): React.ReactElement => {
   const canvasRef = dc.useRef<HTMLCanvasElement | null>(null);
   const fogCanvasRef = dc.useRef<HTMLCanvasElement | null>(null);  // Separate canvas for fog blur effect (CSS blur for iOS compat)
   const containerRef = dc.useRef<HTMLDivElement | null>(null);
@@ -32110,9 +31224,8 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onObjectsCh
     onObjectsChange,
     onTextLabelsChange,
     onEdgesChange,
-    onCurvesChange,
     onMapDataUpdate
-  }), [onCellsChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onCurvesChange, onViewStateChange, onTextLabelSettingsChange]);
+  }), [onCellsChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onViewStateChange, onTextLabelSettingsChange]);
 
 
 
@@ -33089,7 +32202,6 @@ const ToolPalette = ({
       id: 'draw',
       subTools: [
         { id: 'draw' as ToolId, label: 'Paint Cells', title: 'Draw (fill cells) (D)', icon: 'lucide-paintbrush' },
-        { id: 'freehandDraw' as ToolId, label: 'Freehand', title: 'Freehand Draw (curves)', icon: 'lucide-pencil' },
         { id: 'segmentDraw' as ToolId, label: 'Paint Segments', title: 'Paint Segments (partial cells)', icon: 'lucide-triangle', gridOnly: true },
         { id: 'edgeDraw' as ToolId, label: 'Paint Edges', title: 'Paint Edges (grid lines)', icon: 'lucide-pencil-ruler', gridOnly: true }
       ]
@@ -33330,7 +32442,7 @@ return { ToolPalette };
 
 ```jsx
 // Use resolver for dynamic object types (supports overrides and custom objects)
-const { getResolvedObjectTypes, getResolvedCategories, hasIconClass } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "objectTypeResolver"));
+const { getResolvedObjectTypes, getResolvedCategories, hasIconClass, hasImagePath } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "objectTypeResolver"));
 
 // Ornamental Arrow SVG - Double Chevron Design
 const OrnamentalArrow = ({ direction = "right" }) => {
@@ -33376,10 +32488,10 @@ const OrnamentalArrow = ({ direction = "right" }) => {
   );
 };
 
-const ObjectSidebar = ({ selectedObjectType, onObjectTypeSelect, onToolChange, isCollapsed, onCollapseChange }) => {
+const ObjectSidebar = ({ selectedObjectType, onObjectTypeSelect, onToolChange, isCollapsed, onCollapseChange, mapType = 'grid' }) => {
   // Get resolved object types and categories (includes overrides and custom)
-  const allObjectTypes = getResolvedObjectTypes();
-  const allCategories = getResolvedCategories();
+  const allObjectTypes = getResolvedObjectTypes(mapType);
+  const allCategories = getResolvedCategories(mapType);
   
   // Group objects by category (excluding 'notes' category which is handled specially)
   const objectsByCategory = allCategories
@@ -33459,7 +32571,13 @@ const ObjectSidebar = ({ selectedObjectType, onObjectTypeSelect, onToolChange, i
                 title={objType.label}
               >
                 <div className="dmt-object-symbol">
-                  {hasIconClass(objType) ? (
+                  {hasImagePath(objType) ? (
+                    <img
+                      src={dc.app.vault.adapter.getResourcePath(objType.imagePath)}
+                      alt={objType.label}
+                      className="dmt-object-image"
+                    />
+                  ) : hasIconClass(objType) ? (
                     <span className={`ra ${objType.iconClass}`}></span>
                   ) : (
                     objType.symbol || '?'
@@ -34629,6 +33747,34 @@ const ObjectHelpers = {
     return BUILT_IN_OBJECTS
       .filter(o => o.category === categoryId && !objectOverrides[o.id]?.hidden)
       .map(o => o.id);
+  },
+
+  /**
+   * Render an object's visual symbol into a container element
+   * Handles image, icon, and symbol rendering with consistent priority
+   * @param {Object} obj - Object with imagePath, iconClass, or symbol
+   * @param {HTMLElement} container - Container element to render into
+   * @param {Object} app - Obsidian app instance (for getResourcePath)
+   * @param {Object} options - Optional size configuration { width, height }
+   */
+  renderObjectSymbol(obj, container, app, options = {}) {
+    const { width = '20px', height = '20px' } = options;
+
+    if (obj.imagePath) {
+      const imgEl = container.createEl('img', {
+        cls: 'dmt-settings-object-image',
+        attr: { src: app.vault.adapter.getResourcePath(obj.imagePath), alt: obj.label }
+      });
+      imgEl.style.width = width;
+      imgEl.style.height = height;
+      imgEl.style.objectFit = 'contain';
+    } else if (obj.iconClass && RPGAwesomeHelpers.isValid(obj.iconClass)) {
+      const iconInfo = RPGAwesomeHelpers.getInfo(obj.iconClass);
+      const iconSpan = container.createEl('span', { cls: 'ra' });
+      iconSpan.textContent = iconInfo.char;
+    } else {
+      container.textContent = obj.symbol || '?';
+    }
   }
 };`;
 ```
@@ -36230,13 +35376,17 @@ class ObjectEditModal extends Modal {
     // Form state
     this.symbol = existingObject?.symbol || '';
     this.iconClass = existingObject?.iconClass || '';
+    this.imagePath = existingObject?.imagePath || '';
     this.label = existingObject?.label || '';
     this.category = existingObject?.category || 'features';
-    
+
     // UI state - determine initial mode based on existing object
-    this.useIcon = !!existingObject?.iconClass;
+    // Modes: 'symbol', 'icon', 'image'
+    this.mode = existingObject?.imagePath ? 'image' : (existingObject?.iconClass ? 'icon' : 'symbol');
     this.iconSearchQuery = '';
     this.iconCategory = 'all';
+    this.imageSearchQuery = '';
+    this.imageSearchResults = [];
   }
   
   onOpen() {
@@ -36248,49 +35398,59 @@ class ObjectEditModal extends Modal {
     
     contentEl.createEl('h2', { text: isEditing ? 'Edit Object' : 'Create Custom Object' });
     
-    // Icon type toggle
+    // Mode toggle (symbol / icon / image)
     const toggleContainer = contentEl.createDiv({ cls: 'dmt-icon-type-toggle' });
-    
-    const unicodeBtn = toggleContainer.createEl('button', { 
+
+    const unicodeBtn = toggleContainer.createEl('button', {
       text: 'Unicode Symbol',
-      cls: 'dmt-icon-type-btn' + (this.useIcon ? '' : ' active'),
+      cls: 'dmt-icon-type-btn' + (this.mode === 'symbol' ? ' active' : ''),
       attr: { type: 'button' }
     });
-    
-    const iconBtn = toggleContainer.createEl('button', { 
+
+    const iconBtn = toggleContainer.createEl('button', {
       text: 'RPGAwesome Icon',
-      cls: 'dmt-icon-type-btn' + (this.useIcon ? ' active' : ''),
+      cls: 'dmt-icon-type-btn' + (this.mode === 'icon' ? ' active' : ''),
       attr: { type: 'button' }
     });
-    
-    // Container for symbol input (shown when useIcon is false)
+
+    const imageBtn = toggleContainer.createEl('button', {
+      text: 'Custom Image',
+      cls: 'dmt-icon-type-btn' + (this.mode === 'image' ? ' active' : ''),
+      attr: { type: 'button' }
+    });
+
+    // Container for symbol input (shown when mode is 'symbol')
     this.symbolContainer = contentEl.createDiv({ cls: 'dmt-symbol-container' });
-    
-    // Container for icon picker (shown when useIcon is true)
+
+    // Container for icon picker (shown when mode is 'icon')
     this.iconPickerContainer = contentEl.createDiv({ cls: 'dmt-icon-picker-container' });
-    
+
+    // Container for image picker (shown when mode is 'image')
+    this.imagePickerContainer = contentEl.createDiv({ cls: 'dmt-image-picker-container' });
+
+    // Store button references for updating active state
+    this.modeButtons = { symbol: unicodeBtn, icon: iconBtn, image: imageBtn };
+
     // Toggle handlers
     unicodeBtn.onclick = () => {
-      if (!this.useIcon) return;
-      this.useIcon = false;
-      unicodeBtn.addClass('active');
-      iconBtn.removeClass('active');
-      this.renderSymbolInput();
-      this.renderIconPicker();
+      if (this.mode === 'symbol') return;
+      this.setMode('symbol');
     };
-    
+
     iconBtn.onclick = () => {
-      if (this.useIcon) return;
-      this.useIcon = true;
-      iconBtn.addClass('active');
-      unicodeBtn.removeClass('active');
-      this.renderSymbolInput();
-      this.renderIconPicker();
+      if (this.mode === 'icon') return;
+      this.setMode('icon');
     };
-    
-    // Initial render of symbol/icon sections
+
+    imageBtn.onclick = () => {
+      if (this.mode === 'image') return;
+      this.setMode('image');
+    };
+
+    // Initial render of all sections
     this.renderSymbolInput();
     this.renderIconPicker();
+    this.renderImagePicker();
     
     // Label input
     new Setting(contentEl)
@@ -36303,8 +35463,11 @@ class ObjectEditModal extends Modal {
           this.label = value;
         }));
     
-    // Category dropdown
-    const allCategories = ObjectHelpers.getAllCategories(this.plugin.settings);
+    // Category dropdown - use map-type-specific settings
+    const mapTypeSettings = this.mapType === 'hex'
+      ? { customCategories: this.plugin.settings.customHexCategories || [] }
+      : { customCategories: this.plugin.settings.customGridCategories || [] };
+    const allCategories = ObjectHelpers.getAllCategories(mapTypeSettings);
     new Setting(contentEl)
       .setName('Category')
       .setDesc('Group this object belongs to')
@@ -36328,11 +35491,27 @@ class ObjectEditModal extends Modal {
     saveBtn.onclick = () => this.save();
   }
   
+  setMode(newMode) {
+    this.mode = newMode;
+    // Update button active states
+    Object.entries(this.modeButtons).forEach(([mode, btn]) => {
+      if (mode === newMode) {
+        btn.addClass('active');
+      } else {
+        btn.removeClass('active');
+      }
+    });
+    // Re-render all mode-specific containers
+    this.renderSymbolInput();
+    this.renderIconPicker();
+    this.renderImagePicker();
+  }
+
   renderSymbolInput() {
     const container = this.symbolContainer;
     container.empty();
-    
-    if (this.useIcon) {
+
+    if (this.mode !== 'symbol') {
       container.style.display = 'none';
       return;
     }
@@ -36385,8 +35564,8 @@ class ObjectEditModal extends Modal {
   renderIconPicker() {
     const container = this.iconPickerContainer;
     container.empty();
-    
-    if (!this.useIcon) {
+
+    if (this.mode !== 'icon') {
       container.style.display = 'none';
       return;
     }
@@ -36533,21 +35712,141 @@ class ObjectEditModal extends Modal {
     infoBox.createDiv({ cls: 'dmt-icon-preview-label', text: iconInfo.label });
     infoBox.createDiv({ cls: 'dmt-icon-preview-class', text: this.iconClass });
   }
-  
+
+  renderImagePicker() {
+    const container = this.imagePickerContainer;
+    container.empty();
+
+    if (this.mode !== 'image') {
+      container.style.display = 'none';
+      return;
+    }
+    container.style.display = 'block';
+
+    // Info text
+    container.createEl('p', {
+      text: 'Select an image from your vault to use as this object\\'s icon.',
+      cls: 'dmt-image-picker-info'
+    });
+
+    // Image search input
+    const searchContainer = container.createDiv({ cls: 'dmt-image-picker-search' });
+    const searchInput = searchContainer.createEl('input', {
+      type: 'text',
+      value: this.imageSearchQuery,
+      attr: { placeholder: 'Search for image...' }
+    });
+
+    // Clear button
+    if (this.imagePath) {
+      const clearBtn = searchContainer.createEl('button', {
+        text: 'x',
+        cls: 'dmt-image-clear-btn',
+        attr: { type: 'button', title: 'Clear image' }
+      });
+      clearBtn.onclick = () => {
+        this.imagePath = '';
+        this.imageSearchQuery = '';
+        this.imageSearchResults = [];
+        this.renderImagePicker();
+      };
+    }
+
+    searchInput.addEventListener('input', async (e) => {
+      this.imageSearchQuery = e.target.value;
+      await this.searchImages(this.imageSearchQuery);
+    });
+
+    // Search results dropdown
+    this.imageResultsContainer = container.createDiv({ cls: 'dmt-image-search-results' });
+    this.renderImageSearchResults();
+
+    // Preview
+    if (this.imagePath) {
+      const previewContainer = container.createDiv({ cls: 'dmt-image-preview' });
+      previewContainer.createEl('p', {
+        text: 'Selected: ' + this.getImageDisplayName(this.imagePath),
+        cls: 'dmt-image-preview-label'
+      });
+      // Try to show the image preview
+      const imgPreview = previewContainer.createEl('img', {
+        cls: 'dmt-image-preview-img',
+        attr: { src: this.app.vault.adapter.getResourcePath(this.imagePath) }
+      });
+      imgPreview.style.maxWidth = '100px';
+      imgPreview.style.maxHeight = '100px';
+    }
+  }
+
+  async searchImages(query) {
+    if (!query || query.trim().length < 2) {
+      this.imageSearchResults = [];
+      this.renderImageSearchResults();
+      return;
+    }
+
+    const lowerQuery = query.toLowerCase();
+    const files = this.app.vault.getFiles();
+    const imageExtensions = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'];
+
+    const matches = files
+      .filter(file => {
+        const ext = file.extension?.toLowerCase();
+        if (!imageExtensions.includes(ext)) return false;
+        return file.path.toLowerCase().includes(lowerQuery) ||
+               file.basename.toLowerCase().includes(lowerQuery);
+      })
+      .slice(0, 10);
+
+    this.imageSearchResults = matches.map(f => f.path);
+    this.renderImageSearchResults();
+  }
+
+  renderImageSearchResults() {
+    const container = this.imageResultsContainer;
+    if (!container) return;
+    container.empty();
+
+    if (this.imageSearchResults.length === 0) return;
+
+    for (const path of this.imageSearchResults) {
+      const item = container.createDiv({ cls: 'dmt-image-search-result' });
+      item.textContent = this.getImageDisplayName(path);
+      item.onclick = () => {
+        this.imagePath = path;
+        this.imageSearchQuery = this.getImageDisplayName(path);
+        this.imageSearchResults = [];
+        this.renderImagePicker();
+      };
+    }
+  }
+
+  getImageDisplayName(path) {
+    if (!path) return '';
+    const parts = path.split('/');
+    return parts[parts.length - 1];
+  }
+
   save() {
     // Validate based on mode
-    if (this.useIcon) {
+    if (this.mode === 'icon') {
       if (!this.iconClass || !RPGAwesomeHelpers.isValid(this.iconClass)) {
         alert('Please select a valid icon');
         return;
       }
+    } else if (this.mode === 'image') {
+      if (!this.imagePath || this.imagePath.trim().length === 0) {
+        alert('Please select an image');
+        return;
+      }
     } else {
+      // symbol mode
       if (!this.symbol || this.symbol.length === 0 || this.symbol.length > 8) {
         alert('Please enter a valid symbol (1-8 characters)');
         return;
       }
     }
-    
+
     if (!this.label || this.label.trim().length === 0) {
       alert('Please enter a label');
       return;
@@ -36565,16 +35864,23 @@ class ObjectEditModal extends Modal {
       
       const original = BUILT_IN_OBJECTS.find(o => o.id === this.existingObject.id);
       const override = {};
-      
-      // Handle symbol/iconClass based on mode
-      if (this.useIcon) {
+
+      // Handle symbol/iconClass/imagePath based on mode
+      if (this.mode === 'icon') {
         if (this.iconClass !== original.iconClass) override.iconClass = this.iconClass;
-        // Clear symbol override if switching to icon
-        if (original.symbol && !this.iconClass) override.symbol = null;
+        // Clear other visual properties
+        if (original.symbol) override.symbol = null;
+        if (original.imagePath) override.imagePath = null;
+      } else if (this.mode === 'image') {
+        override.imagePath = this.imagePath;
+        // Clear other visual properties
+        if (original.symbol) override.symbol = null;
+        if (original.iconClass) override.iconClass = null;
       } else {
         if (this.symbol !== original.symbol) override.symbol = this.symbol;
-        // Clear iconClass override if switching to symbol
+        // Clear other visual properties
         if (original.iconClass) override.iconClass = null;
+        if (original.imagePath) override.imagePath = null;
       }
       
       if (this.label !== original.label) override.label = this.label;
@@ -36607,16 +35913,20 @@ class ObjectEditModal extends Modal {
           label: this.label.trim(),
           category: this.category
         };
-        
-        // Set symbol or iconClass based on mode
-        if (this.useIcon) {
+
+        // Set visual property based on mode, clearing others
+        delete updated.symbol;
+        delete updated.iconClass;
+        delete updated.imagePath;
+
+        if (this.mode === 'icon') {
           updated.iconClass = this.iconClass;
-          delete updated.symbol;
+        } else if (this.mode === 'image') {
+          updated.imagePath = this.imagePath;
         } else {
           updated.symbol = this.symbol;
-          delete updated.iconClass;
         }
-        
+
         this.plugin.settings[customObjectsKey][idx] = updated;
       }
     } else {
@@ -36630,14 +35940,16 @@ class ObjectEditModal extends Modal {
         label: this.label.trim(),
         category: this.category
       };
-      
-      // Set symbol or iconClass based on mode
-      if (this.useIcon) {
+
+      // Set visual property based on mode
+      if (this.mode === 'icon') {
         newObject.iconClass = this.iconClass;
+      } else if (this.mode === 'image') {
+        newObject.imagePath = this.imagePath;
       } else {
         newObject.symbol = this.symbol;
       }
-      
+
       this.plugin.settings[customObjectsKey].push(newObject);
     }
     
@@ -38410,15 +37722,9 @@ const TabRenderObjectsMethods = {
       });
     }
     
-    // Symbol or Icon
+    // Symbol, Icon, or Image
     const symbolEl = row.createSpan({ cls: 'dmt-settings-object-symbol' });
-    if (obj.iconClass && RPGAwesomeHelpers.isValid(obj.iconClass)) {
-      const iconInfo = RPGAwesomeHelpers.getInfo(obj.iconClass);
-      const iconSpan = symbolEl.createEl('span', { cls: 'ra' });
-      iconSpan.textContent = iconInfo.char;
-    } else {
-      symbolEl.textContent = obj.symbol || '?';
-    }
+    ObjectHelpers.renderObjectSymbol(obj, symbolEl, this.app);
     
     // Label
     const labelEl = row.createSpan({ text: obj.label, cls: 'dmt-settings-object-label' });
@@ -39761,7 +39067,7 @@ const { RA_ICONS, RA_CATEGORIES } = await dc.require(dc.headerLink(dc.resolvePat
 const QUICK_SYMBOLS = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "settingsPlugin-quickSymbols"));
 
 /** Plugin version from template */
-const PACKAGED_PLUGIN_VERSION = '0.14.6.4';
+const PACKAGED_PLUGIN_VERSION = '0.14.7.4';
 
 /** LocalStorage keys for tracking user preferences */
 const STORAGE_KEYS = {
@@ -40706,10 +40012,13 @@ interface SettingsModalState {
   customColumns: number;
   boundsLocked: boolean;
   
-  // Image positioning
+  // Image positioning (shared)
   imageOpacity: number;
   imageOffsetX: number;
   imageOffsetY: number;
+
+  // Grid-specific background image settings
+  imageGridSize: number;
   
   // Sizing mode
   sizingMode: SizingMode;
@@ -40743,12 +40052,15 @@ interface CurrentSettings {
 /** Current background image settings */
 interface CurrentBackgroundImage {
   path?: string;
-  gridDensity?: GridDensityKey;
-  customColumns?: number;
-  lockBounds?: boolean;
   opacity?: number;
   offsetX?: number;
   offsetY?: number;
+  // Grid-specific
+  imageGridSize?: number;
+  // Hex-specific
+  gridDensity?: GridDensityKey;
+  customColumns?: number;
+  lockBounds?: boolean;
   sizingMode?: SizingMode;
   measurementMethod?: MeasurementMethod;
   measurementSize?: number;
@@ -40830,6 +40142,7 @@ const Actions = {
   SET_IMAGE_OPACITY: 'SET_IMAGE_OPACITY',
   SET_IMAGE_OFFSET_X: 'SET_IMAGE_OFFSET_X',
   SET_IMAGE_OFFSET_Y: 'SET_IMAGE_OFFSET_Y',
+  SET_IMAGE_GRID_SIZE: 'SET_IMAGE_GRID_SIZE',
   SET_ACTIVE_COLOR_PICKER: 'SET_ACTIVE_COLOR_PICKER',
   SET_LOADING: 'SET_LOADING',
   SHOW_RESIZE_CONFIRM: 'SHOW_RESIZE_CONFIRM',
@@ -40966,6 +40279,11 @@ interface SetImageOffsetYAction {
   payload: number;
 }
 
+interface SetImageGridSizeAction {
+  type: typeof Actions.SET_IMAGE_GRID_SIZE;
+  payload: number;
+}
+
 interface SetActiveColorPickerAction {
   type: typeof Actions.SET_ACTIVE_COLOR_PICKER;
   payload: ColorPickerId;
@@ -41038,6 +40356,7 @@ type SettingsAction =
   | SetImageOpacityAction
   | SetImageOffsetXAction
   | SetImageOffsetYAction
+  | SetImageGridSizeAction
   | SetActiveColorPickerAction
   | SetLoadingAction
   | ShowResizeConfirmAction
@@ -41213,6 +40532,7 @@ function buildInitialState(props: BuildInitialStateProps, globalSettings: Global
     imageOpacity: currentBackgroundImage?.opacity ?? 1,
     imageOffsetX: currentBackgroundImage?.offsetX ?? 0,
     imageOffsetY: currentBackgroundImage?.offsetY ?? 0,
+    imageGridSize: currentBackgroundImage?.imageGridSize ?? 32,
     
     sizingMode: currentBackgroundImage?.sizingMode ?? 'density',
     measurementMethod: currentBackgroundImage?.measurementMethod ?? MEASUREMENT_CORNER,
@@ -41296,8 +40616,8 @@ function settingsReducer(state: SettingsModalState, action: SettingsAction): Set
         backgroundImageDisplayName: displayName,
         imageDimensions: dimensions,
         imageSearchResults: [],
-        hexBounds: bounds,
-        boundsLocked: true
+        // Only update hexBounds if bounds is provided (hex maps)
+        ...(bounds ? { hexBounds: bounds, boundsLocked: true } : {})
       };
     }
     
@@ -41442,7 +40762,10 @@ function settingsReducer(state: SettingsModalState, action: SettingsAction): Set
     
     case Actions.SET_IMAGE_OFFSET_Y:
       return { ...state, imageOffsetY: action.payload };
-    
+
+    case Actions.SET_IMAGE_GRID_SIZE:
+      return { ...state, imageGridSize: action.payload };
+
     case Actions.SET_ACTIVE_COLOR_PICKER:
       return { ...state, activeColorPicker: action.payload };
     
@@ -41602,12 +40925,17 @@ export type CoordinateDisplayMode = 'none' | 'offset' | 'axial';
 /** Background image configuration */
 export interface BackgroundImageConfig {
   path: string | null;
-  lockBounds?: boolean;
-  gridDensity?: GridDensity;
-  customColumns?: number;
   opacity?: number;
   offsetX?: number;
   offsetY?: number;
+
+  // Grid-specific settings (ignored by hex maps)
+  imageGridSize?: number;  // Pixel size of grid cells on background image
+
+  // Hex-specific settings (ignored by grid maps)
+  lockBounds?: boolean;
+  gridDensity?: GridDensity;
+  customColumns?: number;
   sizingMode?: SizingMode;
   measurementMethod?: MeasurementMethod;
   measurementSize?: number;
@@ -41662,20 +40990,25 @@ export interface SettingsReducerState {
   hexBounds: HexBounds;
   boundsLocked: boolean;
 
-  // Background image settings
+  // Background image settings (shared between grid and hex)
   backgroundImagePath: string | null;
   backgroundImageDisplayName: string;
   imageDimensions: ImageDimensions | null;
   imageSearchResults: string[];
+  imageOpacity: number;
+  imageOffsetX: number;
+  imageOffsetY: number;
+
+  // Grid-specific background image settings
+  imageGridSize: number;
+
+  // Hex-specific background image settings
   sizingMode: SizingMode;
   gridDensity: GridDensity;
   customColumns: number;
   measurementMethod: MeasurementMethod;
   measurementSize: number;
   fineTuneOffset: number;
-  imageOpacity: number;
-  imageOffsetX: number;
-  imageOffsetY: number;
 
   // Fog of War image
   fogImagePath: string | null;
@@ -41734,16 +41067,21 @@ export interface MapSettingsHandlers {
   // Color picker
   setActiveColorPicker: (picker: string | null) => void;
 
-  // Background image
+  // Background image (shared)
   setBackgroundImageDisplayName: (name: string) => void;
   handleImageSearch: (searchTerm: string) => Promise<void>;
   handleImageSelect: (displayName: string) => Promise<void>;
   handleImageClear: () => void;
-  handleSizingModeChange: (mode: SizingMode) => void;
-  handleBoundsLockToggle: () => void;
   setImageOpacity: (opacity: number) => void;
   setImageOffsetX: (x: number) => void;
   setImageOffsetY: (y: number) => void;
+
+  // Background image (grid-specific)
+  setImageGridSize: (size: number) => void;
+
+  // Background image (hex-specific)
+  handleSizingModeChange: (mode: SizingMode) => void;
+  handleBoundsLockToggle: () => void;
 
   // Hex grid settings
   handleHexBoundsChange: (axis: 'maxCol' | 'maxRow', value: string) => void;
@@ -41913,6 +41251,7 @@ const MapSettingsProvider: React.FC<MapSettingsProviderProps> = ({
   const tabs = dc.useMemo<SettingsTab[]>(() => {
     const baseTabs: SettingsTab[] = [{ id: 'appearance', label: 'Appearance' }];
     if (mapType === 'hex') baseTabs.push({ id: 'hexgrid', label: 'Hex Grid' });
+    if (mapType === 'grid') baseTabs.push({ id: 'gridbackground', label: 'Background' });
     baseTabs.push({ id: 'measurement', label: 'Measurement' });
     baseTabs.push({ id: 'preferences', label: 'Preferences' });
     return baseTabs;
@@ -41939,25 +41278,40 @@ const MapSettingsProvider: React.FC<MapSettingsProviderProps> = ({
       getImageDimensions(currentBackgroundImage.path).then((dims: ImageDimensions | null) => {
         if (!dims) return;
 
-        const bounds = calculateBoundsFromSettings(
-          dims,
-          currentBackgroundImage.sizingMode ?? 'density',
-          currentBackgroundImage.gridDensity ?? 'medium',
-          currentBackgroundImage.customColumns ?? 24,
-          currentBackgroundImage.measurementSize ?? 86,
-          currentBackgroundImage.measurementMethod ?? MEASUREMENT_CORNER,
-          orientation
-        );
+        // For hex maps, calculate bounds from image dimensions
+        // For grid maps, we just need the image dimensions and display name
+        if (mapType === 'hex') {
+          const bounds = calculateBoundsFromSettings(
+            dims,
+            currentBackgroundImage.sizingMode ?? 'density',
+            currentBackgroundImage.gridDensity ?? 'medium',
+            currentBackgroundImage.customColumns ?? 24,
+            currentBackgroundImage.measurementSize ?? 86,
+            currentBackgroundImage.measurementMethod ?? MEASUREMENT_CORNER,
+            orientation
+          );
 
-        dispatch({
-          type: Actions.IMAGE_SELECTED,
-          payload: {
-            path: currentBackgroundImage.path,
-            displayName: getDisplayNameFromPath(currentBackgroundImage.path),
-            dimensions: dims,
-            bounds: (currentBackgroundImage.lockBounds ?? true) ? bounds : (currentHexBounds ?? { maxCol: 26, maxRow: 20 })
-          }
-        });
+          dispatch({
+            type: Actions.IMAGE_SELECTED,
+            payload: {
+              path: currentBackgroundImage.path,
+              displayName: getDisplayNameFromPath(currentBackgroundImage.path),
+              dimensions: dims,
+              bounds: (currentBackgroundImage.lockBounds ?? true) ? bounds : (currentHexBounds ?? { maxCol: 26, maxRow: 20 })
+            }
+          });
+        } else {
+          // Grid maps: just set the image path and dimensions
+          dispatch({
+            type: Actions.IMAGE_SELECTED,
+            payload: {
+              path: currentBackgroundImage.path,
+              displayName: getDisplayNameFromPath(currentBackgroundImage.path),
+              dimensions: dims,
+              bounds: null  // Grid maps don't use hex bounds
+            }
+          });
+        }
       });
     }
   }, [isOpen]);
@@ -42062,18 +41416,26 @@ const MapSettingsProvider: React.FC<MapSettingsProviderProps> = ({
       }
     };
 
-    const backgroundImageData: BackgroundImageConfig | undefined = mapType === 'hex' ? {
+    // Build background image data for both grid and hex maps
+    const backgroundImageData: BackgroundImageConfig | undefined = state.backgroundImagePath ? {
       path: state.backgroundImagePath,
-      lockBounds: state.boundsLocked,
-      gridDensity: state.gridDensity,
-      customColumns: state.customColumns,
       opacity: state.imageOpacity,
       offsetX: state.imageOffsetX,
       offsetY: state.imageOffsetY,
-      sizingMode: state.sizingMode,
-      measurementMethod: state.measurementMethod,
-      measurementSize: state.measurementSize,
-      fineTuneOffset: state.fineTuneOffset
+      // Grid-specific fields
+      ...(mapType === 'grid' ? {
+        imageGridSize: state.imageGridSize
+      } : {}),
+      // Hex-specific fields
+      ...(mapType === 'hex' ? {
+        lockBounds: state.boundsLocked,
+        gridDensity: state.gridDensity,
+        customColumns: state.customColumns,
+        sizingMode: state.sizingMode,
+        measurementMethod: state.measurementMethod,
+        measurementSize: state.measurementSize,
+        fineTuneOffset: state.fineTuneOffset
+      } : {})
     } : undefined;
 
     let calculatedHexSize: number | null = null;
@@ -42144,6 +41506,7 @@ const MapSettingsProvider: React.FC<MapSettingsProviderProps> = ({
     setImageOpacity: (opacity) => dispatch({ type: Actions.SET_IMAGE_OPACITY, payload: opacity }),
     setImageOffsetX: (x) => dispatch({ type: Actions.SET_IMAGE_OFFSET_X, payload: x }),
     setImageOffsetY: (y) => dispatch({ type: Actions.SET_IMAGE_OFFSET_Y, payload: y }),
+    setImageGridSize: (size) => dispatch({ type: Actions.SET_IMAGE_GRID_SIZE, payload: size }),
     handleResizeConfirmDelete,
     handleResizeConfirmCancel: () => dispatch({ type: Actions.CANCEL_RESIZE }),
     handleCancel: () => onClose(),
@@ -43927,6 +43290,315 @@ return { HexGridTab };
 
 ```
 
+# GridBackgroundTab
+
+```tsx
+/**
+ * GridBackgroundTab.tsx
+ *
+ * Background image settings tab for grid maps.
+ * Allows users to set a background image and configure grid alignment.
+ */
+
+import type { MapType } from '#types/core/map.types';
+
+const { useMapSettings } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "MapSettingsContext"));
+const { CollapsibleSection } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "CollapsibleSection"));
+
+/** Map settings context shape for this component */
+interface GridBackgroundContext {
+  mapType: MapType;
+  backgroundImagePath: string | null;
+  backgroundImageDisplayName: string;
+  setBackgroundImageDisplayName: (name: string) => void;
+  imageSearchResults: string[];
+  handleImageSearch: (query: string) => void;
+  handleImageSelect: (name: string) => void;
+  handleImageClear: () => void;
+  imageOpacity: number;
+  setImageOpacity: (opacity: number) => void;
+  imageOffsetX: number;
+  setImageOffsetX: (x: number) => void;
+  imageOffsetY: number;
+  setImageOffsetY: (y: number) => void;
+  imageGridSize: number;
+  setImageGridSize: (size: number) => void;
+  onOpenAlignmentMode?: () => void;
+}
+
+/**
+ * Grid Background tab content - background image settings for grid maps
+ */
+function GridBackgroundTab(): React.ReactElement | null {
+  const {
+    mapType,
+    backgroundImagePath,
+    backgroundImageDisplayName,
+    setBackgroundImageDisplayName,
+    imageSearchResults,
+    handleImageSearch,
+    handleImageSelect,
+    handleImageClear,
+    imageOpacity,
+    setImageOpacity,
+    imageOffsetX,
+    setImageOffsetX,
+    imageOffsetY,
+    setImageOffsetY,
+    imageGridSize,
+    setImageGridSize,
+    onOpenAlignmentMode
+  } = useMapSettings() as GridBackgroundContext;
+
+  // Guard: only render for grid maps
+  if (mapType !== 'grid') {
+    return null;
+  }
+
+  // Track section open state
+  const [imagePickerOpen, setImagePickerOpen] = dc.useState(!backgroundImagePath);
+  const [alignmentOpen, setAlignmentOpen] = dc.useState(!!backgroundImagePath);
+
+  // Auto-collapse image picker when image is selected
+  dc.useEffect(() => {
+    if (backgroundImagePath) {
+      setImagePickerOpen(false);
+      setAlignmentOpen(true);
+    }
+  }, [backgroundImagePath]);
+
+  return (
+    <div class="dmt-settings-tab-content" style={{ paddingRight: '8px' }}>
+      {/* Background Image Picker Section */}
+      <CollapsibleSection
+        title="Background Image"
+        isOpen={imagePickerOpen}
+        onToggle={setImagePickerOpen}
+        subtitle={backgroundImagePath ? backgroundImageDisplayName || 'Image selected' : 'No image'}
+      >
+        <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '10px' }}>
+          Add a background image for your grid map
+        </p>
+
+        {/* Image picker */}
+        <div style={{ position: 'relative', marginBottom: '12px' }}>
+          <input
+            type="text"
+            placeholder="Search for image..."
+            value={backgroundImageDisplayName}
+            onChange={(e: Event) => {
+              const value = (e.target as HTMLInputElement).value;
+              setBackgroundImageDisplayName(value);
+              handleImageSearch(value);
+            }}
+            style={{
+              width: '100%',
+              padding: '8px 32px 8px 10px',
+              borderRadius: '4px',
+              border: '1px solid var(--background-modifier-border)',
+              background: 'var(--background-primary)',
+              color: 'var(--text-normal)',
+              fontSize: '14px'
+            }}
+          />
+
+          {backgroundImagePath && (
+            <button
+              onClick={handleImageClear}
+              style={{
+                position: 'absolute',
+                right: '6px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                background: 'transparent',
+                border: 'none',
+                color: 'var(--text-muted)',
+                cursor: 'pointer',
+                padding: '4px',
+                fontSize: '16px',
+                lineHeight: '1'
+              }}
+              title="Clear image"
+            >
+              x
+            </button>
+          )}
+
+          {/* Autocomplete dropdown */}
+          {imageSearchResults.length > 0 && (
+            <div style={{
+              position: 'absolute',
+              top: '100%',
+              left: 0,
+              right: 0,
+              maxHeight: '200px',
+              overflowY: 'auto',
+              background: 'var(--background-primary)',
+              border: '1px solid var(--background-modifier-border)',
+              borderRadius: '4px',
+              marginTop: '2px',
+              zIndex: 1000,
+              boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+            }}>
+              {imageSearchResults.map((name: string, idx: number) => (
+                <div
+                  key={idx}
+                  onClick={() => handleImageSelect(name)}
+                  style={{
+                    padding: '8px 10px',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    borderBottom: idx < imageSearchResults.length - 1 ? '1px solid var(--background-modifier-border)' : 'none'
+                  }}
+                  onMouseEnter={(e: Event) => (e.currentTarget as HTMLElement).style.background = 'var(--background-modifier-hover)'}
+                  onMouseLeave={(e: Event) => (e.currentTarget as HTMLElement).style.background = 'transparent'}
+                >
+                  {name}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </CollapsibleSection>
+
+      {/* Grid Alignment Section - only show when image is selected */}
+      {backgroundImagePath && (
+        <CollapsibleSection
+          title="Grid Alignment"
+          isOpen={alignmentOpen}
+          onToggle={setAlignmentOpen}
+          subtitle="Align Windrose grid with background"
+        >
+          <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '16px' }}>
+            Configure how Windrose's grid aligns with any pre-drawn grid on your background image.
+          </p>
+
+          {/* Image Grid Size */}
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 500 }}>
+              Background Grid Size (pixels)
+            </label>
+            <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px' }}>
+              If your background image has a pre-drawn grid, enter the pixel size of each grid cell.
+              Windrose will scale the image to match its grid overlay.
+            </p>
+            <input
+              type="number"
+              value={imageGridSize}
+              min={1}
+              max={500}
+              onChange={(e: Event) => {
+                const value = parseInt((e.target as HTMLInputElement).value, 10);
+                if (!isNaN(value) && value > 0 && value <= 500) {
+                  setImageGridSize(value);
+                }
+              }}
+              style={{
+                width: '100px',
+                padding: '6px 10px',
+                borderRadius: '4px',
+                border: '1px solid var(--background-modifier-border)',
+                background: 'var(--background-primary)',
+                color: 'var(--text-normal)',
+                fontSize: '14px'
+              }}
+            />
+            <span style={{ marginLeft: '8px', fontSize: '12px', color: 'var(--text-muted)' }}>px</span>
+          </div>
+
+          {/* Opacity */}
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 500 }}>
+              Image Opacity
+            </label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.05}
+                value={imageOpacity}
+                onChange={(e: Event) => setImageOpacity(parseFloat((e.target as HTMLInputElement).value))}
+                style={{ flex: 1 }}
+              />
+              <span style={{ fontSize: '12px', color: 'var(--text-muted)', width: '40px' }}>
+                {Math.round(imageOpacity * 100)}%
+              </span>
+            </div>
+          </div>
+
+          {/* X/Y Offset */}
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 500 }}>
+              Position Offset
+            </label>
+            <div style={{ display: 'flex', gap: '16px' }}>
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: '11px', color: 'var(--text-muted)' }}>X Offset</label>
+                <input
+                  type="number"
+                  value={imageOffsetX}
+                  onChange={(e: Event) => setImageOffsetX(parseInt((e.target as HTMLInputElement).value, 10) || 0)}
+                  style={{
+                    width: '100%',
+                    padding: '6px 10px',
+                    borderRadius: '4px',
+                    border: '1px solid var(--background-modifier-border)',
+                    background: 'var(--background-primary)',
+                    color: 'var(--text-normal)',
+                    fontSize: '14px'
+                  }}
+                />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Y Offset</label>
+                <input
+                  type="number"
+                  value={imageOffsetY}
+                  onChange={(e: Event) => setImageOffsetY(parseInt((e.target as HTMLInputElement).value, 10) || 0)}
+                  style={{
+                    width: '100%',
+                    padding: '6px 10px',
+                    borderRadius: '4px',
+                    border: '1px solid var(--background-modifier-border)',
+                    background: 'var(--background-primary)',
+                    color: 'var(--text-normal)',
+                    fontSize: '14px'
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Interactive Alignment Mode Button */}
+          {onOpenAlignmentMode && (
+            <button
+              onClick={onOpenAlignmentMode}
+              style={{
+                width: '100%',
+                padding: '10px',
+                borderRadius: '4px',
+                border: '1px solid var(--interactive-accent)',
+                background: 'transparent',
+                color: 'var(--interactive-accent)',
+                cursor: 'pointer',
+                fontSize: '13px',
+                fontWeight: 500
+              }}
+            >
+              Open Interactive Alignment Mode
+            </button>
+          )}
+        </CollapsibleSection>
+      )}
+    </div>
+  );
+}
+
+return { GridBackgroundTab };
+
+```
+
 # MeasurementTab
 
 ```tsx
@@ -44787,6 +44459,7 @@ const { ModalPortal } = await dc.require(dc.headerLink(dc.resolvePath("compiled-
 const { MapSettingsProvider, useMapSettings } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "MapSettingsContext"));
 const { AppearanceTab } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "AppearanceTab"));
 const { HexGridTab } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "HexGridTab"));
+const { GridBackgroundTab } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "GridBackgroundTab"));
 const { MeasurementTab } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "MeasurementTab"));
 const { PreferencesTab } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "PreferencesTab"));
 const { ResizeConfirmDialog } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "ResizeConfirmDialog"));
@@ -44839,9 +44512,9 @@ export interface MapSettingsModalProps {
 }
 
 const MODAL_SIZE_KEY = 'windrose-settings-modal-size';
-const DEFAULT_WIDTH = 480;
+const DEFAULT_WIDTH = 520;
 const DEFAULT_HEIGHT = 500;
-const MIN_WIDTH = 380;
+const MIN_WIDTH = 480;
 const MIN_HEIGHT = 350;
 const MAX_WIDTH = 800;
 const MAX_HEIGHT = 800;
@@ -45104,6 +44777,7 @@ function MapSettingsModalContent(): React.ReactElement | null {
           }}>
             {activeTab === 'appearance' && <AppearanceTab />}
             {activeTab === 'hexgrid' && mapType === 'hex' && <HexGridTab />}
+            {activeTab === 'gridbackground' && mapType === 'grid' && <GridBackgroundTab />}
             {activeTab === 'measurement' && <MeasurementTab />}
             {activeTab === 'preferences' && <PreferencesTab />}
           </div>
@@ -46971,7 +46645,6 @@ const editingLayer = dc.useMemo(() => {
     handleObjectsChange,
     handleTextLabelsChange,
     handleEdgesChange,
-    handleCurvesChange,
     handleAddCustomColor,
     handleDeleteCustomColor,
     handleUpdateColorOpacity,
@@ -47140,8 +46813,8 @@ const editingLayer = dc.useMemo(() => {
       }
     }
 
-    // Only update backgroundImage for hex maps
-    if (backgroundImage !== undefined && mapData.mapType === 'hex') {
+    // Update backgroundImage for both grid and hex maps
+    if (backgroundImage !== undefined) {
       newMapData.backgroundImage = backgroundImage;
     }
 
@@ -47344,7 +47017,6 @@ const editingLayer = dc.useMemo(() => {
               onObjectsChange={handleObjectsChange}
               onTextLabelsChange={handleTextLabelsChange}
               onEdgesChange={handleEdgesChange}
-              onCurvesChange={handleCurvesChange}
               onViewStateChange={handleViewStateChange}
               onTextLabelSettingsChange={handleTextLabelSettingsChange}
               currentTool={currentTool}
@@ -47471,7 +47143,7 @@ const editingLayer = dc.useMemo(() => {
           currentSettings={mapData.settings}
           currentPreferences={mapData.uiPreferences}
           currentHexBounds={mapData.mapType === 'hex' ? mapData.hexBounds : null}
-          currentBackgroundImage={mapData.mapType === 'hex' ? mapData.backgroundImage : null}
+          currentBackgroundImage={mapData.backgroundImage ?? null}
           currentCells={mapData.mapType === 'hex' ? (getActiveLayer(mapData).cells || []) : []}
           currentObjects={mapData.mapType === 'hex' ? (getActiveLayer(mapData).objects || []) : []}
           mapData={mapData}
@@ -48501,10 +48173,16 @@ button.dmt-orientation-btn,
   line-height: 1.1;
   margin-bottom: 4px;
   color: var(--dmt-text-primary);
-  
+
   /* Optimize rendering and prepare font early */
   will-change: contents;
   text-rendering: optimizeSpeed;
+}
+
+.dmt-object-image {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
 }
 
 .dmt-object-label {
@@ -48966,8 +48644,11 @@ button.dmt-orientation-btn,
 
 .dmt-modal-footer {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   margin-top: 16px;
+  box-sizing: border-box;
+  max-width: 100%;
 }
 
 .dmt-form-group {
@@ -48987,7 +48668,8 @@ button.dmt-orientation-btn,
 }
 
 .dmt-modal-btn {
-  flex: 1;
+  flex: 1 1 0;
+  min-width: 0;
   padding: 10px 16px;
   font-size: 14px;
   font-weight: 500;
@@ -49087,10 +48769,13 @@ button.dmt-orientation-btn,
 /* Settings Modal Tab Bar */
 .dmt-settings-tab-bar {
   display: flex;
+  flex-wrap: wrap;
   gap: 0;
   border-bottom: 1px solid var(--background-modifier-border);
   margin: 0 -20px;
   padding: 0 20px;
+  box-sizing: border-box;
+  max-width: calc(100% + 40px);
 }
 
 .dmt-settings-tab {
@@ -49104,7 +48789,10 @@ button.dmt-orientation-btn,
   cursor: pointer;
   transition: color 0.15s ease, border-color 0.15s ease;
   margin-bottom: -1px;
-  
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: center;
+
   &:hover {
     color: var(--text-normal);
   }
@@ -49117,6 +48805,9 @@ button.dmt-orientation-btn,
 
 .dmt-settings-tab-content {
   min-height: 325px;
+  box-sizing: border-box;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 /* Color picker 2x2 grid items */
@@ -49689,6 +49380,8 @@ button.dmt-orientation-btn,
   .dmt-modal-btn {
     padding: 14px 16px;
     font-size: 16px;
+    flex: 1 1 auto;
+    min-width: 100px;
   }
 
   .dmt-rotate-button,
