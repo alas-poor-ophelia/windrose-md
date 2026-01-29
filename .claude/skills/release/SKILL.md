@@ -64,11 +64,19 @@ npm run release:dry
 npm run release
 ```
 
-The release pipeline now performs these steps:
+The release pipeline performs these steps:
 1. Compile via Obsidian's Datacore Compiler
 2. Run E2E tests against compiled artifact
 3. Commit and push the compiled artifact to the source repo
-4. Create and push version tag (triggers GitHub Actions release)
+4. **Verify** the push succeeded (fetches and compares remote HEAD)
+5. Create and push version tag (triggers GitHub Actions release)
+
+**CRITICAL: The pipeline has safeguards to prevent tagging the wrong commit:**
+- Verifies push completed before tagging
+- Verifies HEAD hasn't changed between commit and tag
+- Warns if the compiled artifact wasn't modified in the current commit
+
+**Always use `npm run release`** - never manually create tags or run steps out of order.
 
 **Available flags:**
 - `--dry-run` - Compile and test, but don't commit/tag
@@ -127,9 +135,31 @@ git push origin :refs/tags/vX.Y.Z
 # Update VERSION to new number and retry
 ```
 
+### Tag Points to Wrong Commit
+
+If a release was created but the zip contains wrong/stale code, the tag was likely created before the artifact commit was pushed:
+
+```bash
+cd "C:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker"
+
+# Check what commit the tag points to vs HEAD
+git show vX.Y.Z --quiet  # Shows tagged commit
+git log -1 --oneline     # Shows current HEAD
+
+# If they differ and HEAD has the correct artifact:
+git push origin :refs/tags/vX.Y.Z  # Delete remote tag
+git tag -d vX.Y.Z                   # Delete local tag
+git tag -a vX.Y.Z -m "Release X.Y.Z"  # Recreate on HEAD
+git push origin vX.Y.Z             # Push new tag
+```
+
+This will trigger GitHub Actions to create a new release with the correct artifact.
+
 ## Manual Fallback
 
-If automation fails, you can release manually:
+**⚠️ WARNING:** Only use manual steps if `npm run release` fails and you understand why. Manual releases are error-prone - the v1.5.5 release bug was caused by tagging before the artifact commit was pushed.
+
+If automation fails, you can release manually, but **follow this order exactly**:
 
 ### 1. Compile Manually
 1. Open Obsidian with the Absalom vault
@@ -144,20 +174,29 @@ set WINDROSE_TEST_MODE=compiled
 npm run test:e2e
 ```
 
-### 3. Commit and Push Artifact
+### 3. Commit and Push Artifact (MUST complete before tagging!)
 ```bash
 cd "C:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker"
 git add dist/compiled-windrose-md.md dist/VERSION
 git commit -m "Release X.Y.Z: compiled artifact"
 git push
+
+# CRITICAL: Verify the push succeeded before proceeding!
+git fetch origin main
+git log -1 --oneline origin/main  # Should show "Release X.Y.Z: compiled artifact"
 ```
 
-### 4. Tag Manually
+### 4. Tag Manually (ONLY after push is verified!)
 ```bash
 cd "C:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker"
+# Verify you're on the right commit
+git log -1 --oneline  # Should show "Release X.Y.Z: compiled artifact"
+
 git tag -a vX.Y.Z -m "Release X.Y.Z"
 git push origin vX.Y.Z
 ```
+
+**Common mistake:** Creating the tag before the artifact commit is pushed. This causes GitHub Actions to build a release from the wrong commit (missing the compiled artifact).
 
 ## Quick Commands
 

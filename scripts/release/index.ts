@@ -172,7 +172,7 @@ function runTests(): void {
   console.log("\n  All tests passed.\n");
 }
 
-function commitAndPushArtifact(version: string, dryRun: boolean): void {
+function commitAndPushArtifact(version: string, dryRun: boolean): string | null {
   console.log(`Step 3: Committing compiled artifact...\n`);
 
   // Check if there are changes to commit
@@ -182,15 +182,17 @@ function commitAndPushArtifact(version: string, dryRun: boolean): void {
   });
 
   if (!gitStatus.trim()) {
-    console.log("  No changes to compiled artifact, skipping commit.\n");
-    return;
+    console.log("  No changes to compiled artifact detected.");
+    console.log("  WARNING: This may indicate compilation didn't produce changes.\n");
+    // Return current HEAD - we'll verify it contains the artifact before tagging
+    return execSync("git rev-parse HEAD", { cwd: SOURCE_ROOT, encoding: "utf-8" }).trim();
   }
 
   if (dryRun) {
     console.log(`  [DRY RUN] Would commit compiled artifact`);
     console.log(`  [DRY RUN] Would push to origin`);
     console.log("");
-    return;
+    return null; // Dry run, no commit SHA to return
   }
 
   // Stage the compiled artifact and any dist changes
@@ -204,28 +206,65 @@ function commitAndPushArtifact(version: string, dryRun: boolean): void {
     `git commit -m "Release ${version}: compiled artifact"`,
     { cwd: SOURCE_ROOT }
   );
-  console.log(`  Committed: Release ${version}: compiled artifact`);
+  const commitSha = execSync("git rev-parse HEAD", { cwd: SOURCE_ROOT, encoding: "utf-8" }).trim();
+  console.log(`  Committed: Release ${version}: compiled artifact (${commitSha.slice(0, 7)})`);
 
   // Push to current branch (with upstream if needed)
   try {
-    execSync("git push", { cwd: SOURCE_ROOT, stdio: "pipe" });
+    execSync("git push", { cwd: SOURCE_ROOT, stdio: "inherit" });
   } catch {
     // Branch may not have upstream set, try with --set-upstream
     const branch = execSync("git branch --show-current", {
       cwd: SOURCE_ROOT,
       encoding: "utf-8",
     }).trim();
-    execSync(`git push --set-upstream origin ${branch}`, { cwd: SOURCE_ROOT });
+    execSync(`git push --set-upstream origin ${branch}`, { cwd: SOURCE_ROOT, stdio: "inherit" });
   }
-  console.log("  Pushed to origin\n");
+  console.log("  Pushed to origin");
+
+  // Verify push succeeded by fetching and comparing
+  console.log("  Verifying push...");
+  execSync("git fetch origin main", { cwd: SOURCE_ROOT, stdio: "pipe" });
+  const remoteHead = execSync("git rev-parse origin/main", { cwd: SOURCE_ROOT, encoding: "utf-8" }).trim();
+  if (remoteHead !== commitSha) {
+    throw new Error(`Push verification failed: local HEAD (${commitSha.slice(0, 7)}) != remote (${remoteHead.slice(0, 7)})`);
+  }
+  console.log(`  Verified: remote main is at ${commitSha.slice(0, 7)}\n`);
+
+  return commitSha;
 }
 
-function createTag(version: string, dryRun: boolean): void {
+function createTag(version: string, dryRun: boolean, expectedCommit: string | null): void {
   const tagName = `v${version}`;
   console.log(`Step 4: Creating tag ${tagName}...\n`);
 
+  // CRITICAL: Verify we're tagging the right commit
+  const currentHead = execSync("git rev-parse HEAD", { cwd: SOURCE_ROOT, encoding: "utf-8" }).trim();
+
+  if (expectedCommit && currentHead !== expectedCommit) {
+    throw new Error(
+      `HEAD changed unexpectedly!\n` +
+      `  Expected: ${expectedCommit.slice(0, 7)}\n` +
+      `  Current:  ${currentHead.slice(0, 7)}\n` +
+      `  Aborting to prevent tagging wrong commit.`
+    );
+  }
+
+  // Verify the compiled artifact exists and was modified recently
+  const artifactStat = execSync(
+    `git log -1 --format="%H %s" -- dist/compiled-windrose-md.md`,
+    { cwd: SOURCE_ROOT, encoding: "utf-8" }
+  ).trim();
+
+  if (!artifactStat.includes(currentHead.slice(0, 7)) && !artifactStat.toLowerCase().includes("release")) {
+    console.warn(`  WARNING: compiled-windrose-md.md was not modified in the current commit.`);
+    console.warn(`  Last modified in: ${artifactStat}`);
+    console.warn(`  Current HEAD: ${currentHead.slice(0, 7)}`);
+    console.warn(`  Proceeding anyway, but verify this is intentional.\n`);
+  }
+
   if (dryRun) {
-    console.log(`  [DRY RUN] Would create tag: ${tagName}`);
+    console.log(`  [DRY RUN] Would create tag: ${tagName} at ${currentHead.slice(0, 7)}`);
     console.log(`  [DRY RUN] Would push tag to origin`);
     return;
   }
@@ -235,10 +274,10 @@ function createTag(version: string, dryRun: boolean): void {
     `git tag -a ${tagName} -m "Release ${version}"`,
     { cwd: SOURCE_ROOT }
   );
-  console.log(`  Created tag: ${tagName}`);
+  console.log(`  Created tag: ${tagName} at ${currentHead.slice(0, 7)}`);
 
   // Push tag to origin
-  execSync(`git push origin ${tagName}`, { cwd: SOURCE_ROOT });
+  execSync(`git push origin ${tagName}`, { cwd: SOURCE_ROOT, stdio: "inherit" });
   console.log(`  Pushed tag to origin`);
   console.log(`  GitHub Actions will create the release.\n`);
 }
@@ -272,14 +311,15 @@ async function main(): Promise<void> {
   }
 
   // Step 3: Commit and push compiled artifact
+  let artifactCommit: string | null = null;
   if (!options.skipCompile) {
-    commitAndPushArtifact(version, options.dryRun);
+    artifactCommit = commitAndPushArtifact(version, options.dryRun);
   } else {
     console.log("Step 3: Skipping artifact commit (compilation was skipped)\n");
   }
 
-  // Step 4: Tag and push
-  createTag(version, options.dryRun);
+  // Step 4: Tag and push (pass commit SHA for verification)
+  createTag(version, options.dryRun, artifactCommit);
 
   console.log("╔════════════════════════════════════════════╗");
   console.log("║       Release Pipeline Complete!           ║");
