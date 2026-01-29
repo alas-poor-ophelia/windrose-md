@@ -102,5 +102,33 @@ const ObjectHelpers = {
     return BUILT_IN_OBJECTS
       .filter(o => o.category === categoryId && !objectOverrides[o.id]?.hidden)
       .map(o => o.id);
+  },
+
+  /**
+   * Render an object's visual symbol into a container element
+   * Handles image, icon, and symbol rendering with consistent priority
+   * @param {Object} obj - Object with imagePath, iconClass, or symbol
+   * @param {HTMLElement} container - Container element to render into
+   * @param {Object} app - Obsidian app instance (for getResourcePath)
+   * @param {Object} options - Optional size configuration { width, height }
+   */
+  renderObjectSymbol(obj, container, app, options = {}) {
+    const { width = '20px', height = '20px' } = options;
+
+    if (obj.imagePath) {
+      const imgEl = container.createEl('img', {
+        cls: 'dmt-settings-object-image',
+        attr: { src: app.vault.adapter.getResourcePath(obj.imagePath), alt: obj.label }
+      });
+      imgEl.style.width = width;
+      imgEl.style.height = height;
+      imgEl.style.objectFit = 'contain';
+    } else if (obj.iconClass && RPGAwesomeHelpers.isValid(obj.iconClass)) {
+      const iconInfo = RPGAwesomeHelpers.getInfo(obj.iconClass);
+      const iconSpan = container.createEl('span', { cls: 'ra' });
+      iconSpan.textContent = iconInfo.char;
+    } else {
+      container.textContent = obj.symbol || '?';
+    }
   }
 };`;

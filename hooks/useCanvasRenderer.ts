@@ -49,8 +49,9 @@ const { renderNoteLinkBadge, renderTooltipIndicator, renderObjectLinkIndicator }
 const { renderTextLabels } = await requireModuleByName("textLabelRenderer.ts") as {
   renderTextLabels: (labels: TextLabel[], context: { ctx: CanvasRenderingContext2D; zoom: number; getFontCss: (fontFace: string) => string }, geometry: { worldToScreen: (x: number, y: number, offsetX: number, offsetY: number, zoom: number) => { screenX: number; screenY: number } }, viewState: { offsetX: number; offsetY: number; zoom: number }) => void;
 };
-const { renderHexBackgroundImage } = await requireModuleByName("backgroundRenderer.ts") as {
+const { renderHexBackgroundImage, renderGridBackgroundImage } = await requireModuleByName("backgroundRenderer.ts") as {
   renderHexBackgroundImage: (bgImage: HTMLImageElement, config: { path: string; offsetX?: number; offsetY?: number; opacity?: number }, hexBounds: { maxCol: number; maxRow: number }, hexGeometry: { hexSize: number; sqrt3: number; hexToWorld: (q: number, r: number) => { worldX: number; worldY: number } }, orientation: string, context: { ctx: CanvasRenderingContext2D; offsetX: number; offsetY: number; zoom: number }, offsetToAxial: (col: number, row: number, orientation: string) => { q: number; r: number }) => void;
+  renderGridBackgroundImage: (bgImage: HTMLImageElement, config: { path: string; offsetX?: number; offsetY?: number; opacity?: number; imageGridSize?: number }, dimensions: { width: number; height: number }, cellSize: number, context: { ctx: CanvasRenderingContext2D; offsetX: number; offsetY: number; zoom: number }) => void;
 };
 const { renderGridFog } = await requireModuleByName("gridFogRenderer.ts") as {
   renderGridFog: (fogCells: Array<{ col: number; row: number }>, context: { ctx: CanvasRenderingContext2D; fogCtx: CanvasRenderingContext2D | null; offsetX: number; offsetY: number; scaledSize: number }, options: { fowOpacity: number; fowBlurEnabled: boolean; blurRadius: number; useGlobalAlpha: boolean }, visibleBounds: { minCol: number; maxCol: number; minRow: number; maxRow: number }, zoom: number) => void;
@@ -64,7 +65,7 @@ const { getFogSettings, clearFogCanvas, renderFog } = await requireModuleByName(
   renderFog: (fow: { enabled: boolean; foggedCells?: Array<{ col: number; row: number }> }, context: { ctx: CanvasRenderingContext2D; fogCanvas: HTMLCanvasElement | null; width: number; height: number; offsetX: number; offsetY: number; zoom: number; scaledSize: number; northDirection: number }, settings: { fowColor: string; fowOpacity: number; fowImagePath?: string; fowBlurEnabled: boolean; fowBlurFactor: number }, mapBounds: { hexBounds?: { maxCol: number; maxRow: number }; dimensions?: { width: number; height: number } }, isHexMap: boolean, hexGeometry: { hexSize: number; getHexVertices: (q: number, r: number) => Array<{ worldX: number; worldY: number }>; hexToWorld: (q: number, r: number) => { worldX: number; worldY: number }; getNeighbors: (q: number, r: number) => Array<{ q: number; r: number }> } | null, gridGeometry: { cellSize: number } | null, geometry: { worldToScreen: (worldX: number, worldY: number, offsetX: number, offsetY: number, zoom: number) => { screenX: number; screenY: number } }, orientation: string, getCachedImage: (path: string) => HTMLImageElement | null, renderGridFog: typeof renderGridFog, renderHexFog: typeof renderHexFog, offsetToAxial: (col: number, row: number, orientation: string) => { q: number; r: number }, axialToOffset: (q: number, r: number, orientation: string) => { col: number; row: number }) => void;
 };
 const { renderObjects } = await requireModuleByName("objectRenderer.ts") as {
-  renderObjects: (layer: MapLayer, context: { ctx: CanvasRenderingContext2D; offsetX: number; offsetY: number; zoom: number; scaledSize: number }, geometry: IGeometry, isHexMap: boolean, orientation: string, deps: { getObjectType: typeof getObjectType; getRenderChar: typeof getRenderChar; isCellFogged: typeof isCellFogged; getObjectsInCell: typeof getObjectsInCell; getSlotOffset: typeof getSlotOffset; getMultiObjectScale: typeof getMultiObjectScale; renderNoteLinkBadge: typeof renderNoteLinkBadge; renderTooltipIndicator: typeof renderTooltipIndicator; renderObjectLinkIndicator: typeof renderObjectLinkIndicator }) => void;
+  renderObjects: (layer: MapLayer, context: { ctx: CanvasRenderingContext2D; offsetX: number; offsetY: number; zoom: number; scaledSize: number }, geometry: IGeometry, isHexMap: boolean, orientation: string, deps: { getObjectType: typeof getObjectType; getRenderChar: typeof getRenderChar; isCellFogged: typeof isCellFogged; getObjectsInCell: typeof getObjectsInCell; getSlotOffset: typeof getSlotOffset; getMultiObjectScale: typeof getMultiObjectScale; renderNoteLinkBadge: typeof renderNoteLinkBadge; renderTooltipIndicator: typeof renderTooltipIndicator; renderObjectLinkIndicator: typeof renderObjectLinkIndicator; getCachedImage?: typeof getCachedImage }) => void;
 };
 const { renderSelections } = await requireModuleByName("selectionRenderer.ts") as {
   renderSelections: (selectedItems: RendererSelectedItem[], textLabels: TextLabel[] | undefined, objects: MapObject[] | undefined, context: { ctx: CanvasRenderingContext2D; offsetX: number; offsetY: number; zoom: number; scaledSize: number }, geometry: IGeometry, hexGeometry: { hexToWorld: (q: number, r: number) => { worldX: number; worldY: number } } | null, isHexMap: boolean, isResizeMode: boolean, orientation: string, showCoordinates: boolean, visibility: { textLabels?: boolean; objects?: boolean }, deps: { getFontCss: typeof getFontCss; getObjectsInCell: typeof getObjectsInCell; getSlotOffset: typeof getSlotOffset; getMultiObjectScale: typeof getMultiObjectScale }) => void;
@@ -94,8 +95,19 @@ interface Renderer {
   getScaledSize: (geometry: IGeometry, zoom: number) => number;
   calculateViewportOffset: (geometry: IGeometry, center: { x: number; y: number }, canvasSize: { width: number; height: number }, zoom: number) => { offsetX: number; offsetY: number };
 
-  // Optional background image rendering (hex only)
-  renderBackgroundImage: (ctx: CanvasRenderingContext2D, geometry: IGeometry, bgImage: HTMLImageElement | null, bgConfig: { path: string; offsetX?: number; offsetY?: number; opacity?: number } | undefined, hexBounds: { maxCol: number; maxRow: number } | undefined, orientation: string, offsetX: number, offsetY: number, zoom: number) => void;
+  // Background image rendering (both grid and hex)
+  renderBackgroundImage: (
+    ctx: CanvasRenderingContext2D,
+    geometry: IGeometry,
+    bgImage: HTMLImageElement | null,
+    bgConfig: { path: string; offsetX?: number; offsetY?: number; opacity?: number; imageGridSize?: number } | undefined,
+    boundsOrDimensions: { maxCol: number; maxRow: number } | { width: number; height: number } | undefined,
+    orientation: string,
+    offsetX: number,
+    offsetY: number,
+    zoom: number,
+    renderGridBackgroundImage?: typeof renderGridBackgroundImage
+  ) => void;
 
   // Grid/cell rendering
   renderGrid: (ctx: CanvasRenderingContext2D, geometry: IGeometry, viewState: RendererViewState, dimensions: { width: number; height: number }, showGrid: boolean, options: { lineColor: string; lineWidth: number }) => void;
@@ -283,18 +295,23 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
     zoom
   );
 
-  // Draw background image (hex maps only - grid renderer is no-op)
+  // Draw background image (both grid and hex maps)
   const bgImage = mapData.backgroundImage?.path ? getCachedImage(mapData.backgroundImage.path) : null;
+  const isHexMapForBg = geometry.type === 'hex';
+  const boundsOrDimensions = isHexMapForBg
+    ? mapData.hexBounds
+    : mapData.dimensions || { width: 300, height: 300 };
   renderer.renderBackgroundImage(
     ctx,
     geometry,
     bgImage,
     mapData.backgroundImage,
-    mapData.hexBounds,
+    boundsOrDimensions,
     mapData.orientation || 'flat',
     offsetX,
     offsetY,
-    zoom
+    zoom,
+    renderGridBackgroundImage
   );
 
   // Create renderer viewState object
@@ -355,6 +372,7 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
         renderNoteLinkBadge,
         renderTooltipIndicator,
         renderObjectLinkIndicator,
+        getCachedImage,
       }
     );
   }

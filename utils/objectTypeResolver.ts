@@ -29,6 +29,7 @@ interface ObjectTypeDefinition {
   id: string;
   symbol?: string;
   iconClass?: string;
+  imagePath?: string;  // Vault image path for custom image objects
   label: string;
   category: string;
   order?: number;
@@ -75,6 +76,8 @@ interface ObjectSettings {
 interface RenderChar {
   char: string;
   isIcon: boolean;
+  isImage?: boolean;    // True if rendering via image (imagePath)
+  imagePath?: string;   // Vault image path for image rendering
 }
 
 /** Validation result */
@@ -128,12 +131,24 @@ function hasIconClass(objectType: ObjectTypeDefinition | null | undefined): bool
 }
 
 /**
+ * Check if an object type uses a custom image
+ */
+function hasImagePath(objectType: ObjectTypeDefinition | null | undefined): boolean {
+  return objectType != null && typeof objectType.imagePath === 'string' && objectType.imagePath.length > 0;
+}
+
+/**
  * Get the render character for an object type
- * Handles both iconClass (RPGAwesome) and symbol (Unicode) with fallback
+ * Handles imagePath (custom image), iconClass (RPGAwesome), and symbol (Unicode) with fallback
  */
 function getRenderChar(objectType: ObjectTypeDefinition | null | undefined): RenderChar {
   if (!objectType) {
     return { char: '?', isIcon: false };
+  }
+
+  // Check for custom image first (highest priority)
+  if (hasImagePath(objectType)) {
+    return { char: '', isIcon: false, isImage: true, imagePath: objectType.imagePath };
   }
 
   // If iconClass is set, try to get the icon character
@@ -361,23 +376,34 @@ function isValidSymbol(symbol: string | null | undefined): boolean {
 }
 
 /**
+ * Validate an image path
+ * Returns true if the path is a non-empty string
+ */
+function isValidImagePath(imagePath: string | null | undefined): boolean {
+  return typeof imagePath === 'string' && imagePath.trim().length > 0;
+}
+
+/**
  * Validate an object definition
- * Objects can have either a symbol (Unicode) OR an iconClass (RPGAwesome), or both
+ * Objects can have a symbol (Unicode), iconClass (RPGAwesome), or imagePath (custom image)
  */
 function validateObjectDefinition(obj: Partial<ObjectTypeDefinition>): ValidationResult {
   const errors: string[] = [];
 
   const hasSymbol = obj.symbol && isValidSymbol(obj.symbol);
   const hasIcon = obj.iconClass && isValidIconClass(obj.iconClass);
+  const hasImage = obj.imagePath && isValidImagePath(obj.imagePath);
 
-  // Must have at least one of symbol or iconClass
-  if (!hasSymbol && !hasIcon) {
+  // Must have at least one of symbol, iconClass, or imagePath
+  if (!hasSymbol && !hasIcon && !hasImage) {
     if (obj.iconClass && !hasIcon) {
       errors.push('Invalid icon selection');
     } else if (obj.symbol && !hasSymbol) {
       errors.push('Symbol must be 1-8 characters');
+    } else if (obj.imagePath && !hasImage) {
+      errors.push('Invalid image path');
     } else {
-      errors.push('Either a symbol or an icon is required');
+      errors.push('Either a symbol, icon, or image is required');
     }
   }
 
@@ -403,10 +429,12 @@ return {
   getObjectType,
   getHiddenObjects,
 
-  // Icon/symbol helpers
+  // Icon/symbol/image helpers
   hasIconClass,
+  hasImagePath,
   getRenderChar,
   isValidIconClass,
+  isValidImagePath,
 
   // Utilities
   objectTypeExists,

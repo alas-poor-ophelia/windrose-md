@@ -1,8 +1,8 @@
 /**
  * Background Renderer Module
  *
- * Renders background images for hex maps, handling proper positioning,
- * scaling, and opacity based on hex grid bounds.
+ * Renders background images for grid and hex maps, handling proper positioning,
+ * scaling, and opacity based on map bounds.
  */
 
 interface HexBounds {
@@ -15,6 +15,7 @@ interface BackgroundImageConfig {
   offsetX?: number;
   offsetY?: number;
   opacity?: number;
+  imageGridSize?: number;  // Grid maps: pixel size of grid cells on background image
 }
 
 interface HexGeometryLike {
@@ -117,6 +118,79 @@ function renderHexBackgroundImage(
   }
 }
 
+interface GridDimensions {
+  width: number;   // Grid width in cells
+  height: number;  // Grid height in cells
+}
+
+/**
+ * Renders a background image for a grid map.
+ * Centers the image based on grid dimensions and applies offset/opacity/scaling.
+ *
+ * @param bgImage - The loaded HTMLImageElement
+ * @param config - Background image configuration (path, offsets, opacity, imageGridSize)
+ * @param dimensions - Grid dimensions in cells (width, height)
+ * @param cellSize - The grid cell size in pixels
+ * @param context - Render context with canvas context and view state
+ */
+function renderGridBackgroundImage(
+  bgImage: HTMLImageElement,
+  config: BackgroundImageConfig,
+  dimensions: GridDimensions,
+  cellSize: number,
+  context: RenderBackgroundContext
+): void {
+  const { ctx, offsetX, offsetY, zoom } = context;
+
+  // Calculate world bounds from grid dimensions (simpler than hex)
+  const worldWidth = dimensions.width * cellSize;
+  const worldHeight = dimensions.height * cellSize;
+  const worldCenterX = worldWidth / 2;
+  const worldCenterY = worldHeight / 2;
+
+  // Get image dimensions
+  const imgWidth = bgImage.naturalWidth;
+  const imgHeight = bgImage.naturalHeight;
+
+  // Calculate image scale factor
+  // If imageGridSize is specified, scale image so its grid matches Windrose's grid
+  // Scale = cellSize / imageGridSize
+  // (e.g., if image has 40px grid and Windrose uses 32px, scale = 0.8)
+  const imageScale = config.imageGridSize && config.imageGridSize > 0
+    ? cellSize / config.imageGridSize
+    : 1.0;
+
+  // Apply image offsets
+  const imgOffsetX = config.offsetX ?? 0;
+  const imgOffsetY = config.offsetY ?? 0;
+
+  // Calculate scaled image dimensions
+  const scaledImgWidth = imgWidth * imageScale;
+  const scaledImgHeight = imgHeight * imageScale;
+
+  // Calculate screen position (center image on grid bounds)
+  const screenCenterX = offsetX + worldCenterX * zoom;
+  const screenCenterY = offsetY + worldCenterY * zoom;
+  const screenX = screenCenterX - (scaledImgWidth * zoom) / 2 + (imgOffsetX * zoom);
+  const screenY = screenCenterY - (scaledImgHeight * zoom) / 2 + (imgOffsetY * zoom);
+
+  // Apply opacity if needed
+  const opacity = config.opacity ?? 1;
+  if (opacity < 1) {
+    ctx.save();
+    ctx.globalAlpha = opacity;
+  }
+
+  // Draw the background image
+  ctx.drawImage(bgImage, screenX, screenY, scaledImgWidth * zoom, scaledImgHeight * zoom);
+
+  // Restore opacity
+  if (opacity < 1) {
+    ctx.restore();
+  }
+}
+
 return {
-  renderHexBackgroundImage
+  renderHexBackgroundImage,
+  renderGridBackgroundImage
 };

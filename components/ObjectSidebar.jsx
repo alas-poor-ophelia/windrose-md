@@ -2,7 +2,7 @@ const pathResolverPath = dc.resolvePath("pathResolver.ts");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
 // Use resolver for dynamic object types (supports overrides and custom objects)
-const { getResolvedObjectTypes, getResolvedCategories, hasIconClass } = await requireModuleByName("objectTypeResolver.ts");
+const { getResolvedObjectTypes, getResolvedCategories, hasIconClass, hasImagePath } = await requireModuleByName("objectTypeResolver.ts");
 
 // Ornamental Arrow SVG - Double Chevron Design
 const OrnamentalArrow = ({ direction = "right" }) => {
@@ -48,10 +48,10 @@ const OrnamentalArrow = ({ direction = "right" }) => {
   );
 };
 
-const ObjectSidebar = ({ selectedObjectType, onObjectTypeSelect, onToolChange, isCollapsed, onCollapseChange }) => {
+const ObjectSidebar = ({ selectedObjectType, onObjectTypeSelect, onToolChange, isCollapsed, onCollapseChange, mapType = 'grid' }) => {
   // Get resolved object types and categories (includes overrides and custom)
-  const allObjectTypes = getResolvedObjectTypes();
-  const allCategories = getResolvedCategories();
+  const allObjectTypes = getResolvedObjectTypes(mapType);
+  const allCategories = getResolvedCategories(mapType);
   
   // Group objects by category (excluding 'notes' category which is handled specially)
   const objectsByCategory = allCategories
@@ -131,7 +131,13 @@ const ObjectSidebar = ({ selectedObjectType, onObjectTypeSelect, onToolChange, i
                 title={objType.label}
               >
                 <div className="dmt-object-symbol">
-                  {hasIconClass(objType) ? (
+                  {hasImagePath(objType) ? (
+                    <img
+                      src={dc.app.vault.adapter.getResourcePath(objType.imagePath)}
+                      alt={objType.label}
+                      className="dmt-object-image"
+                    />
+                  ) : hasIconClass(objType) ? (
                     <span className={`ra ${objType.iconClass}`}></span>
                   ) : (
                     objType.symbol || '?'

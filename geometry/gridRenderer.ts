@@ -63,10 +63,47 @@ const gridRenderer = {
 
   /**
    * Render background image for grid maps.
-   * Grid maps don't support background images - this is a no-op.
+   * Centers the image based on grid dimensions and applies offset/opacity/scaling.
+   *
+   * @param ctx - Canvas rendering context
+   * @param geometry - Grid geometry instance
+   * @param bgImage - The loaded HTMLImageElement (or null)
+   * @param bgConfig - Background image configuration
+   * @param dimensions - Grid dimensions in cells (width, height)
+   * @param _orientation - Hex orientation (unused for grid maps, included for interface compatibility)
+   * @param offsetX - Viewport X offset
+   * @param offsetY - Viewport Y offset
+   * @param zoom - Current zoom level
+   * @param renderGridBackgroundImage - Render function from backgroundRenderer
    */
-  renderBackgroundImage(): void {
-    // Grid maps don't render background images
+  renderBackgroundImage(
+    ctx: CanvasRenderingContext2D,
+    geometry: IGridRenderer,
+    bgImage: HTMLImageElement | null,
+    bgConfig: { path: string; offsetX?: number; offsetY?: number; opacity?: number; imageGridSize?: number } | undefined,
+    dimensions: { width: number; height: number } | undefined,
+    _orientation: string,
+    offsetX: number,
+    offsetY: number,
+    zoom: number,
+    renderGridBackgroundImage: (
+      bgImage: HTMLImageElement,
+      config: { path: string; offsetX?: number; offsetY?: number; opacity?: number; imageGridSize?: number },
+      dimensions: { width: number; height: number },
+      cellSize: number,
+      context: { ctx: CanvasRenderingContext2D; offsetX: number; offsetY: number; zoom: number }
+    ) => void
+  ): void {
+    if (!bgImage || !bgConfig?.path || !dimensions) return;
+    if (!bgImage.complete) return;
+
+    renderGridBackgroundImage(
+      bgImage,
+      bgConfig,
+      dimensions,
+      geometry.cellSize,
+      { ctx, offsetX, offsetY, zoom }
+    );
   },
 
   /**

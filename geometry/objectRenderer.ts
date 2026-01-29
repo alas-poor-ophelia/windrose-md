@@ -46,9 +46,17 @@ interface ObjectRenderContext {
   scaledSize: number;
 }
 
+/** Render character result from objectTypeResolver */
+interface RenderChar {
+  char: string;
+  isIcon: boolean;
+  isImage?: boolean;
+  imagePath?: string;
+}
+
 interface ObjectRenderDeps {
   getObjectType: (typeId: string) => ObjectTypeDef | null;
-  getRenderChar: (objType: ObjectTypeDef) => { char: string; isIcon: boolean };
+  getRenderChar: (objType: ObjectTypeDef) => RenderChar;
   isCellFogged: (layer: MapLayer, col: number, row: number) => boolean;
   getObjectsInCell: (objects: MapObject[], x: number, y: number) => MapObject[];
   getSlotOffset: (slot: number, count: number, orientation: string) => { offsetX: number; offsetY: number };
@@ -56,6 +64,7 @@ interface ObjectRenderDeps {
   renderNoteLinkBadge: (ctx: CanvasRenderingContext2D, position: { screenX: number; screenY: number; objectWidth: number; objectHeight: number }, config: { scaledSize: number }) => void;
   renderTooltipIndicator: (ctx: CanvasRenderingContext2D, position: { screenX: number; screenY: number; objectWidth: number; objectHeight: number }, config: { scaledSize: number }) => void;
   renderObjectLinkIndicator: (ctx: CanvasRenderingContext2D, position: { screenX: number; screenY: number; objectWidth: number; objectHeight: number }, config: { scaledSize: number }) => void;
+  getCachedImage?: (path: string) => HTMLImageElement | null;
 }
 
 /**
@@ -157,6 +166,7 @@ function calculateObjectPosition(
 
 /**
  * Renders a single object on the canvas.
+ * Handles three rendering modes: custom images, RPGAwesome icons, and Unicode symbols.
  */
 function renderSingleObject(
   ctx: CanvasRenderingContext2D,
@@ -164,7 +174,8 @@ function renderSingleObject(
   objType: ObjectTypeDef,
   position: { screenX: number; screenY: number; objectWidth: number; objectHeight: number },
   scaledSize: number,
-  getRenderChar: (objType: ObjectTypeDef) => { char: string; isIcon: boolean }
+  getRenderChar: (objType: ObjectTypeDef) => RenderChar,
+  getCachedImage?: (path: string) => HTMLImageElement | null
 ): void {
   const { screenX, screenY, objectWidth, objectHeight } = position;
 
@@ -172,9 +183,44 @@ function renderSingleObject(
   const centerY = screenY + objectHeight / 2;
 
   const objectScale = obj.scale ?? 1.0;
+  const rotation = obj.rotation || 0;
+
+  const renderInfo = getRenderChar(objType);
+
+  // Handle custom image rendering
+  if (renderInfo.isImage && renderInfo.imagePath && getCachedImage) {
+    const img = getCachedImage(renderInfo.imagePath);
+    if (img && img.complete) {
+      // Calculate image size (fits within object bounds with 90% fill)
+      const imgSize = Math.min(objectWidth, objectHeight) * 0.9 * objectScale;
+
+      ctx.save();
+
+      // Apply rotation if needed
+      if (rotation !== 0) {
+        ctx.translate(centerX, centerY);
+        ctx.rotate((rotation * Math.PI) / 180);
+        ctx.translate(-centerX, -centerY);
+      }
+
+      // Draw the image centered
+      ctx.drawImage(
+        img,
+        centerX - imgSize / 2,
+        centerY - imgSize / 2,
+        imgSize,
+        imgSize
+      );
+
+      ctx.restore();
+      return;
+    }
+    // Image not loaded yet - fall through to render placeholder
+  }
+
+  // Font-based rendering (icons and Unicode symbols)
   const fontSize = Math.min(objectWidth, objectHeight) * 0.8 * objectScale;
 
-  const rotation = obj.rotation || 0;
   if (rotation !== 0) {
     ctx.save();
     ctx.translate(centerX, centerY);
@@ -182,9 +228,7 @@ function renderSingleObject(
     ctx.translate(-centerX, -centerY);
   }
 
-  const { char: renderChar, isIcon } = getRenderChar(objType);
-
-  if (isIcon) {
+  if (renderInfo.isIcon) {
     ctx.font = `${fontSize}px rpgawesome`;
   } else {
     ctx.font = `${fontSize}px 'Noto Emoji', 'Noto Sans Symbols 2', monospace`;
@@ -192,10 +236,10 @@ function renderSingleObject(
 
   ctx.strokeStyle = '#000000';
   ctx.lineWidth = Math.max(2, fontSize * 0.08);
-  ctx.strokeText(renderChar, centerX, centerY);
+  ctx.strokeText(renderInfo.char, centerX, centerY);
 
   ctx.fillStyle = obj.color || '#ffffff';
-  ctx.fillText(renderChar, centerX, centerY);
+  ctx.fillText(renderInfo.char, centerX, centerY);
 
   if (rotation !== 0) {
     ctx.restore();
@@ -267,7 +311,7 @@ function renderObjects(
     );
 
     // Render the object
-    renderSingleObject(ctx, obj, objType, position, scaledSize, deps.getRenderChar);
+    renderSingleObject(ctx, obj, objType, position, scaledSize, deps.getRenderChar, deps.getCachedImage);
 
     // Render badges
     renderObjectBadges(ctx, obj, position, scaledSize, deps);

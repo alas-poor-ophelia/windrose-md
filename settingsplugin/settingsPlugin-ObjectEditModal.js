@@ -16,13 +16,17 @@ class ObjectEditModal extends Modal {
     // Form state
     this.symbol = existingObject?.symbol || '';
     this.iconClass = existingObject?.iconClass || '';
+    this.imagePath = existingObject?.imagePath || '';
     this.label = existingObject?.label || '';
     this.category = existingObject?.category || 'features';
-    
+
     // UI state - determine initial mode based on existing object
-    this.useIcon = !!existingObject?.iconClass;
+    // Modes: 'symbol', 'icon', 'image'
+    this.mode = existingObject?.imagePath ? 'image' : (existingObject?.iconClass ? 'icon' : 'symbol');
     this.iconSearchQuery = '';
     this.iconCategory = 'all';
+    this.imageSearchQuery = '';
+    this.imageSearchResults = [];
   }
   
   onOpen() {
@@ -34,49 +38,59 @@ class ObjectEditModal extends Modal {
     
     contentEl.createEl('h2', { text: isEditing ? 'Edit Object' : 'Create Custom Object' });
     
-    // Icon type toggle
+    // Mode toggle (symbol / icon / image)
     const toggleContainer = contentEl.createDiv({ cls: 'dmt-icon-type-toggle' });
-    
-    const unicodeBtn = toggleContainer.createEl('button', { 
+
+    const unicodeBtn = toggleContainer.createEl('button', {
       text: 'Unicode Symbol',
-      cls: 'dmt-icon-type-btn' + (this.useIcon ? '' : ' active'),
+      cls: 'dmt-icon-type-btn' + (this.mode === 'symbol' ? ' active' : ''),
       attr: { type: 'button' }
     });
-    
-    const iconBtn = toggleContainer.createEl('button', { 
+
+    const iconBtn = toggleContainer.createEl('button', {
       text: 'RPGAwesome Icon',
-      cls: 'dmt-icon-type-btn' + (this.useIcon ? ' active' : ''),
+      cls: 'dmt-icon-type-btn' + (this.mode === 'icon' ? ' active' : ''),
       attr: { type: 'button' }
     });
-    
-    // Container for symbol input (shown when useIcon is false)
+
+    const imageBtn = toggleContainer.createEl('button', {
+      text: 'Custom Image',
+      cls: 'dmt-icon-type-btn' + (this.mode === 'image' ? ' active' : ''),
+      attr: { type: 'button' }
+    });
+
+    // Container for symbol input (shown when mode is 'symbol')
     this.symbolContainer = contentEl.createDiv({ cls: 'dmt-symbol-container' });
-    
-    // Container for icon picker (shown when useIcon is true)
+
+    // Container for icon picker (shown when mode is 'icon')
     this.iconPickerContainer = contentEl.createDiv({ cls: 'dmt-icon-picker-container' });
-    
+
+    // Container for image picker (shown when mode is 'image')
+    this.imagePickerContainer = contentEl.createDiv({ cls: 'dmt-image-picker-container' });
+
+    // Store button references for updating active state
+    this.modeButtons = { symbol: unicodeBtn, icon: iconBtn, image: imageBtn };
+
     // Toggle handlers
     unicodeBtn.onclick = () => {
-      if (!this.useIcon) return;
-      this.useIcon = false;
-      unicodeBtn.addClass('active');
-      iconBtn.removeClass('active');
-      this.renderSymbolInput();
-      this.renderIconPicker();
+      if (this.mode === 'symbol') return;
+      this.setMode('symbol');
     };
-    
+
     iconBtn.onclick = () => {
-      if (this.useIcon) return;
-      this.useIcon = true;
-      iconBtn.addClass('active');
-      unicodeBtn.removeClass('active');
-      this.renderSymbolInput();
-      this.renderIconPicker();
+      if (this.mode === 'icon') return;
+      this.setMode('icon');
     };
-    
-    // Initial render of symbol/icon sections
+
+    imageBtn.onclick = () => {
+      if (this.mode === 'image') return;
+      this.setMode('image');
+    };
+
+    // Initial render of all sections
     this.renderSymbolInput();
     this.renderIconPicker();
+    this.renderImagePicker();
     
     // Label input
     new Setting(contentEl)
@@ -89,8 +103,11 @@ class ObjectEditModal extends Modal {
           this.label = value;
         }));
     
-    // Category dropdown
-    const allCategories = ObjectHelpers.getAllCategories(this.plugin.settings);
+    // Category dropdown - use map-type-specific settings
+    const mapTypeSettings = this.mapType === 'hex'
+      ? { customCategories: this.plugin.settings.customHexCategories || [] }
+      : { customCategories: this.plugin.settings.customGridCategories || [] };
+    const allCategories = ObjectHelpers.getAllCategories(mapTypeSettings);
     new Setting(contentEl)
       .setName('Category')
       .setDesc('Group this object belongs to')
@@ -114,11 +131,27 @@ class ObjectEditModal extends Modal {
     saveBtn.onclick = () => this.save();
   }
   
+  setMode(newMode) {
+    this.mode = newMode;
+    // Update button active states
+    Object.entries(this.modeButtons).forEach(([mode, btn]) => {
+      if (mode === newMode) {
+        btn.addClass('active');
+      } else {
+        btn.removeClass('active');
+      }
+    });
+    // Re-render all mode-specific containers
+    this.renderSymbolInput();
+    this.renderIconPicker();
+    this.renderImagePicker();
+  }
+
   renderSymbolInput() {
     const container = this.symbolContainer;
     container.empty();
-    
-    if (this.useIcon) {
+
+    if (this.mode !== 'symbol') {
       container.style.display = 'none';
       return;
     }
@@ -171,8 +204,8 @@ class ObjectEditModal extends Modal {
   renderIconPicker() {
     const container = this.iconPickerContainer;
     container.empty();
-    
-    if (!this.useIcon) {
+
+    if (this.mode !== 'icon') {
       container.style.display = 'none';
       return;
     }
@@ -319,21 +352,141 @@ class ObjectEditModal extends Modal {
     infoBox.createDiv({ cls: 'dmt-icon-preview-label', text: iconInfo.label });
     infoBox.createDiv({ cls: 'dmt-icon-preview-class', text: this.iconClass });
   }
-  
+
+  renderImagePicker() {
+    const container = this.imagePickerContainer;
+    container.empty();
+
+    if (this.mode !== 'image') {
+      container.style.display = 'none';
+      return;
+    }
+    container.style.display = 'block';
+
+    // Info text
+    container.createEl('p', {
+      text: 'Select an image from your vault to use as this object\\'s icon.',
+      cls: 'dmt-image-picker-info'
+    });
+
+    // Image search input
+    const searchContainer = container.createDiv({ cls: 'dmt-image-picker-search' });
+    const searchInput = searchContainer.createEl('input', {
+      type: 'text',
+      value: this.imageSearchQuery,
+      attr: { placeholder: 'Search for image...' }
+    });
+
+    // Clear button
+    if (this.imagePath) {
+      const clearBtn = searchContainer.createEl('button', {
+        text: 'x',
+        cls: 'dmt-image-clear-btn',
+        attr: { type: 'button', title: 'Clear image' }
+      });
+      clearBtn.onclick = () => {
+        this.imagePath = '';
+        this.imageSearchQuery = '';
+        this.imageSearchResults = [];
+        this.renderImagePicker();
+      };
+    }
+
+    searchInput.addEventListener('input', async (e) => {
+      this.imageSearchQuery = e.target.value;
+      await this.searchImages(this.imageSearchQuery);
+    });
+
+    // Search results dropdown
+    this.imageResultsContainer = container.createDiv({ cls: 'dmt-image-search-results' });
+    this.renderImageSearchResults();
+
+    // Preview
+    if (this.imagePath) {
+      const previewContainer = container.createDiv({ cls: 'dmt-image-preview' });
+      previewContainer.createEl('p', {
+        text: 'Selected: ' + this.getImageDisplayName(this.imagePath),
+        cls: 'dmt-image-preview-label'
+      });
+      // Try to show the image preview
+      const imgPreview = previewContainer.createEl('img', {
+        cls: 'dmt-image-preview-img',
+        attr: { src: this.app.vault.adapter.getResourcePath(this.imagePath) }
+      });
+      imgPreview.style.maxWidth = '100px';
+      imgPreview.style.maxHeight = '100px';
+    }
+  }
+
+  async searchImages(query) {
+    if (!query || query.trim().length < 2) {
+      this.imageSearchResults = [];
+      this.renderImageSearchResults();
+      return;
+    }
+
+    const lowerQuery = query.toLowerCase();
+    const files = this.app.vault.getFiles();
+    const imageExtensions = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'];
+
+    const matches = files
+      .filter(file => {
+        const ext = file.extension?.toLowerCase();
+        if (!imageExtensions.includes(ext)) return false;
+        return file.path.toLowerCase().includes(lowerQuery) ||
+               file.basename.toLowerCase().includes(lowerQuery);
+      })
+      .slice(0, 10);
+
+    this.imageSearchResults = matches.map(f => f.path);
+    this.renderImageSearchResults();
+  }
+
+  renderImageSearchResults() {
+    const container = this.imageResultsContainer;
+    if (!container) return;
+    container.empty();
+
+    if (this.imageSearchResults.length === 0) return;
+
+    for (const path of this.imageSearchResults) {
+      const item = container.createDiv({ cls: 'dmt-image-search-result' });
+      item.textContent = this.getImageDisplayName(path);
+      item.onclick = () => {
+        this.imagePath = path;
+        this.imageSearchQuery = this.getImageDisplayName(path);
+        this.imageSearchResults = [];
+        this.renderImagePicker();
+      };
+    }
+  }
+
+  getImageDisplayName(path) {
+    if (!path) return '';
+    const parts = path.split('/');
+    return parts[parts.length - 1];
+  }
+
   save() {
     // Validate based on mode
-    if (this.useIcon) {
+    if (this.mode === 'icon') {
       if (!this.iconClass || !RPGAwesomeHelpers.isValid(this.iconClass)) {
         alert('Please select a valid icon');
         return;
       }
+    } else if (this.mode === 'image') {
+      if (!this.imagePath || this.imagePath.trim().length === 0) {
+        alert('Please select an image');
+        return;
+      }
     } else {
+      // symbol mode
       if (!this.symbol || this.symbol.length === 0 || this.symbol.length > 8) {
         alert('Please enter a valid symbol (1-8 characters)');
         return;
       }
     }
-    
+
     if (!this.label || this.label.trim().length === 0) {
       alert('Please enter a label');
       return;
@@ -351,16 +504,23 @@ class ObjectEditModal extends Modal {
       
       const original = BUILT_IN_OBJECTS.find(o => o.id === this.existingObject.id);
       const override = {};
-      
-      // Handle symbol/iconClass based on mode
-      if (this.useIcon) {
+
+      // Handle symbol/iconClass/imagePath based on mode
+      if (this.mode === 'icon') {
         if (this.iconClass !== original.iconClass) override.iconClass = this.iconClass;
-        // Clear symbol override if switching to icon
-        if (original.symbol && !this.iconClass) override.symbol = null;
+        // Clear other visual properties
+        if (original.symbol) override.symbol = null;
+        if (original.imagePath) override.imagePath = null;
+      } else if (this.mode === 'image') {
+        override.imagePath = this.imagePath;
+        // Clear other visual properties
+        if (original.symbol) override.symbol = null;
+        if (original.iconClass) override.iconClass = null;
       } else {
         if (this.symbol !== original.symbol) override.symbol = this.symbol;
-        // Clear iconClass override if switching to symbol
+        // Clear other visual properties
         if (original.iconClass) override.iconClass = null;
+        if (original.imagePath) override.imagePath = null;
       }
       
       if (this.label !== original.label) override.label = this.label;
@@ -393,16 +553,20 @@ class ObjectEditModal extends Modal {
           label: this.label.trim(),
           category: this.category
         };
-        
-        // Set symbol or iconClass based on mode
-        if (this.useIcon) {
+
+        // Set visual property based on mode, clearing others
+        delete updated.symbol;
+        delete updated.iconClass;
+        delete updated.imagePath;
+
+        if (this.mode === 'icon') {
           updated.iconClass = this.iconClass;
-          delete updated.symbol;
+        } else if (this.mode === 'image') {
+          updated.imagePath = this.imagePath;
         } else {
           updated.symbol = this.symbol;
-          delete updated.iconClass;
         }
-        
+
         this.plugin.settings[customObjectsKey][idx] = updated;
       }
     } else {
@@ -416,14 +580,16 @@ class ObjectEditModal extends Modal {
         label: this.label.trim(),
         category: this.category
       };
-      
-      // Set symbol or iconClass based on mode
-      if (this.useIcon) {
+
+      // Set visual property based on mode
+      if (this.mode === 'icon') {
         newObject.iconClass = this.iconClass;
+      } else if (this.mode === 'image') {
+        newObject.imagePath = this.imagePath;
       } else {
         newObject.symbol = this.symbol;
       }
-      
+
       this.plugin.settings[customObjectsKey].push(newObject);
     }
     

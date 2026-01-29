@@ -75,12 +75,17 @@ export type CoordinateDisplayMode = 'none' | 'offset' | 'axial';
 /** Background image configuration */
 export interface BackgroundImageConfig {
   path: string | null;
-  lockBounds?: boolean;
-  gridDensity?: GridDensity;
-  customColumns?: number;
   opacity?: number;
   offsetX?: number;
   offsetY?: number;
+
+  // Grid-specific settings (ignored by hex maps)
+  imageGridSize?: number;  // Pixel size of grid cells on background image
+
+  // Hex-specific settings (ignored by grid maps)
+  lockBounds?: boolean;
+  gridDensity?: GridDensity;
+  customColumns?: number;
   sizingMode?: SizingMode;
   measurementMethod?: MeasurementMethod;
   measurementSize?: number;
@@ -135,20 +140,25 @@ export interface SettingsReducerState {
   hexBounds: HexBounds;
   boundsLocked: boolean;
 
-  // Background image settings
+  // Background image settings (shared between grid and hex)
   backgroundImagePath: string | null;
   backgroundImageDisplayName: string;
   imageDimensions: ImageDimensions | null;
   imageSearchResults: string[];
+  imageOpacity: number;
+  imageOffsetX: number;
+  imageOffsetY: number;
+
+  // Grid-specific background image settings
+  imageGridSize: number;
+
+  // Hex-specific background image settings
   sizingMode: SizingMode;
   gridDensity: GridDensity;
   customColumns: number;
   measurementMethod: MeasurementMethod;
   measurementSize: number;
   fineTuneOffset: number;
-  imageOpacity: number;
-  imageOffsetX: number;
-  imageOffsetY: number;
 
   // Fog of War image
   fogImagePath: string | null;
@@ -207,16 +217,21 @@ export interface MapSettingsHandlers {
   // Color picker
   setActiveColorPicker: (picker: string | null) => void;
 
-  // Background image
+  // Background image (shared)
   setBackgroundImageDisplayName: (name: string) => void;
   handleImageSearch: (searchTerm: string) => Promise<void>;
   handleImageSelect: (displayName: string) => Promise<void>;
   handleImageClear: () => void;
-  handleSizingModeChange: (mode: SizingMode) => void;
-  handleBoundsLockToggle: () => void;
   setImageOpacity: (opacity: number) => void;
   setImageOffsetX: (x: number) => void;
   setImageOffsetY: (y: number) => void;
+
+  // Background image (grid-specific)
+  setImageGridSize: (size: number) => void;
+
+  // Background image (hex-specific)
+  handleSizingModeChange: (mode: SizingMode) => void;
+  handleBoundsLockToggle: () => void;
 
   // Hex grid settings
   handleHexBoundsChange: (axis: 'maxCol' | 'maxRow', value: string) => void;
@@ -386,6 +401,7 @@ const MapSettingsProvider: React.FC<MapSettingsProviderProps> = ({
   const tabs = dc.useMemo<SettingsTab[]>(() => {
     const baseTabs: SettingsTab[] = [{ id: 'appearance', label: 'Appearance' }];
     if (mapType === 'hex') baseTabs.push({ id: 'hexgrid', label: 'Hex Grid' });
+    if (mapType === 'grid') baseTabs.push({ id: 'gridbackground', label: 'Background' });
     baseTabs.push({ id: 'measurement', label: 'Measurement' });
     baseTabs.push({ id: 'preferences', label: 'Preferences' });
     return baseTabs;
@@ -412,25 +428,40 @@ const MapSettingsProvider: React.FC<MapSettingsProviderProps> = ({
       getImageDimensions(currentBackgroundImage.path).then((dims: ImageDimensions | null) => {
         if (!dims) return;
 
-        const bounds = calculateBoundsFromSettings(
-          dims,
-          currentBackgroundImage.sizingMode ?? 'density',
-          currentBackgroundImage.gridDensity ?? 'medium',
-          currentBackgroundImage.customColumns ?? 24,
-          currentBackgroundImage.measurementSize ?? 86,
-          currentBackgroundImage.measurementMethod ?? MEASUREMENT_CORNER,
-          orientation
-        );
+        // For hex maps, calculate bounds from image dimensions
+        // For grid maps, we just need the image dimensions and display name
+        if (mapType === 'hex') {
+          const bounds = calculateBoundsFromSettings(
+            dims,
+            currentBackgroundImage.sizingMode ?? 'density',
+            currentBackgroundImage.gridDensity ?? 'medium',
+            currentBackgroundImage.customColumns ?? 24,
+            currentBackgroundImage.measurementSize ?? 86,
+            currentBackgroundImage.measurementMethod ?? MEASUREMENT_CORNER,
+            orientation
+          );
 
-        dispatch({
-          type: Actions.IMAGE_SELECTED,
-          payload: {
-            path: currentBackgroundImage.path,
-            displayName: getDisplayNameFromPath(currentBackgroundImage.path),
-            dimensions: dims,
-            bounds: (currentBackgroundImage.lockBounds ?? true) ? bounds : (currentHexBounds ?? { maxCol: 26, maxRow: 20 })
-          }
-        });
+          dispatch({
+            type: Actions.IMAGE_SELECTED,
+            payload: {
+              path: currentBackgroundImage.path,
+              displayName: getDisplayNameFromPath(currentBackgroundImage.path),
+              dimensions: dims,
+              bounds: (currentBackgroundImage.lockBounds ?? true) ? bounds : (currentHexBounds ?? { maxCol: 26, maxRow: 20 })
+            }
+          });
+        } else {
+          // Grid maps: just set the image path and dimensions
+          dispatch({
+            type: Actions.IMAGE_SELECTED,
+            payload: {
+              path: currentBackgroundImage.path,
+              displayName: getDisplayNameFromPath(currentBackgroundImage.path),
+              dimensions: dims,
+              bounds: null  // Grid maps don't use hex bounds
+            }
+          });
+        }
       });
     }
   }, [isOpen]);
@@ -535,18 +566,26 @@ const MapSettingsProvider: React.FC<MapSettingsProviderProps> = ({
       }
     };
 
-    const backgroundImageData: BackgroundImageConfig | undefined = mapType === 'hex' ? {
+    // Build background image data for both grid and hex maps
+    const backgroundImageData: BackgroundImageConfig | undefined = state.backgroundImagePath ? {
       path: state.backgroundImagePath,
-      lockBounds: state.boundsLocked,
-      gridDensity: state.gridDensity,
-      customColumns: state.customColumns,
       opacity: state.imageOpacity,
       offsetX: state.imageOffsetX,
       offsetY: state.imageOffsetY,
-      sizingMode: state.sizingMode,
-      measurementMethod: state.measurementMethod,
-      measurementSize: state.measurementSize,
-      fineTuneOffset: state.fineTuneOffset
+      // Grid-specific fields
+      ...(mapType === 'grid' ? {
+        imageGridSize: state.imageGridSize
+      } : {}),
+      // Hex-specific fields
+      ...(mapType === 'hex' ? {
+        lockBounds: state.boundsLocked,
+        gridDensity: state.gridDensity,
+        customColumns: state.customColumns,
+        sizingMode: state.sizingMode,
+        measurementMethod: state.measurementMethod,
+        measurementSize: state.measurementSize,
+        fineTuneOffset: state.fineTuneOffset
+      } : {})
     } : undefined;
 
     let calculatedHexSize: number | null = null;
@@ -617,6 +656,7 @@ const MapSettingsProvider: React.FC<MapSettingsProviderProps> = ({
     setImageOpacity: (opacity) => dispatch({ type: Actions.SET_IMAGE_OPACITY, payload: opacity }),
     setImageOffsetX: (x) => dispatch({ type: Actions.SET_IMAGE_OFFSET_X, payload: x }),
     setImageOffsetY: (y) => dispatch({ type: Actions.SET_IMAGE_OFFSET_Y, payload: y }),
+    setImageGridSize: (size) => dispatch({ type: Actions.SET_IMAGE_GRID_SIZE, payload: size }),
     handleResizeConfirmDelete,
     handleResizeConfirmCancel: () => dispatch({ type: Actions.CANCEL_RESIZE }),
     handleCancel: () => onClose(),

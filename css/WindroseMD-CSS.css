@@ -967,10 +967,16 @@ button.dmt-orientation-btn,
   line-height: 1.1;
   margin-bottom: 4px;
   color: var(--dmt-text-primary);
-  
+
   /* Optimize rendering and prepare font early */
   will-change: contents;
   text-rendering: optimizeSpeed;
+}
+
+.dmt-object-image {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
 }
 
 .dmt-object-label {
@@ -1432,8 +1438,11 @@ button.dmt-orientation-btn,
 
 .dmt-modal-footer {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   margin-top: 16px;
+  box-sizing: border-box;
+  max-width: 100%;
 }
 
 .dmt-form-group {
@@ -1453,7 +1462,8 @@ button.dmt-orientation-btn,
 }
 
 .dmt-modal-btn {
-  flex: 1;
+  flex: 1 1 0;
+  min-width: 0;
   padding: 10px 16px;
   font-size: 14px;
   font-weight: 500;
@@ -1553,10 +1563,13 @@ button.dmt-orientation-btn,
 /* Settings Modal Tab Bar */
 .dmt-settings-tab-bar {
   display: flex;
+  flex-wrap: wrap;
   gap: 0;
   border-bottom: 1px solid var(--background-modifier-border);
   margin: 0 -20px;
   padding: 0 20px;
+  box-sizing: border-box;
+  max-width: calc(100% + 40px);
 }
 
 .dmt-settings-tab {
@@ -1570,7 +1583,10 @@ button.dmt-orientation-btn,
   cursor: pointer;
   transition: color 0.15s ease, border-color 0.15s ease;
   margin-bottom: -1px;
-  
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: center;
+
   &:hover {
     color: var(--text-normal);
   }
@@ -1583,6 +1599,9 @@ button.dmt-orientation-btn,
 
 .dmt-settings-tab-content {
   min-height: 325px;
+  box-sizing: border-box;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 /* Color picker 2x2 grid items */
@@ -2155,6 +2174,8 @@ button.dmt-orientation-btn,
   .dmt-modal-btn {
     padding: 14px 16px;
     font-size: 16px;
+    flex: 1 1 auto;
+    min-width: 100px;
   }
 
   .dmt-rotate-button,

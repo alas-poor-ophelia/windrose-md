@@ -672,8 +672,8 @@ const editingLayer = dc.useMemo(() => {
       }
     }
 
-    // Only update backgroundImage for hex maps
-    if (backgroundImage !== undefined && mapData.mapType === 'hex') {
+    // Update backgroundImage for both grid and hex maps
+    if (backgroundImage !== undefined) {
       newMapData.backgroundImage = backgroundImage;
     }
 
@@ -1002,7 +1002,7 @@ const editingLayer = dc.useMemo(() => {
           currentSettings={mapData.settings}
           currentPreferences={mapData.uiPreferences}
           currentHexBounds={mapData.mapType === 'hex' ? mapData.hexBounds : null}
-          currentBackgroundImage={mapData.mapType === 'hex' ? mapData.backgroundImage : null}
+          currentBackgroundImage={mapData.backgroundImage ?? null}
           currentCells={mapData.mapType === 'hex' ? (getActiveLayer(mapData).cells || []) : []}
           currentObjects={mapData.mapType === 'hex' ? (getActiveLayer(mapData).objects || []) : []}
           mapData={mapData}

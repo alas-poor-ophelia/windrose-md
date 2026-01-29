@@ -22,6 +22,7 @@ const { ModalPortal } = await requireModuleByName("ModalPortal.tsx");
 const { MapSettingsProvider, useMapSettings } = await requireModuleByName("MapSettingsContext.tsx");
 const { AppearanceTab } = await requireModuleByName("AppearanceTab.tsx");
 const { HexGridTab } = await requireModuleByName("HexGridTab.tsx");
+const { GridBackgroundTab } = await requireModuleByName("GridBackgroundTab.tsx");
 const { MeasurementTab } = await requireModuleByName("MeasurementTab.tsx");
 const { PreferencesTab } = await requireModuleByName("PreferencesTab.tsx");
 const { ResizeConfirmDialog } = await requireModuleByName("ResizeConfirmDialog.tsx");
@@ -74,9 +75,9 @@ export interface MapSettingsModalProps {
 }
 
 const MODAL_SIZE_KEY = 'windrose-settings-modal-size';
-const DEFAULT_WIDTH = 480;
+const DEFAULT_WIDTH = 520;
 const DEFAULT_HEIGHT = 500;
-const MIN_WIDTH = 380;
+const MIN_WIDTH = 480;
 const MIN_HEIGHT = 350;
 const MAX_WIDTH = 800;
 const MAX_HEIGHT = 800;
@@ -339,6 +340,7 @@ function MapSettingsModalContent(): React.ReactElement | null {
           }}>
             {activeTab === 'appearance' && <AppearanceTab />}
             {activeTab === 'hexgrid' && mapType === 'hex' && <HexGridTab />}
+            {activeTab === 'gridbackground' && mapType === 'grid' && <GridBackgroundTab />}
             {activeTab === 'measurement' && <MeasurementTab />}
             {activeTab === 'preferences' && <PreferencesTab />}
           </div>

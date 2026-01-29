@@ -169,10 +169,13 @@ interface SettingsModalState {
   customColumns: number;
   boundsLocked: boolean;
   
-  // Image positioning
+  // Image positioning (shared)
   imageOpacity: number;
   imageOffsetX: number;
   imageOffsetY: number;
+
+  // Grid-specific background image settings
+  imageGridSize: number;
   
   // Sizing mode
   sizingMode: SizingMode;
@@ -206,12 +209,15 @@ interface CurrentSettings {
 /** Current background image settings */
 interface CurrentBackgroundImage {
   path?: string;
-  gridDensity?: GridDensityKey;
-  customColumns?: number;
-  lockBounds?: boolean;
   opacity?: number;
   offsetX?: number;
   offsetY?: number;
+  // Grid-specific
+  imageGridSize?: number;
+  // Hex-specific
+  gridDensity?: GridDensityKey;
+  customColumns?: number;
+  lockBounds?: boolean;
   sizingMode?: SizingMode;
   measurementMethod?: MeasurementMethod;
   measurementSize?: number;
@@ -293,6 +299,7 @@ const Actions = {
   SET_IMAGE_OPACITY: 'SET_IMAGE_OPACITY',
   SET_IMAGE_OFFSET_X: 'SET_IMAGE_OFFSET_X',
   SET_IMAGE_OFFSET_Y: 'SET_IMAGE_OFFSET_Y',
+  SET_IMAGE_GRID_SIZE: 'SET_IMAGE_GRID_SIZE',
   SET_ACTIVE_COLOR_PICKER: 'SET_ACTIVE_COLOR_PICKER',
   SET_LOADING: 'SET_LOADING',
   SHOW_RESIZE_CONFIRM: 'SHOW_RESIZE_CONFIRM',
@@ -429,6 +436,11 @@ interface SetImageOffsetYAction {
   payload: number;
 }
 
+interface SetImageGridSizeAction {
+  type: typeof Actions.SET_IMAGE_GRID_SIZE;
+  payload: number;
+}
+
 interface SetActiveColorPickerAction {
   type: typeof Actions.SET_ACTIVE_COLOR_PICKER;
   payload: ColorPickerId;
@@ -501,6 +513,7 @@ type SettingsAction =
   | SetImageOpacityAction
   | SetImageOffsetXAction
   | SetImageOffsetYAction
+  | SetImageGridSizeAction
   | SetActiveColorPickerAction
   | SetLoadingAction
   | ShowResizeConfirmAction
@@ -676,6 +689,7 @@ function buildInitialState(props: BuildInitialStateProps, globalSettings: Global
     imageOpacity: currentBackgroundImage?.opacity ?? 1,
     imageOffsetX: currentBackgroundImage?.offsetX ?? 0,
     imageOffsetY: currentBackgroundImage?.offsetY ?? 0,
+    imageGridSize: currentBackgroundImage?.imageGridSize ?? 32,
     
     sizingMode: currentBackgroundImage?.sizingMode ?? 'density',
     measurementMethod: currentBackgroundImage?.measurementMethod ?? MEASUREMENT_CORNER,
@@ -759,8 +773,8 @@ function settingsReducer(state: SettingsModalState, action: SettingsAction): Set
         backgroundImageDisplayName: displayName,
         imageDimensions: dimensions,
         imageSearchResults: [],
-        hexBounds: bounds,
-        boundsLocked: true
+        // Only update hexBounds if bounds is provided (hex maps)
+        ...(bounds ? { hexBounds: bounds, boundsLocked: true } : {})
       };
     }
     
@@ -905,7 +919,10 @@ function settingsReducer(state: SettingsModalState, action: SettingsAction): Set
     
     case Actions.SET_IMAGE_OFFSET_Y:
       return { ...state, imageOffsetY: action.payload };
-    
+
+    case Actions.SET_IMAGE_GRID_SIZE:
+      return { ...state, imageGridSize: action.payload };
+
     case Actions.SET_ACTIVE_COLOR_PICKER:
       return { ...state, activeColorPicker: action.payload };
     

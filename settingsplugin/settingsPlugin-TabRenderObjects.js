@@ -384,15 +384,9 @@ const TabRenderObjectsMethods = {
       });
     }
     
-    // Symbol or Icon
+    // Symbol, Icon, or Image
     const symbolEl = row.createSpan({ cls: 'dmt-settings-object-symbol' });
-    if (obj.iconClass && RPGAwesomeHelpers.isValid(obj.iconClass)) {
-      const iconInfo = RPGAwesomeHelpers.getInfo(obj.iconClass);
-      const iconSpan = symbolEl.createEl('span', { cls: 'ra' });
-      iconSpan.textContent = iconInfo.char;
-    } else {
-      symbolEl.textContent = obj.symbol || '?';
-    }
+    ObjectHelpers.renderObjectSymbol(obj, symbolEl, this.app);
     
     // Label
     const labelEl = row.createSpan({ text: obj.label, cls: 'dmt-settings-object-label' });

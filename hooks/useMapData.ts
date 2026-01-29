@@ -43,6 +43,11 @@ const { getEffectiveSettings } = await requireModuleByName("settingsAccessor.ts"
   getEffectiveSettings: (mapSettings: MapData['settings']) => PluginSettings;
 };
 
+const { getResolvedObjectTypes, hasImagePath } = await requireModuleByName("objectTypeResolver.ts") as {
+  getResolvedObjectTypes: (mapType: MapType) => Array<{ id: string; imagePath?: string }>;
+  hasImagePath: (obj: { imagePath?: string }) => boolean;
+};
+
 /**
  * Hook for managing map data loading, saving, and state.
  *
@@ -62,6 +67,7 @@ function useMapData(
   const [pendingData, setPendingData] = dc.useState<MapData | null>(null);
   const [backgroundImageReady, setBackgroundImageReady] = dc.useState<boolean>(false);
   const [fowImageReady, setFowImageReady] = dc.useState<boolean>(false);
+  const [settingsVersion, setSettingsVersion] = dc.useState<number>(0);
   const saveTimerRef = dc.useRef<ReturnType<typeof setTimeout> | null>(null);
   const saveVersionRef = dc.useRef<number>(0);
 
@@ -107,6 +113,33 @@ function useMapData(
       setFowImageReady(false);
     }
   }, [mapData?.settings]);
+
+  // Preload custom object images when map loads or settings change
+  dc.useEffect(() => {
+    if (!mapData) return;
+
+    const objectTypes = getResolvedObjectTypes(mapData.mapType);
+    const imageObjects = objectTypes.filter(hasImagePath);
+
+    for (const objType of imageObjects) {
+      if (objType.imagePath) {
+        preloadImage(objType.imagePath);
+      }
+    }
+  }, [mapData?.mapType, settingsVersion]);
+
+  // Listen for settings changes to trigger image preload
+  dc.useEffect(() => {
+    const handleSettingsChange = (): void => {
+      setSettingsVersion((prev: number) => prev + 1);
+    };
+
+    window.addEventListener('dmt-settings-changed', handleSettingsChange);
+
+    return () => {
+      window.removeEventListener('dmt-settings-changed', handleSettingsChange);
+    };
+  }, []);
 
   // Debounced save effect
   dc.useEffect(() => {
