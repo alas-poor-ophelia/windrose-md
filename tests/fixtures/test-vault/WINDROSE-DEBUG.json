@@ -1,0 +1,5 @@
+{
+  "dataFilePath": "_test-data/dungeon-maps-data.json",
+  "dungeonGeneratorPath": "Projects/dungeon-map-tracker/generation/dungeonGenerator.js",
+  "objectPlacerPath": "Projects/dungeon-map-tracker/generation/objectPlacer.js"
+}

@@ -268,8 +268,9 @@ export interface ObjectOverride {
  */
 export interface CustomObject {
   id: string;
-  symbol?: string;            // Unicode symbol (required if no iconClass)
-  iconClass?: string;         // RPGAwesome icon class (required if no symbol)
+  symbol?: string;            // Unicode symbol (optional if iconClass or imagePath set)
+  iconClass?: string;         // RPGAwesome icon class (optional if symbol or imagePath set)
+  imagePath?: string;         // Vault image path (optional if symbol or iconClass set)
   label: string;              // Display name
   category: string;           // Category ID
   order?: number;             // Sort order

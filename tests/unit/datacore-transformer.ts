@@ -49,6 +49,7 @@ const MODULE_MAP: Record<string, string> = {
   'pathResolver.ts': './utils/pathResolver.ts',
   'borderCalculator.ts': './utils/borderCalculator.ts',
   'segmentBorderCalculator.ts': './utils/segmentBorderCalculator.ts',
+  'objectTypeResolver.ts': './utils/objectTypeResolver.ts',
 
   // Hooks
   'useHistory.ts': './hooks/useHistory.ts',
@@ -79,6 +80,9 @@ const MODULE_MAP: Record<string, string> = {
   // Generation
   'dungeonGenerator.js': './generation/dungeonGenerator.js',
   'objectPlacer.js': './generation/objectPlacer.js',
+
+  // Settings
+  'settingsReducer.ts': './components/settings/settingsReducer.ts',
 };
 
 export function datacoreTransformer(options: TransformOptions = {}): Plugin {
@@ -246,11 +250,24 @@ const dc = {
 
 /**
  * Get relative directory path from normalized file path
+ * Returns the full path from src/, e.g., "components/settings" for components/settings/settingsReducer.ts
  */
 function getRelativeDir(normalizedPath: string): string {
-  // Extract the directory relative to src/
+  // Extract the directory path relative to src/
+  // Match everything after /src/ up to the filename
+  const srcMatch = normalizedPath.match(/\/src\/(.+)\/[^/]+$/);
+  if (srcMatch) {
+    return srcMatch[1];
+  }
+
+  // Fallback: extract just the top-level directory for non-src paths
   const match = normalizedPath.match(/\/(geometry|utils|hooks|context|components|generation)\//);
   if (match) {
+    // Check if there's a subdirectory
+    const subMatch = normalizedPath.match(new RegExp(`/${match[1]}/([^/]+)/[^/]+$`));
+    if (subMatch) {
+      return `${match[1]}/${subMatch[1]}`;
+    }
     return match[1];
   }
   return '';

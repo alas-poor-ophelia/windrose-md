@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "_testing/smoke-test-hex.md",
+                "file": "_testing/smoke-test-hex-compiled.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "smoke-test-hex"
+              "title": "smoke-test-hex-compiled"
             }
           }
         ]
@@ -168,8 +168,12 @@
   },
   "active": "13aafd55d6dc8ff5",
   "lastOpenFiles": [
-    "_testing/smoke-test-map.md",
+    "_testing/smoke-test-compiled.md",
+    "_testing/smoke-test-hex-compiled.md",
     "_testing/smoke-test-hex.md",
+    "_testing/dungeon-generation-test.md",
+    "_testing/dungeon-test-map.md",
+    "_testing/smoke-test-map.md",
     "Projects/dungeon-map-tracker/utils/textLabelOperations.ts",
     "Projects/dungeon-map-tracker/utils/settingsAccessor.ts",
     "Projects/dungeon-map-tracker/hooks/useDataHandlers.ts",

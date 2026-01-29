@@ -1,0 +1,15 @@
+# Auto-detect text files and normalize line endings
+* text=auto
+
+# Force LF for source files
+*.js text eol=lf
+*.jsx text eol=lf
+*.ts text eol=lf
+*.tsx text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.css text eol=lf
+
+# Keep Windows line endings for batch files
+*.bat text eol=crlf
+*.cmd text eol=crlf

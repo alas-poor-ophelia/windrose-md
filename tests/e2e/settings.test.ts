@@ -60,13 +60,13 @@ test("Settings modal has correct tabs for grid map", async ({ page }) => {
 
   await openSettingsModal(page);
 
-  // Check for expected tabs (grid maps have: Appearance, Measurement, Preferences)
+  // Check for expected tabs (grid maps have: Appearance, Background, Measurement, Preferences)
   const tabBar = page.locator('.dmt-settings-tab-bar');
   await tabBar.waitFor({ state: "visible", timeout: 5000 });
 
   const tabs = page.locator('.dmt-settings-tab');
   const tabCount = await tabs.count();
-  expect(tabCount).toBe(3); // Appearance, Measurement, Preferences (no Hex Grid)
+  expect(tabCount).toBe(4); // Appearance, Background, Measurement, Preferences
 
   // Verify tab labels
   const tabTexts: string[] = [];
@@ -74,6 +74,7 @@ test("Settings modal has correct tabs for grid map", async ({ page }) => {
     tabTexts.push(await tabs.nth(i).textContent() || "");
   }
   expect(tabTexts).toContain("Appearance");
+  expect(tabTexts).toContain("Background");
   expect(tabTexts).toContain("Measurement");
   expect(tabTexts).toContain("Preferences");
 

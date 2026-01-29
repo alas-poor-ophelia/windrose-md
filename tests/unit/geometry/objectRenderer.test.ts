@@ -30,7 +30,17 @@ function createMockContext(): CanvasRenderingContext2D {
     rotate: vi.fn(),
     strokeText: vi.fn(),
     fillText: vi.fn(),
+    drawImage: vi.fn(),
   } as unknown as CanvasRenderingContext2D;
+}
+
+// Mock HTMLImageElement for image object tests
+function createMockImage(width = 100, height = 100, complete = true): HTMLImageElement {
+  return {
+    naturalWidth: width,
+    naturalHeight: height,
+    complete,
+  } as unknown as HTMLImageElement;
 }
 
 // Mock geometry
@@ -313,6 +323,157 @@ describe("objectRenderer", () => {
       renderSingleObject(ctx, obj, objType, position, 40, deps.getRenderChar);
 
       expect(ctx.fillStyle).toBe('#ffffff');
+    });
+
+    // === Image Object Rendering ===
+
+    describe("image objects", () => {
+      it("renders image when getRenderChar returns isImage: true", () => {
+        const obj = { id: '1', type: 'test', position: { x: 0, y: 0 } };
+        const objType = createMockObjectType();
+        const position = { screenX: 100, screenY: 100, objectWidth: 40, objectHeight: 40 };
+        const mockImage = createMockImage();
+        const getCachedImage = vi.fn(() => mockImage);
+
+        deps.getRenderChar.mockReturnValue({ char: '', isIcon: false, isImage: true, imagePath: 'test.png' });
+
+        renderSingleObject(ctx, obj, objType, position, 40, deps.getRenderChar, getCachedImage);
+
+        expect(ctx.drawImage).toHaveBeenCalled();
+      });
+
+      it("uses getCachedImage to fetch the image", () => {
+        const obj = { id: '1', type: 'test', position: { x: 0, y: 0 } };
+        const objType = createMockObjectType();
+        const position = { screenX: 100, screenY: 100, objectWidth: 40, objectHeight: 40 };
+        const mockImage = createMockImage();
+        const getCachedImage = vi.fn(() => mockImage);
+
+        deps.getRenderChar.mockReturnValue({ char: '', isIcon: false, isImage: true, imagePath: 'vault/images/test.png' });
+
+        renderSingleObject(ctx, obj, objType, position, 40, deps.getRenderChar, getCachedImage);
+
+        expect(getCachedImage).toHaveBeenCalledWith('vault/images/test.png');
+      });
+
+      it("skips font rendering for image objects", () => {
+        const obj = { id: '1', type: 'test', position: { x: 0, y: 0 } };
+        const objType = createMockObjectType();
+        const position = { screenX: 100, screenY: 100, objectWidth: 40, objectHeight: 40 };
+        const mockImage = createMockImage();
+        const getCachedImage = vi.fn(() => mockImage);
+
+        deps.getRenderChar.mockReturnValue({ char: '', isIcon: false, isImage: true, imagePath: 'test.png' });
+
+        renderSingleObject(ctx, obj, objType, position, 40, deps.getRenderChar, getCachedImage);
+
+        expect(ctx.fillText).not.toHaveBeenCalled();
+        expect(ctx.strokeText).not.toHaveBeenCalled();
+      });
+
+      it("applies rotation to image objects", () => {
+        const obj = { id: '1', type: 'test', position: { x: 0, y: 0 }, rotation: 45 };
+        const objType = createMockObjectType();
+        const position = { screenX: 100, screenY: 100, objectWidth: 40, objectHeight: 40 };
+        const mockImage = createMockImage();
+        const getCachedImage = vi.fn(() => mockImage);
+
+        deps.getRenderChar.mockReturnValue({ char: '', isIcon: false, isImage: true, imagePath: 'test.png' });
+
+        renderSingleObject(ctx, obj, objType, position, 40, deps.getRenderChar, getCachedImage);
+
+        expect(ctx.save).toHaveBeenCalled();
+        expect(ctx.rotate).toHaveBeenCalled();
+        expect(ctx.restore).toHaveBeenCalled();
+      });
+
+      it("applies scale to image objects", () => {
+        const obj = { id: '1', type: 'test', position: { x: 0, y: 0 }, scale: 0.5 };
+        const objType = createMockObjectType();
+        const position = { screenX: 100, screenY: 100, objectWidth: 40, objectHeight: 40 };
+        const mockImage = createMockImage();
+        const getCachedImage = vi.fn(() => mockImage);
+
+        deps.getRenderChar.mockReturnValue({ char: '', isIcon: false, isImage: true, imagePath: 'test.png' });
+
+        renderSingleObject(ctx, obj, objType, position, 40, deps.getRenderChar, getCachedImage);
+
+        // Check drawImage was called with scaled dimensions
+        const drawCall = vi.mocked(ctx.drawImage).mock.calls[0];
+        const drawWidth = drawCall[3];
+        const drawHeight = drawCall[4];
+
+        // Base size is min(40,40) * 0.9 = 36, scaled by 0.5 = 18
+        expect(drawWidth).toBe(18);
+        expect(drawHeight).toBe(18);
+      });
+
+      it("falls back to font rendering when image not loaded", () => {
+        const obj = { id: '1', type: 'test', position: { x: 0, y: 0 } };
+        const objType = createMockObjectType();
+        const position = { screenX: 100, screenY: 100, objectWidth: 40, objectHeight: 40 };
+        const mockImage = createMockImage(100, 100, false); // complete = false
+        const getCachedImage = vi.fn(() => mockImage);
+
+        deps.getRenderChar.mockReturnValue({ char: '?', isIcon: false, isImage: true, imagePath: 'test.png' });
+
+        renderSingleObject(ctx, obj, objType, position, 40, deps.getRenderChar, getCachedImage);
+
+        // Should fall back to font rendering
+        expect(ctx.drawImage).not.toHaveBeenCalled();
+        expect(ctx.fillText).toHaveBeenCalled();
+      });
+
+      it("falls back to font rendering when getCachedImage is undefined", () => {
+        const obj = { id: '1', type: 'test', position: { x: 0, y: 0 } };
+        const objType = createMockObjectType();
+        const position = { screenX: 100, screenY: 100, objectWidth: 40, objectHeight: 40 };
+
+        deps.getRenderChar.mockReturnValue({ char: '?', isIcon: false, isImage: true, imagePath: 'test.png' });
+
+        // No getCachedImage provided
+        renderSingleObject(ctx, obj, objType, position, 40, deps.getRenderChar);
+
+        expect(ctx.drawImage).not.toHaveBeenCalled();
+        expect(ctx.fillText).toHaveBeenCalled();
+      });
+
+      it("falls back to font rendering when getCachedImage returns null", () => {
+        const obj = { id: '1', type: 'test', position: { x: 0, y: 0 } };
+        const objType = createMockObjectType();
+        const position = { screenX: 100, screenY: 100, objectWidth: 40, objectHeight: 40 };
+        const getCachedImage = vi.fn(() => null);
+
+        deps.getRenderChar.mockReturnValue({ char: '?', isIcon: false, isImage: true, imagePath: 'test.png' });
+
+        renderSingleObject(ctx, obj, objType, position, 40, deps.getRenderChar, getCachedImage);
+
+        expect(ctx.drawImage).not.toHaveBeenCalled();
+        expect(ctx.fillText).toHaveBeenCalled();
+      });
+
+      it("centers image within object bounds", () => {
+        const obj = { id: '1', type: 'test', position: { x: 0, y: 0 } };
+        const objType = createMockObjectType();
+        const position = { screenX: 100, screenY: 100, objectWidth: 40, objectHeight: 40 };
+        const mockImage = createMockImage();
+        const getCachedImage = vi.fn(() => mockImage);
+
+        deps.getRenderChar.mockReturnValue({ char: '', isIcon: false, isImage: true, imagePath: 'test.png' });
+
+        renderSingleObject(ctx, obj, objType, position, 40, deps.getRenderChar, getCachedImage);
+
+        const drawCall = vi.mocked(ctx.drawImage).mock.calls[0];
+        const drawX = drawCall[1];
+        const drawY = drawCall[2];
+        const drawWidth = drawCall[3];
+
+        // Center of object is at (100 + 40/2, 100 + 40/2) = (120, 120)
+        // Image size is 36 (40 * 0.9), so draw at 120 - 18 = 102
+        expect(drawX).toBe(102);
+        expect(drawY).toBe(102);
+        expect(drawWidth).toBe(36);
+      });
     });
   });
 

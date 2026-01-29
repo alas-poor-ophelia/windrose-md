@@ -1,7 +1,7 @@
 import { defineConfig } from "vitest/config";
 import path from "path";
 
-const testVaultPath = path.resolve(__dirname, "tests/fixtures/test-vault");
+const testVaultPath = path.resolve(__dirname, "tests/fixtures/test-vault-compiled");
 
 /**
  * Vitest config for testing the COMPILED Windrose artifact.

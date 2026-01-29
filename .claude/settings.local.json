@@ -11,7 +11,8 @@
       "Bash(npm run check:*)",
       "Bash(find:*)",
       "mcp__ide__getDiagnostics",
-      "Bash(dir:*)"
+      "Bash(dir:*)",
+      "Bash(npm run test:unit:*)"
     ]
   },
   "hooks": {

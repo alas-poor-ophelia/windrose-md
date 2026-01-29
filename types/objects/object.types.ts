@@ -53,8 +53,9 @@ export interface ObjectType {
  */
 export interface ObjectTypeDefinition {
   id: ObjectTypeId;
-  symbol?: string;           // Unicode symbol (optional if iconClass set)
-  iconClass?: string;        // RPGAwesome icon class (optional if symbol set)
+  symbol?: string;           // Unicode symbol (optional if iconClass or imagePath set)
+  iconClass?: string;        // RPGAwesome icon class (optional if symbol or imagePath set)
+  imagePath?: string;        // Vault image path for custom image objects
   label: string;
   category: ObjectCategory;
   order?: number;            // Sort order in UI
@@ -110,6 +111,8 @@ export interface CategoryDefinition {
 export interface RenderChar {
   char: string;              // The character/icon to render
   isIcon: boolean;           // True if char is from RPGAwesome font
+  isImage?: boolean;         // True if rendering via image (imagePath)
+  imagePath?: string;        // Vault image path for image rendering
 }
 
 // ===========================================

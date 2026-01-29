@@ -38,7 +38,7 @@ Update these files in the source repo (`C:\Users\whipl\OneDrive\Documents\Absalo
 
 1. **`dist/VERSION`** - Single line with version number (e.g., `1.5.1`)
 
-2. **`dist/CHANGELOG.md`** - Copy the changelog content (confirmed in Step 1) to the top of this file
+2. **`dist/CHANGELOG.md`** - **REPLACE** the entire file contents with ONLY the changelog for this version. Do NOT append or prepend - the file should contain ONLY the current version's changelog. Previous version notes are NOT preserved.
 
 3. **`.compilersettings`** - Update the `"version"` field to match
 

@@ -1,0 +1,209 @@
+{
+  "maps": {
+    "smoke-test-map-001": {
+      "name": "Smoke Test Map",
+      "description": "",
+      "mapType": "grid",
+      "northDirection": 0,
+      "customColors": [],
+      "sidebarCollapsed": false,
+      "expandedState": false,
+      "settings": {
+        "useGlobalSettings": true,
+        "overrides": {}
+      },
+      "uiPreferences": {
+        "rememberPanZoom": true,
+        "rememberSidebarState": true,
+        "rememberExpandedState": false
+      },
+      "lastTextLabelSettings": null,
+      "schemaVersion": 2,
+      "activeLayerId": "layer-1",
+      "layerPanelVisible": false,
+      "layers": [
+        {
+          "id": "layer-1",
+          "name": "Layer 1",
+          "order": 0,
+          "visible": true,
+          "cells": [],
+          "edges": [],
+          "objects": [],
+          "textLabels": [],
+          "fogOfWar": null
+        },
+        {
+          "id": "layer-2",
+          "name": "Layer 2",
+          "order": 1,
+          "visible": true,
+          "cells": [],
+          "edges": [],
+          "objects": [],
+          "textLabels": [],
+          "fogOfWar": null,
+          "showLayerBelow": false
+        },
+        {
+          "id": "layer-3",
+          "name": "Layer 3",
+          "order": 2,
+          "visible": true,
+          "cells": [],
+          "edges": [],
+          "objects": [],
+          "textLabels": [],
+          "fogOfWar": null,
+          "showLayerBelow": false
+        }
+      ],
+      "gridSize": 32,
+      "dimensions": {
+        "width": 300,
+        "height": 300
+      },
+      "viewState": {
+        "zoom": 1,
+        "center": {
+          "x": 150,
+          "y": 150
+        }
+      },
+      "objects": [],
+      "textLabels": [],
+      "edges": []
+    },
+    "dungeon-test-map-001": {
+      "name": "Dungeon Test Map",
+      "description": "Test fixture for dungeon generation reroll tests",
+      "mapType": "grid",
+      "northDirection": 0,
+      "customColors": [],
+      "sidebarCollapsed": false,
+      "expandedState": false,
+      "settings": {
+        "useGlobalSettings": true,
+        "overrides": {}
+      },
+      "uiPreferences": {
+        "rememberPanZoom": true,
+        "rememberSidebarState": true,
+        "rememberExpandedState": false
+      },
+      "lastTextLabelSettings": null,
+      "schemaVersion": 2,
+      "activeLayerId": "dungeon-layer-1",
+      "layerPanelVisible": false,
+      "generationSettings": {
+        "preset": "small",
+        "configOverrides": {
+          "style": "classic"
+        }
+      },
+      "layers": [
+        {
+          "id": "dungeon-layer-1",
+          "name": "Layer 1",
+          "order": 0,
+          "visible": true,
+          "cells": [
+            { "x": 5, "y": 5, "color": "#666666" },
+            { "x": 6, "y": 5, "color": "#666666" },
+            { "x": 7, "y": 5, "color": "#666666" },
+            { "x": 5, "y": 6, "color": "#666666" },
+            { "x": 6, "y": 6, "color": "#888888" },
+            { "x": 7, "y": 6, "color": "#666666" },
+            { "x": 5, "y": 7, "color": "#666666" },
+            { "x": 6, "y": 7, "color": "#666666" },
+            { "x": 7, "y": 7, "color": "#666666" }
+          ],
+          "edges": [],
+          "objects": [
+            {
+              "id": "test-door-001",
+              "type": "door-single",
+              "category": "doors",
+              "position": { "x": 8, "y": 6 },
+              "rotation": 0
+            },
+            {
+              "id": "test-stairs-001",
+              "type": "stairs-down",
+              "category": "stairs",
+              "position": { "x": 6, "y": 6 },
+              "rotation": 0
+            }
+          ],
+          "textLabels": [],
+          "fogOfWar": null
+        }
+      ],
+      "gridSize": 32,
+      "dimensions": {
+        "width": 300,
+        "height": 300
+      },
+      "viewState": {
+        "zoom": 1,
+        "center": {
+          "x": 150,
+          "y": 150
+        }
+      },
+      "objects": [],
+      "textLabels": [],
+      "edges": []
+    },
+    "smoke-test-hex-001": {
+      "name": "Smoke Test Hex Map",
+      "description": "",
+      "mapType": "hex",
+      "northDirection": 0,
+      "customColors": [],
+      "sidebarCollapsed": false,
+      "expandedState": false,
+      "settings": {
+        "useGlobalSettings": true,
+        "overrides": {}
+      },
+      "uiPreferences": {
+        "rememberPanZoom": true,
+        "rememberSidebarState": true,
+        "rememberExpandedState": false
+      },
+      "lastTextLabelSettings": null,
+      "schemaVersion": 2,
+      "activeLayerId": "hex-layer-1",
+      "layerPanelVisible": false,
+      "layers": [
+        {
+          "id": "hex-layer-1",
+          "name": "Layer 1",
+          "order": 0,
+          "visible": true,
+          "cells": [],
+          "edges": [],
+          "objects": [],
+          "textLabels": [],
+          "fogOfWar": null
+        }
+      ],
+      "gridSize": 32,
+      "dimensions": {
+        "width": 300,
+        "height": 300
+      },
+      "viewState": {
+        "zoom": 1,
+        "center": {
+          "x": 150,
+          "y": 150
+        }
+      },
+      "objects": [],
+      "textLabels": [],
+      "edges": []
+    }
+  }
+}

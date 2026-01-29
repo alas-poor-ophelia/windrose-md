@@ -1,7 +1,7 @@
 {
   "id": "dungeon-map-tracker-settings",
   "name": "Windrose MapDesigner",
-  "version": "0.14.2",
+  "version": "0.14.6.4",
   "minAppVersion": "0.15.0",
   "description": "Global settings and commands for Windrose MapDesigner - customize default colors, hex orientation, and visual preferences.",
   "author": "Windrose MD",

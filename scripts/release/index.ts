@@ -16,7 +16,7 @@
  */
 
 import { execSync, spawnSync } from "child_process";
-import { readFileSync, existsSync } from "fs";
+import { readFileSync, existsSync, copyFileSync } from "fs";
 import * as path from "path";
 import { compileViaObsidian } from "./compile.js";
 
@@ -27,6 +27,8 @@ const DEV_ROOT = "C:\\Dev\\windrose";
 const OUTPUT_PATH = path.join(SOURCE_ROOT, "dist", "compiled-windrose-md.md");
 const VERSION_PATH = path.join(SOURCE_ROOT, "dist", "VERSION");
 const CHANGELOG_PATH = path.join(SOURCE_ROOT, "dist", "CHANGELOG.md");
+const COMPILED_TEST_VAULT = path.join(DEV_ROOT, "tests", "fixtures", "test-vault-compiled");
+const COMPILED_TEST_ARTIFACT = path.join(COMPILED_TEST_VAULT, "_compiled", "compiled-windrose-md.md");
 
 // Datacore Compiler command ID for Windrose
 const DEFAULT_COMPILER_COMMAND = "dc-compiler:compile-projects-dungeon-map-tracker--compilersettings";
@@ -60,6 +62,18 @@ function getVersion(): string {
 
 function checkPrerequisites(version: string): void {
   console.log("Checking prerequisites...\n");
+
+  // CRITICAL: Ensure we're on main branch
+  const currentBranch = execSync("git branch --show-current", {
+    cwd: SOURCE_ROOT,
+    encoding: "utf-8",
+  }).trim();
+  if (currentBranch !== "main") {
+    throw new Error(
+      `Must be on 'main' branch to release. Currently on '${currentBranch}'. Run: git checkout main`
+    );
+  }
+  console.log(`  Branch: main`);
 
   // Check VERSION file exists
   if (!existsSync(VERSION_PATH)) {
@@ -130,6 +144,10 @@ async function runCompile(commandId: string): Promise<void> {
   if (!result.success) {
     throw new Error(`Compilation failed: ${result.error}`);
   }
+
+  // Copy compiled artifact to test-vault-compiled for release tests
+  copyFileSync(OUTPUT_PATH, COMPILED_TEST_ARTIFACT);
+  console.log(`  Copied artifact to test-vault-compiled`);
 
   console.log("");
 }

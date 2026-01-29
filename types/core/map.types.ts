@@ -47,7 +47,7 @@ export interface MapSettings {
 }
 
 // ===========================================
-// Background Image (Hex Maps)
+// Background Image (Grid and Hex Maps)
 // ===========================================
 
 export type GridDensity = 'sparse' | 'medium' | 'dense' | 'custom';
@@ -56,13 +56,23 @@ export type MeasurementMethod = 'edge' | 'corner';
 
 export interface BackgroundImage {
   path: string | null;
-  lockBounds: boolean;
-  gridDensity: GridDensity;
-  customColumns: number;
-  sizingMode: SizingMode;
-  measurementMethod: MeasurementMethod;
-  measurementSize: number;
-  fineTuneOffset: number;
+
+  // Shared settings (both grid and hex maps)
+  opacity?: number;          // Image opacity (0-1, default 1)
+  offsetX?: number;          // X offset in pixels for alignment
+  offsetY?: number;          // Y offset in pixels for alignment
+
+  // Grid-specific settings (ignored by hex maps)
+  imageGridSize?: number;    // Pixel size of grid cells on the background image
+
+  // Hex-specific settings (ignored by grid maps, optional for grid maps)
+  lockBounds?: boolean;
+  gridDensity?: GridDensity;
+  customColumns?: number;
+  sizingMode?: SizingMode;
+  measurementMethod?: MeasurementMethod;
+  measurementSize?: number;
+  fineTuneOffset?: number;
 }
 
 // ===========================================
@@ -208,6 +218,8 @@ export interface MapData {
   hexSize?: number;
   orientation?: HexOrientation;
   hexBounds?: HexBounds;
+
+  // Background image (both grid and hex maps)
   backgroundImage?: BackgroundImage;
 
   // Per-map settings (optional - defaults to global settings)
