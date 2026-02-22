@@ -311,6 +311,9 @@ const ToolPalette = ({
         case 'm':
           onToolChange('measure' as ToolId);
           break;
+        case 'f':
+          onToolChange('freehand' as ToolId);
+          break;
         default:
           return;
       }
@@ -354,6 +357,7 @@ const ToolPalette = ({
     { id: 'clearArea' as ToolId, title: 'Clear Area (click two corners to erase)', icon: 'lucide-square-x', gridOnly: true },
     { id: 'addObject' as ToolId, title: 'Add Object (select from sidebar)', icon: 'lucide-map-pin-plus' },
     { id: 'addText' as ToolId, title: 'Add Text Label', icon: 'lucide-type' },
+    { id: 'freehand' as ToolId, title: 'Freehand Draw (F)', icon: 'lucide-pen-tool' },
     { id: 'measure' as ToolId, title: 'Measure Distance (M)', icon: 'lucide-ruler' }
   ];
 

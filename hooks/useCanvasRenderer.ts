@@ -126,6 +126,18 @@ const { segmentRenderer } = await requireModuleByName("segmentRenderer.ts") as {
     renderSegmentBorders: (ctx: CanvasRenderingContext2D, segmentCells: Cell[], allCells: Cell[], geometry: IGeometry, viewState: RendererViewState, options: { border: string; borderWidth: number }) => void;
   };
 };
+const { renderCurves } = await requireModuleByName("curveRenderer.ts") as {
+  renderCurves: (ctx: CanvasRenderingContext2D, curves: unknown[], viewState: { x: number; y: number; zoom: number }, theme: RendererTheme, options?: { opacity?: number; mergeIndex?: CurveCellMergeIndex | null; gridConfig?: { cellSize: number; lineColor: string; lineWidth: number; interiorRatio: number } }) => void;
+};
+const { buildMergeIndex } = await requireModuleByName("curveCellOverlap.ts") as {
+  buildMergeIndex: (cells: Array<{ x: number; y: number; color: string }>, curves: unknown[], cellSize: number) => CurveCellMergeIndex;
+};
+
+/** Spatial index for curve-cell visual merging */
+interface CurveCellMergeIndex {
+  cellBordersToSuppress: Map<string, Set<string>>;
+  curveCellRects: Map<number, Array<{ x: number; y: number; w: number; h: number }>>;
+}
 const { getCachedImage } = await requireModuleByName("imageOperations.ts") as {
   getCachedImage: (path: string) => HTMLImageElement | null;
 };
@@ -155,6 +167,7 @@ function getRenderer(geometry: IGeometry): Renderer {
 /** Options for rendering layer content */
 interface RenderLayerContentOptions {
   opacity?: number;
+  mergeIndex?: CurveCellMergeIndex | null;
 }
 
 /**
@@ -170,7 +183,7 @@ function renderLayerCellsAndEdges(
   renderer: Renderer,
   options: RenderLayerContentOptions = {}
 ): void {
-  const { opacity = 1 } = options;
+  const { opacity = 1, mergeIndex = null } = options;
 
   // Apply opacity if needed
   const previousAlpha = ctx.globalAlpha;
@@ -205,6 +218,16 @@ function renderLayerCellsAndEdges(
 
     const allCellsLookup = buildCellLookup(cellsWithColor);
 
+    // Wrap border calculator to suppress borders adjacent to same-color curves
+    const bordersCalculator = mergeIndex
+      ? (lookup: CellMap, x: number, y: number) => {
+          const base = calculateBordersOptimized(lookup, x, y);
+          const suppressed = mergeIndex.cellBordersToSuppress.get(`${x},${y}`);
+          if (!suppressed) return base;
+          return base.filter((side: string) => !suppressed.has(side));
+        }
+      : calculateBordersOptimized;
+
     if (simpleCells.length > 0) {
       renderer.renderCellBorders(
         ctx,
@@ -212,7 +235,7 @@ function renderLayerCellsAndEdges(
         geometry,
         viewState,
         () => allCellsLookup,
-        calculateBordersOptimized,
+        bordersCalculator,
         {
           border: theme.cells.border,
           borderWidth: theme.cells.borderWidth
@@ -347,11 +370,46 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
       renderLayerCellsAndEdges(ctx, layerBelow, geometry, rendererViewState, THEME, renderer, {
         opacity: ghostOpacity
       });
+      // Ghost layer curves
+      if (layerBelow.curves && layerBelow.curves.length > 0) {
+        const ghostGridConfig = geometry.type === 'grid'
+          ? { cellSize: (geometry as any).cellSize, lineColor: THEME.grid.lines, lineWidth: THEME.grid.lineWidth || 1, interiorRatio: 0.5 }
+          : undefined;
+        renderCurves(ctx, layerBelow.curves, rendererViewState, THEME, { opacity: ghostOpacity, gridConfig: ghostGridConfig });
+      }
     }
   }
 
+  // Build curve-cell merge index for active layer (grid maps only)
+  let activeMergeIndex: CurveCellMergeIndex | null = null;
+  if (geometry.type === 'grid' &&
+      activeLayer.cells && activeLayer.cells.length > 0 &&
+      activeLayer.curves && activeLayer.curves.length > 0) {
+    const cellsForMerge = activeLayer.cells.map(cell => ({
+      x: cell.x, y: cell.y, color: getCellColor(cell)
+    }));
+    activeMergeIndex = buildMergeIndex(
+      cellsForMerge,
+      activeLayer.curves,
+      (geometry as any).cellSize
+    );
+  }
+
   // Draw active layer cells and edges
-  renderLayerCellsAndEdges(ctx, activeLayer, geometry, rendererViewState, THEME, renderer);
+  renderLayerCellsAndEdges(ctx, activeLayer, geometry, rendererViewState, THEME, renderer, {
+    mergeIndex: activeMergeIndex
+  });
+
+  // Draw freehand curves (between cells and objects)
+  if (activeLayer.curves && activeLayer.curves.length > 0) {
+    const curveGridConfig = geometry.type === 'grid'
+      ? { cellSize: (geometry as any).cellSize, lineColor: THEME.grid.lines, lineWidth: THEME.grid.lineWidth || 1, interiorRatio: 0.5 }
+      : undefined;
+    renderCurves(ctx, activeLayer.curves, rendererViewState, THEME, {
+      mergeIndex: activeMergeIndex,
+      gridConfig: curveGridConfig
+    });
+  }
 
   // Draw objects
   if (activeLayer.objects && activeLayer.objects.length > 0 && !showCoordinates && visibility.objects) {

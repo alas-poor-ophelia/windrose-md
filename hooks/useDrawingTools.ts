@@ -19,6 +19,7 @@ import type { MapData, MapLayer } from '#types/core/map.types';
 import type { Edge } from '#types/core/edge.types';
 import type { MapObject } from '#types/objects/object.types';
 import type { TextLabel } from '#types/core/textLabel.types';
+import type { Curve } from '#types/core/curve.types';
 import type {
   PreviewSettings,
   RectangleStart,
@@ -60,6 +61,7 @@ interface GridGeometryConstructor {
 
 interface MapOperationsValue {
   onCellsChange: (cells: Cell[], skipHistory?: boolean) => void;
+  onCurvesChange: (curves: Curve[], skipHistory?: boolean) => void;
   onObjectsChange: (objects: MapObject[]) => void;
   onTextLabelsChange: (labels: TextLabel[]) => void;
   onEdgesChange: (edges: Edge[], skipHistory?: boolean) => void;
@@ -90,6 +92,10 @@ interface EraseResult {
 
 const { eraseObjectAt } = await requireModuleByName("objectOperations.ts") as {
   eraseObjectAt: (objects: MapObject[], x: number, y: number, mapType: string) => EraseResult;
+};
+
+const { eraseCellFromCurves } = await requireModuleByName("curveBoolean.ts") as {
+  eraseCellFromCurves: (curves: Curve[], cellX: number, cellY: number, cellSize: number) => Curve[] | null;
 };
 
 const { getActiveLayer } = await requireModuleByName("layerAccessor.ts") as {
@@ -145,6 +151,7 @@ const useDrawingTools = (
 
   const {
     onCellsChange,
+    onCurvesChange,
     onObjectsChange,
     onTextLabelsChange,
     onEdgesChange,
@@ -178,6 +185,7 @@ const useDrawingTools = (
   // Track initial state for batched history
   const strokeInitialStateRef = dc.useRef<Cell[] | null>(null);
   const strokeInitialEdgesRef = dc.useRef<Edge[] | null>(null);
+  const strokeInitialCurvesRef = dc.useRef<Curve[] | null>(null);
 
   const toggleCell = (coords: Point, shouldFill: boolean, dragStart: DragStartContext | null = null): void => {
     if (!mapData || !geometry) return;
@@ -249,6 +257,18 @@ const useDrawingTools = (
       } else if (getCellIndex(activeLayer.cells, coords, geometry) !== -1) {
         const newCells = accessorRemoveCell(activeLayer.cells, coords, geometry);
         onCellsChange(newCells, isBatchedStroke);
+      } else if (activeLayer.curves && activeLayer.curves.length > 0 && geometry) {
+        // Try erasing from curves
+        const cellSize = (geometry as { cellSize: number }).cellSize;
+        if (cellSize) {
+          const newCurves = eraseCellFromCurves(activeLayer.curves, coordX, coordY, cellSize);
+          if (newCurves) {
+            if (strokeInitialCurvesRef.current === null) {
+              strokeInitialCurvesRef.current = activeLayer.curves;
+            }
+            onCurvesChange(newCurves, isBatchedStroke);
+          }
+        }
       }
     }
   };
@@ -578,6 +598,7 @@ const useDrawingTools = (
     setProcessedEdges(new Set());
     strokeInitialStateRef.current = [...activeLayer.cells];
     strokeInitialEdgesRef.current = null;
+    strokeInitialCurvesRef.current = null;
     processCellDuringDrag(e, dragStart);
   };
 
@@ -597,6 +618,10 @@ const useDrawingTools = (
     if (strokeInitialEdgesRef.current !== null && mapData && onEdgesChange) {
       onEdgesChange(activeLayer.edges || [], false);
       strokeInitialEdgesRef.current = null;
+    }
+    if (strokeInitialCurvesRef.current !== null && mapData) {
+      onCurvesChange(activeLayer.curves || [], false);
+      strokeInitialCurvesRef.current = null;
     }
   };
 

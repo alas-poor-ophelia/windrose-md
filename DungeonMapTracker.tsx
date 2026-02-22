@@ -501,6 +501,7 @@ const editingLayer = dc.useMemo(() => {
   const {
     handleNameChange,
     handleCellsChange,
+    handleCurvesChange,
     handleObjectsChange,
     handleTextLabelsChange,
     handleEdgesChange,
@@ -873,6 +874,7 @@ const editingLayer = dc.useMemo(() => {
               notePath={notePath}
               mapData={mapData.mapType === 'hex' ? { ...mapData, northDirection: 0 } : mapData}
               onCellsChange={handleCellsChange}
+              onCurvesChange={handleCurvesChange}
               onObjectsChange={handleObjectsChange}
               onTextLabelsChange={handleTextLabelsChange}
               onEdgesChange={handleEdgesChange}
@@ -893,6 +895,13 @@ const editingLayer = dc.useMemo(() => {
             >
               {/* DrawingLayer - handles all drawing tools */}
               <MapCanvas.DrawingLayer
+                currentTool={currentTool}
+                selectedColor={selectedColor}
+                selectedOpacity={selectedOpacity}
+              />
+
+              {/* FreehandLayer - handles freehand curve drawing */}
+              <MapCanvas.FreehandLayer
                 currentTool={currentTool}
                 selectedColor={selectedColor}
                 selectedOpacity={selectedOpacity}

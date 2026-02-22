@@ -5,9 +5,8 @@
  * Handles loading/saving map data to the Obsidian vault.
  */
 
-import type { MapData, MapType, ViewState } from '#types/core/map.types';
+import type { MapData, MapLayer, MapType, ViewState } from '#types/core/map.types';
 import type { HexOrientation } from '#types/settings/settings.types';
-import type { Layer } from '#types/core/layer.types';
 
 const pathResolverPath = dc.resolvePath("pathResolver.ts");
 const { requireModuleByName } = await dc.require(pathResolverPath);
@@ -169,7 +168,44 @@ async function loadMapData(mapId: string, mapName: string = '', mapType: MapType
         data.maps[mapId] = migrateToLayerSchema(mapData);
       }
 
-      return data.maps[mapId];
+      // Ensure curves array exists on all layers (backward compat)
+      const loadedMap = data.maps[mapId];
+      if (loadedMap.layers) {
+        for (const layer of loadedMap.layers) {
+          if (!layer.curves) {
+            layer.curves = [];
+          }
+          // Filter out v1 POC curves that lack required start/segments fields
+          layer.curves = layer.curves.filter((c: any) => c.start && c.segments);
+          for (const curve of layer.curves) {
+            // Strip runtime cache properties that should never be serialized.
+            // _path2d (Path2D) serializes as {} which poisons the cache check on reload.
+            // _flatPoly is harmless but wastes space.
+            delete (curve as any)._path2d;
+            delete (curve as any)._flatPoly;
+
+            // Migrate legacy holes (flat number[]) to innerRings ([[x,y],...])
+            const legacy = (curve as any).holes;
+            if (legacy && legacy.length > 0) {
+              const innerRings: [number, number][][] = [];
+              for (const hole of legacy) {
+                if (!hole || hole.length < 6) continue;
+                const ring: [number, number][] = [];
+                for (let i = 0; i < hole.length; i += 2) {
+                  ring.push([hole[i], hole[i + 1]]);
+                }
+                innerRings.push(ring);
+              }
+              if (innerRings.length > 0) {
+                curve.innerRings = innerRings;
+              }
+              delete (curve as any).holes;
+            }
+          }
+        }
+      }
+
+      return loadedMap;
     } else {
       return createNewMap(mapId, mapName, mapType);
     }
@@ -197,8 +233,11 @@ async function saveMapData(mapId: string, mapData: MapData): Promise<boolean> {
     if (!allData.maps) allData.maps = {};
     allData.maps[mapId] = mapData;
 
-    // Save back
-    const jsonString = JSON.stringify(allData, null, 2);
+    // Save back (strip runtime cache properties from curves)
+    const jsonString = JSON.stringify(allData, (key, value) => {
+      if (key === '_path2d' || key === '_flatPoly') return undefined;
+      return value;
+    }, 2);
 
     if (file) {
       await app.vault.modify(file, jsonString);
@@ -226,12 +265,13 @@ function createNewMap(mapId: string, mapName: string = '', mapType: MapType = 'g
   const initialLayerId = generateLayerId();
 
   // Initial layer
-  const initialLayer: Layer = {
+  const initialLayer: MapLayer = {
     id: initialLayerId,
     name: '1',
     order: 0,
     visible: true,
     cells: [],
+    curves: [],
     edges: [],
     objects: [],
     textLabels: [],

@@ -358,6 +358,15 @@ const useEventCoordinator = ({
         if (diagonalFillHandlers?.handleDiagonalFillClick) {
           diagonalFillHandlers.handleDiagonalFillClick(e, isTouchEvent);
         }
+
+      } else if (currentTool === 'freehand') {
+        if (hasMultiSelection) clearSelection();
+
+        const freehandHandlers = getHandlers('freehand');
+        if (freehandHandlers?.handlePointerDown) {
+          const eventToUse = isTouchEvent ? syntheticEvent : e;
+          freehandHandlers.handlePointerDown(eventToUse, gridX, gridY, isTouchEvent);
+        }
       }
     };
 
@@ -529,6 +538,14 @@ const useEventCoordinator = ({
       return;
     }
 
+    if (currentTool === 'freehand') {
+      const freehandHandlers = getHandlers('freehand');
+      if (freehandHandlers?.handlePointerMove) {
+        freehandHandlers.handlePointerMove(e);
+      }
+      return;
+    }
+
     if (layerVisibility.objects && objectHandlers?.handleHoverUpdate) {
       objectHandlers.handleHoverUpdate(e);
     }
@@ -624,6 +641,13 @@ const useEventCoordinator = ({
         currentTool === 'edgeLine' || currentTool === 'segmentDraw') {
       if (drawingHandlers?.stopDrawing) {
         drawingHandlers.stopDrawing(e);
+      }
+    }
+
+    if (currentTool === 'freehand') {
+      const freehandHandlers = getHandlers('freehand');
+      if (freehandHandlers?.stopDrawing) {
+        freehandHandlers.stopDrawing(e);
       }
     }
 

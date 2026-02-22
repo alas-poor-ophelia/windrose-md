@@ -2,6 +2,7 @@ import type { ComponentChildren } from 'preact';
 import type {
   MapData,
   Cell,
+  Curve,
   MapObject,
   TextLabel,
   Edge,
@@ -32,6 +33,7 @@ const { MapSelectionProvider, useMapSelection } = await requireModuleByName("Map
 const { ObjectLinkingProvider } = await requireModuleByName("ObjectLinkingContext.tsx");
 const { ObjectLayer } = await requireModuleByName("ObjectLayer.tsx");
 const { DrawingLayer } = await requireModuleByName("DrawingLayer.tsx");
+const { FreehandLayer } = await requireModuleByName("FreehandLayer.tsx");
 const { TextLayer } = await requireModuleByName("TextLayer.tsx");
 const { NotePinLayer } = await requireModuleByName("NotePinLayer.tsx");
 const { EventHandlerProvider } = await requireModuleByName("EventHandlerContext.tsx");
@@ -80,6 +82,7 @@ interface MapCanvasContentProps {
   notePath?: string;
   mapData: MapData | null;
   onCellsChange: (cells: Cell[], skipHistory?: boolean) => void;
+  onCurvesChange: (curves: Curve[], skipHistory?: boolean) => void;
   onObjectsChange: (objects: MapObject[]) => void;
   onTextLabelsChange: (labels: TextLabel[]) => void;
   onEdgesChange: (edges: Edge[], skipHistory?: boolean) => void;
@@ -141,7 +144,7 @@ const Coordinators = ({ canvasRef, mapData, geometry, isFocused, isColorPickerOp
  * MapCanvasContent - Inner component that uses context hooks
  * Contains all the map canvas logic and interacts with shared selection state
  */
-const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onViewStateChange, onTextLabelSettingsChange, currentTool, selectedObjectType, selectedColor, isColorPickerOpen, customColors, onAddCustomColor, onDeleteCustomColor, isFocused, isAnimating, theme, isAlignmentMode, children }: MapCanvasContentProps): React.ReactElement => {
+const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onViewStateChange, onTextLabelSettingsChange, currentTool, selectedObjectType, selectedColor, isColorPickerOpen, customColors, onAddCustomColor, onDeleteCustomColor, isFocused, isAnimating, theme, isAlignmentMode, children }: MapCanvasContentProps): React.ReactElement => {
   const canvasRef = dc.useRef<HTMLCanvasElement | null>(null);
   const fogCanvasRef = dc.useRef<HTMLCanvasElement | null>(null);  // Separate canvas for fog blur effect (CSS blur for iOS compat)
   const containerRef = dc.useRef<HTMLDivElement | null>(null);
@@ -429,11 +432,12 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onObjectsCh
 
     // Callbacks
     onCellsChange,
+    onCurvesChange,
     onObjectsChange,
     onTextLabelsChange,
     onEdgesChange,
     onMapDataUpdate
-  }), [onCellsChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onViewStateChange, onTextLabelSettingsChange]);
+  }), [onCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onViewStateChange, onTextLabelSettingsChange]);
 
 
 
@@ -511,6 +515,7 @@ const MapCanvas = (props: MapCanvasProps): React.ReactElement => {
 // Attach layer components using dot notation
 MapCanvas.ObjectLayer = ObjectLayer;
 MapCanvas.DrawingLayer = DrawingLayer;
+MapCanvas.FreehandLayer = FreehandLayer;
 MapCanvas.TextLayer = TextLayer;
 MapCanvas.NotePinLayer = NotePinLayer;
 MapCanvas.HexCoordinateLayer = HexCoordinateLayer;
