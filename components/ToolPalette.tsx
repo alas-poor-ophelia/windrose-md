@@ -299,7 +299,7 @@ const ToolPalette = ({
 
       switch (key) {
         case 'd':
-          onToolChange('draw' as ToolId);
+          onToolChange(subToolSelections.draw || 'draw' as ToolId);
           break;
         case 'e':
           onToolChange('erase' as ToolId);
@@ -338,7 +338,8 @@ const ToolPalette = ({
       subTools: [
         { id: 'draw' as ToolId, label: 'Paint Cells', title: 'Draw (fill cells) (D)', icon: 'lucide-paintbrush' },
         { id: 'segmentDraw' as ToolId, label: 'Paint Segments', title: 'Paint Segments (partial cells)', icon: 'lucide-triangle', gridOnly: true },
-        { id: 'edgeDraw' as ToolId, label: 'Paint Edges', title: 'Paint Edges (grid lines)', icon: 'lucide-pencil-ruler', gridOnly: true }
+        { id: 'edgeDraw' as ToolId, label: 'Paint Edges', title: 'Paint Edges (grid lines)', icon: 'lucide-pencil-ruler', gridOnly: true },
+        { id: 'freehand' as ToolId, label: 'Freehand Draw', title: 'Freehand Draw (F)', icon: 'lucide-pen-tool' }
       ]
     },
     {
@@ -357,7 +358,6 @@ const ToolPalette = ({
     { id: 'clearArea' as ToolId, title: 'Clear Area (click two corners to erase)', icon: 'lucide-square-x', gridOnly: true },
     { id: 'addObject' as ToolId, title: 'Add Object (select from sidebar)', icon: 'lucide-map-pin-plus' },
     { id: 'addText' as ToolId, title: 'Add Text Label', icon: 'lucide-type' },
-    { id: 'freehand' as ToolId, title: 'Freehand Draw (F)', icon: 'lucide-pen-tool' },
     { id: 'measure' as ToolId, title: 'Measure Distance (M)', icon: 'lucide-ruler' }
   ];
 
