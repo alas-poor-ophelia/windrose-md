@@ -8,6 +8,7 @@
 
 import type { MapData, ViewState, TextLabelSettings } from '../core/map.types';
 import type { Cell } from '../core/cell.types';
+import type { Curve } from '../core/curve.types';
 import type { MapObject } from '../objects/object.types';
 import type { TextLabel } from '../objects/note.types';
 import type { HexColor } from '../core/common.types';
@@ -32,6 +33,7 @@ export interface UseDataHandlersOptions {
 /** State snapshot for map data history tracking */
 export interface MapHistorySnapshot {
   cells: Cell[];
+  curves: Curve[];
   name: string;
   objects: MapObject[];
   textLabels: TextLabel[];
@@ -69,6 +71,9 @@ export type HandleTextLabelsChange = LayerDataChangeHandler<TextLabel[]>;
 /** Handle edges change */
 export type HandleEdgesChange = LayerDataChangeHandler<Edge[]>;
 
+/** Handle curves change */
+export type HandleCurvesChange = LayerDataChangeHandler<Curve[]>;
+
 /** Handle map name change */
 export type HandleNameChange = (newName: string) => void;
 
@@ -97,6 +102,7 @@ export type HandleTextLabelSettingsChange = (settings: TextLabelSettings) => voi
 /** Layer data handlers group */
 export interface LayerDataHandlers {
   handleCellsChange: HandleCellsChange;
+  handleCurvesChange: HandleCurvesChange;
   handleObjectsChange: HandleObjectsChange;
   handleTextLabelsChange: HandleTextLabelsChange;
   handleEdgesChange: HandleEdgesChange;
@@ -126,6 +132,7 @@ export interface UseDataHandlersResult {
   // Direct access
   handleNameChange: HandleNameChange;
   handleCellsChange: HandleCellsChange;
+  handleCurvesChange: HandleCurvesChange;
   handleObjectsChange: HandleObjectsChange;
   handleTextLabelsChange: HandleTextLabelsChange;
   handleEdgesChange: HandleEdgesChange;

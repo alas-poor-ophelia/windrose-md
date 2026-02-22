@@ -19,6 +19,7 @@ export type ToolId =
   | 'areaSelect'
   // Drawing tools
   | 'draw'
+  | 'freehand'
   | 'erase'
   | 'eyedropper'
   // Shape tools

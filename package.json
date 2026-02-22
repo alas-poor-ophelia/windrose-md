@@ -30,6 +30,7 @@
     "obsidian-testing-framework": "^0.1.6",
     "obsidian-typings": "^4.50.0",
     "patch-package": "^8.0.1",
+    "polygon-clipping": "^0.15.7",
     "preact": "^10.25.0",
     "ts-plugin-datacore": "file:./ts-plugin-datacore",
     "typescript": "^5.7.0",

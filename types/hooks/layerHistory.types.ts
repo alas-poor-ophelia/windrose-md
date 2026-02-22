@@ -7,6 +7,7 @@
  */
 
 import type { Cell } from '../core/cell.types';
+import type { Curve } from '../core/curve.types';
 import type { Edge, TextLabel, MapObjectRef, MapData, LayerId } from '../core/map.types';
 import type { HistoryState } from './history.types';
 
@@ -21,6 +22,8 @@ import type { HistoryState } from './history.types';
 export interface LayerHistorySnapshot {
   /** Cell data for the layer */
   cells: Cell[];
+  /** Freehand curves on the layer */
+  curves: Curve[];
   /** Map name (stored at root, but tracked for undo) */
   name: string;
   /** Objects placed on the layer */

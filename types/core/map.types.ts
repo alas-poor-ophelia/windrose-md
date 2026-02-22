@@ -6,6 +6,7 @@
  */
 
 import type { Cell } from './cell.types';
+import type { Curve } from './curve.types';
 import type { Point } from './geometry.types';
 import type { HexOrientation, FrameSettings } from '../settings/settings.types';
 
@@ -169,6 +170,7 @@ export interface MapLayer {
   order: number;
   visible: boolean;
   cells: Cell[];
+  curves: Curve[];
   edges: Edge[];
   objects: MapObjectRef[];
   textLabels: TextLabel[];

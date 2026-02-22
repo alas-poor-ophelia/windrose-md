@@ -40,6 +40,13 @@ export type {
 } from './core/cell.types';
 
 export type {
+  // Curves
+  CurveId,
+  BezierSegment,
+  Curve,
+} from './core/curve.types';
+
+export type {
   // Map
   MapType,
   LayerId,

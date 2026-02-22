@@ -35,6 +35,9 @@ const MODULE_MAP: Record<string, string> = {
   'cellAccessor.ts': './geometry/cellAccessor.ts',
   'layerAccessor.ts': './utils/layerAccessor.ts',
   'segmentRenderer.ts': './geometry/segmentRenderer.ts',
+  'curveBoolean.ts': './geometry/curveBoolean.ts',
+  'curveCellOverlap.ts': './geometry/curveCellOverlap.ts',
+  'polygonClipping.ts': './geometry/polygonClipping.ts',
 
   // Utils
   'rotationOperations.ts': './utils/rotationOperations.ts',

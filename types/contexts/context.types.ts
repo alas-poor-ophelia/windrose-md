@@ -9,6 +9,7 @@
 import type { MapObject } from '../objects/object.types';
 import type { TextLabel, NotePin } from '../objects/note.types';
 import type { IGeometry, Point } from '../core/geometry.types';
+import type { Curve } from '../core/curve.types';
 import type { MapData } from '../core/map.types';
 import type { Cell } from '../core/cell.types';
 import type { BorderSide } from '../core/rendering.types';
@@ -70,6 +71,7 @@ export interface MapStateContextValue {
 /** MapOperationsContext value shape */
 export interface MapOperationsContextValue {
   onCellsChange: (cells: Cell[], skipHistory?: boolean) => void;
+  onCurvesChange: (curves: Curve[], skipHistory?: boolean) => void;
   onObjectsChange: (objects: MapObject[]) => void;
   onTextLabelsChange: (labels: TextLabel[]) => void;
   onEdgesChange: (edges: Edge[], skipHistory?: boolean) => void;
