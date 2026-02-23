@@ -178,12 +178,6 @@ async function loadMapData(mapId: string, mapName: string = '', mapType: MapType
           // Filter out v1 POC curves that lack required start/segments fields
           layer.curves = layer.curves.filter((c: any) => c.start && c.segments);
           for (const curve of layer.curves) {
-            // Strip runtime cache properties that should never be serialized.
-            // _path2d (Path2D) serializes as {} which poisons the cache check on reload.
-            // _flatPoly is harmless but wastes space.
-            delete (curve as any)._path2d;
-            delete (curve as any)._flatPoly;
-
             // Migrate legacy holes (flat number[]) to innerRings ([[x,y],...])
             const legacy = (curve as any).holes;
             if (legacy && legacy.length > 0) {
@@ -233,11 +227,7 @@ async function saveMapData(mapId: string, mapData: MapData): Promise<boolean> {
     if (!allData.maps) allData.maps = {};
     allData.maps[mapId] = mapData;
 
-    // Save back (strip runtime cache properties from curves)
-    const jsonString = JSON.stringify(allData, (key, value) => {
-      if (key === '_path2d' || key === '_flatPoly') return undefined;
-      return value;
-    }, 2);
+    const jsonString = JSON.stringify(allData, null, 2);
 
     if (file) {
       await app.vault.modify(file, jsonString);

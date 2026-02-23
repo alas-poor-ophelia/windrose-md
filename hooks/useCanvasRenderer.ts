@@ -11,6 +11,7 @@ import type { IGeometry, Point } from '#types/core/geometry.types';
 import type { Cell, CellMap } from '#types/core/cell.types';
 import type { MapObject, ObjectTypeDef } from '#types/objects/object.types';
 import type { TextLabel } from '#types/objects/note.types';
+import type { Curve } from '#types/core/curve.types';
 import type {
   RenderCanvas,
   UseCanvasRenderer,
@@ -76,6 +77,14 @@ const { getFontCss } = await requireModuleByName("fontOptions.ts") as {
 const { GridGeometry } = await requireModuleByName("GridGeometry.ts") as {
   GridGeometry: new (cellSize: number) => IGeometry & { cellSize: number; getScaledCellSize: (zoom: number) => number };
 };
+const { calculateViewportOffset } = await requireModuleByName("BaseGeometry.ts") as {
+  calculateViewportOffset: (
+    geometry: { type: string; cellSize: number },
+    center: { x: number; y: number },
+    canvasSize: { width: number; height: number },
+    zoom: number
+  ) => { offsetX: number; offsetY: number };
+};
 const { HexGeometry } = await requireModuleByName("HexGeometry.ts") as {
   HexGeometry: new (hexSize: number, orientation: string, hexBounds: { maxCol: number; maxRow: number } | null) => IGeometry & {
     hexSize: number;
@@ -127,10 +136,10 @@ const { segmentRenderer } = await requireModuleByName("segmentRenderer.ts") as {
   };
 };
 const { renderCurves } = await requireModuleByName("curveRenderer.ts") as {
-  renderCurves: (ctx: CanvasRenderingContext2D, curves: unknown[], viewState: { x: number; y: number; zoom: number }, theme: RendererTheme, options?: { opacity?: number; mergeIndex?: CurveCellMergeIndex | null; gridConfig?: { cellSize: number; lineColor: string; lineWidth: number; interiorRatio: number } }) => void;
+  renderCurves: (ctx: CanvasRenderingContext2D, curves: Curve[], viewState: { x: number; y: number; zoom: number }, theme: RendererTheme, options?: { opacity?: number; mergeIndex?: CurveCellMergeIndex | null; gridConfig?: { cellSize: number; lineColor: string; lineWidth: number; interiorRatio: number } }) => void;
 };
 const { buildMergeIndex } = await requireModuleByName("curveCellOverlap.ts") as {
-  buildMergeIndex: (cells: Array<{ x: number; y: number; color: string }>, curves: unknown[], cellSize: number) => CurveCellMergeIndex;
+  buildMergeIndex: (cells: Array<{ x: number; y: number; color: string }>, curves: Curve[], cellSize: number) => CurveCellMergeIndex;
 };
 
 /** Spatial index for curve-cell visual merging */
@@ -310,10 +319,10 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   // Get appropriate renderer for this geometry
   const renderer = getRenderer(geometry);
 
-  // Calculate viewport using renderer's polymorphic method
+  // Calculate viewport using shared utility
   const scaledSize = renderer.getScaledSize(geometry, zoom);
-  const { offsetX, offsetY } = renderer.calculateViewportOffset(
-    geometry,
+  const { offsetX, offsetY } = calculateViewportOffset(
+    geometry as { type: string; cellSize: number },
     center,
     { width, height },
     zoom

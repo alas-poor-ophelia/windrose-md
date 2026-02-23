@@ -50,14 +50,16 @@ const EDGE_OFFSETS: Array<{ side: BorderSide; mx: number; my: number; dx: number
   { side: 'left',   mx: 0.0, my: 0.5, dx: -1, dy:  0 },
 ];
 
+const flatPolyCache = new WeakMap<Curve, Pt[]>();
+
 /**
  * Get (or cache) the flattened polygon for a curve.
- * Caches on curve._flatPoly alongside the existing _path2d cache.
  */
 function getCachedFlatPoly(curve: Curve): Pt[] {
-  if ((curve as any)._flatPoly) return (curve as any)._flatPoly;
+  const cached = flatPolyCache.get(curve);
+  if (cached) return cached;
   const poly = flattenCurve(curve);
-  (curve as any)._flatPoly = poly;
+  flatPolyCache.set(curve, poly);
   return poly;
 }
 

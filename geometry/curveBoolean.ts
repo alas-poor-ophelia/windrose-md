@@ -635,6 +635,81 @@ function eraseCellFromCurves(
   return newCurves;
 }
 
+/**
+ * Subtract a world-coordinate rectangle from all curves using boolean polygon subtraction.
+ *
+ * @param curves - Current array of curves
+ * @param worldMinX - Left edge in world coordinates
+ * @param worldMinY - Top edge in world coordinates
+ * @param worldMaxX - Right edge in world coordinates
+ * @param worldMaxY - Bottom edge in world coordinates
+ * @returns New curves array with the rectangle subtracted, or null if no curves were affected
+ */
+function eraseRectangleFromCurves(
+  curves: Curve[],
+  worldMinX: number, worldMinY: number,
+  worldMaxX: number, worldMaxY: number
+): Curve[] | null {
+  if (!curves || curves.length === 0) return null;
+
+  const rectPoly: Polygon = [[
+    [worldMinX, worldMinY],
+    [worldMaxX, worldMinY],
+    [worldMaxX, worldMaxY],
+    [worldMinX, worldMaxY],
+    [worldMinX, worldMinY]
+  ]];
+
+  let changed = false;
+  const newCurves: Curve[] = [];
+
+  for (let i = 0; i < curves.length; i++) {
+    const curve = curves[i];
+    if (!curve.closed) {
+      newCurves.push(curve);
+      continue;
+    }
+
+    const subject = curveToPolygon(curve);
+    if (subject[0].length < 4) {
+      newCurves.push(curve);
+      continue;
+    }
+
+    let result: MultiPolygon;
+    try {
+      result = difference(subject, rectPoly);
+    } catch {
+      newCurves.push(curve);
+      continue;
+    }
+
+    if (!result || result.length === 0) {
+      changed = true;
+      continue;
+    }
+
+    const minArea = 1.0;
+    let anyKept = false;
+    for (let j = 0; j < result.length; j++) {
+      const poly = result[j];
+      if (polygonArea(poly) < minArea) continue;
+      const simplified: Polygon = poly.map(ring => simplifyRing(ring));
+      const id = j === 0
+        ? curve.id
+        : curve.id + '-' + Date.now() + '-' + Math.random().toString(36).substr(2, 6);
+      newCurves.push(polygonToCurve(simplified, curve, id));
+      anyKept = true;
+    }
+
+    if (!anyKept || result.length !== 1 || subject[0].length !== result[0][0].length) {
+      changed = true;
+    }
+  }
+
+  return changed ? newCurves : null;
+}
+
 return {
   flattenCurve,
   isLinearBezier,
@@ -645,5 +720,6 @@ return {
   polygonToCurve,
   subtractCellFromCurve,
   findCurveAtCell,
-  eraseCellFromCurves
+  eraseCellFromCurves,
+  eraseRectangleFromCurves
 };
