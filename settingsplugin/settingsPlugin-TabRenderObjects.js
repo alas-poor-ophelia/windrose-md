@@ -458,6 +458,59 @@ const TabRenderObjectsMethods = {
         };
       }
     } else {
+      // Copy to other map type button for custom objects
+      const targetType = this.selectedMapType === 'hex' ? 'grid' : 'hex';
+      const targetLabel = targetType === 'hex' ? 'Hex' : 'Grid';
+      const copyBtn = actions.createEl('button', { cls: 'dmt-settings-icon-btn', attr: { 'aria-label': \`Copy to \${targetLabel}\`, title: \`Copy to \${targetLabel}\` } });
+      IconHelpers.set(copyBtn, 'copy');
+      copyBtn.onclick = async () => {
+        const targetObjectsKey = targetType === 'hex' ? 'customHexObjects' : 'customGridObjects';
+        const targetCategoriesKey = targetType === 'hex' ? 'customHexCategories' : 'customGridCategories';
+
+        if (!this.plugin.settings[targetObjectsKey]) {
+          this.plugin.settings[targetObjectsKey] = [];
+        }
+
+        // Generate new unique ID
+        const newId = 'custom-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+
+        // Check if category exists in target
+        let targetCategory = obj.category;
+        const targetCategories = this.plugin.settings[targetCategoriesKey] || [];
+        const builtInCategoryIds = ObjectHelpers.getCategories({
+          objectOverrides: {},
+          customObjects: [],
+          customCategories: []
+        }).map(c => c.id);
+
+        if (!builtInCategoryIds.includes(obj.category) && !targetCategories.find(c => c.id === obj.category)) {
+          // Custom category doesn't exist in target - copy it over
+          const sourceCategoriesKey = this.selectedMapType === 'hex' ? 'customHexCategories' : 'customGridCategories';
+          const sourceCategories = this.plugin.settings[sourceCategoriesKey] || [];
+          const sourceCat = sourceCategories.find(c => c.id === obj.category);
+          if (sourceCat) {
+            if (!this.plugin.settings[targetCategoriesKey]) {
+              this.plugin.settings[targetCategoriesKey] = [];
+            }
+            this.plugin.settings[targetCategoriesKey].push({ ...sourceCat });
+          }
+        }
+
+        // Copy the object with new ID
+        const copiedObj = { ...obj };
+        delete copiedObj.isBuiltIn;
+        delete copiedObj.isModified;
+        delete copiedObj.isHidden;
+        copiedObj.id = newId;
+        copiedObj.category = targetCategory;
+
+        this.plugin.settings[targetObjectsKey].push(copiedObj);
+
+        this.settingsChanged = true;
+        await this.plugin.saveSettings();
+        new Notice(\`Copied "\${obj.label}" to \${targetLabel} maps\`);
+      };
+
       // Delete button for custom objects
       const deleteBtn = actions.createEl('button', { cls: 'dmt-settings-icon-btn dmt-settings-icon-btn-danger', attr: { 'aria-label': 'Delete', title: 'Delete object' } });
       IconHelpers.set(deleteBtn, 'trash-2');

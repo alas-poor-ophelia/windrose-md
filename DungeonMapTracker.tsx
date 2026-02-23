@@ -83,6 +83,7 @@ interface DungeonMapTrackerProps {
 }
 
 interface LayerVisibilityState {
+  grid: boolean;
   objects: boolean;
   textLabels: boolean;
   hexCoordinates: boolean;
@@ -196,6 +197,7 @@ const editingLayer = dc.useMemo(() => {
 
   // Layer visibility state (session-only, resets on reload)
   const [layerVisibility, setLayerVisibility] = dc.useState<LayerVisibilityState>({
+    grid: true,
     objects: true,
     textLabels: true,
     hexCoordinates: false

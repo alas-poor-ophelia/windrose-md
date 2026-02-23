@@ -155,6 +155,7 @@ function getRenderer(geometry: IGeometry): Renderer {
 /** Options for rendering layer content */
 interface RenderLayerContentOptions {
   opacity?: number;
+  showGrid?: boolean;
 }
 
 /**
@@ -170,7 +171,7 @@ function renderLayerCellsAndEdges(
   renderer: Renderer,
   options: RenderLayerContentOptions = {}
 ): void {
-  const { opacity = 1 } = options;
+  const { opacity = 1, showGrid: showInteriorGrid = true } = options;
 
   // Apply opacity if needed
   const previousAlpha = ctx.globalAlpha;
@@ -195,7 +196,7 @@ function renderLayerCellsAndEdges(
       segmentRenderer.renderSegmentCells(ctx, segmentCells, geometry, viewState);
     }
 
-    if (renderer.renderInteriorGridLines && cellsWithColor.length > 0) {
+    if (showInteriorGrid && renderer.renderInteriorGridLines && cellsWithColor.length > 0) {
       renderer.renderInteriorGridLines(ctx, cellsWithColor, geometry, viewState, {
         lineColor: theme.grid.lines,
         lineWidth: theme.grid.lineWidth || 1,
@@ -256,7 +257,7 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   const itemsArray: RendererSelectedItem[] = Array.isArray(selectedItems) ? selectedItems : (selectedItems ? [selectedItems] : []);
 
   // Default layer visibility
-  const visibility: LayerVisibility = layerVisibility || { objects: true, textLabels: true, hexCoordinates: true };
+  const visibility: LayerVisibility = layerVisibility || { grid: true, objects: true, textLabels: true, hexCoordinates: true };
 
   // Get theme with current settings (use provided theme or fetch global)
   const THEME = theme || getTheme();
@@ -334,7 +335,7 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   ctx.restore();
 
   // Draw grid lines
-  renderer.renderGrid(ctx, geometry, rendererViewState, { width, height }, true, {
+  renderer.renderGrid(ctx, geometry, rendererViewState, { width, height }, visibility.grid !== false, {
     lineColor: THEME.grid.lines,
     lineWidth: THEME.grid.lineWidth || 1
   });
@@ -345,13 +346,16 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
     if (layerBelow) {
       const ghostOpacity = activeLayer.layerBelowOpacity ?? 0.25;
       renderLayerCellsAndEdges(ctx, layerBelow, geometry, rendererViewState, THEME, renderer, {
-        opacity: ghostOpacity
+        opacity: ghostOpacity,
+        showGrid: visibility.grid !== false
       });
     }
   }
 
   // Draw active layer cells and edges
-  renderLayerCellsAndEdges(ctx, activeLayer, geometry, rendererViewState, THEME, renderer);
+  renderLayerCellsAndEdges(ctx, activeLayer, geometry, rendererViewState, THEME, renderer, {
+    showGrid: visibility.grid !== false
+  });
 
   // Draw objects
   if (activeLayer.objects && activeLayer.objects.length > 0 && !showCoordinates && visibility.objects) {

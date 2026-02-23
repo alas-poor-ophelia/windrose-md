@@ -20,6 +20,7 @@ export interface FogOfWarState {
 
 /** Layer visibility state */
 export interface LayerVisibility {
+  grid: boolean;
   objects: boolean;
   textLabels: boolean;
   hexCoordinates?: boolean;
@@ -73,6 +74,11 @@ const VisibilityToolbar = ({
   onFogClearAll
 }: VisibilityToolbarProps): React.ReactElement => {
   const layers: LayerDef[] = [
+    {
+      id: 'grid',
+      icon: 'lucide-grid-2x-2x',
+      tooltip: 'Toggle grid visibility'
+    },
     {
       id: 'objects',
       icon: 'lucide-boxes',

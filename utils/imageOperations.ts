@@ -41,7 +41,7 @@ const GRID_DENSITY_PRESETS: GridDensityPresets = {
  * Build index of all image files in vault for autocomplete
  */
 async function buildImageIndex(): Promise<ImageIndexEntry[]> {
-  const imageExtensions = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'];
+  const imageExtensions = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg'];
   const imageFiles: ImageIndexEntry[] = [];
 
   // Get all files from vault
@@ -121,8 +121,11 @@ async function preloadImage(vaultPath: string): Promise<HTMLImageElement | null>
       // Read as binary
       const binary = await app.vault.readBinary(file);
 
-      // Convert to blob URL
-      const blob = new Blob([binary]);
+      // Convert to blob URL (SVGs need explicit MIME type to parse correctly)
+      const isSvg = vaultPath.toLowerCase().endsWith('.svg');
+      const blob = isSvg
+        ? new Blob([binary], { type: 'image/svg+xml' })
+        : new Blob([binary]);
       const url = URL.createObjectURL(blob);
 
       // Create and load image
@@ -130,11 +133,14 @@ async function preloadImage(vaultPath: string): Promise<HTMLImageElement | null>
 
       await new Promise<void>((resolve, reject) => {
         img.onload = () => {
-          // Cache dimensions
-          dimensionsCache.set(vaultPath, {
-            width: img.naturalWidth,
-            height: img.naturalHeight
-          });
+          // Cache dimensions (SVGs with viewBox but no width/height report 0)
+          let width = img.naturalWidth;
+          let height = img.naturalHeight;
+          if (width === 0 || height === 0) {
+            width = 100;
+            height = 100;
+          }
+          dimensionsCache.set(vaultPath, { width, height });
           resolve();
         };
         img.onerror = () => {

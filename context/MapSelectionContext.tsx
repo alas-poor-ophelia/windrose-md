@@ -322,6 +322,7 @@ const MapSelectionProvider: React.FC<MapSelectionProviderProps> = ({ children, l
   // ============================================================================
 
   const effectiveLayerVisibility: LayerVisibility = {
+    grid: true,
     objects: true,
     textLabels: true,
     hexCoordinates: true,
