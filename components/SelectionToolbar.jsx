@@ -405,7 +405,7 @@ const SelectionToolbar = ({
     { id: 'removeLink', icon: 'lucide-unlink', title: 'Remove object link', onClick: onRemoveLink, visible: hasLinkedObject },
     { id: 'copyLink', icon: 'lucide-link', title: 'Copy link to clipboard', onClick: onCopyLink },
     { id: 'color', icon: 'lucide-palette', title: 'Change Object Color', onClick: onColorClick, isColorButton: true },
-    { id: 'resize', icon: 'lucide-scaling', title: 'Resize Object', onClick: onResize },
+    { id: 'resize', icon: 'lucide-scaling', title: 'Resize Object', onClick: onResize, visible: mapData.mapType !== 'hex' },
     { id: 'delete', icon: 'lucide-trash-2', title: 'Delete (or press Delete/Backspace)', onClick: onDelete, isDelete: true }
   ].filter(btn => btn.visible !== false) : [];
 

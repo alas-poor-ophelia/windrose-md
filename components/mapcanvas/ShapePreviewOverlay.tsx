@@ -213,18 +213,6 @@ const ShapePreviewOverlay = ({
   const geo = geometry as GeometryWithMethods;
 
   if (shapeType === 'rectangle' || shapeType === 'clearArea') {
-    const startScreen = cellToScreen(startPoint.x, startPoint.y, geo, mapData, canvasWidth, canvasHeight, true);
-    const endScreen = cellToScreen(endPoint.x, endPoint.y, geo, mapData, canvasWidth, canvasHeight, true);
-
-    const scaledStart = {
-      x: startScreen.x * displayScale + canvasOffsetX,
-      y: startScreen.y * displayScale + canvasOffsetY
-    };
-    const scaledEnd = {
-      x: endScreen.x * displayScale + canvasOffsetX,
-      y: endScreen.y * displayScale + canvasOffsetY
-    };
-
     const minX = Math.min(startPoint.x, endPoint.x);
     const maxX = Math.max(startPoint.x, endPoint.x);
     const minY = Math.min(startPoint.y, endPoint.y);
@@ -233,28 +221,38 @@ const ShapePreviewOverlay = ({
     const widthCells = maxX - minX + 1;
     const heightCells = maxY - minY + 1;
 
-    const topLeftScreen = cellToScreen(minX, minY, geo, mapData, canvasWidth, canvasHeight, true);
-    const rectX = topLeftScreen.x * displayScale + canvasOffsetX - scaledCellSize / 2;
-    const rectY = topLeftScreen.y * displayScale + canvasOffsetY - scaledCellSize / 2;
-    const rectWidth = widthCells * scaledCellSize;
-    const rectHeight = heightCells * scaledCellSize;
+    // Compute all four corners in grid space, rotate each through cellToScreen
+    const halfCell = 0.5;
+    const corners = [
+      cellToScreen(minX - halfCell, minY - halfCell, geo, mapData, canvasWidth, canvasHeight, false), // TL
+      cellToScreen(maxX + halfCell, minY - halfCell, geo, mapData, canvasWidth, canvasHeight, false), // TR
+      cellToScreen(maxX + halfCell, maxY + halfCell, geo, mapData, canvasWidth, canvasHeight, false), // BR
+      cellToScreen(minX - halfCell, maxY + halfCell, geo, mapData, canvasWidth, canvasHeight, false), // BL
+    ].map(p => ({
+      x: p.x * displayScale + canvasOffsetX,
+      y: p.y * displayScale + canvasOffsetY
+    }));
+
+    const polygonPoints = corners.map(c => `${c.x},${c.y}`).join(' ');
+
+    // Tooltip at midpoint of top edge
+    tooltipPosition = {
+      x: (corners[0].x + corners[1].x) / 2,
+      y: (corners[0].y + corners[1].y) / 2 - 10
+    };
 
     dimensionText = distanceSettings
       ? formatRectDimensions(widthCells, heightCells, distanceSettings)
       : `${widthCells}×${heightCells}`;
-    tooltipPosition = { x: rectX + rectWidth / 2, y: rectY - 10 };
 
     overlayContent = (
-      <rect
-        x={rectX}
-        y={rectY}
-        width={rectWidth}
-        height={rectHeight}
+      <polygon
+        points={polygonPoints}
         fill={isConfirmable ? `${strokeColor}22` : 'none'}
         stroke={strokeColor}
         strokeWidth={2}
         strokeDasharray={isConfirmable ? "none" : "8,4"}
-        rx={2}
+        strokeLinejoin="round"
       />
     );
 

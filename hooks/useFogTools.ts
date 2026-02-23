@@ -150,8 +150,7 @@ const useFogTools = (
   );
 
   /**
-   * Apply fog/reveal to a rectangular area
-   * Rectangle tool defaults to reveal (erase) mode
+   * Apply fog to a rectangular area
    */
   const applyRectangle = dc.useCallback(
     (startCol: number, startRow: number, endCol: number, endRow: number): void => {
@@ -162,8 +161,7 @@ const useFogTools = (
 
       const activeLayer = getActiveLayer(mapData);
 
-      // Rectangle tool reveals (erases fog) by default
-      const updatedLayer = revealRectangle(activeLayer, startCol, startRow, endCol, endRow);
+      const updatedLayer = fogRectangle(activeLayer, startCol, startRow, endCol, endRow);
 
       if (updatedLayer && updatedLayer.fogOfWar) {
         onFogChange(updatedLayer.fogOfWar);

@@ -1030,26 +1030,27 @@ const useObjectInteractions = (
     const { mapType } = mapData;
     const { x: sourceX, y: sourceY } = sourceObject.position;
 
-    const directions = [[1, 0], [0, 1], [-1, 0], [0, -1]];
+    // Hex-axial 6 directions vs Cartesian 4 directions
+    const directions = mapType === 'hex'
+      ? [[1, 0], [1, -1], [0, -1], [-1, 0], [-1, 1], [0, 1]]
+      : [[1, 0], [0, 1], [-1, 0], [0, -1]];
     let targetX = sourceX;
     let targetY = sourceY;
     let found = false;
 
-    for (let ring = 1; ring <= 10 && !found; ring++) {
-      for (let dir = 0; dir < 4 && !found; dir++) {
-        for (let step = 0; step < ring && !found; step++) {
-          const checkX = sourceX + directions[dir][0] * ring;
-          const checkY = sourceY + directions[dir][1] * (step + 1 - ring);
-
-          if (canPlaceObjectAt(getActiveLayer(mapData).objects, checkX, checkY, mapType)) {
-            targetX = checkX;
-            targetY = checkY;
-            found = true;
-          }
-        }
+    // Check immediate neighbors first
+    for (const [dx, dy] of directions) {
+      if (canPlaceObjectAt(getActiveLayer(mapData).objects, sourceX + dx, sourceY + dy, mapType)) {
+        targetX = sourceX + dx;
+        targetY = sourceY + dy;
+        found = true;
+        break;
       }
+    }
 
-      if (!found) {
+    // Expanding ring search if immediate neighbors are full
+    if (!found) {
+      for (let ring = 2; ring <= 10 && !found; ring++) {
         for (let dx = -ring; dx <= ring && !found; dx++) {
           for (let dy = -ring; dy <= ring && !found; dy++) {
             if (Math.abs(dx) === ring || Math.abs(dy) === ring) {

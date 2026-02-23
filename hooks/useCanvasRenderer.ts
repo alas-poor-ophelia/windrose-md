@@ -33,10 +33,10 @@ const { buildCellLookup, calculateBordersOptimized } = await requireModuleByName
   calculateBordersOptimized: (cell: Cell, lookup: CellMap) => { top: boolean; right: boolean; bottom: boolean; left: boolean };
 };
 const { getObjectType } = await requireModuleByName("objectOperations.ts") as {
-  getObjectType: (typeId: string) => ObjectTypeDef | null;
+  getObjectType: (typeId: string, mapType?: string) => ObjectTypeDef | null;
 };
 const { getRenderChar } = await requireModuleByName("objectTypeResolver.ts") as {
-  getRenderChar: (objType: ObjectTypeDef) => { char: string; isIcon: boolean };
+  getRenderChar: (objType: ObjectTypeDef) => { char: string; isIcon: boolean; isImage?: boolean; imagePath?: string };
 };
 const { getCellColor } = await requireModuleByName("colorOperations.ts") as {
   getCellColor: (cell: Cell) => string;
@@ -356,6 +356,8 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   // Draw objects
   if (activeLayer.objects && activeLayer.objects.length > 0 && !showCoordinates && visibility.objects) {
     const isHexMap = geometry.type === 'hex';
+    const mapType = mapData.mapType || 'grid';
+    const getObjectTypeForMap = (typeId: string) => getObjectType(typeId, mapType);
     renderObjects(
       activeLayer,
       { ctx, offsetX, offsetY, zoom, scaledSize },
@@ -363,7 +365,7 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
       isHexMap,
       mapData.orientation || 'flat',
       {
-        getObjectType,
+        getObjectType: getObjectTypeForMap,
         getRenderChar,
         isCellFogged,
         getObjectsInCell,
