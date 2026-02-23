@@ -21,7 +21,7 @@ const { RA_ICONS, RA_CATEGORIES } = await requireModuleByName("rpgAwesomeIcons.t
 const QUICK_SYMBOLS = await requireModuleByName("settingsPlugin-quickSymbols.js");
 
 /** Plugin version from template */
-const PACKAGED_PLUGIN_VERSION = '0.14.9';
+const PACKAGED_PLUGIN_VERSION = '0.15.1';
 
 /** LocalStorage keys for tracking user preferences */
 const STORAGE_KEYS = {

@@ -87,7 +87,59 @@ class WindroseMDSettingsPlugin extends Plugin {
   async onload() {
     await this.loadSettings();
     this.addSettingTab(new WindroseMDSettingsTab(this.app, this));
-    
+
+    // Auto-load object sets from configured folder
+    if (this.settings.objectSetsAutoLoadFolder) {
+      try {
+        const added = await ObjectSetHelpers.scanAutoLoadFolder(this);
+        if (added > 0) await this.saveSettings();
+      } catch (e) {
+        console.warn('[Windrose] Auto-load scan failed:', e.message);
+      }
+    }
+
+    // Watch auto-load folder for changes (debounced re-scan)
+    this._autoLoadScanTimer = null;
+    const debouncedScan = () => {
+      const folder = this.settings.objectSetsAutoLoadFolder;
+      if (!folder) return;
+      if (this._autoLoadScanTimer) clearTimeout(this._autoLoadScanTimer);
+      this._autoLoadScanTimer = setTimeout(async () => {
+        try {
+          const added = await ObjectSetHelpers.scanAutoLoadFolder(this);
+          if (added > 0) {
+            await this.saveSettings();
+            console.log('[Windrose] Auto-load: found', added, 'new set(s)');
+          }
+        } catch (e) {
+          // Silently ignore - folder may have been removed
+        }
+      }, 2000);
+    };
+
+    const isInAutoLoadFolder = (file) => {
+      const folder = this.settings.objectSetsAutoLoadFolder;
+      return folder && file && file.path && file.path.startsWith(folder + '/');
+    };
+
+    this.registerEvent(this.app.vault.on('create', (file) => {
+      if (isInAutoLoadFolder(file)) debouncedScan();
+    }));
+    this.registerEvent(this.app.vault.on('delete', (file) => {
+      if (isInAutoLoadFolder(file)) debouncedScan();
+    }));
+    this.registerEvent(this.app.vault.on('rename', (file, oldPath) => {
+      const folder = this.settings.objectSetsAutoLoadFolder;
+      if (folder && ((file.path && file.path.startsWith(folder + '/')) || (oldPath && oldPath.startsWith(folder + '/')))) {
+        debouncedScan();
+      }
+    }));
+    this.registerEvent(this.app.vault.on('modify', (file) => {
+      if (isInAutoLoadFolder(file) && file.path && file.path.endsWith('/objects.json')) {
+        debouncedScan();
+      }
+    }));
+
     // Register command to insert a new map
     this.addCommand({
       id: 'insert-new-map',
@@ -580,7 +632,11 @@ class WindroseMDSettingsPlugin extends Plugin {
         fogOfWarBlurEnabled: false,
         fogOfWarBlurFactor: 0.20,
         // Controls visibility
-        alwaysShowControls: false
+        alwaysShowControls: false,
+        // Object sets
+        objectSets: [],
+        activeObjectSetId: null,
+        objectSetsAutoLoadFolder: ''
       }, data || {});
     } catch (error) {
       console.warn('[DMT Settings] Error loading settings, using defaults:', error);
@@ -620,7 +676,11 @@ class WindroseMDSettingsPlugin extends Plugin {
         fogOfWarBlurEnabled: false,
         fogOfWarBlurFactor: 0.20,
         // Controls visibility
-        alwaysShowControls: false
+        alwaysShowControls: false,
+        // Object sets
+        objectSets: [],
+        activeObjectSetId: null,
+        objectSetsAutoLoadFolder: ''
       };
     }
   }

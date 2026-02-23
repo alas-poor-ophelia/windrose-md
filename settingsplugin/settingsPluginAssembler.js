@@ -13,6 +13,7 @@ const DragHelpers = await requireModuleByName("settingsPlugin-DragHelpers.js");
 const IconHelpers = await requireModuleByName("settingsPlugin-IconHelpers.js");
 const RPGAwesomeHelpers = await requireModuleByName("settingsPlugin-RPGAwesomeHelpers.js");
 const DungeonEssenceVisualizer = await requireModuleByName("settingsPlugin-DungeonEssenceVisualizer.js");
+const ObjectSetHelpers = await requireModuleByName("settingsPlugin-ObjectSetHelpers.js");
 
 const InsertMapModal = await requireModuleByName("settingsPlugin-InsertMapModal.js");
 const InsertDungeonModal = await requireModuleByName("settingsPlugin-InsertDungeonModal.js");
@@ -21,6 +22,9 @@ const CategoryEditModal = await requireModuleByName("settingsPlugin-CategoryEdit
 const ColorEditModal = await requireModuleByName("settingsPlugin-ColorEditModal.js");
 const ExportModal = await requireModuleByName("settingsPlugin-ExportModal.js");
 const ImportModal = await requireModuleByName("settingsPlugin-ImportModal.js");
+const ObjectSetRenameModal = await requireModuleByName("settingsPlugin-ObjectSetRenameModal.js");
+const ObjectSetExportModal = await requireModuleByName("settingsPlugin-ObjectSetExportModal.js");
+const ObjectSetImportModal = await requireModuleByName("settingsPlugin-ObjectSetImportModal.js");
 
 const TabRenderCore = await requireModuleByName("settingsPlugin-TabRenderCore.js");
 const TabRenderSettings = await requireModuleByName("settingsPlugin-TabRenderSettings.js");
@@ -31,11 +35,11 @@ const STYLES_CSS = await requireModuleByName("settingsPlugin-styles.js");
 
 // Concatenate content
 const HELPERS_CONTENT = [
-  ObjectHelpers, ColorHelpers, DragHelpers, IconHelpers, RPGAwesomeHelpers, DungeonEssenceVisualizer
+  ObjectHelpers, ColorHelpers, DragHelpers, IconHelpers, RPGAwesomeHelpers, DungeonEssenceVisualizer, ObjectSetHelpers
 ].join('\n\n');
 
 const MODALS_CONTENT = [
-  InsertMapModal, InsertDungeonModal, ObjectEditModal, CategoryEditModal, ColorEditModal, ExportModal, ImportModal
+  InsertMapModal, InsertDungeonModal, ObjectEditModal, CategoryEditModal, ColorEditModal, ExportModal, ImportModal, ObjectSetRenameModal, ObjectSetExportModal, ObjectSetImportModal
 ].join('\n\n');
 
 const TAB_RENDER_CONTENT = [

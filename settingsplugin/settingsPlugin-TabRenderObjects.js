@@ -4,11 +4,19 @@ return `// settingsPlugin-TabRenderObjects.js
 
 const TabRenderObjectsMethods = {
   renderObjectTypesContent(containerEl) {
-    containerEl.createEl('p', { 
+    containerEl.createEl('p', {
       text: 'Customize map objects: modify built-in objects, create custom objects, or hide objects you don\\'t use.',
       cls: 'setting-item-description'
     });
-    
+
+    // =========================================================================
+    // Object Sets
+    // =========================================================================
+
+    this.renderObjectSetsBlock(containerEl);
+
+    containerEl.createEl('div', { cls: 'dmt-set-separator' });
+
     // Map Type selector dropdown
     new Setting(containerEl)
       .setName('Map Type')
@@ -525,6 +533,197 @@ const TabRenderObjectsMethods = {
         }
       };
     }
+  },
+
+  // ---------------------------------------------------------------------------
+  // Object Sets block - rendered at top of Object Types section
+  // ---------------------------------------------------------------------------
+
+  renderObjectSetsBlock(containerEl) {
+    const s = this.plugin.settings;
+    const sets = s.objectSets || [];
+
+    containerEl.createEl('div', { cls: 'dmt-settings-subheading', text: 'Object Sets' });
+    containerEl.createEl('p', {
+      text: 'Save and swap between named collections of object customizations.',
+      cls: 'setting-item-description'
+    });
+
+    // Active Set indicator
+    const activeSet = sets.find(st => st.id === s.activeObjectSetId);
+    if (activeSet) {
+      const bar = containerEl.createDiv({ cls: 'dmt-set-active-bar' });
+      bar.createSpan({ text: 'Active set: ' });
+      bar.createSpan({ text: activeSet.name, cls: 'dmt-set-active-name' });
+      const deactivateBtn = bar.createEl('button', {
+        text: 'Deactivate',
+        cls: 'dmt-settings-icon-btn',
+        attr: { title: 'Stop tracking active set (keeps current objects)' }
+      });
+      deactivateBtn.onclick = async () => {
+        ObjectSetHelpers.deactivateSet(this.plugin);
+        await this.plugin.saveSettings();
+        this.display();
+      };
+    }
+
+    // Active Set dropdown
+    new Setting(containerEl)
+      .setName('Active Set')
+      .setDesc('Switch to a saved set (overwrites current objects)')
+      .addDropdown(dropdown => {
+        dropdown.addOption('', 'None (manual)');
+        for (const set of sets) {
+          const scope = [];
+          if (set.data.hex) scope.push('hex');
+          if (set.data.grid) scope.push('grid');
+          dropdown.addOption(set.id, set.name + (scope.length ? ' [' + scope.join('+') + ']' : ''));
+        }
+        dropdown.setValue(s.activeObjectSetId || '');
+        dropdown.onChange(async (value) => {
+          if (!value) {
+            ObjectSetHelpers.deactivateSet(this.plugin);
+            this.settingsChanged = true;
+            await this.plugin.saveSettings();
+            this.display();
+            return;
+          }
+
+          // Prompt to save current objects before switching
+          const hasAny = Object.keys(s.hexObjectOverrides || {}).length > 0 ||
+            (s.customHexObjects || []).length > 0 ||
+            (s.customHexCategories || []).length > 0 ||
+            Object.keys(s.gridObjectOverrides || {}).length > 0 ||
+            (s.customGridObjects || []).length > 0 ||
+            (s.customGridCategories || []).length > 0;
+
+          if (hasAny) {
+            if (confirm('Save your current objects as a set before switching?')) {
+              const name = prompt('Name for the saved set:', 'My Objects');
+              if (name) {
+                ObjectSetHelpers.saveCurrentAsSet(this.plugin, name);
+              }
+            }
+          }
+
+          ObjectSetHelpers.activateSet(this.plugin, value);
+          this.settingsChanged = true;
+          await this.plugin.saveSettings();
+          window.dispatchEvent(new CustomEvent('dmt-settings-changed', {
+            detail: { timestamp: Date.now() }
+          }));
+          this.display();
+        });
+      });
+
+    // Saved Sets list
+    if (sets.length > 0) {
+      const listContainer = containerEl.createDiv({ cls: 'dmt-set-list' });
+      for (const set of sets) {
+        const row = listContainer.createDiv({ cls: 'dmt-set-row' });
+        if (set.id === s.activeObjectSetId) row.addClass('dmt-set-row-active');
+
+        // Name
+        row.createSpan({ text: set.name, cls: 'dmt-set-name' });
+
+        // Scope badges
+        const badges = row.createSpan({ cls: 'dmt-set-badges' });
+        if (set.data.hex) badges.createSpan({ text: 'hex', cls: 'dmt-set-badge' });
+        if (set.data.grid) badges.createSpan({ text: 'grid', cls: 'dmt-set-badge' });
+        badges.createSpan({ text: set.source, cls: 'dmt-set-badge dmt-set-badge-source' });
+
+        // Actions
+        const actions = row.createDiv({ cls: 'dmt-set-actions' });
+
+        const renameBtn = actions.createEl('button', {
+          cls: 'dmt-settings-icon-btn',
+          attr: { 'aria-label': 'Rename', title: 'Rename set' }
+        });
+        IconHelpers.set(renameBtn, 'pencil');
+        renameBtn.onclick = () => {
+          new ObjectSetRenameModal(this.app, set.name, async (newName) => {
+            ObjectSetHelpers.renameSet(this.plugin, set.id, newName);
+            await this.plugin.saveSettings();
+            this.display();
+          }).open();
+        };
+
+        const exportBtn = actions.createEl('button', {
+          cls: 'dmt-settings-icon-btn',
+          attr: { 'aria-label': 'Export', title: 'Export set to folder' }
+        });
+        IconHelpers.set(exportBtn, 'download');
+        exportBtn.onclick = () => {
+          new ObjectSetExportModal(this.app, this.plugin, set).open();
+        };
+
+        const deleteBtn = actions.createEl('button', {
+          cls: 'dmt-settings-icon-btn dmt-settings-icon-btn-danger',
+          attr: { 'aria-label': 'Delete', title: 'Delete set' }
+        });
+        IconHelpers.set(deleteBtn, 'trash-2');
+        deleteBtn.onclick = async () => {
+          if (confirm('Delete set "' + set.name + '"?')) {
+            const wasActive = set.id === s.activeObjectSetId;
+            ObjectSetHelpers.deleteSet(this.plugin, set.id);
+            this.settingsChanged = true;
+            await this.plugin.saveSettings();
+            if (wasActive) {
+              new Notice('Active set deleted. Current objects left in place.');
+            }
+            this.display();
+          }
+        };
+      }
+    }
+
+    // Action buttons
+    const actionSetting = new Setting(containerEl)
+      .setName('Manage Sets');
+
+    actionSetting.addButton(btn => btn
+      .setButtonText('Save Current as Set')
+      .onClick(async () => {
+        const name = prompt('Name for the new set:', 'My Objects');
+        if (!name) return;
+        ObjectSetHelpers.saveCurrentAsSet(this.plugin, name);
+        await this.plugin.saveSettings();
+        new Notice('Saved set: ' + name);
+        this.display();
+      }));
+
+    actionSetting.addButton(btn => btn
+      .setButtonText('Import from Folder')
+      .onClick(() => {
+        new ObjectSetImportModal(this.app, this.plugin, async () => {
+          this.settingsChanged = true;
+          this.display();
+        }).open();
+      }));
+
+    // Auto-Load Folder
+    new Setting(containerEl)
+      .setName('Auto-Load Folder')
+      .setDesc('Vault folder to scan for object set packages on startup')
+      .addText(text => text
+        .setPlaceholder('e.g. windrose-objects')
+        .setValue(s.objectSetsAutoLoadFolder || '')
+        .onChange(async (value) => {
+          s.objectSetsAutoLoadFolder = value.trim();
+          await this.plugin.saveSettings();
+        }))
+      .addButton(btn => btn
+        .setButtonText('Scan Now')
+        .onClick(async () => {
+          const added = await ObjectSetHelpers.scanAutoLoadFolder(this.plugin);
+          await this.plugin.saveSettings();
+          if (added > 0) {
+            new Notice('Found ' + added + ' new set(s)');
+          } else {
+            new Notice('No new sets found');
+          }
+          this.display();
+        }));
   }
 
 };`;

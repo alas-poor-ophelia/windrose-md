@@ -1149,6 +1149,93 @@ return `/* settingsPlugin-styles.css
 }
 
 /* ===========================================
+ * Object Sets
+ * =========================================== */
+.dmt-set-separator {
+  border-top: 1px solid var(--background-modifier-border);
+  margin: 1.5em 0 1em 0;
+}
+
+.dmt-set-active-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--background-secondary);
+  border: 1px solid var(--interactive-accent);
+  border-radius: 6px;
+  margin-bottom: 12px;
+  font-size: 13px;
+}
+
+.dmt-set-active-name {
+  font-weight: 600;
+  color: var(--interactive-accent);
+}
+
+.dmt-set-active-bar .dmt-settings-icon-btn {
+  margin-left: auto;
+  font-size: 11px;
+}
+
+.dmt-set-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.dmt-set-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 4px;
+  background: var(--background-secondary);
+  border: 1px solid transparent;
+}
+
+.dmt-set-row-active {
+  border-color: var(--interactive-accent);
+}
+
+.dmt-set-name {
+  font-weight: 500;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dmt-set-badges {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.dmt-set-badge {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: var(--background-modifier-border);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.dmt-set-badge-source {
+  background: var(--background-modifier-border-hover, var(--background-modifier-border));
+  font-style: italic;
+}
+
+.dmt-set-actions {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+/* ===========================================
  * Animations
  * =========================================== */
 @keyframes dmt-shake {
