@@ -4,22 +4,28 @@ const { requireModuleByName } = await dc.require(pathResolverPath);
 
 const { calculateObjectScreenPosition } = await requireModuleByName("screenPositionUtils.ts");
 const { openNoteInNewTab } = await requireModuleByName("noteOperations.ts");
+const { getActiveLayer } = await requireModuleByName("layerAccessor.ts");
+const { useMapState } = await requireModuleByName("MapContext.tsx");
 
-const LinkedNoteHoverOverlays = ({ canvasRef, mapData, selectedItem, geometry }) => {
+const LinkedNoteHoverOverlays = ({ selectedItem }) => {
+  const { canvasRef, containerRef, mapData, geometry } = useMapState();
+
   // Don't render anything if prerequisites aren't met
-  if (!canvasRef.current || !mapData?.objects || !geometry) return null;
-  
+  if (!canvasRef.current || !containerRef.current || !mapData?.layers || !geometry) return null;
+
+  const activeLayer = getActiveLayer(mapData);
+
   // Filter: must have linkedNote AND not be currently selected
-  const objectsWithLinks = mapData.objects.filter(obj => {
-    return obj.linkedNote && 
-           typeof obj.linkedNote === 'string' && 
+  const objectsWithLinks = (activeLayer.objects || []).filter(obj => {
+    return obj.linkedNote &&
+           typeof obj.linkedNote === 'string' &&
            !(selectedItem?.type === 'object' && selectedItem?.id === obj.id);
   });
-  
+
   return (
     <>
       {objectsWithLinks.map(obj => {
-        const position = calculateObjectScreenPosition(obj, canvasRef.current, mapData, geometry);
+        const position = calculateObjectScreenPosition(obj, canvasRef.current, mapData, geometry, containerRef);
         if (!position) return null;
         
         const { screenX, screenY, objectWidth, objectHeight } = position;

@@ -213,6 +213,11 @@ const useEventCoordinator = ({
       return;
     }
 
+    // Only left-click (button 0) triggers tool actions; right-click is handled by contextmenu
+    if (e.type === 'mousedown' && (e as MouseEvent).button !== 0) {
+      return;
+    }
+
     e.preventDefault();
     e.stopPropagation();
 
@@ -661,7 +666,7 @@ const useEventCoordinator = ({
     const panZoomHandlers = getHandlers('panZoom') as PanZoomHandlers | null;
     if (!panZoomHandlers) return;
 
-    if (e.button === 1) {
+    if (e.button === 1 || e.button === 2) {
       e.preventDefault();
       panZoomHandlers.startPan(e.clientX, e.clientY);
     }
@@ -671,7 +676,7 @@ const useEventCoordinator = ({
     const panZoomHandlers = getHandlers('panZoom') as PanZoomHandlers | null;
     if (!panZoomHandlers) return;
 
-    if (panZoomHandlers.isPanning && e.button === 1) {
+    if (panZoomHandlers.isPanning && (e.button === 1 || e.button === 2)) {
       e.preventDefault();
       panZoomHandlers.stopPan();
     }
@@ -714,7 +719,7 @@ const useEventCoordinator = ({
     if (!canvas) return;
 
     const handleMouseDown = (e: MouseEvent): void => {
-      if (e.button === 1) {
+      if (e.button === 1 || e.button === 2) {
         handlePanStart(e);
       } else {
         handlePointerDown(e);

@@ -478,11 +478,7 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onObjectsCh
             </div>
 
             <LinkedNoteHoverOverlays
-              canvasRef={canvasRef}
-              mapData={mapData}
               selectedItem={selectedItem}
-              geometry={geometry}
-              layerVisibility={layerVisibility}
             />
 
             {/* Render child layers */}

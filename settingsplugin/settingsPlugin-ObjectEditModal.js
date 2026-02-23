@@ -93,15 +93,23 @@ class ObjectEditModal extends Modal {
     this.renderImagePicker();
     
     // Label input
-    new Setting(contentEl)
+    this.labelSetting = new Setting(contentEl)
       .setName('Label')
       .setDesc('Display name for this object')
-      .addText(text => text
-        .setValue(this.label)
-        .setPlaceholder('e.g., Treasure Chest')
-        .onChange(value => {
-          this.label = value;
-        }));
+      .addText(text => {
+        text
+          .setValue(this.label)
+          .setPlaceholder('e.g., Treasure Chest')
+          .onChange(value => {
+            this.label = value;
+            // Clear error when user starts typing
+            if (this.labelSetting.descEl.hasClass('mod-warning')) {
+              this.labelSetting.setDesc('Display name for this object');
+              this.labelSetting.descEl.removeClass('mod-warning');
+            }
+          });
+        this.labelInputEl = text.inputEl;
+      });
     
     // Category dropdown - use map-type-specific settings
     const mapTypeSettings = this.mapType === 'hex'
@@ -488,7 +496,9 @@ class ObjectEditModal extends Modal {
     }
 
     if (!this.label || this.label.trim().length === 0) {
-      alert('Please enter a label');
+      this.labelSetting.setDesc('Please enter a label');
+      this.labelSetting.descEl.addClass('mod-warning');
+      this.labelInputEl?.focus();
       return;
     }
     
