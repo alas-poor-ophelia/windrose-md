@@ -26,7 +26,7 @@ const { requireModuleByName } = await dc.require(pathResolverPath) as {
 
 // Import getObjectType from the resolver (handles overrides, custom objects, fallback)
 const { getObjectType } = await requireModuleByName("objectTypeResolver.ts") as {
-  getObjectType: (typeId: string) => ObjectTypeDef
+  getObjectType: (typeId: string, mapType?: MapType) => ObjectTypeDef
 };
 
 const { 
@@ -162,15 +162,15 @@ function addObjectToHex(
   x: number,
   y: number
 ): PlacementResult {
-  const objectType = getObjectType(typeId);
+  const objectType = getObjectType(typeId, 'hex');
   if (objectType.isUnknown) {
-    return { 
-      objects, 
-      success: false, 
-      error: `Unknown object type: ${typeId}` 
+    return {
+      objects,
+      success: false,
+      error: `Unknown object type: ${typeId}`
     };
   }
-  
+
   // Check if cell can accept another object
   if (!canAddObjectToCell(objects, x, y)) {
     return { 
@@ -399,7 +399,7 @@ function placeObject(
   }
   
   // Grid: single object per cell
-  const objectType = getObjectType(typeId);
+  const objectType = getObjectType(typeId, mapType);
   if (objectType.isUnknown) {
     return { 
       objects, 
