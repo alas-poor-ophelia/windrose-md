@@ -12,6 +12,7 @@
 // Type-only imports
 import type { MapData, MapLayer, ViewState, TextLabelSettings } from '#types/core/map.types';
 import type { Cell } from '#types/core/cell.types';
+import type { Curve } from '#types/core/curve.types';
 import type { MapObject } from '#types/objects/object.types';
 import type { TextLabel } from '#types/objects/note.types';
 import type { HexColor } from '#types/core/common.types';
@@ -53,6 +54,7 @@ function useDataHandlers({
     overrides: Partial<HistoryState> = {}
   ): HistoryState => ({
     cells: overrides.cells ?? layer.cells ?? [],
+    curves: overrides.curves ?? layer.curves ?? [],
     name: name,
     objects: overrides.objects ?? layer.objects ?? [],
     textLabels: overrides.textLabels ?? layer.textLabels ?? [],
@@ -63,7 +65,7 @@ function useDataHandlers({
   // Factory: Create layer data change handler
   // =========================================================================
 
-  type LayerField = 'cells' | 'objects' | 'textLabels' | 'edges';
+  type LayerField = 'cells' | 'curves' | 'objects' | 'textLabels' | 'edges';
 
   const createLayerDataHandler = dc.useCallback(<T,>(field: LayerField) => {
     return (newValue: T, suppressHistory = false): void => {
@@ -90,6 +92,11 @@ function useDataHandlers({
 
   const handleCellsChange = dc.useMemo(
     () => createLayerDataHandler<Cell[]>('cells'),
+    [createLayerDataHandler]
+  );
+
+  const handleCurvesChange = dc.useMemo(
+    () => createLayerDataHandler<Curve[]>('curves'),
     [createLayerDataHandler]
   );
 
@@ -216,6 +223,7 @@ function useDataHandlers({
 
   const layerDataHandlers: LayerDataHandlers = {
     handleCellsChange,
+    handleCurvesChange,
     handleObjectsChange,
     handleTextLabelsChange,
     handleEdgesChange
@@ -239,6 +247,7 @@ function useDataHandlers({
     // Direct access
     handleNameChange,
     handleCellsChange,
+    handleCurvesChange,
     handleObjectsChange,
     handleTextLabelsChange,
     handleEdgesChange,

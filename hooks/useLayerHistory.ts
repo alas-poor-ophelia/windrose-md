@@ -71,6 +71,7 @@ function useLayerHistory({
 
   const initialSnapshot: LayerHistorySnapshot = {
     cells: [],
+    curves: [],
     name: "",
     objects: [],
     textLabels: [],
@@ -112,6 +113,7 @@ function useLayerHistory({
       const activeLayer = getActiveLayer(mapData);
       resetHistory({
         cells: activeLayer.cells,
+        curves: activeLayer.curves || [],
         name: mapData.name || '',
         objects: activeLayer.objects || [],
         textLabels: activeLayer.textLabels || [],
@@ -131,6 +133,7 @@ function useLayerHistory({
   const buildHistoryState = dc.useCallback(
     (layer: MapLayer, name: string): LayerHistorySnapshot => ({
       cells: layer.cells || [],
+      curves: layer.curves || [],
       name: name,
       objects: layer.objects || [],
       textLabels: layer.textLabels || [],
@@ -301,6 +304,7 @@ function useLayerHistory({
         { ...mapData, name: previousState.name },
         {
           cells: previousState.cells,
+          curves: previousState.curves || [],
           objects: previousState.objects || [],
           textLabels: previousState.textLabels || [],
           edges: previousState.edges || []
@@ -323,6 +327,7 @@ function useLayerHistory({
         { ...mapData, name: nextState.name },
         {
           cells: nextState.cells,
+          curves: nextState.curves || [],
           objects: nextState.objects || [],
           textLabels: nextState.textLabels || [],
           edges: nextState.edges || []

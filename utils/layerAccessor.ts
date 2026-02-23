@@ -58,13 +58,19 @@ function getActiveLayer(mapData: MapData | null | undefined): MapLayer {
       order: 0,
       visible: true,
       cells: (mapData as LegacyMapData)?.cells || [],
+      curves: [],
       edges: (mapData as LegacyMapData)?.edges || [],
       objects: (mapData as LegacyMapData)?.objects || [],
       textLabels: (mapData as LegacyMapData)?.textLabels || [],
       fogOfWar: null
     };
   }
-  return mapData.layers.find(l => l.id === mapData.activeLayerId) || mapData.layers[0];
+  const layer = mapData.layers.find(l => l.id === mapData.activeLayerId) || mapData.layers[0];
+  // Ensure curves array exists (backward compat for pre-curves data)
+  if (!layer.curves) {
+    layer.curves = [];
+  }
+  return layer;
 }
 
 /**
@@ -175,6 +181,7 @@ function addLayer(mapData: MapData, name: string | null = null): MapData {
     order: maxOrder + 1,
     visible: true,
     cells: [],
+    curves: [],
     edges: [],
     objects: [],
     textLabels: [],
@@ -270,6 +277,7 @@ function createEmptyLayer(id: LayerId, name: string, order: number): MapLayer {
     order,
     visible: true,
     cells: [],
+    curves: [],
     edges: [],
     objects: [],
     textLabels: [],
@@ -407,6 +415,7 @@ function migrateToLayerSchema(legacyMapData: LegacyMapData): MapData | LegacyMap
       order: 0,
       visible: true,
       cells: cellsData,
+      curves: [],
       edges: edgesData,
       objects: objectsData,
       textLabels: textLabelsData,

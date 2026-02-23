@@ -25,7 +25,8 @@ export type HandlerLayerType =
   | 'measure'
   | 'alignment'
   | 'imageAlignment'
-  | 'diagonalFill';
+  | 'diagonalFill'
+  | 'freehand';
 
 /** Generic handler function type */
 export type HandlerFunction = (...args: unknown[]) => unknown;

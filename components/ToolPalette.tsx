@@ -299,7 +299,7 @@ const ToolPalette = ({
 
       switch (key) {
         case 'd':
-          onToolChange('draw' as ToolId);
+          onToolChange(subToolSelections.draw || 'draw' as ToolId);
           break;
         case 'e':
           onToolChange('erase' as ToolId);
@@ -310,6 +310,9 @@ const ToolPalette = ({
           break;
         case 'm':
           onToolChange('measure' as ToolId);
+          break;
+        case 'f':
+          onToolChange('freehand' as ToolId);
           break;
         default:
           return;
@@ -335,7 +338,8 @@ const ToolPalette = ({
       subTools: [
         { id: 'draw' as ToolId, label: 'Paint Cells', title: 'Draw (fill cells) (D)', icon: 'lucide-paintbrush' },
         { id: 'segmentDraw' as ToolId, label: 'Paint Segments', title: 'Paint Segments (partial cells)', icon: 'lucide-triangle', gridOnly: true },
-        { id: 'edgeDraw' as ToolId, label: 'Paint Edges', title: 'Paint Edges (grid lines)', icon: 'lucide-pencil-ruler', gridOnly: true }
+        { id: 'edgeDraw' as ToolId, label: 'Paint Edges', title: 'Paint Edges (grid lines)', icon: 'lucide-pencil-ruler', gridOnly: true },
+        { id: 'freehand' as ToolId, label: 'Freehand Draw', title: 'Freehand Draw (F)', icon: 'lucide-pen-tool' }
       ]
     },
     {
