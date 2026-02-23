@@ -308,4 +308,27 @@ abstract class BaseGeometry implements IGeometry {
 // Type exports for consuming modules
 export type { BaseGeometry };
 
-return { BaseGeometry };
+/**
+ * Calculate viewport offset for centering the map on canvas.
+ * Grid maps multiply center by scaled cell size; hex maps multiply by zoom only.
+ */
+function calculateViewportOffset(
+  geometry: { type: string; cellSize: number },
+  center: { x: number; y: number },
+  canvasSize: { width: number; height: number },
+  zoom: number
+): { offsetX: number; offsetY: number } {
+  if (geometry.type !== 'hex') {
+    const scaledSize = geometry.cellSize * zoom;
+    return {
+      offsetX: canvasSize.width / 2 - center.x * scaledSize,
+      offsetY: canvasSize.height / 2 - center.y * scaledSize,
+    };
+  }
+  return {
+    offsetX: canvasSize.width / 2 - center.x * zoom,
+    offsetY: canvasSize.height / 2 - center.y * zoom,
+  };
+}
+
+return { BaseGeometry, calculateViewportOffset };

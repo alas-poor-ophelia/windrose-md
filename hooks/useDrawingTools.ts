@@ -94,8 +94,9 @@ const { eraseObjectAt } = await requireModuleByName("objectOperations.ts") as {
   eraseObjectAt: (objects: MapObject[], x: number, y: number, mapType: string) => EraseResult;
 };
 
-const { eraseCellFromCurves } = await requireModuleByName("curveBoolean.ts") as {
+const { eraseCellFromCurves, eraseRectangleFromCurves } = await requireModuleByName("curveBoolean.ts") as {
   eraseCellFromCurves: (curves: Curve[], cellX: number, cellY: number, cellSize: number) => Curve[] | null;
+  eraseRectangleFromCurves: (curves: Curve[], worldMinX: number, worldMinY: number, worldMaxX: number, worldMaxY: number) => Curve[] | null;
 };
 
 const { getActiveLayer } = await requireModuleByName("layerAccessor.ts") as {
@@ -569,6 +570,17 @@ const useDrawingTools = (
 
     const newCells = removeCellsInBounds(activeLayer.cells, x1, y1, x2, y2, geometry);
     onCellsChange(newCells);
+
+    if (activeLayer.curves && activeLayer.curves.length > 0) {
+      const newCurves = eraseRectangleFromCurves(
+        activeLayer.curves,
+        worldMinX, worldMinY,
+        worldMaxX, worldMaxY
+      );
+      if (newCurves) {
+        onCurvesChange(newCurves);
+      }
+    }
   };
 
   const processCellDuringDrag = (e: PointerEvent | MouseEvent | TouchEvent, dragStart: DragStartContext | null = null): void => {
@@ -883,6 +895,7 @@ const useDrawingTools = (
       setProcessedSegments(new Set());
       strokeInitialStateRef.current = null;
       strokeInitialEdgesRef.current = null;
+      strokeInitialCurvesRef.current = null;
     }
   };
 

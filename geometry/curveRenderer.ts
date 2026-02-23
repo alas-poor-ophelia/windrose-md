@@ -16,12 +16,15 @@ interface CurveViewState {
   zoom: number;
 }
 
+const path2DCache = new WeakMap<Curve, Path2D>();
+
 /**
  * Build a Path2D for a curve, including holes.
- * Caches on curve._path2d for reuse across frames.
+ * Caches in a WeakMap for reuse across frames.
  */
 function buildPath2D(curve: Curve): Path2D {
-  if ((curve as any)._path2d) return (curve as any)._path2d;
+  const cached = path2DCache.get(curve);
+  if (cached) return cached;
 
   const path = new Path2D();
   const [sx, sy] = curve.start;
@@ -50,16 +53,8 @@ function buildPath2D(curve: Curve): Path2D {
     }
   }
 
-  (curve as any)._path2d = path;
+  path2DCache.set(curve, path);
   return path;
-}
-
-/**
- * Invalidate the cached Path2D for a curve (call after mutation).
- */
-function invalidatePath2D(curve: Curve): void {
-  delete (curve as any)._path2d;
-  delete (curve as any)._flatPoly;
 }
 
 /** Grid configuration for interior grid lines inside curves */
@@ -243,6 +238,5 @@ function renderCurves(
 
 return {
   renderCurves,
-  buildPath2D,
-  invalidatePath2D
+  buildPath2D
 };

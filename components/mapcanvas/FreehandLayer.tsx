@@ -41,6 +41,15 @@ const { fitPointsToBezier } = await requireModuleByName("curveFitting.ts") as {
   ) => { start: [number, number]; segments: BezierSegment[] } | null;
 };
 
+const { calculateViewportOffset } = await requireModuleByName("BaseGeometry.ts") as {
+  calculateViewportOffset: (
+    geometry: { type: string; cellSize: number },
+    center: { x: number; y: number },
+    canvasSize: { width: number; height: number },
+    zoom: number
+  ) => { offsetX: number; offsetY: number };
+};
+
 const { getActiveLayer } = await requireModuleByName("layerAccessor.ts") as {
   getActiveLayer: (mapData: unknown) => { curves: Curve[] };
 };
@@ -121,17 +130,12 @@ const FreehandLayer = ({
     const { zoom, center } = mapData.viewState;
     const { width, height } = overlay;
 
-    // Calculate viewport offset (must match useCanvasRenderer's calculation)
-    let offsetX: number, offsetY: number;
-    if (geometry && geometry.type !== 'hex') {
-      const cellSize = geometry.cellSize;
-      const scaledSize = cellSize * zoom;
-      offsetX = width / 2 - center.x * scaledSize;
-      offsetY = height / 2 - center.y * scaledSize;
-    } else {
-      offsetX = width / 2 - center.x * zoom;
-      offsetY = height / 2 - center.y * zoom;
-    }
+    const { offsetX, offsetY } = calculateViewportOffset(
+      geometry || { type: 'hex', cellSize: 1 },
+      center,
+      { width, height },
+      zoom
+    );
 
     ctx.save();
 
@@ -274,8 +278,7 @@ const FreehandLayer = ({
     registerHandlers('freehand', {
       handlePointerDown,
       handlePointerMove,
-      stopDrawing,
-      isDrawing: isDrawingRef.current
+      stopDrawing
     });
 
     return () => unregisterHandlers('freehand');
