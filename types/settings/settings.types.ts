@@ -139,6 +139,11 @@ export interface PluginSettings {
   // Color palette customization
   colorPaletteOverrides?: Record<string, ColorOverride>;
   customPaletteColors?: CustomColor[];
+
+  // Object sets
+  objectSets?: ObjectSet[];
+  activeObjectSetId?: string | null;
+  objectSetsAutoLoadFolder?: string;
 }
 
 // ===========================================
@@ -294,6 +299,38 @@ export interface ObjectSettings {
   objectOverrides: Record<string, ObjectOverride>;
   customObjects: CustomObject[];
   customCategories: CustomCategory[];
+}
+
+// ===========================================
+// Object Set Types
+// ===========================================
+
+/**
+ * Hex and/or grid object data stored in an object set.
+ * Each side is optional — a set may contain only hex, only grid, or both.
+ */
+export interface ObjectSetData {
+  hex?: {
+    objectOverrides?: Record<string, ObjectOverride>;
+    customObjects?: CustomObject[];
+    customCategories?: CustomCategory[];
+  };
+  grid?: {
+    objectOverrides?: Record<string, ObjectOverride>;
+    customObjects?: CustomObject[];
+    customCategories?: CustomCategory[];
+  };
+}
+
+/**
+ * A named, saveable collection of object customizations.
+ */
+export interface ObjectSet {
+  id: string;
+  name: string;
+  source: 'manual' | 'folder';
+  folderPath?: string;
+  data: ObjectSetData;
 }
 
 // ===========================================
