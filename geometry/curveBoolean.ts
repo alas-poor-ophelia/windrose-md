@@ -710,6 +710,81 @@ function eraseRectangleFromCurves(
   return changed ? newCurves : null;
 }
 
+/**
+ * Subtract an arbitrary world-coordinate polygon from all curves using boolean subtraction.
+ *
+ * @param curves - Current array of curves
+ * @param clipVertices - Vertices of the clip polygon in world coordinates (open or closed)
+ * @returns New curves array with the polygon subtracted, or null if no curves were affected
+ */
+function eraseWorldPolygonFromCurves(
+  curves: Curve[],
+  clipVertices: Pt[]
+): Curve[] | null {
+  if (!curves || curves.length === 0 || clipVertices.length < 3) return null;
+
+  // Ensure closed ring
+  let ring = clipVertices;
+  const first = ring[0];
+  const last = ring[ring.length - 1];
+  if (first[0] !== last[0] || first[1] !== last[1]) {
+    ring = [...ring, [first[0], first[1]]];
+  }
+
+  const clipPoly: Polygon = [ensureCCW(ring)];
+
+  let changed = false;
+  const newCurves: Curve[] = [];
+
+  for (let i = 0; i < curves.length; i++) {
+    const curve = curves[i];
+    if (!curve.closed) {
+      newCurves.push(curve);
+      continue;
+    }
+
+    const subject = curveToPolygon(curve);
+    if (subject[0].length < 4) {
+      newCurves.push(curve);
+      continue;
+    }
+
+    let result: MultiPolygon;
+    try {
+      result = difference(subject, clipPoly);
+    } catch {
+      newCurves.push(curve);
+      continue;
+    }
+
+    if (!result || result.length === 0) {
+      changed = true;
+      continue;
+    }
+
+    const clipArea = Math.abs(signedArea(ring));
+    const minArea = clipArea * 0.01;
+
+    let anyKept = false;
+    for (let j = 0; j < result.length; j++) {
+      const poly = result[j];
+      if (polygonArea(poly) < minArea) continue;
+      const simplified: Polygon = poly.map(r => simplifyRing(r));
+      const id = j === 0
+        ? curve.id
+        : curve.id + '-' + Date.now() + '-' + Math.random().toString(36).substr(2, 6);
+      newCurves.push(polygonToCurve(simplified, curve, id));
+      anyKept = true;
+    }
+
+    if (!anyKept || result.length !== 1 || subject[0].length !== result[0][0].length || result[0].length !== subject.length) {
+      changed = true;
+    }
+  }
+
+  return changed ? newCurves : null;
+}
+
 return {
   flattenCurve,
   isLinearBezier,
@@ -722,6 +797,7 @@ return {
   findCurveAtCell,
   eraseCellFromCurves,
   eraseRectangleFromCurves,
+  eraseWorldPolygonFromCurves,
   signedArea,
   ensureCCW,
   ensureCW,
