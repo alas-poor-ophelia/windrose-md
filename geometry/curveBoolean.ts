@@ -702,7 +702,7 @@ function eraseRectangleFromCurves(
       anyKept = true;
     }
 
-    if (!anyKept || result.length !== 1 || subject[0].length !== result[0][0].length) {
+    if (!anyKept || result.length !== 1 || subject[0].length !== result[0][0].length || result[0].length !== subject.length) {
       changed = true;
     }
   }
@@ -721,5 +721,12 @@ return {
   subtractCellFromCurve,
   findCurveAtCell,
   eraseCellFromCurves,
-  eraseRectangleFromCurves
+  eraseRectangleFromCurves,
+  signedArea,
+  ensureCCW,
+  ensureCW,
+  polygonArea,
+  segmentIntersectsRect,
+  polygonIntersectsRect,
+  evalBezier
 };
