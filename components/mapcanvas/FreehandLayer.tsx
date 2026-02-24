@@ -16,7 +16,7 @@ const { requireModuleByName } = await dc.require(pathResolverPath);
 const { useMapState, useMapOperations } = await requireModuleByName("MapContext.tsx") as {
   useMapState: () => {
     mapData: { layers: { id: string; curves: Curve[] }[]; activeLayerId: string; viewState: { zoom: number; center: { x: number; y: number } }; northDirection?: number } | null;
-    geometry: { cellSize: number; type: string } | null;
+    geometry: { cellSize: number; type: string; getScaledCellSize: (zoom: number) => number } | null;
     screenToWorld: (clientX: number, clientY: number) => { worldX: number; worldY: number } | null;
     getClientCoords: (e: PointerEvent | MouseEvent | TouchEvent) => { clientX: number; clientY: number };
     canvasRef: { current: HTMLCanvasElement | null };
@@ -83,7 +83,7 @@ const FreehandLayer = ({
   const overlayRef = dc.useRef<HTMLCanvasElement | null>(null);
 
   // Closure snap threshold: half a cell size
-  const snapDistance = geometry ? geometry.cellSize * 0.5 : 20;
+  const snapDistance = geometry ? geometry.getScaledCellSize(1) * 0.5 : 20;
 
   /**
    * Create the overlay canvas, sized and positioned to match the main canvas.
