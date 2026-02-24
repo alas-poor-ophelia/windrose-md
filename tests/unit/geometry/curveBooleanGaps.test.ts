@@ -21,6 +21,7 @@ vi.mock("../../../src/geometry/polygonClipping.ts", () => ({
 
 import {
   flattenCurve,
+  simplifyRing,
   pointInPolygon,
   cellOverlapsCurve,
   curveToPolygon,
@@ -29,6 +30,7 @@ import {
   findCurveAtCell,
   eraseCellFromCurves,
   eraseRectangleFromCurves,
+  eraseWorldPolygonFromCurves,
   signedArea,
   ensureCCW,
   ensureCW,
@@ -514,5 +516,192 @@ describe("state consistency", () => {
     expect(result.length).toBeGreaterThanOrEqual(1);
     expect(result[0].closed).toBe(true);
     expect(result[0].segments.length).toBeGreaterThan(0);
+  });
+});
+
+// =========================================================================
+// Regression: eraseWorldPolygonFromCurves hole expansion (Bug A fix)
+// =========================================================================
+
+describe("eraseWorldPolygonFromCurves hole expansion", () => {
+  it("returns non-null when erasing a polygon that overlaps a curve", () => {
+    const curves = [makeLargeCurve(0, 0, 8, 8, CELL_SIZE)];
+    // Erase a square region fully interior to the curve
+    const clip: [number, number][] = [
+      [80, 80], [120, 80], [120, 120], [80, 120]
+    ];
+    const result = eraseWorldPolygonFromCurves(curves, clip);
+    expect(result).not.toBeNull();
+    expect(result!.length).toBe(1);
+  });
+
+  it("detects change when expanding an existing hole", () => {
+    const curves = [makeLargeCurve(0, 0, 8, 8, CELL_SIZE)];
+
+    // First erasure: create a hole at cell (2,2) region
+    const clip1: [number, number][] = [
+      [80, 80], [120, 80], [120, 120], [80, 120]
+    ];
+    const r1 = eraseWorldPolygonFromCurves(curves, clip1);
+    expect(r1).not.toBeNull();
+    expect(r1!.length).toBe(1);
+    expect(r1![0].innerRings).toBeDefined();
+    expect(r1![0].innerRings!.length).toBe(1);
+
+    // Second erasure: expand the hole by erasing adjacent region
+    const clip2: [number, number][] = [
+      [120, 80], [160, 80], [160, 120], [120, 120]
+    ];
+    const r2 = eraseWorldPolygonFromCurves(r1!, clip2);
+
+    // This must NOT return null — the hole expanded
+    expect(r2).not.toBeNull();
+    expect(r2!.length).toBe(1);
+  });
+
+  it("merged hole has larger area than original hole", () => {
+    const curves = [makeLargeCurve(0, 0, 8, 8, CELL_SIZE)];
+
+    // Create initial hole
+    const clip1: [number, number][] = [
+      [80, 80], [120, 80], [120, 120], [80, 120]
+    ];
+    const r1 = eraseWorldPolygonFromCurves(curves, clip1)!;
+    const area1 = polygonArea(curveToPolygon(r1[0]));
+
+    // Expand the hole
+    const clip2: [number, number][] = [
+      [120, 80], [160, 80], [160, 120], [120, 120]
+    ];
+    const r2 = eraseWorldPolygonFromCurves(r1, clip2)!;
+    const area2 = polygonArea(curveToPolygon(r2[0]));
+
+    // Area must have decreased (hole grew)
+    expect(area2).toBeLessThan(area1);
+  });
+
+  it("sequential adjacent erasures all succeed", () => {
+    let curves = [makeLargeCurve(0, 0, 8, 8, CELL_SIZE)];
+
+    // Erase 4 adjacent interior squares in sequence
+    const clips: [number, number][][] = [
+      [[80, 80], [120, 80], [120, 120], [80, 120]],
+      [[120, 80], [160, 80], [160, 120], [120, 120]],
+      [[80, 120], [120, 120], [120, 160], [80, 160]],
+      [[120, 120], [160, 120], [160, 160], [120, 160]],
+    ];
+
+    for (let i = 0; i < clips.length; i++) {
+      const result = eraseWorldPolygonFromCurves(curves, clips[i]);
+      expect(result).not.toBeNull();
+      curves = result!;
+    }
+
+    // Final curve should still be valid
+    expect(curves.length).toBeGreaterThan(0);
+    expect(curves[0].segments.length).toBeGreaterThan(0);
+  });
+
+  it("returns null when polygon does not overlap any curve", () => {
+    const curves = [makeLargeCurve(0, 0, 3, 3, CELL_SIZE)];
+    const clip: [number, number][] = [
+      [500, 500], [540, 500], [540, 540], [500, 540]
+    ];
+    const result = eraseWorldPolygonFromCurves(curves, clip);
+    expect(result).toBeNull();
+  });
+});
+
+// =========================================================================
+// Regression: eraseRectangleFromCurves hole expansion (same Bug A fix)
+// =========================================================================
+
+describe("eraseRectangleFromCurves hole expansion", () => {
+  it("detects change when expanding an existing hole", () => {
+    const curves = [makeLargeCurve(0, 0, 8, 8, CELL_SIZE)];
+
+    // Create hole with first rectangle (interior)
+    const r1 = eraseRectangleFromCurves(curves, 80, 80, 120, 120);
+    expect(r1).not.toBeNull();
+
+    // Expand hole with adjacent rectangle
+    const r2 = eraseRectangleFromCurves(r1!, 120, 80, 160, 120);
+    expect(r2).not.toBeNull();
+  });
+});
+
+// =========================================================================
+// Regression: simplifyRing near-duplicate vertex handling (Bug B fix)
+// =========================================================================
+
+describe("simplifyRing near-duplicate vertices", () => {
+  it("preserves corner when intersection point is near hex corner", () => {
+    // Simulates polygon-clipping output where an intersection point
+    // lands very close to a hex corner. Without dedup, both the
+    // intersection point and the corner get removed (cascading deletion).
+    const ring: [number, number][] = [
+      [0, 0],
+      [100, 0],
+      [100.02, 0.02],   // intersection point near corner (100, 0)→(100, 100)
+      [100, 100],
+      [0, 100],
+      [0, 0]
+    ];
+    const simplified = simplifyRing(ring);
+
+    // Must preserve the corner at ~(100, 0)/(100, 100) region.
+    // The near-duplicate pair should merge, not cascade-delete.
+    expect(simplified.length).toBeGreaterThanOrEqual(5); // 4 corners + closing
+  });
+
+  it("does not cascade-delete through near-duplicate pair", () => {
+    // Two near-duplicate vertices at a 90-degree corner.
+    // Without dedup: both form tiny triangles → both removed → corner lost.
+    const ring: [number, number][] = [
+      [0, 0],
+      [50, 0],
+      [50.01, 0.01],    // near-duplicate of next vertex
+      [50, 50],
+      [0, 50],
+      [0, 0]
+    ];
+    const simplified = simplifyRing(ring);
+
+    // The ~90° corner near (50, 0)→(50, 50) must survive
+    const hasCornerNear50 = simplified.some(
+      ([x, _y]) => Math.abs(x - 50) < 1
+    );
+    expect(hasCornerNear50).toBe(true);
+    expect(simplified.length).toBeGreaterThanOrEqual(5);
+  });
+
+  it("still removes truly collinear points after dedup", () => {
+    // Midpoints on straight edges should still be removed
+    const ring: [number, number][] = [
+      [0, 0], [50, 0], [100, 0],  // midpoint on top edge
+      [100, 50], [100, 100],       // midpoint on right edge
+      [0, 100],
+      [0, 0]
+    ];
+    const simplified = simplifyRing(ring);
+    // Should reduce to 4 corners + closing = 5
+    expect(simplified.length).toBe(5);
+  });
+
+  it("handles multiple near-duplicate pairs", () => {
+    // Two separate near-duplicate pairs at two different corners
+    const ring: [number, number][] = [
+      [0, 0],
+      [99.98, 0.01],   // near (100, 0)
+      [100, 0],
+      [100, 100],
+      [0.02, 99.99],   // near (0, 100)
+      [0, 100],
+      [0, 0]
+    ];
+    const simplified = simplifyRing(ring);
+
+    // Both corners must survive
+    expect(simplified.length).toBeGreaterThanOrEqual(5);
   });
 });
