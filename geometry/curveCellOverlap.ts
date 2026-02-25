@@ -12,7 +12,6 @@
 import type { Curve } from '#types/core/curve.types';
 import type { BorderSide } from '#types/core/rendering.types';
 
-// Datacore imports
 const pathResolverPath = dc.resolvePath("pathResolver.ts");
 const { requireModuleByName } = await dc.require(pathResolverPath) as {
   requireModuleByName: (name: string) => Promise<unknown>
