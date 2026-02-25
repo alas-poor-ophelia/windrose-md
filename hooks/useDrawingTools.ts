@@ -94,9 +94,10 @@ const { eraseObjectAt } = await requireModuleByName("objectOperations.ts") as {
   eraseObjectAt: (objects: MapObject[], x: number, y: number, mapType: string) => EraseResult;
 };
 
-const { eraseCellFromCurves, eraseRectangleFromCurves } = await requireModuleByName("curveBoolean.ts") as {
+const { eraseCellFromCurves, eraseRectangleFromCurves, eraseWorldPolygonFromCurves } = await requireModuleByName("curveBoolean.ts") as {
   eraseCellFromCurves: (curves: Curve[], cellX: number, cellY: number, cellSize: number) => Curve[] | null;
   eraseRectangleFromCurves: (curves: Curve[], worldMinX: number, worldMinY: number, worldMaxX: number, worldMaxY: number) => Curve[] | null;
+  eraseWorldPolygonFromCurves: (curves: Curve[], clipVertices: [number, number][]) => Curve[] | null;
 };
 
 const { getActiveLayer } = await requireModuleByName("layerAccessor.ts") as {
@@ -260,15 +261,23 @@ const useDrawingTools = (
         onCellsChange(newCells, isBatchedStroke);
       } else if (activeLayer.curves && activeLayer.curves.length > 0 && geometry) {
         // Try erasing from curves
-        const cellSize = (geometry as { cellSize: number }).cellSize;
-        if (cellSize) {
-          const newCurves = eraseCellFromCurves(activeLayer.curves, coordX, coordY, cellSize);
-          if (newCurves) {
-            if (strokeInitialCurvesRef.current === null) {
-              strokeInitialCurvesRef.current = activeLayer.curves;
-            }
-            onCurvesChange(newCurves, isBatchedStroke);
+        let newCurves: Curve[] | null = null;
+        if (geometry.type === 'hex') {
+          const hexGeo = geometry as { getHexVertices: (q: number, r: number) => { worldX: number; worldY: number }[] };
+          const verts = hexGeo.getHexVertices(coordX, coordY);
+          const clipPoly = verts.map(v => [v.worldX, v.worldY] as [number, number]);
+          newCurves = eraseWorldPolygonFromCurves(activeLayer.curves, clipPoly);
+        } else {
+          const cellSize = (geometry as { cellSize: number }).cellSize;
+          if (cellSize) {
+            newCurves = eraseCellFromCurves(activeLayer.curves, coordX, coordY, cellSize);
           }
+        }
+        if (newCurves) {
+          if (strokeInitialCurvesRef.current === null) {
+            strokeInitialCurvesRef.current = activeLayer.curves;
+          }
+          onCurvesChange(newCurves, isBatchedStroke);
         }
       }
     }

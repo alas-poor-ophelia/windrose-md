@@ -335,13 +335,40 @@ function simplifyRing(ring: Pt[], epsilon: number = 0.1): Pt[] {
   const open = isClosed ? ring.slice(0, -1) : ring.slice();
   if (open.length < 3) return ring;
 
+  // Pass 1: merge near-duplicate vertices to prevent cascading deletion.
+  // Without this, two near-coincident vertices (e.g. an intersection point
+  // landing close to a hex corner) both form tiny triangles with neighbors
+  // and both get removed by the collinearity pass, eliminating real corners.
+  const snapDistSq = epsilon * epsilon;
+  const deduped: Pt[] = [open[0]];
+  for (let i = 1; i < open.length; i++) {
+    const prev = deduped[deduped.length - 1];
+    const dx = open[i][0] - prev[0];
+    const dy = open[i][1] - prev[1];
+    if (dx * dx + dy * dy > snapDistSq) {
+      deduped.push(open[i]);
+    }
+  }
+  // Check wrap-around: last vs first
+  if (deduped.length > 1) {
+    const first = deduped[0];
+    const last = deduped[deduped.length - 1];
+    const dx = last[0] - first[0];
+    const dy = last[1] - first[1];
+    if (dx * dx + dy * dy <= snapDistSq) {
+      deduped.pop();
+    }
+  }
+  if (deduped.length < 3) return ring;
+
+  // Pass 2: remove collinear points
   const result: Pt[] = [];
-  const n = open.length;
+  const n = deduped.length;
 
   for (let i = 0; i < n; i++) {
-    const prev = open[(i - 1 + n) % n];
-    const curr = open[i];
-    const next = open[(i + 1) % n];
+    const prev = deduped[(i - 1 + n) % n];
+    const curr = deduped[i];
+    const next = deduped[(i + 1) % n];
 
     // Cross product to detect collinearity
     const cross = (curr[0] - prev[0]) * (next[1] - prev[1]) -
@@ -690,10 +717,14 @@ function eraseRectangleFromCurves(
     }
 
     const minArea = 1.0;
+    const subjectArea = polygonArea(subject);
     let anyKept = false;
+    let totalResultArea = 0;
     for (let j = 0; j < result.length; j++) {
       const poly = result[j];
-      if (polygonArea(poly) < minArea) continue;
+      const area = polygonArea(poly);
+      if (area < minArea) continue;
+      totalResultArea += area;
       const simplified: Polygon = poly.map(ring => simplifyRing(ring));
       const id = j === 0
         ? curve.id
@@ -702,7 +733,86 @@ function eraseRectangleFromCurves(
       anyKept = true;
     }
 
-    if (!anyKept || result.length !== 1 || subject[0].length !== result[0][0].length) {
+    if (!anyKept || result.length !== 1 || subjectArea - totalResultArea > minArea * 0.01) {
+      changed = true;
+    }
+  }
+
+  return changed ? newCurves : null;
+}
+
+/**
+ * Subtract an arbitrary world-coordinate polygon from all curves using boolean subtraction.
+ *
+ * @param curves - Current array of curves
+ * @param clipVertices - Vertices of the clip polygon in world coordinates (open or closed)
+ * @returns New curves array with the polygon subtracted, or null if no curves were affected
+ */
+function eraseWorldPolygonFromCurves(
+  curves: Curve[],
+  clipVertices: Pt[]
+): Curve[] | null {
+  if (!curves || curves.length === 0 || clipVertices.length < 3) return null;
+
+  // Ensure closed ring
+  let ring = clipVertices;
+  const first = ring[0];
+  const last = ring[ring.length - 1];
+  if (first[0] !== last[0] || first[1] !== last[1]) {
+    ring = [...ring, [first[0], first[1]]];
+  }
+
+  const clipPoly: Polygon = [ensureCCW(ring)];
+
+  let changed = false;
+  const newCurves: Curve[] = [];
+
+  for (let i = 0; i < curves.length; i++) {
+    const curve = curves[i];
+    if (!curve.closed) {
+      newCurves.push(curve);
+      continue;
+    }
+
+    const subject = curveToPolygon(curve);
+    if (subject[0].length < 4) {
+      newCurves.push(curve);
+      continue;
+    }
+
+    let result: MultiPolygon;
+    try {
+      result = difference(subject, clipPoly);
+    } catch {
+      newCurves.push(curve);
+      continue;
+    }
+
+    if (!result || result.length === 0) {
+      changed = true;
+      continue;
+    }
+
+    const clipArea = Math.abs(signedArea(ring));
+    const minArea = clipArea * 0.01;
+
+    const subjectArea = polygonArea(subject);
+    let anyKept = false;
+    let totalResultArea = 0;
+    for (let j = 0; j < result.length; j++) {
+      const poly = result[j];
+      const area = polygonArea(poly);
+      if (area < minArea) continue;
+      totalResultArea += area;
+      const simplified: Polygon = poly.map(r => simplifyRing(r));
+      const id = j === 0
+        ? curve.id
+        : curve.id + '-' + Date.now() + '-' + Math.random().toString(36).substr(2, 6);
+      newCurves.push(polygonToCurve(simplified, curve, id));
+      anyKept = true;
+    }
+
+    if (!anyKept || result.length !== 1 || subjectArea - totalResultArea > minArea * 0.01) {
       changed = true;
     }
   }
@@ -721,5 +831,13 @@ return {
   subtractCellFromCurve,
   findCurveAtCell,
   eraseCellFromCurves,
-  eraseRectangleFromCurves
+  eraseRectangleFromCurves,
+  eraseWorldPolygonFromCurves,
+  signedArea,
+  ensureCCW,
+  ensureCW,
+  polygonArea,
+  segmentIntersectsRect,
+  polygonIntersectsRect,
+  evalBezier
 };
