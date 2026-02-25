@@ -111,7 +111,11 @@ class ExportModal extends Modal {
             // Check if file exists
             const existingFile = this.app.vault.getAbstractFileByPath(finalFilename);
             if (existingFile) {
-              if (!confirm(\`File "\${finalFilename}" already exists. Overwrite?\`)) {
+              if (!await new ConfirmModal(this.app, {
+                message: \`File "\${finalFilename}" already exists. Overwrite?\`,
+                confirmText: 'Overwrite',
+                isDestructive: true
+              }).openAndGetValue()) {
                 return;
               }
               await this.app.vault.modify(existingFile, json);
@@ -119,10 +123,10 @@ class ExportModal extends Modal {
               await this.app.vault.create(finalFilename, json);
             }
             
-            alert(\`Exported to: \${finalFilename}\`);
+            new Notice(\`Exported to: \${finalFilename}\`);
             this.close();
           } catch (err) {
-            alert(\`Export failed: \${err.message}\`);
+            new Notice(\`Export failed: \${err.message}\`);
           }
         }));
   }

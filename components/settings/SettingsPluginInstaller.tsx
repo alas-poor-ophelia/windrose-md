@@ -21,7 +21,7 @@ const { RA_ICONS, RA_CATEGORIES } = await requireModuleByName("rpgAwesomeIcons.t
 const QUICK_SYMBOLS = await requireModuleByName("settingsPlugin-quickSymbols.js");
 
 /** Plugin version from template */
-const PACKAGED_PLUGIN_VERSION = '0.15.1';
+const PACKAGED_PLUGIN_VERSION = '0.15.5';
 
 /** LocalStorage keys for tracking user preferences */
 const STORAGE_KEYS = {
@@ -128,7 +128,7 @@ function generateManifest(): PluginManifest {
     id: 'dungeon-map-tracker-settings',
     name: 'Windrose MapDesigner',
     version: PACKAGED_PLUGIN_VERSION,
-    minAppVersion: '0.15.0',
+    minAppVersion: '1.4.10', // Required for AbstractInputSuggest
     description: 'Global settings and commands for Windrose MapDesigner - customize default colors, hex orientation, and visual preferences.',
     author: 'Windrose MD',
     isDesktopOnly: false

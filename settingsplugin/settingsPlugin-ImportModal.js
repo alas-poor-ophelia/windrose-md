@@ -138,7 +138,7 @@ class ImportModal extends Modal {
     const importBtn = buttonContainer.createEl('button', { text: 'Import', cls: 'mod-cta' });
     importBtn.onclick = async () => {
       if (!this.importData) {
-        alert('Please select a valid export file first.');
+        new Notice('Please select a valid export file first.');
         return;
       }
       

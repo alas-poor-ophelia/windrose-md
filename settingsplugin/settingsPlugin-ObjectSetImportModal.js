@@ -28,9 +28,12 @@ class ObjectSetImportModal extends Modal {
     new Setting(contentEl)
       .setName('Folder Path')
       .setDesc('Vault-relative path (e.g. object-sets/my-set)')
-      .addText(text => text
-        .setPlaceholder('path/to/set-folder')
-        .onChange(v => { folderPath = v.trim(); }))
+      .addSearch(search => {
+        new FolderSuggest(this.app, search.inputEl);
+        search
+          .setPlaceholder('path/to/set-folder')
+          .onChange(v => { folderPath = v.trim(); });
+      })
       .addButton(btn => btn
         .setButtonText('Preview')
         .onClick(async () => {

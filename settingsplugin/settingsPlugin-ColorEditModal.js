@@ -113,11 +113,11 @@ class ColorEditModal extends Modal {
     saveBtn.addEventListener('click', async () => {
       // Validate
       if (!labelValue.trim()) {
-        alert('Please enter a label for this color.');
+        new Notice('Please enter a label for this color.');
         return;
       }
       if (!/^#[0-9A-Fa-f]{6}$/.test(colorValue)) {
-        alert('Please enter a valid hex color (e.g., #4A9EFF)');
+        new Notice('Please enter a valid hex color (e.g., #4A9EFF)');
         return;
       }
       

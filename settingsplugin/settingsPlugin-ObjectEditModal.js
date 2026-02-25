@@ -479,18 +479,18 @@ class ObjectEditModal extends Modal {
     // Validate based on mode
     if (this.mode === 'icon') {
       if (!this.iconClass || !RPGAwesomeHelpers.isValid(this.iconClass)) {
-        alert('Please select a valid icon');
+        new Notice('Please select a valid icon');
         return;
       }
     } else if (this.mode === 'image') {
       if (!this.imagePath || this.imagePath.trim().length === 0) {
-        alert('Please select an image');
+        new Notice('Please select an image');
         return;
       }
     } else {
       // symbol mode
       if (!this.symbol || this.symbol.length === 0 || this.symbol.length > 8) {
-        alert('Please enter a valid symbol (1-8 characters)');
+        new Notice('Please enter a valid symbol (1-8 characters)');
         return;
       }
     }

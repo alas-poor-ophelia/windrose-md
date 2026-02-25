@@ -73,6 +73,63 @@ const ObjectSetHelpers = {
   },
 
   /**
+   * Reset all object customizations to built-in defaults for both map types.
+   * Clears overrides, custom objects, custom categories, and active set tracking.
+   */
+  resetToDefaults(plugin) {
+    const s = plugin.settings;
+    s.hexObjectOverrides = {};
+    s.customHexObjects = [];
+    s.customHexCategories = [];
+    s.gridObjectOverrides = {};
+    s.customGridObjects = [];
+    s.customGridCategories = [];
+    s.activeObjectSetId = null;
+  },
+
+  /**
+   * Check if live object settings differ from the active set (or from defaults).
+   * Returns true if the user has unsaved modifications.
+   */
+  isDirty(plugin) {
+    const s = plugin.settings;
+    const activeSetId = s.activeObjectSetId;
+
+    const hexOverrides = s.hexObjectOverrides || {};
+    const hexObjects = s.customHexObjects || [];
+    const hexCategories = s.customHexCategories || [];
+    const gridOverrides = s.gridObjectOverrides || {};
+    const gridObjects = s.customGridObjects || [];
+    const gridCategories = s.customGridCategories || [];
+
+    if (!activeSetId) {
+      // On Defaults - dirty if any customizations exist
+      return Object.keys(hexOverrides).length > 0 ||
+        hexObjects.length > 0 || hexCategories.length > 0 ||
+        Object.keys(gridOverrides).length > 0 ||
+        gridObjects.length > 0 || gridCategories.length > 0;
+    }
+
+    // On a named set - compare live state to stored snapshot
+    const set = (s.objectSets || []).find(st => st.id === activeSetId);
+    if (!set) return true;
+
+    const compare = (live, stored) => JSON.stringify(live) !== JSON.stringify(stored);
+
+    const setHex = set.data.hex || {};
+    if (compare(hexOverrides, setHex.objectOverrides || {})) return true;
+    if (compare(hexObjects, setHex.customObjects || [])) return true;
+    if (compare(hexCategories, setHex.customCategories || [])) return true;
+
+    const setGrid = set.data.grid || {};
+    if (compare(gridOverrides, setGrid.objectOverrides || {})) return true;
+    if (compare(gridObjects, setGrid.customObjects || [])) return true;
+    if (compare(gridCategories, setGrid.customCategories || [])) return true;
+
+    return false;
+  },
+
+  /**
    * Delete a set by ID. Clears activeObjectSetId if it was the active set.
    */
   deleteSet(plugin, setId) {

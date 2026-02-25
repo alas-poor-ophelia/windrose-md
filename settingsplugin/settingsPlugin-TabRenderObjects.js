@@ -94,18 +94,22 @@ const TabRenderObjectsMethods = {
     // Reset All button (only show if there are customizations)
     if (hasAnyCustomizations) {
       new Setting(containerEl)
-        .setName('Reset All Customizations')
-        .setDesc(\`Remove all custom objects, categories, and modifications for \${this.selectedMapType} maps\`)
+        .setName(\`Reset \${this.selectedMapType === 'hex' ? 'Hex' : 'Grid'} to Defaults\`)
+        .setDesc(\`Restore built-in objects for \${this.selectedMapType} maps. Does not affect saved sets.\`)
         .addButton(btn => btn
-          .setButtonText('Reset All')
+          .setButtonText('Reset to Defaults')
           .setWarning()
           .onClick(async () => {
             const counts = [];
             if (hasOverrides) counts.push(\`\${Object.keys(mapTypeSettings.objectOverrides).length} modification(s)\`);
             if (hasCustomObjects) counts.push(\`\${mapTypeSettings.customObjects.length} custom object(s)\`);
             if (hasCustomCategories) counts.push(\`\${mapTypeSettings.customCategories.length} custom category(ies)\`);
-            
-            if (confirm(\`This will remove \${counts.join(', ')} for \${this.selectedMapType} maps. Maps using custom objects will show "?" placeholders.\\\\n\\\\nContinue?\`)) {
+
+            if (await new ConfirmModal(this.app, {
+              message: \`This will remove \${counts.join(', ')} for \${this.selectedMapType} maps. Saved sets are not affected. Maps using custom objects will show "?" placeholders.\`,
+              confirmText: 'Reset to Defaults',
+              isDestructive: true
+            }).openAndGetValue()) {
               this.updateObjectSettingsForMapType({
                 objectOverrides: {},
                 customObjects: [],
@@ -216,10 +220,14 @@ const TabRenderObjectsMethods = {
         IconHelpers.set(deleteBtn, 'trash-2');
         deleteBtn.onclick = async () => {
           if (allCategoryObjects.length > 0) {
-            alert(\`Cannot delete "\${category.label}" - it contains \${allCategoryObjects.length} object(s). Move or delete them first.\`);
+            new Notice(\`Cannot delete "\${category.label}" - it contains \${allCategoryObjects.length} object(s). Move or delete them first.\`);
             return;
           }
-          if (confirm(\`Delete category "\${category.label}"?\`)) {
+          if (await new ConfirmModal(this.app, {
+              message: \`Delete category "\${category.label}"?\`,
+              confirmText: 'Delete',
+              isDestructive: true
+            }).openAndGetValue()) {
             const categoriesKey = this.selectedMapType === 'hex' ? 'customHexCategories' : 'customGridCategories';
             if (this.plugin.settings[categoriesKey]) {
               this.plugin.settings[categoriesKey] = this.plugin.settings[categoriesKey].filter(c => c.id !== category.id);
@@ -455,7 +463,11 @@ const TabRenderObjectsMethods = {
         const resetBtn = actions.createEl('button', { cls: 'dmt-settings-icon-btn', attr: { 'aria-label': 'Reset to default', title: 'Reset to default' } });
         IconHelpers.set(resetBtn, 'rotate-ccw');
         resetBtn.onclick = async () => {
-          if (confirm(\`Reset "\${obj.label}" to its default symbol and name?\`)) {
+          if (await new ConfirmModal(this.app, {
+              message: \`Reset "\${obj.label}" to its default symbol and name?\`,
+              confirmText: 'Reset',
+              isDestructive: true
+            }).openAndGetValue()) {
             if (this.plugin.settings[overridesKey]) {
               delete this.plugin.settings[overridesKey][obj.id];
             }
@@ -523,7 +535,11 @@ const TabRenderObjectsMethods = {
       const deleteBtn = actions.createEl('button', { cls: 'dmt-settings-icon-btn dmt-settings-icon-btn-danger', attr: { 'aria-label': 'Delete', title: 'Delete object' } });
       IconHelpers.set(deleteBtn, 'trash-2');
       deleteBtn.onclick = async () => {
-        if (confirm(\`Delete "\${obj.label}"? Maps using this object will show a "?" placeholder.\`)) {
+        if (await new ConfirmModal(this.app, {
+            message: \`Delete "\${obj.label}"? Maps using this object will show a "?" placeholder.\`,
+            confirmText: 'Delete',
+            isDestructive: true
+          }).openAndGetValue()) {
           if (this.plugin.settings[customObjectsKey]) {
             this.plugin.settings[customObjectsKey] = this.plugin.settings[customObjectsKey].filter(o => o.id !== obj.id);
           }
@@ -551,20 +567,18 @@ const TabRenderObjectsMethods = {
 
     // Active Set indicator
     const activeSet = sets.find(st => st.id === s.activeObjectSetId);
+    const isDirty = ObjectSetHelpers.isDirty(this.plugin);
+
     if (activeSet) {
       const bar = containerEl.createDiv({ cls: 'dmt-set-active-bar' });
       bar.createSpan({ text: 'Active set: ' });
       bar.createSpan({ text: activeSet.name, cls: 'dmt-set-active-name' });
-      const deactivateBtn = bar.createEl('button', {
-        text: 'Deactivate',
-        cls: 'dmt-settings-icon-btn',
-        attr: { title: 'Stop tracking active set (keeps current objects)' }
-      });
-      deactivateBtn.onclick = async () => {
-        ObjectSetHelpers.deactivateSet(this.plugin);
-        await this.plugin.saveSettings();
-        this.display();
-      };
+      if (isDirty) {
+        bar.createSpan({ text: ' (modified)', cls: 'dmt-set-modified-badge' });
+      }
+    } else if (isDirty) {
+      const bar = containerEl.createDiv({ cls: 'dmt-set-active-bar dmt-set-modified-bar' });
+      bar.createSpan({ text: 'Objects modified from defaults', cls: 'dmt-set-modified-badge' });
     }
 
     // Active Set dropdown
@@ -572,38 +586,41 @@ const TabRenderObjectsMethods = {
       .setName('Active Set')
       .setDesc('Switch to a saved set (overwrites current objects)')
       .addDropdown(dropdown => {
-        dropdown.addOption('', 'None (manual)');
+        dropdown.addOption('__defaults__', 'Defaults (built-in)');
         for (const set of sets) {
           const scope = [];
           if (set.data.hex) scope.push('hex');
           if (set.data.grid) scope.push('grid');
           dropdown.addOption(set.id, set.name + (scope.length ? ' [' + scope.join('+') + ']' : ''));
         }
-        dropdown.setValue(s.activeObjectSetId || '');
+        dropdown.setValue(s.activeObjectSetId || '__defaults__');
         dropdown.onChange(async (value) => {
-          if (!value) {
-            ObjectSetHelpers.deactivateSet(this.plugin);
-            this.settingsChanged = true;
-            await this.plugin.saveSettings();
-            this.display();
-            return;
-          }
-
           // Prompt to save current objects before switching
-          const hasAny = Object.keys(s.hexObjectOverrides || {}).length > 0 ||
-            (s.customHexObjects || []).length > 0 ||
-            (s.customHexCategories || []).length > 0 ||
-            Object.keys(s.gridObjectOverrides || {}).length > 0 ||
-            (s.customGridObjects || []).length > 0 ||
-            (s.customGridCategories || []).length > 0;
-
-          if (hasAny) {
-            if (confirm('Save your current objects as a set before switching?')) {
-              const name = prompt('Name for the saved set:', 'My Objects');
+          if (isDirty) {
+            if (await new ConfirmModal(this.app, {
+              message: 'Save your current objects as a set before switching?',
+              confirmText: 'Save',
+              cancelText: value === '__defaults__' ? 'Reset Without Saving' : 'Switch Without Saving'
+            }).openAndGetValue()) {
+              const name = await new PromptModal(this.app, {
+                message: 'Name for the saved set:',
+                defaultValue: 'My Objects'
+              }).openAndGetValue();
               if (name) {
                 ObjectSetHelpers.saveCurrentAsSet(this.plugin, name);
               }
             }
+          }
+
+          if (value === '__defaults__') {
+            ObjectSetHelpers.resetToDefaults(this.plugin);
+            this.settingsChanged = true;
+            await this.plugin.saveSettings();
+            window.dispatchEvent(new CustomEvent('dmt-settings-changed', {
+              detail: { timestamp: Date.now() }
+            }));
+            this.display();
+            return;
           }
 
           ObjectSetHelpers.activateSet(this.plugin, value);
@@ -663,14 +680,14 @@ const TabRenderObjectsMethods = {
         });
         IconHelpers.set(deleteBtn, 'trash-2');
         deleteBtn.onclick = async () => {
-          if (confirm('Delete set "' + set.name + '"?')) {
-            const wasActive = set.id === s.activeObjectSetId;
+          if (await new ConfirmModal(this.app, {
+              message: 'Delete set "' + set.name + '"?',
+              confirmText: 'Delete',
+              isDestructive: true
+            }).openAndGetValue()) {
             ObjectSetHelpers.deleteSet(this.plugin, set.id);
             this.settingsChanged = true;
             await this.plugin.saveSettings();
-            if (wasActive) {
-              new Notice('Active set deleted. Current objects left in place.');
-            }
             this.display();
           }
         };
@@ -684,7 +701,10 @@ const TabRenderObjectsMethods = {
     actionSetting.addButton(btn => btn
       .setButtonText('Save Current as Set')
       .onClick(async () => {
-        const name = prompt('Name for the new set:', 'My Objects');
+        const name = await new PromptModal(this.app, {
+          message: 'Name for the new set:',
+          defaultValue: 'My Objects'
+        }).openAndGetValue();
         if (!name) return;
         ObjectSetHelpers.saveCurrentAsSet(this.plugin, name);
         await this.plugin.saveSettings();
@@ -705,13 +725,16 @@ const TabRenderObjectsMethods = {
     new Setting(containerEl)
       .setName('Auto-Load Folder')
       .setDesc('Vault folder to scan for object set packages on startup')
-      .addText(text => text
-        .setPlaceholder('e.g. windrose-objects')
-        .setValue(s.objectSetsAutoLoadFolder || '')
-        .onChange(async (value) => {
-          s.objectSetsAutoLoadFolder = value.trim();
-          await this.plugin.saveSettings();
-        }))
+      .addSearch(search => {
+        new FolderSuggest(this.app, search.inputEl);
+        search
+          .setPlaceholder('e.g. windrose-objects')
+          .setValue(s.objectSetsAutoLoadFolder || '')
+          .onChange(async (value) => {
+            s.objectSetsAutoLoadFolder = value.trim();
+            await this.plugin.saveSettings();
+          });
+      })
       .addButton(btn => btn
         .setButtonText('Scan Now')
         .onClick(async () => {

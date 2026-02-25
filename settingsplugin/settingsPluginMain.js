@@ -29,7 +29,7 @@ return `// settingsPluginMain.js - Windrose MapDesigner Settings Plugin
 
 const PLUGIN_VERSION = '{{PLUGIN_VERSION}}';
 
-const { Plugin, PluginSettingTab, Setting, Modal, setIcon } = require('obsidian');
+const { Plugin, PluginSettingTab, Setting, Modal, setIcon, AbstractInputSuggest } = require('obsidian');
 
 // =============================================================================
 // DATA CONSTANTS

@@ -68,7 +68,7 @@ class CategoryEditModal extends Modal {
   
   save() {
     if (!this.label || this.label.trim().length === 0) {
-      alert('Please enter a category name');
+      new Notice('Please enter a category name');
       return;
     }
     

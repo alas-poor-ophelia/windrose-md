@@ -473,7 +473,7 @@ class InsertDungeonModal extends Modal {
         this.close();
       } catch (err) {
         console.error('[Windrose] Dungeon generation failed:', err);
-        alert('Failed to generate dungeon: ' + err.message);
+        new Notice('Failed to generate dungeon: ' + err.message);
       }
     };
 
@@ -514,7 +514,7 @@ class InsertDungeonModal extends Modal {
           this.close();
         } catch (err) {
           console.error('[Windrose] Dungeon generation failed:', err);
-          alert('Failed to generate dungeon: ' + err.message);
+          new Notice('Failed to generate dungeon: ' + err.message);
         }
       }
     });

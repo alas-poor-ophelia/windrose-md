@@ -32,7 +32,11 @@ const TabRenderColorsMethods = {
         .setButtonText('Reset All')
         .setWarning()
         .onClick(async () => {
-          if (confirm('Reset all colors to defaults? This will remove all customizations.')) {
+          if (await new ConfirmModal(this.app, {
+              message: 'Reset all colors to defaults? This will remove all customizations.',
+              confirmText: 'Reset All',
+              isDestructive: true
+            }).openAndGetValue()) {
             this.plugin.settings.colorPaletteOverrides = {};
             this.plugin.settings.customPaletteColors = [];
             this.settingsChanged = true;

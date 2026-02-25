@@ -1235,6 +1235,16 @@ return `/* settingsPlugin-styles.css
   flex-shrink: 0;
 }
 
+.dmt-set-modified-badge {
+  color: var(--text-warning);
+  font-size: 12px;
+  font-style: italic;
+}
+
+.dmt-set-modified-bar {
+  border-color: var(--text-warning);
+}
+
 /* ===========================================
  * Animations
  * =========================================== */

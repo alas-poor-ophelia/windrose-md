@@ -14,6 +14,7 @@ const IconHelpers = await requireModuleByName("settingsPlugin-IconHelpers.js");
 const RPGAwesomeHelpers = await requireModuleByName("settingsPlugin-RPGAwesomeHelpers.js");
 const DungeonEssenceVisualizer = await requireModuleByName("settingsPlugin-DungeonEssenceVisualizer.js");
 const ObjectSetHelpers = await requireModuleByName("settingsPlugin-ObjectSetHelpers.js");
+const FolderSuggest = await requireModuleByName("settingsPlugin-FolderSuggest.js");
 
 const InsertMapModal = await requireModuleByName("settingsPlugin-InsertMapModal.js");
 const InsertDungeonModal = await requireModuleByName("settingsPlugin-InsertDungeonModal.js");
@@ -25,6 +26,8 @@ const ImportModal = await requireModuleByName("settingsPlugin-ImportModal.js");
 const ObjectSetRenameModal = await requireModuleByName("settingsPlugin-ObjectSetRenameModal.js");
 const ObjectSetExportModal = await requireModuleByName("settingsPlugin-ObjectSetExportModal.js");
 const ObjectSetImportModal = await requireModuleByName("settingsPlugin-ObjectSetImportModal.js");
+const ConfirmModal = await requireModuleByName("settingsPlugin-ConfirmModal.js");
+const PromptModal = await requireModuleByName("settingsPlugin-PromptModal.js");
 
 const TabRenderCore = await requireModuleByName("settingsPlugin-TabRenderCore.js");
 const TabRenderSettings = await requireModuleByName("settingsPlugin-TabRenderSettings.js");
@@ -35,11 +38,11 @@ const STYLES_CSS = await requireModuleByName("settingsPlugin-styles.js");
 
 // Concatenate content
 const HELPERS_CONTENT = [
-  ObjectHelpers, ColorHelpers, DragHelpers, IconHelpers, RPGAwesomeHelpers, DungeonEssenceVisualizer, ObjectSetHelpers
+  ObjectHelpers, ColorHelpers, DragHelpers, IconHelpers, RPGAwesomeHelpers, DungeonEssenceVisualizer, ObjectSetHelpers, FolderSuggest
 ].join('\n\n');
 
 const MODALS_CONTENT = [
-  InsertMapModal, InsertDungeonModal, ObjectEditModal, CategoryEditModal, ColorEditModal, ExportModal, ImportModal, ObjectSetRenameModal, ObjectSetExportModal, ObjectSetImportModal
+  InsertMapModal, InsertDungeonModal, ObjectEditModal, CategoryEditModal, ColorEditModal, ExportModal, ImportModal, ObjectSetRenameModal, ObjectSetExportModal, ObjectSetImportModal, ConfirmModal, PromptModal
 ].join('\n\n');
 
 const TAB_RENDER_CONTENT = [
