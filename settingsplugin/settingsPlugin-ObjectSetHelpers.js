@@ -12,6 +12,38 @@ const ObjectSetHelpers = {
   },
 
   /**
+   * Resolve relative image filenames in set data to full vault paths.
+   * Handles both customObjects and objectOverrides.
+   */
+  resolveImagePaths(data, imagesFolder, vault) {
+    for (const side of ['hex', 'grid']) {
+      if (!data[side]) continue;
+      // Custom objects
+      if (data[side].customObjects) {
+        for (const obj of data[side].customObjects) {
+          if (obj.imagePath && !obj.imagePath.includes('/')) {
+            const resolved = imagesFolder + '/' + obj.imagePath;
+            if (vault.getAbstractFileByPath(resolved)) {
+              obj.imagePath = resolved;
+            }
+          }
+        }
+      }
+      // Object overrides (built-in objects with custom images)
+      if (data[side].objectOverrides) {
+        for (const override of Object.values(data[side].objectOverrides)) {
+          if (override.imagePath && !override.imagePath.includes('/')) {
+            const resolved = imagesFolder + '/' + override.imagePath;
+            if (vault.getAbstractFileByPath(resolved)) {
+              override.imagePath = resolved;
+            }
+          }
+        }
+      }
+    }
+  },
+
+  /**
    * Snapshot current hex+grid object data into a new ObjectSet.
    */
   saveCurrentAsSet(plugin, name) {
@@ -151,15 +183,22 @@ const ObjectSetHelpers = {
   },
 
   /**
-   * Get all imagePath values from a set's custom objects.
+   * Get all imagePath values from a set's custom objects and overrides.
    */
   getImagePaths(setData) {
     const paths = [];
     for (const side of ['hex', 'grid']) {
       const sideData = setData[side];
-      if (!sideData || !sideData.customObjects) continue;
-      for (const obj of sideData.customObjects) {
-        if (obj.imagePath) paths.push(obj.imagePath);
+      if (!sideData) continue;
+      if (sideData.customObjects) {
+        for (const obj of sideData.customObjects) {
+          if (obj.imagePath) paths.push(obj.imagePath);
+        }
+      }
+      if (sideData.objectOverrides) {
+        for (const override of Object.values(sideData.objectOverrides)) {
+          if (override.imagePath) paths.push(override.imagePath);
+        }
       }
     }
     return [...new Set(paths)];
@@ -215,10 +254,19 @@ const ObjectSetHelpers = {
 
     // Rewrite imagePath in export data to relative filenames
     for (const side of ['hex', 'grid']) {
-      if (!exportSetData[side] || !exportSetData[side].customObjects) continue;
-      for (const obj of exportSetData[side].customObjects) {
-        if (obj.imagePath && imageMap[obj.imagePath]) {
-          obj.imagePath = imageMap[obj.imagePath];
+      if (!exportSetData[side]) continue;
+      if (exportSetData[side].customObjects) {
+        for (const obj of exportSetData[side].customObjects) {
+          if (obj.imagePath && imageMap[obj.imagePath]) {
+            obj.imagePath = imageMap[obj.imagePath];
+          }
+        }
+      }
+      if (exportSetData[side].objectOverrides) {
+        for (const override of Object.values(exportSetData[side].objectOverrides)) {
+          if (override.imagePath && imageMap[override.imagePath]) {
+            override.imagePath = imageMap[override.imagePath];
+          }
         }
       }
     }
@@ -288,22 +336,7 @@ const ObjectSetHelpers = {
     }
 
     // Resolve relative image filenames to vault paths
-    const imagesFolder = folderPath + '/images';
-    for (const side of ['hex', 'grid']) {
-      if (!data[side] || !data[side].customObjects) continue;
-      for (const obj of data[side].customObjects) {
-        if (obj.imagePath && !obj.imagePath.includes('/')) {
-          // Relative filename — resolve to images subfolder
-          const resolved = imagesFolder + '/' + obj.imagePath;
-          const imageFile = plugin.app.vault.getAbstractFileByPath(resolved);
-          if (imageFile) {
-            obj.imagePath = resolved;
-          } else {
-            console.warn('[Windrose] Import: image not found:', resolved);
-          }
-        }
-      }
-    }
+    ObjectSetHelpers.resolveImagePaths(data, folderPath + '/images', plugin.app.vault);
 
     // Build set object
     const s = plugin.settings;
@@ -358,26 +391,14 @@ const ObjectSetHelpers = {
           st => st.source === 'folder' && st.folderPath === child.path
         );
 
+        // Resolve relative image filenames to vault paths
+        ObjectSetHelpers.resolveImagePaths(data, child.path + '/images', plugin.app.vault);
+
         if (existing) {
           // Update data in place
           existing.name = data.name || existing.name;
           existing.data = { hex: data.hex, grid: data.grid };
         } else {
-          // Resolve image paths before adding
-          const imagesFolder = child.path + '/images';
-          for (const side of ['hex', 'grid']) {
-            if (!data[side] || !data[side].customObjects) continue;
-            for (const obj of data[side].customObjects) {
-              if (obj.imagePath && !obj.imagePath.includes('/')) {
-                const resolved = imagesFolder + '/' + obj.imagePath;
-                const imageFile = plugin.app.vault.getAbstractFileByPath(resolved);
-                if (imageFile) {
-                  obj.imagePath = resolved;
-                }
-              }
-            }
-          }
-
           const setName = ObjectSetHelpers.deduplicateName(
             plugin.settings.objectSets,
             data.name || child.name

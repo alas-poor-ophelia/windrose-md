@@ -88,15 +88,17 @@ class WindroseMDSettingsPlugin extends Plugin {
     await this.loadSettings();
     this.addSettingTab(new WindroseMDSettingsTab(this.app, this));
 
-    // Auto-load object sets from configured folder
-    if (this.settings.objectSetsAutoLoadFolder) {
-      try {
-        const added = await ObjectSetHelpers.scanAutoLoadFolder(this);
-        if (added > 0) await this.saveSettings();
-      } catch (e) {
-        console.warn('[Windrose] Auto-load scan failed:', e.message);
+    // Auto-load object sets from configured folder (deferred until vault is indexed)
+    this.app.workspace.onLayoutReady(async () => {
+      if (this.settings.objectSetsAutoLoadFolder) {
+        try {
+          const added = await ObjectSetHelpers.scanAutoLoadFolder(this);
+          if (added > 0) await this.saveSettings();
+        } catch (e) {
+          console.warn('[Windrose] Auto-load scan failed:', e.message);
+        }
       }
-    }
+    });
 
     // Watch auto-load folder for changes (debounced re-scan)
     this._autoLoadScanTimer = null;
