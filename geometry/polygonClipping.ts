@@ -7,6 +7,10 @@
  * At runtime in Obsidian: loads the UMD bundle from the vault via app.vault.read().
  * In unit tests: the datacore-transformer converts this to an ES import from npm.
  */
+const pathResolverPath = dc.resolvePath("pathResolver.ts");
+const { getBasePath } = await dc.require(pathResolverPath) as {
+  getBasePath: () => string;
+};
 
 // Type definitions matching polygon-clipping's API
 type Ring = [number, number][];
@@ -16,12 +20,7 @@ type MultiPolygon = Polygon[];
 type DifferenceFn = (subject: Polygon | MultiPolygon, ...clips: (Polygon | MultiPolygon)[]) => MultiPolygon;
 
 // Load the vendored UMD bundle at runtime
-const basePath = window.__dmtBasePath;
-if (!basePath) {
-  throw new Error('[polygonClipping] window.__dmtBasePath not set');
-}
-
-const bundlePath = `${basePath}/vendor/polygon-clipping.umd.js`;
+const bundlePath = `${getBasePath()}/vendor/polygon-clipping.umd.js`;
 const bundleFile = app.vault.getAbstractFileByPath(bundlePath);
 if (!bundleFile) {
   throw new Error(`[polygonClipping] Bundle not found at: ${bundlePath}`);
