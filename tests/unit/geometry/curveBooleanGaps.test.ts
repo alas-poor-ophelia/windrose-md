@@ -40,6 +40,10 @@ import {
   evalBezier,
 } from "../../../src/geometry/curveBoolean.ts";
 
+import {
+  fitPointsToBezier,
+} from "../../../src/geometry/curveFitting.ts";
+
 import type { Curve, BezierSegment } from "#types/core/curve.types";
 
 // =========================================================================
@@ -703,5 +707,386 @@ describe("simplifyRing near-duplicate vertices", () => {
 
     // Both corners must survive
     expect(simplified.length).toBeGreaterThanOrEqual(5);
+  });
+});
+
+// =========================================================================
+// Regression: fitted freehand curves + hex polygon erasure
+//
+// Tests that curves produced by fitPointsToBezier (including the alpha cap
+// in Schneider's algorithm) can be erased by hex cell polygons.
+// This is the exact pipeline: draw freehand → close → erase hex cells.
+// =========================================================================
+
+describe("fitted freehand curve hex erasure", () => {
+  const HEX_SIZE = 30;
+  const SQRT3 = Math.sqrt(3);
+
+  /** Compute hex center in world coords (flat-top orientation) */
+  function hexToWorld(q: number, r: number): { x: number; y: number } {
+    return {
+      x: HEX_SIZE * (3 / 2) * q,
+      y: HEX_SIZE * (SQRT3 / 2 * q + SQRT3 * r),
+    };
+  }
+
+  /** Get the 6 vertices of a flat-top hex cell */
+  function getHexVertices(q: number, r: number): [number, number][] {
+    const center = hexToWorld(q, r);
+    const verts: [number, number][] = [];
+    for (let i = 0; i < 6; i++) {
+      const angleDeg = 60 * i;
+      const angleRad = (Math.PI / 180) * angleDeg;
+      verts.push([
+        center.x + HEX_SIZE * Math.cos(angleRad),
+        center.y + HEX_SIZE * Math.sin(angleRad),
+      ]);
+    }
+    return verts;
+  }
+
+  /** Generate points along a circle (simulating a freehand drawing) */
+  function circlePoints(
+    cx: number, cy: number, radius: number, count: number
+  ): { x: number; y: number }[] {
+    const pts: { x: number; y: number }[] = [];
+    for (let i = 0; i <= count; i++) {
+      const angle = (2 * Math.PI * i) / count;
+      pts.push({
+        x: cx + radius * Math.cos(angle),
+        y: cy + radius * Math.sin(angle),
+      });
+    }
+    return pts;
+  }
+
+  /** Create a closed curve from fitted freehand points */
+  function makeFittedCurve(
+    rawPoints: { x: number; y: number }[],
+    color: string = "#ff0000"
+  ): Curve | null {
+    const result = fitPointsToBezier(rawPoints);
+    if (!result || result.segments.length === 0) return null;
+
+    // Snap closure (like FreehandLayer does)
+    const lastSeg = result.segments[result.segments.length - 1];
+    lastSeg[4] = result.start[0];
+    lastSeg[5] = result.start[1];
+
+    return {
+      id: "fitted-test-curve",
+      start: result.start,
+      segments: result.segments,
+      closed: true,
+      color,
+      opacity: 1,
+      strokeColor: "#000000",
+      strokeWidth: 2,
+    };
+  }
+
+  /** Find all hex cells that overlap the curve polygon */
+  function findOverlappingHexCells(
+    curve: Curve,
+    qRange: [number, number],
+    rRange: [number, number]
+  ): { q: number; r: number }[] {
+    const outer = flattenCurve(curve);
+    const cells: { q: number; r: number }[] = [];
+    for (let q = qRange[0]; q <= qRange[1]; q++) {
+      for (let r = rRange[0]; r <= rRange[1]; r++) {
+        const hexVerts = getHexVertices(q, r);
+        const hexCenter = hexToWorld(q, r);
+        if (pointInPolygon(hexCenter.x, hexCenter.y, outer)) {
+          cells.push({ q, r });
+        }
+      }
+    }
+    return cells;
+  }
+
+  it("interior hex cells are erasable from a fitted circular curve", () => {
+    // Draw a large circle covering many hex cells
+    const center = hexToWorld(2, 2);
+    const radius = HEX_SIZE * 3.5;
+    const rawPoints = circlePoints(center.x, center.y, radius, 60);
+    const curve = makeFittedCurve(rawPoints);
+    expect(curve).not.toBeNull();
+
+    // Find hex cells whose centers are inside the curve
+    const interiorCells = findOverlappingHexCells(curve!, [-1, 5], [-1, 5]);
+    expect(interiorCells.length).toBeGreaterThan(3);
+
+    // Try erasing each interior cell
+    let unerasableCells: { q: number; r: number }[] = [];
+    for (const cell of interiorCells) {
+      const clipPoly = getHexVertices(cell.q, cell.r);
+      const result = eraseWorldPolygonFromCurves([curve!], clipPoly);
+      if (result === null) {
+        unerasableCells.push(cell);
+      }
+    }
+
+    // All interior cells must be erasable
+    expect(unerasableCells).toEqual([]);
+  });
+
+  it("sequential hex cell erasures all succeed", () => {
+    const center = hexToWorld(2, 2);
+    const radius = HEX_SIZE * 3;
+    const rawPoints = circlePoints(center.x, center.y, radius, 50);
+    const curve = makeFittedCurve(rawPoints);
+    expect(curve).not.toBeNull();
+
+    const interiorCells = findOverlappingHexCells(curve!, [0, 4], [0, 4]);
+    expect(interiorCells.length).toBeGreaterThan(2);
+
+    // Erase cells one at a time, feeding results back
+    let curves: Curve[] = [curve!];
+    let failedAt: { q: number; r: number } | null = null;
+    for (const cell of interiorCells) {
+      const clipPoly = getHexVertices(cell.q, cell.r);
+      const result = eraseWorldPolygonFromCurves(curves, clipPoly);
+      if (result === null) {
+        failedAt = cell;
+        break;
+      }
+      curves = result;
+    }
+
+    expect(failedAt).toBeNull();
+  });
+
+  it("curve with anti-parallel tangents (spike-prone) is still erasable", () => {
+    // Points that create nearly anti-parallel endpoint tangents —
+    // the alpha cap fires in generateBezier for these segments.
+    // Simulates a narrow, elongated freehand shape on a hex grid.
+    const cx = hexToWorld(2, 2).x;
+    const cy = hexToWorld(2, 2).y;
+    const pts: { x: number; y: number }[] = [];
+
+    // Narrow ellipse: 4x wider than tall
+    for (let i = 0; i <= 40; i++) {
+      const angle = (2 * Math.PI * i) / 40;
+      pts.push({
+        x: cx + HEX_SIZE * 3 * Math.cos(angle),
+        y: cy + HEX_SIZE * 0.8 * Math.sin(angle),
+      });
+    }
+
+    const curve = makeFittedCurve(pts);
+    expect(curve).not.toBeNull();
+
+    // Find interior cells
+    const outer = flattenCurve(curve!);
+    const hexCenter = hexToWorld(2, 2);
+    if (pointInPolygon(hexCenter.x, hexCenter.y, outer)) {
+      const clipPoly = getHexVertices(2, 2);
+      const result = eraseWorldPolygonFromCurves([curve!], clipPoly);
+      expect(result).not.toBeNull();
+    }
+  });
+
+  it("fitted curve polygon covers the same area as rendering would", () => {
+    // Verify that flattenCurve produces a polygon that agrees with
+    // the Bézier curves — cells inside the polygon are erasable.
+    const center = hexToWorld(3, 3);
+    const radius = HEX_SIZE * 2.5;
+    const rawPoints = circlePoints(center.x, center.y, radius, 80);
+    const curve = makeFittedCurve(rawPoints);
+    expect(curve).not.toBeNull();
+
+    const poly = curveToPolygon(curve!);
+    const outer = poly[0];
+
+    // The polygon should have positive area
+    expect(polygonArea(poly)).toBeGreaterThan(100);
+
+    // The polygon should be a valid closed ring
+    expect(outer[0][0]).toBeCloseTo(outer[outer.length - 1][0], 5);
+    expect(outer[0][1]).toBeCloseTo(outer[outer.length - 1][1], 5);
+
+    // No self-intersection: polygon-clipping should succeed without error
+    const clipPoly = getHexVertices(3, 3);
+    expect(() => {
+      eraseWorldPolygonFromCurves([curve!], clipPoly);
+    }).not.toThrow();
+  });
+});
+
+// =========================================================================
+// Reproduction tests: actual unerasable curves from user's "hex freehand" map
+// =========================================================================
+
+describe("unerasable hex curves reproduction (actual data)", () => {
+  // hexSize = 80, flat-top orientation
+  const HEX_SIZE_80 = 80;
+  const SQRT3_80 = Math.sqrt(3);
+
+  function hexToWorld80(q: number, r: number) {
+    return {
+      x: HEX_SIZE_80 * (3 / 2) * q,
+      y: HEX_SIZE_80 * (SQRT3_80 / 2 * q + SQRT3_80 * r),
+    };
+  }
+
+  function getHexVertices80(q: number, r: number): [number, number][] {
+    const center = hexToWorld80(q, r);
+    const verts: [number, number][] = [];
+    for (let i = 0; i < 6; i++) {
+      const angleDeg = 60 * i; // flat-top: offset 0
+      const angleRad = (Math.PI / 180) * angleDeg;
+      verts.push([
+        center.x + HEX_SIZE_80 * Math.cos(angleRad),
+        center.y + HEX_SIZE_80 * Math.sin(angleRad),
+      ]);
+    }
+    return verts;
+  }
+
+  // Curve 3 from the user's JSON: a single hex outline at hex (5, 3)
+  const hexOutlineCurve: Curve = {
+    id: "curve-hex-outline-5-3",
+    start: [520, 762.1023553303061],
+    segments: [
+      [533.3333333333334, 739.0083445627209, 546.6666666666666, 715.9143337951359, 560, 692.8203230275508],
+      [586.6666666666666, 692.8203230275508, 613.3333333333334, 692.8203230275508, 640, 692.8203230275508],
+      [653.3333333333334, 715.9143337951358, 666.6666666666666, 739.0083445627208, 680, 762.1023553303058],
+      [666.6666666666666, 785.1963660978909, 653.3333333333334, 808.290376865476, 640, 831.384387633061],
+      [613.3333333333334, 831.384387633061, 586.6666666666666, 831.384387633061, 560, 831.384387633061],
+    ],
+    closed: true,
+    color: "#c4a57b",
+    opacity: 1,
+    strokeColor: "#c4a57b",
+    strokeWidth: 2,
+  };
+
+  // Curve 1: complex freehand curve with mixed bezier and linear segments
+  const complexFreehandCurve: Curve = {
+    id: "curve-1772067629019-6n0trde1i",
+    start: [-125.28593658350601, 1021.508942080109],
+    segments: [
+      [-119.46715021609123, 979.9346627009515, -113.64836384867644, 938.3603833217942, -107.82957748126165, 896.7861039426367],
+      [-99.51702552781195, 871.8415363151422, -91.20447357436224, 846.8969686876478, -82.89192162091254, 821.9524010601533],
+      [-68.65884234780418, 801.8911397721558, -54.42576307469584, 781.8298784841583, -40.19268380158748, 761.7686171961608],
+      [-40.12845586772498, 761.8798632408758, -40.06422793386248, 761.9911092855908, -39.999999999999986, 762.1023553303058],
+      [-53.33333333333332, 785.1963660978909, -66.66666666666666, 808.290376865476, -80, 831.384387633061],
+      [-66.66666666666666, 854.478398400646, -53.33333333333333, 877.572409168231, -39.999999999999986, 900.6664199358161],
+      [-53.33333333333332, 923.7604307034012, -66.66666666666666, 946.8544414709862, -80, 969.9484522385713],
+      [-66.66666666666669, 993.0424630061563, -53.33333333333336, 1016.1364737737413, -40.000000000000036, 1039.2304845413262],
+      [-53.33333333333336, 1062.3244953089113, -66.66666666666669, 1085.4185060764964, -80, 1108.5125168440816],
+      [-66.66666666666669, 1131.6065276116665, -53.33333333333336, 1154.7005383792516, -40.000000000000036, 1177.7945491468365],
+      [-50.54579876597331, 1196.0604084158995, -61.091597531946576, 1214.3262676849622, -71.63739629791985, 1232.5921269540252],
+      [-78.71392552029728, 1221.26654204779, -85.79045474267473, 1209.940957141555, -92.86698396505216, 1198.6153722353197],
+      [-102.84204630919182, 1167.0189199071601, -112.81710865333149, 1135.4224675790003, -122.79217099747115, 1103.8260152508408],
+    ],
+    closed: true,
+    color: "#c4a57b",
+    opacity: 1,
+    strokeColor: "#c4a57b",
+    strokeWidth: 2,
+  };
+
+  it("can flatten the hex outline curve into a valid polygon", () => {
+    const poly = curveToPolygon(hexOutlineCurve);
+    expect(poly[0].length).toBeGreaterThanOrEqual(7); // 6 vertices + closing
+    expect(polygonArea(poly)).toBeGreaterThan(0);
+  });
+
+  it("hex outline curve matches hex (5,3) vertices exactly", () => {
+    const flat = flattenCurve(hexOutlineCurve);
+    const hexVerts = getHexVertices80(5, 3);
+
+    // The curve's endpoints should match hex vertices
+    const curveEndpoints = [
+      hexOutlineCurve.start,
+      ...hexOutlineCurve.segments.map(s => [s[4], s[5]] as [number, number]),
+    ];
+
+    // Check each endpoint is a hex vertex (within tolerance)
+    for (const ep of curveEndpoints) {
+      const matchesAnyVertex = hexVerts.some(
+        v => Math.abs(v[0] - ep[0]) < 0.01 && Math.abs(v[1] - ep[1]) < 0.01
+      );
+      expect(matchesAnyVertex).toBe(true);
+    }
+  });
+
+  it("polygon-clipping throws on shared-edge polygons (known limitation)", () => {
+    const hexVerts = getHexVertices80(5, 3);
+
+    // Build subject and clip polygons WITHOUT perturbation
+    const subject = curveToPolygon(hexOutlineCurve);
+    let ring: [number, number][] = hexVerts;
+    const first = ring[0];
+    const last = ring[ring.length - 1];
+    if (first[0] !== last[0] || first[1] !== last[1]) {
+      ring = [...ring, [first[0], first[1]]];
+    }
+    const clipPoly = [ensureCCW(ring)];
+
+    // Without perturbation, polygon-clipping throws on shared edges
+    expect(() => polygonClipping.difference(subject, clipPoly)).toThrow(
+      /Unable to complete output ring/
+    );
+  });
+
+  it("eraseWorldPolygonFromCurves removes the hex outline with matching hex polygon", () => {
+    const hexVerts = getHexVertices80(5, 3);
+    const result = eraseWorldPolygonFromCurves([hexOutlineCurve], hexVerts);
+
+    // Should return non-null (change detected) with empty array (fully erased)
+    expect(result).not.toBeNull();
+    expect(result!.length).toBe(0);
+  });
+
+  it("complex freehand curve boundary-only hexes return null (no interior overlap)", () => {
+    // Hex (0, 6) has center at (0, 831.38). The curve only touches
+    // its boundary vertices but doesn't fill its interior.
+    // The eraser correctly returns null (no meaningful change).
+    const hexVerts06 = getHexVertices80(0, 6);
+    const result06 = eraseWorldPolygonFromCurves([complexFreehandCurve], hexVerts06);
+    expect(result06).toBeNull();
+  });
+
+  it("hex outline is identical to its hex polygon (area comparison)", () => {
+    const curveArea = polygonArea(curveToPolygon(hexOutlineCurve));
+    const hexVerts = getHexVertices80(5, 3);
+    // Close the hex polygon
+    const hexRing = [...hexVerts, hexVerts[0]];
+    const hexArea = Math.abs(signedArea(hexRing));
+
+    // Areas should be nearly identical (same hex)
+    expect(Math.abs(curveArea - hexArea) / hexArea).toBeLessThan(0.001);
+  });
+
+  it("erasing hex cells whose center is inside the curve produces changes", () => {
+    // The complex curve is a narrow closed shape; only hexes with their
+    // center INSIDE the polygon are meaningfully covered.
+    // Hexes that merely share boundary vertices are NOT covered.
+    const flat = flattenCurve(complexFreehandCurve);
+
+    // Scan a range of hexes to find which ones have their center inside
+    const coveredHexes: [number, number][] = [];
+    for (let q = -2; q <= 1; q++) {
+      for (let r = 4; r <= 10; r++) {
+        const center = hexToWorld80(q, r);
+        if (pointInPolygon(center.x, center.y, flat)) {
+          coveredHexes.push([q, r]);
+        }
+      }
+    }
+
+    // There should be at least some covered hexes
+    expect(coveredHexes.length).toBeGreaterThan(0);
+
+    // Each covered hex should be erasable
+    for (const [q, r] of coveredHexes) {
+      const verts = getHexVertices80(q, r);
+      const result = eraseWorldPolygonFromCurves([complexFreehandCurve], verts);
+      const center = hexToWorld80(q, r);
+      expect(result).not.toBeNull();
+    }
   });
 });

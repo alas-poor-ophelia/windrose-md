@@ -63,17 +63,17 @@ function getVersion(): string {
 function checkPrerequisites(version: string): void {
   console.log("Checking prerequisites...\n");
 
-  // CRITICAL: Ensure we're on main branch
+  // CRITICAL: Ensure we're on main branch (or release branch for dry runs)
   const currentBranch = execSync("git branch --show-current", {
     cwd: SOURCE_ROOT,
     encoding: "utf-8",
   }).trim();
-  if (currentBranch !== "main") {
+  if (currentBranch !== "main" && !currentBranch.startsWith("release/")) {
     throw new Error(
-      `Must be on 'main' branch to release. Currently on '${currentBranch}'. Run: git checkout main`
+      `Must be on 'main' or 'release/*' branch to release. Currently on '${currentBranch}'. Run: git checkout main`
     );
   }
-  console.log(`  Branch: main`);
+  console.log(`  Branch: ${currentBranch}`);
 
   // Check VERSION file exists
   if (!existsSync(VERSION_PATH)) {

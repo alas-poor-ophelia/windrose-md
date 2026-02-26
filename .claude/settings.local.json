@@ -1,18 +1,24 @@
 {
   "permissions": {
     "allow": [
-      "Bash(cat:*)",
-      "Bash(ls \"C:\\\\Dev\\\\windrose\\\\types\\\\core\"\" && echo -e \"n=== File count ===\" && ls -1 \"C:Devwindrosetypescore\"\")",
-      "Bash(git show:*)",
-      "Bash(git diff:*)",
+      "Bash(npm run test:unit *)",
+      "Bash(npm run test:e2e *)",
+      "Bash(npm run check *)",
+      "Bash(git checkout *)",
+      "Bash(git merge *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git -C *)",
+      "Bash(npx vitest *)",
       "Skill(review-comments)",
-      "Bash(ls:*)",
-      "Bash(git -C \"C:\\\\Dev\\\\windrose\" log --oneline -15)",
-      "Bash(npm run check:*)",
-      "Bash(find:*)",
+      "Skill(review-src)",
+      "Skill(release)",
       "mcp__ide__getDiagnostics",
       "Bash(dir:*)",
-      "Bash(npm run test:unit:*)"
+      "Bash(npm run test:unit:*)",
+      "Bash(npm run check:*)",
+      "Bash(git status:*)",
+      "Bash(findstr:*)"
     ]
   },
   "hooks": {

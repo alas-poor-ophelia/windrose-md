@@ -321,6 +321,72 @@ describe("near-closure fitting", () => {
     expect(dist).toBeLessThan(10);
   });
 
+  // Regression: spike artifacts from extreme Bézier control points.
+  // When endpoint tangents are nearly anti-parallel, the C matrix determinant
+  // approaches zero and alpha values can blow up, placing control points
+  // far from the curve and creating visible spikes.
+  it("control points stay bounded even with anti-parallel tangents", () => {
+    // Points with nearly anti-parallel endpoint tangents (going right then left)
+    // This creates a near-singular C matrix in generateBezier
+    const pts: [number, number][] = [
+      [0, 0], [10, 0.5], [20, -0.3], [30, 0.1]
+    ];
+    const result = fitCubicBezier(pts, 16);
+    expect(result.length).toBeGreaterThanOrEqual(1);
+
+    // Compute bounding box of input points
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const [x, y] of pts) {
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+    }
+    const pad = Math.max(maxX - minX, maxY - minY, 20) * 2;
+
+    // All control points must stay within a reasonable bounding box
+    for (const seg of result) {
+      expect(seg[0]).toBeGreaterThan(minX - pad); // CP1.x
+      expect(seg[0]).toBeLessThan(maxX + pad);
+      expect(seg[1]).toBeGreaterThan(minY - pad); // CP1.y
+      expect(seg[1]).toBeLessThan(maxY + pad);
+      expect(seg[2]).toBeGreaterThan(minX - pad); // CP2.x
+      expect(seg[2]).toBeLessThan(maxX + pad);
+      expect(seg[3]).toBeGreaterThan(minY - pad); // CP2.y
+      expect(seg[3]).toBeLessThan(maxY + pad);
+    }
+  });
+
+  it("control points stay bounded for a tight U-turn shape", () => {
+    // Narrow shape with sharp reversals — spike-prone after recursive splitting
+    const pts: [number, number][] = [
+      [0, 0], [5, 30], [3, 60], [0, 90],
+      [-2, 60], [-4, 30], [-1, 1]
+    ];
+    const result = fitCubicBezier(pts, 16);
+    expect(result.length).toBeGreaterThanOrEqual(1);
+
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const [x, y] of pts) {
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+    }
+    const pad = Math.max(maxX - minX, maxY - minY) * 2;
+
+    for (const seg of result) {
+      expect(seg[0]).toBeGreaterThan(minX - pad);
+      expect(seg[0]).toBeLessThan(maxX + pad);
+      expect(seg[1]).toBeGreaterThan(minY - pad);
+      expect(seg[1]).toBeLessThan(maxY + pad);
+      expect(seg[2]).toBeGreaterThan(minX - pad);
+      expect(seg[2]).toBeLessThan(maxX + pad);
+      expect(seg[3]).toBeGreaterThan(minY - pad);
+      expect(seg[3]).toBeLessThan(maxY + pad);
+    }
+  });
+
   // Regression: open curve (not near-closed) should NOT have endpoints close together
   it("open curve endpoints are not accidentally close", () => {
     // Half circle — endpoints are far apart

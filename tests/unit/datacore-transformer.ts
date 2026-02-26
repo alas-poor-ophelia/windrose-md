@@ -38,6 +38,7 @@ const MODULE_MAP: Record<string, string> = {
   'curveBoolean.ts': './geometry/curveBoolean.ts',
   'curveCellOverlap.ts': './geometry/curveCellOverlap.ts',
   'polygonClipping.ts': './geometry/polygonClipping.ts',
+  'polygon-clipping-wrapper.js': './vendor/polygon-clipping-wrapper.js',
   'curveFitting.ts': './geometry/curveFitting.ts',
 
   // Utils
