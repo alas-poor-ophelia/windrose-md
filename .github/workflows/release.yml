@@ -40,7 +40,16 @@ jobs:
             "WindroseMD - FONTS (Snippet).css" \
             "Fog of war.jpg"
           cd ..
-      
+
+      - name: Collect Object Set zips
+        id: objsets
+        run: |
+          OBJSET_FILES=$(find dist -maxdepth 1 -name 'ObjSet*.zip' -printf '%p\n' | tr '\n' ',' | sed 's/,$//')
+          echo "files=$OBJSET_FILES" >> $GITHUB_OUTPUT
+          if [ -n "$OBJSET_FILES" ]; then
+            echo "Found Object Sets: $OBJSET_FILES"
+          fi
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
@@ -48,6 +57,7 @@ jobs:
           body_path: ${{ steps.changelog.outputs.changelog_exists == 'true' && 'dist/CHANGELOG.md' || '' }}
           files: |
             windrose-md-v${{ steps.version.outputs.version }}.zip
+            dist/ObjSet*.zip
           draft: false
           prerelease: false
         env:

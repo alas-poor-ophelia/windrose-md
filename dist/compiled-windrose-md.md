@@ -1,9 +1,9 @@
 <!-- Compiled by Datacore Script Compiler -->
 <!-- Source: Projects/dungeon-map-tracker -->
 <!-- Main Component: DungeonMapTracker -->
-<!-- Compiled: 2026-01-29T21:07:01.774Z -->
-<!-- Files: 136 -->
-<!-- Version: 1.5.5 -->
+<!-- Compiled: 2026-02-26T04:39:35.112Z -->
+<!-- Files: 150 -->
+<!-- Version: 1.5.6 -->
 <!-- CSS Files: 1 -->
 
 # Demo
@@ -1008,13 +1008,19 @@ function getActiveLayer(mapData: MapData | null | undefined): MapLayer {
       order: 0,
       visible: true,
       cells: (mapData as LegacyMapData)?.cells || [],
+      curves: [],
       edges: (mapData as LegacyMapData)?.edges || [],
       objects: (mapData as LegacyMapData)?.objects || [],
       textLabels: (mapData as LegacyMapData)?.textLabels || [],
       fogOfWar: null
     };
   }
-  return mapData.layers.find(l => l.id === mapData.activeLayerId) || mapData.layers[0];
+  const layer = mapData.layers.find(l => l.id === mapData.activeLayerId) || mapData.layers[0];
+  // Ensure curves array exists (backward compat for pre-curves data)
+  if (!layer.curves) {
+    layer.curves = [];
+  }
+  return layer;
 }
 
 /**
@@ -1125,6 +1131,7 @@ function addLayer(mapData: MapData, name: string | null = null): MapData {
     order: maxOrder + 1,
     visible: true,
     cells: [],
+    curves: [],
     edges: [],
     objects: [],
     textLabels: [],
@@ -1220,6 +1227,7 @@ function createEmptyLayer(id: LayerId, name: string, order: number): MapLayer {
     order,
     visible: true,
     cells: [],
+    curves: [],
     edges: [],
     objects: [],
     textLabels: [],
@@ -1357,6 +1365,7 @@ function migrateToLayerSchema(legacyMapData: LegacyMapData): MapData | LegacyMap
       order: 0,
       visible: true,
       cells: cellsData,
+      curves: [],
       edges: edgesData,
       objects: objectsData,
       textLabels: textLabelsData,
@@ -1748,9 +1757,8 @@ return {
  * Handles loading/saving map data to the Obsidian vault.
  */
 
-import type { MapData, MapType, ViewState } from '#types/core/map.types';
+import type { MapData, MapLayer, MapType, ViewState } from '#types/core/map.types';
 import type { HexOrientation } from '#types/settings/settings.types';
-import type { Layer } from '#types/core/layer.types';
 
 /** Constants module */
 interface ConstantsModule {
@@ -1909,7 +1917,38 @@ async function loadMapData(mapId: string, mapName: string = '', mapType: MapType
         data.maps[mapId] = migrateToLayerSchema(mapData);
       }
 
-      return data.maps[mapId];
+      // Ensure curves array exists on all layers (backward compat)
+      const loadedMap = data.maps[mapId];
+      if (loadedMap.layers) {
+        for (const layer of loadedMap.layers) {
+          if (!layer.curves) {
+            layer.curves = [];
+          }
+          // Filter out v1 POC curves that lack required start/segments fields
+          layer.curves = layer.curves.filter((c: any) => c.start && c.segments);
+          for (const curve of layer.curves) {
+            // Migrate legacy holes (flat number[]) to innerRings ([[x,y],...])
+            const legacy = (curve as any).holes;
+            if (legacy && legacy.length > 0) {
+              const innerRings: [number, number][][] = [];
+              for (const hole of legacy) {
+                if (!hole || hole.length < 6) continue;
+                const ring: [number, number][] = [];
+                for (let i = 0; i < hole.length; i += 2) {
+                  ring.push([hole[i], hole[i + 1]]);
+                }
+                innerRings.push(ring);
+              }
+              if (innerRings.length > 0) {
+                curve.innerRings = innerRings;
+              }
+              delete (curve as any).holes;
+            }
+          }
+        }
+      }
+
+      return loadedMap;
     } else {
       return createNewMap(mapId, mapName, mapType);
     }
@@ -1937,7 +1976,6 @@ async function saveMapData(mapId: string, mapData: MapData): Promise<boolean> {
     if (!allData.maps) allData.maps = {};
     allData.maps[mapId] = mapData;
 
-    // Save back
     const jsonString = JSON.stringify(allData, null, 2);
 
     if (file) {
@@ -1966,12 +2004,13 @@ function createNewMap(mapId: string, mapName: string = '', mapType: MapType = 'g
   const initialLayerId = generateLayerId();
 
   // Initial layer
-  const initialLayer: Layer = {
+  const initialLayer: MapLayer = {
     id: initialLayerId,
     name: '1',
     order: 0,
     visible: true,
     cells: [],
+    curves: [],
     edges: [],
     objects: [],
     textLabels: [],
@@ -2119,7 +2158,7 @@ const GRID_DENSITY_PRESETS: GridDensityPresets = {
  * Build index of all image files in vault for autocomplete
  */
 async function buildImageIndex(): Promise<ImageIndexEntry[]> {
-  const imageExtensions = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'];
+  const imageExtensions = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg'];
   const imageFiles: ImageIndexEntry[] = [];
 
   // Get all files from vault
@@ -2199,8 +2238,11 @@ async function preloadImage(vaultPath: string): Promise<HTMLImageElement | null>
       // Read as binary
       const binary = await app.vault.readBinary(file);
 
-      // Convert to blob URL
-      const blob = new Blob([binary]);
+      // Convert to blob URL (SVGs need explicit MIME type to parse correctly)
+      const isSvg = vaultPath.toLowerCase().endsWith('.svg');
+      const blob = isSvg
+        ? new Blob([binary], { type: 'image/svg+xml' })
+        : new Blob([binary]);
       const url = URL.createObjectURL(blob);
 
       // Create and load image
@@ -2208,11 +2250,14 @@ async function preloadImage(vaultPath: string): Promise<HTMLImageElement | null>
 
       await new Promise<void>((resolve, reject) => {
         img.onload = () => {
-          // Cache dimensions
-          dimensionsCache.set(vaultPath, {
-            width: img.naturalWidth,
-            height: img.naturalHeight
-          });
+          // Cache dimensions (SVGs with viewBox but no width/height report 0)
+          let width = img.naturalWidth;
+          let height = img.naturalHeight;
+          if (width === 0 || height === 0) {
+            width = 100;
+            height = 100;
+          }
+          dimensionsCache.set(vaultPath, { width, height });
           resolve();
         };
         img.onerror = () => {
@@ -3953,6 +3998,7 @@ function useLayerHistory({
 
   const initialSnapshot: LayerHistorySnapshot = {
     cells: [],
+    curves: [],
     name: "",
     objects: [],
     textLabels: [],
@@ -3994,6 +4040,7 @@ function useLayerHistory({
       const activeLayer = getActiveLayer(mapData);
       resetHistory({
         cells: activeLayer.cells,
+        curves: activeLayer.curves || [],
         name: mapData.name || '',
         objects: activeLayer.objects || [],
         textLabels: activeLayer.textLabels || [],
@@ -4013,6 +4060,7 @@ function useLayerHistory({
   const buildHistoryState = dc.useCallback(
     (layer: MapLayer, name: string): LayerHistorySnapshot => ({
       cells: layer.cells || [],
+      curves: layer.curves || [],
       name: name,
       objects: layer.objects || [],
       textLabels: layer.textLabels || [],
@@ -4183,6 +4231,7 @@ function useLayerHistory({
         { ...mapData, name: previousState.name },
         {
           cells: previousState.cells,
+          curves: previousState.curves || [],
           objects: previousState.objects || [],
           textLabels: previousState.textLabels || [],
           edges: previousState.edges || []
@@ -4205,6 +4254,7 @@ function useLayerHistory({
         { ...mapData, name: nextState.name },
         {
           cells: nextState.cells,
+          curves: nextState.curves || [],
           objects: nextState.objects || [],
           textLabels: nextState.textLabels || [],
           edges: nextState.edges || []
@@ -4698,6 +4748,7 @@ return { useFogOfWar };
 // Type-only imports
 import type { MapData, MapLayer, ViewState, TextLabelSettings } from '#types/core/map.types';
 import type { Cell } from '#types/core/cell.types';
+import type { Curve } from '#types/core/curve.types';
 import type { MapObject } from '#types/objects/object.types';
 import type { TextLabel } from '#types/objects/note.types';
 import type { HexColor } from '#types/core/common.types';
@@ -4736,6 +4787,7 @@ function useDataHandlers({
     overrides: Partial<HistoryState> = {}
   ): HistoryState => ({
     cells: overrides.cells ?? layer.cells ?? [],
+    curves: overrides.curves ?? layer.curves ?? [],
     name: name,
     objects: overrides.objects ?? layer.objects ?? [],
     textLabels: overrides.textLabels ?? layer.textLabels ?? [],
@@ -4746,7 +4798,7 @@ function useDataHandlers({
   // Factory: Create layer data change handler
   // =========================================================================
 
-  type LayerField = 'cells' | 'objects' | 'textLabels' | 'edges';
+  type LayerField = 'cells' | 'curves' | 'objects' | 'textLabels' | 'edges';
 
   const createLayerDataHandler = dc.useCallback(<T,>(field: LayerField) => {
     return (newValue: T, suppressHistory = false): void => {
@@ -4773,6 +4825,11 @@ function useDataHandlers({
 
   const handleCellsChange = dc.useMemo(
     () => createLayerDataHandler<Cell[]>('cells'),
+    [createLayerDataHandler]
+  );
+
+  const handleCurvesChange = dc.useMemo(
+    () => createLayerDataHandler<Curve[]>('curves'),
     [createLayerDataHandler]
   );
 
@@ -4899,6 +4956,7 @@ function useDataHandlers({
 
   const layerDataHandlers: LayerDataHandlers = {
     handleCellsChange,
+    handleCurvesChange,
     handleObjectsChange,
     handleTextLabelsChange,
     handleEdgesChange
@@ -4922,6 +4980,7 @@ function useDataHandlers({
     // Direct access
     handleNameChange,
     handleCellsChange,
+    handleCurvesChange,
     handleObjectsChange,
     handleTextLabelsChange,
     handleEdgesChange,
@@ -5251,7 +5310,30 @@ abstract class BaseGeometry implements IGeometry {
 // Type exports for consuming modules
 export type { BaseGeometry };
 
-return { BaseGeometry };
+/**
+ * Calculate viewport offset for centering the map on canvas.
+ * Grid maps multiply center by scaled cell size; hex maps multiply by zoom only.
+ */
+function calculateViewportOffset(
+  geometry: { type: string; cellSize: number },
+  center: { x: number; y: number },
+  canvasSize: { width: number; height: number },
+  zoom: number
+): { offsetX: number; offsetY: number } {
+  if (geometry.type !== 'hex') {
+    const scaledSize = geometry.cellSize * zoom;
+    return {
+      offsetX: canvasSize.width / 2 - center.x * scaledSize,
+      offsetY: canvasSize.height / 2 - center.y * scaledSize,
+    };
+  }
+  return {
+    offsetX: canvasSize.width / 2 - center.x * zoom,
+    offsetY: canvasSize.height / 2 - center.y * zoom,
+  };
+}
+
+return { BaseGeometry, calculateViewportOffset };
 ```
 
 # GridGeometry
@@ -7054,7 +7136,7 @@ import type {
 // Datacore imports
 // Import getObjectType from the resolver (handles overrides, custom objects, fallback)
 const { getObjectType } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "objectTypeResolver")) as {
-  getObjectType: (typeId: string) => ObjectTypeDef
+  getObjectType: (typeId: string, mapType?: MapType) => ObjectTypeDef
 };
 
 const { 
@@ -7190,15 +7272,15 @@ function addObjectToHex(
   x: number,
   y: number
 ): PlacementResult {
-  const objectType = getObjectType(typeId);
+  const objectType = getObjectType(typeId, 'hex');
   if (objectType.isUnknown) {
-    return { 
-      objects, 
-      success: false, 
-      error: `Unknown object type: ${typeId}` 
+    return {
+      objects,
+      success: false,
+      error: `Unknown object type: ${typeId}`
     };
   }
-  
+
   // Check if cell can accept another object
   if (!canAddObjectToCell(objects, x, y)) {
     return { 
@@ -7427,7 +7509,7 @@ function placeObject(
   }
   
   // Grid: single object per cell
-  const objectType = getObjectType(typeId);
+  const objectType = getObjectType(typeId, mapType);
   if (objectType.isUnknown) {
     return { 
       objects, 
@@ -11649,6 +11731,1438 @@ export type {
 return { segmentRenderer };
 ```
 
+# curveRenderer
+
+```ts
+/**
+ * curveRenderer.ts
+ *
+ * Renders freehand curves on the HTML Canvas 2D context.
+ * Builds and caches Path2D objects per curve, applies viewport transforms,
+ * fills closed paths with even-odd rule, and strokes all paths.
+ */
+
+import type { Curve } from '#types/core/curve.types';
+import type { RendererTheme } from '#types/hooks/canvasRenderer.types';
+
+/** Viewport state needed for rendering */
+interface CurveViewState {
+  x: number;  // offsetX
+  y: number;  // offsetY
+  zoom: number;
+}
+
+const path2DCache = new WeakMap<Curve, Path2D>();
+
+/**
+ * Build a Path2D for a curve, including holes.
+ * Caches in a WeakMap for reuse across frames.
+ */
+function buildPath2D(curve: Curve): Path2D {
+  const cached = path2DCache.get(curve);
+  if (cached) return cached;
+
+  const path = new Path2D();
+  const [sx, sy] = curve.start;
+  path.moveTo(sx, sy);
+
+  const segs = curve.segments;
+  for (let i = 0; i < segs.length; i++) {
+    const seg = segs[i];
+    path.bezierCurveTo(seg[0], seg[1], seg[2], seg[3], seg[4], seg[5]);
+  }
+
+  if (curve.closed) {
+    path.closePath();
+  }
+
+  // Add inner rings as subpaths (counter-wound for even-odd fill)
+  if (curve.innerRings) {
+    for (let h = 0; h < curve.innerRings.length; h++) {
+      const ring = curve.innerRings[h];
+      if (!ring || ring.length < 3) continue;
+      path.moveTo(ring[0][0], ring[0][1]);
+      for (let i = 1; i < ring.length; i++) {
+        path.lineTo(ring[i][0], ring[i][1]);
+      }
+      path.closePath();
+    }
+  }
+
+  path2DCache.set(curve, path);
+  return path;
+}
+
+/** Grid configuration for interior grid lines inside curves */
+interface CurveGridConfig {
+  cellSize: number;
+  lineColor: string;
+  lineWidth: number;
+  interiorRatio: number;
+}
+
+/**
+ * Compute the world-coordinate bounding box of a curve from its geometry.
+ */
+function getCurveBounds(curve: Curve): { minX: number; minY: number; maxX: number; maxY: number } {
+  let minX = curve.start[0];
+  let minY = curve.start[1];
+  let maxX = minX;
+  let maxY = minY;
+
+  const segs = curve.segments;
+  for (let i = 0; i < segs.length; i++) {
+    const seg = segs[i];
+    // Check all 3 points per segment (cp1, cp2, endpoint)
+    for (let j = 0; j < 6; j += 2) {
+      const px = seg[j];
+      const py = seg[j + 1];
+      if (px < minX) minX = px;
+      if (px > maxX) maxX = px;
+      if (py < minY) minY = py;
+      if (py > maxY) maxY = py;
+    }
+  }
+
+  return { minX, minY, maxX, maxY };
+}
+
+/**
+ * Render interior grid lines clipped to a curve's filled area.
+ * Uses fillRect (not stroke) for Obsidian Live Preview compatibility.
+ * Coordinates are in world space (caller has already applied viewport transform).
+ */
+function renderCurveInteriorGrid(
+  ctx: CanvasRenderingContext2D,
+  curve: Curve,
+  path: Path2D,
+  gridConfig: CurveGridConfig
+): void {
+  const { cellSize, lineColor, lineWidth, interiorRatio } = gridConfig;
+  const actualLineWidth = Math.max(1 / ctx.getTransform().a, lineWidth * interiorRatio);
+  const halfWidth = actualLineWidth / 2;
+
+  const bounds = getCurveBounds(curve);
+
+  // Grid-align the bounds with 1-cell padding
+  const startCol = Math.floor(bounds.minX / cellSize) - 1;
+  const endCol = Math.ceil(bounds.maxX / cellSize) + 1;
+  const startRow = Math.floor(bounds.minY / cellSize) - 1;
+  const endRow = Math.ceil(bounds.maxY / cellSize) + 1;
+
+  ctx.save();
+  ctx.clip(path, 'evenodd');
+  ctx.fillStyle = lineColor;
+
+  // Draw vertical grid lines
+  for (let col = startCol; col <= endCol; col++) {
+    const x = col * cellSize;
+    ctx.fillRect(x - halfWidth, bounds.minY - cellSize, actualLineWidth, bounds.maxY - bounds.minY + cellSize * 2);
+  }
+
+  // Draw horizontal grid lines
+  for (let row = startRow; row <= endRow; row++) {
+    const y = row * cellSize;
+    ctx.fillRect(bounds.minX - cellSize, y - halfWidth, bounds.maxX - bounds.minX + cellSize * 2, actualLineWidth);
+  }
+
+  ctx.restore();
+}
+
+/**
+ * Render all curves for a layer onto the canvas.
+ *
+ * @param ctx - Canvas 2D rendering context
+ * @param curves - Array of curves to render
+ * @param viewState - Current viewport (offsetX, offsetY, zoom)
+ * @param theme - Renderer theme for border styling
+ * @param options - Optional rendering options
+ */
+function renderCurves(
+  ctx: CanvasRenderingContext2D,
+  curves: Curve[],
+  viewState: CurveViewState,
+  theme: RendererTheme,
+  options: {
+    opacity?: number;
+    mergeIndex?: { curveCellRects: Map<number, Array<{ x: number; y: number; w: number; h: number }>> } | null;
+    gridConfig?: CurveGridConfig;
+  } = {}
+): void {
+  if (!curves || !Array.isArray(curves) || curves.length === 0) return;
+
+  const { x: offsetX, y: offsetY, zoom } = viewState;
+  const { opacity = 1, mergeIndex = null, gridConfig } = options;
+
+  const previousAlpha = ctx.globalAlpha;
+  if (opacity < 1) {
+    ctx.globalAlpha = opacity;
+  }
+
+  ctx.save();
+
+  // Apply viewport transform: world coords -> screen coords
+  ctx.translate(offsetX, offsetY);
+  ctx.scale(zoom, zoom);
+
+  // Stroke styling matches cell borders
+  const strokeColor = theme.cells.border;
+  const strokeWidth = theme.cells.borderWidth / zoom; // Constant screen-space width
+
+  // Render each curve individually
+  for (let i = 0; i < curves.length; i++) {
+    const curve = curves[i];
+    if (!curve || !curve.start || !curve.segments) continue;
+
+    const path = buildPath2D(curve);
+
+    // Fill closed curves
+    if (curve.closed && curve.color && curve.color !== 'transparent') {
+      ctx.fillStyle = curve.color;
+      const curveAlpha = curve.opacity ?? 1;
+      if (curveAlpha < 1 || opacity < 1) {
+        ctx.globalAlpha = (opacity < 1 ? opacity : 1) * curveAlpha;
+      }
+      ctx.fill(path, 'evenodd');
+      // Reset alpha
+      ctx.globalAlpha = opacity < 1 ? opacity : 1;
+    }
+
+    // Interior grid lines: between fill and stroke, clipped to curve shape
+    if (gridConfig && curve.closed && curve.color && curve.color !== 'transparent') {
+      renderCurveInteriorGrid(ctx, curve, path, gridConfig);
+    }
+
+    // Stroke all curves
+    if (curve.closed) {
+      ctx.strokeStyle = strokeColor;
+      ctx.lineWidth = strokeWidth;
+    } else {
+      ctx.strokeStyle = curve.strokeColor || strokeColor;
+      ctx.lineWidth = (curve.strokeWidth || 2) / zoom;
+    }
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    // Check for same-color cell rects to clip out of the stroke
+    const cellRects = mergeIndex?.curveCellRects?.get(i);
+    if (cellRects && cellRects.length > 0 && curve.closed) {
+      // Clip-based stroke suppression: stroke everywhere except
+      // where same-color cells cover the curve border.
+      // Uses even-odd rule: large rect + cell rects = holes at cells.
+      ctx.save();
+      const clipPath = new Path2D();
+      clipPath.rect(-1e6, -1e6, 2e6, 2e6);
+      for (let r = 0; r < cellRects.length; r++) {
+        const cr = cellRects[r];
+        clipPath.rect(cr.x, cr.y, cr.w, cr.h);
+      }
+      ctx.clip(clipPath, 'evenodd');
+      ctx.stroke(path);
+      ctx.restore();
+    } else {
+      ctx.stroke(path);
+    }
+  }
+
+  ctx.restore();
+
+  if (opacity < 1) {
+    ctx.globalAlpha = previousAlpha;
+  }
+}
+
+return {
+  renderCurves,
+  buildPath2D
+};
+
+```
+
+# polygon-clipping-wrapper
+
+```js
+/**
+ * polygon-clipping-wrapper.js
+ *
+ * Datacore module wrapping the vendored polygon-clipping UMD bundle.
+ *
+ * The UMD source is embedded inline so this module works in the compiled
+ * markdown (where there is no filesystem access for loading separate files).
+ * Local `module` and `exports` variables provide a CommonJS context that
+ * the UMD's environment detection finds, so it writes to module.exports
+ * instead of falling through to the global/window branch.
+ *
+ * Source: polygon-clipping v0.15.7 (vendored from npm)
+ * Original UMD at: src/vendor/polygon-clipping.umd.js
+ */
+
+// CommonJS shim — the UMD checks `typeof exports` and `typeof module`
+const module = { exports: {} };
+const exports = module.exports;
+
+// === polygon-clipping v0.15.7 UMD bundle ===
+!function(t,e){"object"==typeof exports&&"undefined"!=typeof module?module.exports=e():"function"==typeof define&&define.amd?define(e):(t="undefined"!=typeof globalThis?globalThis:t||self).polygonClipping=e()}(this,(function(){"use strict";
+/**
+     * splaytree v3.1.2
+     * Fast Splay tree for Node and browser
+     *
+     * @author Alexander Milevski <info@w8r.name>
+     * @license MIT
+     * @preserve
+     */
+/*! *****************************************************************************
+    Copyright (c) Microsoft Corporation. All rights reserved.
+    Licensed under the Apache License, Version 2.0 (the "License"); you may not use
+    this file except in compliance with the License. You may obtain a copy of the
+    License at http://www.apache.org/licenses/LICENSE-2.0
+
+    THIS CODE IS PROVIDED ON AN *AS IS* BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+    KIND, EITHER EXPRESS OR IMPLIED, INCLUDING WITHOUT LIMITATION ANY IMPLIED
+    WARRANTIES OR CONDITIONS OF TITLE, FITNESS FOR A PARTICULAR PURPOSE,
+    MERCHANTABLITY OR NON-INFRINGEMENT.
+
+    See the Apache Version 2.0 License for specific language governing permissions
+    and limitations under the License.
+    ***************************************************************************** */function t(t,e){var n,r,i,o,s={label:0,sent:function(){if(1&i[0])throw i[1];return i[1]},trys:[],ops:[]};return o={next:l(0),throw:l(1),return:l(2)},"function"==typeof Symbol&&(o[Symbol.iterator]=function(){return this}),o;function l(o){return function(l){return function(o){if(n)throw new TypeError("Generator is already executing.");for(;s;)try{if(n=1,r&&(i=2&o[0]?r.return:o[0]?r.throw||((i=r.return)&&i.call(r),0):r.next)&&!(i=i.call(r,o[1])).done)return i;switch(r=0,i&&(o=[2&o[0],i.value]),o[0]){case 0:case 1:i=o;break;case 4:return s.label++,{value:o[1],done:!1};case 5:s.label++,r=o[1],o=[0];continue;case 7:o=s.ops.pop(),s.trys.pop();continue;default:if(!(i=s.trys,(i=i.length>0&&i[i.length-1])||6!==o[0]&&2!==o[0])){s=0;continue}if(3===o[0]&&(!i||o[1]>i[0]&&o[1]<i[3])){s.label=o[1];break}if(6===o[0]&&s.label<i[1]){s.label=i[1],i=o;break}if(i&&s.label<i[2]){s.label=i[2],s.ops.push(o);break}i[2]&&s.ops.pop(),s.trys.pop();continue}o=e.call(t,s)}catch(t){o=[6,t],r=0}finally{n=i=0}if(5&o[0])throw o[1];return{value:o[0]?o[1]:void 0,done:!0}}([o,l])}}}var e=function(t,e){this.next=null,this.key=t,this.data=e,this.left=null,this.right=null};function n(t,e){return t>e?1:t<e?-1:0}function r(t,n,r){for(var i=new e(null,null),o=i,s=i;;){var l=r(t,n.key);if(l<0){if(null===n.left)break;if(r(t,n.left.key)<0){var h=n.left;if(n.left=h.right,h.right=n,null===(n=h).left)break}s.left=n,s=n,n=n.left}else{if(!(l>0))break;if(null===n.right)break;if(r(t,n.right.key)>0){h=n.right;if(n.right=h.left,h.left=n,null===(n=h).right)break}o.right=n,o=n,n=n.right}}return o.right=n.left,s.left=n.right,n.left=i.right,n.right=i.left,n}function i(t,n,i,o){var s=new e(t,n);if(null===i)return s.left=s.right=null,s;var l=o(t,(i=r(t,i,o)).key);return l<0?(s.left=i.left,s.right=i,i.left=null):l>=0&&(s.right=i.right,s.left=i,i.right=null),s}function o(t,e,n){var i=null,o=null;if(e){var s=n((e=r(t,e,n)).key,t);0===s?(i=e.left,o=e.right):s<0?(o=e.right,e.right=null,i=e):(i=e.left,e.left=null,o=e)}return{left:i,right:o}}function s(t,e,n,r,i){if(t){r(e+(n?"└── ":"├── ")+i(t)+"\n");var o=e+(n?"    ":"│   ");t.left&&s(t.left,o,!1,r,i),t.right&&s(t.right,o,!0,r,i)}}var l=function(){function l(t){void 0===t&&(t=n),this._root=null,this._size=0,this._comparator=t}return l.prototype.insert=function(t,e){return this._size++,this._root=i(t,e,this._root,this._comparator)},l.prototype.add=function(t,n){var i=new e(t,n);null===this._root&&(i.left=i.right=null,this._size++,this._root=i);var o=this._comparator,s=r(t,this._root,o),l=o(t,s.key);return 0===l?this._root=s:(l<0?(i.left=s.left,i.right=s,s.left=null):l>0&&(i.right=s.right,i.left=s,s.right=null),this._size++,this._root=i),this._root},l.prototype.remove=function(t){this._root=this._remove(t,this._root,this._comparator)},l.prototype._remove=function(t,e,n){var i;return null===e?null:0===n(t,(e=r(t,e,n)).key)?(null===e.left?i=e.right:(i=r(t,e.left,n)).right=e.right,this._size--,i):e},l.prototype.pop=function(){var t=this._root;if(t){for(;t.left;)t=t.left;return this._root=r(t.key,this._root,this._comparator),this._root=this._remove(t.key,this._root,this._comparator),{key:t.key,data:t.data}}return null},l.prototype.findStatic=function(t){for(var e=this._root,n=this._comparator;e;){var r=n(t,e.key);if(0===r)return e;e=r<0?e.left:e.right}return null},l.prototype.find=function(t){return this._root&&(this._root=r(t,this._root,this._comparator),0!==this._comparator(t,this._root.key))?null:this._root},l.prototype.contains=function(t){for(var e=this._root,n=this._comparator;e;){var r=n(t,e.key);if(0===r)return!0;e=r<0?e.left:e.right}return!1},l.prototype.forEach=function(t,e){for(var n=this._root,r=[],i=!1;!i;)null!==n?(r.push(n),n=n.left):0!==r.length?(n=r.pop(),t.call(e,n),n=n.right):i=!0;return this},l.prototype.range=function(t,e,n,r){for(var i=[],o=this._comparator,s=this._root;0!==i.length||s;)if(s)i.push(s),s=s.left;else{if(o((s=i.pop()).key,e)>0)break;if(o(s.key,t)>=0&&n.call(r,s))return this;s=s.right}return this},l.prototype.keys=function(){var t=[];return this.forEach((function(e){var n=e.key;return t.push(n)})),t},l.prototype.values=function(){var t=[];return this.forEach((function(e){var n=e.data;return t.push(n)})),t},l.prototype.min=function(){return this._root?this.minNode(this._root).key:null},l.prototype.max=function(){return this._root?this.maxNode(this._root).key:null},l.prototype.minNode=function(t){if(void 0===t&&(t=this._root),t)for(;t.left;)t=t.left;return t},l.prototype.maxNode=function(t){if(void 0===t&&(t=this._root),t)for(;t.right;)t=t.right;return t},l.prototype.at=function(t){for(var e=this._root,n=!1,r=0,i=[];!n;)if(e)i.push(e),e=e.left;else if(i.length>0){if(e=i.pop(),r===t)return e;r++,e=e.right}else n=!0;return null},l.prototype.next=function(t){var e=this._root,n=null;if(t.right){for(n=t.right;n.left;)n=n.left;return n}for(var r=this._comparator;e;){var i=r(t.key,e.key);if(0===i)break;i<0?(n=e,e=e.left):e=e.right}return n},l.prototype.prev=function(t){var e=this._root,n=null;if(null!==t.left){for(n=t.left;n.right;)n=n.right;return n}for(var r=this._comparator;e;){var i=r(t.key,e.key);if(0===i)break;i<0?e=e.left:(n=e,e=e.right)}return n},l.prototype.clear=function(){return this._root=null,this._size=0,this},l.prototype.toList=function(){return function(t){var n=t,r=[],i=!1,o=new e(null,null),s=o;for(;!i;)n?(r.push(n),n=n.left):r.length>0?n=(n=s=s.next=r.pop()).right:i=!0;return s.next=null,o.next}(this._root)},l.prototype.load=function(t,n,r){void 0===n&&(n=[]),void 0===r&&(r=!1);var i=t.length,o=this._comparator;if(r&&f(t,n,0,i-1,o),null===this._root)this._root=h(t,n,0,i),this._size=i;else{var s=function(t,n,r){var i=new e(null,null),o=i,s=t,l=n;for(;null!==s&&null!==l;)r(s.key,l.key)<0?(o.next=s,s=s.next):(o.next=l,l=l.next),o=o.next;null!==s?o.next=s:null!==l&&(o.next=l);return i.next}(this.toList(),function(t,n){for(var r=new e(null,null),i=r,o=0;o<t.length;o++)i=i.next=new e(t[o],n[o]);return i.next=null,r.next}(t,n),o);i=this._size+i,this._root=u({head:s},0,i)}return this},l.prototype.isEmpty=function(){return null===this._root},Object.defineProperty(l.prototype,"size",{get:function(){return this._size},enumerable:!0,configurable:!0}),Object.defineProperty(l.prototype,"root",{get:function(){return this._root},enumerable:!0,configurable:!0}),l.prototype.toString=function(t){void 0===t&&(t=function(t){return String(t.key)});var e=[];return s(this._root,"",!0,(function(t){return e.push(t)}),t),e.join("")},l.prototype.update=function(t,e,n){var s=this._comparator,l=o(t,this._root,s),h=l.left,u=l.right;s(t,e)<0?u=i(e,n,u,s):h=i(e,n,h,s),this._root=function(t,e,n){return null===e?t:(null===t||((e=r(t.key,e,n)).left=t),e)}(h,u,s)},l.prototype.split=function(t){return o(t,this._root,this._comparator)},l.prototype[Symbol.iterator]=function(){var e,n,r;return t(this,(function(t){switch(t.label){case 0:e=this._root,n=[],r=!1,t.label=1;case 1:return r?[3,6]:null===e?[3,2]:(n.push(e),e=e.left,[3,5]);case 2:return 0===n.length?[3,4]:[4,e=n.pop()];case 3:return t.sent(),e=e.right,[3,5];case 4:r=!0,t.label=5;case 5:return[3,1];case 6:return[2]}}))},l}();function h(t,n,r,i){var o=i-r;if(o>0){var s=r+Math.floor(o/2),l=t[s],u=n[s],f=new e(l,u);return f.left=h(t,n,r,s),f.right=h(t,n,s+1,i),f}return null}function u(t,e,n){var r=n-e;if(r>0){var i=e+Math.floor(r/2),o=u(t,e,i),s=t.head;return s.left=o,t.head=t.head.next,s.right=u(t,i+1,n),s}return null}function f(t,e,n,r,i){if(!(n>=r)){for(var o=t[n+r>>1],s=n-1,l=r+1;;){do{s++}while(i(t[s],o)<0);do{l--}while(i(t[l],o)>0);if(s>=l)break;var h=t[s];t[s]=t[l],t[l]=h,h=e[s],e[s]=e[l],e[l]=h}f(t,e,n,l,i),f(t,e,l+1,r,i)}}const c=(t,e)=>t.ll.x<=e.x&&e.x<=t.ur.x&&t.ll.y<=e.y&&e.y<=t.ur.y,p=(t,e)=>{if(e.ur.x<t.ll.x||t.ur.x<e.ll.x||e.ur.y<t.ll.y||t.ur.y<e.ll.y)return null;const n=t.ll.x<e.ll.x?e.ll.x:t.ll.x,r=t.ur.x<e.ur.x?t.ur.x:e.ur.x;return{ll:{x:n,y:t.ll.y<e.ll.y?e.ll.y:t.ll.y},ur:{x:r,y:t.ur.y<e.ur.y?t.ur.y:e.ur.y}}};let g=Number.EPSILON;void 0===g&&(g=Math.pow(2,-52));const a=g*g,y=(t,e)=>{if(-g<t&&t<g&&-g<e&&e<g)return 0;const n=t-e;return n*n<a*t*e?0:t<e?-1:1};class x{constructor(){this.tree=new l,this.round(0)}round(t){const e=this.tree.add(t),n=this.tree.prev(e);if(null!==n&&0===y(e.key,n.key))return this.tree.remove(t),n.key;const r=this.tree.next(e);return null!==r&&0===y(e.key,r.key)?(this.tree.remove(t),r.key):t}}const b=new class{constructor(){this.reset()}reset(){this.xRounder=new x,this.yRounder=new x}round(t,e){return{x:this.xRounder.round(t),y:this.yRounder.round(e)}}},v=11102230246251565e-32,d=134217729,m=(3+8*v)*v;function E(t,e,n,r,i){let o,s,l,h,u=e[0],f=r[0],c=0,p=0;f>u==f>-u?(o=u,u=e[++c]):(o=f,f=r[++p]);let g=0;if(c<t&&p<n)for(f>u==f>-u?(s=u+o,l=o-(s-u),u=e[++c]):(s=f+o,l=o-(s-f),f=r[++p]),o=s,0!==l&&(i[g++]=l);c<t&&p<n;)f>u==f>-u?(s=o+u,h=s-o,l=o-(s-h)+(u-h),u=e[++c]):(s=o+f,h=s-o,l=o-(s-h)+(f-h),f=r[++p]),o=s,0!==l&&(i[g++]=l);for(;c<t;)s=o+u,h=s-o,l=o-(s-h)+(u-h),u=e[++c],o=s,0!==l&&(i[g++]=l);for(;p<n;)s=o+f,h=s-o,l=o-(s-h)+(f-h),f=r[++p],o=s,0!==l&&(i[g++]=l);return 0===o&&0!==g||(i[g++]=o),g}function S(t){return new Float64Array(t)}const _=22204460492503146e-32,w=11093356479670487e-47,k=S(4),R=S(8),I=S(12),P=S(16),N=S(4);function A(t,e,n,r,i,o){const s=(e-o)*(n-i),l=(t-i)*(r-o),h=s-l,u=Math.abs(s+l);return Math.abs(h)>=33306690738754716e-32*u?h:-function(t,e,n,r,i,o,s){let l,h,u,f,c,p,g,a,y,x,b,v,S,A,O,L,$,M;const z=t-i,B=n-i,G=e-o,T=r-o;A=z*T,p=d*z,g=p-(p-z),a=z-g,p=d*T,y=p-(p-T),x=T-y,O=a*x-(A-g*y-a*y-g*x),L=G*B,p=d*G,g=p-(p-G),a=G-g,p=d*B,y=p-(p-B),x=B-y,$=a*x-(L-g*y-a*y-g*x),b=O-$,c=O-b,k[0]=O-(b+c)+(c-$),v=A+b,c=v-A,S=A-(v-c)+(b-c),b=S-L,c=S-b,k[1]=S-(b+c)+(c-L),M=v+b,c=M-v,k[2]=v-(M-c)+(b-c),k[3]=M;let q=function(t,e){let n=e[0];for(let r=1;r<t;r++)n+=e[r];return n}(4,k),C=_*s;if(q>=C||-q>=C)return q;if(c=t-z,l=t-(z+c)+(c-i),c=n-B,u=n-(B+c)+(c-i),c=e-G,h=e-(G+c)+(c-o),c=r-T,f=r-(T+c)+(c-o),0===l&&0===h&&0===u&&0===f)return q;if(C=w*s+m*Math.abs(q),q+=z*f+T*l-(G*u+B*h),q>=C||-q>=C)return q;A=l*T,p=d*l,g=p-(p-l),a=l-g,p=d*T,y=p-(p-T),x=T-y,O=a*x-(A-g*y-a*y-g*x),L=h*B,p=d*h,g=p-(p-h),a=h-g,p=d*B,y=p-(p-B),x=B-y,$=a*x-(L-g*y-a*y-g*x),b=O-$,c=O-b,N[0]=O-(b+c)+(c-$),v=A+b,c=v-A,S=A-(v-c)+(b-c),b=S-L,c=S-b,N[1]=S-(b+c)+(c-L),M=v+b,c=M-v,N[2]=v-(M-c)+(b-c),N[3]=M;const F=E(4,k,4,N,R);A=z*f,p=d*z,g=p-(p-z),a=z-g,p=d*f,y=p-(p-f),x=f-y,O=a*x-(A-g*y-a*y-g*x),L=G*u,p=d*G,g=p-(p-G),a=G-g,p=d*u,y=p-(p-u),x=u-y,$=a*x-(L-g*y-a*y-g*x),b=O-$,c=O-b,N[0]=O-(b+c)+(c-$),v=A+b,c=v-A,S=A-(v-c)+(b-c),b=S-L,c=S-b,N[1]=S-(b+c)+(c-L),M=v+b,c=M-v,N[2]=v-(M-c)+(b-c),N[3]=M;const j=E(F,R,4,N,I);A=l*f,p=d*l,g=p-(p-l),a=l-g,p=d*f,y=p-(p-f),x=f-y,O=a*x-(A-g*y-a*y-g*x),L=h*u,p=d*h,g=p-(p-h),a=h-g,p=d*u,y=p-(p-u),x=u-y,$=a*x-(L-g*y-a*y-g*x),b=O-$,c=O-b,N[0]=O-(b+c)+(c-$),v=A+b,c=v-A,S=A-(v-c)+(b-c),b=S-L,c=S-b,N[1]=S-(b+c)+(c-L),M=v+b,c=M-v,N[2]=v-(M-c)+(b-c),N[3]=M;const U=E(j,I,4,N,P);return P[U-1]}(t,e,n,r,i,o,u)}const O=(t,e)=>t.x*e.y-t.y*e.x,L=(t,e)=>t.x*e.x+t.y*e.y,$=(t,e,n)=>{const r=A(t.x,t.y,e.x,e.y,n.x,n.y);return r>0?-1:r<0?1:0},M=t=>Math.sqrt(L(t,t)),z=(t,e,n)=>{const r={x:e.x-t.x,y:e.y-t.y},i={x:n.x-t.x,y:n.y-t.y};return O(i,r)/M(i)/M(r)},B=(t,e,n)=>{const r={x:e.x-t.x,y:e.y-t.y},i={x:n.x-t.x,y:n.y-t.y};return L(i,r)/M(i)/M(r)},G=(t,e,n)=>0===e.y?null:{x:t.x+e.x/e.y*(n-t.y),y:n},T=(t,e,n)=>0===e.x?null:{x:n,y:t.y+e.y/e.x*(n-t.x)};class q{static compare(t,e){const n=q.comparePoints(t.point,e.point);return 0!==n?n:(t.point!==e.point&&t.link(e),t.isLeft!==e.isLeft?t.isLeft?1:-1:F.compare(t.segment,e.segment))}static comparePoints(t,e){return t.x<e.x?-1:t.x>e.x?1:t.y<e.y?-1:t.y>e.y?1:0}constructor(t,e){void 0===t.events?t.events=[this]:t.events.push(this),this.point=t,this.isLeft=e}link(t){if(t.point===this.point)throw new Error("Tried to link already linked events");const e=t.point.events;for(let t=0,n=e.length;t<n;t++){const n=e[t];this.point.events.push(n),n.point=this.point}this.checkForConsuming()}checkForConsuming(){const t=this.point.events.length;for(let e=0;e<t;e++){const n=this.point.events[e];if(void 0===n.segment.consumedBy)for(let r=e+1;r<t;r++){const t=this.point.events[r];void 0===t.consumedBy&&(n.otherSE.point.events===t.otherSE.point.events&&n.segment.consume(t.segment))}}}getAvailableLinkedEvents(){const t=[];for(let e=0,n=this.point.events.length;e<n;e++){const n=this.point.events[e];n!==this&&!n.segment.ringOut&&n.segment.isInResult()&&t.push(n)}return t}getLeftmostComparator(t){const e=new Map,n=n=>{const r=n.otherSE;e.set(n,{sine:z(this.point,t.point,r.point),cosine:B(this.point,t.point,r.point)})};return(t,r)=>{e.has(t)||n(t),e.has(r)||n(r);const{sine:i,cosine:o}=e.get(t),{sine:s,cosine:l}=e.get(r);return i>=0&&s>=0?o<l?1:o>l?-1:0:i<0&&s<0?o<l?-1:o>l?1:0:s<i?-1:s>i?1:0}}}let C=0;class F{static compare(t,e){const n=t.leftSE.point.x,r=e.leftSE.point.x,i=t.rightSE.point.x,o=e.rightSE.point.x;if(o<n)return 1;if(i<r)return-1;const s=t.leftSE.point.y,l=e.leftSE.point.y,h=t.rightSE.point.y,u=e.rightSE.point.y;if(n<r){if(l<s&&l<h)return 1;if(l>s&&l>h)return-1;const n=t.comparePoint(e.leftSE.point);if(n<0)return 1;if(n>0)return-1;const r=e.comparePoint(t.rightSE.point);return 0!==r?r:-1}if(n>r){if(s<l&&s<u)return-1;if(s>l&&s>u)return 1;const n=e.comparePoint(t.leftSE.point);if(0!==n)return n;const r=t.comparePoint(e.rightSE.point);return r<0?1:r>0?-1:1}if(s<l)return-1;if(s>l)return 1;if(i<o){const n=e.comparePoint(t.rightSE.point);if(0!==n)return n}if(i>o){const n=t.comparePoint(e.rightSE.point);if(n<0)return 1;if(n>0)return-1}if(i!==o){const t=h-s,e=i-n,f=u-l,c=o-r;if(t>e&&f<c)return 1;if(t<e&&f>c)return-1}return i>o?1:i<o||h<u?-1:h>u?1:t.id<e.id?-1:t.id>e.id?1:0}constructor(t,e,n,r){this.id=++C,this.leftSE=t,t.segment=this,t.otherSE=e,this.rightSE=e,e.segment=this,e.otherSE=t,this.rings=n,this.windings=r}static fromRing(t,e,n){let r,i,o;const s=q.comparePoints(t,e);if(s<0)r=t,i=e,o=1;else{if(!(s>0))throw new Error(`Tried to create degenerate segment at [${t.x}, ${t.y}]`);r=e,i=t,o=-1}const l=new q(r,!0),h=new q(i,!1);return new F(l,h,[n],[o])}replaceRightSE(t){this.rightSE=t,this.rightSE.segment=this,this.rightSE.otherSE=this.leftSE,this.leftSE.otherSE=this.rightSE}bbox(){const t=this.leftSE.point.y,e=this.rightSE.point.y;return{ll:{x:this.leftSE.point.x,y:t<e?t:e},ur:{x:this.rightSE.point.x,y:t>e?t:e}}}vector(){return{x:this.rightSE.point.x-this.leftSE.point.x,y:this.rightSE.point.y-this.leftSE.point.y}}isAnEndpoint(t){return t.x===this.leftSE.point.x&&t.y===this.leftSE.point.y||t.x===this.rightSE.point.x&&t.y===this.rightSE.point.y}comparePoint(t){if(this.isAnEndpoint(t))return 0;const e=this.leftSE.point,n=this.rightSE.point,r=this.vector();if(e.x===n.x)return t.x===e.x?0:t.x<e.x?1:-1;const i=(t.y-e.y)/r.y,o=e.x+i*r.x;if(t.x===o)return 0;const s=(t.x-e.x)/r.x,l=e.y+s*r.y;return t.y===l?0:t.y<l?-1:1}getIntersection(t){const e=this.bbox(),n=t.bbox(),r=p(e,n);if(null===r)return null;const i=this.leftSE.point,o=this.rightSE.point,s=t.leftSE.point,l=t.rightSE.point,h=c(e,s)&&0===this.comparePoint(s),u=c(n,i)&&0===t.comparePoint(i),f=c(e,l)&&0===this.comparePoint(l),g=c(n,o)&&0===t.comparePoint(o);if(u&&h)return g&&!f?o:!g&&f?l:null;if(u)return f&&i.x===l.x&&i.y===l.y?null:i;if(h)return g&&o.x===s.x&&o.y===s.y?null:s;if(g&&f)return null;if(g)return o;if(f)return l;const a=((t,e,n,r)=>{if(0===e.x)return T(n,r,t.x);if(0===r.x)return T(t,e,n.x);if(0===e.y)return G(n,r,t.y);if(0===r.y)return G(t,e,n.y);const i=O(e,r);if(0==i)return null;const o={x:n.x-t.x,y:n.y-t.y},s=O(o,e)/i,l=O(o,r)/i;return{x:(t.x+l*e.x+(n.x+s*r.x))/2,y:(t.y+l*e.y+(n.y+s*r.y))/2}})(i,this.vector(),s,t.vector());return null===a?null:c(r,a)?b.round(a.x,a.y):null}split(t){const e=[],n=void 0!==t.events,r=new q(t,!0),i=new q(t,!1),o=this.rightSE;this.replaceRightSE(i),e.push(i),e.push(r);const s=new F(r,o,this.rings.slice(),this.windings.slice());return q.comparePoints(s.leftSE.point,s.rightSE.point)>0&&s.swapEvents(),q.comparePoints(this.leftSE.point,this.rightSE.point)>0&&this.swapEvents(),n&&(r.checkForConsuming(),i.checkForConsuming()),e}swapEvents(){const t=this.rightSE;this.rightSE=this.leftSE,this.leftSE=t,this.leftSE.isLeft=!0,this.rightSE.isLeft=!1;for(let t=0,e=this.windings.length;t<e;t++)this.windings[t]*=-1}consume(t){let e=this,n=t;for(;e.consumedBy;)e=e.consumedBy;for(;n.consumedBy;)n=n.consumedBy;const r=F.compare(e,n);if(0!==r){if(r>0){const t=e;e=n,n=t}if(e.prev===n){const t=e;e=n,n=t}for(let t=0,r=n.rings.length;t<r;t++){const r=n.rings[t],i=n.windings[t],o=e.rings.indexOf(r);-1===o?(e.rings.push(r),e.windings.push(i)):e.windings[o]+=i}n.rings=null,n.windings=null,n.consumedBy=e,n.leftSE.consumedBy=e.leftSE,n.rightSE.consumedBy=e.rightSE}}prevInResult(){return void 0!==this._prevInResult||(this.prev?this.prev.isInResult()?this._prevInResult=this.prev:this._prevInResult=this.prev.prevInResult():this._prevInResult=null),this._prevInResult}beforeState(){if(void 0!==this._beforeState)return this._beforeState;if(this.prev){const t=this.prev.consumedBy||this.prev;this._beforeState=t.afterState()}else this._beforeState={rings:[],windings:[],multiPolys:[]};return this._beforeState}afterState(){if(void 0!==this._afterState)return this._afterState;const t=this.beforeState();this._afterState={rings:t.rings.slice(0),windings:t.windings.slice(0),multiPolys:[]};const e=this._afterState.rings,n=this._afterState.windings,r=this._afterState.multiPolys;for(let t=0,r=this.rings.length;t<r;t++){const r=this.rings[t],i=this.windings[t],o=e.indexOf(r);-1===o?(e.push(r),n.push(i)):n[o]+=i}const i=[],o=[];for(let t=0,r=e.length;t<r;t++){if(0===n[t])continue;const r=e[t],s=r.poly;if(-1===o.indexOf(s))if(r.isExterior)i.push(s);else{-1===o.indexOf(s)&&o.push(s);const t=i.indexOf(r.poly);-1!==t&&i.splice(t,1)}}for(let t=0,e=i.length;t<e;t++){const e=i[t].multiPoly;-1===r.indexOf(e)&&r.push(e)}return this._afterState}isInResult(){if(this.consumedBy)return!1;if(void 0!==this._isInResult)return this._isInResult;const t=this.beforeState().multiPolys,e=this.afterState().multiPolys;switch(H.type){case"union":{const n=0===t.length,r=0===e.length;this._isInResult=n!==r;break}case"intersection":{let n,r;t.length<e.length?(n=t.length,r=e.length):(n=e.length,r=t.length),this._isInResult=r===H.numMultiPolys&&n<r;break}case"xor":{const n=Math.abs(t.length-e.length);this._isInResult=n%2==1;break}case"difference":{const n=t=>1===t.length&&t[0].isSubject;this._isInResult=n(t)!==n(e);break}default:throw new Error(`Unrecognized operation type found ${H.type}`)}return this._isInResult}}class j{constructor(t,e,n){if(!Array.isArray(t)||0===t.length)throw new Error("Input geometry is not a valid Polygon or MultiPolygon");if(this.poly=e,this.isExterior=n,this.segments=[],"number"!=typeof t[0][0]||"number"!=typeof t[0][1])throw new Error("Input geometry is not a valid Polygon or MultiPolygon");const r=b.round(t[0][0],t[0][1]);this.bbox={ll:{x:r.x,y:r.y},ur:{x:r.x,y:r.y}};let i=r;for(let e=1,n=t.length;e<n;e++){if("number"!=typeof t[e][0]||"number"!=typeof t[e][1])throw new Error("Input geometry is not a valid Polygon or MultiPolygon");let n=b.round(t[e][0],t[e][1]);n.x===i.x&&n.y===i.y||(this.segments.push(F.fromRing(i,n,this)),n.x<this.bbox.ll.x&&(this.bbox.ll.x=n.x),n.y<this.bbox.ll.y&&(this.bbox.ll.y=n.y),n.x>this.bbox.ur.x&&(this.bbox.ur.x=n.x),n.y>this.bbox.ur.y&&(this.bbox.ur.y=n.y),i=n)}r.x===i.x&&r.y===i.y||this.segments.push(F.fromRing(i,r,this))}getSweepEvents(){const t=[];for(let e=0,n=this.segments.length;e<n;e++){const n=this.segments[e];t.push(n.leftSE),t.push(n.rightSE)}return t}}class U{constructor(t,e){if(!Array.isArray(t))throw new Error("Input geometry is not a valid Polygon or MultiPolygon");this.exteriorRing=new j(t[0],this,!0),this.bbox={ll:{x:this.exteriorRing.bbox.ll.x,y:this.exteriorRing.bbox.ll.y},ur:{x:this.exteriorRing.bbox.ur.x,y:this.exteriorRing.bbox.ur.y}},this.interiorRings=[];for(let e=1,n=t.length;e<n;e++){const n=new j(t[e],this,!1);n.bbox.ll.x<this.bbox.ll.x&&(this.bbox.ll.x=n.bbox.ll.x),n.bbox.ll.y<this.bbox.ll.y&&(this.bbox.ll.y=n.bbox.ll.y),n.bbox.ur.x>this.bbox.ur.x&&(this.bbox.ur.x=n.bbox.ur.x),n.bbox.ur.y>this.bbox.ur.y&&(this.bbox.ur.y=n.bbox.ur.y),this.interiorRings.push(n)}this.multiPoly=e}getSweepEvents(){const t=this.exteriorRing.getSweepEvents();for(let e=0,n=this.interiorRings.length;e<n;e++){const n=this.interiorRings[e].getSweepEvents();for(let e=0,r=n.length;e<r;e++)t.push(n[e])}return t}}class Y{constructor(t,e){if(!Array.isArray(t))throw new Error("Input geometry is not a valid Polygon or MultiPolygon");try{"number"==typeof t[0][0][0]&&(t=[t])}catch(t){}this.polys=[],this.bbox={ll:{x:Number.POSITIVE_INFINITY,y:Number.POSITIVE_INFINITY},ur:{x:Number.NEGATIVE_INFINITY,y:Number.NEGATIVE_INFINITY}};for(let e=0,n=t.length;e<n;e++){const n=new U(t[e],this);n.bbox.ll.x<this.bbox.ll.x&&(this.bbox.ll.x=n.bbox.ll.x),n.bbox.ll.y<this.bbox.ll.y&&(this.bbox.ll.y=n.bbox.ll.y),n.bbox.ur.x>this.bbox.ur.x&&(this.bbox.ur.x=n.bbox.ur.x),n.bbox.ur.y>this.bbox.ur.y&&(this.bbox.ur.y=n.bbox.ur.y),this.polys.push(n)}this.isSubject=e}getSweepEvents(){const t=[];for(let e=0,n=this.polys.length;e<n;e++){const n=this.polys[e].getSweepEvents();for(let e=0,r=n.length;e<r;e++)t.push(n[e])}return t}}class V{static factory(t){const e=[];for(let n=0,r=t.length;n<r;n++){const r=t[n];if(!r.isInResult()||r.ringOut)continue;let i=null,o=r.leftSE,s=r.rightSE;const l=[o],h=o.point,u=[];for(;i=o,o=s,l.push(o),o.point!==h;)for(;;){const t=o.getAvailableLinkedEvents();if(0===t.length){const t=l[0].point,e=l[l.length-1].point;throw new Error(`Unable to complete output ring starting at [${t.x}, ${t.y}]. Last matching segment found ends at [${e.x}, ${e.y}].`)}if(1===t.length){s=t[0].otherSE;break}let n=null;for(let t=0,e=u.length;t<e;t++)if(u[t].point===o.point){n=t;break}if(null!==n){const t=u.splice(n)[0],r=l.splice(t.index);r.unshift(r[0].otherSE),e.push(new V(r.reverse()));continue}u.push({index:l.length,point:o.point});const r=o.getLeftmostComparator(i);s=t.sort(r)[0].otherSE;break}e.push(new V(l))}return e}constructor(t){this.events=t;for(let e=0,n=t.length;e<n;e++)t[e].segment.ringOut=this;this.poly=null}getGeom(){let t=this.events[0].point;const e=[t];for(let n=1,r=this.events.length-1;n<r;n++){const r=this.events[n].point,i=this.events[n+1].point;0!==$(r,t,i)&&(e.push(r),t=r)}if(1===e.length)return null;const n=e[0],r=e[1];0===$(n,t,r)&&e.shift(),e.push(e[0]);const i=this.isExteriorRing()?1:-1,o=this.isExteriorRing()?0:e.length-1,s=this.isExteriorRing()?e.length:-1,l=[];for(let t=o;t!=s;t+=i)l.push([e[t].x,e[t].y]);return l}isExteriorRing(){if(void 0===this._isExteriorRing){const t=this.enclosingRing();this._isExteriorRing=!t||!t.isExteriorRing()}return this._isExteriorRing}enclosingRing(){return void 0===this._enclosingRing&&(this._enclosingRing=this._calcEnclosingRing()),this._enclosingRing}_calcEnclosingRing(){let t=this.events[0];for(let e=1,n=this.events.length;e<n;e++){const n=this.events[e];q.compare(t,n)>0&&(t=n)}let e=t.segment.prevInResult(),n=e?e.prevInResult():null;for(;;){if(!e)return null;if(!n)return e.ringOut;if(n.ringOut!==e.ringOut)return n.ringOut.enclosingRing()!==e.ringOut?e.ringOut:e.ringOut.enclosingRing();e=n.prevInResult(),n=e?e.prevInResult():null}}}class X{constructor(t){this.exteriorRing=t,t.poly=this,this.interiorRings=[]}addInterior(t){this.interiorRings.push(t),t.poly=this}getGeom(){const t=[this.exteriorRing.getGeom()];if(null===t[0])return null;for(let e=0,n=this.interiorRings.length;e<n;e++){const n=this.interiorRings[e].getGeom();null!==n&&t.push(n)}return t}}class Q{constructor(t){this.rings=t,this.polys=this._composePolys(t)}getGeom(){const t=[];for(let e=0,n=this.polys.length;e<n;e++){const n=this.polys[e].getGeom();null!==n&&t.push(n)}return t}_composePolys(t){const e=[];for(let n=0,r=t.length;n<r;n++){const r=t[n];if(!r.poly)if(r.isExteriorRing())e.push(new X(r));else{const t=r.enclosingRing();t.poly||e.push(new X(t)),t.poly.addInterior(r)}}return e}}class W{constructor(t){let e=arguments.length>1&&void 0!==arguments[1]?arguments[1]:F.compare;this.queue=t,this.tree=new l(e),this.segments=[]}process(t){const e=t.segment,n=[];if(t.consumedBy)return t.isLeft?this.queue.remove(t.otherSE):this.tree.remove(e),n;const r=t.isLeft?this.tree.add(e):this.tree.find(e);if(!r)throw new Error(`Unable to find segment #${e.id} [${e.leftSE.point.x}, ${e.leftSE.point.y}] -> [${e.rightSE.point.x}, ${e.rightSE.point.y}] in SweepLine tree.`);let i,o,s=r,l=r;for(;void 0===i;)s=this.tree.prev(s),null===s?i=null:void 0===s.key.consumedBy&&(i=s.key);for(;void 0===o;)l=this.tree.next(l),null===l?o=null:void 0===l.key.consumedBy&&(o=l.key);if(t.isLeft){let r=null;if(i){const t=i.getIntersection(e);if(null!==t&&(e.isAnEndpoint(t)||(r=t),!i.isAnEndpoint(t))){const e=this._splitSafely(i,t);for(let t=0,r=e.length;t<r;t++)n.push(e[t])}}let s=null;if(o){const t=o.getIntersection(e);if(null!==t&&(e.isAnEndpoint(t)||(s=t),!o.isAnEndpoint(t))){const e=this._splitSafely(o,t);for(let t=0,r=e.length;t<r;t++)n.push(e[t])}}if(null!==r||null!==s){let t=null;if(null===r)t=s;else if(null===s)t=r;else{t=q.comparePoints(r,s)<=0?r:s}this.queue.remove(e.rightSE),n.push(e.rightSE);const i=e.split(t);for(let t=0,e=i.length;t<e;t++)n.push(i[t])}n.length>0?(this.tree.remove(e),n.push(t)):(this.segments.push(e),e.prev=i)}else{if(i&&o){const t=i.getIntersection(o);if(null!==t){if(!i.isAnEndpoint(t)){const e=this._splitSafely(i,t);for(let t=0,r=e.length;t<r;t++)n.push(e[t])}if(!o.isAnEndpoint(t)){const e=this._splitSafely(o,t);for(let t=0,r=e.length;t<r;t++)n.push(e[t])}}}this.tree.remove(e)}return n}_splitSafely(t,e){this.tree.remove(t);const n=t.rightSE;this.queue.remove(n);const r=t.split(e);return r.push(n),void 0===t.consumedBy&&this.tree.add(t),r}}const Z="undefined"!=typeof process&&process.env.POLYGON_CLIPPING_MAX_QUEUE_SIZE||1e6,D="undefined"!=typeof process&&process.env.POLYGON_CLIPPING_MAX_SWEEPLINE_SEGMENTS||1e6;const H=new class{run(t,e,n){H.type=t,b.reset();const r=[new Y(e,!0)];for(let t=0,e=n.length;t<e;t++)r.push(new Y(n[t],!1));if(H.numMultiPolys=r.length,"difference"===H.type){const t=r[0];let e=1;for(;e<r.length;)null!==p(r[e].bbox,t.bbox)?e++:r.splice(e,1)}if("intersection"===H.type)for(let t=0,e=r.length;t<e;t++){const e=r[t];for(let n=t+1,i=r.length;n<i;n++)if(null===p(e.bbox,r[n].bbox))return[]}const i=new l(q.compare);for(let t=0,e=r.length;t<e;t++){const e=r[t].getSweepEvents();for(let t=0,n=e.length;t<n;t++)if(i.insert(e[t]),i.size>Z)throw new Error("Infinite loop when putting segment endpoints in a priority queue (queue size too big).")}const o=new W(i);let s=i.size,h=i.pop();for(;h;){const t=h.key;if(i.size===s){const e=t.segment;throw new Error(`Unable to pop() ${t.isLeft?"left":"right"} SweepEvent [${t.point.x}, ${t.point.y}] from segment #${e.id} [${e.leftSE.point.x}, ${e.leftSE.point.y}] -> [${e.rightSE.point.x}, ${e.rightSE.point.y}] from queue.`)}if(i.size>Z)throw new Error("Infinite loop when passing sweep line over endpoints (queue size too big).");if(o.segments.length>D)throw new Error("Infinite loop when passing sweep line over endpoints (too many sweep line segments).");const e=o.process(t);for(let t=0,n=e.length;t<n;t++){const n=e[t];void 0===n.consumedBy&&i.insert(n)}s=i.size,h=i.pop()}b.reset();const u=V.factory(o.segments);return new Q(u).getGeom()}};var J={union:function(t){for(var e=arguments.length,n=new Array(e>1?e-1:0),r=1;r<e;r++)n[r-1]=arguments[r];return H.run("union",t,n)},intersection:function(t){for(var e=arguments.length,n=new Array(e>1?e-1:0),r=1;r<e;r++)n[r-1]=arguments[r];return H.run("intersection",t,n)},xor:function(t){for(var e=arguments.length,n=new Array(e>1?e-1:0),r=1;r<e;r++)n[r-1]=arguments[r];return H.run("xor",t,n)},difference:function(t){for(var e=arguments.length,n=new Array(e>1?e-1:0),r=1;r<e;r++)n[r-1]=arguments[r];return H.run("difference",t,n)}};return J}));
+// === end polygon-clipping UMD bundle ===
+
+const pc = module.exports.default || module.exports;
+
+return {
+  difference: pc.difference,
+  union: pc.union,
+  intersection: pc.intersection,
+  xor: pc.xor
+};
+
+```
+
+# polygonClipping
+
+```ts
+/**
+ * polygonClipping.ts
+ *
+ * Typed interface to the vendored polygon-clipping library.
+ * Loads the wrapper module which embeds the UMD bundle inline,
+ * so it works in both dev (Datacore in vault) and production
+ * (compiled markdown with no filesystem access).
+ *
+ * In unit tests: mocked to use the npm polygon-clipping package directly.
+ */
+
+// Type definitions matching polygon-clipping's API
+type Ring = [number, number][];
+type Polygon = Ring[];
+type MultiPolygon = Polygon[];
+
+type DifferenceFn = (subject: Polygon | MultiPolygon, ...clips: (Polygon | MultiPolygon)[]) => MultiPolygon;
+
+const pcModule = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "polygon-clipping-wrapper")) as {
+  difference: DifferenceFn;
+};
+
+const difference: DifferenceFn = pcModule.difference;
+
+return { difference };
+
+```
+
+# curveBoolean
+
+```ts
+/**
+ * curveBoolean.ts
+ *
+ * Boolean subtraction of grid cells from freehand curves using the
+ * polygon-clipping library (Martinez-Rueda-Feito algorithm).
+ *
+ * After erasure, the curve's path data (start + segments) IS the modified
+ * geometry. No secondary data structures like "erasedCells" or flat hole
+ * arrays. Inner rings from boolean holes are stored as coordinate-pair
+ * arrays on `curve.innerRings`.
+ */
+
+import type { Curve, BezierSegment } from '#types/core/curve.types';
+
+// Datacore imports
+const { difference } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "polygonClipping")) as {
+  difference: (
+    subject: [number, number][][] | [number, number][][][],
+    ...clips: ([number, number][][] | [number, number][][][])[]
+  ) => [number, number][][][]
+};
+
+/** A 2D point as [x, y] tuple */
+type Pt = [number, number];
+
+// polygon-clipping format types
+type Ring = Pt[];
+type Polygon = Ring[];
+type MultiPolygon = Polygon[];
+
+// =========================================================================
+// Bezier flattening
+// =========================================================================
+
+/**
+ * Evaluate a cubic bezier at parameter t.
+ */
+function evalBezier(
+  p0x: number, p0y: number,
+  p1x: number, p1y: number,
+  p2x: number, p2y: number,
+  p3x: number, p3y: number,
+  t: number
+): Pt {
+  const mt = 1 - t;
+  const mt2 = mt * mt;
+  const mt3 = mt2 * mt;
+  const t2 = t * t;
+  const t3 = t2 * t;
+  return [
+    mt3 * p0x + 3 * mt2 * t * p1x + 3 * mt * t2 * p2x + t3 * p3x,
+    mt3 * p0y + 3 * mt2 * t * p1y + 3 * mt * t2 * p2y + t3 * p3y
+  ];
+}
+
+/**
+ * Check if a cubic bezier segment is effectively linear.
+ * Returns true when both control points lie on (or very close to)
+ * the line between the start and end points.
+ */
+function isLinearBezier(
+  p0x: number, p0y: number,
+  cp1x: number, cp1y: number,
+  cp2x: number, cp2y: number,
+  p3x: number, p3y: number,
+  epsilon: number = 0.1
+): boolean {
+  // Distance from control points to the line (p0 → p3)
+  const dx = p3x - p0x;
+  const dy = p3y - p0y;
+  const lenSq = dx * dx + dy * dy;
+
+  if (lenSq < epsilon * epsilon) {
+    // Degenerate: start ≈ end, check if control points are also close
+    return (
+      (cp1x - p0x) * (cp1x - p0x) + (cp1y - p0y) * (cp1y - p0y) < epsilon * epsilon &&
+      (cp2x - p0x) * (cp2x - p0x) + (cp2y - p0y) * (cp2y - p0y) < epsilon * epsilon
+    );
+  }
+
+  // Perpendicular distance of cp1 from line p0→p3
+  const d1 = Math.abs(dx * (p0y - cp1y) - dy * (p0x - cp1x)) / Math.sqrt(lenSq);
+  // Perpendicular distance of cp2 from line p0→p3
+  const d2 = Math.abs(dx * (p0y - cp2y) - dy * (p0x - cp2x)) / Math.sqrt(lenSq);
+
+  return d1 < epsilon && d2 < epsilon;
+}
+
+/**
+ * Flatten a curve's bezier segments into a dense polygon ring.
+ * Returns array of [x, y] points suitable for polygon-clipping.
+ * The ring is closed (last point equals first point) as required by GeoJSON.
+ *
+ * Linear bezier segments (from previous boolean subtractions) are emitted
+ * as a single endpoint to prevent vertex count explosion.
+ */
+function flattenCurve(curve: Curve, stepsPerSegment: number = 16): Pt[] {
+  const pts: Pt[] = [];
+  let px = curve.start[0];
+  let py = curve.start[1];
+  pts.push([px, py]);
+
+  const segs = curve.segments;
+  for (let i = 0; i < segs.length; i++) {
+    const seg = segs[i];
+
+    if (isLinearBezier(px, py, seg[0], seg[1], seg[2], seg[3], seg[4], seg[5])) {
+      // Linear segment: emit only the endpoint
+      pts.push([seg[4], seg[5]]);
+    } else {
+      // True curve: subdivide
+      for (let step = 1; step <= stepsPerSegment; step++) {
+        const t = step / stepsPerSegment;
+        const pt = evalBezier(px, py, seg[0], seg[1], seg[2], seg[3], seg[4], seg[5], t);
+        pts.push(pt);
+      }
+    }
+    px = seg[4];
+    py = seg[5];
+  }
+
+  // Close the ring (GeoJSON requirement: first == last)
+  if (pts.length > 1) {
+    const first = pts[0];
+    const last = pts[pts.length - 1];
+    if (first[0] !== last[0] || first[1] !== last[1]) {
+      pts.push([first[0], first[1]]);
+    }
+  }
+
+  return pts;
+}
+
+// =========================================================================
+// Point-in-polygon (ray casting)
+// =========================================================================
+
+/**
+ * Test if point (px, py) is inside a polygon using ray casting.
+ * Polygon is given as array of [x, y] points (assumed closed).
+ */
+function pointInPolygon(px: number, py: number, poly: Pt[]): boolean {
+  let inside = false;
+  const n = poly.length;
+  for (let i = 0, j = n - 1; i < n; j = i++) {
+    const xi = poly[i][0], yi = poly[i][1];
+    const xj = poly[j][0], yj = poly[j][1];
+    if (((yi > py) !== (yj > py)) &&
+        (px < (xj - xi) * (py - yi) / (yj - yi) + xi)) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
+// =========================================================================
+// Cell overlap detection
+// =========================================================================
+
+/**
+ * Check if a cell rectangle overlaps with a curve's filled region.
+ * Tests cell center and corners against the outer polygon,
+ * then excludes cells that fall entirely within an inner ring (hole).
+ */
+function cellOverlapsCurve(
+  cellX: number, cellY: number, cellSize: number,
+  outerPoly: Pt[],
+  innerRings?: Pt[][]
+): boolean {
+  const x0 = cellX * cellSize;
+  const y0 = cellY * cellSize;
+  const cx = x0 + cellSize * 0.5;
+  const cy = y0 + cellSize * 0.5;
+
+  // Quick check: is cell center inside outer polygon?
+  let centerInside = pointInPolygon(cx, cy, outerPoly);
+
+  if (!centerInside) {
+    // Check corners — cell might straddle the boundary
+    const x1 = x0 + cellSize;
+    const y1 = y0 + cellSize;
+    if (!pointInPolygon(x0, y0, outerPoly) &&
+        !pointInPolygon(x1, y0, outerPoly) &&
+        !pointInPolygon(x0, y1, outerPoly) &&
+        !pointInPolygon(x1, y1, outerPoly)) {
+      // Check if any polygon edge intersects the cell rect
+      if (!polygonIntersectsRect(outerPoly, x0, y0, x1, y1)) {
+        return false;
+      }
+    }
+    // At least one corner or edge intersects — cell overlaps
+  } else {
+    // Center is inside outer polygon — check it's not inside a hole
+    if (innerRings) {
+      for (let h = 0; h < innerRings.length; h++) {
+        if (pointInPolygon(cx, cy, innerRings[h])) {
+          return false; // Cell center is inside a hole
+        }
+      }
+    }
+  }
+
+  return true;
+}
+
+/**
+ * Check if any edge of a polygon intersects an axis-aligned rectangle.
+ */
+function polygonIntersectsRect(poly: Pt[], rx0: number, ry0: number, rx1: number, ry1: number): boolean {
+  const n = poly.length;
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    if (segmentIntersectsRect(poly[i][0], poly[i][1], poly[j][0], poly[j][1], rx0, ry0, rx1, ry1)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Cohen-Sutherland segment vs AABB intersection test.
+ */
+function segmentIntersectsRect(
+  x1: number, y1: number, x2: number, y2: number,
+  rx0: number, ry0: number, rx1: number, ry1: number
+): boolean {
+  function outcode(x: number, y: number): number {
+    let code = 0;
+    if (x < rx0) code |= 1;
+    else if (x > rx1) code |= 2;
+    if (y < ry0) code |= 4;
+    else if (y > ry1) code |= 8;
+    return code;
+  }
+
+  let oc1 = outcode(x1, y1);
+  let oc2 = outcode(x2, y2);
+
+  for (let iter = 0; iter < 20; iter++) {
+    if ((oc1 | oc2) === 0) return true;
+    if ((oc1 & oc2) !== 0) return false;
+
+    const ocOut = oc1 !== 0 ? oc1 : oc2;
+    let x: number, y: number;
+
+    if (ocOut & 8) {
+      x = x1 + (x2 - x1) * (ry1 - y1) / (y2 - y1);
+      y = ry1;
+    } else if (ocOut & 4) {
+      x = x1 + (x2 - x1) * (ry0 - y1) / (y2 - y1);
+      y = ry0;
+    } else if (ocOut & 2) {
+      y = y1 + (y2 - y1) * (rx1 - x1) / (x2 - x1);
+      x = rx1;
+    } else {
+      y = y1 + (y2 - y1) * (rx0 - x1) / (x2 - x1);
+      x = rx0;
+    }
+
+    if (ocOut === oc1) {
+      x1 = x; y1 = y;
+      oc1 = outcode(x1, y1);
+    } else {
+      x2 = x; y2 = y;
+      oc2 = outcode(x2, y2);
+    }
+  }
+
+  return false;
+}
+
+// =========================================================================
+// Polygon winding utilities
+// =========================================================================
+
+/**
+ * Compute the signed area of a polygon ring.
+ * Positive = CCW, Negative = CW (standard math orientation).
+ */
+function signedArea(ring: Pt[]): number {
+  let area = 0;
+  const n = ring.length;
+  for (let i = 0, j = n - 1; i < n; j = i++) {
+    area += (ring[j][0] - ring[i][0]) * (ring[j][1] + ring[i][1]);
+  }
+  return area / 2;
+}
+
+/**
+ * Ensure a ring has counter-clockwise winding.
+ * polygon-clipping expects CCW outer rings.
+ */
+function ensureCCW(ring: Pt[]): Pt[] {
+  if (signedArea(ring) > 0) {
+    return ring.slice().reverse();
+  }
+  return ring;
+}
+
+/**
+ * Ensure a ring has clockwise winding.
+ * polygon-clipping expects CW inner rings (holes).
+ */
+function ensureCW(ring: Pt[]): Pt[] {
+  if (signedArea(ring) < 0) {
+    return ring.slice().reverse();
+  }
+  return ring;
+}
+
+// =========================================================================
+// Polygon simplification
+// =========================================================================
+
+/**
+ * Remove collinear points from a polygon ring.
+ * Keeps the ring's shape but eliminates redundant vertices that lie
+ * on straight edges. Prevents vertex count from growing unboundedly
+ * across repeated boolean subtractions.
+ */
+function simplifyRing(ring: Pt[], epsilon: number = 0.1): Pt[] {
+  if (ring.length < 4) return ring; // Need at least 3 unique + closing
+
+  // Check if ring is closed
+  const isClosed = ring.length > 1 &&
+    ring[0][0] === ring[ring.length - 1][0] &&
+    ring[0][1] === ring[ring.length - 1][1];
+
+  // Work with open ring (remove closing point temporarily)
+  const open = isClosed ? ring.slice(0, -1) : ring.slice();
+  if (open.length < 3) return ring;
+
+  // Pass 1: merge near-duplicate vertices to prevent cascading deletion.
+  // Without this, two near-coincident vertices (e.g. an intersection point
+  // landing close to a hex corner) both form tiny triangles with neighbors
+  // and both get removed by the collinearity pass, eliminating real corners.
+  const snapDistSq = epsilon * epsilon;
+  const deduped: Pt[] = [open[0]];
+  for (let i = 1; i < open.length; i++) {
+    const prev = deduped[deduped.length - 1];
+    const dx = open[i][0] - prev[0];
+    const dy = open[i][1] - prev[1];
+    if (dx * dx + dy * dy > snapDistSq) {
+      deduped.push(open[i]);
+    }
+  }
+  // Check wrap-around: last vs first
+  if (deduped.length > 1) {
+    const first = deduped[0];
+    const last = deduped[deduped.length - 1];
+    const dx = last[0] - first[0];
+    const dy = last[1] - first[1];
+    if (dx * dx + dy * dy <= snapDistSq) {
+      deduped.pop();
+    }
+  }
+  if (deduped.length < 3) return ring;
+
+  // Pass 2: remove collinear points
+  const result: Pt[] = [];
+  const n = deduped.length;
+
+  for (let i = 0; i < n; i++) {
+    const prev = deduped[(i - 1 + n) % n];
+    const curr = deduped[i];
+    const next = deduped[(i + 1) % n];
+
+    // Cross product to detect collinearity
+    const cross = (curr[0] - prev[0]) * (next[1] - prev[1]) -
+                  (curr[1] - prev[1]) * (next[0] - prev[0]);
+
+    if (Math.abs(cross) > epsilon) {
+      result.push(curr);
+    }
+  }
+
+  if (result.length < 3) return ring; // Degenerate, keep original
+
+  // Re-close if was closed
+  if (isClosed) {
+    result.push([result[0][0], result[0][1]]);
+  }
+
+  return result;
+}
+
+// =========================================================================
+// Curve ↔ Polygon conversion
+// =========================================================================
+
+/**
+ * Build a polygon-clipping-compatible Polygon from a Curve.
+ * Returns [outerRing, ...innerRings] where outer is CCW and inners are CW.
+ */
+function curveToPolygon(curve: Curve): Polygon {
+  const outer = ensureCCW(flattenCurve(curve));
+  const rings: Ring[] = [outer];
+
+  if (curve.innerRings) {
+    for (let i = 0; i < curve.innerRings.length; i++) {
+      const ring = curve.innerRings[i];
+      if (ring.length < 3) continue;
+      // Ensure closed ring
+      let closed = ring;
+      const first = ring[0];
+      const last = ring[ring.length - 1];
+      if (first[0] !== last[0] || first[1] !== last[1]) {
+        closed = [...ring, [first[0], first[1]]];
+      }
+      rings.push(ensureCW(closed));
+    }
+  }
+
+  return rings;
+}
+
+/**
+ * Convert a polygon-clipping result polygon (one element of MultiPolygon)
+ * back to a Curve object.
+ *
+ * The outer ring becomes start + segments (degenerate linear beziers).
+ * Any inner rings are stored as curve.innerRings.
+ */
+function polygonToCurve(
+  rings: Polygon,
+  template: Curve,
+  newId?: string
+): Curve {
+  const outerRing = rings[0];
+  // Remove closing point if present (we store open rings in segments)
+  let outer = outerRing;
+  if (outer.length > 1) {
+    const first = outer[0];
+    const last = outer[outer.length - 1];
+    if (first[0] === last[0] && first[1] === last[1]) {
+      outer = outer.slice(0, -1);
+    }
+  }
+
+  if (outer.length < 3) {
+    // Degenerate polygon — return a minimal placeholder
+    const start: Pt = outer.length > 0 ? [outer[0][0], outer[0][1]] : [0, 0];
+    return {
+      id: newId || template.id,
+      start,
+      segments: [],
+      closed: true,
+      color: template.color,
+      opacity: template.opacity,
+      strokeColor: template.strokeColor,
+      strokeWidth: template.strokeWidth
+    };
+  }
+
+  const start: Pt = [outer[0][0], outer[0][1]];
+  const segments: BezierSegment[] = [];
+
+  for (let i = 1; i < outer.length; i++) {
+    const prev = outer[i - 1];
+    const curr = outer[i];
+    // Linear bezier: control points at 1/3 and 2/3 along the line
+    const cp1x = prev[0] + (curr[0] - prev[0]) / 3;
+    const cp1y = prev[1] + (curr[1] - prev[1]) / 3;
+    const cp2x = prev[0] + 2 * (curr[0] - prev[0]) / 3;
+    const cp2y = prev[1] + 2 * (curr[1] - prev[1]) / 3;
+    segments.push([cp1x, cp1y, cp2x, cp2y, curr[0], curr[1]]);
+  }
+
+  // Collect inner rings (holes), removing closing points
+  let innerRings: Pt[][] | undefined;
+  if (rings.length > 1) {
+    innerRings = [];
+    for (let r = 1; r < rings.length; r++) {
+      let ring = rings[r];
+      if (ring.length > 1) {
+        const first = ring[0];
+        const last = ring[ring.length - 1];
+        if (first[0] === last[0] && first[1] === last[1]) {
+          ring = ring.slice(0, -1);
+        }
+      }
+      if (ring.length >= 3) {
+        innerRings.push(ring);
+      }
+    }
+    if (innerRings.length === 0) {
+      innerRings = undefined;
+    }
+  }
+
+  const curve: Curve = {
+    id: newId || template.id,
+    start,
+    segments,
+    closed: true,
+    color: template.color,
+    opacity: template.opacity,
+    strokeColor: template.strokeColor,
+    strokeWidth: template.strokeWidth
+  };
+
+  if (innerRings) {
+    curve.innerRings = innerRings;
+  }
+
+  return curve;
+}
+
+// =========================================================================
+// Clip polygon perturbation (prevent shared-edge crashes)
+// =========================================================================
+
+/**
+ * Slightly expand a closed polygon ring outward from its centroid.
+ * Prevents polygon-clipping (Martinez-Rueda-Feito) from crashing when
+ * the subject and clip polygons share exact edges — a common case when
+ * curves have been previously erased along hex/grid boundaries.
+ *
+ * The expansion is 0.01 world units (~0.01px), invisible at any zoom
+ * but enough to break exact edge coincidence.
+ */
+const CLIP_EXPAND_EPSILON = 0.01;
+
+function expandClipRing(ring: Ring): Ring {
+  // Compute centroid of the ring (exclude closing point if present)
+  const isClosed = ring.length > 1 &&
+    ring[0][0] === ring[ring.length - 1][0] &&
+    ring[0][1] === ring[ring.length - 1][1];
+  const n = isClosed ? ring.length - 1 : ring.length;
+  if (n < 3) return ring;
+
+  let cx = 0, cy = 0;
+  for (let i = 0; i < n; i++) {
+    cx += ring[i][0];
+    cy += ring[i][1];
+  }
+  cx /= n;
+  cy /= n;
+
+  // Scale each vertex outward from centroid by epsilon
+  const expanded: Ring = [];
+  for (let i = 0; i < ring.length; i++) {
+    const dx = ring[i][0] - cx;
+    const dy = ring[i][1] - cy;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist < 1e-10) {
+      expanded.push(ring[i]);
+    } else {
+      expanded.push([
+        ring[i][0] + (dx / dist) * CLIP_EXPAND_EPSILON,
+        ring[i][1] + (dy / dist) * CLIP_EXPAND_EPSILON,
+      ]);
+    }
+  }
+  return expanded;
+}
+
+// =========================================================================
+// Polygon area filter (remove degenerate slivers)
+// =========================================================================
+
+/**
+ * Compute the absolute area of a polygon (with holes).
+ */
+function polygonArea(rings: Polygon): number {
+  let area = Math.abs(signedArea(rings[0]));
+  for (let i = 1; i < rings.length; i++) {
+    area -= Math.abs(signedArea(rings[i]));
+  }
+  return Math.abs(area);
+}
+
+// =========================================================================
+// Main API
+// =========================================================================
+
+/**
+ * Subtract a grid cell from a single curve using boolean polygon subtraction.
+ *
+ * @returns Array of resulting curves (0 if fully erased, 1 if modified, 2+ if split)
+ */
+function subtractCellFromCurve(
+  curve: Curve,
+  cellX: number, cellY: number,
+  cellSize: number
+): Curve[] {
+  if (!curve.closed) return [curve];
+
+  // Build subject polygon from curve
+  const subject = curveToPolygon(curve);
+  if (subject[0].length < 4) return [curve]; // Need at least 3 points + closing
+
+  // Build clip polygon (cell rectangle, CCW)
+  const rx0 = cellX * cellSize;
+  const ry0 = cellY * cellSize;
+  const rx1 = rx0 + cellSize;
+  const ry1 = ry0 + cellSize;
+
+  const cellPoly: Polygon = [expandClipRing([
+    [rx0, ry0],
+    [rx1, ry0],
+    [rx1, ry1],
+    [rx0, ry1],
+    [rx0, ry0]
+  ])];
+
+  // Boolean difference
+  let result: MultiPolygon;
+  try {
+    result = difference(subject, cellPoly);
+  } catch {
+    // polygon-clipping can throw on degenerate input — preserve original
+    return [curve];
+  }
+
+  if (!result || result.length === 0) {
+    return []; // Fully erased
+  }
+
+  // Minimum area threshold to filter degenerate slivers
+  const minArea = cellSize * cellSize * 0.01;
+
+  // Convert results back to Curve objects, simplifying rings first
+  const resultCurves: Curve[] = [];
+  for (let i = 0; i < result.length; i++) {
+    const poly = result[i];
+    if (polygonArea(poly) < minArea) continue;
+
+    // Simplify all rings to remove collinear vertices from cell subtraction
+    const simplified: Polygon = poly.map(ring => simplifyRing(ring));
+
+    const id = i === 0
+      ? curve.id
+      : curve.id + '-' + Date.now() + '-' + Math.random().toString(36).substr(2, 6);
+
+    resultCurves.push(polygonToCurve(simplified, curve, id));
+  }
+
+  return resultCurves.length > 0 ? resultCurves : [];
+}
+
+/**
+ * Find which curve (if any) contains a grid cell.
+ * Returns the index of the first overlapping curve, or -1.
+ * Accounts for inner rings (holes) — cells inside holes are not found.
+ */
+function findCurveAtCell(
+  curves: Curve[],
+  cellX: number, cellY: number,
+  cellSize: number
+): number {
+  for (let i = 0; i < curves.length; i++) {
+    const curve = curves[i];
+    if (!curve || !curve.closed) continue;
+
+    const outerPoly = flattenCurve(curve);
+    if (outerPoly.length < 3) continue;
+
+    // Build inner ring polygons for hole checking
+    let innerPolys: Pt[][] | undefined;
+    if (curve.innerRings && curve.innerRings.length > 0) {
+      innerPolys = curve.innerRings.filter(r => r.length >= 3);
+    }
+
+    if (cellOverlapsCurve(cellX, cellY, cellSize, outerPoly, innerPolys)) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+/**
+ * Erase a cell from the curves array using boolean polygon subtraction.
+ *
+ * @param curves - Current array of curves
+ * @param cellX - Grid column to erase
+ * @param cellY - Grid row to erase
+ * @param cellSize - Grid cell size in world units
+ * @returns New curves array with the cell erased, or null if no curve was affected
+ */
+function eraseCellFromCurves(
+  curves: Curve[],
+  cellX: number, cellY: number,
+  cellSize: number
+): Curve[] | null {
+  if (!curves || curves.length === 0) return null;
+
+  const idx = findCurveAtCell(curves, cellX, cellY, cellSize);
+  if (idx === -1) return null;
+
+  const affected = curves[idx];
+  const resultCurves = subtractCellFromCurve(affected, cellX, cellY, cellSize);
+
+  // Build new curves array: replace affected curve with result(s)
+  const newCurves: Curve[] = [];
+  for (let i = 0; i < curves.length; i++) {
+    if (i === idx) {
+      for (let j = 0; j < resultCurves.length; j++) {
+        newCurves.push(resultCurves[j]);
+      }
+    } else {
+      newCurves.push(curves[i]);
+    }
+  }
+
+  return newCurves;
+}
+
+/**
+ * Subtract a world-coordinate rectangle from all curves using boolean polygon subtraction.
+ *
+ * @param curves - Current array of curves
+ * @param worldMinX - Left edge in world coordinates
+ * @param worldMinY - Top edge in world coordinates
+ * @param worldMaxX - Right edge in world coordinates
+ * @param worldMaxY - Bottom edge in world coordinates
+ * @returns New curves array with the rectangle subtracted, or null if no curves were affected
+ */
+function eraseRectangleFromCurves(
+  curves: Curve[],
+  worldMinX: number, worldMinY: number,
+  worldMaxX: number, worldMaxY: number
+): Curve[] | null {
+  if (!curves || curves.length === 0) return null;
+
+  const rectPoly: Polygon = [expandClipRing([
+    [worldMinX, worldMinY],
+    [worldMaxX, worldMinY],
+    [worldMaxX, worldMaxY],
+    [worldMinX, worldMaxY],
+    [worldMinX, worldMinY]
+  ])];
+
+  let changed = false;
+  const newCurves: Curve[] = [];
+
+  for (let i = 0; i < curves.length; i++) {
+    const curve = curves[i];
+    if (!curve.closed) {
+      newCurves.push(curve);
+      continue;
+    }
+
+    const subject = curveToPolygon(curve);
+    if (subject[0].length < 4) {
+      newCurves.push(curve);
+      continue;
+    }
+
+    let result: MultiPolygon;
+    try {
+      result = difference(subject, rectPoly);
+    } catch {
+      newCurves.push(curve);
+      continue;
+    }
+
+    if (!result || result.length === 0) {
+      changed = true;
+      continue;
+    }
+
+    const minArea = 1.0;
+    const subjectArea = polygonArea(subject);
+    let anyKept = false;
+    let totalResultArea = 0;
+    for (let j = 0; j < result.length; j++) {
+      const poly = result[j];
+      const area = polygonArea(poly);
+      if (area < minArea) continue;
+      totalResultArea += area;
+      const simplified: Polygon = poly.map(ring => simplifyRing(ring));
+      const id = j === 0
+        ? curve.id
+        : curve.id + '-' + Date.now() + '-' + Math.random().toString(36).substr(2, 6);
+      newCurves.push(polygonToCurve(simplified, curve, id));
+      anyKept = true;
+    }
+
+    if (!anyKept || result.length !== 1 || subjectArea - totalResultArea > minArea * 0.01 ||
+        (anyKept && result[0].length !== subject.length)) {
+      changed = true;
+    }
+  }
+
+  return changed ? newCurves : null;
+}
+
+/**
+ * Subtract an arbitrary world-coordinate polygon from all curves using boolean subtraction.
+ *
+ * @param curves - Current array of curves
+ * @param clipVertices - Vertices of the clip polygon in world coordinates (open or closed)
+ * @returns New curves array with the polygon subtracted, or null if no curves were affected
+ */
+function eraseWorldPolygonFromCurves(
+  curves: Curve[],
+  clipVertices: Pt[]
+): Curve[] | null {
+  if (!curves || curves.length === 0 || clipVertices.length < 3) return null;
+
+  // Ensure closed ring
+  let ring = clipVertices;
+  const first = ring[0];
+  const last = ring[ring.length - 1];
+  if (first[0] !== last[0] || first[1] !== last[1]) {
+    ring = [...ring, [first[0], first[1]]];
+  }
+
+  const clipPoly: Polygon = [expandClipRing(ensureCCW(ring))];
+
+  let changed = false;
+  const newCurves: Curve[] = [];
+
+  for (let i = 0; i < curves.length; i++) {
+    const curve = curves[i];
+    if (!curve.closed) {
+      newCurves.push(curve);
+      continue;
+    }
+
+    const subject = curveToPolygon(curve);
+    if (subject[0].length < 4) {
+      newCurves.push(curve);
+      continue;
+    }
+
+    let result: MultiPolygon;
+    try {
+      result = difference(subject, clipPoly);
+    } catch {
+      newCurves.push(curve);
+      continue;
+    }
+
+    if (!result || result.length === 0) {
+      changed = true;
+      continue;
+    }
+
+    const clipArea = Math.abs(signedArea(ring));
+    const minArea = clipArea * 0.01;
+
+    const subjectArea = polygonArea(subject);
+    let anyKept = false;
+    let totalResultArea = 0;
+    for (let j = 0; j < result.length; j++) {
+      const poly = result[j];
+      const area = polygonArea(poly);
+      if (area < minArea) continue;
+      totalResultArea += area;
+      const simplified: Polygon = poly.map(r => simplifyRing(r));
+      const id = j === 0
+        ? curve.id
+        : curve.id + '-' + Date.now() + '-' + Math.random().toString(36).substr(2, 6);
+      newCurves.push(polygonToCurve(simplified, curve, id));
+      anyKept = true;
+    }
+
+    if (!anyKept || result.length !== 1 || subjectArea - totalResultArea > minArea * 0.01 ||
+        (anyKept && result[0].length !== subject.length)) {
+      changed = true;
+    }
+  }
+
+  return changed ? newCurves : null;
+}
+
+return {
+  flattenCurve,
+  isLinearBezier,
+  simplifyRing,
+  pointInPolygon,
+  cellOverlapsCurve,
+  curveToPolygon,
+  polygonToCurve,
+  subtractCellFromCurve,
+  findCurveAtCell,
+  eraseCellFromCurves,
+  eraseRectangleFromCurves,
+  eraseWorldPolygonFromCurves,
+  signedArea,
+  ensureCCW,
+  ensureCW,
+  polygonArea,
+  segmentIntersectsRect,
+  polygonIntersectsRect,
+  evalBezier
+};
+
+```
+
+# curveCellOverlap
+
+```ts
+/**
+ * curveCellOverlap.ts
+ *
+ * Builds a spatial merge index that identifies where freehand curves
+ * and painted grid cells of the same color overlap. Used at render time
+ * to suppress interior borders between same-color regions, creating a
+ * visually unified painted area.
+ *
+ * This is a rendering-time operation only — no data is modified.
+ */
+
+import type { Curve } from '#types/core/curve.types';
+import type { BorderSide } from '#types/core/rendering.types';
+
+const { flattenCurve, pointInPolygon, cellOverlapsCurve } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "curveBoolean")) as {
+  flattenCurve: (curve: Curve, stepsPerSegment?: number) => [number, number][];
+  pointInPolygon: (px: number, py: number, poly: [number, number][]) => boolean;
+  cellOverlapsCurve: (cellX: number, cellY: number, cellSize: number, outerPoly: [number, number][], innerRings?: [number, number][][]) => boolean;
+};
+
+/** A 2D point as [x, y] tuple */
+type Pt = [number, number];
+
+/** Minimal cell interface for the merge index */
+interface MergeCell {
+  x: number;
+  y: number;
+  color: string;
+}
+
+/** Spatial index for curve-cell visual merging */
+interface CurveCellMergeIndex {
+  /** Cell borders to suppress: key "x,y" → set of sides */
+  cellBordersToSuppress: Map<string, Set<BorderSide>>;
+  /** Same-color cell rects per curve index (world coordinates) */
+  curveCellRects: Map<number, Array<{ x: number; y: number; w: number; h: number }>>;
+}
+
+/** Direction offsets for testing edge midpoints outward from a cell */
+const EDGE_OFFSETS: Array<{ side: BorderSide; mx: number; my: number; dx: number; dy: number }> = [
+  { side: 'top',    mx: 0.5, my: 0.0, dx:  0, dy: -1 },
+  { side: 'right',  mx: 1.0, my: 0.5, dx:  1, dy:  0 },
+  { side: 'bottom', mx: 0.5, my: 1.0, dx:  0, dy:  1 },
+  { side: 'left',   mx: 0.0, my: 0.5, dx: -1, dy:  0 },
+];
+
+const flatPolyCache = new WeakMap<Curve, Pt[]>();
+
+/**
+ * Get (or cache) the flattened polygon for a curve.
+ */
+function getCachedFlatPoly(curve: Curve): Pt[] {
+  const cached = flatPolyCache.get(curve);
+  if (cached) return cached;
+  const poly = flattenCurve(curve);
+  flatPolyCache.set(curve, poly);
+  return poly;
+}
+
+/**
+ * Build the merge index for a set of cells and curves.
+ *
+ * For each closed curve, finds all same-color cells that overlap it.
+ * For each overlapping cell, determines which border sides face into the
+ * curve's filled region (and should be suppressed). Also records the
+ * cell rectangles per curve (for clip-based stroke suppression).
+ *
+ * @param cells - Painted cells with resolved colors
+ * @param curves - Layer curves
+ * @param cellSize - Grid cell size in world units
+ * @returns Merge index for both cell border and curve stroke suppression
+ */
+function buildMergeIndex(
+  cells: MergeCell[],
+  curves: Curve[],
+  cellSize: number
+): CurveCellMergeIndex {
+  const cellBordersToSuppress = new Map<string, Set<BorderSide>>();
+  const curveCellRects = new Map<number, Array<{ x: number; y: number; w: number; h: number }>>();
+
+  if (!cells || cells.length === 0 || !curves || curves.length === 0) {
+    return { cellBordersToSuppress, curveCellRects };
+  }
+
+  // Build cell color lookup: "x,y" → color
+  const cellColorMap = new Map<string, string>();
+  for (let i = 0; i < cells.length; i++) {
+    const c = cells[i];
+    cellColorMap.set(`${c.x},${c.y}`, c.color);
+  }
+
+  // Epsilon for outward offset when testing edge midpoints (world units)
+  const epsilon = cellSize * 0.02;
+
+  for (let ci = 0; ci < curves.length; ci++) {
+    const curve = curves[ci];
+    if (!curve || !curve.closed || !curve.color || curve.color === 'transparent') continue;
+
+    const outerPoly = getCachedFlatPoly(curve);
+    if (outerPoly.length < 3) continue;
+
+    // Build inner ring polygons (for hole checking)
+    let innerPolys: Pt[][] | undefined;
+    if (curve.innerRings && curve.innerRings.length > 0) {
+      innerPolys = curve.innerRings.filter(r => r.length >= 3) as Pt[][];
+    }
+
+    // Compute bounding box of the curve polygon → grid coordinate range
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (let p = 0; p < outerPoly.length; p++) {
+      const px = outerPoly[p][0], py = outerPoly[p][1];
+      if (px < minX) minX = px;
+      if (py < minY) minY = py;
+      if (px > maxX) maxX = px;
+      if (py > maxY) maxY = py;
+    }
+
+    // Expand by one cell in each direction to catch adjacency
+    const gridMinX = Math.floor(minX / cellSize) - 1;
+    const gridMinY = Math.floor(minY / cellSize) - 1;
+    const gridMaxX = Math.ceil(maxX / cellSize);
+    const gridMaxY = Math.ceil(maxY / cellSize);
+
+    // Check each cell in the bounding box range
+    for (let gx = gridMinX; gx <= gridMaxX; gx++) {
+      for (let gy = gridMinY; gy <= gridMaxY; gy++) {
+        const key = `${gx},${gy}`;
+        const cellColor = cellColorMap.get(key);
+        if (!cellColor) continue;
+
+        // Color must match exactly
+        if (cellColor !== curve.color) continue;
+
+        // Check geometric overlap
+        if (!cellOverlapsCurve(gx, gy, cellSize, outerPoly, innerPolys)) continue;
+
+        // This cell overlaps a same-color curve — record the cell rect
+        if (!curveCellRects.has(ci)) {
+          curveCellRects.set(ci, []);
+        }
+        curveCellRects.get(ci)!.push({
+          x: gx * cellSize,
+          y: gy * cellSize,
+          w: cellSize,
+          h: cellSize
+        });
+
+        // Determine which border sides should be suppressed.
+        // A border is suppressed if the point just outside that edge
+        // is inside the curve's filled region.
+        const worldX = gx * cellSize;
+        const worldY = gy * cellSize;
+
+        for (const edge of EDGE_OFFSETS) {
+          // Midpoint of this cell edge in world coords
+          const midX = worldX + edge.mx * cellSize;
+          const midY = worldY + edge.my * cellSize;
+
+          // Offset outward from the cell
+          const testX = midX + edge.dx * epsilon;
+          const testY = midY + edge.dy * epsilon;
+
+          if (pointInPolygon(testX, testY, outerPoly)) {
+            // Make sure the test point isn't inside a hole
+            let inHole = false;
+            if (innerPolys) {
+              for (let h = 0; h < innerPolys.length; h++) {
+                if (pointInPolygon(testX, testY, innerPolys[h])) {
+                  inHole = true;
+                  break;
+                }
+              }
+            }
+
+            if (!inHole) {
+              if (!cellBordersToSuppress.has(key)) {
+                cellBordersToSuppress.set(key, new Set());
+              }
+              cellBordersToSuppress.get(key)!.add(edge.side);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return { cellBordersToSuppress, curveCellRects };
+}
+
+return {
+  buildMergeIndex,
+  getCachedFlatPoly
+};
+
+```
+
 # useCanvasRenderer
 
 ```ts
@@ -11665,6 +13179,7 @@ import type { IGeometry, Point } from '#types/core/geometry.types';
 import type { Cell, CellMap } from '#types/core/cell.types';
 import type { MapObject, ObjectTypeDef } from '#types/objects/object.types';
 import type { TextLabel } from '#types/objects/note.types';
+import type { Curve } from '#types/core/curve.types';
 import type {
   RenderCanvas,
   UseCanvasRenderer,
@@ -11684,10 +13199,10 @@ const { buildCellLookup, calculateBordersOptimized } = await dc.require(dc.heade
   calculateBordersOptimized: (cell: Cell, lookup: CellMap) => { top: boolean; right: boolean; bottom: boolean; left: boolean };
 };
 const { getObjectType } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "objectOperations")) as {
-  getObjectType: (typeId: string) => ObjectTypeDef | null;
+  getObjectType: (typeId: string, mapType?: string) => ObjectTypeDef | null;
 };
 const { getRenderChar } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "objectTypeResolver")) as {
-  getRenderChar: (objType: ObjectTypeDef) => { char: string; isIcon: boolean };
+  getRenderChar: (objType: ObjectTypeDef) => { char: string; isIcon: boolean; isImage?: boolean; imagePath?: string };
 };
 const { getCellColor } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "colorOperations")) as {
   getCellColor: (cell: Cell) => string;
@@ -11726,6 +13241,14 @@ const { getFontCss } = await dc.require(dc.headerLink(dc.resolvePath("compiled-w
 };
 const { GridGeometry } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "GridGeometry")) as {
   GridGeometry: new (cellSize: number) => IGeometry & { cellSize: number; getScaledCellSize: (zoom: number) => number };
+};
+const { calculateViewportOffset } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "BaseGeometry")) as {
+  calculateViewportOffset: (
+    geometry: { type: string; cellSize: number },
+    center: { x: number; y: number },
+    canvasSize: { width: number; height: number },
+    zoom: number
+  ) => { offsetX: number; offsetY: number };
 };
 const { HexGeometry } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "HexGeometry")) as {
   HexGeometry: new (hexSize: number, orientation: string, hexBounds: { maxCol: number; maxRow: number } | null) => IGeometry & {
@@ -11777,6 +13300,18 @@ const { segmentRenderer } = await dc.require(dc.headerLink(dc.resolvePath("compi
     renderSegmentBorders: (ctx: CanvasRenderingContext2D, segmentCells: Cell[], allCells: Cell[], geometry: IGeometry, viewState: RendererViewState, options: { border: string; borderWidth: number }) => void;
   };
 };
+const { renderCurves } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "curveRenderer")) as {
+  renderCurves: (ctx: CanvasRenderingContext2D, curves: Curve[], viewState: { x: number; y: number; zoom: number }, theme: RendererTheme, options?: { opacity?: number; mergeIndex?: CurveCellMergeIndex | null; gridConfig?: { cellSize: number; lineColor: string; lineWidth: number; interiorRatio: number } }) => void;
+};
+const { buildMergeIndex } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "curveCellOverlap")) as {
+  buildMergeIndex: (cells: Array<{ x: number; y: number; color: string }>, curves: Curve[], cellSize: number) => CurveCellMergeIndex;
+};
+
+/** Spatial index for curve-cell visual merging */
+interface CurveCellMergeIndex {
+  cellBordersToSuppress: Map<string, Set<string>>;
+  curveCellRects: Map<number, Array<{ x: number; y: number; w: number; h: number }>>;
+}
 const { getCachedImage } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "imageOperations")) as {
   getCachedImage: (path: string) => HTMLImageElement | null;
 };
@@ -11806,6 +13341,8 @@ function getRenderer(geometry: IGeometry): Renderer {
 /** Options for rendering layer content */
 interface RenderLayerContentOptions {
   opacity?: number;
+  showGrid?: boolean;
+  mergeIndex?: CurveCellMergeIndex | null;
 }
 
 /**
@@ -11821,7 +13358,7 @@ function renderLayerCellsAndEdges(
   renderer: Renderer,
   options: RenderLayerContentOptions = {}
 ): void {
-  const { opacity = 1 } = options;
+  const { opacity = 1, showGrid: showInteriorGrid = true, mergeIndex = null } = options;
 
   // Apply opacity if needed
   const previousAlpha = ctx.globalAlpha;
@@ -11846,7 +13383,7 @@ function renderLayerCellsAndEdges(
       segmentRenderer.renderSegmentCells(ctx, segmentCells, geometry, viewState);
     }
 
-    if (renderer.renderInteriorGridLines && cellsWithColor.length > 0) {
+    if (showInteriorGrid && renderer.renderInteriorGridLines && cellsWithColor.length > 0) {
       renderer.renderInteriorGridLines(ctx, cellsWithColor, geometry, viewState, {
         lineColor: theme.grid.lines,
         lineWidth: theme.grid.lineWidth || 1,
@@ -11856,6 +13393,16 @@ function renderLayerCellsAndEdges(
 
     const allCellsLookup = buildCellLookup(cellsWithColor);
 
+    // Wrap border calculator to suppress borders adjacent to same-color curves
+    const bordersCalculator = mergeIndex
+      ? (lookup: CellMap, x: number, y: number) => {
+          const base = calculateBordersOptimized(lookup, x, y);
+          const suppressed = mergeIndex.cellBordersToSuppress.get(`${x},${y}`);
+          if (!suppressed) return base;
+          return base.filter((side: string) => !suppressed.has(side));
+        }
+      : calculateBordersOptimized;
+
     if (simpleCells.length > 0) {
       renderer.renderCellBorders(
         ctx,
@@ -11863,7 +13410,7 @@ function renderLayerCellsAndEdges(
         geometry,
         viewState,
         () => allCellsLookup,
-        calculateBordersOptimized,
+        bordersCalculator,
         {
           border: theme.cells.border,
           borderWidth: theme.cells.borderWidth
@@ -11907,7 +13454,7 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   const itemsArray: RendererSelectedItem[] = Array.isArray(selectedItems) ? selectedItems : (selectedItems ? [selectedItems] : []);
 
   // Default layer visibility
-  const visibility: LayerVisibility = layerVisibility || { objects: true, textLabels: true, hexCoordinates: true };
+  const visibility: LayerVisibility = layerVisibility || { grid: true, objects: true, textLabels: true, hexCoordinates: true };
 
   // Get theme with current settings (use provided theme or fetch global)
   const THEME = theme || getTheme();
@@ -11937,10 +13484,10 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   // Get appropriate renderer for this geometry
   const renderer = getRenderer(geometry);
 
-  // Calculate viewport using renderer's polymorphic method
+  // Calculate viewport using shared utility
   const scaledSize = renderer.getScaledSize(geometry, zoom);
-  const { offsetX, offsetY } = renderer.calculateViewportOffset(
-    geometry,
+  const { offsetX, offsetY } = calculateViewportOffset(
+    geometry as { type: string; cellSize: number },
     center,
     { width, height },
     zoom
@@ -11985,7 +13532,7 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   ctx.restore();
 
   // Draw grid lines
-  renderer.renderGrid(ctx, geometry, rendererViewState, { width, height }, true, {
+  renderer.renderGrid(ctx, geometry, rendererViewState, { width, height }, visibility.grid !== false, {
     lineColor: THEME.grid.lines,
     lineWidth: THEME.grid.lineWidth || 1
   });
@@ -11996,17 +13543,56 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
     if (layerBelow) {
       const ghostOpacity = activeLayer.layerBelowOpacity ?? 0.25;
       renderLayerCellsAndEdges(ctx, layerBelow, geometry, rendererViewState, THEME, renderer, {
-        opacity: ghostOpacity
+        opacity: ghostOpacity,
+        showGrid: visibility.grid !== false
       });
+      // Ghost layer curves
+      if (layerBelow.curves && layerBelow.curves.length > 0) {
+        const ghostGridConfig = geometry.type === 'grid'
+          ? { cellSize: (geometry as any).cellSize, lineColor: THEME.grid.lines, lineWidth: THEME.grid.lineWidth || 1, interiorRatio: 0.5 }
+          : undefined;
+        renderCurves(ctx, layerBelow.curves, rendererViewState, THEME, { opacity: ghostOpacity, gridConfig: ghostGridConfig });
+      }
     }
   }
 
+  // Build curve-cell merge index for active layer (grid maps only)
+  let activeMergeIndex: CurveCellMergeIndex | null = null;
+  if (geometry.type === 'grid' &&
+      activeLayer.cells && activeLayer.cells.length > 0 &&
+      activeLayer.curves && activeLayer.curves.length > 0) {
+    const cellsForMerge = activeLayer.cells.map(cell => ({
+      x: cell.x, y: cell.y, color: getCellColor(cell)
+    }));
+    activeMergeIndex = buildMergeIndex(
+      cellsForMerge,
+      activeLayer.curves,
+      (geometry as any).cellSize
+    );
+  }
+
   // Draw active layer cells and edges
-  renderLayerCellsAndEdges(ctx, activeLayer, geometry, rendererViewState, THEME, renderer);
+  renderLayerCellsAndEdges(ctx, activeLayer, geometry, rendererViewState, THEME, renderer, {
+    showGrid: visibility.grid !== false,
+    mergeIndex: activeMergeIndex
+  });
+
+  // Draw freehand curves (between cells and objects)
+  if (activeLayer.curves && activeLayer.curves.length > 0) {
+    const curveGridConfig = geometry.type === 'grid'
+      ? { cellSize: (geometry as any).cellSize, lineColor: THEME.grid.lines, lineWidth: THEME.grid.lineWidth || 1, interiorRatio: 0.5 }
+      : undefined;
+    renderCurves(ctx, activeLayer.curves, rendererViewState, THEME, {
+      mergeIndex: activeMergeIndex,
+      gridConfig: curveGridConfig
+    });
+  }
 
   // Draw objects
   if (activeLayer.objects && activeLayer.objects.length > 0 && !showCoordinates && visibility.objects) {
     const isHexMap = geometry.type === 'hex';
+    const mapType = mapData.mapType || 'grid';
+    const getObjectTypeForMap = (typeId: string) => getObjectType(typeId, mapType);
     renderObjects(
       activeLayer,
       { ctx, offsetX, offsetY, zoom, scaledSize },
@@ -12014,7 +13600,7 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
       isHexMap,
       mapData.orientation || 'flat',
       {
-        getObjectType,
+        getObjectType: getObjectTypeForMap,
         getRenderChar,
         isCellFogged,
         getObjectsInCell,
@@ -12341,20 +13927,30 @@ function useCanvasInteraction(
     const { viewState } = mapData;
     const { zoom: oldZoom, center: oldCenter } = viewState;
 
-    const gridGeometry = geometry as { getScaledCellSize: (zoom: number) => number };
-    const scaledGridSize = gridGeometry.getScaledCellSize(oldZoom);
-    const offsetX = canvas.width / 2 - oldCenter.x * scaledGridSize;
-    const offsetY = canvas.height / 2 - oldCenter.y * scaledGridSize;
+    // Use the same offset formula as screenToWorld/screenToGrid:
+    // Grid maps: offset = canvas/2 - center * cellSize * zoom
+    // Hex maps:  offset = canvas/2 - center * zoom
+    let oldScale: number, newScale: number;
+    if (geometry instanceof GridGeometry) {
+      const gridGeometry = geometry as { getScaledCellSize: (zoom: number) => number };
+      oldScale = gridGeometry.getScaledCellSize(oldZoom);
+      newScale = gridGeometry.getScaledCellSize(newZoom);
+    } else {
+      oldScale = oldZoom;
+      newScale = newZoom;
+    }
 
-    const worldX = (mouseX - offsetX) / scaledGridSize;
-    const worldY = (mouseY - offsetY) / scaledGridSize;
+    const offsetX = canvas.width / 2 - oldCenter.x * oldScale;
+    const offsetY = canvas.height / 2 - oldCenter.y * oldScale;
 
-    const newScaledGridSize = gridGeometry.getScaledCellSize(newZoom);
-    const newOffsetX = mouseX - worldX * newScaledGridSize;
-    const newOffsetY = mouseY - worldY * newScaledGridSize;
+    const worldX = (mouseX - offsetX) / oldScale;
+    const worldY = (mouseY - offsetY) / oldScale;
 
-    const newCenterX = (canvas.width / 2 - newOffsetX) / newScaledGridSize;
-    const newCenterY = (canvas.height / 2 - newOffsetY) / newScaledGridSize;
+    const newOffsetX = mouseX - worldX * newScale;
+    const newOffsetY = mouseY - worldY * newScale;
+
+    const newCenterX = (canvas.width / 2 - newOffsetX) / newScale;
+    const newCenterY = (canvas.height / 2 - newOffsetY) / newScale;
 
     onViewStateChange({
       zoom: newZoom,
@@ -13126,28 +14722,123 @@ return {
 };
 ```
 
+# MapContext
+
+```tsx
+/**
+ * MapContext.tsx
+ * Provides shared map state and operations to all layers via Context
+ */
+
+// Type-only imports
+import type { MapStateContextValue, MapOperationsContextValue } from '#types/contexts/context.types';
+
+// Create contexts with proper typing
+const MapStateContext = dc.createContext<MapStateContextValue | null>(null);
+const MapOperationsContext = dc.createContext<MapOperationsContextValue | null>(null);
+
+/**
+ * Hook to access shared map state
+ * @returns Map state (canvasRef, mapData, geometry, coordinate utils)
+ * @throws If used outside MapStateProvider
+ */
+function useMapState(): MapStateContextValue {
+  const context = dc.useContext(MapStateContext);
+  if (!context) {
+    throw new Error('useMapState must be used within MapStateProvider');
+  }
+  return context;
+}
+
+/**
+ * Hook to access map operations
+ * @returns Map operations (getObjectAtPosition, addObject, etc.)
+ * @throws If used outside MapOperationsProvider
+ */
+function useMapOperations(): MapOperationsContextValue {
+  const context = dc.useContext(MapOperationsContext);
+  if (!context) {
+    throw new Error('useMapOperations must be used within MapOperationsProvider');
+  }
+  return context;
+}
+
+/** Props for MapStateProvider */
+interface MapStateProviderProps {
+  value: MapStateContextValue;
+  children: React.ReactNode;
+}
+
+/**
+ * Provider component for map state
+ * Wraps children and provides read-only map state via Context
+ */
+const MapStateProvider: React.FC<MapStateProviderProps> = ({ value, children }) => {
+  return (
+    <MapStateContext.Provider value={value}>
+      {children}
+    </MapStateContext.Provider>
+  );
+};
+
+/** Props for MapOperationsProvider */
+interface MapOperationsProviderProps {
+  value: MapOperationsContextValue;
+  children: React.ReactNode;
+}
+
+/**
+ * Provider component for map operations
+ * Wraps children and provides map operation functions via Context
+ */
+const MapOperationsProvider: React.FC<MapOperationsProviderProps> = ({ value, children }) => {
+  return (
+    <MapOperationsContext.Provider value={value}>
+      {children}
+    </MapOperationsContext.Provider>
+  );
+};
+
+// Datacore export
+return {
+  MapStateProvider,
+  MapOperationsProvider,
+  useMapState,
+  useMapOperations,
+  MapStateContext,
+  MapOperationsContext
+};
+
+```
+
 # LinkedNoteHoverOverlays
 
 ```jsx
 // components/LinkedNoteHoverOverlays.jsx - Invisible hover links for objects with linked notes
 const { calculateObjectScreenPosition } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "screenPositionUtils"));
 const { openNoteInNewTab } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "noteOperations"));
+const { getActiveLayer } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "layerAccessor"));
+const { useMapState } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "MapContext"));
 
-const LinkedNoteHoverOverlays = ({ canvasRef, mapData, selectedItem, geometry }) => {
+const LinkedNoteHoverOverlays = ({ selectedItem }) => {
+  const { canvasRef, containerRef, mapData, geometry } = useMapState();
+
   // Don't render anything if prerequisites aren't met
-  if (!canvasRef.current || !mapData?.objects || !geometry) return null;
-  
+  if (!canvasRef.current || !containerRef.current || !mapData?.layers || !geometry) return null;
+
+  const activeLayer = getActiveLayer(mapData);
+
   // Filter: must have linkedNote AND not be currently selected
-  const objectsWithLinks = mapData.objects.filter(obj => {
-    return obj.linkedNote && 
-           typeof obj.linkedNote === 'string' && 
+  const objectsWithLinks = (activeLayer.objects || []).filter(obj => {
+    return obj.linkedNote &&
+           typeof obj.linkedNote === 'string' &&
            !(selectedItem?.type === 'object' && selectedItem?.id === obj.id);
   });
-  
+
   return (
     <>
       {objectsWithLinks.map(obj => {
-        const position = calculateObjectScreenPosition(obj, canvasRef.current, mapData, geometry);
+        const position = calculateObjectScreenPosition(obj, canvasRef.current, mapData, geometry, containerRef);
         if (!position) return null;
         
         const { screenX, screenY, objectWidth, objectHeight } = position;
@@ -13289,95 +14980,6 @@ const LinkedNoteHoverOverlays = ({ canvasRef, mapData, selectedItem, geometry })
 };
 
 return { LinkedNoteHoverOverlays };
-```
-
-# MapContext
-
-```tsx
-/**
- * MapContext.tsx
- * Provides shared map state and operations to all layers via Context
- */
-
-// Type-only imports
-import type { MapStateContextValue, MapOperationsContextValue } from '#types/contexts/context.types';
-
-// Create contexts with proper typing
-const MapStateContext = dc.createContext<MapStateContextValue | null>(null);
-const MapOperationsContext = dc.createContext<MapOperationsContextValue | null>(null);
-
-/**
- * Hook to access shared map state
- * @returns Map state (canvasRef, mapData, geometry, coordinate utils)
- * @throws If used outside MapStateProvider
- */
-function useMapState(): MapStateContextValue {
-  const context = dc.useContext(MapStateContext);
-  if (!context) {
-    throw new Error('useMapState must be used within MapStateProvider');
-  }
-  return context;
-}
-
-/**
- * Hook to access map operations
- * @returns Map operations (getObjectAtPosition, addObject, etc.)
- * @throws If used outside MapOperationsProvider
- */
-function useMapOperations(): MapOperationsContextValue {
-  const context = dc.useContext(MapOperationsContext);
-  if (!context) {
-    throw new Error('useMapOperations must be used within MapOperationsProvider');
-  }
-  return context;
-}
-
-/** Props for MapStateProvider */
-interface MapStateProviderProps {
-  value: MapStateContextValue;
-  children: React.ReactNode;
-}
-
-/**
- * Provider component for map state
- * Wraps children and provides read-only map state via Context
- */
-const MapStateProvider: React.FC<MapStateProviderProps> = ({ value, children }) => {
-  return (
-    <MapStateContext.Provider value={value}>
-      {children}
-    </MapStateContext.Provider>
-  );
-};
-
-/** Props for MapOperationsProvider */
-interface MapOperationsProviderProps {
-  value: MapOperationsContextValue;
-  children: React.ReactNode;
-}
-
-/**
- * Provider component for map operations
- * Wraps children and provides map operation functions via Context
- */
-const MapOperationsProvider: React.FC<MapOperationsProviderProps> = ({ value, children }) => {
-  return (
-    <MapOperationsContext.Provider value={value}>
-      {children}
-    </MapOperationsContext.Provider>
-  );
-};
-
-// Datacore export
-return {
-  MapStateProvider,
-  MapOperationsProvider,
-  useMapState,
-  useMapOperations,
-  MapStateContext,
-  MapOperationsContext
-};
-
 ```
 
 # MapSelectionContext
@@ -13707,6 +15309,7 @@ const MapSelectionProvider: React.FC<MapSelectionProviderProps> = ({ children, l
   // ============================================================================
 
   const effectiveLayerVisibility: LayerVisibility = {
+    grid: true,
     objects: true,
     textLabels: true,
     hexCoordinates: true,
@@ -13940,7 +15543,8 @@ export type HandlerLayerType =
   | 'measure'
   | 'alignment'
   | 'imageAlignment'
-  | 'diagonalFill';
+  | 'diagonalFill'
+  | 'freehand';
 
 /** Generic handler function type */
 export type HandlerFunction = (...args: unknown[]) => unknown;
@@ -15098,26 +16702,27 @@ const useObjectInteractions = (
     const { mapType } = mapData;
     const { x: sourceX, y: sourceY } = sourceObject.position;
 
-    const directions = [[1, 0], [0, 1], [-1, 0], [0, -1]];
+    // Hex-axial 6 directions vs Cartesian 4 directions
+    const directions = mapType === 'hex'
+      ? [[1, 0], [1, -1], [0, -1], [-1, 0], [-1, 1], [0, 1]]
+      : [[1, 0], [0, 1], [-1, 0], [0, -1]];
     let targetX = sourceX;
     let targetY = sourceY;
     let found = false;
 
-    for (let ring = 1; ring <= 10 && !found; ring++) {
-      for (let dir = 0; dir < 4 && !found; dir++) {
-        for (let step = 0; step < ring && !found; step++) {
-          const checkX = sourceX + directions[dir][0] * ring;
-          const checkY = sourceY + directions[dir][1] * (step + 1 - ring);
-
-          if (canPlaceObjectAt(getActiveLayer(mapData).objects, checkX, checkY, mapType)) {
-            targetX = checkX;
-            targetY = checkY;
-            found = true;
-          }
-        }
+    // Check immediate neighbors first
+    for (const [dx, dy] of directions) {
+      if (canPlaceObjectAt(getActiveLayer(mapData).objects, sourceX + dx, sourceY + dy, mapType)) {
+        targetX = sourceX + dx;
+        targetY = sourceY + dy;
+        found = true;
+        break;
       }
+    }
 
-      if (!found) {
+    // Expanding ring search if immediate neighbors are full
+    if (!found) {
+      for (let ring = 2; ring <= 10 && !found; ring++) {
         for (let dx = -ring; dx <= ring && !found; dx++) {
           for (let dy = -ring; dy <= ring && !found; dy++) {
             if (Math.abs(dx) === ring || Math.abs(dy) === ring) {
@@ -16582,7 +18187,7 @@ const SelectionToolbar = ({
     { id: 'removeLink', icon: 'lucide-unlink', title: 'Remove object link', onClick: onRemoveLink, visible: hasLinkedObject },
     { id: 'copyLink', icon: 'lucide-link', title: 'Copy link to clipboard', onClick: onCopyLink },
     { id: 'color', icon: 'lucide-palette', title: 'Change Object Color', onClick: onColorClick, isColorButton: true },
-    { id: 'resize', icon: 'lucide-scaling', title: 'Resize Object', onClick: onResize },
+    { id: 'resize', icon: 'lucide-scaling', title: 'Resize Object', onClick: onResize, visible: mapData.mapType !== 'hex' },
     { id: 'delete', icon: 'lucide-trash-2', title: 'Delete (or press Delete/Backspace)', onClick: onDelete, isDelete: true }
   ].filter(btn => btn.visible !== false) : [];
 
@@ -18263,6 +19868,7 @@ import type { MapData, MapLayer } from '#types/core/map.types';
 import type { Edge } from '#types/core/edge.types';
 import type { MapObject } from '#types/objects/object.types';
 import type { TextLabel } from '#types/core/textLabel.types';
+import type { Curve } from '#types/core/curve.types';
 import type {
   PreviewSettings,
   RectangleStart,
@@ -18299,6 +19905,7 @@ interface GridGeometryConstructor {
 
 interface MapOperationsValue {
   onCellsChange: (cells: Cell[], skipHistory?: boolean) => void;
+  onCurvesChange: (curves: Curve[], skipHistory?: boolean) => void;
   onObjectsChange: (objects: MapObject[]) => void;
   onTextLabelsChange: (labels: TextLabel[]) => void;
   onEdgesChange: (edges: Edge[], skipHistory?: boolean) => void;
@@ -18329,6 +19936,12 @@ interface EraseResult {
 
 const { eraseObjectAt } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "objectOperations")) as {
   eraseObjectAt: (objects: MapObject[], x: number, y: number, mapType: string) => EraseResult;
+};
+
+const { eraseCellFromCurves, eraseRectangleFromCurves, eraseWorldPolygonFromCurves } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "curveBoolean")) as {
+  eraseCellFromCurves: (curves: Curve[], cellX: number, cellY: number, cellSize: number) => Curve[] | null;
+  eraseRectangleFromCurves: (curves: Curve[], worldMinX: number, worldMinY: number, worldMaxX: number, worldMaxY: number) => Curve[] | null;
+  eraseWorldPolygonFromCurves: (curves: Curve[], clipVertices: [number, number][]) => Curve[] | null;
 };
 
 const { getActiveLayer } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "layerAccessor")) as {
@@ -18384,6 +19997,7 @@ const useDrawingTools = (
 
   const {
     onCellsChange,
+    onCurvesChange,
     onObjectsChange,
     onTextLabelsChange,
     onEdgesChange,
@@ -18417,6 +20031,7 @@ const useDrawingTools = (
   // Track initial state for batched history
   const strokeInitialStateRef = dc.useRef<Cell[] | null>(null);
   const strokeInitialEdgesRef = dc.useRef<Edge[] | null>(null);
+  const strokeInitialCurvesRef = dc.useRef<Curve[] | null>(null);
 
   const toggleCell = (coords: Point, shouldFill: boolean, dragStart: DragStartContext | null = null): void => {
     if (!mapData || !geometry) return;
@@ -18488,6 +20103,26 @@ const useDrawingTools = (
       } else if (getCellIndex(activeLayer.cells, coords, geometry) !== -1) {
         const newCells = accessorRemoveCell(activeLayer.cells, coords, geometry);
         onCellsChange(newCells, isBatchedStroke);
+      } else if (activeLayer.curves && activeLayer.curves.length > 0 && geometry) {
+        // Try erasing from curves
+        let newCurves: Curve[] | null = null;
+        if (geometry.type === 'hex') {
+          const hexGeo = geometry as { getHexVertices: (q: number, r: number) => { worldX: number; worldY: number }[] };
+          const verts = hexGeo.getHexVertices(coordX, coordY);
+          const clipPoly = verts.map(v => [v.worldX, v.worldY] as [number, number]);
+          newCurves = eraseWorldPolygonFromCurves(activeLayer.curves, clipPoly);
+        } else {
+          const cellSize = (geometry as { cellSize: number }).cellSize;
+          if (cellSize) {
+            newCurves = eraseCellFromCurves(activeLayer.curves, coordX, coordY, cellSize);
+          }
+        }
+        if (newCurves) {
+          if (strokeInitialCurvesRef.current === null) {
+            strokeInitialCurvesRef.current = activeLayer.curves;
+          }
+          onCurvesChange(newCurves, isBatchedStroke);
+        }
       }
     }
   };
@@ -18788,6 +20423,17 @@ const useDrawingTools = (
 
     const newCells = removeCellsInBounds(activeLayer.cells, x1, y1, x2, y2, geometry);
     onCellsChange(newCells);
+
+    if (activeLayer.curves && activeLayer.curves.length > 0) {
+      const newCurves = eraseRectangleFromCurves(
+        activeLayer.curves,
+        worldMinX, worldMinY,
+        worldMaxX, worldMaxY
+      );
+      if (newCurves) {
+        onCurvesChange(newCurves);
+      }
+    }
   };
 
   const processCellDuringDrag = (e: PointerEvent | MouseEvent | TouchEvent, dragStart: DragStartContext | null = null): void => {
@@ -18817,6 +20463,7 @@ const useDrawingTools = (
     setProcessedEdges(new Set());
     strokeInitialStateRef.current = [...activeLayer.cells];
     strokeInitialEdgesRef.current = null;
+    strokeInitialCurvesRef.current = null;
     processCellDuringDrag(e, dragStart);
   };
 
@@ -18836,6 +20483,10 @@ const useDrawingTools = (
     if (strokeInitialEdgesRef.current !== null && mapData && onEdgesChange) {
       onEdgesChange(activeLayer.edges || [], false);
       strokeInitialEdgesRef.current = null;
+    }
+    if (strokeInitialCurvesRef.current !== null && mapData) {
+      onCurvesChange(activeLayer.curves || [], false);
+      strokeInitialCurvesRef.current = null;
     }
   };
 
@@ -19097,6 +20748,7 @@ const useDrawingTools = (
       setProcessedSegments(new Set());
       strokeInitialStateRef.current = null;
       strokeInitialEdgesRef.current = null;
+      strokeInitialCurvesRef.current = null;
     }
   };
 
@@ -19399,18 +21051,6 @@ const ShapePreviewOverlay = ({
   const geo = geometry as GeometryWithMethods;
 
   if (shapeType === 'rectangle' || shapeType === 'clearArea') {
-    const startScreen = cellToScreen(startPoint.x, startPoint.y, geo, mapData, canvasWidth, canvasHeight, true);
-    const endScreen = cellToScreen(endPoint.x, endPoint.y, geo, mapData, canvasWidth, canvasHeight, true);
-
-    const scaledStart = {
-      x: startScreen.x * displayScale + canvasOffsetX,
-      y: startScreen.y * displayScale + canvasOffsetY
-    };
-    const scaledEnd = {
-      x: endScreen.x * displayScale + canvasOffsetX,
-      y: endScreen.y * displayScale + canvasOffsetY
-    };
-
     const minX = Math.min(startPoint.x, endPoint.x);
     const maxX = Math.max(startPoint.x, endPoint.x);
     const minY = Math.min(startPoint.y, endPoint.y);
@@ -19419,28 +21059,38 @@ const ShapePreviewOverlay = ({
     const widthCells = maxX - minX + 1;
     const heightCells = maxY - minY + 1;
 
-    const topLeftScreen = cellToScreen(minX, minY, geo, mapData, canvasWidth, canvasHeight, true);
-    const rectX = topLeftScreen.x * displayScale + canvasOffsetX - scaledCellSize / 2;
-    const rectY = topLeftScreen.y * displayScale + canvasOffsetY - scaledCellSize / 2;
-    const rectWidth = widthCells * scaledCellSize;
-    const rectHeight = heightCells * scaledCellSize;
+    // Compute all four corners in grid space, rotate each through cellToScreen
+    const halfCell = 0.5;
+    const corners = [
+      cellToScreen(minX - halfCell, minY - halfCell, geo, mapData, canvasWidth, canvasHeight, false), // TL
+      cellToScreen(maxX + halfCell, minY - halfCell, geo, mapData, canvasWidth, canvasHeight, false), // TR
+      cellToScreen(maxX + halfCell, maxY + halfCell, geo, mapData, canvasWidth, canvasHeight, false), // BR
+      cellToScreen(minX - halfCell, maxY + halfCell, geo, mapData, canvasWidth, canvasHeight, false), // BL
+    ].map(p => ({
+      x: p.x * displayScale + canvasOffsetX,
+      y: p.y * displayScale + canvasOffsetY
+    }));
+
+    const polygonPoints = corners.map(c => `${c.x},${c.y}`).join(' ');
+
+    // Tooltip at midpoint of top edge
+    tooltipPosition = {
+      x: (corners[0].x + corners[1].x) / 2,
+      y: (corners[0].y + corners[1].y) / 2 - 10
+    };
 
     dimensionText = distanceSettings
       ? formatRectDimensions(widthCells, heightCells, distanceSettings)
       : `${widthCells}×${heightCells}`;
-    tooltipPosition = { x: rectX + rectWidth / 2, y: rectY - 10 };
 
     overlayContent = (
-      <rect
-        x={rectX}
-        y={rectY}
-        width={rectWidth}
-        height={rectHeight}
+      <polygon
+        points={polygonPoints}
         fill={isConfirmable ? `${strokeColor}22` : 'none'}
         stroke={strokeColor}
         strokeWidth={2}
         strokeDasharray={isConfirmable ? "none" : "8,4"}
-        rx={2}
+        strokeLinejoin="round"
       />
     );
 
@@ -21004,6 +22654,748 @@ const DrawingLayer = ({
 };
 
 return { DrawingLayer };
+
+```
+
+# curveFitting
+
+```ts
+/**
+ * curveFitting.ts
+ *
+ * Converts raw pointer input points into smooth cubic bezier curves.
+ * Uses Ramer-Douglas-Peucker simplification followed by Schneider's
+ * iterative least-squares bezier fitting algorithm.
+ */
+
+import type { BezierSegment } from '#types/core/curve.types';
+
+/** A 2D point as [x, y] tuple for internal use */
+type Vec2 = [number, number];
+
+// ============================================================================
+// VECTOR MATH
+// ============================================================================
+
+function vAdd(a: Vec2, b: Vec2): Vec2 {
+  return [a[0] + b[0], a[1] + b[1]];
+}
+
+function vSub(a: Vec2, b: Vec2): Vec2 {
+  return [a[0] - b[0], a[1] - b[1]];
+}
+
+function vScale(v: Vec2, s: number): Vec2 {
+  return [v[0] * s, v[1] * s];
+}
+
+function vDot(a: Vec2, b: Vec2): number {
+  return a[0] * b[0] + a[1] * b[1];
+}
+
+function vLen(v: Vec2): number {
+  return Math.sqrt(v[0] * v[0] + v[1] * v[1]);
+}
+
+function vNorm(v: Vec2): Vec2 {
+  const len = vLen(v);
+  if (len < 1e-10) return [0, 0];
+  return [v[0] / len, v[1] / len];
+}
+
+function vDist(a: Vec2, b: Vec2): number {
+  return vLen(vSub(a, b));
+}
+
+// ============================================================================
+// RAMER-DOUGLAS-PEUCKER SIMPLIFICATION
+// ============================================================================
+
+/**
+ * Simplify a polyline by removing points that don't contribute
+ * significant deviation from the line between their neighbors.
+ */
+function rdpSimplify(points: Vec2[], tolerance: number): Vec2[] {
+  if (points.length <= 2) return points;
+
+  // Find the point with maximum distance from the line (first -> last)
+  const first = points[0];
+  const last = points[points.length - 1];
+  let maxDist = 0;
+  let maxIdx = 0;
+
+  for (let i = 1; i < points.length - 1; i++) {
+    const d = perpendicularDistance(points[i], first, last);
+    if (d > maxDist) {
+      maxDist = d;
+      maxIdx = i;
+    }
+  }
+
+  if (maxDist > tolerance) {
+    const left = rdpSimplify(points.slice(0, maxIdx + 1), tolerance);
+    const right = rdpSimplify(points.slice(maxIdx), tolerance);
+    return [...left.slice(0, -1), ...right];
+  } else {
+    return [first, last];
+  }
+}
+
+function perpendicularDistance(point: Vec2, lineStart: Vec2, lineEnd: Vec2): number {
+  const dx = lineEnd[0] - lineStart[0];
+  const dy = lineEnd[1] - lineStart[1];
+  const lenSq = dx * dx + dy * dy;
+
+  if (lenSq < 1e-10) return vDist(point, lineStart);
+
+  let t = ((point[0] - lineStart[0]) * dx + (point[1] - lineStart[1]) * dy) / lenSq;
+  t = Math.max(0, Math.min(1, t));
+
+  const proj: Vec2 = [lineStart[0] + t * dx, lineStart[1] + t * dy];
+  return vDist(point, proj);
+}
+
+// ============================================================================
+// SCHNEIDER'S BEZIER FITTING
+// ============================================================================
+
+/** Maximum iterations for Newton-Raphson refinement */
+const MAX_ITERATIONS = 4;
+
+/**
+ * Fit a sequence of points to one or more cubic bezier curves.
+ * Returns array of BezierSegment tuples.
+ *
+ * @param points - Simplified point array (at least 2 points)
+ * @param error - Maximum allowed fitting error (squared)
+ */
+function fitCubicBezier(points: Vec2[], error: number): BezierSegment[] {
+  if (points.length < 2) return [];
+  if (points.length === 2) {
+    return [lineToBezier(points[0], points[1])];
+  }
+
+  // Compute left and right tangent vectors
+  const tHat1 = computeLeftTangent(points, 0);
+  const tHat2 = computeRightTangent(points, points.length - 1);
+
+  return fitCubicBezierImpl(points, tHat1, tHat2, error);
+}
+
+function fitCubicBezierImpl(
+  points: Vec2[],
+  tHat1: Vec2,
+  tHat2: Vec2,
+  error: number
+): BezierSegment[] {
+  if (points.length === 2) {
+    return [lineToBezier(points[0], points[1])];
+  }
+
+  // Parameterize points by chord length
+  let u = chordLengthParameterize(points);
+
+  // Generate bezier curve and check fit
+  let bezCurve = generateBezier(points, u, tHat1, tHat2);
+  let { maxError, splitPoint } = computeMaxError(points, bezCurve, u);
+
+  if (maxError < error) {
+    return [bezierToSegment(bezCurve)];
+  }
+
+  // If error is not too large, try reparameterization
+  const iterationError = error * 4;
+  if (maxError < iterationError) {
+    for (let i = 0; i < MAX_ITERATIONS; i++) {
+      const uPrime = reparameterize(points, u, bezCurve);
+      bezCurve = generateBezier(points, uPrime, tHat1, tHat2);
+      const result = computeMaxError(points, bezCurve, uPrime);
+      maxError = result.maxError;
+      splitPoint = result.splitPoint;
+
+      if (maxError < error) {
+        return [bezierToSegment(bezCurve)];
+      }
+      u = uPrime;
+    }
+  }
+
+  // Fitting failed — split at point of max error and fit each half
+  const tHatCenter = computeCenterTangent(points, splitPoint);
+  const left = fitCubicBezierImpl(
+    points.slice(0, splitPoint + 1),
+    tHat1,
+    vScale(tHatCenter, -1),
+    error
+  );
+  const right = fitCubicBezierImpl(
+    points.slice(splitPoint),
+    tHatCenter,
+    tHat2,
+    error
+  );
+
+  return [...left, ...right];
+}
+
+function lineToBezier(p0: Vec2, p1: Vec2): BezierSegment {
+  const dist = vDist(p0, p1) / 3;
+  const dir = vNorm(vSub(p1, p0));
+  return [
+    p0[0] + dir[0] * dist, p0[1] + dir[1] * dist,
+    p1[0] - dir[0] * dist, p1[1] - dir[1] * dist,
+    p1[0], p1[1]
+  ];
+}
+
+function bezierToSegment(b: Vec2[]): BezierSegment {
+  return [b[1][0], b[1][1], b[2][0], b[2][1], b[3][0], b[3][1]];
+}
+
+// ============================================================================
+// TANGENT COMPUTATION
+// ============================================================================
+
+function computeLeftTangent(points: Vec2[], end: number): Vec2 {
+  return vNorm(vSub(points[end + 1], points[end]));
+}
+
+function computeRightTangent(points: Vec2[], end: number): Vec2 {
+  return vNorm(vSub(points[end - 1], points[end]));
+}
+
+function computeCenterTangent(points: Vec2[], center: number): Vec2 {
+  const v1 = vSub(points[center - 1], points[center]);
+  const v2 = vSub(points[center], points[center + 1]);
+  const avg: Vec2 = [(v1[0] + v2[0]) / 2, (v1[1] + v2[1]) / 2];
+  return vNorm(avg);
+}
+
+// ============================================================================
+// PARAMETERIZATION
+// ============================================================================
+
+function chordLengthParameterize(points: Vec2[]): number[] {
+  const u = [0];
+  for (let i = 1; i < points.length; i++) {
+    u.push(u[i - 1] + vDist(points[i], points[i - 1]));
+  }
+  const totalLen = u[u.length - 1];
+  if (totalLen > 0) {
+    for (let i = 1; i < u.length; i++) {
+      u[i] /= totalLen;
+    }
+  }
+  return u;
+}
+
+function reparameterize(points: Vec2[], u: number[], bezCurve: Vec2[]): number[] {
+  return u.map((uVal, i) => newtonRaphsonRootFind(bezCurve, points[i], uVal));
+}
+
+function newtonRaphsonRootFind(bez: Vec2[], point: Vec2, u: number): number {
+  // Q(u)
+  const q = bezierEval(3, bez, u);
+  // Q'(u) - first derivative
+  const q1 = bezierDerivatives(bez);
+  const q1u = bezierEval(2, q1, u);
+  // Q''(u) - second derivative
+  const q2 = bezierDerivatives(q1);
+  const q2u = bezierEval(1, q2, u);
+
+  const diff = vSub(q, point);
+  const numerator = vDot(diff, q1u);
+  const denominator = vDot(q1u, q1u) + vDot(diff, q2u);
+
+  if (Math.abs(denominator) < 1e-12) return u;
+
+  return u - numerator / denominator;
+}
+
+function bezierDerivatives(bez: Vec2[]): Vec2[] {
+  const d: Vec2[] = [];
+  const degree = bez.length - 1;
+  for (let i = 0; i < degree; i++) {
+    d.push(vScale(vSub(bez[i + 1], bez[i]), degree));
+  }
+  return d;
+}
+
+// ============================================================================
+// BEZIER GENERATION & EVALUATION
+// ============================================================================
+
+function generateBezier(
+  points: Vec2[],
+  uPrime: number[],
+  tHat1: Vec2,
+  tHat2: Vec2
+): Vec2[] {
+  const first = points[0];
+  const last = points[points.length - 1];
+  const nPts = points.length;
+
+  // Compute A matrix (precomputed Bernstein basis)
+  const A: [Vec2, Vec2][] = [];
+  for (let i = 0; i < nPts; i++) {
+    const u = uPrime[i];
+    const b1 = 3 * u * (1 - u) * (1 - u);
+    const b2 = 3 * u * u * (1 - u);
+    A.push([vScale(tHat1, b1), vScale(tHat2, b2)]);
+  }
+
+  // Create C and X matrices
+  const C: [[number, number], [number, number]] = [[0, 0], [0, 0]];
+  const X: [number, number] = [0, 0];
+
+  for (let i = 0; i < nPts; i++) {
+    C[0][0] += vDot(A[i][0], A[i][0]);
+    C[0][1] += vDot(A[i][0], A[i][1]);
+    C[1][0] = C[0][1];
+    C[1][1] += vDot(A[i][1], A[i][1]);
+
+    const u = uPrime[i];
+    const b0 = (1 - u) * (1 - u) * (1 - u);
+    const b1 = 3 * u * (1 - u) * (1 - u);
+    const b2 = 3 * u * u * (1 - u);
+    const b3 = u * u * u;
+
+    const tmp = vSub(
+      points[i],
+      vAdd(
+        vAdd(vScale(first, b0), vScale(first, b1)),
+        vAdd(vScale(last, b2), vScale(last, b3))
+      )
+    );
+
+    X[0] += vDot(A[i][0], tmp);
+    X[1] += vDot(A[i][1], tmp);
+  }
+
+  // Compute determinants of C and X
+  const det_C0_C1 = C[0][0] * C[1][1] - C[1][0] * C[0][1];
+  const det_C0_X = C[0][0] * X[1] - C[1][0] * X[0];
+  const det_X_C1 = X[0] * C[1][1] - X[1] * C[0][1];
+
+  // Derive alpha values
+  const alpha_l = Math.abs(det_C0_C1) < 1e-12 ? 0 : det_X_C1 / det_C0_C1;
+  const alpha_r = Math.abs(det_C0_C1) < 1e-12 ? 0 : det_C0_X / det_C0_C1;
+
+  // If alpha is negative or unreasonably large, use the Wu/Barsky heuristic.
+  // Large alphas occur when the C matrix determinant is near-zero (nearly-parallel
+  // tangents), placing control points far from the curve and creating spike artifacts.
+  const segLength = vDist(first, last);
+  const epsilon = 1e-6 * segLength;
+  const maxAlpha = segLength;
+
+  if (alpha_l < epsilon || alpha_r < epsilon ||
+      alpha_l > maxAlpha || alpha_r > maxAlpha) {
+    const dist = segLength / 3;
+    return [
+      first,
+      vAdd(first, vScale(tHat1, dist)),
+      vAdd(last, vScale(tHat2, dist)),
+      last
+    ];
+  }
+
+  return [
+    first,
+    vAdd(first, vScale(tHat1, alpha_l)),
+    vAdd(last, vScale(tHat2, alpha_r)),
+    last
+  ];
+}
+
+function bezierEval(degree: number, V: Vec2[], t: number): Vec2 {
+  const tmp: Vec2[] = V.slice(0, degree + 1).map(v => [...v] as Vec2);
+
+  for (let i = 1; i <= degree; i++) {
+    for (let j = 0; j <= degree - i; j++) {
+      tmp[j] = [
+        (1 - t) * tmp[j][0] + t * tmp[j + 1][0],
+        (1 - t) * tmp[j][1] + t * tmp[j + 1][1]
+      ];
+    }
+  }
+  return tmp[0];
+}
+
+// ============================================================================
+// ERROR COMPUTATION
+// ============================================================================
+
+function computeMaxError(
+  points: Vec2[],
+  bezCurve: Vec2[],
+  u: number[]
+): { maxError: number; splitPoint: number } {
+  let maxDist = 0;
+  let splitPoint = Math.floor(points.length / 2);
+
+  for (let i = 1; i < points.length - 1; i++) {
+    const p = bezierEval(3, bezCurve, u[i]);
+    const diff = vSub(p, points[i]);
+    const dist = vDot(diff, diff); // squared distance
+    if (dist >= maxDist) {
+      maxDist = dist;
+      splitPoint = i;
+    }
+  }
+
+  return { maxError: maxDist, splitPoint };
+}
+
+// ============================================================================
+// PUBLIC API
+// ============================================================================
+
+/** Default simplification tolerance in world units */
+const DEFAULT_SIMPLIFY_TOLERANCE = 2;
+
+/** Default fitting error (squared) in world units */
+const DEFAULT_FIT_ERROR = 16; // 4px squared
+
+/**
+ * Convert an array of raw input points to fitted cubic bezier segments.
+ *
+ * @param rawPoints - Array of {x, y} from pointer events
+ * @param simplifyTolerance - RDP tolerance in world units (default 2)
+ * @param fitError - Max fitting error squared (default 16 = 4px^2)
+ * @returns Object with start point and bezier segments
+ */
+function fitPointsToBezier(
+  rawPoints: { x: number; y: number }[],
+  simplifyTolerance: number = DEFAULT_SIMPLIFY_TOLERANCE,
+  fitError: number = DEFAULT_FIT_ERROR
+): { start: [number, number]; segments: BezierSegment[] } | null {
+  if (rawPoints.length < 2) return null;
+
+  // Convert to Vec2 tuples
+  const pts: Vec2[] = rawPoints.map(p => [p.x, p.y]);
+
+  // Remove exact duplicates (common with pointer events)
+  const deduped: Vec2[] = [pts[0]];
+  for (let i = 1; i < pts.length; i++) {
+    if (pts[i][0] !== pts[i - 1][0] || pts[i][1] !== pts[i - 1][1]) {
+      deduped.push(pts[i]);
+    }
+  }
+
+  if (deduped.length < 2) return null;
+
+  // Simplify
+  const simplified = rdpSimplify(deduped, simplifyTolerance);
+  if (simplified.length < 2) return null;
+
+  // Fit to bezier curves
+  const segments = fitCubicBezier(simplified, fitError);
+
+  return {
+    start: simplified[0],
+    segments
+  };
+}
+
+return {
+  fitPointsToBezier,
+  rdpSimplify,
+  fitCubicBezier
+};
+
+```
+
+# FreehandLayer
+
+```tsx
+/**
+ * FreehandLayer.tsx
+ *
+ * Captures pointer input for freehand curve drawing.
+ * Collects world-coordinate points during a stroke, fits them to
+ * cubic bezier curves on pointer up, and commits to the curves array.
+ * Draws a live preview polyline on a temporary overlay canvas during the stroke,
+ * avoiding interference with the main render loop.
+ */
+
+import type { Curve, BezierSegment } from '#types/core/curve.types';
+
+const { useMapState, useMapOperations } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "MapContext")) as {
+  useMapState: () => {
+    mapData: { layers: { id: string; curves: Curve[] }[]; activeLayerId: string; viewState: { zoom: number; center: { x: number; y: number } }; northDirection?: number } | null;
+    geometry: { cellSize: number; type: string; getScaledCellSize: (zoom: number) => number } | null;
+    screenToWorld: (clientX: number, clientY: number) => { worldX: number; worldY: number } | null;
+    getClientCoords: (e: PointerEvent | MouseEvent | TouchEvent) => { clientX: number; clientY: number };
+    canvasRef: { current: HTMLCanvasElement | null };
+  };
+  useMapOperations: () => {
+    onCurvesChange: (curves: Curve[], skipHistory?: boolean) => void;
+  };
+};
+
+const { useEventHandlerRegistration } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "EventHandlerContext")) as {
+  useEventHandlerRegistration: () => {
+    registerHandlers: (layerType: string, handlers: Record<string, unknown>) => void;
+    unregisterHandlers: (layerType: string) => void;
+  };
+};
+
+const { fitPointsToBezier } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "curveFitting")) as {
+  fitPointsToBezier: (
+    rawPoints: { x: number; y: number }[],
+    simplifyTolerance?: number,
+    fitError?: number
+  ) => { start: [number, number]; segments: BezierSegment[] } | null;
+};
+
+const { calculateViewportOffset } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "BaseGeometry")) as {
+  calculateViewportOffset: (
+    geometry: { type: string; cellSize: number },
+    center: { x: number; y: number },
+    canvasSize: { width: number; height: number },
+    zoom: number
+  ) => { offsetX: number; offsetY: number };
+};
+
+const { getActiveLayer } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "layerAccessor")) as {
+  getActiveLayer: (mapData: unknown) => { curves: Curve[] };
+};
+
+/** Props for FreehandLayer */
+interface FreehandLayerProps {
+  currentTool: string;
+  selectedColor: string;
+  selectedOpacity?: number;
+}
+
+/** Generate a unique curve ID */
+function generateCurveId(): string {
+  return 'curve-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+}
+
+const FreehandLayer = ({
+  currentTool,
+  selectedColor,
+  selectedOpacity = 1
+}: FreehandLayerProps): null => {
+
+  const { mapData, geometry, screenToWorld, getClientCoords, canvasRef } = useMapState();
+  const { onCurvesChange } = useMapOperations();
+  const { registerHandlers, unregisterHandlers } = useEventHandlerRegistration();
+
+  // Drawing state
+  const isDrawingRef = dc.useRef(false);
+  const pointsRef = dc.useRef<{ x: number; y: number }[]>([]);
+  // Overlay canvas for live preview (avoids interfering with main render loop)
+  const overlayRef = dc.useRef<HTMLCanvasElement | null>(null);
+
+  // Closure snap threshold: half a cell size
+  const snapDistance = geometry ? geometry.getScaledCellSize(1) * 0.5 : 20;
+
+  /**
+   * Create the overlay canvas, sized and positioned to match the main canvas.
+   */
+  const createOverlay = dc.useCallback((): HTMLCanvasElement | null => {
+    const mainCanvas = canvasRef.current;
+    if (!mainCanvas || !mainCanvas.parentElement) return null;
+
+    const overlay = document.createElement('canvas');
+    overlay.width = mainCanvas.width;
+    overlay.height = mainCanvas.height;
+    overlay.style.position = 'absolute';
+    overlay.style.top = '0';
+    overlay.style.left = '0';
+    overlay.style.pointerEvents = 'none';
+    mainCanvas.parentElement.appendChild(overlay);
+    overlayRef.current = overlay;
+    return overlay;
+  }, [canvasRef]);
+
+  /**
+   * Remove the overlay canvas.
+   */
+  const removeOverlay = dc.useCallback(() => {
+    if (overlayRef.current && overlayRef.current.parentElement) {
+      overlayRef.current.parentElement.removeChild(overlayRef.current);
+    }
+    overlayRef.current = null;
+  }, []);
+
+  /**
+   * Draw the live preview polyline on the overlay canvas.
+   */
+  const drawPreview = dc.useCallback((points: { x: number; y: number }[]) => {
+    const overlay = overlayRef.current;
+    if (!overlay || points.length < 2 || !mapData) return;
+
+    const ctx = overlay.getContext('2d');
+    if (!ctx) return;
+
+    // Clear overlay
+    ctx.clearRect(0, 0, overlay.width, overlay.height);
+
+    const { zoom, center } = mapData.viewState;
+    const { width, height } = overlay;
+
+    const { offsetX, offsetY } = calculateViewportOffset(
+      geometry || { type: 'hex', cellSize: 1 },
+      center,
+      { width, height },
+      zoom
+    );
+
+    ctx.save();
+
+    // Apply north rotation if present
+    const northDirection = mapData.northDirection || 0;
+    if (northDirection !== 0) {
+      ctx.translate(width / 2, height / 2);
+      ctx.rotate((northDirection * Math.PI) / 180);
+      ctx.translate(-width / 2, -height / 2);
+    }
+
+    // Transform to world coordinates
+    ctx.translate(offsetX, offsetY);
+    ctx.scale(zoom, zoom);
+
+    // Draw polyline
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, points[0].y);
+    for (let i = 1; i < points.length; i++) {
+      ctx.lineTo(points[i].x, points[i].y);
+    }
+
+    ctx.strokeStyle = selectedColor;
+    ctx.lineWidth = 2 / zoom; // Constant screen-space width
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.globalAlpha = 0.7;
+    ctx.stroke();
+
+    // Draw closure indicator if endpoint is near start
+    if (points.length > 5) {
+      const startPt = points[0];
+      const endPt = points[points.length - 1];
+      const dx = endPt.x - startPt.x;
+      const dy = endPt.y - startPt.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < snapDistance) {
+        ctx.beginPath();
+        ctx.arc(startPt.x, startPt.y, snapDistance * 0.3, 0, Math.PI * 2);
+        ctx.fillStyle = selectedColor;
+        ctx.globalAlpha = 0.3;
+        ctx.fill();
+      }
+    }
+
+    ctx.restore();
+  }, [mapData, geometry, selectedColor, snapDistance]);
+
+  const handlePointerDown = dc.useCallback((e: MouseEvent | TouchEvent | PointerEvent, _gridX?: number, _gridY?: number, _isTouch?: boolean) => {
+    if (currentTool !== 'freehand') return;
+
+    const { clientX, clientY } = getClientCoords(e);
+    const coords = screenToWorld(clientX, clientY);
+    if (!coords) return;
+
+    // Create overlay canvas for preview
+    createOverlay();
+
+    isDrawingRef.current = true;
+    pointsRef.current = [{ x: coords.worldX, y: coords.worldY }];
+  }, [currentTool, screenToWorld, getClientCoords, createOverlay]);
+
+  const handlePointerMove = dc.useCallback((e: MouseEvent | TouchEvent | PointerEvent) => {
+    if (!isDrawingRef.current || currentTool !== 'freehand') return;
+
+    const { clientX, clientY } = getClientCoords(e);
+    const coords = screenToWorld(clientX, clientY);
+    if (!coords) return;
+
+    pointsRef.current.push({ x: coords.worldX, y: coords.worldY });
+
+    // Draw live preview on overlay
+    drawPreview(pointsRef.current);
+  }, [currentTool, screenToWorld, getClientCoords, drawPreview]);
+
+  const stopDrawing = dc.useCallback(() => {
+    if (!isDrawingRef.current) return;
+    isDrawingRef.current = false;
+
+    // Remove overlay canvas
+    removeOverlay();
+
+    const points = pointsRef.current;
+    if (points.length < 3) {
+      pointsRef.current = [];
+      return;
+    }
+
+    // Fit to bezier curves
+    const result = fitPointsToBezier(points);
+    if (!result || result.segments.length === 0) {
+      pointsRef.current = [];
+      return;
+    }
+
+    // Closure detection: check if end is near start
+    const startPt = points[0];
+    const endPt = points[points.length - 1];
+    const dx = endPt.x - startPt.x;
+    const dy = endPt.y - startPt.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const isClosed = dist < snapDistance;
+
+    if (isClosed && result.segments.length > 0) {
+      // Snap last segment endpoint to start
+      const lastSeg = result.segments[result.segments.length - 1];
+      lastSeg[4] = result.start[0];
+      lastSeg[5] = result.start[1];
+    }
+
+    // Build curve object
+    const curve: Curve = {
+      id: generateCurveId(),
+      start: result.start,
+      segments: result.segments,
+      closed: isClosed,
+      color: isClosed ? selectedColor : 'transparent',
+      opacity: isClosed ? selectedOpacity : 1,
+      strokeColor: selectedColor,
+      strokeWidth: 2
+    };
+
+    // Get current curves and append
+    if (mapData) {
+      const activeLayer = getActiveLayer(mapData);
+      const currentCurves = activeLayer.curves || [];
+      onCurvesChange([...currentCurves, curve]);
+    }
+
+    pointsRef.current = [];
+  }, [mapData, selectedColor, selectedOpacity, snapDistance, onCurvesChange, removeOverlay]);
+
+  // Clean up overlay on unmount
+  dc.useEffect(() => {
+    return () => removeOverlay();
+  }, [removeOverlay]);
+
+  // Register event handlers
+  dc.useEffect(() => {
+    registerHandlers('freehand', {
+      handlePointerDown,
+      handlePointerMove,
+      stopDrawing
+    });
+
+    return () => unregisterHandlers('freehand');
+  }, [registerHandlers, unregisterHandlers, handlePointerDown, handlePointerMove, stopDrawing]);
+
+  // No visual output — drawing happens on the overlay canvas
+  return null;
+};
+
+return { FreehandLayer };
 
 ```
 
@@ -25219,8 +27611,7 @@ const useFogTools = (
   );
 
   /**
-   * Apply fog/reveal to a rectangular area
-   * Rectangle tool defaults to reveal (erase) mode
+   * Apply fog to a rectangular area
    */
   const applyRectangle = dc.useCallback(
     (startCol: number, startRow: number, endCol: number, endRow: number): void => {
@@ -25231,8 +27622,7 @@ const useFogTools = (
 
       const activeLayer = getActiveLayer(mapData);
 
-      // Rectangle tool reveals (erases fog) by default
-      const updatedLayer = revealRectangle(activeLayer, startCol, startRow, endCol, endRow);
+      const updatedLayer = fogRectangle(activeLayer, startCol, startRow, endCol, endRow);
 
       if (updatedLayer && updatedLayer.fogOfWar) {
         onFogChange(updatedLayer.fogOfWar);
@@ -30140,6 +32530,11 @@ const useEventCoordinator = ({
       return;
     }
 
+    // Only left-click (button 0) triggers tool actions; right-click is handled by contextmenu
+    if (e.type === 'mousedown' && (e as MouseEvent).button !== 0) {
+      return;
+    }
+
     e.preventDefault();
     e.stopPropagation();
 
@@ -30284,6 +32679,15 @@ const useEventCoordinator = ({
 
         if (diagonalFillHandlers?.handleDiagonalFillClick) {
           diagonalFillHandlers.handleDiagonalFillClick(e, isTouchEvent);
+        }
+
+      } else if (currentTool === 'freehand') {
+        if (hasMultiSelection) clearSelection();
+
+        const freehandHandlers = getHandlers('freehand');
+        if (freehandHandlers?.handlePointerDown) {
+          const eventToUse = isTouchEvent ? syntheticEvent : e;
+          freehandHandlers.handlePointerDown(eventToUse, gridX, gridY, isTouchEvent);
         }
       }
     };
@@ -30456,6 +32860,14 @@ const useEventCoordinator = ({
       return;
     }
 
+    if (currentTool === 'freehand') {
+      const freehandHandlers = getHandlers('freehand');
+      if (freehandHandlers?.handlePointerMove) {
+        freehandHandlers.handlePointerMove(e);
+      }
+      return;
+    }
+
     if (layerVisibility.objects && objectHandlers?.handleHoverUpdate) {
       objectHandlers.handleHoverUpdate(e);
     }
@@ -30554,6 +32966,13 @@ const useEventCoordinator = ({
       }
     }
 
+    if (currentTool === 'freehand') {
+      const freehandHandlers = getHandlers('freehand');
+      if (freehandHandlers?.stopDrawing) {
+        freehandHandlers.stopDrawing(e);
+      }
+    }
+
     if (fogHandlers?.handlePointerUp) {
       fogHandlers.handlePointerUp(e);
     }
@@ -30588,7 +33007,7 @@ const useEventCoordinator = ({
     const panZoomHandlers = getHandlers('panZoom') as PanZoomHandlers | null;
     if (!panZoomHandlers) return;
 
-    if (e.button === 1) {
+    if (e.button === 1 || e.button === 2) {
       e.preventDefault();
       panZoomHandlers.startPan(e.clientX, e.clientY);
     }
@@ -30598,7 +33017,7 @@ const useEventCoordinator = ({
     const panZoomHandlers = getHandlers('panZoom') as PanZoomHandlers | null;
     if (!panZoomHandlers) return;
 
-    if (panZoomHandlers.isPanning && e.button === 1) {
+    if (panZoomHandlers.isPanning && (e.button === 1 || e.button === 2)) {
       e.preventDefault();
       panZoomHandlers.stopPan();
     }
@@ -30641,7 +33060,7 @@ const useEventCoordinator = ({
     if (!canvas) return;
 
     const handleMouseDown = (e: MouseEvent): void => {
-      if (e.button === 1) {
+      if (e.button === 1 || e.button === 2) {
         handlePanStart(e);
       } else {
         handlePointerDown(e);
@@ -30797,6 +33216,7 @@ import type { ComponentChildren } from 'preact';
 import type {
   MapData,
   Cell,
+  Curve,
   MapObject,
   TextLabel,
   Edge,
@@ -30824,6 +33244,7 @@ const { MapSelectionProvider, useMapSelection } = await dc.require(dc.headerLink
 const { ObjectLinkingProvider } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "ObjectLinkingContext"));
 const { ObjectLayer } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "ObjectLayer"));
 const { DrawingLayer } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "DrawingLayer"));
+const { FreehandLayer } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "FreehandLayer"));
 const { TextLayer } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "TextLayer"));
 const { NotePinLayer } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "NotePinLayer"));
 const { EventHandlerProvider } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "EventHandlerContext"));
@@ -30872,6 +33293,7 @@ interface MapCanvasContentProps {
   notePath?: string;
   mapData: MapData | null;
   onCellsChange: (cells: Cell[], skipHistory?: boolean) => void;
+  onCurvesChange: (curves: Curve[], skipHistory?: boolean) => void;
   onObjectsChange: (objects: MapObject[]) => void;
   onTextLabelsChange: (labels: TextLabel[]) => void;
   onEdgesChange: (edges: Edge[], skipHistory?: boolean) => void;
@@ -30933,7 +33355,7 @@ const Coordinators = ({ canvasRef, mapData, geometry, isFocused, isColorPickerOp
  * MapCanvasContent - Inner component that uses context hooks
  * Contains all the map canvas logic and interacts with shared selection state
  */
-const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onViewStateChange, onTextLabelSettingsChange, currentTool, selectedObjectType, selectedColor, isColorPickerOpen, customColors, onAddCustomColor, onDeleteCustomColor, isFocused, isAnimating, theme, isAlignmentMode, children }: MapCanvasContentProps): React.ReactElement => {
+const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onViewStateChange, onTextLabelSettingsChange, currentTool, selectedObjectType, selectedColor, isColorPickerOpen, customColors, onAddCustomColor, onDeleteCustomColor, isFocused, isAnimating, theme, isAlignmentMode, children }: MapCanvasContentProps): React.ReactElement => {
   const canvasRef = dc.useRef<HTMLCanvasElement | null>(null);
   const fogCanvasRef = dc.useRef<HTMLCanvasElement | null>(null);  // Separate canvas for fog blur effect (CSS blur for iOS compat)
   const containerRef = dc.useRef<HTMLDivElement | null>(null);
@@ -31221,11 +33643,12 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onObjectsCh
 
     // Callbacks
     onCellsChange,
+    onCurvesChange,
     onObjectsChange,
     onTextLabelsChange,
     onEdgesChange,
     onMapDataUpdate
-  }), [onCellsChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onViewStateChange, onTextLabelSettingsChange]);
+  }), [onCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onViewStateChange, onTextLabelSettingsChange]);
 
 
 
@@ -31270,11 +33693,7 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onObjectsCh
             </div>
 
             <LinkedNoteHoverOverlays
-              canvasRef={canvasRef}
-              mapData={mapData}
               selectedItem={selectedItem}
-              geometry={geometry}
-              layerVisibility={layerVisibility}
             />
 
             {/* Render child layers */}
@@ -31303,6 +33722,7 @@ const MapCanvas = (props: MapCanvasProps): React.ReactElement => {
 // Attach layer components using dot notation
 MapCanvas.ObjectLayer = ObjectLayer;
 MapCanvas.DrawingLayer = DrawingLayer;
+MapCanvas.FreehandLayer = FreehandLayer;
 MapCanvas.TextLayer = TextLayer;
 MapCanvas.NotePinLayer = NotePinLayer;
 MapCanvas.HexCoordinateLayer = HexCoordinateLayer;
@@ -32167,7 +34587,7 @@ const ToolPalette = ({
 
       switch (key) {
         case 'd':
-          onToolChange('draw' as ToolId);
+          onToolChange(subToolSelections.draw || 'draw' as ToolId);
           break;
         case 'e':
           onToolChange('erase' as ToolId);
@@ -32178,6 +34598,9 @@ const ToolPalette = ({
           break;
         case 'm':
           onToolChange('measure' as ToolId);
+          break;
+        case 'f':
+          onToolChange('freehand' as ToolId);
           break;
         default:
           return;
@@ -32203,7 +34626,8 @@ const ToolPalette = ({
       subTools: [
         { id: 'draw' as ToolId, label: 'Paint Cells', title: 'Draw (fill cells) (D)', icon: 'lucide-paintbrush' },
         { id: 'segmentDraw' as ToolId, label: 'Paint Segments', title: 'Paint Segments (partial cells)', icon: 'lucide-triangle', gridOnly: true },
-        { id: 'edgeDraw' as ToolId, label: 'Paint Edges', title: 'Paint Edges (grid lines)', icon: 'lucide-pencil-ruler', gridOnly: true }
+        { id: 'edgeDraw' as ToolId, label: 'Paint Edges', title: 'Paint Edges (grid lines)', icon: 'lucide-pencil-ruler', gridOnly: true },
+        { id: 'freehand' as ToolId, label: 'Freehand Draw', title: 'Freehand Draw (F)', icon: 'lucide-pen-tool' }
       ]
     },
     {
@@ -32633,6 +35057,7 @@ export interface FogOfWarState {
 
 /** Layer visibility state */
 export interface LayerVisibility {
+  grid: boolean;
   objects: boolean;
   textLabels: boolean;
   hexCoordinates?: boolean;
@@ -32686,6 +35111,11 @@ const VisibilityToolbar = ({
   onFogClearAll
 }: VisibilityToolbarProps): React.ReactElement => {
   const layers: LayerDef[] = [
+    {
+      id: 'grid',
+      icon: 'lucide-grid-2x-2x',
+      tooltip: 'Toggle grid visibility'
+    },
     {
       id: 'objects',
       icon: 'lucide-boxes',
@@ -32864,7 +35294,7 @@ return `// settingsPluginMain.js - Windrose MapDesigner Settings Plugin
 
 const PLUGIN_VERSION = '{{PLUGIN_VERSION}}';
 
-const { Plugin, PluginSettingTab, Setting, Modal, setIcon } = require('obsidian');
+const { Plugin, PluginSettingTab, Setting, Modal, setIcon, AbstractInputSuggest } = require('obsidian');
 
 // =============================================================================
 // DATA CONSTANTS
@@ -32922,7 +35352,61 @@ class WindroseMDSettingsPlugin extends Plugin {
   async onload() {
     await this.loadSettings();
     this.addSettingTab(new WindroseMDSettingsTab(this.app, this));
-    
+
+    // Auto-load object sets from configured folder (deferred until vault is indexed)
+    this.app.workspace.onLayoutReady(async () => {
+      if (this.settings.objectSetsAutoLoadFolder) {
+        try {
+          const added = await ObjectSetHelpers.scanAutoLoadFolder(this);
+          if (added > 0) await this.saveSettings();
+        } catch (e) {
+          console.warn('[Windrose] Auto-load scan failed:', e.message);
+        }
+      }
+    });
+
+    // Watch auto-load folder for changes (debounced re-scan)
+    this._autoLoadScanTimer = null;
+    const debouncedScan = () => {
+      const folder = this.settings.objectSetsAutoLoadFolder;
+      if (!folder) return;
+      if (this._autoLoadScanTimer) clearTimeout(this._autoLoadScanTimer);
+      this._autoLoadScanTimer = setTimeout(async () => {
+        try {
+          const added = await ObjectSetHelpers.scanAutoLoadFolder(this);
+          if (added > 0) {
+            await this.saveSettings();
+            console.log('[Windrose] Auto-load: found', added, 'new set(s)');
+          }
+        } catch (e) {
+          // Silently ignore - folder may have been removed
+        }
+      }, 2000);
+    };
+
+    const isInAutoLoadFolder = (file) => {
+      const folder = this.settings.objectSetsAutoLoadFolder;
+      return folder && file && file.path && file.path.startsWith(folder + '/');
+    };
+
+    this.registerEvent(this.app.vault.on('create', (file) => {
+      if (isInAutoLoadFolder(file)) debouncedScan();
+    }));
+    this.registerEvent(this.app.vault.on('delete', (file) => {
+      if (isInAutoLoadFolder(file)) debouncedScan();
+    }));
+    this.registerEvent(this.app.vault.on('rename', (file, oldPath) => {
+      const folder = this.settings.objectSetsAutoLoadFolder;
+      if (folder && ((file.path && file.path.startsWith(folder + '/')) || (oldPath && oldPath.startsWith(folder + '/')))) {
+        debouncedScan();
+      }
+    }));
+    this.registerEvent(this.app.vault.on('modify', (file) => {
+      if (isInAutoLoadFolder(file) && file.path && file.path.endsWith('/objects.json')) {
+        debouncedScan();
+      }
+    }));
+
     // Register command to insert a new map
     this.addCommand({
       id: 'insert-new-map',
@@ -33415,7 +35899,11 @@ class WindroseMDSettingsPlugin extends Plugin {
         fogOfWarBlurEnabled: false,
         fogOfWarBlurFactor: 0.20,
         // Controls visibility
-        alwaysShowControls: false
+        alwaysShowControls: false,
+        // Object sets
+        objectSets: [],
+        activeObjectSetId: null,
+        objectSetsAutoLoadFolder: ''
       }, data || {});
     } catch (error) {
       console.warn('[DMT Settings] Error loading settings, using defaults:', error);
@@ -33455,7 +35943,11 @@ class WindroseMDSettingsPlugin extends Plugin {
         fogOfWarBlurEnabled: false,
         fogOfWarBlurFactor: 0.20,
         // Controls visibility
-        alwaysShowControls: false
+        alwaysShowControls: false,
+        // Object sets
+        objectSets: [],
+        activeObjectSetId: null,
+        objectSetsAutoLoadFolder: ''
       };
     }
   }
@@ -34708,6 +37200,463 @@ class DungeonEssenceVisualizer {
 `;
 ```
 
+# settingsPlugin-ObjectSetHelpers
+
+```js
+return `// settingsPlugin-ObjectSetHelpers.js
+// Object set management helpers - save, activate, import, export, scan
+// This file is concatenated into the settings plugin template by the assembler
+
+/**
+ * Object set management helpers.
+ * All methods take the plugin instance for access to settings and vault.
+ */
+const ObjectSetHelpers = {
+  generateId() {
+    return 'set-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+  },
+
+  /**
+   * Resolve relative image filenames in set data to full vault paths.
+   * Handles both customObjects and objectOverrides.
+   */
+  resolveImagePaths(data, imagesFolder, vault) {
+    for (const side of ['hex', 'grid']) {
+      if (!data[side]) continue;
+      // Custom objects
+      if (data[side].customObjects) {
+        for (const obj of data[side].customObjects) {
+          if (obj.imagePath && !obj.imagePath.includes('/')) {
+            const resolved = imagesFolder + '/' + obj.imagePath;
+            if (vault.getAbstractFileByPath(resolved)) {
+              obj.imagePath = resolved;
+            }
+          }
+        }
+      }
+      // Object overrides (built-in objects with custom images)
+      if (data[side].objectOverrides) {
+        for (const override of Object.values(data[side].objectOverrides)) {
+          if (override.imagePath && !override.imagePath.includes('/')) {
+            const resolved = imagesFolder + '/' + override.imagePath;
+            if (vault.getAbstractFileByPath(resolved)) {
+              override.imagePath = resolved;
+            }
+          }
+        }
+      }
+    }
+  },
+
+  /**
+   * Snapshot current hex+grid object data into a new ObjectSet.
+   */
+  saveCurrentAsSet(plugin, name) {
+    const s = plugin.settings;
+    if (!s.objectSets) s.objectSets = [];
+
+    const set = {
+      id: ObjectSetHelpers.generateId(),
+      name: name,
+      source: 'manual',
+      data: {
+        hex: {
+          objectOverrides: JSON.parse(JSON.stringify(s.hexObjectOverrides || {})),
+          customObjects: JSON.parse(JSON.stringify(s.customHexObjects || [])),
+          customCategories: JSON.parse(JSON.stringify(s.customHexCategories || []))
+        },
+        grid: {
+          objectOverrides: JSON.parse(JSON.stringify(s.gridObjectOverrides || {})),
+          customObjects: JSON.parse(JSON.stringify(s.customGridObjects || [])),
+          customCategories: JSON.parse(JSON.stringify(s.customGridCategories || []))
+        }
+      }
+    };
+
+    s.objectSets.push(set);
+    return set;
+  },
+
+  /**
+   * Copy-on-activate: overwrite hex/grid settings keys from set data.
+   * Only overwrites sides that are present in the set (partial apply).
+   */
+  activateSet(plugin, setId) {
+    const s = plugin.settings;
+    const sets = s.objectSets || [];
+    const set = sets.find(st => st.id === setId);
+    if (!set) return false;
+
+    if (set.data.hex) {
+      s.hexObjectOverrides = JSON.parse(JSON.stringify(set.data.hex.objectOverrides || {}));
+      s.customHexObjects = JSON.parse(JSON.stringify(set.data.hex.customObjects || []));
+      s.customHexCategories = JSON.parse(JSON.stringify(set.data.hex.customCategories || []));
+    }
+    if (set.data.grid) {
+      s.gridObjectOverrides = JSON.parse(JSON.stringify(set.data.grid.objectOverrides || {}));
+      s.customGridObjects = JSON.parse(JSON.stringify(set.data.grid.customObjects || []));
+      s.customGridCategories = JSON.parse(JSON.stringify(set.data.grid.customCategories || []));
+    }
+
+    s.activeObjectSetId = setId;
+    return true;
+  },
+
+  /**
+   * Clear activeObjectSetId. Leaves current objects in place.
+   */
+  deactivateSet(plugin) {
+    plugin.settings.activeObjectSetId = null;
+  },
+
+  /**
+   * Reset all object customizations to built-in defaults for both map types.
+   * Clears overrides, custom objects, custom categories, and active set tracking.
+   */
+  resetToDefaults(plugin) {
+    const s = plugin.settings;
+    s.hexObjectOverrides = {};
+    s.customHexObjects = [];
+    s.customHexCategories = [];
+    s.gridObjectOverrides = {};
+    s.customGridObjects = [];
+    s.customGridCategories = [];
+    s.activeObjectSetId = null;
+  },
+
+  /**
+   * Check if live object settings differ from the active set (or from defaults).
+   * Returns true if the user has unsaved modifications.
+   */
+  isDirty(plugin) {
+    const s = plugin.settings;
+    const activeSetId = s.activeObjectSetId;
+
+    const hexOverrides = s.hexObjectOverrides || {};
+    const hexObjects = s.customHexObjects || [];
+    const hexCategories = s.customHexCategories || [];
+    const gridOverrides = s.gridObjectOverrides || {};
+    const gridObjects = s.customGridObjects || [];
+    const gridCategories = s.customGridCategories || [];
+
+    if (!activeSetId) {
+      // On Defaults - dirty if any customizations exist
+      return Object.keys(hexOverrides).length > 0 ||
+        hexObjects.length > 0 || hexCategories.length > 0 ||
+        Object.keys(gridOverrides).length > 0 ||
+        gridObjects.length > 0 || gridCategories.length > 0;
+    }
+
+    // On a named set - compare live state to stored snapshot
+    const set = (s.objectSets || []).find(st => st.id === activeSetId);
+    if (!set) return true;
+
+    const compare = (live, stored) => JSON.stringify(live) !== JSON.stringify(stored);
+
+    const setHex = set.data.hex || {};
+    if (compare(hexOverrides, setHex.objectOverrides || {})) return true;
+    if (compare(hexObjects, setHex.customObjects || [])) return true;
+    if (compare(hexCategories, setHex.customCategories || [])) return true;
+
+    const setGrid = set.data.grid || {};
+    if (compare(gridOverrides, setGrid.objectOverrides || {})) return true;
+    if (compare(gridObjects, setGrid.customObjects || [])) return true;
+    if (compare(gridCategories, setGrid.customCategories || [])) return true;
+
+    return false;
+  },
+
+  /**
+   * Delete a set by ID. Clears activeObjectSetId if it was the active set.
+   */
+  deleteSet(plugin, setId) {
+    const s = plugin.settings;
+    if (!s.objectSets) return;
+    s.objectSets = s.objectSets.filter(st => st.id !== setId);
+    if (s.activeObjectSetId === setId) {
+      s.activeObjectSetId = null;
+    }
+  },
+
+  /**
+   * Rename a set in place.
+   */
+  renameSet(plugin, setId, newName) {
+    const s = plugin.settings;
+    const set = (s.objectSets || []).find(st => st.id === setId);
+    if (set) set.name = newName;
+  },
+
+  /**
+   * Get all imagePath values from a set's custom objects and overrides.
+   */
+  getImagePaths(setData) {
+    const paths = [];
+    for (const side of ['hex', 'grid']) {
+      const sideData = setData[side];
+      if (!sideData) continue;
+      if (sideData.customObjects) {
+        for (const obj of sideData.customObjects) {
+          if (obj.imagePath) paths.push(obj.imagePath);
+        }
+      }
+      if (sideData.objectOverrides) {
+        for (const override of Object.values(sideData.objectOverrides)) {
+          if (override.imagePath) paths.push(override.imagePath);
+        }
+      }
+    }
+    return [...new Set(paths)];
+  },
+
+  /**
+   * Deduplicate a set name against existing sets.
+   * Returns the name as-is if unique, or appends " (2)", " (3)", etc.
+   */
+  deduplicateName(existingSets, name) {
+    const names = new Set(existingSets.map(s => s.name));
+    if (!names.has(name)) return name;
+    let counter = 2;
+    while (names.has(name + ' (' + counter + ')')) counter++;
+    return name + ' (' + counter + ')';
+  },
+
+  /**
+   * Export a set to a vault folder.
+   * Creates <destFolder>/<setName>/objects.json and copies images to images/.
+   */
+  async exportSetToFolder(plugin, setId, destFolder, options) {
+    const s = plugin.settings;
+    const set = (s.objectSets || []).find(st => st.id === setId);
+    if (!set) throw new Error('Set not found');
+
+    const includeHex = options?.includeHex !== false;
+    const includeGrid = options?.includeGrid !== false;
+    const setName = (options?.name || set.name).replace(/[\\\\/:*?"<>|]/g, '_');
+
+    // Build export data
+    const exportData = {
+      windroseMD_objectSet: true,
+      version: '1.0',
+      name: options?.name || set.name
+    };
+
+    const exportSetData = {};
+    if (includeHex && set.data.hex) {
+      exportSetData.hex = JSON.parse(JSON.stringify(set.data.hex));
+    }
+    if (includeGrid && set.data.grid) {
+      exportSetData.grid = JSON.parse(JSON.stringify(set.data.grid));
+    }
+
+    // Collect image paths and rewrite to relative filenames
+    const imagePaths = ObjectSetHelpers.getImagePaths(exportSetData);
+    const imageMap = {};
+    for (const fullPath of imagePaths) {
+      const filename = fullPath.split('/').pop();
+      imageMap[fullPath] = filename;
+    }
+
+    // Rewrite imagePath in export data to relative filenames
+    for (const side of ['hex', 'grid']) {
+      if (!exportSetData[side]) continue;
+      if (exportSetData[side].customObjects) {
+        for (const obj of exportSetData[side].customObjects) {
+          if (obj.imagePath && imageMap[obj.imagePath]) {
+            obj.imagePath = imageMap[obj.imagePath];
+          }
+        }
+      }
+      if (exportSetData[side].objectOverrides) {
+        for (const override of Object.values(exportSetData[side].objectOverrides)) {
+          if (override.imagePath && imageMap[override.imagePath]) {
+            override.imagePath = imageMap[override.imagePath];
+          }
+        }
+      }
+    }
+
+    exportData.hex = exportSetData.hex;
+    exportData.grid = exportSetData.grid;
+
+    // Write to vault
+    const basePath = destFolder ? destFolder + '/' + setName : 'object-sets/' + setName;
+
+    // Ensure folders exist
+    try { await plugin.app.vault.createFolder(basePath); } catch (e) { /* exists */ }
+
+    const jsonPath = basePath + '/objects.json';
+    const jsonContent = JSON.stringify(exportData, null, 2);
+    const existingJson = plugin.app.vault.getAbstractFileByPath(jsonPath);
+    if (existingJson) {
+      await plugin.app.vault.modify(existingJson, jsonContent);
+    } else {
+      await plugin.app.vault.create(jsonPath, jsonContent);
+    }
+
+    // Copy images
+    if (imagePaths.length > 0) {
+      const imgFolder = basePath + '/images';
+      try { await plugin.app.vault.createFolder(imgFolder); } catch (e) { /* exists */ }
+
+      for (const fullPath of imagePaths) {
+        const sourceFile = plugin.app.vault.getAbstractFileByPath(fullPath);
+        if (!sourceFile) {
+          console.warn('[Windrose] Export: image not found:', fullPath);
+          continue;
+        }
+        const filename = imageMap[fullPath];
+        const destPath = imgFolder + '/' + filename;
+        const existingImg = plugin.app.vault.getAbstractFileByPath(destPath);
+        if (!existingImg) {
+          const binary = await plugin.app.vault.readBinary(sourceFile);
+          await plugin.app.vault.createBinary(destPath, binary);
+        }
+      }
+    }
+
+    return basePath;
+  },
+
+  /**
+   * Import a set from a vault folder containing objects.json.
+   * Resolves relative image filenames back to vault paths.
+   */
+  async importSetFromFolder(plugin, folderPath) {
+    const folder = plugin.app.vault.getAbstractFileByPath(folderPath);
+    if (!folder || !folder.children) {
+      throw new Error('Folder not found: ' + folderPath);
+    }
+
+    const jsonFile = plugin.app.vault.getAbstractFileByPath(folderPath + '/objects.json');
+    if (!jsonFile) {
+      throw new Error('No objects.json found in ' + folderPath);
+    }
+
+    const content = await plugin.app.vault.read(jsonFile);
+    const data = JSON.parse(content);
+
+    if (!data.windroseMD_objectSet) {
+      throw new Error('Not a valid Windrose object set (missing windroseMD_objectSet flag)');
+    }
+
+    // Resolve relative image filenames to vault paths
+    ObjectSetHelpers.resolveImagePaths(data, folderPath + '/images', plugin.app.vault);
+
+    // Build set object
+    const s = plugin.settings;
+    if (!s.objectSets) s.objectSets = [];
+
+    const setName = ObjectSetHelpers.deduplicateName(s.objectSets, data.name || 'Imported Set');
+
+    const set = {
+      id: ObjectSetHelpers.generateId(),
+      name: setName,
+      source: 'folder',
+      folderPath: folderPath,
+      data: {
+        hex: data.hex || undefined,
+        grid: data.grid || undefined
+      }
+    };
+
+    s.objectSets.push(set);
+    return set;
+  },
+
+  /**
+   * Scan the auto-load folder for valid object set packages.
+   * Adds or updates folder-sourced sets. Does not remove stale ones
+   * (user may have moved folders around).
+   */
+  async scanAutoLoadFolder(plugin) {
+    const folderPath = plugin.settings.objectSetsAutoLoadFolder;
+    if (!folderPath) return 0;
+
+    const folder = plugin.app.vault.getAbstractFileByPath(folderPath);
+    if (!folder || !folder.children) return 0;
+
+    if (!plugin.settings.objectSets) plugin.settings.objectSets = [];
+
+    let added = 0;
+    for (const child of folder.children) {
+      // Only look at subfolders
+      if (!child.children) continue;
+
+      const jsonFile = plugin.app.vault.getAbstractFileByPath(child.path + '/objects.json');
+      if (!jsonFile) continue;
+
+      try {
+        const content = await plugin.app.vault.read(jsonFile);
+        const data = JSON.parse(content);
+        if (!data.windroseMD_objectSet) continue;
+
+        // Check if this folder is already tracked
+        const existing = plugin.settings.objectSets.find(
+          st => st.source === 'folder' && st.folderPath === child.path
+        );
+
+        // Resolve relative image filenames to vault paths
+        ObjectSetHelpers.resolveImagePaths(data, child.path + '/images', plugin.app.vault);
+
+        if (existing) {
+          // Update data in place
+          existing.name = data.name || existing.name;
+          existing.data = { hex: data.hex, grid: data.grid };
+        } else {
+          const setName = ObjectSetHelpers.deduplicateName(
+            plugin.settings.objectSets,
+            data.name || child.name
+          );
+
+          plugin.settings.objectSets.push({
+            id: ObjectSetHelpers.generateId(),
+            name: setName,
+            source: 'folder',
+            folderPath: child.path,
+            data: { hex: data.hex, grid: data.grid }
+          });
+          added++;
+        }
+      } catch (e) {
+        console.warn('[Windrose] Scan: failed to read', child.path, e.message);
+      }
+    }
+
+    return added;
+  }
+};`;
+
+```
+
+# settingsPlugin-FolderSuggest
+
+```js
+return `// settingsPlugin-FolderSuggest.js
+// Folder path autocomplete using Obsidian's AbstractInputSuggest
+// This file is concatenated into the settings plugin template by the assembler
+
+class FolderSuggest extends AbstractInputSuggest {
+  getSuggestions(query) {
+    const folders = this.app.vault.getAllFolders(true);
+    if (!query) return folders;
+    const lower = query.toLowerCase();
+    return folders.filter(f => f.path.toLowerCase().includes(lower));
+  }
+
+  renderSuggestion(folder, el) {
+    el.setText(folder.path === '' ? '/ (vault root)' : folder.path);
+  }
+
+  selectSuggestion(folder) {
+    this.setValue(folder.path);
+    this.textInputEl.dispatchEvent(new Event('input'));
+    this.close();
+  }
+}`;
+
+```
+
 # settingsPlugin-InsertMapModal
 
 ```js
@@ -35296,7 +38245,7 @@ class InsertDungeonModal extends Modal {
         this.close();
       } catch (err) {
         console.error('[Windrose] Dungeon generation failed:', err);
-        alert('Failed to generate dungeon: ' + err.message);
+        new Notice('Failed to generate dungeon: ' + err.message);
       }
     };
 
@@ -35337,7 +38286,7 @@ class InsertDungeonModal extends Modal {
           this.close();
         } catch (err) {
           console.error('[Windrose] Dungeon generation failed:', err);
-          alert('Failed to generate dungeon: ' + err.message);
+          new Notice('Failed to generate dungeon: ' + err.message);
         }
       }
     });
@@ -35453,15 +38402,23 @@ class ObjectEditModal extends Modal {
     this.renderImagePicker();
     
     // Label input
-    new Setting(contentEl)
+    this.labelSetting = new Setting(contentEl)
       .setName('Label')
       .setDesc('Display name for this object')
-      .addText(text => text
-        .setValue(this.label)
-        .setPlaceholder('e.g., Treasure Chest')
-        .onChange(value => {
-          this.label = value;
-        }));
+      .addText(text => {
+        text
+          .setValue(this.label)
+          .setPlaceholder('e.g., Treasure Chest')
+          .onChange(value => {
+            this.label = value;
+            // Clear error when user starts typing
+            if (this.labelSetting.descEl.hasClass('mod-warning')) {
+              this.labelSetting.setDesc('Display name for this object');
+              this.labelSetting.descEl.removeClass('mod-warning');
+            }
+          });
+        this.labelInputEl = text.inputEl;
+      });
     
     // Category dropdown - use map-type-specific settings
     const mapTypeSettings = this.mapType === 'hex'
@@ -35831,24 +38788,26 @@ class ObjectEditModal extends Modal {
     // Validate based on mode
     if (this.mode === 'icon') {
       if (!this.iconClass || !RPGAwesomeHelpers.isValid(this.iconClass)) {
-        alert('Please select a valid icon');
+        new Notice('Please select a valid icon');
         return;
       }
     } else if (this.mode === 'image') {
       if (!this.imagePath || this.imagePath.trim().length === 0) {
-        alert('Please select an image');
+        new Notice('Please select an image');
         return;
       }
     } else {
       // symbol mode
       if (!this.symbol || this.symbol.length === 0 || this.symbol.length > 8) {
-        alert('Please enter a valid symbol (1-8 characters)');
+        new Notice('Please enter a valid symbol (1-8 characters)');
         return;
       }
     }
 
     if (!this.label || this.label.trim().length === 0) {
-      alert('Please enter a label');
+      this.labelSetting.setDesc('Please enter a label');
+      this.labelSetting.descEl.addClass('mod-warning');
+      this.labelInputEl?.focus();
       return;
     }
     
@@ -36037,7 +38996,7 @@ class CategoryEditModal extends Modal {
   
   save() {
     if (!this.label || this.label.trim().length === 0) {
-      alert('Please enter a category name');
+      new Notice('Please enter a category name');
       return;
     }
     
@@ -36196,11 +39155,11 @@ class ColorEditModal extends Modal {
     saveBtn.addEventListener('click', async () => {
       // Validate
       if (!labelValue.trim()) {
-        alert('Please enter a label for this color.');
+        new Notice('Please enter a label for this color.');
         return;
       }
       if (!/^#[0-9A-Fa-f]{6}$/.test(colorValue)) {
-        alert('Please enter a valid hex color (e.g., #4A9EFF)');
+        new Notice('Please enter a valid hex color (e.g., #4A9EFF)');
         return;
       }
       
@@ -36371,7 +39330,11 @@ class ExportModal extends Modal {
             // Check if file exists
             const existingFile = this.app.vault.getAbstractFileByPath(finalFilename);
             if (existingFile) {
-              if (!confirm(\`File "\${finalFilename}" already exists. Overwrite?\`)) {
+              if (!await new ConfirmModal(this.app, {
+                message: \`File "\${finalFilename}" already exists. Overwrite?\`,
+                confirmText: 'Overwrite',
+                isDestructive: true
+              }).openAndGetValue()) {
                 return;
               }
               await this.app.vault.modify(existingFile, json);
@@ -36379,10 +39342,10 @@ class ExportModal extends Modal {
               await this.app.vault.create(finalFilename, json);
             }
             
-            alert(\`Exported to: \${finalFilename}\`);
+            new Notice(\`Exported to: \${finalFilename}\`);
             this.close();
           } catch (err) {
-            alert(\`Export failed: \${err.message}\`);
+            new Notice(\`Export failed: \${err.message}\`);
           }
         }));
   }
@@ -36537,7 +39500,7 @@ class ImportModal extends Modal {
     const importBtn = buttonContainer.createEl('button', { text: 'Import', cls: 'mod-cta' });
     importBtn.onclick = async () => {
       if (!this.importData) {
-        alert('Please select a valid export file first.');
+        new Notice('Please select a valid export file first.');
         return;
       }
       
@@ -36604,6 +39567,438 @@ class ImportModal extends Modal {
   }
 }
 `;
+```
+
+# settingsPlugin-ObjectSetRenameModal
+
+```js
+return `// settingsPlugin-ObjectSetRenameModal.js
+// Simple rename prompt modal for object sets
+// This file is concatenated into the settings plugin template by the assembler
+
+class ObjectSetRenameModal extends Modal {
+  constructor(app, currentName, onSave) {
+    super(app);
+    this.currentName = currentName;
+    this.onSave = onSave;
+  }
+
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.createEl('h2', { text: 'Rename Object Set' });
+
+    let newName = this.currentName;
+    new Setting(contentEl)
+      .setName('Set Name')
+      .addText(text => {
+        text.setValue(this.currentName);
+        text.onChange(v => { newName = v; });
+        // Auto-focus and select all
+        setTimeout(() => {
+          text.inputEl.focus();
+          text.inputEl.select();
+        }, 50);
+      });
+
+    const buttons = contentEl.createDiv({ cls: 'dmt-modal-buttons' });
+
+    const cancelBtn = buttons.createEl('button', { text: 'Cancel' });
+    cancelBtn.onclick = () => this.close();
+
+    const saveBtn = buttons.createEl('button', { text: 'Save', cls: 'mod-cta' });
+    saveBtn.onclick = () => {
+      const trimmed = newName.trim();
+      if (!trimmed) {
+        new Notice('Name cannot be empty');
+        return;
+      }
+      this.onSave(trimmed);
+      this.close();
+    };
+  }
+
+  onClose() {
+    this.contentEl.empty();
+  }
+}`;
+
+```
+
+# settingsPlugin-ObjectSetExportModal
+
+```js
+return `// settingsPlugin-ObjectSetExportModal.js
+// Modal for exporting an object set to a vault folder
+// This file is concatenated into the settings plugin template by the assembler
+
+class ObjectSetExportModal extends Modal {
+  constructor(app, plugin, set) {
+    super(app);
+    this.plugin = plugin;
+    this.set = set;
+  }
+
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.addClass('dmt-export-modal');
+
+    contentEl.createEl('h2', { text: 'Export Object Set' });
+
+    const set = this.set;
+    let exportName = set.name;
+    let includeHex = !!set.data.hex;
+    let includeGrid = !!set.data.grid;
+
+    new Setting(contentEl)
+      .setName('Set Name')
+      .setDesc('Name used for the export folder')
+      .addText(text => text
+        .setValue(exportName)
+        .onChange(v => { exportName = v; }));
+
+    if (set.data.hex) {
+      new Setting(contentEl)
+        .setName('Include hex objects')
+        .addToggle(toggle => toggle
+          .setValue(includeHex)
+          .onChange(v => { includeHex = v; }));
+    }
+
+    if (set.data.grid) {
+      new Setting(contentEl)
+        .setName('Include grid objects')
+        .addToggle(toggle => toggle
+          .setValue(includeGrid)
+          .onChange(v => { includeGrid = v; }));
+    }
+
+    const imagePaths = ObjectSetHelpers.getImagePaths(set.data);
+    if (imagePaths.length > 0) {
+      contentEl.createEl('p', {
+        text: imagePaths.length + ' image(s) will be bundled into the export.',
+        cls: 'setting-item-description'
+      });
+    }
+
+    // Destination info
+    const destFolder = this.plugin.settings.objectSetsAutoLoadFolder || '';
+    const destDesc = destFolder
+      ? 'Will export to: ' + destFolder + '/' + (exportName || set.name).replace(/[\\\\\\\\/:*?"<>|]/g, '_')
+      : 'Will export to: object-sets/' + (exportName || set.name).replace(/[\\\\\\\\/:*?"<>|]/g, '_');
+
+    contentEl.createEl('p', {
+      text: destDesc,
+      cls: 'setting-item-description'
+    });
+
+    const buttons = contentEl.createDiv({ cls: 'dmt-modal-buttons' });
+
+    const cancelBtn = buttons.createEl('button', { text: 'Cancel' });
+    cancelBtn.onclick = () => this.close();
+
+    const exportBtn = buttons.createEl('button', { text: 'Export', cls: 'mod-cta' });
+    exportBtn.onclick = async () => {
+      if (!includeHex && !includeGrid) {
+        new Notice('Select at least one map type to export');
+        return;
+      }
+
+      try {
+        const destPath = await ObjectSetHelpers.exportSetToFolder(
+          this.plugin, set.id, destFolder || null,
+          { name: exportName, includeHex, includeGrid }
+        );
+        new Notice('Exported to: ' + destPath);
+        this.close();
+      } catch (err) {
+        new Notice('Export failed: ' + err.message);
+      }
+    };
+  }
+
+  onClose() {
+    this.contentEl.empty();
+  }
+}`;
+
+```
+
+# settingsPlugin-ObjectSetImportModal
+
+```js
+return `// settingsPlugin-ObjectSetImportModal.js
+// Modal for importing an object set from a vault folder
+// This file is concatenated into the settings plugin template by the assembler
+
+class ObjectSetImportModal extends Modal {
+  constructor(app, plugin, onImport) {
+    super(app);
+    this.plugin = plugin;
+    this.onImport = onImport;
+  }
+
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.addClass('dmt-import-modal');
+
+    contentEl.createEl('h2', { text: 'Import Object Set from Folder' });
+
+    contentEl.createEl('p', {
+      text: 'Enter the vault path to a folder containing objects.json.',
+      cls: 'setting-item-description'
+    });
+
+    let folderPath = '';
+    const previewArea = contentEl.createDiv({ cls: 'dmt-import-preview' });
+    previewArea.style.display = 'none';
+
+    new Setting(contentEl)
+      .setName('Folder Path')
+      .setDesc('Vault-relative path (e.g. object-sets/my-set)')
+      .addSearch(search => {
+        new FolderSuggest(this.app, search.inputEl);
+        search
+          .setPlaceholder('path/to/set-folder')
+          .onChange(v => { folderPath = v.trim(); });
+      })
+      .addButton(btn => btn
+        .setButtonText('Preview')
+        .onClick(async () => {
+          previewArea.empty();
+
+          if (!folderPath) {
+            previewArea.createEl('p', { text: 'Enter a folder path first.', cls: 'dmt-import-error' });
+            previewArea.style.display = 'block';
+            return;
+          }
+
+          const folder = this.app.vault.getAbstractFileByPath(folderPath);
+          if (!folder || !folder.children) {
+            previewArea.createEl('p', { text: 'Folder not found: ' + folderPath, cls: 'dmt-import-error' });
+            previewArea.style.display = 'block';
+            return;
+          }
+
+          const jsonFile = this.app.vault.getAbstractFileByPath(folderPath + '/objects.json');
+          if (!jsonFile) {
+            previewArea.createEl('p', { text: 'No objects.json found in this folder.', cls: 'dmt-import-error' });
+            previewArea.style.display = 'block';
+            return;
+          }
+
+          try {
+            const content = await this.app.vault.read(jsonFile);
+            const data = JSON.parse(content);
+
+            if (!data.windroseMD_objectSet) {
+              previewArea.createEl('p', { text: 'Not a valid Windrose object set.', cls: 'dmt-import-error' });
+              previewArea.style.display = 'block';
+              return;
+            }
+
+            previewArea.createEl('p', { text: 'Valid object set: ' + (data.name || 'Unnamed') });
+
+            const scope = [];
+            if (data.hex) {
+              const objCount = (data.hex.customObjects || []).length;
+              const overCount = Object.keys(data.hex.objectOverrides || {}).length;
+              scope.push('Hex: ' + objCount + ' custom, ' + overCount + ' overrides');
+            }
+            if (data.grid) {
+              const objCount = (data.grid.customObjects || []).length;
+              const overCount = Object.keys(data.grid.objectOverrides || {}).length;
+              scope.push('Grid: ' + objCount + ' custom, ' + overCount + ' overrides');
+            }
+            for (const line of scope) {
+              previewArea.createEl('p', { text: line, cls: 'setting-item-description' });
+            }
+
+            // Check for duplicate name
+            const existing = (this.plugin.settings.objectSets || []).find(s => s.name === data.name);
+            if (existing) {
+              previewArea.createEl('p', {
+                text: 'A set named "' + data.name + '" already exists. It will be imported with a unique name.',
+                cls: 'dmt-import-note'
+              });
+            }
+
+            previewArea.style.display = 'block';
+          } catch (err) {
+            previewArea.createEl('p', { text: 'Error reading: ' + err.message, cls: 'dmt-import-error' });
+            previewArea.style.display = 'block';
+          }
+        }));
+
+    const buttons = contentEl.createDiv({ cls: 'dmt-modal-buttons' });
+
+    const cancelBtn = buttons.createEl('button', { text: 'Cancel' });
+    cancelBtn.onclick = () => this.close();
+
+    const importBtn = buttons.createEl('button', { text: 'Import', cls: 'mod-cta' });
+    importBtn.onclick = async () => {
+      if (!folderPath) {
+        new Notice('Enter a folder path first');
+        return;
+      }
+
+      try {
+        const set = await ObjectSetHelpers.importSetFromFolder(this.plugin, folderPath);
+        await this.plugin.saveSettings();
+        new Notice('Imported set: ' + set.name);
+        this.onImport();
+        this.close();
+      } catch (err) {
+        new Notice('Import failed: ' + err.message);
+      }
+    };
+  }
+
+  onClose() {
+    this.contentEl.empty();
+  }
+}`;
+
+```
+
+# settingsPlugin-ConfirmModal
+
+```js
+return `// settingsPlugin-ConfirmModal.js
+// Generic confirmation modal replacing native confirm() dialogs
+// This file is concatenated into the settings plugin template by the assembler
+
+class ConfirmModal extends Modal {
+  constructor(app, options = {}) {
+    super(app);
+    this.message = options.message || 'Are you sure?';
+    this.confirmText = options.confirmText || 'Confirm';
+    this.cancelText = options.cancelText || 'Cancel';
+    this.isDestructive = options.isDestructive || false;
+    this.resolved = false;
+  }
+
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.empty();
+
+    const paragraphs = this.message.split('\\n').filter(s => s.trim());
+    for (const p of paragraphs) {
+      contentEl.createEl('p', { text: p });
+    }
+
+    const buttons = contentEl.createDiv({ cls: 'dmt-modal-buttons' });
+
+    const cancelBtn = buttons.createEl('button', { text: this.cancelText });
+    cancelBtn.onclick = () => {
+      this.resolved = true;
+      this.resolvePromise(false);
+      this.close();
+    };
+
+    const confirmBtn = buttons.createEl('button', {
+      text: this.confirmText,
+      cls: this.isDestructive ? 'mod-warning' : 'mod-cta'
+    });
+    confirmBtn.onclick = () => {
+      this.resolved = true;
+      this.resolvePromise(true);
+      this.close();
+    };
+  }
+
+  onClose() {
+    this.contentEl.empty();
+    if (!this.resolved && this.resolvePromise) {
+      this.resolvePromise(false);
+    }
+  }
+
+  openAndGetValue() {
+    return new Promise((resolve) => {
+      this.resolvePromise = resolve;
+      this.open();
+    });
+  }
+}`;
+
+```
+
+# settingsPlugin-PromptModal
+
+```js
+return `// settingsPlugin-PromptModal.js
+// Generic text input modal replacing native prompt() dialogs
+// This file is concatenated into the settings plugin template by the assembler
+
+class PromptModal extends Modal {
+  constructor(app, options = {}) {
+    super(app);
+    this.message = options.message || '';
+    this.defaultValue = options.defaultValue || '';
+    this.placeholder = options.placeholder || '';
+    this.inputValue = this.defaultValue;
+    this.resolved = false;
+  }
+
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.empty();
+
+    if (this.message) {
+      contentEl.createEl('p', { text: this.message });
+    }
+
+    new Setting(contentEl)
+      .addText(text => {
+        text.setValue(this.inputValue);
+        if (this.placeholder) text.setPlaceholder(this.placeholder);
+        text.onChange(v => { this.inputValue = v; });
+        setTimeout(() => {
+          text.inputEl.focus();
+          text.inputEl.select();
+        }, 50);
+      });
+
+    const buttons = contentEl.createDiv({ cls: 'dmt-modal-buttons' });
+
+    const cancelBtn = buttons.createEl('button', { text: 'Cancel' });
+    cancelBtn.onclick = () => {
+      this.resolved = true;
+      this.resolvePromise(null);
+      this.close();
+    };
+
+    const saveBtn = buttons.createEl('button', { text: 'OK', cls: 'mod-cta' });
+    saveBtn.onclick = () => {
+      const trimmed = this.inputValue.trim();
+      if (!trimmed) {
+        new Notice('Name cannot be empty');
+        return;
+      }
+      this.resolved = true;
+      this.resolvePromise(trimmed);
+      this.close();
+    };
+  }
+
+  onClose() {
+    this.contentEl.empty();
+    if (!this.resolved && this.resolvePromise) {
+      this.resolvePromise(null);
+    }
+  }
+
+  openAndGetValue() {
+    return new Promise((resolve) => {
+      this.resolvePromise = resolve;
+      this.open();
+    });
+  }
+}`;
+
 ```
 
 # settingsPlugin-TabRenderCore
@@ -37185,7 +40580,11 @@ const TabRenderColorsMethods = {
         .setButtonText('Reset All')
         .setWarning()
         .onClick(async () => {
-          if (confirm('Reset all colors to defaults? This will remove all customizations.')) {
+          if (await new ConfirmModal(this.app, {
+              message: 'Reset all colors to defaults? This will remove all customizations.',
+              confirmText: 'Reset All',
+              isDestructive: true
+            }).openAndGetValue()) {
             this.plugin.settings.colorPaletteOverrides = {};
             this.plugin.settings.customPaletteColors = [];
             this.settingsChanged = true;
@@ -37342,11 +40741,19 @@ return `// settingsPlugin-TabRenderObjects.js
 
 const TabRenderObjectsMethods = {
   renderObjectTypesContent(containerEl) {
-    containerEl.createEl('p', { 
+    containerEl.createEl('p', {
       text: 'Customize map objects: modify built-in objects, create custom objects, or hide objects you don\\'t use.',
       cls: 'setting-item-description'
     });
-    
+
+    // =========================================================================
+    // Object Sets
+    // =========================================================================
+
+    this.renderObjectSetsBlock(containerEl);
+
+    containerEl.createEl('div', { cls: 'dmt-set-separator' });
+
     // Map Type selector dropdown
     new Setting(containerEl)
       .setName('Map Type')
@@ -37424,18 +40831,22 @@ const TabRenderObjectsMethods = {
     // Reset All button (only show if there are customizations)
     if (hasAnyCustomizations) {
       new Setting(containerEl)
-        .setName('Reset All Customizations')
-        .setDesc(\`Remove all custom objects, categories, and modifications for \${this.selectedMapType} maps\`)
+        .setName(\`Reset \${this.selectedMapType === 'hex' ? 'Hex' : 'Grid'} to Defaults\`)
+        .setDesc(\`Restore built-in objects for \${this.selectedMapType} maps. Does not affect saved sets.\`)
         .addButton(btn => btn
-          .setButtonText('Reset All')
+          .setButtonText('Reset to Defaults')
           .setWarning()
           .onClick(async () => {
             const counts = [];
             if (hasOverrides) counts.push(\`\${Object.keys(mapTypeSettings.objectOverrides).length} modification(s)\`);
             if (hasCustomObjects) counts.push(\`\${mapTypeSettings.customObjects.length} custom object(s)\`);
             if (hasCustomCategories) counts.push(\`\${mapTypeSettings.customCategories.length} custom category(ies)\`);
-            
-            if (confirm(\`This will remove \${counts.join(', ')} for \${this.selectedMapType} maps. Maps using custom objects will show "?" placeholders.\\\\n\\\\nContinue?\`)) {
+
+            if (await new ConfirmModal(this.app, {
+              message: \`This will remove \${counts.join(', ')} for \${this.selectedMapType} maps. Saved sets are not affected. Maps using custom objects will show "?" placeholders.\`,
+              confirmText: 'Reset to Defaults',
+              isDestructive: true
+            }).openAndGetValue()) {
               this.updateObjectSettingsForMapType({
                 objectOverrides: {},
                 customObjects: [],
@@ -37546,10 +40957,14 @@ const TabRenderObjectsMethods = {
         IconHelpers.set(deleteBtn, 'trash-2');
         deleteBtn.onclick = async () => {
           if (allCategoryObjects.length > 0) {
-            alert(\`Cannot delete "\${category.label}" - it contains \${allCategoryObjects.length} object(s). Move or delete them first.\`);
+            new Notice(\`Cannot delete "\${category.label}" - it contains \${allCategoryObjects.length} object(s). Move or delete them first.\`);
             return;
           }
-          if (confirm(\`Delete category "\${category.label}"?\`)) {
+          if (await new ConfirmModal(this.app, {
+              message: \`Delete category "\${category.label}"?\`,
+              confirmText: 'Delete',
+              isDestructive: true
+            }).openAndGetValue()) {
             const categoriesKey = this.selectedMapType === 'hex' ? 'customHexCategories' : 'customGridCategories';
             if (this.plugin.settings[categoriesKey]) {
               this.plugin.settings[categoriesKey] = this.plugin.settings[categoriesKey].filter(c => c.id !== category.id);
@@ -37785,7 +41200,11 @@ const TabRenderObjectsMethods = {
         const resetBtn = actions.createEl('button', { cls: 'dmt-settings-icon-btn', attr: { 'aria-label': 'Reset to default', title: 'Reset to default' } });
         IconHelpers.set(resetBtn, 'rotate-ccw');
         resetBtn.onclick = async () => {
-          if (confirm(\`Reset "\${obj.label}" to its default symbol and name?\`)) {
+          if (await new ConfirmModal(this.app, {
+              message: \`Reset "\${obj.label}" to its default symbol and name?\`,
+              confirmText: 'Reset',
+              isDestructive: true
+            }).openAndGetValue()) {
             if (this.plugin.settings[overridesKey]) {
               delete this.plugin.settings[overridesKey][obj.id];
             }
@@ -37796,11 +41215,68 @@ const TabRenderObjectsMethods = {
         };
       }
     } else {
+      // Copy to other map type button for custom objects
+      const targetType = this.selectedMapType === 'hex' ? 'grid' : 'hex';
+      const targetLabel = targetType === 'hex' ? 'Hex' : 'Grid';
+      const copyBtn = actions.createEl('button', { cls: 'dmt-settings-icon-btn', attr: { 'aria-label': \`Copy to \${targetLabel}\`, title: \`Copy to \${targetLabel}\` } });
+      IconHelpers.set(copyBtn, 'copy');
+      copyBtn.onclick = async () => {
+        const targetObjectsKey = targetType === 'hex' ? 'customHexObjects' : 'customGridObjects';
+        const targetCategoriesKey = targetType === 'hex' ? 'customHexCategories' : 'customGridCategories';
+
+        if (!this.plugin.settings[targetObjectsKey]) {
+          this.plugin.settings[targetObjectsKey] = [];
+        }
+
+        // Generate new unique ID
+        const newId = 'custom-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+
+        // Check if category exists in target
+        let targetCategory = obj.category;
+        const targetCategories = this.plugin.settings[targetCategoriesKey] || [];
+        const builtInCategoryIds = ObjectHelpers.getCategories({
+          objectOverrides: {},
+          customObjects: [],
+          customCategories: []
+        }).map(c => c.id);
+
+        if (!builtInCategoryIds.includes(obj.category) && !targetCategories.find(c => c.id === obj.category)) {
+          // Custom category doesn't exist in target - copy it over
+          const sourceCategoriesKey = this.selectedMapType === 'hex' ? 'customHexCategories' : 'customGridCategories';
+          const sourceCategories = this.plugin.settings[sourceCategoriesKey] || [];
+          const sourceCat = sourceCategories.find(c => c.id === obj.category);
+          if (sourceCat) {
+            if (!this.plugin.settings[targetCategoriesKey]) {
+              this.plugin.settings[targetCategoriesKey] = [];
+            }
+            this.plugin.settings[targetCategoriesKey].push({ ...sourceCat });
+          }
+        }
+
+        // Copy the object with new ID
+        const copiedObj = { ...obj };
+        delete copiedObj.isBuiltIn;
+        delete copiedObj.isModified;
+        delete copiedObj.isHidden;
+        copiedObj.id = newId;
+        copiedObj.category = targetCategory;
+
+        this.plugin.settings[targetObjectsKey].push(copiedObj);
+
+        this.settingsChanged = true;
+        await this.plugin.saveSettings();
+        new Notice(\`Copied "\${obj.label}" to \${targetLabel} maps\`);
+      };
+
       // Delete button for custom objects
       const deleteBtn = actions.createEl('button', { cls: 'dmt-settings-icon-btn dmt-settings-icon-btn-danger', attr: { 'aria-label': 'Delete', title: 'Delete object' } });
       IconHelpers.set(deleteBtn, 'trash-2');
       deleteBtn.onclick = async () => {
-        if (confirm(\`Delete "\${obj.label}"? Maps using this object will show a "?" placeholder.\`)) {
+        if (await new ConfirmModal(this.app, {
+            message: \`Delete "\${obj.label}"? Maps using this object will show a "?" placeholder.\`,
+            confirmText: 'Delete',
+            isDestructive: true
+          }).openAndGetValue()) {
           if (this.plugin.settings[customObjectsKey]) {
             this.plugin.settings[customObjectsKey] = this.plugin.settings[customObjectsKey].filter(o => o.id !== obj.id);
           }
@@ -37810,6 +41286,204 @@ const TabRenderObjectsMethods = {
         }
       };
     }
+  },
+
+  // ---------------------------------------------------------------------------
+  // Object Sets block - rendered at top of Object Types section
+  // ---------------------------------------------------------------------------
+
+  renderObjectSetsBlock(containerEl) {
+    const s = this.plugin.settings;
+    const sets = s.objectSets || [];
+
+    containerEl.createEl('div', { cls: 'dmt-settings-subheading', text: 'Object Sets' });
+    containerEl.createEl('p', {
+      text: 'Save and swap between named collections of object customizations.',
+      cls: 'setting-item-description'
+    });
+
+    // Active Set indicator
+    const activeSet = sets.find(st => st.id === s.activeObjectSetId);
+    const isDirty = ObjectSetHelpers.isDirty(this.plugin);
+
+    if (activeSet) {
+      const bar = containerEl.createDiv({ cls: 'dmt-set-active-bar' });
+      bar.createSpan({ text: 'Active set: ' });
+      bar.createSpan({ text: activeSet.name, cls: 'dmt-set-active-name' });
+      if (isDirty) {
+        bar.createSpan({ text: ' (modified)', cls: 'dmt-set-modified-badge' });
+      }
+    } else if (isDirty) {
+      const bar = containerEl.createDiv({ cls: 'dmt-set-active-bar dmt-set-modified-bar' });
+      bar.createSpan({ text: 'Objects modified from defaults', cls: 'dmt-set-modified-badge' });
+    }
+
+    // Active Set dropdown
+    new Setting(containerEl)
+      .setName('Active Set')
+      .setDesc('Switch to a saved set (overwrites current objects)')
+      .addDropdown(dropdown => {
+        dropdown.addOption('__defaults__', 'Defaults (built-in)');
+        for (const set of sets) {
+          const scope = [];
+          if (set.data.hex) scope.push('hex');
+          if (set.data.grid) scope.push('grid');
+          dropdown.addOption(set.id, set.name + (scope.length ? ' [' + scope.join('+') + ']' : ''));
+        }
+        dropdown.setValue(s.activeObjectSetId || '__defaults__');
+        dropdown.onChange(async (value) => {
+          // Prompt to save current objects before switching
+          if (isDirty) {
+            if (await new ConfirmModal(this.app, {
+              message: 'Save your current objects as a set before switching?',
+              confirmText: 'Save',
+              cancelText: value === '__defaults__' ? 'Reset Without Saving' : 'Switch Without Saving'
+            }).openAndGetValue()) {
+              const name = await new PromptModal(this.app, {
+                message: 'Name for the saved set:',
+                defaultValue: 'My Objects'
+              }).openAndGetValue();
+              if (name) {
+                ObjectSetHelpers.saveCurrentAsSet(this.plugin, name);
+              }
+            }
+          }
+
+          if (value === '__defaults__') {
+            ObjectSetHelpers.resetToDefaults(this.plugin);
+            this.settingsChanged = true;
+            await this.plugin.saveSettings();
+            window.dispatchEvent(new CustomEvent('dmt-settings-changed', {
+              detail: { timestamp: Date.now() }
+            }));
+            this.display();
+            return;
+          }
+
+          ObjectSetHelpers.activateSet(this.plugin, value);
+          this.settingsChanged = true;
+          await this.plugin.saveSettings();
+          window.dispatchEvent(new CustomEvent('dmt-settings-changed', {
+            detail: { timestamp: Date.now() }
+          }));
+          this.display();
+        });
+      });
+
+    // Saved Sets list
+    if (sets.length > 0) {
+      const listContainer = containerEl.createDiv({ cls: 'dmt-set-list' });
+      for (const set of sets) {
+        const row = listContainer.createDiv({ cls: 'dmt-set-row' });
+        if (set.id === s.activeObjectSetId) row.addClass('dmt-set-row-active');
+
+        // Name
+        row.createSpan({ text: set.name, cls: 'dmt-set-name' });
+
+        // Scope badges
+        const badges = row.createSpan({ cls: 'dmt-set-badges' });
+        if (set.data.hex) badges.createSpan({ text: 'hex', cls: 'dmt-set-badge' });
+        if (set.data.grid) badges.createSpan({ text: 'grid', cls: 'dmt-set-badge' });
+        badges.createSpan({ text: set.source, cls: 'dmt-set-badge dmt-set-badge-source' });
+
+        // Actions
+        const actions = row.createDiv({ cls: 'dmt-set-actions' });
+
+        const renameBtn = actions.createEl('button', {
+          cls: 'dmt-settings-icon-btn',
+          attr: { 'aria-label': 'Rename', title: 'Rename set' }
+        });
+        IconHelpers.set(renameBtn, 'pencil');
+        renameBtn.onclick = () => {
+          new ObjectSetRenameModal(this.app, set.name, async (newName) => {
+            ObjectSetHelpers.renameSet(this.plugin, set.id, newName);
+            await this.plugin.saveSettings();
+            this.display();
+          }).open();
+        };
+
+        const exportBtn = actions.createEl('button', {
+          cls: 'dmt-settings-icon-btn',
+          attr: { 'aria-label': 'Export', title: 'Export set to folder' }
+        });
+        IconHelpers.set(exportBtn, 'download');
+        exportBtn.onclick = () => {
+          new ObjectSetExportModal(this.app, this.plugin, set).open();
+        };
+
+        const deleteBtn = actions.createEl('button', {
+          cls: 'dmt-settings-icon-btn dmt-settings-icon-btn-danger',
+          attr: { 'aria-label': 'Delete', title: 'Delete set' }
+        });
+        IconHelpers.set(deleteBtn, 'trash-2');
+        deleteBtn.onclick = async () => {
+          if (await new ConfirmModal(this.app, {
+              message: 'Delete set "' + set.name + '"?',
+              confirmText: 'Delete',
+              isDestructive: true
+            }).openAndGetValue()) {
+            ObjectSetHelpers.deleteSet(this.plugin, set.id);
+            this.settingsChanged = true;
+            await this.plugin.saveSettings();
+            this.display();
+          }
+        };
+      }
+    }
+
+    // Action buttons
+    const actionSetting = new Setting(containerEl)
+      .setName('Manage Sets');
+
+    actionSetting.addButton(btn => btn
+      .setButtonText('Save Current as Set')
+      .onClick(async () => {
+        const name = await new PromptModal(this.app, {
+          message: 'Name for the new set:',
+          defaultValue: 'My Objects'
+        }).openAndGetValue();
+        if (!name) return;
+        ObjectSetHelpers.saveCurrentAsSet(this.plugin, name);
+        await this.plugin.saveSettings();
+        new Notice('Saved set: ' + name);
+        this.display();
+      }));
+
+    actionSetting.addButton(btn => btn
+      .setButtonText('Import from Folder')
+      .onClick(() => {
+        new ObjectSetImportModal(this.app, this.plugin, async () => {
+          this.settingsChanged = true;
+          this.display();
+        }).open();
+      }));
+
+    // Auto-Load Folder
+    new Setting(containerEl)
+      .setName('Auto-Load Folder')
+      .setDesc('Vault folder to scan for object set packages on startup')
+      .addSearch(search => {
+        new FolderSuggest(this.app, search.inputEl);
+        search
+          .setPlaceholder('e.g. windrose-objects')
+          .setValue(s.objectSetsAutoLoadFolder || '')
+          .onChange(async (value) => {
+            s.objectSetsAutoLoadFolder = value.trim();
+            await this.plugin.saveSettings();
+          });
+      })
+      .addButton(btn => btn
+        .setButtonText('Scan Now')
+        .onClick(async () => {
+          const added = await ObjectSetHelpers.scanAutoLoadFolder(this.plugin);
+          await this.plugin.saveSettings();
+          if (added > 0) {
+            new Notice('Found ' + added + ' new set(s)');
+          } else {
+            new Notice('No new sets found');
+          }
+          this.display();
+        }));
   }
 
 };`;
@@ -38969,6 +42643,103 @@ return `/* settingsPlugin-styles.css
 }
 
 /* ===========================================
+ * Object Sets
+ * =========================================== */
+.dmt-set-separator {
+  border-top: 1px solid var(--background-modifier-border);
+  margin: 1.5em 0 1em 0;
+}
+
+.dmt-set-active-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--background-secondary);
+  border: 1px solid var(--interactive-accent);
+  border-radius: 6px;
+  margin-bottom: 12px;
+  font-size: 13px;
+}
+
+.dmt-set-active-name {
+  font-weight: 600;
+  color: var(--interactive-accent);
+}
+
+.dmt-set-active-bar .dmt-settings-icon-btn {
+  margin-left: auto;
+  font-size: 11px;
+}
+
+.dmt-set-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.dmt-set-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 4px;
+  background: var(--background-secondary);
+  border: 1px solid transparent;
+}
+
+.dmt-set-row-active {
+  border-color: var(--interactive-accent);
+}
+
+.dmt-set-name {
+  font-weight: 500;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dmt-set-badges {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.dmt-set-badge {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: var(--background-modifier-border);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.dmt-set-badge-source {
+  background: var(--background-modifier-border-hover, var(--background-modifier-border));
+  font-style: italic;
+}
+
+.dmt-set-actions {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.dmt-set-modified-badge {
+  color: var(--text-warning);
+  font-size: 12px;
+  font-style: italic;
+}
+
+.dmt-set-modified-bar {
+  border-color: var(--text-warning);
+}
+
+/* ===========================================
  * Animations
  * =========================================== */
 @keyframes dmt-shake {
@@ -38997,6 +42768,8 @@ const DragHelpers = await dc.require(dc.headerLink(dc.resolvePath("compiled-wind
 const IconHelpers = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "settingsPlugin-IconHelpers"));
 const RPGAwesomeHelpers = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "settingsPlugin-RPGAwesomeHelpers"));
 const DungeonEssenceVisualizer = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "settingsPlugin-DungeonEssenceVisualizer"));
+const ObjectSetHelpers = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "settingsPlugin-ObjectSetHelpers"));
+const FolderSuggest = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "settingsPlugin-FolderSuggest"));
 
 const InsertMapModal = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "settingsPlugin-InsertMapModal"));
 const InsertDungeonModal = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "settingsPlugin-InsertDungeonModal"));
@@ -39005,6 +42778,11 @@ const CategoryEditModal = await dc.require(dc.headerLink(dc.resolvePath("compile
 const ColorEditModal = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "settingsPlugin-ColorEditModal"));
 const ExportModal = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "settingsPlugin-ExportModal"));
 const ImportModal = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "settingsPlugin-ImportModal"));
+const ObjectSetRenameModal = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "settingsPlugin-ObjectSetRenameModal"));
+const ObjectSetExportModal = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "settingsPlugin-ObjectSetExportModal"));
+const ObjectSetImportModal = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "settingsPlugin-ObjectSetImportModal"));
+const ConfirmModal = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "settingsPlugin-ConfirmModal"));
+const PromptModal = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "settingsPlugin-PromptModal"));
 
 const TabRenderCore = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "settingsPlugin-TabRenderCore"));
 const TabRenderSettings = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "settingsPlugin-TabRenderSettings"));
@@ -39015,11 +42793,11 @@ const STYLES_CSS = await dc.require(dc.headerLink(dc.resolvePath("compiled-windr
 
 // Concatenate content
 const HELPERS_CONTENT = [
-  ObjectHelpers, ColorHelpers, DragHelpers, IconHelpers, RPGAwesomeHelpers, DungeonEssenceVisualizer
+  ObjectHelpers, ColorHelpers, DragHelpers, IconHelpers, RPGAwesomeHelpers, DungeonEssenceVisualizer, ObjectSetHelpers, FolderSuggest
 ].join('\n\n');
 
 const MODALS_CONTENT = [
-  InsertMapModal, InsertDungeonModal, ObjectEditModal, CategoryEditModal, ColorEditModal, ExportModal, ImportModal
+  InsertMapModal, InsertDungeonModal, ObjectEditModal, CategoryEditModal, ColorEditModal, ExportModal, ImportModal, ObjectSetRenameModal, ObjectSetExportModal, ObjectSetImportModal, ConfirmModal, PromptModal
 ].join('\n\n');
 
 const TAB_RENDER_CONTENT = [
@@ -39067,7 +42845,7 @@ const { RA_ICONS, RA_CATEGORIES } = await dc.require(dc.headerLink(dc.resolvePat
 const QUICK_SYMBOLS = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "settingsPlugin-quickSymbols"));
 
 /** Plugin version from template */
-const PACKAGED_PLUGIN_VERSION = '0.14.7.4';
+const PACKAGED_PLUGIN_VERSION = '0.15.8';
 
 /** LocalStorage keys for tracking user preferences */
 const STORAGE_KEYS = {
@@ -39174,7 +42952,7 @@ function generateManifest(): PluginManifest {
     id: 'dungeon-map-tracker-settings',
     name: 'Windrose MapDesigner',
     version: PACKAGED_PLUGIN_VERSION,
-    minAppVersion: '0.15.0',
+    minAppVersion: '1.4.10', // Required for AbstractInputSuggest
     description: 'Global settings and commands for Windrose MapDesigner - customize default colors, hex orientation, and visual preferences.',
     author: 'Windrose MD',
     isDesktopOnly: false
@@ -46224,6 +50002,7 @@ interface DungeonMapTrackerProps {
 }
 
 interface LayerVisibilityState {
+  grid: boolean;
   objects: boolean;
   textLabels: boolean;
   hexCoordinates: boolean;
@@ -46337,6 +50116,7 @@ const editingLayer = dc.useMemo(() => {
 
   // Layer visibility state (session-only, resets on reload)
   const [layerVisibility, setLayerVisibility] = dc.useState<LayerVisibilityState>({
+    grid: true,
     objects: true,
     textLabels: true,
     hexCoordinates: false
@@ -46642,6 +50422,7 @@ const editingLayer = dc.useMemo(() => {
   const {
     handleNameChange,
     handleCellsChange,
+    handleCurvesChange,
     handleObjectsChange,
     handleTextLabelsChange,
     handleEdgesChange,
@@ -47014,6 +50795,7 @@ const editingLayer = dc.useMemo(() => {
               notePath={notePath}
               mapData={mapData.mapType === 'hex' ? { ...mapData, northDirection: 0 } : mapData}
               onCellsChange={handleCellsChange}
+              onCurvesChange={handleCurvesChange}
               onObjectsChange={handleObjectsChange}
               onTextLabelsChange={handleTextLabelsChange}
               onEdgesChange={handleEdgesChange}
@@ -47034,6 +50816,13 @@ const editingLayer = dc.useMemo(() => {
             >
               {/* DrawingLayer - handles all drawing tools */}
               <MapCanvas.DrawingLayer
+                currentTool={currentTool}
+                selectedColor={selectedColor}
+                selectedOpacity={selectedOpacity}
+              />
+
+              {/* FreehandLayer - handles freehand curve drawing */}
+              <MapCanvas.FreehandLayer
                 currentTool={currentTool}
                 selectedColor={selectedColor}
                 selectedOpacity={selectedOpacity}
