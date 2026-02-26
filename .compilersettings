@@ -6,6 +6,6 @@
   "minifyEnabled": false,
   "obfuscateEnabled": false,
   "version": "1.5.6",
-  "additionalFiles": ["Projects/dungeon-map-tracker/vendor/polygon-clipping.umd.js"],
+  "additionalFiles": [],
   "postScript": "Projects/dungeon-map-tracker/finalize-release.js"
 }

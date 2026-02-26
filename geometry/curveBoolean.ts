@@ -512,6 +512,55 @@ function polygonToCurve(
 }
 
 // =========================================================================
+// Clip polygon perturbation (prevent shared-edge crashes)
+// =========================================================================
+
+/**
+ * Slightly expand a closed polygon ring outward from its centroid.
+ * Prevents polygon-clipping (Martinez-Rueda-Feito) from crashing when
+ * the subject and clip polygons share exact edges — a common case when
+ * curves have been previously erased along hex/grid boundaries.
+ *
+ * The expansion is 0.01 world units (~0.01px), invisible at any zoom
+ * but enough to break exact edge coincidence.
+ */
+const CLIP_EXPAND_EPSILON = 0.01;
+
+function expandClipRing(ring: Ring): Ring {
+  // Compute centroid of the ring (exclude closing point if present)
+  const isClosed = ring.length > 1 &&
+    ring[0][0] === ring[ring.length - 1][0] &&
+    ring[0][1] === ring[ring.length - 1][1];
+  const n = isClosed ? ring.length - 1 : ring.length;
+  if (n < 3) return ring;
+
+  let cx = 0, cy = 0;
+  for (let i = 0; i < n; i++) {
+    cx += ring[i][0];
+    cy += ring[i][1];
+  }
+  cx /= n;
+  cy /= n;
+
+  // Scale each vertex outward from centroid by epsilon
+  const expanded: Ring = [];
+  for (let i = 0; i < ring.length; i++) {
+    const dx = ring[i][0] - cx;
+    const dy = ring[i][1] - cy;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist < 1e-10) {
+      expanded.push(ring[i]);
+    } else {
+      expanded.push([
+        ring[i][0] + (dx / dist) * CLIP_EXPAND_EPSILON,
+        ring[i][1] + (dy / dist) * CLIP_EXPAND_EPSILON,
+      ]);
+    }
+  }
+  return expanded;
+}
+
+// =========================================================================
 // Polygon area filter (remove degenerate slivers)
 // =========================================================================
 
@@ -552,13 +601,13 @@ function subtractCellFromCurve(
   const rx1 = rx0 + cellSize;
   const ry1 = ry0 + cellSize;
 
-  const cellPoly: Polygon = [[
+  const cellPoly: Polygon = [expandClipRing([
     [rx0, ry0],
     [rx1, ry0],
     [rx1, ry1],
     [rx0, ry1],
     [rx0, ry0]
-  ]];
+  ])];
 
   // Boolean difference
   let result: MultiPolygon;
@@ -679,13 +728,13 @@ function eraseRectangleFromCurves(
 ): Curve[] | null {
   if (!curves || curves.length === 0) return null;
 
-  const rectPoly: Polygon = [[
+  const rectPoly: Polygon = [expandClipRing([
     [worldMinX, worldMinY],
     [worldMaxX, worldMinY],
     [worldMaxX, worldMaxY],
     [worldMinX, worldMaxY],
     [worldMinX, worldMinY]
-  ]];
+  ])];
 
   let changed = false;
   const newCurves: Curve[] = [];
@@ -733,7 +782,8 @@ function eraseRectangleFromCurves(
       anyKept = true;
     }
 
-    if (!anyKept || result.length !== 1 || subjectArea - totalResultArea > minArea * 0.01) {
+    if (!anyKept || result.length !== 1 || subjectArea - totalResultArea > minArea * 0.01 ||
+        (anyKept && result[0].length !== subject.length)) {
       changed = true;
     }
   }
@@ -762,7 +812,7 @@ function eraseWorldPolygonFromCurves(
     ring = [...ring, [first[0], first[1]]];
   }
 
-  const clipPoly: Polygon = [ensureCCW(ring)];
+  const clipPoly: Polygon = [expandClipRing(ensureCCW(ring))];
 
   let changed = false;
   const newCurves: Curve[] = [];
@@ -812,7 +862,8 @@ function eraseWorldPolygonFromCurves(
       anyKept = true;
     }
 
-    if (!anyKept || result.length !== 1 || subjectArea - totalResultArea > minArea * 0.01) {
+    if (!anyKept || result.length !== 1 || subjectArea - totalResultArea > minArea * 0.01 ||
+        (anyKept && result[0].length !== subject.length)) {
       changed = true;
     }
   }

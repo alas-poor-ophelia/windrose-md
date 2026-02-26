@@ -1,11 +1,12 @@
 /**
  * polygonClipping.ts
  *
- * Datacore wrapper for the vendored polygon-clipping library.
- * Provides typed polygon boolean operations (difference, union, intersection).
+ * Typed interface to the vendored polygon-clipping library.
+ * Loads the wrapper module which embeds the UMD bundle inline,
+ * so it works in both dev (Datacore in vault) and production
+ * (compiled markdown with no filesystem access).
  *
- * At runtime in Obsidian: loads the UMD bundle from the vault via app.vault.read().
- * In unit tests: the datacore-transformer converts this to an ES import from npm.
+ * In unit tests: mocked to use the npm polygon-clipping package directly.
  */
 
 // Type definitions matching polygon-clipping's API
@@ -15,23 +16,15 @@ type MultiPolygon = Polygon[];
 
 type DifferenceFn = (subject: Polygon | MultiPolygon, ...clips: (Polygon | MultiPolygon)[]) => MultiPolygon;
 
-// Load the vendored UMD bundle at runtime
-const bundlePath = dc.resolvePath("polygon-clipping.umd.js");
-const bundleFile = app.vault.getAbstractFileByPath(bundlePath);
-if (!bundleFile) {
-  throw new Error(`[polygonClipping] Bundle not found at: ${bundlePath}`);
-}
-const bundleSource = await app.vault.read(bundleFile);
+const pathResolverPath = dc.resolvePath("pathResolver.ts");
+const { requireModuleByName } = await dc.require(pathResolverPath) as {
+  requireModuleByName: (name: string) => Promise<unknown>
+};
 
-// Evaluate the UMD bundle in a scoped context that captures module.exports
-const moduleObj: { exports: Record<string, unknown> } = { exports: {} };
-const wrappedFn = new Function('module', 'exports', bundleSource);
-wrappedFn(moduleObj, moduleObj.exports);
-
-const pc = (moduleObj.exports.default || moduleObj.exports) as {
+const pcModule = await requireModuleByName("polygon-clipping-wrapper.js") as {
   difference: DifferenceFn;
 };
 
-const difference: DifferenceFn = pc.difference;
+const difference: DifferenceFn = pcModule.difference;
 
 return { difference };

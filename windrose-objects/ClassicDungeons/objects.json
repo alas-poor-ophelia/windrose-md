@@ -1,0 +1,332 @@
+{
+  "windroseMD_objectSet": true,
+  "version": "1.0",
+  "name": "Classic Dungeons by Bloated Blowfish",
+  "grid": {
+    "objectOverrides": {
+      "stairs-up": {
+        "symbol": "↥",
+        "label": "Stairs",
+        "order": 20,
+        "hidden": true
+      },
+      "stairs-down": {
+        "symbol": "➾",
+        "label": "Slide",
+        "order": 20
+      },
+      "door-vertical": {
+        "symbol": "𝅚",
+        "label": "Door",
+        "order": 50,
+        "hidden": true
+      },
+      "door-horizontal": {
+        "symbol": "C",
+        "label": "Concealed Door",
+        "order": 60
+      },
+      "secret-door": {
+        "symbol": "S",
+        "order": 70
+      },
+      "ladder": {
+        "imagePath": "Trapdoor.png",
+        "symbol": null,
+        "label": "Trapdoor",
+        "order": 30
+      },
+      "portal": {
+        "symbol": "⸎",
+        "order": 80
+      },
+      "altar": {
+        "symbol": "ↇ",
+        "order": 0
+      },
+      "statue": {
+        "symbol": "✪",
+        "order": 10
+      },
+      "cage": {
+        "symbol": "⬚",
+        "label": "Illusionary Floor",
+        "category": "hazards"
+      },
+      "trap": {
+        "symbol": "⮽"
+      },
+      "cauldron": {
+        "imagePath": "Spike.png",
+        "symbol": null,
+        "label": "Pit - Spiketrap",
+        "category": "hazards"
+      },
+      "chest": {
+        "imagePath": "Chest.png",
+        "symbol": null,
+        "label": "Chest",
+        "order": 20
+      },
+      "crate": {
+        "imagePath": "Crate3.png",
+        "symbol": null,
+        "label": "Crate",
+        "order": 30
+      },
+      "sack": {
+        "imagePath": "Sack.png",
+        "symbol": null,
+        "order": 50
+      },
+      "coffin": {
+        "imagePath": "Sarcophagus9b.png",
+        "symbol": null,
+        "order": 60
+      },
+      "book": {
+        "imagePath": "Bookshelf.png",
+        "symbol": null,
+        "label": "Bookshelf I",
+        "order": 150
+      },
+      "table": {
+        "imagePath": "Table.png",
+        "symbol": null,
+        "order": 180
+      },
+      "chair": {
+        "order": 80,
+        "hidden": true
+      },
+      "bed": {
+        "order": 90,
+        "hidden": true
+      },
+      "anvil": {
+        "iconClass": "ra-anvil",
+        "order": 220
+      },
+      "fountain": {
+        "imagePath": "Fountain.png",
+        "symbol": null,
+        "order": 70
+      },
+      "lever": {
+        "imagePath": "Lever.png",
+        "symbol": null,
+        "label": "Lever",
+        "order": 80
+      },
+      "flower": {
+        "order": 130,
+        "hidden": true
+      },
+      "plant": {
+        "order": 140,
+        "hidden": true
+      },
+      "tree-dec": {
+        "order": 150,
+        "hidden": true
+      },
+      "tree-ev": {
+        "order": 160,
+        "hidden": true
+      },
+      "tree-lfls": {
+        "order": 170,
+        "hidden": true
+      },
+      "monster": {
+        "iconClass": "ra-death-skull"
+      },
+      "boss": {
+        "iconClass": "ra-broken-skull"
+      },
+      "boss-alt": {
+        "hidden": true
+      },
+      "npc-alt": {
+        "hidden": true
+      },
+      "npc": {
+        "iconClass": "ra-player"
+      },
+      "pit": {
+        "iconClass": "ra-chessboard",
+        "label": "Grate"
+      },
+      "poi": {
+        "iconClass": "ra-crossed-bones"
+      },
+      "guard": {
+        "iconClass": "ra-guarded-tower"
+      },
+      "hazard": {
+        "hidden": true
+      }
+    },
+    "customObjects": [
+      {
+        "id": "custom-1769732929832-nyycox10t",
+        "label": "Stairs",
+        "category": "navigation",
+        "imagePath": "Stairs.png",
+        "order": 10
+      },
+      {
+        "id": "custom-1769738059919-0sczek89e",
+        "label": "Door",
+        "category": "navigation",
+        "imagePath": "Door.png",
+        "order": 40
+      },
+      {
+        "id": "custom-1769739432257-1zu7qu5s8",
+        "label": "Pit- Speartrap",
+        "category": "hazards",
+        "imagePath": "Spear.png"
+      },
+      {
+        "id": "custom-1769739458459-afkj1knj0",
+        "label": "Pit 10'",
+        "category": "hazards",
+        "imagePath": "Pit.png"
+      },
+      {
+        "id": "custom-1769739584917-0u5rxrhiy",
+        "label": "Square Stairs",
+        "category": "navigation",
+        "imagePath": "SquareStairs.png"
+      },
+      {
+        "id": "custom-1769739606807-pkdry0jwt",
+        "label": "Spiral Stairs",
+        "category": "navigation",
+        "imagePath": "SpiralStairs.png"
+      },
+      {
+        "id": "custom-1769740207362-h8pqxd31w",
+        "label": "Stone Throne",
+        "category": "features",
+        "imagePath": "Throne.png",
+        "order": 90
+      },
+      {
+        "id": "custom-1769740245149-mt47zztzr",
+        "label": "Weapon Rack",
+        "category": "features",
+        "imagePath": "WeaponRack.png",
+        "order": 100
+      },
+      {
+        "id": "custom-1769740312464-dkw4fhpbf",
+        "label": "Pillar I",
+        "category": "features",
+        "imagePath": "Pillar1.png",
+        "order": 120
+      },
+      {
+        "id": "custom-1769740329620-ime8bywx6",
+        "label": "Pillar II",
+        "category": "features",
+        "imagePath": "Pillar2.png",
+        "order": 130
+      },
+      {
+        "id": "custom-1769740353318-adcoh3gra",
+        "label": "Pillar Square",
+        "category": "features",
+        "imagePath": "Pillar3.png",
+        "order": 140
+      },
+      {
+        "id": "custom-1769740385871-1twa9uze0",
+        "label": "Fireplace",
+        "category": "features",
+        "imagePath": "Fireplace.png",
+        "order": 170
+      },
+      {
+        "id": "custom-1769740422106-4bnal0xfq",
+        "label": "Font",
+        "category": "features",
+        "imagePath": "Font.png",
+        "order": 210
+      },
+      {
+        "id": "custom-1769741414622-udcvsxsyh",
+        "label": "Bed",
+        "category": "features",
+        "imagePath": "Bed.png",
+        "order": 230
+      },
+      {
+        "id": "custom-1769741693197-ne8ib3p4o",
+        "label": "Bookshelf II",
+        "category": "features",
+        "imagePath": "Bookshelf2.png",
+        "order": 160
+      },
+      {
+        "id": "custom-1769741866461-layc23pum",
+        "label": "Barrel",
+        "category": "features",
+        "imagePath": "Barrel.png",
+        "order": 40
+      },
+      {
+        "id": "custom-1769741921403-uacskzzdo",
+        "label": "Weapon Rack II",
+        "category": "features",
+        "imagePath": "WeaponRack2.png",
+        "order": 110
+      },
+      {
+        "id": "custom-1769752200631-hq2a8acih",
+        "label": "Table Round",
+        "category": "features",
+        "imagePath": "TableRound.png",
+        "order": 190
+      },
+      {
+        "id": "custom-1769752287780-ltc078c2d",
+        "label": "Chair",
+        "category": "features",
+        "imagePath": "Chair.png",
+        "order": 200
+      },
+      {
+        "id": "custom-1769752439678-2f14lui9u",
+        "label": "Bridge Rope",
+        "category": "features",
+        "imagePath": "BridgeRope.png"
+      },
+      {
+        "id": "custom-1769752460780-8mvx6b5bq",
+        "label": "Bridge Stone",
+        "category": "features",
+        "imagePath": "Bridge20.png"
+      },
+      {
+        "id": "custom-1769752505245-c1e2ztz4n",
+        "label": "Door Broken",
+        "category": "navigation",
+        "imagePath": "Brokendoor.png"
+      },
+      {
+        "id": "custom-1769752611224-xahhd3iuy",
+        "label": "Coffin II",
+        "category": "features",
+        "imagePath": "SarcophagusW1.png"
+      },
+      {
+        "id": "custom-1769753071157-hvwm9zlr3",
+        "label": "Coffin III",
+        "category": "features",
+        "imagePath": "Sarcophagus7.png"
+      }
+    ]
+  }
+}

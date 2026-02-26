@@ -319,11 +319,15 @@ function generateBezier(
   const alpha_l = Math.abs(det_C0_C1) < 1e-12 ? 0 : det_X_C1 / det_C0_C1;
   const alpha_r = Math.abs(det_C0_C1) < 1e-12 ? 0 : det_C0_X / det_C0_C1;
 
-  // If alpha is negative, use the Wu/Barsky heuristic
+  // If alpha is negative or unreasonably large, use the Wu/Barsky heuristic.
+  // Large alphas occur when the C matrix determinant is near-zero (nearly-parallel
+  // tangents), placing control points far from the curve and creating spike artifacts.
   const segLength = vDist(first, last);
   const epsilon = 1e-6 * segLength;
+  const maxAlpha = segLength;
 
-  if (alpha_l < epsilon || alpha_r < epsilon) {
+  if (alpha_l < epsilon || alpha_r < epsilon ||
+      alpha_l > maxAlpha || alpha_r > maxAlpha) {
     const dist = segLength / 3;
     return [
       first,

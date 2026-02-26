@@ -226,20 +226,30 @@ function useCanvasInteraction(
     const { viewState } = mapData;
     const { zoom: oldZoom, center: oldCenter } = viewState;
 
-    const gridGeometry = geometry as { getScaledCellSize: (zoom: number) => number };
-    const scaledGridSize = gridGeometry.getScaledCellSize(oldZoom);
-    const offsetX = canvas.width / 2 - oldCenter.x * scaledGridSize;
-    const offsetY = canvas.height / 2 - oldCenter.y * scaledGridSize;
+    // Use the same offset formula as screenToWorld/screenToGrid:
+    // Grid maps: offset = canvas/2 - center * cellSize * zoom
+    // Hex maps:  offset = canvas/2 - center * zoom
+    let oldScale: number, newScale: number;
+    if (geometry instanceof GridGeometry) {
+      const gridGeometry = geometry as { getScaledCellSize: (zoom: number) => number };
+      oldScale = gridGeometry.getScaledCellSize(oldZoom);
+      newScale = gridGeometry.getScaledCellSize(newZoom);
+    } else {
+      oldScale = oldZoom;
+      newScale = newZoom;
+    }
 
-    const worldX = (mouseX - offsetX) / scaledGridSize;
-    const worldY = (mouseY - offsetY) / scaledGridSize;
+    const offsetX = canvas.width / 2 - oldCenter.x * oldScale;
+    const offsetY = canvas.height / 2 - oldCenter.y * oldScale;
 
-    const newScaledGridSize = gridGeometry.getScaledCellSize(newZoom);
-    const newOffsetX = mouseX - worldX * newScaledGridSize;
-    const newOffsetY = mouseY - worldY * newScaledGridSize;
+    const worldX = (mouseX - offsetX) / oldScale;
+    const worldY = (mouseY - offsetY) / oldScale;
 
-    const newCenterX = (canvas.width / 2 - newOffsetX) / newScaledGridSize;
-    const newCenterY = (canvas.height / 2 - newOffsetY) / newScaledGridSize;
+    const newOffsetX = mouseX - worldX * newScale;
+    const newOffsetY = mouseY - worldY * newScale;
+
+    const newCenterX = (canvas.width / 2 - newOffsetX) / newScale;
+    const newCenterY = (canvas.height / 2 - newOffsetY) / newScale;
 
     onViewStateChange({
       zoom: newZoom,
