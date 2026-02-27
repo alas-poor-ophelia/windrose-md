@@ -81,6 +81,9 @@ const MODULE_MAP: Record<string, string> = {
   'dungeonGenerator.js': './generation/dungeonGenerator.js',
   'objectPlacer.js': './generation/objectPlacer.js',
 
+  // Bridge
+  'obsidianBridge.ts': './utils/obsidianBridge.ts',
+
   // Settings
   'settingsReducer.ts': './components/settings/settingsReducer.ts',
 };
