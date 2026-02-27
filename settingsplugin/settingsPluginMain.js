@@ -29,7 +29,15 @@ return `// settingsPluginMain.js - Windrose MapDesigner Settings Plugin
 
 const PLUGIN_VERSION = '{{PLUGIN_VERSION}}';
 
-const { Plugin, PluginSettingTab, Setting, Modal, setIcon, AbstractInputSuggest } = require('obsidian');
+const obsidianModule = require('obsidian');
+const { Plugin, PluginSettingTab, Setting, Modal, setIcon, AbstractInputSuggest } = obsidianModule;
+
+// Initialize bridge for Datacore components
+window.__windrose = window.__windrose || {};
+window.__windrose.obsidian = obsidianModule;
+window.__windrose.version = PLUGIN_VERSION;
+window.__windrose.ready = true;
+window.dispatchEvent(new CustomEvent('windrose:bridge-ready'));
 
 // =============================================================================
 // DATA CONSTANTS
@@ -264,7 +272,13 @@ class WindroseMDSettingsPlugin extends Plugin {
     });
   }
 
-  onunload() {}
+  onunload() {
+    if (window.__windrose) {
+      window.__windrose.ready = false;
+      window.__windrose.obsidian = null;
+      window.dispatchEvent(new CustomEvent('windrose:bridge-teardown'));
+    }
+  }
 
   /**
    * Get the path to the Windrose data file.

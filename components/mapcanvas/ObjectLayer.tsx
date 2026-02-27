@@ -24,7 +24,7 @@ const { useMapSelection } = await requireModuleByName("MapSelectionContext.tsx")
 const { useLinkingMode } = await requireModuleByName("ObjectLinkingContext.tsx");
 const { useEventHandlerRegistration } = await requireModuleByName("EventHandlerContext.tsx");
 const { useObjectInteractions } = await requireModuleByName("useObjectInteractions.ts");
-const { TextInputModal } = await requireModuleByName("TextInputModal.tsx");
+const { TextInputModal, openNativeTextInputModal } = await requireModuleByName("TextInputModal.tsx");
 const { NoteLinkModal } = await requireModuleByName("NoteLinkModal.jsx");
 const { SelectionToolbar } = await requireModuleByName("SelectionToolbar.jsx");
 const { calculateObjectScreenPosition } = await requireModuleByName("screenPositionUtils.ts");
@@ -415,8 +415,24 @@ const ObjectLayer = ({
         setDragStart(null);
       }
 
-      setEditingObjectId(selectedItem.id);
-      setShowNoteModal(true);
+      const objectId = selectedItem.id;
+      const obj = getActiveLayer(mapData!).objects.find((o: MapObject) => o.id === objectId);
+      const objTitle = obj?.label || 'Object';
+      const objTooltip = obj?.customTooltip || '';
+
+      const opened = openNativeTextInputModal({
+        onSubmit: (content: string) => {
+          handleNoteSubmit(content, objectId);
+        },
+        title: `Note for ${objTitle}`,
+        placeholder: 'Add a custom note...',
+        initialValue: objTooltip
+      });
+
+      if (!opened) {
+        setEditingObjectId(objectId);
+        setShowNoteModal(true);
+      }
     }
   };
 
