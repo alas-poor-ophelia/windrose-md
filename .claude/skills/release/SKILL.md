@@ -67,9 +67,10 @@ npm run release
 The release pipeline performs these steps:
 1. Compile via Obsidian's Datacore Compiler
 2. Run E2E tests against compiled artifact
-3. Commit and push the compiled artifact to the source repo
-4. **Verify** the push succeeded (fetches and compares remote HEAD)
+3. Commit the compiled artifact (if changed)
+4. Push the branch to origin and **verify** the push succeeded (always runs, even with `--skip-compile`)
 5. Create and push version tag (triggers GitHub Actions release)
+6. Wait for GitHub release, download the zip, and **verify** the artifact matches local
 
 **CRITICAL: The pipeline has safeguards to prevent tagging the wrong commit:**
 - Verifies push completed before tagging

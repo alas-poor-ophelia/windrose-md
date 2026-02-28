@@ -5,8 +5,9 @@
  * Steps:
  *   1. Compile via Obsidian's Datacore Compiler
  *   2. Run E2E tests against compiled artifact
- *   3. Commit and push compiled artifact to source repo
+ *   3. Commit compiled artifact, push branch to source repo
  *   4. Create and push version tag (triggers GitHub Actions release)
+ *   5. Download release zip and verify artifact matches local
  *
  * Usage:
  *   npm run release              # Full release: compile, test, commit, tag
@@ -16,7 +17,8 @@
  */
 
 import { execSync, spawnSync } from "child_process";
-import { readFileSync, existsSync, copyFileSync } from "fs";
+import { readFileSync, existsSync, copyFileSync, mkdtempSync, rmSync } from "fs";
+import * as os from "os";
 import * as path from "path";
 import { compileViaObsidian } from "./compile.js";
 
@@ -172,7 +174,7 @@ function runTests(): void {
   console.log("\n  All tests passed.\n");
 }
 
-function commitAndPushArtifact(version: string, dryRun: boolean): string | null {
+function commitArtifact(version: string, dryRun: boolean): void {
   console.log(`Step 3: Committing compiled artifact...\n`);
 
   // Check if there are changes to commit
@@ -184,15 +186,13 @@ function commitAndPushArtifact(version: string, dryRun: boolean): string | null 
   if (!gitStatus.trim()) {
     console.log("  No changes to compiled artifact detected.");
     console.log("  WARNING: This may indicate compilation didn't produce changes.\n");
-    // Return current HEAD - we'll verify it contains the artifact before tagging
-    return execSync("git rev-parse HEAD", { cwd: SOURCE_ROOT, encoding: "utf-8" }).trim();
+    return;
   }
 
   if (dryRun) {
     console.log(`  [DRY RUN] Would commit compiled artifact`);
-    console.log(`  [DRY RUN] Would push to origin`);
     console.log("");
-    return null; // Dry run, no commit SHA to return
+    return;
   }
 
   // Stage the compiled artifact and any dist changes
@@ -207,41 +207,52 @@ function commitAndPushArtifact(version: string, dryRun: boolean): string | null 
     { cwd: SOURCE_ROOT }
   );
   const commitSha = execSync("git rev-parse HEAD", { cwd: SOURCE_ROOT, encoding: "utf-8" }).trim();
-  console.log(`  Committed: Release ${version}: compiled artifact (${commitSha.slice(0, 7)})`);
+  console.log(`  Committed: Release ${version}: compiled artifact (${commitSha.slice(0, 7)})\n`);
+}
+
+function pushAndVerify(dryRun: boolean): string {
+  const branch = execSync("git branch --show-current", {
+    cwd: SOURCE_ROOT,
+    encoding: "utf-8",
+  }).trim();
+  const localHead = execSync("git rev-parse HEAD", { cwd: SOURCE_ROOT, encoding: "utf-8" }).trim();
+
+  console.log(`Step 3b: Pushing ${branch} to origin...\n`);
+
+  if (dryRun) {
+    console.log(`  [DRY RUN] Would push ${branch} to origin`);
+    console.log(`  [DRY RUN] Local HEAD: ${localHead.slice(0, 7)}\n`);
+    return localHead;
+  }
 
   // Push to current branch (with upstream if needed)
   try {
     execSync("git push", { cwd: SOURCE_ROOT, stdio: "inherit" });
   } catch {
-    // Branch may not have upstream set, try with --set-upstream
-    const branch = execSync("git branch --show-current", {
-      cwd: SOURCE_ROOT,
-      encoding: "utf-8",
-    }).trim();
     execSync(`git push --set-upstream origin ${branch}`, { cwd: SOURCE_ROOT, stdio: "inherit" });
   }
   console.log("  Pushed to origin");
 
   // Verify push succeeded by fetching and comparing
   console.log("  Verifying push...");
-  execSync("git fetch origin main", { cwd: SOURCE_ROOT, stdio: "pipe" });
-  const remoteHead = execSync("git rev-parse origin/main", { cwd: SOURCE_ROOT, encoding: "utf-8" }).trim();
-  if (remoteHead !== commitSha) {
-    throw new Error(`Push verification failed: local HEAD (${commitSha.slice(0, 7)}) != remote (${remoteHead.slice(0, 7)})`);
+  execSync(`git fetch origin ${branch}`, { cwd: SOURCE_ROOT, stdio: "pipe" });
+  const remoteHead = execSync(`git rev-parse origin/${branch}`, { cwd: SOURCE_ROOT, encoding: "utf-8" }).trim();
+  if (remoteHead !== localHead) {
+    throw new Error(`Push verification failed: local HEAD (${localHead.slice(0, 7)}) != remote (${remoteHead.slice(0, 7)})`);
   }
-  console.log(`  Verified: remote main is at ${commitSha.slice(0, 7)}\n`);
+  console.log(`  Verified: remote ${branch} is at ${localHead.slice(0, 7)}\n`);
 
-  return commitSha;
+  return localHead;
 }
 
-function createTag(version: string, dryRun: boolean, expectedCommit: string | null): void {
+function createTag(version: string, dryRun: boolean, expectedCommit: string): void {
   const tagName = `v${version}`;
   console.log(`Step 4: Creating tag ${tagName}...\n`);
 
   // CRITICAL: Verify we're tagging the right commit
   const currentHead = execSync("git rev-parse HEAD", { cwd: SOURCE_ROOT, encoding: "utf-8" }).trim();
 
-  if (expectedCommit && currentHead !== expectedCommit) {
+  if (currentHead !== expectedCommit) {
     throw new Error(
       `HEAD changed unexpectedly!\n` +
       `  Expected: ${expectedCommit.slice(0, 7)}\n` +
@@ -282,6 +293,86 @@ function createTag(version: string, dryRun: boolean, expectedCommit: string | nu
   console.log(`  GitHub Actions will create the release.\n`);
 }
 
+function waitForRelease(version: string, maxWait: number = 120000): void {
+  const tagName = `v${version}`;
+  const zipName = `windrose-md-${tagName}.zip`;
+  console.log(`Step 5: Verifying GitHub release...\n`);
+  console.log(`  Waiting for GitHub Actions to create release for ${tagName}...`);
+
+  const startTime = Date.now();
+  const pollInterval = 5000;
+
+  // Poll until the release exists
+  while (Date.now() - startTime < maxWait) {
+    try {
+      const result = execSync(`gh release view ${tagName} --json assets --jq ".assets[].name"`, {
+        cwd: SOURCE_ROOT,
+        encoding: "utf-8",
+        stdio: ["pipe", "pipe", "pipe"],
+      });
+      if (result.includes(zipName)) {
+        console.log(`  Release found with ${zipName}`);
+        break;
+      }
+    } catch {
+      // Release doesn't exist yet
+    }
+
+    const elapsed = Math.round((Date.now() - startTime) / 1000);
+    process.stdout.write(`  Waiting... (${elapsed}s)\r`);
+    spawnSync("node", ["-e", `Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,${pollInterval})`], { stdio: "ignore" });
+  }
+
+  // Final check — did we time out?
+  try {
+    execSync(`gh release view ${tagName} --json assets --jq ".assets[].name"`, {
+      cwd: SOURCE_ROOT,
+      encoding: "utf-8",
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+  } catch {
+    console.warn(`\n  WARNING: Release not found after ${maxWait / 1000}s. Verify manually on GitHub.\n`);
+    return;
+  }
+
+  // Download and verify
+  const tmpDir = mkdtempSync(path.join(os.tmpdir(), "windrose-release-"));
+  try {
+    console.log(`  Downloading ${zipName}...`);
+    execSync(`gh release download ${tagName} --pattern "${zipName}" --dir "${tmpDir}" --clobber`, {
+      cwd: SOURCE_ROOT,
+      stdio: "pipe",
+    });
+
+    // Extract the compiled artifact from the zip
+    const zipPath = path.join(tmpDir, zipName);
+    const extractDir = path.join(tmpDir, "extracted");
+    execSync(`powershell -Command "Expand-Archive -Path '${zipPath}' -DestinationPath '${extractDir}' -Force"`, {
+      stdio: "pipe",
+    });
+
+    // Compare against local compiled artifact
+    const localArtifact = readFileSync(OUTPUT_PATH, "utf-8");
+    const remoteArtifactPath = path.join(extractDir, "compiled-windrose-md.md");
+    const remoteArtifact = readFileSync(remoteArtifactPath, "utf-8");
+
+    if (localArtifact === remoteArtifact) {
+      console.log("  VERIFIED: Release artifact matches local compiled artifact.\n");
+    } else {
+      const localLines = localArtifact.split("\n").length;
+      const remoteLines = remoteArtifact.split("\n").length;
+      throw new Error(
+        `Release artifact does NOT match local!\n` +
+        `  Local:  ${localLines} lines\n` +
+        `  Remote: ${remoteLines} lines\n` +
+        `  The release may contain a stale artifact. Investigate before distributing.`
+      );
+    }
+  } finally {
+    rmSync(tmpDir, { recursive: true, force: true });
+  }
+}
+
 async function main(): Promise<void> {
   const options = parseArgs();
 
@@ -310,16 +401,23 @@ async function main(): Promise<void> {
     runTests();
   }
 
-  // Step 3: Commit and push compiled artifact
-  let artifactCommit: string | null = null;
+  // Step 3: Commit compiled artifact (if compilation produced changes)
   if (!options.skipCompile) {
-    artifactCommit = commitAndPushArtifact(version, options.dryRun);
+    commitArtifact(version, options.dryRun);
   } else {
     console.log("Step 3: Skipping artifact commit (compilation was skipped)\n");
   }
 
+  // Step 3b: Always push to origin before tagging
+  const pushedCommit = pushAndVerify(options.dryRun);
+
   // Step 4: Tag and push (pass commit SHA for verification)
-  createTag(version, options.dryRun, artifactCommit);
+  createTag(version, options.dryRun, pushedCommit);
+
+  // Step 5: Verify the GitHub release artifact matches local
+  if (!options.dryRun) {
+    waitForRelease(version);
+  }
 
   console.log("╔════════════════════════════════════════════╗");
   console.log("║       Release Pipeline Complete!           ║");
@@ -327,7 +425,7 @@ async function main(): Promise<void> {
 
   if (!options.dryRun) {
     console.log(`Version ${version} has been tagged and pushed.`);
-    console.log("Check GitHub Actions for release status.");
+    console.log("Release artifact verified.");
   }
 }
 
