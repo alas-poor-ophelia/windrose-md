@@ -1,9 +1,9 @@
 <!-- Compiled by Datacore Script Compiler -->
 <!-- Source: Projects/dungeon-map-tracker -->
 <!-- Main Component: DungeonMapTracker -->
-<!-- Compiled: 2026-02-26T04:39:35.112Z -->
-<!-- Files: 150 -->
-<!-- Version: 1.5.6 -->
+<!-- Compiled: 2026-02-28T07:49:32.008Z -->
+<!-- Files: 151 -->
+<!-- Version: 1.5.7 -->
 <!-- CSS Files: 1 -->
 
 # Demo
@@ -12344,6 +12344,65 @@ function segmentIntersectsRect(
 }
 
 // =========================================================================
+// Open curve overlap detection
+// =========================================================================
+
+/**
+ * Check if any part of an open curve's stroke path overlaps an axis-aligned rectangle.
+ * Flattens the curve and tests each polyline segment against the rect.
+ */
+function openCurveOverlapsRect(curve: Curve, x0: number, y0: number, x1: number, y1: number): boolean {
+  const pts = flattenCurve(curve);
+  // flattenCurve adds a synthetic closing segment for open curves — skip it
+  const last = pts.length - 2;
+  for (let i = 0; i < last; i++) {
+    if (segmentIntersectsRect(pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1], x0, y0, x1, y1)) return true;
+  }
+  return false;
+}
+
+/**
+ * Check if any part of an open curve's stroke path overlaps an arbitrary polygon.
+ * Tests both point-in-polygon and segment-edge intersection to handle linear
+ * beziers that flatten to just two points.
+ */
+function openCurveOverlapsPolygon(curve: Curve, poly: Pt[]): boolean {
+  const pts = flattenCurve(curve);
+  const last = pts.length - 2; // skip synthetic closing segment
+  // Check if any flattened point is inside the polygon
+  for (let i = 0; i <= last; i++) {
+    if (pointInPolygon(pts[i][0], pts[i][1], poly)) return true;
+  }
+  // Check if any curve segment crosses any polygon edge
+  const pn = poly.length;
+  for (let i = 0; i < last; i++) {
+    for (let j = 0; j < pn - 1; j++) {
+      if (segmentsIntersect(
+        pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1],
+        poly[j][0], poly[j][1], poly[j + 1][0], poly[j + 1][1]
+      )) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Test if two line segments (a1→a2) and (b1→b2) properly intersect.
+ */
+function segmentsIntersect(
+  ax1: number, ay1: number, ax2: number, ay2: number,
+  bx1: number, by1: number, bx2: number, by2: number
+): boolean {
+  const d1 = (bx2 - bx1) * (ay1 - by1) - (by2 - by1) * (ax1 - bx1);
+  const d2 = (bx2 - bx1) * (ay2 - by1) - (by2 - by1) * (ax2 - bx1);
+  const d3 = (ax2 - ax1) * (by1 - ay1) - (ay2 - ay1) * (bx1 - ax1);
+  const d4 = (ax2 - ax1) * (by2 - ay1) - (ay2 - ay1) * (bx2 - ax1);
+  if (((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) &&
+      ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))) return true;
+  return false;
+}
+
+// =========================================================================
 // Polygon winding utilities
 // =========================================================================
 
@@ -12658,7 +12717,7 @@ function subtractCellFromCurve(
   cellX: number, cellY: number,
   cellSize: number
 ): Curve[] {
-  if (!curve.closed) return [curve];
+  if (!curve.closed) return []; // Open curves are fully removed when hit
 
   // Build subject polygon from curve
   const subject = curveToPolygon(curve);
@@ -12725,7 +12784,13 @@ function findCurveAtCell(
 ): number {
   for (let i = 0; i < curves.length; i++) {
     const curve = curves[i];
-    if (!curve || !curve.closed) continue;
+    if (!curve) continue;
+    if (!curve.closed) {
+      const x0 = cellX * cellSize;
+      const y0 = cellY * cellSize;
+      if (openCurveOverlapsRect(curve, x0, y0, x0 + cellSize, y0 + cellSize)) return i;
+      continue;
+    }
 
     const outerPoly = flattenCurve(curve);
     if (outerPoly.length < 3) continue;
@@ -12811,6 +12876,10 @@ function eraseRectangleFromCurves(
   for (let i = 0; i < curves.length; i++) {
     const curve = curves[i];
     if (!curve.closed) {
+      if (openCurveOverlapsRect(curve, worldMinX, worldMinY, worldMaxX, worldMaxY)) {
+        changed = true;
+        continue;
+      }
       newCurves.push(curve);
       continue;
     }
@@ -12889,6 +12958,10 @@ function eraseWorldPolygonFromCurves(
   for (let i = 0; i < curves.length; i++) {
     const curve = curves[i];
     if (!curve.closed) {
+      if (openCurveOverlapsPolygon(curve, ring)) {
+        changed = true;
+        continue;
+      }
       newCurves.push(curve);
       continue;
     }
@@ -12959,6 +13032,8 @@ return {
   polygonArea,
   segmentIntersectsRect,
   polygonIntersectsRect,
+  openCurveOverlapsRect,
+  openCurveOverlapsPolygon,
   evalBezier
 };
 
@@ -16818,31 +16893,217 @@ return { useObjectInteractions };
 
 ```
 
+# obsidianBridge
+
+```ts
+/**
+ * obsidianBridge.ts
+ *
+ * Bridge utility for accessing the `obsidian` module from Datacore components.
+ * The settings plugin captures `require('obsidian')` and stores it on
+ * `window.__windrose`. This module encapsulates all access behind a typed API.
+ *
+ * Components load the bridge via:
+ *   const { getObsidianModule } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "obsidianBridge"));
+ *
+ * Then cast at point of use:
+ *   const obs = getObsidianModule();
+ *   const Modal = obs.Modal as typeof import('obsidian').Modal;
+ */
+
+declare global {
+  interface Window {
+    __windrose?: {
+      obsidian: Record<string, unknown>;
+      version: string;
+      ready: boolean;
+    };
+  }
+}
+
+/**
+ * Returns true if the settings plugin has initialized the bridge.
+ */
+function isBridgeAvailable(): boolean {
+  return window.__windrose?.ready === true;
+}
+
+/**
+ * Returns the full obsidian module object, typed loosely.
+ * Throws if bridge is unavailable.
+ */
+function getObsidianModule(): Record<string, unknown> {
+  if (!window.__windrose?.ready) {
+    throw new Error(
+      '[Windrose] Obsidian bridge not available. Is the settings plugin installed and enabled?'
+    );
+  }
+  return window.__windrose.obsidian;
+}
+
+/**
+ * Returns a Promise that resolves when the bridge is ready,
+ * or rejects after timeout.
+ */
+function waitForBridge(timeoutMs: number = 5000): Promise<void> {
+  if (window.__windrose?.ready) return Promise.resolve();
+
+  return new Promise((resolve, reject) => {
+    const onReady = (): void => {
+      clearTimeout(timer);
+      resolve();
+    };
+
+    const timer = setTimeout(() => {
+      window.removeEventListener('windrose:bridge-ready', onReady);
+      reject(new Error(
+        `[Windrose] Bridge did not initialize within ${timeoutMs}ms. ` +
+        `Ensure the Windrose Settings plugin is installed and enabled.`
+      ));
+    }, timeoutMs);
+
+    window.addEventListener('windrose:bridge-ready', onReady, { once: true });
+  });
+}
+
+return { isBridgeAvailable, getObsidianModule, waitForBridge };
+
+```
+
 # TextInputModal
 
 ```tsx
 /**
  * TextInputModal.tsx
  *
- * Modal dialog for text label entry.
+ * Modal dialog for text input (object notes/tooltips).
+ * Uses native Obsidian Modal via the bridge when available,
+ * falls back to Preact overlay otherwise.
  */
 
 import type { JSX } from 'preact';
+import type { Modal as ObsidianModal, App } from 'obsidian';
 
-/** Props for TextInputModal component */
+const { isBridgeAvailable, getObsidianModule } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "obsidianBridge")) as {
+  isBridgeAvailable: () => boolean;
+  getObsidianModule: () => Record<string, unknown>;
+};
+
+/** Props for TextInputModal Preact component (fallback) */
 export interface TextInputModalProps {
-  /** Initial text value (for editing existing labels) */
   initialValue?: string;
-  /** Callback when text is submitted */
   onSubmit: (text: string) => void;
-  /** Callback when modal is cancelled */
   onCancel: () => void;
-  /** Modal title */
   title?: string;
-  /** Input placeholder text */
   placeholder?: string;
 }
 
+/**
+ * Opens a text input modal using native Obsidian Modal if bridge is available,
+ * otherwise returns false so the caller can fall back to the Preact component.
+ */
+function openNativeTextInputModal(options: {
+  onSubmit: (text: string) => void;
+  onCancel?: () => void;
+  title?: string;
+  placeholder?: string;
+  initialValue?: string;
+}): boolean {
+  if (!isBridgeAvailable()) return false;
+
+  try {
+    const obs = getObsidianModule();
+    const ModalClass = obs.Modal as typeof ObsidianModal;
+    const app = (dc as { app: App }).app;
+
+    const {
+      onSubmit,
+      onCancel,
+      title = 'Add Text Label',
+      placeholder = 'Enter label text...',
+      initialValue = ''
+    } = options;
+
+    const modal = new (class extends ModalClass {
+      private inputEl!: HTMLInputElement;
+      private submitted = false;
+
+      onOpen(): void {
+        const { contentEl, titleEl } = this;
+        titleEl.setText(title);
+
+        this.inputEl = contentEl.createEl('input', {
+          type: 'text',
+          placeholder,
+          value: initialValue,
+          cls: 'dmt-modal-input'
+        });
+        this.inputEl.maxLength = 200;
+        this.inputEl.style.width = '100%';
+        this.inputEl.style.marginBottom = '12px';
+
+        this.inputEl.addEventListener('keydown', (e: KeyboardEvent) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            this.submit();
+          }
+        });
+
+        const buttonContainer = contentEl.createEl('div', {
+          cls: 'dmt-modal-buttons'
+        });
+        buttonContainer.style.display = 'flex';
+        buttonContainer.style.justifyContent = 'flex-end';
+        buttonContainer.style.gap = '8px';
+
+        const cancelBtn = buttonContainer.createEl('button', {
+          text: 'Cancel',
+          cls: 'dmt-modal-btn dmt-modal-btn-cancel'
+        });
+        cancelBtn.addEventListener('click', () => this.close());
+
+        const submitBtn = buttonContainer.createEl('button', {
+          text: initialValue ? 'Update' : 'Add Label',
+          cls: 'dmt-modal-btn dmt-modal-btn-submit'
+        });
+        submitBtn.addEventListener('click', () => this.submit());
+
+        setTimeout(() => {
+          this.inputEl.focus();
+          if (initialValue) {
+            this.inputEl.select();
+          }
+        }, 0);
+      }
+
+      submit(): void {
+        const trimmed = this.inputEl.value.trim();
+        if (trimmed.length > 0 && trimmed.length <= 200) {
+          this.submitted = true;
+          onSubmit(trimmed);
+          this.close();
+        }
+      }
+
+      onClose(): void {
+        if (!this.submitted && onCancel) {
+          onCancel();
+        }
+        this.contentEl.empty();
+      }
+    })(app);
+
+    modal.open();
+    return true;
+  } catch (e) {
+    console.warn('[Windrose] Failed to open native modal, falling back to Preact:', (e as Error).message);
+    return false;
+  }
+}
+
+/**
+ * Preact fallback component for when the bridge is unavailable.
+ */
 const TextInputModal = ({
   initialValue = '',
   onSubmit,
@@ -16856,7 +17117,6 @@ const TextInputModal = ({
   dc.useEffect(() => {
     if (inputRef.current) {
       inputRef.current.focus();
-      // Select all text if editing existing label
       if (initialValue) {
         inputRef.current.select();
       }
@@ -16880,7 +17140,6 @@ const TextInputModal = ({
     }
   };
 
-  // Prevent clicks inside modal from closing it
   const handleModalClick = (e: JSX.TargetedMouseEvent<HTMLDivElement>): void => {
     e.stopPropagation();
   };
@@ -16928,7 +17187,7 @@ const TextInputModal = ({
   );
 };
 
-return { TextInputModal };
+return { TextInputModal, openNativeTextInputModal };
 
 ```
 
@@ -18656,7 +18915,7 @@ const { useMapSelection } = await dc.require(dc.headerLink(dc.resolvePath("compi
 const { useLinkingMode } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "ObjectLinkingContext"));
 const { useEventHandlerRegistration } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "EventHandlerContext"));
 const { useObjectInteractions } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "useObjectInteractions"));
-const { TextInputModal } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "TextInputModal"));
+const { TextInputModal, openNativeTextInputModal } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "TextInputModal"));
 const { NoteLinkModal } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "NoteLinkModal"));
 const { SelectionToolbar } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "SelectionToolbar"));
 const { calculateObjectScreenPosition } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "screenPositionUtils"));
@@ -19047,8 +19306,24 @@ const ObjectLayer = ({
         setDragStart(null);
       }
 
-      setEditingObjectId(selectedItem.id);
-      setShowNoteModal(true);
+      const objectId = selectedItem.id;
+      const obj = getActiveLayer(mapData!).objects.find((o: MapObject) => o.id === objectId);
+      const objTitle = obj?.label || 'Object';
+      const objTooltip = obj?.customTooltip || '';
+
+      const opened = openNativeTextInputModal({
+        onSubmit: (content: string) => {
+          handleNoteSubmit(content, objectId);
+        },
+        title: `Note for ${objTitle}`,
+        placeholder: 'Add a custom note...',
+        initialValue: objTooltip
+      });
+
+      if (!opened) {
+        setEditingObjectId(objectId);
+        setShowNoteModal(true);
+      }
     }
   };
 
@@ -35294,7 +35569,15 @@ return `// settingsPluginMain.js - Windrose MapDesigner Settings Plugin
 
 const PLUGIN_VERSION = '{{PLUGIN_VERSION}}';
 
-const { Plugin, PluginSettingTab, Setting, Modal, setIcon, AbstractInputSuggest } = require('obsidian');
+const obsidianModule = require('obsidian');
+const { Plugin, PluginSettingTab, Setting, Modal, setIcon, AbstractInputSuggest } = obsidianModule;
+
+// Initialize bridge for Datacore components
+window.__windrose = window.__windrose || {};
+window.__windrose.obsidian = obsidianModule;
+window.__windrose.version = PLUGIN_VERSION;
+window.__windrose.ready = true;
+window.dispatchEvent(new CustomEvent('windrose:bridge-ready'));
 
 // =============================================================================
 // DATA CONSTANTS
@@ -35529,7 +35812,13 @@ class WindroseMDSettingsPlugin extends Plugin {
     });
   }
 
-  onunload() {}
+  onunload() {
+    if (window.__windrose) {
+      window.__windrose.ready = false;
+      window.__windrose.obsidian = null;
+      window.dispatchEvent(new CustomEvent('windrose:bridge-teardown'));
+    }
+  }
 
   /**
    * Get the path to the Windrose data file.
@@ -42845,7 +43134,7 @@ const { RA_ICONS, RA_CATEGORIES } = await dc.require(dc.headerLink(dc.resolvePat
 const QUICK_SYMBOLS = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "settingsPlugin-quickSymbols"));
 
 /** Plugin version from template */
-const PACKAGED_PLUGIN_VERSION = '0.15.8';
+const PACKAGED_PLUGIN_VERSION = '0.15.9';
 
 /** LocalStorage keys for tracking user preferences */
 const STORAGE_KEYS = {
