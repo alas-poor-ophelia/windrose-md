@@ -341,20 +341,14 @@ describe("eraseRectangleFromCurves", () => {
     expect(hasPointInCutRegion).toBe(false);
   });
 
-  // Regression: open curves incorrectly subtracted
-  it("preserves open curves unchanged", () => {
+  it("removes open curves that overlap the erase rectangle", () => {
     const openCurve: Curve = {
       ...makeLargeCurve(0, 0, 5, 5, CELL_SIZE, "open-curve"),
       closed: false,
     };
     const result = eraseRectangleFromCurves([openCurve], 0, 0, 200, 200);
-    // Open curve is untouched → returns null (no changes)
-    // or if returned, should contain the original open curve
-    if (result !== null) {
-      expect(result.length).toBe(1);
-      expect(result[0].id).toBe("open-curve");
-      expect(result[0].closed).toBe(false);
-    }
+    expect(result).not.toBeNull();
+    expect(result!.length).toBe(0);
   });
 
   // Regression: bisection produces invalid curves

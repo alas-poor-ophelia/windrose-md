@@ -67,6 +67,10 @@ const MODULE_MAP: Record<string, string> = {
   'useEventCoordinator.ts': './hooks/useEventCoordinator.ts',
   'useDataHandlers.ts': './hooks/useDataHandlers.ts',
 
+  // Curve boolean
+  'curveBoolean.ts': './geometry/curveBoolean.ts',
+  'polygonClipping.ts': './geometry/polygonClipping.ts',
+
   // Geometry helpers
   'BaseGeometry.ts': './geometry/BaseGeometry.ts',
   'offsetCoordinates.ts': './geometry/offsetCoordinates.ts',
@@ -85,6 +89,9 @@ const MODULE_MAP: Record<string, string> = {
   // Generation
   'dungeonGenerator.js': './generation/dungeonGenerator.js',
   'objectPlacer.js': './generation/objectPlacer.js',
+
+  // Bridge
+  'obsidianBridge.ts': './utils/obsidianBridge.ts',
 
   // Settings
   'settingsReducer.ts': './components/settings/settingsReducer.ts',
