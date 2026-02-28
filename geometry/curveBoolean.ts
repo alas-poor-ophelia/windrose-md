@@ -275,6 +275,65 @@ function segmentIntersectsRect(
 }
 
 // =========================================================================
+// Open curve overlap detection
+// =========================================================================
+
+/**
+ * Check if any part of an open curve's stroke path overlaps an axis-aligned rectangle.
+ * Flattens the curve and tests each polyline segment against the rect.
+ */
+function openCurveOverlapsRect(curve: Curve, x0: number, y0: number, x1: number, y1: number): boolean {
+  const pts = flattenCurve(curve);
+  // flattenCurve adds a synthetic closing segment for open curves — skip it
+  const last = pts.length - 2;
+  for (let i = 0; i < last; i++) {
+    if (segmentIntersectsRect(pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1], x0, y0, x1, y1)) return true;
+  }
+  return false;
+}
+
+/**
+ * Check if any part of an open curve's stroke path overlaps an arbitrary polygon.
+ * Tests both point-in-polygon and segment-edge intersection to handle linear
+ * beziers that flatten to just two points.
+ */
+function openCurveOverlapsPolygon(curve: Curve, poly: Pt[]): boolean {
+  const pts = flattenCurve(curve);
+  const last = pts.length - 2; // skip synthetic closing segment
+  // Check if any flattened point is inside the polygon
+  for (let i = 0; i <= last; i++) {
+    if (pointInPolygon(pts[i][0], pts[i][1], poly)) return true;
+  }
+  // Check if any curve segment crosses any polygon edge
+  const pn = poly.length;
+  for (let i = 0; i < last; i++) {
+    for (let j = 0; j < pn - 1; j++) {
+      if (segmentsIntersect(
+        pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1],
+        poly[j][0], poly[j][1], poly[j + 1][0], poly[j + 1][1]
+      )) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Test if two line segments (a1→a2) and (b1→b2) properly intersect.
+ */
+function segmentsIntersect(
+  ax1: number, ay1: number, ax2: number, ay2: number,
+  bx1: number, by1: number, bx2: number, by2: number
+): boolean {
+  const d1 = (bx2 - bx1) * (ay1 - by1) - (by2 - by1) * (ax1 - bx1);
+  const d2 = (bx2 - bx1) * (ay2 - by1) - (by2 - by1) * (ax2 - bx1);
+  const d3 = (ax2 - ax1) * (by1 - ay1) - (ay2 - ay1) * (bx1 - ax1);
+  const d4 = (ax2 - ax1) * (by2 - ay1) - (ay2 - ay1) * (bx2 - ax1);
+  if (((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) &&
+      ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))) return true;
+  return false;
+}
+
+// =========================================================================
 // Polygon winding utilities
 // =========================================================================
 
@@ -589,7 +648,7 @@ function subtractCellFromCurve(
   cellX: number, cellY: number,
   cellSize: number
 ): Curve[] {
-  if (!curve.closed) return [curve];
+  if (!curve.closed) return []; // Open curves are fully removed when hit
 
   // Build subject polygon from curve
   const subject = curveToPolygon(curve);
@@ -656,7 +715,13 @@ function findCurveAtCell(
 ): number {
   for (let i = 0; i < curves.length; i++) {
     const curve = curves[i];
-    if (!curve || !curve.closed) continue;
+    if (!curve) continue;
+    if (!curve.closed) {
+      const x0 = cellX * cellSize;
+      const y0 = cellY * cellSize;
+      if (openCurveOverlapsRect(curve, x0, y0, x0 + cellSize, y0 + cellSize)) return i;
+      continue;
+    }
 
     const outerPoly = flattenCurve(curve);
     if (outerPoly.length < 3) continue;
@@ -742,6 +807,10 @@ function eraseRectangleFromCurves(
   for (let i = 0; i < curves.length; i++) {
     const curve = curves[i];
     if (!curve.closed) {
+      if (openCurveOverlapsRect(curve, worldMinX, worldMinY, worldMaxX, worldMaxY)) {
+        changed = true;
+        continue;
+      }
       newCurves.push(curve);
       continue;
     }
@@ -820,6 +889,10 @@ function eraseWorldPolygonFromCurves(
   for (let i = 0; i < curves.length; i++) {
     const curve = curves[i];
     if (!curve.closed) {
+      if (openCurveOverlapsPolygon(curve, ring)) {
+        changed = true;
+        continue;
+      }
       newCurves.push(curve);
       continue;
     }
@@ -890,5 +963,7 @@ return {
   polygonArea,
   segmentIntersectsRect,
   polygonIntersectsRect,
+  openCurveOverlapsRect,
+  openCurveOverlapsPolygon,
   evalBezier
 };
