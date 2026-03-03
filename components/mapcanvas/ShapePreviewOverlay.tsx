@@ -127,6 +127,49 @@ function cellToScreen(
 }
 
 /**
+ * Convert world coordinates directly to buffer-space screen coordinates.
+ * Used for hex bounding-box corners where we bypass cell-to-world conversion.
+ */
+function worldToScreen(
+  worldX: number,
+  worldY: number,
+  geometry: GeometryWithMethods,
+  mapData: MapData,
+  canvasWidth: number,
+  canvasHeight: number
+): Point {
+  const { zoom, center } = mapData.viewState;
+  const northDirection = mapData.northDirection || 0;
+
+  let offsetX: number, offsetY: number;
+  if (geometry instanceof GridGeometry) {
+    const scaledCellSize = geometry.getScaledCellSize(zoom);
+    offsetX = canvasWidth / 2 - center.x * scaledCellSize;
+    offsetY = canvasHeight / 2 - center.y * scaledCellSize;
+  } else {
+    offsetX = canvasWidth / 2 - center.x * zoom;
+    offsetY = canvasHeight / 2 - center.y * zoom;
+  }
+
+  let screenX = offsetX + worldX * zoom;
+  let screenY = offsetY + worldY * zoom;
+
+  if (northDirection !== 0) {
+    const cx = canvasWidth / 2;
+    const cy = canvasHeight / 2;
+    screenX -= cx;
+    screenY -= cy;
+    const angleRad = (northDirection * Math.PI) / 180;
+    const rotatedX = screenX * Math.cos(angleRad) - screenY * Math.sin(angleRad);
+    const rotatedY = screenX * Math.sin(angleRad) + screenY * Math.cos(angleRad);
+    screenX = rotatedX + cx;
+    screenY = rotatedY + cy;
+  }
+
+  return { x: screenX, y: screenY };
+}
+
+/**
  * Format dimension text for display
  */
 function formatRectDimensions(
@@ -229,17 +272,46 @@ const ShapePreviewOverlay = ({
     const widthCells = maxX - minX + 1;
     const heightCells = maxY - minY + 1;
 
-    // Compute all four corners: useCenter=false gives top-left of cell (cellX * cellSize),
-    // so minX is the left edge and maxX+1 is the right edge of the region
-    const corners = [
-      cellToScreen(minX, minY, geo, mapData, canvasWidth, canvasHeight, false),         // TL
-      cellToScreen(maxX + 1, minY, geo, mapData, canvasWidth, canvasHeight, false),     // TR
-      cellToScreen(maxX + 1, maxY + 1, geo, mapData, canvasWidth, canvasHeight, false), // BR
-      cellToScreen(minX, maxY + 1, geo, mapData, canvasWidth, canvasHeight, false),     // BL
-    ].map(p => ({
-      x: p.x * displayScale + canvasOffsetX,
-      y: p.y * displayScale + canvasOffsetY
-    }));
+    let corners: { x: number; y: number }[];
+
+    const isHex = !(geo instanceof GridGeometry);
+    if (isHex && geo.getCellCenter) {
+      // Hex: compute axis-aligned bounding box from corner cell world centers,
+      // then draw a clean rectangle (hex cells don't have rectangular corners)
+      const cellCenters = [
+        geo.getCellCenter(minX, minY),
+        geo.getCellCenter(maxX, minY),
+        geo.getCellCenter(minX, maxY),
+        geo.getCellCenter(maxX, maxY),
+      ];
+      const hexSize = geo.getScaledCellSize(1);
+      const wMinX = Math.min(...cellCenters.map(c => c.worldX)) - hexSize;
+      const wMaxX = Math.max(...cellCenters.map(c => c.worldX)) + hexSize;
+      const wMinY = Math.min(...cellCenters.map(c => c.worldY)) - hexSize;
+      const wMaxY = Math.max(...cellCenters.map(c => c.worldY)) + hexSize;
+
+      corners = [
+        worldToScreen(wMinX, wMinY, geo, mapData, canvasWidth, canvasHeight),
+        worldToScreen(wMaxX, wMinY, geo, mapData, canvasWidth, canvasHeight),
+        worldToScreen(wMaxX, wMaxY, geo, mapData, canvasWidth, canvasHeight),
+        worldToScreen(wMinX, wMaxY, geo, mapData, canvasWidth, canvasHeight),
+      ].map(p => ({
+        x: p.x * displayScale + canvasOffsetX,
+        y: p.y * displayScale + canvasOffsetY
+      }));
+    } else {
+      // Grid: useCenter=false gives top-left of cell (cellX * cellSize),
+      // so minX is the left edge and maxX+1 is the right edge of the region
+      corners = [
+        cellToScreen(minX, minY, geo, mapData, canvasWidth, canvasHeight, false),         // TL
+        cellToScreen(maxX + 1, minY, geo, mapData, canvasWidth, canvasHeight, false),     // TR
+        cellToScreen(maxX + 1, maxY + 1, geo, mapData, canvasWidth, canvasHeight, false), // BR
+        cellToScreen(minX, maxY + 1, geo, mapData, canvasWidth, canvasHeight, false),     // BL
+      ].map(p => ({
+        x: p.x * displayScale + canvasOffsetX,
+        y: p.y * displayScale + canvasOffsetY
+      }));
+    }
 
     const polygonPoints = corners.map(c => `${c.x},${c.y}`).join(' ');
 

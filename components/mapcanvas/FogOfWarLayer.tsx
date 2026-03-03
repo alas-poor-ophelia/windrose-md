@@ -105,29 +105,8 @@ const FogOfWarLayer = ({
 
     const displayScale = canvasRect.width / width;
 
-    /**
-     * Convert offset coords (col, row) to buffer-space screen coords.
-     * useCenter=true → cell center (grid: +0.5, hex: hex center)
-     * useCenter=false → cell top-left corner (grid only; hex always uses center)
-     */
-    const toScreen = (col: number, row: number, useCenter = true): { x: number; y: number } => {
-      let worldX: number, worldY: number;
-
-      if (isGrid) {
-        if (useCenter) {
-          worldX = (col + 0.5) * geometry.cellSize;
-          worldY = (row + 0.5) * geometry.cellSize;
-        } else {
-          worldX = col * geometry.cellSize;
-          worldY = row * geometry.cellSize;
-        }
-      } else {
-        const axial = offsetToAxial(col, row, geometry.orientation);
-        const world = geometry.gridToWorld(axial.q, axial.r);
-        worldX = world.worldX;
-        worldY = world.worldY;
-      }
-
+    /** Convert world coordinates to buffer-space screen coords (viewport + zoom + rotation) */
+    const worldToBuffer = (worldX: number, worldY: number): { x: number; y: number } => {
       let screenX = pxOffsetX + worldX * zoom;
       let screenY = pxOffsetY + worldY * zoom;
 
@@ -146,6 +125,28 @@ const FogOfWarLayer = ({
       return { x: screenX, y: screenY };
     };
 
+    /** Convert offset coords (col, row) to buffer-space screen coords */
+    const toScreen = (col: number, row: number, useCenter = true): { x: number; y: number } => {
+      let worldX: number, worldY: number;
+
+      if (isGrid) {
+        if (useCenter) {
+          worldX = (col + 0.5) * geometry.cellSize;
+          worldY = (row + 0.5) * geometry.cellSize;
+        } else {
+          worldX = col * geometry.cellSize;
+          worldY = row * geometry.cellSize;
+        }
+      } else {
+        const axial = offsetToAxial(col, row, geometry.orientation);
+        const world = geometry.gridToWorld(axial.q, axial.r);
+        worldX = world.worldX;
+        worldY = world.worldY;
+      }
+
+      return worldToBuffer(worldX, worldY);
+    };
+
     // Rectangle hover preview: show full rectangle outline
     if (rectangleHover) {
       const settings = getSettings();
@@ -157,15 +158,55 @@ const FogOfWarLayer = ({
       const minRow = Math.min(rectangleStart.row, rectangleHover.row);
       const maxRow = Math.max(rectangleStart.row, rectangleHover.row);
 
-      const corners = [
-        toScreen(minCol, minRow, false),         // TL
-        toScreen(maxCol + 1, minRow, false),     // TR
-        toScreen(maxCol + 1, maxRow + 1, false), // BR
-        toScreen(minCol, maxRow + 1, false),     // BL
-      ].map(p => ({
-        x: p.x * displayScale + canvasOffsetX,
-        y: p.y * displayScale + canvasOffsetY
-      }));
+      let corners: { x: number; y: number }[];
+
+      if (isGrid) {
+        corners = [
+          toScreen(minCol, minRow, false),         // TL
+          toScreen(maxCol + 1, minRow, false),     // TR
+          toScreen(maxCol + 1, maxRow + 1, false), // BR
+          toScreen(minCol, maxRow + 1, false),     // BL
+        ].map(p => ({
+          x: p.x * displayScale + canvasOffsetX,
+          y: p.y * displayScale + canvasOffsetY
+        }));
+      } else {
+        // Hex: compute axis-aligned bounding box from corner cell world centers
+        const getCellWorld = (col: number, row: number) => {
+          const axial = offsetToAxial(col, row, geometry.orientation);
+          return geometry.gridToWorld(axial.q, axial.r);
+        };
+        const cellCenters = [
+          getCellWorld(minCol, minRow),
+          getCellWorld(maxCol, minRow),
+          getCellWorld(minCol, maxRow),
+          getCellWorld(maxCol, maxRow),
+        ];
+        // Check stagger: include different-parity column/row to capture offset shift
+        if (maxCol > minCol) {
+          cellCenters.push(getCellWorld(minCol + 1, minRow));
+          cellCenters.push(getCellWorld(minCol + 1, maxRow));
+        }
+        if (maxRow > minRow) {
+          cellCenters.push(getCellWorld(minCol, minRow + 1));
+          cellCenters.push(getCellWorld(maxCol, minRow + 1));
+        }
+        const hexSize = scaledSize / zoom; // getScaledCellSize(zoom) / zoom = hexSize
+        const wMinX = Math.min(...cellCenters.map(c => c.worldX)) - hexSize;
+        const wMaxX = Math.max(...cellCenters.map(c => c.worldX)) + hexSize;
+        const wMinY = Math.min(...cellCenters.map(c => c.worldY)) - hexSize;
+        const wMaxY = Math.max(...cellCenters.map(c => c.worldY)) + hexSize;
+
+        corners = [
+          worldToBuffer(wMinX, wMinY),
+          worldToBuffer(wMaxX, wMinY),
+          worldToBuffer(wMaxX, wMaxY),
+          worldToBuffer(wMinX, wMaxY),
+        ].map(p => ({
+          x: p.x * displayScale + canvasOffsetX,
+          y: p.y * displayScale + canvasOffsetY
+        }));
+      }
 
       const polygonPoints = corners.map(c => `${c.x},${c.y}`).join(' ');
 
