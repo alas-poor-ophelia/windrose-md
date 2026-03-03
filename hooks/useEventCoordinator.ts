@@ -468,6 +468,23 @@ const useEventCoordinator = ({
       fogHandlers.handlePointerMove(e);
     }
 
+    if (currentTool === 'areaSelect') {
+      const isTouch = touchEvent.touches !== undefined || (e as PointerEvent).pointerType === 'touch';
+      if (!isTouch) {
+        const areaSelectHandlers = getHandlers('areaSelect') as AreaSelectHandlers | null;
+        if (areaSelectHandlers?.areaSelectStart && areaSelectHandlers.updateAreaSelectHover && toGrid) {
+          const coords = toGrid(clientX, clientY);
+          if (coords) {
+            areaSelectHandlers.updateAreaSelectHover(coords.x, coords.y);
+          }
+        }
+      }
+      if (layerVisibility.objects && objectHandlers?.handleHoverUpdate) {
+        objectHandlers.handleHoverUpdate(e);
+      }
+      return;
+    }
+
     if (currentTool === 'draw' || currentTool === 'erase' ||
         currentTool === 'rectangle' || currentTool === 'circle' ||
         currentTool === 'clearArea' ||

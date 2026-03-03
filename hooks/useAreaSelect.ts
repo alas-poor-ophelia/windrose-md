@@ -86,7 +86,15 @@ const useAreaSelect = (currentTool: ToolId): UseAreaSelectResult => {
     clearSelection
   } = useMapSelection();
 
+  const [areaSelectHoverPosition, setAreaSelectHoverPosition] = dc.useState<Point | null>(null);
+
   const isAreaSelectTool = currentTool === 'areaSelect';
+
+  const updateAreaSelectHover = dc.useCallback((gridX: number, gridY: number): void => {
+    if (areaSelectStart) {
+      setAreaSelectHoverPosition({ x: gridX, y: gridY });
+    }
+  }, [areaSelectStart]);
 
   /**
    * Handle click for area select tool
@@ -140,6 +148,7 @@ const useAreaSelect = (currentTool: ToolId): UseAreaSelectResult => {
       }
 
       setAreaSelectStart(null);
+      setAreaSelectHoverPosition(null);
 
       return true;
     },
@@ -164,6 +173,7 @@ const useAreaSelect = (currentTool: ToolId): UseAreaSelectResult => {
   const cancelAreaSelect = dc.useCallback((): void => {
     if (areaSelectStart) {
       setAreaSelectStart(null);
+      setAreaSelectHoverPosition(null);
     }
   }, [areaSelectStart, setAreaSelectStart]);
 
@@ -176,10 +186,12 @@ const useAreaSelect = (currentTool: ToolId): UseAreaSelectResult => {
     // State
     areaSelectStart,
     isAreaSelecting,
+    areaSelectHoverPosition,
 
     // Handlers
     handleAreaSelectClick,
-    cancelAreaSelect
+    cancelAreaSelect,
+    updateAreaSelectHover
   };
 };
 

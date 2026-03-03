@@ -19,6 +19,8 @@ const { useFogTools } = await requireModuleByName("useFogTools.ts");
 const { useMapState } = await requireModuleByName("MapContext.tsx");
 const { useEventHandlerRegistration } = await requireModuleByName("EventHandlerContext.tsx");
 const { GridGeometry } = await requireModuleByName("GridGeometry.ts");
+const { getSettings } = await requireModuleByName("settingsAccessor.ts");
+const { offsetToAxial } = await requireModuleByName("offsetCoordinates.ts");
 
 /** Props for FogOfWarLayer component */
 export interface FogOfWarLayerProps {
@@ -41,6 +43,7 @@ const FogOfWarLayer = ({
   const {
     isDrawing,
     rectangleStart,
+    rectangleHover,
     handlePointerDown,
     handlePointerMove,
     handlePointerUp,
@@ -60,13 +63,14 @@ const FogOfWarLayer = ({
       handlePointerUp,
       handleKeyDown,
       isDrawing,
-      rectangleStart
+      rectangleStart,
+      rectangleHover
     });
 
     return () => unregisterHandlers('fogOfWar');
   }, [activeTool, registerHandlers, unregisterHandlers,
     handlePointerDown, handlePointerMove, handlePointerUp, handleKeyDown,
-    isDrawing, rectangleStart]);
+    isDrawing, rectangleStart, rectangleHover]);
 
   const renderPreviewOverlay = (): React.ReactElement | null => {
     if (!activeTool || !rectangleStart || !canvasRef.current || !containerRef?.current || !geometry) {
@@ -79,17 +83,17 @@ const FogOfWarLayer = ({
     const { width, height } = canvas;
 
     let scaledSize: number;
-    let offsetX: number;
-    let offsetY: number;
+    let pxOffsetX: number;
+    let pxOffsetY: number;
 
     const isGrid = geometry instanceof GridGeometry;
     if (isGrid) {
       scaledSize = geometry.getScaledCellSize(zoom);
-      offsetX = width / 2 - center.x * scaledSize;
-      offsetY = height / 2 - center.y * scaledSize;
+      pxOffsetX = width / 2 - center.x * scaledSize;
+      pxOffsetY = height / 2 - center.y * scaledSize;
     } else {
-      offsetX = width / 2 - center.x * zoom;
-      offsetY = height / 2 - center.y * zoom;
+      pxOffsetX = width / 2 - center.x * zoom;
+      pxOffsetY = height / 2 - center.y * zoom;
       scaledSize = geometry.getScaledCellSize(zoom);
     }
 
@@ -101,47 +105,101 @@ const FogOfWarLayer = ({
 
     const displayScale = canvasRect.width / width;
 
-    const { col, row } = rectangleStart;
+    /**
+     * Convert offset coords (col, row) to buffer-space screen coords.
+     * useCenter=true → cell center (grid: +0.5, hex: hex center)
+     * useCenter=false → cell top-left corner (grid only; hex always uses center)
+     */
+    const toScreen = (col: number, row: number, useCenter = true): { x: number; y: number } => {
+      let worldX: number, worldY: number;
 
-    let screenX: number;
-    let screenY: number;
-
-    if (isGrid) {
-      const worldX = (col + 0.5) * geometry.cellSize;
-      const worldY = (row + 0.5) * geometry.cellSize;
-      screenX = offsetX + worldX * zoom;
-      screenY = offsetY + worldY * zoom;
-    } else {
-      if (geometry.offsetToAxial) {
-        const axial = geometry.offsetToAxial(col, row);
-        const world = geometry.gridToWorld(axial.q, axial.r);
-        screenX = offsetX + world.worldX * zoom;
-        screenY = offsetY + world.worldY * zoom;
+      if (isGrid) {
+        if (useCenter) {
+          worldX = (col + 0.5) * geometry.cellSize;
+          worldY = (row + 0.5) * geometry.cellSize;
+        } else {
+          worldX = col * geometry.cellSize;
+          worldY = row * geometry.cellSize;
+        }
       } else {
-        screenX = offsetX + col * scaledSize;
-        screenY = offsetY + row * scaledSize;
+        const axial = offsetToAxial(col, row, geometry.orientation);
+        const world = geometry.gridToWorld(axial.q, axial.r);
+        worldX = world.worldX;
+        worldY = world.worldY;
       }
+
+      let screenX = pxOffsetX + worldX * zoom;
+      let screenY = pxOffsetY + worldY * zoom;
+
+      if (northDirection !== 0) {
+        const cx = width / 2;
+        const cy = height / 2;
+        screenX -= cx;
+        screenY -= cy;
+        const angleRad = (northDirection * Math.PI) / 180;
+        const rotatedX = screenX * Math.cos(angleRad) - screenY * Math.sin(angleRad);
+        const rotatedY = screenX * Math.sin(angleRad) + screenY * Math.cos(angleRad);
+        screenX = rotatedX + cx;
+        screenY = rotatedY + cy;
+      }
+
+      return { x: screenX, y: screenY };
+    };
+
+    // Rectangle hover preview: show full rectangle outline
+    if (rectangleHover) {
+      const settings = getSettings();
+      const previewEnabled = (settings as Record<string, unknown>).shapePreviewKbm !== false;
+      if (!previewEnabled) return null;
+
+      const minCol = Math.min(rectangleStart.col, rectangleHover.col);
+      const maxCol = Math.max(rectangleStart.col, rectangleHover.col);
+      const minRow = Math.min(rectangleStart.row, rectangleHover.row);
+      const maxRow = Math.max(rectangleStart.row, rectangleHover.row);
+
+      const corners = [
+        toScreen(minCol, minRow, false),         // TL
+        toScreen(maxCol + 1, minRow, false),     // TR
+        toScreen(maxCol + 1, maxRow + 1, false), // BR
+        toScreen(minCol, maxRow + 1, false),     // BL
+      ].map(p => ({
+        x: p.x * displayScale + canvasOffsetX,
+        y: p.y * displayScale + canvasOffsetY
+      }));
+
+      const polygonPoints = corners.map(c => `${c.x},${c.y}`).join(' ');
+
+      return (
+        <svg
+          className="dmt-fow-preview"
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            pointerEvents: 'none',
+            zIndex: 100,
+            overflow: 'visible'
+          }}
+        >
+          <polygon
+            points={polygonPoints}
+            fill="none"
+            stroke="#00ff00"
+            strokeWidth={2}
+            strokeDasharray="8,4"
+            strokeLinejoin="round"
+          />
+        </svg>
+      );
     }
 
-    if (northDirection !== 0) {
-      const centerX = width / 2;
-      const centerY = height / 2;
-
-      screenX -= centerX;
-      screenY -= centerY;
-
-      const angleRad = (northDirection * Math.PI) / 180;
-      const rotatedX = screenX * Math.cos(angleRad) - screenY * Math.sin(angleRad);
-      const rotatedY = screenX * Math.sin(angleRad) + screenY * Math.cos(angleRad);
-
-      screenX = rotatedX + centerX;
-      screenY = rotatedY + centerY;
-    }
-
-    const displayX = canvasOffsetX + screenX * displayScale;
-    const displayY = canvasOffsetY + screenY * displayScale;
+    // Single-cell start marker (before mouse moves after first click)
+    const cellCenter = toScreen(rectangleStart.col, rectangleStart.row, true);
+    const displayX = cellCenter.x * displayScale + canvasOffsetX;
+    const displayY = cellCenter.y * displayScale + canvasOffsetY;
     const displaySize = scaledSize * displayScale;
-
     const halfSize = displaySize / 2;
 
     return (

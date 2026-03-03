@@ -18,6 +18,8 @@ const { useMapState } = await requireModuleByName("MapContext.tsx");
 const { useMapSelection } = await requireModuleByName("MapSelectionContext.tsx");
 const { useEventHandlerRegistration } = await requireModuleByName("EventHandlerContext.tsx");
 const { GridGeometry } = await requireModuleByName("GridGeometry.ts");
+const { ShapePreviewOverlay } = await requireModuleByName("ShapePreviewOverlay.tsx");
+const { getSettings } = await requireModuleByName("settingsAccessor.ts");
 
 /** Props for AreaSelectLayer component */
 export interface AreaSelectLayerProps {
@@ -32,7 +34,9 @@ const AreaSelectLayer = ({ currentTool }: AreaSelectLayerProps): React.ReactElem
   const {
     handleAreaSelectClick,
     cancelAreaSelect,
-    isAreaSelecting
+    isAreaSelecting,
+    areaSelectHoverPosition,
+    updateAreaSelectHover
   } = useAreaSelect(currentTool);
 
   const { registerHandlers, unregisterHandlers } = useEventHandlerRegistration();
@@ -42,11 +46,12 @@ const AreaSelectLayer = ({ currentTool }: AreaSelectLayerProps): React.ReactElem
       handleAreaSelectClick,
       cancelAreaSelect,
       isAreaSelecting,
-      areaSelectStart
+      areaSelectStart,
+      updateAreaSelectHover
     });
 
     return () => unregisterHandlers('areaSelect');
-  }, [registerHandlers, unregisterHandlers, handleAreaSelectClick, cancelAreaSelect, isAreaSelecting, areaSelectStart]);
+  }, [registerHandlers, unregisterHandlers, handleAreaSelectClick, cancelAreaSelect, isAreaSelecting, areaSelectStart, updateAreaSelectHover]);
 
   dc.useEffect(() => {
     if (currentTool !== 'areaSelect' && areaSelectStart) {
@@ -154,7 +159,34 @@ const AreaSelectLayer = ({ currentTool }: AreaSelectLayerProps): React.ReactElem
     );
   };
 
-  return renderStartMarker();
+  const renderRectanglePreview = (): React.ReactElement | null => {
+    if (!areaSelectStart || !areaSelectHoverPosition) return null;
+
+    const settings = getSettings();
+    const previewEnabled = (settings as Record<string, unknown>).shapePreviewKbm !== false;
+    if (!previewEnabled) return null;
+
+    return (
+      <ShapePreviewOverlay
+        shapeType="areaSelect"
+        startPoint={{ x: areaSelectStart.x, y: areaSelectStart.y }}
+        endPoint={areaSelectHoverPosition}
+        geometry={geometry}
+        mapData={mapData}
+        canvasRef={canvasRef}
+        containerRef={containerRef}
+      />
+    );
+  };
+
+  const showPreview = areaSelectHoverPosition && areaSelectStart;
+
+  return (
+    <>
+      {!showPreview && renderStartMarker()}
+      {renderRectanglePreview()}
+    </>
+  );
 };
 
 return { AreaSelectLayer };

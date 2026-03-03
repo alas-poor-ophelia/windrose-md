@@ -84,8 +84,15 @@ function cellToScreen(
       worldY = (cellY + 0.5) * geometry.cellSize;
     }
   } else {
-    worldX = cellX * geometry.cellSize;
-    worldY = cellY * geometry.cellSize;
+    if (geometry.getCellCenter) {
+      // Hex: no rectangular corners, use cell center as approximation
+      const cellCenter = geometry.getCellCenter(cellX, cellY);
+      worldX = cellCenter.worldX;
+      worldY = cellCenter.worldY;
+    } else {
+      worldX = cellX * geometry.cellSize;
+      worldY = cellY * geometry.cellSize;
+    }
   }
 
   let offsetX: number, offsetY: number;
@@ -202,7 +209,8 @@ const ShapePreviewOverlay = ({
     rectangle: '#00ff00',
     clearArea: '#ff0000',
     circle: '#00aaff',
-    edgeLine: '#ff9500'
+    edgeLine: '#ff9500',
+    areaSelect: '#4a9eff'
   };
   const strokeColor = colors[shapeType || ''] || '#00ff00';
 
@@ -212,7 +220,7 @@ const ShapePreviewOverlay = ({
 
   const geo = geometry as GeometryWithMethods;
 
-  if (shapeType === 'rectangle' || shapeType === 'clearArea') {
+  if (shapeType === 'rectangle' || shapeType === 'clearArea' || shapeType === 'areaSelect') {
     const minX = Math.min(startPoint.x, endPoint.x);
     const maxX = Math.max(startPoint.x, endPoint.x);
     const minY = Math.min(startPoint.y, endPoint.y);

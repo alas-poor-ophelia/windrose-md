@@ -78,6 +78,7 @@ const useFogTools = (
   // Fog tool state
   const [isDrawing, setIsDrawing] = dc.useState<boolean>(false);
   const [rectangleStart, setRectangleStart] = dc.useState<FogRectangleStart | null>(null);
+  const [rectangleHover, setRectangleHover] = dc.useState<OffsetCoords | null>(null);
   const [lastCell, setLastCell] = dc.useState<FogCellPosition | null>(null);
   const [processedCells, setProcessedCells] = dc.useState<Set<string>>(new Set());
 
@@ -188,6 +189,7 @@ const useFogTools = (
         } else {
           applyRectangle(rectangleStart.col, rectangleStart.row, col, row);
           setRectangleStart(null);
+          setRectangleHover(null);
         }
       } else if (activeTool === 'paint' || activeTool === 'erase') {
         setIsDrawing(true);
@@ -204,8 +206,20 @@ const useFogTools = (
    */
   const handlePointerMove = dc.useCallback(
     (e: PointerEvent | MouseEvent): void => {
-      if (!activeTool || !isDrawing) return;
-      if (activeTool === 'rectangle') return; // Rectangle doesn't use drag
+      if (!activeTool) return;
+
+      // Rectangle mode: track hover position for preview
+      if (activeTool === 'rectangle') {
+        if (rectangleStart) {
+          const offset = screenToOffset(e.clientX, e.clientY);
+          if (offset) {
+            setRectangleHover(offset);
+          }
+        }
+        return;
+      }
+
+      if (!isDrawing) return;
 
       const offset = screenToOffset(e.clientX, e.clientY);
       if (!offset) return;
@@ -223,7 +237,7 @@ const useFogTools = (
       setLastCell({ col, row });
       applyToCell(col, row);
     },
-    [activeTool, isDrawing, screenToOffset, lastCell, processedCells, applyToCell]
+    [activeTool, isDrawing, rectangleStart, screenToOffset, lastCell, processedCells, applyToCell]
   );
 
   /**
@@ -253,6 +267,7 @@ const useFogTools = (
   const cancelFog = dc.useCallback((): void => {
     setIsDrawing(false);
     setRectangleStart(null);
+    setRectangleHover(null);
     setLastCell(null);
     setProcessedCells(new Set());
   }, []);
@@ -260,6 +275,7 @@ const useFogTools = (
   return {
     isDrawing,
     rectangleStart,
+    rectangleHover,
     handlePointerDown,
     handlePointerMove,
     handlePointerUp,
