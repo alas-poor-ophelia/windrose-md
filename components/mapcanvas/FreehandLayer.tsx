@@ -173,11 +173,33 @@ const FreehandLayer = ({
       const dy = endPt.y - startPt.y;
       const dist = Math.sqrt(dx * dx + dy * dy);
       if (dist < snapDistance) {
+        const radius = snapDistance * 0.5;
+        const ringWidth = 2 / zoom;
+
+        // Start point: filled circle with contrasting outline
         ctx.beginPath();
-        ctx.arc(startPt.x, startPt.y, snapDistance * 0.3, 0, Math.PI * 2);
+        ctx.arc(startPt.x, startPt.y, radius, 0, Math.PI * 2);
         ctx.fillStyle = selectedColor;
-        ctx.globalAlpha = 0.3;
+        ctx.globalAlpha = 0.4;
         ctx.fill();
+        ctx.globalAlpha = 0.9;
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = ringWidth * 2;
+        ctx.stroke();
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = ringWidth;
+        ctx.stroke();
+
+        // Cursor-tip: smaller ring at endpoint
+        ctx.beginPath();
+        ctx.arc(endPt.x, endPt.y, radius * 0.5, 0, Math.PI * 2);
+        ctx.globalAlpha = 0.6;
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = ringWidth * 1.5;
+        ctx.stroke();
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = ringWidth * 0.75;
+        ctx.stroke();
       }
     }
 

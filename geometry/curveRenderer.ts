@@ -103,7 +103,8 @@ function renderCurveInteriorGrid(
   gridConfig: CurveGridConfig
 ): void {
   const { cellSize, lineColor, lineWidth, interiorRatio } = gridConfig;
-  const actualLineWidth = Math.max(1 / ctx.getTransform().a, lineWidth * interiorRatio);
+  const zoom = ctx.getTransform().a;
+  const actualLineWidth = Math.max(1, lineWidth * interiorRatio) / zoom;
   const halfWidth = actualLineWidth / 2;
 
   const bounds = getCurveBounds(curve);

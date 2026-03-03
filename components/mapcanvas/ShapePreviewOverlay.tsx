@@ -221,13 +221,13 @@ const ShapePreviewOverlay = ({
     const widthCells = maxX - minX + 1;
     const heightCells = maxY - minY + 1;
 
-    // Compute all four corners in grid space, rotate each through cellToScreen
-    const halfCell = 0.5;
+    // Compute all four corners: useCenter=false gives top-left of cell (cellX * cellSize),
+    // so minX is the left edge and maxX+1 is the right edge of the region
     const corners = [
-      cellToScreen(minX - halfCell, minY - halfCell, geo, mapData, canvasWidth, canvasHeight, false), // TL
-      cellToScreen(maxX + halfCell, minY - halfCell, geo, mapData, canvasWidth, canvasHeight, false), // TR
-      cellToScreen(maxX + halfCell, maxY + halfCell, geo, mapData, canvasWidth, canvasHeight, false), // BR
-      cellToScreen(minX - halfCell, maxY + halfCell, geo, mapData, canvasWidth, canvasHeight, false), // BL
+      cellToScreen(minX, minY, geo, mapData, canvasWidth, canvasHeight, false),         // TL
+      cellToScreen(maxX + 1, minY, geo, mapData, canvasWidth, canvasHeight, false),     // TR
+      cellToScreen(maxX + 1, maxY + 1, geo, mapData, canvasWidth, canvasHeight, false), // BR
+      cellToScreen(minX, maxY + 1, geo, mapData, canvasWidth, canvasHeight, false),     // BL
     ].map(p => ({
       x: p.x * displayScale + canvasOffsetX,
       y: p.y * displayScale + canvasOffsetY
