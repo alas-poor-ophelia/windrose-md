@@ -996,15 +996,20 @@ button.dmt-orientation-btn,
 }
 
 .dmt-deselect-btn {
-  width: 100%;
-  padding: 6px 4px;
-  font-size: 9pt;
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background-color: var(--dmt-bg-tertiary);
   color: var(--dmt-text-primary);
   border: 1px solid #4a4a4a;
   border-radius: 3px;
   cursor: pointer;
   transition: var(--dmt-transition);
+  flex-shrink: 0;
 
   &:hover {
     background-color: #454545;
@@ -1013,6 +1018,59 @@ button.dmt-orientation-btn,
 
   &:active {
     background-color: var(--dmt-bg-secondary);
+  }
+}
+
+.dmt-sidebar-footer-row {
+  display: flex;
+  gap: 4px;
+  justify-content: center;
+}
+
+.dmt-freeform-toggle {
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--dmt-bg-tertiary);
+  color: var(--dmt-text-secondary);
+  border: 1px solid #4a4a4a;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: var(--dmt-transition);
+  flex-shrink: 0;
+
+  &:hover {
+    background-color: #454545;
+    border-color: #5a5a5a;
+    color: var(--dmt-text-primary);
+  }
+}
+
+.dmt-freeform-collapsed-indicator {
+  position: absolute;
+  left: 0;
+  top: 38px;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--interactive-accent) !important;
+  color: var(--text-on-accent) !important;
+  border: 1.5px solid var(--dmt-border-primary);
+  border-radius: 6px;
+  cursor: pointer;
+  z-index: 200;
+  box-shadow:
+    2px 2px 6px rgba(0, 0, 0, 0.4),
+    0 0 12px rgba(196, 165, 123, 0.3) !important;
+
+  &:hover {
+    filter: brightness(1.15);
   }
 }
 

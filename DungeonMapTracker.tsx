@@ -174,6 +174,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     isColorPickerOpen, setIsColorPickerOpen
   } = useToolState();
 
+  const [freeformPlacementMode, setFreeformPlacementMode] = dc.useState(false);
+
   const [showFooter, setShowFooter] = dc.useState(false);
   const [isFocused, setIsFocused] = dc.useState(false);
   const [isExpanded, setIsExpanded] = dc.useState(false);
@@ -852,6 +854,8 @@ const editingLayer = dc.useMemo(() => {
             isCollapsed={mapData.sidebarCollapsed || false}
             onCollapseChange={handleSidebarCollapseChange}
             mapType={mapData.mapType || 'grid'}
+            isFreeformMode={freeformPlacementMode}
+            onFreeformToggle={() => setFreeformPlacementMode(prev => !prev)}
           />
 
           {/* Layer Controls Panel (Z-Layer System) */}
@@ -917,6 +921,7 @@ const editingLayer = dc.useMemo(() => {
                 customColors={mapData.customColors || []}
                 onAddCustomColor={handleAddCustomColor}
                 onDeleteCustomColor={handleDeleteCustomColor}
+                freeformPlacementMode={freeformPlacementMode}
               />
 
               {/* AreaSelectLayer - handles area selection tool for multi-select */}

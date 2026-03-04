@@ -57,7 +57,16 @@ function calculateObjectScreenPosition(
   let offsetX: number, offsetY: number, screenX: number, screenY: number;
   let objectWidth: number, objectHeight: number;
 
-  if (mapType === 'hex') {
+  if (object.freeform && object.worldPosition) {
+    const cellUnit = mapType === 'hex' ? (geometry as HexGeometryLike).hexSize : gridSize;
+    offsetX = centerX - center.x * (mapType === 'hex' ? zoom : cellUnit * zoom);
+    offsetY = centerY - center.y * (mapType === 'hex' ? zoom : cellUnit * zoom);
+    // worldPosition is the object center; screenX/screenY should also be center
+    screenX = offsetX + object.worldPosition.x * zoom;
+    screenY = offsetY + object.worldPosition.y * zoom;
+    objectWidth = size.width * cellUnit * zoom;
+    objectHeight = size.height * cellUnit * zoom;
+  } else if (mapType === 'hex') {
     const hexGeom = geometry as HexGeometryLike;
     const { worldX, worldY } = hexGeom.hexToWorld(object.position.x, object.position.y);
 

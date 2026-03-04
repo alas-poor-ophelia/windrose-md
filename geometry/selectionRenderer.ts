@@ -245,6 +245,22 @@ function renderResizeOverlay(
   }
 }
 
+function renderDiamondHandle(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  size: number
+): void {
+  const r = size / 2;
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - r);
+  ctx.lineTo(cx + r, cy);
+  ctx.lineTo(cx, cy + r);
+  ctx.lineTo(cx - r, cy);
+  ctx.closePath();
+  ctx.fill();
+}
+
 /**
  * Renders selection rectangle and corner handles for an object.
  */
@@ -254,7 +270,8 @@ function renderObjectSelectionRectangle(
   screenY: number,
   objectWidth: number,
   objectHeight: number,
-  isResizeMode: boolean
+  isResizeMode: boolean,
+  freeform: boolean = false
 ): void {
   // Draw selection rectangle
   ctx.strokeStyle = SELECTION_COLOR;
@@ -267,10 +284,20 @@ function renderObjectSelectionRectangle(
   ctx.fillStyle = SELECTION_COLOR;
   const handleSize = isResizeMode ? HANDLE_SIZE_RESIZE : HANDLE_SIZE_NORMAL;
 
-  ctx.fillRect(screenX + 2 - handleSize/2, screenY + 2 - handleSize/2, handleSize, handleSize);
-  ctx.fillRect(screenX + objectWidth - 2 - handleSize/2, screenY + 2 - handleSize/2, handleSize, handleSize);
-  ctx.fillRect(screenX + 2 - handleSize/2, screenY + objectHeight - 2 - handleSize/2, handleSize, handleSize);
-  ctx.fillRect(screenX + objectWidth - 2 - handleSize/2, screenY + objectHeight - 2 - handleSize/2, handleSize, handleSize);
+  const corners = [
+    { cx: screenX + 2, cy: screenY + 2 },
+    { cx: screenX + objectWidth - 2, cy: screenY + 2 },
+    { cx: screenX + 2, cy: screenY + objectHeight - 2 },
+    { cx: screenX + objectWidth - 2, cy: screenY + objectHeight - 2 }
+  ];
+
+  for (const { cx, cy } of corners) {
+    if (freeform) {
+      renderDiamondHandle(ctx, cx, cy, handleSize);
+    } else {
+      ctx.fillRect(cx - handleSize/2, cy - handleSize/2, handleSize, handleSize);
+    }
+  }
 }
 
 /**
@@ -290,7 +317,17 @@ function renderObjectSelection(
 ): void {
   let position: { screenX: number; screenY: number; objectWidth: number; objectHeight: number; cellWidth: number; cellHeight: number };
 
-  if (isHexMap && hexGeometry) {
+  if (object.freeform && object.worldPosition) {
+    const { offsetX, offsetY, zoom, scaledSize } = context;
+    const size = object.size || { width: 1, height: 1 };
+    const { screenX, screenY } = geometry.worldToScreen(
+      object.worldPosition.x, object.worldPosition.y, offsetX, offsetY, zoom
+    );
+    const objectWidth = size.width * scaledSize;
+    const objectHeight = size.height * scaledSize;
+    // worldPosition is the object center; convert to top-left for selection rendering
+    position = { screenX: screenX - objectWidth / 2, screenY: screenY - objectHeight / 2, objectWidth, objectHeight, cellWidth: scaledSize, cellHeight: scaledSize };
+  } else if (isHexMap && hexGeometry) {
     position = calculateHexObjectSelectionPosition(object, allObjects, hexGeometry, context, orientation, deps);
   } else {
     position = calculateGridObjectSelectionPosition(object, geometry, context);
@@ -304,7 +341,7 @@ function renderObjectSelection(
   }
 
   // Draw selection rectangle and handles
-  renderObjectSelectionRectangle(ctx, screenX, screenY, objectWidth, objectHeight, isResizeMode);
+  renderObjectSelectionRectangle(ctx, screenX, screenY, objectWidth, objectHeight, isResizeMode, !!object.freeform);
 }
 
 /**

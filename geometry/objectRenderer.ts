@@ -36,6 +36,7 @@ interface MapLayer {
 interface GeometryLike {
   toOffsetCoords: (x: number, y: number) => { col: number; row: number };
   gridToScreen: (x: number, y: number, offsetX: number, offsetY: number, zoom: number) => { screenX: number; screenY: number };
+  worldToScreen: (worldX: number, worldY: number, offsetX: number, offsetY: number, zoom: number) => { screenX: number; screenY: number };
 }
 
 interface ObjectRenderContext {
@@ -112,6 +113,22 @@ function calculateObjectPosition(
 ): { screenX: number; screenY: number; objectWidth: number; objectHeight: number } {
   const { offsetX, offsetY, zoom, scaledSize } = context;
   const size = obj.size || { width: 1, height: 1 };
+
+  // Freeform objects use world-space coordinates directly
+  // worldPosition is the object's center, but the renderer expects top-left
+  if (obj.freeform && obj.worldPosition) {
+    const { screenX, screenY } = geometry.worldToScreen(
+      obj.worldPosition.x, obj.worldPosition.y, offsetX, offsetY, zoom
+    );
+    const objW = size.width * scaledSize;
+    const objH = size.height * scaledSize;
+    return {
+      screenX: screenX - objW / 2,
+      screenY: screenY - objH / 2,
+      objectWidth: objW,
+      objectHeight: objH
+    };
+  }
 
   let { screenX, screenY } = geometry.gridToScreen(obj.position.x, obj.position.y, offsetX, offsetY, zoom);
   let objectWidth = size.width * scaledSize;

@@ -29,6 +29,10 @@ const { NoteLinkModal } = await requireModuleByName("NoteLinkModal.jsx");
 const { SelectionToolbar } = await requireModuleByName("SelectionToolbar.jsx");
 const { calculateObjectScreenPosition } = await requireModuleByName("screenPositionUtils.ts");
 const { getActiveLayer } = await requireModuleByName("layerAccessor.ts");
+const { convertObjectToFreeform, snapObjectToGrid } = await requireModuleByName("objectOperations.ts") as {
+  convertObjectToFreeform: (obj: MapObject, cellCenterWorldX: number, cellCenterWorldY: number, cellSize: number) => Partial<MapObject>;
+  snapObjectToGrid: (nearestGridPos: { x: number; y: number }) => Partial<MapObject>;
+};
 const { copyDeepLinkToClipboard } = await requireModuleByName("deepLinkHandler.ts");
 const { LinkingModeBanner } = await requireModuleByName("LinkingModeBanner.tsx");
 
@@ -65,6 +69,8 @@ export interface ObjectLayerProps {
   onAddCustomColor?: (color: HexColor) => void;
   /** Callback to delete custom color */
   onDeleteCustomColor?: (colorId: string) => void;
+  /** Whether freeform placement mode is active (sidebar toggle) */
+  freeformPlacementMode?: boolean;
 }
 
 const ObjectLayer = ({
@@ -73,7 +79,8 @@ const ObjectLayer = ({
   onObjectsChange,
   customColors,
   onAddCustomColor,
-  onDeleteCustomColor
+  onDeleteCustomColor,
+  freeformPlacementMode = false
 }: ObjectLayerProps): React.ReactElement | null => {
   const { canvasRef, containerRef, mapData, mapId, notePath, geometry, screenToGrid, screenToWorld, getClientCoords, GridGeometry } = useMapState();
   const { getObjectAtPosition, addObject, updateObject, removeObject, isAreaFree, onObjectsChange: contextOnObjectsChange, onTextLabelsChange, removeTextLabel } = useMapOperations();
@@ -93,6 +100,10 @@ const ObjectLayer = ({
   } = useMapSelection();
 
   const { isLinkingMode, linkingFrom, startLinking, cancelLinking } = useLinkingMode();
+
+  // Keep a ref in sync with the freeformPlacementMode prop for the interactions hook
+  const freeformPlacementModeRef = dc.useRef(freeformPlacementMode);
+  freeformPlacementModeRef.current = freeformPlacementMode;
 
   // Helper for bidirectional link updates (handles same-layer vs cross-layer)
   const applyLinkUpdate = dc.useCallback((
@@ -300,7 +311,7 @@ const ObjectLayer = ({
     handleObjectColorSelect,
     handleObjectColorReset,
     getClickedCorner
-  } = useObjectInteractions(currentTool, selectedObjectType, onAddCustomColor, customColors);
+  } = useObjectInteractions(currentTool, selectedObjectType, onAddCustomColor, customColors, freeformPlacementModeRef);
 
   const { registerHandlers, unregisterHandlers } = useEventHandlerRegistration();
 
@@ -441,6 +452,37 @@ const ObjectLayer = ({
       e.preventDefault();
       e.stopPropagation();
       setIsResizeMode(true);
+    }
+  };
+
+  const handleFreeformToggle = (): void => {
+    if (selectedItem?.type !== 'object' || !mapData || !geometry) return;
+    const obj = getActiveLayer(mapData).objects?.find((o: MapObject) => o.id === selectedItem.id);
+    if (!obj) return;
+
+    let updates: Partial<MapObject>;
+    if (obj.freeform) {
+      // Snap to grid: find nearest cell from worldPosition
+      const nearestGrid = obj.worldPosition && geometry.worldToGrid
+        ? geometry.worldToGrid(obj.worldPosition.x, obj.worldPosition.y)
+        : obj.position;
+      updates = snapObjectToGrid(nearestGrid);
+    } else {
+      // Convert to freeform: compute world position from grid cell center
+      const cellCenter = geometry.getCellCenter
+        ? (geometry as any).getCellCenter(obj.position.x, obj.position.y)
+        : (geometry as any).gridToWorld(obj.position.x, obj.position.y);
+      const cellSize = (geometry as any).cellSize || (geometry as any).hexSize || mapData.gridSize;
+      updates = convertObjectToFreeform(obj, cellCenter.worldX, cellCenter.worldY, cellSize);
+    }
+
+    const updatedObjects = updateObject(getActiveLayer(mapData).objects, obj.id, updates);
+    onObjectsChange(updatedObjects);
+
+    // Update selected item data so toolbar reflects new state
+    const updatedObj = updatedObjects.find((o: MapObject) => o.id === obj.id);
+    if (updatedObj) {
+      setSelectedItem({ type: 'object', id: obj.id, data: updatedObj });
     }
   };
 
@@ -765,6 +807,7 @@ const ObjectLayer = ({
           geometry={geometry}
           onRotate={handleObjectRotation}
           onDuplicate={handleObjectDuplicate}
+          onFreeformToggle={handleFreeformToggle}
           onLabel={handleNoteButtonClick}
           onLinkNote={() => handleEditNoteLink(selectedItem?.id)}
           onLinkObject={handleLinkObject}

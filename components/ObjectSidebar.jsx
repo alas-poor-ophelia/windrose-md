@@ -48,7 +48,7 @@ const OrnamentalArrow = ({ direction = "right" }) => {
   );
 };
 
-const ObjectSidebar = ({ selectedObjectType, onObjectTypeSelect, onToolChange, isCollapsed, onCollapseChange, mapType = 'grid' }) => {
+const ObjectSidebar = ({ selectedObjectType, onObjectTypeSelect, onToolChange, isCollapsed, onCollapseChange, mapType = 'grid', isFreeformMode = false, onFreeformToggle }) => {
   // Get resolved object types and categories (includes overrides and custom)
   const allObjectTypes = getResolvedObjectTypes(mapType);
   const allCategories = getResolvedCategories(mapType);
@@ -85,6 +85,15 @@ const ObjectSidebar = ({ selectedObjectType, onObjectTypeSelect, onToolChange, i
         >
           <OrnamentalArrow direction="right" />
         </button>
+        {isFreeformMode && (
+          <button
+            className="dmt-freeform-collapsed-indicator interactive-child"
+            title="Freeform placement active (tap to disable)"
+            onClick={onFreeformToggle}
+          >
+            <dc.Icon icon="lucide-diamond" size={12} />
+          </button>
+        )}
       </div>
     );
   }
@@ -150,17 +159,26 @@ const ObjectSidebar = ({ selectedObjectType, onObjectTypeSelect, onToolChange, i
         ))}
       </div>
       
-      {selectedObjectType && (
-        <div className="dmt-sidebar-footer">
+      <div className="dmt-sidebar-footer">
+        <div className="dmt-sidebar-footer-row">
+          {selectedObjectType && (
+            <button
+              className="dmt-deselect-btn"
+              onClick={() => onObjectTypeSelect(null)}
+              title="Clear selection"
+            >
+              <dc.Icon icon="lucide-package-x" size={14} />
+            </button>
+          )}
           <button
-            className="dmt-deselect-btn"
-            onClick={() => onObjectTypeSelect(null)}
-            title="Deselect object"
+            className={`dmt-freeform-toggle ${isFreeformMode ? 'dmt-toolbar-button-active' : ''}`}
+            onClick={onFreeformToggle}
+            title={isFreeformMode ? 'Disable freeform placement' : 'Enable freeform placement'}
           >
-            Clear Selection
+            <dc.Icon icon="lucide-diamond" size={14} />
           </button>
         </div>
-      )}
+      </div>
     </div>
   );
 };

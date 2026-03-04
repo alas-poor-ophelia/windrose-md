@@ -103,10 +103,11 @@ const { useMapSelection } = await requireModuleByName("MapSelectionContext.tsx")
   useMapSelection: () => MapSelectionValue;
 };
 
-const { calculateEdgeAlignment, getAlignmentOffset, placeObject, canPlaceObjectAt, removeObjectFromHex, generateObjectId } = await requireModuleByName("objectOperations.ts") as {
+const { calculateEdgeAlignment, getAlignmentOffset, placeObject, placeObjectFreeform, canPlaceObjectAt, removeObjectFromHex, generateObjectId } = await requireModuleByName("objectOperations.ts") as {
   calculateEdgeAlignment: (fractionalX: number, fractionalY: number, gridX: number, gridY: number) => string;
   getAlignmentOffset: (alignment: string, cellSize: number) => { x: number; y: number };
   placeObject: (objects: MapObject[], type: string, x: number, y: number, options: { mapType: string; alignment?: string }) => { success: boolean; objects: MapObject[] };
+  placeObjectFreeform: (objects: MapObject[], type: string, worldX: number, worldY: number, nearestGridPos: { x: number; y: number }, mapType: string) => { success: boolean; objects: MapObject[]; object?: MapObject };
   canPlaceObjectAt: (objects: MapObject[], x: number, y: number, mapType: string) => boolean;
   removeObjectFromHex: (objects: MapObject[], id: string) => MapObject[];
   generateObjectId: () => string;
@@ -132,7 +133,8 @@ const useObjectInteractions = (
   currentTool: ToolId,
   selectedObjectType: string | null,
   onAddCustomColor: ((color: string) => void) | undefined,
-  customColors: string[]
+  customColors: string[],
+  freeformPlacementModeRef?: { current: boolean }
 ): UseObjectInteractionsResult => {
   const {
     geometry,
@@ -177,6 +179,7 @@ const useObjectInteractions = (
   const [edgeSnapMode, setEdgeSnapMode] = dc.useState<boolean>(false);
   const longPressTimerRef = dc.useRef<ReturnType<typeof setTimeout> | null>(null);
   const altKeyPressedRef = dc.useRef<boolean>(false);
+  const shiftKeyPressedRef = dc.useRef<boolean>(false);
 
   const objectColorBtnRef = dc.useRef<HTMLButtonElement | null>(null);
   const pendingObjectCustomColorRef = dc.useRef<string | null>(null);
@@ -189,12 +192,18 @@ const useObjectInteractions = (
           setEdgeSnapMode(true);
         }
       }
+      if (e.key === 'Shift') {
+        shiftKeyPressedRef.current = true;
+      }
     };
 
     const handleKeyUp = (e: KeyboardEvent): void => {
       if (e.key === 'Alt') {
         altKeyPressedRef.current = false;
         setEdgeSnapMode(false);
+      }
+      if (e.key === 'Shift') {
+        shiftKeyPressedRef.current = false;
       }
     };
 
@@ -329,6 +338,27 @@ const useObjectInteractions = (
 
     const mapType = mapData!.mapType || 'grid';
 
+    // Freeform placement: Alt+Shift or sidebar toggle places at exact world coordinates
+    const useFreeformPlacement = (altKeyPressedRef.current && shiftKeyPressedRef.current)
+                                || (freeformPlacementModeRef?.current ?? false);
+    if (useFreeformPlacement && clientX !== undefined && clientY !== undefined) {
+      const worldCoords = screenToWorld(clientX, clientY);
+      if (!worldCoords) return true;
+
+      const result = placeObjectFreeform(
+        getActiveLayer(mapData!).objects || [],
+        selectedObjectType,
+        worldCoords.worldX,
+        worldCoords.worldY,
+        { x: gridX, y: gridY },
+        mapType
+      );
+      if (result.success) {
+        onObjectsChange(result.objects);
+      }
+      return true;
+    }
+
     if (!canPlaceObjectAt(getActiveLayer(mapData!).objects || [], gridX, gridY, mapType)) {
       return true;
     }
@@ -444,7 +474,8 @@ const useObjectInteractions = (
         setIsDraggingSelection(true);
         const offsetX = gridX - object.position.x;
         const offsetY = gridY - object.position.y;
-        setDragStart({ x: clientX, y: clientY, gridX, gridY, offsetX, offsetY });
+        const worldCoords = object.freeform ? screenToWorld(clientX, clientY) : null;
+        setDragStart({ x: clientX, y: clientY, gridX, gridY, offsetX, offsetY, worldX: worldCoords?.worldX, worldY: worldCoords?.worldY });
         setIsResizeMode(false);
       } else {
         setSelectedItem({ type: 'object', id: object.id, data: object });
@@ -454,6 +485,7 @@ const useObjectInteractions = (
         setIsDraggingSelection(true);
         const offsetX = gridX - object.position.x;
         const offsetY = gridY - object.position.y;
+        const worldCoords = object.freeform ? screenToWorld(clientX, clientY) : null;
         setDragStart({
           x: clientX,
           y: clientY,
@@ -461,7 +493,9 @@ const useObjectInteractions = (
           gridY,
           offsetX,
           offsetY,
-          objectId: object.id
+          objectId: object.id,
+          worldX: worldCoords?.worldX,
+          worldY: worldCoords?.worldY
         });
 
         if (longPressTimerRef.current) {
@@ -512,6 +546,126 @@ const useObjectInteractions = (
     e.preventDefault();
     e.stopPropagation();
 
+    const currentObject = getActiveLayer(mapData).objects?.find((o: MapObject) => o.id === objectId);
+
+    // Alt+Shift drag inversion: temporarily flip snap behavior
+    const isInverted = altKeyPressedRef.current && shiftKeyPressedRef.current;
+    if (isInverted && currentObject) {
+      // Track inversion state for cleanup on drag end
+      if (!dragStart.wasInverted) {
+        setDragStart({ ...dragStart, wasInverted: true, originalFreeform: !!currentObject.freeform });
+      }
+
+      if (!currentObject.freeform) {
+        // Grid → freeform inversion: drag in continuous world-space
+        const worldCoords = screenToWorld(clientX, clientY);
+        if (!worldCoords) return true;
+
+        // First frame of inversion: compute initial worldPosition from grid cell center
+        let baseWorldX: number, baseWorldY: number;
+        if (currentObject.worldPosition) {
+          baseWorldX = currentObject.worldPosition.x;
+          baseWorldY = currentObject.worldPosition.y;
+        } else {
+          const cellCenter = geometry?.getCellCenter
+            ? (geometry as any).getCellCenter(currentObject.position.x, currentObject.position.y)
+            : geometry?.gridToWorld?.(currentObject.position.x, currentObject.position.y);
+          if (!cellCenter) return true;
+          baseWorldX = cellCenter.worldX;
+          baseWorldY = cellCenter.worldY;
+        }
+
+        if (dragStart.worldX != null && dragStart.worldY != null) {
+          const deltaWorldX = worldCoords.worldX - dragStart.worldX;
+          const deltaWorldY = worldCoords.worldY - dragStart.worldY;
+          baseWorldX = baseWorldX + deltaWorldX;
+          baseWorldY = baseWorldY + deltaWorldY;
+        }
+
+        const nearestGrid = screenToGrid(clientX, clientY);
+        const updatedObjects = updateObject(
+          getActiveLayer(mapData).objects,
+          objectId!,
+          {
+            freeform: true,
+            worldPosition: { x: baseWorldX, y: baseWorldY },
+            ...(nearestGrid ? { position: { x: nearestGrid.x, y: nearestGrid.y } } : {})
+          }
+        );
+        onObjectsChange(updatedObjects, true);
+        setDragStart({ ...dragStart, x: clientX, y: clientY, worldX: worldCoords.worldX, worldY: worldCoords.worldY, wasInverted: true, originalFreeform: false });
+        return true;
+      } else {
+        // Freeform → grid inversion: snap to grid cells
+        const coords = screenToGrid(clientX, clientY);
+        if (!coords) return true;
+
+        const offsetX = dragStart.offsetX || 0;
+        const offsetY = dragStart.offsetY || 0;
+        const targetX = coords.x - offsetX;
+        const targetY = coords.y - offsetY;
+
+        // Snap worldPosition to cell center
+        const cellCenter = geometry?.getCellCenter
+          ? (geometry as any).getCellCenter(targetX, targetY)
+          : geometry?.gridToWorld?.(targetX, targetY);
+
+        const updatedObjects = updateObject(
+          getActiveLayer(mapData).objects,
+          objectId!,
+          {
+            position: { x: targetX, y: targetY },
+            ...(cellCenter ? { worldPosition: { x: cellCenter.worldX, y: cellCenter.worldY } } : {})
+          }
+        );
+        onObjectsChange(updatedObjects, true);
+        setDragStart({ ...dragStart, x: clientX, y: clientY, gridX: coords.x, gridY: coords.y, wasInverted: true, originalFreeform: true });
+        return true;
+      }
+    }
+
+    // If inversion was active but Alt+Shift released mid-drag, lock current position and continue in native mode
+    if (dragStart.wasInverted && !isInverted) {
+      const worldCoords = screenToWorld(clientX, clientY);
+      setDragStart({
+        ...dragStart,
+        x: clientX,
+        y: clientY,
+        wasInverted: false,
+        worldX: worldCoords?.worldX,
+        worldY: worldCoords?.worldY
+      });
+      return true;
+    }
+
+    // Freeform drag: continuous world-space movement (like text labels)
+    if (currentObject?.freeform && currentObject.worldPosition && dragStart.worldX != null && dragStart.worldY != null) {
+      const worldCoords = screenToWorld(clientX, clientY);
+      if (!worldCoords) return true;
+
+      const deltaWorldX = worldCoords.worldX - dragStart.worldX;
+      const deltaWorldY = worldCoords.worldY - dragStart.worldY;
+
+      const newWorldX = currentObject.worldPosition.x + deltaWorldX;
+      const newWorldY = currentObject.worldPosition.y + deltaWorldY;
+
+      // Update nearest grid cell for fog checks
+      const nearestGrid = screenToGrid(clientX, clientY);
+
+      const updatedObjects = updateObject(
+        getActiveLayer(mapData).objects,
+        objectId!,
+        {
+          worldPosition: { x: newWorldX, y: newWorldY },
+          ...(nearestGrid ? { position: { x: nearestGrid.x, y: nearestGrid.y } } : {})
+        }
+      );
+      onObjectsChange(updatedObjects, true);
+
+      setDragStart({ ...dragStart, x: clientX, y: clientY, worldX: worldCoords.worldX, worldY: worldCoords.worldY });
+      return true;
+    }
+
     const coords = screenToGrid(clientX, clientY);
     if (!coords) return true;
 
@@ -523,7 +677,6 @@ const useObjectInteractions = (
     const targetY = y - offsetY;
 
     if (x !== dragStart.gridX || y !== dragStart.gridY) {
-      const currentObject = getActiveLayer(mapData).objects?.find((o: MapObject) => o.id === objectId);
       if (!currentObject) return true;
 
       const isMovingWithinSameCell = currentObject.position.x === targetX && currentObject.position.y === targetY;
@@ -758,6 +911,37 @@ const useObjectInteractions = (
         longPressTimerRef.current = null;
       }
 
+      // Clean up drag inversion: restore original freeform state
+      if (dragStart?.wasInverted && mapData) {
+        const objectId = selectedItem?.id || dragStart.objectId;
+        const currentObject = getActiveLayer(mapData).objects?.find((o: MapObject) => o.id === objectId);
+        if (currentObject && objectId) {
+          if (dragStart.originalFreeform === false) {
+            // Was grid, inverted to freeform → restore as grid object
+            const { freeform: _f, worldPosition: _wp, ...rest } = currentObject;
+            const updatedObjects = updateObject(
+              getActiveLayer(mapData).objects,
+              objectId,
+              { freeform: undefined as any, worldPosition: undefined as any }
+            );
+            onObjectsChange(updatedObjects, true);
+          } else if (dragStart.originalFreeform === true) {
+            // Was freeform, inverted to grid → keep freeform, snap worldPosition to final cell center
+            const cellCenter = geometry?.getCellCenter
+              ? (geometry as any).getCellCenter(currentObject.position.x, currentObject.position.y)
+              : geometry?.gridToWorld?.(currentObject.position.x, currentObject.position.y);
+            if (cellCenter) {
+              const updatedObjects = updateObject(
+                getActiveLayer(mapData).objects,
+                objectId,
+                { worldPosition: { x: cellCenter.worldX, y: cellCenter.worldY } }
+              );
+              onObjectsChange(updatedObjects, true);
+            }
+          }
+        }
+      }
+
       setIsDraggingSelection(false);
       setDragStart(null);
 
@@ -768,7 +952,7 @@ const useObjectInteractions = (
       return true;
     }
     return false;
-  }, [isDraggingSelection, selectedItem, dragStart, setIsDraggingSelection, setDragStart, onObjectsChange, mapData]);
+  }, [isDraggingSelection, selectedItem, dragStart, setIsDraggingSelection, setDragStart, onObjectsChange, mapData, geometry, updateObject]);
 
   const stopObjectResizing = dc.useCallback((): boolean => {
     if (isResizing) {

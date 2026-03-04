@@ -124,6 +124,27 @@ const useGroupDrag = (): UseGroupDragResult => {
     isGroupDragging
   } = useMapSelection();
 
+  // Track Alt+Shift for drag inversion in group drags
+  const altKeyRef = dc.useRef(false);
+  const shiftKeyRef = dc.useRef(false);
+
+  dc.useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent): void => {
+      if (e.key === 'Alt') altKeyRef.current = true;
+      if (e.key === 'Shift') shiftKeyRef.current = true;
+    };
+    const onKeyUp = (e: KeyboardEvent): void => {
+      if (e.key === 'Alt') altKeyRef.current = false;
+      if (e.key === 'Shift') shiftKeyRef.current = false;
+    };
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+    };
+  }, []);
+
   const getClickedSelectedItem = dc.useCallback((
     x: number,
     y: number,
@@ -190,13 +211,24 @@ const useGroupDrag = (): UseGroupDragResult => {
       if (item.type === 'object') {
         const obj = activeLayer.objects?.find((o: MapObject) => o.id === item.id);
         if (obj) {
-          offsets.set(item.id, {
-            type: 'object',
-            gridOffsetX: gridX - obj.position.x,
-            gridOffsetY: gridY - obj.position.y,
-            worldOffsetX: 0,
-            worldOffsetY: 0
-          });
+          if (obj.freeform && obj.worldPosition) {
+            offsets.set(item.id, {
+              type: 'object',
+              gridOffsetX: 0,
+              gridOffsetY: 0,
+              worldOffsetX: worldCoords.worldX - obj.worldPosition.x,
+              worldOffsetY: worldCoords.worldY - obj.worldPosition.y,
+              freeform: true
+            });
+          } else {
+            offsets.set(item.id, {
+              type: 'object',
+              gridOffsetX: gridX - obj.position.x,
+              gridOffsetY: gridY - obj.position.y,
+              worldOffsetX: 0,
+              worldOffsetY: 0
+            });
+          }
         }
       } else if (item.type === 'text') {
         const label = activeLayer.textLabels?.find((l: TextLabel) => l.id === item.id);
@@ -259,6 +291,8 @@ const useGroupDrag = (): UseGroupDragResult => {
     const objectUpdates: ObjectDragUpdate[] = [];
     const textUpdates: TextDragUpdate[] = [];
 
+    const isInverted = altKeyRef.current && shiftKeyRef.current;
+
     for (const item of selectedItems) {
       const offset = offsets.get(item.id);
       if (!offset) continue;
@@ -266,13 +300,54 @@ const useGroupDrag = (): UseGroupDragResult => {
       if (item.type === 'object') {
         const obj = activeLayer.objects?.find((o: MapObject) => o.id === item.id);
         if (obj) {
-          const newX = gridX - offset.gridOffsetX;
-          const newY = gridY - offset.gridOffsetY;
-          objectUpdates.push({
-            id: item.id,
-            oldObj: obj,
-            newPosition: { x: newX, y: newY }
-          });
+          if (isInverted) {
+            // Drag inversion: flip each object's snap behavior
+            if (!offset.freeform) {
+              // Grid → freeform inversion: use world-space delta
+              const cellCenter = (geometry as any)?.getCellCenter?.(obj.position.x, obj.position.y)
+                || (geometry as any)?.gridToWorld?.(obj.position.x, obj.position.y);
+              const baseX = obj.worldPosition?.x ?? cellCenter?.worldX ?? 0;
+              const baseY = obj.worldPosition?.y ?? cellCenter?.worldY ?? 0;
+              const newWorldX = baseX + worldDeltaX;
+              const newWorldY = baseY + worldDeltaY;
+              const nearestGrid = screenToGrid(clientX, clientY);
+              objectUpdates.push({
+                id: item.id,
+                oldObj: obj,
+                newPosition: nearestGrid || obj.position,
+                freeformPosition: { x: newWorldX, y: newWorldY }
+              });
+            } else {
+              // Freeform → grid inversion: snap to grid
+              const newX = gridX - offset.gridOffsetX;
+              const newY = gridY - offset.gridOffsetY;
+              const cellCenter = (geometry as any)?.getCellCenter?.(newX, newY)
+                || (geometry as any)?.gridToWorld?.(newX, newY);
+              objectUpdates.push({
+                id: item.id,
+                oldObj: obj,
+                newPosition: { x: newX, y: newY },
+                freeformPosition: cellCenter ? { x: cellCenter.worldX, y: cellCenter.worldY } : undefined
+              });
+            }
+          } else if (offset.freeform) {
+            const newWorldX = worldX - offset.worldOffsetX;
+            const newWorldY = worldY - offset.worldOffsetY;
+            objectUpdates.push({
+              id: item.id,
+              oldObj: obj,
+              newPosition: obj.position,
+              freeformPosition: { x: newWorldX, y: newWorldY }
+            });
+          } else {
+            const newX = gridX - offset.gridOffsetX;
+            const newY = gridY - offset.gridOffsetY;
+            objectUpdates.push({
+              id: item.id,
+              oldObj: obj,
+              newPosition: { x: newX, y: newY }
+            });
+          }
         }
       } else if (item.type === 'text') {
         const label = activeLayer.textLabels?.find((l: TextLabel) => l.id === item.id);
@@ -288,8 +363,11 @@ const useGroupDrag = (): UseGroupDragResult => {
       }
     }
 
+    // Bounds and overlap checks only apply to grid-anchored objects
+    const gridUpdates = objectUpdates.filter(u => !u.freeformPosition);
+
     if (geometry && geometry.isWithinBounds) {
-      for (const update of objectUpdates) {
+      for (const update of gridUpdates) {
         if (!geometry.isWithinBounds(update.newPosition.x, update.newPosition.y)) {
           return true;
         }
@@ -304,7 +382,7 @@ const useGroupDrag = (): UseGroupDragResult => {
       (obj: MapObject) => !selectedObjectIds.has(obj.id)
     );
 
-    for (const update of objectUpdates) {
+    for (const update of gridUpdates) {
       const movingSize = update.oldObj.size || { width: 1, height: 1 };
       const movingMinX = update.newPosition.x;
       const movingMinY = update.newPosition.y;
@@ -333,10 +411,19 @@ const useGroupDrag = (): UseGroupDragResult => {
       for (const update of objectUpdates) {
         const idx = updatedObjects.findIndex((o: MapObject) => o.id === update.id);
         if (idx !== -1) {
-          updatedObjects[idx] = {
-            ...updatedObjects[idx],
-            position: update.newPosition
-          };
+          if (update.freeformPosition) {
+            updatedObjects[idx] = {
+              ...updatedObjects[idx],
+              position: update.newPosition,
+              worldPosition: update.freeformPosition,
+              ...(isInverted && !offsets.get(update.id)?.freeform ? { freeform: true } : {})
+            };
+          } else {
+            updatedObjects[idx] = {
+              ...updatedObjects[idx],
+              position: update.newPosition
+            };
+          }
         }
       }
 
@@ -382,6 +469,44 @@ const useGroupDrag = (): UseGroupDragResult => {
       return false;
     }
 
+    // Restore original freeform state for any objects that were inverted during drag
+    if (mapData) {
+      const activeLayer = getActiveLayer(mapData);
+      const offsets = groupDragOffsetsRef.current;
+      let needsRestore = false;
+      const updatedObjects = [...(activeLayer.objects || [])];
+
+      for (const [id, offset] of offsets) {
+        if (offset.type !== 'object') continue;
+        const idx = updatedObjects.findIndex((o: MapObject) => o.id === id);
+        if (idx === -1) continue;
+        const obj = updatedObjects[idx];
+
+        // Grid object that was temporarily made freeform → restore to grid
+        if (!offset.freeform && obj.freeform) {
+          const { freeform: _f, worldPosition: _wp, ...rest } = obj;
+          updatedObjects[idx] = rest as MapObject;
+          needsRestore = true;
+        }
+        // Freeform object that was snapped to grid → keep freeform, snap worldPosition to cell center
+        if (offset.freeform && obj.worldPosition) {
+          const cellCenter = (geometry as any)?.getCellCenter?.(obj.position.x, obj.position.y)
+            || (geometry as any)?.gridToWorld?.(obj.position.x, obj.position.y);
+          if (cellCenter) {
+            updatedObjects[idx] = {
+              ...obj,
+              worldPosition: { x: cellCenter.worldX, y: cellCenter.worldY }
+            };
+            needsRestore = true;
+          }
+        }
+      }
+
+      if (needsRestore) {
+        onObjectsChange(updatedObjects, true);
+      }
+    }
+
     setIsDraggingSelection(false);
     setDragStart(null);
 
@@ -402,7 +527,7 @@ const useGroupDrag = (): UseGroupDragResult => {
     groupDragOffsetsRef.current = new Map();
 
     return true;
-  }, [isDraggingSelection, dragStart, mapData, setIsDraggingSelection, setDragStart, onObjectsChange, onTextLabelsChange]);
+  }, [isDraggingSelection, dragStart, mapData, geometry, setIsDraggingSelection, setDragStart, onObjectsChange, onTextLabelsChange]);
 
   return {
     isGroupDragging,
