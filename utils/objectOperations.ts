@@ -493,6 +493,77 @@ function canPlaceObjectAt(
 }
 
 // ===========================================
+// Freeform Placement API
+// ===========================================
+
+/**
+ * Place an object at exact world coordinates (freeform, not grid-snapped).
+ * No collision check — freeform objects can overlap anything.
+ */
+function placeObjectFreeform(
+  objects: MapObject[],
+  typeId: string,
+  worldX: number,
+  worldY: number,
+  nearestGridPos: { x: number; y: number },
+  mapType: MapType
+): PlacementResult {
+  const objectType = getObjectType(typeId, mapType);
+  if (objectType.isUnknown) {
+    return { objects, success: false, error: `Unknown object type: ${typeId}` };
+  }
+
+  const newObject: MapObject = {
+    id: generateObjectId(),
+    type: typeId,
+    position: nearestGridPos,
+    size: { width: 1, height: 1 },
+    label: objectType.label,
+    linkedNote: null,
+    freeform: true,
+    worldPosition: { x: worldX, y: worldY }
+  };
+
+  return { objects: [...objects, newObject], success: true, object: newObject };
+}
+
+/**
+ * Convert a grid-anchored object to freeform.
+ * Computes worldPosition from grid position + alignment offset using cell center coords.
+ */
+function convertObjectToFreeform(
+  obj: MapObject,
+  cellCenterWorldX: number,
+  cellCenterWorldY: number,
+  cellSize: number
+): ObjectUpdate {
+  const alignOffset = getAlignmentOffset(obj.alignment || 'center');
+  return {
+    freeform: true,
+    worldPosition: {
+      x: cellCenterWorldX + alignOffset.offsetX * cellSize,
+      y: cellCenterWorldY + alignOffset.offsetY * cellSize
+    },
+    alignment: 'center' as ObjectAlignment
+  };
+}
+
+/**
+ * Convert a freeform object to grid-anchored.
+ * Snaps to the nearest grid cell and clears freeform fields.
+ */
+function snapObjectToGrid(
+  nearestGridPos: { x: number; y: number }
+): ObjectUpdate {
+  return {
+    position: nearestGridPos,
+    freeform: undefined,
+    worldPosition: undefined,
+    alignment: 'center' as ObjectAlignment
+  };
+}
+
+// ===========================================
 // Exports
 // ===========================================
 
@@ -521,5 +592,10 @@ return {
   // Unified API (preferred for new code)
   placeObject,
   eraseObjectAt,
-  canPlaceObjectAt
+  canPlaceObjectAt,
+
+  // Freeform placement API
+  placeObjectFreeform,
+  convertObjectToFreeform,
+  snapObjectToGrid
 };

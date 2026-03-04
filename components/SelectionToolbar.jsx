@@ -310,7 +310,8 @@ const SelectionToolbar = ({
   onDelete,
   onScaleChange,  // handler for scale slider
   onDuplicate,    // handler for duplicating object
-  
+  onFreeformToggle, // handler for toggling freeform/grid-anchored placement
+
   // Multi-select handlers
   onRotateAll,
   onDuplicateAll,
@@ -395,10 +396,12 @@ const SelectionToolbar = ({
   const hasLinkedObject = !!(isObject && selectedItem.data?.linkedObject);
   const isNotePin = selectedItem.data?.type === 'note_pin';
 
+  const isFreeform = !!(isObject && selectedItem.data?.freeform);
   const objectButtons = isObject ? [
     { id: 'rotate', icon: 'lucide-rotate-cw', title: 'Rotate 45° (or press R)', onClick: onRotate },
     { id: 'label', icon: 'lucide-sticky-note', title: 'Add/Edit Label', onClick: onLabel, visible: !isNotePin },
     { id: 'duplicate', icon: 'lucide-copy', title: 'Duplicate Object', onClick: onDuplicate },
+    { id: 'freeform', icon: 'lucide-diamond', title: isFreeform ? 'Snap to grid' : 'Convert to freeform', onClick: onFreeformToggle, active: isFreeform },
     { id: 'linkNote', icon: 'lucide-scroll-text', title: selectedItem.data?.linkedNote ? 'Edit linked note' : 'Link note', onClick: onLinkNote },
     { id: 'linkObject', icon: 'lucide-link-2', title: hasLinkedObject ? 'Edit object link' : 'Link to object', onClick: onLinkObject, active: hasLinkedObject },
     { id: 'followLink', icon: 'lucide-arrow-right-circle', title: 'Go to linked object', onClick: onFollowLink, visible: hasLinkedObject },

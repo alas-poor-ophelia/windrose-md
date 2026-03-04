@@ -15,6 +15,7 @@ type Polygon = Ring[];
 type MultiPolygon = Polygon[];
 
 type DifferenceFn = (subject: Polygon | MultiPolygon, ...clips: (Polygon | MultiPolygon)[]) => MultiPolygon;
+type UnionFn = (subject: Polygon | MultiPolygon, ...others: (Polygon | MultiPolygon)[]) => MultiPolygon;
 
 const pathResolverPath = dc.resolvePath("pathResolver.ts");
 const { requireModuleByName } = await dc.require(pathResolverPath) as {
@@ -23,8 +24,10 @@ const { requireModuleByName } = await dc.require(pathResolverPath) as {
 
 const pcModule = await requireModuleByName("polygon-clipping-wrapper.js") as {
   difference: DifferenceFn;
+  union: UnionFn;
 };
 
 const difference: DifferenceFn = pcModule.difference;
+const union: UnionFn = pcModule.union;
 
-return { difference };
+return { difference, union };

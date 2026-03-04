@@ -18,10 +18,14 @@ const { requireModuleByName } = await dc.require(pathResolverPath) as {
   requireModuleByName: (name: string) => Promise<unknown>
 };
 
-const { difference } = await requireModuleByName("polygonClipping.ts") as {
+const { difference, union } = await requireModuleByName("polygonClipping.ts") as {
   difference: (
     subject: [number, number][][] | [number, number][][][],
     ...clips: ([number, number][][] | [number, number][][][])[]
+  ) => [number, number][][][],
+  union: (
+    subject: [number, number][][] | [number, number][][][],
+    ...others: ([number, number][][] | [number, number][][][])[]
   ) => [number, number][][][]
 };
 
@@ -944,6 +948,29 @@ function eraseWorldPolygonFromCurves(
   return changed ? newCurves : null;
 }
 
+/**
+ * Compute the polygon union of multiple closed curves.
+ * Returns a MultiPolygon result, or null on failure.
+ */
+function unionCurves(curves: Curve[]): MultiPolygon | null {
+  if (!curves || curves.length < 2) return null;
+
+  const polygons: Polygon[] = [];
+  for (let i = 0; i < curves.length; i++) {
+    const curve = curves[i];
+    if (!curve.closed) return null;
+    const poly = curveToPolygon(curve);
+    if (poly[0].length < 4) return null;
+    polygons.push(poly);
+  }
+
+  try {
+    return union(polygons[0], ...polygons.slice(1));
+  } catch {
+    return null;
+  }
+}
+
 return {
   flattenCurve,
   isLinearBezier,
@@ -957,6 +984,7 @@ return {
   eraseCellFromCurves,
   eraseRectangleFromCurves,
   eraseWorldPolygonFromCurves,
+  unionCurves,
   signedArea,
   ensureCCW,
   ensureCW,
