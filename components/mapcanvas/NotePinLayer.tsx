@@ -19,7 +19,7 @@ const { requireModuleByName } = await dc.require(pathResolverPath);
 const { useNotePinInteraction } = await requireModuleByName("useNotePinInteraction.ts");
 const { useMapState, useMapOperations } = await requireModuleByName("MapContext.tsx");
 const { useMapSelection } = await requireModuleByName("MapSelectionContext.tsx");
-const { NoteLinkModal } = await requireModuleByName("NoteLinkModal.jsx");
+const { NoteLinkModal, openNativeNoteLinkModal } = await requireModuleByName("NoteLinkModal.jsx");
 const { useEventHandlerRegistration } = await requireModuleByName("EventHandlerContext.tsx");
 
 /** Props for NotePinLayer component */
@@ -49,6 +49,7 @@ const NotePinLayer = ({
   } = useNotePinInteraction(currentTool, selectedObjectType);
 
   const { registerHandlers, unregisterHandlers } = useEventHandlerRegistration();
+  const nativeOpenedRef = dc.useRef(false);
 
   dc.useEffect(() => {
     registerHandlers('notePin', {
@@ -58,13 +59,33 @@ const NotePinLayer = ({
     return () => unregisterHandlers('notePin');
   }, [registerHandlers, unregisterHandlers, handleNotePinPlacement]);
 
+  // Try native modal when showNoteLinkModal becomes true
+  dc.useEffect(() => {
+    if (!showNoteLinkModal || !pendingNotePinId || !mapData) {
+      nativeOpenedRef.current = false;
+      return;
+    }
+
+    const currentNotePath = mapData.objects?.find(
+      (obj: { id: string }) => obj.id === pendingNotePinId
+    )?.linkedNote || null;
+
+    const opened = openNativeNoteLinkModal({
+      onSave: handleNoteLinkSave,
+      onClose: handleNoteLinkCancel,
+      currentNotePath,
+      objectType: 'note_pin'
+    });
+    nativeOpenedRef.current = opened;
+  }, [showNoteLinkModal, pendingNotePinId]);
+
   if (showCoordinates) {
     return null;
   }
 
   return (
     <>
-      {showNoteLinkModal && pendingNotePinId && mapData && (
+      {showNoteLinkModal && pendingNotePinId && mapData && !nativeOpenedRef.current && (
         <NoteLinkModal
           isOpen={showNoteLinkModal}
           onClose={handleNoteLinkCancel}

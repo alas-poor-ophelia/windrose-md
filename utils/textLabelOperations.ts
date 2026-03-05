@@ -24,6 +24,7 @@ export interface TextLabelOptions {
   fontSize?: number;
   fontFace?: FontFace;
   color?: HexColor;
+  opacity?: number;
 }
 
 /** Text label data structure */
@@ -35,6 +36,7 @@ export interface TextLabel {
   fontSize: number;
   fontFace: FontFace;
   color: HexColor;
+  opacity?: number;
 }
 
 /** Partial text label for updates */
@@ -91,7 +93,8 @@ function addTextLabel(
     rotation: 0,
     fontSize: options.fontSize || 16,
     fontFace: options.fontFace || 'sans',
-    color: options.color || '#ffffff'
+    color: options.color || '#ffffff',
+    ...(options.opacity !== undefined && options.opacity !== 1 ? { opacity: options.opacity } : {})
   };
   
   return [...(labels || []), newLabel];

@@ -13,6 +13,7 @@ const { requireModuleByName } = await dc.require(pathResolverPath);
 
 const { useMapSettings } = await requireModuleByName("MapSettingsContext.tsx");
 const { CollapsibleSection } = await requireModuleByName("CollapsibleSection.tsx");
+const { SettingItem } = await requireModuleByName("SettingItem.tsx");
 
 /** Map settings context shape for this component */
 interface BackgroundImageContext {
@@ -57,7 +58,6 @@ function BackgroundImageSection(): React.ReactElement {
     setIsOpen(newIsOpen);
   };
 
-  // Generate subtitle showing selected image or status
   const subtitle = backgroundImagePath
     ? backgroundImageDisplayName || 'Image selected'
     : 'No image';
@@ -69,96 +69,91 @@ function BackgroundImageSection(): React.ReactElement {
       onToggle={handleToggle}
       subtitle={subtitle}
     >
-      <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '10px' }}>
-        Add an image to automatically size the hex grid
-      </p>
-
-      {/* Image picker */}
-      <div style={{ position: 'relative', marginBottom: '12px' }}>
-        <input
-          type="text"
-          placeholder="Search for image..."
-          value={backgroundImageDisplayName}
-          onChange={(e: Event) => {
-            const value = (e.target as HTMLInputElement).value;
-            setBackgroundImageDisplayName(value);
-            handleImageSearch(value);
-          }}
-          style={{
-            width: '100%',
-            padding: '8px 32px 8px 10px',
-            borderRadius: '4px',
-            border: '1px solid var(--background-modifier-border)',
-            background: 'var(--background-primary)',
-            color: 'var(--text-normal)',
-            fontSize: '14px'
-          }}
-        />
-
-        {backgroundImagePath && (
-          <button
-            onClick={handleImageClear}
-            style={{
-              position: 'absolute',
-              right: '6px',
-              top: '50%',
-              transform: 'translateY(-50%)',
-              background: 'transparent',
-              border: 'none',
-              color: 'var(--text-muted)',
-              cursor: 'pointer',
-              padding: '4px',
-              fontSize: '16px',
-              lineHeight: '1'
+      <SettingItem name="Image" description="Add an image to automatically size the hex grid" vertical>
+        <div style={{ position: 'relative' }}>
+          <input
+            type="text"
+            placeholder="Search for image..."
+            value={backgroundImageDisplayName}
+            onChange={(e: Event) => {
+              const value = (e.target as HTMLInputElement).value;
+              setBackgroundImageDisplayName(value);
+              handleImageSearch(value);
             }}
-            title="Clear image"
-          >
-            ×
-          </button>
-        )}
+            style={{
+              width: '100%',
+              padding: '8px 32px 8px 10px',
+              borderRadius: '4px',
+              border: '1px solid var(--background-modifier-border)',
+              background: 'var(--background-primary)',
+              color: 'var(--text-normal)',
+              fontSize: '14px'
+            }}
+          />
 
-        {/* Autocomplete dropdown */}
-        {imageSearchResults.length > 0 && (
-          <div style={{
-            position: 'absolute',
-            top: '100%',
-            left: 0,
-            right: 0,
-            maxHeight: '200px',
-            overflowY: 'auto',
-            background: 'var(--background-primary)',
-            border: '1px solid var(--background-modifier-border)',
-            borderRadius: '4px',
-            marginTop: '2px',
-            zIndex: 1000,
-            boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
-          }}>
-            {imageSearchResults.map((name: string, idx: number) => (
-              <div
-                key={idx}
-                onClick={() => handleImageSelect(name)}
-                style={{
-                  padding: '8px 10px',
-                  cursor: 'pointer',
-                  fontSize: '13px',
-                  borderBottom: idx < imageSearchResults.length - 1 ? '1px solid var(--background-modifier-border)' : 'none'
-                }}
-                onMouseEnter={(e: Event) => (e.currentTarget as HTMLElement).style.background = 'var(--background-modifier-hover)'}
-                onMouseLeave={(e: Event) => (e.currentTarget as HTMLElement).style.background = 'transparent'}
-              >
-                {name}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+          {backgroundImagePath && (
+            <button
+              onClick={handleImageClear}
+              style={{
+                position: 'absolute',
+                right: '6px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                background: 'transparent',
+                border: 'none',
+                color: 'var(--text-muted)',
+                cursor: 'pointer',
+                padding: '4px',
+                fontSize: '16px',
+                lineHeight: '1'
+              }}
+              title="Clear image"
+            >
+              ×
+            </button>
+          )}
+
+          {/* Autocomplete dropdown */}
+          {imageSearchResults.length > 0 && (
+            <div style={{
+              position: 'absolute',
+              top: '100%',
+              left: 0,
+              right: 0,
+              maxHeight: '200px',
+              overflowY: 'auto',
+              background: 'var(--background-primary)',
+              border: '1px solid var(--background-modifier-border)',
+              borderRadius: '4px',
+              marginTop: '2px',
+              zIndex: 1000,
+              boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+            }}>
+              {imageSearchResults.map((name: string, idx: number) => (
+                <div
+                  key={idx}
+                  onClick={() => handleImageSelect(name)}
+                  style={{
+                    padding: '8px 10px',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    borderBottom: idx < imageSearchResults.length - 1 ? '1px solid var(--background-modifier-border)' : 'none'
+                  }}
+                  onMouseEnter={(e: Event) => (e.currentTarget as HTMLElement).style.background = 'var(--background-modifier-hover)'}
+                  onMouseLeave={(e: Event) => (e.currentTarget as HTMLElement).style.background = 'transparent'}
+                >
+                  {name}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </SettingItem>
 
       {/* Show dimensions when image is selected */}
       {imageDimensions && (
-        <div>
-          <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-            Detected: {imageDimensions.width} × {imageDimensions.height} px
-          </p>
+        <div class="setting-item-description">
+          Detected: {imageDimensions.width} × {imageDimensions.height} px
         </div>
       )}
     </CollapsibleSection>

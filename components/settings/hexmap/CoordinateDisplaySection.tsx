@@ -13,6 +13,7 @@ const { requireModuleByName } = await dc.require(pathResolverPath);
 const { useMapSettings } = await requireModuleByName("MapSettingsContext.tsx");
 const { CollapsibleSection } = await requireModuleByName("CollapsibleSection.tsx");
 const { ColorPickerItem } = await requireModuleByName("AppearanceTab.tsx");
+const { SettingItem } = await requireModuleByName("SettingItem.tsx");
 
 /** Coordinate display mode type */
 type CoordinateDisplayMode = 'rectangular' | 'radial';
@@ -38,7 +39,7 @@ interface CoordinateColorsContext {
 }
 
 /**
- * Coordinate display mode selector (content only, no wrapper)
+ * Coordinate display mode selector
  */
 function CoordinateModeContent(): React.ReactElement {
   const {
@@ -47,14 +48,9 @@ function CoordinateModeContent(): React.ReactElement {
   } = useMapSettings() as CoordinateModeContext;
 
   return (
-    <div style={{ marginBottom: '16px' }}>
-      <label class="dmt-form-label" style={{ marginBottom: '4px' }}>Display Mode</label>
-      <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '10px' }}>
-        How coordinates appear when pressing C
-      </p>
-
+    <SettingItem name="Display Mode" description="How coordinates appear when pressing C" vertical>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        <label class="dmt-radio-label" style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: 'pointer' }}>
+        <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: 'pointer' }}>
           <input
             type="radio"
             name="coordMode"
@@ -71,7 +67,7 @@ function CoordinateModeContent(): React.ReactElement {
           </div>
         </label>
 
-        <label class="dmt-radio-label" style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: 'pointer' }}>
+        <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: 'pointer' }}>
           <input
             type="radio"
             name="coordMode"
@@ -88,12 +84,12 @@ function CoordinateModeContent(): React.ReactElement {
           </div>
         </label>
       </div>
-    </div>
+    </SettingItem>
   );
 }
 
 /**
- * Coordinate text color pickers (content only, no wrapper)
+ * Coordinate text color pickers
  */
 function CoordinateColorsContent(): React.ReactElement {
   const {
@@ -102,14 +98,13 @@ function CoordinateColorsContent(): React.ReactElement {
   } = useMapSettings() as CoordinateColorsContext;
 
   return (
-    <div>
-      <label class="dmt-form-label" style={{ marginBottom: '4px' }}>Text Colors</label>
-      <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '10px' }}>
-        {useGlobalSettings
-          ? 'Using global settings (enable custom colors in Appearance tab to override)'
-          : 'Custom colors for coordinate overlay text'}
-      </p>
-
+    <SettingItem
+      name="Text Colors"
+      description={useGlobalSettings
+        ? 'Using global settings (enable custom colors in Appearance tab to override)'
+        : 'Custom colors for coordinate overlay text'}
+      vertical
+    >
       <div
         style={{
           opacity: useGlobalSettings ? 0.5 : 1,
@@ -130,7 +125,7 @@ function CoordinateColorsContent(): React.ReactElement {
           align="right"
         />
       </div>
-    </div>
+    </SettingItem>
   );
 }
 
@@ -140,7 +135,6 @@ function CoordinateColorsContent(): React.ReactElement {
 function CoordinateDisplaySection(): React.ReactElement {
   const { coordinateDisplayMode } = useMapSettings() as CoordinateModeContext;
 
-  // Generate subtitle based on current mode
   const subtitle = coordinateDisplayMode === 'rectangular' ? 'A1, B2, ...' : 'Ring-Position';
 
   return (

@@ -2,9 +2,9 @@
 const pathResolverPath = dc.resolvePath("pathResolver.ts");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
-const { TextLabelEditor } = await requireModuleByName("TextLabelEditor.jsx");
+const { TextLabelEditor, openNativeTextLabelEditor } = await requireModuleByName("TextLabelEditor.jsx");
 const { TextInputModal } = await requireModuleByName("TextInputModal.tsx");
-const { NoteLinkModal } = await requireModuleByName("NoteLinkModal.jsx");
+const { NoteLinkModal, openNativeNoteLinkModal } = await requireModuleByName("NoteLinkModal.jsx");
 const { ColorPicker } = await requireModuleByName("ColorPicker.tsx");
 const { openNoteInNewTab } = await requireModuleByName("noteOperations.ts");
 
@@ -234,6 +234,7 @@ const ModalOverlays = ({
             initialFontSize={currentLabel?.fontSize || 16}
             initialFontFace={currentLabel?.fontFace || 'sans'}
             initialColor={currentLabel?.color || '#ffffff'}
+            initialOpacity={currentLabel?.opacity ?? 1}
             isEditing={!!editingTextId}
             customColors={customColors || []}
             onAddCustomColor={onAddCustomColor}

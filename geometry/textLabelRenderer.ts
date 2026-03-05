@@ -32,6 +32,10 @@ function renderTextLabel(
 
   ctx.save();
 
+  if (label.opacity !== undefined && label.opacity !== 1) {
+    ctx.globalAlpha = label.opacity;
+  }
+
   ctx.translate(screenX, screenY);
   ctx.rotate(((label.rotation || 0) * Math.PI) / 180);
 

@@ -19,7 +19,7 @@ const { requireModuleByName } = await dc.require(pathResolverPath);
 const { useTextLabelInteraction } = await requireModuleByName("useTextLabelInteraction.ts");
 const { useMapState, useMapOperations } = await requireModuleByName("MapContext.tsx");
 const { useMapSelection } = await requireModuleByName("MapSelectionContext.tsx");
-const { TextLabelEditor } = await requireModuleByName("TextLabelEditor.jsx");
+const { TextLabelEditor, openNativeTextLabelEditor } = await requireModuleByName("TextLabelEditor.jsx");
 const { useEventHandlerRegistration } = await requireModuleByName("EventHandlerContext.tsx");
 const { SelectionToolbar } = await requireModuleByName("SelectionToolbar.jsx");
 const { getActiveLayer } = await requireModuleByName("layerAccessor.ts");
@@ -75,6 +75,41 @@ const TextLayer = ({
   } = useTextLabelInteraction(currentTool, onAddCustomColor, customColors);
 
   const { registerHandlers, unregisterHandlers } = useEventHandlerRegistration();
+  const nativeOpenedRef = dc.useRef(false);
+
+  // Try native TextLabelEditor when showTextModal becomes true
+  dc.useEffect(() => {
+    if (!showTextModal || !mapData) {
+      nativeOpenedRef.current = false;
+      return;
+    }
+
+    let currentLabel = null;
+    if (editingTextId) {
+      currentLabel = getActiveLayer(mapData).textLabels?.find((l: TextLabel) => l.id === editingTextId) || null;
+    }
+
+    const savedSettings = mapData?.lastTextLabelSettings as { fontSize?: number; fontFace?: string; color?: HexColor; opacity?: number } | undefined;
+    const defaultFontSize = currentLabel?.fontSize || savedSettings?.fontSize || 16;
+    const defaultFontFace = currentLabel?.fontFace || savedSettings?.fontFace || 'sans';
+    const defaultColor = currentLabel?.color || savedSettings?.color || '#ffffff';
+    const defaultOpacity = currentLabel?.opacity ?? savedSettings?.opacity ?? 1;
+
+    const opened = openNativeTextLabelEditor({
+      initialValue: currentLabel?.content || '',
+      initialFontSize: defaultFontSize,
+      initialFontFace: defaultFontFace,
+      initialColor: defaultColor,
+      initialOpacity: defaultOpacity,
+      isEditing: !!editingTextId,
+      customColors: customColors || [],
+      onAddCustomColor,
+      onDeleteCustomColor,
+      onSubmit: handleTextSubmit,
+      onCancel: handleTextCancel
+    });
+    nativeOpenedRef.current = opened;
+  }, [showTextModal, editingTextId]);
 
   const handleCopyLink = dc.useCallback(() => {
     if (!selectedItem || selectedItem.type !== 'text' || !mapData || !mapId || !notePath) return;
@@ -137,16 +172,17 @@ const TextLayer = ({
         />
       )}
 
-      {showTextModal && (() => {
+      {showTextModal && !nativeOpenedRef.current && (() => {
         let currentLabel: TextLabel | null = null;
         if (editingTextId && mapData?.textLabels) {
           currentLabel = getActiveLayer(mapData).textLabels.find((l: TextLabel) => l.id === editingTextId) || null;
         }
 
-        const savedSettings = mapData?.lastTextLabelSettings as { fontSize?: number; fontFace?: string; color?: HexColor } | undefined;
+        const savedSettings = mapData?.lastTextLabelSettings as { fontSize?: number; fontFace?: string; color?: HexColor; opacity?: number } | undefined;
         const defaultFontSize = currentLabel?.fontSize || savedSettings?.fontSize || 16;
         const defaultFontFace = currentLabel?.fontFace || savedSettings?.fontFace || 'sans';
         const defaultColor = currentLabel?.color || savedSettings?.color || '#ffffff';
+        const defaultOpacity = currentLabel?.opacity ?? savedSettings?.opacity ?? 1;
 
         return (
           <TextLabelEditor
@@ -154,6 +190,7 @@ const TextLayer = ({
             initialFontSize={defaultFontSize}
             initialFontFace={defaultFontFace}
             initialColor={defaultColor}
+            initialOpacity={defaultOpacity}
             isEditing={!!editingTextId}
             customColors={customColors || []}
             onAddCustomColor={onAddCustomColor}

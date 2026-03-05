@@ -25,7 +25,7 @@ const { useLinkingMode } = await requireModuleByName("ObjectLinkingContext.tsx")
 const { useEventHandlerRegistration } = await requireModuleByName("EventHandlerContext.tsx");
 const { useObjectInteractions } = await requireModuleByName("useObjectInteractions.ts");
 const { TextInputModal, openNativeTextInputModal } = await requireModuleByName("TextInputModal.tsx");
-const { NoteLinkModal } = await requireModuleByName("NoteLinkModal.jsx");
+const { NoteLinkModal, openNativeNoteLinkModal } = await requireModuleByName("NoteLinkModal.jsx");
 const { SelectionToolbar } = await requireModuleByName("SelectionToolbar.jsx");
 const { calculateObjectScreenPosition } = await requireModuleByName("screenPositionUtils.ts");
 const { getActiveLayer } = await requireModuleByName("layerAccessor.ts");
@@ -519,15 +519,25 @@ const ObjectLayer = ({
       setDragStart(null);
     }
 
-    setEditingNoteObjectId(objectId);
-    setShowNoteLinkModal(true);
+    const obj = getActiveLayer(mapData!).objects?.find((o: MapObject) => o.id === objectId);
+    const opened = openNativeNoteLinkModal({
+      onSave: (notePath: string) => handleNoteLinkSaveForObject(notePath, objectId),
+      onClose: () => { setEditingNoteObjectId(null); },
+      currentNotePath: obj?.linkedNote || null,
+      objectType: obj?.type || null
+    });
+
+    if (!opened) {
+      setEditingNoteObjectId(objectId);
+      setShowNoteLinkModal(true);
+    }
   };
 
-  const handleNoteLinkSave = (notePath: string): void => {
-    if (!mapData || !editingNoteObjectId) return;
+  const handleNoteLinkSaveForObject = (notePath: string, objectId: string): void => {
+    if (!mapData) return;
 
     const updatedObjects = getActiveLayer(mapData).objects.map((obj: MapObject) => {
-      if (obj.id === editingNoteObjectId) {
+      if (obj.id === objectId) {
         return { ...obj, linkedNote: notePath };
       }
       return obj;
@@ -535,13 +545,17 @@ const ObjectLayer = ({
 
     onObjectsChange(updatedObjects);
 
-    if (selectedItem?.type === 'object' && selectedItem.id === editingNoteObjectId) {
-      const updatedObject = updatedObjects.find((obj: MapObject) => obj.id === editingNoteObjectId);
+    if (selectedItem?.type === 'object' && selectedItem.id === objectId) {
+      const updatedObject = updatedObjects.find((obj: MapObject) => obj.id === objectId);
       if (updatedObject) {
         setSelectedItem({ ...selectedItem, data: updatedObject });
       }
     }
+  };
 
+  const handleNoteLinkSave = (notePath: string): void => {
+    if (!editingNoteObjectId) return;
+    handleNoteLinkSaveForObject(notePath, editingNoteObjectId);
     setShowNoteLinkModal(false);
     setEditingNoteObjectId(null);
   };

@@ -1,13 +1,180 @@
 const pathResolverPath = dc.resolvePath("pathResolver.ts");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
-const { 
+const {
   getNoteDisplayNames,
   getFullPathFromDisplayName,
   getDisplayNameFromPath
 } = await requireModuleByName("noteOperations.ts");
 
 const { getObjectType } = await requireModuleByName("objectTypeResolver.ts");
+
+const { isBridgeAvailable, getObsidianModule } = await requireModuleByName("obsidianBridge.ts");
+
+/**
+ * Opens a native Obsidian Modal for note linking.
+ * Uses AbstractInputSuggest for autocomplete.
+ * Returns true if native modal opened, false to fall back to Preact.
+ */
+function openNativeNoteLinkModal(options) {
+  if (!isBridgeAvailable()) return false;
+
+  try {
+    const obs = getObsidianModule();
+    const ModalClass = obs.Modal;
+    const AbstractInputSuggestClass = obs.AbstractInputSuggest;
+    const app = dc.app;
+
+    const {
+      onSave,
+      onClose,
+      currentNotePath = null,
+      objectType = null
+    } = options;
+
+    const objectTypeLabel = (() => {
+      if (!objectType) return 'Object';
+      const type = getObjectType(objectType);
+      return type ? type.label : 'Object';
+    })();
+
+    let noteCache = null;
+
+    const modal = new (class extends ModalClass {
+      inputEl;
+      submitted = false;
+
+      onOpen() {
+        const { contentEl, titleEl } = this;
+        titleEl.setText(`Link Note to ${objectTypeLabel}`);
+
+        const label = contentEl.createEl('label', { text: 'Note Name' });
+        label.style.display = 'block';
+        label.style.marginBottom = '6px';
+        label.style.fontSize = '13px';
+        label.style.color = 'var(--text-muted)';
+
+        this.inputEl = contentEl.createEl('input', {
+          type: 'text',
+          placeholder: 'Type to search notes...',
+          cls: 'dmt-modal-input'
+        });
+        this.inputEl.style.width = '100%';
+        this.inputEl.style.marginBottom = '16px';
+
+        const displayName = getDisplayNameFromPath(currentNotePath);
+        if (displayName) {
+          this.inputEl.value = displayName;
+        }
+
+        // Attach AbstractInputSuggest for autocomplete
+        const inputEl = this.inputEl;
+        new (class extends AbstractInputSuggestClass {
+          async getSuggestions(query) {
+            if (!noteCache) {
+              try {
+                noteCache = await getNoteDisplayNames();
+              } catch {
+                return [];
+              }
+            }
+            if (!query) return noteCache.slice(0, 20);
+            return noteCache
+              .filter(name => fuzzyMatch(name, query))
+              .map(name => ({ text: name, score: scoreMatch(name, query) }))
+              .sort((a, b) => b.score - a.score)
+              .slice(0, 10)
+              .map(item => item.text);
+          }
+
+          renderSuggestion(note, el) {
+            el.setText(note);
+          }
+
+          selectSuggestion(note) {
+            inputEl.value = note;
+            inputEl.dispatchEvent(new Event('input'));
+            this.close();
+          }
+        })(app, this.inputEl);
+
+        this.inputEl.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            this.submit();
+          }
+        });
+
+        // Buttons
+        const buttonContainer = contentEl.createEl('div', { cls: 'dmt-modal-buttons' });
+        buttonContainer.style.display = 'flex';
+        buttonContainer.style.justifyContent = 'flex-end';
+        buttonContainer.style.gap = '8px';
+
+        const cancelBtn = buttonContainer.createEl('button', {
+          text: 'Cancel',
+          cls: 'dmt-modal-btn dmt-modal-btn-cancel'
+        });
+        cancelBtn.addEventListener('click', () => this.close());
+
+        if (currentNotePath) {
+          const removeBtn = buttonContainer.createEl('button', {
+            text: 'Remove Link',
+            cls: 'dmt-modal-btn dmt-modal-btn-danger'
+          });
+          removeBtn.addEventListener('click', () => {
+            this.submitted = true;
+            onSave(null);
+            this.close();
+          });
+        }
+
+        const saveBtn = buttonContainer.createEl('button', {
+          text: 'Save',
+          cls: 'dmt-modal-btn dmt-modal-btn-submit'
+        });
+        saveBtn.addEventListener('click', () => this.submit());
+
+        setTimeout(() => {
+          this.inputEl.focus();
+          if (displayName) this.inputEl.select();
+        }, 0);
+      }
+
+      async submit() {
+        const value = this.inputEl.value.trim();
+        this.submitted = true;
+
+        if (!value) {
+          onSave(null);
+          this.close();
+          return;
+        }
+
+        const fullPath = await getFullPathFromDisplayName(value);
+        if (!fullPath) {
+          onSave(value + '.md');
+        } else {
+          onSave(fullPath);
+        }
+        this.close();
+      }
+
+      onClose() {
+        if (!this.submitted) {
+          onClose();
+        }
+        this.contentEl.empty();
+      }
+    })(app);
+
+    modal.open();
+    return true;
+  } catch (e) {
+    console.warn('[Windrose] Failed to open native NoteLinkModal, falling back to Preact:', e.message);
+    return false;
+  }
+}
 
 /**
  * Modal for linking notes to objects
@@ -415,4 +582,4 @@ function AutocompleteInput({
   );
 }
 
-return { NoteLinkModal };
+return { NoteLinkModal, openNativeNoteLinkModal };

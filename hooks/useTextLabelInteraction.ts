@@ -309,7 +309,8 @@ const useTextLabelInteraction = (
           content: labelData.content.trim(),
           fontSize: labelData.fontSize,
           fontFace: labelData.fontFace,
-          color: labelData.color
+          color: labelData.color,
+          ...(labelData.opacity !== undefined ? { opacity: labelData.opacity } : {})
         }
       );
       onTextLabelsChange(newLabels);
@@ -323,7 +324,8 @@ const useTextLabelInteraction = (
         {
           fontSize: labelData.fontSize,
           fontFace: labelData.fontFace,
-          color: labelData.color
+          color: labelData.color,
+          ...(labelData.opacity !== undefined ? { opacity: labelData.opacity } : {})
         }
       );
       onTextLabelsChange(newLabels);
@@ -334,7 +336,8 @@ const useTextLabelInteraction = (
           lastTextLabelSettings: {
             fontSize: labelData.fontSize,
             fontFace: labelData.fontFace,
-            color: labelData.color
+            color: labelData.color,
+            ...(labelData.opacity !== undefined ? { opacity: labelData.opacity } : {})
           }
         });
       }
