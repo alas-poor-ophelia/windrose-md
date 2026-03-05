@@ -56,7 +56,7 @@ function openNativeTextLabelEditor(options) {
         const { contentEl, titleEl } = this;
         titleEl.setText(isEditing ? 'Edit Text Label' : 'Add Text Label');
         contentEl.addClass('dmt-text-editor-native');
-        this.modalEl.addClass('dmt-text-editor-modal-native');
+        this.modalEl.style.width = '520px';
 
         // Text input
         const textSection = contentEl.createDiv('dmt-text-editor-section');
@@ -288,6 +288,7 @@ function openNativeTextLabelEditor(options) {
         const text = currentText.trim();
         if (text.length > 0) {
           this.previewEl.style.display = 'flex';
+          this.previewEl.style.padding = '16px';
           this.previewEl.textContent = text;
           const fontOption = getFontOption(currentFontFace);
           this.previewEl.style.fontSize = `${currentFontSize}px`;
