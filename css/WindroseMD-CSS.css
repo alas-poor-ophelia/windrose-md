@@ -2443,6 +2443,16 @@ button.dmt-orientation-btn,
   margin-top: 8px;
 }
 
+.dmt-text-editor-modal-native {
+  width: 520px;
+  max-width: 95vw;
+}
+
+.dmt-native-color-swatches {
+  margin-top: 8px;
+  width: 100%;
+}
+
 /* Edit Button (for text labels) */
 .dmt-edit-button {
   position: absolute;

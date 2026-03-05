@@ -56,6 +56,7 @@ function openNativeTextLabelEditor(options) {
         const { contentEl, titleEl } = this;
         titleEl.setText(isEditing ? 'Edit Text Label' : 'Add Text Label');
         contentEl.addClass('dmt-text-editor-native');
+        this.modalEl.addClass('dmt-text-editor-modal-native');
 
         // Text input
         const textSection = contentEl.createDiv('dmt-text-editor-section');
@@ -162,11 +163,9 @@ function openNativeTextLabelEditor(options) {
           this.updatePreview();
         });
 
-        // Preview (no max-height - adapts to content)
+        // Preview
         this.previewEl = contentEl.createDiv('dmt-text-editor-preview');
         this.previewEl.style.display = 'none';
-        this.previewEl.style.maxHeight = 'none';
-        this.previewEl.style.overflow = 'visible';
         this.updatePreview();
 
         // Buttons
@@ -288,7 +287,7 @@ function openNativeTextLabelEditor(options) {
         if (!this.previewEl) return;
         const text = currentText.trim();
         if (text.length > 0) {
-          this.previewEl.style.display = 'block';
+          this.previewEl.style.display = 'flex';
           this.previewEl.textContent = text;
           const fontOption = getFontOption(currentFontFace);
           this.previewEl.style.fontSize = `${currentFontSize}px`;

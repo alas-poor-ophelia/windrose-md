@@ -22,6 +22,7 @@ function openNativeNoteLinkModal(options) {
   try {
     const obs = getObsidianModule();
     const ModalClass = obs.Modal;
+    const SettingClass = obs.Setting;
     const AbstractInputSuggestClass = obs.AbstractInputSuggest;
     const app = dc.app;
 
@@ -48,24 +49,21 @@ function openNativeNoteLinkModal(options) {
         const { contentEl, titleEl } = this;
         titleEl.setText(`Link Note to ${objectTypeLabel}`);
 
-        const label = contentEl.createEl('label', { text: 'Note Name' });
-        label.style.display = 'block';
-        label.style.marginBottom = '6px';
-        label.style.fontSize = '13px';
-        label.style.color = 'var(--text-muted)';
-
-        this.inputEl = contentEl.createEl('input', {
-          type: 'text',
-          placeholder: 'Type to search notes...',
-          cls: 'dmt-modal-input'
-        });
-        this.inputEl.style.width = '100%';
-        this.inputEl.style.marginBottom = '16px';
-
         const displayName = getDisplayNameFromPath(currentNotePath);
-        if (displayName) {
-          this.inputEl.value = displayName;
-        }
+
+        // Use Obsidian's native search input (magnifying glass + clear button)
+        let searchComponent = null;
+        new SettingClass(contentEl)
+          .setName('Note Name')
+          .addSearch(search => {
+            searchComponent = search;
+            search.setPlaceholder('Type to search notes...');
+            if (displayName) {
+              search.setValue(displayName);
+            }
+          });
+
+        this.inputEl = searchComponent.inputEl;
 
         // Attach AbstractInputSuggest for autocomplete
         const inputEl = this.inputEl;
@@ -78,7 +76,7 @@ function openNativeNoteLinkModal(options) {
                 return [];
               }
             }
-            if (!query) return noteCache.slice(0, 20);
+            if (!query) return [];
             return noteCache
               .filter(name => fuzzyMatch(name, query))
               .map(name => ({ text: name, score: scoreMatch(name, query) }))
