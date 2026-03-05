@@ -170,20 +170,14 @@ function openNativeTextLabelEditor(options) {
         this.updatePreview();
 
         // Buttons
-        const buttonContainer = contentEl.createDiv('dmt-modal-buttons');
-        buttonContainer.style.display = 'flex';
-        buttonContainer.style.justifyContent = 'flex-end';
-        buttonContainer.style.gap = '8px';
+        const buttonContainer = contentEl.createDiv({ cls: 'modal-button-container' });
 
-        const cancelBtn = buttonContainer.createEl('button', {
-          text: 'Cancel',
-          cls: 'dmt-modal-btn dmt-modal-btn-cancel'
-        });
+        const cancelBtn = buttonContainer.createEl('button', { text: 'Cancel' });
         cancelBtn.addEventListener('click', () => this.close());
 
         const submitBtn = buttonContainer.createEl('button', {
           text: isEditing ? 'Update' : 'Add Label',
-          cls: 'dmt-modal-btn dmt-modal-btn-submit'
+          cls: 'mod-cta'
         });
         submitBtn.addEventListener('click', () => this.submit());
 

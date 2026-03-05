@@ -106,21 +106,15 @@ function openNativeNoteLinkModal(options) {
         });
 
         // Buttons
-        const buttonContainer = contentEl.createEl('div', { cls: 'dmt-modal-buttons' });
-        buttonContainer.style.display = 'flex';
-        buttonContainer.style.justifyContent = 'flex-end';
-        buttonContainer.style.gap = '8px';
+        const buttonContainer = contentEl.createDiv({ cls: 'modal-button-container' });
 
-        const cancelBtn = buttonContainer.createEl('button', {
-          text: 'Cancel',
-          cls: 'dmt-modal-btn dmt-modal-btn-cancel'
-        });
+        const cancelBtn = buttonContainer.createEl('button', { text: 'Cancel' });
         cancelBtn.addEventListener('click', () => this.close());
 
         if (currentNotePath) {
           const removeBtn = buttonContainer.createEl('button', {
             text: 'Remove Link',
-            cls: 'dmt-modal-btn dmt-modal-btn-danger'
+            cls: 'mod-warning'
           });
           removeBtn.addEventListener('click', () => {
             this.submitted = true;
@@ -131,7 +125,7 @@ function openNativeNoteLinkModal(options) {
 
         const saveBtn = buttonContainer.createEl('button', {
           text: 'Save',
-          cls: 'dmt-modal-btn dmt-modal-btn-submit'
+          cls: 'mod-cta'
         });
         saveBtn.addEventListener('click', () => this.submit());
 
