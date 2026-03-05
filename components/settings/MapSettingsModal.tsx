@@ -8,9 +8,8 @@
  * 3. Measurement - Distance settings
  * 4. Preferences - UI state persistence options
  *
- * Features:
- * - Draggable by header
- * - Resizable (size persists across sessions)
+ * Native path: uses Obsidian Modal via NativeModalPortal
+ * Fallback path: custom drag/resize UI via Preact portal
  */
 
 import type { MapType } from '#types/core/map.types';
@@ -19,6 +18,7 @@ const pathResolverPath = dc.resolvePath("pathResolver.ts");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
 const { ModalPortal } = await requireModuleByName("ModalPortal.tsx");
+const { isBridgeAvailable, NativeModalPortal } = await requireModuleByName("obsidianBridge.ts");
 const { MapSettingsProvider, useMapSettings } = await requireModuleByName("MapSettingsContext.tsx");
 const { AppearanceTab } = await requireModuleByName("AppearanceTab.tsx");
 const { HexGridTab } = await requireModuleByName("HexGridTab.tsx");
@@ -113,9 +113,48 @@ function savePersistedSize(width: number, height: number): void {
 }
 
 /**
- * Inner modal content that uses the settings context
+ * Tab bar + body shared by both native and fallback paths
  */
-function MapSettingsModalContent(): React.ReactElement | null {
+function TabContent({ tabs, activeTab, setActiveTab, mapType }: {
+  tabs: SettingsTab[];
+  activeTab: string;
+  setActiveTab: (id: string) => void;
+  mapType: MapType;
+}): React.ReactElement {
+  return (
+    <>
+      <div class="dmt-settings-tab-bar" style={{ flexShrink: 0 }}>
+        {tabs.map((tab: SettingsTab) => (
+          <button
+            key={tab.id}
+            class={`dmt-settings-tab ${activeTab === tab.id ? 'dmt-settings-tab-active' : ''}`}
+            onClick={() => setActiveTab(tab.id)}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      <div class="dmt-modal-body" style={{
+        paddingTop: '16px',
+        flex: 1,
+        overflowY: 'auto',
+        minHeight: 0
+      }}>
+        {activeTab === 'appearance' && <AppearanceTab />}
+        {activeTab === 'hexgrid' && mapType === 'hex' && <HexGridTab />}
+        {activeTab === 'gridbackground' && mapType === 'grid' && <GridBackgroundTab />}
+        {activeTab === 'measurement' && <MeasurementTab />}
+        {activeTab === 'preferences' && <PreferencesTab />}
+      </div>
+    </>
+  );
+}
+
+/**
+ * Fallback modal content with custom drag/resize UI (deprecation target)
+ */
+function FallbackModalContent(): React.ReactElement | null {
   const {
     isOpen,
     activeTab,
@@ -320,30 +359,7 @@ function MapSettingsModalContent(): React.ReactElement | null {
             <h3>Map Settings</h3>
           </div>
 
-          <div class="dmt-settings-tab-bar" style={{ flexShrink: 0 }}>
-            {tabs.map((tab: SettingsTab) => (
-              <button
-                key={tab.id}
-                class={`dmt-settings-tab ${activeTab === tab.id ? 'dmt-settings-tab-active' : ''}`}
-                onClick={() => setActiveTab(tab.id)}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-
-          <div class="dmt-modal-body" style={{
-            paddingTop: '16px',
-            flex: 1,
-            overflowY: 'auto',
-            minHeight: 0
-          }}>
-            {activeTab === 'appearance' && <AppearanceTab />}
-            {activeTab === 'hexgrid' && mapType === 'hex' && <HexGridTab />}
-            {activeTab === 'gridbackground' && mapType === 'grid' && <GridBackgroundTab />}
-            {activeTab === 'measurement' && <MeasurementTab />}
-            {activeTab === 'preferences' && <PreferencesTab />}
-          </div>
+          <TabContent tabs={tabs} activeTab={activeTab} setActiveTab={setActiveTab} mapType={mapType} />
 
           <div class="dmt-modal-footer" style={{ flexShrink: 0 }}>
             <button
@@ -423,6 +439,49 @@ function MapSettingsModalContent(): React.ReactElement | null {
 
       <ResizeConfirmDialog />
     </ModalPortal>
+  );
+}
+
+/**
+ * Inner modal content that uses the settings context.
+ * Renders native Obsidian modal when bridge is available, fallback otherwise.
+ */
+function MapSettingsModalContent(): React.ReactElement | null {
+  const {
+    isOpen,
+    activeTab,
+    setActiveTab,
+    tabs,
+    mapType,
+    isLoading,
+    handleSave,
+    handleCancel
+  } = useMapSettings();
+
+  if (!isOpen) return null;
+
+  if (!isBridgeAvailable()) {
+    return <FallbackModalContent />;
+  }
+
+  return (
+    <NativeModalPortal
+      title="Map Settings"
+      modalClass="dmt-settings-native-modal"
+      onClose={handleCancel}
+    >
+      <div class="dmt-settings-modal">
+        <TabContent tabs={tabs} activeTab={activeTab} setActiveTab={setActiveTab} mapType={mapType} />
+
+        <div class="modal-button-container">
+          <button onClick={handleCancel} disabled={isLoading}>Cancel</button>
+          <button class="mod-cta" onClick={handleSave} disabled={isLoading}>
+            {isLoading ? 'Saving...' : 'Save'}
+          </button>
+        </div>
+      </div>
+      <ResizeConfirmDialog />
+    </NativeModalPortal>
   );
 }
 

@@ -10,6 +10,8 @@ const { requireModuleByName } = await dc.require(pathResolverPath);
 
 const { useMapSettings } = await requireModuleByName("MapSettingsContext.tsx");
 const { saveMapImageToVault } = await requireModuleByName("exportOperations.ts");
+const { SettingItem, SettingHeading } = await requireModuleByName("SettingItem.tsx");
+const { NativeToggle } = await requireModuleByName("NativeControls.tsx");
 
 /** Export result */
 interface ExportResult {
@@ -68,106 +70,85 @@ function PreferencesTab(): React.ReactElement {
 
   return (
     <div class="dmt-settings-tab-content">
-      <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '16px' }}>
-        Control what state is remembered for this map
-      </p>
+      <SettingItem
+        name="Remember pan and zoom"
+        description="Restore map position when reopening"
+      >
+        <NativeToggle
+          value={preferences.rememberPanZoom}
+          onChange={() => handlePreferenceToggle('rememberPanZoom')}
+        />
+      </SettingItem>
 
-      <div class="dmt-form-group">
-        <label class="dmt-checkbox-label">
-          <input
-            type="checkbox"
-            checked={preferences.rememberPanZoom}
-            onChange={() => handlePreferenceToggle('rememberPanZoom')}
-            class="dmt-checkbox"
-          />
-          <span>Remember pan and zoom position</span>
-        </label>
-      </div>
+      <SettingItem
+        name="Remember sidebar state"
+        description="Restore sidebar collapsed/expanded state"
+      >
+        <NativeToggle
+          value={preferences.rememberSidebarState}
+          onChange={() => handlePreferenceToggle('rememberSidebarState')}
+        />
+      </SettingItem>
 
-      <div class="dmt-form-group">
-        <label class="dmt-checkbox-label">
-          <input
-            type="checkbox"
-            checked={preferences.rememberSidebarState}
-            onChange={() => handlePreferenceToggle('rememberSidebarState')}
-            class="dmt-checkbox"
-          />
-          <span>Remember sidebar collapsed state</span>
-        </label>
-      </div>
+      <SettingItem
+        name="Remember expanded state"
+        description="Restore expanded/compact map view"
+      >
+        <NativeToggle
+          value={preferences.rememberExpandedState}
+          onChange={() => handlePreferenceToggle('rememberExpandedState')}
+        />
+      </SettingItem>
 
-      <div class="dmt-form-group">
-        <label class="dmt-checkbox-label">
-          <input
-            type="checkbox"
-            checked={preferences.rememberExpandedState}
-            onChange={() => handlePreferenceToggle('rememberExpandedState')}
-            class="dmt-checkbox"
-          />
-          <span>Remember expanded state</span>
-        </label>
-      </div>
+      <SettingItem
+        name="Always show map controls"
+        description="Keep zoom, layers, and settings buttons visible instead of auto-hiding"
+      >
+        <NativeToggle
+          value={alwaysShowControls}
+          onChange={() => handleColorChange('alwaysShowControls', !alwaysShowControls)}
+        />
+      </SettingItem>
 
-      <div class="dmt-form-group">
-        <label class="dmt-checkbox-label">
-          <input
-            type="checkbox"
-            checked={alwaysShowControls}
-            onChange={(e: Event) => handleColorChange('alwaysShowControls', (e.target as HTMLInputElement).checked)}
-            class="dmt-checkbox"
-          />
-          <span>Always show map controls</span>
-        </label>
-        <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px', marginLeft: '22px' }}>
-          Keep zoom, layers, and settings buttons visible instead of auto-hiding
-        </p>
-      </div>
+      <SettingHeading text="Export" />
 
-      <div style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px solid var(--background-modifier-border)' }}>
-        <h4 style={{ fontSize: '14px', fontWeight: 600, marginBottom: '8px' }}>Export</h4>
-        <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '12px' }}>
-          Export your map as a PNG image
-        </p>
-
+      <SettingItem
+        name="Export as image"
+        description="Save your map as a PNG file"
+      >
         <button
-          class="windrose-btn"
+          class="mod-cta"
           onClick={handleExportImage}
           disabled={isExporting}
-          style={{
-            padding: '6px 12px',
-            cursor: isExporting ? 'wait' : 'pointer',
-            opacity: isExporting ? 0.6 : 1
-          }}
+          style={{ opacity: isExporting ? 0.6 : 1 }}
         >
-          {isExporting ? 'Exporting...' : 'Export as Image'}
+          {isExporting ? 'Exporting...' : 'Export'}
         </button>
+      </SettingItem>
 
-        {exportError && (
-          <div style={{
-            marginTop: '8px',
-            padding: '8px',
-            backgroundColor: 'var(--background-modifier-error)',
-            color: 'var(--text-error)',
-            borderRadius: '4px',
-            fontSize: '12px'
-          }}>
-            {exportError}
-          </div>
-        )}
+      {exportError && (
+        <div style={{
+          padding: '8px',
+          backgroundColor: 'var(--background-modifier-error)',
+          color: 'var(--text-error)',
+          borderRadius: '4px',
+          fontSize: '12px'
+        }}>
+          {exportError}
+        </div>
+      )}
 
-        {exportSuccess && (
-          <div style={{
-            marginTop: '8px',
-            padding: '8px',
-            backgroundColor: 'var(--background-modifier-success)',
-            color: 'var(--text-success)',
-            borderRadius: '4px',
-            fontSize: '12px'
-          }}>
-            {exportSuccess}
-          </div>
-        )}
-      </div>
+      {exportSuccess && (
+        <div style={{
+          padding: '8px',
+          backgroundColor: 'var(--background-modifier-success)',
+          color: 'var(--text-success)',
+          borderRadius: '4px',
+          fontSize: '12px'
+        }}>
+          {exportSuccess}
+        </div>
+      )}
     </div>
   );
 }

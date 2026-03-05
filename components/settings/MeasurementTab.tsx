@@ -11,6 +11,8 @@ const pathResolverPath = dc.resolvePath("pathResolver.ts");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
 const { useMapSettings } = await requireModuleByName("MapSettingsContext.tsx");
+const { SettingItem } = await requireModuleByName("SettingItem.tsx");
+const { NativeToggle, NativeDropdown } = await requireModuleByName("NativeControls.tsx");
 
 /** Distance settings state */
 interface DistanceSettingsState {
@@ -45,100 +47,73 @@ function MeasurementTab(): React.ReactElement {
     }
   };
 
-  const handleUnitChange = (e: Event): void => {
-    setDistanceSettings((prev: DistanceSettingsState) => ({
-      ...prev,
-      distanceUnit: (e.target as HTMLSelectElement).value
-    }));
-  };
 
-  const handleDiagonalRuleChange = (e: Event): void => {
-    setDistanceSettings((prev: DistanceSettingsState) => ({
-      ...prev,
-      gridDiagonalRule: (e.target as HTMLSelectElement).value as DiagonalRule
-    }));
-  };
-
-  const handleDisplayFormatChange = (e: Event): void => {
-    setDistanceSettings((prev: DistanceSettingsState) => ({
-      ...prev,
-      displayFormat: (e.target as HTMLSelectElement).value as DistanceDisplayFormat
-    }));
-  };
+  const isDisabled = distanceSettings.useGlobalDistance;
 
   return (
     <div class="dmt-settings-tab-content">
-      <div class="dmt-form-group" style={{ marginBottom: '16px' }}>
-        <label class="dmt-checkbox-label">
-          <input
-            type="checkbox"
-            checked={!distanceSettings.useGlobalDistance}
-            onChange={handleToggleUseGlobal}
-            class="dmt-checkbox"
-          />
-          <span>Use custom measurement settings for this map</span>
-        </label>
-      </div>
+      <SettingItem
+        name="Custom measurement settings"
+        description="Override global distance settings for this map"
+      >
+        <NativeToggle
+          value={!distanceSettings.useGlobalDistance}
+          onChange={handleToggleUseGlobal}
+        />
+      </SettingItem>
 
-      <div style={{ opacity: distanceSettings.useGlobalDistance ? 0.5 : 1 }}>
-        <div class="dmt-form-group">
-          <label class="dmt-form-label">Distance per {isHexMap ? 'Hex' : 'Cell'}</label>
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-            <input
-              type="number"
-              min="0.1"
-              step="0.1"
-              value={distanceSettings.distancePerCell}
-              disabled={distanceSettings.useGlobalDistance}
-              onChange={handleDistancePerCellChange}
-              class="dmt-form-input"
-              style={{ width: '80px' }}
-            />
-            <select
-              value={distanceSettings.distanceUnit}
-              disabled={distanceSettings.useGlobalDistance}
-              onChange={handleUnitChange}
-              class="dmt-form-select"
-              style={{ width: '120px' }}
-            >
-              <option value="ft">feet</option>
-              <option value="m">meters</option>
-              <option value="mi">miles</option>
-              <option value="km">kilometers</option>
-              <option value="yd">yards</option>
-            </select>
-          </div>
-        </div>
+      <div style={{ opacity: isDisabled ? 0.5 : 1 }}>
+        <SettingItem name={`Distance per ${isHexMap ? 'Hex' : 'Cell'}`}>
+          <input
+            type="number"
+            min="0.1"
+            step="0.1"
+            value={distanceSettings.distancePerCell}
+            disabled={isDisabled}
+            onChange={handleDistancePerCellChange}
+            style={{ width: '80px' }}
+          />
+          <NativeDropdown
+            value={distanceSettings.distanceUnit}
+            options={[
+              { value: 'ft', label: 'feet' },
+              { value: 'm', label: 'meters' },
+              { value: 'mi', label: 'miles' },
+              { value: 'km', label: 'kilometers' },
+              { value: 'yd', label: 'yards' }
+            ]}
+            onChange={(val: string) => setDistanceSettings((prev: DistanceSettingsState) => ({ ...prev, distanceUnit: val }))}
+            disabled={isDisabled}
+          />
+        </SettingItem>
 
         {!isHexMap && (
-          <div class="dmt-form-group">
-            <label class="dmt-form-label">Diagonal Movement</label>
-            <select
+          <SettingItem name="Diagonal Movement">
+            <NativeDropdown
               value={distanceSettings.gridDiagonalRule}
-              disabled={distanceSettings.useGlobalDistance}
-              onChange={handleDiagonalRuleChange}
-              class="dmt-form-select"
-            >
-              <option value="alternating">Alternating (5-10-5-10, D&D 5e)</option>
-              <option value="equal">Equal (Chebyshev, all moves = 1)</option>
-              <option value="euclidean">True Distance (Euclidean)</option>
-            </select>
-          </div>
+              options={[
+                { value: 'alternating', label: 'Alternating (5-10-5-10)' },
+                { value: 'equal', label: 'Equal (Chebyshev)' },
+                { value: 'euclidean', label: 'True Distance' }
+              ]}
+              onChange={(val: string) => setDistanceSettings((prev: DistanceSettingsState) => ({ ...prev, gridDiagonalRule: val as DiagonalRule }))}
+              disabled={isDisabled}
+            />
+          </SettingItem>
         )}
 
-        <div class="dmt-form-group">
-          <label class="dmt-form-label">Display Format</label>
-          <select
+        <SettingItem name="Display Format">
+          <NativeDropdown
             value={distanceSettings.displayFormat}
-            disabled={distanceSettings.useGlobalDistance}
-            onChange={handleDisplayFormatChange}
-            class="dmt-form-select"
-          >
-            <option value="both">Cells and Units (e.g., "3 cells (15 ft)")</option>
-            <option value="cells">Cells Only (e.g., "3 cells")</option>
-            <option value="units">Units Only (e.g., "15 ft")</option>
-          </select>
-        </div>
+            options={[
+              { value: 'both', label: 'Cells and Units' },
+              { value: 'cells', label: 'Cells Only' },
+              { value: 'units', label: 'Units Only' }
+            ]}
+            onChange={(val: string) => setDistanceSettings((prev: DistanceSettingsState) => ({ ...prev, displayFormat: val as DistanceDisplayFormat }))}
+            disabled={isDisabled}
+          />
+        </SettingItem>
       </div>
     </div>
   );

@@ -9,6 +9,8 @@ const pathResolverPath = dc.resolvePath("pathResolver.ts");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
 const { useMapSettings } = await requireModuleByName("MapSettingsContext.tsx");
+const { SettingItem } = await requireModuleByName("SettingItem.tsx");
+const { NativeToggle } = await requireModuleByName("NativeControls.tsx");
 
 /** Hex bounds configuration */
 interface HexBounds {
@@ -37,7 +39,6 @@ function BoundsSection(): React.ReactElement {
     handleBoundsLockToggle
   } = useMapSettings() as BoundsSectionContext;
 
-  // Generate display label for playable area (e.g., "A1 to Z20")
   const getPlayableAreaLabel = (): string => {
     const maxColLetter = String.fromCharCode(65 + Math.min(hexBounds.maxCol - 1, 25));
     const overflow = hexBounds.maxCol > 26 ? '+' : '';
@@ -47,24 +48,17 @@ function BoundsSection(): React.ReactElement {
   const isDisabled = boundsLocked && !!backgroundImagePath;
 
   return (
-    <div class="dmt-form-group">
-      <label class="dmt-form-label">
-        Map Bounds
-        {isDisabled && (
-          <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 'normal', marginLeft: '8px' }}>
-            (controlled by background image)
-          </span>
-        )}
-      </label>
-      <div style={{
-        display: 'flex',
-        gap: '16px',
-        alignItems: 'center',
-        flexWrap: 'wrap',
-        opacity: isDisabled ? 0.6 : 1
-      }}>
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Columns:</span>
+    <div>
+      <SettingItem
+        name="Map Bounds"
+        description={`Playable area: ${getPlayableAreaLabel()}${isDisabled ? ' (controlled by background image)' : ''}`}
+      >
+        <div style={{
+          display: 'flex',
+          gap: '8px',
+          alignItems: 'center',
+          opacity: isDisabled ? 0.6 : 1
+        }}>
           <input
             type="number"
             min="1"
@@ -72,21 +66,17 @@ function BoundsSection(): React.ReactElement {
             value={hexBounds.maxCol}
             onChange={(e: Event) => handleHexBoundsChange('maxCol', (e.target as HTMLInputElement).value)}
             disabled={isDisabled}
-            class="dmt-number-input"
             style={{
-              padding: '6px 10px',
+              width: '60px',
+              padding: '4px 8px',
               borderRadius: '4px',
               border: '1px solid var(--background-modifier-border)',
               background: isDisabled ? 'var(--background-secondary)' : 'var(--background-primary)',
               color: isDisabled ? 'var(--text-muted)' : 'var(--text-normal)',
-              fontSize: '14px',
-              width: '70px'
+              fontSize: '13px'
             }}
           />
-        </div>
-        <span style={{ color: 'var(--text-muted)' }}>×</span>
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Rows:</span>
+          <span style={{ color: 'var(--text-muted)' }}>×</span>
           <input
             type="number"
             min="1"
@@ -94,34 +84,29 @@ function BoundsSection(): React.ReactElement {
             value={hexBounds.maxRow}
             onChange={(e: Event) => handleHexBoundsChange('maxRow', (e.target as HTMLInputElement).value)}
             disabled={isDisabled}
-            class="dmt-number-input"
             style={{
-              padding: '6px 10px',
+              width: '60px',
+              padding: '4px 8px',
               borderRadius: '4px',
               border: '1px solid var(--background-modifier-border)',
               background: isDisabled ? 'var(--background-secondary)' : 'var(--background-primary)',
               color: isDisabled ? 'var(--text-muted)' : 'var(--text-normal)',
-              fontSize: '14px',
-              width: '70px'
+              fontSize: '13px'
             }}
           />
         </div>
-      </div>
-      <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '8px' }}>
-        Playable area: {getPlayableAreaLabel()}
-      </p>
+      </SettingItem>
 
-      {/* Lock bounds checkbox - only show when background image is present */}
       {backgroundImagePath && (
-        <label class="dmt-checkbox-label" style={{ marginTop: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <input
-            type="checkbox"
-            checked={boundsLocked}
+        <SettingItem
+          name="Lock bounds to image"
+          description="Automatically set bounds from image dimensions"
+        >
+          <NativeToggle
+            value={boundsLocked}
             onChange={handleBoundsLockToggle}
-            class="dmt-checkbox"
           />
-          <span style={{ fontSize: '13px' }}>Lock bounds to image dimensions</span>
-        </label>
+        </SettingItem>
       )}
     </div>
   );

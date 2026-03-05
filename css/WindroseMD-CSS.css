@@ -1494,6 +1494,18 @@ button.dmt-orientation-btn,
   }
 }
 
+/* Native Obsidian modal sizing */
+.dmt-settings-native-modal {
+  width: 520px;
+  max-width: 95vw;
+}
+.dmt-settings-native-modal .modal-content {
+  max-height: 70vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
 .dmt-modal-footer {
   display: flex;
   flex-wrap: wrap;
@@ -1660,6 +1672,7 @@ button.dmt-orientation-btn,
   box-sizing: border-box;
   max-width: 100%;
   overflow-x: hidden;
+  padding-right: 8px;
 }
 
 /* Color picker 2x2 grid items */

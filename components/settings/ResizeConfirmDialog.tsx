@@ -3,12 +3,16 @@
  *
  * Confirmation dialog shown when resizing the grid would orphan content.
  * Warns users about cells/objects that will be deleted outside new bounds.
+ *
+ * Native path: opens an Obsidian Modal imperatively.
+ * Fallback path: custom overlay via ModalPortal.
  */
 
 const pathResolverPath = dc.resolvePath("pathResolver.ts");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
 const { ModalPortal } = await requireModuleByName("ModalPortal.tsx");
+const { isBridgeAvailable, getObsidianModule } = await requireModuleByName("obsidianBridge.ts");
 const { useMapSettings } = await requireModuleByName("MapSettingsContext.tsx");
 
 /** Orphan content info */
@@ -18,9 +22,105 @@ interface OrphanInfo {
 }
 
 /**
- * Resize confirmation dialog
+ * Native resize confirmation dialog using Obsidian Modal
  */
-function ResizeConfirmDialog(): React.ReactElement | null {
+function NativeResizeConfirmDialog(): React.ReactElement | null {
+  const {
+    showResizeConfirm,
+    orphanInfo,
+    handleResizeConfirmDelete,
+    handleResizeConfirmCancel
+  } = useMapSettings() as {
+    showResizeConfirm: boolean;
+    orphanInfo: OrphanInfo;
+    handleResizeConfirmDelete: () => void;
+    handleResizeConfirmCancel: () => void;
+  };
+
+  const deleteRef = dc.useRef(handleResizeConfirmDelete);
+  deleteRef.current = handleResizeConfirmDelete;
+  const cancelRef = dc.useRef(handleResizeConfirmCancel);
+  cancelRef.current = handleResizeConfirmCancel;
+
+  dc.useEffect(() => {
+    if (!showResizeConfirm || !isBridgeAvailable()) return;
+
+    const obs = getObsidianModule();
+    const ModalClass = obs.Modal as new (app: unknown) => {
+      contentEl: HTMLElement;
+      titleEl: { setText: (t: string) => void };
+      open: () => void;
+      close: () => void;
+      onClose: () => void;
+    };
+    const app = (dc as unknown as { app: unknown }).app;
+
+    let closedByCode = false;
+    const modal = new ModalClass(app);
+    modal.titleEl.setText('Content Outside New Grid');
+
+    const content = modal.contentEl;
+    content.createEl('p', {
+      text: 'Resizing the grid will remove content outside the new boundaries:'
+    });
+
+    const list = content.createEl('ul');
+    if (orphanInfo.cells > 0) {
+      list.createEl('li', {
+        text: `${orphanInfo.cells} painted cell${orphanInfo.cells !== 1 ? 's' : ''}`
+      });
+    }
+    if (orphanInfo.objects > 0) {
+      list.createEl('li', {
+        text: `${orphanInfo.objects} object${orphanInfo.objects !== 1 ? 's' : ''}/pin${orphanInfo.objects !== 1 ? 's' : ''}`
+      });
+    }
+
+    content.createEl('p', {
+      text: 'This content will be permanently deleted when you save. To recover it, cancel and expand the grid bounds instead.',
+      cls: 'setting-item-description'
+    });
+
+    const buttonRow = content.createDiv({ cls: 'modal-button-container' });
+
+    const cancelBtn = buttonRow.createEl('button', { text: 'Cancel' });
+    cancelBtn.addEventListener('click', () => {
+      closedByCode = true;
+      modal.close();
+      cancelRef.current();
+    });
+
+    const deleteBtn = buttonRow.createEl('button', {
+      text: 'Delete & Resize',
+      cls: 'mod-warning'
+    });
+    deleteBtn.addEventListener('click', () => {
+      closedByCode = true;
+      modal.close();
+      deleteRef.current();
+    });
+
+    modal.onClose = () => {
+      if (!closedByCode) {
+        cancelRef.current();
+      }
+    };
+
+    modal.open();
+
+    return () => {
+      closedByCode = true;
+      modal.close();
+    };
+  }, [showResizeConfirm]);
+
+  return null;
+}
+
+/**
+ * Fallback resize confirmation dialog (deprecation target)
+ */
+function FallbackResizeConfirmDialog(): React.ReactElement | null {
   const {
     showResizeConfirm,
     orphanInfo,
@@ -137,6 +237,16 @@ function ResizeConfirmDialog(): React.ReactElement | null {
       </div>
     </ModalPortal>
   );
+}
+
+/**
+ * Resize confirmation dialog — delegates to native or fallback
+ */
+function ResizeConfirmDialog(): React.ReactElement | null {
+  if (isBridgeAvailable()) {
+    return h(NativeResizeConfirmDialog, null);
+  }
+  return h(FallbackResizeConfirmDialog, null);
 }
 
 return { ResizeConfirmDialog };
