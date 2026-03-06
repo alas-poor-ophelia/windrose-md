@@ -141,9 +141,15 @@ async function setupModalInteract(
     modalEl.style.height = `${savedSize.height}px`;
   }
 
+  // Prevent overscroll on the modal container (Obsidian's backdrop)
+  modalEl.style.overflow = 'hidden';
+  const containerEl = modalEl.parentElement;
+  if (containerEl) {
+    containerEl.style.overflow = 'hidden';
+  }
+
   // Center the modal initially
   const rect = modalEl.getBoundingClientRect();
-  const containerEl = modalEl.parentElement;
   if (containerEl) {
     const containerRect = containerEl.getBoundingClientRect();
     const x = (containerRect.width - rect.width) / 2;

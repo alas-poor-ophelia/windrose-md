@@ -1504,6 +1504,7 @@ button.dmt-orientation-btn,
   max-width: 95vw;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 .dmt-settings-native-modal .modal-content {
   max-height: 70vh;
@@ -1523,14 +1524,14 @@ button.dmt-orientation-btn,
   position: absolute;
   z-index: 10;
 }
-.dmt-resize-top { top: -3px; left: 8px; right: 8px; height: 6px; cursor: ns-resize; }
-.dmt-resize-bottom { bottom: -3px; left: 8px; right: 8px; height: 6px; cursor: ns-resize; }
-.dmt-resize-left { left: -3px; top: 8px; bottom: 8px; width: 6px; cursor: ew-resize; }
-.dmt-resize-right { right: -3px; top: 8px; bottom: 8px; width: 6px; cursor: ew-resize; }
-.dmt-resize-top-left { top: -3px; left: -3px; width: 12px; height: 12px; cursor: nwse-resize; }
-.dmt-resize-top-right { top: -3px; right: -3px; width: 12px; height: 12px; cursor: nesw-resize; }
-.dmt-resize-bottom-left { bottom: -3px; left: -3px; width: 12px; height: 12px; cursor: nesw-resize; }
-.dmt-resize-bottom-right { bottom: -3px; right: -3px; width: 12px; height: 12px; cursor: nwse-resize; }
+.dmt-resize-top { top: 0; left: 8px; right: 8px; height: 6px; cursor: ns-resize; }
+.dmt-resize-bottom { bottom: 0; left: 8px; right: 8px; height: 6px; cursor: ns-resize; }
+.dmt-resize-left { left: 0; top: 8px; bottom: 8px; width: 6px; cursor: ew-resize; }
+.dmt-resize-right { right: 0; top: 8px; bottom: 8px; width: 6px; cursor: ew-resize; }
+.dmt-resize-top-left { top: 0; left: 0; width: 12px; height: 12px; cursor: nwse-resize; }
+.dmt-resize-top-right { top: 0; right: 0; width: 12px; height: 12px; cursor: nesw-resize; }
+.dmt-resize-bottom-left { bottom: 0; left: 0; width: 12px; height: 12px; cursor: nesw-resize; }
+.dmt-resize-bottom-right { bottom: 0; right: 0; width: 12px; height: 12px; cursor: nwse-resize; }
 
 .dmt-modal-footer {
   display: flex;
