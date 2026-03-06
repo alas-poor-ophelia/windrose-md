@@ -177,6 +177,7 @@ const useObjectInteractions = (
   const dragInitialStateRef = dc.useRef<MapObject[] | null>(null);
 
   const [edgeSnapMode, setEdgeSnapMode] = dc.useState<boolean>(false);
+  const [freeformDragPreview, setFreeformDragPreview] = dc.useState<boolean>(false);
   const longPressTimerRef = dc.useRef<ReturnType<typeof setTimeout> | null>(null);
   const altKeyPressedRef = dc.useRef<boolean>(false);
   const shiftKeyPressedRef = dc.useRef<boolean>(false);
@@ -190,10 +191,16 @@ const useObjectInteractions = (
         altKeyPressedRef.current = true;
         if (currentTool === 'addObject' || selectedItem?.type === 'object') {
           setEdgeSnapMode(true);
+          if (shiftKeyPressedRef.current) {
+            setFreeformDragPreview(true);
+          }
         }
       }
       if (e.key === 'Shift') {
         shiftKeyPressedRef.current = true;
+        if (altKeyPressedRef.current && (currentTool === 'addObject' || selectedItem?.type === 'object')) {
+          setFreeformDragPreview(true);
+        }
       }
     };
 
@@ -201,9 +208,11 @@ const useObjectInteractions = (
       if (e.key === 'Alt') {
         altKeyPressedRef.current = false;
         setEdgeSnapMode(false);
+        setFreeformDragPreview(false);
       }
       if (e.key === 'Shift') {
         shiftKeyPressedRef.current = false;
+        setFreeformDragPreview(false);
       }
     };
 
@@ -556,7 +565,13 @@ const useObjectInteractions = (
         setDragStart({ ...dragStart, wasInverted: true, originalFreeform: !!currentObject.freeform });
       }
 
-      if (!currentObject.freeform) {
+      // Use originalFreeform (captured on first frame) to determine direction,
+      // since currentObject.freeform changes after the first frame of inversion
+      const wasOriginallyGrid = dragStart.wasInverted
+        ? dragStart.originalFreeform === false
+        : !currentObject.freeform;
+
+      if (wasOriginallyGrid) {
         // Grid → freeform inversion: drag in continuous world-space
         const worldCoords = screenToWorld(clientX, clientY);
         if (!worldCoords) return true;
@@ -911,20 +926,13 @@ const useObjectInteractions = (
         longPressTimerRef.current = null;
       }
 
-      // Clean up drag inversion: restore original freeform state
+      // Clean up drag inversion
       if (dragStart?.wasInverted && mapData) {
         const objectId = selectedItem?.id || dragStart.objectId;
         const currentObject = getActiveLayer(mapData).objects?.find((o: MapObject) => o.id === objectId);
         if (currentObject && objectId) {
           if (dragStart.originalFreeform === false) {
-            // Was grid, inverted to freeform → restore as grid object
-            const { freeform: _f, worldPosition: _wp, ...rest } = currentObject;
-            const updatedObjects = updateObject(
-              getActiveLayer(mapData).objects,
-              objectId,
-              { freeform: undefined as any, worldPosition: undefined as any }
-            );
-            onObjectsChange(updatedObjects, true);
+            // Was grid, Alt+Shift dragged to freeform → keep as freeform permanently
           } else if (dragStart.originalFreeform === true) {
             // Was freeform, inverted to grid → keep freeform, snap worldPosition to final cell center
             const cellCenter = geometry?.getCellCenter
@@ -949,10 +957,19 @@ const useObjectInteractions = (
         onObjectsChange(getActiveLayer(mapData!).objects, false);
         dragInitialStateRef.current = null;
       }
+
+      // Refresh selectedItem.data so toolbar reflects current freeform state
+      if (selectedItem?.type === 'object' && mapData) {
+        const freshObject = getActiveLayer(mapData).objects?.find((o: MapObject) => o.id === selectedItem.id);
+        if (freshObject) {
+          setSelectedItem({ type: 'object', id: selectedItem.id, data: freshObject });
+        }
+      }
+
       return true;
     }
     return false;
-  }, [isDraggingSelection, selectedItem, dragStart, setIsDraggingSelection, setDragStart, onObjectsChange, mapData, geometry, updateObject]);
+  }, [isDraggingSelection, selectedItem, dragStart, setIsDraggingSelection, setDragStart, onObjectsChange, mapData, geometry, updateObject, setSelectedItem]);
 
   const stopObjectResizing = dc.useCallback((): boolean => {
     if (isResizing) {
@@ -1298,6 +1315,7 @@ const useObjectInteractions = (
     pendingObjectCustomColorRef,
     edgeSnapMode,
     setEdgeSnapMode,
+    freeformDragPreview,
     longPressTimerRef,
 
     handleObjectPlacement,

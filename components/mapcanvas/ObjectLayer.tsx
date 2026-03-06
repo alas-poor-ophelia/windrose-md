@@ -294,6 +294,7 @@ const ObjectLayer = ({
     pendingObjectCustomColorRef,
     edgeSnapMode,
     setEdgeSnapMode,
+    freeformDragPreview,
     longPressTimerRef,
     handleObjectPlacement,
     handleObjectSelection,
@@ -740,7 +741,7 @@ const ObjectLayer = ({
         />
       )}
 
-      {edgeSnapMode && selectedItem?.type === 'object' && indicatorPositions && (
+      {edgeSnapMode && selectedItem?.type === 'object' && indicatorPositions && !freeformDragPreview && (
         <>
           <div
             className="dmt-edge-snap-indicator north"
@@ -806,6 +807,32 @@ const ObjectLayer = ({
               zIndex: 1000
             }}
           />
+        </>
+      )}
+
+      {freeformDragPreview && selectedItem?.type === 'object' && indicatorPositions && (
+        <>
+          {(['north', 'south', 'east', 'west'] as const).map(dir => {
+            const invertToFreeform = !selectedObject?.freeform;
+            return (
+              <div
+                key={dir}
+                className={`dmt-inversion-indicator ${dir}`}
+                style={{
+                  position: 'absolute',
+                  left: `${indicatorPositions[dir].x + 2}px`,
+                  top: `${indicatorPositions[dir].y + 2}px`,
+                  width: '8px',
+                  height: '8px',
+                  backgroundColor: 'var(--interactive-accent, #4a9eff)',
+                  transform: invertToFreeform ? 'rotate(45deg)' : 'none',
+                  filter: 'drop-shadow(0 0 3px var(--interactive-accent, #4a9eff))',
+                  pointerEvents: 'none',
+                  zIndex: 1000
+                }}
+              />
+            );
+          })}
         </>
       )}
 
