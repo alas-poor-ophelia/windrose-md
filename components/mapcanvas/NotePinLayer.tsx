@@ -20,6 +20,7 @@ const { useNotePinInteraction } = await requireModuleByName("useNotePinInteracti
 const { useMapState, useMapOperations } = await requireModuleByName("MapContext.tsx");
 const { useMapSelection } = await requireModuleByName("MapSelectionContext.tsx");
 const { NoteLinkModal, openNativeNoteLinkModal } = await requireModuleByName("NoteLinkModal.jsx");
+const { isBridgeAvailable } = await requireModuleByName("obsidianBridge.ts");
 const { useEventHandlerRegistration } = await requireModuleByName("EventHandlerContext.tsx");
 
 /** Props for NotePinLayer component */
@@ -85,7 +86,7 @@ const NotePinLayer = ({
 
   return (
     <>
-      {showNoteLinkModal && pendingNotePinId && mapData && !nativeOpenedRef.current && (
+      {showNoteLinkModal && pendingNotePinId && mapData && !nativeOpenedRef.current && !isBridgeAvailable() && (
         <NoteLinkModal
           isOpen={showNoteLinkModal}
           onClose={handleNoteLinkCancel}

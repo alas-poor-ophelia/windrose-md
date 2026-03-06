@@ -20,6 +20,7 @@ const { useTextLabelInteraction } = await requireModuleByName("useTextLabelInter
 const { useMapState, useMapOperations } = await requireModuleByName("MapContext.tsx");
 const { useMapSelection } = await requireModuleByName("MapSelectionContext.tsx");
 const { TextLabelEditor, openNativeTextLabelEditor } = await requireModuleByName("TextLabelEditor.jsx");
+const { isBridgeAvailable } = await requireModuleByName("obsidianBridge.ts");
 const { useEventHandlerRegistration } = await requireModuleByName("EventHandlerContext.tsx");
 const { SelectionToolbar } = await requireModuleByName("SelectionToolbar.jsx");
 const { getActiveLayer } = await requireModuleByName("layerAccessor.ts");
@@ -172,7 +173,7 @@ const TextLayer = ({
         />
       )}
 
-      {showTextModal && !nativeOpenedRef.current && (() => {
+      {showTextModal && !nativeOpenedRef.current && !isBridgeAvailable() && (() => {
         let currentLabel: TextLabel | null = null;
         if (editingTextId && mapData?.textLabels) {
           currentLabel = getActiveLayer(mapData).textLabels.find((l: TextLabel) => l.id === editingTextId) || null;
