@@ -469,6 +469,8 @@ function MapSettingsModalContent(): React.ReactElement | null {
       title="Map Settings"
       modalClass="dmt-settings-native-modal"
       onClose={handleCancel}
+      draggable
+      resizable
     >
       <div class="dmt-settings-modal">
         <TabContent tabs={tabs} activeTab={activeTab} setActiveTab={setActiveTab} mapType={mapType} />
