@@ -427,7 +427,7 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   if (activeLayer.objects && activeLayer.objects.length > 0 && !showCoordinates && visibility.objects) {
     const isHexMap = geometry.type === 'hex';
     const mapType = mapData.mapType || 'grid';
-    const getObjectTypeForMap = (typeId: string) => getObjectType(typeId, mapType);
+    const getObjectTypeForMap = (typeId: string) => getObjectType(typeId, mapType, mapData.objectSetId);
     renderObjects(
       activeLayer,
       { ctx, offsetX, offsetY, zoom, scaledSize },

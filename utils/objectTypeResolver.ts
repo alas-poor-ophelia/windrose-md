@@ -98,6 +98,7 @@ interface ObjectTypesModule {
 /** Settings accessor module */
 interface SettingsAccessorModule {
   getObjectSettings: (mapType: MapType) => ObjectSettings;
+  getObjectSettingsForSet: (setId: string, mapType: MapType) => ObjectSettings | null;
 }
 
 /** RPG Awesome icons module */
@@ -108,8 +109,17 @@ interface RPGAwesomeIconsModule {
 }
 
 const { OBJECT_TYPES, CATEGORIES } = await requireModuleByName("objectTypes.ts") as ObjectTypesModule;
-const { getObjectSettings } = await requireModuleByName("settingsAccessor.ts") as SettingsAccessorModule;
+const { getObjectSettings, getObjectSettingsForSet } = await requireModuleByName("settingsAccessor.ts") as SettingsAccessorModule;
 const { RA_ICONS, getIconChar, getIconInfo } = await requireModuleByName("rpgAwesomeIcons.ts") as RPGAwesomeIconsModule;
+
+/** Resolve object settings: per-map set -> global -> defaults */
+function resolveObjectSettings(mapType: MapType, objectSetId?: string | null): ObjectSettings {
+  if (objectSetId) {
+    const setSettings = getObjectSettingsForSet(objectSetId, mapType);
+    if (setSettings) return setSettings;
+  }
+  return getObjectSettings(mapType);
+}
 
 /**
  * Fallback for unknown/deleted object types
@@ -194,8 +204,8 @@ const BUILT_IN_CATEGORY_ORDER: Record<string, number> = {
  * Get effective object types list (built-ins + overrides + custom)
  * This is the main function consumers should use for listing available objects.
  */
-function getResolvedObjectTypes(mapType: MapType = 'grid'): ObjectTypeDefinition[] {
-  const settings = getObjectSettings(mapType);
+function getResolvedObjectTypes(mapType: MapType = 'grid', objectSetId?: string | null): ObjectTypeDefinition[] {
+  const settings = resolveObjectSettings(mapType, objectSetId);
   const { objectOverrides = {}, customObjects = [] } = settings;
 
   // Apply overrides to built-ins, filter out hidden ones
@@ -239,8 +249,8 @@ function getResolvedObjectTypes(mapType: MapType = 'grid'): ObjectTypeDefinition
 /**
  * Get effective categories list (built-ins + custom), sorted by order
  */
-function getResolvedCategories(mapType: MapType = 'grid'): CategoryDefinition[] {
-  const settings = getObjectSettings(mapType);
+function getResolvedCategories(mapType: MapType = 'grid', objectSetId?: string | null): CategoryDefinition[] {
+  const settings = resolveObjectSettings(mapType, objectSetId);
   const { customCategories = [] } = settings;
 
   // Add order to built-in categories
@@ -267,8 +277,8 @@ function getResolvedCategories(mapType: MapType = 'grid'): CategoryDefinition[] 
  * Get list of hidden built-in objects
  * Useful for showing a "hidden objects" section in settings
  */
-function getHiddenObjects(mapType: MapType = 'grid'): ObjectTypeDefinition[] {
-  const settings = getObjectSettings(mapType);
+function getHiddenObjects(mapType: MapType = 'grid', objectSetId?: string | null): ObjectTypeDefinition[] {
+  const settings = resolveObjectSettings(mapType, objectSetId);
   const { objectOverrides = {} } = settings;
 
   return OBJECT_TYPES
@@ -284,7 +294,7 @@ function getHiddenObjects(mapType: MapType = 'grid'): ObjectTypeDefinition[] {
  * Get a single object type by ID
  * Returns the resolved version (with overrides applied) or fallback for unknown
  */
-function getObjectType(typeId: string | null | undefined, mapType: MapType = 'grid'): ObjectTypeDefinition {
+function getObjectType(typeId: string | null | undefined, mapType: MapType = 'grid', objectSetId?: string | null): ObjectTypeDefinition {
   // Handle null/undefined
   if (!typeId) {
     return UNKNOWN_OBJECT_FALLBACK;
@@ -295,7 +305,7 @@ function getObjectType(typeId: string | null | undefined, mapType: MapType = 'gr
     return UNKNOWN_OBJECT_FALLBACK;
   }
 
-  const settings = getObjectSettings(mapType);
+  const settings = resolveObjectSettings(mapType, objectSetId);
   const { objectOverrides = {}, customObjects = [] } = settings;
 
   // Check built-in objects first (including hidden ones - they still need to render)
@@ -336,8 +346,8 @@ function getObjectType(typeId: string | null | undefined, mapType: MapType = 'gr
 /**
  * Check if an object type exists (built-in or custom, not hidden)
  */
-function objectTypeExists(typeId: string, mapType: MapType = 'grid'): boolean {
-  const objType = getObjectType(typeId, mapType);
+function objectTypeExists(typeId: string, mapType: MapType = 'grid', objectSetId?: string | null): boolean {
+  const objType = getObjectType(typeId, mapType, objectSetId);
   return objType.id !== '__unknown__' && !objType.isHidden;
 }
 

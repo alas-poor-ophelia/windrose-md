@@ -118,7 +118,7 @@ function useMapData(
   dc.useEffect(() => {
     if (!mapData) return;
 
-    const objectTypes = getResolvedObjectTypes(mapData.mapType);
+    const objectTypes = getResolvedObjectTypes(mapData.mapType, mapData.objectSetId);
     const imageObjects = objectTypes.filter(hasImagePath);
 
     for (const objType of imageObjects) {
@@ -126,7 +126,7 @@ function useMapData(
         preloadImage(objType.imagePath);
       }
     }
-  }, [mapData?.mapType, settingsVersion]);
+  }, [mapData?.mapType, mapData?.objectSetId, settingsVersion]);
 
   // Listen for settings changes to trigger image preload
   dc.useEffect(() => {

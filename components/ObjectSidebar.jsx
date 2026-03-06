@@ -48,10 +48,10 @@ const OrnamentalArrow = ({ direction = "right" }) => {
   );
 };
 
-const ObjectSidebar = ({ selectedObjectType, onObjectTypeSelect, onToolChange, isCollapsed, onCollapseChange, mapType = 'grid', isFreeformMode = false, onFreeformToggle }) => {
+const ObjectSidebar = ({ selectedObjectType, onObjectTypeSelect, onToolChange, isCollapsed, onCollapseChange, mapType = 'grid', objectSetId, isFreeformMode = false, onFreeformToggle }) => {
   // Get resolved object types and categories (includes overrides and custom)
-  const allObjectTypes = getResolvedObjectTypes(mapType);
-  const allCategories = getResolvedCategories(mapType);
+  const allObjectTypes = getResolvedObjectTypes(mapType, objectSetId);
+  const allCategories = getResolvedCategories(mapType, objectSetId);
   
   // Group objects by category (excluding 'notes' category which is handled specially)
   const objectsByCategory = allCategories

@@ -273,6 +273,40 @@ function getObjectSettings(mapType: 'hex' | 'grid' = 'grid'): ObjectSettings {
 }
 
 /**
+ * Get object settings from a specific object set by ID
+ * Returns null if the set is not found (caller should fall back to global)
+ */
+function getObjectSettingsForSet(setId: string, mapType: 'hex' | 'grid' = 'grid'): ObjectSettings | null {
+  try {
+    if (!dc || !(dc as { app?: ObsidianApp }).app || !(dc as { app: ObsidianApp }).app.plugins) {
+      return null;
+    }
+
+    const app = (dc as { app: ObsidianApp }).app;
+    const plugin = app.plugins.plugins['dungeon-map-tracker-settings'];
+
+    if (plugin && plugin.settings) {
+      const sets = plugin.settings.objectSets || [];
+      const set = sets.find((s: { id: string }) => s.id === setId);
+      if (!set) return null;
+
+      const sideData = mapType === 'hex' ? set.data?.hex : set.data?.grid;
+      if (!sideData) return FALLBACK_OBJECT_SETTINGS;
+
+      return {
+        objectOverrides: sideData.objectOverrides || {},
+        customObjects: sideData.customObjects || [],
+        customCategories: sideData.customCategories || []
+      };
+    }
+  } catch (error) {
+    console.warn('[settingsAccessor] Could not resolve object set:', setId, error);
+  }
+
+  return null;
+}
+
+/**
  * Get color palette settings from the plugin
  * Returns resolved color palette (built-in with overrides + custom colors)
  */
@@ -340,14 +374,15 @@ function getColorPaletteSettings(): ResolvedColorEntry[] {
 // Exports
 // ===========================================
 
-return { 
-  getSettings, 
-  getSetting, 
-  isPluginAvailable, 
-  getTheme, 
-  getEffectiveSettings, 
-  getObjectSettings, 
-  getColorPaletteSettings, 
-  FALLBACK_SETTINGS, 
-  BUILT_IN_COLORS 
+return {
+  getSettings,
+  getSetting,
+  isPluginAvailable,
+  getTheme,
+  getEffectiveSettings,
+  getObjectSettings,
+  getObjectSettingsForSet,
+  getColorPaletteSettings,
+  FALLBACK_SETTINGS,
+  BUILT_IN_COLORS
 };

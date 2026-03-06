@@ -174,6 +174,9 @@ export interface SettingsReducerState {
   // UI state
   isLoading: boolean;
 
+  // Per-map object set
+  objectSetId: string | null;
+
   // Resize confirmation dialog
   showResizeConfirm: boolean;
   pendingBoundsChange: PendingBoundsChange | null;
@@ -195,10 +198,14 @@ export interface SettingsSaveData {
   overrides: Partial<PluginSettings>;
   coordinateDisplayMode: CoordinateDisplayMode;
   distanceSettings: DistanceSettingsSave | null;
+  objectSetId?: string | null;
 }
 
 /** Handler functions exposed by context */
 export interface MapSettingsHandlers {
+  // Object set
+  handleObjectSetChange: (setId: string | null) => void;
+
   // Tab navigation
   setActiveTab: (tab: SettingsTabId) => void;
 
@@ -337,6 +344,7 @@ export interface MapSettingsProviderProps {
   currentDistanceSettings?: Partial<DistanceSettings> | null;
   currentCells?: Cell[];
   currentObjects?: MapObject[];
+  currentObjectSetId?: string | null;
   mapData?: MapData | null;
   geometry?: IGeometry | null;
 }
@@ -380,6 +388,7 @@ const MapSettingsProvider: React.FC<MapSettingsProviderProps> = ({
   currentDistanceSettings = null,
   currentCells = [],
   currentObjects = [],
+  currentObjectSetId = null,
   mapData = null,
   geometry = null
 }) => {
@@ -389,7 +398,7 @@ const MapSettingsProvider: React.FC<MapSettingsProviderProps> = ({
   // State via reducer
   const [state, dispatch] = dc.useReducer(
     settingsReducer,
-    { props: { initialTab, mapType, currentSettings, currentPreferences, currentHexBounds, currentBackgroundImage, currentDistanceSettings }, globalSettings },
+    { props: { initialTab, mapType, currentSettings, currentPreferences, currentHexBounds, currentBackgroundImage, currentDistanceSettings, currentObjectSetId }, globalSettings },
     (init: { props: Record<string, unknown>; globalSettings: PluginSettings }) => buildInitialState(init.props, init.globalSettings) as SettingsReducerState
   );
 
@@ -418,7 +427,7 @@ const MapSettingsProvider: React.FC<MapSettingsProviderProps> = ({
     dispatch({
       type: Actions.INITIALIZE,
       payload: {
-        props: { initialTab, mapType, currentSettings, currentPreferences, currentHexBounds, currentBackgroundImage, currentDistanceSettings },
+        props: { initialTab, mapType, currentSettings, currentPreferences, currentHexBounds, currentBackgroundImage, currentDistanceSettings, currentObjectSetId },
         globalSettings
       }
     });
@@ -558,6 +567,7 @@ const MapSettingsProvider: React.FC<MapSettingsProviderProps> = ({
       useGlobalSettings: state.useGlobalSettings,
       overrides: state.useGlobalSettings ? {} : state.overrides,
       coordinateDisplayMode: state.coordinateDisplayMode,
+      objectSetId: state.objectSetId,
       distanceSettings: state.distanceSettings.useGlobalDistance ? null : {
         distancePerCell: state.distanceSettings.distancePerCell,
         distanceUnit: state.distanceSettings.distanceUnit,
@@ -659,6 +669,7 @@ const MapSettingsProvider: React.FC<MapSettingsProviderProps> = ({
     setImageGridSize: (size) => dispatch({ type: Actions.SET_IMAGE_GRID_SIZE, payload: size }),
     handleResizeConfirmDelete,
     handleResizeConfirmCancel: () => dispatch({ type: Actions.CANCEL_RESIZE }),
+    handleObjectSetChange: (setId) => dispatch({ type: Actions.SET_OBJECT_SET_ID, payload: setId }),
     handleCancel: () => onClose(),
 
     // Dispatches needing context for orphan checks

@@ -193,6 +193,9 @@ interface SettingsModalState {
   pendingBoundsChange: PendingBoundsChange | null;
   orphanInfo: OrphanInfo;
   deleteOrphanedContent: boolean;
+
+  // Per-map object set
+  objectSetId: string | null;
 }
 
 // ===========================================
@@ -267,6 +270,7 @@ interface BuildInitialStateProps {
   currentHexBounds?: HexBounds;
   currentBackgroundImage?: CurrentBackgroundImage;
   currentDistanceSettings?: CurrentDistanceSettings;
+  currentObjectSetId?: string | null;
 }
 
 // ===========================================
@@ -309,7 +313,8 @@ const Actions = {
   SET_FOG_IMAGE_DISPLAY_NAME: 'SET_FOG_IMAGE_DISPLAY_NAME',
   SET_FOG_IMAGE_SEARCH_RESULTS: 'SET_FOG_IMAGE_SEARCH_RESULTS',
   FOG_IMAGE_SELECTED: 'FOG_IMAGE_SELECTED',
-  CLEAR_FOG_IMAGE: 'CLEAR_FOG_IMAGE'
+  CLEAR_FOG_IMAGE: 'CLEAR_FOG_IMAGE',
+  SET_OBJECT_SET_ID: 'SET_OBJECT_SET_ID'
 } as const;
 
 /** Action type union */
@@ -487,6 +492,11 @@ interface ClearFogImageAction {
   type: typeof Actions.CLEAR_FOG_IMAGE;
 }
 
+interface SetObjectSetIdAction {
+  type: typeof Actions.SET_OBJECT_SET_ID;
+  payload: string | null;
+}
+
 /** Discriminated union of all actions */
 type SettingsAction =
   | InitializeAction
@@ -523,7 +533,8 @@ type SettingsAction =
   | SetFogImageDisplayNameAction
   | SetFogImageSearchResultsAction
   | FogImageSelectedAction
-  | ClearFogImageAction;
+  | ClearFogImageAction
+  | SetObjectSetIdAction;
 
 // ===========================================
 // Constants
@@ -703,7 +714,9 @@ function buildInitialState(props: BuildInitialStateProps, globalSettings: Global
     showResizeConfirm: false,
     pendingBoundsChange: null,
     orphanInfo: { cells: 0, objects: 0 },
-    deleteOrphanedContent: false
+    deleteOrphanedContent: false,
+
+    objectSetId: props.currentObjectSetId ?? null
   };
 }
 
@@ -986,6 +999,9 @@ function settingsReducer(state: SettingsModalState, action: SettingsAction): Set
         }
       };
     
+    case Actions.SET_OBJECT_SET_ID:
+      return { ...state, objectSetId: action.payload };
+
     default:
       return state;
   }

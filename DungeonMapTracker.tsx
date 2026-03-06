@@ -648,7 +648,8 @@ const editingLayer = dc.useMemo(() => {
     const newMapData: MapData = {
       ...mapData,
       settings: settingsData,
-      uiPreferences: preferencesData
+      uiPreferences: preferencesData,
+      objectSetId: settingsData.objectSetId ?? null
     };
 
     // Only update hexBounds for hex maps
@@ -866,6 +867,7 @@ const editingLayer = dc.useMemo(() => {
             isCollapsed={mapData.sidebarCollapsed || false}
             onCollapseChange={handleSidebarCollapseChange}
             mapType={mapData.mapType || 'grid'}
+            objectSetId={mapData.objectSetId}
             isFreeformMode={freeformPlacementMode}
             onFreeformToggle={() => setFreeformPlacementMode(prev => !prev)}
           />
@@ -1030,6 +1032,7 @@ const editingLayer = dc.useMemo(() => {
           currentSettings={mapData.settings}
           currentPreferences={mapData.uiPreferences}
           currentHexBounds={mapData.mapType === 'hex' ? mapData.hexBounds : null}
+          currentObjectSetId={mapData.objectSetId}
           currentBackgroundImage={mapData.backgroundImage ?? null}
           currentCells={mapData.mapType === 'hex' ? (getActiveLayer(mapData).cells || []) : []}
           currentObjects={mapData.mapType === 'hex' ? (getActiveLayer(mapData).objects || []) : []}
