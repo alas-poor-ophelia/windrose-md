@@ -140,7 +140,8 @@ function renderCurveInteriorGrid(
   gridConfig: CurveGridConfig
 ): void {
   const { cellSize, lineColor, lineWidth, interiorRatio } = gridConfig;
-  const zoom = ctx.getTransform().a;
+  const t = ctx.getTransform();
+  const zoom = Math.sqrt(t.a * t.a + t.b * t.b) || 1;
   const actualLineWidth = Math.max(1, lineWidth * interiorRatio) / zoom;
   const halfWidth = actualLineWidth / 2;
 
@@ -181,7 +182,8 @@ function renderUnionInteriorGrid(
   gridConfig: CurveGridConfig
 ): void {
   const { cellSize, lineColor, lineWidth, interiorRatio } = gridConfig;
-  const zoom = ctx.getTransform().a;
+  const t = ctx.getTransform();
+  const zoom = Math.sqrt(t.a * t.a + t.b * t.b) || 1;
   const actualLineWidth = Math.max(1, lineWidth * interiorRatio) / zoom;
   const halfWidth = actualLineWidth / 2;
 

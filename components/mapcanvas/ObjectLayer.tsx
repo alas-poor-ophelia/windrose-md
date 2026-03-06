@@ -694,7 +694,7 @@ const ObjectLayer = ({
       return null;
     }
 
-    const screenPos = calculateObjectScreenPosition(selectedObject, canvasRef.current, mapData, geometry);
+    const screenPos = calculateObjectScreenPosition(selectedObject, canvasRef.current, mapData, geometry, containerRef);
 
     if (!screenPos) return null;
 
