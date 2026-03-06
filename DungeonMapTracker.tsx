@@ -724,6 +724,18 @@ const editingLayer = dc.useMemo(() => {
     }
   }, [mapData, updateMapData]);
 
+  const handleAlignmentGridSizeChange = dc.useCallback((newSize: number) => {
+    if (mapData && mapData.backgroundImage) {
+      updateMapData({
+        ...mapData,
+        backgroundImage: {
+          ...mapData.backgroundImage,
+          imageGridSize: newSize
+        }
+      });
+    }
+  }, [mapData, updateMapData]);
+
   const handleAlignmentApply = dc.useCallback((finalX: number, finalY: number) => {
     // Offset values are already in mapData from handleAlignmentOffsetChange
     setIsAlignmentMode(false);
@@ -1012,7 +1024,7 @@ const editingLayer = dc.useMemo(() => {
           onClose={handleSettingsClose}
           onSave={handleSettingsSave}
           onOpenAlignmentMode={handleOpenAlignmentMode}
-          initialTab={returningFromAlignment ? 'hexgrid' : null}
+          initialTab={returningFromAlignment ? (mapData?.mapType === 'hex' ? 'hexgrid' : 'gridbackground') : null}
           mapType={mapData?.mapType || 'grid'}
           orientation={mapData?.orientation || 'flat'}
           currentSettings={mapData.settings}
@@ -1035,6 +1047,8 @@ const editingLayer = dc.useMemo(() => {
             onOffsetChange={handleAlignmentOffsetChange}
             onApply={handleAlignmentApply}
             onCancel={handleAlignmentCancel}
+            gridSize={mapData.backgroundImage?.imageGridSize}
+            onGridSizeChange={mapData.mapType === 'grid' ? handleAlignmentGridSizeChange : undefined}
           />
         )}
 

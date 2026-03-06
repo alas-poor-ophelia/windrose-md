@@ -295,7 +295,7 @@ export interface MapSettingsContextValue extends
   // Props passed through
   isOpen: boolean;
   onClose: () => void;
-  onOpenAlignmentMode?: () => void;
+  onOpenAlignmentMode?: (currentX: number, currentY: number) => void;
   mapType: MapType;
   orientation: HexOrientation;
 
@@ -326,7 +326,7 @@ export interface MapSettingsProviderProps {
     calculatedHexSize: number | null,
     forceDelete: boolean
   ) => void;
-  onOpenAlignmentMode?: () => void;
+  onOpenAlignmentMode?: (currentX: number, currentY: number) => void;
   initialTab?: SettingsTabId | null;
   mapType?: MapType;
   orientation?: HexOrientation;

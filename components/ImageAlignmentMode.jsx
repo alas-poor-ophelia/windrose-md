@@ -16,7 +16,7 @@ const { ModalPortal } = await requireModuleByName("ModalPortal.tsx");
  * - Live offset display
  * - Apply/Reset/Cancel actions
  */
-function ImageAlignmentMode({ dc, isActive, offsetX, offsetY, onOffsetChange, onApply, onCancel }) {
+function ImageAlignmentMode({ dc, isActive, offsetX, offsetY, onOffsetChange, onApply, onCancel, gridSize, onGridSizeChange }) {
   const [panelPosition, setPanelPosition] = dc.useState({ x: null, y: null });
   const [isDragging, setIsDragging] = dc.useState(false);
   const [dragStart, setDragStart] = dc.useState({ x: 0, y: 0 });
@@ -25,14 +25,11 @@ function ImageAlignmentMode({ dc, isActive, offsetX, offsetY, onOffsetChange, on
   // Initialize panel position and store initial offset
   dc.useEffect(() => {
     if (isActive && panelPosition.x === null) {
-      // Position in bottom-right, accounting for panel size
+      // Position in bottom-right corner, 10% inset from edges
       const panelWidth = 280;
-      const panelHeight = 200;
-      const padding = 80;
-      
       setPanelPosition({
-        x: window.innerWidth - panelWidth - padding,
-        y: window.innerHeight - panelHeight - padding
+        x: window.innerWidth - panelWidth - Math.max(20, window.innerWidth * 0.05),
+        y: Math.max(20, window.innerHeight * 0.45)
       });
       
       // Store initial offset for reset/cancel
@@ -48,8 +45,8 @@ function ImageAlignmentMode({ dc, isActive, offsetX, offsetY, onOffsetChange, on
   // Canvas drag event handlers - use useCallback to stabilize
   const handleCanvasPointerDown = dc.useCallback((e) => {
     // Only handle events on the canvas
-    const canvas = document.querySelector('.dmt-canvas');
-    if (!canvas || !e.target.closest('.dmt-canvas')) {
+    const canvas = document.querySelector('[class^="dmt-canvas"]');
+    if (!canvas || !e.target.closest('[class^="dmt-canvas"]')) {
       return;
     }    // Only handle single-finger/mouse events (let two-finger pan through)
     if (e.touches && e.touches.length > 1) {      return;
@@ -86,44 +83,9 @@ function ImageAlignmentMode({ dc, isActive, offsetX, offsetY, onOffsetChange, on
   dc.useEffect(() => {    if (!isActive) {      return;
     }
     
-    const allCanvases = document.querySelectorAll('.dmt-canvas');    allCanvases.forEach((c, i) => {    });
-    
-    const canvas = document.querySelector('.dmt-canvas');
+    const canvas = document.querySelector('[class^="dmt-canvas"]');
     if (!canvas) return;
-    
-    // Check if this is the SAME canvas useEventCoordinator is using    
-    // Check if canvas has pointer-events blocked
-    const computedStyle = window.getComputedStyle(canvas);    
-    // Check what element is actually at the canvas center
-    const rect = canvas.getBoundingClientRect();
-    const centerX = rect.left + rect.width / 2;
-    const centerY = rect.top + rect.height / 2;    
-    const elementAtCenter = document.elementFromPoint(centerX, centerY);    
-    // Check if anything is overlaying
-    const allElementsAtPoint = [];
-    let checkElement = elementAtCenter;
-    while (checkElement) {
-      allElementsAtPoint.push(`${checkElement.tagName}.${checkElement.className}`);
-      checkElement = checkElement.parentElement;
-    }    
-    // Check canvas visibility    
-    // Check for scroll containers
-    let scrollParent = canvas.parentElement;
-    while (scrollParent) {
-      const scrollStyle = window.getComputedStyle(scrollParent);
-      const hasScroll = scrollParent.scrollHeight > scrollParent.clientHeight || 
-                       scrollParent.scrollWidth > scrollParent.clientWidth;
-      if (hasScroll || scrollStyle.overflow !== 'visible') {      }
-      if (scrollParent === document.body) break;
-      scrollParent = scrollParent.parentElement;
-    }
-    
-    // Test if ANY events reach this canvas
-    const testHandler = (e) => {    };
-    canvas.addEventListener('click', testHandler);
-    canvas.addEventListener('mousedown', testHandler);
-    canvas.addEventListener('mouseup', testHandler);
-    canvas.addEventListener('pointerdown', testHandler);    
+
     // Attach to document instead of canvas to avoid CodeMirror interception
     document.addEventListener('pointerdown', handleCanvasPointerDown);
     document.addEventListener('pointermove', handleCanvasPointerMove);
@@ -156,23 +118,25 @@ function ImageAlignmentMode({ dc, isActive, offsetX, offsetY, onOffsetChange, on
       if (e.target.tagName === 'INPUT') return;
       
       const step = e.shiftKey ? 10 : 1;
+      const safeX = typeof offsetX === 'number' && !isNaN(offsetX) ? offsetX : 0;
+      const safeY = typeof offsetY === 'number' && !isNaN(offsetY) ? offsetY : 0;
       let handled = false;
-      
+
       switch (e.key) {
         case 'ArrowLeft':
-          onOffsetChange(offsetX - step, offsetY);
+          onOffsetChange(safeX - step, safeY);
           handled = true;
           break;
         case 'ArrowRight':
-          onOffsetChange(offsetX + step, offsetY);
+          onOffsetChange(safeX + step, safeY);
           handled = true;
           break;
         case 'ArrowUp':
-          onOffsetChange(offsetX, offsetY - step);
+          onOffsetChange(safeX, safeY - step);
           handled = true;
           break;
         case 'ArrowDown':
-          onOffsetChange(offsetX, offsetY + step);
+          onOffsetChange(safeX, safeY + step);
           handled = true;
           break;
         case 'Enter':
@@ -195,39 +159,48 @@ function ImageAlignmentMode({ dc, isActive, offsetX, offsetY, onOffsetChange, on
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isActive, offsetX, offsetY, onOffsetChange]);
   
-  // Panel dragging
-  const handlePanelMouseDown = dc.useCallback((e) => {
+  // Panel dragging (mouse + touch)
+  const handlePanelPointerDown = dc.useCallback((e) => {
     // Only drag from header
     if (!e.target.closest('.alignment-panel-header')) return;
-    
+
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
     setIsDragging(true);
     setDragStart({
-      x: e.clientX - panelPosition.x,
-      y: e.clientY - panelPosition.y
+      x: clientX - panelPosition.x,
+      y: clientY - panelPosition.y
     });
     e.preventDefault();
   }, [panelPosition]);
-  
+
   dc.useEffect(() => {
     if (!isDragging) return;
-    
-    const handleMouseMove = (e) => {
+
+    const handleMove = (e) => {
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
       setPanelPosition({
-        x: e.clientX - dragStart.x,
-        y: e.clientY - dragStart.y
+        x: clientX - dragStart.x,
+        y: clientY - dragStart.y
       });
     };
-    
-    const handleMouseUp = () => {
+
+    const handleEnd = () => {
       setIsDragging(false);
     };
-    
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-    
+
+    document.addEventListener('mousemove', handleMove);
+    document.addEventListener('mouseup', handleEnd);
+    document.addEventListener('touchmove', handleMove, { passive: false });
+    document.addEventListener('touchend', handleEnd);
+
     return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener('mousemove', handleMove);
+      document.removeEventListener('mouseup', handleEnd);
+      document.removeEventListener('touchmove', handleMove);
+      document.removeEventListener('touchend', handleEnd);
     };
   }, [isDragging, dragStart]);
   
@@ -253,6 +226,13 @@ function ImageAlignmentMode({ dc, isActive, offsetX, offsetY, onOffsetChange, on
     const value = parseInt(e.target.value, 10) || 0;
     onOffsetChange(offsetX, value);
   }, [offsetX, onOffsetChange]);
+
+  const handleGridSizeChange = dc.useCallback((e) => {
+    const value = parseInt(e.target.value, 10);
+    if (onGridSizeChange && value > 0) {
+      onGridSizeChange(value);
+    }
+  }, [onGridSizeChange]);
   
   if (!isActive || panelPosition.x === null) return null;
   
@@ -265,6 +245,9 @@ function ImageAlignmentMode({ dc, isActive, offsetX, offsetY, onOffsetChange, on
           left: `${panelPosition.x}px`,
           top: `${panelPosition.y}px`,
           width: '280px',
+          maxHeight: 'calc(100vh - 40px)',
+          display: 'flex',
+          flexDirection: 'column',
           background: 'var(--background-primary)',
           border: '1px solid var(--background-modifier-border)',
           borderRadius: '8px',
@@ -273,7 +256,8 @@ function ImageAlignmentMode({ dc, isActive, offsetX, offsetY, onOffsetChange, on
           cursor: isDragging ? 'grabbing' : 'default',
           userSelect: 'none'
         }}
-        onMouseDown={handlePanelMouseDown}
+        onMouseDown={handlePanelPointerDown}
+        onTouchStart={handlePanelPointerDown}
       >
         {/* Header - Draggable */}
         <div
@@ -296,7 +280,7 @@ function ImageAlignmentMode({ dc, isActive, offsetX, offsetY, onOffsetChange, on
         </div>
         
         {/* Content */}
-        <div style={{ padding: '16px' }}>
+        <div style={{ padding: '16px', overflowY: 'auto', flex: 1 }}>
           {/* Offset Display */}
           <div style={{ marginBottom: '16px' }}>
             <div style={{ display: 'flex', gap: '12px', marginBottom: '8px' }}>
@@ -341,6 +325,31 @@ function ImageAlignmentMode({ dc, isActive, offsetX, offsetY, onOffsetChange, on
             </div>
           </div>
           
+          {/* Grid Size */}
+          {onGridSizeChange && (
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>
+                Background Grid Size (px)
+              </label>
+              <input
+                type="number"
+                value={gridSize || ''}
+                min="1"
+                onChange={handleGridSizeChange}
+                placeholder="e.g. 140"
+                style={{
+                  width: '100%',
+                  padding: '6px 8px',
+                  fontSize: '13px',
+                  background: 'var(--background-primary)',
+                  border: '1px solid var(--background-modifier-border)',
+                  borderRadius: '4px',
+                  color: 'var(--text-normal)'
+                }}
+              />
+            </div>
+          )}
+
           {/* Instructions */}
           <div
             style={{

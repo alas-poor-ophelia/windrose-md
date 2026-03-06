@@ -33,7 +33,7 @@ interface GridBackgroundContext {
   setImageOffsetY: (y: number) => void;
   imageGridSize: number;
   setImageGridSize: (size: number) => void;
-  onOpenAlignmentMode?: () => void;
+  onOpenAlignmentMode?: (currentX: number, currentY: number) => void;
 }
 
 /**
@@ -260,7 +260,7 @@ function GridBackgroundTab(): React.ReactElement | null {
               description="Drag the image to align with the grid"
             >
               <button
-                onClick={onOpenAlignmentMode}
+                onClick={() => onOpenAlignmentMode?.(imageOffsetX, imageOffsetY)}
                 class="mod-cta"
                 style={{ padding: '6px 12px', fontSize: '13px' }}
               >
