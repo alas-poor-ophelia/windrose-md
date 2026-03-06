@@ -149,7 +149,7 @@ function NativeModalPortal({
 
   return h('div', {
     ref: wrapperRef,
-    style: isPortaled ? undefined : { display: 'none' }
+    style: isPortaled ? { display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 } : { display: 'none' }
   }, children);
 }
 

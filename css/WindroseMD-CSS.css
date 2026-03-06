@@ -1482,16 +1482,20 @@ button.dmt-orientation-btn,
 
 /* Settings modal specific - cap height and make scrollable */
 .dmt-settings-modal {
-  max-height: 500px;
   display: flex;
   flex-direction: column;
-  
+
   .dmt-modal-body {
     flex: 1;
     overflow-y: auto;
     overflow-x: hidden;
     min-height: 0;
   }
+}
+
+/* Fallback (non-native) modal: cap the inner height */
+.dmt-modal-content.dmt-settings-modal {
+  max-height: 500px;
 }
 
 /* Native Obsidian modal sizing */
@@ -1501,9 +1505,13 @@ button.dmt-orientation-btn,
 }
 .dmt-settings-native-modal .modal-content {
   max-height: 70vh;
-  overflow-y: auto;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+}
+.dmt-settings-native-modal .dmt-settings-modal {
+  flex: 1;
+  min-height: 0;
 }
 
 .dmt-modal-footer {
