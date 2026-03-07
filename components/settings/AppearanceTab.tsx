@@ -325,6 +325,8 @@ function AppearanceTab(): React.ReactElement {
     useGlobalSettings,
     overrides,
     globalSettings,
+    objectSetId,
+    handleObjectSetChange,
     handleToggleUseGlobal,
     handleLineWidthChange,
     handleColorChange,
@@ -333,6 +335,24 @@ function AppearanceTab(): React.ReactElement {
 
   return (
     <div class="dmt-settings-tab-content">
+      {globalSettings.objectSets && globalSettings.objectSets.length > 0 && (
+        <SettingItem
+          name="Object set"
+          description="Override the global object set for this map"
+        >
+          <select
+            class="dropdown"
+            value={objectSetId || ''}
+            onChange={(e) => handleObjectSetChange(e.currentTarget.value || null)}
+          >
+            <option value="">Use global</option>
+            {globalSettings.objectSets.map((set) => (
+              <option key={set.id} value={set.id}>{set.name}</option>
+            ))}
+          </select>
+        </SettingItem>
+      )}
+
       <SettingItem
         name="Custom colors"
         description="Override global color settings for this map"

@@ -29,8 +29,6 @@ function PreferencesTab(): React.ReactElement {
     useGlobalSettings,
     overrides,
     globalSettings,
-    objectSetId,
-    handleObjectSetChange,
     handlePreferenceToggle,
     handleColorChange,
     mapData,
@@ -72,24 +70,6 @@ function PreferencesTab(): React.ReactElement {
 
   return (
     <div class="dmt-settings-tab-content">
-      {globalSettings.objectSets && globalSettings.objectSets.length > 0 && (
-        <SettingItem
-          name="Object set"
-          description="Override the global object set for this map"
-        >
-          <select
-            class="dropdown"
-            value={objectSetId || ''}
-            onChange={(e) => handleObjectSetChange(e.currentTarget.value || null)}
-          >
-            <option value="">Use global</option>
-            {globalSettings.objectSets.map((set) => (
-              <option key={set.id} value={set.id}>{set.name}</option>
-            ))}
-          </select>
-        </SettingItem>
-      )}
-
       <SettingItem
         name="Remember pan and zoom"
         description="Restore map position when reopening"
