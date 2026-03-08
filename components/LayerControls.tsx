@@ -73,11 +73,7 @@ const LayerControls = ({
   const reversedLayers = [...layers].reverse();
   const activeLayerId = mapData?.activeLayerId;
 
-  const handleOverlayClick = (e: JSX.TargetedMouseEvent<HTMLDivElement> | JSX.TargetedTouchEvent<HTMLDivElement>): void => {
-    e.stopPropagation();
-    e.preventDefault();
-    setExpandedLayerId(null);
-  };
+  const controlsRef = dc.useRef<HTMLDivElement>(null);
 
   dc.useEffect(() => {
     if (!expandedLayerId) return;
@@ -88,8 +84,18 @@ const LayerControls = ({
       }
     };
 
+    const handleClickOutside = (e: PointerEvent): void => {
+      if (controlsRef.current && !controlsRef.current.contains(e.target as Node)) {
+        setExpandedLayerId(null);
+      }
+    };
+
     document.addEventListener('keydown', handleEscape);
-    return () => document.removeEventListener('keydown', handleEscape);
+    document.addEventListener('pointerdown', handleClickOutside, true);
+    return () => {
+      document.removeEventListener('keydown', handleEscape);
+      document.removeEventListener('pointerdown', handleClickOutside, true);
+    };
   }, [expandedLayerId]);
 
   const handleLayerClick = (layerId: string, e: JSX.TargetedMouseEvent<HTMLButtonElement>): void => {
@@ -256,18 +262,8 @@ const LayerControls = ({
   };
 
   return (
-    <>
-      {expandedLayerId && (
-        <div
-          className="dmt-layer-overlay"
-          onClick={handleOverlayClick}
-          onContextMenu={handleOverlayClick}
-          onMouseDown={handleOverlayClick}
-          onTouchStart={handleOverlayClick}
-        />
-      )}
-
       <div
+        ref={controlsRef}
         className={`dmt-layer-controls ${sidebarCollapsed ? 'sidebar-closed' : 'sidebar-open'} ${isOpen ? 'dmt-layer-controls-open' : ''}`}
       >
         {reversedLayers.map((layer, visualIndex) => {
@@ -373,7 +369,6 @@ const LayerControls = ({
           <dc.Icon icon="lucide-plus" />
         </button>
       </div>
-    </>
   );
 };
 

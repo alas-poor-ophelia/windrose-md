@@ -3127,17 +3127,6 @@ button.dmt-fow-tool-btn,
    ============================================ */
 
 /* Invisible overlay to block clicks when context menu is open */
-.dmt-layer-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 149; /* Just below layer controls (150) */
-  background: transparent;
-  cursor: default;
-}
-
 .dmt-layer-controls {
   position: absolute;
   top: 50%;
@@ -3168,7 +3157,6 @@ button.dmt-fow-tool-btn,
 .dmt-layer-controls.dmt-layer-controls-open {
   opacity: 1;
   transform: translateY(-50%) translateX(0);
-  pointer-events: auto;
 }
 
 .dmt-layer-controls.sidebar-open {
@@ -3185,6 +3173,7 @@ button.dmt-fow-tool-btn,
   display: flex;
   align-items: center;
   width: fit-content;
+  pointer-events: auto;
 }
 
 /* Layer Button */
@@ -3385,6 +3374,7 @@ button.dmt-layer-add-btn {
   overflow: hidden;
   transition: all 0.2s ease;
   margin-top: 4px;
+  pointer-events: auto;
 }
 
 .dmt-layer-add-btn:hover {
