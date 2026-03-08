@@ -639,7 +639,7 @@ const editingLayer = dc.useMemo(() => {
     settingsData: MapSettings,
     preferencesData: UIPreferences,
     hexBounds: HexBounds | null = null,
-    backgroundImage: BackgroundImage | undefined = undefined,
+    backgroundImage: BackgroundImage | null = null,
     hexSize: number | null = null,
     deleteOrphanedContent: boolean = false
   ): void => {
@@ -678,10 +678,8 @@ const editingLayer = dc.useMemo(() => {
       }
     }
 
-    // Update backgroundImage for both grid and hex maps
-    if (backgroundImage !== undefined) {
-      newMapData.backgroundImage = backgroundImage;
-    }
+    // Update backgroundImage for both grid and hex maps (null clears it)
+    newMapData.backgroundImage = backgroundImage;
 
     // Update hexSize if calculated from background image
     if (hexSize !== null && mapData.mapType === 'hex') {

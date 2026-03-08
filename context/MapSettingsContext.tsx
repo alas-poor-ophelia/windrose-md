@@ -329,7 +329,7 @@ export interface MapSettingsProviderProps {
     settingsData: SettingsSaveData,
     preferences: ModalPreferences,
     hexBounds: HexBounds | null,
-    backgroundImageData: BackgroundImageConfig | undefined,
+    backgroundImageData: BackgroundImageConfig | null,
     calculatedHexSize: number | null,
     forceDelete: boolean
   ) => void;
@@ -577,7 +577,7 @@ const MapSettingsProvider: React.FC<MapSettingsProviderProps> = ({
     };
 
     // Build background image data for both grid and hex maps
-    const backgroundImageData: BackgroundImageConfig | undefined = state.backgroundImagePath ? {
+    const backgroundImageData: BackgroundImageConfig | null = state.backgroundImagePath ? {
       path: state.backgroundImagePath,
       opacity: state.imageOpacity,
       offsetX: state.imageOffsetX,
@@ -596,7 +596,7 @@ const MapSettingsProvider: React.FC<MapSettingsProviderProps> = ({
         measurementSize: state.measurementSize,
         fineTuneOffset: state.fineTuneOffset
       } : {})
-    } : undefined;
+    } : null;
 
     let calculatedHexSize: number | null = null;
     if (mapType === 'hex' && state.backgroundImagePath && state.boundsLocked && state.imageDimensions) {
