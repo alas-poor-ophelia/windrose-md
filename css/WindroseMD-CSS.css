@@ -3138,20 +3138,6 @@ button.dmt-fow-tool-btn,
   opacity: 0;
   pointer-events: none;
   transition: left 0.3s ease, opacity 200ms ease-out, transform 200ms ease-out;
-  /* Constrain height to canvas and enable scrolling */
-  max-height: calc(100% - 80px);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  /* Padding for slide-out options menu and slider popup */
-  padding-right: 200px;
-  margin-right: -200px;
-  /* Hide scrollbar but keep scroll functionality */
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-
-.dmt-layer-controls::-webkit-scrollbar {
-  display: none;
 }
 
 .dmt-layer-controls.dmt-layer-controls-open {
@@ -3173,7 +3159,7 @@ button.dmt-fow-tool-btn,
   display: flex;
   align-items: center;
   width: fit-content;
-  pointer-events: auto;
+  pointer-events: none;
 }
 
 /* Layer Button */
@@ -3198,6 +3184,7 @@ button.dmt-layer-btn {
   transition: all 0.2s ease;
   position: relative;
   user-select: none;
+  pointer-events: auto;
 }
 
 .dmt-layer-btn:hover {
