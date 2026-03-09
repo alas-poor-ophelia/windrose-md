@@ -1,9 +1,9 @@
 <!-- Compiled by Datacore Script Compiler -->
 <!-- Source: Projects/dungeon-map-tracker -->
 <!-- Main Component: DungeonMapTracker -->
-<!-- Compiled: 2026-02-28T07:49:32.008Z -->
-<!-- Files: 151 -->
-<!-- Version: 1.5.7 -->
+<!-- Compiled: 2026-03-09T04:46:35.658Z -->
+<!-- Files: 155 -->
+<!-- Version: 1.5.8 -->
 <!-- CSS Files: 1 -->
 
 # Demo
@@ -870,6 +870,40 @@ function getObjectSettings(mapType: 'hex' | 'grid' = 'grid'): ObjectSettings {
 }
 
 /**
+ * Get object settings from a specific object set by ID
+ * Returns null if the set is not found (caller should fall back to global)
+ */
+function getObjectSettingsForSet(setId: string, mapType: 'hex' | 'grid' = 'grid'): ObjectSettings | null {
+  try {
+    if (!dc || !(dc as { app?: ObsidianApp }).app || !(dc as { app: ObsidianApp }).app.plugins) {
+      return null;
+    }
+
+    const app = (dc as { app: ObsidianApp }).app;
+    const plugin = app.plugins.plugins['dungeon-map-tracker-settings'];
+
+    if (plugin && plugin.settings) {
+      const sets = plugin.settings.objectSets || [];
+      const set = sets.find((s: { id: string }) => s.id === setId);
+      if (!set) return null;
+
+      const sideData = mapType === 'hex' ? set.data?.hex : set.data?.grid;
+      if (!sideData) return FALLBACK_OBJECT_SETTINGS;
+
+      return {
+        objectOverrides: sideData.objectOverrides || {},
+        customObjects: sideData.customObjects || [],
+        customCategories: sideData.customCategories || []
+      };
+    }
+  } catch (error) {
+    console.warn('[settingsAccessor] Could not resolve object set:', setId, error);
+  }
+
+  return null;
+}
+
+/**
  * Get color palette settings from the plugin
  * Returns resolved color palette (built-in with overrides + custom colors)
  */
@@ -937,16 +971,17 @@ function getColorPaletteSettings(): ResolvedColorEntry[] {
 // Exports
 // ===========================================
 
-return { 
-  getSettings, 
-  getSetting, 
-  isPluginAvailable, 
-  getTheme, 
-  getEffectiveSettings, 
-  getObjectSettings, 
-  getColorPaletteSettings, 
-  FALLBACK_SETTINGS, 
-  BUILT_IN_COLORS 
+return {
+  getSettings,
+  getSetting,
+  isPluginAvailable,
+  getTheme,
+  getEffectiveSettings,
+  getObjectSettings,
+  getObjectSettingsForSet,
+  getColorPaletteSettings,
+  FALLBACK_SETTINGS,
+  BUILT_IN_COLORS
 };
 ```
 
@@ -3192,6 +3227,7 @@ interface ObjectTypesModule {
 /** Settings accessor module */
 interface SettingsAccessorModule {
   getObjectSettings: (mapType: MapType) => ObjectSettings;
+  getObjectSettingsForSet: (setId: string, mapType: MapType) => ObjectSettings | null;
 }
 
 /** RPG Awesome icons module */
@@ -3202,8 +3238,17 @@ interface RPGAwesomeIconsModule {
 }
 
 const { OBJECT_TYPES, CATEGORIES } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "objectTypes")) as ObjectTypesModule;
-const { getObjectSettings } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "settingsAccessor")) as SettingsAccessorModule;
+const { getObjectSettings, getObjectSettingsForSet } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "settingsAccessor")) as SettingsAccessorModule;
 const { RA_ICONS, getIconChar, getIconInfo } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "rpgAwesomeIcons")) as RPGAwesomeIconsModule;
+
+/** Resolve object settings: per-map set -> global -> defaults */
+function resolveObjectSettings(mapType: MapType, objectSetId?: string | null): ObjectSettings {
+  if (objectSetId) {
+    const setSettings = getObjectSettingsForSet(objectSetId, mapType);
+    if (setSettings) return setSettings;
+  }
+  return getObjectSettings(mapType);
+}
 
 /**
  * Fallback for unknown/deleted object types
@@ -3288,8 +3333,8 @@ const BUILT_IN_CATEGORY_ORDER: Record<string, number> = {
  * Get effective object types list (built-ins + overrides + custom)
  * This is the main function consumers should use for listing available objects.
  */
-function getResolvedObjectTypes(mapType: MapType = 'grid'): ObjectTypeDefinition[] {
-  const settings = getObjectSettings(mapType);
+function getResolvedObjectTypes(mapType: MapType = 'grid', objectSetId?: string | null): ObjectTypeDefinition[] {
+  const settings = resolveObjectSettings(mapType, objectSetId);
   const { objectOverrides = {}, customObjects = [] } = settings;
 
   // Apply overrides to built-ins, filter out hidden ones
@@ -3333,8 +3378,8 @@ function getResolvedObjectTypes(mapType: MapType = 'grid'): ObjectTypeDefinition
 /**
  * Get effective categories list (built-ins + custom), sorted by order
  */
-function getResolvedCategories(mapType: MapType = 'grid'): CategoryDefinition[] {
-  const settings = getObjectSettings(mapType);
+function getResolvedCategories(mapType: MapType = 'grid', objectSetId?: string | null): CategoryDefinition[] {
+  const settings = resolveObjectSettings(mapType, objectSetId);
   const { customCategories = [] } = settings;
 
   // Add order to built-in categories
@@ -3361,8 +3406,8 @@ function getResolvedCategories(mapType: MapType = 'grid'): CategoryDefinition[] 
  * Get list of hidden built-in objects
  * Useful for showing a "hidden objects" section in settings
  */
-function getHiddenObjects(mapType: MapType = 'grid'): ObjectTypeDefinition[] {
-  const settings = getObjectSettings(mapType);
+function getHiddenObjects(mapType: MapType = 'grid', objectSetId?: string | null): ObjectTypeDefinition[] {
+  const settings = resolveObjectSettings(mapType, objectSetId);
   const { objectOverrides = {} } = settings;
 
   return OBJECT_TYPES
@@ -3378,7 +3423,7 @@ function getHiddenObjects(mapType: MapType = 'grid'): ObjectTypeDefinition[] {
  * Get a single object type by ID
  * Returns the resolved version (with overrides applied) or fallback for unknown
  */
-function getObjectType(typeId: string | null | undefined, mapType: MapType = 'grid'): ObjectTypeDefinition {
+function getObjectType(typeId: string | null | undefined, mapType: MapType = 'grid', objectSetId?: string | null): ObjectTypeDefinition {
   // Handle null/undefined
   if (!typeId) {
     return UNKNOWN_OBJECT_FALLBACK;
@@ -3389,7 +3434,7 @@ function getObjectType(typeId: string | null | undefined, mapType: MapType = 'gr
     return UNKNOWN_OBJECT_FALLBACK;
   }
 
-  const settings = getObjectSettings(mapType);
+  const settings = resolveObjectSettings(mapType, objectSetId);
   const { objectOverrides = {}, customObjects = [] } = settings;
 
   // Check built-in objects first (including hidden ones - they still need to render)
@@ -3430,8 +3475,8 @@ function getObjectType(typeId: string | null | undefined, mapType: MapType = 'gr
 /**
  * Check if an object type exists (built-in or custom, not hidden)
  */
-function objectTypeExists(typeId: string, mapType: MapType = 'grid'): boolean {
-  const objType = getObjectType(typeId, mapType);
+function objectTypeExists(typeId: string, mapType: MapType = 'grid', objectSetId?: string | null): boolean {
+  const objType = getObjectType(typeId, mapType, objectSetId);
   return objType.id !== '__unknown__' && !objType.isHidden;
 }
 
@@ -3666,7 +3711,7 @@ function useMapData(
   dc.useEffect(() => {
     if (!mapData) return;
 
-    const objectTypes = getResolvedObjectTypes(mapData.mapType);
+    const objectTypes = getResolvedObjectTypes(mapData.mapType, mapData.objectSetId);
     const imageObjects = objectTypes.filter(hasImagePath);
 
     for (const objType of imageObjects) {
@@ -3674,7 +3719,7 @@ function useMapData(
         preloadImage(objType.imagePath);
       }
     }
-  }, [mapData?.mapType, settingsVersion]);
+  }, [mapData?.mapType, mapData?.objectSetId, settingsVersion]);
 
   // Listen for settings changes to trigger image preload
   dc.useEffect(() => {
@@ -7603,6 +7648,77 @@ function canPlaceObjectAt(
 }
 
 // ===========================================
+// Freeform Placement API
+// ===========================================
+
+/**
+ * Place an object at exact world coordinates (freeform, not grid-snapped).
+ * No collision check — freeform objects can overlap anything.
+ */
+function placeObjectFreeform(
+  objects: MapObject[],
+  typeId: string,
+  worldX: number,
+  worldY: number,
+  nearestGridPos: { x: number; y: number },
+  mapType: MapType
+): PlacementResult {
+  const objectType = getObjectType(typeId, mapType);
+  if (objectType.isUnknown) {
+    return { objects, success: false, error: `Unknown object type: ${typeId}` };
+  }
+
+  const newObject: MapObject = {
+    id: generateObjectId(),
+    type: typeId,
+    position: nearestGridPos,
+    size: { width: 1, height: 1 },
+    label: objectType.label,
+    linkedNote: null,
+    freeform: true,
+    worldPosition: { x: worldX, y: worldY }
+  };
+
+  return { objects: [...objects, newObject], success: true, object: newObject };
+}
+
+/**
+ * Convert a grid-anchored object to freeform.
+ * Computes worldPosition from grid position + alignment offset using cell center coords.
+ */
+function convertObjectToFreeform(
+  obj: MapObject,
+  cellCenterWorldX: number,
+  cellCenterWorldY: number,
+  cellSize: number
+): ObjectUpdate {
+  const alignOffset = getAlignmentOffset(obj.alignment || 'center');
+  return {
+    freeform: true,
+    worldPosition: {
+      x: cellCenterWorldX + alignOffset.offsetX * cellSize,
+      y: cellCenterWorldY + alignOffset.offsetY * cellSize
+    },
+    alignment: 'center' as ObjectAlignment
+  };
+}
+
+/**
+ * Convert a freeform object to grid-anchored.
+ * Snaps to the nearest grid cell and clears freeform fields.
+ */
+function snapObjectToGrid(
+  nearestGridPos: { x: number; y: number }
+): ObjectUpdate {
+  return {
+    position: nearestGridPos,
+    freeform: undefined,
+    worldPosition: undefined,
+    alignment: 'center' as ObjectAlignment
+  };
+}
+
+// ===========================================
 // Exports
 // ===========================================
 
@@ -7631,7 +7747,12 @@ return {
   // Unified API (preferred for new code)
   placeObject,
   eraseObjectAt,
-  canPlaceObjectAt
+  canPlaceObjectAt,
+
+  // Freeform placement API
+  placeObjectFreeform,
+  convertObjectToFreeform,
+  snapObjectToGrid
 };
 ```
 
@@ -7795,6 +7916,10 @@ function renderTextLabel(
   const { screenX, screenY } = position;
 
   ctx.save();
+
+  if (label.opacity !== undefined && label.opacity !== 1) {
+    ctx.globalAlpha = label.opacity;
+  }
 
   ctx.translate(screenX, screenY);
   ctx.rotate(((label.rotation || 0) * Math.PI) / 180);
@@ -8958,6 +9083,7 @@ interface MapLayer {
 interface GeometryLike {
   toOffsetCoords: (x: number, y: number) => { col: number; row: number };
   gridToScreen: (x: number, y: number, offsetX: number, offsetY: number, zoom: number) => { screenX: number; screenY: number };
+  worldToScreen: (worldX: number, worldY: number, offsetX: number, offsetY: number, zoom: number) => { screenX: number; screenY: number };
 }
 
 interface ObjectRenderContext {
@@ -9034,6 +9160,22 @@ function calculateObjectPosition(
 ): { screenX: number; screenY: number; objectWidth: number; objectHeight: number } {
   const { offsetX, offsetY, zoom, scaledSize } = context;
   const size = obj.size || { width: 1, height: 1 };
+
+  // Freeform objects use world-space coordinates directly
+  // worldPosition is the object's center, but the renderer expects top-left
+  if (obj.freeform && obj.worldPosition) {
+    const { screenX, screenY } = geometry.worldToScreen(
+      obj.worldPosition.x, obj.worldPosition.y, offsetX, offsetY, zoom
+    );
+    const objW = size.width * scaledSize;
+    const objH = size.height * scaledSize;
+    return {
+      screenX: screenX - objW / 2,
+      screenY: screenY - objH / 2,
+      objectWidth: objW,
+      objectHeight: objH
+    };
+  }
 
   let { screenX, screenY } = geometry.gridToScreen(obj.position.x, obj.position.y, offsetX, offsetY, zoom);
   let objectWidth = size.width * scaledSize;
@@ -9500,6 +9642,22 @@ function renderResizeOverlay(
   }
 }
 
+function renderDiamondHandle(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  size: number
+): void {
+  const r = size / 2;
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - r);
+  ctx.lineTo(cx + r, cy);
+  ctx.lineTo(cx, cy + r);
+  ctx.lineTo(cx - r, cy);
+  ctx.closePath();
+  ctx.fill();
+}
+
 /**
  * Renders selection rectangle and corner handles for an object.
  */
@@ -9509,7 +9667,8 @@ function renderObjectSelectionRectangle(
   screenY: number,
   objectWidth: number,
   objectHeight: number,
-  isResizeMode: boolean
+  isResizeMode: boolean,
+  freeform: boolean = false
 ): void {
   // Draw selection rectangle
   ctx.strokeStyle = SELECTION_COLOR;
@@ -9522,10 +9681,20 @@ function renderObjectSelectionRectangle(
   ctx.fillStyle = SELECTION_COLOR;
   const handleSize = isResizeMode ? HANDLE_SIZE_RESIZE : HANDLE_SIZE_NORMAL;
 
-  ctx.fillRect(screenX + 2 - handleSize/2, screenY + 2 - handleSize/2, handleSize, handleSize);
-  ctx.fillRect(screenX + objectWidth - 2 - handleSize/2, screenY + 2 - handleSize/2, handleSize, handleSize);
-  ctx.fillRect(screenX + 2 - handleSize/2, screenY + objectHeight - 2 - handleSize/2, handleSize, handleSize);
-  ctx.fillRect(screenX + objectWidth - 2 - handleSize/2, screenY + objectHeight - 2 - handleSize/2, handleSize, handleSize);
+  const corners = [
+    { cx: screenX + 2, cy: screenY + 2 },
+    { cx: screenX + objectWidth - 2, cy: screenY + 2 },
+    { cx: screenX + 2, cy: screenY + objectHeight - 2 },
+    { cx: screenX + objectWidth - 2, cy: screenY + objectHeight - 2 }
+  ];
+
+  for (const { cx, cy } of corners) {
+    if (freeform) {
+      renderDiamondHandle(ctx, cx, cy, handleSize);
+    } else {
+      ctx.fillRect(cx - handleSize/2, cy - handleSize/2, handleSize, handleSize);
+    }
+  }
 }
 
 /**
@@ -9545,7 +9714,17 @@ function renderObjectSelection(
 ): void {
   let position: { screenX: number; screenY: number; objectWidth: number; objectHeight: number; cellWidth: number; cellHeight: number };
 
-  if (isHexMap && hexGeometry) {
+  if (object.freeform && object.worldPosition) {
+    const { offsetX, offsetY, zoom, scaledSize } = context;
+    const size = object.size || { width: 1, height: 1 };
+    const { screenX, screenY } = geometry.worldToScreen(
+      object.worldPosition.x, object.worldPosition.y, offsetX, offsetY, zoom
+    );
+    const objectWidth = size.width * scaledSize;
+    const objectHeight = size.height * scaledSize;
+    // worldPosition is the object center; convert to top-left for selection rendering
+    position = { screenX: screenX - objectWidth / 2, screenY: screenY - objectHeight / 2, objectWidth, objectHeight, cellWidth: scaledSize, cellHeight: scaledSize };
+  } else if (isHexMap && hexGeometry) {
     position = calculateHexObjectSelectionPosition(object, allObjects, hexGeometry, context, orientation, deps);
   } else {
     position = calculateGridObjectSelectionPosition(object, geometry, context);
@@ -9559,7 +9738,7 @@ function renderObjectSelection(
   }
 
   // Draw selection rectangle and handles
-  renderObjectSelectionRectangle(ctx, screenX, screenY, objectWidth, objectHeight, isResizeMode);
+  renderObjectSelectionRectangle(ctx, screenX, screenY, objectWidth, objectHeight, isResizeMode, !!object.freeform);
 }
 
 /**
@@ -11731,254 +11910,6 @@ export type {
 return { segmentRenderer };
 ```
 
-# curveRenderer
-
-```ts
-/**
- * curveRenderer.ts
- *
- * Renders freehand curves on the HTML Canvas 2D context.
- * Builds and caches Path2D objects per curve, applies viewport transforms,
- * fills closed paths with even-odd rule, and strokes all paths.
- */
-
-import type { Curve } from '#types/core/curve.types';
-import type { RendererTheme } from '#types/hooks/canvasRenderer.types';
-
-/** Viewport state needed for rendering */
-interface CurveViewState {
-  x: number;  // offsetX
-  y: number;  // offsetY
-  zoom: number;
-}
-
-const path2DCache = new WeakMap<Curve, Path2D>();
-
-/**
- * Build a Path2D for a curve, including holes.
- * Caches in a WeakMap for reuse across frames.
- */
-function buildPath2D(curve: Curve): Path2D {
-  const cached = path2DCache.get(curve);
-  if (cached) return cached;
-
-  const path = new Path2D();
-  const [sx, sy] = curve.start;
-  path.moveTo(sx, sy);
-
-  const segs = curve.segments;
-  for (let i = 0; i < segs.length; i++) {
-    const seg = segs[i];
-    path.bezierCurveTo(seg[0], seg[1], seg[2], seg[3], seg[4], seg[5]);
-  }
-
-  if (curve.closed) {
-    path.closePath();
-  }
-
-  // Add inner rings as subpaths (counter-wound for even-odd fill)
-  if (curve.innerRings) {
-    for (let h = 0; h < curve.innerRings.length; h++) {
-      const ring = curve.innerRings[h];
-      if (!ring || ring.length < 3) continue;
-      path.moveTo(ring[0][0], ring[0][1]);
-      for (let i = 1; i < ring.length; i++) {
-        path.lineTo(ring[i][0], ring[i][1]);
-      }
-      path.closePath();
-    }
-  }
-
-  path2DCache.set(curve, path);
-  return path;
-}
-
-/** Grid configuration for interior grid lines inside curves */
-interface CurveGridConfig {
-  cellSize: number;
-  lineColor: string;
-  lineWidth: number;
-  interiorRatio: number;
-}
-
-/**
- * Compute the world-coordinate bounding box of a curve from its geometry.
- */
-function getCurveBounds(curve: Curve): { minX: number; minY: number; maxX: number; maxY: number } {
-  let minX = curve.start[0];
-  let minY = curve.start[1];
-  let maxX = minX;
-  let maxY = minY;
-
-  const segs = curve.segments;
-  for (let i = 0; i < segs.length; i++) {
-    const seg = segs[i];
-    // Check all 3 points per segment (cp1, cp2, endpoint)
-    for (let j = 0; j < 6; j += 2) {
-      const px = seg[j];
-      const py = seg[j + 1];
-      if (px < minX) minX = px;
-      if (px > maxX) maxX = px;
-      if (py < minY) minY = py;
-      if (py > maxY) maxY = py;
-    }
-  }
-
-  return { minX, minY, maxX, maxY };
-}
-
-/**
- * Render interior grid lines clipped to a curve's filled area.
- * Uses fillRect (not stroke) for Obsidian Live Preview compatibility.
- * Coordinates are in world space (caller has already applied viewport transform).
- */
-function renderCurveInteriorGrid(
-  ctx: CanvasRenderingContext2D,
-  curve: Curve,
-  path: Path2D,
-  gridConfig: CurveGridConfig
-): void {
-  const { cellSize, lineColor, lineWidth, interiorRatio } = gridConfig;
-  const actualLineWidth = Math.max(1 / ctx.getTransform().a, lineWidth * interiorRatio);
-  const halfWidth = actualLineWidth / 2;
-
-  const bounds = getCurveBounds(curve);
-
-  // Grid-align the bounds with 1-cell padding
-  const startCol = Math.floor(bounds.minX / cellSize) - 1;
-  const endCol = Math.ceil(bounds.maxX / cellSize) + 1;
-  const startRow = Math.floor(bounds.minY / cellSize) - 1;
-  const endRow = Math.ceil(bounds.maxY / cellSize) + 1;
-
-  ctx.save();
-  ctx.clip(path, 'evenodd');
-  ctx.fillStyle = lineColor;
-
-  // Draw vertical grid lines
-  for (let col = startCol; col <= endCol; col++) {
-    const x = col * cellSize;
-    ctx.fillRect(x - halfWidth, bounds.minY - cellSize, actualLineWidth, bounds.maxY - bounds.minY + cellSize * 2);
-  }
-
-  // Draw horizontal grid lines
-  for (let row = startRow; row <= endRow; row++) {
-    const y = row * cellSize;
-    ctx.fillRect(bounds.minX - cellSize, y - halfWidth, bounds.maxX - bounds.minX + cellSize * 2, actualLineWidth);
-  }
-
-  ctx.restore();
-}
-
-/**
- * Render all curves for a layer onto the canvas.
- *
- * @param ctx - Canvas 2D rendering context
- * @param curves - Array of curves to render
- * @param viewState - Current viewport (offsetX, offsetY, zoom)
- * @param theme - Renderer theme for border styling
- * @param options - Optional rendering options
- */
-function renderCurves(
-  ctx: CanvasRenderingContext2D,
-  curves: Curve[],
-  viewState: CurveViewState,
-  theme: RendererTheme,
-  options: {
-    opacity?: number;
-    mergeIndex?: { curveCellRects: Map<number, Array<{ x: number; y: number; w: number; h: number }>> } | null;
-    gridConfig?: CurveGridConfig;
-  } = {}
-): void {
-  if (!curves || !Array.isArray(curves) || curves.length === 0) return;
-
-  const { x: offsetX, y: offsetY, zoom } = viewState;
-  const { opacity = 1, mergeIndex = null, gridConfig } = options;
-
-  const previousAlpha = ctx.globalAlpha;
-  if (opacity < 1) {
-    ctx.globalAlpha = opacity;
-  }
-
-  ctx.save();
-
-  // Apply viewport transform: world coords -> screen coords
-  ctx.translate(offsetX, offsetY);
-  ctx.scale(zoom, zoom);
-
-  // Stroke styling matches cell borders
-  const strokeColor = theme.cells.border;
-  const strokeWidth = theme.cells.borderWidth / zoom; // Constant screen-space width
-
-  // Render each curve individually
-  for (let i = 0; i < curves.length; i++) {
-    const curve = curves[i];
-    if (!curve || !curve.start || !curve.segments) continue;
-
-    const path = buildPath2D(curve);
-
-    // Fill closed curves
-    if (curve.closed && curve.color && curve.color !== 'transparent') {
-      ctx.fillStyle = curve.color;
-      const curveAlpha = curve.opacity ?? 1;
-      if (curveAlpha < 1 || opacity < 1) {
-        ctx.globalAlpha = (opacity < 1 ? opacity : 1) * curveAlpha;
-      }
-      ctx.fill(path, 'evenodd');
-      // Reset alpha
-      ctx.globalAlpha = opacity < 1 ? opacity : 1;
-    }
-
-    // Interior grid lines: between fill and stroke, clipped to curve shape
-    if (gridConfig && curve.closed && curve.color && curve.color !== 'transparent') {
-      renderCurveInteriorGrid(ctx, curve, path, gridConfig);
-    }
-
-    // Stroke all curves
-    if (curve.closed) {
-      ctx.strokeStyle = strokeColor;
-      ctx.lineWidth = strokeWidth;
-    } else {
-      ctx.strokeStyle = curve.strokeColor || strokeColor;
-      ctx.lineWidth = (curve.strokeWidth || 2) / zoom;
-    }
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-
-    // Check for same-color cell rects to clip out of the stroke
-    const cellRects = mergeIndex?.curveCellRects?.get(i);
-    if (cellRects && cellRects.length > 0 && curve.closed) {
-      // Clip-based stroke suppression: stroke everywhere except
-      // where same-color cells cover the curve border.
-      // Uses even-odd rule: large rect + cell rects = holes at cells.
-      ctx.save();
-      const clipPath = new Path2D();
-      clipPath.rect(-1e6, -1e6, 2e6, 2e6);
-      for (let r = 0; r < cellRects.length; r++) {
-        const cr = cellRects[r];
-        clipPath.rect(cr.x, cr.y, cr.w, cr.h);
-      }
-      ctx.clip(clipPath, 'evenodd');
-      ctx.stroke(path);
-      ctx.restore();
-    } else {
-      ctx.stroke(path);
-    }
-  }
-
-  ctx.restore();
-
-  if (opacity < 1) {
-    ctx.globalAlpha = previousAlpha;
-  }
-}
-
-return {
-  renderCurves,
-  buildPath2D
-};
-
-```
-
 # polygon-clipping-wrapper
 
 ```js
@@ -12058,14 +11989,17 @@ type Polygon = Ring[];
 type MultiPolygon = Polygon[];
 
 type DifferenceFn = (subject: Polygon | MultiPolygon, ...clips: (Polygon | MultiPolygon)[]) => MultiPolygon;
+type UnionFn = (subject: Polygon | MultiPolygon, ...others: (Polygon | MultiPolygon)[]) => MultiPolygon;
 
 const pcModule = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "polygon-clipping-wrapper")) as {
   difference: DifferenceFn;
+  union: UnionFn;
 };
 
 const difference: DifferenceFn = pcModule.difference;
+const union: UnionFn = pcModule.union;
 
-return { difference };
+return { difference, union };
 
 ```
 
@@ -12087,10 +12021,14 @@ return { difference };
 import type { Curve, BezierSegment } from '#types/core/curve.types';
 
 // Datacore imports
-const { difference } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "polygonClipping")) as {
+const { difference, union } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "polygonClipping")) as {
   difference: (
     subject: [number, number][][] | [number, number][][][],
     ...clips: ([number, number][][] | [number, number][][][])[]
+  ) => [number, number][][][],
+  union: (
+    subject: [number, number][][] | [number, number][][][],
+    ...others: ([number, number][][] | [number, number][][][])[]
   ) => [number, number][][][]
 };
 
@@ -13013,6 +12951,29 @@ function eraseWorldPolygonFromCurves(
   return changed ? newCurves : null;
 }
 
+/**
+ * Compute the polygon union of multiple closed curves.
+ * Returns a MultiPolygon result, or null on failure.
+ */
+function unionCurves(curves: Curve[]): MultiPolygon | null {
+  if (!curves || curves.length < 2) return null;
+
+  const polygons: Polygon[] = [];
+  for (let i = 0; i < curves.length; i++) {
+    const curve = curves[i];
+    if (!curve.closed) return null;
+    const poly = curveToPolygon(curve);
+    if (poly[0].length < 4) return null;
+    polygons.push(poly);
+  }
+
+  try {
+    return union(polygons[0], ...polygons.slice(1));
+  } catch {
+    return null;
+  }
+}
+
 return {
   flattenCurve,
   isLinearBezier,
@@ -13026,6 +12987,7 @@ return {
   eraseCellFromCurves,
   eraseRectangleFromCurves,
   eraseWorldPolygonFromCurves,
+  unionCurves,
   signedArea,
   ensureCCW,
   ensureCW,
@@ -13035,6 +12997,594 @@ return {
   openCurveOverlapsRect,
   openCurveOverlapsPolygon,
   evalBezier
+};
+
+```
+
+# curveRenderer
+
+```ts
+/**
+ * curveRenderer.ts
+ *
+ * Renders freehand curves on the HTML Canvas 2D context.
+ * Builds and caches Path2D objects per curve, applies viewport transforms,
+ * fills closed paths with even-odd rule, and strokes all paths.
+ *
+ * Overlapping closed curves with the same color+opacity are merged via
+ * polygon union at render time, eliminating internal stroke borders.
+ * The data model is never touched — union is purely visual.
+ */
+
+import type { Curve } from '#types/core/curve.types';
+import type { RendererTheme } from '#types/hooks/canvasRenderer.types';
+
+// Datacore import for polygon union
+const { unionCurves } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "curveBoolean")) as {
+  unionCurves: (curves: Curve[]) => [number, number][][][] | null
+};
+
+/** Viewport state needed for rendering */
+interface CurveViewState {
+  x: number;  // offsetX
+  y: number;  // offsetY
+  zoom: number;
+}
+
+/** Axis-aligned bounding box */
+interface AABB {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+}
+
+/** A union group ready for rendering */
+interface UnionGroup {
+  path: Path2D;
+  bounds: AABB;
+  color: string;
+  opacity: number;
+  curveIndices: number[];
+}
+
+/** Result of preprocessing curves for rendering */
+interface PreprocessResult {
+  unionGroups: UnionGroup[];
+  individualCurves: { curve: Curve; index: number }[];
+}
+
+const path2DCache = new WeakMap<Curve, Path2D>();
+
+/**
+ * Build a Path2D for a curve, including holes.
+ * Caches in a WeakMap for reuse across frames.
+ */
+function buildPath2D(curve: Curve): Path2D {
+  const cached = path2DCache.get(curve);
+  if (cached) return cached;
+
+  const path = new Path2D();
+  const [sx, sy] = curve.start;
+  path.moveTo(sx, sy);
+
+  const segs = curve.segments;
+  for (let i = 0; i < segs.length; i++) {
+    const seg = segs[i];
+    path.bezierCurveTo(seg[0], seg[1], seg[2], seg[3], seg[4], seg[5]);
+  }
+
+  if (curve.closed) {
+    path.closePath();
+  }
+
+  // Add inner rings as subpaths (counter-wound for even-odd fill)
+  if (curve.innerRings) {
+    for (let h = 0; h < curve.innerRings.length; h++) {
+      const ring = curve.innerRings[h];
+      if (!ring || ring.length < 3) continue;
+      path.moveTo(ring[0][0], ring[0][1]);
+      for (let i = 1; i < ring.length; i++) {
+        path.lineTo(ring[i][0], ring[i][1]);
+      }
+      path.closePath();
+    }
+  }
+
+  path2DCache.set(curve, path);
+  return path;
+}
+
+/** Grid configuration for interior grid lines inside curves */
+interface CurveGridConfig {
+  cellSize: number;
+  lineColor: string;
+  lineWidth: number;
+  interiorRatio: number;
+}
+
+/**
+ * Compute the world-coordinate bounding box of a curve from its geometry.
+ */
+function getCurveBounds(curve: Curve): AABB {
+  let minX = curve.start[0];
+  let minY = curve.start[1];
+  let maxX = minX;
+  let maxY = minY;
+
+  const segs = curve.segments;
+  for (let i = 0; i < segs.length; i++) {
+    const seg = segs[i];
+    // Check all 3 points per segment (cp1, cp2, endpoint)
+    for (let j = 0; j < 6; j += 2) {
+      const px = seg[j];
+      const py = seg[j + 1];
+      if (px < minX) minX = px;
+      if (px > maxX) maxX = px;
+      if (py < minY) minY = py;
+      if (py > maxY) maxY = py;
+    }
+  }
+
+  return { minX, minY, maxX, maxY };
+}
+
+/**
+ * Render interior grid lines clipped to a curve's filled area.
+ * Uses fillRect (not stroke) for Obsidian Live Preview compatibility.
+ * Coordinates are in world space (caller has already applied viewport transform).
+ */
+function renderCurveInteriorGrid(
+  ctx: CanvasRenderingContext2D,
+  curve: Curve,
+  path: Path2D,
+  gridConfig: CurveGridConfig
+): void {
+  const { cellSize, lineColor, lineWidth, interiorRatio } = gridConfig;
+  const t = ctx.getTransform();
+  const zoom = Math.sqrt(t.a * t.a + t.b * t.b) || 1;
+  const actualLineWidth = Math.max(1, lineWidth * interiorRatio) / zoom;
+  const halfWidth = actualLineWidth / 2;
+
+  const bounds = getCurveBounds(curve);
+
+  // Grid-align the bounds with 1-cell padding
+  const startCol = Math.floor(bounds.minX / cellSize) - 1;
+  const endCol = Math.ceil(bounds.maxX / cellSize) + 1;
+  const startRow = Math.floor(bounds.minY / cellSize) - 1;
+  const endRow = Math.ceil(bounds.maxY / cellSize) + 1;
+
+  ctx.save();
+  ctx.clip(path, 'evenodd');
+  ctx.fillStyle = lineColor;
+
+  // Draw vertical grid lines
+  for (let col = startCol; col <= endCol; col++) {
+    const x = col * cellSize;
+    ctx.fillRect(x - halfWidth, bounds.minY - cellSize, actualLineWidth, bounds.maxY - bounds.minY + cellSize * 2);
+  }
+
+  // Draw horizontal grid lines
+  for (let row = startRow; row <= endRow; row++) {
+    const y = row * cellSize;
+    ctx.fillRect(bounds.minX - cellSize, y - halfWidth, bounds.maxX - bounds.minX + cellSize * 2, actualLineWidth);
+  }
+
+  ctx.restore();
+}
+
+/**
+ * Render interior grid lines clipped to a union group's path.
+ */
+function renderUnionInteriorGrid(
+  ctx: CanvasRenderingContext2D,
+  bounds: AABB,
+  path: Path2D,
+  gridConfig: CurveGridConfig
+): void {
+  const { cellSize, lineColor, lineWidth, interiorRatio } = gridConfig;
+  const t = ctx.getTransform();
+  const zoom = Math.sqrt(t.a * t.a + t.b * t.b) || 1;
+  const actualLineWidth = Math.max(1, lineWidth * interiorRatio) / zoom;
+  const halfWidth = actualLineWidth / 2;
+
+  const startCol = Math.floor(bounds.minX / cellSize) - 1;
+  const endCol = Math.ceil(bounds.maxX / cellSize) + 1;
+  const startRow = Math.floor(bounds.minY / cellSize) - 1;
+  const endRow = Math.ceil(bounds.maxY / cellSize) + 1;
+
+  ctx.save();
+  ctx.clip(path, 'evenodd');
+  ctx.fillStyle = lineColor;
+
+  for (let col = startCol; col <= endCol; col++) {
+    const x = col * cellSize;
+    ctx.fillRect(x - halfWidth, bounds.minY - cellSize, actualLineWidth, bounds.maxY - bounds.minY + cellSize * 2);
+  }
+
+  for (let row = startRow; row <= endRow; row++) {
+    const y = row * cellSize;
+    ctx.fillRect(bounds.minX - cellSize, y - halfWidth, bounds.maxX - bounds.minX + cellSize * 2, actualLineWidth);
+  }
+
+  ctx.restore();
+}
+
+// =========================================================================
+// AABB overlap and union-find clustering
+// =========================================================================
+
+function aabbOverlap(a: AABB, b: AABB): boolean {
+  return a.minX <= b.maxX && b.minX <= a.maxX &&
+         a.minY <= b.maxY && b.minY <= a.maxY;
+}
+
+function findOverlapClusters(items: { bounds: AABB; index: number }[]): number[][] {
+  const n = items.length;
+  const parent = new Int32Array(n);
+  const rank = new Int32Array(n);
+  for (let i = 0; i < n; i++) parent[i] = i;
+
+  function find(x: number): number {
+    while (parent[x] !== x) {
+      parent[x] = parent[parent[x]];
+      x = parent[x];
+    }
+    return x;
+  }
+
+  function unite(a: number, b: number): void {
+    const ra = find(a);
+    const rb = find(b);
+    if (ra === rb) return;
+    if (rank[ra] < rank[rb]) { parent[ra] = rb; }
+    else if (rank[ra] > rank[rb]) { parent[rb] = ra; }
+    else { parent[rb] = ra; rank[ra]++; }
+  }
+
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      if (aabbOverlap(items[i].bounds, items[j].bounds)) {
+        unite(i, j);
+      }
+    }
+  }
+
+  const clusters = new Map<number, number[]>();
+  for (let i = 0; i < n; i++) {
+    const root = find(i);
+    let cluster = clusters.get(root);
+    if (!cluster) {
+      cluster = [];
+      clusters.set(root, cluster);
+    }
+    cluster.push(items[i].index);
+  }
+
+  return Array.from(clusters.values());
+}
+
+// =========================================================================
+// MultiPolygon → Path2D conversion
+// =========================================================================
+
+function multiPolygonToPath2D(multiPoly: [number, number][][][]): Path2D {
+  const path = new Path2D();
+  for (let p = 0; p < multiPoly.length; p++) {
+    const polygon = multiPoly[p];
+    for (let r = 0; r < polygon.length; r++) {
+      const ring = polygon[r];
+      if (ring.length < 2) continue;
+      path.moveTo(ring[0][0], ring[0][1]);
+      for (let i = 1; i < ring.length; i++) {
+        path.lineTo(ring[i][0], ring[i][1]);
+      }
+      path.closePath();
+    }
+  }
+  return path;
+}
+
+function multiPolygonBounds(multiPoly: [number, number][][][]): AABB {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (let p = 0; p < multiPoly.length; p++) {
+    const ring = multiPoly[p][0]; // outer ring
+    if (!ring) continue;
+    for (let i = 0; i < ring.length; i++) {
+      const x = ring[i][0], y = ring[i][1];
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+    }
+  }
+  return { minX, minY, maxX, maxY };
+}
+
+// =========================================================================
+// Two-level caching for preprocessing
+// =========================================================================
+
+let preprocessCacheRef: Curve[] | null = null;
+let preprocessCacheResult: PreprocessResult | null = null;
+
+const unionCache = new Map<string, { refs: Curve[]; path: Path2D; bounds: AABB }>();
+
+function preprocessCurves(curves: Curve[]): PreprocessResult {
+  // Level 1: array reference check
+  if (preprocessCacheRef === curves && preprocessCacheResult) {
+    return preprocessCacheResult;
+  }
+
+  const individualCurves: { curve: Curve; index: number }[] = [];
+  const unionGroups: UnionGroup[] = [];
+
+  // Group closed curves by color|opacity
+  const colorGroups = new Map<string, { curve: Curve; index: number; bounds: AABB }[]>();
+
+  for (let i = 0; i < curves.length; i++) {
+    const curve = curves[i];
+    if (!curve || !curve.start || !curve.segments) continue;
+
+    if (!curve.closed || !curve.color || curve.color === 'transparent') {
+      individualCurves.push({ curve, index: i });
+      continue;
+    }
+
+    const key = `${curve.color}|${curve.opacity ?? 1}`;
+    let group = colorGroups.get(key);
+    if (!group) {
+      group = [];
+      colorGroups.set(key, group);
+    }
+    group.push({ curve, index: i, bounds: getCurveBounds(curve) });
+  }
+
+  for (const [, group] of colorGroups) {
+    if (group.length === 1) {
+      individualCurves.push({ curve: group[0].curve, index: group[0].index });
+      continue;
+    }
+
+    // Find overlap clusters via AABB
+    const clusterItems = group.map(g => ({ bounds: g.bounds, index: g.index }));
+    const clusters = findOverlapClusters(clusterItems);
+
+    for (const cluster of clusters) {
+      if (cluster.length === 1) {
+        const idx = cluster[0];
+        const item = group.find(g => g.index === idx)!;
+        individualCurves.push({ curve: item.curve, index: item.index });
+        continue;
+      }
+
+      // Build cache key from sorted curve IDs
+      const clusterCurves = cluster.map(idx => {
+        const item = group.find(g => g.index === idx)!;
+        return item.curve;
+      });
+      const sortedIds = clusterCurves.map(c => c.id).sort().join(',');
+
+      // Level 2: union cache by sorted IDs + ref validation
+      const cached = unionCache.get(sortedIds);
+      if (cached && cached.refs.length === clusterCurves.length) {
+        let valid = true;
+        for (let i = 0; i < cached.refs.length; i++) {
+          if (cached.refs[i] !== clusterCurves[i]) {
+            valid = false;
+            break;
+          }
+        }
+        if (valid) {
+          unionGroups.push({
+            path: cached.path,
+            bounds: cached.bounds,
+            color: clusterCurves[0].color,
+            opacity: clusterCurves[0].opacity ?? 1,
+            curveIndices: cluster
+          });
+          continue;
+        }
+      }
+
+      // Compute union
+      const result = unionCurves(clusterCurves);
+      if (!result) {
+        // Fallback to individual rendering
+        for (const idx of cluster) {
+          const item = group.find(g => g.index === idx)!;
+          individualCurves.push({ curve: item.curve, index: item.index });
+        }
+        continue;
+      }
+
+      const path = multiPolygonToPath2D(result);
+      const bounds = multiPolygonBounds(result);
+
+      unionCache.set(sortedIds, { refs: clusterCurves.slice(), path, bounds });
+
+      unionGroups.push({
+        path,
+        bounds,
+        color: clusterCurves[0].color,
+        opacity: clusterCurves[0].opacity ?? 1,
+        curveIndices: cluster
+      });
+    }
+  }
+
+  const result: PreprocessResult = { unionGroups, individualCurves };
+  preprocessCacheRef = curves;
+  preprocessCacheResult = result;
+  return result;
+}
+
+// =========================================================================
+// Main render function
+// =========================================================================
+
+/**
+ * Render all curves for a layer onto the canvas.
+ *
+ * @param ctx - Canvas 2D rendering context
+ * @param curves - Array of curves to render
+ * @param viewState - Current viewport (offsetX, offsetY, zoom)
+ * @param theme - Renderer theme for border styling
+ * @param options - Optional rendering options
+ */
+function renderCurves(
+  ctx: CanvasRenderingContext2D,
+  curves: Curve[],
+  viewState: CurveViewState,
+  theme: RendererTheme,
+  options: {
+    opacity?: number;
+    mergeIndex?: { curveCellRects: Map<number, Array<{ x: number; y: number; w: number; h: number }>> } | null;
+    gridConfig?: CurveGridConfig;
+  } = {}
+): void {
+  if (!curves || !Array.isArray(curves) || curves.length === 0) return;
+
+  const { x: offsetX, y: offsetY, zoom } = viewState;
+  const { opacity = 1, mergeIndex = null, gridConfig } = options;
+
+  const previousAlpha = ctx.globalAlpha;
+  if (opacity < 1) {
+    ctx.globalAlpha = opacity;
+  }
+
+  ctx.save();
+
+  // Apply viewport transform: world coords -> screen coords
+  ctx.translate(offsetX, offsetY);
+  ctx.scale(zoom, zoom);
+
+  // Stroke styling matches cell borders
+  const strokeColor = theme.cells.border;
+  const strokeWidth = theme.cells.borderWidth / zoom; // Constant screen-space width
+
+  // Preprocess: group overlapping same-color curves for union rendering
+  const { unionGroups, individualCurves } = preprocessCurves(curves);
+
+  // --- Render union groups ---
+  for (let g = 0; g < unionGroups.length; g++) {
+    const group = unionGroups[g];
+
+    // Fill
+    ctx.fillStyle = group.color;
+    const groupAlpha = group.opacity;
+    if (groupAlpha < 1 || opacity < 1) {
+      ctx.globalAlpha = (opacity < 1 ? opacity : 1) * groupAlpha;
+    }
+    ctx.fill(group.path, 'evenodd');
+    ctx.globalAlpha = opacity < 1 ? opacity : 1;
+
+    // Interior grid lines (grid maps only)
+    if (gridConfig) {
+      renderUnionInteriorGrid(ctx, group.bounds, group.path, gridConfig);
+    }
+
+    // Stroke with aggregated merge index clipping
+    ctx.strokeStyle = strokeColor;
+    ctx.lineWidth = strokeWidth;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    // Aggregate cell rects from all curves in the group
+    let aggregatedRects: Array<{ x: number; y: number; w: number; h: number }> | null = null;
+    if (mergeIndex) {
+      for (let ci = 0; ci < group.curveIndices.length; ci++) {
+        const rects = mergeIndex.curveCellRects?.get(group.curveIndices[ci]);
+        if (rects && rects.length > 0) {
+          if (!aggregatedRects) aggregatedRects = [];
+          for (let r = 0; r < rects.length; r++) {
+            aggregatedRects.push(rects[r]);
+          }
+        }
+      }
+    }
+
+    if (aggregatedRects && aggregatedRects.length > 0) {
+      ctx.save();
+      const clipPath = new Path2D();
+      clipPath.rect(-1e6, -1e6, 2e6, 2e6);
+      for (let r = 0; r < aggregatedRects.length; r++) {
+        const cr = aggregatedRects[r];
+        clipPath.rect(cr.x, cr.y, cr.w, cr.h);
+      }
+      ctx.clip(clipPath, 'evenodd');
+      ctx.stroke(group.path);
+      ctx.restore();
+    } else {
+      ctx.stroke(group.path);
+    }
+  }
+
+  // --- Render individual curves (unchanged from original path) ---
+  for (let ic = 0; ic < individualCurves.length; ic++) {
+    const { curve, index: i } = individualCurves[ic];
+
+    const path = buildPath2D(curve);
+
+    // Fill closed curves
+    if (curve.closed && curve.color && curve.color !== 'transparent') {
+      ctx.fillStyle = curve.color;
+      const curveAlpha = curve.opacity ?? 1;
+      if (curveAlpha < 1 || opacity < 1) {
+        ctx.globalAlpha = (opacity < 1 ? opacity : 1) * curveAlpha;
+      }
+      ctx.fill(path, 'evenodd');
+      // Reset alpha
+      ctx.globalAlpha = opacity < 1 ? opacity : 1;
+    }
+
+    // Interior grid lines: between fill and stroke, clipped to curve shape
+    if (gridConfig && curve.closed && curve.color && curve.color !== 'transparent') {
+      renderCurveInteriorGrid(ctx, curve, path, gridConfig);
+    }
+
+    // Stroke all curves
+    if (curve.closed) {
+      ctx.strokeStyle = strokeColor;
+      ctx.lineWidth = strokeWidth;
+    } else {
+      ctx.strokeStyle = curve.strokeColor || strokeColor;
+      ctx.lineWidth = (curve.strokeWidth || 2) / zoom;
+    }
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    // Check for same-color cell rects to clip out of the stroke
+    const cellRects = mergeIndex?.curveCellRects?.get(i);
+    if (cellRects && cellRects.length > 0 && curve.closed) {
+      // Clip-based stroke suppression: stroke everywhere except
+      // where same-color cells cover the curve border.
+      // Uses even-odd rule: large rect + cell rects = holes at cells.
+      ctx.save();
+      const clipPath = new Path2D();
+      clipPath.rect(-1e6, -1e6, 2e6, 2e6);
+      for (let r = 0; r < cellRects.length; r++) {
+        const cr = cellRects[r];
+        clipPath.rect(cr.x, cr.y, cr.w, cr.h);
+      }
+      ctx.clip(clipPath, 'evenodd');
+      ctx.stroke(path);
+      ctx.restore();
+    } else {
+      ctx.stroke(path);
+    }
+  }
+
+  ctx.restore();
+
+  if (opacity < 1) {
+    ctx.globalAlpha = previousAlpha;
+  }
+}
+
+return {
+  renderCurves,
+  buildPath2D
 };
 
 ```
@@ -13667,7 +14217,7 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   if (activeLayer.objects && activeLayer.objects.length > 0 && !showCoordinates && visibility.objects) {
     const isHexMap = geometry.type === 'hex';
     const mapType = mapData.mapType || 'grid';
-    const getObjectTypeForMap = (typeId: string) => getObjectType(typeId, mapType);
+    const getObjectTypeForMap = (typeId: string) => getObjectType(typeId, mapType, mapData.objectSetId);
     renderObjects(
       activeLayer,
       { ctx, offsetX, offsetY, zoom, scaledSize },
@@ -14244,6 +14794,7 @@ export interface TextLabelOptions {
   fontSize?: number;
   fontFace?: FontFace;
   color?: HexColor;
+  opacity?: number;
 }
 
 /** Text label data structure */
@@ -14255,6 +14806,7 @@ export interface TextLabel {
   fontSize: number;
   fontFace: FontFace;
   color: HexColor;
+  opacity?: number;
 }
 
 /** Partial text label for updates */
@@ -14311,7 +14863,8 @@ function addTextLabel(
     rotation: 0,
     fontSize: options.fontSize || 16,
     fontFace: options.fontFace || 'sans',
-    color: options.color || '#ffffff'
+    color: options.color || '#ffffff',
+    ...(options.opacity !== undefined && options.opacity !== 1 ? { opacity: options.opacity } : {})
   };
   
   return [...(labels || []), newLabel];
@@ -14541,7 +15094,16 @@ function calculateObjectScreenPosition(
   let offsetX: number, offsetY: number, screenX: number, screenY: number;
   let objectWidth: number, objectHeight: number;
 
-  if (mapType === 'hex') {
+  if (object.freeform && object.worldPosition) {
+    const cellUnit = mapType === 'hex' ? (geometry as HexGeometryLike).hexSize : gridSize;
+    offsetX = centerX - center.x * (mapType === 'hex' ? zoom : cellUnit * zoom);
+    offsetY = centerY - center.y * (mapType === 'hex' ? zoom : cellUnit * zoom);
+    // worldPosition is the object center; screenX/screenY should also be center
+    screenX = offsetX + object.worldPosition.x * zoom;
+    screenY = offsetY + object.worldPosition.y * zoom;
+    objectWidth = size.width * cellUnit * zoom;
+    objectHeight = size.height * cellUnit * zoom;
+  } else if (mapType === 'hex') {
     const hexGeom = geometry as HexGeometryLike;
     const { worldX, worldY } = hexGeom.hexToWorld(object.position.x, object.position.y);
 
@@ -15850,10 +16412,11 @@ const { useMapSelection } = await dc.require(dc.headerLink(dc.resolvePath("compi
   useMapSelection: () => MapSelectionValue;
 };
 
-const { calculateEdgeAlignment, getAlignmentOffset, placeObject, canPlaceObjectAt, removeObjectFromHex, generateObjectId } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "objectOperations")) as {
+const { calculateEdgeAlignment, getAlignmentOffset, placeObject, placeObjectFreeform, canPlaceObjectAt, removeObjectFromHex, generateObjectId } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "objectOperations")) as {
   calculateEdgeAlignment: (fractionalX: number, fractionalY: number, gridX: number, gridY: number) => string;
   getAlignmentOffset: (alignment: string, cellSize: number) => { x: number; y: number };
   placeObject: (objects: MapObject[], type: string, x: number, y: number, options: { mapType: string; alignment?: string }) => { success: boolean; objects: MapObject[] };
+  placeObjectFreeform: (objects: MapObject[], type: string, worldX: number, worldY: number, nearestGridPos: { x: number; y: number }, mapType: string) => { success: boolean; objects: MapObject[]; object?: MapObject };
   canPlaceObjectAt: (objects: MapObject[], x: number, y: number, mapType: string) => boolean;
   removeObjectFromHex: (objects: MapObject[], id: string) => MapObject[];
   generateObjectId: () => string;
@@ -15879,7 +16442,8 @@ const useObjectInteractions = (
   currentTool: ToolId,
   selectedObjectType: string | null,
   onAddCustomColor: ((color: string) => void) | undefined,
-  customColors: string[]
+  customColors: string[],
+  freeformPlacementModeRef?: { current: boolean }
 ): UseObjectInteractionsResult => {
   const {
     geometry,
@@ -15922,8 +16486,10 @@ const useObjectInteractions = (
   const dragInitialStateRef = dc.useRef<MapObject[] | null>(null);
 
   const [edgeSnapMode, setEdgeSnapMode] = dc.useState<boolean>(false);
+  const [freeformDragPreview, setFreeformDragPreview] = dc.useState<boolean>(false);
   const longPressTimerRef = dc.useRef<ReturnType<typeof setTimeout> | null>(null);
   const altKeyPressedRef = dc.useRef<boolean>(false);
+  const shiftKeyPressedRef = dc.useRef<boolean>(false);
 
   const objectColorBtnRef = dc.useRef<HTMLButtonElement | null>(null);
   const pendingObjectCustomColorRef = dc.useRef<string | null>(null);
@@ -15934,6 +16500,15 @@ const useObjectInteractions = (
         altKeyPressedRef.current = true;
         if (currentTool === 'addObject' || selectedItem?.type === 'object') {
           setEdgeSnapMode(true);
+          if (shiftKeyPressedRef.current) {
+            setFreeformDragPreview(true);
+          }
+        }
+      }
+      if (e.key === 'Shift') {
+        shiftKeyPressedRef.current = true;
+        if (altKeyPressedRef.current && (currentTool === 'addObject' || selectedItem?.type === 'object')) {
+          setFreeformDragPreview(true);
         }
       }
     };
@@ -15942,6 +16517,11 @@ const useObjectInteractions = (
       if (e.key === 'Alt') {
         altKeyPressedRef.current = false;
         setEdgeSnapMode(false);
+        setFreeformDragPreview(false);
+      }
+      if (e.key === 'Shift') {
+        shiftKeyPressedRef.current = false;
+        setFreeformDragPreview(false);
       }
     };
 
@@ -16076,6 +16656,27 @@ const useObjectInteractions = (
 
     const mapType = mapData!.mapType || 'grid';
 
+    // Freeform placement: Alt+Shift or sidebar toggle places at exact world coordinates
+    const useFreeformPlacement = (altKeyPressedRef.current && shiftKeyPressedRef.current)
+                                || (freeformPlacementModeRef?.current ?? false);
+    if (useFreeformPlacement && clientX !== undefined && clientY !== undefined) {
+      const worldCoords = screenToWorld(clientX, clientY);
+      if (!worldCoords) return true;
+
+      const result = placeObjectFreeform(
+        getActiveLayer(mapData!).objects || [],
+        selectedObjectType,
+        worldCoords.worldX,
+        worldCoords.worldY,
+        { x: gridX, y: gridY },
+        mapType
+      );
+      if (result.success) {
+        onObjectsChange(result.objects);
+      }
+      return true;
+    }
+
     if (!canPlaceObjectAt(getActiveLayer(mapData!).objects || [], gridX, gridY, mapType)) {
       return true;
     }
@@ -16191,7 +16792,8 @@ const useObjectInteractions = (
         setIsDraggingSelection(true);
         const offsetX = gridX - object.position.x;
         const offsetY = gridY - object.position.y;
-        setDragStart({ x: clientX, y: clientY, gridX, gridY, offsetX, offsetY });
+        const worldCoords = object.freeform ? screenToWorld(clientX, clientY) : null;
+        setDragStart({ x: clientX, y: clientY, gridX, gridY, offsetX, offsetY, worldX: worldCoords?.worldX, worldY: worldCoords?.worldY });
         setIsResizeMode(false);
       } else {
         setSelectedItem({ type: 'object', id: object.id, data: object });
@@ -16201,6 +16803,7 @@ const useObjectInteractions = (
         setIsDraggingSelection(true);
         const offsetX = gridX - object.position.x;
         const offsetY = gridY - object.position.y;
+        const worldCoords = object.freeform ? screenToWorld(clientX, clientY) : null;
         setDragStart({
           x: clientX,
           y: clientY,
@@ -16208,7 +16811,9 @@ const useObjectInteractions = (
           gridY,
           offsetX,
           offsetY,
-          objectId: object.id
+          objectId: object.id,
+          worldX: worldCoords?.worldX,
+          worldY: worldCoords?.worldY
         });
 
         if (longPressTimerRef.current) {
@@ -16259,6 +16864,132 @@ const useObjectInteractions = (
     e.preventDefault();
     e.stopPropagation();
 
+    const currentObject = getActiveLayer(mapData).objects?.find((o: MapObject) => o.id === objectId);
+
+    // Alt+Shift drag inversion: temporarily flip snap behavior
+    const isInverted = altKeyPressedRef.current && shiftKeyPressedRef.current;
+    if (isInverted && currentObject) {
+      // Track inversion state for cleanup on drag end
+      if (!dragStart.wasInverted) {
+        setDragStart({ ...dragStart, wasInverted: true, originalFreeform: !!currentObject.freeform });
+      }
+
+      // Use originalFreeform (captured on first frame) to determine direction,
+      // since currentObject.freeform changes after the first frame of inversion
+      const wasOriginallyGrid = dragStart.wasInverted
+        ? dragStart.originalFreeform === false
+        : !currentObject.freeform;
+
+      if (wasOriginallyGrid) {
+        // Grid → freeform inversion: drag in continuous world-space
+        const worldCoords = screenToWorld(clientX, clientY);
+        if (!worldCoords) return true;
+
+        // First frame of inversion: compute initial worldPosition from grid cell center
+        let baseWorldX: number, baseWorldY: number;
+        if (currentObject.worldPosition) {
+          baseWorldX = currentObject.worldPosition.x;
+          baseWorldY = currentObject.worldPosition.y;
+        } else {
+          const cellCenter = geometry?.getCellCenter
+            ? (geometry as any).getCellCenter(currentObject.position.x, currentObject.position.y)
+            : geometry?.gridToWorld?.(currentObject.position.x, currentObject.position.y);
+          if (!cellCenter) return true;
+          baseWorldX = cellCenter.worldX;
+          baseWorldY = cellCenter.worldY;
+        }
+
+        if (dragStart.worldX != null && dragStart.worldY != null) {
+          const deltaWorldX = worldCoords.worldX - dragStart.worldX;
+          const deltaWorldY = worldCoords.worldY - dragStart.worldY;
+          baseWorldX = baseWorldX + deltaWorldX;
+          baseWorldY = baseWorldY + deltaWorldY;
+        }
+
+        const nearestGrid = screenToGrid(clientX, clientY);
+        const updatedObjects = updateObject(
+          getActiveLayer(mapData).objects,
+          objectId!,
+          {
+            freeform: true,
+            worldPosition: { x: baseWorldX, y: baseWorldY },
+            ...(nearestGrid ? { position: { x: nearestGrid.x, y: nearestGrid.y } } : {})
+          }
+        );
+        onObjectsChange(updatedObjects, true);
+        setDragStart({ ...dragStart, x: clientX, y: clientY, worldX: worldCoords.worldX, worldY: worldCoords.worldY, wasInverted: true, originalFreeform: false });
+        return true;
+      } else {
+        // Freeform → grid inversion: snap to grid cells
+        const coords = screenToGrid(clientX, clientY);
+        if (!coords) return true;
+
+        const offsetX = dragStart.offsetX || 0;
+        const offsetY = dragStart.offsetY || 0;
+        const targetX = coords.x - offsetX;
+        const targetY = coords.y - offsetY;
+
+        // Snap worldPosition to cell center
+        const cellCenter = geometry?.getCellCenter
+          ? (geometry as any).getCellCenter(targetX, targetY)
+          : geometry?.gridToWorld?.(targetX, targetY);
+
+        const updatedObjects = updateObject(
+          getActiveLayer(mapData).objects,
+          objectId!,
+          {
+            position: { x: targetX, y: targetY },
+            ...(cellCenter ? { worldPosition: { x: cellCenter.worldX, y: cellCenter.worldY } } : {})
+          }
+        );
+        onObjectsChange(updatedObjects, true);
+        setDragStart({ ...dragStart, x: clientX, y: clientY, gridX: coords.x, gridY: coords.y, wasInverted: true, originalFreeform: true });
+        return true;
+      }
+    }
+
+    // If inversion was active but Alt+Shift released mid-drag, lock current position and continue in native mode
+    if (dragStart.wasInverted && !isInverted) {
+      const worldCoords = screenToWorld(clientX, clientY);
+      setDragStart({
+        ...dragStart,
+        x: clientX,
+        y: clientY,
+        wasInverted: false,
+        worldX: worldCoords?.worldX,
+        worldY: worldCoords?.worldY
+      });
+      return true;
+    }
+
+    // Freeform drag: continuous world-space movement (like text labels)
+    if (currentObject?.freeform && currentObject.worldPosition && dragStart.worldX != null && dragStart.worldY != null) {
+      const worldCoords = screenToWorld(clientX, clientY);
+      if (!worldCoords) return true;
+
+      const deltaWorldX = worldCoords.worldX - dragStart.worldX;
+      const deltaWorldY = worldCoords.worldY - dragStart.worldY;
+
+      const newWorldX = currentObject.worldPosition.x + deltaWorldX;
+      const newWorldY = currentObject.worldPosition.y + deltaWorldY;
+
+      // Update nearest grid cell for fog checks
+      const nearestGrid = screenToGrid(clientX, clientY);
+
+      const updatedObjects = updateObject(
+        getActiveLayer(mapData).objects,
+        objectId!,
+        {
+          worldPosition: { x: newWorldX, y: newWorldY },
+          ...(nearestGrid ? { position: { x: nearestGrid.x, y: nearestGrid.y } } : {})
+        }
+      );
+      onObjectsChange(updatedObjects, true);
+
+      setDragStart({ ...dragStart, x: clientX, y: clientY, worldX: worldCoords.worldX, worldY: worldCoords.worldY });
+      return true;
+    }
+
     const coords = screenToGrid(clientX, clientY);
     if (!coords) return true;
 
@@ -16270,7 +17001,6 @@ const useObjectInteractions = (
     const targetY = y - offsetY;
 
     if (x !== dragStart.gridX || y !== dragStart.gridY) {
-      const currentObject = getActiveLayer(mapData).objects?.find((o: MapObject) => o.id === objectId);
       if (!currentObject) return true;
 
       const isMovingWithinSameCell = currentObject.position.x === targetX && currentObject.position.y === targetY;
@@ -16505,6 +17235,30 @@ const useObjectInteractions = (
         longPressTimerRef.current = null;
       }
 
+      // Clean up drag inversion
+      if (dragStart?.wasInverted && mapData) {
+        const objectId = selectedItem?.id || dragStart.objectId;
+        const currentObject = getActiveLayer(mapData).objects?.find((o: MapObject) => o.id === objectId);
+        if (currentObject && objectId) {
+          if (dragStart.originalFreeform === false) {
+            // Was grid, Alt+Shift dragged to freeform → keep as freeform permanently
+          } else if (dragStart.originalFreeform === true) {
+            // Was freeform, inverted to grid → keep freeform, snap worldPosition to final cell center
+            const cellCenter = geometry?.getCellCenter
+              ? (geometry as any).getCellCenter(currentObject.position.x, currentObject.position.y)
+              : geometry?.gridToWorld?.(currentObject.position.x, currentObject.position.y);
+            if (cellCenter) {
+              const updatedObjects = updateObject(
+                getActiveLayer(mapData).objects,
+                objectId,
+                { worldPosition: { x: cellCenter.worldX, y: cellCenter.worldY } }
+              );
+              onObjectsChange(updatedObjects, true);
+            }
+          }
+        }
+      }
+
       setIsDraggingSelection(false);
       setDragStart(null);
 
@@ -16512,10 +17266,19 @@ const useObjectInteractions = (
         onObjectsChange(getActiveLayer(mapData!).objects, false);
         dragInitialStateRef.current = null;
       }
+
+      // Refresh selectedItem.data so toolbar reflects current freeform state
+      if (selectedItem?.type === 'object' && mapData) {
+        const freshObject = getActiveLayer(mapData).objects?.find((o: MapObject) => o.id === selectedItem.id);
+        if (freshObject) {
+          setSelectedItem({ type: 'object', id: selectedItem.id, data: freshObject });
+        }
+      }
+
       return true;
     }
     return false;
-  }, [isDraggingSelection, selectedItem, dragStart, setIsDraggingSelection, setDragStart, onObjectsChange, mapData]);
+  }, [isDraggingSelection, selectedItem, dragStart, setIsDraggingSelection, setDragStart, onObjectsChange, mapData, geometry, updateObject, setSelectedItem]);
 
   const stopObjectResizing = dc.useCallback((): boolean => {
     if (isResizing) {
@@ -16861,6 +17624,7 @@ const useObjectInteractions = (
     pendingObjectCustomColorRef,
     edgeSnapMode,
     setEdgeSnapMode,
+    freeformDragPreview,
     longPressTimerRef,
 
     handleObjectPlacement,
@@ -16890,6 +17654,145 @@ const useObjectInteractions = (
 };
 
 return { useObjectInteractions };
+
+```
+
+# interact-wrapper
+
+```js
+/**
+ * interact-wrapper.js
+ *
+ * Datacore module wrapping the vendored interact.js UMD bundle.
+ *
+ * The UMD source is embedded inline so this module works in the compiled
+ * markdown (where there is no filesystem access for loading separate files).
+ * Local `module` and `exports` variables provide a CommonJS context that
+ * the UMD's environment detection finds, so it writes to module.exports
+ * instead of falling through to the global/window branch.
+ *
+ * Source: interact.js v1.10.27 (vendored from npm, MIT license)
+ * Original minified UMD at: src/vendor/interact.min.js
+ */
+
+// CommonJS shim — the UMD checks `typeof exports` and `typeof module`
+const module = { exports: {} };
+const exports = module.exports;
+
+// === interact.js v1.10.27 UMD bundle ===
+/* interact.js 1.10.27 | https://raw.github.com/taye/interact.js/main/LICENSE */
+!function(t,e){"object"==typeof exports&&"undefined"!=typeof module?module.exports=e():"function"==typeof define&&define.amd?define(e):(t="undefined"!=typeof globalThis?globalThis:t||self).interact=e()}(this,(function(){"use strict";function t(t,e){var n=Object.keys(t);if(Object.getOwnPropertySymbols){var r=Object.getOwnPropertySymbols(t);e&&(r=r.filter((function(e){return Object.getOwnPropertyDescriptor(t,e).enumerable}))),n.push.apply(n,r)}return n}function e(e){for(var n=1;n<arguments.length;n++){var r=null!=arguments[n]?arguments[n]:{};n%2?t(Object(r),!0).forEach((function(t){a(e,t,r[t])})):Object.getOwnPropertyDescriptors?Object.defineProperties(e,Object.getOwnPropertyDescriptors(r)):t(Object(r)).forEach((function(t){Object.defineProperty(e,t,Object.getOwnPropertyDescriptor(r,t))}))}return e}function n(t){return n="function"==typeof Symbol&&"symbol"==typeof Symbol.iterator?function(t){return typeof t}:function(t){return t&&"function"==typeof Symbol&&t.constructor===Symbol&&t!==Symbol.prototype?"symbol":typeof t},n(t)}function r(t,e){if(!(t instanceof e))throw new TypeError("Cannot call a class as a function")}function i(t,e){for(var n=0;n<e.length;n++){var r=e[n];r.enumerable=r.enumerable||!1,r.configurable=!0,"value"in r&&(r.writable=!0),Object.defineProperty(t,d(r.key),r)}}function o(t,e,n){return e&&i(t.prototype,e),n&&i(t,n),Object.defineProperty(t,"prototype",{writable:!1}),t}function a(t,e,n){return(e=d(e))in t?Object.defineProperty(t,e,{value:n,enumerable:!0,configurable:!0,writable:!0}):t[e]=n,t}function s(t,e){if("function"!=typeof e&&null!==e)throw new TypeError("Super expression must either be null or a function");t.prototype=Object.create(e&&e.prototype,{constructor:{value:t,writable:!0,configurable:!0}}),Object.defineProperty(t,"prototype",{writable:!1}),e&&l(t,e)}function c(t){return c=Object.setPrototypeOf?Object.getPrototypeOf.bind():function(t){return t.__proto__||Object.getPrototypeOf(t)},c(t)}function l(t,e){return l=Object.setPrototypeOf?Object.setPrototypeOf.bind():function(t,e){return t.__proto__=e,t},l(t,e)}function u(t){if(void 0===t)throw new ReferenceError("this hasn't been initialised - super() hasn't been called");return t}function p(t){var e=function(){if("undefined"==typeof Reflect||!Reflect.construct)return!1;if(Reflect.construct.sham)return!1;if("function"==typeof Proxy)return!0;try{return Boolean.prototype.valueOf.call(Reflect.construct(Boolean,[],(function(){}))),!0}catch(t){return!1}}();return function(){var n,r=c(t);if(e){var i=c(this).constructor;n=Reflect.construct(r,arguments,i)}else n=r.apply(this,arguments);return function(t,e){if(e&&("object"==typeof e||"function"==typeof e))return e;if(void 0!==e)throw new TypeError("Derived constructors may only return object or undefined");return u(t)}(this,n)}}function f(){return f="undefined"!=typeof Reflect&&Reflect.get?Reflect.get.bind():function(t,e,n){var r=function(t,e){for(;!Object.prototype.hasOwnProperty.call(t,e)&&null!==(t=c(t)););return t}(t,e);if(r){var i=Object.getOwnPropertyDescriptor(r,e);return i.get?i.get.call(arguments.length<3?t:n):i.value}},f.apply(this,arguments)}function d(t){var e=function(t,e){if("object"!=typeof t||null===t)return t;var n=t[Symbol.toPrimitive];if(void 0!==n){var r=n.call(t,e||"default");if("object"!=typeof r)return r;throw new TypeError("@@toPrimitive must return a primitive value.")}return("string"===e?String:Number)(t)}(t,"string");return"symbol"==typeof e?e:e+""}var h=function(t){return!(!t||!t.Window)&&t instanceof t.Window},v=void 0,g=void 0;function m(t){v=t;var e=t.document.createTextNode("");e.ownerDocument!==t.document&&"function"==typeof t.wrap&&t.wrap(e)===e&&(t=t.wrap(t)),g=t}function y(t){return h(t)?t:(t.ownerDocument||t).defaultView||g.window}"undefined"!=typeof window&&window&&m(window);var b=function(t){return!!t&&"object"===n(t)},x=function(t){return"function"==typeof t},w={window:function(t){return t===g||h(t)},docFrag:function(t){return b(t)&&11===t.nodeType},object:b,func:x,number:function(t){return"number"==typeof t},bool:function(t){return"boolean"==typeof t},string:function(t){return"string"==typeof t},element:function(t){if(!t||"object"!==n(t))return!1;var e=y(t)||g;return/object|function/.test("undefined"==typeof Element?"undefined":n(Element))?t instanceof Element||t instanceof e.Element:1===t.nodeType&&"string"==typeof t.nodeName},plainObject:function(t){return b(t)&&!!t.constructor&&/function Object\b/.test(t.constructor.toString())},array:function(t){return b(t)&&void 0!==t.length&&x(t.splice)}};function E(t){var e=t.interaction;if("drag"===e.prepared.name){var n=e.prepared.axis;"x"===n?(e.coords.cur.page.y=e.coords.start.page.y,e.coords.cur.client.y=e.coords.start.client.y,e.coords.velocity.client.y=0,e.coords.velocity.page.y=0):"y"===n&&(e.coords.cur.page.x=e.coords.start.page.x,e.coords.cur.client.x=e.coords.start.client.x,e.coords.velocity.client.x=0,e.coords.velocity.page.x=0)}}function T(t){var e=t.iEvent,n=t.interaction;if("drag"===n.prepared.name){var r=n.prepared.axis;if("x"===r||"y"===r){var i="x"===r?"y":"x";e.page[i]=n.coords.start.page[i],e.client[i]=n.coords.start.client[i],e.delta[i]=0}}}var S={id:"actions/drag",install:function(t){var e=t.actions,n=t.Interactable,r=t.defaults;n.prototype.draggable=S.draggable,e.map.drag=S,e.methodDict.drag="draggable",r.actions.drag=S.defaults},listeners:{"interactions:before-action-move":E,"interactions:action-resume":E,"interactions:action-move":T,"auto-start:check":function(t){var e=t.interaction,n=t.interactable,r=t.buttons,i=n.options.drag;if(i&&i.enabled&&(!e.pointerIsDown||!/mouse|pointer/.test(e.pointerType)||0!=(r&n.options.drag.mouseButtons)))return t.action={name:"drag",axis:"start"===i.lockAxis?i.startAxis:i.lockAxis},!1}},draggable:function(t){return w.object(t)?(this.options.drag.enabled=!1!==t.enabled,this.setPerAction("drag",t),this.setOnEvents("drag",t),/^(xy|x|y|start)$/.test(t.lockAxis)&&(this.options.drag.lockAxis=t.lockAxis),/^(xy|x|y)$/.test(t.startAxis)&&(this.options.drag.startAxis=t.startAxis),this):w.bool(t)?(this.options.drag.enabled=t,this):this.options.drag},beforeMove:E,move:T,defaults:{startAxis:"xy",lockAxis:"xy"},getCursor:function(){return"move"},filterEventType:function(t){return 0===t.search("drag")}},_=S,P={init:function(t){var e=t;P.document=e.document,P.DocumentFragment=e.DocumentFragment||O,P.SVGElement=e.SVGElement||O,P.SVGSVGElement=e.SVGSVGElement||O,P.SVGElementInstance=e.SVGElementInstance||O,P.Element=e.Element||O,P.HTMLElement=e.HTMLElement||P.Element,P.Event=e.Event,P.Touch=e.Touch||O,P.PointerEvent=e.PointerEvent||e.MSPointerEvent},document:null,DocumentFragment:null,SVGElement:null,SVGSVGElement:null,SVGElementInstance:null,Element:null,HTMLElement:null,Event:null,Touch:null,PointerEvent:null};function O(){}var k=P;var D={init:function(t){var e=k.Element,n=t.navigator||{};D.supportsTouch="ontouchstart"in t||w.func(t.DocumentTouch)&&k.document instanceof t.DocumentTouch,D.supportsPointerEvent=!1!==n.pointerEnabled&&!!k.PointerEvent,D.isIOS=/iP(hone|od|ad)/.test(n.platform),D.isIOS7=/iP(hone|od|ad)/.test(n.platform)&&/OS 7[^\d]/.test(n.appVersion),D.isIe9=/MSIE 9/.test(n.userAgent),D.isOperaMobile="Opera"===n.appName&&D.supportsTouch&&/Presto/.test(n.userAgent),D.prefixedMatchesSelector="matches"in e.prototype?"matches":"webkitMatchesSelector"in e.prototype?"webkitMatchesSelector":"mozMatchesSelector"in e.prototype?"mozMatchesSelector":"oMatchesSelector"in e.prototype?"oMatchesSelector":"msMatchesSelector",D.pEventTypes=D.supportsPointerEvent?k.PointerEvent===t.MSPointerEvent?{up:"MSPointerUp",down:"MSPointerDown",over:"mouseover",out:"mouseout",move:"MSPointerMove",cancel:"MSPointerCancel"}:{up:"pointerup",down:"pointerdown",over:"pointerover",out:"pointerout",move:"pointermove",cancel:"pointercancel"}:null,D.wheelEvent=k.document&&"onmousewheel"in k.document?"mousewheel":"wheel"},supportsTouch:null,supportsPointerEvent:null,isIOS7:null,isIOS:null,isIe9:null,isOperaMobile:null,prefixedMatchesSelector:null,pEventTypes:null,wheelEvent:null};var I=D;function M(t,e){if(t.contains)return t.contains(e);for(;e;){if(e===t)return!0;e=e.parentNode}return!1}function z(t,e){for(;w.element(t);){if(R(t,e))return t;t=A(t)}return null}function A(t){var e=t.parentNode;if(w.docFrag(e)){for(;(e=e.host)&&w.docFrag(e););return e}return e}function R(t,e){return g!==v&&(e=e.replace(/\/deep\//g," ")),t[I.prefixedMatchesSelector](e)}var C=function(t){return t.parentNode||t.host};function j(t,e){for(var n,r=[],i=t;(n=C(i))&&i!==e&&n!==i.ownerDocument;)r.unshift(i),i=n;return r}function F(t,e,n){for(;w.element(t);){if(R(t,e))return!0;if((t=A(t))===n)return R(t,e)}return!1}function X(t){return t.correspondingUseElement||t}function Y(t){var e=t instanceof k.SVGElement?t.getBoundingClientRect():t.getClientRects()[0];return e&&{left:e.left,right:e.right,top:e.top,bottom:e.bottom,width:e.width||e.right-e.left,height:e.height||e.bottom-e.top}}function L(t){var e,n=Y(t);if(!I.isIOS7&&n){var r={x:(e=(e=y(t))||g).scrollX||e.document.documentElement.scrollLeft,y:e.scrollY||e.document.documentElement.scrollTop};n.left+=r.x,n.right+=r.x,n.top+=r.y,n.bottom+=r.y}return n}function q(t){for(var e=[];t;)e.push(t),t=A(t);return e}function B(t){return!!w.string(t)&&(k.document.querySelector(t),!0)}function V(t,e){for(var n in e)t[n]=e[n];return t}function W(t,e,n){return"parent"===t?A(n):"self"===t?e.getRect(n):z(n,t)}function G(t,e,n,r){var i=t;return w.string(i)?i=W(i,e,n):w.func(i)&&(i=i.apply(void 0,r)),w.element(i)&&(i=L(i)),i}function N(t){return t&&{x:"x"in t?t.x:t.left,y:"y"in t?t.y:t.top}}function U(t){return!t||"x"in t&&"y"in t||((t=V({},t)).x=t.left||0,t.y=t.top||0,t.width=t.width||(t.right||0)-t.x,t.height=t.height||(t.bottom||0)-t.y),t}function H(t,e,n){t.left&&(e.left+=n.x),t.right&&(e.right+=n.x),t.top&&(e.top+=n.y),t.bottom&&(e.bottom+=n.y),e.width=e.right-e.left,e.height=e.bottom-e.top}function K(t,e,n){var r=n&&t.options[n];return N(G(r&&r.origin||t.options.origin,t,e,[t&&e]))||{x:0,y:0}}function $(t,e){var n=arguments.length>2&&void 0!==arguments[2]?arguments[2]:function(t){return!0},r=arguments.length>3?arguments[3]:void 0;if(r=r||{},w.string(t)&&-1!==t.search(" ")&&(t=J(t)),w.array(t))return t.forEach((function(t){return $(t,e,n,r)})),r;if(w.object(t)&&(e=t,t=""),w.func(e)&&n(t))r[t]=r[t]||[],r[t].push(e);else if(w.array(e))for(var i=0,o=e;i<o.length;i++){var a=o[i];$(t,a,n,r)}else if(w.object(e))for(var s in e){$(J(s).map((function(e){return"".concat(t).concat(e)})),e[s],n,r)}return r}function J(t){return t.trim().split(/ +/)}var Q=function(t,e){return Math.sqrt(t*t+e*e)},Z=["webkit","moz"];function tt(t,e){t.__set||(t.__set={});var n=function(n){if(Z.some((function(t){return 0===n.indexOf(t)})))return 1;"function"!=typeof t[n]&&"__set"!==n&&Object.defineProperty(t,n,{get:function(){return n in t.__set?t.__set[n]:t.__set[n]=e[n]},set:function(e){t.__set[n]=e},configurable:!0})};for(var r in e)n(r);return t}function et(t,e){t.page=t.page||{},t.page.x=e.page.x,t.page.y=e.page.y,t.client=t.client||{},t.client.x=e.client.x,t.client.y=e.client.y,t.timeStamp=e.timeStamp}function nt(t){t.page.x=0,t.page.y=0,t.client.x=0,t.client.y=0}function rt(t){return t instanceof k.Event||t instanceof k.Touch}function it(t,e,n){return t=t||"page",(n=n||{}).x=e[t+"X"],n.y=e[t+"Y"],n}function ot(t,e){return e=e||{x:0,y:0},I.isOperaMobile&&rt(t)?(it("screen",t,e),e.x+=window.scrollX,e.y+=window.scrollY):it("page",t,e),e}function at(t){return w.number(t.pointerId)?t.pointerId:t.identifier}function st(t,e,n){var r=e.length>1?lt(e):e[0];ot(r,t.page),function(t,e){e=e||{},I.isOperaMobile&&rt(t)?it("screen",t,e):it("client",t,e)}(r,t.client),t.timeStamp=n}function ct(t){var e=[];return w.array(t)?(e[0]=t[0],e[1]=t[1]):"touchend"===t.type?1===t.touches.length?(e[0]=t.touches[0],e[1]=t.changedTouches[0]):0===t.touches.length&&(e[0]=t.changedTouches[0],e[1]=t.changedTouches[1]):(e[0]=t.touches[0],e[1]=t.touches[1]),e}function lt(t){for(var e={pageX:0,pageY:0,clientX:0,clientY:0,screenX:0,screenY:0},n=0;n<t.length;n++){var r=t[n];for(var i in e)e[i]+=r[i]}for(var o in e)e[o]/=t.length;return e}function ut(t){if(!t.length)return null;var e=ct(t),n=Math.min(e[0].pageX,e[1].pageX),r=Math.min(e[0].pageY,e[1].pageY),i=Math.max(e[0].pageX,e[1].pageX),o=Math.max(e[0].pageY,e[1].pageY);return{x:n,y:r,left:n,top:r,right:i,bottom:o,width:i-n,height:o-r}}function pt(t,e){var n=e+"X",r=e+"Y",i=ct(t),o=i[0][n]-i[1][n],a=i[0][r]-i[1][r];return Q(o,a)}function ft(t,e){var n=e+"X",r=e+"Y",i=ct(t),o=i[1][n]-i[0][n],a=i[1][r]-i[0][r];return 180*Math.atan2(a,o)/Math.PI}function dt(t){return w.string(t.pointerType)?t.pointerType:w.number(t.pointerType)?[void 0,void 0,"touch","pen","mouse"][t.pointerType]:/touch/.test(t.type||"")||t instanceof k.Touch?"touch":"mouse"}function ht(t){var e=w.func(t.composedPath)?t.composedPath():t.path;return[X(e?e[0]:t.target),X(t.currentTarget)]}var vt=function(){function t(e){r(this,t),this.immediatePropagationStopped=!1,this.propagationStopped=!1,this._interaction=e}return o(t,[{key:"preventDefault",value:function(){}},{key:"stopPropagation",value:function(){this.propagationStopped=!0}},{key:"stopImmediatePropagation",value:function(){this.immediatePropagationStopped=this.propagationStopped=!0}}]),t}();Object.defineProperty(vt.prototype,"interaction",{get:function(){return this._interaction._proxy},set:function(){}});var gt=function(t,e){for(var n=0;n<e.length;n++){var r=e[n];t.push(r)}return t},mt=function(t){return gt([],t)},yt=function(t,e){for(var n=0;n<t.length;n++)if(e(t[n],n,t))return n;return-1},bt=function(t,e){return t[yt(t,e)]},xt=function(t){s(n,t);var e=p(n);function n(t,i,o){var a;r(this,n),(a=e.call(this,i._interaction)).dropzone=void 0,a.dragEvent=void 0,a.relatedTarget=void 0,a.draggable=void 0,a.propagationStopped=!1,a.immediatePropagationStopped=!1;var s="dragleave"===o?t.prev:t.cur,c=s.element,l=s.dropzone;return a.type=o,a.target=c,a.currentTarget=c,a.dropzone=l,a.dragEvent=i,a.relatedTarget=i.target,a.draggable=i.interactable,a.timeStamp=i.timeStamp,a}return o(n,[{key:"reject",value:function(){var t=this,e=this._interaction.dropState;if("dropactivate"===this.type||this.dropzone&&e.cur.dropzone===this.dropzone&&e.cur.element===this.target)if(e.prev.dropzone=this.dropzone,e.prev.element=this.target,e.rejected=!0,e.events.enter=null,this.stopImmediatePropagation(),"dropactivate"===this.type){var r=e.activeDrops,i=yt(r,(function(e){var n=e.dropzone,r=e.element;return n===t.dropzone&&r===t.target}));e.activeDrops.splice(i,1);var o=new n(e,this.dragEvent,"dropdeactivate");o.dropzone=this.dropzone,o.target=this.target,this.dropzone.fire(o)}else this.dropzone.fire(new n(e,this.dragEvent,"dragleave"))}},{key:"preventDefault",value:function(){}},{key:"stopPropagation",value:function(){this.propagationStopped=!0}},{key:"stopImmediatePropagation",value:function(){this.immediatePropagationStopped=this.propagationStopped=!0}}]),n}(vt);function wt(t,e){for(var n=0,r=t.slice();n<r.length;n++){var i=r[n],o=i.dropzone,a=i.element;e.dropzone=o,e.target=a,o.fire(e),e.propagationStopped=e.immediatePropagationStopped=!1}}function Et(t,e){for(var n=function(t,e){for(var n=[],r=0,i=t.interactables.list;r<i.length;r++){var o=i[r];if(o.options.drop.enabled){var a=o.options.drop.accept;if(!(w.element(a)&&a!==e||w.string(a)&&!R(e,a)||w.func(a)&&!a({dropzone:o,draggableElement:e})))for(var s=0,c=o.getAllElements();s<c.length;s++){var l=c[s];l!==e&&n.push({dropzone:o,element:l,rect:o.getRect(l)})}}}return n}(t,e),r=0;r<n.length;r++){var i=n[r];i.rect=i.dropzone.getRect(i.element)}return n}function Tt(t,e,n){for(var r=t.dropState,i=t.interactable,o=t.element,a=[],s=0,c=r.activeDrops;s<c.length;s++){var l=c[s],u=l.dropzone,p=l.element,f=l.rect,d=u.dropCheck(e,n,i,o,p,f);a.push(d?p:null)}var h=function(t){for(var e,n,r,i=[],o=0;o<t.length;o++){var a=t[o],s=t[e];if(a&&o!==e)if(s){var c=C(a),l=C(s);if(c!==a.ownerDocument)if(l!==a.ownerDocument)if(c!==l){i=i.length?i:j(s);var u=void 0;if(s instanceof k.HTMLElement&&a instanceof k.SVGElement&&!(a instanceof k.SVGSVGElement)){if(a===l)continue;u=a.ownerSVGElement}else u=a;for(var p=j(u,s.ownerDocument),f=0;p[f]&&p[f]===i[f];)f++;var d=[p[f-1],p[f],i[f]];if(d[0])for(var h=d[0].lastChild;h;){if(h===d[1]){e=o,i=p;break}if(h===d[2])break;h=h.previousSibling}}else r=s,void 0,void 0,(parseInt(y(n=a).getComputedStyle(n).zIndex,10)||0)>=(parseInt(y(r).getComputedStyle(r).zIndex,10)||0)&&(e=o);else e=o}else e=o}return e}(a);return r.activeDrops[h]||null}function St(t,e,n){var r=t.dropState,i={enter:null,leave:null,activate:null,deactivate:null,move:null,drop:null};return"dragstart"===n.type&&(i.activate=new xt(r,n,"dropactivate"),i.activate.target=null,i.activate.dropzone=null),"dragend"===n.type&&(i.deactivate=new xt(r,n,"dropdeactivate"),i.deactivate.target=null,i.deactivate.dropzone=null),r.rejected||(r.cur.element!==r.prev.element&&(r.prev.dropzone&&(i.leave=new xt(r,n,"dragleave"),n.dragLeave=i.leave.target=r.prev.element,n.prevDropzone=i.leave.dropzone=r.prev.dropzone),r.cur.dropzone&&(i.enter=new xt(r,n,"dragenter"),n.dragEnter=r.cur.element,n.dropzone=r.cur.dropzone)),"dragend"===n.type&&r.cur.dropzone&&(i.drop=new xt(r,n,"drop"),n.dropzone=r.cur.dropzone,n.relatedTarget=r.cur.element),"dragmove"===n.type&&r.cur.dropzone&&(i.move=new xt(r,n,"dropmove"),n.dropzone=r.cur.dropzone)),i}function _t(t,e){var n=t.dropState,r=n.activeDrops,i=n.cur,o=n.prev;e.leave&&o.dropzone.fire(e.leave),e.enter&&i.dropzone.fire(e.enter),e.move&&i.dropzone.fire(e.move),e.drop&&i.dropzone.fire(e.drop),e.deactivate&&wt(r,e.deactivate),n.prev.dropzone=i.dropzone,n.prev.element=i.element}function Pt(t,e){var n=t.interaction,r=t.iEvent,i=t.event;if("dragmove"===r.type||"dragend"===r.type){var o=n.dropState;e.dynamicDrop&&(o.activeDrops=Et(e,n.element));var a=r,s=Tt(n,a,i);o.rejected=o.rejected&&!!s&&s.dropzone===o.cur.dropzone&&s.element===o.cur.element,o.cur.dropzone=s&&s.dropzone,o.cur.element=s&&s.element,o.events=St(n,0,a)}}var Ot={id:"actions/drop",install:function(t){var e=t.actions,n=t.interactStatic,r=t.Interactable,i=t.defaults;t.usePlugin(_),r.prototype.dropzone=function(t){return function(t,e){if(w.object(e)){if(t.options.drop.enabled=!1!==e.enabled,e.listeners){var n=$(e.listeners),r=Object.keys(n).reduce((function(t,e){return t[/^(enter|leave)/.test(e)?"drag".concat(e):/^(activate|deactivate|move)/.test(e)?"drop".concat(e):e]=n[e],t}),{}),i=t.options.drop.listeners;i&&t.off(i),t.on(r),t.options.drop.listeners=r}return w.func(e.ondrop)&&t.on("drop",e.ondrop),w.func(e.ondropactivate)&&t.on("dropactivate",e.ondropactivate),w.func(e.ondropdeactivate)&&t.on("dropdeactivate",e.ondropdeactivate),w.func(e.ondragenter)&&t.on("dragenter",e.ondragenter),w.func(e.ondragleave)&&t.on("dragleave",e.ondragleave),w.func(e.ondropmove)&&t.on("dropmove",e.ondropmove),/^(pointer|center)$/.test(e.overlap)?t.options.drop.overlap=e.overlap:w.number(e.overlap)&&(t.options.drop.overlap=Math.max(Math.min(1,e.overlap),0)),"accept"in e&&(t.options.drop.accept=e.accept),"checker"in e&&(t.options.drop.checker=e.checker),t}if(w.bool(e))return t.options.drop.enabled=e,t;return t.options.drop}(this,t)},r.prototype.dropCheck=function(t,e,n,r,i,o){return function(t,e,n,r,i,o,a){var s=!1;if(!(a=a||t.getRect(o)))return!!t.options.drop.checker&&t.options.drop.checker(e,n,s,t,o,r,i);var c=t.options.drop.overlap;if("pointer"===c){var l=K(r,i,"drag"),u=ot(e);u.x+=l.x,u.y+=l.y;var p=u.x>a.left&&u.x<a.right,f=u.y>a.top&&u.y<a.bottom;s=p&&f}var d=r.getRect(i);if(d&&"center"===c){var h=d.left+d.width/2,v=d.top+d.height/2;s=h>=a.left&&h<=a.right&&v>=a.top&&v<=a.bottom}if(d&&w.number(c)){s=Math.max(0,Math.min(a.right,d.right)-Math.max(a.left,d.left))*Math.max(0,Math.min(a.bottom,d.bottom)-Math.max(a.top,d.top))/(d.width*d.height)>=c}t.options.drop.checker&&(s=t.options.drop.checker(e,n,s,t,o,r,i));return s}(this,t,e,n,r,i,o)},n.dynamicDrop=function(e){return w.bool(e)?(t.dynamicDrop=e,n):t.dynamicDrop},V(e.phaselessTypes,{dragenter:!0,dragleave:!0,dropactivate:!0,dropdeactivate:!0,dropmove:!0,drop:!0}),e.methodDict.drop="dropzone",t.dynamicDrop=!1,i.actions.drop=Ot.defaults},listeners:{"interactions:before-action-start":function(t){var e=t.interaction;"drag"===e.prepared.name&&(e.dropState={cur:{dropzone:null,element:null},prev:{dropzone:null,element:null},rejected:null,events:null,activeDrops:[]})},"interactions:after-action-start":function(t,e){var n=t.interaction,r=(t.event,t.iEvent);if("drag"===n.prepared.name){var i=n.dropState;i.activeDrops=[],i.events={},i.activeDrops=Et(e,n.element),i.events=St(n,0,r),i.events.activate&&(wt(i.activeDrops,i.events.activate),e.fire("actions/drop:start",{interaction:n,dragEvent:r}))}},"interactions:action-move":Pt,"interactions:after-action-move":function(t,e){var n=t.interaction,r=t.iEvent;if("drag"===n.prepared.name){var i=n.dropState;_t(n,i.events),e.fire("actions/drop:move",{interaction:n,dragEvent:r}),i.events={}}},"interactions:action-end":function(t,e){if("drag"===t.interaction.prepared.name){var n=t.interaction,r=t.iEvent;Pt(t,e),_t(n,n.dropState.events),e.fire("actions/drop:end",{interaction:n,dragEvent:r})}},"interactions:stop":function(t){var e=t.interaction;if("drag"===e.prepared.name){var n=e.dropState;n&&(n.activeDrops=null,n.events=null,n.cur.dropzone=null,n.cur.element=null,n.prev.dropzone=null,n.prev.element=null,n.rejected=!1)}}},getActiveDrops:Et,getDrop:Tt,getDropEvents:St,fireDropEvents:_t,filterEventType:function(t){return 0===t.search("drag")||0===t.search("drop")},defaults:{enabled:!1,accept:null,overlap:"pointer"}},kt=Ot;function Dt(t){var e=t.interaction,n=t.iEvent,r=t.phase;if("gesture"===e.prepared.name){var i=e.pointers.map((function(t){return t.pointer})),o="start"===r,a="end"===r,s=e.interactable.options.deltaSource;if(n.touches=[i[0],i[1]],o)n.distance=pt(i,s),n.box=ut(i),n.scale=1,n.ds=0,n.angle=ft(i,s),n.da=0,e.gesture.startDistance=n.distance,e.gesture.startAngle=n.angle;else if(a||e.pointers.length<2){var c=e.prevEvent;n.distance=c.distance,n.box=c.box,n.scale=c.scale,n.ds=0,n.angle=c.angle,n.da=0}else n.distance=pt(i,s),n.box=ut(i),n.scale=n.distance/e.gesture.startDistance,n.angle=ft(i,s),n.ds=n.scale-e.gesture.scale,n.da=n.angle-e.gesture.angle;e.gesture.distance=n.distance,e.gesture.angle=n.angle,w.number(n.scale)&&n.scale!==1/0&&!isNaN(n.scale)&&(e.gesture.scale=n.scale)}}var It={id:"actions/gesture",before:["actions/drag","actions/resize"],install:function(t){var e=t.actions,n=t.Interactable,r=t.defaults;n.prototype.gesturable=function(t){return w.object(t)?(this.options.gesture.enabled=!1!==t.enabled,this.setPerAction("gesture",t),this.setOnEvents("gesture",t),this):w.bool(t)?(this.options.gesture.enabled=t,this):this.options.gesture},e.map.gesture=It,e.methodDict.gesture="gesturable",r.actions.gesture=It.defaults},listeners:{"interactions:action-start":Dt,"interactions:action-move":Dt,"interactions:action-end":Dt,"interactions:new":function(t){t.interaction.gesture={angle:0,distance:0,scale:1,startAngle:0,startDistance:0}},"auto-start:check":function(t){if(!(t.interaction.pointers.length<2)){var e=t.interactable.options.gesture;if(e&&e.enabled)return t.action={name:"gesture"},!1}}},defaults:{},getCursor:function(){return""},filterEventType:function(t){return 0===t.search("gesture")}},Mt=It;function zt(t,e,n,r,i,o,a){if(!e)return!1;if(!0===e){var s=w.number(o.width)?o.width:o.right-o.left,c=w.number(o.height)?o.height:o.bottom-o.top;if(a=Math.min(a,Math.abs(("left"===t||"right"===t?s:c)/2)),s<0&&("left"===t?t="right":"right"===t&&(t="left")),c<0&&("top"===t?t="bottom":"bottom"===t&&(t="top")),"left"===t){var l=s>=0?o.left:o.right;return n.x<l+a}if("top"===t){var u=c>=0?o.top:o.bottom;return n.y<u+a}if("right"===t)return n.x>(s>=0?o.right:o.left)-a;if("bottom"===t)return n.y>(c>=0?o.bottom:o.top)-a}return!!w.element(r)&&(w.element(e)?e===r:F(r,e,i))}function At(t){var e=t.iEvent,n=t.interaction;if("resize"===n.prepared.name&&n.resizeAxes){var r=e;n.interactable.options.resize.square?("y"===n.resizeAxes?r.delta.x=r.delta.y:r.delta.y=r.delta.x,r.axes="xy"):(r.axes=n.resizeAxes,"x"===n.resizeAxes?r.delta.y=0:"y"===n.resizeAxes&&(r.delta.x=0))}}var Rt,Ct,jt={id:"actions/resize",before:["actions/drag"],install:function(t){var e=t.actions,n=t.browser,r=t.Interactable,i=t.defaults;jt.cursors=function(t){return t.isIe9?{x:"e-resize",y:"s-resize",xy:"se-resize",top:"n-resize",left:"w-resize",bottom:"s-resize",right:"e-resize",topleft:"se-resize",bottomright:"se-resize",topright:"ne-resize",bottomleft:"ne-resize"}:{x:"ew-resize",y:"ns-resize",xy:"nwse-resize",top:"ns-resize",left:"ew-resize",bottom:"ns-resize",right:"ew-resize",topleft:"nwse-resize",bottomright:"nwse-resize",topright:"nesw-resize",bottomleft:"nesw-resize"}}(n),jt.defaultMargin=n.supportsTouch||n.supportsPointerEvent?20:10,r.prototype.resizable=function(e){return function(t,e,n){if(w.object(e))return t.options.resize.enabled=!1!==e.enabled,t.setPerAction("resize",e),t.setOnEvents("resize",e),w.string(e.axis)&&/^x$|^y$|^xy$/.test(e.axis)?t.options.resize.axis=e.axis:null===e.axis&&(t.options.resize.axis=n.defaults.actions.resize.axis),w.bool(e.preserveAspectRatio)?t.options.resize.preserveAspectRatio=e.preserveAspectRatio:w.bool(e.square)&&(t.options.resize.square=e.square),t;if(w.bool(e))return t.options.resize.enabled=e,t;return t.options.resize}(this,e,t)},e.map.resize=jt,e.methodDict.resize="resizable",i.actions.resize=jt.defaults},listeners:{"interactions:new":function(t){t.interaction.resizeAxes="xy"},"interactions:action-start":function(t){!function(t){var e=t.iEvent,n=t.interaction;if("resize"===n.prepared.name&&n.prepared.edges){var r=e,i=n.rect;n._rects={start:V({},i),corrected:V({},i),previous:V({},i),delta:{left:0,right:0,width:0,top:0,bottom:0,height:0}},r.edges=n.prepared.edges,r.rect=n._rects.corrected,r.deltaRect=n._rects.delta}}(t),At(t)},"interactions:action-move":function(t){!function(t){var e=t.iEvent,n=t.interaction;if("resize"===n.prepared.name&&n.prepared.edges){var r=e,i=n.interactable.options.resize.invert,o="reposition"===i||"negate"===i,a=n.rect,s=n._rects,c=s.start,l=s.corrected,u=s.delta,p=s.previous;if(V(p,l),o){if(V(l,a),"reposition"===i){if(l.top>l.bottom){var f=l.top;l.top=l.bottom,l.bottom=f}if(l.left>l.right){var d=l.left;l.left=l.right,l.right=d}}}else l.top=Math.min(a.top,c.bottom),l.bottom=Math.max(a.bottom,c.top),l.left=Math.min(a.left,c.right),l.right=Math.max(a.right,c.left);for(var h in l.width=l.right-l.left,l.height=l.bottom-l.top,l)u[h]=l[h]-p[h];r.edges=n.prepared.edges,r.rect=l,r.deltaRect=u}}(t),At(t)},"interactions:action-end":function(t){var e=t.iEvent,n=t.interaction;if("resize"===n.prepared.name&&n.prepared.edges){var r=e;r.edges=n.prepared.edges,r.rect=n._rects.corrected,r.deltaRect=n._rects.delta}},"auto-start:check":function(t){var e=t.interaction,n=t.interactable,r=t.element,i=t.rect,o=t.buttons;if(i){var a=V({},e.coords.cur.page),s=n.options.resize;if(s&&s.enabled&&(!e.pointerIsDown||!/mouse|pointer/.test(e.pointerType)||0!=(o&s.mouseButtons))){if(w.object(s.edges)){var c={left:!1,right:!1,top:!1,bottom:!1};for(var l in c)c[l]=zt(l,s.edges[l],a,e._latestPointer.eventTarget,r,i,s.margin||jt.defaultMargin);c.left=c.left&&!c.right,c.top=c.top&&!c.bottom,(c.left||c.right||c.top||c.bottom)&&(t.action={name:"resize",edges:c})}else{var u="y"!==s.axis&&a.x>i.right-jt.defaultMargin,p="x"!==s.axis&&a.y>i.bottom-jt.defaultMargin;(u||p)&&(t.action={name:"resize",axes:(u?"x":"")+(p?"y":"")})}return!t.action&&void 0}}}},defaults:{square:!1,preserveAspectRatio:!1,axis:"xy",margin:NaN,edges:null,invert:"none"},cursors:null,getCursor:function(t){var e=t.edges,n=t.axis,r=t.name,i=jt.cursors,o=null;if(n)o=i[r+n];else if(e){for(var a="",s=0,c=["top","bottom","left","right"];s<c.length;s++){var l=c[s];e[l]&&(a+=l)}o=i[a]}return o},filterEventType:function(t){return 0===t.search("resize")},defaultMargin:null},Ft=jt,Xt={id:"actions",install:function(t){t.usePlugin(Mt),t.usePlugin(Ft),t.usePlugin(_),t.usePlugin(kt)}},Yt=0;var Lt={request:function(t){return Rt(t)},cancel:function(t){return Ct(t)},init:function(t){if(Rt=t.requestAnimationFrame,Ct=t.cancelAnimationFrame,!Rt)for(var e=["ms","moz","webkit","o"],n=0;n<e.length;n++){var r=e[n];Rt=t["".concat(r,"RequestAnimationFrame")],Ct=t["".concat(r,"CancelAnimationFrame")]||t["".concat(r,"CancelRequestAnimationFrame")]}Rt=Rt&&Rt.bind(t),Ct=Ct&&Ct.bind(t),Rt||(Rt=function(e){var n=Date.now(),r=Math.max(0,16-(n-Yt)),i=t.setTimeout((function(){e(n+r)}),r);return Yt=n+r,i},Ct=function(t){return clearTimeout(t)})}};var qt={defaults:{enabled:!1,margin:60,container:null,speed:300},now:Date.now,interaction:null,i:0,x:0,y:0,isScrolling:!1,prevTime:0,margin:0,speed:0,start:function(t){qt.isScrolling=!0,Lt.cancel(qt.i),t.autoScroll=qt,qt.interaction=t,qt.prevTime=qt.now(),qt.i=Lt.request(qt.scroll)},stop:function(){qt.isScrolling=!1,qt.interaction&&(qt.interaction.autoScroll=null),Lt.cancel(qt.i)},scroll:function(){var t=qt.interaction,e=t.interactable,n=t.element,r=t.prepared.name,i=e.options[r].autoScroll,o=Bt(i.container,e,n),a=qt.now(),s=(a-qt.prevTime)/1e3,c=i.speed*s;if(c>=1){var l={x:qt.x*c,y:qt.y*c};if(l.x||l.y){var u=Vt(o);w.window(o)?o.scrollBy(l.x,l.y):o&&(o.scrollLeft+=l.x,o.scrollTop+=l.y);var p=Vt(o),f={x:p.x-u.x,y:p.y-u.y};(f.x||f.y)&&e.fire({type:"autoscroll",target:n,interactable:e,delta:f,interaction:t,container:o})}qt.prevTime=a}qt.isScrolling&&(Lt.cancel(qt.i),qt.i=Lt.request(qt.scroll))},check:function(t,e){var n;return null==(n=t.options[e].autoScroll)?void 0:n.enabled},onInteractionMove:function(t){var e=t.interaction,n=t.pointer;if(e.interacting()&&qt.check(e.interactable,e.prepared.name))if(e.simulation)qt.x=qt.y=0;else{var r,i,o,a,s=e.interactable,c=e.element,l=e.prepared.name,u=s.options[l].autoScroll,p=Bt(u.container,s,c);if(w.window(p))a=n.clientX<qt.margin,r=n.clientY<qt.margin,i=n.clientX>p.innerWidth-qt.margin,o=n.clientY>p.innerHeight-qt.margin;else{var f=Y(p);a=n.clientX<f.left+qt.margin,r=n.clientY<f.top+qt.margin,i=n.clientX>f.right-qt.margin,o=n.clientY>f.bottom-qt.margin}qt.x=i?1:a?-1:0,qt.y=o?1:r?-1:0,qt.isScrolling||(qt.margin=u.margin,qt.speed=u.speed,qt.start(e))}}};function Bt(t,e,n){return(w.string(t)?W(t,e,n):t)||y(n)}function Vt(t){return w.window(t)&&(t=window.document.body),{x:t.scrollLeft,y:t.scrollTop}}var Wt={id:"auto-scroll",install:function(t){var e=t.defaults,n=t.actions;t.autoScroll=qt,qt.now=function(){return t.now()},n.phaselessTypes.autoscroll=!0,e.perAction.autoScroll=qt.defaults},listeners:{"interactions:new":function(t){t.interaction.autoScroll=null},"interactions:destroy":function(t){t.interaction.autoScroll=null,qt.stop(),qt.interaction&&(qt.interaction=null)},"interactions:stop":qt.stop,"interactions:action-move":function(t){return qt.onInteractionMove(t)}}},Gt=Wt;function Nt(t,e){var n=!1;return function(){return n||(g.console.warn(e),n=!0),t.apply(this,arguments)}}function Ut(t,e){return t.name=e.name,t.axis=e.axis,t.edges=e.edges,t}function Ht(t){return w.bool(t)?(this.options.styleCursor=t,this):null===t?(delete this.options.styleCursor,this):this.options.styleCursor}function Kt(t){return w.func(t)?(this.options.actionChecker=t,this):null===t?(delete this.options.actionChecker,this):this.options.actionChecker}var $t={id:"auto-start/interactableMethods",install:function(t){var e=t.Interactable;e.prototype.getAction=function(e,n,r,i){var o=function(t,e,n,r,i){var o=t.getRect(r),a=e.buttons||{0:1,1:4,3:8,4:16}[e.button],s={action:null,interactable:t,interaction:n,element:r,rect:o,buttons:a};return i.fire("auto-start:check",s),s.action}(this,n,r,i,t);return this.options.actionChecker?this.options.actionChecker(e,n,o,this,i,r):o},e.prototype.ignoreFrom=Nt((function(t){return this._backCompatOption("ignoreFrom",t)}),"Interactable.ignoreFrom() has been deprecated. Use Interactble.draggable({ignoreFrom: newValue})."),e.prototype.allowFrom=Nt((function(t){return this._backCompatOption("allowFrom",t)}),"Interactable.allowFrom() has been deprecated. Use Interactble.draggable({allowFrom: newValue})."),e.prototype.actionChecker=Kt,e.prototype.styleCursor=Ht}};function Jt(t,e,n,r,i){return e.testIgnoreAllow(e.options[t.name],n,r)&&e.options[t.name].enabled&&ee(e,n,t,i)?t:null}function Qt(t,e,n,r,i,o,a){for(var s=0,c=r.length;s<c;s++){var l=r[s],u=i[s],p=l.getAction(e,n,t,u);if(p){var f=Jt(p,l,u,o,a);if(f)return{action:f,interactable:l,element:u}}}return{action:null,interactable:null,element:null}}function Zt(t,e,n,r,i){var o=[],a=[],s=r;function c(t){o.push(t),a.push(s)}for(;w.element(s);){o=[],a=[],i.interactables.forEachMatch(s,c);var l=Qt(t,e,n,o,a,r,i);if(l.action&&!l.interactable.options[l.action.name].manualStart)return l;s=A(s)}return{action:null,interactable:null,element:null}}function te(t,e,n){var r=e.action,i=e.interactable,o=e.element;r=r||{name:null},t.interactable=i,t.element=o,Ut(t.prepared,r),t.rect=i&&r.name?i.getRect(o):null,ie(t,n),n.fire("autoStart:prepared",{interaction:t})}function ee(t,e,n,r){var i=t.options,o=i[n.name].max,a=i[n.name].maxPerElement,s=r.autoStart.maxInteractions,c=0,l=0,u=0;if(!(o&&a&&s))return!1;for(var p=0,f=r.interactions.list;p<f.length;p++){var d=f[p],h=d.prepared.name;if(d.interacting()){if(++c>=s)return!1;if(d.interactable===t){if((l+=h===n.name?1:0)>=o)return!1;if(d.element===e&&(u++,h===n.name&&u>=a))return!1}}}return s>0}function ne(t,e){return w.number(t)?(e.autoStart.maxInteractions=t,this):e.autoStart.maxInteractions}function re(t,e,n){var r=n.autoStart.cursorElement;r&&r!==t&&(r.style.cursor=""),t.ownerDocument.documentElement.style.cursor=e,t.style.cursor=e,n.autoStart.cursorElement=e?t:null}function ie(t,e){var n=t.interactable,r=t.element,i=t.prepared;if("mouse"===t.pointerType&&n&&n.options.styleCursor){var o="";if(i.name){var a=n.options[i.name].cursorChecker;o=w.func(a)?a(i,n,r,t._interacting):e.actions.map[i.name].getCursor(i)}re(t.element,o||"",e)}else e.autoStart.cursorElement&&re(e.autoStart.cursorElement,"",e)}var oe={id:"auto-start/base",before:["actions"],install:function(t){var e=t.interactStatic,n=t.defaults;t.usePlugin($t),n.base.actionChecker=null,n.base.styleCursor=!0,V(n.perAction,{manualStart:!1,max:1/0,maxPerElement:1,allowFrom:null,ignoreFrom:null,mouseButtons:1}),e.maxInteractions=function(e){return ne(e,t)},t.autoStart={maxInteractions:1/0,withinInteractionLimit:ee,cursorElement:null}},listeners:{"interactions:down":function(t,e){var n=t.interaction,r=t.pointer,i=t.event,o=t.eventTarget;n.interacting()||te(n,Zt(n,r,i,o,e),e)},"interactions:move":function(t,e){!function(t,e){var n=t.interaction,r=t.pointer,i=t.event,o=t.eventTarget;"mouse"!==n.pointerType||n.pointerIsDown||n.interacting()||te(n,Zt(n,r,i,o,e),e)}(t,e),function(t,e){var n=t.interaction;if(n.pointerIsDown&&!n.interacting()&&n.pointerWasMoved&&n.prepared.name){e.fire("autoStart:before-start",t);var r=n.interactable,i=n.prepared.name;i&&r&&(r.options[i].manualStart||!ee(r,n.element,n.prepared,e)?n.stop():(n.start(n.prepared,r,n.element),ie(n,e)))}}(t,e)},"interactions:stop":function(t,e){var n=t.interaction,r=n.interactable;r&&r.options.styleCursor&&re(n.element,"",e)}},maxInteractions:ne,withinInteractionLimit:ee,validateAction:Jt},ae=oe;var se={id:"auto-start/dragAxis",listeners:{"autoStart:before-start":function(t,e){var n=t.interaction,r=t.eventTarget,i=t.dx,o=t.dy;if("drag"===n.prepared.name){var a=Math.abs(i),s=Math.abs(o),c=n.interactable.options.drag,l=c.startAxis,u=a>s?"x":a<s?"y":"xy";if(n.prepared.axis="start"===c.lockAxis?u[0]:c.lockAxis,"xy"!==u&&"xy"!==l&&l!==u){n.prepared.name=null;for(var p=r,f=function(t){if(t!==n.interactable){var i=n.interactable.options.drag;if(!i.manualStart&&t.testIgnoreAllow(i,p,r)){var o=t.getAction(n.downPointer,n.downEvent,n,p);if(o&&"drag"===o.name&&function(t,e){if(!e)return!1;var n=e.options.drag.startAxis;return"xy"===t||"xy"===n||n===t}(u,t)&&ae.validateAction(o,t,p,r,e))return t}}};w.element(p);){var d=e.interactables.forEachMatch(p,f);if(d){n.prepared.name="drag",n.interactable=d,n.element=p;break}p=A(p)}}}}}};function ce(t){var e=t.prepared&&t.prepared.name;if(!e)return null;var n=t.interactable.options;return n[e].hold||n[e].delay}var le={id:"auto-start/hold",install:function(t){var e=t.defaults;t.usePlugin(ae),e.perAction.hold=0,e.perAction.delay=0},listeners:{"interactions:new":function(t){t.interaction.autoStartHoldTimer=null},"autoStart:prepared":function(t){var e=t.interaction,n=ce(e);n>0&&(e.autoStartHoldTimer=setTimeout((function(){e.start(e.prepared,e.interactable,e.element)}),n))},"interactions:move":function(t){var e=t.interaction,n=t.duplicate;e.autoStartHoldTimer&&e.pointerWasMoved&&!n&&(clearTimeout(e.autoStartHoldTimer),e.autoStartHoldTimer=null)},"autoStart:before-start":function(t){var e=t.interaction;ce(e)>0&&(e.prepared.name=null)}},getHoldDuration:ce},ue=le,pe={id:"auto-start",install:function(t){t.usePlugin(ae),t.usePlugin(ue),t.usePlugin(se)}},fe=function(t){return/^(always|never|auto)$/.test(t)?(this.options.preventDefault=t,this):w.bool(t)?(this.options.preventDefault=t?"always":"never",this):this.options.preventDefault};function de(t){var e=t.interaction,n=t.event;e.interactable&&e.interactable.checkAndPreventDefault(n)}var he={id:"core/interactablePreventDefault",install:function(t){var e=t.Interactable;e.prototype.preventDefault=fe,e.prototype.checkAndPreventDefault=function(e){return function(t,e,n){var r=t.options.preventDefault;if("never"!==r)if("always"!==r){if(e.events.supportsPassive&&/^touch(start|move)$/.test(n.type)){var i=y(n.target).document,o=e.getDocOptions(i);if(!o||!o.events||!1!==o.events.passive)return}/^(mouse|pointer|touch)*(down|start)/i.test(n.type)||w.element(n.target)&&R(n.target,"input,select,textarea,[contenteditable=true],[contenteditable=true] *")||n.preventDefault()}else n.preventDefault()}(this,t,e)},t.interactions.docEvents.push({type:"dragstart",listener:function(e){for(var n=0,r=t.interactions.list;n<r.length;n++){var i=r[n];if(i.element&&(i.element===e.target||M(i.element,e.target)))return void i.interactable.checkAndPreventDefault(e)}}})},listeners:["down","move","up","cancel"].reduce((function(t,e){return t["interactions:".concat(e)]=de,t}),{})};function ve(t,e){if(e.phaselessTypes[t])return!0;for(var n in e.map)if(0===t.indexOf(n)&&t.substr(n.length)in e.phases)return!0;return!1}function ge(t){var e={};for(var n in t){var r=t[n];w.plainObject(r)?e[n]=ge(r):w.array(r)?e[n]=mt(r):e[n]=r}return e}var me=function(){function t(e){r(this,t),this.states=[],this.startOffset={left:0,right:0,top:0,bottom:0},this.startDelta=void 0,this.result=void 0,this.endResult=void 0,this.startEdges=void 0,this.edges=void 0,this.interaction=void 0,this.interaction=e,this.result=ye(),this.edges={left:!1,right:!1,top:!1,bottom:!1}}return o(t,[{key:"start",value:function(t,e){var n,r,i=t.phase,o=this.interaction,a=function(t){var e=t.interactable.options[t.prepared.name],n=e.modifiers;if(n&&n.length)return n;return["snap","snapSize","snapEdges","restrict","restrictEdges","restrictSize"].map((function(t){var n=e[t];return n&&n.enabled&&{options:n,methods:n._methods}})).filter((function(t){return!!t}))}(o);this.prepareStates(a),this.startEdges=V({},o.edges),this.edges=V({},this.startEdges),this.startOffset=(n=o.rect,r=e,n?{left:r.x-n.left,top:r.y-n.top,right:n.right-r.x,bottom:n.bottom-r.y}:{left:0,top:0,right:0,bottom:0}),this.startDelta={x:0,y:0};var s=this.fillArg({phase:i,pageCoords:e,preEnd:!1});return this.result=ye(),this.startAll(s),this.result=this.setAll(s)}},{key:"fillArg",value:function(t){var e=this.interaction;return t.interaction=e,t.interactable=e.interactable,t.element=e.element,t.rect||(t.rect=e.rect),t.edges||(t.edges=this.startEdges),t.startOffset=this.startOffset,t}},{key:"startAll",value:function(t){for(var e=0,n=this.states;e<n.length;e++){var r=n[e];r.methods.start&&(t.state=r,r.methods.start(t))}}},{key:"setAll",value:function(t){var e=t.phase,n=t.preEnd,r=t.skipModifiers,i=t.rect,o=t.edges;t.coords=V({},t.pageCoords),t.rect=V({},i),t.edges=V({},o);for(var a=r?this.states.slice(r):this.states,s=ye(t.coords,t.rect),c=0;c<a.length;c++){var l,u=a[c],p=u.options,f=V({},t.coords),d=null;null!=(l=u.methods)&&l.set&&this.shouldDo(p,n,e)&&(t.state=u,d=u.methods.set(t),H(t.edges,t.rect,{x:t.coords.x-f.x,y:t.coords.y-f.y})),s.eventProps.push(d)}V(this.edges,t.edges),s.delta.x=t.coords.x-t.pageCoords.x,s.delta.y=t.coords.y-t.pageCoords.y,s.rectDelta.left=t.rect.left-i.left,s.rectDelta.right=t.rect.right-i.right,s.rectDelta.top=t.rect.top-i.top,s.rectDelta.bottom=t.rect.bottom-i.bottom;var h=this.result.coords,v=this.result.rect;if(h&&v){var g=s.rect.left!==v.left||s.rect.right!==v.right||s.rect.top!==v.top||s.rect.bottom!==v.bottom;s.changed=g||h.x!==s.coords.x||h.y!==s.coords.y}return s}},{key:"applyToInteraction",value:function(t){var e=this.interaction,n=t.phase,r=e.coords.cur,i=e.coords.start,o=this.result,a=this.startDelta,s=o.delta;"start"===n&&V(this.startDelta,o.delta);for(var c=0,l=[[i,a],[r,s]];c<l.length;c++){var u=l[c],p=u[0],f=u[1];p.page.x+=f.x,p.page.y+=f.y,p.client.x+=f.x,p.client.y+=f.y}var d=this.result.rectDelta,h=t.rect||e.rect;h.left+=d.left,h.right+=d.right,h.top+=d.top,h.bottom+=d.bottom,h.width=h.right-h.left,h.height=h.bottom-h.top}},{key:"setAndApply",value:function(t){var e=this.interaction,n=t.phase,r=t.preEnd,i=t.skipModifiers,o=this.setAll(this.fillArg({preEnd:r,phase:n,pageCoords:t.modifiedCoords||e.coords.cur.page}));if(this.result=o,!o.changed&&(!i||i<this.states.length)&&e.interacting())return!1;if(t.modifiedCoords){var a=e.coords.cur.page,s={x:t.modifiedCoords.x-a.x,y:t.modifiedCoords.y-a.y};o.coords.x+=s.x,o.coords.y+=s.y,o.delta.x+=s.x,o.delta.y+=s.y}this.applyToInteraction(t)}},{key:"beforeEnd",value:function(t){var e=t.interaction,n=t.event,r=this.states;if(r&&r.length){for(var i=!1,o=0;o<r.length;o++){var a=r[o];t.state=a;var s=a.options,c=a.methods,l=c.beforeEnd&&c.beforeEnd(t);if(l)return this.endResult=l,!1;i=i||!i&&this.shouldDo(s,!0,t.phase,!0)}i&&e.move({event:n,preEnd:!0})}}},{key:"stop",value:function(t){var e=t.interaction;if(this.states&&this.states.length){var n=V({states:this.states,interactable:e.interactable,element:e.element,rect:null},t);this.fillArg(n);for(var r=0,i=this.states;r<i.length;r++){var o=i[r];n.state=o,o.methods.stop&&o.methods.stop(n)}this.states=null,this.endResult=null}}},{key:"prepareStates",value:function(t){this.states=[];for(var e=0;e<t.length;e++){var n=t[e],r=n.options,i=n.methods,o=n.name;this.states.push({options:r,methods:i,index:e,name:o})}return this.states}},{key:"restoreInteractionCoords",value:function(t){var e=t.interaction,n=e.coords,r=e.rect,i=e.modification;if(i.result){for(var o=i.startDelta,a=i.result,s=a.delta,c=a.rectDelta,l=0,u=[[n.start,o],[n.cur,s]];l<u.length;l++){var p=u[l],f=p[0],d=p[1];f.page.x-=d.x,f.page.y-=d.y,f.client.x-=d.x,f.client.y-=d.y}r.left-=c.left,r.right-=c.right,r.top-=c.top,r.bottom-=c.bottom}}},{key:"shouldDo",value:function(t,e,n,r){return!(!t||!1===t.enabled||r&&!t.endOnly||t.endOnly&&!e||"start"===n&&!t.setStart)}},{key:"copyFrom",value:function(t){this.startOffset=t.startOffset,this.startDelta=t.startDelta,this.startEdges=t.startEdges,this.edges=t.edges,this.states=t.states.map((function(t){return ge(t)})),this.result=ye(V({},t.result.coords),V({},t.result.rect))}},{key:"destroy",value:function(){for(var t in this)this[t]=null}}]),t}();function ye(t,e){return{rect:e,coords:t,delta:{x:0,y:0},rectDelta:{left:0,right:0,top:0,bottom:0},eventProps:[],changed:!0}}function be(t,e){var n=t.defaults,r={start:t.start,set:t.set,beforeEnd:t.beforeEnd,stop:t.stop},i=function(t){var i=t||{};for(var o in i.enabled=!1!==i.enabled,n)o in i||(i[o]=n[o]);var a={options:i,methods:r,name:e,enable:function(){return i.enabled=!0,a},disable:function(){return i.enabled=!1,a}};return a};return e&&"string"==typeof e&&(i._defaults=n,i._methods=r),i}function xe(t){var e=t.iEvent,n=t.interaction.modification.result;n&&(e.modifiers=n.eventProps)}var we={id:"modifiers/base",before:["actions"],install:function(t){t.defaults.perAction.modifiers=[]},listeners:{"interactions:new":function(t){var e=t.interaction;e.modification=new me(e)},"interactions:before-action-start":function(t){var e=t.interaction,n=t.interaction.modification;n.start(t,e.coords.start.page),e.edges=n.edges,n.applyToInteraction(t)},"interactions:before-action-move":function(t){var e=t.interaction,n=e.modification,r=n.setAndApply(t);return e.edges=n.edges,r},"interactions:before-action-end":function(t){var e=t.interaction,n=e.modification,r=n.beforeEnd(t);return e.edges=n.startEdges,r},"interactions:action-start":xe,"interactions:action-move":xe,"interactions:action-end":xe,"interactions:after-action-start":function(t){return t.interaction.modification.restoreInteractionCoords(t)},"interactions:after-action-move":function(t){return t.interaction.modification.restoreInteractionCoords(t)},"interactions:stop":function(t){return t.interaction.modification.stop(t)}}},Ee=we,Te={base:{preventDefault:"auto",deltaSource:"page"},perAction:{enabled:!1,origin:{x:0,y:0}},actions:{}},Se=function(t){s(n,t);var e=p(n);function n(t,i,o,a,s,c,l){var p;r(this,n),(p=e.call(this,t)).relatedTarget=null,p.screenX=void 0,p.screenY=void 0,p.button=void 0,p.buttons=void 0,p.ctrlKey=void 0,p.shiftKey=void 0,p.altKey=void 0,p.metaKey=void 0,p.page=void 0,p.client=void 0,p.delta=void 0,p.rect=void 0,p.x0=void 0,p.y0=void 0,p.t0=void 0,p.dt=void 0,p.duration=void 0,p.clientX0=void 0,p.clientY0=void 0,p.velocity=void 0,p.speed=void 0,p.swipe=void 0,p.axes=void 0,p.preEnd=void 0,s=s||t.element;var f=t.interactable,d=(f&&f.options||Te).deltaSource,h=K(f,s,o),v="start"===a,g="end"===a,m=v?u(p):t.prevEvent,y=v?t.coords.start:g?{page:m.page,client:m.client,timeStamp:t.coords.cur.timeStamp}:t.coords.cur;return p.page=V({},y.page),p.client=V({},y.client),p.rect=V({},t.rect),p.timeStamp=y.timeStamp,g||(p.page.x-=h.x,p.page.y-=h.y,p.client.x-=h.x,p.client.y-=h.y),p.ctrlKey=i.ctrlKey,p.altKey=i.altKey,p.shiftKey=i.shiftKey,p.metaKey=i.metaKey,p.button=i.button,p.buttons=i.buttons,p.target=s,p.currentTarget=s,p.preEnd=c,p.type=l||o+(a||""),p.interactable=f,p.t0=v?t.pointers[t.pointers.length-1].downTime:m.t0,p.x0=t.coords.start.page.x-h.x,p.y0=t.coords.start.page.y-h.y,p.clientX0=t.coords.start.client.x-h.x,p.clientY0=t.coords.start.client.y-h.y,p.delta=v||g?{x:0,y:0}:{x:p[d].x-m[d].x,y:p[d].y-m[d].y},p.dt=t.coords.delta.timeStamp,p.duration=p.timeStamp-p.t0,p.velocity=V({},t.coords.velocity[d]),p.speed=Q(p.velocity.x,p.velocity.y),p.swipe=g||"inertiastart"===a?p.getSwipe():null,p}return o(n,[{key:"getSwipe",value:function(){var t=this._interaction;if(t.prevEvent.speed<600||this.timeStamp-t.prevEvent.timeStamp>150)return null;var e=180*Math.atan2(t.prevEvent.velocityY,t.prevEvent.velocityX)/Math.PI;e<0&&(e+=360);var n=112.5<=e&&e<247.5,r=202.5<=e&&e<337.5;return{up:r,down:!r&&22.5<=e&&e<157.5,left:n,right:!n&&(292.5<=e||e<67.5),angle:e,speed:t.prevEvent.speed,velocity:{x:t.prevEvent.velocityX,y:t.prevEvent.velocityY}}}},{key:"preventDefault",value:function(){}},{key:"stopImmediatePropagation",value:function(){this.immediatePropagationStopped=this.propagationStopped=!0}},{key:"stopPropagation",value:function(){this.propagationStopped=!0}}]),n}(vt);Object.defineProperties(Se.prototype,{pageX:{get:function(){return this.page.x},set:function(t){this.page.x=t}},pageY:{get:function(){return this.page.y},set:function(t){this.page.y=t}},clientX:{get:function(){return this.client.x},set:function(t){this.client.x=t}},clientY:{get:function(){return this.client.y},set:function(t){this.client.y=t}},dx:{get:function(){return this.delta.x},set:function(t){this.delta.x=t}},dy:{get:function(){return this.delta.y},set:function(t){this.delta.y=t}},velocityX:{get:function(){return this.velocity.x},set:function(t){this.velocity.x=t}},velocityY:{get:function(){return this.velocity.y},set:function(t){this.velocity.y=t}}});var _e=o((function t(e,n,i,o,a){r(this,t),this.id=void 0,this.pointer=void 0,this.event=void 0,this.downTime=void 0,this.downTarget=void 0,this.id=e,this.pointer=n,this.event=i,this.downTime=o,this.downTarget=a})),Pe=function(t){return t.interactable="",t.element="",t.prepared="",t.pointerIsDown="",t.pointerWasMoved="",t._proxy="",t}({}),Oe=function(t){return t.start="",t.move="",t.end="",t.stop="",t.interacting="",t}({}),ke=0,De=function(){function t(e){var n=this,i=e.pointerType,o=e.scopeFire;r(this,t),this.interactable=null,this.element=null,this.rect=null,this._rects=void 0,this.edges=null,this._scopeFire=void 0,this.prepared={name:null,axis:null,edges:null},this.pointerType=void 0,this.pointers=[],this.downEvent=null,this.downPointer={},this._latestPointer={pointer:null,event:null,eventTarget:null},this.prevEvent=null,this.pointerIsDown=!1,this.pointerWasMoved=!1,this._interacting=!1,this._ending=!1,this._stopped=!0,this._proxy=void 0,this.simulation=null,this.doMove=Nt((function(t){this.move(t)}),"The interaction.doMove() method has been renamed to interaction.move()"),this.coords={start:{page:{x:0,y:0},client:{x:0,y:0},timeStamp:0},prev:{page:{x:0,y:0},client:{x:0,y:0},timeStamp:0},cur:{page:{x:0,y:0},client:{x:0,y:0},timeStamp:0},delta:{page:{x:0,y:0},client:{x:0,y:0},timeStamp:0},velocity:{page:{x:0,y:0},client:{x:0,y:0},timeStamp:0}},this._id=ke++,this._scopeFire=o,this.pointerType=i;var a=this;this._proxy={};var s=function(t){Object.defineProperty(n._proxy,t,{get:function(){return a[t]}})};for(var c in Pe)s(c);var l=function(t){Object.defineProperty(n._proxy,t,{value:function(){return a[t].apply(a,arguments)}})};for(var u in Oe)l(u);this._scopeFire("interactions:new",{interaction:this})}return o(t,[{key:"pointerMoveTolerance",get:function(){return 1}},{key:"pointerDown",value:function(t,e,n){var r=this.updatePointer(t,e,n,!0),i=this.pointers[r];this._scopeFire("interactions:down",{pointer:t,event:e,eventTarget:n,pointerIndex:r,pointerInfo:i,type:"down",interaction:this})}},{key:"start",value:function(t,e,n){return!(this.interacting()||!this.pointerIsDown||this.pointers.length<("gesture"===t.name?2:1)||!e.options[t.name].enabled)&&(Ut(this.prepared,t),this.interactable=e,this.element=n,this.rect=e.getRect(n),this.edges=this.prepared.edges?V({},this.prepared.edges):{left:!0,right:!0,top:!0,bottom:!0},this._stopped=!1,this._interacting=this._doPhase({interaction:this,event:this.downEvent,phase:"start"})&&!this._stopped,this._interacting)}},{key:"pointerMove",value:function(t,e,n){this.simulation||this.modification&&this.modification.endResult||this.updatePointer(t,e,n,!1);var r,i,o=this.coords.cur.page.x===this.coords.prev.page.x&&this.coords.cur.page.y===this.coords.prev.page.y&&this.coords.cur.client.x===this.coords.prev.client.x&&this.coords.cur.client.y===this.coords.prev.client.y;this.pointerIsDown&&!this.pointerWasMoved&&(r=this.coords.cur.client.x-this.coords.start.client.x,i=this.coords.cur.client.y-this.coords.start.client.y,this.pointerWasMoved=Q(r,i)>this.pointerMoveTolerance);var a,s,c,l=this.getPointerIndex(t),u={pointer:t,pointerIndex:l,pointerInfo:this.pointers[l],event:e,type:"move",eventTarget:n,dx:r,dy:i,duplicate:o,interaction:this};o||(a=this.coords.velocity,s=this.coords.delta,c=Math.max(s.timeStamp/1e3,.001),a.page.x=s.page.x/c,a.page.y=s.page.y/c,a.client.x=s.client.x/c,a.client.y=s.client.y/c,a.timeStamp=c),this._scopeFire("interactions:move",u),o||this.simulation||(this.interacting()&&(u.type=null,this.move(u)),this.pointerWasMoved&&et(this.coords.prev,this.coords.cur))}},{key:"move",value:function(t){t&&t.event||nt(this.coords.delta),(t=V({pointer:this._latestPointer.pointer,event:this._latestPointer.event,eventTarget:this._latestPointer.eventTarget,interaction:this},t||{})).phase="move",this._doPhase(t)}},{key:"pointerUp",value:function(t,e,n,r){var i=this.getPointerIndex(t);-1===i&&(i=this.updatePointer(t,e,n,!1));var o=/cancel$/i.test(e.type)?"cancel":"up";this._scopeFire("interactions:".concat(o),{pointer:t,pointerIndex:i,pointerInfo:this.pointers[i],event:e,eventTarget:n,type:o,curEventTarget:r,interaction:this}),this.simulation||this.end(e),this.removePointer(t,e)}},{key:"documentBlur",value:function(t){this.end(t),this._scopeFire("interactions:blur",{event:t,type:"blur",interaction:this})}},{key:"end",value:function(t){var e;this._ending=!0,t=t||this._latestPointer.event,this.interacting()&&(e=this._doPhase({event:t,interaction:this,phase:"end"})),this._ending=!1,!0===e&&this.stop()}},{key:"currentAction",value:function(){return this._interacting?this.prepared.name:null}},{key:"interacting",value:function(){return this._interacting}},{key:"stop",value:function(){this._scopeFire("interactions:stop",{interaction:this}),this.interactable=this.element=null,this._interacting=!1,this._stopped=!0,this.prepared.name=this.prevEvent=null}},{key:"getPointerIndex",value:function(t){var e=at(t);return"mouse"===this.pointerType||"pen"===this.pointerType?this.pointers.length-1:yt(this.pointers,(function(t){return t.id===e}))}},{key:"getPointerInfo",value:function(t){return this.pointers[this.getPointerIndex(t)]}},{key:"updatePointer",value:function(t,e,n,r){var i,o,a,s=at(t),c=this.getPointerIndex(t),l=this.pointers[c];return r=!1!==r&&(r||/(down|start)$/i.test(e.type)),l?l.pointer=t:(l=new _e(s,t,e,null,null),c=this.pointers.length,this.pointers.push(l)),st(this.coords.cur,this.pointers.map((function(t){return t.pointer})),this._now()),i=this.coords.delta,o=this.coords.prev,a=this.coords.cur,i.page.x=a.page.x-o.page.x,i.page.y=a.page.y-o.page.y,i.client.x=a.client.x-o.client.x,i.client.y=a.client.y-o.client.y,i.timeStamp=a.timeStamp-o.timeStamp,r&&(this.pointerIsDown=!0,l.downTime=this.coords.cur.timeStamp,l.downTarget=n,tt(this.downPointer,t),this.interacting()||(et(this.coords.start,this.coords.cur),et(this.coords.prev,this.coords.cur),this.downEvent=e,this.pointerWasMoved=!1)),this._updateLatestPointer(t,e,n),this._scopeFire("interactions:update-pointer",{pointer:t,event:e,eventTarget:n,down:r,pointerInfo:l,pointerIndex:c,interaction:this}),c}},{key:"removePointer",value:function(t,e){var n=this.getPointerIndex(t);if(-1!==n){var r=this.pointers[n];this._scopeFire("interactions:remove-pointer",{pointer:t,event:e,eventTarget:null,pointerIndex:n,pointerInfo:r,interaction:this}),this.pointers.splice(n,1),this.pointerIsDown=!1}}},{key:"_updateLatestPointer",value:function(t,e,n){this._latestPointer.pointer=t,this._latestPointer.event=e,this._latestPointer.eventTarget=n}},{key:"destroy",value:function(){this._latestPointer.pointer=null,this._latestPointer.event=null,this._latestPointer.eventTarget=null}},{key:"_createPreparedEvent",value:function(t,e,n,r){return new Se(this,t,this.prepared.name,e,this.element,n,r)}},{key:"_fireEvent",value:function(t){var e;null==(e=this.interactable)||e.fire(t),(!this.prevEvent||t.timeStamp>=this.prevEvent.timeStamp)&&(this.prevEvent=t)}},{key:"_doPhase",value:function(t){var e=t.event,n=t.phase,r=t.preEnd,i=t.type,o=this.rect;if(o&&"move"===n&&(H(this.edges,o,this.coords.delta[this.interactable.options.deltaSource]),o.width=o.right-o.left,o.height=o.bottom-o.top),!1===this._scopeFire("interactions:before-action-".concat(n),t))return!1;var a=t.iEvent=this._createPreparedEvent(e,n,r,i);return this._scopeFire("interactions:action-".concat(n),t),"start"===n&&(this.prevEvent=a),this._fireEvent(a),this._scopeFire("interactions:after-action-".concat(n),t),!0}},{key:"_now",value:function(){return Date.now()}}]),t}();function Ie(t){Me(t.interaction)}function Me(t){if(!function(t){return!(!t.offset.pending.x&&!t.offset.pending.y)}(t))return!1;var e=t.offset.pending;return Ae(t.coords.cur,e),Ae(t.coords.delta,e),H(t.edges,t.rect,e),e.x=0,e.y=0,!0}function ze(t){var e=t.x,n=t.y;this.offset.pending.x+=e,this.offset.pending.y+=n,this.offset.total.x+=e,this.offset.total.y+=n}function Ae(t,e){var n=t.page,r=t.client,i=e.x,o=e.y;n.x+=i,n.y+=o,r.x+=i,r.y+=o}Oe.offsetBy="";var Re={id:"offset",before:["modifiers","pointer-events","actions","inertia"],install:function(t){t.Interaction.prototype.offsetBy=ze},listeners:{"interactions:new":function(t){t.interaction.offset={total:{x:0,y:0},pending:{x:0,y:0}}},"interactions:update-pointer":function(t){return function(t){t.pointerIsDown&&(Ae(t.coords.cur,t.offset.total),t.offset.pending.x=0,t.offset.pending.y=0)}(t.interaction)},"interactions:before-action-start":Ie,"interactions:before-action-move":Ie,"interactions:before-action-end":function(t){var e=t.interaction;if(Me(e))return e.move({offset:!0}),e.end(),!1},"interactions:stop":function(t){var e=t.interaction;e.offset.total.x=0,e.offset.total.y=0,e.offset.pending.x=0,e.offset.pending.y=0}}},Ce=Re;var je=function(){function t(e){r(this,t),this.active=!1,this.isModified=!1,this.smoothEnd=!1,this.allowResume=!1,this.modification=void 0,this.modifierCount=0,this.modifierArg=void 0,this.startCoords=void 0,this.t0=0,this.v0=0,this.te=0,this.targetOffset=void 0,this.modifiedOffset=void 0,this.currentOffset=void 0,this.lambda_v0=0,this.one_ve_v0=0,this.timeout=void 0,this.interaction=void 0,this.interaction=e}return o(t,[{key:"start",value:function(t){var e=this.interaction,n=Fe(e);if(!n||!n.enabled)return!1;var r=e.coords.velocity.client,i=Q(r.x,r.y),o=this.modification||(this.modification=new me(e));if(o.copyFrom(e.modification),this.t0=e._now(),this.allowResume=n.allowResume,this.v0=i,this.currentOffset={x:0,y:0},this.startCoords=e.coords.cur.page,this.modifierArg=o.fillArg({pageCoords:this.startCoords,preEnd:!0,phase:"inertiastart"}),this.t0-e.coords.cur.timeStamp<50&&i>n.minSpeed&&i>n.endSpeed)this.startInertia();else{if(o.result=o.setAll(this.modifierArg),!o.result.changed)return!1;this.startSmoothEnd()}return e.modification.result.rect=null,e.offsetBy(this.targetOffset),e._doPhase({interaction:e,event:t,phase:"inertiastart"}),e.offsetBy({x:-this.targetOffset.x,y:-this.targetOffset.y}),e.modification.result.rect=null,this.active=!0,e.simulation=this,!0}},{key:"startInertia",value:function(){var t=this,e=this.interaction.coords.velocity.client,n=Fe(this.interaction),r=n.resistance,i=-Math.log(n.endSpeed/this.v0)/r;this.targetOffset={x:(e.x-i)/r,y:(e.y-i)/r},this.te=i,this.lambda_v0=r/this.v0,this.one_ve_v0=1-n.endSpeed/this.v0;var o=this.modification,a=this.modifierArg;a.pageCoords={x:this.startCoords.x+this.targetOffset.x,y:this.startCoords.y+this.targetOffset.y},o.result=o.setAll(a),o.result.changed&&(this.isModified=!0,this.modifiedOffset={x:this.targetOffset.x+o.result.delta.x,y:this.targetOffset.y+o.result.delta.y}),this.onNextFrame((function(){return t.inertiaTick()}))}},{key:"startSmoothEnd",value:function(){var t=this;this.smoothEnd=!0,this.isModified=!0,this.targetOffset={x:this.modification.result.delta.x,y:this.modification.result.delta.y},this.onNextFrame((function(){return t.smoothEndTick()}))}},{key:"onNextFrame",value:function(t){var e=this;this.timeout=Lt.request((function(){e.active&&t()}))}},{key:"inertiaTick",value:function(){var t,e,n,r,i,o,a,s=this,c=this.interaction,l=Fe(c).resistance,u=(c._now()-this.t0)/1e3;if(u<this.te){var p,f=1-(Math.exp(-l*u)-this.lambda_v0)/this.one_ve_v0;this.isModified?(t=0,e=0,n=this.targetOffset.x,r=this.targetOffset.y,i=this.modifiedOffset.x,o=this.modifiedOffset.y,p={x:Ye(a=f,t,n,i),y:Ye(a,e,r,o)}):p={x:this.targetOffset.x*f,y:this.targetOffset.y*f};var d={x:p.x-this.currentOffset.x,y:p.y-this.currentOffset.y};this.currentOffset.x+=d.x,this.currentOffset.y+=d.y,c.offsetBy(d),c.move(),this.onNextFrame((function(){return s.inertiaTick()}))}else c.offsetBy({x:this.modifiedOffset.x-this.currentOffset.x,y:this.modifiedOffset.y-this.currentOffset.y}),this.end()}},{key:"smoothEndTick",value:function(){var t=this,e=this.interaction,n=e._now()-this.t0,r=Fe(e).smoothEndDuration;if(n<r){var i={x:Le(n,0,this.targetOffset.x,r),y:Le(n,0,this.targetOffset.y,r)},o={x:i.x-this.currentOffset.x,y:i.y-this.currentOffset.y};this.currentOffset.x+=o.x,this.currentOffset.y+=o.y,e.offsetBy(o),e.move({skipModifiers:this.modifierCount}),this.onNextFrame((function(){return t.smoothEndTick()}))}else e.offsetBy({x:this.targetOffset.x-this.currentOffset.x,y:this.targetOffset.y-this.currentOffset.y}),this.end()}},{key:"resume",value:function(t){var e=t.pointer,n=t.event,r=t.eventTarget,i=this.interaction;i.offsetBy({x:-this.currentOffset.x,y:-this.currentOffset.y}),i.updatePointer(e,n,r,!0),i._doPhase({interaction:i,event:n,phase:"resume"}),et(i.coords.prev,i.coords.cur),this.stop()}},{key:"end",value:function(){this.interaction.move(),this.interaction.end(),this.stop()}},{key:"stop",value:function(){this.active=this.smoothEnd=!1,this.interaction.simulation=null,Lt.cancel(this.timeout)}}]),t}();function Fe(t){var e=t.interactable,n=t.prepared;return e&&e.options&&n.name&&e.options[n.name].inertia}var Xe={id:"inertia",before:["modifiers","actions"],install:function(t){var e=t.defaults;t.usePlugin(Ce),t.usePlugin(Ee),t.actions.phases.inertiastart=!0,t.actions.phases.resume=!0,e.perAction.inertia={enabled:!1,resistance:10,minSpeed:100,endSpeed:10,allowResume:!0,smoothEndDuration:300}},listeners:{"interactions:new":function(t){var e=t.interaction;e.inertia=new je(e)},"interactions:before-action-end":function(t){var e=t.interaction,n=t.event;return(!e._interacting||e.simulation||!e.inertia.start(n))&&null},"interactions:down":function(t){var e=t.interaction,n=t.eventTarget,r=e.inertia;if(r.active)for(var i=n;w.element(i);){if(i===e.element){r.resume(t);break}i=A(i)}},"interactions:stop":function(t){var e=t.interaction.inertia;e.active&&e.stop()},"interactions:before-action-resume":function(t){var e=t.interaction.modification;e.stop(t),e.start(t,t.interaction.coords.cur.page),e.applyToInteraction(t)},"interactions:before-action-inertiastart":function(t){return t.interaction.modification.setAndApply(t)},"interactions:action-resume":xe,"interactions:action-inertiastart":xe,"interactions:after-action-inertiastart":function(t){return t.interaction.modification.restoreInteractionCoords(t)},"interactions:after-action-resume":function(t){return t.interaction.modification.restoreInteractionCoords(t)}}};function Ye(t,e,n,r){var i=1-t;return i*i*e+2*i*t*n+t*t*r}function Le(t,e,n,r){return-n*(t/=r)*(t-2)+e}var qe=Xe;function Be(t,e){for(var n=0;n<e.length;n++){var r=e[n];if(t.immediatePropagationStopped)break;r(t)}}var Ve=function(){function t(e){r(this,t),this.options=void 0,this.types={},this.propagationStopped=!1,this.immediatePropagationStopped=!1,this.global=void 0,this.options=V({},e||{})}return o(t,[{key:"fire",value:function(t){var e,n=this.global;(e=this.types[t.type])&&Be(t,e),!t.propagationStopped&&n&&(e=n[t.type])&&Be(t,e)}},{key:"on",value:function(t,e){var n=$(t,e);for(t in n)this.types[t]=gt(this.types[t]||[],n[t])}},{key:"off",value:function(t,e){var n=$(t,e);for(t in n){var r=this.types[t];if(r&&r.length)for(var i=0,o=n[t];i<o.length;i++){var a=o[i],s=r.indexOf(a);-1!==s&&r.splice(s,1)}}}},{key:"getRect",value:function(t){return null}}]),t}();var We=function(){function t(e){r(this,t),this.currentTarget=void 0,this.originalEvent=void 0,this.type=void 0,this.originalEvent=e,tt(this,e)}return o(t,[{key:"preventOriginalDefault",value:function(){this.originalEvent.preventDefault()}},{key:"stopPropagation",value:function(){this.originalEvent.stopPropagation()}},{key:"stopImmediatePropagation",value:function(){this.originalEvent.stopImmediatePropagation()}}]),t}();function Ge(t){return w.object(t)?{capture:!!t.capture,passive:!!t.passive}:{capture:!!t,passive:!1}}function Ne(t,e){return t===e||("boolean"==typeof t?!!e.capture===t&&!1==!!e.passive:!!t.capture==!!e.capture&&!!t.passive==!!e.passive)}var Ue={id:"events",install:function(t){var e,n=[],r={},i=[],o={add:a,remove:s,addDelegate:function(t,e,n,o,s){var u=Ge(s);if(!r[n]){r[n]=[];for(var p=0;p<i.length;p++){var f=i[p];a(f,n,c),a(f,n,l,!0)}}var d=r[n],h=bt(d,(function(n){return n.selector===t&&n.context===e}));h||(h={selector:t,context:e,listeners:[]},d.push(h));h.listeners.push({func:o,options:u})},removeDelegate:function(t,e,n,i,o){var a,u=Ge(o),p=r[n],f=!1;if(!p)return;for(a=p.length-1;a>=0;a--){var d=p[a];if(d.selector===t&&d.context===e){for(var h=d.listeners,v=h.length-1;v>=0;v--){var g=h[v];if(g.func===i&&Ne(g.options,u)){h.splice(v,1),h.length||(p.splice(a,1),s(e,n,c),s(e,n,l,!0)),f=!0;break}}if(f)break}}},delegateListener:c,delegateUseCapture:l,delegatedEvents:r,documents:i,targets:n,supportsOptions:!1,supportsPassive:!1};function a(t,e,r,i){if(t.addEventListener){var a=Ge(i),s=bt(n,(function(e){return e.eventTarget===t}));s||(s={eventTarget:t,events:{}},n.push(s)),s.events[e]||(s.events[e]=[]),bt(s.events[e],(function(t){return t.func===r&&Ne(t.options,a)}))||(t.addEventListener(e,r,o.supportsOptions?a:a.capture),s.events[e].push({func:r,options:a}))}}function s(t,e,r,i){if(t.addEventListener&&t.removeEventListener){var a=yt(n,(function(e){return e.eventTarget===t})),c=n[a];if(c&&c.events)if("all"!==e){var l=!1,u=c.events[e];if(u){if("all"===r){for(var p=u.length-1;p>=0;p--){var f=u[p];s(t,e,f.func,f.options)}return}for(var d=Ge(i),h=0;h<u.length;h++){var v=u[h];if(v.func===r&&Ne(v.options,d)){t.removeEventListener(e,r,o.supportsOptions?d:d.capture),u.splice(h,1),0===u.length&&(delete c.events[e],l=!0);break}}}l&&!Object.keys(c.events).length&&n.splice(a,1)}else for(e in c.events)c.events.hasOwnProperty(e)&&s(t,e,"all")}}function c(t,e){for(var n=Ge(e),i=new We(t),o=r[t.type],a=ht(t)[0],s=a;w.element(s);){for(var c=0;c<o.length;c++){var l=o[c],u=l.selector,p=l.context;if(R(s,u)&&M(p,a)&&M(p,s)){var f=l.listeners;i.currentTarget=s;for(var d=0;d<f.length;d++){var h=f[d];Ne(h.options,n)&&h.func(i)}}}s=A(s)}}function l(t){return c(t,!0)}return null==(e=t.document)||e.createElement("div").addEventListener("test",null,{get capture(){return o.supportsOptions=!0},get passive(){return o.supportsPassive=!0}}),t.events=o,o}},He={methodOrder:["simulationResume","mouseOrPen","hasPointer","idle"],search:function(t){for(var e=0,n=He.methodOrder;e<n.length;e++){var r=n[e],i=He[r](t);if(i)return i}return null},simulationResume:function(t){var e=t.pointerType,n=t.eventType,r=t.eventTarget,i=t.scope;if(!/down|start/i.test(n))return null;for(var o=0,a=i.interactions.list;o<a.length;o++){var s=a[o],c=r;if(s.simulation&&s.simulation.allowResume&&s.pointerType===e)for(;c;){if(c===s.element)return s;c=A(c)}}return null},mouseOrPen:function(t){var e,n=t.pointerId,r=t.pointerType,i=t.eventType,o=t.scope;if("mouse"!==r&&"pen"!==r)return null;for(var a=0,s=o.interactions.list;a<s.length;a++){var c=s[a];if(c.pointerType===r){if(c.simulation&&!Ke(c,n))continue;if(c.interacting())return c;e||(e=c)}}if(e)return e;for(var l=0,u=o.interactions.list;l<u.length;l++){var p=u[l];if(!(p.pointerType!==r||/down/i.test(i)&&p.simulation))return p}return null},hasPointer:function(t){for(var e=t.pointerId,n=0,r=t.scope.interactions.list;n<r.length;n++){var i=r[n];if(Ke(i,e))return i}return null},idle:function(t){for(var e=t.pointerType,n=0,r=t.scope.interactions.list;n<r.length;n++){var i=r[n];if(1===i.pointers.length){var o=i.interactable;if(o&&(!o.options.gesture||!o.options.gesture.enabled))continue}else if(i.pointers.length>=2)continue;if(!i.interacting()&&e===i.pointerType)return i}return null}};function Ke(t,e){return t.pointers.some((function(t){return t.id===e}))}var $e=He,Je=["pointerDown","pointerMove","pointerUp","updatePointer","removePointer","windowBlur"];function Qe(t,e){return function(n){var r=e.interactions.list,i=dt(n),o=ht(n),a=o[0],s=o[1],c=[];if(/^touch/.test(n.type)){e.prevTouchTime=e.now();for(var l=0,u=n.changedTouches;l<u.length;l++){var p=u[l],f={pointer:p,pointerId:at(p),pointerType:i,eventType:n.type,eventTarget:a,curEventTarget:s,scope:e},d=Ze(f);c.push([f.pointer,f.eventTarget,f.curEventTarget,d])}}else{var h=!1;if(!I.supportsPointerEvent&&/mouse/.test(n.type)){for(var v=0;v<r.length&&!h;v++)h="mouse"!==r[v].pointerType&&r[v].pointerIsDown;h=h||e.now()-e.prevTouchTime<500||0===n.timeStamp}if(!h){var g={pointer:n,pointerId:at(n),pointerType:i,eventType:n.type,curEventTarget:s,eventTarget:a,scope:e},m=Ze(g);c.push([g.pointer,g.eventTarget,g.curEventTarget,m])}}for(var y=0;y<c.length;y++){var b=c[y],x=b[0],w=b[1],E=b[2];b[3][t](x,n,w,E)}}}function Ze(t){var e=t.pointerType,n=t.scope,r={interaction:$e.search(t),searchDetails:t};return n.fire("interactions:find",r),r.interaction||n.interactions.new({pointerType:e})}function tn(t,e){var n=t.doc,r=t.scope,i=t.options,o=r.interactions.docEvents,a=r.events,s=a[e];for(var c in r.browser.isIOS&&!i.events&&(i.events={passive:!1}),a.delegatedEvents)s(n,c,a.delegateListener),s(n,c,a.delegateUseCapture,!0);for(var l=i&&i.events,u=0;u<o.length;u++){var p=o[u];s(n,p.type,p.listener,l)}}var en={id:"core/interactions",install:function(t){for(var e={},n=0;n<Je.length;n++){var i=Je[n];e[i]=Qe(i,t)}var a,c=I.pEventTypes;function l(){for(var e=0,n=t.interactions.list;e<n.length;e++){var r=n[e];if(r.pointerIsDown&&"touch"===r.pointerType&&!r._interacting)for(var i=function(){var e=a[o];t.documents.some((function(t){return M(t.doc,e.downTarget)}))||r.removePointer(e.pointer,e.event)},o=0,a=r.pointers;o<a.length;o++)i()}}(a=k.PointerEvent?[{type:c.down,listener:l},{type:c.down,listener:e.pointerDown},{type:c.move,listener:e.pointerMove},{type:c.up,listener:e.pointerUp},{type:c.cancel,listener:e.pointerUp}]:[{type:"mousedown",listener:e.pointerDown},{type:"mousemove",listener:e.pointerMove},{type:"mouseup",listener:e.pointerUp},{type:"touchstart",listener:l},{type:"touchstart",listener:e.pointerDown},{type:"touchmove",listener:e.pointerMove},{type:"touchend",listener:e.pointerUp},{type:"touchcancel",listener:e.pointerUp}]).push({type:"blur",listener:function(e){for(var n=0,r=t.interactions.list;n<r.length;n++){r[n].documentBlur(e)}}}),t.prevTouchTime=0,t.Interaction=function(e){s(i,e);var n=p(i);function i(){return r(this,i),n.apply(this,arguments)}return o(i,[{key:"pointerMoveTolerance",get:function(){return t.interactions.pointerMoveTolerance},set:function(e){t.interactions.pointerMoveTolerance=e}},{key:"_now",value:function(){return t.now()}}]),i}(De),t.interactions={list:[],new:function(e){e.scopeFire=function(e,n){return t.fire(e,n)};var n=new t.Interaction(e);return t.interactions.list.push(n),n},listeners:e,docEvents:a,pointerMoveTolerance:1},t.usePlugin(he)},listeners:{"scope:add-document":function(t){return tn(t,"add")},"scope:remove-document":function(t){return tn(t,"remove")},"interactable:unset":function(t,e){for(var n=t.interactable,r=e.interactions.list.length-1;r>=0;r--){var i=e.interactions.list[r];i.interactable===n&&(i.stop(),e.fire("interactions:destroy",{interaction:i}),i.destroy(),e.interactions.list.length>2&&e.interactions.list.splice(r,1))}}},onDocSignal:tn,doOnInteractions:Qe,methodNames:Je},nn=en,rn=function(t){return t[t.On=0]="On",t[t.Off=1]="Off",t}(rn||{}),on=function(){function t(e,n,i,o){r(this,t),this.target=void 0,this.options=void 0,this._actions=void 0,this.events=new Ve,this._context=void 0,this._win=void 0,this._doc=void 0,this._scopeEvents=void 0,this._actions=n.actions,this.target=e,this._context=n.context||i,this._win=y(B(e)?this._context:e),this._doc=this._win.document,this._scopeEvents=o,this.set(n)}return o(t,[{key:"_defaults",get:function(){return{base:{},perAction:{},actions:{}}}},{key:"setOnEvents",value:function(t,e){return w.func(e.onstart)&&this.on("".concat(t,"start"),e.onstart),w.func(e.onmove)&&this.on("".concat(t,"move"),e.onmove),w.func(e.onend)&&this.on("".concat(t,"end"),e.onend),w.func(e.oninertiastart)&&this.on("".concat(t,"inertiastart"),e.oninertiastart),this}},{key:"updatePerActionListeners",value:function(t,e,n){var r,i=this,o=null==(r=this._actions.map[t])?void 0:r.filterEventType,a=function(t){return(null==o||o(t))&&ve(t,i._actions)};(w.array(e)||w.object(e))&&this._onOff(rn.Off,t,e,void 0,a),(w.array(n)||w.object(n))&&this._onOff(rn.On,t,n,void 0,a)}},{key:"setPerAction",value:function(t,e){var n=this._defaults;for(var r in e){var i=r,o=this.options[t],a=e[i];"listeners"===i&&this.updatePerActionListeners(t,o.listeners,a),w.array(a)?o[i]=mt(a):w.plainObject(a)?(o[i]=V(o[i]||{},ge(a)),w.object(n.perAction[i])&&"enabled"in n.perAction[i]&&(o[i].enabled=!1!==a.enabled)):w.bool(a)&&w.object(n.perAction[i])?o[i].enabled=a:o[i]=a}}},{key:"getRect",value:function(t){return t=t||(w.element(this.target)?this.target:null),w.string(this.target)&&(t=t||this._context.querySelector(this.target)),L(t)}},{key:"rectChecker",value:function(t){var e=this;return w.func(t)?(this.getRect=function(n){var r=V({},t.apply(e,n));return"width"in r||(r.width=r.right-r.left,r.height=r.bottom-r.top),r},this):null===t?(delete this.getRect,this):this.getRect}},{key:"_backCompatOption",value:function(t,e){if(B(e)||w.object(e)){for(var n in this.options[t]=e,this._actions.map)this.options[n][t]=e;return this}return this.options[t]}},{key:"origin",value:function(t){return this._backCompatOption("origin",t)}},{key:"deltaSource",value:function(t){return"page"===t||"client"===t?(this.options.deltaSource=t,this):this.options.deltaSource}},{key:"getAllElements",value:function(){var t=this.target;return w.string(t)?Array.from(this._context.querySelectorAll(t)):w.func(t)&&t.getAllElements?t.getAllElements():w.element(t)?[t]:[]}},{key:"context",value:function(){return this._context}},{key:"inContext",value:function(t){return this._context===t.ownerDocument||M(this._context,t)}},{key:"testIgnoreAllow",value:function(t,e,n){return!this.testIgnore(t.ignoreFrom,e,n)&&this.testAllow(t.allowFrom,e,n)}},{key:"testAllow",value:function(t,e,n){return!t||!!w.element(n)&&(w.string(t)?F(n,t,e):!!w.element(t)&&M(t,n))}},{key:"testIgnore",value:function(t,e,n){return!(!t||!w.element(n))&&(w.string(t)?F(n,t,e):!!w.element(t)&&M(t,n))}},{key:"fire",value:function(t){return this.events.fire(t),this}},{key:"_onOff",value:function(t,e,n,r,i){w.object(e)&&!w.array(e)&&(r=n,n=null);var o=$(e,n,i);for(var a in o){"wheel"===a&&(a=I.wheelEvent);for(var s=0,c=o[a];s<c.length;s++){var l=c[s];ve(a,this._actions)?this.events[t===rn.On?"on":"off"](a,l):w.string(this.target)?this._scopeEvents[t===rn.On?"addDelegate":"removeDelegate"](this.target,this._context,a,l,r):this._scopeEvents[t===rn.On?"add":"remove"](this.target,a,l,r)}}return this}},{key:"on",value:function(t,e,n){return this._onOff(rn.On,t,e,n)}},{key:"off",value:function(t,e,n){return this._onOff(rn.Off,t,e,n)}},{key:"set",value:function(t){var e=this._defaults;for(var n in w.object(t)||(t={}),this.options=ge(e.base),this._actions.methodDict){var r=n,i=this._actions.methodDict[r];this.options[r]={},this.setPerAction(r,V(V({},e.perAction),e.actions[r])),this[i](t[r])}for(var o in t)"getRect"!==o?w.func(this[o])&&this[o](t[o]):this.rectChecker(t.getRect);return this}},{key:"unset",value:function(){if(w.string(this.target))for(var t in this._scopeEvents.delegatedEvents)for(var e=this._scopeEvents.delegatedEvents[t],n=e.length-1;n>=0;n--){var r=e[n],i=r.selector,o=r.context,a=r.listeners;i===this.target&&o===this._context&&e.splice(n,1);for(var s=a.length-1;s>=0;s--)this._scopeEvents.removeDelegate(this.target,this._context,t,a[s][0],a[s][1])}else this._scopeEvents.remove(this.target,"all")}}]),t}(),an=function(){function t(e){var n=this;r(this,t),this.list=[],this.selectorMap={},this.scope=void 0,this.scope=e,e.addListeners({"interactable:unset":function(t){var e=t.interactable,r=e.target,i=w.string(r)?n.selectorMap[r]:r[n.scope.id],o=yt(i,(function(t){return t===e}));i.splice(o,1)}})}return o(t,[{key:"new",value:function(t,e){e=V(e||{},{actions:this.scope.actions});var n=new this.scope.Interactable(t,e,this.scope.document,this.scope.events);return this.scope.addDocument(n._doc),this.list.push(n),w.string(t)?(this.selectorMap[t]||(this.selectorMap[t]=[]),this.selectorMap[t].push(n)):(n.target[this.scope.id]||Object.defineProperty(t,this.scope.id,{value:[],configurable:!0}),t[this.scope.id].push(n)),this.scope.fire("interactable:new",{target:t,options:e,interactable:n,win:this.scope._win}),n}},{key:"getExisting",value:function(t,e){var n=e&&e.context||this.scope.document,r=w.string(t),i=r?this.selectorMap[t]:t[this.scope.id];if(i)return bt(i,(function(e){return e._context===n&&(r||e.inContext(t))}))}},{key:"forEachMatch",value:function(t,e){for(var n=0,r=this.list;n<r.length;n++){var i=r[n],o=void 0;if((w.string(i.target)?w.element(t)&&R(t,i.target):t===i.target)&&i.inContext(t)&&(o=e(i)),void 0!==o)return o}}}]),t}();var sn=function(){function t(){var e=this;r(this,t),this.id="__interact_scope_".concat(Math.floor(100*Math.random())),this.isInitialized=!1,this.listenerMaps=[],this.browser=I,this.defaults=ge(Te),this.Eventable=Ve,this.actions={map:{},phases:{start:!0,move:!0,end:!0},methodDict:{},phaselessTypes:{}},this.interactStatic=function(t){var e=function e(n,r){var i=t.interactables.getExisting(n,r);return i||((i=t.interactables.new(n,r)).events.global=e.globalEvents),i};return e.getPointerAverage=lt,e.getTouchBBox=ut,e.getTouchDistance=pt,e.getTouchAngle=ft,e.getElementRect=L,e.getElementClientRect=Y,e.matchesSelector=R,e.closest=z,e.globalEvents={},e.version="1.10.27",e.scope=t,e.use=function(t,e){return this.scope.usePlugin(t,e),this},e.isSet=function(t,e){return!!this.scope.interactables.get(t,e&&e.context)},e.on=Nt((function(t,e,n){if(w.string(t)&&-1!==t.search(" ")&&(t=t.trim().split(/ +/)),w.array(t)){for(var r=0,i=t;r<i.length;r++){var o=i[r];this.on(o,e,n)}return this}if(w.object(t)){for(var a in t)this.on(a,t[a],e);return this}return ve(t,this.scope.actions)?this.globalEvents[t]?this.globalEvents[t].push(e):this.globalEvents[t]=[e]:this.scope.events.add(this.scope.document,t,e,{options:n}),this}),"The interact.on() method is being deprecated"),e.off=Nt((function(t,e,n){if(w.string(t)&&-1!==t.search(" ")&&(t=t.trim().split(/ +/)),w.array(t)){for(var r=0,i=t;r<i.length;r++){var o=i[r];this.off(o,e,n)}return this}if(w.object(t)){for(var a in t)this.off(a,t[a],e);return this}var s;return ve(t,this.scope.actions)?t in this.globalEvents&&-1!==(s=this.globalEvents[t].indexOf(e))&&this.globalEvents[t].splice(s,1):this.scope.events.remove(this.scope.document,t,e,n),this}),"The interact.off() method is being deprecated"),e.debug=function(){return this.scope},e.supportsTouch=function(){return I.supportsTouch},e.supportsPointerEvent=function(){return I.supportsPointerEvent},e.stop=function(){for(var t=0,e=this.scope.interactions.list;t<e.length;t++)e[t].stop();return this},e.pointerMoveTolerance=function(t){return w.number(t)?(this.scope.interactions.pointerMoveTolerance=t,this):this.scope.interactions.pointerMoveTolerance},e.addDocument=function(t,e){this.scope.addDocument(t,e)},e.removeDocument=function(t){this.scope.removeDocument(t)},e}(this),this.InteractEvent=Se,this.Interactable=void 0,this.interactables=new an(this),this._win=void 0,this.document=void 0,this.window=void 0,this.documents=[],this._plugins={list:[],map:{}},this.onWindowUnload=function(t){return e.removeDocument(t.target)};var n=this;this.Interactable=function(t){s(i,t);var e=p(i);function i(){return r(this,i),e.apply(this,arguments)}return o(i,[{key:"_defaults",get:function(){return n.defaults}},{key:"set",value:function(t){return f(c(i.prototype),"set",this).call(this,t),n.fire("interactable:set",{options:t,interactable:this}),this}},{key:"unset",value:function(){f(c(i.prototype),"unset",this).call(this);var t=n.interactables.list.indexOf(this);t<0||(n.interactables.list.splice(t,1),n.fire("interactable:unset",{interactable:this}))}}]),i}(on)}return o(t,[{key:"addListeners",value:function(t,e){this.listenerMaps.push({id:e,map:t})}},{key:"fire",value:function(t,e){for(var n=0,r=this.listenerMaps;n<r.length;n++){var i=r[n].map[t];if(i&&!1===i(e,this,t))return!1}}},{key:"init",value:function(t){return this.isInitialized?this:function(t,e){t.isInitialized=!0,w.window(e)&&m(e);return k.init(e),I.init(e),Lt.init(e),t.window=e,t.document=e.document,t.usePlugin(nn),t.usePlugin(Ue),t}(this,t)}},{key:"pluginIsInstalled",value:function(t){var e=t.id;return e?!!this._plugins.map[e]:-1!==this._plugins.list.indexOf(t)}},{key:"usePlugin",value:function(t,e){if(!this.isInitialized)return this;if(this.pluginIsInstalled(t))return this;if(t.id&&(this._plugins.map[t.id]=t),this._plugins.list.push(t),t.install&&t.install(this,e),t.listeners&&t.before){for(var n=0,r=this.listenerMaps.length,i=t.before.reduce((function(t,e){return t[e]=!0,t[cn(e)]=!0,t}),{});n<r;n++){var o=this.listenerMaps[n].id;if(o&&(i[o]||i[cn(o)]))break}this.listenerMaps.splice(n,0,{id:t.id,map:t.listeners})}else t.listeners&&this.listenerMaps.push({id:t.id,map:t.listeners});return this}},{key:"addDocument",value:function(t,e){if(-1!==this.getDocIndex(t))return!1;var n=y(t);e=e?V({},e):{},this.documents.push({doc:t,options:e}),this.events.documents.push(t),t!==this.document&&this.events.add(n,"unload",this.onWindowUnload),this.fire("scope:add-document",{doc:t,window:n,scope:this,options:e})}},{key:"removeDocument",value:function(t){var e=this.getDocIndex(t),n=y(t),r=this.documents[e].options;this.events.remove(n,"unload",this.onWindowUnload),this.documents.splice(e,1),this.events.documents.splice(e,1),this.fire("scope:remove-document",{doc:t,window:n,scope:this,options:r})}},{key:"getDocIndex",value:function(t){for(var e=0;e<this.documents.length;e++)if(this.documents[e].doc===t)return e;return-1}},{key:"getDocOptions",value:function(t){var e=this.getDocIndex(t);return-1===e?null:this.documents[e].options}},{key:"now",value:function(){return(this.window.Date||Date).now()}}]),t}();function cn(t){return t&&t.replace(/\/.*$/,"")}var ln=new sn,un=ln.interactStatic,pn="undefined"!=typeof globalThis?globalThis:window;ln.init(pn);var fn=Object.freeze({__proto__:null,edgeTarget:function(){},elements:function(){},grid:function(t){var e=[["x","y"],["left","top"],["right","bottom"],["width","height"]].filter((function(e){var n=e[0],r=e[1];return n in t||r in t})),n=function(n,r){for(var i=t.range,o=t.limits,a=void 0===o?{left:-1/0,right:1/0,top:-1/0,bottom:1/0}:o,s=t.offset,c=void 0===s?{x:0,y:0}:s,l={range:i,grid:t,x:null,y:null},u=0;u<e.length;u++){var p=e[u],f=p[0],d=p[1],h=Math.round((n-c.x)/t[f]),v=Math.round((r-c.y)/t[d]);l[f]=Math.max(a.left,Math.min(a.right,h*t[f]+c.x)),l[d]=Math.max(a.top,Math.min(a.bottom,v*t[d]+c.y))}return l};return n.grid=t,n.coordFields=e,n}}),dn={id:"snappers",install:function(t){var e=t.interactStatic;e.snappers=V(e.snappers||{},fn),e.createSnapGrid=e.snappers.grid}},hn=dn,vn={start:function(t){var n=t.state,r=t.rect,i=t.edges,o=t.pageCoords,a=n.options,s=a.ratio,c=a.enabled,l=n.options,u=l.equalDelta,p=l.modifiers;"preserve"===s&&(s=r.width/r.height),n.startCoords=V({},o),n.startRect=V({},r),n.ratio=s,n.equalDelta=u;var f=n.linkedEdges={top:i.top||i.left&&!i.bottom,left:i.left||i.top&&!i.right,bottom:i.bottom||i.right&&!i.top,right:i.right||i.bottom&&!i.left};if(n.xIsPrimaryAxis=!(!i.left&&!i.right),n.equalDelta){var d=(f.left?1:-1)*(f.top?1:-1);n.edgeSign={x:d,y:d}}else n.edgeSign={x:f.left?-1:1,y:f.top?-1:1};if(!1!==c&&V(i,f),null!=p&&p.length){var h=new me(t.interaction);h.copyFrom(t.interaction.modification),h.prepareStates(p),n.subModification=h,h.startAll(e({},t))}},set:function(t){var n=t.state,r=t.rect,i=t.coords,o=n.linkedEdges,a=V({},i),s=n.equalDelta?gn:mn;if(V(t.edges,o),s(n,n.xIsPrimaryAxis,i,r),!n.subModification)return null;var c=V({},r);H(o,c,{x:i.x-a.x,y:i.y-a.y});var l=n.subModification.setAll(e(e({},t),{},{rect:c,edges:o,pageCoords:i,prevCoords:i,prevRect:c})),u=l.delta;l.changed&&(s(n,Math.abs(u.x)>Math.abs(u.y),l.coords,l.rect),V(i,l.coords));return l.eventProps},defaults:{ratio:"preserve",equalDelta:!1,modifiers:[],enabled:!1}};function gn(t,e,n){var r=t.startCoords,i=t.edgeSign;e?n.y=r.y+(n.x-r.x)*i.y:n.x=r.x+(n.y-r.y)*i.x}function mn(t,e,n,r){var i=t.startRect,o=t.startCoords,a=t.ratio,s=t.edgeSign;if(e){var c=r.width/a;n.y=o.y+(c-i.height)*s.y}else{var l=r.height*a;n.x=o.x+(l-i.width)*s.x}}var yn=be(vn,"aspectRatio"),bn=function(){};bn._defaults={};var xn=bn;function wn(t,e,n){return w.func(t)?G(t,e.interactable,e.element,[n.x,n.y,e]):G(t,e.interactable,e.element)}var En={start:function(t){var e=t.rect,n=t.startOffset,r=t.state,i=t.interaction,o=t.pageCoords,a=r.options,s=a.elementRect,c=V({left:0,top:0,right:0,bottom:0},a.offset||{});if(e&&s){var l=wn(a.restriction,i,o);if(l){var u=l.right-l.left-e.width,p=l.bottom-l.top-e.height;u<0&&(c.left+=u,c.right+=u),p<0&&(c.top+=p,c.bottom+=p)}c.left+=n.left-e.width*s.left,c.top+=n.top-e.height*s.top,c.right+=n.right-e.width*(1-s.right),c.bottom+=n.bottom-e.height*(1-s.bottom)}r.offset=c},set:function(t){var e=t.coords,n=t.interaction,r=t.state,i=r.options,o=r.offset,a=wn(i.restriction,n,e);if(a){var s=function(t){return!t||"left"in t&&"top"in t||((t=V({},t)).left=t.x||0,t.top=t.y||0,t.right=t.right||t.left+t.width,t.bottom=t.bottom||t.top+t.height),t}(a);e.x=Math.max(Math.min(s.right-o.right,e.x),s.left+o.left),e.y=Math.max(Math.min(s.bottom-o.bottom,e.y),s.top+o.top)}},defaults:{restriction:null,elementRect:null,offset:null,endOnly:!1,enabled:!1}},Tn=be(En,"restrict"),Sn={top:1/0,left:1/0,bottom:-1/0,right:-1/0},_n={top:-1/0,left:-1/0,bottom:1/0,right:1/0};function Pn(t,e){for(var n=0,r=["top","left","bottom","right"];n<r.length;n++){var i=r[n];i in t||(t[i]=e[i])}return t}var On={noInner:Sn,noOuter:_n,start:function(t){var e,n=t.interaction,r=t.startOffset,i=t.state,o=i.options;o&&(e=N(wn(o.offset,n,n.coords.start.page))),e=e||{x:0,y:0},i.offset={top:e.y+r.top,left:e.x+r.left,bottom:e.y-r.bottom,right:e.x-r.right}},set:function(t){var e=t.coords,n=t.edges,r=t.interaction,i=t.state,o=i.offset,a=i.options;if(n){var s=V({},e),c=wn(a.inner,r,s)||{},l=wn(a.outer,r,s)||{};Pn(c,Sn),Pn(l,_n),n.top?e.y=Math.min(Math.max(l.top+o.top,s.y),c.top+o.top):n.bottom&&(e.y=Math.max(Math.min(l.bottom+o.bottom,s.y),c.bottom+o.bottom)),n.left?e.x=Math.min(Math.max(l.left+o.left,s.x),c.left+o.left):n.right&&(e.x=Math.max(Math.min(l.right+o.right,s.x),c.right+o.right))}},defaults:{inner:null,outer:null,offset:null,endOnly:!1,enabled:!1}},kn=be(On,"restrictEdges"),Dn=V({get elementRect(){return{top:0,left:0,bottom:1,right:1}},set elementRect(t){}},En.defaults),In=be({start:En.start,set:En.set,defaults:Dn},"restrictRect"),Mn={width:-1/0,height:-1/0},zn={width:1/0,height:1/0};var An=be({start:function(t){return On.start(t)},set:function(t){var e=t.interaction,n=t.state,r=t.rect,i=t.edges,o=n.options;if(i){var a=U(wn(o.min,e,t.coords))||Mn,s=U(wn(o.max,e,t.coords))||zn;n.options={endOnly:o.endOnly,inner:V({},On.noInner),outer:V({},On.noOuter)},i.top?(n.options.inner.top=r.bottom-a.height,n.options.outer.top=r.bottom-s.height):i.bottom&&(n.options.inner.bottom=r.top+a.height,n.options.outer.bottom=r.top+s.height),i.left?(n.options.inner.left=r.right-a.width,n.options.outer.left=r.right-s.width):i.right&&(n.options.inner.right=r.left+a.width,n.options.outer.right=r.left+s.width),On.set(t),n.options=o}},defaults:{min:null,max:null,endOnly:!1,enabled:!1}},"restrictSize");var Rn={start:function(t){var e,n=t.interaction,r=t.interactable,i=t.element,o=t.rect,a=t.state,s=t.startOffset,c=a.options,l=c.offsetWithOrigin?function(t){var e=t.interaction.element,n=N(G(t.state.options.origin,null,null,[e])),r=n||K(t.interactable,e,t.interaction.prepared.name);return r}(t):{x:0,y:0};if("startCoords"===c.offset)e={x:n.coords.start.page.x,y:n.coords.start.page.y};else{var u=G(c.offset,r,i,[n]);(e=N(u)||{x:0,y:0}).x+=l.x,e.y+=l.y}var p=c.relativePoints;a.offsets=o&&p&&p.length?p.map((function(t,n){return{index:n,relativePoint:t,x:s.left-o.width*t.x+e.x,y:s.top-o.height*t.y+e.y}})):[{index:0,relativePoint:null,x:e.x,y:e.y}]},set:function(t){var e=t.interaction,n=t.coords,r=t.state,i=r.options,o=r.offsets,a=K(e.interactable,e.element,e.prepared.name),s=V({},n),c=[];i.offsetWithOrigin||(s.x-=a.x,s.y-=a.y);for(var l=0,u=o;l<u.length;l++)for(var p=u[l],f=s.x-p.x,d=s.y-p.y,h=0,v=i.targets.length;h<v;h++){var g=i.targets[h],m=void 0;(m=w.func(g)?g(f,d,e._proxy,p,h):g)&&c.push({x:(w.number(m.x)?m.x:f)+p.x,y:(w.number(m.y)?m.y:d)+p.y,range:w.number(m.range)?m.range:i.range,source:g,index:h,offset:p})}for(var y={target:null,inRange:!1,distance:0,range:0,delta:{x:0,y:0}},b=0;b<c.length;b++){var x=c[b],E=x.range,T=x.x-s.x,S=x.y-s.y,_=Q(T,S),P=_<=E;E===1/0&&y.inRange&&y.range!==1/0&&(P=!1),y.target&&!(P?y.inRange&&E!==1/0?_/E<y.distance/y.range:E===1/0&&y.range!==1/0||_<y.distance:!y.inRange&&_<y.distance)||(y.target=x,y.distance=_,y.range=E,y.inRange=P,y.delta.x=T,y.delta.y=S)}return y.inRange&&(n.x=y.target.x,n.y=y.target.y),r.closest=y,y},defaults:{range:1/0,targets:null,offset:null,offsetWithOrigin:!0,origin:null,relativePoints:null,endOnly:!1,enabled:!1}},Cn=be(Rn,"snap");var jn={start:function(t){var e=t.state,n=t.edges,r=e.options;if(!n)return null;t.state={options:{targets:null,relativePoints:[{x:n.left?0:1,y:n.top?0:1}],offset:r.offset||"self",origin:{x:0,y:0},range:r.range}},e.targetFields=e.targetFields||[["width","height"],["x","y"]],Rn.start(t),e.offsets=t.state.offsets,t.state=e},set:function(t){var e=t.interaction,n=t.state,r=t.coords,i=n.options,o=n.offsets,a={x:r.x-o[0].x,y:r.y-o[0].y};n.options=V({},i),n.options.targets=[];for(var s=0,c=i.targets||[];s<c.length;s++){var l=c[s],u=void 0;if(u=w.func(l)?l(a.x,a.y,e):l){for(var p=0,f=n.targetFields;p<f.length;p++){var d=f[p],h=d[0],v=d[1];if(h in u||v in u){u.x=u[h],u.y=u[v];break}}n.options.targets.push(u)}}var g=Rn.set(t);return n.options=i,g},defaults:{range:1/0,targets:null,offset:null,endOnly:!1,enabled:!1}},Fn=be(jn,"snapSize");var Xn={aspectRatio:yn,restrictEdges:kn,restrict:Tn,restrictRect:In,restrictSize:An,snapEdges:be({start:function(t){var e=t.edges;return e?(t.state.targetFields=t.state.targetFields||[[e.left?"left":"right",e.top?"top":"bottom"]],jn.start(t)):null},set:jn.set,defaults:V(ge(jn.defaults),{targets:void 0,range:void 0,offset:{x:0,y:0}})},"snapEdges"),snap:Cn,snapSize:Fn,spring:xn,avoid:xn,transform:xn,rubberband:xn},Yn={id:"modifiers",install:function(t){var e=t.interactStatic;for(var n in t.usePlugin(Ee),t.usePlugin(hn),e.modifiers=Xn,Xn){var r=Xn[n],i=r._defaults,o=r._methods;i._methods=o,t.defaults.perAction[n]=i}}},Ln=Yn,qn=function(t){s(n,t);var e=p(n);function n(t,i,o,a,s,c){var l;if(r(this,n),tt(u(l=e.call(this,s)),o),o!==i&&tt(u(l),i),l.timeStamp=c,l.originalEvent=o,l.type=t,l.pointerId=at(i),l.pointerType=dt(i),l.target=a,l.currentTarget=null,"tap"===t){var p=s.getPointerIndex(i);l.dt=l.timeStamp-s.pointers[p].downTime;var f=l.timeStamp-s.tapTime;l.double=!!s.prevTap&&"doubletap"!==s.prevTap.type&&s.prevTap.target===l.target&&f<500}else"doubletap"===t&&(l.dt=i.timeStamp-s.tapTime,l.double=!0);return l}return o(n,[{key:"_subtractOrigin",value:function(t){var e=t.x,n=t.y;return this.pageX-=e,this.pageY-=n,this.clientX-=e,this.clientY-=n,this}},{key:"_addOrigin",value:function(t){var e=t.x,n=t.y;return this.pageX+=e,this.pageY+=n,this.clientX+=e,this.clientY+=n,this}},{key:"preventDefault",value:function(){this.originalEvent.preventDefault()}}]),n}(vt),Bn={id:"pointer-events/base",before:["inertia","modifiers","auto-start","actions"],install:function(t){t.pointerEvents=Bn,t.defaults.actions.pointerEvents=Bn.defaults,V(t.actions.phaselessTypes,Bn.types)},listeners:{"interactions:new":function(t){var e=t.interaction;e.prevTap=null,e.tapTime=0},"interactions:update-pointer":function(t){var e=t.down,n=t.pointerInfo;if(!e&&n.hold)return;n.hold={duration:1/0,timeout:null}},"interactions:move":function(t,e){var n=t.interaction,r=t.pointer,i=t.event,o=t.eventTarget;t.duplicate||n.pointerIsDown&&!n.pointerWasMoved||(n.pointerIsDown&&Gn(t),Vn({interaction:n,pointer:r,event:i,eventTarget:o,type:"move"},e))},"interactions:down":function(t,e){!function(t,e){for(var n=t.interaction,r=t.pointer,i=t.event,o=t.eventTarget,a=t.pointerIndex,s=n.pointers[a].hold,c=q(o),l={interaction:n,pointer:r,event:i,eventTarget:o,type:"hold",targets:[],path:c,node:null},u=0;u<c.length;u++){var p=c[u];l.node=p,e.fire("pointerEvents:collect-targets",l)}if(!l.targets.length)return;for(var f=1/0,d=0,h=l.targets;d<h.length;d++){var v=h[d].eventable.options.holdDuration;v<f&&(f=v)}s.duration=f,s.timeout=setTimeout((function(){Vn({interaction:n,eventTarget:o,pointer:r,event:i,type:"hold"},e)}),f)}(t,e),Vn(t,e)},"interactions:up":function(t,e){Gn(t),Vn(t,e),function(t,e){var n=t.interaction,r=t.pointer,i=t.event,o=t.eventTarget;n.pointerWasMoved||Vn({interaction:n,eventTarget:o,pointer:r,event:i,type:"tap"},e)}(t,e)},"interactions:cancel":function(t,e){Gn(t),Vn(t,e)}},PointerEvent:qn,fire:Vn,collectEventTargets:Wn,defaults:{holdDuration:600,ignoreFrom:null,allowFrom:null,origin:{x:0,y:0}},types:{down:!0,move:!0,up:!0,cancel:!0,tap:!0,doubletap:!0,hold:!0}};function Vn(t,e){var n=t.interaction,r=t.pointer,i=t.event,o=t.eventTarget,a=t.type,s=t.targets,c=void 0===s?Wn(t,e):s,l=new qn(a,r,i,o,n,e.now());e.fire("pointerEvents:new",{pointerEvent:l});for(var u={interaction:n,pointer:r,event:i,eventTarget:o,targets:c,type:a,pointerEvent:l},p=0;p<c.length;p++){var f=c[p];for(var d in f.props||{})l[d]=f.props[d];var h=K(f.eventable,f.node);if(l._subtractOrigin(h),l.eventable=f.eventable,l.currentTarget=f.node,f.eventable.fire(l),l._addOrigin(h),l.immediatePropagationStopped||l.propagationStopped&&p+1<c.length&&c[p+1].node!==l.currentTarget)break}if(e.fire("pointerEvents:fired",u),"tap"===a){var v=l.double?Vn({interaction:n,pointer:r,event:i,eventTarget:o,type:"doubletap"},e):l;n.prevTap=v,n.tapTime=v.timeStamp}return l}function Wn(t,e){var n=t.interaction,r=t.pointer,i=t.event,o=t.eventTarget,a=t.type,s=n.getPointerIndex(r),c=n.pointers[s];if("tap"===a&&(n.pointerWasMoved||!c||c.downTarget!==o))return[];for(var l=q(o),u={interaction:n,pointer:r,event:i,eventTarget:o,type:a,path:l,targets:[],node:null},p=0;p<l.length;p++){var f=l[p];u.node=f,e.fire("pointerEvents:collect-targets",u)}return"hold"===a&&(u.targets=u.targets.filter((function(t){var e,r;return t.eventable.options.holdDuration===(null==(e=n.pointers[s])||null==(r=e.hold)?void 0:r.duration)}))),u.targets}function Gn(t){var e=t.interaction,n=t.pointerIndex,r=e.pointers[n].hold;r&&r.timeout&&(clearTimeout(r.timeout),r.timeout=null)}var Nn=Object.freeze({__proto__:null,default:Bn});function Un(t){var e=t.interaction;e.holdIntervalHandle&&(clearInterval(e.holdIntervalHandle),e.holdIntervalHandle=null)}var Hn={id:"pointer-events/holdRepeat",install:function(t){t.usePlugin(Bn);var e=t.pointerEvents;e.defaults.holdRepeatInterval=0,e.types.holdrepeat=t.actions.phaselessTypes.holdrepeat=!0},listeners:["move","up","cancel","endall"].reduce((function(t,e){return t["pointerEvents:".concat(e)]=Un,t}),{"pointerEvents:new":function(t){var e=t.pointerEvent;"hold"===e.type&&(e.count=(e.count||0)+1)},"pointerEvents:fired":function(t,e){var n=t.interaction,r=t.pointerEvent,i=t.eventTarget,o=t.targets;if("hold"===r.type&&o.length){var a=o[0].eventable.options.holdRepeatInterval;a<=0||(n.holdIntervalHandle=setTimeout((function(){e.pointerEvents.fire({interaction:n,eventTarget:i,type:"hold",pointer:r,event:r},e)}),a))}}})},Kn=Hn;var $n={id:"pointer-events/interactableTargets",install:function(t){var e=t.Interactable;e.prototype.pointerEvents=function(t){return V(this.events.options,t),this};var n=e.prototype._backCompatOption;e.prototype._backCompatOption=function(t,e){var r=n.call(this,t,e);return r===this&&(this.events.options[t]=e),r}},listeners:{"pointerEvents:collect-targets":function(t,e){var n=t.targets,r=t.node,i=t.type,o=t.eventTarget;e.interactables.forEachMatch(r,(function(t){var e=t.events,a=e.options;e.types[i]&&e.types[i].length&&t.testIgnoreAllow(a,r,o)&&n.push({node:r,eventable:e,props:{interactable:t}})}))},"interactable:new":function(t){var e=t.interactable;e.events.getRect=function(t){return e.getRect(t)}},"interactable:set":function(t,e){var n=t.interactable,r=t.options;V(n.events.options,e.pointerEvents.defaults),V(n.events.options,r.pointerEvents||{})}}},Jn=$n,Qn={id:"pointer-events",install:function(t){t.usePlugin(Nn),t.usePlugin(Kn),t.usePlugin(Jn)}},Zn=Qn;var tr={id:"reflow",install:function(t){var e=t.Interactable;t.actions.phases.reflow=!0,e.prototype.reflow=function(e){return function(t,e,n){for(var r=t.getAllElements(),i=n.window.Promise,o=i?[]:null,a=function(){var a=r[s],c=t.getRect(a);if(!c)return 1;var l,u=bt(n.interactions.list,(function(n){return n.interacting()&&n.interactable===t&&n.element===a&&n.prepared.name===e.name}));if(u)u.move(),o&&(l=u._reflowPromise||new i((function(t){u._reflowResolve=t})));else{var p=U(c),f=function(t){return{coords:t,get page(){return this.coords.page},get client(){return this.coords.client},get timeStamp(){return this.coords.timeStamp},get pageX(){return this.coords.page.x},get pageY(){return this.coords.page.y},get clientX(){return this.coords.client.x},get clientY(){return this.coords.client.y},get pointerId(){return this.coords.pointerId},get target(){return this.coords.target},get type(){return this.coords.type},get pointerType(){return this.coords.pointerType},get buttons(){return this.coords.buttons},preventDefault:function(){}}}({page:{x:p.x,y:p.y},client:{x:p.x,y:p.y},timeStamp:n.now()});l=function(t,e,n,r,i){var o=t.interactions.new({pointerType:"reflow"}),a={interaction:o,event:i,pointer:i,eventTarget:n,phase:"reflow"};o.interactable=e,o.element=n,o.prevEvent=i,o.updatePointer(i,i,n,!0),nt(o.coords.delta),Ut(o.prepared,r),o._doPhase(a);var s=t.window,c=s.Promise,l=c?new c((function(t){o._reflowResolve=t})):void 0;o._reflowPromise=l,o.start(r,e,n),o._interacting?(o.move(a),o.end(i)):(o.stop(),o._reflowResolve());return o.removePointer(i,i),l}(n,t,a,e,f)}o&&o.push(l)},s=0;s<r.length&&!a();s++);return o&&i.all(o).then((function(){return t}))}(this,e,t)}},listeners:{"interactions:stop":function(t,e){var n=t.interaction;"reflow"===n.pointerType&&(n._reflowResolve&&n._reflowResolve(),function(t,e){t.splice(t.indexOf(e),1)}(e.interactions.list,n))}}},er=tr;if(un.use(he),un.use(Ce),un.use(Zn),un.use(qe),un.use(Ln),un.use(pe),un.use(Xt),un.use(Gt),un.use(er),un.default=un,"object"===("undefined"==typeof module?"undefined":n(module))&&module)try{module.exports=un}catch(t){}return un.default=un,un}));
+// === end interact.js UMD bundle ===
+
+const interact = module.exports.default || module.exports;
+
+return { interact };
+
+```
+
+# interactjs
+
+```ts
+/**
+ * interactjs.ts
+ *
+ * Typed interface to the vendored interact.js library.
+ * Loads the wrapper module which embeds the UMD bundle inline,
+ * so it works in both dev (Datacore in vault) and production
+ * (compiled markdown with no filesystem access).
+ *
+ * Exposes only the drag and resize APIs needed for modal interaction.
+ */
+
+/** Drag event from interact.js */
+interface InteractDragEvent {
+  target: HTMLElement;
+  dx: number;
+  dy: number;
+  clientX: number;
+  clientY: number;
+  clientX0: number;
+  clientY0: number;
+}
+
+/** Resize event from interact.js */
+interface InteractResizeEvent {
+  target: HTMLElement;
+  rect: { width: number; height: number; top: number; left: number; bottom: number; right: number };
+  deltaRect: { left: number; right: number; top: number; bottom: number };
+  edges: { top: boolean; bottom: boolean; left: boolean; right: boolean };
+}
+
+/** Drag options */
+interface DraggableOptions {
+  allowFrom?: string;
+  listeners?: {
+    start?: (event: InteractDragEvent) => void;
+    move?: (event: InteractDragEvent) => void;
+    end?: (event: InteractDragEvent) => void;
+  };
+  modifiers?: unknown[];
+}
+
+/** Resize edge configuration */
+interface ResizeEdges {
+  top?: boolean | string;
+  bottom?: boolean | string;
+  left?: boolean | string;
+  right?: boolean | string;
+}
+
+/** Resize options */
+interface ResizableOptions {
+  edges?: ResizeEdges;
+  listeners?: {
+    start?: (event: InteractResizeEvent) => void;
+    move?: (event: InteractResizeEvent) => void;
+    end?: (event: InteractResizeEvent) => void;
+  };
+  modifiers?: unknown[];
+  invert?: 'none' | 'negate' | 'reposition';
+}
+
+/** Interactable instance returned by interact(element) */
+interface Interactable {
+  draggable(options: DraggableOptions): Interactable;
+  resizable(options: ResizableOptions): Interactable;
+  unset(): void;
+}
+
+/** Restrict modifier options */
+interface RestrictOptions {
+  restriction: 'parent' | 'self' | HTMLElement | { x: number; y: number; width: number; height: number };
+  endOnly?: boolean;
+}
+
+/** RestrictSize modifier options */
+interface RestrictSizeOptions {
+  min?: { width: number; height: number };
+  max?: { width: number; height: number };
+}
+
+/** The interact function and its static modifiers */
+interface InteractStatic {
+  (target: HTMLElement | string): Interactable;
+  modifiers: {
+    restrict(options: RestrictOptions): unknown;
+    restrictRect(options: RestrictOptions): unknown;
+    restrictSize(options: RestrictSizeOptions): unknown;
+  };
+}
+
+const wrapperModule = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "interact-wrapper")) as {
+  interact: InteractStatic;
+};
+
+const interact: InteractStatic = wrapperModule.interact;
+
+return {
+  interact,
+  // Re-export types for consumers (TypeScript structural typing)
+};
 
 ```
 
@@ -16966,7 +17869,291 @@ function waitForBridge(timeoutMs: number = 5000): Promise<void> {
   });
 }
 
-return { isBridgeAvailable, getObsidianModule, waitForBridge };
+/** Size constraints for resizable modals */
+const MODAL_MIN_WIDTH = 400;
+const MODAL_MIN_HEIGHT = 300;
+const MODAL_MAX_WIDTH = 900;
+const MODAL_MAX_HEIGHT = 800;
+const MODAL_SIZE_KEY = 'windrose-native-modal-size';
+
+/**
+ * Load/save modal size from localStorage
+ */
+function loadModalSize(): { width: number; height: number } | null {
+  try {
+    const stored = localStorage.getItem(MODAL_SIZE_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      return {
+        width: Math.max(MODAL_MIN_WIDTH, Math.min(MODAL_MAX_WIDTH, parsed.width)),
+        height: Math.max(MODAL_MIN_HEIGHT, Math.min(MODAL_MAX_HEIGHT, parsed.height))
+      };
+    }
+  } catch { /* ignore */ }
+  return null;
+}
+
+function saveModalSize(width: number, height: number): void {
+  try {
+    localStorage.setItem(MODAL_SIZE_KEY, JSON.stringify({ width, height }));
+  } catch { /* ignore */ }
+}
+
+/** interact.js function type for drag/resize */
+type InteractFn = (target: HTMLElement) => {
+  draggable: (opts: unknown) => unknown;
+  resizable: (opts: unknown) => unknown;
+  unset: () => void;
+};
+
+/**
+ * Lazily load interact.js via the Datacore module system.
+ * Cached after first load.
+ */
+let _interactCache: InteractFn | null = null;
+async function loadInteract(): Promise<InteractFn> {
+  if (_interactCache) return _interactCache;
+  // Dynamic loading via eval-style to avoid transformer regex stripping
+  const resolver = await dc.require(dc.resolvePath("pathResolver.ts")) as {
+    requireModuleByName: (name: string) => Promise<{ interact: InteractFn }>
+  };
+  const mod = await resolver.dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "interactjs"));
+  _interactCache = mod.interact;
+  return _interactCache;
+}
+
+/**
+ * Set up interact.js drag and resize on a native modal element.
+ * Returns a cleanup function that calls interactable.unset().
+ */
+async function setupModalInteract(
+  modalEl: HTMLElement,
+  options: { draggable?: boolean; resizable?: boolean }
+): Promise<() => void> {
+  const interact = await loadInteract();
+
+  // Switch from relative (Obsidian default) to absolute positioning for drag
+  modalEl.style.position = 'absolute';
+
+  // Restore persisted size if available
+  const savedSize = loadModalSize();
+  if (savedSize && options.resizable) {
+    modalEl.style.width = `${savedSize.width}px`;
+    modalEl.style.height = `${savedSize.height}px`;
+  }
+
+  // Prevent overscroll on the modal container (Obsidian's backdrop)
+  modalEl.style.overflow = 'hidden';
+  const containerEl = modalEl.parentElement;
+  if (containerEl) {
+    containerEl.style.overflow = 'hidden';
+  }
+
+  // Center the modal initially
+  const rect = modalEl.getBoundingClientRect();
+  if (containerEl) {
+    const containerRect = containerEl.getBoundingClientRect();
+    const x = (containerRect.width - rect.width) / 2;
+    const y = (containerRect.height - rect.height) / 2;
+    modalEl.style.left = `${x}px`;
+    modalEl.style.top = `${y}px`;
+    modalEl.style.transform = 'none';
+    modalEl.style.margin = '0';
+    modalEl.dataset.x = String(x);
+    modalEl.dataset.y = String(y);
+  }
+
+  // Add resize handles
+  if (options.resizable) {
+    const edges = ['top', 'right', 'bottom', 'left', 'top-right', 'top-left', 'bottom-right', 'bottom-left'];
+    for (const edge of edges) {
+      const handle = document.createElement('div');
+      handle.className = `dmt-resize-handle dmt-resize-${edge}`;
+      modalEl.appendChild(handle);
+    }
+  }
+
+  const interactable = interact(modalEl);
+
+  if (options.draggable) {
+    interactable.draggable({
+      allowFrom: '.modal-header',
+      listeners: {
+        move(event: { dx: number; dy: number; target: HTMLElement }) {
+          const target = event.target;
+          const x = (parseFloat(target.dataset.x || '0')) + event.dx;
+          const y = (parseFloat(target.dataset.y || '0')) + event.dy;
+          target.style.left = `${x}px`;
+          target.style.top = `${y}px`;
+          target.dataset.x = String(x);
+          target.dataset.y = String(y);
+        }
+      }
+    });
+  }
+
+  if (options.resizable) {
+    interactable.resizable({
+      edges: {
+        top: '.dmt-resize-top, .dmt-resize-top-left, .dmt-resize-top-right',
+        right: '.dmt-resize-right, .dmt-resize-top-right, .dmt-resize-bottom-right',
+        bottom: '.dmt-resize-bottom, .dmt-resize-bottom-left, .dmt-resize-bottom-right',
+        left: '.dmt-resize-left, .dmt-resize-top-left, .dmt-resize-bottom-left'
+      },
+      listeners: {
+        move(event: {
+          target: HTMLElement;
+          rect: { width: number; height: number };
+          deltaRect: { left: number; top: number };
+        }) {
+          const target = event.target;
+          const { width, height } = event.rect;
+
+          // Clamp dimensions
+          const clampedWidth = Math.max(MODAL_MIN_WIDTH, Math.min(MODAL_MAX_WIDTH, width));
+          const clampedHeight = Math.max(MODAL_MIN_HEIGHT, Math.min(MODAL_MAX_HEIGHT, height));
+
+          target.style.width = `${clampedWidth}px`;
+          target.style.height = `${clampedHeight}px`;
+
+          // Adjust position for top/left edge resizing
+          const x = (parseFloat(target.dataset.x || '0')) + event.deltaRect.left;
+          const y = (parseFloat(target.dataset.y || '0')) + event.deltaRect.top;
+          target.style.left = `${x}px`;
+          target.style.top = `${y}px`;
+          target.dataset.x = String(x);
+          target.dataset.y = String(y);
+        },
+        end(event: { target: HTMLElement; rect: { width: number; height: number } }) {
+          saveModalSize(event.rect.width, event.rect.height);
+        }
+      }
+    });
+  }
+
+  // Add drag cursor to header
+  if (options.draggable) {
+    const header = modalEl.querySelector('.modal-header') as HTMLElement | null;
+    if (header) {
+      header.style.cursor = 'grab';
+      header.addEventListener('mousedown', () => { header.style.cursor = 'grabbing'; });
+      header.addEventListener('mouseup', () => { header.style.cursor = 'grab'; });
+    }
+  }
+
+  return () => {
+    interactable.unset();
+    // Remove resize handles
+    modalEl.querySelectorAll('.dmt-resize-handle').forEach(el => el.remove());
+  };
+}
+
+/**
+ * Preact component that renders children inside a native Obsidian Modal.
+ * When mounted, opens a Modal; when unmounted, closes it.
+ * Children are rendered in the Preact tree then portaled into contentEl.
+ *
+ * Props:
+ *   onClose: () => void     — called when modal is dismissed (Esc / overlay click)
+ *   modalClass?: string     — optional CSS class added to the modal element
+ *   title?: string          — optional title set via titleEl.setText()
+ *   draggable?: boolean     — enable drag from header (desktop only)
+ *   resizable?: boolean     — enable resize from edges/corners (desktop only)
+ *   children: any           — Preact children to render inside the modal
+ */
+function NativeModalPortal({
+  onClose,
+  modalClass,
+  title,
+  draggable,
+  resizable,
+  children
+}: {
+  onClose: () => void;
+  modalClass?: string;
+  title?: string;
+  draggable?: boolean;
+  resizable?: boolean;
+  children?: unknown;
+}): React.ReactElement {
+  const wrapperRef = dc.useRef<HTMLDivElement>(null);
+  const modalRef = dc.useRef<unknown>(null);
+  const closedByCodeRef = dc.useRef(false);
+  const interactCleanupRef = dc.useRef<(() => void) | null>(null);
+  const [isPortaled, setIsPortaled] = dc.useState(false);
+
+  // Store latest onClose in a ref to avoid re-creating the modal on callback changes
+  const onCloseRef = dc.useRef(onClose);
+  onCloseRef.current = onClose;
+
+  dc.useEffect(() => {
+    if (!isBridgeAvailable()) return;
+
+    try {
+      const obs = getObsidianModule();
+      const ModalClass = obs.Modal as new (app: unknown) => {
+        contentEl: HTMLElement;
+        modalEl: HTMLElement;
+        titleEl: { setText: (t: string) => void };
+        open: () => void;
+        close: () => void;
+        onOpen: () => void;
+        onClose: () => void;
+      };
+      const app = (dc as unknown as { app: unknown }).app;
+
+      const modal = new (class extends (ModalClass as any) {
+        onOpen(): void {
+          if (title) {
+            this.titleEl.setText(title);
+          }
+          if (modalClass) {
+            this.modalEl.addClass(modalClass);
+          }
+          if (wrapperRef.current) {
+            this.contentEl.appendChild(wrapperRef.current);
+          }
+          setIsPortaled(true);
+
+          // Set up interact.js drag/resize (desktop only)
+          if ((draggable || resizable) && !('ontouchstart' in window)) {
+            setupModalInteract(this.modalEl, { draggable, resizable }).then(cleanup => {
+              interactCleanupRef.current = cleanup;
+            }).catch(err => {
+              console.warn('[Windrose] Failed to set up modal drag/resize:', err);
+            });
+          }
+        }
+        onClose(): void {
+          if (!closedByCodeRef.current) {
+            onCloseRef.current();
+          }
+        }
+      })(app);
+
+      modalRef.current = modal;
+      modal.open();
+
+      return () => {
+        closedByCodeRef.current = true;
+        if (interactCleanupRef.current) {
+          interactCleanupRef.current();
+          interactCleanupRef.current = null;
+        }
+        modal.close();
+      };
+    } catch (e) {
+      console.warn('[Windrose] NativeModalPortal: failed to open native modal:', (e as Error).message);
+    }
+  }, []);
+
+  return h('div', {
+    ref: wrapperRef,
+    style: isPortaled ? { display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 } : { display: 'none' }
+  }, children);
+}
+
+return { isBridgeAvailable, getObsidianModule, waitForBridge, NativeModalPortal };
 
 ```
 
@@ -17194,13 +18381,172 @@ return { TextInputModal, openNativeTextInputModal };
 # NoteLinkModal
 
 ```jsx
-const { 
+const {
   getNoteDisplayNames,
   getFullPathFromDisplayName,
   getDisplayNameFromPath
 } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "noteOperations"));
 
 const { getObjectType } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "objectTypeResolver"));
+
+const { isBridgeAvailable, getObsidianModule } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "obsidianBridge"));
+
+/**
+ * Opens a native Obsidian Modal for note linking.
+ * Uses AbstractInputSuggest for autocomplete.
+ * Returns true if native modal opened, false to fall back to Preact.
+ */
+function openNativeNoteLinkModal(options) {
+  if (!isBridgeAvailable()) return false;
+
+  try {
+    const obs = getObsidianModule();
+    const ModalClass = obs.Modal;
+    const SettingClass = obs.Setting;
+    const AbstractInputSuggestClass = obs.AbstractInputSuggest;
+    const app = dc.app;
+
+    const {
+      onSave,
+      onClose,
+      currentNotePath = null,
+      objectType = null
+    } = options;
+
+    const objectTypeLabel = (() => {
+      if (!objectType) return 'Object';
+      const type = getObjectType(objectType);
+      return type ? type.label : 'Object';
+    })();
+
+    let noteCache = null;
+
+    const modal = new (class extends ModalClass {
+      inputEl;
+      submitted = false;
+
+      onOpen() {
+        const { contentEl, titleEl } = this;
+        titleEl.setText(`Link Note to ${objectTypeLabel}`);
+
+        const displayName = getDisplayNameFromPath(currentNotePath);
+
+        // Use Obsidian's native search input (magnifying glass + clear button)
+        let searchComponent = null;
+        new SettingClass(contentEl)
+          .setName('Note Name')
+          .addSearch(search => {
+            searchComponent = search;
+            search.setPlaceholder('Type to search notes...');
+            if (displayName) {
+              search.setValue(displayName);
+            }
+          });
+
+        this.inputEl = searchComponent.inputEl;
+
+        // Attach AbstractInputSuggest for autocomplete
+        const inputEl = this.inputEl;
+        new (class extends AbstractInputSuggestClass {
+          async getSuggestions(query) {
+            if (!noteCache) {
+              try {
+                noteCache = await getNoteDisplayNames();
+              } catch {
+                return [];
+              }
+            }
+            if (!query) return [];
+            return noteCache
+              .filter(name => fuzzyMatch(name, query))
+              .map(name => ({ text: name, score: scoreMatch(name, query) }))
+              .sort((a, b) => b.score - a.score)
+              .slice(0, 10)
+              .map(item => item.text);
+          }
+
+          renderSuggestion(note, el) {
+            el.setText(note);
+          }
+
+          selectSuggestion(note) {
+            inputEl.value = note;
+            inputEl.dispatchEvent(new Event('input'));
+            this.close();
+          }
+        })(app, this.inputEl);
+
+        this.inputEl.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            this.submit();
+          }
+        });
+
+        // Buttons
+        const buttonContainer = contentEl.createDiv({ cls: 'modal-button-container' });
+
+        const cancelBtn = buttonContainer.createEl('button', { text: 'Cancel' });
+        cancelBtn.addEventListener('click', () => this.close());
+
+        if (currentNotePath) {
+          const removeBtn = buttonContainer.createEl('button', {
+            text: 'Remove Link',
+            cls: 'mod-warning'
+          });
+          removeBtn.addEventListener('click', () => {
+            this.submitted = true;
+            onSave(null);
+            this.close();
+          });
+        }
+
+        const saveBtn = buttonContainer.createEl('button', {
+          text: 'Save',
+          cls: 'mod-cta'
+        });
+        saveBtn.addEventListener('click', () => this.submit());
+
+        setTimeout(() => {
+          this.inputEl.focus();
+          if (displayName) this.inputEl.select();
+        }, 0);
+      }
+
+      async submit() {
+        const value = this.inputEl.value.trim();
+        this.submitted = true;
+
+        if (!value) {
+          onSave(null);
+          this.close();
+          return;
+        }
+
+        const fullPath = await getFullPathFromDisplayName(value);
+        if (!fullPath) {
+          onSave(value + '.md');
+        } else {
+          onSave(fullPath);
+        }
+        this.close();
+      }
+
+      onClose() {
+        if (!this.submitted) {
+          onClose();
+        }
+        this.contentEl.empty();
+      }
+    })(app);
+
+    modal.open();
+    return true;
+  } catch (e) {
+    console.warn('[Windrose] Failed to open native NoteLinkModal, falling back to Preact:', e.message);
+    return false;
+  }
+}
 
 /**
  * Modal for linking notes to objects
@@ -17608,7 +18954,7 @@ function AutocompleteInput({
   );
 }
 
-return { NoteLinkModal };
+return { NoteLinkModal, openNativeNoteLinkModal };
 ```
 
 # ColorPicker
@@ -18351,7 +19697,8 @@ const SelectionToolbar = ({
   onDelete,
   onScaleChange,  // handler for scale slider
   onDuplicate,    // handler for duplicating object
-  
+  onFreeformToggle, // handler for toggling freeform/grid-anchored placement
+
   // Multi-select handlers
   onRotateAll,
   onDuplicateAll,
@@ -18436,10 +19783,12 @@ const SelectionToolbar = ({
   const hasLinkedObject = !!(isObject && selectedItem.data?.linkedObject);
   const isNotePin = selectedItem.data?.type === 'note_pin';
 
+  const isFreeform = !!(isObject && selectedItem.data?.freeform);
   const objectButtons = isObject ? [
     { id: 'rotate', icon: 'lucide-rotate-cw', title: 'Rotate 45° (or press R)', onClick: onRotate },
     { id: 'label', icon: 'lucide-sticky-note', title: 'Add/Edit Label', onClick: onLabel, visible: !isNotePin },
     { id: 'duplicate', icon: 'lucide-copy', title: 'Duplicate Object', onClick: onDuplicate },
+    { id: 'freeform', icon: 'lucide-diamond', title: isFreeform ? 'Snap to grid' : 'Convert to freeform', onClick: onFreeformToggle, active: isFreeform },
     { id: 'linkNote', icon: 'lucide-scroll-text', title: selectedItem.data?.linkedNote ? 'Edit linked note' : 'Link note', onClick: onLinkNote },
     { id: 'linkObject', icon: 'lucide-link-2', title: hasLinkedObject ? 'Edit object link' : 'Link to object', onClick: onLinkObject, active: hasLinkedObject },
     { id: 'followLink', icon: 'lucide-arrow-right-circle', title: 'Go to linked object', onClick: onFollowLink, visible: hasLinkedObject },
@@ -18916,10 +20265,14 @@ const { useLinkingMode } = await dc.require(dc.headerLink(dc.resolvePath("compil
 const { useEventHandlerRegistration } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "EventHandlerContext"));
 const { useObjectInteractions } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "useObjectInteractions"));
 const { TextInputModal, openNativeTextInputModal } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "TextInputModal"));
-const { NoteLinkModal } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "NoteLinkModal"));
+const { NoteLinkModal, openNativeNoteLinkModal } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "NoteLinkModal"));
 const { SelectionToolbar } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "SelectionToolbar"));
 const { calculateObjectScreenPosition } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "screenPositionUtils"));
 const { getActiveLayer } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "layerAccessor"));
+const { convertObjectToFreeform, snapObjectToGrid } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "objectOperations")) as {
+  convertObjectToFreeform: (obj: MapObject, cellCenterWorldX: number, cellCenterWorldY: number, cellSize: number) => Partial<MapObject>;
+  snapObjectToGrid: (nearestGridPos: { x: number; y: number }) => Partial<MapObject>;
+};
 const { copyDeepLinkToClipboard } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "deepLinkHandler"));
 const { LinkingModeBanner } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "LinkingModeBanner"));
 
@@ -18956,6 +20309,8 @@ export interface ObjectLayerProps {
   onAddCustomColor?: (color: HexColor) => void;
   /** Callback to delete custom color */
   onDeleteCustomColor?: (colorId: string) => void;
+  /** Whether freeform placement mode is active (sidebar toggle) */
+  freeformPlacementMode?: boolean;
 }
 
 const ObjectLayer = ({
@@ -18964,7 +20319,8 @@ const ObjectLayer = ({
   onObjectsChange,
   customColors,
   onAddCustomColor,
-  onDeleteCustomColor
+  onDeleteCustomColor,
+  freeformPlacementMode = false
 }: ObjectLayerProps): React.ReactElement | null => {
   const { canvasRef, containerRef, mapData, mapId, notePath, geometry, screenToGrid, screenToWorld, getClientCoords, GridGeometry } = useMapState();
   const { getObjectAtPosition, addObject, updateObject, removeObject, isAreaFree, onObjectsChange: contextOnObjectsChange, onTextLabelsChange, removeTextLabel } = useMapOperations();
@@ -18984,6 +20340,10 @@ const ObjectLayer = ({
   } = useMapSelection();
 
   const { isLinkingMode, linkingFrom, startLinking, cancelLinking } = useLinkingMode();
+
+  // Keep a ref in sync with the freeformPlacementMode prop for the interactions hook
+  const freeformPlacementModeRef = dc.useRef(freeformPlacementMode);
+  freeformPlacementModeRef.current = freeformPlacementMode;
 
   // Helper for bidirectional link updates (handles same-layer vs cross-layer)
   const applyLinkUpdate = dc.useCallback((
@@ -19174,6 +20534,7 @@ const ObjectLayer = ({
     pendingObjectCustomColorRef,
     edgeSnapMode,
     setEdgeSnapMode,
+    freeformDragPreview,
     longPressTimerRef,
     handleObjectPlacement,
     handleObjectSelection,
@@ -19191,7 +20552,7 @@ const ObjectLayer = ({
     handleObjectColorSelect,
     handleObjectColorReset,
     getClickedCorner
-  } = useObjectInteractions(currentTool, selectedObjectType, onAddCustomColor, customColors);
+  } = useObjectInteractions(currentTool, selectedObjectType, onAddCustomColor, customColors, freeformPlacementModeRef);
 
   const { registerHandlers, unregisterHandlers } = useEventHandlerRegistration();
 
@@ -19335,6 +20696,37 @@ const ObjectLayer = ({
     }
   };
 
+  const handleFreeformToggle = (): void => {
+    if (selectedItem?.type !== 'object' || !mapData || !geometry) return;
+    const obj = getActiveLayer(mapData).objects?.find((o: MapObject) => o.id === selectedItem.id);
+    if (!obj) return;
+
+    let updates: Partial<MapObject>;
+    if (obj.freeform) {
+      // Snap to grid: find nearest cell from worldPosition
+      const nearestGrid = obj.worldPosition && geometry.worldToGrid
+        ? geometry.worldToGrid(obj.worldPosition.x, obj.worldPosition.y)
+        : obj.position;
+      updates = snapObjectToGrid(nearestGrid);
+    } else {
+      // Convert to freeform: compute world position from grid cell center
+      const cellCenter = geometry.getCellCenter
+        ? (geometry as any).getCellCenter(obj.position.x, obj.position.y)
+        : (geometry as any).gridToWorld(obj.position.x, obj.position.y);
+      const cellSize = (geometry as any).cellSize || (geometry as any).hexSize || mapData.gridSize;
+      updates = convertObjectToFreeform(obj, cellCenter.worldX, cellCenter.worldY, cellSize);
+    }
+
+    const updatedObjects = updateObject(getActiveLayer(mapData).objects, obj.id, updates);
+    onObjectsChange(updatedObjects);
+
+    // Update selected item data so toolbar reflects new state
+    const updatedObj = updatedObjects.find((o: MapObject) => o.id === obj.id);
+    if (updatedObj) {
+      setSelectedItem({ type: 'object', id: obj.id, data: updatedObj });
+    }
+  };
+
   const handleNoteModalSubmit = (content: string): void => {
     handleNoteSubmit(content, editingObjectId);
     setShowNoteModal(false);
@@ -19368,15 +20760,25 @@ const ObjectLayer = ({
       setDragStart(null);
     }
 
-    setEditingNoteObjectId(objectId);
-    setShowNoteLinkModal(true);
+    const obj = getActiveLayer(mapData!).objects?.find((o: MapObject) => o.id === objectId);
+    const opened = openNativeNoteLinkModal({
+      onSave: (notePath: string) => handleNoteLinkSaveForObject(notePath, objectId),
+      onClose: () => { setEditingNoteObjectId(null); },
+      currentNotePath: obj?.linkedNote || null,
+      objectType: obj?.type || null
+    });
+
+    if (!opened) {
+      setEditingNoteObjectId(objectId);
+      setShowNoteLinkModal(true);
+    }
   };
 
-  const handleNoteLinkSave = (notePath: string): void => {
-    if (!mapData || !editingNoteObjectId) return;
+  const handleNoteLinkSaveForObject = (notePath: string, objectId: string): void => {
+    if (!mapData) return;
 
     const updatedObjects = getActiveLayer(mapData).objects.map((obj: MapObject) => {
-      if (obj.id === editingNoteObjectId) {
+      if (obj.id === objectId) {
         return { ...obj, linkedNote: notePath };
       }
       return obj;
@@ -19384,13 +20786,17 @@ const ObjectLayer = ({
 
     onObjectsChange(updatedObjects);
 
-    if (selectedItem?.type === 'object' && selectedItem.id === editingNoteObjectId) {
-      const updatedObject = updatedObjects.find((obj: MapObject) => obj.id === editingNoteObjectId);
+    if (selectedItem?.type === 'object' && selectedItem.id === objectId) {
+      const updatedObject = updatedObjects.find((obj: MapObject) => obj.id === objectId);
       if (updatedObject) {
         setSelectedItem({ ...selectedItem, data: updatedObject });
       }
     }
+  };
 
+  const handleNoteLinkSave = (notePath: string): void => {
+    if (!editingNoteObjectId) return;
+    handleNoteLinkSaveForObject(notePath, editingNoteObjectId);
     setShowNoteLinkModal(false);
     setEditingNoteObjectId(null);
   };
@@ -19529,7 +20935,7 @@ const ObjectLayer = ({
       return null;
     }
 
-    const screenPos = calculateObjectScreenPosition(selectedObject, canvasRef.current, mapData, geometry);
+    const screenPos = calculateObjectScreenPosition(selectedObject, canvasRef.current, mapData, geometry, containerRef);
 
     if (!screenPos) return null;
 
@@ -19575,7 +20981,7 @@ const ObjectLayer = ({
         />
       )}
 
-      {edgeSnapMode && selectedItem?.type === 'object' && indicatorPositions && (
+      {edgeSnapMode && selectedItem?.type === 'object' && indicatorPositions && !freeformDragPreview && (
         <>
           <div
             className="dmt-edge-snap-indicator north"
@@ -19644,6 +21050,32 @@ const ObjectLayer = ({
         </>
       )}
 
+      {freeformDragPreview && selectedItem?.type === 'object' && indicatorPositions && (
+        <>
+          {(['north', 'south', 'east', 'west'] as const).map(dir => {
+            const invertToFreeform = !selectedObject?.freeform;
+            return (
+              <div
+                key={dir}
+                className={`dmt-inversion-indicator ${dir}`}
+                style={{
+                  position: 'absolute',
+                  left: `${indicatorPositions[dir].x + 2}px`,
+                  top: `${indicatorPositions[dir].y + 2}px`,
+                  width: '8px',
+                  height: '8px',
+                  backgroundColor: 'var(--interactive-accent, #4a9eff)',
+                  transform: invertToFreeform ? 'rotate(45deg)' : 'none',
+                  filter: 'drop-shadow(0 0 3px var(--interactive-accent, #4a9eff))',
+                  pointerEvents: 'none',
+                  zIndex: 1000
+                }}
+              />
+            );
+          })}
+        </>
+      )}
+
       {((selectedItem?.type === 'object' || hasMultiSelection) && !isDraggingSelection) && (
         <SelectionToolbar
           selectedItem={selectedItem}
@@ -19656,6 +21088,7 @@ const ObjectLayer = ({
           geometry={geometry}
           onRotate={handleObjectRotation}
           onDuplicate={handleObjectDuplicate}
+          onFreeformToggle={handleFreeformToggle}
           onLabel={handleNoteButtonClick}
           onLinkNote={() => handleEditNoteLink(selectedItem?.id)}
           onLinkObject={handleLinkObject}
@@ -21197,8 +22630,15 @@ function cellToScreen(
       worldY = (cellY + 0.5) * geometry.cellSize;
     }
   } else {
-    worldX = cellX * geometry.cellSize;
-    worldY = cellY * geometry.cellSize;
+    if (geometry.getCellCenter) {
+      // Hex: no rectangular corners, use cell center as approximation
+      const cellCenter = geometry.getCellCenter(cellX, cellY);
+      worldX = cellCenter.worldX;
+      worldY = cellCenter.worldY;
+    } else {
+      worldX = cellX * geometry.cellSize;
+      worldY = cellY * geometry.cellSize;
+    }
   }
 
   let offsetX: number, offsetY: number;
@@ -21227,6 +22667,49 @@ function cellToScreen(
 
     screenX = rotatedX + centerX;
     screenY = rotatedY + centerY;
+  }
+
+  return { x: screenX, y: screenY };
+}
+
+/**
+ * Convert world coordinates directly to buffer-space screen coordinates.
+ * Used for hex bounding-box corners where we bypass cell-to-world conversion.
+ */
+function worldToScreen(
+  worldX: number,
+  worldY: number,
+  geometry: GeometryWithMethods,
+  mapData: MapData,
+  canvasWidth: number,
+  canvasHeight: number
+): Point {
+  const { zoom, center } = mapData.viewState;
+  const northDirection = mapData.northDirection || 0;
+
+  let offsetX: number, offsetY: number;
+  if (geometry instanceof GridGeometry) {
+    const scaledCellSize = geometry.getScaledCellSize(zoom);
+    offsetX = canvasWidth / 2 - center.x * scaledCellSize;
+    offsetY = canvasHeight / 2 - center.y * scaledCellSize;
+  } else {
+    offsetX = canvasWidth / 2 - center.x * zoom;
+    offsetY = canvasHeight / 2 - center.y * zoom;
+  }
+
+  let screenX = offsetX + worldX * zoom;
+  let screenY = offsetY + worldY * zoom;
+
+  if (northDirection !== 0) {
+    const cx = canvasWidth / 2;
+    const cy = canvasHeight / 2;
+    screenX -= cx;
+    screenY -= cy;
+    const angleRad = (northDirection * Math.PI) / 180;
+    const rotatedX = screenX * Math.cos(angleRad) - screenY * Math.sin(angleRad);
+    const rotatedY = screenX * Math.sin(angleRad) + screenY * Math.cos(angleRad);
+    screenX = rotatedX + cx;
+    screenY = rotatedY + cy;
   }
 
   return { x: screenX, y: screenY };
@@ -21315,7 +22798,8 @@ const ShapePreviewOverlay = ({
     rectangle: '#00ff00',
     clearArea: '#ff0000',
     circle: '#00aaff',
-    edgeLine: '#ff9500'
+    edgeLine: '#ff9500',
+    areaSelect: '#4a9eff'
   };
   const strokeColor = colors[shapeType || ''] || '#00ff00';
 
@@ -21325,7 +22809,7 @@ const ShapePreviewOverlay = ({
 
   const geo = geometry as GeometryWithMethods;
 
-  if (shapeType === 'rectangle' || shapeType === 'clearArea') {
+  if (shapeType === 'rectangle' || shapeType === 'clearArea' || shapeType === 'areaSelect') {
     const minX = Math.min(startPoint.x, endPoint.x);
     const maxX = Math.max(startPoint.x, endPoint.x);
     const minY = Math.min(startPoint.y, endPoint.y);
@@ -21334,17 +22818,46 @@ const ShapePreviewOverlay = ({
     const widthCells = maxX - minX + 1;
     const heightCells = maxY - minY + 1;
 
-    // Compute all four corners in grid space, rotate each through cellToScreen
-    const halfCell = 0.5;
-    const corners = [
-      cellToScreen(minX - halfCell, minY - halfCell, geo, mapData, canvasWidth, canvasHeight, false), // TL
-      cellToScreen(maxX + halfCell, minY - halfCell, geo, mapData, canvasWidth, canvasHeight, false), // TR
-      cellToScreen(maxX + halfCell, maxY + halfCell, geo, mapData, canvasWidth, canvasHeight, false), // BR
-      cellToScreen(minX - halfCell, maxY + halfCell, geo, mapData, canvasWidth, canvasHeight, false), // BL
-    ].map(p => ({
-      x: p.x * displayScale + canvasOffsetX,
-      y: p.y * displayScale + canvasOffsetY
-    }));
+    let corners: { x: number; y: number }[];
+
+    const isHex = !(geo instanceof GridGeometry);
+    if (isHex && geo.getCellCenter) {
+      // Hex: compute axis-aligned bounding box from corner cell world centers,
+      // then draw a clean rectangle (hex cells don't have rectangular corners)
+      const cellCenters = [
+        geo.getCellCenter(minX, minY),
+        geo.getCellCenter(maxX, minY),
+        geo.getCellCenter(minX, maxY),
+        geo.getCellCenter(maxX, maxY),
+      ];
+      const hexSize = geo.getScaledCellSize(1);
+      const wMinX = Math.min(...cellCenters.map(c => c.worldX)) - hexSize;
+      const wMaxX = Math.max(...cellCenters.map(c => c.worldX)) + hexSize;
+      const wMinY = Math.min(...cellCenters.map(c => c.worldY)) - hexSize;
+      const wMaxY = Math.max(...cellCenters.map(c => c.worldY)) + hexSize;
+
+      corners = [
+        worldToScreen(wMinX, wMinY, geo, mapData, canvasWidth, canvasHeight),
+        worldToScreen(wMaxX, wMinY, geo, mapData, canvasWidth, canvasHeight),
+        worldToScreen(wMaxX, wMaxY, geo, mapData, canvasWidth, canvasHeight),
+        worldToScreen(wMinX, wMaxY, geo, mapData, canvasWidth, canvasHeight),
+      ].map(p => ({
+        x: p.x * displayScale + canvasOffsetX,
+        y: p.y * displayScale + canvasOffsetY
+      }));
+    } else {
+      // Grid: useCenter=false gives top-left of cell (cellX * cellSize),
+      // so minX is the left edge and maxX+1 is the right edge of the region
+      corners = [
+        cellToScreen(minX, minY, geo, mapData, canvasWidth, canvasHeight, false),         // TL
+        cellToScreen(maxX + 1, minY, geo, mapData, canvasWidth, canvasHeight, false),     // TR
+        cellToScreen(maxX + 1, maxY + 1, geo, mapData, canvasWidth, canvasHeight, false), // BR
+        cellToScreen(minX, maxY + 1, geo, mapData, canvasWidth, canvasHeight, false),     // BL
+      ].map(p => ({
+        x: p.x * displayScale + canvasOffsetX,
+        y: p.y * displayScale + canvasOffsetY
+      }));
+    }
 
     const polygonPoints = corners.map(c => `${c.x},${c.y}`).join(' ');
 
@@ -23555,11 +25068,33 @@ const FreehandLayer = ({
       const dy = endPt.y - startPt.y;
       const dist = Math.sqrt(dx * dx + dy * dy);
       if (dist < snapDistance) {
+        const radius = snapDistance * 0.5;
+        const ringWidth = 2 / zoom;
+
+        // Start point: filled circle with contrasting outline
         ctx.beginPath();
-        ctx.arc(startPt.x, startPt.y, snapDistance * 0.3, 0, Math.PI * 2);
+        ctx.arc(startPt.x, startPt.y, radius, 0, Math.PI * 2);
         ctx.fillStyle = selectedColor;
-        ctx.globalAlpha = 0.3;
+        ctx.globalAlpha = 0.4;
         ctx.fill();
+        ctx.globalAlpha = 0.9;
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = ringWidth * 2;
+        ctx.stroke();
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = ringWidth;
+        ctx.stroke();
+
+        // Cursor-tip: smaller ring at endpoint
+        ctx.beginPath();
+        ctx.arc(endPt.x, endPt.y, radius * 0.5, 0, Math.PI * 2);
+        ctx.globalAlpha = 0.6;
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = ringWidth * 1.5;
+        ctx.stroke();
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = ringWidth * 0.75;
+        ctx.stroke();
       }
     }
 
@@ -23985,7 +25520,8 @@ const useTextLabelInteraction = (
           content: labelData.content.trim(),
           fontSize: labelData.fontSize,
           fontFace: labelData.fontFace,
-          color: labelData.color
+          color: labelData.color,
+          ...(labelData.opacity !== undefined ? { opacity: labelData.opacity } : {})
         }
       );
       onTextLabelsChange(newLabels);
@@ -23999,7 +25535,8 @@ const useTextLabelInteraction = (
         {
           fontSize: labelData.fontSize,
           fontFace: labelData.fontFace,
-          color: labelData.color
+          color: labelData.color,
+          ...(labelData.opacity !== undefined ? { opacity: labelData.opacity } : {})
         }
       );
       onTextLabelsChange(newLabels);
@@ -24010,7 +25547,8 @@ const useTextLabelInteraction = (
           lastTextLabelSettings: {
             fontSize: labelData.fontSize,
             fontFace: labelData.fontFace,
-            color: labelData.color
+            color: labelData.color,
+            ...(labelData.opacity !== undefined ? { opacity: labelData.opacity } : {})
           }
         });
       }
@@ -24220,15 +25758,341 @@ return { useTextLabelInteraction };
 
 const { FONT_OPTIONS, DEFAULT_FONT, DEFAULT_FONT_SIZE, DEFAULT_TEXT_COLOR, FONT_SIZE_MIN, FONT_SIZE_MAX, FONT_SIZE_STEP, getFontOption } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "fontOptions"));
 const { ColorPicker } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "ColorPicker"));
-const { COLOR_PALETTE } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "colorOperations"));
+const { COLOR_PALETTE, getColorPalette } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "colorOperations"));
+const { isBridgeAvailable, getObsidianModule } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "obsidianBridge"));
 
-const TextLabelEditor = ({ 
-  initialValue = '', 
+/**
+ * Opens a native Obsidian Modal for text label editing.
+ * Uses native DOM for all UI including color palette.
+ * Returns true if native modal opened, false to fall back to Preact.
+ */
+function openNativeTextLabelEditor(options) {
+  if (!isBridgeAvailable()) return false;
+
+  try {
+    const obs = getObsidianModule();
+    const ModalClass = obs.Modal;
+    const SettingClass = obs.Setting;
+    const app = dc.app;
+
+    const {
+      initialValue = '',
+      initialFontSize = DEFAULT_FONT_SIZE,
+      initialFontFace = DEFAULT_FONT,
+      initialColor = DEFAULT_TEXT_COLOR,
+      initialOpacity = 1,
+      isEditing = false,
+      customColors = [],
+      onAddCustomColor,
+      onDeleteCustomColor,
+      onSubmit,
+      onCancel
+    } = options;
+
+    let currentText = initialValue;
+    let currentFontSize = initialFontSize;
+    let currentFontFace = initialFontFace;
+    let currentColor = initialColor;
+    let currentOpacity = initialOpacity;
+
+    const modal = new (class extends ModalClass {
+      submitted = false;
+      inputEl = null;
+      fontSizeInput = null;
+      opacityInput = null;
+      opacityValueEl = null;
+      previewEl = null;
+      colorBtnEl = null;
+      swatchContainerEl = null;
+
+      onOpen() {
+        const { contentEl, titleEl } = this;
+        titleEl.setText(isEditing ? 'Edit Text Label' : 'Add Text Label');
+        contentEl.addClass('dmt-text-editor-native');
+        this.modalEl.style.width = '520px';
+
+        // Text input
+        const textSection = contentEl.createDiv('dmt-text-editor-section');
+        textSection.createEl('label', { text: 'Text', cls: 'dmt-text-editor-label' });
+        this.inputEl = textSection.createEl('input', {
+          type: 'text',
+          placeholder: 'Enter label text...',
+          cls: 'dmt-modal-input',
+          value: initialValue
+        });
+        this.inputEl.maxLength = 200;
+        this.inputEl.style.width = '100%';
+        this.inputEl.addEventListener('input', (e) => {
+          currentText = e.target.value;
+          this.updatePreview();
+        });
+        this.inputEl.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            this.submit();
+          }
+        });
+
+        // Font controls row
+        const controlsRow = contentEl.createDiv();
+        controlsRow.style.display = 'flex';
+        controlsRow.style.gap = '12px';
+        controlsRow.style.marginBottom = '12px';
+
+        // Font dropdown
+        const fontSection = controlsRow.createDiv();
+        fontSection.style.flex = '1';
+        fontSection.createEl('label', { text: 'Font', cls: 'dmt-text-editor-label' });
+        const fontSelect = fontSection.createEl('select', { cls: 'dmt-text-editor-select' });
+        fontSelect.style.width = '100%';
+        for (const font of FONT_OPTIONS) {
+          const opt = fontSelect.createEl('option', { text: font.name, value: font.id });
+          if (font.id === initialFontFace) opt.selected = true;
+        }
+        fontSelect.addEventListener('change', (e) => {
+          currentFontFace = e.target.value;
+          this.updatePreview();
+        });
+
+        // Font size
+        const sizeSection = controlsRow.createDiv();
+        sizeSection.style.width = '80px';
+        sizeSection.createEl('label', { text: 'Size', cls: 'dmt-text-editor-label' });
+        this.fontSizeInput = sizeSection.createEl('input', {
+          type: 'number',
+          cls: 'dmt-text-editor-number',
+          value: String(initialFontSize)
+        });
+        this.fontSizeInput.min = String(FONT_SIZE_MIN);
+        this.fontSizeInput.max = String(FONT_SIZE_MAX);
+        this.fontSizeInput.step = String(FONT_SIZE_STEP);
+        this.fontSizeInput.style.width = '100%';
+        this.fontSizeInput.addEventListener('change', (e) => {
+          const val = parseInt(e.target.value, 10);
+          if (!isNaN(val) && val > 0) {
+            currentFontSize = Math.max(FONT_SIZE_MIN, Math.min(FONT_SIZE_MAX, val));
+            this.fontSizeInput.value = String(currentFontSize);
+          }
+          this.updatePreview();
+        });
+
+        // Color section
+        const colorSection = contentEl.createDiv('dmt-text-editor-section');
+        colorSection.createEl('label', { text: 'Color', cls: 'dmt-text-editor-label' });
+
+        this.colorBtnEl = colorSection.createEl('button', { cls: 'dmt-text-editor-color-button' });
+        this.colorBtnEl.style.backgroundColor = currentColor;
+        this.colorBtnEl.createSpan({ text: currentColor.toUpperCase(), cls: 'dmt-text-editor-color-label' });
+        this.colorBtnEl.title = 'Select text color';
+        this.colorBtnEl.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.toggleSwatches();
+        });
+
+        // Color swatches (hidden by default)
+        this.swatchContainerEl = colorSection.createDiv('dmt-native-color-swatches');
+        this.swatchContainerEl.style.display = 'none';
+        this.buildSwatches();
+
+        // Opacity slider
+        const opacitySection = contentEl.createDiv('dmt-text-editor-section');
+        opacitySection.createEl('label', { text: 'Opacity', cls: 'dmt-text-editor-label' });
+        const opacityRow = opacitySection.createDiv();
+        opacityRow.style.display = 'flex';
+        opacityRow.style.alignItems = 'center';
+        opacityRow.style.gap = '8px';
+        this.opacityInput = opacityRow.createEl('input', { type: 'range' });
+        this.opacityInput.min = '0';
+        this.opacityInput.max = '1';
+        this.opacityInput.step = '0.05';
+        this.opacityInput.value = String(currentOpacity);
+        this.opacityInput.style.flex = '1';
+        this.opacityValueEl = opacityRow.createSpan({ text: `${Math.round(currentOpacity * 100)}%` });
+        this.opacityValueEl.style.minWidth = '36px';
+        this.opacityValueEl.style.textAlign = 'right';
+        this.opacityInput.addEventListener('input', (e) => {
+          currentOpacity = parseFloat(e.target.value);
+          this.opacityValueEl.textContent = `${Math.round(currentOpacity * 100)}%`;
+          this.updatePreview();
+        });
+
+        // Preview
+        this.previewEl = contentEl.createDiv('dmt-text-editor-preview');
+        this.previewEl.style.display = 'none';
+        this.updatePreview();
+
+        // Buttons
+        const buttonContainer = contentEl.createDiv({ cls: 'modal-button-container' });
+
+        const cancelBtn = buttonContainer.createEl('button', { text: 'Cancel' });
+        cancelBtn.addEventListener('click', () => this.close());
+
+        const submitBtn = buttonContainer.createEl('button', {
+          text: isEditing ? 'Update' : 'Add Label',
+          cls: 'mod-cta'
+        });
+        submitBtn.addEventListener('click', () => this.submit());
+
+        const hint = contentEl.createDiv('dmt-modal-hint');
+        hint.setText('Press Enter to confirm, Esc to cancel');
+
+        setTimeout(() => {
+          this.inputEl.focus();
+          if (initialValue) this.inputEl.select();
+        }, 0);
+      }
+
+      buildSwatches() {
+        this.swatchContainerEl.empty();
+
+        const palette = getColorPalette();
+        const allCustom = customColors || [];
+
+        // Built-in palette
+        const paletteRow = this.swatchContainerEl.createDiv();
+        paletteRow.style.display = 'flex';
+        paletteRow.style.flexWrap = 'wrap';
+        paletteRow.style.gap = '4px';
+        paletteRow.style.marginBottom = '8px';
+
+        for (const c of palette) {
+          const swatch = paletteRow.createEl('button');
+          swatch.style.width = '24px';
+          swatch.style.height = '24px';
+          swatch.style.borderRadius = '4px';
+          swatch.style.border = c.color === currentColor ? '2px solid var(--text-accent)' : '1px solid var(--background-modifier-border)';
+          swatch.style.backgroundColor = c.color;
+          swatch.style.cursor = 'pointer';
+          swatch.style.padding = '0';
+          swatch.title = c.label;
+          swatch.addEventListener('click', () => this.selectColor(c.color));
+        }
+
+        // Custom colors
+        if (allCustom.length > 0) {
+          const customRow = this.swatchContainerEl.createDiv();
+          customRow.style.display = 'flex';
+          customRow.style.flexWrap = 'wrap';
+          customRow.style.gap = '4px';
+          customRow.style.marginBottom = '8px';
+
+          for (const c of allCustom) {
+            const swatch = customRow.createEl('button');
+            swatch.style.width = '24px';
+            swatch.style.height = '24px';
+            swatch.style.borderRadius = '4px';
+            swatch.style.border = c.color === currentColor ? '2px solid var(--text-accent)' : '1px solid var(--background-modifier-border)';
+            swatch.style.backgroundColor = c.color;
+            swatch.style.cursor = 'pointer';
+            swatch.style.padding = '0';
+            swatch.title = c.label || c.color;
+            swatch.addEventListener('click', () => this.selectColor(c.color));
+          }
+        }
+
+        // Native color input for custom colors
+        const customRow = this.swatchContainerEl.createDiv();
+        customRow.style.display = 'flex';
+        customRow.style.alignItems = 'center';
+        customRow.style.gap = '8px';
+
+        const colorInput = customRow.createEl('input', { type: 'color' });
+        colorInput.value = currentColor;
+        colorInput.style.width = '32px';
+        colorInput.style.height = '32px';
+        colorInput.style.border = 'none';
+        colorInput.style.padding = '0';
+        colorInput.style.cursor = 'pointer';
+        colorInput.addEventListener('input', (e) => {
+          this.selectColor(e.target.value);
+        });
+
+        const addBtn = customRow.createEl('button', { text: 'Save Color', cls: 'dmt-modal-btn' });
+        addBtn.style.fontSize = '12px';
+        addBtn.style.padding = '4px 8px';
+        addBtn.addEventListener('click', () => {
+          if (onAddCustomColor) onAddCustomColor(currentColor);
+          this.buildSwatches();
+        });
+
+        // Reset button
+        const resetBtn = customRow.createEl('button', { text: 'Reset', cls: 'dmt-modal-btn' });
+        resetBtn.style.fontSize = '12px';
+        resetBtn.style.padding = '4px 8px';
+        resetBtn.addEventListener('click', () => {
+          this.selectColor(DEFAULT_TEXT_COLOR);
+        });
+      }
+
+      selectColor(color) {
+        currentColor = color;
+        this.colorBtnEl.style.backgroundColor = color;
+        this.colorBtnEl.querySelector('.dmt-text-editor-color-label').textContent = color.toUpperCase();
+        this.updatePreview();
+      }
+
+      toggleSwatches() {
+        const visible = this.swatchContainerEl.style.display !== 'none';
+        this.swatchContainerEl.style.display = visible ? 'none' : 'block';
+      }
+
+      updatePreview() {
+        if (!this.previewEl) return;
+        const text = currentText.trim();
+        if (text.length > 0) {
+          this.previewEl.style.display = 'flex';
+          this.previewEl.style.padding = '16px';
+          this.previewEl.textContent = text;
+          const fontOption = getFontOption(currentFontFace);
+          this.previewEl.style.fontSize = `${currentFontSize}px`;
+          this.previewEl.style.fontFamily = fontOption?.css || 'sans-serif';
+          this.previewEl.style.color = currentColor;
+          this.previewEl.style.opacity = String(currentOpacity);
+          this.previewEl.style.textShadow = '-1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000';
+        } else {
+          this.previewEl.style.display = 'none';
+        }
+      }
+
+      submit() {
+        const trimmed = currentText.trim();
+        if (trimmed.length > 0 && trimmed.length <= 200) {
+          this.submitted = true;
+          onSubmit({
+            content: trimmed,
+            fontSize: currentFontSize,
+            fontFace: currentFontFace,
+            color: currentColor,
+            opacity: currentOpacity
+          });
+          this.close();
+        }
+      }
+
+      onClose() {
+        if (!this.submitted && onCancel) {
+          onCancel();
+        }
+        this.contentEl.empty();
+      }
+    })(app);
+
+    modal.open();
+    return true;
+  } catch (e) {
+    console.warn('[Windrose] Failed to open native TextLabelEditor, falling back to Preact:', e.message);
+    return false;
+  }
+}
+
+const TextLabelEditor = ({
+  initialValue = '',
   initialFontSize = DEFAULT_FONT_SIZE,
   initialFontFace = DEFAULT_FONT,
   initialColor = DEFAULT_TEXT_COLOR,
-  onSubmit, 
-  onCancel, 
+  initialOpacity = 1,
+  onSubmit,
+  onCancel,
   isEditing = false,
   customColors = [],
   onAddCustomColor,
@@ -24239,6 +26103,7 @@ const TextLabelEditor = ({
   const [fontSizeInput, setFontSizeInput] = dc.useState(String(initialFontSize)); // Raw input for typing
   const [fontFace, setFontFace] = dc.useState(initialFontFace);
   const [color, setColor] = dc.useState(initialColor);
+  const [opacity, setOpacity] = dc.useState(initialOpacity);
   const [isColorPickerOpen, setIsColorPickerOpen] = dc.useState(false);
   const [showPreview, setShowPreview] = dc.useState(false);
   
@@ -24275,7 +26140,8 @@ const TextLabelEditor = ({
         content: trimmed,
         fontSize: fontSize,
         fontFace: fontFace,
-        color: color
+        color: color,
+        opacity: opacity
       };
       onSubmit(labelData);
     }
@@ -24463,6 +26329,25 @@ const TextLabelEditor = ({
           </div>
         </div>
         
+        {/* Opacity slider */}
+        <div className="dmt-text-editor-section">
+          <label className="dmt-text-editor-label">Opacity</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.05"
+              value={opacity}
+              onChange={(e) => setOpacity(parseFloat(e.target.value))}
+              style={{ flex: 1 }}
+            />
+            <span style={{ minWidth: '36px', textAlign: 'right' }}>
+              {Math.round(opacity * 100)}%
+            </span>
+          </div>
+        </div>
+
         {/* Live Preview Toggle & Section */}
         {text.trim().length > 0 && (
           <div className="dmt-text-editor-section">
@@ -24479,12 +26364,13 @@ const TextLabelEditor = ({
             </div>
             
             {showPreview && (
-              <div 
+              <div
                 className="dmt-text-editor-preview"
                 style={{
                   fontSize: `${fontSize}px`,
                   fontFamily: getFontOption(fontFace)?.css || 'sans-serif',
                   color: color,
+                  opacity: opacity,
                   textShadow: '-1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000'
                 }}
               >
@@ -24519,7 +26405,7 @@ const TextLabelEditor = ({
   );
 };
 
-return { TextLabelEditor };
+return { TextLabelEditor, openNativeTextLabelEditor };
 ```
 
 # TextLayer
@@ -24543,7 +26429,8 @@ import type { CustomColor } from '../ColorPicker.tsx';
 const { useTextLabelInteraction } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "useTextLabelInteraction"));
 const { useMapState, useMapOperations } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "MapContext"));
 const { useMapSelection } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "MapSelectionContext"));
-const { TextLabelEditor } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "TextLabelEditor"));
+const { TextLabelEditor, openNativeTextLabelEditor } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "TextLabelEditor"));
+const { isBridgeAvailable } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "obsidianBridge"));
 const { useEventHandlerRegistration } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "EventHandlerContext"));
 const { SelectionToolbar } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "SelectionToolbar"));
 const { getActiveLayer } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "layerAccessor"));
@@ -24599,6 +26486,41 @@ const TextLayer = ({
   } = useTextLabelInteraction(currentTool, onAddCustomColor, customColors);
 
   const { registerHandlers, unregisterHandlers } = useEventHandlerRegistration();
+  const nativeOpenedRef = dc.useRef(false);
+
+  // Try native TextLabelEditor when showTextModal becomes true
+  dc.useEffect(() => {
+    if (!showTextModal || !mapData) {
+      nativeOpenedRef.current = false;
+      return;
+    }
+
+    let currentLabel = null;
+    if (editingTextId) {
+      currentLabel = getActiveLayer(mapData).textLabels?.find((l: TextLabel) => l.id === editingTextId) || null;
+    }
+
+    const savedSettings = mapData?.lastTextLabelSettings as { fontSize?: number; fontFace?: string; color?: HexColor; opacity?: number } | undefined;
+    const defaultFontSize = currentLabel?.fontSize || savedSettings?.fontSize || 16;
+    const defaultFontFace = currentLabel?.fontFace || savedSettings?.fontFace || 'sans';
+    const defaultColor = currentLabel?.color || savedSettings?.color || '#ffffff';
+    const defaultOpacity = currentLabel?.opacity ?? savedSettings?.opacity ?? 1;
+
+    const opened = openNativeTextLabelEditor({
+      initialValue: currentLabel?.content || '',
+      initialFontSize: defaultFontSize,
+      initialFontFace: defaultFontFace,
+      initialColor: defaultColor,
+      initialOpacity: defaultOpacity,
+      isEditing: !!editingTextId,
+      customColors: customColors || [],
+      onAddCustomColor,
+      onDeleteCustomColor,
+      onSubmit: handleTextSubmit,
+      onCancel: handleTextCancel
+    });
+    nativeOpenedRef.current = opened;
+  }, [showTextModal, editingTextId]);
 
   const handleCopyLink = dc.useCallback(() => {
     if (!selectedItem || selectedItem.type !== 'text' || !mapData || !mapId || !notePath) return;
@@ -24661,16 +26583,17 @@ const TextLayer = ({
         />
       )}
 
-      {showTextModal && (() => {
+      {showTextModal && !nativeOpenedRef.current && !isBridgeAvailable() && (() => {
         let currentLabel: TextLabel | null = null;
         if (editingTextId && mapData?.textLabels) {
           currentLabel = getActiveLayer(mapData).textLabels.find((l: TextLabel) => l.id === editingTextId) || null;
         }
 
-        const savedSettings = mapData?.lastTextLabelSettings as { fontSize?: number; fontFace?: string; color?: HexColor } | undefined;
+        const savedSettings = mapData?.lastTextLabelSettings as { fontSize?: number; fontFace?: string; color?: HexColor; opacity?: number } | undefined;
         const defaultFontSize = currentLabel?.fontSize || savedSettings?.fontSize || 16;
         const defaultFontFace = currentLabel?.fontFace || savedSettings?.fontFace || 'sans';
         const defaultColor = currentLabel?.color || savedSettings?.color || '#ffffff';
+        const defaultOpacity = currentLabel?.opacity ?? savedSettings?.opacity ?? 1;
 
         return (
           <TextLabelEditor
@@ -24678,6 +26601,7 @@ const TextLayer = ({
             initialFontSize={defaultFontSize}
             initialFontFace={defaultFontFace}
             initialColor={defaultColor}
+            initialOpacity={defaultOpacity}
             isEditing={!!editingTextId}
             customColors={customColors || []}
             onAddCustomColor={onAddCustomColor}
@@ -24924,7 +26848,8 @@ import type { ObjectTypeId } from '#types/objects/object.types';
 const { useNotePinInteraction } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "useNotePinInteraction"));
 const { useMapState, useMapOperations } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "MapContext"));
 const { useMapSelection } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "MapSelectionContext"));
-const { NoteLinkModal } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "NoteLinkModal"));
+const { NoteLinkModal, openNativeNoteLinkModal } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "NoteLinkModal"));
+const { isBridgeAvailable } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "obsidianBridge"));
 const { useEventHandlerRegistration } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "EventHandlerContext"));
 
 /** Props for NotePinLayer component */
@@ -24954,6 +26879,7 @@ const NotePinLayer = ({
   } = useNotePinInteraction(currentTool, selectedObjectType);
 
   const { registerHandlers, unregisterHandlers } = useEventHandlerRegistration();
+  const nativeOpenedRef = dc.useRef(false);
 
   dc.useEffect(() => {
     registerHandlers('notePin', {
@@ -24963,13 +26889,33 @@ const NotePinLayer = ({
     return () => unregisterHandlers('notePin');
   }, [registerHandlers, unregisterHandlers, handleNotePinPlacement]);
 
+  // Try native modal when showNoteLinkModal becomes true
+  dc.useEffect(() => {
+    if (!showNoteLinkModal || !pendingNotePinId || !mapData) {
+      nativeOpenedRef.current = false;
+      return;
+    }
+
+    const currentNotePath = mapData.objects?.find(
+      (obj: { id: string }) => obj.id === pendingNotePinId
+    )?.linkedNote || null;
+
+    const opened = openNativeNoteLinkModal({
+      onSave: handleNoteLinkSave,
+      onClose: handleNoteLinkCancel,
+      currentNotePath,
+      objectType: 'note_pin'
+    });
+    nativeOpenedRef.current = opened;
+  }, [showNoteLinkModal, pendingNotePinId]);
+
   if (showCoordinates) {
     return null;
   }
 
   return (
     <>
-      {showNoteLinkModal && pendingNotePinId && mapData && (
+      {showNoteLinkModal && pendingNotePinId && mapData && !nativeOpenedRef.current && !isBridgeAvailable() && (
         <NoteLinkModal
           isOpen={showNoteLinkModal}
           onClose={handleNoteLinkCancel}
@@ -27472,7 +29418,15 @@ const useAreaSelect = (currentTool: ToolId): UseAreaSelectResult => {
     clearSelection
   } = useMapSelection();
 
+  const [areaSelectHoverPosition, setAreaSelectHoverPosition] = dc.useState<Point | null>(null);
+
   const isAreaSelectTool = currentTool === 'areaSelect';
+
+  const updateAreaSelectHover = dc.useCallback((gridX: number, gridY: number): void => {
+    if (areaSelectStart) {
+      setAreaSelectHoverPosition({ x: gridX, y: gridY });
+    }
+  }, [areaSelectStart]);
 
   /**
    * Handle click for area select tool
@@ -27526,6 +29480,7 @@ const useAreaSelect = (currentTool: ToolId): UseAreaSelectResult => {
       }
 
       setAreaSelectStart(null);
+      setAreaSelectHoverPosition(null);
 
       return true;
     },
@@ -27550,6 +29505,7 @@ const useAreaSelect = (currentTool: ToolId): UseAreaSelectResult => {
   const cancelAreaSelect = dc.useCallback((): void => {
     if (areaSelectStart) {
       setAreaSelectStart(null);
+      setAreaSelectHoverPosition(null);
     }
   }, [areaSelectStart, setAreaSelectStart]);
 
@@ -27562,10 +29518,12 @@ const useAreaSelect = (currentTool: ToolId): UseAreaSelectResult => {
     // State
     areaSelectStart,
     isAreaSelecting,
+    areaSelectHoverPosition,
 
     // Handlers
     handleAreaSelectClick,
-    cancelAreaSelect
+    cancelAreaSelect,
+    updateAreaSelectHover
   };
 };
 
@@ -27593,6 +29551,8 @@ const { useMapState } = await dc.require(dc.headerLink(dc.resolvePath("compiled-
 const { useMapSelection } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "MapSelectionContext"));
 const { useEventHandlerRegistration } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "EventHandlerContext"));
 const { GridGeometry } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "GridGeometry"));
+const { ShapePreviewOverlay } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "ShapePreviewOverlay"));
+const { getSettings } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "settingsAccessor"));
 
 /** Props for AreaSelectLayer component */
 export interface AreaSelectLayerProps {
@@ -27607,7 +29567,9 @@ const AreaSelectLayer = ({ currentTool }: AreaSelectLayerProps): React.ReactElem
   const {
     handleAreaSelectClick,
     cancelAreaSelect,
-    isAreaSelecting
+    isAreaSelecting,
+    areaSelectHoverPosition,
+    updateAreaSelectHover
   } = useAreaSelect(currentTool);
 
   const { registerHandlers, unregisterHandlers } = useEventHandlerRegistration();
@@ -27617,11 +29579,12 @@ const AreaSelectLayer = ({ currentTool }: AreaSelectLayerProps): React.ReactElem
       handleAreaSelectClick,
       cancelAreaSelect,
       isAreaSelecting,
-      areaSelectStart
+      areaSelectStart,
+      updateAreaSelectHover
     });
 
     return () => unregisterHandlers('areaSelect');
-  }, [registerHandlers, unregisterHandlers, handleAreaSelectClick, cancelAreaSelect, isAreaSelecting, areaSelectStart]);
+  }, [registerHandlers, unregisterHandlers, handleAreaSelectClick, cancelAreaSelect, isAreaSelecting, areaSelectStart, updateAreaSelectHover]);
 
   dc.useEffect(() => {
     if (currentTool !== 'areaSelect' && areaSelectStart) {
@@ -27729,7 +29692,34 @@ const AreaSelectLayer = ({ currentTool }: AreaSelectLayerProps): React.ReactElem
     );
   };
 
-  return renderStartMarker();
+  const renderRectanglePreview = (): React.ReactElement | null => {
+    if (!areaSelectStart || !areaSelectHoverPosition) return null;
+
+    const settings = getSettings();
+    const previewEnabled = (settings as Record<string, unknown>).shapePreviewKbm !== false;
+    if (!previewEnabled) return null;
+
+    return (
+      <ShapePreviewOverlay
+        shapeType="areaSelect"
+        startPoint={{ x: areaSelectStart.x, y: areaSelectStart.y }}
+        endPoint={areaSelectHoverPosition}
+        geometry={geometry}
+        mapData={mapData}
+        canvasRef={canvasRef}
+        containerRef={containerRef}
+      />
+    );
+  };
+
+  const showPreview = areaSelectHoverPosition && areaSelectStart;
+
+  return (
+    <>
+      {!showPreview && renderStartMarker()}
+      {renderRectanglePreview()}
+    </>
+  );
 };
 
 return { AreaSelectLayer };
@@ -27814,6 +29804,7 @@ const useFogTools = (
   // Fog tool state
   const [isDrawing, setIsDrawing] = dc.useState<boolean>(false);
   const [rectangleStart, setRectangleStart] = dc.useState<FogRectangleStart | null>(null);
+  const [rectangleHover, setRectangleHover] = dc.useState<OffsetCoords | null>(null);
   const [lastCell, setLastCell] = dc.useState<FogCellPosition | null>(null);
   const [processedCells, setProcessedCells] = dc.useState<Set<string>>(new Set());
 
@@ -27924,6 +29915,7 @@ const useFogTools = (
         } else {
           applyRectangle(rectangleStart.col, rectangleStart.row, col, row);
           setRectangleStart(null);
+          setRectangleHover(null);
         }
       } else if (activeTool === 'paint' || activeTool === 'erase') {
         setIsDrawing(true);
@@ -27940,8 +29932,20 @@ const useFogTools = (
    */
   const handlePointerMove = dc.useCallback(
     (e: PointerEvent | MouseEvent): void => {
-      if (!activeTool || !isDrawing) return;
-      if (activeTool === 'rectangle') return; // Rectangle doesn't use drag
+      if (!activeTool) return;
+
+      // Rectangle mode: track hover position for preview
+      if (activeTool === 'rectangle') {
+        if (rectangleStart) {
+          const offset = screenToOffset(e.clientX, e.clientY);
+          if (offset) {
+            setRectangleHover(offset);
+          }
+        }
+        return;
+      }
+
+      if (!isDrawing) return;
 
       const offset = screenToOffset(e.clientX, e.clientY);
       if (!offset) return;
@@ -27959,7 +29963,7 @@ const useFogTools = (
       setLastCell({ col, row });
       applyToCell(col, row);
     },
-    [activeTool, isDrawing, screenToOffset, lastCell, processedCells, applyToCell]
+    [activeTool, isDrawing, rectangleStart, screenToOffset, lastCell, processedCells, applyToCell]
   );
 
   /**
@@ -27989,6 +29993,7 @@ const useFogTools = (
   const cancelFog = dc.useCallback((): void => {
     setIsDrawing(false);
     setRectangleStart(null);
+    setRectangleHover(null);
     setLastCell(null);
     setProcessedCells(new Set());
   }, []);
@@ -27996,6 +30001,7 @@ const useFogTools = (
   return {
     isDrawing,
     rectangleStart,
+    rectangleHover,
     handlePointerDown,
     handlePointerMove,
     handlePointerUp,
@@ -28030,6 +30036,8 @@ const { useFogTools } = await dc.require(dc.headerLink(dc.resolvePath("compiled-
 const { useMapState } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "MapContext"));
 const { useEventHandlerRegistration } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "EventHandlerContext"));
 const { GridGeometry } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "GridGeometry"));
+const { getSettings } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "settingsAccessor"));
+const { offsetToAxial } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "offsetCoordinates"));
 
 /** Props for FogOfWarLayer component */
 export interface FogOfWarLayerProps {
@@ -28052,6 +30060,7 @@ const FogOfWarLayer = ({
   const {
     isDrawing,
     rectangleStart,
+    rectangleHover,
     handlePointerDown,
     handlePointerMove,
     handlePointerUp,
@@ -28071,13 +30080,14 @@ const FogOfWarLayer = ({
       handlePointerUp,
       handleKeyDown,
       isDrawing,
-      rectangleStart
+      rectangleStart,
+      rectangleHover
     });
 
     return () => unregisterHandlers('fogOfWar');
   }, [activeTool, registerHandlers, unregisterHandlers,
     handlePointerDown, handlePointerMove, handlePointerUp, handleKeyDown,
-    isDrawing, rectangleStart]);
+    isDrawing, rectangleStart, rectangleHover]);
 
   const renderPreviewOverlay = (): React.ReactElement | null => {
     if (!activeTool || !rectangleStart || !canvasRef.current || !containerRef?.current || !geometry) {
@@ -28090,17 +30100,17 @@ const FogOfWarLayer = ({
     const { width, height } = canvas;
 
     let scaledSize: number;
-    let offsetX: number;
-    let offsetY: number;
+    let pxOffsetX: number;
+    let pxOffsetY: number;
 
     const isGrid = geometry instanceof GridGeometry;
     if (isGrid) {
       scaledSize = geometry.getScaledCellSize(zoom);
-      offsetX = width / 2 - center.x * scaledSize;
-      offsetY = height / 2 - center.y * scaledSize;
+      pxOffsetX = width / 2 - center.x * scaledSize;
+      pxOffsetY = height / 2 - center.y * scaledSize;
     } else {
-      offsetX = width / 2 - center.x * zoom;
-      offsetY = height / 2 - center.y * zoom;
+      pxOffsetX = width / 2 - center.x * zoom;
+      pxOffsetY = height / 2 - center.y * zoom;
       scaledSize = geometry.getScaledCellSize(zoom);
     }
 
@@ -28112,47 +30122,142 @@ const FogOfWarLayer = ({
 
     const displayScale = canvasRect.width / width;
 
-    const { col, row } = rectangleStart;
+    /** Convert world coordinates to buffer-space screen coords (viewport + zoom + rotation) */
+    const worldToBuffer = (worldX: number, worldY: number): { x: number; y: number } => {
+      let screenX = pxOffsetX + worldX * zoom;
+      let screenY = pxOffsetY + worldY * zoom;
 
-    let screenX: number;
-    let screenY: number;
-
-    if (isGrid) {
-      const worldX = (col + 0.5) * geometry.cellSize;
-      const worldY = (row + 0.5) * geometry.cellSize;
-      screenX = offsetX + worldX * zoom;
-      screenY = offsetY + worldY * zoom;
-    } else {
-      if (geometry.offsetToAxial) {
-        const axial = geometry.offsetToAxial(col, row);
-        const world = geometry.gridToWorld(axial.q, axial.r);
-        screenX = offsetX + world.worldX * zoom;
-        screenY = offsetY + world.worldY * zoom;
-      } else {
-        screenX = offsetX + col * scaledSize;
-        screenY = offsetY + row * scaledSize;
+      if (northDirection !== 0) {
+        const cx = width / 2;
+        const cy = height / 2;
+        screenX -= cx;
+        screenY -= cy;
+        const angleRad = (northDirection * Math.PI) / 180;
+        const rotatedX = screenX * Math.cos(angleRad) - screenY * Math.sin(angleRad);
+        const rotatedY = screenX * Math.sin(angleRad) + screenY * Math.cos(angleRad);
+        screenX = rotatedX + cx;
+        screenY = rotatedY + cy;
       }
+
+      return { x: screenX, y: screenY };
+    };
+
+    /** Convert offset coords (col, row) to buffer-space screen coords */
+    const toScreen = (col: number, row: number, useCenter = true): { x: number; y: number } => {
+      let worldX: number, worldY: number;
+
+      if (isGrid) {
+        if (useCenter) {
+          worldX = (col + 0.5) * geometry.cellSize;
+          worldY = (row + 0.5) * geometry.cellSize;
+        } else {
+          worldX = col * geometry.cellSize;
+          worldY = row * geometry.cellSize;
+        }
+      } else {
+        const axial = offsetToAxial(col, row, geometry.orientation);
+        const world = geometry.gridToWorld(axial.q, axial.r);
+        worldX = world.worldX;
+        worldY = world.worldY;
+      }
+
+      return worldToBuffer(worldX, worldY);
+    };
+
+    // Rectangle hover preview: show full rectangle outline
+    if (rectangleHover) {
+      const settings = getSettings();
+      const previewEnabled = (settings as Record<string, unknown>).shapePreviewKbm !== false;
+      if (!previewEnabled) return null;
+
+      const minCol = Math.min(rectangleStart.col, rectangleHover.col);
+      const maxCol = Math.max(rectangleStart.col, rectangleHover.col);
+      const minRow = Math.min(rectangleStart.row, rectangleHover.row);
+      const maxRow = Math.max(rectangleStart.row, rectangleHover.row);
+
+      let corners: { x: number; y: number }[];
+
+      if (isGrid) {
+        corners = [
+          toScreen(minCol, minRow, false),         // TL
+          toScreen(maxCol + 1, minRow, false),     // TR
+          toScreen(maxCol + 1, maxRow + 1, false), // BR
+          toScreen(minCol, maxRow + 1, false),     // BL
+        ].map(p => ({
+          x: p.x * displayScale + canvasOffsetX,
+          y: p.y * displayScale + canvasOffsetY
+        }));
+      } else {
+        // Hex: compute axis-aligned bounding box from corner cell world centers
+        const getCellWorld = (col: number, row: number) => {
+          const axial = offsetToAxial(col, row, geometry.orientation);
+          return geometry.gridToWorld(axial.q, axial.r);
+        };
+        const cellCenters = [
+          getCellWorld(minCol, minRow),
+          getCellWorld(maxCol, minRow),
+          getCellWorld(minCol, maxRow),
+          getCellWorld(maxCol, maxRow),
+        ];
+        // Check stagger: include different-parity column/row to capture offset shift
+        if (maxCol > minCol) {
+          cellCenters.push(getCellWorld(minCol + 1, minRow));
+          cellCenters.push(getCellWorld(minCol + 1, maxRow));
+        }
+        if (maxRow > minRow) {
+          cellCenters.push(getCellWorld(minCol, minRow + 1));
+          cellCenters.push(getCellWorld(maxCol, minRow + 1));
+        }
+        const hexSize = scaledSize / zoom; // getScaledCellSize(zoom) / zoom = hexSize
+        const wMinX = Math.min(...cellCenters.map(c => c.worldX)) - hexSize;
+        const wMaxX = Math.max(...cellCenters.map(c => c.worldX)) + hexSize;
+        const wMinY = Math.min(...cellCenters.map(c => c.worldY)) - hexSize;
+        const wMaxY = Math.max(...cellCenters.map(c => c.worldY)) + hexSize;
+
+        corners = [
+          worldToBuffer(wMinX, wMinY),
+          worldToBuffer(wMaxX, wMinY),
+          worldToBuffer(wMaxX, wMaxY),
+          worldToBuffer(wMinX, wMaxY),
+        ].map(p => ({
+          x: p.x * displayScale + canvasOffsetX,
+          y: p.y * displayScale + canvasOffsetY
+        }));
+      }
+
+      const polygonPoints = corners.map(c => `${c.x},${c.y}`).join(' ');
+
+      return (
+        <svg
+          className="dmt-fow-preview"
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            pointerEvents: 'none',
+            zIndex: 100,
+            overflow: 'visible'
+          }}
+        >
+          <polygon
+            points={polygonPoints}
+            fill="none"
+            stroke="#00ff00"
+            strokeWidth={2}
+            strokeDasharray="8,4"
+            strokeLinejoin="round"
+          />
+        </svg>
+      );
     }
 
-    if (northDirection !== 0) {
-      const centerX = width / 2;
-      const centerY = height / 2;
-
-      screenX -= centerX;
-      screenY -= centerY;
-
-      const angleRad = (northDirection * Math.PI) / 180;
-      const rotatedX = screenX * Math.cos(angleRad) - screenY * Math.sin(angleRad);
-      const rotatedY = screenX * Math.sin(angleRad) + screenY * Math.cos(angleRad);
-
-      screenX = rotatedX + centerX;
-      screenY = rotatedY + centerY;
-    }
-
-    const displayX = canvasOffsetX + screenX * displayScale;
-    const displayY = canvasOffsetY + screenY * displayScale;
+    // Single-cell start marker (before mouse moves after first click)
+    const cellCenter = toScreen(rectangleStart.col, rectangleStart.row, true);
+    const displayX = cellCenter.x * displayScale + canvasOffsetX;
+    const displayY = cellCenter.y * displayScale + canvasOffsetY;
     const displaySize = scaledSize * displayScale;
-
     const halfSize = displaySize / 2;
 
     return (
@@ -32299,6 +34404,27 @@ const useGroupDrag = (): UseGroupDragResult => {
     isGroupDragging
   } = useMapSelection();
 
+  // Track Alt+Shift for drag inversion in group drags
+  const altKeyRef = dc.useRef(false);
+  const shiftKeyRef = dc.useRef(false);
+
+  dc.useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent): void => {
+      if (e.key === 'Alt') altKeyRef.current = true;
+      if (e.key === 'Shift') shiftKeyRef.current = true;
+    };
+    const onKeyUp = (e: KeyboardEvent): void => {
+      if (e.key === 'Alt') altKeyRef.current = false;
+      if (e.key === 'Shift') shiftKeyRef.current = false;
+    };
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+    };
+  }, []);
+
   const getClickedSelectedItem = dc.useCallback((
     x: number,
     y: number,
@@ -32365,13 +34491,24 @@ const useGroupDrag = (): UseGroupDragResult => {
       if (item.type === 'object') {
         const obj = activeLayer.objects?.find((o: MapObject) => o.id === item.id);
         if (obj) {
-          offsets.set(item.id, {
-            type: 'object',
-            gridOffsetX: gridX - obj.position.x,
-            gridOffsetY: gridY - obj.position.y,
-            worldOffsetX: 0,
-            worldOffsetY: 0
-          });
+          if (obj.freeform && obj.worldPosition) {
+            offsets.set(item.id, {
+              type: 'object',
+              gridOffsetX: 0,
+              gridOffsetY: 0,
+              worldOffsetX: worldCoords.worldX - obj.worldPosition.x,
+              worldOffsetY: worldCoords.worldY - obj.worldPosition.y,
+              freeform: true
+            });
+          } else {
+            offsets.set(item.id, {
+              type: 'object',
+              gridOffsetX: gridX - obj.position.x,
+              gridOffsetY: gridY - obj.position.y,
+              worldOffsetX: 0,
+              worldOffsetY: 0
+            });
+          }
         }
       } else if (item.type === 'text') {
         const label = activeLayer.textLabels?.find((l: TextLabel) => l.id === item.id);
@@ -32434,6 +34571,8 @@ const useGroupDrag = (): UseGroupDragResult => {
     const objectUpdates: ObjectDragUpdate[] = [];
     const textUpdates: TextDragUpdate[] = [];
 
+    const isInverted = altKeyRef.current && shiftKeyRef.current;
+
     for (const item of selectedItems) {
       const offset = offsets.get(item.id);
       if (!offset) continue;
@@ -32441,13 +34580,54 @@ const useGroupDrag = (): UseGroupDragResult => {
       if (item.type === 'object') {
         const obj = activeLayer.objects?.find((o: MapObject) => o.id === item.id);
         if (obj) {
-          const newX = gridX - offset.gridOffsetX;
-          const newY = gridY - offset.gridOffsetY;
-          objectUpdates.push({
-            id: item.id,
-            oldObj: obj,
-            newPosition: { x: newX, y: newY }
-          });
+          if (isInverted) {
+            // Drag inversion: flip each object's snap behavior
+            if (!offset.freeform) {
+              // Grid → freeform inversion: use world-space delta
+              const cellCenter = (geometry as any)?.getCellCenter?.(obj.position.x, obj.position.y)
+                || (geometry as any)?.gridToWorld?.(obj.position.x, obj.position.y);
+              const baseX = obj.worldPosition?.x ?? cellCenter?.worldX ?? 0;
+              const baseY = obj.worldPosition?.y ?? cellCenter?.worldY ?? 0;
+              const newWorldX = baseX + worldDeltaX;
+              const newWorldY = baseY + worldDeltaY;
+              const nearestGrid = screenToGrid(clientX, clientY);
+              objectUpdates.push({
+                id: item.id,
+                oldObj: obj,
+                newPosition: nearestGrid || obj.position,
+                freeformPosition: { x: newWorldX, y: newWorldY }
+              });
+            } else {
+              // Freeform → grid inversion: snap to grid
+              const newX = gridX - offset.gridOffsetX;
+              const newY = gridY - offset.gridOffsetY;
+              const cellCenter = (geometry as any)?.getCellCenter?.(newX, newY)
+                || (geometry as any)?.gridToWorld?.(newX, newY);
+              objectUpdates.push({
+                id: item.id,
+                oldObj: obj,
+                newPosition: { x: newX, y: newY },
+                freeformPosition: cellCenter ? { x: cellCenter.worldX, y: cellCenter.worldY } : undefined
+              });
+            }
+          } else if (offset.freeform) {
+            const newWorldX = worldX - offset.worldOffsetX;
+            const newWorldY = worldY - offset.worldOffsetY;
+            objectUpdates.push({
+              id: item.id,
+              oldObj: obj,
+              newPosition: obj.position,
+              freeformPosition: { x: newWorldX, y: newWorldY }
+            });
+          } else {
+            const newX = gridX - offset.gridOffsetX;
+            const newY = gridY - offset.gridOffsetY;
+            objectUpdates.push({
+              id: item.id,
+              oldObj: obj,
+              newPosition: { x: newX, y: newY }
+            });
+          }
         }
       } else if (item.type === 'text') {
         const label = activeLayer.textLabels?.find((l: TextLabel) => l.id === item.id);
@@ -32463,8 +34643,11 @@ const useGroupDrag = (): UseGroupDragResult => {
       }
     }
 
+    // Bounds and overlap checks only apply to grid-anchored objects
+    const gridUpdates = objectUpdates.filter(u => !u.freeformPosition);
+
     if (geometry && geometry.isWithinBounds) {
-      for (const update of objectUpdates) {
+      for (const update of gridUpdates) {
         if (!geometry.isWithinBounds(update.newPosition.x, update.newPosition.y)) {
           return true;
         }
@@ -32479,7 +34662,7 @@ const useGroupDrag = (): UseGroupDragResult => {
       (obj: MapObject) => !selectedObjectIds.has(obj.id)
     );
 
-    for (const update of objectUpdates) {
+    for (const update of gridUpdates) {
       const movingSize = update.oldObj.size || { width: 1, height: 1 };
       const movingMinX = update.newPosition.x;
       const movingMinY = update.newPosition.y;
@@ -32508,10 +34691,19 @@ const useGroupDrag = (): UseGroupDragResult => {
       for (const update of objectUpdates) {
         const idx = updatedObjects.findIndex((o: MapObject) => o.id === update.id);
         if (idx !== -1) {
-          updatedObjects[idx] = {
-            ...updatedObjects[idx],
-            position: update.newPosition
-          };
+          if (update.freeformPosition) {
+            updatedObjects[idx] = {
+              ...updatedObjects[idx],
+              position: update.newPosition,
+              worldPosition: update.freeformPosition,
+              ...(isInverted && !offsets.get(update.id)?.freeform ? { freeform: true } : {})
+            };
+          } else {
+            updatedObjects[idx] = {
+              ...updatedObjects[idx],
+              position: update.newPosition
+            };
+          }
         }
       }
 
@@ -32557,6 +34749,44 @@ const useGroupDrag = (): UseGroupDragResult => {
       return false;
     }
 
+    // Restore original freeform state for any objects that were inverted during drag
+    if (mapData) {
+      const activeLayer = getActiveLayer(mapData);
+      const offsets = groupDragOffsetsRef.current;
+      let needsRestore = false;
+      const updatedObjects = [...(activeLayer.objects || [])];
+
+      for (const [id, offset] of offsets) {
+        if (offset.type !== 'object') continue;
+        const idx = updatedObjects.findIndex((o: MapObject) => o.id === id);
+        if (idx === -1) continue;
+        const obj = updatedObjects[idx];
+
+        // Grid object that was temporarily made freeform → restore to grid
+        if (!offset.freeform && obj.freeform) {
+          const { freeform: _f, worldPosition: _wp, ...rest } = obj;
+          updatedObjects[idx] = rest as MapObject;
+          needsRestore = true;
+        }
+        // Freeform object that was snapped to grid → keep freeform, snap worldPosition to cell center
+        if (offset.freeform && obj.worldPosition) {
+          const cellCenter = (geometry as any)?.getCellCenter?.(obj.position.x, obj.position.y)
+            || (geometry as any)?.gridToWorld?.(obj.position.x, obj.position.y);
+          if (cellCenter) {
+            updatedObjects[idx] = {
+              ...obj,
+              worldPosition: { x: cellCenter.worldX, y: cellCenter.worldY }
+            };
+            needsRestore = true;
+          }
+        }
+      }
+
+      if (needsRestore) {
+        onObjectsChange(updatedObjects, true);
+      }
+    }
+
     setIsDraggingSelection(false);
     setDragStart(null);
 
@@ -32577,7 +34807,7 @@ const useGroupDrag = (): UseGroupDragResult => {
     groupDragOffsetsRef.current = new Map();
 
     return true;
-  }, [isDraggingSelection, dragStart, mapData, setIsDraggingSelection, setDragStart, onObjectsChange, onTextLabelsChange]);
+  }, [isDraggingSelection, dragStart, mapData, geometry, setIsDraggingSelection, setDragStart, onObjectsChange, onTextLabelsChange]);
 
   return {
     isGroupDragging,
@@ -33058,6 +35288,23 @@ const useEventCoordinator = ({
 
     if (fogHandlers?.handlePointerMove) {
       fogHandlers.handlePointerMove(e);
+    }
+
+    if (currentTool === 'areaSelect') {
+      const isTouch = touchEvent.touches !== undefined || (e as PointerEvent).pointerType === 'touch';
+      if (!isTouch) {
+        const areaSelectHandlers = getHandlers('areaSelect') as AreaSelectHandlers | null;
+        if (areaSelectHandlers?.areaSelectStart && areaSelectHandlers.updateAreaSelectHover && toGrid) {
+          const coords = toGrid(clientX, clientY);
+          if (coords) {
+            areaSelectHandlers.updateAreaSelectHover(coords.x, coords.y);
+          }
+        }
+      }
+      if (layerVisibility.objects && objectHandlers?.handleHoverUpdate) {
+        objectHandlers.handleHoverUpdate(e);
+      }
+      return;
     }
 
     if (currentTool === 'draw' || currentTool === 'erase' ||
@@ -35187,10 +37434,10 @@ const OrnamentalArrow = ({ direction = "right" }) => {
   );
 };
 
-const ObjectSidebar = ({ selectedObjectType, onObjectTypeSelect, onToolChange, isCollapsed, onCollapseChange, mapType = 'grid' }) => {
+const ObjectSidebar = ({ selectedObjectType, onObjectTypeSelect, onToolChange, isCollapsed, onCollapseChange, mapType = 'grid', objectSetId, isFreeformMode = false, onFreeformToggle }) => {
   // Get resolved object types and categories (includes overrides and custom)
-  const allObjectTypes = getResolvedObjectTypes(mapType);
-  const allCategories = getResolvedCategories(mapType);
+  const allObjectTypes = getResolvedObjectTypes(mapType, objectSetId);
+  const allCategories = getResolvedCategories(mapType, objectSetId);
   
   // Group objects by category (excluding 'notes' category which is handled specially)
   const objectsByCategory = allCategories
@@ -35224,6 +37471,15 @@ const ObjectSidebar = ({ selectedObjectType, onObjectTypeSelect, onToolChange, i
         >
           <OrnamentalArrow direction="right" />
         </button>
+        {isFreeformMode && (
+          <button
+            className="dmt-freeform-collapsed-indicator interactive-child"
+            title="Freeform placement active (tap to disable)"
+            onClick={onFreeformToggle}
+          >
+            <dc.Icon icon="lucide-diamond" size={12} />
+          </button>
+        )}
       </div>
     );
   }
@@ -35289,17 +37545,26 @@ const ObjectSidebar = ({ selectedObjectType, onObjectTypeSelect, onToolChange, i
         ))}
       </div>
       
-      {selectedObjectType && (
-        <div className="dmt-sidebar-footer">
+      <div className="dmt-sidebar-footer">
+        <div className="dmt-sidebar-footer-row">
+          {selectedObjectType && (
+            <button
+              className="dmt-deselect-btn"
+              onClick={() => onObjectTypeSelect(null)}
+              title="Clear selection"
+            >
+              <dc.Icon icon="lucide-package-x" size={14} />
+            </button>
+          )}
           <button
-            className="dmt-deselect-btn"
-            onClick={() => onObjectTypeSelect(null)}
-            title="Deselect object"
+            className={`dmt-freeform-toggle ${isFreeformMode ? 'dmt-toolbar-button-active' : ''}`}
+            onClick={onFreeformToggle}
+            title={isFreeformMode ? 'Disable freeform placement' : 'Enable freeform placement'}
           >
-            Clear Selection
+            <dc.Icon icon="lucide-diamond" size={14} />
           </button>
         </div>
-      )}
+      </div>
     </div>
   );
 };
@@ -43134,7 +45399,7 @@ const { RA_ICONS, RA_CATEGORIES } = await dc.require(dc.headerLink(dc.resolvePat
 const QUICK_SYMBOLS = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "settingsPlugin-quickSymbols"));
 
 /** Plugin version from template */
-const PACKAGED_PLUGIN_VERSION = '0.15.9';
+const PACKAGED_PLUGIN_VERSION = '0.16.1';
 
 /** LocalStorage keys for tracking user preferences */
 const STORAGE_KEYS = {
@@ -44103,6 +46368,9 @@ interface SettingsModalState {
   pendingBoundsChange: PendingBoundsChange | null;
   orphanInfo: OrphanInfo;
   deleteOrphanedContent: boolean;
+
+  // Per-map object set
+  objectSetId: string | null;
 }
 
 // ===========================================
@@ -44177,6 +46445,7 @@ interface BuildInitialStateProps {
   currentHexBounds?: HexBounds;
   currentBackgroundImage?: CurrentBackgroundImage;
   currentDistanceSettings?: CurrentDistanceSettings;
+  currentObjectSetId?: string | null;
 }
 
 // ===========================================
@@ -44219,7 +46488,8 @@ const Actions = {
   SET_FOG_IMAGE_DISPLAY_NAME: 'SET_FOG_IMAGE_DISPLAY_NAME',
   SET_FOG_IMAGE_SEARCH_RESULTS: 'SET_FOG_IMAGE_SEARCH_RESULTS',
   FOG_IMAGE_SELECTED: 'FOG_IMAGE_SELECTED',
-  CLEAR_FOG_IMAGE: 'CLEAR_FOG_IMAGE'
+  CLEAR_FOG_IMAGE: 'CLEAR_FOG_IMAGE',
+  SET_OBJECT_SET_ID: 'SET_OBJECT_SET_ID'
 } as const;
 
 /** Action type union */
@@ -44397,6 +46667,11 @@ interface ClearFogImageAction {
   type: typeof Actions.CLEAR_FOG_IMAGE;
 }
 
+interface SetObjectSetIdAction {
+  type: typeof Actions.SET_OBJECT_SET_ID;
+  payload: string | null;
+}
+
 /** Discriminated union of all actions */
 type SettingsAction =
   | InitializeAction
@@ -44433,7 +46708,8 @@ type SettingsAction =
   | SetFogImageDisplayNameAction
   | SetFogImageSearchResultsAction
   | FogImageSelectedAction
-  | ClearFogImageAction;
+  | ClearFogImageAction
+  | SetObjectSetIdAction;
 
 // ===========================================
 // Constants
@@ -44613,7 +46889,9 @@ function buildInitialState(props: BuildInitialStateProps, globalSettings: Global
     showResizeConfirm: false,
     pendingBoundsChange: null,
     orphanInfo: { cells: 0, objects: 0 },
-    deleteOrphanedContent: false
+    deleteOrphanedContent: false,
+
+    objectSetId: props.currentObjectSetId ?? null
   };
 }
 
@@ -44896,6 +47174,9 @@ function settingsReducer(state: SettingsModalState, action: SettingsAction): Set
         }
       };
     
+    case Actions.SET_OBJECT_SET_ID:
+      return { ...state, objectSetId: action.payload };
+
     default:
       return state;
   }
@@ -45091,6 +47372,9 @@ export interface SettingsReducerState {
   // UI state
   isLoading: boolean;
 
+  // Per-map object set
+  objectSetId: string | null;
+
   // Resize confirmation dialog
   showResizeConfirm: boolean;
   pendingBoundsChange: PendingBoundsChange | null;
@@ -45112,10 +47396,14 @@ export interface SettingsSaveData {
   overrides: Partial<PluginSettings>;
   coordinateDisplayMode: CoordinateDisplayMode;
   distanceSettings: DistanceSettingsSave | null;
+  objectSetId?: string | null;
 }
 
 /** Handler functions exposed by context */
 export interface MapSettingsHandlers {
+  // Object set
+  handleObjectSetChange: (setId: string | null) => void;
+
   // Tab navigation
   setActiveTab: (tab: SettingsTabId) => void;
 
@@ -45212,7 +47500,7 @@ export interface MapSettingsContextValue extends
   // Props passed through
   isOpen: boolean;
   onClose: () => void;
-  onOpenAlignmentMode?: () => void;
+  onOpenAlignmentMode?: (currentX: number, currentY: number) => void;
   mapType: MapType;
   orientation: HexOrientation;
 
@@ -45239,11 +47527,11 @@ export interface MapSettingsProviderProps {
     settingsData: SettingsSaveData,
     preferences: ModalPreferences,
     hexBounds: HexBounds | null,
-    backgroundImageData: BackgroundImageConfig | undefined,
+    backgroundImageData: BackgroundImageConfig | null,
     calculatedHexSize: number | null,
     forceDelete: boolean
   ) => void;
-  onOpenAlignmentMode?: () => void;
+  onOpenAlignmentMode?: (currentX: number, currentY: number) => void;
   initialTab?: SettingsTabId | null;
   mapType?: MapType;
   orientation?: HexOrientation;
@@ -45254,6 +47542,7 @@ export interface MapSettingsProviderProps {
   currentDistanceSettings?: Partial<DistanceSettings> | null;
   currentCells?: Cell[];
   currentObjects?: MapObject[];
+  currentObjectSetId?: string | null;
   mapData?: MapData | null;
   geometry?: IGeometry | null;
 }
@@ -45297,6 +47586,7 @@ const MapSettingsProvider: React.FC<MapSettingsProviderProps> = ({
   currentDistanceSettings = null,
   currentCells = [],
   currentObjects = [],
+  currentObjectSetId = null,
   mapData = null,
   geometry = null
 }) => {
@@ -45306,7 +47596,7 @@ const MapSettingsProvider: React.FC<MapSettingsProviderProps> = ({
   // State via reducer
   const [state, dispatch] = dc.useReducer(
     settingsReducer,
-    { props: { initialTab, mapType, currentSettings, currentPreferences, currentHexBounds, currentBackgroundImage, currentDistanceSettings }, globalSettings },
+    { props: { initialTab, mapType, currentSettings, currentPreferences, currentHexBounds, currentBackgroundImage, currentDistanceSettings, currentObjectSetId }, globalSettings },
     (init: { props: Record<string, unknown>; globalSettings: PluginSettings }) => buildInitialState(init.props, init.globalSettings) as SettingsReducerState
   );
 
@@ -45335,7 +47625,7 @@ const MapSettingsProvider: React.FC<MapSettingsProviderProps> = ({
     dispatch({
       type: Actions.INITIALIZE,
       payload: {
-        props: { initialTab, mapType, currentSettings, currentPreferences, currentHexBounds, currentBackgroundImage, currentDistanceSettings },
+        props: { initialTab, mapType, currentSettings, currentPreferences, currentHexBounds, currentBackgroundImage, currentDistanceSettings, currentObjectSetId },
         globalSettings
       }
     });
@@ -45475,6 +47765,7 @@ const MapSettingsProvider: React.FC<MapSettingsProviderProps> = ({
       useGlobalSettings: state.useGlobalSettings,
       overrides: state.useGlobalSettings ? {} : state.overrides,
       coordinateDisplayMode: state.coordinateDisplayMode,
+      objectSetId: state.objectSetId,
       distanceSettings: state.distanceSettings.useGlobalDistance ? null : {
         distancePerCell: state.distanceSettings.distancePerCell,
         distanceUnit: state.distanceSettings.distanceUnit,
@@ -45484,7 +47775,7 @@ const MapSettingsProvider: React.FC<MapSettingsProviderProps> = ({
     };
 
     // Build background image data for both grid and hex maps
-    const backgroundImageData: BackgroundImageConfig | undefined = state.backgroundImagePath ? {
+    const backgroundImageData: BackgroundImageConfig | null = state.backgroundImagePath ? {
       path: state.backgroundImagePath,
       opacity: state.imageOpacity,
       offsetX: state.imageOffsetX,
@@ -45503,7 +47794,7 @@ const MapSettingsProvider: React.FC<MapSettingsProviderProps> = ({
         measurementSize: state.measurementSize,
         fineTuneOffset: state.fineTuneOffset
       } : {})
-    } : undefined;
+    } : null;
 
     let calculatedHexSize: number | null = null;
     if (mapType === 'hex' && state.backgroundImagePath && state.boundsLocked && state.imageDimensions) {
@@ -45576,6 +47867,7 @@ const MapSettingsProvider: React.FC<MapSettingsProviderProps> = ({
     setImageGridSize: (size) => dispatch({ type: Actions.SET_IMAGE_GRID_SIZE, payload: size }),
     handleResizeConfirmDelete,
     handleResizeConfirmCancel: () => dispatch({ type: Actions.CANCEL_RESIZE }),
+    handleObjectSetChange: (setId) => dispatch({ type: Actions.SET_OBJECT_SET_ID, payload: setId }),
     handleCancel: () => onClose(),
 
     // Dispatches needing context for orphan checks
@@ -45792,6 +48084,437 @@ return { CollapsibleSection };
 
 ```
 
+# SettingItem
+
+```tsx
+/**
+ * SettingItem.tsx
+ *
+ * Preact components for settings rows.
+ * Native path: uses Obsidian's Setting class imperatively for structure,
+ * with Preact children rendered into the control area.
+ * Fallback path: renders custom DOM with Obsidian's setting-item CSS classes.
+ */
+
+const { isBridgeAvailable, getObsidianModule } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "obsidianBridge"));
+
+interface SettingItemProps {
+  name: string;
+  description?: string;
+  vertical?: boolean;
+  children?: any;
+}
+
+/**
+ * Standard setting row: name + optional description on left, control on right.
+ * Native path: creates Obsidian Setting instance imperatively.
+ * Fallback path: renders using Obsidian's .setting-item CSS classes.
+ * When vertical=true, stacks label above control (for wide controls like color grids).
+ */
+function SettingItem({ name, description, vertical, children }: SettingItemProps): React.ReactElement {
+  const containerRef = dc.useRef<HTMLDivElement>(null);
+  const controlRef = dc.useRef<HTMLDivElement>(null);
+  const settingRef = dc.useRef<any>(null);
+
+  const bridgeAvailable = isBridgeAvailable();
+
+  dc.useEffect(() => {
+    if (!bridgeAvailable || !containerRef.current) return;
+
+    try {
+      const obs = getObsidianModule();
+      const SettingClass = obs.Setting as new (containerEl: HTMLElement) => {
+        setName: (name: string) => any;
+        setDesc: (desc: string) => any;
+        settingEl: HTMLElement;
+        controlEl: HTMLElement;
+        infoEl: HTMLElement;
+      };
+
+      const setting = new SettingClass(containerRef.current);
+      setting.setName(name);
+      if (description) {
+        setting.setDesc(description);
+      }
+
+      if (vertical) {
+        setting.settingEl.style.flexDirection = 'column';
+        setting.settingEl.style.alignItems = 'flex-start';
+        setting.controlEl.style.width = '100%';
+        setting.controlEl.style.marginTop = '8px';
+      }
+
+      // Move Preact children into the native control area
+      if (controlRef.current) {
+        while (controlRef.current.firstChild) {
+          setting.controlEl.appendChild(controlRef.current.firstChild);
+        }
+      }
+
+      settingRef.current = setting;
+
+      return () => {
+        // Setting appends its own DOM to containerRef — clear it
+        if (containerRef.current) {
+          containerRef.current.empty?.() || (containerRef.current.innerHTML = '');
+        }
+      };
+    } catch {
+      // If Setting creation fails, fallback DOM is already visible
+    }
+  }, []);
+
+  // Update name/description reactively
+  dc.useEffect(() => {
+    if (settingRef.current) {
+      settingRef.current.setName(name);
+    }
+  }, [name]);
+
+  dc.useEffect(() => {
+    if (settingRef.current) {
+      if (description) {
+        settingRef.current.setDesc(description);
+      }
+    }
+  }, [description]);
+
+  if (bridgeAvailable) {
+    return (
+      <>
+        <div ref={containerRef} />
+        <div ref={controlRef} style={{ display: 'none' }}>{children}</div>
+      </>
+    );
+  }
+
+  // Fallback path
+  return (
+    <div class="setting-item" style={vertical ? { flexDirection: 'column', alignItems: 'flex-start' } : undefined}>
+      <div class="setting-item-info">
+        <div class="setting-item-name">{name}</div>
+        {description && <div class="setting-item-description">{description}</div>}
+      </div>
+      <div class="setting-item-control" style={vertical ? { width: '100%', marginTop: '8px' } : undefined}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+interface SettingHeadingProps {
+  text: string;
+}
+
+/**
+ * Section heading matching Obsidian's setting-item-heading pattern.
+ */
+function SettingHeading({ text }: SettingHeadingProps): React.ReactElement {
+  return (
+    <div class="setting-item setting-item-heading">
+      <div class="setting-item-info">
+        <div class="setting-item-name">{text}</div>
+      </div>
+    </div>
+  );
+}
+
+return { SettingItem, SettingHeading };
+
+```
+
+# NativeControls
+
+```tsx
+/**
+ * NativeControls.tsx
+ *
+ * Native Obsidian control wrappers for use inside SettingItem.
+ * Each wrapper creates the Obsidian component imperatively and
+ * falls back to standard HTML controls when bridge is unavailable.
+ */
+
+const { isBridgeAvailable, getObsidianModule } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "obsidianBridge"));
+
+// ─── NativeToggle ───────────────────────────────────────────────
+
+interface NativeToggleProps {
+  value: boolean;
+  onChange: (value: boolean) => void;
+  disabled?: boolean;
+}
+
+function NativeToggle({ value, onChange, disabled }: NativeToggleProps): React.ReactElement {
+  const containerRef = dc.useRef<HTMLDivElement>(null);
+  const toggleRef = dc.useRef<any>(null);
+
+  const bridgeAvailable = isBridgeAvailable();
+
+  // Store latest onChange in ref to avoid recreating toggle
+  const onChangeRef = dc.useRef(onChange);
+  onChangeRef.current = onChange;
+
+  dc.useEffect(() => {
+    if (!bridgeAvailable || !containerRef.current) return;
+
+    try {
+      const obs = getObsidianModule();
+      const SettingClass = obs.Setting as new (containerEl: HTMLElement) => {
+        settingEl: HTMLElement;
+        controlEl: HTMLElement;
+        addToggle: (cb: (toggle: any) => void) => any;
+      };
+
+      // Create a temporary setting to extract its toggle component
+      const tempContainer = document.createElement('div');
+      const setting = new SettingClass(tempContainer);
+      let toggleInstance: any = null;
+
+      setting.addToggle((toggle: any) => {
+        toggleInstance = toggle;
+        toggle.setValue(value);
+        toggle.onChange((newVal: boolean) => onChangeRef.current(newVal));
+        if (disabled) {
+          toggle.setDisabled(true);
+        }
+      });
+
+      // Move just the toggle element into our container
+      if (toggleInstance && setting.controlEl.firstChild) {
+        containerRef.current.appendChild(setting.controlEl.firstChild);
+      }
+
+      toggleRef.current = toggleInstance;
+
+      return () => {
+        if (containerRef.current) {
+          containerRef.current.innerHTML = '';
+        }
+      };
+    } catch {
+      // Fallback will render
+    }
+  }, []);
+
+  // Update value without recreating
+  dc.useEffect(() => {
+    if (toggleRef.current) {
+      toggleRef.current.setValue(value);
+    }
+  }, [value]);
+
+  // Update disabled state without recreating
+  dc.useEffect(() => {
+    if (toggleRef.current) {
+      toggleRef.current.setDisabled(!!disabled);
+    }
+  }, [disabled]);
+
+  if (bridgeAvailable) {
+    return h('div', { ref: containerRef });
+  }
+
+  // Fallback: standard checkbox
+  return (
+    <div class="checkbox-container" onClick={() => !disabled && onChange(!value)}>
+      <input type="checkbox" checked={value} disabled={disabled} tabIndex={-1} />
+    </div>
+  );
+}
+
+// ─── NativeDropdown ─────────────────────────────────────────────
+
+interface NativeDropdownOption {
+  value: string;
+  label: string;
+}
+
+interface NativeDropdownProps {
+  value: string;
+  options: NativeDropdownOption[];
+  onChange: (value: string) => void;
+  disabled?: boolean;
+}
+
+function NativeDropdown({ value, options, onChange, disabled }: NativeDropdownProps): React.ReactElement {
+  const containerRef = dc.useRef<HTMLDivElement>(null);
+  const dropdownRef = dc.useRef<any>(null);
+
+  const bridgeAvailable = isBridgeAvailable();
+
+  const onChangeRef = dc.useRef(onChange);
+  onChangeRef.current = onChange;
+
+  dc.useEffect(() => {
+    if (!bridgeAvailable || !containerRef.current) return;
+
+    try {
+      const obs = getObsidianModule();
+      const SettingClass = obs.Setting as new (containerEl: HTMLElement) => {
+        settingEl: HTMLElement;
+        controlEl: HTMLElement;
+        addDropdown: (cb: (dropdown: any) => void) => any;
+      };
+
+      const tempContainer = document.createElement('div');
+      const setting = new SettingClass(tempContainer);
+      let dropdownInstance: any = null;
+
+      setting.addDropdown((dropdown: any) => {
+        dropdownInstance = dropdown;
+        for (const opt of options) {
+          dropdown.addOption(opt.value, opt.label);
+        }
+        dropdown.setValue(value);
+        dropdown.onChange((newVal: string) => onChangeRef.current(newVal));
+        if (disabled) {
+          dropdown.setDisabled(true);
+        }
+      });
+
+      if (dropdownInstance && setting.controlEl.firstChild) {
+        containerRef.current.appendChild(setting.controlEl.firstChild);
+      }
+
+      dropdownRef.current = dropdownInstance;
+
+      return () => {
+        if (containerRef.current) {
+          containerRef.current.innerHTML = '';
+        }
+      };
+    } catch {
+      // Fallback will render
+    }
+  }, []);
+
+  dc.useEffect(() => {
+    if (dropdownRef.current) {
+      dropdownRef.current.setValue(value);
+    }
+  }, [value]);
+
+  dc.useEffect(() => {
+    if (dropdownRef.current) {
+      dropdownRef.current.setDisabled(!!disabled);
+    }
+  }, [disabled]);
+
+  if (bridgeAvailable) {
+    return h('div', { ref: containerRef });
+  }
+
+  // Fallback: standard select
+  return (
+    <select
+      value={value}
+      disabled={disabled}
+      onChange={(e: Event) => onChange((e.target as HTMLSelectElement).value)}
+      class="dropdown"
+    >
+      {options.map((opt: NativeDropdownOption) => (
+        <option key={opt.value} value={opt.value}>{opt.label}</option>
+      ))}
+    </select>
+  );
+}
+
+// ─── NativeSlider ───────────────────────────────────────────────
+
+interface NativeSliderProps {
+  value: number;
+  min: number;
+  max: number;
+  step?: number;
+  onChange: (value: number) => void;
+  disabled?: boolean;
+}
+
+function NativeSlider({ value, min, max, step, onChange, disabled }: NativeSliderProps): React.ReactElement {
+  const containerRef = dc.useRef<HTMLDivElement>(null);
+  const sliderRef = dc.useRef<any>(null);
+
+  const bridgeAvailable = isBridgeAvailable();
+
+  const onChangeRef = dc.useRef(onChange);
+  onChangeRef.current = onChange;
+
+  dc.useEffect(() => {
+    if (!bridgeAvailable || !containerRef.current) return;
+
+    try {
+      const obs = getObsidianModule();
+      const SettingClass = obs.Setting as new (containerEl: HTMLElement) => {
+        settingEl: HTMLElement;
+        controlEl: HTMLElement;
+        addSlider: (cb: (slider: any) => void) => any;
+      };
+
+      const tempContainer = document.createElement('div');
+      const setting = new SettingClass(tempContainer);
+      let sliderInstance: any = null;
+
+      setting.addSlider((slider: any) => {
+        sliderInstance = slider;
+        slider.setLimits(min, max, step ?? 1);
+        slider.setValue(value);
+        slider.onChange((newVal: number) => onChangeRef.current(newVal));
+        if (disabled) {
+          slider.setDisabled(true);
+        }
+      });
+
+      if (sliderInstance && setting.controlEl.firstChild) {
+        containerRef.current.appendChild(setting.controlEl.firstChild);
+      }
+
+      sliderRef.current = sliderInstance;
+
+      return () => {
+        if (containerRef.current) {
+          containerRef.current.innerHTML = '';
+        }
+      };
+    } catch {
+      // Fallback will render
+    }
+  }, []);
+
+  dc.useEffect(() => {
+    if (sliderRef.current) {
+      sliderRef.current.setValue(value);
+    }
+  }, [value]);
+
+  dc.useEffect(() => {
+    if (sliderRef.current) {
+      sliderRef.current.setDisabled(!!disabled);
+    }
+  }, [disabled]);
+
+  if (bridgeAvailable) {
+    return h('div', { ref: containerRef, style: { width: '120px' } });
+  }
+
+  // Fallback: standard range input
+  return (
+    <input
+      type="range"
+      min={min}
+      max={max}
+      step={step ?? 1}
+      value={value}
+      disabled={disabled}
+      onChange={(e: Event) => onChange(parseFloat((e.target as HTMLInputElement).value))}
+      style={{ width: '120px', cursor: disabled ? 'not-allowed' : 'pointer' }}
+    />
+  );
+}
+
+return { NativeToggle, NativeDropdown, NativeSlider };
+
+```
+
 # AppearanceTab
 
 ```tsx
@@ -45807,6 +48530,8 @@ import type { HexColor } from '#types/core/common.types';
 const { ColorPicker } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "ColorPicker"));
 const { CollapsibleSection } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "CollapsibleSection"));
 const { useMapSettings } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "MapSettingsContext"));
+const { SettingItem, SettingHeading } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "SettingItem"));
+const { NativeToggle, NativeSlider } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "NativeControls"));
 
 /** Props for ColorPickerItem */
 interface ColorPickerItemProps {
@@ -45915,244 +48640,195 @@ function FogOfWarSection(): React.ReactElement {
       onToggle={handleToggle}
       subtitle={subtitle}
     >
-      <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '12px' }}>
-        Customize how hidden areas appear on the map
-      </p>
-
-      <div style={{ marginBottom: '16px', opacity: useGlobalSettings ? 0.5 : 1 }}>
-        <label class="dmt-form-label" style={{ marginBottom: '4px', fontSize: '12px' }}>Fog Color</label>
-        <div style={{ display: 'flex', gap: '6px', alignItems: 'center', position: 'relative' }}>
-          <button
-            class="dmt-color-button"
-            disabled={useGlobalSettings}
-            onClick={() => !useGlobalSettings && setActiveColorPicker('fogOfWarColor')}
-            style={{
-              backgroundColor: overrides.fogOfWarColor ?? '#000000',
-              cursor: useGlobalSettings ? 'not-allowed' : 'pointer',
-              minWidth: '80px'
-            }}
-          >
-            <span class="dmt-color-button-label">{overrides.fogOfWarColor ?? '#000000'}</span>
-          </button>
-
-          <button
-            class="dmt-color-reset-btn"
-            disabled={useGlobalSettings}
-            onClick={() => !useGlobalSettings && handleColorChange('fogOfWarColor', THEME.fogOfWar.color)}
-            title="Reset to default"
-            style={{ cursor: useGlobalSettings ? 'not-allowed' : 'pointer' }}
-          >
-            <dc.Icon icon="lucide-rotate-ccw" />
-          </button>
-
-          <ColorPicker
-            isOpen={activeColorPicker === 'fogOfWarColor' && !useGlobalSettings}
-            selectedColor={overrides.fogOfWarColor ?? '#000000'}
-            onColorSelect={(color: HexColor) => handleColorChange('fogOfWarColor', color)}
-            onClose={() => setActiveColorPicker(null)}
-            onReset={() => handleColorChange('fogOfWarColor', globalSettings.fogOfWarColor)}
-            customColors={[]}
-            pendingCustomColorRef={pendingCustomColorRef}
-            title="Fog Color"
-            position="below"
-            align="left"
-          />
-        </div>
-        <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
-          Used if no image is set, or as fallback if image fails to load
-        </p>
-      </div>
-
-      <div style={{ marginBottom: '16px', opacity: useGlobalSettings ? 0.5 : 1 }}>
-        <label class="dmt-form-label" style={{ marginBottom: '8px', display: 'block' }}>
-          Fog Opacity: {Math.round((overrides.fogOfWarOpacity ?? 0.9) * 100)}%
-        </label>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <input
-            type="range"
-            min="10"
-            max="100"
-            value={Math.round((overrides.fogOfWarOpacity ?? 0.9) * 100)}
-            onChange={(e: Event) => !useGlobalSettings && handleColorChange('fogOfWarOpacity', parseInt((e.target as HTMLInputElement).value, 10) / 100)}
-            disabled={useGlobalSettings}
-            style={{
-              flex: 1,
-              height: '6px',
-              cursor: useGlobalSettings ? 'not-allowed' : 'pointer',
-              accentColor: 'var(--interactive-accent)'
-            }}
-          />
-          <span style={{
-            fontSize: '12px',
-            color: 'var(--text-muted)',
-            minWidth: '35px',
-            textAlign: 'right'
-          }}>
-            {Math.round((overrides.fogOfWarOpacity ?? 0.9) * 100)}%
-          </span>
-          <button
-            class="dmt-color-reset-btn"
-            disabled={useGlobalSettings}
-            onClick={() => !useGlobalSettings && handleColorChange('fogOfWarOpacity', 0.9)}
-            title="Reset to default (90%)"
-            style={{ cursor: useGlobalSettings ? 'not-allowed' : 'pointer' }}
-          >
-            <dc.Icon icon="lucide-rotate-ccw" />
-          </button>
-        </div>
-        <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
-          Higher values make fog more opaque (10-100%)
-        </p>
-      </div>
-
       <div style={{ opacity: useGlobalSettings ? 0.5 : 1 }}>
-        <label class="dmt-form-label" style={{ marginBottom: '4px', fontSize: '12px' }}>
-          Fog Texture (optional)
-        </label>
-        <div style={{ position: 'relative', marginBottom: '8px' }}>
-          <input
-            type="text"
-            placeholder="Search for tileable image..."
-            value={fogImageDisplayName}
-            disabled={useGlobalSettings}
-            onChange={(e: Event) => {
-              if (useGlobalSettings) return;
-              const value = (e.target as HTMLInputElement).value;
-              setFogImageDisplayName(value);
-              handleFogImageSearch(value);
-            }}
-            style={{
-              width: '100%',
-              padding: '8px 32px 8px 10px',
-              borderRadius: '4px',
-              border: '1px solid var(--background-modifier-border)',
-              background: 'var(--background-primary)',
-              color: 'var(--text-normal)',
-              fontSize: '14px',
-              cursor: useGlobalSettings ? 'not-allowed' : 'text'
-            }}
-          />
-
-          {overrides.fogOfWarImage && !useGlobalSettings && (
+        <SettingItem name="Fog Color" description="Used if no image is set, or as fallback">
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'center', position: 'relative' }}>
             <button
-              onClick={handleFogImageClear}
-              style={{
-                position: 'absolute',
-                right: '6px',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                background: 'transparent',
-                border: 'none',
-                color: 'var(--text-muted)',
-                cursor: 'pointer',
-                padding: '4px',
-                fontSize: '16px',
-                lineHeight: '1'
-              }}
-              title="Clear image"
-            >
-              ×
-            </button>
-          )}
-
-          {fogImageSearchResults.length > 0 && !useGlobalSettings && (
-            <div style={{
-              position: 'absolute',
-              top: '100%',
-              left: 0,
-              right: 0,
-              maxHeight: '200px',
-              overflowY: 'auto',
-              background: 'var(--background-primary)',
-              border: '1px solid var(--background-modifier-border)',
-              borderRadius: '4px',
-              marginTop: '2px',
-              zIndex: 1000,
-              boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
-            }}>
-              {fogImageSearchResults.map((name: string, idx: number) => (
-                <div
-                  key={idx}
-                  onClick={() => handleFogImageSelect(name)}
-                  style={{
-                    padding: '8px 10px',
-                    cursor: 'pointer',
-                    fontSize: '13px',
-                    borderBottom: idx < fogImageSearchResults.length - 1 ? '1px solid var(--background-modifier-border)' : 'none'
-                  }}
-                  onMouseEnter={(e: MouseEvent) => (e.currentTarget as HTMLElement).style.background = 'var(--background-modifier-hover)'}
-                  onMouseLeave={(e: MouseEvent) => (e.currentTarget as HTMLElement).style.background = 'transparent'}
-                >
-                  {name}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-        <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-          Select a tileable image to use instead of solid color. Image will be tiled across fogged areas.
-        </p>
-      </div>
-
-      <div style={{ marginTop: '16px', opacity: useGlobalSettings ? 0.5 : 1 }}>
-        <label class="dmt-checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: useGlobalSettings ? 'not-allowed' : 'pointer' }}>
-          <input
-            type="checkbox"
-            checked={overrides.fogOfWarBlurEnabled ?? false}
-            onChange={() => !useGlobalSettings && handleColorChange('fogOfWarBlurEnabled', !(overrides.fogOfWarBlurEnabled ?? false))}
-            disabled={useGlobalSettings}
-            class="dmt-checkbox"
-          />
-          <span>Soft edges</span>
-        </label>
-        <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px', marginLeft: '24px' }}>
-          Adds a subtle blur effect at fog boundaries for a softer look
-        </p>
-      </div>
-
-      {(overrides.fogOfWarBlurEnabled ?? false) && (
-        <div style={{ marginTop: '12px', marginLeft: '24px', opacity: useGlobalSettings ? 0.5 : 1 }}>
-          <label class="dmt-form-label" style={{ marginBottom: '8px', display: 'block', fontSize: '12px' }}>
-            Blur Intensity: {Math.round((overrides.fogOfWarBlurFactor ?? 0.20) * 100)}%
-          </label>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <input
-              type="range"
-              min="5"
-              max="50"
-              value={Math.round((overrides.fogOfWarBlurFactor ?? 0.20) * 100)}
-              onChange={(e: Event) => !useGlobalSettings && handleColorChange('fogOfWarBlurFactor', parseInt((e.target as HTMLInputElement).value, 10) / 100)}
+              class="dmt-color-button"
               disabled={useGlobalSettings}
+              onClick={() => !useGlobalSettings && setActiveColorPicker('fogOfWarColor')}
               style={{
-                flex: 1,
-                height: '6px',
+                backgroundColor: overrides.fogOfWarColor ?? '#000000',
                 cursor: useGlobalSettings ? 'not-allowed' : 'pointer',
-                accentColor: 'var(--interactive-accent)'
+                minWidth: '80px'
               }}
-            />
-            <span style={{
-              fontSize: '12px',
-              color: 'var(--text-muted)',
-              minWidth: '35px',
-              textAlign: 'right'
-            }}>
-              {Math.round((overrides.fogOfWarBlurFactor ?? 0.20) * 100)}%
-            </span>
+            >
+              <span class="dmt-color-button-label">{overrides.fogOfWarColor ?? '#000000'}</span>
+            </button>
+
             <button
               class="dmt-color-reset-btn"
               disabled={useGlobalSettings}
-              onClick={() => !useGlobalSettings && handleColorChange('fogOfWarBlurFactor', 0.20)}
-              title="Reset to default (8%)"
+              onClick={() => !useGlobalSettings && handleColorChange('fogOfWarColor', THEME.fogOfWar.color)}
+              title="Reset to default"
+              style={{ cursor: useGlobalSettings ? 'not-allowed' : 'pointer' }}
+            >
+              <dc.Icon icon="lucide-rotate-ccw" />
+            </button>
+
+            <ColorPicker
+              isOpen={activeColorPicker === 'fogOfWarColor' && !useGlobalSettings}
+              selectedColor={overrides.fogOfWarColor ?? '#000000'}
+              onColorSelect={(color: HexColor) => handleColorChange('fogOfWarColor', color)}
+              onClose={() => setActiveColorPicker(null)}
+              onReset={() => handleColorChange('fogOfWarColor', globalSettings.fogOfWarColor)}
+              customColors={[]}
+              pendingCustomColorRef={pendingCustomColorRef}
+              title="Fog Color"
+              position="below"
+              align="left"
+            />
+          </div>
+        </SettingItem>
+
+        <SettingItem
+          name={`Fog Opacity: ${Math.round((overrides.fogOfWarOpacity ?? 0.9) * 100)}%`}
+          description="Higher values make fog more opaque (10-100%)"
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <NativeSlider
+              min={10}
+              max={100}
+              value={Math.round((overrides.fogOfWarOpacity ?? 0.9) * 100)}
+              onChange={(val: number) => handleColorChange('fogOfWarOpacity', val / 100)}
+              disabled={useGlobalSettings}
+            />
+            <button
+              class="dmt-color-reset-btn"
+              disabled={useGlobalSettings}
+              onClick={() => !useGlobalSettings && handleColorChange('fogOfWarOpacity', 0.9)}
+              title="Reset to default (90%)"
               style={{ cursor: useGlobalSettings ? 'not-allowed' : 'pointer' }}
             >
               <dc.Icon icon="lucide-rotate-ccw" />
             </button>
           </div>
-          <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
-            Size of blur as percentage of cell size (5-50%)
-          </p>
-        </div>
-      )}
+        </SettingItem>
+
+        <SettingItem
+          name="Fog Texture"
+          description="Select a tileable image to use instead of solid color"
+          vertical
+        >
+          <div style={{ position: 'relative' }}>
+            <input
+              type="text"
+              placeholder="Search for tileable image..."
+              value={fogImageDisplayName}
+              disabled={useGlobalSettings}
+              onChange={(e: Event) => {
+                if (useGlobalSettings) return;
+                const value = (e.target as HTMLInputElement).value;
+                setFogImageDisplayName(value);
+                handleFogImageSearch(value);
+              }}
+              style={{
+                width: '100%',
+                padding: '8px 32px 8px 10px',
+                borderRadius: '4px',
+                border: '1px solid var(--background-modifier-border)',
+                background: 'var(--background-primary)',
+                color: 'var(--text-normal)',
+                fontSize: '14px',
+                cursor: useGlobalSettings ? 'not-allowed' : 'text'
+              }}
+            />
+
+            {overrides.fogOfWarImage && !useGlobalSettings && (
+              <button
+                onClick={handleFogImageClear}
+                style={{
+                  position: 'absolute',
+                  right: '6px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'var(--text-muted)',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  fontSize: '16px',
+                  lineHeight: '1'
+                }}
+                title="Clear image"
+              >
+                ×
+              </button>
+            )}
+
+            {fogImageSearchResults.length > 0 && !useGlobalSettings && (
+              <div style={{
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                right: 0,
+                maxHeight: '200px',
+                overflowY: 'auto',
+                background: 'var(--background-primary)',
+                border: '1px solid var(--background-modifier-border)',
+                borderRadius: '4px',
+                marginTop: '2px',
+                zIndex: 1000,
+                boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+              }}>
+                {fogImageSearchResults.map((name: string, idx: number) => (
+                  <div
+                    key={idx}
+                    onClick={() => handleFogImageSelect(name)}
+                    style={{
+                      padding: '8px 10px',
+                      cursor: 'pointer',
+                      fontSize: '13px',
+                      borderBottom: idx < fogImageSearchResults.length - 1 ? '1px solid var(--background-modifier-border)' : 'none'
+                    }}
+                    onMouseEnter={(e: MouseEvent) => (e.currentTarget as HTMLElement).style.background = 'var(--background-modifier-hover)'}
+                    onMouseLeave={(e: MouseEvent) => (e.currentTarget as HTMLElement).style.background = 'transparent'}
+                  >
+                    {name}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </SettingItem>
+
+        <SettingItem
+          name="Soft edges"
+          description="Adds a subtle blur effect at fog boundaries"
+        >
+          <NativeToggle
+            value={overrides.fogOfWarBlurEnabled ?? false}
+            onChange={() => handleColorChange('fogOfWarBlurEnabled', !(overrides.fogOfWarBlurEnabled ?? false))}
+            disabled={useGlobalSettings}
+          />
+        </SettingItem>
+
+        {(overrides.fogOfWarBlurEnabled ?? false) && (
+          <SettingItem
+            name={`Blur Intensity: ${Math.round((overrides.fogOfWarBlurFactor ?? 0.20) * 100)}%`}
+            description="Size of blur as percentage of cell size (5-50%)"
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <NativeSlider
+                min={5}
+                max={50}
+                value={Math.round((overrides.fogOfWarBlurFactor ?? 0.20) * 100)}
+                onChange={(val: number) => handleColorChange('fogOfWarBlurFactor', val / 100)}
+                disabled={useGlobalSettings}
+              />
+              <button
+                class="dmt-color-reset-btn"
+                disabled={useGlobalSettings}
+                onClick={() => !useGlobalSettings && handleColorChange('fogOfWarBlurFactor', 0.20)}
+                title="Reset to default (20%)"
+                style={{ cursor: useGlobalSettings ? 'not-allowed' : 'pointer' }}
+              >
+                <dc.Icon icon="lucide-rotate-ccw" />
+              </button>
+            </div>
+          </SettingItem>
+        )}
+      </div>
     </CollapsibleSection>
   );
 }
@@ -46166,6 +48842,8 @@ function AppearanceTab(): React.ReactElement {
     useGlobalSettings,
     overrides,
     globalSettings,
+    objectSetId,
+    handleObjectSetChange,
     handleToggleUseGlobal,
     handleLineWidthChange,
     handleColorChange,
@@ -46174,74 +48852,81 @@ function AppearanceTab(): React.ReactElement {
 
   return (
     <div class="dmt-settings-tab-content">
-      <div class="dmt-form-group" style={{ marginBottom: '16px' }}>
-        <label class="dmt-checkbox-label">
-          <input
-            type="checkbox"
-            checked={!useGlobalSettings}
-            onChange={handleToggleUseGlobal}
-            class="dmt-checkbox"
-          />
-          <span>Use custom colors for this map</span>
-        </label>
-      </div>
+      {globalSettings.objectSets && globalSettings.objectSets.length > 0 && (
+        <SettingItem
+          name="Object set"
+          description="Override the global object set for this map"
+        >
+          <select
+            class="dropdown"
+            value={objectSetId || ''}
+            onChange={(e) => handleObjectSetChange(e.currentTarget.value || null)}
+          >
+            <option value="">Use global</option>
+            {globalSettings.objectSets.map((set) => (
+              <option key={set.id} value={set.id}>{set.name}</option>
+            ))}
+          </select>
+        </SettingItem>
+      )}
 
-      <div
-        class="dmt-color-grid"
-        style={{
-          opacity: useGlobalSettings ? 0.5 : 1,
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
-          gap: '16px'
-        }}
+      <SettingItem
+        name="Custom colors"
+        description="Override global color settings for this map"
       >
-        <ColorPickerItem
-          colorKey="gridLineColor"
-          label="Grid Lines"
-          defaultColor={THEME.grid.lines}
+        <NativeToggle
+          value={!useGlobalSettings}
+          onChange={handleToggleUseGlobal}
         />
-        <ColorPickerItem
-          colorKey="backgroundColor"
-          label="Background"
-          defaultColor={THEME.grid.background}
-          align="right"
-        />
-        <ColorPickerItem
-          colorKey="borderColor"
-          label="Cell Border"
-          defaultColor={THEME.cells.border}
-        />
-        <ColorPickerItem
-          colorKey="coordinateKeyColor"
-          label="Coord Key"
-          defaultColor={THEME.coordinateKey.color}
-          align="right"
-        />
+      </SettingItem>
+
+      <div style={{ opacity: useGlobalSettings ? 0.5 : 1 }}>
+        <div
+          class="dmt-color-grid"
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: '16px',
+            padding: '12px 0'
+          }}
+        >
+          <ColorPickerItem
+            colorKey="gridLineColor"
+            label="Grid Lines"
+            defaultColor={THEME.grid.lines}
+          />
+          <ColorPickerItem
+            colorKey="backgroundColor"
+            label="Background"
+            defaultColor={THEME.grid.background}
+            align="right"
+          />
+          <ColorPickerItem
+            colorKey="borderColor"
+            label="Cell Border"
+            defaultColor={THEME.cells.border}
+          />
+          <ColorPickerItem
+            colorKey="coordinateKeyColor"
+            label="Coord Key"
+            defaultColor={THEME.coordinateKey.color}
+            align="right"
+          />
+        </div>
       </div>
 
       {mapType === 'grid' && (
-        <div
-          class="dmt-form-group"
-          style={{
-            marginTop: '20px',
-            opacity: useGlobalSettings ? 0.5 : 1
-          }}
+        <SettingItem
+          name={`Grid Line Width: ${overrides.gridLineWidth ?? 1}px`}
+          description="Thickness of the grid lines (1-5 pixels)"
         >
-          <label class="dmt-form-label" style={{ marginBottom: '8px' }}>
-            Grid Line Width: {overrides.gridLineWidth ?? 1}px
-          </label>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <input
-              type="range"
-              min="1"
-              max="5"
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', opacity: useGlobalSettings ? 0.5 : 1 }}>
+            <NativeSlider
+              min={1}
+              max={5}
               value={overrides.gridLineWidth ?? 1}
-              onInput={(e: Event) => handleLineWidthChange((e.target as HTMLInputElement).value)}
+              onChange={(val: number) => handleLineWidthChange(val)}
               disabled={useGlobalSettings}
-              style={{
-                flex: 1,
-                cursor: useGlobalSettings ? 'not-allowed' : 'pointer'
-              }}
             />
             <button
               class="dmt-color-reset-btn"
@@ -46253,50 +48938,57 @@ function AppearanceTab(): React.ReactElement {
               <dc.Icon icon="lucide-rotate-ccw" />
             </button>
           </div>
-          <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '6px' }}>
-            Thickness of the grid lines (1-5 pixels)
-          </p>
-        </div>
+        </SettingItem>
       )}
 
-      <div style={{ marginTop: '20px' }}>
-        <FogOfWarSection />
-      </div>
+      <FogOfWarSection />
 
-      <div style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px solid var(--background-modifier-border)' }}>
-        <h4 style={{ fontSize: '14px', fontWeight: 600, marginBottom: '8px' }}>Canvas Size</h4>
-        <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '16px' }}>
-          Canvas height settings (leave blank to use global defaults)
-        </p>
-
-        <div style={{ display: 'flex', gap: '12px', padding: '0 2px', opacity: useGlobalSettings ? 0.5 : 1 }}>
-          <div class="dmt-form-group" style={{ flex: 1, marginBottom: 0 }}>
-            <label class="dmt-form-label">Desktop (pixels)</label>
+      <SettingItem
+        name="Canvas Size"
+        description="Height in pixels (leave blank for global defaults)"
+        vertical
+      >
+        <div style={{ display: 'flex', gap: '12px', width: '100%', opacity: useGlobalSettings ? 0.5 : 1 }}>
+          <div style={{ flex: 1 }}>
+            <label style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>Desktop</label>
             <input
               type="number"
-              class="dmt-modal-input"
               placeholder={String(globalSettings.canvasHeight ?? 600)}
               value={useGlobalSettings ? '' : (overrides.canvasHeight ?? '')}
               onChange={(e: Event) => !useGlobalSettings && handleColorChange('canvasHeight', (e.target as HTMLInputElement).value === '' ? undefined : parseInt((e.target as HTMLInputElement).value, 10))}
               disabled={useGlobalSettings}
-              style={{ opacity: useGlobalSettings ? 0.5 : 1 }}
+              style={{
+                width: '100%',
+                padding: '6px 10px',
+                borderRadius: '4px',
+                border: '1px solid var(--background-modifier-border)',
+                background: 'var(--background-primary)',
+                color: 'var(--text-normal)',
+                fontSize: '14px'
+              }}
             />
           </div>
-
-          <div class="dmt-form-group" style={{ flex: 1, marginBottom: 0 }}>
-            <label class="dmt-form-label">Mobile/Touch (pixels)</label>
+          <div style={{ flex: 1 }}>
+            <label style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>Mobile</label>
             <input
               type="number"
-              class="dmt-modal-input"
               placeholder={String(globalSettings.canvasHeightMobile ?? 400)}
               value={useGlobalSettings ? '' : (overrides.canvasHeightMobile ?? '')}
               onChange={(e: Event) => !useGlobalSettings && handleColorChange('canvasHeightMobile', (e.target as HTMLInputElement).value === '' ? undefined : parseInt((e.target as HTMLInputElement).value, 10))}
               disabled={useGlobalSettings}
-              style={{ opacity: useGlobalSettings ? 0.5 : 1 }}
+              style={{
+                width: '100%',
+                padding: '6px 10px',
+                borderRadius: '4px',
+                border: '1px solid var(--background-modifier-border)',
+                background: 'var(--background-primary)',
+                color: 'var(--text-normal)',
+                fontSize: '14px'
+              }}
             />
           </div>
         </div>
-      </div>
+      </SettingItem>
     </div>
   );
 }
@@ -46320,6 +49012,7 @@ import type { ImageDimensions } from '#types/settings/settings.types';
 
 const { useMapSettings } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "MapSettingsContext"));
 const { CollapsibleSection } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "CollapsibleSection"));
+const { SettingItem } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "SettingItem"));
 
 /** Map settings context shape for this component */
 interface BackgroundImageContext {
@@ -46364,7 +49057,6 @@ function BackgroundImageSection(): React.ReactElement {
     setIsOpen(newIsOpen);
   };
 
-  // Generate subtitle showing selected image or status
   const subtitle = backgroundImagePath
     ? backgroundImageDisplayName || 'Image selected'
     : 'No image';
@@ -46376,96 +49068,91 @@ function BackgroundImageSection(): React.ReactElement {
       onToggle={handleToggle}
       subtitle={subtitle}
     >
-      <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '10px' }}>
-        Add an image to automatically size the hex grid
-      </p>
-
-      {/* Image picker */}
-      <div style={{ position: 'relative', marginBottom: '12px' }}>
-        <input
-          type="text"
-          placeholder="Search for image..."
-          value={backgroundImageDisplayName}
-          onChange={(e: Event) => {
-            const value = (e.target as HTMLInputElement).value;
-            setBackgroundImageDisplayName(value);
-            handleImageSearch(value);
-          }}
-          style={{
-            width: '100%',
-            padding: '8px 32px 8px 10px',
-            borderRadius: '4px',
-            border: '1px solid var(--background-modifier-border)',
-            background: 'var(--background-primary)',
-            color: 'var(--text-normal)',
-            fontSize: '14px'
-          }}
-        />
-
-        {backgroundImagePath && (
-          <button
-            onClick={handleImageClear}
-            style={{
-              position: 'absolute',
-              right: '6px',
-              top: '50%',
-              transform: 'translateY(-50%)',
-              background: 'transparent',
-              border: 'none',
-              color: 'var(--text-muted)',
-              cursor: 'pointer',
-              padding: '4px',
-              fontSize: '16px',
-              lineHeight: '1'
+      <SettingItem name="Image" description="Add an image to automatically size the hex grid" vertical>
+        <div style={{ position: 'relative' }}>
+          <input
+            type="text"
+            placeholder="Search for image..."
+            value={backgroundImageDisplayName}
+            onChange={(e: Event) => {
+              const value = (e.target as HTMLInputElement).value;
+              setBackgroundImageDisplayName(value);
+              handleImageSearch(value);
             }}
-            title="Clear image"
-          >
-            ×
-          </button>
-        )}
+            style={{
+              width: '100%',
+              padding: '8px 32px 8px 10px',
+              borderRadius: '4px',
+              border: '1px solid var(--background-modifier-border)',
+              background: 'var(--background-primary)',
+              color: 'var(--text-normal)',
+              fontSize: '14px'
+            }}
+          />
 
-        {/* Autocomplete dropdown */}
-        {imageSearchResults.length > 0 && (
-          <div style={{
-            position: 'absolute',
-            top: '100%',
-            left: 0,
-            right: 0,
-            maxHeight: '200px',
-            overflowY: 'auto',
-            background: 'var(--background-primary)',
-            border: '1px solid var(--background-modifier-border)',
-            borderRadius: '4px',
-            marginTop: '2px',
-            zIndex: 1000,
-            boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
-          }}>
-            {imageSearchResults.map((name: string, idx: number) => (
-              <div
-                key={idx}
-                onClick={() => handleImageSelect(name)}
-                style={{
-                  padding: '8px 10px',
-                  cursor: 'pointer',
-                  fontSize: '13px',
-                  borderBottom: idx < imageSearchResults.length - 1 ? '1px solid var(--background-modifier-border)' : 'none'
-                }}
-                onMouseEnter={(e: Event) => (e.currentTarget as HTMLElement).style.background = 'var(--background-modifier-hover)'}
-                onMouseLeave={(e: Event) => (e.currentTarget as HTMLElement).style.background = 'transparent'}
-              >
-                {name}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+          {backgroundImagePath && (
+            <button
+              onClick={handleImageClear}
+              style={{
+                position: 'absolute',
+                right: '6px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                background: 'transparent',
+                border: 'none',
+                color: 'var(--text-muted)',
+                cursor: 'pointer',
+                padding: '4px',
+                fontSize: '16px',
+                lineHeight: '1'
+              }}
+              title="Clear image"
+            >
+              ×
+            </button>
+          )}
+
+          {/* Autocomplete dropdown */}
+          {imageSearchResults.length > 0 && (
+            <div style={{
+              position: 'absolute',
+              top: '100%',
+              left: 0,
+              right: 0,
+              maxHeight: '200px',
+              overflowY: 'auto',
+              background: 'var(--background-primary)',
+              border: '1px solid var(--background-modifier-border)',
+              borderRadius: '4px',
+              marginTop: '2px',
+              zIndex: 1000,
+              boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+            }}>
+              {imageSearchResults.map((name: string, idx: number) => (
+                <div
+                  key={idx}
+                  onClick={() => handleImageSelect(name)}
+                  style={{
+                    padding: '8px 10px',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    borderBottom: idx < imageSearchResults.length - 1 ? '1px solid var(--background-modifier-border)' : 'none'
+                  }}
+                  onMouseEnter={(e: Event) => (e.currentTarget as HTMLElement).style.background = 'var(--background-modifier-hover)'}
+                  onMouseLeave={(e: Event) => (e.currentTarget as HTMLElement).style.background = 'transparent'}
+                >
+                  {name}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </SettingItem>
 
       {/* Show dimensions when image is selected */}
       {imageDimensions && (
-        <div>
-          <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-            Detected: {imageDimensions.width} × {imageDimensions.height} px
-          </p>
+        <div class="setting-item-description">
+          Detected: {imageDimensions.width} × {imageDimensions.height} px
         </div>
       )}
     </CollapsibleSection>
@@ -46501,6 +49188,8 @@ import type {
 
 const { useMapSettings } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "MapSettingsContext"));
 const { CollapsibleSection } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "CollapsibleSection"));
+const { SettingItem } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "SettingItem"));
+const { NativeSlider } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "NativeControls"));
 
 /** Fine tune range */
 interface FineTuneRange {
@@ -46577,90 +49266,90 @@ function DensityModeContent(): React.ReactElement {
 
   return (
     <div>
-      <label class="dmt-form-label" style={{ marginBottom: '8px' }}>Grid Density</label>
+      <SettingItem name="Grid Density" vertical>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: 'pointer' }}>
+            <input
+              type="radio"
+              name="gridDensity"
+              value="sparse"
+              checked={gridDensity === 'sparse'}
+              onChange={() => handleDensityChange('sparse')}
+              style={{ marginTop: '2px' }}
+            />
+            <div>
+              <span style={{ fontWeight: 500 }}>{GRID_DENSITY_PRESETS.sparse.label}</span>
+              <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                {GRID_DENSITY_PRESETS.sparse.description}
+              </p>
+            </div>
+          </label>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-        <label class="dmt-radio-label" style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: 'pointer' }}>
-          <input
-            type="radio"
-            name="gridDensity"
-            value="sparse"
-            checked={gridDensity === 'sparse'}
-            onChange={() => handleDensityChange('sparse')}
-            style={{ marginTop: '2px' }}
-          />
-          <div>
-            <span style={{ fontWeight: 500 }}>{GRID_DENSITY_PRESETS.sparse.label}</span>
-            <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
-              {GRID_DENSITY_PRESETS.sparse.description}
-            </p>
-          </div>
-        </label>
+          <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: 'pointer' }}>
+            <input
+              type="radio"
+              name="gridDensity"
+              value="medium"
+              checked={gridDensity === 'medium'}
+              onChange={() => handleDensityChange('medium')}
+              style={{ marginTop: '2px' }}
+            />
+            <div>
+              <span style={{ fontWeight: 500 }}>{GRID_DENSITY_PRESETS.medium.label}</span>
+              <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                {GRID_DENSITY_PRESETS.medium.description}
+              </p>
+            </div>
+          </label>
 
-        <label class="dmt-radio-label" style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: 'pointer' }}>
-          <input
-            type="radio"
-            name="gridDensity"
-            value="medium"
-            checked={gridDensity === 'medium'}
-            onChange={() => handleDensityChange('medium')}
-            style={{ marginTop: '2px' }}
-          />
-          <div>
-            <span style={{ fontWeight: 500 }}>{GRID_DENSITY_PRESETS.medium.label}</span>
-            <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
-              {GRID_DENSITY_PRESETS.medium.description}
-            </p>
-          </div>
-        </label>
+          <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: 'pointer' }}>
+            <input
+              type="radio"
+              name="gridDensity"
+              value="dense"
+              checked={gridDensity === 'dense'}
+              onChange={() => handleDensityChange('dense')}
+              style={{ marginTop: '2px' }}
+            />
+            <div>
+              <span style={{ fontWeight: 500 }}>{GRID_DENSITY_PRESETS.dense.label}</span>
+              <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                {GRID_DENSITY_PRESETS.dense.description}
+              </p>
+            </div>
+          </label>
 
-        <label class="dmt-radio-label" style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: 'pointer' }}>
-          <input
-            type="radio"
-            name="gridDensity"
-            value="dense"
-            checked={gridDensity === 'dense'}
-            onChange={() => handleDensityChange('dense')}
-            style={{ marginTop: '2px' }}
-          />
-          <div>
-            <span style={{ fontWeight: 500 }}>{GRID_DENSITY_PRESETS.dense.label}</span>
-            <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
-              {GRID_DENSITY_PRESETS.dense.description}
-            </p>
-          </div>
-        </label>
-
-        <label class="dmt-radio-label" style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-          <input
-            type="radio"
-            name="gridDensity"
-            value="custom"
-            checked={gridDensity === 'custom'}
-            onChange={() => handleDensityChange('custom')}
-          />
-          <span style={{ fontWeight: 500 }}>Custom</span>
-          <input
-            type="number"
-            min="1"
-            max="200"
-            value={customColumns}
-            onChange={(e: Event) => handleCustomColumnsChange((e.target as HTMLInputElement).value)}
-            disabled={gridDensity !== 'custom'}
-            style={{
-              width: '60px',
-              padding: '4px 8px',
-              borderRadius: '4px',
-              border: '1px solid var(--background-modifier-border)',
-              background: 'var(--background-primary)',
-              color: 'var(--text-normal)',
-              fontSize: '13px',
-              opacity: gridDensity !== 'custom' ? 0.5 : 1
-            }}
-          />
-          <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>columns</span>
-        </label>
-      </div>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+            <input
+              type="radio"
+              name="gridDensity"
+              value="custom"
+              checked={gridDensity === 'custom'}
+              onChange={() => handleDensityChange('custom')}
+            />
+            <span style={{ fontWeight: 500 }}>Custom</span>
+            <input
+              type="number"
+              min="1"
+              max="200"
+              value={customColumns}
+              onChange={(e: Event) => handleCustomColumnsChange((e.target as HTMLInputElement).value)}
+              disabled={gridDensity !== 'custom'}
+              style={{
+                width: '60px',
+                padding: '4px 8px',
+                borderRadius: '4px',
+                border: '1px solid var(--background-modifier-border)',
+                background: 'var(--background-primary)',
+                color: 'var(--text-normal)',
+                fontSize: '13px',
+                opacity: gridDensity !== 'custom' ? 0.5 : 1
+              }}
+            />
+            <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>columns</span>
+          </label>
+        </div>
+      </SettingItem>
 
       {/* Show calculated result */}
       {imageDimensions && (
@@ -46706,54 +49395,53 @@ function MeasurementModeContent(): React.ReactElement {
 
   return (
     <div>
-      <label class="dmt-form-label" style={{ marginBottom: '8px' }}>Hex Measurement</label>
+      <SettingItem name="Measurement Method">
+        <div style={{ display: 'flex', gap: '12px' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+            <input
+              type="radio"
+              name="measurementMethod"
+              value={MEASUREMENT_EDGE}
+              checked={measurementMethod === MEASUREMENT_EDGE}
+              onChange={() => handleMeasurementMethodChange(MEASUREMENT_EDGE)}
+            />
+            <span style={{ fontSize: '13px' }}>Edge-to-edge</span>
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+            <input
+              type="radio"
+              name="measurementMethod"
+              value={MEASUREMENT_CORNER}
+              checked={measurementMethod === MEASUREMENT_CORNER}
+              onChange={() => handleMeasurementMethodChange(MEASUREMENT_CORNER)}
+            />
+            <span style={{ fontSize: '13px' }}>Corner-to-corner</span>
+          </label>
+        </div>
+      </SettingItem>
 
-      {/* Measurement method selector */}
-      <div style={{ display: 'flex', gap: '12px', marginBottom: '12px' }}>
-        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+      <SettingItem name="Size">
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
           <input
-            type="radio"
-            name="measurementMethod"
-            value={MEASUREMENT_EDGE}
-            checked={measurementMethod === MEASUREMENT_EDGE}
-            onChange={() => handleMeasurementMethodChange(MEASUREMENT_EDGE)}
+            type="number"
+            min="10"
+            max="500"
+            step="1"
+            value={measurementSize}
+            onChange={(e: Event) => handleMeasurementSizeChange((e.target as HTMLInputElement).value)}
+            style={{
+              width: '80px',
+              padding: '4px 8px',
+              borderRadius: '4px',
+              border: '1px solid var(--background-modifier-border)',
+              background: 'var(--background-primary)',
+              color: 'var(--text-normal)',
+              fontSize: '13px'
+            }}
           />
-          <span style={{ fontSize: '13px' }}>Edge-to-edge</span>
-        </label>
-        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
-          <input
-            type="radio"
-            name="measurementMethod"
-            value={MEASUREMENT_CORNER}
-            checked={measurementMethod === MEASUREMENT_CORNER}
-            onChange={() => handleMeasurementMethodChange(MEASUREMENT_CORNER)}
-          />
-          <span style={{ fontSize: '13px' }}>Corner-to-corner</span>
-        </label>
-      </div>
-
-      {/* Size input */}
-      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '12px' }}>
-        <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Size:</span>
-        <input
-          type="number"
-          min="10"
-          max="500"
-          step="1"
-          value={measurementSize}
-          onChange={(e: Event) => handleMeasurementSizeChange((e.target as HTMLInputElement).value)}
-          style={{
-            width: '80px',
-            padding: '4px 8px',
-            borderRadius: '4px',
-            border: '1px solid var(--background-modifier-border)',
-            background: 'var(--background-primary)',
-            color: 'var(--text-normal)',
-            fontSize: '13px'
-          }}
-        />
-        <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>pixels</span>
-      </div>
+          <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>pixels</span>
+        </div>
+      </SettingItem>
 
       {/* Calculated result */}
       <div style={{ padding: '8px', background: 'var(--background-secondary)', borderRadius: '4px', marginBottom: '12px' }}>
@@ -46773,57 +49461,57 @@ function MeasurementModeContent(): React.ReactElement {
           padding: '4px 0',
           userSelect: 'none'
         }}>
-          ⚙ Fine-Tune Alignment
+          Fine-Tune Alignment
         </summary>
 
         <div style={{ marginTop: '8px', padding: '12px', background: 'var(--background-secondary)', borderRadius: '4px' }}>
-          <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '12px' }}>
-            Adjust if hexes don't align perfectly with your image grid. Small changes can make a big difference.
-          </p>
+          <SettingItem
+            name="Hex size"
+            description="Adjust if hexes don't align perfectly with your image grid"
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <input
+                type="number"
+                min={fineTuneRange.min}
+                max={fineTuneRange.max}
+                step="0.5"
+                value={effectiveHexSize.toFixed(1)}
+                onChange={(e: Event) => handleFineTuneChange(parseFloat((e.target as HTMLInputElement).value))}
+                style={{
+                  width: '80px',
+                  padding: '4px 8px',
+                  borderRadius: '4px',
+                  border: '1px solid var(--background-modifier-border)',
+                  background: 'var(--background-primary)',
+                  color: 'var(--text-normal)',
+                  fontSize: '13px'
+                }}
+              />
+              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>px</span>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Hex size:</span>
-            <input
-              type="number"
-              min={fineTuneRange.min}
-              max={fineTuneRange.max}
-              step="0.5"
-              value={effectiveHexSize.toFixed(1)}
-              onChange={(e: Event) => handleFineTuneChange(parseFloat((e.target as HTMLInputElement).value))}
-              style={{
-                width: '80px',
-                padding: '4px 8px',
-                borderRadius: '4px',
-                border: '1px solid var(--background-modifier-border)',
-                background: 'var(--background-primary)',
-                color: 'var(--text-normal)',
-                fontSize: '13px'
-              }}
-            />
-            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>px</span>
-
-            {fineTuneOffset !== 0 && (
-              <>
-                <span style={{ fontSize: '12px', color: 'var(--text-accent)' }}>
-                  ({fineTuneOffset > 0 ? '+' : ''}{fineTuneOffset.toFixed(1)})
-                </span>
-                <button
-                  onClick={handleFineTuneReset}
-                  style={{
-                    padding: '4px 8px',
-                    fontSize: '11px',
-                    background: 'var(--interactive-normal)',
-                    border: 'none',
-                    borderRadius: '3px',
-                    cursor: 'pointer',
-                    color: 'var(--text-normal)'
-                  }}
-                >
-                  Reset
-                </button>
-              </>
-            )}
-          </div>
+              {fineTuneOffset !== 0 && (
+                <>
+                  <span style={{ fontSize: '12px', color: 'var(--text-accent)' }}>
+                    ({fineTuneOffset > 0 ? '+' : ''}{fineTuneOffset.toFixed(1)})
+                  </span>
+                  <button
+                    onClick={handleFineTuneReset}
+                    style={{
+                      padding: '4px 8px',
+                      fontSize: '11px',
+                      background: 'var(--interactive-normal)',
+                      border: 'none',
+                      borderRadius: '3px',
+                      cursor: 'pointer',
+                      color: 'var(--text-normal)'
+                    }}
+                  >
+                    Reset
+                  </button>
+                </>
+              )}
+            </div>
+          </SettingItem>
         </div>
       </details>
     </div>
@@ -46903,54 +49591,33 @@ function SizingModeSection(): React.ReactElement | null {
       {sizingMode === 'measurement' && <MeasurementModeContent />}
 
       {/* Opacity slider */}
-      <div style={{ marginTop: '16px' }}>
-        <label class="dmt-form-label" style={{ marginBottom: '8px', display: 'block' }}>
-          Image Opacity: {Math.round(imageOpacity * 100)}%
-        </label>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <input
-            type="range"
-            min="0"
-            max="100"
-            value={Math.round(imageOpacity * 100)}
-            onChange={(e: Event) => setImageOpacity(parseInt((e.target as HTMLInputElement).value, 10) / 100)}
-            style={{
-              flex: 1,
-              height: '6px',
-              cursor: 'pointer',
-              accentColor: 'var(--interactive-accent)'
-            }}
-          />
-          <span style={{
-            fontSize: '12px',
-            color: 'var(--text-muted)',
-            minWidth: '35px',
-            textAlign: 'right'
-          }}>
-            {Math.round(imageOpacity * 100)}%
-          </span>
-        </div>
-        <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
-          Lower opacity makes the grid more visible over the image
-        </p>
-      </div>
+      <SettingItem
+        name={`Image Opacity: ${Math.round(imageOpacity * 100)}%`}
+        description="Lower opacity makes the grid more visible over the image"
+      >
+        <NativeSlider
+          min={0}
+          max={100}
+          value={Math.round(imageOpacity * 100)}
+          onChange={(val: number) => setImageOpacity(val / 100)}
+        />
+      </SettingItem>
 
-      {/* Image offset controls - collapsible, starts collapsed */}
+      {/* Image offset controls */}
       <CollapsibleSection
         title="Image Offset"
         defaultOpen={false}
         subtitle={`X: ${imageOffsetX}, Y: ${imageOffsetY}`}
       >
-        <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '8px' }}>
+        <SettingItem name="Offset" description="Fine-tune image position relative to grid center">
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>X:</span>
             <input
               type="number"
               value={imageOffsetX}
               onChange={(e: Event) => setImageOffsetX(parseInt((e.target as HTMLInputElement).value, 10) || 0)}
-              class="dmt-number-input"
               style={{
-                width: '80px',
+                width: '70px',
                 padding: '4px 8px',
                 borderRadius: '4px',
                 border: '1px solid var(--background-modifier-border)',
@@ -46959,16 +49626,13 @@ function SizingModeSection(): React.ReactElement | null {
                 fontSize: '13px'
               }}
             />
-          </div>
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Y:</span>
             <input
               type="number"
               value={imageOffsetY}
               onChange={(e: Event) => setImageOffsetY(parseInt((e.target as HTMLInputElement).value, 10) || 0)}
-              class="dmt-number-input"
               style={{
-                width: '80px',
+                width: '70px',
                 padding: '4px 8px',
                 borderRadius: '4px',
                 border: '1px solid var(--background-modifier-border)',
@@ -46978,31 +49642,17 @@ function SizingModeSection(): React.ReactElement | null {
               }}
             />
           </div>
-        </div>
-        <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px' }}>
-          Fine-tune image position relative to grid center
-        </p>
-        <button
-          onClick={() => onOpenAlignmentMode?.(imageOffsetX, imageOffsetY)}
-          style={{
-            padding: '6px 12px',
-            fontSize: '12px',
-            fontWeight: '500',
-            background: 'var(--interactive-normal)',
-            color: 'var(--text-normal)',
-            border: '1px solid var(--background-modifier-border)',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px'
-          }}
-          onMouseEnter={(e: Event) => (e.target as HTMLElement).style.background = 'var(--interactive-hover)'}
-          onMouseLeave={(e: Event) => (e.target as HTMLElement).style.background = 'var(--interactive-normal)'}
-        >
-          <span>📍</span>
-          <span>Adjust Position Interactively</span>
-        </button>
+        </SettingItem>
+
+        <SettingItem name="Interactive Alignment" description="Drag the image to align with the grid">
+          <button
+            onClick={() => onOpenAlignmentMode?.(imageOffsetX, imageOffsetY)}
+            class="mod-cta"
+            style={{ padding: '6px 12px', fontSize: '12px' }}
+          >
+            Adjust
+          </button>
+        </SettingItem>
       </CollapsibleSection>
     </div>
   );
@@ -47023,6 +49673,8 @@ return { SizingModeSection, DensityModeContent, MeasurementModeContent };
  */
 
 const { useMapSettings } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "MapSettingsContext"));
+const { SettingItem } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "SettingItem"));
+const { NativeToggle } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "NativeControls"));
 
 /** Hex bounds configuration */
 interface HexBounds {
@@ -47051,7 +49703,6 @@ function BoundsSection(): React.ReactElement {
     handleBoundsLockToggle
   } = useMapSettings() as BoundsSectionContext;
 
-  // Generate display label for playable area (e.g., "A1 to Z20")
   const getPlayableAreaLabel = (): string => {
     const maxColLetter = String.fromCharCode(65 + Math.min(hexBounds.maxCol - 1, 25));
     const overflow = hexBounds.maxCol > 26 ? '+' : '';
@@ -47061,24 +49712,17 @@ function BoundsSection(): React.ReactElement {
   const isDisabled = boundsLocked && !!backgroundImagePath;
 
   return (
-    <div class="dmt-form-group">
-      <label class="dmt-form-label">
-        Map Bounds
-        {isDisabled && (
-          <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 'normal', marginLeft: '8px' }}>
-            (controlled by background image)
-          </span>
-        )}
-      </label>
-      <div style={{
-        display: 'flex',
-        gap: '16px',
-        alignItems: 'center',
-        flexWrap: 'wrap',
-        opacity: isDisabled ? 0.6 : 1
-      }}>
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Columns:</span>
+    <div>
+      <SettingItem
+        name="Map Bounds"
+        description={`Playable area: ${getPlayableAreaLabel()}${isDisabled ? ' (controlled by background image)' : ''}`}
+      >
+        <div style={{
+          display: 'flex',
+          gap: '8px',
+          alignItems: 'center',
+          opacity: isDisabled ? 0.6 : 1
+        }}>
           <input
             type="number"
             min="1"
@@ -47086,21 +49730,17 @@ function BoundsSection(): React.ReactElement {
             value={hexBounds.maxCol}
             onChange={(e: Event) => handleHexBoundsChange('maxCol', (e.target as HTMLInputElement).value)}
             disabled={isDisabled}
-            class="dmt-number-input"
             style={{
-              padding: '6px 10px',
+              width: '60px',
+              padding: '4px 8px',
               borderRadius: '4px',
               border: '1px solid var(--background-modifier-border)',
               background: isDisabled ? 'var(--background-secondary)' : 'var(--background-primary)',
               color: isDisabled ? 'var(--text-muted)' : 'var(--text-normal)',
-              fontSize: '14px',
-              width: '70px'
+              fontSize: '13px'
             }}
           />
-        </div>
-        <span style={{ color: 'var(--text-muted)' }}>×</span>
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Rows:</span>
+          <span style={{ color: 'var(--text-muted)' }}>×</span>
           <input
             type="number"
             min="1"
@@ -47108,34 +49748,29 @@ function BoundsSection(): React.ReactElement {
             value={hexBounds.maxRow}
             onChange={(e: Event) => handleHexBoundsChange('maxRow', (e.target as HTMLInputElement).value)}
             disabled={isDisabled}
-            class="dmt-number-input"
             style={{
-              padding: '6px 10px',
+              width: '60px',
+              padding: '4px 8px',
               borderRadius: '4px',
               border: '1px solid var(--background-modifier-border)',
               background: isDisabled ? 'var(--background-secondary)' : 'var(--background-primary)',
               color: isDisabled ? 'var(--text-muted)' : 'var(--text-normal)',
-              fontSize: '14px',
-              width: '70px'
+              fontSize: '13px'
             }}
           />
         </div>
-      </div>
-      <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '8px' }}>
-        Playable area: {getPlayableAreaLabel()}
-      </p>
+      </SettingItem>
 
-      {/* Lock bounds checkbox - only show when background image is present */}
       {backgroundImagePath && (
-        <label class="dmt-checkbox-label" style={{ marginTop: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <input
-            type="checkbox"
-            checked={boundsLocked}
+        <SettingItem
+          name="Lock bounds to image"
+          description="Automatically set bounds from image dimensions"
+        >
+          <NativeToggle
+            value={boundsLocked}
             onChange={handleBoundsLockToggle}
-            class="dmt-checkbox"
           />
-          <span style={{ fontSize: '13px' }}>Lock bounds to image dimensions</span>
-        </label>
+        </SettingItem>
       )}
     </div>
   );
@@ -47160,6 +49795,7 @@ import type { HexColor } from '#types/core/common.types';
 const { useMapSettings } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "MapSettingsContext"));
 const { CollapsibleSection } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "CollapsibleSection"));
 const { ColorPickerItem } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "AppearanceTab"));
+const { SettingItem } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "SettingItem"));
 
 /** Coordinate display mode type */
 type CoordinateDisplayMode = 'rectangular' | 'radial';
@@ -47185,7 +49821,7 @@ interface CoordinateColorsContext {
 }
 
 /**
- * Coordinate display mode selector (content only, no wrapper)
+ * Coordinate display mode selector
  */
 function CoordinateModeContent(): React.ReactElement {
   const {
@@ -47194,14 +49830,9 @@ function CoordinateModeContent(): React.ReactElement {
   } = useMapSettings() as CoordinateModeContext;
 
   return (
-    <div style={{ marginBottom: '16px' }}>
-      <label class="dmt-form-label" style={{ marginBottom: '4px' }}>Display Mode</label>
-      <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '10px' }}>
-        How coordinates appear when pressing C
-      </p>
-
+    <SettingItem name="Display Mode" description="How coordinates appear when pressing C" vertical>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        <label class="dmt-radio-label" style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: 'pointer' }}>
+        <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: 'pointer' }}>
           <input
             type="radio"
             name="coordMode"
@@ -47218,7 +49849,7 @@ function CoordinateModeContent(): React.ReactElement {
           </div>
         </label>
 
-        <label class="dmt-radio-label" style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: 'pointer' }}>
+        <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: 'pointer' }}>
           <input
             type="radio"
             name="coordMode"
@@ -47235,12 +49866,12 @@ function CoordinateModeContent(): React.ReactElement {
           </div>
         </label>
       </div>
-    </div>
+    </SettingItem>
   );
 }
 
 /**
- * Coordinate text color pickers (content only, no wrapper)
+ * Coordinate text color pickers
  */
 function CoordinateColorsContent(): React.ReactElement {
   const {
@@ -47249,14 +49880,13 @@ function CoordinateColorsContent(): React.ReactElement {
   } = useMapSettings() as CoordinateColorsContext;
 
   return (
-    <div>
-      <label class="dmt-form-label" style={{ marginBottom: '4px' }}>Text Colors</label>
-      <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '10px' }}>
-        {useGlobalSettings
-          ? 'Using global settings (enable custom colors in Appearance tab to override)'
-          : 'Custom colors for coordinate overlay text'}
-      </p>
-
+    <SettingItem
+      name="Text Colors"
+      description={useGlobalSettings
+        ? 'Using global settings (enable custom colors in Appearance tab to override)'
+        : 'Custom colors for coordinate overlay text'}
+      vertical
+    >
       <div
         style={{
           opacity: useGlobalSettings ? 0.5 : 1,
@@ -47277,7 +49907,7 @@ function CoordinateColorsContent(): React.ReactElement {
           align="right"
         />
       </div>
-    </div>
+    </SettingItem>
   );
 }
 
@@ -47287,7 +49917,6 @@ function CoordinateColorsContent(): React.ReactElement {
 function CoordinateDisplaySection(): React.ReactElement {
   const { coordinateDisplayMode } = useMapSettings() as CoordinateModeContext;
 
-  // Generate subtitle based on current mode
   const subtitle = coordinateDisplayMode === 'rectangular' ? 'A1, B2, ...' : 'Ring-Position';
 
   return (
@@ -47371,6 +50000,8 @@ import type { MapType } from '#types/core/map.types';
 
 const { useMapSettings } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "MapSettingsContext"));
 const { CollapsibleSection } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "CollapsibleSection"));
+const { SettingItem } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "SettingItem"));
+const { NativeSlider } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "NativeControls"));
 
 /** Map settings context shape for this component */
 interface GridBackgroundContext {
@@ -47390,7 +50021,7 @@ interface GridBackgroundContext {
   setImageOffsetY: (y: number) => void;
   imageGridSize: number;
   setImageGridSize: (size: number) => void;
-  onOpenAlignmentMode?: () => void;
+  onOpenAlignmentMode?: (currentX: number, currentY: number) => void;
 }
 
 /**
@@ -47443,89 +50074,86 @@ function GridBackgroundTab(): React.ReactElement | null {
         onToggle={setImagePickerOpen}
         subtitle={backgroundImagePath ? backgroundImageDisplayName || 'Image selected' : 'No image'}
       >
-        <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '10px' }}>
-          Add a background image for your grid map
-        </p>
-
-        {/* Image picker */}
-        <div style={{ position: 'relative', marginBottom: '12px' }}>
-          <input
-            type="text"
-            placeholder="Search for image..."
-            value={backgroundImageDisplayName}
-            onChange={(e: Event) => {
-              const value = (e.target as HTMLInputElement).value;
-              setBackgroundImageDisplayName(value);
-              handleImageSearch(value);
-            }}
-            style={{
-              width: '100%',
-              padding: '8px 32px 8px 10px',
-              borderRadius: '4px',
-              border: '1px solid var(--background-modifier-border)',
-              background: 'var(--background-primary)',
-              color: 'var(--text-normal)',
-              fontSize: '14px'
-            }}
-          />
-
-          {backgroundImagePath && (
-            <button
-              onClick={handleImageClear}
-              style={{
-                position: 'absolute',
-                right: '6px',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                background: 'transparent',
-                border: 'none',
-                color: 'var(--text-muted)',
-                cursor: 'pointer',
-                padding: '4px',
-                fontSize: '16px',
-                lineHeight: '1'
+        <SettingItem name="Image" description="Add a background image for your grid map" vertical>
+          <div style={{ position: 'relative' }}>
+            <input
+              type="text"
+              placeholder="Search for image..."
+              value={backgroundImageDisplayName}
+              onChange={(e: Event) => {
+                const value = (e.target as HTMLInputElement).value;
+                setBackgroundImageDisplayName(value);
+                handleImageSearch(value);
               }}
-              title="Clear image"
-            >
-              x
-            </button>
-          )}
+              style={{
+                width: '100%',
+                padding: '8px 32px 8px 10px',
+                borderRadius: '4px',
+                border: '1px solid var(--background-modifier-border)',
+                background: 'var(--background-primary)',
+                color: 'var(--text-normal)',
+                fontSize: '14px'
+              }}
+            />
 
-          {/* Autocomplete dropdown */}
-          {imageSearchResults.length > 0 && (
-            <div style={{
-              position: 'absolute',
-              top: '100%',
-              left: 0,
-              right: 0,
-              maxHeight: '200px',
-              overflowY: 'auto',
-              background: 'var(--background-primary)',
-              border: '1px solid var(--background-modifier-border)',
-              borderRadius: '4px',
-              marginTop: '2px',
-              zIndex: 1000,
-              boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
-            }}>
-              {imageSearchResults.map((name: string, idx: number) => (
-                <div
-                  key={idx}
-                  onClick={() => handleImageSelect(name)}
-                  style={{
-                    padding: '8px 10px',
-                    cursor: 'pointer',
-                    fontSize: '13px',
-                    borderBottom: idx < imageSearchResults.length - 1 ? '1px solid var(--background-modifier-border)' : 'none'
-                  }}
-                  onMouseEnter={(e: Event) => (e.currentTarget as HTMLElement).style.background = 'var(--background-modifier-hover)'}
-                  onMouseLeave={(e: Event) => (e.currentTarget as HTMLElement).style.background = 'transparent'}
-                >
-                  {name}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+            {backgroundImagePath && (
+              <button
+                onClick={handleImageClear}
+                style={{
+                  position: 'absolute',
+                  right: '6px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'var(--text-muted)',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  fontSize: '16px',
+                  lineHeight: '1'
+                }}
+                title="Clear image"
+              >
+                x
+              </button>
+            )}
+
+            {/* Autocomplete dropdown */}
+            {imageSearchResults.length > 0 && (
+              <div style={{
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                right: 0,
+                maxHeight: '200px',
+                overflowY: 'auto',
+                background: 'var(--background-primary)',
+                border: '1px solid var(--background-modifier-border)',
+                borderRadius: '4px',
+                marginTop: '2px',
+                zIndex: 1000,
+                boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+              }}>
+                {imageSearchResults.map((name: string, idx: number) => (
+                  <div
+                    key={idx}
+                    onClick={() => handleImageSelect(name)}
+                    style={{
+                      padding: '8px 10px',
+                      cursor: 'pointer',
+                      fontSize: '13px',
+                      borderBottom: idx < imageSearchResults.length - 1 ? '1px solid var(--background-modifier-border)' : 'none'
+                    }}
+                    onMouseEnter={(e: Event) => (e.currentTarget as HTMLElement).style.background = 'var(--background-modifier-hover)'}
+                    onMouseLeave={(e: Event) => (e.currentTarget as HTMLElement).style.background = 'transparent'}
+                  >
+                    {name}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </SettingItem>
       </CollapsibleSection>
 
       {/* Grid Alignment Section - only show when image is selected */}
@@ -47536,125 +50164,97 @@ function GridBackgroundTab(): React.ReactElement | null {
           onToggle={setAlignmentOpen}
           subtitle="Align Windrose grid with background"
         >
-          <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '16px' }}>
-            Configure how Windrose's grid aligns with any pre-drawn grid on your background image.
-          </p>
-
-          {/* Image Grid Size */}
-          <div style={{ marginBottom: '16px' }}>
-            <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 500 }}>
-              Background Grid Size (pixels)
-            </label>
-            <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px' }}>
-              If your background image has a pre-drawn grid, enter the pixel size of each grid cell.
-              Windrose will scale the image to match its grid overlay.
-            </p>
-            <input
-              type="number"
-              value={imageGridSize}
-              min={1}
-              max={500}
-              onChange={(e: Event) => {
-                const value = parseInt((e.target as HTMLInputElement).value, 10);
-                if (!isNaN(value) && value > 0 && value <= 500) {
-                  setImageGridSize(value);
-                }
-              }}
-              style={{
-                width: '100px',
-                padding: '6px 10px',
-                borderRadius: '4px',
-                border: '1px solid var(--background-modifier-border)',
-                background: 'var(--background-primary)',
-                color: 'var(--text-normal)',
-                fontSize: '14px'
-              }}
-            />
-            <span style={{ marginLeft: '8px', fontSize: '12px', color: 'var(--text-muted)' }}>px</span>
-          </div>
-
-          {/* Opacity */}
-          <div style={{ marginBottom: '16px' }}>
-            <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 500 }}>
-              Image Opacity
-            </label>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <SettingItem
+            name="Background Grid Size"
+            description="Pixel size of each grid cell on your background image. Windrose will scale to match."
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
               <input
-                type="range"
-                min={0}
-                max={1}
-                step={0.05}
-                value={imageOpacity}
-                onChange={(e: Event) => setImageOpacity(parseFloat((e.target as HTMLInputElement).value))}
-                style={{ flex: 1 }}
+                type="number"
+                value={imageGridSize}
+                min={1}
+                max={500}
+                onChange={(e: Event) => {
+                  const value = parseInt((e.target as HTMLInputElement).value, 10);
+                  if (!isNaN(value) && value > 0 && value <= 500) {
+                    setImageGridSize(value);
+                  }
+                }}
+                style={{
+                  width: '80px',
+                  padding: '6px 10px',
+                  borderRadius: '4px',
+                  border: '1px solid var(--background-modifier-border)',
+                  background: 'var(--background-primary)',
+                  color: 'var(--text-normal)',
+                  fontSize: '14px'
+                }}
               />
-              <span style={{ fontSize: '12px', color: 'var(--text-muted)', width: '40px' }}>
-                {Math.round(imageOpacity * 100)}%
-              </span>
+              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>px</span>
             </div>
-          </div>
+          </SettingItem>
 
-          {/* X/Y Offset */}
-          <div style={{ marginBottom: '16px' }}>
-            <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 500 }}>
-              Position Offset
-            </label>
-            <div style={{ display: 'flex', gap: '16px' }}>
-              <div style={{ flex: 1 }}>
-                <label style={{ fontSize: '11px', color: 'var(--text-muted)' }}>X Offset</label>
-                <input
-                  type="number"
-                  value={imageOffsetX}
-                  onChange={(e: Event) => setImageOffsetX(parseInt((e.target as HTMLInputElement).value, 10) || 0)}
-                  style={{
-                    width: '100%',
-                    padding: '6px 10px',
-                    borderRadius: '4px',
-                    border: '1px solid var(--background-modifier-border)',
-                    background: 'var(--background-primary)',
-                    color: 'var(--text-normal)',
-                    fontSize: '14px'
-                  }}
-                />
-              </div>
-              <div style={{ flex: 1 }}>
-                <label style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Y Offset</label>
-                <input
-                  type="number"
-                  value={imageOffsetY}
-                  onChange={(e: Event) => setImageOffsetY(parseInt((e.target as HTMLInputElement).value, 10) || 0)}
-                  style={{
-                    width: '100%',
-                    padding: '6px 10px',
-                    borderRadius: '4px',
-                    border: '1px solid var(--background-modifier-border)',
-                    background: 'var(--background-primary)',
-                    color: 'var(--text-normal)',
-                    fontSize: '14px'
-                  }}
-                />
-              </div>
+          <SettingItem
+            name={`Image Opacity: ${Math.round(imageOpacity * 100)}%`}
+          >
+            <NativeSlider
+              min={0}
+              max={100}
+              step={5}
+              value={Math.round(imageOpacity * 100)}
+              onChange={(val: number) => setImageOpacity(val / 100)}
+            />
+          </SettingItem>
+
+          <SettingItem name="Position Offset">
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>X</span>
+              <input
+                type="number"
+                value={imageOffsetX}
+                onChange={(e: Event) => setImageOffsetX(parseInt((e.target as HTMLInputElement).value, 10) || 0)}
+                style={{
+                  width: '60px',
+                  padding: '4px 8px',
+                  borderRadius: '4px',
+                  border: '1px solid var(--background-modifier-border)',
+                  background: 'var(--background-primary)',
+                  color: 'var(--text-normal)',
+                  fontSize: '13px'
+                }}
+              />
+              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Y</span>
+              <input
+                type="number"
+                value={imageOffsetY}
+                onChange={(e: Event) => setImageOffsetY(parseInt((e.target as HTMLInputElement).value, 10) || 0)}
+                style={{
+                  width: '60px',
+                  padding: '4px 8px',
+                  borderRadius: '4px',
+                  border: '1px solid var(--background-modifier-border)',
+                  background: 'var(--background-primary)',
+                  color: 'var(--text-normal)',
+                  fontSize: '13px'
+                }}
+              />
             </div>
-          </div>
+          </SettingItem>
 
           {/* Interactive Alignment Mode Button */}
           {onOpenAlignmentMode && (
-            <button
-              onClick={onOpenAlignmentMode}
-              style={{
-                width: '100%',
-                padding: '10px',
-                borderRadius: '4px',
-                border: '1px solid var(--interactive-accent)',
-                background: 'transparent',
-                color: 'var(--interactive-accent)',
-                cursor: 'pointer',
-                fontSize: '13px',
-                fontWeight: 500
-              }}
+            <SettingItem
+              name="Interactive Alignment"
+              description="Drag the image to align with the grid"
             >
-              Open Interactive Alignment Mode
-            </button>
+              <button
+                onClick={() => onOpenAlignmentMode?.(imageOffsetX, imageOffsetY)}
+                class="mod-cta"
+                style={{ padding: '6px 12px', fontSize: '13px' }}
+              >
+                Open
+              </button>
+            </SettingItem>
           )}
         </CollapsibleSection>
       )}
@@ -47679,6 +50279,8 @@ return { GridBackgroundTab };
 import type { DiagonalRule, DistanceDisplayFormat } from '#types/settings/settings.types';
 
 const { useMapSettings } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "MapSettingsContext"));
+const { SettingItem } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "SettingItem"));
+const { NativeToggle, NativeDropdown } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "NativeControls"));
 
 /** Distance settings state */
 interface DistanceSettingsState {
@@ -47713,100 +50315,73 @@ function MeasurementTab(): React.ReactElement {
     }
   };
 
-  const handleUnitChange = (e: Event): void => {
-    setDistanceSettings((prev: DistanceSettingsState) => ({
-      ...prev,
-      distanceUnit: (e.target as HTMLSelectElement).value
-    }));
-  };
 
-  const handleDiagonalRuleChange = (e: Event): void => {
-    setDistanceSettings((prev: DistanceSettingsState) => ({
-      ...prev,
-      gridDiagonalRule: (e.target as HTMLSelectElement).value as DiagonalRule
-    }));
-  };
-
-  const handleDisplayFormatChange = (e: Event): void => {
-    setDistanceSettings((prev: DistanceSettingsState) => ({
-      ...prev,
-      displayFormat: (e.target as HTMLSelectElement).value as DistanceDisplayFormat
-    }));
-  };
+  const isDisabled = distanceSettings.useGlobalDistance;
 
   return (
     <div class="dmt-settings-tab-content">
-      <div class="dmt-form-group" style={{ marginBottom: '16px' }}>
-        <label class="dmt-checkbox-label">
-          <input
-            type="checkbox"
-            checked={!distanceSettings.useGlobalDistance}
-            onChange={handleToggleUseGlobal}
-            class="dmt-checkbox"
-          />
-          <span>Use custom measurement settings for this map</span>
-        </label>
-      </div>
+      <SettingItem
+        name="Custom measurement settings"
+        description="Override global distance settings for this map"
+      >
+        <NativeToggle
+          value={!distanceSettings.useGlobalDistance}
+          onChange={handleToggleUseGlobal}
+        />
+      </SettingItem>
 
-      <div style={{ opacity: distanceSettings.useGlobalDistance ? 0.5 : 1 }}>
-        <div class="dmt-form-group">
-          <label class="dmt-form-label">Distance per {isHexMap ? 'Hex' : 'Cell'}</label>
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-            <input
-              type="number"
-              min="0.1"
-              step="0.1"
-              value={distanceSettings.distancePerCell}
-              disabled={distanceSettings.useGlobalDistance}
-              onChange={handleDistancePerCellChange}
-              class="dmt-form-input"
-              style={{ width: '80px' }}
-            />
-            <select
-              value={distanceSettings.distanceUnit}
-              disabled={distanceSettings.useGlobalDistance}
-              onChange={handleUnitChange}
-              class="dmt-form-select"
-              style={{ width: '120px' }}
-            >
-              <option value="ft">feet</option>
-              <option value="m">meters</option>
-              <option value="mi">miles</option>
-              <option value="km">kilometers</option>
-              <option value="yd">yards</option>
-            </select>
-          </div>
-        </div>
+      <div style={{ opacity: isDisabled ? 0.5 : 1 }}>
+        <SettingItem name={`Distance per ${isHexMap ? 'Hex' : 'Cell'}`}>
+          <input
+            type="number"
+            min="0.1"
+            step="0.1"
+            value={distanceSettings.distancePerCell}
+            disabled={isDisabled}
+            onChange={handleDistancePerCellChange}
+            style={{ width: '80px' }}
+          />
+          <NativeDropdown
+            value={distanceSettings.distanceUnit}
+            options={[
+              { value: 'ft', label: 'feet' },
+              { value: 'm', label: 'meters' },
+              { value: 'mi', label: 'miles' },
+              { value: 'km', label: 'kilometers' },
+              { value: 'yd', label: 'yards' }
+            ]}
+            onChange={(val: string) => setDistanceSettings((prev: DistanceSettingsState) => ({ ...prev, distanceUnit: val }))}
+            disabled={isDisabled}
+          />
+        </SettingItem>
 
         {!isHexMap && (
-          <div class="dmt-form-group">
-            <label class="dmt-form-label">Diagonal Movement</label>
-            <select
+          <SettingItem name="Diagonal Movement">
+            <NativeDropdown
               value={distanceSettings.gridDiagonalRule}
-              disabled={distanceSettings.useGlobalDistance}
-              onChange={handleDiagonalRuleChange}
-              class="dmt-form-select"
-            >
-              <option value="alternating">Alternating (5-10-5-10, D&D 5e)</option>
-              <option value="equal">Equal (Chebyshev, all moves = 1)</option>
-              <option value="euclidean">True Distance (Euclidean)</option>
-            </select>
-          </div>
+              options={[
+                { value: 'alternating', label: 'Alternating (5-10-5-10)' },
+                { value: 'equal', label: 'Equal (Chebyshev)' },
+                { value: 'euclidean', label: 'True Distance' }
+              ]}
+              onChange={(val: string) => setDistanceSettings((prev: DistanceSettingsState) => ({ ...prev, gridDiagonalRule: val as DiagonalRule }))}
+              disabled={isDisabled}
+            />
+          </SettingItem>
         )}
 
-        <div class="dmt-form-group">
-          <label class="dmt-form-label">Display Format</label>
-          <select
+        <SettingItem name="Display Format">
+          <NativeDropdown
             value={distanceSettings.displayFormat}
-            disabled={distanceSettings.useGlobalDistance}
-            onChange={handleDisplayFormatChange}
-            class="dmt-form-select"
-          >
-            <option value="both">Cells and Units (e.g., "3 cells (15 ft)")</option>
-            <option value="cells">Cells Only (e.g., "3 cells")</option>
-            <option value="units">Units Only (e.g., "15 ft")</option>
-          </select>
-        </div>
+            options={[
+              { value: 'both', label: 'Cells and Units' },
+              { value: 'cells', label: 'Cells Only' },
+              { value: 'units', label: 'Units Only' }
+            ]}
+            onChange={(val: string) => setDistanceSettings((prev: DistanceSettingsState) => ({ ...prev, displayFormat: val as DistanceDisplayFormat }))}
+            disabled={isDisabled}
+          />
+        </SettingItem>
       </div>
     </div>
   );
@@ -48191,6 +50766,8 @@ return {
 
 const { useMapSettings } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "MapSettingsContext"));
 const { saveMapImageToVault } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "exportOperations"));
+const { SettingItem, SettingHeading } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "SettingItem"));
+const { NativeToggle } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "NativeControls"));
 
 /** Export result */
 interface ExportResult {
@@ -48249,106 +50826,85 @@ function PreferencesTab(): React.ReactElement {
 
   return (
     <div class="dmt-settings-tab-content">
-      <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '16px' }}>
-        Control what state is remembered for this map
-      </p>
+      <SettingItem
+        name="Remember pan and zoom"
+        description="Restore map position when reopening"
+      >
+        <NativeToggle
+          value={preferences.rememberPanZoom}
+          onChange={() => handlePreferenceToggle('rememberPanZoom')}
+        />
+      </SettingItem>
 
-      <div class="dmt-form-group">
-        <label class="dmt-checkbox-label">
-          <input
-            type="checkbox"
-            checked={preferences.rememberPanZoom}
-            onChange={() => handlePreferenceToggle('rememberPanZoom')}
-            class="dmt-checkbox"
-          />
-          <span>Remember pan and zoom position</span>
-        </label>
-      </div>
+      <SettingItem
+        name="Remember sidebar state"
+        description="Restore sidebar collapsed/expanded state"
+      >
+        <NativeToggle
+          value={preferences.rememberSidebarState}
+          onChange={() => handlePreferenceToggle('rememberSidebarState')}
+        />
+      </SettingItem>
 
-      <div class="dmt-form-group">
-        <label class="dmt-checkbox-label">
-          <input
-            type="checkbox"
-            checked={preferences.rememberSidebarState}
-            onChange={() => handlePreferenceToggle('rememberSidebarState')}
-            class="dmt-checkbox"
-          />
-          <span>Remember sidebar collapsed state</span>
-        </label>
-      </div>
+      <SettingItem
+        name="Remember expanded state"
+        description="Restore expanded/compact map view"
+      >
+        <NativeToggle
+          value={preferences.rememberExpandedState}
+          onChange={() => handlePreferenceToggle('rememberExpandedState')}
+        />
+      </SettingItem>
 
-      <div class="dmt-form-group">
-        <label class="dmt-checkbox-label">
-          <input
-            type="checkbox"
-            checked={preferences.rememberExpandedState}
-            onChange={() => handlePreferenceToggle('rememberExpandedState')}
-            class="dmt-checkbox"
-          />
-          <span>Remember expanded state</span>
-        </label>
-      </div>
+      <SettingItem
+        name="Always show map controls"
+        description="Keep zoom, layers, and settings buttons visible instead of auto-hiding"
+      >
+        <NativeToggle
+          value={alwaysShowControls}
+          onChange={() => handleColorChange('alwaysShowControls', !alwaysShowControls)}
+        />
+      </SettingItem>
 
-      <div class="dmt-form-group">
-        <label class="dmt-checkbox-label">
-          <input
-            type="checkbox"
-            checked={alwaysShowControls}
-            onChange={(e: Event) => handleColorChange('alwaysShowControls', (e.target as HTMLInputElement).checked)}
-            class="dmt-checkbox"
-          />
-          <span>Always show map controls</span>
-        </label>
-        <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px', marginLeft: '22px' }}>
-          Keep zoom, layers, and settings buttons visible instead of auto-hiding
-        </p>
-      </div>
+      <SettingHeading text="Export" />
 
-      <div style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px solid var(--background-modifier-border)' }}>
-        <h4 style={{ fontSize: '14px', fontWeight: 600, marginBottom: '8px' }}>Export</h4>
-        <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '12px' }}>
-          Export your map as a PNG image
-        </p>
-
+      <SettingItem
+        name="Export as image"
+        description="Save your map as a PNG file"
+      >
         <button
-          class="windrose-btn"
+          class="mod-cta"
           onClick={handleExportImage}
           disabled={isExporting}
-          style={{
-            padding: '6px 12px',
-            cursor: isExporting ? 'wait' : 'pointer',
-            opacity: isExporting ? 0.6 : 1
-          }}
+          style={{ opacity: isExporting ? 0.6 : 1 }}
         >
-          {isExporting ? 'Exporting...' : 'Export as Image'}
+          {isExporting ? 'Exporting...' : 'Export'}
         </button>
+      </SettingItem>
 
-        {exportError && (
-          <div style={{
-            marginTop: '8px',
-            padding: '8px',
-            backgroundColor: 'var(--background-modifier-error)',
-            color: 'var(--text-error)',
-            borderRadius: '4px',
-            fontSize: '12px'
-          }}>
-            {exportError}
-          </div>
-        )}
+      {exportError && (
+        <div style={{
+          padding: '8px',
+          backgroundColor: 'var(--background-modifier-error)',
+          color: 'var(--text-error)',
+          borderRadius: '4px',
+          fontSize: '12px'
+        }}>
+          {exportError}
+        </div>
+      )}
 
-        {exportSuccess && (
-          <div style={{
-            marginTop: '8px',
-            padding: '8px',
-            backgroundColor: 'var(--background-modifier-success)',
-            color: 'var(--text-success)',
-            borderRadius: '4px',
-            fontSize: '12px'
-          }}>
-            {exportSuccess}
-          </div>
-        )}
-      </div>
+      {exportSuccess && (
+        <div style={{
+          padding: '8px',
+          backgroundColor: 'var(--background-modifier-success)',
+          color: 'var(--text-success)',
+          borderRadius: '4px',
+          fontSize: '12px'
+        }}>
+          {exportSuccess}
+        </div>
+      )}
     </div>
   );
 }
@@ -48365,9 +50921,13 @@ return { PreferencesTab };
  *
  * Confirmation dialog shown when resizing the grid would orphan content.
  * Warns users about cells/objects that will be deleted outside new bounds.
+ *
+ * Native path: opens an Obsidian Modal imperatively.
+ * Fallback path: custom overlay via ModalPortal.
  */
 
 const { ModalPortal } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "ModalPortal"));
+const { isBridgeAvailable, getObsidianModule } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "obsidianBridge"));
 const { useMapSettings } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "MapSettingsContext"));
 
 /** Orphan content info */
@@ -48377,9 +50937,105 @@ interface OrphanInfo {
 }
 
 /**
- * Resize confirmation dialog
+ * Native resize confirmation dialog using Obsidian Modal
  */
-function ResizeConfirmDialog(): React.ReactElement | null {
+function NativeResizeConfirmDialog(): React.ReactElement | null {
+  const {
+    showResizeConfirm,
+    orphanInfo,
+    handleResizeConfirmDelete,
+    handleResizeConfirmCancel
+  } = useMapSettings() as {
+    showResizeConfirm: boolean;
+    orphanInfo: OrphanInfo;
+    handleResizeConfirmDelete: () => void;
+    handleResizeConfirmCancel: () => void;
+  };
+
+  const deleteRef = dc.useRef(handleResizeConfirmDelete);
+  deleteRef.current = handleResizeConfirmDelete;
+  const cancelRef = dc.useRef(handleResizeConfirmCancel);
+  cancelRef.current = handleResizeConfirmCancel;
+
+  dc.useEffect(() => {
+    if (!showResizeConfirm || !isBridgeAvailable()) return;
+
+    const obs = getObsidianModule();
+    const ModalClass = obs.Modal as new (app: unknown) => {
+      contentEl: HTMLElement;
+      titleEl: { setText: (t: string) => void };
+      open: () => void;
+      close: () => void;
+      onClose: () => void;
+    };
+    const app = (dc as unknown as { app: unknown }).app;
+
+    let closedByCode = false;
+    const modal = new ModalClass(app);
+    modal.titleEl.setText('Content Outside New Grid');
+
+    const content = modal.contentEl;
+    content.createEl('p', {
+      text: 'Resizing the grid will remove content outside the new boundaries:'
+    });
+
+    const list = content.createEl('ul');
+    if (orphanInfo.cells > 0) {
+      list.createEl('li', {
+        text: `${orphanInfo.cells} painted cell${orphanInfo.cells !== 1 ? 's' : ''}`
+      });
+    }
+    if (orphanInfo.objects > 0) {
+      list.createEl('li', {
+        text: `${orphanInfo.objects} object${orphanInfo.objects !== 1 ? 's' : ''}/pin${orphanInfo.objects !== 1 ? 's' : ''}`
+      });
+    }
+
+    content.createEl('p', {
+      text: 'This content will be permanently deleted when you save. To recover it, cancel and expand the grid bounds instead.',
+      cls: 'setting-item-description'
+    });
+
+    const buttonRow = content.createDiv({ cls: 'modal-button-container' });
+
+    const cancelBtn = buttonRow.createEl('button', { text: 'Cancel' });
+    cancelBtn.addEventListener('click', () => {
+      closedByCode = true;
+      modal.close();
+      cancelRef.current();
+    });
+
+    const deleteBtn = buttonRow.createEl('button', {
+      text: 'Delete & Resize',
+      cls: 'mod-warning'
+    });
+    deleteBtn.addEventListener('click', () => {
+      closedByCode = true;
+      modal.close();
+      deleteRef.current();
+    });
+
+    modal.onClose = () => {
+      if (!closedByCode) {
+        cancelRef.current();
+      }
+    };
+
+    modal.open();
+
+    return () => {
+      closedByCode = true;
+      modal.close();
+    };
+  }, [showResizeConfirm]);
+
+  return null;
+}
+
+/**
+ * Fallback resize confirmation dialog (deprecation target)
+ */
+function FallbackResizeConfirmDialog(): React.ReactElement | null {
   const {
     showResizeConfirm,
     orphanInfo,
@@ -48498,6 +51154,16 @@ function ResizeConfirmDialog(): React.ReactElement | null {
   );
 }
 
+/**
+ * Resize confirmation dialog — delegates to native or fallback
+ */
+function ResizeConfirmDialog(): React.ReactElement | null {
+  if (isBridgeAvailable()) {
+    return h(NativeResizeConfirmDialog, null);
+  }
+  return h(FallbackResizeConfirmDialog, null);
+}
+
 return { ResizeConfirmDialog };
 
 ```
@@ -48515,14 +51181,14 @@ return { ResizeConfirmDialog };
  * 3. Measurement - Distance settings
  * 4. Preferences - UI state persistence options
  *
- * Features:
- * - Draggable by header
- * - Resizable (size persists across sessions)
+ * Native path: uses Obsidian Modal via NativeModalPortal
+ * Fallback path: custom drag/resize UI via Preact portal
  */
 
 import type { MapType } from '#types/core/map.types';
 
 const { ModalPortal } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "ModalPortal"));
+const { isBridgeAvailable, NativeModalPortal } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "obsidianBridge"));
 const { MapSettingsProvider, useMapSettings } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "MapSettingsContext"));
 const { AppearanceTab } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "AppearanceTab"));
 const { HexGridTab } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md"), "HexGridTab"));
@@ -48617,9 +51283,48 @@ function savePersistedSize(width: number, height: number): void {
 }
 
 /**
- * Inner modal content that uses the settings context
+ * Tab bar + body shared by both native and fallback paths
  */
-function MapSettingsModalContent(): React.ReactElement | null {
+function TabContent({ tabs, activeTab, setActiveTab, mapType }: {
+  tabs: SettingsTab[];
+  activeTab: string;
+  setActiveTab: (id: string) => void;
+  mapType: MapType;
+}): React.ReactElement {
+  return (
+    <>
+      <div class="dmt-settings-tab-bar" style={{ flexShrink: 0 }}>
+        {tabs.map((tab: SettingsTab) => (
+          <button
+            key={tab.id}
+            class={`dmt-settings-tab ${activeTab === tab.id ? 'dmt-settings-tab-active' : ''}`}
+            onClick={() => setActiveTab(tab.id)}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      <div class="dmt-modal-body" style={{
+        paddingTop: '16px',
+        flex: 1,
+        overflowY: 'auto',
+        minHeight: 0
+      }}>
+        {activeTab === 'appearance' && <AppearanceTab />}
+        {activeTab === 'hexgrid' && mapType === 'hex' && <HexGridTab />}
+        {activeTab === 'gridbackground' && mapType === 'grid' && <GridBackgroundTab />}
+        {activeTab === 'measurement' && <MeasurementTab />}
+        {activeTab === 'preferences' && <PreferencesTab />}
+      </div>
+    </>
+  );
+}
+
+/**
+ * Fallback modal content with custom drag/resize UI (deprecation target)
+ */
+function FallbackModalContent(): React.ReactElement | null {
   const {
     isOpen,
     activeTab,
@@ -48824,30 +51529,7 @@ function MapSettingsModalContent(): React.ReactElement | null {
             <h3>Map Settings</h3>
           </div>
 
-          <div class="dmt-settings-tab-bar" style={{ flexShrink: 0 }}>
-            {tabs.map((tab: SettingsTab) => (
-              <button
-                key={tab.id}
-                class={`dmt-settings-tab ${activeTab === tab.id ? 'dmt-settings-tab-active' : ''}`}
-                onClick={() => setActiveTab(tab.id)}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-
-          <div class="dmt-modal-body" style={{
-            paddingTop: '16px',
-            flex: 1,
-            overflowY: 'auto',
-            minHeight: 0
-          }}>
-            {activeTab === 'appearance' && <AppearanceTab />}
-            {activeTab === 'hexgrid' && mapType === 'hex' && <HexGridTab />}
-            {activeTab === 'gridbackground' && mapType === 'grid' && <GridBackgroundTab />}
-            {activeTab === 'measurement' && <MeasurementTab />}
-            {activeTab === 'preferences' && <PreferencesTab />}
-          </div>
+          <TabContent tabs={tabs} activeTab={activeTab} setActiveTab={setActiveTab} mapType={mapType} />
 
           <div class="dmt-modal-footer" style={{ flexShrink: 0 }}>
             <button
@@ -48931,6 +51613,51 @@ function MapSettingsModalContent(): React.ReactElement | null {
 }
 
 /**
+ * Inner modal content that uses the settings context.
+ * Renders native Obsidian modal when bridge is available, fallback otherwise.
+ */
+function MapSettingsModalContent(): React.ReactElement | null {
+  const {
+    isOpen,
+    activeTab,
+    setActiveTab,
+    tabs,
+    mapType,
+    isLoading,
+    handleSave,
+    handleCancel
+  } = useMapSettings();
+
+  if (!isOpen) return null;
+
+  if (!isBridgeAvailable()) {
+    return <FallbackModalContent />;
+  }
+
+  return (
+    <NativeModalPortal
+      title="Map Settings"
+      modalClass="dmt-settings-native-modal"
+      onClose={handleCancel}
+      draggable
+      resizable
+    >
+      <div class="dmt-settings-modal">
+        <TabContent tabs={tabs} activeTab={activeTab} setActiveTab={setActiveTab} mapType={mapType} />
+
+        <div class="modal-button-container">
+          <button onClick={handleCancel} disabled={isLoading}>Cancel</button>
+          <button class="mod-cta" onClick={handleSave} disabled={isLoading}>
+            {isLoading ? 'Saving...' : 'Save'}
+          </button>
+        </div>
+      </div>
+      <ResizeConfirmDialog />
+    </NativeModalPortal>
+  );
+}
+
+/**
  * Main MapSettingsModal component
  */
 function MapSettingsModal(props: MapSettingsModalProps): React.ReactElement {
@@ -48963,7 +51690,7 @@ const { ModalPortal } = await dc.require(dc.headerLink(dc.resolvePath("compiled-
  * - Live offset display
  * - Apply/Reset/Cancel actions
  */
-function ImageAlignmentMode({ dc, isActive, offsetX, offsetY, onOffsetChange, onApply, onCancel }) {
+function ImageAlignmentMode({ dc, isActive, offsetX, offsetY, onOffsetChange, onApply, onCancel, gridSize, onGridSizeChange }) {
   const [panelPosition, setPanelPosition] = dc.useState({ x: null, y: null });
   const [isDragging, setIsDragging] = dc.useState(false);
   const [dragStart, setDragStart] = dc.useState({ x: 0, y: 0 });
@@ -48972,14 +51699,11 @@ function ImageAlignmentMode({ dc, isActive, offsetX, offsetY, onOffsetChange, on
   // Initialize panel position and store initial offset
   dc.useEffect(() => {
     if (isActive && panelPosition.x === null) {
-      // Position in bottom-right, accounting for panel size
+      // Position in bottom-right corner, 10% inset from edges
       const panelWidth = 280;
-      const panelHeight = 200;
-      const padding = 80;
-      
       setPanelPosition({
-        x: window.innerWidth - panelWidth - padding,
-        y: window.innerHeight - panelHeight - padding
+        x: window.innerWidth - panelWidth - Math.max(20, window.innerWidth * 0.05),
+        y: Math.max(20, window.innerHeight * 0.45)
       });
       
       // Store initial offset for reset/cancel
@@ -48995,8 +51719,8 @@ function ImageAlignmentMode({ dc, isActive, offsetX, offsetY, onOffsetChange, on
   // Canvas drag event handlers - use useCallback to stabilize
   const handleCanvasPointerDown = dc.useCallback((e) => {
     // Only handle events on the canvas
-    const canvas = document.querySelector('.dmt-canvas');
-    if (!canvas || !e.target.closest('.dmt-canvas')) {
+    const canvas = document.querySelector('[class^="dmt-canvas"]');
+    if (!canvas || !e.target.closest('[class^="dmt-canvas"]')) {
       return;
     }    // Only handle single-finger/mouse events (let two-finger pan through)
     if (e.touches && e.touches.length > 1) {      return;
@@ -49033,44 +51757,9 @@ function ImageAlignmentMode({ dc, isActive, offsetX, offsetY, onOffsetChange, on
   dc.useEffect(() => {    if (!isActive) {      return;
     }
     
-    const allCanvases = document.querySelectorAll('.dmt-canvas');    allCanvases.forEach((c, i) => {    });
-    
-    const canvas = document.querySelector('.dmt-canvas');
+    const canvas = document.querySelector('[class^="dmt-canvas"]');
     if (!canvas) return;
-    
-    // Check if this is the SAME canvas useEventCoordinator is using    
-    // Check if canvas has pointer-events blocked
-    const computedStyle = window.getComputedStyle(canvas);    
-    // Check what element is actually at the canvas center
-    const rect = canvas.getBoundingClientRect();
-    const centerX = rect.left + rect.width / 2;
-    const centerY = rect.top + rect.height / 2;    
-    const elementAtCenter = document.elementFromPoint(centerX, centerY);    
-    // Check if anything is overlaying
-    const allElementsAtPoint = [];
-    let checkElement = elementAtCenter;
-    while (checkElement) {
-      allElementsAtPoint.push(`${checkElement.tagName}.${checkElement.className}`);
-      checkElement = checkElement.parentElement;
-    }    
-    // Check canvas visibility    
-    // Check for scroll containers
-    let scrollParent = canvas.parentElement;
-    while (scrollParent) {
-      const scrollStyle = window.getComputedStyle(scrollParent);
-      const hasScroll = scrollParent.scrollHeight > scrollParent.clientHeight || 
-                       scrollParent.scrollWidth > scrollParent.clientWidth;
-      if (hasScroll || scrollStyle.overflow !== 'visible') {      }
-      if (scrollParent === document.body) break;
-      scrollParent = scrollParent.parentElement;
-    }
-    
-    // Test if ANY events reach this canvas
-    const testHandler = (e) => {    };
-    canvas.addEventListener('click', testHandler);
-    canvas.addEventListener('mousedown', testHandler);
-    canvas.addEventListener('mouseup', testHandler);
-    canvas.addEventListener('pointerdown', testHandler);    
+
     // Attach to document instead of canvas to avoid CodeMirror interception
     document.addEventListener('pointerdown', handleCanvasPointerDown);
     document.addEventListener('pointermove', handleCanvasPointerMove);
@@ -49103,23 +51792,25 @@ function ImageAlignmentMode({ dc, isActive, offsetX, offsetY, onOffsetChange, on
       if (e.target.tagName === 'INPUT') return;
       
       const step = e.shiftKey ? 10 : 1;
+      const safeX = typeof offsetX === 'number' && !isNaN(offsetX) ? offsetX : 0;
+      const safeY = typeof offsetY === 'number' && !isNaN(offsetY) ? offsetY : 0;
       let handled = false;
-      
+
       switch (e.key) {
         case 'ArrowLeft':
-          onOffsetChange(offsetX - step, offsetY);
+          onOffsetChange(safeX - step, safeY);
           handled = true;
           break;
         case 'ArrowRight':
-          onOffsetChange(offsetX + step, offsetY);
+          onOffsetChange(safeX + step, safeY);
           handled = true;
           break;
         case 'ArrowUp':
-          onOffsetChange(offsetX, offsetY - step);
+          onOffsetChange(safeX, safeY - step);
           handled = true;
           break;
         case 'ArrowDown':
-          onOffsetChange(offsetX, offsetY + step);
+          onOffsetChange(safeX, safeY + step);
           handled = true;
           break;
         case 'Enter':
@@ -49142,39 +51833,48 @@ function ImageAlignmentMode({ dc, isActive, offsetX, offsetY, onOffsetChange, on
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isActive, offsetX, offsetY, onOffsetChange]);
   
-  // Panel dragging
-  const handlePanelMouseDown = dc.useCallback((e) => {
+  // Panel dragging (mouse + touch)
+  const handlePanelPointerDown = dc.useCallback((e) => {
     // Only drag from header
     if (!e.target.closest('.alignment-panel-header')) return;
-    
+
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
     setIsDragging(true);
     setDragStart({
-      x: e.clientX - panelPosition.x,
-      y: e.clientY - panelPosition.y
+      x: clientX - panelPosition.x,
+      y: clientY - panelPosition.y
     });
     e.preventDefault();
   }, [panelPosition]);
-  
+
   dc.useEffect(() => {
     if (!isDragging) return;
-    
-    const handleMouseMove = (e) => {
+
+    const handleMove = (e) => {
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
       setPanelPosition({
-        x: e.clientX - dragStart.x,
-        y: e.clientY - dragStart.y
+        x: clientX - dragStart.x,
+        y: clientY - dragStart.y
       });
     };
-    
-    const handleMouseUp = () => {
+
+    const handleEnd = () => {
       setIsDragging(false);
     };
-    
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-    
+
+    document.addEventListener('mousemove', handleMove);
+    document.addEventListener('mouseup', handleEnd);
+    document.addEventListener('touchmove', handleMove, { passive: false });
+    document.addEventListener('touchend', handleEnd);
+
     return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener('mousemove', handleMove);
+      document.removeEventListener('mouseup', handleEnd);
+      document.removeEventListener('touchmove', handleMove);
+      document.removeEventListener('touchend', handleEnd);
     };
   }, [isDragging, dragStart]);
   
@@ -49200,6 +51900,13 @@ function ImageAlignmentMode({ dc, isActive, offsetX, offsetY, onOffsetChange, on
     const value = parseInt(e.target.value, 10) || 0;
     onOffsetChange(offsetX, value);
   }, [offsetX, onOffsetChange]);
+
+  const handleGridSizeChange = dc.useCallback((e) => {
+    const value = parseInt(e.target.value, 10);
+    if (onGridSizeChange && value > 0) {
+      onGridSizeChange(value);
+    }
+  }, [onGridSizeChange]);
   
   if (!isActive || panelPosition.x === null) return null;
   
@@ -49212,6 +51919,9 @@ function ImageAlignmentMode({ dc, isActive, offsetX, offsetY, onOffsetChange, on
           left: `${panelPosition.x}px`,
           top: `${panelPosition.y}px`,
           width: '280px',
+          maxHeight: 'calc(100vh - 40px)',
+          display: 'flex',
+          flexDirection: 'column',
           background: 'var(--background-primary)',
           border: '1px solid var(--background-modifier-border)',
           borderRadius: '8px',
@@ -49220,7 +51930,8 @@ function ImageAlignmentMode({ dc, isActive, offsetX, offsetY, onOffsetChange, on
           cursor: isDragging ? 'grabbing' : 'default',
           userSelect: 'none'
         }}
-        onMouseDown={handlePanelMouseDown}
+        onMouseDown={handlePanelPointerDown}
+        onTouchStart={handlePanelPointerDown}
       >
         {/* Header - Draggable */}
         <div
@@ -49243,7 +51954,7 @@ function ImageAlignmentMode({ dc, isActive, offsetX, offsetY, onOffsetChange, on
         </div>
         
         {/* Content */}
-        <div style={{ padding: '16px' }}>
+        <div style={{ padding: '16px', overflowY: 'auto', flex: 1 }}>
           {/* Offset Display */}
           <div style={{ marginBottom: '16px' }}>
             <div style={{ display: 'flex', gap: '12px', marginBottom: '8px' }}>
@@ -49288,6 +51999,31 @@ function ImageAlignmentMode({ dc, isActive, offsetX, offsetY, onOffsetChange, on
             </div>
           </div>
           
+          {/* Grid Size */}
+          {onGridSizeChange && (
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>
+                Background Grid Size (px)
+              </label>
+              <input
+                type="number"
+                value={gridSize || ''}
+                min="1"
+                onChange={handleGridSizeChange}
+                placeholder="e.g. 140"
+                style={{
+                  width: '100%',
+                  padding: '6px 8px',
+                  fontSize: '13px',
+                  background: 'var(--background-primary)',
+                  border: '1px solid var(--background-modifier-border)',
+                  borderRadius: '4px',
+                  color: 'var(--text-normal)'
+                }}
+              />
+            </div>
+          )}
+
           {/* Instructions */}
           <div
             style={{
@@ -49437,11 +52173,7 @@ const LayerControls = ({
   const reversedLayers = [...layers].reverse();
   const activeLayerId = mapData?.activeLayerId;
 
-  const handleOverlayClick = (e: JSX.TargetedMouseEvent<HTMLDivElement> | JSX.TargetedTouchEvent<HTMLDivElement>): void => {
-    e.stopPropagation();
-    e.preventDefault();
-    setExpandedLayerId(null);
-  };
+  const controlsRef = dc.useRef<HTMLDivElement>(null);
 
   dc.useEffect(() => {
     if (!expandedLayerId) return;
@@ -49452,8 +52184,18 @@ const LayerControls = ({
       }
     };
 
+    const handleClickOutside = (e: PointerEvent): void => {
+      if (controlsRef.current && !controlsRef.current.contains(e.target as Node)) {
+        setExpandedLayerId(null);
+      }
+    };
+
     document.addEventListener('keydown', handleEscape);
-    return () => document.removeEventListener('keydown', handleEscape);
+    document.addEventListener('pointerdown', handleClickOutside, true);
+    return () => {
+      document.removeEventListener('keydown', handleEscape);
+      document.removeEventListener('pointerdown', handleClickOutside, true);
+    };
   }, [expandedLayerId]);
 
   const handleLayerClick = (layerId: string, e: JSX.TargetedMouseEvent<HTMLButtonElement>): void => {
@@ -49620,18 +52362,8 @@ const LayerControls = ({
   };
 
   return (
-    <>
-      {expandedLayerId && (
-        <div
-          className="dmt-layer-overlay"
-          onClick={handleOverlayClick}
-          onContextMenu={handleOverlayClick}
-          onMouseDown={handleOverlayClick}
-          onTouchStart={handleOverlayClick}
-        />
-      )}
-
       <div
+        ref={controlsRef}
         className={`dmt-layer-controls ${sidebarCollapsed ? 'sidebar-closed' : 'sidebar-open'} ${isOpen ? 'dmt-layer-controls-open' : ''}`}
       >
         {reversedLayers.map((layer, visualIndex) => {
@@ -49737,7 +52469,6 @@ const LayerControls = ({
           <dc.Icon icon="lucide-plus" />
         </button>
       </div>
-    </>
   );
 };
 
@@ -50382,6 +53113,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     isColorPickerOpen, setIsColorPickerOpen
   } = useToolState();
 
+  const [freeformPlacementMode, setFreeformPlacementMode] = dc.useState(false);
+
   const [showFooter, setShowFooter] = dc.useState(false);
   const [isFocused, setIsFocused] = dc.useState(false);
   const [isExpanded, setIsExpanded] = dc.useState(false);
@@ -50845,7 +53578,7 @@ const editingLayer = dc.useMemo(() => {
     settingsData: MapSettings,
     preferencesData: UIPreferences,
     hexBounds: HexBounds | null = null,
-    backgroundImage: BackgroundImage | undefined = undefined,
+    backgroundImage: BackgroundImage | null = null,
     hexSize: number | null = null,
     deleteOrphanedContent: boolean = false
   ): void => {
@@ -50854,7 +53587,8 @@ const editingLayer = dc.useMemo(() => {
     const newMapData: MapData = {
       ...mapData,
       settings: settingsData,
-      uiPreferences: preferencesData
+      uiPreferences: preferencesData,
+      objectSetId: settingsData.objectSetId ?? null
     };
 
     // Only update hexBounds for hex maps
@@ -50883,10 +53617,8 @@ const editingLayer = dc.useMemo(() => {
       }
     }
 
-    // Update backgroundImage for both grid and hex maps
-    if (backgroundImage !== undefined) {
-      newMapData.backgroundImage = backgroundImage;
-    }
+    // Update backgroundImage for both grid and hex maps (null clears it)
+    newMapData.backgroundImage = backgroundImage;
 
     // Update hexSize if calculated from background image
     if (hexSize !== null && mapData.mapType === 'hex') {
@@ -50925,6 +53657,18 @@ const editingLayer = dc.useMemo(() => {
           ...mapData.backgroundImage,
           offsetX: newX,
           offsetY: newY
+        }
+      });
+    }
+  }, [mapData, updateMapData]);
+
+  const handleAlignmentGridSizeChange = dc.useCallback((newSize: number) => {
+    if (mapData && mapData.backgroundImage) {
+      updateMapData({
+        ...mapData,
+        backgroundImage: {
+          ...mapData.backgroundImage,
+          imageGridSize: newSize
         }
       });
     }
@@ -51060,6 +53804,9 @@ const editingLayer = dc.useMemo(() => {
             isCollapsed={mapData.sidebarCollapsed || false}
             onCollapseChange={handleSidebarCollapseChange}
             mapType={mapData.mapType || 'grid'}
+            objectSetId={mapData.objectSetId}
+            isFreeformMode={freeformPlacementMode}
+            onFreeformToggle={() => setFreeformPlacementMode(prev => !prev)}
           />
 
           {/* Layer Controls Panel (Z-Layer System) */}
@@ -51125,6 +53872,7 @@ const editingLayer = dc.useMemo(() => {
                 customColors={mapData.customColors || []}
                 onAddCustomColor={handleAddCustomColor}
                 onDeleteCustomColor={handleDeleteCustomColor}
+                freeformPlacementMode={freeformPlacementMode}
               />
 
               {/* AreaSelectLayer - handles area selection tool for multi-select */}
@@ -51215,12 +53963,13 @@ const editingLayer = dc.useMemo(() => {
           onClose={handleSettingsClose}
           onSave={handleSettingsSave}
           onOpenAlignmentMode={handleOpenAlignmentMode}
-          initialTab={returningFromAlignment ? 'hexgrid' : null}
+          initialTab={returningFromAlignment ? (mapData?.mapType === 'hex' ? 'hexgrid' : 'gridbackground') : null}
           mapType={mapData?.mapType || 'grid'}
           orientation={mapData?.orientation || 'flat'}
           currentSettings={mapData.settings}
           currentPreferences={mapData.uiPreferences}
           currentHexBounds={mapData.mapType === 'hex' ? mapData.hexBounds : null}
+          currentObjectSetId={mapData.objectSetId}
           currentBackgroundImage={mapData.backgroundImage ?? null}
           currentCells={mapData.mapType === 'hex' ? (getActiveLayer(mapData).cells || []) : []}
           currentObjects={mapData.mapType === 'hex' ? (getActiveLayer(mapData).objects || []) : []}
@@ -51238,6 +53987,8 @@ const editingLayer = dc.useMemo(() => {
             onOffsetChange={handleAlignmentOffsetChange}
             onApply={handleAlignmentApply}
             onCancel={handleAlignmentCancel}
+            gridSize={mapData.backgroundImage?.imageGridSize}
+            onGridSizeChange={mapData.mapType === 'grid' ? handleAlignmentGridSizeChange : undefined}
           />
         )}
 
@@ -52280,15 +55031,20 @@ button.dmt-orientation-btn,
 }
 
 .dmt-deselect-btn {
-  width: 100%;
-  padding: 6px 4px;
-  font-size: 9pt;
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background-color: var(--dmt-bg-tertiary);
   color: var(--dmt-text-primary);
   border: 1px solid #4a4a4a;
   border-radius: 3px;
   cursor: pointer;
   transition: var(--dmt-transition);
+  flex-shrink: 0;
 
   &:hover {
     background-color: #454545;
@@ -52297,6 +55053,59 @@ button.dmt-orientation-btn,
 
   &:active {
     background-color: var(--dmt-bg-secondary);
+  }
+}
+
+.dmt-sidebar-footer-row {
+  display: flex;
+  gap: 4px;
+  justify-content: center;
+}
+
+.dmt-freeform-toggle {
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--dmt-bg-tertiary);
+  color: var(--dmt-text-secondary);
+  border: 1px solid #4a4a4a;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: var(--dmt-transition);
+  flex-shrink: 0;
+
+  &:hover {
+    background-color: #454545;
+    border-color: #5a5a5a;
+    color: var(--dmt-text-primary);
+  }
+}
+
+.dmt-freeform-collapsed-indicator {
+  position: absolute;
+  left: 0;
+  top: 38px;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--interactive-accent) !important;
+  color: var(--text-on-accent) !important;
+  border: 1.5px solid var(--dmt-border-primary);
+  border-radius: 6px;
+  cursor: pointer;
+  z-index: 200;
+  box-shadow:
+    2px 2px 6px rgba(0, 0, 0, 0.4),
+    0 0 12px rgba(196, 165, 123, 0.3) !important;
+
+  &:hover {
+    filter: brightness(1.15);
   }
 }
 
@@ -52708,10 +55517,9 @@ button.dmt-orientation-btn,
 
 /* Settings modal specific - cap height and make scrollable */
 .dmt-settings-modal {
-  max-height: 500px;
   display: flex;
   flex-direction: column;
-  
+
   .dmt-modal-body {
     flex: 1;
     overflow-y: auto;
@@ -52719,6 +55527,46 @@ button.dmt-orientation-btn,
     min-height: 0;
   }
 }
+
+/* Fallback (non-native) modal: cap the inner height */
+.dmt-modal-content.dmt-settings-modal {
+  max-height: 500px;
+}
+
+/* Native Obsidian modal sizing */
+.dmt-settings-native-modal {
+  width: 520px;
+  max-width: 95vw;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.dmt-settings-native-modal .modal-content {
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  flex: 1;
+  min-height: 0;
+}
+.dmt-settings-native-modal .dmt-settings-modal {
+  flex: 1;
+  min-height: 0;
+}
+
+/* Resize handles for native modals (interact.js) */
+.dmt-resize-handle {
+  position: absolute;
+  z-index: 10;
+}
+.dmt-resize-top { top: 0; left: 8px; right: 8px; height: 6px; cursor: ns-resize; }
+.dmt-resize-bottom { bottom: 0; left: 8px; right: 8px; height: 6px; cursor: ns-resize; }
+.dmt-resize-left { left: 0; top: 8px; bottom: 8px; width: 6px; cursor: ew-resize; }
+.dmt-resize-right { right: 0; top: 8px; bottom: 8px; width: 6px; cursor: ew-resize; }
+.dmt-resize-top-left { top: 0; left: 0; width: 12px; height: 12px; cursor: nwse-resize; }
+.dmt-resize-top-right { top: 0; right: 0; width: 12px; height: 12px; cursor: nesw-resize; }
+.dmt-resize-bottom-left { bottom: 0; left: 0; width: 12px; height: 12px; cursor: nesw-resize; }
+.dmt-resize-bottom-right { bottom: 0; right: 0; width: 12px; height: 12px; cursor: nwse-resize; }
 
 .dmt-modal-footer {
   display: flex;
@@ -52886,6 +55734,7 @@ button.dmt-orientation-btn,
   box-sizing: border-box;
   max-width: 100%;
   overflow-x: hidden;
+  padding-right: 8px;
 }
 
 /* Color picker 2x2 grid items */
@@ -53656,6 +56505,10 @@ button.dmt-orientation-btn,
   margin-top: 8px;
 }
 
+.dmt-native-color-swatches {
+  margin-top: 8px;
+}
+
 /* Edit Button (for text labels) */
 .dmt-edit-button {
   position: absolute;
@@ -54309,17 +57162,6 @@ button.dmt-fow-tool-btn,
    ============================================ */
 
 /* Invisible overlay to block clicks when context menu is open */
-.dmt-layer-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 149; /* Just below layer controls (150) */
-  background: transparent;
-  cursor: default;
-}
-
 .dmt-layer-controls {
   position: absolute;
   top: 50%;
@@ -54331,26 +57173,11 @@ button.dmt-fow-tool-btn,
   opacity: 0;
   pointer-events: none;
   transition: left 0.3s ease, opacity 200ms ease-out, transform 200ms ease-out;
-  /* Constrain height to canvas and enable scrolling */
-  max-height: calc(100% - 80px);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  /* Padding for slide-out options menu and slider popup */
-  padding-right: 200px;
-  margin-right: -200px;
-  /* Hide scrollbar but keep scroll functionality */
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-
-.dmt-layer-controls::-webkit-scrollbar {
-  display: none;
 }
 
 .dmt-layer-controls.dmt-layer-controls-open {
   opacity: 1;
   transform: translateY(-50%) translateX(0);
-  pointer-events: auto;
 }
 
 .dmt-layer-controls.sidebar-open {
@@ -54367,6 +57194,7 @@ button.dmt-fow-tool-btn,
   display: flex;
   align-items: center;
   width: fit-content;
+  pointer-events: none;
 }
 
 /* Layer Button */
@@ -54391,6 +57219,7 @@ button.dmt-layer-btn {
   transition: all 0.2s ease;
   position: relative;
   user-select: none;
+  pointer-events: auto;
 }
 
 .dmt-layer-btn:hover {
@@ -54567,6 +57396,7 @@ button.dmt-layer-add-btn {
   overflow: hidden;
   transition: all 0.2s ease;
   margin-top: 4px;
+  pointer-events: auto;
 }
 
 .dmt-layer-add-btn:hover {
