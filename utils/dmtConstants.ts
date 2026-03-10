@@ -159,12 +159,12 @@ interface NeighborOffset {
 type DiagonalDirection = 'TL-BR' | 'TR-BL';
 
 // =============================================================================
-// Datacore Imports
+// Path Resolution (inlined for compiled bundle compatibility)
 // =============================================================================
 
-const pathResolverPath = dc.resolvePath("pathResolver.ts");
-const pathResolverImport = await dc.require(pathResolverPath) as { getJsonPath: () => string };
-const { getJsonPath } = pathResolverImport;
+function getJsonPath(): string {
+  return "windrose-md-data.json";
+}
 
 // =============================================================================
 // Theme Configuration

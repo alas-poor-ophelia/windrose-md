@@ -3,9 +3,10 @@
   "outputName": "compiled-windrose-md.md",
   "outputDir": "Projects/dungeon-map-tracker/dist",
   "includeDemo": false,
-  "minifyEnabled": false,
+  "minifyEnabled": true,
   "obfuscateEnabled": false,
   "version": "1.5.8",
   "additionalFiles": [],
-  "postScript": "Projects/dungeon-map-tracker/finalize-release.js"
+  "postScript": "Projects/dungeon-map-tracker/finalize-release.js",
+  "treeShake": "definitions"
 }
