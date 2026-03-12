@@ -412,13 +412,11 @@ const ToolPalette = ({
     };
 
     setTimeout(() => {
-      document.addEventListener('mousedown', handleClickOutside);
-      document.addEventListener('touchstart', handleClickOutside);
-    }, 10);
+      document.addEventListener('pointerup', handleClickOutside);
+    }, 100);
 
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('touchstart', handleClickOutside);
+      document.removeEventListener('pointerup', handleClickOutside);
     };
   }, [openSubMenu]);
 
@@ -442,13 +440,11 @@ const ToolPalette = ({
     };
 
     setTimeout(() => {
-      document.addEventListener('mousedown', handleClickOutside);
-      document.addEventListener('touchstart', handleClickOutside);
-    }, 10);
+      document.addEventListener('pointerup', handleClickOutside);
+    }, 100);
 
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('touchstart', handleClickOutside);
+      document.removeEventListener('pointerup', handleClickOutside);
     };
   }, [isColorPickerOpen]);
 

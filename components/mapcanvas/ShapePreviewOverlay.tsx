@@ -300,17 +300,21 @@ const ShapePreviewOverlay = ({
         y: p.y * displayScale + canvasOffsetY
       }));
     } else {
-      // Grid: useCenter=false gives top-left of cell (cellX * cellSize),
-      // so minX is the left edge and maxX+1 is the right edge of the region
-      corners = [
-        cellToScreen(minX, minY, geo, mapData, canvasWidth, canvasHeight, false),         // TL
-        cellToScreen(maxX + 1, minY, geo, mapData, canvasWidth, canvasHeight, false),     // TR
-        cellToScreen(maxX + 1, maxY + 1, geo, mapData, canvasWidth, canvasHeight, false), // BR
-        cellToScreen(minX, maxY + 1, geo, mapData, canvasWidth, canvasHeight, false),     // BL
-      ].map(p => ({
-        x: p.x * displayScale + canvasOffsetX,
-        y: p.y * displayScale + canvasOffsetY
-      }));
+      // Grid: compute corners directly from grid-edge world coordinates.
+      // minX gives the left edge, maxX+1 gives the right edge of the region.
+      const gridCornerWorlds = [
+        { wx: minX * geo.cellSize, wy: minY * geo.cellSize },             // TL
+        { wx: (maxX + 1) * geo.cellSize, wy: minY * geo.cellSize },       // TR
+        { wx: (maxX + 1) * geo.cellSize, wy: (maxY + 1) * geo.cellSize }, // BR
+        { wx: minX * geo.cellSize, wy: (maxY + 1) * geo.cellSize },       // BL
+      ];
+      corners = gridCornerWorlds.map(({ wx, wy }) => {
+        const p = worldToScreen(wx, wy, geo, mapData, canvasWidth, canvasHeight);
+        return {
+          x: p.x * displayScale + canvasOffsetX,
+          y: p.y * displayScale + canvasOffsetY
+        };
+      });
     }
 
     const polygonPoints = corners.map(c => `${c.x},${c.y}`).join(' ');

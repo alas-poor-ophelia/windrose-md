@@ -256,28 +256,34 @@ const useDrawingTools = (
         if (result.success) {
           onObjectsChange(result.objects);
         }
-      } else if (getCellIndex(activeLayer.cells, coords, geometry) !== -1) {
-        const newCells = accessorRemoveCell(activeLayer.cells, coords, geometry);
-        onCellsChange(newCells, isBatchedStroke);
-      } else if (activeLayer.curves && activeLayer.curves.length > 0 && geometry) {
-        // Try erasing from curves
-        let newCurves: Curve[] | null = null;
-        if (geometry.type === 'hex') {
-          const hexGeo = geometry as { getHexVertices: (q: number, r: number) => { worldX: number; worldY: number }[] };
-          const verts = hexGeo.getHexVertices(coordX, coordY);
-          const clipPoly = verts.map(v => [v.worldX, v.worldY] as [number, number]);
-          newCurves = eraseWorldPolygonFromCurves(activeLayer.curves, clipPoly);
-        } else {
-          const cellSize = (geometry as { cellSize: number }).cellSize;
-          if (cellSize) {
-            newCurves = eraseCellFromCurves(activeLayer.curves, coordX, coordY, cellSize);
+      } else {
+        // Try curves first — they render above painted cells, so erase them first
+        let curveErased = false;
+        if (activeLayer.curves && activeLayer.curves.length > 0 && geometry) {
+          let newCurves: Curve[] | null = null;
+          if (geometry.type === 'hex') {
+            const hexGeo = geometry as { getHexVertices: (q: number, r: number) => { worldX: number; worldY: number }[] };
+            const verts = hexGeo.getHexVertices(coordX, coordY);
+            const clipPoly = verts.map(v => [v.worldX, v.worldY] as [number, number]);
+            newCurves = eraseWorldPolygonFromCurves(activeLayer.curves, clipPoly);
+          } else {
+            const cellSize = (geometry as { cellSize: number }).cellSize;
+            if (cellSize) {
+              newCurves = eraseCellFromCurves(activeLayer.curves, coordX, coordY, cellSize);
+            }
+          }
+          if (newCurves) {
+            if (strokeInitialCurvesRef.current === null) {
+              strokeInitialCurvesRef.current = activeLayer.curves;
+            }
+            onCurvesChange(newCurves, isBatchedStroke);
+            curveErased = true;
           }
         }
-        if (newCurves) {
-          if (strokeInitialCurvesRef.current === null) {
-            strokeInitialCurvesRef.current = activeLayer.curves;
-          }
-          onCurvesChange(newCurves, isBatchedStroke);
+        // Fall through to painted cells only if no curve was erased
+        if (!curveErased && getCellIndex(activeLayer.cells, coords, geometry) !== -1) {
+          const newCells = accessorRemoveCell(activeLayer.cells, coords, geometry);
+          onCellsChange(newCells, isBatchedStroke);
         }
       }
     }
