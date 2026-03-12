@@ -18,6 +18,7 @@ import type {
   UIPreferences,
   MapSettings,
   ObjectLink,
+  MapLayer,
 } from '#types/index';
 import type { ResolvedTheme } from '#types/settings/settings.types';
 
@@ -55,7 +56,7 @@ const { MapSettingsModal } = await requireModuleByName("MapSettingsModal.tsx");
 const { getSetting, getTheme, getEffectiveSettings } = await requireModuleByName("settingsAccessor.ts");
 const { DEFAULTS } = await requireModuleByName("dmtConstants.ts");
 const { getColorByHex, isDefaultColor } = await requireModuleByName("colorOperations.ts");
-const { axialToOffset, isWithinOffsetBounds } = await requireModuleByName("offsetCoordinates.ts");
+const { axialToOffset, offsetToAxial, isWithinOffsetBounds } = await requireModuleByName("offsetCoordinates.ts");
 const { ImageAlignmentMode } = await requireModuleByName("ImageAlignmentMode.jsx");
 const { ModalPortal } = await requireModuleByName("ModalPortal.tsx");
 
@@ -98,6 +99,7 @@ interface CornerBracketProps {
 interface HexBounds {
   maxCol: number;
   maxRow: number;
+  maxRing?: number;
 }
 
 // ============================================================================
@@ -659,21 +661,78 @@ const editingLayer = dc.useMemo(() => {
       // If requested, delete content that would be outside the new bounds
       if (deleteOrphanedContent) {
         const orientation = mapData.orientation || 'flat';
+        const isRadial = hexBounds.maxRing !== undefined;
 
-        // Filter cells to keep only those within new bounds
-        if (newMapData.cells && newMapData.cells.length > 0) {
-          newMapData.cells = newMapData.cells.filter((cell: Cell) => {
-            const { col, row } = axialToOffset(cell.q, cell.r, orientation);
-            return isWithinOffsetBounds(col, row, hexBounds);
+        const isInBounds = (q: number, r: number): boolean => {
+          if (isRadial) {
+            const ring = Math.max(Math.abs(q), Math.abs(r), Math.abs(q + r));
+            return ring <= hexBounds.maxRing!;
+          }
+          const { col, row } = axialToOffset(q, r, orientation);
+          return isWithinOffsetBounds(col, row, hexBounds);
+        };
+
+        // Check if a fog cell (offset coords) is within new bounds
+        const isFogCellInBounds = (col: number, row: number): boolean => {
+          if (isRadial) {
+            const { q, r } = offsetToAxial(col, row, orientation);
+            const ring = Math.max(Math.abs(q), Math.abs(r), Math.abs(q + r));
+            return ring <= hexBounds.maxRing!;
+          }
+          return isWithinOffsetBounds(col, row, hexBounds);
+        };
+
+        // Filter cells, objects, and fog across all layers to keep only those within new bounds
+        if (newMapData.layers && newMapData.layers.length > 0) {
+          newMapData.layers = newMapData.layers.map((layer: MapLayer) => {
+            const filteredCells = layer.cells?.filter((cell: Cell) =>
+              isInBounds(cell.q, cell.r)
+            );
+            const filteredObjects = layer.objects?.filter((obj: MapObject) =>
+              isInBounds(obj.position.x, obj.position.y)
+            );
+            const filteredFog = layer.fogOfWar?.foggedCells?.filter(
+              (fc: { col: number; row: number }) => isFogCellInBounds(fc.col, fc.row)
+            );
+            const fogChanged = filteredFog !== layer.fogOfWar?.foggedCells;
+            if (filteredCells === layer.cells && filteredObjects === layer.objects && !fogChanged) return layer;
+            return {
+              ...layer,
+              cells: filteredCells ?? [],
+              objects: filteredObjects ?? [],
+              ...(layer.fogOfWar && fogChanged ? {
+                fogOfWar: { ...layer.fogOfWar, foggedCells: filteredFog ?? [] }
+              } : {})
+            };
           });
         }
+      }
+    }
 
-        // Filter objects to keep only those within new bounds
-        if (newMapData.objects && newMapData.objects.length > 0) {
-          newMapData.objects = newMapData.objects.filter((obj: MapObject) => {
-            const { col, row } = axialToOffset(obj.position.x, obj.position.y, orientation);
-            return isWithinOffsetBounds(col, row, hexBounds);
-          });
+    // Recenter viewport when switching between rectangular and radial bounds
+    if (hexBounds !== null && mapData.mapType === 'hex') {
+      const wasRadial = mapData.hexBounds?.maxRing !== undefined;
+      const isNowRadial = hexBounds.maxRing !== undefined;
+      if (wasRadial !== isNowRadial) {
+        if (isNowRadial) {
+          // Radial: center on axial origin (0,0) which is world (0,0)
+          newMapData.viewState = { ...mapData.viewState, center: { x: 0, y: 0 } };
+        } else {
+          // Back to rectangular: center on middle of rectangular bounds
+          const orientation = mapData.orientation || 'flat';
+          const hSize = hexSize ?? mapData.hexSize ?? 40;
+          const centerCol = Math.floor(hexBounds.maxCol / 2);
+          const centerRow = Math.floor(hexBounds.maxRow / 2);
+          const { q, r } = offsetToAxial(centerCol, centerRow, orientation);
+          let worldX: number, worldY: number;
+          if (orientation === 'flat') {
+            worldX = hSize * (3 / 2) * q;
+            worldY = hSize * (Math.sqrt(3) / 2 * q + Math.sqrt(3) * r);
+          } else {
+            worldX = hSize * (Math.sqrt(3) * q + Math.sqrt(3) / 2 * r);
+            worldY = hSize * (3 / 2) * r;
+          }
+          newMapData.viewState = { ...mapData.viewState, center: { x: worldX, y: worldY } };
         }
       }
     }

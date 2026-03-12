@@ -134,21 +134,25 @@ interface ImageSearchResult {
 // Settings Modal State
 // ===========================================
 
+/** Bounds shape mode */
+type BoundsShape = 'rectangular' | 'radial';
+
 /** Complete settings modal state */
 interface SettingsModalState {
   activeTab: SettingsTabId;
-  
+
   // Global settings toggle
   useGlobalSettings: boolean;
   overrides: SettingsOverrides;
-  
+
   // Preferences
   preferences: SettingsPreferences;
-  
+
   // Distance settings
   distanceSettings: DistanceSettings;
-  
+
   // Hex bounds
+  boundsShape: BoundsShape;
   hexBounds: HexBounds;
   
   // Coordinate display
@@ -314,7 +318,8 @@ const Actions = {
   SET_FOG_IMAGE_SEARCH_RESULTS: 'SET_FOG_IMAGE_SEARCH_RESULTS',
   FOG_IMAGE_SELECTED: 'FOG_IMAGE_SELECTED',
   CLEAR_FOG_IMAGE: 'CLEAR_FOG_IMAGE',
-  SET_OBJECT_SET_ID: 'SET_OBJECT_SET_ID'
+  SET_OBJECT_SET_ID: 'SET_OBJECT_SET_ID',
+  SET_BOUNDS_SHAPE: 'SET_BOUNDS_SHAPE'
 } as const;
 
 /** Action type union */
@@ -497,6 +502,11 @@ interface SetObjectSetIdAction {
   payload: string | null;
 }
 
+interface SetBoundsShapeAction {
+  type: typeof Actions.SET_BOUNDS_SHAPE;
+  payload: BoundsShape;
+}
+
 /** Discriminated union of all actions */
 type SettingsAction =
   | InitializeAction
@@ -534,7 +544,8 @@ type SettingsAction =
   | SetFogImageSearchResultsAction
   | FogImageSelectedAction
   | ClearFogImageAction
-  | SetObjectSetIdAction;
+  | SetObjectSetIdAction
+  | SetBoundsShapeAction;
 
 // ===========================================
 // Constants
@@ -553,6 +564,13 @@ const GRID_DENSITY_PRESETS: Record<Exclude<GridDensityKey, 'custom'>, GridDensit
 /**
  * Check if content would be orphaned by new bounds
  */
+/**
+ * Ring distance from origin in axial coordinates
+ */
+function getHexRing(q: number, r: number): number {
+  return Math.max(Math.abs(q), Math.abs(r), Math.abs(q + r));
+}
+
 function getOrphanedContentInfo(
   newBounds: HexBounds,
   mapType: MapType,
@@ -561,32 +579,39 @@ function getOrphanedContentInfo(
   orientation: HexOrientation
 ): OrphanInfo {
   if (mapType !== 'hex') return { cells: 0, objects: 0 };
-  
+
+  const isRadial = newBounds.maxRing !== undefined;
+
+  const isOutOfBounds = (q: number, r: number): boolean => {
+    if (isRadial) {
+      return getHexRing(q, r) > newBounds.maxRing!;
+    }
+    const { col, row } = axialToOffset(q, r, orientation);
+    return !isWithinOffsetBounds(col, row, newBounds);
+  };
+
   let orphanedCells = 0;
   let orphanedObjects = 0;
-  
+
   if (currentCells && currentCells.length > 0) {
     currentCells.forEach(cell => {
-      // Hex cells use q/r (axial) coordinates
       const hexCell = cell as Cell & { q?: number; r?: number };
       if (hexCell.q !== undefined && hexCell.r !== undefined) {
-        const { col, row } = axialToOffset(hexCell.q, hexCell.r, orientation);
-        if (!isWithinOffsetBounds(col, row, newBounds)) {
+        if (isOutOfBounds(hexCell.q, hexCell.r)) {
           orphanedCells++;
         }
       }
     });
   }
-  
+
   if (currentObjects && currentObjects.length > 0) {
     currentObjects.forEach(obj => {
-      const { col, row } = axialToOffset(obj.position.x, obj.position.y, orientation);
-      if (!isWithinOffsetBounds(col, row, newBounds)) {
+      if (isOutOfBounds(obj.position.x, obj.position.y)) {
         orphanedObjects++;
       }
     });
   }
-  
+
   return { cells: orphanedCells, objects: orphanedObjects };
 }
 
@@ -674,9 +699,11 @@ function buildInitialState(props: BuildInitialStateProps, globalSettings: Global
       displayFormat: currentDistanceSettings?.displayFormat ?? (globalSettings.distanceDisplayFormat ?? 'both')
     },
     
+    boundsShape: currentHexBounds?.maxRing !== undefined ? 'radial' : 'rectangular',
     hexBounds: {
       maxCol: currentHexBounds?.maxCol ?? 26,
-      maxRow: currentHexBounds?.maxRow ?? 20
+      maxRow: currentHexBounds?.maxRow ?? 20,
+      ...(currentHexBounds?.maxRing !== undefined ? { maxRing: currentHexBounds.maxRing } : {})
     },
     
     coordinateDisplayMode: currentSettings?.coordinateDisplayMode ?? 'rectangular',
@@ -766,8 +793,15 @@ function settingsReducer(state: SettingsModalState, action: SettingsAction): Set
         distanceSettings: { ...state.distanceSettings, ...action.payload }
       };
     
-    case Actions.SET_HEX_BOUNDS:
-      return { ...state, hexBounds: action.payload };
+    case Actions.SET_HEX_BOUNDS: {
+      const newBounds = action.payload;
+      // When radial, auto-compute maxCol/maxRow from maxRing
+      if (state.boundsShape === 'radial' && newBounds.maxRing !== undefined) {
+        const derived = 2 * newBounds.maxRing + 1;
+        return { ...state, hexBounds: { ...newBounds, maxCol: derived, maxRow: derived } };
+      }
+      return { ...state, hexBounds: newBounds };
+    }
     
     case Actions.SET_COORDINATE_MODE:
       return { ...state, coordinateDisplayMode: action.payload };
@@ -1001,6 +1035,30 @@ function settingsReducer(state: SettingsModalState, action: SettingsAction): Set
     
     case Actions.SET_OBJECT_SET_ID:
       return { ...state, objectSetId: action.payload };
+
+    case Actions.SET_BOUNDS_SHAPE: {
+      const shape = action.payload;
+      if (shape === 'radial') {
+        // Derive maxRing from current rectangular bounds
+        const maxRing = state.hexBounds.maxRing ?? Math.floor(Math.min(state.hexBounds.maxCol, state.hexBounds.maxRow) / 2);
+        const derived = 2 * maxRing + 1;
+        return {
+          ...state,
+          boundsShape: 'radial',
+          hexBounds: { maxCol: derived, maxRow: derived, maxRing },
+          coordinateDisplayMode: 'radial'
+        };
+      } else {
+        // Remove maxRing, keep maxCol/maxRow
+        const { maxRing: _removed, ...rectBounds } = state.hexBounds;
+        return {
+          ...state,
+          boundsShape: 'rectangular',
+          hexBounds: rectBounds as HexBounds,
+          coordinateDisplayMode: 'rectangular'
+        };
+      }
+    }
 
     default:
       return state;

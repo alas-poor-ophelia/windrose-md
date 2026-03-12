@@ -119,6 +119,65 @@ class HexGeometry extends BaseGeometry {
   }
   
   /**
+   * Whether this geometry uses radial (ring-based) or rectangular bounds
+   */
+  get renderingMode(): 'rectangular' | 'radial' {
+    return this.bounds?.maxRing !== undefined ? 'radial' : 'rectangular';
+  }
+
+  /**
+   * Get ring distance from origin for axial coordinates
+   */
+  getHexRing(q: number, r: number): number {
+    return Math.max(Math.abs(q), Math.abs(r), Math.abs(q + r));
+  }
+
+  /**
+   * Get all hexes in a specific ring around origin
+   * Ring 0 returns just the center. Ring N returns 6*N hexes.
+   */
+  iterateRing(ring: number): Array<{q: number, r: number}> {
+    if (ring === 0) return [{ q: 0, r: 0 }];
+
+    const results: Array<{q: number, r: number}> = [];
+    // Direction vectors for walking each edge clockwise
+    const directions = [
+      { dq: 1, dr: 0 },
+      { dq: 0, dr: 1 },
+      { dq: -1, dr: 1 },
+      { dq: -1, dr: 0 },
+      { dq: 0, dr: -1 },
+      { dq: 1, dr: -1 }
+    ];
+
+    // Start at (0, -ring)
+    let q = 0;
+    let r = -ring;
+
+    for (let edge = 0; edge < 6; edge++) {
+      for (let step = 0; step < ring; step++) {
+        results.push({ q, r });
+        q += directions[edge].dq;
+        r += directions[edge].dr;
+      }
+    }
+
+    return results;
+  }
+
+  /**
+   * Get all hexes from ring 0 through maxRing
+   * Total count: 1 + 3 * maxRing * (maxRing + 1)
+   */
+  getAllRadialCells(maxRing: number): Array<{q: number, r: number}> {
+    const results: Array<{q: number, r: number}> = [];
+    for (let ring = 0; ring <= maxRing; ring++) {
+      results.push(...this.iterateRing(ring));
+    }
+    return results;
+  }
+
+  /**
    * Convert world coordinates to axial hex coordinates
    */
   worldToHex(worldX: number, worldY: number): AxialCoords {
@@ -319,8 +378,22 @@ class HexGeometry extends BaseGeometry {
       return;
     }
     
+    // Use fill-based rendering to work around strokeStyle corruption
+    ctx.fillStyle = lineColor;
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 1;
+
+    // Radial mode: iterate by rings instead of rectangular grid
+    if (this.renderingMode === 'radial') {
+      const cells = this.getAllRadialCells(this.bounds!.maxRing!);
+      for (const { q, r } of cells) {
+        this.drawHexOutline(ctx, q, r, offsetX, offsetY, zoom, lineWidth);
+      }
+      return;
+    }
+
     let minCol: number, maxCol: number, minRow: number, maxRow: number;
-    
+
     if (this.bounds) {
       minCol = 0;
       maxCol = this.bounds.maxCol - 1;
@@ -330,38 +403,33 @@ class HexGeometry extends BaseGeometry {
       const diagonal = Math.sqrt(width * width + height * height) * 2;
       const expandedWidth = diagonal;
       const expandedHeight = diagonal;
-      
+
       const { minQ, maxQ, minR, maxR } = this.getVisibleHexRange(
         offsetX, offsetY, expandedWidth, expandedHeight, zoom
       );
-      
+
       const corner1 = axialToOffset(minQ, minR, this.orientation);
       const corner2 = axialToOffset(maxQ, maxR, this.orientation);
       const corner3 = axialToOffset(minQ, maxR, this.orientation);
       const corner4 = axialToOffset(maxQ, minR, this.orientation);
-      
+
       minCol = Math.min(corner1.col, corner2.col, corner3.col, corner4.col);
       maxCol = Math.max(corner1.col, corner2.col, corner3.col, corner4.col);
       minRow = Math.min(corner1.row, corner2.row, corner3.row, corner4.row);
       maxRow = Math.max(corner1.row, corner2.row, corner3.row, corner4.row);
     }
-    
+
     // Safety check on iteration count
     const totalHexes = (maxCol - minCol + 1) * (maxRow - minRow + 1);
     if (totalHexes > 50000 || !isFinite(totalHexes)) {
       console.warn(`[HexGeometry.drawGrid] Too many hexes to draw (${totalHexes}), aborting`);
       return;
     }
-    
-    // Use fill-based rendering to work around strokeStyle corruption
-    ctx.fillStyle = lineColor;
-    ctx.globalCompositeOperation = 'source-over';
-    ctx.globalAlpha = 1;
-    
+
     for (let col = minCol; col <= maxCol; col++) {
       for (let row = minRow; row <= maxRow; row++) {
         const { q, r } = offsetToAxial(col, row, this.orientation);
-        
+
         if (!this.bounds || this.isWithinBounds(q, r)) {
           this.drawHexOutline(ctx, q, r, offsetX, offsetY, zoom, lineWidth);
         }
@@ -515,9 +583,13 @@ class HexGeometry extends BaseGeometry {
    */
   isWithinBounds(x: number, y: number): boolean {
     if (!this.bounds) return true;
-    
+
+    if (this.renderingMode === 'radial') {
+      return this.getHexRing(x, y) <= this.bounds.maxRing!;
+    }
+
     const { col, row } = axialToOffset(x, y, this.orientation);
-    return col >= 0 && col < this.bounds.maxCol && 
+    return col >= 0 && col < this.bounds.maxCol &&
            row >= 0 && row < this.bounds.maxRow;
   }
   
@@ -526,11 +598,20 @@ class HexGeometry extends BaseGeometry {
    */
   clampToBounds(x: number, y: number): Point {
     if (!this.bounds) return { x, y };
-    
+
+    if (this.renderingMode === 'radial') {
+      const ring = this.getHexRing(x, y);
+      if (ring <= this.bounds.maxRing!) return { x, y };
+      // Scale toward origin and round to nearest hex
+      const scale = this.bounds.maxRing! / ring;
+      const { q, r } = this.roundHex(x * scale, y * scale);
+      return { x: q, y: r };
+    }
+
     const { col, row } = axialToOffset(x, y, this.orientation);
     const clampedCol = Math.max(0, Math.min(this.bounds.maxCol - 1, col));
     const clampedRow = Math.max(0, Math.min(this.bounds.maxRow - 1, row));
-    
+
     const clamped = offsetToAxial(clampedCol, clampedRow, this.orientation);
     return { x: clamped.q, y: clamped.r };
   }

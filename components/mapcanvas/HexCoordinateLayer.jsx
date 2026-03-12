@@ -18,18 +18,6 @@ const { axialToOffset, offsetToAxial, columnToLabel, rowToLabel } = await requir
 const { getEffectiveSettings } = await requireModuleByName("settingsAccessor.ts");
 
 /**
- * Calculate the ring (distance from origin) for a hex in axial coordinates
- * Ring 0 = center, Ring 1 = 6 adjacent hexes, Ring 2 = 12 hexes, etc.
- * @param {number} q - Axial q coordinate
- * @param {number} r - Axial r coordinate
- * @returns {number} Ring number (0 = center)
- */
-function getHexRing(q, r) {
-  // Hex distance formula: (|q| + |q + r| + |r|) / 2
-  return (Math.abs(q) + Math.abs(q + r) + Math.abs(r)) / 2;
-}
-
-/**
  * Check if a world-space point is inside a flat-topped regular hexagon
  * Used for creating flat-topped radial coordinate boundaries
  * A flat-topped hexagon has flat edges at top/bottom and pointed vertices at left/right
@@ -115,9 +103,12 @@ function getVisibleHexes(geometry, mapData, canvas, displayMode = 'rectangular')
   
   // Get canvas display rect for coordinate scaling
   const rect = canvas.getBoundingClientRect();
-  const containerRect = canvas.parentElement?.getBoundingClientRect() || rect;
-  
-  // Calculate canvas offset within container (due to flex centering)
+  // Use the positioning ancestor (.dmt-canvas-container) for offset calculation,
+  // since .dmt-coordinate-layer is position:absolute relative to it
+  const positioningAncestor = canvas.closest('.dmt-canvas-container');
+  const containerRect = positioningAncestor?.getBoundingClientRect() || rect;
+
+  // Calculate canvas offset within the positioning container (due to flex centering)
   const canvasOffsetX = rect.left - containerRect.left;
   const canvasOffsetY = rect.top - containerRect.top;
   
@@ -165,63 +156,74 @@ function getVisibleHexes(geometry, mapData, canvas, displayMode = 'rectangular')
   const visibleHexes = [];
   
   if (displayMode === 'radial') {
-    // Radial mode: iterate all hexes in bounds, check flat-topped hexagonal containment
-    const hexBounds = mapData.hexBounds || { maxCol: 26, maxRow: 20 };
-    
-    // Calculate max radius based on smaller dimension (so pattern fits in bounds)
-    const maxRadius = Math.floor(Math.min(hexBounds.maxCol, hexBounds.maxRow) / 2);
-    
-    // Use the center hex for both boundary and labeling (ensures consistency)
-    const centerCol = Math.floor((hexBounds.maxCol - 1) / 2);
-    const centerRow = Math.floor((hexBounds.maxRow - 1) / 2);
-    const { q: centerQ, r: centerR } = offsetToAxial(centerCol, centerRow, geometry.orientation);
-    
-    // Get center position in world coordinates
-    const centerWorld = geometry.hexToWorld(centerQ, centerR);
-    
-    // Calculate circumradius for flat-topped hexagonal boundary
-    // The world-space distance to a ring boundary is ring * sqrt(3) * hexSize
-    const sqrt3 = Math.sqrt(3);
-    const circumradius = maxRadius * sqrt3 * geometry.hexSize;
-    
-    // Iterate all hexes in rectangular bounds
-    for (let col = 0; col < hexBounds.maxCol; col++) {
-      for (let row = 0; row < hexBounds.maxRow; row++) {
-        const { q, r } = offsetToAxial(col, row, geometry.orientation);
-        
-        // Get this hex's world position relative to center
-        const hexWorld = geometry.hexToWorld(q, r);
-        const relWorldX = hexWorld.worldX - centerWorld.worldX;
-        const relWorldY = hexWorld.worldY - centerWorld.worldY;
-        
-        // Check if inside flat-topped hexagonal boundary
-        if (!isInsideFlatToppedHexagon(relWorldX, relWorldY, circumradius)) {
-          continue;
-        }
-        
-        // Calculate ring using hex distance from same center
-        const dq = q - centerQ;
-        const dr = r - centerR;
-        const ring = getHexRing(dq, dr);
-        
+    if (geometry.renderingMode === 'radial') {
+      // Radial bounds: iterate cells from geometry (origin-centered)
+      const cells = geometry.getAllRadialCells(mapData.hexBounds.maxRing);
+      for (const { q, r } of cells) {
+        const ring = geometry.getHexRing(q, r);
         const pos = getDisplayPosition(q, r);
         if (!pos) continue;
-        
-        // Calculate position within ring
+
         let label;
         if (ring === 0) {
           label = "⟐";
         } else {
-          const position = getPositionInRing(dq, dr, ring);
+          const position = getPositionInRing(q, r, ring);
           label = `${ring}-${position}`;
         }
-        
-        visibleHexes.push({ 
-          col, row, q, r, 
-          displayX: pos.displayX, 
+
+        const { col, row } = axialToOffset(q, r, geometry.orientation);
+        visibleHexes.push({
+          col, row, q, r,
+          displayX: pos.displayX,
           displayY: pos.displayY,
-          label 
+          label
         });
+      }
+    } else {
+      // Rectangular bounds with radial label display: derive center from bounds
+      const hexBounds = mapData.hexBounds || { maxCol: 26, maxRow: 20 };
+      const maxRadius = Math.floor(Math.min(hexBounds.maxCol, hexBounds.maxRow) / 2);
+      const centerCol = Math.floor((hexBounds.maxCol - 1) / 2);
+      const centerRow = Math.floor((hexBounds.maxRow - 1) / 2);
+      const { q: centerQ, r: centerR } = offsetToAxial(centerCol, centerRow, geometry.orientation);
+      const centerWorld = geometry.hexToWorld(centerQ, centerR);
+      const sqrt3 = Math.sqrt(3);
+      const circumradius = maxRadius * sqrt3 * geometry.hexSize;
+
+      for (let col = 0; col < hexBounds.maxCol; col++) {
+        for (let row = 0; row < hexBounds.maxRow; row++) {
+          const { q, r } = offsetToAxial(col, row, geometry.orientation);
+          const hexWorld = geometry.hexToWorld(q, r);
+          const relWorldX = hexWorld.worldX - centerWorld.worldX;
+          const relWorldY = hexWorld.worldY - centerWorld.worldY;
+
+          if (!isInsideFlatToppedHexagon(relWorldX, relWorldY, circumradius)) {
+            continue;
+          }
+
+          const dq = q - centerQ;
+          const dr = r - centerR;
+          const ring = geometry.getHexRing(dq, dr);
+
+          const pos = getDisplayPosition(q, r);
+          if (!pos) continue;
+
+          let label;
+          if (ring === 0) {
+            label = "⟐";
+          } else {
+            const position = getPositionInRing(dq, dr, ring);
+            label = `${ring}-${position}`;
+          }
+
+          visibleHexes.push({
+            col, row, q, r,
+            displayX: pos.displayX,
+            displayY: pos.displayY,
+            label
+          });
+        }
       }
     }
   } else {

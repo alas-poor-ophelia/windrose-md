@@ -241,6 +241,9 @@ export interface MapSettingsHandlers {
   handleBoundsLockToggle: () => void;
 
   // Hex grid settings
+  boundsShape: 'rectangular' | 'radial';
+  handleBoundsShapeChange: (shape: 'rectangular' | 'radial') => void;
+  handleRadiusChange: (value: string) => void;
   handleHexBoundsChange: (axis: 'maxCol' | 'maxRow', value: string) => void;
   handleDensityChange: (density: GridDensity) => void;
   handleCustomColumnsChange: (columns: number) => void;
@@ -619,16 +622,20 @@ const MapSettingsProvider: React.FC<MapSettingsProviderProps> = ({
   const handleSave = (): void => {
     // Check for orphaned content if bounds were reduced (hex maps only)
     if (mapType === 'hex' && currentHexBounds) {
-      const isReduction = state.hexBounds.maxCol < currentHexBounds.maxCol ||
-                          state.hexBounds.maxRow < currentHexBounds.maxRow;
+      const isRectReduction = state.hexBounds.maxCol < currentHexBounds.maxCol ||
+                              state.hexBounds.maxRow < currentHexBounds.maxRow;
+      const isRadialReduction = state.hexBounds.maxRing !== undefined && (
+        currentHexBounds.maxRing === undefined ||
+        state.hexBounds.maxRing < currentHexBounds.maxRing
+      );
 
-      if (isReduction) {
+      if (isRectReduction || isRadialReduction) {
         const orphans = getOrphanedContentInfo(state.hexBounds, mapType, currentCells, currentObjects, orientation) as OrphanInfo;
         if (orphans.cells > 0 || orphans.objects > 0) {
           dispatch({
             type: Actions.SHOW_RESIZE_CONFIRM,
             payload: {
-              pendingBoundsChange: { newBounds: state.hexBounds, previousBounds: currentHexBounds },
+              pendingBoundsChange: { newBounds: state.hexBounds, oldBounds: currentHexBounds },
               orphanInfo: orphans
             }
           });
@@ -671,6 +678,18 @@ const MapSettingsProvider: React.FC<MapSettingsProviderProps> = ({
     handleResizeConfirmCancel: () => dispatch({ type: Actions.CANCEL_RESIZE }),
     handleObjectSetChange: (setId) => dispatch({ type: Actions.SET_OBJECT_SET_ID, payload: setId }),
     handleCancel: () => onClose(),
+
+    // Bounds shape
+    boundsShape: state.boundsShape,
+    handleBoundsShapeChange: (shape) => {
+      dispatch({ type: Actions.SET_BOUNDS_SHAPE, payload: shape });
+    },
+    handleRadiusChange: (value) => {
+      const numValue = parseInt(value, 10);
+      if (isNaN(numValue) || numValue <= 0 || numValue > 100) return;
+      const derived = 2 * numValue + 1;
+      dispatch({ type: Actions.SET_HEX_BOUNDS, payload: { maxCol: derived, maxRow: derived, maxRing: numValue } });
+    },
 
     // Dispatches needing context for orphan checks
     handleHexBoundsChange: (axis, value) => {
