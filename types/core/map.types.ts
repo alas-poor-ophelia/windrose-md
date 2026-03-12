@@ -275,6 +275,7 @@ export interface MapDimensions {
 export interface HexBounds {
   maxCol: number;
   maxRow: number;
+  maxRing?: number;  // When present, hexagonal boundary used instead of rectangular
 }
 
 /** Generic bounds for fog operations */

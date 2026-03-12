@@ -520,4 +520,249 @@ describe("HexGeometry", () => {
       expect(geometry.getScaledHexSize(1.5)).toBe(geometry.getScaledCellSize(1.5));
     });
   });
+
+  // ===========================================================================
+  // Radial Rendering Mode
+  // ===========================================================================
+
+  describe("radial rendering mode", () => {
+    // =========================================================================
+    // renderingMode getter
+    // =========================================================================
+
+    describe("renderingMode", () => {
+      it("returns 'rectangular' when no bounds", () => {
+        const g = new HexGeometry(HEX_SIZE, "flat");
+        expect(g.renderingMode).toBe("rectangular");
+      });
+
+      it("returns 'rectangular' when bounds have no maxRing", () => {
+        const g = new HexGeometry(HEX_SIZE, "flat", { maxCol: 10, maxRow: 10 });
+        expect(g.renderingMode).toBe("rectangular");
+      });
+
+      it("returns 'radial' when bounds have maxRing", () => {
+        const g = new HexGeometry(HEX_SIZE, "flat", { maxCol: 11, maxRow: 11, maxRing: 5 });
+        expect(g.renderingMode).toBe("radial");
+      });
+    });
+
+    // =========================================================================
+    // getHexRing
+    // =========================================================================
+
+    describe("getHexRing", () => {
+      let geometry: InstanceType<typeof HexGeometry>;
+
+      beforeEach(() => {
+        geometry = new HexGeometry(HEX_SIZE, "flat");
+      });
+
+      it("origin is ring 0", () => {
+        expect(geometry.getHexRing(0, 0)).toBe(0);
+      });
+
+      it("(1, -1) is ring 1", () => {
+        expect(geometry.getHexRing(1, -1)).toBe(1);
+      });
+
+      it("(1, 0) is ring 1", () => {
+        expect(geometry.getHexRing(1, 0)).toBe(1);
+      });
+
+      it("(0, 1) is ring 1", () => {
+        expect(geometry.getHexRing(0, 1)).toBe(1);
+      });
+
+      it("(2, 0) is ring 2", () => {
+        expect(geometry.getHexRing(2, 0)).toBe(2);
+      });
+
+      it("(-2, 1) is ring 2", () => {
+        expect(geometry.getHexRing(-2, 1)).toBe(2);
+      });
+
+      it("(3, -3) is ring 3", () => {
+        expect(geometry.getHexRing(3, -3)).toBe(3);
+      });
+
+      it("all 6 neighbors of origin are ring 1", () => {
+        const neighbors = [
+          [1, 0], [1, -1], [0, -1],
+          [-1, 0], [-1, 1], [0, 1]
+        ];
+        for (const [q, r] of neighbors) {
+          expect(geometry.getHexRing(q, r)).toBe(1);
+        }
+      });
+    });
+
+    // =========================================================================
+    // iterateRing
+    // =========================================================================
+
+    describe("iterateRing", () => {
+      let geometry: InstanceType<typeof HexGeometry>;
+
+      beforeEach(() => {
+        geometry = new HexGeometry(HEX_SIZE, "flat");
+      });
+
+      it("ring 0 returns exactly 1 hex at origin", () => {
+        const cells = geometry.iterateRing(0);
+        expect(cells).toEqual([{ q: 0, r: 0 }]);
+      });
+
+      it("ring 1 returns exactly 6 hexes", () => {
+        const cells = geometry.iterateRing(1);
+        expect(cells).toHaveLength(6);
+      });
+
+      it("ring 1 has no duplicates", () => {
+        const cells = geometry.iterateRing(1);
+        const keys = cells.map(c => `${c.q},${c.r}`);
+        expect(new Set(keys).size).toBe(6);
+      });
+
+      it("ring 3 returns exactly 18 hexes", () => {
+        const cells = geometry.iterateRing(3);
+        expect(cells).toHaveLength(18);
+      });
+
+      it("ring 3 has no duplicates", () => {
+        const cells = geometry.iterateRing(3);
+        const keys = cells.map(c => `${c.q},${c.r}`);
+        expect(new Set(keys).size).toBe(18);
+      });
+
+      it("all returned hexes have correct ring distance", () => {
+        for (const ring of [1, 2, 3, 5]) {
+          const cells = geometry.iterateRing(ring);
+          for (const { q, r } of cells) {
+            expect(geometry.getHexRing(q, r)).toBe(ring);
+          }
+        }
+      });
+    });
+
+    // =========================================================================
+    // getAllRadialCells
+    // =========================================================================
+
+    describe("getAllRadialCells", () => {
+      let geometry: InstanceType<typeof HexGeometry>;
+
+      beforeEach(() => {
+        geometry = new HexGeometry(HEX_SIZE, "flat");
+      });
+
+      it("maxRing=0 returns 1 hex", () => {
+        expect(geometry.getAllRadialCells(0)).toHaveLength(1);
+      });
+
+      it("maxRing=1 returns 7 hexes", () => {
+        expect(geometry.getAllRadialCells(1)).toHaveLength(7);
+      });
+
+      it("maxRing=3 returns 37 hexes", () => {
+        expect(geometry.getAllRadialCells(3)).toHaveLength(37);
+      });
+
+      it("maxRing=5 returns 91 hexes", () => {
+        expect(geometry.getAllRadialCells(5)).toHaveLength(91);
+      });
+
+      it("count matches formula 1 + 3*N*(N+1)", () => {
+        for (const n of [0, 1, 2, 3, 4, 5, 10]) {
+          const expected = 1 + 3 * n * (n + 1);
+          expect(geometry.getAllRadialCells(n)).toHaveLength(expected);
+        }
+      });
+
+      it("has no duplicate cells", () => {
+        const cells = geometry.getAllRadialCells(5);
+        const keys = cells.map(c => `${c.q},${c.r}`);
+        expect(new Set(keys).size).toBe(cells.length);
+      });
+    });
+
+    // =========================================================================
+    // isWithinBounds (radial)
+    // =========================================================================
+
+    describe("isWithinBounds with radial bounds", () => {
+      let geometry: InstanceType<typeof HexGeometry>;
+
+      beforeEach(() => {
+        geometry = new HexGeometry(HEX_SIZE, "flat", { maxCol: 7, maxRow: 7, maxRing: 3 });
+      });
+
+      it("origin is within bounds", () => {
+        expect(geometry.isWithinBounds(0, 0)).toBe(true);
+      });
+
+      it("hex at exactly maxRing is within bounds", () => {
+        expect(geometry.isWithinBounds(3, 0)).toBe(true);
+        expect(geometry.isWithinBounds(0, 3)).toBe(true);
+        expect(geometry.isWithinBounds(-3, 0)).toBe(true);
+        expect(geometry.isWithinBounds(3, -3)).toBe(true);
+      });
+
+      it("hex at maxRing + 1 is out of bounds", () => {
+        expect(geometry.isWithinBounds(4, 0)).toBe(false);
+        expect(geometry.isWithinBounds(0, 4)).toBe(false);
+        expect(geometry.isWithinBounds(-4, 0)).toBe(false);
+      });
+
+      it("negative coordinates at valid ring distance are within bounds", () => {
+        expect(geometry.isWithinBounds(-1, 1)).toBe(true);
+        expect(geometry.isWithinBounds(-2, 2)).toBe(true);
+        expect(geometry.isWithinBounds(-3, 3)).toBe(true);
+      });
+
+      it("all cells from getAllRadialCells are within bounds", () => {
+        const cells = geometry.getAllRadialCells(3);
+        for (const { q, r } of cells) {
+          expect(geometry.isWithinBounds(q, r)).toBe(true);
+        }
+      });
+    });
+
+    // =========================================================================
+    // clampToBounds (radial)
+    // =========================================================================
+
+    describe("clampToBounds with radial bounds", () => {
+      let geometry: InstanceType<typeof HexGeometry>;
+
+      beforeEach(() => {
+        geometry = new HexGeometry(HEX_SIZE, "flat", { maxCol: 7, maxRow: 7, maxRing: 3 });
+      });
+
+      it("hex already within bounds returns unchanged", () => {
+        expect(geometry.clampToBounds(0, 0)).toEqual({ x: 0, y: 0 });
+        expect(geometry.clampToBounds(2, -1)).toEqual({ x: 2, y: -1 });
+        expect(geometry.clampToBounds(3, 0)).toEqual({ x: 3, y: 0 });
+      });
+
+      it("origin clamps to origin", () => {
+        expect(geometry.clampToBounds(0, 0)).toEqual({ x: 0, y: 0 });
+      });
+
+      it("hex outside bounds returns a hex on the boundary ring", () => {
+        const result = geometry.clampToBounds(6, 0);
+        expect(geometry.getHexRing(result.x, result.y)).toBeLessThanOrEqual(3);
+      });
+
+      it("clamped hex is within bounds", () => {
+        const outOfBounds = [
+          [5, 0], [0, 5], [-5, 0], [5, -5], [-4, 2], [10, -10]
+        ];
+        for (const [q, r] of outOfBounds) {
+          const result = geometry.clampToBounds(q, r);
+          expect(geometry.isWithinBounds(result.x, result.y)).toBe(true);
+        }
+      });
+    });
+  });
 });
