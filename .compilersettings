@@ -8,5 +8,23 @@
   "version": "1.5.8",
   "additionalFiles": [],
   "postScript": "Projects/dungeon-map-tracker/finalize-release.js",
-  "treeShake": "definitions"
+  "treeShake": "definitions",
+  "vendorModules": {
+    "interact-wrapper": {
+      "format": "umd",
+      "shake": true
+    },
+    "interact.min": {
+      "format": "umd",
+      "shake": true
+    },
+    "polygon-clipping-wrapper": {
+      "format": "umd",
+      "shake": true
+    },
+    "polygon-clipping.umd": {
+      "format": "umd",
+      "shake": true
+    }
+  }
 }

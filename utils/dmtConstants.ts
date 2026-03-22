@@ -159,11 +159,23 @@ interface NeighborOffset {
 type DiagonalDirection = 'TL-BR' | 'TR-BL';
 
 // =============================================================================
-// Path Resolution (inlined for compiled bundle compatibility)
+// Path Resolution (try/catch for compiled bundle compatibility)
+// In uncompiled: pathResolver is imported and provides getJsonPath with
+// WINDROSE-DEBUG.json override support.
+// In compiled: import rewriter strips pathResolver lines, causing a
+// ReferenceError on pathResolverImport, which the catch handles by
+// falling back to the default data file path.
 // =============================================================================
 
-function getJsonPath(): string {
-  return "windrose-md-data.json";
+let getJsonPath: () => string;
+try {
+  const pathResolverPath = dc.resolvePath("pathResolver.ts");
+  const pathResolverImport = await dc.require(pathResolverPath) as { getJsonPath: () => string };
+  // Assign from imported module (blank line above prevents import rewriter regex overlap)
+  getJsonPath = pathResolverImport.getJsonPath;
+} catch {
+  // Compiled bundle fallback — pathResolver not available
+  getJsonPath = () => "windrose-md-data.json";
 }
 
 // =============================================================================
