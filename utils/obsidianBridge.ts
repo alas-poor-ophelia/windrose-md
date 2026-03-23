@@ -247,10 +247,18 @@ async function setupModalInteract(
   };
 }
 
+/** Type for dc.preact */
+type PreactModule = { render: (vnode: unknown, parent: HTMLElement) => void };
+
 /**
  * Preact component that renders children inside a native Obsidian Modal.
- * When mounted, opens a Modal; when unmounted, closes it.
- * Children are rendered in the Preact tree then portaled into contentEl.
+ * Opens a native Modal, then mounts a separate Preact render tree into
+ * its contentEl via dc.preact.render(). Children updates are synced
+ * on every parent render via useEffect.
+ *
+ * Because dc.preact.render() creates an independent tree (no shared context),
+ * callers must pass a contextBridge function that wraps children with any
+ * needed context providers.
  *
  * Props:
  *   onClose: () => void     — called when modal is dismissed (Esc / overlay click)
@@ -258,6 +266,7 @@ async function setupModalInteract(
  *   title?: string          — optional title set via titleEl.setText()
  *   draggable?: boolean     — enable drag from header (desktop only)
  *   resizable?: boolean     — enable resize from edges/corners (desktop only)
+ *   contextBridge?: (children) => vnode — wraps children with context providers
  *   children: any           — Preact children to render inside the modal
  */
 function NativeModalPortal({
@@ -266,6 +275,7 @@ function NativeModalPortal({
   title,
   draggable,
   resizable,
+  contextBridge,
   children
 }: {
   onClose: () => void;
@@ -273,20 +283,24 @@ function NativeModalPortal({
   title?: string;
   draggable?: boolean;
   resizable?: boolean;
+  contextBridge?: (children: unknown) => React.ReactElement;
   children?: unknown;
-}): React.ReactElement {
-  const wrapperRef = dc.useRef<HTMLDivElement>(null);
+}): React.ReactElement | null {
+  const contentElRef = dc.useRef<HTMLElement | null>(null);
   const modalRef = dc.useRef<unknown>(null);
   const closedByCodeRef = dc.useRef(false);
   const interactCleanupRef = dc.useRef<(() => void) | null>(null);
-  const [isPortaled, setIsPortaled] = dc.useState(false);
 
   // Store latest onClose in a ref to avoid re-creating the modal on callback changes
   const onCloseRef = dc.useRef(onClose);
   onCloseRef.current = onClose;
 
+  // Open the native modal once on mount
   dc.useEffect(() => {
     if (!isBridgeAvailable()) return;
+
+    const preact = (dc as unknown as { preact: PreactModule }).preact;
+    if (!preact?.render) return;
 
     try {
       const obs = getObsidianModule();
@@ -309,10 +323,7 @@ function NativeModalPortal({
           if (modalClass) {
             this.modalEl.addClass(modalClass);
           }
-          if (wrapperRef.current) {
-            this.contentEl.appendChild(wrapperRef.current);
-          }
-          setIsPortaled(true);
+          contentElRef.current = this.contentEl;
 
           // Set up interact.js drag/resize (desktop only)
           if ((draggable || resizable) && !('ontouchstart' in window)) {
@@ -339,6 +350,11 @@ function NativeModalPortal({
           interactCleanupRef.current();
           interactCleanupRef.current = null;
         }
+        // Unmount the Preact tree before closing
+        if (contentElRef.current) {
+          preact.render(null as unknown as React.ReactElement, contentElRef.current);
+        }
+        contentElRef.current = null;
         modal.close();
       };
     } catch (e) {
@@ -346,10 +362,22 @@ function NativeModalPortal({
     }
   }, []);
 
-  return h('div', {
-    ref: wrapperRef,
-    style: isPortaled ? { display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 } : { display: 'none' }
-  }, children);
+  // Render children into contentEl as a standalone Preact tree.
+  // Runs on every parent render so children updates (tab switches, etc.) propagate.
+  dc.useEffect(() => {
+    if (!contentElRef.current) return;
+    const preact = (dc as unknown as { preact: PreactModule }).preact;
+    if (!preact?.render) return;
+
+    const wrapper = h('div', {
+      style: { display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }
+    }, children);
+
+    preact.render(contextBridge ? contextBridge(wrapper) : wrapper, contentElRef.current);
+  });
+
+  // This component owns no DOM — the native modal is the container
+  return null;
 }
 
 return { isBridgeAvailable, getObsidianModule, waitForBridge, NativeModalPortal };
