@@ -372,6 +372,14 @@ const useEventCoordinator = ({
           const eventToUse = isTouchEvent ? syntheticEvent : e;
           freehandHandlers.handlePointerDown(eventToUse, gridX, gridY, isTouchEvent);
         }
+
+      } else if (currentTool === 'regionPaint' || currentTool === 'regionBoundary') {
+        if (hasMultiSelection) clearSelection();
+
+        const regionHandlers = getHandlers('region');
+        if (regionHandlers?.handlePointerDown) {
+          regionHandlers.handlePointerDown(e);
+        }
       }
     };
 
@@ -568,6 +576,14 @@ const useEventCoordinator = ({
       return;
     }
 
+    if (currentTool === 'regionPaint' || currentTool === 'regionBoundary') {
+      const regionHandlers = getHandlers('region');
+      if (regionHandlers?.handlePointerMove) {
+        regionHandlers.handlePointerMove(e);
+      }
+      return;
+    }
+
     if (layerVisibility.objects && objectHandlers?.handleHoverUpdate) {
       objectHandlers.handleHoverUpdate(e);
     }
@@ -741,11 +757,20 @@ const useEventCoordinator = ({
   }, [getHandlers]);
 
   const handleCanvasDoubleClick = dc.useCallback((e: MouseEvent): void => {
+    // Region boundary mode: double-click closes the polygon
+    if (currentTool === 'regionBoundary') {
+      const regionHandlers = getHandlers('region');
+      if (regionHandlers?.handleDoubleClick) {
+        regionHandlers.handleDoubleClick(e);
+        return;
+      }
+    }
+
     const textHandlers = getHandlers('text') as TextHandlers | null;
     if (!textHandlers?.handleCanvasDoubleClick) return;
 
     textHandlers.handleCanvasDoubleClick(e);
-  }, [getHandlers]);
+  }, [currentTool, getHandlers]);
 
   const handleContextMenu = dc.useCallback((e: MouseEvent): void => {
     e.preventDefault();

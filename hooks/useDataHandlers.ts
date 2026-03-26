@@ -217,6 +217,14 @@ function useDataHandlers({
     });
   }, [updateMapData]);
 
+  // Handle regions change (hex maps only) - NOT tracked in layer history
+  const handleRegionsChange = dc.useCallback((regions: import('#types/core/map.types').Region[]): void => {
+    updateMapData((currentMapData: MapData | null) => {
+      if (!currentMapData) return currentMapData;
+      return { ...currentMapData, regions };
+    });
+  }, [updateMapData]);
+
   // =========================================================================
   // Return Value
   // =========================================================================
@@ -236,7 +244,8 @@ function useDataHandlers({
     handleUpdateColorOpacity,
     handleViewStateChange,
     handleSidebarCollapseChange,
-    handleTextLabelSettingsChange
+    handleTextLabelSettingsChange,
+    handleRegionsChange
   };
 
   return {
@@ -256,7 +265,8 @@ function useDataHandlers({
     handleUpdateColorOpacity,
     handleViewStateChange,
     handleSidebarCollapseChange,
-    handleTextLabelSettingsChange
+    handleTextLabelSettingsChange,
+    handleRegionsChange
   };
 }
 

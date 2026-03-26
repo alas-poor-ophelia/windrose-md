@@ -42,6 +42,7 @@ const { MeasurementLayer } = await requireModuleByName("MeasurementLayer.tsx");
 const { DiagonalFillOverlay } = await requireModuleByName("DiagonalFillOverlay.tsx");
 const { AreaSelectLayer } = await requireModuleByName("AreaSelectLayer.tsx");
 const { FogOfWarLayer } = await requireModuleByName("FogOfWarLayer.tsx");
+const { RegionLayer } = await requireModuleByName("RegionLayer.tsx");
 const { RerollDungeonButton } = await requireModuleByName("RerollDungeonButton.jsx");
 const { getSetting } = await requireModuleByName("settingsAccessor.ts");
 const { usePanZoomCoordinator } = await requireModuleByName("usePanZoomCoordinator.ts");
@@ -519,6 +520,7 @@ MapCanvas.MeasurementLayer = MeasurementLayer;
 MapCanvas.DiagonalFillOverlay = DiagonalFillOverlay;
 MapCanvas.AreaSelectLayer = AreaSelectLayer;
 MapCanvas.FogOfWarLayer = FogOfWarLayer;
+MapCanvas.RegionLayer = RegionLayer;
 MapCanvas.RerollDungeonButton = RerollDungeonButton;
 
 return { MapCanvas };

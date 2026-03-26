@@ -23,12 +23,14 @@ interface SubToolDef {
   title: string;
   icon: string;
   gridOnly?: boolean;
+  hexOnly?: boolean;
 }
 
 /** Tool group with sub-tools */
 interface ToolGroup {
   id: string;
   subTools: SubToolDef[];
+  hexOnly?: boolean;
 }
 
 /** Simple tool (no sub-menu) */
@@ -37,6 +39,7 @@ interface SimpleTool {
   title: string;
   icon: string;
   gridOnly?: boolean;
+  hexOnly?: boolean;
 }
 
 /** Bracket position */
@@ -47,6 +50,7 @@ interface SubToolSelections {
   select: ToolId;
   draw: ToolId;
   rectangle: ToolId;
+  region: ToolId;
 }
 
 /** Props for ToolPaletteBracket */
@@ -176,8 +180,12 @@ const ToolButtonWithSubMenu = ({
   const longPressTimer = dc.useRef<ReturnType<typeof setTimeout> | null>(null);
   const LONG_PRESS_DURATION = 300;
 
+  // Hide entire group if it's map-type-restricted
+  if (toolGroup.hexOnly && mapType !== 'hex') return null;
+
   const visibleSubTools = toolGroup.subTools.filter(st =>
-    mapType !== 'hex' || !st.gridOnly
+    (mapType !== 'hex' || !st.gridOnly) &&
+    (mapType !== 'grid' || !st.hexOnly)
   );
 
   if (visibleSubTools.length === 0) return null;
@@ -285,7 +293,8 @@ const ToolPalette = ({
   const [subToolSelections, setSubToolSelections] = dc.useState<SubToolSelections>({
     select: 'select' as ToolId,
     draw: 'draw' as ToolId,
-    rectangle: 'rectangle' as ToolId
+    rectangle: 'rectangle' as ToolId,
+    region: 'regionPaint' as ToolId
   });
 
   dc.useEffect(() => {
@@ -349,6 +358,14 @@ const ToolPalette = ({
         { id: 'edgeLine' as ToolId, label: 'Edge Line', title: 'Edge Line (click two points)', icon: 'lucide-git-commit-horizontal', gridOnly: true },
         { id: 'diagonalFill' as ToolId, label: 'Diagonal Fill', title: 'Fill diagonal gaps (click two corners)', icon: 'lucide-slash', gridOnly: true }
       ]
+    },
+    {
+      id: 'region',
+      hexOnly: true,
+      subTools: [
+        { id: 'regionPaint' as ToolId, label: 'Paint Region', title: 'Paint hexes into a region', icon: 'lucide-map' },
+        { id: 'regionBoundary' as ToolId, label: 'Draw Boundary', title: 'Draw region boundary polygon', icon: 'lucide-pentagon' }
+      ]
     }
   ];
 
@@ -361,9 +378,10 @@ const ToolPalette = ({
     { id: 'measure' as ToolId, title: 'Measure Distance (M)', icon: 'lucide-ruler' }
   ];
 
-  const visibleSimpleTools = mapType === 'hex'
-    ? simpleTools.filter(tool => !tool.gridOnly)
-    : simpleTools;
+  const visibleSimpleTools = simpleTools.filter(tool =>
+    (mapType !== 'hex' || !tool.gridOnly) &&
+    (mapType !== 'grid' || !tool.hexOnly)
+  );
 
   const handleSubMenuOpen = (groupId: string): void => {
     setOpenSubMenu(openSubMenu === groupId ? null : groupId);
@@ -525,6 +543,20 @@ const ToolPalette = ({
           currentTool={currentTool}
           currentSubTool={subToolSelections.rectangle}
           isSubMenuOpen={openSubMenu === 'rectangle'}
+          onToolSelect={onToolChange}
+          onSubToolSelect={handleSubToolSelect}
+          onSubMenuOpen={handleSubMenuOpen}
+          onSubMenuClose={handleSubMenuClose}
+          mapType={mapType}
+        />
+      )}
+
+      {mapType === 'hex' && (
+        <ToolButtonWithSubMenu
+          toolGroup={toolGroups[3]}
+          currentTool={currentTool}
+          currentSubTool={subToolSelections.region}
+          isSubMenuOpen={openSubMenu === 'region'}
           onToolSelect={onToolChange}
           onSubToolSelect={handleSubToolSelect}
           onSubMenuOpen={handleSubMenuOpen}

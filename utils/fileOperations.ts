@@ -114,6 +114,10 @@ async function loadMapData(mapId: string, mapName: string = '', mapType: MapType
       if (!mapData.lastTextLabelSettings) {
         mapData.lastTextLabelSettings = null;
       }
+      // Ensure regions array exists (backward compatibility)
+      if (!mapData.regions) {
+        mapData.regions = [];
+      }
       // Ensure hexBounds exists for hex maps (use defaults, handle migration)
       if (mapData.mapType === 'hex') {
         if (!mapData.hexBounds) {

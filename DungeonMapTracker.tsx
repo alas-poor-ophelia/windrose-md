@@ -516,7 +516,8 @@ const editingLayer = dc.useMemo(() => {
     handleUpdateColorOpacity,
     handleViewStateChange,
     handleSidebarCollapseChange,
-    handleTextLabelSettingsChange
+    handleTextLabelSettingsChange,
+    handleRegionsChange
   } = useDataHandlers({ mapData, updateMapData, addToHistory, isApplyingHistory });
 
   const containerRef = dc.useRef<HTMLDivElement | null>(null);
@@ -1022,6 +1023,14 @@ const editingLayer = dc.useMemo(() => {
                   onInitializeFog={(updatedMapData: MapData) => updateMapData(updatedMapData)}
                 />
               )}
+
+              {/* RegionLayer - hex region creation and editing */}
+              <MapCanvas.RegionLayer
+                currentTool={currentTool}
+                selectedColor={selectedColor}
+                selectedOpacity={selectedOpacity}
+                onRegionsChange={handleRegionsChange}
+              />
 
               {/* HexCoordinateLayer - displays coordinate labels when 'C' key is held */}
               <MapCanvas.HexCoordinateLayer />

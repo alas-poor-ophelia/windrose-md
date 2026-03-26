@@ -95,6 +95,9 @@ const { HexGeometry } = await requireModuleByName("HexGeometry.ts") as {
     getNeighbors: (q: number, r: number) => Array<{ q: number; r: number }>;
   };
 };
+const { renderRegions } = await requireModuleByName("regionRenderer.ts") as {
+  renderRegions: (ctx: CanvasRenderingContext2D, regions: import('#types/core/map.types').Region[], geometry: any, viewState: { x: number; y: number; zoom: number }, options?: { foggedCells?: Set<string> }) => void;
+};
 
 interface Renderer {
   // Polymorphic properties
@@ -421,6 +424,20 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
       mergeIndex: activeMergeIndex,
       gridConfig: curveGridConfig
     });
+  }
+
+  // Draw regions (hex maps only, between curves and objects)
+  if (geometry.type === 'hex' && mapData.regions && mapData.regions.length > 0) {
+    const regionFow = activeLayer.fogOfWar;
+    let foggedAxialSet: Set<string> | undefined;
+    if (regionFow?.enabled && regionFow?.foggedCells?.length) {
+      foggedAxialSet = new Set<string>();
+      for (const fc of regionFow.foggedCells) {
+        const { q, r } = offsetToAxial(fc.col, fc.row, mapData.orientation || 'flat');
+        foggedAxialSet.add(`${q},${r}`);
+      }
+    }
+    renderRegions(ctx, mapData.regions, geometry, { x: offsetX, y: offsetY, zoom }, { foggedCells: foggedAxialSet });
   }
 
   // Draw objects
