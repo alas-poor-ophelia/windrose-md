@@ -50,12 +50,18 @@ interface UseRegionToolsResult {
   pendingHexes: Point[];
   boundaryVertices: Point[];
   isActive: boolean;
+  editingRegionId: string | null;
+  editingRegion: Region | null;
   handlePointerDown: (e: PointerEvent) => void;
   handlePointerMove: (e: PointerEvent) => void;
   handlePointerUp: (e: PointerEvent) => void;
   handleDoubleClick: (e: MouseEvent) => void;
   confirmRegion: (name: string, linkedNote?: string) => void;
   cancelRegion: () => void;
+  deleteRegion: (regionId: string) => void;
+  updateRegion: (regionId: string, updates: Partial<Region>) => void;
+  startEditingRegion: (regionId: string) => void;
+  stopEditingRegion: () => void;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────
@@ -101,16 +107,24 @@ function useRegionTools(options: RegionToolsOptions): UseRegionToolsResult {
   const isPaintMode = currentTool === 'regionPaint';
   const isBoundaryMode = currentTool === 'regionBoundary';
 
-  // Pending hex selection (axial coords)
+  // Pending hex selection (axial coords) — for new region creation
   const [pendingHexes, setPendingHexes] = dc.useState<Point[]>([]);
   // Boundary polygon vertices (world coords)
   const [boundaryVertices, setBoundaryVertices] = dc.useState<Array<{ x: number; y: number }>>([]);
+  // Editing state — when set, paint mode modifies an existing region
+  const [editingRegionId, setEditingRegionId] = dc.useState<string | null>(null);
+
+  const editingRegion = dc.useMemo(() => {
+    if (!editingRegionId || !mapData?.regions) return null;
+    return mapData.regions.find(r => r.id === editingRegionId) || null;
+  }, [editingRegionId, mapData?.regions]);
 
   // Reset state when switching away from region tools
   dc.useEffect(() => {
     if (!isActive) {
       setPendingHexes([]);
       setBoundaryVertices([]);
+      setEditingRegionId(null);
     }
   }, [isActive]);
 
@@ -126,6 +140,16 @@ function useRegionTools(options: RegionToolsOptions): UseRegionToolsResult {
     return screenToWorld(e.clientX, e.clientY);
   }, [screenToWorld]);
 
+  // ── Helper: find which region a hex belongs to ─────────────────────
+
+  const findRegionForHex = dc.useCallback((q: number, r: number): Region | null => {
+    if (!mapData?.regions) return null;
+    const key = hexKey(q, r);
+    return mapData.regions.find(region =>
+      region.hexes.some(h => hexKey(h.x, h.y) === key)
+    ) || null;
+  }, [mapData?.regions]);
+
   // ── Paint Mode Handlers ────────────────────────────────────────────
 
   const handlePaintPointerDown = dc.useCallback((e: PointerEvent) => {
@@ -135,6 +159,46 @@ function useRegionTools(options: RegionToolsOptions): UseRegionToolsResult {
     const hexGeom = geometry as InstanceType<typeof HexGeometry>;
     if (!hexGeom.isWithinBounds(hex.q, hex.r)) return;
 
+    // If editing an existing region, add/remove hex from it directly
+    if (editingRegionId && mapData) {
+      const key = hexKey(hex.q, hex.r);
+      const regions = mapData.regions || [];
+      const regionIdx = regions.findIndex(r => r.id === editingRegionId);
+      if (regionIdx === -1) return;
+
+      const region = regions[regionIdx];
+      const hexInRegion = region.hexes.some(h => hexKey(h.x, h.y) === key);
+
+      const updatedRegion = {
+        ...region,
+        hexes: hexInRegion
+          ? region.hexes.filter(h => hexKey(h.x, h.y) !== key)
+          : [...region.hexes, { x: hex.q, y: hex.r }]
+      };
+
+      // If adding, remove hex from any other region (exclusive)
+      const updatedRegions = regions.map((r, i) => {
+        if (i === regionIdx) return updatedRegion;
+        if (!hexInRegion) {
+          return { ...r, hexes: r.hexes.filter(h => hexKey(h.x, h.y) !== key) };
+        }
+        return r;
+      });
+
+      onRegionsChange(updatedRegions);
+      return;
+    }
+
+    // If no editing and no pending selection, check if clicking on an existing region
+    if (pendingHexes.length === 0) {
+      const existingRegion = findRegionForHex(hex.q, hex.r);
+      if (existingRegion) {
+        setEditingRegionId(existingRegion.id);
+        return;
+      }
+    }
+
+    // Normal pending hex toggle for new region creation
     setPendingHexes(prev => {
       const key = hexKey(hex.q, hex.r);
       const exists = prev.some(h => hexKey(h.x, h.y) === key);
@@ -143,7 +207,7 @@ function useRegionTools(options: RegionToolsOptions): UseRegionToolsResult {
       }
       return [...prev, { x: hex.q, y: hex.r }];
     });
-  }, [getHexCoords, geometry]);
+  }, [getHexCoords, geometry, editingRegionId, mapData, pendingHexes.length, findRegionForHex, onRegionsChange]);
 
   // ── Boundary Mode Handlers ─────────────────────────────────────────
 
@@ -270,18 +334,52 @@ function useRegionTools(options: RegionToolsOptions): UseRegionToolsResult {
   const cancelRegion = dc.useCallback(() => {
     setPendingHexes([]);
     setBoundaryVertices([]);
+    setEditingRegionId(null);
+  }, []);
+
+  // ── Region Editing ─────────────────────────────────────────────────
+
+  const deleteRegion = dc.useCallback((regionId: string) => {
+    if (!mapData) return;
+    const regions = (mapData.regions || []).filter(r => r.id !== regionId);
+    onRegionsChange(regions);
+    if (editingRegionId === regionId) setEditingRegionId(null);
+  }, [mapData, onRegionsChange, editingRegionId]);
+
+  const updateRegion = dc.useCallback((regionId: string, updates: Partial<Region>) => {
+    if (!mapData) return;
+    const regions = (mapData.regions || []).map(r =>
+      r.id === regionId ? { ...r, ...updates } : r
+    );
+    onRegionsChange(regions);
+  }, [mapData, onRegionsChange]);
+
+  const startEditingRegion = dc.useCallback((regionId: string) => {
+    setPendingHexes([]);
+    setBoundaryVertices([]);
+    setEditingRegionId(regionId);
+  }, []);
+
+  const stopEditingRegion = dc.useCallback(() => {
+    setEditingRegionId(null);
   }, []);
 
   return {
     pendingHexes,
     boundaryVertices,
     isActive,
+    editingRegionId,
+    editingRegion,
     handlePointerDown,
     handlePointerMove,
     handlePointerUp,
     handleDoubleClick,
     confirmRegion,
-    cancelRegion
+    cancelRegion,
+    deleteRegion,
+    updateRegion,
+    startEditingRegion,
+    stopEditingRegion
   };
 }
 

@@ -39,12 +39,18 @@ const RegionLayer = ({
     pendingHexes,
     boundaryVertices,
     isActive,
+    editingRegionId,
+    editingRegion,
     handlePointerDown,
     handlePointerMove,
     handlePointerUp,
     handleDoubleClick,
     confirmRegion,
-    cancelRegion
+    cancelRegion,
+    deleteRegion,
+    updateRegion,
+    startEditingRegion,
+    stopEditingRegion
   } = useRegionTools({
     currentTool,
     selectedColor,
@@ -84,12 +90,18 @@ const RegionLayer = ({
   }, []);
 
   const handleConfirmName = dc.useCallback(() => {
-    if (regionName.trim()) {
+    if (!regionName.trim()) return;
+
+    if (editingRegionId) {
+      // Renaming an existing region
+      updateRegion(editingRegionId, { name: regionName.trim() });
+    } else {
+      // Creating a new region
       confirmRegion(regionName.trim());
-      setShowNameInput(false);
-      setRegionName('');
     }
-  }, [regionName, confirmRegion]);
+    setShowNameInput(false);
+    setRegionName('');
+  }, [regionName, confirmRegion, editingRegionId, updateRegion]);
 
   const handleCancelName = dc.useCallback(() => {
     setShowNameInput(false);
@@ -153,7 +165,11 @@ const RegionLayer = ({
 
     ctx.clearRect(0, 0, overlay.width, overlay.height);
 
-    if (pendingHexes.length === 0 && boundaryVertices.length === 0) return;
+    // Determine what to draw: pending hexes (new region) OR editing region hexes
+    const hexesToHighlight = editingRegion ? editingRegion.hexes : pendingHexes;
+    const highlightColor = editingRegion ? editingRegion.color : selectedColor;
+
+    if (hexesToHighlight.length === 0 && boundaryVertices.length === 0) return;
 
     const hexGeom = geometry as any;
     const viewState = mapData.viewState;
@@ -173,13 +189,13 @@ const RegionLayer = ({
     const offsetX = overlay.width / 2 - viewState.center.x * viewState.zoom;
     const offsetY = overlay.height / 2 - viewState.center.y * viewState.zoom;
 
-    // Draw pending hexes
-    if (pendingHexes.length > 0) {
-      ctx.globalAlpha = 0.4;
-      ctx.fillStyle = selectedColor;
+    // Draw highlighted hexes (pending or editing)
+    if (hexesToHighlight.length > 0) {
+      ctx.globalAlpha = editingRegion ? 0.15 : 0.4;
+      ctx.fillStyle = highlightColor;
 
       ctx.beginPath();
-      for (const h of pendingHexes) {
+      for (const h of hexesToHighlight) {
         const vertices = hexGeom.getHexVertices(h.x, h.y);
         const screenVerts = vertices.map((v: any) =>
           hexGeom.worldToScreen(v.worldX, v.worldY, offsetX, offsetY, viewState.zoom)
@@ -194,11 +210,11 @@ const RegionLayer = ({
 
       // Selection border
       ctx.globalAlpha = 0.8;
-      ctx.strokeStyle = selectedColor;
+      ctx.strokeStyle = highlightColor;
       ctx.lineWidth = 2 * viewState.zoom;
 
       ctx.beginPath();
-      for (const h of pendingHexes) {
+      for (const h of hexesToHighlight) {
         const vertices = hexGeom.getHexVertices(h.x, h.y);
         const screenVerts = vertices.map((v: any) =>
           hexGeom.worldToScreen(v.worldX, v.worldY, offsetX, offsetY, viewState.zoom)
@@ -242,14 +258,101 @@ const RegionLayer = ({
     if (northDirection !== 0) {
       ctx.restore();
     }
-  }, [pendingHexes, boundaryVertices, canvasRef, geometry, mapData, selectedColor]);
+  }, [pendingHexes, boundaryVertices, canvasRef, geometry, mapData, selectedColor, editingRegion]);
 
   if (!isRegionTool) return null;
 
   return (
     <div className="dmt-region-ui" style={{ position: 'relative' }}>
+      {/* Editing existing region bar */}
+      {editingRegion && pendingHexes.length === 0 && !showNameInput && (
+        <div style={{
+          position: 'fixed',
+          bottom: '100px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          display: 'flex',
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: '10px',
+          background: 'var(--background-secondary)',
+          border: '1px solid var(--background-modifier-border)',
+          borderRadius: '8px',
+          padding: '8px 16px',
+          zIndex: 1000,
+          boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+          whiteSpace: 'nowrap'
+        }}>
+          <div style={{
+            width: '12px',
+            height: '12px',
+            borderRadius: '3px',
+            background: editingRegion.color,
+            flexShrink: 0
+          }} />
+          <span style={{ color: 'var(--text-normal)', fontSize: '13px', fontWeight: '600' }}>
+            {editingRegion.name}
+          </span>
+          <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>
+            {editingRegion.hexes.length} hex{editingRegion.hexes.length !== 1 ? 'es' : ''}
+          </span>
+          <span style={{ color: 'var(--text-faint)', fontSize: '11px', margin: '0 4px' }}>|</span>
+          <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>
+            Click to add/remove hexes
+          </span>
+          <button
+            onClick={() => {
+              setShowNameInput(true);
+              setRegionName(editingRegion.name);
+            }}
+            style={{
+              padding: '4px 12px',
+              background: 'transparent',
+              color: 'var(--text-accent)',
+              borderRadius: '4px',
+              border: '1px solid var(--background-modifier-border)',
+              cursor: 'pointer',
+              fontSize: '12px',
+              minHeight: '32px'
+            }}
+          >
+            Rename
+          </button>
+          <button
+            onClick={() => deleteRegion(editingRegion.id)}
+            style={{
+              padding: '4px 12px',
+              background: 'transparent',
+              color: 'var(--text-error)',
+              borderRadius: '4px',
+              border: '1px solid var(--background-modifier-border)',
+              cursor: 'pointer',
+              fontSize: '12px',
+              minHeight: '32px'
+            }}
+          >
+            Delete
+          </button>
+          <button
+            onClick={stopEditingRegion}
+            style={{
+              padding: '4px 12px',
+              background: 'transparent',
+              color: 'var(--text-muted)',
+              borderRadius: '4px',
+              border: '1px solid var(--background-modifier-border)',
+              cursor: 'pointer',
+              fontSize: '12px',
+              minHeight: '32px'
+            }}
+          >
+            Done
+          </button>
+        </div>
+      )}
+
       {/* Create Region bar */}
-      {pendingHexes.length > 0 && !showNameInput && (
+      {pendingHexes.length > 0 && !showNameInput && !editingRegionId && (
         <div style={{
           position: 'fixed',
           bottom: '100px',
