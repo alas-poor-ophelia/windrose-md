@@ -6,7 +6,7 @@
  * for layer data and map-level data with history tracking.
  */
 
-import type { MapData, ViewState, TextLabelSettings } from '../core/map.types';
+import type { MapData, ViewState, TextLabelSettings, Region } from '../core/map.types';
 import type { Cell } from '../core/cell.types';
 import type { Curve } from '../core/curve.types';
 import type { MapObject } from '../objects/object.types';
@@ -95,6 +95,9 @@ export type HandleSidebarCollapseChange = (collapsed: boolean) => void;
 /** Handle text label settings change */
 export type HandleTextLabelSettingsChange = (settings: TextLabelSettings) => void;
 
+/** Handle regions change (hex maps only) */
+export type HandleRegionsChange = (regions: Region[]) => void;
+
 // ===========================================
 // Grouped Handlers
 // ===========================================
@@ -117,6 +120,7 @@ export interface MapDataHandlers {
   handleViewStateChange: HandleViewStateChange;
   handleSidebarCollapseChange: HandleSidebarCollapseChange;
   handleTextLabelSettingsChange: HandleTextLabelSettingsChange;
+  handleRegionsChange: HandleRegionsChange;
 }
 
 // ===========================================
@@ -142,4 +146,6 @@ export interface UseDataHandlersResult {
   handleViewStateChange: HandleViewStateChange;
   handleSidebarCollapseChange: HandleSidebarCollapseChange;
   handleTextLabelSettingsChange: HandleTextLabelSettingsChange;
+  handleRegionsChange: HandleRegionsChange;
 }
+

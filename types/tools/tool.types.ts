@@ -36,6 +36,9 @@ export type ToolId =
   | 'addObject'
   | 'addText'
   | 'addNote'
+  // Region tools (hex maps)
+  | 'regionPaint'
+  | 'regionBoundary'
   // Utility tools
   | 'measure'
   | 'fog'

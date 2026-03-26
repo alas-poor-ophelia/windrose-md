@@ -241,6 +241,9 @@ export interface MapData {
   // Note pins (global, not per-layer)
   notePins?: NotePin[];
 
+  // Regions (hex maps only, global not per-layer)
+  regions?: Region[];
+
   // Migration metadata
   _migratedAt?: string;
 }
@@ -294,6 +297,30 @@ export interface NotePin {
   linkedNote?: string;
   color?: string;
   icon?: string;
+}
+
+// ===========================================
+// Regions (hex maps only)
+// ===========================================
+
+/** Named region spanning multiple hexes */
+export interface Region {
+  id: string;
+  name: string;
+  /** Member hex positions in axial coordinates {x: q, y: r} */
+  hexes: Point[];
+  color: string;
+  opacity: number;
+  borderColor: string;
+  borderWidth: number;
+  visible: boolean;
+  linkedNote?: string;
+  icon?: string;
+  /** Manual label offset from computed centroid */
+  labelPosition?: Point;
+  /** Z-order for rendering (lower = behind) */
+  order: number;
+  tags?: string[];
 }
 
 // ===========================================
