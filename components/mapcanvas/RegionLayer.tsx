@@ -17,6 +17,7 @@ const { useMapState } = await requireModuleByName("MapContext.tsx");
 const { useEventHandlerRegistration } = await requireModuleByName("EventHandlerContext.tsx");
 const { useRegionTools } = await requireModuleByName("useRegionTools.ts");
 const { getObsidianModule, isBridgeAvailable } = await requireModuleByName("obsidianBridge.ts");
+const { openNativeNoteLinkModal } = await requireModuleByName("NoteLinkModal.jsx");
 
 interface RegionLayerProps {
   currentTool: ToolId;
@@ -313,6 +314,38 @@ const RegionLayer = ({
       item.setIcon(region.visible ? 'lucide-eye-off' : 'lucide-eye');
       item.onClick(() => updateRegion(region.id, { visible: !region.visible }));
     });
+
+    if (region.linkedNote) {
+      menu.addItem((item: any) => {
+        item.setTitle('Open Linked Note');
+        item.setIcon('lucide-external-link');
+        item.onClick(() => {
+          const linkPath = region.linkedNote!.replace(/\.md$/, '');
+          dc.app.workspace.openLinkText(linkPath, '', false);
+        });
+      });
+    }
+
+    menu.addItem((item: any) => {
+      item.setTitle(region.linkedNote ? 'Change Linked Note' : 'Link Note');
+      item.setIcon('lucide-link');
+      item.onClick(() => {
+        openNativeNoteLinkModal({
+          onSave: (notePath: string) => updateRegion(region.id, { linkedNote: notePath || undefined }),
+          onClose: () => {},
+          currentNotePath: region.linkedNote || null,
+          objectType: null
+        });
+      });
+    });
+
+    if (region.linkedNote) {
+      menu.addItem((item: any) => {
+        item.setTitle('Remove Note Link');
+        item.setIcon('lucide-unlink');
+        item.onClick(() => updateRegion(region.id, { linkedNote: undefined }));
+      });
+    }
 
     menu.addSeparator();
 
