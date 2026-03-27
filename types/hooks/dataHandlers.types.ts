@@ -38,6 +38,7 @@ export interface MapHistorySnapshot {
   objects: MapObject[];
   textLabels: TextLabel[];
   edges: Edge[];
+  regions?: Region[];
 }
 
 // ===========================================
