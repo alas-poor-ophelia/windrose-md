@@ -3587,6 +3587,58 @@ button.dmt-region-option-btn {
 }
 
 /* ==========================================================================
+   SUB-HEX BREADCRUMB
+   ========================================================================== */
+
+.dmt-sub-hex-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 12px;
+  background: var(--dmt-bg-secondary);
+  border-bottom: 1px solid var(--dmt-bg-tertiary);
+  font-size: 12px;
+  color: var(--dmt-text-secondary);
+  flex-shrink: 0;
+}
+
+.dmt-breadcrumb-segment {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.dmt-breadcrumb-separator {
+  display: flex;
+  align-items: center;
+  color: var(--dmt-text-muted);
+  margin: 0 2px;
+}
+
+.is-tablet button.dmt-breadcrumb-link,
+button.dmt-breadcrumb-link {
+  background: none;
+  border: none;
+  color: var(--dmt-accent-primary);
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 3px;
+  font-size: 12px;
+  transition: all 150ms ease;
+}
+
+.dmt-breadcrumb-link:hover {
+  background: var(--dmt-bg-tertiary);
+  text-decoration: underline;
+}
+
+.dmt-breadcrumb-current {
+  color: var(--dmt-text-primary);
+  font-weight: 500;
+  padding: 2px 4px;
+}
+
+/* ==========================================================================
    LAYER EDIT MODAL
    ========================================================================== */
 

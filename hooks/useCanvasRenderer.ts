@@ -440,6 +440,39 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
     renderRegions(ctx, mapData.regions, geometry, { x: offsetX, y: offsetY, zoom }, { foggedCells: foggedAxialSet });
   }
 
+  // Draw sub-hex indicators (small diamond on hexes that have sub-hex data)
+  if (geometry.type === 'hex' && mapData.subHexMaps) {
+    const hexGeom = geometry as unknown as {
+      hexSize: number;
+      hexToWorld: (q: number, r: number) => { worldX: number; worldY: number };
+      worldToScreen: (worldX: number, worldY: number, offsetX: number, offsetY: number, zoom: number) => { screenX: number; screenY: number };
+    };
+
+    ctx.save();
+    for (const hexKey of Object.keys(mapData.subHexMaps)) {
+      const [qStr, rStr] = hexKey.split(',');
+      const q = parseInt(qStr, 10);
+      const r = parseInt(rStr, 10);
+      const world = hexGeom.hexToWorld(q, r);
+      const screen = hexGeom.worldToScreen(world.worldX, world.worldY, offsetX, offsetY, zoom);
+      const size = Math.max(4, hexGeom.hexSize * zoom * 0.12);
+
+      // Small diamond indicator at hex center
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+      ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(screen.screenX, screen.screenY - size);
+      ctx.lineTo(screen.screenX + size, screen.screenY);
+      ctx.lineTo(screen.screenX, screen.screenY + size);
+      ctx.lineTo(screen.screenX - size, screen.screenY);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
   // Draw objects
   if (activeLayer.objects && activeLayer.objects.length > 0 && !showCoordinates && visibility.objects) {
     const isHexMap = geometry.type === 'hex';

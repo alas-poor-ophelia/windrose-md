@@ -757,6 +757,17 @@ const useEventCoordinator = ({
   }, [getHandlers]);
 
   const handleCanvasDoubleClick = dc.useCallback((e: MouseEvent): void => {
+    // Sub-hex entry: double-click on hex in select mode
+    if (currentTool === 'select' && geometry?.type === 'hex' && screenToGrid) {
+      const coords = screenToGrid(e.clientX, e.clientY);
+      if (coords) {
+        document.dispatchEvent(new CustomEvent('windrose:enter-sub-hex', {
+          detail: { q: coords.x, r: coords.y }
+        }));
+        return;
+      }
+    }
+
     // Region boundary mode: double-click closes the polygon
     if (currentTool === 'regionBoundary') {
       const regionHandlers = getHandlers('region');
@@ -770,23 +781,37 @@ const useEventCoordinator = ({
     if (!textHandlers?.handleCanvasDoubleClick) return;
 
     textHandlers.handleCanvasDoubleClick(e);
-  }, [currentTool, getHandlers]);
+  }, [currentTool, getHandlers, geometry, screenToGrid]);
 
   const handleContextMenu = dc.useCallback((e: MouseEvent): void => {
     e.preventDefault();
 
-    // Region context menu (works from region tools AND select mode)
+    // General hex context menu (dispatch for DungeonMapTracker to handle)
+    // This replaces the separate region context menu for hex maps
+    if (geometry?.type === 'hex' && screenToGrid) {
+      const coords = screenToGrid(e.clientX, e.clientY);
+      if (coords) {
+        document.dispatchEvent(new CustomEvent('windrose:hex-context-menu', {
+          detail: { q: coords.x, r: coords.y, screenX: e.clientX, screenY: e.clientY }
+        }));
+        return;
+      }
+    }
+
+    // Region context menu for non-hex maps (fallback)
     const regionHandlers = getHandlers('region');
     if (regionHandlers?.handleContextMenu) {
       regionHandlers.handleContextMenu(e);
-      // Don't return — if context menu didn't trigger, fall through
     }
 
     const drawingHandlers = getHandlers('drawing') as DrawingHandlers | null;
     if (drawingHandlers?.cancelShapePreview) {
       drawingHandlers.cancelShapePreview();
     }
-  }, [currentTool, getHandlers]);
+  }, [currentTool, getHandlers, geometry, screenToGrid]);
+
+  // Long-press timer for touch context menu
+  const longPressTimerRef = dc.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   dc.useEffect(() => {
     const canvas = canvasRef.current;
@@ -809,9 +834,34 @@ const useEventCoordinator = ({
       handlePointerUp(e);
     };
 
+    // Touch long-press handler for hex context menu (500ms)
+    const handleTouchStartForLongPress = (e: TouchEvent): void => {
+      if (e.touches.length !== 1) return;
+      const touch = e.touches[0];
+      const startX = touch.clientX;
+      const startY = touch.clientY;
+
+      if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = setTimeout(() => {
+        longPressTimerRef.current = null;
+        // Dispatch as context menu event
+        handleContextMenu({ clientX: startX, clientY: startY, preventDefault: () => {} } as unknown as MouseEvent);
+      }, 500);
+    };
+
+    const cancelLongPress = (): void => {
+      if (longPressTimerRef.current) {
+        clearTimeout(longPressTimerRef.current);
+        longPressTimerRef.current = null;
+      }
+    };
+
     canvas.addEventListener('mousedown', handleMouseDown);
     canvas.addEventListener('mouseup', handleMouseUp);
     canvas.addEventListener('touchstart', handlePointerDown as EventListener);
+    canvas.addEventListener('touchstart', handleTouchStartForLongPress as EventListener);
+    canvas.addEventListener('touchmove', cancelLongPress);
+    canvas.addEventListener('touchend', cancelLongPress);
     canvas.addEventListener('mousemove', handlePointerMove as EventListener);
     canvas.addEventListener('touchmove', handlePointerMove as EventListener);
     canvas.addEventListener('touchend', handlePointerUp as EventListener);
@@ -821,9 +871,13 @@ const useEventCoordinator = ({
     canvas.addEventListener('contextmenu', handleContextMenu);
 
     return () => {
+      cancelLongPress();
       canvas.removeEventListener('mousedown', handleMouseDown);
       canvas.removeEventListener('mouseup', handleMouseUp);
       canvas.removeEventListener('touchstart', handlePointerDown as EventListener);
+      canvas.removeEventListener('touchstart', handleTouchStartForLongPress as EventListener);
+      canvas.removeEventListener('touchmove', cancelLongPress);
+      canvas.removeEventListener('touchend', cancelLongPress);
       canvas.removeEventListener('mousemove', handlePointerMove as EventListener);
       canvas.removeEventListener('touchmove', handlePointerMove as EventListener);
       canvas.removeEventListener('touchend', handlePointerUp as EventListener);

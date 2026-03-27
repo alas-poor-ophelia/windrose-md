@@ -1,0 +1,15 @@
+- [x] BUG: Rectangle tool/clear area preview offset
+- [x] BUG: Freehand interior grid not scaling with zoom properly
+- [x] BUG: freehand borders not visually merging with other freehand shapes.
+- [x] IMPROVEMENT: Make "close" indicator for freehand shapes more visually obvious
+- [x] IMPROVEMENT: Apply proper preview to all other "rectangle tools" (area select, others?)
+- [x] IMPROVEMENT: Allow objects to be "unlocked", allowing world space movement like text labels.
+- [x] BUG: Freehand shapes lose fill and turn black at E/W map orientations (possibly only when abutting painted cells).
+- [x] BUG: Overlay when holding ALT on selected object (to indicate Edge Snap) completely busted.
+- [x] IMPROVEMENT: Add similar overlay (with Diamond) when holding alt shift to indicate inversion,
+- [x] FEATURE: Obsidian API integration with plugin
+	- [x] Basic functionality + several modals/other items with fallback
+- [x] FEATURE: Allow per-map object set switching (from map settings)
+- [ ] FEATURE: Subhex regions.   
+- [ ] IMPROVEMENT: Slim wrapper for plugin. Windrose ships with a shim, that then installs a more properly compiled version of the full plugin. Would allow for much better code structure/maintainability,
+

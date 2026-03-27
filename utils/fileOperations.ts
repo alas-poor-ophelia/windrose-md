@@ -203,6 +203,20 @@ async function loadMapData(mapId: string, mapName: string = '', mapType: MapType
         }
       }
 
+      // Migrate sub-hex maps if present (recursive)
+      if (loadedMap.subHexMaps) {
+        for (const hexKey of Object.keys(loadedMap.subHexMaps)) {
+          const subHex = loadedMap.subHexMaps[hexKey];
+          if (subHex?.mapData?.layers) {
+            for (const layer of subHex.mapData.layers) {
+              if (!layer.curves) layer.curves = [];
+              layer.curves = layer.curves.filter((c: any) => c.start && c.segments);
+            }
+            if (!subHex.mapData.regions) subHex.mapData.regions = [];
+          }
+        }
+      }
+
       return loadedMap;
     } else {
       return createNewMap(mapId, mapName, mapType);
@@ -249,6 +263,44 @@ async function saveMapData(mapId: string, mapData: MapData): Promise<boolean> {
 /**
  * Create a new map with defaults
  */
+/**
+ * Calculate a zoom level that fits the hex grid within the canvas.
+ */
+function calculateFitZoom(
+  hexSize: number,
+  orientation: string,
+  hexBounds: { maxCol: number; maxRow: number; maxRing?: number },
+  canvasWidth: number,
+  canvasHeight: number
+): number {
+  const sqrt3 = Math.sqrt(3);
+  let worldWidth: number, worldHeight: number;
+
+  if (hexBounds.maxRing !== undefined && hexBounds.maxRing > 0) {
+    // Radial bounds — full diameter including outer hex edges
+    if (orientation === 'flat') {
+      worldWidth = hexSize * 2 * (hexBounds.maxRing * 1.5 + 1);
+      worldHeight = hexSize * sqrt3 * (hexBounds.maxRing * 2 + 1);
+    } else {
+      worldWidth = hexSize * sqrt3 * (hexBounds.maxRing * 2 + 1);
+      worldHeight = hexSize * 2 * (hexBounds.maxRing * 1.5 + 1);
+    }
+  } else {
+    // Rectangular bounds — account for hex stagger offset
+    if (orientation === 'flat') {
+      worldWidth = hexSize * (1.5 * hexBounds.maxCol + 0.5);
+      worldHeight = hexSize * sqrt3 * (hexBounds.maxRow + 0.5);
+    } else {
+      worldWidth = hexSize * sqrt3 * (hexBounds.maxCol + 0.5);
+      worldHeight = hexSize * (1.5 * hexBounds.maxRow + 0.5);
+    }
+  }
+
+  // Use 0.85 factor to leave visible margin around the grid
+  const fitZoom = Math.min(canvasWidth / worldWidth, canvasHeight / worldHeight) * 0.85;
+  return Math.max(DEFAULTS.minZoom, Math.min(DEFAULTS.maxZoom, fitZoom));
+}
+
 function createNewMap(mapId: string, mapName: string = '', mapType: MapType = 'grid'): MapData {
   if (!DEFAULTS) {
     console.error('[createNewMap] CRITICAL: DEFAULTS is undefined!');
@@ -340,8 +392,13 @@ function createNewMap(mapId: string, mapName: string = '', mapType: MapType = 'g
       worldY = hexSize * (3 / 2) * centerR;
     }
 
+    const fitZoom = calculateFitZoom(
+      hexSize, orientation, baseMap.hexBounds,
+      DEFAULTS.canvasSize.width, DEFAULTS.canvasSize.height
+    );
+
     baseMap.viewState = {
-      zoom: DEFAULTS.initialZoom,
+      zoom: fitZoom,
       center: {
         x: worldX,
         y: worldY
@@ -363,4 +420,4 @@ function createNewMap(mapId: string, mapName: string = '', mapType: MapType = 'g
   return baseMap;
 }
 
-return { loadMapData, saveMapData, createNewMap };
+return { loadMapData, saveMapData, createNewMap, calculateFitZoom };

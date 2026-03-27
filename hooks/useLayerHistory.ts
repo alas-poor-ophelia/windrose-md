@@ -63,7 +63,8 @@ const {
 function useLayerHistory({
   mapData,
   updateMapData,
-  isLoading
+  isLoading,
+  navigationVersion = 0
 }: UseLayerHistoryOptions): UseLayerHistoryResult {
   // =========================================================================
   // Core History Hook
@@ -124,6 +125,14 @@ function useLayerHistory({
       historyInitialized.current = true;
     }
   }, [mapData, isLoading, resetHistory]);
+
+  // Reset history when sub-hex navigation changes level
+  dc.useEffect(() => {
+    if (navigationVersion > 0) {
+      layerHistoryCache.current = {};
+      historyInitialized.current = false;
+    }
+  }, [navigationVersion]);
 
   // =========================================================================
   // Layer State Helpers
