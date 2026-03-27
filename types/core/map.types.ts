@@ -244,6 +244,9 @@ export interface MapData {
   // Regions (hex maps only, global not per-layer)
   regions?: Region[];
 
+  // Sub-hex drill-down maps (hex maps only, keyed by "q,r")
+  subHexMaps?: Record<string, SubHexMapData>;
+
   // Migration metadata
   _migratedAt?: string;
 }
@@ -321,6 +324,20 @@ export interface Region {
   /** Z-order for rendering (lower = behind) */
   order: number;
   tags?: string[];
+}
+
+// ===========================================
+// Sub-Hex Drill-Down
+// ===========================================
+
+/** Sub-hex map stored as nested MapData inside a parent hex */
+export interface SubHexMapData {
+  /** Number of rings in the sub-hex grid (default 7 → 127 cells) */
+  subdivisionRings: number;
+  /** Full MapData for the sub-hex (recursive) */
+  mapData: MapData;
+  /** ISO date of last modification */
+  lastModified: string;
 }
 
 // ===========================================

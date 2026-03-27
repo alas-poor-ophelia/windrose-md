@@ -56,6 +56,8 @@ export interface UseLayerHistoryOptions {
   updateMapData: (data: MapData) => void;
   /** Whether map data is still loading */
   isLoading: boolean;
+  /** Incremented on sub-hex navigation to reset history */
+  navigationVersion?: number;
 }
 
 // ===========================================

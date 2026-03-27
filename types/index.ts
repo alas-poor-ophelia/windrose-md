@@ -61,6 +61,7 @@ export type {
   GridDensity,
   SizingMode,
   MeasurementMethod,
+  SubHexMapData,
 } from './core/map.types';
 
 export type {
