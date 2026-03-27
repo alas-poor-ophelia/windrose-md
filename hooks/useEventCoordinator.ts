@@ -723,7 +723,7 @@ const useEventCoordinator = ({
     const panZoomHandlers = getHandlers('panZoom') as PanZoomHandlers | null;
     if (!panZoomHandlers) return;
 
-    if (e.button === 1 || e.button === 2) {
+    if (e.button === 1) {
       e.preventDefault();
       panZoomHandlers.startPan(e.clientX, e.clientY);
     }
@@ -733,7 +733,7 @@ const useEventCoordinator = ({
     const panZoomHandlers = getHandlers('panZoom') as PanZoomHandlers | null;
     if (!panZoomHandlers) return;
 
-    if (panZoomHandlers.isPanning && (e.button === 1 || e.button === 2)) {
+    if (panZoomHandlers.isPanning && e.button === 1) {
       e.preventDefault();
       panZoomHandlers.stopPan();
     }
@@ -774,19 +774,31 @@ const useEventCoordinator = ({
 
   const handleContextMenu = dc.useCallback((e: MouseEvent): void => {
     e.preventDefault();
+
+    // Region context menu (works from region tools AND select mode)
+    const regionHandlers = getHandlers('region');
+    if (regionHandlers?.handleContextMenu) {
+      regionHandlers.handleContextMenu(e);
+      // Don't return — if context menu didn't trigger, fall through
+    }
+
     const drawingHandlers = getHandlers('drawing') as DrawingHandlers | null;
     if (drawingHandlers?.cancelShapePreview) {
       drawingHandlers.cancelShapePreview();
     }
-  }, [getHandlers]);
+  }, [currentTool, getHandlers]);
 
   dc.useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
     const handleMouseDown = (e: MouseEvent): void => {
-      if (e.button === 1 || e.button === 2) {
+      if (e.button === 1) {
+        // Middle-click: pan
         handlePanStart(e);
+      } else if (e.button === 2) {
+        // Right-click: context menu only (do NOT start pan)
+        return;
       } else {
         handlePointerDown(e);
       }

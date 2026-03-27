@@ -1,9 +1,9 @@
 /**
  * RegionLayer.tsx
  *
- * Interaction layer for hex region creation.
+ * Interaction layer for hex region creation and editing.
  * Registers handlers with EventHandlerContext and renders
- * a pending-hex selection overlay and "Create Region" button.
+ * a pending-hex selection overlay and region management UI.
  */
 
 import type { ToolId } from '#types/tools/tool.types';
@@ -16,6 +16,7 @@ const { requireModuleByName } = await dc.require(pathResolverPath);
 const { useMapState } = await requireModuleByName("MapContext.tsx");
 const { useEventHandlerRegistration } = await requireModuleByName("EventHandlerContext.tsx");
 const { useRegionTools } = await requireModuleByName("useRegionTools.ts");
+const { getObsidianModule, isBridgeAvailable } = await requireModuleByName("obsidianBridge.ts");
 
 interface RegionLayerProps {
   currentTool: ToolId;
@@ -45,12 +46,15 @@ const RegionLayer = ({
     handlePointerMove,
     handlePointerUp,
     handleDoubleClick,
+    handleContextMenu,
     confirmRegion,
     cancelRegion,
     deleteRegion,
     updateRegion,
     startEditingRegion,
-    stopEditingRegion
+    stopEditingRegion,
+    contextMenu,
+    dismissContextMenu
   } = useRegionTools({
     currentTool,
     selectedColor,
@@ -62,23 +66,24 @@ const RegionLayer = ({
     onRegionsChange
   });
 
-  // Register/unregister handlers with event coordinator
+  // Register handlers — always register context menu, tool handlers only when active
   dc.useEffect(() => {
-    if (!isRegionTool) {
-      unregisterHandlers('region');
-      return;
+    const handlers: Record<string, any> = {
+      handleContextMenu
+    };
+
+    if (isRegionTool) {
+      handlers.handlePointerDown = handlePointerDown;
+      handlers.handlePointerMove = handlePointerMove;
+      handlers.handlePointerUp = handlePointerUp;
+      handlers.handleDoubleClick = handleDoubleClick;
     }
 
-    registerHandlers('region', {
-      handlePointerDown,
-      handlePointerMove,
-      handlePointerUp,
-      handleDoubleClick
-    });
+    registerHandlers('region', handlers);
 
     return () => unregisterHandlers('region');
   }, [isRegionTool, registerHandlers, unregisterHandlers,
-    handlePointerDown, handlePointerMove, handlePointerUp, handleDoubleClick]);
+    handlePointerDown, handlePointerMove, handlePointerUp, handleDoubleClick, handleContextMenu]);
 
   // Name input state
   const [showNameInput, setShowNameInput] = dc.useState(false);
@@ -93,10 +98,8 @@ const RegionLayer = ({
     if (!regionName.trim()) return;
 
     if (editingRegionId) {
-      // Renaming an existing region
       updateRegion(editingRegionId, { name: regionName.trim() });
     } else {
-      // Creating a new region
       confirmRegion(regionName.trim());
     }
     setShowNameInput(false);
@@ -118,13 +121,19 @@ const RegionLayer = ({
     }
   }, [handleConfirmName, handleCancelName]);
 
-  // Overlay canvas — appended to mainCanvas.parentElement (same as FreehandLayer)
+  // Color change handler for the inline <input type="color">
+  const handleColorChange = dc.useCallback((e: any) => {
+    if (!editingRegion) return;
+    const newColor = e.target.value;
+    updateRegion(editingRegion.id, { color: newColor, borderColor: newColor });
+  }, [editingRegion, updateRegion]);
+
+  // ── Overlay canvas (same as FreehandLayer pattern) ─────────────────
   const overlayRef = dc.useRef<HTMLCanvasElement | null>(null);
 
   dc.useEffect(() => {
     const mainCanvas = canvasRef.current;
     if (!mainCanvas || !mainCanvas.parentElement || !isRegionTool) {
-      // Cleanup overlay when tool deactivated
       if (overlayRef.current && overlayRef.current.parentElement) {
         overlayRef.current.parentElement.removeChild(overlayRef.current);
         overlayRef.current = null;
@@ -132,7 +141,6 @@ const RegionLayer = ({
       return;
     }
 
-    // Create overlay if needed
     if (!overlayRef.current) {
       const overlay = document.createElement('canvas');
       overlay.style.position = 'absolute';
@@ -151,7 +159,7 @@ const RegionLayer = ({
     };
   }, [canvasRef, isRegionTool]);
 
-  // Render pending hexes on the overlay canvas
+  // Render pending/editing hexes on the overlay
   dc.useEffect(() => {
     const overlay = overlayRef.current;
     const mainCanvas = canvasRef.current;
@@ -162,10 +170,8 @@ const RegionLayer = ({
 
     const ctx = overlay.getContext('2d');
     if (!ctx) return;
-
     ctx.clearRect(0, 0, overlay.width, overlay.height);
 
-    // Determine what to draw: pending hexes (new region) OR editing region hexes
     const hexesToHighlight = editingRegion ? editingRegion.hexes : pendingHexes;
     const highlightColor = editingRegion ? editingRegion.color : selectedColor;
 
@@ -177,7 +183,6 @@ const RegionLayer = ({
 
     const northDirection = mapData.northDirection || 0;
 
-    // Apply north direction rotation (same as main renderer)
     if (northDirection !== 0) {
       ctx.save();
       ctx.translate(overlay.width / 2, overlay.height / 2);
@@ -185,56 +190,41 @@ const RegionLayer = ({
       ctx.translate(-overlay.width / 2, -overlay.height / 2);
     }
 
-    // Viewport offset (same formula as hex renderer)
     const offsetX = overlay.width / 2 - viewState.center.x * viewState.zoom;
     const offsetY = overlay.height / 2 - viewState.center.y * viewState.zoom;
 
-    // Draw highlighted hexes (pending or editing)
     if (hexesToHighlight.length > 0) {
       ctx.globalAlpha = editingRegion ? 0.15 : 0.4;
       ctx.fillStyle = highlightColor;
-
       ctx.beginPath();
       for (const h of hexesToHighlight) {
         const vertices = hexGeom.getHexVertices(h.x, h.y);
-        const screenVerts = vertices.map((v: any) =>
-          hexGeom.worldToScreen(v.worldX, v.worldY, offsetX, offsetY, viewState.zoom)
-        );
-        ctx.moveTo(screenVerts[0].screenX, screenVerts[0].screenY);
-        for (let i = 1; i < screenVerts.length; i++) {
-          ctx.lineTo(screenVerts[i].screenX, screenVerts[i].screenY);
-        }
+        const sv = vertices.map((v: any) => hexGeom.worldToScreen(v.worldX, v.worldY, offsetX, offsetY, viewState.zoom));
+        ctx.moveTo(sv[0].screenX, sv[0].screenY);
+        for (let i = 1; i < sv.length; i++) ctx.lineTo(sv[i].screenX, sv[i].screenY);
         ctx.closePath();
       }
       ctx.fill();
 
-      // Selection border
       ctx.globalAlpha = 0.8;
       ctx.strokeStyle = highlightColor;
       ctx.lineWidth = 2 * viewState.zoom;
-
       ctx.beginPath();
       for (const h of hexesToHighlight) {
         const vertices = hexGeom.getHexVertices(h.x, h.y);
-        const screenVerts = vertices.map((v: any) =>
-          hexGeom.worldToScreen(v.worldX, v.worldY, offsetX, offsetY, viewState.zoom)
-        );
-        ctx.moveTo(screenVerts[0].screenX, screenVerts[0].screenY);
-        for (let i = 1; i < screenVerts.length; i++) {
-          ctx.lineTo(screenVerts[i].screenX, screenVerts[i].screenY);
-        }
+        const sv = vertices.map((v: any) => hexGeom.worldToScreen(v.worldX, v.worldY, offsetX, offsetY, viewState.zoom));
+        ctx.moveTo(sv[0].screenX, sv[0].screenY);
+        for (let i = 1; i < sv.length; i++) ctx.lineTo(sv[i].screenX, sv[i].screenY);
         ctx.closePath();
       }
       ctx.stroke();
       ctx.globalAlpha = 1;
     }
 
-    // Draw boundary polygon
     if (boundaryVertices.length > 0) {
       ctx.strokeStyle = '#ffffff';
       ctx.lineWidth = 2;
       ctx.setLineDash([6, 4]);
-
       ctx.beginPath();
       const s0 = hexGeom.worldToScreen(boundaryVertices[0].x, boundaryVertices[0].y, offsetX, offsetY, viewState.zoom);
       ctx.moveTo(s0.screenX, s0.screenY);
@@ -245,7 +235,6 @@ const RegionLayer = ({
       ctx.stroke();
       ctx.setLineDash([]);
 
-      // Vertex dots
       ctx.fillStyle = '#ffffff';
       for (const v of boundaryVertices) {
         const s = hexGeom.worldToScreen(v.x, v.y, offsetX, offsetY, viewState.zoom);
@@ -255,13 +244,130 @@ const RegionLayer = ({
       }
     }
 
-    if (northDirection !== 0) {
-      ctx.restore();
-    }
+    if (northDirection !== 0) ctx.restore();
   }, [pendingHexes, boundaryVertices, canvasRef, geometry, mapData, selectedColor, editingRegion]);
 
-  if (!isRegionTool) return null;
+  // ── Context menu via Obsidian's native Menu API ────────────────────
+  dc.useEffect(() => {
+    if (!contextMenu || !mapData?.regions || !isBridgeAvailable()) {
+      if (contextMenu) dismissContextMenu();
+      return;
+    }
 
+    const region = mapData.regions.find(r => r.id === contextMenu.regionId);
+    if (!region) { dismissContextMenu(); return; }
+
+    const obs = getObsidianModule();
+    const MenuClass = obs.Menu as new () => {
+      addItem: (cb: (item: any) => void) => any;
+      addSeparator: () => any;
+      showAtPosition: (pos: { x: number; y: number }) => void;
+    };
+
+    const menu = new MenuClass();
+
+    menu.addItem((item: any) => {
+      item.setTitle('Edit Region');
+      item.setIcon('lucide-pencil');
+      item.onClick(() => startEditingRegion(region.id));
+    });
+
+    menu.addItem((item: any) => {
+      item.setTitle('Rename');
+      item.setIcon('lucide-type');
+      item.onClick(() => {
+        startEditingRegion(region.id);
+        setShowNameInput(true);
+        setRegionName(region.name);
+      });
+    });
+
+    menu.addItem((item: any) => {
+      item.setTitle(region.visible ? 'Hide Region' : 'Show Region');
+      item.setIcon(region.visible ? 'lucide-eye-off' : 'lucide-eye');
+      item.onClick(() => updateRegion(region.id, { visible: !region.visible }));
+    });
+
+    menu.addSeparator();
+
+    menu.addItem((item: any) => {
+      item.setTitle('Delete Region');
+      item.setIcon('lucide-trash-2');
+      item.setWarning(true);
+      item.onClick(() => deleteRegion(region.id));
+    });
+
+    menu.showAtPosition({ x: contextMenu.screenX, y: contextMenu.screenY });
+    dismissContextMenu();
+  }, [contextMenu, mapData?.regions]);
+
+  // ── Long-press touch support for context menu (500ms) ──────────────
+  const longPressTimerRef = dc.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressPosRef = dc.useRef<{ x: number; y: number } | null>(null);
+
+  dc.useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const handleTouchStart = (e: TouchEvent) => {
+      if (e.touches.length !== 1) return;
+      const touch = e.touches[0];
+      longPressPosRef.current = { x: touch.clientX, y: touch.clientY };
+
+      longPressTimerRef.current = setTimeout(() => {
+        if (!longPressPosRef.current) return;
+        const synth = new MouseEvent('contextmenu', {
+          clientX: longPressPosRef.current.x,
+          clientY: longPressPosRef.current.y,
+          bubbles: true
+        });
+        const hex = screenToGrid ? screenToGrid(longPressPosRef.current.x, longPressPosRef.current.y) : null;
+        if (hex && mapData?.regions) {
+          const key = `${hex.x},${hex.y}`;
+          const region = mapData.regions.find(r => r.hexes.some(h => `${h.x},${h.y}` === key));
+          if (region) {
+            handleContextMenu(synth);
+          }
+        }
+        longPressPosRef.current = null;
+      }, 500);
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (longPressPosRef.current && e.touches.length === 1) {
+        const touch = e.touches[0];
+        const dx = touch.clientX - longPressPosRef.current.x;
+        const dy = touch.clientY - longPressPosRef.current.y;
+        if (dx * dx + dy * dy > 100) {
+          if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+          longPressPosRef.current = null;
+        }
+      }
+    };
+
+    const handleTouchEnd = () => {
+      if (longPressTimerRef.current) {
+        clearTimeout(longPressTimerRef.current);
+        longPressTimerRef.current = null;
+      }
+      longPressPosRef.current = null;
+    };
+
+    canvas.addEventListener('touchstart', handleTouchStart, { passive: true });
+    canvas.addEventListener('touchmove', handleTouchMove, { passive: true });
+    canvas.addEventListener('touchend', handleTouchEnd);
+    canvas.addEventListener('touchcancel', handleTouchEnd);
+
+    return () => {
+      canvas.removeEventListener('touchstart', handleTouchStart);
+      canvas.removeEventListener('touchmove', handleTouchMove);
+      canvas.removeEventListener('touchend', handleTouchEnd);
+      canvas.removeEventListener('touchcancel', handleTouchEnd);
+      if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+    };
+  }, [canvasRef, screenToGrid, mapData?.regions, handleContextMenu]);
+
+  // ── JSX ────────────────────────────────────────────────────────────
   return (
     <div className="dmt-region-ui" style={{ position: 'relative' }}>
       {/* Editing existing region bar */}
@@ -283,13 +389,22 @@ const RegionLayer = ({
           boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
           whiteSpace: 'nowrap'
         }}>
-          <div style={{
-            width: '12px',
-            height: '12px',
-            borderRadius: '3px',
-            background: editingRegion.color,
-            flexShrink: 0
-          }} />
+          <input
+            type="color"
+            value={editingRegion.color}
+            onInput={handleColorChange}
+            title="Change region color"
+            style={{
+              width: '28px',
+              height: '28px',
+              borderRadius: '4px',
+              border: '2px solid var(--background-modifier-border)',
+              cursor: 'pointer',
+              flexShrink: 0,
+              padding: 0,
+              background: 'none'
+            }}
+          />
           <span style={{ color: 'var(--text-normal)', fontSize: '13px', fontWeight: '600' }}>
             {editingRegion.name}
           </span>
@@ -298,7 +413,7 @@ const RegionLayer = ({
           </span>
           <span style={{ color: 'var(--text-faint)', fontSize: '11px', margin: '0 4px' }}>|</span>
           <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>
-            Click to add/remove hexes
+            Click hexes to add/remove
           </span>
           <button
             onClick={() => {
@@ -352,7 +467,7 @@ const RegionLayer = ({
       )}
 
       {/* Create Region bar */}
-      {pendingHexes.length > 0 && !showNameInput && !editingRegionId && (
+      {isRegionTool && pendingHexes.length > 0 && !showNameInput && !editingRegionId && (
         <div style={{
           position: 'fixed',
           bottom: '100px',

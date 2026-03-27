@@ -46,22 +46,31 @@ interface RegionToolsOptions {
   onRegionsChange: (regions: Region[]) => void;
 }
 
+interface ContextMenuState {
+  regionId: string;
+  screenX: number;
+  screenY: number;
+}
+
 interface UseRegionToolsResult {
   pendingHexes: Point[];
   boundaryVertices: Point[];
   isActive: boolean;
   editingRegionId: string | null;
   editingRegion: Region | null;
+  contextMenu: ContextMenuState | null;
   handlePointerDown: (e: PointerEvent) => void;
   handlePointerMove: (e: PointerEvent) => void;
   handlePointerUp: (e: PointerEvent) => void;
   handleDoubleClick: (e: MouseEvent) => void;
+  handleContextMenu: (e: MouseEvent) => void;
   confirmRegion: (name: string, linkedNote?: string) => void;
   cancelRegion: () => void;
   deleteRegion: (regionId: string) => void;
   updateRegion: (regionId: string, updates: Partial<Region>) => void;
   startEditingRegion: (regionId: string) => void;
   stopEditingRegion: () => void;
+  dismissContextMenu: () => void;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────
@@ -113,6 +122,8 @@ function useRegionTools(options: RegionToolsOptions): UseRegionToolsResult {
   const [boundaryVertices, setBoundaryVertices] = dc.useState<Array<{ x: number; y: number }>>([]);
   // Editing state — when set, paint mode modifies an existing region
   const [editingRegionId, setEditingRegionId] = dc.useState<string | null>(null);
+  // Context menu state
+  const [contextMenu, setContextMenu] = dc.useState<ContextMenuState | null>(null);
 
   const editingRegion = dc.useMemo(() => {
     if (!editingRegionId || !mapData?.regions) return null;
@@ -125,6 +136,7 @@ function useRegionTools(options: RegionToolsOptions): UseRegionToolsResult {
       setPendingHexes([]);
       setBoundaryVertices([]);
       setEditingRegionId(null);
+      setContextMenu(null);
     }
   }, [isActive]);
 
@@ -364,22 +376,43 @@ function useRegionTools(options: RegionToolsOptions): UseRegionToolsResult {
     setEditingRegionId(null);
   }, []);
 
+  // ── Context Menu ───────────────────────────────────────────────────
+
+  const handleContextMenu = dc.useCallback((e: MouseEvent) => {
+    const hex = getHexCoords(e);
+    if (!hex) return;
+
+    const region = findRegionForHex(hex.q, hex.r);
+    if (region) {
+      e.preventDefault();
+      e.stopPropagation();
+      setContextMenu({ regionId: region.id, screenX: e.clientX, screenY: e.clientY });
+    }
+  }, [getHexCoords, findRegionForHex]);
+
+  const dismissContextMenu = dc.useCallback(() => {
+    setContextMenu(null);
+  }, []);
+
   return {
     pendingHexes,
     boundaryVertices,
     isActive,
     editingRegionId,
     editingRegion,
+    contextMenu,
     handlePointerDown,
     handlePointerMove,
     handlePointerUp,
     handleDoubleClick,
+    handleContextMenu,
     confirmRegion,
     cancelRegion,
     deleteRegion,
     updateRegion,
     startEditingRegion,
-    stopEditingRegion
+    stopEditingRegion,
+    dismissContextMenu
   };
 }
 
