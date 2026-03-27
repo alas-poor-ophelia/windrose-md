@@ -51,14 +51,16 @@ function useDataHandlers({
   const buildHistoryState = dc.useCallback((
     layer: MapLayer,
     name: string,
-    overrides: Partial<HistoryState> = {}
+    overrides: Partial<HistoryState> = {},
+    regions: import('#types/core/map.types').Region[] = []
   ): HistoryState => ({
     cells: overrides.cells ?? layer.cells ?? [],
     curves: overrides.curves ?? layer.curves ?? [],
     name: name,
     objects: overrides.objects ?? layer.objects ?? [],
     textLabels: overrides.textLabels ?? layer.textLabels ?? [],
-    edges: overrides.edges ?? layer.edges ?? []
+    edges: overrides.edges ?? layer.edges ?? [],
+    regions: overrides.regions ?? regions
   }), []);
 
   // =========================================================================
@@ -78,7 +80,7 @@ function useDataHandlers({
 
         if (!suppressHistory) {
           const activeLayer = getActiveLayer(currentMapData);
-          addToHistory(buildHistoryState(activeLayer, currentMapData.name, { [field]: newValue as unknown as Cell[] | MapObject[] | TextLabel[] | unknown[] }));
+          addToHistory(buildHistoryState(activeLayer, currentMapData.name, { [field]: newValue as unknown as Cell[] | MapObject[] | TextLabel[] | unknown[] }, currentMapData.regions || []));
         }
 
         return newMapData;
@@ -127,7 +129,7 @@ function useDataHandlers({
       if (!currentMapData) return currentMapData;
 
       const activeLayer = getActiveLayer(currentMapData);
-      addToHistory(buildHistoryState(activeLayer, newName));
+      addToHistory(buildHistoryState(activeLayer, newName, {}, currentMapData.regions || []));
 
       return { ...currentMapData, name: newName };
     });
@@ -217,13 +219,19 @@ function useDataHandlers({
     });
   }, [updateMapData]);
 
-  // Handle regions change (hex maps only) - NOT tracked in layer history
+  // Handle regions change (hex maps only) - tracked in history for undo/redo
   const handleRegionsChange = dc.useCallback((regions: import('#types/core/map.types').Region[]): void => {
+    if (isApplyingHistory()) return;
+
     updateMapData((currentMapData: MapData | null) => {
       if (!currentMapData) return currentMapData;
+
+      const activeLayer = getActiveLayer(currentMapData);
+      addToHistory(buildHistoryState(activeLayer, currentMapData.name, {}, regions));
+
       return { ...currentMapData, regions };
     });
-  }, [updateMapData]);
+  }, [updateMapData, addToHistory, isApplyingHistory, buildHistoryState]);
 
   // =========================================================================
   // Return Value

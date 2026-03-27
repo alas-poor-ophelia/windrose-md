@@ -62,6 +62,7 @@ const { ModalPortal } = await requireModuleByName("ModalPortal.tsx");
 
 const { getActiveLayer, getLayerById } = await requireModuleByName("layerAccessor.ts");
 const { LayerControls } = await requireModuleByName("LayerControls.tsx");
+const { RegionPanel } = await requireModuleByName("RegionPanel.tsx");
 const { LayerEditModal } = await requireModuleByName("LayerEditModal.tsx");
 
 // RPGAwesome icon font support
@@ -188,6 +189,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   const [showSettingsModal, setShowSettingsModal] = dc.useState(false);
   const [showVisibilityToolbar, setShowVisibilityToolbar] = dc.useState(false);
   const [showLayerPanel, setShowLayerPanel] = dc.useState(false);
+  const [showRegionPanel, setShowRegionPanel] = dc.useState(false);
   const [editingLayerId, setEditingLayerId] = dc.useState<string | null>(null);
 const editingLayer = dc.useMemo(() => {
     return editingLayerId ? getLayerById(mapData, editingLayerId) : null;
@@ -414,6 +416,15 @@ const editingLayer = dc.useMemo(() => {
     isApplyingHistory
   } = useLayerHistory({ mapData, updateMapData, isLoading });
 
+  // Wrap undo to let in-progress operations (e.g. region creation) cancel first
+  const wrappedHandleUndo = dc.useCallback(() => {
+    const event = new CustomEvent('windrose:before-undo', { cancelable: true });
+    document.dispatchEvent(event);
+    if (!event.defaultPrevented) {
+      handleUndo();
+    }
+  }, [handleUndo]);
+
   // Listen for deep link navigation events
   dc.useEffect(() => {
     const handleNavigateTo = (event: CustomEvent): void => {
@@ -450,6 +461,39 @@ const editingLayer = dc.useMemo(() => {
       window.removeEventListener('dmt-navigate-to', handleNavigateTo as EventListener);
     };
   }, [mapId, mapData, updateMapData, handleLayerSelect]);
+
+  // Listen for center-on-region events from region panel
+  dc.useEffect(() => {
+    const handleCenterOnRegion = (event: CustomEvent): void => {
+      const { regionId } = event.detail;
+      if (!mapData || !geometry || geometry.type !== 'hex') return;
+
+      const region = (mapData.regions || []).find((r: Region) => r.id === regionId);
+      if (!region || region.hexes.length === 0) return;
+
+      // Compute centroid in world coordinates
+      let cx = 0, cy = 0;
+      for (const hex of region.hexes) {
+        const world = (geometry as any).hexToWorld(hex.x, hex.y);
+        cx += world.worldX;
+        cy += world.worldY;
+      }
+      cx /= region.hexes.length;
+      cy /= region.hexes.length;
+
+
+      updateMapData((current: MapData) => ({
+        ...current,
+        viewState: {
+          ...current.viewState,
+          center: { x: cx, y: cy }
+        }
+      }));
+    };
+
+    document.addEventListener('windrose:center-on-region', handleCenterOnRegion as EventListener);
+    return () => document.removeEventListener('windrose:center-on-region', handleCenterOnRegion as EventListener);
+  }, [mapData, geometry, updateMapData]);
 
   // Listen for cross-layer object link events
   dc.useEffect(() => {
@@ -878,7 +922,7 @@ const editingLayer = dc.useMemo(() => {
         <ToolPalette
           currentTool={currentTool}
           onToolChange={setCurrentTool}
-          onUndo={handleUndo}
+          onUndo={wrappedHandleUndo}
           onRedo={handleRedo}
           canUndo={canUndo}
           canRedo={canRedo}
@@ -943,6 +987,20 @@ const editingLayer = dc.useMemo(() => {
             sidebarCollapsed={mapData.sidebarCollapsed || false}
             isOpen={showLayerPanel}
           />
+
+          {/* Region Panel (hex maps only) */}
+          {mapData.mapType === 'hex' && (
+            <RegionPanel
+              regions={mapData.regions || []}
+              onRegionsChange={handleRegionsChange}
+              onEditRegion={(regionId: string) => {
+                // Dispatch to RegionLayer's edit mode via custom event
+                document.dispatchEvent(new CustomEvent('windrose:edit-region', { detail: { regionId } }));
+              }}
+              sidebarCollapsed={mapData.sidebarCollapsed || false}
+              isOpen={showRegionPanel}
+            />
+          )}
 
           {/* For hex maps, override northDirection to 0 for rendering while keeping real value for compass display */}
           {/* This allows the compass to show and persist the north direction without actually rotating hex maps */}
@@ -1064,6 +1122,8 @@ const editingLayer = dc.useMemo(() => {
             mapType={mapData.mapType}
             showLayerPanel={showLayerPanel}
             onToggleLayerPanel={() => setShowLayerPanel(!showLayerPanel)}
+            showRegionPanel={showRegionPanel}
+            onToggleRegionPanel={mapData.mapType === 'hex' ? () => setShowRegionPanel(!showRegionPanel) : undefined}
             showVisibilityToolbar={showVisibilityToolbar}
             onToggleVisibilityToolbar={() => setShowVisibilityToolbar(!showVisibilityToolbar)}
             alwaysShowControls={effectiveSettings?.alwaysShowControls ?? false}

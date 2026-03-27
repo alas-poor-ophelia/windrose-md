@@ -75,7 +75,8 @@ function useLayerHistory({
     name: "",
     objects: [],
     textLabels: [],
-    edges: []
+    edges: [],
+    regions: []
   };
 
   const {
@@ -117,7 +118,8 @@ function useLayerHistory({
         name: mapData.name || '',
         objects: activeLayer.objects || [],
         textLabels: activeLayer.textLabels || [],
-        edges: activeLayer.edges || []
+        edges: activeLayer.edges || [],
+        regions: mapData.regions || []
       });
       historyInitialized.current = true;
     }
@@ -131,13 +133,14 @@ function useLayerHistory({
    * Build a history state snapshot from layer data
    */
   const buildHistoryState = dc.useCallback(
-    (layer: MapLayer, name: string): LayerHistorySnapshot => ({
+    (layer: MapLayer, name: string, regions: import('#types/core/map.types').Region[] = []): LayerHistorySnapshot => ({
       cells: layer.cells || [],
       curves: layer.curves || [],
       name: name,
       objects: layer.objects || [],
       textLabels: layer.textLabels || [],
-      edges: layer.edges || []
+      edges: layer.edges || [],
+      regions: regions
     }),
     []
   );
@@ -163,7 +166,7 @@ function useLayerHistory({
         // No cached history for this layer - initialize fresh
         const layer = getActiveLayer(newMapData);
         historyInitialized.current = false;
-        resetHistory(buildHistoryState(layer, newMapData.name || ''));
+        resetHistory(buildHistoryState(layer, newMapData.name || '', newMapData.regions || []));
         historyInitialized.current = true;
       }
     },
@@ -203,7 +206,7 @@ function useLayerHistory({
     // New layer always starts with fresh history
     const newActiveLayer = getActiveLayer(newMapData);
     historyInitialized.current = false;
-    resetHistory(buildHistoryState(newActiveLayer, newMapData.name || ''));
+    resetHistory(buildHistoryState(newActiveLayer, newMapData.name || '', newMapData.regions || []));
     historyInitialized.current = true;
   }, [mapData, updateMapData, saveCurrentLayerHistory, resetHistory, buildHistoryState]);
 
@@ -299,9 +302,9 @@ function useLayerHistory({
     const previousState = undoInternal();
     if (previousState && mapData) {
       isApplyingHistoryRef.current = true;
-      // Apply layer-specific data to active layer, name stays at root
+      // Apply layer-specific data to active layer, name and regions at root
       const newMapData = updateActiveLayer(
-        { ...mapData, name: previousState.name },
+        { ...mapData, name: previousState.name, regions: previousState.regions || mapData.regions },
         {
           cells: previousState.cells,
           curves: previousState.curves || [],
@@ -322,9 +325,9 @@ function useLayerHistory({
     const nextState = redoInternal();
     if (nextState && mapData) {
       isApplyingHistoryRef.current = true;
-      // Apply layer-specific data to active layer, name stays at root
+      // Apply layer-specific data to active layer, name and regions at root
       const newMapData = updateActiveLayer(
-        { ...mapData, name: nextState.name },
+        { ...mapData, name: nextState.name, regions: nextState.regions || mapData.regions },
         {
           cells: nextState.cells,
           curves: nextState.curves || [],

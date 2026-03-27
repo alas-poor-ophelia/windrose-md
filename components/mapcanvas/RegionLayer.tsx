@@ -85,9 +85,35 @@ const RegionLayer = ({
   }, [isRegionTool, registerHandlers, unregisterHandlers,
     handlePointerDown, handlePointerMove, handlePointerUp, handleDoubleClick, handleContextMenu]);
 
+  // Listen for edit-region events from sidebar panel
+  dc.useEffect(() => {
+    const handler = (e: CustomEvent) => {
+      const { regionId } = e.detail;
+      if (regionId) {
+        startEditingRegion(regionId);
+      }
+    };
+    document.addEventListener('windrose:edit-region', handler as EventListener);
+    return () => document.removeEventListener('windrose:edit-region', handler as EventListener);
+  }, [startEditingRegion]);
+
   // Name input state
   const [showNameInput, setShowNameInput] = dc.useState(false);
   const [regionName, setRegionName] = dc.useState('');
+
+  // Intercept undo when region creation/editing is in progress — cancel instead
+  dc.useEffect(() => {
+    const handler = (e: Event) => {
+      if (pendingHexes.length > 0 || editingRegionId || showNameInput) {
+        e.preventDefault();
+        cancelRegion();
+        setShowNameInput(false);
+        setRegionName('');
+      }
+    };
+    document.addEventListener('windrose:before-undo', handler);
+    return () => document.removeEventListener('windrose:before-undo', handler);
+  }, [pendingHexes.length, editingRegionId, showNameInput, cancelRegion]);
 
   const handleCreateClick = dc.useCallback(() => {
     setShowNameInput(true);

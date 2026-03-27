@@ -23,6 +23,8 @@ const MapControls = ({
   onToggleVisibilityToolbar,
   showLayerPanel,
   onToggleLayerPanel,
+  showRegionPanel,
+  onToggleRegionPanel,
   alwaysShowControls = false
 }) => {
     // When alwaysShowControls is true, controls are always visible
@@ -216,10 +218,22 @@ const MapControls = ({
               <dc.Icon icon="lucide-layers" />
             </button>
             
+            {/* Region Panel Toggle Button (hex maps only) */}
+            {mapType === 'hex' && onToggleRegionPanel && (
+              <button
+                className={`dmt-expand-btn dmt-drawer-item ${showRegionPanel ? 'dmt-expand-btn-active' : ''} ${controlsRevealed ? 'dmt-drawer-item-visible' : ''}`}
+                style={getDrawerItemStyle(2)}
+                onClick={handleControlInteraction(onToggleRegionPanel)}
+                title="Toggle region panel"
+              >
+                <dc.Icon icon="lucide-map" />
+              </button>
+            )}
+
             {/* Visibility Toggle Button */}
             <button
               className={`dmt-expand-btn dmt-drawer-item ${showVisibilityToolbar ? 'dmt-expand-btn-active' : ''} ${controlsRevealed ? 'dmt-drawer-item-visible' : ''}`}
-              style={getDrawerItemStyle(2)}
+              style={getDrawerItemStyle(mapType === 'hex' && onToggleRegionPanel ? 3 : 2)}
               onClick={handleControlInteraction(onToggleVisibilityToolbar)}
               title="Toggle layer visibility"
             >
@@ -229,7 +243,7 @@ const MapControls = ({
             {/* Settings Button */}
             <button
               className={`dmt-expand-btn dmt-drawer-item ${controlsRevealed ? 'dmt-drawer-item-visible' : ''}`}
-              style={getDrawerItemStyle(3)}
+              style={getDrawerItemStyle(mapType === 'hex' && onToggleRegionPanel ? 4 : 3)}
               onClick={handleControlInteraction(onSettingsClick)}
               title="Map Settings"
             >
