@@ -296,8 +296,8 @@ function calculateFitZoom(
     }
   }
 
-  // Use 0.85 factor to leave visible margin around the grid
-  const fitZoom = Math.min(canvasWidth / worldWidth, canvasHeight / worldHeight) * 0.85;
+  // Use 0.7 factor to leave comfortable margin around the grid
+  const fitZoom = Math.min(canvasWidth / worldWidth, canvasHeight / worldHeight) * 0.7;
   return Math.max(DEFAULTS.minZoom, Math.min(DEFAULTS.maxZoom, fitZoom));
 }
 

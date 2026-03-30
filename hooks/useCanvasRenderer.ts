@@ -449,7 +449,18 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
     };
 
     ctx.save();
-    for (const hexKey of Object.keys(mapData.subHexMaps)) {
+    for (const [hexKey, subHex] of Object.entries(mapData.subHexMaps)) {
+      // Only show indicator if the sub-hex has actual content
+      const sd = (subHex as any)?.mapData;
+      if (!sd?.layers) continue;
+      const hasContent = sd.layers.some((l: any) =>
+        (l.cells && l.cells.length > 0) ||
+        (l.curves && l.curves.length > 0) ||
+        (l.objects && l.objects.length > 0) ||
+        (l.textLabels && l.textLabels.length > 0)
+      );
+      if (!hasContent) continue;
+
       const [qStr, rStr] = hexKey.split(',');
       const q = parseInt(qStr, 10);
       const r = parseInt(rStr, 10);

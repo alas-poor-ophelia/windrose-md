@@ -150,7 +150,7 @@ function useSubHexNavigation({
   const depth = navStack.length;
   const activeMapData = isInSubHex ? subHexMapData : rootMapData;
 
-  // Build breadcrumb segments
+  // Build breadcrumb segments using actual map names
   const breadcrumbs = dc.useMemo((): BreadcrumbSegment[] => {
     if (!isInSubHex) return [];
 
@@ -160,11 +160,21 @@ function useSubHexNavigation({
 
     for (let i = 0; i < navStack.length; i++) {
       const key = navStack[i].hexKey;
-      segments.push({ label: `Hex (${key})`, depth: i + 1 });
+      const isLast = i === navStack.length - 1;
+
+      if (isLast) {
+        // Current level — use the live activeMapData name
+        segments.push({ label: subHexMapData?.name || `Hex (${key})`, depth: i + 1 });
+      } else {
+        // Intermediate level — look up name from the next frame's parent
+        const nextFrame = navStack[i + 1];
+        const subHexName = nextFrame?.parentMapData?.name;
+        segments.push({ label: subHexName || `Hex (${key})`, depth: i + 1 });
+      }
     }
 
     return segments;
-  }, [navStack, isInSubHex]);
+  }, [navStack, isInSubHex, subHexMapData?.name]);
 
   // Enter a sub-hex at the given axial coordinate
   const enterSubHex = dc.useCallback((q: number, r: number): void => {
