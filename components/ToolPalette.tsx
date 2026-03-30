@@ -49,7 +49,8 @@ type BracketPosition = 'tl' | 'tr' | 'bl' | 'br';
 interface SubToolSelections {
   select: ToolId;
   draw: ToolId;
-  rectangle: ToolId;
+  fill: ToolId;
+  erase: ToolId;
   region: ToolId;
 }
 
@@ -293,7 +294,8 @@ const ToolPalette = ({
   const [subToolSelections, setSubToolSelections] = dc.useState<SubToolSelections>({
     select: 'select' as ToolId,
     draw: 'draw' as ToolId,
-    rectangle: 'rectangle' as ToolId,
+    fill: 'rectangle' as ToolId,
+    erase: 'erase' as ToolId,
     region: 'regionPaint' as ToolId
   });
 
@@ -311,7 +313,7 @@ const ToolPalette = ({
           onToolChange(subToolSelections.draw || 'draw' as ToolId);
           break;
         case 'e':
-          onToolChange('erase' as ToolId);
+          onToolChange(subToolSelections.erase || 'erase' as ToolId);
           break;
         case 's':
         case 'v':
@@ -352,11 +354,18 @@ const ToolPalette = ({
       ]
     },
     {
-      id: 'rectangle',
+      id: 'fill',
       subTools: [
         { id: 'rectangle' as ToolId, label: 'Fill Rectangle', title: 'Rectangle (click two corners)', icon: 'lucide-square', gridOnly: true },
-        { id: 'edgeLine' as ToolId, label: 'Edge Line', title: 'Edge Line (click two points)', icon: 'lucide-git-commit-horizontal', gridOnly: true },
+        { id: 'circle' as ToolId, label: 'Fill Circle', title: 'Circle (click edge, then center)', icon: 'lucide-circle', gridOnly: true },
         { id: 'diagonalFill' as ToolId, label: 'Diagonal Fill', title: 'Fill diagonal gaps (click two corners)', icon: 'lucide-slash', gridOnly: true }
+      ]
+    },
+    {
+      id: 'erase',
+      subTools: [
+        { id: 'erase' as ToolId, label: 'Erase', title: 'Erase (remove text/objects/cells/edges) (E)', icon: 'lucide-eraser' },
+        { id: 'clearArea' as ToolId, label: 'Clear Area', title: 'Clear Area (click two corners to erase)', icon: 'lucide-square-x', gridOnly: true }
       ]
     },
     {
@@ -370,9 +379,7 @@ const ToolPalette = ({
   ];
 
   const simpleTools: SimpleTool[] = [
-    { id: 'erase' as ToolId, title: 'Erase (remove text/objects/cells/edges) (E)', icon: 'lucide-eraser' },
-    { id: 'circle' as ToolId, title: 'Circle (click edge, then center)', icon: 'lucide-circle', gridOnly: true },
-    { id: 'clearArea' as ToolId, title: 'Clear Area (click two corners to erase)', icon: 'lucide-square-x', gridOnly: true },
+    { id: 'edgeLine' as ToolId, title: 'Paint Line (click two points)', icon: 'lucide-git-commit-horizontal', gridOnly: true },
     { id: 'addObject' as ToolId, title: 'Add Object (select from sidebar)', icon: 'lucide-map-pin-plus' },
     { id: 'addText' as ToolId, title: 'Add Text Label', icon: 'lucide-type' },
     { id: 'measure' as ToolId, title: 'Measure Distance (M)', icon: 'lucide-ruler' }
@@ -529,20 +536,12 @@ const ToolPalette = ({
         />
       </div>
 
-      <button
-        className={`dmt-tool-btn interactive-child ${currentTool === 'erase' ? 'dmt-tool-btn-active' : ''}`}
-        onClick={() => onToolChange('erase' as ToolId)}
-        title="Erase (remove text/objects/cells/edges)"
-      >
-        <dc.Icon icon="lucide-eraser" />
-      </button>
-
       {mapType !== 'hex' && (
         <ToolButtonWithSubMenu
           toolGroup={toolGroups[2]}
           currentTool={currentTool}
-          currentSubTool={subToolSelections.rectangle}
-          isSubMenuOpen={openSubMenu === 'rectangle'}
+          currentSubTool={subToolSelections.fill}
+          isSubMenuOpen={openSubMenu === 'fill'}
           onToolSelect={onToolChange}
           onSubToolSelect={handleSubToolSelect}
           onSubMenuOpen={handleSubMenuOpen}
@@ -551,9 +550,21 @@ const ToolPalette = ({
         />
       )}
 
+      <ToolButtonWithSubMenu
+        toolGroup={toolGroups[3]}
+        currentTool={currentTool}
+        currentSubTool={subToolSelections.erase}
+        isSubMenuOpen={openSubMenu === 'erase'}
+        onToolSelect={onToolChange}
+        onSubToolSelect={handleSubToolSelect}
+        onSubMenuOpen={handleSubMenuOpen}
+        onSubMenuClose={handleSubMenuClose}
+        mapType={mapType}
+      />
+
       {mapType === 'hex' && (
         <ToolButtonWithSubMenu
-          toolGroup={toolGroups[3]}
+          toolGroup={toolGroups[4]}
           currentTool={currentTool}
           currentSubTool={subToolSelections.region}
           isSubMenuOpen={openSubMenu === 'region'}
@@ -565,7 +576,7 @@ const ToolPalette = ({
         />
       )}
 
-      {visibleSimpleTools.filter(t => t.id !== 'erase').map(tool => (
+      {visibleSimpleTools.map(tool => (
         <button
           key={tool.id}
           className={`dmt-tool-btn interactive-child ${currentTool === tool.id ? 'dmt-tool-btn-active' : ''}`}
