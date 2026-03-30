@@ -1150,9 +1150,6 @@ const editingLayer = dc.useMemo(() => {
               <RegionPanel
                 regions={mapData.regions || []}
                 onRegionsChange={handleRegionsChange}
-                onEditRegion={(regionId: string) => {
-                  document.dispatchEvent(new CustomEvent('windrose:edit-region', { detail: { regionId } }));
-                }}
                 sidebarCollapsed={mapData.sidebarCollapsed || false}
                 isOpen={showRegionPanel}
               />

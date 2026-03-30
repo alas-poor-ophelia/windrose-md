@@ -3464,7 +3464,6 @@ button.dmt-layer-btn.dmt-layer-btn-pill {
   transform: translateX(-20px);
   max-height: 45%;
   overflow-y: auto;
-  overflow-x: visible;
   flex-shrink: 1;
 }
 
@@ -3489,10 +3488,6 @@ button.dmt-layer-btn.dmt-layer-btn-pill {
   padding: 2px 6px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-}
-
-.dmt-region-item-wrapper {
-  position: relative;
 }
 
 .is-tablet button.dmt-region-item,
@@ -3553,57 +3548,6 @@ button.dmt-region-visibility-btn {
   color: var(--dmt-text-primary);
 }
 
-.dmt-region-options {
-  position: absolute;
-  left: 100%;
-  top: 50%;
-  transform: translateY(-50%);
-  display: flex;
-  gap: 2px;
-  margin-left: 4px;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 150ms ease;
-}
-
-.dmt-region-options.expanded {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.is-tablet button.dmt-region-option-btn,
-button.dmt-region-option-btn {
-  width: 26px;
-  height: 26px;
-  border-radius: 4px;
-  border: 1px solid var(--dmt-bg-tertiary);
-  background: var(--dmt-bg-secondary);
-  color: var(--dmt-text-secondary);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  padding: 0;
-  transition: all 150ms ease;
-}
-
-.dmt-region-option-btn:hover {
-  border-color: var(--dmt-accent-muted);
-  color: var(--dmt-text-primary);
-}
-
-.dmt-region-option-btn.delete:hover {
-  color: #ff6b6b;
-  border-color: #ff6b6b;
-  background: rgba(255, 107, 107, 0.1);
-}
-
-.dmt-region-option-btn.edit:hover {
-  color: #4a9eff;
-  border-color: #4a9eff;
-  background: rgba(74, 158, 255, 0.1);
-}
 
 /* ==========================================================================
    SUB-HEX BREADCRUMB

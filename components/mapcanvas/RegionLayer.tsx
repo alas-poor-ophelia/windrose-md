@@ -476,6 +476,34 @@ const RegionLayer = ({
           </span>
           <button
             onClick={() => {
+              const region = editingRegion;
+              openNativeNoteLinkModal({
+                onSave: (notePath: string) => {
+                  updateRegion(region.id, { linkedNote: notePath || undefined });
+                },
+                onClose: () => {},
+                currentNotePath: region.linkedNote || null,
+                objectType: null
+              });
+            }}
+            title={editingRegion.linkedNote ? 'Change linked note' : 'Link note'}
+            style={{
+              padding: '4px 8px',
+              background: 'transparent',
+              color: editingRegion.linkedNote ? 'var(--text-accent)' : 'var(--text-muted)',
+              borderRadius: '4px',
+              border: '1px solid var(--background-modifier-border)',
+              cursor: 'pointer',
+              fontSize: '12px',
+              minHeight: '32px',
+              display: 'flex',
+              alignItems: 'center'
+            }}
+          >
+            <dc.Icon icon={editingRegion.linkedNote ? 'lucide-file-check' : 'lucide-link'} />
+          </button>
+          <button
+            onClick={() => {
               setShowNameInput(true);
               setRegionName(editingRegion.name);
             }}

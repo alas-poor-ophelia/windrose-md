@@ -1,5 +1,5 @@
 # The Plugin
-Although WindroseMD is itself a datacore script, and not technically a plugin, it does ship with and install its own plugin to manage settings, and better integrate into Obsidian. Although once mandatory, the plugin is now required, due to an increased reliance on Obsidian’s own APIs.
+Although WindroseMD is itself a datacore script, and not technically a plugin, it does ship with and install its own plugin to manage settings, and better integrate into Obsidian. Although once optional, the plugin is now required, due to an increased reliance on Obsidian’s own APIs.
 
 The plugin has a rich settings menu, offering many global defaults and customizations to be changed.
 
@@ -45,19 +45,20 @@ When it comes to creating or modifying a map, the Tool Palette contains most thi
 	- **Paint** tool: Color in an individual cell with selected color
 	- **Paint segments** (**GRID ONLY**): Paint segments of a single cell. Subdivides a cell into 8 triangular subsegments. Allows for half, quarter, or smooth diagonals.
 	- **Paint edge** (**GRID ONLY**): Paints an “edge” (paint over grid lines) with selected color. Use for custom borders, etc
-	- **Freehand** tool: Create non-grid locked polygonal shapes
+	- **Freehand draw** tool: Create non-grid locked polygonal shapes
 - **Color palette**: Select or create new colors to use in your maps. Colors can be defined globally in settings plugin.
-- **Eraser**: erase things. Affects most map contents
+- **Eraser** tool group: 
+	- **Eraser** tool: erase single things. Affects most map contents (cells, objects, text labels, etc)
+	- **Clear area** tool: deletes everything in a rectangle
 - **Region** tool group (**HEX ONLY**)
 	- **Paint region**: Define a new map region cell by cell.
 	- **Select region**: Define a new map region by selecting a polygon. Double click to close.
 - **Fill** tool group (**GRID ONLY**)
-	- **Draw rectangle** tool: Draws a rectangle, corner to corner. Uses selected color.
-	- **Edge line**: Paints an edge in a line, point to point.
-	- **Diagonal fill**: 
-- **Fill circle** (**GRID ONLY**): Draws a “circle”, center to radius. Used selected color.
-- **Erase rectangle**: Erases contents of selected rectangle.
-- **Place object**: Place “Objects” on the map—used for any dungeon stocking, world landmarking, etc. Think doors, traps, mountain ranges, forests. Places currently selected object from object sidebar.
+	- **Fill rectangle** tool: Draws a rectangle, corner to corner. Uses selected color.
+	- **Fill circle** tool: Draws a “circle”, center to radius. Used selected color.
+	- **Diagonal fill**: Places segments along a staggered row of painted cells to make them look like a smooth diagonal.
+- **Paint Line**: Paints an edge in a line, point to point.
+- **Place object**: Place “Objects” on the map—used for any dungeon stocking, world landmarking, etc. Think doors, traps, mountain ranges, forests. Places currently selected object from object sidebar. Objects can be **linked to notes**.
 - **Text Label**: Create a text label on the map. Configurable size, color, font.
 - **Measure**: Measures from point to point, using defined cell size. Units configurable globally or per map.
 - **Undo**: Undoes last action. Remembers up to 50 actions, does not persist on Obsidian restart.
@@ -128,7 +129,7 @@ These can be configured in settings.
 Cell size for both Hex and Grid maps is generally in reference to a **background image**. It is assumed otherwise this doesn’t matter too much and is mostly a functionality of zoom. However, if a background image has a pre-drawn grid, or you need to size a grid to show in proper relation to an image, changing size makes more sense.
 
 ##### Grid Area
-**Grid** maps have effectively infinite area. The map grid will draw out as far as you go. **Hex maps** have a limited area (this is both a convention, of world maps tend to have set boundaries and a **performance** concern, as hex maps are slightly more compute heavy to draw).
+**Grid** maps have effectively infinite area. The map grid will draw out as far as you go. **Hex maps** have a limited area (this is both a convention, as world maps tend to have set boundaries and a **performance** concern, as hex maps are slightly more compute heavy to draw).
 
 #### Hex map style
 **Hex maps** can be **radial**, which draws hexes in **rings** radiating out from a center point, forming a hex of hexes; or **rectangular**, which is an offset hex pattern. The size of your map area can be configured for both of these in settings.
@@ -241,14 +242,14 @@ By default, **fog of war** is a solid color, but a tileable image may be chosen 
 ### Layers/Floors
 Maps may have **layers**. Functionally these are similar to “floors”, especially for grid maps, rather than actual drawing layers, although some creativity is certainly possible.
 
-**Layers** are added from the **layer** menu, accessed through the **Map Controls**. Layers may be renamed, and you can adjust how visible/invisible a layer will be. You may select icons for layers.
+**Layers** are added from the **layer** menu, accessed through the **Map Controls**. Layers may be renamed, and you can adjust how visible/invisible a layer will be from other layers for clarity. You may select icons for layers.
 
 You can link between layers with the inter-map linking functionality on **objects**.
 
 ### Regions (Hex Only)
 For **hex maps**, you can declare **regions** using one of the **region creation** tools in the **tool palette**. You can either **paint** regions, one cell at a time, or **select** by clicking out a polygon to define an area. Regions will use the selected color from the color palette at 30% opacity. You can still paint over regions, and they will coexist.
 
-You can name regions using the region creation toolbar that shows when creating or editing a region. The region toolbar will also show the number of hexes in the region. R
+You can name regions using the region creation toolbar that shows when creating or editing a region. The region toolbar will also show the number of hexes in the region. 
 
 The name of a **region** will show up over every region, kind of like a fixed text label, and will scale with zoom.
 
