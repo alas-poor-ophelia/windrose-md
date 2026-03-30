@@ -29,6 +29,7 @@ Windrose has two different styles of maps:
 # Features
 ### What Windrose Is
 - Graph paper in Obsidian, a flexible grid you can draw layouts for dungeons or worlds in, and add objects atop. Within this, there is a lot of flexibility, for instance, import an image of a pre-made map to a grid map, import images of your party and monsters for **object** icons, and link those objects to player or monster notes, and you have a battlemap.
+- A preliminary tool that can you start a design in, and then **export as an image** to trace in an external application like Dungeondraft (and then you could move the finished map back as a background if you wanted).
 
 ### What Windrose Isn’t
 - A full map design tool like Dungeondraft. New features are always getting added, and some will continue to take it closer, but it’s simply not practical to reinvent the entire wheel inside Obsidian.

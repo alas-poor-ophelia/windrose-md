@@ -1129,33 +1129,35 @@ const editingLayer = dc.useMemo(() => {
             onFreeformToggle={() => setFreeformPlacementMode(prev => !prev)}
           />
 
-          {/* Layer Controls Panel (Z-Layer System) */}
-          <LayerControls
-            mapData={mapData}
-            onLayerSelect={handleLayerSelect}
-            onLayerAdd={handleLayerAdd}
-            onLayerDelete={handleLayerDelete}
-            onLayerReorder={handleLayerReorder}
-            onToggleShowLayerBelow={handleToggleShowLayerBelow}
-            onSetLayerBelowOpacity={handleSetLayerBelowOpacity}
-            onEditLayer={setEditingLayerId}
-            sidebarCollapsed={mapData.sidebarCollapsed || false}
-            isOpen={showLayerPanel}
-          />
-
-          {/* Region Panel (hex maps only) */}
-          {mapData.mapType === 'hex' && (
-            <RegionPanel
-              regions={mapData.regions || []}
-              onRegionsChange={handleRegionsChange}
-              onEditRegion={(regionId: string) => {
-                // Dispatch to RegionLayer's edit mode via custom event
-                document.dispatchEvent(new CustomEvent('windrose:edit-region', { detail: { regionId } }));
-              }}
+          {/* Left side panels container — layers + regions stacked */}
+          <div className={`dmt-left-panels ${mapData.sidebarCollapsed ? 'sidebar-closed' : 'sidebar-open'}`}>
+            {/* Layer Controls Panel (Z-Layer System) */}
+            <LayerControls
+              mapData={mapData}
+              onLayerSelect={handleLayerSelect}
+              onLayerAdd={handleLayerAdd}
+              onLayerDelete={handleLayerDelete}
+              onLayerReorder={handleLayerReorder}
+              onToggleShowLayerBelow={handleToggleShowLayerBelow}
+              onSetLayerBelowOpacity={handleSetLayerBelowOpacity}
+              onEditLayer={setEditingLayerId}
               sidebarCollapsed={mapData.sidebarCollapsed || false}
-              isOpen={showRegionPanel}
+              isOpen={showLayerPanel}
             />
-          )}
+
+            {/* Region Panel (hex maps only) */}
+            {mapData.mapType === 'hex' && (
+              <RegionPanel
+                regions={mapData.regions || []}
+                onRegionsChange={handleRegionsChange}
+                onEditRegion={(regionId: string) => {
+                  document.dispatchEvent(new CustomEvent('windrose:edit-region', { detail: { regionId } }));
+                }}
+                sidebarCollapsed={mapData.sidebarCollapsed || false}
+                isOpen={showRegionPanel}
+              />
+            )}
+          </div>
 
           {/* For hex maps, override northDirection to 0 for rendering while keeping real value for compass display */}
           {/* This allows the compass to show and persist the north direction without actually rotating hex maps */}
