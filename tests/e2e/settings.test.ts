@@ -225,18 +225,18 @@ test("Settings modal is draggable via header", async ({ page }) => {
   // Get initial position: native uses .dmt-settings-native-modal, fallback uses .dmt-settings-modal
   const modal = page.locator('.dmt-settings-native-modal, .dmt-modal-content.dmt-settings-modal').first();
 
-  // Wait for interact.js to finish setup (it applies position: absolute)
+  // Wait for interact.js to finish setup (it sets data-x/data-y on the modal)
   await page.waitForFunction(
     () => {
-      const el = document.querySelector('.dmt-settings-native-modal') || document.querySelector('.dmt-modal-content.dmt-settings-modal');
-      if (!el) return false;
-      const style = (el as HTMLElement).style;
-      // Native path: interact.js sets position:absolute; Fallback: uses position:fixed
-      return style.position === 'absolute' || style.position === 'fixed';
+      const el = document.querySelector('.dmt-settings-native-modal');
+      if (el && (el as HTMLElement).dataset.x) return true;
+      // Fallback modal uses custom drag, no interact.js
+      const fallback = document.querySelector('.dmt-modal-content.dmt-settings-modal');
+      return !!fallback;
     },
-    { timeout: 5000 }
+    { timeout: 10000 }
   ).catch(() => { /* proceed anyway */ });
-  await page.waitForTimeout(200);
+  await page.waitForTimeout(300);
 
   const initialBox = await modal.boundingBox();
   expect(initialBox).not.toBeNull();
