@@ -1,30 +1,42 @@
-## Version 1.5.8
-Some freehand polish, some new flexibility for objects, and the beginning of proper Obsidian API integration.
+## Version 1.6.0
+And finally, the long promised beginning of the "hex maps" releases is here! Just like 1.5.x was the "dungeon release", I plan to do several point releases focused around hex maps. Some of it will doubtlessly affect grid maps as well, and bug fixes will be unaffected, but for now, here's the first release of new hex map functionality.
 
-#### **WARNING:** THE PLUGIN WILL BE BECOMING MANDATORY WITHIN THE NEXT 2-3 RELEASES. FOR NOW, IT REMAINS OPTIONAL OVERALL, BUT WINDROSE IS MOVING IN A DIRECTION THAT WILL MAKE KEEPING THE PLUGIN OPTIONAL TOO MUCH UPKEEP.
+Also, I've started work on what will likely become a very re-imagined README.md (the frontpage of this project on GitHub), as well as the basis for more detailed actual docs. For now, that is a Feature List, providing a full list of what functionality WindroseMD supports, as that list did not exist anywhere in one place.
+
+That is also now linked from the top of the README, just so it's findable. I'll be fleshing out all the documentation and promo stuff over the next few releases, so keep an eye out for that.
 
 ### New Features
-- Freeform object placement.
-	- Objects can now be "unlocked" from their grid cell, allowing free world-space movement similar to how text labels work. Hold Alt+Shift and click to place an object at an arbitrary position, or use the new toggle in the selection toolbar to convert an existing object between grid-anchored and freeform.
-	- Freeform objects use diamond-shaped selection handles to visually distinguish them from grid-anchored ones.
-	- Dragging freeform objects uses continuous world-space movement rather than snapping to grid cells.
-- Per-map object set selection.
-	- You can now swap which object set is active on a per-map basis, right from the map settings. No more being locked into a single global set across all your maps.
-- Obsidian API integration.
-	- Windrose now hooks into native Obsidian APIs via the companion plugin for a handful of UI elements. Note linking, text label editing, and parts of the map settings modal now use native Obsidian modals (with autocomplete, native color pickers, etc.) when the plugin is installed.
-	- If the plugin isn't installed or something goes wrong, everything falls back to the existing Preact-based UI, so nothing should break.
+- Radial hex maps
+	- Hex maps can now be rendered radially, rather than needing to rely only on a radial coordinate overlay on a rectangular grid.
+	- This can be adjusted in **Map Settings**.
+	- For now, radial coordinates on a rectangular grid are still supported. This may change, as that was more of a shortcut/bandaid until the feature was formally added.
+- Regions
+	- **Regions** are a new layer/construct for hex maps, which allow you to declare one or more hexes as a region, each of which will have their own color and label, making them distinct "zones" of your hex map.  All tools should work as normal with them.
+	- A new tool group, **Regions** has been added to the tool palette. It has two tools, both centered around creating new Regions.
+		- **Paint Region** allows you to define a region one hex at a time, just like painting the map.
+		- **Define Boundaries** lets you encircle an area to define as a region. Click/tap a point on the map, and click again to define a polygonal boundary. Double click/tap to close.
+			- Honestly this one is a bit experimental and maybe a bit awkward, but should still be better than clicking individual hexes would be for particularly large regions.
+	- When defining a region, a Region toolbar will appear that shows how many hexes you have selected in this region, and allows you to name and save the region.
+	- A new button has been added to the **Map Controls** (near the button to open the Layers menu) to open the new Regions sidebar.
+		- The Regions sidebar shows a list of all defined regions on the map. Clicking the name of a region will center the map on that region. Clicking the Eye button for a region will show or hide that region on the map.
+	- Regions can be edited, either by right clicking (or long pressing on touch devices) any hex of a region and selecting the option, or by clicking or tapping an existing region with either Region creation tool.
+- Sub-maps
+	- Hex maps can now have nested sub-maps, which allows you to drill down from one hex into another hex map. Think clicking a city hex on the world map to show a hex map of the city in more detail. And then even clicking a district hex on the city map to drill down even further.
+	- Sub-maps can be created from the right-click context menu, or by double clicking/tapping any hex. Doing this will automatically open a new sub-map.
+	- When in a sub-map, you can understand where you're at with the new breadcrumbs view, located between the map name and the tool palette.
+	- Sub-maps can be re-named by changing the name of the map when viewing one.
+	- In theory, you can nest infinitely, but I've only tested about 3 deep.
+	- Hexes with sub-maps indicate that they have one with a diamond icon in the center of the hex. This will only show up if you have made changes to a sub-map/the sub-map has data.
+	- By default, sub-maps will show up as radial maps, with a size of 7 rings. This can be adjusted in the Map Settings menu the same way you would for changing the size/style of a top level hex map.
+	- Each sub-map is essentially its entirely own instance of Windrose for now, which means that settings should be individually adjustable for each layer. This will probably be modified at least slightly, for UX clarity if nothing else going forwards.
 
 ### Improvements
-- The "close" indicator for freehand shapes is now much more visually obvious, making it clearer when your shape is about to snap shut.
-- Rectangle-style tool previews (size overlay, affected area highlight) have been extended to the area select and clear rectangle tools, not just fill rectangle/circle.
-- Added a new visual overlay (diamond indicator) when holding Alt+Shift on a selected object to indicate freeform placement mode, matching the existing arrow overlay for Edge Snap (Alt).
-- Image Adjustment Mode on grid maps now includes a grid size control, making it easier to align Windrose's grid with a pre-existing grid on your background image without needing to bounce back and forth between tabs.
+- The Tool Palette has been slightly reorganized.
+	- The clear rectangle tool has been moved into a group with the Eraser
+	- Fill circle, Fill rectangle, and Diagonal fill have been consolidated into a single group
+	- "Edge line" has been removed from the fill rectangle sub-menu (not sure why that seemed like a good idea at the time) to become its own top level tool. It has also been renamed to "Paint Line" which I think is a bit clearer.
+- As alluded to above, I've introduced a new Context menu pattern, using Obsidian's native context menu API. For now this is just being used for hex map regions/sub-maps, but the pattern will likely be used in some other places going forwards, or backported to places that used different UIs. Let me know what you think.
 
 ### Bug Fixes
-- Fixed an issue where the rectangle tool and clear area tool preview was offset from where it should have been.
-- Fixed a bug where freehand shape interiors weren't scaling properly with zoom, causing visual misalignment at non-default zoom levels.
-- Fixed a bug where freehand shape borders wouldn't visually merge with adjacent freehand shapes the way painted cells do.
-- Fixed a bug where freehand shapes would lose their fill color and turn black when the compass was rotated to East or West orientations, particularly when abutting normal painted cells.
-- Fixed the Edge Snap overlay (the one that appears when holding Alt on a selected object) which was, to put it generously, completely busted.
-- Fixed several bugs with background image handling in Image Adjustment Mode, particularly around interactive repositioning not behaving correctly.
-- Fixed a bug where the layer menu could obstruct clicks.
+- Fixed some UI bugs with the Map Settings modal
+- Reverted out the non-functional fix for the Color Palette automatically closing itself right after it opened on Linux, as that didn't fix the bug, and introduced a new issue where the Color Palette couldn't be closed by clicking outside of it. You can now once again close the palette by clicking outside of it.
