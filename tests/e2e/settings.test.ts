@@ -68,10 +68,10 @@ test("Settings modal has correct tabs for grid map", async ({ page }) => {
   const tabCount = await tabs.count();
   expect(tabCount).toBe(4); // Appearance, Background, Measurement, Preferences
 
-  // Verify tab labels
+  // Verify tab labels (trim whitespace from textContent)
   const tabTexts: string[] = [];
   for (let i = 0; i < tabCount; i++) {
-    tabTexts.push(await tabs.nth(i).textContent() || "");
+    tabTexts.push((await tabs.nth(i).textContent() || "").trim());
   }
   expect(tabTexts).toContain("Appearance");
   expect(tabTexts).toContain("Background");
@@ -94,10 +94,10 @@ test("Settings modal has Hex Grid tab for hex maps", async ({ page }) => {
   const tabCount = await tabs.count();
   expect(tabCount).toBe(4); // Appearance, Hex Grid, Measurement, Preferences
 
-  // Verify Hex Grid tab exists
+  // Verify Hex Grid tab exists (trim whitespace from textContent)
   const tabTexts: string[] = [];
   for (let i = 0; i < tabCount; i++) {
-    tabTexts.push(await tabs.nth(i).textContent() || "");
+    tabTexts.push((await tabs.nth(i).textContent() || "").trim());
   }
   expect(tabTexts).toContain("Hex Grid");
 
@@ -224,6 +224,20 @@ test("Settings modal is draggable via header", async ({ page }) => {
 
   // Get initial position: native uses .dmt-settings-native-modal, fallback uses .dmt-settings-modal
   const modal = page.locator('.dmt-settings-native-modal, .dmt-modal-content.dmt-settings-modal').first();
+
+  // Wait for interact.js to finish setup (it applies position: absolute)
+  await page.waitForFunction(
+    () => {
+      const el = document.querySelector('.dmt-settings-native-modal') || document.querySelector('.dmt-modal-content.dmt-settings-modal');
+      if (!el) return false;
+      const style = (el as HTMLElement).style;
+      // Native path: interact.js sets position:absolute; Fallback: uses position:fixed
+      return style.position === 'absolute' || style.position === 'fixed';
+    },
+    { timeout: 5000 }
+  ).catch(() => { /* proceed anyway */ });
+  await page.waitForTimeout(200);
+
   const initialBox = await modal.boundingBox();
   expect(initialBox).not.toBeNull();
 
@@ -239,7 +253,7 @@ test("Settings modal is draggable via header", async ({ page }) => {
   await page.mouse.down();
   await page.mouse.move(startX + 50, startY + 50, { steps: 5 });
   await page.mouse.up();
-  await page.waitForTimeout(100);
+  await page.waitForTimeout(200);
 
   // Check that position changed
   const newBox = await modal.boundingBox();
