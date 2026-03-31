@@ -19,7 +19,7 @@ const { requireModuleByName } = await dc.require(pathResolverPath);
 
 const { ModalPortal } = await requireModuleByName("ModalPortal.tsx");
 const { isBridgeAvailable, NativeModalPortal } = await requireModuleByName("obsidianBridge.ts");
-const { MapSettingsProvider, useMapSettings } = await requireModuleByName("MapSettingsContext.tsx");
+const { MapSettingsContext, MapSettingsProvider, useMapSettings } = await requireModuleByName("MapSettingsContext.tsx");
 const { AppearanceTab } = await requireModuleByName("AppearanceTab.tsx");
 const { HexGridTab } = await requireModuleByName("HexGridTab.tsx");
 const { GridBackgroundTab } = await requireModuleByName("GridBackgroundTab.tsx");
@@ -447,6 +447,7 @@ function FallbackModalContent(): React.ReactElement | null {
  * Renders native Obsidian modal when bridge is available, fallback otherwise.
  */
 function MapSettingsModalContent(): React.ReactElement | null {
+  const ctx = useMapSettings();
   const {
     isOpen,
     activeTab,
@@ -456,7 +457,7 @@ function MapSettingsModalContent(): React.ReactElement | null {
     isLoading,
     handleSave,
     handleCancel
-  } = useMapSettings();
+  } = ctx;
 
   if (!isOpen) return null;
 
@@ -471,6 +472,7 @@ function MapSettingsModalContent(): React.ReactElement | null {
       onClose={handleCancel}
       draggable
       resizable
+      contextBridge={(children: unknown) => h(MapSettingsContext.Provider, { value: ctx }, children)}
     >
       <div class="dmt-settings-modal">
         <TabContent tabs={tabs} activeTab={activeTab} setActiveTab={setActiveTab} mapType={mapType} />
