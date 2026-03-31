@@ -378,7 +378,8 @@ const useEventCoordinator = ({
 
         const regionHandlers = getHandlers('region');
         if (regionHandlers?.handlePointerDown) {
-          regionHandlers.handlePointerDown(e);
+          const eventToUse = isTouchEvent ? syntheticEvent : e;
+          regionHandlers.handlePointerDown(eventToUse);
         }
       }
     };
@@ -812,6 +813,7 @@ const useEventCoordinator = ({
 
   // Long-press timer for touch context menu
   const longPressTimerRef = dc.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastTapRef = dc.useRef<{ time: number; x: number; y: number } | null>(null);
 
   dc.useEffect(() => {
     const canvas = canvasRef.current;
@@ -854,6 +856,26 @@ const useEventCoordinator = ({
         clearTimeout(longPressTimerRef.current);
         longPressTimerRef.current = null;
       }
+      lastTapRef.current = null;
+    };
+
+    const handleTouchEndDoubleTap = (e: TouchEvent): void => {
+      if (e.changedTouches.length !== 1) return;
+      const touch = e.changedTouches[0];
+      const now = Date.now();
+      const last = lastTapRef.current;
+
+      if (last && now - last.time < 300) {
+        const dx = touch.clientX - last.x;
+        const dy = touch.clientY - last.y;
+        if (dx * dx + dy * dy < 900) {
+          lastTapRef.current = null;
+          handleCanvasDoubleClick({ clientX: touch.clientX, clientY: touch.clientY, preventDefault: () => {} } as unknown as MouseEvent);
+          return;
+        }
+      }
+
+      lastTapRef.current = { time: now, x: touch.clientX, y: touch.clientY };
     };
 
     canvas.addEventListener('mousedown', handleMouseDown);
@@ -862,6 +884,7 @@ const useEventCoordinator = ({
     canvas.addEventListener('touchstart', handleTouchStartForLongPress as EventListener);
     canvas.addEventListener('touchmove', cancelLongPress);
     canvas.addEventListener('touchend', cancelLongPress);
+    canvas.addEventListener('touchend', handleTouchEndDoubleTap);
     canvas.addEventListener('mousemove', handlePointerMove as EventListener);
     canvas.addEventListener('touchmove', handlePointerMove as EventListener);
     canvas.addEventListener('touchend', handlePointerUp as EventListener);
@@ -878,6 +901,7 @@ const useEventCoordinator = ({
       canvas.removeEventListener('touchstart', handleTouchStartForLongPress as EventListener);
       canvas.removeEventListener('touchmove', cancelLongPress);
       canvas.removeEventListener('touchend', cancelLongPress);
+      canvas.removeEventListener('touchend', handleTouchEndDoubleTap);
       canvas.removeEventListener('mousemove', handlePointerMove as EventListener);
       canvas.removeEventListener('touchmove', handlePointerMove as EventListener);
       canvas.removeEventListener('touchend', handlePointerUp as EventListener);
