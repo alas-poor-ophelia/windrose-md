@@ -22,16 +22,8 @@ export interface RendererSelectedItem {
   data?: MapObject | TextLabel;
 }
 
-// ===========================================
-// Layer Visibility
-// ===========================================
-
-/** Layer visibility options */
-export interface LayerVisibility {
-  objects: boolean;
-  textLabels: boolean;
-  hexCoordinates: boolean;
-}
+// Re-export LayerVisibility from canonical location
+export type { LayerVisibility } from '../contexts/context.types';
 
 // ===========================================
 // Theme Types

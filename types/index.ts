@@ -175,15 +175,25 @@ export type {
 // ===========================================
 // Context Types
 // ===========================================
-// Note: Context value types (MapSettingsContextValue, MapSelectionContextValue,
-// EventHandlerContextValue) are defined inline in their component files.
-// Import directly from component if needed - hooks provide type inference.
 export type {
   EdgeInfo,
   Edge,
   ExtendedGeometry,
+  DrawingLayerState,
+  PanZoomLayerState,
   MapStateContextValue,
   MapOperationsContextValue,
+  SelectableItemType,
+  SelectedItem,
+  AreaSelectPosition,
+  DragStartPosition,
+  GroupDragOffset,
+  LayerVisibility,
+  MousePosition,
+  HoveredObject,
+  ItemUpdate,
+  GroupDragInitialState,
+  MapSelectionContextValue,
 } from './contexts/context.types';
 
 // ===========================================
@@ -289,10 +299,8 @@ export type {
 } from './hooks/canvasInteraction.types';
 
 export type {
-  SelectedItem,
   DragOffset,
   DragOffsetsMap,
-  GroupDragInitialState,
   ObjectDragUpdate,
   TextDragUpdate,
   PositionUpdate,
@@ -377,7 +385,6 @@ export type {
 
 export type {
   RendererSelectedItem,
-  LayerVisibility,
   RendererTheme,
   RendererViewState,
   RenderCanvas,
