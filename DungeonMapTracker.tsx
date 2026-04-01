@@ -55,8 +55,8 @@ const { MapSettingsModal } = await requireModuleByName("MapSettingsModal.tsx");
 const { getTheme, getEffectiveSettings } = await requireModuleByName("settingsAccessor.ts");
 const { DEFAULTS } = await requireModuleByName("dmtConstants.ts");
 const { getColorByHex, isDefaultColor } = await requireModuleByName("colorOperations.ts");
-const { axialToOffset, offsetToAxial, isWithinOffsetBounds } = await requireModuleByName("offsetCoordinates.ts");
 const { ImageAlignmentMode } = await requireModuleByName("ImageAlignmentMode.tsx");
+const { useAlignmentMode } = await requireModuleByName("useAlignmentMode.ts");
 const { ModalPortal } = await requireModuleByName("ModalPortal.tsx");
 
 const { getActiveLayer } = await requireModuleByName("layerAccessor.ts");
@@ -203,8 +203,10 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     showSettingsModal, setShowSettingsModal,
     showPluginInstaller, setShowPluginInstaller,
     editingLayerId, setEditingLayerId,
-    editingLayer, pluginInstalled
-  } = usePanelState({ mapData });
+    editingLayer, pluginInstalled,
+    handleSettingsClick, handleSettingsSave, handleSettingsClose: panelSettingsClose,
+    handlePluginInstall, handlePluginDecline
+  } = usePanelState({ mapData, updateMapData });
 
   // UI layout state (expand/collapse, panels, focus, footer)
   const {
@@ -216,11 +218,13 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     showRegionPanel, setShowRegionPanel
   } = useUILayout({ mapData, updateMapData, showPluginInstaller });
 
-  // Image alignment mode state
-  const [isAlignmentMode, setIsAlignmentMode] = dc.useState(false);
-  const [alignmentOffsetX, setAlignmentOffsetX] = dc.useState(0);
-  const [alignmentOffsetY, setAlignmentOffsetY] = dc.useState(0);
-  const [returningFromAlignment, setReturningFromAlignment] = dc.useState(false);
+  // Image alignment mode (extracted to useAlignmentMode hook)
+  const {
+    isAlignmentMode, alignmentOffsetX, alignmentOffsetY,
+    returningFromAlignment, setReturningFromAlignment,
+    handleOpenAlignmentMode, handleAlignmentOffsetChange,
+    handleAlignmentGridSizeChange, handleAlignmentApply, handleAlignmentCancel
+  } = useAlignmentMode({ mapData, updateMapData, setShowSettingsModal });
 
   // Layer visibility state (session-only, resets on reload)
   const [layerVisibility, setLayerVisibility] = dc.useState<LayerVisibilityState>({
@@ -321,21 +325,10 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   }, [updateMapData]);
 
 
-  // Handle plugin installation
-  const handlePluginInstall = (): void => {
-    setPluginInstalled(true);
-    setShowPluginInstaller(false);
-  };
-
-  // Handle plugin decline
-  const handlePluginDecline = (): void => {
-    if (mapData) {
-      updateMapData({
-        ...mapData,
-        settingsPluginDeclined: true
-      });
-    }
-    setShowPluginInstaller(false);
+  // Compose settings close with alignment reset
+  const handleSettingsClose = (): void => {
+    panelSettingsClose();
+    setReturningFromAlignment(false);
   };
 
   // Layer and history management (extracted to useLayerHistory hook)
@@ -533,194 +526,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   };
 
 
-  const handleSettingsClick = (): void => {
-    setShowSettingsModal(true);
-  };
 
-  const handleSettingsSave = (
-    settingsData: MapSettings,
-    preferencesData: UIPreferences,
-    hexBounds: HexBounds | null = null,
-    backgroundImage: BackgroundImage | null = null,
-    hexSize: number | null = null,
-    deleteOrphanedContent: boolean = false
-  ): void => {
-    if (!mapData) return;
-
-    const newMapData: MapData = {
-      ...mapData,
-      settings: settingsData,
-      uiPreferences: preferencesData,
-      objectSetId: settingsData.objectSetId ?? null
-    };
-
-    // Only update hexBounds for hex maps
-    if (hexBounds !== null && mapData.mapType === 'hex') {
-      newMapData.hexBounds = hexBounds;
-
-      // If requested, delete content that would be outside the new bounds
-      if (deleteOrphanedContent) {
-        const orientation = mapData.orientation || 'flat';
-        const isRadial = hexBounds.maxRing !== undefined;
-
-        const isInBounds = (q: number, r: number): boolean => {
-          if (isRadial) {
-            const ring = Math.max(Math.abs(q), Math.abs(r), Math.abs(q + r));
-            return ring <= hexBounds.maxRing!;
-          }
-          const { col, row } = axialToOffset(q, r, orientation);
-          return isWithinOffsetBounds(col, row, hexBounds);
-        };
-
-        // Check if a fog cell (offset coords) is within new bounds
-        const isFogCellInBounds = (col: number, row: number): boolean => {
-          if (isRadial) {
-            const { q, r } = offsetToAxial(col, row, orientation);
-            const ring = Math.max(Math.abs(q), Math.abs(r), Math.abs(q + r));
-            return ring <= hexBounds.maxRing!;
-          }
-          return isWithinOffsetBounds(col, row, hexBounds);
-        };
-
-        // Filter cells, objects, and fog across all layers to keep only those within new bounds
-        if (newMapData.layers && newMapData.layers.length > 0) {
-          newMapData.layers = newMapData.layers.map((layer: MapLayer) => {
-            const filteredCells = layer.cells?.filter((cell: Cell) =>
-              isInBounds(cell.q, cell.r)
-            );
-            const filteredObjects = layer.objects?.filter((obj: MapObject) =>
-              isInBounds(obj.position.x, obj.position.y)
-            );
-            const filteredFog = layer.fogOfWar?.foggedCells?.filter(
-              (fc: { col: number; row: number }) => isFogCellInBounds(fc.col, fc.row)
-            );
-            const fogChanged = filteredFog !== layer.fogOfWar?.foggedCells;
-            if (filteredCells === layer.cells && filteredObjects === layer.objects && !fogChanged) return layer;
-            return {
-              ...layer,
-              cells: filteredCells ?? [],
-              objects: filteredObjects ?? [],
-              ...(layer.fogOfWar && fogChanged ? {
-                fogOfWar: { ...layer.fogOfWar, foggedCells: filteredFog ?? [] }
-              } : {})
-            };
-          });
-        }
-      }
-    }
-
-    // Recenter viewport when switching between rectangular and radial bounds
-    if (hexBounds !== null && mapData.mapType === 'hex') {
-      const wasRadial = mapData.hexBounds?.maxRing !== undefined;
-      const isNowRadial = hexBounds.maxRing !== undefined;
-      if (wasRadial !== isNowRadial) {
-        if (isNowRadial) {
-          // Radial: center on axial origin (0,0) which is world (0,0)
-          newMapData.viewState = { ...mapData.viewState, center: { x: 0, y: 0 } };
-        } else {
-          // Back to rectangular: center on middle of rectangular bounds
-          const orientation = mapData.orientation || 'flat';
-          const hSize = hexSize ?? mapData.hexSize ?? 40;
-          const centerCol = Math.floor(hexBounds.maxCol / 2);
-          const centerRow = Math.floor(hexBounds.maxRow / 2);
-          const { q, r } = offsetToAxial(centerCol, centerRow, orientation);
-          let worldX: number, worldY: number;
-          if (orientation === 'flat') {
-            worldX = hSize * (3 / 2) * q;
-            worldY = hSize * (Math.sqrt(3) / 2 * q + Math.sqrt(3) * r);
-          } else {
-            worldX = hSize * (Math.sqrt(3) * q + Math.sqrt(3) / 2 * r);
-            worldY = hSize * (3 / 2) * r;
-          }
-          newMapData.viewState = { ...mapData.viewState, center: { x: worldX, y: worldY } };
-        }
-      }
-    }
-
-    // Update backgroundImage for both grid and hex maps (null clears it)
-    newMapData.backgroundImage = backgroundImage;
-
-    // Update hexSize if calculated from background image
-    if (hexSize !== null && mapData.mapType === 'hex') {
-      newMapData.hexSize = hexSize;
-    }
-
-    updateMapData(newMapData);
-
-    // Force re-render to apply new settings
-    setSettingsVersion((prev: number) => prev + 1);
-  };
-
-
-  const handleSettingsClose = (): void => {
-    setShowSettingsModal(false);
-    setReturningFromAlignment(false); // Reset flag when modal closes
-  };
-
-  // Image alignment mode handlers
-  const handleOpenAlignmentMode = dc.useCallback((currentX: number, currentY: number) => {
-    setAlignmentOffsetX(currentX);
-    setAlignmentOffsetY(currentY);
-    setIsAlignmentMode(true);
-    setShowSettingsModal(false); // Hide settings modal
-  }, []);
-
-  const handleAlignmentOffsetChange = dc.useCallback((newX: number, newY: number) => {
-    setAlignmentOffsetX(newX);
-    setAlignmentOffsetY(newY);
-
-    // Update the map data immediately for visual feedback
-    if (mapData && mapData.backgroundImage) {
-      updateMapData({
-        ...mapData,
-        backgroundImage: {
-          ...mapData.backgroundImage,
-          offsetX: newX,
-          offsetY: newY
-        }
-      });
-    }
-  }, [mapData, updateMapData]);
-
-  const handleAlignmentGridSizeChange = dc.useCallback((newSize: number) => {
-    if (mapData && mapData.backgroundImage) {
-      updateMapData({
-        ...mapData,
-        backgroundImage: {
-          ...mapData.backgroundImage,
-          imageGridSize: newSize
-        }
-      });
-    }
-  }, [mapData, updateMapData]);
-
-  const handleAlignmentApply = dc.useCallback((finalX: number, finalY: number) => {
-    // Offset values are already in mapData from handleAlignmentOffsetChange
-    setIsAlignmentMode(false);
-    setReturningFromAlignment(true); // Flag that we're returning from alignment
-    setShowSettingsModal(true); // Reopen settings modal
-  }, []);
-
-  const handleAlignmentCancel = dc.useCallback((originalX: number, originalY: number) => {
-    // Revert to original offset
-    setAlignmentOffsetX(originalX);
-    setAlignmentOffsetY(originalY);
-
-    if (mapData && mapData.backgroundImage) {
-      updateMapData({
-        ...mapData,
-        backgroundImage: {
-          ...mapData.backgroundImage,
-          offsetX: originalX,
-          offsetY: originalY
-        }
-      });
-    }
-
-    setIsAlignmentMode(false);
-    setReturningFromAlignment(true); // Flag that we're returning from alignment
-    setShowSettingsModal(true); // Reopen settings modal
-  }, [mapData, updateMapData]);
 
   // Loading state
   if (isLoading) {
