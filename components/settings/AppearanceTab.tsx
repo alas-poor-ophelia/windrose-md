@@ -12,7 +12,7 @@ const { requireModuleByName } = await dc.require(pathResolverPath);
 
 const { ColorPicker } = await requireModuleByName("ColorPicker.tsx");
 const { CollapsibleSection } = await requireModuleByName("CollapsibleSection.tsx");
-const { useMapSettings } = await requireModuleByName("MapSettingsContext.tsx");
+const { useAppearance, useModalShell } = await requireModuleByName("MapSettingsContext.tsx");
 const { SettingItem, SettingHeading } = await requireModuleByName("SettingItem.tsx");
 const { NativeToggle, NativeSlider } = await requireModuleByName("NativeControls.tsx");
 
@@ -36,7 +36,7 @@ function ColorPickerItem({ colorKey, label, defaultColor, align = 'left' }: Colo
     pendingCustomColorRef,
     handleColorChange,
     globalSettings
-  } = useMapSettings();
+  } = useAppearance();
 
   return (
     <div class="dmt-color-grid-item">
@@ -101,7 +101,7 @@ function FogOfWarSection(): React.ReactElement {
     handleFogImageSelect,
     handleFogImageClear,
     THEME
-  } = useMapSettings();
+  } = useAppearance();
 
   const [userToggled, setUserToggled] = dc.useState(false);
   const [isOpen, setIsOpen] = dc.useState(false);
@@ -320,8 +320,8 @@ function FogOfWarSection(): React.ReactElement {
  * Appearance tab content
  */
 function AppearanceTab(): React.ReactElement {
+  const { mapType } = useModalShell();
   const {
-    mapType,
     useGlobalSettings,
     overrides,
     globalSettings,
@@ -331,7 +331,7 @@ function AppearanceTab(): React.ReactElement {
     handleLineWidthChange,
     handleColorChange,
     THEME
-  } = useMapSettings();
+  } = useAppearance();
 
   return (
     <div class="dmt-settings-tab-content">

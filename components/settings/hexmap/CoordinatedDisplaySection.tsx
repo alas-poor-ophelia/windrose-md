@@ -12,7 +12,7 @@ import type { HexColor } from '#types/core/common.types';
 const pathResolverPath = dc.resolvePath("pathResolver.ts");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
-const { useMapSettings } = await requireModuleByName("MapSettingsContext.tsx");
+const { useHexGrid, useAppearance } = await requireModuleByName("MapSettingsContext.tsx");
 const { ColorPickerItem } = await requireModuleByName("AppearanceTab.tsx");
 
 /** Coordinate display mode type */
@@ -45,7 +45,7 @@ function CoordinateModeSection(): React.ReactElement {
   const {
     coordinateDisplayMode,
     setCoordinateDisplayMode
-  } = useMapSettings() as CoordinateModeContext;
+  } = useHexGrid();
 
   return (
     <div class="dmt-form-group" style={{ marginTop: '20px' }}>
@@ -100,7 +100,7 @@ function CoordinateColorsSection(): React.ReactElement {
   const {
     useGlobalSettings,
     THEME
-  } = useMapSettings() as CoordinateColorsContext;
+  } = useAppearance();
 
   return (
     <div class="dmt-form-group" style={{ marginTop: '20px' }}>

@@ -10,7 +10,7 @@ import type { MapType } from '#types/core/map.types';
 const pathResolverPath = dc.resolvePath("pathResolver.ts");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
-const { useMapSettings } = await requireModuleByName("MapSettingsContext.tsx");
+const { useBackgroundImage, useModalShell } = await requireModuleByName("MapSettingsContext.tsx");
 const { CollapsibleSection } = await requireModuleByName("CollapsibleSection.tsx");
 const { SettingItem } = await requireModuleByName("SettingItem.tsx");
 const { NativeSlider } = await requireModuleByName("NativeControls.tsx");
@@ -41,7 +41,6 @@ interface GridBackgroundContext {
  */
 function GridBackgroundTab(): React.ReactElement | null {
   const {
-    mapType,
     backgroundImagePath,
     backgroundImageDisplayName,
     setBackgroundImageDisplayName,
@@ -58,7 +57,8 @@ function GridBackgroundTab(): React.ReactElement | null {
     imageGridSize,
     setImageGridSize,
     onOpenAlignmentMode
-  } = useMapSettings() as GridBackgroundContext;
+  } = useBackgroundImage();
+  const { mapType } = useModalShell();
 
   // Guard: only render for grid maps
   if (mapType !== 'grid') {

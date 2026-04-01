@@ -10,7 +10,7 @@ import type { DiagonalRule, DistanceDisplayFormat } from '#types/settings/settin
 const pathResolverPath = dc.resolvePath("pathResolver.ts");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
-const { useMapSettings } = await requireModuleByName("MapSettingsContext.tsx");
+const { useModalShell } = await requireModuleByName("MapSettingsContext.tsx");
 const { SettingItem } = await requireModuleByName("SettingItem.tsx");
 const { NativeToggle, NativeDropdown } = await requireModuleByName("NativeControls.tsx");
 
@@ -31,7 +31,7 @@ function MeasurementTab(): React.ReactElement {
     isHexMap,
     distanceSettings,
     setDistanceSettings
-  } = useMapSettings();
+  } = useModalShell();
 
   const handleToggleUseGlobal = (): void => {
     setDistanceSettings((prev: DistanceSettingsState) => ({

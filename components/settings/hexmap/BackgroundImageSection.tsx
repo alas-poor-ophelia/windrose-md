@@ -11,7 +11,7 @@ import type { ImageDimensions } from '#types/settings/settings.types';
 const pathResolverPath = dc.resolvePath("pathResolver.ts");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
-const { useMapSettings } = await requireModuleByName("MapSettingsContext.tsx");
+const { useBackgroundImage } = await requireModuleByName("MapSettingsContext.tsx");
 const { CollapsibleSection } = await requireModuleByName("CollapsibleSection.tsx");
 const { SettingItem } = await requireModuleByName("SettingItem.tsx");
 
@@ -40,7 +40,7 @@ function BackgroundImageSection(): React.ReactElement {
     handleImageSearch,
     handleImageSelect,
     handleImageClear
-  } = useMapSettings() as BackgroundImageContext;
+  } = useBackgroundImage();
 
   // Track if user has manually toggled (to override auto-collapse behavior)
   const [userToggled, setUserToggled] = dc.useState(false);

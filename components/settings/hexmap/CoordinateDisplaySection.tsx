@@ -10,7 +10,7 @@ import type { HexColor } from '#types/core/common.types';
 const pathResolverPath = dc.resolvePath("pathResolver.ts");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
-const { useMapSettings } = await requireModuleByName("MapSettingsContext.tsx");
+const { useHexGrid, useAppearance } = await requireModuleByName("MapSettingsContext.tsx");
 const { CollapsibleSection } = await requireModuleByName("CollapsibleSection.tsx");
 const { ColorPickerItem } = await requireModuleByName("AppearanceTab.tsx");
 const { SettingItem } = await requireModuleByName("SettingItem.tsx");
@@ -45,7 +45,7 @@ function CoordinateModeContent(): React.ReactElement {
   const {
     coordinateDisplayMode,
     setCoordinateDisplayMode
-  } = useMapSettings() as CoordinateModeContext;
+  } = useHexGrid();
 
   return (
     <SettingItem name="Display Mode" description="How coordinates appear when pressing C" vertical>
@@ -95,7 +95,7 @@ function CoordinateColorsContent(): React.ReactElement {
   const {
     useGlobalSettings,
     THEME
-  } = useMapSettings() as CoordinateColorsContext;
+  } = useAppearance();
 
   return (
     <SettingItem
@@ -133,7 +133,7 @@ function CoordinateColorsContent(): React.ReactElement {
  * Combined coordinate display section - collapsible, starts collapsed
  */
 function CoordinateDisplaySection(): React.ReactElement {
-  const { coordinateDisplayMode } = useMapSettings() as CoordinateModeContext;
+  const { coordinateDisplayMode } = useHexGrid();
 
   const subtitle = coordinateDisplayMode === 'rectangular' ? 'A1, B2, ...' : 'Ring-Position';
 

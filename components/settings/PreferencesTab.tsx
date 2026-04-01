@@ -8,7 +8,7 @@
 const pathResolverPath = dc.resolvePath("pathResolver.ts");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
-const { useMapSettings } = await requireModuleByName("MapSettingsContext.tsx");
+const { useModalShell, useAppearance } = await requireModuleByName("MapSettingsContext.tsx");
 const { saveMapImageToVault } = await requireModuleByName("exportOperations.ts");
 const { SettingItem, SettingHeading } = await requireModuleByName("SettingItem.tsx");
 const { NativeToggle } = await requireModuleByName("NativeControls.tsx");
@@ -24,16 +24,8 @@ interface ExportResult {
  * Preferences tab content
  */
 function PreferencesTab(): React.ReactElement {
-  const {
-    preferences,
-    useGlobalSettings,
-    overrides,
-    globalSettings,
-    handlePreferenceToggle,
-    handleColorChange,
-    mapData,
-    geometry
-  } = useMapSettings();
+  const { preferences, handlePreferenceToggle, mapData, geometry } = useModalShell();
+  const { useGlobalSettings, overrides, globalSettings, handleColorChange } = useAppearance();
 
   const [isExporting, setIsExporting] = dc.useState(false);
   const [exportError, setExportError] = dc.useState<string | null>(null);

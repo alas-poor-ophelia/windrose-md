@@ -19,7 +19,11 @@ const { requireModuleByName } = await dc.require(pathResolverPath);
 
 const { ModalPortal } = await requireModuleByName("ModalPortal.tsx");
 const { isBridgeAvailable, NativeModalPortal } = await requireModuleByName("obsidianBridge.ts");
-const { MapSettingsContext, MapSettingsProvider, useMapSettings } = await requireModuleByName("MapSettingsContext.tsx");
+const {
+  MapSettingsProvider,
+  ModalShellContext, AppearanceContext, BackgroundImageContext, HexGridContext,
+  useModalShell, useAppearance, useBackgroundImage, useHexGrid,
+} = await requireModuleByName("MapSettingsContext.tsx");
 const { AppearanceTab } = await requireModuleByName("AppearanceTab.tsx");
 const { HexGridTab } = await requireModuleByName("HexGridTab.tsx");
 const { GridBackgroundTab } = await requireModuleByName("GridBackgroundTab.tsx");
@@ -165,7 +169,7 @@ function FallbackModalContent(): React.ReactElement | null {
     handleSave,
     handleCancel,
     mouseDownTargetRef
-  } = useMapSettings();
+  } = useModalShell();
 
   const [position, setPosition] = dc.useState<ModalPosition>({ x: null, y: null });
   const [size, setSize] = dc.useState<ModalSize>(loadPersistedSize);
@@ -453,7 +457,10 @@ function FallbackModalContent(): React.ReactElement | null {
  * Renders native Obsidian modal when bridge is available, fallback otherwise.
  */
 function MapSettingsModalContent(): React.ReactElement | null {
-  const ctx = useMapSettings();
+  const shellCtx = useModalShell();
+  const appearanceCtx = useAppearance();
+  const bgImageCtx = useBackgroundImage();
+  const hexGridCtx = useHexGrid();
   const {
     isOpen,
     activeTab,
@@ -463,13 +470,19 @@ function MapSettingsModalContent(): React.ReactElement | null {
     isLoading,
     handleSave,
     handleCancel
-  } = ctx;
+  } = shellCtx;
 
   if (!isOpen) return null;
 
   if (!isBridgeAvailable()) {
     return <FallbackModalContent />;
   }
+
+  const contextBridge = (children: unknown) =>
+    h(ModalShellContext.Provider, { value: shellCtx },
+      h(AppearanceContext.Provider, { value: appearanceCtx },
+        h(BackgroundImageContext.Provider, { value: bgImageCtx },
+          h(HexGridContext.Provider, { value: hexGridCtx }, children))));
 
   return (
     <NativeModalPortal
@@ -478,7 +491,7 @@ function MapSettingsModalContent(): React.ReactElement | null {
       onClose={handleCancel}
       draggable
       resizable
-      contextBridge={(children: unknown) => h(MapSettingsContext.Provider, { value: ctx }, children)}
+      contextBridge={contextBridge}
     >
       <div class="dmt-settings-modal">
         <TabContent tabs={tabs} activeTab={activeTab} setActiveTab={setActiveTab} mapType={mapType} />

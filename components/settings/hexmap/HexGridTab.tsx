@@ -11,7 +11,7 @@ import type { MapType } from '#types/core/map.types';
 const pathResolverPath = dc.resolvePath("pathResolver.ts");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
-const { useMapSettings } = await requireModuleByName("MapSettingsContext.tsx");
+const { useModalShell } = await requireModuleByName("MapSettingsContext.tsx");
 const { BackgroundImageSection } = await requireModuleByName("BackgroundImageSection.tsx");
 const { SizingModeSection } = await requireModuleByName("SizingModeSection.tsx");
 const { BoundsSection } = await requireModuleByName("BoundsSection.tsx");
@@ -21,7 +21,7 @@ const { CoordinateDisplaySection } = await requireModuleByName("CoordinateDispla
  * Hex Grid tab content - composes all hex-specific settings sections
  */
 function HexGridTab(): React.ReactElement | null {
-  const { mapType } = useMapSettings() as { mapType: MapType };
+  const { mapType } = useModalShell();
 
   // Guard: only render for hex maps
   if (mapType !== 'hex') {

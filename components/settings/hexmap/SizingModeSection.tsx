@@ -21,7 +21,7 @@ import type {
 const pathResolverPath = dc.resolvePath("pathResolver.ts");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
-const { useMapSettings } = await requireModuleByName("MapSettingsContext.tsx");
+const { useBackgroundImage, useHexGrid } = await requireModuleByName("MapSettingsContext.tsx");
 const { CollapsibleSection } = await requireModuleByName("CollapsibleSection.tsx");
 const { SettingItem } = await requireModuleByName("SettingItem.tsx");
 const { NativeSlider } = await requireModuleByName("NativeControls.tsx");
@@ -88,7 +88,6 @@ function DensityModeContent(): React.ReactElement {
   const {
     gridDensity,
     customColumns,
-    hexBounds,
     imageDimensions,
     orientation,
     handleDensityChange,
@@ -97,7 +96,8 @@ function DensityModeContent(): React.ReactElement {
     calculateGridFromColumns,
     hexSizeToMeasurement,
     MEASUREMENT_EDGE
-  } = useMapSettings() as DensityModeContext;
+  } = useBackgroundImage();
+  const { hexBounds } = useHexGrid();
 
   return (
     <div>
@@ -210,7 +210,6 @@ function MeasurementModeContent(): React.ReactElement {
   const {
     measurementMethod,
     measurementSize,
-    hexBounds,
     fineTuneOffset,
     handleMeasurementMethodChange,
     handleMeasurementSizeChange,
@@ -221,7 +220,8 @@ function MeasurementModeContent(): React.ReactElement {
     measurementToHexSize,
     getFineTuneRange,
     orientation
-  } = useMapSettings() as MeasurementModeContext;
+  } = useBackgroundImage();
+  const { hexBounds } = useHexGrid();
 
   const baseHexSize = measurementToHexSize(measurementSize, measurementMethod, orientation);
   const fineTuneEnabled = fineTuneOffset !== 0;
@@ -369,7 +369,7 @@ function SizingModeSection(): React.ReactElement | null {
     setImageOffsetY,
     handleSizingModeChange,
     onOpenAlignmentMode
-  } = useMapSettings() as SizingModeSectionContext;
+  } = useBackgroundImage();
 
   // Only show when image is selected and dimensions are loaded
   if (!backgroundImagePath || !imageDimensions) {

@@ -279,8 +279,91 @@ export interface FineTuneRange {
   step: number;
 }
 
-/** Utility functions exposed by context */
-export interface MapSettingsUtilities {
+// ===========================================
+// Context Value Types
+// ===========================================
+
+/** Modal shell context - UI chrome + tab-specific data for the settings modal */
+export interface ModalShellContextValue {
+  isOpen: boolean;
+  activeTab: SettingsTabId;
+  tabs: SettingsTab[];
+  mapType: MapType;
+  isHexMap: boolean;
+  isLoading: boolean;
+  setActiveTab: (tab: SettingsTabId) => void;
+  handleSave: () => void;
+  handleCancel: () => void;
+  mouseDownTargetRef: React.MutableRefObject<EventTarget | null>;
+  // Measurement tab fields
+  distanceSettings: DistanceSettings;
+  setDistanceSettings: (updates: Partial<DistanceSettings>) => void;
+  // Preferences tab fields
+  preferences: ModalPreferences;
+  handlePreferenceToggle: (key: keyof ModalPreferences) => void;
+  // Export (PreferencesTab)
+  mapData: MapData | null;
+  geometry: IGeometry | null;
+}
+
+/** Appearance context - colors, overrides, fog image */
+export interface AppearanceContextValue {
+  useGlobalSettings: boolean;
+  overrides: Partial<PluginSettings>;
+  activeColorPicker: string | null;
+  globalSettings: PluginSettings;
+  objectSetId: string | null;
+  THEME: Record<string, unknown>;
+  fogImageDisplayName: string;
+  fogImageSearchResults: string[];
+  pendingCustomColorRef: React.MutableRefObject<HexColor | null>;
+  handleToggleUseGlobal: () => void;
+  handleColorChange: (key: string, value: HexColor) => void;
+  handleLineWidthChange: (value: number) => void;
+  setActiveColorPicker: (picker: string | null) => void;
+  handleObjectSetChange: (setId: string | null) => void;
+  setFogImageDisplayName: (name: string) => void;
+  handleFogImageSearch: (searchTerm: string) => Promise<void>;
+  handleFogImageSelect: (displayName: string) => Promise<void>;
+  handleFogImageClear: () => void;
+}
+
+/** Background image context - image, sizing, density, measurement */
+export interface BackgroundImageContextValue {
+  backgroundImagePath: string | null;
+  backgroundImageDisplayName: string;
+  imageDimensions: ImageDimensions | null;
+  imageSearchResults: string[];
+  imageOpacity: number;
+  imageOffsetX: number;
+  imageOffsetY: number;
+  imageGridSize: number;
+  sizingMode: SizingMode;
+  gridDensity: GridDensity;
+  customColumns: number;
+  measurementMethod: MeasurementMethod;
+  measurementSize: number;
+  fineTuneOffset: number;
+  orientation: HexOrientation;
+  onOpenAlignmentMode?: (currentX: number, currentY: number) => void;
+  setBackgroundImageDisplayName: (name: string) => void;
+  handleImageSearch: (searchTerm: string) => Promise<void>;
+  handleImageSelect: (displayName: string) => Promise<void>;
+  handleImageClear: () => void;
+  setImageOpacity: (opacity: number) => void;
+  setImageOffsetX: (x: number) => void;
+  setImageOffsetY: (y: number) => void;
+  setImageGridSize: (size: number) => void;
+  handleSizingModeChange: (mode: SizingMode) => void;
+  handleDensityChange: (density: GridDensity) => void;
+  handleCustomColumnsChange: (columns: number) => void;
+  handleMeasurementMethodChange: (method: MeasurementMethod) => void;
+  handleMeasurementSizeChange: (size: number) => void;
+  handleFineTuneChange: (adjustedHexSize: number) => void;
+  handleFineTuneReset: () => void;
+  GRID_DENSITY_PRESETS: Record<GridDensity, number>;
+  MEASUREMENT_EDGE: MeasurementMethod;
+  MEASUREMENT_CORNER: MeasurementMethod;
   calculateGridFromColumns: (width: number, height: number, columns: number, orientation: HexOrientation) => GridCalculation;
   calculateGridFromMeasurement: (width: number, height: number, hexSize: number, orientation: HexOrientation) => GridCalculation;
   measurementToHexSize: (measurement: number, method: MeasurementMethod, orientation: HexOrientation) => number;
@@ -288,12 +371,22 @@ export interface MapSettingsUtilities {
   getFineTuneRange: (baseHexSize: number) => FineTuneRange;
 }
 
-/** Constants exposed by context */
-export interface MapSettingsConstants {
-  GRID_DENSITY_PRESETS: Record<GridDensity, number>;
-  MEASUREMENT_EDGE: MeasurementMethod;
-  MEASUREMENT_CORNER: MeasurementMethod;
-  THEME: Record<string, unknown>;
+/** Hex grid context - bounds, coordinates, resize confirmation */
+export interface HexGridContextValue {
+  hexBounds: HexBounds;
+  boundsShape: 'rectangular' | 'radial';
+  boundsLocked: boolean;
+  coordinateDisplayMode: CoordinateDisplayMode;
+  showResizeConfirm: boolean;
+  pendingBoundsChange: PendingBoundsChange | null;
+  orphanInfo: OrphanInfo | null;
+  handleHexBoundsChange: (axis: 'maxCol' | 'maxRow', value: string) => void;
+  handleBoundsShapeChange: (shape: 'rectangular' | 'radial') => void;
+  handleRadiusChange: (value: string) => void;
+  handleBoundsLockToggle: () => void;
+  setCoordinateDisplayMode: (mode: CoordinateDisplayMode) => void;
+  handleResizeConfirmDelete: () => void;
+  handleResizeConfirmCancel: () => void;
 }
 
 /** Complete MapSettingsContext value shape */
@@ -353,22 +446,36 @@ export interface MapSettingsProviderProps {
 }
 
 // ===========================================
-// Context
+// Contexts
 // ===========================================
 
-const MapSettingsContext = dc.createContext<MapSettingsContextValue | null>(null);
+const ModalShellContext = dc.createContext<ModalShellContextValue | null>(null);
+const AppearanceContext = dc.createContext<AppearanceContextValue | null>(null);
+const BackgroundImageContext = dc.createContext<BackgroundImageContextValue | null>(null);
+const HexGridContext = dc.createContext<HexGridContextValue | null>(null);
 
-/**
- * Hook to access map settings context
- * @returns Map settings state, handlers, and utilities
- * @throws If used outside MapSettingsProvider
- */
-function useMapSettings(): MapSettingsContextValue {
-  const context = dc.useContext(MapSettingsContext);
-  if (!context) {
-    throw new Error('useMapSettings must be used within a MapSettingsProvider');
-  }
-  return context;
+function useModalShell(): ModalShellContextValue {
+  const ctx = dc.useContext(ModalShellContext);
+  if (!ctx) throw new Error('useModalShell must be used within MapSettingsProvider');
+  return ctx;
+}
+
+function useAppearance(): AppearanceContextValue {
+  const ctx = dc.useContext(AppearanceContext);
+  if (!ctx) throw new Error('useAppearance must be used within MapSettingsProvider');
+  return ctx;
+}
+
+function useBackgroundImage(): BackgroundImageContextValue {
+  const ctx = dc.useContext(BackgroundImageContext);
+  if (!ctx) throw new Error('useBackgroundImage must be used within MapSettingsProvider');
+  return ctx;
+}
+
+function useHexGrid(): HexGridContextValue {
+  const ctx = dc.useContext(HexGridContext);
+  if (!ctx) throw new Error('useHexGrid must be used within MapSettingsProvider');
+  return ctx;
 }
 
 // ===========================================
@@ -743,41 +850,140 @@ const MapSettingsProvider: React.FC<MapSettingsProviderProps> = ({
   };
 
   // ===========================================================================
-  // Context Value
+  // Stable Ref Wrappers (for handlers that close over changing state)
   // ===========================================================================
 
-  const contextValue: MapSettingsContextValue = {
-    // Props
-    isOpen, onClose, onOpenAlignmentMode, mapType, orientation,
+  const handleSaveRef = dc.useRef(handleSave);
+  handleSaveRef.current = handleSave;
+  const stableHandleSave = dc.useCallback(() => handleSaveRef.current(), []);
 
-    // Map data for export
-    mapData, geometry,
+  const handleResizeConfirmDeleteRef = dc.useRef(handlers.handleResizeConfirmDelete);
+  handleResizeConfirmDeleteRef.current = handlers.handleResizeConfirmDelete;
+  const stableHandleResizeConfirmDelete = dc.useCallback(() => handleResizeConfirmDeleteRef.current(), []);
 
-    // External
-    globalSettings, tabs, isHexMap,
+  // ===========================================================================
+  // Memoized Sub-Context Values
+  // ===========================================================================
 
-    // State
-    ...state,
+  const modalShellValue = dc.useMemo((): ModalShellContextValue => ({
+    isOpen, activeTab: state.activeTab, tabs, mapType, isHexMap,
+    isLoading: state.isLoading,
+    setActiveTab: handlers.setActiveTab,
+    handleSave: stableHandleSave,
+    handleCancel: handlers.handleCancel,
+    mouseDownTargetRef,
+    distanceSettings: state.distanceSettings,
+    setDistanceSettings: handlers.setDistanceSettings,
+    preferences: state.preferences,
+    handlePreferenceToggle: handlers.handlePreferenceToggle,
+    mapData, geometry
+  }), [isOpen, state.activeTab, state.isLoading, state.distanceSettings, state.preferences]);
 
-    // Refs
-    pendingCustomColorRef, mouseDownTargetRef,
+  const appearanceValue = dc.useMemo((): AppearanceContextValue => ({
+    useGlobalSettings: state.useGlobalSettings,
+    overrides: state.overrides,
+    activeColorPicker: state.activeColorPicker,
+    globalSettings,
+    objectSetId: state.objectSetId,
+    THEME,
+    fogImageDisplayName: state.fogImageDisplayName,
+    fogImageSearchResults: state.fogImageSearchResults,
+    pendingCustomColorRef,
+    handleToggleUseGlobal: handlers.handleToggleUseGlobal,
+    handleColorChange: handlers.handleColorChange,
+    handleLineWidthChange: handlers.handleLineWidthChange,
+    setActiveColorPicker: handlers.setActiveColorPicker,
+    handleObjectSetChange: handlers.handleObjectSetChange,
+    setFogImageDisplayName: handlers.setFogImageDisplayName,
+    handleFogImageSearch: handlers.handleFogImageSearch,
+    handleFogImageSelect: handlers.handleFogImageSelect,
+    handleFogImageClear: handlers.handleFogImageClear,
+  }), [
+    state.useGlobalSettings, state.overrides, state.activeColorPicker,
+    state.objectSetId, state.fogImageDisplayName, state.fogImageSearchResults
+  ]);
 
-    // Handlers
-    ...handlers,
-
-    // Constants for consumers
-    GRID_DENSITY_PRESETS, MEASUREMENT_EDGE, MEASUREMENT_CORNER, THEME,
-
-    // Utilities for consumers
+  const backgroundImageValue = dc.useMemo((): BackgroundImageContextValue => ({
+    backgroundImagePath: state.backgroundImagePath,
+    backgroundImageDisplayName: state.backgroundImageDisplayName,
+    imageDimensions: state.imageDimensions,
+    imageSearchResults: state.imageSearchResults,
+    imageOpacity: state.imageOpacity,
+    imageOffsetX: state.imageOffsetX,
+    imageOffsetY: state.imageOffsetY,
+    imageGridSize: state.imageGridSize,
+    sizingMode: state.sizingMode,
+    gridDensity: state.gridDensity,
+    customColumns: state.customColumns,
+    measurementMethod: state.measurementMethod,
+    measurementSize: state.measurementSize,
+    fineTuneOffset: state.fineTuneOffset,
+    orientation,
+    onOpenAlignmentMode,
+    setBackgroundImageDisplayName: handlers.setBackgroundImageDisplayName,
+    handleImageSearch: handlers.handleImageSearch,
+    handleImageSelect: handlers.handleImageSelect,
+    handleImageClear: handlers.handleImageClear,
+    setImageOpacity: handlers.setImageOpacity,
+    setImageOffsetX: handlers.setImageOffsetX,
+    setImageOffsetY: handlers.setImageOffsetY,
+    setImageGridSize: handlers.setImageGridSize,
+    handleSizingModeChange: handlers.handleSizingModeChange,
+    handleDensityChange: handlers.handleDensityChange,
+    handleCustomColumnsChange: handlers.handleCustomColumnsChange,
+    handleMeasurementMethodChange: handlers.handleMeasurementMethodChange,
+    handleMeasurementSizeChange: handlers.handleMeasurementSizeChange,
+    handleFineTuneChange: handlers.handleFineTuneChange,
+    handleFineTuneReset: handlers.handleFineTuneReset,
+    GRID_DENSITY_PRESETS,
+    MEASUREMENT_EDGE, MEASUREMENT_CORNER,
     calculateGridFromColumns, calculateGridFromMeasurement,
-    measurementToHexSize, hexSizeToMeasurement, getFineTuneRange
-  };
+    measurementToHexSize, hexSizeToMeasurement, getFineTuneRange,
+  }), [
+    state.backgroundImagePath, state.backgroundImageDisplayName,
+    state.imageDimensions, state.imageSearchResults,
+    state.imageOpacity, state.imageOffsetX, state.imageOffsetY, state.imageGridSize,
+    state.sizingMode, state.gridDensity, state.customColumns,
+    state.measurementMethod, state.measurementSize, state.fineTuneOffset,
+    handleImageSearch, handleImageSelect
+  ]);
+
+  const hexGridValue = dc.useMemo((): HexGridContextValue => ({
+    hexBounds: state.hexBounds,
+    boundsShape: state.boundsShape,
+    boundsLocked: state.boundsLocked,
+    coordinateDisplayMode: state.coordinateDisplayMode,
+    showResizeConfirm: state.showResizeConfirm,
+    pendingBoundsChange: state.pendingBoundsChange,
+    orphanInfo: state.orphanInfo,
+    handleHexBoundsChange: handlers.handleHexBoundsChange,
+    handleBoundsShapeChange: handlers.handleBoundsShapeChange,
+    handleRadiusChange: handlers.handleRadiusChange,
+    handleBoundsLockToggle: handlers.handleBoundsLockToggle,
+    setCoordinateDisplayMode: handlers.setCoordinateDisplayMode,
+    handleResizeConfirmDelete: stableHandleResizeConfirmDelete,
+    handleResizeConfirmCancel: handlers.handleResizeConfirmCancel,
+  }), [
+    state.hexBounds, state.boundsShape, state.boundsLocked,
+    state.coordinateDisplayMode, state.showResizeConfirm,
+    state.pendingBoundsChange, state.orphanInfo
+  ]);
 
   return (
-    <MapSettingsContext.Provider value={contextValue}>
-      {children}
-    </MapSettingsContext.Provider>
+    <ModalShellContext.Provider value={modalShellValue}>
+      <AppearanceContext.Provider value={appearanceValue}>
+        <BackgroundImageContext.Provider value={backgroundImageValue}>
+          <HexGridContext.Provider value={hexGridValue}>
+            {children}
+          </HexGridContext.Provider>
+        </BackgroundImageContext.Provider>
+      </AppearanceContext.Provider>
+    </ModalShellContext.Provider>
   );
 };
 
-return { MapSettingsContext, MapSettingsProvider, useMapSettings, GRID_DENSITY_PRESETS };
+return {
+  MapSettingsProvider, GRID_DENSITY_PRESETS,
+  ModalShellContext, AppearanceContext, BackgroundImageContext, HexGridContext,
+  useModalShell, useAppearance, useBackgroundImage, useHexGrid,
+};

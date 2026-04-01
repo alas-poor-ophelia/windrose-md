@@ -8,7 +8,7 @@
 const pathResolverPath = dc.resolvePath("pathResolver.ts");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
-const { useMapSettings } = await requireModuleByName("MapSettingsContext.tsx");
+const { useHexGrid, useBackgroundImage } = await requireModuleByName("MapSettingsContext.tsx");
 const { SettingItem } = await requireModuleByName("SettingItem.tsx");
 const { NativeToggle } = await requireModuleByName("NativeControls.tsx");
 
@@ -41,12 +41,12 @@ function BoundsSection(): React.ReactElement {
     hexBounds,
     boundsShape,
     boundsLocked,
-    backgroundImagePath,
     handleHexBoundsChange,
     handleBoundsShapeChange,
     handleRadiusChange,
     handleBoundsLockToggle
-  } = useMapSettings() as BoundsSectionContext;
+  } = useHexGrid();
+  const { backgroundImagePath } = useBackgroundImage();
 
   const getPlayableAreaLabel = (): string => {
     if (boundsShape === 'radial') {

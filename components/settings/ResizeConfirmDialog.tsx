@@ -13,7 +13,7 @@ const { requireModuleByName } = await dc.require(pathResolverPath);
 
 const { ModalPortal } = await requireModuleByName("ModalPortal.tsx");
 const { isBridgeAvailable, getObsidianModule } = await requireModuleByName("obsidianBridge.ts");
-const { useMapSettings } = await requireModuleByName("MapSettingsContext.tsx");
+const { useHexGrid } = await requireModuleByName("MapSettingsContext.tsx");
 
 /** Orphan content info */
 interface OrphanInfo {
@@ -30,7 +30,7 @@ function NativeResizeConfirmDialog(): React.ReactElement | null {
     orphanInfo,
     handleResizeConfirmDelete,
     handleResizeConfirmCancel
-  } = useMapSettings() as {
+  } = useHexGrid() as {
     showResizeConfirm: boolean;
     orphanInfo: OrphanInfo;
     handleResizeConfirmDelete: () => void;
@@ -126,7 +126,7 @@ function FallbackResizeConfirmDialog(): React.ReactElement | null {
     orphanInfo,
     handleResizeConfirmDelete,
     handleResizeConfirmCancel
-  } = useMapSettings() as {
+  } = useHexGrid() as {
     showResizeConfirm: boolean;
     orphanInfo: OrphanInfo;
     handleResizeConfirmDelete: () => void;
