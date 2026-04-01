@@ -23,30 +23,14 @@ const { requireModuleByName } = await dc.require(pathResolverPath) as {
   requireModuleByName: (name: string) => Promise<unknown>
 };
 
-// Context types - using inline types until contexts are fully typed
-interface MapStateValue {
-  canvasRef: { current: HTMLCanvasElement | null };
-  mapData: MapData | null;
-  geometry: IGeometry | null;
-  screenToWorld: (clientX: number, clientY: number) => WorldCoords | null;
-  screenToGrid: (clientX: number, clientY: number) => Point | null;
-  getClientCoords: (e: PointerEvent | MouseEvent | TouchEvent) => { clientX: number; clientY: number };
-}
+import type { MapStateContextValue, MapSelectionContextValue } from '#types/contexts/context.types';
 
-interface MapSelectionValue {
-  areaSelectStart: AreaSelectStart | null;
-  setAreaSelectStart: (start: AreaSelectStart | null) => void;
-  selectMultiple: (items: SelectableItem[]) => void;
-  clearSelection: () => void;
-}
-
-const { useMapState, useMapOperations } = await requireModuleByName("MapContext.tsx") as {
-  useMapState: () => MapStateValue;
-  useMapOperations: () => unknown;
+const { useMapState } = await requireModuleByName("MapContext.tsx") as {
+  useMapState: () => MapStateContextValue;
 };
 
 const { useMapSelection } = await requireModuleByName("MapSelectionContext.tsx") as {
-  useMapSelection: () => MapSelectionValue;
+  useMapSelection: () => MapSelectionContextValue;
 };
 
 const { getItemsInWorldRect } = await requireModuleByName("multiSelectOperations.ts") as {

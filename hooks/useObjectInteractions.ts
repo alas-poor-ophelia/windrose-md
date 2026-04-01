@@ -20,10 +20,9 @@ import type {
   ResizeCorner,
   ObjectDragStart,
   ButtonPosition,
-  MousePosition,
   UseObjectInteractionsResult,
 } from '#types/hooks/objectInteractions.types';
-import type { SelectedItem } from '#types/hooks/groupDrag.types';
+import type { MapStateContextValue, MapOperationsContextValue, MapSelectionContextValue } from '#types/contexts/context.types';
 
 // Datacore imports
 const pathResolverPath = dc.resolvePath("pathResolver.ts");
@@ -34,53 +33,6 @@ const { requireModuleByName } = await dc.require(pathResolverPath) as {
 const { getNextRotation } = await dc.require(dc.resolvePath("utils/rotationOperations.ts")) as {
   getNextRotation: (currentRotation: number) => number
 };
-
-// Context types
-interface MapStateValue {
-  geometry: (IGeometry & {
-    cellSize: number;
-    hexSize?: number;
-    isWithinBounds?: (x: number, y: number) => boolean;
-    getScaledCellSize?: (zoom: number) => number;
-    hexToWorld?: (x: number, y: number) => { worldX: number; worldY: number };
-    gridToScreen?: (x: number, y: number, offsetX: number, offsetY: number, zoom: number) => { screenX: number; screenY: number };
-    gridToWorld?: (x: number, y: number) => { worldX: number; worldY: number };
-    worldToGrid?: (worldX: number, worldY: number) => Point;
-    width?: number;
-    toOffsetCoords: (x: number, y: number) => { col: number; row: number };
-  }) | null;
-  canvasRef: { current: HTMLCanvasElement | null };
-  containerRef: { current: HTMLElement | null };
-  mapData: MapData | null;
-  screenToGrid: (clientX: number, clientY: number) => Point | null;
-  screenToWorld: (clientX: number, clientY: number) => { worldX: number; worldY: number } | null;
-  getClientCoords: (e: PointerEvent | MouseEvent | TouchEvent) => { clientX: number; clientY: number };
-  GridGeometry: unknown;
-}
-
-interface MapOperationsValue {
-  getObjectAtPosition: (objects: MapObject[], x: number, y: number) => MapObject | null;
-  addObject: (objects: MapObject[], type: string, x: number, y: number) => MapObject[];
-  updateObject: (objects: MapObject[], id: string, updates: Partial<MapObject>) => MapObject[];
-  removeObject: (objects: MapObject[], id: string) => MapObject[];
-  isAreaFree: (objects: MapObject[], x: number, y: number, width: number, height: number, excludeId?: string) => boolean;
-  onObjectsChange: (objects: MapObject[], skipHistory?: boolean) => void;
-}
-
-interface MapSelectionValue {
-  selectedItem: SelectedItem | null;
-  setSelectedItem: (item: SelectedItem | null) => void;
-  isDraggingSelection: boolean;
-  setIsDraggingSelection: (value: boolean) => void;
-  dragStart: ObjectDragStart | null;
-  setDragStart: (value: ObjectDragStart | null) => void;
-  isResizeMode: boolean;
-  setIsResizeMode: (value: boolean) => void;
-  hoveredObject: MapObject | null;
-  setHoveredObject: (obj: MapObject | null) => void;
-  mousePosition: MousePosition | null;
-  setMousePosition: (pos: MousePosition | null) => void;
-}
 
 interface ScreenPositionResult {
   screenX: number;
@@ -95,12 +47,12 @@ const { calculateObjectScreenPosition: calculateScreenPos, applyInverseRotation 
 };
 
 const { useMapState, useMapOperations } = await requireModuleByName("MapContext.tsx") as {
-  useMapState: () => MapStateValue;
-  useMapOperations: () => MapOperationsValue;
+  useMapState: () => MapStateContextValue;
+  useMapOperations: () => MapOperationsContextValue;
 };
 
 const { useMapSelection } = await requireModuleByName("MapSelectionContext.tsx") as {
-  useMapSelection: () => MapSelectionValue;
+  useMapSelection: () => MapSelectionContextValue;
 };
 
 const { calculateEdgeAlignment, getAlignmentOffset, placeObject, placeObjectFreeform, canPlaceObjectAt, removeObjectFromHex, generateObjectId } = await requireModuleByName("objectOperations.ts") as {

@@ -33,22 +33,11 @@ const { requireModuleByName } = await dc.require(pathResolverPath) as {
   requireModuleByName: (name: string) => Promise<unknown>
 };
 
-// Context types
-interface MapStateValue {
-  geometry: (IGeometry & { cellSize: number }) | null;
-  mapData: MapData | null;
-  screenToWorld: (clientX: number, clientY: number) => { worldX: number; worldY: number } | null;
-  screenToGrid: (clientX: number, clientY: number) => Point | null;
-  getClientCoords: (e: PointerEvent | MouseEvent | TouchEvent) => { clientX: number; clientY: number };
-}
-
-interface MapOperationsValue {
-  onCellsChange: (cells: Cell[], skipHistory?: boolean) => void;
-}
+import type { MapStateContextValue, MapOperationsContextValue } from '#types/contexts/context.types';
 
 const { useMapState, useMapOperations } = await requireModuleByName("MapContext.tsx") as {
-  useMapState: () => MapStateValue;
-  useMapOperations: () => MapOperationsValue;
+  useMapState: () => MapStateContextValue;
+  useMapOperations: () => MapOperationsContextValue;
 };
 
 const { getActiveLayer } = await requireModuleByName("layerAccessor.ts") as {

@@ -9,8 +9,7 @@
  */
 
 // Type-only imports
-import type { Point, IGeometry } from '#types/core/geometry.types';
-import type { MapData } from '#types/core/map.types';
+import type { Point } from '#types/core/geometry.types';
 import type { ToolId } from '#types/tools/tool.types';
 import type {
   UseEventCoordinatorOptions,
@@ -30,7 +29,8 @@ import type {
   DiagonalFillHandlers,
   HandlerLayerName,
 } from '#types/hooks/eventCoordinator.types';
-import type { SelectedItem } from '#types/hooks/groupDrag.types';
+import type { SelectedItem, MapStateContextValue, MapSelectionContextValue } from '#types/contexts/context.types';
+import type { UseGroupDragResult } from '#types/hooks/groupDrag.types';
 
 // Datacore imports
 const pathResolverPath = dc.resolvePath("pathResolver.ts");
@@ -38,63 +38,16 @@ const { requireModuleByName } = await dc.require(pathResolverPath) as {
   requireModuleByName: (name: string) => Promise<unknown>
 };
 
-// Context types
-interface LayerVisibility {
-  objects: boolean;
-  textLabels: boolean;
-  [key: string]: boolean;
-}
-
-interface DragStart {
-  x: number;
-  y: number;
-  gridX: number;
-  gridY: number;
-  worldX: number;
-  worldY: number;
-  isGroupDrag?: boolean;
-}
-
-interface MapStateValue {
-  canvasRef: { current: HTMLCanvasElement | null };
-  currentTool: ToolId;
-  screenToGrid: (clientX: number, clientY: number) => Point | null;
-  screenToWorld: (clientX: number, clientY: number) => { worldX: number; worldY: number } | null;
-  getClientCoords: (e: PointerEvent | MouseEvent | TouchEvent) => { clientX: number; clientY: number };
-  geometry: (IGeometry & { cellSize: number }) | null;
-}
-
-interface MapSelectionValue {
-  selectedItem: SelectedItem | null;
-  setSelectedItem: (item: SelectedItem | null) => void;
-  isDraggingSelection: boolean;
-  setIsDraggingSelection: (value: boolean) => void;
-  dragStart: DragStart | null;
-  setDragStart: (value: DragStart | null) => void;
-  layerVisibility: LayerVisibility;
-  hasMultiSelection: boolean;
-  isSelected: (type: string, id: string) => boolean;
-  isGroupDragging: boolean;
-  clearSelection: () => void;
-}
-
 interface RegisteredHandlersValue {
   getHandlers: (layer: HandlerLayerName) => unknown;
 }
 
-interface UseGroupDragResult {
-  getClickedSelectedItem: (gridX: number, gridY: number, worldX: number, worldY: number) => SelectedItem | null;
-  startGroupDrag: (clientX: number, clientY: number, gridX: number, gridY: number) => boolean;
-  handleGroupDrag: (e: PointerEvent | MouseEvent | TouchEvent) => boolean;
-  stopGroupDrag: () => boolean;
-}
-
 const { useMapState } = await requireModuleByName("MapContext.tsx") as {
-  useMapState: () => MapStateValue;
+  useMapState: () => MapStateContextValue;
 };
 
 const { useMapSelection } = await requireModuleByName("MapSelectionContext.tsx") as {
-  useMapSelection: () => MapSelectionValue;
+  useMapSelection: () => MapSelectionContextValue;
 };
 
 const { useRegisteredHandlers } = await requireModuleByName("EventHandlerContext.tsx") as {

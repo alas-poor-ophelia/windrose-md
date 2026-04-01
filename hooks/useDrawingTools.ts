@@ -16,9 +16,8 @@ import type { ToolId } from '#types/tools/tool.types';
 import type { Point, IGeometry } from '#types/core/geometry.types';
 import type { Cell, SegmentName } from '#types/core/cell.types';
 import type { MapData, MapLayer } from '#types/core/map.types';
-import type { Edge } from '#types/core/edge.types';
 import type { MapObject } from '#types/objects/object.types';
-import type { TextLabel } from '#types/core/textLabel.types';
+import type { TextLabel } from '#types/objects/note.types';
 import type { Curve } from '#types/core/curve.types';
 import type {
   PreviewSettings,
@@ -32,7 +31,7 @@ import type {
   DragStartContext,
   UseDrawingToolsResult,
 } from '#types/hooks/drawingTools.types';
-import type { EdgeInfo } from '#types/contexts/context.types';
+import type { Edge, MapStateContextValue, MapOperationsContextValue } from '#types/contexts/context.types';
 
 // Datacore imports
 const pathResolverPath = dc.resolvePath("pathResolver.ts");
@@ -40,41 +39,9 @@ const { requireModuleByName } = await dc.require(pathResolverPath) as {
   requireModuleByName: (name: string) => Promise<unknown>
 };
 
-// Context types - inline until contexts are fully typed
-interface MapStateValue {
-  geometry: (IGeometry & { cellSize: number; screenToEdge?: (worldX: number, worldY: number, threshold: number) => EdgeInfo | null }) | null;
-  canvasRef: { current: HTMLCanvasElement | null };
-  mapData: MapData | null;
-  screenToGrid: (clientX: number, clientY: number) => Point | null;
-  screenToWorld: (clientX: number, clientY: number) => { worldX: number; worldY: number } | null;
-  getClientCoords: (e: PointerEvent | MouseEvent | TouchEvent) => { clientX: number; clientY: number };
-  GridGeometry: GridGeometryConstructor;
-}
-
-interface GridGeometryConstructor {
-  new (...args: unknown[]): IGeometry & {
-    cellSize: number;
-    screenToEdge: (worldX: number, worldY: number, threshold: number) => EdgeInfo | null;
-    worldToGrid: (worldX: number, worldY: number) => Point;
-  };
-}
-
-interface MapOperationsValue {
-  onCellsChange: (cells: Cell[], skipHistory?: boolean) => void;
-  onCurvesChange: (curves: Curve[], skipHistory?: boolean) => void;
-  onObjectsChange: (objects: MapObject[]) => void;
-  onTextLabelsChange: (labels: TextLabel[]) => void;
-  onEdgesChange: (edges: Edge[], skipHistory?: boolean) => void;
-  getTextLabelAtPosition: (labels: TextLabel[], worldX: number, worldY: number, ctx: CanvasRenderingContext2D | null) => TextLabel | null;
-  removeTextLabel: (labels: TextLabel[], id: string) => TextLabel[];
-  getObjectAtPosition: (objects: MapObject[], x: number, y: number) => MapObject | null;
-  removeObjectAtPosition: (objects: MapObject[], x: number, y: number) => MapObject[];
-  removeObjectsInRectangle: (objects: MapObject[], x1: number, y1: number, x2: number, y2: number) => MapObject[];
-}
-
 const { useMapState, useMapOperations } = await requireModuleByName("MapContext.tsx") as {
-  useMapState: () => MapStateValue;
-  useMapOperations: () => MapOperationsValue;
+  useMapState: () => MapStateContextValue;
+  useMapOperations: () => MapOperationsContextValue;
 };
 
 const { addEdge, removeEdge, getEdgeAt, generateEdgeLine, mergeEdges } = await requireModuleByName("edgeOperations.ts") as {

@@ -8,134 +8,20 @@
  * - Multi-selection: area select tool (two-click rectangle)
  */
 
-// ===========================================
-// Types
-// ===========================================
-
-/** Selected item types */
-export type SelectableItemType = 'object' | 'text' | 'notePin';
-
-/** A selected item */
-export interface SelectedItem {
-  type: SelectableItemType;
-  id: string;
-  data: Record<string, unknown>;
-}
-
-/** World position for area select start */
-export interface AreaSelectPosition {
-  worldX: number;
-  worldY: number;
-}
-
-/** Drag start position */
-export interface DragStartPosition {
-  x: number;
-  y: number;
-  worldX?: number;
-  worldY?: number;
-}
-
-/** Group drag offset for a single item */
-export interface GroupDragOffset {
-  type: SelectableItemType;
-  gridOffsetX: number;
-  gridOffsetY: number;
-  worldOffsetX: number;
-  worldOffsetY: number;
-}
-
-/** Layer visibility settings */
-export interface LayerVisibility {
-  objects: boolean;
-  textLabels: boolean;
-  hexCoordinates: boolean;
-}
-
-/** Mouse position */
-export interface MousePosition {
-  x: number;
-  y: number;
-}
-
-/** Hovered object info */
-export interface HoveredObject {
-  id: string;
-  type: string;
-  [key: string]: unknown;
-}
-
-/** Item update for updateSelectedItemsData */
-export interface ItemUpdate {
-  id: string;
-  [key: string]: unknown;
-}
-
-/** Initial state for batch history during group drag */
-export interface GroupDragInitialState {
-  objects: unknown[];
-  textLabels: unknown[];
-}
-
-/** MapSelectionContext value shape */
-export interface MapSelectionContextValue {
-  // Multi-select state
-  selectedItems: SelectedItem[];
-  setSelectedItems: React.Dispatch<React.SetStateAction<SelectedItem[]>>;
-  hasMultiSelection: boolean;
-  selectionCount: number;
-
-  // Selection helpers
-  selectItem: (item: SelectedItem | null) => void;
-  selectMultiple: (items: SelectedItem[] | null) => void;
-  addToSelection: (item: SelectedItem | null) => void;
-  removeFromSelection: (id: string) => void;
-  clearSelection: () => void;
-  isSelected: (id: string) => boolean;
-  updateSelectedItemsData: (updates: ItemUpdate[]) => void;
-
-  // Area select state
-  areaSelectStart: AreaSelectPosition | null;
-  setAreaSelectStart: React.Dispatch<React.SetStateAction<AreaSelectPosition | null>>;
-
-  // Backward compatibility
-  selectedItem: SelectedItem | null;
-  setSelectedItem: (item: SelectedItem | null) => void;
-
-  // Drag state
-  isDraggingSelection: boolean;
-  setIsDraggingSelection: React.Dispatch<React.SetStateAction<boolean>>;
-  dragStart: DragStartPosition | null;
-  setDragStart: React.Dispatch<React.SetStateAction<DragStartPosition | null>>;
-  isResizeMode: boolean;
-  setIsResizeMode: React.Dispatch<React.SetStateAction<boolean>>;
-
-  // Group drag state
-  groupDragOffsetsRef: React.MutableRefObject<Map<string, GroupDragOffset>>;
-  groupDragInitialStateRef: React.MutableRefObject<GroupDragInitialState | null>;
-  isGroupDragging: boolean;
-
-  // Hover state
-  hoveredObject: HoveredObject | null;
-  setHoveredObject: React.Dispatch<React.SetStateAction<HoveredObject | null>>;
-  mousePosition: MousePosition | null;
-  setMousePosition: React.Dispatch<React.SetStateAction<MousePosition | null>>;
-
-  // Note pin modal state
-  showNoteLinkModal: boolean;
-  setShowNoteLinkModal: React.Dispatch<React.SetStateAction<boolean>>;
-  pendingNotePinId: string | null;
-  setPendingNotePinId: React.Dispatch<React.SetStateAction<string | null>>;
-  editingNoteObjectId: string | null;
-  setEditingNoteObjectId: React.Dispatch<React.SetStateAction<string | null>>;
-
-  // Coordinate overlay state
-  showCoordinates: boolean;
-  setShowCoordinates: React.Dispatch<React.SetStateAction<boolean>>;
-
-  // Layer visibility
-  layerVisibility: LayerVisibility;
-}
+// Types — imported from canonical location
+import type {
+  SelectableItemType,
+  SelectedItem,
+  AreaSelectPosition,
+  DragStartPosition,
+  GroupDragOffset,
+  LayerVisibility,
+  MousePosition,
+  HoveredObject,
+  ItemUpdate,
+  GroupDragInitialState,
+  MapSelectionContextValue,
+} from '#types/contexts/context.types';
 
 // ===========================================
 // Context

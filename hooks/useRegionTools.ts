@@ -26,14 +26,7 @@ const { HexGeometry } = await requireModuleByName("HexGeometry.ts") as {
   };
 };
 
-// ── Types ────────────────────────────────────────────────────────────
-
-interface MapStateValue {
-  geometry: IGeometry | null;
-  mapData: MapData | null;
-  screenToWorld: (clientX: number, clientY: number) => { worldX: number; worldY: number } | null;
-  screenToGrid: (clientX: number, clientY: number) => Point | null;
-}
+import type { MapStateContextValue } from '#types/contexts/context.types';
 
 interface RegionToolsOptions {
   currentTool: ToolId;

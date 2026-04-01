@@ -29,15 +29,10 @@ const { requireModuleByName } = await dc.require(pathResolverPath) as {
   requireModuleByName: (name: string) => Promise<unknown>
 };
 
-// Context types - inline until contexts are fully typed
-interface MapStateValue {
-  geometry: IGeometry | null;
-  mapData: MapData | null;
-  screenToGrid: (clientX: number, clientY: number) => Point | null;
-}
+import type { MapStateContextValue } from '#types/contexts/context.types';
 
 const { useMapState } = await requireModuleByName("MapContext.tsx") as {
-  useMapState: () => MapStateValue;
+  useMapState: () => MapStateContextValue;
 };
 
 const {

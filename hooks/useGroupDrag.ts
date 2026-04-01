@@ -15,7 +15,7 @@
 import type { Point, IGeometry } from '#types/core/geometry.types';
 import type { MapData, MapLayer } from '#types/core/map.types';
 import type { MapObject } from '#types/objects/object.types';
-import type { TextLabel } from '#types/core/textLabel.types';
+import type { TextLabel } from '#types/objects/note.types';
 import type {
   SelectedItem,
   DragOffset,
@@ -26,6 +26,7 @@ import type {
   PositionUpdate,
   UseGroupDragResult,
 } from '#types/hooks/groupDrag.types';
+import type { MapStateContextValue, MapOperationsContextValue, MapSelectionContextValue } from '#types/contexts/context.types';
 
 // Datacore imports
 const pathResolverPath = dc.resolvePath("pathResolver.ts");
@@ -33,51 +34,13 @@ const { requireModuleByName } = await dc.require(pathResolverPath) as {
   requireModuleByName: (name: string) => Promise<unknown>
 };
 
-// Context types
-interface MapStateValue {
-  geometry: (IGeometry & { isWithinBounds?: (x: number, y: number) => boolean }) | null;
-  mapData: MapData | null;
-  screenToGrid: (clientX: number, clientY: number) => Point | null;
-  screenToWorld: (clientX: number, clientY: number) => { worldX: number; worldY: number } | null;
-  getClientCoords: (e: PointerEvent | MouseEvent | TouchEvent) => { clientX: number; clientY: number };
-}
-
-interface MapOperationsValue {
-  onObjectsChange: (objects: MapObject[], skipHistory?: boolean) => void;
-  onTextLabelsChange: (labels: TextLabel[], skipHistory?: boolean) => void;
-}
-
-interface DragStart {
-  x: number;
-  y: number;
-  gridX: number;
-  gridY: number;
-  worldX: number;
-  worldY: number;
-  isGroupDrag?: boolean;
-}
-
-interface MapSelectionValue {
-  selectedItems: SelectedItem[];
-  hasMultiSelection: boolean;
-  isSelected: (type: string, id: string) => boolean;
-  updateSelectedItemsData: (updates: PositionUpdate[]) => void;
-  isDraggingSelection: boolean;
-  setIsDraggingSelection: (value: boolean) => void;
-  dragStart: DragStart | null;
-  setDragStart: (value: DragStart | null) => void;
-  groupDragOffsetsRef: { current: DragOffsetsMap };
-  groupDragInitialStateRef: { current: GroupDragInitialState | null };
-  isGroupDragging: boolean;
-}
-
 const { useMapState, useMapOperations } = await requireModuleByName("MapContext.tsx") as {
-  useMapState: () => MapStateValue;
-  useMapOperations: () => MapOperationsValue;
+  useMapState: () => MapStateContextValue;
+  useMapOperations: () => MapOperationsContextValue;
 };
 
 const { useMapSelection } = await requireModuleByName("MapSelectionContext.tsx") as {
-  useMapSelection: () => MapSelectionValue;
+  useMapSelection: () => MapSelectionContextValue;
 };
 
 const { getActiveLayer } = await requireModuleByName("layerAccessor.ts") as {
@@ -85,12 +48,12 @@ const { getActiveLayer } = await requireModuleByName("layerAccessor.ts") as {
 };
 
 const { HexGeometry } = await requireModuleByName("HexGeometry.ts") as {
-  HexGeometry: unknown;
+  HexGeometry: new (...args: unknown[]) => IGeometry;
 };
 
 const { getObjectsInCell, assignSlot } = await requireModuleByName("hexSlotPositioner.ts") as {
-  getObjectsInCell: unknown;
-  assignSlot: unknown;
+  getObjectsInCell: (objects: MapObject[], x: number, y: number) => MapObject[];
+  assignSlot: (occupiedSlots: number[]) => number;
 };
 
 /**
