@@ -456,8 +456,5 @@ return {
 
   // Constants
   UNKNOWN_OBJECT_FALLBACK,
-  BUILT_IN_CATEGORY_ORDER,
-
-  // Re-export icon data for convenience
-  RA_ICONS
+  BUILT_IN_CATEGORY_ORDER
 };

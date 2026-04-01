@@ -30,6 +30,7 @@ interface SubToolDef {
 interface ToolGroup {
   id: string;
   subTools: SubToolDef[];
+  gridOnly?: boolean;
   hexOnly?: boolean;
 }
 
@@ -299,6 +300,16 @@ const ToolPalette = ({
     region: 'regionPaint' as ToolId
   });
 
+  /** Keyboard shortcut map: key -> group ID (uses current sub-tool) or direct tool ID */
+  const SHORTCUT_MAP: Record<string, { group?: keyof SubToolSelections; tool?: ToolId }> = {
+    'd': { group: 'draw' },
+    'e': { group: 'erase' },
+    's': { group: 'select' },
+    'v': { group: 'select' },
+    'm': { tool: 'measure' as ToolId },
+    'f': { tool: 'freehand' as ToolId }
+  };
+
   dc.useEffect(() => {
     if (!isFocused) return;
 
@@ -306,29 +317,13 @@ const ToolPalette = ({
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
       if (e.ctrlKey || e.metaKey || e.altKey) return;
 
-      const key = e.key.toLowerCase();
+      const shortcut = SHORTCUT_MAP[e.key.toLowerCase()];
+      if (!shortcut) return;
 
-      switch (key) {
-        case 'd':
-          onToolChange(subToolSelections.draw || 'draw' as ToolId);
-          break;
-        case 'e':
-          onToolChange(subToolSelections.erase || 'erase' as ToolId);
-          break;
-        case 's':
-        case 'v':
-          onToolChange(subToolSelections.select || 'select' as ToolId);
-          break;
-        case 'm':
-          onToolChange('measure' as ToolId);
-          break;
-        case 'f':
-          onToolChange('freehand' as ToolId);
-          break;
-        default:
-          return;
-      }
-
+      const toolId = shortcut.group
+        ? (subToolSelections[shortcut.group] || shortcut.group as ToolId)
+        : shortcut.tool!;
+      onToolChange(toolId);
       e.preventDefault();
     };
 
@@ -355,6 +350,7 @@ const ToolPalette = ({
     },
     {
       id: 'fill',
+      gridOnly: true,
       subTools: [
         { id: 'rectangle' as ToolId, label: 'Fill Rectangle', title: 'Rectangle (click two corners)', icon: 'lucide-square', gridOnly: true },
         { id: 'circle' as ToolId, label: 'Fill Circle', title: 'Circle (click edge, then center)', icon: 'lucide-circle', gridOnly: true },
@@ -484,29 +480,20 @@ const ToolPalette = ({
       <ToolPaletteBracket position="bl" />
       <ToolPaletteBracket position="br" />
 
-      <ToolButtonWithSubMenu
-        toolGroup={toolGroups[0]}
-        currentTool={currentTool}
-        currentSubTool={subToolSelections.select}
-        isSubMenuOpen={openSubMenu === 'select'}
-        onToolSelect={onToolChange}
-        onSubToolSelect={handleSubToolSelect}
-        onSubMenuOpen={handleSubMenuOpen}
-        onSubMenuClose={handleSubMenuClose}
-        mapType={mapType}
-      />
-
-      <ToolButtonWithSubMenu
-        toolGroup={toolGroups[1]}
-        currentTool={currentTool}
-        currentSubTool={subToolSelections.draw}
-        isSubMenuOpen={openSubMenu === 'draw'}
-        onToolSelect={onToolChange}
-        onSubToolSelect={handleSubToolSelect}
-        onSubMenuOpen={handleSubMenuOpen}
-        onSubMenuClose={handleSubMenuClose}
-        mapType={mapType}
-      />
+      {toolGroups.slice(0, 2).map(group => (
+        <ToolButtonWithSubMenu
+          key={group.id}
+          toolGroup={group}
+          currentTool={currentTool}
+          currentSubTool={subToolSelections[group.id as keyof SubToolSelections]}
+          isSubMenuOpen={openSubMenu === group.id}
+          onToolSelect={onToolChange}
+          onSubToolSelect={handleSubToolSelect}
+          onSubMenuOpen={handleSubMenuOpen}
+          onSubMenuClose={handleSubMenuClose}
+          mapType={mapType}
+        />
+      ))}
 
       <div style={{ position: 'relative', display: 'inline-block' }}>
         <button
@@ -540,45 +527,24 @@ const ToolPalette = ({
         />
       </div>
 
-      {mapType !== 'hex' && (
-        <ToolButtonWithSubMenu
-          toolGroup={toolGroups[2]}
-          currentTool={currentTool}
-          currentSubTool={subToolSelections.fill}
-          isSubMenuOpen={openSubMenu === 'fill'}
-          onToolSelect={onToolChange}
-          onSubToolSelect={handleSubToolSelect}
-          onSubMenuOpen={handleSubMenuOpen}
-          onSubMenuClose={handleSubMenuClose}
-          mapType={mapType}
-        />
-      )}
-
-      <ToolButtonWithSubMenu
-        toolGroup={toolGroups[3]}
-        currentTool={currentTool}
-        currentSubTool={subToolSelections.erase}
-        isSubMenuOpen={openSubMenu === 'erase'}
-        onToolSelect={onToolChange}
-        onSubToolSelect={handleSubToolSelect}
-        onSubMenuOpen={handleSubMenuOpen}
-        onSubMenuClose={handleSubMenuClose}
-        mapType={mapType}
-      />
-
-      {mapType === 'hex' && (
-        <ToolButtonWithSubMenu
-          toolGroup={toolGroups[4]}
-          currentTool={currentTool}
-          currentSubTool={subToolSelections.region}
-          isSubMenuOpen={openSubMenu === 'region'}
-          onToolSelect={onToolChange}
-          onSubToolSelect={handleSubToolSelect}
-          onSubMenuOpen={handleSubMenuOpen}
-          onSubMenuClose={handleSubMenuClose}
-          mapType={mapType}
-        />
-      )}
+      {toolGroups.slice(2).map(group => {
+        if (group.gridOnly && mapType === 'hex') return null;
+        if (group.hexOnly && mapType !== 'hex') return null;
+        return (
+          <ToolButtonWithSubMenu
+            key={group.id}
+            toolGroup={group}
+            currentTool={currentTool}
+            currentSubTool={subToolSelections[group.id as keyof SubToolSelections]}
+            isSubMenuOpen={openSubMenu === group.id}
+            onToolSelect={onToolChange}
+            onSubToolSelect={handleSubToolSelect}
+            onSubMenuOpen={handleSubMenuOpen}
+            onSubMenuClose={handleSubMenuClose}
+            mapType={mapType}
+          />
+        );
+      })}
 
       {visibleSimpleTools.map(tool => (
         <button

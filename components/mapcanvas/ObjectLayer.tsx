@@ -24,8 +24,9 @@ const { useMapSelection } = await requireModuleByName("MapSelectionContext.tsx")
 const { useLinkingMode } = await requireModuleByName("ObjectLinkingContext.tsx");
 const { useEventHandlerRegistration } = await requireModuleByName("EventHandlerContext.tsx");
 const { useObjectInteractions } = await requireModuleByName("useObjectInteractions.ts");
-const { TextInputModal, openNativeTextInputModal } = await requireModuleByName("TextInputModal.tsx");
-const { NoteLinkModal, openNativeNoteLinkModal } = await requireModuleByName("NoteLinkModal.jsx");
+const { TextInputModal } = await requireModuleByName("TextInputModal.tsx");
+const { NoteLinkModal } = await requireModuleByName("NoteLinkModal.jsx");
+const { useObjectModals } = await requireModuleByName("useObjectModals.ts");
 const { SelectionToolbar } = await requireModuleByName("SelectionToolbar.jsx");
 const { calculateObjectScreenPosition } = await requireModuleByName("screenPositionUtils.ts");
 const { getActiveLayer } = await requireModuleByName("layerAccessor.ts");
@@ -35,6 +36,7 @@ const { convertObjectToFreeform, snapObjectToGrid } = await requireModuleByName(
 };
 const { copyDeepLinkToClipboard } = await requireModuleByName("deepLinkHandler.ts");
 const { LinkingModeBanner } = await requireModuleByName("LinkingModeBanner.tsx");
+const { CardinalIndicators } = await requireModuleByName("CardinalIndicators.tsx");
 
 const { rotateByIncrement } = await dc.require(dc.resolvePath("utils/rotationOperations.ts")) as {
   rotateByIncrement: (currentRotation: number) => number
@@ -45,14 +47,6 @@ interface SelectedItem {
   type: 'object' | 'text' | 'notePin';
   id: string;
   data?: MapObject;
-}
-
-/** Cardinal direction indicator positions */
-interface CardinalIndicatorPositions {
-  north: { x: number; y: number };
-  south: { x: number; y: number };
-  east: { x: number; y: number };
-  west: { x: number; y: number };
 }
 
 /** Props for ObjectLayer component */
@@ -87,13 +81,12 @@ const ObjectLayer = ({
   const {
     selectedItem, setSelectedItem,
     selectedItems, isSelected, hasMultiSelection, selectionCount, selectItem, selectMultiple, clearSelection,
-    isDraggingSelection, setIsDraggingSelection,
-    dragStart, setDragStart,
+    isDraggingSelection,
     isResizeMode, setIsResizeMode,
     hoveredObject, setHoveredObject,
     mousePosition, setMousePosition,
-    showNoteLinkModal, setShowNoteLinkModal,
-    editingNoteObjectId, setEditingNoteObjectId,
+    showNoteLinkModal,
+    editingNoteObjectId,
     showCoordinates,
     layerVisibility,
     updateSelectedItemsData
@@ -128,8 +121,6 @@ const ObjectLayer = ({
     }
   }, [mapData, onObjectsChange]);
 
-  const [showNoteModal, setShowNoteModal] = dc.useState(false);
-  const [editingObjectId, setEditingObjectId] = dc.useState<string | null>(null);
   const [showObjectColorPicker, setShowObjectColorPicker] = dc.useState(false);
 
   const handleScaleChange = dc.useCallback((newScale: number) => {
@@ -314,6 +305,12 @@ const ObjectLayer = ({
     getClickedCorner
   } = useObjectInteractions(currentTool, selectedObjectType, onAddCustomColor, customColors, freeformPlacementModeRef);
 
+  const {
+    showNoteModal, editingObjectId,
+    handleNoteButtonClick, handleNoteModalSubmit, handleNoteCancel,
+    handleEditNoteLink, handleNoteLinkSave, handleNoteLinkCancel
+  } = useObjectModals({ onObjectsChange, handleNoteSubmit });
+
   const { registerHandlers, unregisterHandlers } = useEventHandlerRegistration();
 
   // Wrap handleObjectSelection to intercept clicks when in linking mode
@@ -410,37 +407,6 @@ const ObjectLayer = ({
     return () => unregisterHandlers('object');
   }, []);
 
-  const handleNoteButtonClick = (e: JSX.TargetedMouseEvent<HTMLElement>): void => {
-    if (selectedItem?.type === 'object') {
-      e.preventDefault();
-      e.stopPropagation();
-
-      if (isDraggingSelection) {
-        setIsDraggingSelection(false);
-        setDragStart(null);
-      }
-
-      const objectId = selectedItem.id;
-      const obj = getActiveLayer(mapData!).objects.find((o: MapObject) => o.id === objectId);
-      const objTitle = obj?.label || 'Object';
-      const objTooltip = obj?.customTooltip || '';
-
-      const opened = openNativeTextInputModal({
-        onSubmit: (content: string) => {
-          handleNoteSubmit(content, objectId);
-        },
-        title: `Note for ${objTitle}`,
-        placeholder: 'Add a custom note...',
-        initialValue: objTooltip
-      });
-
-      if (!opened) {
-        setEditingObjectId(objectId);
-        setShowNoteModal(true);
-      }
-    }
-  };
-
   const handleResizeButtonClick = (e: JSX.TargetedMouseEvent<HTMLElement>): void => {
     if (selectedItem?.type === 'object') {
       e.preventDefault();
@@ -480,17 +446,6 @@ const ObjectLayer = ({
     }
   };
 
-  const handleNoteModalSubmit = (content: string): void => {
-    handleNoteSubmit(content, editingObjectId);
-    setShowNoteModal(false);
-    setEditingObjectId(null);
-  };
-
-  const handleNoteCancel = (): void => {
-    setShowNoteModal(false);
-    setEditingObjectId(null);
-  };
-
   const handleObjectColorButtonClick = (e: JSX.TargetedMouseEvent<HTMLElement>): void => {
     if (selectedItem?.type === 'object') {
       e.preventDefault();
@@ -505,58 +460,6 @@ const ObjectLayer = ({
 
   const handleObjectColorResetWrapper = (): void => {
     handleObjectColorReset(setShowObjectColorPicker);
-  };
-
-  const handleEditNoteLink = (objectId: string): void => {
-    if (isDraggingSelection) {
-      setIsDraggingSelection(false);
-      setDragStart(null);
-    }
-
-    const obj = getActiveLayer(mapData!).objects?.find((o: MapObject) => o.id === objectId);
-    const opened = openNativeNoteLinkModal({
-      onSave: (notePath: string) => handleNoteLinkSaveForObject(notePath, objectId),
-      onClose: () => { setEditingNoteObjectId(null); },
-      currentNotePath: obj?.linkedNote || null,
-      objectType: obj?.type || null
-    });
-
-    if (!opened) {
-      setEditingNoteObjectId(objectId);
-      setShowNoteLinkModal(true);
-    }
-  };
-
-  const handleNoteLinkSaveForObject = (notePath: string, objectId: string): void => {
-    if (!mapData) return;
-
-    const updatedObjects = getActiveLayer(mapData).objects.map((obj: MapObject) => {
-      if (obj.id === objectId) {
-        return { ...obj, linkedNote: notePath };
-      }
-      return obj;
-    });
-
-    onObjectsChange(updatedObjects);
-
-    if (selectedItem?.type === 'object' && selectedItem.id === objectId) {
-      const updatedObject = updatedObjects.find((obj: MapObject) => obj.id === objectId);
-      if (updatedObject) {
-        setSelectedItem({ ...selectedItem, data: updatedObject });
-      }
-    }
-  };
-
-  const handleNoteLinkSave = (notePath: string): void => {
-    if (!editingNoteObjectId) return;
-    handleNoteLinkSaveForObject(notePath, editingNoteObjectId);
-    setShowNoteLinkModal(false);
-    setEditingNoteObjectId(null);
-  };
-
-  const handleNoteLinkCancel = (): void => {
-    setShowNoteLinkModal(false);
-    setEditingNoteObjectId(null);
   };
 
   const handleLinkObject = dc.useCallback(() => {
@@ -683,7 +586,7 @@ const ObjectLayer = ({
     return null;
   }
 
-  const getCardinalIndicatorPositions = (selectedObject: MapObject): CardinalIndicatorPositions | null => {
+  const getCardinalIndicatorPositions = (selectedObject: MapObject) => {
     if (!selectedObject || !canvasRef.current || !containerRef.current || !mapData) {
       return null;
     }
@@ -734,100 +637,12 @@ const ObjectLayer = ({
         />
       )}
 
-      {edgeSnapMode && selectedItem?.type === 'object' && indicatorPositions && !freeformDragPreview && (
-        <>
-          <div
-            className="dmt-edge-snap-indicator north"
-            style={{
-              position: 'absolute',
-              left: `${indicatorPositions.north.x}px`,
-              top: `${indicatorPositions.north.y}px`,
-              width: 0,
-              height: 0,
-              borderLeft: '6px solid transparent',
-              borderRight: '6px solid transparent',
-              borderBottom: '8px solid var(--interactive-accent, #4a9eff)',
-              filter: 'drop-shadow(0 0 3px var(--interactive-accent, #4a9eff))',
-              pointerEvents: 'none',
-              zIndex: 1000
-            }}
-          />
-          <div
-            className="dmt-edge-snap-indicator south"
-            style={{
-              position: 'absolute',
-              left: `${indicatorPositions.south.x}px`,
-              top: `${indicatorPositions.south.y}px`,
-              width: 0,
-              height: 0,
-              borderLeft: '6px solid transparent',
-              borderRight: '6px solid transparent',
-              borderTop: '8px solid var(--interactive-accent, #4a9eff)',
-              filter: 'drop-shadow(0 0 3px var(--interactive-accent, #4a9eff))',
-              pointerEvents: 'none',
-              zIndex: 1000
-            }}
-          />
-          <div
-            className="dmt-edge-snap-indicator east"
-            style={{
-              position: 'absolute',
-              left: `${indicatorPositions.east.x}px`,
-              top: `${indicatorPositions.east.y}px`,
-              width: 0,
-              height: 0,
-              borderTop: '6px solid transparent',
-              borderBottom: '6px solid transparent',
-              borderLeft: '8px solid var(--interactive-accent, #4a9eff)',
-              filter: 'drop-shadow(0 0 3px var(--interactive-accent, #4a9eff))',
-              pointerEvents: 'none',
-              zIndex: 1000
-            }}
-          />
-          <div
-            className="dmt-edge-snap-indicator west"
-            style={{
-              position: 'absolute',
-              left: `${indicatorPositions.west.x}px`,
-              top: `${indicatorPositions.west.y}px`,
-              width: 0,
-              height: 0,
-              borderTop: '6px solid transparent',
-              borderBottom: '6px solid transparent',
-              borderRight: '8px solid var(--interactive-accent, #4a9eff)',
-              filter: 'drop-shadow(0 0 3px var(--interactive-accent, #4a9eff))',
-              pointerEvents: 'none',
-              zIndex: 1000
-            }}
-          />
-        </>
-      )}
-
-      {freeformDragPreview && selectedItem?.type === 'object' && indicatorPositions && (
-        <>
-          {(['north', 'south', 'east', 'west'] as const).map(dir => {
-            const invertToFreeform = !selectedObject?.freeform;
-            return (
-              <div
-                key={dir}
-                className={`dmt-inversion-indicator ${dir}`}
-                style={{
-                  position: 'absolute',
-                  left: `${indicatorPositions[dir].x + 2}px`,
-                  top: `${indicatorPositions[dir].y + 2}px`,
-                  width: '8px',
-                  height: '8px',
-                  backgroundColor: 'var(--interactive-accent, #4a9eff)',
-                  transform: invertToFreeform ? 'rotate(45deg)' : 'none',
-                  filter: 'drop-shadow(0 0 3px var(--interactive-accent, #4a9eff))',
-                  pointerEvents: 'none',
-                  zIndex: 1000
-                }}
-              />
-            );
-          })}
-        </>
-      )}
+      <CardinalIndicators
+        indicatorPositions={indicatorPositions}
+        isObjectSelected={selectedItem?.type === 'object'}
+        isFreeformPreview={!!freeformDragPreview}
+        isFreeform={!!selectedObject?.freeform}
+      />
 
       {((selectedItem?.type === 'object' || hasMultiSelection) && !isDraggingSelection) && (
         <SelectionToolbar

@@ -13,8 +13,7 @@
  * Higher-level code (hooks, components) only sees Point.
  * Storage and geometry internals use native coordinates.
  * 
- * NOTE: Some functions are exported for API completeness even if not currently
- * used externally (normalizeCoords, getCellCoords, cellExists, removeCells, getCellFill).
+ * NOTE: cellExists and getCellFill are exported for API completeness.
  */
 
 /* eslint-disable @typescript-eslint/no-unused-vars */
@@ -157,14 +156,6 @@ function normalizeToPoint(coords: AnyCoords): Point {
   };
 }
 
-/**
- * Normalize any coordinate format to native storage format.
- */
-function normalizeCoords(coords: AnyCoords, geometry: IGeometry): { x: number; y: number } | { q: number; r: number } {
-  const point = normalizeToPoint(coords);
-  return pointToNative(point, geometry);
-}
-
 // ============================================================================
 // CELL KEY GENERATION
 // ============================================================================
@@ -185,13 +176,6 @@ function cellKey(coords: Point, geometry: IGeometry): CellKey {
  */
 function cellKeyFromCell(cell: Cell, geometry: IGeometry): CellKey {
   return cellKey(cellToPoint(cell), geometry);
-}
-
-/**
- * Extract coordinates from a cell as Point.
- */
-function getCellCoords(cell: Cell, _geometry: IGeometry): Point {
-  return cellToPoint(cell);
 }
 
 // ============================================================================
@@ -305,19 +289,6 @@ function setCells(
   }
   
   return Array.from(cellMap.values());
-}
-
-/**
- * Remove multiple cells by coordinates.
- * @param coordsList - Array of Point coordinates to remove
- */
-function removeCells(
-  cells: Cell[],
-  coordsList: Point[],
-  geometry: IGeometry
-): Cell[] {
-  const removeKeys = new Set(coordsList.map(c => cellKey(c, geometry)));
-  return cells.filter(cell => !removeKeys.has(cellKeyFromCell(cell, geometry)));
 }
 
 /**
@@ -645,11 +616,9 @@ return {
   isSimpleCell,
   
   // Coordinate utilities
-  normalizeCoords,
   normalizeToPoint,
   cellKey,
   cellKeyFromCell,
-  getCellCoords,
   cellToPoint,
   
   // Query functions
@@ -662,7 +631,6 @@ return {
   setCell,
   removeCell,
   setCells,
-  removeCells,
   removeCellsInBounds,
   
   // Segment support (partial cell painting)

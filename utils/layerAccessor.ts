@@ -268,25 +268,7 @@ function reorderLayers(mapData: MapData, layerId: LayerId, newIndex: number): Ma
 // ============================================================================
 
 /**
- * Create an empty layer structure (for new layers or migration)
- */
-function createEmptyLayer(id: LayerId, name: string, order: number): MapLayer {
-  return {
-    id,
-    name,
-    order,
-    visible: true,
-    cells: [],
-    curves: [],
-    edges: [],
-    objects: [],
-    textLabels: [],
-    fogOfWar: null
-  };
-}
-
-/**
- * Create a deep clone of map data for backup purposes
+ * Create a deep clone of map data for backup purposes (internal to migration)
  */
 function createBackup<T>(mapData: T): T | null {
   try {
@@ -752,9 +734,6 @@ function getFogState(layer: MapLayer): FogState {
 // ============================================================================
 
 return {
-  // Constants (re-exported from dmtConstants for convenience)
-  SCHEMA_VERSION,
-  
   // UUID generation
   generateLayerId,
   
@@ -774,9 +753,6 @@ return {
   reorderLayers,
   
   // Migration
-  createEmptyLayer,
-  createBackup,
-  validateMigration,
   migrateToLayerSchema,
   needsMigration,
   

@@ -748,6 +748,43 @@ function buildInitialState(props: BuildInitialStateProps, globalSettings: Global
 }
 
 // ===========================================
+// Helpers
+// ===========================================
+
+/** Apply grid bounds from a calculation result, mutating newState.hexBounds in place. */
+function applyBoundsCalc(newState: SettingsModalState, calc: GridCalculation): SettingsModalState {
+  newState.hexBounds = { maxCol: calc.columns, maxRow: calc.rows };
+  return newState;
+}
+
+/** Recalculate bounds using column-based sizing if image is loaded and bounds are locked. */
+function recalcFromColumns(
+  state: SettingsModalState,
+  newState: SettingsModalState,
+  columns: number,
+  orientation: HexOrientation
+): SettingsModalState {
+  if (!state.imageDimensions || !state.boundsLocked) return newState;
+  return applyBoundsCalc(newState, calculateGridFromColumns(
+    state.imageDimensions.width, state.imageDimensions.height, columns, orientation
+  ));
+}
+
+/** Recalculate bounds using measurement-based sizing if image is loaded and bounds are locked. */
+function recalcFromMeasurement(
+  state: SettingsModalState,
+  newState: SettingsModalState,
+  size: number,
+  method: MeasurementMethod,
+  orientation: HexOrientation
+): SettingsModalState {
+  if (!state.imageDimensions || !state.boundsLocked) return newState;
+  return applyBoundsCalc(newState, calculateGridFromMeasurement(
+    state.imageDimensions.width, state.imageDimensions.height, size, method, orientation
+  ));
+}
+
+// ===========================================
 // Reducer
 // ===========================================
 
@@ -837,41 +874,20 @@ function settingsReducer(state: SettingsModalState, action: SettingsAction): Set
     
     case Actions.SET_DENSITY: {
       const { density, orientation } = action.payload;
-      const newState: SettingsModalState = { ...state, gridDensity: density };
-      
-      if (state.imageDimensions && state.boundsLocked) {
-        const columns = density === 'custom' 
-          ? state.customColumns 
-          : GRID_DENSITY_PRESETS[density]?.columns ?? 24;
-        const calc = calculateGridFromColumns(
-          state.imageDimensions.width, 
-          state.imageDimensions.height, 
-          columns, 
-          orientation
-        );
-        newState.hexBounds = { maxCol: calc.columns, maxRow: calc.rows };
-      }
-      
-      return newState;
+      const columns = density === 'custom'
+        ? state.customColumns
+        : GRID_DENSITY_PRESETS[density]?.columns ?? 24;
+      return recalcFromColumns(state, { ...state, gridDensity: density }, columns, orientation);
     }
-    
+
     case Actions.SET_CUSTOM_COLUMNS: {
       const { columns, orientation } = action.payload;
       const numValue = parseInt(String(columns), 10);
       if (isNaN(numValue) || numValue <= 0) return state;
-      
       const newState: SettingsModalState = { ...state, customColumns: numValue };
-      
-      if (state.imageDimensions && state.boundsLocked && state.gridDensity === 'custom') {
-        const calc = calculateGridFromColumns(
-          state.imageDimensions.width, 
-          state.imageDimensions.height, 
-          numValue, 
-          orientation
-        );
-        newState.hexBounds = { maxCol: calc.columns, maxRow: calc.rows };
+      if (state.gridDensity === 'custom') {
+        return recalcFromColumns(state, newState, numValue, orientation);
       }
-      
       return newState;
     }
     
@@ -881,40 +897,19 @@ function settingsReducer(state: SettingsModalState, action: SettingsAction): Set
     case Actions.SET_MEASUREMENT_METHOD: {
       const { method, orientation } = action.payload;
       const newState: SettingsModalState = { ...state, measurementMethod: method };
-      
-      if (state.imageDimensions && state.boundsLocked && state.sizingMode === 'measurement') {
-        const calc = calculateGridFromMeasurement(
-          state.imageDimensions.width, 
-          state.imageDimensions.height, 
-          state.measurementSize, 
-          method, 
-          orientation
-        );
-        newState.hexBounds = { maxCol: calc.columns, maxRow: calc.rows };
-      }
-      
-      return newState;
+      return state.sizingMode === 'measurement'
+        ? recalcFromMeasurement(state, newState, state.measurementSize, method, orientation)
+        : newState;
     }
-    
+
     case Actions.SET_MEASUREMENT_SIZE: {
       const { size, orientation } = action.payload;
       const numValue = parseFloat(String(size));
       if (isNaN(numValue) || !validateMeasurementSize(numValue).valid) return state;
-      
       const newState: SettingsModalState = { ...state, measurementSize: numValue };
-      
-      if (state.imageDimensions && state.boundsLocked && state.sizingMode === 'measurement') {
-        const calc = calculateGridFromMeasurement(
-          state.imageDimensions.width, 
-          state.imageDimensions.height, 
-          numValue, 
-          state.measurementMethod, 
-          orientation
-        );
-        newState.hexBounds = { maxCol: calc.columns, maxRow: calc.rows };
-      }
-      
-      return newState;
+      return state.sizingMode === 'measurement'
+        ? recalcFromMeasurement(state, newState, numValue, state.measurementMethod, orientation)
+        : newState;
     }
     
     case Actions.SET_FINE_TUNE: {
@@ -940,35 +935,26 @@ function settingsReducer(state: SettingsModalState, action: SettingsAction): Set
     case Actions.RESET_FINE_TUNE: {
       const { orientation } = action.payload;
       const newState: SettingsModalState = { ...state, fineTuneOffset: 0, fineTuneEnabled: false };
-      
-      if (state.imageDimensions && state.boundsLocked && state.sizingMode === 'measurement') {
-        const calc = calculateGridFromMeasurement(
-          state.imageDimensions.width, 
-          state.imageDimensions.height, 
-          state.measurementSize, 
-          state.measurementMethod, 
-          orientation
-        );
-        newState.hexBounds = { maxCol: calc.columns, maxRow: calc.rows };
-      }
-      
-      return newState;
+      return state.sizingMode === 'measurement'
+        ? recalcFromMeasurement(state, newState, state.measurementSize, state.measurementMethod, orientation)
+        : newState;
     }
     
     case Actions.TOGGLE_BOUNDS_LOCK:
       return { ...state, boundsLocked: !state.boundsLocked };
     
     case Actions.SET_IMAGE_OPACITY:
-      return { ...state, imageOpacity: action.payload };
-    
     case Actions.SET_IMAGE_OFFSET_X:
-      return { ...state, imageOffsetX: action.payload };
-    
     case Actions.SET_IMAGE_OFFSET_Y:
-      return { ...state, imageOffsetY: action.payload };
-
-    case Actions.SET_IMAGE_GRID_SIZE:
-      return { ...state, imageGridSize: action.payload };
+    case Actions.SET_IMAGE_GRID_SIZE: {
+      const IMAGE_PROP_FIELD: Record<string, string> = {
+        [Actions.SET_IMAGE_OPACITY]: 'imageOpacity',
+        [Actions.SET_IMAGE_OFFSET_X]: 'imageOffsetX',
+        [Actions.SET_IMAGE_OFFSET_Y]: 'imageOffsetY',
+        [Actions.SET_IMAGE_GRID_SIZE]: 'imageGridSize',
+      };
+      return { ...state, [IMAGE_PROP_FIELD[action.type]]: action.payload };
+    }
 
     case Actions.SET_ACTIVE_COLOR_PICKER:
       return { ...state, activeColorPicker: action.payload };
