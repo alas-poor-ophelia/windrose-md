@@ -16,7 +16,7 @@ import type { EffectiveDistanceSettings } from '#types/hooks/distanceMeasurement
 const pathResolverPath = dc.resolvePath("pathResolver.ts");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
-const { GridGeometry } = await requireModuleByName("GridGeometry.ts");
+const { cellToScreen } = await requireModuleByName("cellToScreenConverter.ts");
 
 /** Shape type for preview */
 type ShapeType = 'rectangle' | 'circle' | 'clearArea' | 'edgeLine';
@@ -28,12 +28,6 @@ interface MapData {
     center: Point;
   };
   northDirection?: number;
-}
-
-/** Geometry with optional methods */
-interface GeometryWithMethods extends IGeometry {
-  cellSize: number;
-  getCellCenter?: (x: number, y: number) => { worldX: number; worldY: number };
 }
 
 /** Props for ShapePreviewOverlay component */
@@ -56,74 +50,6 @@ export interface ShapePreviewOverlayProps {
   distanceSettings?: EffectiveDistanceSettings | null;
   /** If true (touch mode), show as confirmable preview */
   isConfirmable?: boolean;
-}
-
-/**
- * Convert cell coordinates to screen coordinates
- */
-function cellToScreen(
-  cellX: number,
-  cellY: number,
-  geometry: GeometryWithMethods,
-  mapData: MapData,
-  canvasWidth: number,
-  canvasHeight: number,
-  useCenter = true
-): Point {
-  const { zoom, center } = mapData.viewState;
-  const northDirection = mapData.northDirection || 0;
-
-  let worldX: number, worldY: number;
-  if (useCenter) {
-    if (geometry.getCellCenter) {
-      const cellCenter = geometry.getCellCenter(cellX, cellY);
-      worldX = cellCenter.worldX;
-      worldY = cellCenter.worldY;
-    } else {
-      worldX = (cellX + 0.5) * geometry.cellSize;
-      worldY = (cellY + 0.5) * geometry.cellSize;
-    }
-  } else {
-    if (geometry.getCellCenter) {
-      // Hex: no rectangular corners, use cell center as approximation
-      const cellCenter = geometry.getCellCenter(cellX, cellY);
-      worldX = cellCenter.worldX;
-      worldY = cellCenter.worldY;
-    } else {
-      worldX = cellX * geometry.cellSize;
-      worldY = cellY * geometry.cellSize;
-    }
-  }
-
-  let offsetX: number, offsetY: number;
-  if (geometry instanceof GridGeometry) {
-    const scaledCellSize = geometry.getScaledCellSize(zoom);
-    offsetX = canvasWidth / 2 - center.x * scaledCellSize;
-    offsetY = canvasHeight / 2 - center.y * scaledCellSize;
-  } else {
-    offsetX = canvasWidth / 2 - center.x * zoom;
-    offsetY = canvasHeight / 2 - center.y * zoom;
-  }
-
-  let screenX = offsetX + worldX * zoom;
-  let screenY = offsetY + worldY * zoom;
-
-  if (northDirection !== 0) {
-    const centerX = canvasWidth / 2;
-    const centerY = canvasHeight / 2;
-
-    screenX -= centerX;
-    screenY -= centerY;
-
-    const angleRad = (northDirection * Math.PI) / 180;
-    const rotatedX = screenX * Math.cos(angleRad) - screenY * Math.sin(angleRad);
-    const rotatedY = screenX * Math.sin(angleRad) + screenY * Math.cos(angleRad);
-
-    screenX = rotatedX + centerX;
-    screenY = rotatedY + centerY;
-  }
-
-  return { x: screenX, y: screenY };
 }
 
 /**

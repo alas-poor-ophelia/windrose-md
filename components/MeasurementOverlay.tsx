@@ -10,73 +10,7 @@
 const pathResolverPath = dc.resolvePath("pathResolver.ts");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
-const { GridGeometry } = await requireModuleByName("GridGeometry.ts");
-
-/**
- * Convert cell coordinates to screen coordinates
- * Uses the same calculation pattern as DrawingLayer and useCanvasRenderer
- * 
- * @param {number} cellX - Cell X coordinate
- * @param {number} cellY - Cell Y coordinate
- * @param {Object} geometry - GridGeometry or HexGeometry instance
- * @param {Object} mapData - Map data containing viewState
- * @param {number} canvasWidth - Canvas width in pixels
- * @param {number} canvasHeight - Canvas height in pixels
- * @returns {{x: number, y: number}} Screen coordinates
- */
-function cellToScreen(cellX, cellY, geometry, mapData, canvasWidth, canvasHeight) {
-  const { zoom, center } = mapData.viewState;
-  const northDirection = mapData.northDirection || 0;
-  
-  // Get cell center in world coordinates
-  let worldX, worldY;
-  if (geometry.getCellCenter) {
-    const cellCenter = geometry.getCellCenter(cellX, cellY);
-    worldX = cellCenter.worldX;
-    worldY = cellCenter.worldY;
-  } else if (geometry.getHexCenter) {
-    const hexCenter = geometry.getHexCenter(cellX, cellY);
-    worldX = hexCenter.worldX;
-    worldY = hexCenter.worldY;
-  } else {
-    worldX = cellX;
-    worldY = cellY;
-  }
-  
-  // Calculate offset based on geometry type (same as useCanvasRenderer)
-  let offsetX, offsetY;
-  if (geometry instanceof GridGeometry) {
-    const scaledCellSize = geometry.getScaledCellSize(zoom);
-    offsetX = canvasWidth / 2 - center.x * scaledCellSize;
-    offsetY = canvasHeight / 2 - center.y * scaledCellSize;
-  } else {
-    // HexGeometry: center is in world pixel coordinates
-    offsetX = canvasWidth / 2 - center.x * zoom;
-    offsetY = canvasHeight / 2 - center.y * zoom;
-  }
-  
-  // Convert world to screen
-  let screenX = offsetX + worldX * zoom;
-  let screenY = offsetY + worldY * zoom;
-  
-  // Apply rotation if needed
-  if (northDirection !== 0) {
-    const centerX = canvasWidth / 2;
-    const centerY = canvasHeight / 2;
-    
-    screenX -= centerX;
-    screenY -= centerY;
-    
-    const angleRad = (northDirection * Math.PI) / 180;
-    const rotatedX = screenX * Math.cos(angleRad) - screenY * Math.sin(angleRad);
-    const rotatedY = screenX * Math.sin(angleRad) + screenY * Math.cos(angleRad);
-    
-    screenX = rotatedX + centerX;
-    screenY = rotatedY + centerY;
-  }
-  
-  return { x: screenX, y: screenY };
-}
+const { cellToScreen } = await requireModuleByName("cellToScreenConverter.ts");
 
 const MeasurementOverlay = ({
   measureOrigin,

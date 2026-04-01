@@ -44,11 +44,11 @@ const { useFogOfWar } = await requireModuleByName("useFogOfWar.ts");
 const { useDataHandlers } = await requireModuleByName("useDataHandlers.ts");
 const { GridGeometry } = await requireModuleByName("GridGeometry.ts");
 const { HexGeometry } = await requireModuleByName("HexGeometry.ts");
-const { MapHeader } = await requireModuleByName("MapHeader.jsx");
+const { MapHeader } = await requireModuleByName("MapHeader.tsx");
 const { MapCanvas } = await requireModuleByName("MapCanvas.tsx");
-const { MapControls } = await requireModuleByName("MapControls.jsx");
+const { MapControls } = await requireModuleByName("MapControls.tsx");
 const { ToolPalette } = await requireModuleByName("ToolPalette.tsx");
-const { ObjectSidebar } = await requireModuleByName("ObjectSidebar.jsx");
+const { ObjectSidebar } = await requireModuleByName("ObjectSidebar.tsx");
 const { VisibilityToolbar } = await requireModuleByName("VisibilityToolbar.tsx");
 const { SettingsPluginInstaller } = await requireModuleByName("SettingsPluginInstaller.tsx");
 const { MapSettingsModal } = await requireModuleByName("MapSettingsModal.tsx");
@@ -56,7 +56,7 @@ const { getTheme, getEffectiveSettings } = await requireModuleByName("settingsAc
 const { DEFAULTS } = await requireModuleByName("dmtConstants.ts");
 const { getColorByHex, isDefaultColor } = await requireModuleByName("colorOperations.ts");
 const { axialToOffset, offsetToAxial, isWithinOffsetBounds } = await requireModuleByName("offsetCoordinates.ts");
-const { ImageAlignmentMode } = await requireModuleByName("ImageAlignmentMode.jsx");
+const { ImageAlignmentMode } = await requireModuleByName("ImageAlignmentMode.tsx");
 const { ModalPortal } = await requireModuleByName("ModalPortal.tsx");
 
 const { getActiveLayer } = await requireModuleByName("layerAccessor.ts");
@@ -68,7 +68,7 @@ const { useCustomEventHandlers } = await requireModuleByName("useCustomEventHand
 const { useUILayout } = await requireModuleByName("useUILayout.ts");
 const { usePanelState } = await requireModuleByName("usePanelState.ts");
 const { getObsidianModule, isBridgeAvailable } = await requireModuleByName("obsidianBridge.ts");
-const { openNativeNoteLinkModal } = await requireModuleByName("NoteLinkModal.jsx") as {
+const { openNativeNoteLinkModal } = await requireModuleByName("NoteLinkModal.tsx") as {
   openNativeNoteLinkModal: (options: { onSave: (path: string) => void; onClose: () => void; currentNotePath: string | null; objectType: string | null }) => boolean;
 };
 const { SubHexBreadcrumb } = await requireModuleByName("SubHexBreadcrumb.tsx");

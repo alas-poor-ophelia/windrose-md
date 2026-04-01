@@ -25,9 +25,9 @@ const { useLinkingMode } = await requireModuleByName("ObjectLinkingContext.tsx")
 const { useEventHandlerRegistration } = await requireModuleByName("EventHandlerContext.tsx");
 const { useObjectInteractions } = await requireModuleByName("useObjectInteractions.ts");
 const { TextInputModal } = await requireModuleByName("TextInputModal.tsx");
-const { NoteLinkModal } = await requireModuleByName("NoteLinkModal.jsx");
+const { NoteLinkModal } = await requireModuleByName("NoteLinkModal.tsx");
 const { useObjectModals } = await requireModuleByName("useObjectModals.ts");
-const { SelectionToolbar } = await requireModuleByName("SelectionToolbar.jsx");
+const { SelectionToolbar } = await requireModuleByName("SelectionToolbar.tsx");
 const { calculateObjectScreenPosition } = await requireModuleByName("screenPositionUtils.ts");
 const { getActiveLayer } = await requireModuleByName("layerAccessor.ts");
 const { convertObjectToFreeform, snapObjectToGrid } = await requireModuleByName("objectOperations.ts") as {
@@ -574,7 +574,7 @@ const ObjectLayer = ({
     };
 
     document.addEventListener('mousedown', handleClickOutside);
-    document.addEventListener('touchstart', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside, { passive: true });
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);

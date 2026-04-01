@@ -17,7 +17,7 @@ const { useMapState } = await requireModuleByName("MapContext.tsx");
 const { useEventHandlerRegistration } = await requireModuleByName("EventHandlerContext.tsx");
 const { useRegionTools } = await requireModuleByName("useRegionTools.ts");
 const { getObsidianModule, isBridgeAvailable } = await requireModuleByName("obsidianBridge.ts");
-const { openNativeNoteLinkModal } = await requireModuleByName("NoteLinkModal.jsx");
+const { openNativeNoteLinkModal } = await requireModuleByName("NoteLinkModal.tsx");
 
 interface RegionLayerProps {
   currentTool: ToolId;

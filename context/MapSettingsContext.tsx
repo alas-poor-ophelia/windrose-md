@@ -606,7 +606,7 @@ const MapSettingsProvider: React.FC<MapSettingsProviderProps> = ({
 
     const timeoutId = setTimeout(() => {
       document.addEventListener('mousedown', handleClickOutside);
-      document.addEventListener('touchstart', handleClickOutside);
+      document.addEventListener('touchstart', handleClickOutside, { passive: true });
     }, 0);
 
     return () => {

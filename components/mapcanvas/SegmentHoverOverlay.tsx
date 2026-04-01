@@ -12,7 +12,7 @@ import type { IGeometry } from '#types/core/geometry.types';
 const pathResolverPath = dc.resolvePath("pathResolver.ts");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
-const { GridGeometry } = await requireModuleByName("GridGeometry.ts");
+const { cellToScreen } = await requireModuleByName("cellToScreenConverter.ts");
 const { SEGMENT_VERTICES, SEGMENT_TRIANGLES } = await requireModuleByName("dmtConstants.ts");
 
 /** Segment name type */
@@ -48,53 +48,6 @@ export interface SegmentHoverOverlayProps {
   canvasRef: { current: HTMLCanvasElement | null } | null;
   /** Reference to container element */
   containerRef: { current: HTMLElement | null } | null;
-}
-
-/** Grid geometry with cellSize property */
-interface GridGeometryInstance extends IGeometry {
-  cellSize: number;
-}
-
-/**
- * Convert cell coordinates to screen coordinates
- */
-function cellToScreen(
-  cellX: number,
-  cellY: number,
-  geometry: GridGeometryInstance,
-  mapData: MapData,
-  canvasWidth: number,
-  canvasHeight: number
-): Point {
-  const { zoom, center } = mapData.viewState;
-  const northDirection = mapData.northDirection || 0;
-
-  const worldX = cellX * geometry.cellSize;
-  const worldY = cellY * geometry.cellSize;
-
-  const scaledCellSize = geometry.getScaledCellSize(zoom);
-  const offsetX = canvasWidth / 2 - center.x * scaledCellSize;
-  const offsetY = canvasHeight / 2 - center.y * scaledCellSize;
-
-  let screenX = offsetX + worldX * zoom;
-  let screenY = offsetY + worldY * zoom;
-
-  if (northDirection !== 0) {
-    const centerX = canvasWidth / 2;
-    const centerY = canvasHeight / 2;
-
-    screenX -= centerX;
-    screenY -= centerY;
-
-    const angleRad = (northDirection * Math.PI) / 180;
-    const rotatedX = screenX * Math.cos(angleRad) - screenY * Math.sin(angleRad);
-    const rotatedY = screenX * Math.sin(angleRad) + screenY * Math.cos(angleRad);
-
-    screenX = rotatedX + centerX;
-    screenY = rotatedY + centerY;
-  }
-
-  return { x: screenX, y: screenY };
 }
 
 /**
@@ -149,10 +102,11 @@ const SegmentHoverOverlay = ({
   const cellTopLeft = cellToScreen(
     cellX,
     cellY,
-    geometry as GridGeometryInstance,
+    geometry,
     mapData,
     canvasWidth,
-    canvasHeight
+    canvasHeight,
+    false
   );
 
   const scaledTopLeft = {

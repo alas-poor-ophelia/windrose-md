@@ -15,7 +15,7 @@ const { useMapState } = await requireModuleByName("MapContext.tsx");
 const { useMapSelection } = await requireModuleByName("MapSelectionContext.tsx");
 const { getActiveLayer } = await requireModuleByName("layerAccessor.ts");
 const { openNativeTextInputModal } = await requireModuleByName("TextInputModal.tsx");
-const { openNativeNoteLinkModal } = await requireModuleByName("NoteLinkModal.jsx");
+const { openNativeNoteLinkModal } = await requireModuleByName("NoteLinkModal.tsx");
 
 interface UseObjectModalsArgs {
   onObjectsChange: (objects: MapObject[], suppressHistory?: boolean) => void;

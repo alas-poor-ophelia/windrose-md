@@ -19,7 +19,7 @@ const { requireModuleByName } = await dc.require(pathResolverPath);
 const { useNotePinInteraction } = await requireModuleByName("useNotePinInteraction.ts");
 const { useMapState, useMapOperations } = await requireModuleByName("MapContext.tsx");
 const { useMapSelection } = await requireModuleByName("MapSelectionContext.tsx");
-const { NoteLinkModal, openNativeNoteLinkModal } = await requireModuleByName("NoteLinkModal.jsx");
+const { NoteLinkModal, openNativeNoteLinkModal } = await requireModuleByName("NoteLinkModal.tsx");
 const { isBridgeAvailable } = await requireModuleByName("obsidianBridge.ts");
 const { useEventHandlerRegistration } = await requireModuleByName("EventHandlerContext.tsx");
 

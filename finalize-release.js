@@ -13,8 +13,9 @@ async function run(ctx) {
   let cleaned = outputContent;
 
   // Step 1: Remove orphaned getJsonPath destructuring line (references undefined pathResolverImport)
+  // Handles both formatted (const { getJsonPath }) and minified (const {getJsonPath}) output
   cleaned = cleaned.replace(
-    /const \{ getJsonPath \} = pathResolverImport;\r?\n/g,
+    /const \{?\s*getJsonPath\s*\}? = pathResolverImport;\r?\n?/g,
     ''
   );
 

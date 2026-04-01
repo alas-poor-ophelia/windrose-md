@@ -1,6 +1,6 @@
 const pathResolverPath = dc.resolvePath("pathResolver.ts");
 const { requireModuleByName } = await dc.require(pathResolverPath);
-const { WindroseCompass } = await requireModuleByName("WindroseCompass.jsx");
+const { WindroseCompass } = await requireModuleByName("WindroseCompass.tsx");
 
 // Timing constants - easy to tune
 const COLLAPSE_DELAY_DESKTOP_MS = 800;   // Desktop: time after mouse leaves

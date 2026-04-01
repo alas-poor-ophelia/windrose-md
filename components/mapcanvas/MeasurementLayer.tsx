@@ -12,7 +12,7 @@ const pathResolverPath = dc.resolvePath("pathResolver.ts");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
 const { useDistanceMeasurement } = await requireModuleByName("useDistanceMeasurement.ts");
-const { MeasurementOverlay } = await requireModuleByName("MeasurementOverlay.jsx");
+const { MeasurementOverlay } = await requireModuleByName("MeasurementOverlay.tsx");
 const { useMapState } = await requireModuleByName("MapContext.tsx");
 const { useEventHandlerRegistration } = await requireModuleByName("EventHandlerContext.tsx");
 

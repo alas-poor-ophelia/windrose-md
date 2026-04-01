@@ -834,10 +834,10 @@ const useEventCoordinator = ({
     canvas.addEventListener('mousedown', handleMouseDown);
     canvas.addEventListener('mouseup', handleMouseUp);
     canvas.addEventListener('touchstart', handlePointerDown as EventListener);
-    canvas.addEventListener('touchstart', handleTouchStartForLongPress as EventListener);
-    canvas.addEventListener('touchmove', cancelLongPress);
-    canvas.addEventListener('touchend', cancelLongPress);
-    canvas.addEventListener('touchend', handleTouchEndDoubleTap);
+    canvas.addEventListener('touchstart', handleTouchStartForLongPress as EventListener, { passive: true });
+    canvas.addEventListener('touchmove', cancelLongPress, { passive: true });
+    canvas.addEventListener('touchend', cancelLongPress, { passive: true });
+    canvas.addEventListener('touchend', handleTouchEndDoubleTap, { passive: true });
     canvas.addEventListener('mousemove', handlePointerMove as EventListener);
     canvas.addEventListener('touchmove', handlePointerMove as EventListener);
     canvas.addEventListener('touchend', handlePointerUp as EventListener);
@@ -926,7 +926,7 @@ const useEventCoordinator = ({
     };
 
     window.addEventListener('mouseup', handleGlobalPointerUp);
-    window.addEventListener('touchend', handleGlobalPointerUp as EventListener);
+    window.addEventListener('touchend', handleGlobalPointerUp as EventListener, { passive: true });
     window.addEventListener('mousemove', handleGlobalMouseMove);
 
     return () => {

@@ -11,7 +11,7 @@ const pathResolverPath = dc.resolvePath("pathResolver.ts");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
 const { THEME, DEFAULTS } = await requireModuleByName("dmtConstants.ts");
-const { WindroseCompass } = await requireModuleByName("WindroseCompass.jsx");
+const { WindroseCompass } = await requireModuleByName("WindroseCompass.tsx");
 
 // NOTE: Assembler is lazy-loaded only when install/upgrade is triggered
 // This avoids running assembly on every app load

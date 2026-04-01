@@ -434,7 +434,7 @@ const ToolPalette = ({
 
     setTimeout(() => {
       document.addEventListener('mousedown', handleClickOutside);
-      document.addEventListener('touchstart', handleClickOutside);
+      document.addEventListener('touchstart', handleClickOutside, { passive: true });
     }, 10);
 
     return () => {
@@ -464,7 +464,7 @@ const ToolPalette = ({
 
     setTimeout(() => {
       document.addEventListener('mousedown', handleClickOutside);
-      document.addEventListener('touchstart', handleClickOutside);
+      document.addEventListener('touchstart', handleClickOutside, { passive: true });
     }, 10);
 
     return () => {

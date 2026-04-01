@@ -2,9 +2,9 @@
 const pathResolverPath = dc.resolvePath("pathResolver.ts");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
-const { TextLabelEditor, openNativeTextLabelEditor } = await requireModuleByName("TextLabelEditor.jsx");
+const { TextLabelEditor, openNativeTextLabelEditor } = await requireModuleByName("TextLabelEditor.tsx");
 const { TextInputModal } = await requireModuleByName("TextInputModal.tsx");
-const { NoteLinkModal, openNativeNoteLinkModal } = await requireModuleByName("NoteLinkModal.jsx");
+const { NoteLinkModal, openNativeNoteLinkModal } = await requireModuleByName("NoteLinkModal.tsx");
 const { ColorPicker } = await requireModuleByName("ColorPicker.tsx");
 const { openNoteInNewTab } = await requireModuleByName("noteOperations.ts");
 
