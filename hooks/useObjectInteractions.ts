@@ -46,6 +46,27 @@ const { calculateObjectScreenPosition: calculateScreenPos, applyInverseRotation 
   applyInverseRotation: (x: number, y: number, width: number, height: number, angle: number) => { x: number; y: number };
 };
 
+const { useObjectModifications } = await requireModuleByName("useObjectModifications.ts") as {
+  useObjectModifications: () => {
+    handleObjectWheel: (e: WheelEvent) => boolean;
+    handleNoteSubmit: (content: string, editingObjectId: string) => void;
+    handleObjectColorSelect: (color: string) => void;
+    handleObjectColorReset: (setShowObjectColorPicker: (show: boolean) => void) => void;
+    handleObjectRotation: () => void;
+    handleObjectDeletion: () => void;
+    handleObjectDuplicate: () => void;
+  };
+};
+
+const { useObjectUIPositions } = await requireModuleByName("useObjectUIPositions.ts") as {
+  useObjectUIPositions: () => {
+    calculateLabelButtonPosition: () => import('#types/hooks/objectInteractions.types').ButtonPosition;
+    calculateLinkNoteButtonPosition: () => import('#types/hooks/objectInteractions.types').ButtonPosition;
+    calculateResizeButtonPosition: () => import('#types/hooks/objectInteractions.types').ButtonPosition;
+    calculateObjectColorButtonPosition: () => import('#types/hooks/objectInteractions.types').ButtonPosition;
+  };
+};
+
 const { useMapState, useMapOperations } = await requireModuleByName("MapContext.tsx") as {
   useMapState: () => MapStateContextValue;
   useMapOperations: () => MapOperationsContextValue;
@@ -122,6 +143,23 @@ const useObjectInteractions = (
     mousePosition,
     setMousePosition
   } = useMapSelection();
+
+  const {
+    calculateLabelButtonPosition,
+    calculateLinkNoteButtonPosition,
+    calculateResizeButtonPosition,
+    calculateObjectColorButtonPosition
+  } = useObjectUIPositions();
+
+  const {
+    handleObjectWheel,
+    handleNoteSubmit,
+    handleObjectColorSelect,
+    handleObjectColorReset,
+    handleObjectRotation,
+    handleObjectDeletion,
+    handleObjectDuplicate
+  } = useObjectModifications();
 
   const [isResizing, setIsResizing] = dc.useState<boolean>(false);
   const [resizeCorner, setResizeCorner] = dc.useState<ResizeCorner>(null);
@@ -978,276 +1016,6 @@ const useObjectInteractions = (
     return false;
   }, [selectedItem, isResizeMode, mapData, removeObject, updateObject, onObjectsChange, setSelectedItem, setIsResizeMode]
   );
-
-  const handleObjectWheel = dc.useCallback((e: WheelEvent): boolean => {
-    if (selectedItem?.type !== 'object' || !mapData) {
-      return false;
-    }
-
-    const coords = screenToGrid(e.clientX, e.clientY);
-    if (!coords) return false;
-
-    const { x, y } = coords;
-    const selectedObject = getActiveLayer(mapData).objects.find((obj: MapObject) => obj.id === selectedItem.id);
-    if (!selectedObject) return false;
-
-    const isOverObject = x >= selectedObject.position.x &&
-                     x < selectedObject.position.x + (selectedObject.size?.width || 1) &&
-                     y >= selectedObject.position.y &&
-                     y < selectedObject.position.y + (selectedObject.size?.height || 1);
-
-    if (!isOverObject) return false;
-
-    e.preventDefault();
-
-    const currentScale = selectedObject.scale ?? 1.0;
-    const delta = e.deltaY > 0 ? -0.05 : 0.05;
-    const newScale = Math.max(0.25, Math.min(1.3, currentScale + delta));
-
-    if (newScale !== currentScale) {
-      const updatedObjects = updateObject(getActiveLayer(mapData).objects, selectedItem.id, { scale: newScale });
-      onObjectsChange(updatedObjects);
-    }
-
-    return true;
-  }, [selectedItem, mapData, screenToGrid, updateObject, onObjectsChange]);
-
-  const calculateLabelButtonPosition = dc.useCallback((): ButtonPosition => {
-    if (selectedItem?.type !== 'object' || !mapData || !canvasRef.current) {
-      return { x: 0, y: 0 };
-    }
-
-    const object = getActiveLayer(mapData).objects.find((obj: MapObject) => obj.id === selectedItem.id);
-    if (!object) return { x: 0, y: 0 };
-
-    const pos = calculateScreenPos(object, canvasRef.current, mapData, geometry!);
-    if (!pos) return { x: 0, y: 0 };
-
-    const { screenX, screenY, objectWidth, objectHeight } = pos;
-    const buttonOffset = 4;
-
-    const buttonX = screenX + (objectWidth / 2) + buttonOffset;
-    const buttonY = screenY - (objectHeight / 2) - buttonOffset - 22;
-
-    return { x: buttonX, y: buttonY };
-  }, [selectedItem, mapData, canvasRef, geometry]
-  );
-
-  const calculateLinkNoteButtonPosition = dc.useCallback((): ButtonPosition => {
-    if (selectedItem?.type !== 'object' || !mapData || !canvasRef.current) {
-      return { x: 0, y: 0 };
-    }
-
-    const object = getActiveLayer(mapData).objects.find((obj: MapObject) => obj.id === selectedItem.id);
-    if (!object) return { x: 0, y: 0 };
-
-    const pos = calculateScreenPos(object, canvasRef.current, mapData, geometry!);
-    if (!pos) return { x: 0, y: 0 };
-
-    const { screenX, screenY, objectWidth, objectHeight } = pos;
-    const buttonOffset = 4;
-    const buttonHeight = 44;
-    const minSpacing = 8;
-
-    let buttonY = screenY + (objectHeight / 2) + buttonOffset;
-
-    const addEditNoteButtonBottom = screenY - (objectHeight / 2) - buttonOffset - 22 + buttonHeight;
-
-    if (buttonY - 22 < addEditNoteButtonBottom + minSpacing) {
-      buttonY = addEditNoteButtonBottom + minSpacing + 22;
-    }
-
-    const buttonX = screenX + (objectWidth / 2) + buttonOffset;
-
-    return { x: buttonX, y: buttonY - 22 };
-  }, [selectedItem, mapData, canvasRef, geometry]
-  );
-
-  const calculateResizeButtonPosition = dc.useCallback((): ButtonPosition => {
-    if (selectedItem?.type !== 'object' || !mapData || !canvasRef.current) {
-      return { x: 0, y: 0 };
-    }
-
-    const object = getActiveLayer(mapData).objects.find((obj: MapObject) => obj.id === selectedItem.id);
-    if (!object) return { x: 0, y: 0 };
-
-    const pos = calculateScreenPos(object, canvasRef.current, mapData, geometry!);
-    if (!pos) return { x: 0, y: 0 };
-
-    const { screenX, screenY, objectWidth, objectHeight } = pos;
-    const buttonOffset = 4;
-    const buttonSize = 44;
-
-    const buttonX = screenX - (objectWidth / 2) - buttonOffset - buttonSize;
-    const buttonY = screenY - (objectHeight / 2) - buttonOffset - 22;
-
-    return { x: buttonX, y: buttonY };
-  }, [selectedItem, mapData, canvasRef, geometry]
-  );
-
-  const calculateObjectColorButtonPosition = dc.useCallback((): ButtonPosition => {
-    if (selectedItem?.type !== 'object' || !mapData || !canvasRef.current) {
-      return { x: 0, y: 0 };
-    }
-
-    const object = getActiveLayer(mapData).objects.find((obj: MapObject) => obj.id === selectedItem.id);
-    if (!object) return { x: 0, y: 0 };
-
-    const pos = calculateScreenPos(object, canvasRef.current, mapData, geometry!);
-    if (!pos) return { x: 0, y: 0 };
-
-    const { screenX, screenY, objectWidth, objectHeight } = pos;
-    const buttonOffset = 4;
-    const buttonSize = 44;
-    const buttonHeight = 44;
-    const minSpacing = 8;
-
-    let buttonY = screenY + (objectHeight / 2) + buttonOffset;
-
-    const resizeButtonBottom = screenY - (objectHeight / 2) - buttonOffset - 22 + buttonHeight;
-
-    if (buttonY - 22 < resizeButtonBottom + minSpacing) {
-      buttonY = resizeButtonBottom + minSpacing + 22;
-    }
-
-    const buttonX = screenX - (objectWidth / 2) - buttonOffset - buttonSize;
-
-    return { x: buttonX, y: buttonY - 22 };
-  }, [selectedItem, mapData, canvasRef, geometry]
-  );
-
-  const handleNoteSubmit = dc.useCallback((content: string, editingObjectId: string): void => {
-    if (editingObjectId && mapData) {
-      const updatedObjects = updateObject(
-        getActiveLayer(mapData).objects,
-        editingObjectId,
-        { customTooltip: content && content.trim() ? content.trim() : undefined }
-      );
-      onObjectsChange(updatedObjects);
-    }
-  }, [mapData, onObjectsChange, updateObject]
-  );
-
-  const handleObjectColorSelect = dc.useCallback((color: string): void => {
-    if (selectedItem?.type === 'object' && mapData) {
-      const updatedObjects = updateObject(
-        getActiveLayer(mapData).objects,
-        selectedItem.id,
-        { color: color }
-      );
-      onObjectsChange(updatedObjects);
-    }
-  }, [selectedItem, mapData, updateObject, onObjectsChange]
-  );
-
-  const handleObjectColorReset = dc.useCallback((setShowObjectColorPicker: (show: boolean) => void): void => {
-    handleObjectColorSelect('#ffffff');
-    setShowObjectColorPicker(false);
-  }, [handleObjectColorSelect]);
-
-  const handleObjectRotation = dc.useCallback((): void => {
-    if (!selectedItem || selectedItem.type !== 'object' || !mapData) {
-      return;
-    }
-
-    const currentObject = getActiveLayer(mapData).objects?.find((obj: MapObject) => obj.id === selectedItem.id);
-    const currentRotation = currentObject?.rotation || 0;
-    const nextRotation = getNextRotation(currentRotation);
-
-    const updatedObjects = updateObject(
-      getActiveLayer(mapData).objects,
-      selectedItem.id,
-      { rotation: nextRotation }
-    );
-    onObjectsChange(updatedObjects);
-  }, [selectedItem, mapData, updateObject, onObjectsChange]);
-
-  const handleObjectDeletion = dc.useCallback((): void => {
-    if (!selectedItem || selectedItem.type !== 'object' || !mapData) {
-      return;
-    }
-
-    const updatedObjects = removeObject(getActiveLayer(mapData).objects, selectedItem.id);
-    onObjectsChange(updatedObjects);
-    setSelectedItem(null);
-  }, [selectedItem, mapData, removeObject, onObjectsChange, setSelectedItem]);
-
-  const handleObjectDuplicate = dc.useCallback((): void => {
-    if (!selectedItem || selectedItem.type !== 'object' || !mapData) {
-      return;
-    }
-
-    const sourceObject = getActiveLayer(mapData).objects.find((obj: MapObject) => obj.id === selectedItem.id);
-    if (!sourceObject) return;
-
-    const { mapType } = mapData;
-    const { x: sourceX, y: sourceY } = sourceObject.position;
-
-    // Hex-axial 6 directions vs Cartesian 4 directions
-    const directions = mapType === 'hex'
-      ? [[1, 0], [1, -1], [0, -1], [-1, 0], [-1, 1], [0, 1]]
-      : [[1, 0], [0, 1], [-1, 0], [0, -1]];
-    let targetX = sourceX;
-    let targetY = sourceY;
-    let found = false;
-
-    // Check immediate neighbors first
-    for (const [dx, dy] of directions) {
-      if (canPlaceObjectAt(getActiveLayer(mapData).objects, sourceX + dx, sourceY + dy, mapType)) {
-        targetX = sourceX + dx;
-        targetY = sourceY + dy;
-        found = true;
-        break;
-      }
-    }
-
-    // Expanding ring search if immediate neighbors are full
-    if (!found) {
-      for (let ring = 2; ring <= 10 && !found; ring++) {
-        for (let dx = -ring; dx <= ring && !found; dx++) {
-          for (let dy = -ring; dy <= ring && !found; dy++) {
-            if (Math.abs(dx) === ring || Math.abs(dy) === ring) {
-              const checkX = sourceX + dx;
-              const checkY = sourceY + dy;
-
-              if (canPlaceObjectAt(getActiveLayer(mapData).objects, checkX, checkY, mapType)) {
-                targetX = checkX;
-                targetY = checkY;
-                found = true;
-              }
-            }
-          }
-        }
-      }
-    }
-
-    if (!found) {
-      console.warn('No empty space found for duplicate');
-      return;
-    }
-
-    const newObject: MapObject = {
-      ...sourceObject,
-      id: generateObjectId(),
-      position: { x: targetX, y: targetY }
-    };
-
-    if (mapType === 'hex') {
-      const occupiedSlots = getActiveLayer(mapData).objects
-        .filter((obj: MapObject) => obj.position.x === targetX && obj.position.y === targetY)
-        .map((obj: MapObject) => obj.slot)
-        .filter((s: number | undefined): s is number => s !== undefined);
-      newObject.slot = assignSlot(occupiedSlots);
-    }
-
-    const updatedObjects = [...getActiveLayer(mapData).objects, newObject];
-    onObjectsChange(updatedObjects);
-
-    setSelectedItem({
-      type: 'object',
-      id: newObject.id
-    });
-  }, [selectedItem, mapData, onObjectsChange, setSelectedItem]);
 
   dc.useEffect(() => {
     if (currentTool !== 'select') {
