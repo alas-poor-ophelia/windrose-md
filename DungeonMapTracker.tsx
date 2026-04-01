@@ -17,7 +17,6 @@ import type {
   BackgroundImage,
   UIPreferences,
   MapSettings,
-  ObjectLink,
   MapLayer,
 } from '#types/index';
 import type { ResolvedTheme } from '#types/settings/settings.types';
@@ -51,20 +50,23 @@ const { MapControls } = await requireModuleByName("MapControls.jsx");
 const { ToolPalette } = await requireModuleByName("ToolPalette.tsx");
 const { ObjectSidebar } = await requireModuleByName("ObjectSidebar.jsx");
 const { VisibilityToolbar } = await requireModuleByName("VisibilityToolbar.tsx");
-const { SettingsPluginInstaller, shouldOfferUpgrade } = await requireModuleByName("SettingsPluginInstaller.tsx");
+const { SettingsPluginInstaller } = await requireModuleByName("SettingsPluginInstaller.tsx");
 const { MapSettingsModal } = await requireModuleByName("MapSettingsModal.tsx");
-const { getSetting, getTheme, getEffectiveSettings } = await requireModuleByName("settingsAccessor.ts");
+const { getTheme, getEffectiveSettings } = await requireModuleByName("settingsAccessor.ts");
 const { DEFAULTS } = await requireModuleByName("dmtConstants.ts");
 const { getColorByHex, isDefaultColor } = await requireModuleByName("colorOperations.ts");
 const { axialToOffset, offsetToAxial, isWithinOffsetBounds } = await requireModuleByName("offsetCoordinates.ts");
 const { ImageAlignmentMode } = await requireModuleByName("ImageAlignmentMode.jsx");
 const { ModalPortal } = await requireModuleByName("ModalPortal.tsx");
 
-const { getActiveLayer, getLayerById } = await requireModuleByName("layerAccessor.ts");
+const { getActiveLayer } = await requireModuleByName("layerAccessor.ts");
 const { LayerControls } = await requireModuleByName("LayerControls.tsx");
 const { RegionPanel } = await requireModuleByName("RegionPanel.tsx");
 const { LayerEditModal } = await requireModuleByName("LayerEditModal.tsx");
 const { useSubHexNavigation } = await requireModuleByName("useSubHexNavigation.ts");
+const { useCustomEventHandlers } = await requireModuleByName("useCustomEventHandlers.ts");
+const { useUILayout } = await requireModuleByName("useUILayout.ts");
+const { usePanelState } = await requireModuleByName("usePanelState.ts");
 const { getObsidianModule, isBridgeAvailable } = await requireModuleByName("obsidianBridge.ts");
 const { openNativeNoteLinkModal } = await requireModuleByName("NoteLinkModal.jsx") as {
   openNativeNoteLinkModal: (options: { onSave: (path: string) => void; onClose: () => void; currentNotePath: string | null; objectType: string | null }) => boolean;
@@ -196,21 +198,23 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
 
   const [freeformPlacementMode, setFreeformPlacementMode] = dc.useState(false);
 
-  const [showFooter, setShowFooter] = dc.useState(false);
-  const [isFocused, setIsFocused] = dc.useState(false);
-  const [isExpanded, setIsExpanded] = dc.useState(false);
-  const [isAnimating, setIsAnimating] = dc.useState(false);
-  const [pluginInstalled, setPluginInstalled] = dc.useState<boolean | null>(null); // null = checking, true/false = result
-  const [showPluginInstaller, setShowPluginInstaller] = dc.useState(false);
-  const [settingsVersion, setSettingsVersion] = dc.useState(0); // Incremented to force re-render on settings change
-  const [showSettingsModal, setShowSettingsModal] = dc.useState(false);
-  const [showVisibilityToolbar, setShowVisibilityToolbar] = dc.useState(false);
-  const [showLayerPanel, setShowLayerPanel] = dc.useState(false);
-  const [showRegionPanel, setShowRegionPanel] = dc.useState(false);
-  const [editingLayerId, setEditingLayerId] = dc.useState<string | null>(null);
-const editingLayer = dc.useMemo(() => {
-    return editingLayerId ? getLayerById(mapData, editingLayerId) : null;
-  }, [editingLayerId, mapData]);
+  // Panel/modal state (plugin installer, settings modal, layer edit)
+  const {
+    showSettingsModal, setShowSettingsModal,
+    showPluginInstaller, setShowPluginInstaller,
+    editingLayerId, setEditingLayerId,
+    editingLayer, pluginInstalled
+  } = usePanelState({ mapData });
+
+  // UI layout state (expand/collapse, panels, focus, footer)
+  const {
+    containerRef, isFocused, setIsFocused,
+    isExpanded, isAnimating, handleToggleExpand,
+    showFooter, setShowFooter,
+    showVisibilityToolbar, setShowVisibilityToolbar,
+    showLayerPanel, setShowLayerPanel,
+    showRegionPanel, setShowRegionPanel
+  } = useUILayout({ mapData, updateMapData, showPluginInstaller });
 
   // Image alignment mode state
   const [isAlignmentMode, setIsAlignmentMode] = dc.useState(false);
@@ -296,71 +300,7 @@ const editingLayer = dc.useMemo(() => {
         : (effectiveSettings.canvasHeight ?? 600))
     : (isTouchDevice ? 400 : 600);
 
-  // Check if settings plugin is installed
-  dc.useEffect(() => {
-    async function checkPlugin(): Promise<void> {
-      try {
-        const pluginDir = '.obsidian/plugins/dungeon-map-tracker-settings';
-        const exists = await dc.app.vault.adapter.exists(pluginDir);
-        setPluginInstalled(exists);
-      } catch (error) {
-        console.error('[DungeonMapTracker] Error checking plugin:', error);
-        setPluginInstalled(false);
-      }
-    }
-    checkPlugin();
-  }, []);
 
-  // Determine if we should show the plugin installer (install or upgrade mode)
-  dc.useEffect(() => {
-    if (pluginInstalled === null || !mapData) return; // Still checking or data not loaded
-
-    // Check if we should show installer for new install
-    if (!pluginInstalled && !mapData.settingsPluginDeclined) {
-      setShowPluginInstaller(true);
-      return;
-    }
-
-    // Check if we should show installer for upgrade
-    if (pluginInstalled && shouldOfferUpgrade()) {
-      setShowPluginInstaller(true);
-      return;
-    }
-
-    // Otherwise, hide installer
-    setShowPluginInstaller(false);
-  }, [pluginInstalled, mapData]);
-
-  // Initialize expanded state from settings or saved state (only if not showing installer)
-  dc.useEffect(() => {
-    if (showPluginInstaller || !mapData) return; // Don't apply if showing installer or no data
-
-    // Small delay to ensure plugins are loaded
-    const timer = setTimeout(() => {
-      try {
-        // Check if we should remember expanded state for this map
-        if (mapData.uiPreferences?.rememberExpandedState && mapData.expandedState !== undefined) {
-          // Use saved expanded state
-          if (mapData.expandedState && !isExpanded) {
-            setIsExpanded(true);
-            setIsAnimating(false);
-          }
-        } else {
-          // Fall back to global expandedByDefault setting
-          const expandedByDefault = getSetting('expandedByDefault');
-          if (expandedByDefault && !isExpanded) {
-            setIsExpanded(true);
-            setIsAnimating(false);
-          }
-        }
-      } catch (error) {
-        console.warn('[DungeonMapTracker] Error reading expanded state:', error);
-        // Continue with default (not expanded)
-      }
-    }, 100);
-
-    return () => clearTimeout(timer);
-  }, [showPluginInstaller, mapData]); // Run when installer status or map data changes
 
   // Initialize opacity from mapData when loaded
   dc.useEffect(() => {
@@ -380,20 +320,6 @@ const editingLayer = dc.useMemo(() => {
     }));
   }, [updateMapData]);
 
-  // Listen for settings changes and force re-render
-  dc.useEffect(() => {
-    const handleSettingsChange = (): void => {
-      // Increment settingsVersion to force component re-render
-      // This causes getTheme() to be called again with fresh settings
-      setSettingsVersion((prev: number) => prev + 1);
-    };
-
-    window.addEventListener('dmt-settings-changed', handleSettingsChange);
-
-    return () => {
-      window.removeEventListener('dmt-settings-changed', handleSettingsChange);
-    };
-  }, []);
 
   // Handle plugin installation
   const handlePluginInstall = (): void => {
@@ -442,160 +368,11 @@ const editingLayer = dc.useMemo(() => {
     }
   }, [handleUndo]);
 
-  // Escape key exits sub-hex drill-down (capture phase to intercept before other handlers)
-  dc.useEffect(() => {
-    if (!isInSubHex) return;
-
-    const handleEscape = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') {
-        const target = e.target as HTMLElement;
-        // Don't intercept when typing in inputs or when a modal is open
-        if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
-        if (document.querySelector('.modal-container')) return;
-        e.preventDefault();
-        e.stopPropagation();
-        exitSubHex();
-      }
-    };
-
-    document.addEventListener('keydown', handleEscape, true);
-    return () => document.removeEventListener('keydown', handleEscape, true);
-  }, [isInSubHex, exitSubHex]);
-
-  // Listen for sub-hex entry events from double-click on hex
-  dc.useEffect(() => {
-    const handleEnterSubHex = (event: CustomEvent): void => {
-      const { q, r } = event.detail;
-      if (mapData?.mapType === 'hex') {
-        enterSubHex(q, r);
-      }
-    };
-
-    document.addEventListener('windrose:enter-sub-hex', handleEnterSubHex as EventListener);
-    return () => document.removeEventListener('windrose:enter-sub-hex', handleEnterSubHex as EventListener);
-  }, [mapData?.mapType, enterSubHex]);
-
-  // Listen for deep link navigation events
-  dc.useEffect(() => {
-    const handleNavigateTo = (event: CustomEvent): void => {
-      const { mapId: targetMapId, x, y, zoom, layerId } = event.detail;
-
-      // Only respond if this is our map
-      if (targetMapId !== mapId) return;
-
-      // Switch to target layer if it exists and is different
-      if (mapData?.layers && layerId) {
-        const targetLayer = mapData.layers.find((l: { id: string }) => l.id === layerId);
-        if (targetLayer && mapData.activeLayerId !== layerId) {
-          handleLayerSelect(layerId);
-        }
-      }
-
-      // Navigate to a comfortable viewing zoom regardless of what the link stored
-      const DEEP_LINK_ZOOM = 1.175;
-      updateMapData((currentMapData: MapData) => ({
-        ...currentMapData,
-        viewState: {
-          ...currentMapData.viewState,
-          center: { x, y },
-          zoom: DEEP_LINK_ZOOM
-        }
-      }));
-
-      new Notice(`Navigated to location on ${mapData?.name || 'map'}`);
-    };
-
-    window.addEventListener('dmt-navigate-to', handleNavigateTo as EventListener);
-
-    return () => {
-      window.removeEventListener('dmt-navigate-to', handleNavigateTo as EventListener);
-    };
-  }, [mapId, mapData, updateMapData, handleLayerSelect]);
-
-  // Listen for center-on-region events from region panel
-  dc.useEffect(() => {
-    const handleCenterOnRegion = (event: CustomEvent): void => {
-      const { regionId } = event.detail;
-      if (!mapData || !geometry || geometry.type !== 'hex') return;
-
-      const region = (mapData.regions || []).find((r: Region) => r.id === regionId);
-      if (!region || region.hexes.length === 0) return;
-
-      // Compute centroid in world coordinates
-      let cx = 0, cy = 0;
-      for (const hex of region.hexes) {
-        const world = (geometry as any).hexToWorld(hex.x, hex.y);
-        cx += world.worldX;
-        cy += world.worldY;
-      }
-      cx /= region.hexes.length;
-      cy /= region.hexes.length;
-
-
-      updateMapData((current: MapData) => ({
-        ...current,
-        viewState: {
-          ...current.viewState,
-          center: { x: cx, y: cy }
-        }
-      }));
-    };
-
-    document.addEventListener('windrose:center-on-region', handleCenterOnRegion as EventListener);
-    return () => document.removeEventListener('windrose:center-on-region', handleCenterOnRegion as EventListener);
-  }, [mapData, geometry, updateMapData]);
-
-  // Listen for cross-layer object link events
-  dc.useEffect(() => {
-    type LinkUpdate = { layerId: string; objectId: string; link?: ObjectLink };
-
-    const updateObjectLinksAcrossLayers = (updates: LinkUpdate[]): void => {
-      updateMapData((currentMapData: MapData) => ({
-        ...currentMapData,
-        layers: currentMapData.layers.map((layer: { id: string; objects?: MapObject[] }) => {
-          const layerUpdates = updates.filter(u => u.layerId === layer.id);
-          if (layerUpdates.length === 0 || !layer.objects) return layer;
-
-          return {
-            ...layer,
-            objects: layer.objects.map((obj: MapObject) => {
-              const update = layerUpdates.find(u => u.objectId === obj.id);
-              if (!update) return obj;
-              if (update.link !== undefined) {
-                return { ...obj, linkedObject: update.link };
-              }
-              const { linkedObject: _removed, ...rest } = obj;
-              return rest as MapObject;
-            })
-          };
-        })
-      }));
-    };
-
-    const handleCreateObjectLink = (event: CustomEvent): void => {
-      const { sourceLayerId, sourceObjectId, sourceLink, targetLayerId, targetObjectId, targetLink } = event.detail;
-      updateObjectLinksAcrossLayers([
-        { layerId: sourceLayerId, objectId: sourceObjectId, link: sourceLink },
-        { layerId: targetLayerId, objectId: targetObjectId, link: targetLink }
-      ]);
-    };
-
-    const handleRemoveObjectLink = (event: CustomEvent): void => {
-      const { sourceLayerId, sourceObjectId, targetLayerId, targetObjectId } = event.detail;
-      updateObjectLinksAcrossLayers([
-        { layerId: sourceLayerId, objectId: sourceObjectId },
-        { layerId: targetLayerId, objectId: targetObjectId }
-      ]);
-    };
-
-    window.addEventListener('dmt-create-object-link', handleCreateObjectLink as EventListener);
-    window.addEventListener('dmt-remove-object-link', handleRemoveObjectLink as EventListener);
-
-    return () => {
-      window.removeEventListener('dmt-create-object-link', handleCreateObjectLink as EventListener);
-      window.removeEventListener('dmt-remove-object-link', handleRemoveObjectLink as EventListener);
-    };
-  }, [updateMapData]);
+  // Custom event listeners (sub-hex, deep links, regions, object links)
+  useCustomEventHandlers({
+    mapData, mapId, geometry, updateMapData,
+    handleLayerSelect, enterSubHex, exitSubHex, isInSubHex
+  });
 
   // Data change handlers (extracted to useDataHandlers hook)
   const {
@@ -712,42 +489,6 @@ const editingLayer = dc.useMemo(() => {
     return () => document.removeEventListener('windrose:hex-context-menu', handleHexContextMenu as EventListener);
   }, [mapData, enterSubHex, handleRegionsChange]);
 
-  const containerRef = dc.useRef<HTMLDivElement | null>(null);
-
-  // Effect to manage parent element classes
-  dc.useEffect(() => {
-    if (!containerRef.current) return;
-
-    const container = containerRef.current;
-
-    // Walk up to find cm-embed-block
-    let cmEmbedBlock: HTMLElement | null = container.parentElement;
-    while (cmEmbedBlock && !cmEmbedBlock.classList.contains('cm-embed-block')) {
-      cmEmbedBlock = cmEmbedBlock.parentElement;
-      if (cmEmbedBlock?.classList.contains('cm-editor')) {
-        cmEmbedBlock = null;
-        break;
-      }
-    }
-
-    // Manage classes on container
-    container.classList.toggle('dmt-expanded', isExpanded);
-    container.classList.toggle('dmt-animating', isAnimating);
-
-    // Manage classes on parent if found
-    if (cmEmbedBlock) {
-      cmEmbedBlock.classList.add('dmt-cm-parent');
-      cmEmbedBlock.classList.toggle('dmt-cm-expanded', isExpanded);
-      cmEmbedBlock.classList.toggle('dmt-cm-animating', isAnimating);
-    }
-
-    // Cleanup
-    return () => {
-      container.classList.remove('dmt-expanded', 'dmt-animating');
-      cmEmbedBlock?.classList.remove('dmt-cm-parent', 'dmt-cm-expanded', 'dmt-cm-animating');
-    };
-  }, [isExpanded, isAnimating]);
-
   // Zoom in (increase zoom by step)
   const handleZoomIn = (): void => {
     if (!mapData) return;
@@ -791,40 +532,6 @@ const editingLayer = dc.useMemo(() => {
     updateMapData(newMapData);
   };
 
-  const animationTimeoutRef = dc.useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const handleToggleExpand = (): void => {
-
-    // Clear any pending animation timeout
-    if (animationTimeoutRef.current) {
-      clearTimeout(animationTimeoutRef.current);
-      animationTimeoutRef.current = null;
-    }
-
-    const newExpandedState = !isExpanded;
-
-    if (newExpandedState) {
-      setIsExpanded(true);
-      setIsAnimating(false);
-    } else {
-      setIsAnimating(true);
-      setIsExpanded(false);
-
-      animationTimeoutRef.current = setTimeout(() => {
-        setIsAnimating(false);
-        animationTimeoutRef.current = null;
-      }, 300);
-    }
-
-    // Save expanded state if preference is enabled
-    if (mapData && mapData.uiPreferences?.rememberExpandedState) {
-      const newMapData = {
-        ...mapData,
-        expandedState: newExpandedState
-      };
-      updateMapData(newMapData);
-    }
-  };
 
   const handleSettingsClick = (): void => {
     setShowSettingsModal(true);
