@@ -98,50 +98,29 @@ const usePanZoomCoordinator = ({
   // Register pan/zoom handlers with EventHandlerContext for event coordination
   const { registerHandlers, unregisterHandlers } = useEventHandlerRegistration();
 
-  // Register pan/zoom handlers and state when they change
-  dc.useEffect(() => {
-    registerHandlers('panZoom', {
-      // Pan handlers
-      startPan,
-      updatePan,
-      stopPan,
-      // Touch pan handlers
-      startTouchPan,
-      updateTouchPan,
-      stopTouchPan,
-      // Zoom handler
-      handleWheel,
-      // Helper functions
-      getClientCoords,
-      getTouchCenter,
-      getTouchDistance,
-      screenToGrid,
-      // State for coordination
-      isPanning,
-      isTouchPanning,
-      panStart,
-      touchPanStart,
-      spaceKeyPressed,
-      lastTouchTimeRef,
-      initialPinchDistance,
-      // State setters (for coordination layer to manage state)
-      setIsPanning,
-      setIsTouchPanning,
-      setPanStart,
-      setTouchPanStart,
-      setInitialPinchDistance
-    });
-
-    return () => unregisterHandlers('panZoom');
-  }, [
-    registerHandlers, unregisterHandlers,
+  // Ref holds the latest handler object; updated every render so consumers
+  // always get current closures without effect re-registration churn.
+  const handlersRef = dc.useRef<Record<string, unknown> | null>(null);
+  handlersRef.current = {
     startPan, updatePan, stopPan,
     startTouchPan, updateTouchPan, stopTouchPan,
     handleWheel,
     getClientCoords, getTouchCenter, getTouchDistance, screenToGrid,
-    isPanning, isTouchPanning, panStart, touchPanStart, spaceKeyPressed, initialPinchDistance,
+    isPanning, isTouchPanning, panStart, touchPanStart, spaceKeyPressed,
+    lastTouchTimeRef, initialPinchDistance,
     setIsPanning, setIsTouchPanning, setPanStart, setTouchPanStart, setInitialPinchDistance
-  ]);
+  };
+
+  // Register once on mount with stable proxy that delegates to handlersRef
+  dc.useEffect(() => {
+    const proxy = new Proxy({} as Record<string, unknown>, {
+      get(_target, prop: string) {
+        return handlersRef.current?.[prop];
+      }
+    });
+    registerHandlers('panZoom', proxy);
+    return () => unregisterHandlers('panZoom');
+  }, []);
 
   // Coordinator hooks don't return anything - they just set up behavior
 };

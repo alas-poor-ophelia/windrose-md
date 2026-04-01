@@ -177,6 +177,12 @@ function FallbackModalContent(): React.ReactElement | null {
   const [resizeEdge, setResizeEdge] = dc.useState<ResizeEdge>(null);
   const resizeStartRef = dc.useRef<ResizeStart>({ x: 0, y: 0, width: 0, height: 0, posX: 0, posY: 0 });
 
+  // Refs for stable drag/resize effect closures
+  const dragOffsetRef = dc.useRef<DragOffset>(dragOffset);
+  dragOffsetRef.current = dragOffset;
+  const sizeRef = dc.useRef<ModalSize>(size);
+  sizeRef.current = size;
+
   const modalRef = dc.useRef<HTMLDivElement | null>(null);
 
   dc.useEffect(() => {
@@ -207,11 +213,11 @@ function FallbackModalContent(): React.ReactElement | null {
     if (!isDragging) return;
 
     const handleMouseMove = (e: MouseEvent): void => {
-      const newX = e.clientX - dragOffset.x;
-      const newY = e.clientY - dragOffset.y;
+      const newX = e.clientX - dragOffsetRef.current.x;
+      const newY = e.clientY - dragOffsetRef.current.y;
 
-      const maxX = window.innerWidth - size.width;
-      const maxY = window.innerHeight - size.height;
+      const maxX = window.innerWidth - sizeRef.current.width;
+      const maxY = window.innerHeight - sizeRef.current.height;
 
       setPosition({
         x: Math.max(0, Math.min(maxX, newX)),
@@ -230,7 +236,7 @@ function FallbackModalContent(): React.ReactElement | null {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isDragging, dragOffset, size]);
+  }, [isDragging]);
 
   const handleResizeStart = dc.useCallback((e: MouseEvent, edge: ResizeEdge): void => {
     e.preventDefault();
@@ -290,7 +296,7 @@ function FallbackModalContent(): React.ReactElement | null {
     const handleMouseUp = (): void => {
       setIsResizing(false);
       setResizeEdge(null);
-      savePersistedSize(size.width, size.height);
+      savePersistedSize(sizeRef.current.width, sizeRef.current.height);
     };
 
     document.addEventListener('mousemove', handleMouseMove);
@@ -300,7 +306,7 @@ function FallbackModalContent(): React.ReactElement | null {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isResizing, resizeEdge, size]);
+  }, [isResizing, resizeEdge]);
 
   if (!isOpen) return null;
 

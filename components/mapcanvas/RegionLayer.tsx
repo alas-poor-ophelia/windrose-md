@@ -68,23 +68,21 @@ const RegionLayer = ({
   });
 
   // Register handlers — always register context menu, tool handlers only when active
+  const regionHandlersRef = dc.useRef<Record<string, unknown> | null>(null);
+  regionHandlersRef.current = {
+    handleContextMenu,
+    ...(isRegionTool ? { handlePointerDown, handlePointerMove, handlePointerUp, handleDoubleClick } : {})
+  };
+
   dc.useEffect(() => {
-    const handlers: Record<string, any> = {
-      handleContextMenu
-    };
-
-    if (isRegionTool) {
-      handlers.handlePointerDown = handlePointerDown;
-      handlers.handlePointerMove = handlePointerMove;
-      handlers.handlePointerUp = handlePointerUp;
-      handlers.handleDoubleClick = handleDoubleClick;
-    }
-
-    registerHandlers('region', handlers);
-
+    const proxy = new Proxy({} as Record<string, unknown>, {
+      get(_target, prop: string) {
+        return regionHandlersRef.current?.[prop];
+      }
+    });
+    registerHandlers('region', proxy);
     return () => unregisterHandlers('region');
-  }, [isRegionTool, registerHandlers, unregisterHandlers,
-    handlePointerDown, handlePointerMove, handlePointerUp, handleDoubleClick, handleContextMenu]);
+  }, []);
 
   // Listen for edit-region events from sidebar panel
   dc.useEffect(() => {

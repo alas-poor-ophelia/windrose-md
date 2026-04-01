@@ -67,6 +67,14 @@ function useCanvasInteraction(
 
   const [spaceKeyPressed, setSpaceKeyPressed] = dc.useState<boolean>(false);
 
+  // Refs for reading current state inside stable event handlers (avoids effect churn)
+  const isPanningRef = dc.useRef<boolean>(false);
+  const spaceKeyPressedRef = dc.useRef<boolean>(false);
+
+  // Keep refs in sync with state for stable effect closures
+  isPanningRef.current = isPanning;
+  spaceKeyPressedRef.current = spaceKeyPressed;
+
   // Track recent touch to ignore synthetic mouse events
   const lastTouchTimeRef = dc.useRef<number>(0);
 
@@ -368,9 +376,9 @@ function useCanvasInteraction(
 
   dc.useEffect(() => {
     if (!focused) {
-      if (spaceKeyPressed) {
+      if (spaceKeyPressedRef.current) {
         setSpaceKeyPressed(false);
-        if (isPanning) {
+        if (isPanningRef.current) {
           stopPan();
         }
       }
@@ -388,7 +396,7 @@ function useCanvasInteraction(
     const handleSpaceUp = (e: KeyboardEvent): void => {
       if (e.key === ' ') {
         setSpaceKeyPressed(false);
-        if (isPanning) {
+        if (isPanningRef.current) {
           stopPan();
         }
       }
@@ -400,7 +408,7 @@ function useCanvasInteraction(
       window.removeEventListener('keydown', handleSpaceDown);
       window.removeEventListener('keyup', handleSpaceUp);
     };
-  }, [focused, isPanning, spaceKeyPressed]);
+  }, [focused]);
 
   return {
     isPanning,

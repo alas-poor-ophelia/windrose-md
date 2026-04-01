@@ -131,25 +131,22 @@ const TextLayer = ({
     copyDeepLinkToClipboard(displayText, notePath, mapId, x, y, zoom, layerId);
   }, [selectedItem, mapData, mapId, notePath]);
 
-  dc.useEffect(() => {
-    registerHandlers('text', {
-      handleTextPlacement,
-      handleTextSelection,
-      handleTextDragging,
-      stopTextDragging,
-      handleCanvasDoubleClick,
-      handleEditClick,
-      handleTextKeyDown
-    });
-
-    return () => unregisterHandlers('text');
-  }, [
-    registerHandlers, unregisterHandlers,
+  const textHandlersRef = dc.useRef<Record<string, unknown> | null>(null);
+  textHandlersRef.current = {
     handleTextPlacement, handleTextSelection,
     handleTextDragging, stopTextDragging,
-    handleCanvasDoubleClick, handleEditClick,
-    handleTextKeyDown
-  ]);
+    handleCanvasDoubleClick, handleEditClick, handleTextKeyDown
+  };
+
+  dc.useEffect(() => {
+    const proxy = new Proxy({} as Record<string, unknown>, {
+      get(_target, prop: string) {
+        return textHandlersRef.current?.[prop];
+      }
+    });
+    registerHandlers('text', proxy);
+    return () => unregisterHandlers('text');
+  }, []);
 
   if (showCoordinates || !layerVisibility.textLabels) {
     return null;

@@ -119,22 +119,27 @@ function useImageAlignment({
   }, [isDraggingImage]);
 
   // Register handlers when in alignment mode
+  const alignmentHandlersRef = dc.useRef<Record<string, unknown> | null>(null);
+  alignmentHandlersRef.current = {
+    handlePointerDown: handleImageDragStart,
+    handlePointerMove: handleImageDragMove,
+    handlePointerUp: handleImageDragEnd
+  };
+
   dc.useEffect(() => {
     if (!isAlignmentMode) {
       unregisterHandlers('imageAlignment');
       return;
     }
 
-    registerHandlers('imageAlignment', {
-      handlePointerDown: handleImageDragStart,
-      handlePointerMove: handleImageDragMove,
-      handlePointerUp: handleImageDragEnd
+    const proxy = new Proxy({} as Record<string, unknown>, {
+      get(_target, prop: string) {
+        return alignmentHandlersRef.current?.[prop];
+      }
     });
-
-    return () => {
-      unregisterHandlers('imageAlignment');
-    };
-  }, [isAlignmentMode, handleImageDragStart, handleImageDragMove, handleImageDragEnd, registerHandlers, unregisterHandlers]);
+    registerHandlers('imageAlignment', proxy);
+    return () => unregisterHandlers('imageAlignment');
+  }, [isAlignmentMode]);
 
   return {
     isDraggingImage

@@ -295,16 +295,19 @@ const FreehandLayer = ({
     return () => removeOverlay();
   }, [removeOverlay]);
 
-  // Register event handlers
-  dc.useEffect(() => {
-    registerHandlers('freehand', {
-      handlePointerDown,
-      handlePointerMove,
-      stopDrawing
-    });
+  // Register event handlers (ref + proxy to avoid re-registration churn)
+  const freehandHandlersRef = dc.useRef<Record<string, unknown> | null>(null);
+  freehandHandlersRef.current = { handlePointerDown, handlePointerMove, stopDrawing };
 
+  dc.useEffect(() => {
+    const proxy = new Proxy({} as Record<string, unknown>, {
+      get(_target, prop: string) {
+        return freehandHandlersRef.current?.[prop];
+      }
+    });
+    registerHandlers('freehand', proxy);
     return () => unregisterHandlers('freehand');
-  }, [registerHandlers, unregisterHandlers, handlePointerDown, handlePointerMove, stopDrawing]);
+  }, []);
 
   // No visual output — drawing happens on the overlay canvas
   return null;

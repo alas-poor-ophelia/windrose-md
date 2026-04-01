@@ -162,15 +162,18 @@ const DiagonalFillOverlay = ({ currentTool }: DiagonalFillOverlayProps): React.R
 
   const { registerHandlers, unregisterHandlers } = useEventHandlerRegistration();
 
+  const diagonalFillHandlersRef = dc.useRef<Record<string, unknown> | null>(null);
+  diagonalFillHandlersRef.current = { handleDiagonalFillClick, handleDiagonalFillMove, cancelFill, fillStart };
+
   dc.useEffect(() => {
-    registerHandlers('diagonalFill', {
-      handleDiagonalFillClick,
-      handleDiagonalFillMove,
-      cancelFill,
-      fillStart
+    const proxy = new Proxy({} as Record<string, unknown>, {
+      get(_target, prop: string) {
+        return diagonalFillHandlersRef.current?.[prop];
+      }
     });
+    registerHandlers('diagonalFill', proxy);
     return () => unregisterHandlers('diagonalFill');
-  }, [registerHandlers, unregisterHandlers, handleDiagonalFillClick, handleDiagonalFillMove, cancelFill, fillStart]);
+  }, []);
 
   if (currentTool !== 'diagonalFill' || !fillStart || !geometry || !mapData || !canvasRef?.current) {
     return null;

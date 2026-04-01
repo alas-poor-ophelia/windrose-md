@@ -41,17 +41,21 @@ const AreaSelectLayer = ({ currentTool }: AreaSelectLayerProps): React.ReactElem
 
   const { registerHandlers, unregisterHandlers } = useEventHandlerRegistration();
 
-  dc.useEffect(() => {
-    registerHandlers('areaSelect', {
-      handleAreaSelectClick,
-      cancelAreaSelect,
-      isAreaSelecting,
-      areaSelectStart,
-      updateAreaSelectHover
-    });
+  const areaSelectHandlersRef = dc.useRef<Record<string, unknown> | null>(null);
+  areaSelectHandlersRef.current = {
+    handleAreaSelectClick, cancelAreaSelect,
+    isAreaSelecting, areaSelectStart, updateAreaSelectHover
+  };
 
+  dc.useEffect(() => {
+    const proxy = new Proxy({} as Record<string, unknown>, {
+      get(_target, prop: string) {
+        return areaSelectHandlersRef.current?.[prop];
+      }
+    });
+    registerHandlers('areaSelect', proxy);
     return () => unregisterHandlers('areaSelect');
-  }, [registerHandlers, unregisterHandlers, handleAreaSelectClick, cancelAreaSelect, isAreaSelecting, areaSelectStart, updateAreaSelectHover]);
+  }, []);
 
   dc.useEffect(() => {
     if (currentTool !== 'areaSelect' && areaSelectStart) {

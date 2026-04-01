@@ -57,15 +57,18 @@ const MeasurementLayer = ({
 
   const { registerHandlers, unregisterHandlers } = useEventHandlerRegistration();
 
+  const measureHandlersRef = dc.useRef<Record<string, unknown> | null>(null);
+  measureHandlersRef.current = { handleMeasureClick, handleMeasureMove, clearMeasurement, measureOrigin };
+
   dc.useEffect(() => {
-    registerHandlers('measure', {
-      handleMeasureClick,
-      handleMeasureMove,
-      clearMeasurement,
-      measureOrigin
+    const proxy = new Proxy({} as Record<string, unknown>, {
+      get(_target, prop: string) {
+        return measureHandlersRef.current?.[prop];
+      }
     });
+    registerHandlers('measure', proxy);
     return () => unregisterHandlers('measure');
-  }, [registerHandlers, unregisterHandlers, handleMeasureClick, handleMeasureMove, clearMeasurement, measureOrigin]);
+  }, []);
 
   if (currentTool !== 'measure' || !measureOrigin) {
     return null;

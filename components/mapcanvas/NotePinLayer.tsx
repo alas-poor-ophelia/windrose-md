@@ -52,13 +52,18 @@ const NotePinLayer = ({
   const { registerHandlers, unregisterHandlers } = useEventHandlerRegistration();
   const nativeOpenedRef = dc.useRef(false);
 
-  dc.useEffect(() => {
-    registerHandlers('notePin', {
-      handleNotePinPlacement
-    });
+  const notePinHandlersRef = dc.useRef<Record<string, unknown> | null>(null);
+  notePinHandlersRef.current = { handleNotePinPlacement };
 
+  dc.useEffect(() => {
+    const proxy = new Proxy({} as Record<string, unknown>, {
+      get(_target, prop: string) {
+        return notePinHandlersRef.current?.[prop];
+      }
+    });
+    registerHandlers('notePin', proxy);
     return () => unregisterHandlers('notePin');
-  }, [registerHandlers, unregisterHandlers, handleNotePinPlacement]);
+  }, []);
 
   // Try native modal when showNoteLinkModal becomes true
   dc.useEffect(() => {

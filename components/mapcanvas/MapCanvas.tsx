@@ -183,6 +183,10 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
 
   // Orientation animation state
 
+  // Ref for reading showCoordinates inside stable keyboard effect
+  const showCoordinatesRef = dc.useRef<boolean>(showCoordinates);
+  showCoordinatesRef.current = showCoordinates;
+
   // Refs to hold layer state for cursor coordination
   const drawingLayerStateRef = dc.useRef<DrawingLayerState>({ isDrawing: false, rectangleStart: null, circleStart: null });
   const panZoomLayerStateRef = dc.useRef<PanZoomLayerState>({ isPanning: false, isTouchPanning: false, spaceKeyPressed: false });
@@ -310,30 +314,23 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
 
     // Only attach listeners if focused and on a hex map
     if (!isFocused || mapData?.mapType !== 'hex') {
-      // Always hide coordinates on non-hex maps
-      // In 'hold' mode, also hide when losing focus
-      // In 'toggle' mode, keep coordinates visible when mouse leaves (but hide on non-hex maps)
-      if (showCoordinates && (mapData?.mapType !== 'hex' || keyMode === 'hold')) {
+      if (showCoordinatesRef.current && (mapData?.mapType !== 'hex' || keyMode === 'hold')) {
         setShowCoordinates(false);
       }
       return;
     }
 
     const handleKeyDown = (e: KeyboardEvent): void => {
-      // Only track 'C' key when focused, and only if not typing in an input
       const target = e.target as HTMLElement;
       if (e.key.toLowerCase() === 'c' && !e.shiftKey && !e.ctrlKey && !e.metaKey &&
           target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') {
-        // Ignore key repeat events in toggle mode
         if (e.repeat && keyMode === 'toggle') return;
 
         e.preventDefault();
 
         if (keyMode === 'toggle') {
-          // Toggle mode: flip the state
-          setShowCoordinates(!showCoordinates);
+          setShowCoordinates(!showCoordinatesRef.current);
         } else {
-          // Hold mode: show on keydown
           setShowCoordinates(true);
         }
       }
@@ -341,7 +338,6 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
 
     const handleKeyUp = (e: KeyboardEvent): void => {
       if (e.key.toLowerCase() === 'c') {
-        // Only hide on keyup in 'hold' mode
         if (keyMode === 'hold') {
           setShowCoordinates(false);
         }
@@ -354,7 +350,7 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [isFocused, mapData?.mapType, showCoordinates, setShowCoordinates]);
+  }, [isFocused, mapData?.mapType]);
 
   // Determine cursor class based on current tool and interaction state
   const getCursorClass = (): string => {

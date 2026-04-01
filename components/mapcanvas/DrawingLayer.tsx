@@ -147,31 +147,26 @@ const DrawingLayer = ({
 
   const { registerHandlers, unregisterHandlers } = useEventHandlerRegistration();
 
-  dc.useEffect(() => {
-    registerHandlers('drawing', {
-      handleDrawingPointerDown,
-      handleDrawingPointerMove,
-      stopDrawing: handleStopDrawing,
-      cancelDrawing,
-      isDrawing,
-      rectangleStart,
-      circleStart,
-      edgeLineStart,
-      updateShapeHover,
-      updateEdgeLineHover,
-      shapeHoverPosition,
-      touchConfirmPending,
-      cancelShapePreview,
-      previewEnabled: previewSettings.kbmEnabled,
-      updateSegmentHover,
-      clearSegmentHover
-    });
+  const drawingHandlersRef = dc.useRef<Record<string, unknown> | null>(null);
+  drawingHandlersRef.current = {
+    handleDrawingPointerDown, handleDrawingPointerMove,
+    stopDrawing: handleStopDrawing, cancelDrawing,
+    isDrawing, rectangleStart, circleStart, edgeLineStart,
+    updateShapeHover, updateEdgeLineHover, shapeHoverPosition,
+    touchConfirmPending, cancelShapePreview,
+    previewEnabled: previewSettings.kbmEnabled,
+    updateSegmentHover, clearSegmentHover
+  };
 
+  dc.useEffect(() => {
+    const proxy = new Proxy({} as Record<string, unknown>, {
+      get(_target, prop: string) {
+        return drawingHandlersRef.current?.[prop];
+      }
+    });
+    registerHandlers('drawing', proxy);
     return () => unregisterHandlers('drawing');
-  }, [registerHandlers, unregisterHandlers, handleDrawingPointerDown, handleDrawingPointerMove,
-    handleStopDrawing, cancelDrawing, isDrawing, rectangleStart, circleStart, edgeLineStart,
-    updateShapeHover, updateEdgeLineHover, shapeHoverPosition, touchConfirmPending,
-    cancelShapePreview, previewSettings.kbmEnabled, updateSegmentHover, clearSegmentHover]);
+  }, []);
 
   dc.useEffect(() => {
     if (onDrawingStateChange) {

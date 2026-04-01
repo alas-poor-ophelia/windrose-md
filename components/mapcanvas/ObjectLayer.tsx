@@ -389,33 +389,26 @@ const ObjectLayer = ({
     return handleObjectSelection(clientX, clientY, gridX, gridY);
   }, [isLinkingMode, linkingFrom, mapData, handleObjectSelection, applyLinkUpdate, cancelLinking, setSelectedItem]);
 
-  dc.useEffect(() => {
-    registerHandlers('object', {
-      handleObjectPlacement,
-      handleObjectSelection: wrappedHandleObjectSelection,
-      handleObjectDragging,
-      handleObjectResizing,
-      stopObjectDragging,
-      stopObjectResizing,
-      handleHoverUpdate,
-      handleObjectWheel,
-      handleObjectKeyDown,
-      isResizing,
-      resizeCorner,
-      edgeSnapMode,
-      setEdgeSnapMode
-    });
-
-    return () => unregisterHandlers('object');
-  }, [
-    registerHandlers, unregisterHandlers,
-    handleObjectPlacement, wrappedHandleObjectSelection,
+  const objectHandlersRef = dc.useRef<Record<string, unknown> | null>(null);
+  objectHandlersRef.current = {
+    handleObjectPlacement,
+    handleObjectSelection: wrappedHandleObjectSelection,
     handleObjectDragging, handleObjectResizing,
     stopObjectDragging, stopObjectResizing,
     handleHoverUpdate, handleObjectWheel, handleObjectKeyDown,
     isResizing, resizeCorner,
     edgeSnapMode, setEdgeSnapMode
-  ]);
+  };
+
+  dc.useEffect(() => {
+    const proxy = new Proxy({} as Record<string, unknown>, {
+      get(_target, prop: string) {
+        return objectHandlersRef.current?.[prop];
+      }
+    });
+    registerHandlers('object', proxy);
+    return () => unregisterHandlers('object');
+  }, []);
 
   const handleNoteButtonClick = (e: JSX.TargetedMouseEvent<HTMLElement>): void => {
     if (selectedItem?.type === 'object') {

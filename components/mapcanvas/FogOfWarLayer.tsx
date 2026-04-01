@@ -51,26 +51,26 @@ const FogOfWarLayer = ({
     cancelFog
   } = useFogTools(activeTool, onFogChange, onInitializeFog);
 
+  const fogHandlersRef = dc.useRef<Record<string, unknown> | null>(null);
+  fogHandlersRef.current = {
+    handlePointerDown, handlePointerMove, handlePointerUp, handleKeyDown,
+    isDrawing, rectangleStart, rectangleHover
+  };
+
   dc.useEffect(() => {
     if (!activeTool) {
       unregisterHandlers('fogOfWar');
       return;
     }
 
-    registerHandlers('fogOfWar', {
-      handlePointerDown,
-      handlePointerMove,
-      handlePointerUp,
-      handleKeyDown,
-      isDrawing,
-      rectangleStart,
-      rectangleHover
+    const proxy = new Proxy({} as Record<string, unknown>, {
+      get(_target, prop: string) {
+        return fogHandlersRef.current?.[prop];
+      }
     });
-
+    registerHandlers('fogOfWar', proxy);
     return () => unregisterHandlers('fogOfWar');
-  }, [activeTool, registerHandlers, unregisterHandlers,
-    handlePointerDown, handlePointerMove, handlePointerUp, handleKeyDown,
-    isDrawing, rectangleStart, rectangleHover]);
+  }, [activeTool]);
 
   const renderPreviewOverlay = (): React.ReactElement | null => {
     if (!activeTool || !rectangleStart || !canvasRef.current || !containerRef?.current || !geometry) {
