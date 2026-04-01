@@ -20,8 +20,6 @@ import {
   addLayer,
   removeLayer,
   reorderLayers,
-  createEmptyLayer,
-  createBackup,
   isCellFogged,
   fogCell,
   revealCell,
@@ -393,41 +391,6 @@ describe("layerAccessor", () => {
   // ===========================================================================
   // Utility Functions
   // ===========================================================================
-
-  describe("createEmptyLayer", () => {
-    it("creates layer with empty collections", () => {
-      const layer = createEmptyLayer("test-id", "Test Layer", 5);
-
-      expect(layer.id).toBe("test-id");
-      expect(layer.name).toBe("Test Layer");
-      expect(layer.order).toBe(5);
-      expect(layer.visible).toBe(true);
-      expect(layer.cells).toEqual([]);
-      expect(layer.edges).toEqual([]);
-      expect(layer.objects).toEqual([]);
-      expect(layer.textLabels).toEqual([]);
-      expect(layer.fogOfWar).toBeNull();
-    });
-  });
-
-  describe("createBackup", () => {
-    it("creates deep clone", () => {
-      const original = { a: 1, b: { c: 2 } };
-      const backup = createBackup(original);
-
-      expect(backup).toEqual(original);
-      expect(backup).not.toBe(original);
-      expect(backup!.b).not.toBe(original.b);
-    });
-
-    it("returns null for non-serializable data", () => {
-      const circular: Record<string, unknown> = { a: 1 };
-      circular.self = circular;
-
-      const backup = createBackup(circular);
-      expect(backup).toBeNull();
-    });
-  });
 
   // ===========================================================================
   // Fog of War Functions
