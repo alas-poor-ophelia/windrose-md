@@ -23,9 +23,17 @@
 // VERSION & IMPORTS
 // =============================================================================
 
-const PLUGIN_VERSION = '0.15.1';
+const PLUGIN_VERSION = '0.16.1';
 
-const { Plugin, PluginSettingTab, Setting, Modal, setIcon } = require('obsidian');
+const obsidianModule = require('obsidian');
+const { Plugin, PluginSettingTab, Setting, Modal, setIcon, AbstractInputSuggest } = obsidianModule;
+
+// Initialize bridge for Datacore components
+window.__windrose = window.__windrose || {};
+window.__windrose.obsidian = obsidianModule;
+window.__windrose.version = PLUGIN_VERSION;
+window.__windrose.ready = true;
+window.dispatchEvent(new CustomEvent('windrose:bridge-ready'));
 
 // =============================================================================
 // DATA CONSTANTS
@@ -3948,6 +3956,38 @@ const ObjectSetHelpers = {
   },
 
   /**
+   * Resolve relative image filenames in set data to full vault paths.
+   * Handles both customObjects and objectOverrides.
+   */
+  resolveImagePaths(data, imagesFolder, vault) {
+    for (const side of ['hex', 'grid']) {
+      if (!data[side]) continue;
+      // Custom objects
+      if (data[side].customObjects) {
+        for (const obj of data[side].customObjects) {
+          if (obj.imagePath && !obj.imagePath.includes('/')) {
+            const resolved = imagesFolder + '/' + obj.imagePath;
+            if (vault.getAbstractFileByPath(resolved)) {
+              obj.imagePath = resolved;
+            }
+          }
+        }
+      }
+      // Object overrides (built-in objects with custom images)
+      if (data[side].objectOverrides) {
+        for (const override of Object.values(data[side].objectOverrides)) {
+          if (override.imagePath && !override.imagePath.includes('/')) {
+            const resolved = imagesFolder + '/' + override.imagePath;
+            if (vault.getAbstractFileByPath(resolved)) {
+              override.imagePath = resolved;
+            }
+          }
+        }
+      }
+    }
+  },
+
+  /**
    * Snapshot current hex+grid object data into a new ObjectSet.
    */
   saveCurrentAsSet(plugin, name) {
@@ -4009,6 +4049,63 @@ const ObjectSetHelpers = {
   },
 
   /**
+   * Reset all object customizations to built-in defaults for both map types.
+   * Clears overrides, custom objects, custom categories, and active set tracking.
+   */
+  resetToDefaults(plugin) {
+    const s = plugin.settings;
+    s.hexObjectOverrides = {};
+    s.customHexObjects = [];
+    s.customHexCategories = [];
+    s.gridObjectOverrides = {};
+    s.customGridObjects = [];
+    s.customGridCategories = [];
+    s.activeObjectSetId = null;
+  },
+
+  /**
+   * Check if live object settings differ from the active set (or from defaults).
+   * Returns true if the user has unsaved modifications.
+   */
+  isDirty(plugin) {
+    const s = plugin.settings;
+    const activeSetId = s.activeObjectSetId;
+
+    const hexOverrides = s.hexObjectOverrides || {};
+    const hexObjects = s.customHexObjects || [];
+    const hexCategories = s.customHexCategories || [];
+    const gridOverrides = s.gridObjectOverrides || {};
+    const gridObjects = s.customGridObjects || [];
+    const gridCategories = s.customGridCategories || [];
+
+    if (!activeSetId) {
+      // On Defaults - dirty if any customizations exist
+      return Object.keys(hexOverrides).length > 0 ||
+        hexObjects.length > 0 || hexCategories.length > 0 ||
+        Object.keys(gridOverrides).length > 0 ||
+        gridObjects.length > 0 || gridCategories.length > 0;
+    }
+
+    // On a named set - compare live state to stored snapshot
+    const set = (s.objectSets || []).find(st => st.id === activeSetId);
+    if (!set) return true;
+
+    const compare = (live, stored) => JSON.stringify(live) !== JSON.stringify(stored);
+
+    const setHex = set.data.hex || {};
+    if (compare(hexOverrides, setHex.objectOverrides || {})) return true;
+    if (compare(hexObjects, setHex.customObjects || [])) return true;
+    if (compare(hexCategories, setHex.customCategories || [])) return true;
+
+    const setGrid = set.data.grid || {};
+    if (compare(gridOverrides, setGrid.objectOverrides || {})) return true;
+    if (compare(gridObjects, setGrid.customObjects || [])) return true;
+    if (compare(gridCategories, setGrid.customCategories || [])) return true;
+
+    return false;
+  },
+
+  /**
    * Delete a set by ID. Clears activeObjectSetId if it was the active set.
    */
   deleteSet(plugin, setId) {
@@ -4030,15 +4127,22 @@ const ObjectSetHelpers = {
   },
 
   /**
-   * Get all imagePath values from a set's custom objects.
+   * Get all imagePath values from a set's custom objects and overrides.
    */
   getImagePaths(setData) {
     const paths = [];
     for (const side of ['hex', 'grid']) {
       const sideData = setData[side];
-      if (!sideData || !sideData.customObjects) continue;
-      for (const obj of sideData.customObjects) {
-        if (obj.imagePath) paths.push(obj.imagePath);
+      if (!sideData) continue;
+      if (sideData.customObjects) {
+        for (const obj of sideData.customObjects) {
+          if (obj.imagePath) paths.push(obj.imagePath);
+        }
+      }
+      if (sideData.objectOverrides) {
+        for (const override of Object.values(sideData.objectOverrides)) {
+          if (override.imagePath) paths.push(override.imagePath);
+        }
       }
     }
     return [...new Set(paths)];
@@ -4094,10 +4198,19 @@ const ObjectSetHelpers = {
 
     // Rewrite imagePath in export data to relative filenames
     for (const side of ['hex', 'grid']) {
-      if (!exportSetData[side] || !exportSetData[side].customObjects) continue;
-      for (const obj of exportSetData[side].customObjects) {
-        if (obj.imagePath && imageMap[obj.imagePath]) {
-          obj.imagePath = imageMap[obj.imagePath];
+      if (!exportSetData[side]) continue;
+      if (exportSetData[side].customObjects) {
+        for (const obj of exportSetData[side].customObjects) {
+          if (obj.imagePath && imageMap[obj.imagePath]) {
+            obj.imagePath = imageMap[obj.imagePath];
+          }
+        }
+      }
+      if (exportSetData[side].objectOverrides) {
+        for (const override of Object.values(exportSetData[side].objectOverrides)) {
+          if (override.imagePath && imageMap[override.imagePath]) {
+            override.imagePath = imageMap[override.imagePath];
+          }
         }
       }
     }
@@ -4167,22 +4280,7 @@ const ObjectSetHelpers = {
     }
 
     // Resolve relative image filenames to vault paths
-    const imagesFolder = folderPath + '/images';
-    for (const side of ['hex', 'grid']) {
-      if (!data[side] || !data[side].customObjects) continue;
-      for (const obj of data[side].customObjects) {
-        if (obj.imagePath && !obj.imagePath.includes('/')) {
-          // Relative filename — resolve to images subfolder
-          const resolved = imagesFolder + '/' + obj.imagePath;
-          const imageFile = plugin.app.vault.getAbstractFileByPath(resolved);
-          if (imageFile) {
-            obj.imagePath = resolved;
-          } else {
-            console.warn('[Windrose] Import: image not found:', resolved);
-          }
-        }
-      }
-    }
+    ObjectSetHelpers.resolveImagePaths(data, folderPath + '/images', plugin.app.vault);
 
     // Build set object
     const s = plugin.settings;
@@ -4237,26 +4335,14 @@ const ObjectSetHelpers = {
           st => st.source === 'folder' && st.folderPath === child.path
         );
 
+        // Resolve relative image filenames to vault paths
+        ObjectSetHelpers.resolveImagePaths(data, child.path + '/images', plugin.app.vault);
+
         if (existing) {
           // Update data in place
           existing.name = data.name || existing.name;
           existing.data = { hex: data.hex, grid: data.grid };
         } else {
-          // Resolve image paths before adding
-          const imagesFolder = child.path + '/images';
-          for (const side of ['hex', 'grid']) {
-            if (!data[side] || !data[side].customObjects) continue;
-            for (const obj of data[side].customObjects) {
-              if (obj.imagePath && !obj.imagePath.includes('/')) {
-                const resolved = imagesFolder + '/' + obj.imagePath;
-                const imageFile = plugin.app.vault.getAbstractFileByPath(resolved);
-                if (imageFile) {
-                  obj.imagePath = resolved;
-                }
-              }
-            }
-          }
-
           const setName = ObjectSetHelpers.deduplicateName(
             plugin.settings.objectSets,
             data.name || child.name
@@ -4279,6 +4365,29 @@ const ObjectSetHelpers = {
     return added;
   }
 };
+
+// settingsPlugin-FolderSuggest.js
+// Folder path autocomplete using Obsidian's AbstractInputSuggest
+// This file is concatenated into the settings plugin template by the assembler
+
+class FolderSuggest extends AbstractInputSuggest {
+  getSuggestions(query) {
+    const folders = this.app.vault.getAllFolders(true);
+    if (!query) return folders;
+    const lower = query.toLowerCase();
+    return folders.filter(f => f.path.toLowerCase().includes(lower));
+  }
+
+  renderSuggestion(folder, el) {
+    el.setText(folder.path === '' ? '/ (vault root)' : folder.path);
+  }
+
+  selectSuggestion(folder) {
+    this.setValue(folder.path);
+    this.textInputEl.dispatchEvent(new Event('input'));
+    this.close();
+  }
+}
 
 // =============================================================================
 // MODAL CLASSES
@@ -4866,7 +4975,7 @@ class InsertDungeonModal extends Modal {
         this.close();
       } catch (err) {
         console.error('[Windrose] Dungeon generation failed:', err);
-        alert('Failed to generate dungeon: ' + err.message);
+        new Notice('Failed to generate dungeon: ' + err.message);
       }
     };
 
@@ -4907,7 +5016,7 @@ class InsertDungeonModal extends Modal {
           this.close();
         } catch (err) {
           console.error('[Windrose] Dungeon generation failed:', err);
-          alert('Failed to generate dungeon: ' + err.message);
+          new Notice('Failed to generate dungeon: ' + err.message);
         }
       }
     });
@@ -5405,18 +5514,18 @@ class ObjectEditModal extends Modal {
     // Validate based on mode
     if (this.mode === 'icon') {
       if (!this.iconClass || !RPGAwesomeHelpers.isValid(this.iconClass)) {
-        alert('Please select a valid icon');
+        new Notice('Please select a valid icon');
         return;
       }
     } else if (this.mode === 'image') {
       if (!this.imagePath || this.imagePath.trim().length === 0) {
-        alert('Please select an image');
+        new Notice('Please select an image');
         return;
       }
     } else {
       // symbol mode
       if (!this.symbol || this.symbol.length === 0 || this.symbol.length > 8) {
-        alert('Please enter a valid symbol (1-8 characters)');
+        new Notice('Please enter a valid symbol (1-8 characters)');
         return;
       }
     }
@@ -5609,7 +5718,7 @@ class CategoryEditModal extends Modal {
   
   save() {
     if (!this.label || this.label.trim().length === 0) {
-      alert('Please enter a category name');
+      new Notice('Please enter a category name');
       return;
     }
     
@@ -5764,11 +5873,11 @@ class ColorEditModal extends Modal {
     saveBtn.addEventListener('click', async () => {
       // Validate
       if (!labelValue.trim()) {
-        alert('Please enter a label for this color.');
+        new Notice('Please enter a label for this color.');
         return;
       }
       if (!/^#[0-9A-Fa-f]{6}$/.test(colorValue)) {
-        alert('Please enter a valid hex color (e.g., #4A9EFF)');
+        new Notice('Please enter a valid hex color (e.g., #4A9EFF)');
         return;
       }
       
@@ -5935,7 +6044,11 @@ class ExportModal extends Modal {
             // Check if file exists
             const existingFile = this.app.vault.getAbstractFileByPath(finalFilename);
             if (existingFile) {
-              if (!confirm(`File "${finalFilename}" already exists. Overwrite?`)) {
+              if (!await new ConfirmModal(this.app, {
+                message: `File "${finalFilename}" already exists. Overwrite?`,
+                confirmText: 'Overwrite',
+                isDestructive: true
+              }).openAndGetValue()) {
                 return;
               }
               await this.app.vault.modify(existingFile, json);
@@ -5943,10 +6056,10 @@ class ExportModal extends Modal {
               await this.app.vault.create(finalFilename, json);
             }
             
-            alert(`Exported to: ${finalFilename}`);
+            new Notice(`Exported to: ${finalFilename}`);
             this.close();
           } catch (err) {
-            alert(`Export failed: ${err.message}`);
+            new Notice(`Export failed: ${err.message}`);
           }
         }));
   }
@@ -6097,7 +6210,7 @@ class ImportModal extends Modal {
     const importBtn = buttonContainer.createEl('button', { text: 'Import', cls: 'mod-cta' });
     importBtn.onclick = async () => {
       if (!this.importData) {
-        alert('Please select a valid export file first.');
+        new Notice('Please select a valid export file first.');
         return;
       }
       
@@ -6341,9 +6454,12 @@ class ObjectSetImportModal extends Modal {
     new Setting(contentEl)
       .setName('Folder Path')
       .setDesc('Vault-relative path (e.g. object-sets/my-set)')
-      .addText(text => text
-        .setPlaceholder('path/to/set-folder')
-        .onChange(v => { folderPath = v.trim(); }))
+      .addSearch(search => {
+        new FolderSuggest(this.app, search.inputEl);
+        search
+          .setPlaceholder('path/to/set-folder')
+          .onChange(v => { folderPath = v.trim(); });
+      })
       .addButton(btn => btn
         .setButtonText('Preview')
         .onClick(async () => {
@@ -6441,20 +6557,150 @@ class ObjectSetImportModal extends Modal {
   }
 }
 
+// settingsPlugin-ConfirmModal.js
+// Generic confirmation modal replacing native confirm() dialogs
+// This file is concatenated into the settings plugin template by the assembler
+
+class ConfirmModal extends Modal {
+  constructor(app, options = {}) {
+    super(app);
+    this.message = options.message || 'Are you sure?';
+    this.confirmText = options.confirmText || 'Confirm';
+    this.cancelText = options.cancelText || 'Cancel';
+    this.isDestructive = options.isDestructive || false;
+    this.resolved = false;
+  }
+
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.empty();
+
+    const paragraphs = this.message.split('\n').filter(s => s.trim());
+    for (const p of paragraphs) {
+      contentEl.createEl('p', { text: p });
+    }
+
+    const buttons = contentEl.createDiv({ cls: 'dmt-modal-buttons' });
+
+    const cancelBtn = buttons.createEl('button', { text: this.cancelText });
+    cancelBtn.onclick = () => {
+      this.resolved = true;
+      this.resolvePromise(false);
+      this.close();
+    };
+
+    const confirmBtn = buttons.createEl('button', {
+      text: this.confirmText,
+      cls: this.isDestructive ? 'mod-warning' : 'mod-cta'
+    });
+    confirmBtn.onclick = () => {
+      this.resolved = true;
+      this.resolvePromise(true);
+      this.close();
+    };
+  }
+
+  onClose() {
+    this.contentEl.empty();
+    if (!this.resolved && this.resolvePromise) {
+      this.resolvePromise(false);
+    }
+  }
+
+  openAndGetValue() {
+    return new Promise((resolve) => {
+      this.resolvePromise = resolve;
+      this.open();
+    });
+  }
+}
+
+// settingsPlugin-PromptModal.js
+// Generic text input modal replacing native prompt() dialogs
+// This file is concatenated into the settings plugin template by the assembler
+
+class PromptModal extends Modal {
+  constructor(app, options = {}) {
+    super(app);
+    this.message = options.message || '';
+    this.defaultValue = options.defaultValue || '';
+    this.placeholder = options.placeholder || '';
+    this.inputValue = this.defaultValue;
+    this.resolved = false;
+  }
+
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.empty();
+
+    if (this.message) {
+      contentEl.createEl('p', { text: this.message });
+    }
+
+    new Setting(contentEl)
+      .addText(text => {
+        text.setValue(this.inputValue);
+        if (this.placeholder) text.setPlaceholder(this.placeholder);
+        text.onChange(v => { this.inputValue = v; });
+        setTimeout(() => {
+          text.inputEl.focus();
+          text.inputEl.select();
+        }, 50);
+      });
+
+    const buttons = contentEl.createDiv({ cls: 'dmt-modal-buttons' });
+
+    const cancelBtn = buttons.createEl('button', { text: 'Cancel' });
+    cancelBtn.onclick = () => {
+      this.resolved = true;
+      this.resolvePromise(null);
+      this.close();
+    };
+
+    const saveBtn = buttons.createEl('button', { text: 'OK', cls: 'mod-cta' });
+    saveBtn.onclick = () => {
+      const trimmed = this.inputValue.trim();
+      if (!trimmed) {
+        new Notice('Name cannot be empty');
+        return;
+      }
+      this.resolved = true;
+      this.resolvePromise(trimmed);
+      this.close();
+    };
+  }
+
+  onClose() {
+    this.contentEl.empty();
+    if (!this.resolved && this.resolvePromise) {
+      this.resolvePromise(null);
+    }
+  }
+
+  openAndGetValue() {
+    return new Promise((resolve) => {
+      this.resolvePromise = resolve;
+      this.open();
+    });
+  }
+}
+
 class WindroseMDSettingsPlugin extends Plugin {
   async onload() {
     await this.loadSettings();
     this.addSettingTab(new WindroseMDSettingsTab(this.app, this));
 
-    // Auto-load object sets from configured folder
-    if (this.settings.objectSetsAutoLoadFolder) {
-      try {
-        const added = await ObjectSetHelpers.scanAutoLoadFolder(this);
-        if (added > 0) await this.saveSettings();
-      } catch (e) {
-        console.warn('[Windrose] Auto-load scan failed:', e.message);
+    // Auto-load object sets from configured folder (deferred until vault is indexed)
+    this.app.workspace.onLayoutReady(async () => {
+      if (this.settings.objectSetsAutoLoadFolder) {
+        try {
+          const added = await ObjectSetHelpers.scanAutoLoadFolder(this);
+          if (added > 0) await this.saveSettings();
+        } catch (e) {
+          console.warn('[Windrose] Auto-load scan failed:', e.message);
+        }
       }
-    }
+    });
 
     // Watch auto-load folder for changes (debounced re-scan)
     this._autoLoadScanTimer = null;
@@ -6620,7 +6866,13 @@ class WindroseMDSettingsPlugin extends Plugin {
     });
   }
 
-  onunload() {}
+  onunload() {
+    if (window.__windrose) {
+      window.__windrose.ready = false;
+      window.__windrose.obsidian = null;
+      window.dispatchEvent(new CustomEvent('windrose:bridge-teardown'));
+    }
+  }
 
   /**
    * Get the path to the Windrose data file.
@@ -6955,7 +7207,7 @@ class WindroseMDSettingsPlugin extends Plugin {
     try {
       const data = await this.loadData();
       this.settings = Object.assign({
-        version: '0.15.1',
+        version: '0.16.1',
         hexOrientation: 'flat',
         gridLineColor: '#666666',
         gridLineWidth: 1,
@@ -6999,7 +7251,7 @@ class WindroseMDSettingsPlugin extends Plugin {
     } catch (error) {
       console.warn('[DMT Settings] Error loading settings, using defaults:', error);
       this.settings = {
-        version: '0.15.1',
+        version: '0.16.1',
         hexOrientation: 'flat',
         gridLineColor: '#666666',
         gridLineWidth: 1,
@@ -7780,7 +8032,11 @@ const TabRenderColorsMethods = {
         .setButtonText('Reset All')
         .setWarning()
         .onClick(async () => {
-          if (confirm('Reset all colors to defaults? This will remove all customizations.')) {
+          if (await new ConfirmModal(this.app, {
+              message: 'Reset all colors to defaults? This will remove all customizations.',
+              confirmText: 'Reset All',
+              isDestructive: true
+            }).openAndGetValue()) {
             this.plugin.settings.colorPaletteOverrides = {};
             this.plugin.settings.customPaletteColors = [];
             this.settingsChanged = true;
@@ -8023,18 +8279,22 @@ const TabRenderObjectsMethods = {
     // Reset All button (only show if there are customizations)
     if (hasAnyCustomizations) {
       new Setting(containerEl)
-        .setName('Reset All Customizations')
-        .setDesc(`Remove all custom objects, categories, and modifications for ${this.selectedMapType} maps`)
+        .setName(`Reset ${this.selectedMapType === 'hex' ? 'Hex' : 'Grid'} to Defaults`)
+        .setDesc(`Restore built-in objects for ${this.selectedMapType} maps. Does not affect saved sets.`)
         .addButton(btn => btn
-          .setButtonText('Reset All')
+          .setButtonText('Reset to Defaults')
           .setWarning()
           .onClick(async () => {
             const counts = [];
             if (hasOverrides) counts.push(`${Object.keys(mapTypeSettings.objectOverrides).length} modification(s)`);
             if (hasCustomObjects) counts.push(`${mapTypeSettings.customObjects.length} custom object(s)`);
             if (hasCustomCategories) counts.push(`${mapTypeSettings.customCategories.length} custom category(ies)`);
-            
-            if (confirm(`This will remove ${counts.join(', ')} for ${this.selectedMapType} maps. Maps using custom objects will show "?" placeholders.\\n\\nContinue?`)) {
+
+            if (await new ConfirmModal(this.app, {
+              message: `This will remove ${counts.join(', ')} for ${this.selectedMapType} maps. Saved sets are not affected. Maps using custom objects will show "?" placeholders.`,
+              confirmText: 'Reset to Defaults',
+              isDestructive: true
+            }).openAndGetValue()) {
               this.updateObjectSettingsForMapType({
                 objectOverrides: {},
                 customObjects: [],
@@ -8145,10 +8405,14 @@ const TabRenderObjectsMethods = {
         IconHelpers.set(deleteBtn, 'trash-2');
         deleteBtn.onclick = async () => {
           if (allCategoryObjects.length > 0) {
-            alert(`Cannot delete "${category.label}" - it contains ${allCategoryObjects.length} object(s). Move or delete them first.`);
+            new Notice(`Cannot delete "${category.label}" - it contains ${allCategoryObjects.length} object(s). Move or delete them first.`);
             return;
           }
-          if (confirm(`Delete category "${category.label}"?`)) {
+          if (await new ConfirmModal(this.app, {
+              message: `Delete category "${category.label}"?`,
+              confirmText: 'Delete',
+              isDestructive: true
+            }).openAndGetValue()) {
             const categoriesKey = this.selectedMapType === 'hex' ? 'customHexCategories' : 'customGridCategories';
             if (this.plugin.settings[categoriesKey]) {
               this.plugin.settings[categoriesKey] = this.plugin.settings[categoriesKey].filter(c => c.id !== category.id);
@@ -8384,7 +8648,11 @@ const TabRenderObjectsMethods = {
         const resetBtn = actions.createEl('button', { cls: 'dmt-settings-icon-btn', attr: { 'aria-label': 'Reset to default', title: 'Reset to default' } });
         IconHelpers.set(resetBtn, 'rotate-ccw');
         resetBtn.onclick = async () => {
-          if (confirm(`Reset "${obj.label}" to its default symbol and name?`)) {
+          if (await new ConfirmModal(this.app, {
+              message: `Reset "${obj.label}" to its default symbol and name?`,
+              confirmText: 'Reset',
+              isDestructive: true
+            }).openAndGetValue()) {
             if (this.plugin.settings[overridesKey]) {
               delete this.plugin.settings[overridesKey][obj.id];
             }
@@ -8452,7 +8720,11 @@ const TabRenderObjectsMethods = {
       const deleteBtn = actions.createEl('button', { cls: 'dmt-settings-icon-btn dmt-settings-icon-btn-danger', attr: { 'aria-label': 'Delete', title: 'Delete object' } });
       IconHelpers.set(deleteBtn, 'trash-2');
       deleteBtn.onclick = async () => {
-        if (confirm(`Delete "${obj.label}"? Maps using this object will show a "?" placeholder.`)) {
+        if (await new ConfirmModal(this.app, {
+            message: `Delete "${obj.label}"? Maps using this object will show a "?" placeholder.`,
+            confirmText: 'Delete',
+            isDestructive: true
+          }).openAndGetValue()) {
           if (this.plugin.settings[customObjectsKey]) {
             this.plugin.settings[customObjectsKey] = this.plugin.settings[customObjectsKey].filter(o => o.id !== obj.id);
           }
@@ -8480,20 +8752,18 @@ const TabRenderObjectsMethods = {
 
     // Active Set indicator
     const activeSet = sets.find(st => st.id === s.activeObjectSetId);
+    const isDirty = ObjectSetHelpers.isDirty(this.plugin);
+
     if (activeSet) {
       const bar = containerEl.createDiv({ cls: 'dmt-set-active-bar' });
       bar.createSpan({ text: 'Active set: ' });
       bar.createSpan({ text: activeSet.name, cls: 'dmt-set-active-name' });
-      const deactivateBtn = bar.createEl('button', {
-        text: 'Deactivate',
-        cls: 'dmt-settings-icon-btn',
-        attr: { title: 'Stop tracking active set (keeps current objects)' }
-      });
-      deactivateBtn.onclick = async () => {
-        ObjectSetHelpers.deactivateSet(this.plugin);
-        await this.plugin.saveSettings();
-        this.display();
-      };
+      if (isDirty) {
+        bar.createSpan({ text: ' (modified)', cls: 'dmt-set-modified-badge' });
+      }
+    } else if (isDirty) {
+      const bar = containerEl.createDiv({ cls: 'dmt-set-active-bar dmt-set-modified-bar' });
+      bar.createSpan({ text: 'Objects modified from defaults', cls: 'dmt-set-modified-badge' });
     }
 
     // Active Set dropdown
@@ -8501,38 +8771,41 @@ const TabRenderObjectsMethods = {
       .setName('Active Set')
       .setDesc('Switch to a saved set (overwrites current objects)')
       .addDropdown(dropdown => {
-        dropdown.addOption('', 'None (manual)');
+        dropdown.addOption('__defaults__', 'Defaults (built-in)');
         for (const set of sets) {
           const scope = [];
           if (set.data.hex) scope.push('hex');
           if (set.data.grid) scope.push('grid');
           dropdown.addOption(set.id, set.name + (scope.length ? ' [' + scope.join('+') + ']' : ''));
         }
-        dropdown.setValue(s.activeObjectSetId || '');
+        dropdown.setValue(s.activeObjectSetId || '__defaults__');
         dropdown.onChange(async (value) => {
-          if (!value) {
-            ObjectSetHelpers.deactivateSet(this.plugin);
-            this.settingsChanged = true;
-            await this.plugin.saveSettings();
-            this.display();
-            return;
-          }
-
           // Prompt to save current objects before switching
-          const hasAny = Object.keys(s.hexObjectOverrides || {}).length > 0 ||
-            (s.customHexObjects || []).length > 0 ||
-            (s.customHexCategories || []).length > 0 ||
-            Object.keys(s.gridObjectOverrides || {}).length > 0 ||
-            (s.customGridObjects || []).length > 0 ||
-            (s.customGridCategories || []).length > 0;
-
-          if (hasAny) {
-            if (confirm('Save your current objects as a set before switching?')) {
-              const name = prompt('Name for the saved set:', 'My Objects');
+          if (isDirty) {
+            if (await new ConfirmModal(this.app, {
+              message: 'Save your current objects as a set before switching?',
+              confirmText: 'Save',
+              cancelText: value === '__defaults__' ? 'Reset Without Saving' : 'Switch Without Saving'
+            }).openAndGetValue()) {
+              const name = await new PromptModal(this.app, {
+                message: 'Name for the saved set:',
+                defaultValue: 'My Objects'
+              }).openAndGetValue();
               if (name) {
                 ObjectSetHelpers.saveCurrentAsSet(this.plugin, name);
               }
             }
+          }
+
+          if (value === '__defaults__') {
+            ObjectSetHelpers.resetToDefaults(this.plugin);
+            this.settingsChanged = true;
+            await this.plugin.saveSettings();
+            window.dispatchEvent(new CustomEvent('dmt-settings-changed', {
+              detail: { timestamp: Date.now() }
+            }));
+            this.display();
+            return;
           }
 
           ObjectSetHelpers.activateSet(this.plugin, value);
@@ -8592,14 +8865,14 @@ const TabRenderObjectsMethods = {
         });
         IconHelpers.set(deleteBtn, 'trash-2');
         deleteBtn.onclick = async () => {
-          if (confirm('Delete set "' + set.name + '"?')) {
-            const wasActive = set.id === s.activeObjectSetId;
+          if (await new ConfirmModal(this.app, {
+              message: 'Delete set "' + set.name + '"?',
+              confirmText: 'Delete',
+              isDestructive: true
+            }).openAndGetValue()) {
             ObjectSetHelpers.deleteSet(this.plugin, set.id);
             this.settingsChanged = true;
             await this.plugin.saveSettings();
-            if (wasActive) {
-              new Notice('Active set deleted. Current objects left in place.');
-            }
             this.display();
           }
         };
@@ -8613,7 +8886,10 @@ const TabRenderObjectsMethods = {
     actionSetting.addButton(btn => btn
       .setButtonText('Save Current as Set')
       .onClick(async () => {
-        const name = prompt('Name for the new set:', 'My Objects');
+        const name = await new PromptModal(this.app, {
+          message: 'Name for the new set:',
+          defaultValue: 'My Objects'
+        }).openAndGetValue();
         if (!name) return;
         ObjectSetHelpers.saveCurrentAsSet(this.plugin, name);
         await this.plugin.saveSettings();
@@ -8634,13 +8910,16 @@ const TabRenderObjectsMethods = {
     new Setting(containerEl)
       .setName('Auto-Load Folder')
       .setDesc('Vault folder to scan for object set packages on startup')
-      .addText(text => text
-        .setPlaceholder('e.g. windrose-objects')
-        .setValue(s.objectSetsAutoLoadFolder || '')
-        .onChange(async (value) => {
-          s.objectSetsAutoLoadFolder = value.trim();
-          await this.plugin.saveSettings();
-        }))
+      .addSearch(search => {
+        new FolderSuggest(this.app, search.inputEl);
+        search
+          .setPlaceholder('e.g. windrose-objects')
+          .setValue(s.objectSetsAutoLoadFolder || '')
+          .onChange(async (value) => {
+            s.objectSetsAutoLoadFolder = value.trim();
+            await this.plugin.saveSettings();
+          });
+      })
       .addButton(btn => btn
         .setButtonText('Scan Now')
         .onClick(async () => {
