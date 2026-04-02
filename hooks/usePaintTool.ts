@@ -12,7 +12,7 @@ import type { MapData, MapLayer } from '#types/core/map.types';
 import type { MapObject } from '#types/objects/object.types';
 import type { Curve } from '#types/core/curve.types';
 import type { DragStartContext } from '#types/hooks/drawingTools.types';
-import type { Edge, MapStateContextValue } from '#types/contexts/context.types';
+import type { Edge, EdgeInfo, MapStateContextValue } from '#types/contexts/context.types';
 
 const pathResolverPath = dc.resolvePath("pathResolver.ts");
 const { requireModuleByName } = await dc.require(pathResolverPath);
@@ -26,12 +26,6 @@ const {
   removeCell: (cells: Cell[], coords: Point, geometry: IGeometry) => Cell[];
   getCellIndex: (cells: Cell[], coords: Point, geometry: IGeometry) => number;
 };
-
-interface EdgeInfo {
-  x: number;
-  y: number;
-  side: string;
-}
 
 interface EraseResult {
   success: boolean;

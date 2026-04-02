@@ -267,10 +267,9 @@ const useGroupDrag = (): UseGroupDragResult => {
             // Drag inversion: flip each object's snap behavior
             if (!offset.freeform) {
               // Grid → freeform inversion: use world-space delta
-              const cellCenter = (geometry as any)?.getCellCenter?.(obj.position.x, obj.position.y)
-                || (geometry as any)?.gridToWorld?.(obj.position.x, obj.position.y);
-              const baseX = obj.worldPosition?.x ?? cellCenter?.worldX ?? 0;
-              const baseY = obj.worldPosition?.y ?? cellCenter?.worldY ?? 0;
+              const cellCenter = geometry.getCellCenter(obj.position.x, obj.position.y);
+              const baseX = obj.worldPosition?.x ?? cellCenter.worldX;
+              const baseY = obj.worldPosition?.y ?? cellCenter.worldY;
               const newWorldX = baseX + worldDeltaX;
               const newWorldY = baseY + worldDeltaY;
               const nearestGrid = screenToGrid(clientX, clientY);
@@ -284,13 +283,12 @@ const useGroupDrag = (): UseGroupDragResult => {
               // Freeform → grid inversion: snap to grid
               const newX = gridX - offset.gridOffsetX;
               const newY = gridY - offset.gridOffsetY;
-              const cellCenter = (geometry as any)?.getCellCenter?.(newX, newY)
-                || (geometry as any)?.gridToWorld?.(newX, newY);
+              const cellCenter = geometry.getCellCenter(newX, newY);
               objectUpdates.push({
                 id: item.id,
                 oldObj: obj,
                 newPosition: { x: newX, y: newY },
-                freeformPosition: cellCenter ? { x: cellCenter.worldX, y: cellCenter.worldY } : undefined
+                freeformPosition: { x: cellCenter.worldX, y: cellCenter.worldY }
               });
             }
           } else if (offset.freeform) {
@@ -453,15 +451,12 @@ const useGroupDrag = (): UseGroupDragResult => {
         }
         // Freeform object that was snapped to grid → keep freeform, snap worldPosition to cell center
         if (offset.freeform && obj.worldPosition) {
-          const cellCenter = (geometry as any)?.getCellCenter?.(obj.position.x, obj.position.y)
-            || (geometry as any)?.gridToWorld?.(obj.position.x, obj.position.y);
-          if (cellCenter) {
-            updatedObjects[idx] = {
-              ...obj,
-              worldPosition: { x: cellCenter.worldX, y: cellCenter.worldY }
-            };
-            needsRestore = true;
-          }
+          const cellCenter = geometry.getCellCenter(obj.position.x, obj.position.y);
+          updatedObjects[idx] = {
+            ...obj,
+            worldPosition: { x: cellCenter.worldX, y: cellCenter.worldY }
+          };
+          needsRestore = true;
         }
       }
 

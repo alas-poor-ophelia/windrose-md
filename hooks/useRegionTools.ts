@@ -263,7 +263,9 @@ function useRegionTools(options: RegionToolsOptions): UseRegionToolsResult {
       }
     } else {
       // Rectangular bounds - iterate offset coords and convert
-      const { offsetToAxial } = requireModuleByName("offsetCoordinates.ts") as any;
+      const { offsetToAxial } = requireModuleByName("offsetCoordinates.ts") as {
+        offsetToAxial: (col: number, row: number, orientation: string) => { q: number; r: number };
+      };
       // Sync fallback: iterate reasonable range
       for (let col = 0; col <= bounds.maxCol; col++) {
         for (let row = 0; row <= bounds.maxRow; row++) {

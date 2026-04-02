@@ -8,6 +8,7 @@
 // Type-only imports
 import type { MapData, MapLayer, ViewState } from '#types/core/map.types';
 import type { IGeometry, Point } from '#types/core/geometry.types';
+import type { ExtendedGeometry } from '#types/contexts/context.types';
 import type { Cell, CellMap } from '#types/core/cell.types';
 import type { MapObject, ObjectTypeDef } from '#types/objects/object.types';
 import type { TextLabel } from '#types/objects/note.types';
@@ -387,7 +388,7 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
       // Ghost layer curves
       if (layerBelow.curves && layerBelow.curves.length > 0) {
         const ghostGridConfig = geometry.type === 'grid'
-          ? { cellSize: (geometry as any).cellSize, lineColor: THEME.grid.lines, lineWidth: THEME.grid.lineWidth || 1, interiorRatio: 0.5 }
+          ? { cellSize: (geometry as ExtendedGeometry).cellSize, lineColor: THEME.grid.lines, lineWidth: THEME.grid.lineWidth || 1, interiorRatio: 0.5 }
           : undefined;
         renderCurves(ctx, layerBelow.curves, rendererViewState, THEME, { opacity: ghostOpacity, gridConfig: ghostGridConfig });
       }
@@ -405,7 +406,7 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
     activeMergeIndex = buildMergeIndex(
       cellsForMerge,
       activeLayer.curves,
-      (geometry as any).cellSize
+      (geometry as ExtendedGeometry).cellSize
     );
   }
 
@@ -418,7 +419,7 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   // Draw freehand curves (between cells and objects)
   if (activeLayer.curves && activeLayer.curves.length > 0) {
     const curveGridConfig = geometry.type === 'grid'
-      ? { cellSize: (geometry as any).cellSize, lineColor: THEME.grid.lines, lineWidth: THEME.grid.lineWidth || 1, interiorRatio: 0.5 }
+      ? { cellSize: (geometry as ExtendedGeometry).cellSize, lineColor: THEME.grid.lines, lineWidth: THEME.grid.lineWidth || 1, interiorRatio: 0.5 }
       : undefined;
     renderCurves(ctx, activeLayer.curves, rendererViewState, THEME, {
       mergeIndex: activeMergeIndex,
@@ -442,16 +443,12 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
 
   // Draw sub-hex indicators (small diamond on hexes that have sub-hex data)
   if (geometry.type === 'hex' && mapData.subHexMaps) {
-    const hexGeom = geometry as unknown as {
-      hexSize: number;
-      hexToWorld: (q: number, r: number) => { worldX: number; worldY: number };
-      worldToScreen: (worldX: number, worldY: number, offsetX: number, offsetY: number, zoom: number) => { screenX: number; screenY: number };
-    };
+    const hexGeom = geometry as ExtendedGeometry;
 
     ctx.save();
     for (const [hexKey, subHex] of Object.entries(mapData.subHexMaps)) {
       // Only show indicator if the sub-hex has actual content
-      const sd = (subHex as any)?.mapData;
+      const sd = subHex.mapData;
       if (!sd?.layers) continue;
       const hasContent = sd.layers.some((l: any) =>
         (l.cells && l.cells.length > 0) ||
@@ -464,9 +461,9 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
       const [qStr, rStr] = hexKey.split(',');
       const q = parseInt(qStr, 10);
       const r = parseInt(rStr, 10);
-      const world = hexGeom.hexToWorld(q, r);
+      const world = hexGeom.hexToWorld!(q, r);
       const screen = hexGeom.worldToScreen(world.worldX, world.worldY, offsetX, offsetY, zoom);
-      const size = Math.max(4, hexGeom.hexSize * zoom * 0.12);
+      const size = Math.max(4, hexGeom.hexSize! * zoom * 0.12);
 
       // Small diamond indicator at hex center
       ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';

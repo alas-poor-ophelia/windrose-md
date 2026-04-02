@@ -8,16 +8,10 @@
 import type { IGeometry } from '#types/core/geometry.types';
 import type { MapData, MapLayer } from '#types/core/map.types';
 import type { ToolId } from '#types/tools/tool.types';
-import type { Edge, MapStateContextValue } from '#types/contexts/context.types';
+import type { Edge, EdgeInfo, MapStateContextValue } from '#types/contexts/context.types';
 
 const pathResolverPath = dc.resolvePath("pathResolver.ts");
 const { requireModuleByName } = await dc.require(pathResolverPath);
-
-interface EdgeInfo {
-  x: number;
-  y: number;
-  side: string;
-}
 
 const { addEdge, removeEdge, getEdgeAt } = await requireModuleByName("edgeOperations.ts") as {
   addEdge: (edges: Edge[], x: number, y: number, side: string, color: string, opacity: number) => Edge[];

@@ -252,10 +252,7 @@ function useObjectDragSelect(
           baseWorldX = currentObject.worldPosition.x;
           baseWorldY = currentObject.worldPosition.y;
         } else {
-          const cellCenter = geometry?.getCellCenter
-            ? (geometry as any).getCellCenter(currentObject.position.x, currentObject.position.y)
-            : geometry?.gridToWorld?.(currentObject.position.x, currentObject.position.y);
-          if (!cellCenter) return true;
+          const cellCenter = geometry.getCellCenter(currentObject.position.x, currentObject.position.y);
           baseWorldX = cellCenter.worldX;
           baseWorldY = cellCenter.worldY;
         }
@@ -289,9 +286,7 @@ function useObjectDragSelect(
         const targetX = coords.x - offsetX;
         const targetY = coords.y - offsetY;
 
-        const cellCenter = geometry?.getCellCenter
-          ? (geometry as any).getCellCenter(targetX, targetY)
-          : geometry?.gridToWorld?.(targetX, targetY);
+        const cellCenter = geometry.getCellCenter(targetX, targetY);
 
         const updatedObjects = updateObject(
           getActiveLayer(mapData).objects,
@@ -442,17 +437,13 @@ function useObjectDragSelect(
             // Was grid, Alt+Shift dragged to freeform → keep as freeform permanently
           } else if (dragStart.originalFreeform === true) {
             // Was freeform, inverted to grid → keep freeform, snap worldPosition to final cell center
-            const cellCenter = geometry?.getCellCenter
-              ? (geometry as any).getCellCenter(currentObject.position.x, currentObject.position.y)
-              : geometry?.gridToWorld?.(currentObject.position.x, currentObject.position.y);
-            if (cellCenter) {
-              const updatedObjects = updateObject(
-                getActiveLayer(mapData).objects,
-                objectId,
-                { worldPosition: { x: cellCenter.worldX, y: cellCenter.worldY } }
-              );
-              onObjectsChange(updatedObjects, true);
-            }
+            const cellCenter = geometry.getCellCenter(currentObject.position.x, currentObject.position.y);
+            const updatedObjects = updateObject(
+              getActiveLayer(mapData).objects,
+              objectId,
+              { worldPosition: { x: cellCenter.worldX, y: cellCenter.worldY } }
+            );
+            onObjectsChange(updatedObjects, true);
           }
         }
       }

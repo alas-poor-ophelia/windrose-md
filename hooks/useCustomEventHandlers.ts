@@ -12,6 +12,7 @@
 
 import type { MapData } from '#types/core/map.types';
 import type { IGeometry } from '#types/core/geometry.types';
+import type { ExtendedGeometry } from '#types/contexts/context.types';
 import type { MapObject, ObjectLink } from '#types/objects/object.types';
 
 const pathResolverPath = dc.resolvePath("pathResolver.ts");
@@ -133,7 +134,7 @@ function useCustomEventHandlers({
       // Compute centroid in world coordinates
       let cx = 0, cy = 0;
       for (const hex of region.hexes) {
-        const world = (geometry as any).hexToWorld(hex.x, hex.y);
+        const world = (geometry as ExtendedGeometry).hexToWorld!(hex.x, hex.y);
         cx += world.worldX;
         cy += world.worldY;
       }

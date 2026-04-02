@@ -14,6 +14,7 @@ import type { ToolId } from '#types/tools/tool.types';
 import type { ObjectTypeId, MapObject } from '#types/objects/object.types';
 import type { TextLabel } from '#types/objects/note.types';
 import type { HexColor } from '#types/core/common.types';
+import type { ExtendedGeometry } from '#types/contexts/context.types';
 import type { CustomColor } from '../ColorPicker.tsx';
 
 const pathResolverPath = dc.resolvePath("pathResolver.ts");
@@ -430,10 +431,8 @@ const ObjectLayer = ({
       updates = snapObjectToGrid(nearestGrid);
     } else {
       // Convert to freeform: compute world position from grid cell center
-      const cellCenter = geometry.getCellCenter
-        ? (geometry as any).getCellCenter(obj.position.x, obj.position.y)
-        : (geometry as any).gridToWorld(obj.position.x, obj.position.y);
-      const cellSize = (geometry as any).cellSize || (geometry as any).hexSize || mapData.gridSize;
+      const cellCenter = geometry.getCellCenter(obj.position.x, obj.position.y);
+      const cellSize = (geometry as ExtendedGeometry).cellSize || mapData.gridSize;
       updates = convertObjectToFreeform(obj, cellCenter.worldX, cellCenter.worldY, cellSize);
     }
 
