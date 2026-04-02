@@ -128,6 +128,19 @@ function useMapData(
     }
   }, [mapData?.mapType, mapData?.objectSetId, settingsVersion]);
 
+  // Preload tile images when tilesets are defined
+  dc.useEffect(() => {
+    if (!mapData?.tilesets) return;
+
+    for (const tileset of mapData.tilesets) {
+      for (const tile of tileset.tiles) {
+        if (tile.vaultPath) {
+          preloadImage(tile.vaultPath);
+        }
+      }
+    }
+  }, [mapData?.tilesets]);
+
   // Listen for settings changes to trigger image preload
   dc.useEffect(() => {
     const handleSettingsChange = (): void => {

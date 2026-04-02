@@ -99,6 +99,9 @@ const { HexGeometry } = await requireModuleByName("HexGeometry.ts") as {
 const { renderRegions } = await requireModuleByName("regionRenderer.ts") as {
   renderRegions: (ctx: CanvasRenderingContext2D, regions: import('#types/core/map.types').Region[], geometry: any, viewState: { x: number; y: number; zoom: number }, options?: { foggedCells?: Set<string> }) => void;
 };
+const { renderTiles } = await requireModuleByName("tileRenderer.ts") as {
+  renderTiles: (ctx: CanvasRenderingContext2D, tiles: import('#types/tiles/tile.types').HexTileAssignment[], tilesets: import('#types/tiles/tile.types').TilesetDef[], geometry: { hexToWorld: (q: number, r: number) => { worldX: number; worldY: number }; worldToScreen: (wx: number, wy: number, ox: number, oy: number, zoom: number) => { screenX: number; screenY: number }; hexSize: number; orientation: string }, viewState: { x: number; y: number; zoom: number }, options?: { opacity?: number; getCachedImage?: (path: string) => HTMLImageElement | null; canvasWidth?: number; canvasHeight?: number }) => void;
+};
 
 interface Renderer {
   // Polymorphic properties
@@ -385,6 +388,18 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
         opacity: ghostOpacity,
         showGrid: visibility.grid !== false
       });
+      // Ghost layer tiles
+      if (geometry.type === 'hex' && layerBelow.tiles && layerBelow.tiles.length > 0 && mapData.tilesets && mapData.tilesets.length > 0) {
+        const hexGeom = geometry as ExtendedGeometry;
+        renderTiles(
+          ctx,
+          layerBelow.tiles,
+          mapData.tilesets,
+          { hexToWorld: hexGeom.hexToWorld!, worldToScreen: hexGeom.worldToScreen, hexSize: hexGeom.hexSize!, orientation: mapData.orientation || 'flat' },
+          rendererViewState,
+          { opacity: ghostOpacity, getCachedImage, canvasWidth: width, canvasHeight: height }
+        );
+      }
       // Ghost layer curves
       if (layerBelow.curves && layerBelow.curves.length > 0) {
         const ghostGridConfig = geometry.type === 'grid'
@@ -425,6 +440,19 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
       mergeIndex: activeMergeIndex,
       gridConfig: curveGridConfig
     });
+  }
+
+  // Draw hex tiles (between curves and regions, z-sorted for overflow occlusion)
+  if (geometry.type === 'hex' && activeLayer.tiles && activeLayer.tiles.length > 0 && mapData.tilesets && mapData.tilesets.length > 0) {
+    const hexGeom = geometry as ExtendedGeometry;
+    renderTiles(
+      ctx,
+      activeLayer.tiles,
+      mapData.tilesets,
+      { hexToWorld: hexGeom.hexToWorld!, worldToScreen: hexGeom.worldToScreen, hexSize: hexGeom.hexSize!, orientation: mapData.orientation || 'flat' },
+      rendererViewState,
+      { getCachedImage, canvasWidth: width, canvasHeight: height }
+    );
   }
 
   // Draw regions (hex maps only, between curves and objects)
