@@ -23,6 +23,13 @@ interface UseUILayoutOptions {
   showPluginInstaller: boolean;
 }
 
+interface LayerVisibilityState {
+  grid: boolean;
+  objects: boolean;
+  textLabels: boolean;
+  hexCoordinates: boolean;
+}
+
 interface UseUILayoutResult {
   containerRef: { current: HTMLDivElement | null };
   isFocused: boolean;
@@ -38,6 +45,8 @@ interface UseUILayoutResult {
   setShowLayerPanel: (v: boolean) => void;
   showRegionPanel: boolean;
   setShowRegionPanel: (v: boolean) => void;
+  layerVisibility: LayerVisibilityState;
+  handleToggleLayerVisibility: (layerId: keyof LayerVisibilityState) => void;
 }
 
 function useUILayout({
@@ -53,6 +62,21 @@ function useUILayout({
   const [showVisibilityToolbar, setShowVisibilityToolbar] = dc.useState(false);
   const [showLayerPanel, setShowLayerPanel] = dc.useState(false);
   const [showRegionPanel, setShowRegionPanel] = dc.useState(false);
+
+  // Layer visibility state (session-only, resets on reload)
+  const [layerVisibility, setLayerVisibility] = dc.useState<LayerVisibilityState>({
+    grid: true,
+    objects: true,
+    textLabels: true,
+    hexCoordinates: false
+  });
+
+  const handleToggleLayerVisibility = dc.useCallback((layerId: keyof LayerVisibilityState) => {
+    setLayerVisibility((prev: LayerVisibilityState) => ({
+      ...prev,
+      [layerId]: !prev[layerId]
+    }));
+  }, []);
 
   const containerRef = dc.useRef<HTMLDivElement | null>(null);
   const animationTimeoutRef = dc.useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -151,7 +175,8 @@ function useUILayout({
     showFooter, setShowFooter,
     showVisibilityToolbar, setShowVisibilityToolbar,
     showLayerPanel, setShowLayerPanel,
-    showRegionPanel, setShowRegionPanel
+    showRegionPanel, setShowRegionPanel,
+    layerVisibility, handleToggleLayerVisibility
   };
 }
 

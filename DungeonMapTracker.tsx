@@ -3,21 +3,7 @@
 import type {
   MapData,
   MapType,
-  ViewState,
   IGeometry,
-  ToolId,
-  ObjectTypeId,
-  Cell,
-  MapObject,
-  TextLabel,
-  Edge,
-  TextLabelSettings,
-  FogToolId,
-  LayerVisibility,
-  BackgroundImage,
-  UIPreferences,
-  MapSettings,
-  MapLayer,
 } from '#types/index';
 import type { ResolvedTheme } from '#types/settings/settings.types';
 
@@ -67,10 +53,7 @@ const { useSubHexNavigation } = await requireModuleByName("useSubHexNavigation.t
 const { useCustomEventHandlers } = await requireModuleByName("useCustomEventHandlers.ts");
 const { useUILayout } = await requireModuleByName("useUILayout.ts");
 const { usePanelState } = await requireModuleByName("usePanelState.ts");
-const { getObsidianModule, isBridgeAvailable } = await requireModuleByName("obsidianBridge.ts");
-const { openNativeNoteLinkModal } = await requireModuleByName("NoteLinkModal.tsx") as {
-  openNativeNoteLinkModal: (options: { onSave: (path: string) => void; onClose: () => void; currentNotePath: string | null; objectType: string | null }) => boolean;
-};
+const { useViewControls } = await requireModuleByName("useViewControls.ts");
 const { SubHexBreadcrumb } = await requireModuleByName("SubHexBreadcrumb.tsx");
 
 // RPGAwesome icon font support
@@ -90,13 +73,6 @@ interface DungeonMapTrackerProps {
   mapId?: string;
   mapName?: string;
   mapType?: MapType;
-}
-
-interface LayerVisibilityState {
-  grid: boolean;
-  objects: boolean;
-  textLabels: boolean;
-  hexCoordinates: boolean;
 }
 
 type CornerPosition = 'tl' | 'tr' | 'bl' | 'br';
@@ -192,11 +168,11 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     currentTool, setCurrentTool,
     selectedObjectType, setSelectedObjectType,
     selectedColor, setSelectedColor,
-    selectedOpacity, setSelectedOpacity,
-    isColorPickerOpen, setIsColorPickerOpen
-  } = useToolState();
-
-  const [freeformPlacementMode, setFreeformPlacementMode] = dc.useState(false);
+    selectedOpacity,
+    isColorPickerOpen, setIsColorPickerOpen,
+    freeformPlacementMode, setFreeformPlacementMode,
+    handleOpacityChange
+  } = useToolState({ mapData, updateMapData });
 
   // Panel/modal state (plugin installer, settings modal, layer edit)
   const {
@@ -208,14 +184,15 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     handlePluginInstall, handlePluginDecline
   } = usePanelState({ mapData, updateMapData });
 
-  // UI layout state (expand/collapse, panels, focus, footer)
+  // UI layout state (expand/collapse, panels, focus, footer, layer visibility)
   const {
     containerRef, isFocused, setIsFocused,
     isExpanded, isAnimating, handleToggleExpand,
     showFooter, setShowFooter,
     showVisibilityToolbar, setShowVisibilityToolbar,
     showLayerPanel, setShowLayerPanel,
-    showRegionPanel, setShowRegionPanel
+    showRegionPanel, setShowRegionPanel,
+    layerVisibility, handleToggleLayerVisibility
   } = useUILayout({ mapData, updateMapData, showPluginInstaller });
 
   // Image alignment mode (extracted to useAlignmentMode hook)
@@ -225,22 +202,6 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     handleOpenAlignmentMode, handleAlignmentOffsetChange,
     handleAlignmentGridSizeChange, handleAlignmentApply, handleAlignmentCancel
   } = useAlignmentMode({ mapData, updateMapData, setShowSettingsModal });
-
-  // Layer visibility state (session-only, resets on reload)
-  const [layerVisibility, setLayerVisibility] = dc.useState<LayerVisibilityState>({
-    grid: true,
-    objects: true,
-    textLabels: true,
-    hexCoordinates: false
-  });
-
-  // Toggle a specific layer's visibility
-  const handleToggleLayerVisibility = dc.useCallback((layerId: keyof LayerVisibilityState) => {
-    setLayerVisibility((prev: LayerVisibilityState) => ({
-      ...prev,
-      [layerId]: !prev[layerId]
-    }));
-  }, []);
 
   // Create geometry instance for coordinate conversions
   // Same logic as MapCanvas for consistency
@@ -306,25 +267,6 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
 
 
 
-  // Initialize opacity from mapData when loaded
-  dc.useEffect(() => {
-    if (!mapData) return;
-
-    if (mapData.lastSelectedOpacity !== undefined) {
-      setSelectedOpacity(mapData.lastSelectedOpacity);
-    }
-  }, [mapData?.lastSelectedOpacity]);
-
-  // Handler to update opacity and persist to mapData
-  const handleOpacityChange = dc.useCallback((newOpacity: number) => {
-    setSelectedOpacity(newOpacity);
-    updateMapData((currentMapData: MapData) => ({
-      ...currentMapData,
-      lastSelectedOpacity: newOpacity
-    }));
-  }, [updateMapData]);
-
-
   // Compose settings close with alignment reset
   const handleSettingsClose = (): void => {
     panelSettingsClose();
@@ -361,12 +303,6 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     }
   }, [handleUndo]);
 
-  // Custom event listeners (sub-hex, deep links, regions, object links)
-  useCustomEventHandlers({
-    mapData, mapId, geometry, updateMapData,
-    handleLayerSelect, enterSubHex, exitSubHex, isInSubHex
-  });
-
   // Data change handlers (extracted to useDataHandlers hook)
   const {
     handleNameChange,
@@ -384,146 +320,17 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     handleRegionsChange
   } = useDataHandlers({ mapData, updateMapData, addToHistory, isApplyingHistory });
 
-  // Listen for general hex context menu events (after handleRegionsChange is available)
-  dc.useEffect(() => {
-    const handleHexContextMenu = (event: CustomEvent): void => {
-      if (!mapData || mapData.mapType !== 'hex' || !isBridgeAvailable()) return;
+  // Custom event listeners (sub-hex, deep links, regions, object links, hex context menu)
+  useCustomEventHandlers({
+    mapData, mapId, geometry, updateMapData,
+    handleLayerSelect, enterSubHex, exitSubHex, isInSubHex,
+    handleRegionsChange
+  });
 
-      const { q, r, screenX, screenY } = event.detail;
-      const hexKey = `${q},${r}`;
-      const hasSubHex = !!(mapData.subHexMaps && mapData.subHexMaps[hexKey]);
-
-      const obs = getObsidianModule();
-      const MenuClass = obs.Menu as new () => {
-        addItem: (cb: (item: any) => void) => any;
-        addSeparator: () => any;
-        showAtPosition: (pos: { x: number; y: number }) => void;
-      };
-
-      const menu = new MenuClass();
-
-      menu.addItem((item: any) => {
-        item.setTitle(hasSubHex ? `Enter Sub-Hex (${q}, ${r})` : `Create Sub-Hex (${q}, ${r})`);
-        item.setIcon(hasSubHex ? 'lucide-arrow-down-right' : 'lucide-plus-circle');
-        item.onClick(() => enterSubHex(q, r));
-      });
-
-      // Region actions if this hex belongs to a region
-      const region = (mapData.regions || []).find((reg: any) =>
-        reg.hexes.some((h: any) => h.x === q && h.y === r)
-      );
-      if (region) {
-        menu.addSeparator();
-
-        menu.addItem((item: any) => {
-          item.setTitle(`Edit Region: ${region.name}`);
-          item.setIcon('lucide-pencil');
-          item.onClick(() => {
-            document.dispatchEvent(new CustomEvent('windrose:edit-region', { detail: { regionId: region.id } }));
-          });
-        });
-
-        menu.addItem((item: any) => {
-          item.setTitle(region.visible ? 'Hide Region' : 'Show Region');
-          item.setIcon(region.visible ? 'lucide-eye-off' : 'lucide-eye');
-          item.onClick(() => {
-            const updated = (mapData.regions || []).map((r: any) =>
-              r.id === region.id ? { ...r, visible: !r.visible } : r
-            );
-            handleRegionsChange(updated);
-          });
-        });
-
-        if (region.linkedNote) {
-          menu.addItem((item: any) => {
-            item.setTitle('Open Linked Note');
-            item.setIcon('lucide-external-link');
-            item.onClick(() => {
-              const linkPath = region.linkedNote.replace(/\.md$/, '');
-              dc.app.workspace.openLinkText(linkPath, '', false);
-            });
-          });
-        }
-
-        menu.addItem((item: any) => {
-          item.setTitle(region.linkedNote ? 'Change Linked Note' : 'Link Note');
-          item.setIcon('lucide-link');
-          item.onClick(() => {
-            openNativeNoteLinkModal({
-              onSave: (notePath: string) => {
-                const updated = (mapData.regions || []).map((r: any) =>
-                  r.id === region.id ? { ...r, linkedNote: notePath || undefined } : r
-                );
-                handleRegionsChange(updated);
-              },
-              onClose: () => {},
-              currentNotePath: region.linkedNote || null,
-              objectType: null
-            });
-          });
-        });
-
-        menu.addSeparator();
-
-        menu.addItem((item: any) => {
-          item.setTitle('Delete Region');
-          item.setIcon('lucide-trash-2');
-          item.setWarning(true);
-          item.onClick(() => {
-            handleRegionsChange((mapData.regions || []).filter((r: any) => r.id !== region.id));
-          });
-        });
-      }
-
-      menu.showAtPosition({ x: screenX, y: screenY });
-    };
-
-    document.addEventListener('windrose:hex-context-menu', handleHexContextMenu as EventListener);
-    return () => document.removeEventListener('windrose:hex-context-menu', handleHexContextMenu as EventListener);
-  }, [mapData, enterSubHex, handleRegionsChange]);
-
-  // Zoom in (increase zoom by step)
-  const handleZoomIn = (): void => {
-    if (!mapData) return;
-    const newZoom = Math.min(
-      DEFAULTS.maxZoom,
-      mapData.viewState.zoom + DEFAULTS.zoomButtonStep
-    );
-    handleViewStateChange({
-      ...mapData.viewState,
-      zoom: newZoom
-    });
-  };
-
-  // Zoom out (decrease zoom by step)
-  const handleZoomOut = (): void => {
-    if (!mapData) return;
-    const newZoom = Math.max(
-      DEFAULTS.minZoom,
-      mapData.viewState.zoom - DEFAULTS.zoomButtonStep
-    );
-    handleViewStateChange({
-      ...mapData.viewState,
-      zoom: newZoom
-    });
-  };
-
-  // Compass click - cycle through rotations
-  const handleCompassClick = (): void => {
-    if (!mapData) return;
-
-    // Cycle through: 0 -> 90 -> 180 -> 270 -> 0 degrees
-    const rotations = [0, 90, 180, 270];
-    const currentIndex = rotations.indexOf(mapData.northDirection);
-    const nextIndex = (currentIndex + 1) % rotations.length;
-    const newRotation = rotations[nextIndex];
-
-    const newMapData = {
-      ...mapData,
-      northDirection: newRotation
-    };
-    updateMapData(newMapData);
-  };
+  // View controls (zoom, compass)
+  const { handleZoomIn, handleZoomOut, handleCompassClick } = useViewControls({
+    mapData, updateMapData, handleViewStateChange
+  });
 
 
 

@@ -21,6 +21,7 @@ import type {
   ToolStateActions
 } from '#types/tools/tool.types';
 import type { ObjectTypeId } from '#types/objects/object.types';
+import type { MapData } from '#types/core/map.types';
 
 // Datacore imports
 const pathResolverPath = dc.resolvePath("pathResolver.ts");
@@ -39,7 +40,9 @@ function useToolState(options: UseToolStateOptions = {}): UseToolStateResult {
   const {
     initialTool = 'select',
     initialColor = DEFAULT_COLOR,
-    initialOpacity = 1
+    initialOpacity = 1,
+    mapData = null,
+    updateMapData = null
   } = options;
 
   // Tool selection state
@@ -50,6 +53,28 @@ function useToolState(options: UseToolStateOptions = {}): UseToolStateResult {
   const [selectedColor, setSelectedColor] = dc.useState(initialColor);
   const [selectedOpacity, setSelectedOpacity] = dc.useState(initialOpacity);
   const [isColorPickerOpen, setIsColorPickerOpen] = dc.useState(false);
+
+  // Freeform placement mode (tool modifier)
+  const [freeformPlacementMode, setFreeformPlacementMode] = dc.useState(false);
+
+  // Initialize opacity from mapData when loaded
+  dc.useEffect(() => {
+    if (!mapData) return;
+    if (mapData.lastSelectedOpacity !== undefined) {
+      setSelectedOpacity(mapData.lastSelectedOpacity);
+    }
+  }, [mapData?.lastSelectedOpacity]);
+
+  // Handler to update opacity and persist to mapData
+  const handleOpacityChange = dc.useCallback((newOpacity: number) => {
+    setSelectedOpacity(newOpacity);
+    if (updateMapData) {
+      updateMapData((currentMapData: MapData) => ({
+        ...currentMapData,
+        lastSelectedOpacity: newOpacity
+      }));
+    }
+  }, [updateMapData]);
 
   // Grouped state object for easy destructuring
   const toolState: ToolStateValues = {
@@ -81,7 +106,10 @@ function useToolState(options: UseToolStateOptions = {}): UseToolStateResult {
     setSelectedObjectType,
     setSelectedColor,
     setSelectedOpacity,
-    setIsColorPickerOpen
+    setIsColorPickerOpen,
+    freeformPlacementMode,
+    setFreeformPlacementMode,
+    handleOpacityChange
   };
 }
 
