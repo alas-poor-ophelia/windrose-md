@@ -22,7 +22,7 @@ const { useMapSelection } = await requireModuleByName("MapSelectionContext.tsx")
 const { TextLabelEditor, openNativeTextLabelEditor } = await requireModuleByName("TextLabelEditor.tsx");
 const { isBridgeAvailable } = await requireModuleByName("obsidianBridge.ts");
 const { useEventHandlerRegistration } = await requireModuleByName("EventHandlerContext.tsx");
-const { SelectionToolbar } = await requireModuleByName("SelectionToolbar.tsx");
+const { TextSelectionToolbar } = await requireModuleByName("TextSelectionToolbar.tsx");
 const { getActiveLayer } = await requireModuleByName("layerAccessor.ts");
 const { copyDeepLinkToClipboard } = await requireModuleByName("deepLinkHandler.ts");
 
@@ -155,7 +155,7 @@ const TextLayer = ({
   return (
     <>
       {selectedItem?.type === 'text' && !isDraggingSelection && (
-        <SelectionToolbar
+        <TextSelectionToolbar
           selectedItem={selectedItem}
           mapData={mapData}
           canvasRef={canvasRef}
@@ -165,8 +165,6 @@ const TextLayer = ({
           onRotate={handleRotateClick}
           onCopyLink={handleCopyLink}
           onDelete={handleTextDeletion}
-          isResizeMode={false}
-          showColorPicker={false}
         />
       )}
 

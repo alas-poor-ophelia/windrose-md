@@ -27,7 +27,8 @@ const { useObjectInteractions } = await requireModuleByName("useObjectInteractio
 const { TextInputModal } = await requireModuleByName("TextInputModal.tsx");
 const { NoteLinkModal } = await requireModuleByName("NoteLinkModal.tsx");
 const { useObjectModals } = await requireModuleByName("useObjectModals.ts");
-const { SelectionToolbar } = await requireModuleByName("SelectionToolbar.tsx");
+const { ObjectSelectionToolbar } = await requireModuleByName("ObjectSelectionToolbar.tsx");
+const { MultiSelectToolbar } = await requireModuleByName("MultiSelectToolbar.tsx");
 const { calculateObjectScreenPosition } = await requireModuleByName("screenPositionUtils.ts");
 const { getActiveLayer } = await requireModuleByName("layerAccessor.ts");
 const { convertObjectToFreeform, snapObjectToGrid } = await requireModuleByName("objectOperations.ts") as {
@@ -644,12 +645,23 @@ const ObjectLayer = ({
         isFreeform={!!selectedObject?.freeform}
       />
 
-      {((selectedItem?.type === 'object' || hasMultiSelection) && !isDraggingSelection) && (
-        <SelectionToolbar
-          selectedItem={selectedItem}
+      {hasMultiSelection && selectedItems?.length > 1 && !isDraggingSelection && (
+        <MultiSelectToolbar
           selectedItems={selectedItems}
-          hasMultiSelection={hasMultiSelection}
           selectionCount={selectionCount}
+          mapData={mapData}
+          canvasRef={canvasRef}
+          containerRef={containerRef}
+          geometry={geometry}
+          onRotateAll={handleRotateAll}
+          onDuplicateAll={handleDuplicateAll}
+          onDeleteAll={handleDeleteAll}
+        />
+      )}
+
+      {selectedItem?.type === 'object' && !hasMultiSelection && !isDraggingSelection && (
+        <ObjectSelectionToolbar
+          selectedItem={selectedItem}
           mapData={mapData}
           canvasRef={canvasRef}
           containerRef={containerRef}
@@ -667,9 +679,6 @@ const ObjectLayer = ({
           onResize={handleResizeButtonClick}
           onDelete={handleObjectDeletion}
           onScaleChange={handleScaleChange}
-          onRotateAll={handleRotateAll}
-          onDuplicateAll={handleDuplicateAll}
-          onDeleteAll={handleDeleteAll}
           isResizeMode={isResizeMode}
           showColorPicker={showObjectColorPicker}
           currentColor={selectedItem?.data?.color}
