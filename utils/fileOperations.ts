@@ -172,10 +172,16 @@ async function loadMapData(mapId: string, mapName: string = '', mapType: MapType
         data.maps[mapId] = migrateToLayerSchema(mapData);
       }
 
-      // Ensure curves array exists on all layers (backward compat)
+      // Ensure arrays exist on all layers (backward compat)
       const loadedMap = data.maps[mapId];
+      if (!loadedMap.tilesets) {
+        loadedMap.tilesets = [];
+      }
       if (loadedMap.layers) {
         for (const layer of loadedMap.layers) {
+          if (!layer.tiles) {
+            layer.tiles = [];
+          }
           if (!layer.curves) {
             layer.curves = [];
           }
