@@ -39,6 +39,8 @@ export type ToolId =
   // Region tools (hex maps)
   | 'regionPaint'
   | 'regionBoundary'
+  // Tile tools (hex maps)
+  | 'tilePaint'
   // Utility tools
   | 'measure'
   | 'fog'

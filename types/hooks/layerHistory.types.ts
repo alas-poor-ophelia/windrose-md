@@ -9,6 +9,7 @@
 import type { Cell } from '../core/cell.types';
 import type { Curve } from '../core/curve.types';
 import type { Edge, TextLabel, MapObjectRef, MapData, LayerId, Region } from '../core/map.types';
+import type { HexTileAssignment } from '../tiles/tile.types';
 import type { HistoryState } from './history.types';
 
 // ===========================================
@@ -32,6 +33,8 @@ export interface LayerHistorySnapshot {
   textLabels: TextLabel[];
   /** Painted edges on the layer */
   edges: Edge[];
+  /** Hex tile assignments on the layer */
+  tiles?: HexTileAssignment[];
   /** Regions (map-level, tracked for undo) */
   regions?: Region[];
 }
