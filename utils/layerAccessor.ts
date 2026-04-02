@@ -527,41 +527,48 @@ function revealCell(layer: MapLayer, col: number, row: number): MapLayer {
 }
 
 /**
- * Add fog to a rectangular area of cells
+ * Normalize rectangle corners and apply a fog operation to cells within bounds.
  */
-function fogRectangle(
+function modifyRectangleFog(
   layer: MapLayer,
   startCol: number,
   startRow: number,
   endCol: number,
-  endRow: number
+  endRow: number,
+  operation: 'fog' | 'reveal'
 ): MapLayer {
   if (!layer.fogOfWar) return layer;
-  
-  // Normalize coordinates (handle any corner order)
+
   const minCol = Math.min(startCol, endCol);
   const maxCol = Math.max(startCol, endCol);
   const minRow = Math.min(startRow, endRow);
   const maxRow = Math.max(startRow, endRow);
-  
-  // Build set of existing fogged cells for fast lookup
+
+  if (operation === 'reveal') {
+    return {
+      ...layer,
+      fogOfWar: {
+        ...layer.fogOfWar,
+        foggedCells: layer.fogOfWar.foggedCells.filter(c =>
+          c.col < minCol || c.col > maxCol || c.row < minRow || c.row > maxRow
+        )
+      }
+    };
+  }
+
+  // fog: add cells not already fogged
   const existingSet = new Set(
     layer.fogOfWar.foggedCells.map(c => `${c.col},${c.row}`)
   );
-  
-  // Collect new cells to add
   const newCells: FoggedCell[] = [];
   for (let col = minCol; col <= maxCol; col++) {
     for (let row = minRow; row <= maxRow; row++) {
-      const key = `${col},${row}`;
-      if (!existingSet.has(key)) {
+      if (!existingSet.has(`${col},${row}`)) {
         newCells.push({ col, row });
       }
     }
   }
-  
   if (newCells.length === 0) return layer;
-  
   return {
     ...layer,
     fogOfWar: {
@@ -571,33 +578,12 @@ function fogRectangle(
   };
 }
 
-/**
- * Remove fog from a rectangular area of cells (reveal them)
- */
-function revealRectangle(
-  layer: MapLayer,
-  startCol: number,
-  startRow: number,
-  endCol: number,
-  endRow: number
-): MapLayer {
-  if (!layer.fogOfWar) return layer;
-  
-  // Normalize coordinates
-  const minCol = Math.min(startCol, endCol);
-  const maxCol = Math.max(startCol, endCol);
-  const minRow = Math.min(startRow, endRow);
-  const maxRow = Math.max(startRow, endRow);
-  
-  return {
-    ...layer,
-    fogOfWar: {
-      ...layer.fogOfWar,
-      foggedCells: layer.fogOfWar.foggedCells.filter(c => 
-        c.col < minCol || c.col > maxCol || c.row < minRow || c.row > maxRow
-      )
-    }
-  };
+function fogRectangle(layer: MapLayer, startCol: number, startRow: number, endCol: number, endRow: number): MapLayer {
+  return modifyRectangleFog(layer, startCol, startRow, endCol, endRow, 'fog');
+}
+
+function revealRectangle(layer: MapLayer, startCol: number, startRow: number, endCol: number, endRow: number): MapLayer {
+  return modifyRectangleFog(layer, startCol, startRow, endCol, endRow, 'reveal');
 }
 
 /**

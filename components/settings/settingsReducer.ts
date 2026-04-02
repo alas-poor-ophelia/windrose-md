@@ -785,6 +785,61 @@ function recalcFromMeasurement(
 }
 
 // ===========================================
+// Image Selection Helpers
+// ===========================================
+
+/** Apply background image selection — updates path, display name, dimensions, and optionally bounds. */
+function applyImageSelected(
+  state: SettingsModalState,
+  payload: { path: string; displayName: string; dimensions: ImageDimensions; bounds?: HexBounds }
+): SettingsModalState {
+  const { path, displayName, dimensions, bounds } = payload;
+  return {
+    ...state,
+    backgroundImagePath: path,
+    backgroundImageDisplayName: displayName,
+    imageDimensions: dimensions,
+    imageSearchResults: [],
+    ...(bounds ? { hexBounds: bounds, boundsLocked: true } : {})
+  };
+}
+
+/** Clear background image and reset related state. */
+function applyClearImage(state: SettingsModalState): SettingsModalState {
+  return {
+    ...state,
+    backgroundImagePath: null,
+    backgroundImageDisplayName: '',
+    imageDimensions: null,
+    boundsLocked: false,
+    imageSearchResults: []
+  };
+}
+
+/** Apply fog image selection — updates display name and fog override. */
+function applyFogImageSelected(
+  state: SettingsModalState,
+  payload: { path: string; displayName: string }
+): SettingsModalState {
+  return {
+    ...state,
+    fogImageDisplayName: payload.displayName,
+    fogImageSearchResults: [],
+    overrides: { ...state.overrides, fogOfWarImage: payload.path }
+  };
+}
+
+/** Clear fog image and reset related state. */
+function applyClearFogImage(state: SettingsModalState): SettingsModalState {
+  return {
+    ...state,
+    fogImageDisplayName: '',
+    fogImageSearchResults: [],
+    overrides: { ...state.overrides, fogOfWarImage: null }
+  };
+}
+
+// ===========================================
 // Reducer
 // ===========================================
 
@@ -845,32 +900,15 @@ function settingsReducer(state: SettingsModalState, action: SettingsAction): Set
     
     case Actions.SET_IMAGE_SEARCH_RESULTS:
       return { ...state, imageSearchResults: action.payload };
-    
+
     case Actions.SET_IMAGE_DISPLAY_NAME:
       return { ...state, backgroundImageDisplayName: action.payload };
-    
-    case Actions.IMAGE_SELECTED: {
-      const { path, displayName, dimensions, bounds } = action.payload;
-      return {
-        ...state,
-        backgroundImagePath: path,
-        backgroundImageDisplayName: displayName,
-        imageDimensions: dimensions,
-        imageSearchResults: [],
-        // Only update hexBounds if bounds is provided (hex maps)
-        ...(bounds ? { hexBounds: bounds, boundsLocked: true } : {})
-      };
-    }
-    
+
+    case Actions.IMAGE_SELECTED:
+      return applyImageSelected(state, action.payload);
+
     case Actions.CLEAR_IMAGE:
-      return {
-        ...state,
-        backgroundImagePath: null,
-        backgroundImageDisplayName: '',
-        imageDimensions: null,
-        boundsLocked: false,
-        imageSearchResults: []
-      };
+      return applyClearImage(state);
     
     case Actions.SET_DENSITY: {
       const { density, orientation } = action.payload;
@@ -993,31 +1031,15 @@ function settingsReducer(state: SettingsModalState, action: SettingsAction): Set
     // Fog of War image picker actions
     case Actions.SET_FOG_IMAGE_DISPLAY_NAME:
       return { ...state, fogImageDisplayName: action.payload };
-    
+
     case Actions.SET_FOG_IMAGE_SEARCH_RESULTS:
       return { ...state, fogImageSearchResults: action.payload };
-    
+
     case Actions.FOG_IMAGE_SELECTED:
-      return {
-        ...state,
-        fogImageDisplayName: action.payload.displayName,
-        fogImageSearchResults: [],
-        overrides: {
-          ...state.overrides,
-          fogOfWarImage: action.payload.path
-        }
-      };
-    
+      return applyFogImageSelected(state, action.payload);
+
     case Actions.CLEAR_FOG_IMAGE:
-      return {
-        ...state,
-        fogImageDisplayName: '',
-        fogImageSearchResults: [],
-        overrides: {
-          ...state.overrides,
-          fogOfWarImage: null
-        }
-      };
+      return applyClearFogImage(state);
     
     case Actions.SET_OBJECT_SET_ID:
       return { ...state, objectSetId: action.payload };

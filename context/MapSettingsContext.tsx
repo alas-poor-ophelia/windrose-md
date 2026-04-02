@@ -669,34 +669,28 @@ const MapSettingsProvider: React.FC<MapSettingsProviderProps> = ({
     });
   };
 
-  // Core save logic - forceDelete bypasses orphan check
-  const doSave = (forceDelete: boolean = false): void => {
-    dispatch({ type: Actions.SET_LOADING, payload: true });
+  // Memoized save data — recomputed only when underlying state changes
+  const settingsData = dc.useMemo((): SettingsSaveData => ({
+    useGlobalSettings: state.useGlobalSettings,
+    overrides: state.useGlobalSettings ? {} : state.overrides,
+    coordinateDisplayMode: state.coordinateDisplayMode,
+    objectSetId: state.objectSetId,
+    distanceSettings: state.distanceSettings.useGlobalDistance ? null : {
+      distancePerCell: state.distanceSettings.distancePerCell,
+      distanceUnit: state.distanceSettings.distanceUnit,
+      gridDiagonalRule: state.distanceSettings.gridDiagonalRule,
+      displayFormat: state.distanceSettings.displayFormat
+    }
+  }), [state.useGlobalSettings, state.overrides, state.coordinateDisplayMode, state.objectSetId, state.distanceSettings]);
 
-    const settingsData: SettingsSaveData = {
-      useGlobalSettings: state.useGlobalSettings,
-      overrides: state.useGlobalSettings ? {} : state.overrides,
-      coordinateDisplayMode: state.coordinateDisplayMode,
-      objectSetId: state.objectSetId,
-      distanceSettings: state.distanceSettings.useGlobalDistance ? null : {
-        distancePerCell: state.distanceSettings.distancePerCell,
-        distanceUnit: state.distanceSettings.distanceUnit,
-        gridDiagonalRule: state.distanceSettings.gridDiagonalRule,
-        displayFormat: state.distanceSettings.displayFormat
-      }
-    };
-
-    // Build background image data for both grid and hex maps
-    const backgroundImageData: BackgroundImageConfig | null = state.backgroundImagePath ? {
+  const backgroundImageData = dc.useMemo((): BackgroundImageConfig | null => {
+    if (!state.backgroundImagePath) return null;
+    return {
       path: state.backgroundImagePath,
       opacity: state.imageOpacity,
       offsetX: state.imageOffsetX,
       offsetY: state.imageOffsetY,
-      // Grid-specific fields
-      ...(mapType === 'grid' ? {
-        imageGridSize: state.imageGridSize
-      } : {}),
-      // Hex-specific fields
+      ...(mapType === 'grid' ? { imageGridSize: state.imageGridSize } : {}),
       ...(mapType === 'hex' ? {
         lockBounds: state.boundsLocked,
         gridDensity: state.gridDensity,
@@ -706,21 +700,31 @@ const MapSettingsProvider: React.FC<MapSettingsProviderProps> = ({
         measurementSize: state.measurementSize,
         fineTuneOffset: state.fineTuneOffset
       } : {})
-    } : null;
+    };
+  }, [
+    state.backgroundImagePath, state.imageOpacity, state.imageOffsetX, state.imageOffsetY,
+    state.imageGridSize, state.boundsLocked, state.gridDensity, state.customColumns,
+    state.sizingMode, state.measurementMethod, state.measurementSize, state.fineTuneOffset, mapType
+  ]);
 
-    let calculatedHexSize: number | null = null;
-    if (mapType === 'hex' && state.backgroundImagePath && state.boundsLocked && state.imageDimensions) {
-      if (state.sizingMode === 'density') {
-        const calc = calculateGridFromColumns(state.imageDimensions.width, state.imageDimensions.height, state.hexBounds.maxCol, orientation) as GridCalculation;
-        calculatedHexSize = calc.hexSize;
-      } else {
-        const baseHexSize = measurementToHexSize(state.measurementSize, state.measurementMethod, orientation) as number;
-        calculatedHexSize = state.fineTuneOffset !== 0 ? baseHexSize + state.fineTuneOffset : baseHexSize;
-      }
+  const calculatedHexSize = dc.useMemo((): number | null => {
+    if (mapType !== 'hex' || !state.backgroundImagePath || !state.boundsLocked || !state.imageDimensions) return null;
+    if (state.sizingMode === 'density') {
+      const calc = calculateGridFromColumns(state.imageDimensions.width, state.imageDimensions.height, state.hexBounds.maxCol, orientation) as GridCalculation;
+      return calc.hexSize;
     }
+    const baseHexSize = measurementToHexSize(state.measurementSize, state.measurementMethod, orientation) as number;
+    return state.fineTuneOffset !== 0 ? baseHexSize + state.fineTuneOffset : baseHexSize;
+  }, [
+    mapType, state.backgroundImagePath, state.boundsLocked, state.imageDimensions,
+    state.sizingMode, state.hexBounds.maxCol, orientation,
+    state.measurementSize, state.measurementMethod, state.fineTuneOffset
+  ]);
 
+  // Core save logic - forceDelete bypasses orphan check
+  const doSave = (forceDelete: boolean = false): void => {
+    dispatch({ type: Actions.SET_LOADING, payload: true });
     onSave(settingsData, state.preferences, mapType === 'hex' ? state.hexBounds : null, backgroundImageData, calculatedHexSize, forceDelete);
-
     dispatch({ type: Actions.CLEAR_DELETE_FLAG });
     dispatch({ type: Actions.SET_LOADING, payload: false });
     onClose();
