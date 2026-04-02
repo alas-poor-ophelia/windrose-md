@@ -13,6 +13,7 @@ import type { MapObject } from '../objects/object.types';
 import type { TextLabel } from '../objects/note.types';
 import type { HexColor } from '../core/common.types';
 import type { Edge } from '../contexts/context.types';
+import type { HexTileAssignment } from '../tiles/tile.types';
 
 // ===========================================
 // Hook Options
@@ -38,6 +39,7 @@ export interface MapHistorySnapshot {
   objects: MapObject[];
   textLabels: TextLabel[];
   edges: Edge[];
+  tiles?: HexTileAssignment[];
   regions?: Region[];
 }
 
@@ -75,6 +77,9 @@ export type HandleEdgesChange = LayerDataChangeHandler<Edge[]>;
 /** Handle curves change */
 export type HandleCurvesChange = LayerDataChangeHandler<Curve[]>;
 
+/** Handle tiles change (hex maps only) */
+export type HandleTilesChange = LayerDataChangeHandler<HexTileAssignment[]>;
+
 /** Handle map name change */
 export type HandleNameChange = (newName: string) => void;
 
@@ -110,6 +115,7 @@ export interface LayerDataHandlers {
   handleObjectsChange: HandleObjectsChange;
   handleTextLabelsChange: HandleTextLabelsChange;
   handleEdgesChange: HandleEdgesChange;
+  handleTilesChange: HandleTilesChange;
 }
 
 /** Map data handlers group */
@@ -141,6 +147,7 @@ export interface UseDataHandlersResult {
   handleObjectsChange: HandleObjectsChange;
   handleTextLabelsChange: HandleTextLabelsChange;
   handleEdgesChange: HandleEdgesChange;
+  handleTilesChange: HandleTilesChange;
   handleAddCustomColor: HandleAddCustomColor;
   handleDeleteCustomColor: HandleDeleteCustomColor;
   handleUpdateColorOpacity: HandleUpdateColorOpacity;
