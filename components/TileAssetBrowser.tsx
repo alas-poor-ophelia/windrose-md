@@ -6,7 +6,7 @@
  * Selecting a tile sets it as the active brush for placement.
  */
 
-import type { TilesetDef, TileEntry, HexTileAssignment } from '#types/tiles/tile.types';
+import type { TilesetDef, TileEntry } from '#types/tiles/tile.types';
 
 interface TileAssetBrowserProps {
   tilesets: TilesetDef[];
@@ -80,10 +80,8 @@ const TileAssetBrowser = ({
     });
   };
 
-  // Get the active tileset
   const activeTileset = tilesets[activeTilesetIndex] || null;
 
-  // Filter tiles by search
   const filteredTiles = dc.useMemo(() => {
     if (!activeTileset) return [];
     const tiles = activeTileset.tiles;
@@ -96,7 +94,6 @@ const TileAssetBrowser = ({
     );
   }, [activeTileset, searchFilter]);
 
-  // Group by category
   const groupedTiles = dc.useMemo(() => {
     const groups = new Map<string, TileEntry[]>();
     for (const tile of filteredTiles) {
@@ -107,7 +104,6 @@ const TileAssetBrowser = ({
     return groups;
   }, [filteredTiles]);
 
-  // Get image URL for a tile
   const getTileImageUrl = (tile: TileEntry): string => {
     return dc.app.vault.adapter.getResourcePath(tile.vaultPath);
   };

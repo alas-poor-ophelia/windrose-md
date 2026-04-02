@@ -74,6 +74,7 @@ function useLayerHistory({
     cells: [],
     curves: [],
     name: "",
+    tiles: [],
     objects: [],
     textLabels: [],
     edges: [],

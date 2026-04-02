@@ -39,7 +39,6 @@ const TilePlacementLayer = ({
   const isTileTool = currentTool === 'tilePaint';
   const hasTileSelected = !!(selectedTilesetId && selectedTileId);
 
-  // Track which hexes were painted in current stroke to avoid duplicates
   const paintedInStrokeRef = dc.useRef<Set<string>>(new Set());
   const isDraggingRef = dc.useRef(false);
 
@@ -50,7 +49,6 @@ const TilePlacementLayer = ({
     const currentTiles = activeLayer.tiles || [];
     const key = `${q},${r}`;
 
-    // Skip if already painted in this stroke
     if (paintedInStrokeRef.current.has(key)) return;
     paintedInStrokeRef.current.add(key);
 
@@ -97,7 +95,6 @@ const TilePlacementLayer = ({
     }
   }, [mapData, onTilesChange]);
 
-  // Pointer handlers
   const handlePointerDown = dc.useCallback((e: PointerEvent) => {
     if (!isTileTool || !geometry || geometry.type !== 'hex') return;
 
@@ -128,7 +125,6 @@ const TilePlacementLayer = ({
     paintedInStrokeRef.current = new Set();
   }, []);
 
-  // Register handlers
   const tileHandlersRef = dc.useRef<Record<string, unknown> | null>(null);
   tileHandlersRef.current = isTileTool
     ? { handlePointerDown, handlePointerMove, handlePointerUp }
