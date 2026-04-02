@@ -22,6 +22,7 @@ interface SubToolDef {
   label: string;
   title: string;
   icon: string;
+  shortcut?: string;
   gridOnly?: boolean;
   hexOnly?: boolean;
 }
@@ -29,6 +30,7 @@ interface SubToolDef {
 /** Tool group with sub-tools */
 interface ToolGroup {
   id: string;
+  shortcut?: string;
   subTools: SubToolDef[];
   gridOnly?: boolean;
   hexOnly?: boolean;
@@ -39,6 +41,7 @@ interface SimpleTool {
   id: ToolId;
   title: string;
   icon: string;
+  shortcut?: string;
   gridOnly?: boolean;
   hexOnly?: boolean;
 }
@@ -267,6 +270,92 @@ const ToolButtonWithSubMenu = ({
   );
 };
 
+// ============================================================================
+// TOOL CONFIGURATION (module-level, single source of truth)
+// ============================================================================
+
+const toolGroups: ToolGroup[] = [
+  {
+    id: 'select',
+    shortcut: 's',
+    subTools: [
+      { id: 'select' as ToolId, label: 'Click Select', title: 'Select/Move (S)', icon: 'lucide-hand' },
+      { id: 'areaSelect' as ToolId, label: 'Area Select', title: 'Area Select (click two corners)', icon: 'lucide-box-select' }
+    ]
+  },
+  {
+    id: 'draw',
+    shortcut: 'd',
+    subTools: [
+      { id: 'draw' as ToolId, label: 'Paint Cells', title: 'Draw (fill cells) (D)', icon: 'lucide-paintbrush' },
+      { id: 'segmentDraw' as ToolId, label: 'Paint Segments', title: 'Paint Segments (partial cells)', icon: 'lucide-triangle', gridOnly: true },
+      { id: 'edgeDraw' as ToolId, label: 'Paint Edges', title: 'Paint Edges (grid lines)', icon: 'lucide-pencil-ruler', gridOnly: true },
+      { id: 'freehand' as ToolId, label: 'Freehand Draw', title: 'Freehand Draw (F)', icon: 'lucide-pen-tool', shortcut: 'f' }
+    ]
+  },
+  {
+    id: 'fill',
+    gridOnly: true,
+    subTools: [
+      { id: 'rectangle' as ToolId, label: 'Fill Rectangle', title: 'Rectangle (click two corners)', icon: 'lucide-square', gridOnly: true },
+      { id: 'circle' as ToolId, label: 'Fill Circle', title: 'Circle (click edge, then center)', icon: 'lucide-circle', gridOnly: true },
+      { id: 'diagonalFill' as ToolId, label: 'Diagonal Fill', title: 'Fill diagonal gaps (click two corners)', icon: 'lucide-slash', gridOnly: true }
+    ]
+  },
+  {
+    id: 'erase',
+    shortcut: 'e',
+    subTools: [
+      { id: 'erase' as ToolId, label: 'Erase', title: 'Erase (remove text/objects/cells/edges) (E)', icon: 'lucide-eraser' },
+      { id: 'clearArea' as ToolId, label: 'Clear Area', title: 'Clear Area (click two corners to erase)', icon: 'lucide-square-x', gridOnly: true }
+    ]
+  },
+  {
+    id: 'region',
+    hexOnly: true,
+    subTools: [
+      { id: 'regionPaint' as ToolId, label: 'Paint Region', title: 'Paint hexes into a region', icon: 'lucide-map' },
+      { id: 'regionBoundary' as ToolId, label: 'Draw Boundary', title: 'Draw region boundary polygon', icon: 'lucide-pentagon' }
+    ]
+  }
+];
+
+const simpleTools: SimpleTool[] = [
+  { id: 'edgeLine' as ToolId, title: 'Paint Line (click two points)', icon: 'lucide-git-commit-horizontal', gridOnly: true },
+  { id: 'addObject' as ToolId, title: 'Add Object (select from sidebar)', icon: 'lucide-map-pin-plus' },
+  { id: 'addText' as ToolId, title: 'Add Text Label', icon: 'lucide-type' },
+  { id: 'measure' as ToolId, title: 'Measure Distance (M)', icon: 'lucide-ruler', shortcut: 'm' }
+];
+
+// Derive shortcut map from tool config: key -> { group } or { tool }
+const SHORTCUT_MAP: Record<string, { group?: keyof SubToolSelections; tool?: ToolId }> = {};
+for (const group of toolGroups) {
+  if (group.shortcut) {
+    SHORTCUT_MAP[group.shortcut] = { group: group.id as keyof SubToolSelections };
+  }
+  for (const sub of group.subTools) {
+    if (sub.shortcut) {
+      SHORTCUT_MAP[sub.shortcut] = { tool: sub.id };
+    }
+  }
+}
+for (const tool of simpleTools) {
+  if (tool.shortcut) {
+    SHORTCUT_MAP[tool.shortcut] = { tool: tool.id };
+  }
+}
+// 'v' is an alias for select
+SHORTCUT_MAP['v'] = { group: 'select' };
+
+// Derive initial sub-tool selections from first sub-tool in each group
+const INITIAL_SUB_TOOL_SELECTIONS: SubToolSelections = Object.fromEntries(
+  toolGroups.map(g => [g.id, g.subTools[0].id])
+) as unknown as SubToolSelections;
+
+// ============================================================================
+// MAIN COMPONENT
+// ============================================================================
+
 const ToolPalette = ({
   currentTool,
   onToolChange,
@@ -292,23 +381,7 @@ const ToolPalette = ({
   const pendingCustomColorRef = dc.useRef<HexColor | null>(null);
 
   const [openSubMenu, setOpenSubMenu] = dc.useState<string | null>(null);
-  const [subToolSelections, setSubToolSelections] = dc.useState<SubToolSelections>({
-    select: 'select' as ToolId,
-    draw: 'draw' as ToolId,
-    fill: 'rectangle' as ToolId,
-    erase: 'erase' as ToolId,
-    region: 'regionPaint' as ToolId
-  });
-
-  /** Keyboard shortcut map: key -> group ID (uses current sub-tool) or direct tool ID */
-  const SHORTCUT_MAP: Record<string, { group?: keyof SubToolSelections; tool?: ToolId }> = {
-    'd': { group: 'draw' },
-    'e': { group: 'erase' },
-    's': { group: 'select' },
-    'v': { group: 'select' },
-    'm': { tool: 'measure' as ToolId },
-    'f': { tool: 'freehand' as ToolId }
-  };
+  const [subToolSelections, setSubToolSelections] = dc.useState<SubToolSelections>(INITIAL_SUB_TOOL_SELECTIONS);
 
   dc.useEffect(() => {
     if (!isFocused) return;
@@ -330,56 +403,6 @@ const ToolPalette = ({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onToolChange, isFocused, subToolSelections]);
-
-  const toolGroups: ToolGroup[] = [
-    {
-      id: 'select',
-      subTools: [
-        { id: 'select' as ToolId, label: 'Click Select', title: 'Select/Move (S)', icon: 'lucide-hand' },
-        { id: 'areaSelect' as ToolId, label: 'Area Select', title: 'Area Select (click two corners)', icon: 'lucide-box-select' }
-      ]
-    },
-    {
-      id: 'draw',
-      subTools: [
-        { id: 'draw' as ToolId, label: 'Paint Cells', title: 'Draw (fill cells) (D)', icon: 'lucide-paintbrush' },
-        { id: 'segmentDraw' as ToolId, label: 'Paint Segments', title: 'Paint Segments (partial cells)', icon: 'lucide-triangle', gridOnly: true },
-        { id: 'edgeDraw' as ToolId, label: 'Paint Edges', title: 'Paint Edges (grid lines)', icon: 'lucide-pencil-ruler', gridOnly: true },
-        { id: 'freehand' as ToolId, label: 'Freehand Draw', title: 'Freehand Draw (F)', icon: 'lucide-pen-tool' }
-      ]
-    },
-    {
-      id: 'fill',
-      gridOnly: true,
-      subTools: [
-        { id: 'rectangle' as ToolId, label: 'Fill Rectangle', title: 'Rectangle (click two corners)', icon: 'lucide-square', gridOnly: true },
-        { id: 'circle' as ToolId, label: 'Fill Circle', title: 'Circle (click edge, then center)', icon: 'lucide-circle', gridOnly: true },
-        { id: 'diagonalFill' as ToolId, label: 'Diagonal Fill', title: 'Fill diagonal gaps (click two corners)', icon: 'lucide-slash', gridOnly: true }
-      ]
-    },
-    {
-      id: 'erase',
-      subTools: [
-        { id: 'erase' as ToolId, label: 'Erase', title: 'Erase (remove text/objects/cells/edges) (E)', icon: 'lucide-eraser' },
-        { id: 'clearArea' as ToolId, label: 'Clear Area', title: 'Clear Area (click two corners to erase)', icon: 'lucide-square-x', gridOnly: true }
-      ]
-    },
-    {
-      id: 'region',
-      hexOnly: true,
-      subTools: [
-        { id: 'regionPaint' as ToolId, label: 'Paint Region', title: 'Paint hexes into a region', icon: 'lucide-map' },
-        { id: 'regionBoundary' as ToolId, label: 'Draw Boundary', title: 'Draw region boundary polygon', icon: 'lucide-pentagon' }
-      ]
-    }
-  ];
-
-  const simpleTools: SimpleTool[] = [
-    { id: 'edgeLine' as ToolId, title: 'Paint Line (click two points)', icon: 'lucide-git-commit-horizontal', gridOnly: true },
-    { id: 'addObject' as ToolId, title: 'Add Object (select from sidebar)', icon: 'lucide-map-pin-plus' },
-    { id: 'addText' as ToolId, title: 'Add Text Label', icon: 'lucide-type' },
-    { id: 'measure' as ToolId, title: 'Measure Distance (M)', icon: 'lucide-ruler' }
-  ];
 
   const visibleSimpleTools = simpleTools.filter(tool =>
     (mapType !== 'hex' || !tool.gridOnly) &&
