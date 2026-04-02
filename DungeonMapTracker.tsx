@@ -55,6 +55,7 @@ const { useUILayout } = await requireModuleByName("useUILayout.ts");
 const { usePanelState } = await requireModuleByName("usePanelState.ts");
 const { useViewControls } = await requireModuleByName("useViewControls.ts");
 const { SubHexBreadcrumb } = await requireModuleByName("SubHexBreadcrumb.tsx");
+const { TileAssetBrowser } = await requireModuleByName("TileAssetBrowser.tsx");
 
 // RPGAwesome icon font support
 const { RA_ICONS } = await requireModuleByName("rpgAwesomeIcons.ts");
@@ -194,6 +195,26 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     showRegionPanel, setShowRegionPanel,
     layerVisibility, handleToggleLayerVisibility
   } = useUILayout({ mapData, updateMapData, showPluginInstaller });
+
+  // Tile browser state (hex maps only)
+  const [tileBrowserCollapsed, setTileBrowserCollapsed] = dc.useState<boolean>(true);
+  const [selectedTilesetId, setSelectedTilesetId] = dc.useState<string | null>(null);
+  const [selectedTileId, setSelectedTileId] = dc.useState<string | null>(null);
+  const [tileRotation, setTileRotation] = dc.useState<number>(0);
+  const [tileFlipH, setTileFlipH] = dc.useState<boolean>(false);
+  const showTilePanel = mapData?.mapType === 'hex' && (mapData?.tilesets?.length ?? 0) > 0;
+
+  const handleTileSelect = (tilesetId: string, tileId: string) => {
+    setSelectedTilesetId(tilesetId);
+    setSelectedTileId(tileId);
+  };
+
+  const handleTileDeselect = () => {
+    setSelectedTilesetId(null);
+    setSelectedTileId(null);
+    setTileRotation(0);
+    setTileFlipH(false);
+  };
 
   // Image alignment mode (extracted to useAlignmentMode hook)
   const {
@@ -584,6 +605,24 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
             </MapCanvas>
           </div>
 
+          {/* Tile Asset Browser (right sidebar, hex maps with tilesets only) */}
+          {showTilePanel && (
+            <TileAssetBrowser
+              tilesets={mapData.tilesets || []}
+              selectedTilesetId={selectedTilesetId}
+              selectedTileId={selectedTileId}
+              onTileSelect={handleTileSelect}
+              onTileDeselect={handleTileDeselect}
+              onToolChange={setCurrentTool}
+              isCollapsed={tileBrowserCollapsed}
+              onCollapseChange={setTileBrowserCollapsed}
+              rotation={tileRotation}
+              flipH={tileFlipH}
+              onRotationChange={setTileRotation}
+              onFlipChange={setTileFlipH}
+            />
+          )}
+
           <MapControls
             onZoomIn={handleZoomIn}
             onZoomOut={handleZoomOut}
@@ -598,6 +637,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
             onToggleLayerPanel={() => setShowLayerPanel(!showLayerPanel)}
             showRegionPanel={showRegionPanel}
             onToggleRegionPanel={mapData.mapType === 'hex' ? () => setShowRegionPanel(!showRegionPanel) : undefined}
+            showTilePanel={showTilePanel && !tileBrowserCollapsed}
+            onToggleTilePanel={showTilePanel ? () => setTileBrowserCollapsed(!tileBrowserCollapsed) : undefined}
             showVisibilityToolbar={showVisibilityToolbar}
             onToggleVisibilityToolbar={() => setShowVisibilityToolbar(!showVisibilityToolbar)}
             alwaysShowControls={effectiveSettings?.alwaysShowControls ?? false}

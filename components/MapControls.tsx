@@ -25,6 +25,8 @@ const MapControls = ({
   onToggleLayerPanel,
   showRegionPanel,
   onToggleRegionPanel,
+  showTilePanel,
+  onToggleTilePanel,
   alwaysShowControls = false
 }) => {
     // When alwaysShowControls is true, controls are always visible
@@ -230,20 +232,36 @@ const MapControls = ({
               </button>
             )}
 
+            {/* Tile Browser Toggle Button (hex maps with tilesets only) */}
+            {onToggleTilePanel && (
+              <button
+                className={`dmt-expand-btn dmt-drawer-item ${showTilePanel ? 'dmt-expand-btn-active' : ''} ${controlsRevealed ? 'dmt-drawer-item-visible' : ''}`}
+                style={getDrawerItemStyle(mapType === 'hex' && onToggleRegionPanel ? 3 : 2)}
+                onClick={handleControlInteraction(onToggleTilePanel)}
+                title="Toggle tile browser"
+              >
+                <dc.Icon icon="lucide-grid-3x3" />
+              </button>
+            )}
+
             {/* Visibility Toggle Button */}
             <button
               className={`dmt-expand-btn dmt-drawer-item ${showVisibilityToolbar ? 'dmt-expand-btn-active' : ''} ${controlsRevealed ? 'dmt-drawer-item-visible' : ''}`}
-              style={getDrawerItemStyle(mapType === 'hex' && onToggleRegionPanel ? 3 : 2)}
+              style={getDrawerItemStyle(
+                2 + (mapType === 'hex' && onToggleRegionPanel ? 1 : 0) + (onToggleTilePanel ? 1 : 0)
+              )}
               onClick={handleControlInteraction(onToggleVisibilityToolbar)}
               title="Toggle layer visibility"
             >
               <dc.Icon icon="lucide-eye" />
             </button>
-            
+
             {/* Settings Button */}
             <button
               className={`dmt-expand-btn dmt-drawer-item ${controlsRevealed ? 'dmt-drawer-item-visible' : ''}`}
-              style={getDrawerItemStyle(mapType === 'hex' && onToggleRegionPanel ? 4 : 3)}
+              style={getDrawerItemStyle(
+                3 + (mapType === 'hex' && onToggleRegionPanel ? 1 : 0) + (onToggleTilePanel ? 1 : 0)
+              )}
               onClick={handleControlInteraction(onSettingsClick)}
               title="Map Settings"
             >
