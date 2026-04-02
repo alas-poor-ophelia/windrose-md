@@ -35,20 +35,20 @@ export interface Edge {
   opacity?: number;
 }
 
-/** Extended geometry interface with common optional methods */
+/** Extended geometry with implementation-specific properties beyond IGeometry */
 export interface ExtendedGeometry extends IGeometry {
+  /** Grid cell size (GridGeometry) or hex size (HexGeometry) */
   cellSize: number;
+  /** Hex-specific: hex radius from center to vertex */
   hexSize?: number;
+  /** Hex-specific: hex width in pixels */
   width?: number;
+  /** Hex-specific: sqrt(3) cached for hex math */
+  sqrt3?: number;
+  /** Grid-specific: detect which edge a point is near */
   screenToEdge?: (worldX: number, worldY: number, threshold: number) => EdgeInfo | null;
-  isWithinBounds?: (x: number, y: number) => boolean;
-  getScaledCellSize?: (zoom: number) => number;
+  /** Hex-specific: convert axial (q,r) to world pixels */
   hexToWorld?: (x: number, y: number) => { worldX: number; worldY: number };
-  gridToScreen?: (x: number, y: number, offsetX: number, offsetY: number, zoom: number) => { screenX: number; screenY: number };
-  gridToWorld?: (x: number, y: number) => { worldX: number; worldY: number };
-  worldToGrid?: (worldX: number, worldY: number) => Point;
-  getCellCenter?: (x: number, y: number) => { worldX: number; worldY: number };
-  toOffsetCoords?: (x: number, y: number) => { col: number; row: number };
 }
 
 /** Drawing layer state change callback shape */

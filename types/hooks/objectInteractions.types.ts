@@ -50,11 +50,9 @@ export interface ButtonPosition {
 // Mouse Position Types
 // ===========================================
 
-/** Mouse position relative to container */
-export interface MousePosition {
-  x: number;
-  y: number;
-}
+// MousePosition is canonical in contexts/context.types.ts
+import type { MousePosition } from '../contexts/context.types';
+export type { MousePosition };
 
 // ===========================================
 // State Values

@@ -286,10 +286,17 @@ export interface IGeometry {
    */
   cellToOffsetCoords(cell: Cell): OffsetCoords;
   
+  /**
+   * Get center point of a cell in world coordinates
+   * Grid: center of the square cell
+   * Hex: center of the hex at (q, r)
+   */
+  getCellCenter(x: number, y: number): WorldCoords;
+
   // ===========================================
   // Rendering
   // ===========================================
-  
+
   /**
    * Draw grid lines on canvas
    */

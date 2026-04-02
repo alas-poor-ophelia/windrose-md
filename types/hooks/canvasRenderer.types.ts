@@ -10,6 +10,7 @@ import type { MapData } from '../core/map.types';
 import type { IGeometry } from '../core/geometry.types';
 import type { MapObject } from '../objects/object.types';
 import type { TextLabel } from '../objects/note.types';
+import type { LayerVisibility } from '../contexts/context.types';
 
 // ===========================================
 // Selected Item Types
@@ -22,8 +23,7 @@ export interface RendererSelectedItem {
   data?: MapObject | TextLabel;
 }
 
-// Re-export LayerVisibility from canonical location
-export type { LayerVisibility } from '../contexts/context.types';
+// LayerVisibility imported from contexts/context.types above
 
 // ===========================================
 // Theme Types

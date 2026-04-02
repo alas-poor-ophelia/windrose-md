@@ -70,6 +70,8 @@ export interface UseToolStateOptions {
   initialTool?: ToolId;
   initialColor?: string;
   initialOpacity?: number;
+  mapData?: any;
+  updateMapData?: (data: any) => void;
 }
 
 /** Grouped tool state values */
@@ -109,6 +111,13 @@ export interface UseToolStateResult {
   setSelectedColor: (color: string) => void;
   setSelectedOpacity: (opacity: number) => void;
   setIsColorPickerOpen: (open: boolean) => void;
+
+  // Freeform placement mode
+  freeformPlacementMode: boolean;
+  setFreeformPlacementMode: (mode: boolean | ((prev: boolean) => boolean)) => void;
+
+  // Opacity persistence
+  handleOpacityChange: (opacity: number) => void;
 }
 
 // ===========================================

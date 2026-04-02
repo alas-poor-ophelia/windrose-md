@@ -9,6 +9,7 @@
 import type { Point } from '../core/geometry.types';
 import type { MapObject } from '../objects/object.types';
 import type { TextLabel } from '../objects/note.types';
+import type { SelectedItem } from '../contexts/context.types';
 
 // Re-export SelectedItem from canonical location
 export type { SelectedItem } from '../contexts/context.types';

@@ -331,7 +331,6 @@ export type {
   ResizeInitialState,
   ObjectDragStart,
   ButtonPosition,
-  MousePosition,
   ObjectInteractionStateValues,
   ObjectColorBtnRef,
   PendingObjectCustomColorRef,
