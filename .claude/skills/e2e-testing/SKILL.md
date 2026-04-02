@@ -1,0 +1,226 @@
+# E2E Testing Patterns
+
+Reference this skill when writing, debugging, or modifying E2E tests for Windrose. E2E tests launch real Obsidian instances via Playwright and interact with the Dungeon Map Tools component.
+
+## Stack & Configuration
+
+- **obsidian-testing-framework** — manages Obsidian instance lifecycle
+- **Playwright** — automates Obsidian UI (Electron app)
+- **Vitest** — test runner with retry support
+
+```typescript
+// vitest.config.ts (E2E)
+pool: "forks",
+poolOptions: { forks: { singleFork: true } },  // Sequential, NOT parallel
+testTimeout: 60000,
+hookTimeout: 60000,
+retry: 1  // Retry flaky tests once
+```
+
+Unit tests (`vitest.unit.config.ts`) use parallel threads with 5s timeout — completely different config.
+
+## Two Test Modes
+
+| | Dev Mode (default) | Compiled Mode |
+|---|---|---|
+| Command | `npm run test:e2e` | `WINDROSE_TEST_MODE=compiled npm run test:e2e` |
+| Source | `src/` symlinked files | `dist/compiled-windrose-md.md` |
+| Container timeout | 10s | 60s |
+| Autosave wait | 3s | 4s |
+| Data file | `_test-data/dungeon-maps-data.json` | `windrose-md-data.json` |
+| Fixtures | `smoke-test-map.md` | `smoke-test-compiled.md` |
+
+Compiled mode is 6x slower because Datacore must index the entire ~15k line bundle. Don't reduce the 60s timeout.
+
+## Essential Helpers
+
+### waitForContainer(page, timeout?)
+
+**Always call this after navigation.** It handles:
+1. Waiting for markdown view to load
+2. Dismissing plugin installer modal if it appears
+3. Polling for `.dmt-container` visibility
+4. Detecting Datacore errors vs "getting ready" state
+5. Auto-screenshot to `tests/e2e/screenshots/` on timeout
+
+```typescript
+await navigateToMap(page, TEST_MAPS.grid);
+await waitForContainer(page);  // REQUIRED — never skip
+```
+
+### setupErrorTracking(page)
+
+Captures Windrose-specific console errors (matching `windrose`, `dmt`, `dungeon`):
+
+```typescript
+const errors = setupErrorTracking(page);
+// ... test logic ...
+expect(errors).toHaveLength(0);  // Always verify at end
+```
+
+### getCanvasCenter(page)
+
+Returns absolute page coordinates of canvas center:
+
+```typescript
+const center = await getCanvasCenter(page);
+await page.mouse.click(center.x, center.y);
+```
+
+### focusCanvas(page)
+
+Clicks canvas and waits 100ms — required before keyboard shortcuts.
+
+## DMT Selectors
+
+All component elements use the `.dmt-` prefix:
+
+| Element | Selector |
+|---------|----------|
+| Container | `.dmt-container` |
+| Canvas | `.dmt-canvas-wrapper canvas` |
+| Tool palette | `.dmt-tool-palette` |
+| Tool buttons | `.dmt-tool-btn` |
+| Active tool | `.dmt-tool-btn-active` |
+| History controls | `.dmt-history-controls` |
+| History buttons | `.dmt-history-btn` |
+| Layer panel | `.dmt-layer-panel` |
+| Layer buttons | `.dmt-layer-btn` |
+| Layer wrapper | `.dmt-layer-btn-wrapper` |
+| Object sidebar | `.dmt-object-sidebar` |
+| Sidebar toggle | `.dmt-sidebar-toggle` |
+| Object items | `.dmt-object-item` |
+| Settings button | `.dmt-expand-btn[title="Map Settings"]` |
+| Subtool menu | `.dmt-subtool-menu` |
+| Plugin installer | `.dmt-plugin-installer` |
+
+**Tool button order (by index):** 0=Select, 1=Draw, 2=Erase, 3=Rectangle, 4=Circle
+
+```typescript
+const drawTool = page.locator(".dmt-tool-palette .dmt-tool-btn").nth(1);
+```
+
+## Fixture Structure
+
+```
+tests/fixtures/test-vault/
+├── _testing/
+│   ├── smoke-test-map.md           # Grid map fixture
+│   └── smoke-test-hex.md           # Hex map fixture
+├── _test-data/
+│   └── dungeon-maps-data.json      # Dev mode data
+└── windrose-md-data.json           # Compiled mode data
+```
+
+- Fixtures reset from `.clean.json` files before each test run
+- Source files are **symlinked**, not copied — changes appear immediately
+- Use `TEST_MAPS.grid` / `TEST_MAPS.hex` constants, not hardcoded paths
+
+## Canvas Interaction Patterns
+
+### Click to Paint/Erase
+
+```typescript
+await drawTool.click();
+await page.waitForTimeout(100);
+
+const center = await getCanvasCenter(page);
+await page.mouse.click(center.x, center.y);
+await page.waitForTimeout(200);  // Wait for render
+```
+
+### Drag for Rectangle/Circle
+
+```typescript
+const canvas = page.locator(".dmt-canvas-wrapper canvas").first();
+const box = await canvas.boundingBox();
+
+const startX = box!.x + box!.width * 0.3;
+const startY = box!.y + box!.height * 0.3;
+const endX = box!.x + box!.width * 0.6;
+const endY = box!.y + box!.height * 0.6;
+
+await page.mouse.move(startX, startY);
+await page.mouse.down();
+await page.mouse.move(endX, endY, { steps: 5 });  // steps required for smooth drag
+await page.mouse.up();
+await page.waitForTimeout(300);
+```
+
+### Relative Canvas Click
+
+```typescript
+await canvas.click({
+  position: {
+    x: box!.width / 3,    // Relative to canvas origin
+    y: box!.height / 3
+  }
+});
+```
+
+### Canvas Coordinate Gotcha
+
+The object sidebar overlaps the left portion of the canvas. Click coordinates should offset from center, not from canvas origin. `getCanvasCenter()` accounts for this, but manual coordinate math should use `center.x - 150, center.y - 150` type offsets.
+
+## Data Verification
+
+Use `doWithApp()` to access Obsidian APIs from test context:
+
+```typescript
+const result = await doWithApp(page, async (app: any) => {
+  const file = app.vault.getAbstractFileByPath("windrose-md-data.json");
+  const content = await app.vault.read(file);
+  const data = JSON.parse(content);
+  return data.maps[mapId].layers[0].cells.length;
+});
+expect(result).toBeGreaterThan(0);
+```
+
+## Test Template
+
+```typescript
+import { setupErrorTracking, navigateToMap, waitForContainer, TEST_MAPS } from "./helpers";
+
+describe("Feature Name", () => {
+  test("specific behavior", async ({ page }) => {
+    const errors = setupErrorTracking(page);
+
+    await navigateToMap(page, TEST_MAPS.grid);
+    await waitForContainer(page);
+
+    // ... interactions ...
+
+    expect(errors).toHaveLength(0);
+  });
+});
+```
+
+## Running Tests
+
+```bash
+npm run test:e2e                           # All E2E tests (~35-40s)
+npm run test:e2e -- smoke.test.ts          # Single file
+npm run test:e2e -- -t "Grid map loads"    # By test name
+WINDROSE_TEST_MODE=compiled npm run test:e2e  # Compiled mode
+```
+
+## Known Flaky Tests
+
+- **Freehand curve drawing** — mouse-based drawing on canvas often fails to produce curve data. When ALL freehand tests fail, it's environment flakiness, not code.
+- **Keyboard shortcuts** — timing-sensitive, may need `focusCanvas()` + extra waits.
+- **Persistence tests** — autosave delay means assertions must wait `AUTOSAVE_WAIT` after drawing.
+- **Diagonal fill** — geometry-dependent, may fail on certain canvas sizes.
+
+## Anti-Patterns
+
+| Mistake | Consequence | Fix |
+|---------|------------|-----|
+| Skipping `waitForContainer()` | Test fails randomly | Always call after navigation |
+| Skipping `setupErrorTracking()` | Errors go undetected | Always set up and verify at end |
+| Hardcoded fixture paths | Breaks in compiled mode | Use `TEST_MAPS` constants |
+| `page.mouse.move()` without `steps` | Drag operations miss intermediate cells | Add `{ steps: 5 }` |
+| Checking DOM immediately after click | Canvas hasn't rendered yet | Wait 100-200ms after interactions |
+| Reducing compiled mode timeout | Tests fail on slow machines | Keep 60s — Datacore indexing is the bottleneck |
+| Modifying symlinked fixture files | Corrupts source repo | Fixtures are symlinks — only modify `.clean.json` copies |
+| Using bare `npx vitest run` | Runs E2E config (default), not unit | Use `npm run test:unit` for unit tests |
+| Generic selectors like `canvas` | May match other Obsidian elements | Use `.dmt-canvas-wrapper canvas` |

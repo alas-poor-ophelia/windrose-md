@@ -92,6 +92,56 @@ function useMyContext(): MyContextValue {
 return { MyProvider, useMyContext };
 ```
 
+## Selector Provider Pattern (Splitting Large Contexts)
+
+When a context has many fields (e.g., 78 in MapSettingsContext), any change re-renders all consumers. Split into memoized sub-context providers that expose slices:
+
+```typescript
+// Keep ONE useReducer for all state
+const [state, dispatch] = dc.useReducer(settingsReducer, initialState);
+
+// Create sub-contexts for independent concerns
+const BackgroundImageContext = dc.createContext(null);
+const GridSettingsContext = dc.createContext(null);
+const HexSettingsContext = dc.createContext(null);
+const UIStateContext = dc.createContext(null);
+
+// Each sub-context value memoized with only its fields as deps
+const bgValue = dc.useMemo(() => ({
+  backgroundImage: state.backgroundImage,
+  opacity: state.opacity,
+  handleImageChange,
+  handleOpacityChange,
+}), [state.backgroundImage, state.opacity]);
+
+// Dispatch-based handlers are stable (dispatch identity never changes)
+const handleImageChange = dc.useCallback((img) => {
+  dispatch({ type: 'SET_BACKGROUND', payload: img });
+}, []);
+
+// Nest providers — order doesn't matter between siblings
+return (
+  <BackgroundImageContext.Provider value={bgValue}>
+    <GridSettingsContext.Provider value={gridValue}>
+      {children}
+    </GridSettingsContext.Provider>
+  </BackgroundImageContext.Provider>
+);
+```
+
+**Cross-cutting handlers** (e.g., `handleSave` that reads from multiple sub-contexts) use ref wrappers for stable identity:
+
+```typescript
+// Ref holds the latest value without causing re-renders
+const stateRef = dc.useRef(state);
+stateRef.current = state;  // Updated every render
+
+const handleSave = dc.useCallback(() => {
+  // Reads from ref — always has latest state
+  saveData(stateRef.current);
+}, []);  // Empty deps — stable identity
+```
+
 ## JSX Rules
 
 - **`.tsx` files:** Full JSX support. JSX transpiles to `h()` calls automatically.
@@ -160,3 +210,31 @@ When splitting a large file into smaller modules:
 | Shared `useRef` across files | Ref lives in one hook's closure | Pass ref as parameter or keep co-located |
 | `dc.useEffect` before `dc.useState` it reads | Datacore doesn't hoist | Reorder declarations |
 | `appendChild` on Preact-managed DOM | Preact reconciliation moves it back | Use `dc.preact.render()` for independent tree |
+| Duplicate `const` names across destructurings | Datacore `new Function()` throws SyntaxError | Rename or remove from old destructuring first |
+
+## Datacore Runtime Gotchas
+
+### Duplicate `const` Declarations Crash
+
+TypeScript won't catch this, but Datacore's `new Function()` eval will throw a `SyntaxError`:
+
+```typescript
+// CRASHES at runtime — duplicate 'hexBounds'
+const { hexBounds } = useBackgroundImageSettings();
+const { hexBounds } = useGridSettings();  // SyntaxError!
+
+// Fix: rename or remove from one destructuring
+const { hexBounds } = useBackgroundImageSettings();
+const { gridSize } = useGridSettings();  // Only destructure what you need
+```
+
+This commonly happens when splitting a large hook into smaller ones — the parent was destructuring everything from one source, now two sources export overlapping names.
+
+### Hook Declaration Order is Strict
+
+Datacore does not hoist hook declarations. The constraint goes beyond "effects after state":
+
+- **All** `dc.useState` calls referenced by an effect must appear before that effect in source order
+- When extracting hooks, the extracted hook's internal `dc.useState` calls count toward the parent component's hook order
+- If extraction reorders the total hook count seen by the component, it may break silently
+- `dc.useCallback` that references state must also appear after that state declaration
