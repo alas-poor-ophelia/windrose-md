@@ -29,71 +29,173 @@ interface TransformOptions {
  * This mirrors what pathResolver.ts does at runtime
  */
 const MODULE_MAP: Record<string, string> = {
-  // Geometry
-  'GridGeometry.ts': './geometry/GridGeometry.ts',
-  'HexGeometry.ts': './geometry/HexGeometry.ts',
-  'cellAccessor.ts': './geometry/cellAccessor.ts',
-  'layerAccessor.ts': './utils/layerAccessor.ts',
-  'segmentRenderer.ts': './geometry/segmentRenderer.ts',
-  'curveBoolean.ts': './geometry/curveBoolean.ts',
-  'curveCellOverlap.ts': './geometry/curveCellOverlap.ts',
-  'polygonClipping.ts': './geometry/polygonClipping.ts',
+  // Geometry core
+  'GridGeometry.ts': './geometry/core/GridGeometry.ts',
+  'HexGeometry.ts': './geometry/core/HexGeometry.ts',
+  'BaseGeometry.ts': './geometry/core/BaseGeometry.ts',
+  'cellAccessor.ts': './geometry/core/cellAccessor.ts',
+  'offsetCoordinates.ts': './geometry/core/offsetCoordinates.ts',
+  'hexMeasurements.ts': './geometry/core/hexMeasurements.ts',
+
+  // Geometry renderers
+  'segmentRenderer.ts': './geometry/renderers/segmentRenderer.ts',
+  'badgeRenderer.ts': './geometry/renderers/badgeRenderer.ts',
+  'textLabelRenderer.ts': './geometry/renderers/textLabelRenderer.ts',
+  'backgroundRenderer.ts': './geometry/renderers/backgroundRenderer.ts',
+  'objectRenderer.ts': './geometry/renderers/objectRenderer.ts',
+  'selectionRenderer.ts': './geometry/renderers/selectionRenderer.ts',
+  'regionRenderer.ts': './geometry/renderers/regionRenderer.ts',
+  'tileRenderer.ts': './geometry/renderers/tileRenderer.ts',
+  'curveRenderer.ts': './geometry/renderers/curveRenderer.ts',
+  'gridRenderer.ts': './geometry/renderers/gridRenderer.ts',
+  'hexRenderer.ts': './geometry/renderers/hexRenderer.ts',
+
+  // Geometry fog
+  'fogRenderer.ts': './geometry/fog/fogRenderer.ts',
+  'gridFogRenderer.ts': './geometry/fog/gridFogRenderer.ts',
+  'hexFogRenderer.ts': './geometry/fog/hexFogRenderer.ts',
+
+  // Geometry curves
+  'curveBoolean.ts': './geometry/curves/curveBoolean.ts',
+  'curveCellOverlap.ts': './geometry/curves/curveCellOverlap.ts',
+  'curveFitting.ts': './geometry/curves/curveFitting.ts',
+  'polygonClipping.ts': './geometry/curves/polygonClipping.ts',
   'polygon-clipping-wrapper.js': './vendor/polygon-clipping-wrapper.js',
-  'curveFitting.ts': './geometry/curveFitting.ts',
 
-  // Utils
-  'rotationOperations.ts': './utils/rotationOperations.ts',
-  'colorOperations.ts': './utils/colorOperations.ts',
-  'deepLinkHandler.ts': './utils/deepLinkHandler.ts',
-  'frameDetection.ts': './utils/frameDetection.ts',
-  'imageOperations.ts': './utils/imageOperations.ts',
-  'distanceOperations.ts': './utils/distanceOperations.ts',
-  'diagonalFillOperations.ts': './utils/diagonalFillOperations.ts',
-  'edgeOperations.ts': './utils/edgeOperations.ts',
-  'dmtConstants.ts': './utils/dmtConstants.ts',
-  'pathResolver.ts': './utils/pathResolver.ts',
-  'borderCalculator.ts': './utils/borderCalculator.ts',
-  'segmentBorderCalculator.ts': './utils/segmentBorderCalculator.ts',
-  'objectTypeResolver.ts': './utils/objectTypeResolver.ts',
+  'layerAccessor.ts': './persistence/layerAccessor.ts',
 
-  // Hooks
-  'useHistory.ts': './hooks/useHistory.ts',
-  'useDrawingTools.ts': './hooks/useDrawingTools.ts',
-  'useCanvasInteraction.ts': './hooks/useCanvasInteraction.ts',
-  'useCanvasRenderer.ts': './hooks/useCanvasRenderer.ts',
-  'useDistanceMeasurement.ts': './hooks/useDistanceMeasurement.ts',
-  'useAreaSelect.ts': './hooks/useAreaSelect.ts',
-  'useDiagonalFill.ts': './hooks/useDiagonalFill.ts',
-  'useEventCoordinator.ts': './hooks/useEventCoordinator.ts',
-  'useDataHandlers.ts': './hooks/useDataHandlers.ts',
+  // Core
+  'dmtConstants.ts': './core/dmtConstants.ts',
+  'pathResolver.ts': './core/pathResolver.ts',
+  'settingsAccessor.ts': './core/settingsAccessor.ts',
+  'obsidianBridge.ts': './core/obsidianBridge.ts',
+  'interactjs.ts': './core/interactjs.ts',
 
-  // Curve boolean
-  'curveBoolean.ts': './geometry/curveBoolean.ts',
-  'polygonClipping.ts': './geometry/polygonClipping.ts',
+  // Objects
+  'objectTypes.ts': './objects/objectTypes.ts',
+  'objectTypeResolver.ts': './objects/objectTypeResolver.ts',
+  'objectOperations.ts': './objects/objectOperations.ts',
+  'hexSlotPositioner.ts': './objects/hexSlotPositioner.ts',
+  'screenPositionUtils.ts': './objects/screenPositionUtils.ts',
+  'multiSelectOperations.ts': './objects/multiSelectOperations.ts',
 
-  // Geometry helpers
-  'BaseGeometry.ts': './geometry/BaseGeometry.ts',
-  'offsetCoordinates.ts': './geometry/offsetCoordinates.ts',
-  'hexMeasurements.ts': './geometry/hexMeasurements.ts',
+  // Drawing
+  'rotationOperations.ts': './drawing/rotationOperations.ts',
+  'colorOperations.ts': './drawing/colorOperations.ts',
+  'distanceOperations.ts': './drawing/distanceOperations.ts',
+  'diagonalFillOperations.ts': './drawing/diagonalFillOperations.ts',
+  'edgeOperations.ts': './drawing/edgeOperations.ts',
+  'borderCalculator.ts': './drawing/borderCalculator.ts',
+  'segmentBorderCalculator.ts': './drawing/segmentBorderCalculator.ts',
+  'cellToScreenConverter.ts': './drawing/cellToScreenConverter.ts',
 
-  // Renderers
-  'badgeRenderer.ts': './geometry/badgeRenderer.ts',
-  'textLabelRenderer.ts': './geometry/textLabelRenderer.ts',
-  'backgroundRenderer.ts': './geometry/backgroundRenderer.ts',
-  'gridFogRenderer.ts': './geometry/gridFogRenderer.ts',
-  'hexFogRenderer.ts': './geometry/hexFogRenderer.ts',
-  'fogRenderer.ts': './geometry/fogRenderer.ts',
-  'objectRenderer.ts': './geometry/objectRenderer.ts',
-  'selectionRenderer.ts': './geometry/selectionRenderer.ts',
+  // Text
+  'textLabelOperations.ts': './text/textLabelOperations.ts',
+  'fontOptions.ts': './text/fontOptions.ts',
+
+  // Assets
+  'imageOperations.ts': './assets/imageOperations.ts',
+  'tilesetOperations.ts': './assets/tilesetOperations.ts',
+  'rpgAwesomeIcons.ts': './assets/rpgAwesomeIcons.ts',
+  'rpgAwesomeLoader.ts': './assets/rpgAwesomeLoader.ts',
+  // Persistence
+  'fileOperations.ts': './persistence/fileOperations.ts',
+  'deepLinkHandler.ts': './persistence/deepLinkHandler.ts',
+  'exportOperations.ts': './persistence/exportOperations.ts',
+  'noteOperations.ts': './persistence/noteOperations.ts',
+
+  // Hooks - canvas
+  'useCanvasRenderer.ts': './hooks/canvas/useCanvasRenderer.ts',
+  'useCanvasInteraction.ts': './hooks/canvas/useCanvasInteraction.ts',
+  'useEventCoordinator.ts': './hooks/canvas/useEventCoordinator.ts',
+  'usePanZoomCoordinator.ts': './hooks/canvas/usePanZoomCoordinator.ts',
+
+  // Hooks - drawing
+  'useDrawingTools.ts': './hooks/drawing/useDrawingTools.ts',
+  'usePaintTool.ts': './hooks/drawing/usePaintTool.ts',
+  'useEdgeDragTool.ts': './hooks/drawing/useEdgeDragTool.ts',
+  'useSegmentDragTool.ts': './hooks/drawing/useSegmentDragTool.ts',
+  'useShapeTools.ts': './hooks/drawing/useShapeTools.ts',
+  'useSegmentPicker.ts': './hooks/drawing/useSegmentPicker.ts',
+  'useSegmentHover.ts': './hooks/drawing/useSegmentHover.ts',
+  'useDiagonalFill.ts': './hooks/drawing/useDiagonalFill.ts',
+
+  // Hooks - objects
+  'useObjectInteractions.ts': './hooks/objects/useObjectInteractions.ts',
+  'useObjectPlacement.ts': './hooks/objects/useObjectPlacement.ts',
+  'useObjectDragSelect.ts': './hooks/objects/useObjectDragSelect.ts',
+  'useObjectResize.ts': './hooks/objects/useObjectResize.ts',
+  'useObjectHover.ts': './hooks/objects/useObjectHover.ts',
+  'useObjectModifications.ts': './hooks/objects/useObjectModifications.ts',
+  'useObjectUIPositions.ts': './hooks/objects/useObjectUIPositions.ts',
+  'useObjectModals.ts': './hooks/objects/useObjectModals.ts',
+  'useEdgeSnapModifiers.ts': './hooks/objects/useEdgeSnapModifiers.ts',
+  'useGroupDrag.ts': './hooks/objects/useGroupDrag.ts',
+
+  // Hooks - state
+  'useMapData.ts': './hooks/state/useMapData.ts',
+  'useLayerHistory.ts': './hooks/state/useLayerHistory.ts',
+  'useHistory.ts': './hooks/state/useHistory.ts',
+  'useDataHandlers.ts': './hooks/state/useDataHandlers.ts',
+  'useToolState.ts': './hooks/state/useToolState.ts',
+  'usePanelState.ts': './hooks/state/usePanelState.ts',
+  'useUILayout.ts': './hooks/state/useUILayout.ts',
+  'useViewControls.ts': './hooks/state/useViewControls.ts',
+
+  // Hooks - interactions
+  'useTextLabelInteraction.ts': './hooks/interactions/useTextLabelInteraction.ts',
+  'useNotePinInteraction.ts': './hooks/interactions/useNotePinInteraction.ts',
+  'useAreaSelect.ts': './hooks/interactions/useAreaSelect.ts',
+  'useFogOfWar.ts': './hooks/interactions/useFogOfWar.ts',
+  'useFogTools.ts': './hooks/interactions/useFogTools.ts',
+  'useRegionTools.ts': './hooks/interactions/useRegionTools.ts',
+  'useImageAlignment.ts': './hooks/interactions/useImageAlignment.ts',
+  'useDistanceMeasurement.ts': './hooks/interactions/useDistanceMeasurement.ts',
+  'useSubHexNavigation.ts': './hooks/interactions/useSubHexNavigation.ts',
+  'useAlignmentMode.ts': './hooks/interactions/useAlignmentMode.ts',
+  'useCustomEventHandlers.ts': './hooks/interactions/useCustomEventHandlers.ts',
+  'useToolbarPosition.ts': './hooks/interactions/useToolbarPosition.ts',
 
   // Generation
   'dungeonGenerator.js': './generation/dungeonGenerator.js',
   'objectPlacer.js': './generation/objectPlacer.js',
 
-  // Bridge
-  'obsidianBridge.ts': './utils/obsidianBridge.ts',
+  // Components - controls
+  'MapHeader.tsx': './components/controls/MapHeader.tsx',
+  'MapControls.tsx': './components/controls/MapControls.tsx',
+  'SubHexBreadcrumb.tsx': './components/controls/SubHexBreadcrumb.tsx',
 
-  // Settings
+  // Components - modals
+  'TextLabelEditor.tsx': './components/modals/TextLabelEditor.tsx',
+  'TextInputModal.tsx': './components/modals/TextInputModal.tsx',
+  'NoteLinkModal.tsx': './components/modals/NoteLinkModal.tsx',
+  'LayerEditModal.tsx': './components/modals/LayerEditModal.tsx',
+  'ModalPortal.tsx': './components/modals/ModalPortal.tsx',
+
+  // Components - overlays
+  'MeasurementOverlay.tsx': './components/overlays/MeasurementOverlay.tsx',
+  'LinkedNoteHoverOverlays.tsx': './components/overlays/LinkedNoteHoverOverlays.tsx',
+  'LinkingModeBanner.tsx': './components/overlays/LinkingModeBanner.tsx',
+  'ImageAlignmentMode.tsx': './components/overlays/ImageAlignmentMode.tsx',
+
+  // Components - panels
+  'ObjectSidebar.tsx': './components/panels/ObjectSidebar.tsx',
+  'LayerControls.tsx': './components/panels/LayerControls.tsx',
+  'RegionPanel.tsx': './components/panels/RegionPanel.tsx',
+  'TileAssetBrowser.tsx': './components/panels/TileAssetBrowser.tsx',
+
+  // Components - toolbars
+  'ObjectSelectionToolbar.tsx': './components/toolbars/ObjectSelectionToolbar.tsx',
+  'TextSelectionToolbar.tsx': './components/toolbars/TextSelectionToolbar.tsx',
+  'MultiSelectToolbar.tsx': './components/toolbars/MultiSelectToolbar.tsx',
+  'ToolPalette.tsx': './components/toolbars/ToolPalette.tsx',
+  'VisibilityToolbar.tsx': './components/toolbars/VisibilityToolbar.tsx',
+
+  // Components - shared
+  'ColorPicker.tsx': './components/shared/ColorPicker.tsx',
+  'CollapsibleSection.tsx': './components/shared/CollapsibleSection.tsx',
+
+  // Components - settings
   'settingsReducer.ts': './components/settings/settingsReducer.ts',
 };
 
@@ -117,11 +219,16 @@ export function datacoreTransformer(options: TransformOptions = {}): Plugin {
       const isSourceFile =
         normalizedId.includes(`/${sourceDir}/`) ||
         normalizedId.includes('/geometry/') ||
-        normalizedId.includes('/utils/') ||
         normalizedId.includes('/hooks/') ||
         normalizedId.includes('/context/') ||
         normalizedId.includes('/components/') ||
-        normalizedId.includes('/generation/');
+        normalizedId.includes('/generation/') ||
+        normalizedId.includes('/core/') ||
+        normalizedId.includes('/objects/') ||
+        normalizedId.includes('/drawing/') ||
+        normalizedId.includes('/text/') ||
+        normalizedId.includes('/assets/') ||
+        normalizedId.includes('/persistence/');
 
       if (!isSourceFile) {
         return null;
@@ -273,7 +380,7 @@ function getRelativeDir(normalizedPath: string): string {
   }
 
   // Fallback: extract just the top-level directory for non-src paths
-  const match = normalizedPath.match(/\/(geometry|utils|hooks|context|components|generation)\//);
+  const match = normalizedPath.match(/\/(geometry|hooks|context|components|generation|core|objects|drawing|text|assets|persistence)\//);
   if (match) {
     // Check if there's a subdirectory
     const subMatch = normalizedPath.match(new RegExp(`/${match[1]}/([^/]+)/[^/]+$`));
