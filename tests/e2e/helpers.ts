@@ -333,10 +333,11 @@ export async function openSettingsModal(page: any): Promise<void> {
   await page.waitForTimeout(300);
 }
 
-/** Helper to close the settings modal via Cancel button */
+/** Helper to close the settings modal via Cancel button (supports both native and fallback modals) */
 export async function closeSettingsModal(page: any): Promise<void> {
-  const cancelBtn = page.locator('.dmt-modal-btn-cancel');
-  await cancelBtn.click();
+  // Native modal uses plain button text, fallback uses .dmt-modal-btn-cancel
+  const cancelBtn = page.locator('.dmt-modal-btn-cancel, .modal-button-container button:not(.mod-cta)').first();
+  await cancelBtn.dispatchEvent('click');
   await page.waitForTimeout(200);
 }
 

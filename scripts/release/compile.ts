@@ -105,9 +105,9 @@ function postProcessCompiledOutput(outputPath: string, basePath?: string): void 
 
   let content = readFileSync(outputPath, "utf-8");
 
-  // Remove orphaned pathResolverImport line
+  // Remove orphaned pathResolverImport line (handles both formatted and minified output)
   content = content.replace(
-    /const \{ getJsonPath \} = pathResolverImport;\r?\n/g,
+    /const \{?\s*getJsonPath\s*\}? = pathResolverImport;\r?\n?/g,
     ""
   );
 

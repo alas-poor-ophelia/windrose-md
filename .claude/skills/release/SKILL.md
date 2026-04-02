@@ -12,7 +12,7 @@ Guides you through the complete release process for Windrose.
 Before running this skill:
 1. All source changes should be committed
 2. Know the new version number
-3. Changelog for this version should already be written in `DungeonMapTracker.md`
+3. Changelog for this version should already be written in `Windrose Changelogs.md`
 
 The Datacore Compiler command ID is already configured: `dc-compiler:compile-projects-dungeon-map-tracker--compilersettings`
 
@@ -20,13 +20,13 @@ The Datacore Compiler command ID is already configured: `dc-compiler:compile-pro
 
 ### Step 1: Extract and Confirm Changelog
 
-1. Read `DungeonMapTracker.md` in the source repo (`C:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker`)
+1. Read `Windrose Changelogs.md` in the source repo (`C:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker`)
 2. Find the changelog section for the version being released (under `# Changelog`, look for `## Version X.Y.Z` or similar header)
 3. Extract the full changelog content for this version - **IMPORTANT: Stop at the next `## Version` header**. Only include content from the target version's header until (but not including) the next version header.
 4. Present the extracted changelog to the user in a markdown code block (triple backticks) so they can preview the exact formatting that will be used
 5. Ask them to confirm it looks correct before proceeding
 
-**Important:** The user writes changelogs manually in `DungeonMapTracker.md`. Do NOT generate or modify changelog content - only extract what's already there. Be strict about version boundaries - each version section ends where the next one begins.
+**Important:** The user writes changelogs manually in `Windrose Changelogs.md`. Do NOT generate or modify changelog content - only extract what's already there. Be strict about version boundaries - each version section ends where the next one begins.
 
 ## Commit Messages
 
@@ -94,6 +94,19 @@ After `npm run release` succeeds:
 1. Check GitHub Actions for release workflow status
 2. Verify the release appears at: https://github.com/[your-repo]/releases
 3. Test the released artifact in a fresh Obsidian vault
+
+### Step 6: Merge Release Branch to Main
+
+After the release is verified, merge the release branch back into main and push:
+
+```bash
+cd "C:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker"
+git checkout main
+git merge release/vX.Y.Z --no-edit
+git push origin main
+```
+
+This ensures main has the compiled artifact commit, version bump, and any fixes made during the release process (e.g. NativeModalPortal fix in v1.6.0). Without this step, the README, docs, and other files pushed on the release branch won't be visible on the main branch on GitHub.
 
 ## Troubleshooting
 
