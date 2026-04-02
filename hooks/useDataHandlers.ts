@@ -16,6 +16,7 @@ import type { Curve } from '#types/core/curve.types';
 import type { MapObject } from '#types/objects/object.types';
 import type { TextLabel } from '#types/objects/note.types';
 import type { HexColor } from '#types/core/common.types';
+import type { HexTileAssignment } from '#types/tiles/tile.types';
 import type {
   UseDataHandlersOptions,
   UseDataHandlersResult,
@@ -60,6 +61,7 @@ function useDataHandlers({
     objects: overrides.objects ?? layer.objects ?? [],
     textLabels: overrides.textLabels ?? layer.textLabels ?? [],
     edges: overrides.edges ?? layer.edges ?? [],
+    tiles: overrides.tiles ?? layer.tiles ?? [],
     regions: overrides.regions ?? regions
   }), []);
 
@@ -67,7 +69,7 @@ function useDataHandlers({
   // Factory: Create layer data change handler
   // =========================================================================
 
-  type LayerField = 'cells' | 'curves' | 'objects' | 'textLabels' | 'edges';
+  type LayerField = 'cells' | 'curves' | 'objects' | 'textLabels' | 'edges' | 'tiles';
 
   const createLayerDataHandler = dc.useCallback(<T,>(field: LayerField) => {
     return (newValue: T, suppressHistory = false): void => {
@@ -114,6 +116,11 @@ function useDataHandlers({
 
   const handleEdgesChange = dc.useMemo(
     () => createLayerDataHandler<unknown[]>('edges'),
+    [createLayerDataHandler]
+  );
+
+  const handleTilesChange = dc.useMemo(
+    () => createLayerDataHandler<HexTileAssignment[]>('tiles'),
     [createLayerDataHandler]
   );
 
@@ -242,7 +249,8 @@ function useDataHandlers({
     handleCurvesChange,
     handleObjectsChange,
     handleTextLabelsChange,
-    handleEdgesChange
+    handleEdgesChange,
+    handleTilesChange
   };
 
   const mapDataHandlers: MapDataHandlers = {
@@ -268,6 +276,7 @@ function useDataHandlers({
     handleObjectsChange,
     handleTextLabelsChange,
     handleEdgesChange,
+    handleTilesChange,
     handleAddCustomColor,
     handleDeleteCustomColor,
     handleUpdateColorOpacity,

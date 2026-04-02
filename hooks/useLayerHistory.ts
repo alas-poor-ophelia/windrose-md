@@ -120,6 +120,7 @@ function useLayerHistory({
         objects: activeLayer.objects || [],
         textLabels: activeLayer.textLabels || [],
         edges: activeLayer.edges || [],
+        tiles: activeLayer.tiles || [],
         regions: mapData.regions || []
       });
       historyInitialized.current = true;
@@ -149,6 +150,7 @@ function useLayerHistory({
       objects: layer.objects || [],
       textLabels: layer.textLabels || [],
       edges: layer.edges || [],
+      tiles: layer.tiles || [],
       regions: regions
     }),
     []
@@ -319,7 +321,8 @@ function useLayerHistory({
           curves: previousState.curves || [],
           objects: previousState.objects || [],
           textLabels: previousState.textLabels || [],
-          edges: previousState.edges || []
+          edges: previousState.edges || [],
+          tiles: previousState.tiles || []
         }
       );
       updateMapData(newMapData);
@@ -342,7 +345,8 @@ function useLayerHistory({
           curves: nextState.curves || [],
           objects: nextState.objects || [],
           textLabels: nextState.textLabels || [],
-          edges: nextState.edges || []
+          edges: nextState.edges || [],
+          tiles: nextState.tiles || []
         }
       );
       updateMapData(newMapData);

@@ -332,6 +332,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     handleObjectsChange,
     handleTextLabelsChange,
     handleEdgesChange,
+    handleTilesChange,
     handleAddCustomColor,
     handleDeleteCustomColor,
     handleUpdateColorOpacity,
@@ -509,6 +510,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               onObjectsChange={handleObjectsChange}
               onTextLabelsChange={handleTextLabelsChange}
               onEdgesChange={handleEdgesChange}
+              onTilesChange={handleTilesChange}
               onViewStateChange={handleViewStateChange}
               onTextLabelSettingsChange={handleTextLabelSettingsChange}
               currentTool={currentTool}
@@ -576,6 +578,16 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                   onInitializeFog={(updatedMapData: MapData) => updateMapData(updatedMapData)}
                 />
               )}
+
+              {/* TilePlacementLayer - hex tile placement */}
+              <MapCanvas.TilePlacementLayer
+                currentTool={currentTool}
+                selectedTilesetId={selectedTilesetId}
+                selectedTileId={selectedTileId}
+                tileRotation={tileRotation}
+                tileFlipH={tileFlipH}
+                onTilesChange={handleTilesChange}
+              />
 
               {/* RegionLayer - hex region creation and editing */}
               <MapCanvas.RegionLayer

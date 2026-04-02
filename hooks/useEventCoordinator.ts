@@ -334,6 +334,14 @@ const useEventCoordinator = ({
           const eventToUse = isTouchEvent ? syntheticEvent : e;
           regionHandlers.handlePointerDown(eventToUse);
         }
+      } else if (currentTool === 'tilePaint') {
+        if (hasMultiSelection) clearSelection();
+
+        const tileHandlers = getHandlers('tilePlacement');
+        if (tileHandlers?.handlePointerDown) {
+          const eventToUse = isTouchEvent ? syntheticEvent : e;
+          tileHandlers.handlePointerDown(eventToUse);
+        }
       }
     };
 
@@ -538,6 +546,14 @@ const useEventCoordinator = ({
       return;
     }
 
+    if (currentTool === 'tilePaint') {
+      const tileHandlers = getHandlers('tilePlacement');
+      if (tileHandlers?.handlePointerMove) {
+        tileHandlers.handlePointerMove(e);
+      }
+      return;
+    }
+
     if (layerVisibility.objects && objectHandlers?.handleHoverUpdate) {
       objectHandlers.handleHoverUpdate(e);
     }
@@ -640,6 +656,13 @@ const useEventCoordinator = ({
       const freehandHandlers = getHandlers('freehand');
       if (freehandHandlers?.stopDrawing) {
         freehandHandlers.stopDrawing(e);
+      }
+    }
+
+    if (currentTool === 'tilePaint') {
+      const tileHandlers = getHandlers('tilePlacement');
+      if (tileHandlers?.handlePointerUp) {
+        tileHandlers.handlePointerUp(e);
       }
     }
 

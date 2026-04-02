@@ -43,6 +43,7 @@ const { DiagonalFillOverlay } = await requireModuleByName("DiagonalFillOverlay.t
 const { AreaSelectLayer } = await requireModuleByName("AreaSelectLayer.tsx");
 const { FogOfWarLayer } = await requireModuleByName("FogOfWarLayer.tsx");
 const { RegionLayer } = await requireModuleByName("RegionLayer.tsx");
+const { TilePlacementLayer } = await requireModuleByName("TilePlacementLayer.tsx");
 const { RerollDungeonButton } = await requireModuleByName("RerollDungeonButton.tsx");
 const { getSetting } = await requireModuleByName("settingsAccessor.ts");
 const { usePanZoomCoordinator } = await requireModuleByName("usePanZoomCoordinator.ts");
@@ -87,6 +88,7 @@ interface MapCanvasContentProps {
   onObjectsChange: (objects: MapObject[]) => void;
   onTextLabelsChange: (labels: TextLabel[]) => void;
   onEdgesChange: (edges: Edge[], skipHistory?: boolean) => void;
+  onTilesChange?: (tiles: import('#types/tiles/tile.types').HexTileAssignment[]) => void;
   onViewStateChange: (viewState: ViewState) => void;
   onTextLabelSettingsChange: (settings: TextLabelSettings) => void;
   currentTool: ToolId;
@@ -145,7 +147,7 @@ const Coordinators = ({ canvasRef, mapData, geometry, isFocused, isColorPickerOp
  * MapCanvasContent - Inner component that uses context hooks
  * Contains all the map canvas logic and interacts with shared selection state
  */
-const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onViewStateChange, onTextLabelSettingsChange, currentTool, selectedObjectType, selectedColor, isColorPickerOpen, customColors, onAddCustomColor, onDeleteCustomColor, isFocused, isAnimating, theme, isAlignmentMode, children }: MapCanvasContentProps): React.ReactElement => {
+const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onTilesChange, onViewStateChange, onTextLabelSettingsChange, currentTool, selectedObjectType, selectedColor, isColorPickerOpen, customColors, onAddCustomColor, onDeleteCustomColor, isFocused, isAnimating, theme, isAlignmentMode, children }: MapCanvasContentProps): React.ReactElement => {
   const canvasRef = dc.useRef<HTMLCanvasElement | null>(null);
   const fogCanvasRef = dc.useRef<HTMLCanvasElement | null>(null);  // Separate canvas for fog blur effect (CSS blur for iOS compat)
   const containerRef = dc.useRef<HTMLDivElement | null>(null);
@@ -433,8 +435,9 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
     onObjectsChange,
     onTextLabelsChange,
     onEdgesChange,
+    onTilesChange,
     onMapDataUpdate
-  }), [onCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onViewStateChange, onTextLabelSettingsChange]);
+  }), [onCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onTilesChange, onViewStateChange, onTextLabelSettingsChange]);
 
 
 
@@ -517,6 +520,7 @@ MapCanvas.DiagonalFillOverlay = DiagonalFillOverlay;
 MapCanvas.AreaSelectLayer = AreaSelectLayer;
 MapCanvas.FogOfWarLayer = FogOfWarLayer;
 MapCanvas.RegionLayer = RegionLayer;
+MapCanvas.TilePlacementLayer = TilePlacementLayer;
 MapCanvas.RerollDungeonButton = RerollDungeonButton;
 
 return { MapCanvas };
