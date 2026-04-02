@@ -54,6 +54,22 @@ npm run check       # Typecheck + lint
 | Tool interactions | Optional | Required |
 | Before committing | Required | Required |
 
+## Documentation Maintenance
+
+After structural changes (moving files, adding directories, renaming modules), check whether any `CLAUDE.md` files need updating. Each major directory has its own:
+
+| File | Covers |
+|------|--------|
+| `src/CLAUDE.md` | Architecture, file organization, coding patterns |
+| `src/geometry/CLAUDE.md` | Geometry system, coordinate spaces, IGeometry |
+| `src/hooks/CLAUDE.md` | Hook directory structure, patterns, composition |
+| `src/context/CLAUDE.md` | React contexts, provider pattern |
+| `src/components/mapcanvas/CLAUDE.md` | Layer components, canvas architecture |
+| `src/components/settings/CLAUDE.md` | Settings modal, tabs, reducer |
+| `src/settingsplugin/CLAUDE.md` | Settings plugin assembly, template strings |
+
+Keep these accurate — they're the first thing an agent reads when working in that area.
+
 ## Git Commits
 
 **No AI attribution in commits.** Keep commit messages clean and professional.
