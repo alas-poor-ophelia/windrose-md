@@ -122,6 +122,15 @@ export type {
 } from './objects/icon.types';
 
 // ===========================================
+// Tile Types
+// ===========================================
+export type {
+  TilesetDef,
+  TileEntry,
+  HexTileAssignment,
+} from './tiles/tile.types';
+
+// ===========================================
 // Tool Types
 // ===========================================
 export type {

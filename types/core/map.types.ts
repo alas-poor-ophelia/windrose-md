@@ -9,6 +9,7 @@ import type { Cell } from './cell.types';
 import type { Curve } from './curve.types';
 import type { Point } from './geometry.types';
 import type { HexOrientation, FrameSettings } from '../settings/settings.types';
+import type { TilesetDef, HexTileAssignment } from '../tiles/tile.types';
 
 // ===========================================
 // Map Types
@@ -181,6 +182,8 @@ export interface MapLayer {
   layerBelowOpacity?: number;
   /** Optional icon for the layer (RPGAwesome class e.g. 'ra-sword', or Unicode char) */
   icon?: string;
+  /** Hex tile assignments for this layer (hex maps only) */
+  tiles?: HexTileAssignment[];
 }
 
 // ===========================================
@@ -246,6 +249,9 @@ export interface MapData {
 
   // Sub-hex drill-down maps (hex maps only, keyed by "q,r")
   subHexMaps?: Record<string, SubHexMapData>;
+
+  // Hex tile image sets (hex maps only)
+  tilesets?: TilesetDef[];
 
   // Migration metadata
   _migratedAt?: string;
