@@ -9,7 +9,7 @@
  * - Renders preview overlay for rectangle start point
  */
 
-import type { FogTool } from '../VisibilityToolbar.tsx';
+import type { FogTool } from '../toolbars/VisibilityToolbar.tsx';
 import type { FogOfWar } from '#types/core/map.types';
 
 const pathResolverPath = dc.resolvePath("pathResolver.ts");

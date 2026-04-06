@@ -15,7 +15,7 @@ import type { ObjectTypeId, MapObject } from '#types/objects/object.types';
 import type { TextLabel } from '#types/objects/note.types';
 import type { HexColor } from '#types/core/common.types';
 import type { ExtendedGeometry } from '#types/contexts/context.types';
-import type { CustomColor } from '../ColorPicker.tsx';
+import type { CustomColor } from '../shared/ColorPicker.tsx';
 
 const pathResolverPath = dc.resolvePath("pathResolver.ts");
 const { requireModuleByName } = await dc.require(pathResolverPath);
@@ -40,7 +40,7 @@ const { copyDeepLinkToClipboard } = await requireModuleByName("deepLinkHandler.t
 const { LinkingModeBanner } = await requireModuleByName("LinkingModeBanner.tsx");
 const { CardinalIndicators } = await requireModuleByName("CardinalIndicators.tsx");
 
-const { rotateByIncrement } = await dc.require(dc.resolvePath("utils/rotationOperations.ts")) as {
+const { rotateByIncrement } = await requireModuleByName("rotationOperations.ts") as {
   rotateByIncrement: (currentRotation: number) => number
 };
 

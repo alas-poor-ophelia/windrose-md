@@ -11,7 +11,7 @@
 
 import type { ToolId } from '#types/tools/tool.types';
 import type { HexColor } from '#types/core/common.types';
-import type { CustomColor } from '../ColorPicker.tsx';
+import type { CustomColor } from '../shared/ColorPicker.tsx';
 
 const pathResolverPath = dc.resolvePath("pathResolver.ts");
 const { requireModuleByName } = await dc.require(pathResolverPath);

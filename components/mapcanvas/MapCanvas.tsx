@@ -89,6 +89,7 @@ interface MapCanvasContentProps {
   onTextLabelsChange: (labels: TextLabel[]) => void;
   onEdgesChange: (edges: Edge[], skipHistory?: boolean) => void;
   onTilesChange?: (tiles: import('#types/tiles/tile.types').HexTileAssignment[]) => void;
+  tileImagesReady?: boolean;
   onViewStateChange: (viewState: ViewState) => void;
   onTextLabelSettingsChange: (settings: TextLabelSettings) => void;
   currentTool: ToolId;
@@ -147,7 +148,7 @@ const Coordinators = ({ canvasRef, mapData, geometry, isFocused, isColorPickerOp
  * MapCanvasContent - Inner component that uses context hooks
  * Contains all the map canvas logic and interacts with shared selection state
  */
-const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onTilesChange, onViewStateChange, onTextLabelSettingsChange, currentTool, selectedObjectType, selectedColor, isColorPickerOpen, customColors, onAddCustomColor, onDeleteCustomColor, isFocused, isAnimating, theme, isAlignmentMode, children }: MapCanvasContentProps): React.ReactElement => {
+const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onTilesChange, tileImagesReady, onViewStateChange, onTextLabelSettingsChange, currentTool, selectedObjectType, selectedColor, isColorPickerOpen, customColors, onAddCustomColor, onDeleteCustomColor, isFocused, isAnimating, theme, isAlignmentMode, children }: MapCanvasContentProps): React.ReactElement => {
   const canvasRef = dc.useRef<HTMLCanvasElement | null>(null);
   const fogCanvasRef = dc.useRef<HTMLCanvasElement | null>(null);  // Separate canvas for fog blur effect (CSS blur for iOS compat)
   const containerRef = dc.useRef<HTMLDivElement | null>(null);
@@ -268,7 +269,7 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
   }, [isAnimating]);
 
   // Render canvas whenever relevant state changes
-  useCanvasRenderer(canvasRef, fogCanvasRef, mapData, geometry, selectedItems, isResizeMode, theme, showCoordinates, layerVisibility);
+  useCanvasRenderer(canvasRef, fogCanvasRef, mapData, geometry, selectedItems, isResizeMode, theme, showCoordinates, layerVisibility, tileImagesReady);
 
   // Trigger redraw when canvas dimensions change (from expand/collapse)
   dc.useEffect(() => {

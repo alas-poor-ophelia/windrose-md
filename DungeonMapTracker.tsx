@@ -11,7 +11,7 @@ import type { ResolvedTheme } from '#types/settings/settings.types';
 // IMPORTS
 // ============================================================================
 
-const { requireModuleByName, getBasePath } = await dc.require(`${window.__dmtBasePath}/utils/pathResolver.ts`);
+const { requireModuleByName, getBasePath } = await dc.require(`${window.__dmtBasePath}/core/pathResolver.ts`);
 
 
 const css = await app.vault.cachedRead(
@@ -46,6 +46,7 @@ const { useAlignmentMode } = await requireModuleByName("useAlignmentMode.ts");
 const { ModalPortal } = await requireModuleByName("ModalPortal.tsx");
 
 const { getActiveLayer } = await requireModuleByName("layerAccessor.ts");
+const { setCell: accessorSetCell, removeCell: accessorRemoveCell, cellToPoint } = await requireModuleByName("cellAccessor.ts");
 const { LayerControls } = await requireModuleByName("LayerControls.tsx");
 const { RegionPanel } = await requireModuleByName("RegionPanel.tsx");
 const { LayerEditModal } = await requireModuleByName("LayerEditModal.tsx");
@@ -147,7 +148,7 @@ const CornerBracket = ({ position }: CornerBracketProps): React.ReactElement => 
 };
 
 const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'grid' }: DungeonMapTrackerProps): React.ReactElement => {
-  const { mapData: rootMapData, isLoading, saveStatus, updateMapData: rootUpdateMapData, forceSave, fowImageReady } = useMapData(mapId, mapName, mapType);
+  const { mapData: rootMapData, isLoading, saveStatus, updateMapData: rootUpdateMapData, forceSave, fowImageReady, tileImagesReady, getCachedImage } = useMapData(mapId, mapName, mapType);
 
   const {
     activeMapData: mapData,
@@ -354,8 +355,85 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     mapData, updateMapData, handleViewStateChange
   });
 
+  // MCP bridge: each map instance registers its own state + operations keyed by notePath.
+  // No race conditions — the query side picks the active file's state.
+  dc.useEffect(() => {
+    if (!window.__windrose || !mapData || !notePath || !geometry) return;
+    if (!window.__windrose.mcpInstances) window.__windrose.mcpInstances = {};
 
-
+    const activeLayer = getActiveLayer(mapData);
+    const layers = mapData.layers || [];
+    window.__windrose.mcpInstances[notePath] = {
+      mapId,
+      mapName: mapData.name || mapName,
+      mapType: mapData.mapType || 'grid',
+      viewState: {
+        x: mapData.viewState?.offsetX ?? 0,
+        y: mapData.viewState?.offsetY ?? 0,
+        zoom: mapData.viewState?.zoom ?? 1,
+      },
+      activeLayerId: activeLayer?.id || '',
+      layerCount: layers.length,
+      layerIds: layers.map((l: { id: string }) => l.id),
+      currentTool,
+      selectedColor,
+      selectedOpacity,
+      canUndo,
+      canRedo,
+      saveStatus,
+      isExpanded,
+      dataFilePath: 'windrose-md-data.json',
+      notePath,
+      timestamp: Date.now(),
+      ops: {
+        setTool: (toolId: string) => setCurrentTool(toolId),
+        setColor: (color: string) => setSelectedColor(color),
+        setOpacity: (opacity: number) => handleOpacityChange(opacity),
+        paintCell: (x: number, y: number, color?: string, opacity?: number): boolean => {
+          if (!activeLayer) return false;
+          const c = color || selectedColor;
+          const o = opacity ?? selectedOpacity;
+          const newCells = accessorSetCell(activeLayer.cells || [], { x, y }, c, o, geometry);
+          handleCellsChange(newCells);
+          return true;
+        },
+        paintCells: (cells: Array<{ x: number; y: number; color?: string; opacity?: number }>): number => {
+          if (!activeLayer) return 0;
+          let currentCells = activeLayer.cells || [];
+          for (const cell of cells) {
+            const c = cell.color || selectedColor;
+            const o = cell.opacity ?? selectedOpacity;
+            currentCells = accessorSetCell(currentCells, { x: cell.x, y: cell.y }, c, o, geometry);
+          }
+          handleCellsChange(currentCells);
+          return cells.length;
+        },
+        eraseCell: (x: number, y: number): boolean => {
+          if (!activeLayer) return false;
+          const newCells = accessorRemoveCell(activeLayer.cells || [], { x, y }, geometry);
+          handleCellsChange(newCells);
+          return true;
+        },
+        getCells: (): Array<{ x: number; y: number; color: string; opacity: number }> => {
+          if (!activeLayer) return [];
+          return (activeLayer.cells || []).map((cell: { color: string; opacity: number }) => ({
+            ...cellToPoint(cell),
+            color: cell.color,
+            opacity: cell.opacity ?? 1,
+          }));
+        },
+        undo: (): boolean => { wrappedHandleUndo(); return true; },
+        redo: (): boolean => { handleRedo(); return true; },
+        selectLayer: (layerId: string) => handleLayerSelect(layerId),
+        forceSave: () => forceSave(),
+      },
+    };
+  });
+  dc.useEffect(() => {
+    return () => {
+      if (window.__windrose?.mcpInstances) delete window.__windrose.mcpInstances[notePath];
+    };
+  }, []);
 
   // Loading state
   if (isLoading) {
@@ -511,6 +589,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               onTextLabelsChange={handleTextLabelsChange}
               onEdgesChange={handleEdgesChange}
               onTilesChange={handleTilesChange}
+              tileImagesReady={tileImagesReady}
               onViewStateChange={handleViewStateChange}
               onTextLabelSettingsChange={handleTextLabelSettingsChange}
               currentTool={currentTool}
@@ -615,6 +694,27 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               {/* Re-roll button for generated dungeons */}
               <MapCanvas.RerollDungeonButton />
             </MapCanvas>
+
+            <MapControls
+              onZoomIn={handleZoomIn}
+              onZoomOut={handleZoomOut}
+              onCompassClick={handleCompassClick}
+              onSettingsClick={handleSettingsClick}
+              northDirection={mapData.northDirection}
+              currentZoom={mapData.viewState.zoom}
+              isExpanded={isExpanded}
+              onToggleExpand={handleToggleExpand}
+              mapType={mapData.mapType}
+              showLayerPanel={showLayerPanel}
+              onToggleLayerPanel={() => setShowLayerPanel(!showLayerPanel)}
+              showRegionPanel={showRegionPanel}
+              onToggleRegionPanel={mapData.mapType === 'hex' ? () => setShowRegionPanel(!showRegionPanel) : undefined}
+              showTilePanel={showTilePanel && !tileBrowserCollapsed}
+              onToggleTilePanel={showTilePanel ? () => setTileBrowserCollapsed(!tileBrowserCollapsed) : undefined}
+              showVisibilityToolbar={showVisibilityToolbar}
+              onToggleVisibilityToolbar={() => setShowVisibilityToolbar(!showVisibilityToolbar)}
+              alwaysShowControls={effectiveSettings?.alwaysShowControls ?? false}
+            />
           </div>
 
           {/* Tile Asset Browser (right sidebar, hex maps with tilesets only) */}
@@ -632,29 +732,9 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               flipH={tileFlipH}
               onRotationChange={setTileRotation}
               onFlipChange={setTileFlipH}
+              getCachedImage={getCachedImage}
             />
           )}
-
-          <MapControls
-            onZoomIn={handleZoomIn}
-            onZoomOut={handleZoomOut}
-            onCompassClick={handleCompassClick}
-            onSettingsClick={handleSettingsClick}
-            northDirection={mapData.northDirection}
-            currentZoom={mapData.viewState.zoom}
-            isExpanded={isExpanded}
-            onToggleExpand={handleToggleExpand}
-            mapType={mapData.mapType}
-            showLayerPanel={showLayerPanel}
-            onToggleLayerPanel={() => setShowLayerPanel(!showLayerPanel)}
-            showRegionPanel={showRegionPanel}
-            onToggleRegionPanel={mapData.mapType === 'hex' ? () => setShowRegionPanel(!showRegionPanel) : undefined}
-            showTilePanel={showTilePanel && !tileBrowserCollapsed}
-            onToggleTilePanel={showTilePanel ? () => setTileBrowserCollapsed(!tileBrowserCollapsed) : undefined}
-            showVisibilityToolbar={showVisibilityToolbar}
-            onToggleVisibilityToolbar={() => setShowVisibilityToolbar(!showVisibilityToolbar)}
-            alwaysShowControls={effectiveSettings?.alwaysShowControls ?? false}
-          />
         </div>
 
         {showFooter && (
