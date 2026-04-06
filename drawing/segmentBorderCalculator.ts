@@ -17,7 +17,7 @@ import type {
   VertexName,
   InternalEdgeKey,
   CrossCellAdjacency
-} from '../utils/dmtConstants';
+} from '../core/dmtConstants';
 
 // Datacore imports
 const pathResolverPath = dc.resolvePath("pathResolver.ts");

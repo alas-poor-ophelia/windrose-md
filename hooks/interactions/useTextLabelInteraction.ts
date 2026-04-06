@@ -33,7 +33,7 @@ const { applyInverseRotation } = await requireModuleByName("screenPositionUtils.
   applyInverseRotation: (x: number, y: number, angle: number, centerX: number, centerY: number) => { x: number; y: number };
 };
 
-const { getNextRotation } = await dc.require(dc.resolvePath("utils/rotationOperations.ts")) as {
+const { getNextRotation } = await requireModuleByName("rotationOperations.ts") as {
   getNextRotation: (currentRotation: number) => number
 };
 

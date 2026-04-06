@@ -35,8 +35,9 @@ const { loadMapData, saveMapData } = await requireModuleByName("fileOperations.t
   saveMapData: (mapId: string, mapData: MapData) => Promise<boolean>;
 };
 
-const { preloadImage } = await requireModuleByName("imageOperations.ts") as {
+const { preloadImage, getCachedImage } = await requireModuleByName("imageOperations.ts") as {
   preloadImage: (path: string) => Promise<HTMLImageElement | null>;
+  getCachedImage: (path: string) => HTMLImageElement | null;
 };
 
 const { getEffectiveSettings } = await requireModuleByName("settingsAccessor.ts") as {
@@ -129,16 +130,23 @@ function useMapData(
   }, [mapData?.mapType, mapData?.objectSetId, settingsVersion]);
 
   // Preload tile images when tilesets are defined
+  const [tileImagesReady, setTileImagesReady] = dc.useState<boolean>(false);
   dc.useEffect(() => {
-    if (!mapData?.tilesets) return;
+    if (!mapData?.tilesets?.length) {
+      setTileImagesReady(false);
+      return;
+    }
 
+    setTileImagesReady(false);
+    const promises: Promise<unknown>[] = [];
     for (const tileset of mapData.tilesets) {
       for (const tile of tileset.tiles) {
         if (tile.vaultPath) {
-          preloadImage(tile.vaultPath);
+          promises.push(preloadImage(tile.vaultPath));
         }
       }
     }
+    Promise.all(promises).then(() => setTileImagesReady(true));
   }, [mapData?.tilesets]);
 
   // Listen for settings changes to trigger image preload
@@ -247,7 +255,9 @@ function useMapData(
     updateMapData,
     forceSave,
     backgroundImageReady,
-    fowImageReady
+    fowImageReady,
+    tileImagesReady,
+    getCachedImage,
   };
 }
 

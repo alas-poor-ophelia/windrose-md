@@ -1,4 +1,4 @@
-import type { LinkingSource } from '../context/ObjectLinkingContext.tsx';
+import type { LinkingSource } from '../../context/ObjectLinkingContext.tsx';
 
 const pathResolverPath = dc.resolvePath("pathResolver.ts");
 const { requireModuleByName } = await dc.require(pathResolverPath);

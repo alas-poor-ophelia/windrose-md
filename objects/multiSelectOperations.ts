@@ -11,7 +11,7 @@
 import type { Point } from '#types/core/geometry.types';
 import type { MapData, MapLayer } from '#types/core/map.types';
 import type { MapObject, ObjectSize } from '#types/objects/object.types';
-import type { TextLabel, FontFace } from './textLabelOperations';
+import type { TextLabel, FontFace } from '../text/textLabelOperations';
 import type { IGeometry } from '#types/core/geometry.types';
 import type { HexOrientation } from '#types/settings/settings.types';
 

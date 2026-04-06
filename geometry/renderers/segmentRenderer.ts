@@ -23,7 +23,7 @@ import type { ViewState, BorderTheme, IGridRenderer } from '#types/core/renderin
 import type {
   VertexName,
   VertexRatio
-} from '../utils/dmtConstants';
+} from '../../core/dmtConstants';
 
 // Datacore imports
 const pathResolverPath = dc.resolvePath("pathResolver.ts");

@@ -15,7 +15,7 @@ const { requireModuleByName } = await dc.require(pathResolverPath) as {
   requireModuleByName: (name: string) => Promise<unknown>
 };
 
-const { getNextRotation } = await dc.require(dc.resolvePath("utils/rotationOperations.ts")) as {
+const { getNextRotation } = await requireModuleByName("rotationOperations.ts") as {
   getNextRotation: (currentRotation: number) => number
 };
 

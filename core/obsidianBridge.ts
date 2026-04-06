@@ -13,13 +13,54 @@
  *   const Modal = obs.Modal as typeof import('obsidian').Modal;
  */
 
+/** MCP bridge state snapshot — serializable, exposed per-instance on window.__windrose.mcpInstances */
+interface WindroseMcpState {
+  mapId: string;
+  mapName: string;
+  mapType: string;
+  viewState: { x: number; y: number; zoom: number };
+  activeLayerId: string;
+  layerCount: number;
+  layerIds: string[];
+  currentTool: string;
+  selectedColor: string;
+  selectedOpacity: number;
+  canUndo: boolean;
+  canRedo: boolean;
+  saveStatus: string;
+  isExpanded: boolean;
+  dataFilePath: string;
+  notePath: string;
+  timestamp: number;
+  /** Operation functions for MCP Phase 2 — not serializable, call via eval */
+  ops: WindroseMcpOps;
+}
+
+/** Operation functions exposed on the MCP bridge for programmatic control */
+interface WindroseMcpOps {
+  setTool: (toolId: string) => void;
+  setColor: (color: string) => void;
+  setOpacity: (opacity: number) => void;
+  paintCell: (x: number, y: number, color?: string, opacity?: number) => boolean;
+  paintCells: (cells: Array<{ x: number; y: number; color?: string; opacity?: number }>) => number;
+  eraseCell: (x: number, y: number) => boolean;
+  getCells: () => Array<{ x: number; y: number; color: string; opacity: number }>;
+  undo: () => boolean;
+  redo: () => boolean;
+  selectLayer: (layerId: string) => void;
+  forceSave: () => Promise<void>;
+}
+
 declare global {
   interface Window {
     __windrose?: {
       obsidian: Record<string, unknown>;
       version: string;
       ready: boolean;
+      /** Per-instance MCP state keyed by notePath. Query side picks the active one. */
+      mcpInstances?: Record<string, WindroseMcpState>;
     };
+    __windrose_debug?: boolean;
   }
 }
 

@@ -11,7 +11,7 @@ import type { Point, BoundingBox } from '#types/core/geometry.types';
 import type { MapData, MapLayer } from '#types/core/map.types';
 import type { Cell } from '#types/core/cell.types';
 import type { MapObject } from '#types/objects/object.types';
-import type { TextLabel, FontFace } from './textLabelOperations';
+import type { TextLabel, FontFace } from '../text/textLabelOperations';
 import type { HexColor } from '#types/settings/settings.types';
 import type {
   ExportGeometry,

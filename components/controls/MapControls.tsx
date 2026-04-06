@@ -240,7 +240,7 @@ const MapControls = ({
                 onClick={handleControlInteraction(onToggleTilePanel)}
                 title="Toggle tile browser"
               >
-                <dc.Icon icon="lucide-grid-3x3" />
+                <dc.Icon icon="lucide-layout-grid" />
               </button>
             )}
 

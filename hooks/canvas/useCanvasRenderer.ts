@@ -395,7 +395,7 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
           ctx,
           layerBelow.tiles,
           mapData.tilesets,
-          { hexToWorld: hexGeom.hexToWorld!, worldToScreen: hexGeom.worldToScreen, hexSize: hexGeom.hexSize!, orientation: mapData.orientation || 'flat' },
+          { hexToWorld: hexGeom.hexToWorld!.bind(hexGeom), worldToScreen: hexGeom.worldToScreen.bind(hexGeom), hexSize: hexGeom.hexSize!, orientation: mapData.orientation || 'flat' },
           rendererViewState,
           { opacity: ghostOpacity, getCachedImage, canvasWidth: width, canvasHeight: height }
         );
@@ -449,7 +449,7 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
       ctx,
       activeLayer.tiles,
       mapData.tilesets,
-      { hexToWorld: hexGeom.hexToWorld!, worldToScreen: hexGeom.worldToScreen, hexSize: hexGeom.hexSize!, orientation: mapData.orientation || 'flat' },
+      { hexToWorld: hexGeom.hexToWorld!.bind(hexGeom), worldToScreen: hexGeom.worldToScreen.bind(hexGeom), hexSize: hexGeom.hexSize!, orientation: mapData.orientation || 'flat' },
       rendererViewState,
       { getCachedImage, canvasWidth: width, canvasHeight: height }
     );
@@ -609,13 +609,13 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   ctx.restore();
 };
 
-const useCanvasRenderer: UseCanvasRenderer = (canvasRef, fogCanvasRef, mapData, geometry, selectedItems = [], isResizeMode = false, theme = null, showCoordinates = false, layerVisibility = null) => {
+const useCanvasRenderer: UseCanvasRenderer = (canvasRef, fogCanvasRef, mapData, geometry, selectedItems = [], isResizeMode = false, theme = null, showCoordinates = false, layerVisibility = null, tileImagesReady = false) => {
   dc.useEffect(() => {
     if (mapData && geometry && canvasRef.current) {
       const fogCanvas = fogCanvasRef?.current || null;
       renderCanvas(canvasRef.current, fogCanvas, mapData, geometry, selectedItems, isResizeMode, theme, showCoordinates, layerVisibility);
     }
-  }, [mapData, geometry, selectedItems, isResizeMode, theme, canvasRef, fogCanvasRef, showCoordinates, layerVisibility]);
+  }, [mapData, geometry, selectedItems, isResizeMode, theme, canvasRef, fogCanvasRef, showCoordinates, layerVisibility, tileImagesReady]);
 };
 
 return { useCanvasRenderer, renderCanvas };

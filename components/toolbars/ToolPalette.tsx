@@ -8,7 +8,7 @@ import type { JSX } from 'preact';
 import type { HexColor } from '#types/core/common.types';
 import type { MapType } from '#types/core/map.types';
 import type { ToolId } from '#types/tools/tool.types';
-import type { CustomColor, ColorOpacityOverrides } from './ColorPicker.tsx';
+import type { CustomColor, ColorOpacityOverrides } from '../shared/ColorPicker.tsx';
 
 const pathResolverPath = dc.resolvePath("pathResolver.ts");
 const { requireModuleByName } = await dc.require(pathResolverPath);
@@ -325,7 +325,7 @@ const simpleTools: SimpleTool[] = [
   { id: 'addObject' as ToolId, title: 'Add Object (select from sidebar)', icon: 'lucide-map-pin-plus' },
   { id: 'addText' as ToolId, title: 'Add Text Label', icon: 'lucide-type' },
   { id: 'measure' as ToolId, title: 'Measure Distance (M)', icon: 'lucide-ruler', shortcut: 'm' },
-  { id: 'tilePaint' as ToolId, title: 'Place Tile (select from tile browser)', icon: 'lucide-grid-3x3', hexOnly: true }
+  { id: 'tilePaint' as ToolId, title: 'Place Tile (select from tile browser)', icon: 'lucide-layout-grid', hexOnly: true }
 ];
 
 // Derive shortcut map from tool config: key -> { group } or { tool }

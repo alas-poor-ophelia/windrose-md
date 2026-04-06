@@ -17,7 +17,7 @@ import type {
   CoordinateKeyMode,
   HexColor
 } from '#types/settings/settings.types';
-import type { Theme, Defaults } from '../utils/dmtConstants';
+import type { Theme, Defaults } from './dmtConstants';
 
 // Datacore imports
 const pathResolverPath = dc.resolvePath("pathResolver.ts");

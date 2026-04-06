@@ -174,6 +174,7 @@ async function loadMapData(mapId: string, mapName: string = '', mapType: MapType
 
       // Ensure arrays exist on all layers (backward compat)
       const loadedMap = data.maps[mapId];
+      console.log('[fileOperations] loadMapData tilesets for', mapId, ':', loadedMap.tilesets?.length ?? 'undefined');
       if (!loadedMap.tilesets) {
         loadedMap.tilesets = [];
       }

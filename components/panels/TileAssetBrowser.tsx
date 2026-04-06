@@ -8,6 +8,126 @@
 
 import type { TilesetDef, TileEntry } from '#types/tiles/tile.types';
 
+// ===========================================
+// Content-bounds detection for tile thumbnails
+// ===========================================
+
+const boundsCache = new Map<string, { x: number; y: number; w: number; h: number }>();
+const scratchCanvas = document.createElement('canvas');
+
+function getContentBounds(img: HTMLImageElement): { x: number; y: number; w: number; h: number } {
+  const key = img.src;
+  const cached = boundsCache.get(key);
+  if (cached) return cached;
+
+  const w = img.naturalWidth;
+  const h = img.naturalHeight;
+  if (w === 0 || h === 0) return { x: 0, y: 0, w, h };
+
+  scratchCanvas.width = w;
+  scratchCanvas.height = h;
+  const ctx = scratchCanvas.getContext('2d')!;
+  ctx.clearRect(0, 0, w, h);
+  ctx.drawImage(img, 0, 0);
+  const data = ctx.getImageData(0, 0, w, h).data;
+
+  let minX = w, minY = h, maxX = 0, maxY = 0;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if (data[(y * w + x) * 4 + 3] > 10) {
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+    }
+  }
+
+  if (maxX < minX) {
+    const bounds = { x: 0, y: 0, w, h };
+    boundsCache.set(key, bounds);
+    return bounds;
+  }
+
+  const pad = 2;
+  minX = Math.max(0, minX - pad);
+  minY = Math.max(0, minY - pad);
+  maxX = Math.min(w - 1, maxX + pad);
+  maxY = Math.min(h - 1, maxY + pad);
+
+  const bounds = { x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1 };
+  boundsCache.set(key, bounds);
+  return bounds;
+}
+
+// ===========================================
+// Tile thumbnail with content cropping
+// ===========================================
+
+const THUMB_SIZE = 64;
+const PREVIEW_SIZE = 192;
+
+interface TileThumbnailProps {
+  tile: TileEntry;
+  getCachedImage?: (path: string) => HTMLImageElement | null;
+}
+
+function drawTileToCanvas(
+  canvas: HTMLCanvasElement,
+  img: HTMLImageElement,
+  size: number,
+): void {
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  ctx.clearRect(0, 0, size, size);
+  try {
+    const bounds = getContentBounds(img);
+    const scale = Math.min(size / bounds.w, size / bounds.h);
+    const dw = bounds.w * scale;
+    const dh = bounds.h * scale;
+    ctx.drawImage(img, bounds.x, bounds.y, bounds.w, bounds.h,
+      (size - dw) / 2, (size - dh) / 2, dw, dh);
+  } catch {
+    const scale = Math.min(size / img.naturalWidth, size / img.naturalHeight);
+    const dw = img.naturalWidth * scale;
+    const dh = img.naturalHeight * scale;
+    ctx.drawImage(img, (size - dw) / 2, (size - dh) / 2, dw, dh);
+  }
+}
+
+const TileThumbnail = ({ tile, getCachedImage }: TileThumbnailProps): React.ReactElement => {
+  const canvasRef = dc.useRef<HTMLCanvasElement>(null);
+
+  dc.useEffect(() => {
+    const draw = (img: HTMLImageElement) => {
+      if (canvasRef.current) drawTileToCanvas(canvasRef.current, img, THUMB_SIZE);
+    };
+    const img = getCachedImage?.(tile.vaultPath);
+    if (img?.complete) {
+      draw(img);
+      return;
+    }
+    const file = dc.app.vault.getAbstractFileByPath(tile.vaultPath);
+    if (file) {
+      dc.app.vault.readBinary(file).then((binary: ArrayBuffer) => {
+        const blob = new Blob([binary]);
+        const url = URL.createObjectURL(blob);
+        const fallbackImg = new Image();
+        fallbackImg.onload = () => draw(fallbackImg);
+        fallbackImg.src = url;
+      });
+    }
+  }, [tile.vaultPath]);
+
+  return (
+    <canvas ref={canvasRef} className="dmt-tile-thumb-img" width={THUMB_SIZE} height={THUMB_SIZE} />
+  );
+};
+
+// ===========================================
+// Main component
+// ===========================================
+
 interface TileAssetBrowserProps {
   tilesets: TilesetDef[];
   selectedTilesetId: string | null;
@@ -21,6 +141,7 @@ interface TileAssetBrowserProps {
   flipH: boolean;
   onRotationChange: (rotation: number) => void;
   onFlipChange: (flipH: boolean) => void;
+  getCachedImage?: (path: string) => HTMLImageElement | null;
 }
 
 const ROTATION_STEPS = [0, 60, 120, 180, 240, 300];
@@ -38,10 +159,15 @@ const TileAssetBrowser = ({
   flipH,
   onRotationChange,
   onFlipChange,
+  getCachedImage,
 }: TileAssetBrowserProps): React.ReactElement => {
   const [activeTilesetIndex, setActiveTilesetIndex] = dc.useState<number>(0);
   const [searchFilter, setSearchFilter] = dc.useState<string>('');
   const [collapsedCategories, setCollapsedCategories] = dc.useState<Set<string>>(new Set());
+  const [hoveredTile, setHoveredTile] = dc.useState<TileEntry | null>(null);
+  const previewRef = dc.useRef<HTMLCanvasElement>(null);
+  const browserRef = dc.useRef<HTMLDivElement>(null);
+  const portalRef = dc.useRef<HTMLDivElement | null>(null);
 
   const handleToggleCollapse = () => {
     onCollapseChange(!isCollapsed);
@@ -67,6 +193,75 @@ const TileAssetBrowser = ({
     const nextIdx = (currentIdx - 1 + ROTATION_STEPS.length) % ROTATION_STEPS.length;
     onRotationChange(ROTATION_STEPS[nextIdx]);
   };
+
+  // Manage hover preview portal on document.body
+  dc.useEffect(() => {
+    if (!hoveredTile || isCollapsed) {
+      if (portalRef.current) {
+        portalRef.current.style.display = 'none';
+      }
+      return;
+    }
+
+    // Create portal div if needed
+    if (!portalRef.current) {
+      const div = document.createElement('div');
+      div.className = 'dmt-tile-preview-portal';
+      const canvas = document.createElement('canvas');
+      canvas.width = PREVIEW_SIZE;
+      canvas.height = PREVIEW_SIZE;
+      canvas.style.display = 'block';
+      canvas.style.imageRendering = 'pixelated';
+      const label = document.createElement('div');
+      label.className = 'dmt-tile-preview-label';
+      div.appendChild(canvas);
+      div.appendChild(label);
+      document.body.appendChild(div);
+      portalRef.current = div;
+      previewRef.current = canvas;
+    }
+
+    const portal = portalRef.current;
+    const canvas = previewRef.current!;
+    const label = portal.querySelector('.dmt-tile-preview-label') as HTMLElement;
+
+    // Position to the left of the browser panel
+    if (browserRef.current) {
+      const rect = browserRef.current.getBoundingClientRect();
+      portal.style.display = 'block';
+      portal.style.top = (rect.top + rect.height / 2 - (PREVIEW_SIZE + 24) / 2) + 'px';
+      portal.style.left = (rect.left - PREVIEW_SIZE - 16) + 'px';
+    }
+
+    label.textContent = hoveredTile.filename;
+
+    // Draw preview
+    const img = getCachedImage?.(hoveredTile.vaultPath);
+    if (img?.complete) {
+      drawTileToCanvas(canvas, img, PREVIEW_SIZE);
+      return;
+    }
+    const file = dc.app.vault.getAbstractFileByPath(hoveredTile.vaultPath);
+    if (file) {
+      dc.app.vault.readBinary(file).then((binary: ArrayBuffer) => {
+        const blob = new Blob([binary]);
+        const url = URL.createObjectURL(blob);
+        const fallbackImg = new Image();
+        fallbackImg.onload = () => drawTileToCanvas(canvas, fallbackImg, PREVIEW_SIZE);
+        fallbackImg.src = url;
+      });
+    }
+  }, [hoveredTile, isCollapsed]);
+
+  // Cleanup portal on unmount
+  dc.useEffect(() => {
+    return () => {
+      if (portalRef.current) {
+        document.body.removeChild(portalRef.current);
+        portalRef.current = null;
+      }
+    };
+  }, []);
 
   const handleToggleCategory = (category: string) => {
     setCollapsedCategories(prev => {
@@ -104,10 +299,6 @@ const TileAssetBrowser = ({
     return groups;
   }, [filteredTiles]);
 
-  const getTileImageUrl = (tile: TileEntry): string => {
-    return dc.app.vault.adapter.getResourcePath(tile.vaultPath);
-  };
-
   if (tilesets.length === 0) return null as unknown as React.ReactElement;
 
   if (isCollapsed) {
@@ -118,14 +309,14 @@ const TileAssetBrowser = ({
           onClick={handleToggleCollapse}
           title="Show tiles"
         >
-          <dc.Icon icon="lucide-grid-3x3" size={14} />
+          <dc.Icon icon="lucide-layout-grid" size={14} />
         </button>
       </div>
     );
   }
 
   return (
-    <div className="dmt-tile-browser">
+    <div ref={browserRef} className="dmt-tile-browser">
       <div className="dmt-tile-browser-header">
         <span>Tiles</span>
         <button
@@ -184,19 +375,16 @@ const TileAssetBrowser = ({
                 {tiles.map((tile: TileEntry) => {
                   const isSelected = selectedTilesetId === activeTileset?.id && selectedTileId === tile.id;
                   return (
-                    <button
+                    <div
                       key={tile.id}
                       className={`dmt-tile-thumb ${isSelected ? 'dmt-tile-thumb-selected' : ''}`}
                       onClick={() => handleTileClick(activeTileset!.id, tile.id)}
+                      onMouseEnter={() => setHoveredTile(tile)}
+                      onMouseLeave={() => setHoveredTile(null)}
                       title={tile.filename}
                     >
-                      <img
-                        src={getTileImageUrl(tile)}
-                        alt={tile.filename}
-                        className="dmt-tile-thumb-img"
-                        loading="lazy"
-                      />
-                    </button>
+                      <TileThumbnail tile={tile} getCachedImage={getCachedImage} />
+                    </div>
                   );
                 })}
               </div>
@@ -217,15 +405,15 @@ const TileAssetBrowser = ({
           <button
             className="dmt-tile-browser-action-btn"
             onClick={handleRotateCCW}
-            title="Rotate counter-clockwise (60\u00B0)"
+            title="Rotate counter-clockwise (60°)"
           >
             <dc.Icon icon="lucide-rotate-ccw" size={14} />
           </button>
-          <span className="dmt-tile-browser-rotation-label">{rotation}\u00B0</span>
+          <span className="dmt-tile-browser-rotation-label">{rotation}°</span>
           <button
             className="dmt-tile-browser-action-btn"
             onClick={handleRotateCW}
-            title="Rotate clockwise (60\u00B0)"
+            title="Rotate clockwise (60°)"
           >
             <dc.Icon icon="lucide-rotate-cw" size={14} />
           </button>
@@ -245,6 +433,7 @@ const TileAssetBrowser = ({
           </button>
         </div>
       )}
+
     </div>
   );
 };

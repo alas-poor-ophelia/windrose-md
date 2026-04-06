@@ -19,7 +19,7 @@ import type {
   CornerName, 
   NeighborOffset,
   DiagonalDirection 
-} from './dmtConstants';
+} from '../core/dmtConstants';
 
 // Datacore imports
 const pathResolverPath = dc.resolvePath("pathResolver.ts");
