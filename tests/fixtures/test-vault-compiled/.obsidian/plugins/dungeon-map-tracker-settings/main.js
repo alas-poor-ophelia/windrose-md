@@ -23,9 +23,17 @@
 // VERSION & IMPORTS
 // =============================================================================
 
-const PLUGIN_VERSION = '0.14.7.4';
+const PLUGIN_VERSION = '0.16.4';
 
-const { Plugin, PluginSettingTab, Setting, Modal, setIcon } = require('obsidian');
+const obsidianModule = require('obsidian');
+const { Plugin, PluginSettingTab, Setting, Modal, setIcon, AbstractInputSuggest } = obsidianModule;
+
+// Initialize bridge for Datacore components
+window.__windrose = window.__windrose || {};
+window.__windrose.obsidian = obsidianModule;
+window.__windrose.version = PLUGIN_VERSION;
+window.__windrose.ready = true;
+window.dispatchEvent(new CustomEvent('windrose:bridge-ready'));
 
 // =============================================================================
 // DATA CONSTANTS
@@ -3934,6 +3942,453 @@ class DungeonEssenceVisualizer {
 }
 
 
+// settingsPlugin-ObjectSetHelpers.js
+// Object set management helpers - save, activate, import, export, scan
+// This file is concatenated into the settings plugin template by the assembler
+
+/**
+ * Object set management helpers.
+ * All methods take the plugin instance for access to settings and vault.
+ */
+const ObjectSetHelpers = {
+  generateId() {
+    return 'set-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+  },
+
+  /**
+   * Resolve relative image filenames in set data to full vault paths.
+   * Handles both customObjects and objectOverrides.
+   */
+  resolveImagePaths(data, imagesFolder, vault) {
+    for (const side of ['hex', 'grid']) {
+      if (!data[side]) continue;
+      // Custom objects
+      if (data[side].customObjects) {
+        for (const obj of data[side].customObjects) {
+          if (obj.imagePath && !obj.imagePath.includes('/')) {
+            const resolved = imagesFolder + '/' + obj.imagePath;
+            if (vault.getAbstractFileByPath(resolved)) {
+              obj.imagePath = resolved;
+            }
+          }
+        }
+      }
+      // Object overrides (built-in objects with custom images)
+      if (data[side].objectOverrides) {
+        for (const override of Object.values(data[side].objectOverrides)) {
+          if (override.imagePath && !override.imagePath.includes('/')) {
+            const resolved = imagesFolder + '/' + override.imagePath;
+            if (vault.getAbstractFileByPath(resolved)) {
+              override.imagePath = resolved;
+            }
+          }
+        }
+      }
+    }
+  },
+
+  /**
+   * Snapshot current hex+grid object data into a new ObjectSet.
+   */
+  saveCurrentAsSet(plugin, name) {
+    const s = plugin.settings;
+    if (!s.objectSets) s.objectSets = [];
+
+    const set = {
+      id: ObjectSetHelpers.generateId(),
+      name: name,
+      source: 'manual',
+      data: {
+        hex: {
+          objectOverrides: JSON.parse(JSON.stringify(s.hexObjectOverrides || {})),
+          customObjects: JSON.parse(JSON.stringify(s.customHexObjects || [])),
+          customCategories: JSON.parse(JSON.stringify(s.customHexCategories || []))
+        },
+        grid: {
+          objectOverrides: JSON.parse(JSON.stringify(s.gridObjectOverrides || {})),
+          customObjects: JSON.parse(JSON.stringify(s.customGridObjects || [])),
+          customCategories: JSON.parse(JSON.stringify(s.customGridCategories || []))
+        }
+      }
+    };
+
+    s.objectSets.push(set);
+    return set;
+  },
+
+  /**
+   * Copy-on-activate: overwrite hex/grid settings keys from set data.
+   * Only overwrites sides that are present in the set (partial apply).
+   */
+  activateSet(plugin, setId) {
+    const s = plugin.settings;
+    const sets = s.objectSets || [];
+    const set = sets.find(st => st.id === setId);
+    if (!set) return false;
+
+    if (set.data.hex) {
+      s.hexObjectOverrides = JSON.parse(JSON.stringify(set.data.hex.objectOverrides || {}));
+      s.customHexObjects = JSON.parse(JSON.stringify(set.data.hex.customObjects || []));
+      s.customHexCategories = JSON.parse(JSON.stringify(set.data.hex.customCategories || []));
+    }
+    if (set.data.grid) {
+      s.gridObjectOverrides = JSON.parse(JSON.stringify(set.data.grid.objectOverrides || {}));
+      s.customGridObjects = JSON.parse(JSON.stringify(set.data.grid.customObjects || []));
+      s.customGridCategories = JSON.parse(JSON.stringify(set.data.grid.customCategories || []));
+    }
+
+    s.activeObjectSetId = setId;
+    return true;
+  },
+
+  /**
+   * Clear activeObjectSetId. Leaves current objects in place.
+   */
+  deactivateSet(plugin) {
+    plugin.settings.activeObjectSetId = null;
+  },
+
+  /**
+   * Reset all object customizations to built-in defaults for both map types.
+   * Clears overrides, custom objects, custom categories, and active set tracking.
+   */
+  resetToDefaults(plugin) {
+    const s = plugin.settings;
+    s.hexObjectOverrides = {};
+    s.customHexObjects = [];
+    s.customHexCategories = [];
+    s.gridObjectOverrides = {};
+    s.customGridObjects = [];
+    s.customGridCategories = [];
+    s.activeObjectSetId = null;
+  },
+
+  /**
+   * Check if live object settings differ from the active set (or from defaults).
+   * Returns true if the user has unsaved modifications.
+   */
+  isDirty(plugin) {
+    const s = plugin.settings;
+    const activeSetId = s.activeObjectSetId;
+
+    const hexOverrides = s.hexObjectOverrides || {};
+    const hexObjects = s.customHexObjects || [];
+    const hexCategories = s.customHexCategories || [];
+    const gridOverrides = s.gridObjectOverrides || {};
+    const gridObjects = s.customGridObjects || [];
+    const gridCategories = s.customGridCategories || [];
+
+    if (!activeSetId) {
+      // On Defaults - dirty if any customizations exist
+      return Object.keys(hexOverrides).length > 0 ||
+        hexObjects.length > 0 || hexCategories.length > 0 ||
+        Object.keys(gridOverrides).length > 0 ||
+        gridObjects.length > 0 || gridCategories.length > 0;
+    }
+
+    // On a named set - compare live state to stored snapshot
+    const set = (s.objectSets || []).find(st => st.id === activeSetId);
+    if (!set) return true;
+
+    const compare = (live, stored) => JSON.stringify(live) !== JSON.stringify(stored);
+
+    const setHex = set.data.hex || {};
+    if (compare(hexOverrides, setHex.objectOverrides || {})) return true;
+    if (compare(hexObjects, setHex.customObjects || [])) return true;
+    if (compare(hexCategories, setHex.customCategories || [])) return true;
+
+    const setGrid = set.data.grid || {};
+    if (compare(gridOverrides, setGrid.objectOverrides || {})) return true;
+    if (compare(gridObjects, setGrid.customObjects || [])) return true;
+    if (compare(gridCategories, setGrid.customCategories || [])) return true;
+
+    return false;
+  },
+
+  /**
+   * Delete a set by ID. Clears activeObjectSetId if it was the active set.
+   */
+  deleteSet(plugin, setId) {
+    const s = plugin.settings;
+    if (!s.objectSets) return;
+    s.objectSets = s.objectSets.filter(st => st.id !== setId);
+    if (s.activeObjectSetId === setId) {
+      s.activeObjectSetId = null;
+    }
+  },
+
+  /**
+   * Rename a set in place.
+   */
+  renameSet(plugin, setId, newName) {
+    const s = plugin.settings;
+    const set = (s.objectSets || []).find(st => st.id === setId);
+    if (set) set.name = newName;
+  },
+
+  /**
+   * Get all imagePath values from a set's custom objects and overrides.
+   */
+  getImagePaths(setData) {
+    const paths = [];
+    for (const side of ['hex', 'grid']) {
+      const sideData = setData[side];
+      if (!sideData) continue;
+      if (sideData.customObjects) {
+        for (const obj of sideData.customObjects) {
+          if (obj.imagePath) paths.push(obj.imagePath);
+        }
+      }
+      if (sideData.objectOverrides) {
+        for (const override of Object.values(sideData.objectOverrides)) {
+          if (override.imagePath) paths.push(override.imagePath);
+        }
+      }
+    }
+    return [...new Set(paths)];
+  },
+
+  /**
+   * Deduplicate a set name against existing sets.
+   * Returns the name as-is if unique, or appends " (2)", " (3)", etc.
+   */
+  deduplicateName(existingSets, name) {
+    const names = new Set(existingSets.map(s => s.name));
+    if (!names.has(name)) return name;
+    let counter = 2;
+    while (names.has(name + ' (' + counter + ')')) counter++;
+    return name + ' (' + counter + ')';
+  },
+
+  /**
+   * Export a set to a vault folder.
+   * Creates <destFolder>/<setName>/objects.json and copies images to images/.
+   */
+  async exportSetToFolder(plugin, setId, destFolder, options) {
+    const s = plugin.settings;
+    const set = (s.objectSets || []).find(st => st.id === setId);
+    if (!set) throw new Error('Set not found');
+
+    const includeHex = options?.includeHex !== false;
+    const includeGrid = options?.includeGrid !== false;
+    const setName = (options?.name || set.name).replace(/[\\/:*?"<>|]/g, '_');
+
+    // Build export data
+    const exportData = {
+      windroseMD_objectSet: true,
+      version: '1.0',
+      name: options?.name || set.name
+    };
+
+    const exportSetData = {};
+    if (includeHex && set.data.hex) {
+      exportSetData.hex = JSON.parse(JSON.stringify(set.data.hex));
+    }
+    if (includeGrid && set.data.grid) {
+      exportSetData.grid = JSON.parse(JSON.stringify(set.data.grid));
+    }
+
+    // Collect image paths and rewrite to relative filenames
+    const imagePaths = ObjectSetHelpers.getImagePaths(exportSetData);
+    const imageMap = {};
+    for (const fullPath of imagePaths) {
+      const filename = fullPath.split('/').pop();
+      imageMap[fullPath] = filename;
+    }
+
+    // Rewrite imagePath in export data to relative filenames
+    for (const side of ['hex', 'grid']) {
+      if (!exportSetData[side]) continue;
+      if (exportSetData[side].customObjects) {
+        for (const obj of exportSetData[side].customObjects) {
+          if (obj.imagePath && imageMap[obj.imagePath]) {
+            obj.imagePath = imageMap[obj.imagePath];
+          }
+        }
+      }
+      if (exportSetData[side].objectOverrides) {
+        for (const override of Object.values(exportSetData[side].objectOverrides)) {
+          if (override.imagePath && imageMap[override.imagePath]) {
+            override.imagePath = imageMap[override.imagePath];
+          }
+        }
+      }
+    }
+
+    exportData.hex = exportSetData.hex;
+    exportData.grid = exportSetData.grid;
+
+    // Write to vault
+    const basePath = destFolder ? destFolder + '/' + setName : 'object-sets/' + setName;
+
+    // Ensure folders exist
+    try { await plugin.app.vault.createFolder(basePath); } catch (e) { /* exists */ }
+
+    const jsonPath = basePath + '/objects.json';
+    const jsonContent = JSON.stringify(exportData, null, 2);
+    const existingJson = plugin.app.vault.getAbstractFileByPath(jsonPath);
+    if (existingJson) {
+      await plugin.app.vault.modify(existingJson, jsonContent);
+    } else {
+      await plugin.app.vault.create(jsonPath, jsonContent);
+    }
+
+    // Copy images
+    if (imagePaths.length > 0) {
+      const imgFolder = basePath + '/images';
+      try { await plugin.app.vault.createFolder(imgFolder); } catch (e) { /* exists */ }
+
+      for (const fullPath of imagePaths) {
+        const sourceFile = plugin.app.vault.getAbstractFileByPath(fullPath);
+        if (!sourceFile) {
+          
+          continue;
+        }
+        const filename = imageMap[fullPath];
+        const destPath = imgFolder + '/' + filename;
+        const existingImg = plugin.app.vault.getAbstractFileByPath(destPath);
+        if (!existingImg) {
+          const binary = await plugin.app.vault.readBinary(sourceFile);
+          await plugin.app.vault.createBinary(destPath, binary);
+        }
+      }
+    }
+
+    return basePath;
+  },
+
+  /**
+   * Import a set from a vault folder containing objects.json.
+   * Resolves relative image filenames back to vault paths.
+   */
+  async importSetFromFolder(plugin, folderPath) {
+    const folder = plugin.app.vault.getAbstractFileByPath(folderPath);
+    if (!folder || !folder.children) {
+      throw new Error('Folder not found: ' + folderPath);
+    }
+
+    const jsonFile = plugin.app.vault.getAbstractFileByPath(folderPath + '/objects.json');
+    if (!jsonFile) {
+      throw new Error('No objects.json found in ' + folderPath);
+    }
+
+    const content = await plugin.app.vault.read(jsonFile);
+    const data = JSON.parse(content);
+
+    if (!data.windroseMD_objectSet) {
+      throw new Error('Not a valid Windrose object set (missing windroseMD_objectSet flag)');
+    }
+
+    // Resolve relative image filenames to vault paths
+    ObjectSetHelpers.resolveImagePaths(data, folderPath + '/images', plugin.app.vault);
+
+    // Build set object
+    const s = plugin.settings;
+    if (!s.objectSets) s.objectSets = [];
+
+    const setName = ObjectSetHelpers.deduplicateName(s.objectSets, data.name || 'Imported Set');
+
+    const set = {
+      id: ObjectSetHelpers.generateId(),
+      name: setName,
+      source: 'folder',
+      folderPath: folderPath,
+      data: {
+        hex: data.hex || undefined,
+        grid: data.grid || undefined
+      }
+    };
+
+    s.objectSets.push(set);
+    return set;
+  },
+
+  /**
+   * Scan the auto-load folder for valid object set packages.
+   * Adds or updates folder-sourced sets. Does not remove stale ones
+   * (user may have moved folders around).
+   */
+  async scanAutoLoadFolder(plugin) {
+    const folderPath = plugin.settings.objectSetsAutoLoadFolder;
+    if (!folderPath) return 0;
+
+    const folder = plugin.app.vault.getAbstractFileByPath(folderPath);
+    if (!folder || !folder.children) return 0;
+
+    if (!plugin.settings.objectSets) plugin.settings.objectSets = [];
+
+    let added = 0;
+    for (const child of folder.children) {
+      // Only look at subfolders
+      if (!child.children) continue;
+
+      const jsonFile = plugin.app.vault.getAbstractFileByPath(child.path + '/objects.json');
+      if (!jsonFile) continue;
+
+      try {
+        const content = await plugin.app.vault.read(jsonFile);
+        const data = JSON.parse(content);
+        if (!data.windroseMD_objectSet) continue;
+
+        // Check if this folder is already tracked
+        const existing = plugin.settings.objectSets.find(
+          st => st.source === 'folder' && st.folderPath === child.path
+        );
+
+        // Resolve relative image filenames to vault paths
+        ObjectSetHelpers.resolveImagePaths(data, child.path + '/images', plugin.app.vault);
+
+        if (existing) {
+          // Update data in place
+          existing.name = data.name || existing.name;
+          existing.data = { hex: data.hex, grid: data.grid };
+        } else {
+          const setName = ObjectSetHelpers.deduplicateName(
+            plugin.settings.objectSets,
+            data.name || child.name
+          );
+
+          plugin.settings.objectSets.push({
+            id: ObjectSetHelpers.generateId(),
+            name: setName,
+            source: 'folder',
+            folderPath: child.path,
+            data: { hex: data.hex, grid: data.grid }
+          });
+          added++;
+        }
+      } catch (e) {
+        
+      }
+    }
+
+    return added;
+  }
+};
+
+// settingsPlugin-FolderSuggest.js
+// Folder path autocomplete using Obsidian's AbstractInputSuggest
+// This file is concatenated into the settings plugin template by the assembler
+
+class FolderSuggest extends AbstractInputSuggest {
+  getSuggestions(query) {
+    const folders = this.app.vault.getAllFolders(true);
+    if (!query) return folders;
+    const lower = query.toLowerCase();
+    return folders.filter(f => f.path.toLowerCase().includes(lower));
+  }
+
+  renderSuggestion(folder, el) {
+    el.setText(folder.path === '' ? '/ (vault root)' : folder.path);
+  }
+
+  selectSuggestion(folder) {
+    this.setValue(folder.path);
+    this.textInputEl.dispatchEvent(new Event('input'));
+    this.close();
+  }
+}
+
 // =============================================================================
 // MODAL CLASSES
 // Injected at assembly time from settingsPlugin-*Modal.js files
@@ -4519,8 +4974,8 @@ class InsertDungeonModal extends Modal {
         });
         this.close();
       } catch (err) {
-        console.error('[Windrose] Dungeon generation failed:', err);
-        alert('Failed to generate dungeon: ' + err.message);
+        
+        new Notice('Failed to generate dungeon: ' + err.message);
       }
     };
 
@@ -4560,8 +5015,8 @@ class InsertDungeonModal extends Modal {
           });
           this.close();
         } catch (err) {
-          console.error('[Windrose] Dungeon generation failed:', err);
-          alert('Failed to generate dungeon: ' + err.message);
+          
+          new Notice('Failed to generate dungeon: ' + err.message);
         }
       }
     });
@@ -4673,15 +5128,23 @@ class ObjectEditModal extends Modal {
     this.renderImagePicker();
     
     // Label input
-    new Setting(contentEl)
+    this.labelSetting = new Setting(contentEl)
       .setName('Label')
       .setDesc('Display name for this object')
-      .addText(text => text
-        .setValue(this.label)
-        .setPlaceholder('e.g., Treasure Chest')
-        .onChange(value => {
-          this.label = value;
-        }));
+      .addText(text => {
+        text
+          .setValue(this.label)
+          .setPlaceholder('e.g., Treasure Chest')
+          .onChange(value => {
+            this.label = value;
+            // Clear error when user starts typing
+            if (this.labelSetting.descEl.hasClass('mod-warning')) {
+              this.labelSetting.setDesc('Display name for this object');
+              this.labelSetting.descEl.removeClass('mod-warning');
+            }
+          });
+        this.labelInputEl = text.inputEl;
+      });
     
     // Category dropdown - use map-type-specific settings
     const mapTypeSettings = this.mapType === 'hex'
@@ -5051,24 +5514,26 @@ class ObjectEditModal extends Modal {
     // Validate based on mode
     if (this.mode === 'icon') {
       if (!this.iconClass || !RPGAwesomeHelpers.isValid(this.iconClass)) {
-        alert('Please select a valid icon');
+        new Notice('Please select a valid icon');
         return;
       }
     } else if (this.mode === 'image') {
       if (!this.imagePath || this.imagePath.trim().length === 0) {
-        alert('Please select an image');
+        new Notice('Please select an image');
         return;
       }
     } else {
       // symbol mode
       if (!this.symbol || this.symbol.length === 0 || this.symbol.length > 8) {
-        alert('Please enter a valid symbol (1-8 characters)');
+        new Notice('Please enter a valid symbol (1-8 characters)');
         return;
       }
     }
 
     if (!this.label || this.label.trim().length === 0) {
-      alert('Please enter a label');
+      this.labelSetting.setDesc('Please enter a label');
+      this.labelSetting.descEl.addClass('mod-warning');
+      this.labelInputEl?.focus();
       return;
     }
     
@@ -5253,7 +5718,7 @@ class CategoryEditModal extends Modal {
   
   save() {
     if (!this.label || this.label.trim().length === 0) {
-      alert('Please enter a category name');
+      new Notice('Please enter a category name');
       return;
     }
     
@@ -5408,11 +5873,11 @@ class ColorEditModal extends Modal {
     saveBtn.addEventListener('click', async () => {
       // Validate
       if (!labelValue.trim()) {
-        alert('Please enter a label for this color.');
+        new Notice('Please enter a label for this color.');
         return;
       }
       if (!/^#[0-9A-Fa-f]{6}$/.test(colorValue)) {
-        alert('Please enter a valid hex color (e.g., #4A9EFF)');
+        new Notice('Please enter a valid hex color (e.g., #4A9EFF)');
         return;
       }
       
@@ -5579,7 +6044,11 @@ class ExportModal extends Modal {
             // Check if file exists
             const existingFile = this.app.vault.getAbstractFileByPath(finalFilename);
             if (existingFile) {
-              if (!confirm(`File "${finalFilename}" already exists. Overwrite?`)) {
+              if (!await new ConfirmModal(this.app, {
+                message: `File "${finalFilename}" already exists. Overwrite?`,
+                confirmText: 'Overwrite',
+                isDestructive: true
+              }).openAndGetValue()) {
                 return;
               }
               await this.app.vault.modify(existingFile, json);
@@ -5587,10 +6056,10 @@ class ExportModal extends Modal {
               await this.app.vault.create(finalFilename, json);
             }
             
-            alert(`Exported to: ${finalFilename}`);
+            new Notice(`Exported to: ${finalFilename}`);
             this.close();
           } catch (err) {
-            alert(`Export failed: ${err.message}`);
+            new Notice(`Export failed: ${err.message}`);
           }
         }));
   }
@@ -5741,7 +6210,7 @@ class ImportModal extends Modal {
     const importBtn = buttonContainer.createEl('button', { text: 'Import', cls: 'mod-cta' });
     importBtn.onclick = async () => {
       if (!this.importData) {
-        alert('Please select a valid export file first.');
+        new Notice('Please select a valid export file first.');
         return;
       }
       
@@ -5809,11 +6278,472 @@ class ImportModal extends Modal {
 }
 
 
+// settingsPlugin-ObjectSetRenameModal.js
+// Simple rename prompt modal for object sets
+// This file is concatenated into the settings plugin template by the assembler
+
+class ObjectSetRenameModal extends Modal {
+  constructor(app, currentName, onSave) {
+    super(app);
+    this.currentName = currentName;
+    this.onSave = onSave;
+  }
+
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.createEl('h2', { text: 'Rename Object Set' });
+
+    let newName = this.currentName;
+    new Setting(contentEl)
+      .setName('Set Name')
+      .addText(text => {
+        text.setValue(this.currentName);
+        text.onChange(v => { newName = v; });
+        // Auto-focus and select all
+        setTimeout(() => {
+          text.inputEl.focus();
+          text.inputEl.select();
+        }, 50);
+      });
+
+    const buttons = contentEl.createDiv({ cls: 'dmt-modal-buttons' });
+
+    const cancelBtn = buttons.createEl('button', { text: 'Cancel' });
+    cancelBtn.onclick = () => this.close();
+
+    const saveBtn = buttons.createEl('button', { text: 'Save', cls: 'mod-cta' });
+    saveBtn.onclick = () => {
+      const trimmed = newName.trim();
+      if (!trimmed) {
+        new Notice('Name cannot be empty');
+        return;
+      }
+      this.onSave(trimmed);
+      this.close();
+    };
+  }
+
+  onClose() {
+    this.contentEl.empty();
+  }
+}
+
+// settingsPlugin-ObjectSetExportModal.js
+// Modal for exporting an object set to a vault folder
+// This file is concatenated into the settings plugin template by the assembler
+
+class ObjectSetExportModal extends Modal {
+  constructor(app, plugin, set) {
+    super(app);
+    this.plugin = plugin;
+    this.set = set;
+  }
+
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.addClass('dmt-export-modal');
+
+    contentEl.createEl('h2', { text: 'Export Object Set' });
+
+    const set = this.set;
+    let exportName = set.name;
+    let includeHex = !!set.data.hex;
+    let includeGrid = !!set.data.grid;
+
+    new Setting(contentEl)
+      .setName('Set Name')
+      .setDesc('Name used for the export folder')
+      .addText(text => text
+        .setValue(exportName)
+        .onChange(v => { exportName = v; }));
+
+    if (set.data.hex) {
+      new Setting(contentEl)
+        .setName('Include hex objects')
+        .addToggle(toggle => toggle
+          .setValue(includeHex)
+          .onChange(v => { includeHex = v; }));
+    }
+
+    if (set.data.grid) {
+      new Setting(contentEl)
+        .setName('Include grid objects')
+        .addToggle(toggle => toggle
+          .setValue(includeGrid)
+          .onChange(v => { includeGrid = v; }));
+    }
+
+    const imagePaths = ObjectSetHelpers.getImagePaths(set.data);
+    if (imagePaths.length > 0) {
+      contentEl.createEl('p', {
+        text: imagePaths.length + ' image(s) will be bundled into the export.',
+        cls: 'setting-item-description'
+      });
+    }
+
+    // Destination info
+    const destFolder = this.plugin.settings.objectSetsAutoLoadFolder || '';
+    const destDesc = destFolder
+      ? 'Will export to: ' + destFolder + '/' + (exportName || set.name).replace(/[\\\\/:*?"<>|]/g, '_')
+      : 'Will export to: object-sets/' + (exportName || set.name).replace(/[\\\\/:*?"<>|]/g, '_');
+
+    contentEl.createEl('p', {
+      text: destDesc,
+      cls: 'setting-item-description'
+    });
+
+    const buttons = contentEl.createDiv({ cls: 'dmt-modal-buttons' });
+
+    const cancelBtn = buttons.createEl('button', { text: 'Cancel' });
+    cancelBtn.onclick = () => this.close();
+
+    const exportBtn = buttons.createEl('button', { text: 'Export', cls: 'mod-cta' });
+    exportBtn.onclick = async () => {
+      if (!includeHex && !includeGrid) {
+        new Notice('Select at least one map type to export');
+        return;
+      }
+
+      try {
+        const destPath = await ObjectSetHelpers.exportSetToFolder(
+          this.plugin, set.id, destFolder || null,
+          { name: exportName, includeHex, includeGrid }
+        );
+        new Notice('Exported to: ' + destPath);
+        this.close();
+      } catch (err) {
+        new Notice('Export failed: ' + err.message);
+      }
+    };
+  }
+
+  onClose() {
+    this.contentEl.empty();
+  }
+}
+
+// settingsPlugin-ObjectSetImportModal.js
+// Modal for importing an object set from a vault folder
+// This file is concatenated into the settings plugin template by the assembler
+
+class ObjectSetImportModal extends Modal {
+  constructor(app, plugin, onImport) {
+    super(app);
+    this.plugin = plugin;
+    this.onImport = onImport;
+  }
+
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.addClass('dmt-import-modal');
+
+    contentEl.createEl('h2', { text: 'Import Object Set from Folder' });
+
+    contentEl.createEl('p', {
+      text: 'Enter the vault path to a folder containing objects.json.',
+      cls: 'setting-item-description'
+    });
+
+    let folderPath = '';
+    const previewArea = contentEl.createDiv({ cls: 'dmt-import-preview' });
+    previewArea.style.display = 'none';
+
+    new Setting(contentEl)
+      .setName('Folder Path')
+      .setDesc('Vault-relative path (e.g. object-sets/my-set)')
+      .addSearch(search => {
+        new FolderSuggest(this.app, search.inputEl);
+        search
+          .setPlaceholder('path/to/set-folder')
+          .onChange(v => { folderPath = v.trim(); });
+      })
+      .addButton(btn => btn
+        .setButtonText('Preview')
+        .onClick(async () => {
+          previewArea.empty();
+
+          if (!folderPath) {
+            previewArea.createEl('p', { text: 'Enter a folder path first.', cls: 'dmt-import-error' });
+            previewArea.style.display = 'block';
+            return;
+          }
+
+          const folder = this.app.vault.getAbstractFileByPath(folderPath);
+          if (!folder || !folder.children) {
+            previewArea.createEl('p', { text: 'Folder not found: ' + folderPath, cls: 'dmt-import-error' });
+            previewArea.style.display = 'block';
+            return;
+          }
+
+          const jsonFile = this.app.vault.getAbstractFileByPath(folderPath + '/objects.json');
+          if (!jsonFile) {
+            previewArea.createEl('p', { text: 'No objects.json found in this folder.', cls: 'dmt-import-error' });
+            previewArea.style.display = 'block';
+            return;
+          }
+
+          try {
+            const content = await this.app.vault.read(jsonFile);
+            const data = JSON.parse(content);
+
+            if (!data.windroseMD_objectSet) {
+              previewArea.createEl('p', { text: 'Not a valid Windrose object set.', cls: 'dmt-import-error' });
+              previewArea.style.display = 'block';
+              return;
+            }
+
+            previewArea.createEl('p', { text: 'Valid object set: ' + (data.name || 'Unnamed') });
+
+            const scope = [];
+            if (data.hex) {
+              const objCount = (data.hex.customObjects || []).length;
+              const overCount = Object.keys(data.hex.objectOverrides || {}).length;
+              scope.push('Hex: ' + objCount + ' custom, ' + overCount + ' overrides');
+            }
+            if (data.grid) {
+              const objCount = (data.grid.customObjects || []).length;
+              const overCount = Object.keys(data.grid.objectOverrides || {}).length;
+              scope.push('Grid: ' + objCount + ' custom, ' + overCount + ' overrides');
+            }
+            for (const line of scope) {
+              previewArea.createEl('p', { text: line, cls: 'setting-item-description' });
+            }
+
+            // Check for duplicate name
+            const existing = (this.plugin.settings.objectSets || []).find(s => s.name === data.name);
+            if (existing) {
+              previewArea.createEl('p', {
+                text: 'A set named "' + data.name + '" already exists. It will be imported with a unique name.',
+                cls: 'dmt-import-note'
+              });
+            }
+
+            previewArea.style.display = 'block';
+          } catch (err) {
+            previewArea.createEl('p', { text: 'Error reading: ' + err.message, cls: 'dmt-import-error' });
+            previewArea.style.display = 'block';
+          }
+        }));
+
+    const buttons = contentEl.createDiv({ cls: 'dmt-modal-buttons' });
+
+    const cancelBtn = buttons.createEl('button', { text: 'Cancel' });
+    cancelBtn.onclick = () => this.close();
+
+    const importBtn = buttons.createEl('button', { text: 'Import', cls: 'mod-cta' });
+    importBtn.onclick = async () => {
+      if (!folderPath) {
+        new Notice('Enter a folder path first');
+        return;
+      }
+
+      try {
+        const set = await ObjectSetHelpers.importSetFromFolder(this.plugin, folderPath);
+        await this.plugin.saveSettings();
+        new Notice('Imported set: ' + set.name);
+        this.onImport();
+        this.close();
+      } catch (err) {
+        new Notice('Import failed: ' + err.message);
+      }
+    };
+  }
+
+  onClose() {
+    this.contentEl.empty();
+  }
+}
+
+// settingsPlugin-ConfirmModal.js
+// Generic confirmation modal replacing native confirm() dialogs
+// This file is concatenated into the settings plugin template by the assembler
+
+class ConfirmModal extends Modal {
+  constructor(app, options = {}) {
+    super(app);
+    this.message = options.message || 'Are you sure?';
+    this.confirmText = options.confirmText || 'Confirm';
+    this.cancelText = options.cancelText || 'Cancel';
+    this.isDestructive = options.isDestructive || false;
+    this.resolved = false;
+  }
+
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.empty();
+
+    const paragraphs = this.message.split('\n').filter(s => s.trim());
+    for (const p of paragraphs) {
+      contentEl.createEl('p', { text: p });
+    }
+
+    const buttons = contentEl.createDiv({ cls: 'dmt-modal-buttons' });
+
+    const cancelBtn = buttons.createEl('button', { text: this.cancelText });
+    cancelBtn.onclick = () => {
+      this.resolved = true;
+      this.resolvePromise(false);
+      this.close();
+    };
+
+    const confirmBtn = buttons.createEl('button', {
+      text: this.confirmText,
+      cls: this.isDestructive ? 'mod-warning' : 'mod-cta'
+    });
+    confirmBtn.onclick = () => {
+      this.resolved = true;
+      this.resolvePromise(true);
+      this.close();
+    };
+  }
+
+  onClose() {
+    this.contentEl.empty();
+    if (!this.resolved && this.resolvePromise) {
+      this.resolvePromise(false);
+    }
+  }
+
+  openAndGetValue() {
+    return new Promise((resolve) => {
+      this.resolvePromise = resolve;
+      this.open();
+    });
+  }
+}
+
+// settingsPlugin-PromptModal.js
+// Generic text input modal replacing native prompt() dialogs
+// This file is concatenated into the settings plugin template by the assembler
+
+class PromptModal extends Modal {
+  constructor(app, options = {}) {
+    super(app);
+    this.message = options.message || '';
+    this.defaultValue = options.defaultValue || '';
+    this.placeholder = options.placeholder || '';
+    this.inputValue = this.defaultValue;
+    this.resolved = false;
+  }
+
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.empty();
+
+    if (this.message) {
+      contentEl.createEl('p', { text: this.message });
+    }
+
+    new Setting(contentEl)
+      .addText(text => {
+        text.setValue(this.inputValue);
+        if (this.placeholder) text.setPlaceholder(this.placeholder);
+        text.onChange(v => { this.inputValue = v; });
+        setTimeout(() => {
+          text.inputEl.focus();
+          text.inputEl.select();
+        }, 50);
+      });
+
+    const buttons = contentEl.createDiv({ cls: 'dmt-modal-buttons' });
+
+    const cancelBtn = buttons.createEl('button', { text: 'Cancel' });
+    cancelBtn.onclick = () => {
+      this.resolved = true;
+      this.resolvePromise(null);
+      this.close();
+    };
+
+    const saveBtn = buttons.createEl('button', { text: 'OK', cls: 'mod-cta' });
+    saveBtn.onclick = () => {
+      const trimmed = this.inputValue.trim();
+      if (!trimmed) {
+        new Notice('Name cannot be empty');
+        return;
+      }
+      this.resolved = true;
+      this.resolvePromise(trimmed);
+      this.close();
+    };
+  }
+
+  onClose() {
+    this.contentEl.empty();
+    if (!this.resolved && this.resolvePromise) {
+      this.resolvePromise(null);
+    }
+  }
+
+  openAndGetValue() {
+    return new Promise((resolve) => {
+      this.resolvePromise = resolve;
+      this.open();
+    });
+  }
+}
+
 class WindroseMDSettingsPlugin extends Plugin {
   async onload() {
     await this.loadSettings();
     this.addSettingTab(new WindroseMDSettingsTab(this.app, this));
-    
+
+    // Auto-load object sets from configured folder (deferred until vault is indexed)
+    this.app.workspace.onLayoutReady(async () => {
+      if (this.settings.objectSetsAutoLoadFolder) {
+        try {
+          const added = await ObjectSetHelpers.scanAutoLoadFolder(this);
+          if (added > 0) await this.saveSettings();
+        } catch (e) {
+          
+        }
+      }
+    });
+
+    // Watch auto-load folder for changes (debounced re-scan)
+    this._autoLoadScanTimer = null;
+    const debouncedScan = () => {
+      const folder = this.settings.objectSetsAutoLoadFolder;
+      if (!folder) return;
+      if (this._autoLoadScanTimer) clearTimeout(this._autoLoadScanTimer);
+      this._autoLoadScanTimer = setTimeout(async () => {
+        try {
+          const added = await ObjectSetHelpers.scanAutoLoadFolder(this);
+          if (added > 0) {
+            await this.saveSettings();
+            
+          }
+        } catch (e) {
+          // Silently ignore - folder may have been removed
+        }
+      }, 2000);
+    };
+
+    const isInAutoLoadFolder = (file) => {
+      const folder = this.settings.objectSetsAutoLoadFolder;
+      return folder && file && file.path && file.path.startsWith(folder + '/');
+    };
+
+    this.registerEvent(this.app.vault.on('create', (file) => {
+      if (isInAutoLoadFolder(file)) debouncedScan();
+    }));
+    this.registerEvent(this.app.vault.on('delete', (file) => {
+      if (isInAutoLoadFolder(file)) debouncedScan();
+    }));
+    this.registerEvent(this.app.vault.on('rename', (file, oldPath) => {
+      const folder = this.settings.objectSetsAutoLoadFolder;
+      if (folder && ((file.path && file.path.startsWith(folder + '/')) || (oldPath && oldPath.startsWith(folder + '/')))) {
+        debouncedScan();
+      }
+    }));
+    this.registerEvent(this.app.vault.on('modify', (file) => {
+      if (isInAutoLoadFolder(file) && file.path && file.path.endsWith('/objects.json')) {
+        debouncedScan();
+      }
+    }));
+
     // Register command to insert a new map
     this.addCommand({
       id: 'insert-new-map',
@@ -5847,13 +6777,13 @@ class WindroseMDSettingsPlugin extends Plugin {
       // params.action = 'windrose', and the rest is in the query string
       const rawQuery = Object.keys(params).find(key => key.includes('|'));
       if (!rawQuery) {
-        console.error('[Windrose] Invalid deep link format');
+        
         return;
       }
 
       const pipeIndex = rawQuery.indexOf('|');
       if (pipeIndex === -1) {
-        console.error('[Windrose] Missing pipe separator in deep link');
+        
         return;
       }
 
@@ -5862,7 +6792,7 @@ class WindroseMDSettingsPlugin extends Plugin {
       const parts = coordData.split(',');
 
       if (parts.length !== 5) {
-        console.error('[Windrose] Invalid coordinate data in deep link');
+        
         return;
       }
 
@@ -5887,7 +6817,7 @@ class WindroseMDSettingsPlugin extends Plugin {
           }));
         }, 100);
       } catch (err) {
-        console.error('[Windrose] Failed to open note:', err);
+        
         new Notice('Failed to open map note');
       }
     });
@@ -5936,7 +6866,13 @@ class WindroseMDSettingsPlugin extends Plugin {
     });
   }
 
-  onunload() {}
+  onunload() {
+    if (window.__windrose) {
+      window.__windrose.ready = false;
+      window.__windrose.obsidian = null;
+      window.dispatchEvent(new CustomEvent('windrose:bridge-teardown'));
+    }
+  }
 
   /**
    * Get the path to the Windrose data file.
@@ -5951,11 +6887,11 @@ class WindroseMDSettingsPlugin extends Plugin {
         const content = await this.app.vault.read(debugFile);
         const config = JSON.parse(content);
         if (config.dataFilePath) {
-          console.log('[Windrose DEBUG] Using data file:', config.dataFilePath);
+          
           return config.dataFilePath;
         }
       } catch (e) {
-        console.warn('[Windrose] Failed to read WINDROSE-DEBUG.json:', e);
+        
       }
     }
     
@@ -5984,7 +6920,7 @@ class WindroseMDSettingsPlugin extends Plugin {
         const debugContent = await this.app.vault.read(debugFile);
         const config = JSON.parse(debugContent);
         if (config.dungeonGeneratorPath) {
-          console.log('[Windrose DEBUG] Loading generator from:', config.dungeonGeneratorPath);
+          
           const generatorFile = this.app.vault.getAbstractFileByPath(config.dungeonGeneratorPath);
           if (!generatorFile) {
             throw new Error('Debug dungeonGeneratorPath not found: ' + config.dungeonGeneratorPath);
@@ -5994,7 +6930,7 @@ class WindroseMDSettingsPlugin extends Plugin {
           return moduleFunc();
         }
       } catch (e) {
-        console.warn('[Windrose] Debug generator load failed, falling back to compiled:', e.message);
+        
       }
     }
     
@@ -6050,7 +6986,7 @@ class WindroseMDSettingsPlugin extends Plugin {
         const debugContent = await this.app.vault.read(debugFile);
         const config = JSON.parse(debugContent);
         if (config.objectPlacerPath) {
-          console.log('[Windrose DEBUG] Loading objectPlacer from:', config.objectPlacerPath);
+          
           const placerFile = this.app.vault.getAbstractFileByPath(config.objectPlacerPath);
           if (!placerFile) {
             throw new Error('Debug objectPlacerPath not found: ' + config.objectPlacerPath);
@@ -6060,7 +6996,7 @@ class WindroseMDSettingsPlugin extends Plugin {
           return moduleFunc();
         }
       } catch (e) {
-        console.warn('[Windrose] Debug objectPlacer load failed, falling back to compiled:', e.message);
+        
       }
     }
 
@@ -6262,7 +7198,7 @@ class WindroseMDSettingsPlugin extends Plugin {
       }
       
     } catch (error) {
-      console.error('[Windrose] Failed to save dungeon:', error);
+      
       throw error;
     }
   }
@@ -6271,7 +7207,7 @@ class WindroseMDSettingsPlugin extends Plugin {
     try {
       const data = await this.loadData();
       this.settings = Object.assign({
-        version: '0.14.7.4',
+        version: '0.16.4',
         hexOrientation: 'flat',
         gridLineColor: '#666666',
         gridLineWidth: 1,
@@ -6306,12 +7242,16 @@ class WindroseMDSettingsPlugin extends Plugin {
         fogOfWarBlurEnabled: false,
         fogOfWarBlurFactor: 0.20,
         // Controls visibility
-        alwaysShowControls: false
+        alwaysShowControls: false,
+        // Object sets
+        objectSets: [],
+        activeObjectSetId: null,
+        objectSetsAutoLoadFolder: ''
       }, data || {});
     } catch (error) {
-      console.warn('[DMT Settings] Error loading settings, using defaults:', error);
+      
       this.settings = {
-        version: '0.14.7.4',
+        version: '0.16.4',
         hexOrientation: 'flat',
         gridLineColor: '#666666',
         gridLineWidth: 1,
@@ -6346,7 +7286,11 @@ class WindroseMDSettingsPlugin extends Plugin {
         fogOfWarBlurEnabled: false,
         fogOfWarBlurFactor: 0.20,
         // Controls visibility
-        alwaysShowControls: false
+        alwaysShowControls: false,
+        // Object sets
+        objectSets: [],
+        activeObjectSetId: null,
+        objectSetsAutoLoadFolder: ''
       };
     }
   }
@@ -7088,7 +8032,11 @@ const TabRenderColorsMethods = {
         .setButtonText('Reset All')
         .setWarning()
         .onClick(async () => {
-          if (confirm('Reset all colors to defaults? This will remove all customizations.')) {
+          if (await new ConfirmModal(this.app, {
+              message: 'Reset all colors to defaults? This will remove all customizations.',
+              confirmText: 'Reset All',
+              isDestructive: true
+            }).openAndGetValue()) {
             this.plugin.settings.colorPaletteOverrides = {};
             this.plugin.settings.customPaletteColors = [];
             this.settingsChanged = true;
@@ -7241,11 +8189,19 @@ const TabRenderColorsMethods = {
 
 const TabRenderObjectsMethods = {
   renderObjectTypesContent(containerEl) {
-    containerEl.createEl('p', { 
+    containerEl.createEl('p', {
       text: 'Customize map objects: modify built-in objects, create custom objects, or hide objects you don\'t use.',
       cls: 'setting-item-description'
     });
-    
+
+    // =========================================================================
+    // Object Sets
+    // =========================================================================
+
+    this.renderObjectSetsBlock(containerEl);
+
+    containerEl.createEl('div', { cls: 'dmt-set-separator' });
+
     // Map Type selector dropdown
     new Setting(containerEl)
       .setName('Map Type')
@@ -7323,18 +8279,22 @@ const TabRenderObjectsMethods = {
     // Reset All button (only show if there are customizations)
     if (hasAnyCustomizations) {
       new Setting(containerEl)
-        .setName('Reset All Customizations')
-        .setDesc(`Remove all custom objects, categories, and modifications for ${this.selectedMapType} maps`)
+        .setName(`Reset ${this.selectedMapType === 'hex' ? 'Hex' : 'Grid'} to Defaults`)
+        .setDesc(`Restore built-in objects for ${this.selectedMapType} maps. Does not affect saved sets.`)
         .addButton(btn => btn
-          .setButtonText('Reset All')
+          .setButtonText('Reset to Defaults')
           .setWarning()
           .onClick(async () => {
             const counts = [];
             if (hasOverrides) counts.push(`${Object.keys(mapTypeSettings.objectOverrides).length} modification(s)`);
             if (hasCustomObjects) counts.push(`${mapTypeSettings.customObjects.length} custom object(s)`);
             if (hasCustomCategories) counts.push(`${mapTypeSettings.customCategories.length} custom category(ies)`);
-            
-            if (confirm(`This will remove ${counts.join(', ')} for ${this.selectedMapType} maps. Maps using custom objects will show "?" placeholders.\\n\\nContinue?`)) {
+
+            if (await new ConfirmModal(this.app, {
+              message: `This will remove ${counts.join(', ')} for ${this.selectedMapType} maps. Saved sets are not affected. Maps using custom objects will show "?" placeholders.`,
+              confirmText: 'Reset to Defaults',
+              isDestructive: true
+            }).openAndGetValue()) {
               this.updateObjectSettingsForMapType({
                 objectOverrides: {},
                 customObjects: [],
@@ -7445,10 +8405,14 @@ const TabRenderObjectsMethods = {
         IconHelpers.set(deleteBtn, 'trash-2');
         deleteBtn.onclick = async () => {
           if (allCategoryObjects.length > 0) {
-            alert(`Cannot delete "${category.label}" - it contains ${allCategoryObjects.length} object(s). Move or delete them first.`);
+            new Notice(`Cannot delete "${category.label}" - it contains ${allCategoryObjects.length} object(s). Move or delete them first.`);
             return;
           }
-          if (confirm(`Delete category "${category.label}"?`)) {
+          if (await new ConfirmModal(this.app, {
+              message: `Delete category "${category.label}"?`,
+              confirmText: 'Delete',
+              isDestructive: true
+            }).openAndGetValue()) {
             const categoriesKey = this.selectedMapType === 'hex' ? 'customHexCategories' : 'customGridCategories';
             if (this.plugin.settings[categoriesKey]) {
               this.plugin.settings[categoriesKey] = this.plugin.settings[categoriesKey].filter(c => c.id !== category.id);
@@ -7684,7 +8648,11 @@ const TabRenderObjectsMethods = {
         const resetBtn = actions.createEl('button', { cls: 'dmt-settings-icon-btn', attr: { 'aria-label': 'Reset to default', title: 'Reset to default' } });
         IconHelpers.set(resetBtn, 'rotate-ccw');
         resetBtn.onclick = async () => {
-          if (confirm(`Reset "${obj.label}" to its default symbol and name?`)) {
+          if (await new ConfirmModal(this.app, {
+              message: `Reset "${obj.label}" to its default symbol and name?`,
+              confirmText: 'Reset',
+              isDestructive: true
+            }).openAndGetValue()) {
             if (this.plugin.settings[overridesKey]) {
               delete this.plugin.settings[overridesKey][obj.id];
             }
@@ -7695,11 +8663,68 @@ const TabRenderObjectsMethods = {
         };
       }
     } else {
+      // Copy to other map type button for custom objects
+      const targetType = this.selectedMapType === 'hex' ? 'grid' : 'hex';
+      const targetLabel = targetType === 'hex' ? 'Hex' : 'Grid';
+      const copyBtn = actions.createEl('button', { cls: 'dmt-settings-icon-btn', attr: { 'aria-label': `Copy to ${targetLabel}`, title: `Copy to ${targetLabel}` } });
+      IconHelpers.set(copyBtn, 'copy');
+      copyBtn.onclick = async () => {
+        const targetObjectsKey = targetType === 'hex' ? 'customHexObjects' : 'customGridObjects';
+        const targetCategoriesKey = targetType === 'hex' ? 'customHexCategories' : 'customGridCategories';
+
+        if (!this.plugin.settings[targetObjectsKey]) {
+          this.plugin.settings[targetObjectsKey] = [];
+        }
+
+        // Generate new unique ID
+        const newId = 'custom-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+
+        // Check if category exists in target
+        let targetCategory = obj.category;
+        const targetCategories = this.plugin.settings[targetCategoriesKey] || [];
+        const builtInCategoryIds = ObjectHelpers.getCategories({
+          objectOverrides: {},
+          customObjects: [],
+          customCategories: []
+        }).map(c => c.id);
+
+        if (!builtInCategoryIds.includes(obj.category) && !targetCategories.find(c => c.id === obj.category)) {
+          // Custom category doesn't exist in target - copy it over
+          const sourceCategoriesKey = this.selectedMapType === 'hex' ? 'customHexCategories' : 'customGridCategories';
+          const sourceCategories = this.plugin.settings[sourceCategoriesKey] || [];
+          const sourceCat = sourceCategories.find(c => c.id === obj.category);
+          if (sourceCat) {
+            if (!this.plugin.settings[targetCategoriesKey]) {
+              this.plugin.settings[targetCategoriesKey] = [];
+            }
+            this.plugin.settings[targetCategoriesKey].push({ ...sourceCat });
+          }
+        }
+
+        // Copy the object with new ID
+        const copiedObj = { ...obj };
+        delete copiedObj.isBuiltIn;
+        delete copiedObj.isModified;
+        delete copiedObj.isHidden;
+        copiedObj.id = newId;
+        copiedObj.category = targetCategory;
+
+        this.plugin.settings[targetObjectsKey].push(copiedObj);
+
+        this.settingsChanged = true;
+        await this.plugin.saveSettings();
+        new Notice(`Copied "${obj.label}" to ${targetLabel} maps`);
+      };
+
       // Delete button for custom objects
       const deleteBtn = actions.createEl('button', { cls: 'dmt-settings-icon-btn dmt-settings-icon-btn-danger', attr: { 'aria-label': 'Delete', title: 'Delete object' } });
       IconHelpers.set(deleteBtn, 'trash-2');
       deleteBtn.onclick = async () => {
-        if (confirm(`Delete "${obj.label}"? Maps using this object will show a "?" placeholder.`)) {
+        if (await new ConfirmModal(this.app, {
+            message: `Delete "${obj.label}"? Maps using this object will show a "?" placeholder.`,
+            confirmText: 'Delete',
+            isDestructive: true
+          }).openAndGetValue()) {
           if (this.plugin.settings[customObjectsKey]) {
             this.plugin.settings[customObjectsKey] = this.plugin.settings[customObjectsKey].filter(o => o.id !== obj.id);
           }
@@ -7709,6 +8734,204 @@ const TabRenderObjectsMethods = {
         }
       };
     }
+  },
+
+  // ---------------------------------------------------------------------------
+  // Object Sets block - rendered at top of Object Types section
+  // ---------------------------------------------------------------------------
+
+  renderObjectSetsBlock(containerEl) {
+    const s = this.plugin.settings;
+    const sets = s.objectSets || [];
+
+    containerEl.createEl('div', { cls: 'dmt-settings-subheading', text: 'Object Sets' });
+    containerEl.createEl('p', {
+      text: 'Save and swap between named collections of object customizations.',
+      cls: 'setting-item-description'
+    });
+
+    // Active Set indicator
+    const activeSet = sets.find(st => st.id === s.activeObjectSetId);
+    const isDirty = ObjectSetHelpers.isDirty(this.plugin);
+
+    if (activeSet) {
+      const bar = containerEl.createDiv({ cls: 'dmt-set-active-bar' });
+      bar.createSpan({ text: 'Active set: ' });
+      bar.createSpan({ text: activeSet.name, cls: 'dmt-set-active-name' });
+      if (isDirty) {
+        bar.createSpan({ text: ' (modified)', cls: 'dmt-set-modified-badge' });
+      }
+    } else if (isDirty) {
+      const bar = containerEl.createDiv({ cls: 'dmt-set-active-bar dmt-set-modified-bar' });
+      bar.createSpan({ text: 'Objects modified from defaults', cls: 'dmt-set-modified-badge' });
+    }
+
+    // Active Set dropdown
+    new Setting(containerEl)
+      .setName('Active Set')
+      .setDesc('Switch to a saved set (overwrites current objects)')
+      .addDropdown(dropdown => {
+        dropdown.addOption('__defaults__', 'Defaults (built-in)');
+        for (const set of sets) {
+          const scope = [];
+          if (set.data.hex) scope.push('hex');
+          if (set.data.grid) scope.push('grid');
+          dropdown.addOption(set.id, set.name + (scope.length ? ' [' + scope.join('+') + ']' : ''));
+        }
+        dropdown.setValue(s.activeObjectSetId || '__defaults__');
+        dropdown.onChange(async (value) => {
+          // Prompt to save current objects before switching
+          if (isDirty) {
+            if (await new ConfirmModal(this.app, {
+              message: 'Save your current objects as a set before switching?',
+              confirmText: 'Save',
+              cancelText: value === '__defaults__' ? 'Reset Without Saving' : 'Switch Without Saving'
+            }).openAndGetValue()) {
+              const name = await new PromptModal(this.app, {
+                message: 'Name for the saved set:',
+                defaultValue: 'My Objects'
+              }).openAndGetValue();
+              if (name) {
+                ObjectSetHelpers.saveCurrentAsSet(this.plugin, name);
+              }
+            }
+          }
+
+          if (value === '__defaults__') {
+            ObjectSetHelpers.resetToDefaults(this.plugin);
+            this.settingsChanged = true;
+            await this.plugin.saveSettings();
+            window.dispatchEvent(new CustomEvent('dmt-settings-changed', {
+              detail: { timestamp: Date.now() }
+            }));
+            this.display();
+            return;
+          }
+
+          ObjectSetHelpers.activateSet(this.plugin, value);
+          this.settingsChanged = true;
+          await this.plugin.saveSettings();
+          window.dispatchEvent(new CustomEvent('dmt-settings-changed', {
+            detail: { timestamp: Date.now() }
+          }));
+          this.display();
+        });
+      });
+
+    // Saved Sets list
+    if (sets.length > 0) {
+      const listContainer = containerEl.createDiv({ cls: 'dmt-set-list' });
+      for (const set of sets) {
+        const row = listContainer.createDiv({ cls: 'dmt-set-row' });
+        if (set.id === s.activeObjectSetId) row.addClass('dmt-set-row-active');
+
+        // Name
+        row.createSpan({ text: set.name, cls: 'dmt-set-name' });
+
+        // Scope badges
+        const badges = row.createSpan({ cls: 'dmt-set-badges' });
+        if (set.data.hex) badges.createSpan({ text: 'hex', cls: 'dmt-set-badge' });
+        if (set.data.grid) badges.createSpan({ text: 'grid', cls: 'dmt-set-badge' });
+        badges.createSpan({ text: set.source, cls: 'dmt-set-badge dmt-set-badge-source' });
+
+        // Actions
+        const actions = row.createDiv({ cls: 'dmt-set-actions' });
+
+        const renameBtn = actions.createEl('button', {
+          cls: 'dmt-settings-icon-btn',
+          attr: { 'aria-label': 'Rename', title: 'Rename set' }
+        });
+        IconHelpers.set(renameBtn, 'pencil');
+        renameBtn.onclick = () => {
+          new ObjectSetRenameModal(this.app, set.name, async (newName) => {
+            ObjectSetHelpers.renameSet(this.plugin, set.id, newName);
+            await this.plugin.saveSettings();
+            this.display();
+          }).open();
+        };
+
+        const exportBtn = actions.createEl('button', {
+          cls: 'dmt-settings-icon-btn',
+          attr: { 'aria-label': 'Export', title: 'Export set to folder' }
+        });
+        IconHelpers.set(exportBtn, 'download');
+        exportBtn.onclick = () => {
+          new ObjectSetExportModal(this.app, this.plugin, set).open();
+        };
+
+        const deleteBtn = actions.createEl('button', {
+          cls: 'dmt-settings-icon-btn dmt-settings-icon-btn-danger',
+          attr: { 'aria-label': 'Delete', title: 'Delete set' }
+        });
+        IconHelpers.set(deleteBtn, 'trash-2');
+        deleteBtn.onclick = async () => {
+          if (await new ConfirmModal(this.app, {
+              message: 'Delete set "' + set.name + '"?',
+              confirmText: 'Delete',
+              isDestructive: true
+            }).openAndGetValue()) {
+            ObjectSetHelpers.deleteSet(this.plugin, set.id);
+            this.settingsChanged = true;
+            await this.plugin.saveSettings();
+            this.display();
+          }
+        };
+      }
+    }
+
+    // Action buttons
+    const actionSetting = new Setting(containerEl)
+      .setName('Manage Sets');
+
+    actionSetting.addButton(btn => btn
+      .setButtonText('Save Current as Set')
+      .onClick(async () => {
+        const name = await new PromptModal(this.app, {
+          message: 'Name for the new set:',
+          defaultValue: 'My Objects'
+        }).openAndGetValue();
+        if (!name) return;
+        ObjectSetHelpers.saveCurrentAsSet(this.plugin, name);
+        await this.plugin.saveSettings();
+        new Notice('Saved set: ' + name);
+        this.display();
+      }));
+
+    actionSetting.addButton(btn => btn
+      .setButtonText('Import from Folder')
+      .onClick(() => {
+        new ObjectSetImportModal(this.app, this.plugin, async () => {
+          this.settingsChanged = true;
+          this.display();
+        }).open();
+      }));
+
+    // Auto-Load Folder
+    new Setting(containerEl)
+      .setName('Auto-Load Folder')
+      .setDesc('Vault folder to scan for object set packages on startup')
+      .addSearch(search => {
+        new FolderSuggest(this.app, search.inputEl);
+        search
+          .setPlaceholder('e.g. windrose-objects')
+          .setValue(s.objectSetsAutoLoadFolder || '')
+          .onChange(async (value) => {
+            s.objectSetsAutoLoadFolder = value.trim();
+            await this.plugin.saveSettings();
+          });
+      })
+      .addButton(btn => btn
+        .setButtonText('Scan Now')
+        .onClick(async () => {
+          const added = await ObjectSetHelpers.scanAutoLoadFolder(this.plugin);
+          await this.plugin.saveSettings();
+          if (added > 0) {
+            new Notice('Found ' + added + ' new set(s)');
+          } else {
+            new Notice('No new sets found');
+          }
+          this.display();
+        }));
   }
 
 };

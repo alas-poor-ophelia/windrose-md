@@ -144,6 +144,7 @@ export default [
   {
     ignores: [
       "node_modules/**",
+      "mcp/**",
       "types/generated/**",
       "*.md",
       // Legacy JS files in vault - not linted

@@ -27,6 +27,11 @@ playwright-report/
 test-results/
 tests/e2e/screenshots/
 
+# MCP server
+mcp/node_modules/
+mcp/screenshots/
+mcp/dist/
+
 # Windows NUL device artifacts (created by some tools)
 nul
 tests/fixtures/test-vault/nul

@@ -80,5 +80,6 @@ export type UseCanvasRenderer = (
   isResizeMode?: boolean,
   theme?: RendererTheme | null,
   showCoordinates?: boolean,
-  layerVisibility?: LayerVisibility | null
+  layerVisibility?: LayerVisibility | null,
+  tileImagesReady?: boolean
 ) => void;

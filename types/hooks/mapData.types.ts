@@ -48,6 +48,12 @@ export interface UseMapDataResult {
 
   /** Whether the fog of war texture has been preloaded */
   fowImageReady: boolean;
+
+  /** Whether tile images have been preloaded */
+  tileImagesReady: boolean;
+
+  /** Get a cached image element by vault path (null if not loaded) */
+  getCachedImage: (path: string) => HTMLImageElement | null;
 }
 
 // ===========================================

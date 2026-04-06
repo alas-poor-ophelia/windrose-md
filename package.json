@@ -16,6 +16,7 @@
     "release": "npx tsx scripts/release/index.ts",
     "release:dry": "npx tsx scripts/release/index.ts --dry-run",
     "release:compile": "npx tsx scripts/release/compile.ts",
+    "release:cli-compile": "npx tsx scripts/release/cli-compile.ts",
     "postinstall": "patch-package"
   },
   "devDependencies": {

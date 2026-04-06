@@ -1,14 +1,14 @@
 {
   "main": {
-    "id": "d0459e3f6e37f2cb",
+    "id": "361ed7cee351fff0",
     "type": "split",
     "children": [
       {
-        "id": "e7be69227088886d",
+        "id": "ed57eff43dbea63b",
         "type": "tabs",
         "children": [
           {
-            "id": "13aafd55d6dc8ff5",
+            "id": "ed76bca9751474d7",
             "type": "leaf",
             "state": {
               "type": "markdown",
@@ -27,15 +27,15 @@
     "direction": "vertical"
   },
   "left": {
-    "id": "babbd6f68e66d139",
+    "id": "a0946f97963f3471",
     "type": "split",
     "children": [
       {
-        "id": "7103c2c325ff2534",
+        "id": "17ac2cad37147141",
         "type": "tabs",
         "children": [
           {
-            "id": "351243ea511e51e9",
+            "id": "b5d847cfb9ee7862",
             "type": "leaf",
             "state": {
               "type": "file-explorer",
@@ -48,7 +48,7 @@
             }
           },
           {
-            "id": "f76c678ed9b00c62",
+            "id": "3872fd378691e05f",
             "type": "leaf",
             "state": {
               "type": "search",
@@ -65,7 +65,7 @@
             }
           },
           {
-            "id": "34aeb7c1c39e30e3",
+            "id": "94a8279b3161d515",
             "type": "leaf",
             "state": {
               "type": "bookmarks",
@@ -81,19 +81,20 @@
     "width": 300
   },
   "right": {
-    "id": "7640a2b850f656f5",
+    "id": "ea505e959bf18e2b",
     "type": "split",
     "children": [
       {
-        "id": "ae1c982aee2e1cc9",
+        "id": "64ed7787218b7689",
         "type": "tabs",
         "children": [
           {
-            "id": "724a81bf31680525",
+            "id": "9812d50cec9a4957",
             "type": "leaf",
             "state": {
               "type": "backlink",
               "state": {
+                "file": "_testing/dungeon-test-map.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -103,24 +104,25 @@
                 "unlinkedCollapsed": true
               },
               "icon": "links-coming-in",
-              "title": "Backlinks"
+              "title": "Backlinks for dungeon-test-map"
             }
           },
           {
-            "id": "a12bd7069f95faf2",
+            "id": "519a95ca8da9a267",
             "type": "leaf",
             "state": {
               "type": "outgoing-link",
               "state": {
+                "file": "_testing/dungeon-test-map.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               },
               "icon": "links-going-out",
-              "title": "Outgoing links"
+              "title": "Outgoing links from dungeon-test-map"
             }
           },
           {
-            "id": "fe051911a41c6f1d",
+            "id": "8660d370098dfebc",
             "type": "leaf",
             "state": {
               "type": "tag",
@@ -135,17 +137,18 @@
             }
           },
           {
-            "id": "23097393b243a97d",
+            "id": "72332d1b3d7e0d1c",
             "type": "leaf",
             "state": {
               "type": "outline",
               "state": {
+                "file": "_testing/dungeon-test-map.md",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
               },
               "icon": "lucide-list",
-              "title": "Outline"
+              "title": "Outline of dungeon-test-map"
             }
           }
         ]
@@ -166,30 +169,11 @@
       "bases:Create new base": false
     }
   },
-  "active": "13aafd55d6dc8ff5",
+  "active": "ed76bca9751474d7",
   "lastOpenFiles": [
     "_testing/smoke-test-hex.md",
     "_testing/smoke-test-map.md",
     "_testing/dungeon-generation-test.md",
-    "_testing/dungeon-test-map.md",
-    "_testing/smoke-test-hex-compiled.md",
-    "_testing/smoke-test-compiled.md",
-    "Projects/dungeon-map-tracker/utils/textLabelOperations.ts",
-    "Projects/dungeon-map-tracker/utils/settingsAccessor.ts",
-    "Projects/dungeon-map-tracker/hooks/useDataHandlers.ts",
-    "Projects/dungeon-map-tracker/hooks/useCanvasRenderer.ts",
-    "Projects/dungeon-map-tracker/hooks/useCanvasInteraction.ts",
-    "Projects/dungeon-map-tracker/hooks/useAreaSelect.ts",
-    "Projects/dungeon-map-tracker/hooks/CLAUDE.md",
-    "Projects/dungeon-map-tracker/geometry/segmentRenderer.ts",
-    "Projects/dungeon-map-tracker/geometry/offsetCoordinates.ts",
-    "Projects/dungeon-map-tracker/geometry/hexRenderer.ts",
-    "Projects/dungeon-map-tracker/geometry/hexMeasurements.ts",
-    "Projects/dungeon-map-tracker/docs/specs/completed/partial_cell_painting_spec.md",
-    "Projects/dungeon-map-tracker/docs/specs/completed/Map_Canvas_Composition_Refactor.md",
-    "Projects/dungeon-map-tracker/geometry/CLAUDE.md",
-    "Projects/dungeon-map-tracker/components/mapcanvas/CLAUDE.md",
-    "Projects/dungeon-map-tracker/CLAUDE.md",
-    "Pasted image 20260105221401.png"
+    "_testing/dungeon-test-map.md"
   ]
 }
