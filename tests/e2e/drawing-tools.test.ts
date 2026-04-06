@@ -240,3 +240,4 @@ test("Drawing tools work on hex map", async ({ page }) => {
 
   expect(errors).toHaveLength(0);
 });
+
