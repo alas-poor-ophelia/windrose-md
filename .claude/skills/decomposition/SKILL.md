@@ -2,7 +2,7 @@
 
 Use when breaking apart large files in the Windrose `src/` directory. This skill provides patterns for safely extracting logic from monolithic hooks, components, and the root module.
 
-**Prerequisites:** Read the `datacore-patterns` skill first — every extraction must follow Datacore's module system rules.
+**Prerequisites:** This skill is **not standalone**. The `datacore-patterns` skill contains critical rules (duplicate `const` crashes, runtime export constraints, `return {}` semantics) that MUST be understood before extracting. Code that looks correct to TypeScript will crash at Datacore runtime if these rules are violated. Read `datacore-patterns` first.
 
 ---
 
@@ -23,6 +23,7 @@ Extract when a file has **multiple independent responsibilities** sharing a name
 - **Tight state coupling.** If extracting requires passing 10+ parameters back and forth, the abstraction boundary is wrong.
 - **Pure math / algorithmic files.** `curveBoolean.ts` (997 lines) is big but cohesive — it's one algorithm. Don't split algorithms.
 - **Under 300 lines.** The overhead of a new Datacore module (bootstrap + return {}) isn't worth it for small files.
+- **Coordinator/router files.** If the file's primary job is routing events to registered handlers (like `useEventCoordinator.ts`), extraction may not help — the extracted pieces would need all the same dependencies. Ask: "Would the extracted file still need all the same dependencies?" If yes, the file boundary is doing useful aggregation work. Prefer architectural refactors (handler tables, dispatch patterns) over simple extraction for these files.
 
 ---
 
@@ -220,6 +221,52 @@ Extract when a file has **multiple independent responsibilities** sharing a name
 
 ---
 
+### Pattern 5: Routing Table Refactor (for coordinator files)
+
+**When:** A file has large `switch(currentTool)` blocks repeated across multiple event handlers (e.g., `handlePointerDown`, `handlePointerMove`, `handlePointerUp` each switching on the same tool enum).
+
+**This is NOT an extraction — it's an architectural refactor.** You are replacing imperative routing with a declarative handler map.
+
+**Steps:**
+
+1. **Define the handler interface:**
+   ```typescript
+   interface ToolEventHandlers {
+     onPointerDown?: (e: PointerEvent, context: ToolContext) => void;
+     onPointerMove?: (e: PointerEvent, context: ToolContext) => void;
+     onPointerUp?: (e: PointerEvent, context: ToolContext) => void;
+   }
+
+   interface ToolContext {
+     geometry: IGeometry;
+     canvasRef: { current: HTMLCanvasElement | null };
+     // ... shared deps the handlers need
+   }
+   ```
+
+2. **Build the handler map:**
+   ```typescript
+   const toolHandlers: Record<ToolType, ToolEventHandlers> = {
+     select: { onPointerDown: handleSelectDown, onPointerMove: handleSelectMove, ... },
+     draw: { onPointerDown: handleDrawDown, onPointerMove: handleDrawMove, ... },
+     // ...
+   };
+   ```
+
+3. **Replace the switch-case with dispatch:**
+   ```typescript
+   const handlePointerDown = dc.useCallback((e: PointerEvent) => {
+     const handler = toolHandlers[currentTool];
+     handler?.onPointerDown?.(e, toolContext);
+   }, [currentTool, toolContext]);
+   ```
+
+4. **Each tool's handlers can live in separate files** loaded via `requireModuleByName`, keeping the coordinator as a thin dispatch shell.
+
+**Risks:** This is a large refactor. The handler map interface must accommodate all tool-specific state needs via `ToolContext`. Do not attempt this without full test coverage of all tools.
+
+---
+
 ## Extraction Checklist
 
 Before submitting a decomposition PR:
@@ -231,6 +278,8 @@ Before submitting a decomposition PR:
 - [ ] **requireModuleByName bootstrap.** Every new file starts with the pathResolver dance.
 - [ ] **Types via import type.** All cross-module type references use `import type` from `#types/`.
 - [ ] **No prop explosion.** Extracted hooks/components take < 8 parameters. If more, the boundary is wrong.
+- [ ] **No duplicate `const` names.** After extraction, grep the parent for any name that both the parent and extracted module destructure. Duplicate names in the same Datacore scope cause a `SyntaxError` in `new Function()` — TypeScript will NOT catch this. This is the most common post-extraction bug.
+- [ ] **Listener registration co-located with cleanup.** If extracting a handler that was registered in the parent's `useEffect`, either move the `addEventListener` into the extracted hook OR explicitly note in the parent that cleanup responsibility stays there. Split registration/cleanup across files is a leak waiting to happen.
 - [ ] **Tests still pass.** Run `npm run test:unit` at minimum; `npm run test:e2e` if touching interactions.
 - [ ] **Net reduction.** The parent file got meaningfully smaller AND the new file is cohesive (not a grab-bag).
 
@@ -263,7 +312,7 @@ Ranked by safety and impact. These are the recommended first moves:
 | Source File | Extract To | What | Risk |
 |------------|-----------|------|------|
 | `useObjectInteractions.ts` | `useDragResize.ts` | Drag + resize logic | Shared `dragInitialStateRef`, `edgeSnapMode` |
-| `useEventCoordinator.ts` | Lookup table refactor | Replace tool switch/case with handler map | All routing changes |
+| `useEventCoordinator.ts` | Routing table refactor (Pattern 5) | Replace 3x `switch(currentTool)` blocks in pointer handlers with a `ToolEventHandlers` map | High — affects all tool interactions. Requires full E2E test coverage first. See Pattern 5 above. |
 | `DungeonMapTracker.tsx` | Extract settings/theme | Computed settings + theme memoization | Many children depend on it |
 
 ---

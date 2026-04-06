@@ -1,10 +1,10 @@
 # Geometry & Coordinate Systems
 
-Reference this skill when working with coordinate transforms, cell positions, rendering, or any geometry-dependent logic in Windrose. Getting coordinate spaces wrong produces silent data corruption.
+Reference this skill when working with coordinate transforms, cell positions, rendering, or any geometry-dependent logic in Windrose. Getting coordinate spaces wrong produces **silent data corruption** — tiles render in the wrong hex, clicks select the wrong cell, and zoom drifts at non-1.0 levels. These bugs are hard to reproduce because they only appear at specific zoom levels or near cell boundaries.
 
 ## Three Coordinate Spaces
 
-Windrose has three distinct coordinate spaces. Mixing them is the #1 source of geometry bugs.
+Windrose has three distinct coordinate spaces. Mixing them is the #1 source of geometry bugs. Each space exists for a reason:
 
 | Space | Type | Units | Origin |
 |-------|------|-------|--------|
@@ -12,11 +12,13 @@ Windrose has three distinct coordinate spaces. Mixing them is the #1 source of g
 | **World** | `WorldCoords {worldX, worldY}` | Float pixels, zoom-independent | (0,0) = map origin |
 | **Screen** | `ScreenCoords {screenX, screenY}` | Float pixels on canvas | (0,0) = canvas top-left |
 
+**Why three spaces?** Grid is for logical addressing (which cell). World is for stable positioning (zoom/pan-independent — use for storing positions). Screen is for rendering and hit-testing (changes every frame as the user pans/zooms).
+
 **Grid coordinates are geometry-dependent:**
 - GridGeometry: `x = column`, `y = row`
 - HexGeometry: `x = q` (axial), `y = r` (axial)
 
-The same `Point {x, y}` means different things depending on which geometry produced it. Never pass grid coordinates between different geometry instances.
+The same `Point {x, y}` means different things depending on which geometry produced it. Never pass grid coordinates between different geometry instances — they are semantically incompatible even though they share the same type.
 
 ## Transform Chain
 
@@ -53,6 +55,18 @@ getCellCenter(x, y): WorldCoords
 | `getCellDistance` | Supports `diagonalRule` option | Ignores options (single metric) |
 | `isWithinBounds` | Always `true` (unbounded) | Checks bounds if set |
 
+**The `gridToWorld` asymmetry is the most dangerous difference.** Grid rendering starts from the top-left corner and draws right/down. Hex rendering centers the hexagon on its world point. Code that uses `gridToWorld` to position a tile image will be correct on one geometry and off by half a cell on the other. When you need a center for both geometry types, always use `getCellCenter()`:
+
+```typescript
+// WRONG — works on hex, off by half-cell on grid:
+const pos = geometry.gridToWorld(x, y);
+ctx.drawImage(img, pos.worldX, pos.worldY); // grid: draws from top-left (wrong anchor)
+
+// RIGHT — works on both:
+const center = geometry.getCellCenter(x, y);
+ctx.drawImage(img, center.worldX - w/2, center.worldY - h/2, w, h);
+```
+
 ### Viewport Offset Calculation
 
 This is a common source of bugs. The formula differs by geometry type:
@@ -62,7 +76,9 @@ This is a common source of bugs. The formula differs by geometry type:
 // Hex:  offset = canvasCenter - hexCenter * zoom  (NO cellSize factor)
 ```
 
-The `handleWheel` zoom bug (fixed 2026-02-25) was caused by using `getScaledCellSize(zoom)` for hex maps when it should have been just `zoom`.
+**Why the difference?** Hex world coordinates are already in pixel-scale units (hexToWorld produces pixel positions). Grid world coordinates are in cell units (gridToWorld returns `x * cellSize`), so they need the `cellSize` factor to convert to pixels. Applying `cellSize * zoom` to hex coordinates double-scales them.
+
+The `handleWheel` zoom bug (fixed 2026-02-25) was caused by exactly this: using `getScaledCellSize(zoom)` for hex maps when it should have been just `zoom`. The bug was invisible at zoom=1.0 and only appeared as drift during zoom in/out.
 
 ## Cell Types
 
@@ -118,7 +134,18 @@ round each independently → fix largest rounding error to maintain x+y+z=0
 cube → axial
 ```
 
-This is handled by `roundHex()`. Don't try to just `Math.round()` axial coordinates — it produces wrong results near hex boundaries.
+**Why not `Math.round()`?** Axial coordinates live on a constrained lattice where `q + r + s = 0`. Rounding q and r independently violates this constraint, which means the rounded point may not correspond to any actual hex cell. Near hex boundaries this consistently selects the wrong cell. Cube rounding fixes the component with the largest error to restore the constraint.
+
+```typescript
+// WRONG — picks wrong cell near hex edges:
+const q = Math.round(fractionalQ);
+const r = Math.round(fractionalR);
+
+// RIGHT — always lands on a valid hex:
+const { q, r } = roundHex(fractionalQ, fractionalR);
+```
+
+This is handled by `roundHex()` inside `worldToHex()`. You should never need to call it directly — just call `geometry.worldToGrid()`.
 
 ## Distance Calculations
 
@@ -190,10 +217,15 @@ ctx.fill();
 
 | Mistake | Why It Fails | Fix |
 |---------|-------------|-----|
-| Using `Math.round()` on hex coordinates | Wrong cell near boundaries | Use `roundHex()` (cube rounding) |
-| `cellSize * zoom` for hex viewport offset | Grid formula, not hex | Use just `zoom` for hex maps |
-| `ctx.strokeStyle = color; ctx.stroke()` | iOS memory corruption | Use `withStrokeStyle()` wrapper |
-| Passing grid coords from one geometry to another | Different coordinate semantics | Each geometry consumes its own output |
-| `gridToWorld` expecting cell center (grid) | Returns top-left for grid | Use `getCellCenter()` for center |
-| Ignoring orientation in offset conversion | Wrong axial↔offset mapping | Always pass `geometry.orientation` |
-| Checking `instanceof GridGeometry` | Breaks polymorphism | Use `geometry.type === 'grid'` |
+| `Math.round()` on hex coordinates | Violates cube constraint `q+r+s=0`, selects wrong cell near edges | Use `roundHex()` (cube rounding) |
+| `cellSize * zoom` for hex viewport offset | Hex world coords are already pixel-scale; this double-scales them | Use just `zoom` for hex maps |
+| `ctx.strokeStyle = color; ctx.stroke()` | iOS corrupts strokeStyle under memory pressure; style bleeds to next draw | Use `withStrokeStyle()` wrapper |
+| Passing grid coords between geometries | `Point{3,2}` means col=3,row=2 on grid but q=3,r=2 on hex — different cells | Each geometry consumes its own output |
+| `gridToWorld` expecting center (grid) | Grid returns top-left because grid rendering starts from corners | Use `getCellCenter()` for center |
+| Ignoring orientation in offset conversion | Flat and pointy hexes have different axial↔offset mappings; wrong orientation = wrong cell | Always pass `geometry.orientation` |
+| `instanceof GridGeometry` check | Creates hard import dependency; breaks when module loading order changes in Datacore | Use `geometry.type === 'grid'` |
+| Extracting geometry methods into plain objects | `{ hexToWorld: geom.hexToWorld }` detaches `this` — methods like `hexToWorld` use `this.hexSize`, `this.sqrt3` internally, producing `NaN` silently | Use `.bind(geom)` or pass the geometry instance directly |
+
+### Testing Tip
+
+Most coordinate bugs are invisible at zoom=1.0. Always test at zoom 0.5 and 2.0 to catch viewport offset errors, and click near hex boundaries to catch rounding errors.

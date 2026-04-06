@@ -77,7 +77,9 @@ Active tool buttons use bronze background (`--dmt-border-primary`) with dark tex
 
 ### Decorative Elements
 
-The app uses ornamental SVG corner brackets on `.dmt-container` with glow filters. These are part of the brand identity. New containers that feel "primary" can use them; utility panels should not.
+The app uses ornamental SVG corner brackets on `.dmt-container` with glow filters. These are part of the brand identity. **Primary containers** (the map canvas frame, the main toolbar) can use them; **utility panels** (tile browser, property editors, layer controls) should not.
+
+**Why the distinction?** Brackets signal "this is the main stage" — they're visually heavy and create a framing effect. Putting them on every panel dilutes the hierarchy and makes the UI feel cluttered. When in doubt, omit brackets.
 
 ---
 
@@ -145,7 +147,9 @@ Hard numbers. Bookmark this section.
 
 **Not this:** All tools sticky (forces manual switch back to select) or all tools one-shot (forces re-selecting brush after every stroke).
 
-**Why it works:** Figma, Excalidraw, and Dungeondraft all distinguish between continuous tools (pen, brush) and discrete tools (place shape, add component). Matches mental model: "I'm painting" vs "I'm placing one thing."
+**Why it works:** The distinction matches the user's mental model: "I'm painting" (continuous, same action repeated) vs "I'm placing one thing" (discrete, done after placement). Making placement tools sticky causes accidental duplicates; making painting tools one-shot doubles interaction cost per stroke. Figma, Excalidraw, and Dungeondraft all use this split.
+
+**Windrose rule of thumb:** If the user will typically perform the action on multiple cells in sequence (paint, erase, tile placement), make it sticky. If they'll do it once then inspect the result (place object, add label), make it one-shot.
 
 ### 1.4 Toolbar Position and Layout
 
@@ -317,6 +321,8 @@ These are cross-app conventions users expect. Violating them creates confusion:
 **Do this:** Group related micro-operations into a single undo step. Dragging an object generates hundreds of position updates, but undo should restore the object to its pre-drag position in one step. Use a "begin batch" / "end batch" pattern around drag operations.
 
 **Not this:** Every mousemove during a drag creating a separate undo entry (forces users to press Ctrl+Z hundreds of times).
+
+**Why this matters so much:** Undo failures destroy user trust faster than almost any other bug. A user who paints 20 hex tiles in one drag stroke and then presses Ctrl+Z expects ALL 20 to undo at once — not to press Ctrl+Z twenty times. If undo feels unpredictable, users stop trusting it and start working more cautiously, which kills flow state.
 
 **Rule for grouping:**
 - Mouse down to mouse up = one undo step
