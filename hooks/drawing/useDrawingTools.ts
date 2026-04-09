@@ -60,6 +60,7 @@ const useDrawingTools = (
     onObjectsChange,
     onTextLabelsChange,
     onEdgesChange,
+    onTilesChange,
     getTextLabelAtPosition,
     removeTextLabel,
     getObjectAtPosition,
@@ -71,7 +72,7 @@ const useDrawingTools = (
     currentTool, mapData, geometry, GridGeometry, selectedColor, selectedOpacity,
     canvasRef, screenToGrid, screenToWorld, getClientCoords,
     onCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange,
-    getTextLabelAtPosition, removeTextLabel, getObjectAtPosition
+    onTilesChange, getTextLabelAtPosition, removeTextLabel, getObjectAtPosition
   });
 
   const edgeDrag = useEdgeDragTool({

@@ -141,6 +141,8 @@ interface TileAssetBrowserProps {
   flipH: boolean;
   onRotationChange: (rotation: number) => void;
   onFlipChange: (flipH: boolean) => void;
+  tileLayer: 'base' | 'overlay';
+  onTileLayerChange: (layer: 'base' | 'overlay') => void;
   getCachedImage?: (path: string) => HTMLImageElement | null;
 }
 
@@ -159,6 +161,8 @@ const TileAssetBrowser = ({
   flipH,
   onRotationChange,
   onFlipChange,
+  tileLayer,
+  onTileLayerChange,
   getCachedImage,
 }: TileAssetBrowserProps): React.ReactElement => {
   const [activeTilesetIndex, setActiveTilesetIndex] = dc.useState<number>(0);
@@ -233,7 +237,15 @@ const TileAssetBrowser = ({
       portal.style.left = (rect.left - PREVIEW_SIZE - 16) + 'px';
     }
 
-    label.textContent = hoveredTile.filename;
+    label.textContent = hoveredTile.filename + (rotation ? ` (${rotation}°)` : '') + (flipH ? ' [flipped]' : '');
+
+    // Apply rotation/flip preview when this is the selected tile
+    const isHoveredSelected = selectedTilesetId === activeTileset?.id && selectedTileId === hoveredTile.id;
+    if (isHoveredSelected && (rotation || flipH)) {
+      canvas.style.transform = `rotate(${rotation}deg)${flipH ? ' scaleX(-1)' : ''}`;
+    } else {
+      canvas.style.transform = '';
+    }
 
     // Draw preview
     const img = getCachedImage?.(hoveredTile.vaultPath);
@@ -251,7 +263,7 @@ const TileAssetBrowser = ({
         fallbackImg.src = url;
       });
     }
-  }, [hoveredTile, isCollapsed]);
+  }, [hoveredTile, isCollapsed, rotation, flipH, selectedTilesetId, selectedTileId]);
 
   // Cleanup portal on unmount
   dc.useEffect(() => {
@@ -319,6 +331,22 @@ const TileAssetBrowser = ({
     <div ref={browserRef} className="dmt-tile-browser">
       <div className="dmt-tile-browser-header">
         <span>Tiles</span>
+        <div className="dmt-tile-browser-layer-toggle">
+          <button
+            className={`dmt-tile-browser-layer-btn ${tileLayer === 'base' ? 'dmt-tile-browser-layer-active' : ''}`}
+            onClick={() => onTileLayerChange('base')}
+            title="Base layer: terrain tiles"
+          >
+            Base
+          </button>
+          <button
+            className={`dmt-tile-browser-layer-btn ${tileLayer === 'overlay' ? 'dmt-tile-browser-layer-active' : ''}`}
+            onClick={() => onTileLayerChange('overlay')}
+            title="Overlay layer: stamp tiles atop base"
+          >
+            Overlay
+          </button>
+        </div>
         <button
           className="dmt-sidebar-collapse-btn interactive-child"
           onClick={handleToggleCollapse}
@@ -382,6 +410,9 @@ const TileAssetBrowser = ({
                       onMouseEnter={() => setHoveredTile(tile)}
                       onMouseLeave={() => setHoveredTile(null)}
                       title={tile.filename}
+                      style={isSelected && (rotation || flipH)
+                        ? { transform: `rotate(${rotation}deg)${flipH ? ' scaleX(-1)' : ''}` }
+                        : undefined}
                     >
                       <TileThumbnail tile={tile} getCachedImage={getCachedImage} />
                     </div>

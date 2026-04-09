@@ -652,7 +652,9 @@ class WindroseMDSettingsPlugin extends Plugin {
         // Object sets
         objectSets: [],
         activeObjectSetId: null,
-        objectSetsAutoLoadFolder: ''
+        objectSetsAutoLoadFolder: '',
+        // Tileset folders
+        tilesetFolders: []
       }, data || {});
     } catch (error) {
       console.warn('[DMT Settings] Error loading settings, using defaults:', error);
@@ -696,7 +698,9 @@ class WindroseMDSettingsPlugin extends Plugin {
         // Object sets
         objectSets: [],
         activeObjectSetId: null,
-        objectSetsAutoLoadFolder: ''
+        objectSetsAutoLoadFolder: '',
+        // Tileset folders
+        tilesetFolders: []
       };
     }
   }
@@ -847,7 +851,10 @@ class WindroseMDSettingsTab extends PluginSettingTab {
     this.createCollapsibleSection(containerEl, 'Distance Measurement', 
       (el) => this.renderDistanceMeasurementSettingsContent(el),
       { open: openSections.has('Distance Measurement') });
-    this.createCollapsibleSection(containerEl, 'Object Types', 
+    this.createCollapsibleSection(containerEl, 'Tile Sets',
+      (el) => this.renderTilesetFoldersContent(el),
+      { open: openSections.has('Tile Sets') });
+    this.createCollapsibleSection(containerEl, 'Object Types',
       (el) => this.renderObjectTypesContent(el),
       { open: openSections.has('Object Types') });
   }
@@ -877,5 +884,6 @@ Object.assign(WindroseMDSettingsTab.prototype, TabRenderCoreMethods);
 Object.assign(WindroseMDSettingsTab.prototype, TabRenderSettingsMethods);
 Object.assign(WindroseMDSettingsTab.prototype, TabRenderColorsMethods);
 Object.assign(WindroseMDSettingsTab.prototype, TabRenderObjectsMethods);
+Object.assign(WindroseMDSettingsTab.prototype, TabRenderTilesetsMethods);
 
 module.exports = WindroseMDSettingsPlugin;`;

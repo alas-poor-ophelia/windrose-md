@@ -374,6 +374,18 @@ function getColorPaletteSettings(): ResolvedColorEntry[] {
 // Exports
 // ===========================================
 
+/**
+ * Get configured tileset folder paths from the settings plugin
+ */
+function getTilesetFolders(): string[] {
+  try {
+    const settings = getSettings();
+    return (settings as PluginSettings & { tilesetFolders?: string[] }).tilesetFolders || [];
+  } catch {
+    return [];
+  }
+}
+
 return {
   getSettings,
   getSetting,
@@ -383,6 +395,7 @@ return {
   getObjectSettings,
   getObjectSettingsForSet,
   getColorPaletteSettings,
+  getTilesetFolders,
   FALLBACK_SETTINGS,
   BUILT_IN_COLORS
 };

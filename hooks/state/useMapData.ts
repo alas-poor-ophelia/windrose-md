@@ -40,8 +40,15 @@ const { preloadImage, getCachedImage } = await requireModuleByName("imageOperati
   getCachedImage: (path: string) => HTMLImageElement | null;
 };
 
-const { getEffectiveSettings } = await requireModuleByName("settingsAccessor.ts") as {
+const { getEffectiveSettings, getTilesetFolders } = await requireModuleByName("settingsAccessor.ts") as {
   getEffectiveSettings: (mapSettings: MapData['settings']) => PluginSettings;
+  getTilesetFolders: () => string[];
+};
+
+const { createTileset, probeFirstTileImage, scanTilesetFolder } = await requireModuleByName("tilesetOperations.ts") as {
+  createTileset: (folderPath: string, name: string, options?: Record<string, number>) => import('#types/tiles/tile.types').TilesetDef;
+  probeFirstTileImage: (tiles: import('#types/tiles/tile.types').TileEntry[]) => Promise<{ width: number; height: number } | null>;
+  scanTilesetFolder: (folderPath: string) => import('#types/tiles/tile.types').TileEntry[];
 };
 
 const { getResolvedObjectTypes, hasImagePath } = await requireModuleByName("objectTypeResolver.ts") as {
@@ -81,6 +88,51 @@ function useMapData(
     }
     load();
   }, [mapId, mapName, mapType]);
+
+  // Build tilesets from settings folders for hex maps
+  const mapTypeRef = dc.useRef<string | undefined>(undefined);
+  dc.useEffect(() => {
+    // Track mapType to know when map is loaded, but don't re-run on every mapData change
+    if (mapData) mapTypeRef.current = mapData.mapType;
+  }, [mapData?.mapType]);
+
+  dc.useEffect(() => {
+    const currentMapType = mapTypeRef.current;
+    if (!currentMapType || currentMapType !== 'hex') return;
+
+    const folders = getTilesetFolders().filter((f: string) => f.trim());
+    if (folders.length === 0) return;
+
+    // Build tilesets from configured folders (async to probe image dimensions)
+    (async () => {
+      const newTilesets: import('#types/tiles/tile.types').TilesetDef[] = [];
+      for (const folder of folders) {
+        try {
+          const parts = folder.split('/');
+          const name = parts[parts.length - 1] || folder;
+
+          // Probe actual image dimensions from the first tile
+          const tiles = scanTilesetFolder(folder);
+          const dims = await probeFirstTileImage(tiles);
+          const options = dims ? { tileWidth: dims.width, tileHeight: dims.height } : undefined;
+
+          const tileset = createTileset(folder, name, options);
+          if (tileset.tiles.length > 0) {
+            newTilesets.push(tileset);
+          }
+        } catch (e) {
+          console.warn('[Windrose] Failed to scan tileset folder:', folder, e);
+        }
+      }
+
+      if (newTilesets.length > 0) {
+        setMapData((current: MapData | null) => {
+          if (!current) return current;
+          return { ...current, tilesets: newTilesets };
+        });
+      }
+    })();
+  }, [isLoading, settingsVersion]);
 
   // Preload background image when map data loads
   dc.useEffect(() => {

@@ -68,6 +68,12 @@ function sortTilesForRendering(
  * Calculate the draw rectangle for a tile on screen.
  * The tile's hex-area portion is centered on the hex's screen position;
  * overflow extends above/below.
+ *
+ * Tile images contain hex-shaped artwork in a rectangular bounding box.
+ * The tile's tileWidth maps to the hex's width on screen, and the tile's
+ * hexHeight maps to the hex's height on screen. Since hex aspect ratios
+ * differ from the rectangular tile dimensions, independent X/Y scaling
+ * is needed.
  */
 function calculateTileDrawRect(
   screenX: number,
@@ -77,21 +83,26 @@ function calculateTileDrawRect(
   zoom: number,
   orientation: string
 ): { drawX: number; drawY: number; drawWidth: number; drawHeight: number } {
-  // Hex screen height depends on orientation
+  // On-screen hex dimensions (corner-to-corner)
+  const hexScreenWidth = orientation === 'flat'
+    ? 2 * hexSize * zoom
+    : SQRT3 * hexSize * zoom;
   const hexScreenHeight = orientation === 'flat'
     ? SQRT3 * hexSize * zoom
     : 2 * hexSize * zoom;
 
-  // Scale factor: map the tile's hex-area to the hex's screen size
-  const scale = hexScreenHeight / tileset.hexHeight;
-  const drawWidth = tileset.tileWidth * scale;
-  const drawHeight = tileset.tileHeight * scale;
+  // Independent scale factors:
+  // tileWidth maps to hex width, hexHeight maps to hex height
+  const scaleX = hexScreenWidth / tileset.tileWidth;
+  const scaleY = hexScreenHeight / tileset.hexHeight;
+  const drawWidth = tileset.tileWidth * scaleX;
+  const drawHeight = tileset.tileHeight * scaleY;
 
   // Position: center the hex-area portion on the hex center
   // The hex area starts at overflowTop pixels from the top of the tile image
   const hexAreaCenterInTile = tileset.overflowTop + tileset.hexHeight / 2;
   const drawX = screenX - drawWidth / 2;
-  const drawY = screenY - hexAreaCenterInTile * scale;
+  const drawY = screenY - hexAreaCenterInTile * scaleY;
 
   return { drawX, drawY, drawWidth, drawHeight };
 }
@@ -131,7 +142,13 @@ function renderTiles(
     }
   }
 
-  const sorted = sortTilesForRendering(tiles, geometry.orientation);
+  // Two-pass rendering: base tiles first, overlay tiles second
+  const baseTiles = tiles.filter((t: HexTileAssignment) => (t.layer || 'base') === 'base');
+  const overlayTiles = tiles.filter((t: HexTileAssignment) => t.layer === 'overlay');
+  const sortedBase = sortTilesForRendering(baseTiles, geometry.orientation);
+  const sortedOverlay = sortTilesForRendering(overlayTiles, geometry.orientation);
+  const sorted = [...sortedBase, ...sortedOverlay];
+
   const previousAlpha = ctx.globalAlpha;
   const opacity = options?.opacity ?? 1;
   const canvasW = options?.canvasWidth ?? 4000;
@@ -198,3 +215,4 @@ function renderTiles(
 }
 
 return { renderTiles, sortTilesForRendering, calculateTileDrawRect };
+

@@ -203,6 +203,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   const [selectedTileId, setSelectedTileId] = dc.useState<string | null>(null);
   const [tileRotation, setTileRotation] = dc.useState<number>(0);
   const [tileFlipH, setTileFlipH] = dc.useState<boolean>(false);
+  const [tileLayer, setTileLayer] = dc.useState<'base' | 'overlay'>('base');
   const showTilePanel = mapData?.mapType === 'hex' && (mapData?.tilesets?.length ?? 0) > 0;
 
   const handleTileSelect = (tilesetId: string, tileId: string) => {
@@ -665,6 +666,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 selectedTileId={selectedTileId}
                 tileRotation={tileRotation}
                 tileFlipH={tileFlipH}
+                tileLayer={tileLayer}
                 onTilesChange={handleTilesChange}
               />
 
@@ -732,6 +734,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               flipH={tileFlipH}
               onRotationChange={setTileRotation}
               onFlipChange={setTileFlipH}
+              tileLayer={tileLayer}
+              onTileLayerChange={setTileLayer}
               getCachedImage={getCachedImage}
             />
           )}

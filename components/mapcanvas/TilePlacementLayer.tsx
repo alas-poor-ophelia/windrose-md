@@ -22,6 +22,7 @@ interface TilePlacementLayerProps {
   selectedTileId: string | null;
   tileRotation: number;
   tileFlipH: boolean;
+  tileLayer: 'base' | 'overlay';
   onTilesChange: (tiles: HexTileAssignment[]) => void;
 }
 
@@ -31,6 +32,7 @@ const TilePlacementLayer = ({
   selectedTileId,
   tileRotation,
   tileFlipH,
+  tileLayer,
   onTilesChange
 }: TilePlacementLayerProps): React.ReactElement | null => {
   const { mapData, geometry, screenToGrid } = useMapState();
@@ -52,9 +54,10 @@ const TilePlacementLayer = ({
     if (paintedInStrokeRef.current.has(key)) return;
     paintedInStrokeRef.current.add(key);
 
-    // Replace existing tile at this hex, or add new
+    // Replace existing tile at same hex and same layer, or add new
+    const targetLayer = tileLayer || 'base';
     const existingIdx = currentTiles.findIndex(
-      (t: HexTileAssignment) => t.q === q && t.r === r
+      (t: HexTileAssignment) => t.q === q && t.r === r && (t.layer || 'base') === targetLayer
     );
 
     const newTile: HexTileAssignment = {
@@ -62,7 +65,8 @@ const TilePlacementLayer = ({
       tilesetId: selectedTilesetId,
       tileId: selectedTileId,
       rotation: tileRotation || undefined,
-      flipH: tileFlipH || undefined
+      flipH: tileFlipH || undefined,
+      layer: targetLayer === 'base' ? undefined : targetLayer
     };
 
     let newTiles: HexTileAssignment[];
@@ -74,7 +78,7 @@ const TilePlacementLayer = ({
     }
 
     onTilesChange(newTiles);
-  }, [mapData, selectedTilesetId, selectedTileId, tileRotation, tileFlipH, onTilesChange]);
+  }, [mapData, selectedTilesetId, selectedTileId, tileRotation, tileFlipH, tileLayer, onTilesChange]);
 
   const eraseTileAtHex = dc.useCallback((q: number, r: number) => {
     if (!mapData) return;
@@ -85,6 +89,16 @@ const TilePlacementLayer = ({
 
     if (paintedInStrokeRef.current.has(key)) return;
     paintedInStrokeRef.current.add(key);
+
+    // Prefer removing overlay first, then base
+    const overlayIdx = currentTiles.findIndex(
+      (t: HexTileAssignment) => t.q === q && t.r === r && t.layer === 'overlay'
+    );
+    if (overlayIdx >= 0) {
+      const newTiles = currentTiles.filter((_: HexTileAssignment, i: number) => i !== overlayIdx);
+      onTilesChange(newTiles);
+      return;
+    }
 
     const newTiles = currentTiles.filter(
       (t: HexTileAssignment) => !(t.q === q && t.r === r)
@@ -106,8 +120,10 @@ const TilePlacementLayer = ({
 
     if (hasTileSelected) {
       placeTileAtHex(coords.x, coords.y);
+    } else {
+      eraseTileAtHex(coords.x, coords.y);
     }
-  }, [isTileTool, geometry, screenToGrid, hasTileSelected, placeTileAtHex]);
+  }, [isTileTool, geometry, screenToGrid, hasTileSelected, placeTileAtHex, eraseTileAtHex]);
 
   const handlePointerMove = dc.useCallback((e: PointerEvent) => {
     if (!isDraggingRef.current || !isTileTool || !geometry || geometry.type !== 'hex') return;
@@ -117,8 +133,10 @@ const TilePlacementLayer = ({
 
     if (hasTileSelected) {
       placeTileAtHex(coords.x, coords.y);
+    } else {
+      eraseTileAtHex(coords.x, coords.y);
     }
-  }, [isTileTool, geometry, screenToGrid, hasTileSelected, placeTileAtHex]);
+  }, [isTileTool, geometry, screenToGrid, hasTileSelected, placeTileAtHex, eraseTileAtHex]);
 
   const handlePointerUp = dc.useCallback(() => {
     isDraggingRef.current = false;

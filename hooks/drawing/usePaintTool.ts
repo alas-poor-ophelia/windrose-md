@@ -11,6 +11,7 @@ import type { Cell } from '#types/core/cell.types';
 import type { MapData, MapLayer } from '#types/core/map.types';
 import type { MapObject } from '#types/objects/object.types';
 import type { Curve } from '#types/core/curve.types';
+import type { HexTileAssignment } from '#types/tiles/tile.types';
 import type { DragStartContext } from '#types/hooks/drawingTools.types';
 import type { Edge, EdgeInfo, MapStateContextValue } from '#types/contexts/context.types';
 
@@ -66,6 +67,7 @@ interface UsePaintToolOptions {
   onObjectsChange: (objects: MapObject[]) => void;
   onTextLabelsChange: (labels: any[]) => void;
   onEdgesChange: (edges: Edge[], skipHistory?: boolean) => void;
+  onTilesChange?: (tiles: HexTileAssignment[]) => void;
   getTextLabelAtPosition: (labels: any[], worldX: number, worldY: number, ctx: CanvasRenderingContext2D | null) => any;
   removeTextLabel: (labels: any[], id: string) => any[];
   getObjectAtPosition: (objects: MapObject[], x: number, y: number) => MapObject | null;
@@ -89,7 +91,7 @@ function usePaintTool({
   currentTool, mapData, geometry, GridGeometry, selectedColor, selectedOpacity,
   canvasRef, screenToGrid, screenToWorld, getClientCoords,
   onCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange,
-  getTextLabelAtPosition, removeTextLabel, getObjectAtPosition
+  onTilesChange, getTextLabelAtPosition, removeTextLabel, getObjectAtPosition
 }: UsePaintToolOptions): UsePaintToolResult {
 
   const [paintIsDrawing, setPaintIsDrawing] = dc.useState<boolean>(false);
@@ -168,6 +170,23 @@ function usePaintTool({
           onObjectsChange(result.objects);
         }
       } else {
+        // Erase tile at hex coords (overlay first, then base)
+        let tileErased = false;
+        if (geometry?.type === 'hex' && onTilesChange && activeLayer.tiles?.length) {
+          const tiles = activeLayer.tiles as HexTileAssignment[];
+          const overlayIdx = tiles.findIndex((t: HexTileAssignment) => t.q === coordX && t.r === coordY && t.layer === 'overlay');
+          if (overlayIdx >= 0) {
+            onTilesChange(tiles.filter((_: HexTileAssignment, i: number) => i !== overlayIdx));
+            tileErased = true;
+          } else {
+            const baseIdx = tiles.findIndex((t: HexTileAssignment) => t.q === coordX && t.r === coordY);
+            if (baseIdx >= 0) {
+              onTilesChange(tiles.filter((_: HexTileAssignment, i: number) => i !== baseIdx));
+              tileErased = true;
+            }
+          }
+        }
+        if (!tileErased) {
         let curveErased = false;
         if (activeLayer.curves && activeLayer.curves.length > 0 && geometry) {
           let newCurves: Curve[] | null = null;
@@ -193,6 +212,7 @@ function usePaintTool({
         if (!curveErased && getCellIndex(activeLayer.cells, coords, geometry) !== -1) {
           const newCells = accessorRemoveCell(activeLayer.cells, coords, geometry);
           onCellsChange(newCells, isBatchedStroke);
+        }
         }
       }
     }
