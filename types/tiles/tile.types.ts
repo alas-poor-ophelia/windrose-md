@@ -23,6 +23,10 @@ export interface TilesetDef {
   overflowTop: number;
   /** Pixels of overflow below the hex area */
   overflowBottom: number;
+  /** How tile images are scaled into the hex bounding box.
+   *  'fill' = independent X/Y scaling (stretches to hex shape, good for terrain).
+   *  'contain' = uniform scaling preserving aspect ratio (good for stamps/objects). */
+  fitMode?: 'fill' | 'contain';
   tiles: TileEntry[];
 }
 
@@ -54,4 +58,12 @@ export interface HexTileAssignment {
   flipH?: boolean;
   /** Tile layer: 'base' (default) or 'overlay' (stamp atop base) */
   layer?: 'base' | 'overlay';
+  /** Override tileset fitMode for this specific placement */
+  fitMode?: 'fill' | 'contain';
+  /** Freeform stamp: placed at world coordinates, not snapped to hex */
+  freeform?: boolean;
+  /** World-space X coordinate (used when freeform is true) */
+  worldX?: number;
+  /** World-space Y coordinate (used when freeform is true) */
+  worldY?: number;
 }
