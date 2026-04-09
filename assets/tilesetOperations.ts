@@ -104,11 +104,57 @@ function scanTilesetFolder(folderPath: string): TileEntry[] {
 // ===========================================
 
 /**
+ * Measure alpha coverage of a tile image (fraction of non-transparent pixels).
+ * Used to auto-detect fitMode: high coverage = hex-filling terrain, low = stamp/object.
+ */
+async function measureAlphaCoverage(tile: TileEntry): Promise<number | null> {
+  try {
+    const file = app.vault.getAbstractFileByPath(tile.vaultPath);
+    if (!file) return null;
+
+    const binary = await app.vault.readBinary(file);
+    const blob = new Blob([binary]);
+    const url = URL.createObjectURL(blob);
+
+    const result = await new Promise<number | null>((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const w = img.naturalWidth;
+        const h = img.naturalHeight;
+        if (w === 0 || h === 0) { resolve(null); URL.revokeObjectURL(url); return; }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d')!;
+        ctx.drawImage(img, 0, 0);
+        const data = ctx.getImageData(0, 0, w, h).data;
+
+        let opaque = 0;
+        const total = w * h;
+        for (let i = 3; i < data.length; i += 4) {
+          if (data[i] > 10) opaque++;
+        }
+
+        resolve(opaque / total);
+        URL.revokeObjectURL(url);
+      };
+      img.onerror = () => { resolve(null); URL.revokeObjectURL(url); };
+      img.src = url;
+    });
+
+    return result;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Probe tile images to find the dominant (most common) pixel dimensions.
  * Samples up to 5 images, skipping tiny ones (< 64px), and returns
- * the most frequently occurring size.
+ * the most frequently occurring size plus alpha coverage for fitMode detection.
  */
-async function probeFirstTileImage(tiles: TileEntry[]): Promise<{ width: number; height: number } | null> {
+async function probeFirstTileImage(tiles: TileEntry[]): Promise<{ width: number; height: number; alphaCoverage?: number } | null> {
   const MIN_SIZE = 64;
   const MAX_PROBES = 5;
   const sizes: { width: number; height: number }[] = [];
@@ -167,8 +213,14 @@ async function probeFirstTileImage(tiles: TileEntry[]): Promise<{ width: number;
     }
   }
 
-  return best;
+  // Measure alpha coverage from the first tile for fitMode auto-detection
+  const coverage = await measureAlphaCoverage(tiles[0]);
+
+  return { ...best, alphaCoverage: coverage ?? undefined };
 }
+
+/** Alpha coverage threshold: above this → hex-filling (fill), below → stamp (contain) */
+const ALPHA_COVERAGE_THRESHOLD = 0.6;
 
 /**
  * Create a TilesetDef by scanning a vault folder for tile images.
@@ -181,6 +233,7 @@ function createTileset(
     tileWidth?: number;
     tileHeight?: number;
     hexHeight?: number;
+    fitMode?: 'fill' | 'contain';
     overflowTop?: number;
     overflowBottom?: number;
   }
@@ -200,6 +253,7 @@ function createTileset(
     hexHeight: options?.hexHeight ?? detected.hexHeight,
     overflowTop: options?.overflowTop ?? detected.overflowTop,
     overflowBottom: options?.overflowBottom ?? detected.overflowBottom,
+    fitMode: options?.fitMode,
     tiles,
   };
 }
@@ -212,6 +266,8 @@ return {
   scanTilesetFolder,
   createTileset,
   probeFirstTileImage,
+  measureAlphaCoverage,
   autoDetectOverflow,
   generateTilesetId,
+  ALPHA_COVERAGE_THRESHOLD,
 };

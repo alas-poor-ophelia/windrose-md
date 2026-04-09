@@ -23,6 +23,8 @@ interface TilePlacementLayerProps {
   tileRotation: number;
   tileFlipH: boolean;
   tileLayer: 'base' | 'overlay';
+  tileFitMode: 'fill' | 'contain' | 'auto';
+  stampMode: boolean;
   onTilesChange: (tiles: HexTileAssignment[]) => void;
 }
 
@@ -33,9 +35,11 @@ const TilePlacementLayer = ({
   tileRotation,
   tileFlipH,
   tileLayer,
+  tileFitMode,
+  stampMode,
   onTilesChange
 }: TilePlacementLayerProps): React.ReactElement | null => {
-  const { mapData, geometry, screenToGrid } = useMapState();
+  const { mapData, geometry, screenToGrid, screenToWorld } = useMapState();
   const { registerHandlers, unregisterHandlers } = useEventHandlerRegistration();
 
   const isTileTool = currentTool === 'tilePaint';
@@ -66,7 +70,8 @@ const TilePlacementLayer = ({
       tileId: selectedTileId,
       rotation: tileRotation || undefined,
       flipH: tileFlipH || undefined,
-      layer: targetLayer === 'base' ? undefined : targetLayer
+      layer: targetLayer === 'base' ? undefined : targetLayer,
+      fitMode: tileFitMode === 'auto' ? undefined : tileFitMode,
     };
 
     let newTiles: HexTileAssignment[];
@@ -78,7 +83,29 @@ const TilePlacementLayer = ({
     }
 
     onTilesChange(newTiles);
-  }, [mapData, selectedTilesetId, selectedTileId, tileRotation, tileFlipH, tileLayer, onTilesChange]);
+  }, [mapData, selectedTilesetId, selectedTileId, tileRotation, tileFlipH, tileLayer, tileFitMode, onTilesChange]);
+
+  const placeStampAtWorld = dc.useCallback((worldX: number, worldY: number, q: number, r: number) => {
+    if (!mapData || !selectedTilesetId || !selectedTileId) return;
+
+    const activeLayer = getActiveLayer(mapData);
+    const currentTiles = activeLayer.tiles || [];
+
+    const newTile: HexTileAssignment = {
+      q, r,
+      tilesetId: selectedTilesetId,
+      tileId: selectedTileId,
+      rotation: tileRotation || undefined,
+      flipH: tileFlipH || undefined,
+      layer: 'overlay',
+      fitMode: tileFitMode === 'auto' ? undefined : tileFitMode,
+      freeform: true,
+      worldX,
+      worldY,
+    };
+
+    onTilesChange([...currentTiles, newTile]);
+  }, [mapData, selectedTilesetId, selectedTileId, tileRotation, tileFlipH, tileFitMode, onTilesChange]);
 
   const eraseTileAtHex = dc.useCallback((q: number, r: number) => {
     if (!mapData) return;
@@ -115,6 +142,15 @@ const TilePlacementLayer = ({
     const coords = screenToGrid(e.clientX, e.clientY);
     if (!coords) return;
 
+    if (stampMode && hasTileSelected) {
+      // Stamp mode: place at exact world position (click only, no drag)
+      const worldCoords = screenToWorld(e.clientX, e.clientY);
+      if (worldCoords) {
+        placeStampAtWorld(worldCoords.worldX, worldCoords.worldY, coords.x, coords.y);
+      }
+      return;
+    }
+
     isDraggingRef.current = true;
     paintedInStrokeRef.current = new Set();
 
@@ -123,10 +159,11 @@ const TilePlacementLayer = ({
     } else {
       eraseTileAtHex(coords.x, coords.y);
     }
-  }, [isTileTool, geometry, screenToGrid, hasTileSelected, placeTileAtHex, eraseTileAtHex]);
+  }, [isTileTool, geometry, screenToGrid, screenToWorld, hasTileSelected, stampMode, placeTileAtHex, placeStampAtWorld, eraseTileAtHex]);
 
   const handlePointerMove = dc.useCallback((e: PointerEvent) => {
     if (!isDraggingRef.current || !isTileTool || !geometry || geometry.type !== 'hex') return;
+    if (stampMode) return; // No drag-painting in stamp mode
 
     const coords = screenToGrid(e.clientX, e.clientY);
     if (!coords) return;
@@ -136,7 +173,7 @@ const TilePlacementLayer = ({
     } else {
       eraseTileAtHex(coords.x, coords.y);
     }
-  }, [isTileTool, geometry, screenToGrid, hasTileSelected, placeTileAtHex, eraseTileAtHex]);
+  }, [isTileTool, geometry, screenToGrid, hasTileSelected, stampMode, placeTileAtHex, eraseTileAtHex]);
 
   const handlePointerUp = dc.useCallback(() => {
     isDraggingRef.current = false;

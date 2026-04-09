@@ -111,10 +111,14 @@ function useMapData(
           const parts = folder.split('/');
           const name = parts[parts.length - 1] || folder;
 
-          // Probe actual image dimensions from the first tile
+          // Probe actual image dimensions and alpha coverage from the first tile
           const tiles = scanTilesetFolder(folder);
           const dims = await probeFirstTileImage(tiles);
-          const options = dims ? { tileWidth: dims.width, tileHeight: dims.height } : undefined;
+          const fitMode = dims?.alphaCoverage != null && dims.alphaCoverage < 0.6
+            ? 'contain' as const : 'fill' as const;
+          const options = dims
+            ? { tileWidth: dims.width, tileHeight: dims.height, fitMode }
+            : undefined;
 
           const tileset = createTileset(folder, name, options);
           if (tileset.tiles.length > 0) {

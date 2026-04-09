@@ -204,6 +204,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   const [tileRotation, setTileRotation] = dc.useState<number>(0);
   const [tileFlipH, setTileFlipH] = dc.useState<boolean>(false);
   const [tileLayer, setTileLayer] = dc.useState<'base' | 'overlay'>('base');
+  const [tileFitMode, setTileFitMode] = dc.useState<'fill' | 'contain' | 'auto'>('auto');
+  const [stampMode, setStampMode] = dc.useState<boolean>(false);
   const showTilePanel = mapData?.mapType === 'hex' && (mapData?.tilesets?.length ?? 0) > 0;
 
   const handleTileSelect = (tilesetId: string, tileId: string) => {
@@ -667,6 +669,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 tileRotation={tileRotation}
                 tileFlipH={tileFlipH}
                 tileLayer={tileLayer}
+                tileFitMode={tileFitMode}
+                stampMode={stampMode}
                 onTilesChange={handleTilesChange}
               />
 
@@ -736,6 +740,10 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               onFlipChange={setTileFlipH}
               tileLayer={tileLayer}
               onTileLayerChange={setTileLayer}
+              tileFitMode={tileFitMode}
+              onTileFitModeChange={setTileFitMode}
+              stampMode={stampMode}
+              onStampModeChange={setStampMode}
               getCachedImage={getCachedImage}
             />
           )}

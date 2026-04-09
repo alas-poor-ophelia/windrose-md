@@ -81,7 +81,8 @@ function calculateTileDrawRect(
   tileset: TilesetDef,
   hexSize: number,
   zoom: number,
-  orientation: string
+  orientation: string,
+  fitMode?: 'fill' | 'contain'
 ): { drawX: number; drawY: number; drawWidth: number; drawHeight: number } {
   // On-screen hex dimensions (corner-to-corner)
   const hexScreenWidth = orientation === 'flat'
@@ -95,6 +96,24 @@ function calculateTileDrawRect(
   // tileWidth maps to hex width, hexHeight maps to hex height
   const scaleX = hexScreenWidth / tileset.tileWidth;
   const scaleY = hexScreenHeight / tileset.hexHeight;
+
+  const effectiveFit = fitMode || tileset.fitMode || 'fill';
+
+  if (effectiveFit === 'contain') {
+    // Uniform scaling: preserve aspect ratio, fit within hex bounding box
+    const uniformScale = Math.min(scaleX, scaleY);
+    const drawWidth = tileset.tileWidth * uniformScale;
+    const drawHeight = tileset.tileHeight * uniformScale;
+
+    // Center within the hex bounding box
+    const drawX = screenX - drawWidth / 2;
+    const hexAreaCenterInTile = tileset.overflowTop + tileset.hexHeight / 2;
+    const drawY = screenY - hexAreaCenterInTile * uniformScale;
+
+    return { drawX, drawY, drawWidth, drawHeight };
+  }
+
+  // 'fill' mode: independent X/Y scaling (original behavior)
   const drawWidth = tileset.tileWidth * scaleX;
   const drawHeight = tileset.tileHeight * scaleY;
 
@@ -142,12 +161,14 @@ function renderTiles(
     }
   }
 
-  // Two-pass rendering: base tiles first, overlay tiles second
-  const baseTiles = tiles.filter((t: HexTileAssignment) => (t.layer || 'base') === 'base');
-  const overlayTiles = tiles.filter((t: HexTileAssignment) => t.layer === 'overlay');
+  // Three-pass rendering: base tiles, overlay tiles, then freeform stamps (on top)
+  const baseTiles = tiles.filter((t: HexTileAssignment) => !t.freeform && (t.layer || 'base') === 'base');
+  const overlayTiles = tiles.filter((t: HexTileAssignment) => !t.freeform && t.layer === 'overlay');
+  const freeformTiles = tiles.filter((t: HexTileAssignment) => t.freeform);
   const sortedBase = sortTilesForRendering(baseTiles, geometry.orientation);
   const sortedOverlay = sortTilesForRendering(overlayTiles, geometry.orientation);
-  const sorted = [...sortedBase, ...sortedOverlay];
+  // Freeform stamps render in insertion order (no z-sort)
+  const sorted = [...sortedBase, ...sortedOverlay, ...freeformTiles];
 
   const previousAlpha = ctx.globalAlpha;
   const opacity = options?.opacity ?? 1;
@@ -163,11 +184,13 @@ function renderTiles(
     if (!img) continue;
 
     // Convert to screen coordinates
-    const world = geometry.hexToWorld(tile.q, tile.r);
-    const screen = geometry.worldToScreen(
-      world.worldX, world.worldY,
-      viewState.x, viewState.y, viewState.zoom
-    );
+    // Freeform stamps use stored world coordinates directly
+    const screen = tile.freeform && tile.worldX != null && tile.worldY != null
+      ? geometry.worldToScreen(tile.worldX, tile.worldY, viewState.x, viewState.y, viewState.zoom)
+      : (() => {
+          const world = geometry.hexToWorld(tile.q, tile.r);
+          return geometry.worldToScreen(world.worldX, world.worldY, viewState.x, viewState.y, viewState.zoom);
+        })();
 
     // Viewport culling (generous margin for overflow)
     const maxOverflow = Math.max(tileset.overflowTop, tileset.overflowBottom, tileset.tileHeight);
@@ -177,9 +200,45 @@ function renderTiles(
       continue;
     }
 
-    const rect = calculateTileDrawRect(
+    // Auto-detect fit mode for mixed tilesets: if the actual image dimensions
+    // differ significantly from the tileset's declared dimensions, this tile
+    // is a stamp/object (not hex-filling). Scale it relative to the tileset's
+    // coordinate space so a 55px stamp in a 256px tileset stays small.
+    let drawOverride: { drawX: number; drawY: number; drawWidth: number; drawHeight: number } | null = null;
+    const natW = img.naturalWidth;
+    const natH = img.naturalHeight;
+    if (natW > 0 && natH > 0 && !tile.fitMode) {
+      const wRatio = natW / tileset.tileWidth;
+      const hRatio = natH / tileset.hexHeight;
+      if (wRatio < 0.5 || hRatio < 0.5) {
+        // Compute how big this image should be relative to the hex,
+        // using the tileset's fill scaling as the reference frame
+        const hexScreenWidth = geometry.orientation === 'flat'
+          ? 2 * geometry.hexSize * viewState.zoom
+          : SQRT3 * geometry.hexSize * viewState.zoom;
+        const hexScreenHeight = geometry.orientation === 'flat'
+          ? SQRT3 * geometry.hexSize * viewState.zoom
+          : 2 * geometry.hexSize * viewState.zoom;
+
+        const fillScaleX = hexScreenWidth / tileset.tileWidth;
+        const fillScaleY = hexScreenHeight / tileset.hexHeight;
+        // Use the smaller fill scale to preserve aspect ratio
+        const baseScale = Math.min(fillScaleX, fillScaleY);
+        const drawWidth = natW * baseScale;
+        const drawHeight = natH * baseScale;
+        drawOverride = {
+          drawX: screen.screenX - drawWidth / 2,
+          drawY: screen.screenY - drawHeight / 2,
+          drawWidth,
+          drawHeight,
+        };
+      }
+    }
+
+    const rect = drawOverride || calculateTileDrawRect(
       screen.screenX, screen.screenY,
-      tileset, geometry.hexSize, viewState.zoom, geometry.orientation
+      tileset, geometry.hexSize, viewState.zoom, geometry.orientation,
+      tile.fitMode
     );
 
     // Apply opacity

@@ -143,6 +143,10 @@ interface TileAssetBrowserProps {
   onFlipChange: (flipH: boolean) => void;
   tileLayer: 'base' | 'overlay';
   onTileLayerChange: (layer: 'base' | 'overlay') => void;
+  tileFitMode: 'fill' | 'contain' | 'auto';
+  onTileFitModeChange: (mode: 'fill' | 'contain' | 'auto') => void;
+  stampMode: boolean;
+  onStampModeChange: (stamp: boolean) => void;
   getCachedImage?: (path: string) => HTMLImageElement | null;
 }
 
@@ -163,6 +167,10 @@ const TileAssetBrowser = ({
   onFlipChange,
   tileLayer,
   onTileLayerChange,
+  tileFitMode,
+  onTileFitModeChange,
+  stampMode,
+  onStampModeChange,
   getCachedImage,
 }: TileAssetBrowserProps): React.ReactElement => {
   const [activeTilesetIndex, setActiveTilesetIndex] = dc.useState<number>(0);
@@ -454,6 +462,25 @@ const TileAssetBrowser = ({
             title="Flip horizontal"
           >
             <dc.Icon icon="lucide-flip-horizontal" size={14} />
+          </button>
+          <div className="dmt-tile-browser-separator" />
+          <button
+            className={`dmt-tile-browser-action-btn ${stampMode ? 'dmt-tile-browser-action-active' : ''}`}
+            onClick={() => onStampModeChange(!stampMode)}
+            title={stampMode ? 'Stamp mode: ON (free placement)' : 'Stamp mode: OFF (grid-snapped)'}
+          >
+            <dc.Icon icon="lucide-stamp" size={14} />
+          </button>
+          <button
+            className={`dmt-tile-browser-action-btn ${tileFitMode === 'auto' ? '' : tileFitMode === 'contain' ? 'dmt-tile-browser-action-active' : ''}`}
+            onClick={() => {
+              const modes: Array<'auto' | 'fill' | 'contain'> = ['auto', 'fill', 'contain'];
+              const idx = modes.indexOf(tileFitMode);
+              onTileFitModeChange(modes[(idx + 1) % modes.length]);
+            }}
+            title={`Fit mode: ${tileFitMode} (click to cycle: auto → fill → contain)`}
+          >
+            <dc.Icon icon={tileFitMode === 'contain' ? 'lucide-minimize-2' : tileFitMode === 'fill' ? 'lucide-maximize-2' : 'lucide-scan'} size={14} />
           </button>
           <button
             className="dmt-tile-browser-action-btn"
