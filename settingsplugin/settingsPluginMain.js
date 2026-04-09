@@ -150,6 +150,53 @@ class WindroseMDSettingsPlugin extends Plugin {
       }
     }));
 
+    // Register windrose-map code block processor
+    // Parses YAML config (id, name, type) and delegates rendering to Datacore
+    this.registerMarkdownCodeBlockProcessor('windrose-map', (source, el, ctx) => {
+      // Parse simple YAML key: value pairs
+      const config = {};
+      for (const line of source.split('\\n')) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith('#')) continue;
+        const colonIdx = trimmed.indexOf(':');
+        if (colonIdx === -1) continue;
+        const key = trimmed.slice(0, colonIdx).trim();
+        const value = trimmed.slice(colonIdx + 1).trim();
+        config[key] = value;
+      }
+
+      const mapId = config.id || '';
+      const mapName = config.name || 'Unnamed Map';
+      const mapType = config.type || 'grid';
+
+      if (!mapId) {
+        el.createEl('div', {
+          text: 'Windrose: Missing required "id" field in windrose-map block.',
+          cls: 'windrose-error'
+        });
+        return;
+      }
+
+      // Check if Datacore is available
+      if (!window.datacore) {
+        el.createEl('div', {
+          text: 'Windrose: Waiting for Datacore to load...',
+          cls: 'windrose-loading'
+        });
+        // Retry when Datacore becomes available
+        const onReady = () => {
+          el.empty();
+          this._renderWindroseBlock(mapId, mapName, mapType, el, ctx);
+        };
+        window.addEventListener('datacore:index-ready', onReady, { once: true });
+        // Also register cleanup
+        this.register(() => window.removeEventListener('datacore:index-ready', onReady));
+        return;
+      }
+
+      this._renderWindroseBlock(mapId, mapName, mapType, el, ctx);
+    });
+
     // Register command to insert a new map
     this.addCommand({
       id: 'insert-new-map',
@@ -157,20 +204,15 @@ class WindroseMDSettingsPlugin extends Plugin {
       editorCallback: (editor, view) => {
         new InsertMapModal(this.app, (mapName, mapType) => {
           const mapId = 'map-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
-          
+
           const codeBlock = [
-            '\`\`\`datacorejsx',
-            '',
-            'const { View: DungeonMapTracker } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md.md"), "DungeonMapTracker"));',
-            '',
-            \`const mapId = "\${mapId}";\`,
-            \`const mapName = "\${mapName}";\`,
-            \`const mapType = "\${mapType}";\`,
-            '',
-            'return <DungeonMapTracker mapId={mapId} mapName={mapName} mapType={mapType} />;',
+            '\`\`\`windrose-map',
+            \`id: \${mapId}\`,
+            \`name: \${mapName}\`,
+            \`type: \${mapType}\`,
             '\`\`\`'
           ].join('\\n');
-          
+
           editor.replaceSelection(codeBlock);
         }).open();
       }
@@ -237,39 +279,57 @@ class WindroseMDSettingsPlugin extends Plugin {
           const mapId = 'map-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
           await this.saveDungeonToJson(mapId, mapName, cells, objects, edges, options);
 
-          // Debug mode uses source entry point instead of compiled
-          const debugFile = this.app.vault.getAbstractFileByPath('WINDROSE-DEBUG.json');
-          const codeBlock = debugFile
-            ? [
-                '\`\`\`datacorejsx',
-                'window.__dmtBasePath = "Projects/dungeon-map-tracker";',
-                '',
-                'const { DungeonMapTracker } = await dc.require(dc.resolvePath("Dungeon" + "MapTracker.tsx"));',
-                '',
-                \`const mapId = "\${mapId}";\`,
-                \`const mapName = "\${mapName}";\`,
-                'const mapType = "grid";',
-                '',
-                'return <DungeonMapTracker mapId={mapId} mapName={mapName} mapType={mapType} />;',
-                '\`\`\`'
-              ].join('\\n')
-            : [
-                '\`\`\`datacorejsx',
-                '',
-                'const { View: DungeonMapTracker } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md.md"), "DungeonMapTracker"));',
-                '',
-                \`const mapId = "\${mapId}";\`,
-                \`const mapName = "\${mapName}";\`,
-                'const mapType = "grid";',
-                '',
-                'return <DungeonMapTracker mapId={mapId} mapName={mapName} mapType={mapType} />;',
-                '\`\`\`'
-              ].join('\\n');
+          const codeBlock = [
+            '\`\`\`windrose-map',
+            \`id: \${mapId}\`,
+            \`name: \${mapName}\`,
+            'type: grid',
+            '\`\`\`'
+          ].join('\\n');
 
           editor.replaceSelection(codeBlock);
         }).open();
       }
     });
+  }
+
+  /**
+   * Render a windrose-map block by generating JSX source and delegating to Datacore.
+   */
+  _renderWindroseBlock(mapId, mapName, mapType, el, ctx) {
+    const debugFile = this.app.vault.getAbstractFileByPath('WINDROSE-DEBUG.json');
+
+    const jsxSource = debugFile
+      ? [
+          'window.__dmtBasePath = "Projects/dungeon-map-tracker";',
+          '',
+          'const { DungeonMapTracker } = await dc.require(dc.resolvePath("Dungeon" + "MapTracker.tsx"));',
+          '',
+          'const mapId = "' + mapId + '";',
+          'const mapName = "' + mapName.replace(/"/g, '\\\\"') + '";',
+          'const mapType = "' + mapType + '";',
+          '',
+          'return <DungeonMapTracker mapId={mapId} mapName={mapName} mapType={mapType} />;'
+        ].join('\\n')
+      : [
+          'const { View: DungeonMapTracker } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md.md"), "DungeonMapTracker"));',
+          '',
+          'const mapId = "' + mapId + '";',
+          'const mapName = "' + mapName.replace(/"/g, '\\\\"') + '";',
+          'const mapType = "' + mapType + '";',
+          '',
+          'return <DungeonMapTracker mapId={mapId} mapName={mapName} mapType={mapType} />;'
+        ].join('\\n');
+
+    try {
+      window.datacore.executeJsx(jsxSource, el, ctx, ctx.sourcePath);
+    } catch (err) {
+      console.error('[Windrose] Failed to render map block:', err);
+      el.createEl('div', {
+        text: 'Windrose: Failed to render map. Check console for details.',
+        cls: 'windrose-error'
+      });
+    }
   }
 
   onunload() {
