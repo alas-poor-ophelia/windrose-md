@@ -12,7 +12,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp']);
 
-function generateTilesetId(): string {
+function generateTilesetId(folderPath?: string): string {
+  if (folderPath) {
+    let hash = 0;
+    for (let i = 0; i < folderPath.length; i++) {
+      hash = ((hash << 5) - hash + folderPath.charCodeAt(i)) | 0;
+    }
+    return 'tileset-' + Math.abs(hash).toString(36);
+  }
   return 'tileset-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
 }
 
@@ -82,20 +89,22 @@ describe('tilesetOperations', () => {
       expect(id).toMatch(/^tileset-/);
     });
 
-    it('contains a timestamp component', () => {
-      const before = Date.now();
-      const id = generateTilesetId();
-      const after = Date.now();
-
-      const parts = id.split('-');
-      const timestamp = parseInt(parts[1], 10);
-      expect(timestamp).toBeGreaterThanOrEqual(before);
-      expect(timestamp).toBeLessThanOrEqual(after);
-    });
-
-    it('generates unique IDs across calls', () => {
+    it('generates unique random IDs when no folder path given', () => {
       const ids = new Set(Array.from({ length: 20 }, () => generateTilesetId()));
       expect(ids.size).toBe(20);
+    });
+
+    it('returns deterministic ID for a given folder path', () => {
+      const id1 = generateTilesetId('Hex Samples');
+      const id2 = generateTilesetId('Hex Samples');
+      expect(id1).toBe(id2);
+      expect(id1).toMatch(/^tileset-/);
+    });
+
+    it('returns different IDs for different folder paths', () => {
+      const id1 = generateTilesetId('Hex Samples');
+      const id2 = generateTilesetId('Other Tiles');
+      expect(id1).not.toBe(id2);
     });
   });
 

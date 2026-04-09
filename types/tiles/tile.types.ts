@@ -52,4 +52,6 @@ export interface HexTileAssignment {
   /** Rotation in 60-degree increments: 0, 60, 120, 180, 240, 300 */
   rotation?: number;
   flipH?: boolean;
+  /** Tile layer: 'base' (default) or 'overlay' (stamp atop base) */
+  layer?: 'base' | 'overlay';
 }

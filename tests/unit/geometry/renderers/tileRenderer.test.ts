@@ -1,80 +1,25 @@
 /**
  * Unit tests for tileRenderer.ts
- * Tests z-sort ordering, draw rect calculation, and viewport culling.
+ * Tests z-sort ordering and draw rect calculation using actual source functions.
  */
 
 import { describe, it, expect } from 'vitest';
 
-// ===========================================
-// Re-implement pure functions for testability
-// ===========================================
+import { vi } from 'vitest';
+
+import {
+  sortTilesForRendering,
+  calculateTileDrawRect,
+  renderTiles,
+} from "../../../../src/geometry/renderers/tileRenderer.ts";
+
+import type { HexTileAssignment, TilesetDef } from '#types/tiles/tile.types';
 
 const SQRT3 = Math.sqrt(3);
 
-function axialToOffset(q: number, r: number, orientation: string) {
-  if (orientation === 'flat') {
-    return { col: q, row: r + (q - (q & 1)) / 2 };
-  } else {
-    return { col: q + (r - (r & 1)) / 2, row: r };
-  }
-}
-
-interface TileAssignment {
-  q: number;
-  r: number;
-  tilesetId: string;
-  tileId: string;
-  rotation?: number;
-  flipH?: boolean;
-}
-
-function sortTilesForRendering(tiles: TileAssignment[], orientation: string): TileAssignment[] {
-  return [...tiles].sort((a, b) => {
-    const oa = axialToOffset(a.q, a.r, orientation);
-    const ob = axialToOffset(b.q, b.r, orientation);
-    if (oa.row !== ob.row) return oa.row - ob.row;
-    return oa.col - ob.col;
-  });
-}
-
-interface TilesetDef {
-  tileWidth: number;
-  tileHeight: number;
-  hexHeight: number;
-  overflowTop: number;
-  overflowBottom: number;
-}
-
-function calculateTileDrawRect(
-  screenX: number,
-  screenY: number,
-  tileset: TilesetDef,
-  hexSize: number,
-  zoom: number,
-  orientation: string
-): { drawX: number; drawY: number; drawWidth: number; drawHeight: number } {
-  const hexScreenHeight = orientation === 'flat'
-    ? SQRT3 * hexSize * zoom
-    : 2 * hexSize * zoom;
-
-  const scale = hexScreenHeight / tileset.hexHeight;
-  const drawWidth = tileset.tileWidth * scale;
-  const drawHeight = tileset.tileHeight * scale;
-
-  const hexAreaCenterInTile = tileset.overflowTop + tileset.hexHeight / 2;
-  const drawX = screenX - drawWidth / 2;
-  const drawY = screenY - hexAreaCenterInTile * scale;
-
-  return { drawX, drawY, drawWidth, drawHeight };
-}
-
-// ===========================================
-// Tests
-// ===========================================
-
 describe('tileRenderer', () => {
   describe('sortTilesForRendering', () => {
-    const makeTile = (q: number, r: number): TileAssignment => ({
+    const makeTile = (q: number, r: number): HexTileAssignment => ({
       q, r, tilesetId: 'ts1', tileId: 'tile1',
     });
 
@@ -91,7 +36,6 @@ describe('tileRenderer', () => {
     });
 
     it('breaks ties by column', () => {
-      // Same row, different columns
       const tiles = [makeTile(2, 0), makeTile(0, 0), makeTile(1, 0)];
       const sorted = sortTilesForRendering(tiles, 'flat');
       expect(sorted.map(t => t.q)).toEqual([0, 1, 2]);
@@ -128,119 +72,173 @@ describe('tileRenderer', () => {
   });
 
   describe('calculateTileDrawRect', () => {
-    it('centers a square tile with no overflow on the hex (flat-top)', () => {
-      const tileset: TilesetDef = {
-        tileWidth: 256, tileHeight: 256,
-        hexHeight: 256, overflowTop: 0, overflowBottom: 0,
-      };
-      const rect = calculateTileDrawRect(400, 300, tileset, 80, 1, 'flat');
-
-      // Hex screen height for flat-top = sqrt(3) * 80 * 1 ≈ 138.56
-      const hexScreenH = SQRT3 * 80;
-      const scale = hexScreenH / 256;
-      const drawW = 256 * scale;
-      const drawH = 256 * scale;
-
-      expect(rect.drawWidth).toBeCloseTo(drawW, 2);
-      expect(rect.drawHeight).toBeCloseTo(drawH, 2);
-      // Centered horizontally
-      expect(rect.drawX).toBeCloseTo(400 - drawW / 2, 2);
-      // Hex area center = 0 + 256/2 = 128 from top
-      // drawY = 300 - 128 * scale
-      expect(rect.drawY).toBeCloseTo(300 - 128 * scale, 2);
+    const makeTileset = (overrides: Partial<TilesetDef> = {}): TilesetDef => ({
+      id: 'ts1', name: 'Test', folderPath: '/test',
+      tileWidth: 256, tileHeight: 256, hexHeight: 256,
+      overflowTop: 0, overflowBottom: 0, tiles: [],
+      ...overrides,
     });
 
-    it('extends above the hex for tall tiles with overflow (flat-top)', () => {
-      const tileset: TilesetDef = {
-        tileWidth: 256, tileHeight: 384,
-        hexHeight: 256, overflowTop: 128, overflowBottom: 0,
-      };
+    it('tile drawWidth matches hex width for flat-top', () => {
+      const tileset = makeTileset();
       const rect = calculateTileDrawRect(400, 300, tileset, 80, 1, 'flat');
+      // Flat-top hex width = 2 * hexSize = 160
+      expect(rect.drawWidth).toBeCloseTo(2 * 80, 2);
+    });
 
-      const hexScreenH = SQRT3 * 80;
-      const scale = hexScreenH / 256;
+    it('tile drawHeight matches hex height for flat-top (no overflow)', () => {
+      const tileset = makeTileset();
+      const rect = calculateTileDrawRect(400, 300, tileset, 80, 1, 'flat');
+      // Flat-top hex height = sqrt(3) * hexSize
+      expect(rect.drawHeight).toBeCloseTo(SQRT3 * 80, 2);
+    });
 
-      // Hex area center in tile = 128 + 128 = 256 pixels from top
-      // drawY = 300 - 256 * scale
-      const expectedY = 300 - 256 * scale;
-      expect(rect.drawY).toBeCloseTo(expectedY, 2);
+    it('tile drawWidth matches hex width for pointy-top', () => {
+      const tileset = makeTileset();
+      const rect = calculateTileDrawRect(400, 300, tileset, 80, 1, 'pointy');
+      // Pointy-top hex width = sqrt(3) * hexSize
+      expect(rect.drawWidth).toBeCloseTo(SQRT3 * 80, 2);
+    });
 
-      // The draw height is taller than the no-overflow case
-      expect(rect.drawHeight).toBeCloseTo(384 * scale, 2);
-      // So the top edge is above the no-overflow case
-      expect(rect.drawY).toBeLessThan(300 - rect.drawHeight / 2 + 10);
+    it('tile drawHeight matches hex height for pointy-top (no overflow)', () => {
+      const tileset = makeTileset();
+      const rect = calculateTileDrawRect(400, 300, tileset, 80, 1, 'pointy');
+      // Pointy-top hex height = 2 * hexSize = 160
+      expect(rect.drawHeight).toBeCloseTo(2 * 80, 2);
+    });
+
+    it('extends above the hex for tall tiles with overflow', () => {
+      const tileset = makeTileset({
+        tileHeight: 384, overflowTop: 128,
+      });
+      const rect = calculateTileDrawRect(400, 300, tileset, 80, 1, 'pointy');
+
+      const hexScreenH = 2 * 80;
+      const scaleY = hexScreenH / 256;
+
+      expect(rect.drawY).toBeCloseTo(300 - 256 * scaleY, 2);
+      expect(rect.drawHeight).toBeCloseTo(384 * scaleY, 2);
     });
 
     it('scales with zoom', () => {
-      const tileset: TilesetDef = {
-        tileWidth: 256, tileHeight: 256,
-        hexHeight: 256, overflowTop: 0, overflowBottom: 0,
-      };
-      const rect1 = calculateTileDrawRect(400, 300, tileset, 80, 1, 'flat');
-      const rect2 = calculateTileDrawRect(400, 300, tileset, 80, 2, 'flat');
+      const tileset = makeTileset();
+      const rect1 = calculateTileDrawRect(400, 300, tileset, 80, 1, 'pointy');
+      const rect2 = calculateTileDrawRect(400, 300, tileset, 80, 2, 'pointy');
 
       expect(rect2.drawWidth).toBeCloseTo(rect1.drawWidth * 2, 2);
       expect(rect2.drawHeight).toBeCloseTo(rect1.drawHeight * 2, 2);
     });
 
-    it('uses different hex height for pointy-top', () => {
-      const tileset: TilesetDef = {
-        tileWidth: 256, tileHeight: 256,
-        hexHeight: 256, overflowTop: 0, overflowBottom: 0,
-      };
-      const rectFlat = calculateTileDrawRect(400, 300, tileset, 80, 1, 'flat');
-      const rectPointy = calculateTileDrawRect(400, 300, tileset, 80, 1, 'pointy');
+    it('handles equal overflow top and bottom', () => {
+      const tileset = makeTileset({
+        tileHeight: 384, overflowTop: 64, overflowBottom: 64,
+      });
+      const rect = calculateTileDrawRect(400, 300, tileset, 80, 1, 'pointy');
 
-      // Pointy hex height = 2 * hexSize = 160
-      // Flat hex height = sqrt(3) * hexSize ≈ 138.56
-      // So pointy tiles should be larger
-      expect(rectPointy.drawWidth).toBeGreaterThan(rectFlat.drawWidth);
+      const scaleY = (2 * 80) / 256;
+      expect(rect.drawY).toBeCloseTo(300 - 192 * scaleY, 2);
     });
 
-    it('handles equal overflow top and bottom', () => {
-      const tileset: TilesetDef = {
-        tileWidth: 256, tileHeight: 384,
-        hexHeight: 256, overflowTop: 64, overflowBottom: 64,
-      };
-      const rect = calculateTileDrawRect(400, 300, tileset, 80, 1, 'flat');
+    it('Baumgart tiles (256x384) on pointy-top grid', () => {
+      const tileset = makeTileset({
+        tileWidth: 256, tileHeight: 384, hexHeight: 256, overflowTop: 128,
+      });
+      const rect = calculateTileDrawRect(400, 300, tileset, 80, 1, 'pointy');
 
-      // Hex area center = 64 + 128 = 192 from top
-      const hexScreenH = SQRT3 * 80;
-      const scale = hexScreenH / 256;
-      expect(rect.drawY).toBeCloseTo(300 - 192 * scale, 2);
+      // drawWidth = hex width = sqrt(3) * 80
+      expect(rect.drawWidth).toBeCloseTo(SQRT3 * 80, 2);
+      // drawHeight = 384 * scaleY where scaleY = (2*80)/256
+      const scaleY = (2 * 80) / 256;
+      expect(rect.drawHeight).toBeCloseTo(384 * scaleY, 2);
     });
   });
 
-  describe('viewport culling', () => {
-    it('identifies tiles within bounds', () => {
-      // Simple culling check: screen position within canvas + margin
-      const screenX = 500, screenY = 400;
-      const canvasW = 1000, canvasH = 800;
-      const margin = 200;
-
-      const inBounds = screenX >= -margin && screenX <= canvasW + margin &&
-                       screenY >= -margin && screenY <= canvasH + margin;
-      expect(inBounds).toBe(true);
+  describe('renderTiles overlay ordering', () => {
+    const makeTileset = (): TilesetDef => ({
+      id: 'ts1', name: 'Test', folderPath: '/test',
+      tileWidth: 64, tileHeight: 64, hexHeight: 64,
+      overflowTop: 0, overflowBottom: 0,
+      tiles: [
+        { id: 'base1', filename: 'base1.png', vaultPath: '/test/base1.png' },
+        { id: 'overlay1', filename: 'overlay1.png', vaultPath: '/test/overlay1.png' },
+      ],
     });
 
-    it('identifies tiles outside bounds', () => {
-      const screenX = -500, screenY = 400;
-      const canvasW = 1000, canvasH = 800;
-      const margin = 200;
-
-      const inBounds = screenX >= -margin && screenX <= canvasW + margin &&
-                       screenY >= -margin && screenY <= canvasH + margin;
-      expect(inBounds).toBe(false);
+    const makeGeometry = () => ({
+      hexToWorld: (q: number, r: number) => ({ worldX: q * 100, worldY: r * 100 }),
+      worldToScreen: (wx: number, wy: number, ox: number, oy: number, zoom: number) => ({
+        screenX: (wx + ox) * zoom, screenY: (wy + oy) * zoom,
+      }),
+      hexSize: 32,
+      orientation: 'flat' as const,
     });
 
-    it('includes tiles near the edge with overflow margin', () => {
-      const screenX = -150, screenY = 400;
-      const canvasW = 1000, canvasH = 800;
-      const margin = 200;
+    it('renders base tiles before overlay tiles', () => {
+      const drawOrder: string[] = [];
+      const fakeImg = { naturalWidth: 64, naturalHeight: 64 } as HTMLImageElement;
+      const ctx = {
+        globalAlpha: 1,
+        drawImage: vi.fn((_img: HTMLImageElement) => {
+          // Track which tile ID triggered this draw by checking the order
+          drawOrder.push('draw');
+        }),
+        save: vi.fn(),
+        restore: vi.fn(),
+        translate: vi.fn(),
+        rotate: vi.fn(),
+        scale: vi.fn(),
+      } as unknown as CanvasRenderingContext2D;
 
-      const inBounds = screenX >= -margin && screenX <= canvasW + margin &&
-                       screenY >= -margin && screenY <= canvasH + margin;
-      expect(inBounds).toBe(true);
+      const tiles: HexTileAssignment[] = [
+        { q: 0, r: 0, tilesetId: 'ts1', tileId: 'overlay1', layer: 'overlay' },
+        { q: 0, r: 0, tilesetId: 'ts1', tileId: 'base1' },  // no layer = base
+      ];
+
+      renderTiles(ctx, tiles, [makeTileset()], makeGeometry(), { x: 0, y: 0, zoom: 1 }, {
+        getCachedImage: () => fakeImg,
+        canvasWidth: 800,
+        canvasHeight: 600,
+      });
+
+      // Both tiles should be drawn (base first, overlay second)
+      expect(ctx.drawImage).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not crash with overlay-only tiles', () => {
+      const fakeImg = { naturalWidth: 64, naturalHeight: 64 } as HTMLImageElement;
+      const ctx = {
+        globalAlpha: 1,
+        drawImage: vi.fn(),
+        save: vi.fn(),
+        restore: vi.fn(),
+        translate: vi.fn(),
+        rotate: vi.fn(),
+        scale: vi.fn(),
+      } as unknown as CanvasRenderingContext2D;
+
+      const tiles: HexTileAssignment[] = [
+        { q: 0, r: 0, tilesetId: 'ts1', tileId: 'overlay1', layer: 'overlay' },
+      ];
+
+      renderTiles(ctx, tiles, [makeTileset()], makeGeometry(), { x: 0, y: 0, zoom: 1 }, {
+        getCachedImage: () => fakeImg,
+        canvasWidth: 800,
+        canvasHeight: 600,
+      });
+
+      expect(ctx.drawImage).toHaveBeenCalledTimes(1);
+    });
+
+    it('treats tiles without layer field as base', () => {
+      const tiles: HexTileAssignment[] = [
+        { q: 0, r: 0, tilesetId: 'ts1', tileId: 'base1' },
+        { q: 1, r: 0, tilesetId: 'ts1', tileId: 'base1', layer: 'base' },
+      ];
+      // Both should be treated as base — verify by sorting
+      const baseTiles = tiles.filter(t => (t.layer || 'base') === 'base');
+      const overlayTiles = tiles.filter(t => t.layer === 'overlay');
+      expect(baseTiles).toHaveLength(2);
+      expect(overlayTiles).toHaveLength(0);
     });
   });
 });

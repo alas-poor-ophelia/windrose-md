@@ -144,6 +144,9 @@ export interface PluginSettings {
   objectSets?: ObjectSet[];
   activeObjectSetId?: string | null;
   objectSetsAutoLoadFolder?: string;
+
+  // Tileset folders (vault paths scanned for tile images)
+  tilesetFolders?: string[];
 }
 
 // ===========================================

@@ -118,6 +118,9 @@ export interface MapOperationsContextValue {
   removeTextLabel: (labels: TextLabel[], id: string) => TextLabel[];
   onTextLabelsChange: (labels: TextLabel[]) => void;
 
+  // Tile operations
+  onTilesChange?: (tiles: import('../tiles/tile.types').HexTileAssignment[]) => void;
+
   // Note pin operations (optional — not all providers include these)
   onNotePinsChange?: (pins: NotePin[]) => void;
   getNotePinAtPosition?: (pins: NotePin[], worldX: number, worldY: number, cellSize: number) => NotePin | null;
