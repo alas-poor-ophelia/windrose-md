@@ -79,6 +79,7 @@ const OBJECT_TYPES: readonly ObjectType[] = [
 ] as const;
 
 const CATEGORIES: readonly Category[] = [
+  { id: 'notes', label: 'Notes' },
   { id: 'navigation', label: 'Navigation' },
   { id: 'hazards', label: 'Hazards' },
   { id: 'features', label: 'Features' },
