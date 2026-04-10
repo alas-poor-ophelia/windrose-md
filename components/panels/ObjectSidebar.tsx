@@ -8,6 +8,15 @@ const ObjectSidebar = ({ selectedObjectType, onObjectTypeSelect, onToolChange, i
   const [searchFilter, setSearchFilter] = dc.useState('');
   const [collapsedCategories, setCollapsedCategories] = dc.useState(new Set());
 
+  // Local state for immediate re-render; synced from prop and persisted via parent
+  const [activeSetId, setActiveSetId] = dc.useState(objectSetId ?? null);
+  dc.useEffect(() => { setActiveSetId(objectSetId ?? null); }, [objectSetId]);
+
+  const handleSetChange = (newSetId) => {
+    setActiveSetId(newSetId);
+    onObjectSetChange(newSetId);
+  };
+
   // Read available object sets from plugin settings
   const objectSets = dc.useMemo(() => {
     try {
@@ -18,17 +27,14 @@ const ObjectSidebar = ({ selectedObjectType, onObjectTypeSelect, onToolChange, i
     }
   }, []);
 
-  const allObjectTypes = getResolvedObjectTypes(mapType, objectSetId);
-  const allCategories = getResolvedCategories(mapType, objectSetId);
+  const allObjectTypes = getResolvedObjectTypes(mapType, activeSetId);
+  const allCategories = getResolvedCategories(mapType, activeSetId);
 
-  const filteredObjects = dc.useMemo(() => {
-    if (!searchFilter) return allObjectTypes;
+  const filteredObjects = !searchFilter ? allObjectTypes : allObjectTypes.filter(obj => {
     const lower = searchFilter.toLowerCase();
-    return allObjectTypes.filter(obj =>
-      obj.label.toLowerCase().includes(lower) ||
-      (obj.category && obj.category.toLowerCase().includes(lower))
-    );
-  }, [allObjectTypes, searchFilter]);
+    return obj.label.toLowerCase().includes(lower) ||
+      (obj.category && obj.category.toLowerCase().includes(lower));
+  });
 
   const objectsByCategory = allCategories
     .map(category => ({
@@ -101,8 +107,8 @@ const ObjectSidebar = ({ selectedObjectType, onObjectTypeSelect, onToolChange, i
       {objectSets.length > 0 && (
         <div className="dmt-object-sidebar-set-selector">
           <select
-            value={objectSetId || ''}
-            onChange={(e) => onObjectSetChange(e.target.value || null)}
+            value={activeSetId || ''}
+            onChange={(e) => handleSetChange(e.currentTarget.value || null)}
             className="dmt-object-sidebar-select"
           >
             <option value="">Default</option>

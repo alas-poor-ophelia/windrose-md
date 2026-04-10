@@ -290,7 +290,9 @@ function getObjectSettingsForSet(setId: string, mapType: 'hex' | 'grid' = 'grid'
       const set = sets.find((s: { id: string }) => s.id === setId);
       if (!set) return null;
 
-      const sideData = mapType === 'hex' ? set.data?.hex : set.data?.grid;
+      const sideData = mapType === 'hex'
+        ? (set.data?.hex || set.data?.grid)
+        : (set.data?.grid || set.data?.hex);
       if (!sideData) return FALLBACK_OBJECT_SETTINGS;
 
       return {
