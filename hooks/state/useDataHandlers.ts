@@ -218,6 +218,14 @@ function useDataHandlers({
     });
   }, [updateMapData]);
 
+  // Handle object set change - NOT tracked in history
+  const handleObjectSetChange = dc.useCallback((setId: string | null): void => {
+    updateMapData((currentMapData: MapData | null) => {
+      if (!currentMapData) return currentMapData;
+      return { ...currentMapData, objectSetId: setId };
+    });
+  }, [updateMapData]);
+
   // Handle text label settings change - NOT tracked in history
   const handleTextLabelSettingsChange = dc.useCallback((settings: TextLabelSettings): void => {
     updateMapData((currentMapData: MapData | null) => {
@@ -260,6 +268,7 @@ function useDataHandlers({
     handleUpdateColorOpacity,
     handleViewStateChange,
     handleSidebarCollapseChange,
+    handleObjectSetChange,
     handleTextLabelSettingsChange,
     handleRegionsChange
   };
@@ -282,6 +291,7 @@ function useDataHandlers({
     handleUpdateColorOpacity,
     handleViewStateChange,
     handleSidebarCollapseChange,
+    handleObjectSetChange,
     handleTextLabelSettingsChange,
     handleRegionsChange
   };

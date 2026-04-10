@@ -4,9 +4,19 @@ const { requireModuleByName } = await dc.require(pathResolverPath);
 // Use resolver for dynamic object types (supports overrides and custom objects)
 const { getResolvedObjectTypes, getResolvedCategories, hasIconClass, hasImagePath } = await requireModuleByName("objectTypeResolver.ts");
 
-const ObjectSidebar = ({ selectedObjectType, onObjectTypeSelect, onToolChange, isCollapsed, onCollapseChange, mapType = 'grid', objectSetId, isFreeformMode = false, onFreeformToggle }) => {
+const ObjectSidebar = ({ selectedObjectType, onObjectTypeSelect, onToolChange, isCollapsed, onCollapseChange, mapType = 'grid', objectSetId, onObjectSetChange, isFreeformMode = false, onFreeformToggle }) => {
   const [searchFilter, setSearchFilter] = dc.useState('');
   const [collapsedCategories, setCollapsedCategories] = dc.useState(new Set());
+
+  // Read available object sets from plugin settings
+  const objectSets = dc.useMemo(() => {
+    try {
+      const plugin = dc.app.plugins.plugins['dungeon-map-tracker-settings'];
+      return (plugin && plugin.settings && plugin.settings.objectSets) || [];
+    } catch {
+      return [];
+    }
+  }, []);
 
   const allObjectTypes = getResolvedObjectTypes(mapType, objectSetId);
   const allCategories = getResolvedCategories(mapType, objectSetId);
@@ -87,6 +97,21 @@ const ObjectSidebar = ({ selectedObjectType, onObjectTypeSelect, onToolChange, i
           <dc.Icon icon="lucide-panel-left-close" size={14} />
         </button>
       </div>
+
+      {objectSets.length > 0 && (
+        <div className="dmt-object-sidebar-set-selector">
+          <select
+            value={objectSetId || ''}
+            onChange={(e) => onObjectSetChange(e.target.value || null)}
+            className="dmt-object-sidebar-select"
+          >
+            <option value="">Default</option>
+            {objectSets.map((set) => (
+              <option key={set.id} value={set.id}>{set.name}</option>
+            ))}
+          </select>
+        </div>
+      )}
 
       <div className="dmt-object-sidebar-search">
         <input

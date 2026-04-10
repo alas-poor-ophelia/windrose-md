@@ -899,6 +899,22 @@ button.dmt-orientation-btn,
   }
 }
 
+.dmt-object-sidebar-set-selector {
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--dmt-border-secondary);
+  flex-shrink: 0;
+}
+
+.dmt-object-sidebar-select {
+  width: 100%;
+  background: var(--dmt-bg-secondary);
+  color: var(--dmt-text-primary);
+  border: 1px solid var(--dmt-border-secondary);
+  border-radius: 3px;
+  padding: 3px 4px;
+  font-size: 11px;
+}
+
 .dmt-object-sidebar-search {
   padding: 4px 6px;
   border-bottom: 1px solid var(--dmt-border-secondary);

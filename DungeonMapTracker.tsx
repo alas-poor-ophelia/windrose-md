@@ -342,6 +342,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     handleUpdateColorOpacity,
     handleViewStateChange,
     handleSidebarCollapseChange,
+    handleObjectSetChange,
     handleTextLabelSettingsChange,
     handleRegionsChange
   } = useDataHandlers({ mapData, updateMapData, addToHistory, isApplyingHistory });
@@ -548,6 +549,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
             onCollapseChange={handleSidebarCollapseChange}
             mapType={mapData.mapType || 'grid'}
             objectSetId={mapData.objectSetId}
+            onObjectSetChange={handleObjectSetChange}
             isFreeformMode={freeformPlacementMode}
             onFreeformToggle={() => setFreeformPlacementMode(prev => !prev)}
           />
