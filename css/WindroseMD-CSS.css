@@ -1147,7 +1147,7 @@ button.dmt-orientation-btn,
 .is-tablet .dmt-tile-browser-toggle {
   position: absolute;
   right: 0;
-  top: 8px;
+  top: 130px;
   width: 28px;
   height: 28px;
   min-width: 28px;
@@ -1406,12 +1406,19 @@ button.dmt-orientation-btn,
   overflow: hidden;
 }
 
-.dmt-tile-browser-layer-btn {
+button.dmt-tile-browser-layer-btn,
+.is-tablet button.dmt-tile-browser-layer-btn {
   background: transparent !important;
   border: none !important;
   color: var(--dmt-text-muted) !important;
   font-size: 9px;
   padding: 2px 6px;
+  width: auto;
+  height: auto;
+  min-width: 0;
+  min-height: 0;
+  max-width: none;
+  max-height: none;
   cursor: pointer;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -2571,6 +2578,15 @@ button.dmt-orientation-btn,
     height: 35px;
     max-width: 35px;
     max-height: 35px;
+  }
+
+  .dmt-tile-browser {
+    width: 190px;
+  }
+
+  .dmt-tile-browser-toggle,
+  .is-tablet .dmt-tile-browser-toggle {
+    top: 100px;
   }
 
   .dmt-modal-input {

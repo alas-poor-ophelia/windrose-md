@@ -114,10 +114,8 @@ function useMapData(
           // Probe actual image dimensions and alpha coverage from the first tile
           const tiles = scanTilesetFolder(folder);
           const dims = await probeFirstTileImage(tiles);
-          const fitMode = dims?.alphaCoverage != null && dims.alphaCoverage < 0.6
-            ? 'contain' as const : 'fill' as const;
           const options = dims
-            ? { tileWidth: dims.width, tileHeight: dims.height, fitMode }
+            ? { tileWidth: dims.width, tileHeight: dims.height }
             : undefined;
 
           const tileset = createTileset(folder, name, options);
