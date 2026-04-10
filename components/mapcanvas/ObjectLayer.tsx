@@ -27,6 +27,7 @@ const { useEventHandlerRegistration } = await requireModuleByName("EventHandlerC
 const { useObjectInteractions } = await requireModuleByName("useObjectInteractions.ts");
 const { TextInputModal } = await requireModuleByName("TextInputModal.tsx");
 const { NoteLinkModal } = await requireModuleByName("NoteLinkModal.tsx");
+const { isBridgeAvailable } = await requireModuleByName("obsidianBridge.ts");
 const { useObjectModals } = await requireModuleByName("useObjectModals.ts");
 const { ObjectSelectionToolbar } = await requireModuleByName("ObjectSelectionToolbar.tsx");
 const { MultiSelectToolbar } = await requireModuleByName("MultiSelectToolbar.tsx");
@@ -702,7 +703,7 @@ const ObjectLayer = ({
         />
       )}
 
-      {showNoteLinkModal && mapData && (
+      {showNoteLinkModal && mapData && !isBridgeAvailable() && (
         <NoteLinkModal
           isOpen={showNoteLinkModal}
           onClose={handleNoteLinkCancel}

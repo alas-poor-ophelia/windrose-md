@@ -83,7 +83,9 @@ const useNotePinInteraction = (
    * Handle Note Pin placement - places pin and opens modal
    */
   const handleNotePinPlacement = (gridX: number, gridY: number): boolean => {
-    if (currentTool !== 'addObject' || selectedObjectType !== 'note_pin') {
+    if (currentTool === 'addNote') {
+      // addNote tool directly places note pins without needing sidebar selection
+    } else if (currentTool !== 'addObject' || selectedObjectType !== 'note_pin') {
       return false;
     }
 

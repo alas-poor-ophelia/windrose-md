@@ -192,7 +192,6 @@ function isValidIconClass(iconClass: string | null | undefined): boolean {
  * Default category order for built-in categories
  */
 const BUILT_IN_CATEGORY_ORDER: Record<string, number> = {
-  'notes': 0,
   'navigation': 10,
   'hazards': 20,
   'features': 30,

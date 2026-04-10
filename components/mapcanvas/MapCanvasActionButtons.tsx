@@ -7,6 +7,7 @@ const { TextInputModal } = await requireModuleByName("TextInputModal.tsx");
 const { NoteLinkModal, openNativeNoteLinkModal } = await requireModuleByName("NoteLinkModal.tsx");
 const { ColorPicker } = await requireModuleByName("ColorPicker.tsx");
 const { openNoteInNewTab } = await requireModuleByName("noteOperations.ts");
+const { isBridgeAvailable } = await requireModuleByName("obsidianBridge.ts");
 
 // Sub-component: Text Label Control Buttons
 const TextLabelControls = ({ 
@@ -256,8 +257,8 @@ const ModalOverlays = ({
         />
       )}
       
-      {/* Note Link Modal */}
-      {showNoteLinkModal && mapData && (
+      {/* Note Link Modal (Preact fallback - only when native bridge unavailable) */}
+      {showNoteLinkModal && mapData && !isBridgeAvailable() && (
         <NoteLinkModal
           isOpen={showNoteLinkModal}
           onClose={handleNoteLinkCancel}

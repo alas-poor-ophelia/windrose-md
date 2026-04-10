@@ -91,7 +91,7 @@ const NotePinLayer = ({
 
   return (
     <>
-      {showNoteLinkModal && pendingNotePinId && mapData && !nativeOpenedRef.current && !isBridgeAvailable() && (
+      {showNoteLinkModal && pendingNotePinId && mapData && !isBridgeAvailable() && (
         <NoteLinkModal
           isOpen={showNoteLinkModal}
           onClose={handleNoteLinkCancel}

@@ -182,9 +182,8 @@ const TabRenderObjectsMethods = {
       return;
     }
     
-    // Render each category (skip 'notes' - note_pin is handled specially in the map UI)
+    // Render each category
     for (const category of allCategories) {
-      if (category.id === 'notes') continue;
       
       let categoryObjects = filteredObjects.filter(obj => obj.category === category.id);
       if (categoryObjects.length === 0 && category.isBuiltIn) continue;

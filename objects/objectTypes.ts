@@ -24,9 +24,6 @@ interface Category {
 // ===========================================
 
 const OBJECT_TYPES: readonly ObjectType[] = [
-  // Notes
-  { id: 'note_pin', symbol: '📌', label: 'Note Pin', category: 'notes' },
-
   // Navigation
   { id: 'entrance', symbol: '⬤', label: 'Entrance/Exit', category: 'navigation' },
   { id: 'stairs-up', symbol: '▲', label: 'Stairs Up', category: 'navigation' },
@@ -79,7 +76,6 @@ const OBJECT_TYPES: readonly ObjectType[] = [
 ] as const;
 
 const CATEGORIES: readonly Category[] = [
-  { id: 'notes', label: 'Notes' },
   { id: 'navigation', label: 'Navigation' },
   { id: 'hazards', label: 'Hazards' },
   { id: 'features', label: 'Features' },

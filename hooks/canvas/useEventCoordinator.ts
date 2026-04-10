@@ -280,6 +280,14 @@ const useEventCoordinator = ({
           drawingHandlers.handleDrawingPointerDown(eventToUse, gridX, gridY, isTouchEvent);
         }
 
+      } else if (currentTool === 'addNote') {
+        if (hasMultiSelection) clearSelection();
+        if (!layerVisibility.objects) return;
+
+        if (notePinHandlers?.handleNotePinPlacement) {
+          notePinHandlers.handleNotePinPlacement(gridX, gridY);
+        }
+
       } else if (currentTool === 'addObject') {
         if (hasMultiSelection) clearSelection();
 

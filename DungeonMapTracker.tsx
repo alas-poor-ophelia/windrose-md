@@ -761,6 +761,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                       currentTool === 'circle' ? 'Click edge point, then center to fill circle' :
                         currentTool === 'clearArea' ? 'Click two corners to clear area' :
                           currentTool === 'addObject' ? (selectedObjectType ? 'Click to place object' : 'Select an object from the sidebar') :
+                            currentTool === 'addNote' ? 'Click to place note pin' :
                             currentTool === 'addText' ? 'Click to add text label' :
                               'Select a tool'
             } | Undo/redo available | Middle-click or two-finger drag to pan | Scroll to zoom | Click compass to rotate | {getActiveLayer(mapData).cells.length} cells filled | {(getActiveLayer(mapData).objects || []).length} objects placed | {(getActiveLayer(mapData).textLabels || []).length} text labels

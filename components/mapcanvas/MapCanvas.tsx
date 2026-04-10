@@ -369,6 +369,7 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
     if (currentTool === 'select') return 'dmt-canvas-select';
     if (currentTool === 'measure') return 'dmt-canvas-measure';
     if (currentTool === 'diagonalFill') return 'dmt-canvas-diagonal-fill';
+    if (currentTool === 'addNote') return 'dmt-canvas-add-object';
     if (currentTool === 'addObject') {
       return selectedObjectType ? 'dmt-canvas-add-object' : 'dmt-canvas';
     }

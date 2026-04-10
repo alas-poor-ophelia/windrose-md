@@ -323,6 +323,7 @@ const toolGroups: ToolGroup[] = [
 const simpleTools: SimpleTool[] = [
   { id: 'edgeLine' as ToolId, title: 'Paint Line (click two points)', icon: 'lucide-git-commit-horizontal', gridOnly: true },
   { id: 'addObject' as ToolId, title: 'Add Object (select from sidebar)', icon: 'lucide-map-pin-plus' },
+  { id: 'addNote' as ToolId, title: 'Place Note Pin (N)', icon: 'lucide-pin', shortcut: 'n' },
   { id: 'addText' as ToolId, title: 'Add Text Label', icon: 'lucide-type' },
   { id: 'measure' as ToolId, title: 'Measure Distance (M)', icon: 'lucide-ruler', shortcut: 'm' },
   { id: 'tilePaint' as ToolId, title: 'Place Tile (select from tile browser)', icon: 'lucide-layout-grid', hexOnly: true }
