@@ -213,10 +213,7 @@ async function probeFirstTileImage(tiles: TileEntry[]): Promise<{ width: number;
     }
   }
 
-  // Measure alpha coverage from the first tile for fitMode auto-detection
-  const coverage = await measureAlphaCoverage(tiles[0]);
-
-  return { ...best, alphaCoverage: coverage ?? undefined };
+  return { ...best };
 }
 
 /** Alpha coverage threshold: above this → hex-filling (fill), below → stamp (contain) */
@@ -226,9 +223,10 @@ const ALPHA_COVERAGE_THRESHOLD = 0.6;
  * Create a TilesetDef by scanning a vault folder for tile images.
  * Call probeFirstTileImage() first for accurate dimensions.
  */
-function createTileset(
+function createTilesetFromTiles(
   folderPath: string,
   name: string,
+  tiles: TileEntry[],
   options?: {
     tileWidth?: number;
     tileHeight?: number;
@@ -238,7 +236,6 @@ function createTileset(
     overflowBottom?: number;
   }
 ): TilesetDef {
-  const tiles = scanTilesetFolder(folderPath);
   const tileWidth = options?.tileWidth ?? 256;
   const tileHeight = options?.tileHeight ?? 256;
 
@@ -258,6 +255,22 @@ function createTileset(
   };
 }
 
+function createTileset(
+  folderPath: string,
+  name: string,
+  options?: {
+    tileWidth?: number;
+    tileHeight?: number;
+    hexHeight?: number;
+    fitMode?: 'fill' | 'contain';
+    overflowTop?: number;
+    overflowBottom?: number;
+  }
+): TilesetDef {
+  const tiles = scanTilesetFolder(folderPath);
+  return createTilesetFromTiles(folderPath, name, tiles, options);
+}
+
 // ===========================================
 // Module Exports
 // ===========================================
@@ -265,6 +278,7 @@ function createTileset(
 return {
   scanTilesetFolder,
   createTileset,
+  createTilesetFromTiles,
   probeFirstTileImage,
   measureAlphaCoverage,
   autoDetectOverflow,

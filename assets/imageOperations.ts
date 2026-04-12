@@ -151,8 +151,10 @@ async function preloadImage(vaultPath: string): Promise<HTMLImageElement | null>
         img.src = url;
       });
 
-      // Cache the loaded image
+      // Cache the loaded image, then release the blob URL
+      // (Chromium retains the decoded bitmap once the Image element exists)
       imageCache.set(vaultPath, img);
+      URL.revokeObjectURL(url);
       loadingPromises.delete(vaultPath);
 
       return img;
@@ -270,6 +272,18 @@ function calculateGridFromImage(
   };
 }
 
+/**
+ * Evict cached tile images that are no longer in any active tileset.
+ * Call during tileset rebuild to prevent unbounded memory growth.
+ */
+function clearUnusedTileImages(activePaths: Set<string>): void {
+  for (const path of imageCache.keys()) {
+    if (!activePaths.has(path)) {
+      clearCachedImage(path);
+    }
+  }
+}
+
 return {
   buildImageIndex,
   getImageDisplayNames,
@@ -279,6 +293,7 @@ return {
   getCachedImage,
   getImageDimensions,
   clearCachedImage,
+  clearUnusedTileImages,
   calculateGridFromImage,
   GRID_DENSITY_PRESETS
 };

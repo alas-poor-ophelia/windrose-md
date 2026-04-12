@@ -35,9 +35,10 @@ const { loadMapData, saveMapData } = await requireModuleByName("fileOperations.t
   saveMapData: (mapId: string, mapData: MapData) => Promise<boolean>;
 };
 
-const { preloadImage, getCachedImage } = await requireModuleByName("imageOperations.ts") as {
+const { preloadImage, getCachedImage, clearUnusedTileImages } = await requireModuleByName("imageOperations.ts") as {
   preloadImage: (path: string) => Promise<HTMLImageElement | null>;
   getCachedImage: (path: string) => HTMLImageElement | null;
+  clearUnusedTileImages: (activePaths: Set<string>) => void;
 };
 
 const { getEffectiveSettings, getTilesetFolders } = await requireModuleByName("settingsAccessor.ts") as {
@@ -45,8 +46,8 @@ const { getEffectiveSettings, getTilesetFolders } = await requireModuleByName("s
   getTilesetFolders: () => string[];
 };
 
-const { createTileset, probeFirstTileImage, scanTilesetFolder } = await requireModuleByName("tilesetOperations.ts") as {
-  createTileset: (folderPath: string, name: string, options?: Record<string, number>) => import('#types/tiles/tile.types').TilesetDef;
+const { createTilesetFromTiles, probeFirstTileImage, scanTilesetFolder } = await requireModuleByName("tilesetOperations.ts") as {
+  createTilesetFromTiles: (folderPath: string, name: string, tiles: import('#types/tiles/tile.types').TileEntry[], options?: Record<string, number>) => import('#types/tiles/tile.types').TilesetDef;
   probeFirstTileImage: (tiles: import('#types/tiles/tile.types').TileEntry[]) => Promise<{ width: number; height: number } | null>;
   scanTilesetFolder: (folderPath: string) => import('#types/tiles/tile.types').TileEntry[];
 };
@@ -111,14 +112,14 @@ function useMapData(
           const parts = folder.split('/');
           const name = parts[parts.length - 1] || folder;
 
-          // Probe actual image dimensions and alpha coverage from the first tile
+          // Scan once, then pass pre-scanned tiles to avoid double-scan
           const tiles = scanTilesetFolder(folder);
           const dims = await probeFirstTileImage(tiles);
           const options = dims
             ? { tileWidth: dims.width, tileHeight: dims.height }
             : undefined;
 
-          const tileset = createTileset(folder, name, options);
+          const tileset = createTilesetFromTiles(folder, name, tiles, options);
           if (tileset.tiles.length > 0) {
             newTilesets.push(tileset);
           }
@@ -128,6 +129,13 @@ function useMapData(
       }
 
       if (newTilesets.length > 0) {
+        // Evict cached images no longer referenced by any tileset
+        const activePaths = new Set<string>();
+        for (const ts of newTilesets) {
+          for (const t of ts.tiles) activePaths.add(t.vaultPath);
+        }
+        clearUnusedTileImages(activePaths);
+
         setMapData((current: MapData | null) => {
           if (!current) return current;
           return { ...current, tilesets: newTilesets };

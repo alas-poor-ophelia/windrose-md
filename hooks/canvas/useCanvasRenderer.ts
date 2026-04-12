@@ -289,7 +289,8 @@ function renderLayerCellsAndEdges(
   }
 }
 
-const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, selectedItems = [], isResizeMode = false, theme = null, showCoordinates = false, layerVisibility = null, adjacentSubHexes = null) => {
+const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, selectedItems = [], options = {}) => {
+  const { isResizeMode = false, theme = null, showCoordinates = false, layerVisibility = null, adjacentSubHexes = null } = options;
   if (!canvas) return;
 
   // Normalize selectedItems to array (backward compatibility)
@@ -421,6 +422,11 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
 
     ctx.save();
 
+    // Pre-build tile geometry wrapper once (shared across all adjacents)
+    const adjTileGeom = mapData.tilesets && mapData.tilesets.length > 0
+      ? { hexToWorld: hexGeom.hexToWorld!.bind(hexGeom), worldToScreen: hexGeom.worldToScreen.bind(hexGeom), hexSize: hexGeom.hexSize!, orientation: mapData.orientation || 'flat' }
+      : null;
+
     for (const adj of adjacentSubHexes) {
       // Compute offset for this direction
       const scaledQ = adj.dq * tileStep;
@@ -445,14 +451,14 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
       }
 
       // Render tiles from all layers using the existing tile renderer
-      if (mapData.tilesets && mapData.tilesets.length > 0) {
+      if (adjTileGeom) {
         for (const layer of adjLayers) {
           if (layer.tiles && layer.tiles.length > 0) {
             renderTiles(
               ctx,
               layer.tiles,
-              mapData.tilesets,
-              { hexToWorld: hexGeom.hexToWorld!.bind(hexGeom), worldToScreen: hexGeom.worldToScreen.bind(hexGeom), hexSize: hexGeom.hexSize!, orientation: mapData.orientation || 'flat' },
+              mapData.tilesets!,
+              adjTileGeom,
               shiftedViewState,
               { opacity: 0.25, getCachedImage, canvasWidth: width, canvasHeight: height }
             );
@@ -684,11 +690,12 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   ctx.restore();
 };
 
-const useCanvasRenderer: UseCanvasRenderer = (canvasRef, fogCanvasRef, mapData, geometry, selectedItems = [], isResizeMode = false, theme = null, showCoordinates = false, layerVisibility = null, tileImagesReady = false, adjacentSubHexes = null) => {
+const useCanvasRenderer: UseCanvasRenderer = (canvasRef, fogCanvasRef, mapData, geometry, selectedItems = [], options = {}) => {
+  const { isResizeMode = false, theme = null, showCoordinates = false, layerVisibility = null, tileImagesReady = false, adjacentSubHexes = null } = options;
   dc.useEffect(() => {
     if (mapData && geometry && canvasRef.current) {
       const fogCanvas = fogCanvasRef?.current || null;
-      renderCanvas(canvasRef.current, fogCanvas, mapData, geometry, selectedItems, isResizeMode, theme, showCoordinates, layerVisibility, adjacentSubHexes);
+      renderCanvas(canvasRef.current, fogCanvas, mapData, geometry, selectedItems, { isResizeMode, theme, showCoordinates, layerVisibility, adjacentSubHexes });
     }
   }, [mapData, geometry, selectedItems, isResizeMode, theme, canvasRef, fogCanvasRef, showCoordinates, layerVisibility, tileImagesReady, adjacentSubHexes]);
 };

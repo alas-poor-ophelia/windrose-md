@@ -271,7 +271,7 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
   }, [isAnimating]);
 
   // Render canvas whenever relevant state changes
-  useCanvasRenderer(canvasRef, fogCanvasRef, mapData, geometry, selectedItems, isResizeMode, theme, showCoordinates, layerVisibility, tileImagesReady, adjacentSubHexes as any);
+  useCanvasRenderer(canvasRef, fogCanvasRef, mapData, geometry, selectedItems, { isResizeMode, theme, showCoordinates, layerVisibility, tileImagesReady, adjacentSubHexes });
 
   // Trigger redraw when canvas dimensions change (from expand/collapse)
   dc.useEffect(() => {

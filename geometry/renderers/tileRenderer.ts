@@ -50,15 +50,20 @@ const SQRT3 = Math.sqrt(3);
 
 /**
  * Sort tiles by offset row ascending (back → front), then col for stability.
+ * Pre-computes offsets to avoid redundant axialToOffset calls during sort.
  * Returns a new array; does not mutate the original.
  */
 function sortTilesForRendering(
   tiles: HexTileAssignment[],
   orientation: string
 ): HexTileAssignment[] {
+  const offsets = new Map<HexTileAssignment, { col: number; row: number }>();
+  for (const t of tiles) {
+    offsets.set(t, axialToOffset(t.q, t.r, orientation));
+  }
   return [...tiles].sort((a, b) => {
-    const oa = axialToOffset(a.q, a.r, orientation);
-    const ob = axialToOffset(b.q, b.r, orientation);
+    const oa = offsets.get(a)!;
+    const ob = offsets.get(b)!;
     if (oa.row !== ob.row) return oa.row - ob.row;
     return oa.col - ob.col;
   });
@@ -161,21 +166,27 @@ function renderTiles(
     }
   }
 
-  // Three-pass rendering: base tiles, overlay tiles, then freeform stamps (on top)
-  const baseTiles = tiles.filter((t: HexTileAssignment) => !t.freeform && (t.layer || 'base') === 'base');
-  const overlayTiles = tiles.filter((t: HexTileAssignment) => !t.freeform && t.layer === 'overlay');
-  const freeformTiles = tiles.filter((t: HexTileAssignment) => t.freeform);
+  // Single-pass partition: base, overlay, freeform
+  const baseTiles: HexTileAssignment[] = [];
+  const overlayTiles: HexTileAssignment[] = [];
+  const freeformTiles: HexTileAssignment[] = [];
+  for (const t of tiles) {
+    if (t.freeform) freeformTiles.push(t);
+    else if (t.layer === 'overlay') overlayTiles.push(t);
+    else baseTiles.push(t);
+  }
+  // Sort grid-aligned tiles back→front; freeform in insertion order
   const sortedBase = sortTilesForRendering(baseTiles, geometry.orientation);
   const sortedOverlay = sortTilesForRendering(overlayTiles, geometry.orientation);
-  // Freeform stamps render in insertion order (no z-sort)
-  const sorted = [...sortedBase, ...sortedOverlay, ...freeformTiles];
+  // Iterate sequentially instead of concatenating
+  const sorted = [sortedBase, sortedOverlay, freeformTiles];
 
   const previousAlpha = ctx.globalAlpha;
   const opacity = options?.opacity ?? 1;
   const canvasW = options?.canvasWidth ?? 4000;
   const canvasH = options?.canvasHeight ?? 4000;
 
-  for (const tile of sorted) {
+  for (const group of sorted) for (const tile of group) {
     const lookup = entryMap.get(tile.tilesetId + ':' + tile.tileId);
     if (!lookup) continue;
 
