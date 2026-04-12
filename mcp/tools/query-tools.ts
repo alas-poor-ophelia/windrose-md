@@ -49,8 +49,8 @@ export function registerQueryTools(server: McpServer): void {
     "Read raw map data JSON for a specific mapId from the vault data file",
     { mapId: z.string().describe("The map ID to read data for") },
     async ({ mapId }) => {
-      const safeId = mapId.replace(/"/g, '\\"').replace(/'/g, "\\'");
-      const code = `var ii=window.__windrose?.mcpInstances; var ap=app.workspace.getActiveFile()?.path; var st=ii&&ap&&ii[ap]; var dp=st?.dataFilePath||'windrose-md-data.json'; try{var f=app.vault.getAbstractFileByPath(dp); if(!f){JSON.stringify({error:'Data file not found'})}else{var r=await app.vault.read(f); var d=JSON.parse(r); var m=d.maps?.['${safeId}']; m?JSON.stringify(m):JSON.stringify({error:'Map not found: ${safeId}'})}}catch(e){JSON.stringify({error:e.message})}`;
+      const mid = JSON.stringify(mapId);
+      const code = `var mid=${mid};var ii=window.__windrose?.mcpInstances; var ap=app.workspace.getActiveFile()?.path; var st=ii&&ap&&ii[ap]; var dp=st?.dataFilePath||'windrose-md-data.json'; try{var f=app.vault.getAbstractFileByPath(dp); if(!f){JSON.stringify({error:'Data file not found'})}else{var r=await app.vault.read(f); var d=JSON.parse(r); var m=d.maps?.[mid]; m?JSON.stringify(m):JSON.stringify({error:'Map not found: '+mid})}}catch(e){JSON.stringify({error:e.message})}`;
       const result = await obsidianEvalJson<Record<string, unknown>>(code);
       if (result && "error" in result) {
         return {

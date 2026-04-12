@@ -392,10 +392,13 @@ export type {
 } from './hooks/textLabelInteraction.types';
 
 export type {
+  AdjacentSubHexRenderData,
   RendererSelectedItem,
   RendererTheme,
   RendererViewState,
+  RenderCanvasOptions,
   RenderCanvas,
+  UseCanvasRendererOptions,
   UseCanvasRenderer,
 } from './hooks/canvasRenderer.types';
 
@@ -412,13 +415,16 @@ export type {
   HandleObjectsChange,
   HandleTextLabelsChange,
   HandleEdgesChange,
+  HandleTilesChange,
   HandleNameChange,
   HandleAddCustomColor,
   HandleDeleteCustomColor,
   HandleUpdateColorOpacity,
   HandleViewStateChange,
   HandleSidebarCollapseChange,
+  HandleObjectSetChange,
   HandleTextLabelSettingsChange,
+  HandleRegionsChange,
   LayerDataHandlers,
   MapDataHandlers,
   UseDataHandlersResult,

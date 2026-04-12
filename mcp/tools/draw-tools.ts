@@ -6,14 +6,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { obsidianEvalJson } from "../cli-bridge.js";
-
-/** Helper: get the active MCP instance ops accessor as a JS expression */
-const OPS = `(function(){var i=window.__windrose?.mcpInstances;if(!i)return null;var p=app.workspace.getActiveFile()?.path;return p&&i[p]?i[p].ops:null})()`;
-
-/** Helper: build eval code that calls an op and returns JSON result */
-function opCall(fnBody: string): string {
-  return `var ops=${OPS};if(!ops){JSON.stringify({error:'No active map'})}else{${fnBody}}`;
-}
+import { opCall, jsStr } from "./ops-helper.js";
 
 export function registerDrawTools(server: McpServer): void {
   server.tool(
@@ -26,7 +19,7 @@ export function registerDrawTools(server: McpServer): void {
       opacity: z.number().min(0).max(1).optional().describe("Opacity 0-1. Default: current selected opacity"),
     },
     async ({ x, y, color, opacity }) => {
-      const colorArg = color ? `,'${color.replace(/'/g, "\\'")}'` : "";
+      const colorArg = color ? `,${jsStr(color)}` : "";
       const opacityArg = opacity !== undefined ? `,${opacity}` : (color ? ",undefined" : "");
       const code = opCall(
         `var r=ops.paintCell(${x},${y}${colorArg}${opacityArg});JSON.stringify({ok:r,x:${x},y:${y}})`
@@ -50,7 +43,7 @@ export function registerDrawTools(server: McpServer): void {
         y: z.number().describe("Grid Y coordinate"),
         color: z.string().optional().describe("Hex color override for this cell"),
         opacity: z.number().min(0).max(1).optional().describe("Opacity override for this cell"),
-      })).describe("Array of cells to paint"),
+      })).max(10000).describe("Array of cells to paint"),
     },
     async ({ cells }) => {
       const cellsJson = JSON.stringify(cells);

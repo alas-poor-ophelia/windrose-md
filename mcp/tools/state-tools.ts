@@ -5,15 +5,8 @@
 
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { obsidianEval, obsidianEvalJson } from "../cli-bridge.js";
-
-/** Helper: get the active MCP instance ops accessor as a JS expression */
-const OPS = `(function(){var i=window.__windrose?.mcpInstances;if(!i)return null;var p=app.workspace.getActiveFile()?.path;return p&&i[p]?i[p].ops:null})()`;
-
-/** Helper: build eval code that calls an op and returns JSON result */
-function opCall(fnBody: string): string {
-  return `var ops=${OPS};if(!ops){JSON.stringify({error:'No active map'})}else{${fnBody}}`;
-}
+import { obsidianEvalJson } from "../cli-bridge.js";
+import { opCall, jsStr } from "./ops-helper.js";
 
 export function registerStateTools(server: McpServer): void {
   server.tool(
@@ -25,7 +18,7 @@ export function registerStateTools(server: McpServer): void {
       ),
     },
     async ({ toolId }) => {
-      const code = opCall(`ops.setTool('${toolId}');JSON.stringify({ok:true,tool:'${toolId}'})`);
+      const code = opCall(`ops.setTool(${jsStr(toolId)});JSON.stringify({ok:true,tool:${jsStr(toolId)}})`);
       const result = await obsidianEvalJson<{ ok?: boolean; error?: string }>(code);
       if (result.error) {
         return { content: [{ type: "text" as const, text: result.error }], isError: true };
@@ -42,12 +35,11 @@ export function registerStateTools(server: McpServer): void {
       opacity: z.number().min(0).max(1).optional().describe("Opacity 0-1 (default: unchanged)"),
     },
     async ({ color, opacity }) => {
-      const safeColor = color.replace(/'/g, "\\'");
-      let body = `ops.setColor('${safeColor}');`;
+      let body = `ops.setColor(${jsStr(color)});`;
       if (opacity !== undefined) {
         body += `ops.setOpacity(${opacity});`;
       }
-      body += `JSON.stringify({ok:true,color:'${safeColor}'${opacity !== undefined ? `,opacity:${opacity}` : ''}})`;
+      body += `JSON.stringify({ok:true,color:${jsStr(color)}${opacity !== undefined ? `,opacity:${opacity}` : ''}})`;
       const result = await obsidianEvalJson<{ ok?: boolean; error?: string }>(opCall(body));
       if (result.error) {
         return { content: [{ type: "text" as const, text: result.error }], isError: true };
@@ -93,8 +85,7 @@ export function registerStateTools(server: McpServer): void {
       layerId: z.string().describe("Layer ID to activate (get available IDs from windrose_get_state)"),
     },
     async ({ layerId }) => {
-      const safeId = layerId.replace(/'/g, "\\'");
-      const code = opCall(`ops.selectLayer('${safeId}');JSON.stringify({ok:true,layerId:'${safeId}'})`);
+      const code = opCall(`ops.selectLayer(${jsStr(layerId)});JSON.stringify({ok:true,layerId:${jsStr(layerId)}})`);
       const result = await obsidianEvalJson<{ ok?: boolean; error?: string }>(code);
       if (result.error) {
         return { content: [{ type: "text" as const, text: result.error }], isError: true };

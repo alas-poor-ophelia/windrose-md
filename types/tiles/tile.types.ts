@@ -1,6 +1,5 @@
 /**
  * Hex Tile Type Definitions
- * Path: types/tiles/tile.types.ts
  *
  * Tileset definitions, tile entries, and per-hex tile assignments
  * for image-based hex tile rendering with Baumgart-style overflow.
@@ -23,7 +22,7 @@ export interface TilesetDef {
   overflowTop: number;
   /** Pixels of overflow below the hex area */
   overflowBottom: number;
-  /** How tile images are scaled into the hex bounding box.
+  /** How tile images are scaled into the hex bounding box. @default 'fill'
    *  'fill' = independent X/Y scaling (stretches to hex shape, good for terrain).
    *  'contain' = uniform scaling preserving aspect ratio (good for stamps/objects). */
   fitMode?: 'fill' | 'contain';
@@ -53,17 +52,18 @@ export interface HexTileAssignment {
   r: number;
   tilesetId: string;
   tileId: string;
-  /** Rotation in 60-degree increments: 0, 60, 120, 180, 240, 300 */
-  rotation?: number;
+  /** Rotation in 60-degree increments */
+  rotation?: 0 | 60 | 120 | 180 | 240 | 300;
   flipH?: boolean;
   /** Tile layer: 'base' (default) or 'overlay' (stamp atop base) */
   layer?: 'base' | 'overlay';
   /** Override tileset fitMode for this specific placement */
   fitMode?: 'fill' | 'contain';
-  /** Freeform stamp: placed at world coordinates, not snapped to hex */
+  /** Freeform stamp: placed at world coordinates, not snapped to hex.
+   *  When true, worldX and worldY must both be provided. */
   freeform?: boolean;
-  /** World-space X coordinate (used when freeform is true) */
+  /** World-space X coordinate (required when freeform is true) */
   worldX?: number;
-  /** World-space Y coordinate (used when freeform is true) */
+  /** World-space Y coordinate (required when freeform is true) */
   worldY?: number;
 }

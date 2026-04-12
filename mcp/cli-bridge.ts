@@ -29,8 +29,11 @@ const DEFAULT_TIMEOUT = 15_000;
 /** Longer timeout for eval (code execution may be slow) */
 const EVAL_TIMEOUT = 30_000;
 
-/** Quote a string for shell use */
+/** Quote a string for shell use — rejects shell metacharacters to prevent injection */
 function shellQuote(s: string): string {
+  if (/[\x00-\x1f`$\\!#&|;(){}<>]/.test(s)) {
+    throw new Error(`Unsafe characters in shell argument: ${s.slice(0, 50)}`);
+  }
   return `"${s.replace(/"/g, '\\"')}"`;
 }
 
@@ -74,10 +77,18 @@ export async function obsidianEval(code: string): Promise<string> {
     shellQuote(`code=${code}`),
   ].join(" ");
 
-  const { stdout } = await execAsync(cmd, { timeout: EVAL_TIMEOUT });
-  // Obsidian CLI prefixes eval output with "=> "
-  const result = stdout.trim();
-  return result.startsWith("=> ") ? result.slice(3) : result;
+  try {
+    const { stdout } = await execAsync(cmd, { timeout: EVAL_TIMEOUT });
+    // Obsidian CLI prefixes eval output with "=> "
+    const result = stdout.trim();
+    return result.startsWith("=> ") ? result.slice(3) : result;
+  } catch (err: any) {
+    if (err.killed) throw new Error(`Eval timed out after ${EVAL_TIMEOUT}ms`);
+    if (err.code === "ENOENT") {
+      throw new Error(`Obsidian CLI not found at ${OBSIDIAN_CLI}. Is Obsidian installed?`);
+    }
+    throw new Error(`Eval error: ${err.message}`);
+  }
 }
 
 /**
@@ -160,6 +171,6 @@ export async function navigateToMap(params: {
     timestamp: Date.now(),
   });
   await obsidianEval(
-    `window.dispatchEvent(new CustomEvent('dmt-navigate-to', { detail: ${detail} }))`
+    `window.dispatchEvent(new CustomEvent('dmt-navigate-to', { detail: JSON.parse(${JSON.stringify(detail)}) }))`
   );
 }

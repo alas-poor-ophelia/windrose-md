@@ -1,6 +1,5 @@
 /**
  * Data Handlers Hook Type Definitions
- * Path: types/hooks/dataHandlers.types.ts
  *
  * Types for useDataHandlers hook - manages data change handlers
  * for layer data and map-level data with history tracking.
@@ -118,7 +117,7 @@ export interface LayerDataHandlers {
   handleObjectsChange: HandleObjectsChange;
   handleTextLabelsChange: HandleTextLabelsChange;
   handleEdgesChange: HandleEdgesChange;
-  handleTilesChange: HandleTilesChange;
+  handleTilesChange?: HandleTilesChange;
 }
 
 /** Map data handlers group */

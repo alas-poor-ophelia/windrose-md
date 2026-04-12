@@ -1,6 +1,5 @@
 /**
  * Canvas Renderer Hook Type Definitions
- * Path: types/hooks/canvasRenderer.types.ts
  *
  * Types for useCanvasRenderer hook - handles all canvas rendering
  * including grid, cells, objects, text labels, fog of war, and selections.
@@ -67,6 +66,15 @@ export interface RendererViewState {
 // Function Types
 // ===========================================
 
+/** Optional rendering parameters */
+export interface RenderCanvasOptions {
+  isResizeMode?: boolean;
+  theme?: RendererTheme | null;
+  showCoordinates?: boolean;
+  layerVisibility?: LayerVisibility | null;
+  adjacentSubHexes?: AdjacentSubHexRenderData[] | null;
+}
+
 /** Main render function */
 export type RenderCanvas = (
   canvas: HTMLCanvasElement,
@@ -74,12 +82,13 @@ export type RenderCanvas = (
   mapData: MapData,
   geometry: IGeometry,
   selectedItems?: RendererSelectedItem | RendererSelectedItem[],
-  isResizeMode?: boolean,
-  theme?: RendererTheme | null,
-  showCoordinates?: boolean,
-  layerVisibility?: LayerVisibility | null,
-  adjacentSubHexes?: AdjacentSubHexRenderData[] | null
+  options?: RenderCanvasOptions,
 ) => void;
+
+/** Additional hook-specific options beyond RenderCanvasOptions */
+export interface UseCanvasRendererOptions extends RenderCanvasOptions {
+  tileImagesReady?: boolean;
+}
 
 /** useCanvasRenderer hook - triggers re-render on data changes */
 export type UseCanvasRenderer = (
@@ -88,10 +97,5 @@ export type UseCanvasRenderer = (
   mapData: MapData | null,
   geometry: IGeometry | null,
   selectedItems?: RendererSelectedItem | RendererSelectedItem[],
-  isResizeMode?: boolean,
-  theme?: RendererTheme | null,
-  showCoordinates?: boolean,
-  layerVisibility?: LayerVisibility | null,
-  tileImagesReady?: boolean,
-  adjacentSubHexes?: AdjacentSubHexRenderData[] | null
+  options?: UseCanvasRendererOptions,
 ) => void;

@@ -1,42 +1,19 @@
 /**
  * Unit tests for tilesetOperations.ts
- * Tests pure logic and folder scanning with mocked vault.
+ * Pure functions imported from source; scanTilesetFolder tested via mock
+ * since it depends on app.vault.getFiles().
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// ===========================================
-// Re-implement pure functions for testability
-// (Datacore modules can't be imported directly)
-// ===========================================
+import {
+  generateTilesetId,
+  autoDetectOverflow,
+} from '../../../src/assets/tilesetOperations.ts';
 
+// scanTilesetFolder depends on app.vault.getFiles() so we test its
+// logic via a local equivalent that accepts files as a parameter.
 const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp']);
-
-function generateTilesetId(folderPath?: string): string {
-  if (folderPath) {
-    let hash = 0;
-    for (let i = 0; i < folderPath.length; i++) {
-      hash = ((hash << 5) - hash + folderPath.charCodeAt(i)) | 0;
-    }
-    return 'tileset-' + Math.abs(hash).toString(36);
-  }
-  return 'tileset-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
-}
-
-function autoDetectOverflow(tileWidth: number, tileHeight: number) {
-  if (tileHeight > tileWidth) {
-    return {
-      hexHeight: tileWidth,
-      overflowTop: tileHeight - tileWidth,
-      overflowBottom: 0,
-    };
-  }
-  return {
-    hexHeight: tileHeight,
-    overflowTop: 0,
-    overflowBottom: 0,
-  };
-}
 
 interface MockFile {
   path: string;
@@ -150,6 +127,24 @@ describe('tilesetOperations', () => {
       expect(result).toEqual({
         hexHeight: 128,
         overflowTop: 384,
+        overflowBottom: 0,
+      });
+    });
+
+    it('handles zero dimensions', () => {
+      const result = autoDetectOverflow(0, 0);
+      expect(result).toEqual({
+        hexHeight: 0,
+        overflowTop: 0,
+        overflowBottom: 0,
+      });
+    });
+
+    it('handles zero width with nonzero height', () => {
+      const result = autoDetectOverflow(0, 100);
+      expect(result).toEqual({
+        hexHeight: 0,
+        overflowTop: 100,
         overflowBottom: 0,
       });
     });

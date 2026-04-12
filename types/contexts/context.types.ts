@@ -1,6 +1,5 @@
 /**
  * React Context Type Definitions
- * Path: types/contexts/context.types.ts
  *
  * Canonical type definitions for all context values.
  * Hooks and components should import from here — not define inline.
@@ -13,6 +12,7 @@ import type { Curve } from '../core/curve.types';
 import type { MapData } from '../core/map.types';
 import type { Cell } from '../core/cell.types';
 import type { BorderSide } from '../core/rendering.types';
+import type { HexTileAssignment } from '../tiles/tile.types';
 import type { ToolId } from '../tools/tool.types';
 
 // ===========================================
@@ -119,7 +119,7 @@ export interface MapOperationsContextValue {
   onTextLabelsChange: (labels: TextLabel[]) => void;
 
   // Tile operations
-  onTilesChange?: (tiles: import('../tiles/tile.types').HexTileAssignment[]) => void;
+  onTilesChange?: (tiles: HexTileAssignment[]) => void;
 
   // Note pin operations (optional — not all providers include these)
   onNotePinsChange?: (pins: NotePin[]) => void;

@@ -32,6 +32,9 @@ export function registerNavTools(server: McpServer): void {
         ),
     },
     async ({ notePath }) => {
+      if (notePath.includes('..')) {
+        return { content: [{ type: "text" as const, text: "Invalid note path: must not contain .." }], isError: true };
+      }
       await obsidianOpen(notePath);
       return {
         content: [
@@ -85,7 +88,10 @@ export function registerNavTools(server: McpServer): void {
       const name =
         filename || `mcp-screenshot-${Date.now()}.png`;
       mkdirSync(SCREENSHOT_DIR, { recursive: true });
-      const outputPath = path.join(SCREENSHOT_DIR, name);
+      const outputPath = path.resolve(SCREENSHOT_DIR, name);
+      if (!outputPath.startsWith(SCREENSHOT_DIR)) {
+        return { content: [{ type: "text" as const, text: "Screenshot filename cannot contain path traversal" }], isError: true };
+      }
       await obsidianScreenshot(outputPath);
       return {
         content: [
@@ -120,6 +126,7 @@ export function registerNavTools(server: McpServer): void {
     {
       code: z
         .string()
+        .max(50000)
         .describe(
           "JavaScript code to evaluate. Has access to window, app, window.__windrose, etc. Use 'return' for a result."
         ),
