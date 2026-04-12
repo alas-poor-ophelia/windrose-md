@@ -90,6 +90,7 @@ interface MapCanvasContentProps {
   onEdgesChange: (edges: Edge[], skipHistory?: boolean) => void;
   onTilesChange?: (tiles: import('#types/tiles/tile.types').HexTileAssignment[]) => void;
   tileImagesReady?: boolean;
+  adjacentSubHexes?: Array<{ hexKey: string; dq: number; dr: number; mapData: unknown; name: string }> | null;
   onViewStateChange: (viewState: ViewState) => void;
   onTextLabelSettingsChange: (settings: TextLabelSettings) => void;
   currentTool: ToolId;
@@ -108,6 +109,7 @@ interface MapCanvasContentProps {
 
 interface MapCanvasProps extends MapCanvasContentProps {
   layerVisibility: LayerVisibility;
+  adjacentSubHexes?: Array<{ hexKey: string; dq: number; dr: number; mapData: unknown; name: string }> | null;
 }
 
 interface MapDataUpdate {
@@ -148,7 +150,7 @@ const Coordinators = ({ canvasRef, mapData, geometry, isFocused, isColorPickerOp
  * MapCanvasContent - Inner component that uses context hooks
  * Contains all the map canvas logic and interacts with shared selection state
  */
-const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onTilesChange, tileImagesReady, onViewStateChange, onTextLabelSettingsChange, currentTool, selectedObjectType, selectedColor, isColorPickerOpen, customColors, onAddCustomColor, onDeleteCustomColor, isFocused, isAnimating, theme, isAlignmentMode, children }: MapCanvasContentProps): React.ReactElement => {
+const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onTilesChange, tileImagesReady, adjacentSubHexes, onViewStateChange, onTextLabelSettingsChange, currentTool, selectedObjectType, selectedColor, isColorPickerOpen, customColors, onAddCustomColor, onDeleteCustomColor, isFocused, isAnimating, theme, isAlignmentMode, children }: MapCanvasContentProps): React.ReactElement => {
   const canvasRef = dc.useRef<HTMLCanvasElement | null>(null);
   const fogCanvasRef = dc.useRef<HTMLCanvasElement | null>(null);  // Separate canvas for fog blur effect (CSS blur for iOS compat)
   const containerRef = dc.useRef<HTMLDivElement | null>(null);
@@ -269,7 +271,7 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
   }, [isAnimating]);
 
   // Render canvas whenever relevant state changes
-  useCanvasRenderer(canvasRef, fogCanvasRef, mapData, geometry, selectedItems, isResizeMode, theme, showCoordinates, layerVisibility, tileImagesReady);
+  useCanvasRenderer(canvasRef, fogCanvasRef, mapData, geometry, selectedItems, isResizeMode, theme, showCoordinates, layerVisibility, tileImagesReady, adjacentSubHexes as any);
 
   // Trigger redraw when canvas dimensions change (from expand/collapse)
   dc.useEffect(() => {
@@ -306,9 +308,9 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
       }
     } else {
       // After animation, do a proper redraw with correct dimensions
-      renderCanvas(canvas, fogCanvas, mapData, geometry, selectedItem, isResizeMode, theme, showCoordinates, layerVisibility);
+      renderCanvas(canvas, fogCanvas, mapData, geometry, selectedItem, isResizeMode, theme, showCoordinates, layerVisibility, adjacentSubHexes as any);
     }
-  }, [canvasDimensions.width, canvasDimensions.height, isAnimating, showCoordinates, layerVisibility]);
+  }, [canvasDimensions.width, canvasDimensions.height, isAnimating, showCoordinates, layerVisibility, adjacentSubHexes]);
 
   // 'C' key handler for coordinate overlay (hex maps only)
   dc.useEffect(() => {
@@ -497,12 +499,12 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
 };
 
 const MapCanvas = (props: MapCanvasProps): React.ReactElement => {
-  const { children, layerVisibility, ...restProps } = props;
+  const { children, layerVisibility, adjacentSubHexes, ...restProps } = props;
 
   return (
     <MapSelectionProvider layerVisibility={layerVisibility}>
       <ObjectLinkingProvider>
-        <MapCanvasContent {...restProps}>
+        <MapCanvasContent {...restProps} adjacentSubHexes={adjacentSubHexes}>
           {children}
         </MapCanvasContent>
       </ObjectLinkingProvider>

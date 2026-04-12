@@ -345,6 +345,14 @@ const RegionLayer = ({
       });
     }
 
+    if (region.labelPosition) {
+      menu.addItem((item: any) => {
+        item.setTitle('Reset Label Position');
+        item.setIcon('lucide-undo-2');
+        item.onClick(() => updateRegion(region.id, { labelPosition: undefined }));
+      });
+    }
+
     menu.addSeparator();
 
     menu.addItem((item: any) => {

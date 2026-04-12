@@ -24,6 +24,7 @@ export interface LayerVisibility {
   objects: boolean;
   textLabels: boolean;
   hexCoordinates?: boolean;
+  regions?: boolean;
 }
 
 /** Layer definition for visibility toggles */
@@ -93,6 +94,12 @@ const VisibilityToolbar = ({
       id: 'hexCoordinates',
       icon: 'lucide-key-round',
       tooltip: 'Toggle coordinate visibility (or hold C)',
+      hexOnly: true
+    },
+    {
+      id: 'regions',
+      icon: 'lucide-hexagon',
+      tooltip: 'Toggle region visibility',
       hexOnly: true
     }
   ];

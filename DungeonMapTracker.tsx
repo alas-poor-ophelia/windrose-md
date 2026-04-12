@@ -158,7 +158,10 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     enterSubHex,
     exitSubHex,
     navigateToLevel,
-    navigationVersion
+    navigateToSibling,
+    navigationVersion,
+    currentHexKey,
+    adjacentSubHexes
   } = useSubHexNavigation({ mapData: rootMapData, updateMapData: rootUpdateMapData });
 
   // Get current file path for deep linking
@@ -197,6 +200,12 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     layerVisibility, handleToggleLayerVisibility
   } = useUILayout({ mapData, updateMapData, showPluginInstaller });
 
+  // Adjacent sub-map visibility: persisted on root map data
+  const showAdjacentSubMaps = rootMapData?.showAdjacentSubMaps ?? false;
+  const setShowAdjacentSubMaps = dc.useCallback((v: boolean) => {
+    rootUpdateMapData((prev: MapData | null) => prev ? { ...prev, showAdjacentSubMaps: v } : prev);
+  }, [rootUpdateMapData]);
+
   // Tile browser state (hex maps only)
   const [tileBrowserCollapsed, setTileBrowserCollapsed] = dc.useState<boolean>(true);
   const [selectedTilesetId, setSelectedTilesetId] = dc.useState<string | null>(null);
@@ -206,7 +215,10 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   const [tileLayer, setTileLayer] = dc.useState<'base' | 'overlay'>('base');
   const [tileFitMode, setTileFitMode] = dc.useState<'fill' | 'contain' | 'auto'>('auto');
   const [stampMode, setStampMode] = dc.useState<boolean>(false);
-  const showTilePanel = mapData?.mapType === 'hex' && (mapData?.tilesets?.length ?? 0) > 0;
+  // Use rootMapData for tileset check — tilesets are built from global settings and stored on root,
+  // but sub-maps should also have access to tiles
+  const availableTilesets = rootMapData?.tilesets || mapData?.tilesets || [];
+  const showTilePanel = mapData?.mapType === 'hex' && availableTilesets.length > 0;
 
   const handleTileSelect = (tilesetId: string, tileId: string) => {
     setSelectedTilesetId(tilesetId);
@@ -351,8 +363,61 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   useCustomEventHandlers({
     mapData, mapId, geometry, updateMapData,
     handleLayerSelect, enterSubHex, exitSubHex, isInSubHex,
+    navigateToSibling,
     handleRegionsChange
   });
+
+  // Adjacent sub-map click-to-navigate
+  dc.useEffect(() => {
+    if (!showAdjacentSubMaps || !isInSubHex || adjacentSubHexes.length === 0 || !geometry || geometry.type !== 'hex' || !mapData) return;
+
+    const hexGeom = geometry as any;
+    const maxRing = mapData.hexBounds?.maxRing || 7;
+    const tileStep = 2 * maxRing + 1;
+
+    const handleAdjacentClick = (e: MouseEvent) => {
+      const canvas = (e.target as HTMLElement).closest('canvas');
+      if (!canvas) return;
+
+      const rect = canvas.getBoundingClientRect();
+      const canvasX = (e.clientX - rect.left) * (canvas.width / rect.width);
+      const canvasY = (e.clientY - rect.top) * (canvas.height / rect.height);
+
+      const viewState = mapData.viewState;
+      if (!viewState) return;
+      const oX = canvas.width / 2 - viewState.center.x * viewState.zoom;
+      const oY = canvas.height / 2 - viewState.center.y * viewState.zoom;
+
+      // Convert click to world coords
+      const clickWorldX = (canvasX - oX) / viewState.zoom;
+      const clickWorldY = (canvasY - oY) / viewState.zoom;
+
+      // Check each adjacent sub-hex: is the click within its grid bounds?
+      for (const adj of adjacentSubHexes) {
+        const scaledQ = adj.dq * tileStep;
+        const scaledR = adj.dr * tileStep;
+        const offset = hexGeom.hexToWorld(scaledQ, scaledR);
+
+        // Click relative to adjacent grid center
+        const relX = clickWorldX - offset.worldX;
+        const relY = clickWorldY - offset.worldY;
+
+        // Check if within maxRing hex radius (approximate with world-space distance)
+        const gridRadius = hexGeom.hexSize * Math.sqrt(3) * maxRing;
+        if (relX * relX + relY * relY < gridRadius * gridRadius) {
+          // Parse the hex key to get absolute q, r
+          const [aq, ar] = adj.hexKey.split(',').map(Number);
+          document.dispatchEvent(new CustomEvent('windrose:navigate-sibling-sub-hex', { detail: { q: aq, r: ar } }));
+          e.stopPropagation();
+          e.preventDefault();
+          return;
+        }
+      }
+    };
+
+    document.addEventListener('click', handleAdjacentClick, true);
+    return () => document.removeEventListener('click', handleAdjacentClick, true);
+  }, [showAdjacentSubMaps, isInSubHex, adjacentSubHexes, geometry, mapData]);
 
   // View controls (zoom, compass)
   const { handleZoomIn, handleZoomOut, handleCompassClick } = useViewControls({
@@ -492,10 +557,30 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
         />
 
         {isInSubHex && (
-          <SubHexBreadcrumb
-            breadcrumbs={breadcrumbs}
-            onNavigate={navigateToLevel}
-          />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <SubHexBreadcrumb
+              breadcrumbs={breadcrumbs}
+              onNavigate={navigateToLevel}
+            />
+            {adjacentSubHexes.length > 0 && (
+              <button
+                onClick={() => setShowAdjacentSubMaps(!showAdjacentSubMaps)}
+                title={showAdjacentSubMaps ? 'Hide adjacent sub-maps' : 'Show adjacent sub-maps'}
+                style={{
+                  padding: '2px 8px',
+                  fontSize: '11px',
+                  background: showAdjacentSubMaps ? 'var(--interactive-accent)' : 'var(--background-secondary)',
+                  color: showAdjacentSubMaps ? 'var(--text-on-accent)' : 'var(--text-muted)',
+                  border: '1px solid var(--background-modifier-border)',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                <dc.Icon icon="lucide-layers" />
+              </button>
+            )}
+          </div>
         )}
 
         <ToolPalette
@@ -587,7 +672,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
             <MapCanvas
               mapId={mapId}
               notePath={notePath}
-              mapData={mapData.mapType === 'hex' ? { ...mapData, northDirection: 0 } : mapData}
+              mapData={mapData.mapType === 'hex' ? { ...mapData, northDirection: 0, tilesets: availableTilesets.length > 0 ? availableTilesets : mapData.tilesets } : mapData}
               onCellsChange={handleCellsChange}
               onCurvesChange={handleCurvesChange}
               onObjectsChange={handleObjectsChange}
@@ -609,6 +694,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               isAnimating={isAnimating}
               theme={theme}
               layerVisibility={layerVisibility}
+              adjacentSubHexes={showAdjacentSubMaps && isInSubHex ? adjacentSubHexes : null}
             >
               {/* DrawingLayer - handles all drawing tools */}
               <MapCanvas.DrawingLayer
@@ -728,7 +814,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
           {/* Tile Asset Browser (right sidebar, hex maps with tilesets only) */}
           {showTilePanel && (
             <TileAssetBrowser
-              tilesets={mapData.tilesets || []}
+              tilesets={availableTilesets}
               selectedTilesetId={selectedTilesetId}
               selectedTileId={selectedTileId}
               onTileSelect={handleTileSelect}
@@ -786,6 +872,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
           currentObjects={mapData.mapType === 'hex' ? (getActiveLayer(mapData).objects || []) : []}
           mapData={mapData}
           geometry={geometry}
+          isInSubHex={isInSubHex}
+          subMapName={isInSubHex ? (mapData?.name || null) : null}
         />
 
         {/* Image Alignment Mode */}

@@ -304,6 +304,9 @@ export interface ModalShellContextValue {
   // Export (PreferencesTab)
   mapData: MapData | null;
   geometry: IGeometry | null;
+  // Sub-hex context
+  isInSubHex: boolean;
+  subMapName: string | null;
 }
 
 /** Appearance context - colors, overrides, fog image */
@@ -443,6 +446,8 @@ export interface MapSettingsProviderProps {
   currentObjectSetId?: string | null;
   mapData?: MapData | null;
   geometry?: IGeometry | null;
+  isInSubHex?: boolean;
+  subMapName?: string | null;
 }
 
 // ===========================================
@@ -500,7 +505,9 @@ const MapSettingsProvider: React.FC<MapSettingsProviderProps> = ({
   currentObjects = [],
   currentObjectSetId = null,
   mapData = null,
-  geometry = null
+  geometry = null,
+  isInSubHex = false,
+  subMapName = null
 }) => {
   const globalSettings = getSettings() as PluginSettings;
   const isHexMap = mapType === 'hex';
@@ -880,8 +887,9 @@ const MapSettingsProvider: React.FC<MapSettingsProviderProps> = ({
     setDistanceSettings: handlers.setDistanceSettings,
     preferences: state.preferences,
     handlePreferenceToggle: handlers.handlePreferenceToggle,
-    mapData, geometry
-  }), [isOpen, state.activeTab, state.isLoading, state.distanceSettings, state.preferences]);
+    mapData, geometry,
+    isInSubHex, subMapName
+  }), [isOpen, state.activeTab, state.isLoading, state.distanceSettings, state.preferences, isInSubHex, subMapName]);
 
   const appearanceValue = dc.useMemo((): AppearanceContextValue => ({
     useGlobalSettings: state.useGlobalSettings,

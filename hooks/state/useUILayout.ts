@@ -28,6 +28,7 @@ interface LayerVisibilityState {
   objects: boolean;
   textLabels: boolean;
   hexCoordinates: boolean;
+  regions: boolean;
 }
 
 interface UseUILayoutResult {
@@ -68,7 +69,8 @@ function useUILayout({
     grid: true,
     objects: true,
     textLabels: true,
-    hexCoordinates: false
+    hexCoordinates: false,
+    regions: true
   });
 
   const handleToggleLayerVisibility = dc.useCallback((layerId: keyof LayerVisibilityState) => {

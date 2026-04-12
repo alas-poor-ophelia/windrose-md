@@ -289,7 +289,7 @@ function renderLayerCellsAndEdges(
   }
 }
 
-const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, selectedItems = [], isResizeMode = false, theme = null, showCoordinates = false, layerVisibility = null) => {
+const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, selectedItems = [], isResizeMode = false, theme = null, showCoordinates = false, layerVisibility = null, adjacentSubHexes = null) => {
   if (!canvas) return;
 
   // Normalize selectedItems to array (backward compatibility)
@@ -410,6 +410,81 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
     }
   }
 
+  // Draw adjacent sub-hex ghost previews (when drilled into a sub-hex)
+  if (adjacentSubHexes && adjacentSubHexes.length > 0 && geometry.type === 'hex') {
+    const hexGeom = geometry as ExtendedGeometry;
+    const maxRing = mapData.hexBounds?.maxRing || 7;
+
+    // Compute world-space offset for each axial direction.
+    // Two adjacent sub-hex grids tile when their centers are (2*maxRing+1) hex-steps apart.
+    const tileStep = 2 * maxRing + 1;
+
+    ctx.save();
+
+    for (const adj of adjacentSubHexes) {
+      // Compute offset for this direction
+      const scaledQ = adj.dq * tileStep;
+      const scaledR = adj.dr * tileStep;
+      const worldOffset = hexGeom.hexToWorld!(scaledQ, scaledR);
+
+      // Create shifted view state: offset the canvas origin by the world-space delta
+      const shiftedOffsetX = offsetX + worldOffset.worldX * zoom;
+      const shiftedOffsetY = offsetY + worldOffset.worldY * zoom;
+      const shiftedViewState: RendererViewState = { x: shiftedOffsetX, y: shiftedOffsetY, zoom };
+
+      const adjLayers = adj.mapData.layers || [];
+
+      // Render cells and edges from all layers using the existing renderer
+      for (const layer of adjLayers) {
+        if (layer.cells && layer.cells.length > 0) {
+          renderLayerCellsAndEdges(ctx, layer, geometry, shiftedViewState, THEME, renderer, {
+            opacity: 0.25,
+            showGrid: false
+          });
+        }
+      }
+
+      // Render tiles from all layers using the existing tile renderer
+      if (mapData.tilesets && mapData.tilesets.length > 0) {
+        for (const layer of adjLayers) {
+          if (layer.tiles && layer.tiles.length > 0) {
+            renderTiles(
+              ctx,
+              layer.tiles,
+              mapData.tilesets,
+              { hexToWorld: hexGeom.hexToWorld!.bind(hexGeom), worldToScreen: hexGeom.worldToScreen.bind(hexGeom), hexSize: hexGeom.hexSize!, orientation: mapData.orientation || 'flat' },
+              shiftedViewState,
+              { opacity: 0.25, getCachedImage, canvasWidth: width, canvasHeight: height }
+            );
+          }
+        }
+      }
+
+      // Render adjacent name label near edge of current grid (not center of adjacent)
+      ctx.globalAlpha = 0.5;
+      const edgeQ = adj.dq * (maxRing + 2);
+      const edgeR = adj.dr * (maxRing + 2);
+      const edgeWorld = hexGeom.hexToWorld!(edgeQ, edgeR);
+      const labelScreen = hexGeom.worldToScreen(edgeWorld.worldX, edgeWorld.worldY, offsetX, offsetY, zoom);
+      const labelFontSize = Math.max(10, 12 * zoom);
+      ctx.font = `bold ${labelFontSize}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      const labelMetrics = ctx.measureText(adj.name);
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+      ctx.fillRect(
+        labelScreen.screenX - labelMetrics.width / 2 - 4,
+        labelScreen.screenY - labelFontSize / 2 - 2,
+        labelMetrics.width + 8,
+        labelFontSize + 4
+      );
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(adj.name, labelScreen.screenX, labelScreen.screenY);
+    }
+
+    ctx.restore();
+  }
+
   // Build curve-cell merge index for active layer (grid maps only)
   let activeMergeIndex: CurveCellMergeIndex | null = null;
   if (geometry.type === 'grid' &&
@@ -456,7 +531,7 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   }
 
   // Draw regions (hex maps only, between curves and objects)
-  if (geometry.type === 'hex' && mapData.regions && mapData.regions.length > 0) {
+  if (geometry.type === 'hex' && mapData.regions && mapData.regions.length > 0 && visibility.regions !== false) {
     const regionFow = activeLayer.fogOfWar;
     let foggedAxialSet: Set<string> | undefined;
     if (regionFow?.enabled && regionFow?.foggedCells?.length) {
@@ -609,13 +684,13 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   ctx.restore();
 };
 
-const useCanvasRenderer: UseCanvasRenderer = (canvasRef, fogCanvasRef, mapData, geometry, selectedItems = [], isResizeMode = false, theme = null, showCoordinates = false, layerVisibility = null, tileImagesReady = false) => {
+const useCanvasRenderer: UseCanvasRenderer = (canvasRef, fogCanvasRef, mapData, geometry, selectedItems = [], isResizeMode = false, theme = null, showCoordinates = false, layerVisibility = null, tileImagesReady = false, adjacentSubHexes = null) => {
   dc.useEffect(() => {
     if (mapData && geometry && canvasRef.current) {
       const fogCanvas = fogCanvasRef?.current || null;
-      renderCanvas(canvasRef.current, fogCanvas, mapData, geometry, selectedItems, isResizeMode, theme, showCoordinates, layerVisibility);
+      renderCanvas(canvasRef.current, fogCanvas, mapData, geometry, selectedItems, isResizeMode, theme, showCoordinates, layerVisibility, adjacentSubHexes);
     }
-  }, [mapData, geometry, selectedItems, isResizeMode, theme, canvasRef, fogCanvasRef, showCoordinates, layerVisibility, tileImagesReady]);
+  }, [mapData, geometry, selectedItems, isResizeMode, theme, canvasRef, fogCanvasRef, showCoordinates, layerVisibility, tileImagesReady, adjacentSubHexes]);
 };
 
 return { useCanvasRenderer, renderCanvas };

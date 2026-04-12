@@ -26,6 +26,11 @@ const { HexGeometry } = await requireModuleByName("HexGeometry.ts") as {
   };
 };
 
+const { getRegionLabelWorldPosition, computeCentroid } = await requireModuleByName("regionRenderer.ts") as {
+  getRegionLabelWorldPosition: (region: Region, geometry: any) => { worldX: number; worldY: number } | null;
+  computeCentroid: (hexes: Array<{ x: number; y: number }>, geometry: any) => { worldX: number; worldY: number };
+};
+
 import type { MapStateContextValue } from '#types/contexts/context.types';
 
 interface RegionToolsOptions {
@@ -118,6 +123,13 @@ function useRegionTools(options: RegionToolsOptions): UseRegionToolsResult {
   // Context menu state
   const [contextMenu, setContextMenu] = dc.useState<ContextMenuState | null>(null);
 
+  // Label drag state
+  const [draggingLabelRegionId, setDraggingLabelRegionId] = dc.useState<string | null>(null);
+  const labelDragStartRef = dc.useRef<{ worldX: number; worldY: number } | null>(null);
+  const labelDragCleanupRef = dc.useRef<(() => void) | null>(null);
+  const handlePointerMoveRef = dc.useRef<((e: PointerEvent) => void) | null>(null);
+  const handlePointerUpRef = dc.useRef<((e: PointerEvent) => void) | null>(null);
+
   const editingRegion = dc.useMemo(() => {
     if (!editingRegionId || !mapData?.regions) return null;
     return mapData.regions.find(r => r.id === editingRegionId) || null;
@@ -157,7 +169,35 @@ function useRegionTools(options: RegionToolsOptions): UseRegionToolsResult {
 
   // ── Paint Mode Handlers ────────────────────────────────────────────
 
+  // Check if a click hits a region label (world-space proximity)
+  const checkLabelHit = dc.useCallback((worldX: number, worldY: number): Region | null => {
+    if (!mapData?.regions || !geometry || geometry.type !== 'hex') return null;
+    const hexGeom = geometry as InstanceType<typeof HexGeometry>;
+    const hitRadius = hexGeom.hexSize * 0.6;
+
+    for (const region of mapData.regions) {
+      const labelPos = getRegionLabelWorldPosition(region, hexGeom);
+      if (!labelPos) continue;
+      const dx = worldX - labelPos.worldX;
+      const dy = worldY - labelPos.worldY;
+      if (dx * dx + dy * dy < hitRadius * hitRadius) return region;
+    }
+    return null;
+  }, [mapData?.regions, geometry]);
+
   const handlePaintPointerDown = dc.useCallback((e: PointerEvent) => {
+    // Check for label drag first
+    const world = getWorldCoords(e);
+    if (world) {
+      const hitRegion = checkLabelHit(world.worldX, world.worldY);
+      if (hitRegion) {
+        setDraggingLabelRegionId(hitRegion.id);
+        labelDragStartRef.current = { worldX: world.worldX, worldY: world.worldY };
+        e.preventDefault();
+        return;
+      }
+    }
+
     const hex = getHexCoords(e);
     if (!hex) return;
 
@@ -212,7 +252,7 @@ function useRegionTools(options: RegionToolsOptions): UseRegionToolsResult {
       }
       return [...prev, { x: hex.q, y: hex.r }];
     });
-  }, [getHexCoords, geometry, editingRegionId, mapData, pendingHexes.length, findRegionForHex, onRegionsChange]);
+  }, [getHexCoords, getWorldCoords, checkLabelHit, geometry, editingRegionId, mapData, pendingHexes.length, findRegionForHex, onRegionsChange]);
 
   // ── Boundary Mode Handlers ─────────────────────────────────────────
 
@@ -220,8 +260,17 @@ function useRegionTools(options: RegionToolsOptions): UseRegionToolsResult {
     const world = getWorldCoords(e);
     if (!world) return;
 
+    // Check for label drag first
+    const hitRegion = checkLabelHit(world.worldX, world.worldY);
+    if (hitRegion) {
+      setDraggingLabelRegionId(hitRegion.id);
+      labelDragStartRef.current = { worldX: world.worldX, worldY: world.worldY };
+      e.preventDefault();
+      return;
+    }
+
     setBoundaryVertices(prev => [...prev, { x: world.worldX, y: world.worldY }]);
-  }, [getWorldCoords]);
+  }, [getWorldCoords, checkLabelHit]);
 
   const closeBoundaryAndSelectHexes = dc.useCallback(() => {
     if (boundaryVertices.length < 3 || !geometry || geometry.type !== 'hex' || !mapData) return;
@@ -298,13 +347,90 @@ function useRegionTools(options: RegionToolsOptions): UseRegionToolsResult {
     if (isBoundaryMode) handleBoundaryPointerDown(e);
   }, [isActive, isPaintMode, isBoundaryMode, handlePaintPointerDown, handleBoundaryPointerDown]);
 
-  const handlePointerMove = dc.useCallback((_e: PointerEvent) => {
-    // Future: live preview for boundary mode
-  }, []);
+  const handlePointerMove = dc.useCallback((e: PointerEvent) => {
+    if (!draggingLabelRegionId || !labelDragStartRef.current) return;
+    const world = getWorldCoords(e);
+    if (!world || !mapData?.regions || !geometry || geometry.type !== 'hex') return;
+
+    const hexGeom = geometry as InstanceType<typeof HexGeometry>;
+    const region = mapData.regions.find(r => r.id === draggingLabelRegionId);
+    if (!region) return;
+
+    const currentLabelPos = region.labelPosition
+      ? { worldX: region.labelPosition.x, worldY: region.labelPosition.y }
+      : computeCentroid(region.hexes, hexGeom);
+
+    const deltaX = world.worldX - labelDragStartRef.current.worldX;
+    const deltaY = world.worldY - labelDragStartRef.current.worldY;
+
+    let newPos = { x: currentLabelPos.worldX + deltaX, y: currentLabelPos.worldY + deltaY };
+    labelDragStartRef.current = { worldX: world.worldX, worldY: world.worldY };
+
+    // Constrain: label must stay within maxDist of the nearest hex in the region
+    const maxDist = hexGeom.hexSize * 2.5;
+    let nearestDistSq = Infinity;
+    let nearestWorld = { worldX: 0, worldY: 0 };
+    for (const h of region.hexes) {
+      const hw = hexGeom.hexToWorld(h.x, h.y);
+      const dx = newPos.x - hw.worldX;
+      const dy = newPos.y - hw.worldY;
+      const distSq = dx * dx + dy * dy;
+      if (distSq < nearestDistSq) {
+        nearestDistSq = distSq;
+        nearestWorld = hw;
+      }
+    }
+    if (nearestDistSq > maxDist * maxDist) {
+      const dist = Math.sqrt(nearestDistSq);
+      const scale = maxDist / dist;
+      newPos = {
+        x: nearestWorld.worldX + (newPos.x - nearestWorld.worldX) * scale,
+        y: nearestWorld.worldY + (newPos.y - nearestWorld.worldY) * scale
+      };
+    }
+
+    // Update region with new label position (running delta)
+    const regions = (mapData.regions || []).map(r =>
+      r.id === draggingLabelRegionId ? { ...r, labelPosition: newPos } : r
+    );
+    onRegionsChange(regions);
+  }, [draggingLabelRegionId, getWorldCoords, mapData, geometry, onRegionsChange]);
 
   const handlePointerUp = dc.useCallback((_e: PointerEvent) => {
-    // Paint mode is click-based, no drag needed yet
-  }, []);
+    if (draggingLabelRegionId) {
+      setDraggingLabelRegionId(null);
+      labelDragStartRef.current = null;
+      if (labelDragCleanupRef.current) {
+        labelDragCleanupRef.current();
+        labelDragCleanupRef.current = null;
+      }
+    }
+  }, [draggingLabelRegionId]);
+
+  // Keep refs in sync for document-level listeners
+  handlePointerMoveRef.current = handlePointerMove;
+  handlePointerUpRef.current = handlePointerUp;
+
+  // Start document-level drag listeners when label drag begins
+  dc.useEffect(() => {
+    if (!draggingLabelRegionId) return;
+
+    const onMove = (e: PointerEvent) => handlePointerMoveRef.current?.(e);
+    const onUp = (e: PointerEvent) => handlePointerUpRef.current?.(e);
+
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp);
+
+    labelDragCleanupRef.current = () => {
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
+    };
+
+    return () => {
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
+    };
+  }, [draggingLabelRegionId]);
 
   // ── Region Creation ────────────────────────────────────────────────
 

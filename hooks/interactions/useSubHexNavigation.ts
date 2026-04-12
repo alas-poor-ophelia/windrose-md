@@ -48,6 +48,15 @@ interface UseSubHexNavigationOptions {
   updateMapData: MapDataUpdater;
 }
 
+interface AdjacentSubHex {
+  hexKey: string;
+  /** Delta from current hex in axial coords */
+  dq: number;
+  dr: number;
+  mapData: MapData;
+  name: string;
+}
+
 interface UseSubHexNavigationResult {
   activeMapData: MapData | null;
   activeUpdateMapData: MapDataUpdater;
@@ -57,7 +66,10 @@ interface UseSubHexNavigationResult {
   enterSubHex: (q: number, r: number) => void;
   exitSubHex: () => void;
   navigateToLevel: (depth: number) => void;
+  navigateToSibling: (q: number, r: number) => void;
   navigationVersion: number;
+  currentHexKey: string | null;
+  adjacentSubHexes: AdjacentSubHex[];
 }
 
 // =========================================================================
@@ -347,6 +359,103 @@ function useSubHexNavigation({
     });
   }, [isInSubHex, rootUpdateMapData, navStack, propagateToRoot]);
 
+  // Navigate to a sibling sub-hex (atomic exit + enter)
+  const navigateToSibling = dc.useCallback((q: number, r: number): void => {
+    if (navStack.length === 0) return;
+
+    const currentSubHex = subHexMapData;
+    const topFrame = navStack[navStack.length - 1];
+    const siblingKey = `${q},${r}`;
+
+    // Merge current sub-hex back into parent
+    const restoredParent: MapData = {
+      ...topFrame.parentMapData,
+      subHexMaps: {
+        ...(topFrame.parentMapData.subHexMaps || {}),
+        [topFrame.hexKey]: {
+          ...(topFrame.parentMapData.subHexMaps?.[topFrame.hexKey] || {}),
+          mapData: currentSubHex,
+          lastModified: new Date().toISOString()
+        }
+      }
+    };
+
+    // Look up or create sibling sub-hex
+    let siblingSubHex = restoredParent.subHexMaps?.[siblingKey];
+    if (!siblingSubHex) {
+      siblingSubHex = createSubHexMapData(restoredParent, q, r);
+      restoredParent.subHexMaps = {
+        ...(restoredParent.subHexMaps || {}),
+        [siblingKey]: siblingSubHex
+      };
+    }
+
+    // Replace the top frame with the sibling's frame
+    const newFrame: SubHexNavFrame = {
+      parentMapData: restoredParent,
+      parentViewState: topFrame.parentViewState,
+      hexKey: siblingKey
+    };
+
+    const newStack = [...navStack.slice(0, -1), newFrame];
+    setNavStack(newStack);
+    setSubHexMapData(siblingSubHex.mapData);
+    setNavigationVersion(prev => prev + 1);
+
+    // Propagate to root
+    setTimeout(() => propagateToRoot(siblingSubHex!.mapData, newStack), 0);
+  }, [navStack, subHexMapData, propagateToRoot]);
+
+  // Current hex key (for adjacent sub-hex lookup)
+  const currentHexKey = isInSubHex ? navStack[navStack.length - 1].hexKey : null;
+
+  // Compute adjacent sub-hexes (siblings with content)
+  const adjacentSubHexes = dc.useMemo((): AdjacentSubHex[] => {
+    if (!isInSubHex || navStack.length === 0) return [];
+
+    const topFrame = navStack[navStack.length - 1];
+    const parentSubHexMaps = topFrame.parentMapData.subHexMaps;
+    if (!parentSubHexMaps) return [];
+
+    const [cqStr, crStr] = topFrame.hexKey.split(',');
+    const cq = parseInt(cqStr, 10);
+    const cr = parseInt(crStr, 10);
+
+    // 6 axial hex neighbor directions
+    const dirs = [
+      [1, 0], [1, -1], [0, -1],
+      [-1, 0], [-1, 1], [0, 1]
+    ];
+
+    const adjacent: AdjacentSubHex[] = [];
+    for (const [dq, dr] of dirs) {
+      const nq = cq + dq;
+      const nr = cr + dr;
+      const key = `${nq},${nr}`;
+      const subHex = parentSubHexMaps[key];
+      if (subHex?.mapData) {
+        // Only include if it has visible content
+        const sd = subHex.mapData;
+        const hasContent = sd.layers?.some((l: MapLayer) =>
+          (l.cells && l.cells.length > 0) ||
+          (l.curves && l.curves.length > 0) ||
+          (l.objects && l.objects.length > 0) ||
+          (l.textLabels && l.textLabels.length > 0)
+        );
+        if (hasContent) {
+          adjacent.push({
+            hexKey: key,
+            dq,
+            dr,
+            mapData: subHex.mapData,
+            name: subHex.mapData.name || `Hex (${nq}, ${nr})`
+          });
+        }
+      }
+    }
+    return adjacent;
+  }, [isInSubHex, navStack]);
+
   return {
     activeMapData,
     activeUpdateMapData,
@@ -356,7 +465,10 @@ function useSubHexNavigation({
     enterSubHex,
     exitSubHex,
     navigateToLevel,
-    navigationVersion
+    navigateToSibling,
+    navigationVersion,
+    currentHexKey,
+    adjacentSubHexes
   };
 }
 

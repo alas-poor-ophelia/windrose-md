@@ -76,6 +76,8 @@ export interface MapSettingsModalProps {
   globalSettings: Record<string, unknown>;
   onSave: (updates: Record<string, unknown>) => void;
   onCancel: () => void;
+  isInSubHex?: boolean;
+  subMapName?: string | null;
 }
 
 const MODAL_SIZE_KEY = 'windrose-settings-modal-size';
@@ -168,7 +170,9 @@ function FallbackModalContent(): React.ReactElement | null {
     isLoading,
     handleSave,
     handleCancel,
-    mouseDownTargetRef
+    mouseDownTargetRef,
+    isInSubHex,
+    subMapName
   } = useModalShell();
 
   const [position, setPosition] = dc.useState<ModalPosition>({ x: null, y: null });
@@ -366,8 +370,22 @@ function FallbackModalContent(): React.ReactElement | null {
               flexShrink: 0
             }}
           >
-            <h3>Map Settings</h3>
+            <h3>{isInSubHex && subMapName ? `Map Settings \u2014 ${subMapName}` : 'Map Settings'}</h3>
           </div>
+
+          {isInSubHex && (
+            <div style={{
+              padding: '6px 12px',
+              margin: '0 16px 8px',
+              background: 'var(--background-modifier-message)',
+              borderRadius: '4px',
+              fontSize: '12px',
+              color: 'var(--text-muted)',
+              borderLeft: '3px solid var(--interactive-accent)'
+            }}>
+              Editing sub-map settings. Changes apply only to this sub-map.
+            </div>
+          )}
 
           <TabContent tabs={tabs} activeTab={activeTab} setActiveTab={setActiveTab} mapType={mapType} />
 
@@ -469,7 +487,9 @@ function MapSettingsModalContent(): React.ReactElement | null {
     mapType,
     isLoading,
     handleSave,
-    handleCancel
+    handleCancel,
+    isInSubHex,
+    subMapName
   } = shellCtx;
 
   if (!isOpen) return null;
@@ -484,9 +504,13 @@ function MapSettingsModalContent(): React.ReactElement | null {
         h(BackgroundImageContext.Provider, { value: bgImageCtx },
           h(HexGridContext.Provider, { value: hexGridCtx }, children))));
 
+  const modalTitle = isInSubHex && subMapName
+    ? `Map Settings \u2014 ${subMapName}`
+    : 'Map Settings';
+
   return (
     <NativeModalPortal
-      title="Map Settings"
+      title={modalTitle}
       modalClass="dmt-settings-native-modal"
       onClose={handleCancel}
       draggable
@@ -494,6 +518,19 @@ function MapSettingsModalContent(): React.ReactElement | null {
       contextBridge={contextBridge}
     >
       <div class="dmt-settings-modal">
+        {isInSubHex && (
+          <div style={{
+            padding: '6px 12px',
+            marginBottom: '8px',
+            background: 'var(--background-modifier-message)',
+            borderRadius: '4px',
+            fontSize: '12px',
+            color: 'var(--text-muted)',
+            borderLeft: '3px solid var(--interactive-accent)'
+          }}>
+            Editing sub-map settings. Changes apply only to this sub-map.
+          </div>
+        )}
         <TabContent tabs={tabs} activeTab={activeTab} setActiveTab={setActiveTab} mapType={mapType} />
 
         <div class="modal-button-container">

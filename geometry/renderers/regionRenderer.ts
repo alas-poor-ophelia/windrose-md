@@ -166,7 +166,7 @@ function renderRegionLabel(
   }
 
   const centroid = region.labelPosition
-    ? geometry.hexToWorld(region.labelPosition.x, region.labelPosition.y)
+    ? { worldX: region.labelPosition.x, worldY: region.labelPosition.y }
     : computeCentroid(region.hexes, geometry);
 
   const screen = geometry.worldToScreen(
@@ -195,6 +195,22 @@ function renderRegionLabel(
   // Text
   ctx.fillStyle = '#ffffff';
   ctx.fillText(region.name, screen.screenX, screen.screenY);
+}
+
+// ── Hit Detection ───────────────────────────────────────────────────
+
+/**
+ * Get the world-space position of a region's label.
+ * Returns null if the region has no name or hexes.
+ */
+function getRegionLabelWorldPosition(
+  region: Region,
+  geometry: HexGeometryLike
+): { worldX: number; worldY: number } | null {
+  if (!region.visible || region.hexes.length === 0 || !region.name) return null;
+  return region.labelPosition
+    ? { worldX: region.labelPosition.x, worldY: region.labelPosition.y }
+    : computeCentroid(region.hexes, geometry);
 }
 
 // ── Main Entry Point ─────────────────────────────────────────────────
@@ -228,5 +244,6 @@ return {
   renderRegionBorder,
   renderRegionLabel,
   computeBoundaryEdges,
-  computeCentroid
+  computeCentroid,
+  getRegionLabelWorldPosition
 };

@@ -37,6 +37,7 @@ interface UseCustomEventHandlersOptions {
   enterSubHex: (q: number, r: number) => void;
   exitSubHex: () => void;
   isInSubHex: boolean;
+  navigateToSibling?: (q: number, r: number) => void;
   handleRegionsChange: (regions: any) => void;
 }
 
@@ -49,6 +50,7 @@ function useCustomEventHandlers({
   enterSubHex,
   exitSubHex,
   isInSubHex,
+  navigateToSibling,
   handleRegionsChange
 }: UseCustomEventHandlersOptions): void {
 
@@ -84,6 +86,17 @@ function useCustomEventHandlers({
     document.addEventListener('windrose:enter-sub-hex', handleEnterSubHex as EventListener);
     return () => document.removeEventListener('windrose:enter-sub-hex', handleEnterSubHex as EventListener);
   }, [mapData?.mapType, enterSubHex]);
+
+  // Listen for sibling sub-hex navigation (click on adjacent preview)
+  dc.useEffect(() => {
+    if (!navigateToSibling || !isInSubHex) return;
+    const handleNavigateSibling = (event: CustomEvent): void => {
+      const { q, r } = event.detail;
+      navigateToSibling(q, r);
+    };
+    document.addEventListener('windrose:navigate-sibling-sub-hex', handleNavigateSibling as EventListener);
+    return () => document.removeEventListener('windrose:navigate-sibling-sub-hex', handleNavigateSibling as EventListener);
+  }, [isInSubHex, navigateToSibling]);
 
   // Listen for deep link navigation events
   dc.useEffect(() => {
