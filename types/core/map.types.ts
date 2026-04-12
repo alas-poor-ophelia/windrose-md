@@ -232,6 +232,7 @@ export interface MapData {
 
   // UI state persistence (optional - defaults exist)
   uiPreferences?: UIPreferences;
+  showAdjacentSubMaps?: boolean;
   sidebarCollapsed?: boolean;
   expandedState?: boolean;
 
@@ -325,7 +326,7 @@ export interface Region {
   visible: boolean;
   linkedNote?: string;
   icon?: string;
-  /** Manual label offset from computed centroid */
+  /** World-space position for label (if absent, computed from centroid) */
   labelPosition?: Point;
   /** Z-order for rendering (lower = behind) */
   order: number;

@@ -12,6 +12,16 @@ import type { MapObject } from '../objects/object.types';
 import type { TextLabel } from '../objects/note.types';
 import type { LayerVisibility } from '../contexts/context.types';
 
+/** Adjacent sub-hex map for ghost preview rendering */
+export interface AdjacentSubHexRenderData {
+  hexKey: string;
+  /** Delta from current hex in axial coords */
+  dq: number;
+  dr: number;
+  mapData: MapData;
+  name: string;
+}
+
 // ===========================================
 // Selected Item Types
 // ===========================================
@@ -67,7 +77,8 @@ export type RenderCanvas = (
   isResizeMode?: boolean,
   theme?: RendererTheme | null,
   showCoordinates?: boolean,
-  layerVisibility?: LayerVisibility | null
+  layerVisibility?: LayerVisibility | null,
+  adjacentSubHexes?: AdjacentSubHexRenderData[] | null
 ) => void;
 
 /** useCanvasRenderer hook - triggers re-render on data changes */
@@ -81,5 +92,6 @@ export type UseCanvasRenderer = (
   theme?: RendererTheme | null,
   showCoordinates?: boolean,
   layerVisibility?: LayerVisibility | null,
-  tileImagesReady?: boolean
+  tileImagesReady?: boolean,
+  adjacentSubHexes?: AdjacentSubHexRenderData[] | null
 ) => void;
