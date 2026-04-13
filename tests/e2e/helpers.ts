@@ -22,6 +22,29 @@ export const DATA_FILE_PATH = TEST_MODE === "compiled"
   ? "windrose-md-data.json"
   : "_test-data/dungeon-maps-data.json";
 
+/**
+ * Reset the windrose data file to the clean fixture.
+ * Use in beforeEach for tests that mutate cell/object/layer data and assert on counts,
+ * to prevent state pollution from prior tests in the same file.
+ */
+export function resetDataFile(): void {
+  // Use require here to avoid top-level import of node:fs / node:path
+  // (some test files may not need filesystem access)
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const fs = require("fs");
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const path = require("path");
+  const fixturesDir = path.resolve(__dirname, "../fixtures");
+  const cleanFile = path.join(fixturesDir, "dungeon-maps-data.clean.json");
+  const vaultDir = TEST_MODE === "compiled"
+    ? path.join(fixturesDir, "test-vault-compiled")
+    : path.join(fixturesDir, "test-vault");
+  const target = path.join(vaultDir, DATA_FILE_PATH);
+  if (fs.existsSync(cleanFile)) {
+    fs.copyFileSync(cleanFile, target);
+  }
+}
+
 // ===========================================
 // Error Tracking
 // ===========================================

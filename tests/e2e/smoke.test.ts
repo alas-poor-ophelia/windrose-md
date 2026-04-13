@@ -365,7 +365,7 @@ test("Object rotation via toolbar button rotates 45 degrees", async ({ page }) =
 
   const sidebar = page.locator('.dmt-object-sidebar');
   await sidebar.waitFor({ state: "visible", timeout: 5000 });
-  const objectItem = page.locator('.dmt-object-item').first();
+  const objectItem = page.locator('.dmt-object-grid-item').first();
   await objectItem.click();
   await page.waitForTimeout(200);
 
@@ -406,7 +406,7 @@ test("Object rotation via R key rotates 45 degrees", async ({ page }) => {
 
   const sidebar = page.locator('.dmt-object-sidebar');
   await sidebar.waitFor({ state: "visible", timeout: 5000 });
-  const objectItem = page.locator('.dmt-object-item').first();
+  const objectItem = page.locator('.dmt-object-grid-item').first();
   await objectItem.click();
   await page.waitForTimeout(200);
 

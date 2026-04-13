@@ -23,7 +23,7 @@ test("Object can be placed on grid map", async ({ page }) => {
 
   // Expand sidebar and select an object type
   await expandObjectSidebarIfNeeded(page);
-  const objectItem = page.locator('.dmt-object-item').first();
+  const objectItem = page.locator('.dmt-object-grid-item').first();
   const itemExists = await objectItem.count() > 0;
 
   if (itemExists) {
@@ -102,7 +102,7 @@ test("Object sidebar can be expanded", async ({ page }) => {
   expect(isExpanded).toBe(true);
 
   // Should have at least one object type available
-  const objectItems = page.locator('.dmt-object-item');
+  const objectItems = page.locator('.dmt-object-grid-item');
   const count = await objectItems.count();
   expect(count).toBeGreaterThan(0);
 
@@ -119,14 +119,14 @@ test("Object type can be selected from sidebar", async ({ page }) => {
   await expandObjectSidebarIfNeeded(page);
 
   // Click the first object item
-  const objectItem = page.locator('.dmt-object-item').first();
+  const objectItem = page.locator('.dmt-object-grid-item').first();
   await objectItem.waitFor({ state: "visible", timeout: 5000 });
   await objectItem.click();
   await page.waitForTimeout(200);
 
   // The object item should be selected (have the selected class)
   const selectedClass = await objectItem.getAttribute("class");
-  expect(selectedClass).toContain("dmt-object-item-selected");
+  expect(selectedClass).toContain("dmt-object-grid-item-selected");
 
   expect(errors).toHaveLength(0);
 });
@@ -159,7 +159,7 @@ test("Clicking canvas with object tool selected does not throw errors", async ({
 
   // Expand sidebar and select an object type
   await expandObjectSidebarIfNeeded(page);
-  const objectItem = page.locator('.dmt-object-item').first();
+  const objectItem = page.locator('.dmt-object-grid-item').first();
   await objectItem.waitFor({ state: "visible", timeout: 5000 });
   await objectItem.click();
   await page.waitForTimeout(200);

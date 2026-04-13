@@ -1,3 +1,4 @@
+import { beforeEach } from "vitest";
 import {
   test,
   expect,
@@ -11,10 +12,13 @@ import {
   getActiveLayerId,
   getTotalCellCount,
   getCanvasCenter,
+  resetDataFile,
   AUTOSAVE_WAIT,
   TEST_MAPS,
   MAP_IDS
 } from "./helpers";
+
+beforeEach(() => resetDataFile());
 
 // ===========================================
 // Data Persistence Tests

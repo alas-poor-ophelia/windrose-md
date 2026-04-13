@@ -1,3 +1,4 @@
+import { beforeEach } from "vitest";
 import {
   test,
   expect,
@@ -8,10 +9,13 @@ import {
   waitForToolPalette,
   getHistoryButtons,
   getTotalCellCount,
+  resetDataFile,
   AUTOSAVE_WAIT,
   TEST_MAPS,
   MAP_IDS
 } from "./helpers";
+
+beforeEach(() => resetDataFile());
 
 // ===========================================
 // Undo/Redo Tests

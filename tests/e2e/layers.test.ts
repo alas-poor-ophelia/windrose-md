@@ -1,3 +1,4 @@
+import { beforeEach } from "vitest";
 import {
   test,
   expect,
@@ -9,10 +10,13 @@ import {
   openLayerPanel,
   getActiveLayerId,
   getLayerCellCount,
+  resetDataFile,
   AUTOSAVE_WAIT,
   TEST_MAPS,
   MAP_IDS
 } from "./helpers";
+
+beforeEach(() => resetDataFile());
 
 // ===========================================
 // Layer Management Tests
