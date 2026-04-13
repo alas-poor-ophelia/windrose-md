@@ -25,7 +25,7 @@ interface TilePlacementLayerProps {
   tileLayer: 'base' | 'overlay';
   tileFitMode: 'fill' | 'contain' | 'auto';
   stampMode: boolean;
-  onTilesChange: (tiles: HexTileAssignment[]) => void;
+  onTilesChange: (tiles: HexTileAssignment[], suppressHistory?: boolean) => void;
 }
 
 const TilePlacementLayer = ({
@@ -47,6 +47,7 @@ const TilePlacementLayer = ({
 
   const paintedInStrokeRef = dc.useRef<Set<string>>(new Set());
   const isDraggingRef = dc.useRef(false);
+  const strokeInitialTilesRef = dc.useRef<HexTileAssignment[] | null>(null);
 
   const placeTileAtHex = dc.useCallback((q: number, r: number) => {
     if (!mapData || !selectedTilesetId || !selectedTileId) return;
@@ -82,7 +83,8 @@ const TilePlacementLayer = ({
       newTiles = [...currentTiles, newTile];
     }
 
-    onTilesChange(newTiles);
+    const isBatchedStroke = strokeInitialTilesRef.current !== null;
+    onTilesChange(newTiles, isBatchedStroke);
   }, [mapData, selectedTilesetId, selectedTileId, tileRotation, tileFlipH, tileLayer, tileFitMode, onTilesChange]);
 
   const placeStampAtWorld = dc.useCallback((worldX: number, worldY: number, q: number, r: number) => {
@@ -117,13 +119,15 @@ const TilePlacementLayer = ({
     if (paintedInStrokeRef.current.has(key)) return;
     paintedInStrokeRef.current.add(key);
 
+    const isBatchedStroke = strokeInitialTilesRef.current !== null;
+
     // Prefer removing overlay first, then base
     const overlayIdx = currentTiles.findIndex(
       (t: HexTileAssignment) => t.q === q && t.r === r && t.layer === 'overlay'
     );
     if (overlayIdx >= 0) {
       const newTiles = currentTiles.filter((_: HexTileAssignment, i: number) => i !== overlayIdx);
-      onTilesChange(newTiles);
+      onTilesChange(newTiles, isBatchedStroke);
       return;
     }
 
@@ -132,7 +136,7 @@ const TilePlacementLayer = ({
     );
 
     if (newTiles.length !== currentTiles.length) {
-      onTilesChange(newTiles);
+      onTilesChange(newTiles, isBatchedStroke);
     }
   }, [mapData, onTilesChange]);
 
@@ -153,6 +157,9 @@ const TilePlacementLayer = ({
 
     isDraggingRef.current = true;
     paintedInStrokeRef.current = new Set();
+
+    const activeLayer = getActiveLayer(mapData);
+    strokeInitialTilesRef.current = [...(activeLayer.tiles || [])];
 
     if (hasTileSelected) {
       placeTileAtHex(coords.x, coords.y);
@@ -176,9 +183,14 @@ const TilePlacementLayer = ({
   }, [isTileTool, geometry, screenToGrid, hasTileSelected, stampMode, placeTileAtHex, eraseTileAtHex]);
 
   const handlePointerUp = dc.useCallback(() => {
+    if (strokeInitialTilesRef.current !== null && mapData) {
+      const activeLayer = getActiveLayer(mapData);
+      onTilesChange(activeLayer.tiles || [], false);
+      strokeInitialTilesRef.current = null;
+    }
     isDraggingRef.current = false;
     paintedInStrokeRef.current = new Set();
-  }, []);
+  }, [mapData, onTilesChange]);
 
   const tileHandlersRef = dc.useRef<Record<string, unknown> | null>(null);
   tileHandlersRef.current = isTileTool

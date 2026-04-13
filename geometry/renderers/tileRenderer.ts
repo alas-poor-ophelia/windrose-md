@@ -132,6 +132,29 @@ function calculateTileDrawRect(
 }
 
 // ===========================================
+// Entry Map Cache
+// ===========================================
+
+let _cachedEntryMap: Map<string, { entry: { vaultPath: string }; tileset: TilesetDef }> | null = null;
+let _cachedEntryMapSig = '';
+
+function getEntryMap(tilesets: TilesetDef[]): Map<string, { entry: { vaultPath: string }; tileset: TilesetDef }> {
+  let sig = '';
+  for (const ts of tilesets) sig += ts.id + ':' + ts.tiles.length + ',';
+  if (_cachedEntryMap && sig === _cachedEntryMapSig) return _cachedEntryMap;
+
+  const map = new Map<string, { entry: { vaultPath: string }; tileset: TilesetDef }>();
+  for (const ts of tilesets) {
+    for (const entry of ts.tiles) {
+      map.set(ts.id + ':' + entry.id, { entry, tileset: ts });
+    }
+  }
+  _cachedEntryMapSig = sig;
+  _cachedEntryMap = map;
+  return map;
+}
+
+// ===========================================
 // Main Render Function
 // ===========================================
 
@@ -152,13 +175,7 @@ function renderTiles(
   const getCachedImage = options?.getCachedImage;
   if (!getCachedImage) return;
 
-  // Build tile entry lookup (tilesetId:tileId → TileEntry)
-  const entryMap = new Map<string, { entry: { vaultPath: string }; tileset: TilesetDef }>();
-  for (const ts of tilesets) {
-    for (const entry of ts.tiles) {
-      entryMap.set(ts.id + ':' + entry.id, { entry, tileset: ts });
-    }
-  }
+  const entryMap = getEntryMap(tilesets);
 
   // Pre-compute hex screen dimensions (constant for all tiles in this frame)
   const hexScreenWidth = geometry.orientation === 'flat'

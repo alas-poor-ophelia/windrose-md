@@ -67,7 +67,7 @@ interface UsePaintToolOptions {
   onObjectsChange: (objects: MapObject[]) => void;
   onTextLabelsChange: (labels: any[]) => void;
   onEdgesChange: (edges: Edge[], skipHistory?: boolean) => void;
-  onTilesChange?: (tiles: HexTileAssignment[]) => void;
+  onTilesChange?: (tiles: HexTileAssignment[], suppressHistory?: boolean) => void;
   getTextLabelAtPosition: (labels: any[], worldX: number, worldY: number, ctx: CanvasRenderingContext2D | null) => any;
   removeTextLabel: (labels: any[], id: string) => any[];
   getObjectAtPosition: (objects: MapObject[], x: number, y: number) => MapObject | null;
@@ -101,6 +101,7 @@ function usePaintTool({
   const strokeInitialStateRef = dc.useRef<Cell[] | null>(null);
   const strokeInitialEdgesRef = dc.useRef<Edge[] | null>(null);
   const strokeInitialCurvesRef = dc.useRef<Curve[] | null>(null);
+  const strokeInitialTilesRef = dc.useRef<HexTileAssignment[] | null>(null);
 
   const toggleCell = (coords: Point, shouldFill: boolean, dragStart: DragStartContext | null = null): void => {
     if (!mapData || !geometry) return;
@@ -176,12 +177,18 @@ function usePaintTool({
           const tiles = activeLayer.tiles as HexTileAssignment[];
           const overlayIdx = tiles.findIndex((t: HexTileAssignment) => t.q === coordX && t.r === coordY && t.layer === 'overlay');
           if (overlayIdx >= 0) {
-            onTilesChange(tiles.filter((_: HexTileAssignment, i: number) => i !== overlayIdx));
+            if (strokeInitialTilesRef.current === null) {
+              strokeInitialTilesRef.current = [...tiles];
+            }
+            onTilesChange(tiles.filter((_: HexTileAssignment, i: number) => i !== overlayIdx), isBatchedStroke);
             tileErased = true;
           } else {
             const baseIdx = tiles.findIndex((t: HexTileAssignment) => t.q === coordX && t.r === coordY);
             if (baseIdx >= 0) {
-              onTilesChange(tiles.filter((_: HexTileAssignment, i: number) => i !== baseIdx));
+              if (strokeInitialTilesRef.current === null) {
+                strokeInitialTilesRef.current = [...tiles];
+              }
+              onTilesChange(tiles.filter((_: HexTileAssignment, i: number) => i !== baseIdx), isBatchedStroke);
               tileErased = true;
             }
           }
@@ -246,6 +253,7 @@ function usePaintTool({
     strokeInitialStateRef.current = [...activeLayer.cells];
     strokeInitialEdgesRef.current = null;
     strokeInitialCurvesRef.current = null;
+    strokeInitialTilesRef.current = null;
     processCellDuringDrag(e, dragStart);
   };
 
@@ -270,6 +278,10 @@ function usePaintTool({
       onCurvesChange(activeLayer.curves || [], false);
       strokeInitialCurvesRef.current = null;
     }
+    if (strokeInitialTilesRef.current !== null && mapData && onTilesChange) {
+      onTilesChange(activeLayer.tiles || [], false);
+      strokeInitialTilesRef.current = null;
+    }
   };
 
   const cancelPaintDrawing = (): void => {
@@ -280,6 +292,7 @@ function usePaintTool({
       strokeInitialStateRef.current = null;
       strokeInitialEdgesRef.current = null;
       strokeInitialCurvesRef.current = null;
+      strokeInitialTilesRef.current = null;
     }
   };
 

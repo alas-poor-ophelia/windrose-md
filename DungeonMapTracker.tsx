@@ -55,6 +55,7 @@ const { useCustomEventHandlers } = await requireModuleByName("useCustomEventHand
 const { useUILayout } = await requireModuleByName("useUILayout.ts");
 const { usePanelState } = await requireModuleByName("usePanelState.ts");
 const { useViewControls } = await requireModuleByName("useViewControls.ts");
+const { useTileBrush } = await requireModuleByName("useTileBrush.ts");
 const { SubHexBreadcrumb } = await requireModuleByName("SubHexBreadcrumb.tsx");
 const { TileAssetBrowser } = await requireModuleByName("TileAssetBrowser.tsx");
 
@@ -207,30 +208,21 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   }, [rootUpdateMapData]);
 
   // Tile browser state (hex maps only)
-  const [tileBrowserCollapsed, setTileBrowserCollapsed] = dc.useState<boolean>(true);
-  const [selectedTilesetId, setSelectedTilesetId] = dc.useState<string | null>(null);
-  const [selectedTileId, setSelectedTileId] = dc.useState<string | null>(null);
-  const [tileRotation, setTileRotation] = dc.useState<number>(0);
-  const [tileFlipH, setTileFlipH] = dc.useState<boolean>(false);
-  const [tileLayer, setTileLayer] = dc.useState<'base' | 'overlay'>('base');
-  const [tileFitMode, setTileFitMode] = dc.useState<'fill' | 'contain' | 'auto'>('auto');
-  const [stampMode, setStampMode] = dc.useState<boolean>(false);
+  const {
+    tileBrowserCollapsed, setTileBrowserCollapsed,
+    selectedTilesetId, setSelectedTilesetId,
+    selectedTileId, setSelectedTileId,
+    tileRotation, setTileRotation,
+    tileFlipH, setTileFlipH,
+    tileLayer, setTileLayer,
+    tileFitMode, setTileFitMode,
+    stampMode, setStampMode,
+    handleTileSelect, handleTileDeselect,
+  } = useTileBrush();
   // Use rootMapData for tileset check — tilesets are built from global settings and stored on root,
   // but sub-maps should also have access to tiles
   const availableTilesets = rootMapData?.tilesets || mapData?.tilesets || [];
   const showTilePanel = mapData?.mapType === 'hex' && availableTilesets.length > 0;
-
-  const handleTileSelect = (tilesetId: string, tileId: string) => {
-    setSelectedTilesetId(tilesetId);
-    setSelectedTileId(tileId);
-  };
-
-  const handleTileDeselect = () => {
-    setSelectedTilesetId(null);
-    setSelectedTileId(null);
-    setTileRotation(0);
-    setTileFlipH(false);
-  };
 
   // Image alignment mode (extracted to useAlignmentMode hook)
   const {

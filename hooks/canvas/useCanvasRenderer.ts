@@ -412,6 +412,7 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   }
 
   // Draw adjacent sub-hex ghost previews (when drilled into a sub-hex)
+  const MAX_ADJACENT_COMPLEXITY = 500;
   if (adjacentSubHexes && adjacentSubHexes.length > 0 && geometry.type === 'hex') {
     const hexGeom = geometry as ExtendedGeometry;
     const maxRing = mapData.hexBounds?.maxRing || 7;
@@ -440,28 +441,34 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
 
       const adjLayers = adj.mapData.layers || [];
 
-      // Render cells and edges from all layers using the existing renderer
-      for (const layer of adjLayers) {
-        if (layer.cells && layer.cells.length > 0) {
-          renderLayerCellsAndEdges(ctx, layer, geometry, shiftedViewState, THEME, renderer, {
-            opacity: 0.25,
-            showGrid: false
-          });
-        }
-      }
+      // Skip detailed rendering for dense neighbors to cap render cost
+      const totalItems = adjLayers.reduce((sum: number, l: MapLayer) =>
+        sum + (l.cells?.length || 0) + (l.tiles?.length || 0), 0);
+      const isDense = totalItems > MAX_ADJACENT_COMPLEXITY;
 
-      // Render tiles from all layers using the existing tile renderer
-      if (adjTileGeom) {
+      // Render cells, edges, and tiles only for non-dense neighbors
+      if (!isDense) {
         for (const layer of adjLayers) {
-          if (layer.tiles && layer.tiles.length > 0) {
-            renderTiles(
-              ctx,
-              layer.tiles,
-              mapData.tilesets!,
-              adjTileGeom,
-              shiftedViewState,
-              { opacity: 0.25, getCachedImage, canvasWidth: width, canvasHeight: height }
-            );
+          if (layer.cells && layer.cells.length > 0) {
+            renderLayerCellsAndEdges(ctx, layer, geometry, shiftedViewState, THEME, renderer, {
+              opacity: 0.25,
+              showGrid: false
+            });
+          }
+        }
+
+        if (adjTileGeom) {
+          for (const layer of adjLayers) {
+            if (layer.tiles && layer.tiles.length > 0) {
+              renderTiles(
+                ctx,
+                layer.tiles,
+                mapData.tilesets!,
+                adjTileGeom,
+                shiftedViewState,
+                { opacity: 0.25, getCachedImage, canvasWidth: width, canvasHeight: height }
+              );
+            }
           }
         }
       }

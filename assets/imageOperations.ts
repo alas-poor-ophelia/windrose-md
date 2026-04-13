@@ -28,6 +28,33 @@ const imageCache = new Map<string, HTMLImageElement>();
 const loadingPromises = new Map<string, Promise<HTMLImageElement | null>>();
 const dimensionsCache = new Map<string, ImageDimensions>();
 
+let MAX_CACHE_SIZE = 200;
+
+function setMaxCacheSize(size: number): void {
+  MAX_CACHE_SIZE = size;
+}
+
+/** Move key to end of Map (most recently used position) */
+function touchCacheEntry(key: string): void {
+  const value = imageCache.get(key);
+  if (value !== undefined) {
+    imageCache.delete(key);
+    imageCache.set(key, value);
+  }
+}
+
+/** Evict oldest entries until cache is within MAX_CACHE_SIZE */
+function evictIfNeeded(): void {
+  while (imageCache.size > MAX_CACHE_SIZE) {
+    const oldest = imageCache.keys().next().value;
+    if (oldest !== undefined) {
+      clearCachedImage(oldest);
+    } else {
+      break;
+    }
+  }
+}
+
 /**
  * Grid density presets for hex maps
  */
@@ -99,6 +126,7 @@ async function preloadImage(vaultPath: string): Promise<HTMLImageElement | null>
 
   // Return cached if available
   if (imageCache.has(vaultPath)) {
+    touchCacheEntry(vaultPath);
     return imageCache.get(vaultPath)!;
   }
 
@@ -154,6 +182,7 @@ async function preloadImage(vaultPath: string): Promise<HTMLImageElement | null>
       // Cache the loaded image, then release the blob URL
       // (Chromium retains the decoded bitmap once the Image element exists)
       imageCache.set(vaultPath, img);
+      evictIfNeeded();
       URL.revokeObjectURL(url);
       loadingPromises.delete(vaultPath);
 
@@ -174,7 +203,12 @@ async function preloadImage(vaultPath: string): Promise<HTMLImageElement | null>
  * Returns null if image not cached (renderer should handle gracefully).
  */
 function getCachedImage(vaultPath: string): HTMLImageElement | null {
-  return imageCache.get(vaultPath) || null;
+  const img = imageCache.get(vaultPath);
+  if (img) {
+    touchCacheEntry(vaultPath);
+    return img;
+  }
+  return null;
 }
 
 /**
@@ -295,5 +329,7 @@ return {
   clearCachedImage,
   clearUnusedTileImages,
   calculateGridFromImage,
-  GRID_DENSITY_PRESETS
+  GRID_DENSITY_PRESETS,
+  MAX_CACHE_SIZE,
+  setMaxCacheSize
 };
