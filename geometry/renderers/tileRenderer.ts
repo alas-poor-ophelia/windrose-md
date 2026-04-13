@@ -152,12 +152,6 @@ function renderTiles(
   const getCachedImage = options?.getCachedImage;
   if (!getCachedImage) return;
 
-  // Build tileset lookup
-  const tilesetMap = new Map<string, TilesetDef>();
-  for (const ts of tilesets) {
-    tilesetMap.set(ts.id, ts);
-  }
-
   // Build tile entry lookup (tilesetId:tileId → TileEntry)
   const entryMap = new Map<string, { entry: { vaultPath: string }; tileset: TilesetDef }>();
   for (const ts of tilesets) {
@@ -165,6 +159,14 @@ function renderTiles(
       entryMap.set(ts.id + ':' + entry.id, { entry, tileset: ts });
     }
   }
+
+  // Pre-compute hex screen dimensions (constant for all tiles in this frame)
+  const hexScreenWidth = geometry.orientation === 'flat'
+    ? 2 * geometry.hexSize * viewState.zoom
+    : SQRT3 * geometry.hexSize * viewState.zoom;
+  const hexScreenHeight = geometry.orientation === 'flat'
+    ? SQRT3 * geometry.hexSize * viewState.zoom
+    : 2 * geometry.hexSize * viewState.zoom;
 
   // Single-pass partition: base, overlay, freeform
   const baseTiles: HexTileAssignment[] = [];
@@ -222,15 +224,7 @@ function renderTiles(
       const wRatio = natW / tileset.tileWidth;
       const hRatio = natH / tileset.hexHeight;
       if (wRatio < 0.5 || hRatio < 0.5) {
-        // Compute how big this image should be relative to the hex,
-        // using the tileset's fill scaling as the reference frame
-        const hexScreenWidth = geometry.orientation === 'flat'
-          ? 2 * geometry.hexSize * viewState.zoom
-          : SQRT3 * geometry.hexSize * viewState.zoom;
-        const hexScreenHeight = geometry.orientation === 'flat'
-          ? SQRT3 * geometry.hexSize * viewState.zoom
-          : 2 * geometry.hexSize * viewState.zoom;
-
+        // Scale relative to the hex using pre-computed screen dimensions
         const fillScaleX = hexScreenWidth / tileset.tileWidth;
         const fillScaleY = hexScreenHeight / tileset.hexHeight;
         // Use the smaller fill scale to preserve aspect ratio

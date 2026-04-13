@@ -440,7 +440,8 @@ function useSubHexNavigation({
           (l.cells && l.cells.length > 0) ||
           (l.curves && l.curves.length > 0) ||
           (l.objects && l.objects.length > 0) ||
-          (l.textLabels && l.textLabels.length > 0)
+          (l.textLabels && l.textLabels.length > 0) ||
+          (l.tiles && l.tiles.length > 0)
         );
         if (hasContent) {
           adjacent.push({

@@ -467,6 +467,7 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
       }
 
       // Render adjacent name label near edge of current grid (not center of adjacent)
+      ctx.save();
       ctx.globalAlpha = 0.5;
       const edgeQ = adj.dq * (maxRing + 2);
       const edgeR = adj.dr * (maxRing + 2);
@@ -486,6 +487,7 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
       );
       ctx.fillStyle = '#ffffff';
       ctx.fillText(adj.name, labelScreen.screenX, labelScreen.screenY);
+      ctx.restore();
     }
 
     ctx.restore();
@@ -563,7 +565,8 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
         (l.cells && l.cells.length > 0) ||
         (l.curves && l.curves.length > 0) ||
         (l.objects && l.objects.length > 0) ||
-        (l.textLabels && l.textLabels.length > 0)
+        (l.textLabels && l.textLabels.length > 0) ||
+        (l.tiles && l.tiles.length > 0)
       );
       if (!hasContent) continue;
 

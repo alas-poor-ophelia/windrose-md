@@ -99,6 +99,7 @@ const TileThumbnail = ({ tile, getCachedImage }: TileThumbnailProps): React.Reac
   const canvasRef = dc.useRef<HTMLCanvasElement>(null);
 
   dc.useEffect(() => {
+    let blobUrl: string | null = null;
     const draw = (img: HTMLImageElement) => {
       if (canvasRef.current) drawTileToCanvas(canvasRef.current, img, THUMB_SIZE);
     };
@@ -111,12 +112,19 @@ const TileThumbnail = ({ tile, getCachedImage }: TileThumbnailProps): React.Reac
     if (file) {
       dc.app.vault.readBinary(file).then((binary: ArrayBuffer) => {
         const blob = new Blob([binary]);
-        const url = URL.createObjectURL(blob);
+        blobUrl = URL.createObjectURL(blob);
         const fallbackImg = new Image();
-        fallbackImg.onload = () => draw(fallbackImg);
-        fallbackImg.src = url;
+        fallbackImg.onload = () => {
+          URL.revokeObjectURL(blobUrl!);
+          blobUrl = null;
+          draw(fallbackImg);
+        };
+        fallbackImg.src = blobUrl;
       });
     }
+    return () => {
+      if (blobUrl) URL.revokeObjectURL(blobUrl);
+    };
   }, [tile.vaultPath]);
 
   return (
@@ -180,6 +188,15 @@ const TileAssetBrowser = ({
   const previewRef = dc.useRef<HTMLCanvasElement>(null);
   const browserRef = dc.useRef<HTMLDivElement>(null);
   const portalRef = dc.useRef<HTMLDivElement | null>(null);
+
+  // Clamp activeTilesetIndex when tilesets shrink
+  dc.useEffect(() => {
+    if (activeTilesetIndex >= tilesets.length && tilesets.length > 0) {
+      setActiveTilesetIndex(tilesets.length - 1);
+    } else if (tilesets.length === 0) {
+      setActiveTilesetIndex(0);
+    }
+  }, [tilesets.length]);
 
   const handleToggleCollapse = () => {
     onCollapseChange(!isCollapsed);
@@ -256,6 +273,7 @@ const TileAssetBrowser = ({
     }
 
     // Draw preview
+    let previewBlobUrl: string | null = null;
     const img = getCachedImage?.(hoveredTile.vaultPath);
     if (img?.complete) {
       drawTileToCanvas(canvas, img, PREVIEW_SIZE);
@@ -265,12 +283,19 @@ const TileAssetBrowser = ({
     if (file) {
       dc.app.vault.readBinary(file).then((binary: ArrayBuffer) => {
         const blob = new Blob([binary]);
-        const url = URL.createObjectURL(blob);
+        previewBlobUrl = URL.createObjectURL(blob);
         const fallbackImg = new Image();
-        fallbackImg.onload = () => drawTileToCanvas(canvas, fallbackImg, PREVIEW_SIZE);
-        fallbackImg.src = url;
+        fallbackImg.onload = () => {
+          URL.revokeObjectURL(previewBlobUrl!);
+          previewBlobUrl = null;
+          drawTileToCanvas(canvas, fallbackImg, PREVIEW_SIZE);
+        };
+        fallbackImg.src = previewBlobUrl;
       });
     }
+    return () => {
+      if (previewBlobUrl) URL.revokeObjectURL(previewBlobUrl);
+    };
   }, [hoveredTile, isCollapsed, rotation, flipH, selectedTilesetId, selectedTileId]);
 
   // Cleanup portal on unmount

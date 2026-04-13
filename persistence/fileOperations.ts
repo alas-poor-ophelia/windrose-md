@@ -215,6 +215,7 @@ async function loadMapData(mapId: string, mapName: string = '', mapType: MapType
           const subHex = loadedMap.subHexMaps[hexKey];
           if (subHex?.mapData?.layers) {
             for (const layer of subHex.mapData.layers) {
+              if (!layer.tiles) layer.tiles = [];
               if (!layer.curves) layer.curves = [];
               layer.curves = layer.curves.filter((c: any) => c.start && c.segments);
             }

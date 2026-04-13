@@ -129,11 +129,27 @@ function useMapData(
       }
 
       if (newTilesets.length > 0) {
-        // Evict cached images no longer referenced by any tileset
+        // Evict cached images no longer referenced by any tileset,
+        // but preserve background, fog-of-war, and object type images
         const activePaths = new Set<string>();
         for (const ts of newTilesets) {
           for (const t of ts.tiles) activePaths.add(t.vaultPath);
         }
+
+        // Add non-tile image paths so they aren't evicted
+        const currentData = mapData;
+        if (currentData?.backgroundImage?.path) {
+          activePaths.add(currentData.backgroundImage.path);
+        }
+        const effectiveSettings = getEffectiveSettings(currentData?.settings);
+        if (effectiveSettings?.fogOfWarImage) {
+          activePaths.add(effectiveSettings.fogOfWarImage);
+        }
+        const objectTypes = getResolvedObjectTypes(currentData?.mapType ?? 'hex', currentData?.objectSetId);
+        for (const objType of objectTypes) {
+          if (objType.imagePath) activePaths.add(objType.imagePath);
+        }
+
         clearUnusedTileImages(activePaths);
 
         setMapData((current: MapData | null) => {
