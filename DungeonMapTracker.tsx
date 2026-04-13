@@ -803,8 +803,6 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               onToggleLayerPanel={() => setShowLayerPanel(!showLayerPanel)}
               showRegionPanel={showRegionPanel}
               onToggleRegionPanel={mapData.mapType === 'hex' ? () => setShowRegionPanel(!showRegionPanel) : undefined}
-              showTilePanel={showTilePanel && !tileBrowserCollapsed}
-              onToggleTilePanel={showTilePanel ? () => setTileBrowserCollapsed(!tileBrowserCollapsed) : undefined}
               showVisibilityToolbar={showVisibilityToolbar}
               onToggleVisibilityToolbar={() => setShowVisibilityToolbar(!showVisibilityToolbar)}
               alwaysShowControls={effectiveSettings?.alwaysShowControls ?? false}

@@ -25,8 +25,6 @@ const MapControls = ({
   onToggleLayerPanel,
   showRegionPanel,
   onToggleRegionPanel,
-  showTilePanel,
-  onToggleTilePanel,
   alwaysShowControls = false
 }) => {
     // When alwaysShowControls is true, controls are always visible
@@ -232,23 +230,11 @@ const MapControls = ({
               </button>
             )}
 
-            {/* Tile Browser Toggle Button (hex maps with tilesets only) */}
-            {onToggleTilePanel && (
-              <button
-                className={`dmt-expand-btn dmt-drawer-item ${showTilePanel ? 'dmt-expand-btn-active' : ''} ${controlsRevealed ? 'dmt-drawer-item-visible' : ''}`}
-                style={getDrawerItemStyle(mapType === 'hex' && onToggleRegionPanel ? 3 : 2)}
-                onClick={handleControlInteraction(onToggleTilePanel)}
-                title="Toggle tile browser"
-              >
-                <dc.Icon icon="lucide-layout-grid" />
-              </button>
-            )}
-
             {/* Visibility Toggle Button */}
             <button
               className={`dmt-expand-btn dmt-drawer-item ${showVisibilityToolbar ? 'dmt-expand-btn-active' : ''} ${controlsRevealed ? 'dmt-drawer-item-visible' : ''}`}
               style={getDrawerItemStyle(
-                2 + (mapType === 'hex' && onToggleRegionPanel ? 1 : 0) + (onToggleTilePanel ? 1 : 0)
+                2 + (mapType === 'hex' && onToggleRegionPanel ? 1 : 0)
               )}
               onClick={handleControlInteraction(onToggleVisibilityToolbar)}
               title="Toggle layer visibility"
@@ -260,7 +246,7 @@ const MapControls = ({
             <button
               className={`dmt-expand-btn dmt-drawer-item ${controlsRevealed ? 'dmt-drawer-item-visible' : ''}`}
               style={getDrawerItemStyle(
-                3 + (mapType === 'hex' && onToggleRegionPanel ? 1 : 0) + (onToggleTilePanel ? 1 : 0)
+                3 + (mapType === 'hex' && onToggleRegionPanel ? 1 : 0)
               )}
               onClick={handleControlInteraction(onSettingsClick)}
               title="Map Settings"
