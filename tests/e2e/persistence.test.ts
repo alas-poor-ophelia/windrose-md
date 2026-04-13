@@ -66,6 +66,10 @@ test("Map data persists after drawing and navigation", async ({ page }) => {
   expect(boxAfter).not.toBeNull();
   expect(boxAfter!.width).toBeGreaterThan(0);
 
+  // Verify data actually survived the navigation round-trip
+  const countAfterReload = await getTotalCellCount(page, MAP_IDS.grid);
+  expect(countAfterReload).toBeGreaterThan(0);
+
   expect(errors).toHaveLength(0);
 });
 

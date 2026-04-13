@@ -46,11 +46,15 @@ test("SVG overlays align with canvas coordinates", async ({ page }) => {
         // Log position info for debugging
         console.log(`SVG ${i}: position (${svgBox.x}, ${svgBox.y}), canvas: (${canvasBox.x}, ${canvasBox.y})`);
 
-        // For overlays that should match canvas position exactly
+        // Overlays near canvas origin should be tightly aligned;
+        // overlays at object world-space positions may be further away
         if (xDiff < 50 && yDiff < 50) {
-          // This is likely a canvas-aligned overlay
           expect(xDiff).toBeLessThan(positionTolerance);
           expect(yDiff).toBeLessThan(positionTolerance);
+        } else {
+          // Object-positioned overlays should still be within canvas bounds
+          expect(svgBox.x).toBeGreaterThan(canvasBox.x - 500);
+          expect(svgBox.y).toBeGreaterThan(canvasBox.y - 500);
         }
       }
     }
@@ -115,9 +119,10 @@ test("Object overlays remain aligned after pan", async ({ page }) => {
         // Tolerance for movement calculation
         const moveTolerance = 10;
 
-        // Movement should be close to the pan distance (if pan was applied)
-        // Note: This may not trigger if pan requires a specific tool mode
+        // Overlays should move with the pan
         console.log(`Overlay ${i} moved: (${xMove}, ${yMove})`);
+        const totalMove = Math.abs(xMove) + Math.abs(yMove);
+        expect(totalMove).toBeGreaterThan(0);
       }
     }
   }

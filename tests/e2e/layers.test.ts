@@ -7,7 +7,11 @@ import {
   getCanvasCenter,
   waitForToolPalette,
   openLayerPanel,
-  TEST_MAPS
+  getActiveLayerId,
+  getLayerCellCount,
+  AUTOSAVE_WAIT,
+  TEST_MAPS,
+  MAP_IDS
 } from "./helpers";
 
 // ===========================================
@@ -102,6 +106,16 @@ test("Layer can be switched and drawing is layer-specific", async ({ page }) => 
   const newActiveBtn = page.locator('.dmt-layer-btn.dmt-layer-btn-active');
   expect(await newActiveBtn.count()).toBe(1);
 
+  // Get the active layer ID and initial cell count
+  const mapId = MAP_IDS.grid;
+  const activeLayerId = await getActiveLayerId(page, mapId);
+  expect(activeLayerId).not.toBeNull();
+  const initialLayerCells = await getLayerCellCount(page, mapId, activeLayerId!);
+
+  // Close layer panel so canvas receives clicks
+  await openLayerPanel(page);
+  await page.waitForTimeout(300);
+
   // Draw on this layer
   await waitForToolPalette(page);
 
@@ -113,7 +127,11 @@ test("Layer can be switched and drawing is layer-specific", async ({ page }) => 
   await page.mouse.click(center.x, center.y);
   await page.waitForTimeout(300);
 
-  // The operation should complete without errors
+  // Wait for autosave and verify data landed on the correct layer
+  await page.waitForTimeout(AUTOSAVE_WAIT);
+  const newLayerCells = await getLayerCellCount(page, mapId, activeLayerId!);
+  expect(newLayerCells).toBeGreaterThan(initialLayerCells);
+
   expect(errors).toHaveLength(0);
 });
 

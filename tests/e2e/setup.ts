@@ -115,7 +115,7 @@ export async function setup() {
     cpSync(CLEAN_FIXTURE, COMPILED_FIXTURE_TARGET);
     console.log("  Reset: windrose-md-data.json (compiled mode) to clean state");
   } else {
-    console.warn("  Warning: Clean fixture not found, tests may have stale state");
+    throw new Error(`Clean fixture not found at ${CLEAN_FIXTURE} — tests cannot run with stale state`);
   }
 
   // Reset the generation test file (gets modified by dungeon generation tests)
@@ -196,10 +196,14 @@ export async function setup() {
 export async function teardown() {
   console.log("Cleaning up test artifacts...");
 
-  // Reset the test data file to prevent accumulation across test runs
-  if (existsSync(CLEAN_FIXTURE) && existsSync(TEST_DATA_DIR)) {
-    cpSync(CLEAN_FIXTURE, DEV_FIXTURE_TARGET);
-    console.log("  Reset: _test-data/dungeon-maps-data.json to clean state");
+  // Reset both dev and compiled mode fixtures to prevent accumulation
+  if (existsSync(CLEAN_FIXTURE)) {
+    if (existsSync(TEST_DATA_DIR)) {
+      cpSync(CLEAN_FIXTURE, DEV_FIXTURE_TARGET);
+      console.log("  Reset: _test-data/dungeon-maps-data.json to clean state");
+    }
+    cpSync(CLEAN_FIXTURE, COMPILED_FIXTURE_TARGET);
+    console.log("  Reset: windrose-md-data.json (compiled mode) to clean state");
   }
 
   // Clean up obsidian-test-* temp directories created by obsidian-testing-framework

@@ -11,6 +11,7 @@
     "test:unit": "vitest run --config vitest.unit.config.ts",
     "test:unit:watch": "vitest --config vitest.unit.config.ts",
     "test:e2e": "vitest run",
+    "test:e2e:visible": "WINDROSE_E2E_VISIBLE=1 vitest run",
     "test:release": "vitest run --config vitest.release.config.ts",
     "test": "npm run test:unit && npm run test:e2e",
     "release": "npx tsx scripts/release/index.ts",

@@ -114,8 +114,7 @@ export async function waitForContainer(page: any, timeout: number = CONTAINER_TI
   }
 
   // Handle plugin installer if it appears (blocks the main canvas until handled)
-  // Wait briefly for container to appear first
-  await page.waitForTimeout(500);
+  await page.waitForTimeout(100);
   await handlePluginInstallerIfPresent(page, 10000);
 
   // Wait for either the container or an error to appear

@@ -1,5 +1,5 @@
 diff --git a/node_modules/obsidian-testing-framework/lib/index.js b/node_modules/obsidian-testing-framework/lib/index.js
-index 5c02743..9ce7c9d 100644
+index 5c02743..f6604bd 100644
 --- a/node_modules/obsidian-testing-framework/lib/index.js
 +++ b/node_modules/obsidian-testing-framework/lib/index.js
 @@ -7,7 +7,8 @@ import { randomBytes } from "crypto";
@@ -37,7 +37,7 @@ index 5c02743..9ce7c9d 100644
  // @ts-ignore some error about a string type now having `undefined` as part of it's union
  export const test = base.extend({
      electronApp: [
-@@ -70,16 +89,19 @@ export const test = base.extend({
+@@ -70,16 +89,21 @@ export const test = base.extend({
              const vault = inject("vault");
              process.env.ELECTRON_DISABLE_SECURITY_WARNINGS = "true";
              console.log("asar located at:", getExe());
@@ -58,14 +58,16 @@ index 5c02743..9ce7c9d 100644
 +            console.log("Vault hash:", vaultHash);
 +            // Pass vault URI to open the vault directly
 +            const vaultUri = `obsidian://open?vault=${vaultHash}`;
++            // Background mode: move window offscreen unless WINDROSE_E2E_VISIBLE=1
++            const bgArgs = process.env.WINDROSE_E2E_VISIBLE ? [] : ["--window-position=-32000,-32000", "--window-size=1280,720"];
              const electronApp = await electron.launch({
                  timeout: 60000,
 -                args: [getExe(), uriArg].filter((a) => !!a),
-+                args: [getExe(), "--user-data-dir=" + testDataDir, vaultUri],
++                args: [getExe(), "--user-data-dir=" + testDataDir, ...bgArgs, vaultUri],
              });
              electronApp.on("console", async (msg) => {
                  console.log(...(await Promise.all(msg.args().map((a) => a.jsonValue()))));
-@@ -95,6 +117,35 @@ export const test = base.extend({
+@@ -95,6 +119,35 @@ export const test = base.extend({
              // console.log("windows", windows);
              let page = windows[windows.length - 1];
              await page.waitForLoadState("domcontentloaded");
