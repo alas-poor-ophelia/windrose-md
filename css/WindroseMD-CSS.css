@@ -3467,9 +3467,6 @@ button.dmt-fow-tool-btn,
   pointer-events: none;
   transition: opacity 200ms ease-out, transform 200ms ease-out;
   transform: translateX(-20px);
-  max-height: 45%;
-  overflow-y: auto;
-  overflow-x: visible;
   flex-shrink: 1;
 }
 

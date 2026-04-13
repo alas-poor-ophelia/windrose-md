@@ -17,6 +17,7 @@ const pathResolverPath = dc.resolvePath("pathResolver.ts");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 
 const { cellToScreen } = await requireModuleByName("cellToScreenConverter.ts");
+const { GridGeometry } = await requireModuleByName("GridGeometry.ts");
 
 /** Shape type for preview */
 type ShapeType = 'rectangle' | 'circle' | 'clearArea' | 'edgeLine';

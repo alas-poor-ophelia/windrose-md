@@ -14,6 +14,7 @@ const { requireModuleByName } = await dc.require(pathResolverPath);
 
 const { cellToScreen } = await requireModuleByName("cellToScreenConverter.ts");
 const { SEGMENT_VERTICES, SEGMENT_TRIANGLES } = await requireModuleByName("dmtConstants.ts");
+const { GridGeometry } = await requireModuleByName("GridGeometry.ts");
 
 /** Segment name type */
 type SegmentName = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w';
