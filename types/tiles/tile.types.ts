@@ -43,27 +43,44 @@ export interface TileEntry {
 }
 
 // ===========================================
+// Tile Rotation
+// ===========================================
+
+/** Valid rotation angles for hex tiles (60-degree increments) */
+export type TileRotation = 0 | 60 | 120 | 180 | 240 | 300;
+
+// ===========================================
 // Hex Tile Assignment
 // ===========================================
 
-/** A tile placed on a specific hex cell (axial coordinates) */
-export interface HexTileAssignment {
+/** Shared fields for all hex tile assignments */
+interface HexTileAssignmentBase {
   q: number;
   r: number;
   tilesetId: string;
   tileId: string;
   /** Rotation in 60-degree increments */
-  rotation?: 0 | 60 | 120 | 180 | 240 | 300;
+  rotation?: TileRotation;
   flipH?: boolean;
   /** Tile layer: 'base' (default) or 'overlay' (stamp atop base) */
   layer?: 'base' | 'overlay';
   /** Override tileset fitMode for this specific placement */
   fitMode?: 'fill' | 'contain';
-  /** Freeform stamp: placed at world coordinates, not snapped to hex.
-   *  When true, worldX and worldY must both be provided. */
-  freeform?: boolean;
-  /** World-space X coordinate (required when freeform is true) */
-  worldX?: number;
-  /** World-space Y coordinate (required when freeform is true) */
-  worldY?: number;
 }
+
+/** A tile snapped to a hex grid cell */
+interface GridTileAssignment extends HexTileAssignmentBase {
+  freeform?: false;
+}
+
+/** A tile placed at arbitrary world coordinates (not snapped to hex) */
+interface FreeformTileAssignment extends HexTileAssignmentBase {
+  freeform: true;
+  /** World-space X coordinate */
+  worldX: number;
+  /** World-space Y coordinate */
+  worldY: number;
+}
+
+/** A tile placed on a specific hex cell (axial coordinates), or freeform at world coords */
+export type HexTileAssignment = GridTileAssignment | FreeformTileAssignment;

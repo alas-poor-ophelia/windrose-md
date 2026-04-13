@@ -41,6 +41,8 @@ import {
   clearUnusedTileImages,
   preloadImage,
   GRID_DENSITY_PRESETS,
+  MAX_CACHE_SIZE,
+  setMaxCacheSize,
 } from '../../../src/assets/imageOperations';
 
 /**
@@ -338,6 +340,94 @@ describe('imageOperations', () => {
       expect(getCachedImage('tiles/forest.png')).toBeNull();
       expect(getCachedImage('tiles/water.png')).not.toBeNull();
       expect(getCachedImage('tiles/mountain.png')).toBeNull();
+    });
+  });
+
+  // ============================================
+  // LRU eviction
+  // ============================================
+  describe('LRU cache eviction', () => {
+    const TEST_CACHE_SIZE = 5;
+
+    beforeEach(() => {
+      setMaxCacheSize(TEST_CACHE_SIZE);
+    });
+
+    afterEach(() => {
+      // Clean up all test entries
+      for (let i = 0; i <= TEST_CACHE_SIZE + 5; i++) {
+        clearCachedImage(`lru/img${i}.png`);
+      }
+      setMaxCacheSize(200);
+    });
+
+    it('exports MAX_CACHE_SIZE as a positive number', () => {
+      expect(MAX_CACHE_SIZE).toBeGreaterThan(0);
+      expect(typeof MAX_CACHE_SIZE).toBe('number');
+    });
+
+    it('evicts oldest entry when cache exceeds max size', async () => {
+      for (let i = 0; i < TEST_CACHE_SIZE; i++) {
+        await seedCache(`lru/img${i}.png`);
+      }
+
+      // All should be present
+      expect(getCachedImage('lru/img0.png')).not.toBeNull();
+      expect(getCachedImage(`lru/img${TEST_CACHE_SIZE - 1}.png`)).not.toBeNull();
+
+      // Add one more — img0 was just touched by getCachedImage, so img1 is oldest
+      await seedCache(`lru/img${TEST_CACHE_SIZE}.png`);
+
+      expect(getCachedImage('lru/img1.png')).toBeNull();
+      expect(getCachedImage('lru/img0.png')).not.toBeNull();
+      expect(getCachedImage(`lru/img${TEST_CACHE_SIZE}.png`)).not.toBeNull();
+    });
+
+    it('getCachedImage promotes entry to most recently used', async () => {
+      for (let i = 0; i < TEST_CACHE_SIZE; i++) {
+        await seedCache(`lru/img${i}.png`);
+      }
+
+      // Touch img0 to promote it
+      getCachedImage('lru/img0.png');
+
+      // Add 2 more to evict the 2 oldest untouched (img1, img2)
+      await seedCache(`lru/img${TEST_CACHE_SIZE}.png`);
+      await seedCache(`lru/img${TEST_CACHE_SIZE + 1}.png`);
+
+      expect(getCachedImage('lru/img0.png')).not.toBeNull();
+      expect(getCachedImage('lru/img1.png')).toBeNull();
+      expect(getCachedImage('lru/img2.png')).toBeNull();
+    });
+
+    it('preloadImage of existing entry promotes it without eviction', async () => {
+      for (let i = 0; i < TEST_CACHE_SIZE; i++) {
+        await seedCache(`lru/img${i}.png`);
+      }
+
+      // Re-preload img0 (cache hit) — should promote, not add
+      await preloadImage('lru/img0.png');
+
+      // No eviction should have occurred
+      expect(getCachedImage('lru/img0.png')).not.toBeNull();
+      expect(getCachedImage(`lru/img${TEST_CACHE_SIZE - 1}.png`)).not.toBeNull();
+    });
+
+    it('evicts multiple entries to stay within max size', async () => {
+      for (let i = 0; i < TEST_CACHE_SIZE; i++) {
+        await seedCache(`lru/img${i}.png`);
+      }
+
+      // Add 3 more — should evict img0, img1, img2
+      await seedCache(`lru/img${TEST_CACHE_SIZE}.png`);
+      await seedCache(`lru/img${TEST_CACHE_SIZE + 1}.png`);
+      await seedCache(`lru/img${TEST_CACHE_SIZE + 2}.png`);
+
+      expect(getCachedImage('lru/img0.png')).toBeNull();
+      expect(getCachedImage('lru/img1.png')).toBeNull();
+      expect(getCachedImage('lru/img2.png')).toBeNull();
+      expect(getCachedImage('lru/img3.png')).not.toBeNull();
+      expect(getCachedImage('lru/img4.png')).not.toBeNull();
     });
   });
 

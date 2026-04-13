@@ -7,6 +7,7 @@
  */
 
 import type { ObjectTypeId } from '../objects/object.types';
+import type { MapData } from '../core/map.types';
 
 // ===========================================
 // Tool Identifiers
@@ -72,8 +73,8 @@ export interface UseToolStateOptions {
   initialTool?: ToolId;
   initialColor?: string;
   initialOpacity?: number;
-  mapData?: any;
-  updateMapData?: (data: any) => void;
+  mapData?: MapData | null;
+  updateMapData?: (data: MapData) => void;
 }
 
 /** Grouped tool state values */

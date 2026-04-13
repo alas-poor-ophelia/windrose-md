@@ -119,7 +119,7 @@ export interface MapOperationsContextValue {
   onTextLabelsChange: (labels: TextLabel[]) => void;
 
   // Tile operations
-  onTilesChange?: (tiles: HexTileAssignment[]) => void;
+  onTilesChange?: (tiles: HexTileAssignment[], suppressHistory?: boolean) => void;
 
   // Note pin operations (optional — not all providers include these)
   onNotePinsChange?: (pins: NotePin[]) => void;

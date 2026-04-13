@@ -127,6 +127,7 @@ export type {
 export type {
   TilesetDef,
   TileEntry,
+  TileRotation,
   HexTileAssignment,
 } from './tiles/tile.types';
 

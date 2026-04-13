@@ -134,6 +134,7 @@ const MODULE_MAP: Record<string, string> = {
 
   // Hooks - state
   'useMapData.ts': './hooks/state/useMapData.ts',
+  'useTileBrush.ts': './hooks/state/useTileBrush.ts',
   'useLayerHistory.ts': './hooks/state/useLayerHistory.ts',
   'useHistory.ts': './hooks/state/useHistory.ts',
   'useDataHandlers.ts': './hooks/state/useDataHandlers.ts',
