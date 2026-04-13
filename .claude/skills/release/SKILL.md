@@ -13,6 +13,12 @@ Before running this skill:
 1. All source changes should be committed
 2. Know the new version number
 3. Changelog for this version should already be written in `Windrose Changelogs.md`
+4. **Both the source repo AND the dev harness must be on the same `release/vX.Y.Z` branch (or `main`).** The release pipeline checks both and aborts on mismatch. Verify with:
+   ```bash
+   git -C "C:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker" branch --show-current
+   git -C "C:\Dev\windrose" branch --show-current
+   ```
+   If they differ, check out the matching branch in the dev harness before proceeding.
 
 The Datacore Compiler command ID is already configured: `dc-compiler:compile-projects-dungeon-map-tracker--compilersettings`
 

@@ -65,17 +65,33 @@ function getVersion(): string {
 function checkPrerequisites(version: string): void {
   console.log("Checking prerequisites...\n");
 
-  // CRITICAL: Ensure we're on main branch (or release branch for dry runs)
-  const currentBranch = execSync("git branch --show-current", {
+  // CRITICAL: Ensure both repos are on main or a release branch.
+  // Dev harness must match the source repo's branch so test infra changes
+  // and the source artifact land on the same release branch.
+  const sourceBranch = execSync("git branch --show-current", {
     cwd: SOURCE_ROOT,
     encoding: "utf-8",
   }).trim();
-  if (currentBranch !== "main" && !currentBranch.startsWith("release/")) {
+  if (sourceBranch !== "main" && !sourceBranch.startsWith("release/")) {
     throw new Error(
-      `Must be on 'main' or 'release/*' branch to release. Currently on '${currentBranch}'. Run: git checkout main`
+      `Source repo must be on 'main' or 'release/*' branch to release. Currently on '${sourceBranch}'. Run: git -C "${SOURCE_ROOT}" checkout main`
     );
   }
-  console.log(`  Branch: ${currentBranch}`);
+  const devBranch = execSync("git branch --show-current", {
+    cwd: DEV_ROOT,
+    encoding: "utf-8",
+  }).trim();
+  if (devBranch !== "main" && !devBranch.startsWith("release/")) {
+    throw new Error(
+      `Dev harness must be on 'main' or 'release/*' branch to release. Currently on '${devBranch}'. Run: git -C "${DEV_ROOT}" checkout ${sourceBranch}`
+    );
+  }
+  if (sourceBranch !== devBranch) {
+    throw new Error(
+      `Branch mismatch: source repo on '${sourceBranch}', dev harness on '${devBranch}'. Both must match. Run: git -C "${DEV_ROOT}" checkout ${sourceBranch}`
+    );
+  }
+  console.log(`  Branch: ${sourceBranch} (both repos)`);
 
   // Check VERSION file exists
   if (!existsSync(VERSION_PATH)) {
