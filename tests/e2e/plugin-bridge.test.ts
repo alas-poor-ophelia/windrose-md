@@ -10,6 +10,7 @@
  * Delete this file once the real bridge is implemented and integrated.
  */
 
+import { beforeEach } from "vitest";
 import {
   test,
   expect,
@@ -18,6 +19,19 @@ import {
   waitForContainer,
   TEST_MAPS
 } from "./helpers";
+
+// Auto-accept any dialogs to prevent the obsidian-testing-framework's
+// dialog handler from racing with test cleanup (causes intermittent
+// "Page.handleJavaScriptDialog: No dialog is showing" errors).
+beforeEach(({ page }) => {
+  page.on("dialog", async (dialog: any) => {
+    try {
+      await dialog.accept();
+    } catch {
+      // Dialog already dismissed - ignore
+    }
+  });
+});
 
 // ===========================================
 // Approach 1: window.__windrose bridge
