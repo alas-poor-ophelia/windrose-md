@@ -9,9 +9,15 @@ import { existsSync, symlinkSync, unlinkSync, mkdirSync, cpSync, readFileSync, w
 import path from "path";
 
 const TEST_VAULT = path.resolve(__dirname, "../fixtures/test-vault");
+const TEST_VAULT_COMPILED = path.resolve(__dirname, "../fixtures/test-vault-compiled");
 const FIXTURES_DIR = path.resolve(__dirname, "../fixtures");
 const PROJECT_ROOT = path.resolve(__dirname, "../..");
 const MAIN_VAULT = "C:\\Users\\whipl\\OneDrive\\Documents\\Absalom";
+
+// Plugins that live in the main vault and must be kept in sync with both test vaults.
+// The settings plugin version must match the compiled artifact's expectations
+// (e.g. v0.17.0 added the windrose-map code block processor and the obsidian bridge).
+const PLUGINS_TO_SYNC = ["dungeon-map-tracker-settings"];
 
 // Path to the clean fixture and its target locations
 // Dev mode: _test-data/dungeon-maps-data.json (isolated test-only location)
@@ -125,6 +131,27 @@ export async function setup() {
   }
 
   console.log("Setting up test vault symlinks...");
+
+  // Sync plugins from the main vault into both test vaults.
+  // Uses cpSync (not symlink) because OneDrive-backed sources can't be junctioned reliably,
+  // and because the compiled test vault is a git-tracked fixture that shouldn't contain symlinks.
+  for (const vault of [TEST_VAULT, TEST_VAULT_COMPILED]) {
+    for (const pluginId of PLUGINS_TO_SYNC) {
+      const source = path.join(MAIN_VAULT, ".obsidian", "plugins", pluginId);
+      const target = path.join(vault, ".obsidian", "plugins", pluginId);
+      if (!existsSync(source)) {
+        console.warn(`  Plugin source not found: ${source}`);
+        continue;
+      }
+      const fs = await import("fs/promises");
+      if (existsSync(target)) {
+        await fs.rm(target, { recursive: true, force: true });
+      }
+      mkdirSync(path.dirname(target), { recursive: true });
+      cpSync(source, target, { recursive: true });
+      console.log(`  Synced plugin: ${pluginId} -> ${path.basename(vault)}`);
+    }
+  }
 
   // Copy compiled artifacts first (for Datacore indexing)
   for (const copy of copies) {

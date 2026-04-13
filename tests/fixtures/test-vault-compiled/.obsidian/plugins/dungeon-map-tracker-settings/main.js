@@ -23,7 +23,7 @@
 // VERSION & IMPORTS
 // =============================================================================
 
-const PLUGIN_VERSION = '0.16.4';
+const PLUGIN_VERSION = '0.17.0';
 
 const obsidianModule = require('obsidian');
 const { Plugin, PluginSettingTab, Setting, Modal, setIcon, AbstractInputSuggest } = obsidianModule;
@@ -4241,7 +4241,7 @@ const ObjectSetHelpers = {
       for (const fullPath of imagePaths) {
         const sourceFile = plugin.app.vault.getAbstractFileByPath(fullPath);
         if (!sourceFile) {
-          
+          console.warn('[Windrose] Export: image not found:', fullPath);
           continue;
         }
         const filename = imageMap[fullPath];
@@ -4358,7 +4358,7 @@ const ObjectSetHelpers = {
           added++;
         }
       } catch (e) {
-        
+        console.warn('[Windrose] Scan: failed to read', child.path, e.message);
       }
     }
 
@@ -4974,7 +4974,7 @@ class InsertDungeonModal extends Modal {
         });
         this.close();
       } catch (err) {
-        
+        console.error('[Windrose] Dungeon generation failed:', err);
         new Notice('Failed to generate dungeon: ' + err.message);
       }
     };
@@ -5015,7 +5015,7 @@ class InsertDungeonModal extends Modal {
           });
           this.close();
         } catch (err) {
-          
+          console.error('[Windrose] Dungeon generation failed:', err);
           new Notice('Failed to generate dungeon: ' + err.message);
         }
       }
@@ -6697,7 +6697,7 @@ class WindroseMDSettingsPlugin extends Plugin {
           const added = await ObjectSetHelpers.scanAutoLoadFolder(this);
           if (added > 0) await this.saveSettings();
         } catch (e) {
-          
+          console.warn('[Windrose] Auto-load scan failed:', e.message);
         }
       }
     });
@@ -6713,7 +6713,7 @@ class WindroseMDSettingsPlugin extends Plugin {
           const added = await ObjectSetHelpers.scanAutoLoadFolder(this);
           if (added > 0) {
             await this.saveSettings();
-            
+            console.log('[Windrose] Auto-load: found', added, 'new set(s)');
           }
         } catch (e) {
           // Silently ignore - folder may have been removed
@@ -6744,6 +6744,53 @@ class WindroseMDSettingsPlugin extends Plugin {
       }
     }));
 
+    // Register windrose-map code block processor
+    // Parses YAML config (id, name, type) and delegates rendering to Datacore
+    this.registerMarkdownCodeBlockProcessor('windrose-map', (source, el, ctx) => {
+      // Parse simple YAML key: value pairs
+      const config = {};
+      for (const line of source.split('\n')) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith('#')) continue;
+        const colonIdx = trimmed.indexOf(':');
+        if (colonIdx === -1) continue;
+        const key = trimmed.slice(0, colonIdx).trim();
+        const value = trimmed.slice(colonIdx + 1).trim();
+        config[key] = value;
+      }
+
+      const mapId = config.id || '';
+      const mapName = config.name || 'Unnamed Map';
+      const mapType = config.type || 'grid';
+
+      if (!mapId) {
+        el.createEl('div', {
+          text: 'Windrose: Missing required "id" field in windrose-map block.',
+          cls: 'windrose-error'
+        });
+        return;
+      }
+
+      // Check if Datacore is available
+      if (!window.datacore) {
+        el.createEl('div', {
+          text: 'Windrose: Waiting for Datacore to load...',
+          cls: 'windrose-loading'
+        });
+        // Retry when Datacore becomes available
+        const onReady = () => {
+          el.empty();
+          this._renderWindroseBlock(mapId, mapName, mapType, el, ctx);
+        };
+        window.addEventListener('datacore:index-ready', onReady, { once: true });
+        // Also register cleanup
+        this.register(() => window.removeEventListener('datacore:index-ready', onReady));
+        return;
+      }
+
+      this._renderWindroseBlock(mapId, mapName, mapType, el, ctx);
+    });
+
     // Register command to insert a new map
     this.addCommand({
       id: 'insert-new-map',
@@ -6751,20 +6798,15 @@ class WindroseMDSettingsPlugin extends Plugin {
       editorCallback: (editor, view) => {
         new InsertMapModal(this.app, (mapName, mapType) => {
           const mapId = 'map-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
-          
+
           const codeBlock = [
-            '```datacorejsx',
-            '',
-            'const { View: DungeonMapTracker } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md.md"), "DungeonMapTracker"));',
-            '',
-            `const mapId = "${mapId}";`,
-            `const mapName = "${mapName}";`,
-            `const mapType = "${mapType}";`,
-            '',
-            'return <DungeonMapTracker mapId={mapId} mapName={mapName} mapType={mapType} />;',
+            '```windrose-map',
+            `id: ${mapId}`,
+            `name: ${mapName}`,
+            `type: ${mapType}`,
             '```'
           ].join('\n');
-          
+
           editor.replaceSelection(codeBlock);
         }).open();
       }
@@ -6777,13 +6819,13 @@ class WindroseMDSettingsPlugin extends Plugin {
       // params.action = 'windrose', and the rest is in the query string
       const rawQuery = Object.keys(params).find(key => key.includes('|'));
       if (!rawQuery) {
-        
+        console.error('[Windrose] Invalid deep link format');
         return;
       }
 
       const pipeIndex = rawQuery.indexOf('|');
       if (pipeIndex === -1) {
-        
+        console.error('[Windrose] Missing pipe separator in deep link');
         return;
       }
 
@@ -6792,7 +6834,7 @@ class WindroseMDSettingsPlugin extends Plugin {
       const parts = coordData.split(',');
 
       if (parts.length !== 5) {
-        
+        console.error('[Windrose] Invalid coordinate data in deep link');
         return;
       }
 
@@ -6817,7 +6859,7 @@ class WindroseMDSettingsPlugin extends Plugin {
           }));
         }, 100);
       } catch (err) {
-        
+        console.error('[Windrose] Failed to open note:', err);
         new Notice('Failed to open map note');
       }
     });
@@ -6831,39 +6873,57 @@ class WindroseMDSettingsPlugin extends Plugin {
           const mapId = 'map-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
           await this.saveDungeonToJson(mapId, mapName, cells, objects, edges, options);
 
-          // Debug mode uses source entry point instead of compiled
-          const debugFile = this.app.vault.getAbstractFileByPath('WINDROSE-DEBUG.json');
-          const codeBlock = debugFile
-            ? [
-                '```datacorejsx',
-                'window.__dmtBasePath = "Projects/dungeon-map-tracker";',
-                '',
-                'const { DungeonMapTracker } = await dc.require(dc.resolvePath("Dungeon" + "MapTracker.tsx"));',
-                '',
-                `const mapId = "${mapId}";`,
-                `const mapName = "${mapName}";`,
-                'const mapType = "grid";',
-                '',
-                'return <DungeonMapTracker mapId={mapId} mapName={mapName} mapType={mapType} />;',
-                '```'
-              ].join('\n')
-            : [
-                '```datacorejsx',
-                '',
-                'const { View: DungeonMapTracker } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md.md"), "DungeonMapTracker"));',
-                '',
-                `const mapId = "${mapId}";`,
-                `const mapName = "${mapName}";`,
-                'const mapType = "grid";',
-                '',
-                'return <DungeonMapTracker mapId={mapId} mapName={mapName} mapType={mapType} />;',
-                '```'
-              ].join('\n');
+          const codeBlock = [
+            '```windrose-map',
+            `id: ${mapId}`,
+            `name: ${mapName}`,
+            'type: grid',
+            '```'
+          ].join('\n');
 
           editor.replaceSelection(codeBlock);
         }).open();
       }
     });
+  }
+
+  /**
+   * Render a windrose-map block by generating JSX source and delegating to Datacore.
+   */
+  _renderWindroseBlock(mapId, mapName, mapType, el, ctx) {
+    const debugFile = this.app.vault.getAbstractFileByPath('WINDROSE-DEBUG.json');
+
+    const jsxSource = debugFile
+      ? [
+          'window.__dmtBasePath = "Projects/dungeon-map-tracker";',
+          '',
+          'const { DungeonMapTracker } = await dc.require(dc.resolvePath("Dungeon" + "MapTracker.tsx"));',
+          '',
+          'const mapId = "' + mapId + '";',
+          'const mapName = "' + mapName.replace(/"/g, '\\"') + '";',
+          'const mapType = "' + mapType + '";',
+          '',
+          'return <DungeonMapTracker mapId={mapId} mapName={mapName} mapType={mapType} />;'
+        ].join('\n')
+      : [
+          'const { View: DungeonMapTracker } = await dc.require(dc.headerLink(dc.resolvePath("compiled-windrose-md.md"), "DungeonMapTracker"));',
+          '',
+          'const mapId = "' + mapId + '";',
+          'const mapName = "' + mapName.replace(/"/g, '\\"') + '";',
+          'const mapType = "' + mapType + '";',
+          '',
+          'return <DungeonMapTracker mapId={mapId} mapName={mapName} mapType={mapType} />;'
+        ].join('\n');
+
+    try {
+      window.datacore.executeJsx(jsxSource, el, ctx, ctx.sourcePath);
+    } catch (err) {
+      console.error('[Windrose] Failed to render map block:', err);
+      el.createEl('div', {
+        text: 'Windrose: Failed to render map. Check console for details.',
+        cls: 'windrose-error'
+      });
+    }
   }
 
   onunload() {
@@ -6887,11 +6947,11 @@ class WindroseMDSettingsPlugin extends Plugin {
         const content = await this.app.vault.read(debugFile);
         const config = JSON.parse(content);
         if (config.dataFilePath) {
-          
+          console.log('[Windrose DEBUG] Using data file:', config.dataFilePath);
           return config.dataFilePath;
         }
       } catch (e) {
-        
+        console.warn('[Windrose] Failed to read WINDROSE-DEBUG.json:', e);
       }
     }
     
@@ -6920,7 +6980,7 @@ class WindroseMDSettingsPlugin extends Plugin {
         const debugContent = await this.app.vault.read(debugFile);
         const config = JSON.parse(debugContent);
         if (config.dungeonGeneratorPath) {
-          
+          console.log('[Windrose DEBUG] Loading generator from:', config.dungeonGeneratorPath);
           const generatorFile = this.app.vault.getAbstractFileByPath(config.dungeonGeneratorPath);
           if (!generatorFile) {
             throw new Error('Debug dungeonGeneratorPath not found: ' + config.dungeonGeneratorPath);
@@ -6930,7 +6990,7 @@ class WindroseMDSettingsPlugin extends Plugin {
           return moduleFunc();
         }
       } catch (e) {
-        
+        console.warn('[Windrose] Debug generator load failed, falling back to compiled:', e.message);
       }
     }
     
@@ -6986,7 +7046,7 @@ class WindroseMDSettingsPlugin extends Plugin {
         const debugContent = await this.app.vault.read(debugFile);
         const config = JSON.parse(debugContent);
         if (config.objectPlacerPath) {
-          
+          console.log('[Windrose DEBUG] Loading objectPlacer from:', config.objectPlacerPath);
           const placerFile = this.app.vault.getAbstractFileByPath(config.objectPlacerPath);
           if (!placerFile) {
             throw new Error('Debug objectPlacerPath not found: ' + config.objectPlacerPath);
@@ -6996,7 +7056,7 @@ class WindroseMDSettingsPlugin extends Plugin {
           return moduleFunc();
         }
       } catch (e) {
-        
+        console.warn('[Windrose] Debug objectPlacer load failed, falling back to compiled:', e.message);
       }
     }
 
@@ -7198,7 +7258,7 @@ class WindroseMDSettingsPlugin extends Plugin {
       }
       
     } catch (error) {
-      
+      console.error('[Windrose] Failed to save dungeon:', error);
       throw error;
     }
   }
@@ -7207,7 +7267,7 @@ class WindroseMDSettingsPlugin extends Plugin {
     try {
       const data = await this.loadData();
       this.settings = Object.assign({
-        version: '0.16.4',
+        version: '0.17.0',
         hexOrientation: 'flat',
         gridLineColor: '#666666',
         gridLineWidth: 1,
@@ -7246,12 +7306,14 @@ class WindroseMDSettingsPlugin extends Plugin {
         // Object sets
         objectSets: [],
         activeObjectSetId: null,
-        objectSetsAutoLoadFolder: ''
+        objectSetsAutoLoadFolder: '',
+        // Tileset folders
+        tilesetFolders: []
       }, data || {});
     } catch (error) {
-      
+      console.warn('[DMT Settings] Error loading settings, using defaults:', error);
       this.settings = {
-        version: '0.16.4',
+        version: '0.17.0',
         hexOrientation: 'flat',
         gridLineColor: '#666666',
         gridLineWidth: 1,
@@ -7290,7 +7352,9 @@ class WindroseMDSettingsPlugin extends Plugin {
         // Object sets
         objectSets: [],
         activeObjectSetId: null,
-        objectSetsAutoLoadFolder: ''
+        objectSetsAutoLoadFolder: '',
+        // Tileset folders
+        tilesetFolders: []
       };
     }
   }
@@ -7441,7 +7505,10 @@ class WindroseMDSettingsTab extends PluginSettingTab {
     this.createCollapsibleSection(containerEl, 'Distance Measurement', 
       (el) => this.renderDistanceMeasurementSettingsContent(el),
       { open: openSections.has('Distance Measurement') });
-    this.createCollapsibleSection(containerEl, 'Object Types', 
+    this.createCollapsibleSection(containerEl, 'Tile Sets',
+      (el) => this.renderTilesetFoldersContent(el),
+      { open: openSections.has('Tile Sets') });
+    this.createCollapsibleSection(containerEl, 'Object Types',
       (el) => this.renderObjectTypesContent(el),
       { open: openSections.has('Object Types') });
   }
@@ -8936,10 +9003,100 @@ const TabRenderObjectsMethods = {
 
 };
 
+// settingsPlugin-TabRenderTilesets.js
+// WindroseMDSettingsTab render methods - Tileset configuration
+// This file is concatenated into the settings plugin template by the assembler
+
+const TabRenderTilesetsMethods = {
+  renderTilesetFoldersContent(containerEl) {
+    const s = this.plugin.settings;
+    const folders = s.tilesetFolders || [];
+
+    containerEl.createEl('p', {
+      text: 'Configure vault folders containing hex tile images. Each folder becomes a tileset available to all hex maps. Subfolders are used as tile categories.',
+      cls: 'setting-item-description'
+    });
+
+    // List existing folders
+    for (let i = 0; i < folders.length; i++) {
+      const folderPath = folders[i];
+      new Setting(containerEl)
+        .setName('Tile Folder ' + (i + 1))
+        .addSearch(search => {
+          new FolderSuggest(this.app, search.inputEl);
+          search
+            .setPlaceholder('e.g. Assets/Tiles/Baumgart')
+            .setValue(folderPath)
+            .onChange(async (value) => {
+              const updated = [...(s.tilesetFolders || [])];
+              updated[i] = value.trim();
+              s.tilesetFolders = updated;
+              this.settingsChanged = true;
+              await this.plugin.saveSettings();
+            });
+        })
+        .addExtraButton(btn => btn
+          .setIcon('trash-2')
+          .setTooltip('Remove folder')
+          .onClick(async () => {
+            const updated = [...(s.tilesetFolders || [])];
+            updated.splice(i, 1);
+            s.tilesetFolders = updated;
+            this.settingsChanged = true;
+            await this.plugin.saveSettings();
+            this.display();
+          }));
+    }
+
+    // Add folder button
+    new Setting(containerEl)
+      .setName('Add Tile Folder')
+      .setDesc('Add a vault folder to scan for tile images')
+      .addButton(btn => btn
+        .setButtonText('Add Folder')
+        .onClick(async () => {
+          const updated = [...(s.tilesetFolders || []), ''];
+          s.tilesetFolders = updated;
+          this.settingsChanged = true;
+          await this.plugin.saveSettings();
+          this.display();
+        }));
+
+    // Scan preview
+    if (folders.length > 0) {
+      new Setting(containerEl)
+        .setName('Preview')
+        .setDesc('Check what tiles would be loaded from configured folders')
+        .addButton(btn => btn
+          .setButtonText('Scan Folders')
+          .onClick(() => {
+            let totalTiles = 0;
+            const results = [];
+            for (const folder of folders) {
+              if (!folder) continue;
+              const allFiles = this.app.vault.getFiles();
+              const normalizedFolder = folder.endsWith('/') ? folder.slice(0, -1) : folder;
+              const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp']);
+              let count = 0;
+              for (const file of allFiles) {
+                if (!file.path.startsWith(normalizedFolder + '/')) continue;
+                const ext = file.extension ? file.extension.toLowerCase() : '';
+                if (IMAGE_EXTENSIONS.has(ext)) count++;
+              }
+              totalTiles += count;
+              results.push(folder + ': ' + count + ' tile(s)');
+            }
+            new Notice(results.join('\n') + '\nTotal: ' + totalTiles + ' tiles');
+          }));
+    }
+  }
+};
+
 // Mix in the render methods to WindroseMDSettingsTab
 Object.assign(WindroseMDSettingsTab.prototype, TabRenderCoreMethods);
 Object.assign(WindroseMDSettingsTab.prototype, TabRenderSettingsMethods);
 Object.assign(WindroseMDSettingsTab.prototype, TabRenderColorsMethods);
 Object.assign(WindroseMDSettingsTab.prototype, TabRenderObjectsMethods);
+Object.assign(WindroseMDSettingsTab.prototype, TabRenderTilesetsMethods);
 
 module.exports = WindroseMDSettingsPlugin;
