@@ -38,6 +38,7 @@ That said, it also works fully on desktop Obsidian, with the added convenience o
 - Display coordinates.
 - Up to 4 objects allowed per hex, for any regions with multiple points of interest.
 - Supports background images. Select any image from your vault, and how many hexes you want to divide it into (with presets, as well as full customization).
+- **Tile images** — import tileset folders from your vault and paint hex tiles with click or drag. Supports rotation, horizontal flip, and freeform stamp placement for non-grid-locked tile positioning.
 
 ![Hex Map](docs/images/hex-map-docs-screenshot.png)
 
@@ -135,8 +136,20 @@ _For creating a new blank map_
 2. Start mapping!
 
 _For generating a random dungeon_
-1. Select ”Generate a random dungeon”, and customize to your liking.
+1. Select “Generate a random dungeon”, and customize to your liking.
 2. Start exploring and editing!
+
+_Using windrose-map code blocks_
+
+As of v1.6.1, Windrose supports a `windrose-map` code block syntax. This is the modern way to embed maps and is used by the “Insert new map” command automatically. The syntax is:
+
+```windrose-map
+id: your-map-id
+name: My Map
+type: grid
+```
+
+Fields: `id` (required, unique identifier), `name` (display name), `type` (`grid` or `hex`). Map data is stored in `windrose-map-data.json`, referenced by the `id`.
 
 _Old instructions, using Templater, pre-plugin. Still functional
 ```
