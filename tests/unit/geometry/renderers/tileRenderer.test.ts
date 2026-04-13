@@ -69,6 +69,23 @@ describe('tileRenderer', () => {
       expect(sorted[0].q).toBe(1);
       expect(sorted[0].r).toBe(0);
     });
+
+    it('treats tiles without layer field as base when sorting', () => {
+      // Tiles with no layer and tiles with layer='base' should sort identically
+      const tilesNoLayer: HexTileAssignment[] = [
+        { q: 0, r: 2, tilesetId: 'ts1', tileId: 'tile1' },
+        { q: 0, r: 0, tilesetId: 'ts1', tileId: 'tile1' },
+        { q: 0, r: 1, tilesetId: 'ts1', tileId: 'tile1' },
+      ];
+      const tilesExplicitBase: HexTileAssignment[] = [
+        { q: 0, r: 2, tilesetId: 'ts1', tileId: 'tile1', layer: 'base' },
+        { q: 0, r: 0, tilesetId: 'ts1', tileId: 'tile1', layer: 'base' },
+        { q: 0, r: 1, tilesetId: 'ts1', tileId: 'tile1', layer: 'base' },
+      ];
+      const sortedNoLayer = sortTilesForRendering(tilesNoLayer, 'flat');
+      const sortedExplicit = sortTilesForRendering(tilesExplicitBase, 'flat');
+      expect(sortedNoLayer.map(t => t.r)).toEqual(sortedExplicit.map(t => t.r));
+    });
   });
 
   describe('calculateTileDrawRect', () => {
@@ -234,8 +251,8 @@ describe('tileRenderer', () => {
     });
   });
 
-  describe('renderTiles overlay ordering', () => {
-    const makeTileset = (): TilesetDef => ({
+  describe('renderTiles', () => {
+    const makeTileset = (overrides: Partial<TilesetDef> = {}): TilesetDef => ({
       id: 'ts1', name: 'Test', folderPath: '/test',
       tileWidth: 64, tileHeight: 64, hexHeight: 64,
       overflowTop: 0, overflowBottom: 0,
@@ -243,6 +260,7 @@ describe('tileRenderer', () => {
         { id: 'base1', filename: 'base1.png', vaultPath: '/test/base1.png' },
         { id: 'overlay1', filename: 'overlay1.png', vaultPath: '/test/overlay1.png' },
       ],
+      ...overrides,
     });
 
     const makeGeometry = () => ({
@@ -254,21 +272,26 @@ describe('tileRenderer', () => {
       orientation: 'flat' as const,
     });
 
-    it('renders base tiles before overlay tiles', () => {
-      const baseImg = { naturalWidth: 64, naturalHeight: 64, _tag: 'base' } as unknown as HTMLImageElement;
-      const overlayImg = { naturalWidth: 64, naturalHeight: 64, _tag: 'overlay' } as unknown as HTMLImageElement;
-      const drawOrder: string[] = [];
-      const ctx = {
-        globalAlpha: 1,
-        drawImage: vi.fn((img: HTMLImageElement) => {
-          drawOrder.push((img as any)._tag);
-        }),
+    function makeCtx() {
+      return {
+        drawImage: vi.fn(),
         save: vi.fn(),
         restore: vi.fn(),
         translate: vi.fn(),
         rotate: vi.fn(),
         scale: vi.fn(),
-      } as unknown as CanvasRenderingContext2D;
+        globalAlpha: 1,
+      };
+    }
+
+    it('renders base tiles before overlay tiles', () => {
+      const baseImg = { naturalWidth: 64, naturalHeight: 64, _tag: 'base' } as unknown as HTMLImageElement;
+      const overlayImg = { naturalWidth: 64, naturalHeight: 64, _tag: 'overlay' } as unknown as HTMLImageElement;
+      const drawOrder: string[] = [];
+      const ctx = makeCtx();
+      ctx.drawImage.mockImplementation((img: HTMLImageElement) => {
+        drawOrder.push((img as any)._tag);
+      });
 
       const ts = makeTileset();
       ts.tiles.push({ id: 'overlay1', filename: 'overlay.png', vaultPath: 'Tiles/overlay.png' });
@@ -278,7 +301,7 @@ describe('tileRenderer', () => {
         { q: 0, r: 0, tilesetId: 'ts1', tileId: 'base1' },  // no layer = base
       ];
 
-      renderTiles(ctx, tiles, [ts], makeGeometry(), { x: 0, y: 0, zoom: 1 }, {
+      renderTiles(ctx as unknown as CanvasRenderingContext2D, tiles, [ts], makeGeometry(), { x: 0, y: 0, zoom: 1 }, {
         getCachedImage: (path: string) => path.includes('overlay') ? overlayImg : baseImg,
         canvasWidth: 800,
         canvasHeight: 600,
@@ -290,21 +313,13 @@ describe('tileRenderer', () => {
 
     it('does not crash with overlay-only tiles', () => {
       const fakeImg = { naturalWidth: 64, naturalHeight: 64 } as HTMLImageElement;
-      const ctx = {
-        globalAlpha: 1,
-        drawImage: vi.fn(),
-        save: vi.fn(),
-        restore: vi.fn(),
-        translate: vi.fn(),
-        rotate: vi.fn(),
-        scale: vi.fn(),
-      } as unknown as CanvasRenderingContext2D;
+      const ctx = makeCtx();
 
       const tiles: HexTileAssignment[] = [
         { q: 0, r: 0, tilesetId: 'ts1', tileId: 'overlay1', layer: 'overlay' },
       ];
 
-      renderTiles(ctx, tiles, [makeTileset()], makeGeometry(), { x: 0, y: 0, zoom: 1 }, {
+      renderTiles(ctx as unknown as CanvasRenderingContext2D, tiles, [makeTileset()], makeGeometry(), { x: 0, y: 0, zoom: 1 }, {
         getCachedImage: () => fakeImg,
         canvasWidth: 800,
         canvasHeight: 600,
@@ -313,38 +328,43 @@ describe('tileRenderer', () => {
       expect(ctx.drawImage).toHaveBeenCalledTimes(1);
     });
 
-    it('treats tiles without layer field as base', () => {
+    it('treats tiles without layer field as base (rendered before overlays)', () => {
+      const baseImg = { naturalWidth: 64, naturalHeight: 64, _tag: 'noLayer' } as unknown as HTMLImageElement;
+      const overlayImg = { naturalWidth: 64, naturalHeight: 64, _tag: 'overlay' } as unknown as HTMLImageElement;
+      const drawOrder: string[] = [];
+      const ctx = makeCtx();
+      ctx.drawImage.mockImplementation((img: HTMLImageElement) => {
+        drawOrder.push((img as any)._tag);
+      });
+
       const tiles: HexTileAssignment[] = [
-        { q: 0, r: 0, tilesetId: 'ts1', tileId: 'base1' },
-        { q: 1, r: 0, tilesetId: 'ts1', tileId: 'base1', layer: 'base' },
+        { q: 0, r: 0, tilesetId: 'ts1', tileId: 'overlay1', layer: 'overlay' },
+        { q: 0, r: 0, tilesetId: 'ts1', tileId: 'base1' }, // no layer field
       ];
-      // Both should be treated as base — verify by sorting
-      const baseTiles = tiles.filter(t => (t.layer || 'base') === 'base');
-      const overlayTiles = tiles.filter(t => t.layer === 'overlay');
-      expect(baseTiles).toHaveLength(2);
-      expect(overlayTiles).toHaveLength(0);
+
+      renderTiles(ctx as unknown as CanvasRenderingContext2D, tiles, [makeTileset()], makeGeometry(), { x: 0, y: 0, zoom: 1 }, {
+        getCachedImage: (path: string) => path.includes('overlay') ? overlayImg : baseImg,
+        canvasWidth: 800,
+        canvasHeight: 600,
+      });
+
+      // Tile without layer should render in the base group (before overlay)
+      expect(drawOrder).toEqual(['noLayer', 'overlay']);
     });
 
     it('renders freeform stamps using worldX/worldY coordinates', () => {
       const fakeImg = { naturalWidth: 64, naturalHeight: 64 } as HTMLImageElement;
       const drawCalls: { x: number; y: number }[] = [];
-      const ctx = {
-        globalAlpha: 1,
-        drawImage: vi.fn((_img: HTMLImageElement, x: number, y: number) => {
-          drawCalls.push({ x, y });
-        }),
-        save: vi.fn(),
-        restore: vi.fn(),
-        translate: vi.fn(),
-        rotate: vi.fn(),
-        scale: vi.fn(),
-      } as unknown as CanvasRenderingContext2D;
+      const ctx = makeCtx();
+      ctx.drawImage.mockImplementation((_img: HTMLImageElement, x: number, y: number) => {
+        drawCalls.push({ x, y });
+      });
 
       const tiles: HexTileAssignment[] = [
         { q: 0, r: 0, tilesetId: 'ts1', tileId: 'base1', freeform: true, worldX: 50, worldY: 75 },
       ];
 
-      renderTiles(ctx, tiles, [makeTileset()], makeGeometry(), { x: 0, y: 0, zoom: 1 }, {
+      renderTiles(ctx as unknown as CanvasRenderingContext2D, tiles, [makeTileset()], makeGeometry(), { x: 0, y: 0, zoom: 1 }, {
         getCachedImage: () => fakeImg,
         canvasWidth: 800,
         canvasHeight: 600,
@@ -362,17 +382,10 @@ describe('tileRenderer', () => {
       const overlayImg = { naturalWidth: 64, naturalHeight: 64, _tag: 'overlay' } as unknown as HTMLImageElement;
       const freeformImg = { naturalWidth: 64, naturalHeight: 64, _tag: 'freeform' } as unknown as HTMLImageElement;
       const drawOrder: string[] = [];
-      const ctx = {
-        globalAlpha: 1,
-        drawImage: vi.fn((img: HTMLImageElement) => {
-          drawOrder.push((img as any)._tag);
-        }),
-        save: vi.fn(),
-        restore: vi.fn(),
-        translate: vi.fn(),
-        rotate: vi.fn(),
-        scale: vi.fn(),
-      } as unknown as CanvasRenderingContext2D;
+      const ctx = makeCtx();
+      ctx.drawImage.mockImplementation((img: HTMLImageElement) => {
+        drawOrder.push((img as any)._tag);
+      });
 
       const ts = makeTileset();
       ts.tiles.push(
@@ -386,7 +399,7 @@ describe('tileRenderer', () => {
         { q: 0, r: 0, tilesetId: 'ts1', tileId: 'overlay1', layer: 'overlay' },
       ];
 
-      renderTiles(ctx, tiles, [ts], makeGeometry(), { x: 0, y: 0, zoom: 1 }, {
+      renderTiles(ctx as unknown as CanvasRenderingContext2D, tiles, [ts], makeGeometry(), { x: 0, y: 0, zoom: 1 }, {
         getCachedImage: (path: string) => {
           if (path.includes('freeform')) return freeformImg;
           if (path.includes('overlay')) return overlayImg;
@@ -402,21 +415,13 @@ describe('tileRenderer', () => {
 
     it('applies rotation transform when tile has rotation', () => {
       const fakeImg = { naturalWidth: 64, naturalHeight: 64 } as HTMLImageElement;
-      const ctx = {
-        globalAlpha: 1,
-        drawImage: vi.fn(),
-        save: vi.fn(),
-        restore: vi.fn(),
-        translate: vi.fn(),
-        rotate: vi.fn(),
-        scale: vi.fn(),
-      } as unknown as CanvasRenderingContext2D;
+      const ctx = makeCtx();
 
       const tiles: HexTileAssignment[] = [
         { q: 0, r: 0, tilesetId: 'ts1', tileId: 'base1', rotation: 60 },
       ];
 
-      renderTiles(ctx, tiles, [makeTileset()], makeGeometry(), { x: 0, y: 0, zoom: 1 }, {
+      renderTiles(ctx as unknown as CanvasRenderingContext2D, tiles, [makeTileset()], makeGeometry(), { x: 0, y: 0, zoom: 1 }, {
         getCachedImage: () => fakeImg,
         canvasWidth: 800,
         canvasHeight: 600,
@@ -430,21 +435,13 @@ describe('tileRenderer', () => {
 
     it('applies horizontal flip when tile has flipH', () => {
       const fakeImg = { naturalWidth: 64, naturalHeight: 64 } as HTMLImageElement;
-      const ctx = {
-        globalAlpha: 1,
-        drawImage: vi.fn(),
-        save: vi.fn(),
-        restore: vi.fn(),
-        translate: vi.fn(),
-        rotate: vi.fn(),
-        scale: vi.fn(),
-      } as unknown as CanvasRenderingContext2D;
+      const ctx = makeCtx();
 
       const tiles: HexTileAssignment[] = [
         { q: 0, r: 0, tilesetId: 'ts1', tileId: 'base1', flipH: true },
       ];
 
-      renderTiles(ctx, tiles, [makeTileset()], makeGeometry(), { x: 0, y: 0, zoom: 1 }, {
+      renderTiles(ctx as unknown as CanvasRenderingContext2D, tiles, [makeTileset()], makeGeometry(), { x: 0, y: 0, zoom: 1 }, {
         getCachedImage: () => fakeImg,
         canvasWidth: 800,
         canvasHeight: 600,
@@ -455,21 +452,35 @@ describe('tileRenderer', () => {
       expect(ctx.restore).toHaveBeenCalled();
     });
 
+    it('applies both rotation and flipH when both are set', () => {
+      const fakeImg = { naturalWidth: 64, naturalHeight: 64 } as HTMLImageElement;
+      const ctx = makeCtx();
+
+      const tiles: HexTileAssignment[] = [
+        { q: 0, r: 0, tilesetId: 'ts1', tileId: 'base1', rotation: 120, flipH: true },
+      ];
+
+      renderTiles(ctx as unknown as CanvasRenderingContext2D, tiles, [makeTileset()], makeGeometry(), { x: 0, y: 0, zoom: 1 }, {
+        getCachedImage: () => fakeImg,
+        canvasWidth: 800,
+        canvasHeight: 600,
+      });
+
+      expect(ctx.save).toHaveBeenCalledTimes(1);
+      expect(ctx.rotate).toHaveBeenCalledWith((120 * Math.PI) / 180);
+      expect(ctx.scale).toHaveBeenCalledWith(-1, 1);
+      expect(ctx.restore).toHaveBeenCalledTimes(1);
+      expect(ctx.drawImage).toHaveBeenCalledTimes(1);
+    });
+
     it('auto-detects small stamps and applies contain-style scaling', () => {
       // Small image (55px) in a large tileset (256px) should auto-detect as stamp
       const smallImg = { naturalWidth: 55, naturalHeight: 55 } as HTMLImageElement;
       const drawCalls: { x: number; y: number; w: number; h: number }[] = [];
-      const ctx = {
-        globalAlpha: 1,
-        drawImage: vi.fn((_img: HTMLImageElement, x: number, y: number, w: number, h: number) => {
-          drawCalls.push({ x, y, w, h });
-        }),
-        save: vi.fn(),
-        restore: vi.fn(),
-        translate: vi.fn(),
-        rotate: vi.fn(),
-        scale: vi.fn(),
-      } as unknown as CanvasRenderingContext2D;
+      const ctx = makeCtx();
+      ctx.drawImage.mockImplementation((_img: HTMLImageElement, x: number, y: number, w: number, h: number) => {
+        drawCalls.push({ x, y, w, h });
+      });
 
       const ts: TilesetDef = {
         id: 'ts1', name: 'Test', folderPath: 'Tiles',
@@ -482,7 +493,7 @@ describe('tileRenderer', () => {
         { q: 0, r: 0, tilesetId: 'ts1', tileId: 'stamp1' },
       ];
 
-      renderTiles(ctx, tiles, [ts], makeGeometry(), { x: 0, y: 0, zoom: 1 }, {
+      renderTiles(ctx as unknown as CanvasRenderingContext2D, tiles, [ts], makeGeometry(), { x: 0, y: 0, zoom: 1 }, {
         getCachedImage: () => smallImg,
         canvasWidth: 800,
         canvasHeight: 600,
@@ -495,21 +506,13 @@ describe('tileRenderer', () => {
 
     it('skips tiles outside viewport (culling)', () => {
       const fakeImg = { naturalWidth: 64, naturalHeight: 64 } as HTMLImageElement;
-      const ctx = {
-        globalAlpha: 1,
-        drawImage: vi.fn(),
-        save: vi.fn(),
-        restore: vi.fn(),
-        translate: vi.fn(),
-        rotate: vi.fn(),
-        scale: vi.fn(),
-      } as unknown as CanvasRenderingContext2D;
+      const ctx = makeCtx();
 
       const tiles: HexTileAssignment[] = [
         { q: 100, r: 100, tilesetId: 'ts1', tileId: 'base1' },
       ];
 
-      renderTiles(ctx, tiles, [makeTileset()], makeGeometry(), { x: 0, y: 0, zoom: 1 }, {
+      renderTiles(ctx as unknown as CanvasRenderingContext2D, tiles, [makeTileset()], makeGeometry(), { x: 0, y: 0, zoom: 1 }, {
         getCachedImage: () => fakeImg,
         canvasWidth: 100,
         canvasHeight: 100,
@@ -521,27 +524,154 @@ describe('tileRenderer', () => {
 
     it('renders tile within viewport margin', () => {
       const fakeImg = { naturalWidth: 64, naturalHeight: 64 } as HTMLImageElement;
-      const ctx = {
-        globalAlpha: 1,
-        drawImage: vi.fn(),
-        save: vi.fn(),
-        restore: vi.fn(),
-        translate: vi.fn(),
-        rotate: vi.fn(),
-        scale: vi.fn(),
-      } as unknown as CanvasRenderingContext2D;
+      const ctx = makeCtx();
 
       const tiles: HexTileAssignment[] = [
         { q: 0, r: 0, tilesetId: 'ts1', tileId: 'base1' },
       ];
 
-      renderTiles(ctx, tiles, [makeTileset()], makeGeometry(), { x: 0, y: 0, zoom: 1 }, {
+      renderTiles(ctx as unknown as CanvasRenderingContext2D, tiles, [makeTileset()], makeGeometry(), { x: 0, y: 0, zoom: 1 }, {
         getCachedImage: () => fakeImg,
         canvasWidth: 800,
         canvasHeight: 600,
       });
 
       expect(ctx.drawImage).toHaveBeenCalledTimes(1);
+    });
+
+    // ---- Error guard tests ----
+
+    it('skips tile when getCachedImage returns null (image not loaded)', () => {
+      const ctx = makeCtx();
+
+      const tiles: HexTileAssignment[] = [
+        { q: 0, r: 0, tilesetId: 'ts1', tileId: 'base1' },
+      ];
+
+      renderTiles(ctx as unknown as CanvasRenderingContext2D, tiles, [makeTileset()], makeGeometry(), { x: 0, y: 0, zoom: 1 }, {
+        getCachedImage: () => null,
+        canvasWidth: 800,
+        canvasHeight: 600,
+      });
+
+      expect(ctx.drawImage).not.toHaveBeenCalled();
+    });
+
+    it('skips tile referencing a tilesetId not in tilesets array', () => {
+      const fakeImg = { naturalWidth: 64, naturalHeight: 64 } as HTMLImageElement;
+      const ctx = makeCtx();
+
+      const tiles: HexTileAssignment[] = [
+        { q: 0, r: 0, tilesetId: 'nonexistent', tileId: 'base1' },
+      ];
+
+      renderTiles(ctx as unknown as CanvasRenderingContext2D, tiles, [makeTileset()], makeGeometry(), { x: 0, y: 0, zoom: 1 }, {
+        getCachedImage: () => fakeImg,
+        canvasWidth: 800,
+        canvasHeight: 600,
+      });
+
+      expect(ctx.drawImage).not.toHaveBeenCalled();
+    });
+
+    it('skips tile referencing a tileId not in its tileset', () => {
+      const fakeImg = { naturalWidth: 64, naturalHeight: 64 } as HTMLImageElement;
+      const ctx = makeCtx();
+
+      const tiles: HexTileAssignment[] = [
+        { q: 0, r: 0, tilesetId: 'ts1', tileId: 'nonexistent_tile' },
+      ];
+
+      renderTiles(ctx as unknown as CanvasRenderingContext2D, tiles, [makeTileset()], makeGeometry(), { x: 0, y: 0, zoom: 1 }, {
+        getCachedImage: () => fakeImg,
+        canvasWidth: 800,
+        canvasHeight: 600,
+      });
+
+      expect(ctx.drawImage).not.toHaveBeenCalled();
+    });
+
+    it('sets globalAlpha when opacity < 1 and restores it after', () => {
+      const fakeImg = { naturalWidth: 64, naturalHeight: 64 } as HTMLImageElement;
+      const ctx = makeCtx();
+      const alphaValues: number[] = [];
+      ctx.drawImage.mockImplementation(() => {
+        alphaValues.push(ctx.globalAlpha);
+      });
+
+      const tiles: HexTileAssignment[] = [
+        { q: 0, r: 0, tilesetId: 'ts1', tileId: 'base1' },
+      ];
+
+      renderTiles(ctx as unknown as CanvasRenderingContext2D, tiles, [makeTileset()], makeGeometry(), { x: 0, y: 0, zoom: 1 }, {
+        getCachedImage: () => fakeImg,
+        opacity: 0.5,
+        canvasWidth: 800,
+        canvasHeight: 600,
+      });
+
+      expect(ctx.drawImage).toHaveBeenCalledTimes(1);
+      // During drawImage, globalAlpha should have been set to 0.5
+      expect(alphaValues[0]).toBeCloseTo(0.5);
+      // After rendering, globalAlpha should be restored to 1
+      expect(ctx.globalAlpha).toBe(1);
+    });
+
+    it('does not modify globalAlpha when opacity is 1', () => {
+      const fakeImg = { naturalWidth: 64, naturalHeight: 64 } as HTMLImageElement;
+      const ctx = makeCtx();
+      const alphaValues: number[] = [];
+      ctx.drawImage.mockImplementation(() => {
+        alphaValues.push(ctx.globalAlpha);
+      });
+
+      const tiles: HexTileAssignment[] = [
+        { q: 0, r: 0, tilesetId: 'ts1', tileId: 'base1' },
+      ];
+
+      renderTiles(ctx as unknown as CanvasRenderingContext2D, tiles, [makeTileset()], makeGeometry(), { x: 0, y: 0, zoom: 1 }, {
+        getCachedImage: () => fakeImg,
+        canvasWidth: 800,
+        canvasHeight: 600,
+      });
+
+      expect(alphaValues[0]).toBe(1);
+    });
+
+    it('returns early without drawing when tiles array is empty', () => {
+      const ctx = makeCtx();
+
+      renderTiles(ctx as unknown as CanvasRenderingContext2D, [], [makeTileset()], makeGeometry(), { x: 0, y: 0, zoom: 1 }, {
+        getCachedImage: () => null,
+      });
+
+      expect(ctx.drawImage).not.toHaveBeenCalled();
+    });
+
+    it('returns early without drawing when tilesets array is empty', () => {
+      const ctx = makeCtx();
+
+      const tiles: HexTileAssignment[] = [
+        { q: 0, r: 0, tilesetId: 'ts1', tileId: 'base1' },
+      ];
+
+      renderTiles(ctx as unknown as CanvasRenderingContext2D, tiles, [], makeGeometry(), { x: 0, y: 0, zoom: 1 }, {
+        getCachedImage: () => ({ naturalWidth: 64, naturalHeight: 64 } as HTMLImageElement),
+      });
+
+      expect(ctx.drawImage).not.toHaveBeenCalled();
+    });
+
+    it('returns early without drawing when getCachedImage is not provided', () => {
+      const ctx = makeCtx();
+
+      const tiles: HexTileAssignment[] = [
+        { q: 0, r: 0, tilesetId: 'ts1', tileId: 'base1' },
+      ];
+
+      renderTiles(ctx as unknown as CanvasRenderingContext2D, tiles, [makeTileset()], makeGeometry(), { x: 0, y: 0, zoom: 1 });
+
+      expect(ctx.drawImage).not.toHaveBeenCalled();
     });
   });
 });

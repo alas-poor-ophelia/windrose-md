@@ -31,7 +31,7 @@ const EVAL_TIMEOUT = 30_000;
 
 /** Quote a string for shell use — rejects shell metacharacters to prevent injection */
 function shellQuote(s: string): string {
-  if (/[\x00-\x1f`$\\!#&|;(){}<>]/.test(s)) {
+  if (/[\x00-\x1f`$\\!#&|;(){}<>%^]/.test(s)) {
     throw new Error(`Unsafe characters in shell argument: ${s.slice(0, 50)}`);
   }
   return `"${s.replace(/"/g, '\\"')}"`;
@@ -108,9 +108,7 @@ export async function obsidianEvalJson<T = unknown>(code: string): Promise<T> {
  * Returns the path to the saved screenshot.
  */
 export async function obsidianScreenshot(outputPath: string): Promise<string> {
-  // Obsidian CLI expects a Windows-style path
-  const winPath = outputPath.replace(/\//g, "\\");
-  await cli("dev:screenshot", `path=${winPath}`);
+  await cli("dev:screenshot", `path=${outputPath}`);
   return outputPath;
 }
 

@@ -1,59 +1,19 @@
 /**
  * Unit tests for tilesetOperations.ts
- * Pure functions imported from source; scanTilesetFolder tested via mock
- * since it depends on app.vault.getFiles().
+ * Tests pure functions: generateTilesetId, autoDetectOverflow, createTilesetFromTiles.
+ * probeFirstTileImage and scanTilesetFolder require DOM/vault APIs and are not unit-tested here.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 
 import {
   generateTilesetId,
   autoDetectOverflow,
+  createTilesetFromTiles,
+  ALPHA_COVERAGE_THRESHOLD,
 } from '../../../src/assets/tilesetOperations.ts';
 
-// scanTilesetFolder depends on app.vault.getFiles() so we test its
-// logic via a local equivalent that accepts files as a parameter.
-const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp']);
-
-interface MockFile {
-  path: string;
-  name: string;
-  basename: string;
-  extension: string;
-}
-
-function scanTilesetFolder(folderPath: string, allFiles: MockFile[]) {
-  const normalizedFolder = folderPath.endsWith('/')
-    ? folderPath.slice(0, -1)
-    : folderPath;
-
-  const tiles: Array<{
-    id: string;
-    filename: string;
-    vaultPath: string;
-    category?: string;
-  }> = [];
-
-  for (const file of allFiles) {
-    if (!file.path.startsWith(normalizedFolder + '/')) continue;
-
-    const ext = file.extension?.toLowerCase();
-    if (!ext || !IMAGE_EXTENSIONS.has(ext)) continue;
-
-    const relativePath = file.path.slice(normalizedFolder.length + 1);
-    const parts = relativePath.split('/');
-    const category = parts.length > 1 ? parts[0] : undefined;
-
-    tiles.push({
-      id: file.basename,
-      filename: file.name,
-      vaultPath: file.path,
-      category,
-    });
-  }
-
-  return tiles;
-}
+import type { TileEntry } from '#types/tiles/tile.types';
 
 // ===========================================
 // Tests
@@ -82,6 +42,33 @@ describe('tilesetOperations', () => {
       const id1 = generateTilesetId('Hex Samples');
       const id2 = generateTilesetId('Other Tiles');
       expect(id1).not.toBe(id2);
+    });
+
+    it('handles empty string input (treated as falsy, generates random)', () => {
+      const id1 = generateTilesetId('');
+      const id2 = generateTilesetId('');
+      // Empty string is falsy, so each call should produce a random ID
+      expect(id1).toMatch(/^tileset-/);
+      expect(id2).toMatch(/^tileset-/);
+      expect(id1).not.toBe(id2);
+    });
+
+    it('handles very long path deterministically', () => {
+      const longPath = 'a/'.repeat(500) + 'tiles';
+      const id1 = generateTilesetId(longPath);
+      const id2 = generateTilesetId(longPath);
+      expect(id1).toBe(id2);
+      expect(id1).toMatch(/^tileset-/);
+    });
+
+    it('handles non-ASCII characters in path', () => {
+      const id1 = generateTilesetId('地图/タイル/карта');
+      const id2 = generateTilesetId('地图/タイル/карта');
+      expect(id1).toBe(id2);
+      expect(id1).toMatch(/^tileset-/);
+      // Different unicode path produces different ID
+      const id3 = generateTilesetId('другой/путь');
+      expect(id3).not.toBe(id1);
     });
   });
 
@@ -148,66 +135,149 @@ describe('tilesetOperations', () => {
         overflowBottom: 0,
       });
     });
+
+    it('handles tileHeight much larger than tileWidth (e.g., 100x500)', () => {
+      const result = autoDetectOverflow(100, 500);
+      expect(result).toEqual({
+        hexHeight: 100,
+        overflowTop: 400,
+        overflowBottom: 0,
+      });
+    });
+
+    it('handles negative dimensions gracefully', () => {
+      // Negative values are nonsensical but should not throw
+      const result = autoDetectOverflow(-10, -20);
+      // -20 is not > -10, so goes to the else branch
+      expect(result).toEqual({
+        hexHeight: -20,
+        overflowTop: 0,
+        overflowBottom: 0,
+      });
+    });
+
+    it('handles negative width with positive height', () => {
+      // height > width triggers overflow branch
+      const result = autoDetectOverflow(-5, 100);
+      expect(result).toEqual({
+        hexHeight: -5,
+        overflowTop: 105,
+        overflowBottom: 0,
+      });
+    });
   });
 
-  describe('scanTilesetFolder', () => {
-    const mockFiles: MockFile[] = [
-      { path: 'Tiles/forest/oak.png', name: 'oak.png', basename: 'oak', extension: 'png' },
-      { path: 'Tiles/forest/pine.jpg', name: 'pine.jpg', basename: 'pine', extension: 'jpg' },
-      { path: 'Tiles/water/lake.webp', name: 'lake.webp', basename: 'lake', extension: 'webp' },
-      { path: 'Tiles/grass.png', name: 'grass.png', basename: 'grass', extension: 'png' },
-      { path: 'Tiles/readme.md', name: 'readme.md', basename: 'readme', extension: 'md' },
-      { path: 'Tiles/data.json', name: 'data.json', basename: 'data', extension: 'json' },
-      { path: 'Other/unrelated.png', name: 'unrelated.png', basename: 'unrelated', extension: 'png' },
+  describe('createTilesetFromTiles', () => {
+    const sampleTiles: TileEntry[] = [
+      { id: 'grass', filename: 'grass.png', vaultPath: 'Tiles/grass.png' },
+      { id: 'forest', filename: 'forest.png', vaultPath: 'Tiles/trees/forest.png', category: 'trees' },
+      { id: 'water', filename: 'water.png', vaultPath: 'Tiles/water/water.png', category: 'water' },
     ];
 
-    it('filters to image files only', () => {
-      const tiles = scanTilesetFolder('Tiles', mockFiles);
-      const filenames = tiles.map(t => t.filename);
-      expect(filenames).not.toContain('readme.md');
-      expect(filenames).not.toContain('data.json');
+    it('creates a tileset with correct basic fields', () => {
+      const result = createTilesetFromTiles('Tiles', 'My Tileset', sampleTiles);
+      expect(result.name).toBe('My Tileset');
+      expect(result.folderPath).toBe('Tiles');
+      expect(result.tiles).toBe(sampleTiles);
+      expect(result.id).toMatch(/^tileset-/);
     });
 
-    it('only includes files within the target folder', () => {
-      const tiles = scanTilesetFolder('Tiles', mockFiles);
-      const paths = tiles.map(t => t.vaultPath);
-      expect(paths).not.toContain('Other/unrelated.png');
+    it('uses default dimensions (256x256) when no options provided', () => {
+      const result = createTilesetFromTiles('Tiles', 'Test', sampleTiles);
+      expect(result.tileWidth).toBe(256);
+      expect(result.tileHeight).toBe(256);
+      expect(result.hexHeight).toBe(256);
+      expect(result.overflowTop).toBe(0);
+      expect(result.overflowBottom).toBe(0);
     });
 
-    it('assigns category from immediate subfolder', () => {
-      const tiles = scanTilesetFolder('Tiles', mockFiles);
-      const oak = tiles.find(t => t.id === 'oak');
-      const lake = tiles.find(t => t.id === 'lake');
-      expect(oak?.category).toBe('forest');
-      expect(lake?.category).toBe('water');
+    it('uses provided tileWidth and tileHeight', () => {
+      const result = createTilesetFromTiles('Tiles', 'Test', sampleTiles, {
+        tileWidth: 128,
+        tileHeight: 192,
+      });
+      expect(result.tileWidth).toBe(128);
+      expect(result.tileHeight).toBe(192);
+      // autoDetectOverflow should apply: 192 > 128 → overflow = 64
+      expect(result.hexHeight).toBe(128);
+      expect(result.overflowTop).toBe(64);
     });
 
-    it('assigns no category for root-level tiles', () => {
-      const tiles = scanTilesetFolder('Tiles', mockFiles);
-      const grass = tiles.find(t => t.id === 'grass');
-      expect(grass?.category).toBeUndefined();
+    it('allows hexHeight option to override auto-detected value', () => {
+      const result = createTilesetFromTiles('Tiles', 'Test', sampleTiles, {
+        tileWidth: 128,
+        tileHeight: 192,
+        hexHeight: 100,
+      });
+      expect(result.hexHeight).toBe(100);
+      // Overflow still uses auto-detect since not overridden
+      expect(result.overflowTop).toBe(64);
     });
 
-    it('uses filename without extension as id', () => {
-      const tiles = scanTilesetFolder('Tiles', mockFiles);
-      expect(tiles.map(t => t.id)).toEqual(
-        expect.arrayContaining(['oak', 'pine', 'lake', 'grass'])
-      );
+    it('allows overflowTop/overflowBottom options to override auto-detected values', () => {
+      const result = createTilesetFromTiles('Tiles', 'Test', sampleTiles, {
+        tileWidth: 128,
+        tileHeight: 192,
+        overflowTop: 20,
+        overflowBottom: 10,
+      });
+      expect(result.overflowTop).toBe(20);
+      expect(result.overflowBottom).toBe(10);
     });
 
-    it('finds all 4 image files', () => {
-      const tiles = scanTilesetFolder('Tiles', mockFiles);
-      expect(tiles).toHaveLength(4);
+    it('passes through fitMode option', () => {
+      const fill = createTilesetFromTiles('Tiles', 'Test', sampleTiles, { fitMode: 'fill' });
+      const contain = createTilesetFromTiles('Tiles', 'Test', sampleTiles, { fitMode: 'contain' });
+      expect(fill.fitMode).toBe('fill');
+      expect(contain.fitMode).toBe('contain');
     });
 
-    it('handles trailing slash in folder path', () => {
-      const tiles = scanTilesetFolder('Tiles/', mockFiles);
-      expect(tiles).toHaveLength(4);
+    it('fitMode is undefined when not specified', () => {
+      const result = createTilesetFromTiles('Tiles', 'Test', sampleTiles);
+      expect(result.fitMode).toBeUndefined();
     });
 
-    it('returns empty array for non-existent folder', () => {
-      const tiles = scanTilesetFolder('NonExistent', mockFiles);
-      expect(tiles).toHaveLength(0);
+    it('generates a deterministic ID from folderPath', () => {
+      const result1 = createTilesetFromTiles('Tiles/forest', 'Forest', sampleTiles);
+      const result2 = createTilesetFromTiles('Tiles/forest', 'Forest', sampleTiles);
+      expect(result1.id).toBe(result2.id);
+    });
+
+    it('handles empty tiles array', () => {
+      const result = createTilesetFromTiles('Tiles', 'Empty', []);
+      expect(result.tiles).toEqual([]);
+      expect(result.name).toBe('Empty');
+      expect(result.tileWidth).toBe(256);
+    });
+
+    it('handles a single tile', () => {
+      const single: TileEntry[] = [
+        { id: 'solo', filename: 'solo.png', vaultPath: 'Tiles/solo.png' },
+      ];
+      const result = createTilesetFromTiles('Tiles', 'Solo', single);
+      expect(result.tiles).toHaveLength(1);
+      expect(result.tiles[0].id).toBe('solo');
+    });
+
+    it('preserves tile categories from input', () => {
+      const result = createTilesetFromTiles('Tiles', 'Test', sampleTiles);
+      const forest = result.tiles.find(t => t.id === 'forest');
+      expect(forest?.category).toBe('trees');
     });
   });
+
+  describe('ALPHA_COVERAGE_THRESHOLD', () => {
+    it('is a number between 0 and 1', () => {
+      expect(ALPHA_COVERAGE_THRESHOLD).toBeGreaterThan(0);
+      expect(ALPHA_COVERAGE_THRESHOLD).toBeLessThanOrEqual(1);
+    });
+
+    it('equals 0.6', () => {
+      expect(ALPHA_COVERAGE_THRESHOLD).toBe(0.6);
+    });
+  });
+
+  // probeFirstTileImage and measureAlphaCoverage require DOM Image/Canvas APIs
+  // and app.vault access. They are intentionally not unit-tested here.
+  // Integration coverage would require a browser environment or extensive DOM mocking.
 });
