@@ -157,11 +157,8 @@ async function renderMapToCanvas(
       fogCanvas: HTMLCanvasElement | null,
       mapData: MapData,
       geometry: ExportGeometry,
-      selection: unknown[],
-      isSelected: boolean,
-      theme: ExportTheme,
-      showPreview: boolean,
-      visibility: ExportVisibilityOptions
+      selectedItems?: unknown[],
+      options?: { isResizeMode?: boolean; theme?: ExportTheme | null; showCoordinates?: boolean; layerVisibility?: ExportVisibilityOptions | null; adjacentSubHexes?: unknown[] | null }
     ) => void
   };
   
@@ -238,10 +235,7 @@ async function renderMapToCanvas(
     exportMapData,
     geometry,
     [],
-    false,
-    theme,
-    false,
-    { objects: true, textLabels: true, hexCoordinates: false }
+    { isResizeMode: false, theme, showCoordinates: false, layerVisibility: { objects: true, textLabels: true, hexCoordinates: false } }
   );
   
   // Copy to target context

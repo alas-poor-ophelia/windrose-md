@@ -308,7 +308,7 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
       }
     } else {
       // After animation, do a proper redraw with correct dimensions
-      renderCanvas(canvas, fogCanvas, mapData, geometry, selectedItem, isResizeMode, theme, showCoordinates, layerVisibility, adjacentSubHexes as any);
+      renderCanvas(canvas, fogCanvas, mapData, geometry, selectedItem, { isResizeMode, theme, showCoordinates, layerVisibility, adjacentSubHexes });
     }
   }, [canvasDimensions.width, canvasDimensions.height, isAnimating, showCoordinates, layerVisibility, adjacentSubHexes]);
 
