@@ -782,6 +782,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               <MapCanvas.OutlineLayer
                 currentTool={currentTool}
                 selectedColor={selectedColor}
+                onColorChange={setSelectedColor}
                 onOutlinesChange={handleOutlinesChange}
               />
 

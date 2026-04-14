@@ -22,12 +22,14 @@ const { isBridgeAvailable, getObsidianModule } = await requireModuleByName("obsi
 interface OutlineLayerProps {
   currentTool: ToolId;
   selectedColor: string;
+  onColorChange: (color: string) => void;
   onOutlinesChange: (outlines: Outline[]) => void;
 }
 
 const OutlineLayer = ({
   currentTool,
   selectedColor,
+  onColorChange,
   onOutlinesChange
 }: OutlineLayerProps): React.ReactElement | null => {
   const { canvasRef, mapData, geometry, screenToWorld } = useMapState();
@@ -353,12 +355,12 @@ const OutlineLayer = ({
           <input
             type="color"
             value={selectedColor}
-            disabled
-            title="Uses selected color"
+            onInput={(e: any) => onColorChange(e.target.value)}
+            title="Outline color"
             style={{
               width: '28px', height: '28px', borderRadius: '4px',
               border: '2px solid var(--background-modifier-border)',
-              cursor: 'default', padding: 0, background: 'none'
+              cursor: 'pointer', padding: 0, background: 'none'
             }}
           />
 
@@ -370,6 +372,17 @@ const OutlineLayer = ({
           >
             {outlineSettings.filled ? 'Filled' : 'No Fill'}
           </button>
+
+          {outlineSettings.filled && (
+            <input
+              type="range"
+              min="0.05" max="1" step="0.05"
+              value={outlineSettings.fillOpacity}
+              onInput={(e: any) => setOutlineSettings({ fillOpacity: parseFloat(e.target.value) })}
+              title={`Fill opacity: ${Math.round(outlineSettings.fillOpacity * 100)}%`}
+              style={{ width: '60px', minHeight: '28px' }}
+            />
+          )}
 
           {/* Snap mode */}
           <button
@@ -445,6 +458,17 @@ const OutlineLayer = ({
             >
               {outline.filled ? 'Filled' : 'No Fill'}
             </button>
+
+            {outline.filled && (
+              <input
+                type="range"
+                min="0.05" max="1" step="0.05"
+                value={outline.fillOpacity}
+                onInput={(e: any) => updateOutline(outline.id, { fillOpacity: parseFloat(e.target.value) })}
+                title={`Fill opacity: ${Math.round(outline.fillOpacity * 100)}%`}
+                style={{ width: '60px', minHeight: '28px' }}
+              />
+            )}
 
             {/* Snap mode */}
             <button
