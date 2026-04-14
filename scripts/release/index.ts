@@ -367,10 +367,10 @@ function waitForRelease(version: string, maxWait: number = 120000): void {
       stdio: "pipe",
     });
 
-    // Compare against local compiled artifact
-    const localArtifact = readFileSync(OUTPUT_PATH, "utf-8");
+    // Compare against local compiled artifact (normalize line endings — git may convert CRLF to LF)
+    const localArtifact = readFileSync(OUTPUT_PATH, "utf-8").replace(/\r\n/g, "\n");
     const remoteArtifactPath = path.join(extractDir, "compiled-windrose-md.md");
-    const remoteArtifact = readFileSync(remoteArtifactPath, "utf-8");
+    const remoteArtifact = readFileSync(remoteArtifactPath, "utf-8").replace(/\r\n/g, "\n");
 
     if (localArtifact === remoteArtifact) {
       console.log("  VERIFIED: Release artifact matches local compiled artifact.\n");
@@ -417,12 +417,8 @@ async function main(): Promise<void> {
     runTests();
   }
 
-  // Step 3: Commit compiled artifact (if compilation produced changes)
-  if (!options.skipCompile) {
-    commitArtifact(version, options.dryRun);
-  } else {
-    console.log("Step 3: Skipping artifact commit (compilation was skipped)\n");
-  }
+  // Step 3: Commit compiled artifact (if there are uncommitted artifact changes)
+  commitArtifact(version, options.dryRun);
 
   // Step 3b: Always push to origin before tagging
   const pushedCommit = pushAndVerify(options.dryRun);
