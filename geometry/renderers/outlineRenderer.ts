@@ -24,11 +24,13 @@ interface ViewState {
   zoom: number;
 }
 
-const LINE_DASH_PATTERNS: Record<string, number[]> = {
-  solid: [],
-  dashed: [8, 4],
-  dotted: [2, 4]
-};
+function getDashPattern(lineStyle: string): number[] {
+  switch (lineStyle) {
+    case 'dashed': return [12, 6];
+    case 'dotted': return [0.5, 8];
+    default: return [];
+  }
+}
 
 function hexKey(q: number, r: number): string {
   return `${q},${r}`;
@@ -107,6 +109,46 @@ function computeBoundaryEdges(
   return edges;
 }
 
+function chainSegments(
+  segments: Array<{ x1: number; y1: number; x2: number; y2: number }>
+): Array<Array<{ x: number; y: number }>> {
+  if (segments.length === 0) return [];
+
+  const EPS = 0.5;
+  const remaining = segments.map((s, i) => i);
+  const chains: Array<Array<{ x: number; y: number }>> = [];
+
+  while (remaining.length > 0) {
+    const chain: Array<{ x: number; y: number }> = [];
+    const firstIdx = remaining.shift()!;
+    const first = segments[firstIdx];
+    chain.push({ x: first.x1, y: first.y1 }, { x: first.x2, y: first.y2 });
+
+    let extended = true;
+    while (extended) {
+      extended = false;
+      const tail = chain[chain.length - 1];
+      for (let i = 0; i < remaining.length; i++) {
+        const seg = segments[remaining[i]];
+        if (Math.abs(seg.x1 - tail.x) < EPS && Math.abs(seg.y1 - tail.y) < EPS) {
+          chain.push({ x: seg.x2, y: seg.y2 });
+          remaining.splice(i, 1);
+          extended = true;
+          break;
+        }
+        if (Math.abs(seg.x2 - tail.x) < EPS && Math.abs(seg.y2 - tail.y) < EPS) {
+          chain.push({ x: seg.x1, y: seg.y1 });
+          remaining.splice(i, 1);
+          extended = true;
+          break;
+        }
+      }
+    }
+    chains.push(chain);
+  }
+  return chains;
+}
+
 // ── Straight-mode rendering ─────────────────────────────────────────
 
 function renderOutlineStraight(
@@ -136,10 +178,10 @@ function renderOutlineStraight(
   }
 
   ctx.strokeStyle = outline.color;
-  ctx.lineWidth = outline.lineWidth * viewState.zoom;
+  ctx.lineWidth = outline.lineWidth;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
-  ctx.setLineDash(LINE_DASH_PATTERNS[outline.lineStyle] || []);
+  ctx.setLineDash(getDashPattern(outline.lineStyle));
   ctx.beginPath();
   ctx.moveTo(screenVerts[0].screenX, screenVerts[0].screenY);
   for (let i = 1; i < screenVerts.length; i++) {
@@ -186,22 +228,34 @@ function renderOutlineHex(
   const edges = computeBoundaryEdges(enclosedHexes, geometry);
   if (edges.length === 0) return;
 
-  ctx.strokeStyle = outline.color;
-  ctx.lineWidth = outline.lineWidth * viewState.zoom;
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-  ctx.setLineDash(LINE_DASH_PATTERNS[outline.lineStyle] || []);
-  ctx.beginPath();
+  // Build screen-space edge segments
+  const segments: Array<{ x1: number; y1: number; x2: number; y2: number }> = [];
   for (const edge of edges) {
     const vertices = geometry.getHexVertices(edge.q, edge.r);
     const v1 = vertices[edge.edgeIndex];
     const v2 = vertices[(edge.edgeIndex + 1) % 6];
     const s1 = geometry.worldToScreen(v1.worldX, v1.worldY, viewState.x, viewState.y, viewState.zoom);
     const s2 = geometry.worldToScreen(v2.worldX, v2.worldY, viewState.x, viewState.y, viewState.zoom);
-    ctx.moveTo(s1.screenX, s1.screenY);
-    ctx.lineTo(s2.screenX, s2.screenY);
+    segments.push({ x1: s1.screenX, y1: s1.screenY, x2: s2.screenX, y2: s2.screenY });
   }
-  ctx.stroke();
+
+  // Chain segments into continuous paths so dash patterns flow smoothly
+  const chains = chainSegments(segments);
+
+  ctx.strokeStyle = outline.color;
+  ctx.lineWidth = outline.lineWidth;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.setLineDash(getDashPattern(outline.lineStyle));
+
+  for (const chain of chains) {
+    ctx.beginPath();
+    ctx.moveTo(chain[0].x, chain[0].y);
+    for (let i = 1; i < chain.length; i++) {
+      ctx.lineTo(chain[i].x, chain[i].y);
+    }
+    ctx.stroke();
+  }
   ctx.setLineDash([]);
 }
 

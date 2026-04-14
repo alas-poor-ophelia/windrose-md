@@ -59,7 +59,7 @@ interface OutlineSettings {
 
 const DEFAULT_SETTINGS: OutlineSettings = {
   lineStyle: 'solid',
-  lineWidth: 2,
+  lineWidth: 3,
   filled: false,
   fillOpacity: 0.25,
   snapMode: 'straight'

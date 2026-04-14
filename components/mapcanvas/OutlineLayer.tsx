@@ -231,8 +231,14 @@ const OutlineLayer = ({
       );
 
       ctx.strokeStyle = selectedColor;
-      ctx.lineWidth = 2;
-      ctx.setLineDash([6, 4]);
+      ctx.lineWidth = outlineSettings.lineWidth;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      switch (outlineSettings.lineStyle) {
+        case 'dotted': ctx.setLineDash([0.5, 8]); break;
+        case 'dashed': ctx.setLineDash([12, 6]); break;
+        default: ctx.setLineDash([]); break;
+      }
       ctx.beginPath();
       ctx.moveTo(screenVerts[0].screenX, screenVerts[0].screenY);
       for (let i = 1; i < screenVerts.length; i++) {
@@ -241,11 +247,12 @@ const OutlineLayer = ({
       ctx.stroke();
       ctx.setLineDash([]);
 
-      // Vertex dots
+      // Vertex dots — sized relative to line width
+      const dotRadius = Math.max(viewState.zoom * 1.5, 2);
       ctx.fillStyle = selectedColor;
       for (const sv of screenVerts) {
         ctx.beginPath();
-        ctx.arc(sv.screenX, sv.screenY, 4, 0, Math.PI * 2);
+        ctx.arc(sv.screenX, sv.screenY, dotRadius, 0, Math.PI * 2);
         ctx.fill();
       }
     }
@@ -258,12 +265,13 @@ const OutlineLayer = ({
           hexGeom.worldToScreen(v.x, v.y, offsetX, offsetY, viewState.zoom)
         );
 
+        const handleRadius = Math.max(outline.lineWidth * viewState.zoom * 1.2, 2.5);
         ctx.fillStyle = '#ffffff';
         ctx.strokeStyle = outline.color;
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 1.5;
         for (const sv of screenVerts) {
           ctx.beginPath();
-          ctx.arc(sv.screenX, sv.screenY, 5, 0, Math.PI * 2);
+          ctx.arc(sv.screenX, sv.screenY, handleRadius, 0, Math.PI * 2);
           ctx.fill();
           ctx.stroke();
         }
@@ -271,7 +279,7 @@ const OutlineLayer = ({
     }
 
     if (northDirection !== 0) ctx.restore();
-  }, [drawingVertices, selectedOutlineId, canvasRef, geometry, mapData, selectedColor]);
+  }, [drawingVertices, selectedOutlineId, canvasRef, geometry, mapData, selectedColor, outlineSettings]);
 
   // ── Toolbar styles ─────────────────────────────────────────────────
   const barStyle = {
