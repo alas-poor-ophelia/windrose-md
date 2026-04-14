@@ -48,6 +48,25 @@ function pointInPolygon(px: number, py: number, polygon: Array<{ x: number; y: n
   return inside;
 }
 
+function hexOverlapsPolygon(
+  q: number, r: number,
+  polygon: Array<{ x: number; y: number }>,
+  geometry: HexGeometryLike
+): boolean {
+  const center = geometry.hexToWorld(q, r);
+  if (pointInPolygon(center.worldX, center.worldY, polygon)) return true;
+  const verts = geometry.getHexVertices(q, r);
+  for (const v of verts) {
+    if (pointInPolygon(v.worldX, v.worldY, polygon)) return true;
+  }
+  // Check if any polygon vertex falls inside this hex
+  const hexPoly = verts.map(v => ({ x: v.worldX, y: v.worldY }));
+  for (const pv of polygon) {
+    if (pointInPolygon(pv.x, pv.y, hexPoly)) return true;
+  }
+  return false;
+}
+
 function findEnclosedHexes(
   vertices: Point[],
   geometry: HexGeometryLike,
@@ -59,8 +78,7 @@ function findEnclosedHexes(
   if (mapBounds.maxRing !== undefined) {
     for (let ring = 0; ring <= mapBounds.maxRing; ring++) {
       if (ring === 0) {
-        const center = geometry.hexToWorld(0, 0);
-        if (pointInPolygon(center.worldX, center.worldY, vertices)) {
+        if (hexOverlapsPolygon(0, 0, vertices, geometry)) {
           selected.push({ x: 0, y: 0 });
         }
       } else {
@@ -72,8 +90,7 @@ function findEnclosedHexes(
         for (const dir of dirs) {
           for (let step = 0; step < ring; step++) {
             if (geometry.isWithinBounds(q, r)) {
-              const center = geometry.hexToWorld(q, r);
-              if (pointInPolygon(center.worldX, center.worldY, vertices)) {
+              if (hexOverlapsPolygon(q, r, vertices, geometry)) {
                 selected.push({ x: q, y: r });
               }
             }
@@ -95,8 +112,7 @@ function findEnclosedHexes(
           r = row;
         }
         if (geometry.isWithinBounds(q, r)) {
-          const center = geometry.hexToWorld(q, r);
-          if (pointInPolygon(center.worldX, center.worldY, vertices)) {
+          if (hexOverlapsPolygon(q, r, vertices, geometry)) {
             selected.push({ x: q, y: r });
           }
         }
@@ -225,6 +241,10 @@ function renderOutlineHex(
   const enclosedHexes = findEnclosedHexes(outline.vertices, geometry, mapBounds, orientation);
   if (enclosedHexes.length === 0) return;
 
+  const memberSet = new Set<string>();
+  for (const h of enclosedHexes) memberSet.add(hexKey(h.x, h.y));
+
+  // Fill
   if (outline.filled) {
     const prevAlpha = ctx.globalAlpha;
     ctx.globalAlpha = outline.fillOpacity;
@@ -243,36 +263,41 @@ function renderOutlineHex(
     ctx.globalAlpha = prevAlpha;
   }
 
-  const edges = computeBoundaryEdges(enclosedHexes, geometry);
-  if (edges.length === 0) return;
-
-  // Build screen-space edge segments
-  const segments: Array<{ x1: number; y1: number; x2: number; y2: number }> = [];
-  for (const edge of edges) {
-    const vertices = geometry.getHexVertices(edge.q, edge.r);
-    const v1 = vertices[edge.edgeIndex];
-    const v2 = vertices[(edge.edgeIndex + 1) % 6];
-    const s1 = geometry.worldToScreen(v1.worldX, v1.worldY, viewState.x, viewState.y, viewState.zoom);
-    const s2 = geometry.worldToScreen(v2.worldX, v2.worldY, viewState.x, viewState.y, viewState.zoom);
-    segments.push({ x1: s1.screenX, y1: s1.screenY, x2: s2.screenX, y2: s2.screenY });
-  }
-
-  // Chain segments into continuous paths so dash patterns flow smoothly
-  const chains = chainSegments(segments);
-
+  // Stroke: for each hex, draw any edge whose neighbor is NOT in the set
   ctx.strokeStyle = outline.color;
   ctx.lineWidth = outline.lineWidth;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
   ctx.setLineDash(getDashPattern(outline.lineStyle));
 
-  for (const chain of chains) {
-    ctx.beginPath();
-    ctx.moveTo(chain[0].x, chain[0].y);
-    for (let i = 1; i < chain.length; i++) {
-      ctx.lineTo(chain[i].x, chain[i].y);
+  for (const h of enclosedHexes) {
+    const vertices = geometry.getHexVertices(h.x, h.y);
+    const screenVerts = vertices.map(v =>
+      geometry.worldToScreen(v.worldX, v.worldY, viewState.x, viewState.y, viewState.zoom)
+    );
+    const neighbors = geometry.getNeighbors(h.x, h.y);
+
+    const hc = geometry.hexToWorld(h.x, h.y);
+    for (let i = 0; i < 6; i++) {
+      if (!memberSet.has(hexKey(neighbors[i].x, neighbors[i].y))) {
+        const nc = geometry.hexToWorld(neighbors[i].x, neighbors[i].y);
+        const dirX = nc.worldX - hc.worldX;
+        const dirY = nc.worldY - hc.worldY;
+        let bestEdge = 0, bestDot = -Infinity;
+        for (let e = 0; e < 6; e++) {
+          const v1 = vertices[e];
+          const v2 = vertices[(e + 1) % 6];
+          const emx = (v1.worldX + v2.worldX) / 2 - hc.worldX;
+          const emy = (v1.worldY + v2.worldY) / 2 - hc.worldY;
+          const dot = emx * dirX + emy * dirY;
+          if (dot > bestDot) { bestDot = dot; bestEdge = e; }
+        }
+        ctx.beginPath();
+        ctx.moveTo(screenVerts[bestEdge].screenX, screenVerts[bestEdge].screenY);
+        ctx.lineTo(screenVerts[(bestEdge + 1) % 6].screenX, screenVerts[(bestEdge + 1) % 6].screenY);
+        ctx.stroke();
+      }
     }
-    ctx.stroke();
   }
   ctx.setLineDash([]);
 }
