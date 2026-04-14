@@ -342,6 +342,14 @@ const useEventCoordinator = ({
           const eventToUse = isTouchEvent ? syntheticEvent : e;
           regionHandlers.handlePointerDown(eventToUse);
         }
+      } else if (currentTool === 'outline') {
+        if (hasMultiSelection) clearSelection();
+
+        const outlineHandlers = getHandlers('outline');
+        if (outlineHandlers?.handlePointerDown) {
+          const eventToUse = isTouchEvent ? syntheticEvent : e;
+          outlineHandlers.handlePointerDown(eventToUse);
+        }
       } else if (currentTool === 'tilePaint') {
         if (hasMultiSelection) clearSelection();
 
@@ -554,6 +562,14 @@ const useEventCoordinator = ({
       return;
     }
 
+    if (currentTool === 'outline') {
+      const outlineHandlers = getHandlers('outline');
+      if (outlineHandlers?.handlePointerMove) {
+        outlineHandlers.handlePointerMove(e);
+      }
+      return;
+    }
+
     if (currentTool === 'tilePaint') {
       const tileHandlers = getHandlers('tilePlacement');
       if (tileHandlers?.handlePointerMove) {
@@ -674,6 +690,13 @@ const useEventCoordinator = ({
       }
     }
 
+    if (currentTool === 'outline') {
+      const outlineHandlers = getHandlers('outline');
+      if (outlineHandlers?.handlePointerUp) {
+        outlineHandlers.handlePointerUp(e);
+      }
+    }
+
     if (fogHandlers?.handlePointerUp) {
       fogHandlers.handlePointerUp(e);
     }
@@ -758,6 +781,15 @@ const useEventCoordinator = ({
       const regionHandlers = getHandlers('region');
       if (regionHandlers?.handleDoubleClick) {
         regionHandlers.handleDoubleClick(e);
+        return;
+      }
+    }
+
+    // Outline mode: double-click closes the polygon
+    if (currentTool === 'outline') {
+      const outlineHandlers = getHandlers('outline');
+      if (outlineHandlers?.handleDoubleClick) {
+        outlineHandlers.handleDoubleClick(e);
         return;
       }
     }

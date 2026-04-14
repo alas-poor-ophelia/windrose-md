@@ -363,7 +363,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     handleSidebarCollapseChange,
     handleObjectSetChange,
     handleTextLabelSettingsChange,
-    handleRegionsChange
+    handleRegionsChange,
+    handleOutlinesChange
   } = useDataHandlers({ mapData, updateMapData, addToHistory, isApplyingHistory });
 
   // Custom event listeners (sub-hex, deep links, regions, object links, hex context menu)
@@ -775,6 +776,13 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 selectedColor={selectedColor}
                 selectedOpacity={selectedOpacity}
                 onRegionsChange={handleRegionsChange}
+              />
+
+              {/* OutlineLayer - polygon outline drawing and editing */}
+              <MapCanvas.OutlineLayer
+                currentTool={currentTool}
+                selectedColor={selectedColor}
+                onOutlinesChange={handleOutlinesChange}
               />
 
               {/* HexCoordinateLayer - displays coordinate labels when 'C' key is held */}

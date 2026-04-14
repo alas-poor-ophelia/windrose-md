@@ -53,7 +53,8 @@ function useDataHandlers({
     layer: MapLayer,
     name: string,
     overrides: Partial<HistoryState> = {},
-    regions: import('#types/core/map.types').Region[] = []
+    regions: import('#types/core/map.types').Region[] = [],
+    outlines: import('#types/core/map.types').Outline[] = []
   ): HistoryState => ({
     cells: overrides.cells ?? layer.cells ?? [],
     curves: overrides.curves ?? layer.curves ?? [],
@@ -62,7 +63,8 @@ function useDataHandlers({
     textLabels: overrides.textLabels ?? layer.textLabels ?? [],
     edges: overrides.edges ?? layer.edges ?? [],
     tiles: overrides.tiles ?? layer.tiles ?? [],
-    regions: overrides.regions ?? regions
+    regions: overrides.regions ?? regions,
+    outlines: overrides.outlines ?? outlines
   }), []);
 
   // =========================================================================
@@ -248,6 +250,20 @@ function useDataHandlers({
     });
   }, [updateMapData, addToHistory, isApplyingHistory, buildHistoryState]);
 
+  // Handle outlines change (hex maps only) - tracked in history for undo/redo
+  const handleOutlinesChange = dc.useCallback((outlines: import('#types/core/map.types').Outline[]): void => {
+    if (isApplyingHistory()) return;
+
+    updateMapData((currentMapData: MapData | null) => {
+      if (!currentMapData) return currentMapData;
+
+      const activeLayer = getActiveLayer(currentMapData);
+      addToHistory(buildHistoryState(activeLayer, currentMapData.name, {}, currentMapData.regions || [], outlines));
+
+      return { ...currentMapData, outlines };
+    });
+  }, [updateMapData, addToHistory, isApplyingHistory, buildHistoryState]);
+
   // =========================================================================
   // Return Value
   // =========================================================================
@@ -270,7 +286,8 @@ function useDataHandlers({
     handleSidebarCollapseChange,
     handleObjectSetChange,
     handleTextLabelSettingsChange,
-    handleRegionsChange
+    handleRegionsChange,
+    handleOutlinesChange
   };
 
   return {
@@ -293,7 +310,8 @@ function useDataHandlers({
     handleSidebarCollapseChange,
     handleObjectSetChange,
     handleTextLabelSettingsChange,
-    handleRegionsChange
+    handleRegionsChange,
+    handleOutlinesChange
   };
 }
 

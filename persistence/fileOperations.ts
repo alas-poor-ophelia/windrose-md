@@ -118,6 +118,10 @@ async function loadMapData(mapId: string, mapName: string = '', mapType: MapType
       if (!mapData.regions) {
         mapData.regions = [];
       }
+      // Ensure outlines array exists (backward compatibility)
+      if (!mapData.outlines) {
+        mapData.outlines = [];
+      }
       // Ensure hexBounds exists for hex maps (use defaults, handle migration)
       if (mapData.mapType === 'hex') {
         if (!mapData.hexBounds) {
@@ -220,6 +224,7 @@ async function loadMapData(mapId: string, mapName: string = '', mapType: MapType
               layer.curves = layer.curves.filter((c: any) => c.start && c.segments);
             }
             if (!subHex.mapData.regions) subHex.mapData.regions = [];
+            if (!subHex.mapData.outlines) subHex.mapData.outlines = [];
           }
         }
       }

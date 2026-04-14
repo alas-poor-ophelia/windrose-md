@@ -325,6 +325,7 @@ const simpleTools: SimpleTool[] = [
   { id: 'addObject' as ToolId, title: 'Add Object (select from sidebar)', icon: 'lucide-map-pin-plus' },
   { id: 'addNote' as ToolId, title: 'Place Note Pin (N)', icon: 'lucide-pin', shortcut: 'n' },
   { id: 'addText' as ToolId, title: 'Add Text Label', icon: 'lucide-type' },
+  { id: 'outline' as ToolId, title: 'Draw Outline', icon: 'lucide-shapes', hexOnly: true },
   { id: 'measure' as ToolId, title: 'Measure Distance (M)', icon: 'lucide-ruler', shortcut: 'm' },
   { id: 'tilePaint' as ToolId, title: 'Place Tile (select from tile browser)', icon: 'lucide-layout-grid', hexOnly: true }
 ];

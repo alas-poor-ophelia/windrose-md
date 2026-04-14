@@ -99,6 +99,9 @@ const { HexGeometry } = await requireModuleByName("HexGeometry.ts") as {
 const { renderRegions } = await requireModuleByName("regionRenderer.ts") as {
   renderRegions: (ctx: CanvasRenderingContext2D, regions: import('#types/core/map.types').Region[], geometry: any, viewState: { x: number; y: number; zoom: number }, options?: { foggedCells?: Set<string> }) => void;
 };
+const { renderOutlines } = await requireModuleByName("outlineRenderer.ts") as {
+  renderOutlines: (ctx: CanvasRenderingContext2D, outlines: import('#types/core/map.types').Outline[], geometry: any, viewState: { x: number; y: number; zoom: number }, mapBounds: { maxRing?: number; maxCol?: number; maxRow?: number }, orientation: string) => void;
+};
 const { renderTiles } = await requireModuleByName("tileRenderer.ts") as {
   renderTiles: (ctx: CanvasRenderingContext2D, tiles: import('#types/tiles/tile.types').HexTileAssignment[], tilesets: import('#types/tiles/tile.types').TilesetDef[], geometry: { hexToWorld: (q: number, r: number) => { worldX: number; worldY: number }; worldToScreen: (wx: number, wy: number, ox: number, oy: number, zoom: number) => { screenX: number; screenY: number }; hexSize: number; orientation: string }, viewState: { x: number; y: number; zoom: number }, options?: { opacity?: number; getCachedImage?: (path: string) => HTMLImageElement | null; canvasWidth?: number; canvasHeight?: number }) => void;
 };
@@ -557,6 +560,11 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
       }
     }
     renderRegions(ctx, mapData.regions, geometry, { x: offsetX, y: offsetY, zoom }, { foggedCells: foggedAxialSet });
+  }
+
+  // Draw outlines (hex maps only, after regions)
+  if (geometry.type === 'hex' && mapData.outlines && mapData.outlines.length > 0) {
+    renderOutlines(ctx, mapData.outlines, geometry, { x: offsetX, y: offsetY, zoom }, mapData.hexBounds || {}, mapData.orientation || 'flat');
   }
 
   // Draw sub-hex indicators (small diamond on hexes that have sub-hex data)
