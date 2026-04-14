@@ -74,18 +74,21 @@ const OutlineLayer = ({
     return () => unregisterHandlers('outline');
   }, []);
 
-  // ESC to cancel drawing
+  // ESC to cancel drawing, Delete/Backspace to delete selected
   dc.useEffect(() => {
     if (!isOutlineTool) return;
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault();
         cancelDrawing();
+      } else if ((e.key === 'Delete' || e.key === 'Backspace') && selectedOutlineId) {
+        e.preventDefault();
+        deleteOutline(selectedOutlineId);
       }
     };
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
-  }, [isOutlineTool, cancelDrawing]);
+  }, [isOutlineTool, cancelDrawing, selectedOutlineId, deleteOutline]);
 
   // Context menu via windrose:hex-context-menu
   dc.useEffect(() => {
@@ -247,12 +250,10 @@ const OutlineLayer = ({
       ctx.stroke();
       ctx.setLineDash([]);
 
-      // Vertex dots — sized relative to line width
-      const dotRadius = Math.max(viewState.zoom * 1.5, 2);
       ctx.fillStyle = selectedColor;
       for (const sv of screenVerts) {
         ctx.beginPath();
-        ctx.arc(sv.screenX, sv.screenY, dotRadius, 0, Math.PI * 2);
+        ctx.arc(sv.screenX, sv.screenY, 3, 0, Math.PI * 2);
         ctx.fill();
       }
     }
@@ -265,7 +266,7 @@ const OutlineLayer = ({
           hexGeom.worldToScreen(v.x, v.y, offsetX, offsetY, viewState.zoom)
         );
 
-        const handleRadius = Math.max(outline.lineWidth * viewState.zoom * 1.2, 2.5);
+        const handleRadius = Math.max(outline.lineWidth * 1.2, 3);
         ctx.fillStyle = '#ffffff';
         ctx.strokeStyle = outline.color;
         ctx.lineWidth = 1.5;
@@ -382,6 +383,19 @@ const OutlineLayer = ({
           <span style={{ color: 'var(--text-faint)', fontSize: '11px' }}>
             Click to place vertices
           </span>
+
+          {mapData?.outlines && mapData.outlines.length > 0 && (
+            <>
+              <span style={{ color: 'var(--text-faint)', fontSize: '11px', margin: '0 2px' }}>|</span>
+              <button
+                onClick={() => onOutlinesChange([])}
+                style={{ ...btnStyle(), color: 'var(--text-error)' }}
+                title="Delete all outlines"
+              >
+                Clear All ({mapData.outlines.length})
+              </button>
+            </>
+          )}
         </div>
       )}
 

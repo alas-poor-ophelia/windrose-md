@@ -83,8 +83,26 @@ function findEnclosedHexes(
         }
       }
     }
+  } else if (mapBounds.maxCol !== undefined && mapBounds.maxRow !== undefined) {
+    for (let col = 0; col <= mapBounds.maxCol; col++) {
+      for (let row = 0; row <= mapBounds.maxRow; row++) {
+        let q: number, r: number;
+        if (orientation === 'flat') {
+          q = col;
+          r = row - (col - (col & 1)) / 2;
+        } else {
+          q = col - (row - (row & 1)) / 2;
+          r = row;
+        }
+        if (geometry.isWithinBounds(q, r)) {
+          const center = geometry.hexToWorld(q, r);
+          if (pointInPolygon(center.worldX, center.worldY, vertices)) {
+            selected.push({ x: q, y: r });
+          }
+        }
+      }
+    }
   }
-  // Rectangular bounds handled via offsetToAxial at call site if needed
 
   return selected;
 }
