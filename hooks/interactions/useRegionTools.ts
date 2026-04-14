@@ -31,6 +31,10 @@ const { getRegionLabelWorldPosition, computeCentroid } = await requireModuleByNa
   computeCentroid: (hexes: Array<{ x: number; y: number }>, geometry: any) => { worldX: number; worldY: number };
 };
 
+const { offsetToAxial } = await requireModuleByName("offsetCoordinates.ts") as {
+  offsetToAxial: (col: number, row: number, orientation: string) => { q: number; r: number };
+};
+
 import type { MapStateContextValue } from '#types/contexts/context.types';
 
 interface RegionToolsOptions {
@@ -312,10 +316,6 @@ function useRegionTools(options: RegionToolsOptions): UseRegionToolsResult {
       }
     } else {
       // Rectangular bounds - iterate offset coords and convert
-      const { offsetToAxial } = requireModuleByName("offsetCoordinates.ts") as {
-        offsetToAxial: (col: number, row: number, orientation: string) => { q: number; r: number };
-      };
-      // Sync fallback: iterate reasonable range
       for (let col = 0; col <= bounds.maxCol; col++) {
         for (let row = 0; row <= bounds.maxRow; row++) {
           const { q, r } = offsetToAxial(col, row, mapData.orientation || 'flat');

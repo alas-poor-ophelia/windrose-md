@@ -38,7 +38,7 @@ const { ObjectSidebar } = await requireModuleByName("ObjectSidebar.tsx");
 const { VisibilityToolbar } = await requireModuleByName("VisibilityToolbar.tsx");
 const { SettingsPluginInstaller } = await requireModuleByName("SettingsPluginInstaller.tsx");
 const { MapSettingsModal } = await requireModuleByName("MapSettingsModal.tsx");
-const { getTheme, getEffectiveSettings } = await requireModuleByName("settingsAccessor.ts");
+const { getTheme, getEffectiveSettings, getSettings } = await requireModuleByName("settingsAccessor.ts");
 const { DEFAULTS } = await requireModuleByName("dmtConstants.ts");
 const { getColorByHex, isDefaultColor } = await requireModuleByName("colorOperations.ts");
 const { ImageAlignmentMode } = await requireModuleByName("ImageAlignmentMode.tsx");
@@ -201,11 +201,26 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     layerVisibility, handleToggleLayerVisibility
   } = useUILayout({ mapData, updateMapData, showPluginInstaller });
 
-  // Adjacent sub-map visibility: persisted on root map data
-  const showAdjacentSubMaps = rootMapData?.showAdjacentSubMaps ?? false;
+  // Adjacent sub-map visibility: persisted in global plugin settings
+  const [showAdjacentSubMaps, setShowAdjacentSubMapsState] = dc.useState(() =>
+    getSettings().showAdjacentSubMaps ?? false
+  );
   const setShowAdjacentSubMaps = dc.useCallback((v: boolean) => {
-    rootUpdateMapData((prev: MapData | null) => prev ? { ...prev, showAdjacentSubMaps: v } : prev);
-  }, [rootUpdateMapData]);
+    try {
+      const plugin = dc.app.plugins.plugins['dungeon-map-tracker-settings'];
+      if (plugin) {
+        plugin.settings.showAdjacentSubMaps = v;
+        plugin.saveSettings();
+        window.dispatchEvent(new Event('dmt-settings-changed'));
+      }
+    } catch { /* settings plugin unavailable */ }
+    setShowAdjacentSubMapsState(v);
+  }, []);
+  dc.useEffect(() => {
+    const handler = () => setShowAdjacentSubMapsState(getSettings().showAdjacentSubMaps ?? false);
+    window.addEventListener('dmt-settings-changed', handler);
+    return () => window.removeEventListener('dmt-settings-changed', handler);
+  }, []);
 
   // Tile browser state (hex maps only)
   const {

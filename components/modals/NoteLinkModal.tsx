@@ -67,6 +67,7 @@ function openNativeNoteLinkModal(options) {
 
         // Attach AbstractInputSuggest for autocomplete
         const inputEl = this.inputEl;
+        const modalRef = this;
         new (class extends AbstractInputSuggestClass {
           async getSuggestions(query) {
             if (!noteCache) {
@@ -93,6 +94,7 @@ function openNativeNoteLinkModal(options) {
             inputEl.value = note;
             inputEl.dispatchEvent(new Event('input'));
             this.close();
+            modalRef.submit();
           }
         })(app, this.inputEl);
 

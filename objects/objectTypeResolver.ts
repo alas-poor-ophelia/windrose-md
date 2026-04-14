@@ -133,6 +133,10 @@ const UNKNOWN_OBJECT_FALLBACK: ObjectTypeDefinition = {
   isUnknown: true
 };
 
+const INTERNAL_TYPES: Record<string, ObjectTypeDefinition> = {
+  'note_pin': { id: 'note_pin', symbol: '📌', label: 'Note Pin', category: 'markers', isBuiltIn: true }
+};
+
 /**
  * Check if an object type uses an RPGAwesome icon
  */
@@ -337,6 +341,10 @@ function getObjectType(typeId: string | null | undefined, mapType: MapType = 'gr
       isBuiltIn: false
     };
   }
+
+  // Check internal types (valid for programmatic use, not shown in sidebar)
+  const internal = INTERNAL_TYPES[typeId];
+  if (internal) return internal;
 
   // Not found - return fallback
   return UNKNOWN_OBJECT_FALLBACK;

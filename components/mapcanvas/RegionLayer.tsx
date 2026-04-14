@@ -640,7 +640,7 @@ const RegionLayer = ({
             value={regionName}
             onInput={(e: any) => setRegionName(e.target.value)}
             onKeyDown={handleNameKeyDown}
-            autoFocus
+            ref={(el: HTMLInputElement | null) => { if (el) setTimeout(() => el.focus(), 0); }}
             style={{
               background: 'var(--background-primary)',
               color: 'var(--text-normal)',
