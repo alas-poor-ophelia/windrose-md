@@ -18,6 +18,7 @@ const { openNoteInNewTab } = await requireModuleByName("noteOperations.ts");
 const { ColorPicker } = await requireModuleByName("ColorPicker.tsx");
 const { getActiveLayer } = await requireModuleByName("layerAccessor.ts");
 const { getSelectionBounds } = await requireModuleByName("selectionBounds.ts");
+const { isBridgeAvailable, getObsidianModule } = await requireModuleByName("obsidianBridge.ts");
 const { SelectionCardFiligree } = await requireModuleByName("SelectionCardFiligree.tsx");
 const { ModalPortal } = await requireModuleByName("ModalPortal.tsx");
 
@@ -122,6 +123,47 @@ const SelectionActionsOverlay = ({
 }: SelectionActionsOverlayProps): React.ReactElement | null => {
 
   const [linksExpanded, setLinksExpanded] = dc.useState(false);
+
+  // Context menu via Obsidian Menu API
+  dc.useEffect(() => {
+    if (!isBridgeAvailable()) return;
+
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail.handled) return;
+      detail.handled = true;
+      const { screenX, screenY } = detail;
+      const obs = getObsidianModule();
+      const MenuClass = obs.Menu as new () => {
+        addItem: (cb: (item: any) => void) => any;
+        addSeparator: () => any;
+        showAtPosition: (pos: { x: number; y: number }) => void;
+      };
+
+      const menu = new MenuClass();
+      const visibleActions = actions.filter(a => a.visible && !a.disabled);
+
+      let lastGroup: string | null = null;
+      for (const action of visibleActions) {
+        if (lastGroup && action.group !== lastGroup) {
+          menu.addSeparator();
+        }
+        lastGroup = action.group;
+
+        menu.addItem((item: any) => {
+          item.setTitle(action.label);
+          item.setIcon(action.icon);
+          if (action.id === 'delete') item.setWarning(true);
+          item.onClick(() => action.invoke());
+        });
+      }
+
+      menu.showAtPosition({ x: screenX, y: screenY });
+    };
+
+    document.addEventListener('windrose:selection-context-menu', handler);
+    return () => document.removeEventListener('windrose:selection-context-menu', handler);
+  }, [actions]);
 
   if (!selectedItems?.length || !mapData || !canvasRef?.current || !containerRef?.current) {
     return null;

@@ -27,7 +27,7 @@ const { useEventHandlerRegistration } = await requireModuleByName("EventHandlerC
 const { useObjectInteractions } = await requireModuleByName("useObjectInteractions.ts");
 const { TextInputModal } = await requireModuleByName("TextInputModal.tsx");
 const { NoteLinkModal } = await requireModuleByName("NoteLinkModal.tsx");
-const { isBridgeAvailable } = await requireModuleByName("obsidianBridge.ts");
+const { isBridgeAvailable, getObsidianModule } = await requireModuleByName("obsidianBridge.ts");
 const { useObjectModals } = await requireModuleByName("useObjectModals.ts");
 const { SelectionActionsOverlay } = await requireModuleByName("SelectionActionsOverlay.tsx");
 const { buildObjectActions, buildMultiActions } = await requireModuleByName("useSelectionActions.ts");
@@ -582,6 +582,66 @@ const ObjectLayer = ({
       document.removeEventListener('touchstart', handleClickOutside);
     };
   }, [showObjectColorPicker]);
+
+  // Context menu: hit-test for object, select it, show native menu
+  dc.useEffect(() => {
+    if (!isBridgeAvailable() || !mapData || !geometry || !screenToGrid) return;
+
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail.handled) return;
+
+      const coords = screenToGrid(detail.clientX, detail.clientY);
+      if (!coords) return;
+
+      const activeLayer = getActiveLayer(mapData);
+      const obj = getObjectAtPosition(activeLayer.objects || [], coords.x, coords.y);
+      if (!obj) return;
+
+      detail.handled = true;
+
+      const item = { type: 'object' as const, id: obj.id, data: obj };
+
+      const obs = getObsidianModule();
+      const MenuClass = obs.Menu as new () => {
+        addItem: (cb: (item: any) => void) => any;
+        addSeparator: () => any;
+        showAtPosition: (pos: { x: number; y: number }) => void;
+      };
+
+      const actions = buildObjectActions(item, {
+        onRotate: handleObjectRotation,
+        onDuplicate: handleObjectDuplicate,
+        onFreeformToggle: handleFreeformToggle,
+        onLabel: handleNoteButtonClick,
+        onLinkNote: () => handleEditNoteLink(obj.id),
+        onLinkObject: handleLinkObject,
+        onFollowLink: handleFollowLink,
+        onRemoveLink: handleRemoveLink,
+        onCopyLink: handleCopyLink,
+        onColorClick: handleObjectColorButtonClick,
+        onResize: handleResizeButtonClick,
+        onDelete: handleObjectDeletion
+      }, mapData, { isResizeMode });
+
+      const menu = new MenuClass();
+      let lastGroup: string | null = null;
+      for (const action of actions.filter(a => a.visible && !a.disabled)) {
+        if (lastGroup && action.group !== lastGroup) menu.addSeparator();
+        lastGroup = action.group;
+        menu.addItem((mi: any) => {
+          mi.setTitle(action.label);
+          mi.setIcon(action.icon);
+          if (action.id === 'delete') mi.setWarning(true);
+          mi.onClick(() => action.invoke());
+        });
+      }
+      menu.showAtPosition({ x: detail.screenX, y: detail.screenY });
+    };
+
+    document.addEventListener('windrose:selection-context-menu', handler);
+    return () => document.removeEventListener('windrose:selection-context-menu', handler);
+  }, [mapData, geometry, screenToGrid, isResizeMode]);
 
   if (showCoordinates || !layerVisibility.objects) {
     return null;

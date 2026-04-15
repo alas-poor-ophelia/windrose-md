@@ -803,8 +803,13 @@ const useEventCoordinator = ({
   const handleContextMenu = dc.useCallback((e: MouseEvent): void => {
     e.preventDefault();
 
+    // Try object/text context menu first — dispatch event for handlers to claim
+    const contextDetail = { screenX: e.clientX, screenY: e.clientY, clientX: e.clientX, clientY: e.clientY, handled: false };
+    const contextEvent = new CustomEvent('windrose:selection-context-menu', { detail: contextDetail });
+    document.dispatchEvent(contextEvent);
+    if (contextDetail.handled) return;
+
     // General hex context menu (dispatch for DungeonMapTracker to handle)
-    // This replaces the separate region context menu for hex maps
     if (geometry?.type === 'hex' && screenToGrid) {
       const coords = screenToGrid(e.clientX, e.clientY);
       if (coords) {
@@ -825,7 +830,7 @@ const useEventCoordinator = ({
     if (drawingHandlers?.cancelShapePreview) {
       drawingHandlers.cancelShapePreview();
     }
-  }, [currentTool, getHandlers, geometry, screenToGrid]);
+  }, [currentTool, getHandlers, geometry, screenToGrid, selectedItem, isDraggingSelection]);
 
   // Long-press timer for touch context menu
   const longPressTimerRef = dc.useRef<ReturnType<typeof setTimeout> | null>(null);
