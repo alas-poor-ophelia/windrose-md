@@ -37,7 +37,7 @@ function useToolbarPosition({
 }: ToolbarPositionOptions): ToolbarPositionResult | null {
   if (!bounds || !containerRef.current) return null;
 
-  const toolbarGap = 4;
+  const toolbarGap = 8;
   const containerRect = containerRef.current.getBoundingClientRect();
   const containerHeight = containerRect.height;
 

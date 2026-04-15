@@ -29,8 +29,8 @@ const { TextInputModal } = await requireModuleByName("TextInputModal.tsx");
 const { NoteLinkModal } = await requireModuleByName("NoteLinkModal.tsx");
 const { isBridgeAvailable } = await requireModuleByName("obsidianBridge.ts");
 const { useObjectModals } = await requireModuleByName("useObjectModals.ts");
-const { ObjectSelectionToolbar } = await requireModuleByName("ObjectSelectionToolbar.tsx");
-const { MultiSelectToolbar } = await requireModuleByName("MultiSelectToolbar.tsx");
+const { SelectionActionsOverlay } = await requireModuleByName("SelectionActionsOverlay.tsx");
+const { buildObjectActions, buildMultiActions } = await requireModuleByName("useSelectionActions.ts");
 const { calculateObjectScreenPosition } = await requireModuleByName("screenPositionUtils.ts");
 const { getActiveLayer } = await requireModuleByName("layerAccessor.ts");
 const { convertObjectToFreeform, snapObjectToGrid } = await requireModuleByName("objectOperations.ts") as {
@@ -414,7 +414,7 @@ const ObjectLayer = ({
     if (selectedItem?.type === 'object') {
       e.preventDefault();
       e.stopPropagation();
-      setIsResizeMode(true);
+      setIsResizeMode(!isResizeMode);
     }
   };
 
@@ -646,40 +646,46 @@ const ObjectLayer = ({
       />
 
       {hasMultiSelection && selectedItems?.length > 1 && !isDraggingSelection && (
-        <MultiSelectToolbar
+        <SelectionActionsOverlay
           selectedItems={selectedItems}
-          selectionCount={selectionCount}
+          actions={buildMultiActions(selectionCount || selectedItems.length, {
+            onRotateAll: handleRotateAll,
+            onDuplicateAll: handleDuplicateAll,
+            onDeleteAll: handleDeleteAll
+          })}
           mapData={mapData}
           canvasRef={canvasRef}
           containerRef={containerRef}
           geometry={geometry}
-          onRotateAll={handleRotateAll}
-          onDuplicateAll={handleDuplicateAll}
-          onDeleteAll={handleDeleteAll}
+          selectionType="multi"
+          selectionCount={selectionCount}
         />
       )}
 
       {selectedItem?.type === 'object' && !hasMultiSelection && !isDraggingSelection && (
-        <ObjectSelectionToolbar
-          selectedItem={selectedItem}
+        <SelectionActionsOverlay
+          selectedItems={[selectedItem]}
+          actions={buildObjectActions(selectedItem, {
+            onRotate: handleObjectRotation,
+            onDuplicate: handleObjectDuplicate,
+            onFreeformToggle: handleFreeformToggle,
+            onLabel: handleNoteButtonClick,
+            onLinkNote: () => handleEditNoteLink(selectedItem?.id),
+            onLinkObject: handleLinkObject,
+            onFollowLink: handleFollowLink,
+            onRemoveLink: handleRemoveLink,
+            onCopyLink: handleCopyLink,
+            onColorClick: handleObjectColorButtonClick,
+            onResize: handleResizeButtonClick,
+            onDelete: handleObjectDeletion
+          }, mapData, { isResizeMode })}
           mapData={mapData}
           canvasRef={canvasRef}
           containerRef={containerRef}
           geometry={geometry}
-          onRotate={handleObjectRotation}
-          onDuplicate={handleObjectDuplicate}
-          onFreeformToggle={handleFreeformToggle}
-          onLabel={handleNoteButtonClick}
-          onLinkNote={() => handleEditNoteLink(selectedItem?.id)}
-          onLinkObject={handleLinkObject}
-          onFollowLink={handleFollowLink}
-          onRemoveLink={handleRemoveLink}
-          onCopyLink={handleCopyLink}
-          onColorClick={handleObjectColorButtonClick}
-          onResize={handleResizeButtonClick}
-          onDelete={handleObjectDeletion}
-          onScaleChange={handleScaleChange}
+          selectionType="object"
           isResizeMode={isResizeMode}
+          onScaleChange={handleScaleChange}
           showColorPicker={showObjectColorPicker}
           currentColor={selectedItem?.data?.color}
           onColorSelect={handleObjectColorSelect}

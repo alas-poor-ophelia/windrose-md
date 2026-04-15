@@ -1681,6 +1681,315 @@ button.dmt-tile-browser-layer-btn,
   color: var(--text-on-accent) !important;
 }
 
+/* ==========================================================================
+   Selection Actions Card (unified selection toolbar)
+   ========================================================================== */
+
+.dmt-selection-card {
+  position: relative;
+  background: rgba(26, 26, 26, 0.7);
+  border: 2px solid rgba(196, 165, 123, 0.7);
+  border-radius: 4px;
+  box-shadow:
+    inset 0 0 0 3px rgba(26, 26, 26, 0.7),
+    inset 0 0 0 4px rgba(196, 165, 123, 0.15),
+    0 4px 16px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(8px);
+}
+
+.dmt-selection-card-content {
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Corner brackets */
+.dmt-selection-card-bracket {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  pointer-events: none;
+  z-index: 1;
+}
+.dmt-selection-card-bracket-tl { top: 2px; left: 2px; }
+.dmt-selection-card-bracket-tr { top: 2px; right: 2px; transform: scaleX(-1); }
+.dmt-selection-card-bracket-bl { bottom: 2px; left: 2px; transform: scaleY(-1); }
+.dmt-selection-card-bracket-br { display: none; }
+
+/* Filigree decoration */
+.dmt-selection-card-filigree {
+  position: absolute;
+  bottom: -20px;
+  right: -20px;
+  width: 166px;
+  height: 166px;
+  transform: rotate(180deg);
+  color: var(--dmt-border-primary);
+  opacity: 0.55;
+  pointer-events: none;
+  z-index: 0;
+  mix-blend-mode: soft-light;
+}
+
+/* Action grid */
+.dmt-sel-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dmt-sel-row {
+  display: flex;
+  gap: 2px;
+}
+
+.dmt-sel-action {
+  flex: 1;
+  min-width: 0;
+}
+
+.dmt-sel-action-full {
+  flex: 1 1 100%;
+}
+
+/* Action buttons - with tablet overrides */
+.is-tablet button.dmt-sel-action-btn,
+button.dmt-sel-action-btn,
+.dmt-sel-action-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 4px 8px;
+  height: 28px;
+  min-height: 28px;
+  max-height: 28px;
+  min-width: unset;
+  max-width: unset;
+  background: rgba(42, 42, 42, 0.25);
+  border: 1px solid transparent;
+  border-radius: 3px;
+  color: var(--dmt-text-primary);
+  cursor: pointer;
+  font-size: 12px;
+  transition: var(--dmt-transition);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dmt-sel-action-btn svg {
+  color: var(--dmt-border-primary);
+  width: 14px;
+  height: 14px;
+  min-width: 14px;
+  flex-shrink: 0;
+}
+
+.dmt-sel-action-btn:hover:not(:disabled) {
+  background: var(--dmt-bg-tertiary);
+  border-color: var(--dmt-border-secondary);
+}
+
+.dmt-sel-action-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Active state (bronze fill) */
+.dmt-sel-action-active {
+  background: var(--dmt-border-primary) !important;
+  border-color: #8b6842 !important;
+}
+.dmt-sel-action-active svg {
+  color: var(--dmt-bg-primary) !important;
+}
+.dmt-sel-action-active .dmt-sel-action-label {
+  color: var(--dmt-bg-primary);
+}
+
+/* Disabled state */
+.dmt-sel-action-disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* Delete action */
+.dmt-sel-action-delete:hover:not(:disabled) {
+  background: var(--dmt-accent-red);
+  border-color: #6b0000;
+}
+.dmt-sel-action-delete:hover:not(:disabled) svg {
+  color: #ff8080;
+}
+.dmt-sel-action-delete:hover:not(:disabled) .dmt-sel-action-label {
+  color: #ff8080;
+}
+
+/* Color swatch */
+.dmt-sel-color-btn {
+  position: relative;
+}
+.dmt-sel-color-swatch {
+  width: 14px;
+  height: 14px;
+  min-width: 14px;
+  border-radius: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  flex-shrink: 0;
+}
+
+/* Separator */
+.dmt-sel-separator {
+  height: 1px;
+  background: var(--dmt-border-secondary);
+  margin: 2px 0;
+}
+
+/* Links toggle - with tablet overrides */
+.is-tablet button.dmt-sel-links-toggle,
+button.dmt-sel-links-toggle,
+.dmt-sel-links-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 4px 8px;
+  height: 28px;
+  min-height: 28px;
+  max-height: 28px;
+  min-width: unset;
+  max-width: unset;
+  background: rgba(42, 42, 42, 0.3);
+  border: 1px solid transparent;
+  border-radius: 3px;
+  color: var(--dmt-text-secondary);
+  cursor: pointer;
+  font-size: 12px;
+  transition: var(--dmt-transition);
+}
+.dmt-sel-links-toggle svg {
+  color: var(--dmt-border-primary);
+  width: 14px;
+  height: 14px;
+  min-width: 14px;
+}
+.dmt-sel-links-toggle svg:last-child {
+  margin-left: auto;
+  width: 12px;
+  height: 12px;
+  color: var(--dmt-text-muted);
+}
+.dmt-sel-links-toggle:hover {
+  background: var(--dmt-bg-tertiary);
+  border-color: var(--dmt-border-secondary);
+}
+.dmt-sel-links-toggle.expanded {
+  background: rgba(42, 42, 42, 0.5);
+  border-color: var(--dmt-border-secondary);
+}
+
+/* Links panel */
+.dmt-sel-links-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding-left: 8px;
+}
+.dmt-sel-links-panel .dmt-sel-action-btn {
+  padding: 4px 4px;
+  background: rgba(42, 42, 42, 0.3);
+}
+
+/* Resize row */
+.dmt-sel-resize-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+}
+.dmt-sel-resize-row svg {
+  color: var(--dmt-border-primary);
+  flex-shrink: 0;
+}
+.dmt-sel-resize-row input[type="range"] {
+  flex: 1;
+  min-width: 0;
+}
+.dmt-sel-resize-value {
+  font-size: 10px;
+  color: var(--dmt-text-muted);
+  min-width: 28px;
+  text-align: right;
+}
+
+/* Footer icon buttons — glass effect lets filigree show through */
+.dmt-sel-footer-icons {
+  display: flex;
+  gap: 4px;
+  justify-content: center;
+  padding: 2px 0;
+  position: relative;
+  z-index: 1;
+}
+
+.is-tablet button.dmt-sel-icon-btn,
+button.dmt-sel-icon-btn,
+.dmt-sel-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  min-height: 24px;
+  max-width: 24px;
+  max-height: 24px;
+  background: rgba(42, 42, 42, 0.6);
+  border: 1px solid rgba(58, 58, 58, 0.6);
+  border-radius: 3px;
+  cursor: pointer;
+  transition: var(--dmt-transition);
+}
+.dmt-sel-icon-btn svg {
+  color: var(--dmt-text-muted);
+  width: 14px;
+  height: 14px;
+}
+.dmt-sel-icon-btn:hover {
+  background: var(--dmt-bg-tertiary);
+  border-color: var(--dmt-border-primary);
+}
+.dmt-sel-icon-btn:hover svg {
+  color: var(--dmt-text-primary);
+}
+.dmt-sel-icon-btn.dmt-sel-action-active {
+  background: var(--dmt-border-primary);
+  border-color: #8b6842;
+}
+.dmt-sel-icon-btn.dmt-sel-action-active svg {
+  color: var(--dmt-bg-primary);
+}
+
+/* Multi-select badge */
+.dmt-sel-multi-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  height: 24px;
+  background: var(--dmt-border-primary);
+  border-radius: 3px;
+  color: var(--dmt-bg-primary);
+  font-size: 11px;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+.dmt-sel-multi-badge svg {
+  color: var(--dmt-bg-primary);
+}
+
 /* ============================================
    TEXT LABEL/MODAL SYSTEM
    ============================================ */
