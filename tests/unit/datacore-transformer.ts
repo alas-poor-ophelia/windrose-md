@@ -77,6 +77,7 @@ const MODULE_MAP: Record<string, string> = {
   'objectOperations.ts': './objects/objectOperations.ts',
   'hexSlotPositioner.ts': './objects/hexSlotPositioner.ts',
   'screenPositionUtils.ts': './objects/screenPositionUtils.ts',
+  'selectionBounds.ts': './objects/selectionBounds.ts',
   'multiSelectOperations.ts': './objects/multiSelectOperations.ts',
 
   // Drawing
@@ -156,6 +157,7 @@ const MODULE_MAP: Record<string, string> = {
   'useAlignmentMode.ts': './hooks/interactions/useAlignmentMode.ts',
   'useCustomEventHandlers.ts': './hooks/interactions/useCustomEventHandlers.ts',
   'useToolbarPosition.ts': './hooks/interactions/useToolbarPosition.ts',
+  'useSelectionActions.ts': './hooks/interactions/useSelectionActions.ts',
 
   // Generation
   'dungeonGenerator.js': './generation/dungeonGenerator.js',
@@ -192,6 +194,8 @@ const MODULE_MAP: Record<string, string> = {
   'ToolPalette.tsx': './components/toolbars/ToolPalette.tsx',
   'VisibilityToolbar.tsx': './components/toolbars/VisibilityToolbar.tsx',
   'FogOfWarToolbar.tsx': './components/toolbars/FogOfWarToolbar.tsx',
+  'SelectionActionsOverlay.tsx': './components/toolbars/SelectionActionsOverlay.tsx',
+  'SelectionCardFiligree.tsx': './components/toolbars/SelectionCardFiligree.tsx',
 
   // Components - shared
   'ColorPicker.tsx': './components/shared/ColorPicker.tsx',
