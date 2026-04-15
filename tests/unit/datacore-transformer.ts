@@ -191,6 +191,7 @@ const MODULE_MAP: Record<string, string> = {
   'MultiSelectToolbar.tsx': './components/toolbars/MultiSelectToolbar.tsx',
   'ToolPalette.tsx': './components/toolbars/ToolPalette.tsx',
   'VisibilityToolbar.tsx': './components/toolbars/VisibilityToolbar.tsx',
+  'FogOfWarToolbar.tsx': './components/toolbars/FogOfWarToolbar.tsx',
 
   // Components - shared
   'ColorPicker.tsx': './components/shared/ColorPicker.tsx',
