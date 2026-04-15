@@ -563,7 +563,7 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   }
 
   // Draw outlines (hex maps only, after regions)
-  if (geometry.type === 'hex' && mapData.outlines && mapData.outlines.length > 0) {
+  if (geometry.type === 'hex' && mapData.outlines && mapData.outlines.length > 0 && visibility.outlines !== false) {
     renderOutlines(ctx, mapData.outlines, geometry, { x: offsetX, y: offsetY, zoom }, mapData.hexBounds || {}, mapData.orientation || 'flat');
   }
 

@@ -36,6 +36,7 @@ const { MapControls } = await requireModuleByName("MapControls.tsx");
 const { ToolPalette } = await requireModuleByName("ToolPalette.tsx");
 const { ObjectSidebar } = await requireModuleByName("ObjectSidebar.tsx");
 const { VisibilityToolbar } = await requireModuleByName("VisibilityToolbar.tsx");
+const { FogOfWarToolbar } = await requireModuleByName("FogOfWarToolbar.tsx");
 const { SettingsPluginInstaller } = await requireModuleByName("SettingsPluginInstaller.tsx");
 const { MapSettingsModal } = await requireModuleByName("MapSettingsModal.tsx");
 const { getTheme, getEffectiveSettings, getSettings } = await requireModuleByName("settingsAccessor.ts");
@@ -618,10 +619,13 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
           layerVisibility={layerVisibility}
           onToggleLayer={handleToggleLayerVisibility}
           mapType={mapData.mapType}
-          // Fog of War props
-          fogOfWarState={currentFogState}
           showFogTools={showFogTools}
           onFogToolsToggle={handleFogToolsToggle}
+        />
+
+        <FogOfWarToolbar
+          isOpen={showFogTools && showVisibilityToolbar}
+          fogOfWarState={currentFogState}
           onFogToolSelect={handleFogToolSelect}
           onFogVisibilityToggle={handleFogVisibilityToggle}
           onFogFillAll={handleFogFillAll}

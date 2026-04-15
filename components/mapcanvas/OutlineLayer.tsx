@@ -60,6 +60,54 @@ const OutlineLayer = ({
     onOutlinesChange
   });
 
+  const showClearAllConfirm = dc.useCallback((count: number) => {
+    if (isBridgeAvailable()) {
+      const obs = getObsidianModule();
+      const ModalClass = obs.Modal as new (app: unknown) => {
+        contentEl: HTMLElement;
+        titleEl: { setText: (t: string) => void };
+        open: () => void;
+        close: () => void;
+        onClose: () => void;
+      };
+      const app = (dc as unknown as { app: unknown }).app;
+
+      let closedByCode = false;
+      const modal = new ModalClass(app);
+      modal.titleEl.setText('Clear All Outlines');
+
+      const content = modal.contentEl;
+      content.createEl('p', {
+        text: `This will permanently delete ${count} outline${count !== 1 ? 's' : ''}. This cannot be undone.`
+      });
+
+      const buttonRow = content.createDiv({ cls: 'modal-button-container' });
+
+      const cancelBtn = buttonRow.createEl('button', { text: 'Cancel' });
+      cancelBtn.addEventListener('click', () => {
+        closedByCode = true;
+        modal.close();
+      });
+
+      const deleteBtn = buttonRow.createEl('button', {
+        text: 'Delete All',
+        cls: 'mod-warning'
+      });
+      deleteBtn.addEventListener('click', () => {
+        closedByCode = true;
+        modal.close();
+        onOutlinesChange([]);
+      });
+
+      modal.onClose = () => {};
+      modal.open();
+    } else {
+      if (confirm(`Delete all ${count} outlines? This cannot be undone.`)) {
+        onOutlinesChange([]);
+      }
+    }
+  }, [onOutlinesChange]);
+
   // Register handlers via Proxy pattern
   const outlineHandlersRef = dc.useRef<Record<string, unknown> | null>(null);
   outlineHandlersRef.current = isOutlineTool
@@ -401,7 +449,7 @@ const OutlineLayer = ({
             <>
               <span style={{ color: 'var(--text-faint)', fontSize: '11px', margin: '0 2px' }}>|</span>
               <button
-                onClick={() => onOutlinesChange([])}
+                onClick={() => showClearAllConfirm(mapData.outlines.length)}
                 style={{ ...btnStyle(), color: 'var(--text-error)' }}
                 title="Delete all outlines"
               >

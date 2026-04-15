@@ -25,6 +25,7 @@ export interface LayerVisibility {
   textLabels: boolean;
   hexCoordinates?: boolean;
   regions?: boolean;
+  outlines?: boolean;
 }
 
 /** Layer definition for visibility toggles */
@@ -37,28 +38,12 @@ interface LayerDef {
 
 /** Props for VisibilityToolbar component */
 export interface VisibilityToolbarProps {
-  /** Whether the toolbar is visible */
   isOpen: boolean;
-  /** Current visibility state for each layer */
   layerVisibility: LayerVisibility;
-  /** Callback to toggle a layer's visibility */
   onToggleLayer: (layerId: keyof LayerVisibility) => void;
-  /** 'grid' or 'hex' - hex coordinates only show for hex maps */
   mapType: MapType;
-  /** FoW state from active layer */
-  fogOfWarState?: FogOfWarState;
-  /** Whether FoW tools panel is expanded */
   showFogTools?: boolean;
-  /** Toggle FoW tools panel visibility */
   onFogToolsToggle?: () => void;
-  /** Select a FoW tool */
-  onFogToolSelect?: (tool: FogTool) => void;
-  /** Toggle fog visibility */
-  onFogVisibilityToggle?: () => void;
-  /** Fill all cells with fog */
-  onFogFillAll?: () => void;
-  /** Clear all fog */
-  onFogClearAll?: () => void;
 }
 
 const VisibilityToolbar = ({
@@ -66,13 +51,8 @@ const VisibilityToolbar = ({
   layerVisibility,
   onToggleLayer,
   mapType,
-  fogOfWarState = { initialized: false, enabled: false, activeTool: null },
   showFogTools = false,
-  onFogToolsToggle,
-  onFogToolSelect,
-  onFogVisibilityToggle,
-  onFogFillAll,
-  onFogClearAll
+  onFogToolsToggle
 }: VisibilityToolbarProps): React.ReactElement => {
   const layers: LayerDef[] = [
     {
@@ -100,6 +80,12 @@ const VisibilityToolbar = ({
       id: 'regions',
       icon: 'lucide-hexagon',
       tooltip: 'Toggle region visibility',
+      hexOnly: true
+    },
+    {
+      id: 'outlines',
+      icon: 'lucide-spline',
+      tooltip: 'Toggle outline visibility',
       hexOnly: true
     }
   ];
@@ -149,57 +135,6 @@ const VisibilityToolbar = ({
           <dc.Icon icon="lucide-cloud-fog" />
           <span className="dmt-fow-label">Fog</span>
         </button>
-
-        <div className={`dmt-fow-tools-panel ${showFogTools ? 'expanded' : ''}`}>
-          <button
-            className={`dmt-fow-tool-btn ${!fogOfWarState.enabled ? 'disabled' : ''}`}
-            onClick={onFogVisibilityToggle}
-            title={fogOfWarState.enabled ? "Hide fog overlay" : "Show fog overlay"}
-            disabled={!fogOfWarState.initialized}
-          >
-            <dc.Icon icon={fogOfWarState.enabled ? "lucide-eye" : "lucide-eye-off"} />
-          </button>
-
-          <button
-            className={`dmt-fow-tool-btn ${fogOfWarState.activeTool === 'paint' ? 'active' : ''}`}
-            onClick={() => onFogToolSelect?.('paint')}
-            title="Paint fog onto cells"
-          >
-            <dc.Icon icon="lucide-paintbrush" />
-          </button>
-
-          <button
-            className={`dmt-fow-tool-btn ${fogOfWarState.activeTool === 'erase' ? 'active' : ''}`}
-            onClick={() => onFogToolSelect?.('erase')}
-            title="Erase fog (reveal cells)"
-          >
-            <dc.Icon icon="lucide-eraser" />
-          </button>
-
-          <button
-            className={`dmt-fow-tool-btn ${fogOfWarState.activeTool === 'rectangle' ? 'active' : ''}`}
-            onClick={() => onFogToolSelect?.('rectangle')}
-            title="Rectangle tool - click two corners"
-          >
-            <dc.Icon icon="lucide-square" />
-          </button>
-
-          <button
-            className="dmt-fow-tool-btn"
-            onClick={onFogFillAll}
-            title="Fill all painted cells with fog"
-          >
-            <dc.Icon icon="lucide-paint-bucket" />
-          </button>
-
-          <button
-            className="dmt-fow-tool-btn"
-            onClick={onFogClearAll}
-            title="Clear all fog from layer"
-          >
-            <dc.Icon icon="lucide-x-square" />
-          </button>
-        </div>
       </div>
     </div>
   );

@@ -3345,6 +3345,34 @@ button.dmt-fow-tool-btn,
   }
 }
 
+/* Floating FoW toolbar (shown when fog tools are toggled) */
+.dmt-fow-floating-toolbar {
+  position: fixed;
+  bottom: 100px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--dmt-bg-primary);
+  border: 2px solid var(--dmt-border-primary);
+  border-radius: 4px;
+  padding: 6px 10px;
+  z-index: 1000;
+  box-shadow:
+    inset 0 0 0 3px var(--dmt-bg-primary),
+    inset 0 0 0 4px rgba(196, 165, 123, 0.3),
+    0 4px 12px rgba(0, 0, 0, 0.4);
+  white-space: nowrap;
+}
+
+.dmt-fow-floating-separator {
+  width: 1px;
+  height: 20px;
+  background: var(--dmt-border-secondary);
+  margin: 0 2px;
+}
+
 /* ==========================================================================
    Scale Slider (shown during resize mode)
    ========================================================================== */
