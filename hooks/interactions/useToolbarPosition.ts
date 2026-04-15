@@ -26,6 +26,8 @@ interface ToolbarPositionResult {
   shouldFlipAbove: boolean;
   selectionTop: number;
   selectionBottom: number;
+  viewportOffsetX: number;
+  viewportOffsetY: number;
 }
 
 function useToolbarPosition({
@@ -61,7 +63,11 @@ function useToolbarPosition({
   const maxX = containerRect.width - toolbarWidth - 4;
   toolbarX = Math.max(minX, Math.min(maxX, toolbarX));
 
-  return { toolbarX, toolbarY, shouldFlipAbove, selectionTop, selectionBottom };
+  return {
+    toolbarX, toolbarY, shouldFlipAbove, selectionTop, selectionBottom,
+    viewportOffsetX: containerRect.left,
+    viewportOffsetY: containerRect.top
+  };
 }
 
 return { useToolbarPosition };

@@ -19,6 +19,7 @@ const { ColorPicker } = await requireModuleByName("ColorPicker.tsx");
 const { getActiveLayer } = await requireModuleByName("layerAccessor.ts");
 const { getSelectionBounds } = await requireModuleByName("selectionBounds.ts");
 const { SelectionCardFiligree } = await requireModuleByName("SelectionCardFiligree.tsx");
+const { ModalPortal } = await requireModuleByName("ModalPortal.tsx");
 
 type BracketPosition = 'tl' | 'tr' | 'bl' | 'br';
 
@@ -264,16 +265,19 @@ const SelectionActionsOverlay = ({
     );
   };
 
+  const vx = toolbarPos.viewportOffsetX;
+  const vy = toolbarPos.viewportOffsetY;
+
   return (
-    <>
+    <ModalPortal>
       {/* Linked Note Display */}
       {linkedNote && linkedNoteY !== undefined && (
         <div
           className="dmt-selection-linked-note"
           style={{
-            position: 'absolute',
-            left: `${bounds.screenX}px`,
-            top: `${linkedNoteY}px`,
+            position: 'fixed',
+            left: `${vx + bounds.screenX}px`,
+            top: `${vy + linkedNoteY}px`,
             transform: 'translateX(-50%)',
             pointerEvents: 'auto',
             zIndex: 150
@@ -298,9 +302,9 @@ const SelectionActionsOverlay = ({
       <div
         className="dmt-selection-card"
         style={{
-          position: 'absolute',
-          left: `${toolbarPos.toolbarX}px`,
-          top: `${toolbarPos.toolbarY}px`,
+          position: 'fixed',
+          left: `${vx + toolbarPos.toolbarX}px`,
+          top: `${vy + toolbarPos.toolbarY}px`,
           width: `${cardWidth}px`,
           pointerEvents: 'auto',
           zIndex: 150
@@ -389,7 +393,7 @@ const SelectionActionsOverlay = ({
           )}
         </div>
       </div>
-    </>
+    </ModalPortal>
   );
 };
 
