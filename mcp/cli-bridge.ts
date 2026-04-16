@@ -38,6 +38,25 @@ function shellQuote(s: string): string {
 }
 
 /**
+ * Quote a string for shell use inside double quotes, escaping bash-special
+ * characters rather than rejecting them. Used for eval code payloads where
+ * parentheses, braces, semicolons etc. are expected JS syntax.
+ * Inside bash double quotes only $, `, \, !, and " are special.
+ */
+function shellQuoteEval(s: string): string {
+  if (/[\x00-\x1f]/.test(s)) {
+    throw new Error(`Control characters in eval code: ${s.slice(0, 50)}`);
+  }
+  const escaped = s
+    .replace(/\\/g, "\\\\")
+    .replace(/"/g, '\\"')
+    .replace(/\$/g, "\\$")
+    .replace(/`/g, "\\`")
+    .replace(/!/g, "\\!");
+  return `"${escaped}"`;
+}
+
+/**
  * Execute a raw Obsidian CLI command.
  * Uses exec (shell) instead of execFile because bun's execFile
  * doesn't handle .com executables on Windows.
@@ -74,7 +93,7 @@ export async function obsidianEval(code: string): Promise<string> {
     shellQuote(OBSIDIAN_CLI),
     shellQuote(`vault=${VAULT}`),
     "eval",
-    shellQuote(`code=${code}`),
+    shellQuoteEval(`code=${code}`),
   ].join(" ");
 
   try {

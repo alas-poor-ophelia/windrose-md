@@ -122,13 +122,15 @@ export function registerNavTools(server: McpServer): void {
 
   server.tool(
     "windrose_eval",
-    "Evaluate arbitrary JavaScript in the Obsidian window context. Use for advanced operations not covered by other tools.",
+    "Evaluate JavaScript in the Obsidian window context. Use for advanced operations not covered by other tools. Prefer dedicated tools (windrose_paint_cell, windrose_set_tool, etc.) when they exist.",
     {
       code: z
         .string()
         .max(50000)
         .describe(
-          "JavaScript code to evaluate. Has access to window, app, window.__windrose, etc. Use 'return' for a result."
+          "JavaScript code to evaluate. Has access to window, app, window.__windrose, etc. " +
+          "Return values via JSON.stringify(). Use var instead of let/const. " +
+          "Avoid template literals (backticks) — use string concatenation instead."
         ),
     },
     async ({ code }) => {
