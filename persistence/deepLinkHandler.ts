@@ -1,9 +1,3 @@
-/**
- * Deep link parsing and generation for Windrose maps.
- * Format: obsidian://windrose?notePath|mapId,x,y,zoom,layerId
- */
-
-/** Parsed deep link data */
 export interface DeepLinkData {
   notePath: string;
   mapId: string;
@@ -13,75 +7,54 @@ export interface DeepLinkData {
   layerId: string;
 }
 
-/** Navigation event detail (extends DeepLinkData with timestamp) */
 export interface NavigationEventDetail extends DeepLinkData {
   timestamp: number;
 }
 
-/** Protocol prefix for Windrose deep links (uses Obsidian's protocol handler) */
-const PROTOCOL = 'obsidian://windrose?';
-
-/** Custom event name for map navigation */
+const PROTOCOL = 'windrose:';
+const LEGACY_PROTOCOL = 'obsidian://windrose?';
 const NAVIGATION_EVENT = 'dmt-navigate-to';
 
-/** Parse a deep link URL into structured data */
-function parseDeepLink(url: string): DeepLinkData | null {
-  if (!url || typeof url !== 'string') {
-    return null;
+function parseDeepLinkData(rawDataStr: string): DeepLinkData | null {
+  let dataStr = rawDataStr;
+  try {
+    dataStr = decodeURIComponent(rawDataStr);
+  } catch {
+    // fall back to raw
   }
-
-  if (!url.startsWith(PROTOCOL)) {
-    return null;
-  }
-
-  const dataStr = url.slice(PROTOCOL.length);
   const pipeIndex = dataStr.indexOf('|');
-  if (pipeIndex === -1) {
-    return null;
-  }
+  if (pipeIndex === -1) return null;
 
   const notePath = dataStr.slice(0, pipeIndex);
   const coordData = dataStr.slice(pipeIndex + 1);
   const parts = coordData.split(',');
 
-  if (parts.length !== 5) {
-    return null;
-  }
+  if (parts.length !== 5) return null;
 
   const [mapId, xStr, yStr, zoomStr, layerId] = parts;
-
-  if (!notePath || !mapId || !layerId) {
-    return null;
-  }
+  if (!notePath || !mapId || !layerId) return null;
 
   const x = parseFloat(xStr);
   const y = parseFloat(yStr);
   const zoom = parseFloat(zoomStr);
 
-  if (isNaN(x) || isNaN(y) || isNaN(zoom)) {
-    return null;
-  }
+  if (isNaN(x) || isNaN(y) || isNaN(zoom)) return null;
 
-  return {
-    notePath,
-    mapId,
-    x,
-    y,
-    zoom,
-    layerId
-  };
+  return { notePath, mapId, x, y, zoom, layerId };
 }
 
-/**
- * Generate a deep link URL from map location data.
- * @param notePath Path to the note containing the map
- * @param mapId The map identifier
- * @param x X coordinate
- * @param y Y coordinate
- * @param zoom Zoom level
- * @param layerId Layer identifier
- * @returns Deep link URL
- */
+function parseDeepLink(url: string): DeepLinkData | null {
+  if (!url || typeof url !== 'string') return null;
+
+  if (url.startsWith(PROTOCOL)) {
+    return parseDeepLinkData(url.slice(PROTOCOL.length));
+  }
+  if (url.startsWith(LEGACY_PROTOCOL)) {
+    return parseDeepLinkData(url.slice(LEGACY_PROTOCOL.length));
+  }
+  return null;
+}
+
 function generateDeepLink(
   notePath: string,
   mapId: string,
@@ -98,17 +71,6 @@ function generateDeepLink(
   return `${PROTOCOL}${notePath}|${mapId},${roundedX},${roundedY},${roundedZoom},${layerId}`;
 }
 
-/**
- * Generate a markdown link with display text.
- * @param displayText Text to show for the link
- * @param notePath Path to the note containing the map
- * @param mapId The map identifier
- * @param x X coordinate
- * @param y Y coordinate
- * @param zoom Zoom level
- * @param layerId Layer identifier
- * @returns Markdown link syntax
- */
 function generateDeepLinkMarkdown(
   displayText: string,
   notePath: string,
@@ -124,16 +86,6 @@ function generateDeepLinkMarkdown(
   return `[${escapedText}](${url})`;
 }
 
-/**
- * Copy a deep link to clipboard and show a Notice.
- * @param displayText Text to show for the link
- * @param notePath Path to the note containing the map
- * @param mapId The map identifier
- * @param x X coordinate
- * @param y Y coordinate
- * @param zoom Zoom level
- * @param layerId Layer identifier
- */
 function copyDeepLinkToClipboard(
   displayText: string,
   notePath: string,
@@ -153,10 +105,6 @@ function copyDeepLinkToClipboard(
   });
 }
 
-/**
- * Emit a navigation event for map components to handle.
- * @param data Navigation target data
- */
 function emitNavigationEvent(data: DeepLinkData): void {
   const detail: NavigationEventDetail = {
     ...data,
@@ -169,6 +117,7 @@ function emitNavigationEvent(data: DeepLinkData): void {
 
 return {
   PROTOCOL,
+  LEGACY_PROTOCOL,
   NAVIGATION_EVENT,
   parseDeepLink,
   generateDeepLink,

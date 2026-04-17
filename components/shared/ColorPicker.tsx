@@ -10,6 +10,7 @@ import type { HexColor } from '#types/core/common.types';
 const pathResolverPath = dc.resolvePath("pathResolver.ts");
 const { requireModuleByName } = await dc.require(pathResolverPath);
 const { getColorPalette, DEFAULT_COLOR } = await requireModuleByName("colorOperations.ts");
+const { ModalPortal } = await requireModuleByName("ModalPortal.tsx");
 
 /** Color definition from palette */
 export interface ColorDef {
@@ -74,6 +75,10 @@ export interface ColorPickerProps {
   opacity?: number;
   /** Callback when opacity changes */
   onOpacityChange?: ((opacity: number) => void) | null;
+  /** Render in a portal anchored to anchorRef (escapes overflow clipping) */
+  portalled?: boolean;
+  /** Anchor element for portalled positioning */
+  anchorRef?: { current: HTMLElement | null };
 }
 
 const ColorPicker = ({
@@ -92,7 +97,9 @@ const ColorPicker = ({
   position = 'below',
   align = 'left',
   opacity = 1,
-  onOpacityChange = null
+  onOpacityChange = null,
+  portalled = false,
+  anchorRef
 }: ColorPickerProps): React.ReactElement | null => {
   const [previewColor, setPreviewColor] = dc.useState<HexColor | null>(null);
   const [editTargetId, setEditTargetId] = dc.useState<string | null>(null);
@@ -270,7 +277,31 @@ const ColorPicker = ({
     ? { right: '0', left: 'auto' }
     : { left: '0' };
 
-  return (
+  let pickerStyle: JSX.CSSProperties = {
+    position: 'absolute',
+    ...(position === 'above'
+      ? { bottom: 'calc(100% + 8px)', top: 'auto' }
+      : { top: 'calc(100% + 8px)' }
+    ),
+    ...horizontalStyle,
+    zIndex: 1501
+  };
+
+  if (portalled && anchorRef?.current) {
+    const rect = anchorRef.current.getBoundingClientRect();
+    const gap = 8;
+    pickerStyle = {
+      position: 'fixed',
+      left: `${rect.left}px`,
+      ...(position === 'above'
+        ? { bottom: `${window.innerHeight - rect.top + gap}px` }
+        : { top: `${rect.bottom + gap}px` }
+      ),
+      zIndex: 1501
+    };
+  }
+
+  const pickerEl = (
     <div
       className="dmt-color-picker"
       onClick={handlePickerClick}
@@ -278,15 +309,7 @@ const ColorPicker = ({
       onTouchStart={handlePickerTouch}
       onTouchMove={handlePickerTouch}
       onTouchEnd={handlePickerTouch}
-      style={{
-        position: 'absolute',
-        ...(position === 'above'
-          ? { bottom: 'calc(100% + 8px)', top: 'auto' }
-          : { top: 'calc(100% + 8px)' }
-        ),
-        ...horizontalStyle,
-        zIndex: 1501
-      }}
+      style={pickerStyle}
     >
       <div className="dmt-color-picker-header">
         <span className="dmt-color-picker-title">{title}</span>
@@ -419,6 +442,11 @@ const ColorPicker = ({
       )}
     </div>
   );
+
+  if (portalled) {
+    return <ModalPortal>{pickerEl}</ModalPortal>;
+  }
+  return pickerEl;
 };
 
 return { ColorPicker, DEFAULT_COLOR };

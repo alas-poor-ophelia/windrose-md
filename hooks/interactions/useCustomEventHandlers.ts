@@ -98,15 +98,15 @@ function useCustomEventHandlers({
     return () => document.removeEventListener('windrose:navigate-sibling-sub-hex', handleNavigateSibling as EventListener);
   }, [isInSubHex, navigateToSibling]);
 
-  // Listen for deep link navigation events
+  // Listen for deep link navigation events. Also consumes any navigation that
+  // was stashed by the settings plugin before this map mounted (cross-note
+  // openLinkText case — the event fires before the new note's map is ready).
   dc.useEffect(() => {
     const handleNavigateTo = (event: CustomEvent): void => {
       const { mapId: targetMapId, x, y, zoom, layerId } = event.detail;
 
-      // Only respond if this is our map
       if (targetMapId !== mapId) return;
 
-      // Switch to target layer if it exists and is different
       if (mapData?.layers && layerId) {
         const targetLayer = mapData.layers.find((l: { id: string }) => l.id === layerId);
         if (targetLayer && mapData.activeLayerId !== layerId) {
@@ -114,21 +114,56 @@ function useCustomEventHandlers({
         }
       }
 
-      // Navigate to a comfortable viewing zoom regardless of what the link stored
       const DEEP_LINK_ZOOM = 1.175;
-      updateMapData((currentMapData: MapData) => ({
-        ...currentMapData,
-        viewState: {
-          ...currentMapData.viewState,
-          center: { x, y },
-          zoom: DEEP_LINK_ZOOM
+      const effectiveZoom = (zoom && zoom > 0) ? zoom : DEEP_LINK_ZOOM;
+
+      let centerX = x;
+      let centerY = y;
+      if (mapData?.mapType === 'hex' && geometry) {
+        const worldCoords = (geometry as ExtendedGeometry).hexToWorld!(x, y);
+        if (worldCoords) {
+          centerX = worldCoords.worldX;
+          centerY = worldCoords.worldY;
         }
-      }));
+      }
+
+      console.log('[Windrose:DL] navigate handler:', {
+        eventXY: { x, y },
+        resolvedCenter: { x: centerX, y: centerY },
+        effectiveZoom,
+        mapType: mapData?.mapType,
+        currentCenter: mapData?.viewState?.center,
+        currentZoom: mapData?.viewState?.zoom
+      });
+
+      updateMapData((currentMapData: MapData) => {
+        console.log('[Windrose:DL] updateMapData:', {
+          oldCenter: currentMapData.viewState.center,
+          newCenter: { x: centerX, y: centerY },
+          oldZoom: currentMapData.viewState.zoom,
+          newZoom: effectiveZoom
+        });
+        return {
+          ...currentMapData,
+          viewState: {
+            ...currentMapData.viewState,
+            center: { x: centerX, y: centerY },
+            zoom: effectiveZoom
+          }
+        };
+      });
 
       new Notice(`Navigated to location on ${mapData?.name || 'map'}`);
     };
 
     window.addEventListener('dmt-navigate-to', handleNavigateTo as EventListener);
+
+    const w = window as unknown as { __windrose?: { pendingNavigate?: { mapId: string; x: number; y: number; zoom: number; layerId: string; timestamp: number; consumed: boolean } } };
+    const pending = w.__windrose?.pendingNavigate;
+    if (pending && !pending.consumed && pending.mapId === mapId) {
+      pending.consumed = true;
+      handleNavigateTo(new CustomEvent('dmt-navigate-to', { detail: pending }));
+    }
 
     return () => {
       window.removeEventListener('dmt-navigate-to', handleNavigateTo as EventListener);

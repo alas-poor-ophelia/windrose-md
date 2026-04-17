@@ -266,8 +266,9 @@ const ObjectLayer = ({
       const obj = activeLayer.objects?.find((o: MapObject) => o.id === selectedItem.id);
       if (!obj) return;
       displayText = obj.label || obj.customTooltip || 'Object';
-      x = obj.position.x;
-      y = obj.position.y;
+      const size = obj.size || { width: 1, height: 1 };
+      x = obj.position.x + size.width / 2;
+      y = obj.position.y + size.height / 2;
     } else if (selectedItem.type === 'text') {
       const label = activeLayer.textLabels?.find((l: TextLabel) => l.id === selectedItem.id);
       if (!label) return;

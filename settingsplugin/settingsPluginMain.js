@@ -218,8 +218,149 @@ class WindroseMDSettingsPlugin extends Plugin {
       }
     });
     
-    // Register Obsidian protocol handler for deep links
-    // Format: obsidian://windrose?notePath|mapId,x,y,zoom,layerId
+    // Post-processor + document-capture fallback for windrose: deep links.
+    // DIAGNOSTIC BUILD: heavy logging at each decision point to trace behavior.
+    const W = '[Windrose:DL]';
+    const parseWindroseHref = (href) => {
+      if (!href || !href.startsWith('windrose:')) {
+        console.warn(W, 'parse: not a windrose: href', { href });
+        return null;
+      }
+      let dataStr = href.slice('windrose:'.length);
+      try {
+        dataStr = decodeURIComponent(dataStr);
+      } catch (err) {
+        console.warn(W, 'parse: decodeURIComponent failed, using raw', err);
+      }
+      const pipeIndex = dataStr.indexOf('|');
+      if (pipeIndex === -1) {
+        console.warn(W, 'parse: no pipe separator', { dataStr });
+        return null;
+      }
+      const notePath = dataStr.slice(0, pipeIndex);
+      const parts = dataStr.slice(pipeIndex + 1).split(',');
+      if (parts.length !== 5) {
+        console.warn(W, 'parse: wrong part count', { parts });
+        return null;
+      }
+      const [mapId, x, y, zoom, layerId] = parts;
+      const result = { notePath, mapId, x: parseFloat(x), y: parseFloat(y), zoom: parseFloat(zoom), layerId };
+      console.log(W, 'parsed href', result);
+      return result;
+    };
+
+    const navigateToWindroseLink = async (parsed, sourcePath) => {
+      console.log(W, 'navigate: start', { parsed, sourcePath });
+      const { notePath, mapId, x, y, zoom, layerId } = parsed;
+      const currentPath = sourcePath || '';
+      const isSameNote = notePath === currentPath || notePath === currentPath.replace(/\.md$/, '');
+      console.log(W, 'navigate: sameNote?', { isSameNote, notePath, currentPath });
+      if (!isSameNote) {
+        try {
+          const linkPath = notePath.replace(/\.md$/, '');
+          console.log(W, 'navigate: openLinkText', { linkPath });
+          await this.app.workspace.openLinkText(linkPath, '', false);
+          console.log(W, 'navigate: openLinkText OK');
+        } catch (err) {
+          console.error(W, 'navigate: openLinkText FAILED', err);
+          new Notice('Failed to open map note');
+          return;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+
+      const detail = { mapId, x, y, zoom, layerId, timestamp: Date.now() };
+      window.__windrose = window.__windrose || {};
+      window.__windrose.pendingNavigate = { ...detail, consumed: false };
+      console.log(W, 'navigate: stashed pending + dispatching', detail);
+      window.dispatchEvent(new CustomEvent('dmt-navigate-to', { detail }));
+      console.log(W, 'navigate: dispatched');
+
+      // Scroll the note viewport to the map codeblock (may not be visible if below fold)
+      setTimeout(() => {
+        try {
+          const leaf = document.querySelector('.workspace-leaf.mod-active .view-content');
+          if (leaf) {
+            const mapEl = leaf.querySelector('.dmt-container');
+            if (mapEl) {
+              mapEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              console.log(W, 'navigate: scrolled to map');
+            }
+          }
+        } catch (err) {
+          console.warn(W, 'navigate: scroll failed', err);
+        }
+      }, 200);
+    };
+
+    this.registerMarkdownPostProcessor((el, ctx) => {
+      const candidates = el.querySelectorAll(
+        'a[href^="windrose:"], a[data-href^="windrose:"]'
+      );
+      if (candidates.length === 0) return;
+      console.log(W, 'post-processor: invoked', {
+        sourcePath: ctx.sourcePath,
+        elTag: el.tagName,
+        totalAnchors: el.querySelectorAll('a').length,
+        windroseLinks: candidates.length
+      });
+
+      candidates.forEach((link, idx) => {
+        const rawHref = link.getAttribute('href') || '';
+        const dataHref = link.getAttribute('data-href') || '';
+        console.log(W, 'post-processor: link', idx, {
+          text: link.textContent,
+          href: rawHref,
+          dataHref,
+          className: link.className
+        });
+        const original = rawHref.startsWith('windrose:') ? rawHref
+                       : dataHref.startsWith('windrose:') ? dataHref : '';
+        if (!original) {
+          console.warn(W, 'post-processor: no windrose: value to store');
+          return;
+        }
+
+        const replacement = document.createElement('a');
+        replacement.textContent = link.textContent;
+        replacement.className = 'windrose-deep-link';
+        replacement.setAttribute('href', '#');
+        replacement.setAttribute('data-windrose-href', original);
+        replacement.style.cursor = 'pointer';
+        link.replaceWith(replacement);
+        console.log(W, 'post-processor: replaced link', idx);
+      });
+    });
+
+    // Defense in depth: document-level capture handler for Live Preview or dynamic content.
+    this.registerDomEvent(document, 'click', async (e) => {
+      const target = e.target;
+      if (!(target && target.closest)) return;
+      const link = target.closest('a[href^="windrose:"], a[data-href^="windrose:"], a[data-windrose-href]');
+      if (!link) return;
+      console.log(W, 'doc-capture: caught click', {
+        href: link.getAttribute('href'),
+        dataHref: link.getAttribute('data-href'),
+        stored: link.getAttribute('data-windrose-href')
+      });
+      e.preventDefault();
+      e.stopPropagation();
+      if (typeof e.stopImmediatePropagation === 'function') e.stopImmediatePropagation();
+      const href = link.getAttribute('data-windrose-href')
+        || link.getAttribute('href')
+        || link.getAttribute('data-href')
+        || '';
+      const parsed = parseWindroseHref(href);
+      if (!parsed) return;
+      const sourcePath = this.app.workspace.getActiveFile()?.path || '';
+      try {
+        await navigateToWindroseLink(parsed, sourcePath);
+      } catch (err) {
+        console.error(W, 'doc-capture: navigate threw', err);
+      }
+    }, { capture: true });
+
+    // Legacy: Obsidian protocol handler for old obsidian://windrose? links
     this.registerObsidianProtocolHandler('windrose', async (params) => {
       // The data comes as URL search params - we need to parse the raw query
       // params.action = 'windrose', and the rest is in the query string
@@ -269,6 +410,107 @@ class WindroseMDSettingsPlugin extends Plugin {
         new Notice('Failed to open map note');
       }
     });
+
+    // CodeMirror 6 editor extension: catches clicks on windrose: links in Live Preview.
+    // Post-processor does not run in Live Preview, so this is our only hook there.
+    try {
+      const cmView = require('@codemirror/view');
+      if (cmView && cmView.EditorView) {
+        const plugin = this;
+
+        // In Live Preview, markdown links render as <span class="cm-link"> with no href
+        // on the DOM — the URL lives in the editor's document model. We query the
+        // document at the click position and scan for windrose: URLs on that line.
+        // No regex: regex literals inside the outer backtick template lose their
+        // escapes ("\[" becomes "[" after template eval), producing invalid patterns.
+        const findWindroseHrefAtPos = (view, pos) => {
+          try {
+            const line = view.state.doc.lineAt(pos);
+            const lineText = line.text;
+            const localPos = pos - line.from;
+            const SCHEME = 'windrose:';
+            const urls = [];
+            let search = 0;
+            while (true) {
+              const idx = lineText.indexOf(SCHEME, search);
+              if (idx === -1) break;
+              let end = idx;
+              while (end < lineText.length) {
+                const ch = lineText[end];
+                if (ch === ')' || ch === ' ' || ch === '\\t' || ch === '\\n') break;
+                end++;
+              }
+              urls.push({ start: idx, end, url: lineText.slice(idx, end) });
+              search = end;
+            }
+            if (urls.length === 0) return null;
+            for (const u of urls) {
+              const linkStart = Math.max(0, u.start - 200);
+              const linkEnd = Math.min(lineText.length, u.end + 5);
+              if (localPos >= linkStart && localPos <= linkEnd) {
+                return u.url;
+              }
+            }
+            return urls[0].url;
+          } catch (err) {
+            console.warn(W, 'cm6: findWindroseHrefAtPos error', err);
+          }
+          return null;
+        };
+
+        const windroseEditorExt = cmView.EditorView.domEventHandlers({
+          click: (event, view) => {
+            const target = event.target;
+            console.log(W, 'cm6: click', {
+              tag: target?.tagName,
+              className: target?.className,
+              text: target?.textContent?.slice(0, 40),
+              parentClass: target?.parentElement?.className
+            });
+            if (!target || typeof target.closest !== 'function') return false;
+
+            let windroseHref = null;
+
+            const anchor = target.closest('a[href^="windrose:"], a[data-href^="windrose:"], a[data-windrose-href]');
+            if (anchor) {
+              windroseHref = anchor.getAttribute('data-windrose-href')
+                || anchor.getAttribute('href')
+                || anchor.getAttribute('data-href')
+                || null;
+            }
+
+            if (!windroseHref && target.closest('.cm-link, .cm-underline, .cm-hmd-internal-link')) {
+              const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
+              console.log(W, 'cm6: cm-link click, pos:', pos);
+              if (pos != null) {
+                windroseHref = findWindroseHrefAtPos(view, pos);
+                console.log(W, 'cm6: extracted href from doc:', windroseHref);
+              }
+            }
+
+            if (!windroseHref) return false;
+
+            console.log(W, 'cm6: intercepting', windroseHref);
+            event.preventDefault();
+            event.stopPropagation();
+            if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
+            const parsed = parseWindroseHref(windroseHref);
+            if (!parsed) return true;
+            const sourcePath = plugin.app.workspace.getActiveFile()?.path || '';
+            navigateToWindroseLink(parsed, sourcePath).catch((err) => {
+              console.error(W, 'cm6: navigate threw', err);
+            });
+            return true;
+          }
+        });
+        this.registerEditorExtension([windroseEditorExt]);
+        console.log(W, 'cm6: editor extension registered');
+      } else {
+        console.warn(W, 'cm6: @codemirror/view not available, Live Preview interception unavailable');
+      }
+    } catch (err) {
+      console.error(W, 'cm6: failed to register editor extension', err);
+    }
 
     // Register command to generate a random dungeon
     this.addCommand({
