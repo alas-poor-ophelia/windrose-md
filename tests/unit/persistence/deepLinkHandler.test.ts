@@ -1,11 +1,5 @@
-/**
- * Unit tests for deepLinkHandler.ts
- * Tests deep link parsing and generation for Windrose maps
- */
-
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
-// Mock window and CustomEvent for Node.js environment
 const mockDispatchEvent = vi.fn();
 vi.stubGlobal('window', { dispatchEvent: mockDispatchEvent });
 vi.stubGlobal('CustomEvent', class CustomEvent extends Event {
@@ -18,6 +12,7 @@ vi.stubGlobal('CustomEvent', class CustomEvent extends Event {
 
 import {
   PROTOCOL,
+  LEGACY_PROTOCOL,
   NAVIGATION_EVENT,
   parseDeepLink,
   generateDeepLink,
@@ -26,11 +21,13 @@ import {
 } from '../../../src/persistence/deepLinkHandler.ts';
 
 describe('deepLinkHandler', () => {
-  const WINDROSE_PROTOCOL = 'obsidian://windrose?';
-
   describe('constants', () => {
-    it('exports correct PROTOCOL for Windrose links', () => {
-      expect(PROTOCOL).toBe(WINDROSE_PROTOCOL);
+    it('exports new windrose: protocol', () => {
+      expect(PROTOCOL).toBe('windrose:');
+    });
+
+    it('exports legacy protocol for backward compatibility', () => {
+      expect(LEGACY_PROTOCOL).toBe('obsidian://windrose?');
     });
 
     it('exports correct NAVIGATION_EVENT', () => {
@@ -39,8 +36,20 @@ describe('deepLinkHandler', () => {
   });
 
   describe('parseDeepLink', () => {
-    it('parses valid deep link', () => {
-      const result = parseDeepLink(`${WINDROSE_PROTOCOL}folder/note.md|map-123,5,10,1.5,layer-456`);
+    it('parses new format link', () => {
+      const result = parseDeepLink('windrose:folder/note.md|map-123,5,10,1.5,layer-456');
+      expect(result).toEqual({
+        notePath: 'folder/note.md',
+        mapId: 'map-123',
+        x: 5,
+        y: 10,
+        zoom: 1.5,
+        layerId: 'layer-456'
+      });
+    });
+
+    it('parses legacy format link', () => {
+      const result = parseDeepLink('obsidian://windrose?folder/note.md|map-123,5,10,1.5,layer-456');
       expect(result).toEqual({
         notePath: 'folder/note.md',
         mapId: 'map-123',
@@ -52,7 +61,7 @@ describe('deepLinkHandler', () => {
     });
 
     it('parses deep link with decimal coordinates', () => {
-      const result = parseDeepLink(`${WINDROSE_PROTOCOL}Maps/dungeon.md|test-map,15.75,8.25,2.0,layer-001`);
+      const result = parseDeepLink('windrose:Maps/dungeon.md|test-map,15.75,8.25,2.0,layer-001');
       expect(result).toEqual({
         notePath: 'Maps/dungeon.md',
         mapId: 'test-map',
@@ -64,7 +73,7 @@ describe('deepLinkHandler', () => {
     });
 
     it('parses deep link with negative coordinates', () => {
-      const result = parseDeepLink(`${WINDROSE_PROTOCOL}world.md|hex-map,-5,-10,1.2,layer-abc`);
+      const result = parseDeepLink('windrose:world.md|hex-map,-5,-10,1.2,layer-abc');
       expect(result).toEqual({
         notePath: 'world.md',
         mapId: 'hex-map',
@@ -90,73 +99,106 @@ describe('deepLinkHandler', () => {
     });
 
     it('returns null for missing pipe separator', () => {
-      expect(parseDeepLink(`${WINDROSE_PROTOCOL}map-123,5,10,1.5,layer`)).toBeNull();
+      expect(parseDeepLink('windrose:map-123,5,10,1.5,layer')).toBeNull();
     });
 
     it('returns null for wrong number of coordinate parts', () => {
-      expect(parseDeepLink(`${WINDROSE_PROTOCOL}note.md|map-123,5,10`)).toBeNull(); // too few
-      expect(parseDeepLink(`${WINDROSE_PROTOCOL}note.md|map-123,5,10,1.5,layer,extra`)).toBeNull(); // too many
+      expect(parseDeepLink('windrose:note.md|map-123,5,10')).toBeNull();
+      expect(parseDeepLink('windrose:note.md|map-123,5,10,1.5,layer,extra')).toBeNull();
     });
 
     it('returns null for invalid numeric values', () => {
-      expect(parseDeepLink(`${WINDROSE_PROTOCOL}note.md|map-123,abc,10,1.5,layer`)).toBeNull();
-      expect(parseDeepLink(`${WINDROSE_PROTOCOL}note.md|map-123,5,xyz,1.5,layer`)).toBeNull();
-      expect(parseDeepLink(`${WINDROSE_PROTOCOL}note.md|map-123,5,10,not-a-number,layer`)).toBeNull();
+      expect(parseDeepLink('windrose:note.md|map-123,abc,10,1.5,layer')).toBeNull();
+      expect(parseDeepLink('windrose:note.md|map-123,5,xyz,1.5,layer')).toBeNull();
+      expect(parseDeepLink('windrose:note.md|map-123,5,10,not-a-number,layer')).toBeNull();
     });
 
     it('returns null for empty notePath, mapId or layerId', () => {
-      expect(parseDeepLink(`${WINDROSE_PROTOCOL}|map,5,10,1.5,layer`)).toBeNull();
-      expect(parseDeepLink(`${WINDROSE_PROTOCOL}note.md|,5,10,1.5,layer`)).toBeNull();
-      expect(parseDeepLink(`${WINDROSE_PROTOCOL}note.md|map,5,10,1.5,`)).toBeNull();
+      expect(parseDeepLink('windrose:|map,5,10,1.5,layer')).toBeNull();
+      expect(parseDeepLink('windrose:note.md|,5,10,1.5,layer')).toBeNull();
+      expect(parseDeepLink('windrose:note.md|map,5,10,1.5,')).toBeNull();
+    });
+  });
+
+  describe('backward compatibility', () => {
+    it('parses legacy links with decimal coordinates', () => {
+      const result = parseDeepLink('obsidian://windrose?Maps/dungeon.md|test-map,15.75,8.25,2.0,layer-001');
+      expect(result).toEqual({
+        notePath: 'Maps/dungeon.md',
+        mapId: 'test-map',
+        x: 15.75,
+        y: 8.25,
+        zoom: 2.0,
+        layerId: 'layer-001'
+      });
+    });
+
+    it('parses legacy links with negative coordinates', () => {
+      const result = parseDeepLink('obsidian://windrose?world.md|hex-map,-5,-10,1.2,layer-abc');
+      expect(result).toEqual({
+        notePath: 'world.md',
+        mapId: 'hex-map',
+        x: -5,
+        y: -10,
+        zoom: 1.2,
+        layerId: 'layer-abc'
+      });
+    });
+
+    it('returns identical results for same data in both formats', () => {
+      const data = 'Maps/castle.md|map-1,10,20,1.5,layer-2';
+      const newResult = parseDeepLink(`windrose:${data}`);
+      const legacyResult = parseDeepLink(`obsidian://windrose?${data}`);
+      expect(newResult).toEqual(legacyResult);
     });
   });
 
   describe('generateDeepLink', () => {
-    it('generates valid deep link URL', () => {
+    it('generates new format URL', () => {
       const result = generateDeepLink('folder/note.md', 'map-123', 5, 10, 1.5, 'layer-456');
-      expect(result).toBe(`${WINDROSE_PROTOCOL}folder/note.md|map-123,5,10,1.5,layer-456`);
+      expect(result).toBe('windrose:folder/note.md|map-123,5,10,1.5,layer-456');
     });
 
     it('rounds coordinates to 2 decimal places', () => {
       const result = generateDeepLink('note.md', 'map-123', 5.12345, 10.98765, 1.55555, 'layer-456');
-      expect(result).toBe(`${WINDROSE_PROTOCOL}note.md|map-123,5.12,10.99,1.56,layer-456`);
+      expect(result).toBe('windrose:note.md|map-123,5.12,10.99,1.56,layer-456');
     });
 
     it('handles integer coordinates', () => {
       const result = generateDeepLink('note.md', 'map-123', 5, 10, 2, 'layer-456');
-      expect(result).toBe(`${WINDROSE_PROTOCOL}note.md|map-123,5,10,2,layer-456`);
+      expect(result).toBe('windrose:note.md|map-123,5,10,2,layer-456');
     });
 
     it('handles negative coordinates', () => {
       const result = generateDeepLink('world.md', 'hex-map', -5, -10, 1.2, 'layer-abc');
-      expect(result).toBe(`${WINDROSE_PROTOCOL}world.md|hex-map,-5,-10,1.2,layer-abc`);
+      expect(result).toBe('windrose:world.md|hex-map,-5,-10,1.2,layer-abc');
     });
 
     it('handles zero coordinates', () => {
       const result = generateDeepLink('map.md', 'map', 0, 0, 1, 'layer');
-      expect(result).toBe(`${WINDROSE_PROTOCOL}map.md|map,0,0,1,layer`);
+      expect(result).toBe('windrose:map.md|map,0,0,1,layer');
     });
   });
 
   describe('generateDeepLinkMarkdown', () => {
     it('generates valid markdown link', () => {
       const result = generateDeepLinkMarkdown('Throne Room', 'Maps/castle.md', 'castle-map', 15, 8, 1.2, 'layer-001');
-      expect(result).toBe(`[Throne Room](${WINDROSE_PROTOCOL}Maps/castle.md|castle-map,15,8,1.2,layer-001)`);
+      expect(result).toBe('[Throne Room](windrose:Maps/castle.md|castle-map,15,8,1.2,layer-001)');
     });
 
     it('escapes brackets in display text', () => {
       const result = generateDeepLinkMarkdown('Room [A]', 'note.md', 'map', 5, 5, 1, 'layer');
-      expect(result).toBe(`[Room A](${WINDROSE_PROTOCOL}note.md|map,5,5,1,layer)`);
+      expect(result).toBe('[Room A](windrose:note.md|map,5,5,1,layer)');
     });
 
     it('handles empty display text', () => {
       const result = generateDeepLinkMarkdown('', 'note.md', 'map', 5, 5, 1, 'layer');
-      expect(result).toBe(`[](${WINDROSE_PROTOCOL}note.md|map,5,5,1,layer)`);
+      expect(result).toBe('[](windrose:note.md|map,5,5,1,layer)');
     });
 
     it('handles special characters in display text', () => {
       const result = generateDeepLinkMarkdown("King's Chamber", 'note.md', 'map', 5, 5, 1, 'layer');
-      expect(result).toBe(`[King's Chamber](${WINDROSE_PROTOCOL}note.md|map,5,5,1,layer)`);
+      expect(result).toBe("[King's Chamber](windrose:note.md|map,5,5,1,layer)");
     });
   });
 
