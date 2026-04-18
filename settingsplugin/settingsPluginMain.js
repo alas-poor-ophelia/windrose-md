@@ -559,7 +559,29 @@ class WindroseMDSettingsPlugin extends Plugin {
             return false;
           }
         });
-        this.registerEditorExtension([windroseEditorExt]);
+        // ViewPlugin: tag external-link icon spans on lines containing a windrose: URL
+        // so the styles.css rule for .windrose-deep-link-icon can hide the ↗ icon.
+        // LP collapses the URL text out of the DOM, so selectors alone can't tell a
+        // windrose link apart from an http link — we correlate each icon span to its
+        // source line via the CM6 document model.
+        const windroseIconTagger = cmView.ViewPlugin.fromClass(class {
+          constructor(view) { this.tag(view); }
+          update(u) { if (u.docChanged || u.viewportChanged || u.geometryChanged) this.tag(u.view); }
+          tag(view) {
+            const spans = view.contentDOM.querySelectorAll('.external-link');
+            for (const el of spans) {
+              let isWindrose = false;
+              try {
+                const pos = view.posAtDOM(el);
+                const line = view.state.doc.lineAt(pos);
+                if (line.text.indexOf('(windrose:') >= 0) isWindrose = true;
+              } catch (_) { /* ignore */ }
+              el.classList.toggle('windrose-deep-link-icon', isWindrose);
+            }
+          }
+        });
+
+        this.registerEditorExtension([windroseEditorExt, windroseIconTagger]);
         console.log(W, 'cm6: editor extension registered');
       } else {
         console.warn(W, 'cm6: @codemirror/view not available, Live Preview interception unavailable');
