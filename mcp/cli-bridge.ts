@@ -41,13 +41,20 @@ function shellQuote(s: string): string {
  * Quote a string for shell use inside double quotes, escaping bash-special
  * characters rather than rejecting them. Used for eval code payloads where
  * parentheses, braces, semicolons etc. are expected JS syntax.
- * Inside bash double quotes only $, `, \, !, and " are special.
+ *
+ * Newlines and tabs in the input are collapsed to single spaces so multi-line
+ * eval payloads survive Node's exec (which invokes cmd.exe /c on Windows and
+ * breaks on literal newlines). Callers should separate JS statements with
+ * semicolons; ASI after a newline is not reliable once newlines are stripped.
+ * Backtick template literals with embedded newlines are therefore unsupported —
+ * use string concatenation.
  */
 function shellQuoteEval(s: string): string {
-  if (/[\x00-\x1f]/.test(s)) {
-    throw new Error(`Control characters in eval code: ${s.slice(0, 50)}`);
+  const collapsed = s.replace(/[\n\r\t]+/g, " ");
+  if (/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(collapsed)) {
+    throw new Error(`Control characters in eval code: ${collapsed.slice(0, 50)}`);
   }
-  const escaped = s
+  const escaped = collapsed
     .replace(/\\/g, "\\\\")
     .replace(/"/g, '\\"')
     .replace(/\$/g, "\\$")

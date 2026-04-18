@@ -122,20 +122,30 @@ export function registerNavTools(server: McpServer): void {
 
   server.tool(
     "windrose_eval",
-    "Evaluate JavaScript in the Obsidian window context. Use for advanced operations not covered by other tools. Prefer dedicated tools (windrose_paint_cell, windrose_set_tool, etc.) when they exist.",
+    "Evaluate JavaScript in the Obsidian window context. Use for advanced probing not covered by other tools. Prefer dedicated tools (windrose_paint_cell, windrose_set_tool, windrose_vault_read, etc.) when they exist.",
     {
       code: z
         .string()
         .max(50000)
         .describe(
-          "JavaScript code to evaluate. Has access to window, app, window.__windrose, etc. " +
-          "Return values via JSON.stringify(). Use var instead of let/const. " +
-          "Avoid template literals (backticks) — use string concatenation instead."
+          "JavaScript code. Has access to window, app, window.__windrose. " +
+          "Multi-line input is accepted — newlines are collapsed to spaces, so separate statements with ';'. " +
+          "Avoid backtick template literals (newlines inside them are lost). " +
+          "Return value: the last expression evaluated — CLI prints it prefixed with '=> '. " +
+          "Without asyncWrap, top-level 'return' and 'await' are NOT allowed — wrap in '(async () => { ... })()' yourself. " +
+          "With asyncWrap=true, the code is auto-wrapped so you can use 'await' and 'return' freely."
+        ),
+      asyncWrap: z
+        .boolean()
+        .optional()
+        .describe(
+          "If true, wrap code in an async IIFE: '(async () => { <code> })()'. Lets you use top-level await and return. Default false."
         ),
     },
-    async ({ code }) => {
+    async ({ code, asyncWrap }) => {
+      const payload = asyncWrap ? `(async () => { ${code} })()` : code;
       try {
-        const result = await obsidianEval(code);
+        const result = await obsidianEval(payload);
         return {
           content: [{ type: "text" as const, text: result || "(no output)" }],
         };
@@ -144,6 +154,72 @@ export function registerNavTools(server: McpServer): void {
           content: [
             { type: "text" as const, text: `Eval error: ${err.message}` },
           ],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.tool(
+    "windrose_vault_read",
+    "Read a vault file by path (via app.vault.adapter.read). Use for static-verify (e.g. confirming a new symbol reached the plugin main.js artifact). Supports an optional search term — returns surrounding context instead of full content.",
+    {
+      path: z
+        .string()
+        .describe(
+          "Vault-relative path. Examples: '.obsidian/plugins/dungeon-map-tracker-settings/main.js', 'compiled-windrose-md.md', 'windrose-md-data.json'"
+        ),
+      search: z
+        .string()
+        .optional()
+        .describe(
+          "If provided, return { found, length, index, context } where context is ~200 chars around the first match. If omitted, return the full file content (up to 500KB)."
+        ),
+      maxBytes: z
+        .number()
+        .optional()
+        .describe("Truncate full-content reads to this many bytes. Default 500000. Ignored when 'search' is set."),
+    },
+    async ({ path: vaultPath, search, maxBytes }) => {
+      if (vaultPath.includes("..")) {
+        return {
+          content: [{ type: "text" as const, text: "Invalid path: must not contain '..'" }],
+          isError: true,
+        };
+      }
+      const limit = maxBytes ?? 500_000;
+      const p = JSON.stringify(vaultPath);
+      let code: string;
+      if (search) {
+        const s = JSON.stringify(search);
+        code =
+          `(async () => { try { const c = await app.vault.adapter.read(${p}); const idx = c.indexOf(${s}); ` +
+          `if (idx < 0) return JSON.stringify({ found: false, length: c.length }); ` +
+          `const ctxStart = Math.max(0, idx - 80); const ctxEnd = Math.min(c.length, idx + ${s}.length + 80); ` +
+          `return JSON.stringify({ found: true, length: c.length, index: idx, context: c.slice(ctxStart, ctxEnd) }); ` +
+          `} catch (e) { return JSON.stringify({ error: e.message }); } })()`;
+      } else {
+        code =
+          `(async () => { try { const c = await app.vault.adapter.read(${p}); ` +
+          `return JSON.stringify({ length: c.length, truncated: c.length > ${limit}, content: c.slice(0, ${limit}) }); ` +
+          `} catch (e) { return JSON.stringify({ error: e.message }); } })()`;
+      }
+      try {
+        const raw = await obsidianEval(code);
+        let parsed: any;
+        try { parsed = JSON.parse(raw); } catch { parsed = { error: `Unparseable result: ${raw.slice(0, 200)}` }; }
+        if (parsed && parsed.error) {
+          return {
+            content: [{ type: "text" as const, text: `Error: ${parsed.error}` }],
+            isError: true,
+          };
+        }
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify(parsed, null, 2) }],
+        };
+      } catch (err: any) {
+        return {
+          content: [{ type: "text" as const, text: `Eval error: ${err.message}` }],
           isError: true,
         };
       }
