@@ -1319,12 +1319,6 @@ return `/* settingsPlugin-styles.css
   padding: 8px 12px;
 }
 
-.windrose-deep-link {
-  text-decoration: underline;
-  text-decoration-style: dotted;
-  text-decoration-color: var(--text-accent);
-}
-
 /* Live-Preview external-link icon suppression on windrose: URLs only.
    The icon is a ::after on span.external-link; CM6 ViewPlugin tags the
    icon span with .windrose-deep-link-icon when its line contains windrose:. */
