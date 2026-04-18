@@ -1276,13 +1276,35 @@ return `/* settingsPlugin-styles.css
 .windrose-hover-preview {
   position: relative;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  flex-direction: column;
   width: 240px;
-  height: 180px;
   background: var(--background-secondary);
   border-radius: 4px;
   overflow: hidden;
+}
+
+.windrose-hover-preview-header {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+  line-height: 1.25;
+}
+
+.windrose-hover-preview-header-map {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-normal);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.windrose-hover-preview-header-note {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .windrose-hover-preview canvas {

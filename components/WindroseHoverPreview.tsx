@@ -37,11 +37,20 @@ interface WindroseHoverPreviewProps {
   y: number;
   zoom: number;
   layerId?: string;
+  notePath?: string;
 }
 
-function WindroseHoverPreview({ mapId, x, y, zoom, layerId }: WindroseHoverPreviewProps): React.ReactElement {
+function noteBasename(notePath?: string): string {
+  if (!notePath) return '';
+  const slash = Math.max(notePath.lastIndexOf('/'), notePath.lastIndexOf('\\'));
+  const base = slash >= 0 ? notePath.slice(slash + 1) : notePath;
+  return base.replace(/\.md$/i, '');
+}
+
+function WindroseHoverPreview({ mapId, x, y, zoom, layerId, notePath }: WindroseHoverPreviewProps): React.ReactElement {
   const canvasRef = dc.useRef<HTMLCanvasElement | null>(null);
   const [status, setStatus] = dc.useState<'loading' | 'ready' | 'missing' | 'error'>('loading');
+  const [mapName, setMapName] = dc.useState<string>('');
 
   dc.useEffect(() => {
     let cancelled = false;
@@ -54,6 +63,8 @@ function WindroseHoverPreview({ mapId, x, y, zoom, layerId }: WindroseHoverPrevi
           setStatus('missing');
           return;
         }
+
+        setMapName((mapData.name as string) || mapId);
 
         const focused: MapData = {
           ...mapData,
@@ -97,21 +108,44 @@ function WindroseHoverPreview({ mapId, x, y, zoom, layerId }: WindroseHoverPrevi
           layerVisibility: { grid: true, objects: true, textLabels: true, hexCoordinates: false }
         });
 
-        // Crosshair at canvas center (viewState.center is the target).
+        // Corner brackets framing the target (viewState.center). Spread wide
+        // enough to surround the zoomed object rather than sit on top of it.
         const ctx = canvas.getContext('2d');
         if (ctx) {
           const cx = PREVIEW_WIDTH / 2;
           const cy = PREVIEW_HEIGHT / 2;
-          const arm = 8;
-          const gap = 3;
+          const offset = 34; // distance from center to each bracket corner
+          const arm = 14;    // length of each bracket arm
+          const drawBrackets = () => {
+            ctx.beginPath();
+            // Top-left
+            ctx.moveTo(cx - offset + arm, cy - offset); ctx.lineTo(cx - offset, cy - offset); ctx.lineTo(cx - offset, cy - offset + arm);
+            // Top-right
+            ctx.moveTo(cx + offset - arm, cy - offset); ctx.lineTo(cx + offset, cy - offset); ctx.lineTo(cx + offset, cy - offset + arm);
+            // Bottom-left
+            ctx.moveTo(cx - offset, cy + offset - arm); ctx.lineTo(cx - offset, cy + offset); ctx.lineTo(cx - offset + arm, cy + offset);
+            // Bottom-right
+            ctx.moveTo(cx + offset, cy + offset - arm); ctx.lineTo(cx + offset, cy + offset); ctx.lineTo(cx + offset - arm, cy + offset);
+            ctx.stroke();
+          };
           ctx.save();
-          ctx.lineWidth = 2;
-          ctx.strokeStyle = '#ff4444';
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          // Halo stroke for drama/contrast against any background.
+          ctx.lineWidth = 5;
+          ctx.strokeStyle = 'rgba(0, 0, 0, 0.55)';
+          drawBrackets();
+          // Main stroke.
+          ctx.lineWidth = 2.5;
+          ctx.strokeStyle = '#ff3b3b';
+          drawBrackets();
+          // Center pin dot.
+          ctx.fillStyle = '#ff3b3b';
+          ctx.strokeStyle = 'rgba(0, 0, 0, 0.6)';
+          ctx.lineWidth = 1.5;
           ctx.beginPath();
-          ctx.moveTo(cx - arm, cy); ctx.lineTo(cx - gap, cy);
-          ctx.moveTo(cx + gap, cy); ctx.lineTo(cx + arm, cy);
-          ctx.moveTo(cx, cy - arm); ctx.lineTo(cx, cy - gap);
-          ctx.moveTo(cx, cy + gap); ctx.lineTo(cx, cy + arm);
+          ctx.arc(cx, cy, 2, 0, Math.PI * 2);
+          ctx.fill();
           ctx.stroke();
           ctx.restore();
         }
@@ -125,8 +159,18 @@ function WindroseHoverPreview({ mapId, x, y, zoom, layerId }: WindroseHoverPrevi
     return () => { cancelled = true; };
   }, [mapId, x, y, zoom, layerId]);
 
+  const noteLabel = noteBasename(notePath);
+  const headerMapName = mapName || mapId;
+  const showHeader = status === 'ready' && (headerMapName || noteLabel);
+
   return (
     <div className="windrose-hover-preview">
+      {showHeader && (
+        <div className="windrose-hover-preview-header">
+          {headerMapName && <div className="windrose-hover-preview-header-map">{headerMapName}</div>}
+          {noteLabel && <div className="windrose-hover-preview-header-note">{noteLabel}</div>}
+        </div>
+      )}
       <canvas
         ref={canvasRef}
         width={PREVIEW_WIDTH}
