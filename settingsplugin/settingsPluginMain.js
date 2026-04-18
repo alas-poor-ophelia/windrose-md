@@ -564,10 +564,27 @@ class WindroseMDSettingsPlugin extends Plugin {
         // LP collapses the URL text out of the DOM, so selectors alone can't tell a
         // windrose link apart from an http link — we correlate each icon span to its
         // source line via the CM6 document model.
+        //
+        // Uses rAF-debounced tagging + a MutationObserver on contentDOM because
+        // Obsidian adds the .external-link class via a separate view plugin whose
+        // run order isn't guaranteed relative to ours. Without the observer, newly
+        // rendered spans (scroll, reload, cursor move) briefly show the default icon.
         const windroseIconTagger = cmView.ViewPlugin.fromClass(class {
-          constructor(view) { this.tag(view); }
-          update(u) { if (u.docChanged || u.viewportChanged || u.geometryChanged) this.tag(u.view); }
-          tag(view) {
+          constructor(view) {
+            this.view = view;
+            this.pending = false;
+            this.schedule();
+            this.observer = new MutationObserver(() => this.schedule());
+            this.observer.observe(view.contentDOM, { childList: true, subtree: true });
+          }
+          update() { this.schedule(); }
+          schedule() {
+            if (this.pending) return;
+            this.pending = true;
+            requestAnimationFrame(() => { this.pending = false; this.tag(); });
+          }
+          tag() {
+            const view = this.view;
             const spans = view.contentDOM.querySelectorAll('.external-link');
             for (const el of spans) {
               let isWindrose = false;
@@ -579,6 +596,7 @@ class WindroseMDSettingsPlugin extends Plugin {
               el.classList.toggle('windrose-deep-link-icon', isWindrose);
             }
           }
+          destroy() { if (this.observer) this.observer.disconnect(); }
         });
 
         this.registerEditorExtension([windroseEditorExt, windroseIconTagger]);
