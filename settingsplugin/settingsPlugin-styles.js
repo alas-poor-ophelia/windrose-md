@@ -1256,4 +1256,49 @@ return `/* settingsPlugin-styles.css
 
 .dmt-shake {
   animation: dmt-shake 0.3s ease;
+}
+
+/* ===========================================
+ * Deeplink Hover Preview
+ * =========================================== */
+.windrose-hover-preview-popover {
+  padding: 6px;
+}
+
+.windrose-hover-preview-host {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 240px;
+  min-height: 180px;
+}
+
+.windrose-hover-preview {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 240px;
+  height: 180px;
+  background: var(--background-secondary);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.windrose-hover-preview canvas {
+  display: block;
+  width: 240px;
+  height: 180px;
+}
+
+.windrose-hover-preview-state {
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 8px 12px;
+}
+
+.windrose-deep-link {
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-decoration-color: var(--text-accent);
 }`;

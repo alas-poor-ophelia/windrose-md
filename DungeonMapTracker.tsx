@@ -46,6 +46,11 @@ const { ImageAlignmentMode } = await requireModuleByName("ImageAlignmentMode.tsx
 const { useAlignmentMode } = await requireModuleByName("useAlignmentMode.ts");
 const { ModalPortal } = await requireModuleByName("ModalPortal.tsx");
 
+// Load the hover-preview module for its side-effect: registering
+// window.__windrose.renderPreview so the settings plugin can render
+// deep-link hover previews without its own Datacore context.
+await requireModuleByName("WindroseHoverPreview.tsx");
+
 const { getActiveLayer } = await requireModuleByName("layerAccessor.ts");
 const { setCell: accessorSetCell, removeCell: accessorRemoveCell, cellToPoint } = await requireModuleByName("cellAccessor.ts");
 const { LayerControls } = await requireModuleByName("LayerControls.tsx");

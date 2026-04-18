@@ -329,6 +329,11 @@ class WindroseMDSettingsPlugin extends Plugin {
         replacement.style.cursor = 'pointer';
         link.replaceWith(replacement);
         console.log(W, 'post-processor: replaced link', idx);
+
+        const parsed = parseWindroseHref(original);
+        if (parsed && typeof DeeplinkHover !== 'undefined') {
+          DeeplinkHover.attachReadingModeHover(this, replacement, parsed);
+        }
       });
     });
 
@@ -458,6 +463,54 @@ class WindroseMDSettingsPlugin extends Plugin {
           return null;
         };
 
+        // Resolve a windrose: href from a pointer event inside the CM6 editor.
+        // Returns { href, anchorEl } or null. Used by click and hover handlers.
+        const resolveWindroseFromEvent = (event, view) => {
+          const target = event.target;
+          if (!target || typeof target.closest !== 'function') return null;
+
+          const anchor = target.closest('a[href^="windrose:"], a[data-href^="windrose:"], a[data-windrose-href]');
+          if (anchor) {
+            const href = anchor.getAttribute('data-windrose-href')
+              || anchor.getAttribute('href')
+              || anchor.getAttribute('data-href')
+              || null;
+            if (href) return { href, anchorEl: anchor };
+          }
+
+          const linkSpan = target.closest('.cm-link, .cm-underline, .cm-hmd-internal-link');
+          if (linkSpan) {
+            const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
+            if (pos != null) {
+              const href = findWindroseHrefAtPos(view, pos);
+              if (href) return { href, anchorEl: linkSpan };
+            }
+          }
+          return null;
+        };
+
+        // LP hover state: last link we fired 'enter' for. Used to dedupe mouseover
+        // fires from walking the mouse across link spans and to emit 'leave' when
+        // the pointer moves off a link.
+        let lpHoverState = null; // { el, href }
+
+        const lpFireLeave = () => {
+          if (!lpHoverState) return;
+          if (typeof DeeplinkHover !== 'undefined') {
+            DeeplinkHover.onLivePreviewPointer(plugin, lpHoverState.el, null, 'leave');
+          }
+          lpHoverState = null;
+        };
+
+        const lpFireEnter = (linkEl, parsed, href) => {
+          if (lpHoverState && lpHoverState.el === linkEl && lpHoverState.href === href) return;
+          if (lpHoverState) lpFireLeave();
+          lpHoverState = { el: linkEl, href };
+          if (typeof DeeplinkHover !== 'undefined') {
+            DeeplinkHover.onLivePreviewPointer(plugin, linkEl, parsed, 'enter');
+          }
+        };
+
         const windroseEditorExt = cmView.EditorView.domEventHandlers({
           click: (event, view) => {
             const target = event.target;
@@ -467,40 +520,43 @@ class WindroseMDSettingsPlugin extends Plugin {
               text: target?.textContent?.slice(0, 40),
               parentClass: target?.parentElement?.className
             });
-            if (!target || typeof target.closest !== 'function') return false;
+            const resolved = resolveWindroseFromEvent(event, view);
+            if (!resolved) return false;
 
-            let windroseHref = null;
-
-            const anchor = target.closest('a[href^="windrose:"], a[data-href^="windrose:"], a[data-windrose-href]');
-            if (anchor) {
-              windroseHref = anchor.getAttribute('data-windrose-href')
-                || anchor.getAttribute('href')
-                || anchor.getAttribute('data-href')
-                || null;
-            }
-
-            if (!windroseHref && target.closest('.cm-link, .cm-underline, .cm-hmd-internal-link')) {
-              const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
-              console.log(W, 'cm6: cm-link click, pos:', pos);
-              if (pos != null) {
-                windroseHref = findWindroseHrefAtPos(view, pos);
-                console.log(W, 'cm6: extracted href from doc:', windroseHref);
-              }
-            }
-
-            if (!windroseHref) return false;
-
-            console.log(W, 'cm6: intercepting', windroseHref);
+            console.log(W, 'cm6: intercepting', resolved.href);
             event.preventDefault();
             event.stopPropagation();
             if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
-            const parsed = parseWindroseHref(windroseHref);
+            const parsed = parseWindroseHref(resolved.href);
             if (!parsed) return true;
             const sourcePath = plugin.app.workspace.getActiveFile()?.path || '';
             navigateToWindroseLink(parsed, sourcePath).catch((err) => {
               console.error(W, 'cm6: navigate threw', err);
             });
             return true;
+          },
+          mouseover: (event, view) => {
+            const resolved = resolveWindroseFromEvent(event, view);
+            if (!resolved) {
+              if (lpHoverState) lpFireLeave();
+              return false;
+            }
+            const parsed = parseWindroseHref(resolved.href);
+            if (!parsed) return false;
+            lpFireEnter(resolved.anchorEl, parsed, resolved.href);
+            return false;
+          },
+          mouseout: (event, view) => {
+            if (!lpHoverState) return false;
+            const related = event.relatedTarget;
+            if (related && typeof related.closest === 'function') {
+              if (related.closest('.windrose-hover-preview-popover')) return false;
+              if (related.closest('.cm-link, .cm-underline, .cm-hmd-internal-link, a[href^="windrose:"], a[data-href^="windrose:"], a[data-windrose-href]')) {
+                return false;
+              }
+            }
+            lpFireLeave();
+            return false;
           }
         });
         this.registerEditorExtension([windroseEditorExt]);

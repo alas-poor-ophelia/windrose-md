@@ -15,6 +15,7 @@ const RPGAwesomeHelpers = await requireModuleByName("settingsPlugin-RPGAwesomeHe
 const DungeonEssenceVisualizer = await requireModuleByName("settingsPlugin-DungeonEssenceVisualizer.js");
 const ObjectSetHelpers = await requireModuleByName("settingsPlugin-ObjectSetHelpers.js");
 const FolderSuggest = await requireModuleByName("settingsPlugin-FolderSuggest.js");
+const DeeplinkHover = await requireModuleByName("settingsPlugin-DeeplinkHover.js");
 
 const InsertMapModal = await requireModuleByName("settingsPlugin-InsertMapModal.js");
 const InsertDungeonModal = await requireModuleByName("settingsPlugin-InsertDungeonModal.js");
@@ -39,7 +40,7 @@ const STYLES_CSS = await requireModuleByName("settingsPlugin-styles.js");
 
 // Concatenate content
 const HELPERS_CONTENT = [
-  ObjectHelpers, ColorHelpers, DragHelpers, IconHelpers, RPGAwesomeHelpers, DungeonEssenceVisualizer, ObjectSetHelpers, FolderSuggest
+  ObjectHelpers, ColorHelpers, DragHelpers, IconHelpers, RPGAwesomeHelpers, DungeonEssenceVisualizer, ObjectSetHelpers, FolderSuggest, DeeplinkHover
 ].join('\n\n');
 
 const MODALS_CONTENT = [
