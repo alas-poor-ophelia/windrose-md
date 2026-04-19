@@ -26,7 +26,25 @@ export interface TilesetDef {
    *  'fill' = independent X/Y scaling (stretches to hex shape, good for terrain).
    *  'contain' = uniform scaling preserving aspect ratio (good for stamps/objects). */
   fitMode?: 'fill' | 'contain';
+  /** Ratio threshold below which a tile is auto-detected as a stamp.
+   *  If naturalWidth/tileWidth < this OR naturalHeight/hexHeight < this,
+   *  the tile uses stamp rendering instead of hex-filling. @default 0.5 */
+  stampThreshold?: number;
+  /** Minimum stamp scale as fraction of hex's smaller screen dimension.
+   *  Prevents tiny stamps from becoming invisible at low zoom. @default 0.2 */
+  minStampScale?: number;
   tiles: TileEntry[];
+}
+
+// ===========================================
+// Tileset Overrides
+// ===========================================
+
+/** User-configurable overrides for a tileset's rendering defaults */
+export interface TilesetOverrides {
+  fitMode?: 'fill' | 'contain';
+  stampThreshold?: number;
+  minStampScale?: number;
 }
 
 // ===========================================

@@ -483,14 +483,14 @@ describe('tileRenderer', () => {
       });
 
       const ts: TilesetDef = {
-        id: 'ts1', name: 'Test', folderPath: 'Tiles',
+        id: 'ts-autodetect', name: 'Test', folderPath: 'Tiles',
         tileWidth: 256, tileHeight: 256, hexHeight: 256,
         overflowTop: 0, overflowBottom: 0,
         tiles: [{ id: 'stamp1', filename: 'stamp.png', vaultPath: 'Tiles/stamp.png' }],
       };
 
       const tiles: HexTileAssignment[] = [
-        { q: 0, r: 0, tilesetId: 'ts1', tileId: 'stamp1' },
+        { q: 0, r: 0, tilesetId: 'ts-autodetect', tileId: 'stamp1' },
       ];
 
       renderTiles(ctx as unknown as CanvasRenderingContext2D, tiles, [ts], makeGeometry(), { x: 0, y: 0, zoom: 1 }, {
@@ -502,6 +502,254 @@ describe('tileRenderer', () => {
       expect(ctx.drawImage).toHaveBeenCalledTimes(1);
       // The draw width should be much smaller than the hex bounding box (64px for flat-top at hexSize 32)
       expect(drawCalls[0].w).toBeLessThan(32);
+    });
+
+    it('enforces minimum stamp size as 20% of hex screen dimension', () => {
+      // Extremely small stamp (10x10) in a large tileset (256px)
+      // Without clamp: baseScale = min(64/256, 55.4/256) ≈ 0.216, drawWidth = 10*0.216 ≈ 2.16px
+      // With clamp: minHexDim ≈ 55.4, minStampDim = 55.4*0.2 ≈ 11.08, so clamp should activate
+      const tinyImg = { naturalWidth: 10, naturalHeight: 10 } as HTMLImageElement;
+      const drawCalls: { w: number; h: number }[] = [];
+      const ctx = makeCtx();
+      ctx.drawImage.mockImplementation((_img: HTMLImageElement, _x: number, _y: number, w: number, h: number) => {
+        drawCalls.push({ w, h });
+      });
+
+      const ts: TilesetDef = {
+        id: 'ts-min', name: 'Test', folderPath: 'Tiles',
+        tileWidth: 256, tileHeight: 256, hexHeight: 256,
+        overflowTop: 0, overflowBottom: 0,
+        tiles: [{ id: 'stamp1', filename: 'stamp.png', vaultPath: 'Tiles/stamp.png' }],
+      };
+
+      const tiles: HexTileAssignment[] = [
+        { q: 0, r: 0, tilesetId: 'ts-min', tileId: 'stamp1' },
+      ];
+
+      renderTiles(ctx as unknown as CanvasRenderingContext2D, tiles, [ts], makeGeometry(), { x: 0, y: 0, zoom: 1 }, {
+        getCachedImage: () => tinyImg,
+        canvasWidth: 800,
+        canvasHeight: 600,
+      });
+
+      expect(ctx.drawImage).toHaveBeenCalledTimes(1);
+      // hexScreenHeight (flat, hexSize=32) = sqrt(3)*32 ≈ 55.4, minStampDim = 55.4*0.2 ≈ 11.08
+      // Both dimensions should be at least ~11px (20% of smaller hex dim)
+      expect(drawCalls[0].w).toBeGreaterThanOrEqual(11);
+      expect(drawCalls[0].h).toBeGreaterThanOrEqual(11);
+    });
+
+    it('preserves aspect ratio for non-square stamps with minimum clamp', () => {
+      // Non-square stamp: 20x80 in a 256px tileset
+      const rectImg = { naturalWidth: 20, naturalHeight: 80 } as HTMLImageElement;
+      const drawCalls: { w: number; h: number }[] = [];
+      const ctx = makeCtx();
+      ctx.drawImage.mockImplementation((_img: HTMLImageElement, _x: number, _y: number, w: number, h: number) => {
+        drawCalls.push({ w, h });
+      });
+
+      const ts: TilesetDef = {
+        id: 'ts-ar', name: 'Test', folderPath: 'Tiles',
+        tileWidth: 256, tileHeight: 256, hexHeight: 256,
+        overflowTop: 0, overflowBottom: 0,
+        tiles: [{ id: 'stamp1', filename: 'stamp.png', vaultPath: 'Tiles/stamp.png' }],
+      };
+
+      const tiles: HexTileAssignment[] = [
+        { q: 0, r: 0, tilesetId: 'ts-ar', tileId: 'stamp1' },
+      ];
+
+      renderTiles(ctx as unknown as CanvasRenderingContext2D, tiles, [ts], makeGeometry(), { x: 0, y: 0, zoom: 1 }, {
+        getCachedImage: () => rectImg,
+        canvasWidth: 800,
+        canvasHeight: 600,
+      });
+
+      expect(ctx.drawImage).toHaveBeenCalledTimes(1);
+      // Aspect ratio must be preserved: w/h should equal 20/80 = 0.25
+      const ratio = drawCalls[0].w / drawCalls[0].h;
+      expect(ratio).toBeCloseTo(0.25, 2);
+    });
+
+    it('stamp minimum size scales with zoom level', () => {
+      const tinyImg = { naturalWidth: 10, naturalHeight: 10 } as HTMLImageElement;
+      const ts: TilesetDef = {
+        id: 'ts-zoom', name: 'Test', folderPath: 'Tiles',
+        tileWidth: 256, tileHeight: 256, hexHeight: 256,
+        overflowTop: 0, overflowBottom: 0,
+        tiles: [{ id: 'stamp1', filename: 'stamp.png', vaultPath: 'Tiles/stamp.png' }],
+      };
+      const tiles: HexTileAssignment[] = [
+        { q: 0, r: 0, tilesetId: 'ts-zoom', tileId: 'stamp1' },
+      ];
+
+      // Render at zoom=1
+      const drawCalls1: { w: number }[] = [];
+      const ctx1 = makeCtx();
+      ctx1.drawImage.mockImplementation((_img: HTMLImageElement, _x: number, _y: number, w: number) => {
+        drawCalls1.push({ w });
+      });
+      renderTiles(ctx1 as unknown as CanvasRenderingContext2D, tiles, [ts], makeGeometry(), { x: 0, y: 0, zoom: 1 }, {
+        getCachedImage: () => tinyImg,
+        canvasWidth: 800,
+        canvasHeight: 600,
+      });
+
+      // Render at zoom=0.5
+      const drawCalls05: { w: number }[] = [];
+      const ctx05 = makeCtx();
+      ctx05.drawImage.mockImplementation((_img: HTMLImageElement, _x: number, _y: number, w: number) => {
+        drawCalls05.push({ w });
+      });
+      renderTiles(ctx05 as unknown as CanvasRenderingContext2D, tiles, [ts], makeGeometry(), { x: 0, y: 0, zoom: 0.5 }, {
+        getCachedImage: () => tinyImg,
+        canvasWidth: 800,
+        canvasHeight: 600,
+      });
+
+      // At zoom=0.5, draw width should be half of zoom=1 (hex-proportional, not fixed pixel)
+      expect(drawCalls05[0].w).toBeCloseTo(drawCalls1[0].w * 0.5, 1);
+    });
+
+    it('preserves relative scale between different stamp sizes', () => {
+      const smallImg = { naturalWidth: 30, naturalHeight: 30 } as HTMLImageElement;
+      const largeImg = { naturalWidth: 80, naturalHeight: 80 } as HTMLImageElement;
+      // Use unique tileset ID to avoid entry map cache collision
+      const tsSmall: TilesetDef = {
+        id: 'ts-scale-s', name: 'Test', folderPath: 'Tiles',
+        tileWidth: 256, tileHeight: 256, hexHeight: 256,
+        overflowTop: 0, overflowBottom: 0,
+        tiles: [{ id: 'small', filename: 'small.png', vaultPath: 'Tiles/small.png' }],
+      };
+      const tsLarge: TilesetDef = {
+        id: 'ts-scale-l', name: 'Test', folderPath: 'Tiles',
+        tileWidth: 256, tileHeight: 256, hexHeight: 256,
+        overflowTop: 0, overflowBottom: 0,
+        tiles: [{ id: 'large', filename: 'large.png', vaultPath: 'Tiles/large.png' }],
+      };
+
+      // Render small stamp
+      const drawSmall: { w: number }[] = [];
+      const ctx1 = makeCtx();
+      ctx1.drawImage.mockImplementation((_img: HTMLImageElement, _x: number, _y: number, w: number) => {
+        drawSmall.push({ w });
+      });
+      renderTiles(ctx1 as unknown as CanvasRenderingContext2D,
+        [{ q: 0, r: 0, tilesetId: 'ts-scale-s', tileId: 'small' }],
+        [tsSmall], makeGeometry(), { x: 0, y: 0, zoom: 1 }, {
+          getCachedImage: () => smallImg,
+          canvasWidth: 800, canvasHeight: 600,
+        });
+
+      // Render large stamp
+      const drawLarge: { w: number }[] = [];
+      const ctx2 = makeCtx();
+      ctx2.drawImage.mockImplementation((_img: HTMLImageElement, _x: number, _y: number, w: number) => {
+        drawLarge.push({ w });
+      });
+      renderTiles(ctx2 as unknown as CanvasRenderingContext2D,
+        [{ q: 0, r: 0, tilesetId: 'ts-scale-l', tileId: 'large' }],
+        [tsLarge], makeGeometry(), { x: 0, y: 0, zoom: 1 }, {
+          getCachedImage: () => largeImg,
+          canvasWidth: 800, canvasHeight: 600,
+        });
+
+      // 80px stamp should render larger than 30px stamp
+      expect(drawLarge[0].w).toBeGreaterThan(drawSmall[0].w);
+    });
+
+    it('respects custom stampThreshold on tileset', () => {
+      // 150px image in 256px tileset: ratio = 0.586
+      // Default threshold (0.5): NOT a stamp (0.586 >= 0.5)
+      // Custom threshold (0.7): IS a stamp (0.586 < 0.7)
+      const img = { naturalWidth: 150, naturalHeight: 150 } as HTMLImageElement;
+
+      // With default threshold — should use hex-filling (calculateTileDrawRect)
+      const drawDefault: { w: number }[] = [];
+      const ctx1 = makeCtx();
+      ctx1.drawImage.mockImplementation((_img: HTMLImageElement, _x: number, _y: number, w: number) => {
+        drawDefault.push({ w });
+      });
+      const tsDefault: TilesetDef = {
+        id: 'ts-thresh-def', name: 'Test', folderPath: 'Tiles',
+        tileWidth: 256, tileHeight: 256, hexHeight: 256,
+        overflowTop: 0, overflowBottom: 0,
+        tiles: [{ id: 't1', filename: 't1.png', vaultPath: 'Tiles/t1.png' }],
+      };
+      renderTiles(ctx1 as unknown as CanvasRenderingContext2D,
+        [{ q: 0, r: 0, tilesetId: 'ts-thresh-def', tileId: 't1' }],
+        [tsDefault], makeGeometry(), { x: 0, y: 0, zoom: 1 }, {
+          getCachedImage: () => img,
+          canvasWidth: 800, canvasHeight: 600,
+        });
+
+      // With stampThreshold=0.7 — same image becomes a stamp (smaller draw size)
+      const drawCustom: { w: number }[] = [];
+      const ctx2 = makeCtx();
+      ctx2.drawImage.mockImplementation((_img: HTMLImageElement, _x: number, _y: number, w: number) => {
+        drawCustom.push({ w });
+      });
+      const tsCustom: TilesetDef = {
+        id: 'ts-thresh-cust', name: 'Test', folderPath: 'Tiles',
+        tileWidth: 256, tileHeight: 256, hexHeight: 256,
+        overflowTop: 0, overflowBottom: 0, stampThreshold: 0.7,
+        tiles: [{ id: 't1', filename: 't1.png', vaultPath: 'Tiles/t1.png' }],
+      };
+      renderTiles(ctx2 as unknown as CanvasRenderingContext2D,
+        [{ q: 0, r: 0, tilesetId: 'ts-thresh-cust', tileId: 't1' }],
+        [tsCustom], makeGeometry(), { x: 0, y: 0, zoom: 1 }, {
+          getCachedImage: () => img,
+          canvasWidth: 800, canvasHeight: 600,
+        });
+
+      // Default should render at hex-fill size, custom at stamp size (smaller)
+      expect(drawDefault[0].w).toBeGreaterThan(drawCustom[0].w);
+    });
+
+    it('respects custom minStampScale on tileset', () => {
+      // Tiny stamp (10x10) in 256px tileset
+      const tinyImg = { naturalWidth: 10, naturalHeight: 10 } as HTMLImageElement;
+
+      // With default minStampScale (0.2) — 20% of hex dim
+      const drawDefault: { w: number }[] = [];
+      const ctx1 = makeCtx();
+      ctx1.drawImage.mockImplementation((_img: HTMLImageElement, _x: number, _y: number, w: number) => {
+        drawDefault.push({ w });
+      });
+      const tsDefault: TilesetDef = {
+        id: 'ts-minsc-def', name: 'Test', folderPath: 'Tiles',
+        tileWidth: 256, tileHeight: 256, hexHeight: 256,
+        overflowTop: 0, overflowBottom: 0,
+        tiles: [{ id: 't1', filename: 't1.png', vaultPath: 'Tiles/t1.png' }],
+      };
+      renderTiles(ctx1 as unknown as CanvasRenderingContext2D,
+        [{ q: 0, r: 0, tilesetId: 'ts-minsc-def', tileId: 't1' }],
+        [tsDefault], makeGeometry(), { x: 0, y: 0, zoom: 1 }, {
+          getCachedImage: () => tinyImg,
+          canvasWidth: 800, canvasHeight: 600,
+        });
+
+      // With minStampScale=0.4 — 40% of hex dim (should render larger)
+      const drawLarger: { w: number }[] = [];
+      const ctx2 = makeCtx();
+      ctx2.drawImage.mockImplementation((_img: HTMLImageElement, _x: number, _y: number, w: number) => {
+        drawLarger.push({ w });
+      });
+      const tsLarger: TilesetDef = {
+        id: 'ts-minsc-lg', name: 'Test', folderPath: 'Tiles',
+        tileWidth: 256, tileHeight: 256, hexHeight: 256,
+        overflowTop: 0, overflowBottom: 0, minStampScale: 0.4,
+        tiles: [{ id: 't1', filename: 't1.png', vaultPath: 'Tiles/t1.png' }],
+      };
+      renderTiles(ctx2 as unknown as CanvasRenderingContext2D,
+        [{ q: 0, r: 0, tilesetId: 'ts-minsc-lg', tileId: 't1' }],
+        [tsLarger], makeGeometry(), { x: 0, y: 0, zoom: 1 }, {
+          getCachedImage: () => tinyImg,
+          canvasWidth: 800, canvasHeight: 600,
+        });
+
+      // 40% min scale should produce larger stamps than 20%
+      expect(drawLarger[0].w).toBeGreaterThan(drawDefault[0].w);
     });
 
     it('skips tiles outside viewport (culling)', () => {

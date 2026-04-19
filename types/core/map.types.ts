@@ -9,7 +9,7 @@ import type { Cell } from './cell.types';
 import type { Curve } from './curve.types';
 import type { Point } from './geometry.types';
 import type { HexOrientation, FrameSettings } from '../settings/settings.types';
-import type { TilesetDef, HexTileAssignment } from '../tiles/tile.types';
+import type { TilesetDef, TilesetOverrides, HexTileAssignment } from '../tiles/tile.types';
 
 // ===========================================
 // Map Types
@@ -253,6 +253,9 @@ export interface MapData {
 
   // Hex tile image sets (hex maps only)
   tilesets?: TilesetDef[];
+
+  // Per-tileset user overrides (keyed by tileset id)
+  tilesetOverrides?: Record<string, TilesetOverrides>;
 
   // Migration metadata
   _migratedAt?: string;
