@@ -29,12 +29,13 @@ const DEFAULT_TIMEOUT = 15_000;
 /** Longer timeout for eval (code execution may be slow) */
 const EVAL_TIMEOUT = 30_000;
 
-/** Quote a string for shell use — rejects shell metacharacters to prevent injection */
+/** Quote a string for shell use — rejects shell metacharacters to prevent injection.
+ *  Backslashes are allowed (needed for Windows file paths). */
 function shellQuote(s: string): string {
-  if (/[\x00-\x1f`$\\!#&|;(){}<>%^]/.test(s)) {
+  if (/[\x00-\x1f`$!#&|;(){}<>%^]/.test(s)) {
     throw new Error(`Unsafe characters in shell argument: ${s.slice(0, 50)}`);
   }
-  return `"${s.replace(/"/g, '\\"')}"`;
+  return `"${s.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
 }
 
 /**
