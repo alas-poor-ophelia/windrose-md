@@ -856,6 +856,13 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               stampMode={stampMode}
               onStampModeChange={setStampMode}
               getCachedImage={getCachedImage}
+              tilesetOverrides={mapData?.tilesetOverrides}
+              onTilesetOverrideChange={(tilesetId: string, overrides: Record<string, unknown>) => {
+                updateMapData((prev: MapData) => ({
+                  ...prev,
+                  tilesetOverrides: { ...prev.tilesetOverrides, [tilesetId]: overrides },
+                }));
+              }}
             />
           )}
         </div>

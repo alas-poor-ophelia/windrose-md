@@ -154,7 +154,15 @@ function useMapData(
 
         setMapData((current: MapData | null) => {
           if (!current) return current;
-          return { ...current, tilesets: newTilesets };
+          // Merge per-tileset user overrides into auto-built tilesets
+          const overrides = current.tilesetOverrides;
+          const mergedTilesets = overrides
+            ? newTilesets.map(ts => {
+                const ov = overrides[ts.id];
+                return ov ? { ...ts, ...ov } : ts;
+              })
+            : newTilesets;
+          return { ...current, tilesets: mergedTilesets };
         });
       }
     })();

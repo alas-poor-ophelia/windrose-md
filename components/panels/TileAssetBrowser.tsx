@@ -6,7 +6,7 @@
  * Selecting a tile sets it as the active brush for placement.
  */
 
-import type { TilesetDef, TileEntry } from '#types/tiles/tile.types';
+import type { TilesetDef, TileEntry, TilesetOverrides } from '#types/tiles/tile.types';
 
 // ===========================================
 // Content-bounds detection for tile thumbnails
@@ -156,6 +156,8 @@ interface TileAssetBrowserProps {
   stampMode: boolean;
   onStampModeChange: (stamp: boolean) => void;
   getCachedImage?: (path: string) => HTMLImageElement | null;
+  tilesetOverrides?: Record<string, TilesetOverrides>;
+  onTilesetOverrideChange?: (tilesetId: string, overrides: TilesetOverrides) => void;
 }
 
 const ROTATION_STEPS = [0, 60, 120, 180, 240, 300];
@@ -180,10 +182,13 @@ const TileAssetBrowser = ({
   stampMode,
   onStampModeChange,
   getCachedImage,
+  tilesetOverrides,
+  onTilesetOverrideChange,
 }: TileAssetBrowserProps): React.ReactElement => {
   const [activeTilesetIndex, setActiveTilesetIndex] = dc.useState<number>(0);
   const [searchFilter, setSearchFilter] = dc.useState<string>('');
   const [collapsedCategories, setCollapsedCategories] = dc.useState<Set<string>>(new Set());
+  const [showTilesetConfig, setShowTilesetConfig] = dc.useState<boolean>(false);
   const [hoveredTile, setHoveredTile] = dc.useState<TileEntry | null>(null);
   const previewRef = dc.useRef<HTMLCanvasElement>(null);
   const browserRef = dc.useRef<HTMLDivElement>(null);
@@ -389,9 +394,9 @@ const TileAssetBrowser = ({
         </button>
       </div>
 
-      {/* Tileset selector (when multiple tilesets) */}
-      {tilesets.length > 1 && (
-        <div className="dmt-tile-browser-tileset-selector">
+      {/* Tileset selector + config gear */}
+      <div className="dmt-tile-browser-tileset-selector">
+        {tilesets.length > 1 && (
           <select
             value={activeTilesetIndex}
             onChange={(e: Event) => setActiveTilesetIndex(parseInt((e.target as HTMLSelectElement).value, 10))}
@@ -401,8 +406,81 @@ const TileAssetBrowser = ({
               <option key={ts.id} value={i}>{ts.name}</option>
             ))}
           </select>
-        </div>
-      )}
+        )}
+        {tilesets.length === 1 && (
+          <span className="dmt-tile-browser-tileset-name">{tilesets[0].name}</span>
+        )}
+        {onTilesetOverrideChange && activeTileset && (
+          <button
+            className="dmt-tile-browser-config-btn clickable-icon"
+            onClick={() => setShowTilesetConfig(!showTilesetConfig)}
+            title="Tileset rendering settings"
+          >
+            <dc.Icon icon="lucide-settings-2" size={14} />
+          </button>
+        )}
+      </div>
+
+      {/* Tileset config panel (inline, toggled by gear icon) */}
+      {showTilesetConfig && activeTileset && onTilesetOverrideChange && (() => {
+        const currentOverrides = tilesetOverrides?.[activeTileset.id] || {};
+        const threshold = currentOverrides.stampThreshold ?? activeTileset.stampThreshold ?? 0.5;
+        const minScale = currentOverrides.minStampScale ?? activeTileset.minStampScale ?? 0.2;
+        const fitMode = currentOverrides.fitMode ?? activeTileset.fitMode;
+
+        const handleOverrideChange = (field: keyof TilesetOverrides, value: number | string | undefined) => {
+          const updated = { ...currentOverrides, [field]: value };
+          // Remove undefined fields to keep data clean
+          if (value === undefined) delete updated[field];
+          onTilesetOverrideChange(activeTileset.id, updated);
+        };
+
+        return (
+          <div className="dmt-tile-browser-config">
+            <div className="dmt-tile-config-row">
+              <label>Fit Mode</label>
+              <select
+                value={fitMode || 'auto'}
+                onChange={(e: Event) => {
+                  const v = (e.target as HTMLSelectElement).value;
+                  handleOverrideChange('fitMode', v === 'auto' ? undefined : v as 'fill' | 'contain');
+                }}
+                className="dmt-tile-config-select"
+              >
+                <option value="auto">Auto</option>
+                <option value="fill">Fill</option>
+                <option value="contain">Contain</option>
+              </select>
+            </div>
+            <div className="dmt-tile-config-row">
+              <label>Stamp threshold</label>
+              <input
+                type="range"
+                min="0.1"
+                max="0.9"
+                step="0.05"
+                value={threshold}
+                onInput={(e: Event) => handleOverrideChange('stampThreshold', parseFloat((e.target as HTMLInputElement).value))}
+                className="dmt-tile-config-slider"
+              />
+              <span className="dmt-tile-config-value">{(threshold * 100).toFixed(0)}%</span>
+            </div>
+            <div className="dmt-tile-config-row">
+              <label>Min stamp size</label>
+              <input
+                type="range"
+                min="0.05"
+                max="0.5"
+                step="0.05"
+                value={minScale}
+                onInput={(e: Event) => handleOverrideChange('minStampScale', parseFloat((e.target as HTMLInputElement).value))}
+                className="dmt-tile-config-slider"
+              />
+              <span className="dmt-tile-config-value">{(minScale * 100).toFixed(0)}%</span>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Search filter */}
       <div className="dmt-tile-browser-search">

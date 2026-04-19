@@ -1177,10 +1177,99 @@ button.dmt-object-grid-item,
   padding: 4px 6px;
   border-bottom: 1px solid var(--dmt-border-secondary);
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.dmt-tile-browser-tileset-name {
+  flex: 1;
+  font-size: 12px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dmt-tile-browser-config-btn {
+  flex-shrink: 0;
+}
+
+.dmt-tile-browser-config {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--dmt-border-secondary);
+  background: var(--background-secondary-alt);
+  flex-shrink: 0;
+}
+
+.dmt-tile-config-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 6px;
+  margin-bottom: 8px;
+  font-size: 11px;
+}
+
+.dmt-tile-config-row:last-child {
+  margin-bottom: 0;
+}
+
+.dmt-tile-config-row label {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.dmt-tile-config-slider {
+  flex-basis: 100%;
+  order: 3;
+  min-width: 0;
+}
+
+.dmt-tile-config-value {
+  flex-shrink: 0;
+  margin-left: auto;
+  text-align: right;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.dmt-tile-config-select {
+  flex-basis: 100%;
+  order: 3;
+  min-width: 0;
+  font-size: 11px;
+}
+
+/* Tablet overrides for tileset config panel */
+.is-tablet .dmt-tile-browser-config {
+  padding: 10px 12px;
+}
+
+.is-tablet .dmt-tile-config-row {
+  margin-bottom: 12px;
+  font-size: 13px;
+  gap: 4px 8px;
+}
+
+.is-tablet .dmt-tile-config-select {
+  font-size: 13px;
+  padding: 6px 8px;
+}
+
+button.dmt-tile-browser-config-btn,
+.is-tablet button.dmt-tile-browser-config-btn {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .dmt-tile-browser-select {
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   background: var(--dmt-bg-secondary);
   color: var(--dmt-text-primary);
   border: 1px solid var(--dmt-border-secondary);
@@ -1415,7 +1504,8 @@ button.dmt-tile-browser-layer-btn,
   background: rgba(255, 255, 255, 0.1) !important;
 }
 
-.dmt-tile-browser-layer-active {
+button.dmt-tile-browser-layer-btn.dmt-tile-browser-layer-active,
+.is-tablet button.dmt-tile-browser-layer-btn.dmt-tile-browser-layer-active {
   background: var(--dmt-border-primary) !important;
   color: var(--dmt-bg-primary) !important;
 }
