@@ -211,7 +211,7 @@ function renderTiles(
 
     const { entry, tileset } = lookup;
     const img = getCachedImage(entry.vaultPath);
-    if (!img) continue;
+    if (!img || !img.naturalWidth) continue;
 
     // Convert to screen coordinates
     // Freeform stamps use stored world coordinates directly
@@ -240,14 +240,22 @@ function renderTiles(
     if (natW > 0 && natH > 0 && !tile.fitMode) {
       const wRatio = natW / tileset.tileWidth;
       const hRatio = natH / tileset.hexHeight;
-      if (wRatio < 0.5 || hRatio < 0.5) {
+      const stampThreshold = tileset.stampThreshold ?? 0.5;
+      if (wRatio < stampThreshold || hRatio < stampThreshold) {
         // Scale relative to the hex using pre-computed screen dimensions
         const fillScaleX = hexScreenWidth / tileset.tileWidth;
         const fillScaleY = hexScreenHeight / tileset.hexHeight;
         // Use the smaller fill scale to preserve aspect ratio
         const baseScale = Math.min(fillScaleX, fillScaleY);
-        const drawWidth = natW * baseScale;
-        const drawHeight = natH * baseScale;
+        // Ensure stamps are at least 20% of hex's smaller screen dimension
+        const minHexDim = Math.min(hexScreenWidth, hexScreenHeight);
+        const minStampDim = minHexDim * (tileset.minStampScale ?? 0.2);
+        const naturalMinDim = Math.min(natW, natH) * baseScale;
+        const effectiveScale = naturalMinDim < minStampDim
+          ? baseScale * (minStampDim / naturalMinDim)
+          : baseScale;
+        const drawWidth = natW * effectiveScale;
+        const drawHeight = natH * effectiveScale;
         drawOverride = {
           drawX: screen.screenX - drawWidth / 2,
           drawY: screen.screenY - drawHeight / 2,
