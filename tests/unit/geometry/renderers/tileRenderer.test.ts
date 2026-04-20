@@ -613,7 +613,7 @@ describe('tileRenderer', () => {
 
     it('preserves relative scale between different stamp sizes', () => {
       const smallImg = { naturalWidth: 30, naturalHeight: 30 } as HTMLImageElement;
-      const largeImg = { naturalWidth: 80, naturalHeight: 80 } as HTMLImageElement;
+      const largeImg = { naturalWidth: 100, naturalHeight: 100 } as HTMLImageElement;
       // Use unique tileset ID to avoid entry map cache collision
       const tsSmall: TilesetDef = {
         id: 'ts-scale-s', name: 'Test', folderPath: 'Tiles',

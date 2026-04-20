@@ -189,6 +189,7 @@ export interface RemovalResult {
 export interface PlacementOptions {
   mapType: MapType;
   alignment?: ObjectAlignment;
+  objectSetId?: string | null;
 }
 
 // ===========================================

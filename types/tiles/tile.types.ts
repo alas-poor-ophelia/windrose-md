@@ -84,6 +84,8 @@ interface HexTileAssignmentBase {
   layer?: 'base' | 'overlay';
   /** Override tileset fitMode for this specific placement */
   fitMode?: 'fill' | 'contain';
+  /** Per-tile size multiplier (default 1.0) */
+  scale?: number;
 }
 
 /** A tile snapped to a hex grid cell */

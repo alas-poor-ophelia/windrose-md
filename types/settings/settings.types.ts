@@ -145,6 +145,10 @@ export interface PluginSettings {
   activeObjectSetId?: string | null;
   objectSetsAutoLoadFolder?: string;
 
+  // Hover preview settings
+  hoverPreviewScale?: number;  // Panel size multiplier (0.5–2.0, default 1.0)
+  hoverPreviewZoom?: number;   // Map zoom level (0.1–2.0, default 0.5)
+
   // Tileset folders (vault paths scanned for tile images)
   tilesetFolders?: string[];
 }

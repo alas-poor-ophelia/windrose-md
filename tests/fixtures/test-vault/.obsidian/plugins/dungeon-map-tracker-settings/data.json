@@ -696,5 +696,6 @@
   ],
   "objectOverrides": {},
   "customObjects": [],
-  "customCategories": []
+  "customCategories": [],
+  "showAdjacentSubMaps": true
 }
