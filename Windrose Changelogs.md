@@ -467,6 +467,87 @@ Continuing the hex maps theme — this release is headlined by hex tile painting
 - Updated README and Feature docs.
 - Major internal codebase refactor that should improve performance and stability.
 
+## Version 1.6.3
+Pretty big quality of life release, with continued fixes and improvements to the hex tiles. Deep links have been completely rewritten to work reliably in both Reading and Live Preview modes, with hover previews that show a map thumbnail when you mouse over a link. The selection toolbar got a full redesign, objects now have right-click context menus, and tile painting has new per-tileset configuration options.
+
+### New Features
+- **Deep Link Rewrite**
+	- Deep links now use a `windrose:` custom URL scheme instead of the old `obsidian://` protocol, which had reliability issues on some systems.
+	- Deep links work in both **Reading mode** and **Live Preview**.
+	- **Hover previews** — hovering a deep link shows a map thumbnail with a crosshair on the target location. Preview size and zoom level are configurable in settings (Map Behavior section).
+- **Selection Toolbar Redesign**
+	- Unified floating toolbar for objects, text labels, and multi-selections, replacing the three separate toolbars.
+	- Links section is collapsible (expanded by default for Note Pin objects).
+	- Right-click (or long press) context menu for objects via Obsidian's native Menu API — works on unselected objects too.
+- **Per-Tileset Rendering Settings**
+	- Gear icon in the tile asset browser opens an inline config panel per tileset.
+	- **Stamp threshold** — control when tiles render as full-hex vs. freeform stamps based on their size relative to the hex.
+	- **Min stamp scale** — set a minimum size for freeform stamps to prevent tiny rendering at low zoom.
+
+### Improvements
+- **Clear All** buttons (Outline and Fog of War) now show a confirmation dialog.
+- **Outlines** added to the visibility toggle menu (hex maps).
+- **Fog of War** toolbar is now a floating toolbar that auto-hides when the visibility menu closes.
+- Stamp rendering uses hex-proportional minimum sizing — small stamps scale relative to hex screen size instead of a fixed pixel minimum.
+- Object placement now correctly uses the per-map object set ID, fixing issues with imported object set customs not placing correctly.
+- Updated Feature docs and README.
+
+### Bug Fixes
+- Fixed tile images stretching to full hex size during image load race (naturalWidth guard).
+- Old `obsidian://windrose?` deep links still work for backward compatibility.
+
+## Version 1.6.2
+Fast follow, with mostly bug fixes/some polish ontop of 1.6.1, but also added a new polygonal Outline tool for hex maps. It's a little rough around the edges, but good enough to release, I think.
+
+### Features
+- **Outline Tool** (hex maps)
+	- Draw polygon outlines on hex maps. Click to place vertices, double-click to close the shape.
+	- Three line styles: **solid**, **dashed**, and **dotted**. Configurable from the toolbar or per-outline after selection.
+	- **Hex Snap mode** — outlines snap to hex cell boundaries, filling enclosed hexes and drawing borders along hex edges. (This is the part that may feel a bit odd, but it works)
+	- **Straight mode** — outlines follow your exact vertex placement for freeform shapes.
+	- Optional fill with configurable opacity.
+	- undo/redo support.
+	- Outlines can be edited by clicking an existing Outline with the Outline tool active. Select and drag vertices to reshape. Delete via toolbar, keyboard (Delete/Backspace), context menu, or Clear All.
+
+### Improvements
+- NoteLinkModal now auto-submits when selecting a suggestion from autocomplete.
+- Region name field now auto-focuses when creating a new region.
+
+### Bug Fixes
+- Fixed Note Pin tool not working without placing an object first due to it not appearing as a valid object type
+- Fixed adjacent sub-map visibility setting not persisting widely
+- Fixed boundary close tool crashing on rectangular hex maps (missing async module load).
+
+## Version 1.6.1
+Continuing the hex maps theme — this release is headlined by hex tile painting, and rounds out with a bunch of quality of life improvements across the board.
+
+### New Features
+- Hex Tile Painting
+	- Paint image tiles onto hex maps. Import tileset folders from your vault (configured in the settings plugin), and paint tiles with click or drag.
+	- A new **Tile Asset Browser** panel shows available tilesets and tiles. Browse by subfolder, click to select.
+	- Tiles support **rotation** (60° increments) and **horizontal flip**.
+	- **Base and overlay layers** — overlay tiles render on top of base tiles, for layering terrain and features.
+	- **Freeform stamp placement** — place tiles at arbitrary positions, not snapped to the hex grid. Good for scattered trees, rocks, etc.
+	- Tile dimensions and overflow (for images taller than the hex, like tree canopies) are auto-detected.
+	- Eraser now erases tiles (overlay first, then base).
+- windrose-map Code Blocks
+	- Windrose now supports a `windrose-map` code block syntax for embedding maps. This is the modern way to create maps, and is what the “Insert new map” command now generates.
+	- Simple YAML format: `id`, `name`, `type`. Existing maps using the old compiled-script embedding continue to work.
+- Adjacent Sub-Map Preview
+	- When viewing a sub-map, neighboring sub-maps now show as ghost previews at the edges of the map. Click a preview to navigate to that sub-map.
+	- Toggle on/off per map — the setting persists.
+
+### Improvements
+- **Note Pin** has been promoted from the object sidebar to a first-class tool in the tool palette, with its own keyboard shortcut (N).
+- **Object Sidebar** has been redesigned to match the tile asset browser's visual style. Includes a new dropdown to switch between object sets without leaving the map.
+- **Object Set cross-type fallback** — if your current object set doesn't have objects for the map type you're on (e.g. hex objects on a grid map), Windrose falls back to the default set instead of showing nothing.
+- **Region labels** are now draggable — reposition them freely within their region. Reset via context menu.
+- **Region visibility toggle** added to the visibility toolbar for hex maps.
+- **Sub-map settings** — the Map Settings modal now shows the sub-map name in the title and an info banner when you're editing a sub-map's settings.
+- Sub-maps now show the parent map's tilesets, so you can paint tiles in sub-maps too.
+- Updated README and Feature docs.
+- Major internal codebase refactor that should improve performance and stability.
+
 ## Version 1.6.0
 And finally, the long promised beginning of the “hex maps” releases is here! Just like 1.5.x was the “dungeon release”, I plan to do several point releases focused around hex maps. Some of it will doubtlessly affect grid maps as well, and bug fixes will be unaffected, but for now, here’s the first release of new hex map functionality.
 
