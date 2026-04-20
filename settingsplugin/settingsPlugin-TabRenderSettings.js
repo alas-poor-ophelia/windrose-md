@@ -354,7 +354,7 @@ const TabRenderSettingsMethods = {
     const previewScalePercent = Math.round((this.plugin.settings.hoverPreviewScale || 1.0) * 100);
     new Setting(containerEl)
       .setName('Link Preview Size')
-      .setDesc(`Scale of the hover preview panel (currently ${previewScalePercent}%)`)
+      .setDesc(\`Scale of the hover preview panel (currently \${previewScalePercent}%)\`)
       .addSlider(slider => slider
         .setLimits(50, 200, 10)
         .setValue(previewScalePercent)
@@ -379,7 +379,7 @@ const TabRenderSettingsMethods = {
     const previewZoomPercent = Math.round(previewZoom * 100);
     new Setting(containerEl)
       .setName('Link Preview Zoom')
-      .setDesc(`How zoomed in the preview map appears (currently ${previewZoomPercent}%)`)
+      .setDesc(\`How zoomed in the preview map appears (currently \${previewZoomPercent}%)\`)
       .addSlider(slider => slider
         .setLimits(10, 200, 10)
         .setValue(previewZoomPercent)

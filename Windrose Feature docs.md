@@ -246,6 +246,8 @@ A link with hoverable preview will also show alongside the other selection menu 
 #### Linking from Notes to Map (Deeplinking)
 **Objects** can have **deeplinks**. Pressing the **deeplink** button when an object is selected will copy a link to that object to your clipboard. You can then paste this link into any other note in your vault. Clicking that link will open the map up to this specific map and object.
 
+Deep links work in both **Reading mode** and **Live Preview**. **Hovering** a deep link shows a small map preview thumbnail with a crosshair on the target location.
+
 ### Fog of War
 Windrose supports a relatively rudimentary but rich **fog of war** functionality, if you wish to obscure parts of a map, either for hex crawls, solo dungeon play (see **random dungeon generation**), or anything else.
 
@@ -295,6 +297,10 @@ With a tile selected, **click** to place it on a single hex, or **drag** to pain
 
 #### Tileset Configuration
 Tileset folders are configured in the **settings plugin**. Each folder is scanned for image files (PNG, JPG, GIF, WebP). Tile dimensions and overflow (for images taller than the hex, like tree canopies) are auto-detected from the images.
+
+Per-tileset rendering settings are available via the gear icon in the tile asset browser. These allow you to adjust:
+- **Stamp threshold** — the minimum proportion of a hex that a tile must cover to be rendered as a full-hex tile vs. a freeform stamp. Useful for mixed tilesets with both terrain and small decoration images.
+- **Min stamp scale** — the minimum size for freeform stamp tiles, as a proportion of the hex. Prevents very small images from rendering too tiny at low zoom levels.
 
 ## Random Dungeons
 Windrose can **generate random dungeon layouts** (this means grid maps only). This can be done by selecting the “WindroseMD: Generate random dungeon” command from Obsidian’s command palette (Ctrl/Cmd+P or swipe down from top). **This will only work from a note which is in edit mode**.
