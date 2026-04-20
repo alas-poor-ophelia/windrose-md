@@ -386,22 +386,21 @@ const SettingsPluginInstaller = ({
           <h3>
             {actionMode === 'upgrade'
               ? `Update Available (v${installedVersion} → v${PACKAGED_PLUGIN_VERSION})`
-              : 'Enhance Your Mapping Experience'
+              : 'Plugin Installation Required'
             }
           </h3>
           <p>
             {actionMode === 'upgrade'
               ? `A new version of the Windrose MapDesigner Settings plugin is available.`
-              : `Install the Windrose MapDesigner Settings plugin to customize:`
+              : `Windrose requires its companion plugin to function. The plugin handles:`
             }
           </p>
           {actionMode === 'install' && (
             <ul>
-              <li>Default colors for grids, borders, and backgrounds</li>
-              <li>Hex grid orientation (flat-top or pointy-top)</li>
-              <li>Coordinate label colors</li>
-              <li>Custom map objects and symbols</li>
-              <li>Visual preferences across all your maps</li>
+              <li>Deep link navigation and hover previews</li>
+              <li>Global settings and color customization</li>
+              <li>Custom map objects and object sets</li>
+              <li>Native modals and Obsidian API integration</li>
             </ul>
           )}
           {actionMode === 'upgrade' && (
@@ -412,7 +411,7 @@ const SettingsPluginInstaller = ({
           <p className="dmt-plugin-installer-note">
             {actionMode === 'upgrade'
               ? 'You can update now or continue with your current version.'
-              : 'This is a one-time setup. You can change settings anytime in Obsidian\'s Settings panel. If you decline, default colors will be used.'
+              : 'This is a one-time setup. The plugin will be installed to your .obsidian/plugins folder and can be managed in Obsidian\'s settings.'
             }
           </p>
           {installError && (
@@ -432,13 +431,15 @@ const SettingsPluginInstaller = ({
               : (actionMode === 'upgrade' ? 'Update Plugin' : 'Install Plugin')
             }
           </button>
-          <button
-            className="dmt-plugin-installer-btn dmt-plugin-installer-btn-secondary"
-            onClick={handleDecline}
-            disabled={isInstalling}
-          >
-            {actionMode === 'upgrade' ? 'Not Now' : 'Use Defaults'}
-          </button>
+          {actionMode === 'upgrade' && (
+            <button
+              className="dmt-plugin-installer-btn dmt-plugin-installer-btn-secondary"
+              onClick={handleDecline}
+              disabled={isInstalling}
+            >
+              Not Now
+            </button>
+          )}
         </div>
       </div>
 
@@ -459,29 +460,21 @@ const SettingsPluginInstaller = ({
                 ? `The Windrose MD Settings plugin has been updated to v${PACKAGED_PLUGIN_VERSION}.`
                 : `The Windrose MD Settings plugin has been installed.`
               }
-              {actionMode === 'install' && ' Would you like to enable it now?'}
+              {actionMode === 'install' && ' Enabling now...'}
             </p>
             {actionMode === 'install' && (
               <p className="dmt-plugin-success-note">
-                You can always enable or disable this plugin later in Obsidian's Community Plugins settings.
+                The plugin will be enabled automatically. You can manage it in Obsidian's Community Plugins settings.
               </p>
             )}
             <div className="dmt-plugin-success-actions">
               {actionMode === 'install' ? (
-                <>
-                  <button
-                    className="dmt-plugin-installer-btn dmt-plugin-installer-btn-primary"
-                    onClick={handleEnableNow}
-                  >
-                    Enable Now
-                  </button>
-                  <button
-                    className="dmt-plugin-installer-btn dmt-plugin-installer-btn-secondary"
-                    onClick={handleContinueWithoutEnabling}
-                  >
-                    Continue Without Enabling
-                  </button>
-                </>
+                <button
+                  className="dmt-plugin-installer-btn dmt-plugin-installer-btn-primary"
+                  onClick={handleEnableNow}
+                >
+                  Enable Plugin
+                </button>
               ) : (
                 <button
                   className="dmt-plugin-installer-btn dmt-plugin-installer-btn-primary"
