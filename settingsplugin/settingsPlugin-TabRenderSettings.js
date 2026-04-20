@@ -349,6 +349,55 @@ const TabRenderSettingsMethods = {
             await this.plugin.saveSettings();
           }
         }));
+
+    // Hover Preview Size
+    const previewScalePercent = Math.round((this.plugin.settings.hoverPreviewScale || 1.0) * 100);
+    new Setting(containerEl)
+      .setName('Link Preview Size')
+      .setDesc(`Scale of the hover preview panel (currently ${previewScalePercent}%)`)
+      .addSlider(slider => slider
+        .setLimits(50, 200, 10)
+        .setValue(previewScalePercent)
+        .setDynamicTooltip()
+        .onChange(async (value) => {
+          this.plugin.settings.hoverPreviewScale = value / 100;
+          this.settingsChanged = true;
+          await this.plugin.saveSettings();
+        }))
+      .addExtraButton(btn => btn
+        .setIcon('rotate-ccw')
+        .setTooltip('Reset to default (100%)')
+        .onClick(async () => {
+          this.plugin.settings.hoverPreviewScale = 1.0;
+          this.settingsChanged = true;
+          await this.plugin.saveSettings();
+          this.display();
+        }));
+
+    // Hover Preview Zoom
+    const previewZoom = this.plugin.settings.hoverPreviewZoom || 0.5;
+    const previewZoomPercent = Math.round(previewZoom * 100);
+    new Setting(containerEl)
+      .setName('Link Preview Zoom')
+      .setDesc(`How zoomed in the preview map appears (currently ${previewZoomPercent}%)`)
+      .addSlider(slider => slider
+        .setLimits(10, 200, 10)
+        .setValue(previewZoomPercent)
+        .setDynamicTooltip()
+        .onChange(async (value) => {
+          this.plugin.settings.hoverPreviewZoom = value / 100;
+          this.settingsChanged = true;
+          await this.plugin.saveSettings();
+        }))
+      .addExtraButton(btn => btn
+        .setIcon('rotate-ccw')
+        .setTooltip('Reset to default (50%)')
+        .onClick(async () => {
+          this.plugin.settings.hoverPreviewZoom = 0.5;
+          this.settingsChanged = true;
+          await this.plugin.saveSettings();
+          this.display();
+        }));
   },
   renderDistanceMeasurementSettingsContent(containerEl) {
     // Grid: Distance per cell

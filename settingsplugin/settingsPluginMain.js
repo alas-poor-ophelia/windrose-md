@@ -245,22 +245,17 @@ class WindroseMDSettingsPlugin extends Plugin {
       }
       const [mapId, x, y, zoom, layerId] = parts;
       const result = { notePath, mapId, x: parseFloat(x), y: parseFloat(y), zoom: parseFloat(zoom), layerId };
-      console.log(W, 'parsed href', result);
       return result;
     };
 
     const navigateToWindroseLink = async (parsed, sourcePath) => {
-      console.log(W, 'navigate: start', { parsed, sourcePath });
       const { notePath, mapId, x, y, zoom, layerId } = parsed;
       const currentPath = sourcePath || '';
       const isSameNote = notePath === currentPath || notePath === currentPath.replace(/\.md$/, '');
-      console.log(W, 'navigate: sameNote?', { isSameNote, notePath, currentPath });
       if (!isSameNote) {
         try {
           const linkPath = notePath.replace(/\.md$/, '');
-          console.log(W, 'navigate: openLinkText', { linkPath });
           await this.app.workspace.openLinkText(linkPath, '', false);
-          console.log(W, 'navigate: openLinkText OK');
         } catch (err) {
           console.error(W, 'navigate: openLinkText FAILED', err);
           new Notice('Failed to open map note');
@@ -272,9 +267,7 @@ class WindroseMDSettingsPlugin extends Plugin {
       const detail = { mapId, x, y, zoom, layerId, timestamp: Date.now() };
       window.__windrose = window.__windrose || {};
       window.__windrose.pendingNavigate = { ...detail, consumed: false };
-      console.log(W, 'navigate: stashed pending + dispatching', detail);
       window.dispatchEvent(new CustomEvent('dmt-navigate-to', { detail }));
-      console.log(W, 'navigate: dispatched');
 
       // Scroll the note viewport to the map codeblock (may not be visible if below fold)
       setTimeout(() => {
@@ -284,7 +277,6 @@ class WindroseMDSettingsPlugin extends Plugin {
             const mapEl = leaf.querySelector('.dmt-container');
             if (mapEl) {
               mapEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-              console.log(W, 'navigate: scrolled to map');
             }
           }
         } catch (err) {
@@ -298,22 +290,10 @@ class WindroseMDSettingsPlugin extends Plugin {
         'a[href^="windrose:"], a[data-href^="windrose:"]'
       );
       if (candidates.length === 0) return;
-      console.log(W, 'post-processor: invoked', {
-        sourcePath: ctx.sourcePath,
-        elTag: el.tagName,
-        totalAnchors: el.querySelectorAll('a').length,
-        windroseLinks: candidates.length
-      });
 
       candidates.forEach((link, idx) => {
         const rawHref = link.getAttribute('href') || '';
         const dataHref = link.getAttribute('data-href') || '';
-        console.log(W, 'post-processor: link', idx, {
-          text: link.textContent,
-          href: rawHref,
-          dataHref,
-          className: link.className
-        });
         const original = rawHref.startsWith('windrose:') ? rawHref
                        : dataHref.startsWith('windrose:') ? dataHref : '';
         if (!original) {
@@ -328,7 +308,6 @@ class WindroseMDSettingsPlugin extends Plugin {
         replacement.setAttribute('data-windrose-href', original);
         replacement.style.cursor = 'pointer';
         link.replaceWith(replacement);
-        console.log(W, 'post-processor: replaced link', idx);
 
         const parsed = parseWindroseHref(original);
         if (parsed && typeof DeeplinkHover !== 'undefined') {
@@ -343,11 +322,6 @@ class WindroseMDSettingsPlugin extends Plugin {
       if (!(target && target.closest)) return;
       const link = target.closest('a[href^="windrose:"], a[data-href^="windrose:"], a[data-windrose-href]');
       if (!link) return;
-      console.log(W, 'doc-capture: caught click', {
-        href: link.getAttribute('href'),
-        dataHref: link.getAttribute('data-href'),
-        stored: link.getAttribute('data-windrose-href')
-      });
       e.preventDefault();
       e.stopPropagation();
       if (typeof e.stopImmediatePropagation === 'function') e.stopImmediatePropagation();
@@ -514,16 +488,9 @@ class WindroseMDSettingsPlugin extends Plugin {
         const windroseEditorExt = cmView.EditorView.domEventHandlers({
           click: (event, view) => {
             const target = event.target;
-            console.log(W, 'cm6: click', {
-              tag: target?.tagName,
-              className: target?.className,
-              text: target?.textContent?.slice(0, 40),
-              parentClass: target?.parentElement?.className
-            });
             const resolved = resolveWindroseFromEvent(event, view);
             if (!resolved) return false;
 
-            console.log(W, 'cm6: intercepting', resolved.href);
             event.preventDefault();
             event.stopPropagation();
             if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
@@ -600,7 +567,6 @@ class WindroseMDSettingsPlugin extends Plugin {
         });
 
         this.registerEditorExtension([windroseEditorExt, windroseIconTagger]);
-        console.log(W, 'cm6: editor extension registered');
       } else {
         console.warn(W, 'cm6: @codemirror/view not available, Live Preview interception unavailable');
       }

@@ -247,13 +247,13 @@ function renderTiles(
         const fillScaleY = hexScreenHeight / tileset.hexHeight;
         // Use the smaller fill scale to preserve aspect ratio
         const baseScale = Math.min(fillScaleX, fillScaleY);
-        // Ensure stamps are at least 20% of hex's smaller screen dimension
+        // Ensure stamps are at least minStampScale of hex's smaller dimension
         const minHexDim = Math.min(hexScreenWidth, hexScreenHeight);
-        const minStampDim = minHexDim * (tileset.minStampScale ?? 0.2);
+        const minStampDim = minHexDim * (tileset.minStampScale ?? 0.35);
         const naturalMinDim = Math.min(natW, natH) * baseScale;
-        const effectiveScale = naturalMinDim < minStampDim
+        const effectiveScale = (naturalMinDim < minStampDim
           ? baseScale * (minStampDim / naturalMinDim)
-          : baseScale;
+          : baseScale) * (tile.scale ?? 1);
         const drawWidth = natW * effectiveScale;
         const drawHeight = natH * effectiveScale;
         drawOverride = {
@@ -265,11 +265,21 @@ function renderTiles(
       }
     }
 
-    const rect = drawOverride || calculateTileDrawRect(
+    let rect = drawOverride || calculateTileDrawRect(
       screen.screenX, screen.screenY,
       tileset, geometry.hexSize, viewState.zoom, geometry.orientation,
       tile.fitMode
     );
+
+    // Apply per-tile scale to non-stamp tiles (stamps already applied above)
+    if (!drawOverride && tile.scale != null && tile.scale !== 1) {
+      const s = tile.scale;
+      const cx = rect.drawX + rect.drawWidth / 2;
+      const cy = rect.drawY + rect.drawHeight / 2;
+      const w = rect.drawWidth * s;
+      const h = rect.drawHeight * s;
+      rect = { drawX: cx - w / 2, drawY: cy - h / 2, drawWidth: w, drawHeight: h };
+    }
 
     // Apply opacity
     if (opacity < 1) {

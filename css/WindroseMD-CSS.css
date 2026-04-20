@@ -1434,6 +1434,22 @@ button.dmt-tile-browser-config-btn,
   flex-wrap: wrap;
 }
 
+.dmt-tile-browser-scale-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: #252525;
+  border-top: 1px solid var(--dmt-border-secondary);
+  flex-shrink: 0;
+  color: var(--dmt-text-muted);
+  font-size: 11px;
+}
+
+.dmt-tile-browser-scale-row .dmt-tile-config-slider {
+  flex: 1;
+}
+
 .dmt-tile-browser-action-btn,
 .is-tablet .dmt-tile-browser-action-btn {
   width: 28px;

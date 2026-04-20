@@ -61,39 +61,48 @@ function autoDetectOverflow(tileWidth: number, tileHeight: number): {
 // ===========================================
 
 /**
- * Scan a vault folder for tile images.
+ * Scan a vault folder for tile images using adapter.list() for folder-scoped
+ * listing instead of vault.getFiles() which walks every file in the vault.
  * Returns TileEntry[] with subfolder-based categories.
  */
-function scanTilesetFolder(folderPath: string): TileEntry[] {
-  const allFiles = app.vault.getFiles();
+async function scanTilesetFolder(folderPath: string): Promise<TileEntry[]> {
   const normalizedFolder = folderPath.endsWith('/')
     ? folderPath.slice(0, -1)
     : folderPath;
 
   const tiles: TileEntry[] = [];
 
-  for (const file of allFiles) {
-    // Must be inside the target folder
-    if (!file.path.startsWith(normalizedFolder + '/')) continue;
+  // Recursively collect image files via adapter.list (folder-scoped, not vault-wide)
+  const queue = [normalizedFolder];
+  while (queue.length > 0) {
+    const dir = queue.pop()!;
+    let listing: { files: string[]; folders: string[] };
+    try {
+      listing = await app.vault.adapter.list(dir);
+    } catch {
+      continue; // folder may not exist
+    }
 
-    // Must be an image
-    const ext = file.extension?.toLowerCase();
-    if (!ext || !IMAGE_EXTENSIONS.has(ext)) continue;
+    for (const sub of listing.folders) {
+      queue.push(sub);
+    }
 
-    // Determine category from immediate subfolder
-    const relativePath = file.path.slice(normalizedFolder.length + 1);
-    const parts = relativePath.split('/');
-    const category = parts.length > 1 ? parts[0] : undefined;
+    for (const filePath of listing.files) {
+      const dotIdx = filePath.lastIndexOf('.');
+      if (dotIdx < 0) continue;
+      const ext = filePath.slice(dotIdx + 1).toLowerCase();
+      if (!IMAGE_EXTENSIONS.has(ext)) continue;
 
-    // ID = filename without extension
-    const id = file.basename;
+      const relativePath = filePath.slice(normalizedFolder.length + 1);
+      const parts = relativePath.split('/');
+      const category = parts.length > 1 ? parts[0] : undefined;
 
-    tiles.push({
-      id,
-      filename: file.name,
-      vaultPath: file.path,
-      category,
-    });
+      const slashIdx = filePath.lastIndexOf('/');
+      const filename = slashIdx >= 0 ? filePath.slice(slashIdx + 1) : filePath;
+      const id = filename.slice(0, filename.lastIndexOf('.'));
+
+      tiles.push({ id, filename, vaultPath: filePath, category });
+    }
   }
 
   return tiles;
@@ -255,7 +264,7 @@ function createTilesetFromTiles(
   };
 }
 
-function createTileset(
+async function createTileset(
   folderPath: string,
   name: string,
   options?: {
@@ -266,8 +275,8 @@ function createTileset(
     overflowTop?: number;
     overflowBottom?: number;
   }
-): TilesetDef {
-  const tiles = scanTilesetFolder(folderPath);
+): Promise<TilesetDef> {
+  const tiles = await scanTilesetFolder(folderPath);
   return createTilesetFromTiles(folderPath, name, tiles, options);
 }
 

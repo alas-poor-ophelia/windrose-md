@@ -35,6 +35,8 @@ interface UseTileBrushResult {
   setTileFitMode: (v: 'fill' | 'contain' | 'auto') => void;
   stampMode: boolean;
   setStampMode: (v: boolean) => void;
+  tileScale: number;
+  setTileScale: (v: number) => void;
   handleTileSelect: (tilesetId: string, tileId: string) => void;
   handleTileDeselect: () => void;
 }
@@ -48,6 +50,7 @@ function useTileBrush(): UseTileBrushResult {
   const [tileLayer, setTileLayer] = dc.useState<'base' | 'overlay'>('base');
   const [tileFitMode, setTileFitMode] = dc.useState<'fill' | 'contain' | 'auto'>('auto');
   const [stampMode, setStampMode] = dc.useState<boolean>(false);
+  const [tileScale, setTileScale] = dc.useState<number>(1);
 
   const handleTileSelect = dc.useCallback((tilesetId: string, tileId: string) => {
     setSelectedTilesetId(tilesetId);
@@ -70,6 +73,7 @@ function useTileBrush(): UseTileBrushResult {
     tileLayer, setTileLayer,
     tileFitMode, setTileFitMode,
     stampMode, setStampMode,
+    tileScale, setTileScale,
     handleTileSelect, handleTileDeselect,
   };
 }

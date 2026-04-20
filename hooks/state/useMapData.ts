@@ -49,7 +49,7 @@ const { getEffectiveSettings, getTilesetFolders } = await requireModuleByName("s
 const { createTilesetFromTiles, probeFirstTileImage, scanTilesetFolder } = await requireModuleByName("tilesetOperations.ts") as {
   createTilesetFromTiles: (folderPath: string, name: string, tiles: import('#types/tiles/tile.types').TileEntry[], options?: Record<string, number>) => import('#types/tiles/tile.types').TilesetDef;
   probeFirstTileImage: (tiles: import('#types/tiles/tile.types').TileEntry[]) => Promise<{ width: number; height: number } | null>;
-  scanTilesetFolder: (folderPath: string) => import('#types/tiles/tile.types').TileEntry[];
+  scanTilesetFolder: (folderPath: string) => Promise<import('#types/tiles/tile.types').TileEntry[]>;
 };
 
 const { getResolvedObjectTypes, hasImagePath } = await requireModuleByName("objectTypeResolver.ts") as {
@@ -113,7 +113,7 @@ function useMapData(
           const name = parts[parts.length - 1] || folder;
 
           // Scan once, then pass pre-scanned tiles to avoid double-scan
-          const tiles = scanTilesetFolder(folder);
+          const tiles = await scanTilesetFolder(folder);
           const dims = await probeFirstTileImage(tiles);
           const options = dims
             ? { tileWidth: dims.width, tileHeight: dims.height }

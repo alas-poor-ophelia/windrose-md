@@ -26,7 +26,7 @@ const { requireModuleByName } = await dc.require(pathResolverPath) as {
 
 // Import getObjectType from the resolver (handles overrides, custom objects, fallback)
 const { getObjectType } = await requireModuleByName("objectTypeResolver.ts") as {
-  getObjectType: (typeId: string, mapType?: MapType) => ObjectTypeDef
+  getObjectType: (typeId: string, mapType?: MapType, objectSetId?: string | null) => ObjectTypeDef
 };
 
 const { 
@@ -82,8 +82,8 @@ function getObjectAtPosition(objects: MapObject[] | null | undefined, x: number,
 /**
  * Add a new object to the objects array (grid maps - single object per cell)
  */
-function addObject(objects: MapObject[], typeId: string, x: number, y: number): MapObject[] {
-  const objectType = getObjectType(typeId);
+function addObject(objects: MapObject[], typeId: string, x: number, y: number, mapType: MapType = 'grid', objectSetId?: string | null): MapObject[] {
+  const objectType = getObjectType(typeId, mapType, objectSetId);
   if (objectType.isUnknown) {
     console.error(`Unknown object type: ${typeId}`);
     return objects;
@@ -160,9 +160,10 @@ function addObjectToHex(
   objects: MapObject[],
   typeId: string,
   x: number,
-  y: number
+  y: number,
+  objectSetId?: string | null
 ): PlacementResult {
-  const objectType = getObjectType(typeId, 'hex');
+  const objectType = getObjectType(typeId, 'hex', objectSetId);
   if (objectType.isUnknown) {
     return {
       objects,
@@ -386,20 +387,20 @@ function placeObject(
   y: number,
   options: PlacementOptions
 ): PlacementResult {
-  const { mapType, alignment = 'center' } = options;
-  
+  const { mapType, alignment = 'center', objectSetId } = options;
+
   if (mapType === 'hex') {
     // Hex: use multi-object placement with slot assignment
-    const result = addObjectToHex(objects, typeId, x, y);
+    const result = addObjectToHex(objects, typeId, x, y, objectSetId);
     if (result.success) {
       const newObject = result.objects[result.objects.length - 1];
       return { ...result, object: newObject };
     }
     return result;
   }
-  
+
   // Grid: single object per cell
-  const objectType = getObjectType(typeId, mapType);
+  const objectType = getObjectType(typeId, mapType, objectSetId);
   if (objectType.isUnknown) {
     return { 
       objects, 
@@ -506,9 +507,10 @@ function placeObjectFreeform(
   worldX: number,
   worldY: number,
   nearestGridPos: { x: number; y: number },
-  mapType: MapType
+  mapType: MapType,
+  objectSetId?: string | null
 ): PlacementResult {
-  const objectType = getObjectType(typeId, mapType);
+  const objectType = getObjectType(typeId, mapType, objectSetId);
   if (objectType.isUnknown) {
     return { objects, success: false, error: `Unknown object type: ${typeId}` };
   }

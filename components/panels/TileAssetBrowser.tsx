@@ -155,6 +155,8 @@ interface TileAssetBrowserProps {
   onTileFitModeChange: (mode: 'fill' | 'contain' | 'auto') => void;
   stampMode: boolean;
   onStampModeChange: (stamp: boolean) => void;
+  tileScale: number;
+  onTileScaleChange: (scale: number) => void;
   getCachedImage?: (path: string) => HTMLImageElement | null;
   tilesetOverrides?: Record<string, TilesetOverrides>;
   onTilesetOverrideChange?: (tilesetId: string, overrides: TilesetOverrides) => void;
@@ -181,6 +183,8 @@ const TileAssetBrowser = ({
   onTileFitModeChange,
   stampMode,
   onStampModeChange,
+  tileScale,
+  onTileScaleChange,
   getCachedImage,
   tilesetOverrides,
   onTilesetOverrideChange,
@@ -592,6 +596,33 @@ const TileAssetBrowser = ({
           >
             <dc.Icon icon="lucide-x" size={14} />
           </button>
+        </div>
+      )}
+
+      {/* Tile scale slider */}
+      {selectedTileId && (
+        <div className="dmt-tile-browser-scale-row">
+          <dc.Icon icon="lucide-scaling" size={12} />
+          <input
+            type="range"
+            min="0.25"
+            max="3"
+            step="0.25"
+            value={tileScale}
+            onInput={(e: Event) => onTileScaleChange(parseFloat((e.target as HTMLInputElement).value))}
+            className="dmt-tile-config-slider"
+            title={`Scale: ${tileScale}x`}
+          />
+          <span className="dmt-tile-config-value">{tileScale}x</span>
+          {tileScale !== 1 && (
+            <button
+              className="dmt-tile-browser-action-btn"
+              onClick={() => onTileScaleChange(1)}
+              title="Reset to 1x"
+            >
+              <dc.Icon icon="lucide-rotate-ccw" size={12} />
+            </button>
+          )}
         </div>
       )}
 

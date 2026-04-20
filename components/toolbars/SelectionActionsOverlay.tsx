@@ -121,7 +121,8 @@ const SelectionActionsOverlay = ({
   selectionCount
 }: SelectionActionsOverlayProps): React.ReactElement | null => {
 
-  const [linksExpanded, setLinksExpanded] = dc.useState(false);
+  const isNotePin = selectedItems.length === 1 && selectedItems[0].data?.type === 'note_pin';
+  const [linksExpanded, setLinksExpanded] = dc.useState(isNotePin);
 
   // Context menu via Obsidian Menu API
   dc.useEffect(() => {

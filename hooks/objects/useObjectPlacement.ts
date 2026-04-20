@@ -26,8 +26,8 @@ const { useMapOperations } = await requireModuleByName("MapContext.tsx") as {
 
 const { calculateEdgeAlignment, placeObject, placeObjectFreeform, canPlaceObjectAt } = await requireModuleByName("objectOperations.ts") as {
   calculateEdgeAlignment: (fractionalX: number, fractionalY: number, gridX: number, gridY: number) => string;
-  placeObject: (objects: MapObject[], type: string, x: number, y: number, options: { mapType: string; alignment?: string }) => { success: boolean; objects: MapObject[] };
-  placeObjectFreeform: (objects: MapObject[], type: string, worldX: number, worldY: number, nearestGridPos: { x: number; y: number }, mapType: string) => { success: boolean; objects: MapObject[]; object?: MapObject };
+  placeObject: (objects: MapObject[], type: string, x: number, y: number, options: { mapType: string; alignment?: string; objectSetId?: string | null }) => { success: boolean; objects: MapObject[] };
+  placeObjectFreeform: (objects: MapObject[], type: string, worldX: number, worldY: number, nearestGridPos: { x: number; y: number }, mapType: string, objectSetId?: string | null) => { success: boolean; objects: MapObject[]; object?: MapObject };
   canPlaceObjectAt: (objects: MapObject[], x: number, y: number, mapType: string) => boolean;
 };
 
@@ -79,7 +79,8 @@ function useObjectPlacement(
         worldCoords.worldX,
         worldCoords.worldY,
         { x: gridX, y: gridY },
-        mapType
+        mapType,
+        mapData!.objectSetId
       );
       if (result.success) {
         onObjectsChange(result.objects);
@@ -107,7 +108,7 @@ function useObjectPlacement(
       selectedObjectType,
       gridX,
       gridY,
-      { mapType, alignment }
+      { mapType, alignment, objectSetId: mapData!.objectSetId }
     );
 
     if (result.success) {

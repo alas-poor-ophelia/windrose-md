@@ -23,19 +23,33 @@ const { renderCanvas } = await requireModuleByName("useCanvasRenderer.ts") as {
 const { GridGeometry } = await requireModuleByName("GridGeometry.ts") as { GridGeometry: new (size: number) => IGeometry };
 const { HexGeometry } = await requireModuleByName("HexGeometry.ts") as { HexGeometry: new (size: number, orientation: string, bounds: unknown) => IGeometry };
 const { DEFAULTS } = await requireModuleByName("dmtConstants.ts") as { DEFAULTS: Record<string, unknown> };
-const { getTheme, getEffectiveSettings } = await requireModuleByName("settingsAccessor.ts") as {
+const { getTheme, getEffectiveSettings, getSettings } = await requireModuleByName("settingsAccessor.ts") as {
   getTheme: () => Record<string, unknown>;
   getEffectiveSettings: (settings: MapData['settings']) => Record<string, unknown>;
+  getSettings: () => Record<string, unknown>;
 };
 
-const PREVIEW_WIDTH = 240;
-const PREVIEW_HEIGHT = 180;
+const BASE_WIDTH = 240;
+const BASE_HEIGHT = 180;
+const DEFAULT_PREVIEW_SCALE = 1.0;
+const DEFAULT_PREVIEW_ZOOM = 0.5;
+
+function getPreviewDimensions(): { width: number; height: number; zoom: number } {
+  try {
+    const s = getSettings();
+    const scale = Math.max(0.5, Math.min(2.0, Number(s.hoverPreviewScale) || DEFAULT_PREVIEW_SCALE));
+    const zoom = Math.max(0.1, Math.min(2.0, Number(s.hoverPreviewZoom) || DEFAULT_PREVIEW_ZOOM));
+    return { width: Math.round(BASE_WIDTH * scale), height: Math.round(BASE_HEIGHT * scale), zoom };
+  } catch {
+    return { width: BASE_WIDTH, height: BASE_HEIGHT, zoom: DEFAULT_PREVIEW_ZOOM };
+  }
+}
 
 interface WindroseHoverPreviewProps {
   mapId: string;
   x: number;
   y: number;
-  zoom: number;
+  zoom?: number;
   layerId?: string;
   notePath?: string;
 }
@@ -47,10 +61,13 @@ function noteBasename(notePath?: string): string {
   return base.replace(/\.md$/i, '');
 }
 
-function WindroseHoverPreview({ mapId, x, y, zoom, layerId, notePath }: WindroseHoverPreviewProps): React.ReactElement {
+function WindroseHoverPreview({ mapId, x, y, zoom: zoomProp, layerId, notePath }: WindroseHoverPreviewProps): React.ReactElement {
   const canvasRef = dc.useRef<HTMLCanvasElement | null>(null);
   const [status, setStatus] = dc.useState<'loading' | 'ready' | 'missing' | 'error'>('loading');
   const [mapName, setMapName] = dc.useState<string>('');
+
+  const preview = getPreviewDimensions();
+  const zoom = zoomProp ?? preview.zoom;
 
   dc.useEffect(() => {
     let cancelled = false;
@@ -100,8 +117,8 @@ function WindroseHoverPreview({ mapId, x, y, zoom, layerId, notePath }: Windrose
 
         const canvas = canvasRef.current;
         if (!canvas) return;
-        canvas.width = PREVIEW_WIDTH;
-        canvas.height = PREVIEW_HEIGHT;
+        canvas.width = preview.width;
+        canvas.height = preview.height;
 
         renderCanvas(canvas, null, focused, geometry, [], {
           theme,
@@ -112,8 +129,8 @@ function WindroseHoverPreview({ mapId, x, y, zoom, layerId, notePath }: Windrose
         // enough to surround the zoomed object rather than sit on top of it.
         const ctx = canvas.getContext('2d');
         if (ctx) {
-          const cx = PREVIEW_WIDTH / 2;
-          const cy = PREVIEW_HEIGHT / 2;
+          const cx = preview.width / 2;
+          const cy = preview.height / 2;
           const offset = 34; // distance from center to each bracket corner
           const arm = 14;    // length of each bracket arm
           const drawBrackets = () => {
@@ -173,8 +190,8 @@ function WindroseHoverPreview({ mapId, x, y, zoom, layerId, notePath }: Windrose
       )}
       <canvas
         ref={canvasRef}
-        width={PREVIEW_WIDTH}
-        height={PREVIEW_HEIGHT}
+        width={preview.width}
+        height={preview.height}
         style={{ display: status === 'ready' ? 'block' : 'none' }}
       />
       {status === 'loading' && <div className="windrose-hover-preview-state">Loading…</div>}

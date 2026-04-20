@@ -28,7 +28,7 @@ const { useMapState, useMapOperations } = await requireModuleByName("MapContext.
   useMapOperations: () => {
     onObjectsChange: (objects: MapObject[]) => void;
     getObjectAtPosition: (objects: MapObject[], x: number, y: number) => MapObject | null;
-    addObject: (objects: MapObject[], type: ObjectTypeId, x: number, y: number) => MapObject[];
+    addObject: (objects: MapObject[], type: ObjectTypeId, x: number, y: number, mapType?: 'hex' | 'grid', objectSetId?: string | null) => MapObject[];
     updateObject: (objects: MapObject[], id: string, updates: Partial<MapObject>) => MapObject[];
     removeObject: (objects: MapObject[], id: string) => MapObject[];
   };
@@ -98,7 +98,7 @@ const useNotePinInteraction = (
     }
 
     // Place the Note Pin object (without linkedNote initially)
-    const newObjects = addObject(getActiveLayer(mapData).objects || [], 'note_pin', gridX, gridY);
+    const newObjects = addObject(getActiveLayer(mapData).objects || [], 'note_pin', gridX, gridY, mapData.mapType || 'grid', mapData.objectSetId);
 
     // Find the newly created pin
     const newPin = newObjects[newObjects.length - 1];

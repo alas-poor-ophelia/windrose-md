@@ -72,8 +72,9 @@ const DeeplinkHover = (() => {
     const viewportW = window.innerWidth || 1200;
     const viewportH = window.innerHeight || 800;
     // Position below the link by default; flip above if it would overflow.
-    const estWidth = 260;
-    const estHeight = 244;
+    const previewScale = Math.max(0.5, Math.min(2.0, Number(plugin.settings.hoverPreviewScale) || 1.0));
+    const estWidth = Math.round(240 * previewScale) + 20;
+    const estHeight = Math.round(180 * previewScale) + 64;
     let left = Math.min(Math.max(8, rect.left), viewportW - estWidth - 8);
     let top = rect.bottom + 8;
     if (top + estHeight > viewportH - 8) {
@@ -101,7 +102,7 @@ const DeeplinkHover = (() => {
         mapId: parsed.mapId,
         x: Number.isFinite(parsed.x) ? parsed.x : 0,
         y: Number.isFinite(parsed.y) ? parsed.y : 0,
-        zoom: Number.isFinite(parsed.zoom) && parsed.zoom > 0 ? parsed.zoom : 1,
+        zoom: Number.isFinite(parsed.zoom) && parsed.zoom > 0 ? parsed.zoom : undefined,
         layerId: parsed.layerId || '',
         notePath: parsed.notePath || ''
       });

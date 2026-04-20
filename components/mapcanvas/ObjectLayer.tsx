@@ -725,6 +725,7 @@ const ObjectLayer = ({
 
       {selectedItem?.type === 'object' && !hasMultiSelection && !isDraggingSelection && (
         <SelectionActionsOverlay
+          key={selectedItem.id}
           selectedItems={[selectedItem]}
           actions={buildObjectActions(selectedItem, {
             onRotate: handleObjectRotation,

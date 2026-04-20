@@ -25,6 +25,7 @@ interface TilePlacementLayerProps {
   tileLayer: 'base' | 'overlay';
   tileFitMode: 'fill' | 'contain' | 'auto';
   stampMode: boolean;
+  tileScale: number;
   onTilesChange: (tiles: HexTileAssignment[], suppressHistory?: boolean) => void;
 }
 
@@ -37,6 +38,7 @@ const TilePlacementLayer = ({
   tileLayer,
   tileFitMode,
   stampMode,
+  tileScale,
   onTilesChange
 }: TilePlacementLayerProps): React.ReactElement | null => {
   const { mapData, geometry, screenToGrid, screenToWorld } = useMapState();
@@ -73,6 +75,7 @@ const TilePlacementLayer = ({
       flipH: tileFlipH || undefined,
       layer: targetLayer === 'base' ? undefined : targetLayer,
       fitMode: tileFitMode === 'auto' ? undefined : tileFitMode,
+      scale: tileScale !== 1 ? tileScale : undefined,
     };
 
     let newTiles: HexTileAssignment[];
@@ -85,7 +88,7 @@ const TilePlacementLayer = ({
 
     const isBatchedStroke = strokeInitialTilesRef.current !== null;
     onTilesChange(newTiles, isBatchedStroke);
-  }, [mapData, selectedTilesetId, selectedTileId, tileRotation, tileFlipH, tileLayer, tileFitMode, onTilesChange]);
+  }, [mapData, selectedTilesetId, selectedTileId, tileRotation, tileFlipH, tileLayer, tileFitMode, tileScale, onTilesChange]);
 
   const placeStampAtWorld = dc.useCallback((worldX: number, worldY: number, q: number, r: number) => {
     if (!mapData || !selectedTilesetId || !selectedTileId) return;
@@ -101,13 +104,14 @@ const TilePlacementLayer = ({
       flipH: tileFlipH || undefined,
       layer: 'overlay',
       fitMode: tileFitMode === 'auto' ? undefined : tileFitMode,
+      scale: tileScale !== 1 ? tileScale : undefined,
       freeform: true,
       worldX,
       worldY,
     };
 
     onTilesChange([...currentTiles, newTile]);
-  }, [mapData, selectedTilesetId, selectedTileId, tileRotation, tileFlipH, tileFitMode, onTilesChange]);
+  }, [mapData, selectedTilesetId, selectedTileId, tileRotation, tileFlipH, tileFitMode, tileScale, onTilesChange]);
 
   const eraseTileAtHex = dc.useCallback((q: number, r: number) => {
     if (!mapData) return;
