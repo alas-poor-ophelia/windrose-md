@@ -56,7 +56,7 @@ const CornerBracket = ({ position }: { position: BracketPosition }): React.React
 };
 
 interface SelectedItem {
-  type: 'object' | 'text' | 'notePin';
+  type: 'object' | 'text' | 'notePin' | 'shapeOverlay';
   id: string;
   data?: any;
 }
@@ -68,7 +68,7 @@ interface SelectionActionsOverlayProps {
   canvasRef: { current: HTMLCanvasElement | null };
   containerRef: { current: HTMLElement | null };
   geometry: IGeometry;
-  selectionType: 'object' | 'text' | 'multi';
+  selectionType: 'object' | 'text' | 'multi' | 'shapeOverlay';
 
   // Resize slider state
   isResizeMode?: boolean;
@@ -88,6 +88,20 @@ interface SelectionActionsOverlayProps {
 
   // Multi-select count
   selectionCount?: number;
+
+  // Player light section
+  isPlayer?: boolean;
+  lightEnabled?: boolean;
+  lightRadius?: number;
+  lightColor?: string;
+  onLightToggle?: () => void;
+  onLightRadiusChange?: (radius: number) => void;
+  onLightColorSelect?: (color: string) => void;
+  showLightColorPicker?: boolean;
+  onLightColorSwatchClick?: () => void;
+  onLightColorPickerClose?: () => void;
+  lightColorButtonRef?: { current: HTMLButtonElement | null };
+  distanceUnit?: string;
 }
 
 const ACTION_GROUPS: { id: string; actions: string[] }[] = [
@@ -95,6 +109,7 @@ const ACTION_GROUPS: { id: string; actions: string[] }[] = [
   { id: 'content', actions: ['edit', 'label', 'duplicate'] },
   { id: 'links', actions: ['linkNote', 'linkObject', 'followLink', 'removeLink'] },
   { id: 'style', actions: ['color'] },
+  { id: 'player', actions: ['playerToggle'] },
   { id: 'danger', actions: ['delete'] }
 ];
 
@@ -118,7 +133,19 @@ const SelectionActionsOverlay = ({
   onDeleteCustomColor,
   pendingCustomColorRef,
   colorButtonRef,
-  selectionCount
+  selectionCount,
+  isPlayer,
+  lightEnabled,
+  lightRadius,
+  lightColor,
+  onLightToggle,
+  onLightRadiusChange,
+  onLightColorSelect,
+  showLightColorPicker,
+  onLightColorSwatchClick,
+  onLightColorPickerClose,
+  lightColorButtonRef,
+  distanceUnit
 }: SelectionActionsOverlayProps): React.ReactElement | null => {
 
   const isNotePin = selectedItems.length === 1 && selectedItems[0].data?.type === 'note_pin';
@@ -215,6 +242,12 @@ const SelectionActionsOverlay = ({
   // Resize slider
   if (isResizeMode) {
     cardHeight += separatorHeight + 4 + 32;
+  }
+
+  // Player light controls (header row + optional controls row)
+  if (isPlayer) {
+    cardHeight += separatorHeight + 4 + 24;
+    if (lightEnabled) cardHeight += 4 + 24;
   }
 
   // Multi-select badge
@@ -410,6 +443,60 @@ const SelectionActionsOverlay = ({
                   title={`Scale: ${Math.round(currentScale * 100)}%`}
                 />
                 <span className="dmt-sel-resize-value">{Math.round(currentScale * 100)}%</span>
+              </div>
+            </>
+          )}
+
+          {/* Player light controls */}
+          {isPlayer && (
+            <>
+              <div className="dmt-sel-separator" />
+              <div className="dmt-sel-player-section">
+                <div className="dmt-sel-player-header" onClick={() => onLightToggle?.()}>
+                  <dc.Icon icon="lucide-sun" size={14} />
+                  <span>Light</span>
+                  <label className="dmt-sel-toggle-switch" onClick={(e: Event) => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      checked={!!lightEnabled}
+                      onChange={() => onLightToggle?.()}
+                    />
+                    <span className="dmt-sel-toggle-slider" />
+                  </label>
+                </div>
+                {lightEnabled && (
+                  <div className="dmt-sel-player-row">
+                    <input
+                      type="number"
+                      className="dmt-sel-radius-input"
+                      value={lightRadius || 30}
+                      min="1"
+                      step="5"
+                      onInput={(e: any) => onLightRadiusChange?.(parseInt(e.target.value) || 30)}
+                    />
+                    <span className="dmt-sel-unit-label">{distanceUnit || 'ft'}</span>
+                    <button
+                      ref={lightColorButtonRef}
+                      className="dmt-sel-light-color-swatch"
+                      onClick={() => onLightColorSwatchClick?.()}
+                      title="Light Color"
+                    >
+                      <span className="dmt-sel-color-swatch" style={{ backgroundColor: lightColor || 'rgba(255, 255, 100, 1)' }} />
+                    </button>
+                    {showLightColorPicker && (
+                      <ColorPicker
+                        isOpen={showLightColorPicker}
+                        selectedColor={lightColor || 'rgba(255, 255, 100, 1)'}
+                        onColorSelect={onLightColorSelect}
+                        onClose={onLightColorPickerClose}
+                        title="Light Color"
+                        position="above"
+                        portalled
+                        anchorRef={lightColorButtonRef}
+                      />
+                    )}
+                  </div>
+                )}
               </div>
             </>
           )}

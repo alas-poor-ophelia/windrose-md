@@ -97,6 +97,52 @@ const ObjectLayer = ({
 
   const { isLinkingMode, linkingFrom, startLinking, cancelLinking } = useLinkingMode();
 
+
+  const handlePlayerToggle = dc.useCallback(() => {
+    if (!selectedItem || selectedItem.type !== 'object' || !mapData) return;
+    const obj = getActiveLayer(mapData).objects?.find(o => o.id === selectedItem.id);
+    if (!obj) return;
+    const isPlayer = !obj.isPlayer;
+    const updates: Record<string, unknown> = { isPlayer };
+    if (isPlayer && !obj.lightRadius) {
+      updates.lightRadius = 30;
+      updates.lightColor = 'rgba(255, 255, 100, 1)';
+      updates.lightEnabled = true;
+    }
+    const updatedObjects = updateObject(getActiveLayer(mapData).objects, selectedItem.id, updates);
+    contextOnObjectsChange(updatedObjects);
+    const updatedObj = updatedObjects.find((o: MapObject) => o.id === selectedItem.id);
+    if (updatedObj) setSelectedItem({ ...selectedItem, data: updatedObj });
+  }, [selectedItem, mapData, updateObject, contextOnObjectsChange, setSelectedItem]);
+
+  const handleLightToggle = dc.useCallback(() => {
+    if (!selectedItem || selectedItem.type !== 'object' || !mapData) return;
+    const lightEnabled = !selectedItem.data?.lightEnabled;
+    const updatedObjects = updateObject(getActiveLayer(mapData).objects, selectedItem.id, { lightEnabled });
+    contextOnObjectsChange(updatedObjects);
+    const updatedObj = updatedObjects.find((o: MapObject) => o.id === selectedItem.id);
+    if (updatedObj) setSelectedItem({ ...selectedItem, data: updatedObj });
+  }, [selectedItem, mapData, updateObject, contextOnObjectsChange, setSelectedItem]);
+
+  const handleLightRadiusChange = dc.useCallback((radius: number) => {
+    if (!selectedItem || selectedItem.type !== 'object' || !mapData) return;
+    const updatedObjects = updateObject(getActiveLayer(mapData).objects, selectedItem.id, { lightRadius: radius });
+    contextOnObjectsChange(updatedObjects);
+    const updatedObj = updatedObjects.find((o: MapObject) => o.id === selectedItem.id);
+    if (updatedObj) setSelectedItem({ ...selectedItem, data: updatedObj });
+  }, [selectedItem, mapData, updateObject, contextOnObjectsChange, setSelectedItem]);
+
+  const handleLightColorSelect = dc.useCallback((color: string) => {
+    if (!selectedItem || selectedItem.type !== 'object' || !mapData) return;
+    const updatedObjects = updateObject(getActiveLayer(mapData).objects, selectedItem.id, { lightColor: color });
+    contextOnObjectsChange(updatedObjects);
+    const updatedObj = updatedObjects.find((o: MapObject) => o.id === selectedItem.id);
+    if (updatedObj) setSelectedItem({ ...selectedItem, data: updatedObj });
+  }, [selectedItem, mapData, updateObject, contextOnObjectsChange, setSelectedItem]);
+
+  const [showLightColorPicker, setShowLightColorPicker] = dc.useState(false);
+  const lightColorBtnRef = dc.useRef<HTMLButtonElement>(null);
+
   // Keep a ref in sync with the freeformPlacementMode prop for the interactions hook
   const freeformPlacementModeRef = dc.useRef(freeformPlacementMode);
   freeformPlacementModeRef.current = freeformPlacementMode;
@@ -727,7 +773,7 @@ const ObjectLayer = ({
         <SelectionActionsOverlay
           key={selectedItem.id}
           selectedItems={[selectedItem]}
-          actions={buildObjectActions(selectedItem, {
+          actions={[...buildObjectActions(selectedItem, {
             onRotate: handleObjectRotation,
             onDuplicate: handleObjectDuplicate,
             onFreeformToggle: handleFreeformToggle,
@@ -739,8 +785,10 @@ const ObjectLayer = ({
             onCopyLink: handleCopyLink,
             onColorClick: handleObjectColorButtonClick,
             onResize: handleResizeButtonClick,
-            onDelete: handleObjectDeletion
-          }, mapData, { isResizeMode })}
+            onDelete: handleObjectDeletion,
+            onPlayerToggle: handlePlayerToggle
+          }, mapData, { isResizeMode, isPlayer: !!selectedItem.data?.isPlayer })]}
+
           mapData={mapData}
           canvasRef={canvasRef}
           containerRef={containerRef}
@@ -758,6 +806,18 @@ const ObjectLayer = ({
           onDeleteCustomColor={onDeleteCustomColor}
           pendingCustomColorRef={pendingObjectCustomColorRef}
           colorButtonRef={objectColorBtnRef}
+          isPlayer={!!selectedItem.data?.isPlayer}
+          lightEnabled={!!selectedItem.data?.lightEnabled}
+          lightRadius={selectedItem.data?.lightRadius || 30}
+          lightColor={selectedItem.data?.lightColor || 'rgba(255, 255, 100, 1)'}
+          onLightToggle={handleLightToggle}
+          onLightRadiusChange={handleLightRadiusChange}
+          onLightColorSelect={handleLightColorSelect}
+          showLightColorPicker={showLightColorPicker}
+          onLightColorSwatchClick={() => setShowLightColorPicker(prev => !prev)}
+          onLightColorPickerClose={() => setShowLightColorPicker(false)}
+          lightColorButtonRef={lightColorBtnRef}
+          distanceUnit={(() => { const s = mapData?.settings?.overrides || {}; return (s.distanceUnit as string) || 'ft'; })()}
         />
       )}
 

@@ -102,6 +102,10 @@ const { renderRegions } = await requireModuleByName("regionRenderer.ts") as {
 const { renderOutlines } = await requireModuleByName("outlineRenderer.ts") as {
   renderOutlines: (ctx: CanvasRenderingContext2D, outlines: import('#types/core/map.types').Outline[], geometry: any, viewState: { x: number; y: number; zoom: number }, mapBounds: { maxRing?: number; maxCol?: number; maxRow?: number }, orientation: string) => void;
 };
+const { renderShapeOverlays, renderPlayerLights } = await requireModuleByName("shapeOverlayRenderer.ts") as {
+  renderShapeOverlays: (ctx: CanvasRenderingContext2D, shapeOverlays: import('#types/core/map.types').ShapeOverlay[], viewState: { x: number; y: number; zoom: number }) => void;
+  renderPlayerLights: (ctx: CanvasRenderingContext2D, objects: unknown[], geometry: unknown, viewState: { x: number; y: number; zoom: number }, distancePerCell: number) => void;
+};
 const { renderTiles } = await requireModuleByName("tileRenderer.ts") as {
   renderTiles: (ctx: CanvasRenderingContext2D, tiles: import('#types/tiles/tile.types').HexTileAssignment[], tilesets: import('#types/tiles/tile.types').TilesetDef[], geometry: { hexToWorld: (q: number, r: number) => { worldX: number; worldY: number }; worldToScreen: (wx: number, wy: number, ox: number, oy: number, zoom: number) => { screenX: number; screenY: number }; hexSize: number; orientation: string }, viewState: { x: number; y: number; zoom: number }, options?: { opacity?: number; getCachedImage?: (path: string) => HTMLImageElement | null; canvasWidth?: number; canvasHeight?: number }) => void;
 };
@@ -565,6 +569,21 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   // Draw outlines (hex maps only, after regions)
   if (geometry.type === 'hex' && mapData.outlines && mapData.outlines.length > 0 && visibility.outlines !== false) {
     renderOutlines(ctx, mapData.outlines, geometry, { x: offsetX, y: offsetY, zoom }, mapData.hexBounds || {}, mapData.orientation || 'flat');
+  }
+
+  // Draw player light radii (before shapes and objects)
+  if (activeLayer.objects?.length) {
+    const playerObjects = activeLayer.objects.filter((o: any) => o.isPlayer && o.lightEnabled);
+    if (playerObjects.length > 0) {
+      const settings = mapData.settings?.overrides || {};
+      const distancePerCell = (settings.distancePerCell as number) || 5;
+      renderPlayerLights(ctx, playerObjects, geometry, { x: offsetX, y: offsetY, zoom }, distancePerCell);
+    }
+  }
+
+  // Draw shape overlays (both grid and hex maps, after outlines)
+  if (mapData.shapeOverlays && mapData.shapeOverlays.length > 0) {
+    renderShapeOverlays(ctx, mapData.shapeOverlays, { x: offsetX, y: offsetY, zoom });
   }
 
   // Draw sub-hex indicators (small diamond on hexes that have sub-hex data)

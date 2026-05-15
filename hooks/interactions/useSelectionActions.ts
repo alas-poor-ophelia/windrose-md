@@ -8,7 +8,7 @@
 import type { MapData } from '#types/core/map.types';
 import type { MapObject } from '#types/objects/object.types';
 
-export type ActionGroup = 'transform' | 'content' | 'links' | 'style' | 'danger';
+export type ActionGroup = 'transform' | 'content' | 'links' | 'style' | 'player' | 'danger';
 
 export interface SelectionAction {
   id: string;
@@ -42,6 +42,7 @@ interface ObjectHandlers {
   onColorClick: (e?: Event) => void;
   onResize: (e?: Event) => void;
   onDelete: (e?: Event) => void;
+  onPlayerToggle?: (e?: Event) => void;
 }
 
 interface TextHandlers {
@@ -59,6 +60,7 @@ interface MultiHandlers {
 
 interface ObjectActionOptions {
   isResizeMode?: boolean;
+  isPlayer?: boolean;
 }
 
 function buildObjectActions(
@@ -129,6 +131,13 @@ function buildObjectActions(
       group: 'style', visible: true, invoke: handlers.onColorClick, special: 'color'
     },
 
+    // Player group
+    {
+      id: 'playerToggle', label: options?.isPlayer ? 'Remove Player' : 'Mark as Player',
+      icon: 'lucide-user', group: 'player', visible: true,
+      invoke: handlers.onPlayerToggle, active: !!options?.isPlayer, iconOnly: true
+    },
+
     // Danger group
     {
       id: 'delete', label: 'Delete', icon: 'lucide-trash-2',
@@ -178,5 +187,33 @@ function buildMultiActions(
   ];
 }
 
-return { buildObjectActions, buildTextActions, buildMultiActions };
+interface ShapeOverlayHandlers {
+  onColorClick: () => void;
+  onDelete: () => void;
+  onFreeformToggle: () => void;
+}
+
+function buildShapeOverlayActions(
+  item: SelectedItem,
+  handlers: ShapeOverlayHandlers
+): SelectionAction[] {
+  const isFreeform = !!(item.data?.freeform);
+  return [
+    {
+      id: 'freeform', label: isFreeform ? 'Snap to Grid' : 'Freeform',
+      icon: 'lucide-diamond', group: 'transform', visible: true,
+      invoke: handlers.onFreeformToggle, active: isFreeform, iconOnly: true
+    },
+    {
+      id: 'color', label: 'Color', icon: 'lucide-palette',
+      group: 'style', visible: true, invoke: handlers.onColorClick, special: 'color'
+    },
+    {
+      id: 'delete', label: 'Delete', icon: 'lucide-trash-2',
+      group: 'danger', visible: true, invoke: handlers.onDelete
+    }
+  ];
+}
+
+return { buildObjectActions, buildTextActions, buildMultiActions, buildShapeOverlayActions };
 export type { SelectionAction, ActionGroup };
