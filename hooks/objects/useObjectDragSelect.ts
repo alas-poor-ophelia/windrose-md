@@ -381,7 +381,8 @@ function useObjectDragSelect(
         if (movedObject) {
           setSelectedItem({
             type: 'object',
-            id: objectId!
+            id: objectId!,
+            data: movedObject
           });
         }
       } else {
@@ -410,7 +411,8 @@ function useObjectDragSelect(
           if (updatedObject) {
             setSelectedItem({
               type: 'object',
-              id: objectId!
+              id: objectId!,
+              data: updatedObject
             });
           }
         }
@@ -453,6 +455,24 @@ function useObjectDragSelect(
 
       if (dragInitialStateRef.current !== null) {
         onObjectsChange(getActiveLayer(mapData!).objects, false);
+
+        const fogObjectId = selectedItem?.id || dragStart?.objectId;
+        if (fogObjectId) {
+          const initialObj = dragInitialStateRef.current.find((o: MapObject) => o.id === fogObjectId);
+          const currentObj = getActiveLayer(mapData!).objects?.find((o: MapObject) => o.id === fogObjectId);
+          if (initialObj && currentObj && currentObj.isPlayer && currentObj.lightEnabled && currentObj.lightRadius) {
+            const moved = initialObj.position.x !== currentObj.position.x
+              || initialObj.position.y !== currentObj.position.y
+              || initialObj.worldPosition?.x !== currentObj.worldPosition?.x
+              || initialObj.worldPosition?.y !== currentObj.worldPosition?.y;
+            if (moved) {
+              document.dispatchEvent(new CustomEvent('windrose:player-fog-clear', {
+                detail: { objectId: fogObjectId }
+              }));
+            }
+          }
+        }
+
         dragInitialStateRef.current = null;
       }
 

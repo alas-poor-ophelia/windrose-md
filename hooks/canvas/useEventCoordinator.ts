@@ -229,6 +229,12 @@ const useEventCoordinator = ({
           if (textHandled) return;
         }
 
+        const shapeHandlers = getHandlers('shapeOverlay');
+        if (shapeHandlers?.handleShapeSelection) {
+          const shapeHandled = (shapeHandlers.handleShapeSelection as (cx: number, cy: number) => boolean)(clientX, clientY);
+          if (shapeHandled) return;
+        }
+
         panStartPositionRef.current = { x: clientX, y: clientY };
         startPan(clientX, clientY);
 
@@ -358,6 +364,14 @@ const useEventCoordinator = ({
           const eventToUse = isTouchEvent ? syntheticEvent : e;
           tileHandlers.handlePointerDown(eventToUse);
         }
+      } else if (currentTool === 'shape') {
+        if (hasMultiSelection) clearSelection();
+
+        const shapeHandlers = getHandlers('shapeOverlay');
+        if (shapeHandlers?.handlePointerDown) {
+          const eventToUse = isTouchEvent ? syntheticEvent : e;
+          shapeHandlers.handlePointerDown(eventToUse);
+        }
       }
     };
 
@@ -446,6 +460,11 @@ const useEventCoordinator = ({
         objectHandlers.handleObjectDragging(e);
       } else if (selectedItem.type === 'text' && layerVisibility.textLabels && textHandlers?.handleTextDragging) {
         textHandlers.handleTextDragging(e);
+      } else if (selectedItem.type === 'shapeOverlay') {
+        const shapeHandlers = getHandlers('shapeOverlay');
+        if (shapeHandlers?.handleShapeDragging) {
+          (shapeHandlers.handleShapeDragging as (e: MouseEvent | TouchEvent) => void)(e);
+        }
       }
       return;
     }
@@ -578,6 +597,14 @@ const useEventCoordinator = ({
       return;
     }
 
+    if (currentTool === 'shape') {
+      const shapeHandlers = getHandlers('shapeOverlay');
+      if (shapeHandlers?.handlePointerMove) {
+        shapeHandlers.handlePointerMove(e);
+      }
+      return;
+    }
+
     if (layerVisibility.objects && objectHandlers?.handleHoverUpdate) {
       objectHandlers.handleHoverUpdate(e);
     }
@@ -662,7 +689,13 @@ const useEventCoordinator = ({
         objectHandlers.stopObjectDragging();
       } else if (selectedItem?.type === 'text' && textHandlers?.stopTextDragging) {
         textHandlers.stopTextDragging();
+      } else if (selectedItem?.type === 'shapeOverlay') {
+        const shapeHandlers = getHandlers('shapeOverlay');
+        if (shapeHandlers?.stopShapeDragging) {
+          (shapeHandlers.stopShapeDragging as () => void)();
+        }
       }
+
       return;
     }
 
