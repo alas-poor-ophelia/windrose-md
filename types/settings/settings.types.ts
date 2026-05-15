@@ -151,6 +151,9 @@ export interface PluginSettings {
 
   // Tileset folders (vault paths scanned for tile images)
   tilesetFolders?: string[];
+
+  // Keyboard shortcuts (action ID → key string)
+  keyboardShortcuts?: Record<string, string>;
 }
 
 // ===========================================
