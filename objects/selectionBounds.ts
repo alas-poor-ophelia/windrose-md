@@ -138,6 +138,34 @@ function getSelectionBounds(
       return calculateTextLabelBounds(label, canvasRef, containerRef, mapData);
     }
 
+    if (item.type === 'shapeOverlay') {
+      const shape = mapData.shapeOverlays?.find(s => s.id === item.id);
+      if (!shape || !canvasRef.current || !containerRef.current) return null;
+      const canvas = canvasRef.current;
+      const { viewState } = mapData;
+      if (!viewState) return null;
+      const { zoom, center } = viewState;
+      const centerX = canvas.width / 2;
+      const centerY = canvas.height / 2;
+      const offsetX = centerX - center.x * zoom;
+      const offsetY = centerY - center.y * zoom;
+      const screenX = shape.worldPosition.x * zoom + offsetX;
+      const screenY = shape.worldPosition.y * zoom + offsetY;
+      const screenSize = shape.size * zoom;
+      const rect = canvas.getBoundingClientRect();
+      const containerRect = containerRef.current.getBoundingClientRect();
+      const canvasOffsetX = rect.left - containerRect.left;
+      const canvasOffsetY = rect.top - containerRect.top;
+      const scaleX = rect.width / canvas.width;
+      const scaleY = rect.height / canvas.height;
+      return {
+        left: (screenX - screenSize) * scaleX + canvasOffsetX,
+        top: (screenY - screenSize) * scaleY + canvasOffsetY,
+        width: screenSize * 2 * scaleX,
+        height: screenSize * 2 * scaleY
+      };
+    }
+
     return null;
   }
 

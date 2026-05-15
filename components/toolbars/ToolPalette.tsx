@@ -317,7 +317,7 @@ const toolGroups: ToolGroup[] = [
       { id: 'regionPaint' as ToolId, label: 'Paint Region', title: 'Paint hexes into a region', icon: 'lucide-map' },
       { id: 'regionBoundary' as ToolId, label: 'Draw Boundary', title: 'Draw region boundary polygon', icon: 'lucide-pentagon' }
     ]
-  }
+  },
 ];
 
 const simpleTools: SimpleTool[] = [
@@ -326,6 +326,7 @@ const simpleTools: SimpleTool[] = [
   { id: 'addNote' as ToolId, title: 'Place Note Pin (N)', icon: 'lucide-pin', shortcut: 'n' },
   { id: 'addText' as ToolId, title: 'Add Text Label', icon: 'lucide-type' },
   { id: 'outline' as ToolId, title: 'Draw Outline', icon: 'lucide-spline', hexOnly: true },
+  { id: 'shape' as ToolId, title: 'Place Shape Overlay', icon: 'lucide-shapes' },
   { id: 'measure' as ToolId, title: 'Measure Distance (M)', icon: 'lucide-ruler', shortcut: 'm' },
   { id: 'tilePaint' as ToolId, title: 'Place Tile (select from tile browser)', icon: 'lucide-image-plus', hexOnly: true }
 ];

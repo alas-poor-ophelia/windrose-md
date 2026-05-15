@@ -122,6 +122,10 @@ async function loadMapData(mapId: string, mapName: string = '', mapType: MapType
       if (!mapData.outlines) {
         mapData.outlines = [];
       }
+      // Ensure shapeOverlays array exists (backward compatibility)
+      if (!mapData.shapeOverlays) {
+        mapData.shapeOverlays = [];
+      }
       // Ensure hexBounds exists for hex maps (use defaults, handle migration)
       if (mapData.mapType === 'hex') {
         if (!mapData.hexBounds) {
@@ -225,6 +229,7 @@ async function loadMapData(mapId: string, mapName: string = '', mapType: MapType
             }
             if (!subHex.mapData.regions) subHex.mapData.regions = [];
             if (!subHex.mapData.outlines) subHex.mapData.outlines = [];
+            if (!subHex.mapData.shapeOverlays) subHex.mapData.shapeOverlays = [];
           }
         }
       }

@@ -44,6 +44,7 @@ const { AreaSelectLayer } = await requireModuleByName("AreaSelectLayer.tsx");
 const { FogOfWarLayer } = await requireModuleByName("FogOfWarLayer.tsx");
 const { RegionLayer } = await requireModuleByName("RegionLayer.tsx");
 const { OutlineLayer } = await requireModuleByName("OutlineLayer.tsx");
+const { ShapeOverlayLayer } = await requireModuleByName("ShapeOverlayLayer.tsx");
 const { TilePlacementLayer } = await requireModuleByName("TilePlacementLayer.tsx");
 const { RerollDungeonButton } = await requireModuleByName("RerollDungeonButton.tsx");
 const { getSetting } = await requireModuleByName("settingsAccessor.ts");
@@ -526,6 +527,7 @@ MapCanvas.AreaSelectLayer = AreaSelectLayer;
 MapCanvas.FogOfWarLayer = FogOfWarLayer;
 MapCanvas.RegionLayer = RegionLayer;
 MapCanvas.OutlineLayer = OutlineLayer;
+MapCanvas.ShapeOverlayLayer = ShapeOverlayLayer;
 MapCanvas.TilePlacementLayer = TilePlacementLayer;
 MapCanvas.RerollDungeonButton = RerollDungeonButton;
 

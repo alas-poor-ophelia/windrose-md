@@ -297,6 +297,84 @@ const ShapePreviewOverlay = ({
       />
     );
 
+  } else if (shapeType === 'shapeSquare') {
+    const minX = Math.min(startPoint.x, endPoint.x);
+    const maxX = Math.max(startPoint.x, endPoint.x);
+    const minY = Math.min(startPoint.y, endPoint.y);
+    const maxY = Math.max(startPoint.y, endPoint.y);
+
+    const corners = [
+      worldToScreen(minX, minY, geo, mapData, canvasWidth, canvasHeight),
+      worldToScreen(maxX, minY, geo, mapData, canvasWidth, canvasHeight),
+      worldToScreen(maxX, maxY, geo, mapData, canvasWidth, canvasHeight),
+      worldToScreen(minX, maxY, geo, mapData, canvasWidth, canvasHeight),
+    ].map(p => ({
+      x: p.x * displayScale + canvasOffsetX,
+      y: p.y * displayScale + canvasOffsetY
+    }));
+
+    const polygonPoints = corners.map(c => `${c.x},${c.y}`).join(' ');
+    tooltipPosition = {
+      x: (corners[0].x + corners[1].x) / 2,
+      y: (corners[0].y + corners[1].y) / 2 - 10
+    };
+
+    const cellSize = geo.cellSize || (geo as any).hexSize || 1;
+    const widthCells = Math.abs(maxX - minX) / cellSize;
+    const heightCells = Math.abs(maxY - minY) / cellSize;
+    dimensionText = distanceSettings
+      ? formatRectDimensions(widthCells, heightCells, distanceSettings)
+      : `${Math.round(widthCells * 10) / 10}×${Math.round(heightCells * 10) / 10}`;
+
+    overlayContent = (
+      <polygon
+        points={polygonPoints}
+        fill="#c4a57b22"
+        stroke="#c4a57b"
+        strokeWidth={2}
+        strokeDasharray="8,4"
+        strokeLinejoin="round"
+      />
+    );
+
+  } else if (shapeType === 'shapeCircle') {
+    const centerScreen = worldToScreen(endPoint.x, endPoint.y, geo, mapData, canvasWidth, canvasHeight);
+    const edgeScreen = worldToScreen(startPoint.x, startPoint.y, geo, mapData, canvasWidth, canvasHeight);
+
+    const scaledCenter = {
+      x: centerScreen.x * displayScale + canvasOffsetX,
+      y: centerScreen.y * displayScale + canvasOffsetY
+    };
+    const scaledEdge = {
+      x: edgeScreen.x * displayScale + canvasOffsetX,
+      y: edgeScreen.y * displayScale + canvasOffsetY
+    };
+
+    const dx = scaledEdge.x - scaledCenter.x;
+    const dy = scaledEdge.y - scaledCenter.y;
+    const radiusScreen = Math.sqrt(dx * dx + dy * dy);
+
+    const cellSize = geo.cellSize || (geo as any).hexSize || 1;
+    const worldDx = startPoint.x - endPoint.x;
+    const worldDy = startPoint.y - endPoint.y;
+    const radiusCells = Math.sqrt(worldDx * worldDx + worldDy * worldDy) / cellSize;
+    dimensionText = distanceSettings
+      ? formatCircleRadius(radiusCells, distanceSettings)
+      : `r: ${Math.round(radiusCells * 10) / 10}`;
+    tooltipPosition = { x: scaledCenter.x, y: scaledCenter.y - radiusScreen - 15 };
+
+    overlayContent = (
+      <circle
+        cx={scaledCenter.x}
+        cy={scaledCenter.y}
+        r={radiusScreen}
+        fill="#c4a57b22"
+        stroke="#c4a57b"
+        strokeWidth={2}
+        strokeDasharray="8,4"
+      />
+    );
+
   } else if (shapeType === 'edgeLine') {
     const startScreen = cellToScreen(startPoint.x, startPoint.y, geo, mapData, canvasWidth, canvasHeight, false);
     const endScreen = cellToScreen(endPoint.x, endPoint.y, geo, mapData, canvasWidth, canvasHeight, false);
