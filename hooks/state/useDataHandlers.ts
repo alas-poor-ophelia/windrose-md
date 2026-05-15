@@ -54,7 +54,9 @@ function useDataHandlers({
     name: string,
     overrides: Partial<HistoryState> = {},
     regions: import('#types/core/map.types').Region[] = [],
-    outlines: import('#types/core/map.types').Outline[] = []
+    outlines: import('#types/core/map.types').Outline[] = [],
+    shapeOverlays: import('#types/core/map.types').ShapeOverlay[] = [],
+    fogOfWar: import('#types/core/map.types').FogOfWar | null = null
   ): HistoryState => ({
     cells: overrides.cells ?? layer.cells ?? [],
     curves: overrides.curves ?? layer.curves ?? [],
@@ -64,7 +66,9 @@ function useDataHandlers({
     edges: overrides.edges ?? layer.edges ?? [],
     tiles: overrides.tiles ?? layer.tiles ?? [],
     regions: overrides.regions ?? regions,
-    outlines: overrides.outlines ?? outlines
+    outlines: overrides.outlines ?? outlines,
+    shapeOverlays: overrides.shapeOverlays ?? shapeOverlays,
+    fogOfWar: overrides.fogOfWar ?? fogOfWar
   }), []);
 
   // =========================================================================
@@ -84,7 +88,7 @@ function useDataHandlers({
 
         if (!suppressHistory) {
           const activeLayer = getActiveLayer(currentMapData);
-          addToHistory(buildHistoryState(activeLayer, currentMapData.name, { [field]: newValue as unknown as Cell[] | MapObject[] | TextLabel[] | unknown[] }, currentMapData.regions || []));
+          addToHistory(buildHistoryState(activeLayer, currentMapData.name, { [field]: newValue as unknown as Cell[] | MapObject[] | TextLabel[] | unknown[] }, currentMapData.regions || [], currentMapData.outlines || [], currentMapData.shapeOverlays || [], activeLayer.fogOfWar));
         }
 
         return newMapData;
@@ -264,6 +268,20 @@ function useDataHandlers({
     });
   }, [updateMapData, addToHistory, isApplyingHistory, buildHistoryState]);
 
+  // Handle shape overlays change - tracked in history for undo/redo
+  const handleShapeOverlaysChange = dc.useCallback((shapeOverlays: import('#types/core/map.types').ShapeOverlay[]): void => {
+    if (isApplyingHistory()) return;
+
+    updateMapData((currentMapData: MapData | null) => {
+      if (!currentMapData) return currentMapData;
+
+      const activeLayer = getActiveLayer(currentMapData);
+      addToHistory(buildHistoryState(activeLayer, currentMapData.name, {}, currentMapData.regions || [], currentMapData.outlines || [], shapeOverlays));
+
+      return { ...currentMapData, shapeOverlays };
+    });
+  }, [updateMapData, addToHistory, isApplyingHistory, buildHistoryState]);
+
   // =========================================================================
   // Return Value
   // =========================================================================
@@ -287,7 +305,8 @@ function useDataHandlers({
     handleObjectSetChange,
     handleTextLabelSettingsChange,
     handleRegionsChange,
-    handleOutlinesChange
+    handleOutlinesChange,
+    handleShapeOverlaysChange
   };
 
   return {
@@ -311,7 +330,8 @@ function useDataHandlers({
     handleObjectSetChange,
     handleTextLabelSettingsChange,
     handleRegionsChange,
-    handleOutlinesChange
+    handleOutlinesChange,
+    handleShapeOverlaysChange
   };
 }
 

@@ -124,7 +124,9 @@ function useLayerHistory({
         edges: activeLayer.edges || [],
         tiles: activeLayer.tiles || [],
         regions: mapData.regions || [],
-        outlines: mapData.outlines || []
+        outlines: mapData.outlines || [],
+        shapeOverlays: mapData.shapeOverlays || [],
+        fogOfWar: activeLayer.fogOfWar
       });
       historyInitialized.current = true;
     }
@@ -146,7 +148,7 @@ function useLayerHistory({
    * Build a history state snapshot from layer data
    */
   const buildHistoryState = dc.useCallback(
-    (layer: MapLayer, name: string, regions: import('#types/core/map.types').Region[] = [], outlines: import('#types/core/map.types').Outline[] = []): LayerHistorySnapshot => ({
+    (layer: MapLayer, name: string, regions: import('#types/core/map.types').Region[] = [], outlines: import('#types/core/map.types').Outline[] = [], shapeOverlays: import('#types/core/map.types').ShapeOverlay[] = [], fogOfWar: import('#types/core/map.types').FogOfWar | null = null): LayerHistorySnapshot => ({
       cells: layer.cells || [],
       curves: layer.curves || [],
       name: name,
@@ -154,6 +156,8 @@ function useLayerHistory({
       textLabels: layer.textLabels || [],
       edges: layer.edges || [],
       tiles: layer.tiles || [],
+      shapeOverlays: shapeOverlays,
+      fogOfWar: fogOfWar ?? layer.fogOfWar,
       regions: regions,
       outlines: outlines
     }),
@@ -181,7 +185,7 @@ function useLayerHistory({
         // No cached history for this layer - initialize fresh
         const layer = getActiveLayer(newMapData);
         historyInitialized.current = false;
-        resetHistory(buildHistoryState(layer, newMapData.name || '', newMapData.regions || [], newMapData.outlines || []));
+        resetHistory(buildHistoryState(layer, newMapData.name || '', newMapData.regions || [], newMapData.outlines || [], newMapData.shapeOverlays || [], layer.fogOfWar));
         historyInitialized.current = true;
       }
     },
@@ -319,14 +323,15 @@ function useLayerHistory({
       isApplyingHistoryRef.current = true;
       // Apply layer-specific data to active layer, name/regions/outlines at root
       const newMapData = updateActiveLayer(
-        { ...mapData, name: previousState.name, regions: previousState.regions || mapData.regions, outlines: previousState.outlines || mapData.outlines },
+        { ...mapData, name: previousState.name, regions: previousState.regions || mapData.regions, outlines: previousState.outlines || mapData.outlines, shapeOverlays: previousState.shapeOverlays || mapData.shapeOverlays },
         {
           cells: previousState.cells,
           curves: previousState.curves || [],
           objects: previousState.objects || [],
           textLabels: previousState.textLabels || [],
           edges: previousState.edges || [],
-          tiles: previousState.tiles || []
+          tiles: previousState.tiles || [],
+          fogOfWar: previousState.fogOfWar !== undefined ? previousState.fogOfWar : undefined
         }
       );
       updateMapData(newMapData);
@@ -343,14 +348,15 @@ function useLayerHistory({
       isApplyingHistoryRef.current = true;
       // Apply layer-specific data to active layer, name/regions/outlines at root
       const newMapData = updateActiveLayer(
-        { ...mapData, name: nextState.name, regions: nextState.regions || mapData.regions, outlines: nextState.outlines || mapData.outlines },
+        { ...mapData, name: nextState.name, regions: nextState.regions || mapData.regions, outlines: nextState.outlines || mapData.outlines, shapeOverlays: nextState.shapeOverlays || mapData.shapeOverlays },
         {
           cells: nextState.cells,
           curves: nextState.curves || [],
           objects: nextState.objects || [],
           textLabels: nextState.textLabels || [],
           edges: nextState.edges || [],
-          tiles: nextState.tiles || []
+          tiles: nextState.tiles || [],
+          fogOfWar: nextState.fogOfWar !== undefined ? nextState.fogOfWar : undefined
         }
       );
       updateMapData(newMapData);

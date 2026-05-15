@@ -371,7 +371,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     handleObjectSetChange,
     handleTextLabelSettingsChange,
     handleRegionsChange,
-    handleOutlinesChange
+    handleOutlinesChange,
+    handleShapeOverlaysChange
   } = useDataHandlers({ mapData, updateMapData, addToHistory, isApplyingHistory });
 
   // Custom event listeners (sub-hex, deep links, regions, object links, hex context menu)
@@ -381,6 +382,89 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     navigateToSibling,
     handleRegionsChange
   });
+
+  // Player fog clearing on drop (reads latest state via functional updater, supports undo)
+  dc.useEffect(() => {
+    const handler = (e: CustomEvent) => {
+      if (!geometry || isApplyingHistory()) return;
+      const { objectId } = e.detail;
+
+      updateMapData((current: any) => {
+        if (!current) return current;
+        const activeLayer = getActiveLayer(current);
+        if (!activeLayer.fogOfWar?.enabled || !activeLayer.fogOfWar?.foggedCells?.length) return current;
+
+        const obj = activeLayer.objects?.find((o: any) => o.id === objectId);
+        if (!obj || !obj.isPlayer || !obj.lightEnabled || !obj.lightRadius) return current;
+
+        const settings = current.settings?.overrides || {};
+        const distancePerCell = (settings.distancePerCell as number) || 5;
+        const cellSize = (geometry as any).cellSize || (geometry as any).hexSize || 1;
+        const radiusInCells = obj.lightRadius / distancePerCell;
+        const radiusInWorld = radiusInCells * cellSize;
+
+        let objWorldX: number, objWorldY: number;
+        if (obj.freeform && obj.worldPosition) {
+          objWorldX = obj.worldPosition.x;
+          objWorldY = obj.worldPosition.y;
+        } else if ((geometry as any).cellToWorld) {
+          const w = (geometry as any).cellToWorld(obj.position.x, obj.position.y);
+          objWorldX = w.worldX;
+          objWorldY = w.worldY;
+        } else {
+          objWorldX = obj.position.x * cellSize;
+          objWorldY = obj.position.y * cellSize;
+        }
+
+        const radiusSq = radiusInWorld * radiusInWorld;
+        const remainingCells = activeLayer.fogOfWar.foggedCells.filter((fc: any) => {
+          let cellWorldX: number, cellWorldY: number;
+          if ((geometry as any).offsetToWorld) {
+            const w = (geometry as any).offsetToWorld(fc.col, fc.row);
+            cellWorldX = w.worldX;
+            cellWorldY = w.worldY;
+          } else {
+            cellWorldX = fc.col * cellSize;
+            cellWorldY = fc.row * cellSize;
+          }
+          const dx = cellWorldX - objWorldX;
+          const dy = cellWorldY - objWorldY;
+          return dx * dx + dy * dy > radiusSq;
+        });
+
+        if (remainingCells.length >= activeLayer.fogOfWar.foggedCells.length) return current;
+
+        const newFog = { ...activeLayer.fogOfWar, foggedCells: remainingCells };
+
+        addToHistory({
+          cells: activeLayer.cells || [],
+          curves: activeLayer.curves || [],
+          name: current.name || '',
+          objects: activeLayer.objects || [],
+          textLabels: activeLayer.textLabels || [],
+          edges: activeLayer.edges || [],
+          tiles: activeLayer.tiles || [],
+          regions: current.regions || [],
+          outlines: current.outlines || [],
+          shapeOverlays: current.shapeOverlays || [],
+          fogOfWar: newFog
+        });
+
+        if (current.layers) {
+          const layers = current.layers.map((l: any) =>
+            l.id === current.activeLayerId
+              ? { ...l, fogOfWar: newFog }
+              : l
+          );
+          return { ...current, layers };
+        }
+        return { ...current, fogOfWar: newFog };
+      });
+    };
+
+    document.addEventListener('windrose:player-fog-clear', handler as EventListener);
+    return () => document.removeEventListener('windrose:player-fog-clear', handler as EventListener);
+  }, [geometry, updateMapData, addToHistory, isApplyingHistory]);
 
   // Adjacent sub-map click-to-navigate
   dc.useEffect(() => {
@@ -797,6 +881,14 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 onOutlinesChange={handleOutlinesChange}
               />
 
+              {/* ShapeOverlayLayer - square/circle shape overlay placement */}
+              <MapCanvas.ShapeOverlayLayer
+                currentTool={currentTool}
+                selectedColor={selectedColor}
+                selectedOpacity={selectedOpacity}
+                onShapeOverlaysChange={handleShapeOverlaysChange}
+              />
+
               {/* HexCoordinateLayer - displays coordinate labels when 'C' key is held */}
               <MapCanvas.HexCoordinateLayer />
 
@@ -831,7 +923,11 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               showRegionPanel={showRegionPanel}
               onToggleRegionPanel={mapData.mapType === 'hex' ? () => setShowRegionPanel(!showRegionPanel) : undefined}
               showVisibilityToolbar={showVisibilityToolbar}
-              onToggleVisibilityToolbar={() => setShowVisibilityToolbar(!showVisibilityToolbar)}
+              onToggleVisibilityToolbar={() => {
+                const closing = showVisibilityToolbar;
+                setShowVisibilityToolbar(!showVisibilityToolbar);
+                if (closing && showFogTools) handleFogToolsToggle();
+              }}
               alwaysShowControls={effectiveSettings?.alwaysShowControls ?? false}
             />
           </div>

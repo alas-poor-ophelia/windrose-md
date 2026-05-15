@@ -2030,6 +2030,112 @@ button.dmt-sel-links-toggle,
   text-align: right;
 }
 
+/* Player light controls */
+.dmt-sel-player-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 8px;
+}
+.dmt-sel-player-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--dmt-text-secondary);
+}
+.dmt-sel-player-header > svg {
+  color: var(--dmt-border-primary);
+  flex-shrink: 0;
+}
+.dmt-sel-player-header > span {
+  flex: 1;
+}
+.dmt-sel-toggle-switch {
+  position: relative;
+  width: 28px;
+  height: 14px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.dmt-sel-toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+}
+.dmt-sel-toggle-slider {
+  position: absolute;
+  inset: 0;
+  background: rgba(42, 42, 42, 0.6);
+  border: 1px solid var(--dmt-border-primary);
+  border-radius: 7px;
+  transition: background 0.15s;
+}
+.dmt-sel-toggle-slider::before {
+  content: '';
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  left: 1px;
+  top: 1px;
+  background: var(--dmt-text-muted);
+  border-radius: 50%;
+  transition: transform 0.15s, background 0.15s;
+}
+.dmt-sel-toggle-switch input:checked + .dmt-sel-toggle-slider {
+  background: rgba(196, 165, 123, 0.3);
+  border-color: var(--dmt-accent-primary);
+}
+.dmt-sel-toggle-switch input:checked + .dmt-sel-toggle-slider::before {
+  transform: translateX(14px);
+  background: var(--dmt-accent-primary);
+}
+.dmt-sel-player-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+}
+.dmt-sel-radius-input {
+  width: 48px;
+  padding: 2px 4px;
+  font-size: 11px;
+  background: rgba(42, 42, 42, 0.4);
+  border: 1px solid var(--dmt-border-primary);
+  border-radius: 3px;
+  color: var(--dmt-text-primary);
+  text-align: right;
+}
+.dmt-sel-radius-input:focus {
+  outline: none;
+  border-color: var(--dmt-accent-primary);
+}
+.dmt-sel-unit-label {
+  font-size: 10px;
+  color: var(--dmt-text-muted);
+}
+.dmt-sel-light-color-swatch {
+  display: flex;
+  align-items: center;
+  margin-left: auto;
+  padding: 2px;
+  background: rgba(42, 42, 42, 0.4);
+  border: 1px solid var(--dmt-border-primary);
+  border-radius: 3px;
+  cursor: pointer;
+}
+.dmt-sel-light-color-swatch:hover {
+  border-color: var(--dmt-accent-primary);
+}
+.dmt-sel-light-color-swatch .dmt-sel-color-swatch {
+  width: 16px;
+  height: 16px;
+  border-radius: 2px;
+}
+
 /* Footer icon buttons — glass effect lets filigree show through */
 .dmt-sel-footer-icons {
   display: flex;
