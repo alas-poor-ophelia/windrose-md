@@ -1018,8 +1018,21 @@ class WindroseMDSettingsPlugin extends Plugin {
         activeObjectSetId: null,
         objectSetsAutoLoadFolder: '',
         // Tileset folders
-        tilesetFolders: []
+        tilesetFolders: [],
+        // Keyboard shortcuts
+        keyboardShortcuts: {
+          selectTool: 's', drawTool: 'd', freehandTool: 'f', eraseTool: 'e',
+          notePinTool: 'n', measureTool: 'm', panMode: 'Space', showCoordinates: 'c',
+          rotate: 'r', layerPrev: '[', layerNext: ']', undo: 'Mod+Z', redo: 'Mod+Y'
+        }
       }, data || {});
+      if (!this.settings.keyboardShortcuts) {
+        this.settings.keyboardShortcuts = {
+          selectTool: 's', drawTool: 'd', freehandTool: 'f', eraseTool: 'e',
+          notePinTool: 'n', measureTool: 'm', panMode: 'Space', showCoordinates: 'c',
+          rotate: 'r', layerPrev: '[', layerNext: ']', undo: 'Mod+Z', redo: 'Mod+Y'
+        };
+      }
     } catch (error) {
       console.warn('[DMT Settings] Error loading settings, using defaults:', error);
       this.settings = {
@@ -1064,7 +1077,13 @@ class WindroseMDSettingsPlugin extends Plugin {
         activeObjectSetId: null,
         objectSetsAutoLoadFolder: '',
         // Tileset folders
-        tilesetFolders: []
+        tilesetFolders: [],
+        // Keyboard shortcuts
+        keyboardShortcuts: {
+          selectTool: 's', drawTool: 'd', freehandTool: 'f', eraseTool: 'e',
+          notePinTool: 'n', measureTool: 'm', panMode: 'Space', showCoordinates: 'c',
+          rotate: 'r', layerPrev: '[', layerNext: ']', undo: 'Mod+Z', redo: 'Mod+Y'
+        }
       };
     }
   }
@@ -1221,6 +1240,9 @@ class WindroseMDSettingsTab extends PluginSettingTab {
     this.createCollapsibleSection(containerEl, 'Object Types',
       (el) => this.renderObjectTypesContent(el),
       { open: openSections.has('Object Types') });
+    this.createCollapsibleSection(containerEl, 'Keyboard Shortcuts',
+      (el) => this.renderKeyboardShortcutsContent(el),
+      { open: openSections.has('Keyboard Shortcuts') });
   }
 
   
@@ -1249,5 +1271,6 @@ Object.assign(WindroseMDSettingsTab.prototype, TabRenderSettingsMethods);
 Object.assign(WindroseMDSettingsTab.prototype, TabRenderColorsMethods);
 Object.assign(WindroseMDSettingsTab.prototype, TabRenderObjectsMethods);
 Object.assign(WindroseMDSettingsTab.prototype, TabRenderTilesetsMethods);
+Object.assign(WindroseMDSettingsTab.prototype, TabRenderKeyboardShortcutsMethods);
 
 module.exports = WindroseMDSettingsPlugin;`;

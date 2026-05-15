@@ -15,6 +15,7 @@ const { requireModuleByName } = await dc.require(pathResolverPath);
 
 const { DEFAULT_COLOR } = await requireModuleByName("colorOperations.ts");
 const { ColorPicker } = await requireModuleByName("ColorPicker.tsx");
+const { getSettings } = await requireModuleByName("settingsAccessor.ts");
 
 /** Sub-tool definition */
 interface SubToolDef {
@@ -23,6 +24,7 @@ interface SubToolDef {
   title: string;
   icon: string;
   shortcut?: string;
+  actionId?: string;
   gridOnly?: boolean;
   hexOnly?: boolean;
 }
@@ -31,6 +33,7 @@ interface SubToolDef {
 interface ToolGroup {
   id: string;
   shortcut?: string;
+  actionId?: string;
   subTools: SubToolDef[];
   gridOnly?: boolean;
   hexOnly?: boolean;
@@ -42,6 +45,7 @@ interface SimpleTool {
   title: string;
   icon: string;
   shortcut?: string;
+  actionId?: string;
   gridOnly?: boolean;
   hexOnly?: boolean;
 }
@@ -161,7 +165,7 @@ const SubMenuFlyout = ({ subTools, currentSubTool, onSelect, onClose }: SubMenuF
             onSelect(subTool.id);
             onClose();
           }}
-          title={subTool.title}
+          title={titleWithShortcut(subTool.title, subTool.actionId, subTool.shortcut)}
         >
           <dc.Icon icon={subTool.icon} />
           <span>{subTool.label}</span>
@@ -250,7 +254,7 @@ const ToolButtonWithSubMenu = ({
         onPointerUp={handlePointerUp}
         onPointerLeave={handlePointerLeave}
         onContextMenu={handleContextMenu}
-        title={currentSubToolDef?.title}
+        title={currentSubToolDef ? titleWithShortcut(currentSubToolDef.title, currentSubToolDef.actionId || toolGroup.actionId, currentSubToolDef.shortcut || toolGroup.shortcut) : undefined}
       >
         <dc.Icon icon={currentSubToolDef?.icon} />
         {hasMultipleSubTools && (
@@ -278,19 +282,21 @@ const toolGroups: ToolGroup[] = [
   {
     id: 'select',
     shortcut: 's',
+    actionId: 'selectTool',
     subTools: [
-      { id: 'select' as ToolId, label: 'Click Select', title: 'Select/Move (S)', icon: 'lucide-hand' },
+      { id: 'select' as ToolId, label: 'Click Select', title: 'Select/Move', icon: 'lucide-hand' },
       { id: 'areaSelect' as ToolId, label: 'Area Select', title: 'Area Select (click two corners)', icon: 'lucide-box-select' }
     ]
   },
   {
     id: 'draw',
     shortcut: 'd',
+    actionId: 'drawTool',
     subTools: [
-      { id: 'draw' as ToolId, label: 'Paint Cells', title: 'Draw (fill cells) (D)', icon: 'lucide-paintbrush' },
+      { id: 'draw' as ToolId, label: 'Paint Cells', title: 'Draw (fill cells)', icon: 'lucide-paintbrush' },
       { id: 'segmentDraw' as ToolId, label: 'Paint Segments', title: 'Paint Segments (partial cells)', icon: 'lucide-triangle', gridOnly: true },
       { id: 'edgeDraw' as ToolId, label: 'Paint Edges', title: 'Paint Edges (grid lines)', icon: 'lucide-pencil-ruler', gridOnly: true },
-      { id: 'freehand' as ToolId, label: 'Freehand Draw', title: 'Freehand Draw (F)', icon: 'lucide-pen-tool', shortcut: 'f' }
+      { id: 'freehand' as ToolId, label: 'Freehand Draw', title: 'Freehand Draw', icon: 'lucide-pen-tool', shortcut: 'f', actionId: 'freehandTool' }
     ]
   },
   {
@@ -305,8 +311,9 @@ const toolGroups: ToolGroup[] = [
   {
     id: 'erase',
     shortcut: 'e',
+    actionId: 'eraseTool',
     subTools: [
-      { id: 'erase' as ToolId, label: 'Erase', title: 'Erase (remove text/objects/cells/edges) (E)', icon: 'lucide-eraser' },
+      { id: 'erase' as ToolId, label: 'Erase', title: 'Erase (remove text/objects/cells/edges)', icon: 'lucide-eraser' },
       { id: 'clearArea' as ToolId, label: 'Clear Area', title: 'Clear Area (click two corners to erase)', icon: 'lucide-square-x', gridOnly: true }
     ]
   },
@@ -323,33 +330,43 @@ const toolGroups: ToolGroup[] = [
 const simpleTools: SimpleTool[] = [
   { id: 'edgeLine' as ToolId, title: 'Paint Line (click two points)', icon: 'lucide-git-commit-horizontal', gridOnly: true },
   { id: 'addObject' as ToolId, title: 'Add Object (select from sidebar)', icon: 'lucide-map-pin-plus' },
-  { id: 'addNote' as ToolId, title: 'Place Note Pin (N)', icon: 'lucide-pin', shortcut: 'n' },
+  { id: 'addNote' as ToolId, title: 'Place Note Pin', icon: 'lucide-pin', shortcut: 'n', actionId: 'notePinTool' },
   { id: 'addText' as ToolId, title: 'Add Text Label', icon: 'lucide-type' },
   { id: 'outline' as ToolId, title: 'Draw Outline', icon: 'lucide-spline', hexOnly: true },
   { id: 'shape' as ToolId, title: 'Place Shape Overlay', icon: 'lucide-shapes' },
-  { id: 'measure' as ToolId, title: 'Measure Distance (M)', icon: 'lucide-ruler', shortcut: 'm' },
+  { id: 'measure' as ToolId, title: 'Measure Distance', icon: 'lucide-ruler', shortcut: 'm', actionId: 'measureTool' },
   { id: 'tilePaint' as ToolId, title: 'Place Tile (select from tile browser)', icon: 'lucide-image-plus', hexOnly: true }
 ];
 
-// Derive shortcut map from tool config: key -> { group } or { tool }
-const SHORTCUT_MAP: Record<string, { group?: keyof SubToolSelections; tool?: ToolId }> = {};
+// Derive DEFAULT shortcut map from tool config: key -> { group } or { tool }
+const DEFAULT_SHORTCUT_MAP: Record<string, { group?: keyof SubToolSelections; tool?: ToolId }> = {};
 for (const group of toolGroups) {
   if (group.shortcut) {
-    SHORTCUT_MAP[group.shortcut] = { group: group.id as keyof SubToolSelections };
+    DEFAULT_SHORTCUT_MAP[group.shortcut] = { group: group.id as keyof SubToolSelections };
   }
   for (const sub of group.subTools) {
     if (sub.shortcut) {
-      SHORTCUT_MAP[sub.shortcut] = { tool: sub.id };
+      DEFAULT_SHORTCUT_MAP[sub.shortcut] = { tool: sub.id };
     }
   }
 }
 for (const tool of simpleTools) {
   if (tool.shortcut) {
-    SHORTCUT_MAP[tool.shortcut] = { tool: tool.id };
+    DEFAULT_SHORTCUT_MAP[tool.shortcut] = { tool: tool.id };
   }
 }
-// 'v' is an alias for select
-SHORTCUT_MAP['v'] = { group: 'select' };
+DEFAULT_SHORTCUT_MAP['v'] = { group: 'select' };
+
+function getShortcutKey(actionId?: string, defaultKey?: string): string | null {
+  if (!actionId) return defaultKey || null;
+  const shortcuts = getSettings()?.keyboardShortcuts;
+  return shortcuts?.[actionId] || defaultKey || null;
+}
+
+function titleWithShortcut(title: string, actionId?: string, defaultKey?: string): string {
+  const key = getShortcutKey(actionId, defaultKey);
+  return key ? title + ' (' + key.toUpperCase() + ')' : title;
+}
 
 // Derive initial sub-tool selections from first sub-tool in each group
 const INITIAL_SUB_TOOL_SELECTIONS: SubToolSelections = Object.fromEntries(
@@ -394,9 +411,35 @@ const ToolPalette = ({
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
       if (e.ctrlKey || e.metaKey || e.altKey) return;
 
-      const shortcut = SHORTCUT_MAP[e.key.toLowerCase()];
-      if (!shortcut) return;
+      const key = e.key.toLowerCase();
+      const shortcuts = getSettings()?.keyboardShortcuts;
 
+      if (shortcuts) {
+        for (const group of toolGroups) {
+          if (group.actionId && shortcuts[group.actionId]?.toLowerCase() === key) {
+            onToolChange(subToolSelections[group.id as keyof SubToolSelections] || group.id as ToolId);
+            e.preventDefault();
+            return;
+          }
+          for (const sub of group.subTools) {
+            if (sub.actionId && shortcuts[sub.actionId]?.toLowerCase() === key) {
+              onToolChange(sub.id);
+              e.preventDefault();
+              return;
+            }
+          }
+        }
+        for (const tool of simpleTools) {
+          if (tool.actionId && shortcuts[tool.actionId]?.toLowerCase() === key) {
+            onToolChange(tool.id);
+            e.preventDefault();
+            return;
+          }
+        }
+      }
+
+      const shortcut = DEFAULT_SHORTCUT_MAP[key];
+      if (!shortcut) return;
       const toolId = shortcut.group
         ? (subToolSelections[shortcut.group] || shortcut.group as ToolId)
         : shortcut.tool!;
@@ -578,7 +621,7 @@ const ToolPalette = ({
           key={tool.id}
           className={`dmt-tool-btn interactive-child ${currentTool === tool.id ? 'dmt-tool-btn-active' : ''}`}
           onClick={() => onToolChange(tool.id)}
-          title={tool.title}
+          title={titleWithShortcut(tool.title, tool.actionId, tool.shortcut)}
         >
           <dc.Icon icon={tool.icon} />
         </button>

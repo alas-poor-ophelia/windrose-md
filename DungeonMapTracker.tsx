@@ -523,6 +523,49 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     mapData, updateMapData, handleViewStateChange
   });
 
+  // Global keyboard shortcuts: layer nav, undo/redo
+  dc.useEffect(() => {
+    if (!isFocused || !mapData) return;
+
+    const handler = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      const key = e.key;
+      const mod = e.ctrlKey || e.metaKey;
+
+      const shortcuts = getSettings()?.keyboardShortcuts || {};
+
+      if (mod && !e.shiftKey && key.toLowerCase() === (shortcuts.undo || 'z').toLowerCase()) {
+        wrappedHandleUndo(); e.preventDefault(); return;
+      }
+      if (mod && key.toLowerCase() === (shortcuts.redo || 'y').toLowerCase()) {
+        handleRedo(); e.preventDefault(); return;
+      }
+      if (mod && e.shiftKey && key.toLowerCase() === 'z') {
+        handleRedo(); e.preventDefault(); return;
+      }
+
+      if (mod || e.altKey) return;
+
+      const layerPrevKey = shortcuts.layerPrev || '[';
+      const layerNextKey = shortcuts.layerNext || ']';
+
+      if (key === layerPrevKey || key === layerNextKey) {
+        const layers = mapData.layers || [];
+        const currentIdx = layers.findIndex((l: { id: string }) => l.id === mapData.activeLayerId);
+        if (key === layerPrevKey && currentIdx > 0) {
+          handleLayerSelect(layers[currentIdx - 1].id);
+          e.preventDefault();
+        } else if (key === layerNextKey && currentIdx < layers.length - 1) {
+          handleLayerSelect(layers[currentIdx + 1].id);
+          e.preventDefault();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [isFocused, mapData, wrappedHandleUndo, handleRedo, handleLayerSelect]);
+
   // MCP bridge: each map instance registers its own state + operations keyed by notePath.
   // No race conditions — the query side picks the active file's state.
   dc.useEffect(() => {

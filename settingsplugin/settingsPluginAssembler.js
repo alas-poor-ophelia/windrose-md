@@ -35,6 +35,7 @@ const TabRenderSettings = await requireModuleByName("settingsPlugin-TabRenderSet
 const TabRenderColors = await requireModuleByName("settingsPlugin-TabRenderColors.js");
 const TabRenderObjects = await requireModuleByName("settingsPlugin-TabRenderObjects.js");
 const TabRenderTilesets = await requireModuleByName("settingsPlugin-TabRenderTilesets.js");
+const TabRenderKeyboardShortcuts = await requireModuleByName("settingsPlugin-TabRenderKeyboardShortcuts.js");
 
 const STYLES_CSS = await requireModuleByName("settingsPlugin-styles.js");
 
@@ -48,7 +49,7 @@ const MODALS_CONTENT = [
 ].join('\n\n');
 
 const TAB_RENDER_CONTENT = [
-  TabRenderCore, TabRenderSettings, TabRenderColors, TabRenderObjects, TabRenderTilesets
+  TabRenderCore, TabRenderSettings, TabRenderColors, TabRenderObjects, TabRenderTilesets, TabRenderKeyboardShortcuts
 ].join('\n\n');
 
 // Assembly function
