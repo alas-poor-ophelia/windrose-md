@@ -40,6 +40,9 @@ const { convertObjectToFreeform, snapObjectToGrid } = await requireModuleByName(
 const { copyDeepLinkToClipboard } = await requireModuleByName("deepLinkHandler.ts");
 const { LinkingModeBanner } = await requireModuleByName("LinkingModeBanner.tsx");
 const { CardinalIndicators } = await requireModuleByName("CardinalIndicators.tsx");
+const { MeasurementOverlay } = await requireModuleByName("MeasurementOverlay.tsx");
+const { formatDistance, getEffectiveDistanceSettings } = await requireModuleByName("distanceOperations.ts");
+const { getSettings } = await requireModuleByName("settingsAccessor.ts");
 
 const { rotateByIncrement } = await requireModuleByName("rotationOperations.ts") as {
   rotateByIncrement: (currentRotation: number) => number
@@ -142,6 +145,21 @@ const ObjectLayer = ({
 
   const [showLightColorPicker, setShowLightColorPicker] = dc.useState(false);
   const lightColorBtnRef = dc.useRef<HTMLButtonElement>(null);
+
+  const [measureMovement, setMeasureMovement] = dc.useState(false);
+  const measureOriginRef = dc.useRef<{ x: number; y: number } | null>(null);
+
+  dc.useEffect(() => {
+    setMeasureMovement(false);
+    measureOriginRef.current = null;
+  }, [selectedItem?.id]);
+
+  if (isDraggingSelection && measureMovement && selectedItem?.data && !measureOriginRef.current) {
+    measureOriginRef.current = { x: selectedItem.data.position.x, y: selectedItem.data.position.y };
+  }
+  if (!isDraggingSelection) {
+    measureOriginRef.current = null;
+  }
 
   // Keep a ref in sync with the freeformPlacementMode prop for the interactions hook
   const freeformPlacementModeRef = dc.useRef(freeformPlacementMode);
@@ -525,6 +543,10 @@ const ObjectLayer = ({
     });
   }, [selectedItem, mapData, startLinking]);
 
+  const handleMeasureToggle = dc.useCallback(() => {
+    setMeasureMovement(prev => !prev);
+  }, []);
+
   const handleFollowLink = dc.useCallback(() => {
     if (!selectedItem || selectedItem.type !== 'object' || !mapData || !mapId || !notePath) return;
 
@@ -668,8 +690,9 @@ const ObjectLayer = ({
         onCopyLink: handleCopyLink,
         onColorClick: handleObjectColorButtonClick,
         onResize: handleResizeButtonClick,
-        onDelete: handleObjectDeletion
-      }, mapData, { isResizeMode });
+        onDelete: handleObjectDeletion,
+        onMeasureToggle: handleMeasureToggle
+      }, mapData, { isResizeMode, isMeasuring: measureMovement });
 
       const menu = new MenuClass();
       let lastGroup: string | null = null;
@@ -735,6 +758,23 @@ const ObjectLayer = ({
     ? getCardinalIndicatorPositions(selectedObject)
     : null;
 
+  const measureTarget = (() => {
+    if (!measureMovement || !isDraggingSelection || !measureOriginRef.current || !selectedItem?.id || !mapData) return null;
+    const obj = getActiveLayer(mapData).objects?.find((o: MapObject) => o.id === selectedItem.id);
+    return obj ? obj.position : null;
+  })();
+
+  const formattedMeasureDistance = (() => {
+    if (!measureOriginRef.current || !measureTarget || !geometry) return null;
+    const origin = measureOriginRef.current;
+    if (origin.x === measureTarget.x && origin.y === measureTarget.y) return null;
+    const globalSettings = getSettings() || {};
+    const overrides = mapData?.settings?.distanceSettings || null;
+    const settings = getEffectiveDistanceSettings(mapData?.mapType || 'grid', globalSettings, overrides);
+    const dist = geometry.getCellDistance(origin.x, origin.y, measureTarget.x, measureTarget.y, { diagonalRule: settings.gridDiagonalRule });
+    return formatDistance(dist, settings.distancePerCell, settings.distanceUnit, settings.displayFormat);
+  })();
+
   return (
     <>
       {/* Linking Mode Banner */}
@@ -751,6 +791,18 @@ const ObjectLayer = ({
         isFreeformPreview={!!freeformDragPreview}
         isFreeform={!!selectedObject?.freeform}
       />
+
+      {measureOriginRef.current && measureTarget && formattedMeasureDistance && (
+        <MeasurementOverlay
+          measureOrigin={measureOriginRef.current}
+          currentTarget={measureTarget}
+          formattedDistance={formattedMeasureDistance}
+          isTargetLocked={false}
+          geometry={geometry}
+          mapData={mapData}
+          canvasRef={canvasRef}
+        />
+      )}
 
       {hasMultiSelection && selectedItems?.length > 1 && !isDraggingSelection && (
         <SelectionActionsOverlay
@@ -786,8 +838,9 @@ const ObjectLayer = ({
             onColorClick: handleObjectColorButtonClick,
             onResize: handleResizeButtonClick,
             onDelete: handleObjectDeletion,
-            onPlayerToggle: handlePlayerToggle
-          }, mapData, { isResizeMode, isPlayer: !!selectedItem.data?.isPlayer })]}
+            onPlayerToggle: handlePlayerToggle,
+            onMeasureToggle: handleMeasureToggle
+          }, mapData, { isResizeMode, isPlayer: !!selectedItem.data?.isPlayer, isMeasuring: measureMovement })]}
 
           mapData={mapData}
           canvasRef={canvasRef}

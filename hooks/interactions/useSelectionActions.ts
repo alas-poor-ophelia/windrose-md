@@ -43,6 +43,7 @@ interface ObjectHandlers {
   onResize: (e?: Event) => void;
   onDelete: (e?: Event) => void;
   onPlayerToggle?: (e?: Event) => void;
+  onMeasureToggle?: (e?: Event) => void;
 }
 
 interface TextHandlers {
@@ -61,6 +62,7 @@ interface MultiHandlers {
 interface ObjectActionOptions {
   isResizeMode?: boolean;
   isPlayer?: boolean;
+  isMeasuring?: boolean;
 }
 
 function buildObjectActions(
@@ -90,6 +92,11 @@ function buildObjectActions(
       id: 'freeform', label: isFreeform ? 'Snap to Grid' : 'Freeform',
       icon: 'lucide-diamond', group: 'transform', visible: true,
       invoke: handlers.onFreeformToggle, active: isFreeform, iconOnly: true
+    },
+    {
+      id: 'measure', label: options?.isMeasuring ? 'Hide Ruler' : 'Ruler',
+      icon: 'lucide-ruler', group: 'transform', visible: true,
+      invoke: handlers.onMeasureToggle, active: !!options?.isMeasuring, iconOnly: true
     },
 
     // Content group
