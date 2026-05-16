@@ -590,3 +590,19 @@ That is also now linked from the top of the README, just so it’s findable. I�
 ### Bug Fixes
 - Fixed some UI bugs with the Map Settings modal
 - Reverted out the non-functional fix for the Color Palette automatically closing itself right after it opened on Linux, as that didn’t fix the bug, and introduced a new issue where the Color Palette couldn’t be closed by clicking outside of it. You can now once again close the palette by clicking outside of it.
+
+## Version 1.7.0
+
+A rather unplanned but hopefully interesting release around a few new features. A new shape/polygon overlay, as well as some new stuff for solo play. And some new/hopefully better stuff around keyboard shortcuts.
+
+### New Features
+- **Shape Overlays** — Place square and circle shape overlays anywhere on the map (world space/not grid snapped). A new "Place Shape Overlay" tool uses two clicks to define the shape (corner-to-corner for squares, edge-then-center for circles, same as the fill tools). Shapes can be selected, dragged, recolored, deleted, and toggled between grid-snapped and freeform placement.
+- **Player Objects & Light Radius** — Any object can now be marked as a "Player" via the selection menu. Player objects gain a toggleable light radius with customizable range and color, rendered as a radius on the canvas. When a player object is dragged to a new position, fog of war is automatically cleared within the light radius at the drop point. Supports compound undo (fog + position).
+- **Object Measurement Overlay** — A new ruler toggle in the object selection toolbar. When enabled, dragging an object shows a dashed measurement line from the origin to the current position with the formatted distance (respects your distance/unit settings).
+- **New Keyboard Shortcuts: Layer Navigation** — Press `[` and `]` to switch between layers while hovering over the map. No more clicking through the layer panel to swap.
+- **Fixed/other new Keyboard Shortcuts: Undo/Redo** — `Ctrl+Z` (undo) and `Ctrl+Y` / `Ctrl+Shift+Z` (redo) now work while hovering over the map.
+- **Configurable Keyboard Shortcuts** — All keyboard shortcuts (tool selection, layer navigation, undo/redo) are now visible and rebindable in the plugin settings. Open Settings → Windrose MapDesigner Settings → Keyboard Shortcuts to see the full list. Click any shortcut to rebind it, or reset individual shortcuts or all at once.
+
+### Improvements
+- Tool palette tooltips now dynamically show the configured shortcut key (e.g., "Select/Move (S)") and update if you rebind shortcuts.
+- Settings plugin updated to v0.18.2.
