@@ -146,7 +146,26 @@ const ColorPicker = ({
       saveOpacityChanges();
       setEditTargetId(null);
     }
+    if (!isOpen) {
+      setPreviewColor(null);
+    }
   }, [isOpen, saveOpacityChanges]);
+
+  dc.useEffect(() => {
+    const input = colorInputRef.current;
+    if (!input) return;
+
+    const handleNativeChange = (): void => {
+      const value = input.value as HexColor;
+      if (onAddCustomColor) onAddCustomColor(value);
+      onColorSelect(value);
+      setPreviewColor(null);
+      if (pendingCustomColorRef) pendingCustomColorRef.current = null;
+    };
+
+    input.addEventListener('change', handleNativeChange);
+    return () => input.removeEventListener('change', handleNativeChange);
+  });
 
   if (!isOpen) return null;
 

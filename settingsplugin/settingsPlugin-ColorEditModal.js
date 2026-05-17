@@ -39,6 +39,8 @@ class ColorEditModal extends Modal {
     let opacityValue = this.existingColor?.opacity ?? 1;
     
     // Color picker
+    let hexInput;
+
     new Setting(contentEl)
       .setName('Color')
       .setDesc('Choose the color value')
@@ -46,19 +48,20 @@ class ColorEditModal extends Modal {
         .setValue(colorValue)
         .onChange(value => {
           colorValue = value;
-          hexInput.value = value;
+          if (hexInput) hexInput.value = value;
         }))
       .addText(text => {
         text.inputEl.addClass('dmt-color-hex-input');
+        hexInput = text.inputEl;
         text.setPlaceholder('#RRGGBB')
           .setValue(colorValue)
           .onChange(value => {
-            if (/^#[0-9A-Fa-f]{6}$/.test(value)) {
-              colorValue = value;
+            const normalized = value.startsWith('#') ? value : '#' + value;
+            if (/^#[0-9A-Fa-f]{6}$/.test(normalized)) {
+              colorValue = normalized;
+              hexInput.value = normalized;
             }
           });
-        // Store reference for color picker sync
-        var hexInput = text.inputEl;
       });
     
     // Label input
