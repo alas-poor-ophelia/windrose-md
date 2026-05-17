@@ -2065,9 +2065,11 @@ button.dmt-sel-links-toggle,
   opacity: 0;
   width: 0;
   height: 0;
-  position: absolute;
   min-width: 0;
   min-height: 0;
+  max-width: 0;
+  max-height: 0;
+  position: absolute;
 }
 .dmt-sel-toggle-slider {
   position: absolute;
@@ -2106,6 +2108,7 @@ button.dmt-sel-links-toggle,
 input.dmt-sel-radius-input,
 .dmt-sel-radius-input {
   width: 48px;
+  height: 22px;
   padding: 2px 4px;
   font-size: 11px;
   background: rgba(42, 42, 42, 0.4);
@@ -2113,10 +2116,10 @@ input.dmt-sel-radius-input,
   border-radius: 3px;
   color: var(--dmt-text-primary);
   text-align: right;
-  min-width: unset;
+  min-width: 48px;
   max-width: 48px;
-  min-height: unset;
-  max-height: unset;
+  min-height: 22px;
+  max-height: 22px;
 }
 .dmt-sel-radius-input:focus {
   outline: none;
@@ -2132,15 +2135,17 @@ button.dmt-sel-light-color-swatch,
   display: flex;
   align-items: center;
   margin-left: auto;
+  width: 22px;
+  height: 22px;
+  min-width: 22px;
+  min-height: 22px;
+  max-width: 22px;
+  max-height: 22px;
   padding: 2px;
   background: rgba(42, 42, 42, 0.4);
   border: 1px solid var(--dmt-border-primary);
   border-radius: 3px;
   cursor: pointer;
-  min-width: unset;
-  min-height: unset;
-  max-width: unset;
-  max-height: unset;
 }
 .dmt-sel-light-color-swatch:hover {
   border-color: var(--dmt-accent-primary);
