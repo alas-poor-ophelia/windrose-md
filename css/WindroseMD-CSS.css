@@ -2060,11 +2060,14 @@ button.dmt-sel-links-toggle,
   flex-shrink: 0;
   cursor: pointer;
 }
+.is-tablet .dmt-sel-toggle-switch input,
 .dmt-sel-toggle-switch input {
   opacity: 0;
   width: 0;
   height: 0;
   position: absolute;
+  min-width: 0;
+  min-height: 0;
 }
 .dmt-sel-toggle-slider {
   position: absolute;
@@ -2099,6 +2102,8 @@ button.dmt-sel-links-toggle,
   gap: 6px;
   height: 24px;
 }
+.is-tablet input.dmt-sel-radius-input,
+input.dmt-sel-radius-input,
 .dmt-sel-radius-input {
   width: 48px;
   padding: 2px 4px;
@@ -2108,6 +2113,10 @@ button.dmt-sel-links-toggle,
   border-radius: 3px;
   color: var(--dmt-text-primary);
   text-align: right;
+  min-width: unset;
+  max-width: 48px;
+  min-height: unset;
+  max-height: unset;
 }
 .dmt-sel-radius-input:focus {
   outline: none;
@@ -2117,6 +2126,8 @@ button.dmt-sel-links-toggle,
   font-size: 10px;
   color: var(--dmt-text-muted);
 }
+.is-tablet button.dmt-sel-light-color-swatch,
+button.dmt-sel-light-color-swatch,
 .dmt-sel-light-color-swatch {
   display: flex;
   align-items: center;
@@ -2126,6 +2137,10 @@ button.dmt-sel-links-toggle,
   border: 1px solid var(--dmt-border-primary);
   border-radius: 3px;
   cursor: pointer;
+  min-width: unset;
+  min-height: unset;
+  max-width: unset;
+  max-height: unset;
 }
 .dmt-sel-light-color-swatch:hover {
   border-color: var(--dmt-accent-primary);
