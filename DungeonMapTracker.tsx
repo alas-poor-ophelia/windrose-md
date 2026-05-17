@@ -407,16 +407,14 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
         if (obj.freeform && obj.worldPosition) {
           objWorldX = obj.worldPosition.x;
           objWorldY = obj.worldPosition.y;
-        } else if ((geometry as any).cellToWorld) {
-          const w = (geometry as any).cellToWorld(obj.position.x, obj.position.y);
+        } else {
+          const w = (geometry as any).getCellCenter(obj.position.x, obj.position.y);
           objWorldX = w.worldX;
           objWorldY = w.worldY;
-        } else {
-          objWorldX = obj.position.x * cellSize;
-          objWorldY = obj.position.y * cellSize;
         }
 
-        const radiusSq = radiusInWorld * radiusInWorld;
+        const clearRadius = radiusInWorld + cellSize * 0.5;
+        const radiusSq = clearRadius * clearRadius;
         const remainingCells = activeLayer.fogOfWar.foggedCells.filter((fc: any) => {
           let cellWorldX: number, cellWorldY: number;
           if ((geometry as any).offsetToWorld) {
@@ -424,8 +422,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
             cellWorldX = w.worldX;
             cellWorldY = w.worldY;
           } else {
-            cellWorldX = fc.col * cellSize;
-            cellWorldY = fc.row * cellSize;
+            cellWorldX = (fc.col + 0.5) * cellSize;
+            cellWorldY = (fc.row + 0.5) * cellSize;
           }
           const dx = cellWorldX - objWorldX;
           const dy = cellWorldY - objWorldY;
