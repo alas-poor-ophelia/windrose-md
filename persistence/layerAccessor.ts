@@ -226,6 +226,61 @@ function removeLayer(mapData: MapData, layerId: LayerId): MapData {
 }
 
 /**
+ * Clone a layer and insert it directly above the source layer.
+ * @param mode 'all' copies everything; 'mapOnly' copies cells, curves, edges, tiles only
+ */
+function cloneLayer(mapData: MapData, layerId: LayerId, mode: 'all' | 'mapOnly'): MapData {
+  if (!mapData?.layers) return mapData;
+
+  const sourceLayer = getLayerById(mapData, layerId);
+  if (!sourceLayer) {
+    console.warn(`Cannot clone: layer ${layerId} not found`);
+    return mapData;
+  }
+
+  const cloneId = generateLayerId();
+  const cloneOrder = sourceLayer.order + 1;
+
+  // Shift layers above the source up by 1 to make room
+  const shiftedLayers = mapData.layers.map(layer =>
+    layer.order > sourceLayer.order
+      ? { ...layer, order: layer.order + 1 }
+      : layer
+  );
+
+  // Deep copy via JSON round-trip (same pattern as createBackup)
+  const deepCopy = <T>(data: T): T => JSON.parse(JSON.stringify(data));
+
+  const sourceName = sourceLayer.name || String(sourceLayer.order + 1);
+
+  const clonedLayer: MapLayer = {
+    id: cloneId,
+    name: `Copy of ${sourceName}`,
+    order: cloneOrder,
+    visible: true,
+    cells: deepCopy(sourceLayer.cells || []),
+    curves: deepCopy(sourceLayer.curves || []),
+    edges: deepCopy(sourceLayer.edges || []),
+    objects: mode === 'all' ? deepCopy(sourceLayer.objects || []) : [],
+    textLabels: mode === 'all' ? deepCopy(sourceLayer.textLabels || []) : [],
+    fogOfWar: mode === 'all' && sourceLayer.fogOfWar ? deepCopy(sourceLayer.fogOfWar) : null,
+    tiles: deepCopy(sourceLayer.tiles || []),
+  };
+
+  if (mode === 'all') {
+    if (sourceLayer.icon) clonedLayer.icon = sourceLayer.icon;
+    if (sourceLayer.showLayerBelow !== undefined) clonedLayer.showLayerBelow = sourceLayer.showLayerBelow;
+    if (sourceLayer.layerBelowOpacity !== undefined) clonedLayer.layerBelowOpacity = sourceLayer.layerBelowOpacity;
+  }
+
+  return {
+    ...mapData,
+    layers: [...shiftedLayers, clonedLayer],
+    activeLayerId: cloneId
+  };
+}
+
+/**
  * Reorder layers by moving a layer to a new position
  */
 function reorderLayers(mapData: MapData, layerId: LayerId, newIndex: number): MapData {
@@ -735,6 +790,7 @@ return {
   updateActiveLayer,
   setActiveLayer,
   addLayer,
+  cloneLayer,
   removeLayer,
   reorderLayers,
   

@@ -8,7 +8,7 @@
 import type { ToolId } from '#types/tools/tool.types';
 import type { Point, IGeometry } from '#types/core/geometry.types';
 import type { Cell } from '#types/core/cell.types';
-import type { MapData, MapLayer } from '#types/core/map.types';
+import type { MapData, MapLayer, Edge } from '#types/core/map.types';
 import type { MapObject } from '#types/objects/object.types';
 import type { TextLabel } from '#types/objects/note.types';
 import type { Curve } from '#types/core/curve.types';
@@ -165,6 +165,15 @@ function useShapeTools({
 
     const newCells = removeCellsInBounds(activeLayer.cells, x1, y1, x2, y2, geometry);
     onCellsChange(newCells);
+
+    if (onEdgesChange && activeLayer.edges && activeLayer.edges.length > 0) {
+      const newEdges = activeLayer.edges.filter((edge: Edge) =>
+        !(edge.x >= minX && edge.x <= maxX && edge.y >= minY && edge.y <= maxY)
+      );
+      if (newEdges.length !== activeLayer.edges.length) {
+        onEdgesChange(newEdges);
+      }
+    }
 
     if (activeLayer.curves && activeLayer.curves.length > 0) {
       const newCurves = eraseRectangleFromCurves(

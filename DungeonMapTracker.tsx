@@ -51,11 +51,12 @@ const { ModalPortal } = await requireModuleByName("ModalPortal.tsx");
 // deep-link hover previews without its own Datacore context.
 await requireModuleByName("WindroseHoverPreview.tsx");
 
-const { getActiveLayer } = await requireModuleByName("layerAccessor.ts");
+const { getActiveLayer, getLayerById } = await requireModuleByName("layerAccessor.ts");
 const { setCell: accessorSetCell, removeCell: accessorRemoveCell, cellToPoint } = await requireModuleByName("cellAccessor.ts");
 const { LayerControls } = await requireModuleByName("LayerControls.tsx");
 const { RegionPanel } = await requireModuleByName("RegionPanel.tsx");
 const { LayerEditModal } = await requireModuleByName("LayerEditModal.tsx");
+const { openNativeCloneLayerModal, CloneLayerModal } = await requireModuleByName("CloneLayerModal.tsx");
 const { useSubHexNavigation } = await requireModuleByName("useSubHexNavigation.ts");
 const { useCustomEventHandlers } = await requireModuleByName("useCustomEventHandlers.ts");
 const { useUILayout } = await requireModuleByName("useUILayout.ts");
@@ -334,6 +335,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     handleToggleShowLayerBelow,
     handleSetLayerBelowOpacity,
     handleUpdateLayerDisplay,
+    handleLayerClone,
     // History state
     canUndo,
     canRedo,
@@ -353,6 +355,24 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
       handleUndo();
     }
   }, [handleUndo]);
+
+  // Clone layer modal state (Preact fallback only)
+  const [cloningLayerId, setCloningLayerId] = dc.useState<string | null>(null);
+
+  const handleCloneLayerRequest = dc.useCallback((layerId: string): void => {
+    if (!mapData) return;
+    const layer = getLayerById(mapData, layerId);
+    if (!layer) return;
+
+    const layerName = layer.name || String(layer.order + 1);
+    const opened = openNativeCloneLayerModal({
+      layerName,
+      onClone: (mode) => handleLayerClone(layerId, mode),
+    });
+    if (!opened) {
+      setCloningLayerId(layerId);
+    }
+  }, [mapData, handleLayerClone]);
 
   // Data change handlers (extracted to useDataHandlers hook)
   const {
@@ -794,6 +814,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               onToggleShowLayerBelow={handleToggleShowLayerBelow}
               onSetLayerBelowOpacity={handleSetLayerBelowOpacity}
               onEditLayer={setEditingLayerId}
+              onLayerClone={handleCloneLayerRequest}
               sidebarCollapsed={mapData.sidebarCollapsed || false}
               isOpen={showLayerPanel}
             />
@@ -1076,6 +1097,24 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
             />
           </ModalPortal>
         )}
+
+        {cloningLayerId && (() => {
+          const layer = getLayerById(mapData, cloningLayerId);
+          if (!layer) return null;
+          const layerName = layer.name || String(layer.order + 1);
+          return (
+            <ModalPortal>
+              <CloneLayerModal
+                layerName={layerName}
+                onClone={(mode) => {
+                  handleLayerClone(cloningLayerId, mode);
+                  setCloningLayerId(null);
+                }}
+                onCancel={() => setCloningLayerId(null)}
+              />
+            </ModalPortal>
+          );
+        })()}
       </div>
     </>
   );

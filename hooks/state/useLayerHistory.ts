@@ -40,6 +40,7 @@ const {
   updateActiveLayer,
   updateLayer,
   addLayer,
+  cloneLayer,
   removeLayer,
   reorderLayers,
   setActiveLayer
@@ -49,6 +50,7 @@ const {
   updateActiveLayer: (mapData: MapData, updates: Partial<MapLayer>) => MapData;
   updateLayer: (mapData: MapData, layerId: LayerId, updates: Partial<MapLayer>) => MapData;
   addLayer: (mapData: MapData) => MapData;
+  cloneLayer: (mapData: MapData, layerId: LayerId, mode: 'all' | 'mapOnly') => MapData;
   removeLayer: (mapData: MapData, layerId: LayerId) => MapData;
   reorderLayers: (mapData: MapData, layerId: LayerId, newIndex: number) => MapData;
   setActiveLayer: (mapData: MapData, layerId: LayerId) => MapData;
@@ -229,6 +231,25 @@ function useLayerHistory({
     historyInitialized.current = true;
   }, [mapData, updateMapData, saveCurrentLayerHistory, resetHistory, buildHistoryState]);
 
+  const handleLayerClone = dc.useCallback(
+    (layerId: LayerId, mode: 'all' | 'mapOnly'): void => {
+      if (!mapData) return;
+
+      saveCurrentLayerHistory();
+
+      const newMapData = cloneLayer(mapData, layerId, mode);
+      if (newMapData === mapData) return;
+
+      updateMapData(newMapData);
+
+      const clonedLayer = getActiveLayer(newMapData);
+      historyInitialized.current = false;
+      resetHistory(buildHistoryState(clonedLayer, newMapData.name || '', newMapData.regions || [], newMapData.outlines || []));
+      historyInitialized.current = true;
+    },
+    [mapData, updateMapData, saveCurrentLayerHistory, resetHistory, buildHistoryState]
+  );
+
   const handleLayerDelete = dc.useCallback(
     (layerId: LayerId): void => {
       if (!mapData) return;
@@ -403,7 +424,8 @@ function useLayerHistory({
     handleLayerReorder,
     handleToggleShowLayerBelow,
     handleSetLayerBelowOpacity,
-    handleUpdateLayerDisplay
+    handleUpdateLayerDisplay,
+    handleLayerClone
   };
 
   const historyActions: HistoryActions = {
@@ -422,6 +444,7 @@ function useLayerHistory({
     handleToggleShowLayerBelow,
     handleSetLayerBelowOpacity,
     handleUpdateLayerDisplay,
+    handleLayerClone,
     canUndo,
     canRedo,
     historyActions,

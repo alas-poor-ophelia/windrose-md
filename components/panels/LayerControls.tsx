@@ -37,6 +37,8 @@ export interface LayerControlsProps {
   onSetLayerBelowOpacity: (layerId: string, opacity: number) => void;
   /** Callback to open layer edit modal */
   onEditLayer: (layerId: string) => void;
+  /** Callback to clone a layer */
+  onLayerClone: (layerId: string) => void;
   /** Whether object sidebar is collapsed */
   sidebarCollapsed: boolean;
   /** Whether the layer controls panel is open */
@@ -57,6 +59,7 @@ const LayerControls = ({
   onToggleShowLayerBelow,
   onSetLayerBelowOpacity,
   onEditLayer,
+  onLayerClone,
   sidebarCollapsed,
   isOpen = true
 }: LayerControlsProps): React.ReactElement => {
@@ -237,6 +240,12 @@ const LayerControls = ({
     onEditLayer(layerId);
   };
 
+  const handleClone = (layerId: string, e: JSX.TargetedMouseEvent<HTMLButtonElement>): void => {
+    e.stopPropagation();
+    setExpandedLayerId(null);
+    onLayerClone(layerId);
+  };
+
   const handleTransparencyToggle = (layerId: string, e: JSX.TargetedMouseEvent<HTMLButtonElement>): void => {
     e.stopPropagation();
     onToggleShowLayerBelow(layerId);
@@ -313,6 +322,13 @@ const LayerControls = ({
                   title="Edit layer"
                 >
                   <dc.Icon icon="lucide-pencil" />
+                </button>
+                <button
+                  className="dmt-layer-option-btn clone"
+                  onClick={(e) => handleClone(layer.id, e)}
+                  title="Clone layer"
+                >
+                  <dc.Icon icon="lucide-copy" />
                 </button>
                 {canDelete && (
                   <button
