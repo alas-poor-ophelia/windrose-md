@@ -23,17 +23,39 @@ declare const app: App;
 async function buildNoteIndex(): Promise<NoteIndexEntry[]> {
   try {
     const markdownFiles = app.vault.getMarkdownFiles();
-    
-    // Return array of paths without the .md extension for cleaner display
-    // Store full path for actual linking
-    return markdownFiles.map(file => ({
-      path: file.path,           // Full path with .md
-      displayName: file.basename // Name without extension
+
+    const entries: NoteIndexEntry[] = markdownFiles.map(file => ({
+      path: file.path,
+      displayName: file.basename
     }));
+
+    const nameCounts = new Map<string, number>();
+    for (const entry of entries) {
+      nameCounts.set(entry.displayName, (nameCounts.get(entry.displayName) || 0) + 1);
+    }
+
+    for (const entry of entries) {
+      if ((nameCounts.get(entry.displayName) || 0) > 1) {
+        const parts = entry.path.replace(/\.md$/, '').split('/');
+        parts.pop();
+        entry.subtitle = parts.length > 2
+          ? parts.slice(-2).join('/')
+          : parts.join('/') || '/';
+      }
+    }
+
+    return entries;
   } catch (error) {
     console.error('[buildNoteIndex] Error indexing vault notes:', error);
     return [];
   }
+}
+
+/**
+ * Get note entries for autocomplete with disambiguation subtitles.
+ */
+async function getNoteEntries(): Promise<NoteIndexEntry[]> {
+  return buildNoteIndex();
 }
 
 /**
@@ -124,6 +146,7 @@ function formatNoteForDisplay(notePath: string | null | undefined): string {
 
 return {
   buildNoteIndex,
+  getNoteEntries,
   getNoteDisplayNames,
   getFullPathFromDisplayName,
   getDisplayNameFromPath,

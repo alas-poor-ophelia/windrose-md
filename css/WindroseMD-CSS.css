@@ -4877,3 +4877,15 @@ button.dmt-breadcrumb-link {
 .dmt-btn-primary:hover {
   background: var(--interactive-accent-hover);
 }
+
+/* Note suggestion disambiguation */
+.dmt-note-suggest-name {
+  font-size: 14px;
+  color: var(--text-normal);
+}
+
+.dmt-note-suggest-path {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 1px;
+}
