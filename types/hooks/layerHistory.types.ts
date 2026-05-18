@@ -8,7 +8,7 @@
 
 import type { Cell } from '../core/cell.types';
 import type { Curve } from '../core/curve.types';
-import type { Edge, TextLabel, MapObjectRef, MapData, LayerId, Region } from '../core/map.types';
+import type { Edge, TextLabel, MapObjectRef, MapData, LayerId, Region, ShapeOverlay, FogOfWar } from '../core/map.types';
 import type { HexTileAssignment } from '../tiles/tile.types';
 import type { HistoryState } from './history.types';
 
@@ -37,6 +37,10 @@ export interface LayerHistorySnapshot {
   tiles?: HexTileAssignment[];
   /** Regions (map-level, tracked for undo) */
   regions?: Region[];
+  /** Shape overlays (map-level, tracked for undo) */
+  shapeOverlays?: ShapeOverlay[];
+  /** Fog of war state (layer-level, tracked for compound undo with player moves) */
+  fogOfWar?: FogOfWar | null;
 }
 
 /**
@@ -85,6 +89,8 @@ export interface LayerActions {
   handleSetLayerBelowOpacity: (layerId: LayerId, opacity: number) => void;
   /** Update layer display (name and/or icon) */
   handleUpdateLayerDisplay: (layerId: LayerId, name: string, icon: string | null) => void;
+  /** Clone a layer ('all' = full clone, 'mapOnly' = terrain only) */
+  handleLayerClone: (layerId: LayerId, mode: 'all' | 'mapOnly') => void;
 }
 
 // ===========================================
@@ -124,6 +130,7 @@ export interface UseLayerHistoryResult {
   handleToggleShowLayerBelow: (layerId: LayerId) => void;
   handleSetLayerBelowOpacity: (layerId: LayerId, opacity: number) => void;
   handleUpdateLayerDisplay: (layerId: LayerId, name: string, icon: string | null) => void;
+  handleLayerClone: (layerId: LayerId, mode: 'all' | 'mapOnly') => void;
 
   // History state
   canUndo: boolean;

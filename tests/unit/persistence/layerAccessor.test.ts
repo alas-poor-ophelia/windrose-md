@@ -18,6 +18,7 @@ import {
   updateActiveLayer,
   setActiveLayer,
   addLayer,
+  cloneLayer,
   removeLayer,
   reorderLayers,
   isCellFogged,
@@ -320,6 +321,175 @@ describe("layerAccessor", () => {
 
       const updated = addLayer(mapData, "Custom Name");
       expect(updated.layers[1].name).toBe("Custom Name");
+    });
+  });
+
+  // ===========================================================================
+  // cloneLayer
+  // ===========================================================================
+
+  describe("cloneLayer", () => {
+    it("creates a clone with new id and 'Copy of' name", () => {
+      const layer1 = createLayer("layer-1", "Base", 0);
+      layer1.cells = [{ x: 0, y: 0, color: "#ff0000" }] as any;
+      const mapData = createMapData([layer1], "layer-1");
+
+      const updated = cloneLayer(mapData, "layer-1", "all");
+
+      expect(updated.layers).toHaveLength(2);
+      const clone = updated.layers.find((l) => l.id !== "layer-1")!;
+      expect(clone.name).toBe("Copy of Base");
+      expect(clone.id).not.toBe("layer-1");
+      expect(clone.id.startsWith("layer-")).toBe(true);
+    });
+
+    it("sets cloned layer as active", () => {
+      const layer1 = createLayer("layer-1", "Base", 0);
+      const mapData = createMapData([layer1], "layer-1");
+
+      const updated = cloneLayer(mapData, "layer-1", "all");
+
+      expect(updated.activeLayerId).not.toBe("layer-1");
+      const clone = updated.layers.find((l) => l.id !== "layer-1")!;
+      expect(updated.activeLayerId).toBe(clone.id);
+    });
+
+    it("inserts clone directly above source layer (order + 1)", () => {
+      const layer1 = createLayer("layer-1", "Bottom", 0);
+      const layer2 = createLayer("layer-2", "Top", 1);
+      const mapData = createMapData([layer1, layer2], "layer-1");
+
+      const updated = cloneLayer(mapData, "layer-1", "all");
+
+      const clone = updated.layers.find(
+        (l) => l.id !== "layer-1" && l.id !== "layer-2"
+      )!;
+      expect(clone.order).toBe(1);
+      // Top layer should have been shifted up
+      const shiftedTop = updated.layers.find((l) => l.id === "layer-2")!;
+      expect(shiftedTop.order).toBe(2);
+    });
+
+    it("mode 'all' copies cells, curves, edges, objects, textLabels, fogOfWar, tiles", () => {
+      const layer1 = createLayer("layer-1", "Full", 0);
+      layer1.cells = [{ x: 1, y: 2, color: "#aaa" }] as any;
+      layer1.curves = [{ id: "c1", start: { x: 0, y: 0 }, segments: [] }] as any;
+      layer1.edges = [{ x: 0, y: 0, side: "right", color: "#000" }];
+      layer1.objects = [{ id: "obj1", typeId: "sword", position: { x: 0, y: 0 } }];
+      layer1.textLabels = [
+        { id: "tl1", text: "hello", position: { x: 0, y: 0 }, fontSize: 12, fontFamily: "sans", color: "#000" },
+      ];
+      layer1.fogOfWar = { enabled: true, foggedCells: [{ col: 0, row: 0 }], texture: null };
+      layer1.tiles = [{ col: 0, row: 0, tilesetId: "ts1", tileIndex: 0 }] as any;
+      const mapData = createMapData([layer1], "layer-1");
+
+      const updated = cloneLayer(mapData, "layer-1", "all");
+
+      const clone = updated.layers.find((l) => l.id !== "layer-1")!;
+      expect(clone.cells).toEqual(layer1.cells);
+      expect(clone.curves).toEqual(layer1.curves);
+      expect(clone.edges).toEqual(layer1.edges);
+      expect(clone.objects).toEqual(layer1.objects);
+      expect(clone.textLabels).toEqual(layer1.textLabels);
+      expect(clone.fogOfWar).toEqual(layer1.fogOfWar);
+      expect(clone.tiles).toEqual(layer1.tiles);
+    });
+
+    it("mode 'mapOnly' copies cells, curves, edges, tiles but not objects, textLabels, fogOfWar", () => {
+      const layer1 = createLayer("layer-1", "Full", 0);
+      layer1.cells = [{ x: 1, y: 2, color: "#aaa" }] as any;
+      layer1.curves = [{ id: "c1", start: { x: 0, y: 0 }, segments: [] }] as any;
+      layer1.edges = [{ x: 0, y: 0, side: "right", color: "#000" }];
+      layer1.objects = [{ id: "obj1", typeId: "sword", position: { x: 0, y: 0 } }];
+      layer1.textLabels = [
+        { id: "tl1", text: "hello", position: { x: 0, y: 0 }, fontSize: 12, fontFamily: "sans", color: "#000" },
+      ];
+      layer1.fogOfWar = { enabled: true, foggedCells: [{ col: 0, row: 0 }], texture: null };
+      layer1.tiles = [{ col: 0, row: 0, tilesetId: "ts1", tileIndex: 0 }] as any;
+      const mapData = createMapData([layer1], "layer-1");
+
+      const updated = cloneLayer(mapData, "layer-1", "mapOnly");
+
+      const clone = updated.layers.find((l) => l.id !== "layer-1")!;
+      expect(clone.cells).toEqual(layer1.cells);
+      expect(clone.curves).toEqual(layer1.curves);
+      expect(clone.edges).toEqual(layer1.edges);
+      expect(clone.tiles).toEqual(layer1.tiles);
+      expect(clone.objects).toEqual([]);
+      expect(clone.textLabels).toEqual([]);
+      expect(clone.fogOfWar).toBeNull();
+    });
+
+    it("deep copies data (mutations don't affect source)", () => {
+      const layer1 = createLayer("layer-1", "Base", 0);
+      layer1.cells = [{ x: 0, y: 0, color: "#ff0000" }] as any;
+      const mapData = createMapData([layer1], "layer-1");
+
+      const updated = cloneLayer(mapData, "layer-1", "all");
+      const clone = updated.layers.find((l) => l.id !== "layer-1")!;
+
+      // Mutate clone data
+      (clone.cells[0] as any).color = "#00ff00";
+      // Source should be unchanged
+      expect((layer1.cells[0] as any).color).toBe("#ff0000");
+    });
+
+    it("returns unchanged mapData when layer not found", () => {
+      const layer1 = createLayer("layer-1", "Base", 0);
+      const mapData = createMapData([layer1], "layer-1");
+
+      const updated = cloneLayer(mapData, "nonexistent", "all");
+      expect(updated).toBe(mapData);
+    });
+
+    it("mode 'all' copies icon, showLayerBelow, layerBelowOpacity", () => {
+      const layer1 = createLayer("layer-1", "Styled", 0);
+      layer1.icon = "ra-sword";
+      layer1.showLayerBelow = true;
+      layer1.layerBelowOpacity = 0.3;
+      const mapData = createMapData([layer1], "layer-1");
+
+      const updated = cloneLayer(mapData, "layer-1", "all");
+      const clone = updated.layers.find((l) => l.id !== "layer-1")!;
+
+      expect(clone.icon).toBe("ra-sword");
+      expect(clone.showLayerBelow).toBe(true);
+      expect(clone.layerBelowOpacity).toBe(0.3);
+    });
+
+    it("mode 'mapOnly' does not copy icon, showLayerBelow, layerBelowOpacity", () => {
+      const layer1 = createLayer("layer-1", "Styled", 0);
+      layer1.icon = "ra-sword";
+      layer1.showLayerBelow = true;
+      layer1.layerBelowOpacity = 0.3;
+      const mapData = createMapData([layer1], "layer-1");
+
+      const updated = cloneLayer(mapData, "layer-1", "mapOnly");
+      const clone = updated.layers.find((l) => l.id !== "layer-1")!;
+
+      expect(clone.icon).toBeUndefined();
+      expect(clone.showLayerBelow).toBeUndefined();
+      expect(clone.layerBelowOpacity).toBeUndefined();
+    });
+
+    it("uses layer number as fallback name when layer has no name", () => {
+      const layer1: MapLayer = {
+        id: "layer-1",
+        name: "",
+        order: 2,
+        visible: true,
+        cells: [],
+        curves: [] as any,
+        edges: [],
+        objects: [],
+        textLabels: [],
+        fogOfWar: null,
+      };
+      const mapData = createMapData([layer1], "layer-1");
+
+      const updated = cloneLayer(mapData, "layer-1", "all");
+      const clone = updated.layers.find((l) => l.id !== "layer-1")!;
+      expect(clone.name).toBe("Copy of 3");
     });
   });
 
