@@ -1,28 +1,23 @@
-## Version 1.6.3
-Pretty big quality of life release, with continued fixes and improvements to the hex tiles. Deep links have been completely rewritten to work reliably in both Reading and Live Preview modes, with hover previews that show a map thumbnail when you mouse over a link. The selection toolbar got a full redesign, objects now have right-click context menus, and tile painting has new per-tileset configuration options.
+## Version 1.7.0
+
+A rather unplanned but hopefully interesting release around a few new features. A new shape/polygon overlay, as well as some new stuff for solo play. And some new/hopefully better stuff around keyboard shortcuts.
 
 ### New Features
-- **Deep Link Rewrite**
-	- Deep links now use a `windrose:` custom URL scheme instead of the old `obsidian://` protocol, which had reliability issues on some systems.
-	- Deep links work in both **Reading mode** and **Live Preview**.
-	- **Hover previews** — hovering a deep link shows a map thumbnail with a crosshair on the target location. Preview size and zoom level are configurable in settings (Map Behavior section).
-- **Selection Toolbar Redesign**
-	- Unified floating toolbar for objects, text labels, and multi-selections, replacing the three separate toolbars.
-	- Links section is collapsible (expanded by default for Note Pin objects).
-	- Right-click (or long press) context menu for objects via Obsidian's native Menu API — works on unselected objects too.
-- **Per-Tileset Rendering Settings**
-	- Gear icon in the tile asset browser opens an inline config panel per tileset.
-	- **Stamp threshold** — control when tiles render as full-hex vs. freeform stamps based on their size relative to the hex.
-	- **Min stamp scale** — set a minimum size for freeform stamps to prevent tiny rendering at low zoom.
+- **Shape Overlays** — Place square and circle shape overlays anywhere on the map (world space/not grid snapped). A new "Place Shape Overlay" tool uses two clicks to define the shape (corner-to-corner for squares, edge-then-center for circles, same as the fill tools). Shapes can be selected, dragged, recolored, deleted, and toggled between grid-snapped and freeform placement.
+- **Player Objects & Light Radius** — Any object can now be marked as a "Player" via the selection menu. Player objects gain a toggleable light radius with customizable range and color, rendered as a radius on the canvas. When a player object is dragged to a new position, fog of war is automatically cleared within the light radius at the drop point. Supports compound undo (fog + position).
+- **Object Measurement Overlay** — A new ruler toggle in the object selection toolbar. When enabled, dragging an object shows a dashed measurement line from the origin to the current position with the formatted distance (respects your distance/unit settings).
+- **Clone Layer** — Clone a layer via the layer panel's right-click menu. Choose "Clone All" (full content including objects, text labels, and fog of war) or "Map Only" (painted tiles, edges, and curves only). The clone is inserted above the source layer and auto-selected.
+- **New Keyboard Shortcuts: Layer Navigation** — Press `[` and `]` to switch between layers while hovering over the map. No more clicking through the layer panel to swap.
+- **Fixed/other new Keyboard Shortcuts: Undo/Redo** — `Ctrl+Z` (undo) and `Ctrl+Y` / `Ctrl+Shift+Z` (redo) now work while hovering over the map.
+- **Configurable Keyboard Shortcuts** — All keyboard shortcuts (tool selection, layer navigation, undo/redo) are now visible and rebindable in the plugin settings. Open Settings → Windrose MapDesigner Settings → Keyboard Shortcuts to see the full list. Click any shortcut to rebind it, or reset individual shortcuts or all at once.
 
 ### Improvements
-- **Clear All** buttons (Outline and Fog of War) now show a confirmation dialog.
-- **Outlines** added to the visibility toggle menu (hex maps).
-- **Fog of War** toolbar is now a floating toolbar that auto-hides when the visibility menu closes.
-- Stamp rendering uses hex-proportional minimum sizing — small stamps scale relative to hex screen size instead of a fixed pixel minimum.
-- Object placement now correctly uses the per-map object set ID, fixing issues with imported object set customs not placing correctly.
-- Updated Feature docs and README.
+- Tool palette tooltips now dynamically show the configured shortcut key (e.g., "Select/Move (S)") and update if you rebind shortcuts.
+- Note link modal now includes a "Create Note" button that closes the modal and opens Obsidian's new file dialog, for quick note creation from Note Pins and Link Note.
+- Note link modal now disambiguates duplicate note names by showing the parent folder path beneath each suggestion.
+- Settings plugin updated to v0.18.2.
 
 ### Bug Fixes
-- Fixed tile images stretching to full hex size during image load race (naturalWidth guard).
-- Old `obsidian://windrose?` deep links still work for backward compatibility.
+- Fixed clear area tool not removing edges/lines created with the Draw Edge tool.
+- Fixed color picker interaction bugs.
+- Fixed layer controls intercepting clicks intended for the map canvas.
