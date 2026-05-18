@@ -110,7 +110,7 @@ function renderShapePreview(
 function renderPlayerLights(
   ctx: CanvasRenderingContext2D,
   objects: Array<{ position: { x: number; y: number }; freeform?: boolean; worldPosition?: { x: number; y: number }; isPlayer?: boolean; lightRadius?: number; lightColor?: string; lightEnabled?: boolean }>,
-  geometry: { cellSize?: number; hexSize?: number; cellToWorld?: (x: number, y: number) => { worldX: number; worldY: number } },
+  geometry: { cellSize?: number; hexSize?: number; getCellCenter: (x: number, y: number) => { worldX: number; worldY: number } },
   viewState: ViewState,
   distancePerCell: number
 ): void {
@@ -125,13 +125,10 @@ function renderPlayerLights(
     if (obj.freeform && obj.worldPosition) {
       worldX = obj.worldPosition.x;
       worldY = obj.worldPosition.y;
-    } else if (geometry.cellToWorld) {
-      const w = geometry.cellToWorld(obj.position.x, obj.position.y);
+    } else {
+      const w = geometry.getCellCenter(obj.position.x, obj.position.y);
       worldX = w.worldX;
       worldY = w.worldY;
-    } else {
-      worldX = obj.position.x * cellSize;
-      worldY = obj.position.y * cellSize;
     }
 
     const { sx, sy } = worldToScreen(worldX, worldY, viewState);
