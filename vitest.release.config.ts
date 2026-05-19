@@ -33,5 +33,10 @@ export default defineConfig({
     env: {
       WINDROSE_TEST_MODE: "compiled",
     },
+    // Write structured results to JSON for release pipeline parsing
+    reporters: ["default", "json"],
+    outputFile: {
+      json: "test-results.json",
+    },
   },
 });

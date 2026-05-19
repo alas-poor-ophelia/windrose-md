@@ -135,7 +135,7 @@ export interface MapOperationsContextValue {
 // Moved from MapSelectionContext.tsx to be importable by hooks via #types/
 
 /** Selected item types */
-export type SelectableItemType = 'object' | 'text' | 'notePin';
+export type SelectableItemType = 'object' | 'text' | 'notePin' | 'shapeOverlay';
 
 /** A selected item */
 export interface SelectedItem {

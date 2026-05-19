@@ -245,6 +245,9 @@ export interface MapData {
   // Note pins (global, not per-layer)
   notePins?: NotePin[];
 
+  // Shape overlays (global, both grid and hex maps)
+  shapeOverlays?: ShapeOverlay[];
+
   // Regions (hex maps only, global not per-layer)
   regions?: Region[];
 
@@ -310,6 +313,23 @@ export interface NotePin {
   linkedNote?: string;
   color?: string;
   icon?: string;
+}
+
+// ===========================================
+// Shape Overlays (geometric shapes, both grid and hex)
+// ===========================================
+
+export type ShapeOverlayType = 'square' | 'circle';
+
+export interface ShapeOverlay {
+  id: string;
+  shape: ShapeOverlayType;
+  worldPosition: Point;
+  size: number;
+  color: string;
+  opacity: number;
+  freeform: boolean;
+  visible: boolean;
 }
 
 // ===========================================

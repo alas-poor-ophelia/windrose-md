@@ -40,6 +40,8 @@ export type ToolId =
   // Region tools (hex maps)
   | 'regionPaint'
   | 'regionBoundary'
+  // Shape overlay tool
+  | 'shape'
   // Tile tools (hex maps)
   | 'tilePaint'
   // Utility tools

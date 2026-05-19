@@ -17,7 +17,7 @@
  */
 
 import { execSync, spawnSync } from "child_process";
-import { readFileSync, existsSync, copyFileSync, mkdtempSync, rmSync } from "fs";
+import { readFileSync, existsSync, copyFileSync, mkdtempSync, rmSync, openSync, closeSync } from "fs";
 import * as os from "os";
 import * as path from "path";
 import { compileViaObsidian } from "./compile.js";
@@ -31,6 +31,8 @@ const VERSION_PATH = path.join(SOURCE_ROOT, "dist", "VERSION");
 const CHANGELOG_PATH = path.join(SOURCE_ROOT, "dist", "CHANGELOG.md");
 const COMPILED_TEST_VAULT = path.join(DEV_ROOT, "tests", "fixtures", "test-vault-compiled");
 const COMPILED_TEST_ARTIFACT = path.join(COMPILED_TEST_VAULT, "_compiled", "compiled-windrose-md.md");
+const TEST_LOG_PATH = path.join(DEV_ROOT, "test-output.log");
+const TEST_RESULTS_PATH = path.join(DEV_ROOT, "test-results.json");
 
 // Datacore Compiler command ID for Windrose
 const DEFAULT_COMPILER_COMMAND = "dc-compiler:compile-projects-dungeon-map-tracker--compilersettings";
@@ -170,12 +172,70 @@ async function runCompile(commandId: string): Promise<void> {
   console.log("");
 }
 
+function printTestSummary(jsonPath: string): { passed: boolean } {
+  if (!existsSync(jsonPath)) {
+    console.log("  WARNING: No test-results.json found. Check test-output.log for details.");
+    return { passed: false };
+  }
+
+  const results = JSON.parse(readFileSync(jsonPath, "utf-8"));
+  const testFiles = results.testResults || [];
+  const passedFiles = testFiles.filter((f: any) => f.status === "passed").length;
+  const failedFiles = testFiles.filter((f: any) => f.status === "failed");
+
+  let totalTests = 0;
+  let totalPassed = 0;
+  let totalFailed = 0;
+  let totalSkipped = 0;
+
+  for (const file of testFiles) {
+    for (const test of file.assertionResults || []) {
+      totalTests++;
+      if (test.status === "passed") totalPassed++;
+      else if (test.status === "failed") totalFailed++;
+      else totalSkipped++;
+    }
+  }
+
+  console.log(`\n  ── Test Results ──────────────────────────────`);
+  console.log(`  Files:  ${passedFiles} passed, ${failedFiles.length} failed (${testFiles.length} total)`);
+  console.log(`  Tests:  ${totalPassed} passed, ${totalFailed} failed, ${totalSkipped} skipped (${totalTests} total)`);
+
+  if (failedFiles.length > 0) {
+    console.log(`\n  ── Failures ─────────────────────────────────`);
+    for (const file of failedFiles) {
+      const relPath = path.relative(DEV_ROOT, file.name);
+      console.log(`\n  FAIL ${relPath}`);
+      for (const test of file.assertionResults || []) {
+        if (test.status === "failed") {
+          console.log(`    ✗ ${test.ancestorTitles?.join(" > ")}${test.ancestorTitles?.length ? " > " : ""}${test.title}`);
+          const msg = (test.failureMessages || []).join("\n");
+          const lines = msg.split("\n").slice(0, 10);
+          for (const line of lines) {
+            console.log(`      ${line}`);
+          }
+          if (msg.split("\n").length > 10) {
+            console.log(`      ... (${msg.split("\n").length - 10} more lines in test-output.log)`);
+          }
+        }
+      }
+    }
+  }
+
+  console.log(`\n  Full output: ${TEST_LOG_PATH}`);
+  console.log(`  JSON results: ${TEST_RESULTS_PATH}\n`);
+
+  return { passed: failedFiles.length === 0 };
+}
+
 function runTests(): void {
   console.log("Step 2: Running E2E tests against compiled artifact...\n");
 
+  const logFd = openSync(TEST_LOG_PATH, "w");
+
   const result = spawnSync("npm", ["run", "test:release"], {
     cwd: DEV_ROOT,
-    stdio: "inherit",
+    stdio: ["ignore", logFd, logFd],
     shell: true,
     env: {
       ...process.env,
@@ -183,11 +243,13 @@ function runTests(): void {
     },
   });
 
-  if (result.status !== 0) {
-    throw new Error("Tests failed. Fix issues and retry.");
-  }
+  closeSync(logFd);
 
-  console.log("\n  All tests passed.\n");
+  const { passed } = printTestSummary(TEST_RESULTS_PATH);
+
+  if (result.status !== 0 || !passed) {
+    throw new Error("Tests failed. See summary above and test-output.log for details.");
+  }
 }
 
 function commitArtifact(version: string, dryRun: boolean): void {

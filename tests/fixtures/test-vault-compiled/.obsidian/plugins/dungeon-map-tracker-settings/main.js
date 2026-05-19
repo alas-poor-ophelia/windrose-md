@@ -23,7 +23,7 @@
 // VERSION & IMPORTS
 // =============================================================================
 
-const PLUGIN_VERSION = '0.17.0';
+const PLUGIN_VERSION = '0.18.2';
 
 const obsidianModule = require('obsidian');
 const { Plugin, PluginSettingTab, Setting, Modal, setIcon, AbstractInputSuggest } = obsidianModule;
@@ -41,12 +41,6 @@ window.dispatchEvent(new CustomEvent('windrose:bridge-ready'));
 // =============================================================================
 
 const BUILT_IN_OBJECTS = [
-  {
-    "id": "note_pin",
-    "symbol": "📌",
-    "label": "Note Pin",
-    "category": "notes"
-  },
   {
     "id": "entrance",
     "symbol": "⬤",
@@ -4389,6 +4383,168 @@ class FolderSuggest extends AbstractInputSuggest {
   }
 }
 
+// settingsPlugin-DeeplinkHover.js
+// Hover preview lifecycle manager for windrose: deep links.
+// Attaches mouseenter/mouseleave to deep-link anchors, shows a HoverPopover
+// containing a Datacore-rendered map preview via window.datacore.executeJsx.
+// This file is concatenated into the settings plugin template by the assembler.
+
+const DeeplinkHover = (() => {
+  const HL = '[Windrose:Hover]';
+  const SHOW_DELAY_MS = 400;
+  const HIDE_GRACE_MS = 300;
+
+  // state: { el: HTMLElement -> { showTimer, hideTimer, popover, hoverEl } }
+  const linkState = new WeakMap();
+  let currentLink = null;
+
+  function clearTimers(state) {
+    if (!state) return;
+    if (state.showTimer) { clearTimeout(state.showTimer); state.showTimer = null; }
+    if (state.hideTimer) { clearTimeout(state.hideTimer); state.hideTimer = null; }
+  }
+
+  function destroyPopover(state) {
+    if (!state) return;
+    if (state.hoverEl && window.__windrose && typeof window.__windrose.unmountPreview === 'function') {
+      try { window.__windrose.unmountPreview(state.host); } catch (err) { /* ignore */ }
+    }
+    if (state.popover) {
+      try { state.popover.hide(); } catch (err) { /* ignore */ }
+      state.popover = null;
+    }
+    state.hoverEl = null;
+    state.host = null;
+  }
+
+  function scheduleHide(linkEl) {
+    const state = linkState.get(linkEl);
+    if (!state) return;
+    if (state.hideTimer) return;
+    state.hideTimer = window.setTimeout(() => {
+      state.hideTimer = null;
+      destroyPopover(state);
+      if (currentLink === linkEl) currentLink = null;
+    }, HIDE_GRACE_MS);
+  }
+
+  function cancelHide(linkEl) {
+    const state = linkState.get(linkEl);
+    if (state && state.hideTimer) {
+      clearTimeout(state.hideTimer);
+      state.hideTimer = null;
+    }
+  }
+
+  function showPopover(plugin, linkEl, parsed) {
+    if (currentLink && currentLink !== linkEl) {
+      const prev = linkState.get(currentLink);
+      clearTimers(prev);
+      destroyPopover(prev);
+    }
+    currentLink = linkEl;
+
+    const state = linkState.get(linkEl) || {};
+    linkState.set(linkEl, state);
+
+    // Custom popover div — simpler and more reliable than HoverPopover which
+    // requires internal lifecycle we don't have access to.
+    const popoverEl = document.body.createDiv({ cls: 'windrose-hover-preview-popover popover' });
+    popoverEl.style.position = 'fixed';
+    popoverEl.style.zIndex = '1000';
+
+    const rect = linkEl.getBoundingClientRect();
+    const viewportW = window.innerWidth || 1200;
+    const viewportH = window.innerHeight || 800;
+    // Position below the link by default; flip above if it would overflow.
+    const previewScale = Math.max(0.5, Math.min(2.0, Number(plugin.settings.hoverPreviewScale) || 1.0));
+    const estWidth = Math.round(240 * previewScale) + 20;
+    const estHeight = Math.round(180 * previewScale) + 64;
+    let left = Math.min(Math.max(8, rect.left), viewportW - estWidth - 8);
+    let top = rect.bottom + 8;
+    if (top + estHeight > viewportH - 8) {
+      top = Math.max(8, rect.top - estHeight - 8);
+    }
+    popoverEl.style.left = left + 'px';
+    popoverEl.style.top = top + 'px';
+
+    state.popover = { hide: () => popoverEl.remove() };
+    state.hoverEl = popoverEl;
+
+    const container = popoverEl.createDiv({ cls: 'windrose-hover-preview-host' });
+    state.host = container;
+    popoverEl.addEventListener('mouseenter', () => cancelHide(linkEl));
+    popoverEl.addEventListener('mouseleave', () => scheduleHide(linkEl));
+
+    const render = window.__windrose && window.__windrose.renderPreview;
+    if (typeof render !== 'function') {
+      container.setText('Preview unavailable — open a map in this note.');
+      return;
+    }
+
+    try {
+      render(container, {
+        mapId: parsed.mapId,
+        x: Number.isFinite(parsed.x) ? parsed.x : 0,
+        y: Number.isFinite(parsed.y) ? parsed.y : 0,
+        zoom: Number.isFinite(parsed.zoom) && parsed.zoom > 0 ? parsed.zoom : undefined,
+        layerId: parsed.layerId || '',
+        notePath: parsed.notePath || ''
+      });
+    } catch (err) {
+      console.error(HL, 'renderPreview failed', err);
+      container.setText('Preview failed to load.');
+    }
+  }
+
+  function onHoverEnter(plugin, linkEl, parsed) {
+    if (!linkEl || !parsed) return;
+
+    const state = linkState.get(linkEl) || {};
+    linkState.set(linkEl, state);
+
+    cancelHide(linkEl);
+
+    if (state.showTimer) return;
+    if (state.popover) return;
+
+    state.showTimer = window.setTimeout(() => {
+      state.showTimer = null;
+      showPopover(plugin, linkEl, parsed);
+    }, SHOW_DELAY_MS);
+  }
+
+  function onHoverLeave(linkEl) {
+    if (!linkEl) return;
+    const state = linkState.get(linkEl);
+    if (!state) return;
+    if (state.showTimer) {
+      clearTimeout(state.showTimer);
+      state.showTimer = null;
+    }
+    if (state.popover) scheduleHide(linkEl);
+  }
+
+  function attachReadingModeHover(plugin, anchor, parsed) {
+    anchor.addEventListener('mouseenter', () => onHoverEnter(plugin, anchor, parsed));
+    anchor.addEventListener('mouseleave', () => onHoverLeave(anchor));
+  }
+
+  // Live Preview: called from CM6 mouseover handler with the resolved windrose href.
+  function onLivePreviewPointer(plugin, linkEl, parsed, kind) {
+    if (kind === 'enter') onHoverEnter(plugin, linkEl, parsed);
+    else if (kind === 'leave') onHoverLeave(linkEl);
+  }
+
+  return {
+    attachReadingModeHover,
+    onLivePreviewPointer,
+    onHoverEnter,
+    onHoverLeave
+  };
+})();
+
+
 // =============================================================================
 // MODAL CLASSES
 // Injected at assembly time from settingsPlugin-*Modal.js files
@@ -6812,8 +6968,128 @@ class WindroseMDSettingsPlugin extends Plugin {
       }
     });
     
-    // Register Obsidian protocol handler for deep links
-    // Format: obsidian://windrose?notePath|mapId,x,y,zoom,layerId
+    // Post-processor + document-capture fallback for windrose: deep links.
+    // DIAGNOSTIC BUILD: heavy logging at each decision point to trace behavior.
+    const W = '[Windrose:DL]';
+    const parseWindroseHref = (href) => {
+      if (!href || !href.startsWith('windrose:')) {
+        console.warn(W, 'parse: not a windrose: href', { href });
+        return null;
+      }
+      let dataStr = href.slice('windrose:'.length);
+      try {
+        dataStr = decodeURIComponent(dataStr);
+      } catch (err) {
+        console.warn(W, 'parse: decodeURIComponent failed, using raw', err);
+      }
+      const pipeIndex = dataStr.indexOf('|');
+      if (pipeIndex === -1) {
+        console.warn(W, 'parse: no pipe separator', { dataStr });
+        return null;
+      }
+      const notePath = dataStr.slice(0, pipeIndex);
+      const parts = dataStr.slice(pipeIndex + 1).split(',');
+      if (parts.length !== 5) {
+        console.warn(W, 'parse: wrong part count', { parts });
+        return null;
+      }
+      const [mapId, x, y, zoom, layerId] = parts;
+      const result = { notePath, mapId, x: parseFloat(x), y: parseFloat(y), zoom: parseFloat(zoom), layerId };
+      return result;
+    };
+
+    const navigateToWindroseLink = async (parsed, sourcePath) => {
+      const { notePath, mapId, x, y, zoom, layerId } = parsed;
+      const currentPath = sourcePath || '';
+      const isSameNote = notePath === currentPath || notePath === currentPath.replace(/.md$/, '');
+      if (!isSameNote) {
+        try {
+          const linkPath = notePath.replace(/.md$/, '');
+          await this.app.workspace.openLinkText(linkPath, '', false);
+        } catch (err) {
+          console.error(W, 'navigate: openLinkText FAILED', err);
+          new Notice('Failed to open map note');
+          return;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+
+      const detail = { mapId, x, y, zoom, layerId, timestamp: Date.now() };
+      window.__windrose = window.__windrose || {};
+      window.__windrose.pendingNavigate = { ...detail, consumed: false };
+      window.dispatchEvent(new CustomEvent('dmt-navigate-to', { detail }));
+
+      // Scroll the note viewport to the map codeblock (may not be visible if below fold)
+      setTimeout(() => {
+        try {
+          const leaf = document.querySelector('.workspace-leaf.mod-active .view-content');
+          if (leaf) {
+            const mapEl = leaf.querySelector('.dmt-container');
+            if (mapEl) {
+              mapEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+          }
+        } catch (err) {
+          console.warn(W, 'navigate: scroll failed', err);
+        }
+      }, 200);
+    };
+
+    this.registerMarkdownPostProcessor((el, ctx) => {
+      const candidates = el.querySelectorAll(
+        'a[href^="windrose:"], a[data-href^="windrose:"]'
+      );
+      if (candidates.length === 0) return;
+
+      candidates.forEach((link, idx) => {
+        const rawHref = link.getAttribute('href') || '';
+        const dataHref = link.getAttribute('data-href') || '';
+        const original = rawHref.startsWith('windrose:') ? rawHref
+                       : dataHref.startsWith('windrose:') ? dataHref : '';
+        if (!original) {
+          console.warn(W, 'post-processor: no windrose: value to store');
+          return;
+        }
+
+        const replacement = document.createElement('a');
+        replacement.textContent = link.textContent;
+        replacement.className = 'windrose-deep-link';
+        replacement.setAttribute('href', '#');
+        replacement.setAttribute('data-windrose-href', original);
+        replacement.style.cursor = 'pointer';
+        link.replaceWith(replacement);
+
+        const parsed = parseWindroseHref(original);
+        if (parsed && typeof DeeplinkHover !== 'undefined') {
+          DeeplinkHover.attachReadingModeHover(this, replacement, parsed);
+        }
+      });
+    });
+
+    // Defense in depth: document-level capture handler for Live Preview or dynamic content.
+    this.registerDomEvent(document, 'click', async (e) => {
+      const target = e.target;
+      if (!(target && target.closest)) return;
+      const link = target.closest('a[href^="windrose:"], a[data-href^="windrose:"], a[data-windrose-href]');
+      if (!link) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (typeof e.stopImmediatePropagation === 'function') e.stopImmediatePropagation();
+      const href = link.getAttribute('data-windrose-href')
+        || link.getAttribute('href')
+        || link.getAttribute('data-href')
+        || '';
+      const parsed = parseWindroseHref(href);
+      if (!parsed) return;
+      const sourcePath = this.app.workspace.getActiveFile()?.path || '';
+      try {
+        await navigateToWindroseLink(parsed, sourcePath);
+      } catch (err) {
+        console.error(W, 'doc-capture: navigate threw', err);
+      }
+    }, { capture: true });
+
+    // Legacy: Obsidian protocol handler for old obsidian://windrose? links
     this.registerObsidianProtocolHandler('windrose', async (params) => {
       // The data comes as URL search params - we need to parse the raw query
       // params.action = 'windrose', and the rest is in the query string
@@ -6863,6 +7139,190 @@ class WindroseMDSettingsPlugin extends Plugin {
         new Notice('Failed to open map note');
       }
     });
+
+    // CodeMirror 6 editor extension: catches clicks on windrose: links in Live Preview.
+    // Post-processor does not run in Live Preview, so this is our only hook there.
+    try {
+      const cmView = require('@codemirror/view');
+      if (cmView && cmView.EditorView) {
+        const plugin = this;
+
+        // In Live Preview, markdown links render as <span class="cm-link"> with no href
+        // on the DOM — the URL lives in the editor's document model. We query the
+        // document at the click position and scan for windrose: URLs on that line.
+        // No regex: regex literals inside the outer backtick template lose their
+        // escapes ("[" becomes "[" after template eval), producing invalid patterns.
+        const findWindroseHrefAtPos = (view, pos) => {
+          try {
+            const line = view.state.doc.lineAt(pos);
+            const lineText = line.text;
+            const localPos = pos - line.from;
+            const SCHEME = 'windrose:';
+            const urls = [];
+            let search = 0;
+            while (true) {
+              const idx = lineText.indexOf(SCHEME, search);
+              if (idx === -1) break;
+              let end = idx;
+              while (end < lineText.length) {
+                const ch = lineText[end];
+                if (ch === ')' || ch === ' ' || ch === '\t' || ch === '\n') break;
+                end++;
+              }
+              urls.push({ start: idx, end, url: lineText.slice(idx, end) });
+              search = end;
+            }
+            if (urls.length === 0) return null;
+            for (const u of urls) {
+              const linkStart = Math.max(0, u.start - 200);
+              const linkEnd = Math.min(lineText.length, u.end + 5);
+              if (localPos >= linkStart && localPos <= linkEnd) {
+                return u.url;
+              }
+            }
+            return urls[0].url;
+          } catch (err) {
+            console.warn(W, 'cm6: findWindroseHrefAtPos error', err);
+          }
+          return null;
+        };
+
+        // Resolve a windrose: href from a pointer event inside the CM6 editor.
+        // Returns { href, anchorEl } or null. Used by click and hover handlers.
+        const resolveWindroseFromEvent = (event, view) => {
+          const target = event.target;
+          if (!target || typeof target.closest !== 'function') return null;
+
+          const anchor = target.closest('a[href^="windrose:"], a[data-href^="windrose:"], a[data-windrose-href]');
+          if (anchor) {
+            const href = anchor.getAttribute('data-windrose-href')
+              || anchor.getAttribute('href')
+              || anchor.getAttribute('data-href')
+              || null;
+            if (href) return { href, anchorEl: anchor };
+          }
+
+          const linkSpan = target.closest('.cm-link, .cm-underline, .cm-hmd-internal-link');
+          if (linkSpan) {
+            const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
+            if (pos != null) {
+              const href = findWindroseHrefAtPos(view, pos);
+              if (href) return { href, anchorEl: linkSpan };
+            }
+          }
+          return null;
+        };
+
+        // LP hover state: last link we fired 'enter' for. Used to dedupe mouseover
+        // fires from walking the mouse across link spans and to emit 'leave' when
+        // the pointer moves off a link.
+        let lpHoverState = null; // { el, href }
+
+        const lpFireLeave = () => {
+          if (!lpHoverState) return;
+          if (typeof DeeplinkHover !== 'undefined') {
+            DeeplinkHover.onLivePreviewPointer(plugin, lpHoverState.el, null, 'leave');
+          }
+          lpHoverState = null;
+        };
+
+        const lpFireEnter = (linkEl, parsed, href) => {
+          if (lpHoverState && lpHoverState.el === linkEl && lpHoverState.href === href) return;
+          if (lpHoverState) lpFireLeave();
+          lpHoverState = { el: linkEl, href };
+          if (typeof DeeplinkHover !== 'undefined') {
+            DeeplinkHover.onLivePreviewPointer(plugin, linkEl, parsed, 'enter');
+          }
+        };
+
+        const windroseEditorExt = cmView.EditorView.domEventHandlers({
+          click: (event, view) => {
+            const target = event.target;
+            const resolved = resolveWindroseFromEvent(event, view);
+            if (!resolved) return false;
+
+            event.preventDefault();
+            event.stopPropagation();
+            if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
+            const parsed = parseWindroseHref(resolved.href);
+            if (!parsed) return true;
+            const sourcePath = plugin.app.workspace.getActiveFile()?.path || '';
+            navigateToWindroseLink(parsed, sourcePath).catch((err) => {
+              console.error(W, 'cm6: navigate threw', err);
+            });
+            return true;
+          },
+          mouseover: (event, view) => {
+            const resolved = resolveWindroseFromEvent(event, view);
+            if (!resolved) {
+              if (lpHoverState) lpFireLeave();
+              return false;
+            }
+            const parsed = parseWindroseHref(resolved.href);
+            if (!parsed) return false;
+            lpFireEnter(resolved.anchorEl, parsed, resolved.href);
+            return false;
+          },
+          mouseout: (event, view) => {
+            if (!lpHoverState) return false;
+            const related = event.relatedTarget;
+            if (related && typeof related.closest === 'function') {
+              if (related.closest('.windrose-hover-preview-popover')) return false;
+              if (related.closest('.cm-link, .cm-underline, .cm-hmd-internal-link, a[href^="windrose:"], a[data-href^="windrose:"], a[data-windrose-href]')) {
+                return false;
+              }
+            }
+            lpFireLeave();
+            return false;
+          }
+        });
+        // ViewPlugin: tag external-link icon spans on lines containing a windrose: URL
+        // so the styles.css rule for .windrose-deep-link-icon can hide the ↗ icon.
+        // LP collapses the URL text out of the DOM, so selectors alone can't tell a
+        // windrose link apart from an http link — we correlate each icon span to its
+        // source line via the CM6 document model.
+        //
+        // Uses rAF-debounced tagging + a MutationObserver on contentDOM because
+        // Obsidian adds the .external-link class via a separate view plugin whose
+        // run order isn't guaranteed relative to ours. Without the observer, newly
+        // rendered spans (scroll, reload, cursor move) briefly show the default icon.
+        const windroseIconTagger = cmView.ViewPlugin.fromClass(class {
+          constructor(view) {
+            this.view = view;
+            this.pending = false;
+            this.schedule();
+            this.observer = new MutationObserver(() => this.schedule());
+            this.observer.observe(view.contentDOM, { childList: true, subtree: true });
+          }
+          update() { this.schedule(); }
+          schedule() {
+            if (this.pending) return;
+            this.pending = true;
+            requestAnimationFrame(() => { this.pending = false; this.tag(); });
+          }
+          tag() {
+            const view = this.view;
+            const spans = view.contentDOM.querySelectorAll('.external-link');
+            for (const el of spans) {
+              let isWindrose = false;
+              try {
+                const pos = view.posAtDOM(el);
+                const line = view.state.doc.lineAt(pos);
+                if (line.text.indexOf('(windrose:') >= 0) isWindrose = true;
+              } catch (_) { /* ignore */ }
+              el.classList.toggle('windrose-deep-link-icon', isWindrose);
+            }
+          }
+          destroy() { if (this.observer) this.observer.disconnect(); }
+        });
+
+        this.registerEditorExtension([windroseEditorExt, windroseIconTagger]);
+      } else {
+        console.warn(W, 'cm6: @codemirror/view not available, Live Preview interception unavailable');
+      }
+    } catch (err) {
+      console.error(W, 'cm6: failed to register editor extension', err);
+    }
 
     // Register command to generate a random dungeon
     this.addCommand({
@@ -7267,7 +7727,7 @@ class WindroseMDSettingsPlugin extends Plugin {
     try {
       const data = await this.loadData();
       this.settings = Object.assign({
-        version: '0.17.0',
+        version: '0.18.2',
         hexOrientation: 'flat',
         gridLineColor: '#666666',
         gridLineWidth: 1,
@@ -7308,12 +7768,25 @@ class WindroseMDSettingsPlugin extends Plugin {
         activeObjectSetId: null,
         objectSetsAutoLoadFolder: '',
         // Tileset folders
-        tilesetFolders: []
+        tilesetFolders: [],
+        // Keyboard shortcuts
+        keyboardShortcuts: {
+          selectTool: 's', drawTool: 'd', freehandTool: 'f', eraseTool: 'e',
+          notePinTool: 'n', measureTool: 'm', panMode: 'Space', showCoordinates: 'c',
+          rotate: 'r', layerPrev: '[', layerNext: ']', undo: 'Mod+Z', redo: 'Mod+Y'
+        }
       }, data || {});
+      if (!this.settings.keyboardShortcuts) {
+        this.settings.keyboardShortcuts = {
+          selectTool: 's', drawTool: 'd', freehandTool: 'f', eraseTool: 'e',
+          notePinTool: 'n', measureTool: 'm', panMode: 'Space', showCoordinates: 'c',
+          rotate: 'r', layerPrev: '[', layerNext: ']', undo: 'Mod+Z', redo: 'Mod+Y'
+        };
+      }
     } catch (error) {
       console.warn('[DMT Settings] Error loading settings, using defaults:', error);
       this.settings = {
-        version: '0.17.0',
+        version: '0.18.2',
         hexOrientation: 'flat',
         gridLineColor: '#666666',
         gridLineWidth: 1,
@@ -7354,7 +7827,13 @@ class WindroseMDSettingsPlugin extends Plugin {
         activeObjectSetId: null,
         objectSetsAutoLoadFolder: '',
         // Tileset folders
-        tilesetFolders: []
+        tilesetFolders: [],
+        // Keyboard shortcuts
+        keyboardShortcuts: {
+          selectTool: 's', drawTool: 'd', freehandTool: 'f', eraseTool: 'e',
+          notePinTool: 'n', measureTool: 'm', panMode: 'Space', showCoordinates: 'c',
+          rotate: 'r', layerPrev: '[', layerNext: ']', undo: 'Mod+Z', redo: 'Mod+Y'
+        }
       };
     }
   }
@@ -7511,6 +7990,9 @@ class WindroseMDSettingsTab extends PluginSettingTab {
     this.createCollapsibleSection(containerEl, 'Object Types',
       (el) => this.renderObjectTypesContent(el),
       { open: openSections.has('Object Types') });
+    this.createCollapsibleSection(containerEl, 'Keyboard Shortcuts',
+      (el) => this.renderKeyboardShortcutsContent(el),
+      { open: openSections.has('Keyboard Shortcuts') });
   }
 
   
@@ -7974,6 +8456,55 @@ const TabRenderSettingsMethods = {
             await this.plugin.saveSettings();
           }
         }));
+
+    // Hover Preview Size
+    const previewScalePercent = Math.round((this.plugin.settings.hoverPreviewScale || 1.0) * 100);
+    new Setting(containerEl)
+      .setName('Link Preview Size')
+      .setDesc(`Scale of the hover preview panel (currently ${previewScalePercent}%)`)
+      .addSlider(slider => slider
+        .setLimits(50, 200, 10)
+        .setValue(previewScalePercent)
+        .setDynamicTooltip()
+        .onChange(async (value) => {
+          this.plugin.settings.hoverPreviewScale = value / 100;
+          this.settingsChanged = true;
+          await this.plugin.saveSettings();
+        }))
+      .addExtraButton(btn => btn
+        .setIcon('rotate-ccw')
+        .setTooltip('Reset to default (100%)')
+        .onClick(async () => {
+          this.plugin.settings.hoverPreviewScale = 1.0;
+          this.settingsChanged = true;
+          await this.plugin.saveSettings();
+          this.display();
+        }));
+
+    // Hover Preview Zoom
+    const previewZoom = this.plugin.settings.hoverPreviewZoom || 0.5;
+    const previewZoomPercent = Math.round(previewZoom * 100);
+    new Setting(containerEl)
+      .setName('Link Preview Zoom')
+      .setDesc(`How zoomed in the preview map appears (currently ${previewZoomPercent}%)`)
+      .addSlider(slider => slider
+        .setLimits(10, 200, 10)
+        .setValue(previewZoomPercent)
+        .setDynamicTooltip()
+        .onChange(async (value) => {
+          this.plugin.settings.hoverPreviewZoom = value / 100;
+          this.settingsChanged = true;
+          await this.plugin.saveSettings();
+        }))
+      .addExtraButton(btn => btn
+        .setIcon('rotate-ccw')
+        .setTooltip('Reset to default (50%)')
+        .onClick(async () => {
+          this.plugin.settings.hoverPreviewZoom = 0.5;
+          this.settingsChanged = true;
+          await this.plugin.saveSettings();
+          this.display();
+        }));
   },
   renderDistanceMeasurementSettingsContent(containerEl) {
     // Grid: Distance per cell
@@ -8434,9 +8965,8 @@ const TabRenderObjectsMethods = {
       return;
     }
     
-    // Render each category (skip 'notes' - note_pin is handled specially in the map UI)
+    // Render each category
     for (const category of allCategories) {
-      if (category.id === 'notes') continue;
       
       let categoryObjects = filteredObjects.filter(obj => obj.category === category.id);
       if (categoryObjects.length === 0 && category.isBuiltIn) continue;
@@ -9092,11 +9622,151 @@ const TabRenderTilesetsMethods = {
   }
 };
 
+// settingsPlugin-TabRenderKeyboardShortcuts.js
+// WindroseMDSettingsTab render methods - Keyboard Shortcuts section
+// This file is concatenated into the settings plugin template by the assembler
+
+const TabRenderKeyboardShortcutsMethods = {
+  renderKeyboardShortcutsContent(containerEl) {
+    const SHORTCUT_ACTIONS = [
+      { id: 'selectTool', label: 'Select Tool', scope: 'Map hover' },
+      { id: 'drawTool', label: 'Draw Tool', scope: 'Map hover' },
+      { id: 'freehandTool', label: 'Freehand Draw', scope: 'Map hover' },
+      { id: 'eraseTool', label: 'Erase Tool', scope: 'Map hover' },
+      { id: 'notePinTool', label: 'Place Note Pin', scope: 'Map hover' },
+      { id: 'measureTool', label: 'Measure Distance', scope: 'Map hover' },
+      { id: 'panMode', label: 'Pan (hold)', scope: 'Map hover' },
+      { id: 'showCoordinates', label: 'Show Coordinates', scope: 'Map hover' },
+      { id: 'rotate', label: 'Rotate Selected', scope: 'Object selected' },
+      { id: 'layerPrev', label: 'Previous Layer', scope: 'Map hover' },
+      { id: 'layerNext', label: 'Next Layer', scope: 'Map hover' },
+      { id: 'undo', label: 'Undo', scope: 'Map hover' },
+      { id: 'redo', label: 'Redo', scope: 'Map hover' }
+    ];
+
+    const DEFAULT_SHORTCUTS = {
+      selectTool: 's', drawTool: 'd', freehandTool: 'f', eraseTool: 'e',
+      notePinTool: 'n', measureTool: 'm', panMode: 'Space', showCoordinates: 'c',
+      rotate: 'r', layerPrev: '[', layerNext: ']', undo: 'Mod+Z', redo: 'Mod+Y'
+    };
+
+    const isMac = navigator.platform.indexOf('Mac') >= 0;
+
+    function formatKey(keyStr) {
+      if (!keyStr) return '—';
+      return keyStr
+        .replace(/Mod\+/gi, isMac ? '⌘' : 'Ctrl+')
+        .replace(/Shift\+/gi, isMac ? '⇧' : 'Shift+')
+        .replace(/Alt\+/gi, isMac ? '⌥' : 'Alt+')
+        .replace('Space', '␣');
+    }
+
+    containerEl.createEl('p', {
+      text: 'Keyboard shortcuts activate when the mouse is over the map canvas. Click a shortcut to rebind it.',
+      cls: 'setting-item-description'
+    });
+
+    for (const action of SHORTCUT_ACTIONS) {
+      const shortcuts = this.plugin.settings.keyboardShortcuts || {};
+      const currentKey = shortcuts[action.id] || DEFAULT_SHORTCUTS[action.id] || '';
+
+      const setting = new Setting(containerEl)
+        .setName(action.label)
+        .setDesc(action.scope);
+
+      const kbdContainer = setting.controlEl.createDiv({ cls: 'dmt-kbd-container' });
+
+      const kbdEl = kbdContainer.createEl('kbd', {
+        text: formatKey(currentKey),
+        cls: 'dmt-kbd-key'
+      });
+      kbdEl.style.cssText = 'cursor:pointer; padding:2px 8px; border:1px solid var(--background-modifier-border); border-radius:4px; font-family:var(--font-monospace); font-size:0.85em; min-width:24px; text-align:center; display:inline-block; background:var(--background-secondary);';
+
+      let isCapturing = false;
+
+      kbdEl.addEventListener('click', () => {
+        if (isCapturing) return;
+        isCapturing = true;
+        kbdEl.textContent = 'Press a key...';
+        kbdEl.style.color = 'var(--text-accent)';
+        kbdEl.style.borderColor = 'var(--text-accent)';
+
+        const captureHandler = (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+
+          if (e.key === 'Escape') {
+            kbdEl.textContent = formatKey(currentKey);
+            kbdEl.style.color = '';
+            kbdEl.style.borderColor = 'var(--background-modifier-border)';
+            isCapturing = false;
+            window.removeEventListener('keydown', captureHandler, true);
+            return;
+          }
+
+          if (['Shift', 'Control', 'Alt', 'Meta'].includes(e.key)) return;
+
+          let newKey = '';
+          if (e.ctrlKey || e.metaKey) newKey += 'Mod+';
+          if (e.shiftKey) newKey += 'Shift+';
+          if (e.altKey) newKey += 'Alt+';
+
+          if (e.key === ' ') newKey += 'Space';
+          else if (e.key.length === 1) newKey += e.key.toLowerCase();
+          else newKey += e.key;
+
+          if (!this.plugin.settings.keyboardShortcuts) {
+            this.plugin.settings.keyboardShortcuts = Object.assign({}, DEFAULT_SHORTCUTS);
+          }
+          this.plugin.settings.keyboardShortcuts[action.id] = newKey;
+          this.settingsChanged = true;
+          this.plugin.saveSettings();
+
+          kbdEl.textContent = formatKey(newKey);
+          kbdEl.style.color = '';
+          kbdEl.style.borderColor = 'var(--background-modifier-border)';
+          isCapturing = false;
+          window.removeEventListener('keydown', captureHandler, true);
+        };
+
+        window.addEventListener('keydown', captureHandler, true);
+      });
+
+      setting.addExtraButton(btn => btn
+        .setIcon('rotate-ccw')
+        .setTooltip('Reset to default')
+        .onClick(async () => {
+          if (!this.plugin.settings.keyboardShortcuts) {
+            this.plugin.settings.keyboardShortcuts = Object.assign({}, DEFAULT_SHORTCUTS);
+          }
+          this.plugin.settings.keyboardShortcuts[action.id] = DEFAULT_SHORTCUTS[action.id];
+          this.settingsChanged = true;
+          await this.plugin.saveSettings();
+          this.display();
+        }));
+    }
+
+    new Setting(containerEl)
+      .setName('Reset All Shortcuts')
+      .setDesc('Restore all keyboard shortcuts to their default values')
+      .addButton(btn => btn
+        .setButtonText('Reset All')
+        .setWarning()
+        .onClick(async () => {
+          this.plugin.settings.keyboardShortcuts = Object.assign({}, DEFAULT_SHORTCUTS);
+          this.settingsChanged = true;
+          await this.plugin.saveSettings();
+          this.display();
+        }));
+  }
+};
+
 // Mix in the render methods to WindroseMDSettingsTab
 Object.assign(WindroseMDSettingsTab.prototype, TabRenderCoreMethods);
 Object.assign(WindroseMDSettingsTab.prototype, TabRenderSettingsMethods);
 Object.assign(WindroseMDSettingsTab.prototype, TabRenderColorsMethods);
 Object.assign(WindroseMDSettingsTab.prototype, TabRenderObjectsMethods);
 Object.assign(WindroseMDSettingsTab.prototype, TabRenderTilesetsMethods);
+Object.assign(WindroseMDSettingsTab.prototype, TabRenderKeyboardShortcutsMethods);
 
 module.exports = WindroseMDSettingsPlugin;

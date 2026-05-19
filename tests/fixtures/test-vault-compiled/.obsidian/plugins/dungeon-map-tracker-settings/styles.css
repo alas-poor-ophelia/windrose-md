@@ -1257,3 +1257,73 @@
 .dmt-shake {
   animation: dmt-shake 0.3s ease;
 }
+
+/* ===========================================
+ * Deeplink Hover Preview
+ * =========================================== */
+.windrose-hover-preview-popover {
+  padding: 6px;
+}
+
+.windrose-hover-preview-host {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 240px;
+  min-height: 180px;
+}
+
+.windrose-hover-preview {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 240px;
+  background: var(--background-secondary);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.windrose-hover-preview-header {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+  line-height: 1.25;
+}
+
+.windrose-hover-preview-header-map {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-normal);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.windrose-hover-preview-header-note {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.windrose-hover-preview canvas {
+  display: block;
+  width: 240px;
+  height: 180px;
+}
+
+.windrose-hover-preview-state {
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 8px 12px;
+}
+
+/* Live-Preview external-link icon suppression on windrose: URLs only.
+   The icon is a ::after on span.external-link; CM6 ViewPlugin tags the
+   icon span with .windrose-deep-link-icon when its line contains windrose:. */
+.windrose-deep-link-icon::after {
+  content: none !important;
+  display: none !important;
+  width: 0 !important;
+}

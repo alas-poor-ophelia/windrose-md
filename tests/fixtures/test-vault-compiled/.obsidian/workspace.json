@@ -1,14 +1,14 @@
 {
   "main": {
-    "id": "cdb80a803aa4b49b",
+    "id": "f56036a6bec68da3",
     "type": "split",
     "children": [
       {
-        "id": "c4375aa497b96098",
+        "id": "60e644cc0354f155",
         "type": "tabs",
         "children": [
           {
-            "id": "8836d71d0600ce7f",
+            "id": "cc9a90799d725e99",
             "type": "leaf",
             "state": {
               "type": "markdown",
@@ -27,15 +27,15 @@
     "direction": "vertical"
   },
   "left": {
-    "id": "3449926458ac848a",
+    "id": "716baee0073209af",
     "type": "split",
     "children": [
       {
-        "id": "275b25ffd17c8e6a",
+        "id": "9de1141c3d356c43",
         "type": "tabs",
         "children": [
           {
-            "id": "d2141aade94483bf",
+            "id": "c812447c2b38a928",
             "type": "leaf",
             "state": {
               "type": "file-explorer",
@@ -48,7 +48,7 @@
             }
           },
           {
-            "id": "a3a128c90d5ed5ca",
+            "id": "df94bd3510a537f6",
             "type": "leaf",
             "state": {
               "type": "search",
@@ -65,7 +65,7 @@
             }
           },
           {
-            "id": "a5ec43adface1347",
+            "id": "9dc9d9422a314d8f",
             "type": "leaf",
             "state": {
               "type": "bookmarks",
@@ -81,15 +81,15 @@
     "width": 300
   },
   "right": {
-    "id": "66d4c82c5f9bfede",
+    "id": "116f64398b7d14d0",
     "type": "split",
     "children": [
       {
-        "id": "5eb1d44b6685f49f",
+        "id": "aef8ef0697da1197",
         "type": "tabs",
         "children": [
           {
-            "id": "433fcdcd4dec8c7a",
+            "id": "2020deedb06449fd",
             "type": "leaf",
             "state": {
               "type": "backlink",
@@ -108,7 +108,7 @@
             }
           },
           {
-            "id": "df97cb8ba99b7d20",
+            "id": "3d6ad1852ed56348",
             "type": "leaf",
             "state": {
               "type": "outgoing-link",
@@ -122,7 +122,7 @@
             }
           },
           {
-            "id": "615bbffc8a4fdf7f",
+            "id": "d71fdd8a5d23e381",
             "type": "leaf",
             "state": {
               "type": "tag",
@@ -137,7 +137,7 @@
             }
           },
           {
-            "id": "4dd6341ece731fe1",
+            "id": "beaac3ca58ae5da7",
             "type": "leaf",
             "state": {
               "type": "outline",
@@ -169,11 +169,9 @@
       "bases:Create new base": false
     }
   },
-  "active": "8836d71d0600ce7f",
+  "active": "cc9a90799d725e99",
   "lastOpenFiles": [
     "_testing/smoke-test-hex-compiled.md",
-    "_testing/smoke-test-compiled.md",
-    "_testing/dungeon-generation-test.md",
-    "_testing/dungeon-test-map.md"
+    "_testing/smoke-test-compiled.md"
   ]
 }

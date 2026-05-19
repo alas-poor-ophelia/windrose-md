@@ -34,6 +34,7 @@ export interface NotePin {
 export interface NoteIndexEntry {
   path: string;           // Full path with .md extension
   displayName: string;    // Name without extension
+  subtitle?: string;      // Parent folder path shown when multiple notes share the same name
 }
 
 // ===========================================

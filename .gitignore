@@ -25,6 +25,8 @@ src
 # Test outputs
 playwright-report/
 test-results/
+test-results.json
+test-output.log
 tests/e2e/screenshots/
 
 # MCP server

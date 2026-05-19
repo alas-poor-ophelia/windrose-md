@@ -158,6 +158,12 @@ export interface MapObject {
   opacity?: number;
   locked?: boolean;
   layerId?: string;
+  freeform?: boolean;
+  worldPosition?: Point;
+  isPlayer?: boolean;
+  lightRadius?: number;
+  lightColor?: string;
+  lightEnabled?: boolean;
 }
 
 export type ObjectUpdate = Partial<Omit<MapObject, 'id'>>;
