@@ -38,7 +38,7 @@ export class Setting {
 
 export class AbstractInputSuggest {
   constructor(_app: any, _inputEl: HTMLInputElement) {}
-  getSuggestions(_query: string) { return []; }
+  getSuggestions(_query: string): unknown[] { return []; }
   renderSuggestion(_value: any, _el: HTMLElement) {}
   selectSuggestion(_value: any) {}
   open() {}

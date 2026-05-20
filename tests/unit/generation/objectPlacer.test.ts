@@ -139,7 +139,7 @@ describe("objectPlacer", () => {
 
   describe("identifyPlacementZones", () => {
     const room = { x: 0, y: 0, width: 5, height: 5, shape: "rectangle" };
-    const roomCells = [];
+    const roomCells: Array<{ x: number; y: number }> = [];
     for (let x = 0; x < 5; x++) {
       for (let y = 0; y < 5; y++) {
         roomCells.push({ x, y });
@@ -153,10 +153,10 @@ describe("objectPlacer", () => {
       // Corners should include cells near (0,0), (0,4), (4,0), (4,4)
       expect(corners.length).toBeGreaterThan(0);
       const hasTopLeft = corners.some(
-        (c) => c.x <= 1 && c.y <= 1
+        (c: { x: number; y: number }) => c.x <= 1 && c.y <= 1
       );
       const hasBottomRight = corners.some(
-        (c) => c.x >= 3 && c.y >= 3
+        (c: { x: number; y: number }) => c.x >= 3 && c.y >= 3
       );
       expect(hasTopLeft).toBe(true);
       expect(hasBottomRight).toBe(true);
@@ -192,22 +192,22 @@ describe("objectPlacer", () => {
 
       // Cell at (2,0) should be in doorAdjacent
       const isDoorCell = zones.doorAdjacent.some(
-        (c) => c.x === 2 && c.y === 0
+        (c: { x: number; y: number }) => c.x === 2 && c.y === 0
       );
       expect(isDoorCell).toBe(true);
 
       // Cell adjacent to door (2,1) should also be in doorAdjacent
       const isAdjacentCell = zones.doorAdjacent.some(
-        (c) => c.x === 2 && c.y === 1
+        (c: { x: number; y: number }) => c.x === 2 && c.y === 1
       );
       expect(isAdjacentCell).toBe(true);
 
       // These cells should NOT be in scattered (available for placement)
       const doorInScattered = zones.scattered.some(
-        (c) => c.x === 2 && c.y === 0
+        (c: { x: number; y: number }) => c.x === 2 && c.y === 0
       );
       const adjacentInScattered = zones.scattered.some(
-        (c) => c.x === 2 && c.y === 1
+        (c: { x: number; y: number }) => c.x === 2 && c.y === 1
       );
       expect(doorInScattered).toBe(false);
       expect(adjacentInScattered).toBe(false);
@@ -314,7 +314,7 @@ describe("objectPlacer", () => {
         { x: 8, y: 2 },
         { x: 9, y: 2 },
       ],
-      byConnection: [],
+      byConnection: [] as unknown[],
     };
 
     const doorPositions = [{ x: 5, y: 2 }];

@@ -540,7 +540,7 @@ describe("objectRenderer", () => {
 
   describe("renderObjects", () => {
     it("does nothing when no objects", () => {
-      const layer = { objects: [] };
+      const layer = { objects: [] as unknown[] };
       const context = { ctx, offsetX: 0, offsetY: 0, zoom: 1, scaledSize: 40 };
 
       renderObjects(layer as any, context, geometry, false, 'flat', deps as any);

@@ -30,6 +30,15 @@ function createMockContext(): CanvasRenderingContext2D {
   } as unknown as CanvasRenderingContext2D;
 }
 
+// Local types matching the (non-exported) interfaces in gridFogRenderer.ts
+interface GridFogRenderContextLocal {
+  ctx: CanvasRenderingContext2D;
+  fogCtx: CanvasRenderingContext2D | null;
+  offsetX: number;
+  offsetY: number;
+  scaledSize: number;
+}
+
 describe("gridFogRenderer", () => {
   let ctx: CanvasRenderingContext2D;
 
@@ -111,7 +120,7 @@ describe("gridFogRenderer", () => {
 
   describe("renderBlurPasses", () => {
     it("does nothing when edgeCells is empty", () => {
-      const context = { ctx, fogCtx: null, offsetX: 0, offsetY: 0, scaledSize: 40 };
+      const context: GridFogRenderContextLocal = { ctx, fogCtx: null, offsetX: 0, offsetY: 0, scaledSize: 40 };
       const options = { fowOpacity: 0.9, fowBlurEnabled: true, blurRadius: 10, useGlobalAlpha: true };
 
       renderBlurPasses([], context, options);
@@ -120,7 +129,7 @@ describe("gridFogRenderer", () => {
     });
 
     it("does nothing when blurRadius is 0", () => {
-      const context = { ctx, fogCtx: null, offsetX: 0, offsetY: 0, scaledSize: 40 };
+      const context: GridFogRenderContextLocal = { ctx, fogCtx: null, offsetX: 0, offsetY: 0, scaledSize: 40 };
       const options = { fowOpacity: 0.9, fowBlurEnabled: true, blurRadius: 0, useGlobalAlpha: true };
 
       renderBlurPasses([{ col: 1, row: 1 }], context, options);
@@ -129,7 +138,7 @@ describe("gridFogRenderer", () => {
     });
 
     it("renders multiple blur passes", () => {
-      const context = { ctx, fogCtx: null, offsetX: 0, offsetY: 0, scaledSize: 40 };
+      const context: GridFogRenderContextLocal = { ctx, fogCtx: null, offsetX: 0, offsetY: 0, scaledSize: 40 };
       const options = { fowOpacity: 0.9, fowBlurEnabled: true, blurRadius: 10, useGlobalAlpha: true };
 
       renderBlurPasses([{ col: 1, row: 1 }], context, options);
@@ -140,7 +149,7 @@ describe("gridFogRenderer", () => {
     });
 
     it("draws circles for each edge cell", () => {
-      const context = { ctx, fogCtx: null, offsetX: 0, offsetY: 0, scaledSize: 40 };
+      const context: GridFogRenderContextLocal = { ctx, fogCtx: null, offsetX: 0, offsetY: 0, scaledSize: 40 };
       const options = { fowOpacity: 0.9, fowBlurEnabled: true, blurRadius: 10, useGlobalAlpha: true };
 
       renderBlurPasses([{ col: 1, row: 1 }, { col: 2, row: 1 }], context, options);
@@ -150,7 +159,7 @@ describe("gridFogRenderer", () => {
     });
 
     it("resets filter to none after blur passes", () => {
-      const context = { ctx, fogCtx: null, offsetX: 0, offsetY: 0, scaledSize: 40 };
+      const context: GridFogRenderContextLocal = { ctx, fogCtx: null, offsetX: 0, offsetY: 0, scaledSize: 40 };
       const options = { fowOpacity: 0.9, fowBlurEnabled: true, blurRadius: 10, useGlobalAlpha: true };
 
       renderBlurPasses([{ col: 1, row: 1 }], context, options);
@@ -165,7 +174,7 @@ describe("gridFogRenderer", () => {
 
   describe("renderFogCells", () => {
     it("renders rectangles for fog cells", () => {
-      const context = { ctx, fogCtx: null, offsetX: 0, offsetY: 0, scaledSize: 40 };
+      const context: GridFogRenderContextLocal = { ctx, fogCtx: null, offsetX: 0, offsetY: 0, scaledSize: 40 };
 
       renderFogCells([{ col: 1, row: 1 }], context);
 
@@ -175,7 +184,7 @@ describe("gridFogRenderer", () => {
     });
 
     it("renders multiple rectangles in single path", () => {
-      const context = { ctx, fogCtx: null, offsetX: 0, offsetY: 0, scaledSize: 40 };
+      const context: GridFogRenderContextLocal = { ctx, fogCtx: null, offsetX: 0, offsetY: 0, scaledSize: 40 };
 
       renderFogCells([
         { col: 1, row: 1 },
@@ -189,7 +198,7 @@ describe("gridFogRenderer", () => {
     });
 
     it("positions rectangles based on offset and scaledSize", () => {
-      const context = { ctx, fogCtx: null, offsetX: 100, offsetY: 50, scaledSize: 40 };
+      const context: GridFogRenderContextLocal = { ctx, fogCtx: null, offsetX: 100, offsetY: 50, scaledSize: 40 };
 
       renderFogCells([{ col: 2, row: 3 }], context);
 
@@ -207,7 +216,7 @@ describe("gridFogRenderer", () => {
 
   describe("renderInteriorGridLines", () => {
     it("does nothing for single cell", () => {
-      const context = { ctx, fogCtx: null, offsetX: 0, offsetY: 0, scaledSize: 40 };
+      const context: GridFogRenderContextLocal = { ctx, fogCtx: null, offsetX: 0, offsetY: 0, scaledSize: 40 };
 
       renderInteriorGridLines([{ col: 1, row: 1 }], new Set(['1,1']), context, 1);
 
@@ -220,7 +229,7 @@ describe("gridFogRenderer", () => {
         { col: 2, row: 1 },
       ];
       const foggedSet = new Set(['1,1', '2,1']);
-      const context = { ctx, fogCtx: null, offsetX: 0, offsetY: 0, scaledSize: 40 };
+      const context: GridFogRenderContextLocal = { ctx, fogCtx: null, offsetX: 0, offsetY: 0, scaledSize: 40 };
 
       renderInteriorGridLines(fogCells, foggedSet, context, 1);
 
@@ -234,7 +243,7 @@ describe("gridFogRenderer", () => {
         { col: 2, row: 1 },
       ];
       const foggedSet = new Set(['1,1', '2,1']);
-      const context = { ctx, fogCtx: null, offsetX: 0, offsetY: 0, scaledSize: 40 };
+      const context: GridFogRenderContextLocal = { ctx, fogCtx: null, offsetX: 0, offsetY: 0, scaledSize: 40 };
 
       renderInteriorGridLines(fogCells, foggedSet, context, 1);
 
@@ -247,7 +256,7 @@ describe("gridFogRenderer", () => {
         { col: 2, row: 1 },
       ];
       const foggedSet = new Set(['1,1', '2,1']);
-      const context = { ctx, fogCtx: null, offsetX: 0, offsetY: 0, scaledSize: 40 };
+      const context: GridFogRenderContextLocal = { ctx, fogCtx: null, offsetX: 0, offsetY: 0, scaledSize: 40 };
 
       renderInteriorGridLines(fogCells, foggedSet, context, 1);
 
@@ -266,7 +275,7 @@ describe("gridFogRenderer", () => {
         { col: 1, row: 1 },
         { col: 2, row: 1 },
       ];
-      const context = { ctx, fogCtx: null, offsetX: 0, offsetY: 0, scaledSize: 40 };
+      const context: GridFogRenderContextLocal = { ctx, fogCtx: null, offsetX: 0, offsetY: 0, scaledSize: 40 };
       const options = { fowOpacity: 0.9, fowBlurEnabled: false, blurRadius: 0, useGlobalAlpha: true };
       const bounds = { minCol: 0, maxCol: 5, minRow: 0, maxRow: 5 };
 
@@ -279,7 +288,7 @@ describe("gridFogRenderer", () => {
 
     it("includes blur passes when enabled", () => {
       const fogCells = [{ col: 1, row: 1 }];
-      const context = { ctx, fogCtx: null, offsetX: 0, offsetY: 0, scaledSize: 40 };
+      const context: GridFogRenderContextLocal = { ctx, fogCtx: null, offsetX: 0, offsetY: 0, scaledSize: 40 };
       const options = { fowOpacity: 0.9, fowBlurEnabled: true, blurRadius: 10, useGlobalAlpha: true };
       const bounds = { minCol: 0, maxCol: 5, minRow: 0, maxRow: 5 };
 
@@ -294,7 +303,7 @@ describe("gridFogRenderer", () => {
         { col: 1, row: 1 },
         { col: 10, row: 10 }, // Outside bounds
       ];
-      const context = { ctx, fogCtx: null, offsetX: 0, offsetY: 0, scaledSize: 40 };
+      const context: GridFogRenderContextLocal = { ctx, fogCtx: null, offsetX: 0, offsetY: 0, scaledSize: 40 };
       const options = { fowOpacity: 0.9, fowBlurEnabled: false, blurRadius: 0, useGlobalAlpha: true };
       const bounds = { minCol: 0, maxCol: 5, minRow: 0, maxRow: 5 };
 

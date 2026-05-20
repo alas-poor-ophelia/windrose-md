@@ -16,6 +16,15 @@ import {
   renderHexFog
 } from "../../../../src/geometry/fog/hexFogRenderer";
 
+// Local type matching the (non-exported) HexFogRenderContext interface
+interface HexFogRenderContextLocal {
+  ctx: CanvasRenderingContext2D;
+  fogCtx: CanvasRenderingContext2D | null;
+  offsetX: number;
+  offsetY: number;
+  zoom: number;
+}
+
 // Mock canvas context
 function createMockContext(): CanvasRenderingContext2D {
   return {
@@ -247,7 +256,7 @@ describe("hexFogRenderer", () => {
 
   describe("renderHexBlurPasses", () => {
     it("does nothing when edgeCells is empty", () => {
-      const context = { ctx, fogCtx: null, offsetX: 0, offsetY: 0, zoom: 1 };
+      const context: HexFogRenderContextLocal = { ctx, fogCtx: null, offsetX: 0, offsetY: 0, zoom: 1 };
       const options = { fowOpacity: 0.9, fowBlurEnabled: true, blurRadius: 10, useGlobalAlpha: true };
 
       renderHexBlurPasses([], context, options, hexGeometry, geometry);
@@ -256,7 +265,7 @@ describe("hexFogRenderer", () => {
     });
 
     it("does nothing when blurRadius is 0", () => {
-      const context = { ctx, fogCtx: null, offsetX: 0, offsetY: 0, zoom: 1 };
+      const context: HexFogRenderContextLocal = { ctx, fogCtx: null, offsetX: 0, offsetY: 0, zoom: 1 };
       const options = { fowOpacity: 0.9, fowBlurEnabled: true, blurRadius: 0, useGlobalAlpha: true };
       const edgeCells = [{ col: 1, row: 1, q: 1, r: 1 }];
 
@@ -266,7 +275,7 @@ describe("hexFogRenderer", () => {
     });
 
     it("renders multiple blur passes", () => {
-      const context = { ctx, fogCtx: null, offsetX: 0, offsetY: 0, zoom: 1 };
+      const context: HexFogRenderContextLocal = { ctx, fogCtx: null, offsetX: 0, offsetY: 0, zoom: 1 };
       const options = { fowOpacity: 0.9, fowBlurEnabled: true, blurRadius: 10, useGlobalAlpha: true };
       const edgeCells = [{ col: 1, row: 1, q: 1, r: 1 }];
 
@@ -278,7 +287,7 @@ describe("hexFogRenderer", () => {
     });
 
     it("traces hex paths for each edge cell", () => {
-      const context = { ctx, fogCtx: null, offsetX: 0, offsetY: 0, zoom: 1 };
+      const context: HexFogRenderContextLocal = { ctx, fogCtx: null, offsetX: 0, offsetY: 0, zoom: 1 };
       const options = { fowOpacity: 0.9, fowBlurEnabled: true, blurRadius: 10, useGlobalAlpha: true };
       const edgeCells = [
         { col: 1, row: 1, q: 1, r: 1 },
@@ -292,7 +301,7 @@ describe("hexFogRenderer", () => {
     });
 
     it("resets filter to none after blur passes", () => {
-      const context = { ctx, fogCtx: null, offsetX: 0, offsetY: 0, zoom: 1 };
+      const context: HexFogRenderContextLocal = { ctx, fogCtx: null, offsetX: 0, offsetY: 0, zoom: 1 };
       const options = { fowOpacity: 0.9, fowBlurEnabled: true, blurRadius: 10, useGlobalAlpha: true };
       const edgeCells = [{ col: 1, row: 1, q: 1, r: 1 }];
 
@@ -308,7 +317,7 @@ describe("hexFogRenderer", () => {
 
   describe("renderHexFogCells", () => {
     it("renders hexagons for fog cells", () => {
-      const context = { ctx, fogCtx: null, offsetX: 0, offsetY: 0, zoom: 1 };
+      const context: HexFogRenderContextLocal = { ctx, fogCtx: null, offsetX: 0, offsetY: 0, zoom: 1 };
       const visibleFogCells = [{ col: 1, row: 1 }];
 
       renderHexFogCells(visibleFogCells, context, hexGeometry, geometry, 'flat', mockOffsetToAxial);
@@ -319,7 +328,7 @@ describe("hexFogRenderer", () => {
     });
 
     it("renders multiple hexagons in single path", () => {
-      const context = { ctx, fogCtx: null, offsetX: 0, offsetY: 0, zoom: 1 };
+      const context: HexFogRenderContextLocal = { ctx, fogCtx: null, offsetX: 0, offsetY: 0, zoom: 1 };
       const visibleFogCells = [
         { col: 1, row: 1 },
         { col: 2, row: 1 },
@@ -334,7 +343,7 @@ describe("hexFogRenderer", () => {
     });
 
     it("converts offset to axial coordinates", () => {
-      const context = { ctx, fogCtx: null, offsetX: 0, offsetY: 0, zoom: 1 };
+      const context: HexFogRenderContextLocal = { ctx, fogCtx: null, offsetX: 0, offsetY: 0, zoom: 1 };
       const visibleFogCells = [{ col: 2, row: 3 }];
 
       renderHexFogCells(visibleFogCells, context, hexGeometry, geometry, 'pointy', mockOffsetToAxial);
@@ -349,7 +358,7 @@ describe("hexFogRenderer", () => {
 
   describe("renderInteriorHexOutlines", () => {
     it("does nothing for single cell", () => {
-      const context = { ctx, fogCtx: null, offsetX: 0, offsetY: 0, zoom: 1 };
+      const context: HexFogRenderContextLocal = { ctx, fogCtx: null, offsetX: 0, offsetY: 0, zoom: 1 };
       const foggedSet = new Set(['1,1']);
 
       renderInteriorHexOutlines(
@@ -372,7 +381,7 @@ describe("hexFogRenderer", () => {
         { col: 2, row: 1 },
       ];
       const foggedSet = new Set(['1,1', '2,1']);
-      const context = { ctx, fogCtx: null, offsetX: 0, offsetY: 0, zoom: 1 };
+      const context: HexFogRenderContextLocal = { ctx, fogCtx: null, offsetX: 0, offsetY: 0, zoom: 1 };
 
       renderInteriorHexOutlines(
         fogCells,
@@ -394,7 +403,7 @@ describe("hexFogRenderer", () => {
         { col: 2, row: 1 },
       ];
       const foggedSet = new Set(['1,1', '2,1']);
-      const context = { ctx, fogCtx: null, offsetX: 0, offsetY: 0, zoom: 1 };
+      const context: HexFogRenderContextLocal = { ctx, fogCtx: null, offsetX: 0, offsetY: 0, zoom: 1 };
 
       renderInteriorHexOutlines(
         fogCells,
@@ -421,7 +430,7 @@ describe("hexFogRenderer", () => {
         { col: 1, row: 1 },
         { col: 2, row: 1 },
       ];
-      const context = { ctx, fogCtx: null, offsetX: 0, offsetY: 0, zoom: 1 };
+      const context: HexFogRenderContextLocal = { ctx, fogCtx: null, offsetX: 0, offsetY: 0, zoom: 1 };
       const options = { fowOpacity: 0.9, fowBlurEnabled: false, blurRadius: 0, useGlobalAlpha: true };
       const bounds = { minCol: 0, maxCol: 5, minRow: 0, maxRow: 5 };
 
@@ -444,7 +453,7 @@ describe("hexFogRenderer", () => {
 
     it("includes blur passes when enabled", () => {
       const fogCells = [{ col: 1, row: 1 }];
-      const context = { ctx, fogCtx: null, offsetX: 0, offsetY: 0, zoom: 1 };
+      const context: HexFogRenderContextLocal = { ctx, fogCtx: null, offsetX: 0, offsetY: 0, zoom: 1 };
       const options = { fowOpacity: 0.9, fowBlurEnabled: true, blurRadius: 10, useGlobalAlpha: true };
       const bounds = { minCol: 0, maxCol: 5, minRow: 0, maxRow: 5 };
 
@@ -469,7 +478,7 @@ describe("hexFogRenderer", () => {
         { col: 1, row: 1 },
         { col: 10, row: 10 }, // Outside bounds
       ];
-      const context = { ctx, fogCtx: null, offsetX: 0, offsetY: 0, zoom: 1 };
+      const context: HexFogRenderContextLocal = { ctx, fogCtx: null, offsetX: 0, offsetY: 0, zoom: 1 };
       const options = { fowOpacity: 0.9, fowBlurEnabled: false, blurRadius: 0, useGlobalAlpha: true };
       const bounds = { minCol: 0, maxCol: 5, minRow: 0, maxRow: 5 };
 
@@ -492,7 +501,7 @@ describe("hexFogRenderer", () => {
 
     it("uses correct orientation for coordinate conversion", () => {
       const fogCells = [{ col: 1, row: 1 }];
-      const context = { ctx, fogCtx: null, offsetX: 0, offsetY: 0, zoom: 1 };
+      const context: HexFogRenderContextLocal = { ctx, fogCtx: null, offsetX: 0, offsetY: 0, zoom: 1 };
       const options = { fowOpacity: 0.9, fowBlurEnabled: false, blurRadius: 0, useGlobalAlpha: true };
       const bounds = { minCol: 0, maxCol: 5, minRow: 0, maxRow: 5 };
 
