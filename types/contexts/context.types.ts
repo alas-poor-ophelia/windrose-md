@@ -45,10 +45,16 @@ export interface ExtendedGeometry extends IGeometry {
   width?: number;
   /** Hex-specific: sqrt(3) cached for hex math */
   sqrt3?: number;
+  /** Hex-specific: orientation (flat or pointy) */
+  orientation?: string;
   /** Grid-specific: detect which edge a point is near */
   screenToEdge?: (worldX: number, worldY: number, threshold: number) => EdgeInfo | null;
   /** Hex-specific: convert axial (q,r) to world pixels */
   hexToWorld?: (x: number, y: number) => { worldX: number; worldY: number };
+  /** Get scaled cell size for the given zoom level */
+  getScaledCellSize: (zoom: number) => number;
+  /** Hex-specific: get scaled hex size for the given zoom level */
+  getScaledHexSize?: (zoom: number) => number;
 }
 
 /** Drawing layer state change callback shape */
@@ -87,6 +93,7 @@ export interface MapStateContextValue {
   HexGeometry?: new (...args: unknown[]) => IGeometry;
   onDrawingStateChange?: (state: DrawingLayerState) => void;
   onPanZoomStateChange?: (state: PanZoomLayerState) => void;
+  [key: string]: unknown;
 }
 
 // ===========================================
@@ -109,14 +116,14 @@ export interface MapOperationsContextValue {
   removeObjectsInRectangle: (objects: MapObject[] | null | undefined, x1: number, y1: number, x2: number, y2: number) => MapObject[];
   isAreaFree: (objects: MapObject[] | null | undefined, x: number, y: number, width: number, height: number, excludeId?: string | null) => boolean;
   canResizeObject: (objects: MapObject[], objectId: string, newWidth: number, newHeight: number, maxSize?: number) => boolean;
-  onObjectsChange: (objects: MapObject[]) => void;
+  onObjectsChange: (objects: MapObject[], skipHistory?: boolean) => void;
 
   // Text label operations
   getTextLabelAtPosition: (labels: TextLabel[], worldX: number, worldY: number, ctx: CanvasRenderingContext2D | null) => TextLabel | null;
   addTextLabel: (labels: TextLabel[] | null | undefined, content: string, x: number, y: number, options?: Record<string, unknown>) => TextLabel[];
   updateTextLabel: (labels: TextLabel[] | null | undefined, id: string, updates: Partial<TextLabel>) => TextLabel[];
   removeTextLabel: (labels: TextLabel[], id: string) => TextLabel[];
-  onTextLabelsChange: (labels: TextLabel[]) => void;
+  onTextLabelsChange: (labels: TextLabel[], skipHistory?: boolean) => void;
 
   // Tile operations
   onTilesChange?: (tiles: HexTileAssignment[], suppressHistory?: boolean) => void;
@@ -127,6 +134,7 @@ export interface MapOperationsContextValue {
 
   // Map-level operations
   onMapDataUpdate?: (updater: (data: MapData | null) => MapData | null) => void;
+  [key: string]: unknown;
 }
 
 // ===========================================
@@ -148,6 +156,8 @@ export interface SelectedItem {
 export interface AreaSelectPosition {
   worldX: number;
   worldY: number;
+  x: number;
+  y: number;
 }
 
 /** Drag start position */
@@ -158,7 +168,16 @@ export interface DragStartPosition {
   gridY?: number;
   worldX?: number;
   worldY?: number;
+  offsetX?: number;
+  offsetY?: number;
+  clientX?: number;
+  clientY?: number;
   isGroupDrag?: boolean;
+  objectId?: string;
+  object?: Record<string, unknown>;
+  wasInverted?: boolean;
+  freeform?: boolean;
+  originalFreeform?: boolean;
 }
 
 /** Group drag offset for a single item */
@@ -168,6 +187,7 @@ export interface GroupDragOffset {
   gridOffsetY: number;
   worldOffsetX: number;
   worldOffsetY: number;
+  freeform?: boolean;
 }
 
 /** Layer visibility settings */
@@ -218,6 +238,8 @@ export interface MapSelectionContextValue {
   removeFromSelection: (id: string) => void;
   clearSelection: () => void;
   isSelected: (id: string) => boolean;
+  /** Underscore alias — destructured but unused in some consumers */
+  _isSelected?: (id: string) => boolean;
   updateSelectedItemsData: (updates: ItemUpdate[]) => void;
 
   // Area select state
@@ -249,6 +271,8 @@ export interface MapSelectionContextValue {
 
   // Note pin modal state
   showNoteLinkModal: boolean;
+  /** Underscore alias — destructured but unused in some consumers */
+  _showNoteLinkModal?: boolean;
   setShowNoteLinkModal: (value: boolean | ((prev: boolean) => boolean)) => void;
   pendingNotePinId: string | null;
   setPendingNotePinId: (value: string | null | ((prev: string | null) => string | null)) => void;

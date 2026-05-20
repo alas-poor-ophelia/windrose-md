@@ -113,6 +113,8 @@ export interface UseFogToolsResult {
   isDrawing: boolean;
   /** Start corner for rectangle tool (null if not started) */
   rectangleStart: FogRectangleStart | null;
+  /** Current hover position for rectangle preview */
+  rectangleHover: FogCellPosition | null;
 
   // Handlers for EventHandlerContext registration
   handlePointerDown: (e: PointerEvent | MouseEvent) => void;
@@ -122,6 +124,8 @@ export interface UseFogToolsResult {
 
   /** Cancel any in-progress operation */
   cancelFog: () => void;
+  /** Alias for cancelFog */
+  _cancelFog?: () => void;
 
   /** Utility for preview rendering - converts screen coords to offset coords */
   screenToOffset: (clientX: number, clientY: number) => OffsetCoords | null;

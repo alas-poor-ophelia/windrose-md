@@ -42,6 +42,7 @@ export interface TextLabelModalData {
   fontSize: number;
   fontFace: string;
   color: string;
+  opacity?: number;
 }
 
 // ===========================================

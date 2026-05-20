@@ -13,7 +13,7 @@ import {
   renderFogCells,
   renderInteriorGridLines,
   renderGridFog
-} from "../../../../src/geometry/fog/gridFogRenderer.ts";
+} from "../../../../src/geometry/fog/gridFogRenderer";
 
 // Mock canvas context
 function createMockContext(): CanvasRenderingContext2D {

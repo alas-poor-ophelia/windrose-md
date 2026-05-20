@@ -14,6 +14,7 @@ import type { Point } from '../core/geometry.types';
 
 /** Options for useEventCoordinator hook */
 export interface UseEventCoordinatorOptions {
+  canvasRef?: { current: HTMLCanvasElement | null };
   isColorPickerOpen: boolean;
   showObjectColorPicker?: boolean;
   isAlignmentMode?: boolean;
@@ -161,6 +162,7 @@ export interface FogHandlers {
 export interface AreaSelectHandlers {
   areaSelectStart?: Point | null;
   handleAreaSelectClick?: (e: Event | SyntheticPointerEvent) => void;
+  updateAreaSelectHover?: (gridX: number, gridY: number) => void;
 }
 
 /** Diagonal fill handlers */

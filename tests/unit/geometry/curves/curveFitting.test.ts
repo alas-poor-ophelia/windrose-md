@@ -10,7 +10,7 @@ import {
   fitPointsToBezier,
   rdpSimplify,
   fitCubicBezier
-} from "../../../../src/geometry/curves/curveFitting.ts";
+} from "../../../../src/geometry/curves/curveFitting";
 
 import type { BezierSegment } from "#types/core/curve.types";
 

@@ -14,7 +14,7 @@ vi.mock("../../../../src/geometry/curves/polygonClipping.ts", () => ({
   difference: polygonClipping.difference
 }));
 
-import { buildMergeIndex } from "../../../../src/geometry/curves/curveCellOverlap.ts";
+import { buildMergeIndex } from "../../../../src/geometry/curves/curveCellOverlap";
 
 import type { Curve, BezierSegment } from "#types/core/curve.types";
 

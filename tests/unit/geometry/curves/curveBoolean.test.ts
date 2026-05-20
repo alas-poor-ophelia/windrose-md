@@ -28,7 +28,7 @@ import {
   eraseWorldPolygonFromCurves,
   openCurveOverlapsRect,
   openCurveOverlapsPolygon,
-} from "../../../../src/geometry/curves/curveBoolean.ts";
+} from "../../../../src/geometry/curves/curveBoolean";
 
 import type { Curve, BezierSegment } from "#types/core/curve.types";
 

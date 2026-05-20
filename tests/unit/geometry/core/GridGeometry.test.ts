@@ -8,7 +8,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 
 // Import GridGeometry class directly - transformer handles conversion
-import { GridGeometry } from "../../../../src/geometry/core/GridGeometry.ts";
+import { GridGeometry } from "../../../../src/geometry/core/GridGeometry";
 
 // Standard cell size for tests
 const CELL_SIZE = 40;

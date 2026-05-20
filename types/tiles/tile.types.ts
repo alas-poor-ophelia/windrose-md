@@ -86,6 +86,10 @@ interface HexTileAssignmentBase {
   fitMode?: 'fill' | 'contain';
   /** Per-tile size multiplier (default 1.0) */
   scale?: number;
+  /** World-space X coordinate (present when freeform is true) */
+  worldX?: number;
+  /** World-space Y coordinate (present when freeform is true) */
+  worldY?: number;
 }
 
 /** A tile snapped to a hex grid cell */

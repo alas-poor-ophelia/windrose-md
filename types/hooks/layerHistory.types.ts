@@ -8,7 +8,7 @@
 
 import type { Cell } from '../core/cell.types';
 import type { Curve } from '../core/curve.types';
-import type { Edge, TextLabel, MapObjectRef, MapData, LayerId, Region, ShapeOverlay, FogOfWar } from '../core/map.types';
+import type { Edge, TextLabel, MapObjectRef, MapData, LayerId, Region, ShapeOverlay, Outline, FogOfWar } from '../core/map.types';
 import type { HexTileAssignment } from '../tiles/tile.types';
 import type { HistoryState } from './history.types';
 
@@ -37,6 +37,8 @@ export interface LayerHistorySnapshot {
   tiles?: HexTileAssignment[];
   /** Regions (map-level, tracked for undo) */
   regions?: Region[];
+  /** Polygon outlines (map-level, tracked for undo) */
+  outlines?: Outline[];
   /** Shape overlays (map-level, tracked for undo) */
   shapeOverlays?: ShapeOverlay[];
   /** Fog of war state (layer-level, tracked for compound undo with player moves) */

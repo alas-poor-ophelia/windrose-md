@@ -18,7 +18,7 @@ import {
   generateDeepLink,
   generateDeepLinkMarkdown,
   emitNavigationEvent
-} from '../../../src/persistence/deepLinkHandler.ts';
+} from '../../../src/persistence/deepLinkHandler';
 
 describe('deepLinkHandler', () => {
   describe('constants', () => {

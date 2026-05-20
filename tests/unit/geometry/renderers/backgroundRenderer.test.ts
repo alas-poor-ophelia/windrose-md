@@ -7,7 +7,7 @@
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
-import { renderHexBackgroundImage, renderGridBackgroundImage } from "../../../../src/geometry/renderers/backgroundRenderer.ts";
+import { renderHexBackgroundImage, renderGridBackgroundImage } from "../../../../src/geometry/renderers/backgroundRenderer";
 
 // Mock canvas context
 function createMockContext(): CanvasRenderingContext2D {

@@ -11,7 +11,7 @@ import {
   renderNoteLinkBadge,
   renderTooltipIndicator,
   renderObjectLinkIndicator
-} from "../../../../src/geometry/renderers/badgeRenderer.ts";
+} from "../../../../src/geometry/renderers/badgeRenderer";
 
 // Mock canvas context
 function createMockContext(): CanvasRenderingContext2D {

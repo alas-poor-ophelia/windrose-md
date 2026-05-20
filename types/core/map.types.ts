@@ -10,6 +10,7 @@ import type { Curve } from './curve.types';
 import type { Point } from './geometry.types';
 import type { HexOrientation, FrameSettings } from '../settings/settings.types';
 import type { TilesetDef, TilesetOverrides, HexTileAssignment } from '../tiles/tile.types';
+import type { MapObject } from '../objects/object.types';
 
 // ===========================================
 // Map Types
@@ -26,6 +27,8 @@ export type SchemaVersion = number;
 export interface ViewState {
   zoom: number;
   center: Point;
+  offsetX?: number;
+  offsetY?: number;
 }
 
 // ===========================================
@@ -46,6 +49,12 @@ export interface MapSettings {
   useGlobalSettings: boolean;
   overrides: Record<string, unknown>;
   frame?: FrameSettings;
+  /** Per-map distance measurement overrides */
+  distanceSettings?: Record<string, unknown>;
+  /** Coordinate display mode for hex maps */
+  coordinateDisplayMode?: string;
+  /** Object set identifier override */
+  objectSetId?: string | null;
 }
 
 // ===========================================
@@ -124,19 +133,67 @@ export interface Edge {
 }
 
 // ===========================================
-// Text Labels
+// Text Labels (canonical type in objects/note.types.ts)
 // ===========================================
 
-export interface TextLabel {
+import type { TextLabel } from '../objects/note.types';
+export type { TextLabel };
+
+// ===========================================
+// Outlines (hex map polygon outlines)
+// ===========================================
+
+export interface Outline {
   id: string;
-  text: string;
-  position: Point;
-  fontSize: number;
-  fontFamily: string;
+  vertices: Point[];
   color: string;
-  backgroundColor?: string;
-  rotation?: number;
-  alignment?: 'left' | 'center' | 'right';
+  lineStyle: 'solid' | 'dashed' | 'dotted';
+  lineWidth: number;
+  filled: boolean;
+  fillOpacity: number;
+  snapMode: 'straight' | 'hex';
+  visible: boolean;
+  order: number;
+}
+
+// ===========================================
+// Color Opacity Overrides
+// ===========================================
+
+export type ColorOpacityOverrides = Record<string, number>;
+
+// ===========================================
+// Generation Settings (dungeon generator)
+// ===========================================
+
+export interface DungeonConfigOverrides {
+  objectDensity?: number;
+  monsterWeight?: number;
+  emptyWeight?: number;
+  featureWeight?: number;
+  trapWeight?: number;
+  useTemplates?: boolean;
+  style?: string;
+  [key: string]: unknown;
+}
+
+export interface DungeonStockingMetadata {
+  rooms?: unknown[];
+  corridorResult?: unknown;
+  doorPositions?: Array<{ x: number; y: number }>;
+  style?: string;
+  entryRoomId?: string;
+  exitRoomId?: string;
+  waterRoomIds?: string[];
+  [key: string]: unknown;
+}
+
+export interface GenerationSettings {
+  preset?: string;
+  seed?: number;
+  configOverrides?: DungeonConfigOverrides;
+  stockingMetadata?: DungeonStockingMetadata;
+  [key: string]: unknown;
 }
 
 // ===========================================
@@ -148,6 +205,7 @@ export interface TextLabel {
 export interface MapObjectRef {
   id: string;
   typeId: string;
+  type?: string;
   position: Point;
   size?: { width: number; height: number };
   scale?: number;
@@ -155,6 +213,19 @@ export interface MapObjectRef {
   color?: string;
   opacity?: number;
   locked?: boolean;
+  freeform?: boolean;
+  worldPosition?: Point;
+  linkedNote?: string | null;
+  label?: string;
+  customTooltip?: string;
+  isPlayer?: boolean;
+  layerId?: string;
+  linkedObject?: { targetMapId: string; targetObjectId: string } | null;
+  slot?: number;
+  alignment?: { offset?: Point };
+  lightRadius?: number;
+  lightColor?: string;
+  lightEnabled?: boolean;
 }
 
 // ===========================================
@@ -173,7 +244,7 @@ export interface MapLayer {
   cells: Cell[];
   curves: Curve[];
   edges: Edge[];
-  objects: MapObjectRef[];
+  objects: MapObject[];
   textLabels: TextLabel[];
   fogOfWar: FogOfWar | null;
   /** Show the layer below this one at reduced opacity (for alignment) */
@@ -242,6 +313,9 @@ export interface MapData {
   // Remembered text label settings
   lastTextLabelSettings?: TextLabelSettings | null;
 
+  // Last selected object opacity
+  lastSelectedOpacity?: number;
+
   // Note pins (global, not per-layer)
   notePins?: NotePin[];
 
@@ -259,6 +333,23 @@ export interface MapData {
 
   // Per-tileset user overrides (keyed by tileset id)
   tilesetOverrides?: Record<string, TilesetOverrides>;
+
+  // Polygon outlines (hex maps)
+  outlines?: Outline[];
+
+  // Object set identifier
+  objectSetId?: string | null;
+
+  // Per-color opacity overrides for palette
+  paletteColorOpacityOverrides?: ColorOpacityOverrides;
+
+  // Dungeon generation settings
+  generationSettings?: GenerationSettings;
+
+  // Legacy/convenience flat access (pre-layer schema)
+  objects?: MapObjectRef[];
+  textLabels?: import('../objects/note.types').TextLabel[];
+  edges?: Edge[];
 
   // Migration metadata
   _migratedAt?: string;

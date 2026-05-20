@@ -61,7 +61,7 @@ describe("objectPlacer", () => {
       const weights = { monster: 2, empty: 2, feature: 2, trap: 2 };
       const normalized = normalizeWeights(weights);
 
-      const sum = Object.values(normalized).reduce((a, b) => a + b, 0);
+      const sum = (Object.values(normalized) as number[]).reduce((a, b) => a + b, 0);
       expect(sum).toBeCloseTo(1.0, 10);
     });
 
@@ -257,14 +257,15 @@ describe("objectPlacer", () => {
 
     it("each style has required pools", () => {
       for (const [style, pool] of Object.entries(STYLE_OBJECT_POOLS)) {
-        expect(pool).toHaveProperty("monsters");
-        expect(pool).toHaveProperty("treasures");
-        expect(pool).toHaveProperty("features");
-        expect(pool).toHaveProperty("traps");
-        expect(Array.isArray(pool.monsters)).toBe(true);
-        expect(Array.isArray(pool.treasures)).toBe(true);
-        expect(Array.isArray(pool.features)).toBe(true);
-        expect(Array.isArray(pool.traps)).toBe(true);
+        const p = pool as any;
+        expect(p).toHaveProperty("monsters");
+        expect(p).toHaveProperty("treasures");
+        expect(p).toHaveProperty("features");
+        expect(p).toHaveProperty("traps");
+        expect(Array.isArray(p.monsters)).toBe(true);
+        expect(Array.isArray(p.treasures)).toBe(true);
+        expect(Array.isArray(p.features)).toBe(true);
+        expect(Array.isArray(p.traps)).toBe(true);
       }
     });
   });
@@ -281,13 +282,14 @@ describe("objectPlacer", () => {
 
     it("each template has valid structure", () => {
       for (const [name, template] of Object.entries(ROOM_TEMPLATES)) {
-        expect(template).toHaveProperty("name");
-        expect(template).toHaveProperty("objects");
-        expect(template).toHaveProperty("minRoomSize");
-        expect(Array.isArray(template.objects)).toBe(true);
-        expect(typeof template.minRoomSize).toBe("number");
+        const t = template as any;
+        expect(t).toHaveProperty("name");
+        expect(t).toHaveProperty("objects");
+        expect(t).toHaveProperty("minRoomSize");
+        expect(Array.isArray(t.objects)).toBe(true);
+        expect(typeof t.minRoomSize).toBe("number");
 
-        for (const obj of template.objects) {
+        for (const obj of t.objects) {
           expect(obj).toHaveProperty("type");
           expect(obj).toHaveProperty("count");
           expect(obj).toHaveProperty("placement");

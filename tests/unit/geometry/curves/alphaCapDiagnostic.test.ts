@@ -24,7 +24,7 @@ vi.mock("../../../../src/geometry/curves/polygonClipping.ts", () => ({
 
 import {
   fitPointsToBezier,
-} from "../../../../src/geometry/curves/curveFitting.ts";
+} from "../../../../src/geometry/curves/curveFitting";
 
 import {
   flattenCurve,
@@ -33,7 +33,7 @@ import {
   eraseWorldPolygonFromCurves,
   signedArea,
   pointInPolygon,
-} from "../../../../src/geometry/curves/curveBoolean.ts";
+} from "../../../../src/geometry/curves/curveBoolean";
 
 import type { Curve, BezierSegment } from "#types/core/curve.types";
 

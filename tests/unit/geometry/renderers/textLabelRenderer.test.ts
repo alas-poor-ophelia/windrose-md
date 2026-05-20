@@ -10,9 +10,9 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import {
   renderTextLabel,
   renderTextLabels
-} from "../../../../src/geometry/renderers/textLabelRenderer.ts";
+} from "../../../../src/geometry/renderers/textLabelRenderer";
 
-import type { TextLabel } from "../../../types/objects/note.types";
+import type { TextLabel } from "../../../../types/objects/note.types";
 
 // Mock canvas context
 function createMockContext(): CanvasRenderingContext2D {

@@ -6,6 +6,7 @@
  * clear area, edge paint, and segment paint tools.
  */
 
+import type { StateUpdater } from 'preact/hooks';
 import type { Point } from '../core/geometry.types';
 import type { Cell, SegmentName } from '../core/cell.types';
 
@@ -198,16 +199,16 @@ export interface SegmentHoverOperations {
 
 /** Direct state setter functions (for advanced use) */
 export interface DrawingStateSetters {
-  setIsDrawing: React.Dispatch<React.SetStateAction<boolean>>;
-  setProcessedCells: React.Dispatch<React.SetStateAction<Set<string>>>;
-  setProcessedEdges: React.Dispatch<React.SetStateAction<Set<string>>>;
-  setProcessedSegments: React.Dispatch<React.SetStateAction<Set<string>>>;
-  setRectangleStart: React.Dispatch<React.SetStateAction<RectangleStart | null>>;
-  setCircleStart: React.Dispatch<React.SetStateAction<CircleStart | null>>;
-  setEdgeLineStart: React.Dispatch<React.SetStateAction<EdgeLineStart | null>>;
-  setShapeHoverPosition: React.Dispatch<React.SetStateAction<ShapeHoverPosition>>;
-  setTouchConfirmPending: React.Dispatch<React.SetStateAction<boolean>>;
-  setPendingEndPoint: React.Dispatch<React.SetStateAction<PendingEndPoint | null>>;
+  setIsDrawing: StateUpdater<boolean>;
+  setProcessedCells: StateUpdater<Set<string>>;
+  setProcessedEdges: StateUpdater<Set<string>>;
+  setProcessedSegments: StateUpdater<Set<string>>;
+  setRectangleStart: StateUpdater<RectangleStart | null>;
+  setCircleStart: StateUpdater<CircleStart | null>;
+  setEdgeLineStart: StateUpdater<EdgeLineStart | null>;
+  setShapeHoverPosition: StateUpdater<ShapeHoverPosition>;
+  setTouchConfirmPending: StateUpdater<boolean>;
+  setPendingEndPoint: StateUpdater<PendingEndPoint | null>;
 }
 
 // ===========================================

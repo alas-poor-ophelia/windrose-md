@@ -23,7 +23,7 @@ import {
   validateMeasurementSize,
   validateFineTune,
   getFineTuneRange,
-} from "../../../../src/geometry/core/hexMeasurements.ts";
+} from "../../../../src/geometry/core/hexMeasurements";
 
 const SQRT3 = Math.sqrt(3);
 

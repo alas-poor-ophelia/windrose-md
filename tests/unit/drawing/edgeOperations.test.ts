@@ -24,9 +24,9 @@ import {
   removeEdgeLine,
   getEdgesForCell,
   clearAllEdges,
-} from "../../../src/drawing/edgeOperations.ts";
+} from "../../../src/drawing/edgeOperations";
 
-import type { Edge } from "../../../src/drawing/edgeOperations.ts";
+import type { Edge } from "../../../src/drawing/edgeOperations";
 
 // Helper to create test edges
 function createEdge(
@@ -232,13 +232,9 @@ describe("edgeOperations", () => {
 
     it("returns original for invalid inputs", () => {
       const edges = [createEdge(0, 0, "right")];
-      // @ts-expect-error - testing invalid input
       expect(addEdge(edges, null, 3, "right", "#ff0000")).toEqual(edges);
-      // @ts-expect-error - testing invalid input
       expect(addEdge(edges, 5, null, "right", "#ff0000")).toEqual(edges);
-      // @ts-expect-error - testing invalid input
       expect(addEdge(edges, 5, 3, null, "#ff0000")).toEqual(edges);
-      // @ts-expect-error - testing invalid input
       expect(addEdge(edges, 5, 3, "right", null)).toEqual(edges);
     });
 

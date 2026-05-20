@@ -11,7 +11,7 @@ import {
   autoDetectOverflow,
   createTilesetFromTiles,
   ALPHA_COVERAGE_THRESHOLD,
-} from '../../../src/assets/tilesetOperations.ts';
+} from '../../../src/assets/tilesetOperations';
 
 import type { TileEntry } from '#types/tiles/tile.types';
 

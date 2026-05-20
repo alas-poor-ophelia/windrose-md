@@ -17,7 +17,7 @@ import {
   isValidSymbol,
   isValidImagePath,
   validateObjectDefinition,
-} from "../../../src/objects/objectTypeResolver.ts";
+} from "../../../src/objects/objectTypeResolver";
 
 // Mock object type for testing
 interface MockObjectType {

@@ -31,9 +31,11 @@ export type CoordinateKeyMode = 'hold' | 'toggle';
 // ===========================================
 
 /** Settings modal tab identifiers */
-export type SettingsTabId = 
+export type SettingsTabId =
   | 'appearance'
   | 'grid'
+  | 'hexgrid'
+  | 'gridbackground'
   | 'measurement'
   | 'preferences';
 
@@ -149,11 +151,15 @@ export interface PluginSettings {
   hoverPreviewScale?: number;  // Panel size multiplier (0.5–2.0, default 1.0)
   hoverPreviewZoom?: number;   // Map zoom level (0.1–2.0, default 0.5)
 
+  // Sub-map display
+  showAdjacentSubMaps?: boolean;
+
   // Tileset folders (vault paths scanned for tile images)
   tilesetFolders?: string[];
 
   // Keyboard shortcuts (action ID → key string)
   keyboardShortcuts?: Record<string, string>;
+  [key: string]: unknown;
 }
 
 // ===========================================

@@ -126,6 +126,15 @@ export interface IGeometry {
    * Use this instead of instanceof checks.
    */
   readonly type: 'grid' | 'hex';
+
+  /**
+   * Cell size in pixels (grid cell side length or hex size).
+   * Present on concrete geometry instances; optional on the interface
+   * so code that narrows via `instanceof` or `type` can access it
+   * without casting.
+   */
+  cellSize?: number;
+
   // ===========================================
   // Coordinate Conversions
   // ===========================================

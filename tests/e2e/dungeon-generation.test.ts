@@ -50,7 +50,7 @@ beforeAll(() => {
 // The obsidian-testing-framework's dialog handling can race with test cleanup,
 // causing unhandled rejections. This handler accepts dialogs immediately and
 // catches any errors from dialogs that were already dismissed.
-beforeEach(({ page }) => {
+beforeEach(({ page }: any) => {
   page.on("dialog", async (dialog: any) => {
     try {
       await dialog.accept();

@@ -62,6 +62,7 @@ export type {
   SizingMode,
   MeasurementMethod,
   SubHexMapData,
+  HexBounds,
 } from './core/map.types';
 
 export type {

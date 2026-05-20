@@ -6,6 +6,7 @@
  * and coordinate transformation for the canvas.
  */
 
+import type { Dispatch, StateUpdater } from 'preact/hooks';
 import type { Point, WorldCoords } from '../core/geometry.types';
 import type { ViewState } from '../core/map.types';
 
@@ -92,12 +93,12 @@ export interface PanHandlers {
 
 /** Direct state setters for external control */
 export interface CanvasInteractionSetters {
-  setIsPanning: React.Dispatch<React.SetStateAction<boolean>>;
-  setIsTouchPanning: React.Dispatch<React.SetStateAction<boolean>>;
-  setPanStart: React.Dispatch<React.SetStateAction<PanStart | null>>;
-  setTouchPanStart: React.Dispatch<React.SetStateAction<TouchCenter | null>>;
-  setInitialPinchDistance: React.Dispatch<React.SetStateAction<number | null>>;
-  setSpaceKeyPressed: React.Dispatch<React.SetStateAction<boolean>>;
+  setIsPanning: Dispatch<StateUpdater<boolean>>;
+  setIsTouchPanning: Dispatch<StateUpdater<boolean>>;
+  setPanStart: Dispatch<StateUpdater<PanStart | null>>;
+  setTouchPanStart: Dispatch<StateUpdater<TouchCenter | null>>;
+  setInitialPinchDistance: Dispatch<StateUpdater<number | null>>;
+  setSpaceKeyPressed: Dispatch<StateUpdater<boolean>>;
 }
 
 // ===========================================

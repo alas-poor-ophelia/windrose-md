@@ -23,7 +23,7 @@ import {
 // Auto-accept any dialogs to prevent the obsidian-testing-framework's
 // dialog handler from racing with test cleanup (causes intermittent
 // "Page.handleJavaScriptDialog: No dialog is showing" errors).
-beforeEach(({ page }) => {
+beforeEach(({ page }: any) => {
   page.on("dialog", async (dialog: any) => {
     try {
       await dialog.accept();

@@ -25,6 +25,7 @@ export interface DragOffset {
   gridOffsetY: number;
   worldOffsetX: number;
   worldOffsetY: number;
+  freeform?: boolean;
 }
 
 /** Map of item IDs to their drag offsets */
@@ -49,6 +50,7 @@ export interface ObjectDragUpdate {
   id: string;
   oldObj: MapObject;
   newPosition: Point;
+  freeformPosition?: Point;
 }
 
 /** Text label position update during drag */

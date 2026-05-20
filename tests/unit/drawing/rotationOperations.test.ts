@@ -4,7 +4,7 @@ import {
 	ROTATION_INCREMENT,
 	getNextRotation,
 	rotateByIncrement,
-} from "../../../src/drawing/rotationOperations.ts";
+} from "../../../src/drawing/rotationOperations";
 
 describe("rotationOperations", () => {
 	describe("constants", () => {

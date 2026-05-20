@@ -13,7 +13,7 @@ import {
   renderSingleObject,
   renderObjectBadges,
   renderObjects,
-} from "../../../../src/geometry/renderers/objectRenderer.ts";
+} from "../../../../src/geometry/renderers/objectRenderer";
 
 // Mock canvas context
 function createMockContext(): CanvasRenderingContext2D {
@@ -50,6 +50,10 @@ function createMockGeometry() {
     gridToScreen: vi.fn((x: number, y: number, offsetX: number, offsetY: number, zoom: number) => ({
       screenX: x * 40 * zoom + offsetX,
       screenY: y * 40 * zoom + offsetY,
+    })),
+    worldToScreen: vi.fn((worldX: number, worldY: number, offsetX: number, offsetY: number, zoom: number) => ({
+      screenX: worldX * zoom + offsetX,
+      screenY: worldY * zoom + offsetY,
     })),
   };
 }
@@ -161,7 +165,7 @@ describe("objectRenderer", () => {
       const obj = { id: '1', type: 'test', position: { x: 2, y: 3 } };
       const context = { ctx, offsetX: 0, offsetY: 0, zoom: 1, scaledSize: 40 };
 
-      const result = calculateObjectPosition(obj, [obj], geometry, context, false, 'flat', deps);
+      const result = calculateObjectPosition(obj as any, [obj] as any, geometry, context, false, 'flat', deps as any);
 
       expect(geometry.gridToScreen).toHaveBeenCalledWith(2, 3, 0, 0, 1);
       expect(result.objectWidth).toBe(40);
@@ -172,7 +176,7 @@ describe("objectRenderer", () => {
       const obj = { id: '1', type: 'test', position: { x: 0, y: 0 }, size: { width: 2, height: 3 } };
       const context = { ctx, offsetX: 0, offsetY: 0, zoom: 1, scaledSize: 40 };
 
-      const result = calculateObjectPosition(obj, [obj], geometry, context, false, 'flat', deps);
+      const result = calculateObjectPosition(obj as any, [obj] as any, geometry, context, false, 'flat', deps as any);
 
       expect(result.objectWidth).toBe(80); // 2 * 40
       expect(result.objectHeight).toBe(120); // 3 * 40
@@ -184,7 +188,7 @@ describe("objectRenderer", () => {
       const allObjects = [obj1, obj2];
       const context = { ctx, offsetX: 0, offsetY: 0, zoom: 1, scaledSize: 40 };
 
-      const result = calculateObjectPosition(obj1, allObjects, geometry, context, true, 'flat', deps);
+      const result = calculateObjectPosition(obj1 as any, allObjects as any, geometry, context, true, 'flat', deps as any);
 
       expect(deps.getMultiObjectScale).toHaveBeenCalledWith(2);
       expect(deps.getSlotOffset).toHaveBeenCalled();
@@ -196,7 +200,7 @@ describe("objectRenderer", () => {
       const obj = { id: '1', type: 'test', position: { x: 0, y: 0 }, alignment: 'north' as const };
       const context = { ctx, offsetX: 0, offsetY: 0, zoom: 1, scaledSize: 40 };
 
-      const result = calculateObjectPosition(obj, [obj], geometry, context, false, 'flat', deps);
+      const result = calculateObjectPosition(obj as any, [obj] as any, geometry, context, false, 'flat', deps as any);
 
       // Should offset Y by -halfCell
       expect(result.screenY).toBeLessThan(0);
@@ -206,7 +210,7 @@ describe("objectRenderer", () => {
       const obj = { id: '1', type: 'test', position: { x: 0, y: 0 }, alignment: 'south' as const };
       const context = { ctx, offsetX: 0, offsetY: 0, zoom: 1, scaledSize: 40 };
 
-      const result = calculateObjectPosition(obj, [obj], geometry, context, false, 'flat', deps);
+      const result = calculateObjectPosition(obj as any, [obj] as any, geometry, context, false, 'flat', deps as any);
 
       // Should offset Y by +halfCell
       expect(result.screenY).toBeGreaterThan(0);
@@ -216,7 +220,7 @@ describe("objectRenderer", () => {
       const obj = { id: '1', type: 'test', position: { x: 0, y: 0 }, alignment: 'east' as const };
       const context = { ctx, offsetX: 0, offsetY: 0, zoom: 1, scaledSize: 40 };
 
-      const result = calculateObjectPosition(obj, [obj], geometry, context, false, 'flat', deps);
+      const result = calculateObjectPosition(obj as any, [obj] as any, geometry, context, false, 'flat', deps as any);
 
       // Should offset X by +halfCell
       expect(result.screenX).toBeGreaterThan(0);
@@ -226,7 +230,7 @@ describe("objectRenderer", () => {
       const obj = { id: '1', type: 'test', position: { x: 0, y: 0 }, alignment: 'west' as const };
       const context = { ctx, offsetX: 0, offsetY: 0, zoom: 1, scaledSize: 40 };
 
-      const result = calculateObjectPosition(obj, [obj], geometry, context, false, 'flat', deps);
+      const result = calculateObjectPosition(obj as any, [obj] as any, geometry, context, false, 'flat', deps as any);
 
       // Should offset X by -halfCell
       expect(result.screenX).toBeLessThan(0);
@@ -335,7 +339,7 @@ describe("objectRenderer", () => {
         const mockImage = createMockImage();
         const getCachedImage = vi.fn(() => mockImage);
 
-        deps.getRenderChar.mockReturnValue({ char: '', isIcon: false, isImage: true, imagePath: 'test.png' });
+        deps.getRenderChar.mockReturnValue({ char: '', isIcon: false, isImage: true, imagePath: 'test.png' } as any);
 
         renderSingleObject(ctx, obj, objType, position, 40, deps.getRenderChar, getCachedImage);
 
@@ -349,7 +353,7 @@ describe("objectRenderer", () => {
         const mockImage = createMockImage();
         const getCachedImage = vi.fn(() => mockImage);
 
-        deps.getRenderChar.mockReturnValue({ char: '', isIcon: false, isImage: true, imagePath: 'vault/images/test.png' });
+        deps.getRenderChar.mockReturnValue({ char: '', isIcon: false, isImage: true, imagePath: 'vault/images/test.png' } as any);
 
         renderSingleObject(ctx, obj, objType, position, 40, deps.getRenderChar, getCachedImage);
 
@@ -363,7 +367,7 @@ describe("objectRenderer", () => {
         const mockImage = createMockImage();
         const getCachedImage = vi.fn(() => mockImage);
 
-        deps.getRenderChar.mockReturnValue({ char: '', isIcon: false, isImage: true, imagePath: 'test.png' });
+        deps.getRenderChar.mockReturnValue({ char: '', isIcon: false, isImage: true, imagePath: 'test.png' } as any);
 
         renderSingleObject(ctx, obj, objType, position, 40, deps.getRenderChar, getCachedImage);
 
@@ -378,7 +382,7 @@ describe("objectRenderer", () => {
         const mockImage = createMockImage();
         const getCachedImage = vi.fn(() => mockImage);
 
-        deps.getRenderChar.mockReturnValue({ char: '', isIcon: false, isImage: true, imagePath: 'test.png' });
+        deps.getRenderChar.mockReturnValue({ char: '', isIcon: false, isImage: true, imagePath: 'test.png' } as any);
 
         renderSingleObject(ctx, obj, objType, position, 40, deps.getRenderChar, getCachedImage);
 
@@ -394,7 +398,7 @@ describe("objectRenderer", () => {
         const mockImage = createMockImage();
         const getCachedImage = vi.fn(() => mockImage);
 
-        deps.getRenderChar.mockReturnValue({ char: '', isIcon: false, isImage: true, imagePath: 'test.png' });
+        deps.getRenderChar.mockReturnValue({ char: '', isIcon: false, isImage: true, imagePath: 'test.png' } as any);
 
         renderSingleObject(ctx, obj, objType, position, 40, deps.getRenderChar, getCachedImage);
 
@@ -415,7 +419,7 @@ describe("objectRenderer", () => {
         const mockImage = createMockImage(100, 100, false); // complete = false
         const getCachedImage = vi.fn(() => mockImage);
 
-        deps.getRenderChar.mockReturnValue({ char: '?', isIcon: false, isImage: true, imagePath: 'test.png' });
+        deps.getRenderChar.mockReturnValue({ char: '?', isIcon: false, isImage: true, imagePath: 'test.png' } as any);
 
         renderSingleObject(ctx, obj, objType, position, 40, deps.getRenderChar, getCachedImage);
 
@@ -429,7 +433,7 @@ describe("objectRenderer", () => {
         const objType = createMockObjectType();
         const position = { screenX: 100, screenY: 100, objectWidth: 40, objectHeight: 40 };
 
-        deps.getRenderChar.mockReturnValue({ char: '?', isIcon: false, isImage: true, imagePath: 'test.png' });
+        deps.getRenderChar.mockReturnValue({ char: '?', isIcon: false, isImage: true, imagePath: 'test.png' } as any);
 
         // No getCachedImage provided
         renderSingleObject(ctx, obj, objType, position, 40, deps.getRenderChar);
@@ -444,7 +448,7 @@ describe("objectRenderer", () => {
         const position = { screenX: 100, screenY: 100, objectWidth: 40, objectHeight: 40 };
         const getCachedImage = vi.fn(() => null);
 
-        deps.getRenderChar.mockReturnValue({ char: '?', isIcon: false, isImage: true, imagePath: 'test.png' });
+        deps.getRenderChar.mockReturnValue({ char: '?', isIcon: false, isImage: true, imagePath: 'test.png' } as any);
 
         renderSingleObject(ctx, obj, objType, position, 40, deps.getRenderChar, getCachedImage);
 
@@ -459,7 +463,7 @@ describe("objectRenderer", () => {
         const mockImage = createMockImage();
         const getCachedImage = vi.fn(() => mockImage);
 
-        deps.getRenderChar.mockReturnValue({ char: '', isIcon: false, isImage: true, imagePath: 'test.png' });
+        deps.getRenderChar.mockReturnValue({ char: '', isIcon: false, isImage: true, imagePath: 'test.png' } as any);
 
         renderSingleObject(ctx, obj, objType, position, 40, deps.getRenderChar, getCachedImage);
 
@@ -539,7 +543,7 @@ describe("objectRenderer", () => {
       const layer = { objects: [] };
       const context = { ctx, offsetX: 0, offsetY: 0, zoom: 1, scaledSize: 40 };
 
-      renderObjects(layer, context, geometry, false, 'flat', deps);
+      renderObjects(layer as any, context, geometry, false, 'flat', deps as any);
 
       expect(deps.getObjectType).not.toHaveBeenCalled();
     });
@@ -553,7 +557,7 @@ describe("objectRenderer", () => {
       };
       const context = { ctx, offsetX: 0, offsetY: 0, zoom: 1, scaledSize: 40 };
 
-      renderObjects(layer, context, geometry, false, 'flat', deps);
+      renderObjects(layer as any, context, geometry, false, 'flat', deps as any);
 
       expect(ctx.fillText).toHaveBeenCalledTimes(2);
     });
@@ -567,7 +571,7 @@ describe("objectRenderer", () => {
       const context = { ctx, offsetX: 0, offsetY: 0, zoom: 1, scaledSize: 40 };
       deps.getObjectType.mockReturnValue(null);
 
-      renderObjects(layer, context, geometry, false, 'flat', deps);
+      renderObjects(layer as any, context, geometry, false, 'flat', deps as any);
 
       expect(ctx.fillText).not.toHaveBeenCalled();
     });
@@ -580,7 +584,7 @@ describe("objectRenderer", () => {
       const context = { ctx, offsetX: 0, offsetY: 0, zoom: 1, scaledSize: 40 };
       deps.isCellFogged.mockReturnValue(true);
 
-      renderObjects(layer, context, geometry, false, 'flat', deps);
+      renderObjects(layer as any, context, geometry, false, 'flat', deps as any);
 
       expect(ctx.fillText).not.toHaveBeenCalled();
     });
@@ -591,7 +595,7 @@ describe("objectRenderer", () => {
       };
       const context = { ctx, offsetX: 0, offsetY: 0, zoom: 1, scaledSize: 40 };
 
-      renderObjects(layer, context, geometry, false, 'flat', deps);
+      renderObjects(layer as any, context, geometry, false, 'flat', deps as any);
 
       expect(ctx.textAlign).toBe('center');
       expect(ctx.textBaseline).toBe('middle');

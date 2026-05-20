@@ -70,7 +70,7 @@ async function seedCache(vaultPath: string, width = 100, height = 100): Promise<
   // Mock Blob constructor
   vi.stubGlobal('Blob', vi.fn(() => ({})));
 
-  const loadPromise = preloadImage(vaultPath);
+  const loadPromise = preloadImage((globalThis as any).app, vaultPath);
 
   // Trigger the onload callback (preloadImage sets img.src which triggers load)
   // We need to wait a tick for the promise setup, then fire onload
@@ -406,7 +406,7 @@ describe('imageOperations', () => {
       }
 
       // Re-preload img0 (cache hit) — should promote, not add
-      await preloadImage('lru/img0.png');
+      await preloadImage((globalThis as any).app, 'lru/img0.png');
 
       // No eviction should have occurred
       expect(getCachedImage('lru/img0.png')).not.toBeNull();
@@ -440,13 +440,13 @@ describe('imageOperations', () => {
     });
 
     it('returns null for empty vault path', async () => {
-      const result = await preloadImage('');
+      const result = await preloadImage((globalThis as any).app, '');
       expect(result).toBeNull();
     });
 
     it('returns null when file is not found in vault', async () => {
       mockVault.getAbstractFileByPath.mockReturnValue(null);
-      const result = await preloadImage('missing/file.png');
+      const result = await preloadImage((globalThis as any).app, 'missing/file.png');
       expect(result).toBeNull();
     });
 
@@ -454,7 +454,7 @@ describe('imageOperations', () => {
       await seedCache('test/loaded.png');
       // Second call should return from cache without hitting vault
       mockVault.getAbstractFileByPath.mockClear();
-      const result = await preloadImage('test/loaded.png');
+      const result = await preloadImage((globalThis as any).app, 'test/loaded.png');
       expect(result).not.toBeNull();
       // Should NOT have called vault again — served from cache
       expect(mockVault.getAbstractFileByPath).not.toHaveBeenCalled();

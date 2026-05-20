@@ -38,11 +38,11 @@ import {
   segmentIntersectsRect,
   polygonIntersectsRect,
   evalBezier,
-} from "../../../../src/geometry/curves/curveBoolean.ts";
+} from "../../../../src/geometry/curves/curveBoolean";
 
 import {
   fitPointsToBezier,
-} from "../../../../src/geometry/curves/curveFitting.ts";
+} from "../../../../src/geometry/curves/curveFitting";
 
 import type { Curve, BezierSegment } from "#types/core/curve.types";
 

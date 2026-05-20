@@ -26,6 +26,8 @@ export interface UseDataHandlersOptions {
   isApplyingHistory: () => boolean;
 }
 
+export type HistoryState = MapHistorySnapshot;
+
 // ===========================================
 // History State
 // ===========================================
@@ -40,6 +42,9 @@ export interface MapHistorySnapshot {
   edges: Edge[];
   tiles?: HexTileAssignment[];
   regions?: Region[];
+  outlines?: import('../core/map.types').Outline[];
+  shapeOverlays?: import('../core/map.types').ShapeOverlay[];
+  fogOfWar?: import('../core/map.types').FogOfWar | null;
 }
 
 // ===========================================
@@ -131,6 +136,8 @@ export interface MapDataHandlers {
   handleObjectSetChange: HandleObjectSetChange;
   handleTextLabelSettingsChange: HandleTextLabelSettingsChange;
   handleRegionsChange: HandleRegionsChange;
+  handleOutlinesChange: (outlines: import('../core/map.types').Outline[]) => void;
+  handleShapeOverlaysChange: (overlays: import('../core/map.types').ShapeOverlay[]) => void;
 }
 
 // ===========================================
@@ -159,5 +166,7 @@ export interface UseDataHandlersResult {
   handleObjectSetChange: HandleObjectSetChange;
   handleTextLabelSettingsChange: HandleTextLabelSettingsChange;
   handleRegionsChange: HandleRegionsChange;
+  handleOutlinesChange: (outlines: import('../core/map.types').Outline[]) => void;
+  handleShapeOverlaysChange: (overlays: import('../core/map.types').ShapeOverlay[]) => void;
 }
 

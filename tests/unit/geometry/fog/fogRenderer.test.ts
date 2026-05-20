@@ -16,7 +16,7 @@ import {
   calculateHexVisibleBounds,
   clearFogCanvas,
   renderFog,
-} from "../../../../src/geometry/fog/fogRenderer.ts";
+} from "../../../../src/geometry/fog/fogRenderer";
 
 // Mock canvas context
 function createMockContext(): CanvasRenderingContext2D {

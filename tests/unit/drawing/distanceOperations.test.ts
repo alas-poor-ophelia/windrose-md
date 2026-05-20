@@ -10,7 +10,7 @@ import { describe, it, expect } from "vitest";
 import {
   formatDistance,
   getEffectiveDistanceSettings,
-} from "../../../src/drawing/distanceOperations.ts";
+} from "../../../src/drawing/distanceOperations";
 
 describe("distanceOperations", () => {
   // ===========================================================================

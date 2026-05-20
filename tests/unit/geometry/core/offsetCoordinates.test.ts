@@ -17,7 +17,7 @@ import {
   isWithinOffsetBounds,
   columnToLabel,
   rowToLabel,
-} from "../../../../src/geometry/core/offsetCoordinates.ts";
+} from "../../../../src/geometry/core/offsetCoordinates";
 
 describe("offsetCoordinates", () => {
   // ===========================================================================

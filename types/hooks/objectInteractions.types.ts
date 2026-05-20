@@ -6,6 +6,7 @@
  * selection, dragging, resizing, and UI interactions.
  */
 
+import type { StateUpdater } from 'preact/hooks';
 import type { MapObject } from '../objects/object.types';
 
 // ===========================================
@@ -167,7 +168,7 @@ export type GetClickedCorner = (
 export interface UseObjectInteractionsResult {
   // State
   isResizeMode: boolean;
-  setIsResizeMode: React.Dispatch<React.SetStateAction<boolean>>;
+  setIsResizeMode: StateUpdater<boolean>;
   isResizing: boolean;
   resizeCorner: ResizeCorner;
   hoveredObject: MapObject | null;
@@ -176,8 +177,10 @@ export interface UseObjectInteractionsResult {
   objectColorBtnRef: ObjectColorBtnRef;
   pendingObjectCustomColorRef: PendingObjectCustomColorRef;
   edgeSnapMode: boolean;
-  setEdgeSnapMode: React.Dispatch<React.SetStateAction<boolean>>;
+  setEdgeSnapMode: StateUpdater<boolean>;
   longPressTimerRef: LongPressTimerRef;
+  /** Whether a freeform drag preview is active (Alt+Shift modifier) */
+  freeformDragPreview: boolean;
 
   // Handlers
   handleObjectPlacement: HandleObjectPlacement;

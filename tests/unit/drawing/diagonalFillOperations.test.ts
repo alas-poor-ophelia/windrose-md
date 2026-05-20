@@ -24,7 +24,7 @@ import {
   getInheritedColor,
   getSegmentsForCorner,
   validateDiagonalPath,
-} from "../../../src/drawing/diagonalFillOperations.ts";
+} from "../../../src/drawing/diagonalFillOperations";
 
 import type { CellMap } from "#types/core/cell.types";
 

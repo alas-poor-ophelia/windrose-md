@@ -5,6 +5,7 @@
  * Types for useAreaSelect hook - two-click rectangle selection tool.
  */
 
+import type { Point } from '../core/geometry.types';
 // Note: Point/WorldCoords/ToolId available via index.ts if needed
 
 // ===========================================
@@ -57,8 +58,14 @@ export interface UseAreaSelectResult {
   isAreaSelecting: boolean;
 
   // Handlers
+  /** Hover position during area selection */
+  areaSelectHoverPosition: Point | null;
+
+  // Handlers
   /** Handle click for area select tool (returns true if handled) */
   handleAreaSelectClick: (e: PointerEvent | MouseEvent | TouchEvent) => boolean;
   /** Cancel area selection (e.g., on tool change or Escape) */
   cancelAreaSelect: () => void;
+  /** Update hover position during area selection */
+  updateAreaSelectHover: (gridX: number, gridY: number) => void;
 }

@@ -44,6 +44,8 @@ export type ToolId =
   | 'shape'
   // Tile tools (hex maps)
   | 'tilePaint'
+  // Outline tool (hex maps)
+  | 'outline'
   // Utility tools
   | 'measure'
   | 'fog'

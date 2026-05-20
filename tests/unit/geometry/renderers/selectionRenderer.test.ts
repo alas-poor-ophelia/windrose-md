@@ -17,7 +17,7 @@ import {
   renderObjectSelection,
   renderObjectSelections,
   renderSelections,
-} from "../../../../src/geometry/renderers/selectionRenderer.ts";
+} from "../../../../src/geometry/renderers/selectionRenderer";
 
 // Mock canvas context
 function createMockContext(): CanvasRenderingContext2D {

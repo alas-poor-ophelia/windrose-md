@@ -54,13 +54,14 @@ export type FontWeight = 'normal' | 'bold';
 export interface TextLabel {
   id: TextLabelId;
   position: Point;
-  text: string;
+  content: string;
   fontSize: number;
-  fontFamily: string;
-  fontWeight: FontWeight;
+  fontFace: string;
+  fontWeight?: FontWeight;
   color: HexColor;
+  opacity?: number;
   backgroundColor?: HexColor;
-  align: TextAlign;
+  align?: TextAlign;
   rotation?: number;
 }
 

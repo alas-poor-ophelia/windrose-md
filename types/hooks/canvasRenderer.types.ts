@@ -5,11 +5,13 @@
  * including grid, cells, objects, text labels, fog of war, and selections.
  */
 
+import type { RefObject } from 'preact';
 import type { MapData } from '../core/map.types';
 import type { IGeometry } from '../core/geometry.types';
 import type { MapObject } from '../objects/object.types';
 import type { TextLabel } from '../objects/note.types';
 import type { LayerVisibility } from '../contexts/context.types';
+export type { LayerVisibility };
 
 /** Adjacent sub-hex map for ghost preview rendering */
 export interface AdjacentSubHexRenderData {
@@ -92,8 +94,8 @@ export interface UseCanvasRendererOptions extends RenderCanvasOptions {
 
 /** useCanvasRenderer hook - triggers re-render on data changes */
 export type UseCanvasRenderer = (
-  canvasRef: React.RefObject<HTMLCanvasElement>,
-  fogCanvasRef: React.RefObject<HTMLCanvasElement> | null,
+  canvasRef: RefObject<HTMLCanvasElement>,
+  fogCanvasRef: RefObject<HTMLCanvasElement> | null,
   mapData: MapData | null,
   geometry: IGeometry | null,
   selectedItems?: RendererSelectedItem | RendererSelectedItem[],

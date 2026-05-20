@@ -16,7 +16,7 @@ import {
   getSegmentAtPosition,
   normalizeCell,
   getFilledSegments,
-} from "../../../../src/geometry/core/cellAccessor.ts";
+} from "../../../../src/geometry/core/cellAccessor";
 
 describe("cellAccessor (imported via transformer)", () => {
   describe("isSimpleCell", () => {
@@ -27,14 +27,14 @@ describe("cellAccessor (imported via transformer)", () => {
 
     it("returns false for cell with segments", () => {
       const cell = { x: 1, y: 2, color: "#ff0000", segments: { n: true } };
-      expect(isSimpleCell(cell)).toBe(false);
+      expect(isSimpleCell(cell as any)).toBe(false);
     });
   });
 
   describe("hasSegments", () => {
     it("returns true when cell has segments object", () => {
       const cell = { x: 1, y: 2, color: "#ff0000", segments: { n: true, s: true } };
-      expect(hasSegments(cell)).toBe(true);
+      expect(hasSegments(cell as any)).toBe(true);
     });
 
     it("returns false when cell has no segments", () => {
@@ -73,7 +73,7 @@ describe("cellAccessor (imported via transformer)", () => {
         color: "#ff0000",
         segments: { n: true, ne: true, e: true, se: true, s: true, sw: true, w: true, nw: true }
       };
-      const result = normalizeCell(fullSegmentCell);
+      const result = normalizeCell(fullSegmentCell as any);
       expect(result).not.toBeNull();
       expect(hasSegments(result!)).toBe(false);
     });
@@ -98,7 +98,7 @@ describe("cellAccessor (imported via transformer)", () => {
         color: "#ff0000",
         segments: { n: true, s: true }
       };
-      const result = normalizeCell(partialCell);
+      const result = normalizeCell(partialCell as any);
       expect(result).toEqual(partialCell);
     });
   });
@@ -117,7 +117,7 @@ describe("cellAccessor (imported via transformer)", () => {
         color: "#ff0000",
         segments: { n: true, s: true }
       };
-      const segments = getFilledSegments(segmentCell);
+      const segments = getFilledSegments(segmentCell as any);
       expect(segments).toHaveLength(2);
       expect(segments).toContain("n");
       expect(segments).toContain("s");

@@ -12,6 +12,18 @@ import type { DatacoreLocalApi } from '@blacksmithgu/datacore';
 // Ensure dc is available globally in all modules
 declare global {
   const dc: DatacoreLocalApi;
+
+  interface Window {
+    __windrose?: {
+      obsidian?: typeof import('obsidian');
+      version?: string;
+      ready?: boolean;
+      pendingNavigate?: { mapPath?: string; consumed?: boolean };
+      mcpInstances?: Record<string, unknown>;
+      dataFilePath?: string;
+      [key: string]: unknown;
+    };
+  }
 }
 
 // Re-export commonly used Datacore types for convenience

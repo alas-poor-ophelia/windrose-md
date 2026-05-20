@@ -31,7 +31,7 @@ import {
   setFogVisibility,
   hasFogData,
   getFogState,
-} from "../../../src/persistence/layerAccessor.ts";
+} from "../../../src/persistence/layerAccessor";
 
 import type { MapData, MapLayer } from "#types/core/map.types";
 
@@ -48,11 +48,12 @@ function createLayer(
     order,
     visible,
     cells: [],
+    curves: [],
     edges: [],
     objects: [],
     textLabels: [],
     fogOfWar: null,
-  };
+  } as MapLayer;
 }
 
 // Helper to create basic map data
@@ -375,9 +376,9 @@ describe("layerAccessor", () => {
       layer1.cells = [{ x: 1, y: 2, color: "#aaa" }] as any;
       layer1.curves = [{ id: "c1", start: { x: 0, y: 0 }, segments: [] }] as any;
       layer1.edges = [{ x: 0, y: 0, side: "right", color: "#000" }];
-      layer1.objects = [{ id: "obj1", typeId: "sword", position: { x: 0, y: 0 } }];
+      layer1.objects = [{ id: "obj1", type: "sword", position: { x: 0, y: 0 }, size: { width: 1, height: 1 } }] as any;
       layer1.textLabels = [
-        { id: "tl1", text: "hello", position: { x: 0, y: 0 }, fontSize: 12, fontFamily: "sans", color: "#000" },
+        { id: "tl1", content: "hello", position: { x: 0, y: 0 }, fontSize: 12, fontFace: "sans", color: "#000" },
       ];
       layer1.fogOfWar = { enabled: true, foggedCells: [{ col: 0, row: 0 }], texture: null };
       layer1.tiles = [{ col: 0, row: 0, tilesetId: "ts1", tileIndex: 0 }] as any;
@@ -400,9 +401,9 @@ describe("layerAccessor", () => {
       layer1.cells = [{ x: 1, y: 2, color: "#aaa" }] as any;
       layer1.curves = [{ id: "c1", start: { x: 0, y: 0 }, segments: [] }] as any;
       layer1.edges = [{ x: 0, y: 0, side: "right", color: "#000" }];
-      layer1.objects = [{ id: "obj1", typeId: "sword", position: { x: 0, y: 0 } }];
+      layer1.objects = [{ id: "obj1", type: "sword", position: { x: 0, y: 0 }, size: { width: 1, height: 1 } }] as any;
       layer1.textLabels = [
-        { id: "tl1", text: "hello", position: { x: 0, y: 0 }, fontSize: 12, fontFamily: "sans", color: "#000" },
+        { id: "tl1", content: "hello", position: { x: 0, y: 0 }, fontSize: 12, fontFace: "sans", color: "#000" },
       ];
       layer1.fogOfWar = { enabled: true, foggedCells: [{ col: 0, row: 0 }], texture: null };
       layer1.tiles = [{ col: 0, row: 0, tilesetId: "ts1", tileIndex: 0 }] as any;

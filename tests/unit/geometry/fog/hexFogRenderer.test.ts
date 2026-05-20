@@ -14,7 +14,7 @@ import {
   renderHexFogCells,
   renderInteriorHexOutlines,
   renderHexFog
-} from "../../../../src/geometry/fog/hexFogRenderer.ts";
+} from "../../../../src/geometry/fog/hexFogRenderer";
 
 // Mock canvas context
 function createMockContext(): CanvasRenderingContext2D {

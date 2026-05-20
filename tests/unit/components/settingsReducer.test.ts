@@ -11,11 +11,12 @@ import { describe, it, expect } from "vitest";
 import {
   Actions,
   settingsReducer,
-} from "../../../src/components/settings/settingsReducer.ts";
+} from "../../../src/components/settings/settingsReducer";
+import type { SettingsModalState } from "../../../src/components/settings/settingsReducer";
 
 // Minimal state shape for testing IMAGE_SELECTED
 function createMockState(overrides = {}) {
-  return {
+  return ({
     activeTab: 'appearance',
     useGlobalSettings: true,
     overrides: {},
@@ -57,8 +58,10 @@ function createMockState(overrides = {}) {
     pendingBoundsChange: null,
     orphanInfo: { cells: 0, objects: 0 },
     deleteOrphanedContent: false,
+    boundsShape: 'rectangular' as const,
+    objectSetId: null,
     ...overrides,
-  };
+  }) as unknown as SettingsModalState;
 }
 
 describe("settingsReducer", () => {

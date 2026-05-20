@@ -12,7 +12,7 @@ import {
   cellExists,
   buildCellLookup,
   calculateBordersOptimized,
-} from "../../../src/drawing/borderCalculator.ts";
+} from "../../../src/drawing/borderCalculator";
 
 // Helper to create test cells
 function createCell(x: number, y: number, color = "#ff0000") {

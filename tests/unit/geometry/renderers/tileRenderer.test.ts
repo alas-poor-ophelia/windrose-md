@@ -11,7 +11,7 @@ import {
   sortTilesForRendering,
   calculateTileDrawRect,
   renderTiles,
-} from "../../../../src/geometry/renderers/tileRenderer.ts";
+} from "../../../../src/geometry/renderers/tileRenderer";
 
 import type { HexTileAssignment, TilesetDef } from '#types/tiles/tile.types';
 

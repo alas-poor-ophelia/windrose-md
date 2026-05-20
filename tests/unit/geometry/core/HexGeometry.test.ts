@@ -12,7 +12,7 @@
 
 import { describe, it, expect, beforeEach } from "vitest";
 
-import { HexGeometry } from "../../../../src/geometry/core/HexGeometry.ts";
+import { HexGeometry } from "../../../../src/geometry/core/HexGeometry";
 
 // Standard hex size for tests (radius from center to vertex)
 const HEX_SIZE = 40;

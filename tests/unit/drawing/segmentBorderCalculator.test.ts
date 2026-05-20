@@ -7,11 +7,11 @@
 
 import { describe, it, expect } from "vitest";
 
-import { getInternalBorders, getExternalBorders } from "../../../src/drawing/segmentBorderCalculator.ts";
-import { buildCellMap } from "../../../src/geometry/core/cellAccessor.ts";
-import { GridGeometry } from "../../../src/geometry/core/GridGeometry.ts";
+import { getInternalBorders, getExternalBorders } from "../../../src/drawing/segmentBorderCalculator";
+import { buildCellMap } from "../../../src/geometry/core/cellAccessor";
+import { GridGeometry } from "../../../src/geometry/core/GridGeometry";
 
-import type { SegmentGridCell, SegmentName, Cell } from "#types/core/cell.types";
+import type { SegmentGridCell, SegmentName, SegmentMap, Cell } from "#types/core/cell.types";
 
 // Helper to create a segment cell with specified filled segments
 function createSegmentCell(
@@ -19,16 +19,7 @@ function createSegmentCell(
   x = 0,
   y = 0
 ): SegmentGridCell {
-  const segments: Record<SegmentName, boolean> = {
-    nw: false,
-    n: false,
-    ne: false,
-    e: false,
-    se: false,
-    s: false,
-    sw: false,
-    w: false,
-  };
+  const segments: SegmentMap = {};
 
   for (const seg of filledSegments) {
     segments[seg] = true;
@@ -202,14 +193,7 @@ describe("segmentBorderCalculator", () => {
         color: "#ff0000",
         segments: {
           nw: true,
-          n: false,
-          ne: false,
-          e: false,
-          se: false,
-          s: false,
-          sw: false,
-          w: false,
-        },
+        } as SegmentMap,
       };
       const borders = getInternalBorders(cell);
       expect(borders).toHaveLength(2);

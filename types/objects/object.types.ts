@@ -164,6 +164,7 @@ export interface MapObject {
   lightRadius?: number;
   lightColor?: string;
   lightEnabled?: boolean;
+  [key: string]: unknown;
 }
 
 export type ObjectUpdate = Partial<Omit<MapObject, 'id'>>;

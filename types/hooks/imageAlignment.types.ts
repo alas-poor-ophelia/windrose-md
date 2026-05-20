@@ -6,6 +6,7 @@
  * image alignment with drag-to-position functionality.
  */
 
+import type { RefObject } from 'preact';
 import type { MapData } from '../core/map.types';
 import type { IGeometry } from '../core/geometry.types';
 
@@ -17,7 +18,7 @@ import type { IGeometry } from '../core/geometry.types';
 export interface UseImageAlignmentOptions {
   mapData: MapData | null;
   geometry: IGeometry | null;
-  canvasRef: React.RefObject<HTMLCanvasElement>;
+  canvasRef: RefObject<HTMLCanvasElement>;
   isAlignmentMode: boolean;
   imageOffsetX: number;
   imageOffsetY: number;
@@ -33,6 +34,8 @@ export interface ImageDragOffset {
   x: number;
   y: number;
 }
+
+export type DragOffset = ImageDragOffset;
 
 /** Client position */
 export interface DragClientPosition {
