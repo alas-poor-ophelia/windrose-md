@@ -5,7 +5,7 @@
  * Mocks the polygonClipping wrapper to use the npm package directly.
  */
 
-import { describe, it, expect, vi, beforeAll } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import polygonClipping from "polygon-clipping";
 
 // Mock the Datacore polygonClipping wrapper to use the npm package

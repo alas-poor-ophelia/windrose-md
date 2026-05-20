@@ -6,14 +6,11 @@ import {
   waitForContainer,
   waitForToolPalette,
   selectSubTool,
-  getCanvasCenter,
   openLayerContextMenu,
   clickTransparencyToggle,
   isTransparencyToggleActive,
   hoverTransparencyButton,
-  getLayerTransparency,
   TEST_MAPS,
-  MAP_IDS
 } from "./helpers";
 
 // ===========================================

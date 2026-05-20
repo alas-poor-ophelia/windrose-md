@@ -3,12 +3,7 @@
  * Tests region fill, border computation, and label rendering
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-
-// Mock module for regionRenderer (Datacore module pattern)
-const MODULE_MAP: Record<string, string> = {
-  'regionRenderer.ts': 'src/geometry/renderers/regionRenderer.ts',
-};
+import { describe, it, expect } from 'vitest';
 
 // Transform Datacore module to ES module
 async function loadRegionRenderer() {

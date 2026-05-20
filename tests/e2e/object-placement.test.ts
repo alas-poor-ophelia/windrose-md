@@ -7,7 +7,6 @@ import {
   waitForContainer,
   getCanvasCenter,
   waitForToolPalette,
-  selectToolByTitle,
   expandObjectSidebarIfNeeded,
   getActiveLayerId,
   getLayerObjectCount,

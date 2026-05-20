@@ -12,7 +12,6 @@ import { describe, it, expect } from "vitest";
 import {
   isSimpleCell,
   hasSegments,
-  cellKey,
   getSegmentAtPosition,
   normalizeCell,
   getFilledSegments,

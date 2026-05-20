@@ -116,9 +116,6 @@ test("Object overlays remain aligned after pan", async ({ page }) => {
         const xMove = box.x - initialPositions[i].x;
         const yMove = box.y - initialPositions[i].y;
 
-        // Tolerance for movement calculation
-        const moveTolerance = 10;
-
         // Overlays should move with the pan
         console.log(`Overlay ${i} moved: (${xMove}, ${yMove})`);
         const totalMove = Math.abs(xMove) + Math.abs(yMove);

@@ -96,16 +96,6 @@ function makeFittedCurve(
   };
 }
 
-/** Evaluate a cubic bezier at parameter t */
-function evalBez(
-  sx: number, sy: number, seg: BezierSegment, t: number
-): [number, number] {
-  const mt = 1 - t;
-  return [
-    mt * mt * mt * sx + 3 * mt * mt * t * seg[0] + 3 * mt * t * t * seg[2] + t * t * t * seg[4],
-    mt * mt * mt * sy + 3 * mt * mt * t * seg[1] + 3 * mt * t * t * seg[3] + t * t * t * seg[5],
-  ];
-}
 
 /**
  * Detect if a segment likely used the alpha cap fallback.
@@ -900,7 +890,7 @@ describe("alpha cap diagnostic: segment-level detection", () => {
     const originalArea = polygonArea(poly);
     expect(originalArea).toBeGreaterThan(100);
 
-    const intersections = countSelfIntersections(outer);
+    countSelfIntersections(outer);
 
     // Count alpha-capped segments
     let cappedCount = 0;
@@ -925,8 +915,6 @@ describe("alpha cap diagnostic: segment-level detection", () => {
       [cx + clipSize, cy + clipSize],
       [cx - clipSize, cy + clipSize],
     ];
-    const clipArea = (clipSize * 2) ** 2;
-
     const eraseResult = eraseWorldPolygonFromCurves([curve!], clipPoly);
 
     if (eraseResult !== null) {

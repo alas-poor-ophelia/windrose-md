@@ -789,7 +789,7 @@ describe("fitted freehand curve hex erasure", () => {
     const cells: { q: number; r: number }[] = [];
     for (let q = qRange[0]; q <= qRange[1]; q++) {
       for (let r = rRange[0]; r <= rRange[1]; r++) {
-        const hexVerts = getHexVertices(q, r);
+        getHexVertices(q, r);
         const hexCenter = hexToWorld(q, r);
         if (pointInPolygon(hexCenter.x, hexCenter.y, outer)) {
           cells.push({ q, r });
@@ -989,7 +989,7 @@ describe("unerasable hex curves reproduction (actual data)", () => {
   });
 
   it("hex outline curve matches hex (5,3) vertices exactly", () => {
-    const flat = flattenCurve(hexOutlineCurve);
+    flattenCurve(hexOutlineCurve);
     const hexVerts = getHexVertices80(5, 3);
 
     // The curve's endpoints should match hex vertices
@@ -1079,7 +1079,6 @@ describe("unerasable hex curves reproduction (actual data)", () => {
     for (const [q, r] of coveredHexes) {
       const verts = getHexVertices80(q, r);
       const result = eraseWorldPolygonFromCurves([complexFreehandCurve], verts);
-      const center = hexToWorld80(q, r);
       expect(result).not.toBeNull();
     }
   });

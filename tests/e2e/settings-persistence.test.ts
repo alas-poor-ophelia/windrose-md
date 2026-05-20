@@ -46,7 +46,6 @@ test("Saving settings modal persists changes to data file", async ({ page }) => 
   const hasToggle = await toggle.count() > 0;
 
   if (hasToggle) {
-    const wasChecked = await toggle.isChecked();
     await toggle.click({ force: true });
     await page.waitForTimeout(200);
 

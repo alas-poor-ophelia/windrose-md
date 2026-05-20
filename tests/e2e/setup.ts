@@ -11,7 +11,6 @@ import path from "path";
 const TEST_VAULT = path.resolve(__dirname, "../fixtures/test-vault");
 const TEST_VAULT_COMPILED = path.resolve(__dirname, "../fixtures/test-vault-compiled");
 const FIXTURES_DIR = path.resolve(__dirname, "../fixtures");
-const PROJECT_ROOT = path.resolve(__dirname, "../..");
 const MAIN_VAULT = "C:\\Users\\whipl\\OneDrive\\Documents\\Absalom";
 
 // Plugins that live in the main vault and must be kept in sync with both test vaults.

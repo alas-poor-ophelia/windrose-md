@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import {
   rollWeightedCategory,
   normalizeWeights,
@@ -6,8 +6,6 @@ import {
   identifyPlacementZones,
   selectValidTemplate,
   stockDungeon,
-  ROOM_CATEGORIES,
-  STOCKING_CONFIG,
   STYLE_OBJECT_POOLS,
   ROOM_TEMPLATES,
 } from "../../../src/generation/objectPlacer.js";
@@ -256,7 +254,7 @@ describe("objectPlacer", () => {
     });
 
     it("each style has required pools", () => {
-      for (const [style, pool] of Object.entries(STYLE_OBJECT_POOLS)) {
+      for (const [_style, pool] of Object.entries(STYLE_OBJECT_POOLS)) {
         const p = pool as any;
         expect(p).toHaveProperty("monsters");
         expect(p).toHaveProperty("treasures");
@@ -281,7 +279,7 @@ describe("objectPlacer", () => {
     });
 
     it("each template has valid structure", () => {
-      for (const [name, template] of Object.entries(ROOM_TEMPLATES)) {
+      for (const [_name, template] of Object.entries(ROOM_TEMPLATES)) {
         const t = template as any;
         expect(t).toHaveProperty("name");
         expect(t).toHaveProperty("objects");

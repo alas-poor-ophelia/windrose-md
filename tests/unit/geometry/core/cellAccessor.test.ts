@@ -230,7 +230,7 @@ function setCells(
 function removeCells(
   cells: Cell[],
   coordsList: Point[],
-  geometry: IGeometry
+  _geometry: IGeometry
 ): Cell[] {
   const removeKeys = new Set(coordsList.map((c) => cellKey(c)));
   return cells.filter((cell) => !removeKeys.has(cellKeyFromCell(cell)));
