@@ -67,12 +67,12 @@ export function setupErrorTracking(page: any): string[] {
 
 /** Navigate to a test map file */
 export async function navigateToMap(page: any, mapPath: string): Promise<void> {
-  await doWithApp(page, async (app: any, path: string) => {
-    const file = app.vault.getAbstractFileByPath(path);
+  await doWithApp(page, async (app: any, path?: string) => {
+    const file = app.vault.getAbstractFileByPath(path!);
     if (file) {
       await app.workspace.openLinkText(file.path, "", false);
     } else {
-      throw new Error(`Test file ${path} not found in vault`);
+      throw new Error(`Test file ${path!} not found in vault`);
     }
   }, mapPath);
 
@@ -386,41 +386,41 @@ export async function openLayerPanel(page: any): Promise<void> {
 
 /** Helper to read cell count from a specific layer in the JSON data file */
 export async function getLayerCellCount(page: any, mapId: string, layerId: string): Promise<number> {
-  return await doWithApp(page, async (app: any, params: { mapId: string; layerId: string; dataPath: string }) => {
-    const dataFile = app.vault.getAbstractFileByPath(params.dataPath);
+  return await doWithApp(page, async (app: any, params?: { mapId: string; layerId: string; dataPath: string }) => {
+    const dataFile = app.vault.getAbstractFileByPath(params!.dataPath);
     if (!dataFile) return -1;
 
     const content = await app.vault.read(dataFile);
     const data = JSON.parse(content);
-    const map = data.maps?.[params.mapId];
+    const map = data.maps?.[params!.mapId];
     if (!map) return -1;
 
-    const layer = map.layers?.find((l: any) => l.id === params.layerId);
+    const layer = map.layers?.find((l: any) => l.id === params!.layerId);
     return layer?.cells?.length ?? 0;
   }, { mapId, layerId, dataPath: DATA_FILE_PATH });
 }
 
 /** Helper to get the active layer ID from the map data */
 export async function getActiveLayerId(page: any, mapId: string): Promise<string | null> {
-  return await doWithApp(page, async (app: any, params: { mapId: string; dataPath: string }) => {
-    const dataFile = app.vault.getAbstractFileByPath(params.dataPath);
+  return await doWithApp(page, async (app: any, params?: { mapId: string; dataPath: string }) => {
+    const dataFile = app.vault.getAbstractFileByPath(params!.dataPath);
     if (!dataFile) return null;
 
     const content = await app.vault.read(dataFile);
     const data = JSON.parse(content);
-    return data.maps?.[params.mapId]?.activeLayerId ?? null;
+    return data.maps?.[params!.mapId]?.activeLayerId ?? null;
   }, { mapId, dataPath: DATA_FILE_PATH });
 }
 
 /** Helper to get total cell count across all layers */
 export async function getTotalCellCount(page: any, mapId: string): Promise<number> {
-  return await doWithApp(page, async (app: any, params: { mapId: string; dataPath: string }) => {
-    const dataFile = app.vault.getAbstractFileByPath(params.dataPath);
+  return await doWithApp(page, async (app: any, params?: { mapId: string; dataPath: string }) => {
+    const dataFile = app.vault.getAbstractFileByPath(params!.dataPath);
     if (!dataFile) return -1;
 
     const content = await app.vault.read(dataFile);
     const data = JSON.parse(content);
-    const map = data.maps?.[params.mapId];
+    const map = data.maps?.[params!.mapId];
     if (!map?.layers) return -1;
 
     return map.layers.reduce((sum: number, layer: any) => sum + (layer.cells?.length ?? 0), 0);
@@ -429,60 +429,60 @@ export async function getTotalCellCount(page: any, mapId: string): Promise<numbe
 
 /** Helper to get the full map data object from JSON */
 export async function getMapData(page: any, mapId: string): Promise<any> {
-  return await doWithApp(page, async (app: any, params: { mapId: string; dataPath: string }) => {
-    const dataFile = app.vault.getAbstractFileByPath(params.dataPath);
+  return await doWithApp(page, async (app: any, params?: { mapId: string; dataPath: string }) => {
+    const dataFile = app.vault.getAbstractFileByPath(params!.dataPath);
     if (!dataFile) return null;
 
     const content = await app.vault.read(dataFile);
     const data = JSON.parse(content);
-    return data.maps?.[params.mapId] ?? null;
+    return data.maps?.[params!.mapId] ?? null;
   }, { mapId, dataPath: DATA_FILE_PATH });
 }
 
 /** Helper to get object count from a specific layer */
 export async function getLayerObjectCount(page: any, mapId: string, layerId: string): Promise<number> {
-  return await doWithApp(page, async (app: any, params: { mapId: string; layerId: string; dataPath: string }) => {
-    const dataFile = app.vault.getAbstractFileByPath(params.dataPath);
+  return await doWithApp(page, async (app: any, params?: { mapId: string; layerId: string; dataPath: string }) => {
+    const dataFile = app.vault.getAbstractFileByPath(params!.dataPath);
     if (!dataFile) return -1;
 
     const content = await app.vault.read(dataFile);
     const data = JSON.parse(content);
-    const map = data.maps?.[params.mapId];
+    const map = data.maps?.[params!.mapId];
     if (!map) return -1;
 
-    const layer = map.layers?.find((l: any) => l.id === params.layerId);
+    const layer = map.layers?.find((l: any) => l.id === params!.layerId);
     return layer?.objects?.length ?? 0;
   }, { mapId, layerId, dataPath: DATA_FILE_PATH });
 }
 
 /** Helper to get text label count from a specific layer */
 export async function getLayerTextLabelCount(page: any, mapId: string, layerId: string): Promise<number> {
-  return await doWithApp(page, async (app: any, params: { mapId: string; layerId: string; dataPath: string }) => {
-    const dataFile = app.vault.getAbstractFileByPath(params.dataPath);
+  return await doWithApp(page, async (app: any, params?: { mapId: string; layerId: string; dataPath: string }) => {
+    const dataFile = app.vault.getAbstractFileByPath(params!.dataPath);
     if (!dataFile) return -1;
 
     const content = await app.vault.read(dataFile);
     const data = JSON.parse(content);
-    const map = data.maps?.[params.mapId];
+    const map = data.maps?.[params!.mapId];
     if (!map) return -1;
 
-    const layer = map.layers?.find((l: any) => l.id === params.layerId);
+    const layer = map.layers?.find((l: any) => l.id === params!.layerId);
     return layer?.textLabels?.length ?? 0;
   }, { mapId, layerId, dataPath: DATA_FILE_PATH });
 }
 
 /** Helper to get edge count from a specific layer */
 export async function getLayerEdgeCount(page: any, mapId: string, layerId: string): Promise<number> {
-  return await doWithApp(page, async (app: any, params: { mapId: string; layerId: string; dataPath: string }) => {
-    const dataFile = app.vault.getAbstractFileByPath(params.dataPath);
+  return await doWithApp(page, async (app: any, params?: { mapId: string; layerId: string; dataPath: string }) => {
+    const dataFile = app.vault.getAbstractFileByPath(params!.dataPath);
     if (!dataFile) return -1;
 
     const content = await app.vault.read(dataFile);
     const data = JSON.parse(content);
-    const map = data.maps?.[params.mapId];
+    const map = data.maps?.[params!.mapId];
     if (!map) return -1;
 
-    const layer = map.layers?.find((l: any) => l.id === params.layerId);
+    const layer = map.layers?.find((l: any) => l.id === params!.layerId);
     return layer?.edges?.length ?? 0;
   }, { mapId, layerId, dataPath: DATA_FILE_PATH });
 }
@@ -537,16 +537,16 @@ export async function hoverTransparencyButton(page: any, layerIndex: number = 1)
 
 /** Helper to get layer transparency settings from JSON data */
 export async function getLayerTransparency(page: any, mapId: string, layerId: string): Promise<{ showLayerBelow: boolean; layerBelowOpacity: number } | null> {
-  return await doWithApp(page, async (app: any, params: { mapId: string; layerId: string; dataPath: string }) => {
-    const dataFile = app.vault.getAbstractFileByPath(params.dataPath);
+  return await doWithApp(page, async (app: any, params?: { mapId: string; layerId: string; dataPath: string }) => {
+    const dataFile = app.vault.getAbstractFileByPath(params!.dataPath);
     if (!dataFile) return null;
 
     const content = await app.vault.read(dataFile);
     const data = JSON.parse(content);
-    const map = data.maps?.[params.mapId];
+    const map = data.maps?.[params!.mapId];
     if (!map) return null;
 
-    const layer = map.layers?.find((l: any) => l.id === params.layerId);
+    const layer = map.layers?.find((l: any) => l.id === params!.layerId);
     if (!layer) return null;
 
     return {

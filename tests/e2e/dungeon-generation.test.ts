@@ -96,8 +96,8 @@ const SMOKE_TEST_MAP = TEST_MAPS.grid;
 
 /** Execute a plugin command */
 async function executeCommand(page: any, commandId: string): Promise<void> {
-  return await doWithApp(page, async (app: any, id: string) => {
-    await app.commands.executeCommandById(id);
+  return await doWithApp(page, async (app: any, id?: string) => {
+    await app.commands.executeCommandById(id!);
   }, commandId);
 }
 
@@ -171,20 +171,20 @@ async function waitForModalClose(page: any): Promise<void> {
 
 /** Get map data from JSON file */
 async function getMapData(page: any, mapId: string): Promise<any> {
-  return await doWithApp(page, async (app: any, params: { mapId: string; dataPath: string }) => {
-    const dataFile = app.vault.getAbstractFileByPath(params.dataPath);
+  return await doWithApp(page, async (app: any, params?: { mapId: string; dataPath: string }) => {
+    const dataFile = app.vault.getAbstractFileByPath(params!.dataPath);
     if (!dataFile) return null;
 
     const content = await app.vault.read(dataFile);
     const data = JSON.parse(content);
-    return data.maps?.[params.mapId] ?? null;
+    return data.maps?.[params!.mapId] ?? null;
   }, { mapId, dataPath: DATA_FILE_PATH });
 }
 
 /** Get the most recently created map from JSON (by ID pattern with timestamp) */
 async function getMostRecentGeneratedMap(page: any): Promise<{ id: string; data: any } | null> {
-  return await doWithApp(page, async (app: any, dataPath: string) => {
-    const dataFile = app.vault.getAbstractFileByPath(dataPath);
+  return await doWithApp(page, async (app: any, dataPath?: string) => {
+    const dataFile = app.vault.getAbstractFileByPath(dataPath!);
     if (!dataFile) return null;
 
     const content = await app.vault.read(dataFile);
@@ -286,8 +286,8 @@ test("Dungeon: Classic Medium generates cells and objects", async ({ page }) => 
   await page.waitForTimeout(1000);
 
   // Record map count before generation
-  const beforeGeneration = await doWithApp(page, async (app: any, dataPath: string) => {
-    const dataFile = app.vault.getAbstractFileByPath(dataPath);
+  const beforeGeneration = await doWithApp(page, async (app: any, dataPath?: string) => {
+    const dataFile = app.vault.getAbstractFileByPath(dataPath!);
     if (!dataFile) return { mapCount: 0 };
     const content = await app.vault.read(dataFile);
     const data = JSON.parse(content);
@@ -321,8 +321,8 @@ test("Dungeon: Classic Medium generates cells and objects", async ({ page }) => 
   await page.waitForTimeout(AUTOSAVE_WAIT + 2000);
 
   // Verify a new map was created
-  const afterGeneration = await doWithApp(page, async (app: any, dataPath: string) => {
-    const dataFile = app.vault.getAbstractFileByPath(dataPath);
+  const afterGeneration = await doWithApp(page, async (app: any, dataPath?: string) => {
+    const dataFile = app.vault.getAbstractFileByPath(dataPath!);
     if (!dataFile) return { mapCount: 0 };
     const content = await app.vault.read(dataFile);
     const data = JSON.parse(content);

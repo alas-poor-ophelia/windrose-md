@@ -569,7 +569,7 @@ describe("objectRenderer", () => {
         ]
       };
       const context = { ctx, offsetX: 0, offsetY: 0, zoom: 1, scaledSize: 40 };
-      deps.getObjectType.mockReturnValue(null);
+      deps.getObjectType.mockReturnValue(null as any);
 
       renderObjects(layer as any, context, geometry, false, 'flat', deps as any);
 

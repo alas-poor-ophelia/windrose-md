@@ -18,6 +18,7 @@ import {
   renderObjectSelections,
   renderSelections,
 } from "../../../../src/geometry/renderers/selectionRenderer";
+import type { MapObject } from "#types/objects/object.types";
 
 // Mock canvas context
 function createMockContext(): CanvasRenderingContext2D {
@@ -67,7 +68,7 @@ function createMockHexGeometry() {
 function createMockDeps() {
   return {
     getFontCss: vi.fn((fontFace: string) => fontFace === 'mono' ? 'monospace' : 'sans-serif'),
-    getObjectsInCell: vi.fn((_objects, _x, _y) => []),
+    getObjectsInCell: vi.fn((_objects, _x, _y): MapObject[] => []),
     getSlotOffset: vi.fn((_slot, _count, _orientation) => ({ offsetX: 0, offsetY: 0 })),
     getMultiObjectScale: vi.fn((_count) => 0.6),
   };
@@ -214,7 +215,7 @@ describe("selectionRenderer", () => {
 
   describe("calculateHexObjectSelectionPosition", () => {
     it("calculates position for single object in hex", () => {
-      const object = { id: '1', type: 'char', position: { x: 2, y: 3 } };
+      const object = { id: '1', type: 'char', position: { x: 2, y: 3 } } as MapObject;
       const allObjects = [object];
       const context = { ctx, offsetX: 10, offsetY: 20, zoom: 1, scaledSize: 40 };
       deps.getObjectsInCell.mockReturnValue([object]);
@@ -229,8 +230,8 @@ describe("selectionRenderer", () => {
     });
 
     it("applies multi-object scaling", () => {
-      const object1 = { id: '1', type: 'char', position: { x: 2, y: 3 } };
-      const object2 = { id: '2', type: 'char', position: { x: 2, y: 3 } };
+      const object1 = { id: '1', type: 'char', position: { x: 2, y: 3 } } as MapObject;
+      const object2 = { id: '2', type: 'char', position: { x: 2, y: 3 } } as MapObject;
       const allObjects = [object1, object2];
       const context = { ctx, offsetX: 0, offsetY: 0, zoom: 1, scaledSize: 40 };
       deps.getObjectsInCell.mockReturnValue([object1, object2]);
@@ -244,8 +245,8 @@ describe("selectionRenderer", () => {
     });
 
     it("applies slot offset for multi-object cells", () => {
-      const object1 = { id: '1', type: 'char', position: { x: 2, y: 3 }, slot: 0 };
-      const object2 = { id: '2', type: 'char', position: { x: 2, y: 3 }, slot: 1 };
+      const object1 = { id: '1', type: 'char', position: { x: 2, y: 3 }, slot: 0 } as MapObject;
+      const object2 = { id: '2', type: 'char', position: { x: 2, y: 3 }, slot: 1 } as MapObject;
       const allObjects = [object1, object2];
       const context = { ctx, offsetX: 0, offsetY: 0, zoom: 1, scaledSize: 40 };
       deps.getObjectsInCell.mockReturnValue([object1, object2]);
@@ -259,7 +260,7 @@ describe("selectionRenderer", () => {
     });
 
     it("applies alignment offset", () => {
-      const object = { id: '1', type: 'char', position: { x: 0, y: 0 }, alignment: 'north' as const };
+      const object = { id: '1', type: 'char', position: { x: 0, y: 0 }, alignment: 'north' as const } as MapObject;
       const allObjects = [object];
       const context = { ctx, offsetX: 0, offsetY: 0, zoom: 1, scaledSize: 40 };
       deps.getObjectsInCell.mockReturnValue([object]);
@@ -268,7 +269,7 @@ describe("selectionRenderer", () => {
         object, allObjects, hexGeometry, context, 'flat', deps
       );
 
-      const objectCenter = { id: '2', type: 'char', position: { x: 0, y: 0 }, alignment: 'center' as const };
+      const objectCenter = { id: '2', type: 'char', position: { x: 0, y: 0 }, alignment: 'center' as const } as MapObject;
       deps.getObjectsInCell.mockReturnValue([objectCenter]);
       const resultCenter = calculateHexObjectSelectionPosition(
         objectCenter, [objectCenter], hexGeometry, context, 'flat', deps
@@ -279,7 +280,7 @@ describe("selectionRenderer", () => {
     });
 
     it("handles custom size objects", () => {
-      const object = { id: '1', type: 'char', position: { x: 0, y: 0 }, size: { width: 2, height: 3 } };
+      const object = { id: '1', type: 'char', position: { x: 0, y: 0 }, size: { width: 2, height: 3 } } as MapObject;
       const allObjects = [object];
       const context = { ctx, offsetX: 0, offsetY: 0, zoom: 1, scaledSize: 40 };
       deps.getObjectsInCell.mockReturnValue([object]);
@@ -311,7 +312,7 @@ describe("selectionRenderer", () => {
 
     it("applies alignment offset", () => {
       const objectNorth = { id: '1', type: 'char', position: { x: 0, y: 0 }, alignment: 'north' as const };
-      const objectCenter = { id: '2', type: 'char', position: { x: 0, y: 0 }, alignment: 'center' as const };
+      const objectCenter = { id: '2', type: 'char', position: { x: 0, y: 0 }, alignment: 'center' as const } as MapObject;
       const context = { ctx, offsetX: 0, offsetY: 0, zoom: 1, scaledSize: 40 };
 
       const resultNorth = calculateGridObjectSelectionPosition(objectNorth, geometry, context);
@@ -431,7 +432,7 @@ describe("selectionRenderer", () => {
 
   describe("renderObjectSelection", () => {
     it("uses hex position calculation for hex maps", () => {
-      const object = { id: '1', type: 'char', position: { x: 2, y: 3 } };
+      const object = { id: '1', type: 'char', position: { x: 2, y: 3 } } as MapObject;
       const context = { ctx, offsetX: 0, offsetY: 0, zoom: 1, scaledSize: 40 };
       deps.getObjectsInCell.mockReturnValue([object]);
 
@@ -673,7 +674,7 @@ describe("selectionRenderer", () => {
 
     it("passes isHexMap and hexGeometry for hex maps", () => {
       const selectedItems = [{ id: '1', type: 'object' as const }];
-      const objects = [{ id: '1', type: 'char', position: { x: 2, y: 3 } }];
+      const objects = [{ id: '1', type: 'char', position: { x: 2, y: 3 } }] as MapObject[];
       const context = { ctx, offsetX: 0, offsetY: 0, zoom: 1, scaledSize: 40 };
       deps.getObjectsInCell.mockReturnValue(objects);
 

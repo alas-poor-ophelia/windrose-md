@@ -13,7 +13,6 @@ import {
   settingsReducer,
 } from "../../../src/components/settings/settingsReducer";
 import type { SettingsModalState } from "../../../src/components/settings/settingsReducer";
-import type { HexBounds } from "#types/core/map.types";
 
 // Minimal state shape for testing IMAGE_SELECTED
 function createMockState(overrides = {}) {
@@ -126,7 +125,7 @@ describe("settingsReducer", () => {
             path: 'images/grid-map.png',
             displayName: 'grid-map.png',
             dimensions: { width: 1920, height: 1080 },
-            bounds: null as HexBounds | null, // Grid maps pass null for bounds
+            bounds: null as any, // Grid maps pass null for bounds
           },
         };
 
@@ -150,7 +149,7 @@ describe("settingsReducer", () => {
             path: 'images/grid-map.png',
             displayName: 'grid-map.png',
             dimensions: { width: 1920, height: 1080 },
-            bounds: null as HexBounds | null,
+            bounds: null as any,
           },
         };
 
@@ -171,7 +170,7 @@ describe("settingsReducer", () => {
             path: 'images/grid-map.png',
             displayName: 'grid-map.png',
             dimensions: { width: 1920, height: 1080 },
-            bounds: null as HexBounds | null,
+            bounds: null as any,
           },
         };
 
@@ -194,7 +193,7 @@ describe("settingsReducer", () => {
             path: 'images/selected.png',
             displayName: 'selected.png',
             dimensions: { width: 800, height: 600 },
-            bounds: null as HexBounds | null,
+            bounds: null as any,
           },
         };
 
@@ -212,7 +211,7 @@ describe("settingsReducer", () => {
             path: 'Assets/Maps/dungeon.webp',
             displayName: 'dungeon.webp',
             dimensions: { width: 2048, height: 2048 },
-            bounds: null as HexBounds | null,
+            bounds: null as any,
           },
         };
 
@@ -232,7 +231,7 @@ describe("settingsReducer", () => {
             path: 'images/4k-map.png',
             displayName: '4k-map.png',
             dimensions,
-            bounds: null as HexBounds | null,
+            bounds: null as any,
           },
         };
 

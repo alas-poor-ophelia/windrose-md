@@ -43,16 +43,16 @@ async function openFogToolbar(page: any): Promise<void> {
 }
 
 async function getFoggedCellCount(page: any, mapId: string, layerId: string): Promise<number> {
-  return await doWithApp(page, async (app: any, params: { mapId: string; layerId: string; dataPath: string }) => {
-    const dataFile = app.vault.getAbstractFileByPath(params.dataPath);
+  return await doWithApp(page, async (app: any, params?: { mapId: string; layerId: string; dataPath: string }) => {
+    const dataFile = app.vault.getAbstractFileByPath(params!.dataPath);
     if (!dataFile) return -1;
 
     const content = await app.vault.read(dataFile);
     const data = JSON.parse(content);
-    const map = data.maps?.[params.mapId];
+    const map = data.maps?.[params!.mapId];
     if (!map) return -1;
 
-    const layer = map.layers?.find((l: any) => l.id === params.layerId);
+    const layer = map.layers?.find((l: any) => l.id === params!.layerId);
     return layer?.fogOfWar?.foggedCells?.length ?? 0;
   }, { mapId, layerId, dataPath: DATA_FILE_PATH });
 }

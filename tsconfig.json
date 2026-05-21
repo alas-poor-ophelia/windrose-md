@@ -5,7 +5,7 @@
     "moduleResolution": "bundler",
     "strict": true,
     "noImplicitAny": true,
-    "strictNullChecks": false,
+    "strictNullChecks": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noImplicitReturns": true,

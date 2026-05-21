@@ -22,13 +22,13 @@ beforeEach(() => resetDataFile());
 // ===========================================
 
 async function getLayerCount(page: any, mapId: string): Promise<number> {
-  return await doWithApp(page, async (app: any, params: { mapId: string; dataPath: string }) => {
-    const dataFile = app.vault.getAbstractFileByPath(params.dataPath);
+  return await doWithApp(page, async (app: any, params?: { mapId: string; dataPath: string }) => {
+    const dataFile = app.vault.getAbstractFileByPath(params!.dataPath);
     if (!dataFile) return -1;
 
     const content = await app.vault.read(dataFile);
     const data = JSON.parse(content);
-    return data.maps?.[params.mapId]?.layers?.length ?? 0;
+    return data.maps?.[params!.mapId]?.layers?.length ?? 0;
   }, { mapId, dataPath: DATA_FILE_PATH });
 }
 
