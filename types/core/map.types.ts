@@ -87,6 +87,17 @@ export interface BackgroundImage {
 }
 
 // ===========================================
+// Custom Color (per-map palette)
+// ===========================================
+
+export interface MapCustomColor {
+  id: string;
+  color: string;
+  label: string;
+  opacity?: number;
+}
+
+// ===========================================
 // Text Label Settings
 // ===========================================
 
@@ -308,7 +319,7 @@ export interface MapData {
   expandedState?: boolean;
 
   // Custom colors for this map
-  customColors?: string[];
+  customColors?: MapCustomColor[];
 
   // Remembered text label settings
   lastTextLabelSettings?: TextLabelSettings | null;

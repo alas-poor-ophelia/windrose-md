@@ -44,9 +44,11 @@ export default [
         "allowExpressions": true,
         "allowTypedFunctionExpressions": true
       }],
-      "@typescript-eslint/no-unused-vars": ["error", { 
+      "@typescript-eslint/no-unused-vars": ["error", {
         "argsIgnorePattern": "^_",
-        "varsIgnorePattern": "^_"
+        "varsIgnorePattern": "^_",
+        "caughtErrorsIgnorePattern": "^_",
+        "ignoreRestSiblings": true
       }],
       "@typescript-eslint/no-floating-promises": "error",
       "@typescript-eslint/strict-boolean-expressions": "warn",
@@ -57,7 +59,7 @@ export default [
       // ===========================================
       "no-unreachable": "error",
       "no-console": "warn",
-      "eqeqeq": ["error", "always"],
+      "eqeqeq": ["error", "always", { "null": "ignore" }],
       "prefer-const": "error",
       
       // ===========================================
@@ -131,13 +133,15 @@ export default [
     },
     rules: {
       "@typescript-eslint/no-explicit-any": "error",
-      "@typescript-eslint/no-unused-vars": ["error", { 
+      "@typescript-eslint/no-unused-vars": ["error", {
         "argsIgnorePattern": "^_",
-        "varsIgnorePattern": "^_"
+        "varsIgnorePattern": "^_",
+        "caughtErrorsIgnorePattern": "^_",
+        "ignoreRestSiblings": true
       }]
     }
   },
-  
+
   // ===========================================
   // Ignore patterns
   // ===========================================
