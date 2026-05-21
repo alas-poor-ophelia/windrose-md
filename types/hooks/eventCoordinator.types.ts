@@ -135,6 +135,9 @@ export interface PanZoomHandlers {
   spaceKeyPressed: boolean;
   isPanning: boolean;
   isTouchPanning: boolean;
+  isTouchPanningRef: { current: boolean };
+  touchPanStartRef: { current: { x: number; y: number } | null };
+  initialPinchDistanceRef: { current: number | null };
   panStart: PanStartPosition | null;
   touchPanStart: { x: number; y: number } | null;
   handleWheel: (e: WheelEvent) => void;
