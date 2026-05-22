@@ -5,22 +5,11 @@ import { expect } from "vitest";
 // Re-export for convenience
 export { test, expect, doWithApp };
 
-// Test mode: "dev" uses uncompiled source, "compiled" uses compiled artifact
-const TEST_MODE = process.env.WINDROSE_TEST_MODE || "dev";
+const CONTAINER_TIMEOUT = 10000;
 
-// Compiled mode needs longer timeouts for initial Datacore indexing
-const CONTAINER_TIMEOUT = TEST_MODE === "compiled" ? 60000 : 10000;
+export const AUTOSAVE_WAIT = 3000;
 
-// Autosave wait time - needs to be longer than the app's autosave delay (2s)
-// Compiled mode may be slower due to larger bundle size
-export const AUTOSAVE_WAIT = TEST_MODE === "compiled" ? 4000 : 3000;
-
-// Data file path differs between dev and compiled modes
-// Dev: uses dedicated _test-data folder (isolated from manual testing)
-// Compiled: uses vault-root windrose-md-data.json
-export const DATA_FILE_PATH = TEST_MODE === "compiled"
-  ? "windrose-md-data.json"
-  : "_test-data/dungeon-maps-data.json";
+export const DATA_FILE_PATH = "_test-data/dungeon-maps-data.json";
 
 /**
  * Reset the windrose data file to the clean fixture.
@@ -28,18 +17,13 @@ export const DATA_FILE_PATH = TEST_MODE === "compiled"
  * to prevent state pollution from prior tests in the same file.
  */
 export function resetDataFile(): void {
-  // Use require here to avoid top-level import of node:fs / node:path
-  // (some test files may not need filesystem access)
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   const fs = require("fs");
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   const path = require("path");
   const fixturesDir = path.resolve(__dirname, "../fixtures");
   const cleanFile = path.join(fixturesDir, "dungeon-maps-data.clean.json");
-  const vaultDir = TEST_MODE === "compiled"
-    ? path.join(fixturesDir, "test-vault-compiled")
-    : path.join(fixturesDir, "test-vault");
-  const target = path.join(vaultDir, DATA_FILE_PATH);
+  const target = path.join(fixturesDir, "test-vault", DATA_FILE_PATH);
   if (fs.existsSync(cleanFile)) {
     fs.copyFileSync(cleanFile, target);
   }
@@ -76,7 +60,6 @@ export async function navigateToMap(page: any, mapPath: string): Promise<void> {
     }
   }, mapPath);
 
-  // Brief wait for Obsidian to switch views and Datacore to start rendering
   await page.waitForTimeout(300);
 }
 
@@ -124,11 +107,10 @@ export async function handlePluginInstallerIfPresent(page: any, timeout: number 
   return true;
 }
 
-/** Wait for Windrose container to be ready, with Datacore error detection */
+/** Wait for Windrose container to be ready */
 export async function waitForContainer(page: any, timeout: number = CONTAINER_TIMEOUT): Promise<any> {
   const container = page.locator(".dmt-container").first();
 
-  // First, wait for a markdown view to be present (indicates Obsidian has loaded the file)
   const markdownView = page.locator(".markdown-reading-view, .markdown-source-view");
   try {
     await markdownView.first().waitFor({ state: "visible", timeout: 5000 });
@@ -136,107 +118,29 @@ export async function waitForContainer(page: any, timeout: number = CONTAINER_TI
     // View not found - proceed anyway
   }
 
-  // Handle plugin installer if it appears (blocks the main canvas until handled)
   await page.waitForTimeout(100);
   await handlePluginInstallerIfPresent(page, 10000);
 
-  // Wait for either the container or an error to appear
-  // Use a race between success and error conditions
-  const startTime = Date.now();
-  let datacoreReadyLogged = false;
-
-  while (Date.now() - startTime < timeout) {
-    // Check if container is visible (success)
-    if (await container.count() > 0 && await container.isVisible()) {
-      return container;
-    }
-
-    // Check for "Datacore is getting ready" message - this means we need to wait longer
-    const datacoreReady = page.locator('text=/Datacore is getting ready/i');
-    if (await datacoreReady.count() > 0) {
-      if (!datacoreReadyLogged) {
-        console.log("[Test Helper] Datacore is indexing, waiting...");
-        datacoreReadyLogged = true;
-      }
-      await page.waitForTimeout(1000);
-      continue;
-    }
-
-    // Check for Datacore error box
-    const errorBox = page.locator(".datacore-error-box");
-    if (await errorBox.count() > 0 && await errorBox.isVisible()) {
-      // Get the error text
-      try {
-        const errorText = await errorBox.first().innerText({ timeout: 500 });
-        const trimmed = errorText?.trim() || "";
-
-        // Ignore loading states - these are not errors
-        if (trimmed.includes("View is rendering") || trimmed.includes("Loading") || trimmed.includes("getting ready")) {
-          // Still loading, wait and continue
-          await page.waitForTimeout(200);
-          continue;
-        }
-
-        // This is a real error
-        if (trimmed) {
-          throw new Error(`Datacore script failed:\n${trimmed}`);
-        }
-      } catch (e: any) {
-        if (e.message.includes("Datacore script failed")) throw e;
-        // Couldn't read error, might be transient
-      }
-    }
-
-    // Brief wait before next check
-    await page.waitForTimeout(100);
-  }
-
-  // Timeout reached - do final check
-  if (await container.count() > 0 && await container.isVisible()) {
-    return container;
-  }
-
-  // Check for error one more time
-  const errorBox = page.locator(".datacore-error-box");
-  if (await errorBox.count() > 0 && await errorBox.isVisible()) {
-    try {
-      const errorText = await errorBox.first().innerText({ timeout: 500 });
-      if (errorText?.trim()) {
-        throw new Error(`Datacore script failed:\n${errorText.trim()}`);
-      }
-    } catch (e: any) {
-      if (e.message.includes("Datacore script failed")) throw e;
-    }
-    throw new Error("Datacore script failed: Error box visible but couldn't read error details");
-  }
-
-  // Get diagnostic info
-  const containerCount = await container.count();
-  const diagErrorBox = page.locator(".datacore-error-box");
-  const errorCount = await diagErrorBox.count();
-  let diagErrorText = "";
-  if (errorCount > 0) {
-    try {
-      diagErrorText = await diagErrorBox.first().innerText({ timeout: 500 });
-    } catch {
-      diagErrorText = "(couldn't read error text)";
-    }
-  }
-
-  // Capture screenshot for debugging
-  const screenshotPath = `tests/e2e/screenshots/container-timeout-${Date.now()}.png`;
   try {
-    await page.screenshot({ path: screenshotPath, fullPage: true });
-    console.log(`[Debug] Screenshot saved to ${screenshotPath}`);
-  } catch (e) {
-    console.log(`[Debug] Failed to capture screenshot: ${e}`);
-  }
+    await container.waitFor({ state: "visible", timeout });
+    return container;
+  } catch {
+    const containerCount = await container.count();
 
-  throw new Error(
-    `Timeout waiting for .dmt-container after ${timeout}ms. ` +
-    `Container count: ${containerCount}, Error boxes: ${errorCount}, Error text: "${diagErrorText}". ` +
-    `Screenshot: ${screenshotPath}`
-  );
+    const screenshotPath = `tests/e2e/screenshots/container-timeout-${Date.now()}.png`;
+    try {
+      await page.screenshot({ path: screenshotPath, fullPage: true });
+      console.log(`[Debug] Screenshot saved to ${screenshotPath}`);
+    } catch (e) {
+      console.log(`[Debug] Failed to capture screenshot: ${e}`);
+    }
+
+    throw new Error(
+      `Timeout waiting for .dmt-container after ${timeout}ms. ` +
+      `Container count: ${containerCount}. ` +
+      `Screenshot: ${screenshotPath}`
+    );
+  }
 }
 
 // ===========================================
@@ -560,15 +464,10 @@ export async function getLayerTransparency(page: any, mapId: string, layerId: st
 // Test Constants
 // ===========================================
 
-export const TEST_MAPS = TEST_MODE === "compiled"
-  ? {
-      grid: "_testing/smoke-test-compiled.md",
-      hex: "_testing/smoke-test-hex-compiled.md"
-    } as const
-  : {
-      grid: "_testing/smoke-test-map.md",
-      hex: "_testing/smoke-test-hex.md"
-    } as const;
+export const TEST_MAPS = {
+  grid: "_testing/smoke-test-map.md",
+  hex: "_testing/smoke-test-hex.md"
+} as const;
 
 export const MAP_IDS = {
   grid: "smoke-test-map-001",

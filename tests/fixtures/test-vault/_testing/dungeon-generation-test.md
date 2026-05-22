@@ -3,7 +3,7 @@
 This file is used for E2E testing of dungeon generation. Content will be inserted here during tests.
 
 ```windrose-map
-id: map-1779137123059-oda59omkg
+id: map-1779433476577-yqhretcyr
 name: 
 type: grid
 ```

@@ -10,7 +10,7 @@ export default defineConfig({
     // Longer timeout for Obsidian startup
     testTimeout: 60000,
     hookTimeout: 60000,
-    // Retry flaky tests (Obsidian/Datacore sometimes doesn't render)
+    // Retry flaky tests (Obsidian sometimes doesn't render)
     retry: 1,
     // Run tests sequentially since each launches Obsidian
     pool: "forks",

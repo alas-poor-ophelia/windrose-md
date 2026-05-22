@@ -17,26 +17,17 @@ import * as path from "path";
 // Test Suite Setup
 // ===========================================
 
-// Reset the data file before any dungeon generation tests run.
-// This ensures a clean state when running with other test suites.
-const TEST_MODE = process.env.WINDROSE_TEST_MODE || "dev";
 const FIXTURES_DIR = path.resolve(__dirname, "../fixtures");
-const TEST_VAULT_PATH = TEST_MODE === "compiled"
-  ? path.join(FIXTURES_DIR, "test-vault-compiled")
-  : path.join(FIXTURES_DIR, "test-vault");
+const TEST_VAULT_PATH = path.join(FIXTURES_DIR, "test-vault");
 const CLEAN_DATA_FILE = path.join(FIXTURES_DIR, "dungeon-maps-data.clean.json");
-
-// Data file path differs between dev and compiled modes
-const DATA_FILE_FULL_PATH = TEST_MODE === "compiled"
-  ? path.join(TEST_VAULT_PATH, "windrose-md-data.json")
-  : path.join(TEST_VAULT_PATH, "_test-data/dungeon-maps-data.json");
+const DATA_FILE_FULL_PATH = path.join(TEST_VAULT_PATH, "_test-data/dungeon-maps-data.json");
 
 beforeAll(() => {
   // Reset data file to clean state before dungeon tests run
   if (fs.existsSync(CLEAN_DATA_FILE)) {
     const cleanData = fs.readFileSync(CLEAN_DATA_FILE, "utf-8");
     fs.writeFileSync(DATA_FILE_FULL_PATH, cleanData);
-    console.log(`[Dungeon Tests] Reset data file to clean state (${TEST_MODE} mode)`);
+    console.log("[Dungeon Tests] Reset data file to clean state");
   } else {
     console.warn("[Dungeon Tests] Clean data file not found at:", CLEAN_DATA_FILE);
   }
@@ -64,7 +55,7 @@ beforeEach(({ page }: any) => {
 // Constants
 // ===========================================
 
-const COMMAND_ID = "dungeon-map-tracker-settings:insert-random-dungeon";
+const COMMAND_ID = "windrose-md:insert-random-dungeon";
 
 const SELECTORS = {
   modal: ".dmt-insert-dungeon-modal",

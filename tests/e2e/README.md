@@ -5,69 +5,55 @@ End-to-end tests that launch real Obsidian instances via `obsidian-testing-frame
 ## Quick Start
 
 ```bash
-npm run test:e2e              # Run all E2E tests (~35-40s)
+npm run build                 # Build the plugin first
+npm run test:e2e              # Run all E2E tests
 npm run test:e2e -- --watch   # Watch mode
 ```
 
-## Test Modes
+The plugin must be built before running E2E tests. The test setup copies `main.js`, `styles.css`, and `manifest.json` into the test vault's plugin directory.
 
-Tests can run against uncompiled source or the compiled artifact, controlled by `WINDROSE_TEST_MODE`:
+## How It Works
 
-### Dev Mode (Default)
-
-```bash
-npm run test:e2e
-```
-
-- Uses source files from `src/` (via symlink)
-- Fixtures: `_testing/smoke-test-map.md`, `_testing/smoke-test-hex.md`
-- Data file: `_test-data/dungeon-maps-data.json`
-- Container timeout: 10s
-
-### Compiled Mode
-
-```bash
-# Windows (cmd)
-set WINDROSE_TEST_MODE=compiled && npm run test:e2e
-
-# Windows (PowerShell)
-$env:WINDROSE_TEST_MODE="compiled"; npm run test:e2e
-
-# Unix/macOS
-WINDROSE_TEST_MODE=compiled npm run test:e2e
-```
-
-- Uses compiled artifact (`dist/compiled-windrose-md.md`)
-- Data file: `windrose-md-data.json` (vault root)
-- Container timeout: 60s (Datacore indexes entire ~15k line bundle)
-- **Use for:** Pre-release validation, debugging release-specific issues
-
-### Why Compiled Mode is Slower
-
-Datacore must parse and index the entire bundled artifact before the component can render. In dev mode, it only loads the specific modules needed.
+1. `setup.ts` copies the built plugin into `test-vault/.obsidian/plugins/windrose-md/`
+2. Each test launches a fresh Obsidian instance with the test vault
+3. Tests navigate to fixture `.md` files containing `windrose-map` code blocks
+4. The plugin renders maps, and tests interact via Playwright selectors
+5. Data assertions read the JSON data file via Obsidian's vault API
 
 ## Test Files
 
 | File | Purpose |
 |------|---------|
-| `smoke.test.ts` | Grid/hex map loading, canvas rendering, controls init |
+| `smoke.test.ts` | Grid/hex map loading, canvas rendering, controls, transparency |
 | `drawing-tools.test.ts` | Paint tool, cell filling, drawing operations |
 | `undo-redo.test.ts` | History controls, undo/redo button state |
-| `objects.test.ts` | Object placement on grid and hex maps |
+| `objects.test.ts` | Object sidebar, object placement |
+| `object-placement.test.ts` | Object placement with data verification |
 | `overlays.test.ts` | SVG overlay positioning alignment |
 | `keyboard.test.ts` | Keyboard shortcuts (D=draw, E=erase, etc.) |
+| `keyboard-integration.test.ts` | Keyboard shortcuts with data verification |
 | `measurement.test.ts` | Measurement tool activation |
-| `layers.test.ts` | Layer panel, adding layers |
+| `layers.test.ts` | Layer panel, adding/switching layers |
+| `layer-management.test.ts` | Layer CRUD with data verification |
 | `settings.test.ts` | Settings modal accessibility |
-| `persistence.test.ts` | Data persistence after drawing |
-| `dungeon-generation.test.ts` | Dungeon generation functionality |
+| `settings-persistence.test.ts` | Settings save/cancel with data verification |
+| `persistence.test.ts` | Data persistence after drawing and navigation |
+| `save-on-unmount.test.ts` | Save-on-unmount behavior |
+| `text-labels.test.ts` | Text label tool and editor |
+| `freehand-drawing.test.ts` | Freehand draw sub-tool |
+| `circle-tool.test.ts` | Circle fill tool |
+| `edge-drawing.test.ts` | Edge draw sub-tool |
+| `hex-drawing.test.ts` | Hex map drawing and persistence |
+| `fog-of-war.test.ts` | Fog of war painting |
+| `visibility.test.ts` | Visibility toolbar toggles |
+| `dungeon-generation.test.ts` | Dungeon generation and reroll |
 
 ### Supporting Files
 
 | File | Purpose |
 |------|---------|
 | `helpers.ts` | Shared test utilities and constants |
-| `setup.ts` | Test vault symlinks and fixture reset |
+| `setup.ts` | Plugin installation and fixture reset |
 | `debug-launch.ts` | Manual Obsidian launch for debugging |
 
 ## Writing New Tests
@@ -75,30 +61,21 @@ Datacore must parse and index the entire bundled artifact before the component c
 ### Basic Structure
 
 ```typescript
-import { describe, beforeAll, afterAll, beforeEach } from "vitest";
 import {
   test, expect, navigateToMap, waitForContainer,
   setupErrorTracking, TEST_MAPS
 } from "./helpers";
 
-describe("My Feature", () => {
-  let errors: string[] = [];
+test("does something expected", async ({ page }) => {
+  const errors = setupErrorTracking(page);
+  await navigateToMap(page, TEST_MAPS.grid);
+  await waitForContainer(page);
 
-  beforeAll(async ({ browser }) => {
-    // Setup if needed
-  });
+  // Test logic here
+  const element = page.locator(".dmt-some-element");
+  await expect(element).toBeVisible();
 
-  test("does something expected", async ({ page }) => {
-    errors = setupErrorTracking(page);
-    await navigateToMap(page, TEST_MAPS.grid);
-    await waitForContainer(page);
-
-    // Test logic here
-    const element = page.locator(".dmt-some-element");
-    await expect(element).toBeVisible();
-
-    expect(errors).toHaveLength(0);
-  });
+  expect(errors).toHaveLength(0);
 });
 ```
 
@@ -106,7 +83,7 @@ describe("My Feature", () => {
 
 ```typescript
 // Navigation
-await navigateToMap(page, "_testing/smoke-test-map.md");
+await navigateToMap(page, TEST_MAPS.grid);
 await waitForContainer(page);  // Waits for .dmt-container
 
 // Tools
@@ -148,17 +125,19 @@ Located in `tests/fixtures/test-vault/`:
 
 | Path | Purpose |
 |------|---------|
-| `_testing/smoke-test-map.md` | Grid map fixture |
+| `_testing/smoke-test-map.md` | Grid map fixture (`windrose-map` code block) |
 | `_testing/smoke-test-hex.md` | Hex map fixture |
-| `_testing/dungeon-generation-test.md` | Generation test fixture |
-| `_test-data/dungeon-maps-data.json` | Dev mode data file |
+| `_testing/dungeon-test-map.md` | Dungeon reroll test fixture |
+| `_testing/dungeon-generation-test.md` | Generation test fixture (gets mutated) |
+| `_test-data/dungeon-maps-data.json` | Data file (reset before each run) |
+| `WINDROSE-DEBUG.json` | Redirects plugin data path for test isolation |
 
 ### Fixture Reset
 
-The `setup.ts` script resets fixtures before each test run:
-- Copies clean JSON data from `fixtures/*.clean.json`
-- Creates symlinks to main vault (Datacore, source files)
-- For compiled mode, copies and patches the compiled artifact
+The `setup.ts` script runs before tests:
+- Copies clean JSON data from `fixtures/dungeon-maps-data.clean.json`
+- Resets `dungeon-generation-test.md` from clean fixture
+- Installs the built plugin (`main.js`, `styles.css`, `manifest.json`) into the test vault
 
 ## Debugging
 
@@ -176,33 +155,19 @@ Opens Obsidian with the test vault for manual inspection.
 
 ### Enable Verbose Logging
 
-Add `console.log()` in helpers or use:
-
 ```typescript
 page.on("console", msg => console.log("PAGE:", msg.text()));
 ```
 
 ## Configuration
 
-E2E tests are configured in `vitest.e2e.config.ts`:
+E2E tests are configured in `vitest.config.ts`:
 
-```typescript
-export default defineConfig({
-  test: {
-    include: ["tests/e2e/**/*.test.ts"],
-    testTimeout: 120000,
-    hookTimeout: 60000,
-    globalSetup: "./tests/e2e/setup.ts",
-  },
-});
-```
-
-## Timeouts
-
-| Operation | Dev Mode | Compiled Mode |
-|-----------|----------|---------------|
-| Container ready | 10s | 60s |
-| Autosave wait | 3s | 4s |
-| Test timeout | 120s | 120s |
-
-Compiled mode timeouts are longer because Datacore must index the entire bundled artifact on first load.
+| Setting | Value |
+|---------|-------|
+| Test timeout | 60s |
+| Hook timeout | 60s |
+| Retry | 1 (flaky test recovery) |
+| Pool | forks (singleFork, sequential) |
+| Container timeout | 10s |
+| Autosave wait | 3s |

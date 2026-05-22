@@ -1,39 +1,30 @@
 import { defineConfig } from "vitest/config";
 import path from "path";
 
-const testVaultPath = path.resolve(__dirname, "tests/fixtures/test-vault-compiled");
+const testVaultPath = path.resolve(__dirname, "tests/fixtures/test-vault");
 
 /**
- * Vitest config for testing the COMPILED Windrose artifact.
+ * Vitest config for release validation.
  *
- * Uses the same test suite as the main config, but the WINDROSE_TEST_MODE=compiled
- * environment variable causes helpers.ts to use the compiled test maps.
+ * Runs the same E2E test suite as the main config but produces
+ * a JSON report for the release pipeline to parse.
  */
 export default defineConfig({
   test: {
-    // Same E2E tests
     include: ["tests/e2e/**/*.test.ts"],
-    // Longer timeout for Obsidian startup
     testTimeout: 60000,
     hookTimeout: 60000,
-    // Run tests sequentially since each launches Obsidian
+    retry: 1,
     pool: "forks",
     poolOptions: {
       forks: {
         singleFork: true,
       },
     },
-    // Same setup (symlinks still needed for vault structure)
     globalSetup: ["tests/e2e/setup.ts"],
-    // Inject test vault path for obsidian-testing-framework
     provide: {
       vault: testVaultPath,
     },
-    // Environment variables for compiled mode
-    env: {
-      WINDROSE_TEST_MODE: "compiled",
-    },
-    // Write structured results to JSON for release pipeline parsing
     reporters: ["default", "json"],
     outputFile: {
       json: "test-results.json",
