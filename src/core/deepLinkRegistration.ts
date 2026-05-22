@@ -1,0 +1,199 @@
+import { Notice } from 'obsidian';
+import type { Plugin } from 'obsidian';
+import { parseDeepLink, emitNavigationEvent } from '../persistence/deepLinkHandler';
+import type { DeepLinkData } from '../persistence/deepLinkHandler';
+
+async function navigateToLink(plugin: Plugin, parsed: DeepLinkData, sourcePath: string): Promise<void> {
+  const currentPath = sourcePath || '';
+  const isSameNote = parsed.notePath === currentPath || parsed.notePath === currentPath.replace(/\.md$/, '');
+
+  if (!isSameNote) {
+    try {
+      const linkPath = parsed.notePath.replace(/\.md$/, '');
+      await plugin.app.workspace.openLinkText(linkPath, '', false);
+    } catch (err) {
+      console.error('[Windrose] Deep link: failed to open note', err);
+      new Notice('Failed to open map note');
+      return;
+    }
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+
+  emitNavigationEvent(parsed);
+
+  setTimeout(() => {
+    try {
+      const leaf = document.querySelector('.workspace-leaf.mod-active .view-content');
+      if (leaf) {
+        const mapEl = leaf.querySelector('.dmt-container');
+        if (mapEl) {
+          mapEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }
+    } catch { /* scroll is best-effort */ }
+  }, 200);
+}
+
+export function registerDeepLinks(plugin: Plugin): void {
+  registerProtocolHandler(plugin);
+  registerPostProcessor(plugin);
+  registerDomCapture(plugin);
+  registerEditorExtension(plugin);
+}
+
+function registerProtocolHandler(plugin: Plugin): void {
+  plugin.registerObsidianProtocolHandler('windrose', async (params) => {
+    const rawQuery = Object.keys(params).find(key => key.includes('|'));
+    if (!rawQuery) return;
+
+    const parsed = parseDeepLink('windrose:' + rawQuery);
+    if (!parsed) return;
+
+    try {
+      const linkPath = parsed.notePath.replace(/\.md$/, '');
+      await plugin.app.workspace.openLinkText(linkPath, '', false);
+      setTimeout(() => emitNavigationEvent(parsed), 100);
+    } catch (err) {
+      console.error('[Windrose] Protocol handler failed:', err);
+      new Notice('Failed to open map note');
+    }
+  });
+}
+
+function registerPostProcessor(plugin: Plugin): void {
+  plugin.registerMarkdownPostProcessor((el, _ctx) => {
+    const candidates = el.querySelectorAll(
+      'a[href^="windrose:"], a[data-href^="windrose:"]'
+    );
+    if (candidates.length === 0) return;
+
+    candidates.forEach((link) => {
+      const rawHref = link.getAttribute('href') || '';
+      const dataHref = link.getAttribute('data-href') || '';
+      const original = rawHref.startsWith('windrose:') ? rawHref
+        : dataHref.startsWith('windrose:') ? dataHref : '';
+      if (!original) return;
+
+      const replacement = document.createElement('a');
+      replacement.textContent = link.textContent;
+      replacement.className = 'windrose-deep-link';
+      replacement.setAttribute('href', '#');
+      replacement.setAttribute('data-windrose-href', original);
+      link.replaceWith(replacement);
+    });
+  });
+}
+
+function registerDomCapture(plugin: Plugin): void {
+  plugin.registerDomEvent(document, 'click', async (e: MouseEvent) => {
+    const target = e.target as HTMLElement;
+    if (!target?.closest) return;
+
+    const link = target.closest(
+      'a[href^="windrose:"], a[data-href^="windrose:"], a[data-windrose-href]'
+    ) as HTMLElement | null;
+    if (!link) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    const href = link.getAttribute('data-windrose-href')
+      || link.getAttribute('href')
+      || link.getAttribute('data-href')
+      || '';
+
+    const parsed = parseDeepLink(href);
+    if (!parsed) return;
+
+    const sourcePath = plugin.app.workspace.getActiveFile()?.path || '';
+    await navigateToLink(plugin, parsed, sourcePath);
+  }, { capture: true } as AddEventListenerOptions);
+}
+
+function registerEditorExtension(plugin: Plugin): void {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const cmView = require('@codemirror/view');
+    if (!cmView?.EditorView) return;
+
+    const SCHEME = 'windrose:';
+
+    const findWindroseHrefAtPos = (view: { state: { doc: { lineAt(pos: number): { text: string; from: number } } } }, pos: number): string | null => {
+      try {
+        const line = view.state.doc.lineAt(pos);
+        const localPos = pos - line.from;
+        const urls: { start: number; end: number; url: string }[] = [];
+        let search = 0;
+
+        while (true) {
+          const idx = line.text.indexOf(SCHEME, search);
+          if (idx === -1) break;
+          let end = idx;
+          while (end < line.text.length) {
+            const ch = line.text[end];
+            if (ch === ')' || ch === ' ' || ch === '\t' || ch === '\n') break;
+            end++;
+          }
+          urls.push({ start: idx, end, url: line.text.slice(idx, end) });
+          search = end;
+        }
+
+        if (urls.length === 0) return null;
+
+        for (const u of urls) {
+          const linkStart = Math.max(0, u.start - 200);
+          const linkEnd = Math.min(line.text.length, u.end + 5);
+          if (localPos >= linkStart && localPos <= linkEnd) return u.url;
+        }
+        return urls[0].url;
+      } catch { return null; }
+    };
+
+    const windroseEditorExt = cmView.EditorView.domEventHandlers({
+      click(event: MouseEvent, view: unknown) {
+        const target = event.target as HTMLElement;
+        if (!target?.closest) return false;
+
+        const anchor = target.closest('a[href^="windrose:"], a[data-href^="windrose:"], a[data-windrose-href]') as HTMLElement | null;
+        if (anchor) {
+          const href = anchor.getAttribute('data-windrose-href')
+            || anchor.getAttribute('href')
+            || anchor.getAttribute('data-href')
+            || '';
+          const parsed = parseDeepLink(href);
+          if (parsed) {
+            event.preventDefault();
+            event.stopPropagation();
+            const sourcePath = plugin.app.workspace.getActiveFile()?.path || '';
+            void navigateToLink(plugin, parsed, sourcePath);
+            return true;
+          }
+        }
+
+        const linkSpan = target.closest('.cm-link, .cm-underline, .cm-hmd-internal-link') as HTMLElement | null;
+        if (linkSpan) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const pos = (view as any).posAtCoords({ x: event.clientX, y: event.clientY });
+          if (pos != null) {
+            const href = findWindroseHrefAtPos(view as Parameters<typeof findWindroseHrefAtPos>[0], pos);
+            if (href) {
+              const parsed = parseDeepLink(href);
+              if (parsed) {
+                event.preventDefault();
+                event.stopPropagation();
+                const sourcePath = plugin.app.workspace.getActiveFile()?.path || '';
+                void navigateToLink(plugin, parsed, sourcePath);
+                return true;
+              }
+            }
+          }
+        }
+        return false;
+      }
+    });
+
+    plugin.registerEditorExtension([windroseEditorExt]);
+  } catch (err) {
+    console.warn('[Windrose] Could not register CM6 extension:', err);
+  }
+}

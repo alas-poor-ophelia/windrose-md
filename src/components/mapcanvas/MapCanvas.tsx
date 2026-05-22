@@ -1,0 +1,563 @@
+import type { ComponentChildren, VNode, RefObject } from 'preact';
+import type {
+  MapData,
+  MapDataUpdate,
+  Cell,
+  Curve,
+  MapObject,
+  TextLabel,
+  Edge,
+  ViewState,
+  TextLabelSettings,
+  ToolId,
+  ObjectTypeId,
+  IGeometry,
+  Point,
+  LayerVisibility
+} from '#types/index';
+import type { ResolvedTheme } from '#types/settings/settings.types';
+import type { MapStateContextValue, MapOperationsContextValue } from '#types/contexts/context.types';
+
+import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
+import { useCanvasRenderer, renderCanvas } from '../../hooks/canvas/useCanvasRenderer';
+import { useCanvasInteraction } from '../../hooks/canvas/useCanvasInteraction';
+import { GridGeometry } from '../../geometry/core/GridGeometry';
+import { DEFAULTS } from '../../core/dmtConstants';
+import { getObjectAtPosition, addObject, removeObject, removeObjectAtPosition, removeObjectsInRectangle, updateObject, isAreaFree, canResizeObject } from '../../objects/objectOperations';
+import { addTextLabel, getTextLabelAtPosition, removeTextLabel, updateTextLabel } from '../../text/textLabelOperations';
+import { HexGeometry } from '../../geometry/core/HexGeometry';
+import { LinkedNoteHoverOverlays } from '../overlays/LinkedNoteHoverOverlays';
+import { MapStateProvider, MapOperationsProvider } from '../../context/MapContext';
+import { MapSelectionProvider, useMapSelection } from '../../context/MapSelectionContext';
+import { ObjectLinkingProvider } from '../../context/ObjectLinkingContext';
+import { ObjectLayer } from './ObjectLayer';
+import { DrawingLayer } from './DrawingLayer';
+import { FreehandLayer } from './FreehandLayer';
+import { TextLayer } from './TextLayer';
+import { NotePinLayer } from './NotePinLayer';
+import { EventHandlerProvider } from '../../context/EventHandlerContext';
+import { HexCoordinateLayer } from './HexCoordinateLayer';
+import { MeasurementLayer } from './MeasurementLayer';
+import { DiagonalFillOverlay } from './DiagonalFillOverlay';
+import { AreaSelectLayer } from './AreaSelectLayer';
+import { FogOfWarLayer } from './FogOfWarLayer';
+import { RegionLayer } from './RegionLayer';
+import { OutlineLayer } from './OutlineLayer';
+import { ShapeOverlayLayer } from './ShapeOverlayLayer';
+import { TilePlacementLayer } from './TilePlacementLayer';
+import { RerollDungeonButton } from './RerollDungeonButton';
+import { getSetting } from '../../core/settingsAccessor';
+import { usePanZoomCoordinator } from '../../hooks/canvas/usePanZoomCoordinator';
+import { useEventCoordinator } from '../../hooks/canvas/useEventCoordinator';
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// ===========================================
+// Local Type Definitions
+// ===========================================
+
+interface CanvasDimensions {
+  width: number;
+  height: number;
+}
+
+interface DrawingLayerState {
+  isDrawing: boolean;
+  rectangleStart: Point | null;
+  circleStart: Point | null;
+}
+
+interface PanZoomLayerState {
+  isPanning: boolean;
+  isTouchPanning: boolean;
+  spaceKeyPressed: boolean;
+}
+
+interface CoordinatorsProps {
+  canvasRef: RefObject<HTMLCanvasElement>;
+  mapData: MapData | null;
+  geometry: IGeometry | null;
+  isFocused: boolean;
+  isColorPickerOpen: boolean;
+  isAlignmentMode: boolean;
+}
+
+interface MapCanvasContentProps {
+  mapId?: string;
+  notePath?: string;
+  mapData: MapData | null;
+  onCellsChange: (cells: Cell[], skipHistory?: boolean) => void;
+  onCurvesChange: (curves: Curve[], skipHistory?: boolean) => void;
+  onObjectsChange: (objects: MapObject[]) => void;
+  onTextLabelsChange: (labels: TextLabel[]) => void;
+  onEdgesChange: (edges: Edge[], skipHistory?: boolean) => void;
+  onTilesChange?: (tiles: import('#types/tiles/tile.types').HexTileAssignment[]) => void;
+  tileImagesReady?: boolean;
+  adjacentSubHexes?: Array<{ hexKey: string; dq: number; dr: number; mapData: unknown; name: string }> | null;
+  onViewStateChange: (viewState: ViewState) => void;
+  onTextLabelSettingsChange: (settings: TextLabelSettings) => void;
+  currentTool: ToolId;
+  selectedObjectType: ObjectTypeId | undefined;
+  selectedColor: string;
+  isColorPickerOpen: boolean;
+  customColors: string[];
+  onAddCustomColor: (color: string) => void;
+  onDeleteCustomColor: (color: string) => void;
+  isFocused: boolean;
+  isAnimating: boolean;
+  theme: ResolvedTheme;
+  isAlignmentMode: boolean;
+  children: ComponentChildren;
+}
+
+interface MapCanvasProps extends MapCanvasContentProps {
+  layerVisibility: LayerVisibility;
+  adjacentSubHexes?: Array<{ hexKey: string; dq: number; dr: number; mapData: unknown; name: string }> | null;
+}
+
+
+// ===========================================
+// Components
+// ===========================================
+
+/**
+ * Coordinators - Internal component that calls coordinator hooks
+ * This component must be rendered inside the Context provider tree
+ * so the hooks have access to MapState, MapSelection, and EventHandler contexts.
+ * Returns null (no visual rendering) - only manages behavioral coordination.
+ */
+const Coordinators = ({ canvasRef, mapData, geometry, isFocused, isColorPickerOpen, isAlignmentMode }: CoordinatorsProps): null => {
+  // Coordinator hooks need to be called inside the provider tree
+  usePanZoomCoordinator({
+    canvasRef,
+    mapData,
+    geometry,
+    isFocused
+  });
+
+  useEventCoordinator({
+    canvasRef,
+    isColorPickerOpen,
+    showObjectColorPicker: false,
+    isAlignmentMode
+  });
+
+  return null; // No UI - coordinators only manage behavior
+};
+
+/**
+ * MapCanvasContent - Inner component that uses context hooks
+ * Contains all the map canvas logic and interacts with shared selection state
+ */
+const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onTilesChange, tileImagesReady, adjacentSubHexes, onViewStateChange, onTextLabelSettingsChange, currentTool, selectedObjectType, selectedColor, isColorPickerOpen, customColors: _customColors, onAddCustomColor: _onAddCustomColor, onDeleteCustomColor: _onDeleteCustomColor, isFocused, isAnimating, theme, isAlignmentMode, children }: MapCanvasContentProps): VNode => {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const fogCanvasRef = useRef<HTMLCanvasElement | null>(null);  // Separate canvas for fog blur effect (CSS blur for iOS compat)
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [canvasDimensions, setCanvasDimensions] = useState<CanvasDimensions>({
+    width: DEFAULTS.canvasSize.width,
+    height: DEFAULTS.canvasSize.height
+  });
+
+  // Create onMapDataUpdate wrapper for map-level changes
+  // This bridges the old prop-based API with the new context-based approach
+  const onMapDataUpdate = useCallback((updates: MapDataUpdate) => {
+    if (updates.viewState && onViewStateChange) {
+      onViewStateChange(updates.viewState);
+    }
+    if (updates.lastTextLabelSettings && onTextLabelSettingsChange) {
+      onTextLabelSettingsChange(updates.lastTextLabelSettings);
+    }
+  }, [onViewStateChange, onTextLabelSettingsChange]);
+
+  // Use shared selection from context (same state ObjectLayer uses)
+  const {
+    selectedItem, setSelectedItem: _setSelectedItem,
+    selectedItems,
+    isDraggingSelection, setIsDraggingSelection: _setIsDraggingSelection,
+    dragStart: _dragStart, setDragStart: _setDragStart,
+    isResizeMode, setIsResizeMode: _setIsResizeMode,
+    hoveredObject: _hoveredObject, setHoveredObject: _setHoveredObject,
+    mousePosition: _mousePosition, setMousePosition: _setMousePosition,
+    showNoteLinkModal: _showNoteLinkModal, setShowNoteLinkModal: _setShowNoteLinkModal,
+    pendingNotePinId: _pendingNotePinId, setPendingNotePinId: _setPendingNotePinId,
+    editingNoteObjectId: _editingNoteObjectId, setEditingNoteObjectId: _setEditingNoteObjectId,
+    showCoordinates, setShowCoordinates,
+    layerVisibility
+  } = useMapSelection();
+
+  // Orientation animation state
+
+  // Ref for reading showCoordinates inside stable keyboard effect
+  const showCoordinatesRef = useRef<boolean>(showCoordinates);
+  showCoordinatesRef.current = showCoordinates;
+
+  // Refs to hold layer state for cursor coordination
+  const drawingLayerStateRef = useRef<DrawingLayerState>({ isDrawing: false, rectangleStart: null, circleStart: null });
+  const panZoomLayerStateRef = useRef<PanZoomLayerState>({ isPanning: false, isTouchPanning: false, spaceKeyPressed: false });
+
+  // Callbacks for layers to expose their state
+  const handleDrawingStateChange = useCallback((drawingState: DrawingLayerState) => {
+    drawingLayerStateRef.current = drawingState;
+  }, []);
+
+  const handlePanZoomStateChange = useCallback((panZoomState: PanZoomLayerState) => {
+    panZoomLayerStateRef.current = panZoomState;
+  }, []);
+
+  // Create geometry instance based on map type
+  // Return null during loading to prevent errors
+  const geometry = useMemo((): IGeometry | null => {
+    if (!mapData) return null;
+
+    const mapType = mapData.mapType || DEFAULTS.mapType;
+
+    if (mapType === 'hex') {
+      const hexSize = mapData.hexSize || DEFAULTS.hexSize;
+      const orientation = mapData.orientation || DEFAULTS.hexOrientation;
+      const hexBounds = mapData.hexBounds || null; // null = infinite (backward compat)
+      return new HexGeometry(hexSize, orientation, hexBounds);
+    } else {
+      // Default to grid
+      const gridSize = mapData.gridSize || DEFAULTS.gridSize;
+      return new GridGeometry(gridSize);
+    }
+  }, [mapData?.mapType, mapData?.gridSize, mapData?.hexSize, mapData?.orientation, mapData?.hexBounds]);
+
+  // Use canvas interaction ONLY for coordinate utility functions
+  const {
+    screenToGrid,
+    screenToWorld,
+    getClientCoords
+  } = useCanvasInteraction(canvasRef, mapData, geometry, undefined, isFocused);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return undefined;
+
+    const updateCanvasSize = (): void => {
+      const rect = container.getBoundingClientRect();
+      setCanvasDimensions({
+        width: Math.max(rect.width, DEFAULTS.canvasSize.width),
+        height: Math.max(rect.height, DEFAULTS.canvasSize.height)
+      });
+    };
+
+    // Initial size
+    updateCanvasSize();
+
+    // Watch for container size changes
+    const resizeObserver = new ResizeObserver(updateCanvasSize);
+    resizeObserver.observe(container);
+
+    return () => resizeObserver.disconnect();
+  }, []);
+
+  // Force canvas resize when animation completes
+  useEffect(() => {
+    if (isAnimating) return; // Only run when animation ends
+
+    const container = containerRef.current;
+    if (!container) return;
+
+    // Wait one more frame to ensure CSS transition is fully complete
+    requestAnimationFrame(() => {
+      const rect = container.getBoundingClientRect();
+      setCanvasDimensions({
+        width: Math.max(rect.width, DEFAULTS.canvasSize.width),
+        height: Math.max(rect.height, DEFAULTS.canvasSize.height)
+      });
+    });
+  }, [isAnimating]);
+
+  // Render canvas whenever relevant state changes
+  useCanvasRenderer(canvasRef, fogCanvasRef, mapData, geometry, selectedItems as unknown as import('#types/hooks/canvasRenderer.types').RendererSelectedItem[], { isResizeMode, theme, showCoordinates, layerVisibility, tileImagesReady, adjacentSubHexes: adjacentSubHexes as unknown as import('#types/hooks/canvasRenderer.types').AdjacentSubHexRenderData[] | null });
+
+  // Trigger redraw when canvas dimensions change (from expand/collapse)
+  useEffect(() => {
+    if (!canvasRef.current || !mapData || !geometry) return;
+
+    const canvas = canvasRef.current;
+    const fogCanvas = fogCanvasRef.current;
+
+    // During animation, preserve canvas content
+    if (isAnimating) {
+      // Save current canvas content
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = canvas.width;
+      tempCanvas.height = canvas.height;
+      const tempCtx = tempCanvas.getContext('2d');
+      if (tempCtx) {
+        tempCtx.drawImage(canvas, 0, 0);
+      }
+
+      // Update canvas size
+      canvas.width = canvasDimensions.width;
+      canvas.height = canvasDimensions.height;
+
+      // Also update fog canvas size
+      if (fogCanvas) {
+        fogCanvas.width = canvasDimensions.width;
+        fogCanvas.height = canvasDimensions.height;
+      }
+
+      // Restore content (will stretch/compress during animation)
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(tempCanvas, 0, 0, canvas.width, canvas.height);
+      }
+    } else {
+      // After animation, do a proper redraw with correct dimensions
+      renderCanvas(canvas, fogCanvas, mapData, geometry, selectedItem as unknown as import('#types/hooks/canvasRenderer.types').RendererSelectedItem, { isResizeMode, theme, showCoordinates, layerVisibility, adjacentSubHexes: adjacentSubHexes as unknown as import('#types/hooks/canvasRenderer.types').AdjacentSubHexRenderData[] | null });
+    }
+  }, [canvasDimensions.width, canvasDimensions.height, isAnimating, showCoordinates, layerVisibility, adjacentSubHexes]);
+
+  // 'C' key handler for coordinate overlay (hex maps only)
+  useEffect(() => {
+    // Get the coordinate key mode from settings ('hold' or 'toggle')
+    const keyMode = getSetting('coordinateKeyMode') || 'hold';
+
+    // Only attach listeners if focused and on a hex map
+    if (!isFocused || mapData?.mapType !== 'hex') {
+      if (showCoordinatesRef.current && (mapData?.mapType !== 'hex' || keyMode === 'hold')) {
+        setShowCoordinates(false);
+      }
+      return undefined;
+    }
+
+    const handleKeyDown = (e: KeyboardEvent): void => {
+      const target = e.target as HTMLElement;
+      if (e.key.toLowerCase() === 'c' && !e.shiftKey && !e.ctrlKey && !e.metaKey &&
+          target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') {
+        if (e.repeat && keyMode === 'toggle') return;
+
+        e.preventDefault();
+
+        if (keyMode === 'toggle') {
+          setShowCoordinates(!showCoordinatesRef.current);
+        } else {
+          setShowCoordinates(true);
+        }
+      }
+    };
+
+    const handleKeyUp = (e: KeyboardEvent): void => {
+      if (e.key.toLowerCase() === 'c') {
+        if (keyMode === 'hold') {
+          setShowCoordinates(false);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, [isFocused, mapData?.mapType]);
+
+  // Determine cursor class based on current tool and interaction state
+  const getCursorClass = (): string => {
+    // Get state
+    const effectiveDrawingState = drawingLayerStateRef.current;
+    const effectivePanZoomState = panZoomLayerStateRef.current;
+
+    // Space key override - show grab cursor
+    if (effectivePanZoomState.spaceKeyPressed && !effectivePanZoomState.isPanning) return 'dmt-canvas-space-grab';
+
+    if (effectivePanZoomState.isPanning || effectivePanZoomState.isTouchPanning) return 'dmt-canvas-panning';
+    if (isDraggingSelection) return 'dmt-canvas-selecting';
+    if (currentTool === 'select') return 'dmt-canvas-select';
+    if (currentTool === 'measure') return 'dmt-canvas-measure';
+    if (currentTool === 'diagonalFill') return 'dmt-canvas-diagonal-fill';
+    if (currentTool === 'addNote') return 'dmt-canvas-add-object';
+    if (currentTool === 'addObject') {
+      return selectedObjectType ? 'dmt-canvas-add-object' : 'dmt-canvas';
+    }
+    if (currentTool === 'addText') {
+      return 'dmt-canvas-add-text';
+    }
+    if (currentTool === 'rectangle') {
+      return effectiveDrawingState.rectangleStart ? 'dmt-canvas-rectangle-active' : 'dmt-canvas-rectangle';
+    }
+    if (currentTool === 'circle') {
+      return effectiveDrawingState.circleStart ? 'dmt-canvas-circle-active' : 'dmt-canvas-circle';
+    }
+    if (currentTool === 'clearArea') {
+      return effectiveDrawingState.rectangleStart ? 'dmt-canvas-cleararea-active' : 'dmt-canvas-cleararea';
+    }
+    if (effectiveDrawingState.isDrawing) {
+      return currentTool === 'draw' ? 'dmt-canvas-drawing' : 'dmt-canvas-erasing';
+    }
+    return currentTool === 'erase' ? 'dmt-canvas-erase' : 'dmt-canvas';
+  };
+
+  // Build context values for providers
+  const mapStateValue = useMemo(() => ({
+    canvasRef,
+    containerRef,
+    mapData,
+    mapId,
+    notePath,
+    geometry,
+    currentTool,
+    selectedColor,
+    selectedObjectType,
+    screenToGrid,
+    screenToWorld,
+    getClientCoords,
+    GridGeometry,
+    HexGeometry,
+    // State change callbacks for layers
+    onDrawingStateChange: handleDrawingStateChange,
+    onPanZoomStateChange: handlePanZoomStateChange
+  } as MapStateContextValue), [canvasRef, containerRef, mapData, mapId, notePath, geometry, currentTool, selectedColor,
+    selectedObjectType, screenToGrid, screenToWorld, getClientCoords,
+    handleDrawingStateChange, handlePanZoomStateChange]);
+
+  const mapOperationsValue = useMemo(() => ({
+    // Object operations
+    getObjectAtPosition,
+    addObject,
+    updateObject,
+    removeObject,
+    isAreaFree,
+    canResizeObject,
+    removeObjectAtPosition,
+    removeObjectsInRectangle,
+
+    // Text operations
+    getTextLabelAtPosition,
+    addTextLabel,
+    updateTextLabel,
+    removeTextLabel,
+
+    // Callbacks
+    onCellsChange,
+    onCurvesChange,
+    onObjectsChange,
+    onTextLabelsChange,
+    onEdgesChange,
+    onTilesChange,
+    onMapDataUpdate
+  } as MapOperationsContextValue), [onCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onTilesChange, onViewStateChange, onTextLabelSettingsChange]);
+
+
+
+  return (
+    <EventHandlerProvider>
+      <MapStateProvider value={mapStateValue}>
+        <MapOperationsProvider value={mapOperationsValue}>
+          {/* Coordinators - must be inside provider tree to access contexts */}
+          <Coordinators
+            canvasRef={canvasRef}
+            mapData={mapData}
+            geometry={geometry}
+            isFocused={isFocused}
+            isColorPickerOpen={isColorPickerOpen}
+            isAlignmentMode={isAlignmentMode}
+          />
+
+          <div className="dmt-canvas-container" ref={containerRef}>
+            {/* Wrapper for canvas alignment - fog canvas positions relative to this */}
+            <div style={{ position: 'relative', display: 'inline-block' }}>
+              {/* Main canvas */}
+              <canvas
+                ref={canvasRef}
+                width={canvasDimensions.width}
+                height={canvasDimensions.height}
+                className={getCursorClass()}
+                style={{ touchAction: 'none', display: 'block' }}
+              />
+
+              {/* Fog blur overlay canvas */}
+              <canvas
+                ref={fogCanvasRef}
+                width={canvasDimensions.width}
+                height={canvasDimensions.height}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  pointerEvents: 'none'
+                }}
+              />
+            </div>
+
+            <LinkedNoteHoverOverlays
+              selectedItem={selectedItem}
+            />
+
+            {/* Render child layers */}
+            {children}
+          </div>
+        </MapOperationsProvider>
+      </MapStateProvider>
+    </EventHandlerProvider>
+  );
+};
+
+const MapCanvas = (props: MapCanvasProps): VNode => {
+  const { children, layerVisibility, adjacentSubHexes, ...restProps } = props;
+
+  return (
+    <MapSelectionProvider layerVisibility={layerVisibility}>
+      <ObjectLinkingProvider>
+        <MapCanvasContent {...restProps} adjacentSubHexes={adjacentSubHexes}>
+          {children}
+        </MapCanvasContent>
+      </ObjectLinkingProvider>
+    </MapSelectionProvider>
+  );
+};
+
+// Attach layer components using dot notation
+MapCanvas.ObjectLayer = ObjectLayer;
+MapCanvas.DrawingLayer = DrawingLayer;
+MapCanvas.FreehandLayer = FreehandLayer;
+MapCanvas.TextLayer = TextLayer;
+MapCanvas.NotePinLayer = NotePinLayer;
+MapCanvas.HexCoordinateLayer = HexCoordinateLayer;
+MapCanvas.MeasurementLayer = MeasurementLayer;
+MapCanvas.DiagonalFillOverlay = DiagonalFillOverlay;
+MapCanvas.AreaSelectLayer = AreaSelectLayer;
+MapCanvas.FogOfWarLayer = FogOfWarLayer;
+MapCanvas.RegionLayer = RegionLayer;
+MapCanvas.OutlineLayer = OutlineLayer;
+MapCanvas.ShapeOverlayLayer = ShapeOverlayLayer;
+MapCanvas.TilePlacementLayer = TilePlacementLayer;
+MapCanvas.RerollDungeonButton = RerollDungeonButton;
+
+export { MapCanvas };

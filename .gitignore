@@ -18,9 +18,14 @@ Thumbs.db
 *.swp
 *.swo
 
-# src is a symlink to vault - don't track it here
-# (the actual source files are tracked in the vault's own repo if any)
-src
+# Build artifacts
+main.js
+
+# Stray vault artifacts (if any leak in)
+src/images/
+src/dist/
+src/DungeonMapTracker.md
+*.tmp
 
 # Test outputs
 playwright-report/

@@ -1,0 +1,960 @@
+/**
+ * curveBoolean.ts
+ *
+ * Boolean subtraction of grid cells from freehand curves using the
+ * polygon-clipping library (Martinez-Rueda-Feito algorithm).
+ *
+ * After erasure, the curve's path data (start + segments) IS the modified
+ * geometry. No secondary data structures like "erasedCells" or flat hole
+ * arrays. Inner rings from boolean holes are stored as coordinate-pair
+ * arrays on `curve.innerRings`.
+ */
+
+import type { Curve, BezierSegment } from '#types/core/curve.types';
+
+import { difference, union } from './polygonClipping';
+
+
+/** A 2D point as [x, y] tuple */
+type Pt = [number, number];
+
+// polygon-clipping format types
+type Ring = Pt[];
+type Polygon = Ring[];
+type MultiPolygon = Polygon[];
+
+// =========================================================================
+// Bezier flattening
+// =========================================================================
+
+/**
+ * Evaluate a cubic bezier at parameter t.
+ */
+function evalBezier(
+  p0x: number, p0y: number,
+  p1x: number, p1y: number,
+  p2x: number, p2y: number,
+  p3x: number, p3y: number,
+  t: number
+): Pt {
+  const mt = 1 - t;
+  const mt2 = mt * mt;
+  const mt3 = mt2 * mt;
+  const t2 = t * t;
+  const t3 = t2 * t;
+  return [
+    mt3 * p0x + 3 * mt2 * t * p1x + 3 * mt * t2 * p2x + t3 * p3x,
+    mt3 * p0y + 3 * mt2 * t * p1y + 3 * mt * t2 * p2y + t3 * p3y
+  ];
+}
+
+/**
+ * Check if a cubic bezier segment is effectively linear.
+ * Returns true when both control points lie on (or very close to)
+ * the line between the start and end points.
+ */
+function isLinearBezier(
+  p0x: number, p0y: number,
+  cp1x: number, cp1y: number,
+  cp2x: number, cp2y: number,
+  p3x: number, p3y: number,
+  epsilon: number = 0.1
+): boolean {
+  // Distance from control points to the line (p0 → p3)
+  const dx = p3x - p0x;
+  const dy = p3y - p0y;
+  const lenSq = dx * dx + dy * dy;
+
+  if (lenSq < epsilon * epsilon) {
+    // Degenerate: start ≈ end, check if control points are also close
+    return (
+      (cp1x - p0x) * (cp1x - p0x) + (cp1y - p0y) * (cp1y - p0y) < epsilon * epsilon &&
+      (cp2x - p0x) * (cp2x - p0x) + (cp2y - p0y) * (cp2y - p0y) < epsilon * epsilon
+    );
+  }
+
+  // Perpendicular distance of cp1 from line p0→p3
+  const d1 = Math.abs(dx * (p0y - cp1y) - dy * (p0x - cp1x)) / Math.sqrt(lenSq);
+  // Perpendicular distance of cp2 from line p0→p3
+  const d2 = Math.abs(dx * (p0y - cp2y) - dy * (p0x - cp2x)) / Math.sqrt(lenSq);
+
+  return d1 < epsilon && d2 < epsilon;
+}
+
+/**
+ * Flatten a curve's bezier segments into a dense polygon ring.
+ * Returns array of [x, y] points suitable for polygon-clipping.
+ * The ring is closed (last point equals first point) as required by GeoJSON.
+ *
+ * Linear bezier segments (from previous boolean subtractions) are emitted
+ * as a single endpoint to prevent vertex count explosion.
+ */
+function flattenCurve(curve: Curve, stepsPerSegment: number = 16): Pt[] {
+  const pts: Pt[] = [];
+  let px = curve.start[0];
+  let py = curve.start[1];
+  pts.push([px, py]);
+
+  const segs = curve.segments;
+  for (let i = 0; i < segs.length; i++) {
+    const seg = segs[i];
+
+    if (isLinearBezier(px, py, seg[0], seg[1], seg[2], seg[3], seg[4], seg[5])) {
+      // Linear segment: emit only the endpoint
+      pts.push([seg[4], seg[5]]);
+    } else {
+      // True curve: subdivide
+      for (let step = 1; step <= stepsPerSegment; step++) {
+        const t = step / stepsPerSegment;
+        const pt = evalBezier(px, py, seg[0], seg[1], seg[2], seg[3], seg[4], seg[5], t);
+        pts.push(pt);
+      }
+    }
+    px = seg[4];
+    py = seg[5];
+  }
+
+  // Close the ring (GeoJSON requirement: first == last)
+  if (pts.length > 1) {
+    const first = pts[0];
+    const last = pts[pts.length - 1];
+    if (first[0] !== last[0] || first[1] !== last[1]) {
+      pts.push([first[0], first[1]]);
+    }
+  }
+
+  return pts;
+}
+
+// =========================================================================
+// Point-in-polygon (ray casting)
+// =========================================================================
+
+/**
+ * Test if point (px, py) is inside a polygon using ray casting.
+ * Polygon is given as array of [x, y] points (assumed closed).
+ */
+function pointInPolygon(px: number, py: number, poly: Pt[]): boolean {
+  let inside = false;
+  const n = poly.length;
+  for (let i = 0, j = n - 1; i < n; j = i++) {
+    const xi = poly[i][0], yi = poly[i][1];
+    const xj = poly[j][0], yj = poly[j][1];
+    if (((yi > py) !== (yj > py)) &&
+        (px < (xj - xi) * (py - yi) / (yj - yi) + xi)) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
+// =========================================================================
+// Cell overlap detection
+// =========================================================================
+
+/**
+ * Check if a cell rectangle overlaps with a curve's filled region.
+ * Tests cell center and corners against the outer polygon,
+ * then excludes cells that fall entirely within an inner ring (hole).
+ */
+function cellOverlapsCurve(
+  cellX: number, cellY: number, cellSize: number,
+  outerPoly: Pt[],
+  innerRings?: Pt[][]
+): boolean {
+  const x0 = cellX * cellSize;
+  const y0 = cellY * cellSize;
+  const cx = x0 + cellSize * 0.5;
+  const cy = y0 + cellSize * 0.5;
+
+  // Quick check: is cell center inside outer polygon?
+  const centerInside = pointInPolygon(cx, cy, outerPoly);
+
+  if (!centerInside) {
+    // Check corners — cell might straddle the boundary
+    const x1 = x0 + cellSize;
+    const y1 = y0 + cellSize;
+    if (!pointInPolygon(x0, y0, outerPoly) &&
+        !pointInPolygon(x1, y0, outerPoly) &&
+        !pointInPolygon(x0, y1, outerPoly) &&
+        !pointInPolygon(x1, y1, outerPoly)) {
+      // Check if any polygon edge intersects the cell rect
+      if (!polygonIntersectsRect(outerPoly, x0, y0, x1, y1)) {
+        return false;
+      }
+    }
+    // At least one corner or edge intersects — cell overlaps
+  } else {
+    // Center is inside outer polygon — check it's not inside a hole
+    if (innerRings) {
+      for (let h = 0; h < innerRings.length; h++) {
+        if (pointInPolygon(cx, cy, innerRings[h])) {
+          return false; // Cell center is inside a hole
+        }
+      }
+    }
+  }
+
+  return true;
+}
+
+/**
+ * Check if any edge of a polygon intersects an axis-aligned rectangle.
+ */
+function polygonIntersectsRect(poly: Pt[], rx0: number, ry0: number, rx1: number, ry1: number): boolean {
+  const n = poly.length;
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    if (segmentIntersectsRect(poly[i][0], poly[i][1], poly[j][0], poly[j][1], rx0, ry0, rx1, ry1)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Cohen-Sutherland segment vs AABB intersection test.
+ */
+function segmentIntersectsRect(
+  x1: number, y1: number, x2: number, y2: number,
+  rx0: number, ry0: number, rx1: number, ry1: number
+): boolean {
+  function outcode(x: number, y: number): number {
+    let code = 0;
+    if (x < rx0) code |= 1;
+    else if (x > rx1) code |= 2;
+    if (y < ry0) code |= 4;
+    else if (y > ry1) code |= 8;
+    return code;
+  }
+
+  let oc1 = outcode(x1, y1);
+  let oc2 = outcode(x2, y2);
+
+  for (let iter = 0; iter < 20; iter++) {
+    if ((oc1 | oc2) === 0) return true;
+    if ((oc1 & oc2) !== 0) return false;
+
+    const ocOut = oc1 !== 0 ? oc1 : oc2;
+    let x: number, y: number;
+
+    if (ocOut & 8) {
+      x = x1 + (x2 - x1) * (ry1 - y1) / (y2 - y1);
+      y = ry1;
+    } else if (ocOut & 4) {
+      x = x1 + (x2 - x1) * (ry0 - y1) / (y2 - y1);
+      y = ry0;
+    } else if (ocOut & 2) {
+      y = y1 + (y2 - y1) * (rx1 - x1) / (x2 - x1);
+      x = rx1;
+    } else {
+      y = y1 + (y2 - y1) * (rx0 - x1) / (x2 - x1);
+      x = rx0;
+    }
+
+    if (ocOut === oc1) {
+      x1 = x; y1 = y;
+      oc1 = outcode(x1, y1);
+    } else {
+      x2 = x; y2 = y;
+      oc2 = outcode(x2, y2);
+    }
+  }
+
+  return false;
+}
+
+// =========================================================================
+// Open curve overlap detection
+// =========================================================================
+
+/**
+ * Check if any part of an open curve's stroke path overlaps an axis-aligned rectangle.
+ * Flattens the curve and tests each polyline segment against the rect.
+ */
+function openCurveOverlapsRect(curve: Curve, x0: number, y0: number, x1: number, y1: number): boolean {
+  const pts = flattenCurve(curve);
+  // flattenCurve adds a synthetic closing segment for open curves — skip it
+  const last = pts.length - 2;
+  for (let i = 0; i < last; i++) {
+    if (segmentIntersectsRect(pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1], x0, y0, x1, y1)) return true;
+  }
+  return false;
+}
+
+/**
+ * Check if any part of an open curve's stroke path overlaps an arbitrary polygon.
+ * Tests both point-in-polygon and segment-edge intersection to handle linear
+ * beziers that flatten to just two points.
+ */
+function openCurveOverlapsPolygon(curve: Curve, poly: Pt[]): boolean {
+  const pts = flattenCurve(curve);
+  const last = pts.length - 2; // skip synthetic closing segment
+  // Check if any flattened point is inside the polygon
+  for (let i = 0; i <= last; i++) {
+    if (pointInPolygon(pts[i][0], pts[i][1], poly)) return true;
+  }
+  // Check if any curve segment crosses any polygon edge
+  const pn = poly.length;
+  for (let i = 0; i < last; i++) {
+    for (let j = 0; j < pn - 1; j++) {
+      if (segmentsIntersect(
+        pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1],
+        poly[j][0], poly[j][1], poly[j + 1][0], poly[j + 1][1]
+      )) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Test if two line segments (a1→a2) and (b1→b2) properly intersect.
+ */
+function segmentsIntersect(
+  ax1: number, ay1: number, ax2: number, ay2: number,
+  bx1: number, by1: number, bx2: number, by2: number
+): boolean {
+  const d1 = (bx2 - bx1) * (ay1 - by1) - (by2 - by1) * (ax1 - bx1);
+  const d2 = (bx2 - bx1) * (ay2 - by1) - (by2 - by1) * (ax2 - bx1);
+  const d3 = (ax2 - ax1) * (by1 - ay1) - (ay2 - ay1) * (bx1 - ax1);
+  const d4 = (ax2 - ax1) * (by2 - ay1) - (ay2 - ay1) * (bx2 - ax1);
+  if (((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) &&
+      ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))) return true;
+  return false;
+}
+
+// =========================================================================
+// Polygon winding utilities
+// =========================================================================
+
+/**
+ * Compute the signed area of a polygon ring.
+ * Positive = CCW, Negative = CW (standard math orientation).
+ */
+function signedArea(ring: Pt[]): number {
+  let area = 0;
+  const n = ring.length;
+  for (let i = 0, j = n - 1; i < n; j = i++) {
+    area += (ring[j][0] - ring[i][0]) * (ring[j][1] + ring[i][1]);
+  }
+  return area / 2;
+}
+
+/**
+ * Ensure a ring has counter-clockwise winding.
+ * polygon-clipping expects CCW outer rings.
+ */
+function ensureCCW(ring: Pt[]): Pt[] {
+  if (signedArea(ring) > 0) {
+    return ring.slice().reverse();
+  }
+  return ring;
+}
+
+/**
+ * Ensure a ring has clockwise winding.
+ * polygon-clipping expects CW inner rings (holes).
+ */
+function ensureCW(ring: Pt[]): Pt[] {
+  if (signedArea(ring) < 0) {
+    return ring.slice().reverse();
+  }
+  return ring;
+}
+
+// =========================================================================
+// Polygon simplification
+// =========================================================================
+
+/**
+ * Remove collinear points from a polygon ring.
+ * Keeps the ring's shape but eliminates redundant vertices that lie
+ * on straight edges. Prevents vertex count from growing unboundedly
+ * across repeated boolean subtractions.
+ */
+function simplifyRing(ring: Pt[], epsilon: number = 0.1): Pt[] {
+  if (ring.length < 4) return ring; // Need at least 3 unique + closing
+
+  // Check if ring is closed
+  const isClosed = ring.length > 1 &&
+    ring[0][0] === ring[ring.length - 1][0] &&
+    ring[0][1] === ring[ring.length - 1][1];
+
+  // Work with open ring (remove closing point temporarily)
+  const open = isClosed ? ring.slice(0, -1) : ring.slice();
+  if (open.length < 3) return ring;
+
+  // Pass 1: merge near-duplicate vertices to prevent cascading deletion.
+  // Without this, two near-coincident vertices (e.g. an intersection point
+  // landing close to a hex corner) both form tiny triangles with neighbors
+  // and both get removed by the collinearity pass, eliminating real corners.
+  const snapDistSq = epsilon * epsilon;
+  const deduped: Pt[] = [open[0]];
+  for (let i = 1; i < open.length; i++) {
+    const prev = deduped[deduped.length - 1];
+    const dx = open[i][0] - prev[0];
+    const dy = open[i][1] - prev[1];
+    if (dx * dx + dy * dy > snapDistSq) {
+      deduped.push(open[i]);
+    }
+  }
+  // Check wrap-around: last vs first
+  if (deduped.length > 1) {
+    const first = deduped[0];
+    const last = deduped[deduped.length - 1];
+    const dx = last[0] - first[0];
+    const dy = last[1] - first[1];
+    if (dx * dx + dy * dy <= snapDistSq) {
+      deduped.pop();
+    }
+  }
+  if (deduped.length < 3) return ring;
+
+  // Pass 2: remove collinear points
+  const result: Pt[] = [];
+  const n = deduped.length;
+
+  for (let i = 0; i < n; i++) {
+    const prev = deduped[(i - 1 + n) % n];
+    const curr = deduped[i];
+    const next = deduped[(i + 1) % n];
+
+    // Cross product to detect collinearity
+    const cross = (curr[0] - prev[0]) * (next[1] - prev[1]) -
+                  (curr[1] - prev[1]) * (next[0] - prev[0]);
+
+    if (Math.abs(cross) > epsilon) {
+      result.push(curr);
+    }
+  }
+
+  if (result.length < 3) return ring; // Degenerate, keep original
+
+  // Re-close if was closed
+  if (isClosed) {
+    result.push([result[0][0], result[0][1]]);
+  }
+
+  return result;
+}
+
+// =========================================================================
+// Curve ↔ Polygon conversion
+// =========================================================================
+
+/**
+ * Build a polygon-clipping-compatible Polygon from a Curve.
+ * Returns [outerRing, ...innerRings] where outer is CCW and inners are CW.
+ */
+function curveToPolygon(curve: Curve): Polygon {
+  const outer = ensureCCW(flattenCurve(curve));
+  const rings: Ring[] = [outer];
+
+  if (curve.innerRings) {
+    for (let i = 0; i < curve.innerRings.length; i++) {
+      const ring = curve.innerRings[i];
+      if (ring.length < 3) continue;
+      // Ensure closed ring
+      let closed = ring;
+      const first = ring[0];
+      const last = ring[ring.length - 1];
+      if (first[0] !== last[0] || first[1] !== last[1]) {
+        closed = [...ring, [first[0], first[1]]];
+      }
+      rings.push(ensureCW(closed));
+    }
+  }
+
+  return rings;
+}
+
+/**
+ * Convert a polygon-clipping result polygon (one element of MultiPolygon)
+ * back to a Curve object.
+ *
+ * The outer ring becomes start + segments (degenerate linear beziers).
+ * Any inner rings are stored as curve.innerRings.
+ */
+function polygonToCurve(
+  rings: Polygon,
+  template: Curve,
+  newId?: string
+): Curve {
+  const outerRing = rings[0];
+  // Remove closing point if present (we store open rings in segments)
+  let outer = outerRing;
+  if (outer.length > 1) {
+    const first = outer[0];
+    const last = outer[outer.length - 1];
+    if (first[0] === last[0] && first[1] === last[1]) {
+      outer = outer.slice(0, -1);
+    }
+  }
+
+  if (outer.length < 3) {
+    // Degenerate polygon — return a minimal placeholder
+    const start: Pt = outer.length > 0 ? [outer[0][0], outer[0][1]] : [0, 0];
+    return {
+      id: newId || template.id,
+      start,
+      segments: [],
+      closed: true,
+      color: template.color,
+      opacity: template.opacity,
+      strokeColor: template.strokeColor,
+      strokeWidth: template.strokeWidth
+    };
+  }
+
+  const start: Pt = [outer[0][0], outer[0][1]];
+  const segments: BezierSegment[] = [];
+
+  for (let i = 1; i < outer.length; i++) {
+    const prev = outer[i - 1];
+    const curr = outer[i];
+    // Linear bezier: control points at 1/3 and 2/3 along the line
+    const cp1x = prev[0] + (curr[0] - prev[0]) / 3;
+    const cp1y = prev[1] + (curr[1] - prev[1]) / 3;
+    const cp2x = prev[0] + 2 * (curr[0] - prev[0]) / 3;
+    const cp2y = prev[1] + 2 * (curr[1] - prev[1]) / 3;
+    segments.push([cp1x, cp1y, cp2x, cp2y, curr[0], curr[1]]);
+  }
+
+  // Collect inner rings (holes), removing closing points
+  let innerRings: Pt[][] | undefined;
+  if (rings.length > 1) {
+    innerRings = [];
+    for (let r = 1; r < rings.length; r++) {
+      let ring = rings[r];
+      if (ring.length > 1) {
+        const first = ring[0];
+        const last = ring[ring.length - 1];
+        if (first[0] === last[0] && first[1] === last[1]) {
+          ring = ring.slice(0, -1);
+        }
+      }
+      if (ring.length >= 3) {
+        innerRings.push(ring);
+      }
+    }
+    if (innerRings.length === 0) {
+      innerRings = undefined;
+    }
+  }
+
+  const curve: Curve = {
+    id: newId || template.id,
+    start,
+    segments,
+    closed: true,
+    color: template.color,
+    opacity: template.opacity,
+    strokeColor: template.strokeColor,
+    strokeWidth: template.strokeWidth
+  };
+
+  if (innerRings) {
+    curve.innerRings = innerRings;
+  }
+
+  return curve;
+}
+
+// =========================================================================
+// Clip polygon perturbation (prevent shared-edge crashes)
+// =========================================================================
+
+/**
+ * Slightly expand a closed polygon ring outward from its centroid.
+ * Prevents polygon-clipping (Martinez-Rueda-Feito) from crashing when
+ * the subject and clip polygons share exact edges — a common case when
+ * curves have been previously erased along hex/grid boundaries.
+ *
+ * The expansion is 0.01 world units (~0.01px), invisible at any zoom
+ * but enough to break exact edge coincidence.
+ */
+const CLIP_EXPAND_EPSILON = 0.01;
+
+function expandClipRing(ring: Ring): Ring {
+  // Compute centroid of the ring (exclude closing point if present)
+  const isClosed = ring.length > 1 &&
+    ring[0][0] === ring[ring.length - 1][0] &&
+    ring[0][1] === ring[ring.length - 1][1];
+  const n = isClosed ? ring.length - 1 : ring.length;
+  if (n < 3) return ring;
+
+  let cx = 0, cy = 0;
+  for (let i = 0; i < n; i++) {
+    cx += ring[i][0];
+    cy += ring[i][1];
+  }
+  cx /= n;
+  cy /= n;
+
+  // Scale each vertex outward from centroid by epsilon
+  const expanded: Ring = [];
+  for (let i = 0; i < ring.length; i++) {
+    const dx = ring[i][0] - cx;
+    const dy = ring[i][1] - cy;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist < 1e-10) {
+      expanded.push(ring[i]);
+    } else {
+      expanded.push([
+        ring[i][0] + (dx / dist) * CLIP_EXPAND_EPSILON,
+        ring[i][1] + (dy / dist) * CLIP_EXPAND_EPSILON,
+      ]);
+    }
+  }
+  return expanded;
+}
+
+// =========================================================================
+// Polygon area filter (remove degenerate slivers)
+// =========================================================================
+
+/**
+ * Compute the absolute area of a polygon (with holes).
+ */
+function polygonArea(rings: Polygon): number {
+  let area = Math.abs(signedArea(rings[0]));
+  for (let i = 1; i < rings.length; i++) {
+    area -= Math.abs(signedArea(rings[i]));
+  }
+  return Math.abs(area);
+}
+
+// =========================================================================
+// Main API
+// =========================================================================
+
+/**
+ * Subtract a grid cell from a single curve using boolean polygon subtraction.
+ *
+ * @returns Array of resulting curves (0 if fully erased, 1 if modified, 2+ if split)
+ */
+function subtractCellFromCurve(
+  curve: Curve,
+  cellX: number, cellY: number,
+  cellSize: number
+): Curve[] {
+  if (!curve.closed) return []; // Open curves are fully removed when hit
+
+  // Build subject polygon from curve
+  const subject = curveToPolygon(curve);
+  if (subject[0].length < 4) return [curve]; // Need at least 3 points + closing
+
+  // Build clip polygon (cell rectangle, CCW)
+  const rx0 = cellX * cellSize;
+  const ry0 = cellY * cellSize;
+  const rx1 = rx0 + cellSize;
+  const ry1 = ry0 + cellSize;
+
+  const cellPoly: Polygon = [expandClipRing([
+    [rx0, ry0],
+    [rx1, ry0],
+    [rx1, ry1],
+    [rx0, ry1],
+    [rx0, ry0]
+  ])];
+
+  // Boolean difference
+  let result: MultiPolygon;
+  try {
+    result = difference(subject, cellPoly);
+  } catch {
+    // polygon-clipping can throw on degenerate input — preserve original
+    return [curve];
+  }
+
+  if (!result || result.length === 0) {
+    return []; // Fully erased
+  }
+
+  // Minimum area threshold to filter degenerate slivers
+  const minArea = cellSize * cellSize * 0.01;
+
+  // Convert results back to Curve objects, simplifying rings first
+  const resultCurves: Curve[] = [];
+  for (let i = 0; i < result.length; i++) {
+    const poly = result[i];
+    if (polygonArea(poly) < minArea) continue;
+
+    // Simplify all rings to remove collinear vertices from cell subtraction
+    const simplified: Polygon = poly.map(ring => simplifyRing(ring));
+
+    const id = i === 0
+      ? curve.id
+      : curve.id + '-' + Date.now() + '-' + Math.random().toString(36).substr(2, 6);
+
+    resultCurves.push(polygonToCurve(simplified, curve, id));
+  }
+
+  return resultCurves.length > 0 ? resultCurves : [];
+}
+
+/**
+ * Find which curve (if any) contains a grid cell.
+ * Returns the index of the first overlapping curve, or -1.
+ * Accounts for inner rings (holes) — cells inside holes are not found.
+ */
+function findCurveAtCell(
+  curves: Curve[],
+  cellX: number, cellY: number,
+  cellSize: number
+): number {
+  for (let i = 0; i < curves.length; i++) {
+    const curve = curves[i];
+    if (!curve) continue;
+    if (!curve.closed) {
+      const x0 = cellX * cellSize;
+      const y0 = cellY * cellSize;
+      if (openCurveOverlapsRect(curve, x0, y0, x0 + cellSize, y0 + cellSize)) return i;
+      continue;
+    }
+
+    const outerPoly = flattenCurve(curve);
+    if (outerPoly.length < 3) continue;
+
+    // Build inner ring polygons for hole checking
+    let innerPolys: Pt[][] | undefined;
+    if (curve.innerRings && curve.innerRings.length > 0) {
+      innerPolys = curve.innerRings.filter(r => r.length >= 3);
+    }
+
+    if (cellOverlapsCurve(cellX, cellY, cellSize, outerPoly, innerPolys)) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+/**
+ * Erase a cell from the curves array using boolean polygon subtraction.
+ *
+ * @param curves - Current array of curves
+ * @param cellX - Grid column to erase
+ * @param cellY - Grid row to erase
+ * @param cellSize - Grid cell size in world units
+ * @returns New curves array with the cell erased, or null if no curve was affected
+ */
+function eraseCellFromCurves(
+  curves: Curve[],
+  cellX: number, cellY: number,
+  cellSize: number
+): Curve[] | null {
+  if (!curves || curves.length === 0) return null;
+
+  const idx = findCurveAtCell(curves, cellX, cellY, cellSize);
+  if (idx === -1) return null;
+
+  const affected = curves[idx];
+  const resultCurves = subtractCellFromCurve(affected, cellX, cellY, cellSize);
+
+  // Build new curves array: replace affected curve with result(s)
+  const newCurves: Curve[] = [];
+  for (let i = 0; i < curves.length; i++) {
+    if (i === idx) {
+      for (let j = 0; j < resultCurves.length; j++) {
+        newCurves.push(resultCurves[j]);
+      }
+    } else {
+      newCurves.push(curves[i]);
+    }
+  }
+
+  return newCurves;
+}
+
+/**
+ * Subtract a world-coordinate rectangle from all curves using boolean polygon subtraction.
+ *
+ * @param curves - Current array of curves
+ * @param worldMinX - Left edge in world coordinates
+ * @param worldMinY - Top edge in world coordinates
+ * @param worldMaxX - Right edge in world coordinates
+ * @param worldMaxY - Bottom edge in world coordinates
+ * @returns New curves array with the rectangle subtracted, or null if no curves were affected
+ */
+function eraseRectangleFromCurves(
+  curves: Curve[],
+  worldMinX: number, worldMinY: number,
+  worldMaxX: number, worldMaxY: number
+): Curve[] | null {
+  if (!curves || curves.length === 0) return null;
+
+  const rectPoly: Polygon = [expandClipRing([
+    [worldMinX, worldMinY],
+    [worldMaxX, worldMinY],
+    [worldMaxX, worldMaxY],
+    [worldMinX, worldMaxY],
+    [worldMinX, worldMinY]
+  ])];
+
+  let changed = false;
+  const newCurves: Curve[] = [];
+
+  for (let i = 0; i < curves.length; i++) {
+    const curve = curves[i];
+    if (!curve.closed) {
+      if (openCurveOverlapsRect(curve, worldMinX, worldMinY, worldMaxX, worldMaxY)) {
+        changed = true;
+        continue;
+      }
+      newCurves.push(curve);
+      continue;
+    }
+
+    const subject = curveToPolygon(curve);
+    if (subject[0].length < 4) {
+      newCurves.push(curve);
+      continue;
+    }
+
+    let result: MultiPolygon;
+    try {
+      result = difference(subject, rectPoly);
+    } catch {
+      newCurves.push(curve);
+      continue;
+    }
+
+    if (!result || result.length === 0) {
+      changed = true;
+      continue;
+    }
+
+    const minArea = 1.0;
+    const subjectArea = polygonArea(subject);
+    let anyKept = false;
+    let totalResultArea = 0;
+    for (let j = 0; j < result.length; j++) {
+      const poly = result[j];
+      const area = polygonArea(poly);
+      if (area < minArea) continue;
+      totalResultArea += area;
+      const simplified: Polygon = poly.map(ring => simplifyRing(ring));
+      const id = j === 0
+        ? curve.id
+        : curve.id + '-' + Date.now() + '-' + Math.random().toString(36).substr(2, 6);
+      newCurves.push(polygonToCurve(simplified, curve, id));
+      anyKept = true;
+    }
+
+    if (!anyKept || result.length !== 1 || subjectArea - totalResultArea > minArea * 0.01 ||
+        (anyKept && result[0].length !== subject.length)) {
+      changed = true;
+    }
+  }
+
+  return changed ? newCurves : null;
+}
+
+/**
+ * Subtract an arbitrary world-coordinate polygon from all curves using boolean subtraction.
+ *
+ * @param curves - Current array of curves
+ * @param clipVertices - Vertices of the clip polygon in world coordinates (open or closed)
+ * @returns New curves array with the polygon subtracted, or null if no curves were affected
+ */
+function eraseWorldPolygonFromCurves(
+  curves: Curve[],
+  clipVertices: Pt[]
+): Curve[] | null {
+  if (!curves || curves.length === 0 || clipVertices.length < 3) return null;
+
+  // Ensure closed ring
+  let ring = clipVertices;
+  const first = ring[0];
+  const last = ring[ring.length - 1];
+  if (first[0] !== last[0] || first[1] !== last[1]) {
+    ring = [...ring, [first[0], first[1]]];
+  }
+
+  const clipPoly: Polygon = [expandClipRing(ensureCCW(ring))];
+
+  let changed = false;
+  const newCurves: Curve[] = [];
+
+  for (let i = 0; i < curves.length; i++) {
+    const curve = curves[i];
+    if (!curve.closed) {
+      if (openCurveOverlapsPolygon(curve, ring)) {
+        changed = true;
+        continue;
+      }
+      newCurves.push(curve);
+      continue;
+    }
+
+    const subject = curveToPolygon(curve);
+    if (subject[0].length < 4) {
+      newCurves.push(curve);
+      continue;
+    }
+
+    let result: MultiPolygon;
+    try {
+      result = difference(subject, clipPoly);
+    } catch {
+      newCurves.push(curve);
+      continue;
+    }
+
+    if (!result || result.length === 0) {
+      changed = true;
+      continue;
+    }
+
+    const clipArea = Math.abs(signedArea(ring));
+    const minArea = clipArea * 0.01;
+
+    const subjectArea = polygonArea(subject);
+    let anyKept = false;
+    let totalResultArea = 0;
+    for (let j = 0; j < result.length; j++) {
+      const poly = result[j];
+      const area = polygonArea(poly);
+      if (area < minArea) continue;
+      totalResultArea += area;
+      const simplified: Polygon = poly.map(r => simplifyRing(r));
+      const id = j === 0
+        ? curve.id
+        : curve.id + '-' + Date.now() + '-' + Math.random().toString(36).substr(2, 6);
+      newCurves.push(polygonToCurve(simplified, curve, id));
+      anyKept = true;
+    }
+
+    if (!anyKept || result.length !== 1 || subjectArea - totalResultArea > minArea * 0.01 ||
+        (anyKept && result[0].length !== subject.length)) {
+      changed = true;
+    }
+  }
+
+  return changed ? newCurves : null;
+}
+
+/**
+ * Compute the polygon union of multiple closed curves.
+ * Returns a MultiPolygon result, or null on failure.
+ */
+function unionCurves(curves: Curve[]): MultiPolygon | null {
+  if (!curves || curves.length < 2) return null;
+
+  const polygons: Polygon[] = [];
+  for (let i = 0; i < curves.length; i++) {
+    const curve = curves[i];
+    if (!curve.closed) return null;
+    const poly = curveToPolygon(curve);
+    if (poly[0].length < 4) return null;
+    polygons.push(poly);
+  }
+
+  try {
+    return union(polygons[0], ...polygons.slice(1));
+  } catch {
+    return null;
+  }
+}
+
+export { flattenCurve, isLinearBezier, simplifyRing, pointInPolygon, cellOverlapsCurve, curveToPolygon, polygonToCurve, subtractCellFromCurve, findCurveAtCell, eraseCellFromCurves, eraseRectangleFromCurves, eraseWorldPolygonFromCurves, unionCurves, signedArea, ensureCCW, ensureCW, polygonArea, segmentIntersectsRect, polygonIntersectsRect, openCurveOverlapsRect, openCurveOverlapsPolygon, evalBezier };

@@ -1,0 +1,691 @@
+/**
+ * RegionLayer.tsx
+ *
+ * Interaction layer for hex region creation and editing.
+ * Registers handlers with EventHandlerContext and renders
+ * a pending-hex selection overlay and region management UI.
+ */
+
+import type { ToolId } from '#types/tools/tool.types';
+import type { VNode } from 'preact';
+import type { Region } from '#types/core/map.types';
+
+import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
+import { useApp } from '../../context/AppContext';
+import { useMapState } from '../../context/MapContext';
+import { useEventHandlerRegistration } from '../../context/EventHandlerContext';
+import { useRegionTools } from '../../hooks/interactions/useRegionTools';
+import { Menu, MenuItem } from 'obsidian';
+import { HexGeometry } from '../../geometry/core/HexGeometry';
+import { openNativeNoteLinkModal } from '../modals/NoteLinkModal';
+import { Icon } from '../shared/Icon';
+
+
+
+
+
+
+
+
+
+
+export interface RegionLayerProps {
+  currentTool: ToolId;
+  selectedColor: string;
+  selectedOpacity: number;
+  onRegionsChange: (regions: Region[]) => void;
+}
+
+const RegionLayer = ({
+  currentTool,
+  selectedColor,
+  selectedOpacity,
+  onRegionsChange
+}: RegionLayerProps): VNode | null => {
+  const app = useApp();
+  const { canvasRef, mapData, geometry, screenToWorld, screenToGrid } = useMapState();
+  const { registerHandlers, unregisterHandlers } = useEventHandlerRegistration();
+
+  const isRegionTool = currentTool === 'regionPaint' || currentTool === 'regionBoundary';
+
+  const {
+    pendingHexes,
+    boundaryVertices,
+    editingRegionId,
+    editingRegion,
+    handlePointerDown,
+    handlePointerMove,
+    handlePointerUp,
+    handleDoubleClick,
+    handleContextMenu,
+    confirmRegion,
+    cancelRegion,
+    deleteRegion,
+    updateRegion,
+    startEditingRegion,
+    stopEditingRegion,
+    contextMenu,
+    dismissContextMenu
+  } = useRegionTools({
+    currentTool,
+    selectedColor,
+    selectedOpacity,
+    mapData,
+    geometry,
+    screenToWorld,
+    screenToGrid,
+    onRegionsChange
+  });
+
+  // Register handlers — always register context menu, tool handlers only when active
+  const regionHandlersRef = useRef<Record<string, unknown> | null>(null);
+  regionHandlersRef.current = {
+    handleContextMenu,
+    ...(isRegionTool ? { handlePointerDown, handlePointerMove, handlePointerUp, handleDoubleClick } : {})
+  };
+
+  useEffect(() => {
+    const proxy = new Proxy({} as Record<string, unknown>, {
+      get(_target, prop: string) {
+        return regionHandlersRef.current?.[prop];
+      }
+    });
+    registerHandlers('region', proxy);
+    return () => unregisterHandlers('region');
+  }, []);
+
+  // Listen for edit-region events from sidebar panel
+  useEffect(() => {
+    const handler = (e: CustomEvent) => {
+      const { regionId } = e.detail;
+      if (regionId) {
+        startEditingRegion(regionId);
+      }
+    };
+    document.addEventListener('windrose:edit-region', handler as EventListener);
+    return () => document.removeEventListener('windrose:edit-region', handler as EventListener);
+  }, [startEditingRegion]);
+
+  // Name input state
+  const [showNameInput, setShowNameInput] = useState(false);
+  const [regionName, setRegionName] = useState('');
+
+  // Intercept undo when region creation/editing is in progress — cancel instead
+  useEffect(() => {
+    const handler = (e: Event) => {
+      if (pendingHexes.length > 0 || editingRegionId || showNameInput) {
+        e.preventDefault();
+        cancelRegion();
+        setShowNameInput(false);
+        setRegionName('');
+      }
+    };
+    document.addEventListener('windrose:before-undo', handler);
+    return () => document.removeEventListener('windrose:before-undo', handler);
+  }, [pendingHexes.length, editingRegionId, showNameInput, cancelRegion]);
+
+  const handleCreateClick = useCallback(() => {
+    setShowNameInput(true);
+    setRegionName('');
+  }, []);
+
+  const handleConfirmName = useCallback(() => {
+    if (!regionName.trim()) return;
+
+    if (editingRegionId) {
+      updateRegion(editingRegionId, { name: regionName.trim() });
+    } else {
+      confirmRegion(regionName.trim());
+    }
+    setShowNameInput(false);
+    setRegionName('');
+  }, [regionName, confirmRegion, editingRegionId, updateRegion]);
+
+  const handleCancelName = useCallback(() => {
+    setShowNameInput(false);
+    setRegionName('');
+  }, []);
+
+  const handleNameKeyDown = useCallback((e: KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleConfirmName();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      handleCancelName();
+    }
+  }, [handleConfirmName, handleCancelName]);
+
+  // Color change handler for the inline <input type="color">
+  const handleColorChange = useCallback((e: Event) => {
+    if (!editingRegion) return;
+    const newColor = (e.target as HTMLInputElement).value;
+    updateRegion(editingRegion.id, { color: newColor, borderColor: newColor });
+  }, [editingRegion, updateRegion]);
+
+  // ── Overlay canvas (same as FreehandLayer pattern) ─────────────────
+  const overlayRef = useRef<HTMLCanvasElement | null>(null);
+
+  useEffect(() => {
+    const mainCanvas = canvasRef.current;
+    if (!mainCanvas || !mainCanvas.parentElement || !isRegionTool) {
+      if (overlayRef.current && overlayRef.current.parentElement) {
+        overlayRef.current.parentElement.removeChild(overlayRef.current);
+        overlayRef.current = null;
+      }
+      return undefined;
+    }
+
+    if (!overlayRef.current) {
+      const overlay = document.createElement('canvas');
+      overlay.classList.add('windrose-overlay-layer');
+      mainCanvas.parentElement.appendChild(overlay);
+      overlayRef.current = overlay;
+    }
+
+    return () => {
+      if (overlayRef.current && overlayRef.current.parentElement) {
+        overlayRef.current.parentElement.removeChild(overlayRef.current);
+        overlayRef.current = null;
+      }
+    };
+  }, [canvasRef, isRegionTool]);
+
+  // Render pending/editing hexes on the overlay
+  useEffect(() => {
+    const overlay = overlayRef.current;
+    const mainCanvas = canvasRef.current;
+    if (!overlay || !mainCanvas || !geometry || geometry.type !== 'hex' || !mapData) return;
+
+    overlay.width = mainCanvas.width;
+    overlay.height = mainCanvas.height;
+
+    const ctx = overlay.getContext('2d');
+    if (!ctx) return;
+    ctx.clearRect(0, 0, overlay.width, overlay.height);
+
+    const hexesToHighlight = editingRegion ? editingRegion.hexes : pendingHexes;
+    const highlightColor = editingRegion ? editingRegion.color : selectedColor;
+
+    if (hexesToHighlight.length === 0 && boundaryVertices.length === 0) return;
+
+    const hexGeom = geometry as unknown as HexGeometry;
+    const viewState = mapData.viewState;
+    if (!viewState) return;
+
+    const northDirection = mapData.northDirection || 0;
+
+    if (northDirection !== 0) {
+      ctx.save();
+      ctx.translate(overlay.width / 2, overlay.height / 2);
+      ctx.rotate((northDirection * Math.PI) / 180);
+      ctx.translate(-overlay.width / 2, -overlay.height / 2);
+    }
+
+    const offsetX = overlay.width / 2 - viewState.center.x * viewState.zoom;
+    const offsetY = overlay.height / 2 - viewState.center.y * viewState.zoom;
+
+    if (hexesToHighlight.length > 0) {
+      ctx.globalAlpha = editingRegion ? 0.15 : 0.4;
+      ctx.fillStyle = highlightColor;
+      ctx.beginPath();
+      for (const h of hexesToHighlight) {
+        const vertices = hexGeom.getHexVertices(h.x, h.y);
+        const sv = vertices.map((v: { worldX: number; worldY: number }) => hexGeom.worldToScreen(v.worldX, v.worldY, offsetX, offsetY, viewState.zoom));
+        ctx.moveTo(sv[0].screenX, sv[0].screenY);
+        for (let i = 1; i < sv.length; i++) ctx.lineTo(sv[i].screenX, sv[i].screenY);
+        ctx.closePath();
+      }
+      ctx.fill();
+
+      ctx.globalAlpha = 0.8;
+      ctx.strokeStyle = highlightColor;
+      ctx.lineWidth = 2 * viewState.zoom;
+      ctx.beginPath();
+      for (const h of hexesToHighlight) {
+        const vertices = hexGeom.getHexVertices(h.x, h.y);
+        const sv = vertices.map((v: { worldX: number; worldY: number }) => hexGeom.worldToScreen(v.worldX, v.worldY, offsetX, offsetY, viewState.zoom));
+        ctx.moveTo(sv[0].screenX, sv[0].screenY);
+        for (let i = 1; i < sv.length; i++) ctx.lineTo(sv[i].screenX, sv[i].screenY);
+        ctx.closePath();
+      }
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+
+    if (boundaryVertices.length > 0) {
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([6, 4]);
+      ctx.beginPath();
+      const s0 = hexGeom.worldToScreen(boundaryVertices[0].x, boundaryVertices[0].y, offsetX, offsetY, viewState.zoom);
+      ctx.moveTo(s0.screenX, s0.screenY);
+      for (let i = 1; i < boundaryVertices.length; i++) {
+        const s = hexGeom.worldToScreen(boundaryVertices[i].x, boundaryVertices[i].y, offsetX, offsetY, viewState.zoom);
+        ctx.lineTo(s.screenX, s.screenY);
+      }
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      ctx.fillStyle = '#ffffff';
+      for (const v of boundaryVertices) {
+        const s = hexGeom.worldToScreen(v.x, v.y, offsetX, offsetY, viewState.zoom);
+        ctx.beginPath();
+        ctx.arc(s.screenX, s.screenY, 4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    if (northDirection !== 0) ctx.restore();
+  }, [pendingHexes, boundaryVertices, canvasRef, geometry, mapData, selectedColor, editingRegion]);
+
+  // ── Context menu via Obsidian's native Menu API ────────────────────
+  useEffect(() => {
+    if (!contextMenu || !mapData?.regions) {
+      if (contextMenu) dismissContextMenu();
+      return;
+    }
+
+    const region = mapData.regions.find(r => r.id === contextMenu.regionId);
+    if (!region) { dismissContextMenu(); return; }
+
+    const menu = new Menu();
+
+    menu.addItem((item: MenuItem) => {
+      item.setTitle('Edit region');
+      item.setIcon('lucide-pencil');
+      item.onClick(() => startEditingRegion(region.id));
+    });
+
+    menu.addItem((item: MenuItem) => {
+      item.setTitle('Rename');
+      item.setIcon('lucide-type');
+      item.onClick(() => {
+        startEditingRegion(region.id);
+        setShowNameInput(true);
+        setRegionName(region.name);
+      });
+    });
+
+    menu.addItem((item: MenuItem) => {
+      item.setTitle(region.visible ? 'Hide Region' : 'Show Region');
+      item.setIcon(region.visible ? 'lucide-eye-off' : 'lucide-eye');
+      item.onClick(() => updateRegion(region.id, { visible: !region.visible }));
+    });
+
+    if (region.linkedNote) {
+      menu.addItem((item: MenuItem) => {
+        item.setTitle('Open linked note');
+        item.setIcon('lucide-external-link');
+        item.onClick(() => {
+          const linkPath = region.linkedNote!.replace(/\.md$/, '');
+          void app.workspace.openLinkText(linkPath, '', false);
+        });
+      });
+    }
+
+    menu.addItem((item: MenuItem) => {
+      item.setTitle(region.linkedNote ? 'Change linked note' : 'Link note');
+      item.setIcon('lucide-link');
+      item.onClick(() => {
+        openNativeNoteLinkModal(app, {
+          onSave: (notePath: string | null) => updateRegion(region.id, { linkedNote: notePath || undefined }),
+          onClose: () => {},
+          currentNotePath: region.linkedNote || null,
+          objectType: null
+        });
+      });
+    });
+
+    if (region.linkedNote) {
+      menu.addItem((item: MenuItem) => {
+        item.setTitle('Remove note link');
+        item.setIcon('lucide-unlink');
+        item.onClick(() => updateRegion(region.id, { linkedNote: undefined }));
+      });
+    }
+
+    if (region.labelPosition) {
+      menu.addItem((item: MenuItem) => {
+        item.setTitle('Reset label position');
+        item.setIcon('lucide-undo-2');
+        item.onClick(() => updateRegion(region.id, { labelPosition: undefined }));
+      });
+    }
+
+    menu.addSeparator();
+
+    menu.addItem((item: MenuItem) => {
+      item.setTitle('Delete region');
+      item.setIcon('lucide-trash-2');
+      item.setWarning(true);
+      item.onClick(() => deleteRegion(region.id));
+    });
+
+    menu.showAtPosition({ x: contextMenu.screenX, y: contextMenu.screenY });
+    dismissContextMenu();
+  }, [contextMenu, mapData?.regions]);
+
+  // ── Long-press touch support for context menu (500ms) ──────────────
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressPosRef = useRef<{ x: number; y: number } | null>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return undefined;
+
+    const handleTouchStart = (e: TouchEvent) => {
+      if (e.touches.length !== 1) return;
+      const touch = e.touches[0];
+      longPressPosRef.current = { x: touch.clientX, y: touch.clientY };
+
+      longPressTimerRef.current = setTimeout(() => {
+        if (!longPressPosRef.current) return;
+        const synth = new MouseEvent('contextmenu', {
+          clientX: longPressPosRef.current.x,
+          clientY: longPressPosRef.current.y,
+          bubbles: true
+        });
+        const hex = screenToGrid ? screenToGrid(longPressPosRef.current.x, longPressPosRef.current.y) : null;
+        if (hex && mapData?.regions) {
+          const key = `${hex.x},${hex.y}`;
+          const region = mapData.regions.find(r => r.hexes.some(h => `${h.x},${h.y}` === key));
+          if (region) {
+            handleContextMenu(synth);
+          }
+        }
+        longPressPosRef.current = null;
+      }, 500);
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (longPressPosRef.current && e.touches.length === 1) {
+        const touch = e.touches[0];
+        const dx = touch.clientX - longPressPosRef.current.x;
+        const dy = touch.clientY - longPressPosRef.current.y;
+        if (dx * dx + dy * dy > 100) {
+          if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+          longPressPosRef.current = null;
+        }
+      }
+    };
+
+    const handleTouchEnd = () => {
+      if (longPressTimerRef.current) {
+        clearTimeout(longPressTimerRef.current);
+        longPressTimerRef.current = null;
+      }
+      longPressPosRef.current = null;
+    };
+
+    canvas.addEventListener('touchstart', handleTouchStart, { passive: true });
+    canvas.addEventListener('touchmove', handleTouchMove, { passive: true });
+    canvas.addEventListener('touchend', handleTouchEnd);
+    canvas.addEventListener('touchcancel', handleTouchEnd);
+
+    return () => {
+      canvas.removeEventListener('touchstart', handleTouchStart);
+      canvas.removeEventListener('touchmove', handleTouchMove);
+      canvas.removeEventListener('touchend', handleTouchEnd);
+      canvas.removeEventListener('touchcancel', handleTouchEnd);
+      if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+    };
+  }, [canvasRef, screenToGrid, mapData?.regions, handleContextMenu]);
+
+  // ── JSX ────────────────────────────────────────────────────────────
+  return (
+    <div className="dmt-region-ui" style={{ position: 'relative' }}>
+      {/* Editing existing region bar */}
+      {editingRegion && pendingHexes.length === 0 && !showNameInput && (
+        <div style={{
+          position: 'fixed',
+          bottom: '100px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          display: 'flex',
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: '10px',
+          background: 'var(--background-secondary)',
+          border: '1px solid var(--background-modifier-border)',
+          borderRadius: '8px',
+          padding: '8px 16px',
+          zIndex: 1000,
+          boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+          whiteSpace: 'nowrap'
+        }}>
+          <input
+            type="color"
+            value={editingRegion.color}
+            onInput={handleColorChange}
+            title="Change region color"
+            style={{
+              width: '28px',
+              height: '28px',
+              borderRadius: '4px',
+              border: '2px solid var(--background-modifier-border)',
+              cursor: 'pointer',
+              flexShrink: 0,
+              padding: 0,
+              background: 'none'
+            }}
+          />
+          <span style={{ color: 'var(--text-normal)', fontSize: '13px', fontWeight: '600' }}>
+            {editingRegion.name}
+          </span>
+          <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>
+            {editingRegion.hexes.length} hex{editingRegion.hexes.length !== 1 ? 'es' : ''}
+          </span>
+          <span style={{ color: 'var(--text-faint)', fontSize: '11px', margin: '0 4px' }}>|</span>
+          <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>
+            Click hexes to add/remove
+          </span>
+          <button
+            onClick={() => {
+              const region = editingRegion;
+              openNativeNoteLinkModal(app, {
+                onSave: (notePath: string | null) => {
+                  updateRegion(region.id, { linkedNote: notePath || undefined });
+                },
+                onClose: () => {},
+                currentNotePath: region.linkedNote || null,
+                objectType: null
+              });
+            }}
+            title={editingRegion.linkedNote ? 'Change linked note' : 'Link note'}
+            style={{
+              padding: '4px 8px',
+              background: 'transparent',
+              color: editingRegion.linkedNote ? 'var(--text-accent)' : 'var(--text-muted)',
+              borderRadius: '4px',
+              border: '1px solid var(--background-modifier-border)',
+              cursor: 'pointer',
+              fontSize: '12px',
+              minHeight: '32px',
+              display: 'flex',
+              alignItems: 'center'
+            }}
+          >
+            <Icon icon={editingRegion.linkedNote ? 'lucide-file-check' : 'lucide-link'} />
+          </button>
+          <button
+            onClick={() => {
+              setShowNameInput(true);
+              setRegionName(editingRegion.name);
+            }}
+            style={{
+              padding: '4px 12px',
+              background: 'transparent',
+              color: 'var(--text-accent)',
+              borderRadius: '4px',
+              border: '1px solid var(--background-modifier-border)',
+              cursor: 'pointer',
+              fontSize: '12px',
+              minHeight: '32px'
+            }}
+          >
+            Rename
+          </button>
+          <button
+            onClick={() => deleteRegion(editingRegion.id)}
+            style={{
+              padding: '4px 12px',
+              background: 'transparent',
+              color: 'var(--text-error)',
+              borderRadius: '4px',
+              border: '1px solid var(--background-modifier-border)',
+              cursor: 'pointer',
+              fontSize: '12px',
+              minHeight: '32px'
+            }}
+          >
+            Delete
+          </button>
+          <button
+            onClick={stopEditingRegion}
+            style={{
+              padding: '4px 12px',
+              background: 'transparent',
+              color: 'var(--text-muted)',
+              borderRadius: '4px',
+              border: '1px solid var(--background-modifier-border)',
+              cursor: 'pointer',
+              fontSize: '12px',
+              minHeight: '32px'
+            }}
+          >
+            Done
+          </button>
+        </div>
+      )}
+
+      {/* Create Region bar */}
+      {isRegionTool && pendingHexes.length > 0 && !showNameInput && !editingRegionId && (
+        <div style={{
+          position: 'fixed',
+          bottom: '100px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          display: 'flex',
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: '10px',
+          background: 'var(--background-secondary)',
+          border: '1px solid var(--background-modifier-border)',
+          borderRadius: '8px',
+          padding: '8px 16px',
+          zIndex: 1000,
+          boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+          whiteSpace: 'nowrap'
+        }}>
+          <span style={{ color: 'var(--text-muted)', fontSize: '13px', marginRight: '4px' }}>
+            {pendingHexes.length} hex{pendingHexes.length !== 1 ? 'es' : ''}
+          </span>
+          <button
+            onClick={handleCreateClick}
+            style={{
+              padding: '6px 16px',
+              background: 'var(--interactive-accent)',
+              color: 'var(--text-on-accent)',
+              borderRadius: '6px',
+              border: 'none',
+              cursor: 'pointer',
+              fontSize: '13px',
+              fontWeight: '600',
+              minHeight: '36px'
+            }}
+          >
+            Create Region
+          </button>
+          <button
+            onClick={cancelRegion}
+            style={{
+              padding: '6px 12px',
+              background: 'transparent',
+              color: 'var(--text-muted)',
+              borderRadius: '6px',
+              border: '1px solid var(--background-modifier-border)',
+              cursor: 'pointer',
+              fontSize: '13px',
+              minHeight: '36px'
+            }}
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+
+      {/* Name input */}
+      {showNameInput && (
+        <div style={{
+          position: 'fixed',
+          bottom: '100px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          display: 'flex',
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: '8px',
+          background: 'var(--background-secondary)',
+          border: '1px solid var(--background-modifier-border)',
+          borderRadius: '8px',
+          padding: '8px 12px',
+          zIndex: 1000,
+          boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+          whiteSpace: 'nowrap'
+        }}>
+          <input
+            type="text"
+            placeholder="Region name..."
+            value={regionName}
+            onInput={(e: Event) => setRegionName((e.target as HTMLInputElement).value)}
+            onKeyDown={handleNameKeyDown}
+            ref={(el: HTMLInputElement | null) => { if (el) setTimeout(() => el.focus(), 0); }}
+            style={{
+              background: 'var(--background-primary)',
+              color: 'var(--text-normal)',
+              border: '1px solid var(--background-modifier-border)',
+              borderRadius: '4px',
+              padding: '6px 10px',
+              fontSize: '14px',
+              width: '200px'
+            }}
+          />
+          <button
+            onClick={handleConfirmName}
+            disabled={!regionName.trim()}
+            style={{
+              padding: '6px 16px',
+              background: regionName.trim() ? 'var(--interactive-accent)' : 'var(--background-modifier-border)',
+              color: regionName.trim() ? 'var(--text-on-accent)' : 'var(--text-muted)',
+              borderRadius: '6px',
+              border: 'none',
+              cursor: regionName.trim() ? 'pointer' : 'default',
+              fontSize: '13px',
+              minHeight: '36px'
+            }}
+          >
+            OK
+          </button>
+          <button
+            onClick={handleCancelName}
+            style={{
+              padding: '6px 12px',
+              background: 'transparent',
+              color: 'var(--text-muted)',
+              borderRadius: '6px',
+              border: '1px solid var(--background-modifier-border)',
+              cursor: 'pointer',
+              fontSize: '13px',
+              minHeight: '36px'
+            }}
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export { RegionLayer };

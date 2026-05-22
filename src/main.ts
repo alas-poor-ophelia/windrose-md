@@ -1,0 +1,373 @@
+import { Plugin, Notice } from 'obsidian';
+import type { PluginSettings } from '#types/settings/settings.types';
+import type { MapType } from '#types/index';
+import { render, h } from 'preact';
+import { DungeonMapTracker } from './DungeonMapTracker';
+import { AppContext } from './context/AppContext';
+import { InsertMapModal } from './components/modals/InsertMapModal';
+import { InsertDungeonModal } from './settings/modals/InsertDungeonModal';
+import * as dungeonGenerator from './generation/dungeonGenerator';
+import * as objectPlacer from './generation/objectPlacer';
+import { registerDeepLinks } from './core/deepLinkRegistration';
+import { setPlugin, clearPlugin } from './core/settingsAccessor';
+import { WindroseMDSettingsTab } from './settings/WindroseSettingsTab';
+
+/** Cell produced by the dungeon generator with grid coordinates. */
+interface DungeonCell {
+  x: number;
+  y: number;
+  [key: string]: unknown;
+}
+
+/** Options bag passed from the dungeon generator. */
+interface DungeonGenOptions {
+  preset?: string;
+  configOverrides?: { autoFogEnabled?: boolean; [key: string]: unknown };
+  distancePerCell?: number;
+  distanceUnit?: string;
+  stockingMetadata?: {
+    rooms?: Array<{ id: string; x: number; y: number; width: number; height: number; radius?: number; shape?: string; parts?: Array<{ x: number; y: number; width: number; height: number }> }>;
+    entryRoomId?: string;
+  };
+  [key: string]: unknown;
+}
+
+export default class WindrosePlugin extends Plugin {
+  settings: Partial<PluginSettings> = {};
+  dataFilePath: string = 'windrose-md-data.json';
+
+  async onload() {
+    await this.loadSettings();
+    await this.migrateFromOldPlugin();
+    this.initMcpNamespace();
+    await this.resolveDebugConfig();
+    await this.resolveDataFilePath();
+    this.checkForConflicts();
+
+    setPlugin(this);
+
+    console.log('[Windrose] Plugin loaded, version:', this.manifest.version, 'data:', this.dataFilePath);
+
+    this.registerMarkdownCodeBlockProcessor('windrose-map', (source, el, ctx) => {
+      const config = parseYamlConfig(source);
+      const mapId = config.id || '';
+      const mapName = config.name || 'Unnamed Map';
+      const mapType = (config.type || 'grid') as MapType;
+
+      if (!mapId) {
+        el.createEl('div', {
+          text: 'Windrose: missing required "ID" field in windrose-map block.',
+          cls: 'windrose-error'
+        });
+        return;
+      }
+
+      render(
+        h(AppContext.Provider, { value: this.app },
+          h(DungeonMapTracker, { mapId, mapName, mapType, notePath: ctx.sourcePath })
+        ),
+        el
+      );
+    });
+
+    registerDeepLinks(this);
+
+    this.addSettingTab(new WindroseMDSettingsTab(this.app, this));
+
+    this.addCommand({
+      id: 'insert-new-map',
+      name: 'Insert new map',
+      editorCallback: (editor) => {
+        new InsertMapModal(this.app, (mapName, mapType) => {
+          const mapId = 'map-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+          const codeBlock = [
+            '```windrose-map',
+            `id: ${mapId}`,
+            `name: ${mapName}`,
+            `type: ${mapType}`,
+            '```'
+          ].join('\n');
+          editor.replaceSelection(codeBlock);
+        }).open();
+      }
+    });
+
+    this.addCommand({
+      id: 'insert-random-dungeon',
+      name: 'Generate random dungeon',
+      editorCallback: async (editor) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        new (InsertDungeonModal as any)(this.app, this, async (mapName: string, cells: any[], objects: any[], edges: any[], options: any) => {
+          const mapId = 'map-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+          await this.saveDungeonToJson(mapId, mapName, cells, objects, edges, options);
+
+          const codeBlock = [
+            '```windrose-map',
+            `id: ${mapId}`,
+            `name: ${mapName}`,
+            'type: grid',
+            '```'
+          ].join('\n');
+
+          editor.replaceSelection(codeBlock);
+        }).open();
+      }
+    });
+  }
+
+  onunload() {
+    clearPlugin();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const w = window as any;
+    if (w.__windrose) {
+      w.__windrose.mcpInstances = null;
+    }
+  }
+
+  private initMcpNamespace() {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const w = window as any;
+    w.__windrose = w.__windrose || {};
+    w.__windrose.version = this.manifest.version;
+  }
+
+  private async resolveDebugConfig() {
+    try {
+      let content: string | null = null;
+      const debugFile = this.app.vault.getAbstractFileByPath('WINDROSE-DEBUG.json');
+      if (debugFile) {
+        content = await this.app.vault.read(debugFile as import('obsidian').TFile);
+      } else if (await this.app.vault.adapter.exists('WINDROSE-DEBUG.json')) {
+        content = await this.app.vault.adapter.read('WINDROSE-DEBUG.json');
+      }
+
+      if (content) {
+        const config = JSON.parse(content);
+        if (config.dataFilePath) {
+          this.dataFilePath = config.dataFilePath;
+          console.log('[Windrose] Debug data path:', config.dataFilePath);
+        }
+      }
+    } catch (e) {
+      console.warn('[Windrose] Failed to load WINDROSE-DEBUG.json:', e);
+    }
+  }
+
+  private async migrateFromOldPlugin() {
+    if (Object.keys(this.settings).length > 0) return;
+
+    const oldDataPath = `${this.app.vault.configDir}/plugins/dungeon-map-tracker-settings/data.json`;
+    try {
+      if (!await this.app.vault.adapter.exists(oldDataPath)) return;
+
+      const content = await this.app.vault.adapter.read(oldDataPath);
+      const oldSettings = JSON.parse(content);
+
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { version, ...importable } = oldSettings;
+      this.settings = importable;
+      await this.saveData(this.settings);
+
+      new Notice('Windrose: settings imported from previous installation.', 10000);
+      console.log('[Windrose] Migrated settings from dungeon-map-tracker-settings');
+    } catch (e) {
+      console.warn('[Windrose] Could not migrate old settings:', e);
+    }
+  }
+
+  private async resolveDataFilePath() {
+    if (this.dataFilePath !== 'windrose-md-data.json') return;
+    if (await this.app.vault.adapter.exists(this.dataFilePath)) return;
+
+    const allFiles = this.app.vault.getFiles();
+    const dataFile = allFiles.find(f => f.name === 'windrose-md-data.json');
+    if (dataFile) {
+      this.dataFilePath = dataFile.path;
+      console.log('[Windrose] Auto-discovered data file at:', dataFile.path);
+    }
+  }
+
+  private checkForConflicts() {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const plugins = (this.app as any).plugins?.plugins;
+    if (plugins?.['dungeon-map-tracker-settings']?._loaded) {
+      new Notice(
+        'Windrose: The old "Dungeon Map Tracker Settings" plugin is still active. ' +
+        'Please disable it in Settings → Community Plugins to avoid conflicts.',
+        20000
+      );
+      console.warn('[Windrose] Old plugin dungeon-map-tracker-settings is still active');
+    }
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async loadDungeonGenerator(): Promise<any> {
+    return dungeonGenerator;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async loadObjectPlacer(): Promise<any> {
+    return objectPlacer;
+  }
+
+  private buildFogOfWar(cells: DungeonCell[], options: DungeonGenOptions): { enabled: boolean; foggedCells: Array<{ col: number; row: number }> } | null {
+    const autoFogEnabled = options?.configOverrides?.autoFogEnabled;
+    if (!autoFogEnabled) return null;
+
+    const stockingMeta = options?.stockingMetadata;
+    if (!stockingMeta?.rooms || !cells?.length) return null;
+
+    const entryRoomId = stockingMeta.entryRoomId;
+    const entryRoom = stockingMeta.rooms.find((r) => r.id === entryRoomId);
+
+    const entryRoomCells = new Set<string>();
+    if (entryRoom) {
+      for (let x = entryRoom.x; x < entryRoom.x + entryRoom.width; x++) {
+        for (let y = entryRoom.y; y < entryRoom.y + entryRoom.height; y++) {
+          if (entryRoom.shape === 'circle' && entryRoom.radius != null) {
+            const centerX = entryRoom.x + entryRoom.radius;
+            const centerY = entryRoom.y + entryRoom.radius;
+            const dx = x + 0.5 - centerX;
+            const dy = y + 0.5 - centerY;
+            if (dx * dx + dy * dy <= entryRoom.radius * entryRoom.radius) {
+              entryRoomCells.add(`${x},${y}`);
+            }
+          } else if (entryRoom.shape === 'composite' && entryRoom.parts) {
+            for (const part of entryRoom.parts) {
+              if (x >= part.x && x < part.x + part.width &&
+                  y >= part.y && y < part.y + part.height) {
+                entryRoomCells.add(`${x},${y}`);
+                break;
+              }
+            }
+          } else {
+            entryRoomCells.add(`${x},${y}`);
+          }
+        }
+      }
+    }
+
+    const foggedCells = cells
+      .filter((c) => !entryRoomCells.has(`${c.x},${c.y}`))
+      .map((c) => ({ col: c.x, row: c.y }));
+
+    return { enabled: true, foggedCells };
+  }
+
+  private async saveDungeonToJson(mapId: string, mapName: string, cells: DungeonCell[], objects: unknown[], edges: unknown[], options: DungeonGenOptions) {
+    const SCHEMA_VERSION = 2;
+
+    try {
+      const dataFilePath = this.dataFilePath;
+      let allData: { maps: Record<string, unknown> } = { maps: {} };
+
+      const file = this.app.vault.getAbstractFileByPath(dataFilePath);
+      if (file) {
+        const content = await this.app.vault.read(file as import('obsidian').TFile);
+        allData = JSON.parse(content) as { maps: Record<string, unknown> };
+      }
+
+      if (!allData.maps) allData.maps = {};
+
+      const layerId = 'layer-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+
+      let centerX = 5, centerY = 5;
+      const gridSize = 32;
+      if (cells.length > 0) {
+        const minX = Math.min(...cells.map((c) => c.x));
+        const maxX = Math.max(...cells.map((c) => c.x));
+        const minY = Math.min(...cells.map((c) => c.y));
+        const maxY = Math.max(...cells.map((c) => c.y));
+        centerX = (minX + maxX) / 2;
+        centerY = (minY + maxY) / 2;
+      }
+
+      const mapData = {
+        name: mapName,
+        description: "",
+        mapType: "grid",
+        northDirection: 0,
+        customColors: [],
+        sidebarCollapsed: false,
+        expandedState: false,
+        generationSettings: {
+          preset: options.preset,
+          configOverrides: options.configOverrides || {},
+          distancePerCell: options.distancePerCell || 5,
+          distanceUnit: options.distanceUnit || 'ft',
+          stockingMetadata: options.stockingMetadata || null
+        },
+        settings: {
+          useGlobalSettings: false,
+          overrides: {
+            distancePerCellGrid: options.distancePerCell || 5,
+            distanceUnitGrid: options.distanceUnit || 'ft'
+          }
+        },
+        uiPreferences: {
+          rememberPanZoom: true,
+          rememberSidebarState: true,
+          rememberExpandedState: false
+        },
+        lastTextLabelSettings: null,
+        schemaVersion: SCHEMA_VERSION,
+        activeLayerId: layerId,
+        layerPanelVisible: false,
+        layers: [{
+          id: layerId,
+          name: 'Layer 1',
+          order: 0,
+          visible: true,
+          cells: cells,
+          edges: edges || [],
+          objects: objects || [],
+          textLabels: [],
+          fogOfWar: this.buildFogOfWar(cells, options)
+        }],
+        gridSize: gridSize,
+        dimensions: { width: 300, height: 300 },
+        viewState: {
+          zoom: 1.5,
+          center: { x: centerX, y: centerY }
+        }
+      };
+
+      allData.maps[mapId] = mapData;
+
+      const jsonString = JSON.stringify(allData, null, 2);
+      if (file) {
+        await this.app.vault.modify(file as import('obsidian').TFile, jsonString);
+      } else {
+        const dirPath = dataFilePath.substring(0, dataFilePath.lastIndexOf('/'));
+        if (dirPath) {
+          try { await this.app.vault.createFolder(dirPath); } catch { /* exists */ }
+        }
+        await this.app.vault.create(dataFilePath, jsonString);
+      }
+    } catch (error) {
+      console.error('[Windrose] Failed to save dungeon:', error);
+      throw error;
+    }
+  }
+
+  async loadSettings() {
+    this.settings = (await this.loadData()) || {};
+  }
+
+  async saveSettings() {
+    await this.saveData(this.settings);
+    window.dispatchEvent(new CustomEvent('dmt-settings-changed'));
+  }
+}
+
+function parseYamlConfig(source: string): Record<string, string> {
+  const config: Record<string, string> = {};
+  for (const line of source.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const colonIdx = trimmed.indexOf(':');
+    if (colonIdx === -1) continue;
+    config[trimmed.slice(0, colonIdx).trim()] = trimmed.slice(colonIdx + 1).trim();
+  }
+  return config;
+}
