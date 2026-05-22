@@ -9,7 +9,7 @@ import type { MapObject, ObjectUpdate } from '../objects/object.types';
 import type { TextLabel, NotePin } from '../objects/note.types';
 import type { IGeometry, Point } from '../core/geometry.types';
 import type { Curve } from '../core/curve.types';
-import type { MapData } from '../core/map.types';
+import type { MapData, ViewState, TextLabelSettings } from '../core/map.types';
 import type { Cell } from '../core/cell.types';
 import type { BorderSide } from '../core/rendering.types';
 import type { HexTileAssignment } from '../tiles/tile.types';
@@ -18,6 +18,12 @@ import type { ToolId } from '../tools/tool.types';
 // ===========================================
 // Shared Helper Types
 // ===========================================
+
+/** Partial update payload for map-level operations (viewState, text label defaults) */
+export interface MapDataUpdate {
+  viewState?: ViewState;
+  lastTextLabelSettings?: TextLabelSettings;
+}
 
 /** Edge info from geometry */
 export interface EdgeInfo {
@@ -133,7 +139,7 @@ export interface MapOperationsContextValue {
   getNotePinAtPosition?: (pins: NotePin[], worldX: number, worldY: number, cellSize: number) => NotePin | null;
 
   // Map-level operations
-  onMapDataUpdate?: (updater: (data: MapData | null) => MapData | null) => void;
+  onMapDataUpdate?: (updates: MapDataUpdate) => void;
   [key: string]: unknown;
 }
 

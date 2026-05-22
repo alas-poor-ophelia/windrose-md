@@ -205,6 +205,7 @@ export type {
   ItemUpdate,
   GroupDragInitialState,
   MapSelectionContextValue,
+  MapDataUpdate,
 } from './contexts/context.types';
 
 // ===========================================
@@ -439,8 +440,3 @@ export type {
   ImageDragHandlerResult,
   UseImageAlignmentResult,
 } from './hooks/imageAlignment.types';
-
-// ===========================================
-// Datacore Globals
-// ===========================================
-export type { DatacoreLocalApi } from './datacore-globals';

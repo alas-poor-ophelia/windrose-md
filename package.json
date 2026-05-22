@@ -1,7 +1,7 @@
 {
   "name": "windrose-md",
   "version": "1.5.0",
-  "description": "Dungeon mapping plugin for Obsidian via Datacore",
+  "description": "Interactive dungeon and world mapping plugin for Obsidian",
   "type": "module",
   "scripts": {
     "lint": "eslint . --ext .ts,.tsx,.js,.jsx",
@@ -21,7 +21,7 @@
     "postinstall": "patch-package"
   },
   "devDependencies": {
-    "@blacksmithgu/datacore": "^0.1.0",
+
     "@playwright/test": "^1.48.1",
     "@typescript-eslint/eslint-plugin": "^8.18.0",
     "@typescript-eslint/parser": "^8.18.0",
@@ -34,13 +34,12 @@
     "patch-package": "^8.0.1",
     "polygon-clipping": "^0.15.7",
     "preact": "^10.25.0",
-    "ts-plugin-datacore": "file:./ts-plugin-datacore",
+
     "typescript": "^5.7.0",
     "vitest": "^2.1.4"
   },
   "keywords": [
     "obsidian",
-    "datacore",
     "dungeon",
     "mapping",
     "ttrpg"

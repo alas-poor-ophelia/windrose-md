@@ -20,12 +20,8 @@
     "types": ["obsidian-typings"],
     "baseUrl": ".",
     "paths": {
-      "#types/*": ["./types/*"],
-      "@blacksmithgu/datacore": ["./node_modules/@blacksmithgu/datacore"]
-    },
-    "plugins": [
-      { "name": "ts-plugin-datacore" }
-    ]
+      "#types/*": ["./types/*"]
+    }
   },
   "include": [
     "src/**/*.ts",

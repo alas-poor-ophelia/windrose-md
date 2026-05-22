@@ -23,12 +23,8 @@ export default [
         ecmaVersion: 2022,
         sourceType: "module",
         ecmaFeatures: {
-          jsx: true,
-          globalReturn: true  // Datacore wraps scripts in async function
+          jsx: true
         }
-      },
-      globals: {
-        dc: "readonly"  // Datacore global
       }
     },
     plugins: {
@@ -63,11 +59,9 @@ export default [
       "prefer-const": "error",
       
       // ===========================================
-      // Obsidian-Specific Rules
+      // Obsidian Community Plugin Rules (recommended)
       // ===========================================
-      "obsidianmd/regex-lookbehind": "error",
-      "obsidianmd/platform": "warn",
-      "obsidianmd/no-static-styles-assignment": "warn"
+      ...obsidianmd.configs.recommended
     }
   },
   
@@ -151,6 +145,9 @@ export default [
       "mcp/**",
       "types/generated/**",
       "*.md",
+      // Build artifacts
+      "main.js",
+      "styles.css",
       // Legacy JS files in vault - not linted
       "src/**/*.js",
       "src/**/*.jsx"

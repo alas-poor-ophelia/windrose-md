@@ -2,16 +2,17 @@
 
 Step-by-step guide for implementing new functionality.
 
-## Step 1: Identify Your Loading Context
+## Step 1: Identify Your Domain
 
-Most features live in **Datacore Runtime** (src/**). Only modify the Settings Plugin if you're changing global Obsidian preferences.
+Most features live in `src/`. Only modify the Settings Tab (`src/settings/`) if you're changing global Obsidian preferences.
 
-| Context | Location | When to Use |
-|---------|----------|-------------|
-| Datacore Runtime | `src/**` | Map features, tools, rendering, hooks |
-| Settings Plugin | `settingsplugin/` | Global Obsidian settings only |
+| Domain | Location | When to Use |
+|--------|----------|-------------|
+| Map features | `src/**` | Tools, rendering, hooks, components |
+| Settings UI | `src/settings/` | Global Obsidian settings tab |
+| Types | `types/` (dev root) | TypeScript type definitions |
 
-See `src/CLAUDE.md` → "Module Loading Contexts" for details.
+See `src/CLAUDE.md` for architecture details.
 
 ## Step 2: Find Reference Patterns
 
@@ -21,8 +22,8 @@ Before writing code, find similar existing features:
 |-----------|-----------------|
 | New tool | `useDrawingTools.ts`, `useAreaSelect.ts` |
 | New layer | `DrawingLayer.tsx`, `ObjectLayer.tsx` |
-| New modal/UI | `components/*.tsx` |
-| New geometry operation | `geometry/GridGeometry.ts`, `geometry/HexGeometry.ts` |
+| New modal/UI | `components/modals/`, `components/overlays/` |
+| New geometry operation | `geometry/core/GridGeometry.ts`, `geometry/core/HexGeometry.ts` |
 | New hook | `hooks/use*.ts` |
 | New context | `context/*Context.tsx` |
 
@@ -30,32 +31,29 @@ Before writing code, find similar existing features:
 
 | Need | File Pattern | Location |
 |------|--------------|----------|
-| Shared state | `*Context.tsx` | `context/` |
-| Reusable logic | `use*.ts` | `hooks/` |
-| Pure functions | `*Operations.ts` | `utils/` |
-| Canvas rendering | `*Renderer.ts` | `geometry/` |
-| Data access | `*Accessor.ts` | `utils/` |
-| React component | `*.tsx` | `components/` |
+| Shared state | `*Context.tsx` | `src/context/` |
+| Reusable logic | `use*.ts` | `src/hooks/` |
+| Pure functions | `*Operations.ts` | Appropriate domain dir |
+| Canvas rendering | `*Renderer.ts` | `src/geometry/renderers/` |
+| Data access | `*Accessor.ts` | `src/persistence/` |
+| Preact component | `*.tsx` | `src/components/` |
 | Types | `*.types.ts` | `types/` (dev root) |
 
 ## Step 4: Wire Up Exports and Imports
 
-**Exporting** (at end of your file):
+**Exporting** (standard ES modules):
 ```typescript
-return { myFunction, MyComponent };
+export { myFunction, MyComponent };
 ```
 
 **Importing** (in consumer file):
 ```typescript
-const { myFunction, MyComponent } = await requireModuleByName("MyFile.ts");
+import { myFunction, MyComponent } from '../path/to/MyFile';
 ```
 
-**For unit tests**, add your module to `MODULE_MAP` in `tests/unit/datacore-transformer.ts`:
+**Type imports** (from the types directory):
 ```typescript
-const MODULE_MAP = {
-  // ...existing entries
-  'MyFile.ts': './path/to/MyFile.ts',
-};
+import type { Cell, MapData } from '#types';
 ```
 
 ## Step 5: Test Your Feature
@@ -70,14 +68,14 @@ const MODULE_MAP = {
 
 ```bash
 npm run test:unit    # Fast, ~300ms
-npm run test:e2e     # Full integration, ~35-40s
+npm run test:e2e     # Full integration
 npm run check        # Typecheck + lint
 ```
 
 ## Checklist Before PR
 
 - [ ] Follows existing file naming conventions
-- [ ] Uses `dc.require()`/`return {}` pattern (no ES imports/exports)
+- [ ] Uses standard ES `import`/`export` syntax
 - [ ] Works on both grid and hex maps
 - [ ] No `console.log` left behind
 - [ ] Types added to `types/` if needed
