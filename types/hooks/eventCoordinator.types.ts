@@ -151,7 +151,9 @@ export interface MeasureHandlers {
 
 /** Image alignment handlers */
 export interface AlignmentHandlers {
-  // Alignment mode handlers if needed
+  handlePointerDown?: (e: Event | SyntheticPointerEvent) => void;
+  handlePointerMove?: (e: Event) => void;
+  handlePointerUp?: (e: Event) => void;
 }
 
 /** Fog of war handlers */

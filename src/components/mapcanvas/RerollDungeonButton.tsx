@@ -50,7 +50,7 @@ const RerollDungeonButton = (): VNode | null => {
   };
 
   const handleRerollAll = (): void => {
-    const result = generateDungeon(settings.preset, undefined, settings.configOverrides || {});
+    const result = generateDungeon(settings.preset, undefined, (settings.configOverrides || {}) as Record<string, unknown>);
     const stockResult = stockDungeon(
       result.metadata.rooms,
       result.metadata.corridorResult,

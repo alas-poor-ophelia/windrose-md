@@ -18,7 +18,7 @@ import { Icon } from '../shared/Icon';
 import type { MapData, MapObjectRef } from '#types/core/map.types';
 import type { TextLabel } from '#types/objects/note.types';
 import type { SelectedItem } from '#types/contexts/context.types';
-import type { CustomColor } from '#types/hooks/dataHandlers.types';
+import type { CustomColor } from '#types/core/common.types';
 
 interface Point { x: number; y: number }
 

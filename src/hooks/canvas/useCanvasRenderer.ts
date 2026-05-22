@@ -606,8 +606,8 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   // =========================================================================
 
   const fow = activeLayer.fogOfWar;
-  const effectiveSettings = getEffectiveSettings(mapData.settings) as Record<string, unknown>;
-  const fowBlurEnabled = (effectiveSettings?.fogOfWarBlurEnabled as boolean) ?? false;
+  const effectiveSettings = getEffectiveSettings(mapData.settings);
+  const fowBlurEnabled = effectiveSettings.fogOfWarBlurEnabled ?? false;
 
   // Clear fog canvas if fog not needed
   if (fow?.enabled !== true || fow?.foggedCells == null || fow.foggedCells.length === 0 || !fowBlurEnabled) {

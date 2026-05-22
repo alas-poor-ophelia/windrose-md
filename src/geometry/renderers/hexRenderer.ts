@@ -9,7 +9,7 @@
 // Type-only imports
 import type { Point, GridStyle } from '#types/core/geometry.types';
 import type {
-  ViewState,
+  RenderViewState,
   CanvasDimensions,
   RenderHexCell,
   BorderTheme,
@@ -91,7 +91,7 @@ const hexRenderer = {
   renderGrid(
     ctx: CanvasRenderingContext2D,
     geometry: IHexRenderer,
-    viewState: ViewState,
+    viewState: RenderViewState,
     canvasDimensions: CanvasDimensions,
     showGrid: boolean,
     style: GridStyle = {}
@@ -119,7 +119,7 @@ const hexRenderer = {
     ctx: CanvasRenderingContext2D,
     cells: RenderHexCell[],
     geometry: IHexRenderer,
-    viewState: ViewState
+    viewState: RenderViewState
   ): void {
     if (cells == null || cells.length === 0) return;
     
@@ -158,7 +158,7 @@ const hexRenderer = {
     _ctx: CanvasRenderingContext2D,
     _cells: RenderHexCell[],
     _geometry: IHexRenderer,
-    _viewState: ViewState,
+    _viewState: RenderViewState,
     _buildCellLookup: BuildCellLookupFn<RenderHexCell>,
     _calculateBorders: CalculateBordersFn,
     _theme: BorderTheme
@@ -174,7 +174,7 @@ const hexRenderer = {
     ctx: CanvasRenderingContext2D,
     cell: Point,
     geometry: IHexRenderer,
-    viewState: ViewState,
+    viewState: RenderViewState,
     isResizeMode: boolean
   ): void {
     // Selection border (thicker for hex to be visible)

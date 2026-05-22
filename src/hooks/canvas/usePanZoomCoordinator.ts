@@ -14,7 +14,7 @@
  */
 
 // Type-only imports
-import type { ViewState } from '#types/core/map.types';
+import type { StoredViewState } from '#types/core/map.types';
 import type { UsePanZoomCoordinatorOptions } from '#types/hooks/panZoomCoordinator.types';
 
 import { useCallback, useEffect, useRef } from 'preact/hooks';
@@ -36,9 +36,9 @@ const usePanZoomCoordinator = ({
   const { onMapDataUpdate } = useMapOperations();
 
   // Create local callback for viewState changes
-  const handleViewStateChange = useCallback((newViewState: ViewState) => {
+  const handleStoredViewStateChange = useCallback((newStoredViewState: StoredViewState) => {
     if (onMapDataUpdate) {
-      onMapDataUpdate({ viewState: newViewState });
+      onMapDataUpdate({ viewState: newStoredViewState });
     }
   }, [onMapDataUpdate]);
 
@@ -70,7 +70,7 @@ const usePanZoomCoordinator = ({
     setPanStart,
     setTouchPanStart,
     setInitialPinchDistance
-  } = useCanvasInteraction(canvasRef, mapData, geometry, handleViewStateChange, isFocused);
+  } = useCanvasInteraction(canvasRef, mapData, geometry, handleStoredViewStateChange, isFocused);
 
   // Register pan/zoom handlers with EventHandlerContext for event coordination
   const { registerHandlers, unregisterHandlers } = useEventHandlerRegistration();

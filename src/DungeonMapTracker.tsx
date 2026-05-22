@@ -15,7 +15,7 @@ import type { Cell } from '#types/core/cell.types';
 import type { TilesetOverrides } from '#types/tiles/tile.types';
 import type { FogTool } from './components/toolbars/VisibilityToolbar';
 import type { LayerVisibility } from '#types/contexts/context.types';
-import type { CustomColor } from '#types/hooks/dataHandlers.types';
+import type { CustomColor } from '#types/core/common.types';
 
 import { useCallback, useEffect, useMemo, useState } from 'preact/hooks';
 import { useMapData } from './hooks/state/useMapData';
@@ -583,7 +583,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
       const key = e.key;
       const mod = e.ctrlKey || e.metaKey;
 
-      const shortcuts = (getSettings() as Record<string, unknown>).keyboardShortcuts as Record<string, string> | undefined ?? {};
+      const shortcuts = getSettings().keyboardShortcuts ?? {};
       const bareKey = (s: string): string => { const parts = s.split('+'); return (parts[parts.length - 1] ?? s).toLowerCase(); };
 
       if (mod && !e.shiftKey && key.toLowerCase() === bareKey(shortcuts.undo ?? 'z')) {
@@ -980,7 +980,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               {/* MeasurementLayer - distance measurement tool overlay */}
               <MapCanvas.MeasurementLayer
                 currentTool={currentTool}
-                globalSettings={effectiveSettings as Record<string, unknown> | undefined}
+                globalSettings={effectiveSettings ?? undefined}
                 mapDistanceOverrides={mapData?.settings?.distanceSettings}
               />
 

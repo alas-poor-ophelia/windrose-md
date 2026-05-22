@@ -12,7 +12,8 @@ import type {
   ObjectSettings,
   ResolvedColorEntry,
   MapSpecificSettings,
-  CoordinateKeyMode
+  CoordinateKeyMode,
+  ObjectSetData
 } from '#types/settings/settings.types';
 import type { App } from 'obsidian';
 
@@ -254,7 +255,7 @@ function getObjectSettingsForSet(setId: string, mapType: 'hex' | 'grid' = 'grid'
   if (!raw) return null;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const sets = ((raw as any).objectSets ?? []) as Array<{ id: string; data?: { hex?: Record<string, unknown>; grid?: Record<string, unknown> } }>;
+  const sets = ((raw as any).objectSets ?? []) as Array<{ id: string; data?: ObjectSetData }>;
   const set = sets.find((s) => s.id === setId);
   if (set == null) return null;
 
@@ -264,9 +265,9 @@ function getObjectSettingsForSet(setId: string, mapType: 'hex' | 'grid' = 'grid'
   if (sideData == null) return FALLBACK_OBJECT_SETTINGS;
 
   return {
-    objectOverrides: (sideData).objectOverrides as Record<string, unknown> ?? {},
-    customObjects: (sideData).customObjects as unknown[] ?? [],
-    customCategories: (sideData).customCategories as unknown[] ?? []
+    objectOverrides: sideData.objectOverrides ?? {},
+    customObjects: sideData.customObjects ?? [],
+    customCategories: sideData.customCategories ?? []
   };
 }
 

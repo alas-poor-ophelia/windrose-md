@@ -127,15 +127,3 @@ export interface UseToolStateResult {
   handleOpacityChange: (opacity: number) => void;
 }
 
-// ===========================================
-// Tool Actions
-// ===========================================
-
-/** Tool switch action */
-export interface ToolSwitchAction {
-  type: 'SWITCH_TOOL';
-  payload: {
-    tool: ToolId;
-    preservePrevious?: boolean;
-  };
-}

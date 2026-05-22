@@ -25,7 +25,7 @@
  */
 
 // Type-only imports
-import type { HexColor } from '#types/settings/settings.types';
+import type { HexColor } from '#types/core/common.types';
 
 // ===========================================
 // Type Definitions

@@ -8,7 +8,7 @@
 
 import type { Dispatch, StateUpdater } from 'preact/hooks';
 import type { Point, WorldCoords } from '../core/geometry.types';
-import type { ViewState } from '../core/map.types';
+import type { StoredViewState } from '../core/map.types';
 
 // Re-export WorldCoords for backwards compatibility
 export type { WorldCoords };
@@ -115,7 +115,7 @@ export interface LastTouchTimeRef {
 // ===========================================
 
 /** View state change callback */
-export type OnViewStateChangeCallback = (viewState: ViewState) => void;
+export type OnViewStateChangeCallback = (viewState: StoredViewState) => void;
 
 // ===========================================
 // Hook Result Type

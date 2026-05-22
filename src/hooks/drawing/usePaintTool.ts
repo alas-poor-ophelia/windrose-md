@@ -14,7 +14,8 @@ import type { Curve } from '#types/core/curve.types';
 import type { TextLabel } from '#types/objects/note.types';
 import type { HexTileAssignment } from '#types/tiles/tile.types';
 import type { DragStartContext } from '#types/hooks/drawingTools.types';
-import type { Edge, ExtendedGeometry, MapStateContextValue } from '#types/contexts/context.types';
+import type { Edge } from '#types/core/rendering.types';
+import type { ExtendedGeometry, MapStateContextValue } from '#types/contexts/context.types';
 
 import { useRef, useState } from 'preact/hooks';
 import { setCell as accessorSetCell, removeCell as accessorRemoveCell, getCellIndex } from '../../geometry/core/cellAccessor';

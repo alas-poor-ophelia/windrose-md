@@ -11,6 +11,7 @@ import type { Point } from './geometry.types';
 import type { HexOrientation, FrameSettings } from '../settings/settings.types';
 import type { TilesetDef, TilesetOverrides, HexTileAssignment } from '../tiles/tile.types';
 import type { MapObject } from '../objects/object.types';
+import type { Edge } from './rendering.types';
 
 // ===========================================
 // Map Types
@@ -18,13 +19,11 @@ import type { MapObject } from '../objects/object.types';
 
 export type MapType = 'grid' | 'hex';
 
-export type SchemaVersion = number;
-
 // ===========================================
-// View State
+// View State (persisted format)
 // ===========================================
 
-export interface ViewState {
+export interface StoredViewState {
   zoom: number;
   center: Point;
   offsetX?: number;
@@ -132,23 +131,17 @@ export interface FogState {
 }
 
 // ===========================================
-// Edge (painted grid lines)
+// Edge (canonical type in rendering.types.ts)
 // ===========================================
 
-export interface Edge {
-  x: number;
-  y: number;
-  side: 'right' | 'bottom';
-  color: string;
-  opacity?: number;
-}
+export type { Edge };
 
 // ===========================================
-// Text Labels (canonical type in objects/note.types.ts)
+// Text Labels & Note Pins (canonical types in objects/note.types.ts)
 // ===========================================
 
-import type { TextLabel } from '../objects/note.types';
-export type { TextLabel };
+import type { TextLabel, NotePin } from '../objects/note.types';
+export type { TextLabel, NotePin };
 
 // ===========================================
 // Outlines (hex map polygon outlines)
@@ -185,7 +178,6 @@ export interface DungeonConfigOverrides {
   trapWeight?: number;
   useTemplates?: boolean;
   style?: string;
-  [key: string]: unknown;
 }
 
 export interface DungeonStockingMetadata {
@@ -196,7 +188,6 @@ export interface DungeonStockingMetadata {
   entryRoomId?: string;
   exitRoomId?: string;
   waterRoomIds?: string[];
-  [key: string]: unknown;
 }
 
 export interface GenerationSettings {
@@ -204,7 +195,6 @@ export interface GenerationSettings {
   seed?: number;
   configOverrides?: DungeonConfigOverrides;
   stockingMetadata?: DungeonStockingMetadata;
-  [key: string]: unknown;
 }
 
 // ===========================================
@@ -279,7 +269,7 @@ export interface MapLayer {
  */
 export interface MapData {
   // Schema & identification
-  schemaVersion: SchemaVersion;
+  schemaVersion: number;
   mapType: MapType;
 
   // Map metadata (optional - defaults exist in fileOperations)
@@ -293,7 +283,7 @@ export interface MapData {
   layers: MapLayer[];
 
   // View state (pan/zoom) - optional, defaults calculated based on map type
-  viewState?: ViewState;
+  viewState?: StoredViewState;
 
   // Map dimensions - optional, defaults from DEFAULTS
   dimensions?: MapDimensions;
@@ -375,7 +365,7 @@ export interface LegacyMapData {
   edges?: Edge[];
   objects?: MapObjectRef[];
   textLabels?: TextLabel[];
-  schemaVersion?: SchemaVersion;
+  schemaVersion?: number;
   mapType?: MapType;
   cellSize?: number;
   dimensions?: MapDimensions;
@@ -403,18 +393,6 @@ export interface HexBounds {
 export interface FogBounds {
   maxCol: number;
   maxRow: number;
-}
-
-// ===========================================
-// Note Pins
-// ===========================================
-
-export interface NotePin {
-  id: string;
-  position: Point;
-  linkedNote?: string;
-  color?: string;
-  icon?: string;
 }
 
 // ===========================================

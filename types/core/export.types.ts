@@ -9,7 +9,7 @@ import type { Point, BoundingBox } from './geometry.types';
 import type { MapData } from './map.types';
 import type { Cell } from './cell.types';
 import type { MapObject } from '../objects/object.types';
-import type { HexColor } from '../settings/settings.types';
+import type { HexColor } from './common.types';
 
 // ===========================================
 // Export Geometry Interface

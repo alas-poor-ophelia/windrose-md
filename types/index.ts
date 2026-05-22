@@ -53,7 +53,7 @@ export type {
   MapLayer,
   MapData,
   MapDimensions,
-  ViewState,
+  StoredViewState,
   UIPreferences,
   MapSettings,
   BackgroundImage,
@@ -63,6 +63,7 @@ export type {
   MeasurementMethod,
   SubHexMapData,
   HexBounds,
+  Edge,
 } from './core/map.types';
 
 export type {
@@ -77,7 +78,14 @@ export type {
   RequireAtLeastOne,
   EventHandler,
   MouseEventWithCoords,
+  CustomColor,
 } from './core/common.types';
+
+export type {
+  // Rendering
+  RenderViewState,
+  BorderSide,
+} from './core/rendering.types';
 
 // ===========================================
 // Object Types
@@ -139,7 +147,6 @@ export type {
   ToolId,
   ToolState,
   ToolOptions,
-  ToolSwitchAction,
 } from './tools/tool.types';
 
 export type {
@@ -156,11 +163,13 @@ export type {
   SettingsTabId,
   CoordinateFormat,
   GridLineStyle,
-  SettingsState,
-  UserPreferences,
+  HexOrientation,
+  DiagonalRule,
+  DistanceDisplayFormat,
   ImageDimensions,
   GridCalculation,
   GridDensityPreset,
+  PaletteColor,
   // Object customization (re-exported from objects for convenience)
   ObjectOverride,
   CustomObject,
@@ -168,27 +177,12 @@ export type {
   ObjectSettings,
 } from './settings/settings.types';
 
-export type {
-  SettingsActionType,
-  SetActiveTabAction,
-  SetCellSizeAction,
-  SetMapTypeAction,
-  SetMapDimensionsAction,
-  SetBackgroundColorAction,
-  SetGridColorAction,
-  ToggleGridAction,
-  ToggleCoordinatesAction,
-  ResetSettingsAction,
-  SettingsAction,
-  SettingsReducer,
-} from './settings/actions.types';
-
 // ===========================================
 // Context Types
 // ===========================================
 export type {
   EdgeInfo,
-  Edge,
+  EdgeInput,
   ExtendedGeometry,
   DrawingLayerState,
   PanZoomLayerState,
@@ -412,7 +406,6 @@ export type {
 export type {
   UseDataHandlersOptions,
   MapHistorySnapshot,
-  CustomColor,
   LayerDataChangeHandler,
   HandleCellsChange,
   HandleObjectsChange,

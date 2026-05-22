@@ -9,9 +9,10 @@ import type { MapObject, ObjectUpdate } from '../objects/object.types';
 import type { TextLabel, NotePin } from '../objects/note.types';
 import type { IGeometry, Point } from '../core/geometry.types';
 import type { Curve } from '../core/curve.types';
-import type { MapData, ViewState, TextLabelSettings } from '../core/map.types';
+import type { MapData, StoredViewState, TextLabelSettings } from '../core/map.types';
+import type { GroupDragInitialState } from '../hooks/groupDrag.types';
 import type { Cell } from '../core/cell.types';
-import type { BorderSide } from '../core/rendering.types';
+import type { BorderSide, Edge } from '../core/rendering.types';
 import type { HexTileAssignment } from '../tiles/tile.types';
 import type { ToolId } from '../tools/tool.types';
 
@@ -21,7 +22,7 @@ import type { ToolId } from '../tools/tool.types';
 
 /** Partial update payload for map-level operations (viewState, text label defaults) */
 export interface MapDataUpdate {
-  viewState?: ViewState;
+  viewState?: StoredViewState;
   lastTextLabelSettings?: TextLabelSettings;
 }
 
@@ -32,8 +33,8 @@ export interface EdgeInfo {
   side: BorderSide;
 }
 
-/** Edge type for edge drawing */
-export interface Edge {
+/** Edge input type for drawing tools (pre-normalization, all 4 sides) */
+export interface EdgeInput {
   x: number;
   y: number;
   side: BorderSide;
@@ -155,7 +156,7 @@ export type SelectableItemType = 'object' | 'text' | 'notePin' | 'shapeOverlay';
 export interface SelectedItem {
   type: SelectableItemType;
   id: string;
-  data?: Record<string, unknown>;
+  data?: MapObject | TextLabel | NotePin;
 }
 
 /** World position for area select start */
@@ -180,7 +181,7 @@ export interface DragStartPosition {
   clientY?: number;
   isGroupDrag?: boolean;
   objectId?: string;
-  object?: Record<string, unknown>;
+  object?: MapObject;
   wasInverted?: boolean;
   freeform?: boolean;
   originalFreeform?: boolean;
@@ -214,7 +215,8 @@ export interface MousePosition {
 export interface HoveredObject {
   id: string;
   type: string;
-  [key: string]: unknown;
+  label?: string;
+  customTooltip?: string;
 }
 
 /** Item update for updateSelectedItemsData */
@@ -223,11 +225,8 @@ export interface ItemUpdate {
   [key: string]: unknown;
 }
 
-/** Initial state for batch history during group drag */
-export interface GroupDragInitialState {
-  objects: unknown[];
-  textLabels: unknown[];
-}
+// GroupDragInitialState — canonical definition in hooks/groupDrag.types.ts
+export type { GroupDragInitialState };
 
 /** MapSelectionContext value — provided by MapSelectionProvider, consumed by layers and hooks */
 export interface MapSelectionContextValue {

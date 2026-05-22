@@ -22,7 +22,7 @@ export interface MeasurementLayerProps {
   /** Current active tool */
   currentTool: ToolId;
   /** Global plugin settings */
-  globalSettings?: Record<string, unknown>;
+  globalSettings?: PluginSettings;
   /** Per-map distance setting overrides */
   mapDistanceOverrides?: Partial<EffectiveDistanceSettings>;
 }
@@ -52,7 +52,7 @@ const MeasurementLayer = ({
     currentTool,
     geometry,
     mapType,
-    globalSettings as PluginSettings,
+    globalSettings!,
     (mapDistanceOverrides ?? null) as MapDistanceOverrides | null
   );
 

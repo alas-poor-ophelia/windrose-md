@@ -10,7 +10,7 @@
  */
 
 // Type-only imports
-import type { MapData, MapLayer, ViewState, TextLabelSettings, MapCustomColor } from '#types/core/map.types';
+import type { MapData, MapLayer, StoredViewState, TextLabelSettings, MapCustomColor } from '#types/core/map.types';
 import type { Cell } from '#types/core/cell.types';
 import type { Curve } from '#types/core/curve.types';
 import type { MapObject } from '#types/objects/object.types';
@@ -20,7 +20,7 @@ import type { HexTileAssignment } from '#types/tiles/tile.types';
 import type {
   UseDataHandlersOptions,
   UseDataHandlersResult,
-  HistoryState,
+  MapHistorySnapshot,
   LayerDataHandlers,
   MapDataHandlers,
 } from '#types/hooks/dataHandlers.types';
@@ -43,15 +43,15 @@ function useDataHandlers({
   // Helper: Build history state from layer + name
   // =========================================================================
 
-  const buildHistoryState = useCallback((
+  const buildMapHistorySnapshot = useCallback((
     layer: MapLayer,
     name: string,
-    overrides: Partial<HistoryState> = {},
+    overrides: Partial<MapHistorySnapshot> = {},
     regions: import('#types/core/map.types').Region[] = [],
     outlines: import('#types/core/map.types').Outline[] = [],
     shapeOverlays: import('#types/core/map.types').ShapeOverlay[] = [],
     fogOfWar: import('#types/core/map.types').FogOfWar | null = null
-  ): HistoryState => ({
+  ): MapHistorySnapshot => ({
     cells: overrides.cells ?? layer.cells ?? [],
     curves: overrides.curves ?? layer.curves ?? [],
     name: name,
@@ -82,13 +82,13 @@ function useDataHandlers({
 
         if (!suppressHistory) {
           const activeLayer = getActiveLayer(currentMapData);
-          addToHistory(buildHistoryState(activeLayer, currentMapData.name ?? '', { [field]: newValue as unknown as Cell[] | MapObject[] | TextLabel[] | unknown[] }, currentMapData.regions || [], currentMapData.outlines || [], currentMapData.shapeOverlays || [], activeLayer.fogOfWar));
+          addToHistory(buildMapHistorySnapshot(activeLayer, currentMapData.name ?? '', { [field]: newValue as unknown as Cell[] | MapObject[] | TextLabel[] | unknown[] }, currentMapData.regions || [], currentMapData.outlines || [], currentMapData.shapeOverlays || [], activeLayer.fogOfWar));
         }
 
         return newMapData;
       });
     };
-  }, [updateMapData, addToHistory, isApplyingHistory, buildHistoryState]);
+  }, [updateMapData, addToHistory, isApplyingHistory, buildMapHistorySnapshot]);
 
   // =========================================================================
   // Layer Data Handlers (using factory)
@@ -136,11 +136,11 @@ function useDataHandlers({
       if (!currentMapData) return currentMapData;
 
       const activeLayer = getActiveLayer(currentMapData);
-      addToHistory(buildHistoryState(activeLayer, newName, {}, currentMapData.regions || []));
+      addToHistory(buildMapHistorySnapshot(activeLayer, newName, {}, currentMapData.regions || []));
 
       return { ...currentMapData, name: newName };
     });
-  }, [updateMapData, addToHistory, isApplyingHistory, buildHistoryState]);
+  }, [updateMapData, addToHistory, isApplyingHistory, buildMapHistorySnapshot]);
 
   // Handle adding a custom color
   const handleAddCustomColor = useCallback((newColor: HexColor): void => {
@@ -203,7 +203,7 @@ function useDataHandlers({
   }, [updateMapData]);
 
   // Handle view state change - NOT tracked in history
-  const handleViewStateChange = useCallback((newViewState: ViewState): void => {
+  const handleViewStateChange = useCallback((newViewState: StoredViewState): void => {
     updateMapData((currentMapData: MapData | null) => {
       if (!currentMapData) return currentMapData;
       return { ...currentMapData, viewState: newViewState };
@@ -242,11 +242,11 @@ function useDataHandlers({
       if (!currentMapData) return currentMapData;
 
       const activeLayer = getActiveLayer(currentMapData);
-      addToHistory(buildHistoryState(activeLayer, currentMapData.name ?? '', {}, regions));
+      addToHistory(buildMapHistorySnapshot(activeLayer, currentMapData.name ?? '', {}, regions));
 
       return { ...currentMapData, regions };
     });
-  }, [updateMapData, addToHistory, isApplyingHistory, buildHistoryState]);
+  }, [updateMapData, addToHistory, isApplyingHistory, buildMapHistorySnapshot]);
 
   // Handle outlines change (hex maps only) - tracked in history for undo/redo
   const handleOutlinesChange = useCallback((outlines: import('#types/core/map.types').Outline[]): void => {
@@ -256,11 +256,11 @@ function useDataHandlers({
       if (!currentMapData) return currentMapData;
 
       const activeLayer = getActiveLayer(currentMapData);
-      addToHistory(buildHistoryState(activeLayer, currentMapData.name ?? '', {}, currentMapData.regions || [], outlines));
+      addToHistory(buildMapHistorySnapshot(activeLayer, currentMapData.name ?? '', {}, currentMapData.regions || [], outlines));
 
       return { ...currentMapData, outlines };
     });
-  }, [updateMapData, addToHistory, isApplyingHistory, buildHistoryState]);
+  }, [updateMapData, addToHistory, isApplyingHistory, buildMapHistorySnapshot]);
 
   // Handle shape overlays change - tracked in history for undo/redo
   const handleShapeOverlaysChange = useCallback((shapeOverlays: import('#types/core/map.types').ShapeOverlay[]): void => {
@@ -270,11 +270,11 @@ function useDataHandlers({
       if (!currentMapData) return currentMapData;
 
       const activeLayer = getActiveLayer(currentMapData);
-      addToHistory(buildHistoryState(activeLayer, currentMapData.name ?? '', {}, currentMapData.regions || [], currentMapData.outlines || [], shapeOverlays));
+      addToHistory(buildMapHistorySnapshot(activeLayer, currentMapData.name ?? '', {}, currentMapData.regions || [], currentMapData.outlines || [], shapeOverlays));
 
       return { ...currentMapData, shapeOverlays };
     });
-  }, [updateMapData, addToHistory, isApplyingHistory, buildHistoryState]);
+  }, [updateMapData, addToHistory, isApplyingHistory, buildMapHistorySnapshot]);
 
   // =========================================================================
   // Return Value

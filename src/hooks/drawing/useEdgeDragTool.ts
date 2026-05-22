@@ -8,7 +8,8 @@
 import type { IGeometry } from '#types/core/geometry.types';
 import type { MapData } from '#types/core/map.types';
 import type { ToolId } from '#types/tools/tool.types';
-import type { Edge, ExtendedGeometry, MapStateContextValue } from '#types/contexts/context.types';
+import type { Edge } from '#types/core/rendering.types';
+import type { ExtendedGeometry, MapStateContextValue } from '#types/contexts/context.types';
 
 import { useRef, useState } from 'preact/hooks';
 import { addEdge, removeEdge } from '../../drawing/edgeOperations';

@@ -9,6 +9,8 @@
 import type { MapData } from '#types/core/map.types';
 import type { VNode } from 'preact';
 import type { IGeometry } from '#types/core/geometry.types';
+import type { SelectedItem } from '#types/contexts/context.types';
+import type { MapObject } from '#types/objects/object.types';
 import type { SelectionAction } from '../../hooks/interactions/useSelectionActions.ts';
 import type { CustomColor } from '../shared/ColorPicker';
 import type { MenuItem } from 'obsidian';
@@ -69,12 +71,6 @@ const CornerBracket = ({ position }: { position: BracketPosition }): VNode => {
     </svg>
   );
 };
-
-interface SelectedItem {
-  type: 'object' | 'text' | 'notePin' | 'shapeOverlay';
-  id: string;
-  data?: Record<string, unknown>;
-}
 
 interface SelectionActionsOverlayProps {
   selectedItems: SelectedItem[];
@@ -155,7 +151,7 @@ const SelectionActionsOverlay = ({
   distanceUnit
 }: SelectionActionsOverlayProps): VNode | null => {
 
-  const isNotePin = selectedItems.length === 1 && selectedItems[0].data?.type === 'note_pin';
+  const isNotePin = selectedItems.length === 1 && (selectedItems[0].data as MapObject | undefined)?.type === 'note_pin';
   const [linksExpanded, setLinksExpanded] = useState(isNotePin);
 
   // Context menu via Obsidian Menu API
@@ -255,7 +251,7 @@ const SelectionActionsOverlay = ({
 
   // Linked note display
   const linkedNote = selectionType === 'object' && selectedItems.length === 1
-    ? selectedItems[0].data?.linkedNote as string | null : null;
+    ? (selectedItems[0].data as MapObject | undefined)?.linkedNote as string | null : null;
   const linkedNoteHeight = linkedNote != null && linkedNote !== '' ? 32 : 0;
   const linkedNoteGap = linkedNote != null && linkedNote !== '' ? 4 : 0;
 

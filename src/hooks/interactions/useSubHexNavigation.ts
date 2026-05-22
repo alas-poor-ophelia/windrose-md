@@ -6,7 +6,7 @@
  * allowing the entire DungeonMapTracker UI to be reused.
  */
 
-import type { MapData, MapLayer, SubHexMapData, ViewState } from '#types/core/map.types';
+import type { MapData, MapLayer, SubHexMapData, StoredViewState } from '#types/core/map.types';
 import type { MapDataUpdater } from '#types/hooks/mapData.types';
 
 import { useCallback, useMemo, useState } from 'preact/hooks';
@@ -29,7 +29,7 @@ import { calculateFitZoom } from '../../persistence/fileOperations';
 
 interface SubHexNavFrame {
   parentMapData: MapData;
-  parentViewState: ViewState;
+  parentStoredViewState: StoredViewState;
   hexKey: string;
 }
 
@@ -215,7 +215,7 @@ function useSubHexNavigation({
     // Push current state onto navigation stack
     const frame: SubHexNavFrame = {
       parentMapData: currentMapData,
-      parentViewState: currentMapData.viewState || { zoom: 1.0, center: { x: 0, y: 0 } },
+      parentStoredViewState: currentMapData.viewState || { zoom: 1.0, center: { x: 0, y: 0 } },
       hexKey
     };
 
@@ -273,7 +273,7 @@ function useSubHexNavigation({
         }
       },
       // Restore the parent's viewState
-      viewState: topFrame.parentViewState
+      viewState: topFrame.parentStoredViewState
     } as MapData;
 
     const newStack = navStack.slice(0, -1);
@@ -312,7 +312,7 @@ function useSubHexNavigation({
             lastModified: new Date().toISOString()
           }
         },
-        viewState: frame.parentViewState
+        viewState: frame.parentStoredViewState
       } as MapData;
       currentData = parent;
       stack = stack.slice(0, -1);
@@ -388,7 +388,7 @@ function useSubHexNavigation({
     // Replace the top frame with the sibling's frame
     const newFrame: SubHexNavFrame = {
       parentMapData: restoredParent,
-      parentViewState: topFrame.parentViewState,
+      parentStoredViewState: topFrame.parentStoredViewState,
       hexKey: siblingKey
     };
 

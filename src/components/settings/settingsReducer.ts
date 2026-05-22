@@ -12,12 +12,12 @@ import type {
   HexOrientation,
   DiagonalRule,
   DistanceDisplayFormat,
-  HexColor,
   SettingsTabId,
   ImageDimensions,
   GridCalculation,
   GridDensityPreset,
 } from '#types/settings/settings.types';
+import type { HexColor } from '#types/core/common.types';
 import type { Cell } from '#types/core/cell.types';
 import type { MapObject } from '#types/objects/object.types';
 

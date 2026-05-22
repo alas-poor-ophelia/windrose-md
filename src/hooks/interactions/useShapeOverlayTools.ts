@@ -8,6 +8,7 @@
 import type { ToolId } from '#types/tools/tool.types';
 import type { Point, IGeometry } from '#types/core/geometry.types';
 import type { MapData, ShapeOverlay, ShapeOverlayType } from '#types/core/map.types';
+import type { SelectedItem } from '#types/contexts/context.types';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { formatDistance } from '../../drawing/distanceOperations';
@@ -208,7 +209,7 @@ function useShapeOverlayTools(options: ShapeOverlayToolsOptions): UseShapeOverla
     if (!world) return false;
     const hit = hitTestShape(world.worldX, world.worldY);
     if (hit) {
-      selectItem({ type: 'shapeOverlay', id: hit.id, data: hit as unknown as Record<string, unknown> });
+      selectItem({ type: 'shapeOverlay', id: hit.id, data: hit as unknown as SelectedItem['data'] });
       setIsDraggingSelection(true);
       setDragStart({ x: 0, y: 0, clientX, clientY, worldX: world.worldX, worldY: world.worldY });
       return true;

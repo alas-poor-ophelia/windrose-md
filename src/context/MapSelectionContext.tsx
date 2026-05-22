@@ -137,7 +137,7 @@ const MapSelectionProvider: FunctionComponent<MapSelectionProviderProps> = ({ ch
       if (update) {
         return {
           ...item,
-          data: { ...item.data, ...update }
+          data: { ...item.data, ...update } as typeof item.data
         };
       }
       return item;

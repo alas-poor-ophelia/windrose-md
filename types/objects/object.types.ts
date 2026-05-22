@@ -66,19 +66,6 @@ export interface ObjectTypeDefinition {
   isUnknown?: boolean;       // True for unknown/deleted object fallback
 }
 
-/** @deprecated Use ObjectTypeDefinition instead */
-export interface ObjectTypeDef {
-  id: ObjectTypeId;
-  name: string;
-  label?: string;
-  category: ObjectCategory;
-  symbol: string;
-  defaultSize?: number;
-  rotatable?: boolean;
-  isUnknown?: boolean;
-  isCustom?: boolean;
-}
-
 // ===========================================
 // Category Definitions
 // ===========================================
@@ -164,7 +151,6 @@ export interface MapObject {
   lightRadius?: number;
   lightColor?: string;
   lightEnabled?: boolean;
-  [key: string]: unknown;
 }
 
 export type ObjectUpdate = Partial<Omit<MapObject, 'id'>>;

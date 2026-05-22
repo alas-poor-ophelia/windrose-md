@@ -179,7 +179,7 @@ const AreaSelectLayer = ({ currentTool }: AreaSelectLayerProps): VNode | null =>
     if (!areaSelectStart || !areaSelectHoverPosition) return null;
 
     const settings = getSettings();
-    const previewEnabled = (settings as Record<string, unknown>).shapePreviewKbm !== false;
+    const previewEnabled = settings.shapePreviewKbm !== false;
     if (!previewEnabled) return null;
 
     return (

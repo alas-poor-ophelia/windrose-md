@@ -5,13 +5,13 @@
  * for layer data and map-level data with history tracking.
  */
 
-import type { MapData, ViewState, TextLabelSettings, Region } from '../core/map.types';
+import type { MapData, StoredViewState, TextLabelSettings, Region } from '../core/map.types';
 import type { Cell } from '../core/cell.types';
 import type { Curve } from '../core/curve.types';
 import type { MapObject } from '../objects/object.types';
 import type { TextLabel } from '../objects/note.types';
 import type { HexColor } from '../core/common.types';
-import type { Edge } from '../contexts/context.types';
+import type { Edge } from '../core/rendering.types';
 import type { HexTileAssignment } from '../tiles/tile.types';
 
 // ===========================================
@@ -25,8 +25,6 @@ export interface UseDataHandlersOptions {
   addToHistory: (state: MapHistorySnapshot) => void;
   isApplyingHistory: () => boolean;
 }
-
-export type HistoryState = MapHistorySnapshot;
 
 // ===========================================
 // History State
@@ -45,18 +43,6 @@ export interface MapHistorySnapshot {
   outlines?: import('../core/map.types').Outline[];
   shapeOverlays?: import('../core/map.types').ShapeOverlay[];
   fogOfWar?: import('../core/map.types').FogOfWar | null;
-}
-
-// ===========================================
-// Custom Color Types
-// ===========================================
-
-/** Custom color entry */
-export interface CustomColor {
-  id: string;
-  color: HexColor;
-  label: string;
-  opacity?: number;
 }
 
 // ===========================================
@@ -97,7 +83,7 @@ export type HandleDeleteCustomColor = (colorId: string) => void;
 export type HandleUpdateColorOpacity = (colorId: string, newOpacity: number) => void;
 
 /** Handle view state change */
-export type HandleViewStateChange = (newViewState: ViewState) => void;
+export type HandleViewStateChange = (newViewState: StoredViewState) => void;
 
 /** Handle sidebar collapse change */
 export type HandleSidebarCollapseChange = (collapsed: boolean) => void;

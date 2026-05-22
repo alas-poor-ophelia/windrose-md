@@ -353,7 +353,7 @@ function createNewMap(_mapId: string, mapName: string = '', mapType: MapType = '
     // Get global settings to respect user configuration
     const globalSettings = getSettings();
 
-    baseMap.hexSize = ((globalSettings.hexSize as number | undefined) ?? DEFAULTS.hexSize);
+    baseMap.hexSize = DEFAULTS.hexSize;
     baseMap.orientation = globalSettings.hexOrientation || DEFAULTS.hexOrientation;
     baseMap.hexBounds = { ...DEFAULTS.hexBounds };
     baseMap.dimensions = { ...DEFAULTS.dimensions };

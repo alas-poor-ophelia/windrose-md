@@ -13,7 +13,7 @@
 // Type-only imports
 import type { Point, GridStyle } from '#types/core/geometry.types';
 import type {
-  ViewState,
+  RenderViewState,
   CanvasDimensions,
   RenderCell,
   Edge,
@@ -111,7 +111,7 @@ const gridRenderer = {
   renderGrid(
     ctx: CanvasRenderingContext2D,
     geometry: IGridRenderer,
-    viewState: ViewState,
+    viewState: RenderViewState,
     canvasDimensions: CanvasDimensions,
     showGrid: boolean,
     style: GridStyle = {}
@@ -139,7 +139,7 @@ const gridRenderer = {
     ctx: CanvasRenderingContext2D,
     cells: RenderCell[],
     geometry: IGridRenderer,
-    viewState: ViewState
+    viewState: RenderViewState
   ): void {
     if (cells == null || cells.length === 0) return;
     
@@ -197,7 +197,7 @@ const gridRenderer = {
     ctx: CanvasRenderingContext2D,
     cells: RenderCell[],
     geometry: IGridRenderer,
-    viewState: ViewState,
+    viewState: RenderViewState,
     style: InteriorGridStyle = {}
   ): void {
     if (cells == null || cells.length === 0) return;
@@ -268,7 +268,7 @@ const gridRenderer = {
     ctx: CanvasRenderingContext2D,
     edges: Edge[],
     geometry: IGridRenderer,
-    viewState: ViewState,
+    viewState: RenderViewState,
     style: EdgeStyle = {}
   ): void {
     if (edges == null || edges.length === 0) return;
@@ -340,7 +340,7 @@ const gridRenderer = {
     ctx: CanvasRenderingContext2D,
     cells: RenderCell[],
     geometry: IGridRenderer,
-    viewState: ViewState,
+    viewState: RenderViewState,
     buildCellLookup: BuildCellLookupFn,
     calculateBorders: CalculateBordersFn,
     theme: BorderTheme
@@ -418,7 +418,7 @@ const gridRenderer = {
     ctx: CanvasRenderingContext2D,
     cell: Point,
     geometry: IGridRenderer,
-    viewState: ViewState,
+    viewState: RenderViewState,
     isResizeMode: boolean
   ): void {
     const scaledSize = geometry.getScaledCellSize(viewState.zoom);

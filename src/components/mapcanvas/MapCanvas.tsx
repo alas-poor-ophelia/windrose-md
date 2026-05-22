@@ -7,7 +7,7 @@ import type {
   MapObject,
   TextLabel,
   Edge,
-  ViewState,
+  StoredViewState,
   TextLabelSettings,
   ToolId,
   ObjectTypeId,
@@ -126,7 +126,7 @@ interface MapCanvasContentProps {
   onTilesChange?: (tiles: import('#types/tiles/tile.types').HexTileAssignment[]) => void;
   tileImagesReady?: boolean;
   adjacentSubHexes?: Array<{ hexKey: string; dq: number; dr: number; mapData: unknown; name: string }> | null;
-  onViewStateChange: (viewState: ViewState) => void;
+  onViewStateChange: (viewState: StoredViewState) => void;
   onTextLabelSettingsChange: (settings: TextLabelSettings) => void;
   currentTool: ToolId;
   selectedObjectType: ObjectTypeId | undefined;

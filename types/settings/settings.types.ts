@@ -5,14 +5,7 @@
  * Updated during Tier 3 migration (settingsAccessor.ts).
  */
 
-import type { MapType } from '../core/map.types';
-
-// ===========================================
-// Basic Types
-// ===========================================
-
-/** Hex color string (e.g., "#ff0000") */
-export type HexColor = string;
+import type { HexColor } from '../core/common.types';
 
 /** Hex orientation options */
 export type HexOrientation = 'flat' | 'pointy';
@@ -140,7 +133,7 @@ export interface PluginSettings {
   
   // Color palette customization
   colorPaletteOverrides?: Record<string, ColorOverride>;
-  customPaletteColors?: CustomColor[];
+  customPaletteColors?: PaletteColor[];
 
   // Object sets
   objectSets?: ObjectSet[];
@@ -159,7 +152,6 @@ export interface PluginSettings {
 
   // Keyboard shortcuts (action ID → key string)
   keyboardShortcuts?: Record<string, string>;
-  [key: string]: unknown;
 }
 
 // ===========================================
@@ -238,7 +230,7 @@ export interface ColorOverride {
   hidden?: boolean;
 }
 
-export interface CustomColor {
+export interface PaletteColor {
   id: string;
   color: HexColor;
   label: string;
@@ -358,40 +350,3 @@ export interface MapSpecificSettings {
   overrides?: Partial<PluginSettings>;
 }
 
-// ===========================================
-// Legacy Types (for migration compatibility)
-// ===========================================
-
-/**
- * Settings state for settingsReducer.
- * TODO: Fully define during settingsReducer.ts migration.
- */
-export interface SettingsState {
-  // Map configuration
-  mapType: MapType;
-  cellSize: number;
-  mapWidth: number;
-  mapHeight: number;
-  
-  // Colors
-  backgroundColor: HexColor;
-  gridColor: HexColor;
-  
-  // Display options
-  showGrid: boolean;
-  showCoordinates: boolean;
-  coordinateFormat: CoordinateFormat;
-  
-  // Active tab in settings modal
-  activeTab: SettingsTabId;
-  
-  // ... more to be added during settingsReducer migration
-}
-
-/** User preferences (persisted) */
-export interface UserPreferences {
-  defaultCellSize: number;
-  defaultMapType: MapType;
-  showWelcomeScreen: boolean;
-  // ... more to be added
-}

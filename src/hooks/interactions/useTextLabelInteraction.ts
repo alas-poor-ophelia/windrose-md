@@ -115,7 +115,7 @@ const useTextLabelInteraction = (
     if (textLabel) {
       // Store initial text label state for batched history entry at drag end
       dragInitialStateRef.current = [...getActiveLayer(mapData).textLabels];
-      setSelectedItem({ type: 'text', id: textLabel.id, data: textLabel as unknown as Record<string, unknown> });
+      setSelectedItem({ type: 'text', id: textLabel.id, data: textLabel });
       setIsDraggingSelection(true);
       setDragStart({ x: clientX, y: clientY, worldX: worldCoords.worldX, worldY: worldCoords.worldY });
       return true;

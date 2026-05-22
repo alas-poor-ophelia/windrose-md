@@ -20,7 +20,8 @@ import type {
   PendingEndPoint,
   ShapeHoverPosition,
 } from '#types/hooks/drawingTools.types';
-import type { Edge, ExtendedGeometry, MapStateContextValue } from '#types/contexts/context.types';
+import type { Edge } from '#types/core/rendering.types';
+import type { ExtendedGeometry, MapStateContextValue } from '#types/contexts/context.types';
 
 import { useCallback, useState } from 'preact/hooks';
 import { setCells, removeCellsInBounds } from '../../geometry/core/cellAccessor';

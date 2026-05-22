@@ -6,6 +6,7 @@
  */
 
 import type { HexColor } from '#types/core/common.types';
+import type { PluginSettings } from '#types/settings/settings.types';
 import type { VNode } from 'preact';
 
 import { useState } from 'preact/hooks';
@@ -18,7 +19,7 @@ import { SettingItem } from './SettingItem';
 import { NativeToggle, NativeSlider } from './NativeControls';
 import { Icon } from '../shared/Icon';
 
-type ColorOverrideKey = keyof SettingsOverrides;
+type ColorOverrideKey = keyof SettingsOverrides & keyof PluginSettings;
 
 
 
@@ -31,7 +32,7 @@ type ColorOverrideKey = keyof SettingsOverrides;
 
 /** Props for ColorPickerItem */
 interface ColorPickerItemProps {
-  colorKey: string;
+  colorKey: ColorOverrideKey;
   label: string;
   defaultColor: HexColor;
   align?: 'left' | 'right';
@@ -60,12 +61,12 @@ function ColorPickerItem({ colorKey, label, defaultColor, align = 'left' }: Colo
           disabled={useGlobalSettings}
           onClick={() => !useGlobalSettings && setActiveColorPicker(colorKey)}
           style={{
-            backgroundColor: overrides[colorKey as ColorOverrideKey] as string,
+            backgroundColor: overrides[colorKey] as string,
             cursor: useGlobalSettings ? 'not-allowed' : 'pointer',
             minWidth: '80px'
           }}
         >
-          <span class="dmt-color-button-label">{overrides[colorKey as ColorOverrideKey] as string}</span>
+          <span class="dmt-color-button-label">{overrides[colorKey] as string}</span>
         </button>
 
         <button
@@ -80,10 +81,10 @@ function ColorPickerItem({ colorKey, label, defaultColor, align = 'left' }: Colo
 
         <ColorPicker
           isOpen={activeColorPicker === colorKey && !useGlobalSettings}
-          selectedColor={overrides[colorKey as ColorOverrideKey] as HexColor}
+          selectedColor={overrides[colorKey] as HexColor}
           onColorSelect={(color: HexColor) => handleColorChange(colorKey, color)}
           onClose={() => setActiveColorPicker(null)}
-          onReset={() => handleColorChange(colorKey, globalSettings[colorKey] as SettingsOverrides[keyof SettingsOverrides])}
+          onReset={() => handleColorChange(colorKey, globalSettings[colorKey] as HexColor)}
           customColors={[]}
           pendingCustomColorRef={pendingCustomColorRef}
           title={label}

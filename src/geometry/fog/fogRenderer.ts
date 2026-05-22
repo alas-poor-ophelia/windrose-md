@@ -79,13 +79,21 @@ type RenderHexFogFn = (
 /**
  * Extracts fog settings from effective settings object.
  */
-function getFogSettings(effectiveSettings: Record<string, unknown>): FogSettings {
+interface FogSettingsSource {
+  fogOfWarColor: string;
+  fogOfWarOpacity: number;
+  fogOfWarImage: string | null;
+  fogOfWarBlurEnabled: boolean;
+  fogOfWarBlurFactor: number;
+}
+
+function getFogSettings(effectiveSettings: FogSettingsSource): FogSettings {
   return {
-    fowColor: (effectiveSettings.fogOfWarColor as string) || '#000000',
-    fowOpacity: (effectiveSettings.fogOfWarOpacity as number) ?? 0.9,
-    fowImagePath: effectiveSettings.fogOfWarImage as string | undefined,
-    fowBlurEnabled: (effectiveSettings.fogOfWarBlurEnabled as boolean) ?? false,
-    fowBlurFactor: (effectiveSettings.fogOfWarBlurFactor as number) ?? 0.08,
+    fowColor: effectiveSettings.fogOfWarColor || '#000000',
+    fowOpacity: effectiveSettings.fogOfWarOpacity ?? 0.9,
+    fowImagePath: effectiveSettings.fogOfWarImage ?? undefined,
+    fowBlurEnabled: effectiveSettings.fogOfWarBlurEnabled ?? false,
+    fowBlurFactor: effectiveSettings.fogOfWarBlurFactor ?? 0.08,
   };
 }
 

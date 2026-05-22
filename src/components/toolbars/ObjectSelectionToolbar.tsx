@@ -19,9 +19,10 @@
 import type { JSX, VNode } from 'preact';
 import type { Ref } from 'preact';
 import type { MapData } from '#types/core/map.types';
+import type { MapObject } from '#types/objects/object.types';
 import type { ExtendedGeometry, SelectedItem } from '#types/contexts/context.types';
 import type { HexColor } from '#types/core/common.types';
-import type { CustomColor } from '#types/hooks/dataHandlers.types';
+import type { CustomColor } from '#types/core/common.types';
 
 import { calculateObjectScreenPosition } from '../../objects/screenPositionUtils';
 import { openNoteInNewTab } from '../../persistence/noteOperations';
@@ -130,16 +131,17 @@ const ObjectSelectionToolbar = ({
     : null;
 
   // Build button definitions (safe to compute even when selectedItem is null — guarded below)
-  const hasLinkedObject = selectedItem?.data?.linkedObject != null;
-  const isNotePin = selectedItem?.data?.type === 'note_pin';
-  const isFreeform = selectedItem?.data?.freeform === true;
+  const selectedObjectData = selectedItem?.data as MapObject | undefined;
+  const hasLinkedObject = selectedObjectData?.linkedObject != null;
+  const isNotePin = selectedObjectData?.type === 'note_pin';
+  const isFreeform = selectedObjectData?.freeform === true;
 
   const buttons = hasRequiredInputs ? [
     { id: 'rotate', icon: 'lucide-rotate-cw', title: 'Rotate 45° (or press R)', onClick: onRotate },
     { id: 'label', icon: 'lucide-sticky-note', title: 'Add/Edit Label', onClick: onLabel, visible: !isNotePin },
     { id: 'duplicate', icon: 'lucide-copy', title: 'Duplicate Object', onClick: onDuplicate },
     { id: 'freeform', icon: 'lucide-diamond', title: isFreeform ? 'Snap to grid' : 'Convert to freeform', onClick: onFreeformToggle, active: isFreeform },
-    { id: 'linkNote', icon: 'lucide-scroll-text', title: selectedItem.data?.linkedNote != null ? 'Edit linked note' : 'Link note', onClick: onLinkNote },
+    { id: 'linkNote', icon: 'lucide-scroll-text', title: selectedObjectData?.linkedNote != null ? 'Edit linked note' : 'Link note', onClick: onLinkNote },
     { id: 'linkObject', icon: 'lucide-link-2', title: hasLinkedObject ? 'Edit object link' : 'Link to object', onClick: onLinkObject, active: hasLinkedObject },
     { id: 'followLink', icon: 'lucide-arrow-right-circle', title: 'Go to linked object', onClick: onFollowLink, visible: hasLinkedObject },
     { id: 'removeLink', icon: 'lucide-unlink', title: 'Remove object link', onClick: onRemoveLink, visible: hasLinkedObject },
@@ -160,7 +162,7 @@ const ObjectSelectionToolbar = ({
   const toolbarHeight = rowCount * buttonSize + (rowCount - 1) * buttonGap;
 
   // Linked note display height
-  const hasLinkedNote = selectedItem?.data?.linkedNote != null && typeof selectedItem?.data?.linkedNote === 'string';
+  const hasLinkedNote = selectedObjectData?.linkedNote != null && typeof selectedObjectData?.linkedNote === 'string';
   const linkedNoteHeight = hasLinkedNote ? 32 : 0;
   const linkedNoteGap = hasLinkedNote ? 4 : 0;
   const extraHeight = linkedNoteGap + linkedNoteHeight;
@@ -227,7 +229,7 @@ const ObjectSelectionToolbar = ({
   return (
     <>
       {/* Linked Note Display */}
-      {hasLinkedNote && selectedItem.data != null && (
+      {hasLinkedNote && selectedObjectData != null && (
         <div
           className="dmt-selection-linked-note"
           style={{
@@ -242,11 +244,11 @@ const ObjectSelectionToolbar = ({
           <div className="dmt-note-display-link">
             <Icon icon="lucide-scroll-text" />
             <InternalLink
-              link={(selectedItem.data.linkedNote as string).replace(/\.md$/, '')}
+              link={(selectedObjectData.linkedNote as string).replace(/\.md$/, '')}
               onClick={(e: Event) => {
                 e.preventDefault();
                 e.stopPropagation();
-                void openNoteInNewTab(selectedItem.data?.linkedNote as string);
+                void openNoteInNewTab(selectedObjectData?.linkedNote as string);
               }}
             />
             <Icon icon="lucide-external-link" />

@@ -11,8 +11,8 @@ import type { Point, ScreenCoords, GridStyle } from './geometry.types';
 // Viewport State
 // ===========================================
 
-/** Viewport state for pan/zoom transforms */
-export interface ViewState {
+/** Viewport state for pan/zoom transforms (renderer coordinate space) */
+export interface RenderViewState {
   x: number;      // Pan offset X
   y: number;      // Pan offset Y
   zoom: number;   // Zoom level

@@ -4,7 +4,7 @@
  * Manages zoom in/out and compass rotation controls.
  */
 
-import type { MapData, ViewState } from '#types/core/map.types';
+import type { MapData, StoredViewState } from '#types/core/map.types';
 
 import { DEFAULTS } from '../../core/dmtConstants';
 
@@ -16,7 +16,7 @@ import { DEFAULTS } from '../../core/dmtConstants';
 interface UseViewControlsOptions {
   mapData: MapData | null;
   updateMapData: (data: MapData | ((current: MapData) => MapData)) => void;
-  handleViewStateChange: (viewState: ViewState) => void;
+  handleViewStateChange: (viewState: StoredViewState) => void;
 }
 
 interface UseViewControlsResult {

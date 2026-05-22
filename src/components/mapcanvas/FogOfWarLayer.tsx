@@ -163,7 +163,7 @@ const FogOfWarLayer = ({
     // Rectangle hover preview: show full rectangle outline
     if (rectangleHover) {
       const settings = getSettings();
-      const previewEnabled = (settings as Record<string, unknown>).shapePreviewKbm !== false;
+      const previewEnabled = settings.shapePreviewKbm !== false;
       if (!previewEnabled) return null;
 
       const minCol = Math.min(rectangleStart.col, rectangleHover.col);

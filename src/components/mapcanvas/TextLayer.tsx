@@ -10,6 +10,7 @@
  */
 
 import type { ToolId } from '#types/tools/tool.types';
+import type { TextLabel } from '#types/objects/note.types';
 import type { VNode } from 'preact';
 import type { HexColor } from '#types/core/common.types';
 import type { CustomColor } from '../shared/ColorPicker.tsx';
@@ -39,18 +40,6 @@ import { copyDeepLinkToClipboard } from '../../persistence/deepLinkHandler';
 
 
 
-
-/** Text label data structure */
-interface TextLabel {
-  id: string;
-  content: string;
-  fontSize?: number;
-  fontFace?: string;
-  color?: HexColor;
-  rotation?: number;
-  opacity?: number;
-  position: { x: number; y: number };
-}
 
 /** Props for TextLayer component */
 export interface TextLayerProps {
