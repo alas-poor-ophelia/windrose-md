@@ -13,7 +13,8 @@ npm-debug.log*
 .DS_Store
 Thumbs.db
 
-# IDE (except project-specific .vscode/settings.json)
+# IDE
+.vscode/
 .idea/
 *.swp
 *.swo
