@@ -51,8 +51,12 @@ tests/fixtures/test-vault/windrose-md-data.json
 # Generated docs
 docs/specs
 
-# Planning artifacts
-PLAN.md
+# Internal archive (one-time scripts, old plans, promo assets)
+internal/
 
-# Claude Code memory
+# Claude Code
 memory/
+.claude/scheduled_tasks.lock
+
+# Test vault plugin artifacts
+tests/fixtures/test-vault/.obsidian/plugins/windrose-md/

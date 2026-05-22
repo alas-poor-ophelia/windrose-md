@@ -2,7 +2,7 @@ WIndrose MapDesigner (WindroseMD) is a simple TTRPG-focused mapping tool for Obs
 
 Low tech enough to run in your text editor, high tech enough to... make you forget you're in your text editor?
 
-> **Looking for a full feature breakdown?** Check out the [Feature List](Windrose%20Feature%20docs.md) for detailed descriptions of everything Windrose can do. This README is getting a proper overhaul soon, but in the meantime, the Feature List is the most complete reference.
+> **Looking for a full feature breakdown?** Check out the [Feature List](src/Windrose%20Feature%20docs.md) for detailed descriptions of everything Windrose can do. This README is getting a proper overhaul soon, but in the meantime, the Feature List is the most complete reference.
 
 ![Full Interface](docs/images/main-ui-docs-screenshot.png)
 
