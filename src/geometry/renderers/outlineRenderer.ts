@@ -143,7 +143,7 @@ function computeBoundaryEdges(
   return edges;
 }
 
-// ── Straight-mode rendering ─────────────────────────────────────────
+// â”€â”€ Straight-mode rendering â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function renderOutlineStraight(
   ctx: CanvasRenderingContext2D,
@@ -186,7 +186,7 @@ function renderOutlineStraight(
   ctx.setLineDash([]);
 }
 
-// ── Hex-snap-mode rendering ─────────────────────────────────────────
+// â”€â”€ Hex-snap-mode rendering â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function renderOutlineHex(
   ctx: CanvasRenderingContext2D,
@@ -262,7 +262,7 @@ function renderOutlineHex(
   ctx.setLineDash([]);
 }
 
-// ── Main Entry Point ────────────────────────────────────────────────
+// â”€â”€ Main Entry Point â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function renderOutlines(
   ctx: CanvasRenderingContext2D,
@@ -272,7 +272,7 @@ function renderOutlines(
   mapBounds: { maxRing?: number; maxCol?: number; maxRow?: number },
   orientation: string
 ): void {
-  if (!outlines || outlines.length === 0) return;
+  if (outlines == null || outlines.length === 0) return;
 
   const sorted = [...outlines].sort((a, b) => a.order - b.order);
 

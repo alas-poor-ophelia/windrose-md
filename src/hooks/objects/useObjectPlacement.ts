@@ -43,17 +43,15 @@ function useObjectPlacement(
     clientX: number,
     clientY: number
   ): boolean => {
-    if (currentTool !== 'addObject' || !selectedObjectType) {
+    if (currentTool !== 'addObject' || selectedObjectType == null || selectedObjectType === '') {
       return false;
     }
 
-    if (geometry && geometry.isWithinBounds) {
-      if (!geometry.isWithinBounds(gridX, gridY)) {
-        return true;
-      }
+    if (!geometry.isWithinBounds(gridX, gridY)) {
+      return true;
     }
 
-    const mapType = mapData!.mapType || 'grid';
+    const mapType = mapData.mapType || 'grid';
 
     // Freeform placement: Alt+Shift or sidebar toggle places at exact world coordinates
     const useFreeformPlacement = (altKeyPressedRef.current && shiftKeyPressedRef.current)
@@ -63,13 +61,13 @@ function useObjectPlacement(
       if (!worldCoords) return true;
 
       const result = placeObjectFreeform(
-        getActiveLayer(mapData!).objects || [],
+        getActiveLayer(mapData).objects,
         selectedObjectType,
         worldCoords.worldX,
         worldCoords.worldY,
         { x: gridX, y: gridY },
         mapType,
-        mapData!.objectSetId
+        mapData.objectSetId
       );
       if (result.success) {
         onObjectsChange(result.objects);
@@ -77,15 +75,15 @@ function useObjectPlacement(
       return true;
     }
 
-    if (!canPlaceObjectAt(getActiveLayer(mapData!).objects || [], gridX, gridY, mapType)) {
+    if (!canPlaceObjectAt(getActiveLayer(mapData).objects, gridX, gridY, mapType)) {
       return true;
     }
 
     let alignment = 'center';
     if (mapType === 'grid' && edgeSnapMode && clientX !== undefined && clientY !== undefined) {
       const worldCoords = screenToWorld(clientX, clientY);
-      if (worldCoords && geometry) {
-        const cellSize = mapData!.gridSize || geometry.cellSize;
+      if (worldCoords) {
+        const cellSize = mapData.gridSize ?? geometry.cellSize;
         const fractionalX = worldCoords.worldX / cellSize;
         const fractionalY = worldCoords.worldY / cellSize;
         alignment = calculateEdgeAlignment(fractionalX, fractionalY, gridX, gridY);
@@ -93,11 +91,11 @@ function useObjectPlacement(
     }
 
     const result = placeObject(
-      getActiveLayer(mapData!).objects || [],
+      getActiveLayer(mapData).objects,
       selectedObjectType,
       gridX,
       gridY,
-      { mapType, alignment: alignment as import('#types/objects/object.types').ObjectAlignment, objectSetId: mapData!.objectSetId }
+      { mapType, alignment: alignment as import('#types/objects/object.types').ObjectAlignment, objectSetId: mapData.objectSetId }
     );
 
     if (result.success) {

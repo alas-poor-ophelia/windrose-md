@@ -76,24 +76,26 @@ function addTextLabel(
 ): TextLabel[] {
   // Validate content
   const trimmed = content.trim();
-  if (!trimmed || trimmed.length === 0) {
+  if (trimmed.length === 0) {
+    // eslint-disable-next-line no-console
     console.warn('Cannot add empty text label');
-    return labels || [];
+    return labels ?? [];
   }
-  
+
   if (trimmed.length > MAX_CONTENT_LENGTH) {
+    // eslint-disable-next-line no-console
     console.warn(`Text label content exceeds ${MAX_CONTENT_LENGTH} character limit`);
-    return labels || [];
+    return labels ?? [];
   }
-  
+
   const newLabel: TextLabel = {
     id: generateTextLabelId(),
     content: trimmed,
     position: { x, y },
     rotation: 0,
-    fontSize: options.fontSize || 16,
-    fontFace: options.fontFace || 'sans',
-    color: options.color || '#ffffff',
+    fontSize: options.fontSize ?? 16,
+    fontFace: options.fontFace ?? 'sans',
+    color: options.color ?? '#ffffff',
     ...(options.opacity !== undefined && options.opacity !== 1 ? { opacity: options.opacity } : {})
   };
   

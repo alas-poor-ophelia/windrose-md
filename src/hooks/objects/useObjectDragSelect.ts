@@ -72,55 +72,55 @@ function useObjectDragSelect(
     }
 
     if (selectedItem?.type === 'object' && isResizeMode) {
-      const selectedObject = getActiveLayer(mapData!).objects?.find((obj: MapObject) => obj.id === selectedItem.id);
-      if (selectedObject) {
+      const selectedObject = getActiveLayer(mapData).objects?.find((obj: MapObject) => obj.id === selectedItem.id);
+      if (selectedObject != null) {
         const corner = getClickedCorner(clientX, clientY, selectedObject);
-        if (corner) {
-          beginResize(corner, [...(getActiveLayer(mapData!).objects || [])], { x: clientX, y: clientY, gridX, gridY, object: { ...selectedObject } });
+        if (corner != null) {
+          beginResize(corner, [...(getActiveLayer(mapData).objects ?? [])], { x: clientX, y: clientY, gridX, gridY, object: { ...selectedObject } });
           return true;
         }
       }
     }
 
     let object: MapObject | null = null;
-    if (mapData!.mapType === 'hex' && geometry instanceof HexGeometry) {
-      const cellObjects = getObjectsInCell(getActiveLayer(mapData!).objects || [], gridX, gridY);
+    if (mapData.mapType === 'hex' && geometry instanceof HexGeometry) {
+      const cellObjects = getObjectsInCell(getActiveLayer(mapData).objects ?? [], gridX, gridY);
 
       if (cellObjects.length > 1) {
         const worldCoords = screenToWorld(clientX, clientY);
-        if (worldCoords && geometry.hexToWorld) {
+        if (worldCoords && geometry.hexToWorld != null) {
           const { worldX: hexCenterX, worldY: hexCenterY } = geometry.hexToWorld(gridX, gridY);
-          const hexWidth = geometry.hexSize! * 2;
+          const hexWidth = (geometry.hexSize ?? 1) * 2;
           const clickOffsetX = (worldCoords.worldX - hexCenterX) / hexWidth;
           const clickOffsetY = (worldCoords.worldY - hexCenterY) / hexWidth;
 
           object = getClickedObjectInCell(
-            getActiveLayer(mapData!).objects || [],
+            getActiveLayer(mapData).objects ?? [],
             gridX,
             gridY,
             clickOffsetX,
             clickOffsetY,
-            mapData!.orientation || 'flat'
+            mapData.orientation ?? 'flat'
           );
         }
       } else if (cellObjects.length === 1) {
         object = cellObjects[0];
       }
     } else {
-      object = getObjectAtPosition(getActiveLayer(mapData!).objects || [], gridX, gridY);
+      object = getObjectAtPosition(getActiveLayer(mapData).objects ?? [], gridX, gridY);
     }
 
-    if (object) {
-      const activeLayer = getActiveLayer(mapData!);
-      if (activeLayer.fogOfWar?.enabled) {
-        const objOffset = geometry!.toOffsetCoords(object.position.x, object.position.y);
+    if (object != null) {
+      const activeLayer = getActiveLayer(mapData);
+      if (activeLayer.fogOfWar?.enabled === true) {
+        const objOffset = geometry.toOffsetCoords(object.position.x, object.position.y);
         if (isCellFogged(activeLayer, objOffset.col, objOffset.row)) {
           object = null;
         }
       }
     }
 
-    if (object) {
+    if (object != null) {
       const isAlreadySelected = selectedItem?.type === 'object' && selectedItem.id === object.id;
 
       if (isAlreadySelected) {
@@ -128,34 +128,32 @@ function useObjectDragSelect(
           clearTimeout(longPressTimerRef.current);
         }
 
-        if (mapData!.mapType !== 'hex') {
+        if (mapData.mapType !== 'hex') {
           longPressTimerRef.current = setTimeout(() => {
             setEdgeSnapMode(!edgeSnapMode);
 
-            if (navigator.vibrate) {
-              navigator.vibrate(50);
-            }
+            navigator.vibrate?.(50);
 
             longPressTimerRef.current = null;
           }, 500);
         }
 
-        dragInitialStateRef.current = [...(getActiveLayer(mapData!).objects || [])];
+        dragInitialStateRef.current = [...getActiveLayer(mapData).objects];
         setIsDraggingSelection(true);
         const offsetX = gridX - object.position.x;
         const offsetY = gridY - object.position.y;
-        const worldCoords = object.freeform ? screenToWorld(clientX, clientY) : null;
+        const worldCoords = object.freeform === true ? screenToWorld(clientX, clientY) : null;
         setDragStart({ x: clientX, y: clientY, gridX, gridY, offsetX, offsetY, worldX: worldCoords?.worldX, worldY: worldCoords?.worldY });
         setIsResizeMode(false);
       } else {
         setSelectedItem({ type: 'object', id: object.id, data: object });
         setIsResizeMode(false);
 
-        dragInitialStateRef.current = [...(getActiveLayer(mapData!).objects || [])];
+        dragInitialStateRef.current = [...getActiveLayer(mapData).objects];
         setIsDraggingSelection(true);
         const offsetX = gridX - object.position.x;
         const offsetY = gridY - object.position.y;
-        const worldCoords = object.freeform ? screenToWorld(clientX, clientY) : null;
+        const worldCoords = object.freeform === true ? screenToWorld(clientX, clientY) : null;
         setDragStart({
           x: clientX,
           y: clientY,
@@ -172,13 +170,11 @@ function useObjectDragSelect(
           clearTimeout(longPressTimerRef.current);
         }
 
-        if (mapData!.mapType !== 'hex') {
+        if (mapData.mapType !== 'hex') {
           longPressTimerRef.current = setTimeout(() => {
             setEdgeSnapMode(true);
 
-            if (navigator.vibrate) {
-              navigator.vibrate(50);
-            }
+            navigator.vibrate?.(50);
 
             longPressTimerRef.current = null;
           }, 500);
@@ -194,12 +190,12 @@ function useObjectDragSelect(
   ]);
 
   const handleObjectDragging = useCallback((e: PointerEvent | MouseEvent | TouchEvent): boolean => {
-    const isDraggingObject = selectedItem?.type === 'object' || dragStart?.objectId;
-    if (!isDraggingSelection || !isDraggingObject || !dragStart || !mapData) {
+    const isDraggingObject = selectedItem?.type === 'object' || (dragStart?.objectId != null && dragStart.objectId !== '');
+    if (!isDraggingSelection || !isDraggingObject || !dragStart) {
       return false;
     }
 
-    const objectId = selectedItem?.id || dragStart.objectId;
+    const objectId = selectedItem?.id ?? dragStart.objectId;
 
     const { clientX, clientY } = getClientCoords(e);
 
@@ -220,14 +216,14 @@ function useObjectDragSelect(
 
     // Alt+Shift drag inversion: temporarily flip snap behavior
     const isInverted = altKeyPressedRef.current && shiftKeyPressedRef.current;
-    if (isInverted && currentObject) {
-      if (!dragStart.wasInverted) {
-        setDragStart({ ...dragStart, wasInverted: true, originalFreeform: !!currentObject.freeform });
+    if (isInverted && currentObject != null) {
+      if (dragStart.wasInverted !== true) {
+        setDragStart({ ...dragStart, wasInverted: true, originalFreeform: currentObject.freeform === true });
       }
 
-      const wasOriginallyGrid = dragStart.wasInverted
+      const wasOriginallyGrid = dragStart.wasInverted === true
         ? dragStart.originalFreeform === false
-        : !currentObject.freeform;
+        : currentObject.freeform !== true;
 
       if (wasOriginallyGrid) {
         const worldCoords = screenToWorld(clientX, clientY);
@@ -238,7 +234,7 @@ function useObjectDragSelect(
           baseWorldX = currentObject.worldPosition.x;
           baseWorldY = currentObject.worldPosition.y;
         } else {
-          const cellCenter = geometry!.getCellCenter(currentObject.position.x, currentObject.position.y);
+          const cellCenter = geometry.getCellCenter(currentObject.position.x, currentObject.position.y);
           baseWorldX = cellCenter.worldX;
           baseWorldY = cellCenter.worldY;
         }
@@ -251,9 +247,10 @@ function useObjectDragSelect(
         }
 
         const nearestGrid = screenToGrid(clientX, clientY);
+        if (objectId == null) return true;
         const updatedObjects = updateObject(
           getActiveLayer(mapData).objects,
-          objectId!,
+          objectId,
           {
             freeform: true,
             worldPosition: { x: baseWorldX, y: baseWorldY },
@@ -267,19 +264,20 @@ function useObjectDragSelect(
         const coords = screenToGrid(clientX, clientY);
         if (!coords) return true;
 
-        const offsetX = dragStart.offsetX || 0;
-        const offsetY = dragStart.offsetY || 0;
+        const offsetX = dragStart.offsetX ?? 0;
+        const offsetY = dragStart.offsetY ?? 0;
         const targetX = coords.x - offsetX;
         const targetY = coords.y - offsetY;
 
-        const cellCenter = geometry!.getCellCenter(targetX, targetY);
+        const cellCenter = geometry.getCellCenter(targetX, targetY);
 
+        if (objectId == null) return true;
         const updatedObjects = updateObject(
           getActiveLayer(mapData).objects,
-          objectId!,
+          objectId,
           {
             position: { x: targetX, y: targetY },
-            ...(cellCenter ? { worldPosition: { x: cellCenter.worldX, y: cellCenter.worldY } } : {})
+            worldPosition: { x: cellCenter.worldX, y: cellCenter.worldY }
           }
         );
         onObjectsChange(updatedObjects, true);
@@ -288,7 +286,7 @@ function useObjectDragSelect(
       }
     }
 
-    if (dragStart.wasInverted && !isInverted) {
+    if (dragStart.wasInverted === true && !isInverted) {
       const worldCoords = screenToWorld(clientX, clientY);
       setDragStart({
         ...dragStart,
@@ -301,7 +299,7 @@ function useObjectDragSelect(
       return true;
     }
 
-    if (currentObject?.freeform && currentObject.worldPosition && dragStart.worldX != null && dragStart.worldY != null) {
+    if (currentObject?.freeform === true && currentObject.worldPosition != null && dragStart.worldX != null && dragStart.worldY != null) {
       const worldCoords = screenToWorld(clientX, clientY);
       if (!worldCoords) return true;
 
@@ -313,12 +311,13 @@ function useObjectDragSelect(
 
       const nearestGrid = screenToGrid(clientX, clientY);
 
+      if (objectId == null) return true;
       const updatedObjects = updateObject(
         getActiveLayer(mapData).objects,
-        objectId!,
+        objectId,
         {
           worldPosition: { x: newWorldX, y: newWorldY },
-          ...(nearestGrid ? { position: { x: nearestGrid.x, y: nearestGrid.y } } : {})
+          ...(nearestGrid != null ? { position: { x: nearestGrid.x, y: nearestGrid.y } } : {})
         }
       );
       onObjectsChange(updatedObjects, true);
@@ -332,8 +331,8 @@ function useObjectDragSelect(
 
     const { x, y } = coords;
 
-    const offsetX = dragStart.offsetX || 0;
-    const offsetY = dragStart.offsetY || 0;
+    const offsetX = dragStart.offsetX ?? 0;
+    const offsetY = dragStart.offsetY ?? 0;
     const targetX = x - offsetX;
     const targetY = y - offsetY;
 
@@ -342,8 +341,10 @@ function useObjectDragSelect(
 
       const isMovingWithinSameCell = currentObject.position.x === targetX && currentObject.position.y === targetY;
 
+      if (objectId == null) return true;
+
       if (mapData.mapType === 'hex' && !isMovingWithinSameCell) {
-        const targetCellObjects = getObjectsInCell(getActiveLayer(mapData).objects || [], targetX, targetY);
+        const targetCellObjects = getObjectsInCell(getActiveLayer(mapData).objects, targetX, targetY);
 
         if (targetCellObjects.length >= 4) {
           return true;
@@ -352,7 +353,7 @@ function useObjectDragSelect(
         const targetSlots = targetCellObjects.map((o: MapObject) => o.slot ?? 0);
         const newSlot = assignSlot(targetSlots);
 
-        let updatedObjects = removeObjectFromHex(getActiveLayer(mapData).objects, objectId!);
+        let updatedObjects = removeObjectFromHex(getActiveLayer(mapData).objects, objectId);
 
         updatedObjects = [...updatedObjects, {
           ...currentObject,
@@ -364,40 +365,40 @@ function useObjectDragSelect(
 
         setDragStart({ x: clientX, y: clientY, gridX: x, gridY: y, offsetX, offsetY, objectId });
         const movedObject = updatedObjects.find((obj: MapObject) => obj.id === objectId);
-        if (movedObject) {
+        if (movedObject != null) {
           setSelectedItem({
             type: 'object',
-            id: objectId!,
+            id: objectId,
             data: movedObject
           });
         }
       } else {
-        const existingObj = getObjectAtPosition(getActiveLayer(mapData).objects || [], targetX, targetY);
+        const existingObj = getObjectAtPosition(getActiveLayer(mapData).objects, targetX, targetY);
 
         if (!existingObj || existingObj.id === objectId) {
           let alignment = 'center';
           if (edgeSnapMode) {
             const worldCoords = screenToWorld(clientX, clientY);
-            if (worldCoords && geometry?.worldToGrid) {
-              const fractionalX = worldCoords.worldX / (mapData.gridSize || geometry.cellSize);
-              const fractionalY = worldCoords.worldY / (mapData.gridSize || geometry.cellSize);
+            if (worldCoords && geometry?.worldToGrid != null) {
+              const fractionalX = worldCoords.worldX / (mapData.gridSize ?? geometry.cellSize);
+              const fractionalY = worldCoords.worldY / (mapData.gridSize ?? geometry.cellSize);
               alignment = calculateEdgeAlignment(fractionalX, fractionalY, targetX, targetY);
             }
           }
 
           const updatedObjects = updateObject(
             getActiveLayer(mapData).objects,
-            objectId!,
+            objectId,
             { position: { x: targetX, y: targetY }, alignment }
           );
           onObjectsChange(updatedObjects, true);
 
           setDragStart({ x: clientX, y: clientY, gridX: x, gridY: y, offsetX, offsetY, objectId });
           const updatedObject = updatedObjects.find((obj: MapObject) => obj.id === objectId);
-          if (updatedObject) {
+          if (updatedObject != null) {
             setSelectedItem({
               type: 'object',
-              id: objectId!,
+              id: objectId,
               data: updatedObject
             });
           }
@@ -409,7 +410,7 @@ function useObjectDragSelect(
     getClientCoords, screenToGrid, screenToWorld, updateObject, onObjectsChange, setDragStart, setSelectedItem, getObjectAtPosition]);
 
   const stopObjectDragging = useCallback((): boolean => {
-    const isDraggingObject = selectedItem?.type === 'object' || dragStart?.objectId;
+    const isDraggingObject = selectedItem?.type === 'object' || (dragStart?.objectId != null && dragStart.objectId !== '');
     if (isDraggingSelection && isDraggingObject) {
       if (longPressTimerRef.current) {
         clearTimeout(longPressTimerRef.current);
@@ -417,15 +418,15 @@ function useObjectDragSelect(
       }
 
       // Clean up drag inversion
-      if (dragStart?.wasInverted && mapData) {
-        const objectId = selectedItem?.id || dragStart.objectId;
+      if (dragStart?.wasInverted === true) {
+        const objectId = selectedItem?.id ?? dragStart.objectId;
         const currentObject = getActiveLayer(mapData).objects?.find((o: MapObject) => o.id === objectId);
-        if (currentObject && objectId) {
+        if (currentObject != null && objectId != null && objectId !== '') {
           if (dragStart.originalFreeform === false) {
             // Was grid, Alt+Shift dragged to freeform → keep as freeform permanently
           } else if (dragStart.originalFreeform === true) {
             // Was freeform, inverted to grid → keep freeform, snap worldPosition to final cell center
-            const cellCenter = geometry!.getCellCenter(currentObject.position.x, currentObject.position.y);
+            const cellCenter = geometry.getCellCenter(currentObject.position.x, currentObject.position.y);
             const updatedObjects = updateObject(
               getActiveLayer(mapData).objects,
               objectId,
@@ -440,13 +441,13 @@ function useObjectDragSelect(
       setDragStart(null);
 
       if (dragInitialStateRef.current !== null) {
-        onObjectsChange(getActiveLayer(mapData!).objects, false);
+        onObjectsChange(getActiveLayer(mapData).objects, false);
 
-        const fogObjectId = selectedItem?.id || dragStart?.objectId;
-        if (fogObjectId) {
+        const fogObjectId = selectedItem?.id ?? dragStart?.objectId;
+        if (fogObjectId != null && fogObjectId !== '') {
           const initialObj = dragInitialStateRef.current.find((o: MapObject) => o.id === fogObjectId);
-          const currentObj = getActiveLayer(mapData!).objects?.find((o: MapObject) => o.id === fogObjectId);
-          if (initialObj && currentObj && currentObj.isPlayer && currentObj.lightEnabled && currentObj.lightRadius) {
+          const currentObj = getActiveLayer(mapData).objects?.find((o: MapObject) => o.id === fogObjectId);
+          if (initialObj && currentObj && currentObj.isPlayer === true && currentObj.lightEnabled === true && currentObj.lightRadius != null) {
             const moved = initialObj.position.x !== currentObj.position.x
               || initialObj.position.y !== currentObj.position.y
               || initialObj.worldPosition?.x !== currentObj.worldPosition?.x
@@ -463,7 +464,7 @@ function useObjectDragSelect(
       }
 
       // Refresh selectedItem.data so toolbar reflects current freeform state
-      if (selectedItem?.type === 'object' && mapData) {
+      if (selectedItem?.type === 'object') {
         const freshObject = getActiveLayer(mapData).objects?.find((o: MapObject) => o.id === selectedItem.id);
         if (freshObject) {
           setSelectedItem({ type: 'object', id: selectedItem.id, data: freshObject });

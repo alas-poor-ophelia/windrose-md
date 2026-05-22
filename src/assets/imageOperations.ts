@@ -130,12 +130,12 @@ async function preloadImage(app: App, vaultPath: string): Promise<HTMLImageEleme
   // Return cached if available
   if (imageCache.has(vaultPath)) {
     touchCacheEntry(vaultPath);
-    return imageCache.get(vaultPath)!;
+    return imageCache.get(vaultPath) ?? null;
   }
 
   // Return existing load promise if in progress
   if (loadingPromises.has(vaultPath)) {
-    return loadingPromises.get(vaultPath)!;
+    return loadingPromises.get(vaultPath) ?? null;
   }
 
   // Start new load
@@ -144,6 +144,7 @@ async function preloadImage(app: App, vaultPath: string): Promise<HTMLImageEleme
       // Get file from vault
       const file = app.vault.getAbstractFileByPath(vaultPath);
       if (!file) {
+        // eslint-disable-next-line no-console
         console.warn(`[imageOperations] Image file not found: ${vaultPath}`);
         loadingPromises.delete(vaultPath);
         return null;
@@ -175,6 +176,7 @@ async function preloadImage(app: App, vaultPath: string): Promise<HTMLImageEleme
           resolve();
         };
         img.onerror = () => {
+          // eslint-disable-next-line no-console
           console.error(`[imageOperations] Failed to load image: ${vaultPath}`);
           URL.revokeObjectURL(url);
           reject(new Error(`Failed to load image: ${vaultPath}`));
@@ -191,6 +193,7 @@ async function preloadImage(app: App, vaultPath: string): Promise<HTMLImageEleme
 
       return img;
     } catch (error) {
+      // eslint-disable-next-line no-console
       console.error('[imageOperations] Error loading image:', error);
       loadingPromises.delete(vaultPath);
       return null;
@@ -222,7 +225,7 @@ async function getImageDimensions(vaultPath: string): Promise<ImageDimensions | 
 
   // Return cached dimensions if available
   if (dimensionsCache.has(vaultPath)) {
-    return dimensionsCache.get(vaultPath)!;
+    return dimensionsCache.get(vaultPath) ?? null;
   }
 
   // Load image (which will cache dimensions)

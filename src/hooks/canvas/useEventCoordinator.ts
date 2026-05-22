@@ -75,7 +75,7 @@ const useEventCoordinator = ({
     if (!panZoomHandlers) return;
 
     const touchEvent = e as TouchEvent;
-    if (isAlignmentMode && (!touchEvent.touches || touchEvent.touches.length === 1)) {
+    if (isAlignmentMode && (touchEvent.touches == null || touchEvent.touches.length === 1)) {
       return;
     }
 
@@ -113,7 +113,7 @@ const useEventCoordinator = ({
       }
     }
 
-    if (touchEvent.touches && touchEvent.touches.length === 2) {
+    if (touchEvent.touches != null && touchEvent.touches.length === 2) {
       if (isColorPickerOpen || showObjectColorPicker) {
         const touch1Target = document.elementFromPoint(touchEvent.touches[0].clientX, touchEvent.touches[0].clientY);
         const touch2Target = document.elementFromPoint(touchEvent.touches[1].clientX, touchEvent.touches[1].clientY);
@@ -138,14 +138,14 @@ const useEventCoordinator = ({
       setRecentMultiTouch(true);
       const center = getTouchCenter(touchEvent.touches);
       const distance = getTouchDistance(touchEvent.touches);
-      if (center && distance) {
+      if (center != null && distance != null) {
         startTouchPan(center);
         setInitialPinchDistance(distance);
       }
       return;
     }
 
-    if (recentMultiTouch || panZoomHandlers.isTouchPanningRef?.current) {
+    if (recentMultiTouch || panZoomHandlers.isTouchPanningRef?.current === true) {
       return;
     }
 
@@ -165,7 +165,7 @@ const useEventCoordinator = ({
     const gridY = coords.y;
 
     const eventType = e.type;
-    const isTouchEvent = !!touchEvent.touches;
+    const isTouchEvent = touchEvent.touches != null;
     const targetElement = e.target;
 
     const syntheticEvent: SyntheticPointerEvent = {
@@ -213,7 +213,7 @@ const useEventCoordinator = ({
         }
 
         const shapeHandlers = getHandlers('shapeOverlay');
-        if (shapeHandlers?.handleShapeSelection) {
+        if (shapeHandlers?.handleShapeSelection != null) {
           const shapeHandled = (shapeHandlers.handleShapeSelection as (cx: number, cy: number) => boolean)(clientX, clientY);
           if (shapeHandled) return;
         }
@@ -382,7 +382,7 @@ const useEventCoordinator = ({
     if (!panZoomHandlers) return;
 
     const touchEvent = e as TouchEvent;
-    if (isAlignmentMode && (!touchEvent.touches || touchEvent.touches.length !== 2)) {
+    if (isAlignmentMode && (touchEvent.touches == null || touchEvent.touches.length !== 2)) {
       return;
     }
 
@@ -398,10 +398,10 @@ const useEventCoordinator = ({
 
     const { clientX, clientY } = getCoords(e);
 
-    if (touchEvent.touches && touchEvent.touches.length === 2) {
+    if (touchEvent.touches != null && touchEvent.touches.length === 2) {
       e.preventDefault();
       e.stopPropagation();
-      if (isTouchPanningRef?.current) {
+      if (isTouchPanningRef?.current === true) {
         if (pendingToolTimeoutRef.current) {
           clearTimeout(pendingToolTimeoutRef.current);
           pendingToolTimeoutRef.current = null;
@@ -412,13 +412,13 @@ const useEventCoordinator = ({
       return;
     }
 
-    if (isPanning && panStart) {
+    if (isPanning && panStart != null) {
       e.preventDefault();
       updatePan(clientX, clientY);
       return;
     }
 
-    if (touchEvent.touches && touchEvent.touches.length > 1) {
+    if (touchEvent.touches != null && touchEvent.touches.length > 1) {
       if (pendingToolTimeoutRef.current) {
         clearTimeout(pendingToolTimeoutRef.current);
         pendingToolTimeoutRef.current = null;
@@ -426,14 +426,14 @@ const useEventCoordinator = ({
       }
     }
 
-    if (layerVisibility.objects && objectHandlers?.isResizing && selectedItem?.type === 'object') {
+    if (layerVisibility.objects && objectHandlers?.isResizing === true && selectedItem?.type === 'object') {
       if (objectHandlers.handleObjectResizing) {
         objectHandlers.handleObjectResizing(e);
       }
       return;
     }
 
-    if (isDraggingSelection && dragStart?.isGroupDrag) {
+    if (isDraggingSelection && dragStart?.isGroupDrag === true) {
       handleGroupDrag(e as PointerEvent);
       return;
     }
@@ -445,7 +445,7 @@ const useEventCoordinator = ({
         textHandlers.handleTextDragging(e);
       } else if (selectedItem.type === 'shapeOverlay') {
         const shapeHandlers = getHandlers('shapeOverlay');
-        if (shapeHandlers?.handleShapeDragging) {
+        if (shapeHandlers?.handleShapeDragging != null) {
           (shapeHandlers.handleShapeDragging as (e: MouseEvent | TouchEvent) => void)(e);
         }
       }
@@ -460,7 +460,7 @@ const useEventCoordinator = ({
       const isTouch = touchEvent.touches !== undefined || (e as PointerEvent).pointerType === 'touch';
       if (!isTouch) {
         const areaSelectHandlers = getHandlers('areaSelect') as AreaSelectHandlers | null;
-        if (areaSelectHandlers?.areaSelectStart && areaSelectHandlers.updateAreaSelectHover && toGrid) {
+        if (areaSelectHandlers?.areaSelectStart != null && areaSelectHandlers.updateAreaSelectHover != null && toGrid != null) {
           const coords = toGrid(clientX, clientY);
           if (coords) {
             areaSelectHandlers.updateAreaSelectHover(coords.x, coords.y);
@@ -484,11 +484,11 @@ const useEventCoordinator = ({
       }
 
       const isTouch = touchEvent.touches !== undefined || (e as PointerEvent).pointerType === 'touch';
-      if (!isTouch && drawingHandlers?.previewEnabled && drawingHandlers?.updateShapeHover) {
+      if (!isTouch && drawingHandlers?.previewEnabled === true && drawingHandlers?.updateShapeHover != null) {
 
-        if (currentTool === 'edgeLine' && drawingHandlers.edgeLineStart && panZoomHandlers.screenToWorld) {
+        if (currentTool === 'edgeLine' && drawingHandlers.edgeLineStart != null && panZoomHandlers.screenToWorld != null) {
           const worldCoords = panZoomHandlers.screenToWorld(clientX, clientY);
-          if (worldCoords && geometry) {
+          if (worldCoords != null && geometry != null) {
             const cellSize = geometry.cellSize;
             const nearestX = Math.round(worldCoords.worldX / cellSize);
             const nearestY = Math.round(worldCoords.worldY / cellSize);
@@ -497,9 +497,9 @@ const useEventCoordinator = ({
             }
           }
         }
-        else if ((currentTool === 'rectangle' || currentTool === 'clearArea' || currentTool === 'circle') && toGrid) {
-          const hasStart = (currentTool === 'circle' && drawingHandlers.circleStart) ||
-                           ((currentTool === 'rectangle' || currentTool === 'clearArea') && drawingHandlers.rectangleStart);
+        else if ((currentTool === 'rectangle' || currentTool === 'clearArea' || currentTool === 'circle') && toGrid != null) {
+          const hasStart = (currentTool === 'circle' && drawingHandlers.circleStart != null) ||
+                           ((currentTool === 'rectangle' || currentTool === 'clearArea') && drawingHandlers.rectangleStart != null);
           if (hasStart) {
             const coords = toGrid(clientX, clientY);
             if (coords) {
@@ -512,7 +512,7 @@ const useEventCoordinator = ({
       }
 
       if (!isTouch && currentTool === 'segmentDraw' && drawingHandlers?.updateSegmentHover) {
-        if (screenToWorld && geometry) {
+        if (screenToWorld != null && geometry != null) {
           const worldCoords = screenToWorld(clientX, clientY);
           if (worldCoords) {
             const cellSize = geometry.cellSize;
@@ -532,7 +532,7 @@ const useEventCoordinator = ({
     }
 
     if (currentTool === 'measure' && measureHandlers?.handleMeasureMove) {
-      if (toGrid) {
+      if (toGrid != null) {
         const coords = toGrid(clientX, clientY);
         if (coords) {
           const gridX = coords.x;
@@ -625,7 +625,7 @@ const useEventCoordinator = ({
         const deltaY = Math.abs(clientY - panStartPositionRef.current.y);
 
         if (deltaX < panMoveThreshold && deltaY < panMoveThreshold && selectedItem) {
-          if (selectedItem.type === 'object' && objectHandlers?.edgeSnapMode) {
+          if (selectedItem.type === 'object' && objectHandlers?.edgeSnapMode === true) {
             objectHandlers.setEdgeSnapMode?.(false);
           } else {
             setSelectedItem(null);
@@ -654,14 +654,14 @@ const useEventCoordinator = ({
       return;
     }
 
-    if (objectHandlers?.isResizing && selectedItem?.type === 'object') {
+    if (objectHandlers?.isResizing === true && selectedItem?.type === 'object') {
       if (objectHandlers.stopObjectResizing) {
         objectHandlers.stopObjectResizing();
       }
       return;
     }
 
-    if (isDraggingSelection && dragStart?.isGroupDrag) {
+    if (isDraggingSelection && dragStart?.isGroupDrag === true) {
       stopGroupDrag();
       return;
     }
@@ -673,7 +673,7 @@ const useEventCoordinator = ({
         textHandlers.stopTextDragging();
       } else if (selectedItem?.type === 'shapeOverlay') {
         const shapeHandlers = getHandlers('shapeOverlay');
-        if (shapeHandlers?.stopShapeDragging) {
+        if (shapeHandlers?.stopShapeDragging != null) {
           (shapeHandlers.stopShapeDragging as () => void)();
         }
       }
@@ -693,7 +693,7 @@ const useEventCoordinator = ({
 
     if (currentTool === 'freehand') {
       const freehandHandlers = getHandlers('freehand');
-      if (freehandHandlers?.stopDrawing) {
+      if (freehandHandlers?.stopDrawing != null) {
         (freehandHandlers.stopDrawing as (e?: Event | MouseEvent | TouchEvent) => void)(e);
       }
     }
@@ -781,7 +781,7 @@ const useEventCoordinator = ({
 
   const handleCanvasDoubleClick = useCallback((e: MouseEvent): void => {
     // Sub-hex entry: double-click on hex in select mode
-    if (currentTool === 'select' && geometry?.type === 'hex' && screenToGrid) {
+    if (currentTool === 'select' && geometry?.type === 'hex' && screenToGrid != null) {
       const coords = screenToGrid(e.clientX, e.clientY);
       if (coords) {
         document.dispatchEvent(new CustomEvent('windrose:enter-sub-hex', {
@@ -825,7 +825,7 @@ const useEventCoordinator = ({
     if (contextDetail.handled) return;
 
     // General hex context menu (dispatch for DungeonMapTracker to handle)
-    if (geometry?.type === 'hex' && screenToGrid) {
+    if (geometry?.type === 'hex' && screenToGrid != null) {
       const coords = screenToGrid(e.clientX, e.clientY);
       if (coords) {
         document.dispatchEvent(new CustomEvent('windrose:hex-context-menu', {
@@ -837,7 +837,7 @@ const useEventCoordinator = ({
 
     // Region context menu for non-hex maps (fallback)
     const regionHandlers = getHandlers('region');
-    if (regionHandlers?.handleContextMenu) {
+    if (regionHandlers?.handleContextMenu != null) {
       (regionHandlers.handleContextMenu as (e: MouseEvent) => void)(e);
     }
 
@@ -966,15 +966,15 @@ const useEventCoordinator = ({
       const textHandlers = getHandlers('text') as TextHandlers | null;
       const panZoomHandlers = getHandlers('panZoom') as unknown as PanZoomHandlers | null;
 
-      if (drawingHandlers?.isDrawing && drawingHandlers?.stopDrawing) {
+      if (drawingHandlers?.isDrawing === true && drawingHandlers?.stopDrawing) {
         drawingHandlers.stopDrawing();
       }
 
-      if (panZoomHandlers?.isPanning && (e as MouseEvent).button === 1) {
+      if (panZoomHandlers?.isPanning === true && (e as MouseEvent).button === 1) {
         panZoomHandlers.stopPan();
       }
 
-      if (panZoomHandlers?.isTouchPanningRef?.current) {
+      if (panZoomHandlers?.isTouchPanningRef?.current === true) {
         panZoomHandlers.stopTouchPan();
         setTimeout(() => setRecentMultiTouch(false), 100);
       }
@@ -983,7 +983,7 @@ const useEventCoordinator = ({
         objectHandlers.stopObjectResizing();
       }
 
-      if (isDraggingSelection && dragStart?.isGroupDrag) {
+      if (isDraggingSelection && dragStart?.isGroupDrag === true) {
         stopGroupDrag();
       }
 
@@ -1003,14 +1003,14 @@ const useEventCoordinator = ({
 
     const handleGlobalMouseMove = (e: MouseEvent): void => {
       const panZoomHandlers = getHandlers('panZoom') as unknown as PanZoomHandlers | null;
-      if (panZoomHandlers?.isPanning && panZoomHandlers?.updatePan) {
+      if (panZoomHandlers?.isPanning === true && panZoomHandlers?.updatePan != null) {
         panZoomHandlers.updatePan(e.clientX, e.clientY);
       }
     };
 
     const handleGlobalTouchMove = (e: TouchEvent): void => {
       const panZoomHandlers = getHandlers('panZoom') as unknown as PanZoomHandlers | null;
-      if (panZoomHandlers?.isTouchPanningRef?.current && panZoomHandlers?.updateTouchPan && e.touches.length === 2) {
+      if (panZoomHandlers?.isTouchPanningRef?.current === true && panZoomHandlers?.updateTouchPan != null && e.touches.length === 2) {
         e.preventDefault();
         panZoomHandlers.updateTouchPan(e.touches);
       }

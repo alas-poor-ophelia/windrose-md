@@ -80,15 +80,14 @@ function useShapeOverlayTools(options: ShapeOverlayToolsOptions): UseShapeOverla
     }
   }, [isShapeTool]);
 
-  const getWorldCoords = useCallback((e: PointerEvent | MouseEvent) => {
-    if (!screenToWorld) return null;
+  const getWorldCoords = useCallback((e: PointerEvent | MouseEvent): { worldX: number; worldY: number } | null => {
     return screenToWorld(e.clientX, e.clientY);
   }, [screenToWorld]);
 
   const sizeToFormattedDistance = useCallback((size: number): string => {
     if (!geometry || !mapData) return '';
-    const cellSize = (geometry as { cellSize?: number; hexSize?: number }).cellSize ||
-                     (geometry as { hexSize?: number }).hexSize || 1;
+    const cellSize = (geometry as { cellSize?: number; hexSize?: number }).cellSize ??
+                     (geometry as { hexSize?: number }).hexSize ?? 1;
     const cellDistance = size / cellSize;
     const settings = mapData.settings?.overrides || {};
     const distancePerCell = (settings.distancePerCell as number) || 5;
@@ -205,7 +204,6 @@ function useShapeOverlayTools(options: ShapeOverlayToolsOptions): UseShapeOverla
   }, [mapData?.shapeOverlays]);
 
   const handleShapeSelection = useCallback((clientX: number, clientY: number): boolean => {
-    if (!screenToWorld) return false;
     const world = screenToWorld(clientX, clientY);
     if (!world) return false;
     const hit = hitTestShape(world.worldX, world.worldY);
@@ -221,7 +219,7 @@ function useShapeOverlayTools(options: ShapeOverlayToolsOptions): UseShapeOverla
   const dragPrevRef = useRef<{ worldX: number; worldY: number } | null>(null);
 
   const handleShapeDragging = useCallback((e: MouseEvent | TouchEvent) => {
-    if (!screenToWorld || !mapData || !currentSelectedItem || currentSelectedItem.type !== 'shapeOverlay') return;
+    if (!mapData || !currentSelectedItem || currentSelectedItem.type !== 'shapeOverlay') return;
     const clientX = (e as MouseEvent).clientX ?? ((e as TouchEvent).touches?.[0]?.clientX || 0);
     const clientY = (e as MouseEvent).clientY ?? ((e as TouchEvent).touches?.[0]?.clientY || 0);
     const world = screenToWorld(clientX, clientY);

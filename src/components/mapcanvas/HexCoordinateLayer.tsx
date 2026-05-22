@@ -27,6 +27,7 @@
  * @returns {boolean} True if point is inside the hexagon
  */
 
+import type { VNode } from 'preact';
 import type { MapData } from '#types/core/map.types';
 import { useMapState } from '../../context/MapContext';
 import { useMapSelection } from '../../context/MapSelectionContext';
@@ -98,8 +99,8 @@ function getPositionInRing(q: number, r: number, ring: number): number {
  * @param {string} displayMode - 'rectangular' or 'radial'
  * @returns {{hexes: Array<{col, row, q, r, displayX, displayY, label}>, scaleX: number, scaleY: number}} Visible hexes with display positions and scale factors
  */
-function getVisibleHexes(geometry: HexGeometry, mapData: MapData, canvas: HTMLCanvasElement | null, displayMode: string = 'rectangular') {
-  if (!canvas || !geometry || !mapData || !mapData.viewState) return { hexes: [], scaleX: 1, scaleY: 1 };
+function getVisibleHexes(geometry: HexGeometry, mapData: MapData, canvas: HTMLCanvasElement | null, displayMode: string = 'rectangular'): { hexes: Array<{ col: number; row: number; q: number; r: number; displayX: number; displayY: number; label: string }>; scaleX: number; scaleY: number } {
+  if (!canvas || !mapData.viewState) return { hexes: [], scaleX: 1, scaleY: 1 };
 
   const { viewState, northDirection = 0 } = mapData;
   const { zoom, center } = viewState;
@@ -282,7 +283,7 @@ function getVisibleHexes(geometry: HexGeometry, mapData: MapData, canvas: HTMLCa
  * Renders coordinate labels over visible hexes
  * Reads display mode settings from mapData.settings
  */
-const HexCoordinateLayer = () => {
+const HexCoordinateLayer = (): VNode | null => {
   // Get shared state from contexts
   const { canvasRef, mapData, geometry } = useMapState();
   const { showCoordinates, layerVisibility } = useMapSelection();
@@ -300,21 +301,22 @@ const HexCoordinateLayer = () => {
   if (!canvas) return null;
   
   // Get coordinate display settings from map settings (with defaults)
-  const displayMode = mapData.settings?.coordinateDisplayMode || 'rectangular';
-  
+  const displayMode = mapData.settings?.coordinateDisplayMode ?? 'rectangular';
+
   // Get effective color settings (merges global with map-specific overrides)
   const effectiveSettings = getEffectiveSettings(mapData.settings);
-  const textColor = effectiveSettings.coordinateTextColor || '#ffffff';
-  const shadowColor = effectiveSettings.coordinateTextShadow || '#000000';
-  
+  const textColor = effectiveSettings.coordinateTextColor ?? '#ffffff';
+  const shadowColor = effectiveSettings.coordinateTextShadow ?? '#000000';
+
   // Calculate visible hexes with display positions and labels
   const { hexes: visibleHexes, scaleX } = getVisibleHexes(
     geometry as unknown as HexGeometry, mapData, canvas, displayMode
   );
-  
+
   // Calculate font size based on hex size and zoom, scaled to display coordinates
-  const zoom = mapData.viewState!.zoom;
-  const hexSize = geometry.hexSize!;
+  if (!mapData.viewState) return null;
+  const zoom = mapData.viewState.zoom;
+  const hexSize = geometry.hexSize ?? 30;
   const canvasFontSize = hexSize * zoom * 0.35;
   const fontSize = Math.max(8, Math.min(24, canvasFontSize * scaleX));
   

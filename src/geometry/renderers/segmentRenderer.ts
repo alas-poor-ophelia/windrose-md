@@ -174,7 +174,7 @@ function renderSegmentCells(
   geometry: IGridRenderer,
   viewState: ViewState
 ): void {
-  if (!cells || cells.length === 0) return;
+  if (cells == null || cells.length === 0) return;
   
   // FUTURE OPTIMIZATION: Could group by color here and batch
   // For now, render individually (profile before optimizing)
@@ -191,7 +191,7 @@ function renderSegmentCells(
 /**
  * Draw an internal border line (center to boundary point)
  * These are diagonal lines showing where filled segments meet empty segments
- * within the same cell (e.g., TL→Center→BR for a diagonal fill).
+ * within the same cell (e.g., TLâ†’Centerâ†’BR for a diagonal fill).
  * Uses fillRect for iOS compatibility (same as existing border rendering)
  */
 function drawInternalBorder(
@@ -282,7 +282,7 @@ function renderSegmentBorders(
   viewState: ViewState,
   theme: BorderTheme
 ): void {
-  if (!segmentCells || segmentCells.length === 0) return;
+  if (segmentCells == null || segmentCells.length === 0) return;
   
   const cellSize = geometry.getScaledCellSize(viewState.zoom);
   const cellMap = buildCellMap(allCells, geometry as unknown as import('#types/core/geometry.types').IGeometry);
@@ -300,7 +300,7 @@ function renderSegmentBorders(
     const vertices = getCellVertices(screenX, screenY, cellSize);
     
     // Draw internal borders (diagonal lines where filled meets empty within cell)
-    // These create the diagonal boundaries like TL→Center→BR
+    // These create the diagonal boundaries like TLâ†’Centerâ†’BR
     const internalBorders = getInternalBorders(cell);
     for (const { from, to } of internalBorders) {
       drawInternalBorder(ctx, vertices, from, to, borderWidth);

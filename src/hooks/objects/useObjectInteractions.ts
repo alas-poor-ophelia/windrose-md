@@ -85,12 +85,13 @@ const useObjectInteractions = (
 
     if (e.key === 'r' || e.key === 'R') {
       e.preventDefault();
-      const currentObject = getActiveLayer(mapData!).objects?.find((obj: MapObject) => obj.id === selectedItem.id);
-      const currentRotation = currentObject?.rotation || 0;
+      if (!mapData) return false;
+      const currentObject = getActiveLayer(mapData).objects?.find((obj: MapObject) => obj.id === selectedItem.id);
+      const currentRotation = currentObject?.rotation ?? 0;
       const nextRotation = getNextRotation(currentRotation);
 
       const updatedObjects = updateObject(
-        getActiveLayer(mapData!).objects,
+        getActiveLayer(mapData).objects,
         selectedItem.id,
         { rotation: nextRotation }
       );
@@ -100,8 +101,9 @@ const useObjectInteractions = (
     }
 
     if (e.key === 'Delete' || e.key === 'Backspace') {
+      if (!mapData) return false;
       e.preventDefault();
-      const updatedObjects = removeObject(getActiveLayer(mapData!).objects, selectedItem.id);
+      const updatedObjects = removeObject(getActiveLayer(mapData).objects, selectedItem.id);
       onObjectsChange(updatedObjects);
       setSelectedItem(null);
       setIsResizeMode(false);

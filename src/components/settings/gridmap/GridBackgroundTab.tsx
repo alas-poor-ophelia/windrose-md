@@ -53,12 +53,12 @@ function GridBackgroundTab(): VNode | null {
   }
 
   // Track section open state
-  const [imagePickerOpen, setImagePickerOpen] = useState(!backgroundImagePath);
-  const [alignmentOpen, setAlignmentOpen] = useState(!!backgroundImagePath);
+  const [imagePickerOpen, setImagePickerOpen] = useState(backgroundImagePath == null || backgroundImagePath === '');
+  const [alignmentOpen, setAlignmentOpen] = useState(backgroundImagePath != null && backgroundImagePath !== '');
 
   // Auto-collapse image picker when image is selected
   useEffect(() => {
-    if (backgroundImagePath) {
+    if (backgroundImagePath != null && backgroundImagePath !== '') {
       setImagePickerOpen(false);
       setAlignmentOpen(true);
     }
@@ -71,7 +71,7 @@ function GridBackgroundTab(): VNode | null {
         title="Background Image"
         isOpen={imagePickerOpen}
         onToggle={setImagePickerOpen}
-        subtitle={backgroundImagePath ? backgroundImageDisplayName || 'Image selected' : 'No image'}
+        subtitle={backgroundImagePath != null && backgroundImagePath !== '' ? (backgroundImageDisplayName || 'Image selected') : 'No image'}
       >
         <SettingItem name="Image" description="Add a background image for your grid map" vertical>
           <div style={{ position: 'relative' }}>
@@ -95,7 +95,7 @@ function GridBackgroundTab(): VNode | null {
               }}
             />
 
-            {backgroundImagePath && (
+            {backgroundImagePath != null && backgroundImagePath !== '' && (
               <button
                 onClick={handleImageClear}
                 style={{
@@ -156,7 +156,7 @@ function GridBackgroundTab(): VNode | null {
       </CollapsibleSection>
 
       {/* Grid Alignment Section - only show when image is selected */}
-      {backgroundImagePath && (
+      {backgroundImagePath != null && backgroundImagePath !== '' && (
         <CollapsibleSection
           title="Grid Alignment"
           isOpen={alignmentOpen}

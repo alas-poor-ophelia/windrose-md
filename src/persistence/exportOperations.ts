@@ -83,7 +83,7 @@ function calculateContentBounds(
   let hasContent = false;
   
   // 1. Painted cells
-  if (layer.cells && layer.cells.length > 0) {
+  if (layer.cells.length > 0) {
     for (const cell of layer.cells) {
       hasContent = true;
       const bounds = geometry.getCellBounds(cell);
@@ -93,9 +93,9 @@ function calculateContentBounds(
       maxY = Math.max(maxY, bounds.maxY);
     }
   }
-  
+
   // 2. Objects
-  if (layer.objects && layer.objects.length > 0) {
+  if (layer.objects.length > 0) {
     for (const obj of layer.objects) {
       hasContent = true;
       const bounds = geometry.getObjectBounds(obj as unknown as MapObject);
@@ -105,9 +105,9 @@ function calculateContentBounds(
       maxY = Math.max(maxY, bounds.maxY);
     }
   }
-  
+
   // 3. Text labels (need temporary canvas for measurement)
-  if (layer.textLabels && layer.textLabels.length > 0) {
+  if (layer.textLabels.length > 0) {
     const tempCanvas = document.createElement('canvas');
     const tempCtx = tempCanvas.getContext('2d');
     
@@ -279,8 +279,8 @@ async function saveMapImageToVault(
     
     // Generate filename with timestamp if not provided
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-    const mapName = (mapData as MapData & { name?: string }).name || 'map';
-    const finalFilename = filename || `${mapName}-${timestamp}.png`;
+    const mapName = (mapData as MapData & { name?: string }).name ?? 'map';
+    const finalFilename = filename ?? `${mapName}-${timestamp}.png`;
     
     // Save to vault root
     const path = `${finalFilename}`;
@@ -297,6 +297,7 @@ async function saveMapImageToVault(
     
     return { success: true, path };
   } catch (error) {
+    // eslint-disable-next-line no-console
     console.error('[exportOperations] Export failed:', error);
     return { success: false, error: (error as Error).message };
   }

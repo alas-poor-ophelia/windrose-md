@@ -114,7 +114,7 @@ const useTextLabelInteraction = (
 
     if (textLabel) {
       // Store initial text label state for batched history entry at drag end
-      dragInitialStateRef.current = [...(getActiveLayer(mapData).textLabels || [])];
+      dragInitialStateRef.current = [...getActiveLayer(mapData).textLabels];
       setSelectedItem({ type: 'text', id: textLabel.id, data: textLabel as unknown as Record<string, unknown> });
       setIsDraggingSelection(true);
       setDragStart({ x: clientX, y: clientY, worldX: worldCoords.worldX, worldY: worldCoords.worldY });
@@ -183,7 +183,7 @@ const useTextLabelInteraction = (
     }
 
     const selectedData = selectedItem.data as unknown as TextLabel;
-    const currentRotation = selectedData.rotation || 0;
+    const currentRotation = selectedData.rotation ?? 0;
     const nextRotation = getNextRotation(currentRotation);
 
     const updatedLabels = updateTextLabel(
@@ -248,14 +248,15 @@ const useTextLabelInteraction = (
    * Handle text label modal submission
    */
   const handleTextSubmit = (labelData: TextLabelModalData): void => {
-    if (!labelData || !labelData.content || !labelData.content.trim()) {
+    if (labelData == null || labelData.content == null || labelData.content.trim() === '') {
       return;
     }
 
-    if (editingTextId) {
+    if (editingTextId != null && editingTextId !== '') {
+      if (mapData == null) return;
       // Update existing label
       const newLabels = updateTextLabel(
-        getActiveLayer(mapData!).textLabels || [],
+        getActiveLayer(mapData).textLabels,
         editingTextId,
         {
           content: labelData.content.trim(),
@@ -269,7 +270,7 @@ const useTextLabelInteraction = (
     } else if (pendingTextPosition && mapData) {
       // Create new label
       const newLabels = addTextLabel(
-        getActiveLayer(mapData).textLabels || [],
+        getActiveLayer(mapData).textLabels,
         labelData.content.trim(),
         pendingTextPosition.x,
         pendingTextPosition.y,
@@ -407,7 +408,7 @@ const useTextLabelInteraction = (
     const textHeight = fontSize * 1.2; // Same as selection box
 
     // Calculate rotated bounding box for the label itself
-    const labelAngle = ((label.rotation || 0) * Math.PI) / 180;
+    const labelAngle = ((label.rotation ?? 0) * Math.PI) / 180;
     const cos = Math.abs(Math.cos(labelAngle));
     const sin = Math.abs(Math.sin(labelAngle));
     const rotatedWidth = textWidth * cos + textHeight * sin;

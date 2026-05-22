@@ -84,7 +84,7 @@ const ShapeOverlayLayer = ({
   // ESC to cancel placement
   useEffect(() => {
     if (!isShapeTool) return undefined;
-    const handler = (e: KeyboardEvent) => {
+    const handler = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') {
         e.preventDefault();
         cancelPlacement();
@@ -231,7 +231,7 @@ const ShapeOverlayLayer = ({
   }
 
   // Selection overlay when a shape is selected
-  if (!isShapeSelected || !selectedItem || !mapData || !geometry) return null;
+  if (!isShapeSelected || !mapData || !geometry) return null;
 
   const shapeActions = buildShapeOverlayActions(selectedItem as unknown as Parameters<typeof buildShapeOverlayActions>[0], {
     onColorClick: handleShapeColorClick,

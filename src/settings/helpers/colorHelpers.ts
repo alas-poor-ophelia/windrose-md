@@ -14,14 +14,14 @@ interface ResolvedColor extends ColorEntry {
 
 export const ColorHelpers = {
   getResolved(settings: Record<string, unknown>): ResolvedColor[] {
-    const colorPaletteOverrides = (settings.colorPaletteOverrides || {}) as Record<string, Record<string, unknown>>;
-    const customPaletteColors = (settings.customPaletteColors || []) as ColorEntry[];
+    const colorPaletteOverrides = (settings.colorPaletteOverrides ?? {}) as Record<string, Record<string, unknown>>;
+    const customPaletteColors = (settings.customPaletteColors ?? []) as ColorEntry[];
 
     const resolvedBuiltIns = (BUILT_IN_COLORS as ColorEntry[])
-      .filter(c => !(colorPaletteOverrides[c.id] as Record<string, unknown> | undefined)?.hidden)
+      .filter(c => (colorPaletteOverrides[c.id] as Record<string, unknown> | undefined)?.hidden !== true)
       .map((c, index) => {
         const override = colorPaletteOverrides[c.id];
-        if (override) {
+        if (override != null) {
           const { hidden, ...overrideProps } = override;
           return {
             ...c,
@@ -45,10 +45,10 @@ export const ColorHelpers = {
   },
 
   getHidden(settings: Record<string, unknown>): Set<string> {
-    const colorPaletteOverrides = (settings.colorPaletteOverrides || {}) as Record<string, { hidden?: boolean }>;
+    const colorPaletteOverrides = (settings.colorPaletteOverrides ?? {}) as Record<string, { hidden?: boolean }>;
     return new Set(
       Object.entries(colorPaletteOverrides)
-        .filter(([, override]) => override.hidden)
+        .filter(([, override]) => override.hidden === true)
         .map(([id]) => id)
     );
   }

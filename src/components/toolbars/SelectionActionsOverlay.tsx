@@ -159,18 +159,18 @@ const SelectionActionsOverlay = ({
 
   // Context menu via Obsidian Menu API
   useEffect(() => {
-    const handler = (e: Event) => {
+    const handler = (e: Event): void => {
       const detail = (e as CustomEvent).detail;
-      if (detail.handled) return;
+      if (detail.handled === true) return;
       detail.handled = true;
       const { screenX, screenY } = detail;
 
       const menu = new Menu();
-      const visibleActions = actions.filter(a => a.visible && !a.disabled);
+      const visibleActions = actions.filter(a => a.visible === true && a.disabled !== true);
 
       let lastGroup: string | null = null;
       for (const action of visibleActions) {
-        if (lastGroup && action.group !== lastGroup) {
+        if (lastGroup != null && lastGroup !== '' && action.group !== lastGroup) {
           menu.addSeparator();
         }
         lastGroup = action.group;
@@ -190,17 +190,17 @@ const SelectionActionsOverlay = ({
     return () => document.removeEventListener('windrose:selection-context-menu', handler);
   }, [actions]);
 
-  if (!selectedItems?.length || !mapData || !canvasRef?.current || !containerRef?.current) {
+  if (selectedItems.length === 0 || canvasRef.current == null || containerRef.current == null) {
     return null;
   }
 
   const bounds = getSelectionBounds(selectedItems as Parameters<typeof getSelectionBounds>[0], mapData, canvasRef, containerRef, geometry);
   if (!bounds) return null;
 
-  const visibleActions = actions.filter(a => a.visible);
-  const iconOnlyActions = visibleActions.filter(a => a.iconOnly);
-  const primaryActions = visibleActions.filter(a => !a.iconOnly && a.group !== 'links');
-  const linkActions = visibleActions.filter(a => a.group === 'links' && !a.iconOnly);
+  const visibleActions = actions.filter(a => a.visible === true);
+  const iconOnlyActions = visibleActions.filter(a => a.iconOnly === true);
+  const primaryActions = visibleActions.filter(a => a.iconOnly !== true && a.group !== 'links');
+  const linkActions = visibleActions.filter(a => a.group === 'links' && a.iconOnly !== true);
 
   // Layout calculation
   const colWidth = 100;
@@ -237,14 +237,14 @@ const SelectionActionsOverlay = ({
   }
 
   // Resize slider
-  if (isResizeMode) {
+  if (isResizeMode === true) {
     cardHeight += separatorHeight + 4 + 32;
   }
 
   // Player light controls (header row + optional controls row)
-  if (isPlayer) {
+  if (isPlayer === true) {
     cardHeight += separatorHeight + 4 + 24;
-    if (lightEnabled) cardHeight += 4 + 24;
+    if (lightEnabled === true) cardHeight += 4 + 24;
   }
 
   // Multi-select badge
@@ -256,8 +256,8 @@ const SelectionActionsOverlay = ({
   // Linked note display
   const linkedNote = selectionType === 'object' && selectedItems.length === 1
     ? selectedItems[0].data?.linkedNote as string | null : null;
-  const linkedNoteHeight = linkedNote ? 32 : 0;
-  const linkedNoteGap = linkedNote ? 4 : 0;
+  const linkedNoteHeight = linkedNote != null && linkedNote !== '' ? 32 : 0;
+  const linkedNoteGap = linkedNote != null && linkedNote !== '' ? 4 : 0;
 
   const toolbarPos = useToolbarPosition({
     bounds,
@@ -275,7 +275,7 @@ const SelectionActionsOverlay = ({
 
   // Linked note Y position
   let linkedNoteY: number | undefined;
-  if (linkedNote) {
+  if (linkedNote != null && linkedNote !== '') {
     if (toolbarPos.shouldFlipAbove) {
       linkedNoteY = toolbarPos.toolbarY - linkedNoteGap - linkedNoteHeight;
     } else {
@@ -283,7 +283,7 @@ const SelectionActionsOverlay = ({
     }
   }
 
-  const renderActionButton = (action: SelectionAction, fullWidth = false) => {
+  const renderActionButton = (action: SelectionAction, fullWidth = false): VNode => {
     if (action.special === 'color') {
       return (
         <div key={action.id} className={`dmt-sel-action ${fullWidth ? 'dmt-sel-action-full' : ''}`} style={{ position: 'relative' }}>
@@ -293,17 +293,17 @@ const SelectionActionsOverlay = ({
             onClick={(e) => action.invoke(e)}
             title={action.label}
           >
-            <span className="dmt-sel-color-swatch" style={{ backgroundColor: currentColor || '#ffffff' }} />
+            <span className="dmt-sel-color-swatch" style={{ backgroundColor: currentColor ?? '#ffffff' }} />
             <span className="dmt-sel-action-label">{action.label}</span>
           </button>
-          {showColorPicker && (
+          {showColorPicker === true && (
             <ColorPicker
               isOpen={showColorPicker}
-              selectedColor={currentColor || '#ffffff'}
-              onColorSelect={onColorSelect!}
-              onClose={onColorPickerClose!}
-              onReset={onColorReset!}
-              customColors={customColors || []}
+              selectedColor={currentColor ?? '#ffffff'}
+              onColorSelect={(color: string) => onColorSelect?.(color)}
+              onClose={() => onColorPickerClose?.()}
+              onReset={() => onColorReset?.()}
+              customColors={customColors ?? []}
               onAddCustomColor={onAddCustomColor}
               onDeleteCustomColor={onDeleteCustomColor}
               pendingCustomColorRef={pendingCustomColorRef}
@@ -320,15 +320,15 @@ const SelectionActionsOverlay = ({
     const classes = [
       'dmt-sel-action-btn',
       action.id === 'delete' && 'dmt-sel-action-delete',
-      action.active && 'dmt-sel-action-active',
-      action.disabled && 'dmt-sel-action-disabled'
+      action.active === true && 'dmt-sel-action-active',
+      action.disabled === true && 'dmt-sel-action-disabled'
     ].filter(Boolean).join(' ');
 
     return (
       <div key={action.id} className={`dmt-sel-action ${fullWidth ? 'dmt-sel-action-full' : ''}`}>
         <button
           className={classes}
-          onClick={(e) => !action.disabled && action.invoke(e)}
+          onClick={(e) => action.disabled !== true && action.invoke(e)}
           title={action.label}
           disabled={action.disabled}
         >
@@ -342,7 +342,7 @@ const SelectionActionsOverlay = ({
   return (
     <>
       {/* Linked Note Display */}
-      {linkedNote && linkedNoteY !== undefined && (
+      {linkedNote != null && linkedNote !== '' && linkedNoteY !== undefined && (
         <div
           className="dmt-selection-linked-note"
           style={{
@@ -392,7 +392,7 @@ const SelectionActionsOverlay = ({
           {isMulti && (
             <div className="dmt-sel-multi-badge">
               <Icon icon="lucide-box-select" size={14} />
-              <span>{selectionCount || selectedItems.length} selected</span>
+              <span>{selectionCount ?? selectedItems.length} selected</span>
             </div>
           )}
 
@@ -426,7 +426,7 @@ const SelectionActionsOverlay = ({
           )}
 
           {/* Resize slider */}
-          {isResizeMode && (
+          {isResizeMode === true && (
             <>
               <div className="dmt-sel-separator" />
               <div className="dmt-sel-resize-row">
@@ -445,7 +445,7 @@ const SelectionActionsOverlay = ({
           )}
 
           {/* Player light controls */}
-          {isPlayer && (
+          {isPlayer === true && (
             <>
               <div className="dmt-sel-separator" />
               <div className="dmt-sel-player-section">
@@ -455,37 +455,37 @@ const SelectionActionsOverlay = ({
                   <label className="dmt-sel-toggle-switch" onClick={(e: Event) => e.stopPropagation()}>
                     <input
                       type="checkbox"
-                      checked={!!lightEnabled}
+                      checked={lightEnabled === true}
                       onChange={() => onLightToggle?.()}
                     />
                     <span className="dmt-sel-toggle-slider" />
                   </label>
                 </div>
-                {lightEnabled && (
+                {lightEnabled === true && (
                   <div className="dmt-sel-player-row">
                     <input
                       type="number"
                       className="dmt-sel-radius-input"
-                      value={lightRadius || 30}
+                      value={lightRadius ?? 30}
                       min="1"
                       step="5"
                       onInput={(e: Event) => onLightRadiusChange?.(parseInt((e.target as HTMLInputElement).value) || 30)}
                     />
-                    <span className="dmt-sel-unit-label">{distanceUnit || 'ft'}</span>
+                    <span className="dmt-sel-unit-label">{distanceUnit ?? 'ft'}</span>
                     <button
                       ref={lightColorButtonRef}
                       className="dmt-sel-light-color-swatch"
                       onClick={() => onLightColorSwatchClick?.()}
                       title="Light Color"
                     >
-                      <span className="dmt-sel-color-swatch" style={{ backgroundColor: lightColor || 'rgba(255, 255, 100, 1)' }} />
+                      <span className="dmt-sel-color-swatch" style={{ backgroundColor: lightColor ?? 'rgba(255, 255, 100, 1)' }} />
                     </button>
-                    {showLightColorPicker && (
+                    {showLightColorPicker === true && (
                       <ColorPicker
                         isOpen={showLightColorPicker}
-                        selectedColor={lightColor || 'rgba(255, 255, 100, 1)'}
-                        onColorSelect={onLightColorSelect!}
-                        onClose={onLightColorPickerClose!}
+                        selectedColor={lightColor ?? 'rgba(255, 255, 100, 1)'}
+                        onColorSelect={(color: string) => onLightColorSelect?.(color)}
+                        onClose={() => onLightColorPickerClose?.()}
                         onReset={() => {}}
                         title="Light Color"
                         position="above"
@@ -507,7 +507,7 @@ const SelectionActionsOverlay = ({
                 {iconOnlyActions.map(action => (
                   <button
                     key={action.id}
-                    className={`dmt-sel-icon-btn ${action.active ? 'dmt-sel-action-active' : ''}`}
+                    className={`dmt-sel-icon-btn ${action.active === true ? 'dmt-sel-action-active' : ''}`}
                     onClick={(e) => action.invoke(e)}
                     title={action.label}
                   >

@@ -121,7 +121,8 @@ const AreaSelectLayer = ({ currentTool }: AreaSelectLayerProps): VNode | null =>
       screenX = offsetX + cellWorldX * zoom;
       screenY = offsetY + cellWorldY * zoom;
     } else {
-      const hexCenter = geometry.hexToWorld!(gridX, gridY);
+      const hexCenter = geometry.hexToWorld?.(gridX, gridY);
+      if (!hexCenter) return null;
       screenX = offsetX + hexCenter.worldX * zoom;
       screenY = offsetY + hexCenter.worldY * zoom;
     }

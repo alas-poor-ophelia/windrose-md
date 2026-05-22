@@ -43,7 +43,8 @@ const useObjectUIPositions = (): {
     const object = getActiveLayer(mapData).objects.find((obj: MapObject) => obj.id === selectedItem.id);
     if (!object) return { x: 0, y: 0 };
 
-    const pos = calculateScreenPos(object, canvasRef.current, mapData, geometry!);
+    if (!geometry) return { x: 0, y: 0 };
+    const pos = calculateScreenPos(object, canvasRef.current, mapData, geometry);
     if (!pos) return { x: 0, y: 0 };
 
     const { screenX, screenY, objectWidth, objectHeight } = pos;
@@ -64,7 +65,8 @@ const useObjectUIPositions = (): {
     const object = getActiveLayer(mapData).objects.find((obj: MapObject) => obj.id === selectedItem.id);
     if (!object) return { x: 0, y: 0 };
 
-    const pos = calculateScreenPos(object, canvasRef.current, mapData, geometry!);
+    if (!geometry) return { x: 0, y: 0 };
+    const pos = calculateScreenPos(object, canvasRef.current, mapData, geometry);
     if (!pos) return { x: 0, y: 0 };
 
     const { screenX, screenY, objectWidth, objectHeight } = pos;
@@ -94,7 +96,8 @@ const useObjectUIPositions = (): {
     const object = getActiveLayer(mapData).objects.find((obj: MapObject) => obj.id === selectedItem.id);
     if (!object) return { x: 0, y: 0 };
 
-    const pos = calculateScreenPos(object, canvasRef.current, mapData, geometry!);
+    if (!geometry) return { x: 0, y: 0 };
+    const pos = calculateScreenPos(object, canvasRef.current, mapData, geometry);
     if (!pos) return { x: 0, y: 0 };
 
     const { screenX, screenY, objectWidth, objectHeight } = pos;
@@ -116,7 +119,8 @@ const useObjectUIPositions = (): {
     const object = getActiveLayer(mapData).objects.find((obj: MapObject) => obj.id === selectedItem.id);
     if (!object) return { x: 0, y: 0 };
 
-    const pos = calculateScreenPos(object, canvasRef.current, mapData, geometry!);
+    if (!geometry) return { x: 0, y: 0 };
+    const pos = calculateScreenPos(object, canvasRef.current, mapData, geometry);
     if (!pos) return { x: 0, y: 0 };
 
     const { screenX, screenY, objectWidth, objectHeight } = pos;

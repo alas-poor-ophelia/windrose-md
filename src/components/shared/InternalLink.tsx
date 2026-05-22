@@ -1,4 +1,4 @@
-import type { ComponentChildren } from 'preact';
+import type { ComponentChildren, VNode } from 'preact';
 
 import { useApp } from '../../context/AppContext';
 
@@ -9,17 +9,17 @@ interface InternalLinkProps {
   [key: string]: unknown;
 }
 
-function InternalLink({ link, children }: InternalLinkProps) {
+function InternalLink({ link, children }: InternalLinkProps): VNode {
   const app = useApp();
 
-  const handleClick = (e: MouseEvent) => {
+  const handleClick = (e: MouseEvent): void => {
     e.preventDefault();
     void app.workspace.openLinkText(link, '', false);
   };
 
   return (
     <a href={link} class="internal-link" onClick={handleClick}>
-      {children || link}
+      {children != null ? children : link}
     </a>
   );
 }

@@ -112,8 +112,8 @@ function createSubHexMapData(parentMapData: MapData, q: number, r: number): SubH
     layers: [initialLayer],
     gridSize: DEFAULTS.gridSize,
     dimensions: { ...DEFAULTS.dimensions },
-    hexSize: parentMapData.hexSize || DEFAULTS.hexSize,
-    orientation: parentMapData.orientation || DEFAULTS.hexOrientation,
+    hexSize: parentMapData.hexSize ?? DEFAULTS.hexSize,
+    orientation: parentMapData.orientation ?? DEFAULTS.hexOrientation,
     hexBounds: {
       maxCol: subdivisionRings * 2 + 1,
       maxRow: subdivisionRings * 2 + 1,
@@ -121,8 +121,8 @@ function createSubHexMapData(parentMapData: MapData, q: number, r: number): SubH
     },
     viewState: {
       zoom: calculateFitZoom(
-        parentMapData.hexSize || DEFAULTS.hexSize,
-        parentMapData.orientation || DEFAULTS.hexOrientation,
+        parentMapData.hexSize ?? DEFAULTS.hexSize,
+        parentMapData.orientation ?? DEFAULTS.hexOrientation,
         { maxCol: subdivisionRings * 2 + 1, maxRow: subdivisionRings * 2 + 1, maxRing: subdivisionRings },
         DEFAULTS.canvasSize.width, DEFAULTS.canvasSize.height
       ),
@@ -162,7 +162,7 @@ function useSubHexNavigation({
     if (!isInSubHex) return [];
 
     const segments: BreadcrumbSegment[] = [
-      { label: navStack[0]?.parentMapData?.name || 'World Map', depth: 0 }
+      { label: navStack[0]?.parentMapData?.name ?? 'World Map', depth: 0 }
     ];
 
     for (let i = 0; i < navStack.length; i++) {
@@ -171,12 +171,12 @@ function useSubHexNavigation({
 
       if (isLast) {
         // Current level — use the live activeMapData name
-        segments.push({ label: subHexMapData?.name || `Hex (${key})`, depth: i + 1 });
+        segments.push({ label: subHexMapData?.name ?? `Hex (${key})`, depth: i + 1 });
       } else {
         // Intermediate level — look up name from the next frame's parent
         const nextFrame = navStack[i + 1];
         const subHexName = nextFrame?.parentMapData?.name;
-        segments.push({ label: subHexName || `Hex (${key})`, depth: i + 1 });
+        segments.push({ label: subHexName ?? `Hex (${key})`, depth: i + 1 });
       }
     }
 
@@ -345,7 +345,7 @@ function useSubHexNavigation({
       const newData = typeof updaterOrData === 'function'
         ? updaterOrData(prev)
         : updaterOrData;
-      if (!newData) return prev;
+      if (newData == null) return prev;
 
       // Propagate to root for saving (async, after state update)
       setTimeout(() => propagateToRoot(newData, navStack), 0);
@@ -394,11 +394,12 @@ function useSubHexNavigation({
 
     const newStack = [...navStack.slice(0, -1), newFrame];
     setNavStack(newStack);
-    setSubHexMapData(siblingSubHex.mapData);
+    const siblingMapData = siblingSubHex.mapData;
+    setSubHexMapData(siblingMapData);
     setNavigationVersion(prev => prev + 1);
 
     // Propagate to root
-    setTimeout(() => propagateToRoot(siblingSubHex!.mapData, newStack), 0);
+    setTimeout(() => propagateToRoot(siblingMapData, newStack), 0);
   }, [navStack, subHexMapData, propagateToRoot]);
 
   // Current hex key (for adjacent sub-hex lookup)
@@ -428,23 +429,23 @@ function useSubHexNavigation({
       const nr = cr + dr;
       const key = `${nq},${nr}`;
       const subHex = parentSubHexMaps[key];
-      if (subHex?.mapData) {
+      if (subHex?.mapData != null) {
         // Only include if it has visible content
         const sd = subHex.mapData;
         const hasContent = sd.layers?.some((l: MapLayer) =>
-          (l.cells && l.cells.length > 0) ||
-          (l.curves && l.curves.length > 0) ||
-          (l.objects && l.objects.length > 0) ||
-          (l.textLabels && l.textLabels.length > 0) ||
-          (l.tiles && l.tiles.length > 0)
-        );
+          l.cells.length > 0 ||
+          l.curves.length > 0 ||
+          l.objects.length > 0 ||
+          l.textLabels.length > 0 ||
+          (l.tiles != null && l.tiles.length > 0)
+        ) === true;
         if (hasContent) {
           adjacent.push({
             hexKey: key,
             dq,
             dr,
             mapData: subHex.mapData,
-            name: subHex.mapData.name || `Hex (${nq}, ${nr})`
+            name: subHex.mapData.name ?? `Hex (${nq}, ${nr})`
           });
         }
       }

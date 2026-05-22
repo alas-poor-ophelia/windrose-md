@@ -108,7 +108,7 @@ function useHistory<T>(initialState: T): UseHistoryResult<T> {
 
   // Set full history state (for restoring after layer switch)
   const restoreHistoryState = useCallback((savedState: HistoryState<T>): void => {
-    if (savedState && savedState.history && typeof savedState.currentIndex === 'number') {
+    if (savedState.history.length > 0 && typeof savedState.currentIndex === 'number') {
       setHistoryState(savedState);
     }
   }, []);

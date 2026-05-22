@@ -244,7 +244,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   const setShowAdjacentSubMaps = useCallback((v: boolean) => {
     try {
       const plugin = app.plugins.plugins['dungeon-map-tracker-settings'];
-      if (plugin) {
+      if (plugin != null) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (plugin as any).settings.showAdjacentSubMaps = v;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -255,7 +255,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     setShowAdjacentSubMapsState(v);
   }, []);
   useEffect(() => {
-    const handler = () => setShowAdjacentSubMapsState(getSettings().showAdjacentSubMaps ?? false);
+    const handler = (): void => { setShowAdjacentSubMapsState(getSettings().showAdjacentSubMaps ?? false); };
     window.addEventListener('dmt-settings-changed', handler);
     return () => window.removeEventListener('dmt-settings-changed', handler);
   }, []);
@@ -291,15 +291,15 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   const geometry = useMemo((): IGeometry | null => {
     if (!mapData) return null;
 
-    const currentMapType = mapData.mapType || DEFAULTS.mapType;
+    const currentMapType = mapData.mapType ?? DEFAULTS.mapType;
 
     if (currentMapType === 'hex') {
-      const hexSize = mapData.hexSize || DEFAULTS.hexSize;
-      const orientation = mapData.orientation || DEFAULTS.hexOrientation;
-      const hexBounds = mapData.hexBounds || null;
+      const hexSize = mapData.hexSize ?? DEFAULTS.hexSize;
+      const orientation = mapData.orientation ?? DEFAULTS.hexOrientation;
+      const hexBounds = mapData.hexBounds ?? null;
       return new HexGeometry(hexSize, orientation, hexBounds);
     } else {
-      const gridSize = mapData.gridSize || DEFAULTS.gridSize;
+      const gridSize = mapData.gridSize ?? DEFAULTS.gridSize;
       return new GridGeometry(gridSize);
     }
   }, [mapData?.mapType, mapData?.gridSize, mapData?.hexSize, mapData?.orientation, mapData?.hexBounds]);
@@ -438,27 +438,27 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
 
   // Player fog clearing on drop (reads latest state via functional updater, supports undo)
   useEffect(() => {
-    const handler = (e: CustomEvent) => {
-      if (!geometry || isApplyingHistory()) return;
+    const handler = (e: CustomEvent): void => {
+      if (geometry == null || isApplyingHistory()) return;
       const { objectId } = e.detail;
 
       updateMapData((current: MapData) => {
-        if (!current) return current;
+        if (current == null) return current;
         const activeLayer = getActiveLayer(current);
-        if (!activeLayer.fogOfWar?.enabled || !activeLayer.fogOfWar?.foggedCells?.length) return current;
+        if (activeLayer.fogOfWar?.enabled !== true || (activeLayer.fogOfWar?.foggedCells?.length ?? 0) === 0) return current;
 
-        const obj = activeLayer.objects?.find((o: MapObject) => o.id === objectId);
-        if (!obj || !obj.isPlayer || !obj.lightEnabled || !obj.lightRadius) return current;
+        const obj = activeLayer.objects.find((o: MapObject) => o.id === objectId);
+        if (obj == null || obj.isPlayer !== true || obj.lightEnabled !== true || (obj.lightRadius ?? 0) === 0) return current;
 
-        const settings = current.settings?.overrides || {};
-        const distancePerCell = (settings.distancePerCell as number) || 5;
+        const settings = current.settings?.overrides ?? {};
+        const distancePerCell = (settings.distancePerCell as number | undefined) ?? 5;
         const richGeom = geometry as RichGeometry;
-        const cellSize = richGeom.cellSize || richGeom.hexSize || 1;
-        const radiusInCells = obj.lightRadius / distancePerCell;
+        const cellSize = (richGeom.cellSize ?? richGeom.hexSize) ?? 1;
+        const radiusInCells = (obj.lightRadius ?? 0) / distancePerCell;
         const radiusInWorld = radiusInCells * cellSize;
 
         let objWorldX: number, objWorldY: number;
-        if (obj.freeform && obj.worldPosition) {
+        if (obj.freeform === true && obj.worldPosition != null) {
           objWorldX = obj.worldPosition.x;
           objWorldY = obj.worldPosition.y;
         } else {
@@ -471,7 +471,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
         const radiusSq = clearRadius * clearRadius;
         const remainingCells = activeLayer.fogOfWar.foggedCells.filter((fc: FoggedCell) => {
           let cellWorldX: number, cellWorldY: number;
-          if (richGeom.offsetToWorld) {
+          if (richGeom.offsetToWorld != null) {
             const w = richGeom.offsetToWorld(fc.col, fc.row);
             cellWorldX = w.worldX;
             cellWorldY = w.worldY;
@@ -489,28 +489,25 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
         const newFog = { ...activeLayer.fogOfWar, foggedCells: remainingCells };
 
         addToHistory({
-          cells: activeLayer.cells || [],
-          curves: activeLayer.curves || [],
-          name: current.name || '',
-          objects: (activeLayer.objects || []) as unknown as MapObjectRef[],
-          textLabels: activeLayer.textLabels || [],
-          edges: activeLayer.edges || [],
-          tiles: activeLayer.tiles || [],
-          regions: current.regions || [],
-          outlines: current.outlines || [],
-          shapeOverlays: current.shapeOverlays || [],
+          cells: activeLayer.cells,
+          curves: activeLayer.curves,
+          name: current.name ?? '',
+          objects: activeLayer.objects as unknown as MapObjectRef[],
+          textLabels: activeLayer.textLabels,
+          edges: activeLayer.edges,
+          tiles: activeLayer.tiles ?? [],
+          regions: current.regions ?? [],
+          outlines: current.outlines ?? [],
+          shapeOverlays: current.shapeOverlays ?? [],
           fogOfWar: newFog
         });
 
-        if (current.layers) {
-          const layers = current.layers.map(l =>
-            l.id === current.activeLayerId
-              ? { ...l, fogOfWar: newFog }
-              : l
-          );
-          return { ...current, layers };
-        }
-        return { ...current, fogOfWar: newFog };
+        const layers = current.layers.map(l =>
+          l.id === current.activeLayerId
+            ? { ...l, fogOfWar: newFog }
+            : l
+        );
+        return { ...current, layers };
       });
     };
 
@@ -523,19 +520,19 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     if (!showAdjacentSubMaps || !isInSubHex || adjacentSubHexes.length === 0 || !geometry || geometry.type !== 'hex' || !mapData) return undefined;
 
     const hexGeom = geometry as ExtendedGeometry;
-    const maxRing = mapData.hexBounds?.maxRing || 7;
+    const maxRing = mapData.hexBounds?.maxRing ?? 7;
     const tileStep = 2 * maxRing + 1;
 
-    const handleAdjacentClick = (e: MouseEvent) => {
+    const handleAdjacentClick = (e: MouseEvent): void => {
       const canvas = (e.target as HTMLElement).closest('canvas');
-      if (!canvas) return;
+      if (canvas == null) return;
 
       const rect = canvas.getBoundingClientRect();
       const canvasX = (e.clientX - rect.left) * (canvas.width / rect.width);
       const canvasY = (e.clientY - rect.top) * (canvas.height / rect.height);
 
       const viewState = mapData.viewState;
-      if (!viewState) return;
+      if (viewState == null) return;
       const oX = canvas.width / 2 - viewState.center.x * viewState.zoom;
       const oY = canvas.height / 2 - viewState.center.y * viewState.zoom;
 
@@ -547,14 +544,16 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
       for (const adj of adjacentSubHexes) {
         const scaledQ = adj.dq * tileStep;
         const scaledR = adj.dr * tileStep;
-        const offset = hexGeom.hexToWorld!(scaledQ, scaledR);
+        if (hexGeom.hexToWorld == null) continue;
+        const offset = hexGeom.hexToWorld(scaledQ, scaledR);
 
         // Click relative to adjacent grid center
         const relX = clickWorldX - offset.worldX;
         const relY = clickWorldY - offset.worldY;
 
         // Check if within maxRing hex radius (approximate with world-space distance)
-        const gridRadius = hexGeom.hexSize! * Math.sqrt(3) * maxRing;
+        const hexSize = hexGeom.hexSize ?? 1;
+        const gridRadius = hexSize * Math.sqrt(3) * maxRing;
         if (relX * relX + relY * relY < gridRadius * gridRadius) {
           // Parse the hex key to get absolute q, r
           const [aq, ar] = adj.hexKey.split(',').map(Number);
@@ -579,18 +578,18 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   useEffect((): (() => void) | undefined => {
     if (!isFocused || !mapData) return undefined;
 
-    const handler = (e: KeyboardEvent) => {
+    const handler = (e: KeyboardEvent): void => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
       const key = e.key;
       const mod = e.ctrlKey || e.metaKey;
 
-      const shortcuts = getSettings()?.keyboardShortcuts || {};
-      const bareKey = (s: string) => s.split('+').pop()!.toLowerCase();
+      const shortcuts = (getSettings() as Record<string, unknown>).keyboardShortcuts as Record<string, string> | undefined ?? {};
+      const bareKey = (s: string): string => { const parts = s.split('+'); return (parts[parts.length - 1] ?? s).toLowerCase(); };
 
-      if (mod && !e.shiftKey && key.toLowerCase() === bareKey(shortcuts.undo || 'z')) {
+      if (mod && !e.shiftKey && key.toLowerCase() === bareKey(shortcuts.undo ?? 'z')) {
         wrappedHandleUndo(); e.preventDefault(); return;
       }
-      if (mod && key.toLowerCase() === bareKey(shortcuts.redo || 'y')) {
+      if (mod && key.toLowerCase() === bareKey(shortcuts.redo ?? 'y')) {
         handleRedo(); e.preventDefault(); return;
       }
       if (mod && e.shiftKey && key.toLowerCase() === 'z') {
@@ -599,11 +598,11 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
 
       if (mod || e.altKey) return;
 
-      const layerPrevKey = shortcuts.layerPrev || '[';
-      const layerNextKey = shortcuts.layerNext || ']';
+      const layerPrevKey = shortcuts.layerPrev ?? '[';
+      const layerNextKey = shortcuts.layerNext ?? ']';
 
       if (key === layerPrevKey || key === layerNextKey) {
-        const layers = mapData.layers || [];
+        const layers = mapData.layers;
         const currentIdx = layers.findIndex((l: { id: string }) => l.id === mapData.activeLayerId);
         if (key === layerPrevKey && currentIdx > 0) {
           handleLayerSelect(layers[currentIdx - 1].id);
@@ -622,21 +621,21 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   // MCP bridge: each map instance registers its own state + operations keyed by notePath.
   // No race conditions — the query side picks the active file's state.
   useEffect(() => {
-    if (!window.__windrose || !mapData || !notePath || !geometry) return;
-    if (!window.__windrose.mcpInstances) window.__windrose.mcpInstances = {};
+    if (window.__windrose == null || mapData == null || notePath === '' || geometry == null) return;
+    if (window.__windrose.mcpInstances == null) window.__windrose.mcpInstances = {};
 
     const activeLayer = getActiveLayer(mapData);
-    const layers = mapData.layers || [];
+    const layers = mapData.layers;
     window.__windrose.mcpInstances[notePath] = {
       mapId,
-      mapName: mapData.name || mapName,
-      mapType: mapData.mapType || 'grid',
+      mapName: mapData.name ?? mapName,
+      mapType: mapData.mapType ?? 'grid',
       viewState: {
         x: mapData.viewState?.offsetX ?? 0,
         y: mapData.viewState?.offsetY ?? 0,
         zoom: mapData.viewState?.zoom ?? 1,
       },
-      activeLayerId: activeLayer?.id || '',
+      activeLayerId: activeLayer?.id ?? '',
       layerCount: layers.length,
       layerIds: layers.map((l: { id: string }) => l.id),
       currentTool,
@@ -654,18 +653,18 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
         setColor: (color: string) => setSelectedColor(color),
         setOpacity: (opacity: number) => handleOpacityChange(opacity),
         paintCell: (x: number, y: number, color?: string, opacity?: number): boolean => {
-          if (!activeLayer) return false;
-          const c = color || selectedColor;
+          if (activeLayer == null) return false;
+          const c = color ?? selectedColor;
           const o = opacity ?? selectedOpacity;
-          const newCells = accessorSetCell(activeLayer.cells || [], { x, y }, c, o, geometry);
+          const newCells = accessorSetCell(activeLayer.cells, { x, y }, c, o, geometry);
           handleCellsChange(newCells);
           return true;
         },
         paintCells: (cells: Array<{ x: number; y: number; color?: string; opacity?: number }>): number => {
-          if (!activeLayer) return 0;
-          let currentCells = activeLayer.cells || [];
+          if (activeLayer == null) return 0;
+          let currentCells = activeLayer.cells;
           for (const cell of cells) {
-            const c = cell.color || selectedColor;
+            const c = cell.color ?? selectedColor;
             const o = cell.opacity ?? selectedOpacity;
             currentCells = accessorSetCell(currentCells, { x: cell.x, y: cell.y }, c, o, geometry);
           }
@@ -673,14 +672,14 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
           return cells.length;
         },
         eraseCell: (x: number, y: number): boolean => {
-          if (!activeLayer) return false;
-          const newCells = accessorRemoveCell(activeLayer.cells || [], { x, y }, geometry);
+          if (activeLayer == null) return false;
+          const newCells = accessorRemoveCell(activeLayer.cells, { x, y }, geometry);
           handleCellsChange(newCells);
           return true;
         },
         getCells: (): Array<{ x: number; y: number; color: string; opacity: number }> => {
-          if (!activeLayer) return [];
-          return (activeLayer.cells || []).map((cell: Cell) => ({
+          if (activeLayer == null) return [];
+          return activeLayer.cells.map((cell: Cell) => ({
             ...cellToPoint(cell),
             color: cell.color,
             opacity: cell.opacity ?? 1,
@@ -695,7 +694,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   });
   useEffect(() => {
     return () => {
-      if (window.__windrose?.mcpInstances) delete window.__windrose.mcpInstances[notePath];
+      if (window.__windrose?.mcpInstances != null) delete window.__windrose.mcpInstances[notePath];
     };
   }, []);
 
@@ -817,9 +816,9 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
             selectedObjectType={selectedObjectType}
             onObjectTypeSelect={setSelectedObjectType}
             onToolChange={(tool) => setCurrentTool(tool as ToolId)}
-            isCollapsed={mapData.sidebarCollapsed || false}
+            isCollapsed={mapData.sidebarCollapsed ?? false}
             onCollapseChange={handleSidebarCollapseChange}
-            mapType={mapData.mapType || 'grid'}
+            mapType={mapData.mapType ?? 'grid'}
             objectSetId={mapData.objectSetId}
             onObjectSetChange={handleObjectSetChange}
             isFreeformMode={freeformPlacementMode}
@@ -827,7 +826,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
           />
 
           {/* Left side panels container — layers + regions stacked */}
-          <div className={`dmt-left-panels ${mapData.sidebarCollapsed ? 'sidebar-closed' : 'sidebar-open'}`}>
+          <div className={`dmt-left-panels ${mapData.sidebarCollapsed === true ? 'sidebar-closed' : 'sidebar-open'}`}>
             {/* Layer Controls Panel (Z-Layer System) */}
             <LayerControls
               mapData={mapData}
@@ -839,16 +838,16 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               onSetLayerBelowOpacity={handleSetLayerBelowOpacity}
               onEditLayer={setEditingLayerId}
               onLayerClone={handleCloneLayerRequest}
-              sidebarCollapsed={mapData.sidebarCollapsed || false}
+              sidebarCollapsed={mapData.sidebarCollapsed ?? false}
               isOpen={showLayerPanel}
             />
 
             {/* Region Panel (hex maps only) */}
             {mapData.mapType === 'hex' && (
               <RegionPanel
-                regions={mapData.regions || []}
+                regions={mapData.regions ?? []}
                 onRegionsChange={handleRegionsChange}
-                sidebarCollapsed={mapData.sidebarCollapsed || false}
+                sidebarCollapsed={mapData.sidebarCollapsed ?? false}
                 isOpen={showRegionPanel}
               />
             )}
@@ -1062,11 +1061,11 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                     currentTool === 'rectangle' ? 'Click two corners to fill rectangle' :
                       currentTool === 'circle' ? 'Click edge point, then center to fill circle' :
                         currentTool === 'clearArea' ? 'Click two corners to clear area' :
-                          currentTool === 'addObject' ? (selectedObjectType ? 'Click to place object' : 'Select an object from the sidebar') :
+                          currentTool === 'addObject' ? (selectedObjectType != null && selectedObjectType !== '' ? 'Click to place object' : 'Select an object from the sidebar') :
                             currentTool === 'addNote' ? 'Click to place note pin' :
                             currentTool === 'addText' ? 'Click to add text label' :
                               'Select a tool'
-            } | Undo/redo available | Middle-click or two-finger drag to pan | Scroll to zoom | Click compass to rotate | {getActiveLayer(mapData).cells.length} cells filled | {(getActiveLayer(mapData).objects || []).length} objects placed | {(getActiveLayer(mapData).textLabels || []).length} text labels
+            } | Undo/redo available | Middle-click or two-finger drag to pan | Scroll to zoom | Click compass to rotate | {getActiveLayer(mapData).cells.length} cells filled | {getActiveLayer(mapData).objects.length} objects placed | {getActiveLayer(mapData).textLabels.length} text labels
           </div>
         )}
 
@@ -1077,24 +1076,24 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
           onSave={handleSettingsSave as unknown as (updates: Record<string, unknown>) => void}
           onOpenAlignmentMode={handleOpenAlignmentMode}
           initialTab={returningFromAlignment ? (mapData?.mapType === 'hex' ? 'hexgrid' : 'gridbackground') : undefined}
-          mapType={mapData?.mapType || 'grid'}
-          orientation={mapData?.orientation || 'flat'}
+          mapType={mapData?.mapType ?? 'grid'}
+          orientation={mapData?.orientation ?? 'flat'}
           currentSettings={mapData.settings}
           currentPreferences={mapData.uiPreferences}
           currentHexBounds={mapData.mapType === 'hex' ? mapData.hexBounds : null}
           currentObjectSetId={mapData.objectSetId}
           currentBackgroundImage={mapData.backgroundImage ?? null}
-          currentCells={mapData.mapType === 'hex' ? (getActiveLayer(mapData).cells || []) : []}
-          currentObjects={mapData.mapType === 'hex' ? (getActiveLayer(mapData).objects || []) : []}
+          currentCells={mapData.mapType === 'hex' ? getActiveLayer(mapData).cells : []}
+          currentObjects={mapData.mapType === 'hex' ? getActiveLayer(mapData).objects : []}
           mapData={mapData}
           geometry={geometry}
           isInSubHex={isInSubHex}
-          subMapName={isInSubHex ? (mapData?.name || undefined) : undefined}
+          subMapName={isInSubHex ? (mapData?.name ?? undefined) : undefined}
           globalSettings={{} as Record<string, unknown>}
         />
 
         {/* Image Alignment Mode */}
-        {isAlignmentMode && mapData.backgroundImage?.path && (
+        {isAlignmentMode && mapData.backgroundImage?.path != null && mapData.backgroundImage.path !== '' && (
           <ImageAlignmentMode
             isActive={isAlignmentMode}
             offsetX={alignmentOffsetX}
@@ -1114,7 +1113,9 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               layer={editingLayer}
               defaultName={String(editingLayer.order + 1)}
               onSave={(name, icon) => {
-                handleUpdateLayerDisplay(editingLayerId!, name, icon);
+                if (editingLayerId != null) {
+                  handleUpdateLayerDisplay(editingLayerId, name, icon);
+                }
                 setEditingLayerId(null);
               }}
               onCancel={() => setEditingLayerId(null)}
@@ -1122,10 +1123,10 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
           </ModalPortal>
         )}
 
-        {cloningLayerId && (() => {
+        {cloningLayerId != null && cloningLayerId !== '' && (() => {
           const layer = getLayerById(mapData, cloningLayerId);
-          if (!layer) return null;
-          const layerName = layer.name || String(layer.order + 1);
+          if (layer == null) return null;
+          const layerName = layer.name ?? String(layer.order + 1);
           return (
             <ModalPortal>
               <CloneLayerModal

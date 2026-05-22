@@ -92,19 +92,20 @@ function useUILayout({
 
     const timer = setTimeout(() => {
       try {
-        if (mapData.uiPreferences?.rememberExpandedState && mapData.expandedState !== undefined) {
-          if (mapData.expandedState) {
+        if (mapData.uiPreferences?.rememberExpandedState === true && mapData.expandedState !== undefined) {
+          if (mapData.expandedState === true) {
             setIsExpanded(true);
             setIsAnimating(false);
           }
         } else {
           const expandedByDefault = getSetting('expandedByDefault');
-          if (expandedByDefault) {
+          if (expandedByDefault === true) {
             setIsExpanded(true);
             setIsAnimating(false);
           }
         }
       } catch (error) {
+        // eslint-disable-next-line no-console
         console.warn('[DungeonMapTracker] Error reading expanded state:', error);
       }
     }, 100);
@@ -122,7 +123,7 @@ function useUILayout({
     let cmEmbedBlock: HTMLElement | null = container.parentElement;
     while (cmEmbedBlock && !cmEmbedBlock.classList.contains('cm-embed-block')) {
       cmEmbedBlock = cmEmbedBlock.parentElement;
-      if (cmEmbedBlock?.classList.contains('cm-editor')) {
+      if (cmEmbedBlock?.classList.contains('cm-editor') === true) {
         cmEmbedBlock = null;
         break;
       }
@@ -164,7 +165,7 @@ function useUILayout({
       }, 300);
     }
 
-    if (mapData && mapData.uiPreferences?.rememberExpandedState) {
+    if (mapData != null && mapData.uiPreferences?.rememberExpandedState === true) {
       const newMapData = {
         ...mapData,
         expandedState: newExpandedState

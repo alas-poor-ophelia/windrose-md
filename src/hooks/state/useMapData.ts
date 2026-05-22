@@ -75,9 +75,9 @@ function useMapData(
 
   useEffect(() => {
     const currentMapType = mapTypeRef.current;
-    if (!currentMapType || currentMapType !== 'hex') return;
+    if (currentMapType == null || currentMapType !== 'hex') return;
 
-    const folders = getTilesetFolders().filter((f: string) => f.trim());
+    const folders = getTilesetFolders().filter((f: string) => f.trim() !== '');
     if (folders.length === 0) return;
 
     // Build tilesets from configured folders (async to probe image dimensions)
@@ -100,6 +100,7 @@ function useMapData(
             newTilesets.push(tileset);
           }
         } catch (e) {
+          // eslint-disable-next-line no-console
           console.warn('[Windrose] Failed to scan tileset folder:', folder, e);
         }
       }
@@ -114,16 +115,16 @@ function useMapData(
 
         // Add non-tile image paths so they aren't evicted
         const currentData = mapData;
-        if (currentData?.backgroundImage?.path) {
+        if (currentData?.backgroundImage?.path != null && currentData.backgroundImage.path !== '') {
           activePaths.add(currentData.backgroundImage.path);
         }
         const effectiveSettings = getEffectiveSettings(currentData?.settings);
-        if (effectiveSettings?.fogOfWarImage) {
+        if (effectiveSettings?.fogOfWarImage != null && effectiveSettings.fogOfWarImage !== '') {
           activePaths.add(effectiveSettings.fogOfWarImage);
         }
         const objectTypes = getResolvedObjectTypes(currentData?.mapType ?? 'hex', currentData?.objectSetId);
         for (const objType of objectTypes) {
-          if (objType.imagePath) activePaths.add(objType.imagePath);
+          if (objType.imagePath != null && objType.imagePath !== '') activePaths.add(objType.imagePath);
         }
 
         clearUnusedTileImages(activePaths);
@@ -132,12 +133,10 @@ function useMapData(
           if (!current) return current;
           // Merge per-tileset user overrides into auto-built tilesets
           const overrides = current.tilesetOverrides;
-          const mergedTilesets = overrides
-            ? newTilesets.map(ts => {
-                const ov = overrides[ts.id];
-                return ov ? { ...ts, ...ov } : ts;
-              })
-            : newTilesets;
+          const mergedTilesets = newTilesets.map(ts => {
+            const ov = overrides?.[ts.id];
+            return ov != null ? { ...ts, ...ov } : ts;
+          });
           return { ...current, tilesets: mergedTilesets };
         });
       }
@@ -146,7 +145,7 @@ function useMapData(
 
   // Preload background image when map data loads
   useEffect(() => {
-    if (mapData?.backgroundImage?.path) {
+    if (mapData?.backgroundImage?.path != null && mapData.backgroundImage.path !== '') {
       setBackgroundImageReady(false);
       void preloadImage(app, mapData.backgroundImage.path).then((img) => {
         if (img) {
@@ -165,7 +164,7 @@ function useMapData(
     const effectiveSettings = getEffectiveSettings(mapData.settings);
     const fowImagePath = effectiveSettings.fogOfWarImage;
 
-    if (fowImagePath) {
+    if (fowImagePath != null && fowImagePath !== '') {
       setFowImageReady(false);
       void preloadImage(app, fowImagePath).then((img) => {
         if (img) {
@@ -185,7 +184,7 @@ function useMapData(
     const imageObjects = objectTypes.filter(hasImagePath);
 
     for (const objType of imageObjects) {
-      if (objType.imagePath) {
+      if (objType.imagePath != null && objType.imagePath !== '') {
         void preloadImage(app, objType.imagePath);
       }
     }
@@ -194,7 +193,7 @@ function useMapData(
   // Preload tile images when tilesets are defined
   const [tileImagesReady, setTileImagesReady] = useState<boolean>(false);
   useEffect(() => {
-    if (!mapData?.tilesets?.length) {
+    if (mapData?.tilesets == null || mapData.tilesets.length === 0) {
       setTileImagesReady(false);
       return;
     }

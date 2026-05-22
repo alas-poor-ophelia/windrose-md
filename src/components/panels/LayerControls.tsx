@@ -84,7 +84,7 @@ const LayerControls = ({
   const controlsRef = useRef<HTMLDivElement>(null);
 
   useEffect((): (() => void) | undefined => {
-    if (!expandedLayerId) return undefined;
+    if (expandedLayerId == null || expandedLayerId === '') return undefined;
 
     const handleEscape = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') {
@@ -216,11 +216,11 @@ const LayerControls = ({
   };
 
   const shouldShowPill = (layer: MapLayer): boolean => {
-    return !isDefaultName(layer) || !!layer.icon;
+    return !isDefaultName(layer) || (layer.icon != null && layer.icon !== '');
   };
 
   const getLayerIcon = (layer: MapLayer): { char: string; isRpgAwesome: boolean } | null => {
-    if (!layer.icon) return null;
+    if (layer.icon == null || layer.icon === '') return null;
     if (layer.icon.startsWith('ra-')) {
       const info = getIconInfo(layer.icon);
       return info ? { char: info.char, isRpgAwesome: true } : null;
@@ -299,7 +299,8 @@ const LayerControls = ({
               onDragEnd={handleDragEnd}
             >
               {(() => {
-                const info = layerDisplayInfo.get(layer.id)!;
+                const info = layerDisplayInfo.get(layer.id);
+                if (info == null) return null;
                 return (
                   <button
                     className={`dmt-layer-btn ${info.isPill ? 'dmt-layer-btn-pill' : ''} ${isActive ? 'dmt-layer-btn-active' : ''} ${isDragging ? 'dragging' : ''} ${isDragOver ? 'drag-over' : ''}`}
@@ -350,13 +351,13 @@ const LayerControls = ({
                   onMouseLeave={handleSliderAreaLeave}
                 >
                   <button
-                    className={`dmt-layer-option-btn transparency ${layer.showLayerBelow ? 'active' : ''}`}
+                    className={`dmt-layer-option-btn transparency ${layer.showLayerBelow === true ? 'active' : ''}`}
                     onClick={(e) => handleTransparencyToggle(layer.id, e)}
-                    title={layer.showLayerBelow ? 'Hide layer below' : 'Show layer below'}
+                    title={layer.showLayerBelow === true ? 'Hide layer below' : 'Show layer below'}
                   >
                     <Icon icon="lucide-layers" />
                   </button>
-                  {sliderHoveredLayerId === layer.id && layer.showLayerBelow && (
+                  {sliderHoveredLayerId === layer.id && layer.showLayerBelow === true && (
                     <div
                       className="dmt-opacity-slider-popup"
                       onMouseEnter={() => handleSliderAreaEnter(layer.id)}

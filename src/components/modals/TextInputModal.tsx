@@ -116,6 +116,7 @@ function openNativeTextInputModal(options: {
     modal.open();
     return true;
   } catch (e) {
+    // eslint-disable-next-line no-console
     console.warn('[Windrose] Failed to open native modal, falling back to Preact:', (e as Error).message);
     return false;
   }

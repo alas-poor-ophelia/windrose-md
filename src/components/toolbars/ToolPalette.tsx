@@ -196,11 +196,11 @@ const ToolButtonWithSubMenu = ({
   const LONG_PRESS_DURATION = 300;
 
   // Hide entire group if it's map-type-restricted
-  if (toolGroup.hexOnly && mapType !== 'hex') return null;
+  if (toolGroup.hexOnly === true && mapType !== 'hex') return null;
 
   const visibleSubTools = toolGroup.subTools.filter(st =>
-    (mapType !== 'hex' || !st.gridOnly) &&
-    (mapType !== 'grid' || !st.hexOnly)
+    (mapType !== 'hex' || st.gridOnly !== true) &&
+    (mapType !== 'grid' || st.hexOnly !== true)
   );
 
   if (visibleSubTools.length === 0) return null;
@@ -260,7 +260,7 @@ const ToolButtonWithSubMenu = ({
         onPointerUp={handlePointerUp}
         onPointerLeave={handlePointerLeave}
         onContextMenu={handleContextMenu}
-        title={currentSubToolDef ? titleWithShortcut(currentSubToolDef.title, currentSubToolDef.actionId || toolGroup.actionId, currentSubToolDef.shortcut || toolGroup.shortcut) : undefined}
+        title={titleWithShortcut(currentSubToolDef.title, currentSubToolDef.actionId ?? toolGroup.actionId, currentSubToolDef.shortcut ?? toolGroup.shortcut)}
       >
         <Icon icon={currentSubToolDef?.icon} />
         {hasMultipleSubTools && (
@@ -347,31 +347,31 @@ const simpleTools: SimpleTool[] = [
 // Derive DEFAULT shortcut map from tool config: key -> { group } or { tool }
 const DEFAULT_SHORTCUT_MAP: Record<string, { group?: keyof SubToolSelections; tool?: ToolId }> = {};
 for (const group of toolGroups) {
-  if (group.shortcut) {
+  if (group.shortcut != null && group.shortcut !== '') {
     DEFAULT_SHORTCUT_MAP[group.shortcut] = { group: group.id as keyof SubToolSelections };
   }
   for (const sub of group.subTools) {
-    if (sub.shortcut) {
+    if (sub.shortcut != null && sub.shortcut !== '') {
       DEFAULT_SHORTCUT_MAP[sub.shortcut] = { tool: sub.id };
     }
   }
 }
 for (const tool of simpleTools) {
-  if (tool.shortcut) {
+  if (tool.shortcut != null && tool.shortcut !== '') {
     DEFAULT_SHORTCUT_MAP[tool.shortcut] = { tool: tool.id };
   }
 }
 DEFAULT_SHORTCUT_MAP['v'] = { group: 'select' };
 
 function getShortcutKey(actionId?: string, defaultKey?: string): string | null {
-  if (!actionId) return defaultKey || null;
+  if (actionId == null || actionId === '') return defaultKey ?? null;
   const shortcuts = getSettings()?.keyboardShortcuts;
-  return shortcuts?.[actionId] || defaultKey || null;
+  return shortcuts?.[actionId] ?? defaultKey ?? null;
 }
 
 function titleWithShortcut(title: string, actionId?: string, defaultKey?: string): string {
   const key = getShortcutKey(actionId, defaultKey);
-  return key ? title + ' (' + key.toUpperCase() + ')' : title;
+  return key != null && key !== '' ? title + ' (' + key.toUpperCase() + ')' : title;
 }
 
 // Derive initial sub-tool selections from first sub-tool in each group
@@ -420,15 +420,15 @@ const ToolPalette = ({
       const key = e.key.toLowerCase();
       const shortcuts = getSettings()?.keyboardShortcuts;
 
-      if (shortcuts) {
+      if (shortcuts != null) {
         for (const group of toolGroups) {
-          if (group.actionId && shortcuts[group.actionId]?.toLowerCase() === key) {
-            onToolChange(subToolSelections[group.id as keyof SubToolSelections] || group.id as ToolId);
+          if (group.actionId != null && group.actionId !== '' && shortcuts[group.actionId]?.toLowerCase() === key) {
+            onToolChange(subToolSelections[group.id as keyof SubToolSelections] ?? group.id as ToolId);
             e.preventDefault();
             return;
           }
           for (const sub of group.subTools) {
-            if (sub.actionId && shortcuts[sub.actionId]?.toLowerCase() === key) {
+            if (sub.actionId != null && sub.actionId !== '' && shortcuts[sub.actionId]?.toLowerCase() === key) {
               onToolChange(sub.id);
               e.preventDefault();
               return;
@@ -436,7 +436,7 @@ const ToolPalette = ({
           }
         }
         for (const tool of simpleTools) {
-          if (tool.actionId && shortcuts[tool.actionId]?.toLowerCase() === key) {
+          if (tool.actionId != null && tool.actionId !== '' && shortcuts[tool.actionId]?.toLowerCase() === key) {
             onToolChange(tool.id);
             e.preventDefault();
             return;
@@ -445,10 +445,10 @@ const ToolPalette = ({
       }
 
       const shortcut = DEFAULT_SHORTCUT_MAP[key];
-      if (!shortcut) return;
-      const toolId = shortcut.group
-        ? (subToolSelections[shortcut.group] || shortcut.group as ToolId)
-        : shortcut.tool!;
+      if (shortcut == null) return;
+      const toolId = shortcut.group != null
+        ? (subToolSelections[shortcut.group] ?? shortcut.group as ToolId)
+        : shortcut.tool ?? currentTool;
       onToolChange(toolId);
       e.preventDefault();
     };
@@ -458,8 +458,8 @@ const ToolPalette = ({
   }, [onToolChange, isFocused, subToolSelections]);
 
   const visibleSimpleTools = simpleTools.filter(tool =>
-    (mapType !== 'hex' || !tool.gridOnly) &&
-    (mapType !== 'grid' || !tool.hexOnly)
+    (mapType !== 'hex' || tool.gridOnly !== true) &&
+    (mapType !== 'grid' || tool.hexOnly !== true)
   );
 
   const handleSubMenuOpen = (groupId: string): void => {
@@ -496,7 +496,7 @@ const ToolPalette = ({
   };
 
   useEffect((): (() => void) | undefined => {
-    if (!openSubMenu) return undefined;
+    if (openSubMenu == null || openSubMenu === '') return undefined;
 
     const handleClickOutside = (e: MouseEvent | TouchEvent): void => {
       const target = e.target as Element;
@@ -528,7 +528,7 @@ const ToolPalette = ({
       const buttonElement = target.closest('.dmt-color-tool-btn');
 
       if (!pickerElement && !buttonElement) {
-        if (pendingCustomColorRef.current) {
+        if (pendingCustomColorRef.current != null && pendingCustomColorRef.current !== '') {
           const colorValue = pendingCustomColorRef.current;
           onAddCustomColor?.(colorValue);
           onColorChange(colorValue);
@@ -578,7 +578,7 @@ const ToolPalette = ({
           onClick={toggleColorPicker}
           title="Choose color"
           style={{
-            borderBottom: `4px solid ${selectedColor || DEFAULT_COLOR}`
+            borderBottom: `4px solid ${selectedColor ?? DEFAULT_COLOR}`
           }}
         >
           <Icon icon="lucide-palette" />
@@ -604,8 +604,8 @@ const ToolPalette = ({
       </div>
 
       {toolGroups.slice(2).map(group => {
-        if (group.gridOnly && mapType === 'hex') return null;
-        if (group.hexOnly && mapType !== 'hex') return null;
+        if (group.gridOnly === true && mapType === 'hex') return null;
+        if (group.hexOnly === true && mapType !== 'hex') return null;
         return (
           <ToolButtonWithSubMenu
             key={group.id}

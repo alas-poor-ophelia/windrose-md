@@ -16,7 +16,7 @@
 
 
 
-import type { JSX } from 'preact';
+import type { JSX, VNode } from 'preact';
 import type { Ref } from 'preact';
 import type { MapData } from '#types/core/map.types';
 import type { ExtendedGeometry, SelectedItem } from '#types/contexts/context.types';
@@ -107,7 +107,7 @@ const ObjectSelectionToolbar = ({
   onDeleteCustomColor,
   pendingCustomColorRef,
   colorButtonRef
-}: ObjectSelectionToolbarProps) => {
+}: ObjectSelectionToolbarProps): VNode | null => {
   if (!selectedItem || selectedItem.type !== 'object' || !mapData || !canvasRef?.current || !containerRef?.current) {
     return null;
   }
@@ -115,7 +115,8 @@ const ObjectSelectionToolbar = ({
   const object = getActiveLayer(mapData).objects?.find(obj => obj.id === selectedItem.id);
   if (!object) return null;
 
-  const pos = calculateObjectScreenPosition(object, canvasRef.current, mapData, geometry!, containerRef);
+  if (geometry == null) return null;
+  const pos = calculateObjectScreenPosition(object, canvasRef.current, mapData, geometry, containerRef);
   if (!pos) return null;
 
   const bounds = {
@@ -126,16 +127,16 @@ const ObjectSelectionToolbar = ({
   };
 
   // Build button definitions
-  const hasLinkedObject = !!(selectedItem.data?.linkedObject);
+  const hasLinkedObject = selectedItem.data?.linkedObject != null;
   const isNotePin = selectedItem.data?.type === 'note_pin';
-  const isFreeform = !!(selectedItem.data?.freeform);
+  const isFreeform = selectedItem.data?.freeform === true;
 
   const buttons = [
     { id: 'rotate', icon: 'lucide-rotate-cw', title: 'Rotate 45° (or press R)', onClick: onRotate },
     { id: 'label', icon: 'lucide-sticky-note', title: 'Add/Edit Label', onClick: onLabel, visible: !isNotePin },
     { id: 'duplicate', icon: 'lucide-copy', title: 'Duplicate Object', onClick: onDuplicate },
     { id: 'freeform', icon: 'lucide-diamond', title: isFreeform ? 'Snap to grid' : 'Convert to freeform', onClick: onFreeformToggle, active: isFreeform },
-    { id: 'linkNote', icon: 'lucide-scroll-text', title: selectedItem.data?.linkedNote ? 'Edit linked note' : 'Link note', onClick: onLinkNote },
+    { id: 'linkNote', icon: 'lucide-scroll-text', title: selectedItem.data?.linkedNote != null ? 'Edit linked note' : 'Link note', onClick: onLinkNote },
     { id: 'linkObject', icon: 'lucide-link-2', title: hasLinkedObject ? 'Edit object link' : 'Link to object', onClick: onLinkObject, active: hasLinkedObject },
     { id: 'followLink', icon: 'lucide-arrow-right-circle', title: 'Go to linked object', onClick: onFollowLink, visible: hasLinkedObject },
     { id: 'removeLink', icon: 'lucide-unlink', title: 'Remove object link', onClick: onRemoveLink, visible: hasLinkedObject },
@@ -156,7 +157,7 @@ const ObjectSelectionToolbar = ({
   const toolbarHeight = rowCount * buttonSize + (rowCount - 1) * buttonGap;
 
   // Linked note display height
-  const hasLinkedNote = selectedItem.data?.linkedNote && typeof selectedItem.data.linkedNote === 'string';
+  const hasLinkedNote = selectedItem.data?.linkedNote != null && typeof selectedItem.data.linkedNote === 'string';
   const linkedNoteHeight = hasLinkedNote ? 32 : 0;
   const linkedNoteGap = hasLinkedNote ? 4 : 0;
   const extraHeight = linkedNoteGap + linkedNoteHeight;
@@ -165,7 +166,7 @@ const ObjectSelectionToolbar = ({
   if (!toolbarPos) return null;
 
   // During resize mode, show scale slider instead of action buttons
-  if (isResizeMode) {
+  if (isResizeMode === true) {
     const actualObject = getActiveLayer(mapData).objects?.find(obj => obj.id === selectedItem.id);
     const currentScale = actualObject?.scale ?? 1.0;
     const sliderWidth = 140;
@@ -223,7 +224,7 @@ const ObjectSelectionToolbar = ({
   return (
     <>
       {/* Linked Note Display */}
-      {hasLinkedNote && (
+      {hasLinkedNote && selectedItem.data != null && (
         <div
           className="dmt-selection-linked-note"
           style={{
@@ -238,11 +239,11 @@ const ObjectSelectionToolbar = ({
           <div className="dmt-note-display-link">
             <Icon icon="lucide-scroll-text" />
             <InternalLink
-              link={(selectedItem.data!.linkedNote as string).replace(/\.md$/, '')}
+              link={(selectedItem.data.linkedNote as string).replace(/\.md$/, '')}
               onClick={(e: Event) => {
                 e.preventDefault();
                 e.stopPropagation();
-                void openNoteInNewTab(selectedItem.data!.linkedNote as string);
+                void openNoteInNewTab(selectedItem.data?.linkedNote as string);
               }}
             />
             <Icon icon="lucide-external-link" />
@@ -263,7 +264,7 @@ const ObjectSelectionToolbar = ({
         }}
       >
         {buttons.map((btn) => {
-          if (btn.isColorButton) {
+          if (btn.isColorButton === true) {
             return (
               <div key={btn.id} style={{ position: 'relative', display: 'inline-block' }}>
                 <button
@@ -271,18 +272,18 @@ const ObjectSelectionToolbar = ({
                   className="dmt-toolbar-button dmt-toolbar-color-button"
                   onClick={(e) => btn.onClick?.(e)}
                   title={btn.title}
-                  style={{ backgroundColor: currentColor || '#ffffff' }}
+                  style={{ backgroundColor: currentColor ?? '#ffffff' }}
                 >
                   <Icon icon={btn.icon} />
                 </button>
-                {showColorPicker && (
+                {showColorPicker === true && (
                   <ColorPicker
                     isOpen={showColorPicker}
-                    selectedColor={currentColor || '#ffffff'}
-                    onColorSelect={onColorSelect!}
-                    onClose={onColorPickerClose!}
-                    onReset={onColorReset!}
-                    customColors={customColors || []}
+                    selectedColor={currentColor ?? '#ffffff'}
+                    onColorSelect={(color: HexColor) => onColorSelect?.(color)}
+                    onClose={() => onColorPickerClose?.()}
+                    onReset={() => onColorReset?.()}
+                    customColors={customColors ?? []}
                     onAddCustomColor={onAddCustomColor}
                     onDeleteCustomColor={onDeleteCustomColor}
                     pendingCustomColorRef={pendingCustomColorRef}
@@ -296,8 +297,8 @@ const ObjectSelectionToolbar = ({
 
           const className = [
             'dmt-toolbar-button',
-            btn.isDelete && 'dmt-toolbar-delete-button',
-            btn.active && 'dmt-toolbar-button-active'
+            btn.isDelete === true && 'dmt-toolbar-delete-button',
+            btn.active === true && 'dmt-toolbar-button-active'
           ].filter(Boolean).join(' ');
 
           return (

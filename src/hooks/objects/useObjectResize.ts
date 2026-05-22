@@ -60,8 +60,6 @@ function useObjectResize(): {
     clientY: number,
     object: MapObject
   ): ResizeCorner => {
-    if (!object || !mapData) return null;
-    if (!geometry) return null;
     if (!canvasRef.current) return null;
 
     const canvas = canvasRef.current;
@@ -75,8 +73,9 @@ function useObjectResize(): {
     x *= scaleX;
     y *= scaleY;
 
+    if (mapData == null) return null;
     const { viewState, mapType } = mapData;
-    if (!viewState) return null;
+    if (viewState == null) return null;
     const { zoom, center } = viewState;
     const northDirection = mapData.northDirection ?? 0;
 
@@ -85,16 +84,16 @@ function useObjectResize(): {
       offsetX = canvas.width / 2 - center.x * zoom;
       offsetY = canvas.height / 2 - center.y * zoom;
 
-      const hexSize = geometry.hexSize!;
-      const size = object.size || { width: 1, height: 1 };
+      const hexSize = geometry.hexSize ?? 1;
+      const size = object.size ?? { width: 1, height: 1 };
       objectWidth = size.width * hexSize * zoom;
       objectHeight = size.height * hexSize * zoom;
     } else {
-      const scaledGridSize = geometry.getScaledCellSize!(zoom);
+      const scaledGridSize = geometry.getScaledCellSize != null ? geometry.getScaledCellSize(zoom) : zoom;
       offsetX = canvas.width / 2 - center.x * scaledGridSize;
       offsetY = canvas.height / 2 - center.y * scaledGridSize;
 
-      const size = object.size || { width: 1, height: 1 };
+      const size = object.size ?? { width: 1, height: 1 };
       objectWidth = size.width * scaledGridSize;
       objectHeight = size.height * scaledGridSize;
     }
@@ -104,17 +103,19 @@ function useObjectResize(): {
     y = rotated.y;
 
     let screenX: number, screenY: number;
-    if (mapType === 'hex') {
-      const { worldX, worldY } = geometry.hexToWorld!(object.position.x, object.position.y);
+    if (mapType === 'hex' && geometry.hexToWorld != null) {
+      const { worldX, worldY } = geometry.hexToWorld(object.position.x, object.position.y);
       screenX = offsetX + worldX * zoom;
       screenY = offsetY + worldY * zoom;
 
       screenX -= objectWidth / 2;
       screenY -= objectHeight / 2;
-    } else {
-      const pos = geometry.gridToScreen!(object.position.x, object.position.y, offsetX, offsetY, zoom);
+    } else if (geometry.gridToScreen != null) {
+      const pos = geometry.gridToScreen(object.position.x, object.position.y, offsetX, offsetY, zoom);
       screenX = pos.screenX;
       screenY = pos.screenY;
+    } else {
+      return null;
     }
 
     const handleSize = isResizeMode ? 14 : 8;
@@ -151,7 +152,8 @@ function useObjectResize(): {
     if (!coords) return true;
 
     const { x, y } = coords;
-    const originalObject = dragStart.object! as { position: { x: number; y: number }; size?: { width: number; height: number } };
+    if (!dragStart.object) return false;
+    const originalObject = dragStart.object as { position: { x: number; y: number }; size?: { width: number; height: number } };
     const originalPos = originalObject.position;
     const originalSize = originalObject.size || { width: 1, height: 1 };
 
@@ -247,7 +249,7 @@ function useObjectResize(): {
       setDragStart(null);
 
       if (resizeInitialStateRef.current !== null) {
-        onObjectsChange(getActiveLayer(mapData!).objects, false);
+        onObjectsChange(getActiveLayer(mapData).objects, false);
         resizeInitialStateRef.current = null;
       }
       return true;

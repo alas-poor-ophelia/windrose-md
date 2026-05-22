@@ -355,6 +355,7 @@ class HexGeometry extends BaseGeometry {
     
     if (!isFinite(width) || !isFinite(height) || !isFinite(zoom) || 
         !isFinite(offsetX) || !isFinite(offsetY) || zoom <= 0) {
+      // eslint-disable-next-line no-console
       console.warn('[HexGeometry.drawGrid] Invalid input values, skipping render');
       return;
     }
@@ -366,7 +367,7 @@ class HexGeometry extends BaseGeometry {
 
     // Radial mode: iterate by rings instead of rectangular grid
     if (this.renderingMode === 'radial') {
-      const cells = this.getAllRadialCells(this.bounds!.maxRing!);
+      const cells = this.getAllRadialCells(this.bounds?.maxRing ?? 0);
       for (const { q, r } of cells) {
         this.drawHexOutline(ctx, q, r, offsetX, offsetY, zoom, lineWidth);
       }
@@ -403,6 +404,7 @@ class HexGeometry extends BaseGeometry {
     // Safety check on iteration count
     const totalHexes = (maxCol - minCol + 1) * (maxRow - minRow + 1);
     if (totalHexes > 50000 || !isFinite(totalHexes)) {
+      // eslint-disable-next-line no-console
       console.warn(`[HexGeometry.drawGrid] Too many hexes to draw (${totalHexes}), aborting`);
       return;
     }
@@ -566,7 +568,7 @@ class HexGeometry extends BaseGeometry {
     if (!this.bounds) return true;
 
     if (this.renderingMode === 'radial') {
-      return this.getHexRing(x, y) <= this.bounds.maxRing!;
+      return this.getHexRing(x, y) <= (this.bounds.maxRing ?? 0);
     }
 
     const { col, row } = axialToOffset(x, y, this.orientation);
@@ -582,9 +584,9 @@ class HexGeometry extends BaseGeometry {
 
     if (this.renderingMode === 'radial') {
       const ring = this.getHexRing(x, y);
-      if (ring <= this.bounds.maxRing!) return { x, y };
+      if (ring <= (this.bounds.maxRing ?? 0)) return { x, y };
       // Scale toward origin and round to nearest hex
-      const scale = this.bounds.maxRing! / ring;
+      const scale = (this.bounds.maxRing ?? 0) / ring;
       const { q, r } = this.roundHex(x * scale, y * scale);
       return { x: q, y: r };
     }

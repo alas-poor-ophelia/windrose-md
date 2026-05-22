@@ -119,7 +119,7 @@ const useFogTools = (
         return;
       }
 
-      if (updatedLayer && updatedLayer.fogOfWar) {
+      if (updatedLayer.fogOfWar != null) {
         onFogChange(updatedLayer.fogOfWar);
       }
     },
@@ -140,7 +140,7 @@ const useFogTools = (
 
       const updatedLayer = fogRectangle(activeLayer, startCol, startRow, endCol, endRow);
 
-      if (updatedLayer && updatedLayer.fogOfWar) {
+      if (updatedLayer.fogOfWar != null) {
         onFogChange(updatedLayer.fogOfWar);
       }
     },

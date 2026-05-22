@@ -100,8 +100,8 @@ function useOutlineTools(options: OutlineToolsOptions): UseOutlineToolsResult {
     setOutlineSettingsState((prev: OutlineSettings) => {
       const next = { ...prev, ...updates };
       // Apply changes to selected outline immediately
-      if (selectedOutlineId && mapData?.outlines) {
-        const outlines = (mapData.outlines || []).map(o =>
+      if (selectedOutlineId != null && selectedOutlineId !== '' && mapData?.outlines != null) {
+        const outlines = mapData.outlines.map(o =>
           o.id === selectedOutlineId ? { ...o, ...updates } : o
         );
         onOutlinesChange(outlines);
@@ -110,8 +110,7 @@ function useOutlineTools(options: OutlineToolsOptions): UseOutlineToolsResult {
     });
   }, [selectedOutlineId, mapData, onOutlinesChange]);
 
-  const getWorldCoords = useCallback((e: PointerEvent | MouseEvent) => {
-    if (!screenToWorld) return null;
+  const getWorldCoords = useCallback((e: PointerEvent | MouseEvent): { worldX: number; worldY: number } | null => {
     return screenToWorld(e.clientX, e.clientY);
   }, [screenToWorld]);
 
@@ -155,7 +154,7 @@ function useOutlineTools(options: OutlineToolsOptions): UseOutlineToolsResult {
     if (!world) return;
 
     // If editing a selected outline, check for vertex drag
-    if (selectedOutlineId && mapData?.outlines) {
+    if (selectedOutlineId != null && selectedOutlineId !== '' && mapData?.outlines != null) {
       const outline = mapData.outlines.find(o => o.id === selectedOutlineId);
       if (outline) {
         const vertexIdx = findVertexAtPoint(world.worldX, world.worldY, outline);
@@ -189,7 +188,7 @@ function useOutlineTools(options: OutlineToolsOptions): UseOutlineToolsResult {
     }
 
     // Deselect if clicking empty space with an outline selected
-    if (selectedOutlineId) {
+    if (selectedOutlineId != null) {
       setSelectedOutlineId(null);
       return;
     }
@@ -199,7 +198,7 @@ function useOutlineTools(options: OutlineToolsOptions): UseOutlineToolsResult {
   }, [getWorldCoords, drawingVertices.length, selectedOutlineId, mapData, findOutlineAtPoint, findVertexAtPoint]);
 
   const handlePointerMove = useCallback((e: PointerEvent) => {
-    if (draggingVertexIndex < 0 || !dragStartRef.current || !selectedOutlineId || !mapData?.outlines) return;
+    if (draggingVertexIndex < 0 || !dragStartRef.current || selectedOutlineId == null || mapData?.outlines == null) return;
     const world = getWorldCoords(e);
     if (!world) return;
 
@@ -207,7 +206,7 @@ function useOutlineTools(options: OutlineToolsOptions): UseOutlineToolsResult {
     const deltaY = world.worldY - dragStartRef.current.worldY;
     dragStartRef.current = { worldX: world.worldX, worldY: world.worldY };
 
-    const outlines = (mapData.outlines || []).map(o => {
+    const outlines = mapData.outlines.map(o => {
       if (o.id !== selectedOutlineId) return o;
       const newVertices = [...o.vertices];
       const v = newVertices[draggingVertexIndex];

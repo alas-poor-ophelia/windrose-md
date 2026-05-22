@@ -138,7 +138,7 @@ function renderLayerCellsAndEdges(
   }
 
   // Draw filled cells
-  if (layer.cells && layer.cells.length > 0) {
+  if (layer.cells.length > 0) {
     const cellsWithColor = layer.cells.map(cell => ({
       ...cell,
       color: getCellColor(cell)
@@ -157,7 +157,7 @@ function renderLayerCellsAndEdges(
     if (showInteriorGrid && renderer.renderInteriorGridLines && cellsWithColor.length > 0) {
       renderer.renderInteriorGridLines(ctx, cellsWithColor, geometry, viewState, {
         lineColor: theme.grid.lines,
-        lineWidth: theme.grid.lineWidth || 1,
+        lineWidth: theme.grid.lineWidth ?? 1,
         interiorRatio: 0.5
       });
     }
@@ -205,7 +205,7 @@ function renderLayerCellsAndEdges(
   }
 
   // Draw painted edges (grid maps only)
-  if (layer.edges && layer.edges.length > 0 && renderer.supportsSegments && renderer.renderEdges) {
+  if (layer.edges.length > 0 && renderer.supportsSegments && renderer.renderEdges) {
     renderer.renderEdges(ctx, layer.edges, geometry, viewState, {
       lineWidth: 1,
       borderWidth: theme.cells.borderWidth
@@ -220,13 +220,13 @@ function renderLayerCellsAndEdges(
 
 const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, selectedItems = [], options = {}) => {
   const { isResizeMode = false, theme = null, showCoordinates = false, layerVisibility = null, adjacentSubHexes = null } = options;
-  if (!canvas) return;
+  if (canvas == null) return;
 
   // Normalize selectedItems to array (backward compatibility)
-  const itemsArray: RendererSelectedItem[] = Array.isArray(selectedItems) ? selectedItems : (selectedItems ? [selectedItems] : []);
+  const itemsArray: RendererSelectedItem[] = Array.isArray(selectedItems) ? selectedItems : (selectedItems != null ? [selectedItems] : []);
 
   // Default layer visibility
-  const visibility: LayerVisibility = layerVisibility || { grid: true, objects: true, textLabels: true, hexCoordinates: true };
+  const visibility: LayerVisibility = layerVisibility ?? { grid: true, objects: true, textLabels: true, hexCoordinates: true };
 
   // Get theme with current settings (use provided theme or fetch global)
   const THEME = theme || getTheme();
@@ -267,7 +267,7 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   );
 
   // Draw background image (both grid and hex maps)
-  const bgImage = mapData.backgroundImage?.path ? getCachedImage(mapData.backgroundImage.path) : null;
+  const bgImage = mapData.backgroundImage?.path != null && mapData.backgroundImage.path !== '' ? getCachedImage(mapData.backgroundImage.path) : null;
   const isHexMapForBg = geometry.type === 'hex';
   const boundsOrDimensions = isHexMapForBg
     ? mapData.hexBounds
@@ -278,7 +278,7 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
     bgImage,
     mapData.backgroundImage as { path: string; offsetX?: number; offsetY?: number; opacity?: number; imageGridSize?: number } | undefined,
     boundsOrDimensions,
-    mapData.orientation || 'flat',
+    mapData.orientation ?? 'flat',
     offsetX,
     offsetY,
     zoom,
@@ -307,11 +307,11 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   // Draw grid lines
   renderer.renderGrid(ctx, geometry, rendererViewState, { width, height }, visibility.grid !== false, {
     lineColor: THEME.grid.lines,
-    lineWidth: THEME.grid.lineWidth || 1
+    lineWidth: THEME.grid.lineWidth ?? 1
   });
 
   // Draw ghost layer (layer below) if enabled
-  if (activeLayer.showLayerBelow) {
+  if (activeLayer.showLayerBelow === true) {
     const layerBelow = getLayerBelow(mapData, activeLayer.id);
     if (layerBelow) {
       const ghostOpacity = activeLayer.layerBelowOpacity ?? 0.25;
@@ -320,21 +320,25 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
         showGrid: visibility.grid !== false
       });
       // Ghost layer tiles
-      if (geometry.type === 'hex' && layerBelow.tiles && layerBelow.tiles.length > 0 && mapData.tilesets && mapData.tilesets.length > 0) {
+      if (geometry.type === 'hex' && layerBelow.tiles != null && layerBelow.tiles.length > 0 && mapData.tilesets != null && mapData.tilesets.length > 0) {
         const hexGeom = geometry as ExtendedGeometry;
-        renderTiles(
-          ctx,
-          layerBelow.tiles,
-          mapData.tilesets,
-          { hexToWorld: hexGeom.hexToWorld!.bind(hexGeom), worldToScreen: hexGeom.worldToScreen.bind(hexGeom), hexSize: hexGeom.hexSize!, orientation: mapData.orientation || 'flat' },
-          rendererViewState,
-          { opacity: ghostOpacity, getCachedImage, canvasWidth: width, canvasHeight: height }
-        );
+        const htw = hexGeom.hexToWorld;
+        const hs = hexGeom.hexSize;
+        if (htw != null && hs != null) {
+          renderTiles(
+            ctx,
+            layerBelow.tiles,
+            mapData.tilesets,
+            { hexToWorld: htw.bind(hexGeom), worldToScreen: hexGeom.worldToScreen.bind(hexGeom), hexSize: hs, orientation: mapData.orientation ?? 'flat' },
+            rendererViewState,
+            { opacity: ghostOpacity, getCachedImage, canvasWidth: width, canvasHeight: height }
+          );
+        }
       }
       // Ghost layer curves
-      if (layerBelow.curves && layerBelow.curves.length > 0) {
+      if (layerBelow.curves.length > 0) {
         const ghostGridConfig = geometry.type === 'grid'
-          ? { cellSize: (geometry as ExtendedGeometry).cellSize, lineColor: THEME.grid.lines, lineWidth: THEME.grid.lineWidth || 1, interiorRatio: 0.5 }
+          ? { cellSize: (geometry as ExtendedGeometry).cellSize, lineColor: THEME.grid.lines, lineWidth: THEME.grid.lineWidth ?? 1, interiorRatio: 0.5 }
           : undefined;
         renderCurves(ctx, layerBelow.curves, rendererViewState, THEME, { opacity: ghostOpacity, gridConfig: ghostGridConfig });
       }
@@ -343,9 +347,11 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
 
   // Draw adjacent sub-hex ghost previews (when drilled into a sub-hex)
   const MAX_ADJACENT_COMPLEXITY = 500;
-  if (adjacentSubHexes && adjacentSubHexes.length > 0 && geometry.type === 'hex') {
+  if (adjacentSubHexes != null && adjacentSubHexes.length > 0 && geometry.type === 'hex') {
     const hexGeom = geometry as ExtendedGeometry;
-    const maxRing = mapData.hexBounds?.maxRing || 7;
+    const hexToWorldFn = hexGeom.hexToWorld;
+    const hexSizeVal = hexGeom.hexSize;
+    const maxRing = mapData.hexBounds?.maxRing ?? 7;
 
     // Compute world-space offset for each axial direction.
     // Two adjacent sub-hex grids tile when their centers are (2*maxRing+1) hex-steps apart.
@@ -354,32 +360,33 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
     ctx.save();
 
     // Pre-build tile geometry wrapper once (shared across all adjacents)
-    const adjTileGeom = mapData.tilesets && mapData.tilesets.length > 0
-      ? { hexToWorld: hexGeom.hexToWorld!.bind(hexGeom), worldToScreen: hexGeom.worldToScreen.bind(hexGeom), hexSize: hexGeom.hexSize!, orientation: mapData.orientation || 'flat' }
+    const adjTileGeom = mapData.tilesets != null && mapData.tilesets.length > 0 && hexToWorldFn != null && hexSizeVal != null
+      ? { hexToWorld: hexToWorldFn.bind(hexGeom), worldToScreen: hexGeom.worldToScreen.bind(hexGeom), hexSize: hexSizeVal, orientation: mapData.orientation ?? 'flat' }
       : null;
 
     for (const adj of adjacentSubHexes) {
       // Compute offset for this direction
+      if (hexToWorldFn == null) continue;
       const scaledQ = adj.dq * tileStep;
       const scaledR = adj.dr * tileStep;
-      const worldOffset = hexGeom.hexToWorld!(scaledQ, scaledR);
+      const worldOffset = hexToWorldFn.call(hexGeom, scaledQ, scaledR);
 
       // Create shifted view state: offset the canvas origin by the world-space delta
       const shiftedOffsetX = offsetX + worldOffset.worldX * zoom;
       const shiftedOffsetY = offsetY + worldOffset.worldY * zoom;
       const shiftedViewState: RendererViewState = { x: shiftedOffsetX, y: shiftedOffsetY, zoom };
 
-      const adjLayers = adj.mapData.layers || [];
+      const adjLayers = adj.mapData.layers ?? [];
 
       // Skip detailed rendering for dense neighbors to cap render cost
       const totalItems = adjLayers.reduce((sum: number, l: MapLayer) =>
-        sum + (l.cells?.length || 0) + (l.tiles?.length || 0), 0);
+        sum + (l.cells?.length ?? 0) + (l.tiles?.length ?? 0), 0);
       const isDense = totalItems > MAX_ADJACENT_COMPLEXITY;
 
       // Render cells, edges, and tiles only for non-dense neighbors
       if (!isDense) {
         for (const layer of adjLayers) {
-          if (layer.cells && layer.cells.length > 0) {
+          if (layer.cells.length > 0) {
             renderLayerCellsAndEdges(ctx, layer, geometry, shiftedViewState, THEME, renderer, {
               opacity: 0.25,
               showGrid: false
@@ -387,13 +394,13 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
           }
         }
 
-        if (adjTileGeom) {
+        if (adjTileGeom != null && mapData.tilesets != null) {
           for (const layer of adjLayers) {
-            if (layer.tiles && layer.tiles.length > 0) {
+            if (layer.tiles != null && layer.tiles.length > 0) {
               renderTiles(
                 ctx,
                 layer.tiles,
-                mapData.tilesets!,
+                mapData.tilesets,
                 adjTileGeom,
                 shiftedViewState,
                 { opacity: 0.25, getCachedImage, canvasWidth: width, canvasHeight: height }
@@ -408,7 +415,7 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
       ctx.globalAlpha = 0.5;
       const edgeQ = adj.dq * (maxRing + 2);
       const edgeR = adj.dr * (maxRing + 2);
-      const edgeWorld = hexGeom.hexToWorld!(edgeQ, edgeR);
+      const edgeWorld = hexToWorldFn.call(hexGeom, edgeQ, edgeR);
       const labelScreen = hexGeom.worldToScreen(edgeWorld.worldX, edgeWorld.worldY, offsetX, offsetY, zoom);
       const labelFontSize = Math.max(10, 12 * zoom);
       ctx.font = `bold ${labelFontSize}px sans-serif`;
@@ -433,8 +440,8 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   // Build curve-cell merge index for active layer (grid maps only)
   let activeMergeIndex: CurveCellMergeIndex | null = null;
   if (geometry.type === 'grid' &&
-      activeLayer.cells && activeLayer.cells.length > 0 &&
-      activeLayer.curves && activeLayer.curves.length > 0) {
+      activeLayer.cells.length > 0 &&
+      activeLayer.curves.length > 0) {
     const cellsForMerge = activeLayer.cells.map(cell => ({
       x: (cell as GridCell).x, y: (cell as GridCell).y, color: getCellColor(cell)
     }));
@@ -452,9 +459,9 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   });
 
   // Draw freehand curves (between cells and objects)
-  if (activeLayer.curves && activeLayer.curves.length > 0) {
+  if (activeLayer.curves.length > 0) {
     const curveGridConfig = geometry.type === 'grid'
-      ? { cellSize: (geometry as ExtendedGeometry).cellSize, lineColor: THEME.grid.lines, lineWidth: THEME.grid.lineWidth || 1, interiorRatio: 0.5 }
+      ? { cellSize: (geometry as ExtendedGeometry).cellSize, lineColor: THEME.grid.lines, lineWidth: THEME.grid.lineWidth ?? 1, interiorRatio: 0.5 }
       : undefined;
     renderCurves(ctx, activeLayer.curves, rendererViewState, THEME, {
       mergeIndex: activeMergeIndex,
@@ -463,26 +470,30 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   }
 
   // Draw hex tiles (between curves and regions, z-sorted for overflow occlusion)
-  if (geometry.type === 'hex' && activeLayer.tiles && activeLayer.tiles.length > 0 && mapData.tilesets && mapData.tilesets.length > 0) {
+  if (geometry.type === 'hex' && activeLayer.tiles != null && activeLayer.tiles.length > 0 && mapData.tilesets != null && mapData.tilesets.length > 0) {
     const hexGeom = geometry as ExtendedGeometry;
-    renderTiles(
-      ctx,
-      activeLayer.tiles,
-      mapData.tilesets,
-      { hexToWorld: hexGeom.hexToWorld!.bind(hexGeom), worldToScreen: hexGeom.worldToScreen.bind(hexGeom), hexSize: hexGeom.hexSize!, orientation: mapData.orientation || 'flat' },
-      rendererViewState,
-      { getCachedImage, canvasWidth: width, canvasHeight: height }
-    );
+    const htw = hexGeom.hexToWorld;
+    const hs = hexGeom.hexSize;
+    if (htw != null && hs != null) {
+      renderTiles(
+        ctx,
+        activeLayer.tiles,
+        mapData.tilesets,
+        { hexToWorld: htw.bind(hexGeom), worldToScreen: hexGeom.worldToScreen.bind(hexGeom), hexSize: hs, orientation: mapData.orientation ?? 'flat' },
+        rendererViewState,
+        { getCachedImage, canvasWidth: width, canvasHeight: height }
+      );
+    }
   }
 
   // Draw regions (hex maps only, between curves and objects)
-  if (geometry.type === 'hex' && mapData.regions && mapData.regions.length > 0 && visibility.regions !== false) {
+  if (geometry.type === 'hex' && mapData.regions != null && mapData.regions.length > 0 && visibility.regions !== false) {
     const regionFow = activeLayer.fogOfWar;
     let foggedAxialSet: Set<string> | undefined;
-    if (regionFow?.enabled && regionFow?.foggedCells?.length) {
+    if (regionFow?.enabled === true && regionFow?.foggedCells != null && regionFow.foggedCells.length > 0) {
       foggedAxialSet = new Set<string>();
       for (const fc of regionFow.foggedCells) {
-        const { q, r } = offsetToAxial(fc.col, fc.row, mapData.orientation || 'flat');
+        const { q, r } = offsetToAxial(fc.col, fc.row, mapData.orientation ?? 'flat');
         foggedAxialSet.add(`${q},${r}`);
       }
     }
@@ -490,16 +501,16 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   }
 
   // Draw outlines (hex maps only, after regions)
-  if (geometry.type === 'hex' && mapData.outlines && mapData.outlines.length > 0 && visibility.outlines !== false) {
-    renderOutlines(ctx, mapData.outlines, geometry as unknown as Parameters<typeof renderOutlines>[2], { x: offsetX, y: offsetY, zoom }, mapData.hexBounds || {}, mapData.orientation || 'flat');
+  if (geometry.type === 'hex' && mapData.outlines != null && mapData.outlines.length > 0 && visibility.outlines !== false) {
+    renderOutlines(ctx, mapData.outlines, geometry as unknown as Parameters<typeof renderOutlines>[2], { x: offsetX, y: offsetY, zoom }, mapData.hexBounds ?? {}, mapData.orientation ?? 'flat');
   }
 
   // Draw player light radii (before shapes and objects)
-  if (activeLayer.objects?.length) {
-    const playerObjects = activeLayer.objects.filter((o: MapObject) => o.isPlayer && o.lightEnabled);
+  if (activeLayer.objects.length > 0) {
+    const playerObjects = activeLayer.objects.filter((o: MapObject) => o.isPlayer === true && o.lightEnabled === true);
     if (playerObjects.length > 0) {
-      const settings = mapData.settings?.overrides || {};
-      const distancePerCell = (settings.distancePerCell as number) || 5;
+      const settings = mapData.settings?.overrides ?? {};
+      const distancePerCell = (settings.distancePerCell as number) ?? 5;
       renderPlayerLights(ctx, playerObjects, geometry, { x: offsetX, y: offsetY, zoom }, distancePerCell);
     }
   }
@@ -510,29 +521,32 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   }
 
   // Draw sub-hex indicators (small diamond on hexes that have sub-hex data)
-  if (geometry.type === 'hex' && mapData.subHexMaps) {
+  if (geometry.type === 'hex' && mapData.subHexMaps != null) {
     const hexGeom = geometry as ExtendedGeometry;
+    const htwFn = hexGeom.hexToWorld;
+    const hsFn = hexGeom.hexSize;
 
+    if (htwFn != null && hsFn != null) {
     ctx.save();
     for (const [hexKey, subHex] of Object.entries(mapData.subHexMaps)) {
       // Only show indicator if the sub-hex has actual content
       const sd = subHex.mapData;
-      if (!sd?.layers) continue;
+      if (sd?.layers == null) continue;
       const hasContent = sd.layers.some((l: MapLayer) =>
-        (l.cells && l.cells.length > 0) ||
-        (l.curves && l.curves.length > 0) ||
-        (l.objects && l.objects.length > 0) ||
-        (l.textLabels && l.textLabels.length > 0) ||
-        (l.tiles && l.tiles.length > 0)
+        l.cells.length > 0 ||
+        l.curves.length > 0 ||
+        l.objects.length > 0 ||
+        l.textLabels.length > 0 ||
+        (l.tiles != null && l.tiles.length > 0)
       );
       if (!hasContent) continue;
 
       const [qStr, rStr] = hexKey.split(',');
       const q = parseInt(qStr, 10);
       const r = parseInt(rStr, 10);
-      const world = hexGeom.hexToWorld!(q, r);
+      const world = htwFn.call(hexGeom, q, r);
       const screen = hexGeom.worldToScreen(world.worldX, world.worldY, offsetX, offsetY, zoom);
-      const size = Math.max(4, hexGeom.hexSize! * zoom * 0.12);
+      const size = Math.max(4, hsFn * zoom * 0.12);
 
       // Small diamond indicator at hex center
       ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
@@ -548,19 +562,20 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
       ctx.stroke();
     }
     ctx.restore();
+    }
   }
 
   // Draw objects
-  if (activeLayer.objects && activeLayer.objects.length > 0 && !showCoordinates && visibility.objects) {
+  if (activeLayer.objects.length > 0 && !showCoordinates && visibility.objects) {
     const isHexMap = geometry.type === 'hex';
-    const mapType = mapData.mapType || 'grid';
-    const getObjectTypeForMap = (typeId: string) => getObjectType(typeId, mapType, mapData.objectSetId);
+    const mapType = mapData.mapType ?? 'grid';
+    const getObjectTypeForMap = (typeId: string): ReturnType<typeof getObjectType> => getObjectType(typeId, mapType, mapData.objectSetId);
     renderObjects(
       activeLayer as unknown as Parameters<typeof renderObjects>[0],
       { ctx, offsetX, offsetY, zoom, scaledSize },
       geometry as unknown as Parameters<typeof renderObjects>[2],
       isHexMap,
-      mapData.orientation || 'flat',
+      mapData.orientation ?? 'flat',
       {
         getObjectType: getObjectTypeForMap,
         getRenderChar: getRenderChar as unknown as Parameters<typeof renderObjects>[5]['getRenderChar'],
@@ -577,7 +592,7 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   }
 
   // Draw text labels
-  if (activeLayer.textLabels && activeLayer.textLabels.length > 0 && !showCoordinates && visibility.textLabels) {
+  if (activeLayer.textLabels.length > 0 && !showCoordinates && visibility.textLabels) {
     renderTextLabels(
       activeLayer.textLabels,
       { ctx, zoom, getFontCss },
@@ -595,18 +610,18 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   const fowBlurEnabled = (effectiveSettings?.fogOfWarBlurEnabled as boolean) ?? false;
 
   // Clear fog canvas if fog not needed
-  if (!fow?.enabled || !fow?.foggedCells?.length || !fowBlurEnabled) {
+  if (fow?.enabled !== true || fow?.foggedCells == null || fow.foggedCells.length === 0 || !fowBlurEnabled) {
     clearFogCanvas(fogCanvas);
   }
 
-  if (fow && fow.enabled && fow.foggedCells?.length) {
+  if (fow != null && fow.enabled === true && fow.foggedCells != null && fow.foggedCells.length > 0) {
     const fogSettings = getFogSettings(effectiveSettings);
     const isHexMap = geometry.type === 'hex';
     const hexGeom = isHexMap ? geometry as InstanceType<typeof HexGeometry> : null;
     const gridGeom = !isHexMap ? geometry as InstanceType<typeof GridGeometry> : null;
 
     renderFog(
-      activeLayer.fogOfWar!,
+      fow,
       { ctx, fogCanvas, width, height, offsetX, offsetY, zoom, scaledSize, northDirection: northDirection ?? 0 },
       fogSettings,
       { hexBounds: mapData.hexBounds, dimensions: mapData.dimensions },
@@ -614,7 +629,7 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
       hexGeom as unknown as Parameters<typeof renderFog>[5],
       gridGeom as unknown as Parameters<typeof renderFog>[6],
       geometry as unknown as Parameters<typeof renderFog>[7],
-      mapData.orientation || 'flat',
+      mapData.orientation ?? 'flat',
       getCachedImage,
       renderGridFog,
       renderHexFog,
@@ -635,7 +650,7 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
     hexGeomForSelection as unknown as Parameters<typeof renderSelections>[5],
     isHexMapForSelection,
     isResizeMode,
-    mapData.orientation || 'flat',
+    mapData.orientation ?? 'flat',
     showCoordinates,
     visibility,
     {

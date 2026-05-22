@@ -47,7 +47,7 @@ interface WindroseHoverPreviewProps {
 }
 
 function noteBasename(notePath?: string): string {
-  if (!notePath) return '';
+  if (notePath == null || notePath === '') return '';
   const slash = Math.max(notePath.lastIndexOf('/'), notePath.lastIndexOf('\\'));
   const base = slash >= 0 ? notePath.slice(slash + 1) : notePath;
   return base.replace(/\.md$/i, '');
@@ -68,17 +68,17 @@ function WindroseHoverPreview({ mapId, x, y, zoom: zoomProp, layerId, notePath }
         const mapData = await loadMapData(getApp(), mapId);
         if (cancelled) return;
 
-        if (!mapData || !mapData.mapType) {
+        if (mapData == null || !mapData.mapType) {
           setStatus('missing');
           return;
         }
 
-        setMapName((mapData.name as string) || mapId);
+        setMapName((mapData.name as string | undefined) ?? mapId);
 
         const focused: MapData = {
           ...mapData,
           viewState: { zoom, center: { x, y } },
-          activeLayerId: layerId || mapData.activeLayerId,
+          activeLayerId: (layerId != null && layerId !== '') ? layerId : mapData.activeLayerId,
           northDirection: 0,
         };
 
@@ -121,7 +121,7 @@ function WindroseHoverPreview({ mapId, x, y, zoom: zoomProp, layerId, notePath }
           const cy = preview.height / 2;
           const offset = 34; // distance from center to each bracket corner
           const arm = 14;    // length of each bracket arm
-          const drawBrackets = () => {
+          const drawBrackets = (): void => {
             ctx.beginPath();
             // Top-left
             ctx.moveTo(cx - offset + arm, cy - offset); ctx.lineTo(cx - offset, cy - offset); ctx.lineTo(cx - offset, cy - offset + arm);
@@ -157,6 +157,7 @@ function WindroseHoverPreview({ mapId, x, y, zoom: zoomProp, layerId, notePath }
 
         setStatus('ready');
       } catch (err) {
+        // eslint-disable-next-line no-console
         console.error('[WindroseHoverPreview] render failed', err);
         if (!cancelled) setStatus('error');
       }
@@ -166,7 +167,7 @@ function WindroseHoverPreview({ mapId, x, y, zoom: zoomProp, layerId, notePath }
 
   const noteLabel = noteBasename(notePath);
   const headerMapName = mapName || mapId;
-  const showHeader = status === 'ready' && (headerMapName || noteLabel);
+  const showHeader = status === 'ready' && (headerMapName !== '' || noteLabel !== '');
 
   return (
     <div className="windrose-hover-preview">
@@ -193,6 +194,7 @@ function renderHoverPreview(el: HTMLElement, params: WindroseHoverPreviewProps):
   try {
     render(<WindroseHoverPreview {...params} />, el);
   } catch (err) {
+    // eslint-disable-next-line no-console
     console.error('[WindroseHoverPreview] renderPreview failed', err);
   }
 }

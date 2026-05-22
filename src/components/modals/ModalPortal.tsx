@@ -31,7 +31,7 @@ const ModalPortal = ({ children }: ModalPortalProps): VNode => {
     portalContainerRef.current = portal;
 
     return () => {
-      if (portal && portal.childNodes.length === 0 && portal.parentNode) {
+      if (portal != null && portal.childNodes.length === 0 && portal.parentNode) {
         portal.parentNode.removeChild(portal);
       }
     };

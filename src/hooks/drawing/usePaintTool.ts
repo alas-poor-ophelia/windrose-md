@@ -114,18 +114,18 @@ function usePaintTool({
         const canvas = canvasRef.current;
         const ctx = canvas ? canvas.getContext('2d') : null;
         const textLabel = getTextLabelAtPosition(
-          activeLayer.textLabels || [],
+          activeLayer.textLabels ?? [],
           worldCoords.worldX,
           worldCoords.worldY,
           ctx
         );
-        if (textLabel) {
-          const newLabels = removeTextLabel(activeLayer.textLabels || [], textLabel.id);
+        if (textLabel != null) {
+          const newLabels = removeTextLabel(activeLayer.textLabels ?? [], textLabel.id);
           onTextLabelsChange(newLabels);
           return;
         }
 
-        if (GridGeometry && geometry instanceof GridGeometry && onEdgesChange) {
+        if (GridGeometry && geometry instanceof GridGeometry) {
           const edgeGeometry = geometry as ExtendedGeometry;
           const edgeInfo = edgeGeometry.screenToEdge?.(worldCoords.worldX, worldCoords.worldY, 0.15);
           if (edgeInfo) {
@@ -136,7 +136,7 @@ function usePaintTool({
               const existingEdge = getEdgeAt(activeLayer.edges as any, edgeInfo.x, edgeInfo.y, edgeInfo.side);
               if (existingEdge) {
                 if (strokeInitialEdgesRef.current === null) {
-                  strokeInitialEdgesRef.current = [...(activeLayer.edges || [])];
+                  strokeInitialEdgesRef.current = [...activeLayer.edges];
                 }
                 setProcessedEdges((prev: Set<string>) => new Set([...prev, edgeKey]));
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -151,17 +151,17 @@ function usePaintTool({
 
       const coordX = coords.x;
       const coordY = coords.y;
-      const obj = getObjectAtPosition(activeLayer.objects || [], coordX, coordY);
-      if (obj) {
-        const mapType = mapData.mapType || 'grid';
-        const result = eraseObjectAt(activeLayer.objects || [], coordX, coordY, mapType);
+      const obj = getObjectAtPosition(activeLayer.objects, coordX, coordY);
+      if (obj != null) {
+        const mapType = mapData.mapType ?? 'grid';
+        const result = eraseObjectAt(activeLayer.objects, coordX, coordY, mapType);
         if (result.success) {
           onObjectsChange(result.objects);
         }
       } else {
         // Erase tile at hex coords (overlay first, then base)
         let tileErased = false;
-        if (geometry?.type === 'hex' && onTilesChange && activeLayer.tiles?.length) {
+        if (geometry?.type === 'hex' && onTilesChange != null && activeLayer.tiles != null && activeLayer.tiles.length > 0) {
           const tiles = activeLayer.tiles as HexTileAssignment[];
           const overlayIdx = tiles.findIndex((t: HexTileAssignment) => t.q === coordX && t.r === coordY && t.layer === 'overlay');
           if (overlayIdx >= 0) {
@@ -183,7 +183,7 @@ function usePaintTool({
         }
         if (!tileErased) {
         let curveErased = false;
-        if (activeLayer.curves && activeLayer.curves.length > 0 && geometry) {
+        if (activeLayer.curves.length > 0) {
           let newCurves: Curve[] | null = null;
           if (geometry.type === 'hex') {
             const hexGeo = geometry as unknown as { getHexVertices(q: number, r: number): { worldX: number; worldY: number }[] };
@@ -246,33 +246,35 @@ function usePaintTool({
   const stopDrawing = (): void => {
     if (!paintIsDrawing) return;
 
-    const activeLayer = getActiveLayer(mapData!);
-
     setPaintIsDrawing(false);
     setProcessedCells(new Set());
     setProcessedEdges(new Set());
 
-    if (strokeInitialStateRef.current !== null && mapData) {
+    if (mapData == null) return;
+
+    const activeLayer = getActiveLayer(mapData);
+
+    if (strokeInitialStateRef.current !== null) {
       if (JSON.stringify(activeLayer.cells) !== JSON.stringify(strokeInitialStateRef.current)) {
         onCellsChange(activeLayer.cells, false);
       }
       strokeInitialStateRef.current = null;
     }
-    if (strokeInitialEdgesRef.current !== null && mapData && onEdgesChange) {
-      if (JSON.stringify(activeLayer.edges || []) !== JSON.stringify(strokeInitialEdgesRef.current)) {
-        onEdgesChange(activeLayer.edges || [], false);
+    if (strokeInitialEdgesRef.current !== null) {
+      if (JSON.stringify(activeLayer.edges) !== JSON.stringify(strokeInitialEdgesRef.current)) {
+        onEdgesChange(activeLayer.edges, false);
       }
       strokeInitialEdgesRef.current = null;
     }
-    if (strokeInitialCurvesRef.current !== null && mapData) {
-      if (JSON.stringify(activeLayer.curves || []) !== JSON.stringify(strokeInitialCurvesRef.current)) {
-        onCurvesChange(activeLayer.curves || [], false);
+    if (strokeInitialCurvesRef.current !== null) {
+      if (JSON.stringify(activeLayer.curves) !== JSON.stringify(strokeInitialCurvesRef.current)) {
+        onCurvesChange(activeLayer.curves, false);
       }
       strokeInitialCurvesRef.current = null;
     }
-    if (strokeInitialTilesRef.current !== null && mapData && onTilesChange) {
-      if (JSON.stringify(activeLayer.tiles || []) !== JSON.stringify(strokeInitialTilesRef.current)) {
-        onTilesChange(activeLayer.tiles || [], false);
+    if (strokeInitialTilesRef.current !== null && onTilesChange != null) {
+      if (JSON.stringify(activeLayer.tiles ?? []) !== JSON.stringify(strokeInitialTilesRef.current)) {
+        onTilesChange(activeLayer.tiles ?? [], false);
       }
       strokeInitialTilesRef.current = null;
     }

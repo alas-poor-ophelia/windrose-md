@@ -73,7 +73,7 @@ function getColorByHex(colorHex: string): ColorDefinition | null {
  * Check if color is the default color.
  */
 function isDefaultColor(colorHex: string | null | undefined): boolean {
-  return !colorHex || colorHex === DEFAULT_COLOR;
+  return colorHex == null || colorHex === '' || colorHex === DEFAULT_COLOR;
 }
 
 // ===========================================

@@ -15,7 +15,7 @@
  */
 
 import { render as preactRender, h } from 'preact';
-import type { JSX } from 'preact';
+import type { JSX, VNode } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { FONT_OPTIONS, DEFAULT_FONT, DEFAULT_FONT_SIZE, DEFAULT_TEXT_COLOR, FONT_SIZE_MIN, FONT_SIZE_MAX, FONT_SIZE_STEP, getFontOption } from '../../text/fontOptions';
 import { ColorPicker } from '../shared/ColorPicker';
@@ -73,18 +73,18 @@ function openNativeTextLabelEditor(app: App, options: OpenNativeTextLabelEditorO
 
     const modal = new (class extends ModalClass {
       submitted = false;
-      inputEl: HTMLInputElement = null!;
-      fontSizeInput: HTMLInputElement = null!;
-      opacityInput: HTMLInputElement = null!;
-      opacityValueEl: HTMLSpanElement = null!;
-      previewEl: HTMLDivElement = null!;
-      colorBtnEl: HTMLButtonElement = null!;
-      colorPickerContainerEl: HTMLDivElement = null!;
+      inputEl!: HTMLInputElement;
+      fontSizeInput!: HTMLInputElement;
+      opacityInput!: HTMLInputElement;
+      opacityValueEl!: HTMLSpanElement;
+      previewEl!: HTMLDivElement;
+      colorBtnEl!: HTMLButtonElement;
+      colorPickerContainerEl!: HTMLDivElement;
       isPickerOpen = false;
       pendingCustomColorRef = { current: null as string | null };
       clickOutsideHandler: ((e: MouseEvent) => void) | null = null;
 
-      onOpen() {
+      onOpen(): void {
         const { contentEl, titleEl } = this;
         titleEl.setText(isEditing ? 'Edit Text Label' : 'Add Text Label');
         contentEl.addClass('dmt-text-editor-native');
@@ -206,7 +206,7 @@ function openNativeTextLabelEditor(app: App, options: OpenNativeTextLabelEditorO
         }, 0);
       }
 
-      renderColorPicker() {
+      renderColorPicker(): void {
         if (this.clickOutsideHandler) {
           document.removeEventListener('mousedown', this.clickOutsideHandler);
           this.clickOutsideHandler = null;
@@ -255,7 +255,7 @@ function openNativeTextLabelEditor(app: App, options: OpenNativeTextLabelEditorO
         }
       }
 
-      selectColor(color: string) {
+      selectColor(color: string): void {
         currentColor = color;
         this.colorBtnEl.style.setProperty('background-color', color);
         const label = this.colorBtnEl.querySelector('.dmt-text-editor-color-label');
@@ -263,8 +263,8 @@ function openNativeTextLabelEditor(app: App, options: OpenNativeTextLabelEditorO
         this.updatePreview();
       }
 
-      updatePreview() {
-        if (!this.previewEl) return;
+      updatePreview(): void {
+        if (this.previewEl == null) return;
         const text = currentText.trim();
         if (text.length > 0) {
           this.previewEl.removeClass('windrose-tle-preview-hidden');
@@ -272,18 +272,20 @@ function openNativeTextLabelEditor(app: App, options: OpenNativeTextLabelEditorO
           this.previewEl.empty();
           const textSpan = this.previewEl.createSpan({ text });
           const fontOption = getFontOption(currentFontFace);
-          textSpan.style.setProperty('font-size', `${currentFontSize}px`);
-          textSpan.style.setProperty('line-height', 'normal');
-          textSpan.style.setProperty('font-family', fontOption?.css || 'sans-serif');
-          textSpan.style.setProperty('color', currentColor);
-          textSpan.style.setProperty('opacity', String(currentOpacity));
+          textSpan.setCssStyles({
+            fontSize: `${currentFontSize}px`,
+            lineHeight: 'normal',
+            fontFamily: fontOption?.css ?? 'sans-serif',
+            color: currentColor,
+            opacity: String(currentOpacity),
+          });
         } else {
           this.previewEl.removeClass('windrose-tle-preview-visible');
           this.previewEl.addClass('windrose-tle-preview-hidden');
         }
       }
 
-      submit() {
+      submit(): void {
         const trimmed = currentText.trim();
         if (trimmed.length > 0 && trimmed.length <= 200) {
           this.submitted = true;
@@ -298,15 +300,15 @@ function openNativeTextLabelEditor(app: App, options: OpenNativeTextLabelEditorO
         }
       }
 
-      onClose() {
+      onClose(): void {
         if (this.clickOutsideHandler) {
           document.removeEventListener('mousedown', this.clickOutsideHandler);
           this.clickOutsideHandler = null;
         }
-        if (this.colorPickerContainerEl) {
+        if (this.colorPickerContainerEl != null) {
           preactRender(null, this.colorPickerContainerEl);
         }
-        if (!this.submitted && onCancel) {
+        if (!this.submitted) {
           onCancel();
         }
         this.contentEl.empty();
@@ -316,6 +318,7 @@ function openNativeTextLabelEditor(app: App, options: OpenNativeTextLabelEditorO
     modal.open();
     return true;
   } catch (e) {
+    // eslint-disable-next-line no-console
     console.warn('[Windrose] Failed to open native TextLabelEditor, falling back to Preact:', (e as Error).message);
     return false;
   }
@@ -347,7 +350,7 @@ const TextLabelEditor = ({
   customColors = [],
   onAddCustomColor,
   onDeleteCustomColor
-}: TextLabelEditorProps) => {
+}: TextLabelEditorProps): VNode => {
   const [text, setText] = useState(initialValue);
   const [fontSize, setFontSize] = useState(initialFontSize);
   const [fontSizeInput, setFontSizeInput] = useState(String(initialFontSize)); // Raw input for typing
@@ -373,7 +376,7 @@ const TextLabelEditor = ({
   }, []);
   
   // Handle keyboard shortcuts
-  const handleKeyDown = (e: KeyboardEvent) => {
+  const handleKeyDown = (e: KeyboardEvent): void => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSubmit();
@@ -383,7 +386,7 @@ const TextLabelEditor = ({
     }
   };
   
-  const handleSubmit = () => {
+  const handleSubmit = (): void => {
     const trimmed = text.trim();
     if (trimmed.length > 0 && trimmed.length <= 200) {
       const labelData = {
@@ -398,17 +401,17 @@ const TextLabelEditor = ({
   };
   
   // Prevent clicks inside modal from closing it
-  const handleModalClick = (e: MouseEvent) => {
+  const handleModalClick = (e: MouseEvent): void => {
     e.stopPropagation();
   };
 
   // Handle font size input change (no clamping during typing)
-  const handleFontSizeInputChange = (e: JSX.TargetedEvent<HTMLInputElement>) => {
+  const handleFontSizeInputChange = (e: JSX.TargetedEvent<HTMLInputElement>): void => {
     setFontSizeInput((e.target as HTMLInputElement).value);
   };
   
   // Handle font size blur - clamp and apply
-  const handleFontSizeBlur = () => {
+  const handleFontSizeBlur = (): void => {
     const value = parseInt(fontSizeInput, 10);
     if (!isNaN(value) && value > 0) {
       const clamped = Math.max(FONT_SIZE_MIN, Math.min(FONT_SIZE_MAX, value));
@@ -421,37 +424,37 @@ const TextLabelEditor = ({
   };
   
   // Handle font face change
-  const handleFontFaceChange = (e: JSX.TargetedEvent<HTMLSelectElement>) => {
+  const handleFontFaceChange = (e: JSX.TargetedEvent<HTMLSelectElement>): void => {
     setFontFace((e.target as HTMLSelectElement).value);
   };
 
   // Color picker handlers
-  const handleColorPickerToggle = (e: MouseEvent) => {
+  const handleColorPickerToggle = (e: MouseEvent): void => {
     e.stopPropagation();
     setIsColorPickerOpen(!isColorPickerOpen);
   };
 
-  const handleColorSelect = (newColor: HexColor) => {
+  const handleColorSelect = (newColor: HexColor): void => {
     setColor(newColor);
   };
   
-  const handleColorReset = () => {
+  const handleColorReset = (): void => {
     setColor(DEFAULT_TEXT_COLOR);
     setIsColorPickerOpen(false);
   };
   
-  const handleCloseColorPicker = () => {
+  const handleCloseColorPicker = (): void => {
     setIsColorPickerOpen(false);
   };
   
-  const handleAddCustomColor = (newColor: HexColor) => {
+  const handleAddCustomColor = (newColor: HexColor): void => {
     if (onAddCustomColor) {
       // Pass raw color string - parent handles wrapping into color object
       onAddCustomColor(newColor);
     }
   };
 
-  const handleDeleteCustomColor = (colorId: string) => {
+  const handleDeleteCustomColor = (colorId: string): void => {
     if (onDeleteCustomColor) {
       onDeleteCustomColor(colorId);
     }
@@ -461,7 +464,7 @@ const TextLabelEditor = ({
   useEffect((): (() => void) | undefined => {
     if (!isColorPickerOpen) return undefined;
 
-    const handleClickOutside = (e: Event) => {
+    const handleClickOutside = (e: Event): void => {
       // Check if click is inside the color picker or the color button
       const target = e.target as HTMLElement | null;
       const pickerElement = target?.closest('.dmt-color-picker');
@@ -469,7 +472,7 @@ const TextLabelEditor = ({
 
       if (!pickerElement && !buttonElement) {
         // Click is outside - save any pending color and close the picker
-        if (pendingCustomColorRef.current) {
+        if (pendingCustomColorRef.current != null && pendingCustomColorRef.current !== '') {
           handleAddCustomColor(pendingCustomColorRef.current);
           setColor(pendingCustomColorRef.current);
           pendingCustomColorRef.current = null;
@@ -619,7 +622,7 @@ const TextLabelEditor = ({
                 className="dmt-text-editor-preview"
                 style={{
                   fontSize: `${fontSize}px`,
-                  fontFamily: getFontOption(fontFace)?.css || 'sans-serif',
+                  fontFamily: getFontOption(fontFace)?.css ?? 'sans-serif',
                   color: color,
                   opacity: opacity,
                   textShadow: '-1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000'

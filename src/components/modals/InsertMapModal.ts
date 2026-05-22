@@ -11,7 +11,7 @@ export class InsertMapModal extends Modal {
     this.onInsert = onInsert;
   }
 
-  onOpen() {
+  onOpen(): void {
     const { contentEl } = this;
     contentEl.empty();
     contentEl.addClass('dmt-insert-map-modal');
@@ -77,13 +77,13 @@ export class InsertMapModal extends Modal {
     });
   }
 
-  private submit() {
+  private submit(): void {
     if (!this.mapType) return;
     this.onInsert(this.mapName, this.mapType);
     this.close();
   }
 
-  onClose() {
+  onClose(): void {
     this.contentEl.empty();
   }
 }

@@ -36,7 +36,7 @@ export default class WindrosePlugin extends Plugin {
   settings: Partial<PluginSettings> = {};
   dataFilePath: string = 'windrose-md-data.json';
 
-  async onload() {
+  async onload(): Promise<void> {
     await this.loadSettings();
     await this.migrateFromOldPlugin();
     this.initMcpNamespace();
@@ -46,15 +46,16 @@ export default class WindrosePlugin extends Plugin {
 
     setPlugin(this);
 
+    // eslint-disable-next-line no-console
     console.log('[Windrose] Plugin loaded, version:', this.manifest.version, 'data:', this.dataFilePath);
 
     this.registerMarkdownCodeBlockProcessor('windrose-map', (source, el, ctx) => {
       const config = parseYamlConfig(source);
-      const mapId = config.id || '';
-      const mapName = config.name || 'Unnamed Map';
-      const mapType = (config.type || 'grid') as MapType;
+      const mapId = config.id ?? '';
+      const mapName = config.name ?? 'Unnamed Map';
+      const mapType = (config.type ?? 'grid') as MapType;
 
-      if (!mapId) {
+      if (mapId === '') {
         el.createEl('div', {
           text: 'Windrose: missing required "ID" field in windrose-map block.',
           cls: 'windrose-error'
@@ -115,45 +116,47 @@ export default class WindrosePlugin extends Plugin {
     });
   }
 
-  onunload() {
+  onunload(): void {
     clearPlugin();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const w = window as any;
-    if (w.__windrose) {
+    if (w.__windrose != null) {
       w.__windrose.mcpInstances = null;
     }
   }
 
-  private initMcpNamespace() {
+  private initMcpNamespace(): void {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const w = window as any;
-    w.__windrose = w.__windrose || {};
+    w.__windrose = w.__windrose ?? {};
     w.__windrose.version = this.manifest.version;
   }
 
-  private async resolveDebugConfig() {
+  private async resolveDebugConfig(): Promise<void> {
     try {
       let content: string | null = null;
       const debugFile = this.app.vault.getAbstractFileByPath('WINDROSE-DEBUG.json');
-      if (debugFile) {
+      if (debugFile != null) {
         content = await this.app.vault.read(debugFile as import('obsidian').TFile);
       } else if (await this.app.vault.adapter.exists('WINDROSE-DEBUG.json')) {
         content = await this.app.vault.adapter.read('WINDROSE-DEBUG.json');
       }
 
-      if (content) {
-        const config = JSON.parse(content);
-        if (config.dataFilePath) {
+      if (content != null && content !== '') {
+        const config = JSON.parse(content) as Record<string, unknown>;
+        if (typeof config.dataFilePath === 'string' && config.dataFilePath !== '') {
           this.dataFilePath = config.dataFilePath;
+          // eslint-disable-next-line no-console
           console.log('[Windrose] Debug data path:', config.dataFilePath);
         }
       }
     } catch (e) {
+      // eslint-disable-next-line no-console
       console.warn('[Windrose] Failed to load WINDROSE-DEBUG.json:', e);
     }
   }
 
-  private async migrateFromOldPlugin() {
+  private async migrateFromOldPlugin(): Promise<void> {
     if (Object.keys(this.settings).length > 0) return;
 
     const oldDataPath = `${this.app.vault.configDir}/plugins/dungeon-map-tracker-settings/data.json`;
@@ -163,39 +166,43 @@ export default class WindrosePlugin extends Plugin {
       const content = await this.app.vault.adapter.read(oldDataPath);
       const oldSettings = JSON.parse(content);
 
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+
       const { version, ...importable } = oldSettings;
       this.settings = importable;
       await this.saveData(this.settings);
 
       new Notice('Windrose: settings imported from previous installation.', 10000);
+      // eslint-disable-next-line no-console
       console.log('[Windrose] Migrated settings from dungeon-map-tracker-settings');
     } catch (e) {
+      // eslint-disable-next-line no-console
       console.warn('[Windrose] Could not migrate old settings:', e);
     }
   }
 
-  private async resolveDataFilePath() {
+  private async resolveDataFilePath(): Promise<void> {
     if (this.dataFilePath !== 'windrose-md-data.json') return;
     if (await this.app.vault.adapter.exists(this.dataFilePath)) return;
 
     const allFiles = this.app.vault.getFiles();
     const dataFile = allFiles.find(f => f.name === 'windrose-md-data.json');
-    if (dataFile) {
+    if (dataFile != null) {
       this.dataFilePath = dataFile.path;
+      // eslint-disable-next-line no-console
       console.log('[Windrose] Auto-discovered data file at:', dataFile.path);
     }
   }
 
-  private checkForConflicts() {
+  private checkForConflicts(): void {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const plugins = (this.app as any).plugins?.plugins;
-    if (plugins?.['dungeon-map-tracker-settings']?._loaded) {
+    const plugins = (this.app as any).plugins?.plugins as Record<string, { _loaded?: boolean }> | undefined;
+    if (plugins?.['dungeon-map-tracker-settings']?._loaded === true) {
       new Notice(
         'Windrose: The old "Dungeon Map Tracker Settings" plugin is still active. ' +
         'Please disable it in Settings → Community Plugins to avoid conflicts.',
         20000
       );
+      // eslint-disable-next-line no-console
       console.warn('[Windrose] Old plugin dungeon-map-tracker-settings is still active');
     }
   }
@@ -212,16 +219,16 @@ export default class WindrosePlugin extends Plugin {
 
   private buildFogOfWar(cells: DungeonCell[], options: DungeonGenOptions): { enabled: boolean; foggedCells: Array<{ col: number; row: number }> } | null {
     const autoFogEnabled = options?.configOverrides?.autoFogEnabled;
-    if (!autoFogEnabled) return null;
+    if (autoFogEnabled !== true) return null;
 
     const stockingMeta = options?.stockingMetadata;
-    if (!stockingMeta?.rooms || !cells?.length) return null;
+    if (stockingMeta?.rooms == null || cells.length === 0) return null;
 
     const entryRoomId = stockingMeta.entryRoomId;
     const entryRoom = stockingMeta.rooms.find((r) => r.id === entryRoomId);
 
     const entryRoomCells = new Set<string>();
-    if (entryRoom) {
+    if (entryRoom != null) {
       for (let x = entryRoom.x; x < entryRoom.x + entryRoom.width; x++) {
         for (let y = entryRoom.y; y < entryRoom.y + entryRoom.height; y++) {
           if (entryRoom.shape === 'circle' && entryRoom.radius != null) {
@@ -254,7 +261,7 @@ export default class WindrosePlugin extends Plugin {
     return { enabled: true, foggedCells };
   }
 
-  private async saveDungeonToJson(mapId: string, mapName: string, cells: DungeonCell[], objects: unknown[], edges: unknown[], options: DungeonGenOptions) {
+  private async saveDungeonToJson(mapId: string, mapName: string, cells: DungeonCell[], objects: unknown[], edges: unknown[], options: DungeonGenOptions): Promise<void> {
     const SCHEMA_VERSION = 2;
 
     try {
@@ -262,12 +269,12 @@ export default class WindrosePlugin extends Plugin {
       let allData: { maps: Record<string, unknown> } = { maps: {} };
 
       const file = this.app.vault.getAbstractFileByPath(dataFilePath);
-      if (file) {
+      if (file != null) {
         const content = await this.app.vault.read(file as import('obsidian').TFile);
         allData = JSON.parse(content) as { maps: Record<string, unknown> };
       }
 
-      if (!allData.maps) allData.maps = {};
+      if (allData.maps == null) allData.maps = {};
 
       const layerId = 'layer-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
 
@@ -292,16 +299,16 @@ export default class WindrosePlugin extends Plugin {
         expandedState: false,
         generationSettings: {
           preset: options.preset,
-          configOverrides: options.configOverrides || {},
-          distancePerCell: options.distancePerCell || 5,
-          distanceUnit: options.distanceUnit || 'ft',
-          stockingMetadata: options.stockingMetadata || null
+          configOverrides: options.configOverrides ?? {},
+          distancePerCell: options.distancePerCell ?? 5,
+          distanceUnit: options.distanceUnit ?? 'ft',
+          stockingMetadata: options.stockingMetadata ?? null
         },
         settings: {
           useGlobalSettings: false,
           overrides: {
-            distancePerCellGrid: options.distancePerCell || 5,
-            distanceUnitGrid: options.distanceUnit || 'ft'
+            distancePerCellGrid: options.distancePerCell ?? 5,
+            distanceUnitGrid: options.distanceUnit ?? 'ft'
           }
         },
         uiPreferences: {
@@ -319,8 +326,8 @@ export default class WindrosePlugin extends Plugin {
           order: 0,
           visible: true,
           cells: cells,
-          edges: edges || [],
-          objects: objects || [],
+          edges: edges ?? [],
+          objects: objects ?? [],
           textLabels: [],
           fogOfWar: this.buildFogOfWar(cells, options)
         }],
@@ -335,26 +342,27 @@ export default class WindrosePlugin extends Plugin {
       allData.maps[mapId] = mapData;
 
       const jsonString = JSON.stringify(allData, null, 2);
-      if (file) {
+      if (file != null) {
         await this.app.vault.modify(file as import('obsidian').TFile, jsonString);
       } else {
         const dirPath = dataFilePath.substring(0, dataFilePath.lastIndexOf('/'));
-        if (dirPath) {
+        if (dirPath !== '') {
           try { await this.app.vault.createFolder(dirPath); } catch { /* exists */ }
         }
         await this.app.vault.create(dataFilePath, jsonString);
       }
     } catch (error) {
+      // eslint-disable-next-line no-console
       console.error('[Windrose] Failed to save dungeon:', error);
       throw error;
     }
   }
 
-  async loadSettings() {
-    this.settings = (await this.loadData()) || {};
+  async loadSettings(): Promise<void> {
+    this.settings = (await this.loadData() as Partial<PluginSettings> | null) ?? {};
   }
 
-  async saveSettings() {
+  async saveSettings(): Promise<void> {
     await this.saveData(this.settings);
     window.dispatchEvent(new CustomEvent('dmt-settings-changed'));
   }

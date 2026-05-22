@@ -7,7 +7,7 @@
  *
  * Overlapping closed curves with the same color+opacity are merged via
  * polygon union at render time, eliminating internal stroke borders.
- * The data model is never touched — union is purely visual.
+ * The data model is never touched â€” union is purely visual.
  */
 
 import type { Curve } from '#types/core/curve.types';
@@ -78,7 +78,7 @@ function buildPath2D(curve: Curve): Path2D {
   if (curve.innerRings) {
     for (let h = 0; h < curve.innerRings.length; h++) {
       const ring = curve.innerRings[h];
-      if (!ring || ring.length < 3) continue;
+      if (ring == null || ring.length < 3) continue;
       path.moveTo(ring[0][0], ring[0][1]);
       for (let i = 1; i < ring.length; i++) {
         path.lineTo(ring[i][0], ring[i][1]);
@@ -261,7 +261,7 @@ function findOverlapClusters(items: { bounds: AABB; index: number }[]): number[]
 }
 
 // =========================================================================
-// MultiPolygon → Path2D conversion
+// MultiPolygon â†’ Path2D conversion
 // =========================================================================
 
 function multiPolygonToPath2D(multiPoly: [number, number][][][]): Path2D {
@@ -285,7 +285,7 @@ function multiPolygonBounds(multiPoly: [number, number][][][]): AABB {
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   for (let p = 0; p < multiPoly.length; p++) {
     const ring = multiPoly[p][0]; // outer ring
-    if (!ring) continue;
+    if (ring == null) continue;
     for (let i = 0; i < ring.length; i++) {
       const x = ring[i][0], y = ring[i][1];
       if (x < minX) minX = x;
@@ -320,9 +320,9 @@ function preprocessCurves(curves: Curve[]): PreprocessResult {
 
   for (let i = 0; i < curves.length; i++) {
     const curve = curves[i];
-    if (!curve || !curve.start || !curve.segments) continue;
+    if (curve == null || curve.start == null || curve.segments == null) continue;
 
-    if (!curve.closed || !curve.color || curve.color === 'transparent') {
+    if (!curve.closed || curve.color == null || curve.color === '' || curve.color === 'transparent') {
       individualCurves.push({ curve, index: i });
       continue;
     }
@@ -349,16 +349,16 @@ function preprocessCurves(curves: Curve[]): PreprocessResult {
     for (const cluster of clusters) {
       if (cluster.length === 1) {
         const idx = cluster[0];
-        const item = group.find(g => g.index === idx)!;
-        individualCurves.push({ curve: item.curve, index: item.index });
+        const item = group.find(g => g.index === idx);
+        if (item != null) individualCurves.push({ curve: item.curve, index: item.index });
         continue;
       }
 
       // Build cache key from sorted curve IDs
       const clusterCurves = cluster.map(idx => {
-        const item = group.find(g => g.index === idx)!;
-        return item.curve;
-      });
+        const item = group.find(g => g.index === idx);
+        return item?.curve;
+      }).filter((c): c is Curve => c != null);
       const sortedIds = clusterCurves.map(c => c.id).sort().join(',');
 
       // Level 2: union cache by sorted IDs + ref validation
@@ -388,8 +388,8 @@ function preprocessCurves(curves: Curve[]): PreprocessResult {
       if (!result) {
         // Fallback to individual rendering
         for (const idx of cluster) {
-          const item = group.find(g => g.index === idx)!;
-          individualCurves.push({ curve: item.curve, index: item.index });
+          const item = group.find(g => g.index === idx);
+          if (item != null) individualCurves.push({ curve: item.curve, index: item.index });
         }
         continue;
       }
@@ -439,7 +439,7 @@ function renderCurves(
     gridConfig?: CurveGridConfig;
   } = {}
 ): void {
-  if (!curves || !Array.isArray(curves) || curves.length === 0) return;
+  if (curves == null || !Array.isArray(curves) || curves.length === 0) return;
 
   const { x: offsetX, y: offsetY, zoom } = viewState;
   const { opacity = 1, mergeIndex = null, gridConfig } = options;

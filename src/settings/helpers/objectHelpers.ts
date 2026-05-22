@@ -40,15 +40,15 @@ interface ResolvedCategory extends CategoryEntry {
 
 export const ObjectHelpers = {
   getResolved(settings: Record<string, unknown>): ResolvedObject[] {
-    const objectOverrides = (settings.objectOverrides || {}) as Record<string, Record<string, unknown>>;
-    const customObjects = (settings.customObjects || []) as ObjectEntry[];
+    const objectOverrides = (settings.objectOverrides ?? {}) as Record<string, Record<string, unknown>>;
+    const customObjects = (settings.customObjects ?? []) as ObjectEntry[];
 
     const resolvedBuiltIns = (BUILT_IN_OBJECTS as ObjectEntry[])
-      .filter(obj => !(objectOverrides[obj.id] as Record<string, unknown> | undefined)?.hidden)
+      .filter(obj => (objectOverrides[obj.id] as Record<string, unknown> | undefined)?.hidden !== true)
       .map((obj, index) => {
         const override = objectOverrides[obj.id];
         const defaultOrder = index * 10;
-        if (override) {
+        if (override != null) {
           const { hidden, ...overrideProps } = override;
           return {
             ...obj,
@@ -72,7 +72,7 @@ export const ObjectHelpers = {
   },
 
   getCategories(settings: Record<string, unknown>): ResolvedCategory[] {
-    const customCategories = (settings.customCategories || []) as CategoryEntry[];
+    const customCategories = (settings.customCategories ?? []) as CategoryEntry[];
 
     const resolvedBuiltIns = (BUILT_IN_CATEGORIES as CategoryEntry[]).map(c => ({
       ...c,
@@ -91,42 +91,42 @@ export const ObjectHelpers = {
   },
 
   getHidden(settings: Record<string, unknown>): ResolvedObject[] {
-    const objectOverrides = (settings.objectOverrides || {}) as Record<string, { hidden?: boolean }>;
+    const objectOverrides = (settings.objectOverrides ?? {}) as Record<string, { hidden?: boolean }>;
     return (BUILT_IN_OBJECTS as ObjectEntry[])
-      .filter(obj => objectOverrides[obj.id]?.hidden)
+      .filter(obj => objectOverrides[obj.id]?.hidden === true)
       .map(obj => ({ ...obj, order: 0, isBuiltIn: true, isHidden: true } as ResolvedObject));
   },
 
   getAllCategories(settings: Record<string, unknown>): (CategoryEntry & { isBuiltIn?: boolean; isCustom?: boolean })[] {
-    const customCategories = (settings.customCategories || []) as CategoryEntry[];
+    const customCategories = (settings.customCategories ?? []) as CategoryEntry[];
     const builtIn = (BUILT_IN_CATEGORIES as CategoryEntry[]).map(c => ({ ...c, isBuiltIn: true }));
     const custom = customCategories.map(c => ({ ...c, isCustom: true }));
     return [...builtIn, ...custom];
   },
 
   getDefaultIdOrder(categoryId: string, settings: Record<string, unknown>): string[] {
-    const objectOverrides = (settings.objectOverrides || {}) as Record<string, { hidden?: boolean }>;
+    const objectOverrides = (settings.objectOverrides ?? {}) as Record<string, { hidden?: boolean }>;
     return (BUILT_IN_OBJECTS as ObjectEntry[])
-      .filter(o => o.category === categoryId && !objectOverrides[o.id]?.hidden)
+      .filter(o => o.category === categoryId && objectOverrides[o.id]?.hidden !== true)
       .map(o => o.id);
   },
 
   renderObjectSymbol(obj: ObjectEntry, container: HTMLElement, app: App, options: { width?: string; height?: string } = {}): void {
     const { width = '20px', height = '20px' } = options;
 
-    if (obj.imagePath) {
+    if (obj.imagePath != null && obj.imagePath !== '') {
       const imgEl = container.createEl('img', {
         cls: 'dmt-settings-object-image windrose-object-image-fit',
-        attr: { src: app.vault.adapter.getResourcePath(obj.imagePath), alt: obj.label || '' }
+        attr: { src: app.vault.adapter.getResourcePath(obj.imagePath), alt: obj.label ?? '' }
       });
       imgEl.style.setProperty('width', width);
       imgEl.style.setProperty('height', height);
-    } else if (obj.iconClass && RPGAwesomeHelpers.isValid(obj.iconClass)) {
+    } else if (obj.iconClass != null && obj.iconClass !== '' && RPGAwesomeHelpers.isValid(obj.iconClass)) {
       const iconInfo = RPGAwesomeHelpers.getInfo(obj.iconClass);
       const iconSpan = container.createEl('span', { cls: 'ra' });
-      iconSpan.textContent = iconInfo?.char || '?';
+      iconSpan.textContent = iconInfo?.char ?? '?';
     } else {
-      container.textContent = obj.symbol || '?';
+      container.textContent = obj.symbol ?? '?';
     }
   }
 };

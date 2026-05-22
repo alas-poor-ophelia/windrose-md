@@ -63,8 +63,9 @@ function worldToScreen(
   canvasWidth: number,
   canvasHeight: number
 ): Point {
-  const { zoom, center } = mapData.viewState!;
-  const northDirection = mapData.northDirection || 0;
+  if (!mapData.viewState) return { x: 0, y: 0 };
+  const { zoom, center } = mapData.viewState;
+  const northDirection = mapData.northDirection ?? 0;
 
   let offsetX: number, offsetY: number;
   if (geometry instanceof GridGeometry) {
@@ -180,7 +181,7 @@ const ShapePreviewOverlay = ({
     edgeLine: '#ff9500',
     areaSelect: '#4a9eff'
   };
-  const strokeColor = colors[shapeType || ''] || '#00ff00';
+  const strokeColor = colors[shapeType ?? ''] ?? '#00ff00';
 
   let overlayContent: VNode | null = null;
   let dimensionText = '';
@@ -201,7 +202,7 @@ const ShapePreviewOverlay = ({
     let corners: { x: number; y: number }[];
 
     const isHex = !(geo instanceof GridGeometry);
-    if (isHex && geo.getCellCenter) {
+    if (isHex && geo.getCellCenter != null) {
       // Hex: compute axis-aligned bounding box from corner cell world centers,
       // then draw a clean rectangle (hex cells don't have rectangular corners)
       const cellCenters = [

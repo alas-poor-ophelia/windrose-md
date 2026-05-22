@@ -71,9 +71,9 @@ function buildObjectActions(
   mapData: MapData,
   options?: ObjectActionOptions
 ): SelectionAction[] {
-  const hasLinkedObject = !!(item.data?.linkedObject);
+  const hasLinkedObject = item.data?.linkedObject != null;
   const isNotePin = item.data?.type === 'note_pin';
-  const isFreeform = !!(item.data?.freeform);
+  const isFreeform = item.data?.freeform === true;
   const isHex = mapData.mapType === 'hex';
   const isResizing = options?.isResizeMode ?? false;
 
@@ -94,9 +94,9 @@ function buildObjectActions(
       invoke: handlers.onFreeformToggle, active: isFreeform, iconOnly: true
     },
     {
-      id: 'measure', label: options?.isMeasuring ? 'Hide Ruler' : 'Ruler',
+      id: 'measure', label: options?.isMeasuring === true ? 'Hide Ruler' : 'Ruler',
       icon: 'lucide-ruler', group: 'transform', visible: true,
-      invoke: handlers.onMeasureToggle!, active: !!options?.isMeasuring, iconOnly: true
+      invoke: handlers.onMeasureToggle ?? ((): void => {}), active: options?.isMeasuring === true, iconOnly: true
     },
 
     // Content group
@@ -111,7 +111,7 @@ function buildObjectActions(
 
     // Links group (expandable in toolbar, flat in context menu)
     {
-      id: 'linkNote', label: item.data?.linkedNote ? 'Edit Note Link' : 'Link Note',
+      id: 'linkNote', label: item.data?.linkedNote != null && item.data.linkedNote !== '' ? 'Edit Note Link' : 'Link Note',
       icon: 'lucide-scroll-text', group: 'links', visible: true, invoke: handlers.onLinkNote
     },
     {
@@ -140,9 +140,9 @@ function buildObjectActions(
 
     // Player group
     {
-      id: 'playerToggle', label: options?.isPlayer ? 'Remove Player' : 'Mark as Player',
+      id: 'playerToggle', label: options?.isPlayer === true ? 'Remove Player' : 'Mark as Player',
       icon: 'lucide-user', group: 'player', visible: true,
-      invoke: handlers.onPlayerToggle!, active: !!options?.isPlayer, iconOnly: true
+      invoke: handlers.onPlayerToggle ?? ((): void => {}), active: options?.isPlayer === true, iconOnly: true
     },
 
     // Danger group
@@ -204,7 +204,7 @@ function buildShapeOverlayActions(
   item: SelectedItem,
   handlers: ShapeOverlayHandlers
 ): SelectionAction[] {
-  const isFreeform = !!(item.data?.freeform);
+  const isFreeform = item.data?.freeform === true;
   return [
     {
       id: 'freeform', label: isFreeform ? 'Snap to Grid' : 'Freeform',

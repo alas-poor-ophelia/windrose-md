@@ -6,7 +6,7 @@
  * to suppress interior borders between same-color regions, creating a
  * visually unified painted area.
  *
- * This is a rendering-time operation only — no data is modified.
+ * This is a rendering-time operation only â€” no data is modified.
  */
 
 import type { Curve } from '#types/core/curve.types';
@@ -31,7 +31,7 @@ interface MergeCell {
 
 /** Spatial index for curve-cell visual merging */
 interface CurveCellMergeIndex {
-  /** Cell borders to suppress: key "x,y" → set of sides */
+  /** Cell borders to suppress: key "x,y" â†’ set of sides */
   cellBordersToSuppress: Map<string, Set<BorderSide>>;
   /** Same-color cell rects per curve index (world coordinates) */
   curveCellRects: Map<number, Array<{ x: number; y: number; w: number; h: number }>>;
@@ -79,11 +79,11 @@ function buildMergeIndex(
   const cellBordersToSuppress = new Map<string, Set<BorderSide>>();
   const curveCellRects = new Map<number, Array<{ x: number; y: number; w: number; h: number }>>();
 
-  if (!cells || cells.length === 0 || !curves || curves.length === 0) {
+  if (cells == null || cells.length === 0 || curves == null || curves.length === 0) {
     return { cellBordersToSuppress, curveCellRects };
   }
 
-  // Build cell color lookup: "x,y" → color
+  // Build cell color lookup: "x,y" â†’ color
   const cellColorMap = new Map<string, string>();
   for (let i = 0; i < cells.length; i++) {
     const c = cells[i];
@@ -95,7 +95,7 @@ function buildMergeIndex(
 
   for (let ci = 0; ci < curves.length; ci++) {
     const curve = curves[ci];
-    if (!curve || !curve.closed || !curve.color || curve.color === 'transparent') continue;
+    if (curve == null || !curve.closed || curve.color == null || curve.color === '' || curve.color === 'transparent') continue;
 
     const outerPoly = getCachedFlatPoly(curve);
     if (outerPoly.length < 3) continue;
@@ -106,7 +106,7 @@ function buildMergeIndex(
       innerPolys = curve.innerRings.filter(r => r.length >= 3) as Pt[][];
     }
 
-    // Compute bounding box of the curve polygon → grid coordinate range
+    // Compute bounding box of the curve polygon â†’ grid coordinate range
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     for (let p = 0; p < outerPoly.length; p++) {
       const px = outerPoly[p][0], py = outerPoly[p][1];
@@ -127,7 +127,7 @@ function buildMergeIndex(
       for (let gy = gridMinY; gy <= gridMaxY; gy++) {
         const key = `${gx},${gy}`;
         const cellColor = cellColorMap.get(key);
-        if (!cellColor) continue;
+        if (cellColor == null || cellColor === '') continue;
 
         // Color must match exactly
         if (cellColor !== curve.color) continue;
@@ -135,11 +135,11 @@ function buildMergeIndex(
         // Check geometric overlap
         if (!cellOverlapsCurve(gx, gy, cellSize, outerPoly, innerPolys)) continue;
 
-        // This cell overlaps a same-color curve — record the cell rect
+        // This cell overlaps a same-color curve â€” record the cell rect
         if (!curveCellRects.has(ci)) {
           curveCellRects.set(ci, []);
         }
-        curveCellRects.get(ci)!.push({
+        curveCellRects.get(ci)?.push({
           x: gx * cellSize,
           y: gy * cellSize,
           w: cellSize,
@@ -177,7 +177,7 @@ function buildMergeIndex(
               if (!cellBordersToSuppress.has(key)) {
                 cellBordersToSuppress.set(key, new Set());
               }
-              cellBordersToSuppress.get(key)!.add(edge.side);
+              cellBordersToSuppress.get(key)?.add(edge.side);
             }
           }
         }

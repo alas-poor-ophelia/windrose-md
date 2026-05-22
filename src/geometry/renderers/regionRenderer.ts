@@ -8,7 +8,7 @@
 import type { Point } from '#types/core/geometry.types';
 import type { Region } from '#types/core/map.types';
 
-// ── Types ────────────────────────────────────────────────────────────
+// â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface HexGeometryLike {
   hexSize: number;
@@ -30,7 +30,7 @@ interface RegionRenderOptions {
   foggedCells?: Set<string>;
 }
 
-// ── Helpers ──────────────────────────────────────────────────────────
+// â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function hexKey(q: number, r: number): string {
   return `${q},${r}`;
@@ -76,7 +76,7 @@ function computeBoundaryEdges(
   return edges;
 }
 
-// ── Render Functions ─────────────────────────────────────────────────
+// â”€â”€ Render Functions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function renderRegionFill(
   ctx: CanvasRenderingContext2D,
@@ -161,7 +161,7 @@ function renderRegionLabel(
 
   // Only show label when enough hexes are revealed
   if (options.foggedCells) {
-    const visibleCount = region.hexes.filter(h => !options.foggedCells!.has(hexKey(h.x, h.y))).length;
+    const visibleCount = region.hexes.filter(h => !(options.foggedCells?.has(hexKey(h.x, h.y)) ?? false)).length;
     if (visibleCount / region.hexes.length < 0.5) return;
   }
 
@@ -197,7 +197,7 @@ function renderRegionLabel(
   ctx.fillText(region.name, screen.screenX, screen.screenY);
 }
 
-// ── Hit Detection ───────────────────────────────────────────────────
+// â”€â”€ Hit Detection â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /**
  * Get the world-space position of a region's label.
@@ -213,7 +213,7 @@ function getRegionLabelWorldPosition(
     : computeCentroid(region.hexes, geometry);
 }
 
-// ── Main Entry Point ─────────────────────────────────────────────────
+// â”€â”€ Main Entry Point â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /**
  * Render all regions for a hex map.
@@ -226,7 +226,7 @@ function renderRegions(
   viewState: ViewState,
   options: RegionRenderOptions = {}
 ): void {
-  if (!regions || regions.length === 0) return;
+  if (regions == null || regions.length === 0) return;
 
   // Sort by order (lower = behind)
   const sorted = [...regions].sort((a, b) => a.order - b.order);

@@ -146,10 +146,10 @@ function getMultiObjectScale(objectCount: number): number {
  * Get objects in a specific cell
  */
 function getObjectsInCell(objects: MapObject[], x: number, y: number): MapObject[] {
-  if (!objects || !Array.isArray(objects)) return [];
+  if (objects == null || !Array.isArray(objects)) return [];
 
   return objects.filter(obj =>
-    obj.position &&
+    obj.position != null &&
     obj.position.x === x &&
     obj.position.y === y
   );

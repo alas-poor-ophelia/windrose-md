@@ -56,11 +56,7 @@ function getActiveLayer(mapData: MapData | null | undefined): MapLayer {
       fogOfWar: null
     };
   }
-  const layer = mapData.layers.find(l => l.id === mapData.activeLayerId) || mapData.layers[0];
-  // Ensure curves array exists (backward compat for pre-curves data)
-  if (!layer.curves) {
-    layer.curves = [];
-  }
+  const layer = mapData.layers.find(l => l.id === mapData.activeLayerId) ?? mapData.layers[0];
   return layer;
 }
 
@@ -121,8 +117,6 @@ function getLayerBelow(mapData: MapData | null | undefined, layerId: LayerId): M
  * Update a specific layer's data (immutable)
  */
 function updateLayer(mapData: MapData, layerId: LayerId, updates: LayerUpdate): MapData {
-  if (!mapData?.layers) return mapData;
-  
   return {
     ...mapData,
     layers: mapData.layers.map(layer =>
@@ -135,7 +129,7 @@ function updateLayer(mapData: MapData, layerId: LayerId, updates: LayerUpdate): 
  * Update the active layer's data (convenience function)
  */
 function updateActiveLayer(mapData: MapData, updates: LayerUpdate): MapData {
-  if (!mapData?.activeLayerId) return mapData;
+  if (mapData.activeLayerId == null || mapData.activeLayerId === '') return mapData;
   return updateLayer(mapData, mapData.activeLayerId, updates);
 }
 
@@ -145,6 +139,7 @@ function updateActiveLayer(mapData: MapData, updates: LayerUpdate): MapData {
 function setActiveLayer(mapData: MapData, layerId: LayerId): MapData {
   // Verify the layer exists
   if (!getLayerById(mapData, layerId)) {
+    // eslint-disable-next-line no-console
     console.warn(`Cannot set active layer: layer ${layerId} not found`);
     return mapData;
   }
@@ -159,8 +154,6 @@ function setActiveLayer(mapData: MapData, layerId: LayerId): MapData {
  * Add a new layer to the map
  */
 function addLayer(mapData: MapData, name: string | null = null): MapData {
-  if (!mapData?.layers) return mapData;
-  
   // Calculate new order (one higher than current max)
   const maxOrder = mapData.layers.length > 0
     ? Math.max(...mapData.layers.map(l => l.order))
@@ -168,7 +161,7 @@ function addLayer(mapData: MapData, name: string | null = null): MapData {
   
   const newLayer: MapLayer = {
     id: generateLayerId(),
-    name: name || String(mapData.layers.length + 1),
+    name: name ?? String(mapData.layers.length + 1),
     order: maxOrder + 1,
     visible: true,
     cells: [],
@@ -190,10 +183,9 @@ function addLayer(mapData: MapData, name: string | null = null): MapData {
  * Remove a layer from the map (prevents removing last layer)
  */
 function removeLayer(mapData: MapData, layerId: LayerId): MapData {
-  if (!mapData?.layers) return mapData;
-  
   // Prevent removing the last layer
   if (mapData.layers.length <= 1) {
+    // eslint-disable-next-line no-console
     console.warn('Cannot remove last layer');
     return mapData;
   }
@@ -221,10 +213,10 @@ function removeLayer(mapData: MapData, layerId: LayerId): MapData {
  * @param mode 'all' copies everything; 'mapOnly' copies cells, curves, edges, tiles only
  */
 function cloneLayer(mapData: MapData, layerId: LayerId, mode: 'all' | 'mapOnly'): MapData {
-  if (!mapData?.layers) return mapData;
 
   const sourceLayer = getLayerById(mapData, layerId);
   if (!sourceLayer) {
+    // eslint-disable-next-line no-console
     console.warn(`Cannot clone: layer ${layerId} not found`);
     return mapData;
   }
@@ -249,17 +241,17 @@ function cloneLayer(mapData: MapData, layerId: LayerId, mode: 'all' | 'mapOnly')
     name: `Copy of ${sourceName}`,
     order: cloneOrder,
     visible: true,
-    cells: deepCopy(sourceLayer.cells || []),
-    curves: deepCopy(sourceLayer.curves || []),
-    edges: deepCopy(sourceLayer.edges || []),
-    objects: mode === 'all' ? deepCopy(sourceLayer.objects || []) : [],
-    textLabels: mode === 'all' ? deepCopy(sourceLayer.textLabels || []) : [],
+    cells: deepCopy(sourceLayer.cells),
+    curves: deepCopy(sourceLayer.curves),
+    edges: deepCopy(sourceLayer.edges),
+    objects: mode === 'all' ? deepCopy(sourceLayer.objects) : [],
+    textLabels: mode === 'all' ? deepCopy(sourceLayer.textLabels) : [],
     fogOfWar: mode === 'all' && sourceLayer.fogOfWar ? deepCopy(sourceLayer.fogOfWar) : null,
     tiles: deepCopy(sourceLayer.tiles || []),
   };
 
   if (mode === 'all') {
-    if (sourceLayer.icon) clonedLayer.icon = sourceLayer.icon;
+    if (sourceLayer.icon != null && sourceLayer.icon !== '') clonedLayer.icon = sourceLayer.icon;
     if (sourceLayer.showLayerBelow !== undefined) clonedLayer.showLayerBelow = sourceLayer.showLayerBelow;
     if (sourceLayer.layerBelowOpacity !== undefined) clonedLayer.layerBelowOpacity = sourceLayer.layerBelowOpacity;
   }
@@ -275,13 +267,12 @@ function cloneLayer(mapData: MapData, layerId: LayerId, mode: 'all' | 'mapOnly')
  * Reorder layers by moving a layer to a new position
  */
 function reorderLayers(mapData: MapData, layerId: LayerId, newIndex: number): MapData {
-  if (!mapData?.layers) return mapData;
-  
   // Get layers sorted by current order
   const sortedLayers = getLayersOrdered(mapData);
   const currentIndex = sortedLayers.findIndex(l => l.id === layerId);
   
   if (currentIndex === -1) {
+    // eslint-disable-next-line no-console
     console.warn(`Cannot reorder: layer ${layerId} not found`);
     return mapData;
   }
@@ -320,6 +311,7 @@ function createBackup<T>(mapData: T): T | null {
   try {
     return JSON.parse(JSON.stringify(mapData));
   } catch (error) {
+    // eslint-disable-next-line no-console
     console.error('[layerAccessor] Failed to create backup:', error);
     return null;
   }
@@ -331,12 +323,7 @@ function createBackup<T>(mapData: T): T | null {
 function validateMigration(originalData: LegacyMapData, migratedData: MapData): MigrationValidation {
   const errors: string[] = [];
   
-  // Check that layers array exists and has content
-  if (!migratedData.layers || !Array.isArray(migratedData.layers)) {
-    errors.push('Migration failed: layers array missing');
-    return { valid: false, errors };
-  }
-  
+  // Check that layers array has content
   if (migratedData.layers.length === 0) {
     errors.push('Migration failed: layers array is empty');
     return { valid: false, errors };
@@ -350,15 +337,15 @@ function validateMigration(originalData: LegacyMapData, migratedData: MapData): 
   }
   
   // Verify data was actually copied (not just empty arrays when original had data)
-  const originalCells = originalData.cells || [];
-  const originalObjects = originalData.objects || [];
-  const originalTextLabels = originalData.textLabels || [];
-  const originalEdges = originalData.edges || [];
-  
-  const layerCells = layer.cells || [];
-  const layerObjects = layer.objects || [];
-  const layerTextLabels = layer.textLabels || [];
-  const layerEdges = layer.edges || [];
+  const originalCells = originalData.cells ?? [];
+  const originalObjects = originalData.objects ?? [];
+  const originalTextLabels = originalData.textLabels ?? [];
+  const originalEdges = originalData.edges ?? [];
+
+  const layerCells = layer.cells;
+  const layerObjects = layer.objects;
+  const layerTextLabels = layer.textLabels;
+  const layerEdges = layer.edges;
   
   // Check cell count matches
   if (originalCells.length !== layerCells.length) {
@@ -397,15 +384,17 @@ function validateMigration(originalData: LegacyMapData, migratedData: MapData): 
  */
 function migrateToLayerSchema(legacyMapData: LegacyMapData): MapData | LegacyMapData {
   // Already migrated? Return as-is
-  if ((legacyMapData.schemaVersion ?? 0) >= SCHEMA_VERSION && (legacyMapData as MapData).layers) {
+  if ((legacyMapData.schemaVersion ?? 0) >= SCHEMA_VERSION && 'layers' in legacyMapData) {
     return legacyMapData as MapData;
   }
   
+  // eslint-disable-next-line no-console
   console.log('[layerAccessor] Starting migration to schema version', SCHEMA_VERSION);
-  
+
   // Create backup BEFORE any modifications
   const backup = createBackup(legacyMapData);
   if (!backup) {
+    // eslint-disable-next-line no-console
     console.error('[layerAccessor] CRITICAL: Could not create backup, aborting migration');
     return legacyMapData; // Return original unchanged
   }
@@ -429,6 +418,7 @@ function migrateToLayerSchema(legacyMapData: LegacyMapData): MapData | LegacyMap
       ? [...legacyMapData.textLabels] 
       : [];
     
+    // eslint-disable-next-line no-console
     console.log('[layerAccessor] Migrating data:', {
       cells: cellsData.length,
       edges: edgesData.length,
@@ -464,7 +454,9 @@ function migrateToLayerSchema(legacyMapData: LegacyMapData): MapData | LegacyMap
     const validation = validateMigration(backup, migratedData);
     
     if (!validation.valid) {
+      // eslint-disable-next-line no-console
       console.error('[layerAccessor] Migration validation failed:', validation.errors);
+      // eslint-disable-next-line no-console
       console.error('[layerAccessor] Restoring from backup');
       return backup; // Return the backup (original data)
     }
@@ -480,12 +472,15 @@ function migrateToLayerSchema(legacyMapData: LegacyMapData): MapData | LegacyMap
     // Store migration metadata for debugging
     cleanedData._migratedAt = new Date().toISOString();
     
+    // eslint-disable-next-line no-console
     console.log('[layerAccessor] Migration successful to schema version', SCHEMA_VERSION);
-    
+
     return cleanedData as MapData;
-    
+
   } catch (error) {
+    // eslint-disable-next-line no-console
     console.error('[layerAccessor] Migration failed with error:', error);
+    // eslint-disable-next-line no-console
     console.error('[layerAccessor] Restoring from backup');
     return backup; // Return the backup (original data)
   }
@@ -498,18 +493,19 @@ function needsMigration(mapData: MapData | LegacyMapData | null | undefined): bo
   if (!mapData) return false;
   
   // Needs migration if no schemaVersion, or version is old, or no layers array
-  const needsIt = !mapData.schemaVersion || 
-                  mapData.schemaVersion < SCHEMA_VERSION || 
-                  !(mapData as MapData).layers;
-  
+  const needsIt = mapData.schemaVersion == null ||
+                  mapData.schemaVersion < SCHEMA_VERSION ||
+                  !('layers' in mapData);
+
   if (needsIt) {
+    // eslint-disable-next-line no-console
     console.log('[layerAccessor] Map needs migration:', {
-      currentVersion: mapData.schemaVersion || 'none',
+      currentVersion: mapData.schemaVersion ?? 'none',
       targetVersion: SCHEMA_VERSION,
-      hasLayers: !!(mapData as MapData).layers
+      hasLayers: 'layers' in mapData
     });
   }
-  
+
   return needsIt;
 }
 
@@ -637,11 +633,7 @@ function revealRectangle(layer: MapLayer, startCol: number, startRow: number, en
  */
 function fogAll(layer: MapLayer, bounds: FogBounds): MapLayer {
   if (!layer.fogOfWar) return layer;
-  if (!bounds || bounds.maxCol === undefined || bounds.maxRow === undefined) {
-    console.warn('[fogAll] Invalid bounds provided');
-    return layer;
-  }
-  
+
   const allCells: FoggedCell[] = [];
   for (let col = 0; col < bounds.maxCol; col++) {
     for (let row = 0; row < bounds.maxRow; row++) {
@@ -664,8 +656,9 @@ function fogAll(layer: MapLayer, bounds: FogBounds): MapLayer {
  */
 function fogPaintedCells(layer: MapLayer, geometry: IGeometry): MapLayer {
   if (!layer.fogOfWar) return layer;
-  if (!layer.cells || layer.cells.length === 0) return layer;
-  if (!geometry || typeof geometry.cellToOffsetCoords !== 'function') {
+  if (layer.cells.length === 0) return layer;
+  if (typeof geometry.cellToOffsetCoords !== 'function') {
+    // eslint-disable-next-line no-console
     console.warn('[fogPaintedCells] Invalid geometry provided');
     return layer;
   }
@@ -744,7 +737,7 @@ function setFogVisibility(layer: MapLayer, enabled: boolean): MapLayer {
  * Check if a layer has any fog data (regardless of visibility)
  */
 function hasFogData(layer: MapLayer): boolean {
-  return !!(layer.fogOfWar && layer.fogOfWar.foggedCells && layer.fogOfWar.foggedCells.length > 0);
+  return layer.fogOfWar != null && layer.fogOfWar.foggedCells.length > 0;
 }
 
 /**

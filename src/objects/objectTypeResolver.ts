@@ -89,9 +89,9 @@ interface ValidationResult {
 
 /** Resolve object settings: per-map set -> global -> defaults */
 function resolveObjectSettings(mapType: MapType, objectSetId?: string | null): ObjectSettings {
-  if (objectSetId) {
+  if (objectSetId != null && objectSetId !== '') {
     const setSettings = getObjectSettingsForSet(objectSetId, mapType);
-    if (setSettings) return setSettings;
+    if (setSettings != null) return setSettings;
   }
   return getObjectSettings(mapType);
 }
@@ -131,7 +131,7 @@ function hasImagePath(objectType: ObjectTypeDefinition | null | undefined): bool
  * Handles imagePath (custom image), iconClass (RPGAwesome), and symbol (Unicode) with fallback
  */
 function getRenderChar(objectType: ObjectTypeDefinition | null | undefined): RenderChar {
-  if (!objectType) {
+  if (objectType == null) {
     return { char: '?', isIcon: false };
   }
 
@@ -142,16 +142,17 @@ function getRenderChar(objectType: ObjectTypeDefinition | null | undefined): Ren
 
   // If iconClass is set, try to get the icon character
   if (hasIconClass(objectType)) {
-    const iconChar = getIconChar(objectType.iconClass!);
-    if (iconChar) {
+    const iconChar = getIconChar(objectType.iconClass ?? '');
+    if (iconChar != null && iconChar !== '') {
       return { char: iconChar, isIcon: true };
     }
     // iconClass was set but invalid - fall through to symbol/fallback
+    // eslint-disable-next-line no-console
     console.warn(`[objectTypeResolver] Invalid iconClass: ${objectType.iconClass}`);
   }
 
   // Use symbol if available
-  if (objectType.symbol) {
+  if (objectType.symbol != null && objectType.symbol !== '') {
     return { char: objectType.symbol, isIcon: false };
   }
 
@@ -163,7 +164,7 @@ function getRenderChar(objectType: ObjectTypeDefinition | null | undefined): Ren
  * Validate an iconClass value
  */
 function isValidIconClass(iconClass: string | null | undefined): boolean {
-  if (!iconClass || typeof iconClass !== 'string') return false;
+  if (iconClass == null || typeof iconClass !== 'string' || iconClass === '') return false;
   return Object.prototype.hasOwnProperty.call(RA_ICONS, iconClass);
 }
 
@@ -189,11 +190,11 @@ function getResolvedObjectTypes(mapType: MapType = 'grid', objectSetId?: string 
   // Apply overrides to built-ins, filter out hidden ones
   // Built-in objects get default order based on their index in OBJECT_TYPES
   const resolvedBuiltIns = OBJECT_TYPES
-    .filter(obj => !objectOverrides[obj.id]?.hidden)
+    .filter(obj => objectOverrides[obj.id]?.hidden !== true)
     .map((obj, index) => {
       const override = objectOverrides[obj.id];
       const defaultOrder = index * 10; // Leave gaps for reordering
-      if (override) {
+      if (override != null) {
         // Merge override properties (excluding 'hidden' which is handled above)
         const { hidden, ...overrideProps } = override;
         return {
@@ -260,7 +261,7 @@ function getHiddenObjects(mapType: MapType = 'grid', objectSetId?: string | null
   const { objectOverrides = {} } = settings;
 
   return OBJECT_TYPES
-    .filter(obj => objectOverrides[obj.id]?.hidden)
+    .filter(obj => objectOverrides[obj.id]?.hidden === true)
     .map(obj => ({
       ...obj,
       isBuiltIn: true,
@@ -274,7 +275,7 @@ function getHiddenObjects(mapType: MapType = 'grid', objectSetId?: string | null
  */
 function getObjectType(typeId: string | null | undefined, mapType: MapType = 'grid', objectSetId?: string | null): ObjectTypeDefinition {
   // Handle null/undefined
-  if (!typeId) {
+  if (typeId == null || typeId === '') {
     return UNKNOWN_OBJECT_FALLBACK;
   }
 
@@ -290,14 +291,14 @@ function getObjectType(typeId: string | null | undefined, mapType: MapType = 'gr
   const builtIn = OBJECT_TYPES.find(t => t.id === typeId);
   if (builtIn) {
     const override = objectOverrides[typeId];
-    if (override) {
+    if (override != null) {
       const { hidden, ...overrideProps } = override;
       return {
         ...builtIn,
         ...overrideProps,
         isBuiltIn: true,
         isModified: true,
-        isHidden: hidden || false
+        isHidden: hidden === true
       };
     }
     return {
@@ -319,7 +320,7 @@ function getObjectType(typeId: string | null | undefined, mapType: MapType = 'gr
 
   // Check internal types (valid for programmatic use, not shown in sidebar)
   const internal = INTERNAL_TYPES[typeId];
-  if (internal) return internal;
+  if (internal != null) return internal;
 
   // Not found - return fallback
   return UNKNOWN_OBJECT_FALLBACK;
@@ -330,7 +331,7 @@ function getObjectType(typeId: string | null | undefined, mapType: MapType = 'gr
  */
 function objectTypeExists(typeId: string, mapType: MapType = 'grid', objectSetId?: string | null): boolean {
   const objType = getObjectType(typeId, mapType, objectSetId);
-  return objType.id !== '__unknown__' && !objType.isHidden;
+  return objType.id !== '__unknown__' && objType.isHidden !== true;
 }
 
 /**
@@ -361,7 +362,7 @@ function generateCustomCategoryId(): string {
  * Returns true if the symbol is valid (non-empty, reasonable length)
  */
 function isValidSymbol(symbol: string | null | undefined): boolean {
-  if (!symbol || typeof symbol !== 'string') return false;
+  if (symbol == null || typeof symbol !== 'string' || symbol === '') return false;
   // Allow 1-4 characters (some emoji are multi-codepoint)
   const trimmed = symbol.trim();
   return trimmed.length >= 1 && trimmed.length <= 8;
@@ -382,28 +383,28 @@ function isValidImagePath(imagePath: string | null | undefined): boolean {
 function validateObjectDefinition(obj: Partial<ObjectTypeDefinition>): ValidationResult {
   const errors: string[] = [];
 
-  const hasSymbol = obj.symbol && isValidSymbol(obj.symbol);
-  const hasIcon = obj.iconClass && isValidIconClass(obj.iconClass);
-  const hasImage = obj.imagePath && isValidImagePath(obj.imagePath);
+  const hasSymbol = obj.symbol != null && obj.symbol !== '' && isValidSymbol(obj.symbol);
+  const hasIcon = obj.iconClass != null && obj.iconClass !== '' && isValidIconClass(obj.iconClass);
+  const hasImage = obj.imagePath != null && obj.imagePath !== '' && isValidImagePath(obj.imagePath);
 
   // Must have at least one of symbol, iconClass, or imagePath
   if (!hasSymbol && !hasIcon && !hasImage) {
-    if (obj.iconClass && !hasIcon) {
+    if (obj.iconClass != null && obj.iconClass !== '' && !hasIcon) {
       errors.push('Invalid icon selection');
-    } else if (obj.symbol && !hasSymbol) {
+    } else if (obj.symbol != null && obj.symbol !== '' && !hasSymbol) {
       errors.push('Symbol must be 1-8 characters');
-    } else if (obj.imagePath && !hasImage) {
+    } else if (obj.imagePath != null && obj.imagePath !== '' && !hasImage) {
       errors.push('Invalid image path');
     } else {
       errors.push('Either a symbol, icon, or image is required');
     }
   }
 
-  if (!obj.label || typeof obj.label !== 'string' || obj.label.trim().length === 0) {
+  if (obj.label == null || typeof obj.label !== 'string' || obj.label.trim().length === 0) {
     errors.push('Label is required');
   }
 
-  if (!obj.category || typeof obj.category !== 'string') {
+  if (obj.category == null || typeof obj.category !== 'string') {
     errors.push('Category is required');
   }
 

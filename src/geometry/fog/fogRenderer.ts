@@ -101,7 +101,7 @@ function createFogFillStyle(
   let fillStyle: string | CanvasPattern = fowColor;
   const useGlobalAlpha = true;
 
-  if (fowImagePath) {
+  if (fowImagePath != null && fowImagePath !== '') {
     const fowImage = getCachedImage(fowImagePath);
     if (fowImage && fowImage.complete && fowImage.naturalWidth > 0) {
       try {
@@ -168,7 +168,7 @@ function setupFogCanvas(
 
   fogCtx.fillStyle = fowColor;
 
-  if (fowImagePath) {
+  if (fowImagePath != null && fowImagePath !== '') {
     const fowImage = getCachedImage(fowImagePath);
     if (fowImage && fowImage.complete && fowImage.naturalWidth > 0) {
       const fogPattern = fogCtx.createPattern(fowImage, 'repeat');
@@ -241,7 +241,7 @@ function renderFog(
   offsetToAxial: (col: number, row: number, orientation: string) => { q: number; r: number },
   axialToOffset: (q: number, r: number, orientation: string) => { col: number; row: number }
 ): void {
-  if (!fow.enabled || !fow.foggedCells?.length) return;
+  if (!fow.enabled || fow.foggedCells == null || fow.foggedCells.length === 0) return;
 
   const { ctx, fogCanvas, width, height, offsetX, offsetY, zoom, scaledSize, northDirection } = context;
   const { fowColor, fowOpacity, fowImagePath, fowBlurEnabled, fowBlurFactor } = settings;

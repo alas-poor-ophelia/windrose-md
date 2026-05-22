@@ -30,8 +30,8 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      // Allow importing types from the types directory
       "#types": path.resolve(__dirname, "types"),
+      obsidian: path.resolve(__dirname, "tests/unit/__mocks__/obsidian.ts"),
     },
   },
 });

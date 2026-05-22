@@ -17,6 +17,7 @@
 // Structural object types that should be preserved during objects-only reroll
 
 import type { Cell, MapObject, Edge } from '#types/index';
+import type { VNode } from 'preact';
 
 import { useState } from 'preact/hooks';
 import { useMapState, useMapOperations } from '../../context/MapContext';
@@ -30,31 +31,31 @@ const STRUCTURAL_TYPES = new Set([
   'stairs-up', 'stairs-down'
 ]);
 
-const RerollDungeonButton = () => {
+const RerollDungeonButton = (): VNode | null => {
   const { mapData } = useMapState();
   const { onCellsChange, onObjectsChange, onEdgesChange } = useMapOperations();
 
   const [showConfirm, setShowConfirm] = useState(false);
 
   // Don't render if no generation settings
-  if (!mapData?.generationSettings?.preset) {
+  if (mapData?.generationSettings?.preset == null || mapData.generationSettings.preset === '') {
     return null;
   }
 
   const settings = mapData.generationSettings;
   const hasStockingMetadata = Boolean(settings.stockingMetadata?.rooms);
 
-  const handleClick = () => {
+  const handleClick = (): void => {
     setShowConfirm(true);
   };
 
-  const handleRerollAll = () => {
+  const handleRerollAll = (): void => {
     const result = generateDungeon(settings.preset, undefined, settings.configOverrides || {});
     const stockResult = stockDungeon(
       result.metadata.rooms,
       result.metadata.corridorResult,
       result.metadata.doorPositions,
-      result.metadata.style || 'classic',
+      result.metadata.style ?? 'classic',
       {
         objectDensity: settings.configOverrides?.objectDensity ?? 1.0,
         monsterWeight: settings.configOverrides?.monsterWeight,
@@ -73,11 +74,11 @@ const RerollDungeonButton = () => {
 
     onCellsChange(result.cells as Cell[], false);
     onObjectsChange(allObjects as MapObject[], false);
-    onEdgesChange((result.edges || []) as Edge[], false);
+    onEdgesChange((result.edges ?? []) as Edge[], false);
     setShowConfirm(false);
   };
 
-  const handleRerollObjectsOnly = () => {
+  const handleRerollObjectsOnly = (): void => {
     const meta = settings.stockingMetadata;
     if (!meta?.rooms) {
       setShowConfirm(false);
@@ -100,7 +101,7 @@ const RerollDungeonButton = () => {
       meta.rooms as RoomLike[],
       meta.corridorResult as CorridorResult,
       occupiedPositions,
-      meta.style || 'classic',
+      meta.style ?? 'classic',
       {
         objectDensity: settings.configOverrides?.objectDensity ?? 1.0,
         monsterWeight: settings.configOverrides?.monsterWeight,
@@ -121,11 +122,11 @@ const RerollDungeonButton = () => {
     setShowConfirm(false);
   };
 
-  const handleCancel = () => {
+  const handleCancel = (): void => {
     setShowConfirm(false);
   };
 
-  const styleName = settings.configOverrides?.style || 'classic';
+  const styleName = settings.configOverrides?.style ?? 'classic';
 
   return (
     <>

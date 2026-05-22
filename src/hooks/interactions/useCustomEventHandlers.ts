@@ -109,26 +109,28 @@ function useCustomEventHandlers({
 
       if (targetMapId !== mapId) return;
 
-      if (mapData?.layers && layerId) {
+      if (mapData?.layers != null && layerId != null && layerId !== '') {
         const targetLayer = mapData.layers.find((l: { id: string }) => l.id === layerId);
-        if (targetLayer && mapData.activeLayerId !== layerId) {
+        if (targetLayer != null && mapData.activeLayerId !== layerId) {
           handleLayerSelect(layerId);
         }
       }
 
       const DEEP_LINK_ZOOM = 1.175;
-      const effectiveZoom = (zoom && zoom > 0) ? zoom : DEEP_LINK_ZOOM;
+      const effectiveZoom = (zoom != null && zoom > 0) ? zoom : DEEP_LINK_ZOOM;
 
       let centerX = x;
       let centerY = y;
       if (mapData?.mapType === 'hex' && geometry) {
-        const worldCoords = (geometry as ExtendedGeometry).hexToWorld!(x, y);
-        if (worldCoords) {
+        const hexToWorld = (geometry as ExtendedGeometry).hexToWorld;
+        const worldCoords = hexToWorld?.(x, y);
+        if (worldCoords != null) {
           centerX = worldCoords.worldX;
           centerY = worldCoords.worldY;
         }
       }
 
+      // eslint-disable-next-line no-console
       console.log('[Windrose:DL] navigate handler:', {
         eventXY: { x, y },
         resolvedCenter: { x: centerX, y: centerY },
@@ -140,6 +142,7 @@ function useCustomEventHandlers({
 
       updateMapData((currentMapData: MapData) => {
         if (!currentMapData.viewState) return currentMapData;
+        // eslint-disable-next-line no-console
         console.log('[Windrose:DL] updateMapData:', {
           oldCenter: currentMapData.viewState.center,
           newCenter: { x: centerX, y: centerY },
@@ -156,7 +159,7 @@ function useCustomEventHandlers({
         };
       });
 
-      new Notice(`Navigated to location on ${mapData?.name || 'map'}`);
+      new Notice(`Navigated to location on ${mapData?.name ?? 'map'}`);
     };
 
     window.addEventListener('dmt-navigate-to', handleNavigateTo as EventListener);
@@ -177,13 +180,15 @@ function useCustomEventHandlers({
       const { regionId } = event.detail;
       if (!mapData || !geometry || geometry.type !== 'hex') return;
 
-      const region = (mapData.regions || []).find((r: Region) => r.id === regionId);
+      const region = (mapData.regions ?? []).find((r: Region) => r.id === regionId);
       if (!region || region.hexes.length === 0) return;
 
       // Compute centroid in world coordinates
+      const hexToWorld = (geometry as ExtendedGeometry).hexToWorld;
+      if (!hexToWorld) return;
       let cx = 0, cy = 0;
       for (const hex of region.hexes) {
-        const world = (geometry as ExtendedGeometry).hexToWorld!(hex.x, hex.y);
+        const world = hexToWorld(hex.x, hex.y);
         cx += world.worldX;
         cy += world.worldY;
       }
@@ -265,7 +270,7 @@ function useCustomEventHandlers({
 
       const { q, r, screenX, screenY } = event.detail;
       const hexKey = `${q},${r}`;
-      const hasSubHex = !!(mapData.subHexMaps && mapData.subHexMaps[hexKey]);
+      const hasSubHex = mapData.subHexMaps != null && mapData.subHexMaps[hexKey] != null;
 
       const menu = new Menu();
 
@@ -276,7 +281,7 @@ function useCustomEventHandlers({
       });
 
       // Region actions if this hex belongs to a region
-      const region = (mapData.regions || []).find((reg: Region) =>
+      const region = (mapData.regions ?? []).find((reg: Region) =>
         reg.hexes.some((h: { x: number; y: number }) => h.x === q && h.y === r)
       );
       if (region) {
@@ -294,37 +299,38 @@ function useCustomEventHandlers({
           item.setTitle(region.visible ? 'Hide Region' : 'Show Region');
           item.setIcon(region.visible ? 'lucide-eye-off' : 'lucide-eye');
           item.onClick(() => {
-            const updated = (mapData.regions || []).map((r: Region) =>
+            const updated = (mapData.regions ?? []).map((r: Region) =>
               r.id === region.id ? { ...r, visible: !r.visible } : r
             );
             handleRegionsChange(updated);
           });
         });
 
-        if (region.linkedNote) {
+        if (region.linkedNote != null && region.linkedNote !== '') {
+          const notePath = region.linkedNote;
           menu.addItem((item: MenuItem) => {
             item.setTitle('Open linked note');
             item.setIcon('lucide-external-link');
             item.onClick(() => {
-              const linkPath = region.linkedNote!.replace(/\.md$/, '');
+              const linkPath = notePath.replace(/\.md$/, '');
               void app.workspace.openLinkText(linkPath, '', false);
             });
           });
         }
 
         menu.addItem((item: MenuItem) => {
-          item.setTitle(region.linkedNote ? 'Change linked note' : 'Link note');
+          item.setTitle(region.linkedNote != null && region.linkedNote !== '' ? 'Change linked note' : 'Link note');
           item.setIcon('lucide-link');
           item.onClick(() => {
             openNativeNoteLinkModal(app, {
               onSave: (notePath: string | null) => {
-                const updated = (mapData.regions || []).map((r: Region) =>
-                  r.id === region.id ? { ...r, linkedNote: notePath || undefined } : r
+                const updated = (mapData.regions ?? []).map((r: Region) =>
+                  r.id === region.id ? { ...r, linkedNote: notePath ?? undefined } : r
                 );
                 handleRegionsChange(updated);
               },
               onClose: () => {},
-              currentNotePath: region.linkedNote || null,
+              currentNotePath: region.linkedNote ?? null,
               objectType: null
             });
           });
@@ -337,7 +343,7 @@ function useCustomEventHandlers({
           item.setIcon('lucide-trash-2');
           item.setWarning(true);
           item.onClick(() => {
-            handleRegionsChange((mapData.regions || []).filter((r: Region) => r.id !== region.id));
+            handleRegionsChange((mapData.regions ?? []).filter((r: Region) => r.id !== region.id));
           });
         });
       }

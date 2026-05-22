@@ -42,7 +42,7 @@ interface TileRenderOptions {
 const SQRT3 = Math.sqrt(3);
 
 /**
- * Sort tiles by offset row ascending (back → front), then col for stability.
+ * Sort tiles by offset row ascending (back â†’ front), then col for stability.
  * Pre-computes offsets to avoid redundant axialToOffset calls during sort.
  * Returns a new array; does not mutate the original.
  */
@@ -55,8 +55,9 @@ function sortTilesForRendering(
     offsets.set(t, axialToOffset(t.q, t.r, orientation as import('#types/settings/settings.types').HexOrientation));
   }
   return [...tiles].sort((a, b) => {
-    const oa = offsets.get(a)!;
-    const ob = offsets.get(b)!;
+    const oa = offsets.get(a);
+    const ob = offsets.get(b);
+    if (oa == null || ob == null) return 0;
     if (oa.row !== ob.row) return oa.row - ob.row;
     return oa.col - ob.col;
   });
@@ -162,8 +163,8 @@ function renderTiles(
   viewState: TileViewState,
   options?: TileRenderOptions
 ): void {
-  if (!tiles || tiles.length === 0) return;
-  if (!tilesets || tilesets.length === 0) return;
+  if (tiles == null || tiles.length === 0) return;
+  if (tilesets == null || tilesets.length === 0) return;
 
   const getCachedImage = options?.getCachedImage;
   if (!getCachedImage) return;
@@ -183,11 +184,11 @@ function renderTiles(
   const overlayTiles: HexTileAssignment[] = [];
   const freeformTiles: HexTileAssignment[] = [];
   for (const t of tiles) {
-    if (t.freeform) freeformTiles.push(t);
+    if (t.freeform === true) freeformTiles.push(t);
     else if (t.layer === 'overlay') overlayTiles.push(t);
     else baseTiles.push(t);
   }
-  // Sort grid-aligned tiles back→front; freeform in insertion order
+  // Sort grid-aligned tiles backâ†’front; freeform in insertion order
   const sortedBase = sortTilesForRendering(baseTiles, geometry.orientation);
   const sortedOverlay = sortTilesForRendering(overlayTiles, geometry.orientation);
   // Iterate sequentially instead of concatenating
@@ -208,7 +209,7 @@ function renderTiles(
 
     // Convert to screen coordinates
     // Freeform stamps use stored world coordinates directly
-    const screen = tile.freeform && tile.worldX != null && tile.worldY != null
+    const screen = tile.freeform === true && tile.worldX != null && tile.worldY != null
       ? geometry.worldToScreen(tile.worldX, tile.worldY, viewState.x, viewState.y, viewState.zoom)
       : (() => {
           const world = geometry.hexToWorld(tile.q, tile.r);
@@ -230,7 +231,7 @@ function renderTiles(
     let drawOverride: { drawX: number; drawY: number; drawWidth: number; drawHeight: number } | null = null;
     const natW = img.naturalWidth;
     const natH = img.naturalHeight;
-    if (natW > 0 && natH > 0 && !tile.fitMode) {
+    if (natW > 0 && natH > 0 && tile.fitMode == null) {
       const wRatio = natW / tileset.tileWidth;
       const hRatio = natH / tileset.hexHeight;
       const stampThreshold = tileset.stampThreshold ?? 0.5;
@@ -265,7 +266,7 @@ function renderTiles(
     );
 
     // Apply per-tile scale to non-stamp tiles (stamps already applied above)
-    if (!drawOverride && tile.scale != null && tile.scale !== 1) {
+    if (drawOverride == null && tile.scale != null && tile.scale !== 1) {
       const s = tile.scale;
       const cx = rect.drawX + rect.drawWidth / 2;
       const cy = rect.drawY + rect.drawHeight / 2;
@@ -280,14 +281,14 @@ function renderTiles(
     }
 
     // Apply rotation/flip if needed
-    const needsTransform = tile.rotation || tile.flipH;
+    const needsTransform = (tile.rotation != null && tile.rotation !== 0) || tile.flipH === true;
     if (needsTransform) {
       ctx.save();
       ctx.translate(screen.screenX, screen.screenY);
-      if (tile.rotation) {
+      if (tile.rotation != null && tile.rotation !== 0) {
         ctx.rotate((tile.rotation * Math.PI) / 180);
       }
-      if (tile.flipH) {
+      if (tile.flipH === true) {
         ctx.scale(-1, 1);
       }
       ctx.translate(-screen.screenX, -screen.screenY);

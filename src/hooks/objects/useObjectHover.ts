@@ -39,7 +39,7 @@ function useObjectHover(): {
 
   const handleHoverUpdate = useCallback((e: PointerEvent | MouseEvent): void => {
     const touchEvent = e as unknown as TouchEvent;
-    if (!touchEvent.touches && mapData && getActiveLayer(mapData).objects) {
+    if (touchEvent.touches == null) {
       const { clientX, clientY } = getClientCoords(e);
       const coords = screenToGrid(clientX, clientY);
       if (coords) {
@@ -49,10 +49,10 @@ function useObjectHover(): {
 
         if (mapData.mapType === 'hex' && geometry instanceof HexGeometry) {
           const worldCoords = screenToWorld(clientX, clientY);
-          if (worldCoords) {
-            const hexCenter = geometry.gridToWorld!(x, y);
-            const clickOffsetX = (worldCoords.worldX - hexCenter.worldX) / geometry.width!;
-            const clickOffsetY = (worldCoords.worldY - hexCenter.worldY) / geometry.width!;
+          if (worldCoords && geometry.gridToWorld != null && geometry.width != null) {
+            const hexCenter = geometry.gridToWorld(x, y);
+            const clickOffsetX = (worldCoords.worldX - hexCenter.worldX) / geometry.width;
+            const clickOffsetY = (worldCoords.worldY - hexCenter.worldY) / geometry.width;
 
             obj = getClickedObjectInCell(
               getActiveLayer(mapData).objects,
@@ -69,8 +69,8 @@ function useObjectHover(): {
 
         if (obj) {
           const activeLayer = getActiveLayer(mapData);
-          if (activeLayer.fogOfWar?.enabled) {
-            const objOffset = geometry!.toOffsetCoords(obj.position.x, obj.position.y);
+          if (activeLayer.fogOfWar?.enabled === true && geometry != null) {
+            const objOffset = geometry.toOffsetCoords(obj.position.x, obj.position.y);
             if (isCellFogged(activeLayer, objOffset.col, objOffset.row)) {
               obj = null;
             }

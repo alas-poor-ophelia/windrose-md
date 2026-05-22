@@ -193,10 +193,10 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
   // Create onMapDataUpdate wrapper for map-level changes
   // This bridges the old prop-based API with the new context-based approach
   const onMapDataUpdate = useCallback((updates: MapDataUpdate) => {
-    if (updates.viewState && onViewStateChange) {
+    if (updates.viewState != null) {
       onViewStateChange(updates.viewState);
     }
-    if (updates.lastTextLabelSettings && onTextLabelSettingsChange) {
+    if (updates.lastTextLabelSettings != null) {
       onTextLabelSettingsChange(updates.lastTextLabelSettings);
     }
   }, [onViewStateChange, onTextLabelSettingsChange]);
@@ -244,13 +244,13 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
     const mapType = mapData.mapType || DEFAULTS.mapType;
 
     if (mapType === 'hex') {
-      const hexSize = mapData.hexSize || DEFAULTS.hexSize;
-      const orientation = mapData.orientation || DEFAULTS.hexOrientation;
-      const hexBounds = mapData.hexBounds || null; // null = infinite (backward compat)
+      const hexSize = mapData.hexSize ?? DEFAULTS.hexSize;
+      const orientation = mapData.orientation ?? DEFAULTS.hexOrientation;
+      const hexBounds = mapData.hexBounds ?? null; // null = infinite (backward compat)
       return new HexGeometry(hexSize, orientation, hexBounds);
     } else {
       // Default to grid
-      const gridSize = mapData.gridSize || DEFAULTS.gridSize;
+      const gridSize = mapData.gridSize ?? DEFAULTS.gridSize;
       return new GridGeometry(gridSize);
     }
   }, [mapData?.mapType, mapData?.gridSize, mapData?.hexSize, mapData?.orientation, mapData?.hexBounds]);
@@ -404,7 +404,7 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
     if (currentTool === 'diagonalFill') return 'dmt-canvas-diagonal-fill';
     if (currentTool === 'addNote') return 'dmt-canvas-add-object';
     if (currentTool === 'addObject') {
-      return selectedObjectType ? 'dmt-canvas-add-object' : 'dmt-canvas';
+      return selectedObjectType != null ? 'dmt-canvas-add-object' : 'dmt-canvas';
     }
     if (currentTool === 'addText') {
       return 'dmt-canvas-add-text';

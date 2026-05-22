@@ -42,15 +42,15 @@ function calculateObjectScreenPosition(
   geometry: IGeometry,
   containerRef: ContainerRef | null = null
 ): ScreenPosition | null {
-  if (!mapData || !canvas || !geometry) {
+  if (mapData == null || canvas == null || geometry == null) {
     return null;
   }
 
   const { gridSize, viewState, northDirection, mapType } = mapData;
-  if (!viewState) return null;
+  if (viewState == null) return null;
   const { zoom, center } = viewState;
-  const size = object.size || { width: 1, height: 1 };
-  const alignment = object.alignment || 'center';
+  const size = object.size ?? { width: 1, height: 1 };
+  const alignment = object.alignment ?? 'center';
 
   const centerX = canvas.width / 2;
   const centerY = canvas.height / 2;
@@ -58,7 +58,7 @@ function calculateObjectScreenPosition(
   let offsetX: number, offsetY: number, screenX: number, screenY: number;
   let objectWidth: number, objectHeight: number;
 
-  if (object.freeform && object.worldPosition) {
+  if (object.freeform === true && object.worldPosition != null) {
     const cellUnit = mapType === 'hex' ? (geometry as HexGeometryLike).hexSize : gridSize ?? 32;
     const cellUnitValue = cellUnit ?? 32;
     offsetX = centerX - center.x * (mapType === 'hex' ? zoom : cellUnitValue * zoom);
@@ -99,7 +99,7 @@ function calculateObjectScreenPosition(
     objectHeight = size.height * scaledGridSize;
   }
 
-  if (northDirection && northDirection !== 0) {
+  if (northDirection != null && northDirection !== 0) {
     const relX = screenX - centerX;
     const relY = screenY - centerY;
 

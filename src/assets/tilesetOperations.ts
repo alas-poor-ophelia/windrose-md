@@ -20,7 +20,7 @@ const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp']);
 
 /** Generate a deterministic tileset ID from folder path */
 function generateTilesetId(folderPath?: string): string {
-  if (folderPath) {
+  if (folderPath != null && folderPath !== '') {
     // Deterministic: same folder always produces the same ID
     let hash = 0;
     for (let i = 0; i < folderPath.length; i++) {
@@ -78,7 +78,8 @@ async function scanTilesetFolder(app: App, folderPath: string): Promise<TileEntr
   // Recursively collect image files via adapter.list (folder-scoped, not vault-wide)
   const queue = [normalizedFolder];
   while (queue.length > 0) {
-    const dir = queue.pop()!;
+    const dir = queue.pop();
+    if (dir == null) continue;
     let listing: { files: string[]; folders: string[] };
     try {
       listing = await app.vault.adapter.list(dir);
@@ -138,7 +139,8 @@ async function measureAlphaCoverage(app: App, tile: TileEntry): Promise<number |
         const canvas = document.createElement('canvas');
         canvas.width = w;
         canvas.height = h;
-        const ctx = canvas.getContext('2d')!;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) { resolve(null); URL.revokeObjectURL(url); return; }
         ctx.drawImage(img, 0, 0);
         const data = ctx.getImageData(0, 0, w, h).data;
 

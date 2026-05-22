@@ -19,6 +19,7 @@
 import type { MapData } from '#types/core/map.types';
 import type { ExtendedGeometry, SelectedItem } from '#types/contexts/context.types';
 
+import type { VNode } from 'preact';
 import { calculateObjectScreenPosition } from '../../objects/screenPositionUtils';
 import { getActiveLayer } from '../../persistence/layerAccessor';
 import { useToolbarPosition } from '../../hooks/interactions/useToolbarPosition';
@@ -42,7 +43,7 @@ function calculateMultiSelectBounds(
   canvasRef: { current: HTMLCanvasElement | null } | null,
   containerRef: { current: HTMLElement | null } | null,
   geometry: ExtendedGeometry | null
-) {
+): { screenX: number; screenY: number; width: number; height: number } | null {
   if (!selectedItems?.length || !canvasRef?.current || !containerRef?.current || !mapData || !geometry) return null;
 
   const canvas = canvasRef.current;
@@ -94,7 +95,7 @@ function calculateMultiSelectBounds(
       let screenX = offsetX + label.position.x * zoom;
       let screenY = offsetY + label.position.y * zoom;
 
-      if (northDirection && northDirection !== 0) {
+      if (northDirection != null && northDirection !== 0) {
         const relX = screenX - centerX;
         const relY = screenY - centerY;
         const angleRad = (northDirection * Math.PI) / 180;
@@ -140,7 +141,7 @@ const MultiSelectToolbar = ({
   onRotateAll,
   onDuplicateAll,
   onDeleteAll
-}: MultiSelectToolbarProps) => {
+}: MultiSelectToolbarProps): VNode | null => {
   if (!selectedItems?.length || !mapData || !canvasRef?.current || !containerRef?.current) {
     return null;
   }
@@ -171,7 +172,7 @@ const MultiSelectToolbar = ({
     >
       <div className="dmt-selection-count">
         <Icon icon="lucide-box-select" size={14} />
-        <span>{selectionCount || selectedItems.length} selected</span>
+        <span>{selectionCount ?? selectedItems.length} selected</span>
       </div>
 
       <button className="dmt-toolbar-button" onClick={onRotateAll} title="Rotate All 90°">

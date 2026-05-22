@@ -16,7 +16,7 @@
  * NOTE: cellExists and getCellFill are exported for API completeness.
  */
 
-/* eslint-disable @typescript-eslint/no-unused-vars */
+ 
 
 // Type-only imports - stripped at runtime
 import type { Point } from '#types/core/geometry.types';
@@ -331,7 +331,7 @@ function getFilledSegments(cell: Cell | null): SegmentName[] {
  * If no segments are filled, return null (cell should be removed).
  */
 function normalizeCell(cell: Cell): Cell | null {
-  if (!cell) return cell;
+  if (cell == null) return cell;
   
   if (hasSegments(cell)) {
     const filledCount = Object.keys(cell.segments).filter(
@@ -371,6 +371,7 @@ function setSegments(
 ): Cell[] {
   // Grid-only feature check
   if (!isGridGeometry(geometry)) {
+    // eslint-disable-next-line no-console
     console.warn('setSegments: Segment painting is only supported for grid maps');
     return cells;
   }
@@ -458,6 +459,7 @@ function removeSegments(
 ): Cell[] {
   // Grid-only feature check
   if (!isGridGeometry(geometry)) {
+    // eslint-disable-next-line no-console
     console.warn('removeSegments: Segment painting is only supported for grid maps');
     return cells;
   }
@@ -549,7 +551,7 @@ function getSegmentAtPosition(localX: number, localY: number): SegmentName {
   let angle = Math.atan2(-dy, dx) * (180 / Math.PI);
   if (angle < 0) angle += 360;
   
-  // Map angle to segment (each segment is 45°)
+  // Map angle to segment (each segment is 45Â°)
   if (angle >= 337.5 || angle < 22.5) return 'e';
   if (angle >= 22.5 && angle < 67.5) return 'ne';
   if (angle >= 67.5 && angle < 112.5) return 'n';

@@ -556,7 +556,7 @@ function getOrphanedContentInfo(
 
   const isOutOfBounds = (q: number, r: number): boolean => {
     if (isRadial) {
-      return getHexRing(q, r) > newBounds.maxRing!;
+      return newBounds.maxRing != null && getHexRing(q, r) > newBounds.maxRing;
     }
     const { col, row } = axialToOffset(q, r, orientation);
     return !isWithinOffsetBounds(col, row, newBounds);
@@ -681,20 +681,20 @@ function buildInitialState(props: BuildInitialStateProps, globalSettings: Global
     coordinateDisplayMode: currentSettings?.coordinateDisplayMode ?? 'rectangular',
     
     backgroundImagePath: currentBackgroundImage?.path ?? null,
-    backgroundImageDisplayName: currentBackgroundImage?.path 
-      ? getDisplayNameFromPath(currentBackgroundImage.path) 
+    backgroundImageDisplayName: currentBackgroundImage?.path != null && currentBackgroundImage.path !== ''
+      ? getDisplayNameFromPath(currentBackgroundImage.path)
       : '',
     imageDimensions: null,
     imageSearchResults: [],
     
-    fogImageDisplayName: currentSettings?.overrides?.fogOfWarImage 
-      ? getDisplayNameFromPath(currentSettings.overrides.fogOfWarImage) 
+    fogImageDisplayName: currentSettings?.overrides?.fogOfWarImage != null && currentSettings.overrides.fogOfWarImage !== ''
+      ? getDisplayNameFromPath(currentSettings.overrides.fogOfWarImage)
       : '',
     fogImageSearchResults: [],
     
     gridDensity: currentBackgroundImage?.gridDensity ?? 'medium',
     customColumns: currentBackgroundImage?.customColumns ?? 24,
-    boundsLocked: currentBackgroundImage?.path ? (currentBackgroundImage.lockBounds ?? true) : false,
+    boundsLocked: currentBackgroundImage?.path != null && currentBackgroundImage.path !== '' ? (currentBackgroundImage.lockBounds ?? true) : false,
     
     imageOpacity: currentBackgroundImage?.opacity ?? 1,
     imageOffsetX: currentBackgroundImage?.offsetX ?? 0,

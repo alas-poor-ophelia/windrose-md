@@ -40,7 +40,7 @@ function PreferencesTab(): VNode {
   const [exportSuccess, setExportSuccess] = useState<string | null>(null);
 
   const handleExportImage = async (): Promise<void> => {
-    if (!mapData || !geometry) {
+    if (mapData == null || geometry == null) {
       setExportError('Map data not available');
       return;
     }
@@ -56,9 +56,10 @@ function PreferencesTab(): VNode {
         setExportSuccess(`Map saved to: ${result.path}`);
         setTimeout(() => setExportSuccess(null), 5000);
       } else {
-        setExportError(result.error || 'Export failed. Please try again.');
+        setExportError(result.error ?? 'Export failed. Please try again.');
       }
     } catch (error) {
+      // eslint-disable-next-line no-console
       console.error('[PreferencesTab] Export error:', error);
       setExportError((error as Error).message || 'Export failed. Please try again.');
     } finally {
@@ -126,7 +127,7 @@ function PreferencesTab(): VNode {
         </button>
       </SettingItem>
 
-      {exportError && (
+      {exportError != null && exportError !== '' && (
         <div style={{
           padding: '8px',
           backgroundColor: 'var(--background-modifier-error)',
@@ -138,7 +139,7 @@ function PreferencesTab(): VNode {
         </div>
       )}
 
-      {exportSuccess && (
+      {exportSuccess != null && exportSuccess !== '' && (
         <div style={{
           padding: '8px',
           backgroundColor: 'var(--background-modifier-success)',

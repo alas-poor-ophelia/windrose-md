@@ -4,7 +4,7 @@ import { parseDeepLink, emitNavigationEvent } from '../persistence/deepLinkHandl
 import type { DeepLinkData } from '../persistence/deepLinkHandler';
 
 async function navigateToLink(plugin: Plugin, parsed: DeepLinkData, sourcePath: string): Promise<void> {
-  const currentPath = sourcePath || '';
+  const currentPath = sourcePath ?? '';
   const isSameNote = parsed.notePath === currentPath || parsed.notePath === currentPath.replace(/\.md$/, '');
 
   if (!isSameNote) {
@@ -12,6 +12,7 @@ async function navigateToLink(plugin: Plugin, parsed: DeepLinkData, sourcePath: 
       const linkPath = parsed.notePath.replace(/\.md$/, '');
       await plugin.app.workspace.openLinkText(linkPath, '', false);
     } catch (err) {
+      // eslint-disable-next-line no-console
       console.error('[Windrose] Deep link: failed to open note', err);
       new Notice('Failed to open map note');
       return;
@@ -44,16 +45,17 @@ export function registerDeepLinks(plugin: Plugin): void {
 function registerProtocolHandler(plugin: Plugin): void {
   plugin.registerObsidianProtocolHandler('windrose', async (params) => {
     const rawQuery = Object.keys(params).find(key => key.includes('|'));
-    if (!rawQuery) return;
+    if (rawQuery == null || rawQuery === '') return;
 
     const parsed = parseDeepLink('windrose:' + rawQuery);
-    if (!parsed) return;
+    if (parsed == null) return;
 
     try {
       const linkPath = parsed.notePath.replace(/\.md$/, '');
       await plugin.app.workspace.openLinkText(linkPath, '', false);
       setTimeout(() => emitNavigationEvent(parsed), 100);
     } catch (err) {
+      // eslint-disable-next-line no-console
       console.error('[Windrose] Protocol handler failed:', err);
       new Notice('Failed to open map note');
     }
@@ -68,11 +70,11 @@ function registerPostProcessor(plugin: Plugin): void {
     if (candidates.length === 0) return;
 
     candidates.forEach((link) => {
-      const rawHref = link.getAttribute('href') || '';
-      const dataHref = link.getAttribute('data-href') || '';
+      const rawHref = link.getAttribute('href') ?? '';
+      const dataHref = link.getAttribute('data-href') ?? '';
       const original = rawHref.startsWith('windrose:') ? rawHref
         : dataHref.startsWith('windrose:') ? dataHref : '';
-      if (!original) return;
+      if (original === '') return;
 
       const replacement = document.createElement('a');
       replacement.textContent = link.textContent;
@@ -87,34 +89,34 @@ function registerPostProcessor(plugin: Plugin): void {
 function registerDomCapture(plugin: Plugin): void {
   plugin.registerDomEvent(document, 'click', async (e: MouseEvent) => {
     const target = e.target as HTMLElement;
-    if (!target?.closest) return;
+    if (target?.closest == null) return;
 
     const link = target.closest(
       'a[href^="windrose:"], a[data-href^="windrose:"], a[data-windrose-href]'
     ) as HTMLElement | null;
-    if (!link) return;
+    if (link == null) return;
 
     e.preventDefault();
     e.stopPropagation();
 
     const href = link.getAttribute('data-windrose-href')
-      || link.getAttribute('href')
-      || link.getAttribute('data-href')
-      || '';
+      ?? link.getAttribute('href')
+      ?? link.getAttribute('data-href')
+      ?? '';
 
     const parsed = parseDeepLink(href);
-    if (!parsed) return;
+    if (parsed == null) return;
 
-    const sourcePath = plugin.app.workspace.getActiveFile()?.path || '';
+    const sourcePath = plugin.app.workspace.getActiveFile()?.path ?? '';
     await navigateToLink(plugin, parsed, sourcePath);
   }, { capture: true } as AddEventListenerOptions);
 }
 
 function registerEditorExtension(plugin: Plugin): void {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
+     
     const cmView = require('@codemirror/view');
-    if (!cmView?.EditorView) return;
+    if (cmView?.EditorView == null) return;
 
     const SCHEME = 'windrose:';
 
@@ -152,36 +154,36 @@ function registerEditorExtension(plugin: Plugin): void {
     const windroseEditorExt = cmView.EditorView.domEventHandlers({
       click(event: MouseEvent, view: unknown) {
         const target = event.target as HTMLElement;
-        if (!target?.closest) return false;
+        if (target?.closest == null) return false;
 
         const anchor = target.closest('a[href^="windrose:"], a[data-href^="windrose:"], a[data-windrose-href]') as HTMLElement | null;
-        if (anchor) {
+        if (anchor != null) {
           const href = anchor.getAttribute('data-windrose-href')
-            || anchor.getAttribute('href')
-            || anchor.getAttribute('data-href')
-            || '';
+            ?? anchor.getAttribute('href')
+            ?? anchor.getAttribute('data-href')
+            ?? '';
           const parsed = parseDeepLink(href);
-          if (parsed) {
+          if (parsed != null) {
             event.preventDefault();
             event.stopPropagation();
-            const sourcePath = plugin.app.workspace.getActiveFile()?.path || '';
+            const sourcePath = plugin.app.workspace.getActiveFile()?.path ?? '';
             void navigateToLink(plugin, parsed, sourcePath);
             return true;
           }
         }
 
         const linkSpan = target.closest('.cm-link, .cm-underline, .cm-hmd-internal-link') as HTMLElement | null;
-        if (linkSpan) {
+        if (linkSpan != null) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const pos = (view as any).posAtCoords({ x: event.clientX, y: event.clientY });
           if (pos != null) {
             const href = findWindroseHrefAtPos(view as Parameters<typeof findWindroseHrefAtPos>[0], pos);
-            if (href) {
+            if (href != null && href !== '') {
               const parsed = parseDeepLink(href);
-              if (parsed) {
+              if (parsed != null) {
                 event.preventDefault();
                 event.stopPropagation();
-                const sourcePath = plugin.app.workspace.getActiveFile()?.path || '';
+                const sourcePath = plugin.app.workspace.getActiveFile()?.path ?? '';
                 void navigateToLink(plugin, parsed, sourcePath);
                 return true;
               }
@@ -194,6 +196,7 @@ function registerEditorExtension(plugin: Plugin): void {
 
     plugin.registerEditorExtension([windroseEditorExt]);
   } catch (err) {
+    // eslint-disable-next-line no-console
     console.warn('[Windrose] Could not register CM6 extension:', err);
   }
 }

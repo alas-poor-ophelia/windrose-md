@@ -65,8 +65,9 @@ function cornerToScreen(
   canvasWidth: number,
   canvasHeight: number
 ): Point {
-  const { zoom, center } = mapData.viewState!;
-  const northDirection = mapData.northDirection || 0;
+  if (!mapData.viewState) return { x: 0, y: 0 };
+  const { zoom, center } = mapData.viewState;
+  const northDirection = mapData.northDirection != null ? mapData.northDirection : 0;
   const cellSize = geometry.cellSize;
 
   const cornerWorldOffsets: Record<CornerName, Point> = {

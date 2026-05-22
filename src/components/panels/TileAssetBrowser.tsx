@@ -32,7 +32,8 @@ function getContentBounds(img: HTMLImageElement): { x: number; y: number; w: num
 
   scratchCanvas.width = w;
   scratchCanvas.height = h;
-  const ctx = scratchCanvas.getContext('2d')!;
+  const ctx = scratchCanvas.getContext('2d');
+  if (ctx == null) return { x: 0, y: 0, w, h };
   ctx.clearRect(0, 0, w, h);
   ctx.drawImage(img, 0, 0);
   const data = ctx.getImageData(0, 0, w, h).data;
@@ -106,11 +107,11 @@ const TileThumbnail = ({ tile, getCachedImage }: TileThumbnailProps): VNode => {
 
   useEffect(() => {
     let blobUrl: string | null = null;
-    const draw = (img: HTMLImageElement) => {
+    const draw = (img: HTMLImageElement): void => {
       if (canvasRef.current) drawTileToCanvas(canvasRef.current, img, THUMB_SIZE);
     };
     const img = getCachedImage?.(tile.vaultPath);
-    if (img?.complete) {
+    if (img?.complete === true) {
       draw(img);
       return undefined;
     }
@@ -121,7 +122,7 @@ const TileThumbnail = ({ tile, getCachedImage }: TileThumbnailProps): VNode => {
         blobUrl = URL.createObjectURL(blob);
         const fallbackImg = new Image();
         fallbackImg.onload = () => {
-          URL.revokeObjectURL(blobUrl!);
+          if (blobUrl != null) URL.revokeObjectURL(blobUrl);
           blobUrl = null;
           draw(fallbackImg);
         };
@@ -129,7 +130,7 @@ const TileThumbnail = ({ tile, getCachedImage }: TileThumbnailProps): VNode => {
       });
     }
     return () => {
-      if (blobUrl) URL.revokeObjectURL(blobUrl);
+      if (blobUrl != null) URL.revokeObjectURL(blobUrl);
     };
   }, [tile.vaultPath]);
 
@@ -214,11 +215,11 @@ const TileAssetBrowser = ({
     }
   }, [tilesets.length]);
 
-  const handleToggleCollapse = () => {
+  const handleToggleCollapse = (): void => {
     onCollapseChange(!isCollapsed);
   };
 
-  const handleTileClick = (tilesetId: string, tileId: string) => {
+  const handleTileClick = (tilesetId: string, tileId: string): void => {
     if (selectedTilesetId === tilesetId && selectedTileId === tileId) {
       onTileDeselect();
     } else {
@@ -227,13 +228,13 @@ const TileAssetBrowser = ({
     }
   };
 
-  const handleRotateCW = () => {
+  const handleRotateCW = (): void => {
     const currentIdx = ROTATION_STEPS.indexOf(rotation);
     const nextIdx = (currentIdx + 1) % ROTATION_STEPS.length;
     onRotationChange(ROTATION_STEPS[nextIdx]);
   };
 
-  const handleRotateCCW = () => {
+  const handleRotateCCW = (): void => {
     const currentIdx = ROTATION_STEPS.indexOf(rotation);
     const nextIdx = (currentIdx - 1 + ROTATION_STEPS.length) % ROTATION_STEPS.length;
     onRotationChange(ROTATION_STEPS[nextIdx]);
@@ -266,7 +267,8 @@ const TileAssetBrowser = ({
     }
 
     const portal = portalRef.current;
-    const canvas = previewRef.current!;
+    const canvas = previewRef.current;
+    if (canvas == null) return undefined;
     const label = portal.querySelector('.dmt-tile-preview-label') as HTMLElement;
 
     // Position to the left of the browser panel
@@ -293,7 +295,7 @@ const TileAssetBrowser = ({
     // Draw preview
     let previewBlobUrl: string | null = null;
     const img = getCachedImage?.(hoveredTile.vaultPath);
-    if (img?.complete) {
+    if (img?.complete === true) {
       drawTileToCanvas(canvas, img, PREVIEW_SIZE);
       return undefined;
     }
@@ -304,7 +306,7 @@ const TileAssetBrowser = ({
         previewBlobUrl = URL.createObjectURL(blob);
         const fallbackImg = new Image();
         fallbackImg.onload = () => {
-          URL.revokeObjectURL(previewBlobUrl!);
+          if (previewBlobUrl != null) URL.revokeObjectURL(previewBlobUrl);
           previewBlobUrl = null;
           drawTileToCanvas(canvas, fallbackImg, PREVIEW_SIZE);
         };
@@ -312,7 +314,7 @@ const TileAssetBrowser = ({
       });
     }
     return () => {
-      if (previewBlobUrl) URL.revokeObjectURL(previewBlobUrl);
+      if (previewBlobUrl != null) URL.revokeObjectURL(previewBlobUrl);
     };
   }, [hoveredTile, isCollapsed, rotation, flipH, selectedTilesetId, selectedTileId]);
 
@@ -326,7 +328,7 @@ const TileAssetBrowser = ({
     };
   }, []);
 
-  const handleToggleCategory = (category: string) => {
+  const handleToggleCategory = (category: string): void => {
     setCollapsedCategories(prev => {
       const next = new Set(prev);
       if (next.has(category)) {
@@ -338,26 +340,27 @@ const TileAssetBrowser = ({
     });
   };
 
-  const activeTileset = tilesets[activeTilesetIndex] || null;
+  const activeTileset = tilesets[activeTilesetIndex] ?? null;
 
   const filteredTiles = useMemo(() => {
-    if (!activeTileset) return [];
+    if (activeTileset == null) return [];
     const tiles = activeTileset.tiles;
-    if (!searchFilter) return tiles;
+    if (searchFilter == null || searchFilter === '') return tiles;
     const lower = searchFilter.toLowerCase();
     return tiles.filter((t: TileEntry) =>
       t.filename.toLowerCase().includes(lower) ||
-      (t.category && t.category.toLowerCase().includes(lower)) ||
-      (t.tags && t.tags.some((tag: string) => tag.toLowerCase().includes(lower)))
+      (t.category != null && t.category !== '' && t.category.toLowerCase().includes(lower)) ||
+      (t.tags != null && t.tags.some((tag: string) => tag.toLowerCase().includes(lower)))
     );
   }, [activeTileset, searchFilter]);
 
   const groupedTiles = useMemo(() => {
     const groups = new Map<string, TileEntry[]>();
     for (const tile of filteredTiles) {
-      const cat = tile.category || 'Uncategorized';
+      const cat = tile.category ?? 'Uncategorized';
       if (!groups.has(cat)) groups.set(cat, []);
-      groups.get(cat)!.push(tile);
+      const group = groups.get(cat);
+      if (group != null) group.push(tile);
     }
     return groups;
   }, [filteredTiles]);
@@ -423,7 +426,7 @@ const TileAssetBrowser = ({
         {tilesets.length === 1 && (
           <span className="dmt-tile-browser-tileset-name">{tilesets[0].name}</span>
         )}
-        {onTilesetOverrideChange && activeTileset && (
+        {onTilesetOverrideChange != null && activeTileset != null && (
           <button
             className="dmt-tile-browser-config-btn clickable-icon"
             onClick={() => setShowTilesetConfig(!showTilesetConfig)}
@@ -435,13 +438,13 @@ const TileAssetBrowser = ({
       </div>
 
       {/* Tileset config panel (inline, toggled by gear icon) */}
-      {showTilesetConfig && activeTileset && onTilesetOverrideChange && (() => {
+      {showTilesetConfig && activeTileset != null && onTilesetOverrideChange != null && (() => {
         const currentOverrides = tilesetOverrides?.[activeTileset.id] || {};
         const threshold = currentOverrides.stampThreshold ?? activeTileset.stampThreshold ?? 0.5;
         const minScale = currentOverrides.minStampScale ?? activeTileset.minStampScale ?? 0.2;
         const fitMode = currentOverrides.fitMode ?? activeTileset.fitMode;
 
-        const handleOverrideChange = (field: keyof TilesetOverrides, value: number | string | undefined) => {
+        const handleOverrideChange = (field: keyof TilesetOverrides, value: number | string | undefined): void => {
           const updated = { ...currentOverrides, [field]: value };
           // Remove undefined fields to keep data clean
           if (value === undefined) delete updated[field];
@@ -530,7 +533,7 @@ const TileAssetBrowser = ({
                     <div
                       key={tile.id}
                       className={`dmt-tile-thumb ${isSelected ? 'dmt-tile-thumb-selected' : ''}`}
-                      onClick={() => handleTileClick(activeTileset!.id, tile.id)}
+                      onClick={() => handleTileClick(activeTileset?.id ?? '', tile.id)}
                       onMouseEnter={() => setHoveredTile(tile)}
                       onMouseLeave={() => setHoveredTile(null)}
                       title={tile.filename}
@@ -549,13 +552,13 @@ const TileAssetBrowser = ({
 
         {filteredTiles.length === 0 && (
           <div className="dmt-tile-browser-empty">
-            {searchFilter ? 'No matching tiles' : 'No tiles in this tileset'}
+            {searchFilter != null && searchFilter !== '' ? 'No matching tiles' : 'No tiles in this tileset'}
           </div>
         )}
       </div>
 
       {/* Footer: rotation/flip controls */}
-      {selectedTileId && (
+      {selectedTileId != null && selectedTileId !== '' && (
         <div className="dmt-tile-browser-footer">
           <button
             className="dmt-tile-browser-action-btn"
@@ -609,7 +612,7 @@ const TileAssetBrowser = ({
       )}
 
       {/* Tile scale slider */}
-      {selectedTileId && (
+      {selectedTileId != null && selectedTileId !== '' && (
         <div className="dmt-tile-browser-scale-row">
           <Icon icon="lucide-scaling" size={12} />
           <input

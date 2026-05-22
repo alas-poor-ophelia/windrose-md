@@ -102,24 +102,24 @@ const TextLayer = ({
     }
 
     let currentLabel = null;
-    if (editingTextId) {
-      currentLabel = getActiveLayer(mapData).textLabels?.find((l: TextLabel) => l.id === editingTextId) || null;
+    if (editingTextId != null && editingTextId !== '') {
+      currentLabel = getActiveLayer(mapData).textLabels?.find((l: TextLabel) => l.id === editingTextId) ?? null;
     }
 
     const savedSettings = mapData?.lastTextLabelSettings as { fontSize?: number; fontFace?: string; color?: HexColor; opacity?: number } | undefined;
-    const defaultFontSize = currentLabel?.fontSize || savedSettings?.fontSize || 16;
-    const defaultFontFace = currentLabel?.fontFace || savedSettings?.fontFace || 'sans';
-    const defaultColor = currentLabel?.color || savedSettings?.color || '#ffffff';
+    const defaultFontSize = currentLabel?.fontSize ?? savedSettings?.fontSize ?? 16;
+    const defaultFontFace = currentLabel?.fontFace ?? savedSettings?.fontFace ?? 'sans';
+    const defaultColor = currentLabel?.color ?? savedSettings?.color ?? '#ffffff';
     const defaultOpacity = currentLabel?.opacity ?? savedSettings?.opacity ?? 1;
 
     const opened = openNativeTextLabelEditor(app, {
-      initialValue: currentLabel?.content || '',
+      initialValue: currentLabel?.content ?? '',
       initialFontSize: defaultFontSize,
       initialFontFace: defaultFontFace,
       initialColor: defaultColor,
       initialOpacity: defaultOpacity,
-      isEditing: !!editingTextId,
-      customColors: customColors || [],
+      isEditing: editingTextId != null && editingTextId !== '',
+      customColors: customColors ?? [],
       onAddCustomColor,
       onDeleteCustomColor,
       onSubmit: handleTextSubmit,
@@ -129,18 +129,18 @@ const TextLayer = ({
   }, [showTextModal, editingTextId]);
 
   const handleCopyLink = useCallback(() => {
-    if (!selectedItem || selectedItem.type !== 'text' || !mapData || !mapId || !notePath) return;
+    if (!selectedItem || selectedItem.type !== 'text' || !mapData || mapId == null || mapId === '' || notePath == null || notePath === '') return;
 
     const activeLayer = getActiveLayer(mapData);
     const label = activeLayer.textLabels?.find((l: TextLabel) => l.id === selectedItem.id);
     if (!label) return;
 
     const zoom = mapData.viewState?.zoom ?? 1.0;
-    const layerId = mapData.activeLayerId || activeLayer?.id || 'layer_001';
-    const displayText = label.content || 'Text';
+    const layerId = mapData.activeLayerId ?? activeLayer?.id ?? 'layer_001';
+    const displayText = label.content ?? 'Text';
 
     // Text labels use world coordinates, convert to grid
-    const gridSize = mapData.gridSize || 32;
+    const gridSize = mapData.gridSize ?? 32;
     const x = label.position.x / gridSize;
     const y = label.position.y / gridSize;
 
@@ -189,25 +189,25 @@ const TextLayer = ({
 
       {showTextModal && !nativeOpenedRef.current && (() => {
         let currentLabel: TextLabel | null = null;
-        if (editingTextId && mapData?.textLabels) {
-          currentLabel = getActiveLayer(mapData).textLabels.find((l: TextLabel) => l.id === editingTextId) || null;
+        if (editingTextId != null && editingTextId !== '' && mapData?.textLabels) {
+          currentLabel = getActiveLayer(mapData).textLabels.find((l: TextLabel) => l.id === editingTextId) ?? null;
         }
 
         const savedSettings = mapData?.lastTextLabelSettings as { fontSize?: number; fontFace?: string; color?: HexColor; opacity?: number } | undefined;
-        const defaultFontSize = currentLabel?.fontSize || savedSettings?.fontSize || 16;
-        const defaultFontFace = currentLabel?.fontFace || savedSettings?.fontFace || 'sans';
-        const defaultColor = currentLabel?.color || savedSettings?.color || '#ffffff';
+        const defaultFontSize = currentLabel?.fontSize ?? savedSettings?.fontSize ?? 16;
+        const defaultFontFace = currentLabel?.fontFace ?? savedSettings?.fontFace ?? 'sans';
+        const defaultColor = currentLabel?.color ?? savedSettings?.color ?? '#ffffff';
         const defaultOpacity = currentLabel?.opacity ?? savedSettings?.opacity ?? 1;
 
         return (
           <TextLabelEditor
-            initialValue={currentLabel?.content || ''}
+            initialValue={currentLabel?.content ?? ''}
             initialFontSize={defaultFontSize}
             initialFontFace={defaultFontFace}
             initialColor={defaultColor}
             initialOpacity={defaultOpacity}
-            isEditing={!!editingTextId}
-            customColors={customColors || []}
+            isEditing={editingTextId != null && editingTextId !== ''}
+            customColors={customColors ?? []}
             onAddCustomColor={onAddCustomColor}
             onDeleteCustomColor={onDeleteCustomColor}
             onSubmit={handleTextSubmit}

@@ -40,16 +40,16 @@ function SettingItem({ name, description, vertical, children }: SettingItemProps
     try {
       const setting = new Setting(containerRef.current);
       setting.setName(name);
-      if (description) {
+      if (description != null && description !== '') {
         setting.setDesc(description);
       }
 
-      if (vertical) {
+      if (vertical === true) {
         setting.settingEl.classList.add('windrose-setting-item-vertical');
       }
 
       // Move Preact children into the native control area
-      if (controlRef.current) {
+      if (controlRef.current != null) {
         while (controlRef.current.firstChild) {
           setting.controlEl.appendChild(controlRef.current.firstChild);
         }
@@ -59,8 +59,9 @@ function SettingItem({ name, description, vertical, children }: SettingItemProps
 
       return () => {
         // Setting appends its own DOM to containerRef — clear it
-        if (containerRef.current) {
-          if (containerRef.current.empty) { containerRef.current.empty(); } else { containerRef.current.innerHTML = ''; }
+        const el = containerRef.current;
+        if (el != null) {
+          if (typeof el.empty === 'function') { el.empty(); } else { el.innerHTML = ''; }
         }
       };
     } catch {
@@ -78,7 +79,7 @@ function SettingItem({ name, description, vertical, children }: SettingItemProps
 
   useEffect(() => {
     if (settingRef.current) {
-      if (description) {
+      if (description != null && description !== '') {
         settingRef.current.setDesc(description);
       }
     }

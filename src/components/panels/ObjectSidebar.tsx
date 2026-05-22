@@ -5,6 +5,7 @@
 
 
 
+import type { VNode } from 'preact';
 import type { MapType } from '#types/core/map.types';
 import type { ObjectSet } from '#types/settings/settings.types';
 
@@ -26,7 +27,7 @@ interface ObjectSidebarProps {
   onFreeformToggle?: () => void;
 }
 
-const ObjectSidebar = ({ selectedObjectType, onObjectTypeSelect, onToolChange, isCollapsed, onCollapseChange, mapType = 'grid', objectSetId, onObjectSetChange, isFreeformMode = false, onFreeformToggle }: ObjectSidebarProps) => {
+const ObjectSidebar = ({ selectedObjectType, onObjectTypeSelect, onToolChange, isCollapsed, onCollapseChange, mapType = 'grid', objectSetId, onObjectSetChange, isFreeformMode = false, onFreeformToggle }: ObjectSidebarProps): VNode => {
   const app = useApp();
   const [searchFilter, setSearchFilter] = useState('');
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
@@ -35,7 +36,7 @@ const ObjectSidebar = ({ selectedObjectType, onObjectTypeSelect, onToolChange, i
   const [activeSetId, setActiveSetId] = useState(objectSetId ?? null);
   useEffect(() => { setActiveSetId(objectSetId ?? null); }, [objectSetId]);
 
-  const handleSetChange = (newSetId: string | null) => {
+  const handleSetChange = (newSetId: string | null): void => {
     setActiveSetId(newSetId);
     onObjectSetChange(newSetId);
   };
@@ -53,10 +54,10 @@ const ObjectSidebar = ({ selectedObjectType, onObjectTypeSelect, onToolChange, i
   const allObjectTypes = getResolvedObjectTypes(mapType, activeSetId);
   const allCategories = getResolvedCategories(mapType, activeSetId);
 
-  const filteredObjects = !searchFilter ? allObjectTypes : allObjectTypes.filter(obj => {
+  const filteredObjects = (searchFilter == null || searchFilter === '') ? allObjectTypes : allObjectTypes.filter(obj => {
     const lower = searchFilter.toLowerCase();
     return obj.label.toLowerCase().includes(lower) ||
-      (obj.category && obj.category.toLowerCase().includes(lower));
+      (obj.category != null && obj.category !== '' && obj.category.toLowerCase().includes(lower));
   });
 
   const objectsByCategory = allCategories
@@ -68,18 +69,18 @@ const ObjectSidebar = ({ selectedObjectType, onObjectTypeSelect, onToolChange, i
     }))
     .filter(category => category.objects.length > 0);
 
-  const handleObjectSelect = (objectId: string) => {
+  const handleObjectSelect = (objectId: string): void => {
     onObjectTypeSelect(objectId);
     if (onToolChange) {
       onToolChange('addObject');
     }
   };
 
-  const handleToggleCollapse = () => {
+  const handleToggleCollapse = (): void => {
     onCollapseChange(!isCollapsed);
   };
 
-  const handleToggleCategory = (categoryId: string) => {
+  const handleToggleCategory = (categoryId: string): void => {
     setCollapsedCategories(prev => {
       const next = new Set(prev);
       if (next.has(categoryId)) {
@@ -130,7 +131,7 @@ const ObjectSidebar = ({ selectedObjectType, onObjectTypeSelect, onToolChange, i
       {objectSets.length > 0 && (
         <div className="dmt-object-sidebar-set-selector">
           <select
-            value={activeSetId || ''}
+            value={activeSetId ?? ''}
             onChange={(e) => handleSetChange(e.currentTarget.value || null)}
             className="dmt-object-sidebar-select"
           >
@@ -179,14 +180,14 @@ const ObjectSidebar = ({ selectedObjectType, onObjectTypeSelect, onToolChange, i
                     <div className="dmt-object-grid-symbol">
                       {hasImagePath(objType) ? (
                         <img
-                          src={app.vault.adapter.getResourcePath(objType.imagePath!)}
+                          src={app.vault.adapter.getResourcePath(objType.imagePath ?? '')}
                           alt={objType.label}
                           className="dmt-object-grid-image"
                         />
                       ) : hasIconClass(objType) ? (
                         <span className={`ra ${objType.iconClass}`}></span>
                       ) : (
-                        objType.symbol || '?'
+                        objType.symbol ?? '?'
                       )}
                     </div>
                     <div className="dmt-object-grid-label">{objType.label}</div>
@@ -199,7 +200,7 @@ const ObjectSidebar = ({ selectedObjectType, onObjectTypeSelect, onToolChange, i
 
         {objectsByCategory.length === 0 && (
           <div className="dmt-object-sidebar-empty">
-            {searchFilter ? 'No matching objects' : 'No objects available'}
+            {searchFilter != null && searchFilter !== '' ? 'No matching objects' : 'No objects available'}
           </div>
         )}
       </div>
@@ -212,7 +213,7 @@ const ObjectSidebar = ({ selectedObjectType, onObjectTypeSelect, onToolChange, i
         >
           <Icon icon="lucide-diamond" size={14} />
         </button>
-        {selectedObjectType && (
+        {selectedObjectType != null && selectedObjectType !== '' && (
           <button
             className="dmt-object-sidebar-action-btn"
             onClick={() => onObjectTypeSelect(null)}

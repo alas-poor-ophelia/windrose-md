@@ -47,13 +47,13 @@ function NativeToggle({ value, onChange, disabled }: NativeToggleProps): VNode {
         toggleInstance = toggle;
         toggle.setValue(value);
         toggle.onChange((newVal: boolean) => onChangeRef.current(newVal));
-        if (disabled) {
+        if (disabled === true) {
           toggle.setDisabled(true);
         }
       });
 
       // Move just the toggle element into our container
-      if (toggleInstance && setting.controlEl.firstChild) {
+      if (toggleInstance != null && setting.controlEl.firstChild) {
         containerRef.current.appendChild(setting.controlEl.firstChild);
       }
 
@@ -79,8 +79,8 @@ function NativeToggle({ value, onChange, disabled }: NativeToggleProps): VNode {
 
   // Update disabled state without recreating
   useEffect(() => {
-    if (toggleRef.current) {
-      toggleRef.current.setDisabled(!!disabled);
+    if (toggleRef.current != null) {
+      toggleRef.current.setDisabled(disabled === true);
     }
   }, [disabled]);
 
@@ -123,12 +123,12 @@ function NativeDropdown({ value, options, onChange, disabled }: NativeDropdownPr
         }
         dropdown.setValue(value);
         dropdown.onChange((newVal: string) => onChangeRef.current(newVal));
-        if (disabled) {
+        if (disabled === true) {
           dropdown.setDisabled(true);
         }
       });
 
-      if (dropdownInstance && setting.controlEl.firstChild) {
+      if (dropdownInstance != null && setting.controlEl.firstChild) {
         containerRef.current.appendChild(setting.controlEl.firstChild);
       }
 
@@ -152,8 +152,8 @@ function NativeDropdown({ value, options, onChange, disabled }: NativeDropdownPr
   }, [value]);
 
   useEffect(() => {
-    if (dropdownRef.current) {
-      dropdownRef.current.setDisabled(!!disabled);
+    if (dropdownRef.current != null) {
+      dropdownRef.current.setDisabled(disabled === true);
     }
   }, [disabled]);
 
@@ -191,12 +191,12 @@ function NativeSlider({ value, min, max, step, onChange, disabled }: NativeSlide
         slider.setLimits(min, max, step ?? 1);
         slider.setValue(value);
         slider.onChange((newVal: number) => onChangeRef.current(newVal));
-        if (disabled) {
+        if (disabled === true) {
           slider.setDisabled(true);
         }
       });
 
-      if (sliderInstance && setting.controlEl.firstChild) {
+      if (sliderInstance != null && setting.controlEl.firstChild) {
         containerRef.current.appendChild(setting.controlEl.firstChild);
       }
 
@@ -220,8 +220,8 @@ function NativeSlider({ value, min, max, step, onChange, disabled }: NativeSlide
   }, [value]);
 
   useEffect(() => {
-    if (sliderRef.current) {
-      sliderRef.current.setDisabled(!!disabled);
+    if (sliderRef.current != null) {
+      sliderRef.current.setDisabled(disabled === true);
     }
   }, [disabled]);
 

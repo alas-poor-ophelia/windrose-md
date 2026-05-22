@@ -21,7 +21,7 @@ const MODAL_SIZE_KEY = 'windrose-native-modal-size';
 function loadModalSize(): { width: number; height: number } | null {
   try {
     const stored = localStorage.getItem(MODAL_SIZE_KEY);
-    if (stored) {
+    if (stored != null && stored !== '') {
       const parsed = JSON.parse(stored);
       return {
         width: Math.max(MODAL_MIN_WIDTH, Math.min(MODAL_MAX_WIDTH, parsed.width)),
@@ -61,7 +61,7 @@ async function setupModalInteract(
   modalEl.classList.add('windrose-modal-portal');
 
   const savedSize = loadModalSize();
-  if (savedSize && options.resizable) {
+  if (savedSize && options.resizable === true) {
     modalEl.style.setProperty('width', `${savedSize.width}px`);
     modalEl.style.setProperty('height', `${savedSize.height}px`);
   }
@@ -83,7 +83,7 @@ async function setupModalInteract(
     modalEl.dataset.y = String(y);
   }
 
-  if (options.resizable) {
+  if (options.resizable === true) {
     const edges = ['top', 'right', 'bottom', 'left', 'top-right', 'top-left', 'bottom-right', 'bottom-left'];
     for (const edge of edges) {
       const handle = document.createElement('div');
@@ -94,14 +94,14 @@ async function setupModalInteract(
 
   const interactable = interact(modalEl);
 
-  if (options.draggable) {
+  if (options.draggable === true) {
     interactable.draggable({
       allowFrom: '.modal-header',
       listeners: {
         move(event: { dx: number; dy: number; target: HTMLElement }) {
           const target = event.target;
-          const x = (parseFloat(target.dataset.x || '0')) + event.dx;
-          const y = (parseFloat(target.dataset.y || '0')) + event.dy;
+          const x = (parseFloat(target.dataset.x ?? '0')) + event.dx;
+          const y = (parseFloat(target.dataset.y ?? '0')) + event.dy;
           target.style.left = `${x}px`;
           target.style.top = `${y}px`;
           target.dataset.x = String(x);
@@ -111,7 +111,7 @@ async function setupModalInteract(
     });
   }
 
-  if (options.resizable) {
+  if (options.resizable === true) {
     interactable.resizable({
       edges: {
         top: '.dmt-resize-top, .dmt-resize-top-left, .dmt-resize-top-right',
@@ -131,8 +131,8 @@ async function setupModalInteract(
           const clampedHeight = Math.max(MODAL_MIN_HEIGHT, Math.min(MODAL_MAX_HEIGHT, height));
           target.style.width = `${clampedWidth}px`;
           target.style.height = `${clampedHeight}px`;
-          const x = (parseFloat(target.dataset.x || '0')) + event.deltaRect.left;
-          const y = (parseFloat(target.dataset.y || '0')) + event.deltaRect.top;
+          const x = (parseFloat(target.dataset.x ?? '0')) + event.deltaRect.left;
+          const y = (parseFloat(target.dataset.y ?? '0')) + event.deltaRect.top;
           target.style.left = `${x}px`;
           target.style.top = `${y}px`;
           target.dataset.x = String(x);
@@ -145,7 +145,7 @@ async function setupModalInteract(
     });
   }
 
-  if (options.draggable) {
+  if (options.draggable === true) {
     const header = modalEl.querySelector('.modal-header') as HTMLElement | null;
     if (header) {
       header.classList.add('windrose-modal-drag-handle');
@@ -190,20 +190,21 @@ function NativeModalPortal({
   useEffect(() => {
     const modal = new (class extends Modal {
       onOpen(): void {
-        if (title) {
+        if (title != null && title !== '') {
           this.titleEl.setText(title);
         }
-        if (modalClass) {
+        if (modalClass != null && modalClass !== '') {
           this.modalEl.addClass(modalClass);
         }
         const target = this.contentEl.createDiv();
         target.classList.add('windrose-modal-render-target');
         setRenderTarget(target);
 
-        if ((draggable || resizable) && !('ontouchstart' in window)) {
+        if ((draggable === true || resizable === true) && !('ontouchstart' in window)) {
           setupModalInteract(this.modalEl, { draggable, resizable }).then(cleanup => {
             interactCleanupRef.current = cleanup;
           }).catch(err => {
+            // eslint-disable-next-line no-console
             console.warn('[Windrose] Failed to set up modal drag/resize:', err);
           });
         }

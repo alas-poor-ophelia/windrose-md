@@ -92,7 +92,7 @@ const VisibilityToolbar = ({
     }
   ];
 
-  const visibleLayers = layers.filter(layer => !layer.hexOnly || mapType === 'hex');
+  const visibleLayers = layers.filter(layer => layer.hexOnly !== true || mapType === 'hex');
 
   return (
     <div className={`dmt-visibility-toolbar ${isOpen ? 'dmt-visibility-toolbar-open' : ''}`}>
@@ -102,12 +102,12 @@ const VisibilityToolbar = ({
         return (
           <button
             key={layer.id}
-            className={`dmt-visibility-btn ${!isVisible ? 'dmt-visibility-btn-hidden' : ''}`}
+            className={`dmt-visibility-btn ${isVisible !== true ? 'dmt-visibility-btn-hidden' : ''}`}
             onClick={() => onToggleLayer(layer.id)}
-            title={`${layer.tooltip} (currently ${isVisible ? 'visible' : 'hidden'})`}
+            title={`${layer.tooltip} (currently ${isVisible === true ? 'visible' : 'hidden'})`}
           >
             <Icon icon={layer.icon} />
-            {!isVisible && (
+            {isVisible !== true && (
               <svg
                 className="dmt-visibility-strikethrough"
                 viewBox="0 0 24 24"

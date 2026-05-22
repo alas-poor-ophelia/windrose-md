@@ -39,7 +39,7 @@ function useImageAlignment({
    * Check if a screen point is over the background image
    */
   const isPointOverImage = useCallback((clientX: number, clientY: number): boolean => {
-    if (!mapData?.backgroundImage?.path) return false;
+    if (mapData?.backgroundImage?.path == null || mapData.backgroundImage.path === '') return false;
     if (!canvasRef.current) return false;
     if (!geometry) return false;
 

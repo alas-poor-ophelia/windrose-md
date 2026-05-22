@@ -123,7 +123,7 @@ const ColorPicker = ({
     const targetId = editTargetIdRef.current;
     const currentOpacity = editingOpacityRef.current;
 
-    if (!targetId) return;
+    if (targetId == null) return;
 
     const customColor = customColors.find(c => c.id === targetId);
     const paletteOverride = paletteColorOpacityOverrides[targetId];
@@ -139,7 +139,7 @@ const ColorPicker = ({
   }, [customColors, paletteColorOpacityOverrides, onUpdateColorOpacity, onOpacityChange]);
 
   const saveAndCloseEditPanel = useCallback(() => {
-    if (!editTargetIdRef.current) return;
+    if (editTargetIdRef.current == null) return;
     if (justOpenedEditRef.current) return;
 
     saveOpacityChanges();
@@ -147,7 +147,7 @@ const ColorPicker = ({
   }, [saveOpacityChanges]);
 
   useEffect(() => {
-    if (!isOpen && editTargetIdRef.current) {
+    if (!isOpen && editTargetIdRef.current != null) {
       saveOpacityChanges();
       setEditTargetId(null);
     }
@@ -181,7 +181,7 @@ const ColorPicker = ({
   const handlePickerMouseDown = (e: JSX.TargetedMouseEvent<HTMLDivElement>): void => {
     e.stopPropagation();
 
-    if (editTargetId && !(e.target as Element).closest('.dmt-color-edit-panel')) {
+    if (editTargetId != null && editTargetId !== '' && !(e.target as Element).closest('.dmt-color-edit-panel')) {
       if (!justOpenedEditRef.current) {
         saveAndCloseEditPanel();
       }
@@ -191,7 +191,7 @@ const ColorPicker = ({
   const handlePickerTouch = (e: JSX.TargetedTouchEvent<HTMLDivElement>): void => {
     e.stopPropagation();
 
-    if (editTargetId && !(e.target as Element).closest('.dmt-color-edit-panel')) {
+    if (editTargetId != null && !(e.target as Element).closest('.dmt-color-edit-panel')) {
       if (!justOpenedEditRef.current) {
         saveAndCloseEditPanel();
       }
@@ -232,7 +232,7 @@ const ColorPicker = ({
   };
 
   const handleColorContextMenu = (e: JSX.TargetedMouseEvent<HTMLButtonElement>, colorDef: ColorDef): void => {
-    if (colorDef.isReset || colorDef.isAddButton || colorDef.isPreview) return;
+    if (colorDef.isReset === true || colorDef.isAddButton === true || colorDef.isPreview === true) return;
     e.preventDefault();
     e.stopPropagation();
 
@@ -243,7 +243,7 @@ const ColorPicker = ({
   };
 
   const handleLongPressStart = (colorDef: ColorDef): void => {
-    if (colorDef.isReset || colorDef.isAddButton || colorDef.isPreview) return;
+    if (colorDef.isReset === true || colorDef.isAddButton === true || colorDef.isPreview === true) return;
     longPressTriggeredRef.current = false;
     longPressTimerRef.current = setTimeout(() => {
       longPressTriggeredRef.current = true;
@@ -280,7 +280,7 @@ const ColorPicker = ({
   const paletteColors = getColorPalette() as ColorDef[];
 
   const paletteColorsWithOverrides = paletteColors.map(c => {
-    const override = paletteColorOpacityOverrides[c.id];
+    const override: number | undefined = paletteColorOpacityOverrides[c.id];
     return override !== undefined ? { ...c, opacity: override } : c;
   });
 
@@ -288,7 +288,7 @@ const ColorPicker = ({
     { id: 'reset', color: '' as HexColor, label: 'Reset to default', isReset: true },
     ...paletteColorsWithOverrides,
     ...customColors.map(c => ({ ...c, label: c.label ?? c.color, isCustom: true })),
-    ...(previewColor ? [{
+    ...(previewColor != null && previewColor !== '' ? [{
       id: 'preview',
       color: previewColor,
       label: 'Selecting...',
@@ -341,7 +341,7 @@ const ColorPicker = ({
 
       <div className="dmt-color-grid">
         {allColors.map(colorDef => {
-          if (colorDef.isReset) {
+          if (colorDef.isReset === true) {
             return (
               <button
                 key={colorDef.id}
@@ -352,7 +352,7 @@ const ColorPicker = ({
                 <Icon icon="lucide-circle-x" />
               </button>
             );
-          } else if (colorDef.isPreview) {
+          } else if (colorDef.isPreview === true) {
             return (
               <div
                 key={colorDef.id}
@@ -365,7 +365,7 @@ const ColorPicker = ({
                 </span>
               </div>
             );
-          } else if (colorDef.isAddButton) {
+          } else if (colorDef.isAddButton === true) {
             return (
               <div
                 key={colorDef.id}
@@ -378,7 +378,7 @@ const ColorPicker = ({
                   type="color"
                   className="dmt-color-input-as-button"
                   onInput={handleColorInput}
-                  defaultValue={selectedColor || '#ffffff'}
+                  defaultValue={selectedColor ?? '#ffffff'}
                   aria-label="Add custom color"
                 />
                 <span className="dmt-color-add-icon-overlay">+</span>

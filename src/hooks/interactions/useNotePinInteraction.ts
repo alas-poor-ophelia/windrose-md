@@ -63,13 +63,13 @@ const useNotePinInteraction = (
     if (!mapData) return false;
 
     // Check if position is occupied
-    const existingObj = getObjectAtPosition(getActiveLayer(mapData).objects || [], gridX, gridY);
+    const existingObj = getObjectAtPosition(getActiveLayer(mapData).objects, gridX, gridY);
     if (existingObj) {
       return true; // Handled but blocked
     }
 
     // Place the Note Pin object (without linkedNote initially)
-    const newObjects = (addObject as unknown as (objects: MapObject[], typeId: string, x: number, y: number, mapType: string, objectSetId?: string | null) => MapObject[])(getActiveLayer(mapData).objects || [], 'note_pin', gridX, gridY, mapData.mapType || 'grid', mapData.objectSetId);
+    const newObjects = (addObject as unknown as (objects: MapObject[], typeId: string, x: number, y: number, mapType: string, objectSetId?: string | null) => MapObject[])(getActiveLayer(mapData).objects, 'note_pin', gridX, gridY, mapData.mapType ?? 'grid', mapData.objectSetId);
 
     // Find the newly created pin
     const newPin = newObjects[newObjects.length - 1];
@@ -100,8 +100,8 @@ const useNotePinInteraction = (
     let updatedObjects: MapObject[];
 
     // Determine which object we're working with
-    const objectId = pendingNotePinId || editingNoteObjectId;
-    if (!objectId) return;
+    const objectId = pendingNotePinId ?? editingNoteObjectId;
+    if (objectId == null || objectId === '') return;
 
     const object = getActiveLayer(mapData).objects?.find(obj => obj.id === objectId);
     if (!object) return;
@@ -109,7 +109,7 @@ const useNotePinInteraction = (
     const isNotePin = object.type === 'note_pin';
 
     // Handle based on object type and whether note is being added or removed
-    if (!notePath || !notePath.trim()) {
+    if (notePath == null || notePath.trim() === '') {
       // Removing note link
       if (isNotePin) {
         // Note Pins are inseparable from notes - remove the entire pin
@@ -142,7 +142,7 @@ const useNotePinInteraction = (
       return;
     }
 
-    if (pendingNotePinId && mapData) {
+    if (pendingNotePinId != null && pendingNotePinId !== '' && mapData != null) {
       // Remove the pending Note Pin since user canceled
       const updatedObjects = removeObject(getActiveLayer(mapData).objects, pendingNotePinId);
       onObjectsChange(updatedObjects);

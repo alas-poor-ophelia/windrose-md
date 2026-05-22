@@ -20,7 +20,7 @@ const LinkingModeBanner = ({ linkingFrom, onCancel }: LinkingModeBannerProps): V
   const objectLabel = objectDef?.label || linkingFrom.objectType;
 
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
+    const handleKeyDown = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') {
         onCancel();
       }

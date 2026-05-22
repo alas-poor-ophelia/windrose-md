@@ -150,7 +150,7 @@ function isValidConcaveCorner(
   
   // Both neighbors for this corner must be painted
   const neighbors = CORNER_NEIGHBOR_CHECKS[corner];
-  if (!neighbors) {
+  if (neighbors == null) {
     return false;
   }
   
@@ -349,7 +349,7 @@ function getInheritedColor(
   corner: CornerName
 ): InheritedColor | null {
   const neighbors = CORNER_NEIGHBOR_CHECKS[corner];
-  if (!neighbors) return null;
+  if (neighbors == null) return null;
   
   // Try each neighbor
   for (const { dx, dy } of neighbors) {
@@ -373,7 +373,7 @@ function getInheritedColor(
  * Get the segments to fill for a given corner
  */
 function getSegmentsForCorner(corner: CornerName): SegmentName[] {
-  return CORNER_SEGMENT_FILL[corner] || [];
+  return CORNER_SEGMENT_FILL[corner] ?? [];
 }
 
 // ===========================================

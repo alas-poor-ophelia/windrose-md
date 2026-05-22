@@ -8,6 +8,7 @@
 
 
 
+import type { VNode } from 'preact';
 import type { SelectedItem } from '#types/contexts/context.types';
 import { calculateObjectScreenPosition } from '../../objects/screenPositionUtils';
 import { openNoteInNewTab } from '../../persistence/noteOperations';
@@ -19,7 +20,7 @@ interface LinkedNoteHoverOverlaysProps {
   selectedItem: SelectedItem | null;
 }
 
-const LinkedNoteHoverOverlays = ({ selectedItem }: LinkedNoteHoverOverlaysProps) => {
+const LinkedNoteHoverOverlays = ({ selectedItem }: LinkedNoteHoverOverlaysProps): VNode | null => {
   const { canvasRef, containerRef, mapData, geometry } = useMapState();
 
   // Don't render anything if prerequisites aren't met
@@ -28,9 +29,9 @@ const LinkedNoteHoverOverlays = ({ selectedItem }: LinkedNoteHoverOverlaysProps)
   const activeLayer = getActiveLayer(mapData);
 
   // Filter: must have linkedNote AND not be currently selected
-  const objectsWithLinks = (activeLayer.objects || []).filter(obj => {
-    return obj.linkedNote &&
-           typeof obj.linkedNote === 'string' &&
+  const objectsWithLinks = (activeLayer.objects ?? []).filter(obj => {
+    return typeof obj.linkedNote === 'string' &&
+           obj.linkedNote !== '' &&
            !(selectedItem?.type === 'object' && selectedItem?.id === obj.id);
   });
 
@@ -45,13 +46,13 @@ const LinkedNoteHoverOverlays = ({ selectedItem }: LinkedNoteHoverOverlaysProps)
         const { screenX, screenY, objectWidth, objectHeight } = position;
 
         const notePath = (obj.linkedNote ?? '').replace(/\.md$/, '');
-        if (!notePath) return null;
+        if (notePath === '') return null;
         
         // Touch handling state (local to each overlay)
         let touchStartTime: number | null = null;
         let touchTimer: ReturnType<typeof setTimeout> | null = null;
 
-        const handleTouchStart = (_e: TouchEvent) => {
+        const handleTouchStart = (_e: TouchEvent): void => {
           touchStartTime = Date.now();
 
           // Set up long-press detection (500ms)
@@ -62,14 +63,14 @@ const LinkedNoteHoverOverlays = ({ selectedItem }: LinkedNoteHoverOverlaysProps)
           }, 500);
         };
 
-        const handleTouchEnd = (e: TouchEvent) => {
+        const handleTouchEnd = (e: TouchEvent): void => {
           if (touchTimer) {
             clearTimeout(touchTimer);
             touchTimer = null;
           }
           
           // If it was a quick tap (not a long press), let it pass through
-          if (touchStartTime && (Date.now() - touchStartTime < 500)) {
+          if (touchStartTime != null && (Date.now() - touchStartTime < 500)) {
             // Quick tap - pass through to canvas
             e.preventDefault();
             e.stopPropagation();
@@ -105,7 +106,7 @@ const LinkedNoteHoverOverlays = ({ selectedItem }: LinkedNoteHoverOverlaysProps)
           touchStartTime = null;
         };
         
-        const handleTouchCancel = () => {
+        const handleTouchCancel = (): void => {
           if (touchTimer) {
             clearTimeout(touchTimer);
             touchTimer = null;

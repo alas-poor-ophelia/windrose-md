@@ -536,14 +536,14 @@ const RA_ICONS: IconMap = {
  */
 function getIconChar(iconClass: string): string | null {
   const icon = RA_ICONS[iconClass];
-  return icon ? icon.char : null;
+  return icon != null ? icon.char : null;
 }
 
 /**
  * Get full info for an icon
  */
 function getIconInfo(iconClass: string): IconData | null {
-  return RA_ICONS[iconClass] || null;
+  return RA_ICONS[iconClass] ?? null;
 }
 
 /**

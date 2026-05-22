@@ -76,14 +76,14 @@ const NotePinLayer = ({
 
   // Try native modal when showNoteLinkModal becomes true
   useEffect(() => {
-    if (!showNoteLinkModal || !pendingNotePinId || !mapData) {
+    if (!showNoteLinkModal || pendingNotePinId == null || pendingNotePinId === '' || !mapData) {
       nativeOpenedRef.current = false;
       return;
     }
 
     const currentNotePath = mapData.objects?.find(
       (obj: { id: string }) => obj.id === pendingNotePinId
-    )?.linkedNote || null;
+    )?.linkedNote ?? null;
 
     const opened = openNativeNoteLinkModal(app, {
       onSave: handleNoteLinkSave,
@@ -100,13 +100,13 @@ const NotePinLayer = ({
 
   return (
     <>
-      {showNoteLinkModal && pendingNotePinId && mapData && !nativeOpenedRef.current && (
+      {showNoteLinkModal && pendingNotePinId != null && pendingNotePinId !== '' && mapData != null && !nativeOpenedRef.current && (
         <NoteLinkModal
           isOpen={showNoteLinkModal}
           onClose={handleNoteLinkCancel}
           onSave={handleNoteLinkSave}
           currentNotePath={
-            mapData.objects?.find((obj: { id: string }) => obj.id === pendingNotePinId)?.linkedNote || null
+            mapData.objects?.find((obj: { id: string }) => obj.id === pendingNotePinId)?.linkedNote ?? null
           }
           objectType="note_pin"
         />

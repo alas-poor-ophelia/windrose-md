@@ -90,7 +90,7 @@ function CollapsibleSection({
           }}>
             {title}
           </span>
-          {subtitle && (
+          {subtitle != null && subtitle !== '' && (
             <span style={{
               fontSize: '12px',
               color: 'var(--text-muted)',

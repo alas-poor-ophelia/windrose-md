@@ -77,10 +77,10 @@ function renderTextLabelSelection(
   const { screenX, screenY } = geometry.worldToScreen(label.position.x, label.position.y, offsetX, offsetY, zoom);
 
   ctx.translate(screenX, screenY);
-  ctx.rotate(((label.rotation || 0) * Math.PI) / 180);
+  ctx.rotate(((label.rotation ?? 0) * Math.PI) / 180);
 
   const fontSize = label.fontSize * zoom;
-  const fontFamily = getFontCss(label.fontFace || 'sans');
+  const fontFamily = getFontCss(label.fontFace ?? 'sans');
   ctx.font = `${fontSize}px ${fontFamily}`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -118,7 +118,7 @@ function renderTextLabelSelections(
   getFontCss: (fontFace: string) => string
 ): void {
   const selectedTextLabels = selectedItems.filter(item => item.type === 'text');
-  if (selectedTextLabels.length === 0 || !textLabels) return;
+  if (selectedTextLabels.length === 0 || textLabels == null) return;
 
   for (const selectedItem of selectedTextLabels) {
     const label = textLabels.find(l => l.id === selectedItem.id);
@@ -319,7 +319,7 @@ function renderObjectSelection(
 ): void {
   let position: { screenX: number; screenY: number; objectWidth: number; objectHeight: number; cellWidth: number; cellHeight: number };
 
-  if (object.freeform && object.worldPosition) {
+  if (object.freeform === true && object.worldPosition != null) {
     const { offsetX, offsetY, zoom, scaledSize } = context;
     const size = object.size || { width: 1, height: 1 };
     const { screenX, screenY } = geometry.worldToScreen(
@@ -343,7 +343,7 @@ function renderObjectSelection(
   }
 
   // Draw selection rectangle and handles
-  renderObjectSelectionRectangle(ctx, screenX, screenY, objectWidth, objectHeight, isResizeMode, !!object.freeform);
+  renderObjectSelectionRectangle(ctx, screenX, screenY, objectWidth, objectHeight, isResizeMode, object.freeform === true);
 }
 
 /**
@@ -361,13 +361,13 @@ function renderObjectSelections(
   deps: Pick<SelectionRenderDeps, 'getObjectsInCell' | 'getSlotOffset' | 'getMultiObjectScale'>
 ): void {
   const selectedObjects = selectedItems.filter(item => item.type === 'object');
-  if (selectedObjects.length === 0 || !objects) return;
+  if (selectedObjects.length === 0 || objects == null) return;
 
   const showResizeOverlay = isResizeMode && selectedObjects.length === 1;
 
   for (const selectedItem of selectedObjects) {
     const object = objects.find(obj => obj.id === selectedItem.id);
-    if (object) {
+    if (object != null) {
       renderObjectSelection(
         context.ctx,
         object,

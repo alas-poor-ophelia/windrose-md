@@ -127,7 +127,7 @@ const MapSelectionProvider: FunctionComponent<MapSelectionProviderProps> = ({ ch
    * Update the data for selected items (used during drag to keep selection in sync)
    */
   const updateSelectedItemsData = useCallback((updates: ItemUpdate[]): void => {
-    if (!updates || updates.length === 0) return;
+    if (updates.length === 0) return;
 
     const updateMap = new Map(updates.map(u => [u.id, u]));
 

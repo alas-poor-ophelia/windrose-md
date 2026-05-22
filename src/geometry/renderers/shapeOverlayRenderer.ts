@@ -115,14 +115,14 @@ function renderPlayerLights(
   distancePerCell: number
 ): void {
   for (const obj of objects) {
-    if (!obj.isPlayer || !obj.lightEnabled || !obj.lightRadius) continue;
+    if (obj.isPlayer !== true || obj.lightEnabled !== true || obj.lightRadius == null) continue;
 
-    const cellSize = geometry.cellSize || geometry.hexSize || 1;
+    const cellSize = geometry.cellSize ?? geometry.hexSize ?? 1;
     const radiusInCells = obj.lightRadius / distancePerCell;
     const radiusInWorld = radiusInCells * cellSize;
 
     let worldX: number, worldY: number;
-    if (obj.freeform && obj.worldPosition) {
+    if (obj.freeform === true && obj.worldPosition != null) {
       worldX = obj.worldPosition.x;
       worldY = obj.worldPosition.y;
     } else {
@@ -136,13 +136,13 @@ function renderPlayerLights(
 
     ctx.save();
     ctx.globalAlpha = 0.15;
-    ctx.fillStyle = obj.lightColor || 'rgba(255, 255, 100, 1)';
+    ctx.fillStyle = obj.lightColor ?? 'rgba(255, 255, 100, 1)';
     ctx.beginPath();
     ctx.arc(sx, sy, screenRadius, 0, Math.PI * 2);
     ctx.fill();
 
     ctx.globalAlpha = 0.4;
-    ctx.strokeStyle = obj.lightColor || 'rgba(255, 255, 100, 1)';
+    ctx.strokeStyle = obj.lightColor ?? 'rgba(255, 255, 100, 1)';
     ctx.lineWidth = 1.5;
     ctx.setLineDash([4, 4]);
     ctx.stroke();

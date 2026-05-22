@@ -43,11 +43,11 @@ function generateObjectId(): ObjectId {
  * Find object at specific grid coordinates
  */
 function getObjectAtPosition(objects: MapObject[] | null | undefined, x: number, y: number): MapObject | null {
-  if (!objects || !Array.isArray(objects)) return null;
+  if (objects == null || !Array.isArray(objects)) return null;
   
   return objects.find(obj => {
     // Ensure size exists (backward compatibility)
-    const size = obj.size || { width: 1, height: 1 };
+    const size = obj.size ?? { width: 1, height: 1 };
     const pos = obj.position;
     
     // Check if (x, y) is within object bounds
@@ -65,7 +65,8 @@ function getObjectAtPosition(objects: MapObject[] | null | undefined, x: number,
  */
 function addObject(objects: MapObject[], typeId: string, x: number, y: number, mapType: MapType = 'grid', objectSetId?: string | null): MapObject[] {
   const objectType = getObjectType(typeId, mapType, objectSetId);
-  if (objectType.isUnknown) {
+  if (objectType.isUnknown === true) {
+    // eslint-disable-next-line no-console
     console.error(`Unknown object type: ${typeId}`);
     return objects;
   }
@@ -73,6 +74,7 @@ function addObject(objects: MapObject[], typeId: string, x: number, y: number, m
   // Check if object already exists at position
   const existing = getObjectAtPosition(objects, x, y);
   if (existing) {
+    // eslint-disable-next-line no-console
     console.warn(`Object already exists at position (${x}, ${y})`);
     return objects;
   }
@@ -145,7 +147,7 @@ function addObjectToHex(
   objectSetId?: string | null
 ): PlacementResult {
   const objectType = getObjectType(typeId, 'hex', objectSetId);
-  if (objectType.isUnknown) {
+  if (objectType.isUnknown === true) {
     return {
       objects,
       success: false,
@@ -272,9 +274,9 @@ function isAreaFree(
   if (!objects || !Array.isArray(objects)) return true;
   
   for (const obj of objects) {
-    if (excludeId && obj.id === excludeId) continue;
+    if (excludeId != null && excludeId !== '' && obj.id === excludeId) continue;
     
-    const size = obj.size || { width: 1, height: 1 };
+    const size = obj.size ?? { width: 1, height: 1 };
     const pos = obj.position;
     
     // Check if rectangles overlap
@@ -382,7 +384,7 @@ function placeObject(
 
   // Grid: single object per cell
   const objectType = getObjectType(typeId, mapType, objectSetId);
-  if (objectType.isUnknown) {
+  if (objectType.isUnknown === true) {
     return { 
       objects, 
       success: false, 
@@ -391,7 +393,7 @@ function placeObject(
   }
   
   const existing = getObjectAtPosition(objects, x, y);
-  if (existing) {
+  if (existing != null) {
     return { 
       objects, 
       success: false, 
@@ -480,7 +482,7 @@ function canPlaceObjectAt(
 
 /**
  * Place an object at exact world coordinates (freeform, not grid-snapped).
- * No collision check — freeform objects can overlap anything.
+ * No collision check â€” freeform objects can overlap anything.
  */
 function placeObjectFreeform(
   objects: MapObject[],
@@ -492,7 +494,7 @@ function placeObjectFreeform(
   objectSetId?: string | null
 ): PlacementResult {
   const objectType = getObjectType(typeId, mapType, objectSetId);
-  if (objectType.isUnknown) {
+  if (objectType.isUnknown === true) {
     return { objects, success: false, error: `Unknown object type: ${typeId}` };
   }
 

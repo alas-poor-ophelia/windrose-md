@@ -102,17 +102,18 @@ const SegmentPickerOverlay = ({
   useEffect(() => {
     if (isOpen && existingCell) {
       if (existingCell.segments) {
-        const filled = (Object.keys(existingCell.segments) as SegmentName[]).filter(
-          seg => existingCell.segments![seg]
+        const segs = existingCell.segments;
+        const filled = (Object.keys(segs) as SegmentName[]).filter(
+          seg => segs[seg]
         );
         setSelectedSegments(new Set(filled));
-      } else if (existingCell.color) {
+      } else if (existingCell.color != null && existingCell.color !== '') {
         setSelectedSegments(new Set(SEGMENT_NAMES as SegmentName[]));
       } else {
         setSelectedSegments(new Set());
       }
     } else if (isOpen) {
-      if (savedSegments && savedSegments.length > 0) {
+      if (savedSegments.length > 0) {
         setSelectedSegments(new Set(savedSegments));
       } else {
         setSelectedSegments(new Set());

@@ -93,7 +93,7 @@ const gridRenderer = {
       context: { ctx: CanvasRenderingContext2D; offsetX: number; offsetY: number; zoom: number }
     ) => void
   ): void {
-    if (!bgImage || !bgConfig?.path || !dimensions) return;
+    if (bgImage == null || bgConfig?.path == null || bgConfig.path === '' || dimensions == null) return;
     if (!bgImage.complete) return;
 
     renderGridBackgroundImage(
@@ -141,7 +141,7 @@ const gridRenderer = {
     geometry: IGridRenderer,
     viewState: ViewState
   ): void {
-    if (!cells || cells.length === 0) return;
+    if (cells == null || cells.length === 0) return;
     
     const scaledSize = geometry.getScaledCellSize(viewState.zoom);
     
@@ -163,10 +163,10 @@ const gridRenderer = {
       const cellsByColor: Record<string, RenderCell[]> = {};
       for (const cell of fullOpacityCells) {
         const color = cell.color;
-        if (!cellsByColor[color]) {
+        if (cellsByColor[color] == null) {
           cellsByColor[color] = [];
         }
-        cellsByColor[color].push(cell);
+        cellsByColor[color]?.push(cell);
       }
       
       for (const [color, cellGroup] of Object.entries(cellsByColor)) {
@@ -200,7 +200,7 @@ const gridRenderer = {
     viewState: ViewState,
     style: InteriorGridStyle = {}
   ): void {
-    if (!cells || cells.length === 0) return;
+    if (cells == null || cells.length === 0) return;
     
     const { lineColor = '#666666', lineWidth = 1, interiorRatio = 0.5 } = style;
     const scaledSize = geometry.getScaledCellSize(viewState.zoom);
@@ -271,7 +271,7 @@ const gridRenderer = {
     viewState: ViewState,
     style: EdgeStyle = {}
   ): void {
-    if (!edges || edges.length === 0) return;
+    if (edges == null || edges.length === 0) return;
     
     const scaledSize = geometry.getScaledCellSize(viewState.zoom);
     // Edge thickness: slightly thicker than grid lines for visibility
@@ -282,7 +282,7 @@ const gridRenderer = {
     
     for (const edge of edges) {
       // Skip malformed edges
-      if (!edge || typeof edge.x !== 'number' || typeof edge.y !== 'number' || !edge.side || !edge.color) {
+      if (edge == null || typeof edge.x !== 'number' || typeof edge.y !== 'number' || edge.side == null || edge.color == null) {
         continue;
       }
       
@@ -345,7 +345,7 @@ const gridRenderer = {
     calculateBorders: CalculateBordersFn,
     theme: BorderTheme
   ): void {
-    if (!cells || cells.length === 0) return;
+    if (cells == null || cells.length === 0) return;
     
     const scaledSize = geometry.getScaledCellSize(viewState.zoom);
     const cellLookup = buildCellLookup(cells);

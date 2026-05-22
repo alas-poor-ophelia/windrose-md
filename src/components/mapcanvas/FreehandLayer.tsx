@@ -103,7 +103,7 @@ const FreehandLayer = ({
     ctx.save();
 
     // Apply north rotation if present
-    const northDirection = mapData.northDirection || 0;
+    const northDirection = mapData.northDirection ?? 0;
     if (northDirection !== 0) {
       ctx.translate(width / 2, height / 2);
       ctx.rotate((northDirection * Math.PI) / 180);
@@ -246,7 +246,7 @@ const FreehandLayer = ({
     // Get current curves and append
     if (mapData) {
       const activeLayer = getActiveLayer(mapData);
-      const currentCurves = activeLayer.curves || [];
+      const currentCurves = activeLayer.curves ?? [];
       onCurvesChange([...currentCurves, curve]);
     }
 

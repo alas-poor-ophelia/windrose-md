@@ -55,17 +55,6 @@ export interface PositionUpdate {
   position: Point;
 }
 
-/** Grid geometry instance interface */
-interface GridGeometryInstance extends IGeometry {
-  cellSize: number;
-}
-
-/** Hex geometry instance interface */
-interface HexGeometryInstance extends IGeometry {
-  hexSize: number;
-  hexToWorld(q: number, r: number): { worldX: number; worldY: number };
-}
-
 /** Geometry with bounds check */
 interface GeometryWithBounds {
   isWithinBounds?(x: number, y: number): boolean;
@@ -103,11 +92,11 @@ function getObjectWorldBounds(
   mapData: MapData
 ): WorldBounds {
   const pos = obj.position;
-  const size: ObjectSize = obj.size || { width: 1, height: 1 };
+  const size: ObjectSize = obj.size ?? { width: 1, height: 1 };
   
   // For grid maps: convert grid cell to world coords
   if (geometry instanceof GridGeometry) {
-    const cellSize = (geometry as GridGeometryInstance).cellSize;
+    const cellSize = geometry.cellSize;
     return {
       minX: pos.x * cellSize,
       minY: pos.y * cellSize,
@@ -118,7 +107,7 @@ function getObjectWorldBounds(
   
   // For hex maps: get hex center in world coords and create bounds around it
   if (geometry instanceof HexGeometry) {
-    const hexGeo = geometry as HexGeometryInstance;
+    const hexGeo = geometry;
     const center = hexGeo.hexToWorld(pos.x, pos.y);
     const hexSize = hexGeo.hexSize;
     
@@ -234,16 +223,16 @@ function getItemsInWorldRect(
   const maxY = Math.max(corner1.worldY, corner2.worldY);
   
   // Check objects
-  const objects = activeLayer.objects || [];
+  const objects = activeLayer.objects ?? [];
   for (const obj of objects) {
     const objBounds = getObjectWorldBounds(obj as unknown as MapObject, geometry, mapData);
     if (rectsOverlap(minX, minY, maxX, maxY, objBounds)) {
       items.push({ type: 'object', id: obj.id, data: obj as unknown as MapObject });
     }
   }
-  
+
   // Check text labels
-  const textLabels = activeLayer.textLabels || [];
+  const textLabels = activeLayer.textLabels ?? [];
   for (const label of textLabels) {
     const labelBounds = getTextLabelWorldBounds(label as unknown as TextLabel, ctx);
     if (rectsOverlap(minX, minY, maxX, maxY, labelBounds)) {
@@ -308,10 +297,10 @@ function isWithinBounds(
   geometry: IGeometry & GeometryWithBounds | null,
   _mapData: MapData
 ): boolean {
-  if (!geometry) return true;
+  if (geometry == null) return true;
   
   // Use geometry's bounds check if available
-  if (geometry.isWithinBounds) {
+  if (geometry.isWithinBounds != null) {
     return geometry.isWithinBounds(gridX, gridY);
   }
   
@@ -328,7 +317,7 @@ function validateGroupMove(
   mapData: MapData
 ): boolean {
   for (const update of updates) {
-    if (update.position) {
+    if (update.position != null) {
       if (!isWithinBounds(update.position.x, update.position.y, geometry, mapData)) {
         return false;
       }

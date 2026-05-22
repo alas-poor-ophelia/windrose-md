@@ -124,7 +124,7 @@ function FogOfWarSection(): VNode {
   };
 
   const opacityPercent = Math.round((overrides.fogOfWarOpacity ?? 0.9) * 100);
-  const subtitle = overrides.fogOfWarImage
+  const subtitle = overrides.fogOfWarImage != null && overrides.fogOfWarImage !== ''
     ? `Image, ${opacityPercent}% opacity`
     : `${overrides.fogOfWarColor ?? '#000000'}, ${opacityPercent}%`;
 
@@ -229,7 +229,7 @@ function FogOfWarSection(): VNode {
               }}
             />
 
-            {overrides.fogOfWarImage && !useGlobalSettings && (
+            {overrides.fogOfWarImage != null && overrides.fogOfWarImage !== '' && !useGlobalSettings && (
               <button
                 onClick={handleFogImageClear}
                 style={{
@@ -354,7 +354,7 @@ function AppearanceTab(): VNode {
         >
           <select
             class="dropdown"
-            value={objectSetId || ''}
+            value={objectSetId ?? ''}
             onChange={(e) => handleObjectSetChange(e.currentTarget.value || null)}
           >
             <option value="">Use global</option>

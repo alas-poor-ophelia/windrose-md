@@ -15,7 +15,7 @@
  * Calculate bounding box for a text label in screen coordinates
  */
 
-import type { JSX } from 'preact';
+import type { JSX, VNode } from 'preact';
 import type { MapData } from '#types/core/map.types';
 import type { TextLabel } from '#types/objects/note.types';
 import type { SelectedItem } from '#types/contexts/context.types';
@@ -42,12 +42,12 @@ function calculateTextLabelBounds(
   canvasRef: { current: HTMLCanvasElement | null },
   containerRef: { current: HTMLElement | null } | null,
   mapData: MapData | null
-) {
-  if (!label || !canvasRef.current || !containerRef?.current || !mapData) return null;
+): { screenX: number; screenY: number; width: number; height: number } | null {
+  if (canvasRef.current == null || containerRef?.current == null || mapData == null) return null;
 
   const canvas = canvasRef.current;
   const { gridSize, viewState, northDirection } = mapData;
-  if (!viewState) return null;
+  if (viewState == null) return null;
   const { zoom, center } = viewState;
   const scaledGridSize = (gridSize ?? 32) * zoom;
 
@@ -59,7 +59,7 @@ function calculateTextLabelBounds(
   let screenX = offsetX + label.position.x * zoom;
   let screenY = offsetY + label.position.y * zoom;
 
-  if (northDirection && northDirection !== 0) {
+  if (northDirection != null && northDirection !== 0) {
     const relX = screenX - centerX;
     const relY = screenY - centerY;
     const angleRad = (northDirection * Math.PI) / 180;
@@ -77,7 +77,7 @@ function calculateTextLabelBounds(
   const textWidth = metrics.width;
   const textHeight = fontSize * 1.2;
 
-  const labelAngle = ((label.rotation || 0) * Math.PI) / 180;
+  const labelAngle = ((label.rotation ?? 0) * Math.PI) / 180;
   const cos = Math.abs(Math.cos(labelAngle));
   const sin = Math.abs(Math.sin(labelAngle));
   const rotatedWidth = textWidth * cos + textHeight * sin;
@@ -110,7 +110,7 @@ const TextSelectionToolbar = ({
   onRotate,
   onCopyLink,
   onDelete
-}: TextSelectionToolbarProps) => {
+}: TextSelectionToolbarProps): VNode | null => {
   if (!selectedItem || selectedItem.type !== 'text' || !mapData || !canvasRef?.current || !containerRef?.current) {
     return null;
   }
@@ -151,7 +151,7 @@ const TextSelectionToolbar = ({
       {buttons.map((btn) => (
         <button
           key={btn.id}
-          className={`dmt-toolbar-button${btn.isDelete ? ' dmt-toolbar-delete-button' : ''}`}
+          className={`dmt-toolbar-button${btn.isDelete === true ? ' dmt-toolbar-delete-button' : ''}`}
           onClick={(e) => btn.onClick?.(e)}
           title={btn.title}
         >

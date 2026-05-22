@@ -45,20 +45,20 @@ const LayerEditModal = ({
   onSave,
   onCancel
 }: LayerEditModalProps): VNode => {
-  const isDefaultLayerName = !layer.name || layer.name === defaultName;
+  const isDefaultLayerName = layer.name == null || layer.name === '' || layer.name === defaultName;
   const initialName = isDefaultLayerName ? '' : layer.name;
-  const initialIcon = layer.icon || null;
-  const initialMode: IconMode = initialIcon
+  const initialIcon = (layer.icon != null && layer.icon !== '') ? layer.icon : null;
+  const initialMode: IconMode = (initialIcon != null && initialIcon !== '')
     ? (initialIcon.startsWith('ra-') ? 'rpgawesome' : 'symbol')
     : 'none';
 
   const [name, setName] = useState(initialName);
   const [iconMode, setIconMode] = useState<IconMode>(initialMode);
   const [symbol, setSymbol] = useState(
-    initialIcon && !initialIcon.startsWith('ra-') ? initialIcon : ''
+    initialIcon != null && initialIcon !== '' && !initialIcon.startsWith('ra-') ? initialIcon : ''
   );
   const [iconClass, setIconClass] = useState(
-    initialIcon && initialIcon.startsWith('ra-') ? initialIcon : ''
+    initialIcon != null && initialIcon !== '' && initialIcon.startsWith('ra-') ? initialIcon : ''
   );
   const [searchQuery, setSearchQuery] = useState('');
   const [iconCategory, setIconCategory] = useState('all');
@@ -106,10 +106,10 @@ const LayerEditModal = ({
   };
 
   const getDisplayIcon = (): string | null => {
-    if (iconMode === 'symbol' && symbol) return symbol;
-    if (iconMode === 'rpgawesome' && iconClass) {
+    if (iconMode === 'symbol' && symbol !== '') return symbol;
+    if (iconMode === 'rpgawesome' && iconClass !== '') {
       const info = getIconInfo(iconClass);
-      return info?.char || null;
+      return info?.char ?? null;
     }
     return null;
   };
@@ -265,8 +265,8 @@ const LayerEditModal = ({
         <div className="dmt-layer-edit-section">
           <label className="dmt-layer-edit-label">Preview</label>
           <div className="dmt-layer-preview">
-            <div className={`dmt-layer-preview-btn ${getDisplayIcon() || getDisplayName().length > 2 ? 'pill' : ''}`}>
-              {getDisplayIcon() && (
+            <div className={`dmt-layer-preview-btn ${getDisplayIcon() != null || getDisplayName().length > 2 ? 'pill' : ''}`}>
+              {getDisplayIcon() != null && (
                 <span className={iconMode === 'rpgawesome' ? 'ra dmt-layer-preview-icon' : 'dmt-layer-preview-icon'}>
                   {getDisplayIcon()}
                 </span>

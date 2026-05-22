@@ -1,14 +1,15 @@
 // WindroseCompass.jsx - Reusable branded compass rose SVG component
 
 
+import type { VNode } from 'preact';
 import { useRef } from 'preact/hooks';
-const WindroseCompass = ({ rotation = 0, size, className = '' }: { rotation?: number; size?: number; className?: string }) => {
+const WindroseCompass = ({ rotation = 0, size, className = '' }: { rotation?: number; size?: number; className?: string }): VNode => {
   // Unique filter IDs to avoid document-global collisions
   const instanceIdRef = useRef<string | undefined>();
-  if (!instanceIdRef.current) {
+  if (instanceIdRef.current == null) {
     instanceIdRef.current = `windrose-${Math.random().toString(36).substr(2, 9)}`;
   }
-  const filterId = (name: string) => `${name}-${instanceIdRef.current}`;
+  const filterId = (name: string): string => `${name}-${instanceIdRef.current}`;
   
   const style = {
     width: size,

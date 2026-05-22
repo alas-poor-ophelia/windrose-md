@@ -156,7 +156,7 @@ function renderGridBackgroundImage(
   // If imageGridSize is specified, scale image so its grid matches Windrose's grid
   // Scale = cellSize / imageGridSize
   // (e.g., if image has 40px grid and Windrose uses 32px, scale = 0.8)
-  const imageScale = config.imageGridSize && config.imageGridSize > 0
+  const imageScale = config.imageGridSize != null && config.imageGridSize > 0
     ? cellSize / config.imageGridSize
     : 1.0;
 

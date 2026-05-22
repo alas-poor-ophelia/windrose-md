@@ -67,7 +67,7 @@ const useDiagonalFill = (currentTool: ToolId): UseDiagonalFillResult => {
   const cellMap = useMemo((): CellMap => {
     if (!mapData || !geometry) return new Map();
     const activeLayer = getActiveLayer(mapData);
-    return buildCellMap(activeLayer.cells || [], geometry);
+    return buildCellMap(activeLayer.cells, geometry);
   }, [mapData, geometry]);
 
   useEffect(() => {
@@ -88,10 +88,10 @@ const useDiagonalFill = (currentTool: ToolId): UseDiagonalFillResult => {
 
   const executeFillPath = useCallback(
     (start: DiagonalFillStart, end: DiagonalFillEnd): void => {
-      if (!start || !end || !geometry || !mapData) return;
+      if (!geometry || !mapData) return;
 
       const activeLayer = getActiveLayer(mapData);
-      const currentCellMap = buildCellMap(activeLayer.cells || [], geometry);
+      const currentCellMap = buildCellMap(activeLayer.cells, geometry);
 
       const validCorners = getValidCornersAlongDiagonal(
         currentCellMap, start.x, start.y, end.x, end.y, start.corner
@@ -105,7 +105,7 @@ const useDiagonalFill = (currentTool: ToolId): UseDiagonalFillResult => {
       const segments = getSegmentsForCorner(start.corner);
       if (segments.length === 0) return;
 
-      let updatedCells = [...(activeLayer.cells || [])];
+      let updatedCells = [...activeLayer.cells];
 
       for (const { x, y } of validCorners) {
         updatedCells = setSegments(
@@ -276,7 +276,7 @@ const useDiagonalFill = (currentTool: ToolId): UseDiagonalFillResult => {
         'BL': { x: 0, y: scaledCellSize }
       };
 
-      const offset = cornerOffsets[corner] || { x: 0, y: 0 };
+      const offset = cornerOffsets[corner];
 
       return {
         x: screenX + offset.x,

@@ -142,7 +142,7 @@ function useShapeTools({
 
     const activeLayer = getActiveLayer(mapData);
 
-    const newObjects = removeObjectsInRectangle(activeLayer.objects || [], x1, y1, x2, y2);
+    const newObjects = removeObjectsInRectangle(activeLayer.objects, x1, y1, x2, y2);
     onObjectsChange(newObjects);
 
     const minX = Math.min(x1, x2);
@@ -153,7 +153,7 @@ function useShapeTools({
     const { worldX: worldMinX, worldY: worldMinY } = geometry.gridToWorld(minX, minY);
     const { worldX: worldMaxX, worldY: worldMaxY } = geometry.gridToWorld(maxX + 1, maxY + 1);
 
-    const newTextLabels = (activeLayer.textLabels || []).filter((label: TextLabel) => {
+    const newTextLabels = activeLayer.textLabels.filter((label: TextLabel) => {
       return !(label.position.x >= worldMinX && label.position.x <= worldMaxX &&
                label.position.y >= worldMinY && label.position.y <= worldMaxY);
     });
@@ -162,7 +162,7 @@ function useShapeTools({
     const newCells = removeCellsInBounds(activeLayer.cells, x1, y1, x2, y2, geometry);
     onCellsChange(newCells);
 
-    if (onEdgesChange && activeLayer.edges && activeLayer.edges.length > 0) {
+    if (activeLayer.edges.length > 0) {
       const newEdges = activeLayer.edges.filter((edge: Edge) =>
         !(edge.x >= minX && edge.x <= maxX && edge.y >= minY && edge.y <= maxY)
       );
@@ -171,7 +171,7 @@ function useShapeTools({
       }
     }
 
-    if (activeLayer.curves && activeLayer.curves.length > 0) {
+    if (activeLayer.curves.length > 0) {
       const newCurves = eraseRectangleFromCurves(
         activeLayer.curves,
         worldMinX, worldMinY,
@@ -184,7 +184,7 @@ function useShapeTools({
   };
 
   const fillEdgeLine = (x1: number, y1: number, x2: number, y2: number): void => {
-    if (!mapData || !onEdgesChange) return;
+    if (!mapData) return;
     if (!GridGeometry || !(geometry instanceof GridGeometry)) return;
 
     const activeLayer = getActiveLayer(mapData);
@@ -210,9 +210,9 @@ function useShapeTools({
   const updateShapeHover = useCallback((gridX: number, gridY: number): void => {
     if (touchConfirmPending) return;
 
-    const hasStart = (currentTool === 'circle' && circleStart) ||
-                     ((currentTool === 'rectangle' || currentTool === 'clearArea') && rectangleStart) ||
-                     (currentTool === 'edgeLine' && edgeLineStart);
+    const hasStart = (currentTool === 'circle' && circleStart != null) ||
+                     ((currentTool === 'rectangle' || currentTool === 'clearArea') && rectangleStart != null) ||
+                     (currentTool === 'edgeLine' && edgeLineStart != null);
 
     if (hasStart) {
       setShapeHoverPosition({ x: gridX, y: gridY });

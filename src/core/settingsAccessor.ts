@@ -122,7 +122,7 @@ function getApp(): App {
 }
 
 function getDataFilePath(): string {
-  return _plugin?.dataFilePath || 'windrose-md-data.json';
+  return _plugin?.dataFilePath ?? 'windrose-md-data.json';
 }
 
 // ===========================================
@@ -148,6 +148,7 @@ function getSetting<K extends keyof PluginSettings>(key: K): PluginSettings[K] {
     const settings = getSettings();
     return settings[key];
   } catch (error) {
+    // eslint-disable-next-line no-console
     console.warn('[settingsAccessor] Error getting setting:', key, error);
     return FALLBACK_SETTINGS[key];
   }
@@ -256,19 +257,19 @@ function getObjectSettingsForSet(setId: string, mapType: 'hex' | 'grid' = 'grid'
   if (!raw) return null;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const sets = (raw as any).objectSets || [];
-  const set = sets.find((s: { id: string }) => s.id === setId);
-  if (!set) return null;
+  const sets = ((raw as any).objectSets ?? []) as Array<{ id: string; data?: { hex?: Record<string, unknown>; grid?: Record<string, unknown> } }>;
+  const set = sets.find((s) => s.id === setId);
+  if (set == null) return null;
 
   const sideData = mapType === 'hex'
-    ? (set.data?.hex || set.data?.grid)
-    : (set.data?.grid || set.data?.hex);
-  if (!sideData) return FALLBACK_OBJECT_SETTINGS;
+    ? (set.data?.hex ?? set.data?.grid)
+    : (set.data?.grid ?? set.data?.hex);
+  if (sideData == null) return FALLBACK_OBJECT_SETTINGS;
 
   return {
-    objectOverrides: sideData.objectOverrides || {},
-    customObjects: sideData.customObjects || [],
-    customCategories: sideData.customCategories || []
+    objectOverrides: (sideData as Record<string, unknown>).objectOverrides as Record<string, unknown> ?? {},
+    customObjects: (sideData as Record<string, unknown>).customObjects as unknown[] ?? [],
+    customCategories: (sideData as Record<string, unknown>).customCategories as unknown[] ?? []
   };
 }
 
@@ -278,20 +279,22 @@ function getObjectSettingsForSet(setId: string, mapType: 'hex' | 'grid' = 'grid'
  */
 function getColorPaletteSettings(): ResolvedColorEntry[] {
   const raw = getPluginSettingsRaw();
-  if (raw) {
+  if (raw != null) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { colorPaletteOverrides = {}, customPaletteColors = [] } = raw as any;
+    const rawAny = raw as any;
+    const colorPaletteOverrides: Record<string, Record<string, unknown> | undefined> = rawAny.colorPaletteOverrides ?? {};
+    const customPaletteColors: ResolvedColorEntry[] = rawAny.customPaletteColors ?? [];
 
     const resolvedBuiltIns: ResolvedColorEntry[] = BUILT_IN_COLORS
-      .filter(c => !colorPaletteOverrides[c.id]?.hidden)
+      .filter(c => (colorPaletteOverrides[c.id]?.hidden as boolean | undefined) !== true)
       .map((c, index) => {
         const override = colorPaletteOverrides[c.id];
-        if (override) {
+        if (override != null) {
           const { hidden, ...overrideProps } = override;
           return {
             ...c,
             ...overrideProps,
-            order: override.order ?? index,
+            order: (override.order as number | undefined) ?? index,
             isBuiltIn: true,
             isModified: true
           };
@@ -299,7 +302,7 @@ function getColorPaletteSettings(): ResolvedColorEntry[] {
         return { ...c, order: index, isBuiltIn: true, isModified: false };
       });
 
-    const resolvedCustom: ResolvedColorEntry[] = (customPaletteColors || []).map((c: ResolvedColorEntry, index: number) => ({
+    const resolvedCustom: ResolvedColorEntry[] = customPaletteColors.map((c: ResolvedColorEntry, index: number) => ({
       ...c,
       order: c.order ?? (100 + index),
       isCustom: true,
@@ -327,7 +330,7 @@ function getColorPaletteSettings(): ResolvedColorEntry[] {
 function getTilesetFolders(): string[] {
   try {
     const settings = getSettings();
-    return (settings as PluginSettings & { tilesetFolders?: string[] }).tilesetFolders || [];
+    return (settings as PluginSettings & { tilesetFolders?: string[] }).tilesetFolders ?? [];
   } catch {
     return [];
   }

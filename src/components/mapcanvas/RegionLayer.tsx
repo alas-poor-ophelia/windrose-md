@@ -96,9 +96,9 @@ const RegionLayer = ({
 
   // Listen for edit-region events from sidebar panel
   useEffect(() => {
-    const handler = (e: CustomEvent) => {
+    const handler = (e: CustomEvent): void => {
       const { regionId } = e.detail;
-      if (regionId) {
+      if ((regionId as string | undefined) != null && (regionId as string) !== '') {
         startEditingRegion(regionId);
       }
     };
@@ -112,8 +112,8 @@ const RegionLayer = ({
 
   // Intercept undo when region creation/editing is in progress — cancel instead
   useEffect(() => {
-    const handler = (e: Event) => {
-      if (pendingHexes.length > 0 || editingRegionId || showNameInput) {
+    const handler = (e: Event): void => {
+      if (pendingHexes.length > 0 || (editingRegionId != null && editingRegionId !== '') || showNameInput) {
         e.preventDefault();
         cancelRegion();
         setShowNameInput(false);
@@ -132,7 +132,7 @@ const RegionLayer = ({
   const handleConfirmName = useCallback(() => {
     if (!regionName.trim()) return;
 
-    if (editingRegionId) {
+    if (editingRegionId != null && editingRegionId !== '') {
       updateRegion(editingRegionId, { name: regionName.trim() });
     } else {
       confirmRegion(regionName.trim());
@@ -213,7 +213,7 @@ const RegionLayer = ({
     const viewState = mapData.viewState;
     if (!viewState) return;
 
-    const northDirection = mapData.northDirection || 0;
+    const northDirection = mapData.northDirection ?? 0;
 
     if (northDirection !== 0) {
       ctx.save();
@@ -313,31 +313,31 @@ const RegionLayer = ({
       item.onClick(() => updateRegion(region.id, { visible: !region.visible }));
     });
 
-    if (region.linkedNote) {
+    if (region.linkedNote != null && region.linkedNote !== '') {
       menu.addItem((item: MenuItem) => {
         item.setTitle('Open linked note');
         item.setIcon('lucide-external-link');
         item.onClick(() => {
-          const linkPath = region.linkedNote!.replace(/\.md$/, '');
+          const linkPath = (region.linkedNote ?? '').replace(/\.md$/, '');
           void app.workspace.openLinkText(linkPath, '', false);
         });
       });
     }
 
     menu.addItem((item: MenuItem) => {
-      item.setTitle(region.linkedNote ? 'Change linked note' : 'Link note');
+      item.setTitle(region.linkedNote != null && region.linkedNote !== '' ? 'Change linked note' : 'Link note');
       item.setIcon('lucide-link');
       item.onClick(() => {
         openNativeNoteLinkModal(app, {
-          onSave: (notePath: string | null) => updateRegion(region.id, { linkedNote: notePath || undefined }),
+          onSave: (notePath: string | null) => updateRegion(region.id, { linkedNote: notePath ?? undefined }),
           onClose: () => {},
-          currentNotePath: region.linkedNote || null,
+          currentNotePath: region.linkedNote ?? null,
           objectType: null
         });
       });
     });
 
-    if (region.linkedNote) {
+    if (region.linkedNote != null && region.linkedNote !== '') {
       menu.addItem((item: MenuItem) => {
         item.setTitle('Remove note link');
         item.setIcon('lucide-unlink');
@@ -374,7 +374,7 @@ const RegionLayer = ({
     const canvas = canvasRef.current;
     if (!canvas) return undefined;
 
-    const handleTouchStart = (e: TouchEvent) => {
+    const handleTouchStart = (e: TouchEvent): void => {
       if (e.touches.length !== 1) return;
       const touch = e.touches[0];
       longPressPosRef.current = { x: touch.clientX, y: touch.clientY };
@@ -386,7 +386,7 @@ const RegionLayer = ({
           clientY: longPressPosRef.current.y,
           bubbles: true
         });
-        const hex = screenToGrid ? screenToGrid(longPressPosRef.current.x, longPressPosRef.current.y) : null;
+        const hex = screenToGrid != null ? screenToGrid(longPressPosRef.current.x, longPressPosRef.current.y) : null;
         if (hex && mapData?.regions) {
           const key = `${hex.x},${hex.y}`;
           const region = mapData.regions.find(r => r.hexes.some(h => `${h.x},${h.y}` === key));
@@ -398,7 +398,7 @@ const RegionLayer = ({
       }, 500);
     };
 
-    const handleTouchMove = (e: TouchEvent) => {
+    const handleTouchMove = (e: TouchEvent): void => {
       if (longPressPosRef.current && e.touches.length === 1) {
         const touch = e.touches[0];
         const dx = touch.clientX - longPressPosRef.current.x;
@@ -410,7 +410,7 @@ const RegionLayer = ({
       }
     };
 
-    const handleTouchEnd = () => {
+    const handleTouchEnd = (): void => {
       if (longPressTimerRef.current) {
         clearTimeout(longPressTimerRef.current);
         longPressTimerRef.current = null;
@@ -485,18 +485,18 @@ const RegionLayer = ({
               const region = editingRegion;
               openNativeNoteLinkModal(app, {
                 onSave: (notePath: string | null) => {
-                  updateRegion(region.id, { linkedNote: notePath || undefined });
+                  updateRegion(region.id, { linkedNote: notePath ?? undefined });
                 },
                 onClose: () => {},
-                currentNotePath: region.linkedNote || null,
+                currentNotePath: region.linkedNote ?? null,
                 objectType: null
               });
             }}
-            title={editingRegion.linkedNote ? 'Change linked note' : 'Link note'}
+            title={editingRegion.linkedNote != null && editingRegion.linkedNote !== '' ? 'Change linked note' : 'Link note'}
             style={{
               padding: '4px 8px',
               background: 'transparent',
-              color: editingRegion.linkedNote ? 'var(--text-accent)' : 'var(--text-muted)',
+              color: editingRegion.linkedNote != null && editingRegion.linkedNote !== '' ? 'var(--text-accent)' : 'var(--text-muted)',
               borderRadius: '4px',
               border: '1px solid var(--background-modifier-border)',
               cursor: 'pointer',
@@ -506,7 +506,7 @@ const RegionLayer = ({
               alignItems: 'center'
             }}
           >
-            <Icon icon={editingRegion.linkedNote ? 'lucide-file-check' : 'lucide-link'} />
+            <Icon icon={editingRegion.linkedNote != null && editingRegion.linkedNote !== '' ? 'lucide-file-check' : 'lucide-link'} />
           </button>
           <button
             onClick={() => {
@@ -560,7 +560,7 @@ const RegionLayer = ({
       )}
 
       {/* Create Region bar */}
-      {isRegionTool && pendingHexes.length > 0 && !showNameInput && !editingRegionId && (
+      {isRegionTool && pendingHexes.length > 0 && !showNameInput && (editingRegionId == null || editingRegionId === '') && (
         <div style={{
           position: 'fixed',
           bottom: '100px',

@@ -41,10 +41,10 @@ export const RPGAwesomeHelpers = {
   },
 
   isValid(iconClass: string): boolean {
-    return !!iconClass && Object.prototype.hasOwnProperty.call(RA_ICONS, iconClass);
+    return iconClass != null && iconClass !== '' && Object.prototype.hasOwnProperty.call(RA_ICONS, iconClass);
   },
 
   getInfo(iconClass: string): { char: string; label: string; category: string } | null {
-    return (RA_ICONS as Record<string, { char: string; label: string; category: string }>)[iconClass] || null;
+    return (RA_ICONS as Record<string, { char: string; label: string; category: string }>)[iconClass] ?? null;
   }
 };

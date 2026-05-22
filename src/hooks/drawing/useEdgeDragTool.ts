@@ -54,7 +54,7 @@ function useEdgeDragTool({
   const strokeInitialEdgesRef = useRef<Edge[] | null>(null);
 
   const toggleEdge = (worldX: number, worldY: number, shouldPaint: boolean): void => {
-    if (!mapData || !geometry || !onEdgesChange) return;
+    if (!mapData || !geometry) return;
     if (!GridGeometry || !(geometry instanceof GridGeometry)) return;
 
     const activeLayer = getActiveLayer(mapData);
@@ -87,7 +87,7 @@ function useEdgeDragTool({
 
     const edgeGeometry = geometry as ExtendedGeometry;
     const edgeInfo = edgeGeometry.screenToEdge?.(worldCoords.worldX, worldCoords.worldY, 0.15);
-    if (!edgeInfo) return;
+    if (edgeInfo == null) return;
 
     const edgeKey = `${edgeInfo.x},${edgeInfo.y},${edgeInfo.side}`;
 
@@ -106,21 +106,20 @@ function useEdgeDragTool({
 
     setEdgeIsDrawing(true);
     setProcessedEdges(new Set());
-    strokeInitialEdgesRef.current = [...(activeLayer.edges || [])];
+    strokeInitialEdgesRef.current = [...(activeLayer.edges ?? [])];
     processEdgeDuringDrag(e);
   };
 
   const stopEdgeDrawing = (): void => {
     if (!edgeIsDrawing) return;
 
-    const activeLayer = getActiveLayer(mapData!);
-
     setEdgeIsDrawing(false);
     setProcessedEdges(new Set());
 
-    if (strokeInitialEdgesRef.current !== null && mapData && onEdgesChange) {
-      if (JSON.stringify(activeLayer.edges || []) !== JSON.stringify(strokeInitialEdgesRef.current)) {
-        onEdgesChange(activeLayer.edges || [], false);
+    if (strokeInitialEdgesRef.current !== null && mapData != null) {
+      const activeLayer = getActiveLayer(mapData);
+      if (JSON.stringify(activeLayer.edges ?? []) !== JSON.stringify(strokeInitialEdgesRef.current)) {
+        onEdgesChange(activeLayer.edges ?? [], false);
       }
       strokeInitialEdgesRef.current = null;
     }

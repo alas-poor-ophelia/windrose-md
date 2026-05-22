@@ -41,15 +41,15 @@ function cellToScreen(
   useCenter = true
 ): Point {
   const { zoom, center } = mapData.viewState;
-  const northDirection = mapData.northDirection || 0;
+  const northDirection = mapData.northDirection ?? 0;
 
   let worldX: number, worldY: number;
   if (useCenter) {
-    if (geometry.getCellCenter) {
+    if (geometry.getCellCenter != null) {
       const cellCenter = geometry.getCellCenter(cellX, cellY);
       worldX = cellCenter.worldX;
       worldY = cellCenter.worldY;
-    } else if (geometry.getHexCenter) {
+    } else if (geometry.getHexCenter != null) {
       const hexCenter = geometry.getHexCenter(cellX, cellY);
       worldX = hexCenter.worldX;
       worldY = hexCenter.worldY;
@@ -58,12 +58,12 @@ function cellToScreen(
       worldY = (cellY + 0.5) * geometry.cellSize;
     }
   } else {
-    if (geometry.getCellCenter) {
+    if (geometry.getCellCenter != null) {
       // Hex: no rectangular corners, use cell center as approximation
       const cellCenter = geometry.getCellCenter(cellX, cellY);
       worldX = cellCenter.worldX;
       worldY = cellCenter.worldY;
-    } else if (geometry.getHexCenter) {
+    } else if (geometry.getHexCenter != null) {
       const hexCenter = geometry.getHexCenter(cellX, cellY);
       worldX = hexCenter.worldX;
       worldY = hexCenter.worldY;
@@ -75,7 +75,7 @@ function cellToScreen(
 
   let offsetX: number, offsetY: number;
   if (geometry instanceof GridGeometry) {
-    const scaledCellSize = geometry.getScaledCellSize!(zoom);
+    const scaledCellSize = geometry.getScaledCellSize(zoom);
     offsetX = canvasWidth / 2 - center.x * scaledCellSize;
     offsetY = canvasHeight / 2 - center.y * scaledCellSize;
   } else {

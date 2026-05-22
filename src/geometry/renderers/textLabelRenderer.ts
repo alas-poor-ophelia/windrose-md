@@ -37,7 +37,7 @@ function renderTextLabel(
   }
 
   ctx.translate(screenX, screenY);
-  ctx.rotate(((label.rotation || 0) * Math.PI) / 180);
+  ctx.rotate(((label.rotation ?? 0) * Math.PI) / 180);
 
   const fontSize = label.fontSize * zoom;
   const fontFamily = getFontCss(label.fontFace || 'sans');

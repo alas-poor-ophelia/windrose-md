@@ -91,15 +91,15 @@ function useLayerHistory({
       const activeLayer = getActiveLayer(mapData);
       resetHistory({
         cells: activeLayer.cells,
-        curves: activeLayer.curves || [],
-        name: mapData.name || '',
-        objects: (activeLayer.objects || []) as unknown as import('#types/core/map.types').MapObjectRef[],
-        textLabels: activeLayer.textLabels || [],
-        edges: activeLayer.edges || [],
-        tiles: activeLayer.tiles || [],
-        regions: mapData.regions || [],
-        outlines: mapData.outlines || [],
-        shapeOverlays: mapData.shapeOverlays || [],
+        curves: activeLayer.curves,
+        name: mapData.name ?? '',
+        objects: activeLayer.objects as unknown as import('#types/core/map.types').MapObjectRef[],
+        textLabels: activeLayer.textLabels,
+        edges: activeLayer.edges,
+        tiles: activeLayer.tiles,
+        regions: mapData.regions ?? [],
+        outlines: mapData.outlines ?? [],
+        shapeOverlays: mapData.shapeOverlays ?? [],
         fogOfWar: activeLayer.fogOfWar
       });
       historyInitialized.current = true;
@@ -123,13 +123,13 @@ function useLayerHistory({
    */
   const buildHistoryState = useCallback(
     (layer: MapLayer, name: string, regions: import('#types/core/map.types').Region[] = [], outlines: import('#types/core/map.types').Outline[] = [], shapeOverlays: import('#types/core/map.types').ShapeOverlay[] = [], fogOfWar: import('#types/core/map.types').FogOfWar | null = null): LayerHistorySnapshot => ({
-      cells: layer.cells || [],
-      curves: layer.curves || [],
+      cells: layer.cells,
+      curves: layer.curves,
       name: name,
-      objects: (layer.objects || []) as unknown as import('#types/core/map.types').MapObjectRef[],
-      textLabels: layer.textLabels || [],
-      edges: layer.edges || [],
-      tiles: layer.tiles || [],
+      objects: layer.objects as unknown as import('#types/core/map.types').MapObjectRef[],
+      textLabels: layer.textLabels,
+      edges: layer.edges,
+      tiles: layer.tiles,
       shapeOverlays: shapeOverlays,
       fogOfWar: fogOfWar ?? layer.fogOfWar,
       regions: regions,
@@ -153,13 +153,13 @@ function useLayerHistory({
   const restoreOrInitLayerHistory = useCallback(
     (newMapData: MapData, layerId: LayerId): void => {
       const cachedHistory = layerHistoryCache.current[layerId];
-      if (cachedHistory) {
+      if (cachedHistory != null) {
         restoreHistoryState(cachedHistory);
       } else {
         // No cached history for this layer - initialize fresh
         const layer = getActiveLayer(newMapData);
         historyInitialized.current = false;
-        resetHistory(buildHistoryState(layer, newMapData.name || '', newMapData.regions || [], newMapData.outlines || [], newMapData.shapeOverlays || [], layer.fogOfWar));
+        resetHistory(buildHistoryState(layer, newMapData.name ?? '', newMapData.regions ?? [], newMapData.outlines ?? [], newMapData.shapeOverlays ?? [], layer.fogOfWar));
         historyInitialized.current = true;
       }
     },
@@ -199,7 +199,7 @@ function useLayerHistory({
     // New layer always starts with fresh history
     const newActiveLayer = getActiveLayer(newMapData);
     historyInitialized.current = false;
-    resetHistory(buildHistoryState(newActiveLayer, newMapData.name || '', newMapData.regions || [], newMapData.outlines || []));
+    resetHistory(buildHistoryState(newActiveLayer, newMapData.name ?? '', newMapData.regions ?? [], newMapData.outlines ?? []));
     historyInitialized.current = true;
   }, [mapData, updateMapData, saveCurrentLayerHistory, resetHistory, buildHistoryState]);
 
@@ -216,7 +216,7 @@ function useLayerHistory({
 
       const clonedLayer = getActiveLayer(newMapData);
       historyInitialized.current = false;
-      resetHistory(buildHistoryState(clonedLayer, newMapData.name || '', newMapData.regions || [], newMapData.outlines || []));
+      resetHistory(buildHistoryState(clonedLayer, newMapData.name ?? '', newMapData.regions ?? [], newMapData.outlines ?? []));
       historyInitialized.current = true;
     },
     [mapData, updateMapData, saveCurrentLayerHistory, resetHistory, buildHistoryState]
@@ -265,7 +265,7 @@ function useLayerHistory({
       if (!layer) return;
 
       const newMapData = updateLayer(mapData, layerId, {
-        showLayerBelow: !layer.showLayerBelow
+        showLayerBelow: layer.showLayerBelow !== true
       });
       updateMapData(newMapData);
     },
@@ -316,14 +316,14 @@ function useLayerHistory({
       isApplyingHistoryRef.current = true;
       // Apply layer-specific data to active layer, name/regions/outlines at root
       const newMapData = updateActiveLayer(
-        { ...mapData, name: previousState.name, regions: previousState.regions || mapData.regions, outlines: previousState.outlines || mapData.outlines, shapeOverlays: previousState.shapeOverlays || mapData.shapeOverlays },
+        { ...mapData, name: previousState.name, regions: previousState.regions ?? mapData.regions, outlines: previousState.outlines ?? mapData.outlines, shapeOverlays: previousState.shapeOverlays ?? mapData.shapeOverlays },
         {
           cells: previousState.cells,
-          curves: previousState.curves || [],
-          objects: (previousState.objects || []) as unknown as import('#types/objects/object.types').MapObject[],
-          textLabels: previousState.textLabels || [],
-          edges: previousState.edges || [],
-          tiles: previousState.tiles || [],
+          curves: previousState.curves,
+          objects: previousState.objects as unknown as import('#types/objects/object.types').MapObject[],
+          textLabels: previousState.textLabels,
+          edges: previousState.edges,
+          tiles: previousState.tiles,
           fogOfWar: previousState.fogOfWar !== undefined ? previousState.fogOfWar : undefined
         }
       );
@@ -341,14 +341,14 @@ function useLayerHistory({
       isApplyingHistoryRef.current = true;
       // Apply layer-specific data to active layer, name/regions/outlines at root
       const newMapData = updateActiveLayer(
-        { ...mapData, name: nextState.name, regions: nextState.regions || mapData.regions, outlines: nextState.outlines || mapData.outlines, shapeOverlays: nextState.shapeOverlays || mapData.shapeOverlays },
+        { ...mapData, name: nextState.name, regions: nextState.regions ?? mapData.regions, outlines: nextState.outlines ?? mapData.outlines, shapeOverlays: nextState.shapeOverlays ?? mapData.shapeOverlays },
         {
           cells: nextState.cells,
-          curves: nextState.curves || [],
-          objects: (nextState.objects || []) as unknown as import('#types/objects/object.types').MapObject[],
-          textLabels: nextState.textLabels || [],
-          edges: nextState.edges || [],
-          tiles: nextState.tiles || [],
+          curves: nextState.curves,
+          objects: nextState.objects as unknown as import('#types/objects/object.types').MapObject[],
+          textLabels: nextState.textLabels,
+          edges: nextState.edges,
+          tiles: nextState.tiles,
           fogOfWar: nextState.fogOfWar !== undefined ? nextState.fogOfWar : undefined
         }
       );

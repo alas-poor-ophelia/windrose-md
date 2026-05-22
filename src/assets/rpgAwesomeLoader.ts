@@ -60,6 +60,7 @@ async function loadRPGAwesomeFont(fontPath: string): Promise<boolean> {
           resolve(true);
           return;
         } catch (fontFaceError) {
+          // eslint-disable-next-line no-console
           console.warn('[RPGAwesome] FontFace API failed, falling back to CSS injection:', fontFaceError);
         }
       }
@@ -79,10 +80,12 @@ async function loadRPGAwesomeFont(fontPath: string): Promise<boolean> {
         fontLoaded = true;
         resolve(true);
       } else {
+        // eslint-disable-next-line no-console
         console.warn('[RPGAwesome] Font may not have loaded correctly');
         resolve(false);
       }
     } catch (error) {
+      // eslint-disable-next-line no-console
       console.error('[RPGAwesome] Failed to load font:', error);
       fontLoaded = false;
       resolve(false);

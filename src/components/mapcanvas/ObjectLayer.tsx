@@ -117,9 +117,9 @@ const ObjectLayer = ({
     if (!selectedItem || selectedItem.type !== 'object' || !mapData) return;
     const obj = getActiveLayer(mapData).objects?.find(o => o.id === selectedItem.id);
     if (!obj) return;
-    const isPlayer = !obj.isPlayer;
+    const isPlayer = obj.isPlayer !== true;
     const updates: Record<string, unknown> = { isPlayer };
-    if (isPlayer && !obj.lightRadius) {
+    if (isPlayer && (obj.lightRadius == null || obj.lightRadius === 0)) {
       updates.lightRadius = 30;
       updates.lightColor = 'rgba(255, 255, 100, 1)';
       updates.lightEnabled = true;
@@ -132,7 +132,7 @@ const ObjectLayer = ({
 
   const handleLightToggle = useCallback(() => {
     if (!selectedItem || selectedItem.type !== 'object' || !mapData) return;
-    const lightEnabled = !selectedItem.data?.lightEnabled;
+    const lightEnabled = (selectedItem.data as MapObject | undefined)?.lightEnabled !== true;
     const updatedObjects = updateObject(getActiveLayer(mapData).objects, selectedItem.id, { lightEnabled });
     contextOnObjectsChange(updatedObjects);
     const updatedObj = updatedObjects.find((o: MapObject) => o.id === selectedItem.id);
@@ -193,7 +193,7 @@ const ObjectLayer = ({
         const update = updates.find(u => u.objectId === obj.id);
         return update ? update.transform(obj) : obj;
       });
-      if (updatedObjects) {
+      if (updatedObjects != null) {
         onObjectsChange(updatedObjects);
       }
     } else {
@@ -219,15 +219,15 @@ const ObjectLayer = ({
     if (!hasMultiSelection || !mapData) return;
 
     const activeLayer = getActiveLayer(mapData);
-    const updatedObjects = [...(activeLayer.objects || [])];
-    const updatedTextLabels = [...(activeLayer.textLabels || [])];
+    const updatedObjects = [...(activeLayer.objects ?? [])];
+    const updatedTextLabels = [...(activeLayer.textLabels ?? [])];
 
     for (const item of selectedItems) {
       if (item.type === 'object') {
         const idx = updatedObjects.findIndex((o: MapObject) => o.id === item.id);
         if (idx !== -1) {
           const obj = updatedObjects[idx];
-          const currentRotation = obj.rotation || 0;
+          const currentRotation = obj.rotation ?? 0;
           const nextRotation = rotateByIncrement(currentRotation);
           updatedObjects[idx] = { ...obj, rotation: nextRotation };
         }
@@ -235,7 +235,7 @@ const ObjectLayer = ({
         const idx = updatedTextLabels.findIndex((l: { id: string }) => l.id === item.id);
         if (idx !== -1) {
           const label = updatedTextLabels[idx];
-          const currentRotation = label.rotation || 0;
+          const currentRotation = label.rotation ?? 0;
           const nextRotation = rotateByIncrement(currentRotation);
           updatedTextLabels[idx] = { ...label, rotation: nextRotation };
         }
@@ -262,8 +262,8 @@ const ObjectLayer = ({
     if (!hasMultiSelection || !mapData) return;
 
     const activeLayer = getActiveLayer(mapData);
-    const updatedObjects = [...(activeLayer.objects || [])];
-    const updatedTextLabels = [...(activeLayer.textLabels || [])];
+    const updatedObjects = [...(activeLayer.objects ?? [])];
+    const updatedTextLabels = [...(activeLayer.textLabels ?? [])];
     const newSelectedItems: SelectedItem[] = [];
 
     const offsetX = 1;
@@ -290,7 +290,7 @@ const ObjectLayer = ({
         if (!sourceLabel) continue;
 
         const newId = `text-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-        const offsetWorld = (mapData.gridSize || 32) * 1;
+        const offsetWorld = (mapData.gridSize ?? 32) * 1;
         const newLabel = {
           ...sourceLabel,
           id: newId,
@@ -319,8 +319,8 @@ const ObjectLayer = ({
     const selectedObjectIds = new Set(selectedItems.filter((i: SelectedItem) => i.type === 'object').map((i: SelectedItem) => i.id));
     const selectedTextIds = new Set(selectedItems.filter((i: SelectedItem) => i.type === 'text').map((i: SelectedItem) => i.id));
 
-    const updatedObjects = (activeLayer.objects || []).filter((obj: MapObject) => !selectedObjectIds.has(obj.id));
-    const updatedTextLabels = (activeLayer.textLabels || []).filter((label: { id: string }) => !selectedTextIds.has(label.id));
+    const updatedObjects = (activeLayer.objects ?? []).filter((obj: MapObject) => !selectedObjectIds.has(obj.id));
+    const updatedTextLabels = (activeLayer.textLabels ?? []).filter((label: { id: string }) => !selectedTextIds.has(label.id));
 
     onObjectsChange(updatedObjects, true);
     onTextLabelsChange(updatedTextLabels, false);
@@ -329,11 +329,11 @@ const ObjectLayer = ({
   }, [hasMultiSelection, mapData, selectedItems, onObjectsChange, onTextLabelsChange, clearSelection]);
 
   const handleCopyLink = useCallback(() => {
-    if (!selectedItem || !mapData || !mapId || !notePath) return;
+    if (!selectedItem || !mapData || mapId == null || mapId === '' || notePath == null || notePath === '') return;
 
     const activeLayer = getActiveLayer(mapData);
     const zoom = mapData.viewState?.zoom ?? 1.0;
-    const layerId = mapData.activeLayerId || activeLayer?.id || 'layer_001';
+    const layerId = mapData.activeLayerId ?? activeLayer?.id ?? 'layer_001';
 
     let displayText = 'Map Location';
     let x = 0;
@@ -342,16 +342,16 @@ const ObjectLayer = ({
     if (selectedItem.type === 'object') {
       const obj = activeLayer.objects?.find((o: MapObject) => o.id === selectedItem.id);
       if (!obj) return;
-      displayText = obj.label || obj.customTooltip || 'Object';
-      const size = obj.size || { width: 1, height: 1 };
+      displayText = obj.label ?? obj.customTooltip ?? 'Object';
+      const size = obj.size ?? { width: 1, height: 1 };
       x = obj.position.x + size.width / 2;
       y = obj.position.y + size.height / 2;
     } else if (selectedItem.type === 'text') {
       const label = activeLayer.textLabels?.find((l: TextLabel) => l.id === selectedItem.id);
       if (!label) return;
-      displayText = label.content || 'Text';
+      displayText = label.content ?? 'Text';
       // Text labels use world coordinates, convert to grid
-      const gridSize = mapData.gridSize || 32;
+      const gridSize = mapData.gridSize ?? 32;
       x = label.position.x / gridSize;
       y = label.position.y / gridSize;
     }
@@ -388,7 +388,7 @@ const ObjectLayer = ({
     showNoteModal, editingObjectId,
     handleNoteButtonClick, handleNoteModalSubmit, handleNoteCancel,
     handleEditNoteLink, handleNoteLinkSave, handleNoteLinkCancel
-  } = useObjectModals({ onObjectsChange, handleNoteSubmit: (content: string, objectId: string | null) => { if (objectId) handleNoteSubmit(content, objectId); } });
+  } = useObjectModals({ onObjectsChange, handleNoteSubmit: (content: string, objectId: string | null) => { if (objectId != null && objectId !== '') handleNoteSubmit(content, objectId); } });
 
   const { registerHandlers, unregisterHandlers } = useEventHandlerRegistration();
 
@@ -500,16 +500,16 @@ const ObjectLayer = ({
     if (!obj) return;
 
     let updates: Partial<MapObject>;
-    if (obj.freeform) {
+    if (obj.freeform === true) {
       // Snap to grid: find nearest cell from worldPosition
-      const nearestGrid = obj.worldPosition && geometry.worldToGrid
+      const nearestGrid = obj.worldPosition != null && geometry.worldToGrid != null
         ? geometry.worldToGrid(obj.worldPosition.x, obj.worldPosition.y)
         : obj.position;
       updates = snapObjectToGrid(nearestGrid);
     } else {
       // Convert to freeform: compute world position from grid cell center
       const cellCenter = geometry.getCellCenter(obj.position.x, obj.position.y);
-      const cellSize = (geometry as ExtendedGeometry).cellSize || mapData.gridSize || 1;
+      const cellSize = (geometry as ExtendedGeometry).cellSize ?? mapData.gridSize ?? 1;
       updates = convertObjectToFreeform(obj, cellCenter.worldX, cellCenter.worldY, cellSize);
     }
 
@@ -559,10 +559,10 @@ const ObjectLayer = ({
   }, []);
 
   const handleFollowLink = useCallback(() => {
-    if (!selectedItem || selectedItem.type !== 'object' || !mapData || !mapId || !notePath) return;
+    if (!selectedItem || selectedItem.type !== 'object' || !mapData || mapId == null || mapId === '' || notePath == null || notePath === '') return;
 
     const obj = selectedItem.data as MapObject;
-    if (!obj?.linkedObject) return;
+    if (obj?.linkedObject == null) return;
 
     const { layerId, objectId } = obj.linkedObject;
 
@@ -644,7 +644,7 @@ const ObjectLayer = ({
       const buttonElement = target.closest('.dmt-object-color-button');
 
       if (!pickerElement && !buttonElement) {
-        if (pendingObjectCustomColorRef.current && onAddCustomColor) {
+        if (pendingObjectCustomColorRef.current != null && pendingObjectCustomColorRef.current !== '' && onAddCustomColor) {
           onAddCustomColor(pendingObjectCustomColorRef.current);
           handleObjectColorSelect(pendingObjectCustomColorRef.current);
           pendingObjectCustomColorRef.current = null;
@@ -665,17 +665,17 @@ const ObjectLayer = ({
 
   // Context menu: hit-test for object, select it, show native menu
   useEffect(() => {
-    if (!mapData || !geometry || !screenToGrid) return undefined;
+    if (!mapData || !geometry) return undefined;
 
-    const handler = (e: Event) => {
+    const handler = (e: Event): void => {
       const detail = (e as CustomEvent).detail;
-      if (detail.handled) return;
+      if (detail.handled === true) return;
 
       const coords = screenToGrid(detail.clientX, detail.clientY);
       if (!coords) return;
 
       const activeLayer = getActiveLayer(mapData);
-      const obj = getObjectAtPosition(activeLayer.objects || [], coords.x, coords.y);
+      const obj = getObjectAtPosition(activeLayer.objects ?? [], coords.x, coords.y);
       if (!obj) return;
 
       detail.handled = true;
@@ -700,8 +700,8 @@ const ObjectLayer = ({
 
       const menu = new Menu();
       let lastGroup: string | null = null;
-      for (const action of actions.filter(a => a.visible && !a.disabled)) {
-        if (lastGroup && action.group !== lastGroup) menu.addSeparator();
+      for (const action of actions.filter(a => a.visible && a.disabled !== true)) {
+        if (lastGroup != null && lastGroup !== '' && action.group !== lastGroup) menu.addSeparator();
         lastGroup = action.group;
         menu.addItem((mi: MenuItem) => {
           mi.setTitle(action.label);
@@ -721,12 +721,12 @@ const ObjectLayer = ({
     return null;
   }
 
-  const getCardinalIndicatorPositions = (selectedObject: MapObject) => {
-    if (!selectedObject || !canvasRef.current || !containerRef.current || !mapData) {
+  const getCardinalIndicatorPositions = (selectedObject: MapObject): { north: { x: number; y: number }; south: { x: number; y: number }; east: { x: number; y: number }; west: { x: number; y: number } } | null => {
+    if (!canvasRef.current || !containerRef.current || !mapData || !geometry) {
       return null;
     }
 
-    const screenPos = calculateObjectScreenPosition(selectedObject, canvasRef.current, mapData, geometry!, containerRef);
+    const screenPos = calculateObjectScreenPosition(selectedObject, canvasRef.current, mapData, geometry, containerRef);
 
     if (!screenPos) return null;
 
@@ -763,7 +763,7 @@ const ObjectLayer = ({
     : null;
 
   const measureTarget = (() => {
-    if (!measureMovement || !isDraggingSelection || !measureOriginRef.current || !selectedItem?.id || !mapData) return null;
+    if (!measureMovement || !isDraggingSelection || !measureOriginRef.current || selectedItem?.id == null || selectedItem.id === '' || !mapData) return null;
     const obj = getActiveLayer(mapData).objects?.find((o: MapObject) => o.id === selectedItem.id);
     return obj ? obj.position : null;
   })();
@@ -772,9 +772,9 @@ const ObjectLayer = ({
     if (!measureOriginRef.current || !measureTarget || !geometry) return null;
     const origin = measureOriginRef.current;
     if (origin.x === measureTarget.x && origin.y === measureTarget.y) return null;
-    const globalSettings = getSettings() || {};
-    const overrides = mapData?.settings?.distanceSettings || null;
-    const settings = getEffectiveDistanceSettings(mapData?.mapType || 'grid', globalSettings, overrides);
+    const globalSettings = getSettings() ?? {};
+    const overrides = mapData?.settings?.distanceSettings ?? null;
+    const settings = getEffectiveDistanceSettings(mapData?.mapType ?? 'grid', globalSettings, overrides);
     const dist = geometry.getCellDistance(origin.x, origin.y, measureTarget.x, measureTarget.y, { diagonalRule: settings.gridDiagonalRule });
     return formatDistance(dist, settings.distancePerCell, settings.distanceUnit, settings.displayFormat);
   })();
@@ -793,10 +793,10 @@ const ObjectLayer = ({
         indicatorPositions={indicatorPositions}
         isObjectSelected={selectedItem?.type === 'object'}
         isFreeformPreview={!!freeformDragPreview}
-        isFreeform={!!selectedObject?.freeform}
+        isFreeform={selectedObject?.freeform === true}
       />
 
-      {measureOriginRef.current && measureTarget && formattedMeasureDistance && (
+      {measureOriginRef.current && measureTarget && formattedMeasureDistance != null && formattedMeasureDistance !== '' && (
         <MeasurementOverlay
           measureOrigin={measureOriginRef.current}
           currentTarget={measureTarget}
@@ -846,7 +846,7 @@ const ObjectLayer = ({
             onDelete: handleObjectDeletion,
             onPlayerToggle: handlePlayerToggle,
             onMeasureToggle: handleMeasureToggle
-          }, mapData, { isResizeMode, isPlayer: !!(selectedItem.data as MapObject | undefined)?.isPlayer, isMeasuring: measureMovement })]}
+          }, mapData, { isResizeMode, isPlayer: (selectedItem.data as MapObject | undefined)?.isPlayer === true, isMeasuring: measureMovement })]}
 
           mapData={mapData}
           canvasRef={canvasRef}
@@ -865,10 +865,10 @@ const ObjectLayer = ({
           onDeleteCustomColor={onDeleteCustomColor}
           pendingCustomColorRef={pendingObjectCustomColorRef}
           colorButtonRef={objectColorBtnRef}
-          isPlayer={!!(selectedItem.data as MapObject | undefined)?.isPlayer}
-          lightEnabled={!!(selectedItem.data as MapObject | undefined)?.lightEnabled}
-          lightRadius={(selectedItem.data as MapObject | undefined)?.lightRadius || 30}
-          lightColor={(selectedItem.data as MapObject | undefined)?.lightColor || 'rgba(255, 255, 100, 1)'}
+          isPlayer={(selectedItem.data as MapObject | undefined)?.isPlayer === true}
+          lightEnabled={(selectedItem.data as MapObject | undefined)?.lightEnabled === true}
+          lightRadius={(selectedItem.data as MapObject | undefined)?.lightRadius ?? 30}
+          lightColor={(selectedItem.data as MapObject | undefined)?.lightColor ?? 'rgba(255, 255, 100, 1)'}
           onLightToggle={handleLightToggle}
           onLightRadiusChange={handleLightRadiusChange}
           onLightColorSelect={handleLightColorSelect}
@@ -876,30 +876,30 @@ const ObjectLayer = ({
           onLightColorSwatchClick={() => setShowLightColorPicker(prev => !prev)}
           onLightColorPickerClose={() => setShowLightColorPicker(false)}
           lightColorButtonRef={lightColorBtnRef}
-          distanceUnit={(() => { const s = mapData?.settings?.overrides || {}; return (s.distanceUnit as string) || 'ft'; })()}
+          distanceUnit={(() => { const s = mapData?.settings?.overrides ?? {}; const unit = s.distanceUnit as string | undefined; return unit != null && unit !== '' ? unit : 'ft'; })()}
         />
       )}
 
-      {showNoteModal && editingObjectId && mapData && (
+      {showNoteModal && editingObjectId != null && editingObjectId !== '' && mapData && (
         <TextInputModal
           onSubmit={handleNoteModalSubmit}
           onCancel={handleNoteCancel}
-          title={`Note for ${getActiveLayer(mapData).objects.find((obj: MapObject) => obj.id === editingObjectId)?.label || 'Object'}`}
+          title={`Note for ${getActiveLayer(mapData).objects.find((obj: MapObject) => obj.id === editingObjectId)?.label ?? 'Object'}`}
           placeholder="Add a custom note..."
-          initialValue={getActiveLayer(mapData).objects.find((obj: MapObject) => obj.id === editingObjectId)?.customTooltip || ''}
+          initialValue={getActiveLayer(mapData).objects.find((obj: MapObject) => obj.id === editingObjectId)?.customTooltip ?? ''}
         />
       )}
 
-      {showNoteLinkModal && mapData && editingNoteObjectId && (
+      {showNoteLinkModal && mapData && editingNoteObjectId != null && editingNoteObjectId !== '' && (
         <NoteLinkModal
           isOpen={showNoteLinkModal}
           onClose={handleNoteLinkCancel}
-          onSave={(notePath: string | null) => { if (notePath) handleNoteLinkSave(notePath); }}
+          onSave={(notePath: string | null) => { if (notePath != null && notePath !== '') handleNoteLinkSave(notePath); }}
           currentNotePath={
-            getActiveLayer(mapData).objects?.find((obj: MapObject) => obj.id === editingNoteObjectId)?.linkedNote || null
+            getActiveLayer(mapData).objects?.find((obj: MapObject) => obj.id === editingNoteObjectId)?.linkedNote ?? null
           }
           objectType={
-            getActiveLayer(mapData).objects?.find((obj: MapObject) => obj.id === editingNoteObjectId)?.type || null
+            getActiveLayer(mapData).objects?.find((obj: MapObject) => obj.id === editingNoteObjectId)?.type ?? null
           }
         />
       )}
@@ -915,7 +915,7 @@ const ObjectLayer = ({
             zIndex: 1000
           }}
         >
-          {hoveredObject.customTooltip
+          {(hoveredObject.customTooltip as string | undefined) != null && (hoveredObject.customTooltip as string) !== ''
             ? `${hoveredObject.label as string} - ${hoveredObject.customTooltip as string}`
             : hoveredObject.label as string
           }

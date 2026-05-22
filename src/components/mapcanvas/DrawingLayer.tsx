@@ -206,7 +206,8 @@ const DrawingLayer = ({
     if (!canvasRef.current || !containerRef?.current || !geometry) return null;
 
     const canvas = canvasRef.current;
-    const { viewState, northDirection } = mapData!;
+    if (!mapData) return null;
+    const { viewState, northDirection } = mapData;
     if (!viewState) return null;
     const { zoom, center } = viewState;
     const { width, height } = canvas;
@@ -292,8 +293,8 @@ const DrawingLayer = ({
     const overlays: VNode[] = [];
     const displayScaledSize = scaledSize * displayScale;
 
-    const showFullPreview = shapeHoverPosition && previewSettings.kbmEnabled;
-    const showTouchPreview = touchConfirmPending && pendingEndPoint;
+    const showFullPreview = shapeHoverPosition != null && previewSettings.kbmEnabled;
+    const showTouchPreview = touchConfirmPending === true && pendingEndPoint != null;
 
     if (rectangleStart && !showFullPreview && !showTouchPreview) {
       const pos = gridToCanvasPosition(rectangleStart.x, rectangleStart.y);
@@ -392,9 +393,9 @@ const DrawingLayer = ({
   const renderShapePreview = (): VNode | null => {
     const endPoint = touchConfirmPending ? pendingEndPoint : shapeHoverPosition;
 
-    const shouldShowPreview = endPoint && (
-      (previewSettings.kbmEnabled && shapeHoverPosition && !touchConfirmPending) ||
-      (touchConfirmPending && pendingEndPoint)
+    const shouldShowPreview = endPoint != null && (
+      (previewSettings.kbmEnabled && shapeHoverPosition != null && touchConfirmPending !== true) ||
+      (touchConfirmPending === true && pendingEndPoint != null)
     );
 
     if (!shouldShowPreview) return null;
@@ -413,7 +414,7 @@ const DrawingLayer = ({
       startPoint = edgeLineStart;
     }
 
-    if (!shapeType || !startPoint) return null;
+    if (shapeType == null || shapeType === '' || !startPoint) return null;
 
     return (
       <ShapePreviewOverlay

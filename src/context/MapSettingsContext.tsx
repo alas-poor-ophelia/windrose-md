@@ -474,7 +474,7 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
     });
 
     // Load image dimensions async if path exists
-    if (currentBackgroundImage?.path) {
+    if (currentBackgroundImage?.path != null && currentBackgroundImage.path !== '') {
       const bgPath = currentBackgroundImage.path;
       void getImageDimensions(bgPath).then((dims: ImageDimensions | null) => {
         if (!dims) return;
@@ -528,7 +528,7 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
       const modalEl = target.closest('.dmt-settings-modal');
 
       if (!pickerEl && !buttonEl && modalEl) {
-        if (pendingCustomColorRef.current && state.activeColorPicker) {
+        if (pendingCustomColorRef.current != null && pendingCustomColorRef.current !== '' && state.activeColorPicker != null && state.activeColorPicker !== '') {
           dispatch({ type: Actions.SET_OVERRIDE, payload: { key: state.activeColorPicker as keyof SettingsOverrides, value: pendingCustomColorRef.current } });
           pendingCustomColorRef.current = null;
         }
@@ -553,7 +553,7 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
   // ===========================================================================
 
   const handleImageSearch = async (searchTerm: string): Promise<void> => {
-    if (!searchTerm?.trim()) {
+    if (searchTerm == null || searchTerm.trim() === '') {
       dispatch({ type: Actions.SET_IMAGE_SEARCH_RESULTS, payload: [] });
       return;
     }
@@ -564,7 +564,7 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
 
   const handleImageSelect = async (displayName: string): Promise<void> => {
     const fullPath = await getFullPathFromDisplayName(displayName) as string | null;
-    if (!fullPath) return;
+    if (fullPath == null || fullPath === '') return;
 
     const dims = await getImageDimensions(fullPath) as ImageDimensions | null;
     if (!dims) return;
@@ -582,7 +582,7 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
 
   // Fog of War image handlers
   const handleFogImageSearch = async (searchTerm: string): Promise<void> => {
-    if (!searchTerm?.trim()) {
+    if (searchTerm == null || searchTerm.trim() === '') {
       dispatch({ type: Actions.SET_FOG_IMAGE_SEARCH_RESULTS, payload: [] });
       return;
     }
@@ -593,7 +593,7 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
 
   const handleFogImageSelect = async (displayName: string): Promise<void> => {
     const fullPath = await getFullPathFromDisplayName(displayName) as string | null;
-    if (!fullPath) return;
+    if (fullPath == null || fullPath === '') return;
 
     dispatch({
       type: Actions.FOG_IMAGE_SELECTED,
@@ -616,7 +616,7 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
   }), [state.useGlobalSettings, state.overrides, state.coordinateDisplayMode, state.objectSetId, state.distanceSettings]);
 
   const backgroundImageData = useMemo((): BackgroundImageConfig | null => {
-    if (!state.backgroundImagePath) return null;
+    if (state.backgroundImagePath == null || state.backgroundImagePath === '') return null;
     return {
       path: state.backgroundImagePath,
       opacity: state.imageOpacity,
@@ -640,7 +640,7 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
   ]);
 
   const calculatedHexSize = useMemo((): number | null => {
-    if (mapType !== 'hex' || !state.backgroundImagePath || !state.boundsLocked || !state.imageDimensions) return null;
+    if (mapType !== 'hex' || state.backgroundImagePath == null || state.backgroundImagePath === '' || !state.boundsLocked || !state.imageDimensions) return null;
     if (state.sizingMode === 'density') {
       const calc = calculateGridFromColumns(state.imageDimensions.width, state.imageDimensions.height, state.hexBounds.maxCol, orientation);
       return calc.hexSize;

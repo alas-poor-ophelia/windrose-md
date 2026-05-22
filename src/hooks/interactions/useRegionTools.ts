@@ -115,8 +115,8 @@ function useRegionTools(options: RegionToolsOptions): UseRegionToolsResult {
   const handlePointerUpRef = useRef<((e: PointerEvent) => void) | null>(null);
 
   const editingRegion = useMemo(() => {
-    if (!editingRegionId || !mapData?.regions) return null;
-    return mapData.regions.find(r => r.id === editingRegionId) || null;
+    if (editingRegionId == null || editingRegionId === '' || !mapData?.regions) return null;
+    return mapData.regions.find(r => r.id === editingRegionId) ?? null;
   }, [editingRegionId, mapData?.regions]);
 
   // Reset state when switching away from region tools
@@ -129,15 +129,14 @@ function useRegionTools(options: RegionToolsOptions): UseRegionToolsResult {
     }
   }, [isActive]);
 
-  const getHexCoords = useCallback((e: PointerEvent | MouseEvent) => {
-    if (!geometry || geometry.type !== 'hex' || !screenToGrid) return null;
+  const getHexCoords = useCallback((e: PointerEvent | MouseEvent): { q: number; r: number } | null => {
+    if (!geometry || geometry.type !== 'hex') return null;
     const grid = screenToGrid(e.clientX, e.clientY);
     if (!grid) return null;
     return { q: grid.x, r: grid.y };
   }, [geometry, screenToGrid]);
 
-  const getWorldCoords = useCallback((e: PointerEvent | MouseEvent) => {
-    if (!screenToWorld) return null;
+  const getWorldCoords = useCallback((e: PointerEvent | MouseEvent): { worldX: number; worldY: number } | null => {
     return screenToWorld(e.clientX, e.clientY);
   }, [screenToWorld]);
 
@@ -189,9 +188,9 @@ function useRegionTools(options: RegionToolsOptions): UseRegionToolsResult {
     if (!hexGeom.isWithinBounds(hex.q, hex.r)) return;
 
     // If editing an existing region, add/remove hex from it directly
-    if (editingRegionId && mapData) {
+    if (editingRegionId != null && editingRegionId !== '' && mapData) {
       const key = hexKey(hex.q, hex.r);
-      const regions = mapData.regions || [];
+      const regions = mapData.regions ?? [];
       const regionIdx = regions.findIndex(r => r.id === editingRegionId);
       if (regionIdx === -1) return;
 
@@ -328,7 +327,7 @@ function useRegionTools(options: RegionToolsOptions): UseRegionToolsResult {
   }, [isActive, isPaintMode, isBoundaryMode, handlePaintPointerDown, handleBoundaryPointerDown]);
 
   const handlePointerMove = useCallback((e: PointerEvent) => {
-    if (!draggingLabelRegionId || !labelDragStartRef.current) return;
+    if (draggingLabelRegionId == null || draggingLabelRegionId === '' || !labelDragStartRef.current) return;
     const world = getWorldCoords(e);
     if (!world || !mapData?.regions || !geometry || geometry.type !== 'hex') return;
 
@@ -370,14 +369,14 @@ function useRegionTools(options: RegionToolsOptions): UseRegionToolsResult {
     }
 
     // Update region with new label position (running delta)
-    const regions = (mapData.regions || []).map(r =>
+    const regions = (mapData.regions ?? []).map(r =>
       r.id === draggingLabelRegionId ? { ...r, labelPosition: newPos } : r
     );
     onRegionsChange(regions);
   }, [draggingLabelRegionId, getWorldCoords, mapData, geometry, onRegionsChange]);
 
-  const handlePointerUp = useCallback((_e: PointerEvent) => {
-    if (draggingLabelRegionId) {
+  const handlePointerUp = useCallback((_e: PointerEvent): void => {
+    if (draggingLabelRegionId != null && draggingLabelRegionId !== '') {
       setDraggingLabelRegionId(null);
       labelDragStartRef.current = null;
       if (labelDragCleanupRef.current) {
@@ -393,10 +392,10 @@ function useRegionTools(options: RegionToolsOptions): UseRegionToolsResult {
 
   // Start document-level drag listeners when label drag begins
   useEffect(() => {
-    if (!draggingLabelRegionId) return undefined;
+    if (draggingLabelRegionId == null || draggingLabelRegionId === '') return undefined;
 
-    const onMove = (e: PointerEvent) => handlePointerMoveRef.current?.(e);
-    const onUp = (e: PointerEvent) => handlePointerUpRef.current?.(e);
+    const onMove = (e: PointerEvent): void => { handlePointerMoveRef.current?.(e); };
+    const onUp = (e: PointerEvent): void => { handlePointerUpRef.current?.(e); };
 
     document.addEventListener('pointermove', onMove);
     document.addEventListener('pointerup', onUp);
@@ -417,7 +416,7 @@ function useRegionTools(options: RegionToolsOptions): UseRegionToolsResult {
   const confirmRegion = useCallback((name: string, linkedNote?: string) => {
     if (pendingHexes.length === 0 || !mapData) return;
 
-    const existingRegions = mapData.regions || [];
+    const existingRegions = mapData.regions ?? [];
 
     // Remove pending hexes from any existing region (exclusive)
     const pendingKeys = new Set(pendingHexes.map(h => hexKey(h.x, h.y)));
@@ -436,7 +435,7 @@ function useRegionTools(options: RegionToolsOptions): UseRegionToolsResult {
       borderWidth: 2,
       visible: true,
       order: updatedExisting.length,
-      ...(linkedNote ? { linkedNote } : {})
+      ...(linkedNote != null && linkedNote !== '' ? { linkedNote } : {})
     };
 
     onRegionsChange([...updatedExisting, newRegion]);
@@ -454,14 +453,14 @@ function useRegionTools(options: RegionToolsOptions): UseRegionToolsResult {
 
   const deleteRegion = useCallback((regionId: string) => {
     if (!mapData) return;
-    const regions = (mapData.regions || []).filter(r => r.id !== regionId);
+    const regions = (mapData.regions ?? []).filter(r => r.id !== regionId);
     onRegionsChange(regions);
     if (editingRegionId === regionId) setEditingRegionId(null);
   }, [mapData, onRegionsChange, editingRegionId]);
 
   const updateRegion = useCallback((regionId: string, updates: Partial<Region>) => {
     if (!mapData) return;
-    const regions = (mapData.regions || []).map(r =>
+    const regions = (mapData.regions ?? []).map(r =>
       r.id === regionId ? { ...r, ...updates } : r
     );
     onRegionsChange(regions);

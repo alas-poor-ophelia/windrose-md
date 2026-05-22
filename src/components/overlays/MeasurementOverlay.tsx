@@ -9,7 +9,7 @@
 
 
 import { useEffect, useRef, useState } from 'preact/hooks';
-import type { RefObject } from 'preact';
+import type { RefObject, VNode } from 'preact';
 import type { MeasurementPoint } from '#types/hooks/distanceMeasurement.types';
 import type { IGeometry } from '#types/core/geometry.types';
 import type { MapData } from '#types/core/map.types';
@@ -33,13 +33,13 @@ const MeasurementOverlay = ({
   geometry,
   mapData,
   canvasRef
-}: MeasurementOverlayProps) => {
+}: MeasurementOverlayProps): VNode | null => {
   const textRef = useRef<SVGTextElement | null>(null);
   const [textWidth, setTextWidth] = useState(80);
   
   // Measure text width for auto-sizing tooltip
   useEffect(() => {
-    if (textRef.current && formattedDistance) {
+    if (textRef.current && formattedDistance != null && formattedDistance !== '') {
       const bbox = textRef.current.getBBox();
       setTextWidth(Math.max(bbox.width + 20, 60));
     }
@@ -63,6 +63,7 @@ const MeasurementOverlay = ({
     flexContainer = flexContainer.parentElement;
     traversalCount++;
     if (traversalCount > 10) {
+      // eslint-disable-next-line no-console
       console.warn('[MeasurementOverlay] Could not find dmt-canvas-container after 10 levels');
       break;
     }
@@ -145,7 +146,7 @@ const MeasurementOverlay = ({
       />
       
       {/* Distance tooltip */}
-      {formattedDistance && (
+      {formattedDistance != null && formattedDistance !== '' && (
         <g transform={`translate(${tooltipX}, ${tooltipY})`}>
           <rect
             x={0}

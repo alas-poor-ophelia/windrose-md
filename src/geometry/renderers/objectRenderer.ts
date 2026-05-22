@@ -80,7 +80,7 @@ function isObjectUnderFog(
   isHexMap: boolean,
   isCellFogged: (layer: MapLayer, col: number, row: number) => boolean
 ): boolean {
-  if (!layer.fogOfWar?.enabled) return false;
+  if (layer.fogOfWar?.enabled !== true) return false;
 
   const size = obj.size || { width: 1, height: 1 };
   const baseOffset = geometry.toOffsetCoords(obj.position.x, obj.position.y);
@@ -118,7 +118,7 @@ function calculateObjectPosition(
 
   // Freeform objects use world-space coordinates directly
   // worldPosition is the object's center, but the renderer expects top-left
-  if (obj.freeform && obj.worldPosition) {
+  if (obj.freeform === true && obj.worldPosition != null) {
     const { screenX, screenY } = geometry.worldToScreen(
       obj.worldPosition.x, obj.worldPosition.y, offsetX, offsetY, zoom
     );
@@ -202,12 +202,12 @@ function renderSingleObject(
   const centerY = screenY + objectHeight / 2;
 
   const objectScale = obj.scale ?? 1.0;
-  const rotation = obj.rotation || 0;
+  const rotation = obj.rotation ?? 0;
 
   const renderInfo = getRenderChar(objType);
 
   // Handle custom image rendering
-  if (renderInfo.isImage && renderInfo.imagePath && getCachedImage) {
+  if (renderInfo.isImage === true && renderInfo.imagePath != null && renderInfo.imagePath !== '' && getCachedImage != null) {
     const img = getCachedImage(renderInfo.imagePath);
     if (img && img.complete) {
       // Calculate image size (fits within object bounds with 90% fill)
@@ -257,7 +257,7 @@ function renderSingleObject(
   ctx.lineWidth = Math.max(2, fontSize * 0.08);
   ctx.strokeText(renderInfo.char, centerX, centerY);
 
-  ctx.fillStyle = obj.color || '#ffffff';
+  ctx.fillStyle = obj.color ?? '#ffffff';
   ctx.fillText(renderInfo.char, centerX, centerY);
 
   if (rotation !== 0) {
@@ -276,17 +276,17 @@ function renderObjectBadges(
   deps: Pick<ObjectRenderDeps, 'renderNoteLinkBadge' | 'renderTooltipIndicator' | 'renderObjectLinkIndicator'>
 ): void {
   // Draw note badge if object has linkedNote
-  if (obj.linkedNote && obj.type !== 'note_pin') {
+  if (obj.linkedNote != null && obj.linkedNote !== '' && obj.type !== 'note_pin') {
     deps.renderNoteLinkBadge(ctx, position, { scaledSize });
   }
 
   // Draw note indicator for custom tooltip
-  if (obj.customTooltip) {
+  if (obj.customTooltip != null && obj.customTooltip !== '') {
     deps.renderTooltipIndicator(ctx, position, { scaledSize });
   }
 
   // Draw link indicator for inter-object links
-  if (obj.linkedObject) {
+  if (obj.linkedObject != null && obj.linkedObject !== '') {
     deps.renderObjectLinkIndicator(ctx, position, { scaledSize });
   }
 }
@@ -302,7 +302,7 @@ function renderObjects(
   orientation: string,
   deps: ObjectRenderDeps
 ): void {
-  if (!layer.objects || layer.objects.length === 0) return;
+  if (layer.objects == null || layer.objects.length === 0) return;
 
   const { ctx, scaledSize } = context;
 

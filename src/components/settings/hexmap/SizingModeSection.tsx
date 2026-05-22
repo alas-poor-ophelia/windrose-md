@@ -319,7 +319,7 @@ function SizingModeSection(): VNode | null {
   } = useBackgroundImage();
 
   // Only show when image is selected and dimensions are loaded
-  if (!backgroundImagePath || !imageDimensions) {
+  if (backgroundImagePath == null || backgroundImagePath === '' || !imageDimensions) {
     return null;
   }
 

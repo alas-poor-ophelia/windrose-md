@@ -38,6 +38,7 @@ interface DataFile {
 async function loadMapData(app: App, mapId: string, mapName: string = '', mapType: MapType = 'grid'): Promise<MapData> {
   try {
     const dataPath = getDataFilePath();
+    // eslint-disable-next-line no-console
     console.log('[loadMapData] path:', dataPath, 'mapId:', mapId);
     const file = app.vault.getAbstractFileByPath(dataPath);
 
@@ -48,7 +49,7 @@ async function loadMapData(app: App, mapId: string, mapName: string = '', mapTyp
     const content = await app.vault.read(file);
     const data = JSON.parse(content) as DataFile;
 
-    if (data.maps && data.maps[mapId]) {
+    if (data.maps[mapId] != null) {
       const mapData = data.maps[mapId];
 
       // Ensure all arrays exist
@@ -164,34 +165,29 @@ async function loadMapData(app: App, mapId: string, mapName: string = '', mapTyp
       if (!loadedMap.tilesets) {
         loadedMap.tilesets = [];
       }
-      if (loadedMap.layers) {
-        for (const layer of loadedMap.layers) {
-          if (!layer.tiles) {
-            layer.tiles = [];
-          }
-          if (!layer.curves) {
-            layer.curves = [];
-          }
-          // Filter out v1 POC curves that lack required start/segments fields
-          layer.curves = layer.curves.filter(c => c.start && c.segments);
-          for (const curve of layer.curves) {
-            // Migrate legacy holes (flat number[]) to innerRings ([[x,y],...])
-            const legacy = (curve as unknown as Record<string, unknown>).holes as number[][] | undefined;
-            if (legacy && legacy.length > 0) {
-              const innerRings: [number, number][][] = [];
-              for (const hole of legacy) {
-                if (!hole || hole.length < 6) continue;
-                const ring: [number, number][] = [];
-                for (let i = 0; i < hole.length; i += 2) {
-                  ring.push([hole[i], hole[i + 1]]);
-                }
-                innerRings.push(ring);
+      for (const layer of loadedMap.layers) {
+        if (!layer.tiles) {
+          layer.tiles = [];
+        }
+        // Filter out v1 POC curves that lack required start/segments fields
+        layer.curves = layer.curves.filter(c => c.start != null && c.segments != null);
+        for (const curve of layer.curves) {
+          // Migrate legacy holes (flat number[]) to innerRings ([[x,y],...])
+          const legacy = (curve as unknown as Record<string, unknown>).holes as number[][] | undefined;
+          if (legacy && legacy.length > 0) {
+            const innerRings: [number, number][][] = [];
+            for (const hole of legacy) {
+              if (hole.length < 6) continue;
+              const ring: [number, number][] = [];
+              for (let i = 0; i < hole.length; i += 2) {
+                ring.push([hole[i], hole[i + 1]]);
               }
-              if (innerRings.length > 0) {
-                curve.innerRings = innerRings;
-              }
-              delete (curve as unknown as Record<string, unknown>).holes;
+              innerRings.push(ring);
             }
+            if (innerRings.length > 0) {
+              curve.innerRings = innerRings;
+            }
+            delete (curve as unknown as Record<string, unknown>).holes;
           }
         }
       }
@@ -200,11 +196,10 @@ async function loadMapData(app: App, mapId: string, mapName: string = '', mapTyp
       if (loadedMap.subHexMaps) {
         for (const hexKey of Object.keys(loadedMap.subHexMaps)) {
           const subHex = loadedMap.subHexMaps[hexKey];
-          if (subHex?.mapData?.layers) {
+          if (subHex?.mapData != null) {
             for (const layer of subHex.mapData.layers) {
               if (!layer.tiles) layer.tiles = [];
-              if (!layer.curves) layer.curves = [];
-              layer.curves = layer.curves.filter(c => c.start && c.segments);
+              layer.curves = layer.curves.filter(c => c.start != null && c.segments != null);
             }
             if (!subHex.mapData.regions) subHex.mapData.regions = [];
             if (!subHex.mapData.outlines) subHex.mapData.outlines = [];
@@ -218,6 +213,7 @@ async function loadMapData(app: App, mapId: string, mapName: string = '', mapTyp
       return createNewMap(mapId, mapName, mapType);
     }
   } catch (error) {
+    // eslint-disable-next-line no-console
     console.error('[loadMapData] Error:', error);
     return createNewMap(mapId, mapName, mapType);
   }
@@ -239,7 +235,6 @@ async function saveMapData(app: App, mapId: string, mapData: MapData): Promise<b
     }
 
     // Update specific map
-    if (!allData.maps) allData.maps = {};
     allData.maps[mapId] = mapData;
 
     const jsonString = JSON.stringify(allData, null, 2);
@@ -252,6 +247,7 @@ async function saveMapData(app: App, mapId: string, mapData: MapData): Promise<b
 
     return true;
   } catch (error) {
+    // eslint-disable-next-line no-console
     console.error('Error saving map data:', error);
     return false;
   }
@@ -299,11 +295,6 @@ function calculateFitZoom(
 }
 
 function createNewMap(_mapId: string, mapName: string = '', mapType: MapType = 'grid'): MapData {
-  if (!DEFAULTS) {
-    console.error('[createNewMap] CRITICAL: DEFAULTS is undefined!');
-    throw new Error('DEFAULTS is undefined - constants.js import failed');
-  }
-
   // Generate layer ID for initial layer
   const initialLayerId = generateLayerId();
 
@@ -362,7 +353,7 @@ function createNewMap(_mapId: string, mapName: string = '', mapType: MapType = '
     // Get global settings to respect user configuration
     const globalSettings = getSettings();
 
-    baseMap.hexSize = (globalSettings.hexSize || DEFAULTS.hexSize) as number;
+    baseMap.hexSize = ((globalSettings.hexSize as number | undefined) ?? DEFAULTS.hexSize);
     baseMap.orientation = globalSettings.hexOrientation || DEFAULTS.hexOrientation;
     baseMap.hexBounds = { ...DEFAULTS.hexBounds };
     baseMap.dimensions = { ...DEFAULTS.dimensions };

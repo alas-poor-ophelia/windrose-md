@@ -184,7 +184,7 @@ const FogOfWarLayer = ({
         }));
       } else {
         // Hex: compute axis-aligned bounding box from corner cell world centers
-        const getCellWorld = (col: number, row: number) => {
+        const getCellWorld = (col: number, row: number): { worldX: number; worldY: number } => {
           const axial = offsetToAxial(col, row, (geometry as unknown as HexGeometry).orientation);
           return geometry.gridToWorld(axial.q, axial.r);
         };

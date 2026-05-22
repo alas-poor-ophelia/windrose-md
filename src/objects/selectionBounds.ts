@@ -38,11 +38,11 @@ function calculateTextLabelBounds(
   containerRef: ContainerRef,
   mapData: MapData
 ): SelectionBounds | null {
-  if (!label || !canvasRef.current || !containerRef?.current || !mapData) return null;
+  if (label == null || canvasRef.current == null || containerRef?.current == null || mapData == null) return null;
 
   const canvas = canvasRef.current;
   const { gridSize, viewState, northDirection } = mapData;
-  if (!viewState) return null;
+  if (viewState == null) return null;
   const { zoom, center } = viewState;
   const scaledGridSize = (gridSize ?? 32) * zoom;
 
@@ -54,7 +54,7 @@ function calculateTextLabelBounds(
   let screenX = offsetX + label.position.x * zoom;
   let screenY = offsetY + label.position.y * zoom;
 
-  if (northDirection && northDirection !== 0) {
+  if (northDirection != null && northDirection !== 0) {
     const relX = screenX - centerX;
     const relY = screenY - centerY;
     const angleRad = (northDirection * Math.PI) / 180;
@@ -72,7 +72,7 @@ function calculateTextLabelBounds(
   const textWidth = metrics.width;
   const textHeight = fontSize * 1.2;
 
-  const labelAngle = ((label.rotation || 0) * Math.PI) / 180;
+  const labelAngle = ((label.rotation ?? 0) * Math.PI) / 180;
   const cos = Math.abs(Math.cos(labelAngle));
   const sin = Math.abs(Math.sin(labelAngle));
   const rotatedWidth = textWidth * cos + textHeight * sin;
@@ -121,7 +121,7 @@ function getSelectionBounds(
   containerRef: ContainerRef,
   geometry: IGeometry
 ): SelectionBounds | null {
-  if (!selectedItems?.length || !canvasRef?.current || !containerRef?.current || !mapData) return null;
+  if (selectedItems == null || selectedItems.length === 0 || canvasRef?.current == null || containerRef?.current == null || mapData == null) return null;
 
   if (selectedItems.length === 1) {
     const item = selectedItems[0];
@@ -141,10 +141,10 @@ function getSelectionBounds(
 
     if (item.type === 'shapeOverlay') {
       const shape = mapData.shapeOverlays?.find(s => s.id === item.id);
-      if (!shape || !canvasRef.current || !containerRef.current) return null;
+      if (shape == null || canvasRef.current == null || containerRef.current == null) return null;
       const canvas = canvasRef.current;
       const { viewState } = mapData;
-      if (!viewState) return null;
+      if (viewState == null) return null;
       const { zoom, center } = viewState;
       const centerX = canvas.width / 2;
       const centerY = canvas.height / 2;
@@ -175,7 +175,7 @@ function getSelectionBounds(
   // Multi-select: compute bounding box of all items
   const canvas = canvasRef.current;
   const { gridSize, viewState, northDirection } = mapData;
-  if (!viewState) return null;
+  if (viewState == null) return null;
   const { zoom, center } = viewState;
   const scaledGridSize = (gridSize ?? 32) * zoom;
 
@@ -222,7 +222,7 @@ function getSelectionBounds(
       let screenX = offsetX + label.position.x * zoom;
       let screenY = offsetY + label.position.y * zoom;
 
-      if (northDirection && northDirection !== 0) {
+      if (northDirection != null && northDirection !== 0) {
         const relX = screenX - centerX;
         const relY = screenY - centerY;
         const angleRad = (northDirection * Math.PI) / 180;
@@ -232,7 +232,7 @@ function getSelectionBounds(
         screenY = centerY + rotatedY;
       }
 
-      const fontSize = (label.fontSize || 16) * zoom;
+      const fontSize = (label.fontSize ?? 16) * zoom;
       const approxWidth = fontSize * 3;
       const approxHeight = fontSize * 1.5;
 

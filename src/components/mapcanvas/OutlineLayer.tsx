@@ -115,11 +115,11 @@ const OutlineLayer = ({
   // ESC to cancel drawing, Delete/Backspace to delete selected
   useEffect(() => {
     if (!isOutlineTool) return undefined;
-    const handler = (e: KeyboardEvent) => {
+    const handler = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') {
         e.preventDefault();
         cancelDrawing();
-      } else if ((e.key === 'Delete' || e.key === 'Backspace') && selectedOutlineId) {
+      } else if ((e.key === 'Delete' || e.key === 'Backspace') && selectedOutlineId != null && selectedOutlineId !== '') {
         e.preventDefault();
         deleteOutline(selectedOutlineId);
       }
@@ -132,9 +132,9 @@ const OutlineLayer = ({
   useEffect(() => {
     if (!isOutlineTool) return undefined;
 
-    const handler = (e: CustomEvent) => {
+    const handler = (e: CustomEvent): void => {
       const { screenX, screenY } = e.detail;
-      if (!mapData?.outlines || !screenToWorld) return;
+      if (!mapData?.outlines) return;
 
       const world = screenToWorld(screenX, screenY);
       if (!world) return;
@@ -247,7 +247,7 @@ const OutlineLayer = ({
     const offsetY = overlay.height / 2 - viewState.center.y * viewState.zoom;
     const hexGeom = geometry as unknown as HexGeometry;
 
-    const northDirection = mapData.northDirection || 0;
+    const northDirection = mapData.northDirection ?? 0;
     if (northDirection !== 0) {
       ctx.save();
       ctx.translate(overlay.width / 2, overlay.height / 2);
@@ -287,7 +287,7 @@ const OutlineLayer = ({
     }
 
     // Draw vertex handles for selected outline
-    if (selectedOutlineId && mapData.outlines) {
+    if (selectedOutlineId != null && selectedOutlineId !== '' && mapData.outlines) {
       const outline = mapData.outlines.find(o => o.id === selectedOutlineId);
       if (outline && outline.vertices.length >= 3) {
         const screenVerts = outline.vertices.map(v =>
@@ -329,10 +329,10 @@ const OutlineLayer = ({
     whiteSpace: 'nowrap' as const
   };
 
-  const btnStyle = (active?: boolean) => ({
+  const btnStyle = (active?: boolean): Record<string, string> => ({
     padding: '4px 10px',
-    background: active ? 'var(--interactive-accent)' : 'transparent',
-    color: active ? 'var(--text-on-accent)' : 'var(--text-muted)',
+    background: active === true ? 'var(--interactive-accent)' : 'transparent',
+    color: active === true ? 'var(--text-on-accent)' : 'var(--text-muted)',
     borderRadius: '4px',
     border: '1px solid var(--background-modifier-border)',
     cursor: 'pointer' as const,
@@ -356,7 +356,7 @@ const OutlineLayer = ({
       )}
 
       {/* Config toolbar: shown when tool is active and not drawing */}
-      {isOutlineTool && drawingVertices.length === 0 && !selectedOutlineId && (
+      {isOutlineTool && drawingVertices.length === 0 && (selectedOutlineId == null || selectedOutlineId === '') && (
         <div style={barStyle}>
           {/* Line style */}
           <select
@@ -427,7 +427,7 @@ const OutlineLayer = ({
             <>
               <span style={{ color: 'var(--text-faint)', fontSize: '11px', margin: '0 2px' }}>|</span>
               <button
-                onClick={() => showClearAllConfirm(mapData.outlines!.length)}
+                onClick={() => showClearAllConfirm((mapData.outlines ?? []).length)}
                 style={{ ...btnStyle(), color: 'var(--text-error)' }}
                 title="Delete all outlines"
               >
@@ -439,7 +439,7 @@ const OutlineLayer = ({
       )}
 
       {/* Selected outline toolbar */}
-      {isOutlineTool && selectedOutlineId && mapData?.outlines && (() => {
+      {isOutlineTool && selectedOutlineId != null && selectedOutlineId !== '' && mapData?.outlines && (() => {
         const outline = mapData.outlines.find(o => o.id === selectedOutlineId);
         if (!outline) return null;
         return (

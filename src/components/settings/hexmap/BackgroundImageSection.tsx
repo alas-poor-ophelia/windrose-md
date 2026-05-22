@@ -43,7 +43,7 @@ function BackgroundImageSection(): VNode {
 
   // Auto-collapse when image is selected (only if user hasn't manually toggled)
   useEffect(() => {
-    if (backgroundImagePath && !userToggled) {
+    if (backgroundImagePath != null && backgroundImagePath !== '' && !userToggled) {
       setIsOpen(false);
     }
   }, [backgroundImagePath, userToggled]);
@@ -53,8 +53,8 @@ function BackgroundImageSection(): VNode {
     setIsOpen(newIsOpen);
   };
 
-  const subtitle = backgroundImagePath
-    ? backgroundImageDisplayName || 'Image selected'
+  const subtitle = backgroundImagePath != null && backgroundImagePath !== ''
+    ? (backgroundImageDisplayName || 'Image selected')
     : 'No image';
 
   return (
@@ -86,7 +86,7 @@ function BackgroundImageSection(): VNode {
             }}
           />
 
-          {backgroundImagePath && (
+          {backgroundImagePath != null && backgroundImagePath !== '' && (
             <button
               onClick={handleImageClear}
               style={{

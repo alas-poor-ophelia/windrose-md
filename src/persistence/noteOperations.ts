@@ -31,11 +31,11 @@ async function buildNoteIndex(app: App): Promise<NoteIndexEntry[]> {
 
     const nameCounts = new Map<string, number>();
     for (const entry of entries) {
-      nameCounts.set(entry.displayName, (nameCounts.get(entry.displayName) || 0) + 1);
+      nameCounts.set(entry.displayName, (nameCounts.get(entry.displayName) ?? 0) + 1);
     }
 
     for (const entry of entries) {
-      if ((nameCounts.get(entry.displayName) || 0) > 1) {
+      if ((nameCounts.get(entry.displayName) ?? 0) > 1) {
         const parts = entry.path.replace(/\.md$/, '').split('/');
         parts.pop();
         entry.subtitle = parts.length > 2
@@ -46,6 +46,7 @@ async function buildNoteIndex(app: App): Promise<NoteIndexEntry[]> {
 
     return entries;
   } catch (error) {
+    // eslint-disable-next-line no-console
     console.error('[buildNoteIndex] Error indexing vault notes:', error);
     return [];
   }
@@ -80,9 +81,9 @@ async function getFullPathFromDisplayName(displayName: string): Promise<string |
  * Get display name from full path.
  */
 function getDisplayNameFromPath(fullPath: string | null | undefined): string {
-  if (!fullPath) return '';
+  if (fullPath == null || fullPath === '') return '';
   // Remove .md extension and get just the filename
-  return fullPath.replace(/\.md$/, '').split('/').pop() || '';
+  return fullPath.replace(/\.md$/, '').split('/').pop() ?? '';
 }
 
 // ===========================================
@@ -93,7 +94,8 @@ function getDisplayNameFromPath(fullPath: string | null | undefined): string {
  * Open a note in a new tab using Obsidian API.
  */
 async function openNoteInNewTab(notePath: string | null | undefined): Promise<boolean> {
-  if (!notePath) {
+  if (notePath == null || notePath === '') {
+    // eslint-disable-next-line no-console
     console.warn('[openNoteInNewTab] No note path provided');
     return false;
   }
@@ -103,6 +105,7 @@ async function openNoteInNewTab(notePath: string | null | undefined): Promise<bo
     await app.workspace.openLinkText(notePath.replace(/\.md$/, ''), '', true);
     return true;
   } catch (error) {
+    // eslint-disable-next-line no-console
     console.error('[openNoteInNewTab] Error opening note:', error);
     return false;
   }
@@ -116,13 +119,14 @@ async function openNoteInNewTab(notePath: string | null | undefined): Promise<bo
  * Validate that a note path exists in the vault.
  */
 async function isValidNotePath(notePath: string | null | undefined): Promise<boolean> {
-  if (!notePath) return false;
+  if (notePath == null || notePath === '') return false;
 
   try {
     const app = getApp();
     const file = app.vault.getAbstractFileByPath(notePath);
     return file !== null && file !== undefined;
   } catch (error) {
+    // eslint-disable-next-line no-console
     console.error('[isValidNotePath] Error validating path:', error);
     return false;
   }
@@ -136,7 +140,7 @@ async function isValidNotePath(notePath: string | null | undefined): Promise<boo
  * Format a note path for display (remove .md, show just basename).
  */
 function formatNoteForDisplay(notePath: string | null | undefined): string {
-  if (!notePath) return '';
+  if (notePath == null || notePath === '') return '';
   return getDisplayNameFromPath(notePath);
 }
 

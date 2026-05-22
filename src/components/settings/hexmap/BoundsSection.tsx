@@ -49,7 +49,7 @@ function BoundsSection(): VNode {
     return `A1 to ${maxColLetter}${overflow}${hexBounds.maxRow}`;
   };
 
-  const isDisabled = boundsLocked && !!backgroundImagePath;
+  const isDisabled = boundsLocked && backgroundImagePath != null && backgroundImagePath !== '';
 
   const inputStyle = {
     width: '60px',
@@ -128,7 +128,7 @@ function BoundsSection(): VNode {
         )}
       </SettingItem>
 
-      {backgroundImagePath && (
+      {backgroundImagePath != null && backgroundImagePath !== '' && (
         <SettingItem
           name="Lock bounds to image"
           description="Automatically set bounds from image dimensions"

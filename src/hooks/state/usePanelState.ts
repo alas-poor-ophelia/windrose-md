@@ -57,7 +57,7 @@ function usePanelState({ mapData, updateMapData }: UsePanelStateOptions): UsePan
   const [editingLayerId, setEditingLayerId] = useState<string | null>(null);
 
   const editingLayer = useMemo(() => {
-    return editingLayerId ? getLayerById(mapData, editingLayerId) : null;
+    return editingLayerId != null && editingLayerId !== '' ? getLayerById(mapData, editingLayerId) : null;
   }, [editingLayerId, mapData]);
 
   // Listen for settings changes and force re-render
@@ -112,7 +112,7 @@ function usePanelState({ mapData, updateMapData }: UsePanelStateOptions): UsePan
         const isInBounds = (q: number, r: number): boolean => {
           if (isRadial) {
             const ring = Math.max(Math.abs(q), Math.abs(r), Math.abs(q + r));
-            return ring <= hexBounds.maxRing!;
+            return ring <= (hexBounds.maxRing ?? 0);
           }
           const { col, row } = axialToOffset(q, r, orientation);
           return isWithinOffsetBounds(col, row, hexBounds);
@@ -122,12 +122,12 @@ function usePanelState({ mapData, updateMapData }: UsePanelStateOptions): UsePan
           if (isRadial) {
             const { q, r } = offsetToAxial(col, row, orientation);
             const ring = Math.max(Math.abs(q), Math.abs(r), Math.abs(q + r));
-            return ring <= hexBounds.maxRing!;
+            return ring <= (hexBounds.maxRing ?? 0);
           }
           return isWithinOffsetBounds(col, row, hexBounds);
         };
 
-        if (newMapData.layers && newMapData.layers.length > 0) {
+        if (newMapData.layers.length > 0) {
           newMapData.layers = newMapData.layers.map((layer: MapLayer) => {
             const filteredCells = layer.cells?.filter((cell: Cell) =>
               isInBounds((cell as unknown as { q: number; r: number }).q, (cell as unknown as { q: number; r: number }).r)

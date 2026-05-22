@@ -113,12 +113,11 @@ function useSegmentDragTool({
   const stopSegmentDrawing = (): void => {
     if (!segmentIsDrawing) return;
 
-    const activeLayer = getActiveLayer(mapData!);
-
     setSegmentIsDrawing(false);
     setProcessedSegments(new Set());
 
-    if (strokeInitialStateRef.current !== null && mapData) {
+    if (strokeInitialStateRef.current !== null && mapData != null) {
+      const activeLayer = getActiveLayer(mapData);
       onCellsChange(activeLayer.cells, false);
       strokeInitialStateRef.current = null;
     }

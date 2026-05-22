@@ -60,22 +60,22 @@ function isLinearBezier(
   p3x: number, p3y: number,
   epsilon: number = 0.1
 ): boolean {
-  // Distance from control points to the line (p0 → p3)
+  // Distance from control points to the line (p0 â†’ p3)
   const dx = p3x - p0x;
   const dy = p3y - p0y;
   const lenSq = dx * dx + dy * dy;
 
   if (lenSq < epsilon * epsilon) {
-    // Degenerate: start ≈ end, check if control points are also close
+    // Degenerate: start â‰ˆ end, check if control points are also close
     return (
       (cp1x - p0x) * (cp1x - p0x) + (cp1y - p0y) * (cp1y - p0y) < epsilon * epsilon &&
       (cp2x - p0x) * (cp2x - p0x) + (cp2y - p0y) * (cp2y - p0y) < epsilon * epsilon
     );
   }
 
-  // Perpendicular distance of cp1 from line p0→p3
+  // Perpendicular distance of cp1 from line p0â†’p3
   const d1 = Math.abs(dx * (p0y - cp1y) - dy * (p0x - cp1x)) / Math.sqrt(lenSq);
-  // Perpendicular distance of cp2 from line p0→p3
+  // Perpendicular distance of cp2 from line p0â†’p3
   const d2 = Math.abs(dx * (p0y - cp2y) - dy * (p0x - cp2x)) / Math.sqrt(lenSq);
 
   return d1 < epsilon && d2 < epsilon;
@@ -171,7 +171,7 @@ function cellOverlapsCurve(
   const centerInside = pointInPolygon(cx, cy, outerPoly);
 
   if (!centerInside) {
-    // Check corners — cell might straddle the boundary
+    // Check corners â€” cell might straddle the boundary
     const x1 = x0 + cellSize;
     const y1 = y0 + cellSize;
     if (!pointInPolygon(x0, y0, outerPoly) &&
@@ -183,9 +183,9 @@ function cellOverlapsCurve(
         return false;
       }
     }
-    // At least one corner or edge intersects — cell overlaps
+    // At least one corner or edge intersects â€” cell overlaps
   } else {
-    // Center is inside outer polygon — check it's not inside a hole
+    // Center is inside outer polygon â€” check it's not inside a hole
     if (innerRings) {
       for (let h = 0; h < innerRings.length; h++) {
         if (pointInPolygon(cx, cy, innerRings[h])) {
@@ -274,7 +274,7 @@ function segmentIntersectsRect(
  */
 function openCurveOverlapsRect(curve: Curve, x0: number, y0: number, x1: number, y1: number): boolean {
   const pts = flattenCurve(curve);
-  // flattenCurve adds a synthetic closing segment for open curves — skip it
+  // flattenCurve adds a synthetic closing segment for open curves â€” skip it
   const last = pts.length - 2;
   for (let i = 0; i < last; i++) {
     if (segmentIntersectsRect(pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1], x0, y0, x1, y1)) return true;
@@ -308,7 +308,7 @@ function openCurveOverlapsPolygon(curve: Curve, poly: Pt[]): boolean {
 }
 
 /**
- * Test if two line segments (a1→a2) and (b1→b2) properly intersect.
+ * Test if two line segments (a1â†’a2) and (b1â†’b2) properly intersect.
  */
 function segmentsIntersect(
   ax1: number, ay1: number, ax2: number, ay2: number,
@@ -439,7 +439,7 @@ function simplifyRing(ring: Pt[], epsilon: number = 0.1): Pt[] {
 }
 
 // =========================================================================
-// Curve ↔ Polygon conversion
+// Curve â†” Polygon conversion
 // =========================================================================
 
 /**
@@ -492,10 +492,10 @@ function polygonToCurve(
   }
 
   if (outer.length < 3) {
-    // Degenerate polygon — return a minimal placeholder
+    // Degenerate polygon â€” return a minimal placeholder
     const start: Pt = outer.length > 0 ? [outer[0][0], outer[0][1]] : [0, 0];
     return {
-      id: newId || template.id,
+      id: (newId != null && newId !== '') ? newId : template.id,
       start,
       segments: [],
       closed: true,
@@ -543,7 +543,7 @@ function polygonToCurve(
   }
 
   const curve: Curve = {
-    id: newId || template.id,
+    id: (newId != null && newId !== '') ? newId : template.id,
     start,
     segments,
     closed: true,
@@ -553,7 +553,7 @@ function polygonToCurve(
     strokeWidth: template.strokeWidth
   };
 
-  if (innerRings) {
+  if (innerRings != null) {
     curve.innerRings = innerRings;
   }
 
@@ -567,7 +567,7 @@ function polygonToCurve(
 /**
  * Slightly expand a closed polygon ring outward from its centroid.
  * Prevents polygon-clipping (Martinez-Rueda-Feito) from crashing when
- * the subject and clip polygons share exact edges — a common case when
+ * the subject and clip polygons share exact edges â€” a common case when
  * curves have been previously erased along hex/grid boundaries.
  *
  * The expansion is 0.01 world units (~0.01px), invisible at any zoom
@@ -663,11 +663,11 @@ function subtractCellFromCurve(
   try {
     result = difference(subject, cellPoly);
   } catch {
-    // polygon-clipping can throw on degenerate input — preserve original
+    // polygon-clipping can throw on degenerate input â€” preserve original
     return [curve];
   }
 
-  if (!result || result.length === 0) {
+  if (result == null || result.length === 0) {
     return []; // Fully erased
   }
 
@@ -696,7 +696,7 @@ function subtractCellFromCurve(
 /**
  * Find which curve (if any) contains a grid cell.
  * Returns the index of the first overlapping curve, or -1.
- * Accounts for inner rings (holes) — cells inside holes are not found.
+ * Accounts for inner rings (holes) â€” cells inside holes are not found.
  */
 function findCurveAtCell(
   curves: Curve[],
@@ -705,7 +705,7 @@ function findCurveAtCell(
 ): number {
   for (let i = 0; i < curves.length; i++) {
     const curve = curves[i];
-    if (!curve) continue;
+    if (curve == null) continue;
     if (!curve.closed) {
       const x0 = cellX * cellSize;
       const y0 = cellY * cellSize;
@@ -743,7 +743,7 @@ function eraseCellFromCurves(
   cellX: number, cellY: number,
   cellSize: number
 ): Curve[] | null {
-  if (!curves || curves.length === 0) return null;
+  if (curves == null || curves.length === 0) return null;
 
   const idx = findCurveAtCell(curves, cellX, cellY, cellSize);
   if (idx === -1) return null;
@@ -781,7 +781,7 @@ function eraseRectangleFromCurves(
   worldMinX: number, worldMinY: number,
   worldMaxX: number, worldMaxY: number
 ): Curve[] | null {
-  if (!curves || curves.length === 0) return null;
+  if (curves == null || curves.length === 0) return null;
 
   const rectPoly: Polygon = [expandClipRing([
     [worldMinX, worldMinY],
@@ -819,7 +819,7 @@ function eraseRectangleFromCurves(
       continue;
     }
 
-    if (!result || result.length === 0) {
+    if (result == null || result.length === 0) {
       changed = true;
       continue;
     }
@@ -861,7 +861,7 @@ function eraseWorldPolygonFromCurves(
   curves: Curve[],
   clipVertices: Pt[]
 ): Curve[] | null {
-  if (!curves || curves.length === 0 || clipVertices.length < 3) return null;
+  if (curves == null || curves.length === 0 || clipVertices.length < 3) return null;
 
   // Ensure closed ring
   let ring = clipVertices;
@@ -901,7 +901,7 @@ function eraseWorldPolygonFromCurves(
       continue;
     }
 
-    if (!result || result.length === 0) {
+    if (result == null || result.length === 0) {
       changed = true;
       continue;
     }
@@ -939,7 +939,7 @@ function eraseWorldPolygonFromCurves(
  * Returns a MultiPolygon result, or null on failure.
  */
 function unionCurves(curves: Curve[]): MultiPolygon | null {
-  if (!curves || curves.length < 2) return null;
+  if (curves == null || curves.length < 2) return null;
 
   const polygons: Polygon[] = [];
   for (let i = 0; i < curves.length; i++) {

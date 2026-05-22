@@ -13,7 +13,7 @@
  * Returns true if native modal opened, false to fall back to Preact.
  */
 
-import type { JSX } from 'preact';
+import type { JSX, VNode } from 'preact';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { getNoteEntries, getFullPathFromDisplayName, getDisplayNameFromPath } from '../../persistence/noteOperations';
 import { getObjectType } from '../../objects/objectTypeResolver';
@@ -45,10 +45,10 @@ function openNativeNoteLinkModal(app: App, options: OpenNativeNoteLinkModalOptio
       objectType = null
     } = options;
 
-    const objectTypeLabel = (() => {
-      if (!objectType) return 'Object';
+    const objectTypeLabel = ((): string => {
+      if (objectType == null || objectType === '') return 'Object';
       const type = getObjectType(objectType);
-      return type ? type.label : 'Object';
+      return type != null ? type.label : 'Object';
     })();
 
     let noteCache: NoteIndexEntry[] | null = null;
@@ -58,7 +58,7 @@ function openNativeNoteLinkModal(app: App, options: OpenNativeNoteLinkModalOptio
       inputEl!: HTMLInputElement;
       submitted = false;
 
-      onOpen() {
+      onOpen(): void {
         const { contentEl, titleEl } = this;
         titleEl.setText(`Link Note to ${objectTypeLabel}`);
 
@@ -70,12 +70,12 @@ function openNativeNoteLinkModal(app: App, options: OpenNativeNoteLinkModalOptio
           .addSearch(search => {
             searchComponent = search;
             search.setPlaceholder('Type to search notes...');
-            if (displayName) {
+            if (displayName !== '') {
               search.setValue(displayName);
             }
           });
 
-        this.inputEl = (searchComponent as SearchComponent | null)!.inputEl;
+        this.inputEl = (searchComponent as SearchComponent).inputEl;
 
         this.inputEl.addEventListener('input', () => {
           selectedPath = null;
@@ -101,14 +101,14 @@ function openNativeNoteLinkModal(app: App, options: OpenNativeNoteLinkModalOptio
               .slice(0, 10);
           }
 
-          renderSuggestion(entry: NoteLinkSuggestion, el: HTMLElement) {
+          renderSuggestion(entry: NoteLinkSuggestion, el: HTMLElement): void {
             el.createDiv({ text: entry.displayName, cls: 'dmt-note-suggest-name' });
-            if (entry.subtitle) {
+            if (entry.subtitle != null && entry.subtitle !== '') {
               el.createDiv({ text: entry.subtitle, cls: 'dmt-note-suggest-path' });
             }
           }
 
-          selectSuggestion(entry: NoteLinkSuggestion) {
+          selectSuggestion(entry: NoteLinkSuggestion): void {
             inputEl.value = entry.displayName;
             inputEl.dispatchEvent(new Event('input'));
             selectedPath = entry.path;
@@ -136,7 +136,7 @@ function openNativeNoteLinkModal(app: App, options: OpenNativeNoteLinkModalOptio
           app.commands.executeCommandById('file-explorer:new-file');
         });
 
-        if (currentNotePath) {
+        if (currentNotePath != null && currentNotePath !== '') {
           const removeBtn = buttonContainer.createEl('button', {
             text: 'Remove link',
             cls: 'mod-warning'
@@ -156,30 +156,30 @@ function openNativeNoteLinkModal(app: App, options: OpenNativeNoteLinkModalOptio
 
         setTimeout(() => {
           this.inputEl.focus();
-          if (displayName) this.inputEl.select();
+          if (displayName !== '') this.inputEl.select();
         }, 0);
       }
 
-      async submit() {
+      async submit(): Promise<void> {
         const value = this.inputEl.value.trim();
         this.submitted = true;
 
-        if (!value) {
+        if (value === '') {
           onSave(null);
           this.close();
           return;
         }
 
-        if (selectedPath) {
+        if (selectedPath != null && selectedPath !== '') {
           onSave(selectedPath);
         } else {
           const fullPath = await getFullPathFromDisplayName(value);
-          onSave(fullPath || value + '.md');
+          onSave((fullPath != null && fullPath !== '') ? fullPath : value + '.md');
         }
         this.close();
       }
 
-      onClose() {
+      onClose(): void {
         if (!this.submitted) {
           onClose();
         }
@@ -190,6 +190,7 @@ function openNativeNoteLinkModal(app: App, options: OpenNativeNoteLinkModalOptio
     modal.open();
     return true;
   } catch (e) {
+    // eslint-disable-next-line no-console
     console.warn('[Windrose] Failed to open native NoteLinkModal, falling back to Preact:', (e as Error).message);
     return false;
   }
@@ -213,7 +214,7 @@ function NoteLinkModal({
   onSave,
   currentNotePath = null,
   objectType = null
-}: NoteLinkModalProps) {
+}: NoteLinkModalProps): VNode | null {
   const [noteInput, setNoteInput] = useState('');
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -222,7 +223,7 @@ function NoteLinkModal({
     if (isOpen) {
       const displayName = getDisplayNameFromPath(currentNotePath);
       setNoteInput(displayName);
-      setSelectedPath(currentNotePath || null);
+      setSelectedPath(currentNotePath ?? null);
     }
   }, [isOpen, currentNotePath]);
 
@@ -230,6 +231,7 @@ function NoteLinkModal({
     try {
       return await getNoteEntries();
     } catch (error) {
+      // eslint-disable-next-line no-console
       console.error('[NoteLinkModal] Error getting suggestions:', error);
       return [];
     }
@@ -245,15 +247,16 @@ function NoteLinkModal({
         return;
       }
 
-      if (selectedPath) {
+      if (selectedPath != null && selectedPath !== '') {
         onSave(selectedPath);
       } else {
         const fullPath = await getFullPathFromDisplayName(noteInput);
-        onSave(fullPath || noteInput + '.md');
+        onSave((fullPath != null && fullPath !== '') ? fullPath : noteInput + '.md');
       }
 
       onClose();
     } catch (error) {
+      // eslint-disable-next-line no-console
       console.error('[NoteLinkModal] Error saving note link:', error);
     } finally {
       setIsLoading(false);
@@ -279,10 +282,10 @@ function NoteLinkModal({
     app.commands.executeCommandById('file-explorer:new-file');
   }, [onClose]);
 
-  const objectTypeLabel = useMemo(() => {
-    if (!objectType) return 'Object';
+  const objectTypeLabel = useMemo((): string => {
+    if (objectType == null || objectType === '') return 'Object';
     const type = getObjectType(objectType);
-    return type ? type.label : 'Object';
+    return type != null ? type.label : 'Object';
   }, [objectType]);
 
   if (!isOpen) return null;
@@ -329,7 +332,7 @@ function NoteLinkModal({
             Create Note
           </button>
 
-          {currentNotePath && (
+          {currentNotePath != null && currentNotePath !== '' && (
             <button
               class="dmt-modal-btn dmt-modal-btn-danger"
               onClick={handleRemove}
@@ -353,7 +356,7 @@ function NoteLinkModal({
 }
 
 function fuzzyMatch(text: string, query: string): boolean {
-  if (!query) return true;
+  if (query === '') return true;
   
   const textLower = text.toLowerCase();
   const queryLower = query.toLowerCase();
@@ -368,7 +371,7 @@ function fuzzyMatch(text: string, query: string): boolean {
 }
 
 function scoreMatch(text: string, query: string): number {
-  if (!query) return 0;
+  if (query === '') return 0;
   
   const textLower = text.toLowerCase();
   const queryLower = query.toLowerCase();
@@ -397,7 +400,7 @@ function AutocompleteInput({
   disabled,
   getSuggestions,
   maxSuggestions = 10
-}: AutocompleteInputProps) {
+}: AutocompleteInputProps): VNode {
   const [suggestions, setSuggestions] = useState<NoteLinkSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
@@ -431,8 +434,8 @@ function AutocompleteInput({
   }, [selectedIndex]);
 
   useEffect(() => {
-    const loadSuggestions = async () => {
-      if (!value || value.length < 1) {
+    const loadSuggestions = async (): Promise<void> => {
+      if (value === '' || value.length < 1) {
         setSuggestions([]);
         setShowSuggestions(false);
         return;
@@ -467,6 +470,7 @@ function AutocompleteInput({
           setSelectedIndex(matches.length - 1);
         }
       } catch (error) {
+        // eslint-disable-next-line no-console
         console.error('Error loading suggestions:', error);
         setSuggestions([]);
       } finally {
@@ -478,7 +482,7 @@ function AutocompleteInput({
   }, [value, getSuggestions, maxSuggestions, userIsTyping]);
 
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
+    const handleClickOutside = (event: MouseEvent): void => {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         setShowSuggestions(false);
         setSelectedIndex(-1);
@@ -489,12 +493,12 @@ function AutocompleteInput({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleInputChange = (e: JSX.TargetedEvent<HTMLInputElement>) => {
+  const handleInputChange = (e: JSX.TargetedEvent<HTMLInputElement>): void => {
     setUserIsTyping(true);
     onChange({ target: { value: (e.target as HTMLInputElement).value } });
   };
 
-  const handleKeyDown = (e: KeyboardEvent) => {
+  const handleKeyDown = (e: KeyboardEvent): void => {
     if (!showSuggestions || suggestions.length === 0) return;
 
     switch (e.key) {
@@ -528,7 +532,7 @@ function AutocompleteInput({
     }
   };
 
-  const selectEntry = (entry: NoteIndexEntry) => {
+  const selectEntry = (entry: NoteIndexEntry): void => {
     justSelectedRef.current = true;
     setUserIsTyping(false);
     onChange({ target: { value: entry.displayName } });
@@ -537,13 +541,13 @@ function AutocompleteInput({
     setSelectedIndex(-1);
   };
 
-  const handleFocus = () => {
+  const handleFocus = (): void => {
     if (value && suggestions.length > 0 && userIsTyping) {
       setShowSuggestions(true);
     }
   };
 
-  const handleBlur = () => {
+  const handleBlur = (): void => {
     setTimeout(() => {
       setUserIsTyping(false);
     }, 200);
@@ -608,7 +612,7 @@ function AutocompleteInput({
               }}>
                 {entry.displayName}
               </div>
-              {entry.subtitle && (
+              {entry.subtitle != null && entry.subtitle !== '' && (
                 <div style={{
                   fontSize: '11px',
                   color: 'var(--text-muted)',

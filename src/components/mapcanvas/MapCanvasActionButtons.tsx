@@ -11,6 +11,7 @@
 
 // Sub-component: Text Label Control Buttons
 
+import type { VNode } from 'preact';
 import { TextLabelEditor } from '../modals/TextLabelEditor';
 import { TextInputModal } from '../modals/TextInputModal';
 import { Icon } from '../shared/Icon';
@@ -37,7 +38,7 @@ const TextLabelControls = ({
   calculateRotateButtonPosition,
   handleEditClick,
   handleRotateClick
-}: TextLabelControlsProps) => {
+}: TextLabelControlsProps): VNode | null => {
   if (selectedItem?.type !== 'text' || !mapData) return null;
   
   return (
@@ -102,25 +103,25 @@ const ModalOverlays = ({
   handleNoteCancel,
   onAddCustomColor,
   onDeleteCustomColor
-}: ModalOverlaysProps) => {
+}: ModalOverlaysProps): VNode => {
   return (
     <>
       {/* Text Label Editor Modal */}
       {showTextModal && (() => {
         let currentLabel: TextLabel | undefined;
-        if (editingTextId && mapData?.textLabels) {
+        if (editingTextId != null && editingTextId !== '' && mapData?.textLabels != null) {
           currentLabel = mapData.textLabels.find((l: TextLabel) => l.id === editingTextId);
         }
-        
+
         return (
           <TextLabelEditor
-            initialValue={currentLabel?.content || ''}
-            initialFontSize={currentLabel?.fontSize || 16}
-            initialFontFace={currentLabel?.fontFace || 'sans'}
-            initialColor={currentLabel?.color || '#ffffff'}
+            initialValue={currentLabel?.content ?? ''}
+            initialFontSize={currentLabel?.fontSize ?? 16}
+            initialFontFace={currentLabel?.fontFace ?? 'sans'}
+            initialColor={currentLabel?.color ?? '#ffffff'}
             initialOpacity={currentLabel?.opacity ?? 1}
-            isEditing={!!editingTextId}
-            customColors={customColors || []}
+            isEditing={editingTextId != null && editingTextId !== ''}
+            customColors={customColors ?? []}
             onAddCustomColor={onAddCustomColor}
             onDeleteCustomColor={onDeleteCustomColor}
             onSubmit={handleTextSubmit}
@@ -128,18 +129,18 @@ const ModalOverlays = ({
           />
         );
       })()}
-      
+
       {/* Object Note Modal */}
-      {showNoteModal && editingObjectId && mapData && (
+      {showNoteModal && editingObjectId != null && editingObjectId !== '' && mapData != null && (
         <TextInputModal
           onSubmit={handleNoteModalSubmit}
           onCancel={handleNoteCancel}
-          title={`Label for ${(mapData.objects ?? []).find((obj: MapObjectRef) => obj.id === editingObjectId)?.label || 'Object'}`}
+          title={`Label for ${(mapData.objects ?? []).find((obj: MapObjectRef) => obj.id === editingObjectId)?.label ?? 'Object'}`}
           placeholder="Add a custom note..."
-          initialValue={(mapData.objects ?? []).find((obj: MapObjectRef) => obj.id === editingObjectId)?.customTooltip || ''}
+          initialValue={(mapData.objects ?? []).find((obj: MapObjectRef) => obj.id === editingObjectId)?.customTooltip ?? ''}
         />
       )}
-      
+
     </>
   );
 };
@@ -172,7 +173,7 @@ const MapCanvasActionButtons = ({
   customColors,
   onAddCustomColor,
   onDeleteCustomColor
-}: MapCanvasActionButtonsProps) => {
+}: MapCanvasActionButtonsProps): VNode => {
   return (
     <>
       <TextLabelControls

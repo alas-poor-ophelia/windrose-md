@@ -30,7 +30,16 @@ interface UseObjectModalsArgs {
   handleNoteSubmit: (content: string, objectId: string | null) => void;
 }
 
-const useObjectModals = ({ onObjectsChange, handleNoteSubmit }: UseObjectModalsArgs) => {
+const useObjectModals = ({ onObjectsChange, handleNoteSubmit }: UseObjectModalsArgs): {
+  showNoteModal: boolean;
+  editingObjectId: string | null;
+  handleNoteButtonClick: (e: JSX.TargetedMouseEvent<HTMLElement>) => void;
+  handleNoteModalSubmit: (content: string) => void;
+  handleNoteCancel: () => void;
+  handleEditNoteLink: (objectId: string) => void;
+  handleNoteLinkSave: (notePath: string) => void;
+  handleNoteLinkCancel: () => void;
+} => {
   const app = useApp();
   const { mapData } = useMapState();
   const {
@@ -54,10 +63,11 @@ const useObjectModals = ({ onObjectsChange, handleNoteSubmit }: UseObjectModalsA
         setDragStart(null);
       }
 
+      if (!mapData) return;
       const objectId = selectedItem.id;
-      const obj = getActiveLayer(mapData!).objects.find((o: MapObject) => o.id === objectId);
-      const objTitle = obj?.label || 'Object';
-      const objTooltip = obj?.customTooltip || '';
+      const obj = getActiveLayer(mapData).objects.find((o: MapObject) => o.id === objectId);
+      const objTitle = obj?.label != null && obj.label !== '' ? obj.label : 'Object';
+      const objTooltip = obj?.customTooltip ?? '';
 
       const opened = openNativeTextInputModal({
         app,
@@ -113,12 +123,13 @@ const useObjectModals = ({ onObjectsChange, handleNoteSubmit }: UseObjectModalsA
       setDragStart(null);
     }
 
-    const obj = getActiveLayer(mapData!).objects?.find((o: MapObject) => o.id === objectId);
+    if (!mapData) return;
+    const obj = getActiveLayer(mapData).objects?.find((o: MapObject) => o.id === objectId);
     const opened = openNativeNoteLinkModal(app, {
-      onSave: (notePath: string | null) => { if (notePath) handleNoteLinkSaveForObject(notePath, objectId); },
+      onSave: (notePath: string | null) => { if (notePath != null) handleNoteLinkSaveForObject(notePath, objectId); },
       onClose: () => { setEditingNoteObjectId(null); },
-      currentNotePath: obj?.linkedNote || null,
-      objectType: obj?.type || null
+      currentNotePath: obj?.linkedNote ?? null,
+      objectType: obj?.type ?? null
     });
 
     if (!opened) {
@@ -128,7 +139,7 @@ const useObjectModals = ({ onObjectsChange, handleNoteSubmit }: UseObjectModalsA
   };
 
   const handleNoteLinkSave = (notePath: string): void => {
-    if (!editingNoteObjectId) return;
+    if (editingNoteObjectId == null) return;
     handleNoteLinkSaveForObject(notePath, editingNoteObjectId);
     setShowNoteLinkModal(false);
     setEditingNoteObjectId(null);

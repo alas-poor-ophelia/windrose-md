@@ -122,13 +122,13 @@ function MapSettingsModalContent(): VNode | null {
 
   if (!isOpen) return null;
 
-  const contextBridge = (children: unknown) =>
+  const contextBridge = (children: unknown): VNode =>
     h(ModalShellContext.Provider, { value: shellCtx },
       h(AppearanceContext.Provider, { value: appearanceCtx },
         h(BackgroundImageContext.Provider, { value: bgImageCtx },
           h(HexGridContext.Provider, { value: hexGridCtx }, children as ComponentChildren))));
 
-  const modalTitle = isInSubHex && subMapName
+  const modalTitle = isInSubHex === true && subMapName != null && subMapName !== ''
     ? `Map Settings \u2014 ${subMapName}`
     : 'Map Settings';
 

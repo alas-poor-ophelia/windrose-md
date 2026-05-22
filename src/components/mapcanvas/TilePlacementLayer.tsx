@@ -51,14 +51,14 @@ const TilePlacementLayer = ({
   const { registerHandlers, unregisterHandlers } = useEventHandlerRegistration();
 
   const isTileTool = currentTool === 'tilePaint';
-  const hasTileSelected = !!(selectedTilesetId && selectedTileId);
+  const hasTileSelected = selectedTilesetId != null && selectedTilesetId !== '' && selectedTileId != null && selectedTileId !== '';
 
   const paintedInStrokeRef = useRef<Set<string>>(new Set());
   const isDraggingRef = useRef(false);
   const strokeInitialTilesRef = useRef<HexTileAssignment[] | null>(null);
 
   const placeTileAtHex = useCallback((q: number, r: number) => {
-    if (!mapData || !selectedTilesetId || !selectedTileId) return;
+    if (!mapData || selectedTilesetId == null || selectedTilesetId === '' || selectedTileId == null || selectedTileId === '') return;
 
     const activeLayer = getActiveLayer(mapData);
     const currentTiles = activeLayer.tiles || [];
@@ -97,7 +97,7 @@ const TilePlacementLayer = ({
   }, [mapData, selectedTilesetId, selectedTileId, tileRotation, tileFlipH, tileLayer, tileFitMode, tileScale, onTilesChange]);
 
   const placeStampAtWorld = useCallback((worldX: number, worldY: number, q: number, r: number) => {
-    if (!mapData || !selectedTilesetId || !selectedTileId) return;
+    if (!mapData || selectedTilesetId == null || selectedTilesetId === '' || selectedTileId == null || selectedTileId === '') return;
 
     const activeLayer = getActiveLayer(mapData);
     const currentTiles = activeLayer.tiles || [];

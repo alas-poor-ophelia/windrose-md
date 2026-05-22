@@ -114,7 +114,8 @@ function useFogOfWar({
       updatedLayer = fogAll(activeLayer, bounds);
     } else {
       // Unbounded maps: fog only painted cells
-      if (!activeLayer.cells || activeLayer.cells.length === 0) {
+      if (activeLayer.cells == null || activeLayer.cells.length === 0) {
+        // eslint-disable-next-line no-console
         console.warn('[FoW] No painted cells to fog');
         return;
       }
@@ -122,12 +123,14 @@ function useFogOfWar({
     }
 
     // Ensure fog is enabled
-    updateMapData(updateActiveLayer(workingMapData, {
-      fogOfWar: {
-        ...updatedLayer.fogOfWar!,
-        enabled: true
-      }
-    }));
+    if (updatedLayer.fogOfWar != null) {
+      updateMapData(updateActiveLayer(workingMapData, {
+        fogOfWar: {
+          ...updatedLayer.fogOfWar,
+          enabled: true
+        }
+      }));
+    }
   }, [mapData, geometry, updateMapData]);
 
   const handleFogClearAll = useCallback((): void => {

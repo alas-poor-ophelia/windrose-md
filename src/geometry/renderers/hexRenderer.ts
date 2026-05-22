@@ -71,7 +71,7 @@ const hexRenderer = {
     offsetY: number,
     zoom: number
   ): void {
-    if (!bgImage || !bgConfig?.path || !hexBounds) return;
+    if (bgImage == null || bgConfig?.path == null || bgConfig.path === '' || hexBounds == null) return;
     if (!bgImage.complete) return;
 
     renderHexBackgroundImage(
@@ -121,7 +121,7 @@ const hexRenderer = {
     geometry: IHexRenderer,
     viewState: ViewState
   ): void {
-    if (!cells || cells.length === 0) return;
+    if (cells == null || cells.length === 0) return;
     
     const previousAlpha = ctx.globalAlpha;
 

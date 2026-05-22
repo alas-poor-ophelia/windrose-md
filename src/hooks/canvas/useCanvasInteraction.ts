@@ -73,12 +73,12 @@ function useCanvasInteraction(
 
   const getClientCoords = (e: PointerEvent | MouseEvent | TouchEvent): ClientCoords => {
     const touchEvent = e as TouchEvent;
-    if (touchEvent.touches && touchEvent.touches.length > 0) {
+    if (touchEvent.touches != null && touchEvent.touches.length > 0) {
       return {
         clientX: touchEvent.touches[0].clientX,
         clientY: touchEvent.touches[0].clientY
       };
-    } else if (touchEvent.changedTouches && touchEvent.changedTouches.length > 0) {
+    } else if (touchEvent.changedTouches != null && touchEvent.changedTouches.length > 0) {
       return {
         clientX: touchEvent.changedTouches[0].clientX,
         clientY: touchEvent.changedTouches[0].clientY
@@ -333,7 +333,7 @@ function useCanvasInteraction(
 
     const center = getTouchCenter(touches);
     const distance = getTouchDistance(touches);
-    if (!center || !distance) return;
+    if (center == null || distance == null) return;
 
     const startCenter = touchPanStartRef.current;
     const deltaX = center.x - startCenter.x;
@@ -359,7 +359,7 @@ function useCanvasInteraction(
       gridDeltaY = -rotatedDeltaY / zoom;
     }
     let newZoom = zoom;
-    if (initialPinchDistanceRef.current) {
+    if (initialPinchDistanceRef.current != null) {
       const scale = distance / initialPinchDistanceRef.current;
       newZoom = Math.max(DEFAULTS.minZoom, Math.min(4, zoom * scale));
     }

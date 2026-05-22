@@ -17,6 +17,7 @@
  * - Apply/Reset/Cancel actions
  */
 
+import type { VNode } from 'preact';
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { ModalPortal } from '../modals/ModalPortal';
 
@@ -31,7 +32,7 @@ interface ImageAlignmentModeProps {
   onGridSizeChange?: (size: number) => void;
 }
 
-function ImageAlignmentMode({ isActive, offsetX, offsetY, onOffsetChange, onApply, onCancel, gridSize, onGridSizeChange }: ImageAlignmentModeProps) {
+function ImageAlignmentMode({ isActive, offsetX, offsetY, onOffsetChange, onApply, onCancel, gridSize, onGridSizeChange }: ImageAlignmentModeProps): VNode | null {
   const [panelPosition, setPanelPosition] = useState<{ x: number | null; y: number | null }>({ x: null, y: null });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
@@ -62,15 +63,15 @@ function ImageAlignmentMode({ isActive, offsetX, offsetY, onOffsetChange, onAppl
     // Only handle events on the canvas
     const canvas = document.querySelector('[class^="dmt-canvas"]');
     const target = e.target as HTMLElement | null;
-    if (!canvas || !target?.closest('[class^="dmt-canvas"]')) {
+    if (canvas == null || !target?.closest('[class^="dmt-canvas"]')) {
       return;
     }    // Only handle single-finger/mouse events (let two-finger pan through)
     const touches = (e as TouchEvent).touches;
-    if (touches && touches.length > 1) {      return;
+    if (touches != null && touches.length > 1) {      return;
     }
 
-    const clientX = touches ? touches[0].clientX : (e as PointerEvent).clientX;
-    const clientY = touches ? touches[0].clientY : (e as PointerEvent).clientY;    isDraggingRef.current = true;
+    const clientX = touches != null ? touches[0].clientX : (e as PointerEvent).clientX;
+    const clientY = touches != null ? touches[0].clientY : (e as PointerEvent).clientY;    isDraggingRef.current = true;
     dragStartOffsetRef.current = { x: offsetX, y: offsetY };
     dragStartClientRef.current = { x: clientX, y: clientY };
     
@@ -82,12 +83,12 @@ function ImageAlignmentMode({ isActive, offsetX, offsetY, onOffsetChange, onAppl
     if (!isDraggingRef.current) return;
 
     const touches = (e as TouchEvent).touches;
-    const clientX = touches ? touches[0].clientX : (e as PointerEvent).clientX;
-    const clientY = touches ? touches[0].clientY : (e as PointerEvent).clientY;
-    
+    const clientX = touches != null ? touches[0].clientX : (e as PointerEvent).clientX;
+    const clientY = touches != null ? touches[0].clientY : (e as PointerEvent).clientY;
+
     const dx = clientX - dragStartClientRef.current.x;
     const dy = clientY - dragStartClientRef.current.y;
-    
+
     const newOffsetX = Math.round(dragStartOffsetRef.current.x + dx);
     const newOffsetY = Math.round(dragStartOffsetRef.current.y + dy);    onOffsetChange(newOffsetX, newOffsetY);
   }, [onOffsetChange]);
@@ -131,7 +132,7 @@ function ImageAlignmentMode({ isActive, offsetX, offsetY, onOffsetChange, onAppl
   useEffect(() => {
     if (!isActive) return undefined;
 
-    const handleKeyDown = (e: KeyboardEvent) => {
+    const handleKeyDown = (e: KeyboardEvent): void => {
       // Ignore if typing in input field
       if ((e.target as HTMLElement | null)?.tagName === 'INPUT') return;
       
@@ -184,8 +185,8 @@ function ImageAlignmentMode({ isActive, offsetX, offsetY, onOffsetChange, onAppl
     if (!target?.closest('.alignment-panel-header')) return;
 
     const touches = (e as TouchEvent).touches;
-    const clientX = touches ? touches[0].clientX : (e as MouseEvent).clientX;
-    const clientY = touches ? touches[0].clientY : (e as MouseEvent).clientY;
+    const clientX = touches != null ? touches[0].clientX : (e as MouseEvent).clientX;
+    const clientY = touches != null ? touches[0].clientY : (e as MouseEvent).clientY;
 
     setIsDragging(true);
     setDragStart({
@@ -198,17 +199,17 @@ function ImageAlignmentMode({ isActive, offsetX, offsetY, onOffsetChange, onAppl
   useEffect(() => {
     if (!isDragging) return undefined;
 
-    const handleMove = (e: MouseEvent | TouchEvent) => {
+    const handleMove = (e: MouseEvent | TouchEvent): void => {
       const touches = (e as TouchEvent).touches;
-      const clientX = touches ? touches[0].clientX : (e as MouseEvent).clientX;
-      const clientY = touches ? touches[0].clientY : (e as MouseEvent).clientY;
+      const clientX = touches != null ? touches[0].clientX : (e as MouseEvent).clientX;
+      const clientY = touches != null ? touches[0].clientY : (e as MouseEvent).clientY;
       setPanelPosition({
         x: clientX - dragStart.x,
         y: clientY - dragStart.y
       });
     };
 
-    const handleEnd = () => {
+    const handleEnd = (): void => {
       setIsDragging(false);
     };
 
@@ -354,7 +355,7 @@ function ImageAlignmentMode({ isActive, offsetX, offsetY, onOffsetChange, onAppl
               </label>
               <input
                 type="number"
-                value={gridSize || ''}
+                value={gridSize != null ? gridSize : ''}
                 min="1"
                 onChange={handleGridSizeChange}
                 placeholder="e.g. 140"

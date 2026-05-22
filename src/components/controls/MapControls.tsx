@@ -4,6 +4,7 @@
 
 // Timing constants - easy to tune
 
+import type { VNode } from 'preact';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { WindroseCompass } from '../shared/WindroseCompass';
 import { Icon } from '../shared/Icon';
@@ -49,7 +50,7 @@ const MapControls = ({
   showRegionPanel,
   onToggleRegionPanel,
   alwaysShowControls = false
-}: MapControlsProps) => {
+}: MapControlsProps): VNode => {
     // When alwaysShowControls is true, controls are always visible
     const [controlsRevealed, setControlsRevealed] = useState(alwaysShowControls);
     const collapseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -70,14 +71,14 @@ const MapControls = ({
       return window.matchMedia('(pointer: coarse)').matches;
     }, []);
     
-    const clearCollapseTimer = () => {
+    const clearCollapseTimer = (): void => {
       if (collapseTimerRef.current) {
         clearTimeout(collapseTimerRef.current);
         collapseTimerRef.current = null;
       }
     };
     
-    const startCollapseTimer = (forTouch = false) => {
+    const startCollapseTimer = (forTouch = false): void => {
       // Don't collapse if always showing controls
       if (alwaysShowControls) return;
       
@@ -89,19 +90,19 @@ const MapControls = ({
     };
     
     // Hover handlers - work on any device with hover capability
-    const handleMouseEnter = () => {
+    const handleMouseEnter = (): void => {
       clearCollapseTimer();
       setControlsRevealed(true);
     };
     
-    const handleMouseLeave = () => {
+    const handleMouseLeave = (): void => {
       startCollapseTimer(false); // desktop timing
     };
     
     // Compass click - works on all devices
     // If collapsed: reveal (tap-to-reveal for touch, or click-to-reveal)
     // If revealed or always showing: rotate compass
-    const handleCompassClick = () => {
+    const handleCompassClick = (): void => {
       if (alwaysShowControls || controlsRevealed) {
         // Controls already revealed or always showing - rotate compass
         onCompassClick();
@@ -121,7 +122,7 @@ const MapControls = ({
     };
     
     // Touch: tap outside to dismiss (only if not always showing)
-    const handleOverlayClick = (e: Event) => {
+    const handleOverlayClick = (e: Event): void => {
       if (alwaysShowControls) return;
 
       e.stopPropagation();
@@ -131,7 +132,7 @@ const MapControls = ({
     };
 
     // Reset collapse timer when interacting with controls (touch)
-    const handleControlInteraction = (handler: (e: Event) => void) => (e: Event) => {
+    const handleControlInteraction = (handler: (e: Event) => void) => (e: Event): void => {
       if (hasTouchCapability && controlsRevealed) {
         startCollapseTimer(true);
       }
@@ -144,7 +145,7 @@ const MapControls = ({
     }, []);
     
     // Stagger timing for bottom drawer items (indices 0-3)
-    const getDrawerItemStyle = (index: number) => ({
+    const getDrawerItemStyle = (index: number): Record<string, string> => ({
       transitionDelay: controlsRevealed 
         ? `${(index + 1) * ITEM_STAGGER_MS}ms`
         : `${(DRAWER_ITEM_COUNT - index + 1) * ITEM_STAGGER_MS}ms`,
@@ -152,7 +153,7 @@ const MapControls = ({
     });
     
     // Expand button animates last on reveal, first on collapse
-    const getExpandStyle = () => ({
+    const getExpandStyle = (): Record<string, string> => ({
       transitionDelay: controlsRevealed 
         ? `${(DRAWER_ITEM_COUNT + 1) * ITEM_STAGGER_MS}ms`
         : `0ms`,
@@ -160,7 +161,7 @@ const MapControls = ({
     });
     
     // Build compass tooltip based on state and capabilities
-    const getCompassTitle = () => {
+    const getCompassTitle = (): string => {
       if (!controlsRevealed && !alwaysShowControls && hasTouchCapability) {
         return "Tap to show controls";
       }
@@ -244,7 +245,7 @@ const MapControls = ({
             {/* Region Panel Toggle Button (hex maps only) */}
             {mapType === 'hex' && onToggleRegionPanel && (
               <button
-                className={`dmt-expand-btn dmt-drawer-item ${showRegionPanel ? 'dmt-expand-btn-active' : ''} ${controlsRevealed ? 'dmt-drawer-item-visible' : ''}`}
+                className={`dmt-expand-btn dmt-drawer-item ${showRegionPanel === true ? 'dmt-expand-btn-active' : ''} ${controlsRevealed ? 'dmt-drawer-item-visible' : ''}`}
                 style={getDrawerItemStyle(2)}
                 onClick={handleControlInteraction(onToggleRegionPanel)}
                 title="Toggle region panel"

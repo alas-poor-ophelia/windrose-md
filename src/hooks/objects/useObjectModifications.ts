@@ -115,7 +115,7 @@ const useObjectModifications = (): {
     }
 
     const currentObject = getActiveLayer(mapData).objects?.find((obj: MapObject) => obj.id === selectedItem.id);
-    const currentRotation = currentObject?.rotation || 0;
+    const currentRotation = currentObject?.rotation ?? 0;
     const nextRotation = getNextRotation(currentRotation);
 
     const updatedObjects = updateObject(
@@ -186,6 +186,7 @@ const useObjectModifications = (): {
     }
 
     if (!found) {
+      // eslint-disable-next-line no-console
       console.warn('No empty space found for duplicate');
       return;
     }

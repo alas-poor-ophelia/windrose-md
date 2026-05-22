@@ -82,7 +82,7 @@ function useDataHandlers({
 
         if (!suppressHistory) {
           const activeLayer = getActiveLayer(currentMapData);
-          addToHistory(buildHistoryState(activeLayer, currentMapData.name || '', { [field]: newValue as unknown as Cell[] | MapObject[] | TextLabel[] | unknown[] }, currentMapData.regions || [], currentMapData.outlines || [], currentMapData.shapeOverlays || [], activeLayer.fogOfWar));
+          addToHistory(buildHistoryState(activeLayer, currentMapData.name ?? '', { [field]: newValue as unknown as Cell[] | MapObject[] | TextLabel[] | unknown[] }, currentMapData.regions || [], currentMapData.outlines || [], currentMapData.shapeOverlays || [], activeLayer.fogOfWar));
         }
 
         return newMapData;
@@ -148,7 +148,7 @@ function useDataHandlers({
       if (!currentMapData) return currentMapData;
 
       const customColorId = `custom-${Date.now()}`;
-      const customColorNumber = (currentMapData.customColors?.length || 0) + 1;
+      const customColorNumber = (currentMapData.customColors?.length ?? 0) + 1;
       const customColorLabel = `Custom ${customColorNumber}`;
 
       const newCustomColor: MapCustomColor = {
@@ -242,7 +242,7 @@ function useDataHandlers({
       if (!currentMapData) return currentMapData;
 
       const activeLayer = getActiveLayer(currentMapData);
-      addToHistory(buildHistoryState(activeLayer, currentMapData.name || '', {}, regions));
+      addToHistory(buildHistoryState(activeLayer, currentMapData.name ?? '', {}, regions));
 
       return { ...currentMapData, regions };
     });
@@ -256,7 +256,7 @@ function useDataHandlers({
       if (!currentMapData) return currentMapData;
 
       const activeLayer = getActiveLayer(currentMapData);
-      addToHistory(buildHistoryState(activeLayer, currentMapData.name || '', {}, currentMapData.regions || [], outlines));
+      addToHistory(buildHistoryState(activeLayer, currentMapData.name ?? '', {}, currentMapData.regions || [], outlines));
 
       return { ...currentMapData, outlines };
     });
@@ -270,7 +270,7 @@ function useDataHandlers({
       if (!currentMapData) return currentMapData;
 
       const activeLayer = getActiveLayer(currentMapData);
-      addToHistory(buildHistoryState(activeLayer, currentMapData.name || '', {}, currentMapData.regions || [], currentMapData.outlines || [], shapeOverlays));
+      addToHistory(buildHistoryState(activeLayer, currentMapData.name ?? '', {}, currentMapData.regions || [], currentMapData.outlines || [], shapeOverlays));
 
       return { ...currentMapData, shapeOverlays };
     });
