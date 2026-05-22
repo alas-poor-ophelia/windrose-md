@@ -1,29 +1,9 @@
-import type { App, Vault, TAbstractFile } from 'obsidian';
+import type { App, Vault, TAbstractFile, TFile } from 'obsidian';
+import type { PluginSettings, ObjectSet, ObjectSetData } from '#types/settings/settings.types';
 
 interface PluginLike {
   app: App;
-  settings: Record<string, unknown>;
-}
-
-interface ObjectSetData {
-  hex?: {
-    objectOverrides?: Record<string, Record<string, unknown>>;
-    customObjects?: Record<string, unknown>[];
-    customCategories?: Record<string, unknown>[];
-  };
-  grid?: {
-    objectOverrides?: Record<string, Record<string, unknown>>;
-    customObjects?: Record<string, unknown>[];
-    customCategories?: Record<string, unknown>[];
-  };
-}
-
-interface ObjectSet {
-  id: string;
-  name: string;
-  source: string;
-  folderPath?: string;
-  data: ObjectSetData;
+  settings: PluginSettings;
 }
 
 interface ExportOptions {
@@ -41,13 +21,13 @@ export const ObjectSetHelpers = {
     return 'set-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
   },
 
-  resolveImagePaths(data: Record<string, Record<string, unknown>>, imagesFolder: string, vault: Vault): void {
+  resolveImagePaths(data: ObjectSetData, imagesFolder: string, vault: Vault): void {
     for (const side of ['hex', 'grid'] as const) {
-      const sideData = data[side] as Record<string, unknown> | undefined;
+      const sideData = data[side];
       if (sideData == null) continue;
       if (sideData.customObjects != null) {
-        for (const obj of sideData.customObjects as Record<string, unknown>[]) {
-          if (obj.imagePath != null && !(obj.imagePath as string).includes('/')) {
+        for (const obj of sideData.customObjects) {
+          if (obj.imagePath != null && !obj.imagePath.includes('/')) {
             const resolved = imagesFolder + '/' + obj.imagePath;
             if (vault.getAbstractFileByPath(resolved) != null) {
               obj.imagePath = resolved;
@@ -56,8 +36,8 @@ export const ObjectSetHelpers = {
         }
       }
       if (sideData.objectOverrides != null) {
-        for (const override of Object.values(sideData.objectOverrides as Record<string, Record<string, unknown>>)) {
-          if (override.imagePath != null && !(override.imagePath as string).includes('/')) {
+        for (const override of Object.values(sideData.objectOverrides)) {
+          if (override.imagePath != null && !override.imagePath.includes('/')) {
             const resolved = imagesFolder + '/' + override.imagePath;
             if (vault.getAbstractFileByPath(resolved) != null) {
               override.imagePath = resolved;
@@ -90,13 +70,13 @@ export const ObjectSetHelpers = {
       }
     };
 
-    (s.objectSets as ObjectSet[]).push(set);
+    s.objectSets.push(set);
     return set;
   },
 
   activateSet(plugin: PluginLike, setId: string): boolean {
     const s = plugin.settings;
-    const sets = (s.objectSets ?? []) as ObjectSet[];
+    const sets = s.objectSets ?? [];
     const set = sets.find(st => st.id === setId);
     if (set == null) return false;
 
@@ -132,14 +112,14 @@ export const ObjectSetHelpers = {
 
   isDirty(plugin: PluginLike): boolean {
     const s = plugin.settings;
-    const activeSetId = s.activeObjectSetId as string | null;
+    const activeSetId = s.activeObjectSetId;
 
-    const hexOverrides = (s.hexObjectOverrides ?? {}) as Record<string, unknown>;
-    const hexObjects = (s.customHexObjects ?? []) as unknown[];
-    const hexCategories = (s.customHexCategories ?? []) as unknown[];
-    const gridOverrides = (s.gridObjectOverrides ?? {}) as Record<string, unknown>;
-    const gridObjects = (s.customGridObjects ?? []) as unknown[];
-    const gridCategories = (s.customGridCategories ?? []) as unknown[];
+    const hexOverrides = s.hexObjectOverrides ?? {};
+    const hexObjects = s.customHexObjects ?? [];
+    const hexCategories = s.customHexCategories ?? [];
+    const gridOverrides = s.gridObjectOverrides ?? {};
+    const gridObjects = s.customGridObjects ?? [];
+    const gridCategories = s.customGridCategories ?? [];
 
     if (activeSetId == null || activeSetId === '') {
       return Object.keys(hexOverrides).length > 0 ||
@@ -148,7 +128,7 @@ export const ObjectSetHelpers = {
         gridObjects.length > 0 || gridCategories.length > 0;
     }
 
-    const set = ((s.objectSets ?? []) as ObjectSet[]).find(st => st.id === activeSetId);
+    const set = (s.objectSets ?? []).find(st => st.id === activeSetId);
     if (set == null) return true;
 
     const compare = (live: unknown, stored: unknown): boolean => JSON.stringify(live) !== JSON.stringify(stored);
@@ -169,7 +149,7 @@ export const ObjectSetHelpers = {
   deleteSet(plugin: PluginLike, setId: string): void {
     const s = plugin.settings;
     if (s.objectSets == null) return;
-    s.objectSets = (s.objectSets as ObjectSet[]).filter(st => st.id !== setId);
+    s.objectSets = s.objectSets.filter(st => st.id !== setId);
     if (s.activeObjectSetId === setId) {
       s.activeObjectSetId = null;
     }
@@ -177,7 +157,7 @@ export const ObjectSetHelpers = {
 
   renameSet(plugin: PluginLike, setId: string, newName: string): void {
     const s = plugin.settings;
-    const set = ((s.objectSets ?? []) as ObjectSet[]).find(st => st.id === setId);
+    const set = (s.objectSets ?? []).find(st => st.id === setId);
     if (set != null) set.name = newName;
   },
 
@@ -188,12 +168,12 @@ export const ObjectSetHelpers = {
       if (sideData == null) continue;
       if (sideData.customObjects != null) {
         for (const obj of sideData.customObjects) {
-          if (obj.imagePath != null) paths.push(obj.imagePath as string);
+          if (obj.imagePath != null) paths.push(obj.imagePath);
         }
       }
       if (sideData.objectOverrides != null) {
         for (const override of Object.values(sideData.objectOverrides)) {
-          if (override.imagePath != null) paths.push(override.imagePath as string);
+          if (override.imagePath != null) paths.push(override.imagePath);
         }
       }
     }
@@ -210,7 +190,7 @@ export const ObjectSetHelpers = {
 
   async exportSetToFolder(plugin: PluginLike, setId: string, destFolder: string, options?: ExportOptions): Promise<string> {
     const s = plugin.settings;
-    const set = ((s.objectSets ?? []) as ObjectSet[]).find(st => st.id === setId);
+    const set = (s.objectSets ?? []).find(st => st.id === setId);
     if (set == null) throw new Error('Set not found');
 
     const includeHex = options?.includeHex !== false;
@@ -223,7 +203,7 @@ export const ObjectSetHelpers = {
       name: options?.name != null && options.name !== '' ? options.name : set.name
     };
 
-    const exportSetData: Record<string, unknown> = {};
+    const exportSetData: ObjectSetData = {};
     if (includeHex && set.data.hex) {
       exportSetData.hex = deepClone(set.data.hex);
     }
@@ -231,7 +211,7 @@ export const ObjectSetHelpers = {
       exportSetData.grid = deepClone(set.data.grid);
     }
 
-    const imagePaths = ObjectSetHelpers.getImagePaths(exportSetData as ObjectSetData);
+    const imagePaths = ObjectSetHelpers.getImagePaths(exportSetData);
     const imageMap: Record<string, string> = {};
     for (const fullPath of imagePaths) {
       const filename = fullPath.split('/').pop() ?? fullPath;
@@ -239,19 +219,19 @@ export const ObjectSetHelpers = {
     }
 
     for (const side of ['hex', 'grid'] as const) {
-      const sideData = exportSetData[side] as Record<string, unknown> | undefined;
+      const sideData = exportSetData[side];
       if (sideData == null) continue;
       if (sideData.customObjects != null) {
-        for (const obj of sideData.customObjects as Record<string, unknown>[]) {
-          if (obj.imagePath != null && imageMap[obj.imagePath as string] != null) {
-            obj.imagePath = imageMap[obj.imagePath as string];
+        for (const obj of sideData.customObjects) {
+          if (obj.imagePath != null && imageMap[obj.imagePath] != null) {
+            obj.imagePath = imageMap[obj.imagePath];
           }
         }
       }
       if (sideData.objectOverrides != null) {
-        for (const override of Object.values(sideData.objectOverrides as Record<string, Record<string, unknown>>)) {
-          if (override.imagePath != null && imageMap[override.imagePath as string] != null) {
-            override.imagePath = imageMap[override.imagePath as string];
+        for (const override of Object.values(sideData.objectOverrides)) {
+          if (override.imagePath != null && imageMap[override.imagePath] != null) {
+            override.imagePath = imageMap[override.imagePath];
           }
         }
       }
@@ -268,7 +248,7 @@ export const ObjectSetHelpers = {
     const jsonContent = JSON.stringify(exportData, null, 2);
     const existingJson = plugin.app.vault.getAbstractFileByPath(jsonPath);
     if (existingJson != null) {
-      await plugin.app.vault.modify(existingJson as TAbstractFile & { path: string }, jsonContent);
+      await plugin.app.vault.modify(existingJson as TFile, jsonContent);
     } else {
       await plugin.app.vault.create(jsonPath, jsonContent);
     }
@@ -288,7 +268,7 @@ export const ObjectSetHelpers = {
         const destPath = imgFolder + '/' + filename;
         const existingImg = plugin.app.vault.getAbstractFileByPath(destPath);
         if (existingImg == null) {
-          const binary = await plugin.app.vault.readBinary(sourceFile as TAbstractFile & { path: string });
+          const binary = await plugin.app.vault.readBinary(sourceFile as TFile);
           await plugin.app.vault.createBinary(destPath, binary);
         }
       }
@@ -308,19 +288,19 @@ export const ObjectSetHelpers = {
       throw new Error('No objects.json found in ' + folderPath);
     }
 
-    const content = await plugin.app.vault.read(jsonFile as TAbstractFile & { path: string });
-    const data = JSON.parse(content) as Record<string, unknown>;
+    const content = await plugin.app.vault.read(jsonFile as TFile);
+    const data = JSON.parse(content) as ObjectSetData & { windroseMD_objectSet?: boolean; name?: string };
 
     if (data.windroseMD_objectSet == null) {
       throw new Error('Not a valid Windrose object set (missing windroseMD_objectSet flag)');
     }
 
-    ObjectSetHelpers.resolveImagePaths(data as Record<string, Record<string, unknown>>, folderPath + '/images', plugin.app.vault);
+    ObjectSetHelpers.resolveImagePaths(data, folderPath + '/images', plugin.app.vault);
 
     const s = plugin.settings;
     if (s.objectSets == null) s.objectSets = [];
 
-    const setName = ObjectSetHelpers.deduplicateName(s.objectSets as ObjectSet[], (data.name as string) ?? 'Imported Set');
+    const setName = ObjectSetHelpers.deduplicateName(s.objectSets, data.name ?? 'Imported Set');
 
     const set: ObjectSet = {
       id: ObjectSetHelpers.generateId(),
@@ -328,17 +308,17 @@ export const ObjectSetHelpers = {
       source: 'folder',
       folderPath: folderPath,
       data: {
-        hex: (data.hex as ObjectSetData['hex']) ?? undefined,
-        grid: (data.grid as ObjectSetData['grid']) ?? undefined
+        hex: data.hex ?? undefined,
+        grid: data.grid ?? undefined
       }
     };
 
-    (s.objectSets as ObjectSet[]).push(set);
+    s.objectSets.push(set);
     return set;
   },
 
   async scanAutoLoadFolder(plugin: PluginLike): Promise<number> {
-    const folderPath = plugin.settings.objectSetsAutoLoadFolder as string | undefined;
+    const folderPath = plugin.settings.objectSetsAutoLoadFolder;
     if (folderPath == null || folderPath === '') return 0;
 
     const folder = plugin.app.vault.getAbstractFileByPath(folderPath) as TAbstractFile & { children?: (TAbstractFile & { children?: unknown[]; name: string; path: string })[] } | null;
@@ -354,31 +334,31 @@ export const ObjectSetHelpers = {
       if (jsonFile == null) continue;
 
       try {
-        const content = await plugin.app.vault.read(jsonFile as TAbstractFile & { path: string });
-        const data = JSON.parse(content) as Record<string, unknown>;
+        const content = await plugin.app.vault.read(jsonFile as TFile);
+        const data = JSON.parse(content) as ObjectSetData & { windroseMD_objectSet?: boolean; name?: string };
         if (data.windroseMD_objectSet == null) continue;
 
-        const existing = (plugin.settings.objectSets as ObjectSet[]).find(
+        const existing = plugin.settings.objectSets.find(
           st => st.source === 'folder' && st.folderPath === child.path
         );
 
-        ObjectSetHelpers.resolveImagePaths(data as Record<string, Record<string, unknown>>, child.path + '/images', plugin.app.vault);
+        ObjectSetHelpers.resolveImagePaths(data, child.path + '/images', plugin.app.vault);
 
         if (existing != null) {
-          existing.name = (data.name as string) ?? existing.name;
-          existing.data = { hex: data.hex as ObjectSetData['hex'], grid: data.grid as ObjectSetData['grid'] };
+          existing.name = data.name ?? existing.name;
+          existing.data = { hex: data.hex, grid: data.grid };
         } else {
           const setName = ObjectSetHelpers.deduplicateName(
-            plugin.settings.objectSets as ObjectSet[],
-            (data.name as string) ?? child.name
+            plugin.settings.objectSets,
+            data.name ?? child.name
           );
 
-          (plugin.settings.objectSets as ObjectSet[]).push({
+          plugin.settings.objectSets.push({
             id: ObjectSetHelpers.generateId(),
             name: setName,
             source: 'folder',
             folderPath: child.path,
-            data: { hex: data.hex as ObjectSetData['hex'], grid: data.grid as ObjectSetData['grid'] }
+            data: { hex: data.hex, grid: data.grid }
           });
           added++;
         }

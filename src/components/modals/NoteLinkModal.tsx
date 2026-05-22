@@ -76,7 +76,7 @@ function openNativeNoteLinkModal(app: App, options: OpenNativeNoteLinkModalOptio
             }
           });
 
-        this.inputEl = (searchComponent as SearchComponent).inputEl;
+        this.inputEl = searchComponent!.inputEl;
 
         this.inputEl.addEventListener('input', () => {
           selectedPath = null;

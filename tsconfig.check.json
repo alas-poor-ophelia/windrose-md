@@ -5,10 +5,14 @@
     "noUnusedParameters": false
   },
   "include": [
-    "types/**/*.ts"
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "types/**/*.ts",
+    "tests/**/*.ts"
   ],
   "exclude": [
     "node_modules",
-    "src"
+    "types/generated",
+    "tests/fixtures/test-vault/Projects"
   ]
 }

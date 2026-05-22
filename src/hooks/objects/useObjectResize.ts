@@ -73,7 +73,7 @@ function useObjectResize(): {
     x *= scaleX;
     y *= scaleY;
 
-    if (mapData == null) return null;
+    if (mapData == null || geometry == null) return null;
     const { viewState, mapType } = mapData;
     if (viewState == null) return null;
     const { zoom, center } = viewState;
@@ -248,7 +248,7 @@ function useObjectResize(): {
       setResizeCorner(null);
       setDragStart(null);
 
-      if (resizeInitialStateRef.current !== null) {
+      if (resizeInitialStateRef.current !== null && mapData != null) {
         onObjectsChange(getActiveLayer(mapData).objects, false);
         resizeInitialStateRef.current = null;
       }

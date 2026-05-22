@@ -38,6 +38,7 @@ function useObjectHover(): {
   const { setHoveredObject, setMousePosition } = useMapSelection();
 
   const handleHoverUpdate = useCallback((e: PointerEvent | MouseEvent): void => {
+    if (mapData == null) return;
     const touchEvent = e as unknown as TouchEvent;
     if (touchEvent.touches == null) {
       const { clientX, clientY } = getClientCoords(e);

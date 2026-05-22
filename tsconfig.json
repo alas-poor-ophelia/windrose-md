@@ -32,6 +32,7 @@
   ],
   "exclude": [
     "node_modules",
-    "types/generated"
+    "types/generated",
+    "tests/fixtures/test-vault/Projects"
   ]
 }

@@ -530,7 +530,7 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
       const modalEl = target.closest('.dmt-settings-modal');
 
       if (!pickerEl && !buttonEl && modalEl) {
-        if (pendingCustomColorRef.current != null && pendingCustomColorRef.current !== '' && state.activeColorPicker != null && state.activeColorPicker !== '') {
+        if (pendingCustomColorRef.current != null && pendingCustomColorRef.current !== '' && state.activeColorPicker != null) {
           dispatch({ type: Actions.SET_OVERRIDE, payload: { key: state.activeColorPicker as keyof SettingsOverrides, value: pendingCustomColorRef.current } });
           pendingCustomColorRef.current = null;
         }

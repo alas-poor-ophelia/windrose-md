@@ -118,7 +118,7 @@ const ObjectSelectionToolbar = ({
     : null;
 
   const screenPos = hasRequiredInputs && object != null && geometry != null
-    ? calculateObjectScreenPosition(object, canvasRef.current, mapData, geometry, containerRef)
+    ? calculateObjectScreenPosition(object, canvasRef.current!, mapData, geometry, containerRef)
     : null;
 
   const bounds = screenPos != null
@@ -181,6 +181,7 @@ const ObjectSelectionToolbar = ({
     const sliderX = bounds.screenX - sliderWidth / 2;
     const sliderY = toolbarPos.selectionTop - sliderGap - sliderHeight;
 
+    if (containerRef.current == null) return null;
     const containerRect = containerRef.current.getBoundingClientRect();
     const clampedSliderX = Math.max(4, Math.min(containerRect.width - sliderWidth - 4, sliderX));
 

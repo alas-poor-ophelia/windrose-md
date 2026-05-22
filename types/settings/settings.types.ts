@@ -270,6 +270,7 @@ export interface ObjectOverride {
   hidden?: boolean;           // Hide this object from the palette
   symbol?: string;            // Override Unicode symbol
   iconClass?: string;         // Override RPGAwesome icon class
+  imagePath?: string;         // Override vault image path
   label?: string;             // Override display name
   category?: string;          // Move to different category
   order?: number;             // Custom sort order

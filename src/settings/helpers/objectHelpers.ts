@@ -6,7 +6,7 @@ const BUILT_IN_OBJECTS = OBJECT_TYPES;
 const BUILT_IN_CATEGORIES = CATEGORIES;
 
 const CATEGORY_ORDER: Record<string, number> = {};
-CATEGORIES.forEach((c: { id: string; order: number }) => { CATEGORY_ORDER[c.id] = c.order; });
+CATEGORIES.forEach((c, index) => { CATEGORY_ORDER[c.id] = index; });
 
 interface ObjectEntry {
   id: string;
@@ -28,8 +28,8 @@ interface ResolvedObject extends ObjectEntry {
 
 interface CategoryEntry {
   id: string;
+  label?: string;
   order?: number;
-  [key: string]: unknown;
 }
 
 interface ResolvedCategory extends CategoryEntry {
@@ -74,7 +74,7 @@ export const ObjectHelpers = {
   getCategories(settings: Record<string, unknown>): ResolvedCategory[] {
     const customCategories = (settings.customCategories ?? []) as CategoryEntry[];
 
-    const resolvedBuiltIns = (BUILT_IN_CATEGORIES as CategoryEntry[]).map(c => ({
+    const resolvedBuiltIns = BUILT_IN_CATEGORIES.map(c => ({
       ...c,
       isBuiltIn: true,
       order: CATEGORY_ORDER[c.id] ?? 50
@@ -99,7 +99,7 @@ export const ObjectHelpers = {
 
   getAllCategories(settings: Record<string, unknown>): (CategoryEntry & { isBuiltIn?: boolean; isCustom?: boolean })[] {
     const customCategories = (settings.customCategories ?? []) as CategoryEntry[];
-    const builtIn = (BUILT_IN_CATEGORIES as CategoryEntry[]).map(c => ({ ...c, isBuiltIn: true }));
+    const builtIn = BUILT_IN_CATEGORIES.map(c => ({ ...c, isBuiltIn: true }));
     const custom = customCategories.map(c => ({ ...c, isCustom: true }));
     return [...builtIn, ...custom];
   },

@@ -47,6 +47,8 @@ function useObjectPlacement(
       return false;
     }
 
+    if (geometry == null || mapData == null) return false;
+
     if (!geometry.isWithinBounds(gridX, gridY)) {
       return true;
     }

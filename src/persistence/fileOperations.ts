@@ -169,6 +169,9 @@ async function loadMapData(app: App, mapId: string, mapName: string = '', mapTyp
         if (!layer.tiles) {
           layer.tiles = [];
         }
+        if (!layer.curves) {
+          layer.curves = [];
+        }
         // Filter out v1 POC curves that lack required start/segments fields
         layer.curves = layer.curves.filter(c => c.start != null && c.segments != null);
         for (const curve of layer.curves) {
@@ -199,6 +202,7 @@ async function loadMapData(app: App, mapId: string, mapName: string = '', mapTyp
           if (subHex?.mapData != null) {
             for (const layer of subHex.mapData.layers) {
               if (!layer.tiles) layer.tiles = [];
+              if (!layer.curves) layer.curves = [];
               layer.curves = layer.curves.filter(c => c.start != null && c.segments != null);
             }
             if (!subHex.mapData.regions) subHex.mapData.regions = [];

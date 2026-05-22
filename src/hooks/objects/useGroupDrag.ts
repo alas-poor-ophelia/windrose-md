@@ -198,6 +198,7 @@ const useGroupDrag = (): UseGroupDragResult => {
     if (!isDraggingSelection || dragStart?.isGroupDrag !== true) {
       return false;
     }
+    if (geometry == null) return true;
 
     const { clientX, clientY } = getClientCoords(e);
     const gridCoords = screenToGrid(clientX, clientY);
@@ -398,6 +399,7 @@ const useGroupDrag = (): UseGroupDragResult => {
     if (!isDraggingSelection || dragStart?.isGroupDrag !== true) {
       return false;
     }
+    if (geometry == null) return false;
 
     // Restore original freeform state for any objects that were inverted during drag
     {

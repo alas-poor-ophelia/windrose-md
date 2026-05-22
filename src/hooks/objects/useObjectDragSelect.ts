@@ -7,7 +7,7 @@
  * Extracted from useObjectInteractions.ts.
  */
 
-import type { MapObject } from '#types/objects/object.types';
+import type { MapObject, ObjectAlignment } from '#types/objects/object.types';
 import type { ToolId } from '#types/tools/tool.types';
 import type {
   ResizeCorner,
@@ -70,6 +70,7 @@ function useObjectDragSelect(
     if (currentTool !== 'select') {
       return false;
     }
+    if (mapData == null || geometry == null) return false;
 
     if (selectedItem?.type === 'object' && isResizeMode) {
       const selectedObject = getActiveLayer(mapData).objects?.find((obj: MapObject) => obj.id === selectedItem.id);
@@ -190,6 +191,7 @@ function useObjectDragSelect(
   ]);
 
   const handleObjectDragging = useCallback((e: PointerEvent | MouseEvent | TouchEvent): boolean => {
+    if (mapData == null || geometry == null) return false;
     const isDraggingObject = selectedItem?.type === 'object' || (dragStart?.objectId != null && dragStart.objectId !== '');
     if (!isDraggingSelection || !isDraggingObject || !dragStart) {
       return false;
@@ -376,7 +378,7 @@ function useObjectDragSelect(
         const existingObj = getObjectAtPosition(getActiveLayer(mapData).objects, targetX, targetY);
 
         if (!existingObj || existingObj.id === objectId) {
-          let alignment = 'center';
+          let alignment: ObjectAlignment = 'center';
           if (edgeSnapMode) {
             const worldCoords = screenToWorld(clientX, clientY);
             if (worldCoords && geometry?.worldToGrid != null) {
@@ -410,6 +412,7 @@ function useObjectDragSelect(
     getClientCoords, screenToGrid, screenToWorld, updateObject, onObjectsChange, setDragStart, setSelectedItem, getObjectAtPosition]);
 
   const stopObjectDragging = useCallback((): boolean => {
+    if (mapData == null || geometry == null) return false;
     const isDraggingObject = selectedItem?.type === 'object' || (dragStart?.objectId != null && dragStart.objectId !== '');
     if (isDraggingSelection && isDraggingObject) {
       if (longPressTimerRef.current) {

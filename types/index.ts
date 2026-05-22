@@ -433,3 +433,12 @@ export type {
   ImageDragHandlerResult,
   UseImageAlignmentResult,
 } from './hooks/imageAlignment.types';
+
+// ===========================================
+// Global Augmentations
+// ===========================================
+export type {
+  WindroseMcpOps,
+  WindroseMcpInstance,
+  WindroseGlobal,
+} from './core/global.types';

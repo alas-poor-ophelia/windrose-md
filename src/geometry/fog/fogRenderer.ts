@@ -80,11 +80,11 @@ type RenderHexFogFn = (
  * Extracts fog settings from effective settings object.
  */
 interface FogSettingsSource {
-  fogOfWarColor: string;
-  fogOfWarOpacity: number;
-  fogOfWarImage: string | null;
-  fogOfWarBlurEnabled: boolean;
-  fogOfWarBlurFactor: number;
+  fogOfWarColor?: string;
+  fogOfWarOpacity?: number;
+  fogOfWarImage?: string | null;
+  fogOfWarBlurEnabled?: boolean;
+  fogOfWarBlurFactor?: number;
 }
 
 function getFogSettings(effectiveSettings: FogSettingsSource): FogSettings {

@@ -129,4 +129,7 @@ export interface UseCanvasInteractionResult extends
   PanHandlers,
   CanvasInteractionSetters {
   lastTouchTimeRef: LastTouchTimeRef;
+  isTouchPanningRef: { current: boolean };
+  touchPanStartRef: { current: TouchCenter | null };
+  initialPinchDistanceRef: { current: number | null };
 }
