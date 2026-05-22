@@ -29,6 +29,9 @@ windrose/                     # Dev root (this directory)
 ## Commands
 
 ```bash
+npm run build       # Build main.js with esbuild
+npm run deploy      # Build + copy main.js/styles.css/manifest.json to vault
+npm run build:watch # Watch mode (rebuilds on file change)
 npm run test:unit   # Unit tests (~300ms)
 npm run test:e2e    # E2E tests (~35-40s)
 npm run check       # Typecheck + lint

@@ -18,6 +18,10 @@
     "release:dry": "npx tsx scripts/release/index.ts --dry-run",
     "release:compile": "npx tsx scripts/release/compile.ts",
     "release:cli-compile": "npx tsx scripts/release/cli-compile.ts",
+    "build": "node esbuild.config.mjs",
+    "build:prod": "node esbuild.config.mjs production",
+    "build:watch": "node esbuild.config.mjs --watch",
+    "deploy": "node esbuild.config.mjs && node -e \"const fs=require('fs');const d='C:/Users/whipl/OneDrive/Documents/Absalom/.obsidian/plugins/windrose-map-designer';['main.js','styles.css','manifest.json'].forEach(f=>fs.copyFileSync(f,d+'/'+f));console.log('Deployed to vault')\"",
     "postinstall": "patch-package"
   },
   "devDependencies": {
