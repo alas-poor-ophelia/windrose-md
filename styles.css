@@ -3386,8 +3386,7 @@ button.dmt-sel-icon-btn,
   background: var(--dmt-bg-secondary);
   border-radius: 4px;
   min-height: 60px;
-  max-height: 200px;
-  overflow: auto;
+  overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
