@@ -33,7 +33,7 @@ import { useMapState } from '../../context/MapContext';
 import { useMapSelection } from '../../context/MapSelectionContext';
 import { axialToOffset, offsetToAxial, columnToLabel, rowToLabel } from '../../geometry/core/offsetCoordinates';
 import { getEffectiveSettings } from '../../core/settingsAccessor';
-import { HexGeometry } from '../../geometry/core/HexGeometry';
+import type { HexGeometry } from '../../geometry/core/HexGeometry';
 function isInsideFlatToppedHexagon(wx: number, wy: number, circumradius: number): boolean {
   const dx = Math.abs(wx);
   const dy = Math.abs(wy);

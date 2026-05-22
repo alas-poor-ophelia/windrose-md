@@ -130,25 +130,8 @@ function useCustomEventHandlers({
         }
       }
 
-      // eslint-disable-next-line no-console
-      console.log('[Windrose:DL] navigate handler:', {
-        eventXY: { x, y },
-        resolvedCenter: { x: centerX, y: centerY },
-        effectiveZoom,
-        mapType: mapData?.mapType,
-        currentCenter: mapData?.viewState?.center,
-        currentZoom: mapData?.viewState?.zoom
-      });
-
       updateMapData((currentMapData: MapData) => {
         if (!currentMapData.viewState) return currentMapData;
-        // eslint-disable-next-line no-console
-        console.log('[Windrose:DL] updateMapData:', {
-          oldCenter: currentMapData.viewState.center,
-          newCenter: { x: centerX, y: centerY },
-          oldZoom: currentMapData.viewState.zoom,
-          newZoom: effectiveZoom
-        });
         return {
           ...currentMapData,
           viewState: {

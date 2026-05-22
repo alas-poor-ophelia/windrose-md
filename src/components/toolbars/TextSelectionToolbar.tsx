@@ -23,6 +23,7 @@ import type { SelectedItem } from '#types/contexts/context.types';
 import { getActiveLayer } from '../../persistence/layerAccessor';
 import { useToolbarPosition } from '../../hooks/interactions/useToolbarPosition';
 import { Icon } from '../shared/Icon';
+import { Z_INDEX } from '../../core/dmtConstants';
 
 type MouseClickEvent = JSX.TargetedMouseEvent<HTMLButtonElement>;
 
@@ -111,15 +112,15 @@ const TextSelectionToolbar = ({
   onCopyLink,
   onDelete
 }: TextSelectionToolbarProps): VNode | null => {
-  if (!selectedItem || selectedItem.type !== 'text' || !mapData || !canvasRef?.current || !containerRef?.current) {
-    return null;
-  }
+  const hasRequiredInputs = !!selectedItem && selectedItem.type === 'text' && !!mapData && !!canvasRef?.current && !!containerRef?.current;
 
-  const label = getActiveLayer(mapData).textLabels?.find(l => l.id === selectedItem.id);
-  if (!label) return null;
+  const label = hasRequiredInputs
+    ? getActiveLayer(mapData).textLabels?.find(l => l.id === selectedItem.id) ?? null
+    : null;
 
-  const bounds = calculateTextLabelBounds(label, canvasRef, containerRef, mapData);
-  if (!bounds) return null;
+  const bounds = hasRequiredInputs && label != null
+    ? calculateTextLabelBounds(label, canvasRef, containerRef, mapData)
+    : null;
 
   const buttonSize = 44;
   const buttonGap = 4;
@@ -133,8 +134,8 @@ const TextSelectionToolbar = ({
   const toolbarWidth = buttons.length * buttonSize + (buttons.length - 1) * buttonGap;
   const toolbarHeight = buttonSize;
 
-  const pos = useToolbarPosition({ bounds, containerRef, toolbarWidth, toolbarHeight });
-  if (!pos) return null;
+  const pos = useToolbarPosition({ bounds, containerRef: containerRef ?? { current: null }, toolbarWidth, toolbarHeight });
+  if (!hasRequiredInputs || !label || !bounds || !pos) return null;
 
   return (
     <div
@@ -145,7 +146,7 @@ const TextSelectionToolbar = ({
         top: `${pos.toolbarY}px`,
         width: `${toolbarWidth}px`,
         pointerEvents: 'auto',
-        zIndex: 150
+        zIndex: Z_INDEX.TOOLBAR
       }}
     >
       {buttons.map((btn) => (

@@ -19,6 +19,7 @@ import { GridGeometry } from '../../geometry/core/GridGeometry';
 import { useDiagonalFill } from '../../hooks/drawing/useDiagonalFill';
 import { useMapState } from '../../context/MapContext';
 import { useEventHandlerRegistration } from '../../context/EventHandlerContext';
+import { Z_INDEX } from '../../core/dmtConstants';
 
 
 
@@ -191,7 +192,7 @@ const DiagonalFillOverlay = ({ currentTool }: DiagonalFillOverlayProps): VNode |
     fillStart.x,
     fillStart.y,
     fillStart.corner,
-    geometry as GridGeometry,
+    geometry,
     mapData,
     canvasWidth,
     canvasHeight
@@ -208,7 +209,7 @@ const DiagonalFillOverlay = ({ currentTool }: DiagonalFillOverlayProps): VNode |
       displayEnd.x,
       displayEnd.y,
       fillStart.corner,
-      geometry as GridGeometry,
+      geometry,
       mapData,
       canvasWidth,
       canvasHeight
@@ -230,7 +231,7 @@ const DiagonalFillOverlay = ({ currentTool }: DiagonalFillOverlayProps): VNode |
         width: '100%',
         height: '100%',
         pointerEvents: 'none',
-        zIndex: 100,
+        zIndex: Z_INDEX.DRAWING_LAYER,
         overflow: 'visible'
       }}
     >

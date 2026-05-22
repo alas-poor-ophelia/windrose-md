@@ -14,6 +14,7 @@ import type { MeasurementPoint } from '#types/hooks/distanceMeasurement.types';
 import type { IGeometry } from '#types/core/geometry.types';
 import type { MapData } from '#types/core/map.types';
 import { cellToScreen } from '../../drawing/cellToScreenConverter';
+import { Z_INDEX } from '../../core/dmtConstants';
 
 interface MeasurementOverlayProps {
   measureOrigin: MeasurementPoint | null;
@@ -109,7 +110,7 @@ const MeasurementOverlay = ({
         width: '100%',
         height: '100%',
         pointerEvents: 'none',
-        zIndex: 100,
+        zIndex: Z_INDEX.DRAWING_LAYER,
         overflow: 'visible'
       }}
     >

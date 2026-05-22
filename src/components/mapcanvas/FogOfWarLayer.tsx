@@ -18,9 +18,10 @@ import { useFogTools } from '../../hooks/interactions/useFogTools';
 import { useMapState } from '../../context/MapContext';
 import { useEventHandlerRegistration } from '../../context/EventHandlerContext';
 import { GridGeometry } from '../../geometry/core/GridGeometry';
-import { HexGeometry } from '../../geometry/core/HexGeometry';
+import type { HexGeometry } from '../../geometry/core/HexGeometry';
 import { getSettings } from '../../core/settingsAccessor';
 import { offsetToAxial } from '../../geometry/core/offsetCoordinates';
+import { Z_INDEX } from '../../core/dmtConstants';
 
 
 
@@ -232,7 +233,7 @@ const FogOfWarLayer = ({
             width: '100%',
             height: '100%',
             pointerEvents: 'none',
-            zIndex: 100,
+            zIndex: Z_INDEX.DRAWING_LAYER,
             overflow: 'visible'
           }}
         >
@@ -268,7 +269,7 @@ const FogOfWarLayer = ({
           backgroundColor: 'rgba(0, 255, 0, 0.1)',
           boxSizing: 'border-box',
           pointerEvents: 'none',
-          zIndex: 100
+          zIndex: Z_INDEX.DRAWING_LAYER
         }}
       />
     );

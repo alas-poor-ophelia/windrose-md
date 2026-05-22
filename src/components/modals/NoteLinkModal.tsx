@@ -20,6 +20,7 @@ import { getObjectType } from '../../objects/objectTypeResolver';
 import { Modal, Setting, AbstractInputSuggest } from 'obsidian';
 import type { App, SearchComponent } from 'obsidian';
 import type { NoteIndexEntry } from '#types/objects/note.types';
+import { Z_INDEX } from '../../core/dmtConstants';
 
 interface NoteLinkSuggestion extends NoteIndexEntry {
   score: number;
@@ -589,7 +590,7 @@ function AutocompleteInput({
           borderRadius: '4px',
           maxHeight: '200px',
           overflowY: 'auto',
-          zIndex: 1000,
+          zIndex: Z_INDEX.INTERACTIVE_LAYER,
           boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)'
         }}>
           {suggestions.map((entry, index) => (

@@ -23,6 +23,7 @@ import { Menu } from 'obsidian';
 import { SelectionCardFiligree } from './SelectionCardFiligree';
 import { Icon } from '../shared/Icon';
 import { InternalLink } from '../shared/InternalLink';
+import { Z_INDEX } from '../../core/dmtConstants';
 
 
 
@@ -190,12 +191,11 @@ const SelectionActionsOverlay = ({
     return () => document.removeEventListener('windrose:selection-context-menu', handler);
   }, [actions]);
 
-  if (selectedItems.length === 0 || canvasRef.current == null || containerRef.current == null) {
-    return null;
-  }
+  const hasRequiredRefs = selectedItems.length > 0 && canvasRef.current != null && containerRef.current != null;
 
-  const bounds = getSelectionBounds(selectedItems as Parameters<typeof getSelectionBounds>[0], mapData, canvasRef, containerRef, geometry);
-  if (!bounds) return null;
+  const bounds = hasRequiredRefs
+    ? getSelectionBounds(selectedItems as Parameters<typeof getSelectionBounds>[0], mapData, canvasRef, containerRef, geometry)
+    : null;
 
   const visibleActions = actions.filter(a => a.visible === true);
   const iconOnlyActions = visibleActions.filter(a => a.iconOnly === true);
@@ -266,7 +266,7 @@ const SelectionActionsOverlay = ({
     toolbarHeight: cardHeight,
     extraHeight: linkedNoteGap + linkedNoteHeight
   });
-  if (!toolbarPos) return null;
+  if (!hasRequiredRefs || !bounds || !toolbarPos) return null;
 
   // Resize slider mode for objects
   const currentScale = selectionType === 'object' && selectedItems.length === 1
@@ -351,7 +351,7 @@ const SelectionActionsOverlay = ({
             top: `${linkedNoteY}px`,
             transform: 'translateX(-50%)',
             pointerEvents: 'auto',
-            zIndex: 150
+            zIndex: Z_INDEX.TOOLBAR
           }}
         >
           <div className="dmt-note-display-link">
@@ -378,7 +378,7 @@ const SelectionActionsOverlay = ({
           top: `${toolbarPos.toolbarY}px`,
           width: `${cardWidth}px`,
           pointerEvents: 'auto',
-          zIndex: 150
+          zIndex: Z_INDEX.TOOLBAR
         }}
       >
         <CornerBracket position="tl" />

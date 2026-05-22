@@ -15,7 +15,7 @@ import type { Point } from '#types/core/geometry.types';
 
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { ModalPortal } from '../modals/ModalPortal';
-import { SEGMENT_NAMES, SEGMENT_VERTICES, SEGMENT_TRIANGLES } from '../../core/dmtConstants';
+import { SEGMENT_NAMES, SEGMENT_VERTICES, SEGMENT_TRIANGLES, Z_INDEX } from '../../core/dmtConstants';
 
 
 
@@ -324,7 +324,7 @@ const SegmentPickerOverlay = ({
           right: 0,
           bottom: 0,
           backgroundColor: 'rgba(0, 0, 0, 0.6)',
-          zIndex: 1999,
+          zIndex: Z_INDEX.PICKER_OVERLAY,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center'

@@ -7,10 +7,12 @@
 import type { JSX, VNode } from 'preact';
 import type { HexColor } from '#types/core/common.types';
 
-import { useCallback, useEffect, useRef, useState, MutableRef } from 'preact/hooks';
+import type { MutableRef } from 'preact/hooks';
+import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { getColorPalette, DEFAULT_COLOR } from '../../drawing/colorOperations';
 import { ModalPortal } from '../modals/ModalPortal';
 import { Icon } from './Icon';
+import { Z_INDEX } from '../../core/dmtConstants';
 
 
 
@@ -161,7 +163,7 @@ const ColorPicker = ({
     if (!input) return undefined;
 
     const handleNativeChange = (): void => {
-      const value = input.value as HexColor;
+      const value = input.value;
       if (onAddCustomColor) onAddCustomColor(value);
       onColorSelect(value);
       setPreviewColor(null);
@@ -217,7 +219,7 @@ const ColorPicker = ({
   };
 
   const handleColorInput = (e: JSX.TargetedEvent<HTMLInputElement, Event>): void => {
-    const value = (e.target as HTMLInputElement).value as HexColor;
+    const value = (e.target as HTMLInputElement).value;
     setPreviewColor(value);
     if (pendingCustomColorRef) {
       pendingCustomColorRef.current = value;
@@ -308,7 +310,7 @@ const ColorPicker = ({
       : { top: 'calc(100% + 8px)' }
     ),
     ...horizontalStyle,
-    zIndex: 1501
+    zIndex: Z_INDEX.COLOR_PICKER
   };
 
   if (portalled && anchorRef?.current) {
@@ -321,7 +323,7 @@ const ColorPicker = ({
         ? { bottom: `${window.innerHeight - rect.top + gap}px` }
         : { top: `${rect.bottom + gap}px` }
       ),
-      zIndex: 1501
+      zIndex: Z_INDEX.COLOR_PICKER
     };
   }
 

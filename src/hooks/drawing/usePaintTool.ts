@@ -126,7 +126,7 @@ function usePaintTool({
         }
 
         if (GridGeometry && geometry instanceof GridGeometry) {
-          const edgeGeometry = geometry as ExtendedGeometry;
+          const edgeGeometry = geometry;
           const edgeInfo = edgeGeometry.screenToEdge?.(worldCoords.worldX, worldCoords.worldY, 0.15);
           if (edgeInfo) {
             const edgeKey = `${edgeInfo.x},${edgeInfo.y},${edgeInfo.side}`;
@@ -162,7 +162,7 @@ function usePaintTool({
         // Erase tile at hex coords (overlay first, then base)
         let tileErased = false;
         if (geometry?.type === 'hex' && onTilesChange != null && activeLayer.tiles != null && activeLayer.tiles.length > 0) {
-          const tiles = activeLayer.tiles as HexTileAssignment[];
+          const tiles = activeLayer.tiles;
           const overlayIdx = tiles.findIndex((t: HexTileAssignment) => t.q === coordX && t.r === coordY && t.layer === 'overlay');
           if (overlayIdx >= 0) {
             if (strokeInitialTilesRef.current === null) {

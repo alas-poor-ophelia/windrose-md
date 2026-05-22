@@ -6,7 +6,8 @@
 import type { MapData, IGeometry } from '#types/index';
 import type { RendererTheme } from '#types/hooks/canvasRenderer.types';
 
-import { render, VNode } from 'preact';
+import type { VNode } from 'preact';
+import { render } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { loadMapData } from '../persistence/fileOperations';
 import { renderCanvas } from '../hooks/canvas/useCanvasRenderer';
@@ -73,7 +74,7 @@ function WindroseHoverPreview({ mapId, x, y, zoom: zoomProp, layerId, notePath }
           return;
         }
 
-        setMapName((mapData.name as string | undefined) ?? mapId);
+        setMapName((mapData.name) ?? mapId);
 
         const focused: MapData = {
           ...mapData,
@@ -84,11 +85,11 @@ function WindroseHoverPreview({ mapId, x, y, zoom: zoomProp, layerId, notePath }
 
         const geometry: IGeometry = focused.mapType === 'hex'
           ? new HexGeometry(
-              (focused.hexSize as number) || (DEFAULTS.hexSize as number),
+              (focused.hexSize as number) || (DEFAULTS.hexSize),
               ((focused.orientation as string) || (DEFAULTS.hexOrientation as string)) as 'flat' | 'pointy',
               focused.hexBounds || null
             )
-          : new GridGeometry((focused.gridSize as number) || (DEFAULTS.gridSize as number));
+          : new GridGeometry((focused.gridSize as number) || (DEFAULTS.gridSize));
 
         const effective = getEffectiveSettings(focused.settings);
         const theme = {

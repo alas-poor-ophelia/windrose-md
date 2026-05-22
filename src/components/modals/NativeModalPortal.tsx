@@ -7,7 +7,8 @@
  */
 
 import { Modal } from 'obsidian';
-import { h, Fragment, VNode } from 'preact';
+import type { VNode } from 'preact';
+import { h, Fragment } from 'preact';
 import { createPortal } from 'preact/compat';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { useApp } from '../../context/AppContext';
@@ -146,7 +147,7 @@ async function setupModalInteract(
   }
 
   if (options.draggable === true) {
-    const header = modalEl.querySelector('.modal-header') as HTMLElement | null;
+    const header = modalEl.querySelector('.modal-header');
     if (header) {
       header.classList.add('windrose-modal-drag-handle');
     }

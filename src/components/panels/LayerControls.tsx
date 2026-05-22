@@ -77,7 +77,7 @@ const LayerControls = ({
   const longPressTriggeredRef = useRef(false);
   const sliderHideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const layers = getLayersOrdered(mapData) as MapLayer[];
+  const layers = getLayersOrdered(mapData);
   const reversedLayers = [...layers].reverse();
   const activeLayerId = mapData?.activeLayerId;
 

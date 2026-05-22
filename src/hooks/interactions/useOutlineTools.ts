@@ -10,7 +10,7 @@ import type { Point, IGeometry } from '#types/core/geometry.types';
 import type { MapData, Outline } from '#types/core/map.types';
 
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
-import { HexGeometry } from '../../geometry/core/HexGeometry';
+import type { HexGeometry } from '../../geometry/core/HexGeometry';
 
 interface OutlineToolsOptions {
   currentTool: ToolId;

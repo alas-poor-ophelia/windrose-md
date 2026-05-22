@@ -19,6 +19,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { cellToScreen } from '../../drawing/cellToScreenConverter';
 import { GridGeometry } from '../../geometry/core/GridGeometry';
 import { HexGeometry } from '../../geometry/core/HexGeometry';
+import { Z_INDEX } from '../../core/dmtConstants';
 
 
 
@@ -430,7 +431,7 @@ const ShapePreviewOverlay = ({
         width: '100%',
         height: '100%',
         pointerEvents: 'none',
-        zIndex: 100,
+        zIndex: Z_INDEX.DRAWING_LAYER,
         overflow: 'visible'
       }}
     >

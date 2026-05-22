@@ -59,7 +59,7 @@ function useEdgeDragTool({
 
     const activeLayer = getActiveLayer(mapData);
 
-    const edgeGeometry = geometry as ExtendedGeometry;
+    const edgeGeometry = geometry;
     const edgeInfo = edgeGeometry.screenToEdge?.(worldX, worldY, 0.15);
     if (!edgeInfo) return;
 
@@ -85,7 +85,7 @@ function useEdgeDragTool({
     const worldCoords = screenToWorld(clientX, clientY);
     if (!worldCoords) return;
 
-    const edgeGeometry = geometry as ExtendedGeometry;
+    const edgeGeometry = geometry;
     const edgeInfo = edgeGeometry.screenToEdge?.(worldCoords.worldX, worldCoords.worldY, 0.15);
     if (edgeInfo == null) return;
 

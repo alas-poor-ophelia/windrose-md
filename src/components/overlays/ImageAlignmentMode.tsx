@@ -20,6 +20,7 @@
 import type { VNode } from 'preact';
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { ModalPortal } from '../modals/ModalPortal';
+import { Z_INDEX } from '../../core/dmtConstants';
 
 interface ImageAlignmentModeProps {
   isActive: boolean;
@@ -274,7 +275,7 @@ function ImageAlignmentMode({ isActive, offsetX, offsetY, onOffsetChange, onAppl
           border: '1px solid var(--background-modifier-border)',
           borderRadius: '8px',
           boxShadow: '0 4px 16px rgba(0, 0, 0, 0.3)',
-          zIndex: 10000,
+          zIndex: Z_INDEX.MODAL_OVERLAY,
           cursor: isDragging ? 'grabbing' : 'default',
           userSelect: 'none'
         }}

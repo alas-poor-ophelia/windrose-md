@@ -12,6 +12,7 @@ import { useBackgroundImage, useModalShell } from '../../../context/MapSettingsC
 import { CollapsibleSection } from '../../shared/CollapsibleSection';
 import { SettingItem } from '../SettingItem';
 import { NativeSlider } from '../NativeControls';
+import { Z_INDEX } from '../../../core/dmtConstants';
 
 
 
@@ -47,12 +48,7 @@ function GridBackgroundTab(): VNode | null {
   } = useBackgroundImage();
   const { mapType } = useModalShell();
 
-  // Guard: only render for grid maps
-  if (mapType !== 'grid') {
-    return null;
-  }
-
-  // Track section open state
+  // Track section open state — hooks must be before any conditional return
   const [imagePickerOpen, setImagePickerOpen] = useState(backgroundImagePath == null || backgroundImagePath === '');
   const [alignmentOpen, setAlignmentOpen] = useState(backgroundImagePath != null && backgroundImagePath !== '');
 
@@ -63,6 +59,10 @@ function GridBackgroundTab(): VNode | null {
       setAlignmentOpen(true);
     }
   }, [backgroundImagePath]);
+
+  if (mapType !== 'grid') {
+    return null;
+  }
 
   return (
     <div class="dmt-settings-tab-content" style={{ paddingRight: '8px' }}>
@@ -130,7 +130,7 @@ function GridBackgroundTab(): VNode | null {
                 border: '1px solid var(--background-modifier-border)',
                 borderRadius: '4px',
                 marginTop: '2px',
-                zIndex: 1000,
+                zIndex: Z_INDEX.INTERACTIVE_LAYER,
                 boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
               }}>
                 {imageSearchResults.map((name: string, idx: number) => (

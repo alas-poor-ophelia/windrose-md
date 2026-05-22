@@ -15,6 +15,7 @@ import { openNoteInNewTab } from '../../persistence/noteOperations';
 import { getActiveLayer } from '../../persistence/layerAccessor';
 import { useMapState } from '../../context/MapContext';
 import { InternalLink } from '../shared/InternalLink';
+import { Z_INDEX } from '../../core/dmtConstants';
 
 interface LinkedNoteHoverOverlaysProps {
   selectedItem: SelectedItem | null;
@@ -124,7 +125,7 @@ const LinkedNoteHoverOverlays = ({ selectedItem }: LinkedNoteHoverOverlaysProps)
               top: `${screenY - objectHeight / 2}px`,
               width: `${objectWidth}px`,
               height: `${objectHeight}px`,
-              zIndex: 10
+              zIndex: Z_INDEX.HOVER_PREVIEW
             }}
             onClickCapture={(e) => {
               if (e.ctrlKey || e.metaKey) {

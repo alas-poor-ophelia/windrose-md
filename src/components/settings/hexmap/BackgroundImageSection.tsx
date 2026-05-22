@@ -12,6 +12,7 @@ import { useEffect, useState } from 'preact/hooks';
 import { useBackgroundImage } from '../../../context/MapSettingsContext';
 import { CollapsibleSection } from '../../shared/CollapsibleSection';
 import { SettingItem } from '../SettingItem';
+import { Z_INDEX } from '../../../core/dmtConstants';
 
 
 
@@ -121,7 +122,7 @@ function BackgroundImageSection(): VNode {
               border: '1px solid var(--background-modifier-border)',
               borderRadius: '4px',
               marginTop: '2px',
-              zIndex: 1000,
+              zIndex: Z_INDEX.INTERACTIVE_LAYER,
               boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
             }}>
               {imageSearchResults.map((name: string, idx: number) => (

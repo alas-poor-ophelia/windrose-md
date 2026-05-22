@@ -1,5 +1,6 @@
 // Type declaration shim for WindroseSettingsTab.js
-import { PluginSettingTab, App, Plugin } from 'obsidian';
+import type { App, Plugin } from 'obsidian';
+import { PluginSettingTab } from 'obsidian';
 
 export class WindroseMDSettingsTab extends PluginSettingTab {
   constructor(app: App, plugin: Plugin);

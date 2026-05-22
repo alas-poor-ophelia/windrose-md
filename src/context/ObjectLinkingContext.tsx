@@ -6,7 +6,8 @@
 
 import type { Point } from '#types/core/geometry.types';
 
-import { createContext, ComponentChildren, FunctionComponent } from 'preact';
+import type { ComponentChildren, FunctionComponent } from 'preact';
+import { createContext } from 'preact';
 import { useCallback, useContext, useMemo, useState } from 'preact/hooks';
 
 // ===========================================

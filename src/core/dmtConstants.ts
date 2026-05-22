@@ -256,6 +256,20 @@ const DEFAULTS: Defaults = {
 const DATA_FILE_PATH = 'windrose-md-data.json';
 
 // =============================================================================
+// Z-Index Layer Ordering
+// =============================================================================
+
+const Z_INDEX = {
+  HOVER_PREVIEW: 10,
+  DRAWING_LAYER: 100,
+  TOOLBAR: 150,
+  INTERACTIVE_LAYER: 1000,
+  COLOR_PICKER: 1501,
+  PICKER_OVERLAY: 1999,
+  MODAL_OVERLAY: 10000,
+} as const;
+
+// =============================================================================
 // Segment System Constants
 // =============================================================================
 
@@ -434,6 +448,6 @@ export type {
 // =============================================================================
 
 export { // Theme and defaults
-  THEME, DEFAULTS, DATA_FILE_PATH, SCHEMA_VERSION, // Segment system constants
+  THEME, DEFAULTS, DATA_FILE_PATH, SCHEMA_VERSION, Z_INDEX, // Segment system constants
   SEGMENT_NAMES, SEGMENT_VERTICES, SEGMENT_TRIANGLES, SEGMENT_INTERNAL_ADJACENCY, SEGMENT_CROSS_CELL_ADJACENCY, SEGMENT_EXTERNAL_EDGES, // Diagonal fill tool constants
   CORNER_SEGMENT_FILL, CORNER_NEIGHBOR_CHECKS, CORNER_DIAGONAL_DIRECTION };

@@ -93,7 +93,7 @@ function registerDomCapture(plugin: Plugin): void {
 
     const link = target.closest(
       'a[href^="windrose:"], a[data-href^="windrose:"], a[data-windrose-href]'
-    ) as HTMLElement | null;
+    );
     if (link == null) return;
 
     e.preventDefault();
@@ -156,7 +156,7 @@ function registerEditorExtension(plugin: Plugin): void {
         const target = event.target as HTMLElement;
         if (target?.closest == null) return false;
 
-        const anchor = target.closest('a[href^="windrose:"], a[data-href^="windrose:"], a[data-windrose-href]') as HTMLElement | null;
+        const anchor = target.closest('a[href^="windrose:"], a[data-href^="windrose:"], a[data-windrose-href]');
         if (anchor != null) {
           const href = anchor.getAttribute('data-windrose-href')
             ?? anchor.getAttribute('href')
@@ -172,7 +172,7 @@ function registerEditorExtension(plugin: Plugin): void {
           }
         }
 
-        const linkSpan = target.closest('.cm-link, .cm-underline, .cm-hmd-internal-link') as HTMLElement | null;
+        const linkSpan = target.closest('.cm-link, .cm-underline, .cm-hmd-internal-link');
         if (linkSpan != null) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const pos = (view as any).posAtCoords({ x: event.clientX, y: event.clientY });

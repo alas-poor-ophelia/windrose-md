@@ -8,6 +8,7 @@
 
 import tsparser from "@typescript-eslint/parser";
 import tsPlugin from "@typescript-eslint/eslint-plugin";
+import reactHooksPlugin from "eslint-plugin-react-hooks";
 import obsidianmd from "eslint-plugin-obsidianmd";
 
 export default [
@@ -29,6 +30,7 @@ export default [
     },
     plugins: {
       "@typescript-eslint": tsPlugin,
+      "react-hooks": reactHooksPlugin,
       "obsidianmd": obsidianmd
     },
     rules: {
@@ -49,7 +51,22 @@ export default [
       "@typescript-eslint/no-floating-promises": "error",
       "@typescript-eslint/strict-boolean-expressions": "warn",
       "@typescript-eslint/no-non-null-assertion": "warn",
-      
+      "@typescript-eslint/no-misused-promises": ["warn", {
+        "checksVoidReturn": { "attributes": false }
+      }],
+      "@typescript-eslint/consistent-type-imports": ["warn", {
+        "prefer": "type-imports",
+        "fixStyle": "separate-type-imports"
+      }],
+      "@typescript-eslint/no-unnecessary-type-assertion": "warn",
+      "@typescript-eslint/prefer-nullish-coalescing": "warn",
+
+      // ===========================================
+      // React Hooks Rules (Preact compatible)
+      // ===========================================
+      "react-hooks/rules-of-hooks": "error",
+      "react-hooks/exhaustive-deps": "warn",
+
       // ===========================================
       // Standard ESLint Rules
       // ===========================================
@@ -57,7 +74,7 @@ export default [
       "no-console": "warn",
       "eqeqeq": ["error", "always", { "null": "ignore" }],
       "prefer-const": "error",
-      
+
       // ===========================================
       // Obsidian Community Plugin Rules (recommended)
       // ===========================================

@@ -19,8 +19,9 @@ import { ShapePreviewOverlay } from './ShapePreviewOverlay';
 import { SegmentPickerOverlay } from './SegmentPickerOverlay';
 import { SegmentHoverOverlay } from './SegmentHoverOverlay';
 import { getSettings } from '../../core/settingsAccessor';
+import { Z_INDEX } from '../../core/dmtConstants';
 import { getEffectiveDistanceSettings } from '../../drawing/distanceOperations';
-import { HexGeometry } from '../../geometry/core/HexGeometry';
+import type { HexGeometry } from '../../geometry/core/HexGeometry';
 import type { SegmentPickerOverlayProps } from './SegmentPickerOverlay';
 
 
@@ -93,8 +94,8 @@ const DrawingLayer = ({
   const previewSettings = useMemo((): PreviewSettings => {
     const settings = globalSettings || getSettings();
     return {
-      kbmEnabled: (settings as Record<string, unknown>).shapePreviewKbm !== false,
-      touchEnabled: (settings as Record<string, unknown>).shapePreviewTouch === true
+      kbmEnabled: (settings).shapePreviewKbm !== false,
+      touchEnabled: (settings).shapePreviewTouch === true
     };
   }, [globalSettings]);
 
@@ -313,7 +314,7 @@ const DrawingLayer = ({
             border: `2px solid ${highlightColor}`,
             boxSizing: 'border-box',
             pointerEvents: 'none',
-            zIndex: 100
+            zIndex: Z_INDEX.DRAWING_LAYER
           }}
         />
       );
@@ -336,7 +337,7 @@ const DrawingLayer = ({
             border: `2px solid ${highlightColor}`,
             boxSizing: 'border-box',
             pointerEvents: 'none',
-            zIndex: 100
+            zIndex: Z_INDEX.DRAWING_LAYER
           }}
         />
       );
@@ -360,7 +361,7 @@ const DrawingLayer = ({
             width: `${markerSize}px`,
             height: `${markerSize}px`,
             pointerEvents: 'none',
-            zIndex: 100,
+            zIndex: Z_INDEX.DRAWING_LAYER,
             overflow: 'visible'
           }}
           viewBox={`0 0 ${markerSize} ${markerSize}`}

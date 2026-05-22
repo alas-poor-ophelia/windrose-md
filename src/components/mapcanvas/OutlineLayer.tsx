@@ -16,9 +16,11 @@ import { useCallback, useEffect, useRef } from 'preact/hooks';
 import { useMapState } from '../../context/MapContext';
 import { useEventHandlerRegistration } from '../../context/EventHandlerContext';
 import { useOutlineTools } from '../../hooks/interactions/useOutlineTools';
-import { Modal, Menu, MenuItem } from 'obsidian';
-import { HexGeometry } from '../../geometry/core/HexGeometry';
+import type { MenuItem } from 'obsidian';
+import { Modal, Menu } from 'obsidian';
+import type { HexGeometry } from '../../geometry/core/HexGeometry';
 import { useApp } from '../../context/AppContext';
+import { Z_INDEX } from '../../core/dmtConstants';
 
 
 
@@ -324,7 +326,7 @@ const OutlineLayer = ({
     border: '1px solid var(--background-modifier-border)',
     borderRadius: '8px',
     padding: '8px 14px',
-    zIndex: 1000,
+    zIndex: Z_INDEX.INTERACTIVE_LAYER,
     boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
     whiteSpace: 'nowrap' as const
   };

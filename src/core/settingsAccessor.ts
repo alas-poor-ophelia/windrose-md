@@ -12,9 +12,6 @@ import type {
   ObjectSettings,
   ResolvedColorEntry,
   MapSpecificSettings,
-  HexOrientation,
-  DiagonalRule,
-  DistanceDisplayFormat,
   CoordinateKeyMode
 } from '#types/settings/settings.types';
 import type { App } from 'obsidian';
@@ -63,7 +60,7 @@ const BUILT_IN_COLORS: BuiltInColor[] = [
 /** Fallback settings based on theme constants */
 const FALLBACK_SETTINGS: PluginSettings = {
   version: '1.0.0',
-  hexOrientation: DEFAULTS.hexOrientation as HexOrientation,
+  hexOrientation: DEFAULTS.hexOrientation,
   gridLineColor: THEME.grid.lines,
   gridLineWidth: THEME.grid.lineWidth,
   backgroundColor: THEME.grid.background,
@@ -83,8 +80,8 @@ const FALLBACK_SETTINGS: PluginSettings = {
   distancePerCellHex: DEFAULTS.distance.perCellHex,
   distanceUnitGrid: DEFAULTS.distance.unitGrid,
   distanceUnitHex: DEFAULTS.distance.unitHex,
-  gridDiagonalRule: DEFAULTS.distance.gridDiagonalRule as DiagonalRule,
-  distanceDisplayFormat: DEFAULTS.distance.displayFormat as DistanceDisplayFormat,
+  gridDiagonalRule: DEFAULTS.distance.gridDiagonalRule,
+  distanceDisplayFormat: DEFAULTS.distance.displayFormat,
   
   // Fog of War appearance settings
   fogOfWarColor: THEME.fogOfWar.color,
@@ -267,9 +264,9 @@ function getObjectSettingsForSet(setId: string, mapType: 'hex' | 'grid' = 'grid'
   if (sideData == null) return FALLBACK_OBJECT_SETTINGS;
 
   return {
-    objectOverrides: (sideData as Record<string, unknown>).objectOverrides as Record<string, unknown> ?? {},
-    customObjects: (sideData as Record<string, unknown>).customObjects as unknown[] ?? [],
-    customCategories: (sideData as Record<string, unknown>).customCategories as unknown[] ?? []
+    objectOverrides: (sideData).objectOverrides as Record<string, unknown> ?? {},
+    customObjects: (sideData).customObjects as unknown[] ?? [],
+    customCategories: (sideData).customCategories as unknown[] ?? []
   };
 }
 

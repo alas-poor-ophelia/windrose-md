@@ -30,6 +30,7 @@ import { getActiveLayer } from '../../persistence/layerAccessor';
 import { useToolbarPosition } from '../../hooks/interactions/useToolbarPosition';
 import { Icon } from '../shared/Icon';
 import { InternalLink } from '../shared/InternalLink';
+import { Z_INDEX } from '../../core/dmtConstants';
 
 type MouseClickEvent = JSX.TargetedMouseEvent<HTMLButtonElement>;
 
@@ -108,30 +109,32 @@ const ObjectSelectionToolbar = ({
   pendingCustomColorRef,
   colorButtonRef
 }: ObjectSelectionToolbarProps): VNode | null => {
-  if (!selectedItem || selectedItem.type !== 'object' || !mapData || !canvasRef?.current || !containerRef?.current) {
-    return null;
-  }
+  // Compute bounds before hooks to satisfy rules-of-hooks (no hooks after conditional returns)
+  const hasRequiredInputs = !!selectedItem && selectedItem.type === 'object' && !!mapData && !!canvasRef?.current && !!containerRef?.current;
 
-  const object = getActiveLayer(mapData).objects?.find(obj => obj.id === selectedItem.id);
-  if (!object) return null;
+  const object = hasRequiredInputs
+    ? getActiveLayer(mapData).objects?.find(obj => obj.id === selectedItem.id) ?? null
+    : null;
 
-  if (geometry == null) return null;
-  const pos = calculateObjectScreenPosition(object, canvasRef.current, mapData, geometry, containerRef);
-  if (!pos) return null;
+  const screenPos = hasRequiredInputs && object != null && geometry != null
+    ? calculateObjectScreenPosition(object, canvasRef.current, mapData, geometry, containerRef)
+    : null;
 
-  const bounds = {
-    screenX: pos.screenX,
-    screenY: pos.screenY,
-    width: pos.objectWidth,
-    height: pos.objectHeight
-  };
+  const bounds = screenPos != null
+    ? {
+      screenX: screenPos.screenX,
+      screenY: screenPos.screenY,
+      width: screenPos.objectWidth,
+      height: screenPos.objectHeight
+    }
+    : null;
 
-  // Build button definitions
-  const hasLinkedObject = selectedItem.data?.linkedObject != null;
-  const isNotePin = selectedItem.data?.type === 'note_pin';
-  const isFreeform = selectedItem.data?.freeform === true;
+  // Build button definitions (safe to compute even when selectedItem is null — guarded below)
+  const hasLinkedObject = selectedItem?.data?.linkedObject != null;
+  const isNotePin = selectedItem?.data?.type === 'note_pin';
+  const isFreeform = selectedItem?.data?.freeform === true;
 
-  const buttons = [
+  const buttons = hasRequiredInputs ? [
     { id: 'rotate', icon: 'lucide-rotate-cw', title: 'Rotate 45° (or press R)', onClick: onRotate },
     { id: 'label', icon: 'lucide-sticky-note', title: 'Add/Edit Label', onClick: onLabel, visible: !isNotePin },
     { id: 'duplicate', icon: 'lucide-copy', title: 'Duplicate Object', onClick: onDuplicate },
@@ -144,26 +147,26 @@ const ObjectSelectionToolbar = ({
     { id: 'color', icon: 'lucide-palette', title: 'Change Object Color', onClick: onColorClick, isColorButton: true },
     { id: 'resize', icon: 'lucide-scaling', title: 'Resize Object', onClick: onResize, visible: mapData.mapType !== 'hex' },
     { id: 'delete', icon: 'lucide-trash-2', title: 'Delete (or press Delete/Backspace)', onClick: onDelete, isDelete: true }
-  ].filter(btn => btn.visible !== false);
+  ].filter(btn => btn.visible !== false) : [];
 
   const buttonSize = 44;
   const buttonGap = 4;
   const buttonsPerRow = 5;
   const buttonCount = buttons.length;
-  const rowCount = Math.ceil(buttonCount / buttonsPerRow);
-  const buttonsInFirstRow = Math.min(buttonCount, buttonsPerRow);
+  const rowCount = Math.ceil(buttonCount / buttonsPerRow) || 1;
+  const buttonsInFirstRow = Math.min(buttonCount, buttonsPerRow) || 1;
 
   const toolbarWidth = buttonsInFirstRow * buttonSize + (buttonsInFirstRow - 1) * buttonGap;
   const toolbarHeight = rowCount * buttonSize + (rowCount - 1) * buttonGap;
 
   // Linked note display height
-  const hasLinkedNote = selectedItem.data?.linkedNote != null && typeof selectedItem.data.linkedNote === 'string';
+  const hasLinkedNote = selectedItem?.data?.linkedNote != null && typeof selectedItem?.data?.linkedNote === 'string';
   const linkedNoteHeight = hasLinkedNote ? 32 : 0;
   const linkedNoteGap = hasLinkedNote ? 4 : 0;
   const extraHeight = linkedNoteGap + linkedNoteHeight;
 
-  const toolbarPos = useToolbarPosition({ bounds, containerRef, toolbarWidth, toolbarHeight, extraHeight });
-  if (!toolbarPos) return null;
+  const toolbarPos = useToolbarPosition({ bounds, containerRef: containerRef ?? { current: null }, toolbarWidth, toolbarHeight, extraHeight });
+  if (!hasRequiredInputs || !object || !screenPos || !bounds || !toolbarPos) return null;
 
   // During resize mode, show scale slider instead of action buttons
   if (isResizeMode === true) {
@@ -189,7 +192,7 @@ const ObjectSelectionToolbar = ({
           width: `${sliderWidth}px`,
           height: `${sliderHeight}px`,
           pointerEvents: 'auto',
-          zIndex: 150
+          zIndex: Z_INDEX.TOOLBAR
         }}
       >
         <div className="dmt-scale-slider-inner">
@@ -233,7 +236,7 @@ const ObjectSelectionToolbar = ({
             top: `${linkedNoteY}px`,
             transform: 'translateX(-50%)',
             pointerEvents: 'auto',
-            zIndex: 150
+            zIndex: Z_INDEX.TOOLBAR
           }}
         >
           <div className="dmt-note-display-link">
@@ -260,7 +263,7 @@ const ObjectSelectionToolbar = ({
           top: `${toolbarPos.toolbarY}px`,
           width: `${toolbarWidth}px`,
           pointerEvents: 'auto',
-          zIndex: 150
+          zIndex: Z_INDEX.TOOLBAR
         }}
       >
         {buttons.map((btn) => {

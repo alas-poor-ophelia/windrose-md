@@ -42,8 +42,10 @@ import type {
   BoundsShape,
 } from '../components/settings/settingsReducer';
 
-import { createContext, ComponentChildren, FunctionComponent } from 'preact';
-import { useCallback, useContext, useEffect, useMemo, useReducer, useRef, MutableRef } from 'preact/hooks';
+import type { ComponentChildren, FunctionComponent } from 'preact';
+import { createContext } from 'preact';
+import type { MutableRef } from 'preact/hooks';
+import { useCallback, useContext, useEffect, useMemo, useReducer, useRef } from 'preact/hooks';
 import { Actions, GRID_DENSITY_PRESETS, settingsReducer, buildInitialState, calculateBoundsFromSettings, getOrphanedContentInfo } from '../components/settings/settingsReducer';
 import { getSettings } from '../core/settingsAccessor';
 import { THEME } from '../core/dmtConstants';
@@ -433,14 +435,14 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
   isInSubHex = false,
   subMapName = null
 }) => {
-  const globalSettings = getSettings() as PluginSettings;
+  const globalSettings = getSettings();
   const isHexMap = mapType === 'hex';
 
   // State via reducer
   const [state, dispatch] = useReducer(
     settingsReducer,
     { props: { initialTab: initialTab ?? undefined, mapType, currentSettings: currentSettings as unknown as BuildInitialStateProps['currentSettings'], currentPreferences: currentPreferences as unknown as SettingsPreferences, currentHexBounds: currentHexBounds ?? undefined, currentBackgroundImage: (currentBackgroundImage ?? undefined) as unknown as BuildInitialStateProps['currentBackgroundImage'], currentDistanceSettings: (currentDistanceSettings ?? undefined) as unknown as BuildInitialStateProps['currentDistanceSettings'], currentObjectSetId }, globalSettings },
-    (init: { props: BuildInitialStateProps; globalSettings: PluginSettings }) => buildInitialState(init.props as BuildInitialStateProps, init.globalSettings as unknown as Parameters<typeof buildInitialState>[1])
+    (init: { props: BuildInitialStateProps; globalSettings: PluginSettings }) => buildInitialState(init.props, init.globalSettings as unknown as Parameters<typeof buildInitialState>[1])
   );
 
   // Refs
@@ -557,16 +559,16 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
       dispatch({ type: Actions.SET_IMAGE_SEARCH_RESULTS, payload: [] });
       return;
     }
-    const allImages = await getImageDisplayNames() as string[];
+    const allImages = await getImageDisplayNames();
     const filtered = allImages.filter((name: string) => name.toLowerCase().includes(searchTerm.toLowerCase()));
     dispatch({ type: Actions.SET_IMAGE_SEARCH_RESULTS, payload: filtered.slice(0, 10) });
   };
 
   const handleImageSelect = async (displayName: string): Promise<void> => {
-    const fullPath = await getFullPathFromDisplayName(displayName) as string | null;
+    const fullPath = await getFullPathFromDisplayName(displayName);
     if (fullPath == null || fullPath === '') return;
 
-    const dims = await getImageDimensions(fullPath) as ImageDimensions | null;
+    const dims = await getImageDimensions(fullPath);
     if (!dims) return;
 
     const bounds = calculateBoundsFromSettings(
@@ -586,13 +588,13 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
       dispatch({ type: Actions.SET_FOG_IMAGE_SEARCH_RESULTS, payload: [] });
       return;
     }
-    const allImages = await getImageDisplayNames() as string[];
+    const allImages = await getImageDisplayNames();
     const filtered = allImages.filter((name: string) => name.toLowerCase().includes(searchTerm.toLowerCase()));
     dispatch({ type: Actions.SET_FOG_IMAGE_SEARCH_RESULTS, payload: filtered.slice(0, 10) });
   };
 
   const handleFogImageSelect = async (displayName: string): Promise<void> => {
-    const fullPath = await getFullPathFromDisplayName(displayName) as string | null;
+    const fullPath = await getFullPathFromDisplayName(displayName);
     if (fullPath == null || fullPath === '') return;
 
     dispatch({
@@ -645,7 +647,7 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
       const calc = calculateGridFromColumns(state.imageDimensions.width, state.imageDimensions.height, state.hexBounds.maxCol, orientation);
       return calc.hexSize;
     }
-    const baseHexSize = measurementToHexSize(state.measurementSize, state.measurementMethod, orientation) as number;
+    const baseHexSize = measurementToHexSize(state.measurementSize, state.measurementMethod, orientation);
     return state.fineTuneOffset !== 0 ? baseHexSize + state.fineTuneOffset : baseHexSize;
   }, [
     mapType, state.backgroundImagePath, state.boundsLocked, state.imageDimensions,
@@ -673,7 +675,7 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
       );
 
       if (isRectReduction || isRadialReduction) {
-        const orphans = getOrphanedContentInfo(state.hexBounds, mapType, currentCells, currentObjects, orientation) as OrphanInfo;
+        const orphans = getOrphanedContentInfo(state.hexBounds, mapType, currentCells, currentObjects, orientation);
         if (orphans.cells > 0 || orphans.objects > 0) {
           dispatch({
             type: Actions.SHOW_RESIZE_CONFIRM,

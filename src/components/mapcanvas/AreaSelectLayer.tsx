@@ -18,6 +18,7 @@ import { useEventHandlerRegistration } from '../../context/EventHandlerContext';
 import { GridGeometry } from '../../geometry/core/GridGeometry';
 import { ShapePreviewOverlay } from './ShapePreviewOverlay';
 import { getSettings } from '../../core/settingsAccessor';
+import { Z_INDEX } from '../../core/dmtConstants';
 
 
 
@@ -167,7 +168,7 @@ const AreaSelectLayer = ({ currentTool }: AreaSelectLayerProps): VNode | null =>
           backgroundColor: 'rgba(74, 158, 255, 0.15)',
           boxSizing: 'border-box',
           pointerEvents: 'none',
-          zIndex: 100,
+          zIndex: Z_INDEX.DRAWING_LAYER,
           borderRadius: '2px'
         }}
       />

@@ -15,7 +15,7 @@ import type { ToolId } from '#types/tools/tool.types';
 import type { ObjectTypeId, MapObject } from '#types/objects/object.types';
 import type { TextLabel } from '#types/objects/note.types';
 import type { HexColor } from '#types/core/common.types';
-import type { ExtendedGeometry, SelectedItem } from '#types/contexts/context.types';
+import type { SelectedItem } from '#types/contexts/context.types';
 import type { CustomColor } from '../shared/ColorPicker.tsx';
 
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
@@ -26,7 +26,8 @@ import { useEventHandlerRegistration } from '../../context/EventHandlerContext';
 import { useObjectInteractions } from '../../hooks/objects/useObjectInteractions';
 import { TextInputModal } from '../modals/TextInputModal';
 import { NoteLinkModal } from '../modals/NoteLinkModal';
-import { Menu, MenuItem } from 'obsidian';
+import type { MenuItem } from 'obsidian';
+import { Menu } from 'obsidian';
 import { useObjectModals } from '../../hooks/objects/useObjectModals';
 import { SelectionActionsOverlay } from '../toolbars/SelectionActionsOverlay';
 import { buildObjectActions, buildMultiActions } from '../../hooks/interactions/useSelectionActions';
@@ -40,6 +41,7 @@ import { MeasurementOverlay } from '../overlays/MeasurementOverlay';
 import { formatDistance, getEffectiveDistanceSettings } from '../../drawing/distanceOperations';
 import { getSettings } from '../../core/settingsAccessor';
 import { rotateByIncrement } from '../../drawing/rotationOperations';
+import { Z_INDEX } from '../../core/dmtConstants';
 
 
 
@@ -509,7 +511,7 @@ const ObjectLayer = ({
     } else {
       // Convert to freeform: compute world position from grid cell center
       const cellCenter = geometry.getCellCenter(obj.position.x, obj.position.y);
-      const cellSize = (geometry as ExtendedGeometry).cellSize ?? mapData.gridSize ?? 1;
+      const cellSize = (geometry).cellSize ?? mapData.gridSize ?? 1;
       updates = convertObjectToFreeform(obj, cellCenter.worldX, cellCenter.worldY, cellSize);
     }
 
@@ -912,7 +914,7 @@ const ObjectLayer = ({
             left: mousePosition.x + 20,
             top: mousePosition.y + 25,
             pointerEvents: 'none',
-            zIndex: 1000
+            zIndex: Z_INDEX.INTERACTIVE_LAYER
           }}
         >
           {(hoveredObject.customTooltip as string | undefined) != null && (hoveredObject.customTooltip as string) !== ''

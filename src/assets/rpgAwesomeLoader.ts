@@ -43,12 +43,11 @@ async function loadRPGAwesomeFont(fontPath: string): Promise<boolean> {
     return fontLoadPromise;
   }
 
-  fontLoadPromise = new Promise<boolean>(async (resolve) => {
+  fontLoadPromise = (async (): Promise<boolean> => {
     try {
       if (document.fonts.check('1em rpgawesome')) {
         fontLoaded = true;
-        resolve(true);
-        return;
+        return true;
       }
 
       if (typeof FontFace !== 'undefined') {
@@ -57,8 +56,7 @@ async function loadRPGAwesomeFont(fontPath: string): Promise<boolean> {
           await font.load();
           document.fonts.add(font);
           fontLoaded = true;
-          resolve(true);
-          return;
+          return true;
         } catch (fontFaceError) {
           // eslint-disable-next-line no-console
           console.warn('[RPGAwesome] FontFace API failed, falling back to CSS injection:', fontFaceError);
@@ -78,19 +76,19 @@ async function loadRPGAwesomeFont(fontPath: string): Promise<boolean> {
 
       if (document.fonts.check('1em rpgawesome')) {
         fontLoaded = true;
-        resolve(true);
+        return true;
       } else {
         // eslint-disable-next-line no-console
         console.warn('[RPGAwesome] Font may not have loaded correctly');
-        resolve(false);
+        return false;
       }
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error('[RPGAwesome] Failed to load font:', error);
       fontLoaded = false;
-      resolve(false);
+      return false;
     }
-  });
+  })();
 
   return fontLoadPromise;
 }

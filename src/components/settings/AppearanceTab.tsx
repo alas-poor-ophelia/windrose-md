@@ -13,6 +13,7 @@ import { ColorPicker } from '../shared/ColorPicker';
 import { CollapsibleSection } from '../shared/CollapsibleSection';
 import { useAppearance, useModalShell } from '../../context/MapSettingsContext';
 import type { SettingsOverrides } from '../../context/MapSettingsContext';
+import { Z_INDEX } from '../../core/dmtConstants';
 import { SettingItem } from './SettingItem';
 import { NativeToggle, NativeSlider } from './NativeControls';
 import { Icon } from '../shared/Icon';
@@ -263,7 +264,7 @@ function FogOfWarSection(): VNode {
                 border: '1px solid var(--background-modifier-border)',
                 borderRadius: '4px',
                 marginTop: '2px',
-                zIndex: 1000,
+                zIndex: Z_INDEX.INTERACTIVE_LAYER,
                 boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
               }}>
                 {fogImageSearchResults.map((name: string, idx: number) => (

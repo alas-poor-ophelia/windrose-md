@@ -15,10 +15,12 @@ import { useApp } from '../../context/AppContext';
 import { useMapState } from '../../context/MapContext';
 import { useEventHandlerRegistration } from '../../context/EventHandlerContext';
 import { useRegionTools } from '../../hooks/interactions/useRegionTools';
-import { Menu, MenuItem } from 'obsidian';
-import { HexGeometry } from '../../geometry/core/HexGeometry';
+import type { MenuItem } from 'obsidian';
+import { Menu } from 'obsidian';
+import type { HexGeometry } from '../../geometry/core/HexGeometry';
 import { openNativeNoteLinkModal } from '../modals/NoteLinkModal';
 import { Icon } from '../shared/Icon';
+import { Z_INDEX } from '../../core/dmtConstants';
 
 
 
@@ -450,7 +452,7 @@ const RegionLayer = ({
           border: '1px solid var(--background-modifier-border)',
           borderRadius: '8px',
           padding: '8px 16px',
-          zIndex: 1000,
+          zIndex: Z_INDEX.INTERACTIVE_LAYER,
           boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
           whiteSpace: 'nowrap'
         }}>
@@ -574,7 +576,7 @@ const RegionLayer = ({
           border: '1px solid var(--background-modifier-border)',
           borderRadius: '8px',
           padding: '8px 16px',
-          zIndex: 1000,
+          zIndex: Z_INDEX.INTERACTIVE_LAYER,
           boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
           whiteSpace: 'nowrap'
         }}>
@@ -630,7 +632,7 @@ const RegionLayer = ({
           border: '1px solid var(--background-modifier-border)',
           borderRadius: '8px',
           padding: '8px 12px',
-          zIndex: 1000,
+          zIndex: Z_INDEX.INTERACTIVE_LAYER,
           boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
           whiteSpace: 'nowrap'
         }}>

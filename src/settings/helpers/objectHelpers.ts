@@ -1,4 +1,4 @@
-import { App } from 'obsidian';
+import type { App } from 'obsidian';
 import { OBJECT_TYPES, CATEGORIES } from '../../objects/objectTypes';
 import { RPGAwesomeHelpers } from './rpgAwesomeHelpers';
 

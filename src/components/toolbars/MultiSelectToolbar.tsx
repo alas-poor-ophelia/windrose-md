@@ -24,6 +24,7 @@ import { calculateObjectScreenPosition } from '../../objects/screenPositionUtils
 import { getActiveLayer } from '../../persistence/layerAccessor';
 import { useToolbarPosition } from '../../hooks/interactions/useToolbarPosition';
 import { Icon } from '../shared/Icon';
+import { Z_INDEX } from '../../core/dmtConstants';
 
 interface MultiSelectToolbarProps {
   selectedItems: SelectedItem[];
@@ -142,12 +143,10 @@ const MultiSelectToolbar = ({
   onDuplicateAll,
   onDeleteAll
 }: MultiSelectToolbarProps): VNode | null => {
-  if (!selectedItems?.length || !mapData || !canvasRef?.current || !containerRef?.current) {
-    return null;
-  }
-
-  const bounds = calculateMultiSelectBounds(selectedItems, mapData, canvasRef, containerRef, geometry);
-  if (!bounds) return null;
+  const hasRequiredRefs = !!selectedItems?.length && !!mapData && !!canvasRef?.current && !!containerRef?.current;
+  const bounds = hasRequiredRefs
+    ? calculateMultiSelectBounds(selectedItems, mapData, canvasRef, containerRef, geometry)
+    : null;
 
   const buttonSize = 44;
   const buttonGap = 4;
@@ -156,8 +155,8 @@ const MultiSelectToolbar = ({
   const toolbarWidth = countBadgeWidth + buttonGap + buttonCount * buttonSize + (buttonCount - 1) * buttonGap;
   const toolbarHeight = buttonSize;
 
-  const pos = useToolbarPosition({ bounds, containerRef, toolbarWidth, toolbarHeight });
-  if (!pos) return null;
+  const pos = useToolbarPosition({ bounds, containerRef: containerRef ?? { current: null }, toolbarWidth, toolbarHeight });
+  if (!hasRequiredRefs || !bounds || !pos) return null;
 
   return (
     <div
@@ -167,7 +166,7 @@ const MultiSelectToolbar = ({
         left: `${pos.toolbarX}px`,
         top: `${pos.toolbarY}px`,
         pointerEvents: 'auto',
-        zIndex: 150
+        zIndex: Z_INDEX.TOOLBAR
       }}
     >
       <div className="dmt-selection-count">

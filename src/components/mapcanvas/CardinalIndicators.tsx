@@ -6,6 +6,7 @@
  */
 
 import type { VNode } from 'preact';
+import { Z_INDEX } from '../../core/dmtConstants';
 
 /** Cardinal direction indicator positions */
 interface CardinalIndicatorPositions {
@@ -25,7 +26,7 @@ interface CardinalIndicatorsProps {
 const INDICATOR_STYLE = {
   position: 'absolute',
   pointerEvents: 'none',
-  zIndex: 1000
+  zIndex: Z_INDEX.INTERACTIVE_LAYER
 } as const;
 
 const ACCENT = 'var(--interactive-accent, #4a9eff)';

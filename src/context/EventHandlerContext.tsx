@@ -15,7 +15,8 @@
 
 /** Layer types that can register handlers */
 
-import { createContext, ComponentChildren, FunctionComponent } from 'preact';
+import type { ComponentChildren, FunctionComponent } from 'preact';
+import { createContext } from 'preact';
 import { useCallback, useContext, useMemo, useRef } from 'preact/hooks';
 export type HandlerLayerType =
   | 'object'

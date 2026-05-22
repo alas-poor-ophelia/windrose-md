@@ -13,7 +13,7 @@ import type { MapData, Region } from '#types/core/map.types';
 
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
-import { HexGeometry } from '../../geometry/core/HexGeometry';
+import type { HexGeometry } from '../../geometry/core/HexGeometry';
 import { getRegionLabelWorldPosition, computeCentroid } from '../../geometry/renderers/regionRenderer';
 import { offsetToAxial } from '../../geometry/core/offsetCoordinates';
 

@@ -69,7 +69,7 @@ export const ObjectSetHelpers = {
   },
 
   saveCurrentAsSet(plugin: PluginLike, name: string): ObjectSet {
-    const s = plugin.settings as Record<string, unknown>;
+    const s = plugin.settings;
     if (s.objectSets == null) s.objectSets = [];
 
     const set: ObjectSet = {
@@ -95,7 +95,7 @@ export const ObjectSetHelpers = {
   },
 
   activateSet(plugin: PluginLike, setId: string): boolean {
-    const s = plugin.settings as Record<string, unknown>;
+    const s = plugin.settings;
     const sets = (s.objectSets ?? []) as ObjectSet[];
     const set = sets.find(st => st.id === setId);
     if (set == null) return false;
@@ -131,7 +131,7 @@ export const ObjectSetHelpers = {
   },
 
   isDirty(plugin: PluginLike): boolean {
-    const s = plugin.settings as Record<string, unknown>;
+    const s = plugin.settings;
     const activeSetId = s.activeObjectSetId as string | null;
 
     const hexOverrides = (s.hexObjectOverrides ?? {}) as Record<string, unknown>;
@@ -167,7 +167,7 @@ export const ObjectSetHelpers = {
   },
 
   deleteSet(plugin: PluginLike, setId: string): void {
-    const s = plugin.settings as Record<string, unknown>;
+    const s = plugin.settings;
     if (s.objectSets == null) return;
     s.objectSets = (s.objectSets as ObjectSet[]).filter(st => st.id !== setId);
     if (s.activeObjectSetId === setId) {
@@ -176,7 +176,7 @@ export const ObjectSetHelpers = {
   },
 
   renameSet(plugin: PluginLike, setId: string, newName: string): void {
-    const s = plugin.settings as Record<string, unknown>;
+    const s = plugin.settings;
     const set = ((s.objectSets ?? []) as ObjectSet[]).find(st => st.id === setId);
     if (set != null) set.name = newName;
   },
@@ -209,7 +209,7 @@ export const ObjectSetHelpers = {
   },
 
   async exportSetToFolder(plugin: PluginLike, setId: string, destFolder: string, options?: ExportOptions): Promise<string> {
-    const s = plugin.settings as Record<string, unknown>;
+    const s = plugin.settings;
     const set = ((s.objectSets ?? []) as ObjectSet[]).find(st => st.id === setId);
     if (set == null) throw new Error('Set not found');
 
@@ -317,7 +317,7 @@ export const ObjectSetHelpers = {
 
     ObjectSetHelpers.resolveImagePaths(data as Record<string, Record<string, unknown>>, folderPath + '/images', plugin.app.vault);
 
-    const s = plugin.settings as Record<string, unknown>;
+    const s = plugin.settings;
     if (s.objectSets == null) s.objectSets = [];
 
     const setName = ObjectSetHelpers.deduplicateName(s.objectSets as ObjectSet[], (data.name as string) ?? 'Imported Set');

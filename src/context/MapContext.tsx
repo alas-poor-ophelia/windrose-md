@@ -6,7 +6,8 @@
 // Type-only imports
 import type { MapStateContextValue, MapOperationsContextValue } from '#types/contexts/context.types';
 
-import { createContext, ComponentChildren, FunctionComponent } from 'preact';
+import type { ComponentChildren, FunctionComponent } from 'preact';
+import { createContext } from 'preact';
 import { useContext } from 'preact/hooks';
 
 // Create contexts with proper typing

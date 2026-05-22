@@ -21,6 +21,7 @@ import { buildShapeOverlayActions } from '../../hooks/interactions/useSelectionA
 import { SelectionActionsOverlay } from '../toolbars/SelectionActionsOverlay';
 import { ShapePreviewOverlay } from './ShapePreviewOverlay';
 import { Icon } from '../shared/Icon';
+import { Z_INDEX } from '../../core/dmtConstants';
 
 
 export interface ShapeOverlayLayerProps {
@@ -178,7 +179,7 @@ const ShapeOverlayLayer = ({
         border: '1px solid var(--background-modifier-border)',
         borderRadius: '8px',
         padding: '8px 16px',
-        zIndex: 1000,
+        zIndex: Z_INDEX.INTERACTIVE_LAYER,
         boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
         whiteSpace: 'nowrap'
       }}>

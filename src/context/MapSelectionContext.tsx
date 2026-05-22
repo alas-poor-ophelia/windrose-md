@@ -22,7 +22,8 @@ import type {
   MapSelectionContextValue
 } from '#types/contexts/context.types';
 
-import { createContext, ComponentChildren, FunctionComponent } from 'preact';
+import type { ComponentChildren, FunctionComponent } from 'preact';
+import { createContext } from 'preact';
 import { useCallback, useContext, useRef, useState } from 'preact/hooks';
 
 // ===========================================
