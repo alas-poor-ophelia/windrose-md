@@ -18,9 +18,9 @@ import type {
   MousePosition,
   HoveredObject,
   ItemUpdate,
-  GroupDragInitialState,
   MapSelectionContextValue
 } from '#types/contexts/context.types';
+import type { GroupDragInitialState } from '#types/hooks/groupDrag.types';
 
 import type { ComponentChildren, FunctionComponent } from 'preact';
 import { createContext } from 'preact';

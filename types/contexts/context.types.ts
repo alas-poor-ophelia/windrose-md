@@ -229,9 +229,6 @@ export interface ItemUpdate {
   [key: string]: unknown;
 }
 
-// GroupDragInitialState — canonical definition in hooks/groupDrag.types.ts
-export type { GroupDragInitialState };
-
 /** MapSelectionContext value — provided by MapSelectionProvider, consumed by layers and hooks */
 export interface MapSelectionContextValue {
   // Multi-select state

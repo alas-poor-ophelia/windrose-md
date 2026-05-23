@@ -197,7 +197,6 @@ export type {
   MousePosition,
   HoveredObject,
   ItemUpdate,
-  GroupDragInitialState,
   MapSelectionContextValue,
   MapDataUpdate,
 } from './contexts/context.types';
@@ -310,6 +309,7 @@ export type {
   ObjectDragUpdate,
   TextDragUpdate,
   PositionUpdate,
+  GroupDragInitialState,
   UseGroupDragResult,
 } from './hooks/groupDrag.types';
 
@@ -411,6 +411,7 @@ export type {
   MapHistorySnapshot,
   LayerDataChangeHandler,
   HandleCellsChange,
+  HandleCurvesChange,
   HandleObjectsChange,
   HandleTextLabelsChange,
   HandleEdgesChange,

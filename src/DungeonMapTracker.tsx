@@ -5,7 +5,6 @@ import type {
   MapData,
   MapType,
   IGeometry,
-  ExtendedGeometry,
 } from '#types/index';
 import type { ResolvedTheme } from '#types/settings/settings.types';
 import type { ToolId } from '#types/tools/tool.types';
@@ -387,9 +386,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
 
   // Adjacent sub-map click-to-navigate
   useEffect((): (() => void) | undefined => {
-    if (!showAdjacentSubMaps || !isInSubHex || adjacentSubHexes.length === 0 || !geometry || geometry.type !== 'hex' || !mapData) return undefined;
-
-    const hexGeom = geometry as ExtendedGeometry;
+    if (!showAdjacentSubMaps || !isInSubHex || adjacentSubHexes.length === 0 || !(geometry instanceof HexGeometry) || !mapData) return undefined;
     const maxRing = mapData.hexBounds?.maxRing ?? 7;
     const tileStep = 2 * maxRing + 1;
 
@@ -414,15 +411,15 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
       for (const adj of adjacentSubHexes) {
         const scaledQ = adj.dq * tileStep;
         const scaledR = adj.dr * tileStep;
-        if (hexGeom.hexToWorld == null) continue;
-        const offset = hexGeom.hexToWorld(scaledQ, scaledR);
+        if (geometry.hexToWorld == null) continue;
+        const offset = geometry.hexToWorld(scaledQ, scaledR);
 
         // Click relative to adjacent grid center
         const relX = clickWorldX - offset.worldX;
         const relY = clickWorldY - offset.worldY;
 
         // Check if within maxRing hex radius (approximate with world-space distance)
-        const hexSize = hexGeom.hexSize ?? 1;
+        const hexSize = geometry.hexSize ?? 1;
         const gridRadius = hexSize * Math.sqrt(3) * maxRing;
         if (relX * relX + relY * relY < gridRadius * gridRadius) {
           // Parse the hex key to get absolute q, r
@@ -451,13 +448,11 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   });
 
   // MCP bridge: each map instance registers its own state + operations keyed by notePath.
-  // No race conditions — the query side picks the active file's state.
   useEffect(() => {
     if (window.__windrose == null || mapData == null || notePath === '' || geometry == null) return;
-    if (window.__windrose.mcpInstances == null) window.__windrose.mcpInstances = {};
+    window.__windrose.mcpInstances ??= {};
 
     const activeLayer = getActiveLayer(mapData);
-    const layers = mapData.layers;
     window.__windrose.mcpInstances[notePath] = {
       mapId,
       mapName: mapData.name ?? mapName,
@@ -468,8 +463,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
         zoom: mapData.viewState?.zoom ?? 1,
       },
       activeLayerId: activeLayer?.id ?? '',
-      layerCount: layers.length,
-      layerIds: layers.map((l: { id: string }) => l.id),
+      layerCount: mapData.layers.length,
+      layerIds: mapData.layers.map((l) => l.id),
       currentTool,
       selectedColor,
       selectedOpacity,
@@ -523,12 +518,17 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
         forceSave: () => forceSave(),
       },
     };
-  });
-  useEffect(() => {
+
     return () => {
       if (window.__windrose?.mcpInstances != null) delete window.__windrose.mcpInstances[notePath];
     };
-  }, [notePath]);
+  }, [
+    mapData, mapId, mapName, notePath, geometry,
+    currentTool, selectedColor, selectedOpacity,
+    canUndo, canRedo, saveStatus, isExpanded,
+    setCurrentTool, setSelectedColor, handleOpacityChange,
+    handleCellsChange, wrappedHandleUndo, handleRedo, handleLayerSelect, forceSave,
+  ]);
 
   if (isLoading || !mapData) {
     return <div className="dmt-loading">Loading map...</div>;
