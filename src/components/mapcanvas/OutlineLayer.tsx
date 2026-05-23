@@ -18,12 +18,7 @@ import { useEventHandlerRegistration } from '../../context/EventHandlerContext';
 import { useOutlineTools } from '../../hooks/interactions/useOutlineTools';
 import type { MenuItem } from 'obsidian';
 import { Modal, Menu } from 'obsidian';
-import type { HexGeometry } from '../../geometry/core/HexGeometry';
 import { useApp } from '../../context/AppContext';
-import { Z_INDEX } from '../../core/dmtConstants';
-
-
-
 
 
 
@@ -52,7 +47,6 @@ const OutlineLayer = ({
   const {
     drawingVertices,
     selectedOutlineId,
-    isActive: _isActive,
     handlePointerDown,
     handlePointerMove,
     handlePointerUp,
@@ -153,7 +147,7 @@ const OutlineLayer = ({
           const lenSq = dx * dx + dy * dy;
           const t = lenSq === 0 ? 0 : Math.max(0, Math.min(1, ((world.worldX - a.x) * dx + (world.worldY - a.y) * dy) / lenSq));
           const dist = Math.sqrt((world.worldX - (a.x + t * dx)) ** 2 + (world.worldY - (a.y + t * dy)) ** 2);
-          if (dist < ((geometry as unknown as HexGeometry)?.hexSize || 30) * 0.5) {
+          if (dist < (geometry?.cellSize ?? 30) * 0.5) {
             hitOutline = outline;
             break;
           }
@@ -247,7 +241,7 @@ const OutlineLayer = ({
 
     const offsetX = overlay.width / 2 - viewState.center.x * viewState.zoom;
     const offsetY = overlay.height / 2 - viewState.center.y * viewState.zoom;
-    const hexGeom = geometry as unknown as HexGeometry;
+    const hexGeom = geometry;
 
     const northDirection = mapData.northDirection ?? 0;
     if (northDirection !== 0) {
@@ -312,46 +306,19 @@ const OutlineLayer = ({
     if (northDirection !== 0) ctx.restore();
   }, [drawingVertices, selectedOutlineId, canvasRef, geometry, mapData, selectedColor, outlineSettings]);
 
-  // ── Toolbar styles ─────────────────────────────────────────────────
-  const barStyle = {
-    position: 'fixed' as const,
-    bottom: '100px',
-    left: '50%',
-    transform: 'translateX(-50%)',
-    display: 'flex',
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    gap: '8px',
-    background: 'var(--background-secondary)',
-    border: '1px solid var(--background-modifier-border)',
-    borderRadius: '8px',
-    padding: '8px 14px',
-    zIndex: Z_INDEX.INTERACTIVE_LAYER,
-    boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
-    whiteSpace: 'nowrap' as const
-  };
-
-  const btnStyle = (active?: boolean): Record<string, string> => ({
-    padding: '4px 10px',
-    background: active === true ? 'var(--interactive-accent)' : 'transparent',
-    color: active === true ? 'var(--text-on-accent)' : 'var(--text-muted)',
-    borderRadius: '4px',
-    border: '1px solid var(--background-modifier-border)',
-    cursor: 'pointer' as const,
-    fontSize: '12px',
-    minHeight: '30px'
-  });
+  const btnClass = (active?: boolean): string =>
+    `dmt-floating-bar-btn${active === true ? ' is-active' : ''}`;
 
   // ── JSX ────────────────────────────────────────────────────────────
   return (
     <div className="dmt-outline-ui" style={{ position: 'relative' }}>
       {/* Drawing mode: vertex count */}
       {isOutlineTool && drawingVertices.length > 0 && (
-        <div style={barStyle}>
-          <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>
+        <div className="dmt-floating-bar">
+          <span className="dmt-floating-bar-label">
             {drawingVertices.length} vertices — double-click to close
           </span>
-          <button onClick={cancelDrawing} style={btnStyle()}>
+          <button onClick={cancelDrawing} className="dmt-floating-bar-btn">
             Cancel
           </button>
         </div>
@@ -359,20 +326,12 @@ const OutlineLayer = ({
 
       {/* Config toolbar: shown when tool is active and not drawing */}
       {isOutlineTool && drawingVertices.length === 0 && (selectedOutlineId == null || selectedOutlineId === '') && (
-        <div style={barStyle}>
+        <div className="dmt-floating-bar">
           {/* Line style */}
           <select
             value={outlineSettings.lineStyle}
             onChange={(e: Event) => setOutlineSettings({ lineStyle: (e.target as HTMLSelectElement).value as 'solid' | 'dashed' | 'dotted' })}
-            style={{
-              background: 'var(--background-primary)',
-              color: 'var(--text-normal)',
-              border: '1px solid var(--background-modifier-border)',
-              borderRadius: '4px',
-              padding: '4px 6px',
-              fontSize: '12px',
-              minHeight: '30px'
-            }}
+            className="dmt-floating-bar-input"
           >
             <option value="solid">Solid</option>
             <option value="dashed">Dashed</option>
@@ -385,18 +344,14 @@ const OutlineLayer = ({
             value={selectedColor}
             onInput={(e: Event) => onColorChange((e.target as HTMLInputElement).value)}
             title="Outline color"
-            style={{
-              width: '28px', height: '28px', borderRadius: '4px',
-              border: '2px solid var(--background-modifier-border)',
-              cursor: 'pointer', padding: 0, background: 'none'
-            }}
+            className="dmt-color-swatch-btn"
           />
 
           {/* Fill toggle */}
           <button
             onClick={() => setOutlineSettings({ filled: !outlineSettings.filled })}
             title={outlineSettings.filled ? 'Filled' : 'Stroke only'}
-            style={btnStyle(outlineSettings.filled)}
+            className={btnClass(outlineSettings.filled)}
           >
             {outlineSettings.filled ? 'Filled' : 'No Fill'}
           </button>
@@ -416,21 +371,21 @@ const OutlineLayer = ({
           <button
             onClick={() => setOutlineSettings({ snapMode: outlineSettings.snapMode === 'straight' ? 'hex' : 'straight' })}
             title={outlineSettings.snapMode === 'straight' ? 'Straight lines' : 'Snap to hex edges'}
-            style={btnStyle(outlineSettings.snapMode === 'hex')}
+            className={btnClass(outlineSettings.snapMode === 'hex')}
           >
             {outlineSettings.snapMode === 'straight' ? 'Straight' : 'Hex Snap'}
           </button>
 
-          <span style={{ color: 'var(--text-faint)', fontSize: '11px' }}>
+          <span className="dmt-floating-bar-label-faint">
             Click to place vertices
           </span>
 
           {mapData?.outlines && mapData.outlines.length > 0 && (
             <>
-              <span style={{ color: 'var(--text-faint)', fontSize: '11px', margin: '0 2px' }}>|</span>
+              <span className="dmt-floating-bar-separator">|</span>
               <button
                 onClick={() => showClearAllConfirm((mapData.outlines ?? []).length)}
-                style={{ ...btnStyle(), color: 'var(--text-error)' }}
+                className="dmt-floating-bar-btn is-danger"
                 title="Delete all outlines"
               >
                 Clear All ({mapData.outlines.length})
@@ -445,20 +400,12 @@ const OutlineLayer = ({
         const outline = mapData.outlines.find(o => o.id === selectedOutlineId);
         if (!outline) return null;
         return (
-          <div style={barStyle}>
+          <div className="dmt-floating-bar">
             {/* Line style */}
             <select
               value={outline.lineStyle}
               onChange={(e: Event) => updateOutline(outline.id, { lineStyle: (e.target as HTMLSelectElement).value as 'solid' | 'dashed' | 'dotted' })}
-              style={{
-                background: 'var(--background-primary)',
-                color: 'var(--text-normal)',
-                border: '1px solid var(--background-modifier-border)',
-                borderRadius: '4px',
-                padding: '4px 6px',
-                fontSize: '12px',
-                minHeight: '30px'
-              }}
+              className="dmt-floating-bar-input"
             >
               <option value="solid">Solid</option>
               <option value="dashed">Dashed</option>
@@ -471,18 +418,14 @@ const OutlineLayer = ({
               value={outline.color}
               onInput={(e: Event) => updateOutline(outline.id, { color: (e.target as HTMLInputElement).value })}
               title="Outline color"
-              style={{
-                width: '28px', height: '28px', borderRadius: '4px',
-                border: '2px solid var(--background-modifier-border)',
-                cursor: 'pointer', padding: 0, background: 'none'
-              }}
+              className="dmt-color-swatch-btn"
             />
 
             {/* Fill toggle */}
             <button
               onClick={() => updateOutline(outline.id, { filled: !outline.filled })}
               title={outline.filled ? 'Filled' : 'Stroke only'}
-              style={btnStyle(outline.filled)}
+              className={btnClass(outline.filled)}
             >
               {outline.filled ? 'Filled' : 'No Fill'}
             </button>
@@ -502,17 +445,17 @@ const OutlineLayer = ({
             <button
               onClick={() => updateOutline(outline.id, { snapMode: outline.snapMode === 'straight' ? 'hex' : 'straight' })}
               title={outline.snapMode === 'straight' ? 'Straight lines' : 'Snap to hex edges'}
-              style={btnStyle(outline.snapMode === 'hex')}
+              className={btnClass(outline.snapMode === 'hex')}
             >
               {outline.snapMode === 'straight' ? 'Straight' : 'Hex Snap'}
             </button>
 
-            <span style={{ color: 'var(--text-faint)', fontSize: '11px', margin: '0 2px' }}>|</span>
+            <span className="dmt-floating-bar-separator">|</span>
 
-            <button onClick={() => deleteOutline(outline.id)} style={{ ...btnStyle(), color: 'var(--text-error)' }}>
+            <button onClick={() => deleteOutline(outline.id)} className="dmt-floating-bar-btn is-danger">
               Delete
             </button>
-            <button onClick={deselectOutline} style={btnStyle()}>
+            <button onClick={deselectOutline} className="dmt-floating-bar-btn">
               Done
             </button>
           </div>

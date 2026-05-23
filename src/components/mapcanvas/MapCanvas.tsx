@@ -17,6 +17,7 @@ import type {
 } from '#types/index';
 import type { ResolvedTheme } from '#types/settings/settings.types';
 import type { MapStateContextValue, MapOperationsContextValue } from '#types/contexts/context.types';
+import type { AdjacentSubHexRenderData } from '#types/hooks/canvasRenderer.types';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { useCanvasRenderer, renderCanvas } from '../../hooks/canvas/useCanvasRenderer';
@@ -49,9 +50,6 @@ import { RerollDungeonButton } from './RerollDungeonButton';
 import { getSetting } from '../../core/settingsAccessor';
 import { usePanZoomCoordinator } from '../../hooks/canvas/usePanZoomCoordinator';
 import { useEventCoordinator } from '../../hooks/canvas/useEventCoordinator';
-
-
-
 
 
 
@@ -125,7 +123,7 @@ interface MapCanvasContentProps {
   onEdgesChange: (edges: Edge[], skipHistory?: boolean) => void;
   onTilesChange?: (tiles: import('#types/tiles/tile.types').HexTileAssignment[]) => void;
   tileImagesReady?: boolean;
-  adjacentSubHexes?: Array<{ hexKey: string; dq: number; dr: number; mapData: unknown; name: string }> | null;
+  adjacentSubHexes?: AdjacentSubHexRenderData[] | null;
   onViewStateChange: (viewState: StoredViewState) => void;
   onTextLabelSettingsChange: (settings: TextLabelSettings) => void;
   currentTool: ToolId;
@@ -144,7 +142,7 @@ interface MapCanvasContentProps {
 
 interface MapCanvasProps extends MapCanvasContentProps {
   layerVisibility: LayerVisibility;
-  adjacentSubHexes?: Array<{ hexKey: string; dq: number; dr: number; mapData: unknown; name: string }> | null;
+  adjacentSubHexes?: AdjacentSubHexRenderData[] | null;
 }
 
 
@@ -203,16 +201,10 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
 
   // Use shared selection from context (same state ObjectLayer uses)
   const {
-    selectedItem, setSelectedItem: _setSelectedItem,
+    selectedItem,
     selectedItems,
-    isDraggingSelection, setIsDraggingSelection: _setIsDraggingSelection,
-    dragStart: _dragStart, setDragStart: _setDragStart,
-    isResizeMode, setIsResizeMode: _setIsResizeMode,
-    hoveredObject: _hoveredObject, setHoveredObject: _setHoveredObject,
-    mousePosition: _mousePosition, setMousePosition: _setMousePosition,
-    showNoteLinkModal: _showNoteLinkModal, setShowNoteLinkModal: _setShowNoteLinkModal,
-    pendingNotePinId: _pendingNotePinId, setPendingNotePinId: _setPendingNotePinId,
-    editingNoteObjectId: _editingNoteObjectId, setEditingNoteObjectId: _setEditingNoteObjectId,
+    isDraggingSelection,
+    isResizeMode,
     showCoordinates, setShowCoordinates,
     layerVisibility
   } = useMapSelection();
@@ -302,7 +294,7 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
   }, [isAnimating]);
 
   // Render canvas whenever relevant state changes
-  useCanvasRenderer(canvasRef, fogCanvasRef, mapData, geometry, selectedItems as unknown as import('#types/hooks/canvasRenderer.types').RendererSelectedItem[], { isResizeMode, theme, showCoordinates, layerVisibility, tileImagesReady, adjacentSubHexes: adjacentSubHexes as unknown as import('#types/hooks/canvasRenderer.types').AdjacentSubHexRenderData[] | null });
+  useCanvasRenderer(canvasRef, fogCanvasRef, mapData, geometry, selectedItems, { isResizeMode, theme, showCoordinates, layerVisibility, tileImagesReady, adjacentSubHexes });
 
   // Trigger redraw when canvas dimensions change (from expand/collapse)
   useEffect(() => {
@@ -339,7 +331,7 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
       }
     } else {
       // After animation, do a proper redraw with correct dimensions
-      renderCanvas(canvas, fogCanvas, mapData, geometry, selectedItem as unknown as import('#types/hooks/canvasRenderer.types').RendererSelectedItem, { isResizeMode, theme, showCoordinates, layerVisibility, adjacentSubHexes: adjacentSubHexes as unknown as import('#types/hooks/canvasRenderer.types').AdjacentSubHexRenderData[] | null });
+      renderCanvas(canvas, fogCanvas, mapData, geometry, selectedItem ?? undefined, { isResizeMode, theme, showCoordinates, layerVisibility, adjacentSubHexes });
     }
   }, [canvasDimensions.width, canvasDimensions.height, isAnimating, showCoordinates, layerVisibility, adjacentSubHexes]);
 
@@ -472,7 +464,7 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
     onEdgesChange,
     onTilesChange,
     onMapDataUpdate
-  } as MapOperationsContextValue), [onCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onTilesChange, onViewStateChange, onTextLabelSettingsChange]);
+  } as MapOperationsContextValue), [onCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onTilesChange, onMapDataUpdate]);
 
 
 

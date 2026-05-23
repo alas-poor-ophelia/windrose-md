@@ -145,8 +145,7 @@ src/
 │   ├── helpers/           # Settings utilities
 │   ├── modals/            # Settings modals
 │   └── tabs/              # Tab render mixins
-├── generation/            # Random map generation
-└── css/                   # Source CSS (compiled to styles.css)
+└── generation/            # Random map generation
 ```
 
 ## Key Principles

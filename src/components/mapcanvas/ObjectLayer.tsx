@@ -134,7 +134,7 @@ const ObjectLayer = ({
 
   const handleLightToggle = useCallback(() => {
     if (!selectedItem || selectedItem.type !== 'object' || !mapData) return;
-    const lightEnabled = (selectedItem.data as MapObject | undefined)?.lightEnabled !== true;
+    const lightEnabled = selectedItem.data?.lightEnabled !== true;
     const updatedObjects = updateObject(getActiveLayer(mapData).objects, selectedItem.id, { lightEnabled });
     contextOnObjectsChange(updatedObjects);
     const updatedObj = updatedObjects.find((o: MapObject) => o.id === selectedItem.id);
@@ -168,9 +168,8 @@ const ObjectLayer = ({
     measureOriginRef.current = null;
   }, [selectedItem?.id]);
 
-  if (isDraggingSelection && measureMovement && selectedItem?.data && !measureOriginRef.current) {
-    const objData = selectedItem.data as MapObject;
-    measureOriginRef.current = { x: objData.position.x, y: objData.position.y };
+  if (isDraggingSelection && measureMovement && selectedItem?.type === 'object' && selectedItem.data && !measureOriginRef.current) {
+    measureOriginRef.current = { x: selectedItem.data.position.x, y: selectedItem.data.position.y };
   }
   if (!isDraggingSelection) {
     measureOriginRef.current = null;
@@ -564,7 +563,7 @@ const ObjectLayer = ({
   const handleFollowLink = useCallback(() => {
     if (!selectedItem || selectedItem.type !== 'object' || !mapData || mapId == null || mapId === '' || notePath == null || notePath === '') return;
 
-    const obj = selectedItem.data as MapObject;
+    const obj = selectedItem.data;
     if (obj?.linkedObject == null) return;
 
     const { layerId, objectId } = obj.linkedObject;
@@ -605,7 +604,7 @@ const ObjectLayer = ({
   const handleRemoveLink = useCallback(() => {
     if (!selectedItem || selectedItem.type !== 'object' || !mapData) return;
 
-    const obj = selectedItem.data as MapObject;
+    const obj = selectedItem.data;
     if (!obj?.linkedObject) return;
 
     const { layerId: targetLayerId, objectId: targetObjectId } = obj.linkedObject;
@@ -833,7 +832,7 @@ const ObjectLayer = ({
           key={selectedItem.id}
           selectedItems={[selectedItem]}
           actions={[...buildObjectActions(
-            selectedItem as unknown as { type: 'object' | 'text' | 'notePin'; id: string; data?: MapObject },
+            selectedItem,
             {
             onRotate: handleObjectRotation,
             onDuplicate: handleObjectDuplicate,
@@ -849,7 +848,7 @@ const ObjectLayer = ({
             onDelete: handleObjectDeletion,
             onPlayerToggle: handlePlayerToggle,
             onMeasureToggle: handleMeasureToggle
-          }, mapData, { isResizeMode, isPlayer: (selectedItem.data as MapObject | undefined)?.isPlayer === true, isMeasuring: measureMovement })]}
+          }, mapData, { isResizeMode, isPlayer: selectedItem.data?.isPlayer === true, isMeasuring: measureMovement })]}
 
           mapData={mapData}
           canvasRef={canvasRef}
@@ -859,7 +858,7 @@ const ObjectLayer = ({
           isResizeMode={isResizeMode}
           onScaleChange={handleScaleChange}
           showColorPicker={showObjectColorPicker}
-          currentColor={(selectedItem?.data as MapObject | undefined)?.color}
+          currentColor={selectedItem.data?.color}
           onColorSelect={handleObjectColorSelect}
           onColorPickerClose={handleObjectColorPickerClose}
           onColorReset={handleObjectColorResetWrapper}
@@ -868,10 +867,10 @@ const ObjectLayer = ({
           onDeleteCustomColor={onDeleteCustomColor}
           pendingCustomColorRef={pendingObjectCustomColorRef}
           colorButtonRef={objectColorBtnRef}
-          isPlayer={(selectedItem.data as MapObject | undefined)?.isPlayer === true}
-          lightEnabled={(selectedItem.data as MapObject | undefined)?.lightEnabled === true}
-          lightRadius={(selectedItem.data as MapObject | undefined)?.lightRadius ?? 30}
-          lightColor={(selectedItem.data as MapObject | undefined)?.lightColor ?? 'rgba(255, 255, 100, 1)'}
+          isPlayer={selectedItem.data?.isPlayer === true}
+          lightEnabled={selectedItem.data?.lightEnabled === true}
+          lightRadius={selectedItem.data?.lightRadius ?? 30}
+          lightColor={selectedItem.data?.lightColor ?? 'rgba(255, 255, 100, 1)'}
           onLightToggle={handleLightToggle}
           onLightRadiusChange={handleLightRadiusChange}
           onLightColorSelect={handleLightColorSelect}
@@ -918,9 +917,9 @@ const ObjectLayer = ({
             zIndex: Z_INDEX.INTERACTIVE_LAYER
           }}
         >
-          {(hoveredObject.customTooltip as string | undefined) != null && (hoveredObject.customTooltip as string) !== ''
-            ? `${hoveredObject.label as string} - ${hoveredObject.customTooltip as string}`
-            : hoveredObject.label as string
+          {hoveredObject.customTooltip != null && hoveredObject.customTooltip !== ''
+            ? `${hoveredObject.label} - ${hoveredObject.customTooltip}`
+            : hoveredObject.label
           }
         </div>
       )}

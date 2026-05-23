@@ -8,9 +8,7 @@
 import type { RefObject } from 'preact';
 import type { MapData } from '../core/map.types';
 import type { IGeometry } from '../core/geometry.types';
-import type { MapObject } from '../objects/object.types';
-import type { TextLabel } from '../objects/note.types';
-import type { LayerVisibility } from '../contexts/context.types';
+import type { LayerVisibility, SelectedItem } from '../contexts/context.types';
 export type { LayerVisibility };
 
 /** Adjacent sub-hex map for ghost preview rendering */
@@ -27,12 +25,8 @@ export interface AdjacentSubHexRenderData {
 // Selected Item Types
 // ===========================================
 
-/** Selected item for rendering selection indicators */
-export interface RendererSelectedItem {
-  type: 'object' | 'text';
-  id: string;
-  data?: MapObject | TextLabel;
-}
+/** Renderer accepts canonical SelectedItem; only processes 'object' and 'text' variants */
+export type RendererSelectedItem = SelectedItem;
 
 // LayerVisibility imported from contexts/context.types above
 

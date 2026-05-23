@@ -10,25 +10,20 @@
  */
 
 import type { HexColor } from '#types/core/common.types';
+import type { SegmentName } from '#types/core/cell.types';
 import type { VNode } from 'preact';
 import type { Point } from '#types/core/geometry.types';
 
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { ModalPortal } from '../modals/ModalPortal';
-import { SEGMENT_NAMES, SEGMENT_VERTICES, SEGMENT_TRIANGLES, Z_INDEX } from '../../core/dmtConstants';
+import { SEGMENT_NAMES, SEGMENT_VERTICES, SEGMENT_TRIANGLES } from '../../core/dmtConstants';
 
 
 
-
-
-
-
-/** Segment name type (8 triangular sections) */
-type SegmentName = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w';
 
 /** Existing cell data structure */
 interface ExistingCellData {
-  segments?: Record<SegmentName, boolean>;
+  segments?: Partial<Record<SegmentName, boolean>>;
   color?: HexColor;
 }
 
@@ -48,8 +43,6 @@ export interface SegmentPickerOverlayProps {
   onConfirm: (segments: SegmentName[], remember: boolean) => void;
   /** Called when picker is dismissed */
   onCancel: () => void;
-  /** Screen position to anchor the picker near */
-  screenPosition?: Point;
   /** Previously saved segment selection */
   savedSegments?: SegmentName[];
   /** Initial state of "remember selection" checkbox */
@@ -93,7 +86,6 @@ const SegmentPickerOverlay = ({
   const selectedSegmentsRef = useRef<Set<SegmentName>>(selectedSegments);
   selectedSegmentsRef.current = selectedSegments;
 
-  const [_isDragging, setIsDragging] = useState(false);
   const dragModeRef = useRef<'add' | 'remove' | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
 
@@ -108,7 +100,7 @@ const SegmentPickerOverlay = ({
         );
         setSelectedSegments(new Set(filled));
       } else if (existingCell.color != null && existingCell.color !== '') {
-        setSelectedSegments(new Set(SEGMENT_NAMES as SegmentName[]));
+        setSelectedSegments(new Set(SEGMENT_NAMES));
       } else {
         setSelectedSegments(new Set());
       }
@@ -127,7 +119,6 @@ const SegmentPickerOverlay = ({
 
   useEffect(() => {
     if (!isOpen) {
-      setIsDragging(false);
       dragModeRef.current = null;
     }
   }, [isOpen]);
@@ -224,7 +215,6 @@ const SegmentPickerOverlay = ({
       const segment = getSegmentAtPoint(pos.x, pos.y);
       if (segment) {
         dragging = true;
-        setIsDragging(true);
         handleSegmentInteraction(segment, true);
       }
     };
@@ -250,7 +240,6 @@ const SegmentPickerOverlay = ({
         e.stopPropagation();
       }
       dragging = false;
-      setIsDragging(false);
       dragModeRef.current = null;
     };
 
@@ -298,7 +287,7 @@ const SegmentPickerOverlay = ({
   const handleSelectAll = (e: Event): void => {
     e.preventDefault();
     e.stopPropagation();
-    setSelectedSegments(new Set(SEGMENT_NAMES as SegmentName[]));
+    setSelectedSegments(new Set(SEGMENT_NAMES));
   };
 
   const handleClearAll = (e: Event): void => {
@@ -314,82 +303,37 @@ const SegmentPickerOverlay = ({
   return (
     <ModalPortal>
       <div
-        className="dmt-segment-picker-overlay"
+        className="dmt-segment-picker-overlay dmt-segment-picker-backdrop"
         onClick={handleOverlayClick}
         onTouchEnd={handleOverlayClick}
-        style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.6)',
-          zIndex: Z_INDEX.PICKER_OVERLAY,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center'
-        }}
       >
         <div
-          className="dmt-segment-picker"
+          className="dmt-segment-picker dmt-segment-picker-card"
           onClick={(e: Event) => e.stopPropagation()}
           onTouchEnd={(e: Event) => e.stopPropagation()}
-          style={{
-            backgroundColor: '#1a1a1a',
-            borderRadius: '12px',
-            padding: '16px',
-            border: '2px solid #c4a57b',
-            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)',
-            minWidth: '260px'
-          }}
         >
-          <div style={{
-            color: '#c4a57b',
-            fontSize: '14px',
-            fontWeight: '600',
-            marginBottom: '12px',
-            textAlign: 'center',
-            textTransform: 'uppercase',
-            letterSpacing: '1px'
-          }}>
+          <div className="dmt-segment-picker-title">
             Select Segments
           </div>
 
-          <div style={{
-            color: '#888',
-            fontSize: '11px',
-            textAlign: 'center',
-            marginBottom: '12px'
-          }}>
+          <div className="dmt-segment-picker-subtitle">
             Cell ({cellCoords?.x}, {cellCoords?.y})
           </div>
 
-          <div style={{
-            display: 'flex',
-            justifyContent: 'center',
-            marginBottom: '16px'
-          }}>
+          <div className="dmt-segment-picker-svg-wrap">
             <svg
               ref={svgRef}
               width={PICKER_SIZE}
               height={PICKER_SIZE}
               viewBox={`0 0 ${PICKER_SIZE} ${PICKER_SIZE}`}
-              style={{
-                backgroundColor: '#2a2a2a',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                touchAction: 'none',
-                userSelect: 'none',
-                WebkitUserSelect: 'none',
-                WebkitTouchCallout: 'none'
-              }}
+              className="dmt-segment-picker-svg"
             >
               <line x1={PICKER_SIZE/2} y1="0" x2={PICKER_SIZE/2} y2={PICKER_SIZE} stroke="#444" strokeWidth="1" />
               <line x1="0" y1={PICKER_SIZE/2} x2={PICKER_SIZE} y2={PICKER_SIZE/2} stroke="#444" strokeWidth="1" />
               <line x1="0" y1="0" x2={PICKER_SIZE} y2={PICKER_SIZE} stroke="#444" strokeWidth="1" />
               <line x1={PICKER_SIZE} y1="0" x2="0" y2={PICKER_SIZE} stroke="#444" strokeWidth="1" />
 
-              {(SEGMENT_NAMES as SegmentName[]).map(segmentName => {
+              {(SEGMENT_NAMES).map(segmentName => {
                 const isSelected = selectedSegments.has(segmentName);
                 const path = getSegmentPath(segmentName, PICKER_SIZE);
 
@@ -406,7 +350,7 @@ const SegmentPickerOverlay = ({
                 );
               })}
 
-              {(SEGMENT_NAMES as SegmentName[]).map(segmentName => {
+              {(SEGMENT_NAMES).map(segmentName => {
                 const angle = segmentAngles[segmentName] * (Math.PI / 180);
                 const labelRadius = PICKER_SIZE * 0.35;
                 const labelX = PICKER_SIZE/2 + Math.cos(angle) * labelRadius;
@@ -440,121 +384,38 @@ const SegmentPickerOverlay = ({
             </svg>
           </div>
 
-          <div style={{
-            display: 'flex',
-            gap: '8px',
-            marginBottom: '16px',
-            justifyContent: 'center'
-          }}>
-            <button
-              onClick={handleSelectAll}
-              style={{
-                padding: '6px 12px',
-                backgroundColor: '#333',
-                border: '1px solid #555',
-                borderRadius: '4px',
-                color: '#ccc',
-                fontSize: '12px',
-                cursor: 'pointer'
-              }}
-            >
+          <div className="dmt-segment-picker-actions">
+            <button onClick={handleSelectAll} className="dmt-segment-picker-btn">
               Select All
             </button>
-            <button
-              onClick={handleClearAll}
-              style={{
-                padding: '6px 12px',
-                backgroundColor: '#333',
-                border: '1px solid #555',
-                borderRadius: '4px',
-                color: '#ccc',
-                fontSize: '12px',
-                cursor: 'pointer'
-              }}
-            >
+            <button onClick={handleClearAll} className="dmt-segment-picker-btn">
               Clear All
             </button>
           </div>
 
-          <div style={{
-            color: '#888',
-            fontSize: '12px',
-            textAlign: 'center',
-            marginBottom: '12px'
-          }}>
+          <div className="dmt-segment-picker-status">
             {selectedSegments.size} of 8 segments selected
           </div>
 
-          <label style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '8px',
-            color: '#aaa',
-            fontSize: '12px',
-            cursor: 'pointer',
-            marginBottom: '16px',
-            userSelect: 'none',
-            WebkitUserSelect: 'none'
-          }}>
+          <label className="dmt-segment-picker-remember">
             <input
               type="checkbox"
               checked={rememberSelection}
               onChange={(e: Event) => setRememberSelection((e.target as HTMLInputElement).checked)}
-              style={{
-                width: '16px',
-                height: '16px',
-                cursor: 'pointer',
-                accentColor: '#c4a57b'
-              }}
             />
             Remember selection for next cell
           </label>
 
-          <div style={{
-            display: 'flex',
-            gap: '12px',
-            justifyContent: 'center'
-          }}>
-            <button
-              onClick={handleCancel}
-              style={{
-                padding: '10px 24px',
-                backgroundColor: '#333',
-                border: '1px solid #555',
-                borderRadius: '6px',
-                color: '#ccc',
-                fontSize: '14px',
-                cursor: 'pointer',
-                minWidth: '80px'
-              }}
-            >
+          <div className="dmt-segment-picker-footer">
+            <button onClick={handleCancel} className="dmt-segment-picker-btn-lg">
               Cancel
             </button>
-            <button
-              onClick={handleConfirm}
-              style={{
-                padding: '10px 24px',
-                backgroundColor: '#c4a57b',
-                border: 'none',
-                borderRadius: '6px',
-                color: '#1a1a1a',
-                fontSize: '14px',
-                fontWeight: '600',
-                cursor: 'pointer',
-                minWidth: '80px'
-              }}
-            >
+            <button onClick={handleConfirm} className="dmt-segment-picker-btn-lg is-primary">
               Apply
             </button>
           </div>
 
-          <div style={{
-            color: '#666',
-            fontSize: '11px',
-            textAlign: 'center',
-            marginTop: '12px'
-          }}>
+          <div className="dmt-segment-picker-hint">
             Tap or drag to toggle segments
           </div>
         </div>

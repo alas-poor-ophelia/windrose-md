@@ -17,10 +17,9 @@ import { useEventHandlerRegistration } from '../../context/EventHandlerContext';
 import { useRegionTools } from '../../hooks/interactions/useRegionTools';
 import type { MenuItem } from 'obsidian';
 import { Menu } from 'obsidian';
-import type { HexGeometry } from '../../geometry/core/HexGeometry';
+import { HexGeometry } from '../../geometry/core/HexGeometry';
 import { openNativeNoteLinkModal } from '../modals/NoteLinkModal';
 import { Icon } from '../shared/Icon';
-import { Z_INDEX } from '../../core/dmtConstants';
 
 
 
@@ -211,7 +210,8 @@ const RegionLayer = ({
 
     if (hexesToHighlight.length === 0 && boundaryVertices.length === 0) return;
 
-    const hexGeom = geometry as unknown as HexGeometry;
+    if (!(geometry instanceof HexGeometry)) return;
+    const hexGeom = geometry;
     const viewState = mapData.viewState;
     if (!viewState) return;
 
@@ -439,47 +439,22 @@ const RegionLayer = ({
     <div className="dmt-region-ui" style={{ position: 'relative' }}>
       {/* Editing existing region bar */}
       {editingRegion && pendingHexes.length === 0 && !showNameInput && (
-        <div style={{
-          position: 'fixed',
-          bottom: '100px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          display: 'flex',
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: '10px',
-          background: 'var(--background-secondary)',
-          border: '1px solid var(--background-modifier-border)',
-          borderRadius: '8px',
-          padding: '8px 16px',
-          zIndex: Z_INDEX.INTERACTIVE_LAYER,
-          boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
-          whiteSpace: 'nowrap'
-        }}>
+        <div className="dmt-floating-bar">
           <input
             type="color"
             value={editingRegion.color}
             onInput={handleColorChange}
             title="Change region color"
-            style={{
-              width: '28px',
-              height: '28px',
-              borderRadius: '4px',
-              border: '2px solid var(--background-modifier-border)',
-              cursor: 'pointer',
-              flexShrink: 0,
-              padding: 0,
-              background: 'none'
-            }}
+            className="dmt-color-swatch-btn"
           />
-          <span style={{ color: 'var(--text-normal)', fontSize: '13px', fontWeight: '600' }}>
+          <span className="dmt-floating-bar-name">
             {editingRegion.name}
           </span>
-          <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>
+          <span className="dmt-floating-bar-label">
             {editingRegion.hexes.length} hex{editingRegion.hexes.length !== 1 ? 'es' : ''}
           </span>
-          <span style={{ color: 'var(--text-faint)', fontSize: '11px', margin: '0 4px' }}>|</span>
-          <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>
+          <span className="dmt-floating-bar-separator">|</span>
+          <span className="dmt-floating-bar-label">
             Click hexes to add/remove
           </span>
           <button
@@ -495,18 +470,8 @@ const RegionLayer = ({
               });
             }}
             title={editingRegion.linkedNote != null && editingRegion.linkedNote !== '' ? 'Change linked note' : 'Link note'}
-            style={{
-              padding: '4px 8px',
-              background: 'transparent',
-              color: editingRegion.linkedNote != null && editingRegion.linkedNote !== '' ? 'var(--text-accent)' : 'var(--text-muted)',
-              borderRadius: '4px',
-              border: '1px solid var(--background-modifier-border)',
-              cursor: 'pointer',
-              fontSize: '12px',
-              minHeight: '32px',
-              display: 'flex',
-              alignItems: 'center'
-            }}
+            className={`dmt-floating-bar-btn${editingRegion.linkedNote != null && editingRegion.linkedNote !== '' ? ' is-accent' : ''}`}
+            style={{ display: 'flex', alignItems: 'center' }}
           >
             <Icon icon={editingRegion.linkedNote != null && editingRegion.linkedNote !== '' ? 'lucide-file-check' : 'lucide-link'} />
           </button>
@@ -515,46 +480,19 @@ const RegionLayer = ({
               setShowNameInput(true);
               setRegionName(editingRegion.name);
             }}
-            style={{
-              padding: '4px 12px',
-              background: 'transparent',
-              color: 'var(--text-accent)',
-              borderRadius: '4px',
-              border: '1px solid var(--background-modifier-border)',
-              cursor: 'pointer',
-              fontSize: '12px',
-              minHeight: '32px'
-            }}
+            className="dmt-floating-bar-btn is-accent"
           >
             Rename
           </button>
           <button
             onClick={() => deleteRegion(editingRegion.id)}
-            style={{
-              padding: '4px 12px',
-              background: 'transparent',
-              color: 'var(--text-error)',
-              borderRadius: '4px',
-              border: '1px solid var(--background-modifier-border)',
-              cursor: 'pointer',
-              fontSize: '12px',
-              minHeight: '32px'
-            }}
+            className="dmt-floating-bar-btn is-danger"
           >
             Delete
           </button>
           <button
             onClick={stopEditingRegion}
-            style={{
-              padding: '4px 12px',
-              background: 'transparent',
-              color: 'var(--text-muted)',
-              borderRadius: '4px',
-              border: '1px solid var(--background-modifier-border)',
-              cursor: 'pointer',
-              fontSize: '12px',
-              minHeight: '32px'
-            }}
+            className="dmt-floating-bar-btn"
           >
             Done
           </button>
@@ -563,54 +501,20 @@ const RegionLayer = ({
 
       {/* Create Region bar */}
       {isRegionTool && pendingHexes.length > 0 && !showNameInput && (editingRegionId == null || editingRegionId === '') && (
-        <div style={{
-          position: 'fixed',
-          bottom: '100px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          display: 'flex',
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: '10px',
-          background: 'var(--background-secondary)',
-          border: '1px solid var(--background-modifier-border)',
-          borderRadius: '8px',
-          padding: '8px 16px',
-          zIndex: Z_INDEX.INTERACTIVE_LAYER,
-          boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
-          whiteSpace: 'nowrap'
-        }}>
-          <span style={{ color: 'var(--text-muted)', fontSize: '13px', marginRight: '4px' }}>
+        <div className="dmt-floating-bar">
+          <span className="dmt-floating-bar-label" style={{ marginRight: '4px' }}>
             {pendingHexes.length} hex{pendingHexes.length !== 1 ? 'es' : ''}
           </span>
           <button
             onClick={handleCreateClick}
-            style={{
-              padding: '6px 16px',
-              background: 'var(--interactive-accent)',
-              color: 'var(--text-on-accent)',
-              borderRadius: '6px',
-              border: 'none',
-              cursor: 'pointer',
-              fontSize: '13px',
-              fontWeight: '600',
-              minHeight: '36px'
-            }}
+            className="dmt-floating-bar-btn is-active"
+            style={{ fontWeight: '600' }}
           >
             Create Region
           </button>
           <button
             onClick={cancelRegion}
-            style={{
-              padding: '6px 12px',
-              background: 'transparent',
-              color: 'var(--text-muted)',
-              borderRadius: '6px',
-              border: '1px solid var(--background-modifier-border)',
-              cursor: 'pointer',
-              fontSize: '13px',
-              minHeight: '36px'
-            }}
+            className="dmt-floating-bar-btn"
           >
             Cancel
           </button>
@@ -619,23 +523,7 @@ const RegionLayer = ({
 
       {/* Name input */}
       {showNameInput && (
-        <div style={{
-          position: 'fixed',
-          bottom: '100px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          display: 'flex',
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: '8px',
-          background: 'var(--background-secondary)',
-          border: '1px solid var(--background-modifier-border)',
-          borderRadius: '8px',
-          padding: '8px 12px',
-          zIndex: Z_INDEX.INTERACTIVE_LAYER,
-          boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
-          whiteSpace: 'nowrap'
-        }}>
+        <div className="dmt-floating-bar">
           <input
             type="text"
             placeholder="Region name..."
@@ -643,44 +531,20 @@ const RegionLayer = ({
             onInput={(e: Event) => setRegionName((e.target as HTMLInputElement).value)}
             onKeyDown={handleNameKeyDown}
             ref={(el: HTMLInputElement | null) => { if (el) setTimeout(() => el.focus(), 0); }}
-            style={{
-              background: 'var(--background-primary)',
-              color: 'var(--text-normal)',
-              border: '1px solid var(--background-modifier-border)',
-              borderRadius: '4px',
-              padding: '6px 10px',
-              fontSize: '14px',
-              width: '200px'
-            }}
+            className="dmt-floating-bar-input"
+            style={{ width: '200px', padding: '6px 10px', fontSize: '14px' }}
           />
           <button
             onClick={handleConfirmName}
             disabled={!regionName.trim()}
-            style={{
-              padding: '6px 16px',
-              background: regionName.trim() ? 'var(--interactive-accent)' : 'var(--background-modifier-border)',
-              color: regionName.trim() ? 'var(--text-on-accent)' : 'var(--text-muted)',
-              borderRadius: '6px',
-              border: 'none',
-              cursor: regionName.trim() ? 'pointer' : 'default',
-              fontSize: '13px',
-              minHeight: '36px'
-            }}
+            className={`dmt-floating-bar-btn${regionName.trim() ? ' is-active' : ''}`}
+            style={{ cursor: regionName.trim() ? 'pointer' : 'default' }}
           >
             OK
           </button>
           <button
             onClick={handleCancelName}
-            style={{
-              padding: '6px 12px',
-              background: 'transparent',
-              color: 'var(--text-muted)',
-              borderRadius: '6px',
-              border: '1px solid var(--background-modifier-border)',
-              cursor: 'pointer',
-              fontSize: '13px',
-              minHeight: '36px'
-            }}
+            className="dmt-floating-bar-btn"
           >
             Cancel
           </button>

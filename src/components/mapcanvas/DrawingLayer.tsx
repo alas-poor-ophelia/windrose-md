@@ -21,10 +21,6 @@ import { SegmentHoverOverlay } from './SegmentHoverOverlay';
 import { getSettings } from '../../core/settingsAccessor';
 import { Z_INDEX } from '../../core/dmtConstants';
 import { getEffectiveDistanceSettings } from '../../drawing/distanceOperations';
-import type { HexGeometry } from '../../geometry/core/HexGeometry';
-import type { SegmentPickerOverlayProps } from './SegmentPickerOverlay';
-
-
 
 
 
@@ -223,7 +219,7 @@ const DrawingLayer = ({
       offsetX = width / 2 - center.x * scaledSize;
       offsetY = height / 2 - center.y * scaledSize;
     } else {
-      scaledSize = (geometry as unknown as HexGeometry).hexSize * zoom;
+      scaledSize = (geometry.cellSize ?? 1) * zoom;
       offsetX = width / 2 - center.x * zoom;
       offsetY = height / 2 - center.y * zoom;
     }
@@ -451,7 +447,7 @@ const DrawingLayer = ({
       <SegmentPickerOverlay
         isOpen={segmentPickerOpen}
         cellCoords={segmentPickerCell}
-        existingCell={segmentPickerExistingCell as unknown as SegmentPickerOverlayProps['existingCell']}
+        existingCell={segmentPickerExistingCell}
         selectedColor={selectedColor ?? ''}
         selectedOpacity={selectedOpacity}
         onConfirm={applySegmentSelection}

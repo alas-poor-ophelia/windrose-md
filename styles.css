@@ -6293,3 +6293,226 @@ button.dmt-breadcrumb-link {
   display: none;
   width: 0;
 }
+/* ============================================
+   FLOATING TOOLBAR (Outline, Region, Drawing)
+   ============================================ */
+
+.dmt-floating-bar {
+  position: fixed;
+  bottom: 100px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  padding: 8px 14px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  white-space: nowrap;
+  pointer-events: auto;
+  z-index: 1000;
+}
+
+.dmt-floating-bar-btn {
+  padding: 4px 10px;
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: 4px;
+  border: 1px solid var(--background-modifier-border);
+  cursor: pointer;
+  font-size: 12px;
+  min-height: 30px;
+}
+
+.dmt-floating-bar-btn.is-active {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+.dmt-floating-bar-btn.is-danger {
+  color: var(--text-error);
+}
+
+.dmt-floating-bar-btn.is-accent {
+  color: var(--text-accent);
+}
+
+.dmt-floating-bar-label {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.dmt-floating-bar-label-faint {
+  color: var(--text-faint);
+  font-size: 11px;
+}
+
+.dmt-floating-bar-separator {
+  color: var(--text-faint);
+  font-size: 11px;
+  margin: 0 2px;
+}
+
+.dmt-floating-bar-name {
+  color: var(--text-normal);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.dmt-color-swatch-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  border: 2px solid var(--background-modifier-border);
+  cursor: pointer;
+  flex-shrink: 0;
+  padding: 0;
+  background: none;
+}
+
+.dmt-floating-bar-input {
+  background: var(--background-primary);
+  color: var(--text-normal);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  padding: 4px 6px;
+  font-size: 12px;
+  min-height: 30px;
+}
+
+/* ============================================
+   SEGMENT PICKER OVERLAY
+   ============================================ */
+
+.dmt-segment-picker-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.6);
+  z-index: 1999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dmt-segment-picker-card {
+  background-color: var(--dmt-bg-primary);
+  border-radius: 12px;
+  padding: 16px;
+  border: 2px solid var(--dmt-border-primary);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  min-width: 260px;
+}
+
+.dmt-segment-picker-title {
+  color: var(--dmt-border-primary);
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.dmt-segment-picker-subtitle {
+  color: var(--dmt-text-muted);
+  font-size: 11px;
+  text-align: center;
+  margin-bottom: 12px;
+}
+
+.dmt-segment-picker-svg-wrap {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.dmt-segment-picker-svg {
+  background-color: var(--dmt-bg-secondary);
+  border-radius: 8px;
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.dmt-segment-picker-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  justify-content: center;
+}
+
+.dmt-segment-picker-btn {
+  padding: 6px 12px;
+  background-color: var(--dmt-bg-tertiary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  color: var(--dmt-text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.dmt-segment-picker-status {
+  color: var(--dmt-text-muted);
+  font-size: 12px;
+  text-align: center;
+  margin-bottom: 12px;
+}
+
+.dmt-segment-picker-remember {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+  margin-bottom: 16px;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.dmt-segment-picker-remember input {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--dmt-border-primary);
+}
+
+.dmt-segment-picker-footer {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.dmt-segment-picker-btn-lg {
+  padding: 10px 24px;
+  background-color: var(--dmt-bg-tertiary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  color: var(--dmt-text-secondary);
+  font-size: 14px;
+  cursor: pointer;
+  min-width: 80px;
+}
+
+.dmt-segment-picker-btn-lg.is-primary {
+  background-color: var(--dmt-border-primary);
+  border: none;
+  color: var(--dmt-bg-primary);
+  font-weight: 600;
+}
+
+.dmt-segment-picker-hint {
+  color: var(--text-faint);
+  font-size: 11px;
+  text-align: center;
+  margin-top: 12px;
+}
