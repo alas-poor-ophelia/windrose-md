@@ -103,7 +103,7 @@ const useAreaSelect = (currentTool: ToolId): UseAreaSelectResult => {
       const items = getItemsInWorldRect(mapData, corner1, corner2, geometry, ctx);
 
       if (items.length > 0) {
-        selectMultiple(items as unknown as import('#types/contexts/context.types').SelectedItem[]);
+        selectMultiple(items);
       } else {
         clearSelection();
       }

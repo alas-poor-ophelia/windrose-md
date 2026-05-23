@@ -9,7 +9,7 @@ import type { MapObject, ObjectUpdate } from '../objects/object.types';
 import type { TextLabel, NotePin } from '../objects/note.types';
 import type { IGeometry, Point } from '../core/geometry.types';
 import type { Curve } from '../core/curve.types';
-import type { MapData, StoredViewState, TextLabelSettings } from '../core/map.types';
+import type { MapData, MapType, ShapeOverlay, StoredViewState, TextLabelSettings } from '../core/map.types';
 import type { GroupDragInitialState } from '../hooks/groupDrag.types';
 import type { Cell } from '../core/cell.types';
 import type { BorderSide, Edge } from '../core/rendering.types';
@@ -120,7 +120,7 @@ export interface MapOperationsContextValue {
 
   // Object operations
   getObjectAtPosition: (objects: MapObject[], x: number, y: number) => MapObject | null;
-  addObject: (objects: MapObject[], typeId: string, x: number, y: number) => MapObject[];
+  addObject: (objects: MapObject[], typeId: string, x: number, y: number, mapType?: MapType, objectSetId?: string | null) => MapObject[];
   updateObject: (objects: MapObject[] | null | undefined, objectId: string, updates: ObjectUpdate) => MapObject[];
   removeObject: (objects: MapObject[] | null | undefined, objectId: string) => MapObject[];
   removeObjectAtPosition: (objects: MapObject[] | null | undefined, x: number, y: number) => MapObject[];
@@ -156,12 +156,12 @@ export interface MapOperationsContextValue {
 /** Selected item types */
 export type SelectableItemType = 'object' | 'text' | 'notePin' | 'shapeOverlay';
 
-/** A selected item */
-export interface SelectedItem {
-  type: SelectableItemType;
-  id: string;
-  data?: MapObject | TextLabel | NotePin;
-}
+/** A selected item — discriminated union enables type-safe data narrowing */
+export type SelectedItem =
+  | { type: 'object'; id: string; data?: MapObject }
+  | { type: 'text'; id: string; data?: TextLabel }
+  | { type: 'notePin'; id: string; data?: NotePin }
+  | { type: 'shapeOverlay'; id: string; data?: ShapeOverlay };
 
 /** World position for area select start */
 export interface AreaSelectPosition {

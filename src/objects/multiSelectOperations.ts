@@ -8,11 +8,12 @@
  */
 
 // Type-only imports
-import type { Point } from '#types/core/geometry.types';
+import type { IGeometry } from '#types/core/geometry.types';
 import type { MapData } from '#types/core/map.types';
 import type { MapObject, ObjectSize } from '#types/objects/object.types';
-import type { TextLabel } from '../text/textLabelOperations';
-import type { IGeometry } from '#types/core/geometry.types';
+import type { TextLabel } from '#types/objects/note.types';
+import type { SelectedItem } from '#types/contexts/context.types';
+import type { PositionUpdate } from '#types/hooks/groupDrag.types';
 import type { HexOrientation } from '#types/settings/settings.types';
 
 import { getActiveLayer } from '../persistence/layerAccessor';
@@ -37,22 +38,6 @@ export interface WorldBounds {
 export interface WorldPoint {
   worldX: number;
   worldY: number;
-}
-
-/** Item types in selection */
-export type SelectableItemType = 'object' | 'text';
-
-/** Selected item reference */
-export interface SelectedItem {
-  type: SelectableItemType;
-  id: string;
-  data: MapObject | TextLabel;
-}
-
-/** Position update for group move */
-export interface PositionUpdate {
-  id: string;
-  position: Point;
 }
 
 /** Geometry with bounds check */
@@ -225,18 +210,18 @@ function getItemsInWorldRect(
   // Check objects
   const objects = activeLayer.objects ?? [];
   for (const obj of objects) {
-    const objBounds = getObjectWorldBounds(obj as unknown as MapObject, geometry, mapData);
+    const objBounds = getObjectWorldBounds(obj, geometry, mapData);
     if (rectsOverlap(minX, minY, maxX, maxY, objBounds)) {
-      items.push({ type: 'object', id: obj.id, data: obj as unknown as MapObject });
+      items.push({ type: 'object', id: obj.id, data: obj });
     }
   }
 
   // Check text labels
   const textLabels = activeLayer.textLabels ?? [];
   for (const label of textLabels) {
-    const labelBounds = getTextLabelWorldBounds(label as unknown as TextLabel, ctx);
+    const labelBounds = getTextLabelWorldBounds(label, ctx);
     if (rectsOverlap(minX, minY, maxX, maxY, labelBounds)) {
-      items.push({ type: 'text', id: label.id, data: label as unknown as TextLabel });
+      items.push({ type: 'text', id: label.id, data: label });
     }
   }
   
@@ -263,10 +248,10 @@ function getSelectionBounds(
   for (const item of selectedItems) {
     let bounds: WorldBounds | undefined;
     
-    if (item.type === 'object') {
-      bounds = getObjectWorldBounds(item.data as MapObject, geometry, mapData);
-    } else if (item.type === 'text') {
-      bounds = getTextLabelWorldBounds(item.data as TextLabel, ctx);
+    if (item.type === 'object' && item.data) {
+      bounds = getObjectWorldBounds(item.data, geometry, mapData);
+    } else if (item.type === 'text' && item.data) {
+      bounds = getTextLabelWorldBounds(item.data, ctx);
     }
     
     if (bounds) {

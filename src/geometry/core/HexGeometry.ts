@@ -63,6 +63,7 @@ interface VisibleHexRange {
 class HexGeometry extends BaseGeometry {
   readonly type = 'hex' as const;
   hexSize: number;
+  cellSize: number;
   orientation: 'flat' | 'pointy';
   bounds: HexBounds | null;
   sqrt3: number;
@@ -79,6 +80,7 @@ class HexGeometry extends BaseGeometry {
   constructor(hexSize: number, orientation: 'flat' | 'pointy' = 'flat', bounds: HexBounds | null = null) {
     super();
     this.hexSize = hexSize;
+    this.cellSize = hexSize;
     this.orientation = orientation;
     this.bounds = bounds;
     

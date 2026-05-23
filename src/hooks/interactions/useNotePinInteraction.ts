@@ -48,7 +48,7 @@ const useNotePinInteraction = (
   } = useMapSelection();
 
   // Track if we just saved (to prevent race condition with cancel)
-  const justSavedRef = useRef<boolean>(false) as JustSavedRef;
+  const justSavedRef: JustSavedRef = useRef<boolean>(false);
 
   /**
    * Handle Note Pin placement - places pin and opens modal
@@ -69,7 +69,7 @@ const useNotePinInteraction = (
     }
 
     // Place the Note Pin object (without linkedNote initially)
-    const newObjects = (addObject as unknown as (objects: MapObject[], typeId: string, x: number, y: number, mapType: string, objectSetId?: string | null) => MapObject[])(getActiveLayer(mapData).objects, 'note_pin', gridX, gridY, mapData.mapType ?? 'grid', mapData.objectSetId);
+    const newObjects = addObject(getActiveLayer(mapData).objects, 'note_pin', gridX, gridY, mapData.mapType ?? 'grid', mapData.objectSetId);
 
     // Find the newly created pin
     const newPin = newObjects[newObjects.length - 1];

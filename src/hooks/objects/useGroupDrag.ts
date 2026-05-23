@@ -389,7 +389,7 @@ const useGroupDrag = (): UseGroupDragResult => {
       ...objectUpdates.map(u => ({ id: u.id, position: u.newPosition })),
       ...textUpdates.map(u => ({ id: u.id, position: u.newPosition }))
     ];
-    updateSelectedItemsData(allUpdates as unknown as import('#types/contexts/context.types').ItemUpdate[]);
+    updateSelectedItemsData(allUpdates);
 
     return true;
   }, [isDraggingSelection, dragStart, mapData, geometry, selectedItems, getClientCoords,

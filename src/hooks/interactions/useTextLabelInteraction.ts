@@ -128,7 +128,7 @@ const useTextLabelInteraction = (
    * Handle text label dragging
    */
   const handleTextDragging = useCallback((e: PointerEvent | MouseEvent | TouchEvent): boolean => {
-    if (!isDraggingSelection || selectedItem?.type !== 'text' || !dragStart || !mapData) {
+    if (!isDraggingSelection || selectedItem?.type !== 'text' || !selectedItem.data || !dragStart || !mapData) {
       return false;
     }
 
@@ -143,7 +143,7 @@ const useTextLabelInteraction = (
     const deltaWorldX = worldCoords.worldX - (dragStart.worldX ?? 0);
     const deltaWorldY = worldCoords.worldY - (dragStart.worldY ?? 0);
 
-    const selectedData = selectedItem.data as unknown as TextLabel;
+    const selectedData = selectedItem.data;
 
     // Update text label position (suppress history during drag)
     const updatedLabels = updateTextLabel(
@@ -178,11 +178,11 @@ const useTextLabelInteraction = (
    * Handle text label rotation (45° increments)
    */
   const handleTextRotation = useCallback((): void => {
-    if (!selectedItem || selectedItem.type !== 'text' || !mapData) {
+    if (!selectedItem || selectedItem.type !== 'text' || !selectedItem.data || !mapData) {
       return;
     }
 
-    const selectedData = selectedItem.data as unknown as TextLabel;
+    const selectedData = selectedItem.data;
     const currentRotation = selectedData.rotation ?? 0;
     const nextRotation = getNextRotation(currentRotation);
 
