@@ -111,7 +111,7 @@ function WindroseHoverPreview({ mapId, x, y, zoom: zoomProp, layerId, notePath }
 
         renderCanvas(canvas, null, focused, geometry, [], {
           theme,
-          layerVisibility: { grid: true, objects: true, textLabels: true, hexCoordinates: false }
+          layerVisibility: { grid: true, objects: true, textLabels: true, hexCoordinates: false, regions: false, outlines: false }
         });
 
         // Corner brackets framing the target (viewState.center). Spread wide

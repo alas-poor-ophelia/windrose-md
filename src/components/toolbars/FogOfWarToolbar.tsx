@@ -5,7 +5,8 @@
  * Appears when FoW tools are toggled from the visibility menu.
  */
 
-import type { FogTool, FogOfWarState } from './VisibilityToolbar.tsx';
+import type { FogOfWarState } from './VisibilityToolbar.tsx';
+import type { FogToolId } from '#types/hooks/fog.types';
 import type { VNode } from 'preact';
 
 import { useCallback } from 'preact/hooks';
@@ -17,7 +18,7 @@ import { Icon } from '../shared/Icon';
 interface FogOfWarToolbarProps {
   isOpen: boolean;
   fogOfWarState: FogOfWarState;
-  onFogToolSelect: (tool: FogTool) => void;
+  onFogToolSelect: (tool: FogToolId) => void;
   onFogVisibilityToggle: () => void;
   onFogFillAll: () => void;
   onFogClearAll: () => void;

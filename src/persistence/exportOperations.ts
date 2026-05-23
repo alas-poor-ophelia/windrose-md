@@ -191,7 +191,7 @@ async function renderMapToCanvas(
     exportMapData,
     geometry as unknown as IGeometry,
     [],
-    { isResizeMode: false, theme, showCoordinates: false, layerVisibility: { objects: true, textLabels: true, hexCoordinates: false } }
+    { isResizeMode: false, theme, showCoordinates: false, layerVisibility: { grid: true, objects: true, textLabels: true, hexCoordinates: false, regions: true, outlines: true } }
   );
   
   // Copy to target context

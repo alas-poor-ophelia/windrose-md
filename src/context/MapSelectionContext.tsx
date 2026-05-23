@@ -215,6 +215,8 @@ const MapSelectionProvider: FunctionComponent<MapSelectionProviderProps> = ({ ch
     objects: true,
     textLabels: true,
     hexCoordinates: true,
+    regions: true,
+    outlines: true,
     ...layerVisibility
   };
 

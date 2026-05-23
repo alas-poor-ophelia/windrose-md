@@ -7,6 +7,7 @@
  */
 
 import type { TilesetDef, TileEntry, TilesetOverrides } from '#types/tiles/tile.types';
+import type { ToolId } from '#types/tools/tool.types';
 import type { VNode } from 'preact';
 import { TFile } from 'obsidian';
 
@@ -149,7 +150,7 @@ interface TileAssetBrowserProps {
   selectedTileId: string | null;
   onTileSelect: (tilesetId: string, tileId: string) => void;
   onTileDeselect: () => void;
-  onToolChange: (tool: string) => void;
+  onToolChange: (tool: ToolId) => void;
   isCollapsed: boolean;
   onCollapseChange: (collapsed: boolean) => void;
   rotation: number;

@@ -11,7 +11,7 @@
 
 import type { FogTool } from '../toolbars/VisibilityToolbar.tsx';
 import type { VNode } from 'preact';
-import type { FogOfWar } from '#types/core/map.types';
+import type { FogOfWar, MapData } from '#types/core/map.types';
 
 import { useEffect, useRef } from 'preact/hooks';
 import { useFogTools } from '../../hooks/interactions/useFogTools';
@@ -40,7 +40,7 @@ export interface FogOfWarLayerProps {
   /** Callback when fog data changes */
   onFogChange: (updatedFogOfWar: FogOfWar) => void;
   /** Callback to initialize fog if needed */
-  onInitializeFog?: () => void;
+  onInitializeFog?: (updatedMapData: MapData) => void;
 }
 
 const FogOfWarLayer = ({

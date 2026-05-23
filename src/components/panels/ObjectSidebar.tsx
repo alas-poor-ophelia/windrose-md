@@ -8,6 +8,7 @@
 import type { VNode } from 'preact';
 import type { MapType } from '#types/core/map.types';
 import type { ObjectSet } from '#types/settings/settings.types';
+import type { ToolId } from '#types/tools/tool.types';
 
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { useApp } from '../../context/AppContext';
@@ -17,7 +18,7 @@ import { Icon } from '../shared/Icon';
 interface ObjectSidebarProps {
   selectedObjectType: string | null;
   onObjectTypeSelect: (id: string | null) => void;
-  onToolChange?: (tool: string) => void;
+  onToolChange?: (tool: ToolId) => void;
   isCollapsed: boolean;
   onCollapseChange: (collapsed: boolean) => void;
   mapType?: MapType;

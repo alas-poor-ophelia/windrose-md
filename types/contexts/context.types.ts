@@ -199,10 +199,12 @@ export interface GroupDragOffset {
 
 /** Layer visibility settings */
 export interface LayerVisibility {
+  grid: boolean;
   objects: boolean;
   textLabels: boolean;
   hexCoordinates: boolean;
-  [key: string]: boolean;
+  regions: boolean;
+  outlines: boolean;
 }
 
 /** Mouse position */

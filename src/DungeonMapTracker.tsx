@@ -13,8 +13,6 @@ import type { ToolId } from '#types/tools/tool.types';
 import type { FoggedCell } from '#types/core/map.types';
 import type { Cell } from '#types/core/cell.types';
 import type { TilesetOverrides } from '#types/tiles/tile.types';
-import type { FogTool } from './components/toolbars/VisibilityToolbar';
-import type { LayerVisibility } from '#types/contexts/context.types';
 import type { CustomColor } from '#types/core/common.types';
 
 import { useCallback, useEffect, useMemo, useState } from 'preact/hooks';
@@ -198,12 +196,11 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   );
   const setShowAdjacentSubMaps = useCallback((v: boolean) => {
     try {
-      const plugin = app.plugins.plugins['dungeon-map-tracker-settings'];
+      const plugin = app.plugins.plugins['dungeon-map-tracker-settings'] as unknown as
+        { settings: { showAdjacentSubMaps?: boolean }; saveSettings(): Promise<void> } | undefined;
       if (plugin != null) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (plugin as any).settings.showAdjacentSubMaps = v;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (plugin as any).saveSettings();
+        plugin.settings.showAdjacentSubMaps = v;
+        plugin.saveSettings();
         window.dispatchEvent(new Event('dmt-settings-changed'));
       }
     } catch { /* settings plugin unavailable */ }
@@ -380,8 +377,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     handleRegionsChange,
     handleOutlinesChange,
     handleShapeOverlaysChange
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  } = useDataHandlers({ mapData, updateMapData: updateMapData as any, addToHistory: addToHistory as any, isApplyingHistory });
+  } = useDataHandlers({ mapData, updateMapData, addToHistory, isApplyingHistory });
 
   // Custom event listeners (sub-hex, deep links, regions, object links, hex context menu)
   useCustomEventHandlers({
@@ -651,7 +647,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     return () => {
       if (window.__windrose?.mcpInstances != null) delete window.__windrose.mcpInstances[notePath];
     };
-  }, []);
+  }, [notePath]);
 
   // Loading state
   if (isLoading) {
@@ -755,7 +751,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
         <FogOfWarToolbar
           isOpen={showFogTools && showVisibilityToolbar}
           fogOfWarState={currentFogState}
-          onFogToolSelect={handleFogToolSelect as unknown as (tool: FogTool) => void}
+          onFogToolSelect={handleFogToolSelect}
           onFogVisibilityToggle={handleFogVisibilityToggle}
           onFogFillAll={handleFogFillAll}
           onFogClearAll={handleFogClearAll}
@@ -770,7 +766,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
           <ObjectSidebar
             selectedObjectType={selectedObjectType}
             onObjectTypeSelect={setSelectedObjectType}
-            onToolChange={(tool) => setCurrentTool(tool as ToolId)}
+            onToolChange={setCurrentTool}
             isCollapsed={mapData.sidebarCollapsed ?? false}
             onCollapseChange={handleSidebarCollapseChange}
             mapType={mapData.mapType ?? 'grid'}
@@ -835,7 +831,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               isFocused={isFocused}
               isAnimating={isAnimating}
               theme={theme}
-              layerVisibility={layerVisibility as unknown as LayerVisibility}
+              layerVisibility={layerVisibility}
               adjacentSubHexes={showAdjacentSubMaps && isInSubHex ? adjacentSubHexes : null}
             >
               {/* DrawingLayer - handles all drawing tools */}
@@ -887,7 +883,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 <MapCanvas.FogOfWarLayer
                   activeTool={fogActiveTool}
                   onFogChange={handleFogChange}
-                  onInitializeFog={((updatedMapData: MapData) => updateMapData(updatedMapData)) as unknown as () => void}
+                  onInitializeFog={(updatedMapData) => updateMapData(updatedMapData)}
                 />
               )}
 
@@ -980,7 +976,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               selectedTileId={selectedTileId}
               onTileSelect={handleTileSelect}
               onTileDeselect={handleTileDeselect}
-              onToolChange={setCurrentTool as unknown as (tool: string) => void}
+              onToolChange={setCurrentTool}
               isCollapsed={tileBrowserCollapsed}
               onCollapseChange={setTileBrowserCollapsed}
               rotation={tileRotation}

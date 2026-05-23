@@ -226,7 +226,7 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   const itemsArray: RendererSelectedItem[] = Array.isArray(selectedItems) ? selectedItems : (selectedItems != null ? [selectedItems] : []);
 
   // Default layer visibility
-  const visibility: LayerVisibility = layerVisibility ?? { grid: true, objects: true, textLabels: true, hexCoordinates: true };
+  const visibility: LayerVisibility = layerVisibility ?? { grid: true, objects: true, textLabels: true, hexCoordinates: true, regions: true, outlines: true };
 
   // Get theme with current settings (use provided theme or fetch global)
   const THEME = theme || getTheme();

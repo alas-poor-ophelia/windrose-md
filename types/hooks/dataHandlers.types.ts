@@ -13,6 +13,8 @@ import type { TextLabel } from '../objects/note.types';
 import type { HexColor } from '../core/common.types';
 import type { Edge } from '../core/rendering.types';
 import type { HexTileAssignment } from '../tiles/tile.types';
+import type { MapDataUpdater } from '../hooks/mapData.types';
+import type { LayerHistorySnapshot } from '../hooks/layerHistory.types';
 
 // ===========================================
 // Hook Options
@@ -21,8 +23,8 @@ import type { HexTileAssignment } from '../tiles/tile.types';
 /** Options for useDataHandlers hook */
 export interface UseDataHandlersOptions {
   mapData: MapData | null;
-  updateMapData: (updater: (current: MapData | null) => MapData | null) => void;
-  addToHistory: (state: MapHistorySnapshot) => void;
+  updateMapData: MapDataUpdater;
+  addToHistory: (state: LayerHistorySnapshot) => void;
   isApplyingHistory: () => boolean;
 }
 
@@ -30,20 +32,8 @@ export interface UseDataHandlersOptions {
 // History State
 // ===========================================
 
-/** State snapshot for map data history tracking */
-export interface MapHistorySnapshot {
-  cells: Cell[];
-  curves: Curve[];
-  name: string;
-  objects: MapObject[];
-  textLabels: TextLabel[];
-  edges: Edge[];
-  tiles?: HexTileAssignment[];
-  regions?: Region[];
-  outlines?: import('../core/map.types').Outline[];
-  shapeOverlays?: import('../core/map.types').ShapeOverlay[];
-  fogOfWar?: import('../core/map.types').FogOfWar | null;
-}
+/** @deprecated Use LayerHistorySnapshot from layerHistory.types instead */
+export type MapHistorySnapshot = LayerHistorySnapshot;
 
 // ===========================================
 // Handler Types
