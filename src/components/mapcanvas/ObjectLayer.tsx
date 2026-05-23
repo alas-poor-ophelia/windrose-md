@@ -399,7 +399,8 @@ const ObjectLayer = ({
     clientX: number,
     clientY: number,
     gridX: number,
-    gridY: number
+    gridY: number,
+    isTouchActive?: boolean
   ): boolean => {
     if (isLinkingMode && linkingFrom && mapData) {
       // In linking mode - try to find target object
@@ -464,7 +465,7 @@ const ObjectLayer = ({
     }
 
     // Not in linking mode or no target found - use normal selection
-    return handleObjectSelection(clientX, clientY, gridX, gridY);
+    return handleObjectSelection(clientX, clientY, gridX, gridY, isTouchActive);
   }, [isLinkingMode, linkingFrom, mapData, handleObjectSelection, applyLinkUpdate, cancelLinking, setSelectedItem]);
 
   const objectHandlersRef = useRef<Record<string, unknown> | null>(null);

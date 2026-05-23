@@ -100,8 +100,10 @@ const useObjectModifications = (): {
         { color: color }
       );
       onObjectsChange(updatedObjects);
+      const updatedObj = updatedObjects.find((o: MapObject) => o.id === selectedItem.id);
+      if (updatedObj) setSelectedItem({ ...selectedItem, data: updatedObj });
     }
-  }, [selectedItem, mapData, updateObject, onObjectsChange]
+  }, [selectedItem, mapData, updateObject, onObjectsChange, setSelectedItem]
   );
 
   const handleObjectColorReset = useCallback((setShowObjectColorPicker: (show: boolean) => void): void => {

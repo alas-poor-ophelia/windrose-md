@@ -46,6 +46,7 @@ const useEventCoordinator = ({
   const [recentMultiTouch, setRecentMultiTouch] = useState<boolean>(false);
   const [, setPendingToolAction] = useState<PendingToolAction | null>(null);
   const pendingToolTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const touchActiveRef = useRef(false);
 
   const panStartPositionRef = useRef<PanStartPosition | null>(null);
   const panMoveThreshold = 5;
@@ -192,8 +193,10 @@ const useEventCoordinator = ({
           }
         }
 
+        const touchEnded = isTouchEvent && !touchActiveRef.current;
+
         if (layerVisibility.objects && objectHandlers?.handleObjectSelection) {
-          const objectHandled = objectHandlers.handleObjectSelection(clientX, clientY, gridX, gridY);
+          const objectHandled = objectHandlers.handleObjectSelection(clientX, clientY, gridX, gridY, touchEnded ? false : undefined);
           if (objectHandled) return;
         }
 
@@ -206,6 +209,11 @@ const useEventCoordinator = ({
         if (shapeHandlers?.handleShapeSelection != null) {
           const shapeHandled = (shapeHandlers.handleShapeSelection as (cx: number, cy: number) => boolean)(clientX, clientY);
           if (shapeHandled) return;
+        }
+
+        if (touchEnded && selectedItem) {
+          setSelectedItem(null);
+          return;
         }
 
         panStartPositionRef.current = { x: clientX, y: clientY };
@@ -349,6 +357,7 @@ const useEventCoordinator = ({
     };
 
     if (isTouchEvent) {
+      touchActiveRef.current = true;
       setPendingToolAction({ execute: executeToolAction });
       pendingToolTimeoutRef.current = setTimeout(() => {
         executeToolAction();
@@ -591,6 +600,11 @@ const useEventCoordinator = ({
     const fogHandlers = getHandlers('fogOfWar');
 
     if (!panZoomHandlers) return;
+
+    const touchEvent = e as TouchEvent;
+    if (touchEvent.changedTouches != null) {
+      touchActiveRef.current = false;
+    }
 
     if (isAlignmentMode) {
       return;

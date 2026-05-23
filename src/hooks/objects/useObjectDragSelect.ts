@@ -50,7 +50,7 @@ function useObjectDragSelect(
   beginResize: (corner: ResizeCorner, objects: MapObject[], dragStart: ObjectDragStart) => void,
   getClickedCorner: (clientX: number, clientY: number, object: MapObject) => ResizeCorner
 ): {
-  handleObjectSelection: (clientX: number, clientY: number, gridX: number, gridY: number) => boolean;
+  handleObjectSelection: (clientX: number, clientY: number, gridX: number, gridY: number, isTouchActive?: boolean) => boolean;
   handleObjectDragging: (e: PointerEvent | MouseEvent | TouchEvent) => boolean;
   stopObjectDragging: () => boolean;
 } {
@@ -65,7 +65,8 @@ function useObjectDragSelect(
     clientX: number,
     clientY: number,
     gridX: number,
-    gridY: number
+    gridY: number,
+    isTouchActive?: boolean
   ): boolean => {
     if (currentTool !== 'select') {
       return false;
@@ -129,7 +130,7 @@ function useObjectDragSelect(
           clearTimeout(longPressTimerRef.current);
         }
 
-        if (mapData.mapType !== 'hex') {
+        if (mapData.mapType !== 'hex' && isTouchActive !== false) {
           longPressTimerRef.current = setTimeout(() => {
             setEdgeSnapMode(!edgeSnapMode);
 
@@ -171,7 +172,7 @@ function useObjectDragSelect(
           clearTimeout(longPressTimerRef.current);
         }
 
-        if (mapData.mapType !== 'hex') {
+        if (mapData.mapType !== 'hex' && isTouchActive !== false) {
           longPressTimerRef.current = setTimeout(() => {
             setEdgeSnapMode(true);
 

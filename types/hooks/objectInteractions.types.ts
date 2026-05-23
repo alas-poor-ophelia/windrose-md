@@ -104,7 +104,8 @@ export type HandleObjectSelection = (
   clientX: number,
   clientY: number,
   gridX: number,
-  gridY: number
+  gridY: number,
+  isTouchActive?: boolean
 ) => boolean;
 
 /** Object dragging handler */

@@ -108,7 +108,7 @@ export interface RegisteredDrawingHandlers {
 
 /** Object layer handlers */
 export interface ObjectHandlers {
-  handleObjectSelection?: (clientX: number, clientY: number, gridX: number, gridY: number) => boolean;
+  handleObjectSelection?: (clientX: number, clientY: number, gridX: number, gridY: number, isTouchActive?: boolean) => boolean;
   handleObjectPlacement?: (gridX: number, gridY: number, clientX: number, clientY: number) => void;
   handleObjectDragging?: (e: Event) => void;
   stopObjectDragging?: () => void;
