@@ -98,8 +98,7 @@ function usePaintTool({
     const q = coords.x;
     const r = coords.y;
 
-    if ((geometry as { isWithinBounds?: (q: number, r: number) => boolean }).isWithinBounds &&
-        !(geometry as { isWithinBounds: (q: number, r: number) => boolean }).isWithinBounds(q, r)) {
+    if (!geometry.isWithinBounds(q, r)) {
       return;
     }
 
@@ -185,12 +184,13 @@ function usePaintTool({
         if (activeLayer.curves.length > 0) {
           let newCurves: Curve[] | null = null;
           if (geometry.type === 'hex') {
-            const hexGeo = geometry as unknown as { getHexVertices(q: number, r: number): { worldX: number; worldY: number }[] };
-            const verts = hexGeo.getHexVertices(coordX, coordY);
-            const clipPoly = verts.map((v: { worldX: number; worldY: number }) => [v.worldX, v.worldY] as [number, number]);
-            newCurves = eraseWorldPolygonFromCurves(activeLayer.curves, clipPoly);
+            const verts = (geometry as ExtendedGeometry).getHexVertices?.(coordX, coordY);
+            if (verts) {
+              const clipPoly = verts.map(v => [v.worldX, v.worldY] as [number, number]);
+              newCurves = eraseWorldPolygonFromCurves(activeLayer.curves, clipPoly);
+            }
           } else {
-            const cellSize = (geometry as { cellSize: number }).cellSize;
+            const cellSize = geometry.cellSize;
             if (cellSize) {
               newCurves = eraseCellFromCurves(activeLayer.curves, coordX, coordY, cellSize);
             }

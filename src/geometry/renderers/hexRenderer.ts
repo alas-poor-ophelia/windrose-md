@@ -159,7 +159,7 @@ const hexRenderer = {
     _cells: RenderHexCell[],
     _geometry: IHexRenderer,
     _viewState: RenderViewState,
-    _buildCellLookup: BuildCellLookupFn<RenderHexCell>,
+    _buildCellLookup: BuildCellLookupFn,
     _calculateBorders: CalculateBordersFn,
     _theme: BorderTheme
   ): void {

@@ -17,9 +17,9 @@
  */
 
 // Type-only imports
-import type { Point } from '#types/core/geometry.types';
+import type { Point, IGeometry } from '#types/core/geometry.types';
 import type { SegmentGridCell, Cell, SegmentName } from '#types/core/cell.types';
-import type { RenderViewState, BorderTheme, IGridRenderer } from '#types/core/rendering.types';
+import type { RenderViewState, BorderTheme } from '#types/core/rendering.types';
 import type { VertexName } from '../../core/dmtConstants';
 
 import { SEGMENT_VERTICES, SEGMENT_TRIANGLES } from '../../core/dmtConstants';
@@ -121,7 +121,7 @@ function drawTriangle(
 function renderSegmentCell(
   ctx: CanvasRenderingContext2D,
   cell: SegmentGridCell,
-  geometry: IGridRenderer,
+  geometry: IGeometry,
   viewState: RenderViewState
 ): void {
   const cellSize = geometry.getScaledCellSize(viewState.zoom);
@@ -171,7 +171,7 @@ function renderSegmentCell(
 function renderSegmentCells(
   ctx: CanvasRenderingContext2D,
   cells: SegmentGridCell[],
-  geometry: IGridRenderer,
+  geometry: IGeometry,
   viewState: RenderViewState
 ): void {
   if (cells == null || cells.length === 0) return;
@@ -278,14 +278,14 @@ function renderSegmentBorders(
   ctx: CanvasRenderingContext2D,
   segmentCells: SegmentGridCell[],
   allCells: Cell[],
-  geometry: IGridRenderer,
+  geometry: IGeometry,
   viewState: RenderViewState,
   theme: BorderTheme
 ): void {
   if (segmentCells == null || segmentCells.length === 0) return;
   
   const cellSize = geometry.getScaledCellSize(viewState.zoom);
-  const cellMap = buildCellMap(allCells, geometry as unknown as import('#types/core/geometry.types').IGeometry);
+  const cellMap = buildCellMap(allCells, geometry);
   const borderWidth = theme.borderWidth || 2;
   
   ctx.fillStyle = theme.border;

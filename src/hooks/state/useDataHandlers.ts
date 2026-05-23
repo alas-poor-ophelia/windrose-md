@@ -10,7 +10,7 @@
  */
 
 // Type-only imports
-import type { MapData, MapLayer, StoredViewState, TextLabelSettings } from '#types/core/map.types';
+import type { MapLayer, StoredViewState, TextLabelSettings } from '#types/core/map.types';
 import type { CustomColor } from '#types/core/common.types';
 import type { Cell } from '#types/core/cell.types';
 import type { Curve } from '#types/core/curve.types';

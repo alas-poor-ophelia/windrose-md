@@ -5,7 +5,7 @@
  * Types shared across grid and hex renderers, and canvas rendering hooks.
  */
 
-import type { Point, ScreenCoords, GridStyle } from './geometry.types';
+import type { Point, IGeometry } from './geometry.types';
 
 // ===========================================
 // Viewport State
@@ -49,8 +49,8 @@ export interface RenderHexCell {
   opacity?: number;
 }
 
-/** Cell lookup map type (keyed by "x,y" or "q,r" string) */
-export type CellLookup<T = RenderCell> = Map<string, T>;
+/** Cell lookup set (keyed by "x,y" or "q,r" string) for O(1) membership checks */
+export type CellLookup = Set<string>;
 
 // ===========================================
 // Edge Rendering
@@ -100,7 +100,7 @@ export type BorderSide = 'top' | 'right' | 'bottom' | 'left';
 // ===========================================
 
 /** Function type for building cell lookup */
-export type BuildCellLookupFn<T = RenderCell> = (cells: T[]) => CellLookup<T>;
+export type BuildCellLookupFn = (cells: RenderCell[]) => CellLookup;
 
 /** Function type for calculating which borders a cell needs */
 export type CalculateBordersFn = (lookup: CellLookup, x: number, y: number) => BorderSide[];
@@ -110,22 +110,13 @@ export type CalculateBordersFn = (lookup: CellLookup, x: number, y: number) => B
 // ===========================================
 
 /**
- * GridGeometry interface - subset used by renderers.
- * Full interface is in GridGeometry.ts
+ * GridGeometry interface — extends IGeometry with grid-specific rendering.
+ * Narrows type discriminant to 'grid' and adds drawCells.
+ * GridGeometry class satisfies this interface.
  */
-export interface IGridRenderer {
+export interface IGridRenderer extends IGeometry {
+  type: 'grid';
   cellSize: number;
-  getScaledCellSize(zoom: number): number;
-  gridToScreen(x: number, y: number, offsetX: number, offsetY: number, zoom: number): ScreenCoords;
-  drawGrid(
-    ctx: CanvasRenderingContext2D,
-    offsetX: number,
-    offsetY: number,
-    width: number,
-    height: number,
-    zoom: number,
-    style: GridStyle
-  ): void;
   drawCells(
     ctx: CanvasRenderingContext2D,
     cells: Point[],
@@ -137,22 +128,13 @@ export interface IGridRenderer {
 }
 
 /**
- * HexGeometry interface - subset used by renderers.
- * Full interface is in HexGeometry.ts
+ * HexGeometry interface — extends IGeometry with hex-specific rendering.
+ * Narrows type discriminant to 'hex' and adds drawHex/drawHexOutline.
+ * HexGeometry class satisfies this interface.
  */
-export interface IHexRenderer {
+export interface IHexRenderer extends IGeometry {
+  type: 'hex';
   hexSize: number;
-  getScaledCellSize(zoom: number): number;
-  gridToScreen(q: number, r: number, offsetX: number, offsetY: number, zoom: number): ScreenCoords;
-  drawGrid(
-    ctx: CanvasRenderingContext2D,
-    offsetX: number,
-    offsetY: number,
-    width: number,
-    height: number,
-    zoom: number,
-    style: GridStyle
-  ): void;
   drawHex(
     ctx: CanvasRenderingContext2D,
     q: number,

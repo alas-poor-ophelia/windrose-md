@@ -5,7 +5,7 @@
  * Owns its own isDrawing state for segment drag strokes.
  */
 
-import type { Point, IGeometry } from '#types/core/geometry.types';
+import type { IGeometry } from '#types/core/geometry.types';
 import type { Cell } from '#types/core/cell.types';
 import type { MapData } from '#types/core/map.types';
 import type { ExtendedGeometry, MapStateContextValue } from '#types/contexts/context.types';
@@ -58,15 +58,14 @@ function useSegmentDragTool({
 
     const activeLayer = getActiveLayer(mapData);
 
-    const gridGeometry = geometry as { worldToGrid: (worldX: number, worldY: number) => Point; cellSize: number };
-    const gridCoords = gridGeometry.worldToGrid(worldX, worldY);
+    const gridCoords = geometry.worldToGrid(worldX, worldY);
     const cellX = gridCoords.x;
     const cellY = gridCoords.y;
 
-    const cellWorldX = cellX * gridGeometry.cellSize;
-    const cellWorldY = cellY * gridGeometry.cellSize;
-    const localX = (worldX - cellWorldX) / gridGeometry.cellSize;
-    const localY = (worldY - cellWorldY) / gridGeometry.cellSize;
+    const cellWorldX = cellX * geometry.cellSize;
+    const cellWorldY = cellY * geometry.cellSize;
+    const localX = (worldX - cellWorldX) / geometry.cellSize;
+    const localY = (worldY - cellWorldY) / geometry.cellSize;
 
     const segment = getSegmentAtPosition(localX, localY);
 

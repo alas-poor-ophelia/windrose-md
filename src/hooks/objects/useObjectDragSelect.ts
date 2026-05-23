@@ -55,6 +55,9 @@ function useObjectDragSelect(
   stopObjectDragging: () => boolean;
 } {
   const { mapData, geometry, screenToGrid, screenToWorld, getClientCoords } = useMapState();
+
+  const edgeSnapModeRef = useRef(edgeSnapMode);
+  edgeSnapModeRef.current = edgeSnapMode;
   const { getObjectAtPosition, updateObject, onObjectsChange } = useMapOperations();
   const { selectedItem, setSelectedItem, isDraggingSelection, setIsDraggingSelection, dragStart, setDragStart, isResizeMode, setIsResizeMode } = useMapSelection();
 
@@ -132,7 +135,7 @@ function useObjectDragSelect(
 
         if (mapData.mapType !== 'hex' && isTouchActive !== false) {
           longPressTimerRef.current = setTimeout(() => {
-            setEdgeSnapMode(!edgeSnapMode);
+            setEdgeSnapMode(!edgeSnapModeRef.current);
 
             navigator.vibrate?.(50);
 

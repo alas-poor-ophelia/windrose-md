@@ -349,8 +349,7 @@ function useShapeTools({
       const worldCoords = screenToWorld(clientX, clientY);
       if (!worldCoords) return false;
 
-      const gridGeometry = geometry as { cellSize: number };
-      const cellSize = gridGeometry.cellSize;
+      const cellSize = geometry.cellSize;
       const nearestX = Math.round(worldCoords.worldX / cellSize);
       const nearestY = Math.round(worldCoords.worldY / cellSize);
 

@@ -11,7 +11,7 @@
 
 // Type-only imports
 import type { SegmentGridCell, CellMap, SegmentName } from '#types/core/cell.types';
-import type { IGridRenderer } from '#types/core/rendering.types';
+import type { IGeometry } from '#types/core/geometry.types';
 
 import { SEGMENT_INTERNAL_ADJACENCY, SEGMENT_CROSS_CELL_ADJACENCY } from '../core/dmtConstants';
 import { getFilledSegments, neighborSegmentFilled } from '../geometry/core/cellAccessor';
@@ -88,7 +88,7 @@ function getInternalBorders(cell: SegmentGridCell): InternalBorder[] {
 function getExternalBorders(
   cell: SegmentGridCell,
   cellMap: CellMap,
-  geometry: IGridRenderer
+  geometry: IGeometry
 ): ExternalBorder[] {
   const borders: ExternalBorder[] = [];
   const filledSegments = getFilledSegments(cell);
@@ -103,7 +103,7 @@ function getExternalBorders(
       cellMap, 
       { x: neighborX, y: neighborY }, 
       adjacency.neighborSegment, 
-      geometry as unknown as import('#types/core/geometry.types').IGeometry
+      geometry
     );
     
     // Need border if neighbor segment is not filled
@@ -125,7 +125,7 @@ function getExternalBorders(
 function getSegmentBorders(
   cell: SegmentGridCell,
   cellMap: CellMap,
-  geometry: IGridRenderer
+  geometry: IGeometry
 ): SegmentBorders {
   return {
     internal: getInternalBorders(cell),

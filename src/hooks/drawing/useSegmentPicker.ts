@@ -6,6 +6,7 @@
 
 import type { IGeometry } from '#types/core/geometry.types';
 import type { Cell, SegmentName } from '#types/core/cell.types';
+import { isGridCell } from '#types/core/cell.types';
 import type { MapData } from '#types/core/map.types';
 import type { SegmentPickerCell } from '#types/hooks/drawingTools.types';
 
@@ -54,11 +55,9 @@ function useSegmentPicker({
 
     const activeLayer = getActiveLayer(mapData);
 
-    const existingCell = activeLayer.cells.find((c: Cell) => {
-      const cx = (c as { x?: number }).x;
-      const cy = (c as { y?: number }).y;
-      return cx === cellX && cy === cellY;
-    });
+    const existingCell = activeLayer.cells.find((c: Cell) =>
+      isGridCell(c) && c.x === cellX && c.y === cellY
+    );
 
     setSegmentPickerCell({ x: cellX, y: cellY });
     setSegmentPickerExistingCell(existingCell || null);
@@ -83,11 +82,9 @@ function useSegmentPicker({
 
     const activeLayer = getActiveLayer(mapData);
 
-    let newCells = activeLayer.cells.filter((c: Cell) => {
-      const cx = (c as { x?: number }).x;
-      const cy = (c as { y?: number }).y;
-      return !(cx === segmentPickerCell.x && cy === segmentPickerCell.y);
-    });
+    let newCells = activeLayer.cells.filter((c: Cell) =>
+      !(isGridCell(c) && c.x === segmentPickerCell.x && c.y === segmentPickerCell.y)
+    );
 
     if (selectedSegments.length > 0) {
       const coords = { x: segmentPickerCell.x, y: segmentPickerCell.y };

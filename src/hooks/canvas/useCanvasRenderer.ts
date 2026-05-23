@@ -9,8 +9,8 @@
 import type { MapLayer } from '#types/core/map.types';
 import type { IGeometry } from '#types/core/geometry.types';
 import type { ExtendedGeometry } from '#types/contexts/context.types';
-import type { Cell, CellMap, GridCell } from '#types/core/cell.types';
-import type { IGridRenderer } from '#types/core/rendering.types';
+import type { Cell, GridCell } from '#types/core/cell.types';
+import type { BuildCellLookupFn, CalculateBordersFn } from '#types/core/rendering.types';
 import type { MapObject } from '#types/objects/object.types';
 import type {
   RenderCanvas,
@@ -57,12 +57,13 @@ interface Renderer {
   // Polymorphic properties
   supportsSegments: boolean;
 
-  // Polymorphic methods for viewport calculation
-  getScaledSize: (geometry: IGeometry, zoom: number) => number;
-  calculateViewportOffset: (geometry: IGeometry, center: { x: number; y: number }, canvasSize: { width: number; height: number }, zoom: number) => { offsetX: number; offsetY: number };
+  // Method syntax enables bivariant checking — gridRenderer/hexRenderer methods
+  // accept narrower IGridRenderer/IHexRenderer params but are safely called with
+  // IGeometry since the runtime object always satisfies both.
+  getScaledSize(geometry: IGeometry, zoom: number): number;
+  calculateViewportOffset(geometry: IGeometry, center: { x: number; y: number }, canvasSize: { width: number; height: number }, zoom: number): { offsetX: number; offsetY: number };
 
-  // Background image rendering (both grid and hex)
-  renderBackgroundImage: (
+  renderBackgroundImage(
     ctx: CanvasRenderingContext2D,
     geometry: IGeometry,
     bgImage: HTMLImageElement | null,
@@ -79,14 +80,13 @@ interface Renderer {
       cellSize: number,
       context: { ctx: CanvasRenderingContext2D; offsetX: number; offsetY: number; zoom: number }
     ) => void
-  ) => void;
+  ): void;
 
-  // Grid/cell rendering
-  renderGrid: (ctx: CanvasRenderingContext2D, geometry: IGeometry, viewState: RendererViewState, dimensions: { width: number; height: number }, showGrid: boolean, options: { lineColor: string; lineWidth: number }) => void;
-  renderPaintedCells: (ctx: CanvasRenderingContext2D, cells: Cell[], geometry: IGeometry, viewState: RendererViewState) => void;
-  renderCellBorders: (ctx: CanvasRenderingContext2D, cells: Cell[], geometry: IGeometry, viewState: RendererViewState, getLookup: () => CellMap, calculateBorders: typeof calculateBordersOptimized, options: { border: string; borderWidth: number }) => void;
-  renderInteriorGridLines?: (ctx: CanvasRenderingContext2D, cells: Cell[], geometry: IGeometry, viewState: RendererViewState, options: { lineColor: string; lineWidth: number; interiorRatio: number }) => void;
-  renderEdges?: (ctx: CanvasRenderingContext2D, edges: unknown[], geometry: IGeometry, viewState: RendererViewState, options: { lineWidth: number; borderWidth: number }) => void;
+  renderGrid(ctx: CanvasRenderingContext2D, geometry: IGeometry, viewState: RendererViewState, dimensions: { width: number; height: number }, showGrid: boolean, options: { lineColor: string; lineWidth: number }): void;
+  renderPaintedCells(ctx: CanvasRenderingContext2D, cells: Cell[], geometry: IGeometry, viewState: RendererViewState): void;
+  renderCellBorders(ctx: CanvasRenderingContext2D, cells: Cell[], geometry: IGeometry, viewState: RendererViewState, buildLookup: BuildCellLookupFn, calculateBorders: CalculateBordersFn, options: { border: string; borderWidth: number }): void;
+  renderInteriorGridLines?(ctx: CanvasRenderingContext2D, cells: Cell[], geometry: IGeometry, viewState: RendererViewState, options: { lineColor: string; lineWidth: number; interiorRatio: number }): void;
+  renderEdges?(ctx: CanvasRenderingContext2D, edges: unknown[], geometry: IGeometry, viewState: RendererViewState, options: { lineWidth: number; borderWidth: number }): void;
 }
 
 
@@ -106,7 +106,8 @@ interface CurveCellMergeIndex {
  * Uses geometry.type discriminator instead of instanceof.
  */
 function getRenderer(geometry: IGeometry): Renderer {
-  return geometry.type === 'hex' ? hexRenderer as unknown as Renderer : gridRenderer as unknown as Renderer;
+  // Safe polymorphic cast: runtime geometry always satisfies the renderer's narrower param types
+  return geometry.type === 'hex' ? hexRenderer as Renderer : gridRenderer as Renderer;
 }
 
 /** Options for rendering layer content */
@@ -151,7 +152,7 @@ function renderLayerCellsAndEdges(
     }
 
     if (segmentCells.length > 0 && renderer.supportsSegments) {
-      segmentRenderer.renderSegmentCells(ctx, segmentCells, geometry as unknown as IGridRenderer, viewState);
+      segmentRenderer.renderSegmentCells(ctx, segmentCells, geometry, viewState);
     }
 
     if (showInteriorGrid && renderer.renderInteriorGridLines && cellsWithColor.length > 0) {
@@ -180,8 +181,8 @@ function renderLayerCellsAndEdges(
         simpleCells,
         geometry,
         viewState,
-        () => allCellsLookup as unknown as CellMap,
-        bordersCalculator as unknown as typeof calculateBordersOptimized,
+        () => allCellsLookup,
+        bordersCalculator,
         {
           border: theme.cells.border,
           borderWidth: theme.cells.borderWidth
@@ -194,7 +195,7 @@ function renderLayerCellsAndEdges(
         ctx,
         segmentCells,
         cellsWithColor,
-        geometry as unknown as IGridRenderer,
+        geometry,
         viewState,
         {
           border: theme.cells.border,
