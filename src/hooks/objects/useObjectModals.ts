@@ -8,7 +8,6 @@
 import type { JSX } from 'preact';
 import type { MapObject } from '#types/objects/object.types';
 
-import { useState } from 'preact/hooks';
 import { useApp } from '../../context/AppContext';
 import { useMapState } from '../../context/MapContext';
 import { useMapSelection } from '../../context/MapSelectionContext';
@@ -31,14 +30,8 @@ interface UseObjectModalsArgs {
 }
 
 const useObjectModals = ({ onObjectsChange, handleNoteSubmit }: UseObjectModalsArgs): {
-  showNoteModal: boolean;
-  editingObjectId: string | null;
   handleNoteButtonClick: (e: JSX.TargetedMouseEvent<HTMLElement>) => void;
-  handleNoteModalSubmit: (content: string) => void;
-  handleNoteCancel: () => void;
   handleEditNoteLink: (objectId: string) => void;
-  handleNoteLinkSave: (notePath: string) => void;
-  handleNoteLinkCancel: () => void;
 } => {
   const app = useApp();
   const { mapData } = useMapState();
@@ -46,12 +39,7 @@ const useObjectModals = ({ onObjectsChange, handleNoteSubmit }: UseObjectModalsA
     selectedItem, setSelectedItem,
     isDraggingSelection, setIsDraggingSelection,
     setDragStart,
-    editingNoteObjectId, setEditingNoteObjectId,
-    setShowNoteLinkModal
   } = useMapSelection();
-
-  const [showNoteModal, setShowNoteModal] = useState(false);
-  const [editingObjectId, setEditingObjectId] = useState<string | null>(null);
 
   const handleNoteButtonClick = (e: JSX.TargetedMouseEvent<HTMLElement>): void => {
     if (selectedItem?.type === 'object') {
@@ -69,7 +57,7 @@ const useObjectModals = ({ onObjectsChange, handleNoteSubmit }: UseObjectModalsA
       const objTitle = obj?.label != null && obj.label !== '' ? obj.label : 'Object';
       const objTooltip = obj?.customTooltip ?? '';
 
-      const opened = openNativeTextInputModal({
+      openNativeTextInputModal({
         app,
         onSubmit: (content: string) => {
           handleNoteSubmit(content, objectId);
@@ -78,23 +66,7 @@ const useObjectModals = ({ onObjectsChange, handleNoteSubmit }: UseObjectModalsA
         placeholder: 'Add a custom note...',
         initialValue: objTooltip
       });
-
-      if (!opened) {
-        setEditingObjectId(objectId);
-        setShowNoteModal(true);
-      }
     }
-  };
-
-  const handleNoteModalSubmit = (content: string): void => {
-    handleNoteSubmit(content, editingObjectId);
-    setShowNoteModal(false);
-    setEditingObjectId(null);
-  };
-
-  const handleNoteCancel = (): void => {
-    setShowNoteModal(false);
-    setEditingObjectId(null);
   };
 
   const handleNoteLinkSaveForObject = (notePath: string, objectId: string): void => {
@@ -125,40 +97,17 @@ const useObjectModals = ({ onObjectsChange, handleNoteSubmit }: UseObjectModalsA
 
     if (!mapData) return;
     const obj = getActiveLayer(mapData).objects?.find((o: MapObject) => o.id === objectId);
-    const opened = openNativeNoteLinkModal(app, {
+    openNativeNoteLinkModal(app, {
       onSave: (notePath: string | null) => { if (notePath != null) handleNoteLinkSaveForObject(notePath, objectId); },
-      onClose: () => { setEditingNoteObjectId(null); },
+      onClose: () => {},
       currentNotePath: obj?.linkedNote ?? null,
       objectType: obj?.type ?? null
     });
-
-    if (!opened) {
-      setEditingNoteObjectId(objectId);
-      setShowNoteLinkModal(true);
-    }
-  };
-
-  const handleNoteLinkSave = (notePath: string): void => {
-    if (editingNoteObjectId == null) return;
-    handleNoteLinkSaveForObject(notePath, editingNoteObjectId);
-    setShowNoteLinkModal(false);
-    setEditingNoteObjectId(null);
-  };
-
-  const handleNoteLinkCancel = (): void => {
-    setShowNoteLinkModal(false);
-    setEditingNoteObjectId(null);
   };
 
   return {
-    showNoteModal,
-    editingObjectId,
     handleNoteButtonClick,
-    handleNoteModalSubmit,
-    handleNoteCancel,
     handleEditNoteLink,
-    handleNoteLinkSave,
-    handleNoteLinkCancel
   };
 };
 

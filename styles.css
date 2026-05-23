@@ -1924,6 +1924,7 @@ button.dmt-tile-browser-layer-btn.dmt-tile-browser-layer-active,
 }
 
 .dmt-sel-action {
+  position: relative;
   flex: 1;
   min-width: 0;
 }

@@ -19,6 +19,7 @@ import { useEffect, useState } from 'preact/hooks';
 import { useToolbarPosition } from '../../hooks/interactions/useToolbarPosition';
 import { openNoteInNewTab } from '../../persistence/noteOperations';
 import { ColorPicker } from '../shared/ColorPicker';
+import { CornerBrackets } from '../shared/CornerBrackets';
 import { getActiveLayer } from '../../persistence/layerAccessor';
 import { getSelectionBounds } from '../../objects/selectionBounds';
 import { Menu } from 'obsidian';
@@ -37,40 +38,6 @@ import { Z_INDEX } from '../../core/dmtConstants';
 
 
 
-
-type BracketPosition = 'tl' | 'tr' | 'bl' | 'br';
-
-const CornerBracket = ({ position }: { position: BracketPosition }): VNode => {
-  return (
-    <svg
-      className={`dmt-selection-card-bracket dmt-selection-card-bracket-${position}`}
-      viewBox="-5 -5 25 25"
-    >
-      <defs>
-        <filter id={`sel-bracket-glow-${position}`}>
-          <feGaussianBlur stdDeviation="1.5" result="coloredBlur"/>
-          <feMerge>
-            <feMergeNode in="coloredBlur"/>
-            <feMergeNode in="SourceGraphic"/>
-          </feMerge>
-        </filter>
-      </defs>
-      <path
-        d="M 0 15 L 0 0 L 15 0"
-        stroke="#c4a57b"
-        strokeWidth="1.5"
-        fill="none"
-        filter={`url(#sel-bracket-glow-${position})`}
-      />
-      <path
-        d="M -2.5 18 L -2.5 -2.5 L 18 -2.5"
-        stroke="rgba(255, 255, 255, 0.4)"
-        strokeWidth="0.8"
-        fill="none"
-      />
-    </svg>
-  );
-};
 
 interface SelectionActionsOverlayProps {
   selectedItems: SelectedItem[];
@@ -282,7 +249,7 @@ const SelectionActionsOverlay = ({
   const renderActionButton = (action: SelectionAction, fullWidth = false): VNode => {
     if (action.special === 'color') {
       return (
-        <div key={action.id} className={`dmt-sel-action ${fullWidth ? 'dmt-sel-action-full' : ''}`} style={{ position: 'relative' }}>
+        <div key={action.id} className={`dmt-sel-action ${fullWidth ? 'dmt-sel-action-full' : ''}`}>
           <button
             ref={colorButtonRef}
             className="dmt-sel-action-btn dmt-sel-color-btn"
@@ -377,10 +344,7 @@ const SelectionActionsOverlay = ({
           zIndex: Z_INDEX.TOOLBAR
         }}
       >
-        <CornerBracket position="tl" />
-        <CornerBracket position="tr" />
-        <CornerBracket position="bl" />
-        <CornerBracket position="br" />
+        <CornerBrackets classPrefix="dmt-selection-card-bracket" variant="minimal" filterId="sel-bracket" />
         <SelectionCardFiligree />
 
         <div className="dmt-selection-card-content">

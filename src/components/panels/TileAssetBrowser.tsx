@@ -103,36 +103,43 @@ function drawTileToCanvas(
   }
 }
 
+function loadVaultImage(
+  vaultPath: string,
+  getCachedImage: ((path: string) => HTMLImageElement | null) | undefined,
+  onDraw: (img: HTMLImageElement) => void,
+): (() => void) | undefined {
+  const cached = getCachedImage?.(vaultPath);
+  if (cached?.complete === true) {
+    onDraw(cached);
+    return undefined;
+  }
+  let blobUrl: string | null = null;
+  const file = app.vault.getAbstractFileByPath(vaultPath);
+  if (file instanceof TFile) {
+    void app.vault.readBinary(file).then((binary: ArrayBuffer) => {
+      const blob = new Blob([binary]);
+      blobUrl = URL.createObjectURL(blob);
+      const img = new Image();
+      img.onload = () => {
+        if (blobUrl != null) URL.revokeObjectURL(blobUrl);
+        blobUrl = null;
+        onDraw(img);
+      };
+      img.src = blobUrl;
+    });
+  }
+  return () => {
+    if (blobUrl != null) URL.revokeObjectURL(blobUrl);
+  };
+}
+
 const TileThumbnail = ({ tile, getCachedImage }: TileThumbnailProps): VNode => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
-    let blobUrl: string | null = null;
-    const draw = (img: HTMLImageElement): void => {
+    return loadVaultImage(tile.vaultPath, getCachedImage, (img) => {
       if (canvasRef.current) drawTileToCanvas(canvasRef.current, img, THUMB_SIZE);
-    };
-    const img = getCachedImage?.(tile.vaultPath);
-    if (img?.complete === true) {
-      draw(img);
-      return undefined;
-    }
-    const file = app.vault.getAbstractFileByPath(tile.vaultPath);
-    if (file instanceof TFile) {
-      void app.vault.readBinary(file).then((binary: ArrayBuffer) => {
-        const blob = new Blob([binary]);
-        blobUrl = URL.createObjectURL(blob);
-        const fallbackImg = new Image();
-        fallbackImg.onload = () => {
-          if (blobUrl != null) URL.revokeObjectURL(blobUrl);
-          blobUrl = null;
-          draw(fallbackImg);
-        };
-        fallbackImg.src = blobUrl;
-      });
-    }
-    return () => {
-      if (blobUrl != null) URL.revokeObjectURL(blobUrl);
-    };
+    });
   }, [tile.vaultPath]);
 
   return (
@@ -196,7 +203,7 @@ const TileAssetBrowser = ({
   getCachedImage,
   tilesetOverrides,
   onTilesetOverrideChange,
-}: TileAssetBrowserProps): VNode => {
+}: TileAssetBrowserProps): VNode | null => {
   const app = useApp();
   const [activeTilesetIndex, setActiveTilesetIndex] = useState<number>(0);
   const [searchFilter, setSearchFilter] = useState<string>('');
@@ -294,29 +301,9 @@ const TileAssetBrowser = ({
     }
 
     // Draw preview
-    let previewBlobUrl: string | null = null;
-    const img = getCachedImage?.(hoveredTile.vaultPath);
-    if (img?.complete === true) {
+    return loadVaultImage(hoveredTile.vaultPath, getCachedImage, (img) => {
       drawTileToCanvas(canvas, img, PREVIEW_SIZE);
-      return undefined;
-    }
-    const file = app.vault.getAbstractFileByPath(hoveredTile.vaultPath);
-    if (file instanceof TFile) {
-      void app.vault.readBinary(file).then((binary: ArrayBuffer) => {
-        const blob = new Blob([binary]);
-        previewBlobUrl = URL.createObjectURL(blob);
-        const fallbackImg = new Image();
-        fallbackImg.onload = () => {
-          if (previewBlobUrl != null) URL.revokeObjectURL(previewBlobUrl);
-          previewBlobUrl = null;
-          drawTileToCanvas(canvas, fallbackImg, PREVIEW_SIZE);
-        };
-        fallbackImg.src = previewBlobUrl;
-      });
-    }
-    return () => {
-      if (previewBlobUrl != null) URL.revokeObjectURL(previewBlobUrl);
-    };
+    });
   }, [hoveredTile, isCollapsed, rotation, flipH, selectedTilesetId, selectedTileId]);
 
   // Cleanup portal on unmount
@@ -366,7 +353,7 @@ const TileAssetBrowser = ({
     return groups;
   }, [filteredTiles]);
 
-  if (tilesets.length === 0) return null as unknown as VNode;
+  if (tilesets.length === 0) return null;
 
   if (isCollapsed) {
     return (

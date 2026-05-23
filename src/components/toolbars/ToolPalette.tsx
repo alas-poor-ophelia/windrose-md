@@ -14,6 +14,7 @@ import type { ColorOpacityOverrides } from '../shared/ColorPicker.tsx';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { DEFAULT_COLOR } from '../../drawing/colorOperations';
 import { ColorPicker } from '../shared/ColorPicker';
+import { CornerBrackets } from '../shared/CornerBrackets';
 import { getSettings } from '../../core/settingsAccessor';
 import { Icon } from '../shared/Icon';
 
@@ -38,7 +39,7 @@ interface SubToolDef {
 
 /** Tool group with sub-tools */
 interface ToolGroup {
-  id: string;
+  id: keyof SubToolSelections;
   shortcut?: string;
   actionId?: string;
   subTools: SubToolDef[];
@@ -57,9 +58,6 @@ interface SimpleTool {
   hexOnly?: boolean;
 }
 
-/** Bracket position */
-type BracketPosition = 'tl' | 'tr' | 'bl' | 'br';
-
 /** Sub-tool selections state */
 interface SubToolSelections {
   select: ToolId;
@@ -67,11 +65,6 @@ interface SubToolSelections {
   fill: ToolId;
   erase: ToolId;
   region: ToolId;
-}
-
-/** Props for ToolPaletteBracket */
-interface ToolPaletteBracketProps {
-  position: BracketPosition;
 }
 
 /** Props for SubMenuFlyout */
@@ -117,48 +110,6 @@ export interface ToolPaletteProps {
   mapType: MapType;
   isFocused?: boolean;
 }
-
-const ToolPaletteBracket = ({ position }: ToolPaletteBracketProps): VNode => {
-  return (
-    <svg
-      className={`dmt-tool-palette-bracket dmt-tool-palette-bracket-${position}`}
-      viewBox="-5 -5 25 25"
-    >
-      <defs>
-        <filter id={`palette-bracket-glow-${position}`}>
-          <feGaussianBlur stdDeviation="1.5" result="coloredBlur"/>
-          <feMerge>
-            <feMergeNode in="coloredBlur"/>
-            <feMergeNode in="SourceGraphic"/>
-          </feMerge>
-        </filter>
-      </defs>
-      <path
-        d="M 0 15 L 0 0 L 15 0"
-        stroke="#c4a57b"
-        strokeWidth="1.5"
-        fill="none"
-        filter={`url(#palette-bracket-glow-${position})`}
-      />
-      <path
-        d="M -2.5 18 L -2.5 -2.5 L 18 -2.5"
-        stroke="rgba(255, 255, 255, 0.4)"
-        strokeWidth="0.8"
-        fill="none"
-      />
-      <line
-        x1="-4" y1="7" x2="0" y2="7"
-        stroke="#c4a57b"
-        strokeWidth="1.5"
-      />
-      <line
-        x1="7" y1="-4" x2="7" y2="0"
-        stroke="#c4a57b"
-        strokeWidth="1.5"
-      />
-    </svg>
-  );
-};
 
 const SubMenuFlyout = ({ subTools, currentSubTool, onSelect, onClose }: SubMenuFlyoutProps): VNode => {
   return (
@@ -254,7 +205,7 @@ const ToolButtonWithSubMenu = ({
   };
 
   return (
-    <div className="dmt-tool-btn-container" style={{ position: 'relative', display: 'inline-block' }}>
+    <div className="dmt-tool-btn-container">
       <button
         className={`dmt-tool-btn interactive-child ${isActive ? 'dmt-tool-btn-active' : ''}`}
         onPointerDown={handlePointerDown}
@@ -291,8 +242,8 @@ const toolGroups: ToolGroup[] = [
     shortcut: 's',
     actionId: 'selectTool',
     subTools: [
-      { id: 'select' as ToolId, label: 'Click Select', title: 'Select/Move', icon: 'lucide-hand' },
-      { id: 'areaSelect' as ToolId, label: 'Area Select', title: 'Area Select (click two corners)', icon: 'lucide-box-select' }
+      { id: 'select', label: 'Click Select', title: 'Select/Move', icon: 'lucide-hand' },
+      { id: 'areaSelect', label: 'Area Select', title: 'Area Select (click two corners)', icon: 'lucide-box-select' }
     ]
   },
   {
@@ -300,19 +251,19 @@ const toolGroups: ToolGroup[] = [
     shortcut: 'd',
     actionId: 'drawTool',
     subTools: [
-      { id: 'draw' as ToolId, label: 'Paint Cells', title: 'Draw (fill cells)', icon: 'lucide-paintbrush' },
-      { id: 'segmentDraw' as ToolId, label: 'Paint Segments', title: 'Paint Segments (partial cells)', icon: 'lucide-triangle', gridOnly: true },
-      { id: 'edgeDraw' as ToolId, label: 'Paint Edges', title: 'Paint Edges (grid lines)', icon: 'lucide-pencil-ruler', gridOnly: true },
-      { id: 'freehand' as ToolId, label: 'Freehand Draw', title: 'Freehand Draw', icon: 'lucide-pen-tool', shortcut: 'f', actionId: 'freehandTool' }
+      { id: 'draw', label: 'Paint Cells', title: 'Draw (fill cells)', icon: 'lucide-paintbrush' },
+      { id: 'segmentDraw', label: 'Paint Segments', title: 'Paint Segments (partial cells)', icon: 'lucide-triangle', gridOnly: true },
+      { id: 'edgeDraw', label: 'Paint Edges', title: 'Paint Edges (grid lines)', icon: 'lucide-pencil-ruler', gridOnly: true },
+      { id: 'freehand', label: 'Freehand Draw', title: 'Freehand Draw', icon: 'lucide-pen-tool', shortcut: 'f', actionId: 'freehandTool' }
     ]
   },
   {
     id: 'fill',
     gridOnly: true,
     subTools: [
-      { id: 'rectangle' as ToolId, label: 'Fill Rectangle', title: 'Rectangle (click two corners)', icon: 'lucide-square', gridOnly: true },
-      { id: 'circle' as ToolId, label: 'Fill Circle', title: 'Circle (click edge, then center)', icon: 'lucide-circle', gridOnly: true },
-      { id: 'diagonalFill' as ToolId, label: 'Diagonal Fill', title: 'Fill diagonal gaps (click two corners)', icon: 'lucide-slash', gridOnly: true }
+      { id: 'rectangle', label: 'Fill Rectangle', title: 'Rectangle (click two corners)', icon: 'lucide-square', gridOnly: true },
+      { id: 'circle', label: 'Fill Circle', title: 'Circle (click edge, then center)', icon: 'lucide-circle', gridOnly: true },
+      { id: 'diagonalFill', label: 'Diagonal Fill', title: 'Fill diagonal gaps (click two corners)', icon: 'lucide-slash', gridOnly: true }
     ]
   },
   {
@@ -320,36 +271,36 @@ const toolGroups: ToolGroup[] = [
     shortcut: 'e',
     actionId: 'eraseTool',
     subTools: [
-      { id: 'erase' as ToolId, label: 'Erase', title: 'Erase (remove text/objects/cells/edges)', icon: 'lucide-eraser' },
-      { id: 'clearArea' as ToolId, label: 'Clear Area', title: 'Clear Area (click two corners to erase)', icon: 'lucide-square-x', gridOnly: true }
+      { id: 'erase', label: 'Erase', title: 'Erase (remove text/objects/cells/edges)', icon: 'lucide-eraser' },
+      { id: 'clearArea', label: 'Clear Area', title: 'Clear Area (click two corners to erase)', icon: 'lucide-square-x', gridOnly: true }
     ]
   },
   {
     id: 'region',
     hexOnly: true,
     subTools: [
-      { id: 'regionPaint' as ToolId, label: 'Paint Region', title: 'Paint hexes into a region', icon: 'lucide-map' },
-      { id: 'regionBoundary' as ToolId, label: 'Draw Boundary', title: 'Draw region boundary polygon', icon: 'lucide-pentagon' }
+      { id: 'regionPaint', label: 'Paint Region', title: 'Paint hexes into a region', icon: 'lucide-map' },
+      { id: 'regionBoundary', label: 'Draw Boundary', title: 'Draw region boundary polygon', icon: 'lucide-pentagon' }
     ]
   },
 ];
 
 const simpleTools: SimpleTool[] = [
-  { id: 'edgeLine' as ToolId, title: 'Paint Line (click two points)', icon: 'lucide-git-commit-horizontal', gridOnly: true },
-  { id: 'addObject' as ToolId, title: 'Add Object (select from sidebar)', icon: 'lucide-map-pin-plus' },
-  { id: 'addNote' as ToolId, title: 'Place Note Pin', icon: 'lucide-pin', shortcut: 'n', actionId: 'notePinTool' },
-  { id: 'addText' as ToolId, title: 'Add Text Label', icon: 'lucide-type' },
-  { id: 'outline' as ToolId, title: 'Draw Outline', icon: 'lucide-spline', hexOnly: true },
-  { id: 'shape' as ToolId, title: 'Place Shape Overlay', icon: 'lucide-shapes' },
-  { id: 'measure' as ToolId, title: 'Measure Distance', icon: 'lucide-ruler', shortcut: 'm', actionId: 'measureTool' },
-  { id: 'tilePaint' as ToolId, title: 'Place Tile (select from tile browser)', icon: 'lucide-image-plus', hexOnly: true }
+  { id: 'edgeLine', title: 'Paint Line (click two points)', icon: 'lucide-git-commit-horizontal', gridOnly: true },
+  { id: 'addObject', title: 'Add Object (select from sidebar)', icon: 'lucide-map-pin-plus' },
+  { id: 'addNote', title: 'Place Note Pin', icon: 'lucide-pin', shortcut: 'n', actionId: 'notePinTool' },
+  { id: 'addText', title: 'Add Text Label', icon: 'lucide-type' },
+  { id: 'outline', title: 'Draw Outline', icon: 'lucide-spline', hexOnly: true },
+  { id: 'shape', title: 'Place Shape Overlay', icon: 'lucide-shapes' },
+  { id: 'measure', title: 'Measure Distance', icon: 'lucide-ruler', shortcut: 'm', actionId: 'measureTool' },
+  { id: 'tilePaint', title: 'Place Tile (select from tile browser)', icon: 'lucide-image-plus', hexOnly: true }
 ];
 
 // Derive DEFAULT shortcut map from tool config: key -> { group } or { tool }
 const DEFAULT_SHORTCUT_MAP: Record<string, { group?: keyof SubToolSelections; tool?: ToolId }> = {};
 for (const group of toolGroups) {
   if (group.shortcut != null && group.shortcut !== '') {
-    DEFAULT_SHORTCUT_MAP[group.shortcut] = { group: group.id as keyof SubToolSelections };
+    DEFAULT_SHORTCUT_MAP[group.shortcut] = { group: group.id };
   }
   for (const sub of group.subTools) {
     if (sub.shortcut != null && sub.shortcut !== '') {
@@ -376,9 +327,13 @@ function titleWithShortcut(title: string, actionId?: string, defaultKey?: string
 }
 
 // Derive initial sub-tool selections from first sub-tool in each group
-const INITIAL_SUB_TOOL_SELECTIONS: SubToolSelections = Object.fromEntries(
-  toolGroups.map(g => [g.id, g.subTools[0].id])
-) as unknown as SubToolSelections;
+const INITIAL_SUB_TOOL_SELECTIONS: SubToolSelections = {
+  select: 'select',
+  draw: 'draw',
+  fill: 'rectangle',
+  erase: 'erase',
+  region: 'regionPaint',
+};
 
 // ============================================================================
 // MAIN COMPONENT
@@ -424,7 +379,7 @@ const ToolPalette = ({
       if (shortcuts != null) {
         for (const group of toolGroups) {
           if (group.actionId != null && group.actionId !== '' && shortcuts[group.actionId]?.toLowerCase() === key) {
-            onToolChange(subToolSelections[group.id as keyof SubToolSelections] ?? group.id as ToolId);
+            onToolChange(subToolSelections[group.id]);
             e.preventDefault();
             return;
           }
@@ -448,7 +403,7 @@ const ToolPalette = ({
       const shortcut = DEFAULT_SHORTCUT_MAP[key];
       if (shortcut == null) return;
       const toolId = shortcut.group != null
-        ? (subToolSelections[shortcut.group] ?? shortcut.group as ToolId)
+        ? subToolSelections[shortcut.group]
         : shortcut.tool ?? currentTool;
       onToolChange(toolId);
       e.preventDefault();
@@ -456,7 +411,7 @@ const ToolPalette = ({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onToolChange, isFocused, subToolSelections]);
+  }, [onToolChange, isFocused, subToolSelections, currentTool]);
 
   const visibleSimpleTools = simpleTools.filter(tool =>
     (mapType !== 'hex' || tool.gridOnly !== true) &&
@@ -483,10 +438,6 @@ const ToolPalette = ({
     onColorPickerOpenChange(!isColorPickerOpen);
   };
 
-  const handleColorSelect = (color: HexColor): void => {
-    onColorChange(color);
-  };
-
   const handleColorReset = (): void => {
     onColorChange(DEFAULT_COLOR);
     onColorPickerOpenChange(false);
@@ -509,12 +460,13 @@ const ToolPalette = ({
       }
     };
 
-    setTimeout(() => {
+    const timerId = setTimeout(() => {
       document.addEventListener('mousedown', handleClickOutside);
       document.addEventListener('touchstart', handleClickOutside, { passive: true });
     }, 10);
 
     return () => {
+      clearTimeout(timerId);
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('touchstart', handleClickOutside);
     };
@@ -539,12 +491,13 @@ const ToolPalette = ({
       }
     };
 
-    setTimeout(() => {
+    const timerId = setTimeout(() => {
       document.addEventListener('mousedown', handleClickOutside);
       document.addEventListener('touchstart', handleClickOutside, { passive: true });
     }, 10);
 
     return () => {
+      clearTimeout(timerId);
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('touchstart', handleClickOutside);
     };
@@ -552,17 +505,14 @@ const ToolPalette = ({
 
   return (
     <div className="dmt-tool-palette">
-      <ToolPaletteBracket position="tl" />
-      <ToolPaletteBracket position="tr" />
-      <ToolPaletteBracket position="bl" />
-      <ToolPaletteBracket position="br" />
+      <CornerBrackets classPrefix="dmt-tool-palette-bracket" variant="compact" filterId="palette-bracket" />
 
       {toolGroups.slice(0, 2).map(group => (
         <ToolButtonWithSubMenu
           key={group.id}
           toolGroup={group}
           currentTool={currentTool}
-          currentSubTool={subToolSelections[group.id as keyof SubToolSelections]}
+          currentSubTool={subToolSelections[group.id]}
           isSubMenuOpen={openSubMenu === group.id}
           onToolSelect={onToolChange}
           onSubToolSelect={handleSubToolSelect}
@@ -572,7 +522,7 @@ const ToolPalette = ({
         />
       ))}
 
-      <div style={{ position: 'relative', display: 'inline-block' }}>
+      <div className="dmt-tool-btn-container">
         <button
           ref={colorBtnRef}
           className={`dmt-tool-btn dmt-color-tool-btn interactive-child ${isColorPickerOpen ? 'dmt-tool-btn-active' : ''}`}
@@ -588,7 +538,7 @@ const ToolPalette = ({
         <ColorPicker
           isOpen={isColorPickerOpen}
           selectedColor={selectedColor}
-          onColorSelect={handleColorSelect}
+          onColorSelect={onColorChange}
           onClose={handleCloseColorPicker}
           onReset={handleColorReset}
           customColors={customColors}
@@ -612,7 +562,7 @@ const ToolPalette = ({
             key={group.id}
             toolGroup={group}
             currentTool={currentTool}
-            currentSubTool={subToolSelections[group.id as keyof SubToolSelections]}
+            currentSubTool={subToolSelections[group.id]}
             isSubMenuOpen={openSubMenu === group.id}
             onToolSelect={onToolChange}
             onSubToolSelect={handleSubToolSelect}

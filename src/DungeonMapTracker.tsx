@@ -55,6 +55,7 @@ import { RA_ICONS } from './assets/rpgAwesomeIcons';
 import { injectIconCSS } from './assets/rpgAwesomeLoader';
 import { useApp } from './context/AppContext';
 import { Icon } from './components/shared/Icon';
+import { CornerBrackets } from './components/shared/CornerBrackets';
 
 // Inject RPGAwesome icon CSS classes on module load
 injectIconCSS(RA_ICONS);
@@ -70,70 +71,9 @@ interface DungeonMapTrackerProps {
   notePath?: string;
 }
 
-type CornerPosition = 'tl' | 'tr' | 'bl' | 'br';
-
-interface CornerBracketProps {
-  position: CornerPosition;
-}
-
-
 // ============================================================================
 // MAIN COMPONENT
 // ============================================================================
-
-// Corner Bracket SVG Component
-const CornerBracket = ({ position }: CornerBracketProps): VNode => {
-  return (
-    <svg
-      className={`dmt-corner-bracket dmt-corner-bracket-${position}`}
-      viewBox="0 0 50 50"
-    >
-      <defs>
-        <filter id={`bracket-glow-${position}`}>
-          <feGaussianBlur stdDeviation="2" result="coloredBlur" />
-          <feMerge>
-            <feMergeNode in="coloredBlur" />
-            <feMergeNode in="SourceGraphic" />
-          </feMerge>
-        </filter>
-      </defs>
-      {/* Main L-bracket with ornamental details */}
-      <path
-        d="M 0 18 L 0 0 L 18 0"
-        stroke="#c4a57b"
-        strokeWidth="3"
-        fill="none"
-        filter={`url(#bracket-glow-${position})`}
-      />
-      {/* Inner detail line */}
-      <path
-        d="M 3 15 L 3 3 L 15 3"
-        stroke="rgba(255, 255, 255, 0.4)"
-        strokeWidth="1"
-        fill="none"
-      />
-      {/* Small notches for detail */}
-      <line
-        x1="0" y1="9" x2="5" y2="9"
-        stroke="#c4a57b"
-        strokeWidth="2"
-      />
-      <line
-        x1="9" y1="0" x2="9" y2="5"
-        stroke="#c4a57b"
-        strokeWidth="2"
-      />
-      {/* Corner ornament */}
-      <circle
-        cx="18" cy="18" r="3"
-        fill="none"
-        stroke="#c4a57b"
-        strokeWidth="1.5"
-        filter={`url(#bracket-glow-${position})`}
-      />
-    </svg>
-  );
-};
 
 const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'grid', notePath = '' }: DungeonMapTrackerProps): VNode => {
   const app = useApp();
@@ -548,11 +488,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
         ref={containerRef}
         className={`dmt-container interactive-child`}
       >
-        {/* Decorative corner brackets */}
-        <CornerBracket position="tl" />
-        <CornerBracket position="tr" />
-        <CornerBracket position="bl" />
-        <CornerBracket position="br" />
+        <CornerBrackets classPrefix="dmt-corner-bracket" variant="ornate" filterId="bracket" />
 
         <MapHeader
           mapData={mapData}

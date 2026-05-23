@@ -18,7 +18,7 @@ import { useEffect, useRef } from 'preact/hooks';
 import { useNotePinInteraction } from '../../hooks/interactions/useNotePinInteraction';
 import { useMapState } from '../../context/MapContext';
 import { useMapSelection } from '../../context/MapSelectionContext';
-import { NoteLinkModal, openNativeNoteLinkModal } from '../modals/NoteLinkModal';
+import { openNativeNoteLinkModal } from '../modals/NoteLinkModal';
 import { useEventHandlerRegistration } from '../../context/EventHandlerContext';
 import { useApp } from '../../context/AppContext';
 
@@ -59,7 +59,6 @@ const NotePinLayer = ({
   } = useNotePinInteraction(currentTool, selectedObjectType);
 
   const { registerHandlers, unregisterHandlers } = useEventHandlerRegistration();
-  const nativeOpenedRef = useRef(false);
 
   const notePinHandlersRef = useRef<Record<string, unknown> | null>(null);
   notePinHandlersRef.current = { handleNotePinPlacement };
@@ -74,24 +73,19 @@ const NotePinLayer = ({
     return () => unregisterHandlers('notePin');
   }, []);
 
-  // Try native modal when showNoteLinkModal becomes true
   useEffect(() => {
-    if (!showNoteLinkModal || pendingNotePinId == null || pendingNotePinId === '' || !mapData) {
-      nativeOpenedRef.current = false;
-      return;
-    }
+    if (!showNoteLinkModal || pendingNotePinId == null || pendingNotePinId === '' || !mapData) return;
 
     const currentNotePath = mapData.objects?.find(
       (obj: { id: string }) => obj.id === pendingNotePinId
     )?.linkedNote ?? null;
 
-    const opened = openNativeNoteLinkModal(app, {
+    openNativeNoteLinkModal(app, {
       onSave: handleNoteLinkSave,
       onClose: handleNoteLinkCancel,
       currentNotePath,
       objectType: 'note_pin'
     });
-    nativeOpenedRef.current = opened;
   }, [showNoteLinkModal, pendingNotePinId]);
 
   if (showCoordinates) {
@@ -100,17 +94,6 @@ const NotePinLayer = ({
 
   return (
     <>
-      {showNoteLinkModal && pendingNotePinId != null && pendingNotePinId !== '' && mapData != null && !nativeOpenedRef.current && (
-        <NoteLinkModal
-          isOpen={showNoteLinkModal}
-          onClose={handleNoteLinkCancel}
-          onSave={handleNoteLinkSave}
-          currentNotePath={
-            mapData.objects?.find((obj: { id: string }) => obj.id === pendingNotePinId)?.linkedNote ?? null
-          }
-          objectType="note_pin"
-        />
-      )}
     </>
   );
 };

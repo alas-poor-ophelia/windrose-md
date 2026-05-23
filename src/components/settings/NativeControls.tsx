@@ -17,7 +17,6 @@ import { h } from 'preact';
 
 
 import { useEffect, useRef } from 'preact/hooks';
-import type { VNode } from 'preact';
 import { Setting } from 'obsidian';
 import type { ToggleComponent, DropdownComponent, SliderComponent } from 'obsidian';
 interface NativeToggleProps {
@@ -26,7 +25,7 @@ interface NativeToggleProps {
   disabled?: boolean;
 }
 
-function NativeToggle({ value, onChange, disabled }: NativeToggleProps): VNode {
+function NativeToggle({ value, onChange, disabled }: NativeToggleProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const toggleRef = useRef<ToggleComponent | null>(null);
 
@@ -84,7 +83,7 @@ function NativeToggle({ value, onChange, disabled }: NativeToggleProps): VNode {
     }
   }, [disabled]);
 
-  return h('div', { ref: containerRef }) as VNode;
+  return h('div', { ref: containerRef });
 }
 
 // ─── NativeDropdown ─────────────────────────────────────────────
@@ -101,7 +100,7 @@ interface NativeDropdownProps {
   disabled?: boolean;
 }
 
-function NativeDropdown({ value, options, onChange, disabled }: NativeDropdownProps): VNode {
+function NativeDropdown({ value, options, onChange, disabled }: NativeDropdownProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<DropdownComponent | null>(null);
 
@@ -157,7 +156,7 @@ function NativeDropdown({ value, options, onChange, disabled }: NativeDropdownPr
     }
   }, [disabled]);
 
-  return h('div', { ref: containerRef }) as VNode;
+  return h('div', { ref: containerRef });
 }
 
 // ─── NativeSlider ───────────────────────────────────────────────
@@ -171,7 +170,7 @@ interface NativeSliderProps {
   disabled?: boolean;
 }
 
-function NativeSlider({ value, min, max, step, onChange, disabled }: NativeSliderProps): VNode {
+function NativeSlider({ value, min, max, step, onChange, disabled }: NativeSliderProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sliderRef = useRef<SliderComponent | null>(null);
 
@@ -225,7 +224,7 @@ function NativeSlider({ value, min, max, step, onChange, disabled }: NativeSlide
     }
   }, [disabled]);
 
-  return h('div', { ref: containerRef, style: { width: '120px' } }) as VNode;
+  return h('div', { ref: containerRef, style: { width: '120px' } });
 }
 
 export { NativeToggle, NativeDropdown, NativeSlider };

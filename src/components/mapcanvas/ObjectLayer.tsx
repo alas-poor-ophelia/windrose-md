@@ -24,8 +24,6 @@ import { useMapSelection } from '../../context/MapSelectionContext';
 import { useLinkingMode } from '../../context/ObjectLinkingContext';
 import { useEventHandlerRegistration } from '../../context/EventHandlerContext';
 import { useObjectInteractions } from '../../hooks/objects/useObjectInteractions';
-import { TextInputModal } from '../modals/TextInputModal';
-import { NoteLinkModal } from '../modals/NoteLinkModal';
 import type { MenuItem } from 'obsidian';
 import { Menu } from 'obsidian';
 import { useObjectModals } from '../../hooks/objects/useObjectModals';
@@ -105,8 +103,6 @@ const ObjectLayer = ({
     isResizeMode, setIsResizeMode,
     hoveredObject,
     mousePosition,
-    showNoteLinkModal,
-    editingNoteObjectId,
     showCoordinates,
     layerVisibility,
     updateSelectedItemsData
@@ -386,9 +382,8 @@ const ObjectLayer = ({
   } = useObjectInteractions(currentTool, selectedObjectType, onAddCustomColor, customColors as unknown as string[], freeformPlacementModeRef);
 
   const {
-    showNoteModal, editingObjectId,
-    handleNoteButtonClick, handleNoteModalSubmit, handleNoteCancel,
-    handleEditNoteLink, handleNoteLinkSave, handleNoteLinkCancel
+    handleNoteButtonClick,
+    handleEditNoteLink,
   } = useObjectModals({ onObjectsChange, handleNoteSubmit: (content: string, objectId: string | null) => { if (objectId != null && objectId !== '') handleNoteSubmit(content, objectId); } });
 
   const { registerHandlers, unregisterHandlers } = useEventHandlerRegistration();
@@ -882,29 +877,6 @@ const ObjectLayer = ({
         />
       )}
 
-      {showNoteModal && editingObjectId != null && editingObjectId !== '' && mapData && (
-        <TextInputModal
-          onSubmit={handleNoteModalSubmit}
-          onCancel={handleNoteCancel}
-          title={`Note for ${getActiveLayer(mapData).objects.find((obj: MapObject) => obj.id === editingObjectId)?.label ?? 'Object'}`}
-          placeholder="Add a custom note..."
-          initialValue={getActiveLayer(mapData).objects.find((obj: MapObject) => obj.id === editingObjectId)?.customTooltip ?? ''}
-        />
-      )}
-
-      {showNoteLinkModal && mapData && editingNoteObjectId != null && editingNoteObjectId !== '' && (
-        <NoteLinkModal
-          isOpen={showNoteLinkModal}
-          onClose={handleNoteLinkCancel}
-          onSave={(notePath: string | null) => { if (notePath != null && notePath !== '') handleNoteLinkSave(notePath); }}
-          currentNotePath={
-            getActiveLayer(mapData).objects?.find((obj: MapObject) => obj.id === editingNoteObjectId)?.linkedNote ?? null
-          }
-          objectType={
-            getActiveLayer(mapData).objects?.find((obj: MapObject) => obj.id === editingNoteObjectId)?.type ?? null
-          }
-        />
-      )}
 
       {hoveredObject && mousePosition && hoveredObject.type !== 'note_pin' && (
         <div

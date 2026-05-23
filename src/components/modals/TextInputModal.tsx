@@ -2,34 +2,12 @@
  * TextInputModal.tsx
  *
  * Modal dialog for text input (object notes/tooltips).
- * Uses native Obsidian Modal via the bridge when available,
- * falls back to Preact overlay otherwise.
+ * Uses native Obsidian Modal.
  */
 
-import type { JSX, VNode } from 'preact';
-
-import { useEffect, useRef, useState } from 'preact/hooks';
 import { Modal } from 'obsidian';
 import type { App } from 'obsidian';
 
-
-
-
-
-
-/** Props for TextInputModal Preact component (fallback) */
-export interface TextInputModalProps {
-  initialValue?: string;
-  onSubmit: (text: string) => void;
-  onCancel: () => void;
-  title?: string;
-  placeholder?: string;
-}
-
-/**
- * Opens a text input modal using native Obsidian Modal if bridge is available,
- * otherwise returns false so the caller can fall back to the Preact component.
- */
 function openNativeTextInputModal(options: {
   app: App;
   onSubmit: (text: string) => void;
@@ -117,95 +95,9 @@ function openNativeTextInputModal(options: {
     return true;
   } catch (e) {
     // eslint-disable-next-line no-console
-    console.warn('[Windrose] Failed to open native modal, falling back to Preact:', (e as Error).message);
+    console.warn('[Windrose] Failed to open native TextInputModal:', (e as Error).message);
     return false;
   }
 }
 
-/**
- * Preact fallback component for when the bridge is unavailable.
- */
-const TextInputModal = ({
-  initialValue = '',
-  onSubmit,
-  onCancel,
-  title = 'Add Text Label',
-  placeholder = 'Enter label text...'
-}: TextInputModalProps): VNode => {
-  const [text, setText] = useState(initialValue);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (inputRef.current) {
-      inputRef.current.focus();
-      if (initialValue) {
-        inputRef.current.select();
-      }
-    }
-  }, []);
-
-  const handleKeyDown = (e: JSX.TargetedKeyboardEvent<HTMLInputElement>): void => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      handleSubmit();
-    } else if (e.key === 'Escape') {
-      e.preventDefault();
-      onCancel();
-    }
-  };
-
-  const handleSubmit = (): void => {
-    const trimmed = text.trim();
-    if (trimmed.length > 0 && trimmed.length <= 200) {
-      onSubmit(trimmed);
-    }
-  };
-
-  const handleModalClick = (e: JSX.TargetedMouseEvent<HTMLDivElement>): void => {
-    e.stopPropagation();
-  };
-
-  return (
-    <div className="dmt-modal-overlay" onClick={onCancel}>
-      <div
-        className="dmt-modal-content"
-        onClick={handleModalClick}
-      >
-        <h3 className="dmt-modal-title">{title}</h3>
-
-        <input
-          ref={inputRef}
-          type="text"
-          className="dmt-modal-input"
-          value={text}
-          onChange={(e) => setText((e.target as HTMLInputElement).value)}
-          onKeyDown={handleKeyDown}
-          maxLength={200}
-          placeholder={placeholder}
-        />
-
-        <div className="dmt-modal-buttons">
-          <button
-            className="dmt-modal-btn dmt-modal-btn-cancel"
-            onClick={onCancel}
-          >
-            Cancel
-          </button>
-          <button
-            className="dmt-modal-btn dmt-modal-btn-submit"
-            onClick={handleSubmit}
-            disabled={text.trim().length === 0}
-          >
-            {initialValue ? 'Update' : 'Add Label'}
-          </button>
-        </div>
-
-        <div className="dmt-modal-hint">
-          Press Enter to confirm, Esc to cancel
-        </div>
-      </div>
-    </div>
-  );
-};
-
-export { TextInputModal, openNativeTextInputModal };
+export { openNativeTextInputModal };

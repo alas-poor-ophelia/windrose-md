@@ -20,7 +20,7 @@ import { useTextLabelInteraction } from '../../hooks/interactions/useTextLabelIn
 import { useMapState } from '../../context/MapContext';
 import { useMapSelection } from '../../context/MapSelectionContext';
 import { useApp } from '../../context/AppContext';
-import { TextLabelEditor, openNativeTextLabelEditor } from '../modals/TextLabelEditor';
+import { openNativeTextLabelEditor } from '../modals/TextLabelEditor';
 import { useEventHandlerRegistration } from '../../context/EventHandlerContext';
 import { SelectionActionsOverlay } from '../toolbars/SelectionActionsOverlay';
 import { buildTextActions } from '../../hooks/interactions/useSelectionActions';
@@ -81,14 +81,9 @@ const TextLayer = ({
   } = useTextLabelInteraction(currentTool, onAddCustomColor, customColors?.map(c => c.color) ?? []);
 
   const { registerHandlers, unregisterHandlers } = useEventHandlerRegistration();
-  const nativeOpenedRef = useRef(false);
 
-  // Try native TextLabelEditor when showTextModal becomes true
   useEffect(() => {
-    if (!showTextModal || !mapData) {
-      nativeOpenedRef.current = false;
-      return;
-    }
+    if (!showTextModal || !mapData) return;
 
     let currentLabel = null;
     if (editingTextId != null && editingTextId !== '') {
@@ -101,7 +96,7 @@ const TextLayer = ({
     const defaultColor = currentLabel?.color ?? savedSettings?.color ?? '#ffffff';
     const defaultOpacity = currentLabel?.opacity ?? savedSettings?.opacity ?? 1;
 
-    const opened = openNativeTextLabelEditor(app, {
+    openNativeTextLabelEditor(app, {
       initialValue: currentLabel?.content ?? '',
       initialFontSize: defaultFontSize,
       initialFontFace: defaultFontFace,
@@ -114,7 +109,6 @@ const TextLayer = ({
       onSubmit: handleTextSubmit,
       onCancel: handleTextCancel
     });
-    nativeOpenedRef.current = opened;
   }, [showTextModal, editingTextId]);
 
   const handleCopyLink = useCallback(() => {
@@ -176,34 +170,6 @@ const TextLayer = ({
         />
       )}
 
-      {showTextModal && !nativeOpenedRef.current && (() => {
-        let currentLabel: TextLabel | null = null;
-        if (editingTextId != null && editingTextId !== '' && mapData?.textLabels) {
-          currentLabel = getActiveLayer(mapData).textLabels.find((l: TextLabel) => l.id === editingTextId) ?? null;
-        }
-
-        const savedSettings = mapData?.lastTextLabelSettings as { fontSize?: number; fontFace?: string; color?: HexColor; opacity?: number } | undefined;
-        const defaultFontSize = currentLabel?.fontSize ?? savedSettings?.fontSize ?? 16;
-        const defaultFontFace = currentLabel?.fontFace ?? savedSettings?.fontFace ?? 'sans';
-        const defaultColor = currentLabel?.color ?? savedSettings?.color ?? '#ffffff';
-        const defaultOpacity = currentLabel?.opacity ?? savedSettings?.opacity ?? 1;
-
-        return (
-          <TextLabelEditor
-            initialValue={currentLabel?.content ?? ''}
-            initialFontSize={defaultFontSize}
-            initialFontFace={defaultFontFace}
-            initialColor={defaultColor}
-            initialOpacity={defaultOpacity}
-            isEditing={editingTextId != null && editingTextId !== ''}
-            customColors={customColors ?? []}
-            onAddCustomColor={onAddCustomColor}
-            onDeleteCustomColor={onDeleteCustomColor}
-            onSubmit={handleTextSubmit}
-            onCancel={handleTextCancel}
-          />
-        );
-      })()}
     </>
   );
 };
