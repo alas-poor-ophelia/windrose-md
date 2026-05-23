@@ -3,6 +3,7 @@
  */
 
 import type { Cell } from '#types/core/cell.types';
+import { isGridCell } from '#types/core/cell.types';
 
 /** Border side identifier */
 type BorderSide = 'top' | 'right' | 'bottom' | 'left';
@@ -29,7 +30,7 @@ const ADJACENT_DIRECTIONS: AdjacentDirection[] = [
  * Check if a cell exists at given coordinates
  */
 function cellExists(cells: Cell[], x: number, y: number): boolean {
-  return cells.some(cell => (cell as unknown as { x: number; y: number }).x === x && (cell as unknown as { x: number; y: number }).y === y);
+  return cells.some(cell => isGridCell(cell) && cell.x === x && cell.y === y);
 }
 
 /**
@@ -58,7 +59,9 @@ function calculateBorders(cells: Cell[], x: number, y: number): BorderSide[] {
 function buildCellLookup(cells: Cell[]): CellLookup {
   const lookup = new Set<string>();
   for (const cell of cells) {
-    lookup.add(`${(cell as unknown as { x: number; y: number }).x},${(cell as unknown as { x: number; y: number }).y}`);
+    if (isGridCell(cell)) {
+      lookup.add(`${cell.x},${cell.y}`);
+    }
   }
   return lookup;
 }

@@ -20,6 +20,7 @@ import type {
 } from '#types/settings/settings.types';
 import type { HexColor } from '#types/core/common.types';
 import type { Cell } from '#types/core/cell.types';
+import { isHexCell } from '#types/core/cell.types';
 import type { MapObject } from '#types/objects/object.types';
 
 import { axialToOffset, isWithinOffsetBounds } from '../../geometry/core/offsetCoordinates';
@@ -540,9 +541,8 @@ function getOrphanedContentInfo(
 
   if (currentCells && currentCells.length > 0) {
     currentCells.forEach(cell => {
-      const hexCell = cell as Cell & { q?: number; r?: number };
-      if (hexCell.q !== undefined && hexCell.r !== undefined) {
-        if (isOutOfBounds(hexCell.q, hexCell.r)) {
+      if (isHexCell(cell)) {
+        if (isOutOfBounds(cell.q, cell.r)) {
           orphanedCells++;
         }
       }

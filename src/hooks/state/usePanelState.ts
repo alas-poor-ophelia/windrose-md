@@ -12,6 +12,7 @@ import type {
   MapData, MapLayer, MapObject, Cell, BackgroundImage,
   UIPreferences, MapSettings,
 } from '#types/index';
+import { isHexCell } from '#types/core/cell.types';
 import type { HexBounds } from '#types/core/map.types';
 
 import { useEffect, useMemo, useState } from 'preact/hooks';
@@ -130,7 +131,7 @@ function usePanelState({ mapData, updateMapData }: UsePanelStateOptions): UsePan
         if (newMapData.layers.length > 0) {
           newMapData.layers = newMapData.layers.map((layer: MapLayer) => {
             const filteredCells = layer.cells?.filter((cell: Cell) =>
-              isInBounds((cell as unknown as { q: number; r: number }).q, (cell as unknown as { q: number; r: number }).r)
+              isHexCell(cell) && isInBounds(cell.q, cell.r)
             );
             const filteredObjects = layer.objects?.filter((obj: MapObject) =>
               isInBounds(obj.position.x, obj.position.y)

@@ -10,7 +10,7 @@ import type {
 } from '#types/index';
 import type { ResolvedTheme } from '#types/settings/settings.types';
 import type { ToolId } from '#types/tools/tool.types';
-import type { FoggedCell, MapObjectRef } from '#types/core/map.types';
+import type { FoggedCell } from '#types/core/map.types';
 import type { Cell } from '#types/core/cell.types';
 import type { TilesetOverrides } from '#types/tiles/tile.types';
 import type { FogTool } from './components/toolbars/VisibilityToolbar';
@@ -447,7 +447,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
           cells: activeLayer.cells,
           curves: activeLayer.curves,
           name: current.name ?? '',
-          objects: activeLayer.objects as unknown as MapObjectRef[],
+          objects: activeLayer.objects,
           textLabels: activeLayer.textLabels,
           edges: activeLayer.edges,
           tiles: activeLayer.tiles ?? [],
