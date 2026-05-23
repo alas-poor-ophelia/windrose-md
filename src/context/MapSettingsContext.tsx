@@ -54,6 +54,7 @@ import type { CurrentSettings, CurrentBackgroundImage, CurrentDistanceSettings }
 import { getSettings } from '../core/settingsAccessor';
 import { THEME } from '../core/dmtConstants';
 import { getImageDisplayNames, getFullPathFromDisplayName, getDisplayNameFromPath, getImageDimensions } from '../assets/imageOperations';
+import type { FineTuneRange } from '../geometry/core/hexMeasurements';
 import { calculateGridFromColumns, calculateGridFromMeasurement, measurementToHexSize, hexSizeToMeasurement, MEASUREMENT_EDGE, MEASUREMENT_CORNER, getFineTuneRange } from '../geometry/core/hexMeasurements';
 
 
@@ -109,7 +110,7 @@ export type OrphanInfo = ReducerOrphanInfo;
 export type PendingBoundsChange = ReducerPendingBoundsChange;
 
 /** Distance settings for save (without useGlobalDistance flag) */
-export interface DistanceSettingsSave {
+interface DistanceSettingsSave {
   distancePerCell: number;
   distanceUnit: string;
   gridDiagonalRule: DiagonalRule;
@@ -117,7 +118,7 @@ export interface DistanceSettingsSave {
 }
 
 /** Settings data passed to onSave */
-export interface SettingsSaveData {
+interface SettingsSaveData {
   useGlobalSettings: boolean;
   overrides: SettingsOverrides | Record<string, never>;
   coordinateDisplayMode: CoordinateDisplayMode;
@@ -126,7 +127,7 @@ export interface SettingsSaveData {
 }
 
 /** Handler functions exposed by context */
-export interface MapSettingsHandlers {
+interface MapSettingsHandlers {
   // Object set
   handleObjectSetChange: (setId: string | null) => void;
 
@@ -187,12 +188,6 @@ export interface MapSettingsHandlers {
   handleCancel: () => void;
   handleResizeConfirmDelete: () => void;
   handleResizeConfirmCancel: () => void;
-}
-
-/** Fine tune range result */
-export interface FineTuneRange {
-  min: number;
-  max: number;
 }
 
 // ===========================================
@@ -306,31 +301,6 @@ export interface HexGridContextValue {
   setCoordinateDisplayMode: (mode: CoordinateDisplayMode) => void;
   handleResizeConfirmDelete: () => void;
   handleResizeConfirmCancel: () => void;
-}
-
-/** Complete MapSettingsContext value shape */
-export interface MapSettingsContextValue extends
-  SettingsModalState,
-  MapSettingsHandlers {
-  // Props passed through
-  isOpen: boolean;
-  onClose: () => void;
-  onOpenAlignmentMode?: (currentX: number, currentY: number) => void;
-  mapType: MapType;
-  orientation: HexOrientation;
-
-  // Map data for export
-  mapData: MapData | null;
-  geometry: IGeometry | null;
-
-  // External data
-  globalSettings: PluginSettings;
-  tabs: SettingsTab[];
-  isHexMap: boolean;
-
-  // Refs
-  pendingCustomColorRef: MutableRef<HexColor | null>;
-  mouseDownTargetRef: MutableRef<EventTarget | null>;
 }
 
 /** Provider props */
@@ -512,14 +482,16 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
     if (!state.activeColorPicker) return undefined;
 
     const handleClickOutside = (e: MouseEvent | TouchEvent): void => {
-      const target = e.target as Element;
+      if (!(e.target instanceof Element)) return;
+      const target = e.target;
       const pickerEl = target.closest('.dmt-color-picker');
       const buttonEl = target.closest('.dmt-color-button');
       const modalEl = target.closest('.dmt-settings-modal');
 
       if (!pickerEl && !buttonEl && modalEl) {
-        if (pendingCustomColorRef.current != null && pendingCustomColorRef.current !== '' && state.activeColorPicker != null) {
-          dispatch({ type: Actions.SET_OVERRIDE, payload: { key: state.activeColorPicker as keyof SettingsOverrides, value: pendingCustomColorRef.current } });
+        const picker = state.activeColorPicker;
+        if (pendingCustomColorRef.current != null && pendingCustomColorRef.current !== '' && picker != null) {
+          dispatch({ type: Actions.SET_OVERRIDE, payload: { key: picker, value: pendingCustomColorRef.current } });
           pendingCustomColorRef.current = null;
         }
         dispatch({ type: Actions.SET_ACTIVE_COLOR_PICKER, payload: null });
@@ -542,7 +514,7 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
   // Async Handlers
   // ===========================================================================
 
-  const handleImageSearch = async (searchTerm: string): Promise<void> => {
+  const handleImageSearch = useCallback(async (searchTerm: string): Promise<void> => {
     if (searchTerm == null || searchTerm.trim() === '') {
       dispatch({ type: Actions.SET_IMAGE_SEARCH_RESULTS, payload: [] });
       return;
@@ -550,9 +522,9 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
     const allImages = await getImageDisplayNames();
     const filtered = allImages.filter((name: string) => name.toLowerCase().includes(searchTerm.toLowerCase()));
     dispatch({ type: Actions.SET_IMAGE_SEARCH_RESULTS, payload: filtered.slice(0, 10) });
-  };
+  }, [dispatch]);
 
-  const handleImageSelect = async (displayName: string): Promise<void> => {
+  const handleImageSelect = useCallback(async (displayName: string): Promise<void> => {
     const fullPath = await getFullPathFromDisplayName(displayName);
     if (fullPath == null || fullPath === '') return;
 
@@ -568,10 +540,9 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
       type: Actions.IMAGE_SELECTED,
       payload: { path: fullPath, displayName, dimensions: dims, bounds }
     });
-  };
+  }, [state.sizingMode, state.gridDensity, state.customColumns, state.measurementSize, state.measurementMethod, orientation, dispatch]);
 
-  // Fog of War image handlers
-  const handleFogImageSearch = async (searchTerm: string): Promise<void> => {
+  const handleFogImageSearch = useCallback(async (searchTerm: string): Promise<void> => {
     if (searchTerm == null || searchTerm.trim() === '') {
       dispatch({ type: Actions.SET_FOG_IMAGE_SEARCH_RESULTS, payload: [] });
       return;
@@ -579,9 +550,9 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
     const allImages = await getImageDisplayNames();
     const filtered = allImages.filter((name: string) => name.toLowerCase().includes(searchTerm.toLowerCase()));
     dispatch({ type: Actions.SET_FOG_IMAGE_SEARCH_RESULTS, payload: filtered.slice(0, 10) });
-  };
+  }, [dispatch]);
 
-  const handleFogImageSelect = async (displayName: string): Promise<void> => {
+  const handleFogImageSelect = useCallback(async (displayName: string): Promise<void> => {
     const fullPath = await getFullPathFromDisplayName(displayName);
     if (fullPath == null || fullPath === '') return;
 
@@ -589,7 +560,7 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
       type: Actions.FOG_IMAGE_SELECTED,
       payload: { path: fullPath, displayName }
     });
-  };
+  }, [dispatch]);
 
   // Memoized save data — recomputed only when underlying state changes
   const settingsData = useMemo((): SettingsSaveData => ({
@@ -879,7 +850,7 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
     state.imageOpacity, state.imageOffsetX, state.imageOffsetY, state.imageGridSize,
     state.sizingMode, state.gridDensity, state.customColumns,
     state.measurementMethod, state.measurementSize, state.fineTuneOffset,
-    handleImageSearch, handleImageSelect
+    orientation, onOpenAlignmentMode, handleImageSearch, handleImageSelect
   ]);
 
   const hexGridValue = useMemo((): HexGridContextValue => ({

@@ -8,22 +8,12 @@
  * This is a coordinator hook, not a visual layer - it manages behavior without rendering.
  */
 
-// Type-only imports
 import type {
   UseEventCoordinatorOptions,
   SyntheticPointerEvent,
   PendingToolAction,
   PanStartPosition,
   AreaSelectPending,
-  RegisteredDrawingHandlers,
-  ObjectHandlers,
-  TextHandlers,
-  NotePinHandlers,
-  PanZoomHandlers,
-  MeasureHandlers,
-  FogHandlers,
-  AreaSelectHandlers,
-  DiagonalFillHandlers
 } from '#types/hooks/eventCoordinator.types';
 
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
@@ -63,14 +53,14 @@ const useEventCoordinator = ({
   const areaSelectPendingRef = useRef<AreaSelectPending | null>(null);
 
   const handlePointerDown = useCallback((e: MouseEvent | TouchEvent): void => {
-    const drawingHandlers = getHandlers('drawing') as RegisteredDrawingHandlers | null;
-    const objectHandlers = getHandlers('object') as ObjectHandlers | null;
-    const textHandlers = getHandlers('text') as TextHandlers | null;
-    const notePinHandlers = getHandlers('notePin') as NotePinHandlers | null;
-    const panZoomHandlers = getHandlers('panZoom') as unknown as PanZoomHandlers | null;
-    const measureHandlers = getHandlers('measure') as MeasureHandlers | null;
-    const fogHandlers = getHandlers('fogOfWar') as FogHandlers | null;
-    const diagonalFillHandlers = getHandlers('diagonalFill') as DiagonalFillHandlers | null;
+    const drawingHandlers = getHandlers('drawing');
+    const objectHandlers = getHandlers('object');
+    const textHandlers = getHandlers('text');
+    const notePinHandlers = getHandlers('notePin');
+    const panZoomHandlers = getHandlers('panZoom');
+    const measureHandlers = getHandlers('measure');
+    const fogHandlers = getHandlers('fogOfWar');
+    const diagonalFillHandlers = getHandlers('diagonalFill');
 
     if (!panZoomHandlers) return;
 
@@ -235,7 +225,7 @@ const useEventCoordinator = ({
           return;
         }
 
-        const areaSelectHandlers = getHandlers('areaSelect') as AreaSelectHandlers | null;
+        const areaSelectHandlers = getHandlers('areaSelect');
         if (areaSelectHandlers?.areaSelectStart) {
           if (areaSelectHandlers.handleAreaSelectClick) {
             areaSelectHandlers.handleAreaSelectClick(syntheticEvent);
@@ -371,13 +361,13 @@ const useEventCoordinator = ({
   }, [currentTool, isColorPickerOpen, showObjectColorPicker, recentMultiTouch, selectedItem, hasMultiSelection, clearSelection, screenToWorld, getClickedSelectedItem, startGroupDrag, getHandlers, layerVisibility, isAlignmentMode]);
 
   const handlePointerMove = useCallback((e: MouseEvent | TouchEvent): void => {
-    const drawingHandlers = getHandlers('drawing') as RegisteredDrawingHandlers | null;
-    const objectHandlers = getHandlers('object') as ObjectHandlers | null;
-    const textHandlers = getHandlers('text') as TextHandlers | null;
-    const panZoomHandlers = getHandlers('panZoom') as unknown as PanZoomHandlers | null;
-    const measureHandlers = getHandlers('measure') as MeasureHandlers | null;
-    const fogHandlers = getHandlers('fogOfWar') as FogHandlers | null;
-    const diagonalFillHandlers = getHandlers('diagonalFill') as DiagonalFillHandlers | null;
+    const drawingHandlers = getHandlers('drawing');
+    const objectHandlers = getHandlers('object');
+    const textHandlers = getHandlers('text');
+    const panZoomHandlers = getHandlers('panZoom');
+    const measureHandlers = getHandlers('measure');
+    const fogHandlers = getHandlers('fogOfWar');
+    const diagonalFillHandlers = getHandlers('diagonalFill');
 
     if (!panZoomHandlers) return;
 
@@ -459,7 +449,7 @@ const useEventCoordinator = ({
     if (currentTool === 'areaSelect') {
       const isTouch = touchEvent.touches !== undefined || (e as PointerEvent).pointerType === 'touch';
       if (!isTouch) {
-        const areaSelectHandlers = getHandlers('areaSelect') as AreaSelectHandlers | null;
+        const areaSelectHandlers = getHandlers('areaSelect');
         if (areaSelectHandlers?.areaSelectStart != null && areaSelectHandlers.updateAreaSelectHover != null && toGrid != null) {
           const coords = toGrid(clientX, clientY);
           if (coords) {
@@ -594,11 +584,11 @@ const useEventCoordinator = ({
   }, [currentTool, isDraggingSelection, dragStart, selectedItem, isGroupDragging, handleGroupDrag, getHandlers, layerVisibility, isAlignmentMode, geometry, screenToWorld]);
 
   const handlePointerUp = useCallback((e: MouseEvent | TouchEvent): void => {
-    const drawingHandlers = getHandlers('drawing') as RegisteredDrawingHandlers | null;
-    const objectHandlers = getHandlers('object') as ObjectHandlers | null;
-    const textHandlers = getHandlers('text') as TextHandlers | null;
-    const panZoomHandlers = getHandlers('panZoom') as unknown as PanZoomHandlers | null;
-    const fogHandlers = getHandlers('fogOfWar') as FogHandlers | null;
+    const drawingHandlers = getHandlers('drawing');
+    const objectHandlers = getHandlers('object');
+    const textHandlers = getHandlers('text');
+    const panZoomHandlers = getHandlers('panZoom');
+    const fogHandlers = getHandlers('fogOfWar');
 
     if (!panZoomHandlers) return;
 
@@ -641,7 +631,7 @@ const useEventCoordinator = ({
         const deltaY = Math.abs(clientY - areaSelectPendingRef.current.clientY);
 
         if (deltaX < panMoveThreshold && deltaY < panMoveThreshold) {
-          const areaSelectHandlers = getHandlers('areaSelect') as AreaSelectHandlers | null;
+          const areaSelectHandlers = getHandlers('areaSelect');
           if (areaSelectHandlers?.handleAreaSelectClick) {
             areaSelectHandlers.handleAreaSelectClick(areaSelectPendingRef.current.syntheticEvent);
           }
@@ -718,8 +708,8 @@ const useEventCoordinator = ({
   }, [currentTool, recentMultiTouch, isDraggingSelection, dragStart, selectedItem, setSelectedItem, isGroupDragging, stopGroupDrag, getHandlers, isAlignmentMode]);
 
   const handlePointerLeave = useCallback((_e: MouseEvent): void => {
-    const drawingHandlers = getHandlers('drawing') as RegisteredDrawingHandlers | null;
-    const diagonalFillHandlers = getHandlers('diagonalFill') as DiagonalFillHandlers | null;
+    const drawingHandlers = getHandlers('drawing');
+    const diagonalFillHandlers = getHandlers('diagonalFill');
 
     if (pendingToolTimeoutRef.current) {
       clearTimeout(pendingToolTimeoutRef.current);
@@ -743,7 +733,7 @@ const useEventCoordinator = ({
   }, [currentTool, getHandlers]);
 
   const handlePanStart = useCallback((e: MouseEvent): void => {
-    const panZoomHandlers = getHandlers('panZoom') as unknown as PanZoomHandlers | null;
+    const panZoomHandlers = getHandlers('panZoom');
     if (!panZoomHandlers) return;
 
     if (e.button === 1) {
@@ -753,7 +743,7 @@ const useEventCoordinator = ({
   }, [getHandlers]);
 
   const handlePanEnd = useCallback((e: MouseEvent): void => {
-    const panZoomHandlers = getHandlers('panZoom') as unknown as PanZoomHandlers | null;
+    const panZoomHandlers = getHandlers('panZoom');
     if (!panZoomHandlers) return;
 
     if (panZoomHandlers.isPanning && e.button === 1) {
@@ -763,13 +753,13 @@ const useEventCoordinator = ({
   }, [getHandlers]);
 
   const handleWheel = useCallback((e: WheelEvent): void => {
-    const objectHandlers = getHandlers('object') as ObjectHandlers | null;
+    const objectHandlers = getHandlers('object');
     if (objectHandlers?.handleObjectWheel) {
       const handled = objectHandlers.handleObjectWheel(e);
       if (handled) return;
     }
 
-    const panZoomHandlers = getHandlers('panZoom') as unknown as PanZoomHandlers | null;
+    const panZoomHandlers = getHandlers('panZoom');
     if (!panZoomHandlers?.handleWheel) return;
 
     if (panZoomHandlers.isPanning) {
@@ -809,7 +799,7 @@ const useEventCoordinator = ({
       }
     }
 
-    const textHandlers = getHandlers('text') as TextHandlers | null;
+    const textHandlers = getHandlers('text');
     if (!textHandlers?.handleCanvasDoubleClick) return;
 
     textHandlers.handleCanvasDoubleClick(e);
@@ -841,7 +831,7 @@ const useEventCoordinator = ({
       (regionHandlers.handleContextMenu as (e: MouseEvent) => void)(e);
     }
 
-    const drawingHandlers = getHandlers('drawing') as RegisteredDrawingHandlers | null;
+    const drawingHandlers = getHandlers('drawing');
     if (drawingHandlers?.cancelShapePreview) {
       drawingHandlers.cancelShapePreview();
     }
@@ -961,10 +951,10 @@ const useEventCoordinator = ({
 
   useEffect(() => {
     const handleGlobalPointerUp = (e: MouseEvent | TouchEvent): void => {
-      const drawingHandlers = getHandlers('drawing') as RegisteredDrawingHandlers | null;
-      const objectHandlers = getHandlers('object') as ObjectHandlers | null;
-      const textHandlers = getHandlers('text') as TextHandlers | null;
-      const panZoomHandlers = getHandlers('panZoom') as unknown as PanZoomHandlers | null;
+      const drawingHandlers = getHandlers('drawing');
+      const objectHandlers = getHandlers('object');
+      const textHandlers = getHandlers('text');
+      const panZoomHandlers = getHandlers('panZoom');
 
       if (drawingHandlers?.isDrawing === true && drawingHandlers?.stopDrawing) {
         drawingHandlers.stopDrawing();
@@ -1002,14 +992,14 @@ const useEventCoordinator = ({
     };
 
     const handleGlobalMouseMove = (e: MouseEvent): void => {
-      const panZoomHandlers = getHandlers('panZoom') as unknown as PanZoomHandlers | null;
+      const panZoomHandlers = getHandlers('panZoom');
       if (panZoomHandlers?.isPanning === true && panZoomHandlers?.updatePan != null) {
         panZoomHandlers.updatePan(e.clientX, e.clientY);
       }
     };
 
     const handleGlobalTouchMove = (e: TouchEvent): void => {
-      const panZoomHandlers = getHandlers('panZoom') as unknown as PanZoomHandlers | null;
+      const panZoomHandlers = getHandlers('panZoom');
       if (panZoomHandlers?.isTouchPanningRef?.current === true && panZoomHandlers?.updateTouchPan != null && e.touches.length === 2) {
         e.preventDefault();
         panZoomHandlers.updateTouchPan(e.touches);
@@ -1036,8 +1026,8 @@ const useEventCoordinator = ({
         return;
       }
 
-      const objectHandlers = getHandlers('object') as ObjectHandlers | null;
-      const textHandlers = getHandlers('text') as TextHandlers | null;
+      const objectHandlers = getHandlers('object');
+      const textHandlers = getHandlers('text');
 
       if (objectHandlers?.handleObjectKeyDown) {
         const handled = objectHandlers.handleObjectKeyDown(e);

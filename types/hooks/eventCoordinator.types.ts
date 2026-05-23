@@ -66,6 +66,26 @@ export interface AreaSelectPending {
 }
 
 // ===========================================
+// Base Handler Types
+// ===========================================
+
+/** Generic handler function type */
+export type HandlerFunction = (...args: unknown[]) => unknown;
+
+/** Handler set for a layer (generic/fallback) */
+export interface LayerHandlers {
+  handlePointerDown?: HandlerFunction;
+  handlePointerMove?: HandlerFunction;
+  handlePointerUp?: HandlerFunction;
+  handleWheel?: HandlerFunction;
+  handleClick?: HandlerFunction;
+  handleDoubleClick?: HandlerFunction;
+  handleKeyDown?: HandlerFunction;
+  handleKeyUp?: HandlerFunction;
+  [key: string]: unknown;
+}
+
+// ===========================================
 // Handler Collections
 // ===========================================
 
@@ -182,19 +202,6 @@ export interface DiagonalFillHandlers {
 // Handler Registry
 // ===========================================
 
-/** Map of handler layer names to handler objects */
-export type HandlerLayerName =
-  | 'drawing'
-  | 'object'
-  | 'text'
-  | 'notePin'
-  | 'panZoom'
-  | 'measure'
-  | 'imageAlignment'
-  | 'fogOfWar'
-  | 'areaSelect'
-  | 'diagonalFill';
-
 /** Handler type mapping for each layer */
 export interface HandlerTypeMap {
   drawing: RegisteredDrawingHandlers;
@@ -207,7 +214,17 @@ export interface HandlerTypeMap {
   fogOfWar: FogHandlers;
   areaSelect: AreaSelectHandlers;
   diagonalFill: DiagonalFillHandlers;
+  fog: FogHandlers;
+  alignment: AlignmentHandlers;
+  freehand: LayerHandlers;
+  tilePlacement: LayerHandlers;
+  outline: LayerHandlers;
+  region: LayerHandlers;
+  shapeOverlay: LayerHandlers;
 }
 
+/** All registered layer names (derived from HandlerTypeMap) */
+export type HandlerLayerName = keyof HandlerTypeMap;
+
 /** Type-safe handler getter function */
-export type GetHandlers = <T extends HandlerLayerName>(layer: T) => HandlerTypeMap[T];
+export type GetHandlers = <T extends HandlerLayerName>(layer: T) => HandlerTypeMap[T] | null;

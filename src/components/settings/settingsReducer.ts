@@ -160,7 +160,6 @@ export interface SettingsModalState {
   sizingMode: SizingMode;
   measurementMethod: MeasurementMethod;
   measurementSize: number;
-  fineTuneEnabled: boolean;
   fineTuneOffset: number;
   
   // UI state
@@ -261,7 +260,6 @@ const Actions = {
   SET_ACTIVE_COLOR_PICKER: 'SET_ACTIVE_COLOR_PICKER',
   SET_LOADING: 'SET_LOADING',
   SHOW_RESIZE_CONFIRM: 'SHOW_RESIZE_CONFIRM',
-  CONFIRM_RESIZE_DELETE: 'CONFIRM_RESIZE_DELETE',
   CANCEL_RESIZE: 'CANCEL_RESIZE',
   CLEAR_DELETE_FLAG: 'CLEAR_DELETE_FLAG',
   SET_FOG_IMAGE_DISPLAY_NAME: 'SET_FOG_IMAGE_DISPLAY_NAME',
@@ -415,10 +413,6 @@ interface ShowResizeConfirmAction {
   payload: { pendingBoundsChange: PendingBoundsChange; orphanInfo: OrphanInfo };
 }
 
-interface ConfirmResizeDeleteAction {
-  type: typeof Actions.CONFIRM_RESIZE_DELETE;
-}
-
 interface CancelResizeAction {
   type: typeof Actions.CANCEL_RESIZE;
 }
@@ -486,7 +480,6 @@ type SettingsAction =
   | SetActiveColorPickerAction
   | SetLoadingAction
   | ShowResizeConfirmAction
-  | ConfirmResizeDeleteAction
   | CancelResizeAction
   | ClearDeleteFlagAction
   | SetFogImageDisplayNameAction
@@ -679,7 +672,6 @@ function buildInitialState(props: BuildInitialStateProps, globalSettings: Plugin
     sizingMode: currentBackgroundImage?.sizingMode ?? 'density',
     measurementMethod: currentBackgroundImage?.measurementMethod ?? MEASUREMENT_CORNER,
     measurementSize: currentBackgroundImage?.measurementSize ?? 86,
-    fineTuneEnabled: (currentBackgroundImage?.fineTuneOffset ?? 0) !== 0,
     fineTuneOffset: currentBackgroundImage?.fineTuneOffset ?? 0,
     
     activeColorPicker: null,
@@ -912,14 +904,13 @@ function settingsReducer(state: SettingsModalState, action: SettingsAction): Set
       return {
         ...state,
         fineTuneOffset: offset,
-        fineTuneEnabled: offset !== 0,
         hexBounds: { maxCol: columns, maxRow: rows }
       };
     }
     
     case Actions.RESET_FINE_TUNE: {
       const { orientation } = action.payload;
-      const newState: SettingsModalState = { ...state, fineTuneOffset: 0, fineTuneEnabled: false };
+      const newState: SettingsModalState = { ...state, fineTuneOffset: 0 };
       return state.sizingMode === 'measurement'
         ? recalcFromMeasurement(state, newState, state.measurementSize, state.measurementMethod, orientation)
         : newState;
@@ -953,16 +944,6 @@ function settingsReducer(state: SettingsModalState, action: SettingsAction): Set
         showResizeConfirm: true,
         pendingBoundsChange: action.payload.pendingBoundsChange,
         orphanInfo: action.payload.orphanInfo
-      };
-    
-    case Actions.CONFIRM_RESIZE_DELETE:
-      if (!state.pendingBoundsChange) return state;
-      return {
-        ...state,
-        hexBounds: state.pendingBoundsChange.newBounds,
-        deleteOrphanedContent: true,
-        showResizeConfirm: false,
-        pendingBoundsChange: null
       };
     
     case Actions.CANCEL_RESIZE:

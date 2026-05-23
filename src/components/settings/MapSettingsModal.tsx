@@ -19,7 +19,7 @@ import type { VNode, ComponentChildren } from 'preact';
 
 import { NativeModalPortal } from '../modals/NativeModalPortal';
 import { MapSettingsProvider, ModalShellContext, AppearanceContext, BackgroundImageContext, HexGridContext, useModalShell, useAppearance, useBackgroundImage, useHexGrid } from '../../context/MapSettingsContext';
-import type { MapSettingsProviderProps } from '../../context/MapSettingsContext';
+import type { MapSettingsProviderProps, SettingsTab } from '../../context/MapSettingsContext';
 import { AppearanceTab } from './AppearanceTab';
 import { HexGridTab } from './hexmap/HexGridTab';
 import { GridBackgroundTab } from './gridmap/GridBackgroundTab';
@@ -39,12 +39,6 @@ import { ResizeConfirmDialog } from './ResizeConfirmDialog';
 
 
 
-
-/** Tab configuration */
-interface SettingsTab {
-  id: string;
-  label: string;
-}
 
 /** Props for MapSettingsModal (provider props minus children/onClose, plus onCancel) */
 export type MapSettingsModalProps = Omit<MapSettingsProviderProps, 'children' | 'onClose'> & {
@@ -67,7 +61,7 @@ function TabContent({ tabs, activeTab, setActiveTab, mapType }: {
           <button
             key={tab.id}
             class={`dmt-settings-tab ${activeTab === tab.id ? 'dmt-settings-tab-active' : ''}`}
-            onClick={() => setActiveTab(tab.id as SettingsTabId)}
+            onClick={() => setActiveTab(tab.id)}
           >
             {tab.label}
           </button>

@@ -53,6 +53,8 @@ hooks/
     ├── useDistanceMeasurement.ts  # Distance measuring tool
     ├── useSubHexNavigation.ts     # Sub-hex map navigation
     ├── useAlignmentMode.ts        # Alignment mode
+    ├── useKeyboardShortcuts.ts    # Global keyboard shortcuts (undo/redo, layer nav)
+    ├── usePlayerFogClear.ts       # Player light radius fog clearing on drop
     ├── useCustomEventHandlers.ts  # Custom event handling
     └── useToolbarPosition.ts      # Toolbar positioning
 ```

@@ -18,49 +18,16 @@
 import type { ComponentChildren, FunctionComponent } from 'preact';
 import { createContext } from 'preact';
 import { useCallback, useContext, useMemo, useRef } from 'preact/hooks';
-export type HandlerLayerType =
-  | 'object'
-  | 'text'
-  | 'drawing'
-  | 'notePin'
-  | 'panZoom'
-  | 'fog'
-  | 'fogOfWar'
-  | 'areaSelect'
-  | 'measure'
-  | 'alignment'
-  | 'imageAlignment'
-  | 'diagonalFill'
-  | 'freehand'
-  | 'tilePlacement'
-  | 'outline'
-  | 'region'
-  | 'shapeOverlay';
-
-/** Generic handler function type */
-export type HandlerFunction = (...args: unknown[]) => unknown;
-
-/** Handler set for a layer */
-export interface LayerHandlers {
-  handlePointerDown?: HandlerFunction;
-  handlePointerMove?: HandlerFunction;
-  handlePointerUp?: HandlerFunction;
-  handleWheel?: HandlerFunction;
-  handleClick?: HandlerFunction;
-  handleDoubleClick?: HandlerFunction;
-  handleKeyDown?: HandlerFunction;
-  handleKeyUp?: HandlerFunction;
-  [key: string]: unknown;
-}
+import type { HandlerLayerName, HandlerTypeMap, LayerHandlers } from '#types/hooks/eventCoordinator.types';
 
 /** All registered handlers by layer type */
-export type HandlersRegistry = Partial<Record<HandlerLayerType, LayerHandlers>>;
+export type HandlersRegistry = Partial<Record<HandlerLayerName, LayerHandlers>>;
 
 /** EventHandlerContext value shape */
 export interface EventHandlerContextValue {
-  registerHandlers: (layerType: HandlerLayerType, handlers: LayerHandlers) => void;
-  unregisterHandlers: (layerType: HandlerLayerType) => void;
-  getHandlers: (layerType: HandlerLayerType) => LayerHandlers | null;
+  registerHandlers: (layerType: HandlerLayerName, handlers: LayerHandlers) => void;
+  unregisterHandlers: (layerType: HandlerLayerName) => void;
+  getHandlers: <T extends HandlerLayerName>(layerType: T) => HandlerTypeMap[T] | null;
   getAllHandlers: () => HandlersRegistry;
 }
 
@@ -112,25 +79,16 @@ const EventHandlerProvider: FunctionComponent<EventHandlerProviderProps> = ({ ch
   // Store handlers by layer type
   const handlersRef = useRef<HandlersRegistry>({});
 
-  /**
-   * Register handlers for a specific layer type
-   */
-  const registerHandlers = useCallback((layerType: HandlerLayerType, handlers: LayerHandlers): void => {
+  const registerHandlers = useCallback((layerType: HandlerLayerName, handlers: LayerHandlers): void => {
     handlersRef.current[layerType] = handlers;
   }, []);
 
-  /**
-   * Unregister handlers for a specific layer type
-   */
-  const unregisterHandlers = useCallback((layerType: HandlerLayerType): void => {
+  const unregisterHandlers = useCallback((layerType: HandlerLayerName): void => {
     delete handlersRef.current[layerType];
   }, []);
 
-  /**
-   * Get handlers for a specific layer type
-   */
-  const getHandlers = useCallback((layerType: HandlerLayerType): LayerHandlers | null => {
-    return handlersRef.current[layerType] || null;
+  const getHandlers = useCallback(<T extends HandlerLayerName>(layerType: T): HandlerTypeMap[T] | null => {
+    return (handlersRef.current[layerType] ?? null) as HandlerTypeMap[T] | null;
   }, []);
 
   /**

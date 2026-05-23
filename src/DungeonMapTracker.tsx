@@ -6,11 +6,9 @@ import type {
   MapType,
   IGeometry,
   ExtendedGeometry,
-  MapObject,
 } from '#types/index';
 import type { ResolvedTheme } from '#types/settings/settings.types';
 import type { ToolId } from '#types/tools/tool.types';
-import type { FoggedCell } from '#types/core/map.types';
 import type { Cell } from '#types/core/cell.types';
 import type { TilesetOverrides } from '#types/tiles/tile.types';
 import type { CustomColor } from '#types/core/common.types';
@@ -46,6 +44,8 @@ import { LayerEditModal } from './components/modals/LayerEditModal';
 import { openNativeCloneLayerModal, CloneLayerModal } from './components/modals/CloneLayerModal';
 import { useSubHexNavigation } from './hooks/interactions/useSubHexNavigation';
 import { useCustomEventHandlers } from './hooks/interactions/useCustomEventHandlers';
+import { useKeyboardShortcuts } from './hooks/interactions/useKeyboardShortcuts';
+import { usePlayerFogClear } from './hooks/interactions/usePlayerFogClear';
 import { useUILayout } from './hooks/state/useUILayout';
 import { usePanelState } from './hooks/state/usePanelState';
 import { useViewControls } from './hooks/state/useViewControls';
@@ -63,11 +63,6 @@ injectIconCSS(RA_ICONS);
 // ============================================================================
 // LOCAL TYPE DEFINITIONS
 // ============================================================================
-
-/** Extended geometry with implementation-specific methods used in this component */
-interface RichGeometry extends ExtendedGeometry {
-  offsetToWorld?: (col: number, row: number) => { worldX: number; worldY: number };
-}
 
 interface DungeonMapTrackerProps {
   mapId?: string;
@@ -388,83 +383,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   });
 
   // Player fog clearing on drop (reads latest state via functional updater, supports undo)
-  useEffect(() => {
-    const handler = (e: CustomEvent): void => {
-      if (geometry == null || isApplyingHistory()) return;
-      const { objectId } = e.detail;
-
-      updateMapData((current: MapData) => {
-        if (current == null) return current;
-        const activeLayer = getActiveLayer(current);
-        if (activeLayer.fogOfWar?.enabled !== true || (activeLayer.fogOfWar?.foggedCells?.length ?? 0) === 0) return current;
-
-        const obj = activeLayer.objects.find((o: MapObject) => o.id === objectId);
-        if (obj == null || obj.isPlayer !== true || obj.lightEnabled !== true || (obj.lightRadius ?? 0) === 0) return current;
-
-        const settings = current.settings?.overrides ?? {};
-        const distancePerCell = (settings.distancePerCell as number | undefined) ?? 5;
-        const richGeom = geometry as RichGeometry;
-        const cellSize = (richGeom.cellSize ?? richGeom.hexSize) ?? 1;
-        const radiusInCells = (obj.lightRadius ?? 0) / distancePerCell;
-        const radiusInWorld = radiusInCells * cellSize;
-
-        let objWorldX: number, objWorldY: number;
-        if (obj.freeform === true && obj.worldPosition != null) {
-          objWorldX = obj.worldPosition.x;
-          objWorldY = obj.worldPosition.y;
-        } else {
-          const w = richGeom.getCellCenter(obj.position.x, obj.position.y);
-          objWorldX = w.worldX;
-          objWorldY = w.worldY;
-        }
-
-        const clearRadius = radiusInWorld + cellSize * 0.5;
-        const radiusSq = clearRadius * clearRadius;
-        const remainingCells = activeLayer.fogOfWar.foggedCells.filter((fc: FoggedCell) => {
-          let cellWorldX: number, cellWorldY: number;
-          if (richGeom.offsetToWorld != null) {
-            const w = richGeom.offsetToWorld(fc.col, fc.row);
-            cellWorldX = w.worldX;
-            cellWorldY = w.worldY;
-          } else {
-            cellWorldX = (fc.col + 0.5) * cellSize;
-            cellWorldY = (fc.row + 0.5) * cellSize;
-          }
-          const dx = cellWorldX - objWorldX;
-          const dy = cellWorldY - objWorldY;
-          return dx * dx + dy * dy > radiusSq;
-        });
-
-        if (remainingCells.length >= activeLayer.fogOfWar.foggedCells.length) return current;
-
-        const newFog = { ...activeLayer.fogOfWar, foggedCells: remainingCells };
-
-        addToHistory({
-          cells: activeLayer.cells,
-          curves: activeLayer.curves,
-          name: current.name ?? '',
-          objects: activeLayer.objects,
-          textLabels: activeLayer.textLabels,
-          edges: activeLayer.edges,
-          tiles: activeLayer.tiles ?? [],
-          regions: current.regions ?? [],
-          outlines: current.outlines ?? [],
-          shapeOverlays: current.shapeOverlays ?? [],
-          fogOfWar: newFog
-        });
-
-        const layers = current.layers.map(l =>
-          l.id === current.activeLayerId
-            ? { ...l, fogOfWar: newFog }
-            : l
-        );
-        return { ...current, layers };
-      });
-    };
-
-    document.addEventListener('windrose:player-fog-clear', handler as EventListener);
-    return () => document.removeEventListener('windrose:player-fog-clear', handler as EventListener);
-  }, [geometry, updateMapData, addToHistory, isApplyingHistory]);
+  usePlayerFogClear({ geometry, updateMapData, addToHistory, isApplyingHistory });
 
   // Adjacent sub-map click-to-navigate
   useEffect((): (() => void) | undefined => {
@@ -526,48 +445,10 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   });
 
   // Global keyboard shortcuts: layer nav, undo/redo
-  useEffect((): (() => void) | undefined => {
-    if (!isFocused || !mapData) return undefined;
-
-    const handler = (e: KeyboardEvent): void => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-      const key = e.key;
-      const mod = e.ctrlKey || e.metaKey;
-
-      const shortcuts = getSettings().keyboardShortcuts ?? {};
-      const bareKey = (s: string): string => { const parts = s.split('+'); return (parts[parts.length - 1] ?? s).toLowerCase(); };
-
-      if (mod && !e.shiftKey && key.toLowerCase() === bareKey(shortcuts.undo ?? 'z')) {
-        wrappedHandleUndo(); e.preventDefault(); return;
-      }
-      if (mod && key.toLowerCase() === bareKey(shortcuts.redo ?? 'y')) {
-        handleRedo(); e.preventDefault(); return;
-      }
-      if (mod && e.shiftKey && key.toLowerCase() === 'z') {
-        handleRedo(); e.preventDefault(); return;
-      }
-
-      if (mod || e.altKey) return;
-
-      const layerPrevKey = shortcuts.layerPrev ?? '[';
-      const layerNextKey = shortcuts.layerNext ?? ']';
-
-      if (key === layerPrevKey || key === layerNextKey) {
-        const layers = mapData.layers;
-        const currentIdx = layers.findIndex((l: { id: string }) => l.id === mapData.activeLayerId);
-        if (key === layerPrevKey && currentIdx > 0) {
-          handleLayerSelect(layers[currentIdx - 1].id);
-          e.preventDefault();
-        } else if (key === layerNextKey && currentIdx < layers.length - 1) {
-          handleLayerSelect(layers[currentIdx + 1].id);
-          e.preventDefault();
-        }
-      }
-    };
-
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [isFocused, mapData, wrappedHandleUndo, handleRedo, handleLayerSelect]);
+  useKeyboardShortcuts({
+    isFocused, mapData,
+    handleUndo: wrappedHandleUndo, handleRedo, handleLayerSelect
+  });
 
   // MCP bridge: each map instance registers its own state + operations keyed by notePath.
   // No race conditions — the query side picks the active file's state.
@@ -649,16 +530,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     };
   }, [notePath]);
 
-  // Loading state
-  if (isLoading) {
-    return (
-      <div className="dmt-loading">
-        Loading map...
-      </div>
-    );
-  }
-
-  if (!mapData) {
+  if (isLoading || !mapData) {
     return <div className="dmt-loading">Loading map...</div>;
   }
 

@@ -24,10 +24,7 @@ import type { VNode } from 'preact';
 import { Modal } from 'obsidian';
 import { useApp } from '../../context/AppContext';
 import { useHexGrid } from '../../context/MapSettingsContext';
-interface OrphanInfo {
-  cells: number;
-  objects: number;
-}
+import type { OrphanInfo } from '../../context/MapSettingsContext';
 
 /**
  * Native resize confirmation dialog using Obsidian Modal

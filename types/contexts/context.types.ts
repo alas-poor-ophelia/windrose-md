@@ -58,6 +58,8 @@ export interface ExtendedGeometry extends IGeometry {
   screenToEdge?: (worldX: number, worldY: number, threshold: number) => EdgeInfo | null;
   /** Hex-specific: convert axial (q,r) to world pixels */
   hexToWorld?: (x: number, y: number) => { worldX: number; worldY: number };
+  /** Convert grid offset coordinates to world pixels */
+  offsetToWorld?: (col: number, row: number) => { worldX: number; worldY: number };
   /** Get scaled cell size for the given zoom level */
   getScaledCellSize: (zoom: number) => number;
   /** Hex-specific: get scaled hex size for the given zoom level */
