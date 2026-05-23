@@ -22,6 +22,11 @@ import { useMapSelection } from '../../context/MapSelectionContext';
 import { useRegisteredHandlers } from '../../context/EventHandlerContext';
 import { useGroupDrag } from '../objects/useGroupDrag';
 
+const DRAWING_TOOL_SET: Set<string> = new Set([
+  'draw', 'erase', 'rectangle', 'circle', 'clearArea',
+  'edgeDraw', 'edgeErase', 'edgeLine', 'segmentDraw'
+]);
+
 
 
 
@@ -206,8 +211,8 @@ const useEventCoordinator = ({
         }
 
         const shapeHandlers = getHandlers('shapeOverlay');
-        if (shapeHandlers?.handleShapeSelection != null) {
-          const shapeHandled = (shapeHandlers.handleShapeSelection as (cx: number, cy: number) => boolean)(clientX, clientY);
+        if (shapeHandlers?.handleShapeSelection) {
+          const shapeHandled = shapeHandlers.handleShapeSelection(clientX, clientY);
           if (shapeHandled) return;
         }
 
@@ -255,11 +260,7 @@ const useEventCoordinator = ({
         areaSelectPendingRef.current = { clientX, clientY, syntheticEvent };
         startPan(clientX, clientY);
 
-      } else if (currentTool === 'draw' || currentTool === 'erase' ||
-                 currentTool === 'rectangle' || currentTool === 'circle' ||
-                 currentTool === 'clearArea' ||
-                 currentTool === 'edgeDraw' || currentTool === 'edgeErase' ||
-                 currentTool === 'edgeLine' || currentTool === 'segmentDraw') {
+      } else if (currentTool != null && DRAWING_TOOL_SET.has(currentTool)) {
         if (hasMultiSelection) clearSelection();
 
         if (drawingHandlers?.handleDrawingPointerDown) {
@@ -444,8 +445,8 @@ const useEventCoordinator = ({
         textHandlers.handleTextDragging(e);
       } else if (selectedItem.type === 'shapeOverlay') {
         const shapeHandlers = getHandlers('shapeOverlay');
-        if (shapeHandlers?.handleShapeDragging != null) {
-          (shapeHandlers.handleShapeDragging as (e: MouseEvent | TouchEvent) => void)(e);
+        if (shapeHandlers?.handleShapeDragging) {
+          shapeHandlers.handleShapeDragging(e);
         }
       }
       return;
@@ -472,11 +473,7 @@ const useEventCoordinator = ({
       return;
     }
 
-    if (currentTool === 'draw' || currentTool === 'erase' ||
-        currentTool === 'rectangle' || currentTool === 'circle' ||
-        currentTool === 'clearArea' ||
-        currentTool === 'edgeDraw' || currentTool === 'edgeErase' ||
-        currentTool === 'edgeLine' || currentTool === 'segmentDraw') {
+    if (currentTool != null && DRAWING_TOOL_SET.has(currentTool)) {
 
       if (drawingHandlers?.handleDrawingPointerMove) {
         drawingHandlers.handleDrawingPointerMove(e);
@@ -677,19 +674,15 @@ const useEventCoordinator = ({
         textHandlers.stopTextDragging();
       } else if (selectedItem?.type === 'shapeOverlay') {
         const shapeHandlers = getHandlers('shapeOverlay');
-        if (shapeHandlers?.stopShapeDragging != null) {
-          (shapeHandlers.stopShapeDragging as () => void)();
+        if (shapeHandlers?.stopShapeDragging) {
+          shapeHandlers.stopShapeDragging();
         }
       }
 
       return;
     }
 
-    if (currentTool === 'draw' || currentTool === 'erase' ||
-        currentTool === 'rectangle' || currentTool === 'circle' ||
-        currentTool === 'clearArea' ||
-        currentTool === 'edgeDraw' || currentTool === 'edgeErase' ||
-        currentTool === 'edgeLine' || currentTool === 'segmentDraw') {
+    if (currentTool != null && DRAWING_TOOL_SET.has(currentTool)) {
       if (drawingHandlers?.stopDrawing) {
         drawingHandlers.stopDrawing(e);
       }
@@ -697,8 +690,8 @@ const useEventCoordinator = ({
 
     if (currentTool === 'freehand') {
       const freehandHandlers = getHandlers('freehand');
-      if (freehandHandlers?.stopDrawing != null) {
-        (freehandHandlers.stopDrawing as (e?: Event | MouseEvent | TouchEvent) => void)(e);
+      if (freehandHandlers?.stopDrawing) {
+        freehandHandlers.stopDrawing();
       }
     }
 
@@ -731,11 +724,7 @@ const useEventCoordinator = ({
       setPendingToolAction(null);
     }
 
-    if (currentTool === 'draw' || currentTool === 'erase' ||
-        currentTool === 'rectangle' || currentTool === 'circle' ||
-        currentTool === 'clearArea' ||
-        currentTool === 'edgeDraw' || currentTool === 'edgeErase' ||
-        currentTool === 'edgeLine' || currentTool === 'segmentDraw') {
+    if (currentTool != null && DRAWING_TOOL_SET.has(currentTool)) {
       if (drawingHandlers?.cancelDrawing) {
         drawingHandlers.cancelDrawing();
       }
@@ -841,15 +830,15 @@ const useEventCoordinator = ({
 
     // Region context menu for non-hex maps (fallback)
     const regionHandlers = getHandlers('region');
-    if (regionHandlers?.handleContextMenu != null) {
-      (regionHandlers.handleContextMenu as (e: MouseEvent) => void)(e);
+    if (regionHandlers?.handleContextMenu) {
+      regionHandlers.handleContextMenu(e);
     }
 
     const drawingHandlers = getHandlers('drawing');
     if (drawingHandlers?.cancelShapePreview) {
       drawingHandlers.cancelShapePreview();
     }
-  }, [currentTool, getHandlers, geometry, screenToGrid, selectedItem, isDraggingSelection]);
+  }, [getHandlers, geometry, screenToGrid]);
 
   // Long-press timer for touch context menu
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -887,7 +876,7 @@ const useEventCoordinator = ({
       longPressTimerRef.current = setTimeout(() => {
         longPressTimerRef.current = null;
         // Dispatch as context menu event
-        handleContextMenu({ clientX: startX, clientY: startY, preventDefault: () => {} } as unknown as MouseEvent);
+        handleContextMenu(new MouseEvent('contextmenu', { clientX: startX, clientY: startY }));
       }, 500);
     };
 
@@ -910,7 +899,7 @@ const useEventCoordinator = ({
         const dy = touch.clientY - last.y;
         if (dx * dx + dy * dy < 900) {
           lastTapRef.current = null;
-          handleCanvasDoubleClick({ clientX: touch.clientX, clientY: touch.clientY, preventDefault: () => {} } as unknown as MouseEvent);
+          handleCanvasDoubleClick(new MouseEvent('dblclick', { clientX: touch.clientX, clientY: touch.clientY }));
           return;
         }
       }

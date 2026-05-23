@@ -198,6 +198,30 @@ export interface DiagonalFillHandlers {
   fillStart?: { x: number; y: number; corner: string } | null;
 }
 
+/** Shape overlay handlers */
+export interface ShapeOverlayHandlers {
+  handleShapeSelection?: (clientX: number, clientY: number) => boolean;
+  handleShapeDragging?: (e: MouseEvent | TouchEvent) => void;
+  stopShapeDragging?: () => void;
+  handlePointerDown?: (e: Event | SyntheticPointerEvent) => void;
+  handlePointerMove?: (e: Event) => void;
+}
+
+/** Freehand drawing handlers */
+export interface FreehandHandlers {
+  handlePointerDown?: (e: Event | SyntheticPointerEvent, gridX?: number, gridY?: number, isTouch?: boolean) => void;
+  handlePointerMove?: (e: Event) => void;
+  stopDrawing?: () => void;
+}
+
+/** Region tool handlers */
+export interface RegionHandlers {
+  handlePointerDown?: (e: Event | SyntheticPointerEvent) => void;
+  handlePointerMove?: (e: Event) => void;
+  handleDoubleClick?: (e: MouseEvent) => void;
+  handleContextMenu?: (e: MouseEvent) => void;
+}
+
 // ===========================================
 // Handler Registry
 // ===========================================
@@ -216,11 +240,11 @@ export interface HandlerTypeMap {
   diagonalFill: DiagonalFillHandlers;
   fog: FogHandlers;
   alignment: AlignmentHandlers;
-  freehand: LayerHandlers;
+  freehand: FreehandHandlers;
   tilePlacement: LayerHandlers;
   outline: LayerHandlers;
-  region: LayerHandlers;
-  shapeOverlay: LayerHandlers;
+  region: RegionHandlers;
+  shapeOverlay: ShapeOverlayHandlers;
 }
 
 /** All registered layer names (derived from HandlerTypeMap) */
