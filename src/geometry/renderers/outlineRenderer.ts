@@ -7,7 +7,7 @@
 import type { Point } from '#types/core/geometry.types';
 import type { Outline } from '#types/core/map.types';
 
-interface HexGeometryLike {
+export interface HexGeometryLike {
   hexSize: number;
   orientation: string;
   hexToWorld(q: number, r: number): { worldX: number; worldY: number };

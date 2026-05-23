@@ -10,7 +10,7 @@ import type { Region } from '#types/core/map.types';
 
 // â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-interface HexGeometryLike {
+export interface HexGeometryLike {
   hexSize: number;
   orientation: string;
   hexToWorld(q: number, r: number): { worldX: number; worldY: number };

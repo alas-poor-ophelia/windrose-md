@@ -497,12 +497,12 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
         foggedAxialSet.add(`${q},${r}`);
       }
     }
-    renderRegions(ctx, mapData.regions, geometry as unknown as Parameters<typeof renderRegions>[2], { x: offsetX, y: offsetY, zoom }, { foggedCells: foggedAxialSet });
+    renderRegions(ctx, mapData.regions, geometry as HexGeometry, { x: offsetX, y: offsetY, zoom }, { foggedCells: foggedAxialSet });
   }
 
   // Draw outlines (hex maps only, after regions)
   if (geometry.type === 'hex' && mapData.outlines != null && mapData.outlines.length > 0 && visibility.outlines !== false) {
-    renderOutlines(ctx, mapData.outlines, geometry as unknown as Parameters<typeof renderOutlines>[2], { x: offsetX, y: offsetY, zoom }, mapData.hexBounds ?? {}, mapData.orientation ?? 'flat');
+    renderOutlines(ctx, mapData.outlines, geometry as HexGeometry, { x: offsetX, y: offsetY, zoom }, mapData.hexBounds ?? {}, mapData.orientation ?? 'flat');
   }
 
   // Draw player light radii (before shapes and objects)
@@ -571,17 +571,17 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
     const mapType = mapData.mapType ?? 'grid';
     const getObjectTypeForMap = (typeId: string): ReturnType<typeof getObjectType> => getObjectType(typeId, mapType, mapData.objectSetId);
     renderObjects(
-      activeLayer as unknown as Parameters<typeof renderObjects>[0],
+      activeLayer,
       { ctx, offsetX, offsetY, zoom, scaledSize },
-      geometry as unknown as Parameters<typeof renderObjects>[2],
+      geometry,
       isHexMap,
       mapData.orientation ?? 'flat',
       {
         getObjectType: getObjectTypeForMap,
-        getRenderChar: getRenderChar as unknown as Parameters<typeof renderObjects>[5]['getRenderChar'],
-        isCellFogged: isCellFogged as unknown as Parameters<typeof renderObjects>[5]['isCellFogged'],
-        getObjectsInCell: getObjectsInCell as unknown as Parameters<typeof renderObjects>[5]['getObjectsInCell'],
-        getSlotOffset: getSlotOffset as unknown as Parameters<typeof renderObjects>[5]['getSlotOffset'],
+        getRenderChar,
+        isCellFogged,
+        getObjectsInCell,
+        getSlotOffset,
         getMultiObjectScale,
         renderNoteLinkBadge,
         renderTooltipIndicator,
@@ -617,8 +617,8 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   if (fow != null && fow.enabled === true && fow.foggedCells != null && fow.foggedCells.length > 0) {
     const fogSettings = getFogSettings(effectiveSettings);
     const isHexMap = geometry.type === 'hex';
-    const hexGeom = isHexMap ? geometry as InstanceType<typeof HexGeometry> : null;
-    const gridGeom = !isHexMap ? geometry as InstanceType<typeof GridGeometry> : null;
+    const hexGeom = isHexMap ? geometry as HexGeometry : null;
+    const gridGeom = !isHexMap ? geometry as GridGeometry : null;
 
     renderFog(
       fow,
@@ -626,28 +626,28 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
       fogSettings,
       { hexBounds: mapData.hexBounds, dimensions: mapData.dimensions },
       isHexMap,
-      hexGeom as unknown as Parameters<typeof renderFog>[5],
-      gridGeom as unknown as Parameters<typeof renderFog>[6],
-      geometry as unknown as Parameters<typeof renderFog>[7],
+      hexGeom,
+      gridGeom,
+      geometry,
       mapData.orientation ?? 'flat',
       getCachedImage,
       renderGridFog,
       renderHexFog,
-      offsetToAxial as unknown as Parameters<typeof renderFog>[12],
-      axialToOffset as unknown as Parameters<typeof renderFog>[13]
+      offsetToAxial,
+      axialToOffset
     );
   }
 
   // Draw selection indicators
   const isHexMapForSelection = geometry.type === 'hex';
-  const hexGeomForSelection = isHexMapForSelection ? geometry as InstanceType<typeof HexGeometry> : null;
+  const hexGeomForSelection = isHexMapForSelection ? geometry as HexGeometry : null;
   renderSelections(
-    itemsArray as unknown as Parameters<typeof renderSelections>[0],
-    activeLayer.textLabels as unknown as Parameters<typeof renderSelections>[1],
-    activeLayer.objects as unknown as Parameters<typeof renderSelections>[2],
+    itemsArray,
+    activeLayer.textLabels,
+    activeLayer.objects,
     { ctx, offsetX, offsetY, zoom, scaledSize },
-    geometry as unknown as Parameters<typeof renderSelections>[4],
-    hexGeomForSelection as unknown as Parameters<typeof renderSelections>[5],
+    geometry,
+    hexGeomForSelection,
     isHexMapForSelection,
     isResizeMode,
     mapData.orientation ?? 'flat',
@@ -655,8 +655,8 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
     visibility,
     {
       getFontCss,
-      getObjectsInCell: getObjectsInCell as unknown as Parameters<typeof renderSelections>[11]['getObjectsInCell'],
-      getSlotOffset: getSlotOffset as unknown as Parameters<typeof renderSelections>[11]['getSlotOffset'],
+      getObjectsInCell,
+      getSlotOffset,
       getMultiObjectScale,
     }
   );

@@ -15,16 +15,8 @@ interface EdgeCell extends FogCell {
   r: number;
 }
 
-interface HexGeometryLike {
-  hexSize: number;
-  getHexVertices: (q: number, r: number) => Array<{ worldX: number; worldY: number }>;
-  hexToWorld: (q: number, r: number) => { worldX: number; worldY: number };
-  getNeighbors: (q: number, r: number) => Array<{ q: number; r: number }>;
-}
-
-interface GeometryLike {
-  worldToScreen: (worldX: number, worldY: number, offsetX: number, offsetY: number, zoom: number) => { screenX: number; screenY: number };
-}
+import type { HexGeometryLike } from './fogRenderer';
+import type { IGeometry } from '#types/core/geometry.types';
 
 interface HexFogRenderContext {
   ctx: CanvasRenderingContext2D;
@@ -49,9 +41,9 @@ function identifyHexEdgeCells(
   foggedSet: Set<string>,
   visibleBounds: { minCol: number; maxCol: number; minRow: number; maxRow: number },
   hexGeometry: HexGeometryLike,
-  orientation: string,
-  offsetToAxial: (col: number, row: number, orientation: string) => { q: number; r: number },
-  axialToOffset: (q: number, r: number, orientation: string) => { col: number; row: number }
+  orientation: 'flat' | 'pointy',
+  offsetToAxial: (col: number, row: number, orientation: 'flat' | 'pointy') => { q: number; r: number },
+  axialToOffset: (q: number, r: number, orientation: 'flat' | 'pointy') => { col: number; row: number }
 ): { visibleFogCells: FogCell[]; edgeCells: EdgeCell[] } {
   const { minCol, maxCol, minRow, maxRow } = visibleBounds;
   const visibleFogCells: FogCell[] = [];
@@ -71,7 +63,7 @@ function identifyHexEdgeCells(
     const { q, r } = offsetToAxial(col, row, orientation);
     const neighbors = hexGeometry.getNeighbors(q, r);
     const isEdge = neighbors.some(n => {
-      const { col: nCol, row: nRow } = axialToOffset(n.q, n.r, orientation);
+      const { col: nCol, row: nRow } = axialToOffset(n.x, n.y, orientation);
       return !foggedSet.has(`${nCol},${nRow}`);
     });
 
@@ -92,7 +84,7 @@ function traceHexPath(
   r: number,
   scale: number,
   hexGeometry: HexGeometryLike,
-  geometry: GeometryLike,
+  geometry: IGeometry,
   context: { offsetX: number; offsetY: number; zoom: number }
 ): void {
   const { offsetX, offsetY, zoom } = context;
@@ -133,7 +125,7 @@ function renderHexBlurPasses(
   context: HexFogRenderContext,
   options: HexFogRenderOptions,
   hexGeometry: HexGeometryLike,
-  geometry: GeometryLike
+  geometry: IGeometry
 ): void {
   const { ctx, fogCtx, offsetX, offsetY, zoom } = context;
   const { fowOpacity, blurRadius } = options;
@@ -178,9 +170,9 @@ function renderHexFogCells(
   visibleFogCells: FogCell[],
   context: HexFogRenderContext,
   hexGeometry: HexGeometryLike,
-  geometry: GeometryLike,
-  orientation: string,
-  offsetToAxial: (col: number, row: number, orientation: string) => { q: number; r: number }
+  geometry: IGeometry,
+  orientation: 'flat' | 'pointy',
+  offsetToAxial: (col: number, row: number, orientation: 'flat' | 'pointy') => { q: number; r: number }
 ): void {
   const { ctx, offsetX, offsetY, zoom } = context;
 
@@ -200,10 +192,10 @@ function renderInteriorHexOutlines(
   foggedSet: Set<string>,
   context: HexFogRenderContext,
   hexGeometry: HexGeometryLike,
-  geometry: GeometryLike,
-  orientation: string,
-  offsetToAxial: (col: number, row: number, orientation: string) => { q: number; r: number },
-  axialToOffset: (q: number, r: number, orientation: string) => { col: number; row: number }
+  geometry: IGeometry,
+  orientation: 'flat' | 'pointy',
+  offsetToAxial: (col: number, row: number, orientation: 'flat' | 'pointy') => { q: number; r: number },
+  axialToOffset: (q: number, r: number, orientation: 'flat' | 'pointy') => { col: number; row: number }
 ): void {
   const { ctx, offsetX, offsetY, zoom } = context;
 
@@ -217,7 +209,7 @@ function renderInteriorHexOutlines(
 
     const neighbors = hexGeometry.getNeighbors(q, r);
     const hasFoggedNeighbor = neighbors.some(n => {
-      const { col: nCol, row: nRow } = axialToOffset(n.q, n.r, orientation);
+      const { col: nCol, row: nRow } = axialToOffset(n.x, n.y, orientation);
       return foggedSet.has(`${nCol},${nRow}`);
     });
 
@@ -249,10 +241,10 @@ function renderHexFog(
   options: HexFogRenderOptions,
   visibleBounds: { minCol: number; maxCol: number; minRow: number; maxRow: number },
   hexGeometry: HexGeometryLike,
-  geometry: GeometryLike,
-  orientation: string,
-  offsetToAxial: (col: number, row: number, orientation: string) => { q: number; r: number },
-  axialToOffset: (q: number, r: number, orientation: string) => { col: number; row: number }
+  geometry: IGeometry,
+  orientation: 'flat' | 'pointy',
+  offsetToAxial: (col: number, row: number, orientation: 'flat' | 'pointy') => { q: number; r: number },
+  axialToOffset: (q: number, r: number, orientation: 'flat' | 'pointy') => { col: number; row: number }
 ): void {
   const foggedSet = new Set(fogCells.map(c => `${c.col},${c.row}`));
 

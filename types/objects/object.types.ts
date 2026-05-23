@@ -20,7 +20,8 @@ export type ObjectCategory =
   | 'features'
   | 'encounters'
   | 'markers'
-  | 'custom';
+  | 'custom'
+  | (string & {});
 
 // ===========================================
 // Object Alignment

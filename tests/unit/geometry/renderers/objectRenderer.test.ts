@@ -7,6 +7,10 @@
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
+import type { MapObject, ObjectTypeDefinition } from '#types/objects/object.types';
+import type { MapLayer } from '#types/core/map.types';
+import type { IGeometry } from '#types/core/geometry.types';
+
 import {
   isObjectUnderFog,
   calculateObjectPosition,
@@ -60,7 +64,7 @@ function createMockGeometry() {
 
 // Mock object type
 function createMockObjectType(id = 'test') {
-  return { id, char: 'T' };
+  return { id, char: 'T' } as unknown as ObjectTypeDefinition;
 }
 
 // Mock dependencies
@@ -101,7 +105,7 @@ describe("objectRenderer", () => {
       const obj = { id: '1', type: 'test', position: { x: 1, y: 1 } };
       const layer = { objects: [obj] };
 
-      const result = isObjectUnderFog(obj, layer, geometry, false, deps.isCellFogged);
+      const result = isObjectUnderFog(obj as unknown as MapObject, layer as unknown as MapLayer, geometry as unknown as IGeometry, false, deps.isCellFogged);
 
       expect(result).toBe(false);
       expect(deps.isCellFogged).not.toHaveBeenCalled();
@@ -112,7 +116,7 @@ describe("objectRenderer", () => {
       const layer = { objects: [obj], fogOfWar: { enabled: true } };
       deps.isCellFogged.mockReturnValue(true);
 
-      const result = isObjectUnderFog(obj, layer, geometry, true, deps.isCellFogged);
+      const result = isObjectUnderFog(obj as unknown as MapObject, layer as unknown as MapLayer, geometry as unknown as IGeometry, true, deps.isCellFogged);
 
       expect(result).toBe(true);
       expect(deps.isCellFogged).toHaveBeenCalledTimes(1);
@@ -124,7 +128,7 @@ describe("objectRenderer", () => {
       const layer = { objects: [obj], fogOfWar: { enabled: true } };
       deps.isCellFogged.mockReturnValue(false);
 
-      const result = isObjectUnderFog(obj, layer, geometry, false, deps.isCellFogged);
+      const result = isObjectUnderFog(obj as unknown as MapObject, layer as unknown as MapLayer, geometry as unknown as IGeometry, false, deps.isCellFogged);
 
       expect(result).toBe(false);
       // Should check all 4 cells (2x2)
@@ -140,7 +144,7 @@ describe("objectRenderer", () => {
         .mockReturnValueOnce(false)
         .mockReturnValueOnce(true);
 
-      const result = isObjectUnderFog(obj, layer, geometry, false, deps.isCellFogged);
+      const result = isObjectUnderFog(obj as unknown as MapObject, layer as unknown as MapLayer, geometry as unknown as IGeometry, false, deps.isCellFogged);
 
       expect(result).toBe(true);
     });
@@ -149,7 +153,7 @@ describe("objectRenderer", () => {
       const obj = { id: '1', type: 'test', position: { x: 1, y: 1 } }; // No size specified
       const layer = { objects: [obj], fogOfWar: { enabled: true } };
 
-      isObjectUnderFog(obj, layer, geometry, false, deps.isCellFogged);
+      isObjectUnderFog(obj as unknown as MapObject, layer as unknown as MapLayer, geometry as unknown as IGeometry, false, deps.isCellFogged);
 
       // Should only check one cell
       expect(deps.isCellFogged).toHaveBeenCalledTimes(1);
@@ -165,7 +169,7 @@ describe("objectRenderer", () => {
       const obj = { id: '1', type: 'test', position: { x: 2, y: 3 } };
       const context = { ctx, offsetX: 0, offsetY: 0, zoom: 1, scaledSize: 40 };
 
-      const result = calculateObjectPosition(obj as any, [obj] as any, geometry, context, false, 'flat', deps as any);
+      const result = calculateObjectPosition(obj as any, [obj] as any, geometry as unknown as IGeometry, context, false, 'flat', deps as any);
 
       expect(geometry.gridToScreen).toHaveBeenCalledWith(2, 3, 0, 0, 1);
       expect(result.objectWidth).toBe(40);
@@ -176,7 +180,7 @@ describe("objectRenderer", () => {
       const obj = { id: '1', type: 'test', position: { x: 0, y: 0 }, size: { width: 2, height: 3 } };
       const context = { ctx, offsetX: 0, offsetY: 0, zoom: 1, scaledSize: 40 };
 
-      const result = calculateObjectPosition(obj as any, [obj] as any, geometry, context, false, 'flat', deps as any);
+      const result = calculateObjectPosition(obj as any, [obj] as any, geometry as unknown as IGeometry, context, false, 'flat', deps as any);
 
       expect(result.objectWidth).toBe(80); // 2 * 40
       expect(result.objectHeight).toBe(120); // 3 * 40
@@ -188,7 +192,7 @@ describe("objectRenderer", () => {
       const allObjects = [obj1, obj2];
       const context = { ctx, offsetX: 0, offsetY: 0, zoom: 1, scaledSize: 40 };
 
-      const result = calculateObjectPosition(obj1 as any, allObjects as any, geometry, context, true, 'flat', deps as any);
+      const result = calculateObjectPosition(obj1 as any, allObjects as any, geometry as unknown as IGeometry, context, true, 'flat', deps as any);
 
       expect(deps.getMultiObjectScale).toHaveBeenCalledWith(2);
       expect(deps.getSlotOffset).toHaveBeenCalled();
@@ -200,7 +204,7 @@ describe("objectRenderer", () => {
       const obj = { id: '1', type: 'test', position: { x: 0, y: 0 }, alignment: 'north' as const };
       const context = { ctx, offsetX: 0, offsetY: 0, zoom: 1, scaledSize: 40 };
 
-      const result = calculateObjectPosition(obj as any, [obj] as any, geometry, context, false, 'flat', deps as any);
+      const result = calculateObjectPosition(obj as any, [obj] as any, geometry as unknown as IGeometry, context, false, 'flat', deps as any);
 
       // Should offset Y by -halfCell
       expect(result.screenY).toBeLessThan(0);
@@ -210,7 +214,7 @@ describe("objectRenderer", () => {
       const obj = { id: '1', type: 'test', position: { x: 0, y: 0 }, alignment: 'south' as const };
       const context = { ctx, offsetX: 0, offsetY: 0, zoom: 1, scaledSize: 40 };
 
-      const result = calculateObjectPosition(obj as any, [obj] as any, geometry, context, false, 'flat', deps as any);
+      const result = calculateObjectPosition(obj as any, [obj] as any, geometry as unknown as IGeometry, context, false, 'flat', deps as any);
 
       // Should offset Y by +halfCell
       expect(result.screenY).toBeGreaterThan(0);
@@ -220,7 +224,7 @@ describe("objectRenderer", () => {
       const obj = { id: '1', type: 'test', position: { x: 0, y: 0 }, alignment: 'east' as const };
       const context = { ctx, offsetX: 0, offsetY: 0, zoom: 1, scaledSize: 40 };
 
-      const result = calculateObjectPosition(obj as any, [obj] as any, geometry, context, false, 'flat', deps as any);
+      const result = calculateObjectPosition(obj as any, [obj] as any, geometry as unknown as IGeometry, context, false, 'flat', deps as any);
 
       // Should offset X by +halfCell
       expect(result.screenX).toBeGreaterThan(0);
@@ -230,7 +234,7 @@ describe("objectRenderer", () => {
       const obj = { id: '1', type: 'test', position: { x: 0, y: 0 }, alignment: 'west' as const };
       const context = { ctx, offsetX: 0, offsetY: 0, zoom: 1, scaledSize: 40 };
 
-      const result = calculateObjectPosition(obj as any, [obj] as any, geometry, context, false, 'flat', deps as any);
+      const result = calculateObjectPosition(obj as any, [obj] as any, geometry as unknown as IGeometry, context, false, 'flat', deps as any);
 
       // Should offset X by -halfCell
       expect(result.screenX).toBeLessThan(0);
@@ -247,7 +251,7 @@ describe("objectRenderer", () => {
       const objType = createMockObjectType();
       const position = { screenX: 100, screenY: 100, objectWidth: 40, objectHeight: 40 };
 
-      renderSingleObject(ctx, obj, objType, position, 40, deps.getRenderChar);
+      renderSingleObject(ctx, obj as unknown as MapObject, objType, position, 40, deps.getRenderChar);
 
       expect(ctx.strokeText).toHaveBeenCalled();
       expect(ctx.fillText).toHaveBeenCalled();
@@ -258,7 +262,7 @@ describe("objectRenderer", () => {
       const objType = createMockObjectType();
       const position = { screenX: 100, screenY: 100, objectWidth: 40, objectHeight: 40 };
 
-      renderSingleObject(ctx, obj, objType, position, 40, deps.getRenderChar);
+      renderSingleObject(ctx, obj as unknown as MapObject, objType, position, 40, deps.getRenderChar);
 
       expect(ctx.save).toHaveBeenCalled();
       expect(ctx.rotate).toHaveBeenCalled();
@@ -270,7 +274,7 @@ describe("objectRenderer", () => {
       const objType = createMockObjectType();
       const position = { screenX: 100, screenY: 100, objectWidth: 40, objectHeight: 40 };
 
-      renderSingleObject(ctx, obj, objType, position, 40, deps.getRenderChar);
+      renderSingleObject(ctx, obj as unknown as MapObject, objType, position, 40, deps.getRenderChar);
 
       expect(ctx.save).not.toHaveBeenCalled();
       expect(ctx.rotate).not.toHaveBeenCalled();
@@ -282,7 +286,7 @@ describe("objectRenderer", () => {
       const position = { screenX: 100, screenY: 100, objectWidth: 40, objectHeight: 40 };
       deps.getRenderChar.mockReturnValue({ char: '\ue800', isIcon: true });
 
-      renderSingleObject(ctx, obj, objType, position, 40, deps.getRenderChar);
+      renderSingleObject(ctx, obj as unknown as MapObject, objType, position, 40, deps.getRenderChar);
 
       expect(ctx.font).toContain('rpgawesome');
     });
@@ -293,7 +297,7 @@ describe("objectRenderer", () => {
       const position = { screenX: 100, screenY: 100, objectWidth: 40, objectHeight: 40 };
       deps.getRenderChar.mockReturnValue({ char: '🏰', isIcon: false });
 
-      renderSingleObject(ctx, obj, objType, position, 40, deps.getRenderChar);
+      renderSingleObject(ctx, obj as unknown as MapObject, objType, position, 40, deps.getRenderChar);
 
       expect(ctx.font).toContain('Noto Emoji');
     });
@@ -303,7 +307,7 @@ describe("objectRenderer", () => {
       const objType = createMockObjectType();
       const position = { screenX: 100, screenY: 100, objectWidth: 40, objectHeight: 40 };
 
-      renderSingleObject(ctx, obj, objType, position, 40, deps.getRenderChar);
+      renderSingleObject(ctx, obj as unknown as MapObject, objType, position, 40, deps.getRenderChar);
 
       // Font size should be scaled by 1.5
       expect(ctx.font).toMatch(/\d+px/);
@@ -314,7 +318,7 @@ describe("objectRenderer", () => {
       const objType = createMockObjectType();
       const position = { screenX: 100, screenY: 100, objectWidth: 40, objectHeight: 40 };
 
-      renderSingleObject(ctx, obj, objType, position, 40, deps.getRenderChar);
+      renderSingleObject(ctx, obj as unknown as MapObject, objType, position, 40, deps.getRenderChar);
 
       expect(ctx.fillStyle).toBe('#ff0000');
     });
@@ -324,7 +328,7 @@ describe("objectRenderer", () => {
       const objType = createMockObjectType();
       const position = { screenX: 100, screenY: 100, objectWidth: 40, objectHeight: 40 };
 
-      renderSingleObject(ctx, obj, objType, position, 40, deps.getRenderChar);
+      renderSingleObject(ctx, obj as unknown as MapObject, objType, position, 40, deps.getRenderChar);
 
       expect(ctx.fillStyle).toBe('#ffffff');
     });
@@ -341,7 +345,7 @@ describe("objectRenderer", () => {
 
         deps.getRenderChar.mockReturnValue({ char: '', isIcon: false, isImage: true, imagePath: 'test.png' } as any);
 
-        renderSingleObject(ctx, obj, objType, position, 40, deps.getRenderChar, getCachedImage);
+        renderSingleObject(ctx, obj as unknown as MapObject, objType, position, 40, deps.getRenderChar, getCachedImage);
 
         expect(ctx.drawImage).toHaveBeenCalled();
       });
@@ -355,7 +359,7 @@ describe("objectRenderer", () => {
 
         deps.getRenderChar.mockReturnValue({ char: '', isIcon: false, isImage: true, imagePath: 'vault/images/test.png' } as any);
 
-        renderSingleObject(ctx, obj, objType, position, 40, deps.getRenderChar, getCachedImage);
+        renderSingleObject(ctx, obj as unknown as MapObject, objType, position, 40, deps.getRenderChar, getCachedImage);
 
         expect(getCachedImage).toHaveBeenCalledWith('vault/images/test.png');
       });
@@ -369,7 +373,7 @@ describe("objectRenderer", () => {
 
         deps.getRenderChar.mockReturnValue({ char: '', isIcon: false, isImage: true, imagePath: 'test.png' } as any);
 
-        renderSingleObject(ctx, obj, objType, position, 40, deps.getRenderChar, getCachedImage);
+        renderSingleObject(ctx, obj as unknown as MapObject, objType, position, 40, deps.getRenderChar, getCachedImage);
 
         expect(ctx.fillText).not.toHaveBeenCalled();
         expect(ctx.strokeText).not.toHaveBeenCalled();
@@ -384,7 +388,7 @@ describe("objectRenderer", () => {
 
         deps.getRenderChar.mockReturnValue({ char: '', isIcon: false, isImage: true, imagePath: 'test.png' } as any);
 
-        renderSingleObject(ctx, obj, objType, position, 40, deps.getRenderChar, getCachedImage);
+        renderSingleObject(ctx, obj as unknown as MapObject, objType, position, 40, deps.getRenderChar, getCachedImage);
 
         expect(ctx.save).toHaveBeenCalled();
         expect(ctx.rotate).toHaveBeenCalled();
@@ -400,7 +404,7 @@ describe("objectRenderer", () => {
 
         deps.getRenderChar.mockReturnValue({ char: '', isIcon: false, isImage: true, imagePath: 'test.png' } as any);
 
-        renderSingleObject(ctx, obj, objType, position, 40, deps.getRenderChar, getCachedImage);
+        renderSingleObject(ctx, obj as unknown as MapObject, objType, position, 40, deps.getRenderChar, getCachedImage);
 
         // Check drawImage was called with scaled dimensions
         const drawCall = vi.mocked(ctx.drawImage).mock.calls[0];
@@ -421,7 +425,7 @@ describe("objectRenderer", () => {
 
         deps.getRenderChar.mockReturnValue({ char: '?', isIcon: false, isImage: true, imagePath: 'test.png' } as any);
 
-        renderSingleObject(ctx, obj, objType, position, 40, deps.getRenderChar, getCachedImage);
+        renderSingleObject(ctx, obj as unknown as MapObject, objType, position, 40, deps.getRenderChar, getCachedImage);
 
         // Should fall back to font rendering
         expect(ctx.drawImage).not.toHaveBeenCalled();
@@ -436,7 +440,7 @@ describe("objectRenderer", () => {
         deps.getRenderChar.mockReturnValue({ char: '?', isIcon: false, isImage: true, imagePath: 'test.png' } as any);
 
         // No getCachedImage provided
-        renderSingleObject(ctx, obj, objType, position, 40, deps.getRenderChar);
+        renderSingleObject(ctx, obj as unknown as MapObject, objType, position, 40, deps.getRenderChar);
 
         expect(ctx.drawImage).not.toHaveBeenCalled();
         expect(ctx.fillText).toHaveBeenCalled();
@@ -450,7 +454,7 @@ describe("objectRenderer", () => {
 
         deps.getRenderChar.mockReturnValue({ char: '?', isIcon: false, isImage: true, imagePath: 'test.png' } as any);
 
-        renderSingleObject(ctx, obj, objType, position, 40, deps.getRenderChar, getCachedImage);
+        renderSingleObject(ctx, obj as unknown as MapObject, objType, position, 40, deps.getRenderChar, getCachedImage);
 
         expect(ctx.drawImage).not.toHaveBeenCalled();
         expect(ctx.fillText).toHaveBeenCalled();
@@ -465,7 +469,7 @@ describe("objectRenderer", () => {
 
         deps.getRenderChar.mockReturnValue({ char: '', isIcon: false, isImage: true, imagePath: 'test.png' } as any);
 
-        renderSingleObject(ctx, obj, objType, position, 40, deps.getRenderChar, getCachedImage);
+        renderSingleObject(ctx, obj as unknown as MapObject, objType, position, 40, deps.getRenderChar, getCachedImage);
 
         const drawCall = vi.mocked(ctx.drawImage).mock.calls[0];
         const drawX = drawCall[1];
@@ -490,7 +494,7 @@ describe("objectRenderer", () => {
       const obj = { id: '1', type: 'test', position: { x: 0, y: 0 }, linkedNote: 'some-note' };
       const position = { screenX: 100, screenY: 100, objectWidth: 40, objectHeight: 40 };
 
-      renderObjectBadges(ctx, obj, position, 40, deps);
+      renderObjectBadges(ctx, obj as unknown as MapObject, position, 40, deps);
 
       expect(deps.renderNoteLinkBadge).toHaveBeenCalled();
     });
@@ -499,7 +503,7 @@ describe("objectRenderer", () => {
       const obj = { id: '1', type: 'note_pin', position: { x: 0, y: 0 }, linkedNote: 'some-note' };
       const position = { screenX: 100, screenY: 100, objectWidth: 40, objectHeight: 40 };
 
-      renderObjectBadges(ctx, obj, position, 40, deps);
+      renderObjectBadges(ctx, obj as unknown as MapObject, position, 40, deps);
 
       expect(deps.renderNoteLinkBadge).not.toHaveBeenCalled();
     });
@@ -508,7 +512,7 @@ describe("objectRenderer", () => {
       const obj = { id: '1', type: 'test', position: { x: 0, y: 0 }, customTooltip: 'tooltip text' };
       const position = { screenX: 100, screenY: 100, objectWidth: 40, objectHeight: 40 };
 
-      renderObjectBadges(ctx, obj, position, 40, deps);
+      renderObjectBadges(ctx, obj as unknown as MapObject, position, 40, deps);
 
       expect(deps.renderTooltipIndicator).toHaveBeenCalled();
     });
@@ -517,7 +521,7 @@ describe("objectRenderer", () => {
       const obj = { id: '1', type: 'test', position: { x: 0, y: 0 }, linkedObject: 'other-obj' };
       const position = { screenX: 100, screenY: 100, objectWidth: 40, objectHeight: 40 };
 
-      renderObjectBadges(ctx, obj, position, 40, deps);
+      renderObjectBadges(ctx, obj as unknown as MapObject, position, 40, deps);
 
       expect(deps.renderObjectLinkIndicator).toHaveBeenCalled();
     });
@@ -526,7 +530,7 @@ describe("objectRenderer", () => {
       const obj = { id: '1', type: 'test', position: { x: 0, y: 0 } };
       const position = { screenX: 100, screenY: 100, objectWidth: 40, objectHeight: 40 };
 
-      renderObjectBadges(ctx, obj, position, 40, deps);
+      renderObjectBadges(ctx, obj as unknown as MapObject, position, 40, deps);
 
       expect(deps.renderNoteLinkBadge).not.toHaveBeenCalled();
       expect(deps.renderTooltipIndicator).not.toHaveBeenCalled();
@@ -543,7 +547,7 @@ describe("objectRenderer", () => {
       const layer = { objects: [] as unknown[] };
       const context = { ctx, offsetX: 0, offsetY: 0, zoom: 1, scaledSize: 40 };
 
-      renderObjects(layer as any, context, geometry, false, 'flat', deps as any);
+      renderObjects(layer as any, context, geometry as unknown as IGeometry, false, 'flat', deps as any);
 
       expect(deps.getObjectType).not.toHaveBeenCalled();
     });
@@ -557,7 +561,7 @@ describe("objectRenderer", () => {
       };
       const context = { ctx, offsetX: 0, offsetY: 0, zoom: 1, scaledSize: 40 };
 
-      renderObjects(layer as any, context, geometry, false, 'flat', deps as any);
+      renderObjects(layer as any, context, geometry as unknown as IGeometry, false, 'flat', deps as any);
 
       expect(ctx.fillText).toHaveBeenCalledTimes(2);
     });
@@ -571,7 +575,7 @@ describe("objectRenderer", () => {
       const context = { ctx, offsetX: 0, offsetY: 0, zoom: 1, scaledSize: 40 };
       deps.getObjectType.mockReturnValue(null as any);
 
-      renderObjects(layer as any, context, geometry, false, 'flat', deps as any);
+      renderObjects(layer as any, context, geometry as unknown as IGeometry, false, 'flat', deps as any);
 
       expect(ctx.fillText).not.toHaveBeenCalled();
     });
@@ -584,7 +588,7 @@ describe("objectRenderer", () => {
       const context = { ctx, offsetX: 0, offsetY: 0, zoom: 1, scaledSize: 40 };
       deps.isCellFogged.mockReturnValue(true);
 
-      renderObjects(layer as any, context, geometry, false, 'flat', deps as any);
+      renderObjects(layer as any, context, geometry as unknown as IGeometry, false, 'flat', deps as any);
 
       expect(ctx.fillText).not.toHaveBeenCalled();
     });
@@ -595,7 +599,7 @@ describe("objectRenderer", () => {
       };
       const context = { ctx, offsetX: 0, offsetY: 0, zoom: 1, scaledSize: 40 };
 
-      renderObjects(layer as any, context, geometry, false, 'flat', deps as any);
+      renderObjects(layer as any, context, geometry as unknown as IGeometry, false, 'flat', deps as any);
 
       expect(ctx.textAlign).toBe('center');
       expect(ctx.textBaseline).toBe('middle');

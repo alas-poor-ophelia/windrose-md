@@ -19,6 +19,8 @@ import {
   renderSelections,
 } from "../../../../src/geometry/renderers/selectionRenderer";
 import type { MapObject } from "#types/objects/object.types";
+import type { TextLabel } from "#types/objects/note.types";
+import type { IGeometry } from "#types/core/geometry.types";
 
 // Mock canvas context
 function createMockContext(): CanvasRenderingContext2D {
@@ -51,7 +53,7 @@ function createMockGeometry() {
       screenX: offsetX + x * 40 * zoom,
       screenY: offsetY + y * 40 * zoom,
     })),
-  };
+  } as unknown as IGeometry;
 }
 
 // Mock hex geometry
@@ -94,7 +96,7 @@ describe("selectionRenderer", () => {
 
   describe("renderTextLabelSelection", () => {
     it("renders selection for text label", () => {
-      const label = { id: '1', content: 'Test', position: { x: 100, y: 100 }, fontSize: 16 };
+      const label = { id: '1', content: 'Test', position: { x: 100, y: 100 }, fontSize: 16 } as unknown as TextLabel;
       const context = { ctx, offsetX: 0, offsetY: 0, zoom: 1, scaledSize: 40 };
 
       renderTextLabelSelection(ctx, label, geometry, context, deps.getFontCss);
@@ -105,7 +107,7 @@ describe("selectionRenderer", () => {
     });
 
     it("applies rotation transform", () => {
-      const label = { id: '1', content: 'Test', position: { x: 0, y: 0 }, fontSize: 16, rotation: 45 };
+      const label = { id: '1', content: 'Test', position: { x: 0, y: 0 }, fontSize: 16, rotation: 45 } as unknown as TextLabel;
       const context = { ctx, offsetX: 0, offsetY: 0, zoom: 1, scaledSize: 40 };
 
       renderTextLabelSelection(ctx, label, geometry, context, deps.getFontCss);
@@ -114,7 +116,7 @@ describe("selectionRenderer", () => {
     });
 
     it("sets correct font based on fontFace", () => {
-      const label = { id: '1', content: 'Test', position: { x: 0, y: 0 }, fontSize: 16, fontFace: 'mono' };
+      const label = { id: '1', content: 'Test', position: { x: 0, y: 0 }, fontSize: 16, fontFace: 'mono' } as unknown as TextLabel;
       const context = { ctx, offsetX: 0, offsetY: 0, zoom: 1, scaledSize: 40 };
 
       renderTextLabelSelection(ctx, label, geometry, context, deps.getFontCss);
@@ -124,7 +126,7 @@ describe("selectionRenderer", () => {
     });
 
     it("draws dashed selection rectangle", () => {
-      const label = { id: '1', content: 'Test', position: { x: 0, y: 0 }, fontSize: 16 };
+      const label = { id: '1', content: 'Test', position: { x: 0, y: 0 }, fontSize: 16 } as unknown as TextLabel;
       const context = { ctx, offsetX: 0, offsetY: 0, zoom: 1, scaledSize: 40 };
 
       renderTextLabelSelection(ctx, label, geometry, context, deps.getFontCss);
@@ -134,7 +136,7 @@ describe("selectionRenderer", () => {
     });
 
     it("draws corner handles", () => {
-      const label = { id: '1', content: 'Test', position: { x: 0, y: 0 }, fontSize: 16 };
+      const label = { id: '1', content: 'Test', position: { x: 0, y: 0 }, fontSize: 16 } as unknown as TextLabel;
       const context = { ctx, offsetX: 0, offsetY: 0, zoom: 1, scaledSize: 40 };
 
       renderTextLabelSelection(ctx, label, geometry, context, deps.getFontCss);
@@ -144,7 +146,7 @@ describe("selectionRenderer", () => {
     });
 
     it("scales font size with zoom", () => {
-      const label = { id: '1', content: 'Test', position: { x: 0, y: 0 }, fontSize: 16 };
+      const label = { id: '1', content: 'Test', position: { x: 0, y: 0 }, fontSize: 16 } as unknown as TextLabel;
       const context = { ctx, offsetX: 0, offsetY: 0, zoom: 2, scaledSize: 40 };
 
       renderTextLabelSelection(ctx, label, geometry, context, deps.getFontCss);
@@ -160,7 +162,7 @@ describe("selectionRenderer", () => {
   describe("renderTextLabelSelections", () => {
     it("renders nothing when no text labels selected", () => {
       const selectedItems = [{ id: '1', type: 'object' as const }];
-      const textLabels = [{ id: '1', content: 'Test', position: { x: 0, y: 0 }, fontSize: 16 }];
+      const textLabels = [{ id: '1', content: 'Test', position: { x: 0, y: 0 }, fontSize: 16 }] as unknown as TextLabel[];
       const context = { ctx, offsetX: 0, offsetY: 0, zoom: 1, scaledSize: 40 };
 
       renderTextLabelSelections(selectedItems, textLabels, context, geometry, deps.getFontCss);
@@ -170,10 +172,10 @@ describe("selectionRenderer", () => {
 
     it("renders nothing when textLabels is empty", () => {
       const selectedItems = [{ id: '1', type: 'text' as const }];
-      const textLabels: ReturnType<typeof createMockContext>[] = [];
+      const textLabels: TextLabel[] = [];
       const context = { ctx, offsetX: 0, offsetY: 0, zoom: 1, scaledSize: 40 };
 
-      renderTextLabelSelections(selectedItems, textLabels as never, context, geometry, deps.getFontCss);
+      renderTextLabelSelections(selectedItems, textLabels, context, geometry, deps.getFontCss);
 
       expect(ctx.save).not.toHaveBeenCalled();
     });
@@ -183,7 +185,7 @@ describe("selectionRenderer", () => {
       const textLabels = [
         { id: '1', content: 'Test', position: { x: 0, y: 0 }, fontSize: 16 },
         { id: '2', content: 'Other', position: { x: 50, y: 50 }, fontSize: 16 },
-      ];
+      ] as unknown as TextLabel[];
       const context = { ctx, offsetX: 0, offsetY: 0, zoom: 1, scaledSize: 40 };
 
       renderTextLabelSelections(selectedItems, textLabels, context, geometry, deps.getFontCss);
@@ -200,7 +202,7 @@ describe("selectionRenderer", () => {
       const textLabels = [
         { id: '1', content: 'Test1', position: { x: 0, y: 0 }, fontSize: 16 },
         { id: '2', content: 'Test2', position: { x: 50, y: 50 }, fontSize: 16 },
-      ];
+      ] as unknown as TextLabel[];
       const context = { ctx, offsetX: 0, offsetY: 0, zoom: 1, scaledSize: 40 };
 
       renderTextLabelSelections(selectedItems, textLabels, context, geometry, deps.getFontCss);
@@ -215,7 +217,7 @@ describe("selectionRenderer", () => {
 
   describe("calculateHexObjectSelectionPosition", () => {
     it("calculates position for single object in hex", () => {
-      const object = { id: '1', type: 'char', position: { x: 2, y: 3 } } as MapObject;
+      const object = { id: '1', type: 'char', position: { x: 2, y: 3 } } as unknown as MapObject;
       const allObjects = [object];
       const context = { ctx, offsetX: 10, offsetY: 20, zoom: 1, scaledSize: 40 };
       deps.getObjectsInCell.mockReturnValue([object]);
@@ -230,8 +232,8 @@ describe("selectionRenderer", () => {
     });
 
     it("applies multi-object scaling", () => {
-      const object1 = { id: '1', type: 'char', position: { x: 2, y: 3 } } as MapObject;
-      const object2 = { id: '2', type: 'char', position: { x: 2, y: 3 } } as MapObject;
+      const object1 = { id: '1', type: 'char', position: { x: 2, y: 3 } } as unknown as MapObject;
+      const object2 = { id: '2', type: 'char', position: { x: 2, y: 3 } } as unknown as MapObject;
       const allObjects = [object1, object2];
       const context = { ctx, offsetX: 0, offsetY: 0, zoom: 1, scaledSize: 40 };
       deps.getObjectsInCell.mockReturnValue([object1, object2]);
@@ -245,8 +247,8 @@ describe("selectionRenderer", () => {
     });
 
     it("applies slot offset for multi-object cells", () => {
-      const object1 = { id: '1', type: 'char', position: { x: 2, y: 3 }, slot: 0 } as MapObject;
-      const object2 = { id: '2', type: 'char', position: { x: 2, y: 3 }, slot: 1 } as MapObject;
+      const object1 = { id: '1', type: 'char', position: { x: 2, y: 3 }, slot: 0 } as unknown as MapObject;
+      const object2 = { id: '2', type: 'char', position: { x: 2, y: 3 }, slot: 1 } as unknown as MapObject;
       const allObjects = [object1, object2];
       const context = { ctx, offsetX: 0, offsetY: 0, zoom: 1, scaledSize: 40 };
       deps.getObjectsInCell.mockReturnValue([object1, object2]);
@@ -260,7 +262,7 @@ describe("selectionRenderer", () => {
     });
 
     it("applies alignment offset", () => {
-      const object = { id: '1', type: 'char', position: { x: 0, y: 0 }, alignment: 'north' as const } as MapObject;
+      const object = { id: '1', type: 'char', position: { x: 0, y: 0 }, alignment: 'north' as const } as unknown as MapObject;
       const allObjects = [object];
       const context = { ctx, offsetX: 0, offsetY: 0, zoom: 1, scaledSize: 40 };
       deps.getObjectsInCell.mockReturnValue([object]);
@@ -269,7 +271,7 @@ describe("selectionRenderer", () => {
         object, allObjects, hexGeometry, context, 'flat', deps
       );
 
-      const objectCenter = { id: '2', type: 'char', position: { x: 0, y: 0 }, alignment: 'center' as const } as MapObject;
+      const objectCenter = { id: '2', type: 'char', position: { x: 0, y: 0 }, alignment: 'center' as const } as unknown as MapObject;
       deps.getObjectsInCell.mockReturnValue([objectCenter]);
       const resultCenter = calculateHexObjectSelectionPosition(
         objectCenter, [objectCenter], hexGeometry, context, 'flat', deps
@@ -280,7 +282,7 @@ describe("selectionRenderer", () => {
     });
 
     it("handles custom size objects", () => {
-      const object = { id: '1', type: 'char', position: { x: 0, y: 0 }, size: { width: 2, height: 3 } } as MapObject;
+      const object = { id: '1', type: 'char', position: { x: 0, y: 0 }, size: { width: 2, height: 3 } } as unknown as MapObject;
       const allObjects = [object];
       const context = { ctx, offsetX: 0, offsetY: 0, zoom: 1, scaledSize: 40 };
       deps.getObjectsInCell.mockReturnValue([object]);
@@ -300,7 +302,7 @@ describe("selectionRenderer", () => {
 
   describe("calculateGridObjectSelectionPosition", () => {
     it("calculates position for grid object", () => {
-      const object = { id: '1', type: 'char', position: { x: 2, y: 3 } };
+      const object = { id: '1', type: 'char', position: { x: 2, y: 3 } } as unknown as MapObject;
       const context = { ctx, offsetX: 10, offsetY: 20, zoom: 1, scaledSize: 40 };
 
       const result = calculateGridObjectSelectionPosition(object, geometry, context);
@@ -311,8 +313,8 @@ describe("selectionRenderer", () => {
     });
 
     it("applies alignment offset", () => {
-      const objectNorth = { id: '1', type: 'char', position: { x: 0, y: 0 }, alignment: 'north' as const };
-      const objectCenter = { id: '2', type: 'char', position: { x: 0, y: 0 }, alignment: 'center' as const } as MapObject;
+      const objectNorth = { id: '1', type: 'char', position: { x: 0, y: 0 }, alignment: 'north' as const } as unknown as MapObject;
+      const objectCenter = { id: '2', type: 'char', position: { x: 0, y: 0 }, alignment: 'center' as const } as unknown as MapObject;
       const context = { ctx, offsetX: 0, offsetY: 0, zoom: 1, scaledSize: 40 };
 
       const resultNorth = calculateGridObjectSelectionPosition(objectNorth, geometry, context);
@@ -322,7 +324,7 @@ describe("selectionRenderer", () => {
     });
 
     it("handles custom size objects", () => {
-      const object = { id: '1', type: 'char', position: { x: 0, y: 0 }, size: { width: 2, height: 2 } };
+      const object = { id: '1', type: 'char', position: { x: 0, y: 0 }, size: { width: 2, height: 2 } } as unknown as MapObject;
       const context = { ctx, offsetX: 0, offsetY: 0, zoom: 1, scaledSize: 40 };
 
       const result = calculateGridObjectSelectionPosition(object, geometry, context);
@@ -332,7 +334,7 @@ describe("selectionRenderer", () => {
     });
 
     it("scales with zoom", () => {
-      const object = { id: '1', type: 'char', position: { x: 0, y: 0 } };
+      const object = { id: '1', type: 'char', position: { x: 0, y: 0 } } as unknown as MapObject;
       const context1 = { ctx, offsetX: 0, offsetY: 0, zoom: 1, scaledSize: 40 };
       const context2 = { ctx, offsetX: 0, offsetY: 0, zoom: 2, scaledSize: 80 };
 
@@ -349,7 +351,7 @@ describe("selectionRenderer", () => {
 
   describe("renderResizeOverlay", () => {
     it("renders overlay for 1x1 object", () => {
-      const object = { id: '1', type: 'char', position: { x: 0, y: 0 } };
+      const object = { id: '1', type: 'char', position: { x: 0, y: 0 } } as unknown as MapObject;
 
       renderResizeOverlay(ctx, object, 100, 100, 40, 40);
 
@@ -357,7 +359,7 @@ describe("selectionRenderer", () => {
     });
 
     it("renders overlays for each cell of multi-cell object", () => {
-      const object = { id: '1', type: 'char', position: { x: 0, y: 0 }, size: { width: 2, height: 3 } };
+      const object = { id: '1', type: 'char', position: { x: 0, y: 0 }, size: { width: 2, height: 3 } } as unknown as MapObject;
 
       renderResizeOverlay(ctx, object, 100, 100, 40, 40);
 
@@ -365,7 +367,7 @@ describe("selectionRenderer", () => {
     });
 
     it("sets transparent blue fill style", () => {
-      const object = { id: '1', type: 'char', position: { x: 0, y: 0 } };
+      const object = { id: '1', type: 'char', position: { x: 0, y: 0 } } as unknown as MapObject;
 
       renderResizeOverlay(ctx, object, 100, 100, 40, 40);
 
@@ -432,7 +434,7 @@ describe("selectionRenderer", () => {
 
   describe("renderObjectSelection", () => {
     it("uses hex position calculation for hex maps", () => {
-      const object = { id: '1', type: 'char', position: { x: 2, y: 3 } } as MapObject;
+      const object = { id: '1', type: 'char', position: { x: 2, y: 3 } } as unknown as MapObject;
       const context = { ctx, offsetX: 0, offsetY: 0, zoom: 1, scaledSize: 40 };
       deps.getObjectsInCell.mockReturnValue([object]);
 
@@ -446,7 +448,7 @@ describe("selectionRenderer", () => {
     });
 
     it("uses grid position calculation for grid maps", () => {
-      const object = { id: '1', type: 'char', position: { x: 2, y: 3 } };
+      const object = { id: '1', type: 'char', position: { x: 2, y: 3 } } as unknown as MapObject;
       const context = { ctx, offsetX: 0, offsetY: 0, zoom: 1, scaledSize: 40 };
 
       renderObjectSelection(
@@ -458,7 +460,7 @@ describe("selectionRenderer", () => {
     });
 
     it("renders resize overlay in resize mode", () => {
-      const object = { id: '1', type: 'char', position: { x: 0, y: 0 } };
+      const object = { id: '1', type: 'char', position: { x: 0, y: 0 } } as unknown as MapObject;
       const context = { ctx, offsetX: 0, offsetY: 0, zoom: 1, scaledSize: 40 };
 
       renderObjectSelection(
@@ -471,7 +473,7 @@ describe("selectionRenderer", () => {
     });
 
     it("skips resize overlay when not in resize mode", () => {
-      const object = { id: '1', type: 'char', position: { x: 0, y: 0 } };
+      const object = { id: '1', type: 'char', position: { x: 0, y: 0 } } as unknown as MapObject;
       const context = { ctx, offsetX: 0, offsetY: 0, zoom: 1, scaledSize: 40 };
 
       renderObjectSelection(
@@ -491,7 +493,7 @@ describe("selectionRenderer", () => {
   describe("renderObjectSelections", () => {
     it("renders nothing when no objects selected", () => {
       const selectedItems = [{ id: '1', type: 'text' as const }];
-      const objects = [{ id: '1', type: 'char', position: { x: 0, y: 0 } }];
+      const objects = [{ id: '1', type: 'char', position: { x: 0, y: 0 } }] as unknown as MapObject[];
       const context = { ctx, offsetX: 0, offsetY: 0, zoom: 1, scaledSize: 40 };
 
       renderObjectSelections(
@@ -504,7 +506,7 @@ describe("selectionRenderer", () => {
 
     it("renders nothing when objects array is empty", () => {
       const selectedItems = [{ id: '1', type: 'object' as const }];
-      const objects: { id: string; type: string; position: { x: number; y: number } }[] = [];
+      const objects: MapObject[] = [];
       const context = { ctx, offsetX: 0, offsetY: 0, zoom: 1, scaledSize: 40 };
 
       renderObjectSelections(
@@ -520,7 +522,7 @@ describe("selectionRenderer", () => {
       const objects = [
         { id: '1', type: 'char', position: { x: 0, y: 0 } },
         { id: '2', type: 'char', position: { x: 1, y: 1 } },
-      ];
+      ] as unknown as MapObject[];
       const context = { ctx, offsetX: 0, offsetY: 0, zoom: 1, scaledSize: 40 };
 
       renderObjectSelections(
@@ -539,7 +541,7 @@ describe("selectionRenderer", () => {
       const objects = [
         { id: '1', type: 'char', position: { x: 0, y: 0 } },
         { id: '2', type: 'char', position: { x: 1, y: 1 } },
-      ];
+      ] as unknown as MapObject[];
       const context = { ctx, offsetX: 0, offsetY: 0, zoom: 1, scaledSize: 40 };
 
       renderObjectSelections(
@@ -558,7 +560,7 @@ describe("selectionRenderer", () => {
       const objects = [
         { id: '1', type: 'char', position: { x: 0, y: 0 } },
         { id: '2', type: 'char', position: { x: 1, y: 1 } },
-      ];
+      ] as unknown as MapObject[];
       const context = { ctx, offsetX: 0, offsetY: 0, zoom: 1, scaledSize: 40 };
 
       renderObjectSelections(
@@ -590,7 +592,7 @@ describe("selectionRenderer", () => {
 
     it("does nothing when showCoordinates is true", () => {
       const selectedItems = [{ id: '1', type: 'text' as const }];
-      const textLabels = [{ id: '1', content: 'Test', position: { x: 0, y: 0 }, fontSize: 16 }];
+      const textLabels = [{ id: '1', content: 'Test', position: { x: 0, y: 0 }, fontSize: 16 }] as unknown as TextLabel[];
       const context = { ctx, offsetX: 0, offsetY: 0, zoom: 1, scaledSize: 40 };
 
       renderSelections(
@@ -603,7 +605,7 @@ describe("selectionRenderer", () => {
 
     it("renders text label selections when visibility enabled", () => {
       const selectedItems = [{ id: '1', type: 'text' as const }];
-      const textLabels = [{ id: '1', content: 'Test', position: { x: 0, y: 0 }, fontSize: 16 }];
+      const textLabels = [{ id: '1', content: 'Test', position: { x: 0, y: 0 }, fontSize: 16 }] as unknown as TextLabel[];
       const context = { ctx, offsetX: 0, offsetY: 0, zoom: 1, scaledSize: 40 };
 
       renderSelections(
@@ -616,7 +618,7 @@ describe("selectionRenderer", () => {
 
     it("skips text labels when visibility disabled", () => {
       const selectedItems = [{ id: '1', type: 'text' as const }];
-      const textLabels = [{ id: '1', content: 'Test', position: { x: 0, y: 0 }, fontSize: 16 }];
+      const textLabels = [{ id: '1', content: 'Test', position: { x: 0, y: 0 }, fontSize: 16 }] as unknown as TextLabel[];
       const context = { ctx, offsetX: 0, offsetY: 0, zoom: 1, scaledSize: 40 };
 
       renderSelections(
@@ -629,7 +631,7 @@ describe("selectionRenderer", () => {
 
     it("renders object selections when visibility enabled", () => {
       const selectedItems = [{ id: '1', type: 'object' as const }];
-      const objects = [{ id: '1', type: 'char', position: { x: 0, y: 0 } }];
+      const objects = [{ id: '1', type: 'char', position: { x: 0, y: 0 } }] as unknown as MapObject[];
       const context = { ctx, offsetX: 0, offsetY: 0, zoom: 1, scaledSize: 40 };
 
       renderSelections(
@@ -642,7 +644,7 @@ describe("selectionRenderer", () => {
 
     it("skips objects when visibility disabled", () => {
       const selectedItems = [{ id: '1', type: 'object' as const }];
-      const objects = [{ id: '1', type: 'char', position: { x: 0, y: 0 } }];
+      const objects = [{ id: '1', type: 'char', position: { x: 0, y: 0 } }] as unknown as MapObject[];
       const context = { ctx, offsetX: 0, offsetY: 0, zoom: 1, scaledSize: 40 };
 
       renderSelections(
@@ -658,8 +660,8 @@ describe("selectionRenderer", () => {
         { id: '1', type: 'text' as const },
         { id: '2', type: 'object' as const },
       ];
-      const textLabels = [{ id: '1', content: 'Test', position: { x: 0, y: 0 }, fontSize: 16 }];
-      const objects = [{ id: '2', type: 'char', position: { x: 0, y: 0 } }];
+      const textLabels = [{ id: '1', content: 'Test', position: { x: 0, y: 0 }, fontSize: 16 }] as unknown as TextLabel[];
+      const objects = [{ id: '2', type: 'char', position: { x: 0, y: 0 } }] as unknown as MapObject[];
       const context = { ctx, offsetX: 0, offsetY: 0, zoom: 1, scaledSize: 40 };
 
       renderSelections(
@@ -674,7 +676,7 @@ describe("selectionRenderer", () => {
 
     it("passes isHexMap and hexGeometry for hex maps", () => {
       const selectedItems = [{ id: '1', type: 'object' as const }];
-      const objects = [{ id: '1', type: 'char', position: { x: 2, y: 3 } }] as MapObject[];
+      const objects = [{ id: '1', type: 'char', position: { x: 2, y: 3 } }] as unknown as MapObject[];
       const context = { ctx, offsetX: 0, offsetY: 0, zoom: 1, scaledSize: 40 };
       deps.getObjectsInCell.mockReturnValue(objects);
 

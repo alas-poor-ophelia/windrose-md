@@ -36,19 +36,17 @@ interface FogRenderContext {
   northDirection: number;
 }
 
-interface GridGeometryLike {
+import type { IGeometry } from '#types/core/geometry.types';
+
+export interface GridGeometryLike {
   cellSize: number;
 }
 
-interface HexGeometryLike {
+export interface HexGeometryLike {
   hexSize: number;
   getHexVertices: (q: number, r: number) => Array<{ worldX: number; worldY: number }>;
   hexToWorld: (q: number, r: number) => { worldX: number; worldY: number };
-  getNeighbors: (q: number, r: number) => Array<{ q: number; r: number }>;
-}
-
-interface GeometryLike {
-  worldToScreen: (worldX: number, worldY: number, offsetX: number, offsetY: number, zoom: number) => { screenX: number; screenY: number };
+  getNeighbors: (q: number, r: number) => Array<{ x: number; y: number }>;
 }
 
 interface MapBounds {
@@ -70,10 +68,10 @@ type RenderHexFogFn = (
   options: { fowOpacity: number; fowBlurEnabled: boolean; blurRadius: number; useGlobalAlpha: boolean },
   visibleBounds: { minCol: number; maxCol: number; minRow: number; maxRow: number },
   hexGeometry: HexGeometryLike,
-  geometry: GeometryLike,
-  orientation: string,
-  offsetToAxial: (col: number, row: number, orientation: string) => { q: number; r: number },
-  axialToOffset: (q: number, r: number, orientation: string) => { col: number; row: number }
+  geometry: IGeometry,
+  orientation: 'flat' | 'pointy',
+  offsetToAxial: (col: number, row: number, orientation: 'flat' | 'pointy') => { q: number; r: number },
+  axialToOffset: (q: number, r: number, orientation: 'flat' | 'pointy') => { col: number; row: number }
 ) => void;
 
 /**
@@ -241,13 +239,13 @@ function renderFog(
   isHexMap: boolean,
   hexGeometry: HexGeometryLike | null,
   gridGeometry: GridGeometryLike | null,
-  geometry: GeometryLike,
-  orientation: string,
+  geometry: IGeometry,
+  orientation: 'flat' | 'pointy',
   getCachedImage: (path: string) => HTMLImageElement | null,
   renderGridFog: RenderGridFogFn,
   renderHexFog: RenderHexFogFn,
-  offsetToAxial: (col: number, row: number, orientation: string) => { q: number; r: number },
-  axialToOffset: (q: number, r: number, orientation: string) => { col: number; row: number }
+  offsetToAxial: (col: number, row: number, orientation: 'flat' | 'pointy') => { q: number; r: number },
+  axialToOffset: (q: number, r: number, orientation: 'flat' | 'pointy') => { col: number; row: number }
 ): void {
   if (!fow.enabled || fow.foggedCells == null || fow.foggedCells.length === 0) return;
 

@@ -5,41 +5,10 @@
  * Handles fog visibility, multi-object hex slots, rotation, and badge indicators.
  */
 
-interface MapObject {
-  id: string;
-  type: string;
-  position: { x: number; y: number };
-  size?: { width: number; height: number };
-  color?: string;
-  rotation?: number;
-  scale?: number;
-  alignment?: 'center' | 'north' | 'south' | 'east' | 'west';
-  slot?: number;
-  linkedNote?: string;
-  customTooltip?: string;
-  linkedObject?: string;
-  freeform?: boolean;
-  worldPosition?: { x: number; y: number };
-}
-
-interface ObjectTypeDef {
-  id: string;
-  char?: string;
-  icon?: string;
-}
-
-interface MapLayer {
-  objects: MapObject[];
-  fogOfWar?: {
-    enabled: boolean;
-  };
-}
-
-interface GeometryLike {
-  toOffsetCoords: (x: number, y: number) => { col: number; row: number };
-  gridToScreen: (x: number, y: number, offsetX: number, offsetY: number, zoom: number) => { screenX: number; screenY: number };
-  worldToScreen: (worldX: number, worldY: number, offsetX: number, offsetY: number, zoom: number) => { screenX: number; screenY: number };
-}
+import type { MapObject } from '#types/objects/object.types';
+import type { ObjectTypeDefinition, RenderChar } from '#types/objects/object.types';
+import type { MapLayer } from '#types/core/map.types';
+import type { IGeometry } from '#types/core/geometry.types';
 
 interface ObjectRenderContext {
   ctx: CanvasRenderingContext2D;
@@ -49,20 +18,12 @@ interface ObjectRenderContext {
   scaledSize: number;
 }
 
-/** Render character result from objectTypeResolver */
-interface RenderChar {
-  char: string;
-  isIcon: boolean;
-  isImage?: boolean;
-  imagePath?: string;
-}
-
 interface ObjectRenderDeps {
-  getObjectType: (typeId: string) => ObjectTypeDef | null;
-  getRenderChar: (objType: ObjectTypeDef) => RenderChar;
+  getObjectType: (typeId: string) => ObjectTypeDefinition | null;
+  getRenderChar: (objType: ObjectTypeDefinition | null | undefined) => RenderChar;
   isCellFogged: (layer: MapLayer, col: number, row: number) => boolean;
   getObjectsInCell: (objects: MapObject[], x: number, y: number) => MapObject[];
-  getSlotOffset: (slot: number, count: number, orientation: string) => { offsetX: number; offsetY: number };
+  getSlotOffset: (slot: number, count: number, orientation: 'flat' | 'pointy') => { offsetX: number; offsetY: number };
   getMultiObjectScale: (count: number) => number;
   renderNoteLinkBadge: (ctx: CanvasRenderingContext2D, position: { screenX: number; screenY: number; objectWidth: number; objectHeight: number }, config: { scaledSize: number }) => void;
   renderTooltipIndicator: (ctx: CanvasRenderingContext2D, position: { screenX: number; screenY: number; objectWidth: number; objectHeight: number }, config: { scaledSize: number }) => void;
@@ -76,7 +37,7 @@ interface ObjectRenderDeps {
 function isObjectUnderFog(
   obj: MapObject,
   layer: MapLayer,
-  geometry: GeometryLike,
+  geometry: IGeometry,
   isHexMap: boolean,
   isCellFogged: (layer: MapLayer, col: number, row: number) => boolean
 ): boolean {
@@ -107,10 +68,10 @@ function isObjectUnderFog(
 function calculateObjectPosition(
   obj: MapObject,
   allObjects: MapObject[],
-  geometry: GeometryLike,
+  geometry: IGeometry,
   context: ObjectRenderContext,
   isHexMap: boolean,
-  orientation: string,
+  orientation: 'flat' | 'pointy',
   deps: Pick<ObjectRenderDeps, 'getObjectsInCell' | 'getSlotOffset' | 'getMultiObjectScale'>
 ): { screenX: number; screenY: number; objectWidth: number; objectHeight: number } {
   const { offsetX, offsetY, zoom, scaledSize } = context;
@@ -190,10 +151,10 @@ function calculateObjectPosition(
 function renderSingleObject(
   ctx: CanvasRenderingContext2D,
   obj: MapObject,
-  objType: ObjectTypeDef,
+  objType: ObjectTypeDefinition | null,
   position: { screenX: number; screenY: number; objectWidth: number; objectHeight: number },
   _scaledSize: number,
-  getRenderChar: (objType: ObjectTypeDef) => RenderChar,
+  getRenderChar: (objType: ObjectTypeDefinition | null | undefined) => RenderChar,
   getCachedImage?: (path: string) => HTMLImageElement | null
 ): void {
   const { screenX, screenY, objectWidth, objectHeight } = position;
@@ -286,7 +247,7 @@ function renderObjectBadges(
   }
 
   // Draw link indicator for inter-object links
-  if (obj.linkedObject != null && obj.linkedObject !== '') {
+  if (obj.linkedObject != null) {
     deps.renderObjectLinkIndicator(ctx, position, { scaledSize });
   }
 }
@@ -297,9 +258,9 @@ function renderObjectBadges(
 function renderObjects(
   layer: MapLayer,
   context: ObjectRenderContext,
-  geometry: GeometryLike,
+  geometry: IGeometry,
   isHexMap: boolean,
-  orientation: string,
+  orientation: 'flat' | 'pointy',
   deps: ObjectRenderDeps
 ): void {
   if (layer.objects == null || layer.objects.length === 0) return;

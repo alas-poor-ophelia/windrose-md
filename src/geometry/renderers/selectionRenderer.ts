@@ -5,37 +5,12 @@
  * Handles selection rectangles, corner handles, and resize mode overlays.
  */
 
-interface TextLabel {
-  id: string;
-  content: string;
-  position: { x: number; y: number };
-  fontSize: number;
-  fontFace?: string;
-  rotation?: number;
-}
+import type { MapObject } from '#types/objects/object.types';
+import type { TextLabel } from '#types/objects/note.types';
+import type { RendererSelectedItem } from '#types/hooks/canvasRenderer.types';
+import type { IGeometry } from '#types/core/geometry.types';
 
-interface MapObject {
-  id: string;
-  type: string;
-  position: { x: number; y: number };
-  size?: { width: number; height: number };
-  alignment?: 'center' | 'north' | 'south' | 'east' | 'west';
-  slot?: number;
-  freeform?: boolean;
-  worldPosition?: { x: number; y: number };
-}
-
-interface SelectedItem {
-  id: string;
-  type: 'text' | 'object';
-}
-
-interface GeometryLike {
-  worldToScreen: (worldX: number, worldY: number, offsetX: number, offsetY: number, zoom: number) => { screenX: number; screenY: number };
-  gridToScreen: (x: number, y: number, offsetX: number, offsetY: number, zoom: number) => { screenX: number; screenY: number };
-}
-
-interface HexGeometryLike {
+export interface HexGeometryLike {
   hexToWorld: (q: number, r: number) => { worldX: number; worldY: number };
 }
 
@@ -50,7 +25,7 @@ interface SelectionRenderContext {
 interface SelectionRenderDeps {
   getFontCss: (fontFace: string) => string;
   getObjectsInCell: (objects: MapObject[], x: number, y: number) => MapObject[];
-  getSlotOffset: (slot: number, count: number, orientation: string) => { offsetX: number; offsetY: number };
+  getSlotOffset: (slot: number, count: number, orientation: 'flat' | 'pointy') => { offsetX: number; offsetY: number };
   getMultiObjectScale: (count: number) => number;
 }
 
@@ -66,7 +41,7 @@ const HANDLE_SIZE_RESIZE = 14;
 function renderTextLabelSelection(
   ctx: CanvasRenderingContext2D,
   label: TextLabel,
-  geometry: GeometryLike,
+  geometry: IGeometry,
   context: SelectionRenderContext,
   getFontCss: (fontFace: string) => string
 ): void {
@@ -111,10 +86,10 @@ function renderTextLabelSelection(
  * Renders selection indicators for all selected text labels.
  */
 function renderTextLabelSelections(
-  selectedItems: SelectedItem[],
+  selectedItems: RendererSelectedItem[],
   textLabels: TextLabel[],
   context: SelectionRenderContext,
-  geometry: GeometryLike,
+  geometry: IGeometry,
   getFontCss: (fontFace: string) => string
 ): void {
   const selectedTextLabels = selectedItems.filter(item => item.type === 'text');
@@ -136,7 +111,7 @@ function calculateHexObjectSelectionPosition(
   allObjects: MapObject[],
   hexGeometry: HexGeometryLike,
   context: SelectionRenderContext,
-  orientation: string,
+  orientation: 'flat' | 'pointy',
   deps: Pick<SelectionRenderDeps, 'getObjectsInCell' | 'getSlotOffset' | 'getMultiObjectScale'>
 ): { screenX: number; screenY: number; objectWidth: number; objectHeight: number; cellWidth: number; cellHeight: number } {
   const { offsetX, offsetY, zoom, scaledSize } = context;
@@ -195,7 +170,7 @@ function calculateHexObjectSelectionPosition(
  */
 function calculateGridObjectSelectionPosition(
   object: MapObject,
-  geometry: GeometryLike,
+  geometry: IGeometry,
   context: SelectionRenderContext
 ): { screenX: number; screenY: number; objectWidth: number; objectHeight: number; cellWidth: number; cellHeight: number } {
   const { offsetX, offsetY, zoom, scaledSize } = context;
@@ -309,12 +284,12 @@ function renderObjectSelection(
   ctx: CanvasRenderingContext2D,
   object: MapObject,
   allObjects: MapObject[],
-  geometry: GeometryLike,
+  geometry: IGeometry,
   hexGeometry: HexGeometryLike | null,
   context: SelectionRenderContext,
   isHexMap: boolean,
   isResizeMode: boolean,
-  orientation: string,
+  orientation: 'flat' | 'pointy',
   deps: Pick<SelectionRenderDeps, 'getObjectsInCell' | 'getSlotOffset' | 'getMultiObjectScale'>
 ): void {
   let position: { screenX: number; screenY: number; objectWidth: number; objectHeight: number; cellWidth: number; cellHeight: number };
@@ -350,14 +325,14 @@ function renderObjectSelection(
  * Renders selection indicators for all selected objects.
  */
 function renderObjectSelections(
-  selectedItems: SelectedItem[],
+  selectedItems: RendererSelectedItem[],
   objects: MapObject[],
   context: SelectionRenderContext,
-  geometry: GeometryLike,
+  geometry: IGeometry,
   hexGeometry: HexGeometryLike | null,
   isHexMap: boolean,
   isResizeMode: boolean,
-  orientation: string,
+  orientation: 'flat' | 'pointy',
   deps: Pick<SelectionRenderDeps, 'getObjectsInCell' | 'getSlotOffset' | 'getMultiObjectScale'>
 ): void {
   const selectedObjects = selectedItems.filter(item => item.type === 'object');
@@ -388,15 +363,15 @@ function renderObjectSelections(
  * Main entry point for rendering all selection indicators.
  */
 function renderSelections(
-  selectedItems: SelectedItem[],
+  selectedItems: RendererSelectedItem[],
   textLabels: TextLabel[] | undefined,
   objects: MapObject[] | undefined,
   context: SelectionRenderContext,
-  geometry: GeometryLike,
+  geometry: IGeometry,
   hexGeometry: HexGeometryLike | null,
   isHexMap: boolean,
   isResizeMode: boolean,
-  orientation: string,
+  orientation: 'flat' | 'pointy',
   showCoordinates: boolean,
   visibility: { textLabels?: boolean; objects?: boolean },
   deps: SelectionRenderDeps

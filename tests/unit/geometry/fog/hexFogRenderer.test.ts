@@ -7,6 +7,7 @@
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
+import type { IGeometry } from "#types/core/geometry.types";
 import {
   identifyHexEdgeCells,
   traceHexPath,
@@ -59,12 +60,12 @@ function createMockHexGeometry() {
       worldY: r * 48 + 16,
     })),
     getNeighbors: vi.fn((q: number, r: number) => [
-      { q: q + 1, r: r },
-      { q: q - 1, r: r },
-      { q: q, r: r + 1 },
-      { q: q, r: r - 1 },
-      { q: q + 1, r: r - 1 },
-      { q: q - 1, r: r + 1 },
+      { x: q + 1, y: r },
+      { x: q - 1, y: r },
+      { x: q, y: r + 1 },
+      { x: q, y: r - 1 },
+      { x: q + 1, y: r - 1 },
+      { x: q - 1, y: r + 1 },
     ]),
   };
 }
@@ -76,7 +77,7 @@ function createMockGeometry() {
       screenX: (worldX + offsetX) * zoom,
       screenY: (worldY + offsetY) * zoom,
     })),
-  };
+  } as unknown as IGeometry;
 }
 
 // Mock coordinate converters

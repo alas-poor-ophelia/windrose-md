@@ -7,6 +7,7 @@
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
+import type { IGeometry } from "#types/core/geometry.types";
 import {
   getFogSettings,
   createFogFillStyle,
@@ -333,7 +334,7 @@ describe("fogRenderer", () => {
     const mockAxialToOffset = vi.fn((q, r) => ({ col: q, row: r }));
     const mockGeometry = {
       worldToScreen: vi.fn(),
-    };
+    } as unknown as IGeometry;
 
     beforeEach(() => {
       mockRenderGridFog.mockClear();
