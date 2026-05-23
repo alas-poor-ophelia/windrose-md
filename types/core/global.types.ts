@@ -34,12 +34,7 @@ interface WindroseMcpInstance {
 }
 
 interface WindroseGlobal {
-  obsidian?: unknown;
   version?: string;
-  ready?: boolean;
-  pendingNavigate?: { consumed: boolean; [key: string]: unknown };
-  renderPreview?: (el: HTMLElement, linkPath: string, app: unknown) => void;
-  unmountPreview?: (el: HTMLElement) => void;
   mcpInstances?: Record<string, WindroseMcpInstance>;
 }
 

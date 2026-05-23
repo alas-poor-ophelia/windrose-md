@@ -16,7 +16,7 @@ import type { ObjectTypeId, MapObject } from '#types/objects/object.types';
 import type { TextLabel } from '#types/objects/note.types';
 import type { HexColor } from '#types/core/common.types';
 import type { SelectedItem } from '#types/contexts/context.types';
-import type { CustomColor } from '../shared/ColorPicker.tsx';
+import type { CustomColor } from '#types/core/common.types';
 
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { useMapState, useMapOperations } from '../../context/MapContext';

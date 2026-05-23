@@ -13,7 +13,7 @@ import type { ToolId } from '#types/tools/tool.types';
 import type { TextLabel } from '#types/objects/note.types';
 import type { VNode } from 'preact';
 import type { HexColor } from '#types/core/common.types';
-import type { CustomColor } from '../shared/ColorPicker.tsx';
+import type { CustomColor } from '#types/core/common.types';
 
 import { useCallback, useEffect, useRef } from 'preact/hooks';
 import { useTextLabelInteraction } from '../../hooks/interactions/useTextLabelInteraction';

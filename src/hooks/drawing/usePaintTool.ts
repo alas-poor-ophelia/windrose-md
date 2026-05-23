@@ -133,15 +133,13 @@ function usePaintTool({
             const edgeKey = `${edgeInfo.x},${edgeInfo.y},${edgeInfo.side}`;
 
             if (!processedEdges.has(edgeKey)) {
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              const existingEdge = getEdgeAt(activeLayer.edges as any, edgeInfo.x, edgeInfo.y, edgeInfo.side);
+              const existingEdge = getEdgeAt(activeLayer.edges, edgeInfo.x, edgeInfo.y, edgeInfo.side);
               if (existingEdge) {
                 if (strokeInitialEdgesRef.current === null) {
                   strokeInitialEdgesRef.current = [...activeLayer.edges];
                 }
                 setProcessedEdges((prev: Set<string>) => new Set([...prev, edgeKey]));
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const newEdges = removeEdge(activeLayer.edges as any, edgeInfo.x, edgeInfo.y, edgeInfo.side);
+                const newEdges = removeEdge(activeLayer.edges, edgeInfo.x, edgeInfo.y, edgeInfo.side);
                 onEdgesChange(newEdges, isBatchedStroke);
                 return;
               }

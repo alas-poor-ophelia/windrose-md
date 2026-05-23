@@ -8,8 +8,11 @@
 
 import type {
   MapData,
+  MapSettings,
   MapType,
+  UIPreferences,
   HexBounds,
+  BackgroundImage,
   MeasurementMethod,
 } from '#types/core/map.types';
 import type { Cell } from '#types/core/cell.types';
@@ -47,19 +50,11 @@ import { createContext } from 'preact';
 import type { MutableRef } from 'preact/hooks';
 import { useCallback, useContext, useEffect, useMemo, useReducer, useRef } from 'preact/hooks';
 import { Actions, GRID_DENSITY_PRESETS, settingsReducer, buildInitialState, calculateBoundsFromSettings, getOrphanedContentInfo } from '../components/settings/settingsReducer';
+import type { CurrentSettings, CurrentBackgroundImage, CurrentDistanceSettings } from '../components/settings/settingsReducer';
 import { getSettings } from '../core/settingsAccessor';
 import { THEME } from '../core/dmtConstants';
 import { getImageDisplayNames, getFullPathFromDisplayName, getDisplayNameFromPath, getImageDimensions } from '../assets/imageOperations';
 import { calculateGridFromColumns, calculateGridFromMeasurement, measurementToHexSize, hexSizeToMeasurement, MEASUREMENT_EDGE, MEASUREMENT_CORNER, getFineTuneRange } from '../geometry/core/hexMeasurements';
-
-
-
-
-// Reducer and pure logic
-
-
-// Dependencies for async operations and constants
-
 
 
 
@@ -106,13 +101,6 @@ export interface DistanceSettings {
   displayFormat: DistanceDisplayFormat;
 }
 
-/** User preferences from settings modal (superset of reducer's SettingsPreferences) */
-export interface ModalPreferences extends SettingsPreferences {
-  showCompass: boolean;
-  expandedByDefault: boolean;
-  alwaysShowControls: boolean;
-  coordinateKeyMode: 'hold' | 'toggle';
-}
 
 /** Orphan info for resize confirmation */
 export type OrphanInfo = ReducerOrphanInfo;
@@ -151,7 +139,7 @@ export interface MapSettingsHandlers {
   handleLineWidthChange: (value: number) => void;
 
   // Preferences
-  handlePreferenceToggle: (key: keyof ModalPreferences) => void;
+  handlePreferenceToggle: (key: PreferenceKey) => void;
 
   // Distance settings
   setDistanceSettings: (updates: Partial<DistanceSettings>) => void;
@@ -227,8 +215,8 @@ export interface ModalShellContextValue {
   distanceSettings: DistanceSettings;
   setDistanceSettings: (updates: Partial<DistanceSettings>) => void;
   // Preferences tab fields
-  preferences: ModalPreferences;
-  handlePreferenceToggle: (key: keyof ModalPreferences) => void;
+  preferences: SettingsPreferences;
+  handlePreferenceToggle: (key: PreferenceKey) => void;
   // Export (PreferencesTab)
   mapData: MapData | null;
   geometry: IGeometry | null;
@@ -351,22 +339,22 @@ export interface MapSettingsProviderProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (
-    settingsData: SettingsSaveData,
-    preferences: ModalPreferences,
+    settingsData: MapSettings,
+    preferencesData: UIPreferences,
     hexBounds: HexBounds | null,
-    backgroundImageData: BackgroundImageConfig | null,
-    calculatedHexSize: number | null,
-    forceDelete: boolean
+    backgroundImage: BackgroundImage | null,
+    hexSize: number | null,
+    deleteOrphanedContent: boolean
   ) => void;
   onOpenAlignmentMode?: (currentX: number, currentY: number) => void;
   initialTab?: SettingsTabId | null;
   mapType?: MapType;
   orientation?: HexOrientation;
-  currentSettings?: Partial<PluginSettings> | null;
-  currentPreferences?: Partial<ModalPreferences> | null;
+  currentSettings?: CurrentSettings | null;
+  currentPreferences?: SettingsPreferences | null;
   currentHexBounds?: HexBounds | null;
-  currentBackgroundImage?: BackgroundImageConfig | null;
-  currentDistanceSettings?: Partial<DistanceSettings> | null;
+  currentBackgroundImage?: CurrentBackgroundImage | null;
+  currentDistanceSettings?: CurrentDistanceSettings | null;
   currentCells?: Cell[];
   currentObjects?: MapObject[];
   currentObjectSetId?: string | null;
@@ -441,8 +429,8 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
   // State via reducer
   const [state, dispatch] = useReducer(
     settingsReducer,
-    { props: { initialTab: initialTab ?? undefined, mapType, currentSettings: currentSettings as unknown as BuildInitialStateProps['currentSettings'], currentPreferences: currentPreferences as unknown as SettingsPreferences, currentHexBounds: currentHexBounds ?? undefined, currentBackgroundImage: (currentBackgroundImage ?? undefined) as unknown as BuildInitialStateProps['currentBackgroundImage'], currentDistanceSettings: (currentDistanceSettings ?? undefined) as unknown as BuildInitialStateProps['currentDistanceSettings'], currentObjectSetId }, globalSettings },
-    (init: { props: BuildInitialStateProps; globalSettings: PluginSettings }) => buildInitialState(init.props, init.globalSettings as unknown as Parameters<typeof buildInitialState>[1])
+    { props: { initialTab: initialTab ?? undefined, mapType, currentSettings: currentSettings ?? undefined, currentPreferences: currentPreferences ?? undefined, currentHexBounds: currentHexBounds ?? undefined, currentBackgroundImage: currentBackgroundImage ?? undefined, currentDistanceSettings: currentDistanceSettings ?? undefined, currentObjectSetId }, globalSettings },
+    (init: { props: BuildInitialStateProps; globalSettings: PluginSettings }) => buildInitialState(init.props, init.globalSettings)
   );
 
   // Refs
@@ -470,8 +458,8 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
     dispatch({
       type: Actions.INITIALIZE,
       payload: {
-        props: { initialTab: initialTab ?? undefined, mapType, currentSettings: currentSettings as unknown as BuildInitialStateProps['currentSettings'], currentPreferences: currentPreferences as unknown as SettingsPreferences, currentHexBounds: currentHexBounds ?? undefined, currentBackgroundImage: (currentBackgroundImage ?? undefined) as unknown as BuildInitialStateProps['currentBackgroundImage'], currentDistanceSettings: (currentDistanceSettings ?? undefined) as unknown as BuildInitialStateProps['currentDistanceSettings'], currentObjectSetId },
-        globalSettings: globalSettings as unknown as Parameters<typeof buildInitialState>[1]
+        props: { initialTab: initialTab ?? undefined, mapType, currentSettings: currentSettings ?? undefined, currentPreferences: currentPreferences ?? undefined, currentHexBounds: currentHexBounds ?? undefined, currentBackgroundImage: currentBackgroundImage ?? undefined, currentDistanceSettings: currentDistanceSettings ?? undefined, currentObjectSetId },
+        globalSettings
       }
     });
 
@@ -658,7 +646,14 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
   // Core save logic - forceDelete bypasses orphan check
   const doSave = (forceDelete: boolean = false): void => {
     dispatch({ type: Actions.SET_LOADING, payload: true });
-    onSave(settingsData, state.preferences as unknown as ModalPreferences, mapType === 'hex' ? state.hexBounds : null, backgroundImageData, calculatedHexSize, forceDelete);
+    const mapSettings: MapSettings = {
+      useGlobalSettings: settingsData.useGlobalSettings,
+      overrides: settingsData.overrides as Record<string, unknown>,
+      coordinateDisplayMode: settingsData.coordinateDisplayMode,
+      distanceSettings: settingsData.distanceSettings != null ? settingsData.distanceSettings as unknown as Record<string, unknown> : undefined,
+      objectSetId: settingsData.objectSetId,
+    };
+    onSave(mapSettings, state.preferences, mapType === 'hex' ? state.hexBounds : null, backgroundImageData, calculatedHexSize, forceDelete);
     dispatch({ type: Actions.CLEAR_DELETE_FLAG });
     dispatch({ type: Actions.SET_LOADING, payload: false });
     onClose();
@@ -707,7 +702,7 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
     handleToggleUseGlobal: () => dispatch({ type: Actions.TOGGLE_USE_GLOBAL }),
     handleColorChange: (key, value) => dispatch({ type: Actions.SET_OVERRIDE, payload: { key: key as keyof SettingsOverrides, value } }),
     handleLineWidthChange: (value) => dispatch({ type: Actions.SET_LINE_WIDTH, payload: value }),
-    handlePreferenceToggle: (key) => dispatch({ type: Actions.TOGGLE_PREFERENCE, payload: key as PreferenceKey }),
+    handlePreferenceToggle: (key) => dispatch({ type: Actions.TOGGLE_PREFERENCE, payload: key }),
     setDistanceSettings: (updates) => dispatch({ type: Actions.SET_DISTANCE_SETTING, payload: updates }),
     setCoordinateDisplayMode: (mode) => dispatch({ type: Actions.SET_COORDINATE_MODE, payload: mode }),
     setActiveColorPicker: (picker) => dispatch({ type: Actions.SET_ACTIVE_COLOR_PICKER, payload: picker as ColorPickerId }),
@@ -812,7 +807,7 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
     mouseDownTargetRef,
     distanceSettings: state.distanceSettings,
     setDistanceSettings: handlers.setDistanceSettings,
-    preferences: state.preferences as unknown as ModalPreferences,
+    preferences: state.preferences,
     handlePreferenceToggle: handlers.handlePreferenceToggle,
     mapData, geometry,
     isInSubHex, subMapName

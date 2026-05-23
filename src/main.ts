@@ -1,4 +1,4 @@
-import { Plugin, Notice } from 'obsidian';
+import { Plugin, Notice, TFile } from 'obsidian';
 import type { PluginSettings } from '#types/settings/settings.types';
 import type { MapType } from '#types/index';
 import { render, h } from 'preact';
@@ -35,6 +35,7 @@ interface DungeonGenOptions {
 export default class WindrosePlugin extends Plugin {
   settings: Partial<PluginSettings> = {};
   dataFilePath: string = 'windrose-md-data.json';
+  private mountedElements: Set<HTMLElement> = new Set();
 
   async onload(): Promise<void> {
     await this.loadSettings();
@@ -69,6 +70,7 @@ export default class WindrosePlugin extends Plugin {
         ),
         el
       );
+      this.mountedElements.add(el);
     });
 
     registerDeepLinks(this);
@@ -97,10 +99,9 @@ export default class WindrosePlugin extends Plugin {
       id: 'insert-random-dungeon',
       name: 'Generate random dungeon',
       editorCallback: async (editor) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        new (InsertDungeonModal as any)(this.app, this, async (mapName: string, cells: any[], objects: any[], edges: any[], options: any) => {
+        new InsertDungeonModal(this.app, this, async (mapName, cells, objects, edges, options) => {
           const mapId = 'map-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
-          await this.saveDungeonToJson(mapId, mapName, cells, objects, edges, options);
+          await this.saveDungeonToJson(mapId, mapName, cells as DungeonCell[], objects, edges, options as DungeonGenOptions);
 
           const codeBlock = [
             '```windrose-map',
@@ -117,27 +118,25 @@ export default class WindrosePlugin extends Plugin {
   }
 
   onunload(): void {
-    clearPlugin();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const w = window as any;
-    if (w.__windrose != null) {
-      w.__windrose.mcpInstances = null;
+    for (const el of this.mountedElements) {
+      render(null, el);
     }
+    this.mountedElements.clear();
+    clearPlugin();
+    delete window.__windrose;
   }
 
   private initMcpNamespace(): void {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const w = window as any;
-    w.__windrose = w.__windrose ?? {};
-    w.__windrose.version = this.manifest.version;
+    window.__windrose = window.__windrose ?? {};
+    window.__windrose.version = this.manifest.version;
   }
 
   private async resolveDebugConfig(): Promise<void> {
     try {
       let content: string | null = null;
       const debugFile = this.app.vault.getAbstractFileByPath('WINDROSE-DEBUG.json');
-      if (debugFile != null) {
-        content = await this.app.vault.read(debugFile as import('obsidian').TFile);
+      if (debugFile instanceof TFile) {
+        content = await this.app.vault.read(debugFile);
       } else if (await this.app.vault.adapter.exists('WINDROSE-DEBUG.json')) {
         content = await this.app.vault.adapter.read('WINDROSE-DEBUG.json');
       }
@@ -164,8 +163,7 @@ export default class WindrosePlugin extends Plugin {
       if (!await this.app.vault.adapter.exists(oldDataPath)) return;
 
       const content = await this.app.vault.adapter.read(oldDataPath);
-      const oldSettings = JSON.parse(content);
-
+      const oldSettings = JSON.parse(content) as Record<string, unknown>;
 
       const { version, ...importable } = oldSettings;
       this.settings = importable;
@@ -207,13 +205,11 @@ export default class WindrosePlugin extends Plugin {
     }
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  async loadDungeonGenerator(): Promise<any> {
+  async loadDungeonGenerator(): Promise<typeof dungeonGenerator> {
     return dungeonGenerator;
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  async loadObjectPlacer(): Promise<any> {
+  async loadObjectPlacer(): Promise<typeof objectPlacer> {
     return objectPlacer;
   }
 
@@ -268,9 +264,10 @@ export default class WindrosePlugin extends Plugin {
       const dataFilePath = this.dataFilePath;
       let allData: { maps: Record<string, unknown> } = { maps: {} };
 
-      const file = this.app.vault.getAbstractFileByPath(dataFilePath);
+      const abstractFile = this.app.vault.getAbstractFileByPath(dataFilePath);
+      const file = abstractFile instanceof TFile ? abstractFile : null;
       if (file != null) {
-        const content = await this.app.vault.read(file as import('obsidian').TFile);
+        const content = await this.app.vault.read(file);
         allData = JSON.parse(content) as { maps: Record<string, unknown> };
       }
 
@@ -343,7 +340,7 @@ export default class WindrosePlugin extends Plugin {
 
       const jsonString = JSON.stringify(allData, null, 2);
       if (file != null) {
-        await this.app.vault.modify(file as import('obsidian').TFile, jsonString);
+        await this.app.vault.modify(file, jsonString);
       } else {
         const dirPath = dataFilePath.substring(0, dataFilePath.lastIndexOf('/'));
         if (dirPath !== '') {

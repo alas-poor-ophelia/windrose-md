@@ -8,7 +8,8 @@ import type { JSX, VNode } from 'preact';
 import type { HexColor } from '#types/core/common.types';
 import type { MapType } from '#types/core/map.types';
 import type { ToolId } from '#types/tools/tool.types';
-import type { CustomColor, ColorOpacityOverrides } from '../shared/ColorPicker.tsx';
+import type { CustomColor } from '#types/core/common.types';
+import type { ColorOpacityOverrides } from '../shared/ColorPicker.tsx';
 
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { DEFAULT_COLOR } from '../../drawing/colorOperations';

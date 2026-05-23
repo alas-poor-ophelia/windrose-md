@@ -16,6 +16,7 @@ import type {
   ImageDimensions,
   GridCalculation,
   GridDensityPreset,
+  PluginSettings,
 } from '#types/settings/settings.types';
 import type { HexColor } from '#types/core/common.types';
 import type { Cell } from '#types/core/cell.types';
@@ -179,16 +180,16 @@ export interface SettingsModalState {
 // Props Interface
 // ===========================================
 
-/** Current settings from map */
-interface CurrentSettings {
+/** Current settings from map (accepts persistence-layer shapes) */
+export interface CurrentSettings {
   useGlobalSettings?: boolean;
-  overrides?: Partial<SettingsOverrides>;
-  coordinateDisplayMode?: CoordinateDisplayMode;
+  overrides?: Record<string, unknown>;
+  coordinateDisplayMode?: string;
 }
 
 /** Current background image settings */
-interface CurrentBackgroundImage {
-  path?: string;
+export interface CurrentBackgroundImage {
+  path?: string | null;
   opacity?: number;
   offsetX?: number;
   offsetY?: number;
@@ -205,37 +206,12 @@ interface CurrentBackgroundImage {
 }
 
 /** Current distance settings */
-interface CurrentDistanceSettings {
+export interface CurrentDistanceSettings {
   useGlobalDistance?: boolean;
   distancePerCell?: number;
   distanceUnit?: string;
   gridDiagonalRule?: DiagonalRule;
   displayFormat?: DistanceDisplayFormat;
-}
-
-/** Global settings from plugin */
-interface GlobalSettings {
-  gridLineColor?: HexColor;
-  gridLineWidth?: number;
-  backgroundColor?: HexColor;
-  borderColor?: HexColor;
-  coordinateKeyColor?: HexColor;
-  coordinateTextColor?: HexColor;
-  coordinateTextShadow?: HexColor;
-  canvasHeight?: number;
-  canvasHeightMobile?: number;
-  fogOfWarColor?: HexColor;
-  fogOfWarOpacity?: number;
-  fogOfWarImage?: string | null;
-  fogOfWarBlurEnabled?: boolean;
-  fogOfWarBlurFactor?: number;
-  alwaysShowControls?: boolean;
-  distancePerCellHex?: number;
-  distancePerCellGrid?: number;
-  distanceUnitHex?: string;
-  distanceUnitGrid?: string;
-  gridDiagonalRule?: DiagonalRule;
-  distanceDisplayFormat?: DistanceDisplayFormat;
 }
 
 /** Props for buildInitialState */
@@ -303,7 +279,7 @@ const Actions = {
 
 interface InitializeAction {
   type: typeof Actions.INITIALIZE;
-  payload: { props: BuildInitialStateProps; globalSettings: GlobalSettings };
+  payload: { props: BuildInitialStateProps; globalSettings: PluginSettings };
 }
 
 interface SetTabAction {
@@ -534,9 +510,6 @@ const GRID_DENSITY_PRESETS: Record<Exclude<GridDensityKey, 'custom'>, GridDensit
 // ===========================================
 
 /**
- * Check if content would be orphaned by new bounds
- */
-/**
  * Ring distance from origin in axial coordinates
  */
 function getHexRing(q: number, r: number): number {
@@ -616,7 +589,7 @@ function calculateBoundsFromSettings(
 /**
  * Build initial state from props and global settings
  */
-function buildInitialState(props: BuildInitialStateProps, globalSettings: GlobalSettings): SettingsModalState {
+function buildInitialState(props: BuildInitialStateProps, globalSettings: PluginSettings): SettingsModalState {
   const {
     initialTab,
     mapType,
@@ -628,33 +601,35 @@ function buildInitialState(props: BuildInitialStateProps, globalSettings: Global
   } = props;
   
   const isHexMap = mapType === 'hex';
-  const defaultDistancePerCell = isHexMap 
-    ? (globalSettings.distancePerCellHex ?? 6) 
+  const defaultDistancePerCell = isHexMap
+    ? (globalSettings.distancePerCellHex ?? 6)
     : (globalSettings.distancePerCellGrid ?? 5);
-  const defaultDistanceUnit = isHexMap 
-    ? (globalSettings.distanceUnitHex ?? 'mi') 
+  const defaultDistanceUnit = isHexMap
+    ? (globalSettings.distanceUnitHex ?? 'mi')
     : (globalSettings.distanceUnitGrid ?? 'ft');
-  
+
+  const o = (currentSettings?.overrides ?? {}) as Partial<SettingsOverrides>;
+
   return {
     activeTab: initialTab || 'appearance',
-    
+
     useGlobalSettings: currentSettings?.useGlobalSettings ?? true,
     overrides: {
-      gridLineColor: currentSettings?.overrides?.gridLineColor ?? globalSettings.gridLineColor ?? '#666666',
-      gridLineWidth: currentSettings?.overrides?.gridLineWidth ?? globalSettings.gridLineWidth ?? 1,
-      backgroundColor: currentSettings?.overrides?.backgroundColor ?? globalSettings.backgroundColor ?? '#1a1a1a',
-      borderColor: currentSettings?.overrides?.borderColor ?? globalSettings.borderColor ?? '#8b6842',
-      coordinateKeyColor: currentSettings?.overrides?.coordinateKeyColor ?? globalSettings.coordinateKeyColor ?? '#c4a57b',
-      coordinateTextColor: currentSettings?.overrides?.coordinateTextColor ?? globalSettings.coordinateTextColor ?? '#ffffff',
-      coordinateTextShadow: currentSettings?.overrides?.coordinateTextShadow ?? globalSettings.coordinateTextShadow ?? '#000000',
-      canvasHeight: currentSettings?.overrides?.canvasHeight ?? globalSettings.canvasHeight ?? 600,
-      canvasHeightMobile: currentSettings?.overrides?.canvasHeightMobile ?? globalSettings.canvasHeightMobile ?? 400,
-      fogOfWarColor: currentSettings?.overrides?.fogOfWarColor ?? globalSettings.fogOfWarColor ?? '#000000',
-      fogOfWarOpacity: currentSettings?.overrides?.fogOfWarOpacity ?? globalSettings.fogOfWarOpacity ?? 0.9,
-      fogOfWarImage: currentSettings?.overrides?.fogOfWarImage ?? globalSettings.fogOfWarImage ?? null,
-      fogOfWarBlurEnabled: currentSettings?.overrides?.fogOfWarBlurEnabled ?? globalSettings.fogOfWarBlurEnabled ?? false,
-      fogOfWarBlurFactor: currentSettings?.overrides?.fogOfWarBlurFactor ?? globalSettings.fogOfWarBlurFactor ?? 0.99,
-      alwaysShowControls: currentSettings?.overrides?.alwaysShowControls ?? globalSettings.alwaysShowControls ?? false
+      gridLineColor: o.gridLineColor ?? globalSettings.gridLineColor ?? '#666666',
+      gridLineWidth: o.gridLineWidth ?? globalSettings.gridLineWidth ?? 1,
+      backgroundColor: o.backgroundColor ?? globalSettings.backgroundColor ?? '#1a1a1a',
+      borderColor: o.borderColor ?? globalSettings.borderColor ?? '#8b6842',
+      coordinateKeyColor: o.coordinateKeyColor ?? globalSettings.coordinateKeyColor ?? '#c4a57b',
+      coordinateTextColor: o.coordinateTextColor ?? globalSettings.coordinateTextColor ?? '#ffffff',
+      coordinateTextShadow: o.coordinateTextShadow ?? globalSettings.coordinateTextShadow ?? '#000000',
+      canvasHeight: o.canvasHeight ?? globalSettings.canvasHeight ?? 600,
+      canvasHeightMobile: o.canvasHeightMobile ?? globalSettings.canvasHeightMobile ?? 400,
+      fogOfWarColor: o.fogOfWarColor ?? globalSettings.fogOfWarColor ?? '#000000',
+      fogOfWarOpacity: o.fogOfWarOpacity ?? globalSettings.fogOfWarOpacity ?? 0.9,
+      fogOfWarImage: o.fogOfWarImage ?? globalSettings.fogOfWarImage ?? null,
+      fogOfWarBlurEnabled: o.fogOfWarBlurEnabled ?? globalSettings.fogOfWarBlurEnabled ?? false,
+      fogOfWarBlurFactor: o.fogOfWarBlurFactor ?? globalSettings.fogOfWarBlurFactor ?? 0.99,
+      alwaysShowControls: o.alwaysShowControls ?? globalSettings.alwaysShowControls ?? false
     },
     
     preferences: {
@@ -678,7 +653,7 @@ function buildInitialState(props: BuildInitialStateProps, globalSettings: Global
       ...(currentHexBounds?.maxRing !== undefined ? { maxRing: currentHexBounds.maxRing } : {})
     },
     
-    coordinateDisplayMode: currentSettings?.coordinateDisplayMode ?? 'rectangular',
+    coordinateDisplayMode: (currentSettings?.coordinateDisplayMode ?? 'rectangular') as CoordinateDisplayMode,
     
     backgroundImagePath: currentBackgroundImage?.path ?? null,
     backgroundImageDisplayName: currentBackgroundImage?.path != null && currentBackgroundImage.path !== ''
@@ -687,8 +662,8 @@ function buildInitialState(props: BuildInitialStateProps, globalSettings: Global
     imageDimensions: null,
     imageSearchResults: [],
     
-    fogImageDisplayName: currentSettings?.overrides?.fogOfWarImage != null && currentSettings.overrides.fogOfWarImage !== ''
-      ? getDisplayNameFromPath(currentSettings.overrides.fogOfWarImage)
+    fogImageDisplayName: o.fogOfWarImage != null && o.fogOfWarImage !== ''
+      ? getDisplayNameFromPath(o.fogOfWarImage)
       : '',
     fogImageSearchResults: [],
     
@@ -1040,8 +1015,10 @@ function settingsReducer(state: SettingsModalState, action: SettingsAction): Set
       }
     }
 
-    default:
+    default: {
+      const _exhaustive: never = action;
       return state;
+    }
   }
 }
 

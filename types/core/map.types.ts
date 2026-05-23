@@ -6,6 +6,7 @@
  */
 
 import type { Cell } from './cell.types';
+import type { CustomColor } from './common.types';
 import type { Curve } from './curve.types';
 import type { Point } from './geometry.types';
 import type { HexOrientation, FrameSettings } from '../settings/settings.types';
@@ -83,17 +84,6 @@ export interface BackgroundImage {
   measurementMethod?: MeasurementMethod;
   measurementSize?: number;
   fineTuneOffset?: number;
-}
-
-// ===========================================
-// Custom Color (per-map palette)
-// ===========================================
-
-export interface MapCustomColor {
-  id: string;
-  color: string;
-  label: string;
-  opacity?: number;
 }
 
 // ===========================================
@@ -309,7 +299,7 @@ export interface MapData {
   expandedState?: boolean;
 
   // Custom colors for this map
-  customColors?: MapCustomColor[];
+  customColors?: CustomColor[];
 
   // Remembered text label settings
   lastTextLabelSettings?: TextLabelSettings | null;

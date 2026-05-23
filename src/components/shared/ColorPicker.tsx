@@ -5,7 +5,7 @@
  */
 
 import type { JSX, VNode } from 'preact';
-import type { HexColor } from '#types/core/common.types';
+import type { CustomColor, HexColor } from '#types/core/common.types';
 
 import type { MutableRef } from 'preact/hooks';
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
@@ -29,14 +29,6 @@ export interface ColorDef {
   isReset?: boolean;
   isAddButton?: boolean;
   isPreview?: boolean;
-}
-
-/** Custom color with opacity */
-export interface CustomColor {
-  id: string;
-  color: HexColor;
-  label?: string;
-  opacity?: number;
 }
 
 /** Position for color picker */

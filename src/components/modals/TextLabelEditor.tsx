@@ -19,7 +19,7 @@ import type { JSX, VNode } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { FONT_OPTIONS, DEFAULT_FONT, DEFAULT_FONT_SIZE, DEFAULT_TEXT_COLOR, FONT_SIZE_MIN, FONT_SIZE_MAX, FONT_SIZE_STEP, getFontOption } from '../../text/fontOptions';
 import { ColorPicker } from '../shared/ColorPicker';
-import type { CustomColor } from '../shared/ColorPicker';
+import type { CustomColor } from '#types/core/common.types';
 import { Modal } from 'obsidian';
 import type { App } from 'obsidian';
 import { Icon } from '../shared/Icon';

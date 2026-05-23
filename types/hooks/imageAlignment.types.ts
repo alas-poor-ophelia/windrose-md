@@ -35,8 +35,6 @@ export interface ImageDragOffset {
   y: number;
 }
 
-export type DragOffset = ImageDragOffset;
-
 /** Client position */
 export interface DragClientPosition {
   x: number;

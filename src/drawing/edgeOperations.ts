@@ -26,6 +26,9 @@
 
 // Type-only imports
 import type { HexColor } from '#types/core/common.types';
+import type { Edge } from '#types/core/rendering.types';
+
+export type { Edge };
 
 // ===========================================
 // Type Definitions
@@ -36,19 +39,6 @@ export type EdgeSideInput = 'top' | 'right' | 'bottom' | 'left';
 
 /** Normalized edge side (storage) */
 export type EdgeSideNormalized = 'right' | 'bottom';
-
-/** Unique edge identifier */
-export type EdgeId = string;
-
-/** Edge data structure */
-export interface Edge {
-  id: EdgeId;
-  x: number;
-  y: number;
-  side: EdgeSideNormalized;
-  color: HexColor;
-  opacity?: number;
-}
 
 /** Normalized edge coordinates (without id) */
 export interface NormalizedEdge {
@@ -66,7 +56,7 @@ export interface EdgeTemplate {
 }
 
 /** Partial edge for updates */
-export type EdgeUpdate = Partial<Omit<Edge, 'id'>>;
+export type EdgeUpdate = Partial<Edge>;
 
 // ===========================================
 // Normalization
@@ -98,7 +88,7 @@ function normalizeEdge(x: number, y: number, side: EdgeSideInput): NormalizedEdg
 /**
  * Generate unique edge ID
  */
-function generateEdgeId(): EdgeId {
+function generateEdgeId(): string {
   return 'edge-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
 }
 
@@ -185,7 +175,7 @@ function removeEdge(
 /**
  * Remove edge by ID
  */
-function removeEdgeById(edges: Edge[] | null | undefined, edgeId: EdgeId): Edge[] {
+function removeEdgeById(edges: Edge[] | null | undefined, edgeId: string): Edge[] {
   if (!edges || !Array.isArray(edges)) return [];
   return edges.filter(e => e.id !== edgeId);
 }
@@ -195,7 +185,7 @@ function removeEdgeById(edges: Edge[] | null | undefined, edgeId: EdgeId): Edge[
  */
 function updateEdge(
   edges: Edge[] | null | undefined,
-  edgeId: EdgeId,
+  edgeId: string,
   updates: EdgeUpdate
 ): Edge[] {
   if (!edges || !Array.isArray(edges)) return [];

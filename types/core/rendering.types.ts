@@ -61,6 +61,7 @@ export type CellLookup<T = RenderCell> = Map<string, T>;
  * Edges are stored normalized as 'right' or 'bottom' only.
  */
 export interface Edge {
+  id?: string;
   x: number;
   y: number;
   side: 'right' | 'bottom';

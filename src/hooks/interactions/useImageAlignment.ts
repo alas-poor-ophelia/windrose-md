@@ -10,7 +10,7 @@
 import type {
   UseImageAlignmentOptions,
   UseImageAlignmentResult,
-  DragOffset,
+  ImageDragOffset,
   DragClientPosition,
   ImageDragHandlerResult,
 } from '#types/hooks/imageAlignment.types';
@@ -32,7 +32,7 @@ function useImageAlignment({
 
   // Track dragging state
   const [isDraggingImage, setIsDraggingImage] = useState<boolean>(false);
-  const [dragStartOffset, setDragStartOffset] = useState<DragOffset>({ x: 0, y: 0 });
+  const [dragStartOffset, setDragStartOffset] = useState<ImageDragOffset>({ x: 0, y: 0 });
   const [dragStartClient, setDragStartClient] = useState<DragClientPosition>({ x: 0, y: 0 });
 
   /**

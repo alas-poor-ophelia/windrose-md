@@ -10,7 +10,8 @@
  */
 
 // Type-only imports
-import type { MapData, MapLayer, StoredViewState, TextLabelSettings, MapCustomColor } from '#types/core/map.types';
+import type { MapData, MapLayer, StoredViewState, TextLabelSettings } from '#types/core/map.types';
+import type { CustomColor } from '#types/core/common.types';
 import type { Cell } from '#types/core/cell.types';
 import type { Curve } from '#types/core/curve.types';
 import type { MapObject } from '#types/objects/object.types';
@@ -151,7 +152,7 @@ function useDataHandlers({
       const customColorNumber = (currentMapData.customColors?.length ?? 0) + 1;
       const customColorLabel = `Custom ${customColorNumber}`;
 
-      const newCustomColor: MapCustomColor = {
+      const newCustomColor: CustomColor = {
         id: customColorId,
         color: newColor,
         label: customColorLabel

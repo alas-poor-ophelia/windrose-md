@@ -241,7 +241,7 @@ describe("edgeOperations", () => {
     it("generates unique ID for new edge", () => {
       const result = addEdge([], 5, 3, "right", "#ff0000");
       expect(result[0].id).toBeDefined();
-      expect(result[0].id.startsWith("edge-")).toBe(true);
+      expect(result[0].id!.startsWith("edge-")).toBe(true);
     });
   });
 

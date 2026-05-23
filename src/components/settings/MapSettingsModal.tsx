@@ -46,18 +46,10 @@ interface SettingsTab {
   label: string;
 }
 
-/** Props for MapSettingsModal */
-export interface MapSettingsModalProps {
-  isOpen: boolean;
-  mapData: unknown;
-  mapType: MapType;
-  globalSettings: Record<string, unknown>;
-  onSave: (updates: Record<string, unknown>) => void;
+/** Props for MapSettingsModal (provider props minus children/onClose, plus onCancel) */
+export type MapSettingsModalProps = Omit<MapSettingsProviderProps, 'children' | 'onClose'> & {
   onCancel: () => void;
-  isInSubHex?: boolean;
-  subMapName?: string | null;
-  [key: string]: unknown;
-}
+};
 
 /**
  * Tab bar + body shared by both native and fallback paths
@@ -174,7 +166,7 @@ function MapSettingsModalContent(): VNode | null {
  */
 function MapSettingsModal(props: MapSettingsModalProps): VNode {
   return (
-    <MapSettingsProvider {...props as unknown as MapSettingsProviderProps} onClose={props.onCancel}>
+    <MapSettingsProvider {...props} onClose={props.onCancel}>
       <MapSettingsModalContent />
     </MapSettingsProvider>
   );

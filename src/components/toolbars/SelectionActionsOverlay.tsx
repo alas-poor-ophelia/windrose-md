@@ -12,7 +12,7 @@ import type { IGeometry } from '#types/core/geometry.types';
 import type { SelectedItem } from '#types/contexts/context.types';
 import type { MapObject } from '#types/objects/object.types';
 import type { SelectionAction } from '../../hooks/interactions/useSelectionActions.ts';
-import type { CustomColor } from '../shared/ColorPicker';
+import type { CustomColor } from '#types/core/common.types';
 import type { MenuItem } from 'obsidian';
 
 import { useEffect, useState } from 'preact/hooks';

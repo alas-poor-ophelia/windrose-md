@@ -59,7 +59,7 @@ export type RequireAtLeastOne<T, Keys extends keyof T = keyof T> =
 export interface CustomColor {
   id: string;
   color: HexColor;
-  label: string;
+  label?: string;
   opacity?: number;
 }
 

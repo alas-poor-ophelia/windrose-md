@@ -69,12 +69,10 @@ function useEdgeDragTool({
     const isBatchedStroke = strokeInitialEdgesRef.current !== null;
 
     if (shouldPaint) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const newEdges = addEdge(activeLayer.edges as any, x, y, side, selectedColor, selectedOpacity);
+      const newEdges = addEdge(activeLayer.edges, x, y, side, selectedColor, selectedOpacity);
       onEdgesChange(newEdges, isBatchedStroke);
     } else {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const newEdges = removeEdge(activeLayer.edges as any, x, y, side);
+      const newEdges = removeEdge(activeLayer.edges, x, y, side);
       onEdgesChange(newEdges, isBatchedStroke);
     }
   };

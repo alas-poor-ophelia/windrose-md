@@ -202,10 +202,8 @@ function useShapeTools({
     }
 
     const newEdgesData = generateEdgeLine(lineX1, lineY1, lineX2, lineY2, selectedColor);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const newEdges = mergeEdges(activeLayer.edges as any, newEdgesData);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    onEdgesChange(newEdges as any);
+    const newEdges = mergeEdges(activeLayer.edges, newEdgesData);
+    onEdgesChange(newEdges);
   };
 
   const updateShapeHover = useCallback((gridX: number, gridY: number): void => {

@@ -10,7 +10,7 @@ import type {
 } from '#types/index';
 import type { ResolvedTheme } from '#types/settings/settings.types';
 import type { ToolId } from '#types/tools/tool.types';
-import type { FoggedCell, MapObjectRef, MapCustomColor } from '#types/core/map.types';
+import type { FoggedCell, MapObjectRef } from '#types/core/map.types';
 import type { Cell } from '#types/core/cell.types';
 import type { TilesetOverrides } from '#types/tiles/tile.types';
 import type { FogTool } from './components/toolbars/VisibilityToolbar';
@@ -58,51 +58,6 @@ import { RA_ICONS } from './assets/rpgAwesomeIcons';
 import { injectIconCSS } from './assets/rpgAwesomeLoader';
 import { useApp } from './context/AppContext';
 import { Icon } from './components/shared/Icon';
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// RPGAwesome icon font support
-
-
-
-
 
 // Inject RPGAwesome icon CSS classes on module load
 injectIconCSS(RA_ICONS);
@@ -779,7 +734,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
           onOpacityChange={handleOpacityChange}
           isColorPickerOpen={isColorPickerOpen}
           onColorPickerOpenChange={setIsColorPickerOpen}
-          customColors={(mapData.customColors || []) as unknown as CustomColor[]}
+          customColors={mapData.customColors ?? []}
           paletteColorOpacityOverrides={mapData.paletteColorOpacityOverrides || {}}
           onAddCustomColor={handleAddCustomColor}
           onDeleteCustomColor={handleDeleteCustomColor}
@@ -874,7 +829,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               selectedObjectType={selectedObjectType ?? undefined}
               selectedColor={selectedColor}
               isColorPickerOpen={isColorPickerOpen}
-              customColors={(mapData.customColors || []).map((c: MapCustomColor) => c.color)}
+              customColors={(mapData.customColors ?? []).map((c: CustomColor) => c.color)}
               onAddCustomColor={handleAddCustomColor}
               onDeleteCustomColor={handleDeleteCustomColor}
               isFocused={isFocused}
@@ -902,7 +857,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 currentTool={currentTool}
                 selectedObjectType={selectedObjectType}
                 onObjectsChange={handleObjectsChange}
-                customColors={(mapData.customColors || []) as unknown as CustomColor[]}
+                customColors={mapData.customColors ?? []}
                 onAddCustomColor={handleAddCustomColor}
                 onDeleteCustomColor={handleDeleteCustomColor}
                 freeformPlacementMode={freeformPlacementMode}
@@ -916,7 +871,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               {/* TextLayer - handles text label interactions */}
               <MapCanvas.TextLayer
                 currentTool={currentTool}
-                customColors={(mapData.customColors || []) as unknown as CustomColor[]}
+                customColors={mapData.customColors ?? []}
                 onAddCustomColor={handleAddCustomColor}
                 onDeleteCustomColor={handleDeleteCustomColor}
               />
@@ -1073,7 +1028,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
         <MapSettingsModal
           isOpen={showSettingsModal}
           onCancel={handleSettingsClose}
-          onSave={handleSettingsSave as unknown as (updates: Record<string, unknown>) => void}
+          onSave={handleSettingsSave}
           onOpenAlignmentMode={handleOpenAlignmentMode}
           initialTab={returningFromAlignment ? (mapData?.mapType === 'hex' ? 'hexgrid' : 'gridbackground') : undefined}
           mapType={mapData?.mapType ?? 'grid'}
@@ -1089,7 +1044,6 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
           geometry={geometry}
           isInSubHex={isInSubHex}
           subMapName={isInSubHex ? (mapData?.name ?? undefined) : undefined}
-          globalSettings={{} as Record<string, unknown>}
         />
 
         {/* Image Alignment Mode */}
