@@ -17,7 +17,7 @@ import type {
 } from '#types/core/map.types';
 import type { Cell } from '#types/core/cell.types';
 import type { MapObject } from '#types/objects/object.types';
-import type { IGeometry } from '#types/core/geometry.types';
+import type { ExtendedGeometry } from '#types/contexts/context.types';
 import type { HexColor } from '#types/core/common.types';
 import type {
   PluginSettings,
@@ -214,7 +214,7 @@ export interface ModalShellContextValue {
   handlePreferenceToggle: (key: PreferenceKey) => void;
   // Export (PreferencesTab)
   mapData: MapData | null;
-  geometry: IGeometry | null;
+  geometry: ExtendedGeometry | null;
   // Sub-hex context
   isInSubHex: boolean;
   subMapName: string | null;
@@ -329,7 +329,7 @@ export interface MapSettingsProviderProps {
   currentObjects?: MapObject[];
   currentObjectSetId?: string | null;
   mapData?: MapData | null;
-  geometry?: IGeometry | null;
+  geometry?: ExtendedGeometry | null;
   isInSubHex?: boolean;
   subMapName?: string | null;
 }

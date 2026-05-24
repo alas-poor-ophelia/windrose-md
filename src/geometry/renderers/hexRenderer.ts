@@ -78,7 +78,7 @@ const hexRenderer = {
       bgImage,
       bgConfig,
       hexBounds,
-      geometry as unknown as { hexSize: number; sqrt3: number; hexToWorld: (q: number, r: number) => { worldX: number; worldY: number } },
+      geometry,
       orientation,
       { ctx, offsetX, offsetY, zoom },
       offsetToAxial as (col: number, row: number, orientation: string) => { q: number; r: number }

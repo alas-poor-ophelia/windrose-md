@@ -332,4 +332,12 @@ export interface IGeometry {
     style: StrokeStyle,
     callback: () => void
   ): void;
+
+  // ===========================================
+  // Bounds Calculation
+  // ===========================================
+
+  getCellBounds(cell: Cell): BoundingBox;
+
+  getObjectBounds(obj: { position: Point; size?: { width: number; height: number } }): BoundingBox;
 }

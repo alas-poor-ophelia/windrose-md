@@ -33,7 +33,7 @@ import { useMapState } from '../../context/MapContext';
 import { useMapSelection } from '../../context/MapSelectionContext';
 import { axialToOffset, offsetToAxial, columnToLabel, rowToLabel } from '../../geometry/core/offsetCoordinates';
 import { getEffectiveSettings } from '../../core/settingsAccessor';
-import type { HexGeometry } from '../../geometry/core/HexGeometry';
+import type { ExtendedHexGeometry } from '#types/contexts/context.types';
 function isInsideFlatToppedHexagon(wx: number, wy: number, circumradius: number): boolean {
   const dx = Math.abs(wx);
   const dy = Math.abs(wy);
@@ -99,7 +99,7 @@ function getPositionInRing(q: number, r: number, ring: number): number {
  * @param {string} displayMode - 'rectangular' or 'radial'
  * @returns {{hexes: Array<{col, row, q, r, displayX, displayY, label}>, scaleX: number, scaleY: number}} Visible hexes with display positions and scale factors
  */
-function getVisibleHexes(geometry: HexGeometry, mapData: MapData, canvas: HTMLCanvasElement | null, displayMode: string = 'rectangular'): { hexes: Array<{ col: number; row: number; q: number; r: number; displayX: number; displayY: number; label: string }>; scaleX: number; scaleY: number } {
+function getVisibleHexes(geometry: ExtendedHexGeometry, mapData: MapData, canvas: HTMLCanvasElement | null, displayMode: string = 'rectangular'): { hexes: Array<{ col: number; row: number; q: number; r: number; displayX: number; displayY: number; label: string }>; scaleX: number; scaleY: number } {
   if (!canvas || !mapData.viewState) return { hexes: [], scaleX: 1, scaleY: 1 };
 
   const { viewState, northDirection = 0 } = mapData;
@@ -293,7 +293,7 @@ const HexCoordinateLayer = (): VNode | null => {
   const effectiveVisible = showCoordinates || layerVisibility.hexCoordinates;
   
   // Don't render if not effectively visible or not a hex map
-  if (!effectiveVisible || !geometry || !mapData || mapData.mapType !== 'hex') {
+  if (!effectiveVisible || !geometry || !mapData || mapData.mapType !== 'hex' || geometry.type !== 'hex') {
     return null;
   }
   
@@ -310,7 +310,7 @@ const HexCoordinateLayer = (): VNode | null => {
 
   // Calculate visible hexes with display positions and labels
   const { hexes: visibleHexes, scaleX } = getVisibleHexes(
-    geometry as unknown as HexGeometry, mapData, canvas, displayMode
+    geometry, mapData, canvas, displayMode
   );
 
   // Calculate font size based on hex size and zoom, scaled to display coordinates

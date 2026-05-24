@@ -379,7 +379,7 @@ const ObjectLayer = ({
     handleNoteSubmit,
     handleObjectColorSelect,
     handleObjectColorReset,
-  } = useObjectInteractions(currentTool, selectedObjectType, onAddCustomColor, customColors as unknown as string[], freeformPlacementModeRef);
+  } = useObjectInteractions(currentTool, selectedObjectType, freeformPlacementModeRef);
 
   const {
     handleNoteButtonClick,

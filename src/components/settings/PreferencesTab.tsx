@@ -17,7 +17,6 @@
 
 import { useState } from 'preact/hooks';
 import type { VNode } from 'preact';
-import type { ExportGeometry } from '#types/core/export.types';
 import { useModalShell, useAppearance } from '../../context/MapSettingsContext';
 import { saveMapImageToVault } from '../../persistence/exportOperations';
 import { SettingItem, SettingHeading } from './SettingItem';
@@ -50,7 +49,7 @@ function PreferencesTab(): VNode {
     setExportSuccess(null);
 
     try {
-      const result: ExportResult = await saveMapImageToVault((globalThis as unknown as { app: import('obsidian').App }).app, mapData, geometry as unknown as ExportGeometry);
+      const result: ExportResult = await saveMapImageToVault((globalThis as unknown as { app: import('obsidian').App }).app, mapData, geometry);
 
       if (result.success) {
         setExportSuccess(`Map saved to: ${result.path}`);

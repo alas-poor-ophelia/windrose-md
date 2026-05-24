@@ -27,7 +27,7 @@ const RegionPanel = ({
   onRegionsChange,
   sidebarCollapsed,
   isOpen = false
-}: RegionPanelProps): VNode => {
+}: RegionPanelProps): VNode | null => {
 
   const getDisplayName = (name: string): string => {
     return name.length > REGION_NAME_MAX_LENGTH
@@ -53,7 +53,7 @@ const RegionPanel = ({
     return [...regions].sort((a, b) => a.order - b.order);
   }, [regions]);
 
-  if (regions.length === 0) return null as unknown as VNode;
+  if (regions.length === 0) return null;
 
   return (
     <div

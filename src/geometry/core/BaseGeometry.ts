@@ -24,6 +24,7 @@
 
 import type {
   Point,
+  BoundingBox,
   ScreenCoords,
   WorldCoords,
   OffsetCoords,
@@ -306,6 +307,10 @@ abstract class BaseGeometry implements IGeometry {
     zoom: number,
     style: GridStyle
   ): void;
+
+  abstract getCellBounds(cell: Cell): BoundingBox;
+
+  abstract getObjectBounds(obj: { position: Point; size?: { width: number; height: number } }): BoundingBox;
 }
 
 /**

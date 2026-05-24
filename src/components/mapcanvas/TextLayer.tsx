@@ -157,8 +157,8 @@ const TextLayer = ({
         <SelectionActionsOverlay
           selectedItems={[selectedItem]}
           actions={buildTextActions({
-            onEdit: handleEditClick as unknown as (e?: Event) => void,
-            onRotate: handleRotateClick as unknown as (e?: Event) => void,
+            onEdit: handleEditClick,
+            onRotate: handleRotateClick,
             onCopyLink: handleCopyLink,
             onDelete: handleTextDeletion
           })}

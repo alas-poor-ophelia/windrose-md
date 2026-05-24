@@ -33,8 +33,6 @@ import { getActiveLayer } from '../../persistence/layerAccessor';
 const useObjectInteractions = (
   currentTool: ToolId,
   selectedObjectType: string | null,
-  _onAddCustomColor: ((color: string) => void) | undefined,
-  _customColors: string[],
   freeformPlacementModeRef?: { current: boolean }
 ): UseObjectInteractionsResult => {
   const { mapData } = useMapState();

@@ -83,7 +83,7 @@ function useDataHandlers({
 
         if (!suppressHistory) {
           const activeLayer = getActiveLayer(currentMapData);
-          addToHistory(buildLayerHistorySnapshot(activeLayer, currentMapData.name ?? '', { [field]: newValue as unknown as Cell[] | MapObject[] | TextLabel[] | unknown[] }, currentMapData.regions || [], currentMapData.outlines || [], currentMapData.shapeOverlays || [], activeLayer.fogOfWar));
+          addToHistory(buildLayerHistorySnapshot(activeLayer, currentMapData.name ?? '', { [field]: newValue } as Partial<LayerHistorySnapshot>, currentMapData.regions || [], currentMapData.outlines || [], currentMapData.shapeOverlays || [], activeLayer.fogOfWar));
         }
 
         return newMapData;

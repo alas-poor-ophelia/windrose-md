@@ -7,7 +7,6 @@
  */
 
 import type { ToolId } from '#types/tools/tool.types';
-import { h } from 'preact';
 import type { VNode } from 'preact';
 import type { ShapeOverlay } from '#types/core/map.types';
 import type { DiagonalRule, DistanceDisplayFormat } from '#types/settings/settings.types';
@@ -232,9 +231,9 @@ const ShapeOverlayLayer = ({
   }
 
   // Selection overlay when a shape is selected
-  if (!isShapeSelected || !mapData || !geometry) return null;
+  if (!isShapeSelected || !selectedItem || selectedItem.type !== 'shapeOverlay' || !mapData || !geometry) return null;
 
-  const shapeActions = buildShapeOverlayActions(selectedItem as unknown as Parameters<typeof buildShapeOverlayActions>[0], {
+  const shapeActions = buildShapeOverlayActions(selectedItem, {
     onColorClick: handleShapeColorClick,
     onDelete: handleShapeDelete,
     onFreeformToggle: handleShapeFreeformToggle
@@ -242,20 +241,22 @@ const ShapeOverlayLayer = ({
 
   const selectedShape = mapData?.shapeOverlays?.find(s => s.id === selectedItem.id);
 
-  return h(SelectionActionsOverlay as unknown as (props: Record<string, unknown>) => VNode, {
-    selectedItems: [selectedItem],
-    actions: shapeActions,
-    mapData,
-    canvasRef,
-    containerRef,
-    geometry,
-    selectionType: 'shapeOverlay',
-    showColorPicker: showShapeColorPicker,
-    currentColor: selectedShape?.color,
-    onColorSelect: handleShapeColorSelect,
-    onColorPickerClose: handleShapeColorPickerClose,
-    colorButtonRef: shapeColorBtnRef
-  }) as unknown as VNode;
+  return (
+    <SelectionActionsOverlay
+      selectedItems={[selectedItem]}
+      actions={shapeActions}
+      mapData={mapData}
+      canvasRef={canvasRef}
+      containerRef={containerRef}
+      geometry={geometry}
+      selectionType="shapeOverlay"
+      showColorPicker={showShapeColorPicker}
+      currentColor={selectedShape?.color}
+      onColorSelect={handleShapeColorSelect}
+      onColorPickerClose={handleShapeColorPickerClose}
+      colorButtonRef={shapeColorBtnRef}
+    />
+  );
 };
 
 export { ShapeOverlayLayer };

@@ -101,7 +101,7 @@ function WindroseHoverPreview({ mapId, x, y, zoom: zoomProp, layerId, notePath }
           },
           cells: {
             border: effective.borderColor,
-            borderWidth: (getTheme().cells as unknown as Record<string, unknown>).borderWidth as number
+            borderWidth: getTheme().cells.borderWidth
           },
         } as RendererTheme;
 

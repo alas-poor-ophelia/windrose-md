@@ -7,6 +7,7 @@
 
 import type { MapData } from '#types/core/map.types';
 import type { MapObject } from '#types/objects/object.types';
+import type { SelectedItem } from '#types/contexts/context.types';
 
 export type ActionGroup = 'transform' | 'content' | 'links' | 'style' | 'player' | 'danger';
 
@@ -21,12 +22,6 @@ export interface SelectionAction {
   invoke: (e?: Event) => void;
   special?: 'color' | 'resize';
   iconOnly?: boolean;
-}
-
-interface SelectedItem {
-  type: 'object' | 'text' | 'notePin';
-  id: string;
-  data?: MapObject;
 }
 
 interface ObjectHandlers {
@@ -66,7 +61,7 @@ interface ObjectActionOptions {
 }
 
 function buildObjectActions(
-  item: SelectedItem,
+  item: Extract<SelectedItem, { type: 'object' }>,
   handlers: ObjectHandlers,
   mapData: MapData,
   options?: ObjectActionOptions
@@ -201,7 +196,7 @@ interface ShapeOverlayHandlers {
 }
 
 function buildShapeOverlayActions(
-  item: SelectedItem,
+  item: Extract<SelectedItem, { type: 'shapeOverlay' }>,
   handlers: ShapeOverlayHandlers
 ): SelectionAction[] {
   const isFreeform = item.data?.freeform === true;

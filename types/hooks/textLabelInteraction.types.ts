@@ -77,10 +77,10 @@ export type HandleTextSubmit = (labelData: TextLabelModalData) => void;
 export type HandleTextCancel = () => void;
 
 /** Rotate button click handler */
-export type HandleRotateClick = (e: MouseEvent) => void;
+export type HandleRotateClick = (e?: Event) => void;
 
 /** Edit button click handler */
-export type HandleEditClick = (e: MouseEvent) => void;
+export type HandleEditClick = (e?: Event) => void;
 
 /** Canvas double-click handler */
 export type HandleCanvasDoubleClick = (e: MouseEvent) => void;

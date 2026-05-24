@@ -135,6 +135,8 @@ export interface IGridRenderer extends IGeometry {
 export interface IHexRenderer extends IGeometry {
   type: 'hex';
   hexSize: number;
+  sqrt3: number;
+  hexToWorld(q: number, r: number): { worldX: number; worldY: number };
   drawHex(
     ctx: CanvasRenderingContext2D,
     q: number,

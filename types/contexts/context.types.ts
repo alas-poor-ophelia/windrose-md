@@ -63,10 +63,14 @@ export interface ExtendedHexGeometry extends BaseExtendedGeometry {
   width: number;
   sqrt3: number;
   orientation: 'flat' | 'pointy';
+  renderingMode: 'rectangular' | 'radial';
   hexToWorld: (x: number, y: number) => { worldX: number; worldY: number };
   worldToHex: (worldX: number, worldY: number) => { q: number; r: number };
   getHexVertices: (q: number, r: number) => { worldX: number; worldY: number }[];
   getScaledHexSize: (zoom: number) => number;
+  getHexRing: (q: number, r: number) => number;
+  getAllRadialCells: (maxRing: number) => Array<{ q: number; r: number }>;
+  getVisibleHexRange: (offsetX: number, offsetY: number, width: number, height: number, zoom: number) => { minQ: number; maxQ: number; minR: number; maxR: number };
 }
 
 /** Extended geometry — discriminated union on `type` field for auto-narrowing */

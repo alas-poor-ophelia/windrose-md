@@ -313,10 +313,10 @@ const useTextLabelInteraction = (
   /**
    * Handle rotate button click
    */
-  const handleRotateClick = (e: MouseEvent): void => {
+  const handleRotateClick = (e?: Event): void => {
     if (selectedItem?.type === 'text') {
-      e.preventDefault();
-      e.stopPropagation();
+      e?.preventDefault();
+      e?.stopPropagation();
       handleTextRotation();
     }
   };
@@ -324,10 +324,10 @@ const useTextLabelInteraction = (
   /**
    * Handle edit button click
    */
-  const handleEditClick = (e: MouseEvent): void => {
+  const handleEditClick = (e?: Event): void => {
     if (selectedItem?.type === 'text') {
-      e.preventDefault();
-      e.stopPropagation();
+      e?.preventDefault();
+      e?.stopPropagation();
 
       // Open editor with current label data
       setEditingTextId(selectedItem.id);

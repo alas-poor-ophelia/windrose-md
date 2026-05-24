@@ -9,10 +9,8 @@
 // Type-only imports
 import type { BoundingBox } from '#types/core/geometry.types';
 import type { MapData, MapLayer } from '#types/core/map.types';
-import type { MapObject } from '#types/objects/object.types';
-import type { TextLabel } from '../text/textLabelOperations';
+import type { TextLabel } from '#types/objects/note.types';
 import type {
-  ExportGeometry,
   RenderParams,
   ExportResult,
   ExportTheme
@@ -75,7 +73,7 @@ function getTextLabelBounds(label: TextLabel, ctx: CanvasRenderingContext2D): Bo
 function calculateContentBounds(
   _mapData: MapData,
   layer: MapLayer,
-  geometry: ExportGeometry
+  geometry: ExtendedGeometry
 ): BoundingBox | null {
   let minX = Infinity, minY = Infinity;
   let maxX = -Infinity, maxY = -Infinity;
@@ -98,7 +96,7 @@ function calculateContentBounds(
   if (layer.objects.length > 0) {
     for (const obj of layer.objects) {
       hasContent = true;
-      const bounds = geometry.getObjectBounds(obj as unknown as MapObject);
+      const bounds = geometry.getObjectBounds(obj);
       minX = Math.min(minX, bounds.minX);
       minY = Math.min(minY, bounds.minY);
       maxX = Math.max(maxX, bounds.maxX);
@@ -114,7 +112,7 @@ function calculateContentBounds(
     if (tempCtx) {
       for (const label of layer.textLabels) {
         hasContent = true;
-        const bounds = getTextLabelBounds(label as unknown as TextLabel, tempCtx);
+        const bounds = getTextLabelBounds(label, tempCtx);
         minX = Math.min(minX, bounds.minX);
         minY = Math.min(minY, bounds.minY);
         maxX = Math.max(maxX, bounds.maxX);
@@ -189,7 +187,7 @@ async function renderMapToCanvas(
     tempCanvas,
     null,
     exportMapData,
-    geometry as unknown as ExtendedGeometry,
+    geometry,
     [],
     { isResizeMode: false, theme, showCoordinates: false, layerVisibility: { grid: true, objects: true, textLabels: true, hexCoordinates: false, regions: true, outlines: true } }
   );
@@ -207,7 +205,7 @@ async function renderMapToCanvas(
  */
 async function exportMapAsImage(
   mapData: MapData,
-  geometry: ExportGeometry,
+  geometry: ExtendedGeometry,
   buffer: number = 20
 ): Promise<Blob> {
   const activeLayer = getActiveLayer(mapData);
@@ -268,7 +266,7 @@ async function exportMapAsImage(
 async function saveMapImageToVault(
   app: App,
   mapData: MapData,
-  geometry: ExportGeometry,
+  geometry: ExtendedGeometry,
   filename?: string
 ): Promise<ExportResult> {
   try {

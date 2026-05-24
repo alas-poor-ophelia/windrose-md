@@ -15,6 +15,7 @@ interface ObjectEntry {
   label?: string;
   imagePath?: string;
   iconClass?: string;
+  order?: number;
   [key: string]: unknown;
 }
 
@@ -63,7 +64,7 @@ export const ObjectHelpers = {
 
     const resolvedCustom = customObjects.map((obj, index) => ({
       ...obj,
-      order: (obj as unknown as { order?: number }).order ?? (1000 + index * 10),
+      order: obj.order ?? (1000 + index * 10),
       isCustom: true,
       isBuiltIn: false
     } as ResolvedObject));

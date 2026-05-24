@@ -38,8 +38,7 @@ function useObjectHover(): {
 
   const handleHoverUpdate = useCallback((e: PointerEvent | MouseEvent): void => {
     if (mapData == null) return;
-    const touchEvent = e as unknown as TouchEvent;
-    if (touchEvent.touches == null) {
+    if (!('touches' in e)) {
       const { clientX, clientY } = getClientCoords(e);
       const coords = screenToGrid(clientX, clientY);
       if (coords) {

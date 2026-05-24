@@ -5,22 +5,10 @@
  * and file operations.
  */
 
-import type { Point, BoundingBox } from './geometry.types';
+import type { BoundingBox } from './geometry.types';
 import type { MapData } from './map.types';
-import type { Cell } from './cell.types';
-import type { MapObject } from '../objects/object.types';
 import type { HexColor } from './common.types';
-
-// ===========================================
-// Export Geometry Interface
-// ===========================================
-
-/** Geometry interface with bounds methods needed for export */
-export interface ExportGeometry {
-  getCellBounds(cell: Cell): BoundingBox;
-  getObjectBounds(obj: MapObject): BoundingBox;
-  worldToGrid?(worldX: number, worldY: number): Point;
-}
+import type { ExtendedGeometry } from '../contexts/context.types';
 
 // ===========================================
 // Render Parameters
@@ -29,7 +17,7 @@ export interface ExportGeometry {
 /** Render parameters for canvas export */
 export interface RenderParams {
   mapData: MapData;
-  geometry: ExportGeometry;
+  geometry: ExtendedGeometry;
   bounds: BoundingBox;
   width: number;
   height: number;
