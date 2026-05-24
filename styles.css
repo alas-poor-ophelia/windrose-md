@@ -200,7 +200,7 @@ body {
 
 .windrose-header {
   margin-bottom: 12px;
-  padding: 4px;
+  padding: clamp(0.25rem, 0.4vw, 0.375rem);
   background-color: rgba(255, 255, 255, 0.05);
   border-radius: 4px;
   display: flex;
@@ -566,7 +566,7 @@ body {
   background: var(--windrose-bg-secondary);
   border: 1px solid var(--windrose-border-primary);
   border-radius: 6px;
-  padding: 4px;
+  padding: clamp(0.25rem, 0.4vw, 0.375rem);
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -879,7 +879,7 @@ button.windrose-orientation-btn,
   border-radius: 3px;
   color: var(--windrose-border-primary);
   cursor: pointer;
-  padding: 4px;
+  padding: clamp(0.25rem, 0.4vw, 0.375rem);
   font-size: 10px;
   line-height: 1;
   transition: var(--windrose-transition);
@@ -1469,7 +1469,7 @@ button.windrose-tile-browser-config-btn,
   background: var(--windrose-bg-primary);
   border: 1px solid var(--windrose-border-primary);
   border-radius: 4px;
-  padding: 4px;
+  padding: clamp(0.25rem, 0.4vw, 0.375rem);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
   pointer-events: none;
   z-index: 10000;
@@ -3363,7 +3363,7 @@ button.windrose-sel-icon-btn,
   border: none;
   color: var(--text-muted);
   cursor: pointer;
-  padding: 4px;
+  padding: clamp(0.25rem, 0.4vw, 0.375rem);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3742,7 +3742,7 @@ button.windrose-sel-icon-btn,
   transform: translateX(-50%) translateY(-20px);
   display: flex;
   gap: 4px;
-  padding: 4px;
+  padding: clamp(0.25rem, 0.4vw, 0.375rem);
   background-color: var(--windrose-bg-primary);
   border: 2px solid var(--windrose-border-primary);
   border-radius: 4px;
@@ -3919,7 +3919,7 @@ button.windrose-fow-tool-btn,
   border-radius: 3px;
   color: var(--windrose-text-primary);
   cursor: pointer;
-  padding: 4px;
+  padding: clamp(0.25rem, 0.4vw, 0.375rem);
   width: 28px;
   height: 28px;
   min-width: 28px;
@@ -4731,7 +4731,7 @@ button.windrose-breadcrumb-link {
   gap: 4px;
   max-height: 180px;
   overflow-y: auto;
-  padding: 4px;
+  padding: clamp(0.25rem, 0.4vw, 0.375rem);
   background: rgba(0, 0, 0, 0.2);
   border-radius: 4px;
 }
@@ -5171,7 +5171,7 @@ button.windrose-breadcrumb-link {
 .windrose-btn-icon {
   background: transparent;
   border: none;
-  padding: 4px;
+  padding: clamp(0.25rem, 0.4vw, 0.375rem);
   border-radius: 4px;
   cursor: pointer;
   color: var(--text-muted);
@@ -5269,7 +5269,7 @@ button.windrose-breadcrumb-link {
   gap: 4px;
   max-height: 150px;
   overflow-y: auto;
-  padding: 4px;
+  padding: clamp(0.25rem, 0.4vw, 0.375rem);
   background: var(--background-secondary);
   border-radius: 8px;
 }
