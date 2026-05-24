@@ -75,9 +75,9 @@ body {
   --windrose-text-secondary: var(--color-base-60);
   --windrose-text-muted: var(--color-base-50);
   --windrose-text-disabled: var(--color-base-40);
-  --windrose-accent-blue: oklch(0.63 0.16 250);
+  --windrose-accent-blue: oklch(0.52 0.18 256);
   --windrose-accent-blue-hover: color-mix(in oklch, var(--windrose-accent-blue) 85%, oklch(0.2 0 0));
-  --windrose-accent-red: oklch(0.35 0.15 10);
+  --windrose-accent-red: oklch(0.56 0.19 26);
   --windrose-accent-red-hover: color-mix(in oklch, var(--windrose-accent-red) 85%, oklch(0.2 0 0));
   --windrose-warning: var(--color-orange);
   --windrose-error: var(--color-red);
