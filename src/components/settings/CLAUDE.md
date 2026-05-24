@@ -14,7 +14,6 @@ MapSettingsModal.tsx         # Main modal container, tab navigation
 ├── NativeControls.tsx       # Native Obsidian modal controls
 ├── SettingItem.tsx          # Reusable setting item component
 ├── ResizeConfirmDialog.tsx  # Confirmation for destructive resizes
-├── SettingsPluginInstaller.tsx # Plugin install/upgrade UI
 ├── settingsReducer.ts       # Settings state reducer
 ├── gridmap/                 # Grid-specific settings sections
 └── hexmap/                  # Hex-specific settings sections

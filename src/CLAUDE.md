@@ -141,7 +141,7 @@ src/
 │   └── settings/          # Settings UI components
 ├── context/               # Preact Contexts
 ├── settings/              # Obsidian settings tab
-│   ├── WindroseSettingsTab.js  # Main settings tab
+│   ├── WindroseSettingsTab.ts  # Main settings tab
 │   ├── helpers/           # Settings utilities
 │   ├── modals/            # Settings modals
 │   └── tabs/              # Tab render mixins

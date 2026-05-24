@@ -33,7 +33,7 @@ interface DungeonGenOptions {
 }
 
 export default class WindrosePlugin extends Plugin {
-  settings: Partial<PluginSettings> = {};
+  settings: PluginSettings = {} as PluginSettings;
   dataFilePath: string = 'windrose-md-data.json';
   private mountedElements: Set<HTMLElement> = new Set();
 
@@ -166,7 +166,7 @@ export default class WindrosePlugin extends Plugin {
       const oldSettings = JSON.parse(content) as Record<string, unknown>;
 
       const { version, ...importable } = oldSettings;
-      this.settings = importable;
+      this.settings = importable as unknown as PluginSettings;
       await this.saveData(this.settings);
 
       new Notice('Windrose: settings imported from previous installation.', 10000);
@@ -356,7 +356,7 @@ export default class WindrosePlugin extends Plugin {
   }
 
   async loadSettings(): Promise<void> {
-    this.settings = (await this.loadData() as Partial<PluginSettings> | null) ?? {};
+    this.settings = ((await this.loadData()) ?? {}) as PluginSettings;
   }
 
   async saveSettings(): Promise<void> {
