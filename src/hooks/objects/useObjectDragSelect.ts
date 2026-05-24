@@ -20,7 +20,6 @@ import { useMapOperations } from '../../context/MapContext';
 import { useMapSelection } from '../../context/MapSelectionContext';
 import { calculateEdgeAlignment, removeObjectFromHex } from '../../objects/objectOperations';
 import { getClickedObjectInCell, getObjectsInCell, assignSlot } from '../../objects/hexSlotPositioner';
-import { HexGeometry } from '../../geometry/core/HexGeometry';
 import { getActiveLayer, isCellFogged } from '../../persistence/layerAccessor';
 
 
@@ -88,7 +87,7 @@ function useObjectDragSelect(
     }
 
     let object: MapObject | null = null;
-    if (mapData.mapType === 'hex' && geometry instanceof HexGeometry) {
+    if (geometry?.type === 'hex') {
       const cellObjects = getObjectsInCell(getActiveLayer(mapData).objects ?? [], gridX, gridY);
 
       if (cellObjects.length > 1) {

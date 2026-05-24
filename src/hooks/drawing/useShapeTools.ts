@@ -6,7 +6,8 @@
  */
 
 import type { ToolId } from '#types/tools/tool.types';
-import type { Point, IGeometry } from '#types/core/geometry.types';
+import type { Point } from '#types/core/geometry.types';
+import type { ExtendedGeometry } from '#types/contexts/context.types';
 import type { Cell } from '#types/core/cell.types';
 import type { MapData } from '#types/core/map.types';
 import type { MapObject } from '#types/objects/object.types';
@@ -21,7 +22,7 @@ import type {
   ShapeHoverPosition,
 } from '#types/hooks/drawingTools.types';
 import type { Edge } from '#types/core/rendering.types';
-import type { ExtendedGeometry, MapStateContextValue } from '#types/contexts/context.types';
+import type { MapStateContextValue } from '#types/contexts/context.types';
 
 import { useCallback, useState } from 'preact/hooks';
 import { setCells, removeCellsInBounds } from '../../geometry/core/cellAccessor';
@@ -52,8 +53,7 @@ interface UseShapeToolsOptions {
   selectedOpacity: number;
   previewSettings: PreviewSettings;
   mapData: MapData | null;
-  geometry: IGeometry | null;
-  GridGeometry: (new (...args: unknown[]) => ExtendedGeometry) | undefined;
+  geometry: ExtendedGeometry | null;
   screenToWorld: MapStateContextValue['screenToWorld'];
   getClientCoords: MapStateContextValue['getClientCoords'];
   onCellsChange: (cells: Cell[], skipHistory?: boolean) => void;
@@ -97,7 +97,7 @@ interface UseShapeToolsResult {
 
 function useShapeTools({
   currentTool, selectedColor, selectedOpacity, previewSettings,
-  mapData, geometry, GridGeometry, screenToWorld, getClientCoords,
+  mapData, geometry, screenToWorld, getClientCoords,
   onCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange,
   removeObjectsInRectangle
 }: UseShapeToolsOptions): UseShapeToolsResult {
@@ -186,7 +186,7 @@ function useShapeTools({
 
   const fillEdgeLine = (x1: number, y1: number, x2: number, y2: number): void => {
     if (!mapData) return;
-    if (!GridGeometry || !(geometry instanceof GridGeometry)) return;
+    if (!geometry || geometry.type !== 'grid') return;
 
     const activeLayer = getActiveLayer(mapData);
 
@@ -343,7 +343,7 @@ function useShapeTools({
     }
 
     if (currentTool === 'edgeLine') {
-      if (!GridGeometry || !(geometry instanceof GridGeometry)) return false;
+      if (!geometry || geometry.type !== 'grid') return false;
 
       const { clientX, clientY } = getClientCoords(e);
       const worldCoords = screenToWorld(clientX, clientY);

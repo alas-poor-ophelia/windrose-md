@@ -25,7 +25,6 @@ import type {
 
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { DEFAULTS } from '../../core/dmtConstants';
-import { GridGeometry } from '../../geometry/core/GridGeometry';
 
 
 
@@ -144,9 +143,8 @@ function useCanvasInteraction(
     }
 
     let offsetX: number, offsetY: number;
-    if (geometry instanceof GridGeometry) {
-      const gridGeometry = geometry as { getScaledCellSize: (zoom: number) => number };
-      const scaledCellSize = gridGeometry.getScaledCellSize(zoom);
+    if (geometry.type === 'grid') {
+      const scaledCellSize = geometry.getScaledCellSize(zoom);
       offsetX = canvas.width / 2 - center.x * scaledCellSize;
       offsetY = canvas.height / 2 - center.y * scaledCellSize;
     } else {
@@ -182,9 +180,8 @@ function useCanvasInteraction(
     const northDirection = mapData.northDirection ?? 0;
 
     let offsetX: number, offsetY: number;
-    if (geometry instanceof GridGeometry) {
-      const gridGeometry = geometry as { getScaledCellSize: (zoom: number) => number };
-      const scaledCellSize = gridGeometry.getScaledCellSize(zoom);
+    if (geometry.type === 'grid') {
+      const scaledCellSize = geometry.getScaledCellSize(zoom);
       offsetX = canvas.width / 2 - center.x * scaledCellSize;
       offsetY = canvas.height / 2 - center.y * scaledCellSize;
     } else {
@@ -237,10 +234,9 @@ function useCanvasInteraction(
     // Grid maps: offset = canvas/2 - center * cellSize * zoom
     // Hex maps:  offset = canvas/2 - center * zoom
     let oldScale: number, newScale: number;
-    if (geometry instanceof GridGeometry) {
-      const gridGeometry = geometry as { getScaledCellSize: (zoom: number) => number };
-      oldScale = gridGeometry.getScaledCellSize(oldZoom);
-      newScale = gridGeometry.getScaledCellSize(newZoom);
+    if (geometry.type === 'grid') {
+      oldScale = geometry.getScaledCellSize(oldZoom);
+      newScale = geometry.getScaledCellSize(newZoom);
     } else {
       oldScale = oldZoom;
       newScale = newZoom;
@@ -292,9 +288,8 @@ function useCanvasInteraction(
     const rotatedDeltaY = deltaX * Math.sin(angleRad) + deltaY * Math.cos(angleRad);
 
     let gridDeltaX: number, gridDeltaY: number;
-    if (geometry instanceof GridGeometry) {
-      const gridGeometry = geometry as { getScaledCellSize: (zoom: number) => number };
-      const scaledGridSize = gridGeometry.getScaledCellSize(zoom);
+    if (geometry.type === 'grid') {
+      const scaledGridSize = geometry.getScaledCellSize(zoom);
       gridDeltaX = -rotatedDeltaX / scaledGridSize;
       gridDeltaY = -rotatedDeltaY / scaledGridSize;
     } else {
@@ -349,9 +344,8 @@ function useCanvasInteraction(
     const rotatedDeltaY = deltaX * Math.sin(angleRad) + deltaY * Math.cos(angleRad);
 
     let gridDeltaX: number, gridDeltaY: number;
-    if (geometry instanceof GridGeometry) {
-      const gridGeometry = geometry as { getScaledCellSize: (zoom: number) => number };
-      const scaledGridSize = gridGeometry.getScaledCellSize(zoom);
+    if (geometry.type === 'grid') {
+      const scaledGridSize = geometry.getScaledCellSize(zoom);
       gridDeltaX = -rotatedDeltaX / scaledGridSize;
       gridDeltaY = -rotatedDeltaY / scaledGridSize;
     } else {

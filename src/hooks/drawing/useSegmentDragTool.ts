@@ -5,7 +5,6 @@
  * Owns its own isDrawing state for segment drag strokes.
  */
 
-import type { IGeometry } from '#types/core/geometry.types';
 import type { Cell } from '#types/core/cell.types';
 import type { MapData } from '#types/core/map.types';
 import type { ExtendedGeometry, MapStateContextValue } from '#types/contexts/context.types';
@@ -23,8 +22,7 @@ import { getActiveLayer } from '../../persistence/layerAccessor';
 
 interface UseSegmentDragToolOptions {
   mapData: MapData | null;
-  geometry: IGeometry | null;
-  GridGeometry: (new (...args: unknown[]) => ExtendedGeometry) | undefined;
+  geometry: ExtendedGeometry | null;
   selectedColor: string;
   selectedOpacity: number;
   screenToWorld: MapStateContextValue['screenToWorld'];
@@ -44,7 +42,7 @@ interface UseSegmentDragToolResult {
 }
 
 function useSegmentDragTool({
-  mapData, geometry, GridGeometry, selectedColor, selectedOpacity,
+  mapData, geometry, selectedColor, selectedOpacity,
   screenToWorld, getClientCoords, onCellsChange
 }: UseSegmentDragToolOptions): UseSegmentDragToolResult {
 
@@ -54,7 +52,7 @@ function useSegmentDragTool({
 
   const toggleSegment = (worldX: number, worldY: number): void => {
     if (!mapData || !geometry) return;
-    if (!GridGeometry || !(geometry instanceof GridGeometry)) return;
+    if (!geometry || geometry.type !== 'grid') return;
 
     const activeLayer = getActiveLayer(mapData);
 
@@ -89,7 +87,7 @@ function useSegmentDragTool({
   };
 
   const processSegmentDuringDrag = (e: PointerEvent | MouseEvent | TouchEvent): void => {
-    if (!GridGeometry || !geometry || !(geometry instanceof GridGeometry)) return;
+    if (!geometry || geometry.type !== 'grid') return;
 
     const { clientX, clientY } = getClientCoords(e);
     const worldCoords = screenToWorld(clientX, clientY);

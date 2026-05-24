@@ -17,8 +17,6 @@ import { useEffect, useRef } from 'preact/hooks';
 import { useFogTools } from '../../hooks/interactions/useFogTools';
 import { useMapState } from '../../context/MapContext';
 import { useEventHandlerRegistration } from '../../context/EventHandlerContext';
-import { GridGeometry } from '../../geometry/core/GridGeometry';
-import type { HexGeometry } from '../../geometry/core/HexGeometry';
 import { getSettings } from '../../core/settingsAccessor';
 import { offsetToAxial } from '../../geometry/core/offsetCoordinates';
 import { Z_INDEX } from '../../core/dmtConstants';
@@ -99,7 +97,7 @@ const FogOfWarLayer = ({
     let pxOffsetX: number;
     let pxOffsetY: number;
 
-    const isGrid = geometry instanceof GridGeometry;
+    const isGrid = geometry.type === 'grid';
     if (isGrid) {
       scaledSize = geometry.getScaledCellSize(zoom);
       pxOffsetX = width / 2 - center.x * scaledSize;
@@ -151,7 +149,7 @@ const FogOfWarLayer = ({
           worldY = row * geometry.cellSize;
         }
       } else {
-        const axial = offsetToAxial(col, row, (geometry as unknown as HexGeometry).orientation);
+        const axial = offsetToAxial(col, row, (mapData.orientation ?? 'flat') as 'flat' | 'pointy');
         const world = geometry.gridToWorld(axial.q, axial.r);
         worldX = world.worldX;
         worldY = world.worldY;
@@ -186,7 +184,7 @@ const FogOfWarLayer = ({
       } else {
         // Hex: compute axis-aligned bounding box from corner cell world centers
         const getCellWorld = (col: number, row: number): { worldX: number; worldY: number } => {
-          const axial = offsetToAxial(col, row, (geometry as unknown as HexGeometry).orientation);
+          const axial = offsetToAxial(col, row, (mapData.orientation ?? 'flat') as 'flat' | 'pointy');
           return geometry.gridToWorld(axial.q, axial.r);
         };
         const cellCenters = [

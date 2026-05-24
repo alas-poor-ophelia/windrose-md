@@ -83,7 +83,6 @@ const DrawingLayer = ({
     canvasRef,
     containerRef,
     mapData,
-    GridGeometry,
     geometry
   } = useMapState();
 
@@ -213,7 +212,7 @@ const DrawingLayer = ({
     let offsetX: number;
     let offsetY: number;
 
-    const isGrid = GridGeometry ? geometry instanceof GridGeometry : false;
+    const isGrid = geometry.type === 'grid';
     if (isGrid) {
       scaledSize = geometry.getScaledCellSize(zoom);
       offsetX = width / 2 - center.x * scaledSize;

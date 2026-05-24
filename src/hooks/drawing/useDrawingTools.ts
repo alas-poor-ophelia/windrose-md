@@ -60,7 +60,6 @@ const useDrawingTools = (
     screenToGrid,
     screenToWorld,
     getClientCoords,
-    GridGeometry
   } = useMapState();
 
   const {
@@ -90,13 +89,13 @@ const useDrawingTools = (
   });
 
   const segmentDrag = useSegmentDragTool({
-    mapData, geometry, GridGeometry, selectedColor, selectedOpacity,
+    mapData, geometry, selectedColor, selectedOpacity,
     screenToWorld, getClientCoords, onCellsChange
   });
 
   const shapes = useShapeTools({
     currentTool, selectedColor, selectedOpacity, previewSettings,
-    mapData, geometry, GridGeometry, screenToWorld, getClientCoords,
+    mapData, geometry, screenToWorld, getClientCoords,
     onCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange,
     removeObjectsInRectangle
   });
@@ -135,7 +134,7 @@ const useDrawingTools = (
     if (currentTool === 'segmentDraw') {
       const isTouch = isTouchEvent || (e as TouchEvent).touches !== undefined || (e as PointerEvent).pointerType === 'touch';
       if (isTouch) {
-        if (GridGeometry && geometry instanceof GridGeometry) {
+        if (geometry && geometry.type === 'grid') {
           segmentPicker.openSegmentPicker(gridX, gridY);
         }
       } else {

@@ -8,7 +8,7 @@
  */
 
 // Type-only imports
-import type { IGeometry } from '#types/core/geometry.types';
+import type { ExtendedGeometry } from '#types/contexts/context.types';
 import type { MapData } from '#types/core/map.types';
 import type { MapObject, ObjectSize } from '#types/objects/object.types';
 import type { TextLabel } from '#types/objects/note.types';
@@ -18,8 +18,6 @@ import type { HexOrientation } from '#types/settings/settings.types';
 
 import { getActiveLayer } from '../persistence/layerAccessor';
 import { getFontCss } from '../text/fontOptions';
-import { GridGeometry } from '../geometry/core/GridGeometry';
-import { HexGeometry } from '../geometry/core/HexGeometry';
 
 
 // ===========================================
@@ -73,14 +71,14 @@ function rectsOverlap(
  */
 function getObjectWorldBounds(
   obj: MapObject,
-  geometry: IGeometry,
+  geometry: ExtendedGeometry,
   mapData: MapData
 ): WorldBounds {
   const pos = obj.position;
   const size: ObjectSize = obj.size ?? { width: 1, height: 1 };
-  
+
   // For grid maps: convert grid cell to world coords
-  if (geometry instanceof GridGeometry) {
+  if (geometry.type === 'grid') {
     const cellSize = geometry.cellSize;
     return {
       minX: pos.x * cellSize,
@@ -89,12 +87,11 @@ function getObjectWorldBounds(
       maxY: (pos.y + size.height) * cellSize
     };
   }
-  
+
   // For hex maps: get hex center in world coords and create bounds around it
-  if (geometry instanceof HexGeometry) {
-    const hexGeo = geometry;
-    const center = hexGeo.hexToWorld(pos.x, pos.y);
-    const hexSize = hexGeo.hexSize;
+  if (geometry.type === 'hex') {
+    const center = geometry.hexToWorld(pos.x, pos.y);
+    const hexSize = geometry.hexSize;
     
     // Approximate hex bounds as a rectangle
     const orientation: HexOrientation = (mapData as MapData & { orientation?: HexOrientation }).orientation || 'flat';
@@ -195,7 +192,7 @@ function getItemsInWorldRect(
   mapData: MapData,
   corner1: WorldPoint,
   corner2: WorldPoint,
-  geometry: IGeometry,
+  geometry: ExtendedGeometry,
   ctx: CanvasRenderingContext2D | null
 ): SelectedItem[] {
   const activeLayer = getActiveLayer(mapData);
@@ -234,7 +231,7 @@ function getItemsInWorldRect(
  */
 function getSelectionBounds(
   selectedItems: SelectedItem[] | null | undefined,
-  geometry: IGeometry,
+  geometry: ExtendedGeometry,
   mapData: MapData,
   ctx: CanvasRenderingContext2D | null
 ): WorldBounds | null {
@@ -279,7 +276,7 @@ function getSelectionBounds(
 function isWithinBounds(
   gridX: number,
   gridY: number,
-  geometry: IGeometry & GeometryWithBounds | null,
+  geometry: ExtendedGeometry | null,
   _mapData: MapData
 ): boolean {
   if (geometry == null) return true;
@@ -298,7 +295,7 @@ function isWithinBounds(
  */
 function validateGroupMove(
   updates: PositionUpdate[],
-  geometry: IGeometry & GeometryWithBounds | null,
+  geometry: ExtendedGeometry | null,
   mapData: MapData
 ): boolean {
   for (const update of updates) {

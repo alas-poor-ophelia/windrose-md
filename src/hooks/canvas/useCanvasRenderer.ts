@@ -8,7 +8,8 @@
 // Type-only imports
 import type { MapLayer } from '#types/core/map.types';
 import type { IGeometry } from '#types/core/geometry.types';
-import type { Cell, GridCell } from '#types/core/cell.types';
+import type { Cell } from '#types/core/cell.types';
+import { isGridCell } from '#types/core/cell.types';
 import type { BuildCellLookupFn, CalculateBordersFn } from '#types/core/rendering.types';
 import type { MapObject } from '#types/objects/object.types';
 import type {
@@ -432,8 +433,8 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   if (geometry.type === 'grid' &&
       activeLayer.cells.length > 0 &&
       activeLayer.curves.length > 0) {
-    const cellsForMerge = activeLayer.cells.map(cell => ({
-      x: (cell as GridCell).x, y: (cell as GridCell).y, color: getCellColor(cell)
+    const cellsForMerge = activeLayer.cells.filter(isGridCell).map(cell => ({
+      x: cell.x, y: cell.y, color: getCellColor(cell)
     }));
     activeMergeIndex = buildMergeIndex(
       cellsForMerge,

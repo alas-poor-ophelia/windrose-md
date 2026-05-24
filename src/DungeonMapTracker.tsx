@@ -326,7 +326,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
 
   // Adjacent sub-map click-to-navigate
   useEffect((): (() => void) | undefined => {
-    if (!showAdjacentSubMaps || !isInSubHex || adjacentSubHexes.length === 0 || !(geometry instanceof HexGeometry) || !mapData) return undefined;
+    if (!showAdjacentSubMaps || !isInSubHex || adjacentSubHexes.length === 0 || geometry?.type !== 'hex' || !mapData) return undefined;
     const maxRing = mapData.hexBounds?.maxRing ?? 7;
     const tileStep = 2 * maxRing + 1;
 

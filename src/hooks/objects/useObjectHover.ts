@@ -12,7 +12,6 @@ import { useMapState } from '../../context/MapContext';
 import { useMapOperations } from '../../context/MapContext';
 import { useMapSelection } from '../../context/MapSelectionContext';
 import { getClickedObjectInCell } from '../../objects/hexSlotPositioner';
-import { HexGeometry } from '../../geometry/core/HexGeometry';
 import { getActiveLayer, isCellFogged } from '../../persistence/layerAccessor';
 
 
@@ -48,7 +47,7 @@ function useObjectHover(): {
 
         const { x, y } = coords;
 
-        if (mapData.mapType === 'hex' && geometry instanceof HexGeometry) {
+        if (geometry?.type === 'hex') {
           const worldCoords = screenToWorld(clientX, clientY);
           if (worldCoords && geometry.gridToWorld != null && geometry.width != null) {
             const hexCenter = geometry.gridToWorld(x, y);

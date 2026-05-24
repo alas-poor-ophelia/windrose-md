@@ -8,12 +8,11 @@
 import type { HexColor } from '#types/core/common.types';
 import type { VNode } from 'preact';
 import type { Point } from '#types/core/geometry.types';
-import type { IGeometry } from '#types/core/geometry.types';
+import type { ExtendedGeometry } from '#types/contexts/context.types';
 import type { MapData } from '#types/core/map.types';
 
 import { cellToScreen } from '../../drawing/cellToScreenConverter';
 import { SEGMENT_VERTICES, SEGMENT_TRIANGLES } from '../../core/dmtConstants';
-import { GridGeometry } from '../../geometry/core/GridGeometry';
 
 
 
@@ -39,7 +38,7 @@ export interface SegmentHoverOverlayProps {
   /** Currently selected paint color */
   selectedColor: HexColor;
   /** Geometry instance */
-  geometry: IGeometry | null;
+  geometry: ExtendedGeometry | null;
   /** Map data */
   mapData: MapData | null;
   /** Reference to canvas element */
@@ -77,7 +76,7 @@ const SegmentHoverOverlay = ({
   canvasRef,
   containerRef
 }: SegmentHoverOverlayProps): VNode | null => {
-  if (!hoverInfo || !geometry || !mapData || !mapData.viewState || !(geometry instanceof GridGeometry)) {
+  if (!hoverInfo || !geometry || !mapData || !mapData.viewState || geometry.type !== 'grid') {
     return null;
   }
 

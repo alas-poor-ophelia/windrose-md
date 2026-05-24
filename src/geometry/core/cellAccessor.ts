@@ -35,8 +35,6 @@ import type {
 } from '#types/core/cell.types';
 import type { IGeometry } from '#types/core/geometry.types';
 
-import { GridGeometry } from './GridGeometry';
-import { HexGeometry } from './HexGeometry';
 import { SEGMENT_NAMES } from '../../core/dmtConstants';
 
 // Re-export types for consumers
@@ -70,14 +68,14 @@ export type {
  * Check if geometry is grid-based (square cells)
  */
 function isGridGeometry(geometry: IGeometry): boolean {
-  return geometry instanceof GridGeometry;
+  return geometry.type === 'grid';
 }
 
 /**
  * Check if geometry is hex-based
  */
 function isHexGeometry(geometry: IGeometry): boolean {
-  return geometry instanceof HexGeometry;
+  return geometry.type === 'hex';
 }
 
 // ============================================================================

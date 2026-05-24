@@ -15,7 +15,7 @@ import type { Point } from '#types/core/geometry.types';
 import type { MapData } from '#types/core/map.types';
 
 import { useEffect, useRef } from 'preact/hooks';
-import { GridGeometry } from '../../geometry/core/GridGeometry';
+import type { ExtendedGridGeometry } from '#types/contexts/context.types';
 import { useDiagonalFill } from '../../hooks/drawing/useDiagonalFill';
 import { useMapState } from '../../context/MapContext';
 import { useEventHandlerRegistration } from '../../context/EventHandlerContext';
@@ -61,7 +61,7 @@ function cornerToScreen(
   cellX: number,
   cellY: number,
   corner: CornerName,
-  geometry: GridGeometry,
+  geometry: ExtendedGridGeometry,
   mapData: MapData,
   canvasWidth: number,
   canvasHeight: number
@@ -169,7 +169,7 @@ const DiagonalFillOverlay = ({ currentTool }: DiagonalFillOverlayProps): VNode |
     return null;
   }
 
-  if (!(geometry instanceof GridGeometry)) {
+  if (geometry.type !== 'grid') {
     return null;
   }
 

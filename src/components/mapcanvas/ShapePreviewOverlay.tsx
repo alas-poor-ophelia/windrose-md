@@ -11,14 +11,12 @@
 
 import type { Point } from '#types/core/geometry.types';
 import type { VNode } from 'preact';
-import type { IGeometry } from '#types/core/geometry.types';
 import type { MapData } from '#types/core/map.types';
 import type { EffectiveDistanceSettings } from '#types/hooks/distanceMeasurement.types';
 
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { cellToScreen } from '../../drawing/cellToScreenConverter';
-import { GridGeometry } from '../../geometry/core/GridGeometry';
-import { HexGeometry } from '../../geometry/core/HexGeometry';
+import type { ExtendedGeometry } from '#types/contexts/context.types';
 import { Z_INDEX } from '../../core/dmtConstants';
 
 
@@ -39,7 +37,7 @@ export interface ShapePreviewOverlayProps {
   /** End/hover point */
   endPoint: Point | null;
   /** Geometry instance */
-  geometry: IGeometry | null;
+  geometry: ExtendedGeometry | null;
   /** Map data */
   mapData: MapData | null;
   /** Reference to canvas element */
@@ -59,7 +57,7 @@ export interface ShapePreviewOverlayProps {
 function worldToScreen(
   worldX: number,
   worldY: number,
-  geometry: IGeometry,
+  geometry: ExtendedGeometry,
   mapData: MapData,
   canvasWidth: number,
   canvasHeight: number
@@ -69,7 +67,7 @@ function worldToScreen(
   const northDirection = mapData.northDirection ?? 0;
 
   let offsetX: number, offsetY: number;
-  if (geometry instanceof GridGeometry) {
+  if (geometry.type === 'grid') {
     const scaledCellSize = geometry.getScaledCellSize(zoom);
     offsetX = canvasWidth / 2 - center.x * scaledCellSize;
     offsetY = canvasHeight / 2 - center.y * scaledCellSize;
@@ -188,7 +186,7 @@ const ShapePreviewOverlay = ({
   let dimensionText = '';
   let tooltipPosition = { x: 0, y: 0 };
 
-  const geo = geometry as IGeometry & { cellSize: number };
+  const geo = geometry;
   const md = mapData as MapData & { viewState: NonNullable<MapData['viewState']> };
 
   if (shapeType === 'rectangle' || shapeType === 'clearArea' || shapeType === 'areaSelect') {
@@ -202,7 +200,7 @@ const ShapePreviewOverlay = ({
 
     let corners: { x: number; y: number }[];
 
-    const isHex = !(geo instanceof GridGeometry);
+    const isHex = geo.type === 'hex';
     if (isHex && geo.getCellCenter != null) {
       // Hex: compute axis-aligned bounding box from corner cell world centers,
       // then draw a clean rectangle (hex cells don't have rectangular corners)
@@ -321,7 +319,7 @@ const ShapePreviewOverlay = ({
       y: (corners[0].y + corners[1].y) / 2 - 10
     };
 
-    const cellSize = geo.cellSize || (geo instanceof HexGeometry ? geo.hexSize : 1);
+    const cellSize = geo.cellSize;
     const widthCells = Math.abs(maxX - minX) / cellSize;
     const heightCells = Math.abs(maxY - minY) / cellSize;
     dimensionText = distanceSettings
@@ -356,7 +354,7 @@ const ShapePreviewOverlay = ({
     const dy = scaledEdge.y - scaledCenter.y;
     const radiusScreen = Math.sqrt(dx * dx + dy * dy);
 
-    const cellSize = geo.cellSize || (geo instanceof HexGeometry ? geo.hexSize : 1);
+    const cellSize = geo.cellSize;
     const worldDx = startPoint.x - endPoint.x;
     const worldDy = startPoint.y - endPoint.y;
     const radiusCells = Math.sqrt(worldDx * worldDx + worldDy * worldDy) / cellSize;

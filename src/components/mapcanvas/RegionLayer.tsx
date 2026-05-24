@@ -17,7 +17,6 @@ import { useEventHandlerRegistration } from '../../context/EventHandlerContext';
 import { useRegionTools } from '../../hooks/interactions/useRegionTools';
 import type { MenuItem } from 'obsidian';
 import { Menu } from 'obsidian';
-import { HexGeometry } from '../../geometry/core/HexGeometry';
 import { openNativeNoteLinkModal } from '../modals/NoteLinkModal';
 import { Icon } from '../shared/Icon';
 
@@ -210,7 +209,7 @@ const RegionLayer = ({
 
     if (hexesToHighlight.length === 0 && boundaryVertices.length === 0) return;
 
-    if (!(geometry instanceof HexGeometry)) return;
+    if (geometry.type !== 'hex') return;
     const hexGeom = geometry;
     const viewState = mapData.viewState;
     if (!viewState) return;

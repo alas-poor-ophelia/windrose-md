@@ -7,7 +7,6 @@
 
 import type { Point, IGeometry } from '#types/core/geometry.types';
 
-import { GridGeometry } from '../geometry/core/GridGeometry';
 
 
 
@@ -74,7 +73,7 @@ function cellToScreen(
   }
 
   let offsetX: number, offsetY: number;
-  if (geometry instanceof GridGeometry) {
+  if (geometry.type === 'grid') {
     const scaledCellSize = geometry.getScaledCellSize(zoom);
     offsetX = canvasWidth / 2 - center.x * scaledCellSize;
     offsetY = canvasHeight / 2 - center.y * scaledCellSize;
