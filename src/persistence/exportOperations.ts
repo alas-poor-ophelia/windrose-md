@@ -24,10 +24,6 @@ import { getFontCss } from '../text/fontOptions';
 import { renderCanvas } from '../hooks/canvas/useCanvasRenderer';
 import { getSettings } from '../core/settingsAccessor';
 
-
-// Obsidian app reference
-
-
 // ===========================================
 // Text Label Bounds
 // ===========================================
@@ -71,7 +67,6 @@ function getTextLabelBounds(label: TextLabel, ctx: CanvasRenderingContext2D): Bo
  * Calculate the world-coordinate bounding box of all content on a layer
  */
 function calculateContentBounds(
-  _mapData: MapData,
   layer: MapLayer,
   geometry: ExtendedGeometry
 ): BoundingBox | null {
@@ -133,32 +128,18 @@ function calculateContentBounds(
 /**
  * Render map content to a canvas context using the same rendering logic as the main canvas.
  */
-async function renderMapToCanvas(
+function renderMapToCanvas(
   ctx: CanvasRenderingContext2D,
   params: RenderParams
-): Promise<void> {
+): void {
   const { mapData, geometry, width, height } = params;
-  
-  // Import rendering dependencies
-  
-  
-  
-  
-  // Create temporary canvas for rendering
+
   const tempCanvas = document.createElement('canvas');
   tempCanvas.width = width;
   tempCanvas.height = height;
-  
-  // Create export-specific map data
-  const exportMapData: MapData = {
-    ...mapData,
-    // Override viewport for export
-  };
-  
-  // Get effective settings for theming
+
   const effectiveSettings = getSettings();
-  
-  // Build export theme
+
   const theme: ExportTheme = {
     grid: {
       lines: effectiveSettings.gridLineColor,
@@ -181,18 +162,16 @@ async function renderMapToCanvas(
     },
     coordinateKey: effectiveSettings.coordinateKeyColor
   };
-  
-  // Render using existing render function
+
   renderCanvas(
     tempCanvas,
     null,
-    exportMapData,
+    mapData,
     geometry,
     [],
     { isResizeMode: false, theme, showCoordinates: false, layerVisibility: { grid: true, objects: true, textLabels: true, hexCoordinates: false, regions: true, outlines: true } }
   );
-  
-  // Copy to target context
+
   ctx.drawImage(tempCanvas, 0, 0);
 }
 
@@ -211,7 +190,7 @@ async function exportMapAsImage(
   const activeLayer = getActiveLayer(mapData);
   
   // Calculate content bounds
-  const bounds = calculateContentBounds(mapData, activeLayer, geometry);
+  const bounds = calculateContentBounds(activeLayer, geometry);
   
   if (!bounds) {
     throw new Error('No content to export');
@@ -275,25 +254,18 @@ async function saveMapImageToVault(
     // Convert blob to array buffer
     const arrayBuffer = await blob.arrayBuffer();
     
-    // Generate filename with timestamp if not provided
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-    const mapName = (mapData as MapData & { name?: string }).name ?? 'map';
-    const finalFilename = filename ?? `${mapName}-${timestamp}.png`;
-    
-    // Save to vault root
-    const path = `${finalFilename}`;
-    
-    // Check if file exists
-    const existingFile = app.vault.getAbstractFileByPath(path);
+    const mapName = mapData.name ?? 'map';
+    const safeName = (filename ?? `${mapName}-${timestamp}.png`).replace(/[\\/:*?"<>|]/g, '_');
+
+    const existingFile = app.vault.getAbstractFileByPath(safeName);
     if (existingFile instanceof TFile) {
-      // File exists, modify it
       await app.vault.modifyBinary(existingFile, arrayBuffer);
     } else {
-      // Create new file
-      await app.vault.createBinary(path, arrayBuffer);
+      await app.vault.createBinary(safeName, arrayBuffer);
     }
-    
-    return { success: true, path };
+
+    return { success: true, path: safeName };
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error('[exportOperations] Export failed:', error);

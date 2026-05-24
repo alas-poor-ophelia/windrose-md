@@ -14,212 +14,143 @@ import { getDataFilePath } from '../core/settingsAccessor';
 import { offsetToAxial } from '../geometry/core/offsetCoordinates';
 import { getSettings } from '../core/settingsAccessor';
 import { migrateToLayerSchema, needsMigration, generateLayerId } from './layerAccessor';
-
-
-
-
-/** Constants module */
-
-/** Layer accessor module */
-
-/** Settings accessor module */
-
-/** Offset coordinates module */
-
+import { calculateFitZoom } from '../geometry/core/hexMeasurements';
 
 /** Data file structure */
 interface DataFile {
   maps: Record<string, MapData>;
 }
 
-/**
- * Load map data from vault
- */
+function migrateMapData(mapData: MapData): MapData {
+  if (!mapData.objects) mapData.objects = [];
+  if (!mapData.textLabels) mapData.textLabels = [];
+  if (!mapData.customColors) mapData.customColors = [];
+  if (!mapData.edges) mapData.edges = [];
+  if (!mapData.regions) mapData.regions = [];
+  if (!mapData.outlines) mapData.outlines = [];
+  if (!mapData.shapeOverlays) mapData.shapeOverlays = [];
+  if (!mapData.mapType) mapData.mapType = 'grid';
+  if (!mapData.settings) {
+    mapData.settings = { useGlobalSettings: true, overrides: {} };
+  }
+  if (!mapData.uiPreferences) {
+    mapData.uiPreferences = {
+      rememberPanZoom: true,
+      rememberSidebarState: true,
+      rememberExpandedState: false
+    };
+  }
+  if (mapData.expandedState === undefined) mapData.expandedState = false;
+  if (!mapData.lastTextLabelSettings) mapData.lastTextLabelSettings = null;
+
+  // Hex-specific migration
+  if (mapData.mapType === 'hex') {
+    if (!mapData.hexBounds) {
+      mapData.hexBounds = { ...DEFAULTS.hexBounds };
+    } else if ((mapData.hexBounds as unknown as Record<string, unknown>).maxQ !== undefined) {
+      // Old axial bounds format → offset format (boundary cast: legacy schema)
+      const legacyBounds = mapData.hexBounds as unknown as Record<string, unknown>;
+      mapData.hexBounds = {
+        maxCol: legacyBounds.maxQ as number,
+        maxRow: legacyBounds.maxR as number
+      };
+    }
+
+    if (!mapData.backgroundImage) {
+      mapData.backgroundImage = {
+        path: null,
+        lockBounds: false,
+        gridDensity: 'medium',
+        customColumns: 24,
+        sizingMode: 'density',
+        measurementMethod: 'corner',
+        measurementSize: 86,
+        fineTuneOffset: 0
+      };
+    } else {
+      if (mapData.backgroundImage.gridDensity === undefined) mapData.backgroundImage.gridDensity = 'medium';
+      if (mapData.backgroundImage.customColumns === undefined) mapData.backgroundImage.customColumns = 24;
+      if (mapData.backgroundImage.sizingMode === undefined) mapData.backgroundImage.sizingMode = 'density';
+      if (mapData.backgroundImage.measurementMethod === undefined) mapData.backgroundImage.measurementMethod = 'corner';
+      if (mapData.backgroundImage.measurementSize === undefined) mapData.backgroundImage.measurementSize = 86;
+      if (mapData.backgroundImage.fineTuneOffset === undefined) mapData.backgroundImage.fineTuneOffset = 0;
+    }
+  }
+
+  // Layer schema migration (v2)
+  if (needsMigration(mapData)) {
+    mapData = migrateToLayerSchema(mapData) as MapData;
+  }
+
+  // Layer-level arrays and curve migration
+  if (!mapData.tilesets) mapData.tilesets = [];
+  for (const layer of mapData.layers) {
+    if (!layer.tiles) layer.tiles = [];
+    if (!layer.curves) layer.curves = [];
+    layer.curves = layer.curves.filter(c => c.start != null && c.segments != null);
+    for (const curve of layer.curves) {
+      // Migrate legacy holes (flat number[]) to innerRings (boundary cast: legacy schema)
+      const legacy = (curve as unknown as Record<string, unknown>).holes as number[][] | undefined;
+      if (legacy && legacy.length > 0) {
+        const innerRings: [number, number][][] = [];
+        for (const hole of legacy) {
+          if (hole.length < 6) continue;
+          const ring: [number, number][] = [];
+          for (let i = 0; i < hole.length; i += 2) {
+            ring.push([hole[i], hole[i + 1]]);
+          }
+          innerRings.push(ring);
+        }
+        if (innerRings.length > 0) {
+          curve.innerRings = innerRings;
+        }
+        delete (curve as unknown as Record<string, unknown>).holes;
+      }
+    }
+  }
+
+  // Sub-hex migration
+  if (mapData.subHexMaps) {
+    for (const hexKey of Object.keys(mapData.subHexMaps)) {
+      const subHex = mapData.subHexMaps[hexKey];
+      if (subHex?.mapData != null) {
+        for (const layer of subHex.mapData.layers) {
+          if (!layer.tiles) layer.tiles = [];
+          if (!layer.curves) layer.curves = [];
+          layer.curves = layer.curves.filter(c => c.start != null && c.segments != null);
+        }
+        if (!subHex.mapData.regions) subHex.mapData.regions = [];
+        if (!subHex.mapData.outlines) subHex.mapData.outlines = [];
+        if (!subHex.mapData.shapeOverlays) subHex.mapData.shapeOverlays = [];
+      }
+    }
+  }
+
+  return mapData;
+}
+
 async function loadMapData(app: App, mapId: string, mapName: string = '', mapType: MapType = 'grid'): Promise<MapData> {
   try {
     const dataPath = getDataFilePath();
-    // eslint-disable-next-line no-console
-    console.log('[loadMapData] path:', dataPath, 'mapId:', mapId);
     const file = app.vault.getAbstractFileByPath(dataPath);
 
     if (!(file instanceof TFile)) {
-      return createNewMap(mapId, mapName, mapType);
+      return createNewMap(mapName, mapType);
     }
 
     const content = await app.vault.read(file);
     const data = JSON.parse(content) as DataFile;
 
     if (data.maps[mapId] != null) {
-      const mapData = data.maps[mapId];
-
-      // Ensure all arrays exist
-      if (!mapData.objects) {
-        mapData.objects = [];
-      }
-      if (!mapData.textLabels) {
-        mapData.textLabels = [];
-      }
-      if (!mapData.customColors) {
-        mapData.customColors = [];
-      }
-      // Ensure edges array exists (for edge painting feature)
-      if (!mapData.edges) {
-        mapData.edges = [];
-      }
-      // Ensure mapType exists (backward compatibility)
-      if (!mapData.mapType) {
-        mapData.mapType = 'grid';
-      }
-      // Ensure settings exist (backward compatibility)
-      if (!mapData.settings) {
-        mapData.settings = {
-          useGlobalSettings: true,
-          overrides: {}
-        };
-      }
-      // Ensure uiPreferences exist (backward compatibility)
-      if (!mapData.uiPreferences) {
-        mapData.uiPreferences = {
-          rememberPanZoom: true,
-          rememberSidebarState: true,
-          rememberExpandedState: false
-        };
-      }
-      // Ensure expandedState exists (backward compatibility)
-      if (mapData.expandedState === undefined) {
-        mapData.expandedState = false;
-      }
-      // Ensure lastTextLabelSettings exists (backward compatibility)
-      if (!mapData.lastTextLabelSettings) {
-        mapData.lastTextLabelSettings = null;
-      }
-      // Ensure regions array exists (backward compatibility)
-      if (!mapData.regions) {
-        mapData.regions = [];
-      }
-      // Ensure outlines array exists (backward compatibility)
-      if (!mapData.outlines) {
-        mapData.outlines = [];
-      }
-      // Ensure shapeOverlays array exists (backward compatibility)
-      if (!mapData.shapeOverlays) {
-        mapData.shapeOverlays = [];
-      }
-      // Ensure hexBounds exists for hex maps (use defaults, handle migration)
-      if (mapData.mapType === 'hex') {
-        if (!mapData.hexBounds) {
-          // No bounds at all - use defaults
-          mapData.hexBounds = { ...DEFAULTS.hexBounds };
-        } else if ((mapData.hexBounds as unknown as Record<string, unknown>).maxQ !== undefined) {
-          // Old axial bounds format - convert to offset format
-          const legacyBounds = mapData.hexBounds as unknown as Record<string, unknown>;
-          mapData.hexBounds = {
-            maxCol: legacyBounds.maxQ as number,
-            maxRow: legacyBounds.maxR as number
-          };
-        }
-        // else: already has maxCol/maxRow (new format) - no action needed
-
-        // Ensure backgroundImage exists for hex maps (backward compatibility)
-        if (!mapData.backgroundImage) {
-          mapData.backgroundImage = {
-            path: null,
-            lockBounds: false,
-            gridDensity: 'medium',
-            customColumns: 24,
-            sizingMode: 'density',
-            measurementMethod: 'corner',
-            measurementSize: 86,
-            fineTuneOffset: 0
-          };
-        } else {
-          // Ensure new fields exist on existing backgroundImage objects
-          if (mapData.backgroundImage.gridDensity === undefined) {
-            mapData.backgroundImage.gridDensity = 'medium';
-          }
-          if (mapData.backgroundImage.customColumns === undefined) {
-            mapData.backgroundImage.customColumns = 24;
-          }
-          // Add new fields for measurement mode (v1.1.0)
-          if (mapData.backgroundImage.sizingMode === undefined) {
-            mapData.backgroundImage.sizingMode = 'density';
-          }
-          if (mapData.backgroundImage.measurementMethod === undefined) {
-            mapData.backgroundImage.measurementMethod = 'corner';
-          }
-          if (mapData.backgroundImage.measurementSize === undefined) {
-            mapData.backgroundImage.measurementSize = 86;
-          }
-          if (mapData.backgroundImage.fineTuneOffset === undefined) {
-            mapData.backgroundImage.fineTuneOffset = 0;
-          }
-        }
-      }
-      // Migrate to layer schema if needed (v2)
-      if (needsMigration(mapData)) {
-        data.maps[mapId] = migrateToLayerSchema(mapData) as MapData;
-      }
-
-      // Ensure arrays exist on all layers (backward compat)
-      const loadedMap = data.maps[mapId];
-      if (!loadedMap.tilesets) {
-        loadedMap.tilesets = [];
-      }
-      for (const layer of loadedMap.layers) {
-        if (!layer.tiles) {
-          layer.tiles = [];
-        }
-        if (!layer.curves) {
-          layer.curves = [];
-        }
-        // Filter out v1 POC curves that lack required start/segments fields
-        layer.curves = layer.curves.filter(c => c.start != null && c.segments != null);
-        for (const curve of layer.curves) {
-          // Migrate legacy holes (flat number[]) to innerRings ([[x,y],...])
-          const legacy = (curve as unknown as Record<string, unknown>).holes as number[][] | undefined;
-          if (legacy && legacy.length > 0) {
-            const innerRings: [number, number][][] = [];
-            for (const hole of legacy) {
-              if (hole.length < 6) continue;
-              const ring: [number, number][] = [];
-              for (let i = 0; i < hole.length; i += 2) {
-                ring.push([hole[i], hole[i + 1]]);
-              }
-              innerRings.push(ring);
-            }
-            if (innerRings.length > 0) {
-              curve.innerRings = innerRings;
-            }
-            delete (curve as unknown as Record<string, unknown>).holes;
-          }
-        }
-      }
-
-      // Migrate sub-hex maps if present (recursive)
-      if (loadedMap.subHexMaps) {
-        for (const hexKey of Object.keys(loadedMap.subHexMaps)) {
-          const subHex = loadedMap.subHexMaps[hexKey];
-          if (subHex?.mapData != null) {
-            for (const layer of subHex.mapData.layers) {
-              if (!layer.tiles) layer.tiles = [];
-              if (!layer.curves) layer.curves = [];
-              layer.curves = layer.curves.filter(c => c.start != null && c.segments != null);
-            }
-            if (!subHex.mapData.regions) subHex.mapData.regions = [];
-            if (!subHex.mapData.outlines) subHex.mapData.outlines = [];
-            if (!subHex.mapData.shapeOverlays) subHex.mapData.shapeOverlays = [];
-          }
-        }
-      }
-
-      return loadedMap;
-    } else {
-      return createNewMap(mapId, mapName, mapType);
+      data.maps[mapId] = migrateMapData(data.maps[mapId]);
+      return data.maps[mapId];
     }
+
+    return createNewMap(mapName, mapType);
   } catch (error) {
     // eslint-disable-next-line no-console
-    console.error('[loadMapData] Error:', error);
-    return createNewMap(mapId, mapName, mapType);
+    console.error('[loadMapData] Failed to load map data, creating new map:', error);
+    return createNewMap(mapName, mapType);
   }
 }
 
@@ -257,48 +188,7 @@ async function saveMapData(app: App, mapId: string, mapData: MapData): Promise<b
   }
 }
 
-/**
- * Create a new map with defaults
- */
-/**
- * Calculate a zoom level that fits the hex grid within the canvas.
- */
-function calculateFitZoom(
-  hexSize: number,
-  orientation: string,
-  hexBounds: { maxCol: number; maxRow: number; maxRing?: number },
-  canvasWidth: number,
-  canvasHeight: number
-): number {
-  const sqrt3 = Math.sqrt(3);
-  let worldWidth: number, worldHeight: number;
-
-  if (hexBounds.maxRing !== undefined && hexBounds.maxRing > 0) {
-    // Radial bounds — full diameter including outer hex edges
-    if (orientation === 'flat') {
-      worldWidth = hexSize * 2 * (hexBounds.maxRing * 1.5 + 1);
-      worldHeight = hexSize * sqrt3 * (hexBounds.maxRing * 2 + 1);
-    } else {
-      worldWidth = hexSize * sqrt3 * (hexBounds.maxRing * 2 + 1);
-      worldHeight = hexSize * 2 * (hexBounds.maxRing * 1.5 + 1);
-    }
-  } else {
-    // Rectangular bounds — account for hex stagger offset
-    if (orientation === 'flat') {
-      worldWidth = hexSize * (1.5 * hexBounds.maxCol + 0.5);
-      worldHeight = hexSize * sqrt3 * (hexBounds.maxRow + 0.5);
-    } else {
-      worldWidth = hexSize * sqrt3 * (hexBounds.maxCol + 0.5);
-      worldHeight = hexSize * (1.5 * hexBounds.maxRow + 0.5);
-    }
-  }
-
-  // Use 0.7 factor to leave comfortable margin around the grid
-  const fitZoom = Math.min(canvasWidth / worldWidth, canvasHeight / worldHeight) * 0.7;
-  return Math.max(DEFAULTS.minZoom, Math.min(DEFAULTS.maxZoom, fitZoom));
-}
-
-function createNewMap(_mapId: string, mapName: string = '', mapType: MapType = 'grid'): MapData {
+function createNewMap(mapName: string = '', mapType: MapType = 'grid'): MapData {
   // Generate layer ID for initial layer
   const initialLayerId = generateLayerId();
 
@@ -412,4 +302,4 @@ function createNewMap(_mapId: string, mapName: string = '', mapType: MapType = '
   return baseMap;
 }
 
-export { loadMapData, saveMapData, createNewMap, calculateFitZoom };
+export { loadMapData, saveMapData, createNewMap };

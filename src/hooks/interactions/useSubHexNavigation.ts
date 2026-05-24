@@ -12,7 +12,7 @@ import type { MapDataUpdater } from '#types/hooks/mapData.types';
 import { useCallback, useMemo, useState } from 'preact/hooks';
 import { DEFAULTS, SCHEMA_VERSION } from '../../core/dmtConstants';
 import { generateLayerId } from '../../persistence/layerAccessor';
-import { calculateFitZoom } from '../../persistence/fileOperations';
+import { calculateFitZoom } from '../../geometry/core/hexMeasurements';
 
 
 

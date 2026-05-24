@@ -17,18 +17,16 @@ const PROTOCOL = 'windrose:';
 const LEGACY_PROTOCOL = 'obsidian://windrose?';
 const NAVIGATION_EVENT = 'dmt-navigate-to';
 
+function decodePathComponent(raw: string): string {
+  return raw.replace(/%7C/gi, '|').replace(/%2C/gi, ',');
+}
+
 function parseDeepLinkData(rawDataStr: string): DeepLinkData | null {
-  let dataStr = rawDataStr;
-  try {
-    dataStr = decodeURIComponent(rawDataStr);
-  } catch {
-    // fall back to raw
-  }
-  const pipeIndex = dataStr.indexOf('|');
+  const pipeIndex = rawDataStr.indexOf('|');
   if (pipeIndex === -1) return null;
 
-  const notePath = dataStr.slice(0, pipeIndex);
-  const coordData = dataStr.slice(pipeIndex + 1);
+  const notePath = decodePathComponent(rawDataStr.slice(0, pipeIndex));
+  const coordData = rawDataStr.slice(pipeIndex + 1);
   const parts = coordData.split(',');
 
   if (parts.length !== 5) return null;
@@ -70,7 +68,8 @@ function generateDeepLink(
   const roundedY = Math.round(y * 100) / 100;
   const roundedZoom = Math.round(zoom * 100) / 100;
 
-  return `${PROTOCOL}${notePath}|${mapId},${roundedX},${roundedY},${roundedZoom},${layerId}`;
+  const encodedPath = notePath.replace(/\|/g, '%7C').replace(/,/g, '%2C');
+  return `${PROTOCOL}${encodedPath}|${mapId},${roundedX},${roundedY},${roundedZoom},${layerId}`;
 }
 
 function generateDeepLinkMarkdown(
@@ -82,8 +81,7 @@ function generateDeepLinkMarkdown(
   zoom: number,
   layerId: string
 ): string {
-  // Escape brackets in display text (remove them to avoid breaking markdown)
-  const escapedText = displayText.replace(/[\[\]]/g, '');
+  const escapedText = displayText.replace(/[\[\]()]/g, '');
   const url = generateDeepLink(notePath, mapId, x, y, zoom, layerId);
   return `[${escapedText}](${url})`;
 }
@@ -130,4 +128,8 @@ function consumePendingNavigate(mapId: string): NavigationEventDetail | null {
   return null;
 }
 
-export { PROTOCOL, LEGACY_PROTOCOL, NAVIGATION_EVENT, parseDeepLink, generateDeepLink, generateDeepLinkMarkdown, copyDeepLinkToClipboard, emitNavigationEvent, consumePendingNavigate };
+export {
+  PROTOCOL, LEGACY_PROTOCOL, NAVIGATION_EVENT,
+  parseDeepLink, generateDeepLink, generateDeepLinkMarkdown,
+  copyDeepLinkToClipboard, emitNavigationEvent, consumePendingNavigate
+};

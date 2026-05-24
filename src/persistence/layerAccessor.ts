@@ -728,7 +728,7 @@ function setFogVisibility(layer: MapLayer, enabled: boolean): MapLayer {
     ...layer,
     fogOfWar: {
       ...layer.fogOfWar,
-      enabled: !!enabled
+      enabled
     }
   };
 }
@@ -750,7 +750,7 @@ function getFogState(layer: MapLayer): FogState {
   return {
     initialized: true,
     enabled: layer.fogOfWar.enabled,
-    cellCount: layer.fogOfWar.foggedCells?.length || 0
+    cellCount: layer.fogOfWar.foggedCells.length
   };
 }
 
@@ -758,9 +758,12 @@ function getFogState(layer: MapLayer): FogState {
 // EXPORTS
 // ============================================================================
 
-export { // UUID generation
-  generateLayerId, // Layer access
-  getActiveLayer, getLayersOrdered, getLayerById, getLayerIndex, getLayerBelow, // Layer modification
-  updateLayer, updateActiveLayer, setActiveLayer, addLayer, cloneLayer, removeLayer, reorderLayers, // Migration
-  migrateToLayerSchema, needsMigration, // Fog of War
-  initializeFogOfWar, isCellFogged, fogCell, revealCell, fogRectangle, revealRectangle, fogAll, fogPaintedCells, revealAll, toggleFogVisibility, setFogVisibility, hasFogData, getFogState };
+export {
+  generateLayerId,
+  getActiveLayer, getLayersOrdered, getLayerById, getLayerIndex, getLayerBelow,
+  updateLayer, updateActiveLayer, setActiveLayer, addLayer, cloneLayer, removeLayer, reorderLayers,
+  migrateToLayerSchema, needsMigration,
+  initializeFogOfWar, isCellFogged, fogCell, revealCell,
+  fogRectangle, revealRectangle, fogAll, fogPaintedCells, revealAll,
+  toggleFogVisibility, setFogVisibility, hasFogData, getFogState
+};

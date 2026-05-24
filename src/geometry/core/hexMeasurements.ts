@@ -22,6 +22,8 @@
 
 import type { HexOrientation, GridCalculation } from '#types/settings/settings.types';
 
+import { DEFAULTS } from '../../core/dmtConstants';
+
 // ===========================================
 // Type Definitions
 // ===========================================
@@ -249,11 +251,50 @@ function getFineTuneRange(baseHexSize: number): FineTuneRange {
 }
 
 // ===========================================
+// Viewport Fitting
+// ===========================================
+
+function calculateFitZoom(
+  hexSize: number,
+  orientation: string,
+  hexBounds: { maxCol: number; maxRow: number; maxRing?: number },
+  canvasWidth: number,
+  canvasHeight: number
+): number {
+  const sqrt3 = Math.sqrt(3);
+  let worldWidth: number, worldHeight: number;
+
+  if (hexBounds.maxRing !== undefined && hexBounds.maxRing > 0) {
+    if (orientation === 'flat') {
+      worldWidth = hexSize * 2 * (hexBounds.maxRing * 1.5 + 1);
+      worldHeight = hexSize * sqrt3 * (hexBounds.maxRing * 2 + 1);
+    } else {
+      worldWidth = hexSize * sqrt3 * (hexBounds.maxRing * 2 + 1);
+      worldHeight = hexSize * 2 * (hexBounds.maxRing * 1.5 + 1);
+    }
+  } else {
+    if (orientation === 'flat') {
+      worldWidth = hexSize * (1.5 * hexBounds.maxCol + 0.5);
+      worldHeight = hexSize * sqrt3 * (hexBounds.maxRow + 0.5);
+    } else {
+      worldWidth = hexSize * sqrt3 * (hexBounds.maxCol + 0.5);
+      worldHeight = hexSize * (1.5 * hexBounds.maxRow + 0.5);
+    }
+  }
+
+  const fitZoom = Math.min(canvasWidth / worldWidth, canvasHeight / worldHeight) * 0.7;
+  return Math.max(DEFAULTS.minZoom, Math.min(DEFAULTS.maxZoom, fitZoom));
+}
+
+// ===========================================
 // Exports
 // ===========================================
 
-export { // Constants
-  MEASUREMENT_EDGE, MEASUREMENT_CORNER, MIN_MEASUREMENT_SIZE, MAX_MEASUREMENT_SIZE, MAX_FINE_TUNE_OFFSET, // Core conversions
-  measurementToHexSize, hexSizeToMeasurement, // Grid calculations
-  calculateColumns, calculateRows, calculateHexSizeFromColumns, calculateGridFromMeasurement, calculateGridFromColumns, // Validation
-  validateMeasurementSize, validateFineTune, getFineTuneRange };
+export {
+  MEASUREMENT_EDGE, MEASUREMENT_CORNER, MIN_MEASUREMENT_SIZE, MAX_MEASUREMENT_SIZE, MAX_FINE_TUNE_OFFSET,
+  measurementToHexSize, hexSizeToMeasurement,
+  calculateColumns, calculateRows, calculateHexSizeFromColumns,
+  calculateGridFromMeasurement, calculateGridFromColumns,
+  validateMeasurementSize, validateFineTune, getFineTuneRange,
+  calculateFitZoom
+};
