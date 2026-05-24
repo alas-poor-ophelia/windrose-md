@@ -6,14 +6,11 @@
  * to the appropriate grid or hex fog renderer.
  */
 
-interface FogCell {
-  col: number;
-  row: number;
-}
+import type { FoggedCell } from '#types/core/map.types';
 
 interface FogOfWar {
   enabled: boolean;
-  foggedCells?: FogCell[];
+  foggedCells?: FoggedCell[];
 }
 
 interface FogSettings {
@@ -55,7 +52,7 @@ interface MapBounds {
 }
 
 type RenderGridFogFn = (
-  fogCells: FogCell[],
+  fogCells: FoggedCell[],
   context: { ctx: CanvasRenderingContext2D; fogCtx: CanvasRenderingContext2D | null; offsetX: number; offsetY: number; scaledSize: number },
   options: { fowOpacity: number; fowBlurEnabled: boolean; blurRadius: number; useGlobalAlpha: boolean },
   visibleBounds: { minCol: number; maxCol: number; minRow: number; maxRow: number },
@@ -63,7 +60,7 @@ type RenderGridFogFn = (
 ) => void;
 
 type RenderHexFogFn = (
-  fogCells: FogCell[],
+  fogCells: FoggedCell[],
   context: { ctx: CanvasRenderingContext2D; fogCtx: CanvasRenderingContext2D | null; offsetX: number; offsetY: number; zoom: number },
   options: { fowOpacity: number; fowBlurEnabled: boolean; blurRadius: number; useGlobalAlpha: boolean },
   visibleBounds: { minCol: number; maxCol: number; minRow: number; maxRow: number },

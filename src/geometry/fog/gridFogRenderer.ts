@@ -5,10 +5,7 @@
  * Handles edge cell detection, multi-pass blur rendering, and interior grid lines.
  */
 
-interface FogCell {
-  col: number;
-  row: number;
-}
+import type { FoggedCell } from '#types/core/map.types';
 
 interface GridFogRenderContext {
   ctx: CanvasRenderingContext2D;
@@ -29,13 +26,13 @@ interface GridFogRenderOptions {
  * Identifies which fog cells are edge cells (adjacent to non-fogged cells).
  */
 function identifyEdgeCells(
-  fogCells: FogCell[],
+  fogCells: FoggedCell[],
   foggedSet: Set<string>,
   visibleBounds: { minCol: number; maxCol: number; minRow: number; maxRow: number }
-): { visibleFogCells: FogCell[]; edgeCells: FogCell[] } {
+): { visibleFogCells: FoggedCell[]; edgeCells: FoggedCell[] } {
   const { minCol, maxCol, minRow, maxRow } = visibleBounds;
-  const visibleFogCells: FogCell[] = [];
-  const edgeCells: FogCell[] = [];
+  const visibleFogCells: FoggedCell[] = [];
+  const edgeCells: FoggedCell[] = [];
 
   for (const fogCell of fogCells) {
     const { col, row } = fogCell;
@@ -65,7 +62,7 @@ function identifyEdgeCells(
  * Renders blur passes for edge cells (the soft fog edge effect).
  */
 function renderBlurPasses(
-  edgeCells: FogCell[],
+  edgeCells: FoggedCell[],
   context: GridFogRenderContext,
   options: GridFogRenderOptions
 ): void {
@@ -113,7 +110,7 @@ function renderBlurPasses(
  * Renders the solid fog rectangles for all visible fog cells.
  */
 function renderFogCells(
-  visibleFogCells: FogCell[],
+  visibleFogCells: FoggedCell[],
   context: GridFogRenderContext
 ): void {
   const { ctx, offsetX, offsetY, scaledSize } = context;
@@ -132,7 +129,7 @@ function renderFogCells(
  * Renders subtle interior grid lines between adjacent fog cells.
  */
 function renderInteriorGridLines(
-  visibleFogCells: FogCell[],
+  visibleFogCells: FoggedCell[],
   foggedSet: Set<string>,
   context: GridFogRenderContext,
   zoom: number
@@ -176,7 +173,7 @@ function renderInteriorGridLines(
  * Orchestrates edge detection, blur passes, solid fog, and interior lines.
  */
 function renderGridFog(
-  fogCells: FogCell[],
+  fogCells: FoggedCell[],
   context: GridFogRenderContext,
   options: GridFogRenderOptions,
   visibleBounds: { minCol: number; maxCol: number; minRow: number; maxRow: number },

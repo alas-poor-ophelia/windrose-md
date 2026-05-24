@@ -6,17 +6,17 @@
  */
 
 import type { ToolId } from '#types/tools/tool.types';
-import type { Point, IGeometry } from '#types/core/geometry.types';
+import type { Point } from '#types/core/geometry.types';
 import type { MapData, Outline } from '#types/core/map.types';
+import type { ExtendedGeometry } from '#types/contexts/context.types';
 
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
-import type { HexGeometry } from '../../geometry/core/HexGeometry';
 
 interface OutlineToolsOptions {
   currentTool: ToolId;
   selectedColor: string;
   mapData: MapData | null;
-  geometry: IGeometry | null;
+  geometry: ExtendedGeometry | null;
   screenToWorld: (clientX: number, clientY: number) => { worldX: number; worldY: number } | null;
   onOutlinesChange: (outlines: Outline[]) => void;
 }
@@ -117,7 +117,7 @@ function useOutlineTools(options: OutlineToolsOptions): UseOutlineToolsResult {
   // Hit-test: find outline nearest to a world-space point
   const findOutlineAtPoint = useCallback((worldX: number, worldY: number): Outline | null => {
     if (!mapData?.outlines || !geometry || geometry.type !== 'hex') return null;
-    const hexGeom = geometry as InstanceType<typeof HexGeometry>;
+    const hexGeom = geometry;
     const hitRadius = hexGeom.hexSize * 0.5;
 
     for (let i = (mapData.outlines.length - 1); i >= 0; i--) {
@@ -137,7 +137,7 @@ function useOutlineTools(options: OutlineToolsOptions): UseOutlineToolsResult {
   // Find vertex near a world-space point (for editing)
   const findVertexAtPoint = useCallback((worldX: number, worldY: number, outline: Outline): number => {
     if (!geometry || geometry.type !== 'hex') return -1;
-    const hexGeom = geometry as InstanceType<typeof HexGeometry>;
+    const hexGeom = geometry;
     const hitRadius = hexGeom.hexSize * 0.4;
 
     for (let i = 0; i < outline.vertices.length; i++) {

@@ -8,12 +8,11 @@
  */
 
 import type { ToolId } from '#types/tools/tool.types';
-import type { Point, IGeometry } from '#types/core/geometry.types';
+import type { Point } from '#types/core/geometry.types';
 import type { MapData, Region } from '#types/core/map.types';
-
+import type { ExtendedGeometry } from '#types/contexts/context.types';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
-import type { HexGeometry } from '../../geometry/core/HexGeometry';
 import { getRegionLabelWorldPosition, computeCentroid } from '../../geometry/renderers/regionRenderer';
 import { offsetToAxial } from '../../geometry/core/offsetCoordinates';
 
@@ -22,7 +21,7 @@ interface RegionToolsOptions {
   selectedColor: string;
   selectedOpacity: number;
   mapData: MapData | null;
-  geometry: IGeometry | null;
+  geometry: ExtendedGeometry | null;
   screenToWorld: (clientX: number, clientY: number) => { worldX: number; worldY: number } | null;
   screenToGrid: (clientX: number, clientY: number) => Point | null;
   onRegionsChange: (regions: Region[]) => void;
@@ -155,7 +154,7 @@ function useRegionTools(options: RegionToolsOptions): UseRegionToolsResult {
   // Check if a click hits a region label (world-space proximity)
   const checkLabelHit = useCallback((worldX: number, worldY: number): Region | null => {
     if (!mapData?.regions || !geometry || geometry.type !== 'hex') return null;
-    const hexGeom = geometry as InstanceType<typeof HexGeometry>;
+    const hexGeom = geometry;
     const hitRadius = hexGeom.hexSize * 0.6;
 
     for (const region of mapData.regions) {
@@ -182,10 +181,9 @@ function useRegionTools(options: RegionToolsOptions): UseRegionToolsResult {
     }
 
     const hex = getHexCoords(e);
-    if (!hex) return;
+    if (!hex || !geometry || geometry.type !== 'hex') return;
 
-    const hexGeom = geometry as InstanceType<typeof HexGeometry>;
-    if (!hexGeom.isWithinBounds(hex.q, hex.r)) return;
+    if (!geometry.isWithinBounds(hex.q, hex.r)) return;
 
     // If editing an existing region, add/remove hex from it directly
     if (editingRegionId != null && editingRegionId !== '' && mapData) {
@@ -258,7 +256,7 @@ function useRegionTools(options: RegionToolsOptions): UseRegionToolsResult {
   const closeBoundaryAndSelectHexes = useCallback(() => {
     if (boundaryVertices.length < 3 || !geometry || geometry.type !== 'hex' || !mapData) return;
 
-    const hexGeom = geometry as InstanceType<typeof HexGeometry>;
+    const hexGeom = geometry;
     const bounds = mapData.hexBounds;
     if (!bounds) return;
 
@@ -331,7 +329,7 @@ function useRegionTools(options: RegionToolsOptions): UseRegionToolsResult {
     const world = getWorldCoords(e);
     if (!world || !mapData?.regions || !geometry || geometry.type !== 'hex') return;
 
-    const hexGeom = geometry as InstanceType<typeof HexGeometry>;
+    const hexGeom = geometry;
     const region = mapData.regions.find(r => r.id === draggingLabelRegionId);
     if (!region) return;
 

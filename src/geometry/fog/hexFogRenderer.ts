@@ -5,12 +5,9 @@
  * Handles edge cell detection, multi-pass blur rendering, and interior hex outlines.
  */
 
-interface FogCell {
-  col: number;
-  row: number;
-}
+import type { FoggedCell } from '#types/core/map.types';
 
-interface EdgeCell extends FogCell {
+interface EdgeCell extends FoggedCell {
   q: number;
   r: number;
 }
@@ -37,16 +34,16 @@ interface HexFogRenderOptions {
  * Identifies which fog cells are edge cells (adjacent to non-fogged cells).
  */
 function identifyHexEdgeCells(
-  fogCells: FogCell[],
+  fogCells: FoggedCell[],
   foggedSet: Set<string>,
   visibleBounds: { minCol: number; maxCol: number; minRow: number; maxRow: number },
   hexGeometry: HexGeometryLike,
   orientation: 'flat' | 'pointy',
   offsetToAxial: (col: number, row: number, orientation: 'flat' | 'pointy') => { q: number; r: number },
   axialToOffset: (q: number, r: number, orientation: 'flat' | 'pointy') => { col: number; row: number }
-): { visibleFogCells: FogCell[]; edgeCells: EdgeCell[] } {
+): { visibleFogCells: FoggedCell[]; edgeCells: EdgeCell[] } {
   const { minCol, maxCol, minRow, maxRow } = visibleBounds;
-  const visibleFogCells: FogCell[] = [];
+  const visibleFogCells: FoggedCell[] = [];
   const edgeCells: EdgeCell[] = [];
 
   for (const fogCell of fogCells) {
@@ -167,7 +164,7 @@ function renderHexBlurPasses(
  * Renders the solid fog hexes for all visible fog cells.
  */
 function renderHexFogCells(
-  visibleFogCells: FogCell[],
+  visibleFogCells: FoggedCell[],
   context: HexFogRenderContext,
   hexGeometry: HexGeometryLike,
   geometry: IGeometry,
@@ -188,7 +185,7 @@ function renderHexFogCells(
  * Renders subtle interior hex outlines between adjacent fog cells.
  */
 function renderInteriorHexOutlines(
-  visibleFogCells: FogCell[],
+  visibleFogCells: FoggedCell[],
   foggedSet: Set<string>,
   context: HexFogRenderContext,
   hexGeometry: HexGeometryLike,
@@ -236,7 +233,7 @@ function renderInteriorHexOutlines(
  * Orchestrates edge detection, blur passes, solid fog, and interior outlines.
  */
 function renderHexFog(
-  fogCells: FogCell[],
+  fogCells: FoggedCell[],
   context: HexFogRenderContext,
   options: HexFogRenderOptions,
   visibleBounds: { minCol: number; maxCol: number; minRow: number; maxRow: number },

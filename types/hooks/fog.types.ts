@@ -7,7 +7,7 @@
  * - useFogTools: Canvas-level fog painting interactions
  */
 
-import type { MapData, FogOfWar } from '../core/map.types';
+import type { MapData, FogOfWar, FoggedCell } from '../core/map.types';
 import type { OffsetCoords, IGeometry } from '../core/geometry.types';
 
 // ===========================================
@@ -18,16 +18,10 @@ import type { OffsetCoords, IGeometry } from '../core/geometry.types';
 export type FogToolId = 'paint' | 'erase' | 'rectangle';
 
 /** Cell position for rectangle operations */
-export interface FogRectangleStart {
-  col: number;
-  row: number;
-}
+export type FogRectangleStart = FoggedCell;
 
 /** Cell position for tracking last painted cell */
-export interface FogCellPosition {
-  col: number;
-  row: number;
-}
+export type FogCellPosition = FoggedCell;
 
 // ===========================================
 // useFogOfWar Types
