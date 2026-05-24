@@ -64,25 +64,25 @@
 
 /* CSS Custom Properties */
 body {
-  --dmt-bg-primary: var(--color-base-00);
-  --dmt-bg-secondary: var(--color-base-20);
-  --dmt-bg-tertiary: var(--color-base-25);
-  --dmt-border-primary: #c4a57b;
-  --dmt-border-primary-rgb: 196, 165, 123;
-  --dmt-border-primary-dark: #8b6842;
-  --dmt-border-secondary: #3a3a3a;
-  --dmt-text-primary: var(--color-base-100);
-  --dmt-text-secondary: var(--color-base-60);
-  --dmt-text-muted: var(--color-base-50);
-  --dmt-text-disabled: var(--color-base-40);
-  --dmt-accent-blue: #4a9eff;
-  --dmt-accent-blue-hover: #3a8eef;
-  --dmt-accent-red: #8b0000;
-  --dmt-accent-red-hover: #a00000;
-  --dmt-warning: var(--color-orange);
-  --dmt-error: var(--color-red);
-  --dmt-success: #4a9eff;
-  --dmt-transition: all 0.15s ease;
+  --windrose-bg-primary: var(--color-base-00);
+  --windrose-bg-secondary: var(--color-base-20);
+  --windrose-bg-tertiary: var(--color-base-25);
+  --windrose-border-primary: #c4a57b;
+  --windrose-border-primary-rgb: 196, 165, 123;
+  --windrose-border-primary-dark: #8b6842;
+  --windrose-border-secondary: #3a3a3a;
+  --windrose-text-primary: var(--color-base-100);
+  --windrose-text-secondary: var(--color-base-60);
+  --windrose-text-muted: var(--color-base-50);
+  --windrose-text-disabled: var(--color-base-40);
+  --windrose-accent-blue: #4a9eff;
+  --windrose-accent-blue-hover: #3a8eef;
+  --windrose-accent-red: #8b0000;
+  --windrose-accent-red-hover: #a00000;
+  --windrose-warning: var(--color-orange);
+  --windrose-error: var(--color-red);
+  --windrose-success: #4a9eff;
+  --windrose-transition: all 0.15s ease;
 }
 
 /* ============================================
@@ -107,16 +107,16 @@ body {
 
 .dmt-container {
   font-family: var(--font-interface);
-  background-color: var(--dmt-bg-primary);
+  background-color: var(--windrose-bg-primary);
   padding: 12px;
   border-radius: 6px;
-  color: var(--dmt-text-primary);
+  color: var(--windrose-text-primary);
   position: relative;
-  border: 2px solid var(--dmt-border-primary);
+  border: 2px solid var(--windrose-border-primary);
   box-shadow:
-    inset 0 0 0 4px var(--dmt-bg-primary),
-    inset 0 0 0 5px rgba(var(--dmt-border-primary-rgb), 0.3),
-    0 0 20px rgba(var(--dmt-border-primary-rgb), 0.2);
+    inset 0 0 0 4px var(--windrose-bg-primary),
+    inset 0 0 0 5px rgba(var(--windrose-border-primary-rgb), 0.3),
+    0 0 20px rgba(var(--windrose-border-primary-rgb), 0.2);
   width: 100%;
   transition: width 0.3s ease, margin-left 0.3s ease;
 }
@@ -127,15 +127,15 @@ body {
 }
 
 .dmt-container.dmt-expanded {
-  --dmt-offset: 0px;
-  width: calc(100cqi - 2 * var(--dmt-offset));
-  margin-inline: calc((100% - 100cqi) / 2 + var(--dmt-offset));
+  --windrose-offset: 0px;
+  width: calc(100cqi - 2 * var(--windrose-offset));
+  margin-inline: calc((100% - 100cqi) / 2 + var(--windrose-offset));
 }
 
 .markdown-source-view.is-live-preview {
   & .dmt-container.dmt-expanded,
   & .dmt-container.dmt-animating {
-    --dmt-offset: 20px;
+    --windrose-offset: 20px;
   }
 
   .cm-content > .cm-embed-block[contenteditable=false].dmt-cm-expanded,
@@ -155,14 +155,14 @@ body {
 .dmt-loading {
   padding: 20px;
   text-align: center;
-  color: var(--dmt-text-muted);
+  color: var(--windrose-text-muted);
 }
 
 .dmt-canvas-wrapper {
   display: flex;
   flex-direction: row;
   position: relative;
-  background-color: var(--dmt-bg-primary);
+  background-color: var(--windrose-bg-primary);
   border-radius: 4px;
   overflow: hidden;
   width: 100%;
@@ -181,7 +181,7 @@ body {
 
 .dmt-canvas-container {
   position: relative;
-  background-color: var(--dmt-bg-primary);
+  background-color: var(--windrose-bg-primary);
   width: 100%;
   height: 100%;
   display: flex;
@@ -211,7 +211,7 @@ body {
 .dmt-map-name {
   background: transparent;
   border: none;
-  color: var(--dmt-text-primary);
+  color: var(--windrose-text-primary);
   font-size: 16px;
   font-weight: bold;
   outline: none;
@@ -219,7 +219,7 @@ body {
   margin-right: 16px;
 
   &::placeholder {
-    color: var(--dmt-text-disabled);
+    color: var(--windrose-text-disabled);
   }
 }
 
@@ -232,12 +232,12 @@ body {
 /* Info Toggle Button */
 .dmt-info-toggle.dmt-info-toggle {
   background: transparent;
-  border: 1px solid var(--dmt-border-secondary);
+  border: 1px solid var(--windrose-border-secondary);
   border-radius: 4px;
-  color: var(--dmt-text-disabled);
+  color: var(--windrose-text-disabled);
   cursor: pointer;
   padding: 4px 8px;
-  transition: var(--dmt-transition);
+  transition: var(--windrose-transition);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -259,17 +259,17 @@ body {
   }
 
   &:hover {
-    border-color: var(--dmt-border-secondary);
-    color: var(--dmt-border-primary);
+    border-color: var(--windrose-border-secondary);
+    color: var(--windrose-border-primary);
   }
 
   &.dmt-info-toggle-active {
-    border-color: var(--dmt-border-primary);
-    color: var(--dmt-border-primary);
+    border-color: var(--windrose-border-primary);
+    color: var(--windrose-border-primary);
 
     &:hover {
-      border-color: var(--dmt-border-primary-dark);
-      color: var(--dmt-border-primary-dark);
+      border-color: var(--windrose-border-primary-dark);
+      color: var(--windrose-border-primary-dark);
     }
   }
 }
@@ -277,14 +277,14 @@ body {
 /* Save Status */
 .dmt-save-status {
   font-size: 18px;
-  color: var(--dmt-success);
+  color: var(--windrose-success);
   padding: 0 8px;
   display: flex;
   align-items: center;
   line-height: 1;
 
   &.dmt-save-status-unsaved {
-    color: var(--dmt-warning);
+    color: var(--windrose-warning);
   }
 
   &.dmt-save-status-saving {
@@ -292,7 +292,7 @@ body {
   }
 
   &.dmt-save-status-error {
-    color: var(--dmt-error);
+    color: var(--windrose-error);
   }
 }
 
@@ -316,7 +316,7 @@ body {
 .dmt-footer {
   margin-top: 8px;
   font-size: 11px;
-  color: var(--dmt-text-disabled);
+  color: var(--windrose-text-disabled);
   text-align: center;
 }
 
@@ -333,7 +333,7 @@ body {
 
   /* Style all SVG paths and elements to use CSS variable */
   path, line, circle {
-    stroke: var(--dmt-border-primary);
+    stroke: var(--windrose-border-primary);
   }
 
   &.dmt-corner-bracket-tl {
@@ -411,7 +411,7 @@ body {
 .dmt-canvas-space-grab,
 .dmt-canvas-select,
 .dmt-canvas-selecting {
-  border: 1px solid var(--dmt-border-secondary);
+  border: 1px solid var(--windrose-border-secondary);
 }
 
 .dmt-canvas,
@@ -462,28 +462,28 @@ body {
   display: flex;
   gap: 4px;
   padding: 8px;
-  background-color: var(--dmt-bg-primary);
-  border: 2px solid var(--dmt-border-primary);
+  background-color: var(--windrose-bg-primary);
+  border: 2px solid var(--windrose-border-primary);
   border-radius: 4px;
   align-items: center;
   margin-bottom: 8px;
   position: relative;
   box-shadow:
-    inset 0 0 0 3px var(--dmt-bg-primary),
-    inset 0 0 0 4px rgba(var(--dmt-border-primary-rgb), 0.3),
-    0 0 15px rgba(var(--dmt-border-primary-rgb), 0.15);
+    inset 0 0 0 3px var(--windrose-bg-primary),
+    inset 0 0 0 4px rgba(var(--windrose-border-primary-rgb), 0.3),
+    0 0 15px rgba(var(--windrose-border-primary-rgb), 0.15);
 }
 
 .dmt-tool-btn {
   position: relative;
-  background-color: var(--dmt-bg-secondary);
-  border: 1px solid var(--dmt-border-secondary);
+  background-color: var(--windrose-bg-secondary);
+  border: 1px solid var(--windrose-border-secondary);
   border-radius: 3px;
-  color: var(--dmt-text-primary);
+  color: var(--windrose-text-primary);
   cursor: pointer;
   padding: 6px 8px;
   font-size: 16px;
-  transition: var(--dmt-transition);
+  transition: var(--windrose-transition);
   min-width: 32px;
   max-width: 42px;
   height: 32px;
@@ -492,28 +492,28 @@ body {
   justify-content: center;
 
   &:hover:not(.dmt-tool-btn-active) {
-    background-color: var(--dmt-bg-tertiary);
-    border-color: var(--dmt-border-secondary);
+    background-color: var(--windrose-bg-tertiary);
+    border-color: var(--windrose-border-secondary);
 
     svg {
-      color: var(--dmt-text-primary);
+      color: var(--windrose-text-primary);
     }
   }
 
   &.dmt-tool-btn-active {
-    background-color: var(--dmt-border-primary);
-    border-color: var(--dmt-border-primary-dark);
-    color: var(--dmt-bg-primary);
+    background-color: var(--windrose-border-primary);
+    border-color: var(--windrose-border-primary-dark);
+    color: var(--windrose-bg-primary);
 
     svg {
-      color: var(--dmt-accent-red);
+      color: var(--windrose-accent-red);
       filter:
-        drop-shadow(1px 0 0 var(--dmt-border-primary)) drop-shadow(-1px 0 0 var(--dmt-border-primary)) drop-shadow(0 1px 0 var(--dmt-border-primary)) drop-shadow(0 -1px 0 var(--dmt-border-primary));
+        drop-shadow(1px 0 0 var(--windrose-border-primary)) drop-shadow(-1px 0 0 var(--windrose-border-primary)) drop-shadow(0 1px 0 var(--windrose-border-primary)) drop-shadow(0 -1px 0 var(--windrose-border-primary));
     }
   }
 
   svg {
-    color: var(--dmt-border-primary);
+    color: var(--windrose-border-primary);
     width: 20px;
     height: 20px;
   }
@@ -547,7 +547,7 @@ body {
 
 .dmt-tool-btn-active .dmt-subtool-indicator {
   opacity: 0.9;
-  color: var(--dmt-bg-primary);
+  color: var(--windrose-bg-primary);
 }
 
 /* Tool button container for sub-menu positioning */
@@ -563,8 +563,8 @@ body {
   top: 50%;
   transform: translateY(-50%);
   margin-left: 6px;
-  background: var(--dmt-bg-secondary);
-  border: 1px solid var(--dmt-border-primary);
+  background: var(--windrose-bg-secondary);
+  border: 1px solid var(--windrose-border-primary);
   border-radius: 6px;
   padding: 4px;
   display: flex;
@@ -586,12 +586,12 @@ body {
   padding: 8px 12px;
   border: none;
   background: transparent;
-  color: var(--dmt-text-primary);
+  color: var(--windrose-text-primary);
   cursor: pointer;
   border-radius: 4px;
   white-space: nowrap;
   font-size: 13px;
-  transition: var(--dmt-transition);
+  transition: var(--windrose-transition);
   width: 100%;
   text-align: left;
   box-sizing: border-box;
@@ -599,20 +599,20 @@ body {
   svg {
     width: 16px;
     height: 16px;
-    color: var(--dmt-border-primary);
+    color: var(--windrose-border-primary);
     flex-shrink: 0;
   }
 
   &:hover {
-    background: var(--dmt-bg-tertiary);
+    background: var(--windrose-bg-tertiary);
   }
 
   &.dmt-subtool-option-active {
-    background: var(--dmt-border-primary);
-    color: var(--dmt-bg-primary);
+    background: var(--windrose-border-primary);
+    color: var(--windrose-bg-primary);
 
     svg {
-      color: var(--dmt-bg-primary);
+      color: var(--windrose-bg-primary);
     }
   }
 }
@@ -623,18 +623,18 @@ body {
   gap: 4px;
   margin-left: 4px;
   padding-left: 8px;
-  border-left: 1px solid var(--dmt-border-secondary);
+  border-left: 1px solid var(--windrose-border-secondary);
 }
 
 .dmt-history-btn {
-  background-color: var(--dmt-bg-secondary);
-  border: 1px solid var(--dmt-border-secondary);
+  background-color: var(--windrose-bg-secondary);
+  border: 1px solid var(--windrose-border-secondary);
   border-radius: 3px;
-  color: var(--dmt-text-primary);
+  color: var(--windrose-text-primary);
   cursor: pointer;
   padding: 6px 8px;
   font-size: 16px;
-  transition: var(--dmt-transition);
+  transition: var(--windrose-transition);
   min-width: 32px;
   height: 32px;
   display: flex;
@@ -642,17 +642,17 @@ body {
   justify-content: center;
 
   svg {
-    color: var(--dmt-text-muted);
+    color: var(--windrose-text-muted);
     width: 18px;
     height: 18px;
   }
 
   &:hover:not(:disabled) {
-    background-color: var(--dmt-bg-tertiary);
-    border-color: var(--dmt-border-secondary);
+    background-color: var(--windrose-bg-tertiary);
+    border-color: var(--windrose-border-secondary);
 
     svg {
-      color: var(--dmt-border-primary);
+      color: var(--windrose-border-primary);
     }
   }
 
@@ -744,8 +744,8 @@ button.dmt-orientation-btn,
   max-width: 35px;
   max-height: 35px;
   background-color: rgba(0, 0, 0, 0.7);
-  border: 2px solid rgba(var(--dmt-border-primary-rgb), 0.4);
-  color: var(--dmt-text-primary);
+  border: 2px solid rgba(var(--windrose-border-primary-rgb), 0.4);
+  color: var(--windrose-text-primary);
   border-radius: 50%;
   cursor: pointer;
   font-size: 18px;
@@ -763,7 +763,7 @@ button.dmt-orientation-btn,
 
   &:hover {
     background-color: rgba(0, 0, 0, 0.85);
-    border-color: rgba(var(--dmt-border-primary-rgb), 0.6);
+    border-color: rgba(var(--windrose-border-primary-rgb), 0.6);
     transform: scale(1.05);
   }
 }
@@ -771,7 +771,7 @@ button.dmt-orientation-btn,
 .dmt-zoom-level {
   font-size: 10px;
   font-weight: 600;
-  color: rgba(var(--dmt-border-primary-rgb), 0.8);
+  color: rgba(var(--windrose-border-primary-rgb), 0.8);
   text-align: center;
   padding: 3px 6px;
   user-select: none;
@@ -842,8 +842,8 @@ button.dmt-orientation-btn,
   width: 180px;
   min-width: 180px;
   height: 100%;
-  background-color: var(--dmt-bg-primary);
-  border-right: 2px solid var(--dmt-border-primary);
+  background-color: var(--windrose-bg-primary);
+  border-right: 2px solid var(--windrose-border-primary);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -867,35 +867,35 @@ button.dmt-orientation-btn,
   padding: 6px 8px;
   font-size: 10pt;
   font-weight: bold;
-  color: var(--dmt-text-primary);
-  background: var(--dmt-bg-secondary);
-  border-bottom: 1px solid var(--dmt-border-secondary);
+  color: var(--windrose-text-primary);
+  background: var(--windrose-bg-secondary);
+  border-bottom: 1px solid var(--windrose-border-secondary);
   flex-shrink: 0;
 }
 
 .dmt-sidebar-collapse-btn.dmt-sidebar-collapse-btn {
   background: transparent;
-  border: 1.5px solid rgba(var(--dmt-border-primary-rgb), 0.4);
+  border: 1.5px solid rgba(var(--windrose-border-primary-rgb), 0.4);
   border-radius: 3px;
-  color: var(--dmt-border-primary);
+  color: var(--windrose-border-primary);
   cursor: pointer;
   padding: 4px;
   font-size: 10px;
   line-height: 1;
-  transition: var(--dmt-transition);
+  transition: var(--windrose-transition);
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   width: 24px;
   height: 24px;
-  box-shadow: 0 0 8px rgba(var(--dmt-border-primary-rgb), 0.2);
+  box-shadow: 0 0 8px rgba(var(--windrose-border-primary-rgb), 0.2);
 
   &:hover {
-    color: var(--dmt-text-primary);
-    border-color: var(--dmt-border-primary);
-    background-color: rgba(var(--dmt-border-primary-rgb), 0.1);
-    box-shadow: 0 0 12px rgba(var(--dmt-border-primary-rgb), 0.4);
+    color: var(--windrose-text-primary);
+    border-color: var(--windrose-border-primary);
+    background-color: rgba(var(--windrose-border-primary-rgb), 0.1);
+    box-shadow: 0 0 12px rgba(var(--windrose-border-primary-rgb), 0.4);
   }
 
   svg {
@@ -918,21 +918,21 @@ button.dmt-orientation-btn,
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: var(--dmt-bg-secondary);
-  color: var(--dmt-text-secondary);
-  border: 1.5px solid var(--dmt-border-primary);
+  background-color: var(--windrose-bg-secondary);
+  color: var(--windrose-text-secondary);
+  border: 1.5px solid var(--windrose-border-primary);
   border-radius: 0 6px 6px 0;
   cursor: pointer;
   z-index: 200;
   box-shadow:
     2px 2px 6px rgba(0, 0, 0, 0.4),
-    0 0 12px rgba(var(--dmt-border-primary-rgb), 0.15);
-  transition: var(--dmt-transition);
+    0 0 12px rgba(var(--windrose-border-primary-rgb), 0.15);
+  transition: var(--windrose-transition);
   padding: 0;
 
   &:hover {
-    background-color: var(--dmt-bg-tertiary);
-    color: var(--dmt-text-primary);
+    background-color: var(--windrose-bg-tertiary);
+    color: var(--windrose-text-primary);
     transform: translateX(3px);
   }
 }
@@ -951,15 +951,15 @@ button.dmt-orientation-btn,
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: var(--dmt-border-primary);
-  color: var(--dmt-bg-primary);
-  border: 1.5px solid var(--dmt-border-primary);
+  background-color: var(--windrose-border-primary);
+  color: var(--windrose-bg-primary);
+  border: 1.5px solid var(--windrose-border-primary);
   border-radius: 0 6px 6px 0;
   cursor: pointer;
   z-index: 200;
   box-shadow:
     2px 2px 6px rgba(0, 0, 0, 0.4),
-    0 0 12px rgba(var(--dmt-border-primary-rgb), 0.15);
+    0 0 12px rgba(var(--windrose-border-primary-rgb), 0.15);
   padding: 0;
 
   &:hover {
@@ -969,15 +969,15 @@ button.dmt-orientation-btn,
 
 .dmt-object-sidebar-set-selector {
   padding: 4px 6px;
-  border-bottom: 1px solid var(--dmt-border-secondary);
+  border-bottom: 1px solid var(--windrose-border-secondary);
   flex-shrink: 0;
 }
 
 .dmt-object-sidebar-select {
   width: 100%;
-  background: var(--dmt-bg-secondary);
-  color: var(--dmt-text-primary);
-  border: 1px solid var(--dmt-border-secondary);
+  background: var(--windrose-bg-secondary);
+  color: var(--windrose-text-primary);
+  border: 1px solid var(--windrose-border-secondary);
   border-radius: 3px;
   padding: 3px 4px;
   font-size: 11px;
@@ -985,27 +985,27 @@ button.dmt-orientation-btn,
 
 .dmt-object-sidebar-search {
   padding: 4px 6px;
-  border-bottom: 1px solid var(--dmt-border-secondary);
+  border-bottom: 1px solid var(--windrose-border-secondary);
   flex-shrink: 0;
 }
 
 .dmt-object-sidebar-search-input {
   width: 100%;
-  background: var(--dmt-bg-secondary);
-  color: var(--dmt-text-primary);
-  border: 1px solid var(--dmt-border-secondary);
+  background: var(--windrose-bg-secondary);
+  color: var(--windrose-text-primary);
+  border: 1px solid var(--windrose-border-secondary);
   border-radius: 3px;
   padding: 4px 6px;
   font-size: 11px;
   box-sizing: border-box;
 
   &::placeholder {
-    color: var(--dmt-text-muted);
+    color: var(--windrose-text-muted);
   }
 
   &:focus {
     outline: none;
-    border-color: var(--dmt-border-primary);
+    border-color: var(--windrose-border-primary);
   }
 }
 
@@ -1020,7 +1020,7 @@ button.dmt-orientation-btn,
   }
 
   &::-webkit-scrollbar-thumb {
-    background: var(--dmt-bg-tertiary);
+    background: var(--windrose-bg-tertiary);
     border-radius: 3px;
   }
 }
@@ -1040,21 +1040,21 @@ button.dmt-orientation-btn,
   max-height: unset;
   background: none;
   border: none;
-  color: var(--dmt-text-muted);
+  color: var(--windrose-text-muted);
   font-size: 9px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   cursor: pointer;
 
   &:hover {
-    color: var(--dmt-text-secondary);
+    color: var(--windrose-text-secondary);
   }
 }
 
 .dmt-object-sidebar-category-count {
   margin-left: auto;
   font-size: 8px;
-  color: var(--dmt-text-disabled);
+  color: var(--windrose-text-disabled);
 }
 
 .dmt-object-sidebar-grid {
@@ -1070,8 +1070,8 @@ button.dmt-object-grid-item,
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: var(--dmt-bg-secondary);
-  border: 1.5px solid var(--dmt-border-secondary);
+  background: var(--windrose-bg-secondary);
+  border: 1.5px solid var(--windrose-border-secondary);
   border-radius: 3px;
   cursor: pointer;
   padding: 6px 2px;
@@ -1080,22 +1080,22 @@ button.dmt-object-grid-item,
   max-width: unset;
   max-height: unset;
   box-sizing: border-box;
-  transition: var(--dmt-transition);
+  transition: var(--windrose-transition);
   width: auto;
   height: auto;
   box-shadow: none;
 
   &:hover {
-    border-color: var(--dmt-text-muted);
-    background: var(--dmt-bg-tertiary);
+    border-color: var(--windrose-text-muted);
+    background: var(--windrose-bg-tertiary);
   }
 }
 
 .dmt-object-grid-item-selected.dmt-object-grid-item-selected,
 .dmt-object-grid-item-selected.dmt-object-grid-item-selected:hover {
-  border-color: var(--dmt-border-primary);
-  box-shadow: 0 0 6px rgba(var(--dmt-border-primary-rgb), 0.4);
-  background: rgba(var(--dmt-border-primary-rgb), 0.1);
+  border-color: var(--windrose-border-primary);
+  box-shadow: 0 0 6px rgba(var(--windrose-border-primary-rgb), 0.4);
+  background: rgba(var(--windrose-border-primary-rgb), 0.1);
 }
 
 .dmt-object-grid-symbol {
@@ -1103,7 +1103,7 @@ button.dmt-object-grid-item,
   font-family: 'Noto Emoji', 'Noto Sans Symbols 2', monospace;
   line-height: 1.1;
   margin-bottom: 2px;
-  color: var(--dmt-text-primary);
+  color: var(--windrose-text-primary);
   text-rendering: optimizeSpeed;
 }
 
@@ -1116,7 +1116,7 @@ button.dmt-object-grid-item,
 .dmt-object-grid-label {
   font-size: 8px;
   line-height: 1.2;
-  color: var(--dmt-text-secondary);
+  color: var(--windrose-text-secondary);
   text-align: center;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1130,8 +1130,8 @@ button.dmt-object-grid-item,
   justify-content: center;
   gap: 4px;
   padding: 6px;
-  background: var(--dmt-bg-secondary);
-  border-top: 1px solid var(--dmt-border-secondary);
+  background: var(--windrose-bg-secondary);
+  border-top: 1px solid var(--windrose-border-secondary);
   flex-shrink: 0;
 }
 
@@ -1146,31 +1146,31 @@ button.dmt-object-grid-item,
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--dmt-bg-secondary);
-  color: var(--dmt-text-secondary);
-  border: 1px solid var(--dmt-border-secondary);
+  background: var(--windrose-bg-secondary);
+  color: var(--windrose-text-secondary);
+  border: 1px solid var(--windrose-border-secondary);
   border-radius: 3px;
   cursor: pointer;
   padding: 0;
-  transition: var(--dmt-transition);
+  transition: var(--windrose-transition);
 
   &:hover {
-    background: var(--dmt-bg-tertiary);
-    color: var(--dmt-text-primary);
+    background: var(--windrose-bg-tertiary);
+    color: var(--windrose-text-primary);
   }
 }
 
 .dmt-object-sidebar-action-active.dmt-object-sidebar-action-active,
 .dmt-object-sidebar-action-active.dmt-object-sidebar-action-active:hover {
-  background: var(--dmt-border-primary);
-  color: var(--dmt-bg-primary);
-  border-color: var(--dmt-border-primary);
+  background: var(--windrose-border-primary);
+  color: var(--windrose-bg-primary);
+  border-color: var(--windrose-border-primary);
 }
 
 .dmt-object-sidebar-empty {
   padding: 16px 8px;
   text-align: center;
-  color: var(--dmt-text-muted);
+  color: var(--windrose-text-muted);
   font-size: 11px;
 }
 
@@ -1182,8 +1182,8 @@ button.dmt-object-grid-item,
   width: 180px;
   display: flex;
   flex-direction: column;
-  background-color: var(--dmt-bg-primary);
-  border-left: 2px solid var(--dmt-border-primary);
+  background-color: var(--windrose-bg-primary);
+  border-left: 2px solid var(--windrose-border-primary);
   transition: all 0.3s ease;
   overflow: hidden;
   flex-shrink: 0;
@@ -1212,21 +1212,21 @@ button.dmt-object-grid-item,
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: var(--dmt-bg-secondary);
-  color: var(--dmt-text-secondary);
-  border: 1.5px solid var(--dmt-border-primary);
+  background-color: var(--windrose-bg-secondary);
+  color: var(--windrose-text-secondary);
+  border: 1.5px solid var(--windrose-border-primary);
   border-radius: 6px 0 0 6px;
   cursor: pointer;
   z-index: 200;
   box-shadow:
     -2px 2px 6px rgba(0, 0, 0, 0.4),
-    0 0 12px rgba(var(--dmt-border-primary-rgb), 0.15);
-  transition: var(--dmt-transition);
+    0 0 12px rgba(var(--windrose-border-primary-rgb), 0.15);
+  transition: var(--windrose-transition);
   padding: 0;
 
   &:hover {
-    background-color: var(--dmt-bg-tertiary);
-    color: var(--dmt-text-primary);
+    background-color: var(--windrose-bg-tertiary);
+    color: var(--windrose-text-primary);
   }
 }
 
@@ -1237,15 +1237,15 @@ button.dmt-object-grid-item,
   padding: 6px 8px;
   font-size: 10pt;
   font-weight: bold;
-  color: var(--dmt-text-primary);
-  background: var(--dmt-bg-secondary);
-  border-bottom: 1px solid var(--dmt-border-secondary);
+  color: var(--windrose-text-primary);
+  background: var(--windrose-bg-secondary);
+  border-bottom: 1px solid var(--windrose-border-secondary);
   flex-shrink: 0;
 }
 
 .dmt-tile-browser-tileset-selector {
   padding: 4px 6px;
-  border-bottom: 1px solid var(--dmt-border-secondary);
+  border-bottom: 1px solid var(--windrose-border-secondary);
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -1267,7 +1267,7 @@ button.dmt-object-grid-item,
 
 .dmt-tile-browser-config {
   padding: 6px 8px;
-  border-bottom: 1px solid var(--dmt-border-secondary);
+  border-bottom: 1px solid var(--windrose-border-secondary);
   background: var(--background-secondary-alt);
   flex-shrink: 0;
 }
@@ -1340,9 +1340,9 @@ button.dmt-tile-browser-config-btn,
 .dmt-tile-browser-select {
   flex: 1;
   min-width: 0;
-  background: var(--dmt-bg-secondary);
-  color: var(--dmt-text-primary);
-  border: 1px solid var(--dmt-border-secondary);
+  background: var(--windrose-bg-secondary);
+  color: var(--windrose-text-primary);
+  border: 1px solid var(--windrose-border-secondary);
   border-radius: 3px;
   padding: 3px 4px;
   font-size: 11px;
@@ -1350,27 +1350,27 @@ button.dmt-tile-browser-config-btn,
 
 .dmt-tile-browser-search {
   padding: 4px 6px;
-  border-bottom: 1px solid var(--dmt-border-secondary);
+  border-bottom: 1px solid var(--windrose-border-secondary);
   flex-shrink: 0;
 }
 
 .dmt-tile-browser-search-input {
   width: 100%;
-  background: var(--dmt-bg-secondary);
-  color: var(--dmt-text-primary);
-  border: 1px solid var(--dmt-border-secondary);
+  background: var(--windrose-bg-secondary);
+  color: var(--windrose-text-primary);
+  border: 1px solid var(--windrose-border-secondary);
   border-radius: 3px;
   padding: 4px 6px;
   font-size: 11px;
   box-sizing: border-box;
 
   &::placeholder {
-    color: var(--dmt-text-muted);
+    color: var(--windrose-text-muted);
   }
 
   &:focus {
     outline: none;
-    border-color: var(--dmt-border-primary);
+    border-color: var(--windrose-border-primary);
   }
 }
 
@@ -1385,7 +1385,7 @@ button.dmt-tile-browser-config-btn,
   }
 
   &::-webkit-scrollbar-thumb {
-    background: var(--dmt-bg-tertiary);
+    background: var(--windrose-bg-tertiary);
     border-radius: 3px;
   }
 }
@@ -1401,21 +1401,21 @@ button.dmt-tile-browser-config-btn,
   max-height: unset;
   background: none;
   border: none;
-  color: var(--dmt-text-muted);
+  color: var(--windrose-text-muted);
   font-size: 9px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   cursor: pointer;
 
   &:hover {
-    color: var(--dmt-text-secondary);
+    color: var(--windrose-text-secondary);
   }
 }
 
 .dmt-tile-browser-category-count {
   margin-left: auto;
   font-size: 8px;
-  color: var(--dmt-text-disabled);
+  color: var(--windrose-text-disabled);
 }
 
 .dmt-tile-browser-grid {
@@ -1431,8 +1431,8 @@ button.dmt-tile-browser-config-btn,
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--dmt-bg-secondary);
-  border: 1.5px solid var(--dmt-border-secondary);
+  background: var(--windrose-bg-secondary);
+  border: 1.5px solid var(--windrose-border-secondary);
   border-radius: 3px;
   cursor: pointer;
   padding: 2px;
@@ -1441,19 +1441,19 @@ button.dmt-tile-browser-config-btn,
   min-height: unset;
   max-width: unset;
   max-height: unset;
-  transition: var(--dmt-transition);
+  transition: var(--windrose-transition);
 
   &:hover {
-    border-color: var(--dmt-text-muted);
-    background: var(--dmt-bg-tertiary);
+    border-color: var(--windrose-text-muted);
+    background: var(--windrose-bg-tertiary);
   }
 }
 
 .dmt-tile-thumb-selected.dmt-tile-thumb-selected,
 .dmt-tile-thumb-selected.dmt-tile-thumb-selected:hover {
-  border-color: var(--dmt-border-primary);
-  box-shadow: 0 0 6px rgba(var(--dmt-border-primary-rgb), 0.4);
-  background: rgba(var(--dmt-border-primary-rgb), 0.1);
+  border-color: var(--windrose-border-primary);
+  box-shadow: 0 0 6px rgba(var(--windrose-border-primary-rgb), 0.4);
+  background: rgba(var(--windrose-border-primary-rgb), 0.1);
 }
 
 .dmt-tile-thumb-img {
@@ -1466,8 +1466,8 @@ button.dmt-tile-browser-config-btn,
 .dmt-tile-preview-portal {
   position: fixed;
   display: none;
-  background: var(--dmt-bg-primary);
-  border: 1px solid var(--dmt-border-primary);
+  background: var(--windrose-bg-primary);
+  border: 1px solid var(--windrose-border-primary);
   border-radius: 4px;
   padding: 4px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
@@ -1477,7 +1477,7 @@ button.dmt-tile-browser-config-btn,
 
 .dmt-tile-preview-label {
   font-size: 10px;
-  color: var(--dmt-text-muted);
+  color: var(--windrose-text-muted);
   text-align: center;
   padding-top: 2px;
   white-space: nowrap;
@@ -1489,7 +1489,7 @@ button.dmt-tile-browser-config-btn,
 .dmt-tile-browser-empty {
   padding: 16px 8px;
   text-align: center;
-  color: var(--dmt-text-muted);
+  color: var(--windrose-text-muted);
   font-size: 11px;
 }
 
@@ -1499,8 +1499,8 @@ button.dmt-tile-browser-config-btn,
   justify-content: center;
   gap: 4px;
   padding: 6px;
-  background: var(--dmt-bg-secondary);
-  border-top: 1px solid var(--dmt-border-secondary);
+  background: var(--windrose-bg-secondary);
+  border-top: 1px solid var(--windrose-border-secondary);
   flex-shrink: 0;
   flex-wrap: wrap;
 }
@@ -1510,10 +1510,10 @@ button.dmt-tile-browser-config-btn,
   align-items: center;
   gap: 4px;
   padding: 4px 8px;
-  background: var(--dmt-bg-secondary);
-  border-top: 1px solid var(--dmt-border-secondary);
+  background: var(--windrose-bg-secondary);
+  border-top: 1px solid var(--windrose-border-secondary);
   flex-shrink: 0;
-  color: var(--dmt-text-muted);
+  color: var(--windrose-text-muted);
   font-size: 11px;
 }
 
@@ -1532,30 +1532,30 @@ button.dmt-tile-browser-config-btn,
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--dmt-bg-secondary);
-  color: var(--dmt-text-secondary);
-  border: 1px solid var(--dmt-border-secondary);
+  background: var(--windrose-bg-secondary);
+  color: var(--windrose-text-secondary);
+  border: 1px solid var(--windrose-border-secondary);
   border-radius: 3px;
   cursor: pointer;
   padding: 0;
-  transition: var(--dmt-transition);
+  transition: var(--windrose-transition);
 
   &:hover {
-    background: var(--dmt-bg-tertiary);
-    color: var(--dmt-text-primary);
+    background: var(--windrose-bg-tertiary);
+    color: var(--windrose-text-primary);
   }
 }
 
 .dmt-tile-browser-action-active.dmt-tile-browser-action-active,
 .dmt-tile-browser-action-active.dmt-tile-browser-action-active:hover {
-  background: var(--dmt-border-primary);
-  color: var(--dmt-bg-primary);
-  border-color: var(--dmt-border-primary);
+  background: var(--windrose-border-primary);
+  color: var(--windrose-bg-primary);
+  border-color: var(--windrose-border-primary);
 }
 
 .dmt-tile-browser-rotation-label {
   font-size: 10px;
-  color: var(--dmt-text-muted);
+  color: var(--windrose-text-muted);
   min-width: 28px;
   text-align: center;
 }
@@ -1563,7 +1563,7 @@ button.dmt-tile-browser-config-btn,
 .dmt-tile-browser-layer-toggle {
   display: flex;
   gap: 1px;
-  background: var(--dmt-border-secondary);
+  background: var(--windrose-border-secondary);
   border-radius: 4px;
   overflow: hidden;
 }
@@ -1572,7 +1572,7 @@ button.dmt-tile-browser-layer-btn,
 .is-tablet button.dmt-tile-browser-layer-btn {
   background: transparent;
   border: none;
-  color: var(--dmt-text-muted);
+  color: var(--windrose-text-muted);
   font-size: 9px;
   padding: 2px 6px;
   width: auto;
@@ -1588,14 +1588,14 @@ button.dmt-tile-browser-layer-btn,
 }
 
 .dmt-tile-browser-layer-btn:hover {
-  color: var(--dmt-text-primary);
+  color: var(--windrose-text-primary);
   background: rgba(255, 255, 255, 0.1);
 }
 
 button.dmt-tile-browser-layer-btn.dmt-tile-browser-layer-active,
 .is-tablet button.dmt-tile-browser-layer-btn.dmt-tile-browser-layer-active {
-  background: var(--dmt-border-primary);
-  color: var(--dmt-bg-primary);
+  background: var(--windrose-border-primary);
+  color: var(--windrose-bg-primary);
 }
 
 /* ============================================
@@ -1604,13 +1604,13 @@ button.dmt-tile-browser-layer-btn.dmt-tile-browser-layer-active,
 
 .dmt-object-tooltip {
   background-color: rgba(42, 42, 42, 0.95);
-  color: var(--dmt-text-primary);
+  color: var(--windrose-text-primary);
   font-size: 11pt;
   padding: 6px 10px;
   border-radius: 4px;
   white-space: nowrap;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-  border: 1px solid var(--dmt-border-secondary);
+  border: 1px solid var(--windrose-border-secondary);
   font-family: sans-serif;
   pointer-events: none;
   position: fixed;
@@ -1624,14 +1624,14 @@ button.dmt-tile-browser-layer-btn.dmt-tile-browser-layer-active,
   width: 32px;
   height: 32px;
   background-color: rgba(74, 158, 255, 0.9);
-  border: 2px solid var(--dmt-text-primary);
+  border: 2px solid var(--windrose-text-primary);
   border-radius: 50%;
-  color: var(--dmt-text-primary);
+  color: var(--windrose-text-primary);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: var(--dmt-transition);
+  transition: var(--windrose-transition);
   z-index: 150;
   user-select: none;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
@@ -1657,13 +1657,13 @@ button.dmt-tile-browser-layer-btn.dmt-tile-browser-layer-active,
 .dmt-note-button svg {
   width: 18px;
   height: 18px;
-  color: var(--dmt-text-primary);
+  color: var(--windrose-text-primary);
 }
 
 .dmt-link-note-button svg {
   width: 18px;
   height: 18px;
-  color: var(--dmt-text-primary);
+  color: var(--windrose-text-primary);
 }
 
 /* Visible Note Link Display */
@@ -1742,7 +1742,7 @@ button.dmt-tile-browser-layer-btn.dmt-tile-browser-layer-active,
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: var(--dmt-transition);
+  transition: var(--windrose-transition);
   user-select: none;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 
@@ -1867,11 +1867,11 @@ button.dmt-tile-browser-layer-btn.dmt-tile-browser-layer-active,
 .dmt-selection-card {
   position: relative;
   background: rgba(26, 26, 26, 0.7);
-  border: 2px solid rgba(var(--dmt-border-primary-rgb), 0.7);
+  border: 2px solid rgba(var(--windrose-border-primary-rgb), 0.7);
   border-radius: 4px;
   box-shadow:
     inset 0 0 0 3px rgba(26, 26, 26, 0.7),
-    inset 0 0 0 4px rgba(var(--dmt-border-primary-rgb), 0.15),
+    inset 0 0 0 4px rgba(var(--windrose-border-primary-rgb), 0.15),
     0 4px 16px rgba(0, 0, 0, 0.5);
   backdrop-filter: blur(8px);
 }
@@ -1904,7 +1904,7 @@ button.dmt-tile-browser-layer-btn.dmt-tile-browser-layer-active,
   width: 166px;
   height: 166px;
   transform: rotate(180deg);
-  color: var(--dmt-border-primary);
+  color: var(--windrose-border-primary);
   opacity: 0.55;
   pointer-events: none;
   z-index: 0;
@@ -1950,17 +1950,17 @@ button.dmt-sel-action-btn,
   background: rgba(42, 42, 42, 0.25);
   border: 1px solid transparent;
   border-radius: 3px;
-  color: var(--dmt-text-primary);
+  color: var(--windrose-text-primary);
   cursor: pointer;
   font-size: 12px;
-  transition: var(--dmt-transition);
+  transition: var(--windrose-transition);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .dmt-sel-action-btn svg {
-  color: var(--dmt-border-primary);
+  color: var(--windrose-border-primary);
   width: 14px;
   height: 14px;
   min-width: 14px;
@@ -1968,8 +1968,8 @@ button.dmt-sel-action-btn,
 }
 
 .dmt-sel-action-btn:hover:not(:disabled) {
-  background: var(--dmt-bg-tertiary);
-  border-color: var(--dmt-border-secondary);
+  background: var(--windrose-bg-tertiary);
+  border-color: var(--windrose-border-secondary);
 }
 
 .dmt-sel-action-label {
@@ -1980,15 +1980,15 @@ button.dmt-sel-action-btn,
 /* Active state (bronze fill) */
 .dmt-sel-action-active.dmt-sel-action-active,
 .dmt-sel-action-active.dmt-sel-action-active:hover {
-  background: var(--dmt-border-primary);
-  border-color: var(--dmt-border-primary-dark);
+  background: var(--windrose-border-primary);
+  border-color: var(--windrose-border-primary-dark);
 }
 .dmt-sel-action-active.dmt-sel-action-active svg,
 .dmt-sel-action-active.dmt-sel-action-active:hover svg {
-  color: var(--dmt-bg-primary);
+  color: var(--windrose-bg-primary);
 }
 .dmt-sel-action-active.dmt-sel-action-active .dmt-sel-action-label {
-  color: var(--dmt-bg-primary);
+  color: var(--windrose-bg-primary);
 }
 
 /* Disabled state */
@@ -1999,7 +1999,7 @@ button.dmt-sel-action-btn,
 
 /* Delete action */
 .dmt-sel-action-delete:hover:not(:disabled) {
-  background: var(--dmt-accent-red);
+  background: var(--windrose-accent-red);
   border-color: #6b0000;
 }
 .dmt-sel-action-delete:hover:not(:disabled) svg {
@@ -2025,7 +2025,7 @@ button.dmt-sel-action-btn,
 /* Separator */
 .dmt-sel-separator {
   height: 1px;
-  background: var(--dmt-border-secondary);
+  background: var(--windrose-border-secondary);
   margin: 2px 0;
 }
 
@@ -2046,13 +2046,13 @@ button.dmt-sel-links-toggle,
   background: rgba(42, 42, 42, 0.3);
   border: 1px solid transparent;
   border-radius: 3px;
-  color: var(--dmt-text-secondary);
+  color: var(--windrose-text-secondary);
   cursor: pointer;
   font-size: 12px;
-  transition: var(--dmt-transition);
+  transition: var(--windrose-transition);
 }
 .dmt-sel-links-toggle svg {
-  color: var(--dmt-border-primary);
+  color: var(--windrose-border-primary);
   width: 14px;
   height: 14px;
   min-width: 14px;
@@ -2061,15 +2061,15 @@ button.dmt-sel-links-toggle,
   margin-left: auto;
   width: 12px;
   height: 12px;
-  color: var(--dmt-text-muted);
+  color: var(--windrose-text-muted);
 }
 .dmt-sel-links-toggle:hover {
-  background: var(--dmt-bg-tertiary);
-  border-color: var(--dmt-border-secondary);
+  background: var(--windrose-bg-tertiary);
+  border-color: var(--windrose-border-secondary);
 }
 .dmt-sel-links-toggle.expanded {
   background: rgba(42, 42, 42, 0.5);
-  border-color: var(--dmt-border-secondary);
+  border-color: var(--windrose-border-secondary);
 }
 
 /* Links panel */
@@ -2092,7 +2092,7 @@ button.dmt-sel-links-toggle,
   padding: 4px 8px;
 }
 .dmt-sel-resize-row svg {
-  color: var(--dmt-border-primary);
+  color: var(--windrose-border-primary);
   flex-shrink: 0;
 }
 .dmt-sel-resize-row input[type="range"] {
@@ -2101,7 +2101,7 @@ button.dmt-sel-links-toggle,
 }
 .dmt-sel-resize-value {
   font-size: 10px;
-  color: var(--dmt-text-muted);
+  color: var(--windrose-text-muted);
   min-width: 28px;
   text-align: right;
 }
@@ -2120,10 +2120,10 @@ button.dmt-sel-links-toggle,
   height: 24px;
   cursor: pointer;
   font-size: 11px;
-  color: var(--dmt-text-secondary);
+  color: var(--windrose-text-secondary);
 }
 .dmt-sel-player-header > svg {
-  color: var(--dmt-border-primary);
+  color: var(--windrose-border-primary);
   flex-shrink: 0;
 }
 .dmt-sel-player-header > span {
@@ -2151,7 +2151,7 @@ button.dmt-sel-links-toggle,
   position: absolute;
   inset: 0;
   background: rgba(42, 42, 42, 0.6);
-  border: 1px solid var(--dmt-border-primary);
+  border: 1px solid var(--windrose-border-primary);
   border-radius: 7px;
   transition: background 0.15s;
 }
@@ -2162,17 +2162,17 @@ button.dmt-sel-links-toggle,
   height: 10px;
   left: 1px;
   top: 1px;
-  background: var(--dmt-text-muted);
+  background: var(--windrose-text-muted);
   border-radius: 50%;
   transition: transform 0.15s, background 0.15s;
 }
 .dmt-sel-toggle-switch input:checked + .dmt-sel-toggle-slider {
-  background: rgba(var(--dmt-border-primary-rgb), 0.3);
-  border-color: var(--dmt-accent-primary);
+  background: rgba(var(--windrose-border-primary-rgb), 0.3);
+  border-color: var(--windrose-accent-primary);
 }
 .dmt-sel-toggle-switch input:checked + .dmt-sel-toggle-slider::before {
   transform: translateX(14px);
-  background: var(--dmt-accent-primary);
+  background: var(--windrose-accent-primary);
 }
 .dmt-sel-player-row {
   display: flex;
@@ -2188,9 +2188,9 @@ input.dmt-sel-radius-input,
   padding: 2px 4px;
   font-size: 11px;
   background: rgba(42, 42, 42, 0.4);
-  border: 1px solid var(--dmt-border-primary);
+  border: 1px solid var(--windrose-border-primary);
   border-radius: 3px;
-  color: var(--dmt-text-primary);
+  color: var(--windrose-text-primary);
   text-align: right;
   min-width: 48px;
   max-width: 48px;
@@ -2199,11 +2199,11 @@ input.dmt-sel-radius-input,
 }
 .dmt-sel-radius-input:focus {
   outline: none;
-  border-color: var(--dmt-accent-primary);
+  border-color: var(--windrose-accent-primary);
 }
 .dmt-sel-unit-label {
   font-size: 10px;
-  color: var(--dmt-text-muted);
+  color: var(--windrose-text-muted);
 }
 .is-tablet button.dmt-sel-light-color-swatch,
 button.dmt-sel-light-color-swatch,
@@ -2219,12 +2219,12 @@ button.dmt-sel-light-color-swatch,
   max-height: 22px;
   padding: 2px;
   background: rgba(42, 42, 42, 0.4);
-  border: 1px solid var(--dmt-border-primary);
+  border: 1px solid var(--windrose-border-primary);
   border-radius: 3px;
   cursor: pointer;
 }
 .dmt-sel-light-color-swatch:hover {
-  border-color: var(--dmt-accent-primary);
+  border-color: var(--windrose-accent-primary);
 }
 .dmt-sel-light-color-swatch .dmt-sel-color-swatch {
   width: 16px;
@@ -2258,27 +2258,27 @@ button.dmt-sel-icon-btn,
   border: 1px solid rgba(58, 58, 58, 0.6);
   border-radius: 3px;
   cursor: pointer;
-  transition: var(--dmt-transition);
+  transition: var(--windrose-transition);
 }
 .dmt-sel-icon-btn svg {
-  color: var(--dmt-text-muted);
+  color: var(--windrose-text-muted);
   width: 14px;
   height: 14px;
 }
 .dmt-sel-icon-btn:hover {
-  background: var(--dmt-bg-tertiary);
-  border-color: var(--dmt-border-primary);
+  background: var(--windrose-bg-tertiary);
+  border-color: var(--windrose-border-primary);
 }
 .dmt-sel-icon-btn:hover svg {
-  color: var(--dmt-text-primary);
+  color: var(--windrose-text-primary);
 }
 .dmt-sel-icon-btn.dmt-sel-action-active {
-  background: var(--dmt-border-primary);
-  border-color: var(--dmt-border-primary-dark);
+  background: var(--windrose-border-primary);
+  border-color: var(--windrose-border-primary-dark);
 }
 .dmt-sel-icon-btn.dmt-sel-action-active svg,
 .dmt-sel-action-active.dmt-sel-action-active:hover svg {
-  color: var(--dmt-bg-primary);
+  color: var(--windrose-bg-primary);
 }
 
 /* Multi-select badge */
@@ -2288,15 +2288,15 @@ button.dmt-sel-icon-btn,
   gap: 6px;
   padding: 4px 8px;
   height: 24px;
-  background: var(--dmt-border-primary);
+  background: var(--windrose-border-primary);
   border-radius: 3px;
-  color: var(--dmt-bg-primary);
+  color: var(--windrose-bg-primary);
   font-size: 11px;
   font-weight: 600;
   margin-bottom: 2px;
 }
 .dmt-sel-multi-badge svg {
-  color: var(--dmt-bg-primary);
+  color: var(--windrose-bg-primary);
 }
 
 /* ============================================
@@ -2328,8 +2328,8 @@ button.dmt-sel-icon-btn,
 }
 
 .dmt-modal-content {
-  background-color: var(--dmt-bg-secondary);
-  border: 1px solid var(--dmt-border-secondary);
+  background-color: var(--windrose-bg-secondary);
+  border: 1px solid var(--windrose-border-secondary);
   border-radius: 8px;
   padding: 20px;
   width: 400px;
@@ -2354,27 +2354,27 @@ button.dmt-sel-icon-btn,
   margin: 0 0 16px 0;
   font-size: 18px;
   font-weight: 600;
-  color: var(--dmt-text-primary);
+  color: var(--windrose-text-primary);
 }
 
 .dmt-modal-input {
   width: 100%;
   padding: 10px 12px;
   font-size: 16px;
-  background-color: var(--dmt-bg-primary);
-  border: 1px solid var(--dmt-border-secondary);
+  background-color: var(--windrose-bg-primary);
+  border: 1px solid var(--windrose-border-secondary);
   border-radius: 4px;
-  color: var(--dmt-text-primary);
+  color: var(--windrose-text-primary);
   outline: none;
   transition: border-color 0.15s ease;
   box-sizing: border-box;
 
   &:focus {
-    border-color: var(--dmt-accent-blue);
+    border-color: var(--windrose-accent-blue);
   }
 
   &::placeholder {
-    color: var(--dmt-text-disabled);
+    color: var(--windrose-text-disabled);
   }
 }
 
@@ -2391,7 +2391,7 @@ button.dmt-sel-icon-btn,
     margin: 0;
     font-size: 18px;
     font-weight: 600;
-    color: var(--dmt-text-primary);
+    color: var(--windrose-text-primary);
   }
 }
 
@@ -2474,7 +2474,7 @@ button.dmt-sel-icon-btn,
   margin-bottom: 6px;
   font-size: 14px;
   font-weight: 500;
-  color: var(--dmt-text-secondary);
+  color: var(--windrose-text-secondary);
 }
 
 .dmt-modal-btn {
@@ -2486,12 +2486,12 @@ button.dmt-sel-icon-btn,
   border-radius: 4px;
   border: 1px solid;
   cursor: pointer;
-  transition: var(--dmt-transition);
+  transition: var(--windrose-transition);
 
   &.dmt-modal-btn-cancel {
-    background-color: var(--dmt-bg-tertiary);
-    border-color: var(--dmt-border-secondary);
-    color: var(--dmt-text-primary);
+    background-color: var(--windrose-bg-tertiary);
+    border-color: var(--windrose-border-secondary);
+    color: var(--windrose-text-primary);
 
     &:hover {
       background-color: #454545;
@@ -2500,13 +2500,13 @@ button.dmt-sel-icon-btn,
   }
 
   &.dmt-modal-btn-submit {
-    background-color: var(--dmt-accent-blue);
-    border-color: var(--dmt-accent-blue);
-    color: var(--dmt-text-primary);
+    background-color: var(--windrose-accent-blue);
+    border-color: var(--windrose-accent-blue);
+    color: var(--windrose-text-primary);
 
     &:hover:not(:disabled) {
-      background-color: var(--dmt-accent-blue-hover);
-      border-color: var(--dmt-accent-blue-hover);
+      background-color: var(--windrose-accent-blue-hover);
+      border-color: var(--windrose-accent-blue-hover);
     }
 
     &:disabled {
@@ -2516,13 +2516,13 @@ button.dmt-sel-icon-btn,
   }
 
   &.dmt-modal-btn-danger {
-    background-color: var(--dmt-accent-red);
-    border-color: var(--dmt-accent-red);
-    color: var(--dmt-text-primary);
+    background-color: var(--windrose-accent-red);
+    border-color: var(--windrose-accent-red);
+    color: var(--windrose-text-primary);
 
     &:hover:not(:disabled) {
-      background-color: var(--dmt-accent-red-hover);
-      border-color: var(--dmt-accent-red-hover);
+      background-color: var(--windrose-accent-red-hover);
+      border-color: var(--windrose-accent-red-hover);
     }
 
     &:disabled {
@@ -2535,7 +2535,7 @@ button.dmt-sel-icon-btn,
 .dmt-modal-hint {
   margin-top: 12px;
   font-size: 11px;
-  color: var(--dmt-text-muted);
+  color: var(--windrose-text-muted);
   text-align: center;
 }
 
@@ -2566,13 +2566,13 @@ button.dmt-sel-icon-btn,
 .dmt-settings-section-title {
   font-size: 14px;
   font-weight: 600;
-  color: var(--dmt-text-primary);
+  color: var(--windrose-text-primary);
   margin: 0 0 4px 0;
 }
 
 .dmt-settings-section-description {
   font-size: 12px;
-  color: var(--dmt-text-muted);
+  color: var(--windrose-text-muted);
   margin: 0;
 }
 
@@ -2646,12 +2646,12 @@ button.dmt-sel-icon-btn,
   align-items: center;
   gap: 10px;
   font-size: 13px;
-  color: var(--dmt-text-primary);
+  color: var(--windrose-text-primary);
   
   svg {
     width: 18px;
     height: 18px;
-    color: var(--dmt-accent-blue);
+    color: var(--windrose-accent-blue);
     flex-shrink: 0;
   }
 }
@@ -2660,17 +2660,17 @@ button.dmt-sel-icon-btn,
   padding: 6px 14px;
   font-size: 12px;
   font-weight: 600;
-  background-color: var(--dmt-accent-blue);
-  border: 1px solid var(--dmt-accent-blue);
+  background-color: var(--windrose-accent-blue);
+  border: 1px solid var(--windrose-accent-blue);
   border-radius: 4px;
-  color: var(--dmt-text-primary);
+  color: var(--windrose-text-primary);
   cursor: pointer;
-  transition: var(--dmt-transition);
+  transition: var(--windrose-transition);
   white-space: nowrap;
   
   &:hover {
-    background-color: var(--dmt-accent-blue-hover);
-    border-color: var(--dmt-accent-blue-hover);
+    background-color: var(--windrose-accent-blue-hover);
+    border-color: var(--windrose-accent-blue-hover);
   }
 }
 
@@ -2693,7 +2693,7 @@ button.dmt-sel-icon-btn,
   display: block;
   font-size: 12px;
   font-weight: 500;
-  color: var(--dmt-text-secondary);
+  color: var(--windrose-text-secondary);
   margin-bottom: 6px;
 }
 
@@ -2703,11 +2703,11 @@ button.dmt-sel-icon-btn,
   gap: 8px;
   cursor: pointer;
   font-size: 13px;
-  color: var(--dmt-text-primary);
+  color: var(--windrose-text-primary);
   user-select: none;
   
   &:hover {
-    color: var(--dmt-accent-blue);
+    color: var(--windrose-accent-blue);
   }
 }
 
@@ -2715,23 +2715,23 @@ button.dmt-sel-icon-btn,
   width: 16px;
   height: 16px;
   cursor: pointer;
-  accent-color: var(--dmt-accent-blue);
+  accent-color: var(--windrose-accent-blue);
 }
 
 .dmt-color-button {
   width: 100%;
   height: 36px;
-  border: 1px solid var(--dmt-border-secondary);
+  border: 1px solid var(--windrose-border-secondary);
   border-radius: 4px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: var(--dmt-transition);
+  transition: var(--windrose-transition);
   position: relative;
   
   &:hover:not(:disabled) {
-    border-color: var(--dmt-accent-blue);
+    border-color: var(--windrose-accent-blue);
     transform: scale(1.01);
   }
   
@@ -2774,8 +2774,8 @@ button.dmt-sel-icon-btn,
 }
 
 .dmt-color-picker {
-  background-color: var(--dmt-bg-secondary);
-  border: 1px solid var(--dmt-border-secondary);
+  background-color: var(--windrose-bg-secondary);
+  border: 1px solid var(--windrose-border-secondary);
   border-radius: 8px;
   padding: 12px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
@@ -2806,15 +2806,15 @@ button.dmt-sel-icon-btn,
 .dmt-color-picker-title {
   font-size: 12px;
   font-weight: 600;
-  color: var(--dmt-text-primary);
+  color: var(--windrose-text-primary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
 .dmt-color-reset-btn {
   background-color: transparent;
-  border: 1px solid var(--dmt-text-disabled);
-  color: var(--dmt-text-primary);
+  border: 1px solid var(--windrose-text-disabled);
+  color: var(--windrose-text-primary);
   width: 24px;
   height: 24px;
   border-radius: 4px;
@@ -2823,11 +2823,11 @@ button.dmt-sel-icon-btn,
   align-items: center;
   justify-content: center;
   font-size: 14px;
-  transition: var(--dmt-transition);
+  transition: var(--windrose-transition);
 
   &:hover {
-    background-color: var(--dmt-bg-tertiary);
-    border-color: var(--dmt-text-muted);
+    background-color: var(--windrose-bg-tertiary);
+    border-color: var(--windrose-text-muted);
   }
 }
 
@@ -2840,10 +2840,10 @@ button.dmt-sel-icon-btn,
 .dmt-color-swatch {
   width: 40px;
   height: 40px;
-  border: 2px solid var(--dmt-border-secondary);
+  border: 2px solid var(--windrose-border-secondary);
   border-radius: 6px;
   cursor: pointer;
-  transition: var(--dmt-transition);
+  transition: var(--windrose-transition);
   position: relative;
   display: flex;
   align-items: center;
@@ -2851,41 +2851,41 @@ button.dmt-sel-icon-btn,
   padding: 0;
 
   &:hover {
-    border-color: var(--dmt-text-primary);
+    border-color: var(--windrose-text-primary);
     transform: scale(1.1);
   }
 
   &.dmt-color-swatch-selected {
-    border-color: var(--dmt-text-primary);
+    border-color: var(--windrose-text-primary);
     border-width: 3px;
     box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.3);
   }
 
   &.dmt-color-swatch-reset {
-    background-color: var(--dmt-bg-tertiary);
-    border: 2px solid var(--dmt-text-disabled);
+    background-color: var(--windrose-bg-tertiary);
+    border: 2px solid var(--windrose-text-disabled);
 
     &:hover {
-      background-color: var(--dmt-border-secondary);
-      border-color: var(--dmt-text-muted);
+      background-color: var(--windrose-border-secondary);
+      border-color: var(--windrose-text-muted);
     }
   }
 
   &.dmt-color-swatch-preview {
-    border: 2px dashed var(--dmt-accent-blue);
+    border: 2px dashed var(--windrose-accent-blue);
     position: relative;
     animation: pulse 1s ease-in-out infinite;
   }
 
   &.dmt-color-swatch-add {
-    background-color: var(--dmt-bg-secondary);
-    border: 2px dashed var(--dmt-text-disabled);
+    background-color: var(--windrose-bg-secondary);
+    border: 2px dashed var(--windrose-text-disabled);
     position: relative;
     overflow: hidden;
 
     &:hover {
-      background-color: var(--dmt-bg-tertiary);
-      border-color: var(--dmt-text-muted);
+      background-color: var(--windrose-bg-tertiary);
+      border-color: var(--windrose-text-muted);
       border-style: solid;
     }
   }
@@ -2905,7 +2905,7 @@ button.dmt-sel-icon-btn,
 
 .dmt-color-reset-icon,
 .dmt-color-checkmark {
-  color: var(--dmt-text-primary);
+  color: var(--windrose-text-primary);
   font-weight: bold;
   text-shadow: 0 0 4px rgba(0, 0, 0, 0.8);
 }
@@ -2924,7 +2924,7 @@ button.dmt-sel-icon-btn,
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  color: var(--dmt-text-primary);
+  color: var(--windrose-text-primary);
   font-size: 18px;
   font-weight: bold;
   text-shadow: 0 0 4px rgba(0, 0, 0, 0.8);
@@ -2944,7 +2944,7 @@ button.dmt-sel-icon-btn,
 
 .dmt-color-add-icon,
 .dmt-color-add-icon-overlay {
-  color: var(--dmt-text-primary);
+  color: var(--windrose-text-primary);
   font-size: 24px;
   font-weight: bold;
 }
@@ -2977,14 +2977,14 @@ button.dmt-sel-icon-btn,
   width: 32px;
   height: 32px;
   background-color: rgba(239, 68, 68, 0.9);
-  border: 2px solid var(--dmt-text-primary);
+  border: 2px solid var(--windrose-text-primary);
   border-radius: 50%;
-  color: var(--dmt-text-primary);
+  color: var(--windrose-text-primary);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: var(--dmt-transition);
+  transition: var(--windrose-transition);
   z-index: 150;
   user-select: none;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
@@ -2992,7 +2992,7 @@ button.dmt-sel-icon-btn,
   svg {
     width: 16px;
     height: 16px;
-    color: var(--dmt-text-primary);
+    color: var(--windrose-text-primary);
   }
 
   &:hover {
@@ -3011,8 +3011,8 @@ button.dmt-sel-icon-btn,
   left: calc(100% + 4px);
   top: 50%;
   transform: translateY(-50%);
-  background: var(--dmt-bg-secondary);
-  border: 1px solid var(--dmt-border-secondary);
+  background: var(--windrose-bg-secondary);
+  border: 1px solid var(--windrose-border-secondary);
   border-radius: 6px;
   padding: 8px;
   display: flex;
@@ -3031,12 +3031,12 @@ button.dmt-sel-icon-btn,
 
 .dmt-color-edit-opacity-label {
   font-size: 11px;
-  color: var(--dmt-text-secondary);
+  color: var(--windrose-text-secondary);
 }
 
 .dmt-color-edit-opacity-value {
   font-size: 11px;
-  color: var(--dmt-text-primary);
+  color: var(--windrose-text-primary);
   min-width: 32px;
   text-align: right;
 }
@@ -3046,14 +3046,14 @@ button.dmt-sel-icon-btn,
   height: 4px;
   cursor: pointer;
   appearance: none;
-  background: var(--dmt-bg-tertiary);
+  background: var(--windrose-bg-tertiary);
   border-radius: 2px;
   
   &::-webkit-slider-thumb {
     appearance: none;
     width: 12px;
     height: 12px;
-    background: var(--dmt-border-primary);
+    background: var(--windrose-border-primary);
     border-radius: 50%;
     cursor: pointer;
   }
@@ -3061,7 +3061,7 @@ button.dmt-sel-icon-btn,
   &::-moz-range-thumb {
     width: 12px;
     height: 12px;
-    background: var(--dmt-border-primary);
+    background: var(--windrose-border-primary);
     border: none;
     border-radius: 50%;
     cursor: pointer;
@@ -3074,12 +3074,12 @@ button.dmt-sel-icon-btn,
   background-color: rgba(239, 68, 68, 0.8);
   border: none;
   border-radius: 4px;
-  color: var(--dmt-text-primary);
+  color: var(--windrose-text-primary);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: var(--dmt-transition);
+  transition: var(--windrose-transition);
   padding: 0;
   
   svg {
@@ -3096,7 +3096,7 @@ button.dmt-sel-icon-btn,
 .dmt-color-opacity-section {
   margin-top: 12px;
   padding-top: 12px;
-  border-top: 1px solid var(--dmt-bg-tertiary);
+  border-top: 1px solid var(--windrose-bg-tertiary);
 }
 
 .dmt-color-opacity-header {
@@ -3109,14 +3109,14 @@ button.dmt-sel-icon-btn,
 .dmt-color-opacity-label {
   font-size: 11px;
   font-weight: 600;
-  color: var(--dmt-text-muted);
+  color: var(--windrose-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
 .dmt-color-opacity-value {
   font-size: 12px;
-  color: var(--dmt-text-primary);
+  color: var(--windrose-text-primary);
   font-weight: 500;
   min-width: 35px;
   text-align: right;
@@ -3127,7 +3127,7 @@ button.dmt-sel-icon-btn,
   height: 6px;
   -webkit-appearance: none;
   appearance: none;
-  background: var(--dmt-bg-tertiary);
+  background: var(--windrose-bg-tertiary);
   border-radius: 3px;
   outline: none;
   cursor: pointer;
@@ -3138,10 +3138,10 @@ button.dmt-sel-icon-btn,
   appearance: none;
   width: 16px;
   height: 16px;
-  background: var(--dmt-accent-blue);
+  background: var(--windrose-accent-blue);
   border-radius: 50%;
   cursor: pointer;
-  border: 2px solid var(--dmt-text-primary);
+  border: 2px solid var(--windrose-text-primary);
   transition: transform 0.15s ease;
 }
 
@@ -3152,10 +3152,10 @@ button.dmt-sel-icon-btn,
 .dmt-color-opacity-slider::-moz-range-thumb {
   width: 16px;
   height: 16px;
-  background: var(--dmt-accent-blue);
+  background: var(--windrose-accent-blue);
   border-radius: 50%;
   cursor: pointer;
-  border: 2px solid var(--dmt-text-primary);
+  border: 2px solid var(--windrose-text-primary);
   transition: transform 0.15s ease;
 }
 
@@ -3384,7 +3384,7 @@ button.dmt-sel-icon-btn,
 .dmt-text-editor-preview {
   padding: 16px;
   text-align: center;
-  background: var(--dmt-bg-secondary);
+  background: var(--windrose-bg-secondary);
   border-radius: 4px;
   min-height: 60px;
   overflow: hidden;
@@ -3406,7 +3406,7 @@ button.dmt-sel-icon-btn,
   position: absolute;
   width: 32px;
   height: 32px;
-  background: linear-gradient(135deg, var(--dmt-accent-blue) 0%, #357abd 100%);
+  background: linear-gradient(135deg, var(--windrose-accent-blue) 0%, #357abd 100%);
   color: white;
   border: 2px solid rgba(255, 255, 255, 0.3);
   border-radius: 6px;
@@ -3498,17 +3498,17 @@ button.dmt-sel-icon-btn,
   justify-content: center;
   min-height: 400px;
   padding: 20px;
-  background: var(--dmt-bg-primary);
+  background: var(--windrose-bg-primary);
 }
 
 .dmt-plugin-installer-card {
   max-width: 600px;
-  background: var(--dmt-bg-secondary);
-  border: 2px solid var(--dmt-border-primary);
+  background: var(--windrose-bg-secondary);
+  border: 2px solid var(--windrose-border-primary);
   border-radius: 8px;
   padding: 32px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3),
-              inset 0 0 0 1px rgba(var(--dmt-border-primary-rgb), 0.2);
+              inset 0 0 0 1px rgba(var(--windrose-border-primary-rgb), 0.2);
 }
 
 .dmt-plugin-installer-icon {
@@ -3520,8 +3520,8 @@ button.dmt-sel-icon-btn,
   svg {
     width: 64px;
     height: 64px;
-    color: var(--dmt-border-primary);
-    filter: drop-shadow(0 0 8px rgba(var(--dmt-border-primary-rgb), 0.4));
+    color: var(--windrose-border-primary);
+    filter: drop-shadow(0 0 8px rgba(var(--windrose-border-primary-rgb), 0.4));
   }
 }
 
@@ -3530,7 +3530,7 @@ button.dmt-sel-icon-btn,
     margin: 0 0 16px 0;
     font-size: 24px;
     font-weight: 600;
-    color: var(--dmt-text-primary);
+    color: var(--windrose-text-primary);
     text-align: center;
   }
   
@@ -3538,7 +3538,7 @@ button.dmt-sel-icon-btn,
     margin: 0 0 12px 0;
     font-size: 15px;
     line-height: 1.6;
-    color: var(--dmt-text-secondary);
+    color: var(--windrose-text-secondary);
   }
   
   ul {
@@ -3548,18 +3548,18 @@ button.dmt-sel-icon-btn,
     li {
       margin: 8px 0;
       font-size: 14px;
-      color: var(--dmt-text-secondary);
+      color: var(--windrose-text-secondary);
     }
   }
   
   .dmt-plugin-installer-note {
     margin-top: 20px;
     padding: 12px;
-    background: rgba(var(--dmt-border-primary-rgb), 0.1);
-    border-left: 3px solid var(--dmt-border-primary);
+    background: rgba(var(--windrose-border-primary-rgb), 0.1);
+    border-left: 3px solid var(--windrose-border-primary);
     border-radius: 4px;
     font-size: 13px;
-    color: var(--dmt-text-muted);
+    color: var(--windrose-text-muted);
   }
 }
 
@@ -3567,9 +3567,9 @@ button.dmt-sel-icon-btn,
   margin-top: 16px;
   padding: 12px;
   background: rgba(239, 68, 68, 0.1);
-  border: 1px solid var(--dmt-error);
+  border: 1px solid var(--windrose-error);
   border-radius: 4px;
-  color: var(--dmt-error);
+  color: var(--windrose-error);
   font-size: 14px;
   text-align: center;
 }
@@ -3597,13 +3597,13 @@ button.dmt-sel-icon-btn,
 }
 
 .dmt-plugin-installer-btn-primary {
-  background: linear-gradient(135deg, var(--dmt-border-primary) 0%, var(--dmt-border-primary-dark) 100%);
-  color: var(--dmt-bg-primary);
-  box-shadow: 0 2px 8px rgba(var(--dmt-border-primary-rgb), 0.3);
+  background: linear-gradient(135deg, var(--windrose-border-primary) 0%, var(--windrose-border-primary-dark) 100%);
+  color: var(--windrose-bg-primary);
+  box-shadow: 0 2px 8px rgba(var(--windrose-border-primary-rgb), 0.3);
   
   &:hover:not(:disabled) {
     transform: translateY(-2px);
-    box-shadow: 0 4px 16px rgba(var(--dmt-border-primary-rgb), 0.4);
+    box-shadow: 0 4px 16px rgba(var(--windrose-border-primary-rgb), 0.4);
   }
   
   &:active:not(:disabled) {
@@ -3612,13 +3612,13 @@ button.dmt-sel-icon-btn,
 }
 
 .dmt-plugin-installer-btn-secondary {
-  background: var(--dmt-bg-tertiary);
-  color: var(--dmt-text-secondary);
-  border: 1px solid var(--dmt-border-secondary);
+  background: var(--windrose-bg-tertiary);
+  color: var(--windrose-text-secondary);
+  border: 1px solid var(--windrose-border-secondary);
   
   &:hover:not(:disabled) {
     background: rgba(255, 255, 255, 0.1);
-    color: var(--dmt-text-primary);
+    color: var(--windrose-text-primary);
   }
 }
 
@@ -3639,12 +3639,12 @@ button.dmt-sel-icon-btn,
 
 .dmt-plugin-success-modal {
   max-width: 500px;
-  background: var(--dmt-bg-secondary);
-  border: 2px solid var(--dmt-border-primary);
+  background: var(--windrose-bg-secondary);
+  border: 2px solid var(--windrose-border-primary);
   border-radius: 8px;
   padding: 32px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5),
-              inset 0 0 0 1px rgba(var(--dmt-border-primary-rgb), 0.2);
+              inset 0 0 0 1px rgba(var(--windrose-border-primary-rgb), 0.2);
   animation: dmt-modal-fade-in 0.2s ease;
 }
 
@@ -3677,7 +3677,7 @@ button.dmt-sel-icon-btn,
   margin: 0 0 16px 0;
   font-size: 22px;
   font-weight: 600;
-  color: var(--dmt-text-primary);
+  color: var(--windrose-text-primary);
   text-align: center;
 }
 
@@ -3685,18 +3685,18 @@ button.dmt-sel-icon-btn,
   margin: 0 0 12px 0;
   font-size: 15px;
   line-height: 1.6;
-  color: var(--dmt-text-secondary);
+  color: var(--windrose-text-secondary);
   text-align: center;
 }
 
 .dmt-plugin-success-note {
   margin-top: 16px;
   padding: 12px;
-  background: rgba(var(--dmt-border-primary-rgb), 0.1);
-  border-left: 3px solid var(--dmt-border-primary);
+  background: rgba(var(--windrose-border-primary-rgb), 0.1);
+  border-left: 3px solid var(--windrose-border-primary);
   border-radius: 4px;
   font-size: 13px;
-  color: var(--dmt-text-muted);
+  color: var(--windrose-text-muted);
   text-align: left;
 }
 
@@ -3743,13 +3743,13 @@ button.dmt-sel-icon-btn,
   display: flex;
   gap: 4px;
   padding: 4px;
-  background-color: var(--dmt-bg-primary);
-  border: 2px solid var(--dmt-border-primary);
+  background-color: var(--windrose-bg-primary);
+  border: 2px solid var(--windrose-border-primary);
   border-radius: 4px;
   z-index: 200;
   box-shadow:
     0 4px 12px rgba(0, 0, 0, 0.5),
-    inset 0 0 0 1px rgba(var(--dmt-border-primary-rgb), 0.2);
+    inset 0 0 0 1px rgba(var(--windrose-border-primary-rgb), 0.2);
   opacity: 0;
   pointer-events: none;
   transition: opacity 200ms ease-out, transform 200ms ease-out;
@@ -3766,23 +3766,23 @@ button.dmt-sel-icon-btn,
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: var(--dmt-bg-secondary);
-  border: 1px solid var(--dmt-border-secondary);
+  background-color: var(--windrose-bg-secondary);
+  border: 1px solid var(--windrose-border-secondary);
   border-radius: 3px;
-  color: var(--dmt-text-primary);
+  color: var(--windrose-text-primary);
   cursor: pointer;
   padding: 6px;
   width: 32px;
   height: 32px;
-  transition: var(--dmt-transition);
+  transition: var(--windrose-transition);
 
   &:hover:not(.dmt-visibility-btn-hidden) {
-    background-color: var(--dmt-bg-tertiary);
-    border-color: var(--dmt-border-primary);
+    background-color: var(--windrose-bg-tertiary);
+    border-color: var(--windrose-border-primary);
   }
 
   svg:not(.dmt-visibility-strikethrough) {
-    color: var(--dmt-border-primary);
+    color: var(--windrose-border-primary);
     width: 18px;
     height: 18px;
   }
@@ -3795,7 +3795,7 @@ button.dmt-sel-icon-btn,
   transform: translate(-50%, -50%);
   width: 24px;
   height: 24px;
-  color: var(--dmt-accent-red);
+  color: var(--windrose-accent-red);
   pointer-events: none;
 }
 
@@ -3805,22 +3805,22 @@ button.dmt-sel-icon-btn,
   
   &:hover {
     background-color: rgba(0, 0, 0, 0.4);
-    border-color: var(--dmt-border-secondary);
+    border-color: var(--windrose-border-secondary);
   }
 
   svg:not(.dmt-visibility-strikethrough) {
-    color: var(--dmt-text-muted);
+    color: var(--windrose-text-muted);
   }
 }
 
 /* Active state for visibility toggle button in controls */
 .dmt-expand-btn-active.dmt-expand-btn-active,
 .dmt-expand-btn-active.dmt-expand-btn-active:hover {
-  background-color: var(--dmt-border-primary);
-  border-color: var(--dmt-border-primary-dark);
+  background-color: var(--windrose-border-primary);
+  border-color: var(--windrose-border-primary-dark);
   
   svg {
-    color: var(--dmt-bg-primary);
+    color: var(--windrose-bg-primary);
   }
 }
 
@@ -3832,7 +3832,7 @@ button.dmt-sel-icon-btn,
 .dmt-visibility-separator {
   width: 1px;
   height: 24px;
-  background: var(--dmt-border-secondary);
+  background: var(--windrose-border-secondary);
   margin: 0 4px;
 }
 
@@ -3851,20 +3851,20 @@ button.dmt-fow-toggle-btn,
   display: flex;
   align-items: center;
   gap: 4px;
-  background-color: var(--dmt-bg-secondary);
-  border: 1px solid var(--dmt-border-secondary);
+  background-color: var(--windrose-bg-secondary);
+  border: 1px solid var(--windrose-border-secondary);
   border-radius: 3px;
-  color: var(--dmt-text-primary);
+  color: var(--windrose-text-primary);
   cursor: pointer;
   padding: 4px 8px;
   height: 32px;
   min-height: 32px;
   max-height: 32px;
-  transition: var(--dmt-transition);
+  transition: var(--windrose-transition);
   white-space: nowrap;
   
   svg {
-    color: var(--dmt-border-primary);
+    color: var(--windrose-border-primary);
     width: 16px;
     height: 16px;
     min-width: 16px;
@@ -3873,19 +3873,19 @@ button.dmt-fow-toggle-btn,
   }
   
   &:hover {
-    background-color: var(--dmt-bg-tertiary);
-    border-color: var(--dmt-border-primary);
+    background-color: var(--windrose-bg-tertiary);
+    border-color: var(--windrose-border-primary);
   }
   
   &.expanded {
-    background-color: var(--dmt-bg-tertiary);
-    border-color: var(--dmt-border-primary);
+    background-color: var(--windrose-bg-tertiary);
+    border-color: var(--windrose-border-primary);
   }
 }
 
 .dmt-fow-label {
   font-size: 11px;
-  color: var(--dmt-text-muted);
+  color: var(--windrose-text-muted);
 }
 
 /* FoW tools panel (expandable) */
@@ -3903,7 +3903,7 @@ button.dmt-fow-toggle-btn,
     opacity: 1;
     margin-left: 4px;
     padding-left: 4px;
-    border-left: 1px solid var(--dmt-border-secondary);
+    border-left: 1px solid var(--windrose-border-secondary);
   }
 }
 
@@ -3914,10 +3914,10 @@ button.dmt-fow-tool-btn,
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: var(--dmt-bg-secondary);
-  border: 1px solid var(--dmt-border-secondary);
+  background-color: var(--windrose-bg-secondary);
+  border: 1px solid var(--windrose-border-secondary);
   border-radius: 3px;
-  color: var(--dmt-text-primary);
+  color: var(--windrose-text-primary);
   cursor: pointer;
   padding: 4px;
   width: 28px;
@@ -3926,29 +3926,29 @@ button.dmt-fow-tool-btn,
   min-height: 28px;
   max-width: 28px;
   max-height: 28px;
-  transition: var(--dmt-transition);
+  transition: var(--windrose-transition);
   
   svg {
-    color: var(--dmt-text-muted);
+    color: var(--windrose-text-muted);
     width: 16px;
     height: 16px;
   }
   
   &:hover:not(:disabled) {
-    background-color: var(--dmt-bg-tertiary);
-    border-color: var(--dmt-border-primary);
+    background-color: var(--windrose-bg-tertiary);
+    border-color: var(--windrose-border-primary);
     
     svg {
-      color: var(--dmt-text-primary);
+      color: var(--windrose-text-primary);
     }
   }
   
   &.active {
-    background-color: var(--dmt-border-primary);
-    border-color: var(--dmt-border-primary-dark);
+    background-color: var(--windrose-border-primary);
+    border-color: var(--windrose-border-primary-dark);
     
     svg {
-      color: var(--dmt-bg-primary);
+      color: var(--windrose-bg-primary);
     }
   }
   
@@ -3958,7 +3958,7 @@ button.dmt-fow-tool-btn,
     cursor: not-allowed;
     
     svg {
-      color: var(--dmt-text-muted);
+      color: var(--windrose-text-muted);
     }
   }
 }
@@ -3972,14 +3972,14 @@ button.dmt-fow-tool-btn,
   display: flex;
   align-items: center;
   gap: 4px;
-  background: var(--dmt-bg-primary);
-  border: 2px solid var(--dmt-border-primary);
+  background: var(--windrose-bg-primary);
+  border: 2px solid var(--windrose-border-primary);
   border-radius: 4px;
   padding: 6px 10px;
   z-index: 1000;
   box-shadow:
-    inset 0 0 0 3px var(--dmt-bg-primary),
-    inset 0 0 0 4px rgba(var(--dmt-border-primary-rgb), 0.3),
+    inset 0 0 0 3px var(--windrose-bg-primary),
+    inset 0 0 0 4px rgba(var(--windrose-border-primary-rgb), 0.3),
     0 4px 12px rgba(0, 0, 0, 0.4);
   white-space: nowrap;
 }
@@ -3987,7 +3987,7 @@ button.dmt-fow-tool-btn,
 .dmt-fow-floating-separator {
   width: 1px;
   height: 20px;
-  background: var(--dmt-border-secondary);
+  background: var(--windrose-border-secondary);
   margin: 0 2px;
 }
 
@@ -3996,8 +3996,8 @@ button.dmt-fow-tool-btn,
    ========================================================================== */
 
 .dmt-scale-slider-container {
-  background: var(--dmt-bg-secondary);
-  border: 1px solid var(--dmt-border-primary);
+  background: var(--windrose-bg-secondary);
+  border: 1px solid var(--windrose-border-primary);
   border-radius: 6px;
   padding: 6px 10px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3),
@@ -4010,7 +4010,7 @@ button.dmt-fow-tool-btn,
   gap: 8px;
   
   svg {
-    color: var(--dmt-text-muted);
+    color: var(--windrose-text-muted);
     flex-shrink: 0;
   }
 }
@@ -4020,7 +4020,7 @@ button.dmt-fow-tool-btn,
   height: 4px;
   -webkit-appearance: none;
   appearance: none;
-  background: var(--dmt-bg-tertiary);
+  background: var(--windrose-bg-tertiary);
   border-radius: 2px;
   cursor: pointer;
   
@@ -4029,10 +4029,10 @@ button.dmt-fow-tool-btn,
     appearance: none;
     width: 14px;
     height: 14px;
-    background: var(--dmt-border-primary);
+    background: var(--windrose-border-primary);
     border-radius: 50%;
     cursor: pointer;
-    border: 2px solid var(--dmt-bg-secondary);
+    border: 2px solid var(--windrose-bg-secondary);
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
     transition: transform 0.1s ease;
     
@@ -4044,10 +4044,10 @@ button.dmt-fow-tool-btn,
   &::-moz-range-thumb {
     width: 14px;
     height: 14px;
-    background: var(--dmt-border-primary);
+    background: var(--windrose-border-primary);
     border-radius: 50%;
     cursor: pointer;
-    border: 2px solid var(--dmt-bg-secondary);
+    border: 2px solid var(--windrose-bg-secondary);
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
     transition: transform 0.1s ease;
     
@@ -4058,13 +4058,13 @@ button.dmt-fow-tool-btn,
   
   &::-webkit-slider-runnable-track {
     height: 4px;
-    background: var(--dmt-bg-tertiary);
+    background: var(--windrose-bg-tertiary);
     border-radius: 2px;
   }
   
   &::-moz-range-track {
     height: 4px;
-    background: var(--dmt-bg-tertiary);
+    background: var(--windrose-bg-tertiary);
     border-radius: 2px;
   }
 }
@@ -4072,7 +4072,7 @@ button.dmt-fow-tool-btn,
 .dmt-scale-value {
   font-size: 12px;
   font-weight: 600;
-  color: var(--dmt-text-muted);
+  color: var(--windrose-text-muted);
   min-width: 36px;
   text-align: right;
   font-family: var(--font-monospace);
@@ -4152,8 +4152,8 @@ button.dmt-layer-btn {
   max-height: 35px;
   border-radius: 50%;
   background: rgba(0, 0, 0, 0.7);
-  border: 2px solid rgba(var(--dmt-border-primary-rgb), 0.4);
-  color: var(--dmt-text-primary);
+  border: 2px solid rgba(var(--windrose-border-primary-rgb), 0.4);
+  color: var(--windrose-text-primary);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
@@ -4166,20 +4166,20 @@ button.dmt-layer-btn {
 }
 
 .dmt-layer-btn:hover {
-  border-color: rgba(var(--dmt-border-primary-rgb), 0.6);
+  border-color: rgba(var(--windrose-border-primary-rgb), 0.6);
   background: rgba(0, 0, 0, 0.85);
   transform: scale(1.05);
 }
 
 .dmt-layer-btn-active {
-  border-color: var(--dmt-border-primary);
-  box-shadow: 0 0 8px rgba(var(--dmt-border-primary-rgb), 0.4);
-  background: rgba(var(--dmt-border-primary-rgb), 0.2);
+  border-color: var(--windrose-border-primary);
+  box-shadow: 0 0 8px rgba(var(--windrose-border-primary-rgb), 0.4);
+  background: rgba(var(--windrose-border-primary-rgb), 0.2);
 }
 
 .dmt-layer-btn-active:hover {
-  border-color: var(--dmt-border-primary);
-  background: rgba(var(--dmt-border-primary-rgb), 0.3);
+  border-color: var(--windrose-border-primary);
+  background: rgba(var(--windrose-border-primary-rgb), 0.3);
 }
 
 /* Layer Options Slide-out */
@@ -4214,8 +4214,8 @@ button.dmt-layer-option-btn {
   max-height: 28px;
   border-radius: 50%;
   background: rgba(0, 0, 0, 0.8);
-  border: 2px solid rgba(var(--dmt-border-primary-rgb), 0.4);
-  color: var(--dmt-text-muted);
+  border: 2px solid rgba(var(--windrose-border-primary-rgb), 0.4);
+  color: var(--windrose-text-muted);
   cursor: pointer;
   display: flex;
   flex: 0 0 auto;
@@ -4228,13 +4228,13 @@ button.dmt-layer-option-btn {
 }
 
 .dmt-layer-option-btn:hover {
-  color: var(--dmt-text-normal);
-  border-color: rgba(var(--dmt-border-primary-rgb), 0.6);
+  color: var(--windrose-text-normal);
+  border-color: rgba(var(--windrose-border-primary-rgb), 0.6);
 }
 
 .dmt-layer-option-btn.delete:hover {
-  color: var(--dmt-error);
-  border-color: var(--dmt-error);
+  color: var(--windrose-error);
+  border-color: var(--windrose-error);
   background: rgba(239, 68, 68, 0.1);
 }
 
@@ -4244,14 +4244,14 @@ button.dmt-layer-option-btn {
 }
 
 .dmt-layer-option-btn.transparency.active {
-  color: var(--dmt-accent-blue);
-  border-color: var(--dmt-accent-blue);
+  color: var(--windrose-accent-blue);
+  border-color: var(--windrose-accent-blue);
   background: rgba(74, 158, 255, 0.15);
   box-shadow: 0 0 8px rgba(74, 158, 255, 0.4);
 }
 
 .dmt-layer-option-btn.transparency:hover {
-  color: var(--dmt-accent-blue);
+  color: var(--windrose-accent-blue);
   border-color: rgba(74, 158, 255, 0.6);
 }
 
@@ -4261,7 +4261,7 @@ button.dmt-layer-option-btn {
   top: 50%;
   transform: translateY(-50%);
   background: rgba(20, 20, 20, 0.95);
-  border: 1px solid rgba(var(--dmt-border-primary-rgb), 0.4);
+  border: 1px solid rgba(var(--windrose-border-primary-rgb), 0.4);
   border-radius: 6px;
   padding: 8px 12px;
   display: flex;
@@ -4279,7 +4279,7 @@ button.dmt-layer-option-btn {
   top: 50%;
   transform: translateY(-50%);
   border: 6px solid transparent;
-  border-right-color: rgba(var(--dmt-border-primary-rgb), 0.4);
+  border-right-color: rgba(var(--windrose-border-primary-rgb), 0.4);
 }
 
 .dmt-opacity-slider {
@@ -4297,7 +4297,7 @@ button.dmt-layer-option-btn {
   appearance: none;
   width: 12px;
   height: 12px;
-  background: var(--dmt-accent-blue);
+  background: var(--windrose-accent-blue);
   border-radius: 50%;
   cursor: pointer;
 }
@@ -4305,14 +4305,14 @@ button.dmt-layer-option-btn {
 .dmt-opacity-slider::-moz-range-thumb {
   width: 12px;
   height: 12px;
-  background: var(--dmt-accent-blue);
+  background: var(--windrose-accent-blue);
   border-radius: 50%;
   border: none;
   cursor: pointer;
 }
 
 .dmt-opacity-value {
-  color: var(--dmt-text-muted);
+  color: var(--windrose-text-muted);
   font-size: 11px;
 }
 
@@ -4327,8 +4327,8 @@ button.dmt-layer-add-btn {
   max-height: 35px;
   border-radius: 50%;
   background: rgba(0, 0, 0, 0.5);
-  border: 2px dashed rgba(var(--dmt-border-primary-rgb), 0.4);
-  color: var(--dmt-text-muted);
+  border: 2px dashed rgba(var(--windrose-border-primary-rgb), 0.4);
+  color: var(--windrose-text-muted);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -4343,9 +4343,9 @@ button.dmt-layer-add-btn {
 
 .dmt-layer-add-btn:hover {
   background: rgba(0, 0, 0, 0.7);
-  border-color: rgba(var(--dmt-border-primary-rgb), 0.6);
+  border-color: rgba(var(--windrose-border-primary-rgb), 0.6);
   border-style: solid;
-  color: var(--dmt-text-primary);
+  color: var(--windrose-text-primary);
   transform: scale(1.05);
 }
 
@@ -4360,9 +4360,9 @@ button.dmt-layer-add-btn {
 }
 
 .dmt-layer-btn.drag-over {
-  border-color: var(--dmt-border-primary);
+  border-color: var(--windrose-border-primary);
   transform: scale(1.05);
-  box-shadow: 0 0 12px rgba(var(--dmt-border-primary-rgb), 0.5);
+  box-shadow: 0 0 12px rgba(var(--windrose-border-primary-rgb), 0.5);
 }
 
 /* Layer Button - Pill Mode (for named layers) */
@@ -4401,8 +4401,8 @@ button.dmt-layer-btn.dmt-layer-btn-pill {
 
 /* Edit button styling */
 .dmt-layer-option-btn.edit:hover {
-  color: var(--dmt-accent-blue);
-  border-color: var(--dmt-accent-blue);
+  color: var(--windrose-accent-blue);
+  border-color: var(--windrose-accent-blue);
   background: rgba(74, 158, 255, 0.1);
 }
 
@@ -4440,7 +4440,7 @@ button.dmt-layer-btn.dmt-layer-btn-pill {
   align-items: center;
   gap: 4px;
   font-size: 10px;
-  color: var(--dmt-text-muted);
+  color: var(--windrose-text-muted);
   padding: 2px 6px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -4452,10 +4452,10 @@ button.dmt-region-item {
   align-items: center;
   gap: 6px;
   padding: 4px 8px;
-  border: 1px solid var(--dmt-bg-tertiary);
+  border: 1px solid var(--windrose-bg-tertiary);
   border-radius: 4px;
-  background: var(--dmt-bg-secondary);
-  color: var(--dmt-text-primary);
+  background: var(--windrose-bg-secondary);
+  color: var(--windrose-text-primary);
   cursor: pointer;
   font-size: 11px;
   min-width: 80px;
@@ -4465,8 +4465,8 @@ button.dmt-region-item {
 }
 
 .dmt-region-item:hover {
-  border-color: var(--dmt-accent-muted);
-  background: var(--dmt-bg-tertiary);
+  border-color: var(--windrose-accent-muted);
+  background: var(--windrose-bg-tertiary);
 }
 
 .dmt-region-item-hidden {
@@ -4492,7 +4492,7 @@ button.dmt-region-item {
 button.dmt-region-visibility-btn {
   background: none;
   border: none;
-  color: var(--dmt-text-muted);
+  color: var(--windrose-text-muted);
   cursor: pointer;
   padding: 0 2px;
   flex-shrink: 0;
@@ -4501,7 +4501,7 @@ button.dmt-region-visibility-btn {
 }
 
 .dmt-region-visibility-btn:hover {
-  color: var(--dmt-text-primary);
+  color: var(--windrose-text-primary);
 }
 
 
@@ -4514,10 +4514,10 @@ button.dmt-region-visibility-btn {
   align-items: center;
   gap: 2px;
   padding: 4px 12px;
-  background: var(--dmt-bg-secondary);
-  border-bottom: 1px solid var(--dmt-bg-tertiary);
+  background: var(--windrose-bg-secondary);
+  border-bottom: 1px solid var(--windrose-bg-tertiary);
   font-size: 12px;
-  color: var(--dmt-text-secondary);
+  color: var(--windrose-text-secondary);
   flex-shrink: 0;
 }
 
@@ -4530,7 +4530,7 @@ button.dmt-region-visibility-btn {
 .dmt-breadcrumb-separator {
   display: flex;
   align-items: center;
-  color: var(--dmt-text-muted);
+  color: var(--windrose-text-muted);
   margin: 0 2px;
 }
 
@@ -4538,7 +4538,7 @@ button.dmt-region-visibility-btn {
 button.dmt-breadcrumb-link {
   background: none;
   border: none;
-  color: var(--dmt-accent-primary);
+  color: var(--windrose-accent-primary);
   cursor: pointer;
   padding: 2px 4px;
   border-radius: 3px;
@@ -4547,12 +4547,12 @@ button.dmt-breadcrumb-link {
 }
 
 .dmt-breadcrumb-link:hover {
-  background: var(--dmt-bg-tertiary);
+  background: var(--windrose-bg-tertiary);
   text-decoration: underline;
 }
 
 .dmt-breadcrumb-current {
-  color: var(--dmt-text-primary);
+  color: var(--windrose-text-primary);
   font-weight: 500;
   padding: 2px 4px;
 }
@@ -4574,7 +4574,7 @@ button.dmt-breadcrumb-link {
 .dmt-layer-edit-label {
   display: block;
   font-size: 12px;
-  color: var(--dmt-text-muted);
+  color: var(--windrose-text-muted);
   margin-bottom: 6px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -4591,23 +4591,23 @@ button.dmt-breadcrumb-link {
   flex: 1;
   padding: 8px 12px;
   background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(var(--dmt-border-primary-rgb), 0.3);
+  border: 1px solid rgba(var(--windrose-border-primary-rgb), 0.3);
   border-radius: 4px;
-  color: var(--dmt-text-muted);
+  color: var(--windrose-text-muted);
   font-size: 12px;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .dmt-icon-mode-btn:hover {
-  border-color: rgba(var(--dmt-border-primary-rgb), 0.5);
-  color: var(--dmt-text-normal);
+  border-color: rgba(var(--windrose-border-primary-rgb), 0.5);
+  color: var(--windrose-text-normal);
 }
 
 .dmt-icon-mode-btn.active {
-  background: rgba(var(--dmt-border-primary-rgb), 0.2);
-  border-color: var(--dmt-border-primary);
-  color: var(--dmt-text-primary);
+  background: rgba(var(--windrose-border-primary-rgb), 0.2);
+  border-color: var(--windrose-border-primary);
+  color: var(--windrose-text-primary);
 }
 
 /* Symbol picker */
@@ -4622,14 +4622,14 @@ button.dmt-breadcrumb-link {
   padding: 8px 12px;
   font-size: 16px;
   background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(var(--dmt-border-primary-rgb), 0.3);
+  border: 1px solid rgba(var(--windrose-border-primary-rgb), 0.3);
   border-radius: 4px;
-  color: var(--dmt-text-primary);
+  color: var(--windrose-text-primary);
 }
 
 .dmt-symbol-input:focus {
   outline: none;
-  border-color: var(--dmt-border-primary);
+  border-color: var(--windrose-border-primary);
 }
 
 .dmt-symbol-preview {
@@ -4639,7 +4639,7 @@ button.dmt-breadcrumb-link {
   align-items: center;
   justify-content: center;
   background: rgba(0, 0, 0, 0.4);
-  border: 1px solid rgba(var(--dmt-border-primary-rgb), 0.3);
+  border: 1px solid rgba(var(--windrose-border-primary-rgb), 0.3);
   border-radius: 4px;
   font-size: 20px;
 }
@@ -4657,22 +4657,22 @@ button.dmt-breadcrumb-link {
   align-items: center;
   justify-content: center;
   background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(var(--dmt-border-primary-rgb), 0.2);
+  border: 1px solid rgba(var(--windrose-border-primary-rgb), 0.2);
   border-radius: 4px;
   font-size: 14px;
-  color: var(--dmt-text-normal);
+  color: var(--windrose-text-normal);
   cursor: pointer;
   transition: all 0.1s ease;
 }
 
 .dmt-quick-symbol-btn:hover {
-  background: rgba(var(--dmt-border-primary-rgb), 0.15);
-  border-color: rgba(var(--dmt-border-primary-rgb), 0.4);
+  background: rgba(var(--windrose-border-primary-rgb), 0.15);
+  border-color: rgba(var(--windrose-border-primary-rgb), 0.4);
 }
 
 .dmt-quick-symbol-btn.selected {
-  background: rgba(var(--dmt-border-primary-rgb), 0.25);
-  border-color: var(--dmt-border-primary);
+  background: rgba(var(--windrose-border-primary-rgb), 0.25);
+  border-color: var(--windrose-border-primary);
 }
 
 /* Icon picker */
@@ -4687,14 +4687,14 @@ button.dmt-breadcrumb-link {
   padding: 8px 12px;
   font-size: 13px;
   background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(var(--dmt-border-primary-rgb), 0.3);
+  border: 1px solid rgba(var(--windrose-border-primary-rgb), 0.3);
   border-radius: 4px;
-  color: var(--dmt-text-primary);
+  color: var(--windrose-text-primary);
 }
 
 .dmt-icon-search:focus {
   outline: none;
-  border-color: var(--dmt-border-primary);
+  border-color: var(--windrose-border-primary);
 }
 
 .dmt-icon-category-tabs {
@@ -4707,22 +4707,22 @@ button.dmt-breadcrumb-link {
   padding: 4px 8px;
   font-size: 10px;
   background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(var(--dmt-border-primary-rgb), 0.2);
+  border: 1px solid rgba(var(--windrose-border-primary-rgb), 0.2);
   border-radius: 3px;
-  color: var(--dmt-text-muted);
+  color: var(--windrose-text-muted);
   cursor: pointer;
   transition: all 0.1s ease;
 }
 
 .dmt-icon-category-tab:hover {
-  border-color: rgba(var(--dmt-border-primary-rgb), 0.4);
-  color: var(--dmt-text-normal);
+  border-color: rgba(var(--windrose-border-primary-rgb), 0.4);
+  color: var(--windrose-text-normal);
 }
 
 .dmt-icon-category-tab.active {
-  background: rgba(var(--dmt-border-primary-rgb), 0.2);
-  border-color: var(--dmt-border-primary);
-  color: var(--dmt-text-primary);
+  background: rgba(var(--windrose-border-primary-rgb), 0.2);
+  border-color: var(--windrose-border-primary);
+  color: var(--windrose-text-primary);
 }
 
 .dmt-icon-grid {
@@ -4751,24 +4751,24 @@ button.dmt-breadcrumb-link {
 
 .dmt-icon-grid-btn .ra {
   font-size: 16px;
-  color: var(--dmt-text-normal);
+  color: var(--windrose-text-normal);
 }
 
 .dmt-icon-grid-btn:hover {
-  background: rgba(var(--dmt-border-primary-rgb), 0.15);
-  border-color: rgba(var(--dmt-border-primary-rgb), 0.3);
+  background: rgba(var(--windrose-border-primary-rgb), 0.15);
+  border-color: rgba(var(--windrose-border-primary-rgb), 0.3);
 }
 
 .dmt-icon-grid-btn.selected {
-  background: rgba(var(--dmt-border-primary-rgb), 0.25);
-  border-color: var(--dmt-border-primary);
+  background: rgba(var(--windrose-border-primary-rgb), 0.25);
+  border-color: var(--windrose-border-primary);
 }
 
 .dmt-icon-grid-more {
   grid-column: 1 / -1;
   text-align: center;
   font-size: 11px;
-  color: var(--dmt-text-muted);
+  color: var(--windrose-text-muted);
   padding: 8px;
 }
 
@@ -4776,7 +4776,7 @@ button.dmt-breadcrumb-link {
   grid-column: 1 / -1;
   text-align: center;
   font-size: 12px;
-  color: var(--dmt-text-muted);
+  color: var(--windrose-text-muted);
   padding: 16px;
 }
 
@@ -4798,9 +4798,9 @@ button.dmt-breadcrumb-link {
   justify-content: center;
   gap: 4px;
   background: rgba(0, 0, 0, 0.7);
-  border: 2px solid rgba(var(--dmt-border-primary-rgb), 0.6);
+  border: 2px solid rgba(var(--windrose-border-primary-rgb), 0.6);
   border-radius: 17.5px;
-  color: var(--dmt-text-primary);
+  color: var(--windrose-text-primary);
   font-size: 14px;
   font-weight: 600;
 }
@@ -4842,9 +4842,9 @@ button.dmt-breadcrumb-link {
   align-items: center;
   justify-content: center;
   background: linear-gradient(135deg, rgba(139, 90, 43, 0.6), rgba(101, 67, 33, 0.6));
-  border: 2px solid rgba(var(--dmt-border-primary-rgb), 0.6);
+  border: 2px solid rgba(var(--windrose-border-primary-rgb), 0.6);
   border-radius: 6px;
-  color: var(--dmt-border-primary);
+  color: var(--windrose-border-primary);
   cursor: pointer;
   transition: all 0.2s ease;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
@@ -4852,7 +4852,7 @@ button.dmt-breadcrumb-link {
 
 .dmt-reroll-btn.dmt-reroll-btn:hover {
   background: linear-gradient(135deg, rgba(139, 90, 43, 0.8), rgba(101, 67, 33, 0.8));
-  border-color: var(--dmt-border-primary);
+  border-color: var(--windrose-border-primary);
   transform: scale(1.05);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
@@ -4892,7 +4892,7 @@ button.dmt-breadcrumb-link {
 /* Re-roll confirmation dialog */
 .dmt-reroll-confirm-dialog {
   background: var(--background-primary);
-  border: 2px solid rgba(var(--dmt-border-primary-rgb), 0.5);
+  border: 2px solid rgba(var(--windrose-border-primary-rgb), 0.5);
   border-radius: 8px;
   padding: 24px;
   max-width: 90vw;
@@ -6398,16 +6398,16 @@ button.dmt-breadcrumb-link {
 }
 
 .dmt-segment-picker-card {
-  background-color: var(--dmt-bg-primary);
+  background-color: var(--windrose-bg-primary);
   border-radius: 12px;
   padding: 16px;
-  border: 2px solid var(--dmt-border-primary);
+  border: 2px solid var(--windrose-border-primary);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
   min-width: 260px;
 }
 
 .dmt-segment-picker-title {
-  color: var(--dmt-border-primary);
+  color: var(--windrose-border-primary);
   font-size: 14px;
   font-weight: 600;
   margin-bottom: 12px;
@@ -6417,7 +6417,7 @@ button.dmt-breadcrumb-link {
 }
 
 .dmt-segment-picker-subtitle {
-  color: var(--dmt-text-muted);
+  color: var(--windrose-text-muted);
   font-size: 11px;
   text-align: center;
   margin-bottom: 12px;
@@ -6430,7 +6430,7 @@ button.dmt-breadcrumb-link {
 }
 
 .dmt-segment-picker-svg {
-  background-color: var(--dmt-bg-secondary);
+  background-color: var(--windrose-bg-secondary);
   border-radius: 8px;
   cursor: pointer;
   touch-action: none;
@@ -6448,16 +6448,16 @@ button.dmt-breadcrumb-link {
 
 .dmt-segment-picker-btn {
   padding: 6px 12px;
-  background-color: var(--dmt-bg-tertiary);
+  background-color: var(--windrose-bg-tertiary);
   border: 1px solid var(--background-modifier-border);
   border-radius: 4px;
-  color: var(--dmt-text-secondary);
+  color: var(--windrose-text-secondary);
   font-size: 12px;
   cursor: pointer;
 }
 
 .dmt-segment-picker-status {
-  color: var(--dmt-text-muted);
+  color: var(--windrose-text-muted);
   font-size: 12px;
   text-align: center;
   margin-bottom: 12px;
@@ -6480,7 +6480,7 @@ button.dmt-breadcrumb-link {
   width: 16px;
   height: 16px;
   cursor: pointer;
-  accent-color: var(--dmt-border-primary);
+  accent-color: var(--windrose-border-primary);
 }
 
 .dmt-segment-picker-footer {
@@ -6491,19 +6491,19 @@ button.dmt-breadcrumb-link {
 
 .dmt-segment-picker-btn-lg {
   padding: 10px 24px;
-  background-color: var(--dmt-bg-tertiary);
+  background-color: var(--windrose-bg-tertiary);
   border: 1px solid var(--background-modifier-border);
   border-radius: 6px;
-  color: var(--dmt-text-secondary);
+  color: var(--windrose-text-secondary);
   font-size: 14px;
   cursor: pointer;
   min-width: 80px;
 }
 
 .dmt-segment-picker-btn-lg.is-primary {
-  background-color: var(--dmt-border-primary);
+  background-color: var(--windrose-border-primary);
   border: none;
-  color: var(--dmt-bg-primary);
+  color: var(--windrose-bg-primary);
   font-weight: 600;
 }
 
