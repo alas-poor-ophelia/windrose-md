@@ -1168,7 +1168,7 @@ button.windrose-object-grid-item,
 }
 
 .windrose-object-sidebar-empty {
-  padding: 16px 8px;
+  padding: clamp(1rem, 1.5vw, 1.25rem) clamp(0.5rem, 1vw, 0.75rem);
   text-align: center;
   color: var(--windrose-text-muted);
   font-size: 11px;
@@ -1487,7 +1487,7 @@ button.windrose-tile-browser-config-btn,
 }
 
 .windrose-tile-browser-empty {
-  padding: 16px 8px;
+  padding: clamp(1rem, 1.5vw, 1.25rem) clamp(0.5rem, 1vw, 0.75rem);
   text-align: center;
   color: var(--windrose-text-muted);
   font-size: 11px;
