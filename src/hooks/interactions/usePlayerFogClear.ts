@@ -1,6 +1,5 @@
 import { useEffect } from 'preact/hooks';
 import type { MapData, FoggedCell } from '#types/core/map.types';
-import type { IGeometry } from '#types/core/geometry.types';
 import type { ExtendedGeometry } from '#types/contexts/context.types';
 import type { MapObject } from '#types/objects/object.types';
 import type { MapDataUpdater } from '#types/hooks/mapData.types';
@@ -8,7 +7,7 @@ import type { LayerHistorySnapshot } from '#types/hooks/layerHistory.types';
 import { getActiveLayer } from '../../persistence/layerAccessor';
 
 interface UsePlayerFogClearOptions {
-  geometry: IGeometry | null;
+  geometry: ExtendedGeometry | null;
   updateMapData: MapDataUpdater;
   addToHistory: (state: LayerHistorySnapshot) => void;
   isApplyingHistory: () => boolean;
@@ -32,8 +31,7 @@ function usePlayerFogClear({
 
         const settings = current.settings?.overrides ?? {};
         const distancePerCell = (settings.distancePerCell as number | undefined) ?? 5;
-        const extGeom = geometry as ExtendedGeometry;
-        const cellSize = (extGeom.cellSize ?? extGeom.hexSize) ?? 1;
+        const cellSize = geometry.cellSize;
         const radiusInCells = (obj.lightRadius ?? 0) / distancePerCell;
         const radiusInWorld = radiusInCells * cellSize;
 
@@ -42,7 +40,7 @@ function usePlayerFogClear({
           objWorldX = obj.worldPosition.x;
           objWorldY = obj.worldPosition.y;
         } else {
-          const w = extGeom.getCellCenter(obj.position.x, obj.position.y);
+          const w = geometry.getCellCenter(obj.position.x, obj.position.y);
           objWorldX = w.worldX;
           objWorldY = w.worldY;
         }
@@ -51,8 +49,8 @@ function usePlayerFogClear({
         const radiusSq = clearRadius * clearRadius;
         const remainingCells = activeLayer.fogOfWar.foggedCells.filter((fc: FoggedCell) => {
           let cellWorldX: number, cellWorldY: number;
-          if (extGeom.offsetToWorld != null) {
-            const w = extGeom.offsetToWorld(fc.col, fc.row);
+          if (geometry.offsetToWorld != null) {
+            const w = geometry.offsetToWorld(fc.col, fc.row);
             cellWorldX = w.worldX;
             cellWorldY = w.worldY;
           } else {

@@ -4,8 +4,8 @@ import type { VNode } from 'preact';
 import type {
   MapData,
   MapType,
-  IGeometry,
 } from '#types/index';
+import type { ExtendedGeometry } from '#types/contexts/context.types';
 import type { ResolvedTheme } from '#types/settings/settings.types';
 import type { ToolId } from '#types/tools/tool.types';
 import type { Cell } from '#types/core/cell.types';
@@ -174,7 +174,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
 
   // Create geometry instance for coordinate conversions
   // Same logic as MapCanvas for consistency
-  const geometry = useMemo((): IGeometry | null => {
+  const geometry = useMemo((): ExtendedGeometry | null => {
     if (!mapData) return null;
 
     const currentMapType = mapData.mapType ?? DEFAULTS.mapType;

@@ -3,7 +3,8 @@
 // hovers a windrose: deep link. Uses the production canvas renderer
 // so the preview matches what the full map looks like.
 
-import type { MapData, IGeometry } from '#types/index';
+import type { MapData } from '#types/index';
+import type { ExtendedGeometry } from '#types/contexts/context.types';
 import type { RendererTheme } from '#types/hooks/canvasRenderer.types';
 
 import type { VNode } from 'preact';
@@ -83,7 +84,7 @@ function WindroseHoverPreview({ mapId, x, y, zoom: zoomProp, layerId, notePath }
           northDirection: 0,
         };
 
-        const geometry: IGeometry = focused.mapType === 'hex'
+        const geometry: ExtendedGeometry = focused.mapType === 'hex'
           ? new HexGeometry(
               (focused.hexSize as number) || (DEFAULTS.hexSize),
               ((focused.orientation as string) || (DEFAULTS.hexOrientation as string)) as 'flat' | 'pointy',

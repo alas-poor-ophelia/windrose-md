@@ -17,7 +17,7 @@ import type {
   ExportResult,
   ExportTheme
 } from '#types/core/export.types';
-import type { IGeometry } from '#types/core/geometry.types';
+import type { ExtendedGeometry } from '#types/contexts/context.types';
 import type { App } from 'obsidian';
 import { TFile } from 'obsidian';
 
@@ -189,7 +189,7 @@ async function renderMapToCanvas(
     tempCanvas,
     null,
     exportMapData,
-    geometry as unknown as IGeometry,
+    geometry as unknown as ExtendedGeometry,
     [],
     { isResizeMode: false, theme, showCoordinates: false, layerVisibility: { grid: true, objects: true, textLabels: true, hexCoordinates: false, regions: true, outlines: true } }
   );

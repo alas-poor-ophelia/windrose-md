@@ -11,7 +11,6 @@
  */
 
 import type { MapData, Region } from '#types/core/map.types';
-import type { IGeometry } from '#types/core/geometry.types';
 import type { ExtendedGeometry } from '#types/contexts/context.types';
 import { Notice } from 'obsidian';
 import type { MapObject, ObjectLink } from '#types/objects/object.types';
@@ -24,7 +23,7 @@ import { useHexContextMenu } from './useHexContextMenu';
 interface UseCustomEventHandlersOptions {
   mapData: MapData | null;
   mapId: string;
-  geometry: IGeometry | null;
+  geometry: ExtendedGeometry | null;
   updateMapData: (updater: MapData | ((current: MapData) => MapData)) => void;
   handleLayerSelect: (layerId: string) => void;
   enterSubHex: (q: number, r: number) => void;
@@ -110,9 +109,8 @@ function useCustomEventHandlers({
 
       let centerX = x;
       let centerY = y;
-      if (mapData?.mapType === 'hex' && geometry) {
-        const hexToWorld = (geometry as ExtendedGeometry).hexToWorld;
-        const worldCoords = hexToWorld?.(x, y);
+      if (geometry?.type === 'hex') {
+        const worldCoords = geometry.hexToWorld(x, y);
         if (worldCoords != null) {
           centerX = worldCoords.worldX;
           centerY = worldCoords.worldY;
@@ -155,11 +153,9 @@ function useCustomEventHandlers({
       const region = (mapData.regions ?? []).find((r: Region) => r.id === regionId);
       if (!region || region.hexes.length === 0) return;
 
-      const hexToWorld = (geometry as ExtendedGeometry).hexToWorld;
-      if (!hexToWorld) return;
       let cx = 0, cy = 0;
       for (const hex of region.hexes) {
-        const world = hexToWorld(hex.x, hex.y);
+        const world = geometry.hexToWorld(hex.x, hex.y);
         cx += world.worldX;
         cy += world.worldY;
       }

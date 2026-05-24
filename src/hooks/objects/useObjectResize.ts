@@ -74,17 +74,17 @@ function useObjectResize(): {
     y *= scaleY;
 
     if (mapData == null || geometry == null) return null;
-    const { viewState, mapType } = mapData;
+    const { viewState } = mapData;
     if (viewState == null) return null;
     const { zoom, center } = viewState;
     const northDirection = mapData.northDirection ?? 0;
 
     let offsetX: number, offsetY: number, objectWidth: number, objectHeight: number;
-    if (mapType === 'hex') {
+    if (geometry.type === 'hex') {
       offsetX = canvas.width / 2 - center.x * zoom;
       offsetY = canvas.height / 2 - center.y * zoom;
 
-      const hexSize = geometry.hexSize ?? 1;
+      const hexSize = geometry.hexSize;
       const size = object.size ?? { width: 1, height: 1 };
       objectWidth = size.width * hexSize * zoom;
       objectHeight = size.height * hexSize * zoom;
@@ -103,7 +103,7 @@ function useObjectResize(): {
     y = rotated.y;
 
     let screenX: number, screenY: number;
-    if (mapType === 'hex' && geometry.hexToWorld != null) {
+    if (geometry.type === 'hex') {
       const { worldX, worldY } = geometry.hexToWorld(object.position.x, object.position.y);
       screenX = offsetX + worldX * zoom;
       screenY = offsetY + worldY * zoom;

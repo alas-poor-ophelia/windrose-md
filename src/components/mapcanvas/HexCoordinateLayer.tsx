@@ -316,7 +316,7 @@ const HexCoordinateLayer = (): VNode | null => {
   // Calculate font size based on hex size and zoom, scaled to display coordinates
   if (!mapData.viewState) return null;
   const zoom = mapData.viewState.zoom;
-  const hexSize = geometry.hexSize ?? 30;
+  const hexSize = geometry.type === 'hex' ? geometry.hexSize : 30;
   const canvasFontSize = hexSize * zoom * 0.35;
   const fontSize = Math.max(8, Math.min(24, canvasFontSize * scaleX));
   

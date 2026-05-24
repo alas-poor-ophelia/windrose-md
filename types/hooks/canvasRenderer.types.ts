@@ -7,8 +7,7 @@
 
 import type { RefObject } from 'preact';
 import type { MapData } from '../core/map.types';
-import type { IGeometry } from '../core/geometry.types';
-import type { LayerVisibility, SelectedItem } from '../contexts/context.types';
+import type { ExtendedGeometry, LayerVisibility, SelectedItem } from '../contexts/context.types';
 export type { LayerVisibility };
 
 /** Adjacent sub-hex map for ghost preview rendering */
@@ -76,7 +75,7 @@ export type RenderCanvas = (
   canvas: HTMLCanvasElement,
   fogCanvas: HTMLCanvasElement | null,
   mapData: MapData,
-  geometry: IGeometry,
+  geometry: ExtendedGeometry,
   selectedItems?: RendererSelectedItem | RendererSelectedItem[],
   options?: RenderCanvasOptions,
 ) => void;
@@ -91,7 +90,7 @@ export type UseCanvasRenderer = (
   canvasRef: RefObject<HTMLCanvasElement>,
   fogCanvasRef: RefObject<HTMLCanvasElement> | null,
   mapData: MapData | null,
-  geometry: IGeometry | null,
+  geometry: ExtendedGeometry | null,
   selectedItems?: RendererSelectedItem | RendererSelectedItem[],
   options?: UseCanvasRendererOptions,
 ) => void;

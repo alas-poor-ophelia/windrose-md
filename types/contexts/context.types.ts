@@ -42,31 +42,35 @@ export interface EdgeInput {
   opacity?: number;
 }
 
-/** Extended geometry with implementation-specific properties beyond IGeometry */
-export interface ExtendedGeometry extends IGeometry {
-  /** Grid cell size (GridGeometry) or hex size (HexGeometry) */
+/** Shared geometry extensions beyond IGeometry (present on both grid and hex) */
+interface BaseExtendedGeometry extends IGeometry {
   cellSize: number;
-  /** Hex-specific: hex radius from center to vertex */
-  hexSize?: number;
-  /** Hex-specific: hex width in pixels */
-  width?: number;
-  /** Hex-specific: sqrt(3) cached for hex math */
-  sqrt3?: number;
-  /** Hex-specific: orientation (flat or pointy) */
-  orientation?: string;
-  /** Grid-specific: detect which edge a point is near */
-  screenToEdge?: (worldX: number, worldY: number, threshold: number) => EdgeInfo | null;
-  /** Hex-specific: convert axial (q,r) to world pixels */
-  hexToWorld?: (x: number, y: number) => { worldX: number; worldY: number };
-  /** Hex-specific: get vertices of hex at (q,r) in world coordinates */
-  getHexVertices?: (q: number, r: number) => { worldX: number; worldY: number }[];
-  /** Convert grid offset coordinates to world pixels */
-  offsetToWorld?: (col: number, row: number) => { worldX: number; worldY: number };
-  /** Get scaled cell size for the given zoom level */
+  offsetToWorld: (col: number, row: number) => { worldX: number; worldY: number };
+  getCellCenter: (x: number, y: number) => { worldX: number; worldY: number };
   getScaledCellSize: (zoom: number) => number;
-  /** Hex-specific: get scaled hex size for the given zoom level */
-  getScaledHexSize?: (zoom: number) => number;
 }
+
+/** Grid-specific geometry extensions */
+export interface ExtendedGridGeometry extends BaseExtendedGeometry {
+  readonly type: 'grid';
+  screenToEdge: (worldX: number, worldY: number, threshold: number) => EdgeInfo | null;
+}
+
+/** Hex-specific geometry extensions */
+export interface ExtendedHexGeometry extends BaseExtendedGeometry {
+  readonly type: 'hex';
+  hexSize: number;
+  width: number;
+  sqrt3: number;
+  orientation: 'flat' | 'pointy';
+  hexToWorld: (x: number, y: number) => { worldX: number; worldY: number };
+  worldToHex: (worldX: number, worldY: number) => { q: number; r: number };
+  getHexVertices: (q: number, r: number) => { worldX: number; worldY: number }[];
+  getScaledHexSize: (zoom: number) => number;
+}
+
+/** Extended geometry — discriminated union on `type` field for auto-narrowing */
+export type ExtendedGeometry = ExtendedGridGeometry | ExtendedHexGeometry;
 
 /** Drawing layer state change callback shape */
 export interface DrawingLayerState {

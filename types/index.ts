@@ -184,6 +184,8 @@ export type {
   EdgeInfo,
   EdgeInput,
   ExtendedGeometry,
+  ExtendedGridGeometry,
+  ExtendedHexGeometry,
   DrawingLayerState,
   PanZoomLayerState,
   MapStateContextValue,

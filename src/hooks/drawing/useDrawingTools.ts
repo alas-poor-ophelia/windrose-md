@@ -78,14 +78,14 @@ const useDrawingTools = (
 
   // Compose sub-hooks
   const paint = usePaintTool({
-    currentTool, mapData, geometry, GridGeometry, selectedColor, selectedOpacity,
+    currentTool, mapData, geometry, selectedColor, selectedOpacity,
     canvasRef, screenToGrid, screenToWorld, getClientCoords,
     onCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange,
     onTilesChange, getTextLabelAtPosition, removeTextLabel, getObjectAtPosition
   });
 
   const edgeDrag = useEdgeDragTool({
-    currentTool, mapData, geometry, GridGeometry, selectedColor, selectedOpacity,
+    currentTool, mapData, geometry, selectedColor, selectedOpacity,
     screenToWorld, getClientCoords, onEdgesChange
   });
 

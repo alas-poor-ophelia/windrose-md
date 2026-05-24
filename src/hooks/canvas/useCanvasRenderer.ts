@@ -8,7 +8,6 @@
 // Type-only imports
 import type { MapLayer } from '#types/core/map.types';
 import type { IGeometry } from '#types/core/geometry.types';
-import type { ExtendedGeometry } from '#types/contexts/context.types';
 import type { Cell, GridCell } from '#types/core/cell.types';
 import type { BuildCellLookupFn, CalculateBordersFn } from '#types/core/rendering.types';
 import type { MapObject } from '#types/objects/object.types';
@@ -37,9 +36,7 @@ import { renderObjects } from '../../geometry/renderers/objectRenderer';
 import { renderSelections } from '../../geometry/renderers/selectionRenderer';
 import { segmentRenderer } from '../../geometry/renderers/segmentRenderer';
 import { getFontCss } from '../../text/fontOptions';
-import type { GridGeometry } from '../../geometry/core/GridGeometry';
 import { calculateViewportOffset } from '../../geometry/core/BaseGeometry';
-import type { HexGeometry } from '../../geometry/core/HexGeometry';
 import { renderRegions } from '../../geometry/renderers/regionRenderer';
 import { renderOutlines } from '../../geometry/renderers/outlineRenderer';
 import { renderShapeOverlays, renderPlayerLights } from '../../geometry/renderers/shapeOverlayRenderer';
@@ -322,24 +319,19 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
       });
       // Ghost layer tiles
       if (geometry.type === 'hex' && layerBelow.tiles != null && layerBelow.tiles.length > 0 && mapData.tilesets != null && mapData.tilesets.length > 0) {
-        const hexGeom = geometry as ExtendedGeometry;
-        const htw = hexGeom.hexToWorld;
-        const hs = hexGeom.hexSize;
-        if (htw != null && hs != null) {
-          renderTiles(
-            ctx,
-            layerBelow.tiles,
-            mapData.tilesets,
-            { hexToWorld: htw.bind(hexGeom), worldToScreen: hexGeom.worldToScreen.bind(hexGeom), hexSize: hs, orientation: mapData.orientation ?? 'flat' },
-            rendererViewState,
-            { opacity: ghostOpacity, getCachedImage, canvasWidth: width, canvasHeight: height }
-          );
-        }
+        renderTiles(
+          ctx,
+          layerBelow.tiles,
+          mapData.tilesets,
+          { hexToWorld: geometry.hexToWorld.bind(geometry), worldToScreen: geometry.worldToScreen.bind(geometry), hexSize: geometry.hexSize, orientation: mapData.orientation ?? 'flat' },
+          rendererViewState,
+          { opacity: ghostOpacity, getCachedImage, canvasWidth: width, canvasHeight: height }
+        );
       }
       // Ghost layer curves
       if (layerBelow.curves.length > 0) {
         const ghostGridConfig = geometry.type === 'grid'
-          ? { cellSize: (geometry as ExtendedGeometry).cellSize, lineColor: THEME.grid.lines, lineWidth: THEME.grid.lineWidth ?? 1, interiorRatio: 0.5 }
+          ? { cellSize: geometry.cellSize, lineColor: THEME.grid.lines, lineWidth: THEME.grid.lineWidth ?? 1, interiorRatio: 0.5 }
           : undefined;
         renderCurves(ctx, layerBelow.curves, rendererViewState, THEME, { opacity: ghostOpacity, gridConfig: ghostGridConfig });
       }
@@ -349,9 +341,8 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   // Draw adjacent sub-hex ghost previews (when drilled into a sub-hex)
   const MAX_ADJACENT_COMPLEXITY = 500;
   if (adjacentSubHexes != null && adjacentSubHexes.length > 0 && geometry.type === 'hex') {
-    const hexGeom = geometry as ExtendedGeometry;
-    const hexToWorldFn = hexGeom.hexToWorld;
-    const hexSizeVal = hexGeom.hexSize;
+    const hexToWorldFn = geometry.hexToWorld;
+    const hexSizeVal = geometry.hexSize;
     const maxRing = mapData.hexBounds?.maxRing ?? 7;
 
     // Compute world-space offset for each axial direction.
@@ -361,16 +352,14 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
     ctx.save();
 
     // Pre-build tile geometry wrapper once (shared across all adjacents)
-    const adjTileGeom = mapData.tilesets != null && mapData.tilesets.length > 0 && hexToWorldFn != null && hexSizeVal != null
-      ? { hexToWorld: hexToWorldFn.bind(hexGeom), worldToScreen: hexGeom.worldToScreen.bind(hexGeom), hexSize: hexSizeVal, orientation: mapData.orientation ?? 'flat' }
+    const adjTileGeom = mapData.tilesets != null && mapData.tilesets.length > 0
+      ? { hexToWorld: hexToWorldFn.bind(geometry), worldToScreen: geometry.worldToScreen.bind(geometry), hexSize: hexSizeVal, orientation: mapData.orientation ?? 'flat' }
       : null;
 
     for (const adj of adjacentSubHexes) {
-      // Compute offset for this direction
-      if (hexToWorldFn == null) continue;
       const scaledQ = adj.dq * tileStep;
       const scaledR = adj.dr * tileStep;
-      const worldOffset = hexToWorldFn.call(hexGeom, scaledQ, scaledR);
+      const worldOffset = hexToWorldFn.call(geometry, scaledQ, scaledR);
 
       // Create shifted view state: offset the canvas origin by the world-space delta
       const shiftedOffsetX = offsetX + worldOffset.worldX * zoom;
@@ -416,8 +405,8 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
       ctx.globalAlpha = 0.5;
       const edgeQ = adj.dq * (maxRing + 2);
       const edgeR = adj.dr * (maxRing + 2);
-      const edgeWorld = hexToWorldFn.call(hexGeom, edgeQ, edgeR);
-      const labelScreen = hexGeom.worldToScreen(edgeWorld.worldX, edgeWorld.worldY, offsetX, offsetY, zoom);
+      const edgeWorld = hexToWorldFn.call(geometry, edgeQ, edgeR);
+      const labelScreen = geometry.worldToScreen(edgeWorld.worldX, edgeWorld.worldY, offsetX, offsetY, zoom);
       const labelFontSize = Math.max(10, 12 * zoom);
       ctx.font = `bold ${labelFontSize}px sans-serif`;
       ctx.textAlign = 'center';
@@ -449,7 +438,7 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
     activeMergeIndex = buildMergeIndex(
       cellsForMerge,
       activeLayer.curves,
-      (geometry as ExtendedGeometry).cellSize
+      geometry.cellSize
     );
   }
 
@@ -462,7 +451,7 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   // Draw freehand curves (between cells and objects)
   if (activeLayer.curves.length > 0) {
     const curveGridConfig = geometry.type === 'grid'
-      ? { cellSize: (geometry as ExtendedGeometry).cellSize, lineColor: THEME.grid.lines, lineWidth: THEME.grid.lineWidth ?? 1, interiorRatio: 0.5 }
+      ? { cellSize: geometry.cellSize, lineColor: THEME.grid.lines, lineWidth: THEME.grid.lineWidth ?? 1, interiorRatio: 0.5 }
       : undefined;
     renderCurves(ctx, activeLayer.curves, rendererViewState, THEME, {
       mergeIndex: activeMergeIndex,
@@ -472,19 +461,14 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
 
   // Draw hex tiles (between curves and regions, z-sorted for overflow occlusion)
   if (geometry.type === 'hex' && activeLayer.tiles != null && activeLayer.tiles.length > 0 && mapData.tilesets != null && mapData.tilesets.length > 0) {
-    const hexGeom = geometry as ExtendedGeometry;
-    const htw = hexGeom.hexToWorld;
-    const hs = hexGeom.hexSize;
-    if (htw != null && hs != null) {
-      renderTiles(
-        ctx,
-        activeLayer.tiles,
-        mapData.tilesets,
-        { hexToWorld: htw.bind(hexGeom), worldToScreen: hexGeom.worldToScreen.bind(hexGeom), hexSize: hs, orientation: mapData.orientation ?? 'flat' },
-        rendererViewState,
-        { getCachedImage, canvasWidth: width, canvasHeight: height }
-      );
-    }
+    renderTiles(
+      ctx,
+      activeLayer.tiles,
+      mapData.tilesets,
+      { hexToWorld: geometry.hexToWorld.bind(geometry), worldToScreen: geometry.worldToScreen.bind(geometry), hexSize: geometry.hexSize, orientation: mapData.orientation ?? 'flat' },
+      rendererViewState,
+      { getCachedImage, canvasWidth: width, canvasHeight: height }
+    );
   }
 
   // Draw regions (hex maps only, between curves and objects)
@@ -498,12 +482,12 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
         foggedAxialSet.add(`${q},${r}`);
       }
     }
-    renderRegions(ctx, mapData.regions, geometry as HexGeometry, { x: offsetX, y: offsetY, zoom }, { foggedCells: foggedAxialSet });
+    renderRegions(ctx, mapData.regions, geometry, { x: offsetX, y: offsetY, zoom }, { foggedCells: foggedAxialSet });
   }
 
   // Draw outlines (hex maps only, after regions)
   if (geometry.type === 'hex' && mapData.outlines != null && mapData.outlines.length > 0 && visibility.outlines !== false) {
-    renderOutlines(ctx, mapData.outlines, geometry as HexGeometry, { x: offsetX, y: offsetY, zoom }, mapData.hexBounds ?? {}, mapData.orientation ?? 'flat');
+    renderOutlines(ctx, mapData.outlines, geometry, { x: offsetX, y: offsetY, zoom }, mapData.hexBounds ?? {}, mapData.orientation ?? 'flat');
   }
 
   // Draw player light radii (before shapes and objects)
@@ -523,11 +507,6 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
 
   // Draw sub-hex indicators (small diamond on hexes that have sub-hex data)
   if (geometry.type === 'hex' && mapData.subHexMaps != null) {
-    const hexGeom = geometry as ExtendedGeometry;
-    const htwFn = hexGeom.hexToWorld;
-    const hsFn = hexGeom.hexSize;
-
-    if (htwFn != null && hsFn != null) {
     ctx.save();
     for (const [hexKey, subHex] of Object.entries(mapData.subHexMaps)) {
       // Only show indicator if the sub-hex has actual content
@@ -545,9 +524,9 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
       const [qStr, rStr] = hexKey.split(',');
       const q = parseInt(qStr, 10);
       const r = parseInt(rStr, 10);
-      const world = htwFn.call(hexGeom, q, r);
-      const screen = hexGeom.worldToScreen(world.worldX, world.worldY, offsetX, offsetY, zoom);
-      const size = Math.max(4, hsFn * zoom * 0.12);
+      const world = geometry.hexToWorld(q, r);
+      const screen = geometry.worldToScreen(world.worldX, world.worldY, offsetX, offsetY, zoom);
+      const size = Math.max(4, geometry.hexSize * zoom * 0.12);
 
       // Small diamond indicator at hex center
       ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
@@ -563,7 +542,6 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
       ctx.stroke();
     }
     ctx.restore();
-    }
   }
 
   // Draw objects
@@ -618,8 +596,8 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   if (fow != null && fow.enabled === true && fow.foggedCells != null && fow.foggedCells.length > 0) {
     const fogSettings = getFogSettings(effectiveSettings);
     const isHexMap = geometry.type === 'hex';
-    const hexGeom = isHexMap ? geometry as HexGeometry : null;
-    const gridGeom = !isHexMap ? geometry as GridGeometry : null;
+    const hexGeom = geometry.type === 'hex' ? geometry : null;
+    const gridGeom = geometry.type === 'grid' ? geometry : null;
 
     renderFog(
       fow,
@@ -641,7 +619,7 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
 
   // Draw selection indicators
   const isHexMapForSelection = geometry.type === 'hex';
-  const hexGeomForSelection = isHexMapForSelection ? geometry as HexGeometry : null;
+  const hexGeomForSelection = geometry.type === 'hex' ? geometry : null;
   renderSelections(
     itemsArray,
     activeLayer.textLabels,

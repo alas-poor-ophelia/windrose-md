@@ -11,12 +11,11 @@ import type {
   TextLabelSettings,
   ToolId,
   ObjectTypeId,
-  IGeometry,
   Point,
   LayerVisibility
 } from '#types/index';
 import type { ResolvedTheme } from '#types/settings/settings.types';
-import type { MapStateContextValue, MapOperationsContextValue } from '#types/contexts/context.types';
+import type { ExtendedGeometry, MapStateContextValue, MapOperationsContextValue } from '#types/contexts/context.types';
 import type { AdjacentSubHexRenderData } from '#types/hooks/canvasRenderer.types';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
@@ -106,7 +105,7 @@ interface PanZoomLayerState {
 interface CoordinatorsProps {
   canvasRef: RefObject<HTMLCanvasElement>;
   mapData: MapData | null;
-  geometry: IGeometry | null;
+  geometry: ExtendedGeometry | null;
   isFocused: boolean;
   isColorPickerOpen: boolean;
   isAlignmentMode: boolean;
@@ -230,7 +229,7 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
 
   // Create geometry instance based on map type
   // Return null during loading to prevent errors
-  const geometry = useMemo((): IGeometry | null => {
+  const geometry = useMemo((): ExtendedGeometry | null => {
     if (!mapData) return null;
 
     const mapType = mapData.mapType || DEFAULTS.mapType;

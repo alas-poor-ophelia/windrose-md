@@ -6,7 +6,7 @@
  */
 
 import type { ToolId } from '#types/tools/tool.types';
-import type { Point, IGeometry } from '#types/core/geometry.types';
+import type { Point } from '#types/core/geometry.types';
 import type { Cell } from '#types/core/cell.types';
 import type { MapData } from '#types/core/map.types';
 import type { MapObject } from '#types/objects/object.types';
@@ -41,8 +41,7 @@ import { getActiveLayer } from '../../persistence/layerAccessor';
 interface UsePaintToolOptions {
   currentTool: ToolId;
   mapData: MapData | null;
-  geometry: IGeometry | null;
-  GridGeometry: (new (...args: unknown[]) => ExtendedGeometry) | undefined;
+  geometry: ExtendedGeometry | null;
   selectedColor: string;
   selectedOpacity: number;
   canvasRef: { current: HTMLCanvasElement | null };
@@ -75,7 +74,7 @@ interface UsePaintToolResult {
 }
 
 function usePaintTool({
-  currentTool, mapData, geometry, GridGeometry, selectedColor, selectedOpacity,
+  currentTool, mapData, geometry, selectedColor, selectedOpacity,
   canvasRef, screenToGrid, screenToWorld, getClientCoords,
   onCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange,
   onTilesChange, getTextLabelAtPosition, removeTextLabel, getObjectAtPosition
@@ -125,9 +124,8 @@ function usePaintTool({
           return;
         }
 
-        if (GridGeometry && geometry instanceof GridGeometry) {
-          const edgeGeometry = geometry;
-          const edgeInfo = edgeGeometry.screenToEdge?.(worldCoords.worldX, worldCoords.worldY, 0.15);
+        if (geometry.type === 'grid') {
+          const edgeInfo = geometry.screenToEdge(worldCoords.worldX, worldCoords.worldY, 0.15);
           if (edgeInfo) {
             const edgeKey = `${edgeInfo.x},${edgeInfo.y},${edgeInfo.side}`;
 
@@ -184,9 +182,9 @@ function usePaintTool({
         if (activeLayer.curves.length > 0) {
           let newCurves: Curve[] | null = null;
           if (geometry.type === 'hex') {
-            const verts = (geometry as ExtendedGeometry).getHexVertices?.(coordX, coordY);
+            const verts = geometry.getHexVertices(coordX, coordY);
             if (verts) {
-              const clipPoly = verts.map(v => [v.worldX, v.worldY] as [number, number]);
+              const clipPoly = verts.map((v: { worldX: number; worldY: number }) => [v.worldX, v.worldY] as [number, number]);
               newCurves = eraseWorldPolygonFromCurves(activeLayer.curves, clipPoly);
             }
           } else {

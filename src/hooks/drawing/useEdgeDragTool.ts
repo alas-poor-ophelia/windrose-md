@@ -5,7 +5,6 @@
  * Owns its own isDrawing state for edge drag strokes.
  */
 
-import type { IGeometry } from '#types/core/geometry.types';
 import type { MapData } from '#types/core/map.types';
 import type { ToolId } from '#types/tools/tool.types';
 import type { Edge } from '#types/core/rendering.types';
@@ -25,8 +24,7 @@ import { getActiveLayer } from '../../persistence/layerAccessor';
 interface UseEdgeDragToolOptions {
   currentTool: ToolId;
   mapData: MapData | null;
-  geometry: IGeometry | null;
-  GridGeometry: (new (...args: unknown[]) => ExtendedGeometry) | undefined;
+  geometry: ExtendedGeometry | null;
   selectedColor: string;
   selectedOpacity: number;
   screenToWorld: MapStateContextValue['screenToWorld'];
@@ -46,7 +44,7 @@ interface UseEdgeDragToolResult {
 }
 
 function useEdgeDragTool({
-  currentTool, mapData, geometry, GridGeometry, selectedColor, selectedOpacity,
+  currentTool, mapData, geometry, selectedColor, selectedOpacity,
   screenToWorld, getClientCoords, onEdgesChange
 }: UseEdgeDragToolOptions): UseEdgeDragToolResult {
 
@@ -55,13 +53,11 @@ function useEdgeDragTool({
   const strokeInitialEdgesRef = useRef<Edge[] | null>(null);
 
   const toggleEdge = (worldX: number, worldY: number, shouldPaint: boolean): void => {
-    if (!mapData || !geometry) return;
-    if (!GridGeometry || !(geometry instanceof GridGeometry)) return;
+    if (!mapData || !geometry || geometry.type !== 'grid') return;
 
     const activeLayer = getActiveLayer(mapData);
 
-    const edgeGeometry = geometry;
-    const edgeInfo = edgeGeometry.screenToEdge?.(worldX, worldY, 0.15);
+    const edgeInfo = geometry.screenToEdge(worldX, worldY, 0.15);
     if (!edgeInfo) return;
 
     const { x, y, side } = edgeInfo;
@@ -78,14 +74,13 @@ function useEdgeDragTool({
   };
 
   const processEdgeDuringDrag = (e: PointerEvent | MouseEvent | TouchEvent): void => {
-    if (!GridGeometry || !geometry || !(geometry instanceof GridGeometry)) return;
+    if (!geometry || geometry.type !== 'grid') return;
 
     const { clientX, clientY } = getClientCoords(e);
     const worldCoords = screenToWorld(clientX, clientY);
     if (!worldCoords) return;
 
-    const edgeGeometry = geometry;
-    const edgeInfo = edgeGeometry.screenToEdge?.(worldCoords.worldX, worldCoords.worldY, 0.15);
+    const edgeInfo = geometry.screenToEdge(worldCoords.worldX, worldCoords.worldY, 0.15);
     if (edgeInfo == null) return;
 
     const edgeKey = `${edgeInfo.x},${edgeInfo.y},${edgeInfo.side}`;

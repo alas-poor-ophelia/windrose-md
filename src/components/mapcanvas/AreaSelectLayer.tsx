@@ -15,7 +15,6 @@ import { useAreaSelect } from '../../hooks/interactions/useAreaSelect';
 import { useMapState } from '../../context/MapContext';
 import { useMapSelection } from '../../context/MapSelectionContext';
 import { useEventHandlerRegistration } from '../../context/EventHandlerContext';
-import { GridGeometry } from '../../geometry/core/GridGeometry';
 import { ShapePreviewOverlay } from './ShapePreviewOverlay';
 import { getSettings } from '../../core/settingsAccessor';
 import { Z_INDEX } from '../../core/dmtConstants';
@@ -91,13 +90,12 @@ const AreaSelectLayer = ({ currentTool }: AreaSelectLayerProps): VNode | null =>
     let offsetX: number;
     let offsetY: number;
 
-    const isGrid = geometry instanceof GridGeometry;
-    if (isGrid) {
+    if (geometry.type === 'grid') {
       scaledSize = geometry.getScaledCellSize(zoom);
       offsetX = width / 2 - center.x * scaledSize;
       offsetY = height / 2 - center.y * scaledSize;
     } else {
-      scaledSize = geometry.getScaledHexSize ? geometry.getScaledHexSize(zoom) : zoom * 30;
+      scaledSize = geometry.getScaledHexSize(zoom);
       offsetX = width / 2 - center.x * zoom;
       offsetY = height / 2 - center.y * zoom;
     }
@@ -116,14 +114,13 @@ const AreaSelectLayer = ({ currentTool }: AreaSelectLayerProps): VNode | null =>
     let screenX: number;
     let screenY: number;
 
-    if (isGrid) {
+    if (geometry.type === 'grid') {
       const cellWorldX = (gridX + 0.5) * geometry.cellSize;
       const cellWorldY = (gridY + 0.5) * geometry.cellSize;
       screenX = offsetX + cellWorldX * zoom;
       screenY = offsetY + cellWorldY * zoom;
     } else {
-      const hexCenter = geometry.hexToWorld?.(gridX, gridY);
-      if (!hexCenter) return null;
+      const hexCenter = geometry.hexToWorld(gridX, gridY);
       screenX = offsetX + hexCenter.worldX * zoom;
       screenY = offsetY + hexCenter.worldY * zoom;
     }
