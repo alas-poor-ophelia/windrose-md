@@ -236,7 +236,7 @@ body {
   border-radius: 4px;
   color: var(--windrose-text-disabled);
   cursor: pointer;
-  padding: 4px 8px;
+  padding: clamp(0.25rem, 0.5vw, 0.375rem) clamp(0.5rem, 1vw, 0.75rem);
   transition: var(--windrose-transition);
   display: flex;
   align-items: center;
@@ -583,7 +583,7 @@ body {
   align-items: center;
   justify-content: flex-start;
   gap: 8px;
-  padding: 8px 12px;
+  padding: clamp(0.5rem, 0.8vw, 0.75rem) clamp(0.75rem, 1.5vw, 1rem);
   border: none;
   background: transparent;
   color: var(--windrose-text-primary);
