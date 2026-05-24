@@ -67,21 +67,21 @@ body {
   --windrose-bg-primary: var(--color-base-00);
   --windrose-bg-secondary: var(--color-base-20);
   --windrose-bg-tertiary: var(--color-base-25);
-  --windrose-border-primary: #c4a57b;
+  --windrose-border-primary: oklch(0.68 0.12 35);
   --windrose-border-primary-rgb: 196, 165, 123;
-  --windrose-border-primary-dark: #8b6842;
-  --windrose-border-secondary: #3a3a3a;
+  --windrose-border-primary-dark: oklch(0.42 0.10 40);
+  --windrose-border-secondary: oklch(0.22 0 0);
   --windrose-text-primary: var(--color-base-100);
   --windrose-text-secondary: var(--color-base-60);
   --windrose-text-muted: var(--color-base-50);
   --windrose-text-disabled: var(--color-base-40);
-  --windrose-accent-blue: #4a9eff;
-  --windrose-accent-blue-hover: #3a8eef;
-  --windrose-accent-red: #8b0000;
-  --windrose-accent-red-hover: #a00000;
+  --windrose-accent-blue: oklch(0.63 0.16 250);
+  --windrose-accent-blue-hover: color-mix(in oklch, var(--windrose-accent-blue) 85%, oklch(0.2 0 0));
+  --windrose-accent-red: oklch(0.35 0.15 10);
+  --windrose-accent-red-hover: color-mix(in oklch, var(--windrose-accent-red) 85%, oklch(0.2 0 0));
   --windrose-warning: var(--color-orange);
   --windrose-error: var(--color-red);
-  --windrose-success: #4a9eff;
+  --windrose-success: var(--windrose-accent-blue);
   --windrose-transition: all 0.15s ease;
 }
 
@@ -105,7 +105,7 @@ body {
    CONTAINER & LAYOUT
    ============================================ */
 
-.dmt-container {
+.windrose-container {
   font-family: var(--font-interface);
   background-color: var(--windrose-bg-primary);
   padding: 12px;
@@ -126,39 +126,39 @@ body {
   overflow: visible;
 }
 
-.dmt-container.dmt-expanded {
+.windrose-container.windrose-expanded {
   --windrose-offset: 0px;
   width: calc(100cqi - 2 * var(--windrose-offset));
   margin-inline: calc((100% - 100cqi) / 2 + var(--windrose-offset));
 }
 
 .markdown-source-view.is-live-preview {
-  & .dmt-container.dmt-expanded,
-  & .dmt-container.dmt-animating {
+  & .windrose-container.windrose-expanded,
+  & .windrose-container.windrose-animating {
     --windrose-offset: 20px;
   }
 
-  .cm-content > .cm-embed-block[contenteditable=false].dmt-cm-expanded,
-  .cm-content > .cm-embed-block[contenteditable=false].dmt-cm-animating {
+  .cm-content > .cm-embed-block[contenteditable=false].windrose-cm-expanded,
+  .cm-content > .cm-embed-block[contenteditable=false].windrose-cm-animating {
     contain: none;
     overflow: normal; 
     animation: none;
   }
 
-  & .cm-embed-block:hover.dmt-cm-parent.dmt-cm-expanded,
-  & .cm-embed-block:hover.dmt-cm-parent.dmt-cm-animating {
+  & .cm-embed-block:hover.windrose-cm-parent.windrose-cm-expanded,
+  & .cm-embed-block:hover.windrose-cm-parent.windrose-cm-animating {
     overflow: visible;
     animation: none;
   }
 }
 
-.dmt-loading {
+.windrose-loading {
   padding: 20px;
   text-align: center;
   color: var(--windrose-text-muted);
 }
 
-.dmt-canvas-wrapper {
+.windrose-canvas-wrapper {
   display: flex;
   flex-direction: row;
   position: relative;
@@ -168,7 +168,7 @@ body {
   width: 100%;
 }
 
-.dmt-canvas-and-controls {
+.windrose-canvas-and-controls {
   flex: 1;
   position: relative;
   min-width: 0;
@@ -179,7 +179,7 @@ body {
   align-items: center;
 }
 
-.dmt-canvas-container {
+.windrose-canvas-container {
   position: relative;
   background-color: var(--windrose-bg-primary);
   width: 100%;
@@ -198,7 +198,7 @@ body {
    HEADER
    ============================================ */
 
-.dmt-header {
+.windrose-header {
   margin-bottom: 12px;
   padding: 4px;
   background-color: rgba(255, 255, 255, 0.05);
@@ -208,7 +208,7 @@ body {
   align-items: center;
 }
 
-.dmt-map-name {
+.windrose-map-name {
   background: transparent;
   border: none;
   color: var(--windrose-text-primary);
@@ -223,14 +223,14 @@ body {
   }
 }
 
-.dmt-header-controls {
+.windrose-header-controls {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
 /* Info Toggle Button */
-.dmt-info-toggle.dmt-info-toggle {
+.windrose-info-toggle.windrose-info-toggle {
   background: transparent;
   border: 1px solid var(--windrose-border-secondary);
   border-radius: 4px;
@@ -263,7 +263,7 @@ body {
     color: var(--windrose-border-primary);
   }
 
-  &.dmt-info-toggle-active {
+  &.windrose-info-toggle-active {
     border-color: var(--windrose-border-primary);
     color: var(--windrose-border-primary);
 
@@ -275,7 +275,7 @@ body {
 }
 
 /* Save Status */
-.dmt-save-status {
+.windrose-save-status {
   font-size: 18px;
   color: var(--windrose-success);
   padding: 0 8px;
@@ -283,15 +283,15 @@ body {
   align-items: center;
   line-height: 1;
 
-  &.dmt-save-status-unsaved {
+  &.windrose-save-status-unsaved {
     color: var(--windrose-warning);
   }
 
-  &.dmt-save-status-saving {
+  &.windrose-save-status-saving {
     animation: rotate 1s linear infinite;
   }
 
-  &.dmt-save-status-error {
+  &.windrose-save-status-error {
     color: var(--windrose-error);
   }
 }
@@ -313,7 +313,7 @@ body {
    FOOTER
    ============================================ */
 
-.dmt-footer {
+.windrose-footer {
   margin-top: 8px;
   font-size: 11px;
   color: var(--windrose-text-disabled);
@@ -324,7 +324,7 @@ body {
    DECORATIVE CORNER BRACKETS
    ============================================ */
 
-.dmt-corner-bracket {
+.windrose-corner-bracket {
   position: absolute;
   width: 50px;
   height: 50px;
@@ -336,24 +336,24 @@ body {
     stroke: var(--windrose-border-primary);
   }
 
-  &.dmt-corner-bracket-tl {
+  &.windrose-corner-bracket-tl {
     top: -2px;
     left: -2px;
   }
 
-  &.dmt-corner-bracket-tr {
+  &.windrose-corner-bracket-tr {
     top: -2px;
     right: -2px;
     transform: scaleX(-1);
   }
 
-  &.dmt-corner-bracket-bl {
+  &.windrose-corner-bracket-bl {
     bottom: -2px;
     left: -2px;
     transform: scaleY(-1);
   }
 
-  &.dmt-corner-bracket-br {
+  &.windrose-corner-bracket-br {
     bottom: -2px;
     right: -2px;
     transform: scale(-1);
@@ -361,32 +361,32 @@ body {
 }
 
 /* Tool Palette Brackets (Outward facing) */
-.dmt-tool-palette-bracket {
+.windrose-tool-palette-bracket {
   position: absolute;
   width: 40px;
   height: 40px;
   pointer-events: none;
   z-index: 10;
 
-  &.dmt-tool-palette-bracket-tl {
+  &.windrose-tool-palette-bracket-tl {
     top: -2px;
     left: -2px;
     transform: rotate(0deg);
   }
 
-  &.dmt-tool-palette-bracket-tr {
+  &.windrose-tool-palette-bracket-tr {
     top: -2px;
     right: -2px;
     transform: scaleX(-1);
   }
 
-  &.dmt-tool-palette-bracket-bl {
+  &.windrose-tool-palette-bracket-bl {
     bottom: -2px;
     left: -2px;
     transform: scaleY(-1);
   }
 
-  &.dmt-tool-palette-bracket-br {
+  &.windrose-tool-palette-bracket-br {
     bottom: -2px;
     right: -2px;
     transform: scale(-1);
@@ -397,60 +397,60 @@ body {
    CANVAS CURSOR STATES
    ============================================ */
 
-.dmt-canvas,
-.dmt-canvas-drawing,
-.dmt-canvas-erasing,
-.dmt-canvas-erase,
-.dmt-canvas-rectangle,
-.dmt-canvas-rectangle-active,
-.dmt-canvas-circle,
-.dmt-canvas-circle-active,
-.dmt-canvas-cleararea,
-.dmt-canvas-cleararea-active,
-.dmt-canvas-panning,
-.dmt-canvas-space-grab,
-.dmt-canvas-select,
-.dmt-canvas-selecting {
+.windrose-canvas,
+.windrose-canvas-drawing,
+.windrose-canvas-erasing,
+.windrose-canvas-erase,
+.windrose-canvas-rectangle,
+.windrose-canvas-rectangle-active,
+.windrose-canvas-circle,
+.windrose-canvas-circle-active,
+.windrose-canvas-cleararea,
+.windrose-canvas-cleararea-active,
+.windrose-canvas-panning,
+.windrose-canvas-space-grab,
+.windrose-canvas-select,
+.windrose-canvas-selecting {
   border: 1px solid var(--windrose-border-secondary);
 }
 
-.dmt-canvas,
-.dmt-canvas-rectangle,
-.dmt-canvas-circle,
-.dmt-canvas-cleararea,
-.dmt-canvas-add-object,
-.dmt-canvas-add-text,
-.dmt-canvas-measure,
-.dmt-canvas-diagonal-fill {
+.windrose-canvas,
+.windrose-canvas-rectangle,
+.windrose-canvas-circle,
+.windrose-canvas-cleararea,
+.windrose-canvas-add-object,
+.windrose-canvas-add-text,
+.windrose-canvas-measure,
+.windrose-canvas-diagonal-fill {
   cursor: crosshair;
 }
 
-.dmt-canvas-drawing,
-.dmt-canvas-rectangle-active,
-.dmt-canvas-circle-active,
-.dmt-canvas-measure-active {
+.windrose-canvas-drawing,
+.windrose-canvas-rectangle-active,
+.windrose-canvas-circle-active,
+.windrose-canvas-measure-active {
   cursor: cell;
 }
 
-.dmt-canvas-erasing,
-.dmt-canvas-erase,
-.dmt-canvas-cleararea-active {
+.windrose-canvas-erasing,
+.windrose-canvas-erase,
+.windrose-canvas-cleararea-active {
   cursor: not-allowed;
 }
 
-.dmt-canvas-panning {
+.windrose-canvas-panning {
   cursor: grabbing;
 }
 
-.dmt-canvas-space-grab {
+.windrose-canvas-space-grab {
   cursor: grab;
 }
 
-.dmt-canvas-select {
+.windrose-canvas-select {
   cursor: default;
 }
 
-.dmt-canvas-selecting {
+.windrose-canvas-selecting {
   cursor: move;
 }
 
@@ -458,7 +458,7 @@ body {
    TOOL PALETTE
    ============================================ */
 
-.dmt-tool-palette {
+.windrose-tool-palette {
   display: flex;
   gap: 4px;
   padding: 8px;
@@ -474,7 +474,7 @@ body {
     0 0 15px rgba(var(--windrose-border-primary-rgb), 0.15);
 }
 
-.dmt-tool-btn {
+.windrose-tool-btn {
   position: relative;
   background-color: var(--windrose-bg-secondary);
   border: 1px solid var(--windrose-border-secondary);
@@ -491,7 +491,7 @@ body {
   align-items: center;
   justify-content: center;
 
-  &:hover:not(.dmt-tool-btn-active) {
+  &:hover:not(.windrose-tool-btn-active) {
     background-color: var(--windrose-bg-tertiary);
     border-color: var(--windrose-border-secondary);
 
@@ -500,7 +500,7 @@ body {
     }
   }
 
-  &.dmt-tool-btn-active {
+  &.windrose-tool-btn-active {
     background-color: var(--windrose-border-primary);
     border-color: var(--windrose-border-primary-dark);
     color: var(--windrose-bg-primary);
@@ -523,13 +523,13 @@ body {
   }
 }
 
-.dmt-color-tool-btn {
+.windrose-color-tool-btn {
   position: relative;
   /* Bottom border shows current color - defined inline via style attribute */
 }
 
 /* Sub-tool indicator triangle */
-.dmt-subtool-indicator {
+.windrose-subtool-indicator {
   position: absolute;
   bottom: 1px;
   right: 1px;
@@ -540,24 +540,24 @@ body {
 }
 
 /* Buttons with sub-tools should be narrower to fit on iPad */
-.dmt-tool-btn-container .dmt-tool-btn {
+.windrose-tool-btn-container .windrose-tool-btn {
   min-width: 28px;
   padding: 6px 5px;
 }
 
-.dmt-tool-btn-active .dmt-subtool-indicator {
+.windrose-tool-btn-active .windrose-subtool-indicator {
   opacity: 0.9;
   color: var(--windrose-bg-primary);
 }
 
 /* Tool button container for sub-menu positioning */
-.dmt-tool-btn-container {
+.windrose-tool-btn-container {
   position: relative;
   display: inline-block;
 }
 
 /* Sub-menu flyout */
-.dmt-subtool-menu {
+.windrose-subtool-menu {
   position: absolute;
   left: 100%;
   top: 50%;
@@ -578,7 +578,7 @@ body {
   min-width: 120px;
 }
 
-.dmt-subtool-option {
+.windrose-subtool-option {
   display: flex;
   align-items: center;
   justify-content: flex-start;
@@ -607,7 +607,7 @@ body {
     background: var(--windrose-bg-tertiary);
   }
 
-  &.dmt-subtool-option-active {
+  &.windrose-subtool-option-active {
     background: var(--windrose-border-primary);
     color: var(--windrose-bg-primary);
 
@@ -618,7 +618,7 @@ body {
 }
 
 /* History Controls */
-.dmt-history-controls {
+.windrose-history-controls {
   display: flex;
   gap: 4px;
   margin-left: 4px;
@@ -626,7 +626,7 @@ body {
   border-left: 1px solid var(--windrose-border-secondary);
 }
 
-.dmt-history-btn {
+.windrose-history-btn {
   background-color: var(--windrose-bg-secondary);
   border: 1px solid var(--windrose-border-secondary);
   border-radius: 3px;
@@ -670,7 +670,7 @@ body {
    MAP CONTROLS (COMPASS & ZOOM)
    ============================================ */
 
-.dmt-controls {
+.windrose-controls {
   position: absolute;
   top: 4px;
   right: 4px;
@@ -683,7 +683,7 @@ body {
   align-items: center;
 }
 
-.dmt-compass {
+.windrose-compass {
   width: 70px;
   height: 70px;
   min-width: 70px;
@@ -707,7 +707,7 @@ body {
   }
 }
 
-.dmt-compass-disabled {
+.windrose-compass-disabled {
   filter: grayscale(1);
   opacity: 0.5;
   
@@ -716,27 +716,27 @@ body {
   }
 }
 
-.dmt-compass-svg {
+.windrose-compass-svg {
   width: 100%;
   height: 100%;
   overflow: visible;
 }
 
-.dmt-zoom-controls {
+.windrose-zoom-controls {
   display: flex;
   flex-direction: column;
   gap: 6px;
   align-items: center;
 }
 
-button.dmt-zoom-btn,
-.is-tablet button.dmt-zoom-btn,
-button.dmt-expand-btn,
-.is-tablet button.dmt-expand-btn,
-button.dmt-layer-btn,
-.is-tablet button.dmt-layer-btn,
-button.dmt-orientation-btn,
-.is-tablet button.dmt-orientation-btn {
+button.windrose-zoom-btn,
+.is-tablet button.windrose-zoom-btn,
+button.windrose-expand-btn,
+.is-tablet button.windrose-expand-btn,
+button.windrose-layer-btn,
+.is-tablet button.windrose-layer-btn,
+button.windrose-orientation-btn,
+.is-tablet button.windrose-orientation-btn {
   width: 35px;
   height: 35px;
   min-width: 35px;
@@ -768,7 +768,7 @@ button.dmt-orientation-btn,
   }
 }
 
-.dmt-zoom-level {
+.windrose-zoom-level {
   font-size: 10px;
   font-weight: 600;
   color: rgba(var(--windrose-border-primary-rgb), 0.8);
@@ -786,7 +786,7 @@ button.dmt-orientation-btn,
    ============================================ */
 
 /* Invisible overlay to capture taps outside controls (touch devices) */
-.dmt-controls-overlay {
+.windrose-controls-overlay {
   position: fixed;
   top: 0;
   left: 0;
@@ -797,7 +797,7 @@ button.dmt-orientation-btn,
   cursor: default;
 }
 
-.dmt-controls-drawer {
+.windrose-controls-drawer {
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -806,16 +806,16 @@ button.dmt-orientation-btn,
 }
 
 /* Compass slides down to make room for expand button */
-.dmt-compass-animated {
+.windrose-compass-animated {
   transform: translateY(-39px);  /* Button height (35px) + gap (4px) */
   transition: transform 180ms cubic-bezier(0.25, 0.1, 0.25, 1);  /* Near-linear with subtle ease-out */
 }
 
-.dmt-compass-revealed {
+.windrose-compass-revealed {
   transform: translateY(0);
 }
 
-.dmt-drawer-item {
+.windrose-drawer-item {
   opacity: 0;
   transform: translateY(-20px) scale(0.8);
   pointer-events: none;
@@ -824,11 +824,11 @@ button.dmt-orientation-btn,
 }
 
 /* Upward slide variant for items above the compass */
-.dmt-drawer-item-up {
+.windrose-drawer-item-up {
   transform: translateY(20px) scale(0.8);
 }
 
-.dmt-drawer-item-visible {
+.windrose-drawer-item-visible {
   opacity: 1;
   transform: translateY(0) scale(1);
   pointer-events: auto;
@@ -838,7 +838,7 @@ button.dmt-orientation-btn,
    OBJECT SIDEBAR
    ============================================ */
 
-.dmt-object-sidebar {
+.windrose-object-sidebar {
   width: 180px;
   min-width: 180px;
   height: 100%;
@@ -852,7 +852,7 @@ button.dmt-orientation-btn,
   position: relative;
   box-sizing: border-box;
 
-  &.dmt-object-sidebar-collapsed {
+  &.windrose-object-sidebar-collapsed {
     width: 0;
     min-width: 0;
     border-right: none;
@@ -860,7 +860,7 @@ button.dmt-orientation-btn,
   }
 }
 
-.dmt-object-sidebar-header {
+.windrose-object-sidebar-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -873,7 +873,7 @@ button.dmt-orientation-btn,
   flex-shrink: 0;
 }
 
-.dmt-sidebar-collapse-btn.dmt-sidebar-collapse-btn {
+.windrose-sidebar-collapse-btn.windrose-sidebar-collapse-btn {
   background: transparent;
   border: 1.5px solid rgba(var(--windrose-border-primary-rgb), 0.4);
   border-radius: 3px;
@@ -904,8 +904,8 @@ button.dmt-orientation-btn,
   }
 }
 
-.dmt-sidebar-toggle,
-.is-tablet .dmt-sidebar-toggle {
+.windrose-sidebar-toggle,
+.is-tablet .windrose-sidebar-toggle {
   position: absolute;
   left: 0;
   top: 8px;
@@ -937,8 +937,8 @@ button.dmt-orientation-btn,
   }
 }
 
-.dmt-freeform-collapsed-indicator,
-.is-tablet .dmt-freeform-collapsed-indicator {
+.windrose-freeform-collapsed-indicator,
+.is-tablet .windrose-freeform-collapsed-indicator {
   position: absolute;
   left: 0;
   top: 42px;
@@ -967,13 +967,13 @@ button.dmt-orientation-btn,
   }
 }
 
-.dmt-object-sidebar-set-selector {
+.windrose-object-sidebar-set-selector {
   padding: 4px 6px;
   border-bottom: 1px solid var(--windrose-border-secondary);
   flex-shrink: 0;
 }
 
-.dmt-object-sidebar-select {
+.windrose-object-sidebar-select {
   width: 100%;
   background: var(--windrose-bg-secondary);
   color: var(--windrose-text-primary);
@@ -983,13 +983,13 @@ button.dmt-orientation-btn,
   font-size: 11px;
 }
 
-.dmt-object-sidebar-search {
+.windrose-object-sidebar-search {
   padding: 4px 6px;
   border-bottom: 1px solid var(--windrose-border-secondary);
   flex-shrink: 0;
 }
 
-.dmt-object-sidebar-search-input {
+.windrose-object-sidebar-search-input {
   width: 100%;
   background: var(--windrose-bg-secondary);
   color: var(--windrose-text-primary);
@@ -1009,7 +1009,7 @@ button.dmt-orientation-btn,
   }
 }
 
-.dmt-object-sidebar-content {
+.windrose-object-sidebar-content {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
@@ -1025,12 +1025,12 @@ button.dmt-orientation-btn,
   }
 }
 
-.dmt-object-sidebar-category {
+.windrose-object-sidebar-category {
   margin-bottom: 4px;
 }
 
-.dmt-object-sidebar-category-label,
-.is-tablet .dmt-object-sidebar-category-label {
+.windrose-object-sidebar-category-label,
+.is-tablet .windrose-object-sidebar-category-label {
   display: flex;
   align-items: center;
   gap: 4px;
@@ -1051,21 +1051,21 @@ button.dmt-orientation-btn,
   }
 }
 
-.dmt-object-sidebar-category-count {
+.windrose-object-sidebar-category-count {
   margin-left: auto;
   font-size: 8px;
   color: var(--windrose-text-disabled);
 }
 
-.dmt-object-sidebar-grid {
+.windrose-object-sidebar-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 3px;
   padding: 3px 0;
 }
 
-button.dmt-object-grid-item,
-.is-tablet button.dmt-object-grid-item {
+button.windrose-object-grid-item,
+.is-tablet button.windrose-object-grid-item {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1091,14 +1091,14 @@ button.dmt-object-grid-item,
   }
 }
 
-.dmt-object-grid-item-selected.dmt-object-grid-item-selected,
-.dmt-object-grid-item-selected.dmt-object-grid-item-selected:hover {
+.windrose-object-grid-item-selected.windrose-object-grid-item-selected,
+.windrose-object-grid-item-selected.windrose-object-grid-item-selected:hover {
   border-color: var(--windrose-border-primary);
   box-shadow: 0 0 6px rgba(var(--windrose-border-primary-rgb), 0.4);
   background: rgba(var(--windrose-border-primary-rgb), 0.1);
 }
 
-.dmt-object-grid-symbol {
+.windrose-object-grid-symbol {
   font-size: 18px;
   font-family: 'Noto Emoji', 'Noto Sans Symbols 2', monospace;
   line-height: 1.1;
@@ -1107,13 +1107,13 @@ button.dmt-object-grid-item,
   text-rendering: optimizeSpeed;
 }
 
-.dmt-object-grid-image {
+.windrose-object-grid-image {
   width: 24px;
   height: 24px;
   object-fit: contain;
 }
 
-.dmt-object-grid-label {
+.windrose-object-grid-label {
   font-size: 8px;
   line-height: 1.2;
   color: var(--windrose-text-secondary);
@@ -1124,7 +1124,7 @@ button.dmt-object-grid-item,
   width: 100%;
 }
 
-.dmt-object-sidebar-footer {
+.windrose-object-sidebar-footer {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1135,8 +1135,8 @@ button.dmt-object-grid-item,
   flex-shrink: 0;
 }
 
-.dmt-object-sidebar-action-btn,
-.is-tablet .dmt-object-sidebar-action-btn {
+.windrose-object-sidebar-action-btn,
+.is-tablet .windrose-object-sidebar-action-btn {
   width: 28px;
   height: 28px;
   min-width: 28px;
@@ -1160,14 +1160,14 @@ button.dmt-object-grid-item,
   }
 }
 
-.dmt-object-sidebar-action-active.dmt-object-sidebar-action-active,
-.dmt-object-sidebar-action-active.dmt-object-sidebar-action-active:hover {
+.windrose-object-sidebar-action-active.windrose-object-sidebar-action-active,
+.windrose-object-sidebar-action-active.windrose-object-sidebar-action-active:hover {
   background: var(--windrose-border-primary);
   color: var(--windrose-bg-primary);
   border-color: var(--windrose-border-primary);
 }
 
-.dmt-object-sidebar-empty {
+.windrose-object-sidebar-empty {
   padding: 16px 8px;
   text-align: center;
   color: var(--windrose-text-muted);
@@ -1178,7 +1178,7 @@ button.dmt-object-grid-item,
    TILE ASSET BROWSER (right sidebar)
    ============================================ */
 
-.dmt-tile-browser {
+.windrose-tile-browser {
   width: 180px;
   display: flex;
   flex-direction: column;
@@ -1190,7 +1190,7 @@ button.dmt-object-grid-item,
   height: 100%;
   box-sizing: border-box;
 
-  &.dmt-tile-browser-collapsed {
+  &.windrose-tile-browser-collapsed {
     width: 0;
     border-left: none;
     overflow: visible;
@@ -1198,8 +1198,8 @@ button.dmt-object-grid-item,
   }
 }
 
-.dmt-tile-browser-toggle,
-.is-tablet .dmt-tile-browser-toggle {
+.windrose-tile-browser-toggle,
+.is-tablet .windrose-tile-browser-toggle {
   position: absolute;
   right: 0;
   top: 130px;
@@ -1230,7 +1230,7 @@ button.dmt-object-grid-item,
   }
 }
 
-.dmt-tile-browser-header {
+.windrose-tile-browser-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1243,7 +1243,7 @@ button.dmt-object-grid-item,
   flex-shrink: 0;
 }
 
-.dmt-tile-browser-tileset-selector {
+.windrose-tile-browser-tileset-selector {
   padding: 4px 6px;
   border-bottom: 1px solid var(--windrose-border-secondary);
   flex-shrink: 0;
@@ -1252,7 +1252,7 @@ button.dmt-object-grid-item,
   gap: 4px;
 }
 
-.dmt-tile-browser-tileset-name {
+.windrose-tile-browser-tileset-name {
   flex: 1;
   font-size: 12px;
   color: var(--text-muted);
@@ -1261,18 +1261,18 @@ button.dmt-object-grid-item,
   white-space: nowrap;
 }
 
-.dmt-tile-browser-config-btn {
+.windrose-tile-browser-config-btn {
   flex-shrink: 0;
 }
 
-.dmt-tile-browser-config {
+.windrose-tile-browser-config {
   padding: 6px 8px;
   border-bottom: 1px solid var(--windrose-border-secondary);
   background: var(--background-secondary-alt);
   flex-shrink: 0;
 }
 
-.dmt-tile-config-row {
+.windrose-tile-config-row {
   display: flex;
   flex-wrap: wrap;
   gap: 2px 6px;
@@ -1280,22 +1280,22 @@ button.dmt-object-grid-item,
   font-size: 11px;
 }
 
-.dmt-tile-config-row:last-child {
+.windrose-tile-config-row:last-child {
   margin-bottom: 0;
 }
 
-.dmt-tile-config-row label {
+.windrose-tile-config-row label {
   flex-shrink: 0;
   color: var(--text-muted);
 }
 
-.dmt-tile-config-slider {
+.windrose-tile-config-slider {
   flex-basis: 100%;
   order: 3;
   min-width: 0;
 }
 
-.dmt-tile-config-value {
+.windrose-tile-config-value {
   flex-shrink: 0;
   margin-left: auto;
   text-align: right;
@@ -1303,7 +1303,7 @@ button.dmt-object-grid-item,
   font-variant-numeric: tabular-nums;
 }
 
-.dmt-tile-config-select {
+.windrose-tile-config-select {
   flex-basis: 100%;
   order: 3;
   min-width: 0;
@@ -1311,23 +1311,23 @@ button.dmt-object-grid-item,
 }
 
 /* Tablet overrides for tileset config panel */
-.is-tablet .dmt-tile-browser-config {
+.is-tablet .windrose-tile-browser-config {
   padding: 10px 12px;
 }
 
-.is-tablet .dmt-tile-config-row {
+.is-tablet .windrose-tile-config-row {
   margin-bottom: 12px;
   font-size: 13px;
   gap: 4px 8px;
 }
 
-.is-tablet .dmt-tile-config-select {
+.is-tablet .windrose-tile-config-select {
   font-size: 13px;
   padding: 6px 8px;
 }
 
-button.dmt-tile-browser-config-btn,
-.is-tablet button.dmt-tile-browser-config-btn {
+button.windrose-tile-browser-config-btn,
+.is-tablet button.windrose-tile-browser-config-btn {
   width: 28px;
   height: 28px;
   min-width: 28px;
@@ -1337,7 +1337,7 @@ button.dmt-tile-browser-config-btn,
   justify-content: center;
 }
 
-.dmt-tile-browser-select {
+.windrose-tile-browser-select {
   flex: 1;
   min-width: 0;
   background: var(--windrose-bg-secondary);
@@ -1348,13 +1348,13 @@ button.dmt-tile-browser-config-btn,
   font-size: 11px;
 }
 
-.dmt-tile-browser-search {
+.windrose-tile-browser-search {
   padding: 4px 6px;
   border-bottom: 1px solid var(--windrose-border-secondary);
   flex-shrink: 0;
 }
 
-.dmt-tile-browser-search-input {
+.windrose-tile-browser-search-input {
   width: 100%;
   background: var(--windrose-bg-secondary);
   color: var(--windrose-text-primary);
@@ -1374,7 +1374,7 @@ button.dmt-tile-browser-config-btn,
   }
 }
 
-.dmt-tile-browser-content {
+.windrose-tile-browser-content {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
@@ -1390,8 +1390,8 @@ button.dmt-tile-browser-config-btn,
   }
 }
 
-.dmt-tile-browser-category-label,
-.is-tablet .dmt-tile-browser-category-label {
+.windrose-tile-browser-category-label,
+.is-tablet .windrose-tile-browser-category-label {
   display: flex;
   align-items: center;
   gap: 4px;
@@ -1412,21 +1412,21 @@ button.dmt-tile-browser-config-btn,
   }
 }
 
-.dmt-tile-browser-category-count {
+.windrose-tile-browser-category-count {
   margin-left: auto;
   font-size: 8px;
   color: var(--windrose-text-disabled);
 }
 
-.dmt-tile-browser-grid {
+.windrose-tile-browser-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 3px;
   padding: 3px 0;
 }
 
-.dmt-tile-thumb,
-.is-tablet .dmt-tile-thumb {
+.windrose-tile-thumb,
+.is-tablet .windrose-tile-thumb {
   aspect-ratio: 1;
   display: flex;
   align-items: center;
@@ -1449,21 +1449,21 @@ button.dmt-tile-browser-config-btn,
   }
 }
 
-.dmt-tile-thumb-selected.dmt-tile-thumb-selected,
-.dmt-tile-thumb-selected.dmt-tile-thumb-selected:hover {
+.windrose-tile-thumb-selected.windrose-tile-thumb-selected,
+.windrose-tile-thumb-selected.windrose-tile-thumb-selected:hover {
   border-color: var(--windrose-border-primary);
   box-shadow: 0 0 6px rgba(var(--windrose-border-primary-rgb), 0.4);
   background: rgba(var(--windrose-border-primary-rgb), 0.1);
 }
 
-.dmt-tile-thumb-img {
+.windrose-tile-thumb-img {
   width: 100%;
   height: 100%;
   object-fit: contain;
   image-rendering: pixelated;
 }
 
-.dmt-tile-preview-portal {
+.windrose-tile-preview-portal {
   position: fixed;
   display: none;
   background: var(--windrose-bg-primary);
@@ -1475,7 +1475,7 @@ button.dmt-tile-browser-config-btn,
   z-index: 10000;
 }
 
-.dmt-tile-preview-label {
+.windrose-tile-preview-label {
   font-size: 10px;
   color: var(--windrose-text-muted);
   text-align: center;
@@ -1486,14 +1486,14 @@ button.dmt-tile-browser-config-btn,
   max-width: 192px;
 }
 
-.dmt-tile-browser-empty {
+.windrose-tile-browser-empty {
   padding: 16px 8px;
   text-align: center;
   color: var(--windrose-text-muted);
   font-size: 11px;
 }
 
-.dmt-tile-browser-footer {
+.windrose-tile-browser-footer {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1505,7 +1505,7 @@ button.dmt-tile-browser-config-btn,
   flex-wrap: wrap;
 }
 
-.dmt-tile-browser-scale-row {
+.windrose-tile-browser-scale-row {
   display: flex;
   align-items: center;
   gap: 4px;
@@ -1517,12 +1517,12 @@ button.dmt-tile-browser-config-btn,
   font-size: 11px;
 }
 
-.dmt-tile-browser-scale-row .dmt-tile-config-slider {
+.windrose-tile-browser-scale-row .windrose-tile-config-slider {
   flex: 1;
 }
 
-.dmt-tile-browser-action-btn,
-.is-tablet .dmt-tile-browser-action-btn {
+.windrose-tile-browser-action-btn,
+.is-tablet .windrose-tile-browser-action-btn {
   width: 28px;
   height: 28px;
   min-width: 28px;
@@ -1546,21 +1546,21 @@ button.dmt-tile-browser-config-btn,
   }
 }
 
-.dmt-tile-browser-action-active.dmt-tile-browser-action-active,
-.dmt-tile-browser-action-active.dmt-tile-browser-action-active:hover {
+.windrose-tile-browser-action-active.windrose-tile-browser-action-active,
+.windrose-tile-browser-action-active.windrose-tile-browser-action-active:hover {
   background: var(--windrose-border-primary);
   color: var(--windrose-bg-primary);
   border-color: var(--windrose-border-primary);
 }
 
-.dmt-tile-browser-rotation-label {
+.windrose-tile-browser-rotation-label {
   font-size: 10px;
   color: var(--windrose-text-muted);
   min-width: 28px;
   text-align: center;
 }
 
-.dmt-tile-browser-layer-toggle {
+.windrose-tile-browser-layer-toggle {
   display: flex;
   gap: 1px;
   background: var(--windrose-border-secondary);
@@ -1568,8 +1568,8 @@ button.dmt-tile-browser-config-btn,
   overflow: hidden;
 }
 
-button.dmt-tile-browser-layer-btn,
-.is-tablet button.dmt-tile-browser-layer-btn {
+button.windrose-tile-browser-layer-btn,
+.is-tablet button.windrose-tile-browser-layer-btn {
   background: transparent;
   border: none;
   color: var(--windrose-text-muted);
@@ -1587,13 +1587,13 @@ button.dmt-tile-browser-layer-btn,
   box-shadow: none;
 }
 
-.dmt-tile-browser-layer-btn:hover {
+.windrose-tile-browser-layer-btn:hover {
   color: var(--windrose-text-primary);
   background: rgba(255, 255, 255, 0.1);
 }
 
-button.dmt-tile-browser-layer-btn.dmt-tile-browser-layer-active,
-.is-tablet button.dmt-tile-browser-layer-btn.dmt-tile-browser-layer-active {
+button.windrose-tile-browser-layer-btn.windrose-tile-browser-layer-active,
+.is-tablet button.windrose-tile-browser-layer-btn.windrose-tile-browser-layer-active {
   background: var(--windrose-border-primary);
   color: var(--windrose-bg-primary);
 }
@@ -1602,7 +1602,7 @@ button.dmt-tile-browser-layer-btn.dmt-tile-browser-layer-active,
    OBJECT INTERACTION BUTTONS
    ============================================ */
 
-.dmt-object-tooltip {
+.windrose-object-tooltip {
   background-color: rgba(42, 42, 42, 0.95);
   color: var(--windrose-text-primary);
   font-size: 11pt;
@@ -1617,10 +1617,10 @@ button.dmt-tile-browser-layer-btn.dmt-tile-browser-layer-active,
   z-index: 1000;
 }
 
-.dmt-rotate-button,
-.dmt-note-button,
-.dmt-link-note-button,
-.dmt-resize-button {
+.windrose-rotate-button,
+.windrose-note-button,
+.windrose-link-note-button,
+.windrose-resize-button {
   width: 32px;
   height: 32px;
   background-color: rgba(74, 158, 255, 0.9);
@@ -1646,28 +1646,28 @@ button.dmt-tile-browser-layer-btn.dmt-tile-browser-layer-active,
   }
 }
 
-.dmt-rotate-button {
+.windrose-rotate-button {
   font-size: 20px;
 }
 
-.dmt-resize-button {
+.windrose-resize-button {
   font-size: 18px;
 }
 
-.dmt-note-button svg {
+.windrose-note-button svg {
   width: 18px;
   height: 18px;
   color: var(--windrose-text-primary);
 }
 
-.dmt-link-note-button svg {
+.windrose-link-note-button svg {
   width: 18px;
   height: 18px;
   color: var(--windrose-text-primary);
 }
 
 /* Visible Note Link Display */
-.dmt-selected-object-note {
+.windrose-selected-object-note {
   background: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
   border-radius: 4px;
@@ -1678,7 +1678,7 @@ button.dmt-tile-browser-layer-btn.dmt-tile-browser-layer-active,
   position: relative;
 }
 
-.dmt-note-display-link {
+.windrose-note-display-link {
   display: flex;
   align-items: center;
   gap: 4px;
@@ -1696,7 +1696,7 @@ button.dmt-tile-browser-layer-btn.dmt-tile-browser-layer-active,
 }
 
 /* Selection Toolbar */
-.dmt-selection-toolbar {
+.windrose-selection-toolbar {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
@@ -1706,11 +1706,11 @@ button.dmt-tile-browser-layer-btn.dmt-tile-browser-layer-active,
 }
 
 /* Multi-select toolbar styling */
-.dmt-multi-select-toolbar {
+.windrose-multi-select-toolbar {
   align-items: center;
 }
 
-.dmt-selection-count {
+.windrose-selection-count {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -1725,13 +1725,13 @@ button.dmt-tile-browser-layer-btn.dmt-tile-browser-layer-active,
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
-.dmt-selection-count svg {
+.windrose-selection-count svg {
   width: 14px;
   height: 14px;
   opacity: 0.9;
 }
 
-.dmt-toolbar-button {
+.windrose-toolbar-button {
   width: 44px;
   height: 44px;
   background: var(--background-primary);
@@ -1764,7 +1764,7 @@ button.dmt-tile-browser-layer-btn.dmt-tile-browser-layer-active,
   }
 }
 
-.dmt-toolbar-color-button {
+.windrose-toolbar-color-button {
   border: 2px solid rgba(255, 255, 255, 0.3);
   
   svg {
@@ -1777,7 +1777,7 @@ button.dmt-tile-browser-layer-btn.dmt-tile-browser-layer-active,
   }
 }
 
-.dmt-toolbar-delete-button {
+.windrose-toolbar-delete-button {
   &:hover {
     background: var(--background-modifier-error);
     border-color: var(--text-error);
@@ -1786,7 +1786,7 @@ button.dmt-tile-browser-layer-btn.dmt-tile-browser-layer-active,
 }
 
 /* Linked note display when used with toolbar */
-.dmt-selection-linked-note {
+.windrose-selection-linked-note {
   background: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
   border-radius: 4px;
@@ -1797,7 +1797,7 @@ button.dmt-tile-browser-layer-btn.dmt-tile-browser-layer-active,
 }
 
 /* Invisible hover links over objects */
-.dmt-object-hover-link.dmt-object-hover-link {
+.windrose-object-hover-link.windrose-object-hover-link {
   pointer-events: auto;  /* Changed: We handle clicks in JS now */
   overflow: hidden;
   cursor: default;  /* Show default cursor instead of pointer */
@@ -1810,7 +1810,7 @@ button.dmt-tile-browser-layer-btn.dmt-tile-browser-layer-active,
 }
 
 /* Linking mode banner */
-.dmt-linking-banner {
+.windrose-linking-banner {
   position: absolute;
   top: 8px;
   left: 50%;
@@ -1819,7 +1819,7 @@ button.dmt-tile-browser-layer-btn.dmt-tile-browser-layer-active,
   pointer-events: auto;
 }
 
-.dmt-linking-banner-content {
+.windrose-linking-banner-content {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1832,13 +1832,13 @@ button.dmt-tile-browser-layer-btn.dmt-tile-browser-layer-active,
   white-space: nowrap;
 }
 
-.dmt-linking-banner-content svg {
+.windrose-linking-banner-content svg {
   width: 16px;
   height: 16px;
   flex-shrink: 0;
 }
 
-.dmt-linking-banner-cancel {
+.windrose-linking-banner-cancel {
   background: rgba(255, 255, 255, 0.2);
   border: none;
   color: inherit;
@@ -1849,13 +1849,13 @@ button.dmt-tile-browser-layer-btn.dmt-tile-browser-layer-active,
   margin-left: 4px;
 }
 
-.dmt-linking-banner-cancel:hover {
+.windrose-linking-banner-cancel:hover {
   background: rgba(255, 255, 255, 0.3);
 }
 
 /* Active state for linked object button */
-.dmt-toolbar-button-active.dmt-toolbar-button-active,
-.dmt-toolbar-button-active.dmt-toolbar-button-active:hover {
+.windrose-toolbar-button-active.windrose-toolbar-button-active,
+.windrose-toolbar-button-active.windrose-toolbar-button-active:hover {
   background-color: var(--interactive-accent);
   color: var(--text-on-accent);
 }
@@ -1864,7 +1864,7 @@ button.dmt-tile-browser-layer-btn.dmt-tile-browser-layer-active,
    Selection Actions Card (unified selection toolbar)
    ========================================================================== */
 
-.dmt-selection-card {
+.windrose-selection-card {
   position: relative;
   background: rgba(26, 26, 26, 0.7);
   border: 2px solid rgba(var(--windrose-border-primary-rgb), 0.7);
@@ -1876,7 +1876,7 @@ button.dmt-tile-browser-layer-btn.dmt-tile-browser-layer-active,
   backdrop-filter: blur(8px);
 }
 
-.dmt-selection-card-content {
+.windrose-selection-card-content {
   padding: 6px 8px;
   display: flex;
   flex-direction: column;
@@ -1884,20 +1884,20 @@ button.dmt-tile-browser-layer-btn.dmt-tile-browser-layer-active,
 }
 
 /* Corner brackets */
-.dmt-selection-card-bracket {
+.windrose-selection-card-bracket {
   position: absolute;
   width: 16px;
   height: 16px;
   pointer-events: none;
   z-index: 1;
 }
-.dmt-selection-card-bracket-tl { top: 2px; left: 2px; }
-.dmt-selection-card-bracket-tr { top: 2px; right: 2px; transform: scaleX(-1); }
-.dmt-selection-card-bracket-bl { bottom: 2px; left: 2px; transform: scaleY(-1); }
-.dmt-selection-card-bracket-br { display: none; }
+.windrose-selection-card-bracket-tl { top: 2px; left: 2px; }
+.windrose-selection-card-bracket-tr { top: 2px; right: 2px; transform: scaleX(-1); }
+.windrose-selection-card-bracket-bl { bottom: 2px; left: 2px; transform: scaleY(-1); }
+.windrose-selection-card-bracket-br { display: none; }
 
 /* Filigree decoration */
-.dmt-selection-card-filigree {
+.windrose-selection-card-filigree {
   position: absolute;
   bottom: -20px;
   right: -20px;
@@ -1912,31 +1912,31 @@ button.dmt-tile-browser-layer-btn.dmt-tile-browser-layer-active,
 }
 
 /* Action grid */
-.dmt-sel-grid {
+.windrose-sel-grid {
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
 
-.dmt-sel-row {
+.windrose-sel-row {
   display: flex;
   gap: 2px;
 }
 
-.dmt-sel-action {
+.windrose-sel-action {
   position: relative;
   flex: 1;
   min-width: 0;
 }
 
-.dmt-sel-action-full {
+.windrose-sel-action-full {
   flex: 1 1 100%;
 }
 
 /* Action buttons - with tablet overrides */
-.is-tablet button.dmt-sel-action-btn,
-button.dmt-sel-action-btn,
-.dmt-sel-action-btn {
+.is-tablet button.windrose-sel-action-btn,
+button.windrose-sel-action-btn,
+.windrose-sel-action-btn {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -1959,7 +1959,7 @@ button.dmt-sel-action-btn,
   text-overflow: ellipsis;
 }
 
-.dmt-sel-action-btn svg {
+.windrose-sel-action-btn svg {
   color: var(--windrose-border-primary);
   width: 14px;
   height: 14px;
@@ -1967,53 +1967,53 @@ button.dmt-sel-action-btn,
   flex-shrink: 0;
 }
 
-.dmt-sel-action-btn:hover:not(:disabled) {
+.windrose-sel-action-btn:hover:not(:disabled) {
   background: var(--windrose-bg-tertiary);
   border-color: var(--windrose-border-secondary);
 }
 
-.dmt-sel-action-label {
+.windrose-sel-action-label {
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 /* Active state (bronze fill) */
-.dmt-sel-action-active.dmt-sel-action-active,
-.dmt-sel-action-active.dmt-sel-action-active:hover {
+.windrose-sel-action-active.windrose-sel-action-active,
+.windrose-sel-action-active.windrose-sel-action-active:hover {
   background: var(--windrose-border-primary);
   border-color: var(--windrose-border-primary-dark);
 }
-.dmt-sel-action-active.dmt-sel-action-active svg,
-.dmt-sel-action-active.dmt-sel-action-active:hover svg {
+.windrose-sel-action-active.windrose-sel-action-active svg,
+.windrose-sel-action-active.windrose-sel-action-active:hover svg {
   color: var(--windrose-bg-primary);
 }
-.dmt-sel-action-active.dmt-sel-action-active .dmt-sel-action-label {
+.windrose-sel-action-active.windrose-sel-action-active .windrose-sel-action-label {
   color: var(--windrose-bg-primary);
 }
 
 /* Disabled state */
-.dmt-sel-action-disabled {
+.windrose-sel-action-disabled {
   opacity: 0.35;
   cursor: not-allowed;
 }
 
 /* Delete action */
-.dmt-sel-action-delete:hover:not(:disabled) {
+.windrose-sel-action-delete:hover:not(:disabled) {
   background: var(--windrose-accent-red);
   border-color: #6b0000;
 }
-.dmt-sel-action-delete:hover:not(:disabled) svg {
+.windrose-sel-action-delete:hover:not(:disabled) svg {
   color: #ff8080;
 }
-.dmt-sel-action-delete:hover:not(:disabled) .dmt-sel-action-label {
+.windrose-sel-action-delete:hover:not(:disabled) .windrose-sel-action-label {
   color: #ff8080;
 }
 
 /* Color swatch */
-.dmt-sel-color-btn {
+.windrose-sel-color-btn {
   position: relative;
 }
-.dmt-sel-color-swatch {
+.windrose-sel-color-swatch {
   width: 14px;
   height: 14px;
   min-width: 14px;
@@ -2023,16 +2023,16 @@ button.dmt-sel-action-btn,
 }
 
 /* Separator */
-.dmt-sel-separator {
+.windrose-sel-separator {
   height: 1px;
   background: var(--windrose-border-secondary);
   margin: 2px 0;
 }
 
 /* Links toggle - with tablet overrides */
-.is-tablet button.dmt-sel-links-toggle,
-button.dmt-sel-links-toggle,
-.dmt-sel-links-toggle {
+.is-tablet button.windrose-sel-links-toggle,
+button.windrose-sel-links-toggle,
+.windrose-sel-links-toggle {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -2051,55 +2051,55 @@ button.dmt-sel-links-toggle,
   font-size: 12px;
   transition: var(--windrose-transition);
 }
-.dmt-sel-links-toggle svg {
+.windrose-sel-links-toggle svg {
   color: var(--windrose-border-primary);
   width: 14px;
   height: 14px;
   min-width: 14px;
 }
-.dmt-sel-links-toggle svg:last-child {
+.windrose-sel-links-toggle svg:last-child {
   margin-left: auto;
   width: 12px;
   height: 12px;
   color: var(--windrose-text-muted);
 }
-.dmt-sel-links-toggle:hover {
+.windrose-sel-links-toggle:hover {
   background: var(--windrose-bg-tertiary);
   border-color: var(--windrose-border-secondary);
 }
-.dmt-sel-links-toggle.expanded {
+.windrose-sel-links-toggle.expanded {
   background: rgba(42, 42, 42, 0.5);
   border-color: var(--windrose-border-secondary);
 }
 
 /* Links panel */
-.dmt-sel-links-panel {
+.windrose-sel-links-panel {
   display: flex;
   flex-direction: column;
   gap: 1px;
   padding-left: 8px;
 }
-.dmt-sel-links-panel .dmt-sel-action-btn {
+.windrose-sel-links-panel .windrose-sel-action-btn {
   padding: 4px 4px;
   background: rgba(42, 42, 42, 0.3);
 }
 
 /* Resize row */
-.dmt-sel-resize-row {
+.windrose-sel-resize-row {
   display: flex;
   align-items: center;
   gap: 6px;
   padding: 4px 8px;
 }
-.dmt-sel-resize-row svg {
+.windrose-sel-resize-row svg {
   color: var(--windrose-border-primary);
   flex-shrink: 0;
 }
-.dmt-sel-resize-row input[type="range"] {
+.windrose-sel-resize-row input[type="range"] {
   flex: 1;
   min-width: 0;
 }
-.dmt-sel-resize-value {
+.windrose-sel-resize-value {
   font-size: 10px;
   color: var(--windrose-text-muted);
   min-width: 28px;
@@ -2107,13 +2107,13 @@ button.dmt-sel-links-toggle,
 }
 
 /* Player light controls */
-.dmt-sel-player-section {
+.windrose-sel-player-section {
   display: flex;
   flex-direction: column;
   gap: 4px;
   padding: 4px 8px;
 }
-.dmt-sel-player-header {
+.windrose-sel-player-header {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -2122,22 +2122,22 @@ button.dmt-sel-links-toggle,
   font-size: 11px;
   color: var(--windrose-text-secondary);
 }
-.dmt-sel-player-header > svg {
+.windrose-sel-player-header > svg {
   color: var(--windrose-border-primary);
   flex-shrink: 0;
 }
-.dmt-sel-player-header > span {
+.windrose-sel-player-header > span {
   flex: 1;
 }
-.dmt-sel-toggle-switch {
+.windrose-sel-toggle-switch {
   position: relative;
   width: 28px;
   height: 14px;
   flex-shrink: 0;
   cursor: pointer;
 }
-.is-tablet .dmt-sel-toggle-switch input,
-.dmt-sel-toggle-switch input {
+.is-tablet .windrose-sel-toggle-switch input,
+.windrose-sel-toggle-switch input {
   opacity: 0;
   width: 0;
   height: 0;
@@ -2147,7 +2147,7 @@ button.dmt-sel-links-toggle,
   max-height: 0;
   position: absolute;
 }
-.dmt-sel-toggle-slider {
+.windrose-sel-toggle-slider {
   position: absolute;
   inset: 0;
   background: rgba(42, 42, 42, 0.6);
@@ -2155,7 +2155,7 @@ button.dmt-sel-links-toggle,
   border-radius: 7px;
   transition: background 0.15s;
 }
-.dmt-sel-toggle-slider::before {
+.windrose-sel-toggle-slider::before {
   content: '';
   position: absolute;
   width: 10px;
@@ -2166,23 +2166,23 @@ button.dmt-sel-links-toggle,
   border-radius: 50%;
   transition: transform 0.15s, background 0.15s;
 }
-.dmt-sel-toggle-switch input:checked + .dmt-sel-toggle-slider {
+.windrose-sel-toggle-switch input:checked + .windrose-sel-toggle-slider {
   background: rgba(var(--windrose-border-primary-rgb), 0.3);
   border-color: var(--windrose-accent-primary);
 }
-.dmt-sel-toggle-switch input:checked + .dmt-sel-toggle-slider::before {
+.windrose-sel-toggle-switch input:checked + .windrose-sel-toggle-slider::before {
   transform: translateX(14px);
   background: var(--windrose-accent-primary);
 }
-.dmt-sel-player-row {
+.windrose-sel-player-row {
   display: flex;
   align-items: center;
   gap: 6px;
   height: 24px;
 }
-.is-tablet input.dmt-sel-radius-input,
-input.dmt-sel-radius-input,
-.dmt-sel-radius-input {
+.is-tablet input.windrose-sel-radius-input,
+input.windrose-sel-radius-input,
+.windrose-sel-radius-input {
   width: 48px;
   height: 22px;
   padding: 2px 4px;
@@ -2197,17 +2197,17 @@ input.dmt-sel-radius-input,
   min-height: 22px;
   max-height: 22px;
 }
-.dmt-sel-radius-input:focus {
+.windrose-sel-radius-input:focus {
   outline: none;
   border-color: var(--windrose-accent-primary);
 }
-.dmt-sel-unit-label {
+.windrose-sel-unit-label {
   font-size: 10px;
   color: var(--windrose-text-muted);
 }
-.is-tablet button.dmt-sel-light-color-swatch,
-button.dmt-sel-light-color-swatch,
-.dmt-sel-light-color-swatch {
+.is-tablet button.windrose-sel-light-color-swatch,
+button.windrose-sel-light-color-swatch,
+.windrose-sel-light-color-swatch {
   display: flex;
   align-items: center;
   margin-left: auto;
@@ -2223,17 +2223,17 @@ button.dmt-sel-light-color-swatch,
   border-radius: 3px;
   cursor: pointer;
 }
-.dmt-sel-light-color-swatch:hover {
+.windrose-sel-light-color-swatch:hover {
   border-color: var(--windrose-accent-primary);
 }
-.dmt-sel-light-color-swatch .dmt-sel-color-swatch {
+.windrose-sel-light-color-swatch .windrose-sel-color-swatch {
   width: 16px;
   height: 16px;
   border-radius: 2px;
 }
 
 /* Footer icon buttons — glass effect lets filigree show through */
-.dmt-sel-footer-icons {
+.windrose-sel-footer-icons {
   display: flex;
   gap: 4px;
   justify-content: center;
@@ -2242,9 +2242,9 @@ button.dmt-sel-light-color-swatch,
   z-index: 1;
 }
 
-.is-tablet button.dmt-sel-icon-btn,
-button.dmt-sel-icon-btn,
-.dmt-sel-icon-btn {
+.is-tablet button.windrose-sel-icon-btn,
+button.windrose-sel-icon-btn,
+.windrose-sel-icon-btn {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2260,29 +2260,29 @@ button.dmt-sel-icon-btn,
   cursor: pointer;
   transition: var(--windrose-transition);
 }
-.dmt-sel-icon-btn svg {
+.windrose-sel-icon-btn svg {
   color: var(--windrose-text-muted);
   width: 14px;
   height: 14px;
 }
-.dmt-sel-icon-btn:hover {
+.windrose-sel-icon-btn:hover {
   background: var(--windrose-bg-tertiary);
   border-color: var(--windrose-border-primary);
 }
-.dmt-sel-icon-btn:hover svg {
+.windrose-sel-icon-btn:hover svg {
   color: var(--windrose-text-primary);
 }
-.dmt-sel-icon-btn.dmt-sel-action-active {
+.windrose-sel-icon-btn.windrose-sel-action-active {
   background: var(--windrose-border-primary);
   border-color: var(--windrose-border-primary-dark);
 }
-.dmt-sel-icon-btn.dmt-sel-action-active svg,
-.dmt-sel-action-active.dmt-sel-action-active:hover svg {
+.windrose-sel-icon-btn.windrose-sel-action-active svg,
+.windrose-sel-action-active.windrose-sel-action-active:hover svg {
   color: var(--windrose-bg-primary);
 }
 
 /* Multi-select badge */
-.dmt-sel-multi-badge {
+.windrose-sel-multi-badge {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -2295,7 +2295,7 @@ button.dmt-sel-icon-btn,
   font-weight: 600;
   margin-bottom: 2px;
 }
-.dmt-sel-multi-badge svg {
+.windrose-sel-multi-badge svg {
   color: var(--windrose-bg-primary);
 }
 
@@ -2303,7 +2303,7 @@ button.dmt-sel-icon-btn,
    TEXT LABEL/MODAL SYSTEM
    ============================================ */
 
-.dmt-modal-overlay {
+.windrose-modal-overlay {
   position: fixed;
   top: 0;
   left: 0;
@@ -2327,7 +2327,7 @@ button.dmt-sel-icon-btn,
   }
 }
 
-.dmt-modal-content {
+.windrose-modal-content {
   background-color: var(--windrose-bg-secondary);
   border: 1px solid var(--windrose-border-secondary);
   border-radius: 8px;
@@ -2350,14 +2350,14 @@ button.dmt-sel-icon-btn,
   }
 }
 
-.dmt-modal-title {
+.windrose-modal-title {
   margin: 0 0 16px 0;
   font-size: 18px;
   font-weight: 600;
   color: var(--windrose-text-primary);
 }
 
-.dmt-modal-input {
+.windrose-modal-input {
   width: 100%;
   padding: 10px 12px;
   font-size: 16px;
@@ -2378,13 +2378,13 @@ button.dmt-sel-icon-btn,
   }
 }
 
-.dmt-modal-buttons {
+.windrose-modal-buttons {
   display: flex;
   gap: 8px;
   margin-top: 16px;
 }
 
-.dmt-modal-header {
+.windrose-modal-header {
   margin-bottom: 16px;
   
   h3 {
@@ -2395,16 +2395,16 @@ button.dmt-sel-icon-btn,
   }
 }
 
-.dmt-modal-body {
+.windrose-modal-body {
   margin-bottom: 16px;
 }
 
 /* Settings modal specific - cap height and make scrollable */
-.dmt-settings-modal {
+.windrose-settings-modal {
   display: flex;
   flex-direction: column;
 
-  .dmt-modal-body {
+  .windrose-modal-body {
     flex: 1;
     overflow-y: auto;
     overflow-x: hidden;
@@ -2413,19 +2413,19 @@ button.dmt-sel-icon-btn,
 }
 
 /* Fallback (non-native) modal: cap the inner height */
-.dmt-modal-content.dmt-settings-modal {
+.windrose-modal-content.windrose-settings-modal {
   max-height: 500px;
 }
 
 /* Native Obsidian modal sizing */
-.dmt-settings-native-modal {
+.windrose-settings-native-modal {
   width: 520px;
   max-width: 95vw;
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
-.dmt-settings-native-modal .modal-content {
+.windrose-settings-native-modal .modal-content {
   max-height: 70vh;
   display: flex;
   flex-direction: column;
@@ -2433,26 +2433,26 @@ button.dmt-sel-icon-btn,
   flex: 1;
   min-height: 0;
 }
-.dmt-settings-native-modal .dmt-settings-modal {
+.windrose-settings-native-modal .windrose-settings-modal {
   flex: 1;
   min-height: 0;
 }
 
 /* Resize handles for native modals (interact.js) */
-.dmt-resize-handle {
+.windrose-resize-handle {
   position: absolute;
   z-index: 10;
 }
-.dmt-resize-top { top: 0; left: 8px; right: 8px; height: 6px; cursor: ns-resize; }
-.dmt-resize-bottom { bottom: 0; left: 8px; right: 8px; height: 6px; cursor: ns-resize; }
-.dmt-resize-left { left: 0; top: 8px; bottom: 8px; width: 6px; cursor: ew-resize; }
-.dmt-resize-right { right: 0; top: 8px; bottom: 8px; width: 6px; cursor: ew-resize; }
-.dmt-resize-top-left { top: 0; left: 0; width: 12px; height: 12px; cursor: nwse-resize; }
-.dmt-resize-top-right { top: 0; right: 0; width: 12px; height: 12px; cursor: nesw-resize; }
-.dmt-resize-bottom-left { bottom: 0; left: 0; width: 12px; height: 12px; cursor: nesw-resize; }
-.dmt-resize-bottom-right { bottom: 0; right: 0; width: 12px; height: 12px; cursor: nwse-resize; }
+.windrose-resize-top { top: 0; left: 8px; right: 8px; height: 6px; cursor: ns-resize; }
+.windrose-resize-bottom { bottom: 0; left: 8px; right: 8px; height: 6px; cursor: ns-resize; }
+.windrose-resize-left { left: 0; top: 8px; bottom: 8px; width: 6px; cursor: ew-resize; }
+.windrose-resize-right { right: 0; top: 8px; bottom: 8px; width: 6px; cursor: ew-resize; }
+.windrose-resize-top-left { top: 0; left: 0; width: 12px; height: 12px; cursor: nwse-resize; }
+.windrose-resize-top-right { top: 0; right: 0; width: 12px; height: 12px; cursor: nesw-resize; }
+.windrose-resize-bottom-left { bottom: 0; left: 0; width: 12px; height: 12px; cursor: nesw-resize; }
+.windrose-resize-bottom-right { bottom: 0; right: 0; width: 12px; height: 12px; cursor: nwse-resize; }
 
-.dmt-modal-footer {
+.windrose-modal-footer {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
@@ -2461,7 +2461,7 @@ button.dmt-sel-icon-btn,
   max-width: 100%;
 }
 
-.dmt-form-group {
+.windrose-form-group {
   margin-bottom: 12px;
   
   &:last-child {
@@ -2469,7 +2469,7 @@ button.dmt-sel-icon-btn,
   }
 }
 
-.dmt-form-label {
+.windrose-form-label {
   display: block;
   margin-bottom: 6px;
   font-size: 14px;
@@ -2477,7 +2477,7 @@ button.dmt-sel-icon-btn,
   color: var(--windrose-text-secondary);
 }
 
-.dmt-modal-btn {
+.windrose-modal-btn {
   flex: 1 1 0;
   min-width: 0;
   padding: 10px 16px;
@@ -2488,7 +2488,7 @@ button.dmt-sel-icon-btn,
   cursor: pointer;
   transition: var(--windrose-transition);
 
-  &.dmt-modal-btn-cancel {
+  &.windrose-modal-btn-cancel {
     background-color: var(--windrose-bg-tertiary);
     border-color: var(--windrose-border-secondary);
     color: var(--windrose-text-primary);
@@ -2499,7 +2499,7 @@ button.dmt-sel-icon-btn,
     }
   }
 
-  &.dmt-modal-btn-submit {
+  &.windrose-modal-btn-submit {
     background-color: var(--windrose-accent-blue);
     border-color: var(--windrose-accent-blue);
     color: var(--windrose-text-primary);
@@ -2515,7 +2515,7 @@ button.dmt-sel-icon-btn,
     }
   }
 
-  &.dmt-modal-btn-danger {
+  &.windrose-modal-btn-danger {
     background-color: var(--windrose-accent-red);
     border-color: var(--windrose-accent-red);
     color: var(--windrose-text-primary);
@@ -2532,7 +2532,7 @@ button.dmt-sel-icon-btn,
   }
 }
 
-.dmt-modal-hint {
+.windrose-modal-hint {
   margin-top: 12px;
   font-size: 11px;
   color: var(--windrose-text-muted);
@@ -2540,12 +2540,12 @@ button.dmt-sel-icon-btn,
 }
 
 /* Settings Modal Specific Styles */
-.dmt-settings-section {
+.windrose-settings-section {
   margin-bottom: 16px;
 }
 
 /* Modal Portal - for rendering modals outside viewport */
-.dmt-modal-portal {
+.windrose-modal-portal {
   position: fixed;
   top: 0;
   left: 0;
@@ -2555,29 +2555,29 @@ button.dmt-sel-icon-btn,
   pointer-events: none;
 }
 
-.dmt-modal-portal-content {
+.windrose-modal-portal-content {
   pointer-events: auto;
 }
 
-.dmt-settings-section-header {
+.windrose-settings-section-header {
   margin-bottom: 12px;
 }
 
-.dmt-settings-section-title {
+.windrose-settings-section-title {
   font-size: 14px;
   font-weight: 600;
   color: var(--windrose-text-primary);
   margin: 0 0 4px 0;
 }
 
-.dmt-settings-section-description {
+.windrose-settings-section-description {
   font-size: 12px;
   color: var(--windrose-text-muted);
   margin: 0;
 }
 
 /* Settings Modal Tab Bar */
-.dmt-settings-tab-bar {
+.windrose-settings-tab-bar {
   display: flex;
   flex-wrap: wrap;
   gap: 0;
@@ -2588,7 +2588,7 @@ button.dmt-sel-icon-btn,
   max-width: calc(100% + 40px);
 }
 
-.dmt-settings-tab {
+.windrose-settings-tab {
   padding: 10px 16px;
   font-size: 13px;
   font-weight: 500;
@@ -2608,12 +2608,12 @@ button.dmt-sel-icon-btn,
   }
 }
 
-.dmt-settings-tab-active {
+.windrose-settings-tab-active {
   color: var(--text-normal);
   border-bottom-color: var(--interactive-accent);
 }
 
-.dmt-settings-tab-content {
+.windrose-settings-tab-content {
   min-height: 325px;
   box-sizing: border-box;
   max-width: 100%;
@@ -2622,13 +2622,13 @@ button.dmt-sel-icon-btn,
 }
 
 /* Color picker 2x2 grid items */
-.dmt-color-grid-item {
+.windrose-color-grid-item {
   display: flex;
   flex-direction: column;
 }
 
 /* Upgrade Banner */
-.dmt-settings-upgrade-banner {
+.windrose-settings-upgrade-banner {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -2641,7 +2641,7 @@ button.dmt-sel-icon-btn,
   animation: slideDown 0.3s ease;
 }
 
-.dmt-settings-upgrade-info {
+.windrose-settings-upgrade-info {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -2656,7 +2656,7 @@ button.dmt-sel-icon-btn,
   }
 }
 
-.dmt-settings-upgrade-btn {
+.windrose-settings-upgrade-btn {
   padding: 6px 14px;
   font-size: 12px;
   font-weight: 600;
@@ -2674,22 +2674,22 @@ button.dmt-sel-icon-btn,
   }
 }
 
-.dmt-settings-upgrade-container {
+.windrose-settings-upgrade-container {
   margin: -8px -8px 16px -8px;
   padding: 12px;
   background-color: rgba(0, 0, 0, 0.2);
   border-radius: 6px;
   
-  .dmt-plugin-installer-card {
+  .windrose-plugin-installer-card {
     margin: 0;
   }
 }
 
-.dmt-form-group {
+.windrose-form-group {
   margin-bottom: 12px;
 }
 
-.dmt-form-label {
+.windrose-form-label {
   display: block;
   font-size: 12px;
   font-weight: 500;
@@ -2697,7 +2697,7 @@ button.dmt-sel-icon-btn,
   margin-bottom: 6px;
 }
 
-.dmt-checkbox-label {
+.windrose-checkbox-label {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -2711,14 +2711,14 @@ button.dmt-sel-icon-btn,
   }
 }
 
-.dmt-checkbox {
+.windrose-checkbox {
   width: 16px;
   height: 16px;
   cursor: pointer;
   accent-color: var(--windrose-accent-blue);
 }
 
-.dmt-color-button {
+.windrose-color-button {
   width: 100%;
   height: 36px;
   border: 1px solid var(--windrose-border-secondary);
@@ -2741,7 +2741,7 @@ button.dmt-sel-icon-btn,
   }
 }
 
-.dmt-color-button-label {
+.windrose-color-button-label {
   font-size: 12px;
   font-weight: 600;
   text-shadow: 
@@ -2754,7 +2754,7 @@ button.dmt-sel-icon-btn,
   font-family: var(--font-monospace);
 }
 
-.dmt-color-settings {
+.windrose-color-settings {
   transition: opacity 0.2s ease;
 }
 
@@ -2762,7 +2762,7 @@ button.dmt-sel-icon-btn,
    COLOR PICKER SYSTEM
    ============================================ */
 
-.dmt-color-picker-overlay {
+.windrose-color-picker-overlay {
   position: fixed;
   top: 0;
   left: 0;
@@ -2773,7 +2773,7 @@ button.dmt-sel-icon-btn,
   pointer-events: auto;
 }
 
-.dmt-color-picker {
+.windrose-color-picker {
   background-color: var(--windrose-bg-secondary);
   border: 1px solid var(--windrose-border-secondary);
   border-radius: 8px;
@@ -2796,14 +2796,14 @@ button.dmt-sel-icon-btn,
   }
 }
 
-.dmt-color-picker-header {
+.windrose-color-picker-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 10px;
 }
 
-.dmt-color-picker-title {
+.windrose-color-picker-title {
   font-size: 12px;
   font-weight: 600;
   color: var(--windrose-text-primary);
@@ -2811,7 +2811,7 @@ button.dmt-sel-icon-btn,
   letter-spacing: 0.5px;
 }
 
-.dmt-color-reset-btn {
+.windrose-color-reset-btn {
   background-color: transparent;
   border: 1px solid var(--windrose-text-disabled);
   color: var(--windrose-text-primary);
@@ -2831,13 +2831,13 @@ button.dmt-sel-icon-btn,
   }
 }
 
-.dmt-color-grid {
+.windrose-color-grid {
   display: grid;
   grid-template-columns: repeat(6, 40px);
   gap: 6px;
 }
 
-.dmt-color-swatch {
+.windrose-color-swatch {
   width: 40px;
   height: 40px;
   border: 2px solid var(--windrose-border-secondary);
@@ -2855,13 +2855,13 @@ button.dmt-sel-icon-btn,
     transform: scale(1.1);
   }
 
-  &.dmt-color-swatch-selected {
+  &.windrose-color-swatch-selected {
     border-color: var(--windrose-text-primary);
     border-width: 3px;
     box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.3);
   }
 
-  &.dmt-color-swatch-reset {
+  &.windrose-color-swatch-reset {
     background-color: var(--windrose-bg-tertiary);
     border: 2px solid var(--windrose-text-disabled);
 
@@ -2871,13 +2871,13 @@ button.dmt-sel-icon-btn,
     }
   }
 
-  &.dmt-color-swatch-preview {
+  &.windrose-color-swatch-preview {
     border: 2px dashed var(--windrose-accent-blue);
     position: relative;
     animation: pulse 1s ease-in-out infinite;
   }
 
-  &.dmt-color-swatch-add {
+  &.windrose-color-swatch-add {
     background-color: var(--windrose-bg-secondary);
     border: 2px dashed var(--windrose-text-disabled);
     position: relative;
@@ -2903,23 +2903,23 @@ button.dmt-sel-icon-btn,
   }
 }
 
-.dmt-color-reset-icon,
-.dmt-color-checkmark {
+.windrose-color-reset-icon,
+.windrose-color-checkmark {
   color: var(--windrose-text-primary);
   font-weight: bold;
   text-shadow: 0 0 4px rgba(0, 0, 0, 0.8);
 }
 
-.dmt-color-reset-icon {
+.windrose-color-reset-icon {
   font-size: 18px;
 }
 
-.dmt-color-checkmark {
+.windrose-color-checkmark {
   font-size: 20px;
   pointer-events: none;
 }
 
-.dmt-color-preview-spinner {
+.windrose-color-preview-spinner {
   position: absolute;
   top: 50%;
   left: 50%;
@@ -2942,14 +2942,14 @@ button.dmt-sel-icon-btn,
   }
 }
 
-.dmt-color-add-icon,
-.dmt-color-add-icon-overlay {
+.windrose-color-add-icon,
+.windrose-color-add-icon-overlay {
   color: var(--windrose-text-primary);
   font-size: 24px;
   font-weight: bold;
 }
 
-.dmt-color-add-icon-overlay {
+.windrose-color-add-icon-overlay {
   position: absolute;
   top: 50%;
   left: 50%;
@@ -2958,7 +2958,7 @@ button.dmt-sel-icon-btn,
   z-index: 1;
 }
 
-.dmt-color-input-as-button {
+.windrose-color-input-as-button {
   width: 100%;
   height: 100%;
   opacity: 0;
@@ -2969,7 +2969,7 @@ button.dmt-sel-icon-btn,
   z-index: 2;
 }
 
-.dmt-color-delete-button {
+.windrose-color-delete-button {
   position: absolute;
   left: calc(100% + 4px);
   top: 50%;
@@ -3006,7 +3006,7 @@ button.dmt-sel-icon-btn,
 }
 
 /* Custom color edit panel (right-click/long-press) */
-.dmt-color-edit-panel {
+.windrose-color-edit-panel {
   position: absolute;
   left: calc(100% + 4px);
   top: 50%;
@@ -3023,25 +3023,25 @@ button.dmt-sel-icon-btn,
   white-space: nowrap;
 }
 
-.dmt-color-edit-opacity {
+.windrose-color-edit-opacity {
   display: flex;
   align-items: center;
   gap: 6px;
 }
 
-.dmt-color-edit-opacity-label {
+.windrose-color-edit-opacity-label {
   font-size: 11px;
   color: var(--windrose-text-secondary);
 }
 
-.dmt-color-edit-opacity-value {
+.windrose-color-edit-opacity-value {
   font-size: 11px;
   color: var(--windrose-text-primary);
   min-width: 32px;
   text-align: right;
 }
 
-.dmt-color-edit-opacity input[type="range"] {
+.windrose-color-edit-opacity input[type="range"] {
   width: 80px;
   height: 4px;
   cursor: pointer;
@@ -3068,7 +3068,7 @@ button.dmt-sel-icon-btn,
   }
 }
 
-.dmt-color-edit-delete {
+.windrose-color-edit-delete {
   width: 24px;
   height: 24px;
   background-color: rgba(239, 68, 68, 0.8);
@@ -3093,20 +3093,20 @@ button.dmt-sel-icon-btn,
 }
 
 /* Color picker opacity slider */
-.dmt-color-opacity-section {
+.windrose-color-opacity-section {
   margin-top: 12px;
   padding-top: 12px;
   border-top: 1px solid var(--windrose-bg-tertiary);
 }
 
-.dmt-color-opacity-header {
+.windrose-color-opacity-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 8px;
 }
 
-.dmt-color-opacity-label {
+.windrose-color-opacity-label {
   font-size: 11px;
   font-weight: 600;
   color: var(--windrose-text-muted);
@@ -3114,7 +3114,7 @@ button.dmt-sel-icon-btn,
   letter-spacing: 0.5px;
 }
 
-.dmt-color-opacity-value {
+.windrose-color-opacity-value {
   font-size: 12px;
   color: var(--windrose-text-primary);
   font-weight: 500;
@@ -3122,7 +3122,7 @@ button.dmt-sel-icon-btn,
   text-align: right;
 }
 
-.dmt-color-opacity-slider {
+.windrose-color-opacity-slider {
   width: 100%;
   height: 6px;
   -webkit-appearance: none;
@@ -3133,7 +3133,7 @@ button.dmt-sel-icon-btn,
   cursor: pointer;
 }
 
-.dmt-color-opacity-slider::-webkit-slider-thumb {
+.windrose-color-opacity-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
   width: 16px;
@@ -3145,11 +3145,11 @@ button.dmt-sel-icon-btn,
   transition: transform 0.15s ease;
 }
 
-.dmt-color-opacity-slider::-webkit-slider-thumb:hover {
+.windrose-color-opacity-slider::-webkit-slider-thumb:hover {
   transform: scale(1.15);
 }
 
-.dmt-color-opacity-slider::-moz-range-thumb {
+.windrose-color-opacity-slider::-moz-range-thumb {
   width: 16px;
   height: 16px;
   background: var(--windrose-accent-blue);
@@ -3159,7 +3159,7 @@ button.dmt-sel-icon-btn,
   transition: transform 0.15s ease;
 }
 
-.dmt-color-opacity-slider::-moz-range-thumb:hover {
+.windrose-color-opacity-slider::-moz-range-thumb:hover {
   transform: scale(1.15);
 }
 
@@ -3169,88 +3169,88 @@ button.dmt-sel-icon-btn,
 
 @media (hover: none) and (pointer: coarse) {
 
-  .dmt-compass {
+  .windrose-compass {
     width: 35px;
     height: 35px;
     max-width: 35px;
     max-height: 35px;
   }
 
-  .dmt-zoom-btn {
+  .windrose-zoom-btn {
     width: 35px;
     height: 35px;
     max-width: 35px;
     max-height: 35px;
   }
 
-  .dmt-tile-browser {
+  .windrose-tile-browser {
     width: 190px;
   }
 
-  .dmt-tile-browser-toggle,
-  .is-tablet .dmt-tile-browser-toggle {
+  .windrose-tile-browser-toggle,
+  .is-tablet .windrose-tile-browser-toggle {
     top: 100px;
   }
 
-  .dmt-modal-input {
+  .windrose-modal-input {
     font-size: 18px;
     padding: 12px;
   }
 
-  .dmt-modal-btn {
+  .windrose-modal-btn {
     padding: 14px 16px;
     font-size: 16px;
     flex: 1 1 auto;
     min-width: 100px;
   }
 
-  .dmt-rotate-button,
-  .dmt-note-button,
-  .dmt-link-note-button,
-  .dmt-resize-button,
-  .dmt-object-color-button {
+  .windrose-rotate-button,
+  .windrose-note-button,
+  .windrose-link-note-button,
+  .windrose-resize-button,
+  .windrose-object-color-button {
     width: 44px;
     height: 44px;
   }
 
-  .dmt-rotate-button {
+  .windrose-rotate-button {
     font-size: 24px;
   }
 
-  .dmt-resize-button {
+  .windrose-resize-button {
     font-size: 22px;
   }
 
-  .dmt-note-button svg {
+  .windrose-note-button svg {
     width: 22px;
     height: 22px;
   }
 
-  .dmt-link-note-button svg {
+  .windrose-link-note-button svg {
     width: 22px;
     height: 22px;
   }
 
-  .dmt-color-swatch {
+  .windrose-color-swatch {
     width: 44px;
     height: 44px;
   }
 
-  .dmt-color-grid {
+  .windrose-color-grid {
     grid-template-columns: repeat(6, 44px);
     gap: 8px;
   }
 
-  .dmt-color-picker {
+  .windrose-color-picker {
     min-width: 320px;
   }
 
-  .dmt-color-reset-btn {
+  .windrose-color-reset-btn {
     width: 28px;
     height: 28px;
   }
 
-  .dmt-color-delete-button {
+  .windrose-color-delete-button {
     width: 44px;
     height: 44px;
 
@@ -3262,24 +3262,24 @@ button.dmt-sel-icon-btn,
 }
 
 /* Text Label Editor Modal Styles */
-.dmt-text-editor-modal {
+.windrose-text-editor-modal {
   width: 420px;
   max-width: 90vw;
 }
 
-.dmt-text-editor-section {
+.windrose-text-editor-section {
   margin-bottom: 16px;
 }
 
-.dmt-text-editor-section-grow {
+.windrose-text-editor-section-grow {
   flex: 1;
 }
 
-.dmt-text-editor-section-small {
+.windrose-text-editor-section-small {
   width: 80px;
 }
 
-.dmt-text-editor-label {
+.windrose-text-editor-label {
   display: block;
   font-size: 12px;
   color: var(--text-muted);
@@ -3287,12 +3287,12 @@ button.dmt-sel-icon-btn,
   font-weight: 500;
 }
 
-.dmt-text-editor-row {
+.windrose-text-editor-row {
   display: flex;
   gap: 12px;
 }
 
-.dmt-text-editor-select {
+.windrose-text-editor-select {
   width: 100%;
   padding: 10px 12px;
   border: 1px solid var(--background-modifier-border);
@@ -3306,12 +3306,12 @@ button.dmt-sel-icon-btn,
   min-height: 40px;
 }
 
-.dmt-text-editor-select:focus {
+.windrose-text-editor-select:focus {
   outline: none;
   border-color: var(--interactive-accent);
 }
 
-.dmt-text-editor-number {
+.windrose-text-editor-number {
   width: 100%;
   padding: 8px 10px;
   border: 1px solid var(--background-modifier-border);
@@ -3322,12 +3322,12 @@ button.dmt-sel-icon-btn,
   font-size: 14px;
 }
 
-.dmt-text-editor-number:focus {
+.windrose-text-editor-number:focus {
   outline: none;
   border-color: var(--interactive-accent);
 }
 
-.dmt-text-editor-color-button {
+.windrose-text-editor-color-button {
   width: 100%;
   height: 40px;
   border: 2px solid var(--background-modifier-border);
@@ -3339,12 +3339,12 @@ button.dmt-sel-icon-btn,
   transition: all 0.15s ease;
 }
 
-.dmt-text-editor-color-button:hover {
+.windrose-text-editor-color-button:hover {
   border-color: var(--interactive-accent);
   transform: translateY(-1px);
 }
 
-.dmt-text-editor-color-label {
+.windrose-text-editor-color-label {
   font-size: 11px;
   font-weight: 600;
   color: white;
@@ -3358,7 +3358,7 @@ button.dmt-sel-icon-btn,
 }
 
 /* Live Preview Section */
-.dmt-text-editor-preview-toggle {
+.windrose-text-editor-preview-toggle {
   background: none;
   border: none;
   color: var(--text-muted);
@@ -3371,17 +3371,17 @@ button.dmt-sel-icon-btn,
   transition: all 0.15s ease;
 }
 
-.dmt-text-editor-preview-toggle:hover {
+.windrose-text-editor-preview-toggle:hover {
   background: var(--background-modifier-hover);
   color: var(--text-normal);
 }
 
-.dmt-text-editor-preview-toggle svg {
+.windrose-text-editor-preview-toggle svg {
   width: 16px;
   height: 16px;
 }
 
-.dmt-text-editor-preview {
+.windrose-text-editor-preview {
   padding: 16px;
   text-align: center;
   background: var(--windrose-bg-secondary);
@@ -3397,12 +3397,12 @@ button.dmt-sel-icon-btn,
   margin-top: 8px;
 }
 
-.dmt-native-color-swatches {
+.windrose-native-color-swatches {
   margin-top: 8px;
 }
 
 /* Edit Button (for text labels) */
-.dmt-edit-button {
+.windrose-edit-button {
   position: absolute;
   width: 32px;
   height: 32px;
@@ -3420,19 +3420,19 @@ button.dmt-sel-icon-btn,
   z-index: 1000;
 }
 
-.dmt-edit-button:hover {
+.windrose-edit-button:hover {
   background: linear-gradient(135deg, #5aa5ff 0%, #4088cd 100%);
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 
-.dmt-edit-button:active {
+.windrose-edit-button:active {
   transform: translateY(0);
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
 }
 
 /* Object Color Button (for objects) */
-.dmt-object-color-button {
+.windrose-object-color-button {
   width: 32px;
   height: 32px;
   border: 2px solid rgba(255, 255, 255, 0.3);
@@ -3446,25 +3446,25 @@ button.dmt-sel-icon-btn,
   z-index: 1000;
 }
 
-.dmt-object-color-button svg {
+.windrose-object-color-button svg {
   width: 16px;
   height: 16px;
   filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.8));
   color: #000;
 }
 
-.dmt-object-color-button:hover {
+.windrose-object-color-button:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
   border-color: rgba(255, 255, 255, 0.5);
 }
 
-.dmt-object-color-button:active {
+.windrose-object-color-button:active {
   transform: translateY(0);
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
 }
 
-.dmt-object-color-button .dmt-color-picker {
+.windrose-object-color-button .windrose-color-picker {
   position: absolute;
   left: 100%;
   top: 0;
@@ -3473,15 +3473,15 @@ button.dmt-sel-icon-btn,
 
 /* Mobile/tablet adjustments for text editor */
 @media (max-width: 768px) {
-  .dmt-text-editor-modal {
+  .windrose-text-editor-modal {
     width: 360px;
   }
 
-  .dmt-text-editor-number {
+  .windrose-text-editor-number {
     width: 60px;
   }
 
-  .dmt-edit-button {
+  .windrose-edit-button {
     width: 44px;
     height: 44px;
     font-size: 22px;
@@ -3492,7 +3492,7 @@ button.dmt-sel-icon-btn,
    PLUGIN INSTALLER
    ============================================ */
 
-.dmt-plugin-installer {
+.windrose-plugin-installer {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3501,7 +3501,7 @@ button.dmt-sel-icon-btn,
   background: var(--windrose-bg-primary);
 }
 
-.dmt-plugin-installer-card {
+.windrose-plugin-installer-card {
   max-width: 600px;
   background: var(--windrose-bg-secondary);
   border: 2px solid var(--windrose-border-primary);
@@ -3511,7 +3511,7 @@ button.dmt-sel-icon-btn,
               inset 0 0 0 1px rgba(var(--windrose-border-primary-rgb), 0.2);
 }
 
-.dmt-plugin-installer-icon {
+.windrose-plugin-installer-icon {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3525,7 +3525,7 @@ button.dmt-sel-icon-btn,
   }
 }
 
-.dmt-plugin-installer-content {
+.windrose-plugin-installer-content {
   h3 {
     margin: 0 0 16px 0;
     font-size: 24px;
@@ -3552,7 +3552,7 @@ button.dmt-sel-icon-btn,
     }
   }
   
-  .dmt-plugin-installer-note {
+  .windrose-plugin-installer-note {
     margin-top: 20px;
     padding: 12px;
     background: rgba(var(--windrose-border-primary-rgb), 0.1);
@@ -3563,7 +3563,7 @@ button.dmt-sel-icon-btn,
   }
 }
 
-.dmt-plugin-installer-error {
+.windrose-plugin-installer-error {
   margin-top: 16px;
   padding: 12px;
   background: rgba(239, 68, 68, 0.1);
@@ -3574,14 +3574,14 @@ button.dmt-sel-icon-btn,
   text-align: center;
 }
 
-.dmt-plugin-installer-actions {
+.windrose-plugin-installer-actions {
   display: flex;
   gap: 12px;
   margin-top: 24px;
   justify-content: center;
 }
 
-.dmt-plugin-installer-btn {
+.windrose-plugin-installer-btn {
   padding: 12px 24px;
   border: none;
   border-radius: 6px;
@@ -3596,7 +3596,7 @@ button.dmt-sel-icon-btn,
   }
 }
 
-.dmt-plugin-installer-btn-primary {
+.windrose-plugin-installer-btn-primary {
   background: linear-gradient(135deg, var(--windrose-border-primary) 0%, var(--windrose-border-primary-dark) 100%);
   color: var(--windrose-bg-primary);
   box-shadow: 0 2px 8px rgba(var(--windrose-border-primary-rgb), 0.3);
@@ -3611,7 +3611,7 @@ button.dmt-sel-icon-btn,
   }
 }
 
-.dmt-plugin-installer-btn-secondary {
+.windrose-plugin-installer-btn-secondary {
   background: var(--windrose-bg-tertiary);
   color: var(--windrose-text-secondary);
   border: 1px solid var(--windrose-border-secondary);
@@ -3623,7 +3623,7 @@ button.dmt-sel-icon-btn,
 }
 
 /* Success Modal */
-.dmt-plugin-success-modal-overlay {
+.windrose-plugin-success-modal-overlay {
   position: fixed;
   top: 0;
   left: 0;
@@ -3637,7 +3637,7 @@ button.dmt-sel-icon-btn,
   backdrop-filter: blur(4px);
 }
 
-.dmt-plugin-success-modal {
+.windrose-plugin-success-modal {
   max-width: 500px;
   background: var(--windrose-bg-secondary);
   border: 2px solid var(--windrose-border-primary);
@@ -3659,7 +3659,7 @@ button.dmt-sel-icon-btn,
   }
 }
 
-.dmt-plugin-success-icon {
+.windrose-plugin-success-icon {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3673,7 +3673,7 @@ button.dmt-sel-icon-btn,
   }
 }
 
-.dmt-plugin-success-modal h3 {
+.windrose-plugin-success-modal h3 {
   margin: 0 0 16px 0;
   font-size: 22px;
   font-weight: 600;
@@ -3681,7 +3681,7 @@ button.dmt-sel-icon-btn,
   text-align: center;
 }
 
-.dmt-plugin-success-modal p {
+.windrose-plugin-success-modal p {
   margin: 0 0 12px 0;
   font-size: 15px;
   line-height: 1.6;
@@ -3689,7 +3689,7 @@ button.dmt-sel-icon-btn,
   text-align: center;
 }
 
-.dmt-plugin-success-note {
+.windrose-plugin-success-note {
   margin-top: 16px;
   padding: 12px;
   background: rgba(var(--windrose-border-primary-rgb), 0.1);
@@ -3700,7 +3700,7 @@ button.dmt-sel-icon-btn,
   text-align: left;
 }
 
-.dmt-plugin-success-actions {
+.windrose-plugin-success-actions {
   display: flex;
   gap: 12px;
   margin-top: 24px;
@@ -3711,7 +3711,7 @@ button.dmt-sel-icon-btn,
    Hex Coordinate Layer
    ============================================ */
 
-.dmt-coordinate-layer {
+.windrose-coordinate-layer {
   position: absolute;
   top: 0;
   left: 0;
@@ -3722,7 +3722,7 @@ button.dmt-sel-icon-btn,
   overflow: hidden;
 }
 
-.dmt-hex-coordinate {
+.windrose-hex-coordinate {
   font-family: var(--font-monospace);
   font-weight: 600;
   /* color and text-shadow applied via inline styles from settings */
@@ -3735,7 +3735,7 @@ button.dmt-sel-icon-btn,
    Visibility Toolbar
    ============================================ */
 
-.dmt-visibility-toolbar {
+.windrose-visibility-toolbar {
   position: absolute;
   top: 128px; /* Below MapHeader + ToolPalette + extra spacing for iPad/mobile (header ~44px + palette ~60px + container padding 12px + gap 12px) */
   left: 50%;
@@ -3755,13 +3755,13 @@ button.dmt-sel-icon-btn,
   transition: opacity 200ms ease-out, transform 200ms ease-out;
 }
 
-.dmt-visibility-toolbar-open {
+.windrose-visibility-toolbar-open {
   opacity: 1;
   transform: translateX(-50%) translateY(0);
   pointer-events: auto;
 }
 
-.dmt-visibility-btn {
+.windrose-visibility-btn {
   position: relative;
   display: flex;
   align-items: center;
@@ -3776,19 +3776,19 @@ button.dmt-sel-icon-btn,
   height: 32px;
   transition: var(--windrose-transition);
 
-  &:hover:not(.dmt-visibility-btn-hidden) {
+  &:hover:not(.windrose-visibility-btn-hidden) {
     background-color: var(--windrose-bg-tertiary);
     border-color: var(--windrose-border-primary);
   }
 
-  svg:not(.dmt-visibility-strikethrough) {
+  svg:not(.windrose-visibility-strikethrough) {
     color: var(--windrose-border-primary);
     width: 18px;
     height: 18px;
   }
 }
 
-.dmt-visibility-strikethrough {
+.windrose-visibility-strikethrough {
   position: absolute;
   top: 50%;
   left: 50%;
@@ -3799,7 +3799,7 @@ button.dmt-sel-icon-btn,
   pointer-events: none;
 }
 
-.dmt-visibility-btn-hidden {
+.windrose-visibility-btn-hidden {
   opacity: 0.6;
   background-color: rgba(0, 0, 0, 0.3);
   
@@ -3808,14 +3808,14 @@ button.dmt-sel-icon-btn,
     border-color: var(--windrose-border-secondary);
   }
 
-  svg:not(.dmt-visibility-strikethrough) {
+  svg:not(.windrose-visibility-strikethrough) {
     color: var(--windrose-text-muted);
   }
 }
 
 /* Active state for visibility toggle button in controls */
-.dmt-expand-btn-active.dmt-expand-btn-active,
-.dmt-expand-btn-active.dmt-expand-btn-active:hover {
+.windrose-expand-btn-active.windrose-expand-btn-active,
+.windrose-expand-btn-active.windrose-expand-btn-active:hover {
   background-color: var(--windrose-border-primary);
   border-color: var(--windrose-border-primary-dark);
   
@@ -3829,7 +3829,7 @@ button.dmt-sel-icon-btn,
    ========================================================================== */
 
 /* Separator between layer toggles and FoW section */
-.dmt-visibility-separator {
+.windrose-visibility-separator {
   width: 1px;
   height: 24px;
   background: var(--windrose-border-secondary);
@@ -3837,7 +3837,7 @@ button.dmt-sel-icon-btn,
 }
 
 /* FoW section container */
-.dmt-fow-section {
+.windrose-fow-section {
   display: flex;
   align-items: center;
   gap: 2px;
@@ -3845,9 +3845,9 @@ button.dmt-sel-icon-btn,
 
 /* FoW toggle button (always visible) */
 /* FoW toggle button - with tablet overrides */
-.is-tablet button.dmt-fow-toggle-btn,
-button.dmt-fow-toggle-btn,
-.dmt-fow-toggle-btn {
+.is-tablet button.windrose-fow-toggle-btn,
+button.windrose-fow-toggle-btn,
+.windrose-fow-toggle-btn {
   display: flex;
   align-items: center;
   gap: 4px;
@@ -3883,13 +3883,13 @@ button.dmt-fow-toggle-btn,
   }
 }
 
-.dmt-fow-label {
+.windrose-fow-label {
   font-size: 11px;
   color: var(--windrose-text-muted);
 }
 
 /* FoW tools panel (expandable) */
-.dmt-fow-tools-panel {
+.windrose-fow-tools-panel {
   display: flex;
   align-items: center;
   gap: 2px;
@@ -3908,9 +3908,9 @@ button.dmt-fow-toggle-btn,
 }
 
 /* Individual FoW tool buttons - with tablet overrides */
-.is-tablet button.dmt-fow-tool-btn,
-button.dmt-fow-tool-btn,
-.dmt-fow-tool-btn {
+.is-tablet button.windrose-fow-tool-btn,
+button.windrose-fow-tool-btn,
+.windrose-fow-tool-btn {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3964,7 +3964,7 @@ button.dmt-fow-tool-btn,
 }
 
 /* Floating FoW toolbar (shown when fog tools are toggled) */
-.dmt-fow-floating-toolbar {
+.windrose-fow-floating-toolbar {
   position: fixed;
   bottom: 100px;
   left: 50%;
@@ -3984,7 +3984,7 @@ button.dmt-fow-tool-btn,
   white-space: nowrap;
 }
 
-.dmt-fow-floating-separator {
+.windrose-fow-floating-separator {
   width: 1px;
   height: 20px;
   background: var(--windrose-border-secondary);
@@ -3995,7 +3995,7 @@ button.dmt-fow-tool-btn,
    Scale Slider (shown during resize mode)
    ========================================================================== */
 
-.dmt-scale-slider-container {
+.windrose-scale-slider-container {
   background: var(--windrose-bg-secondary);
   border: 1px solid var(--windrose-border-primary);
   border-radius: 6px;
@@ -4004,7 +4004,7 @@ button.dmt-fow-tool-btn,
               inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
-.dmt-scale-slider-inner {
+.windrose-scale-slider-inner {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -4015,7 +4015,7 @@ button.dmt-fow-tool-btn,
   }
 }
 
-.dmt-scale-slider {
+.windrose-scale-slider {
   flex: 1;
   height: 4px;
   -webkit-appearance: none;
@@ -4069,7 +4069,7 @@ button.dmt-fow-tool-btn,
   }
 }
 
-.dmt-scale-value {
+.windrose-scale-value {
   font-size: 12px;
   font-weight: 600;
   color: var(--windrose-text-muted);
@@ -4083,7 +4083,7 @@ button.dmt-fow-tool-btn,
    ============================================ */
 
 /* Left panels container — stacks layers + regions without overlap */
-.dmt-left-panels {
+.windrose-left-panels {
   position: absolute;
   top: 0;
   bottom: 0;
@@ -4096,15 +4096,15 @@ button.dmt-fow-tool-btn,
   transition: left 0.3s ease;
 }
 
-.dmt-left-panels.sidebar-open {
+.windrose-left-panels.sidebar-open {
   left: calc(180px + 8px);
 }
 
-.dmt-left-panels.sidebar-closed {
+.windrose-left-panels.sidebar-closed {
   left: 8px;
 }
 
-.dmt-layer-controls {
+.windrose-layer-controls {
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -4115,25 +4115,25 @@ button.dmt-fow-tool-btn,
   flex-shrink: 1;
 }
 
-.dmt-layer-controls.dmt-layer-controls-open {
+.windrose-layer-controls.windrose-layer-controls-open {
   opacity: 1;
   transform: translateX(0);
   pointer-events: auto;
 }
 
-.dmt-layer-controls.dmt-layer-controls-open .dmt-layer-btn,
-.dmt-layer-controls.dmt-layer-controls-open .dmt-layer-add-btn {
+.windrose-layer-controls.windrose-layer-controls-open .windrose-layer-btn,
+.windrose-layer-controls.windrose-layer-controls-open .windrose-layer-add-btn {
   pointer-events: auto;
 }
 
 /* Remove old absolute positioning — now handled by container */
-.dmt-layer-controls.sidebar-open,
-.dmt-layer-controls.sidebar-closed {
+.windrose-layer-controls.sidebar-open,
+.windrose-layer-controls.sidebar-closed {
   left: auto;
 }
 
 /* Layer Button Wrapper (for drag handling) */
-.dmt-layer-btn-wrapper {
+.windrose-layer-btn-wrapper {
   position: relative;
   display: flex;
   align-items: center;
@@ -4142,8 +4142,8 @@ button.dmt-fow-tool-btn,
 }
 
 /* Layer Button */
-.is-tablet button.dmt-layer-btn,
-button.dmt-layer-btn {
+.is-tablet button.windrose-layer-btn,
+button.windrose-layer-btn {
   width: 35px;
   height: 35px;
   min-width: 35px;
@@ -4165,25 +4165,25 @@ button.dmt-layer-btn {
   user-select: none;
 }
 
-.dmt-layer-btn:hover {
+.windrose-layer-btn:hover {
   border-color: rgba(var(--windrose-border-primary-rgb), 0.6);
   background: rgba(0, 0, 0, 0.85);
   transform: scale(1.05);
 }
 
-.dmt-layer-btn-active {
+.windrose-layer-btn-active {
   border-color: var(--windrose-border-primary);
   box-shadow: 0 0 8px rgba(var(--windrose-border-primary-rgb), 0.4);
   background: rgba(var(--windrose-border-primary-rgb), 0.2);
 }
 
-.dmt-layer-btn-active:hover {
+.windrose-layer-btn-active:hover {
   border-color: var(--windrose-border-primary);
   background: rgba(var(--windrose-border-primary-rgb), 0.3);
 }
 
 /* Layer Options Slide-out */
-.dmt-layer-options {
+.windrose-layer-options {
   position: absolute;
   left: 100%;
   top: 0;
@@ -4198,14 +4198,14 @@ button.dmt-layer-btn {
   transition: all 0.2s ease;
 }
 
-.dmt-layer-options.expanded {
+.windrose-layer-options.expanded {
   opacity: 1;
   transform: translateX(0);
   pointer-events: auto;
 }
 
-.is-tablet button.dmt-layer-option-btn,
-button.dmt-layer-option-btn {
+.is-tablet button.windrose-layer-option-btn,
+button.windrose-layer-option-btn {
   width: 28px;
   height: 28px;
   min-width: 28px;
@@ -4227,35 +4227,35 @@ button.dmt-layer-option-btn {
   transition: all 0.15s ease;
 }
 
-.dmt-layer-option-btn:hover {
+.windrose-layer-option-btn:hover {
   color: var(--windrose-text-normal);
   border-color: rgba(var(--windrose-border-primary-rgb), 0.6);
 }
 
-.dmt-layer-option-btn.delete:hover {
+.windrose-layer-option-btn.delete:hover {
   color: var(--windrose-error);
   border-color: var(--windrose-error);
   background: rgba(239, 68, 68, 0.1);
 }
 
 /* Layer Transparency Toggle */
-.dmt-layer-transparency-wrapper {
+.windrose-layer-transparency-wrapper {
   position: relative;
 }
 
-.dmt-layer-option-btn.transparency.active {
+.windrose-layer-option-btn.transparency.active {
   color: var(--windrose-accent-blue);
   border-color: var(--windrose-accent-blue);
   background: rgba(74, 158, 255, 0.15);
   box-shadow: 0 0 8px rgba(74, 158, 255, 0.4);
 }
 
-.dmt-layer-option-btn.transparency:hover {
+.windrose-layer-option-btn.transparency:hover {
   color: var(--windrose-accent-blue);
   border-color: rgba(74, 158, 255, 0.6);
 }
 
-.dmt-opacity-slider-popup {
+.windrose-opacity-slider-popup {
   position: absolute;
   left: calc(100% + 8px);
   top: 50%;
@@ -4272,7 +4272,7 @@ button.dmt-layer-option-btn {
   white-space: nowrap;
 }
 
-.dmt-opacity-slider-popup::before {
+.windrose-opacity-slider-popup::before {
   content: '';
   position: absolute;
   right: 100%;
@@ -4282,7 +4282,7 @@ button.dmt-layer-option-btn {
   border-right-color: rgba(var(--windrose-border-primary-rgb), 0.4);
 }
 
-.dmt-opacity-slider {
+.windrose-opacity-slider {
   width: 70px;
   height: 4px;
   -webkit-appearance: none;
@@ -4292,7 +4292,7 @@ button.dmt-layer-option-btn {
   cursor: pointer;
 }
 
-.dmt-opacity-slider::-webkit-slider-thumb {
+.windrose-opacity-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
   width: 12px;
@@ -4302,7 +4302,7 @@ button.dmt-layer-option-btn {
   cursor: pointer;
 }
 
-.dmt-opacity-slider::-moz-range-thumb {
+.windrose-opacity-slider::-moz-range-thumb {
   width: 12px;
   height: 12px;
   background: var(--windrose-accent-blue);
@@ -4311,14 +4311,14 @@ button.dmt-layer-option-btn {
   cursor: pointer;
 }
 
-.dmt-opacity-value {
+.windrose-opacity-value {
   color: var(--windrose-text-muted);
   font-size: 11px;
 }
 
 /* Add Layer Button */
-.is-tablet button.dmt-layer-add-btn,
-button.dmt-layer-add-btn {
+.is-tablet button.windrose-layer-add-btn,
+button.windrose-layer-add-btn {
   width: 35px;
   height: 35px;
   min-width: 35px;
@@ -4341,7 +4341,7 @@ button.dmt-layer-add-btn {
   margin-top: 4px;
 }
 
-.dmt-layer-add-btn:hover {
+.windrose-layer-add-btn:hover {
   background: rgba(0, 0, 0, 0.7);
   border-color: rgba(var(--windrose-border-primary-rgb), 0.6);
   border-style: solid;
@@ -4349,25 +4349,25 @@ button.dmt-layer-add-btn {
   transform: scale(1.05);
 }
 
-.dmt-layer-add-btn svg {
+.windrose-layer-add-btn svg {
   width: 16px;
   height: 16px;
 }
 
 /* Drag states */
-.dmt-layer-btn.dragging {
+.windrose-layer-btn.dragging {
   opacity: 0.5;
 }
 
-.dmt-layer-btn.drag-over {
+.windrose-layer-btn.drag-over {
   border-color: var(--windrose-border-primary);
   transform: scale(1.05);
   box-shadow: 0 0 12px rgba(var(--windrose-border-primary-rgb), 0.5);
 }
 
 /* Layer Button - Pill Mode (for named layers) */
-.is-tablet button.dmt-layer-btn.dmt-layer-btn-pill,
-button.dmt-layer-btn.dmt-layer-btn-pill {
+.is-tablet button.windrose-layer-btn.windrose-layer-btn-pill,
+button.windrose-layer-btn.windrose-layer-btn-pill {
   width: auto;
   max-width: 180px;
   min-width: 35px;
@@ -4376,13 +4376,13 @@ button.dmt-layer-btn.dmt-layer-btn-pill {
   gap: 4px;
 }
 
-.dmt-layer-icon {
+.windrose-layer-icon {
   font-size: 14px;
   line-height: 1;
   flex-shrink: 0;
 }
 
-.dmt-layer-icon.ra {
+.windrose-layer-icon.ra {
   font-family: 'rpgawesome';
   font-style: normal;
   -webkit-font-feature-settings: normal;
@@ -4393,14 +4393,14 @@ button.dmt-layer-btn.dmt-layer-btn-pill {
   -webkit-font-smoothing: antialiased;
 }
 
-.dmt-layer-name {
+.windrose-layer-name {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 /* Edit button styling */
-.dmt-layer-option-btn.edit:hover {
+.windrose-layer-option-btn.edit:hover {
   color: var(--windrose-accent-blue);
   border-color: var(--windrose-accent-blue);
   background: rgba(74, 158, 255, 0.1);
@@ -4410,7 +4410,7 @@ button.dmt-layer-btn.dmt-layer-btn-pill {
    REGION PANEL
    ========================================================================== */
 
-.dmt-region-panel {
+.windrose-region-panel {
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -4423,19 +4423,19 @@ button.dmt-layer-btn.dmt-layer-btn-pill {
   flex-shrink: 1;
 }
 
-.dmt-region-panel.dmt-region-panel-open {
+.windrose-region-panel.windrose-region-panel-open {
   opacity: 1;
   transform: translateX(0);
   pointer-events: auto;
 }
 
 /* Remove old absolute positioning — now handled by container */
-.dmt-region-panel.sidebar-open,
-.dmt-region-panel.sidebar-closed {
+.windrose-region-panel.sidebar-open,
+.windrose-region-panel.sidebar-closed {
   left: auto;
 }
 
-.dmt-region-panel-header {
+.windrose-region-panel-header {
   display: flex;
   align-items: center;
   gap: 4px;
@@ -4446,8 +4446,8 @@ button.dmt-layer-btn.dmt-layer-btn-pill {
   letter-spacing: 0.5px;
 }
 
-.is-tablet button.dmt-region-item,
-button.dmt-region-item {
+.is-tablet button.windrose-region-item,
+button.windrose-region-item {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -4464,16 +4464,16 @@ button.dmt-region-item {
   white-space: nowrap;
 }
 
-.dmt-region-item:hover {
+.windrose-region-item:hover {
   border-color: var(--windrose-accent-muted);
   background: var(--windrose-bg-tertiary);
 }
 
-.dmt-region-item-hidden {
+.windrose-region-item-hidden {
   opacity: 0.5;
 }
 
-.dmt-region-color-dot {
+.windrose-region-color-dot {
   width: 10px;
   height: 10px;
   border-radius: 50%;
@@ -4481,15 +4481,15 @@ button.dmt-region-item {
   border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
-.dmt-region-name {
+.windrose-region-name {
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   text-align: left;
 }
 
-.is-tablet button.dmt-region-visibility-btn,
-button.dmt-region-visibility-btn {
+.is-tablet button.windrose-region-visibility-btn,
+button.windrose-region-visibility-btn {
   background: none;
   border: none;
   color: var(--windrose-text-muted);
@@ -4500,7 +4500,7 @@ button.dmt-region-visibility-btn {
   align-items: center;
 }
 
-.dmt-region-visibility-btn:hover {
+.windrose-region-visibility-btn:hover {
   color: var(--windrose-text-primary);
 }
 
@@ -4509,7 +4509,7 @@ button.dmt-region-visibility-btn {
    SUB-HEX BREADCRUMB
    ========================================================================== */
 
-.dmt-sub-hex-breadcrumb {
+.windrose-sub-hex-breadcrumb {
   display: flex;
   align-items: center;
   gap: 2px;
@@ -4521,21 +4521,21 @@ button.dmt-region-visibility-btn {
   flex-shrink: 0;
 }
 
-.dmt-breadcrumb-segment {
+.windrose-breadcrumb-segment {
   display: flex;
   align-items: center;
   gap: 2px;
 }
 
-.dmt-breadcrumb-separator {
+.windrose-breadcrumb-separator {
   display: flex;
   align-items: center;
   color: var(--windrose-text-muted);
   margin: 0 2px;
 }
 
-.is-tablet button.dmt-breadcrumb-link,
-button.dmt-breadcrumb-link {
+.is-tablet button.windrose-breadcrumb-link,
+button.windrose-breadcrumb-link {
   background: none;
   border: none;
   color: var(--windrose-accent-primary);
@@ -4546,12 +4546,12 @@ button.dmt-breadcrumb-link {
   transition: all 150ms ease;
 }
 
-.dmt-breadcrumb-link:hover {
+.windrose-breadcrumb-link:hover {
   background: var(--windrose-bg-tertiary);
   text-decoration: underline;
 }
 
-.dmt-breadcrumb-current {
+.windrose-breadcrumb-current {
   color: var(--windrose-text-primary);
   font-weight: 500;
   padding: 2px 4px;
@@ -4561,17 +4561,17 @@ button.dmt-breadcrumb-link {
    LAYER EDIT MODAL
    ========================================================================== */
 
-.dmt-layer-edit-modal {
+.windrose-layer-edit-modal {
   max-width: 400px;
   max-height: 80vh;
   overflow-y: auto;
 }
 
-.dmt-layer-edit-section {
+.windrose-layer-edit-section {
   margin-bottom: 16px;
 }
 
-.dmt-layer-edit-label {
+.windrose-layer-edit-label {
   display: block;
   font-size: 12px;
   color: var(--windrose-text-muted);
@@ -4581,13 +4581,13 @@ button.dmt-breadcrumb-link {
 }
 
 /* Icon mode toggle */
-.dmt-icon-mode-toggle {
+.windrose-icon-mode-toggle {
   display: flex;
   gap: 4px;
   margin-bottom: 12px;
 }
 
-.dmt-icon-mode-btn {
+.windrose-icon-mode-btn {
   flex: 1;
   padding: 8px 12px;
   background: rgba(0, 0, 0, 0.3);
@@ -4599,25 +4599,25 @@ button.dmt-breadcrumb-link {
   transition: all 0.15s ease;
 }
 
-.dmt-icon-mode-btn:hover {
+.windrose-icon-mode-btn:hover {
   border-color: rgba(var(--windrose-border-primary-rgb), 0.5);
   color: var(--windrose-text-normal);
 }
 
-.dmt-icon-mode-btn.active {
+.windrose-icon-mode-btn.active {
   background: rgba(var(--windrose-border-primary-rgb), 0.2);
   border-color: var(--windrose-border-primary);
   color: var(--windrose-text-primary);
 }
 
 /* Symbol picker */
-.dmt-symbol-input-row {
+.windrose-symbol-input-row {
   display: flex;
   gap: 8px;
   margin-bottom: 12px;
 }
 
-.dmt-symbol-input {
+.windrose-symbol-input {
   flex: 1;
   padding: 8px 12px;
   font-size: 16px;
@@ -4627,12 +4627,12 @@ button.dmt-breadcrumb-link {
   color: var(--windrose-text-primary);
 }
 
-.dmt-symbol-input:focus {
+.windrose-symbol-input:focus {
   outline: none;
   border-color: var(--windrose-border-primary);
 }
 
-.dmt-symbol-preview {
+.windrose-symbol-preview {
   width: 40px;
   height: 40px;
   display: flex;
@@ -4644,13 +4644,13 @@ button.dmt-breadcrumb-link {
   font-size: 20px;
 }
 
-.dmt-quick-symbols-grid {
+.windrose-quick-symbols-grid {
   display: grid;
   grid-template-columns: repeat(9, 1fr);
   gap: 4px;
 }
 
-.dmt-quick-symbol-btn {
+.windrose-quick-symbol-btn {
   width: 100%;
   aspect-ratio: 1;
   display: flex;
@@ -4665,24 +4665,24 @@ button.dmt-breadcrumb-link {
   transition: all 0.1s ease;
 }
 
-.dmt-quick-symbol-btn:hover {
+.windrose-quick-symbol-btn:hover {
   background: rgba(var(--windrose-border-primary-rgb), 0.15);
   border-color: rgba(var(--windrose-border-primary-rgb), 0.4);
 }
 
-.dmt-quick-symbol-btn.selected {
+.windrose-quick-symbol-btn.selected {
   background: rgba(var(--windrose-border-primary-rgb), 0.25);
   border-color: var(--windrose-border-primary);
 }
 
 /* Icon picker */
-.dmt-icon-picker {
+.windrose-icon-picker {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
-.dmt-icon-search {
+.windrose-icon-search {
   width: 100%;
   padding: 8px 12px;
   font-size: 13px;
@@ -4692,18 +4692,18 @@ button.dmt-breadcrumb-link {
   color: var(--windrose-text-primary);
 }
 
-.dmt-icon-search:focus {
+.windrose-icon-search:focus {
   outline: none;
   border-color: var(--windrose-border-primary);
 }
 
-.dmt-icon-category-tabs {
+.windrose-icon-category-tabs {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
 }
 
-.dmt-icon-category-tab {
+.windrose-icon-category-tab {
   padding: 4px 8px;
   font-size: 10px;
   background: rgba(0, 0, 0, 0.3);
@@ -4714,18 +4714,18 @@ button.dmt-breadcrumb-link {
   transition: all 0.1s ease;
 }
 
-.dmt-icon-category-tab:hover {
+.windrose-icon-category-tab:hover {
   border-color: rgba(var(--windrose-border-primary-rgb), 0.4);
   color: var(--windrose-text-normal);
 }
 
-.dmt-icon-category-tab.active {
+.windrose-icon-category-tab.active {
   background: rgba(var(--windrose-border-primary-rgb), 0.2);
   border-color: var(--windrose-border-primary);
   color: var(--windrose-text-primary);
 }
 
-.dmt-icon-grid {
+.windrose-icon-grid {
   display: grid;
   grid-template-columns: repeat(8, 1fr);
   gap: 4px;
@@ -4736,7 +4736,7 @@ button.dmt-breadcrumb-link {
   border-radius: 4px;
 }
 
-.dmt-icon-grid-btn {
+.windrose-icon-grid-btn {
   width: 100%;
   aspect-ratio: 1;
   display: flex;
@@ -4749,22 +4749,22 @@ button.dmt-breadcrumb-link {
   transition: all 0.1s ease;
 }
 
-.dmt-icon-grid-btn .ra {
+.windrose-icon-grid-btn .ra {
   font-size: 16px;
   color: var(--windrose-text-normal);
 }
 
-.dmt-icon-grid-btn:hover {
+.windrose-icon-grid-btn:hover {
   background: rgba(var(--windrose-border-primary-rgb), 0.15);
   border-color: rgba(var(--windrose-border-primary-rgb), 0.3);
 }
 
-.dmt-icon-grid-btn.selected {
+.windrose-icon-grid-btn.selected {
   background: rgba(var(--windrose-border-primary-rgb), 0.25);
   border-color: var(--windrose-border-primary);
 }
 
-.dmt-icon-grid-more {
+.windrose-icon-grid-more {
   grid-column: 1 / -1;
   text-align: center;
   font-size: 11px;
@@ -4772,7 +4772,7 @@ button.dmt-breadcrumb-link {
   padding: 8px;
 }
 
-.dmt-icon-grid-empty {
+.windrose-icon-grid-empty {
   grid-column: 1 / -1;
   text-align: center;
   font-size: 12px;
@@ -4781,7 +4781,7 @@ button.dmt-breadcrumb-link {
 }
 
 /* Layer preview */
-.dmt-layer-preview {
+.windrose-layer-preview {
   display: flex;
   justify-content: center;
   padding: 12px;
@@ -4789,7 +4789,7 @@ button.dmt-breadcrumb-link {
   border-radius: 6px;
 }
 
-.dmt-layer-preview-btn {
+.windrose-layer-preview-btn {
   min-width: 35px;
   height: 35px;
   padding: 0 10px;
@@ -4805,22 +4805,22 @@ button.dmt-breadcrumb-link {
   font-weight: 600;
 }
 
-.dmt-layer-preview-btn:not(.pill) {
+.windrose-layer-preview-btn:not(.pill) {
   width: 35px;
   border-radius: 50%;
   padding: 0;
 }
 
-.dmt-layer-preview-icon {
+.windrose-layer-preview-icon {
   font-size: 14px;
   line-height: 1;
 }
 
-.dmt-layer-preview-icon.ra {
+.windrose-layer-preview-icon.ra {
   font-family: 'rpgawesome';
 }
 
-.dmt-layer-preview-name {
+.windrose-layer-preview-name {
   white-space: nowrap;
 }
 
@@ -4829,7 +4829,7 @@ button.dmt-breadcrumb-link {
    ========================================================================== */
 
 /* Re-roll button - positioned to the left of MapControls */
-.dmt-reroll-btn.dmt-reroll-btn {
+.windrose-reroll-btn.windrose-reroll-btn {
   position: absolute;
   top: 12px;
   /* Position relative to right edge, offset from MapControls (80px width + 4px right + 12px gap) */
@@ -4850,32 +4850,32 @@ button.dmt-breadcrumb-link {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
-.dmt-reroll-btn.dmt-reroll-btn:hover {
+.windrose-reroll-btn.windrose-reroll-btn:hover {
   background: linear-gradient(135deg, rgba(139, 90, 43, 0.8), rgba(101, 67, 33, 0.8));
   border-color: var(--windrose-border-primary);
   transform: scale(1.05);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 
-.dmt-reroll-btn.dmt-reroll-btn svg {
+.windrose-reroll-btn.windrose-reroll-btn svg {
   width: 18px;
   height: 18px;
 }
 
 /* Tablet adjustments */
-.is-tablet .dmt-reroll-btn {
+.is-tablet .windrose-reroll-btn {
   width: 44px;
   height: 44px;
   right: 100px; /* Slightly more space on tablet */
 }
 
-.is-tablet .dmt-reroll-btn svg {
+.is-tablet .windrose-reroll-btn svg {
   width: 22px;
   height: 22px;
 }
 
 /* Re-roll confirmation dialog overlay */
-.dmt-reroll-confirm-overlay {
+.windrose-reroll-confirm-overlay {
   position: fixed;
   top: 0;
   left: 0;
@@ -4890,7 +4890,7 @@ button.dmt-breadcrumb-link {
 }
 
 /* Re-roll confirmation dialog */
-.dmt-reroll-confirm-dialog {
+.windrose-reroll-confirm-dialog {
   background: var(--background-primary);
   border: 2px solid rgba(var(--windrose-border-primary-rgb), 0.5);
   border-radius: 8px;
@@ -4899,24 +4899,24 @@ button.dmt-breadcrumb-link {
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
 }
 
-.dmt-reroll-confirm-dialog h3 {
+.windrose-reroll-confirm-dialog h3 {
   margin: 0 0 12px 0;
   color: var(--text-normal);
   font-size: 1.2em;
 }
 
-.dmt-reroll-confirm-dialog p {
+.windrose-reroll-confirm-dialog p {
   margin: 0 0 12px 0;
   color: var(--text-muted);
   line-height: 1.5;
 }
 
-.dmt-reroll-warning.dmt-reroll-warning {
+.windrose-reroll-warning.windrose-reroll-warning {
   color: var(--text-error, #e74c3c);
   font-weight: 500;
 }
 
-.dmt-reroll-confirm-buttons {
+.windrose-reroll-confirm-buttons {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
@@ -4924,11 +4924,11 @@ button.dmt-breadcrumb-link {
   margin-top: 20px;
 }
 
-.dmt-reroll-confirm-buttons.dmt-reroll-three-buttons {
+.windrose-reroll-confirm-buttons.windrose-reroll-three-buttons {
   justify-content: center;
 }
 
-.dmt-btn {
+.windrose-btn {
   padding: 8px 16px;
   border-radius: 4px;
   border: none;
@@ -4937,31 +4937,31 @@ button.dmt-breadcrumb-link {
   transition: all 0.15s ease;
 }
 
-.dmt-btn-secondary {
+.windrose-btn-secondary {
   background: var(--background-modifier-border);
   color: var(--text-normal);
 }
 
-.dmt-btn-secondary:hover {
+.windrose-btn-secondary:hover {
   background: var(--background-modifier-border-hover);
 }
 
-.dmt-btn-primary {
+.windrose-btn-primary {
   background: var(--interactive-accent);
   color: var(--text-on-accent);
 }
 
-.dmt-btn-primary:hover {
+.windrose-btn-primary:hover {
   background: var(--interactive-accent-hover);
 }
 
 /* Note suggestion disambiguation */
-.dmt-note-suggest-name {
+.windrose-note-suggest-name {
   font-size: 14px;
   color: var(--text-normal);
 }
 
-.dmt-note-suggest-path {
+.windrose-note-suggest-path {
   font-size: 11px;
   color: var(--text-muted);
   margin-top: 1px;
@@ -4970,7 +4970,7 @@ button.dmt-breadcrumb-link {
 /* ===========================================
  * Subheadings
  * =========================================== */
-.dmt-settings-subheading {
+.windrose-settings-subheading {
   font-size: 14px;
   font-weight: 600;
   color: var(--text-muted);
@@ -4982,14 +4982,14 @@ button.dmt-breadcrumb-link {
 /* ===========================================
  * Search/Filter
  * =========================================== */
-.dmt-settings-search-container {
+.windrose-settings-search-container {
   display: flex;
   align-items: center;
   gap: 8px;
   margin-bottom: 1em;
 }
 
-.dmt-settings-search-input {
+.windrose-settings-search-input {
   flex: 1;
   padding: 8px 12px;
   border: 1px solid var(--background-modifier-border);
@@ -4998,12 +4998,12 @@ button.dmt-breadcrumb-link {
   font-size: 14px;
 }
 
-.dmt-settings-search-input:focus {
+.windrose-settings-search-input:focus {
   border-color: var(--interactive-accent);
   outline: none;
 }
 
-.dmt-settings-search-clear {
+.windrose-settings-search-clear {
   background: transparent;
   border: none;
   padding: 6px;
@@ -5015,12 +5015,12 @@ button.dmt-breadcrumb-link {
   justify-content: center;
 }
 
-.dmt-settings-search-clear:hover {
+.windrose-settings-search-clear:hover {
   background: var(--background-modifier-hover);
   color: var(--text-normal);
 }
 
-.dmt-settings-no-results {
+.windrose-settings-no-results {
   text-align: center;
   padding: 2em;
   color: var(--text-muted);
@@ -5030,14 +5030,14 @@ button.dmt-breadcrumb-link {
 /* ===========================================
  * Category Containers
  * =========================================== */
-.dmt-settings-category {
+.windrose-settings-category {
   margin: 1em 0;
   border: 1px solid var(--background-modifier-border);
   border-radius: 8px;
   overflow: hidden;
 }
 
-.dmt-settings-category-header {
+.windrose-settings-category-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -5046,21 +5046,21 @@ button.dmt-breadcrumb-link {
   border-bottom: 1px solid var(--background-modifier-border);
 }
 
-.dmt-settings-category-label {
+.windrose-settings-category-label {
   font-weight: 600;
   font-size: 0.95em;
 }
 
-.dmt-settings-category-actions {
+.windrose-settings-category-actions {
   display: flex;
   gap: 4px;
 }
 
-.dmt-settings-category-muted {
+.windrose-settings-category-muted {
   opacity: 0.7;
 }
 
-.dmt-settings-empty-message {
+.windrose-settings-empty-message {
   padding: 16px;
   text-align: center;
   color: var(--text-muted);
@@ -5070,11 +5070,11 @@ button.dmt-breadcrumb-link {
 /* ===========================================
  * Object Rows
  * =========================================== */
-.dmt-settings-object-list {
+.windrose-settings-object-list {
   padding: 4px 0;
 }
 
-.dmt-settings-object-row {
+.windrose-settings-object-row {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -5082,11 +5082,11 @@ button.dmt-breadcrumb-link {
   transition: background-color 0.15s ease;
 }
 
-.dmt-settings-object-row:hover {
+.windrose-settings-object-row:hover {
   background: var(--background-modifier-hover);
 }
 
-.dmt-drag-handle {
+.windrose-drag-handle {
   color: var(--text-muted);
   cursor: grab;
   padding: 0 4px;
@@ -5096,17 +5096,17 @@ button.dmt-breadcrumb-link {
   flex-shrink: 0;
 }
 
-.dmt-settings-object-row:hover .dmt-drag-handle {
+.windrose-settings-object-row:hover .windrose-drag-handle {
   opacity: 1;
 }
 
-.dmt-dragging.dmt-dragging {
+.windrose-dragging.windrose-dragging {
   opacity: 0.5;
   background: var(--interactive-accent);
   border-radius: 4px;
 }
 
-.dmt-settings-object-symbol {
+.windrose-settings-object-symbol {
   font-family: 'Noto Emoji', 'Noto Sans Symbols 2', sans-serif;
   font-size: 1.4em;
   width: 32px;
@@ -5117,28 +5117,28 @@ button.dmt-breadcrumb-link {
   justify-content: center;
 }
 
-.dmt-settings-object-symbol .ra {
+.windrose-settings-object-symbol .ra {
   font-size: 1.2em;
   line-height: 1;
 }
 
-.dmt-settings-object-label {
+.windrose-settings-object-label {
   flex: 1;
   min-width: 0;
 }
 
-.dmt-settings-object-label.dmt-settings-modified {
+.windrose-settings-object-label.windrose-settings-modified {
   font-style: italic;
   color: var(--text-accent);
 }
 
-.dmt-settings-object-label.dmt-settings-modified::after {
+.windrose-settings-object-label.windrose-settings-modified::after {
   content: ' •';
   font-size: 0.8em;
   opacity: 0.7;
 }
 
-.dmt-settings-object-actions {
+.windrose-settings-object-actions {
   display: flex;
   gap: 4px;
   flex-shrink: 0;
@@ -5147,7 +5147,7 @@ button.dmt-breadcrumb-link {
 /* ===========================================
  * Icon Buttons
  * =========================================== */
-.dmt-settings-icon-btn {
+.windrose-settings-icon-btn {
   background: transparent;
   border: none;
   padding: 4px 6px;
@@ -5159,16 +5159,16 @@ button.dmt-breadcrumb-link {
   justify-content: center;
 }
 
-.dmt-settings-icon-btn:hover {
+.windrose-settings-icon-btn:hover {
   background: var(--background-modifier-hover);
   color: var(--text-normal);
 }
 
-.dmt-settings-icon-btn-danger:hover {
+.windrose-settings-icon-btn-danger:hover {
   color: var(--text-error);
 }
 
-.dmt-btn-icon {
+.windrose-btn-icon {
   background: transparent;
   border: none;
   padding: 4px;
@@ -5180,12 +5180,12 @@ button.dmt-breadcrumb-link {
   justify-content: center;
 }
 
-.dmt-btn-icon:hover {
+.windrose-btn-icon:hover {
   background: var(--background-modifier-hover);
   color: var(--text-normal);
 }
 
-.dmt-btn-icon.dmt-btn-danger:hover {
+.windrose-btn-icon.windrose-btn-danger:hover {
   background: var(--background-modifier-error);
   color: var(--text-on-accent);
 }
@@ -5193,30 +5193,30 @@ button.dmt-breadcrumb-link {
 /* ===========================================
  * Hidden Section
  * =========================================== */
-.dmt-settings-hidden-section {
+.windrose-settings-hidden-section {
   margin-top: 2em;
   padding-top: 1em;
   border-top: 1px solid var(--background-modifier-border);
 }
 
-.dmt-settings-hidden-list {
+.windrose-settings-hidden-list {
   margin-top: 8px;
   opacity: 0.7;
 }
 
-.dmt-settings-hidden-list .dmt-settings-object-row {
+.windrose-settings-hidden-list .windrose-settings-object-row {
   background: var(--background-secondary);
 }
 
 /* ===========================================
  * Modal Base Styles
  * =========================================== */
-.dmt-object-edit-modal,
-.dmt-category-edit-modal {
+.windrose-object-edit-modal,
+.windrose-category-edit-modal {
   padding: 0;
 }
 
-.dmt-modal-buttons {
+.windrose-modal-buttons {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
@@ -5228,7 +5228,7 @@ button.dmt-breadcrumb-link {
 /* ===========================================
  * Symbol Input & Preview
  * =========================================== */
-.dmt-symbol-input {
+.windrose-symbol-input {
   font-family: 'Noto Emoji', 'Noto Sans Symbols 2', sans-serif;
   font-size: 1.5em;
   width: 80px;
@@ -5236,7 +5236,7 @@ button.dmt-breadcrumb-link {
   padding: 8px;
 }
 
-.dmt-symbol-preview {
+.windrose-symbol-preview {
   font-family: 'Noto Emoji', 'Noto Sans Symbols 2', sans-serif;
   font-size: 2em;
   width: 48px;
@@ -5252,18 +5252,18 @@ button.dmt-breadcrumb-link {
 /* ===========================================
  * Quick Symbols Grid
  * =========================================== */
-.dmt-quick-symbols {
+.windrose-quick-symbols {
   margin: 1em 0;
 }
 
-.dmt-quick-symbols-label {
+.windrose-quick-symbols-label {
   display: block;
   font-size: 0.9em;
   color: var(--text-muted);
   margin-bottom: 8px;
 }
 
-.dmt-quick-symbols-grid {
+.windrose-quick-symbols-grid {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
@@ -5274,7 +5274,7 @@ button.dmt-breadcrumb-link {
   border-radius: 8px;
 }
 
-.dmt-quick-symbol-btn {
+.windrose-quick-symbol-btn {
   font-family: 'Noto Emoji', 'Noto Sans Symbols 2', sans-serif;
   width: 32px;
   height: 32px;
@@ -5288,7 +5288,7 @@ button.dmt-breadcrumb-link {
   justify-content: center;
 }
 
-.dmt-quick-symbol-btn:hover {
+.windrose-quick-symbol-btn:hover {
   background: var(--background-modifier-hover);
   border-color: var(--interactive-accent);
 }
@@ -5296,23 +5296,23 @@ button.dmt-breadcrumb-link {
 /* ===========================================
  * Import/Export Modal Styles
  * =========================================== */
-.dmt-export-modal,
-.dmt-import-modal {
+.windrose-export-modal,
+.windrose-import-modal {
   padding: 0;
 }
 
-.dmt-export-empty {
+.windrose-export-empty {
   text-align: center;
   padding: 1em;
   color: var(--text-muted);
   font-style: italic;
 }
 
-.dmt-import-file-container {
+.windrose-import-file-container {
   margin: 1em 0;
 }
 
-.dmt-import-file-container input[type="file"] {
+.windrose-import-file-container input[type="file"] {
   width: 100%;
   padding: 1em;
   border: 2px dashed var(--background-modifier-border);
@@ -5321,51 +5321,51 @@ button.dmt-breadcrumb-link {
   cursor: pointer;
 }
 
-.dmt-import-file-container input[type="file"]:hover {
+.windrose-import-file-container input[type="file"]:hover {
   border-color: var(--interactive-accent);
 }
 
-.dmt-import-preview {
+.windrose-import-preview {
   margin: 1em 0;
   padding: 1em;
   background: var(--background-secondary);
   border-radius: 8px;
 }
 
-.dmt-import-preview p {
+.windrose-import-preview p {
   margin: 0.25em 0;
 }
 
-.dmt-import-date {
+.windrose-import-date {
   font-size: 0.85em;
   color: var(--text-muted);
 }
 
-.dmt-import-note {
+.windrose-import-note {
   font-size: 0.9em;
   color: var(--text-muted);
   font-style: italic;
 }
 
-.dmt-import-error {
+.windrose-import-error {
   color: var(--text-error);
   font-weight: 500;
 }
 
-.dmt-import-options {
+.windrose-import-options {
   margin-top: 1em;
 }
 
 /* ===========================================
  * Icon Type Toggle
  * =========================================== */
-.dmt-icon-type-toggle {
+.windrose-icon-type-toggle {
   display: flex;
   gap: 8px;
   margin-bottom: 1em;
 }
 
-.dmt-icon-type-btn {
+.windrose-icon-type-btn {
   flex: 1;
   padding: 8px 12px;
   border: 1px solid var(--background-modifier-border);
@@ -5376,11 +5376,11 @@ button.dmt-breadcrumb-link {
   transition: all 0.15s ease;
 }
 
-.dmt-icon-type-btn:hover {
+.windrose-icon-type-btn:hover {
   background: var(--background-modifier-hover);
 }
 
-.dmt-icon-type-btn.active {
+.windrose-icon-type-btn.active {
   background: var(--interactive-accent);
   color: var(--text-on-accent);
   border-color: var(--interactive-accent);
@@ -5389,19 +5389,19 @@ button.dmt-breadcrumb-link {
 /* ===========================================
  * Icon Picker Container
  * =========================================== */
-.dmt-icon-picker {
+.windrose-icon-picker {
   border: 1px solid var(--background-modifier-border);
   border-radius: 8px;
   background: var(--background-secondary);
   margin-bottom: 1em;
 }
 
-.dmt-icon-picker-search {
+.windrose-icon-picker-search {
   padding: 8px;
   border-bottom: 1px solid var(--background-modifier-border);
 }
 
-.dmt-icon-picker-search input {
+.windrose-icon-picker-search input {
   width: 100%;
   padding: 6px 10px;
   border: 1px solid var(--background-modifier-border);
@@ -5410,7 +5410,7 @@ button.dmt-breadcrumb-link {
   font-size: 14px;
 }
 
-.dmt-icon-picker-search input:focus {
+.windrose-icon-picker-search input:focus {
   border-color: var(--interactive-accent);
   outline: none;
 }
@@ -5418,7 +5418,7 @@ button.dmt-breadcrumb-link {
 /* ===========================================
  * Category Tabs (Icon Picker)
  * =========================================== */
-.dmt-icon-picker-tabs {
+.windrose-icon-picker-tabs {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
@@ -5427,7 +5427,7 @@ button.dmt-breadcrumb-link {
   background: var(--background-primary-alt);
 }
 
-.dmt-icon-picker-tab {
+.windrose-icon-picker-tab {
   padding: 4px 8px;
   border: 1px solid transparent;
   background: transparent;
@@ -5438,12 +5438,12 @@ button.dmt-breadcrumb-link {
   transition: all 0.15s ease;
 }
 
-.dmt-icon-picker-tab:hover {
+.windrose-icon-picker-tab:hover {
   background: var(--background-modifier-hover);
   color: var(--text-normal);
 }
 
-.dmt-icon-picker-tab.active {
+.windrose-icon-picker-tab.active {
   background: var(--interactive-accent);
   color: var(--text-on-accent);
 }
@@ -5451,7 +5451,7 @@ button.dmt-breadcrumb-link {
 /* ===========================================
  * Icon Grid
  * =========================================== */
-.dmt-icon-picker-grid {
+.windrose-icon-picker-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
   gap: 4px;
@@ -5460,7 +5460,7 @@ button.dmt-breadcrumb-link {
   overflow-y: auto;
 }
 
-.dmt-icon-picker-icon {
+.windrose-icon-picker-icon {
   width: 40px;
   height: 40px;
   border: 1px solid var(--background-modifier-border);
@@ -5474,24 +5474,24 @@ button.dmt-breadcrumb-link {
   transition: all 0.15s ease;
 }
 
-.dmt-icon-picker-icon:hover {
+.windrose-icon-picker-icon:hover {
   background: var(--background-modifier-hover);
   border-color: var(--interactive-accent);
   transform: scale(1.1);
 }
 
-.dmt-icon-picker-icon.selected {
+.windrose-icon-picker-icon.selected {
   background: var(--interactive-accent);
   color: var(--text-on-accent);
   border-color: var(--interactive-accent);
 }
 
-.dmt-icon-picker-icon .ra {
+.windrose-icon-picker-icon .ra {
   font-size: 20px;
   line-height: 1;
 }
 
-.dmt-icon-picker-empty {
+.windrose-icon-picker-empty {
   padding: 2em;
   text-align: center;
   color: var(--text-muted);
@@ -5501,7 +5501,7 @@ button.dmt-breadcrumb-link {
 /* ===========================================
  * Selected Icon Preview
  * =========================================== */
-.dmt-icon-preview-row {
+.windrose-icon-preview-row {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -5510,7 +5510,7 @@ button.dmt-breadcrumb-link {
   background: var(--background-primary);
 }
 
-.dmt-icon-preview-large {
+.windrose-icon-preview-large {
   width: 48px;
   height: 48px;
   border: 1px solid var(--background-modifier-border);
@@ -5522,21 +5522,21 @@ button.dmt-breadcrumb-link {
   background: var(--background-secondary);
 }
 
-.dmt-icon-preview-large .ra {
+.windrose-icon-preview-large .ra {
   font-size: 28px;
   line-height: 1;
 }
 
-.dmt-icon-preview-info {
+.windrose-icon-preview-info {
   flex: 1;
 }
 
-.dmt-icon-preview-label {
+.windrose-icon-preview-label {
   font-weight: 500;
   margin-bottom: 2px;
 }
 
-.dmt-icon-preview-class {
+.windrose-icon-preview-class {
   font-size: 12px;
   color: var(--text-muted);
   font-family: var(--font-monospace);
@@ -5562,14 +5562,14 @@ button.dmt-breadcrumb-link {
 /* ===========================================
  * Collapsible Sections
  * =========================================== */
-.dmt-settings-section {
+.windrose-settings-section {
   margin: 0 0 8px 0;
   border: 1px solid var(--background-modifier-border);
   border-radius: 6px;
   overflow: hidden;
 }
 
-.dmt-settings-section > summary {
+.windrose-settings-section > summary {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -5582,31 +5582,31 @@ button.dmt-breadcrumb-link {
   user-select: none;
 }
 
-.dmt-settings-section > summary::-webkit-details-marker {
+.windrose-settings-section > summary::-webkit-details-marker {
   display: none;
 }
 
-.dmt-settings-section > summary::before {
+.windrose-settings-section > summary::before {
   content: '▶';
   font-size: 10px;
   transition: transform 0.2s ease;
   color: var(--text-muted);
 }
 
-.dmt-settings-section[open] > summary::before {
+.windrose-settings-section[open] > summary::before {
   transform: rotate(90deg);
 }
 
-.dmt-settings-section > summary:hover {
+.windrose-settings-section > summary:hover {
   background: var(--background-modifier-hover);
 }
 
-.dmt-settings-section-content {
+.windrose-settings-section-content {
   padding: 12px 16px;
   border-top: 1px solid var(--background-modifier-border);
 }
 
-.dmt-settings-section-content > .setting-item:first-child {
+.windrose-settings-section-content > .setting-item:first-child {
   border-top: none;
   padding-top: 0;
 }
@@ -5614,7 +5614,7 @@ button.dmt-breadcrumb-link {
 /* ===========================================
  * Settings Search
  * =========================================== */
-.dmt-settings-search-wrapper {
+.windrose-settings-search-wrapper {
   margin-bottom: 16px;
   position: sticky;
   top: 0;
@@ -5623,7 +5623,7 @@ button.dmt-breadcrumb-link {
   z-index: 10;
 }
 
-.dmt-settings-search-box {
+.windrose-settings-search-box {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -5633,11 +5633,11 @@ button.dmt-breadcrumb-link {
   background: var(--background-primary);
 }
 
-.dmt-settings-search-box:focus-within {
+.windrose-settings-search-box:focus-within {
   border-color: var(--interactive-accent);
 }
 
-.dmt-settings-search-box input {
+.windrose-settings-search-box input {
   flex: 1;
   border: none;
   background: transparent;
@@ -5645,11 +5645,11 @@ button.dmt-breadcrumb-link {
   outline: none;
 }
 
-.dmt-settings-search-box .search-icon {
+.windrose-settings-search-box .search-icon {
   color: var(--text-muted);
 }
 
-.dmt-settings-search-box .clear-btn {
+.windrose-settings-search-box .clear-btn {
   background: transparent;
   border: none;
   padding: 2px 6px;
@@ -5658,18 +5658,18 @@ button.dmt-breadcrumb-link {
   border-radius: 4px;
 }
 
-.dmt-settings-search-box .clear-btn:hover {
+.windrose-settings-search-box .clear-btn:hover {
   background: var(--background-modifier-hover);
   color: var(--text-normal);
 }
 
 /* Hide non-matching settings during search */
-.dmt-setting-hidden.dmt-setting-hidden {
+.windrose-setting-hidden.windrose-setting-hidden {
   display: none;
 }
 
 /* Highlight matching text */
-.dmt-search-match {
+.windrose-search-match {
   background: var(--text-highlight-bg);
   border-radius: 2px;
 }
@@ -5677,11 +5677,11 @@ button.dmt-breadcrumb-link {
 /* ===========================================
  * Color Palette Section
  * =========================================== */
-.dmt-color-list {
+.windrose-color-list {
   padding: 8px 0;
 }
 
-.dmt-color-row {
+.windrose-color-row {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -5689,11 +5689,11 @@ button.dmt-breadcrumb-link {
   transition: background-color 0.15s ease;
 }
 
-.dmt-color-row:hover {
+.windrose-color-row:hover {
   background: var(--background-modifier-hover);
 }
 
-.dmt-color-row-swatch {
+.windrose-color-row-swatch {
   width: 28px;
   height: 28px;
   border-radius: 4px;
@@ -5701,23 +5701,23 @@ button.dmt-breadcrumb-link {
   flex-shrink: 0;
 }
 
-.dmt-color-row-label {
+.windrose-color-row-label {
   flex: 1;
   min-width: 0;
 }
 
-.dmt-color-row-name {
+.windrose-color-row-name {
   font-weight: 500;
 }
 
-.dmt-color-row-modified,
-.dmt-color-row-custom {
+.windrose-color-row-modified,
+.windrose-color-row-custom {
   font-size: 0.85em;
   color: var(--text-muted);
   font-style: italic;
 }
 
-.dmt-color-row-hex {
+.windrose-color-row-hex {
   font-size: 0.85em;
   color: var(--text-muted);
   background: var(--background-secondary);
@@ -5725,7 +5725,7 @@ button.dmt-breadcrumb-link {
   border-radius: 3px;
 }
 
-.dmt-color-row-actions {
+.windrose-color-row-actions {
   display: flex;
   gap: 4px;
   flex-shrink: 0;
@@ -5734,16 +5734,16 @@ button.dmt-breadcrumb-link {
 /* ===========================================
  * Color Edit Modal
  * =========================================== */
-.dmt-color-edit-modal {
+.windrose-color-edit-modal {
   padding: 16px;
 }
 
-.dmt-color-hex-input.dmt-color-hex-input {
+.windrose-color-hex-input.windrose-color-hex-input {
   font-family: var(--font-monospace);
   width: 90px;
 }
 
-.dmt-color-original-info {
+.windrose-color-original-info {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -5755,7 +5755,7 @@ button.dmt-breadcrumb-link {
   color: var(--text-muted);
 }
 
-.dmt-color-mini-swatch {
+.windrose-color-mini-swatch {
   display: inline-block;
   width: 16px;
   height: 16px;
@@ -5764,17 +5764,17 @@ button.dmt-breadcrumb-link {
   vertical-align: middle;
 }
 
-.dmt-opacity-control {
+.windrose-opacity-control {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.dmt-opacity-control input[type="range"] {
+.windrose-opacity-control input[type="range"] {
   width: 120px;
 }
 
-.dmt-opacity-value {
+.windrose-opacity-value {
   min-width: 40px;
   text-align: right;
   font-size: 0.9em;
@@ -5784,21 +5784,21 @@ button.dmt-breadcrumb-link {
 /* ===========================================
  * Insert Map Modal
  * =========================================== */
-.dmt-insert-map-modal {
+.windrose-insert-map-modal {
   padding: 16px;
 }
 
-.dmt-map-type-selection {
+.windrose-map-type-selection {
   margin-top: 16px;
 }
 
-.dmt-map-type-buttons {
+.windrose-map-type-buttons {
   display: flex;
   gap: 8px;
   margin-top: 8px;
 }
 
-.dmt-map-type-btn {
+.windrose-map-type-btn {
   flex: 1;
   padding: 12px 16px;
   border: 2px solid var(--background-modifier-border);
@@ -5810,12 +5810,12 @@ button.dmt-breadcrumb-link {
   transition: all 0.15s ease;
 }
 
-.dmt-map-type-btn:hover {
+.windrose-map-type-btn:hover {
   border-color: var(--interactive-accent);
   background: var(--background-secondary);
 }
 
-.dmt-map-type-btn.selected {
+.windrose-map-type-btn.selected {
   border-color: var(--interactive-accent);
   background: var(--interactive-accent);
   color: var(--text-on-accent);
@@ -5824,35 +5824,35 @@ button.dmt-breadcrumb-link {
 /* ===========================================
  * Insert Dungeon Modal
  * =========================================== */
-.dmt-insert-dungeon-modal {
+.windrose-insert-dungeon-modal {
   padding: 16px;
   min-width: 400px;
 }
 
 /* Soften the modal container's border and shadow */
-.modal:has(.dmt-insert-dungeon-modal) {
+.modal:has(.windrose-insert-dungeon-modal) {
   border: 1px solid var(--background-modifier-border);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
 }
 
 /* Header with Visualizer */
-.dmt-dungeon-header {
+.windrose-dungeon-header {
   position: relative;
   margin: -16px -16px 0 -16px; /* Extend to modal edges, no bottom margin */
   overflow: hidden;
 }
 
-.dmt-dungeon-visualizer {
+.windrose-dungeon-visualizer {
   width: 100%;
   height: 180px;
   position: relative;
 }
 
-.dmt-dungeon-visualizer canvas {
+.windrose-dungeon-visualizer canvas {
   display: block;
 }
 
-.dmt-dungeon-title-overlay {
+.windrose-dungeon-title-overlay {
   position: absolute;
   bottom: 0;
   left: 0;
@@ -5861,14 +5861,14 @@ button.dmt-breadcrumb-link {
   background: linear-gradient(to bottom, transparent 0%, var(--modal-background) 60%);
 }
 
-.dmt-dungeon-title-overlay h2 {
+.windrose-dungeon-title-overlay h2 {
   margin: 0;
   font-size: 1.3em;
   color: var(--text-normal);
 }
 
 /* Space after header before first setting - this also serves as visual separator */
-.dmt-dungeon-header + .setting-item {
+.windrose-dungeon-header + .setting-item {
   margin-top: 16px;
   border-top: none;
 }
@@ -5888,18 +5888,18 @@ button.dmt-breadcrumb-link {
   }
 }
 
-.dmt-dungeon-size-selection {
+.windrose-dungeon-size-selection {
   margin-top: 16px;
 }
 
-.dmt-dungeon-size-buttons {
+.windrose-dungeon-size-buttons {
   display: flex;
   gap: 8px;
   margin-top: 8px;
   flex-wrap: wrap;
 }
 
-.dmt-dungeon-size-btn {
+.windrose-dungeon-size-btn {
   flex: 1;
   padding: 12px 16px;
   border: 2px solid var(--background-modifier-border);
@@ -5913,29 +5913,29 @@ button.dmt-breadcrumb-link {
   text-align: center;
 }
 
-.dmt-dungeon-size-btn:hover {
+.windrose-dungeon-size-btn:hover {
   border-color: var(--interactive-accent);
   background: var(--background-secondary);
 }
 
-.dmt-dungeon-size-btn.selected {
+.windrose-dungeon-size-btn.selected {
   border-color: var(--interactive-accent);
   background: var(--interactive-accent);
   color: var(--text-on-accent);
 }
 
-.dmt-dungeon-style-selection {
+.windrose-dungeon-style-selection {
   margin-top: 16px;
 }
 
-.dmt-dungeon-style-buttons {
+.windrose-dungeon-style-buttons {
   display: flex;
   gap: 8px;
   margin-top: 8px;
   flex-wrap: wrap;
 }
 
-.dmt-dungeon-style-btn {
+.windrose-dungeon-style-btn {
   flex: 1;
   min-width: 70px;
   padding: 10px 12px;
@@ -5950,41 +5950,41 @@ button.dmt-breadcrumb-link {
   text-align: center;
 }
 
-.dmt-dungeon-style-btn:hover {
+.windrose-dungeon-style-btn:hover {
   border-color: var(--interactive-accent);
   background: var(--background-secondary);
 }
 
-.dmt-dungeon-style-btn.selected {
+.windrose-dungeon-style-btn.selected {
   border-color: var(--interactive-accent);
   background: var(--interactive-accent);
   color: var(--text-on-accent);
 }
 
-.dmt-dungeon-distance-row {
+.windrose-dungeon-distance-row {
   display: flex;
   gap: 8px;
   align-items: center;
   margin-top: 8px;
 }
 
-.dmt-dungeon-distance-row input[type="number"] {
+.windrose-dungeon-distance-row input[type="number"] {
   width: 80px;
 }
 
-.dmt-dungeon-distance-row input[type="text"] {
+.windrose-dungeon-distance-row input[type="text"] {
   width: 60px;
 }
 
 /* Advanced options section */
-.dmt-dungeon-advanced {
+.windrose-dungeon-advanced {
   margin-top: 16px;
   border: 1px solid var(--background-modifier-border);
   border-radius: 6px;
   overflow: hidden;
 }
 
-.dmt-dungeon-advanced-header {
+.windrose-dungeon-advanced-header {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -5995,42 +5995,42 @@ button.dmt-breadcrumb-link {
   font-weight: 500;
 }
 
-.dmt-dungeon-advanced-header:hover {
+.windrose-dungeon-advanced-header:hover {
   background: var(--background-modifier-hover);
 }
 
-.dmt-dungeon-advanced-chevron {
+.windrose-dungeon-advanced-chevron {
   font-size: 0.75em;
   color: var(--text-muted);
 }
 
-.dmt-dungeon-advanced-content {
+.windrose-dungeon-advanced-content {
   padding: 12px;
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
 
-.dmt-dungeon-slider-row {
+.windrose-dungeon-slider-row {
   display: flex;
   align-items: center;
   gap: 12px;
 }
 
-.dmt-dungeon-slider-row label {
+.windrose-dungeon-slider-row label {
   flex: 0 0 130px;
   font-size: 0.9em;
   color: var(--text-normal);
 }
 
-.dmt-dungeon-slider-container {
+.windrose-dungeon-slider-container {
   flex: 1;
   display: flex;
   align-items: center;
   gap: 10px;
 }
 
-.dmt-dungeon-slider-container input[type="range"] {
+.windrose-dungeon-slider-container input[type="range"] {
   flex: 1;
   height: 4px;
   -webkit-appearance: none;
@@ -6040,7 +6040,7 @@ button.dmt-breadcrumb-link {
   cursor: pointer;
 }
 
-.dmt-dungeon-slider-container input[type="range"]::-webkit-slider-thumb {
+.windrose-dungeon-slider-container input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
   width: 16px;
   height: 16px;
@@ -6049,7 +6049,7 @@ button.dmt-breadcrumb-link {
   cursor: pointer;
 }
 
-.dmt-dungeon-slider-container input[type="range"]::-moz-range-thumb {
+.windrose-dungeon-slider-container input[type="range"]::-moz-range-thumb {
   width: 16px;
   height: 16px;
   border-radius: 50%;
@@ -6058,7 +6058,7 @@ button.dmt-breadcrumb-link {
   cursor: pointer;
 }
 
-.dmt-dungeon-slider-value {
+.windrose-dungeon-slider-value {
   flex: 0 0 60px;
   text-align: right;
   font-size: 0.85em;
@@ -6066,13 +6066,13 @@ button.dmt-breadcrumb-link {
   font-family: var(--font-monospace);
 }
 
-.dmt-dungeon-toggle-container {
+.windrose-dungeon-toggle-container {
   flex: 1;
   display: flex;
   align-items: center;
 }
 
-.dmt-dungeon-select {
+.windrose-dungeon-select {
   padding: 4px 8px;
   border: 1px solid var(--background-modifier-border);
   border-radius: 4px;
@@ -6085,7 +6085,7 @@ button.dmt-breadcrumb-link {
 /* ===========================================
  * Dungeon Modal Section Headers
  * =========================================== */
-.dmt-dungeon-section-header {
+.windrose-dungeon-section-header {
   font-size: 0.85em;
   font-weight: 600;
   color: var(--text-muted);
@@ -6096,7 +6096,7 @@ button.dmt-breadcrumb-link {
   border-top: 1px solid var(--background-modifier-border);
 }
 
-.dmt-dungeon-subsection {
+.windrose-dungeon-subsection {
   font-size: 0.8em;
   font-weight: 500;
   color: var(--text-muted);
@@ -6104,7 +6104,7 @@ button.dmt-breadcrumb-link {
   padding-left: 4px;
 }
 
-.dmt-checkbox-hint {
+.windrose-checkbox-hint {
   font-size: 0.8em;
   color: var(--text-muted);
   margin-left: 142px;
@@ -6114,12 +6114,12 @@ button.dmt-breadcrumb-link {
 /* ===========================================
  * Object Sets
  * =========================================== */
-.dmt-set-separator {
+.windrose-set-separator {
   border-top: 1px solid var(--background-modifier-border);
   margin: 1.5em 0 1em 0;
 }
 
-.dmt-set-active-bar {
+.windrose-set-active-bar {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -6131,24 +6131,24 @@ button.dmt-breadcrumb-link {
   font-size: 13px;
 }
 
-.dmt-set-active-name {
+.windrose-set-active-name {
   font-weight: 600;
   color: var(--interactive-accent);
 }
 
-.dmt-set-active-bar .dmt-settings-icon-btn {
+.windrose-set-active-bar .windrose-settings-icon-btn {
   margin-left: auto;
   font-size: 11px;
 }
 
-.dmt-set-list {
+.windrose-set-list {
   display: flex;
   flex-direction: column;
   gap: 4px;
   margin-bottom: 12px;
 }
 
-.dmt-set-row {
+.windrose-set-row {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -6158,11 +6158,11 @@ button.dmt-breadcrumb-link {
   border: 1px solid transparent;
 }
 
-.dmt-set-row-active {
+.windrose-set-row-active {
   border-color: var(--interactive-accent);
 }
 
-.dmt-set-name {
+.windrose-set-name {
   font-weight: 500;
   flex: 1;
   min-width: 0;
@@ -6171,13 +6171,13 @@ button.dmt-breadcrumb-link {
   white-space: nowrap;
 }
 
-.dmt-set-badges {
+.windrose-set-badges {
   display: flex;
   gap: 4px;
   flex-shrink: 0;
 }
 
-.dmt-set-badge {
+.windrose-set-badge {
   font-size: 10px;
   padding: 1px 6px;
   border-radius: 3px;
@@ -6187,24 +6187,24 @@ button.dmt-breadcrumb-link {
   letter-spacing: 0.5px;
 }
 
-.dmt-set-badge-source {
+.windrose-set-badge-source {
   background: var(--background-modifier-border-hover, var(--background-modifier-border));
   font-style: italic;
 }
 
-.dmt-set-actions {
+.windrose-set-actions {
   display: flex;
   gap: 2px;
   flex-shrink: 0;
 }
 
-.dmt-set-modified-badge {
+.windrose-set-modified-badge {
   color: var(--text-warning);
   font-size: 12px;
   font-style: italic;
 }
 
-.dmt-set-modified-bar {
+.windrose-set-modified-bar {
   border-color: var(--text-warning);
 }
 
@@ -6217,7 +6217,7 @@ button.dmt-breadcrumb-link {
   75% { transform: translateX(4px); }
 }
 
-.dmt-shake {
+.windrose-shake {
   animation: dmt-shake 0.3s ease;
 }
 
@@ -6294,7 +6294,7 @@ button.dmt-breadcrumb-link {
    FLOATING TOOLBAR (Outline, Region, Drawing)
    ============================================ */
 
-.dmt-floating-bar {
+.windrose-floating-bar {
   position: fixed;
   bottom: 100px;
   left: 50%;
@@ -6313,7 +6313,7 @@ button.dmt-breadcrumb-link {
   z-index: 1000;
 }
 
-.dmt-floating-bar-btn {
+.windrose-floating-bar-btn {
   padding: 4px 10px;
   background: transparent;
   color: var(--text-muted);
@@ -6324,42 +6324,42 @@ button.dmt-breadcrumb-link {
   min-height: 30px;
 }
 
-.dmt-floating-bar-btn.is-active {
+.windrose-floating-bar-btn.is-active {
   background: var(--interactive-accent);
   color: var(--text-on-accent);
 }
 
-.dmt-floating-bar-btn.is-danger {
+.windrose-floating-bar-btn.is-danger {
   color: var(--text-error);
 }
 
-.dmt-floating-bar-btn.is-accent {
+.windrose-floating-bar-btn.is-accent {
   color: var(--text-accent);
 }
 
-.dmt-floating-bar-label {
+.windrose-floating-bar-label {
   color: var(--text-muted);
   font-size: 12px;
 }
 
-.dmt-floating-bar-label-faint {
+.windrose-floating-bar-label-faint {
   color: var(--text-faint);
   font-size: 11px;
 }
 
-.dmt-floating-bar-separator {
+.windrose-floating-bar-separator {
   color: var(--text-faint);
   font-size: 11px;
   margin: 0 2px;
 }
 
-.dmt-floating-bar-name {
+.windrose-floating-bar-name {
   color: var(--text-normal);
   font-size: 13px;
   font-weight: 600;
 }
 
-.dmt-color-swatch-btn {
+.windrose-color-swatch-btn {
   width: 28px;
   height: 28px;
   border-radius: 4px;
@@ -6370,7 +6370,7 @@ button.dmt-breadcrumb-link {
   background: none;
 }
 
-.dmt-floating-bar-input {
+.windrose-floating-bar-input {
   background: var(--background-primary);
   color: var(--text-normal);
   border: 1px solid var(--background-modifier-border);
@@ -6384,7 +6384,7 @@ button.dmt-breadcrumb-link {
    SEGMENT PICKER OVERLAY
    ============================================ */
 
-.dmt-segment-picker-backdrop {
+.windrose-segment-picker-backdrop {
   position: fixed;
   top: 0;
   left: 0;
@@ -6397,7 +6397,7 @@ button.dmt-breadcrumb-link {
   justify-content: center;
 }
 
-.dmt-segment-picker-card {
+.windrose-segment-picker-card {
   background-color: var(--windrose-bg-primary);
   border-radius: 12px;
   padding: 16px;
@@ -6406,7 +6406,7 @@ button.dmt-breadcrumb-link {
   min-width: 260px;
 }
 
-.dmt-segment-picker-title {
+.windrose-segment-picker-title {
   color: var(--windrose-border-primary);
   font-size: 14px;
   font-weight: 600;
@@ -6416,20 +6416,20 @@ button.dmt-breadcrumb-link {
   letter-spacing: 1px;
 }
 
-.dmt-segment-picker-subtitle {
+.windrose-segment-picker-subtitle {
   color: var(--windrose-text-muted);
   font-size: 11px;
   text-align: center;
   margin-bottom: 12px;
 }
 
-.dmt-segment-picker-svg-wrap {
+.windrose-segment-picker-svg-wrap {
   display: flex;
   justify-content: center;
   margin-bottom: 16px;
 }
 
-.dmt-segment-picker-svg {
+.windrose-segment-picker-svg {
   background-color: var(--windrose-bg-secondary);
   border-radius: 8px;
   cursor: pointer;
@@ -6439,14 +6439,14 @@ button.dmt-breadcrumb-link {
   -webkit-touch-callout: none;
 }
 
-.dmt-segment-picker-actions {
+.windrose-segment-picker-actions {
   display: flex;
   gap: 8px;
   margin-bottom: 16px;
   justify-content: center;
 }
 
-.dmt-segment-picker-btn {
+.windrose-segment-picker-btn {
   padding: 6px 12px;
   background-color: var(--windrose-bg-tertiary);
   border: 1px solid var(--background-modifier-border);
@@ -6456,14 +6456,14 @@ button.dmt-breadcrumb-link {
   cursor: pointer;
 }
 
-.dmt-segment-picker-status {
+.windrose-segment-picker-status {
   color: var(--windrose-text-muted);
   font-size: 12px;
   text-align: center;
   margin-bottom: 12px;
 }
 
-.dmt-segment-picker-remember {
+.windrose-segment-picker-remember {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -6476,20 +6476,20 @@ button.dmt-breadcrumb-link {
   -webkit-user-select: none;
 }
 
-.dmt-segment-picker-remember input {
+.windrose-segment-picker-remember input {
   width: 16px;
   height: 16px;
   cursor: pointer;
   accent-color: var(--windrose-border-primary);
 }
 
-.dmt-segment-picker-footer {
+.windrose-segment-picker-footer {
   display: flex;
   gap: 12px;
   justify-content: center;
 }
 
-.dmt-segment-picker-btn-lg {
+.windrose-segment-picker-btn-lg {
   padding: 10px 24px;
   background-color: var(--windrose-bg-tertiary);
   border: 1px solid var(--background-modifier-border);
@@ -6500,14 +6500,14 @@ button.dmt-breadcrumb-link {
   min-width: 80px;
 }
 
-.dmt-segment-picker-btn-lg.is-primary {
+.windrose-segment-picker-btn-lg.is-primary {
   background-color: var(--windrose-border-primary);
   border: none;
   color: var(--windrose-bg-primary);
   font-weight: 600;
 }
 
-.dmt-segment-picker-hint {
+.windrose-segment-picker-hint {
   color: var(--text-faint);
   font-size: 11px;
   text-align: center;
