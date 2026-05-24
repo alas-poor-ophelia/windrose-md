@@ -6,8 +6,8 @@ import { IconHelpers } from '../helpers/iconHelpers';
 
 export const TabRenderCoreMethods = {
   renderSearchBar(this: SettingsTabThis, containerEl: HTMLElement): void {
-    const wrapper = containerEl.createEl('div', { cls: 'dmt-settings-search-wrapper' });
-    const searchBox = wrapper.createEl('div', { cls: 'dmt-settings-search-box' });
+    const wrapper = containerEl.createEl('div', { cls: 'windrose-settings-search-wrapper' });
+    const searchBox = wrapper.createEl('div', { cls: 'windrose-settings-search-box' });
 
     // Search icon
     const searchIcon = searchBox.createEl('span', { cls: 'search-icon' });
@@ -26,7 +26,7 @@ export const TabRenderCoreMethods = {
 
     // No results message (hidden initially)
     this.noResultsEl = containerEl.createEl('div', {
-      cls: 'dmt-settings-no-results',
+      cls: 'windrose-settings-no-results',
       text: 'No settings found matching your search.'
     });
     this.noResultsEl.style.display = 'none';
@@ -41,7 +41,7 @@ export const TabRenderCoreMethods = {
         this.sections?.forEach(({ details }) => {
           details.style.display = '';
           details.settingItems?.forEach(item => {
-            item.classList.remove('dmt-setting-hidden');
+            item.classList.remove('windrose-setting-hidden');
           });
           details.removeAttribute('open');
         });
@@ -63,10 +63,10 @@ export const TabRenderCoreMethods = {
           const matches = name.includes(q) || desc.includes(q);
 
           if (matches) {
-            item.classList.remove('dmt-setting-hidden');
+            item.classList.remove('windrose-setting-hidden');
             sectionHasMatch = true;
           } else {
-            item.classList.add('dmt-setting-hidden');
+            item.classList.add('windrose-setting-hidden');
           }
         });
 

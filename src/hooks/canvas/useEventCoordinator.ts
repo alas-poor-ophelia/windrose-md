@@ -100,9 +100,9 @@ const useEventCoordinator = ({
 
     if (isColorPickerOpen || showObjectColorPicker) {
       const target = e.target as HTMLElement;
-      const pickerElement = target.closest('.dmt-color-picker');
-      const toolBtnElement = target.closest('.dmt-color-tool-btn');
-      const objectBtnElement = target.closest('.dmt-object-color-button');
+      const pickerElement = target.closest('.windrose-color-picker');
+      const toolBtnElement = target.closest('.windrose-color-tool-btn');
+      const objectBtnElement = target.closest('.windrose-object-color-button');
 
       if (!pickerElement && !toolBtnElement && !objectBtnElement) {
         return;
@@ -114,8 +114,8 @@ const useEventCoordinator = ({
         const touch1Target = document.elementFromPoint(touchEvent.touches[0].clientX, touchEvent.touches[0].clientY);
         const touch2Target = document.elementFromPoint(touchEvent.touches[1].clientX, touchEvent.touches[1].clientY);
 
-        const pickerOrButton1 = touch1Target?.closest('.dmt-color-picker, .dmt-color-tool-btn, .dmt-object-color-button');
-        const pickerOrButton2 = touch2Target?.closest('.dmt-color-picker, .dmt-color-tool-btn, .dmt-object-color-button');
+        const pickerOrButton1 = touch1Target?.closest('.windrose-color-picker, .windrose-color-tool-btn, .windrose-object-color-button');
+        const pickerOrButton2 = touch2Target?.closest('.windrose-color-picker, .windrose-color-tool-btn, .windrose-object-color-button');
 
         if (pickerOrButton1 || pickerOrButton2) {
           return;

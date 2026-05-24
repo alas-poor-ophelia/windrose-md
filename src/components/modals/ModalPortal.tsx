@@ -21,11 +21,11 @@ const ModalPortal = ({ children }: ModalPortalProps): VNode => {
   const [isInPortal, setIsInPortal] = useState(false);
 
   useEffect(() => {
-    let portal = document.getElementById('dmt-modal-portal') as HTMLDivElement | null;
+    let portal = document.getElementById('windrose-modal-portal') as HTMLDivElement | null;
     if (!portal) {
       portal = document.createElement('div');
-      portal.id = 'dmt-modal-portal';
-      portal.className = 'dmt-modal-portal';
+      portal.id = 'windrose-modal-portal';
+      portal.className = 'windrose-modal-portal';
       document.body.appendChild(portal);
     }
     portalContainerRef.current = portal;
@@ -54,7 +54,7 @@ const ModalPortal = ({ children }: ModalPortalProps): VNode => {
   return (
     <div
       ref={wrapperRef}
-      className="dmt-modal-portal-content"
+      className="windrose-modal-portal-content"
       style={{ visibility: isInPortal ? 'visible' : 'hidden' }}
     >
       {children}

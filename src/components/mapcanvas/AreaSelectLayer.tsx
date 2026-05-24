@@ -154,7 +154,7 @@ const AreaSelectLayer = ({ currentTool }: AreaSelectLayerProps): VNode | null =>
     return (
       <div
         key="area-select-start"
-        className="dmt-area-select-marker"
+        className="windrose-area-select-marker"
         style={{
           position: 'absolute',
           left: `${markerX}px`,

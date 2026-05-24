@@ -51,7 +51,7 @@ function CollapsibleSection({
   };
 
   return (
-    <div class="dmt-collapsible-section" style={{
+    <div class="windrose-collapsible-section" style={{
       borderBottom: '1px solid var(--background-modifier-border)',
       marginBottom: '12px'
     }}>

@@ -92,29 +92,29 @@ const CloneLayerModal = ({
   };
 
   return (
-    <div className="dmt-modal-overlay" onClick={onCancel}>
-      <div className="dmt-modal-content" onClick={handleModalClick}>
-        <h3 className="dmt-modal-title">{`Clone Layer: ${layerName}`}</h3>
+    <div className="windrose-modal-overlay" onClick={onCancel}>
+      <div className="windrose-modal-content" onClick={handleModalClick}>
+        <h3 className="windrose-modal-title">{`Clone Layer: ${layerName}`}</h3>
 
         <p style={{ margin: '0 0 16px 0' }}>
           Choose what to include in the cloned layer:
         </p>
 
-        <div className="dmt-modal-buttons">
+        <div className="windrose-modal-buttons">
           <button
-            className="dmt-modal-btn dmt-modal-btn-cancel"
+            className="windrose-modal-btn windrose-modal-btn-cancel"
             onClick={onCancel}
           >
             Cancel
           </button>
           <button
-            className="dmt-modal-btn"
+            className="windrose-modal-btn"
             onClick={() => onClone('mapOnly')}
           >
             Map Only
           </button>
           <button
-            className="dmt-modal-btn dmt-modal-btn-submit"
+            className="windrose-modal-btn windrose-modal-btn-submit"
             onClick={() => onClone('all')}
           >
             Clone All

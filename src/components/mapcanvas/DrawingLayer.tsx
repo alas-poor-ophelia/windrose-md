@@ -299,7 +299,7 @@ const DrawingLayer = ({
       overlays.push(
         <div
           key="rectangle-start"
-          className="dmt-drawing-preview"
+          className="windrose-drawing-preview"
           style={{
             position: 'absolute',
             left: `${pos.x}px`,
@@ -322,7 +322,7 @@ const DrawingLayer = ({
       overlays.push(
         <div
           key="circle-start"
-          className="dmt-drawing-preview"
+          className="windrose-drawing-preview"
           style={{
             position: 'absolute',
             left: `${pos.x}px`,
@@ -348,7 +348,7 @@ const DrawingLayer = ({
       overlays.push(
         <svg
           key="edgeline-start"
-          className="dmt-drawing-preview"
+          className="windrose-drawing-preview"
           style={{
             position: 'absolute',
             left: `${pos.x - halfMarker}px`,

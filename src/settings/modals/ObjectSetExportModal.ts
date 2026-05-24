@@ -27,7 +27,7 @@ class ObjectSetExportModal extends Modal {
   onOpen() {
     const { contentEl } = this;
     contentEl.empty();
-    contentEl.addClass('dmt-export-modal');
+    contentEl.addClass('windrose-export-modal');
 
     contentEl.createEl('h2', { text: 'Export Object Set' });
 
@@ -78,7 +78,7 @@ class ObjectSetExportModal extends Modal {
       cls: 'setting-item-description'
     });
 
-    const buttons = contentEl.createDiv({ cls: 'dmt-modal-buttons' });
+    const buttons = contentEl.createDiv({ cls: 'windrose-modal-buttons' });
 
     const cancelBtn = buttons.createEl('button', { text: 'Cancel' });
     cancelBtn.onclick = () => this.close();

@@ -42,7 +42,7 @@ class PromptModal extends Modal {
         }, 50);
       });
 
-    const buttons = contentEl.createDiv({ cls: 'dmt-modal-buttons' });
+    const buttons = contentEl.createDiv({ cls: 'windrose-modal-buttons' });
 
     const cancelBtn = buttons.createEl('button', { text: 'Cancel' });
     cancelBtn.onclick = () => {

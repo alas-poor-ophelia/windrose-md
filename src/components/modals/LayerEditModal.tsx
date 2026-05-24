@@ -128,20 +128,20 @@ const LayerEditModal = ({
   }, [searchQuery, iconCategory]);
 
   return (
-    <div className="dmt-modal-overlay" onMouseDown={onCancel}>
+    <div className="windrose-modal-overlay" onMouseDown={onCancel}>
       <div
-        className="dmt-modal-content dmt-layer-edit-modal"
+        className="windrose-modal-content windrose-layer-edit-modal"
         onMouseDown={handleModalClick}
       >
-        <h3 className="dmt-modal-title">Edit Layer</h3>
+        <h3 className="windrose-modal-title">Edit Layer</h3>
 
         {/* Name input */}
-        <div className="dmt-layer-edit-section">
-          <label className="dmt-layer-edit-label">Name</label>
+        <div className="windrose-layer-edit-section">
+          <label className="windrose-layer-edit-label">Name</label>
           <input
             ref={nameInputRef}
             type="text"
-            className="dmt-modal-input"
+            className="windrose-modal-input"
             value={name}
             onChange={(e) => setName((e.target as HTMLInputElement).value)}
             onKeyDown={handleKeyDown}
@@ -150,26 +150,26 @@ const LayerEditModal = ({
         </div>
 
         {/* Icon mode toggle */}
-        <div className="dmt-layer-edit-section">
-          <label className="dmt-layer-edit-label">Icon (optional)</label>
-          <div className="dmt-icon-mode-toggle">
+        <div className="windrose-layer-edit-section">
+          <label className="windrose-layer-edit-label">Icon (optional)</label>
+          <div className="windrose-icon-mode-toggle">
             <button
               type="button"
-              className={`dmt-icon-mode-btn ${iconMode === 'none' ? 'active' : ''}`}
+              className={`windrose-icon-mode-btn ${iconMode === 'none' ? 'active' : ''}`}
               onClick={() => setIconMode('none')}
             >
               None
             </button>
             <button
               type="button"
-              className={`dmt-icon-mode-btn ${iconMode === 'symbol' ? 'active' : ''}`}
+              className={`windrose-icon-mode-btn ${iconMode === 'symbol' ? 'active' : ''}`}
               onClick={() => setIconMode('symbol')}
             >
               Symbol
             </button>
             <button
               type="button"
-              className={`dmt-icon-mode-btn ${iconMode === 'rpgawesome' ? 'active' : ''}`}
+              className={`windrose-icon-mode-btn ${iconMode === 'rpgawesome' ? 'active' : ''}`}
               onClick={() => setIconMode('rpgawesome')}
             >
               RPGAwesome
@@ -179,26 +179,26 @@ const LayerEditModal = ({
 
         {/* Symbol picker */}
         {iconMode === 'symbol' && (
-          <div className="dmt-layer-edit-section">
-            <div className="dmt-symbol-input-row">
+          <div className="windrose-layer-edit-section">
+            <div className="windrose-symbol-input-row">
               <input
                 type="text"
-                className="dmt-symbol-input"
+                className="windrose-symbol-input"
                 value={symbol}
                 onChange={(e) => setSymbol((e.target as HTMLInputElement).value)}
                 placeholder="Type or select..."
                 maxLength={8}
               />
-              <div className="dmt-symbol-preview">
+              <div className="windrose-symbol-preview">
                 {symbol || '?'}
               </div>
             </div>
-            <div className="dmt-quick-symbols-grid">
+            <div className="windrose-quick-symbols-grid">
               {QUICK_SYMBOLS.map((sym) => (
                 <button
                   key={sym}
                   type="button"
-                  className={`dmt-quick-symbol-btn ${symbol === sym ? 'selected' : ''}`}
+                  className={`windrose-quick-symbol-btn ${symbol === sym ? 'selected' : ''}`}
                   onClick={() => setSymbol(sym)}
                 >
                   {sym}
@@ -210,18 +210,18 @@ const LayerEditModal = ({
 
         {/* RPGAwesome picker */}
         {iconMode === 'rpgawesome' && (
-          <div className="dmt-layer-edit-section dmt-icon-picker">
+          <div className="windrose-layer-edit-section windrose-icon-picker">
             <input
               type="text"
-              className="dmt-icon-search"
+              className="windrose-icon-search"
               value={searchQuery}
               onChange={(e) => setSearchQuery((e.target as HTMLInputElement).value)}
               placeholder="Search icons..."
             />
-            <div className="dmt-icon-category-tabs">
+            <div className="windrose-icon-category-tabs">
               <button
                 type="button"
-                className={`dmt-icon-category-tab ${iconCategory === 'all' ? 'active' : ''}`}
+                className={`windrose-icon-category-tab ${iconCategory === 'all' ? 'active' : ''}`}
                 onClick={() => setIconCategory('all')}
               >
                 All
@@ -230,19 +230,19 @@ const LayerEditModal = ({
                 <button
                   key={cat.id}
                   type="button"
-                  className={`dmt-icon-category-tab ${iconCategory === cat.id ? 'active' : ''}`}
+                  className={`windrose-icon-category-tab ${iconCategory === cat.id ? 'active' : ''}`}
                   onClick={() => setIconCategory(cat.id)}
                 >
                   {cat.label}
                 </button>
               ))}
             </div>
-            <div className="dmt-icon-grid">
+            <div className="windrose-icon-grid">
               {filteredIcons.slice(0, ICON_GRID_MAX_VISIBLE).map((icon) => (
                 <button
                   key={icon.iconClass}
                   type="button"
-                  className={`dmt-icon-grid-btn ${iconClass === icon.iconClass ? 'selected' : ''}`}
+                  className={`windrose-icon-grid-btn ${iconClass === icon.iconClass ? 'selected' : ''}`}
                   onClick={() => setIconClass(icon.iconClass)}
                   title={icon.label}
                 >
@@ -250,28 +250,28 @@ const LayerEditModal = ({
                 </button>
               ))}
               {filteredIcons.length > ICON_GRID_MAX_VISIBLE && (
-                <div className="dmt-icon-grid-more">
+                <div className="windrose-icon-grid-more">
                   +{filteredIcons.length - ICON_GRID_MAX_VISIBLE} more...
                 </div>
               )}
               {filteredIcons.length === 0 && (
-                <div className="dmt-icon-grid-empty">No icons found</div>
+                <div className="windrose-icon-grid-empty">No icons found</div>
               )}
             </div>
           </div>
         )}
 
         {/* Preview */}
-        <div className="dmt-layer-edit-section">
-          <label className="dmt-layer-edit-label">Preview</label>
-          <div className="dmt-layer-preview">
-            <div className={`dmt-layer-preview-btn ${getDisplayIcon() != null || getDisplayName().length > 2 ? 'pill' : ''}`}>
+        <div className="windrose-layer-edit-section">
+          <label className="windrose-layer-edit-label">Preview</label>
+          <div className="windrose-layer-preview">
+            <div className={`windrose-layer-preview-btn ${getDisplayIcon() != null || getDisplayName().length > 2 ? 'pill' : ''}`}>
               {getDisplayIcon() != null && (
-                <span className={iconMode === 'rpgawesome' ? 'ra dmt-layer-preview-icon' : 'dmt-layer-preview-icon'}>
+                <span className={iconMode === 'rpgawesome' ? 'ra windrose-layer-preview-icon' : 'windrose-layer-preview-icon'}>
                   {getDisplayIcon()}
                 </span>
               )}
-              <span className="dmt-layer-preview-name">
+              <span className="windrose-layer-preview-name">
                 {getDisplayName().length > LAYER_NAME_MAX_LENGTH
                   ? getDisplayName().slice(0, LAYER_NAME_TRUNCATE_AT) + '...'
                   : getDisplayName()}
@@ -281,24 +281,24 @@ const LayerEditModal = ({
         </div>
 
         {/* Buttons */}
-        <div className="dmt-modal-buttons">
+        <div className="windrose-modal-buttons">
           <button
             type="button"
-            className="dmt-modal-btn dmt-modal-btn-cancel"
+            className="windrose-modal-btn windrose-modal-btn-cancel"
             onClick={onCancel}
           >
             Cancel
           </button>
           <button
             type="button"
-            className="dmt-modal-btn dmt-modal-btn-submit"
+            className="windrose-modal-btn windrose-modal-btn-submit"
             onClick={handleSave}
           >
             Save
           </button>
         </div>
 
-        <div className="dmt-modal-hint">
+        <div className="windrose-modal-hint">
           Press Enter to save, Esc to cancel
         </div>
       </div>

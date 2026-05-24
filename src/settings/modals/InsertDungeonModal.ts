@@ -249,14 +249,14 @@ class InsertDungeonModal extends Modal {
   onOpen(): void {
     const { contentEl } = this;
     contentEl.empty();
-    contentEl.addClass('dmt-insert-dungeon-modal');
+    contentEl.addClass('windrose-insert-dungeon-modal');
 
     // === Header with Visualizer ===
-    const headerContainer = contentEl.createDiv({ cls: 'dmt-dungeon-header' });
+    const headerContainer = contentEl.createDiv({ cls: 'windrose-dungeon-header' });
 
-    const visualizerContainer = headerContainer.createDiv({ cls: 'dmt-dungeon-visualizer' });
+    const visualizerContainer = headerContainer.createDiv({ cls: 'windrose-dungeon-visualizer' });
 
-    const titleOverlay = headerContainer.createDiv({ cls: 'dmt-dungeon-title-overlay' });
+    const titleOverlay = headerContainer.createDiv({ cls: 'windrose-dungeon-title-overlay' });
     titleOverlay.createEl('h2', { text: 'Generate Random Dungeon' });
 
     this.visualizer = new DungeonEssenceVisualizer(visualizerContainer, {
@@ -278,14 +278,14 @@ class InsertDungeonModal extends Modal {
         setTimeout(() => text.inputEl.focus(), 10);
       });
 
-    const styleContainer = contentEl.createDiv({ cls: 'dmt-dungeon-style-selection' });
+    const styleContainer = contentEl.createDiv({ cls: 'windrose-dungeon-style-selection' });
     styleContainer.createEl('div', { text: 'Style', cls: 'setting-item-name' });
     styleContainer.createEl('div', {
       text: 'Choose the architectural style of the dungeon',
       cls: 'setting-item-description'
     });
 
-    const styleRow = styleContainer.createDiv({ cls: 'dmt-dungeon-style-buttons' });
+    const styleRow = styleContainer.createDiv({ cls: 'windrose-dungeon-style-buttons' });
 
     const styleInfo: Record<DungeonStyleName, { label: string; desc: string }> = {
       classic: { label: 'Classic', desc: 'Balanced mix of rooms and corridors' },
@@ -298,7 +298,7 @@ class InsertDungeonModal extends Modal {
 
     for (const [style, info] of Object.entries(styleInfo)) {
       const btn = styleRow.createEl('button', {
-        cls: 'dmt-dungeon-style-btn',
+        cls: 'windrose-dungeon-style-btn',
         text: info.label,
         attr: { type: 'button', title: info.desc }
       });
@@ -315,14 +315,14 @@ class InsertDungeonModal extends Modal {
 
     styleButtons.classic.addClass('selected');
 
-    const sizeContainer = contentEl.createDiv({ cls: 'dmt-dungeon-size-selection' });
+    const sizeContainer = contentEl.createDiv({ cls: 'windrose-dungeon-size-selection' });
     sizeContainer.createEl('div', { text: 'Dungeon size', cls: 'setting-item-name' });
     sizeContainer.createEl('div', {
       text: 'Choose the overall size of the generated dungeon',
       cls: 'setting-item-description'
     });
 
-    const buttonRow = sizeContainer.createDiv({ cls: 'dmt-dungeon-size-buttons' });
+    const buttonRow = sizeContainer.createDiv({ cls: 'windrose-dungeon-size-buttons' });
 
     const presetInfo: Record<DungeonSize, { label: string; desc: string }> = {
       small: { label: 'Small', desc: '3-5 rooms, tight layout' },
@@ -334,7 +334,7 @@ class InsertDungeonModal extends Modal {
 
     for (const [preset, info] of Object.entries(presetInfo)) {
       const btn = buttonRow.createEl('button', {
-        cls: 'dmt-dungeon-size-btn',
+        cls: 'windrose-dungeon-size-btn',
         text: info.label,
         attr: { type: 'button', title: info.desc }
       });
@@ -348,14 +348,14 @@ class InsertDungeonModal extends Modal {
       };
     }
 
-    const distContainer = contentEl.createDiv({ cls: 'dmt-dungeon-size-selection' });
+    const distContainer = contentEl.createDiv({ cls: 'windrose-dungeon-size-selection' });
     distContainer.createEl('div', { text: 'Distance measurement', cls: 'setting-item-name' });
     distContainer.createEl('div', {
       text: 'Set the scale for distance measurement on this map',
       cls: 'setting-item-description'
     });
 
-    const distRow = distContainer.createDiv({ cls: 'dmt-dungeon-distance-row' });
+    const distRow = distContainer.createDiv({ cls: 'windrose-dungeon-distance-row' });
 
     const distInput = distRow.createEl('input', {
       type: 'number',
@@ -376,13 +376,13 @@ class InsertDungeonModal extends Modal {
       this.distanceUnit = (e.target as HTMLInputElement).value || 'ft';
     });
 
-    const advancedContainer = contentEl.createDiv({ cls: 'dmt-dungeon-advanced' });
+    const advancedContainer = contentEl.createDiv({ cls: 'windrose-dungeon-advanced' });
 
-    const advancedHeader = advancedContainer.createDiv({ cls: 'dmt-dungeon-advanced-header' });
-    const chevron = advancedHeader.createSpan({ cls: 'dmt-dungeon-advanced-chevron', text: '▶' });
+    const advancedHeader = advancedContainer.createDiv({ cls: 'windrose-dungeon-advanced-header' });
+    const chevron = advancedHeader.createSpan({ cls: 'windrose-dungeon-advanced-chevron', text: '▶' });
     advancedHeader.createSpan({ text: 'Advanced Options' });
 
-    const advancedContent = advancedContainer.createDiv({ cls: 'dmt-dungeon-advanced-content' });
+    const advancedContent = advancedContainer.createDiv({ cls: 'windrose-dungeon-advanced-content' });
     advancedContent.style.display = 'none';
 
     advancedHeader.onclick = () => {
@@ -392,10 +392,10 @@ class InsertDungeonModal extends Modal {
     };
 
     const createSlider = (container: HTMLElement, label: string, key: string, min: number, max: number, step: number, defaultVal: number, formatFn: (v: number) => string) => {
-      const row = container.createDiv({ cls: 'dmt-dungeon-slider-row' });
+      const row = container.createDiv({ cls: 'windrose-dungeon-slider-row' });
       row.createEl('label', { text: label });
 
-      const sliderContainer = row.createDiv({ cls: 'dmt-dungeon-slider-container' });
+      const sliderContainer = row.createDiv({ cls: 'windrose-dungeon-slider-container' });
       const slider = sliderContainer.createEl('input', {
         type: 'range',
         attr: { min: String(min), max: String(max), step: String(step) }
@@ -403,7 +403,7 @@ class InsertDungeonModal extends Modal {
       slider.value = String(defaultVal);
 
       const valueDisplay = sliderContainer.createSpan({
-        cls: 'dmt-dungeon-slider-value',
+        cls: 'windrose-dungeon-slider-value',
         text: formatFn(defaultVal)
       });
 
@@ -433,11 +433,11 @@ class InsertDungeonModal extends Modal {
     createSlider(advancedContent, 'Wide Corridors', 'wideCorridorChance', 0, 1, 0.05, 0.25, pct);
     createSlider(advancedContent, 'Room Size Bias', 'roomSizeBias', -1, 1, 0.1, 0, biasLabel);
 
-    const corridorRow = advancedContent.createDiv({ cls: 'dmt-dungeon-slider-row' });
+    const corridorRow = advancedContent.createDiv({ cls: 'windrose-dungeon-slider-row' });
     corridorRow.createEl('label', { text: 'Corridor Style' });
-    const corridorToggleContainer = corridorRow.createDiv({ cls: 'dmt-dungeon-toggle-container' });
+    const corridorToggleContainer = corridorRow.createDiv({ cls: 'windrose-dungeon-toggle-container' });
 
-    const corridorSelect = corridorToggleContainer.createEl('select', { cls: 'dmt-dungeon-select' });
+    const corridorSelect = corridorToggleContainer.createEl('select', { cls: 'windrose-dungeon-select' });
     corridorSelect.createEl('option', { value: 'straight', text: 'Straight' });
     corridorSelect.createEl('option', { value: 'organic', text: 'Organic' });
     corridorSelect.createEl('option', { value: 'diagonal', text: 'Diagonal' });
@@ -452,67 +452,67 @@ class InsertDungeonModal extends Modal {
     const diagonalLabel = (v: number): string => v === 0 ? 'None' : `${Math.round(v * 100)}%`;
     createSlider(advancedContent, 'Diagonal Corridors', 'diagonalCorridorChance', 0, 1, 0.1, 0.5, diagonalLabel);
 
-    advancedContent.createEl('div', { cls: 'dmt-dungeon-section-header', text: 'Environment' });
+    advancedContent.createEl('div', { cls: 'windrose-dungeon-section-header', text: 'Environment' });
 
     const waterLabel = (v: number): string => v === 0 ? 'None' : `${Math.round(v * 100)}%`;
     createSlider(advancedContent, 'Water Features', 'waterChance', 0, 0.5, 0.05, 0.15, waterLabel);
 
-    advancedContent.createEl('div', { cls: 'dmt-dungeon-section-header', text: 'Object Placement' });
+    advancedContent.createEl('div', { cls: 'windrose-dungeon-section-header', text: 'Object Placement' });
 
     const densityLabel = (v: number): string => v < 0.75 ? 'Sparse' : v > 1.25 ? 'Dense' : 'Normal';
     createSlider(advancedContent, 'Object Density', 'objectDensity', 0.5, 2, 0.1, 1.0, densityLabel);
 
-    const templateRow = advancedContent.createDiv({ cls: 'dmt-dungeon-slider-row' });
+    const templateRow = advancedContent.createDiv({ cls: 'windrose-dungeon-slider-row' });
     templateRow.createEl('label', { text: 'Room Templates' });
-    const templateToggleContainer = templateRow.createDiv({ cls: 'dmt-dungeon-toggle-container' });
+    const templateToggleContainer = templateRow.createDiv({ cls: 'windrose-dungeon-toggle-container' });
     const templateCheckbox = templateToggleContainer.createEl('input', {
       type: 'checkbox',
-      attr: { id: 'dmt-template-toggle' }
+      attr: { id: 'windrose-template-toggle' }
     });
     templateCheckbox.checked = true;
     templateToggleContainer.createEl('label', {
-      attr: { for: 'dmt-template-toggle' },
+      attr: { for: 'windrose-template-toggle' },
       text: 'Enable',
-      cls: 'dmt-checkbox-label'
+      cls: 'windrose-checkbox-label'
     });
     templateCheckbox.addEventListener('change', (e: Event) => {
       this.configOverrides.useTemplates = (e.target as HTMLInputElement).checked;
     });
     advancedContent.createEl('div', {
-      cls: 'dmt-checkbox-hint',
+      cls: 'windrose-checkbox-hint',
       text: 'Generates themed rooms (library, shrine, barracks) with appropriate objects'
     });
 
-    advancedContent.createEl('div', { cls: 'dmt-dungeon-subsection', text: 'Room Categories' });
+    advancedContent.createEl('div', { cls: 'windrose-dungeon-subsection', text: 'Room Categories' });
     createSlider(advancedContent, 'Monsters', 'monsterWeight', 0, 1, 0.05, 0.33, pct);
     createSlider(advancedContent, 'Empty Rooms', 'emptyWeight', 0, 1, 0.05, 0.33, pct);
     createSlider(advancedContent, 'Features', 'featureWeight', 0, 1, 0.05, 0.17, pct);
     createSlider(advancedContent, 'Traps', 'trapWeight', 0, 1, 0.05, 0.17, pct);
 
-    advancedContent.createEl('div', { cls: 'dmt-dungeon-section-header', text: 'Solo Play' });
+    advancedContent.createEl('div', { cls: 'windrose-dungeon-section-header', text: 'Solo Play' });
 
-    const fogRow = advancedContent.createDiv({ cls: 'dmt-dungeon-slider-row' });
+    const fogRow = advancedContent.createDiv({ cls: 'windrose-dungeon-slider-row' });
     fogRow.createEl('label', { text: 'Auto-Fog Dungeon' });
-    const fogToggleContainer = fogRow.createDiv({ cls: 'dmt-dungeon-toggle-container' });
+    const fogToggleContainer = fogRow.createDiv({ cls: 'windrose-dungeon-toggle-container' });
     const fogCheckbox = fogToggleContainer.createEl('input', {
       type: 'checkbox',
-      attr: { id: 'dmt-fog-toggle' }
+      attr: { id: 'windrose-fog-toggle' }
     });
     fogCheckbox.checked = false;
     fogToggleContainer.createEl('label', {
-      attr: { for: 'dmt-fog-toggle' },
+      attr: { for: 'windrose-fog-toggle' },
       text: 'Enable',
-      cls: 'dmt-checkbox-label'
+      cls: 'windrose-checkbox-label'
     });
     fogCheckbox.addEventListener('change', (e: Event) => {
       this.configOverrides.autoFogEnabled = (e.target as HTMLInputElement).checked;
     });
     advancedContent.createEl('div', {
-      cls: 'dmt-checkbox-hint',
+      cls: 'windrose-checkbox-hint',
       text: 'Cover dungeon with fog, revealing only the entrance room'
     });
 
-    const buttonContainer = contentEl.createDiv({ cls: 'dmt-modal-buttons' });
+    const buttonContainer = contentEl.createDiv({ cls: 'windrose-modal-buttons' });
 
     const cancelBtn = buttonContainer.createEl('button', { text: 'Cancel' });
     cancelBtn.onclick = () => this.close();
@@ -520,8 +520,8 @@ class InsertDungeonModal extends Modal {
     const generateBtn = buttonContainer.createEl('button', { text: 'Generate', cls: 'mod-cta' });
     generateBtn.onclick = async () => {
       if (!this.dungeonSize) {
-        buttonRow.addClass('dmt-shake');
-        setTimeout(() => buttonRow.removeClass('dmt-shake'), 300);
+        buttonRow.addClass('windrose-shake');
+        setTimeout(() => buttonRow.removeClass('windrose-shake'), 300);
         return;
       }
 

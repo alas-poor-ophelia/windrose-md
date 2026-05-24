@@ -95,9 +95,9 @@ const ObjectSidebar = ({ selectedObjectType, onObjectTypeSelect, onToolChange, i
 
   if (isCollapsed) {
     return (
-      <div className="dmt-object-sidebar dmt-object-sidebar-collapsed">
+      <div className="windrose-object-sidebar windrose-object-sidebar-collapsed">
         <button
-          className="dmt-sidebar-toggle interactive-child"
+          className="windrose-sidebar-toggle interactive-child"
           onClick={handleToggleCollapse}
           title="Show objects"
         >
@@ -105,7 +105,7 @@ const ObjectSidebar = ({ selectedObjectType, onObjectTypeSelect, onToolChange, i
         </button>
         {isFreeformMode && (
           <button
-            className="dmt-freeform-collapsed-indicator interactive-child"
+            className="windrose-freeform-collapsed-indicator interactive-child"
             title="Freeform placement active (tap to disable)"
             onClick={onFreeformToggle}
           >
@@ -117,11 +117,11 @@ const ObjectSidebar = ({ selectedObjectType, onObjectTypeSelect, onToolChange, i
   }
 
   return (
-    <div className="dmt-object-sidebar">
-      <div className="dmt-object-sidebar-header">
+    <div className="windrose-object-sidebar">
+      <div className="windrose-object-sidebar-header">
         <span>Objects</span>
         <button
-          className="dmt-sidebar-collapse-btn interactive-child"
+          className="windrose-sidebar-collapse-btn interactive-child"
           onClick={handleToggleCollapse}
           title="Hide sidebar"
         >
@@ -130,11 +130,11 @@ const ObjectSidebar = ({ selectedObjectType, onObjectTypeSelect, onToolChange, i
       </div>
 
       {objectSets.length > 0 && (
-        <div className="dmt-object-sidebar-set-selector">
+        <div className="windrose-object-sidebar-set-selector">
           <select
             value={activeSetId ?? ''}
             onChange={(e) => handleSetChange(e.currentTarget.value || null)}
-            className="dmt-object-sidebar-select"
+            className="windrose-object-sidebar-select"
           >
             <option value="">Default</option>
             {objectSets.map((set: ObjectSet) => (
@@ -144,21 +144,21 @@ const ObjectSidebar = ({ selectedObjectType, onObjectTypeSelect, onToolChange, i
         </div>
       )}
 
-      <div className="dmt-object-sidebar-search">
+      <div className="windrose-object-sidebar-search">
         <input
           type="text"
           placeholder="Filter objects..."
           value={searchFilter}
           onInput={(e) => setSearchFilter((e.target as HTMLInputElement).value)}
-          className="dmt-object-sidebar-search-input"
+          className="windrose-object-sidebar-search-input"
         />
       </div>
 
-      <div className="dmt-object-sidebar-content">
+      <div className="windrose-object-sidebar-content">
         {objectsByCategory.map(category => (
-          <div key={category.id} className="dmt-object-sidebar-category">
+          <div key={category.id} className="windrose-object-sidebar-category">
             <button
-              className="dmt-object-sidebar-category-label"
+              className="windrose-object-sidebar-category-label"
               onClick={() => handleToggleCategory(category.id)}
             >
               <Icon
@@ -166,24 +166,24 @@ const ObjectSidebar = ({ selectedObjectType, onObjectTypeSelect, onToolChange, i
                 size={10}
               />
               <span>{category.label}</span>
-              <span className="dmt-object-sidebar-category-count">{category.objects.length}</span>
+              <span className="windrose-object-sidebar-category-count">{category.objects.length}</span>
             </button>
 
             {!collapsedCategories.has(category.id) && (
-              <div className="dmt-object-sidebar-grid">
+              <div className="windrose-object-sidebar-grid">
                 {category.objects.map(objType => (
                   <button
                     key={objType.id}
-                    className={`dmt-object-grid-item ${selectedObjectType === objType.id ? 'dmt-object-grid-item-selected' : ''}`}
+                    className={`windrose-object-grid-item ${selectedObjectType === objType.id ? 'windrose-object-grid-item-selected' : ''}`}
                     onClick={() => handleObjectSelect(objType.id)}
                     title={objType.label}
                   >
-                    <div className="dmt-object-grid-symbol">
+                    <div className="windrose-object-grid-symbol">
                       {hasImagePath(objType) ? (
                         <img
                           src={app.vault.adapter.getResourcePath(objType.imagePath ?? '')}
                           alt={objType.label}
-                          className="dmt-object-grid-image"
+                          className="windrose-object-grid-image"
                         />
                       ) : hasIconClass(objType) ? (
                         <span className={`ra ${objType.iconClass}`}></span>
@@ -191,7 +191,7 @@ const ObjectSidebar = ({ selectedObjectType, onObjectTypeSelect, onToolChange, i
                         objType.symbol ?? '?'
                       )}
                     </div>
-                    <div className="dmt-object-grid-label">{objType.label}</div>
+                    <div className="windrose-object-grid-label">{objType.label}</div>
                   </button>
                 ))}
               </div>
@@ -200,15 +200,15 @@ const ObjectSidebar = ({ selectedObjectType, onObjectTypeSelect, onToolChange, i
         ))}
 
         {objectsByCategory.length === 0 && (
-          <div className="dmt-object-sidebar-empty">
+          <div className="windrose-object-sidebar-empty">
             {searchFilter != null && searchFilter !== '' ? 'No matching objects' : 'No objects available'}
           </div>
         )}
       </div>
 
-      <div className="dmt-object-sidebar-footer">
+      <div className="windrose-object-sidebar-footer">
         <button
-          className={`dmt-object-sidebar-action-btn ${isFreeformMode ? 'dmt-object-sidebar-action-active' : ''}`}
+          className={`windrose-object-sidebar-action-btn ${isFreeformMode ? 'windrose-object-sidebar-action-active' : ''}`}
           onClick={onFreeformToggle}
           title={isFreeformMode ? 'Disable freeform placement' : 'Enable freeform placement'}
         >
@@ -216,7 +216,7 @@ const ObjectSidebar = ({ selectedObjectType, onObjectTypeSelect, onToolChange, i
         </button>
         {selectedObjectType != null && selectedObjectType !== '' && (
           <button
-            className="dmt-object-sidebar-action-btn"
+            className="windrose-object-sidebar-action-btn"
             onClick={() => onObjectTypeSelect(null)}
             title="Clear selection"
           >

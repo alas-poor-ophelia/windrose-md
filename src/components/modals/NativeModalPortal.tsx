@@ -88,7 +88,7 @@ async function setupModalInteract(
     const edges = ['top', 'right', 'bottom', 'left', 'top-right', 'top-left', 'bottom-right', 'bottom-left'];
     for (const edge of edges) {
       const handle = document.createElement('div');
-      handle.className = `dmt-resize-handle dmt-resize-${edge}`;
+      handle.className = `windrose-resize-handle windrose-resize-${edge}`;
       modalEl.appendChild(handle);
     }
   }
@@ -115,10 +115,10 @@ async function setupModalInteract(
   if (options.resizable === true) {
     interactable.resizable({
       edges: {
-        top: '.dmt-resize-top, .dmt-resize-top-left, .dmt-resize-top-right',
-        right: '.dmt-resize-right, .dmt-resize-top-right, .dmt-resize-bottom-right',
-        bottom: '.dmt-resize-bottom, .dmt-resize-bottom-left, .dmt-resize-bottom-right',
-        left: '.dmt-resize-left, .dmt-resize-top-left, .dmt-resize-bottom-left'
+        top: '.windrose-resize-top, .windrose-resize-top-left, .windrose-resize-top-right',
+        right: '.windrose-resize-right, .windrose-resize-top-right, .windrose-resize-bottom-right',
+        bottom: '.windrose-resize-bottom, .windrose-resize-bottom-left, .windrose-resize-bottom-right',
+        left: '.windrose-resize-left, .windrose-resize-top-left, .windrose-resize-bottom-left'
       },
       listeners: {
         move(event: {
@@ -155,7 +155,7 @@ async function setupModalInteract(
 
   return () => {
     interactable.unset();
-    modalEl.querySelectorAll('.dmt-resize-handle').forEach(el => el.remove());
+    modalEl.querySelectorAll('.windrose-resize-handle').forEach(el => el.remove());
   };
 }
 

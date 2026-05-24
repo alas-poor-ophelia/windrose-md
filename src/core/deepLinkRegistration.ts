@@ -26,7 +26,7 @@ async function navigateToLink(plugin: Plugin, parsed: DeepLinkData, sourcePath: 
     try {
       const leaf = document.querySelector('.workspace-leaf.mod-active .view-content');
       if (leaf) {
-        const mapEl = leaf.querySelector('.dmt-container');
+        const mapEl = leaf.querySelector('.windrose-container');
         if (mapEl) {
           mapEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }

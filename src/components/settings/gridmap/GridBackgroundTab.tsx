@@ -65,7 +65,7 @@ function GridBackgroundTab(): VNode | null {
   }
 
   return (
-    <div class="dmt-settings-tab-content" style={{ paddingRight: '8px' }}>
+    <div class="windrose-settings-tab-content" style={{ paddingRight: '8px' }}>
       {/* Background Image Picker Section */}
       <CollapsibleSection
         title="Background Image"

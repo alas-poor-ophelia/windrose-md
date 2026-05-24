@@ -187,7 +187,7 @@ const ObjectSelectionToolbar = ({
 
     return (
       <div
-        className="dmt-scale-slider-container"
+        className="windrose-scale-slider-container"
         style={{
           position: 'absolute',
           left: `${clampedSliderX}px`,
@@ -198,11 +198,11 @@ const ObjectSelectionToolbar = ({
           zIndex: Z_INDEX.TOOLBAR
         }}
       >
-        <div className="dmt-scale-slider-inner">
+        <div className="windrose-scale-slider-inner">
           <Icon icon="lucide-scaling" size={14} />
           <input
             type="range"
-            className="dmt-scale-slider"
+            className="windrose-scale-slider"
             min="25"
             max="130"
             step="5"
@@ -213,7 +213,7 @@ const ObjectSelectionToolbar = ({
             }}
             title={`Scale: ${Math.round(currentScale * 100)}%`}
           />
-          <span className="dmt-scale-value">{Math.round(currentScale * 100)}%</span>
+          <span className="windrose-scale-value">{Math.round(currentScale * 100)}%</span>
         </div>
       </div>
     );
@@ -232,7 +232,7 @@ const ObjectSelectionToolbar = ({
       {/* Linked Note Display */}
       {hasLinkedNote && selectedObjectData != null && (
         <div
-          className="dmt-selection-linked-note"
+          className="windrose-selection-linked-note"
           style={{
             position: 'absolute',
             left: `${bounds.screenX}px`,
@@ -242,7 +242,7 @@ const ObjectSelectionToolbar = ({
             zIndex: Z_INDEX.TOOLBAR
           }}
         >
-          <div className="dmt-note-display-link">
+          <div className="windrose-note-display-link">
             <Icon icon="lucide-scroll-text" />
             <InternalLink
               link={(selectedObjectData.linkedNote as string).replace(/\.md$/, '')}
@@ -259,7 +259,7 @@ const ObjectSelectionToolbar = ({
 
       {/* Toolbar */}
       <div
-        className="dmt-selection-toolbar"
+        className="windrose-selection-toolbar"
         style={{
           position: 'absolute',
           left: `${toolbarPos.toolbarX}px`,
@@ -275,7 +275,7 @@ const ObjectSelectionToolbar = ({
               <div key={btn.id} style={{ position: 'relative', display: 'inline-block' }}>
                 <button
                   ref={colorButtonRef}
-                  className="dmt-toolbar-button dmt-toolbar-color-button"
+                  className="windrose-toolbar-button windrose-toolbar-color-button"
                   onClick={(e) => btn.onClick?.(e)}
                   title={btn.title}
                   style={{ backgroundColor: currentColor ?? '#ffffff' }}
@@ -302,9 +302,9 @@ const ObjectSelectionToolbar = ({
           }
 
           const className = [
-            'dmt-toolbar-button',
-            btn.isDelete === true && 'dmt-toolbar-delete-button',
-            btn.active === true && 'dmt-toolbar-button-active'
+            'windrose-toolbar-button',
+            btn.isDelete === true && 'windrose-toolbar-delete-button',
+            btn.active === true && 'windrose-toolbar-button-active'
           ].filter(Boolean).join(' ');
 
           return (

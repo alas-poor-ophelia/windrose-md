@@ -92,7 +92,7 @@ class WindroseMDSettingsTab extends PluginSettingTab {
   }
 
   createCollapsibleSection(containerEl: HTMLElement, title: string, renderFn: (el: HTMLElement) => void, options: { open?: boolean } = {}): HTMLDetailsElement {
-    const details = containerEl.createEl('details', { cls: 'dmt-settings-section' });
+    const details = containerEl.createEl('details', { cls: 'windrose-settings-section' });
     if (options.open) details.setAttribute('open', '');
 
     this.sections.push({ details, title });
@@ -100,7 +100,7 @@ class WindroseMDSettingsTab extends PluginSettingTab {
     const summary = details.createEl('summary');
     summary.createEl('span', { text: title });
 
-    const contentEl = details.createEl('div', { cls: 'dmt-settings-section-content' });
+    const contentEl = details.createEl('div', { cls: 'windrose-settings-section-content' });
 
     renderFn(contentEl);
 
@@ -158,7 +158,7 @@ class WindroseMDSettingsTab extends PluginSettingTab {
 
   hide(): void {
     if (this.settingsChanged) {
-      window.dispatchEvent(new CustomEvent('dmt-settings-changed', {
+      window.dispatchEvent(new CustomEvent('windrose-settings-changed', {
         detail: { timestamp: Date.now() }
       }));
       this.settingsChanged = false;

@@ -23,21 +23,21 @@ const SubHexBreadcrumb = ({
   onNavigate
 }: SubHexBreadcrumbProps): VNode => {
   return (
-    <div className="dmt-sub-hex-breadcrumb">
+    <div className="windrose-sub-hex-breadcrumb">
       {breadcrumbs.map((segment, index) => {
         const isLast = index === breadcrumbs.length - 1;
         return (
-          <span key={segment.depth} className="dmt-breadcrumb-segment">
+          <span key={segment.depth} className="windrose-breadcrumb-segment">
             {index > 0 && (
-              <span className="dmt-breadcrumb-separator">
+              <span className="windrose-breadcrumb-separator">
                 <Icon icon="lucide-chevron-right" size={12} />
               </span>
             )}
             {isLast ? (
-              <span className="dmt-breadcrumb-current">{segment.label}</span>
+              <span className="windrose-breadcrumb-current">{segment.label}</span>
             ) : (
               <button
-                className="dmt-breadcrumb-link"
+                className="windrose-breadcrumb-link"
                 onClick={() => onNavigate(segment.depth)}
                 title={`Back to ${segment.label}`}
               >

@@ -131,7 +131,7 @@ const RerollDungeonButton = (): VNode | null => {
   return (
     <>
       <button
-        className="dmt-tool-btn dmt-reroll-btn interactive-child"
+        className="windrose-tool-btn windrose-reroll-btn interactive-child"
         onClick={handleClick}
         title={`Re-roll dungeon (${styleName} ${settings.preset})`}
       >
@@ -140,21 +140,21 @@ const RerollDungeonButton = (): VNode | null => {
 
       {showConfirm && (
         <ModalPortal>
-          <div className="dmt-reroll-confirm-overlay" onClick={handleCancel}>
-            <div className="dmt-reroll-confirm-dialog" onClick={e => e.stopPropagation()}>
+          <div className="windrose-reroll-confirm-overlay" onClick={handleCancel}>
+            <div className="windrose-reroll-confirm-dialog" onClick={e => e.stopPropagation()}>
               <h3>Re-roll Dungeon?</h3>
               {hasStockingMetadata ? (
                 <>
                   <p>Choose what to regenerate:</p>
-                  <p className="dmt-reroll-warning">This action cannot be undone.</p>
-                  <div className="dmt-reroll-confirm-buttons dmt-reroll-three-buttons">
-                    <button className="dmt-btn dmt-btn-secondary" onClick={handleCancel}>
+                  <p className="windrose-reroll-warning">This action cannot be undone.</p>
+                  <div className="windrose-reroll-confirm-buttons windrose-reroll-three-buttons">
+                    <button className="windrose-btn windrose-btn-secondary" onClick={handleCancel}>
                       Cancel
                     </button>
-                    <button className="dmt-btn dmt-btn-tertiary" onClick={handleRerollObjectsOnly} title="Keep the map layout, only regenerate monsters, features, and traps">
+                    <button className="windrose-btn windrose-btn-tertiary" onClick={handleRerollObjectsOnly} title="Keep the map layout, only regenerate monsters, features, and traps">
                       Objects Only
                     </button>
-                    <button className="dmt-btn dmt-btn-primary" onClick={handleRerollAll}>
+                    <button className="windrose-btn windrose-btn-primary" onClick={handleRerollAll}>
                       Entire Dungeon
                     </button>
                   </div>
@@ -162,12 +162,12 @@ const RerollDungeonButton = (): VNode | null => {
               ) : (
                 <>
                   <p>This will replace all cells and objects on the current layer with a new randomly generated dungeon.</p>
-                  <p className="dmt-reroll-warning">This action cannot be undone.</p>
-                  <div className="dmt-reroll-confirm-buttons">
-                    <button className="dmt-btn dmt-btn-secondary" onClick={handleCancel}>
+                  <p className="windrose-reroll-warning">This action cannot be undone.</p>
+                  <div className="windrose-reroll-confirm-buttons">
+                    <button className="windrose-btn windrose-btn-secondary" onClick={handleCancel}>
                       Cancel
                     </button>
-                    <button className="dmt-btn dmt-btn-primary" onClick={handleRerollAll}>
+                    <button className="windrose-btn windrose-btn-primary" onClick={handleRerollAll}>
                       Re-roll
                     </button>
                   </div>

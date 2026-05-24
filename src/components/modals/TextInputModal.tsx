@@ -39,7 +39,7 @@ function openNativeTextInputModal(options: {
           type: 'text',
           placeholder,
           value: initialValue,
-          cls: 'dmt-modal-input windrose-text-input-modal-input'
+          cls: 'windrose-modal-input windrose-text-input-modal-input'
         });
         this.inputEl.maxLength = 200;
 
@@ -51,18 +51,18 @@ function openNativeTextInputModal(options: {
         });
 
         const buttonContainer = contentEl.createEl('div', {
-          cls: 'dmt-modal-buttons windrose-modal-button-row'
+          cls: 'windrose-modal-buttons windrose-modal-button-row'
         });
 
         const cancelBtn = buttonContainer.createEl('button', {
           text: 'Cancel',
-          cls: 'dmt-modal-btn dmt-modal-btn-cancel'
+          cls: 'windrose-modal-btn windrose-modal-btn-cancel'
         });
         cancelBtn.addEventListener('click', () => this.close());
 
         const submitBtn = buttonContainer.createEl('button', {
           text: initialValue ? 'Update' : 'Add Label',
-          cls: 'dmt-modal-btn dmt-modal-btn-submit'
+          cls: 'windrose-modal-btn windrose-modal-btn-submit'
         });
         submitBtn.addEventListener('click', () => this.submit());
 

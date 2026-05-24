@@ -23,10 +23,10 @@ const MapHeader = ({ mapData, onNameChange, saveStatus, showFooter, onToggleFoot
   };
   
   const getStatusClass = (): string => {
-    if (saveStatus === 'Unsaved changes') return 'dmt-save-status dmt-save-status-unsaved';
-    if (saveStatus === 'Saving...') return 'dmt-save-status dmt-save-status-saving';
-    if (saveStatus === 'Save failed') return 'dmt-save-status dmt-save-status-error';
-    return 'dmt-save-status';
+    if (saveStatus === 'Unsaved changes') return 'windrose-save-status windrose-save-status-unsaved';
+    if (saveStatus === 'Saving...') return 'windrose-save-status windrose-save-status-saving';
+    if (saveStatus === 'Save failed') return 'windrose-save-status windrose-save-status-error';
+    return 'windrose-save-status';
   };
   
   const getStatusTitle = (): SaveStatus | string => {
@@ -34,17 +34,17 @@ const MapHeader = ({ mapData, onNameChange, saveStatus, showFooter, onToggleFoot
   };
   
   return (
-    <div className="dmt-header">
+    <div className="windrose-header">
       <input
         type="text"
-        className="dmt-map-name"
+        className="windrose-map-name"
         placeholder="Map Name (optional)"
         value={mapData.name}
         onChange={(e) => onNameChange((e.target as HTMLInputElement).value)}
       />
-      <div className="dmt-header-controls">
+      <div className="windrose-header-controls">
         <button
-          className={`dmt-info-toggle ${showFooter ? 'dmt-info-toggle-active' : ''}`}
+          className={`windrose-info-toggle ${showFooter ? 'windrose-info-toggle-active' : ''}`}
           onClick={onToggleFooter}
           title={showFooter ? 'Hide footer info' : 'Show footer info'}
         >

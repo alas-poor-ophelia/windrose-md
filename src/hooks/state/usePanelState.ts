@@ -5,7 +5,7 @@
  * - Settings plugin detection and installer display
  * - Settings modal visibility
  * - Layer edit modal state
- * - Settings change listener (forces re-render on dmt-settings-changed)
+ * - Settings change listener (forces re-render on windrose-settings-changed)
  */
 
 import type {
@@ -67,10 +67,10 @@ function usePanelState({ mapData, updateMapData }: UsePanelStateOptions): UsePan
       setSettingsVersion((prev: number) => prev + 1);
     };
 
-    window.addEventListener('dmt-settings-changed', handleSettingsChange);
+    window.addEventListener('windrose-settings-changed', handleSettingsChange);
 
     return () => {
-      window.removeEventListener('dmt-settings-changed', handleSettingsChange);
+      window.removeEventListener('windrose-settings-changed', handleSettingsChange);
     };
   }, []);
 

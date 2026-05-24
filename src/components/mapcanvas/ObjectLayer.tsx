@@ -431,7 +431,7 @@ const ObjectLayer = ({
             { layerId: mapData.activeLayerId, objectId: targetObject.id, transform: (obj) => ({ ...obj, linkedObject: targetToSourceLink }) }
           ],
           {
-            name: 'dmt-create-object-link',
+            name: 'windrose-create-object-link',
             detail: {
               sourceLayerId: linkingFrom.layerId,
               sourceObjectId: linkingFrom.objectId,
@@ -576,7 +576,7 @@ const ObjectLayer = ({
     }
 
     // Navigate to the target (DungeonMapTracker handles layer switching + panning)
-    window.dispatchEvent(new CustomEvent('dmt-navigate-to', {
+    window.dispatchEvent(new CustomEvent('windrose-navigate-to', {
       detail: {
         notePath,
         mapId,
@@ -617,7 +617,7 @@ const ObjectLayer = ({
         { layerId: targetLayerId, objectId: targetObjectId, transform: removeLinkedObject }
       ],
       {
-        name: 'dmt-remove-object-link',
+        name: 'windrose-remove-object-link',
         detail: { sourceLayerId, sourceObjectId, targetLayerId, targetObjectId }
       }
     );
@@ -637,8 +637,8 @@ const ObjectLayer = ({
 
     const handleClickOutside = (e: MouseEvent | TouchEvent): void => {
       const target = e.target as Element;
-      const pickerElement = target.closest('.dmt-color-picker');
-      const buttonElement = target.closest('.dmt-object-color-button');
+      const pickerElement = target.closest('.windrose-color-picker');
+      const buttonElement = target.closest('.windrose-object-color-button');
 
       if (!pickerElement && !buttonElement) {
         if (pendingObjectCustomColorRef.current != null && pendingObjectCustomColorRef.current !== '' && onAddCustomColor) {
@@ -880,7 +880,7 @@ const ObjectLayer = ({
 
       {hoveredObject && mousePosition && hoveredObject.type !== 'note_pin' && (
         <div
-          className="dmt-object-tooltip"
+          className="windrose-object-tooltip"
           style={{
             position: 'absolute',
             left: mousePosition.x + 20,

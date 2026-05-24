@@ -4,9 +4,9 @@
  * Manages custom DOM event listeners for cross-component communication:
  * - windrose:enter-sub-hex (double-click hex drill-down)
  * - windrose:hex-context-menu (right-click hex context menu)
- * - dmt-navigate-to (deep link navigation)
+ * - windrose-navigate-to (deep link navigation)
  * - windrose:center-on-region (region panel centering)
- * - dmt-create-object-link / dmt-remove-object-link (cross-layer linking)
+ * - windrose-create-object-link / windrose-remove-object-link (cross-layer linking)
  * - Escape key to exit sub-hex navigation
  */
 
@@ -132,15 +132,15 @@ function useCustomEventHandlers({
       new Notice(`Navigated to location on ${mapData?.name ?? 'map'}`);
     };
 
-    window.addEventListener('dmt-navigate-to', handleNavigateTo as EventListener);
+    window.addEventListener('windrose-navigate-to', handleNavigateTo as EventListener);
 
     const pending = consumePendingNavigate(mapId);
     if (pending) {
-      handleNavigateTo(new CustomEvent('dmt-navigate-to', { detail: pending }));
+      handleNavigateTo(new CustomEvent('windrose-navigate-to', { detail: pending }));
     }
 
     return () => {
-      window.removeEventListener('dmt-navigate-to', handleNavigateTo as EventListener);
+      window.removeEventListener('windrose-navigate-to', handleNavigateTo as EventListener);
     };
   }, [mapId, mapData, geometry, updateMapData, handleLayerSelect]);
 
@@ -219,12 +219,12 @@ function useCustomEventHandlers({
       ]);
     };
 
-    window.addEventListener('dmt-create-object-link', handleCreateObjectLink as EventListener);
-    window.addEventListener('dmt-remove-object-link', handleRemoveObjectLink as EventListener);
+    window.addEventListener('windrose-create-object-link', handleCreateObjectLink as EventListener);
+    window.addEventListener('windrose-remove-object-link', handleRemoveObjectLink as EventListener);
 
     return () => {
-      window.removeEventListener('dmt-create-object-link', handleCreateObjectLink as EventListener);
-      window.removeEventListener('dmt-remove-object-link', handleRemoveObjectLink as EventListener);
+      window.removeEventListener('windrose-create-object-link', handleCreateObjectLink as EventListener);
+      window.removeEventListener('windrose-remove-object-link', handleRemoveObjectLink as EventListener);
     };
   }, [updateMapData]);
 

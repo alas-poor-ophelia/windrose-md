@@ -81,7 +81,7 @@ export const TabRenderObjectsMethods = {
 
     this.renderObjectSetsBlock(containerEl);
 
-    containerEl.createEl('div', { cls: 'dmt-set-separator' });
+    containerEl.createEl('div', { cls: 'windrose-set-separator' });
 
     // Map Type selector dropdown
     new Setting(containerEl)
@@ -189,10 +189,10 @@ export const TabRenderObjectsMethods = {
     }
 
     // Search/filter input
-    const searchContainer = containerEl.createDiv({ cls: 'dmt-settings-search-container' });
+    const searchContainer = containerEl.createDiv({ cls: 'windrose-settings-search-container' });
     const searchInput = searchContainer.createEl('input', {
       type: 'text',
-      cls: 'dmt-settings-search-input',
+      cls: 'windrose-settings-search-input',
       attr: { placeholder: 'Filter objects...' },
       value: this.objectFilter || ''
     });
@@ -203,7 +203,7 @@ export const TabRenderObjectsMethods = {
 
     if (this.objectFilter) {
       const clearBtn = searchContainer.createEl('button', {
-        cls: 'dmt-settings-search-clear',
+        cls: 'windrose-settings-search-clear',
         attr: { 'aria-label': 'Clear filter', title: 'Clear filter' }
       });
       IconHelpers.set(clearBtn, 'x');
@@ -215,7 +215,7 @@ export const TabRenderObjectsMethods = {
     }
 
     // Object list container (for filtered re-renders)
-    const objectListContainer = containerEl.createDiv({ cls: 'dmt-settings-object-list-container' });
+    const objectListContainer = containerEl.createDiv({ cls: 'windrose-settings-object-list-container' });
     this.renderObjectList(objectListContainer, allCategories, allObjects, hiddenObjects);
   },
   renderObjectList(this: TabRenderObjectsThis, container: HTMLElement, allCategories: ResolvedCategory[], allObjects: ResolvedObject[], hiddenObjects: ResolvedObject[]): void {
@@ -241,7 +241,7 @@ export const TabRenderObjectsMethods = {
     // Show "no results" message if filter returns nothing
     if (filter && filteredObjects.length === 0 && filteredHidden.length === 0) {
       container.createDiv({
-        cls: 'dmt-settings-no-results',
+        cls: 'windrose-settings-no-results',
         text: `No objects matching "${filter}"`
       });
       return;
@@ -257,18 +257,18 @@ export const TabRenderObjectsMethods = {
       // Sort by order
       categoryObjects = categoryObjects.slice().sort((a: ResolvedObject, b: ResolvedObject) => (a.order ?? 0) - (b.order ?? 0));
 
-      const categoryContainer = container.createDiv({ cls: 'dmt-settings-category' });
+      const categoryContainer = container.createDiv({ cls: 'windrose-settings-category' });
 
       // Category header with object count
-      const categoryHeader = categoryContainer.createDiv({ cls: 'dmt-settings-category-header' });
+      const categoryHeader = categoryContainer.createDiv({ cls: 'windrose-settings-category-header' });
       const labelText = (category.label ?? '') + (categoryObjects.length > 0 ? ` (${categoryObjects.length})` : '');
-      categoryHeader.createSpan({ text: labelText, cls: 'dmt-settings-category-label' });
+      categoryHeader.createSpan({ text: labelText, cls: 'windrose-settings-category-label' });
 
       // Edit/Delete for custom categories
       if (category.isCustom) {
-        const categoryActions = categoryHeader.createDiv({ cls: 'dmt-settings-category-actions' });
+        const categoryActions = categoryHeader.createDiv({ cls: 'windrose-settings-category-actions' });
 
-        const editBtn = categoryActions.createEl('button', { cls: 'dmt-settings-icon-btn', attr: { 'aria-label': 'Edit category', title: 'Edit category' } });
+        const editBtn = categoryActions.createEl('button', { cls: 'windrose-settings-icon-btn', attr: { 'aria-label': 'Edit category', title: 'Edit category' } });
         IconHelpers.set(editBtn, 'pencil');
         editBtn.onclick = () => {
           new CategoryEditModal(this.app, this.plugin as PluginAny, category as PluginAny, async () => {
@@ -280,7 +280,7 @@ export const TabRenderObjectsMethods = {
 
         // Get unfiltered count for delete validation
         const allCategoryObjects = allObjects.filter((obj: ResolvedObject) => obj.category === category.id);
-        const deleteBtn = categoryActions.createEl('button', { cls: 'dmt-settings-icon-btn dmt-settings-icon-btn-danger', attr: { 'aria-label': 'Delete category', title: 'Delete category' } });
+        const deleteBtn = categoryActions.createEl('button', { cls: 'windrose-settings-icon-btn windrose-settings-icon-btn-danger', attr: { 'aria-label': 'Delete category', title: 'Delete category' } });
         IconHelpers.set(deleteBtn, 'trash-2');
         deleteBtn.onclick = async () => {
           if (allCategoryObjects.length > 0) {
@@ -304,7 +304,7 @@ export const TabRenderObjectsMethods = {
       }
 
       // Object list with drag/drop support
-      const objectList = categoryContainer.createDiv({ cls: 'dmt-settings-object-list' });
+      const objectList = categoryContainer.createDiv({ cls: 'windrose-settings-object-list' });
       objectList.dataset.categoryId = category.id;
 
       // Only enable drag/drop when not filtering
@@ -319,13 +319,13 @@ export const TabRenderObjectsMethods = {
 
     // Hidden objects section
     if (filteredHidden.length > 0) {
-      const hiddenContainer = container.createDiv({ cls: 'dmt-settings-hidden-section' });
+      const hiddenContainer = container.createDiv({ cls: 'windrose-settings-hidden-section' });
 
       new Setting(hiddenContainer)
         .setName(`Hidden Objects (${filteredHidden.length})`)
         .setDesc('Built-in objects you\'ve hidden from the palette');
 
-      const hiddenList = hiddenContainer.createDiv({ cls: 'dmt-settings-object-list dmt-settings-hidden-list' });
+      const hiddenList = hiddenContainer.createDiv({ cls: 'windrose-settings-object-list windrose-settings-hidden-list' });
       hiddenList.style.display = 'none';
 
       new Setting(hiddenContainer)
@@ -354,7 +354,7 @@ export const TabRenderObjectsMethods = {
         e.dataTransfer.dropEffect = 'move';
       }
 
-      const dragging = objectList.querySelector('.dmt-dragging');
+      const dragging = objectList.querySelector('.windrose-dragging');
       if (!dragging) return;
 
       const afterElement = DragHelpers.getAfterElement(objectList, e.clientY);
@@ -377,7 +377,7 @@ export const TabRenderObjectsMethods = {
       const customObjectsKey: CustomObjectsKey = this.selectedMapType === 'hex' ? 'customHexObjects' : 'customGridObjects';
 
       // Get new order from DOM positions
-      const rows = [...objectList.querySelectorAll('.dmt-settings-object-row')] as HTMLElement[];
+      const rows = [...objectList.querySelectorAll('.windrose-settings-object-row')] as HTMLElement[];
 
       // Get default ID order for this category
       const defaultIdOrder = ObjectHelpers.getDefaultIdOrder(category.id, this.getObjectSettingsForMapType() as unknown as Record<string, unknown>);
@@ -412,11 +412,11 @@ export const TabRenderObjectsMethods = {
           }
 
           // Update modified indicator in DOM immediately
-          const labelEl = row.querySelector('.dmt-settings-object-label');
+          const labelEl = row.querySelector('.windrose-settings-object-label');
           if (labelEl) {
             const override = this.plugin.settings[overridesKey]?.[id];
             const hasAnyOverride = override && Object.keys(override).length > 0;
-            labelEl.classList.toggle('dmt-settings-modified', !!hasAnyOverride);
+            labelEl.classList.toggle('windrose-settings-modified', !!hasAnyOverride);
           }
         } else {
           // Custom objects - always save order
@@ -433,7 +433,7 @@ export const TabRenderObjectsMethods = {
     });
   },
   renderObjectRow(this: TabRenderObjectsThis, container: HTMLElement, obj: ResolvedObject, isHiddenSection = false, canDrag = false): void {
-    const row = container.createDiv({ cls: 'dmt-settings-object-row' });
+    const row = container.createDiv({ cls: 'windrose-settings-object-row' });
 
     // Get the correct settings keys for the selected map type
     const overridesKey: OverridesKey = this.selectedMapType === 'hex' ? 'hexObjectOverrides' : 'gridObjectOverrides';
@@ -447,9 +447,9 @@ export const TabRenderObjectsMethods = {
     // Drag handle (only if draggable and not in hidden section)
     if (canDrag && !isHiddenSection) {
       row.setAttribute('draggable', 'true');
-      row.classList.add('dmt-draggable');
+      row.classList.add('windrose-draggable');
 
-      const dragHandle = row.createSpan({ cls: 'dmt-drag-handle' });
+      const dragHandle = row.createSpan({ cls: 'windrose-drag-handle' });
       IconHelpers.set(dragHandle, 'grip-vertical');
 
       row.style.userSelect = 'none';
@@ -461,30 +461,30 @@ export const TabRenderObjectsMethods = {
           e.dataTransfer.effectAllowed = 'move';
         }
         setTimeout(() => {
-          row.classList.add('dmt-dragging');
+          row.classList.add('windrose-dragging');
         }, 0);
       });
 
       row.addEventListener('dragend', () => {
-        row.classList.remove('dmt-dragging');
+        row.classList.remove('windrose-dragging');
       });
     }
 
     // Symbol, Icon, or Image
-    const symbolEl = row.createSpan({ cls: 'dmt-settings-object-symbol' });
+    const symbolEl = row.createSpan({ cls: 'windrose-settings-object-symbol' });
     ObjectHelpers.renderObjectSymbol(obj, symbolEl, this.app);
 
     // Label
-    const labelEl = row.createSpan({ text: obj.label ?? '', cls: 'dmt-settings-object-label' });
+    const labelEl = row.createSpan({ text: obj.label ?? '', cls: 'windrose-settings-object-label' });
     if (obj.isModified) {
-      labelEl.addClass('dmt-settings-modified');
+      labelEl.addClass('windrose-settings-modified');
     }
 
     // Actions
-    const actions = row.createDiv({ cls: 'dmt-settings-object-actions' });
+    const actions = row.createDiv({ cls: 'windrose-settings-object-actions' });
 
     // Edit button
-    const editBtn = actions.createEl('button', { cls: 'dmt-settings-icon-btn', attr: { 'aria-label': 'Edit', title: 'Edit object' } });
+    const editBtn = actions.createEl('button', { cls: 'windrose-settings-icon-btn', attr: { 'aria-label': 'Edit', title: 'Edit object' } });
     IconHelpers.set(editBtn, 'pencil');
     editBtn.onclick = () => {
       new ObjectEditModal(this.app, this.plugin as PluginAny, obj, async () => {
@@ -497,7 +497,7 @@ export const TabRenderObjectsMethods = {
     if (obj.isBuiltIn) {
       if (isHiddenSection) {
         // Unhide button
-        const unhideBtn = actions.createEl('button', { cls: 'dmt-settings-icon-btn', attr: { 'aria-label': 'Unhide', title: 'Show in palette' } });
+        const unhideBtn = actions.createEl('button', { cls: 'windrose-settings-icon-btn', attr: { 'aria-label': 'Unhide', title: 'Show in palette' } });
         IconHelpers.set(unhideBtn, 'eye');
         unhideBtn.onclick = async () => {
           if (this.plugin.settings[overridesKey]?.[obj.id]) {
@@ -512,7 +512,7 @@ export const TabRenderObjectsMethods = {
         };
       } else {
         // Hide button
-        const hideBtn = actions.createEl('button', { cls: 'dmt-settings-icon-btn', attr: { 'aria-label': 'Hide', title: 'Hide from palette' } });
+        const hideBtn = actions.createEl('button', { cls: 'windrose-settings-icon-btn', attr: { 'aria-label': 'Hide', title: 'Hide from palette' } });
         IconHelpers.set(hideBtn, 'eye-off');
         hideBtn.onclick = async () => {
           if (!this.plugin.settings[overridesKey]) {
@@ -530,7 +530,7 @@ export const TabRenderObjectsMethods = {
 
       // Reset button (only for modified)
       if (obj.isModified) {
-        const resetBtn = actions.createEl('button', { cls: 'dmt-settings-icon-btn', attr: { 'aria-label': 'Reset to default', title: 'Reset to default' } });
+        const resetBtn = actions.createEl('button', { cls: 'windrose-settings-icon-btn', attr: { 'aria-label': 'Reset to default', title: 'Reset to default' } });
         IconHelpers.set(resetBtn, 'rotate-ccw');
         resetBtn.onclick = async () => {
           if (await new ConfirmModal(this.app, {
@@ -551,7 +551,7 @@ export const TabRenderObjectsMethods = {
       // Copy to other map type button for custom objects
       const targetType = this.selectedMapType === 'hex' ? 'grid' : 'hex';
       const targetLabel = targetType === 'hex' ? 'Hex' : 'Grid';
-      const copyBtn = actions.createEl('button', { cls: 'dmt-settings-icon-btn', attr: { 'aria-label': `Copy to ${targetLabel}`, title: `Copy to ${targetLabel}` } });
+      const copyBtn = actions.createEl('button', { cls: 'windrose-settings-icon-btn', attr: { 'aria-label': `Copy to ${targetLabel}`, title: `Copy to ${targetLabel}` } });
       IconHelpers.set(copyBtn, 'copy');
       copyBtn.onclick = async () => {
         const targetObjectsKey: CustomObjectsKey = targetType === 'hex' ? 'customHexObjects' : 'customGridObjects';
@@ -605,7 +605,7 @@ export const TabRenderObjectsMethods = {
       };
 
       // Delete button for custom objects
-      const deleteBtn = actions.createEl('button', { cls: 'dmt-settings-icon-btn dmt-settings-icon-btn-danger', attr: { 'aria-label': 'Delete', title: 'Delete object' } });
+      const deleteBtn = actions.createEl('button', { cls: 'windrose-settings-icon-btn windrose-settings-icon-btn-danger', attr: { 'aria-label': 'Delete', title: 'Delete object' } });
       IconHelpers.set(deleteBtn, 'trash-2');
       deleteBtn.onclick = async () => {
         if (await new ConfirmModal(this.app, {
@@ -632,7 +632,7 @@ export const TabRenderObjectsMethods = {
     const s = this.plugin.settings;
     const sets = s.objectSets || [];
 
-    containerEl.createEl('div', { cls: 'dmt-settings-subheading', text: 'Object Sets' });
+    containerEl.createEl('div', { cls: 'windrose-settings-subheading', text: 'Object Sets' });
     containerEl.createEl('p', {
       text: 'Save and swap between named collections of object customizations.',
       cls: 'setting-item-description'
@@ -643,15 +643,15 @@ export const TabRenderObjectsMethods = {
     const isDirty = ObjectSetHelpers.isDirty(this.plugin as PluginAny);
 
     if (activeSet) {
-      const bar = containerEl.createDiv({ cls: 'dmt-set-active-bar' });
+      const bar = containerEl.createDiv({ cls: 'windrose-set-active-bar' });
       bar.createSpan({ text: 'Active set: ' });
-      bar.createSpan({ text: activeSet.name, cls: 'dmt-set-active-name' });
+      bar.createSpan({ text: activeSet.name, cls: 'windrose-set-active-name' });
       if (isDirty) {
-        bar.createSpan({ text: ' (modified)', cls: 'dmt-set-modified-badge' });
+        bar.createSpan({ text: ' (modified)', cls: 'windrose-set-modified-badge' });
       }
     } else if (isDirty) {
-      const bar = containerEl.createDiv({ cls: 'dmt-set-active-bar dmt-set-modified-bar' });
-      bar.createSpan({ text: 'Objects modified from defaults', cls: 'dmt-set-modified-badge' });
+      const bar = containerEl.createDiv({ cls: 'windrose-set-active-bar windrose-set-modified-bar' });
+      bar.createSpan({ text: 'Objects modified from defaults', cls: 'windrose-set-modified-badge' });
     }
 
     // Active Set dropdown
@@ -689,7 +689,7 @@ export const TabRenderObjectsMethods = {
             ObjectSetHelpers.resetToDefaults(this.plugin as PluginAny);
             this.settingsChanged = true;
             await this.plugin.saveSettings();
-            window.dispatchEvent(new CustomEvent('dmt-settings-changed', {
+            window.dispatchEvent(new CustomEvent('windrose-settings-changed', {
               detail: { timestamp: Date.now() }
             }));
             this.display();
@@ -699,7 +699,7 @@ export const TabRenderObjectsMethods = {
           ObjectSetHelpers.activateSet(this.plugin as PluginAny, value);
           this.settingsChanged = true;
           await this.plugin.saveSettings();
-          window.dispatchEvent(new CustomEvent('dmt-settings-changed', {
+          window.dispatchEvent(new CustomEvent('windrose-settings-changed', {
             detail: { timestamp: Date.now() }
           }));
           this.display();
@@ -708,25 +708,25 @@ export const TabRenderObjectsMethods = {
 
     // Saved Sets list
     if (sets.length > 0) {
-      const listContainer = containerEl.createDiv({ cls: 'dmt-set-list' });
+      const listContainer = containerEl.createDiv({ cls: 'windrose-set-list' });
       for (const set of sets) {
-        const row = listContainer.createDiv({ cls: 'dmt-set-row' });
-        if (set.id === s.activeObjectSetId) row.addClass('dmt-set-row-active');
+        const row = listContainer.createDiv({ cls: 'windrose-set-row' });
+        if (set.id === s.activeObjectSetId) row.addClass('windrose-set-row-active');
 
         // Name
-        row.createSpan({ text: set.name, cls: 'dmt-set-name' });
+        row.createSpan({ text: set.name, cls: 'windrose-set-name' });
 
         // Scope badges
-        const badges = row.createSpan({ cls: 'dmt-set-badges' });
-        if (set.data.hex) badges.createSpan({ text: 'hex', cls: 'dmt-set-badge' });
-        if (set.data.grid) badges.createSpan({ text: 'grid', cls: 'dmt-set-badge' });
-        badges.createSpan({ text: set.source, cls: 'dmt-set-badge dmt-set-badge-source' });
+        const badges = row.createSpan({ cls: 'windrose-set-badges' });
+        if (set.data.hex) badges.createSpan({ text: 'hex', cls: 'windrose-set-badge' });
+        if (set.data.grid) badges.createSpan({ text: 'grid', cls: 'windrose-set-badge' });
+        badges.createSpan({ text: set.source, cls: 'windrose-set-badge windrose-set-badge-source' });
 
         // Actions
-        const setActions = row.createDiv({ cls: 'dmt-set-actions' });
+        const setActions = row.createDiv({ cls: 'windrose-set-actions' });
 
         const renameBtn = setActions.createEl('button', {
-          cls: 'dmt-settings-icon-btn',
+          cls: 'windrose-settings-icon-btn',
           attr: { 'aria-label': 'Rename', title: 'Rename set' }
         });
         IconHelpers.set(renameBtn, 'pencil');
@@ -739,7 +739,7 @@ export const TabRenderObjectsMethods = {
         };
 
         const exportBtn = setActions.createEl('button', {
-          cls: 'dmt-settings-icon-btn',
+          cls: 'windrose-settings-icon-btn',
           attr: { 'aria-label': 'Export', title: 'Export set to folder' }
         });
         IconHelpers.set(exportBtn, 'download');
@@ -748,7 +748,7 @@ export const TabRenderObjectsMethods = {
         };
 
         const deleteBtn = setActions.createEl('button', {
-          cls: 'dmt-settings-icon-btn dmt-settings-icon-btn-danger',
+          cls: 'windrose-settings-icon-btn windrose-settings-icon-btn-danger',
           attr: { 'aria-label': 'Delete', title: 'Delete set' }
         });
         IconHelpers.set(deleteBtn, 'trash-2');

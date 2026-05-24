@@ -386,33 +386,33 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
     const effectivePanZoomState = panZoomLayerStateRef.current;
 
     // Space key override - show grab cursor
-    if (effectivePanZoomState.spaceKeyPressed && !effectivePanZoomState.isPanning) return 'dmt-canvas-space-grab';
+    if (effectivePanZoomState.spaceKeyPressed && !effectivePanZoomState.isPanning) return 'windrose-canvas-space-grab';
 
-    if (effectivePanZoomState.isPanning || effectivePanZoomState.isTouchPanning) return 'dmt-canvas-panning';
-    if (isDraggingSelection) return 'dmt-canvas-selecting';
-    if (currentTool === 'select') return 'dmt-canvas-select';
-    if (currentTool === 'measure') return 'dmt-canvas-measure';
-    if (currentTool === 'diagonalFill') return 'dmt-canvas-diagonal-fill';
-    if (currentTool === 'addNote') return 'dmt-canvas-add-object';
+    if (effectivePanZoomState.isPanning || effectivePanZoomState.isTouchPanning) return 'windrose-canvas-panning';
+    if (isDraggingSelection) return 'windrose-canvas-selecting';
+    if (currentTool === 'select') return 'windrose-canvas-select';
+    if (currentTool === 'measure') return 'windrose-canvas-measure';
+    if (currentTool === 'diagonalFill') return 'windrose-canvas-diagonal-fill';
+    if (currentTool === 'addNote') return 'windrose-canvas-add-object';
     if (currentTool === 'addObject') {
-      return selectedObjectType != null ? 'dmt-canvas-add-object' : 'dmt-canvas';
+      return selectedObjectType != null ? 'windrose-canvas-add-object' : 'windrose-canvas';
     }
     if (currentTool === 'addText') {
-      return 'dmt-canvas-add-text';
+      return 'windrose-canvas-add-text';
     }
     if (currentTool === 'rectangle') {
-      return effectiveDrawingState.rectangleStart ? 'dmt-canvas-rectangle-active' : 'dmt-canvas-rectangle';
+      return effectiveDrawingState.rectangleStart ? 'windrose-canvas-rectangle-active' : 'windrose-canvas-rectangle';
     }
     if (currentTool === 'circle') {
-      return effectiveDrawingState.circleStart ? 'dmt-canvas-circle-active' : 'dmt-canvas-circle';
+      return effectiveDrawingState.circleStart ? 'windrose-canvas-circle-active' : 'windrose-canvas-circle';
     }
     if (currentTool === 'clearArea') {
-      return effectiveDrawingState.rectangleStart ? 'dmt-canvas-cleararea-active' : 'dmt-canvas-cleararea';
+      return effectiveDrawingState.rectangleStart ? 'windrose-canvas-cleararea-active' : 'windrose-canvas-cleararea';
     }
     if (effectiveDrawingState.isDrawing) {
-      return currentTool === 'draw' ? 'dmt-canvas-drawing' : 'dmt-canvas-erasing';
+      return currentTool === 'draw' ? 'windrose-canvas-drawing' : 'windrose-canvas-erasing';
     }
-    return currentTool === 'erase' ? 'dmt-canvas-erase' : 'dmt-canvas';
+    return currentTool === 'erase' ? 'windrose-canvas-erase' : 'windrose-canvas';
   };
 
   // Build context values for providers
@@ -481,7 +481,7 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
             isAlignmentMode={isAlignmentMode}
           />
 
-          <div className="dmt-canvas-container" ref={containerRef}>
+          <div className="windrose-canvas-container" ref={containerRef}>
             {/* Wrapper for canvas alignment - fog canvas positions relative to this */}
             <div style={{ position: 'relative', display: 'inline-block' }}>
               {/* Main canvas */}

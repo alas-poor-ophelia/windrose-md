@@ -111,9 +111,9 @@ function getVisibleHexes(geometry: ExtendedHexGeometry, mapData: MapData, canvas
   
   // Get canvas display rect for coordinate scaling
   const rect = canvas.getBoundingClientRect();
-  // Use the positioning ancestor (.dmt-canvas-container) for offset calculation,
-  // since .dmt-coordinate-layer is position:absolute relative to it
-  const positioningAncestor = canvas.closest('.dmt-canvas-container');
+  // Use the positioning ancestor (.windrose-canvas-container) for offset calculation,
+  // since .windrose-coordinate-layer is position:absolute relative to it
+  const positioningAncestor = canvas.closest('.windrose-canvas-container');
   const containerRect = positioningAncestor?.getBoundingClientRect() || rect;
 
   // Calculate canvas offset within the positioning container (due to flex centering)
@@ -335,12 +335,12 @@ const HexCoordinateLayer = (): VNode | null => {
   `.trim();
   
   return (
-    <div className="dmt-coordinate-layer">
+    <div className="windrose-coordinate-layer">
       {visibleHexes.map(({ q, r, displayX, displayY, label }) => {
         return (
           <div
             key={`coord-${q}-${r}`}
-            className="dmt-hex-coordinate"
+            className="windrose-hex-coordinate"
             style={{
               position: 'absolute',
               left: `${displayX}px`,

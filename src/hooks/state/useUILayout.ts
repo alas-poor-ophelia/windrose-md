@@ -129,18 +129,18 @@ function useUILayout({
       }
     }
 
-    container.classList.toggle('dmt-expanded', isExpanded);
-    container.classList.toggle('dmt-animating', isAnimating);
+    container.classList.toggle('windrose-expanded', isExpanded);
+    container.classList.toggle('windrose-animating', isAnimating);
 
     if (cmEmbedBlock) {
-      cmEmbedBlock.classList.add('dmt-cm-parent');
-      cmEmbedBlock.classList.toggle('dmt-cm-expanded', isExpanded);
-      cmEmbedBlock.classList.toggle('dmt-cm-animating', isAnimating);
+      cmEmbedBlock.classList.add('windrose-cm-parent');
+      cmEmbedBlock.classList.toggle('windrose-cm-expanded', isExpanded);
+      cmEmbedBlock.classList.toggle('windrose-cm-animating', isAnimating);
     }
 
     return () => {
-      container.classList.remove('dmt-expanded', 'dmt-animating');
-      cmEmbedBlock?.classList.remove('dmt-cm-parent', 'dmt-cm-expanded', 'dmt-cm-animating');
+      container.classList.remove('windrose-expanded', 'windrose-animating');
+      cmEmbedBlock?.classList.remove('windrose-cm-parent', 'windrose-cm-expanded', 'windrose-cm-animating');
     };
   }, [isExpanded, isAnimating]);
 

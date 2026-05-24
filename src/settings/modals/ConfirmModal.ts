@@ -33,7 +33,7 @@ class ConfirmModal extends Modal {
       contentEl.createEl('p', { text: p });
     }
 
-    const buttons = contentEl.createDiv({ cls: 'dmt-modal-buttons' });
+    const buttons = contentEl.createDiv({ cls: 'windrose-modal-buttons' });
 
     const cancelBtn = buttons.createEl('button', { text: this.cancelText });
     cancelBtn.onclick = () => {

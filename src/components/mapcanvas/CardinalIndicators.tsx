@@ -47,7 +47,7 @@ const CardinalIndicators = ({
         {(['north', 'south', 'east', 'west'] as const).map(dir => (
           <div
             key={dir}
-            className={`dmt-inversion-indicator ${dir}`}
+            className={`windrose-inversion-indicator ${dir}`}
             style={{
               ...INDICATOR_STYLE,
               left: `${indicatorPositions[dir].x + 2}px`,
@@ -68,7 +68,7 @@ const CardinalIndicators = ({
   return (
     <>
       <div
-        className="dmt-edge-snap-indicator north"
+        className="windrose-edge-snap-indicator north"
         style={{
           ...INDICATOR_STYLE,
           left: `${indicatorPositions.north.x}px`,
@@ -81,7 +81,7 @@ const CardinalIndicators = ({
         }}
       />
       <div
-        className="dmt-edge-snap-indicator south"
+        className="windrose-edge-snap-indicator south"
         style={{
           ...INDICATOR_STYLE,
           left: `${indicatorPositions.south.x}px`,
@@ -94,7 +94,7 @@ const CardinalIndicators = ({
         }}
       />
       <div
-        className="dmt-edge-snap-indicator east"
+        className="windrose-edge-snap-indicator east"
         style={{
           ...INDICATOR_STYLE,
           left: `${indicatorPositions.east.x}px`,
@@ -107,7 +107,7 @@ const CardinalIndicators = ({
         }}
       />
       <div
-        className="dmt-edge-snap-indicator west"
+        className="windrose-edge-snap-indicator west"
         style={{
           ...INDICATOR_STYLE,
           left: `${indicatorPositions.west.x}px`,

@@ -38,9 +38,9 @@ function useMapData(
     const handleSettingsChange = (): void => {
       setSettingsVersion((prev: number) => prev + 1);
     };
-    window.addEventListener('dmt-settings-changed', handleSettingsChange);
+    window.addEventListener('windrose-settings-changed', handleSettingsChange);
     return () => {
-      window.removeEventListener('dmt-settings-changed', handleSettingsChange);
+      window.removeEventListener('windrose-settings-changed', handleSettingsChange);
     };
   }, []);
 

@@ -29,7 +29,7 @@ class ColorEditModal extends Modal {
   onOpen() {
     const { contentEl } = this;
     contentEl.empty();
-    contentEl.addClass('dmt-color-edit-modal');
+    contentEl.addClass('windrose-color-edit-modal');
 
     const isEdit = !!this.existingColor;
     const isBuiltIn = this.isBuiltIn;
@@ -63,7 +63,7 @@ class ColorEditModal extends Modal {
           if (hexInput) hexInput.value = value;
         }))
       .addText(text => {
-        text.inputEl.addClass('dmt-color-hex-input');
+        text.inputEl.addClass('windrose-color-hex-input');
         hexInput = text.inputEl;
         text.setPlaceholder('#RRGGBB')
           .setValue(colorValue)
@@ -92,14 +92,14 @@ class ColorEditModal extends Modal {
       .setName('Opacity')
       .setDesc('Default opacity when selecting this color');
 
-    const opacityContainer = opacitySetting.controlEl.createEl('div', { cls: 'dmt-opacity-control' });
+    const opacityContainer = opacitySetting.controlEl.createEl('div', { cls: 'windrose-opacity-control' });
     const opacitySlider = opacityContainer.createEl('input', {
       type: 'range',
       attr: { min: '10', max: '100', value: String(Math.round(opacityValue * 100)) }
     });
     const opacityDisplay = opacityContainer.createEl('span', {
       text: `${Math.round(opacityValue * 100)}%`,
-      cls: 'dmt-opacity-value'
+      cls: 'windrose-opacity-value'
     });
 
     opacitySlider.addEventListener('input', (e: Event) => {
@@ -109,17 +109,17 @@ class ColorEditModal extends Modal {
 
     // Show original values for built-ins
     if (isBuiltIn && originalBuiltIn) {
-      const origInfo = contentEl.createEl('div', { cls: 'dmt-color-original-info' });
+      const origInfo = contentEl.createEl('div', { cls: 'windrose-color-original-info' });
       origInfo.createEl('span', { text: 'Original: ' });
       origInfo.createEl('span', {
-        cls: 'dmt-color-mini-swatch',
+        cls: 'windrose-color-mini-swatch',
         attr: { style: `background-color: ${originalBuiltIn.color}` }
       });
       origInfo.createEl('span', { text: ` ${originalBuiltIn.label} (${originalBuiltIn.color})` });
     }
 
     // Action buttons
-    const btnContainer = contentEl.createEl('div', { cls: 'dmt-modal-buttons' });
+    const btnContainer = contentEl.createEl('div', { cls: 'windrose-modal-buttons' });
 
     const saveBtn = btnContainer.createEl('button', {
       text: 'Save',

@@ -15,7 +15,7 @@ export interface NavigationEventDetail extends DeepLinkData {
 
 const PROTOCOL = 'windrose:';
 const LEGACY_PROTOCOL = 'obsidian://windrose?';
-const NAVIGATION_EVENT = 'dmt-navigate-to';
+const NAVIGATION_EVENT = 'windrose-navigate-to';
 
 function decodePathComponent(raw: string): string {
   return raw.replace(/%7C/gi, '|').replace(/%2C/gi, ',');

@@ -146,11 +146,11 @@ export class DungeonEssenceVisualizer {
     return `
       <svg viewBox="0 0 100 100" style="width: 100%; height: 100%;">
         <defs>
-          <filter id="dmt-stamp-shadow" x="-50%" y="-50%" width="200%" height="200%">
+          <filter id="windrose-stamp-shadow" x="-50%" y="-50%" width="200%" height="200%">
             <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="rgba(0, 0, 0, 0.6)"/>
           </filter>
         </defs>
-        <g filter="url(#dmt-stamp-shadow)">
+        <g filter="url(#windrose-stamp-shadow)">
           <circle cx="50" cy="50" r="28" fill="rgba(0, 0, 0, 0.7)" stroke="rgba(196, 165, 123, 0.4)" stroke-width="2"/>
           <circle cx="50" cy="50" r="45" fill="none" stroke="rgba(196, 165, 123, 0.3)" stroke-width="0.8"/>
 
@@ -435,7 +435,7 @@ export class DungeonEssenceVisualizer {
     this.stampOverlay.style.animation = 'none';
     // Trigger reflow
     this.stampOverlay.offsetHeight;
-    this.stampOverlay.style.animation = 'dmt-windrose-stamp 0.35s ease-out forwards';
+    this.stampOverlay.style.animation = 'windrose-windrose-stamp 0.35s ease-out forwards';
     this.stampOverlay.style.opacity = '0.75';
   }
 

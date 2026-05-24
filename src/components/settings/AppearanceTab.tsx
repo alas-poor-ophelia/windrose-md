@@ -53,11 +53,11 @@ function ColorPickerItem({ colorKey, label, defaultColor, align = 'left' }: Colo
   } = useAppearance();
 
   return (
-    <div class="dmt-color-grid-item">
-      <label class="dmt-form-label" style={{ marginBottom: '4px', fontSize: '12px' }}>{label}</label>
+    <div class="windrose-color-grid-item">
+      <label class="windrose-form-label" style={{ marginBottom: '4px', fontSize: '12px' }}>{label}</label>
       <div style={{ display: 'flex', gap: '6px', alignItems: 'center', position: 'relative' }}>
         <button
-          class="dmt-color-button"
+          class="windrose-color-button"
           disabled={useGlobalSettings}
           onClick={() => !useGlobalSettings && setActiveColorPicker(colorKey)}
           style={{
@@ -66,11 +66,11 @@ function ColorPickerItem({ colorKey, label, defaultColor, align = 'left' }: Colo
             minWidth: '80px'
           }}
         >
-          <span class="dmt-color-button-label">{overrides[colorKey] as string}</span>
+          <span class="windrose-color-button-label">{overrides[colorKey] as string}</span>
         </button>
 
         <button
-          class="dmt-color-reset-btn"
+          class="windrose-color-reset-btn"
           disabled={useGlobalSettings}
           onClick={() => !useGlobalSettings && handleColorChange(colorKey, defaultColor)}
           title="Reset to default"
@@ -141,7 +141,7 @@ function FogOfWarSection(): VNode {
         <SettingItem name="Fog Color" description="Used if no image is set, or as fallback">
           <div style={{ display: 'flex', gap: '6px', alignItems: 'center', position: 'relative' }}>
             <button
-              class="dmt-color-button"
+              class="windrose-color-button"
               disabled={useGlobalSettings}
               onClick={() => !useGlobalSettings && setActiveColorPicker('fogOfWarColor')}
               style={{
@@ -150,11 +150,11 @@ function FogOfWarSection(): VNode {
                 minWidth: '80px'
               }}
             >
-              <span class="dmt-color-button-label">{overrides.fogOfWarColor ?? '#000000'}</span>
+              <span class="windrose-color-button-label">{overrides.fogOfWarColor ?? '#000000'}</span>
             </button>
 
             <button
-              class="dmt-color-reset-btn"
+              class="windrose-color-reset-btn"
               disabled={useGlobalSettings}
               onClick={() => !useGlobalSettings && handleColorChange('fogOfWarColor', THEME.fogOfWar.color)}
               title="Reset to default"
@@ -191,7 +191,7 @@ function FogOfWarSection(): VNode {
               disabled={useGlobalSettings}
             />
             <button
-              class="dmt-color-reset-btn"
+              class="windrose-color-reset-btn"
               disabled={useGlobalSettings}
               onClick={() => !useGlobalSettings && handleColorChange('fogOfWarOpacity', 0.9)}
               title="Reset to default (90%)"
@@ -314,7 +314,7 @@ function FogOfWarSection(): VNode {
                 disabled={useGlobalSettings}
               />
               <button
-                class="dmt-color-reset-btn"
+                class="windrose-color-reset-btn"
                 disabled={useGlobalSettings}
                 onClick={() => !useGlobalSettings && handleColorChange('fogOfWarBlurFactor', 0.20)}
                 title="Reset to default (20%)"
@@ -348,7 +348,7 @@ function AppearanceTab(): VNode {
   } = useAppearance();
 
   return (
-    <div class="dmt-settings-tab-content">
+    <div class="windrose-settings-tab-content">
       {globalSettings.objectSets && globalSettings.objectSets.length > 0 && (
         <SettingItem
           name="Object set"
@@ -379,7 +379,7 @@ function AppearanceTab(): VNode {
 
       <div style={{ opacity: useGlobalSettings ? 0.5 : 1 }}>
         <div
-          class="dmt-color-grid"
+          class="windrose-color-grid"
           style={{
             display: 'grid',
             gridTemplateColumns: '1fr 1fr',
@@ -426,7 +426,7 @@ function AppearanceTab(): VNode {
               disabled={useGlobalSettings}
             />
             <button
-              class="dmt-color-reset-btn"
+              class="windrose-color-reset-btn"
               disabled={useGlobalSettings}
               onClick={() => !useGlobalSettings && handleLineWidthChange(1)}
               title="Reset to default (1px)"

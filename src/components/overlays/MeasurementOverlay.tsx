@@ -56,16 +56,16 @@ const MeasurementOverlay = ({
   const canvasRect = canvas.getBoundingClientRect();
   const displayScale = canvasRect.width / canvasWidth;
   
-  // Find the flex container (dmt-canvas-container) that the SVG is positioned relative to
+  // Find the flex container (windrose-canvas-container) that the SVG is positioned relative to
   // Canvas may be nested inside wrapper divs, so traverse up to find the actual container
   let flexContainer = canvas.parentElement;
   let traversalCount = 0;
-  while (flexContainer?.classList && !flexContainer.classList.contains('dmt-canvas-container')) {
+  while (flexContainer?.classList && !flexContainer.classList.contains('windrose-canvas-container')) {
     flexContainer = flexContainer.parentElement;
     traversalCount++;
     if (traversalCount > 10) {
       // eslint-disable-next-line no-console
-      console.warn('[MeasurementOverlay] Could not find dmt-canvas-container after 10 levels');
+      console.warn('[MeasurementOverlay] Could not find windrose-canvas-container after 10 levels');
       break;
     }
   }
@@ -102,7 +102,7 @@ const MeasurementOverlay = ({
   
   return (
     <svg 
-      className="dmt-measurement-overlay"
+      className="windrose-measurement-overlay"
       style={{
         position: 'absolute',
         top: 0,

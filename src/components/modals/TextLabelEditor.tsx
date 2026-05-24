@@ -72,16 +72,16 @@ function openNativeTextLabelEditor(app: App, options: OpenNativeTextLabelEditorO
       onOpen(): void {
         const { contentEl, titleEl } = this;
         titleEl.setText(isEditing ? 'Edit Text Label' : 'Add Text Label');
-        contentEl.addClass('dmt-text-editor-native');
+        contentEl.addClass('windrose-text-editor-native');
         this.modalEl.addClass('windrose-tle-modal');
 
         // Text input
-        const textSection = contentEl.createDiv('dmt-text-editor-section');
-        textSection.createEl('label', { text: 'Text', cls: 'dmt-text-editor-label' });
+        const textSection = contentEl.createDiv('windrose-text-editor-section');
+        textSection.createEl('label', { text: 'Text', cls: 'windrose-text-editor-label' });
         this.inputEl = textSection.createEl('input', {
           type: 'text',
           placeholder: 'Enter label text...',
-          cls: 'dmt-modal-input',
+          cls: 'windrose-modal-input',
           value: initialValue
         });
         this.inputEl.maxLength = 200;
@@ -100,9 +100,9 @@ function openNativeTextLabelEditor(app: App, options: OpenNativeTextLabelEditorO
         const controlsRow = contentEl.createDiv('windrose-tle-controls-row');
 
         // Font dropdown
-        const fontSection = controlsRow.createDiv('dmt-text-editor-section-grow');
-        fontSection.createEl('label', { text: 'Font', cls: 'dmt-text-editor-label' });
-        const fontSelect = fontSection.createEl('select', { cls: 'dmt-text-editor-select' });
+        const fontSection = controlsRow.createDiv('windrose-text-editor-section-grow');
+        fontSection.createEl('label', { text: 'Font', cls: 'windrose-text-editor-label' });
+        const fontSelect = fontSection.createEl('select', { cls: 'windrose-text-editor-select' });
         for (const font of FONT_OPTIONS) {
           const opt = fontSelect.createEl('option', { text: font.name, value: font.id });
           if (font.id === initialFontFace) opt.selected = true;
@@ -113,11 +113,11 @@ function openNativeTextLabelEditor(app: App, options: OpenNativeTextLabelEditorO
         });
 
         // Font size
-        const sizeSection = controlsRow.createDiv('dmt-text-editor-section-small');
-        sizeSection.createEl('label', { text: 'Size', cls: 'dmt-text-editor-label' });
+        const sizeSection = controlsRow.createDiv('windrose-text-editor-section-small');
+        sizeSection.createEl('label', { text: 'Size', cls: 'windrose-text-editor-label' });
         this.fontSizeInput = sizeSection.createEl('input', {
           type: 'number',
-          cls: 'dmt-text-editor-number',
+          cls: 'windrose-text-editor-number',
           value: String(initialFontSize)
         });
         this.fontSizeInput.min = String(FONT_SIZE_MIN);
@@ -133,14 +133,14 @@ function openNativeTextLabelEditor(app: App, options: OpenNativeTextLabelEditorO
         });
 
         // Color section
-        const colorSection = contentEl.createDiv('dmt-text-editor-section');
-        colorSection.createEl('label', { text: 'Color', cls: 'dmt-text-editor-label' });
+        const colorSection = contentEl.createDiv('windrose-text-editor-section');
+        colorSection.createEl('label', { text: 'Color', cls: 'windrose-text-editor-label' });
 
         const colorWrapper = colorSection.createDiv('windrose-tle-color-wrapper');
 
-        this.colorBtnEl = colorWrapper.createEl('button', { cls: 'dmt-text-editor-color-button' });
+        this.colorBtnEl = colorWrapper.createEl('button', { cls: 'windrose-text-editor-color-button' });
         this.colorBtnEl.style.setProperty('background-color', currentColor);
-        this.colorBtnEl.createSpan({ text: currentColor.toUpperCase(), cls: 'dmt-text-editor-color-label' });
+        this.colorBtnEl.createSpan({ text: currentColor.toUpperCase(), cls: 'windrose-text-editor-color-label' });
         this.colorBtnEl.title = 'Select text color';
         this.colorBtnEl.addEventListener('click', (e: MouseEvent) => {
           e.stopPropagation();
@@ -151,8 +151,8 @@ function openNativeTextLabelEditor(app: App, options: OpenNativeTextLabelEditorO
         this.colorPickerContainerEl = colorWrapper.createDiv();
 
         // Opacity slider
-        const opacitySection = contentEl.createDiv('dmt-text-editor-section');
-        opacitySection.createEl('label', { text: 'Opacity', cls: 'dmt-text-editor-label' });
+        const opacitySection = contentEl.createDiv('windrose-text-editor-section');
+        opacitySection.createEl('label', { text: 'Opacity', cls: 'windrose-text-editor-label' });
         const opacityRow = opacitySection.createDiv('windrose-tle-flex-row');
         this.opacityInput = opacityRow.createEl('input', { type: 'range', cls: 'windrose-tle-flex-fill' });
         this.opacityInput.min = '0';
@@ -167,7 +167,7 @@ function openNativeTextLabelEditor(app: App, options: OpenNativeTextLabelEditorO
         });
 
         // Preview
-        this.previewEl = contentEl.createDiv('dmt-text-editor-preview windrose-tle-preview-hidden');
+        this.previewEl = contentEl.createDiv('windrose-text-editor-preview windrose-tle-preview-hidden');
         this.updatePreview();
 
         // Buttons
@@ -182,7 +182,7 @@ function openNativeTextLabelEditor(app: App, options: OpenNativeTextLabelEditorO
         });
         submitBtn.addEventListener('click', () => this.submit());
 
-        const hint = contentEl.createDiv('dmt-modal-hint');
+        const hint = contentEl.createDiv('windrose-modal-hint');
         hint.setText('Press enter to confirm, esc to cancel');
 
         setTimeout(() => {
@@ -200,7 +200,7 @@ function openNativeTextLabelEditor(app: App, options: OpenNativeTextLabelEditorO
         if (this.isPickerOpen) {
           this.clickOutsideHandler = (e: MouseEvent) => {
             const target = e.target as HTMLElement;
-            if (target.closest('.dmt-color-picker') || target.closest('.dmt-text-editor-color-button')) {
+            if (target.closest('.windrose-color-picker') || target.closest('.windrose-text-editor-color-button')) {
               return;
             }
             this.isPickerOpen = false;
@@ -243,7 +243,7 @@ function openNativeTextLabelEditor(app: App, options: OpenNativeTextLabelEditorO
       selectColor(color: string): void {
         currentColor = color;
         this.colorBtnEl.style.setProperty('background-color', color);
-        const label = this.colorBtnEl.querySelector('.dmt-text-editor-color-label');
+        const label = this.colorBtnEl.querySelector('.windrose-text-editor-color-label');
         if (label) label.textContent = color.toUpperCase();
         this.updatePreview();
       }

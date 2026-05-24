@@ -54,9 +54,9 @@ const FogOfWarToolbar = ({
   if (!isOpen) return null;
 
   return (
-    <div className="dmt-fow-floating-toolbar">
+    <div className="windrose-fow-floating-toolbar">
       <button
-        className={`dmt-fow-tool-btn ${!fogOfWarState.enabled ? 'disabled' : ''}`}
+        className={`windrose-fow-tool-btn ${!fogOfWarState.enabled ? 'disabled' : ''}`}
         onClick={onFogVisibilityToggle}
         title={fogOfWarState.enabled ? "Hide fog overlay" : "Show fog overlay"}
         disabled={!fogOfWarState.initialized}
@@ -64,10 +64,10 @@ const FogOfWarToolbar = ({
         <Icon icon={fogOfWarState.enabled ? "lucide-eye" : "lucide-eye-off"} />
       </button>
 
-      <div className="dmt-fow-floating-separator" />
+      <div className="windrose-fow-floating-separator" />
 
       <button
-        className={`dmt-fow-tool-btn ${fogOfWarState.activeTool === 'paint' ? 'active' : ''}`}
+        className={`windrose-fow-tool-btn ${fogOfWarState.activeTool === 'paint' ? 'active' : ''}`}
         onClick={() => onFogToolSelect('paint')}
         title="Paint fog onto cells"
       >
@@ -75,7 +75,7 @@ const FogOfWarToolbar = ({
       </button>
 
       <button
-        className={`dmt-fow-tool-btn ${fogOfWarState.activeTool === 'erase' ? 'active' : ''}`}
+        className={`windrose-fow-tool-btn ${fogOfWarState.activeTool === 'erase' ? 'active' : ''}`}
         onClick={() => onFogToolSelect('erase')}
         title="Erase fog (reveal cells)"
       >
@@ -83,17 +83,17 @@ const FogOfWarToolbar = ({
       </button>
 
       <button
-        className={`dmt-fow-tool-btn ${fogOfWarState.activeTool === 'rectangle' ? 'active' : ''}`}
+        className={`windrose-fow-tool-btn ${fogOfWarState.activeTool === 'rectangle' ? 'active' : ''}`}
         onClick={() => onFogToolSelect('rectangle')}
         title="Rectangle tool - click two corners"
       >
         <Icon icon="lucide-square" />
       </button>
 
-      <div className="dmt-fow-floating-separator" />
+      <div className="windrose-fow-floating-separator" />
 
       <button
-        className="dmt-fow-tool-btn"
+        className="windrose-fow-tool-btn"
         onClick={onFogFillAll}
         title="Fill all painted cells with fog"
       >
@@ -101,7 +101,7 @@ const FogOfWarToolbar = ({
       </button>
 
       <button
-        className="dmt-fow-tool-btn"
+        className="windrose-fow-tool-btn"
         onClick={handleClearAll}
         title="Clear all fog from layer"
       >

@@ -118,7 +118,7 @@ const LinkedNoteHoverOverlays = ({ selectedItem }: LinkedNoteHoverOverlaysProps)
         return (
           <div
             key={`hover-link-${obj.id}`}
-            className="dmt-object-hover-link"
+            className="windrose-object-hover-link"
             style={{
               position: 'absolute',
               left: `${screenX - objectWidth / 2}px`,

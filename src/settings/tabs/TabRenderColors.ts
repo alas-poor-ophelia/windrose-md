@@ -76,11 +76,11 @@ export const TabRenderColorsMethods = {
     const hiddenBuiltIns = BUILT_IN_COLORS.filter(c => hiddenColors.has(c.id));
 
     // Visible colors container
-    const visibleContainer = containerEl.createEl('div', { cls: 'dmt-settings-category' });
-    const visibleHeader = visibleContainer.createEl('div', { cls: 'dmt-settings-category-header' });
-    visibleHeader.createEl('span', { text: `Active Colors (${visibleColors.length})`, cls: 'dmt-settings-category-label' });
+    const visibleContainer = containerEl.createEl('div', { cls: 'windrose-settings-category' });
+    const visibleHeader = visibleContainer.createEl('div', { cls: 'windrose-settings-category-header' });
+    visibleHeader.createEl('span', { text: `Active Colors (${visibleColors.length})`, cls: 'windrose-settings-category-label' });
 
-    const visibleList = visibleContainer.createEl('div', { cls: 'dmt-color-list' });
+    const visibleList = visibleContainer.createEl('div', { cls: 'windrose-color-list' });
 
     visibleColors.forEach((color, index) => {
       this.renderColorRow(visibleList, color as unknown as Record<string, unknown>, index, false);
@@ -89,17 +89,17 @@ export const TabRenderColorsMethods = {
     if (visibleColors.length === 0) {
       visibleList.createEl('div', {
         text: 'No colors visible. Use "Show" to restore hidden colors.',
-        cls: 'dmt-settings-empty-message'
+        cls: 'windrose-settings-empty-message'
       });
     }
 
     // Hidden colors (if any)
     if (hiddenBuiltIns.length > 0) {
-      const hiddenContainer = containerEl.createEl('div', { cls: 'dmt-settings-category dmt-settings-category-muted' });
-      const hiddenHeader = hiddenContainer.createEl('div', { cls: 'dmt-settings-category-header' });
-      hiddenHeader.createEl('span', { text: `Hidden Colors (${hiddenBuiltIns.length})`, cls: 'dmt-settings-category-label' });
+      const hiddenContainer = containerEl.createEl('div', { cls: 'windrose-settings-category windrose-settings-category-muted' });
+      const hiddenHeader = hiddenContainer.createEl('div', { cls: 'windrose-settings-category-header' });
+      hiddenHeader.createEl('span', { text: `Hidden Colors (${hiddenBuiltIns.length})`, cls: 'windrose-settings-category-label' });
 
-      const hiddenList = hiddenContainer.createEl('div', { cls: 'dmt-color-list' });
+      const hiddenList = hiddenContainer.createEl('div', { cls: 'windrose-color-list' });
 
       hiddenBuiltIns.forEach((color, index) => {
         // Build display version with override if exists
@@ -111,37 +111,37 @@ export const TabRenderColorsMethods = {
   },
   renderColorRow(this: SettingsTabThis, containerEl: HTMLElement, colorRecord: Record<string, unknown>, _index: number, isHidden: boolean): void {
     const color = colorRecord as unknown as DisplayColor;
-    const row = containerEl.createEl('div', { cls: 'dmt-color-row' });
+    const row = containerEl.createEl('div', { cls: 'windrose-color-row' });
 
     // Color swatch - apply opacity if set
     const swatchOpacity = color.opacity ?? 1;
     row.createEl('div', {
-      cls: 'dmt-color-row-swatch',
+      cls: 'windrose-color-row-swatch',
       attr: { style: `background-color: ${color.color}; opacity: ${swatchOpacity}` }
     });
 
     // Label with modified indicator
-    const labelContainer = row.createEl('div', { cls: 'dmt-color-row-label' });
-    labelContainer.createEl('span', { text: color.label, cls: 'dmt-color-row-name' });
+    const labelContainer = row.createEl('div', { cls: 'windrose-color-row-label' });
+    labelContainer.createEl('span', { text: color.label, cls: 'windrose-color-row-name' });
 
     if (color.isModified) {
-      labelContainer.createEl('span', { text: ' (modified)', cls: 'dmt-color-row-modified' });
+      labelContainer.createEl('span', { text: ' (modified)', cls: 'windrose-color-row-modified' });
     }
     if (color.isCustom) {
-      labelContainer.createEl('span', { text: ' (custom)', cls: 'dmt-color-row-custom' });
+      labelContainer.createEl('span', { text: ' (custom)', cls: 'windrose-color-row-custom' });
     }
 
     // Hex value + opacity if not 100%
     const hexText = swatchOpacity < 1
       ? `${color.color} @ ${Math.round(swatchOpacity * 100)}%`
       : color.color;
-    row.createEl('code', { text: hexText, cls: 'dmt-color-row-hex' });
+    row.createEl('code', { text: hexText, cls: 'windrose-color-row-hex' });
 
     // Actions
-    const actions = row.createEl('div', { cls: 'dmt-color-row-actions' });
+    const actions = row.createEl('div', { cls: 'windrose-color-row-actions' });
 
     // Edit button
-    const editBtn = actions.createEl('button', { cls: 'dmt-btn-icon', attr: { 'aria-label': 'Edit color' } });
+    const editBtn = actions.createEl('button', { cls: 'windrose-btn-icon', attr: { 'aria-label': 'Edit color' } });
     IconHelpers.set(editBtn, 'pencil');
     editBtn.addEventListener('click', () => {
       new ColorEditModal(this.app, this.plugin, color, async () => {
@@ -153,7 +153,7 @@ export const TabRenderColorsMethods = {
 
     // Show/Hide button (for built-in colors only)
     if (color.isBuiltIn) {
-      const visBtn = actions.createEl('button', { cls: 'dmt-btn-icon', attr: { 'aria-label': isHidden ? 'Show color' : 'Hide color' } });
+      const visBtn = actions.createEl('button', { cls: 'windrose-btn-icon', attr: { 'aria-label': isHidden ? 'Show color' : 'Hide color' } });
       IconHelpers.set(visBtn, isHidden ? 'eye' : 'eye-off');
       visBtn.addEventListener('click', async () => {
         if (!this.plugin.settings.colorPaletteOverrides) {
@@ -177,7 +177,7 @@ export const TabRenderColorsMethods = {
 
       // Reset button (if modified)
       if (color.isModified) {
-        const resetBtn = actions.createEl('button', { cls: 'dmt-btn-icon', attr: { 'aria-label': 'Reset to default' } });
+        const resetBtn = actions.createEl('button', { cls: 'windrose-btn-icon', attr: { 'aria-label': 'Reset to default' } });
         IconHelpers.set(resetBtn, 'rotate-ccw');
         resetBtn.addEventListener('click', async () => {
           if (this.plugin.settings.colorPaletteOverrides) {
@@ -192,7 +192,7 @@ export const TabRenderColorsMethods = {
 
     // Delete button (for custom colors only)
     if (color.isCustom) {
-      const delBtn = actions.createEl('button', { cls: 'dmt-btn-icon dmt-btn-danger', attr: { 'aria-label': 'Delete color' } });
+      const delBtn = actions.createEl('button', { cls: 'windrose-btn-icon windrose-btn-danger', attr: { 'aria-label': 'Delete color' } });
       IconHelpers.set(delBtn, 'trash-2');
       delBtn.addEventListener('click', async () => {
         this.plugin.settings.customPaletteColors = (this.plugin.settings.customPaletteColors ?? []).filter(c => c.id !== color.id);

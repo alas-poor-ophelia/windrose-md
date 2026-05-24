@@ -249,15 +249,15 @@ const SelectionActionsOverlay = ({
   const renderActionButton = (action: SelectionAction, fullWidth = false): VNode => {
     if (action.special === 'color') {
       return (
-        <div key={action.id} className={`dmt-sel-action ${fullWidth ? 'dmt-sel-action-full' : ''}`}>
+        <div key={action.id} className={`windrose-sel-action ${fullWidth ? 'windrose-sel-action-full' : ''}`}>
           <button
             ref={colorButtonRef}
-            className="dmt-sel-action-btn dmt-sel-color-btn"
+            className="windrose-sel-action-btn windrose-sel-color-btn"
             onClick={(e) => action.invoke(e)}
             title={action.label}
           >
-            <span className="dmt-sel-color-swatch" style={{ backgroundColor: currentColor ?? '#ffffff' }} />
-            <span className="dmt-sel-action-label">{action.label}</span>
+            <span className="windrose-sel-color-swatch" style={{ backgroundColor: currentColor ?? '#ffffff' }} />
+            <span className="windrose-sel-action-label">{action.label}</span>
           </button>
           {showColorPicker === true && (
             <ColorPicker
@@ -281,14 +281,14 @@ const SelectionActionsOverlay = ({
     }
 
     const classes = [
-      'dmt-sel-action-btn',
-      action.id === 'delete' && 'dmt-sel-action-delete',
-      action.active === true && 'dmt-sel-action-active',
-      action.disabled === true && 'dmt-sel-action-disabled'
+      'windrose-sel-action-btn',
+      action.id === 'delete' && 'windrose-sel-action-delete',
+      action.active === true && 'windrose-sel-action-active',
+      action.disabled === true && 'windrose-sel-action-disabled'
     ].filter(Boolean).join(' ');
 
     return (
-      <div key={action.id} className={`dmt-sel-action ${fullWidth ? 'dmt-sel-action-full' : ''}`}>
+      <div key={action.id} className={`windrose-sel-action ${fullWidth ? 'windrose-sel-action-full' : ''}`}>
         <button
           className={classes}
           onClick={(e) => action.disabled !== true && action.invoke(e)}
@@ -296,7 +296,7 @@ const SelectionActionsOverlay = ({
           disabled={action.disabled}
         >
           <Icon icon={action.icon} />
-          <span className="dmt-sel-action-label">{action.label}</span>
+          <span className="windrose-sel-action-label">{action.label}</span>
         </button>
       </div>
     );
@@ -307,7 +307,7 @@ const SelectionActionsOverlay = ({
       {/* Linked Note Display */}
       {linkedNote != null && linkedNote !== '' && linkedNoteY !== undefined && (
         <div
-          className="dmt-selection-linked-note"
+          className="windrose-selection-linked-note"
           style={{
             position: 'absolute',
             left: `${bounds.screenX}px`,
@@ -317,7 +317,7 @@ const SelectionActionsOverlay = ({
             zIndex: Z_INDEX.TOOLBAR
           }}
         >
-          <div className="dmt-note-display-link">
+          <div className="windrose-note-display-link">
             <Icon icon="lucide-scroll-text" />
             <InternalLink
               link={linkedNote.replace(/\.md$/, '')}
@@ -334,7 +334,7 @@ const SelectionActionsOverlay = ({
 
       {/* Selection Card */}
       <div
-        className="dmt-selection-card"
+        className="windrose-selection-card"
         style={{
           position: 'absolute',
           left: `${toolbarPos.toolbarX}px`,
@@ -344,22 +344,22 @@ const SelectionActionsOverlay = ({
           zIndex: Z_INDEX.TOOLBAR
         }}
       >
-        <CornerBrackets classPrefix="dmt-selection-card-bracket" variant="minimal" filterId="sel-bracket" />
+        <CornerBrackets classPrefix="windrose-selection-card-bracket" variant="minimal" filterId="sel-bracket" />
         <SelectionCardFiligree />
 
-        <div className="dmt-selection-card-content">
+        <div className="windrose-selection-card-content">
           {/* Multi-select badge */}
           {isMulti && (
-            <div className="dmt-sel-multi-badge">
+            <div className="windrose-sel-multi-badge">
               <Icon icon="lucide-box-select" size={14} />
               <span>{selectionCount ?? selectedItems.length} selected</span>
             </div>
           )}
 
           {/* Primary action rows (2-column grid) */}
-          <div className="dmt-sel-grid">
+          <div className="windrose-sel-grid">
             {primaryRows.map((row, rowIdx) => (
-              <div key={rowIdx} className="dmt-sel-row">
+              <div key={rowIdx} className="windrose-sel-row">
                 {row.map(action => renderActionButton(action, row.length === 1))}
               </div>
             ))}
@@ -368,9 +368,9 @@ const SelectionActionsOverlay = ({
           {/* Links section */}
           {hasLinks && (
             <>
-              <div className="dmt-sel-separator" />
+              <div className="windrose-sel-separator" />
               <button
-                className={`dmt-sel-links-toggle ${linksExpanded ? 'expanded' : ''}`}
+                className={`windrose-sel-links-toggle ${linksExpanded ? 'expanded' : ''}`}
                 onClick={() => setLinksExpanded(!linksExpanded)}
               >
                 <Icon icon="lucide-link-2" />
@@ -378,7 +378,7 @@ const SelectionActionsOverlay = ({
                 <Icon icon={linksExpanded ? 'lucide-chevron-up' : 'lucide-chevron-down'} />
               </button>
               {linksExpanded && (
-                <div className="dmt-sel-links-panel">
+                <div className="windrose-sel-links-panel">
                   {linkActions.map(action => renderActionButton(action, true))}
                 </div>
               )}
@@ -388,18 +388,18 @@ const SelectionActionsOverlay = ({
           {/* Resize slider */}
           {isResizeMode === true && (
             <>
-              <div className="dmt-sel-separator" />
-              <div className="dmt-sel-resize-row">
+              <div className="windrose-sel-separator" />
+              <div className="windrose-sel-resize-row">
                 <Icon icon="lucide-scaling" size={14} />
                 <input
                   type="range"
-                  className="dmt-scale-slider"
+                  className="windrose-scale-slider"
                   min="25" max="130" step="5"
                   value={Math.round(currentScale * 100)}
                   onInput={(e: Event) => onScaleChange?.(parseInt((e.target as HTMLInputElement).value) / 100)}
                   title={`Scale: ${Math.round(currentScale * 100)}%`}
                 />
-                <span className="dmt-sel-resize-value">{Math.round(currentScale * 100)}%</span>
+                <span className="windrose-sel-resize-value">{Math.round(currentScale * 100)}%</span>
               </div>
             </>
           )}
@@ -407,38 +407,38 @@ const SelectionActionsOverlay = ({
           {/* Player light controls */}
           {isPlayer === true && (
             <>
-              <div className="dmt-sel-separator" />
-              <div className="dmt-sel-player-section">
-                <div className="dmt-sel-player-header" onClick={() => onLightToggle?.()}>
+              <div className="windrose-sel-separator" />
+              <div className="windrose-sel-player-section">
+                <div className="windrose-sel-player-header" onClick={() => onLightToggle?.()}>
                   <Icon icon="lucide-sun" size={14} />
                   <span>Light</span>
-                  <label className="dmt-sel-toggle-switch" onClick={(e: Event) => e.stopPropagation()}>
+                  <label className="windrose-sel-toggle-switch" onClick={(e: Event) => e.stopPropagation()}>
                     <input
                       type="checkbox"
                       checked={lightEnabled === true}
                       onChange={() => onLightToggle?.()}
                     />
-                    <span className="dmt-sel-toggle-slider" />
+                    <span className="windrose-sel-toggle-slider" />
                   </label>
                 </div>
                 {lightEnabled === true && (
-                  <div className="dmt-sel-player-row">
+                  <div className="windrose-sel-player-row">
                     <input
                       type="number"
-                      className="dmt-sel-radius-input"
+                      className="windrose-sel-radius-input"
                       value={lightRadius ?? 30}
                       min="1"
                       step="5"
                       onInput={(e: Event) => onLightRadiusChange?.(parseInt((e.target as HTMLInputElement).value) || 30)}
                     />
-                    <span className="dmt-sel-unit-label">{distanceUnit ?? 'ft'}</span>
+                    <span className="windrose-sel-unit-label">{distanceUnit ?? 'ft'}</span>
                     <button
                       ref={lightColorButtonRef}
-                      className="dmt-sel-light-color-swatch"
+                      className="windrose-sel-light-color-swatch"
                       onClick={() => onLightColorSwatchClick?.()}
                       title="Light Color"
                     >
-                      <span className="dmt-sel-color-swatch" style={{ backgroundColor: lightColor ?? 'rgba(255, 255, 100, 1)' }} />
+                      <span className="windrose-sel-color-swatch" style={{ backgroundColor: lightColor ?? 'rgba(255, 255, 100, 1)' }} />
                     </button>
                     {showLightColorPicker === true && (
                       <ColorPicker
@@ -462,12 +462,12 @@ const SelectionActionsOverlay = ({
           {/* Footer icon row (freeform, copy link) */}
           {iconOnlyActions.length > 0 && (
             <>
-              <div className="dmt-sel-separator" />
-              <div className="dmt-sel-footer-icons">
+              <div className="windrose-sel-separator" />
+              <div className="windrose-sel-footer-icons">
                 {iconOnlyActions.map(action => (
                   <button
                     key={action.id}
-                    className={`dmt-sel-icon-btn ${action.active === true ? 'dmt-sel-action-active' : ''}`}
+                    className={`windrose-sel-icon-btn ${action.active === true ? 'windrose-sel-action-active' : ''}`}
                     onClick={(e) => action.invoke(e)}
                     title={action.label}
                   >

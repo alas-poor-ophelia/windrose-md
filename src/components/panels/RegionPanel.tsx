@@ -57,9 +57,9 @@ const RegionPanel = ({
 
   return (
     <div
-      className={`dmt-region-panel ${sidebarCollapsed ? 'sidebar-closed' : 'sidebar-open'} ${isOpen ? 'dmt-region-panel-open' : ''}`}
+      className={`windrose-region-panel ${sidebarCollapsed ? 'sidebar-closed' : 'sidebar-open'} ${isOpen ? 'windrose-region-panel-open' : ''}`}
     >
-      <div className="dmt-region-panel-header">
+      <div className="windrose-region-panel-header">
         <Icon icon="lucide-map" size={12} />
         <span>Regions</span>
       </div>
@@ -67,22 +67,22 @@ const RegionPanel = ({
       {sortedRegions.map(region => (
         <button
           key={region.id}
-          className={`dmt-region-item ${!region.visible ? 'dmt-region-item-hidden' : ''}`}
+          className={`windrose-region-item ${!region.visible ? 'windrose-region-item-hidden' : ''}`}
           onClick={() => handleRegionClick(region.id)}
           title={`${region.name} (${region.hexes.length} hexes)`}
         >
           <span
-            className="dmt-region-color-dot"
+            className="windrose-region-color-dot"
             style={{
               backgroundColor: region.color,
               opacity: region.visible ? 1 : 0.4
             }}
           />
-          <span className="dmt-region-name">
+          <span className="windrose-region-name">
             {getDisplayName(region.name)}
           </span>
           <button
-            className="dmt-region-visibility-btn"
+            className="windrose-region-visibility-btn"
             onClick={(e: Event) => handleToggleVisibility(region.id, e)}
             title={region.visible ? 'Hide region' : 'Show region'}
           >

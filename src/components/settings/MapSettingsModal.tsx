@@ -56,11 +56,11 @@ function TabContent({ tabs, activeTab, setActiveTab, mapType }: {
 }): VNode {
   return (
     <>
-      <div class="dmt-settings-tab-bar" style={{ flexShrink: 0 }}>
+      <div class="windrose-settings-tab-bar" style={{ flexShrink: 0 }}>
         {tabs.map((tab: SettingsTab) => (
           <button
             key={tab.id}
-            class={`dmt-settings-tab ${activeTab === tab.id ? 'dmt-settings-tab-active' : ''}`}
+            class={`windrose-settings-tab ${activeTab === tab.id ? 'windrose-settings-tab-active' : ''}`}
             onClick={() => setActiveTab(tab.id)}
           >
             {tab.label}
@@ -68,7 +68,7 @@ function TabContent({ tabs, activeTab, setActiveTab, mapType }: {
         ))}
       </div>
 
-      <div class="dmt-modal-body" style={{
+      <div class="windrose-modal-body" style={{
         paddingTop: '16px',
         flex: 1,
         overflowY: 'auto',
@@ -121,13 +121,13 @@ function MapSettingsModalContent(): VNode | null {
   return (
     <NativeModalPortal
       title={modalTitle}
-      modalClass="dmt-settings-native-modal"
+      modalClass="windrose-settings-native-modal"
       onClose={handleCancel}
       draggable
       resizable
       contextBridge={contextBridge}
     >
-      <div class="dmt-settings-modal">
+      <div class="windrose-settings-modal">
         {isInSubHex && (
           <div style={{
             padding: '6px 12px',

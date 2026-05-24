@@ -35,7 +35,7 @@ function HexGridTab(): VNode | null {
   }
 
   return (
-    <div class="dmt-settings-tab-content">
+    <div class="windrose-settings-tab-content">
       {/* Background Image Section - image picker and dimensions */}
       <BackgroundImageSection />
 

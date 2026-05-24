@@ -62,9 +62,9 @@ function ImageAlignmentMode({ isActive, offsetX, offsetY, onOffsetChange, onAppl
   // Canvas drag event handlers - use useCallback to stabilize
   const handleCanvasPointerDown = useCallback((e: PointerEvent | TouchEvent) => {
     // Only handle events on the canvas
-    const canvas = document.querySelector('[class^="dmt-canvas"]');
+    const canvas = document.querySelector('[class^="windrose-canvas"]');
     const target = e.target as HTMLElement | null;
-    if (canvas == null || !target?.closest('[class^="dmt-canvas"]')) {
+    if (canvas == null || !target?.closest('[class^="windrose-canvas"]')) {
       return;
     }    // Only handle single-finger/mouse events (let two-finger pan through)
     const touches = (e as TouchEvent).touches;
@@ -103,7 +103,7 @@ function ImageAlignmentMode({ isActive, offsetX, offsetY, onOffsetChange, onAppl
   useEffect(() => {    if (!isActive) {      return undefined;
     }
 
-    const canvas = document.querySelector('[class^="dmt-canvas"]');
+    const canvas = document.querySelector('[class^="windrose-canvas"]');
     if (!canvas) return undefined;
 
     // Attach to document instead of canvas to avoid CodeMirror interception

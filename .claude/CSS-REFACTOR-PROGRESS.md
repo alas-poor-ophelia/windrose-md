@@ -5,18 +5,25 @@
 
 ## Phase Status
 
-- [ ] **Phase 0** — Delete settingsStyles.css, consolidate
-- [ ] **Phase 1** — Rename --dmt- to --windrose- (custom properties)
-- [ ] **Phase 2** — Rename dmt-* to windrose-* (63 files, 387 refs)
-- [ ] **Phase 3** — Rename CustomEvent names dmt-* to windrose-*
-- [ ] **Phase 4a** — Color & Theming (OKLCH + light-dark())
-- [ ] **Phase 4b** — Layout & Sizing (clamp/min/max)
-- [ ] **Phase 4c** — Selectors & Logic (nesting, :has(), :is())
-- [ ] **Phase 4d/4e** — Animation, Positioning, Typography
+- [x] **Phase 0** — Delete settingsStyles.css, consolidate ✓ (Commit: 98109552)
+- [x] **Phase 1** — Rename --dmt- to --windrose- (custom properties) ✓ (Commit: a6fb787a)
+- [ ] **Phase 2** — Rename dmt-* to windrose-* (63 files, 387 refs) — IN PROGRESS (3 scouts: scss selectors, tsx batch1, tsx batch2)
+- [ ] **Phase 3** — Rename CustomEvent names dmt-* to windrose-* — IN PROGRESS (started by scouts in src/main.ts)
+- [x] **Phase 4a** — Color & Theming (OKLCH + light-dark()) ✓ Foundation (Commit: d99392fe)
+- [ ] **Phase 4b** — Layout & Sizing (clamp/min/max) — To do
+- [ ] **Phase 4c** — Selectors & Logic (nesting, :has(), :is()) — To do
+- [ ] **Phase 4d/4e** — Animation, Positioning, Typography — To do
 
 ## Completion Log
 
-(Updated as phases complete)
+**Completed:**
+- Phase 0: settingsStyles.css consolidated (98109552)
+- Phase 1: --dmt- custom properties renamed to --windrose- (a6fb787a)
+- Phase 4a Foundation: OKLCH colors + color-mix() for hover states (d99392fe)
+
+**In Progress:**
+- Phase 2: Class rename across 63 files (3 scouts working in parallel)
+- Phase 3: CustomEvent rename (started by scouts)
 
 ---
 

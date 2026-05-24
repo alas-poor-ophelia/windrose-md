@@ -303,30 +303,30 @@ const SegmentPickerOverlay = ({
   return (
     <ModalPortal>
       <div
-        className="dmt-segment-picker-overlay dmt-segment-picker-backdrop"
+        className="windrose-segment-picker-overlay windrose-segment-picker-backdrop"
         onClick={handleOverlayClick}
         onTouchEnd={handleOverlayClick}
       >
         <div
-          className="dmt-segment-picker dmt-segment-picker-card"
+          className="windrose-segment-picker windrose-segment-picker-card"
           onClick={(e: Event) => e.stopPropagation()}
           onTouchEnd={(e: Event) => e.stopPropagation()}
         >
-          <div className="dmt-segment-picker-title">
+          <div className="windrose-segment-picker-title">
             Select Segments
           </div>
 
-          <div className="dmt-segment-picker-subtitle">
+          <div className="windrose-segment-picker-subtitle">
             Cell ({cellCoords?.x}, {cellCoords?.y})
           </div>
 
-          <div className="dmt-segment-picker-svg-wrap">
+          <div className="windrose-segment-picker-svg-wrap">
             <svg
               ref={svgRef}
               width={PICKER_SIZE}
               height={PICKER_SIZE}
               viewBox={`0 0 ${PICKER_SIZE} ${PICKER_SIZE}`}
-              className="dmt-segment-picker-svg"
+              className="windrose-segment-picker-svg"
             >
               <line x1={PICKER_SIZE/2} y1="0" x2={PICKER_SIZE/2} y2={PICKER_SIZE} stroke="#444" strokeWidth="1" />
               <line x1="0" y1={PICKER_SIZE/2} x2={PICKER_SIZE} y2={PICKER_SIZE/2} stroke="#444" strokeWidth="1" />
@@ -384,20 +384,20 @@ const SegmentPickerOverlay = ({
             </svg>
           </div>
 
-          <div className="dmt-segment-picker-actions">
-            <button onClick={handleSelectAll} className="dmt-segment-picker-btn">
+          <div className="windrose-segment-picker-actions">
+            <button onClick={handleSelectAll} className="windrose-segment-picker-btn">
               Select All
             </button>
-            <button onClick={handleClearAll} className="dmt-segment-picker-btn">
+            <button onClick={handleClearAll} className="windrose-segment-picker-btn">
               Clear All
             </button>
           </div>
 
-          <div className="dmt-segment-picker-status">
+          <div className="windrose-segment-picker-status">
             {selectedSegments.size} of 8 segments selected
           </div>
 
-          <label className="dmt-segment-picker-remember">
+          <label className="windrose-segment-picker-remember">
             <input
               type="checkbox"
               checked={rememberSelection}
@@ -406,16 +406,16 @@ const SegmentPickerOverlay = ({
             Remember selection for next cell
           </label>
 
-          <div className="dmt-segment-picker-footer">
-            <button onClick={handleCancel} className="dmt-segment-picker-btn-lg">
+          <div className="windrose-segment-picker-footer">
+            <button onClick={handleCancel} className="windrose-segment-picker-btn-lg">
               Cancel
             </button>
-            <button onClick={handleConfirm} className="dmt-segment-picker-btn-lg is-primary">
+            <button onClick={handleConfirm} className="windrose-segment-picker-btn-lg is-primary">
               Apply
             </button>
           </div>
 
-          <div className="dmt-segment-picker-hint">
+          <div className="windrose-segment-picker-hint">
             Tap or drag to toggle segments
           </div>
         </div>

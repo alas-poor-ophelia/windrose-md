@@ -95,21 +95,21 @@ const VisibilityToolbar = ({
   const visibleLayers = layers.filter(layer => layer.hexOnly !== true || mapType === 'hex');
 
   return (
-    <div className={`dmt-visibility-toolbar ${isOpen ? 'dmt-visibility-toolbar-open' : ''}`}>
+    <div className={`windrose-visibility-toolbar ${isOpen ? 'windrose-visibility-toolbar-open' : ''}`}>
       {visibleLayers.map(layer => {
         const isVisible = layerVisibility[layer.id];
 
         return (
           <button
             key={layer.id}
-            className={`dmt-visibility-btn ${isVisible !== true ? 'dmt-visibility-btn-hidden' : ''}`}
+            className={`windrose-visibility-btn ${isVisible !== true ? 'windrose-visibility-btn-hidden' : ''}`}
             onClick={() => onToggleLayer(layer.id)}
             title={`${layer.tooltip} (currently ${isVisible === true ? 'visible' : 'hidden'})`}
           >
             <Icon icon={layer.icon} />
             {isVisible !== true && (
               <svg
-                className="dmt-visibility-strikethrough"
+                className="windrose-visibility-strikethrough"
                 viewBox="0 0 24 24"
                 xmlns="http://www.w3.org/2000/svg"
               >
@@ -126,16 +126,16 @@ const VisibilityToolbar = ({
         );
       })}
 
-      <div className="dmt-visibility-separator" />
+      <div className="windrose-visibility-separator" />
 
-      <div className="dmt-fow-section">
+      <div className="windrose-fow-section">
         <button
-          className={`dmt-fow-toggle-btn ${showFogTools ? 'expanded' : ''}`}
+          className={`windrose-fow-toggle-btn ${showFogTools ? 'expanded' : ''}`}
           onClick={onFogToolsToggle}
           title="Fog of War tools"
         >
           <Icon icon="lucide-cloud-fog" />
-          <span className="dmt-fow-label">Fog</span>
+          <span className="windrose-fow-label">Fog</span>
         </button>
       </div>
     </div>

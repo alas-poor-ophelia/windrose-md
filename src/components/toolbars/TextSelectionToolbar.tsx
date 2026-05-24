@@ -139,7 +139,7 @@ const TextSelectionToolbar = ({
 
   return (
     <div
-      className="dmt-selection-toolbar"
+      className="windrose-selection-toolbar"
       style={{
         position: 'absolute',
         left: `${pos.toolbarX}px`,
@@ -152,7 +152,7 @@ const TextSelectionToolbar = ({
       {buttons.map((btn) => (
         <button
           key={btn.id}
-          className={`dmt-toolbar-button${btn.isDelete === true ? ' dmt-toolbar-delete-button' : ''}`}
+          className={`windrose-toolbar-button${btn.isDelete === true ? ' windrose-toolbar-delete-button' : ''}`}
           onClick={(e) => btn.onClick?.(e)}
           title={btn.title}
         >

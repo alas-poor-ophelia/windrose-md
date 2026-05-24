@@ -11,7 +11,7 @@ import type { VNode } from 'preact';
 const SelectionCardFiligree = (): VNode => {
   return (
     <svg
-      className="dmt-selection-card-filigree"
+      className="windrose-selection-card-filigree"
       xmlns="http://www.w3.org/2000/svg"
       viewBox="159 164 159 165"
     >

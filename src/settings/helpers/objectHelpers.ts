@@ -117,7 +117,7 @@ export const ObjectHelpers = {
 
     if (obj.imagePath != null && obj.imagePath !== '') {
       const imgEl = container.createEl('img', {
-        cls: 'dmt-settings-object-image windrose-object-image-fit',
+        cls: 'windrose-settings-object-image windrose-object-image-fit',
         attr: { src: app.vault.adapter.getResourcePath(obj.imagePath), alt: obj.label ?? '' }
       });
       imgEl.style.setProperty('width', width);

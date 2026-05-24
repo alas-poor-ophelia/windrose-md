@@ -45,7 +45,7 @@ function MeasurementTab(): VNode {
   const isDisabled = distanceSettings.useGlobalDistance;
 
   return (
-    <div class="dmt-settings-tab-content">
+    <div class="windrose-settings-tab-content">
       <SettingItem
         name="Custom measurement settings"
         description="Override global distance settings for this map"

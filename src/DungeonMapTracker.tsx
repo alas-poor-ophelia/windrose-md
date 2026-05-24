@@ -135,15 +135,15 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
       if (plugin != null) {
         plugin.settings.showAdjacentSubMaps = v;
         plugin.saveSettings();
-        window.dispatchEvent(new Event('dmt-settings-changed'));
+        window.dispatchEvent(new Event('windrose-settings-changed'));
       }
     } catch { /* settings plugin unavailable */ }
     setShowAdjacentSubMapsState(v);
   }, []);
   useEffect(() => {
     const handler = (): void => { setShowAdjacentSubMapsState(getSettings().showAdjacentSubMaps ?? false); };
-    window.addEventListener('dmt-settings-changed', handler);
-    return () => window.removeEventListener('dmt-settings-changed', handler);
+    window.addEventListener('windrose-settings-changed', handler);
+    return () => window.removeEventListener('windrose-settings-changed', handler);
   }, []);
 
   // Tile browser state (hex maps only)
@@ -471,7 +471,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   ]);
 
   if (isLoading || !mapData) {
-    return <div className="dmt-loading">Loading map...</div>;
+    return <div className="windrose-loading">Loading map...</div>;
   }
 
   // Get color display name
@@ -486,9 +486,9 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     <>
       <div
         ref={containerRef}
-        className={`dmt-container interactive-child`}
+        className={`windrose-container interactive-child`}
       >
-        <CornerBrackets classPrefix="dmt-corner-bracket" variant="ornate" filterId="bracket" />
+        <CornerBrackets classPrefix="windrose-corner-bracket" variant="ornate" filterId="bracket" />
 
         <MapHeader
           mapData={mapData}
@@ -566,7 +566,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
         />
 
         <div
-          className="dmt-canvas-wrapper"
+          className="windrose-canvas-wrapper"
           style={{ height: `${canvasHeight}px` }}
           onMouseEnter={() => setIsFocused(true)}
           onMouseLeave={() => setIsFocused(false)}
@@ -585,7 +585,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
           />
 
           {/* Left side panels container — layers + regions stacked */}
-          <div className={`dmt-left-panels ${mapData.sidebarCollapsed === true ? 'sidebar-closed' : 'sidebar-open'}`}>
+          <div className={`windrose-left-panels ${mapData.sidebarCollapsed === true ? 'sidebar-closed' : 'sidebar-open'}`}>
             {/* Layer Controls Panel (Z-Layer System) */}
             <LayerControls
               mapData={mapData}
@@ -614,7 +614,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
 
           {/* For hex maps, override northDirection to 0 for rendering while keeping real value for compass display */}
           {/* This allows the compass to show and persist the north direction without actually rotating hex maps */}
-          <div className="dmt-canvas-and-controls">
+          <div className="windrose-canvas-and-controls">
             <MapCanvas
               mapId={mapId}
               notePath={notePath}
@@ -812,7 +812,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
         </div>
 
         {showFooter && (
-          <div className="dmt-footer">
+          <div className="windrose-footer">
             Map ID: {mapId} | Color: {getColorDisplayName()} | {
               currentTool === 'select' ? 'Click to select text/objects | Drag to move | Press R to rotate | Press Delete to remove' :
                 currentTool === 'draw' ? 'Click/drag to draw' :

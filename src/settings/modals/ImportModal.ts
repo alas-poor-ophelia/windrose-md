@@ -27,7 +27,7 @@ class ImportModal extends Modal {
   onOpen() {
     const { contentEl } = this;
     contentEl.empty();
-    contentEl.addClass('dmt-import-modal');
+    contentEl.addClass('windrose-import-modal');
 
     const mapTypeLabel = this.mapType === 'hex' ? 'Hex' : 'Grid';
     contentEl.createEl('h2', { text: `Import ${mapTypeLabel} Object Customizations` });
@@ -38,18 +38,18 @@ class ImportModal extends Modal {
     });
 
     // File picker
-    const fileContainer = contentEl.createDiv({ cls: 'dmt-import-file-container' });
+    const fileContainer = contentEl.createDiv({ cls: 'windrose-import-file-container' });
     const fileInput = fileContainer.createEl('input', {
       type: 'file',
       attr: { accept: '.json' }
     });
 
     // Preview area (hidden until file selected)
-    const previewArea = contentEl.createDiv({ cls: 'dmt-import-preview' });
+    const previewArea = contentEl.createDiv({ cls: 'windrose-import-preview' });
     previewArea.style.display = 'none';
 
     // Import options (hidden until file validated)
-    const optionsArea = contentEl.createDiv({ cls: 'dmt-import-options' });
+    const optionsArea = contentEl.createDiv({ cls: 'windrose-import-options' });
     optionsArea.style.display = 'none';
 
     let mergeMode = 'merge'; // 'merge' or 'replace'
@@ -67,7 +67,7 @@ class ImportModal extends Modal {
           previewArea.empty();
           previewArea.createEl('p', {
             text: 'This file is not a valid Windrose MD object export.',
-            cls: 'dmt-import-error'
+            cls: 'windrose-import-error'
           });
           previewArea.style.display = 'block';
           optionsArea.style.display = 'none';
@@ -83,7 +83,7 @@ class ImportModal extends Modal {
         if (data.exportedAt) {
           previewArea.createEl('p', {
             text: `Exported: ${new Date(data.exportedAt as string).toLocaleString()}`,
-            cls: 'dmt-import-date'
+            cls: 'windrose-import-date'
           });
         }
 
@@ -93,7 +93,7 @@ class ImportModal extends Modal {
           if (data.mapType !== this.mapType) {
             previewArea.createEl('p', {
               text: `Note: This was exported from ${sourceType} maps but will be imported to ${mapTypeLabel} maps.`,
-              cls: 'dmt-import-note'
+              cls: 'windrose-import-note'
             });
           }
         }
@@ -131,7 +131,7 @@ class ImportModal extends Modal {
         previewArea.empty();
         previewArea.createEl('p', {
           text: `Error reading file: ${(err as Error).message}`,
-          cls: 'dmt-import-error'
+          cls: 'windrose-import-error'
         });
         previewArea.style.display = 'block';
         optionsArea.style.display = 'none';
@@ -140,7 +140,7 @@ class ImportModal extends Modal {
     });
 
     // Buttons
-    const buttonContainer = contentEl.createDiv({ cls: 'dmt-modal-buttons' });
+    const buttonContainer = contentEl.createDiv({ cls: 'windrose-modal-buttons' });
 
     const cancelBtn = buttonContainer.createEl('button', { text: 'Cancel' });
     cancelBtn.onclick = () => this.close();

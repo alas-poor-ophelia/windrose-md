@@ -175,7 +175,7 @@ const ColorPicker = ({
   const handlePickerMouseDown = (e: JSX.TargetedMouseEvent<HTMLDivElement>): void => {
     e.stopPropagation();
 
-    if (editTargetId != null && editTargetId !== '' && !(e.target as Element).closest('.dmt-color-edit-panel')) {
+    if (editTargetId != null && editTargetId !== '' && !(e.target as Element).closest('.windrose-color-edit-panel')) {
       if (!justOpenedEditRef.current) {
         saveAndCloseEditPanel();
       }
@@ -185,7 +185,7 @@ const ColorPicker = ({
   const handlePickerTouch = (e: JSX.TargetedTouchEvent<HTMLDivElement>): void => {
     e.stopPropagation();
 
-    if (editTargetId != null && !(e.target as Element).closest('.dmt-color-edit-panel')) {
+    if (editTargetId != null && !(e.target as Element).closest('.windrose-color-edit-panel')) {
       if (!justOpenedEditRef.current) {
         saveAndCloseEditPanel();
       }
@@ -321,7 +321,7 @@ const ColorPicker = ({
 
   const pickerEl = (
     <div
-      className="dmt-color-picker"
+      className="windrose-color-picker"
       onClick={handlePickerClick}
       onMouseDown={handlePickerMouseDown}
       onTouchStart={handlePickerTouch}
@@ -329,17 +329,17 @@ const ColorPicker = ({
       onTouchEnd={handlePickerTouch}
       style={pickerStyle}
     >
-      <div className="dmt-color-picker-header">
-        <span className="dmt-color-picker-title">{title}</span>
+      <div className="windrose-color-picker-header">
+        <span className="windrose-color-picker-title">{title}</span>
       </div>
 
-      <div className="dmt-color-grid">
+      <div className="windrose-color-grid">
         {allColors.map(colorDef => {
           if (colorDef.isReset === true) {
             return (
               <button
                 key={colorDef.id}
-                className="dmt-color-swatch dmt-color-swatch-reset"
+                className="windrose-color-swatch windrose-color-swatch-reset"
                 onClick={handleReset}
                 title={colorDef.label}
               >
@@ -350,11 +350,11 @@ const ColorPicker = ({
             return (
               <div
                 key={colorDef.id}
-                className="dmt-color-swatch dmt-color-swatch-preview"
+                className="windrose-color-swatch windrose-color-swatch-preview"
                 style={{ backgroundColor: colorDef.color }}
                 title="Selecting..."
               >
-                <span className="dmt-color-preview-spinner">
+                <span className="windrose-color-preview-spinner">
                   <Icon icon="lucide-loader" />
                 </span>
               </div>
@@ -363,19 +363,19 @@ const ColorPicker = ({
             return (
               <div
                 key={colorDef.id}
-                className="dmt-color-swatch dmt-color-swatch-add"
+                className="windrose-color-swatch windrose-color-swatch-add"
                 title={colorDef.label}
                 onClick={handleAddClick}
               >
                 <input
                   ref={colorInputRef}
                   type="color"
-                  className="dmt-color-input-as-button"
+                  className="windrose-color-input-as-button"
                   onInput={handleColorInput}
                   defaultValue={selectedColor ?? '#ffffff'}
                   aria-label="Add custom color"
                 />
-                <span className="dmt-color-add-icon-overlay">+</span>
+                <span className="windrose-color-add-icon-overlay">+</span>
               </div>
             );
           } else {
@@ -386,7 +386,7 @@ const ColorPicker = ({
             return (
               <div key={colorDef.id} style={{ position: 'relative', display: 'inline-block' }}>
                 <button
-                  className={`dmt-color-swatch interactive-child ${selectedColor === colorDef.color ? 'dmt-color-swatch-selected' : ''}`}
+                  className={`windrose-color-swatch interactive-child ${selectedColor === colorDef.color ? 'windrose-color-swatch-selected' : ''}`}
                   style={{
                     backgroundColor: colorDef.color,
                     opacity: displayOpacity
@@ -400,7 +400,7 @@ const ColorPicker = ({
                   title={colorDef.label + (hasStoredOpacity ? ` (${Math.round((colorDef.opacity ?? 1) * 100)}%)` : '')}
                 >
                   {selectedColor === colorDef.color && (
-                    <span className="dmt-color-checkmark">
+                    <span className="windrose-color-checkmark">
                       <Icon icon="lucide-check" />
                     </span>
                   )}
@@ -408,12 +408,12 @@ const ColorPicker = ({
 
                 {isEditing && (
                   <div
-                    className="dmt-color-edit-panel"
+                    className="windrose-color-edit-panel"
                     onMouseDown={(e) => e.stopPropagation()}
                     onTouchStart={(e) => e.stopPropagation()}
                   >
-                    <div className="dmt-color-edit-opacity">
-                      <span className="dmt-color-edit-opacity-label">Opacity</span>
+                    <div className="windrose-color-edit-opacity">
+                      <span className="windrose-color-edit-opacity-label">Opacity</span>
                       <input
                         type="range"
                         min="10"
@@ -424,11 +424,11 @@ const ColorPicker = ({
                         onMouseDown={(e) => e.stopPropagation()}
                         onTouchStart={(e) => e.stopPropagation()}
                       />
-                      <span className="dmt-color-edit-opacity-value">{Math.round(editingOpacity * 100)}%</span>
+                      <span className="windrose-color-edit-opacity-value">{Math.round(editingOpacity * 100)}%</span>
                     </div>
 
                     <button
-                      className="dmt-color-edit-delete"
+                      className="windrose-color-edit-delete"
                       onClick={(e) => handleDeleteClick(e, colorDef.id)}
                       title="Delete custom color"
                     >
@@ -443,10 +443,10 @@ const ColorPicker = ({
       </div>
 
       {onOpacityChange && (
-        <div className="dmt-color-opacity-section">
-          <div className="dmt-color-opacity-header">
-            <span className="dmt-color-opacity-label">Opacity</span>
-            <span className="dmt-color-opacity-value">{Math.round(opacity * 100)}%</span>
+        <div className="windrose-color-opacity-section">
+          <div className="windrose-color-opacity-header">
+            <span className="windrose-color-opacity-label">Opacity</span>
+            <span className="windrose-color-opacity-value">{Math.round(opacity * 100)}%</span>
           </div>
           <input
             type="range"
@@ -454,7 +454,7 @@ const ColorPicker = ({
             max="100"
             value={Math.round(opacity * 100)}
             onChange={(e) => onOpacityChange(parseInt((e.target as HTMLInputElement).value, 10) / 100)}
-            className="dmt-color-opacity-slider"
+            className="windrose-color-opacity-slider"
           />
         </div>
       )}

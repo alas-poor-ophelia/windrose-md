@@ -1,6 +1,6 @@
 export const DragHelpers = {
   getAfterElement(container: HTMLElement, y: number): HTMLElement | undefined {
-    const draggableElements = [...container.querySelectorAll('.dmt-settings-object-row:not(.dmt-dragging)')] as HTMLElement[];
+    const draggableElements = [...container.querySelectorAll('.windrose-settings-object-row:not(.windrose-dragging)')] as HTMLElement[];
 
     return draggableElements.reduce<{ offset: number; element?: HTMLElement }>((closest, child) => {
       const box = child.getBoundingClientRect();

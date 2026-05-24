@@ -69,7 +69,7 @@ function PreferencesTab(): VNode {
   const alwaysShowControls = overrides.alwaysShowControls ?? globalSettings.alwaysShowControls ?? false;
 
   return (
-    <div class="dmt-settings-tab-content">
+    <div class="windrose-settings-tab-content">
       <SettingItem
         name="Remember pan and zoom"
         description="Restore map position when reopening"

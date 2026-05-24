@@ -439,25 +439,25 @@ const RegionLayer = ({
 
   // ── JSX ────────────────────────────────────────────────────────────
   return (
-    <div className="dmt-region-ui" style={{ position: 'relative' }}>
+    <div className="windrose-region-ui" style={{ position: 'relative' }}>
       {/* Editing existing region bar */}
       {editingRegion && pendingHexes.length === 0 && !showNameInput && (
-        <div className="dmt-floating-bar">
+        <div className="windrose-floating-bar">
           <input
             type="color"
             value={editingRegion.color}
             onInput={handleColorChange}
             title="Change region color"
-            className="dmt-color-swatch-btn"
+            className="windrose-color-swatch-btn"
           />
-          <span className="dmt-floating-bar-name">
+          <span className="windrose-floating-bar-name">
             {editingRegion.name}
           </span>
-          <span className="dmt-floating-bar-label">
+          <span className="windrose-floating-bar-label">
             {editingRegion.hexes.length} hex{editingRegion.hexes.length !== 1 ? 'es' : ''}
           </span>
-          <span className="dmt-floating-bar-separator">|</span>
-          <span className="dmt-floating-bar-label">
+          <span className="windrose-floating-bar-separator">|</span>
+          <span className="windrose-floating-bar-label">
             Click hexes to add/remove
           </span>
           <button
@@ -473,7 +473,7 @@ const RegionLayer = ({
               });
             }}
             title={editingRegion.linkedNote != null && editingRegion.linkedNote !== '' ? 'Change linked note' : 'Link note'}
-            className={`dmt-floating-bar-btn${editingRegion.linkedNote != null && editingRegion.linkedNote !== '' ? ' is-accent' : ''}`}
+            className={`windrose-floating-bar-btn${editingRegion.linkedNote != null && editingRegion.linkedNote !== '' ? ' is-accent' : ''}`}
             style={{ display: 'flex', alignItems: 'center' }}
           >
             <Icon icon={editingRegion.linkedNote != null && editingRegion.linkedNote !== '' ? 'lucide-file-check' : 'lucide-link'} />
@@ -483,19 +483,19 @@ const RegionLayer = ({
               setShowNameInput(true);
               setRegionName(editingRegion.name);
             }}
-            className="dmt-floating-bar-btn is-accent"
+            className="windrose-floating-bar-btn is-accent"
           >
             Rename
           </button>
           <button
             onClick={() => deleteRegion(editingRegion.id)}
-            className="dmt-floating-bar-btn is-danger"
+            className="windrose-floating-bar-btn is-danger"
           >
             Delete
           </button>
           <button
             onClick={stopEditingRegion}
-            className="dmt-floating-bar-btn"
+            className="windrose-floating-bar-btn"
           >
             Done
           </button>
@@ -504,20 +504,20 @@ const RegionLayer = ({
 
       {/* Create Region bar */}
       {isRegionTool && pendingHexes.length > 0 && !showNameInput && (editingRegionId == null || editingRegionId === '') && (
-        <div className="dmt-floating-bar">
-          <span className="dmt-floating-bar-label" style={{ marginRight: '4px' }}>
+        <div className="windrose-floating-bar">
+          <span className="windrose-floating-bar-label" style={{ marginRight: '4px' }}>
             {pendingHexes.length} hex{pendingHexes.length !== 1 ? 'es' : ''}
           </span>
           <button
             onClick={handleCreateClick}
-            className="dmt-floating-bar-btn is-active"
+            className="windrose-floating-bar-btn is-active"
             style={{ fontWeight: '600' }}
           >
             Create Region
           </button>
           <button
             onClick={cancelRegion}
-            className="dmt-floating-bar-btn"
+            className="windrose-floating-bar-btn"
           >
             Cancel
           </button>
@@ -526,7 +526,7 @@ const RegionLayer = ({
 
       {/* Name input */}
       {showNameInput && (
-        <div className="dmt-floating-bar">
+        <div className="windrose-floating-bar">
           <input
             type="text"
             placeholder="Region name..."
@@ -534,20 +534,20 @@ const RegionLayer = ({
             onInput={(e: Event) => setRegionName((e.target as HTMLInputElement).value)}
             onKeyDown={handleNameKeyDown}
             ref={(el: HTMLInputElement | null) => { if (el) setTimeout(() => el.focus(), 0); }}
-            className="dmt-floating-bar-input"
+            className="windrose-floating-bar-input"
             style={{ width: '200px', padding: '6px 10px', fontSize: '14px' }}
           />
           <button
             onClick={handleConfirmName}
             disabled={!regionName.trim()}
-            className={`dmt-floating-bar-btn${regionName.trim() ? ' is-active' : ''}`}
+            className={`windrose-floating-bar-btn${regionName.trim() ? ' is-active' : ''}`}
             style={{ cursor: regionName.trim() ? 'pointer' : 'default' }}
           >
             OK
           </button>
           <button
             onClick={handleCancelName}
-            className="dmt-floating-bar-btn"
+            className="windrose-floating-bar-btn"
           >
             Cancel
           </button>

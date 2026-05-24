@@ -223,7 +223,7 @@ const FogOfWarLayer = ({
 
       return (
         <svg
-          className="dmt-fow-preview"
+          className="windrose-fow-preview"
           style={{
             position: 'absolute',
             top: 0,
@@ -256,7 +256,7 @@ const FogOfWarLayer = ({
 
     return (
       <div
-        className="dmt-fow-preview"
+        className="windrose-fow-preview"
         style={{
           position: 'absolute',
           left: `${displayX - halfSize}px`,

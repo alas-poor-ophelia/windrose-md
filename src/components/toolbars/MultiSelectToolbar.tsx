@@ -160,7 +160,7 @@ const MultiSelectToolbar = ({
 
   return (
     <div
-      className="dmt-selection-toolbar dmt-multi-select-toolbar"
+      className="windrose-selection-toolbar windrose-multi-select-toolbar"
       style={{
         position: 'absolute',
         left: `${pos.toolbarX}px`,
@@ -169,20 +169,20 @@ const MultiSelectToolbar = ({
         zIndex: Z_INDEX.TOOLBAR
       }}
     >
-      <div className="dmt-selection-count">
+      <div className="windrose-selection-count">
         <Icon icon="lucide-box-select" size={14} />
         <span>{selectionCount ?? selectedItems.length} selected</span>
       </div>
 
-      <button className="dmt-toolbar-button" onClick={onRotateAll} title="Rotate All 90°">
+      <button className="windrose-toolbar-button" onClick={onRotateAll} title="Rotate All 90°">
         <Icon icon="lucide-rotate-cw" />
       </button>
 
-      <button className="dmt-toolbar-button" onClick={onDuplicateAll} title="Duplicate All">
+      <button className="windrose-toolbar-button" onClick={onDuplicateAll} title="Duplicate All">
         <Icon icon="lucide-copy" />
       </button>
 
-      <button className="dmt-toolbar-button dmt-toolbar-delete-button" onClick={onDeleteAll} title="Delete All">
+      <button className="windrose-toolbar-button windrose-toolbar-delete-button" onClick={onDeleteAll} title="Delete All">
         <Icon icon="lucide-trash-2" />
       </button>
     </div>

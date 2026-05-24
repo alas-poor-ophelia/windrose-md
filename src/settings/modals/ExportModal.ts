@@ -34,7 +34,7 @@ class ExportModal extends Modal {
   onOpen() {
     const { contentEl } = this;
     contentEl.empty();
-    contentEl.addClass('dmt-export-modal');
+    contentEl.addClass('windrose-export-modal');
 
     const mapTypeLabel = this.mapType === 'hex' ? 'Hex' : 'Grid';
     contentEl.createEl('h2', { text: `Export ${mapTypeLabel} Object Customizations` });
@@ -85,7 +85,7 @@ class ExportModal extends Modal {
     if (!hasOverrides && !hasCustom) {
       contentEl.createEl('p', {
         text: `No customizations to export for ${mapTypeLabel} maps. Modify built-in objects or create custom ones first.`,
-        cls: 'dmt-export-empty'
+        cls: 'windrose-export-empty'
       });
       return;
     }

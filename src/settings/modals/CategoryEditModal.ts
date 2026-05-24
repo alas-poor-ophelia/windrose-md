@@ -30,7 +30,7 @@ class CategoryEditModal extends Modal {
   onOpen() {
     const { contentEl } = this;
     contentEl.empty();
-    contentEl.addClass('dmt-category-edit-modal');
+    contentEl.addClass('windrose-category-edit-modal');
 
     const isEditing = !!this.existingCategory;
 
@@ -67,7 +67,7 @@ class CategoryEditModal extends Modal {
           }
         }));
 
-    const buttonContainer = contentEl.createDiv({ cls: 'dmt-modal-buttons' });
+    const buttonContainer = contentEl.createDiv({ cls: 'windrose-modal-buttons' });
 
     const cancelBtn = buttonContainer.createEl('button', { text: 'Cancel' });
     cancelBtn.onclick = () => this.close();

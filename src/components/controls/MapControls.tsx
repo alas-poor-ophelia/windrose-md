@@ -176,20 +176,20 @@ const MapControls = ({
         {/* Invisible overlay to capture taps outside controls (touch capable devices, not when always showing) */}
         {hasTouchCapability && controlsRevealed && !alwaysShowControls && (
           <div 
-            className="dmt-controls-overlay"
+            className="windrose-controls-overlay"
             onClick={handleOverlayClick}
             onTouchStart={handleOverlayClick}
           />
         )}
         
         <div 
-          className="dmt-controls"
+          className="windrose-controls"
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
         >
           {/* Expand/Collapse Button - Above compass, animates last */}
           <button
-            className={`dmt-expand-btn dmt-drawer-item dmt-drawer-item-up ${controlsRevealed ? 'dmt-drawer-item-visible' : ''}`}
+            className={`windrose-expand-btn windrose-drawer-item windrose-drawer-item-up ${controlsRevealed ? 'windrose-drawer-item-visible' : ''}`}
             style={getExpandStyle()}
             onClick={handleControlInteraction(onToggleExpand)}
             title={isExpanded ? "Collapse to normal width" : "Expand to full width"}
@@ -199,32 +199,32 @@ const MapControls = ({
           
           {/* Compass Rose - Always visible anchor, slides down on reveal */}
           <div 
-            className={`dmt-compass dmt-compass-animated ${controlsRevealed ? 'dmt-compass-revealed' : ''}`}
+            className={`windrose-compass windrose-compass-animated ${controlsRevealed ? 'windrose-compass-revealed' : ''}`}
             onClick={handleCompassClick}
             title={getCompassTitle()}
           >
-            <WindroseCompass rotation={northDirection} className="dmt-compass-svg" />
+            <WindroseCompass rotation={northDirection} className="windrose-compass-svg" />
           </div>
           
           {/* Collapsible controls container - Below compass */}
-          <div className={`dmt-controls-drawer ${controlsRevealed ? 'dmt-controls-drawer-open' : ''}`}>
+          <div className={`windrose-controls-drawer ${controlsRevealed ? 'windrose-controls-drawer-open' : ''}`}>
             {/* Zoom Controls */}
             <div 
-              className={`dmt-zoom-controls dmt-drawer-item ${controlsRevealed ? 'dmt-drawer-item-visible' : ''}`}
+              className={`windrose-zoom-controls windrose-drawer-item ${controlsRevealed ? 'windrose-drawer-item-visible' : ''}`}
               style={getDrawerItemStyle(0)}
             >
               <button
-                className="dmt-zoom-btn"
+                className="windrose-zoom-btn"
                 onClick={handleControlInteraction(onZoomIn)}
                 title="Zoom In"
               >
                 +
               </button>
-              <div className="dmt-zoom-level" title={`Zoom: ${Math.round(currentZoom * 100)}%`}>
+              <div className="windrose-zoom-level" title={`Zoom: ${Math.round(currentZoom * 100)}%`}>
                 {Math.round(currentZoom * 100)}%
               </div>
               <button 
-                className="dmt-zoom-btn"
+                className="windrose-zoom-btn"
                 onClick={handleControlInteraction(onZoomOut)}
                 title="Zoom Out"
               >
@@ -234,7 +234,7 @@ const MapControls = ({
             
             {/* Layer Panel Toggle Button */}
             <button
-              className={`dmt-expand-btn dmt-drawer-item ${showLayerPanel ? 'dmt-expand-btn-active' : ''} ${controlsRevealed ? 'dmt-drawer-item-visible' : ''}`}
+              className={`windrose-expand-btn windrose-drawer-item ${showLayerPanel ? 'windrose-expand-btn-active' : ''} ${controlsRevealed ? 'windrose-drawer-item-visible' : ''}`}
               style={getDrawerItemStyle(1)}
               onClick={handleControlInteraction(onToggleLayerPanel)}
               title="Toggle layer panel"
@@ -245,7 +245,7 @@ const MapControls = ({
             {/* Region Panel Toggle Button (hex maps only) */}
             {mapType === 'hex' && onToggleRegionPanel && (
               <button
-                className={`dmt-expand-btn dmt-drawer-item ${showRegionPanel === true ? 'dmt-expand-btn-active' : ''} ${controlsRevealed ? 'dmt-drawer-item-visible' : ''}`}
+                className={`windrose-expand-btn windrose-drawer-item ${showRegionPanel === true ? 'windrose-expand-btn-active' : ''} ${controlsRevealed ? 'windrose-drawer-item-visible' : ''}`}
                 style={getDrawerItemStyle(2)}
                 onClick={handleControlInteraction(onToggleRegionPanel)}
                 title="Toggle region panel"
@@ -256,7 +256,7 @@ const MapControls = ({
 
             {/* Visibility Toggle Button */}
             <button
-              className={`dmt-expand-btn dmt-drawer-item ${showVisibilityToolbar ? 'dmt-expand-btn-active' : ''} ${controlsRevealed ? 'dmt-drawer-item-visible' : ''}`}
+              className={`windrose-expand-btn windrose-drawer-item ${showVisibilityToolbar ? 'windrose-expand-btn-active' : ''} ${controlsRevealed ? 'windrose-drawer-item-visible' : ''}`}
               style={getDrawerItemStyle(
                 2 + (mapType === 'hex' && onToggleRegionPanel ? 1 : 0)
               )}
@@ -268,7 +268,7 @@ const MapControls = ({
 
             {/* Settings Button */}
             <button
-              className={`dmt-expand-btn dmt-drawer-item ${controlsRevealed ? 'dmt-drawer-item-visible' : ''}`}
+              className={`windrose-expand-btn windrose-drawer-item ${controlsRevealed ? 'windrose-drawer-item-visible' : ''}`}
               style={getDrawerItemStyle(
                 3 + (mapType === 'hex' && onToggleRegionPanel ? 1 : 0)
               )}

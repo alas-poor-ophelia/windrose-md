@@ -93,41 +93,41 @@ class ObjectEditModal extends Modal {
   onOpen() {
     const { contentEl } = this;
     contentEl.empty();
-    contentEl.addClass('dmt-object-edit-modal');
+    contentEl.addClass('windrose-object-edit-modal');
 
     const isEditing = !!this.existingObject;
 
     contentEl.createEl('h2', { text: isEditing ? 'Edit Object' : 'Create Custom Object' });
 
     // Mode toggle (symbol / icon / image)
-    const toggleContainer = contentEl.createDiv({ cls: 'dmt-icon-type-toggle' });
+    const toggleContainer = contentEl.createDiv({ cls: 'windrose-icon-type-toggle' });
 
     const unicodeBtn = toggleContainer.createEl('button', {
       text: 'Unicode Symbol',
-      cls: 'dmt-icon-type-btn' + (this.mode === 'symbol' ? ' active' : ''),
+      cls: 'windrose-icon-type-btn' + (this.mode === 'symbol' ? ' active' : ''),
       attr: { type: 'button' }
     });
 
     const iconBtn = toggleContainer.createEl('button', {
       text: 'RPGAwesome Icon',
-      cls: 'dmt-icon-type-btn' + (this.mode === 'icon' ? ' active' : ''),
+      cls: 'windrose-icon-type-btn' + (this.mode === 'icon' ? ' active' : ''),
       attr: { type: 'button' }
     });
 
     const imageBtn = toggleContainer.createEl('button', {
       text: 'Custom Image',
-      cls: 'dmt-icon-type-btn' + (this.mode === 'image' ? ' active' : ''),
+      cls: 'windrose-icon-type-btn' + (this.mode === 'image' ? ' active' : ''),
       attr: { type: 'button' }
     });
 
     // Container for symbol input (shown when mode is 'symbol')
-    this.symbolContainer = contentEl.createDiv({ cls: 'dmt-symbol-container' });
+    this.symbolContainer = contentEl.createDiv({ cls: 'windrose-symbol-container' });
 
     // Container for icon picker (shown when mode is 'icon')
-    this.iconPickerContainer = contentEl.createDiv({ cls: 'dmt-icon-picker-container' });
+    this.iconPickerContainer = contentEl.createDiv({ cls: 'windrose-icon-picker-container' });
 
     // Container for image picker (shown when mode is 'image')
-    this.imagePickerContainer = contentEl.createDiv({ cls: 'dmt-image-picker-container' });
+    this.imagePickerContainer = contentEl.createDiv({ cls: 'windrose-image-picker-container' });
 
     // Store button references for updating active state
     this.modeButtons = { symbol: unicodeBtn, icon: iconBtn, image: imageBtn };
@@ -191,7 +191,7 @@ class ObjectEditModal extends Modal {
       });
 
     // Buttons
-    const buttonContainer = contentEl.createDiv({ cls: 'dmt-modal-buttons' });
+    const buttonContainer = contentEl.createDiv({ cls: 'windrose-modal-buttons' });
 
     const cancelBtn = buttonContainer.createEl('button', { text: 'Cancel' });
     cancelBtn.onclick = () => this.close();
@@ -233,7 +233,7 @@ class ObjectEditModal extends Modal {
 
     const symbolInput = symbolSetting.controlEl.createEl('input', {
       type: 'text',
-      cls: 'dmt-symbol-input',
+      cls: 'windrose-symbol-input',
       value: this.symbol,
       attr: { placeholder: 'Paste symbol...' }
     });
@@ -246,20 +246,20 @@ class ObjectEditModal extends Modal {
     setTimeout(() => symbolInput.focus(), 50);
 
     // Symbol preview
-    const previewEl = symbolSetting.controlEl.createDiv({ cls: 'dmt-symbol-preview' });
+    const previewEl = symbolSetting.controlEl.createDiv({ cls: 'windrose-symbol-preview' });
     previewEl.textContent = this.symbol || '?';
     this.symbolPreviewEl = previewEl;
     this.symbolInputEl = symbolInput;
 
     // Quick symbols
-    const quickSymbolsContainer = container.createDiv({ cls: 'dmt-quick-symbols' });
-    quickSymbolsContainer.createEl('label', { text: 'Quick Symbols', cls: 'dmt-quick-symbols-label' });
-    const symbolGrid = quickSymbolsContainer.createDiv({ cls: 'dmt-quick-symbols-grid' });
+    const quickSymbolsContainer = container.createDiv({ cls: 'windrose-quick-symbols' });
+    quickSymbolsContainer.createEl('label', { text: 'Quick Symbols', cls: 'windrose-quick-symbols-label' });
+    const symbolGrid = quickSymbolsContainer.createDiv({ cls: 'windrose-quick-symbols-grid' });
 
     for (const sym of QUICK_SYMBOLS) {
       const symBtn = symbolGrid.createEl('button', {
         text: sym,
-        cls: 'dmt-quick-symbol-btn',
+        cls: 'windrose-quick-symbol-btn',
         attr: { type: 'button' }
       });
       symBtn.onclick = () => {
@@ -280,10 +280,10 @@ class ObjectEditModal extends Modal {
     }
     container.style.display = 'block';
 
-    const picker = container.createDiv({ cls: 'dmt-icon-picker' });
+    const picker = container.createDiv({ cls: 'windrose-icon-picker' });
 
     // Search input
-    const searchContainer = picker.createDiv({ cls: 'dmt-icon-picker-search' });
+    const searchContainer = picker.createDiv({ cls: 'windrose-icon-picker-search' });
     const searchInput = searchContainer.createEl('input', {
       type: 'text',
       value: this.iconSearchQuery,
@@ -295,12 +295,12 @@ class ObjectEditModal extends Modal {
     });
 
     // Category tabs
-    const tabsContainer = picker.createDiv({ cls: 'dmt-icon-picker-tabs' });
+    const tabsContainer = picker.createDiv({ cls: 'windrose-icon-picker-tabs' });
 
     // "All" tab
     const allTab = tabsContainer.createEl('button', {
       text: 'All',
-      cls: 'dmt-icon-picker-tab' + (this.iconCategory === 'all' ? ' active' : ''),
+      cls: 'windrose-icon-picker-tab' + (this.iconCategory === 'all' ? ' active' : ''),
       attr: { type: 'button' }
     });
     allTab.onclick = () => {
@@ -314,7 +314,7 @@ class ObjectEditModal extends Modal {
     for (const cat of categories) {
       const tab = tabsContainer.createEl('button', {
         text: cat.label,
-        cls: 'dmt-icon-picker-tab' + (this.iconCategory === cat.id ? ' active' : ''),
+        cls: 'windrose-icon-picker-tab' + (this.iconCategory === cat.id ? ' active' : ''),
         attr: { type: 'button', 'data-category': cat.id }
       });
       tab.onclick = () => {
@@ -326,17 +326,17 @@ class ObjectEditModal extends Modal {
     this.tabsContainer = tabsContainer;
 
     // Icon grid
-    this.iconGridContainer = picker.createDiv({ cls: 'dmt-icon-picker-grid' });
+    this.iconGridContainer = picker.createDiv({ cls: 'windrose-icon-picker-grid' });
     this.renderIconGrid();
 
     // Selected icon preview
-    this.iconPreviewContainer = picker.createDiv({ cls: 'dmt-icon-preview-row' });
+    this.iconPreviewContainer = picker.createDiv({ cls: 'windrose-icon-preview-row' });
     this.updateIconPreview();
   }
 
   renderIconTabs(container: HTMLDivElement) {
     // Update active state on all tabs
-    const tabs = container.querySelectorAll('.dmt-icon-picker-tab');
+    const tabs = container.querySelectorAll('.windrose-icon-picker-tab');
     tabs.forEach(tab => {
       const catId = tab.getAttribute('data-category') || 'all';
       if (catId === this.iconCategory) {
@@ -361,14 +361,14 @@ class ObjectEditModal extends Modal {
     }
 
     if (icons.length === 0) {
-      container.createDiv({ cls: 'dmt-icon-picker-empty', text: 'No icons found' });
+      container.createDiv({ cls: 'windrose-icon-picker-empty', text: 'No icons found' });
       return;
     }
 
     // Render icon buttons
     for (const icon of icons) {
       const iconBtn = container.createEl('button', {
-        cls: 'dmt-icon-picker-icon' + (this.iconClass === icon.iconClass ? ' selected' : ''),
+        cls: 'windrose-icon-picker-icon' + (this.iconClass === icon.iconClass ? ' selected' : ''),
         attr: {
           type: 'button',
           title: icon.label
@@ -382,7 +382,7 @@ class ObjectEditModal extends Modal {
       iconBtn.onclick = () => {
         this.iconClass = icon.iconClass;
         // Update selection state
-        container.querySelectorAll('.dmt-icon-picker-icon').forEach(btn => (btn as HTMLElement).removeClass('selected'));
+        container.querySelectorAll('.windrose-icon-picker-icon').forEach(btn => (btn as HTMLElement).removeClass('selected'));
         iconBtn.addClass('selected');
         this.updateIconPreview();
       };
@@ -401,25 +401,25 @@ class ObjectEditModal extends Modal {
     container.empty();
 
     if (!this.iconClass) {
-      container.createDiv({ cls: 'dmt-icon-preview-info', text: 'Select an icon above' });
+      container.createDiv({ cls: 'windrose-icon-preview-info', text: 'Select an icon above' });
       return;
     }
 
     const iconInfo = RPGAwesomeHelpers.getInfo(this.iconClass);
     if (!iconInfo) {
-      container.createDiv({ cls: 'dmt-icon-preview-info', text: 'Invalid icon selected' });
+      container.createDiv({ cls: 'windrose-icon-preview-info', text: 'Invalid icon selected' });
       return;
     }
 
     // Large preview
-    const previewBox = container.createDiv({ cls: 'dmt-icon-preview-large' });
+    const previewBox = container.createDiv({ cls: 'windrose-icon-preview-large' });
     const iconSpan = previewBox.createEl('span', { cls: 'ra' });
     iconSpan.textContent = iconInfo.char;
 
     // Info
-    const infoBox = container.createDiv({ cls: 'dmt-icon-preview-info' });
-    infoBox.createDiv({ cls: 'dmt-icon-preview-label', text: iconInfo.label });
-    infoBox.createDiv({ cls: 'dmt-icon-preview-class', text: this.iconClass });
+    const infoBox = container.createDiv({ cls: 'windrose-icon-preview-info' });
+    infoBox.createDiv({ cls: 'windrose-icon-preview-label', text: iconInfo.label });
+    infoBox.createDiv({ cls: 'windrose-icon-preview-class', text: this.iconClass });
   }
 
   renderImagePicker() {
@@ -435,11 +435,11 @@ class ObjectEditModal extends Modal {
     // Info text
     container.createEl('p', {
       text: 'Select an image from your vault to use as this object\'s icon.',
-      cls: 'dmt-image-picker-info'
+      cls: 'windrose-image-picker-info'
     });
 
     // Image search input
-    const searchContainer = container.createDiv({ cls: 'dmt-image-picker-search' });
+    const searchContainer = container.createDiv({ cls: 'windrose-image-picker-search' });
     const searchInput = searchContainer.createEl('input', {
       type: 'text',
       value: this.imageSearchQuery,
@@ -450,7 +450,7 @@ class ObjectEditModal extends Modal {
     if (this.imagePath) {
       const clearBtn = searchContainer.createEl('button', {
         text: 'x',
-        cls: 'dmt-image-clear-btn',
+        cls: 'windrose-image-clear-btn',
         attr: { type: 'button', title: 'Clear image' }
       });
       clearBtn.onclick = () => {
@@ -467,19 +467,19 @@ class ObjectEditModal extends Modal {
     });
 
     // Search results dropdown
-    this.imageResultsContainer = container.createDiv({ cls: 'dmt-image-search-results' });
+    this.imageResultsContainer = container.createDiv({ cls: 'windrose-image-search-results' });
     this.renderImageSearchResults();
 
     // Preview
     if (this.imagePath) {
-      const previewContainer = container.createDiv({ cls: 'dmt-image-preview' });
+      const previewContainer = container.createDiv({ cls: 'windrose-image-preview' });
       previewContainer.createEl('p', {
         text: 'Selected: ' + this.getImageDisplayName(this.imagePath),
-        cls: 'dmt-image-preview-label'
+        cls: 'windrose-image-preview-label'
       });
       // Try to show the image preview
       const imgPreview = previewContainer.createEl('img', {
-        cls: 'dmt-image-preview-img',
+        cls: 'windrose-image-preview-img',
         attr: { src: this.app.vault.adapter.getResourcePath(this.imagePath) }
       });
       imgPreview.style.maxWidth = '100px';
@@ -519,7 +519,7 @@ class ObjectEditModal extends Modal {
     if (this.imageSearchResults.length === 0) return;
 
     for (const path of this.imageSearchResults) {
-      const item = container.createDiv({ cls: 'dmt-image-search-result' });
+      const item = container.createDiv({ cls: 'windrose-image-search-result' });
       item.textContent = this.getImageDisplayName(path);
       item.onclick = () => {
         this.imagePath = path;

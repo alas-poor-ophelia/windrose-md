@@ -278,7 +278,7 @@ const LayerControls = ({
   return (
       <div
         ref={controlsRef}
-        className={`dmt-layer-controls ${sidebarCollapsed ? 'sidebar-closed' : 'sidebar-open'} ${isOpen ? 'dmt-layer-controls-open' : ''}`}
+        className={`windrose-layer-controls ${sidebarCollapsed ? 'sidebar-closed' : 'sidebar-open'} ${isOpen ? 'windrose-layer-controls-open' : ''}`}
       >
         {reversedLayers.map((layer, visualIndex) => {
           const isActive = layer.id === activeLayerId;
@@ -290,7 +290,7 @@ const LayerControls = ({
           return (
             <div
               key={layer.id}
-              className="dmt-layer-btn-wrapper"
+              className="windrose-layer-btn-wrapper"
               draggable
               onDragStart={(e) => handleDragStart(layer.id, visualIndex, e)}
               onDragOver={(e) => handleDragOver(visualIndex, e)}
@@ -303,7 +303,7 @@ const LayerControls = ({
                 if (info == null) return null;
                 return (
                   <button
-                    className={`dmt-layer-btn ${info.isPill ? 'dmt-layer-btn-pill' : ''} ${isActive ? 'dmt-layer-btn-active' : ''} ${isDragging ? 'dragging' : ''} ${isDragOver ? 'drag-over' : ''}`}
+                    className={`windrose-layer-btn ${info.isPill ? 'windrose-layer-btn-pill' : ''} ${isActive ? 'windrose-layer-btn-active' : ''} ${isDragging ? 'dragging' : ''} ${isDragOver ? 'drag-over' : ''}`}
                     onClick={(e) => handleLayerClick(layer.id, e)}
                     onContextMenu={(e) => handleContextMenu(layer.id, e)}
                     onTouchStart={() => handleTouchStart(layer.id)}
@@ -312,25 +312,25 @@ const LayerControls = ({
                     title={`${layer.name}${isActive ? ' (active)' : ''} - Right-click for options`}
                   >
                     {info.icon && (
-                      <span className={`dmt-layer-icon ${info.icon.isRpgAwesome ? 'ra' : ''}`}>
+                      <span className={`windrose-layer-icon ${info.icon.isRpgAwesome ? 'ra' : ''}`}>
                         {info.icon.char}
                       </span>
                     )}
-                    <span className="dmt-layer-name">{info.displayName}</span>
+                    <span className="windrose-layer-name">{info.displayName}</span>
                   </button>
                 );
               })()}
 
-              <div className={`dmt-layer-options ${isExpanded ? 'expanded' : ''}`}>
+              <div className={`windrose-layer-options ${isExpanded ? 'expanded' : ''}`}>
                 <button
-                  className="dmt-layer-option-btn edit"
+                  className="windrose-layer-option-btn edit"
                   onClick={(e) => handleEdit(layer.id, e)}
                   title="Edit layer"
                 >
                   <Icon icon="lucide-pencil" />
                 </button>
                 <button
-                  className="dmt-layer-option-btn clone"
+                  className="windrose-layer-option-btn clone"
                   onClick={(e) => handleClone(layer.id, e)}
                   title="Clone layer"
                 >
@@ -338,7 +338,7 @@ const LayerControls = ({
                 </button>
                 {canDelete && (
                   <button
-                    className="dmt-layer-option-btn delete"
+                    className="windrose-layer-option-btn delete"
                     onClick={(e) => handleDelete(layer.id, e)}
                     title="Delete layer"
                   >
@@ -346,12 +346,12 @@ const LayerControls = ({
                   </button>
                 )}
                 <div
-                  className="dmt-layer-transparency-wrapper"
+                  className="windrose-layer-transparency-wrapper"
                   onMouseEnter={() => handleSliderAreaEnter(layer.id)}
                   onMouseLeave={handleSliderAreaLeave}
                 >
                   <button
-                    className={`dmt-layer-option-btn transparency ${layer.showLayerBelow === true ? 'active' : ''}`}
+                    className={`windrose-layer-option-btn transparency ${layer.showLayerBelow === true ? 'active' : ''}`}
                     onClick={(e) => handleTransparencyToggle(layer.id, e)}
                     title={layer.showLayerBelow === true ? 'Hide layer below' : 'Show layer below'}
                   >
@@ -359,7 +359,7 @@ const LayerControls = ({
                   </button>
                   {sliderHoveredLayerId === layer.id && layer.showLayerBelow === true && (
                     <div
-                      className="dmt-opacity-slider-popup"
+                      className="windrose-opacity-slider-popup"
                       onMouseEnter={() => handleSliderAreaEnter(layer.id)}
                       onMouseLeave={handleSliderAreaLeave}
                     >
@@ -370,9 +370,9 @@ const LayerControls = ({
                         step="0.05"
                         value={layer.layerBelowOpacity ?? 0.25}
                         onChange={(e) => handleOpacityChange(layer.id, e)}
-                        className="dmt-opacity-slider"
+                        className="windrose-opacity-slider"
                       />
-                      <span className="dmt-opacity-value">
+                      <span className="windrose-opacity-value">
                         {Math.round((layer.layerBelowOpacity ?? 0.25) * 100)}%
                       </span>
                     </div>
@@ -384,7 +384,7 @@ const LayerControls = ({
         })}
 
         <button
-          className="dmt-layer-add-btn"
+          className="windrose-layer-add-btn"
           onClick={onLayerAdd}
           title="Add new layer"
         >

@@ -9,7 +9,7 @@ import { InsertDungeonModal } from './settings/modals/InsertDungeonModal';
 import * as dungeonGenerator from './generation/dungeonGenerator';
 import * as objectPlacer from './generation/objectPlacer';
 import { registerDeepLinks } from './core/deepLinkRegistration';
-import { setPlugin, clearPlugin } from './core/settingsAccessor';
+import { setPlugin, clearPlugin, FALLBACK_SETTINGS } from './core/settingsAccessor';
 import { WindroseMDSettingsTab } from './settings/WindroseSettingsTab';
 
 /** Cell produced by the dungeon generator with grid coordinates. */
@@ -156,7 +156,7 @@ export default class WindrosePlugin extends Plugin {
   }
 
   private async migrateFromOldPlugin(): Promise<void> {
-    if (Object.keys(this.settings).length > 0) return;
+    if (await this.loadData() != null) return;
 
     const oldDataPath = `${this.app.vault.configDir}/plugins/dungeon-map-tracker-settings/data.json`;
     try {
@@ -166,7 +166,7 @@ export default class WindrosePlugin extends Plugin {
       const oldSettings = JSON.parse(content) as Record<string, unknown>;
 
       const { version, ...importable } = oldSettings;
-      this.settings = importable as unknown as PluginSettings;
+      this.settings = { ...FALLBACK_SETTINGS, ...importable } as PluginSettings;
       await this.saveData(this.settings);
 
       new Notice('Windrose: settings imported from previous installation.', 10000);
@@ -356,12 +356,13 @@ export default class WindrosePlugin extends Plugin {
   }
 
   async loadSettings(): Promise<void> {
-    this.settings = ((await this.loadData()) ?? {}) as PluginSettings;
+    const loaded = (await this.loadData()) as Partial<PluginSettings> | null;
+    this.settings = { ...FALLBACK_SETTINGS, ...loaded };
   }
 
   async saveSettings(): Promise<void> {
     await this.saveData(this.settings);
-    window.dispatchEvent(new CustomEvent('dmt-settings-changed'));
+    window.dispatchEvent(new CustomEvent('windrose-settings-changed'));
   }
 }
 

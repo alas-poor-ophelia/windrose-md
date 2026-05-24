@@ -58,11 +58,11 @@ export const TabRenderKeyboardShortcutsMethods = {
         .setName(action.label)
         .setDesc(action.scope);
 
-      const kbdContainer = setting.controlEl.createDiv({ cls: 'dmt-kbd-container' });
+      const kbdContainer = setting.controlEl.createDiv({ cls: 'windrose-kbd-container' });
 
       const kbdEl = kbdContainer.createEl('kbd', {
         text: formatKey(currentKey),
-        cls: 'dmt-kbd-key'
+        cls: 'windrose-kbd-key'
       });
       kbdEl.style.cssText = 'cursor:pointer; padding:2px 8px; border:1px solid var(--background-modifier-border); border-radius:4px; font-family:var(--font-monospace); font-size:0.85em; min-width:24px; text-align:center; display:inline-block; background:var(--background-secondary);';
 

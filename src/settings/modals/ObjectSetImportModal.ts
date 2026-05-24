@@ -23,7 +23,7 @@ class ObjectSetImportModal extends Modal {
   onOpen() {
     const { contentEl } = this;
     contentEl.empty();
-    contentEl.addClass('dmt-import-modal');
+    contentEl.addClass('windrose-import-modal');
 
     contentEl.createEl('h2', { text: 'Import Object Set from Folder' });
 
@@ -33,7 +33,7 @@ class ObjectSetImportModal extends Modal {
     });
 
     let folderPath = '';
-    const previewArea = contentEl.createDiv({ cls: 'dmt-import-preview' });
+    const previewArea = contentEl.createDiv({ cls: 'windrose-import-preview' });
     previewArea.style.display = 'none';
 
     new Setting(contentEl)
@@ -51,21 +51,21 @@ class ObjectSetImportModal extends Modal {
           previewArea.empty();
 
           if (!folderPath) {
-            previewArea.createEl('p', { text: 'Enter a folder path first.', cls: 'dmt-import-error' });
+            previewArea.createEl('p', { text: 'Enter a folder path first.', cls: 'windrose-import-error' });
             previewArea.style.display = 'block';
             return;
           }
 
           const folder = this.app.vault.getAbstractFileByPath(folderPath) as { children?: unknown[] } | null;
           if (!folder || !folder.children) {
-            previewArea.createEl('p', { text: 'Folder not found: ' + folderPath, cls: 'dmt-import-error' });
+            previewArea.createEl('p', { text: 'Folder not found: ' + folderPath, cls: 'windrose-import-error' });
             previewArea.style.display = 'block';
             return;
           }
 
           const jsonFile = this.app.vault.getAbstractFileByPath(folderPath + '/objects.json');
           if (!jsonFile) {
-            previewArea.createEl('p', { text: 'No objects.json found in this folder.', cls: 'dmt-import-error' });
+            previewArea.createEl('p', { text: 'No objects.json found in this folder.', cls: 'windrose-import-error' });
             previewArea.style.display = 'block';
             return;
           }
@@ -75,7 +75,7 @@ class ObjectSetImportModal extends Modal {
             const data = JSON.parse(content) as Record<string, unknown>;
 
             if (!data.windroseMD_objectSet) {
-              previewArea.createEl('p', { text: 'Not a valid Windrose object set.', cls: 'dmt-import-error' });
+              previewArea.createEl('p', { text: 'Not a valid Windrose object set.', cls: 'windrose-import-error' });
               previewArea.style.display = 'block';
               return;
             }
@@ -104,18 +104,18 @@ class ObjectSetImportModal extends Modal {
             if (existing) {
               previewArea.createEl('p', {
                 text: 'A set named "' + (data.name as string) + '" already exists. It will be imported with a unique name.',
-                cls: 'dmt-import-note'
+                cls: 'windrose-import-note'
               });
             }
 
             previewArea.style.display = 'block';
           } catch (err: unknown) {
-            previewArea.createEl('p', { text: 'Error reading: ' + (err as Error).message, cls: 'dmt-import-error' });
+            previewArea.createEl('p', { text: 'Error reading: ' + (err as Error).message, cls: 'windrose-import-error' });
             previewArea.style.display = 'block';
           }
         }));
 
-    const buttons = contentEl.createDiv({ cls: 'dmt-modal-buttons' });
+    const buttons = contentEl.createDiv({ cls: 'windrose-modal-buttons' });
 
     const cancelBtn = buttons.createEl('button', { text: 'Cancel' });
     cancelBtn.onclick = () => this.close();

@@ -31,12 +31,12 @@ const LinkingModeBanner = ({ linkingFrom, onCancel }: LinkingModeBannerProps): V
   }, [onCancel]);
 
   return (
-    <div className="dmt-linking-banner">
-      <div className="dmt-linking-banner-content">
+    <div className="windrose-linking-banner">
+      <div className="windrose-linking-banner-content">
         <Icon icon="lucide-link-2" />
         <span>Linking from <strong>{objectLabel}</strong> - click target object</span>
         <button
-          className="dmt-linking-banner-cancel"
+          className="windrose-linking-banner-cancel"
           onClick={onCancel}
           title="Cancel (Esc)"
         >

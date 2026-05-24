@@ -143,7 +143,7 @@ const TileThumbnail = ({ tile, getCachedImage }: TileThumbnailProps): VNode => {
   }, [tile.vaultPath]);
 
   return (
-    <canvas ref={canvasRef} className="dmt-tile-thumb-img" width={THUMB_SIZE} height={THUMB_SIZE} />
+    <canvas ref={canvasRef} className="windrose-tile-thumb-img" width={THUMB_SIZE} height={THUMB_SIZE} />
   );
 };
 
@@ -260,13 +260,13 @@ const TileAssetBrowser = ({
     // Create portal div if needed
     if (!portalRef.current) {
       const div = document.createElement('div');
-      div.className = 'dmt-tile-preview-portal';
+      div.className = 'windrose-tile-preview-portal';
       const canvas = document.createElement('canvas');
       canvas.width = PREVIEW_SIZE;
       canvas.height = PREVIEW_SIZE;
       canvas.classList.add('windrose-tile-preview-canvas');
       const label = document.createElement('div');
-      label.className = 'dmt-tile-preview-label';
+      label.className = 'windrose-tile-preview-label';
       div.appendChild(canvas);
       div.appendChild(label);
       document.body.appendChild(div);
@@ -277,7 +277,7 @@ const TileAssetBrowser = ({
     const portal = portalRef.current;
     const canvas = previewRef.current;
     if (canvas == null) return undefined;
-    const label = portal.querySelector('.dmt-tile-preview-label') as HTMLElement;
+    const label = portal.querySelector('.windrose-tile-preview-label') as HTMLElement;
 
     // Position to the left of the browser panel
     if (browserRef.current) {
@@ -357,9 +357,9 @@ const TileAssetBrowser = ({
 
   if (isCollapsed) {
     return (
-      <div className="dmt-tile-browser dmt-tile-browser-collapsed">
+      <div className="windrose-tile-browser windrose-tile-browser-collapsed">
         <button
-          className="dmt-tile-browser-toggle interactive-child"
+          className="windrose-tile-browser-toggle interactive-child"
           onClick={handleToggleCollapse}
           title="Show tiles"
         >
@@ -370,19 +370,19 @@ const TileAssetBrowser = ({
   }
 
   return (
-    <div ref={browserRef} className="dmt-tile-browser">
-      <div className="dmt-tile-browser-header">
+    <div ref={browserRef} className="windrose-tile-browser">
+      <div className="windrose-tile-browser-header">
         <span>Tiles</span>
-        <div className="dmt-tile-browser-layer-toggle">
+        <div className="windrose-tile-browser-layer-toggle">
           <button
-            className={`dmt-tile-browser-layer-btn ${tileLayer === 'base' ? 'dmt-tile-browser-layer-active' : ''}`}
+            className={`windrose-tile-browser-layer-btn ${tileLayer === 'base' ? 'windrose-tile-browser-layer-active' : ''}`}
             onClick={() => onTileLayerChange('base')}
             title="Base layer: terrain tiles"
           >
             Base
           </button>
           <button
-            className={`dmt-tile-browser-layer-btn ${tileLayer === 'overlay' ? 'dmt-tile-browser-layer-active' : ''}`}
+            className={`windrose-tile-browser-layer-btn ${tileLayer === 'overlay' ? 'windrose-tile-browser-layer-active' : ''}`}
             onClick={() => onTileLayerChange('overlay')}
             title="Overlay layer: stamp tiles atop base"
           >
@@ -390,7 +390,7 @@ const TileAssetBrowser = ({
           </button>
         </div>
         <button
-          className="dmt-sidebar-collapse-btn interactive-child"
+          className="windrose-sidebar-collapse-btn interactive-child"
           onClick={handleToggleCollapse}
           title="Hide tile browser"
         >
@@ -399,12 +399,12 @@ const TileAssetBrowser = ({
       </div>
 
       {/* Tileset selector + config gear */}
-      <div className="dmt-tile-browser-tileset-selector">
+      <div className="windrose-tile-browser-tileset-selector">
         {tilesets.length > 1 && (
           <select
             value={activeTilesetIndex}
             onChange={(e: Event) => setActiveTilesetIndex(parseInt((e.target as HTMLSelectElement).value, 10))}
-            className="dmt-tile-browser-select"
+            className="windrose-tile-browser-select"
           >
             {tilesets.map((ts: TilesetDef, i: number) => (
               <option key={ts.id} value={i}>{ts.name}</option>
@@ -412,11 +412,11 @@ const TileAssetBrowser = ({
           </select>
         )}
         {tilesets.length === 1 && (
-          <span className="dmt-tile-browser-tileset-name">{tilesets[0].name}</span>
+          <span className="windrose-tile-browser-tileset-name">{tilesets[0].name}</span>
         )}
         {onTilesetOverrideChange != null && activeTileset != null && (
           <button
-            className="dmt-tile-browser-config-btn clickable-icon"
+            className="windrose-tile-browser-config-btn clickable-icon"
             onClick={() => setShowTilesetConfig(!showTilesetConfig)}
             title="Tileset rendering settings"
           >
@@ -440,8 +440,8 @@ const TileAssetBrowser = ({
         };
 
         return (
-          <div className="dmt-tile-browser-config">
-            <div className="dmt-tile-config-row">
+          <div className="windrose-tile-browser-config">
+            <div className="windrose-tile-config-row">
               <label>Fit Mode</label>
               <select
                 value={fitMode || 'auto'}
@@ -449,14 +449,14 @@ const TileAssetBrowser = ({
                   const v = (e.target as HTMLSelectElement).value;
                   handleOverrideChange('fitMode', v === 'auto' ? undefined : v as 'fill' | 'contain');
                 }}
-                className="dmt-tile-config-select"
+                className="windrose-tile-config-select"
               >
                 <option value="auto">Auto</option>
                 <option value="fill">Fill</option>
                 <option value="contain">Contain</option>
               </select>
             </div>
-            <div className="dmt-tile-config-row">
+            <div className="windrose-tile-config-row">
               <label>Stamp threshold</label>
               <input
                 type="range"
@@ -465,11 +465,11 @@ const TileAssetBrowser = ({
                 step="0.05"
                 value={threshold}
                 onInput={(e: Event) => handleOverrideChange('stampThreshold', parseFloat((e.target as HTMLInputElement).value))}
-                className="dmt-tile-config-slider"
+                className="windrose-tile-config-slider"
               />
-              <span className="dmt-tile-config-value">{(threshold * 100).toFixed(0)}%</span>
+              <span className="windrose-tile-config-value">{(threshold * 100).toFixed(0)}%</span>
             </div>
-            <div className="dmt-tile-config-row">
+            <div className="windrose-tile-config-row">
               <label>Min stamp size</label>
               <input
                 type="range"
@@ -478,31 +478,31 @@ const TileAssetBrowser = ({
                 step="0.05"
                 value={minScale}
                 onInput={(e: Event) => handleOverrideChange('minStampScale', parseFloat((e.target as HTMLInputElement).value))}
-                className="dmt-tile-config-slider"
+                className="windrose-tile-config-slider"
               />
-              <span className="dmt-tile-config-value">{(minScale * 100).toFixed(0)}%</span>
+              <span className="windrose-tile-config-value">{(minScale * 100).toFixed(0)}%</span>
             </div>
           </div>
         );
       })()}
 
       {/* Search filter */}
-      <div className="dmt-tile-browser-search">
+      <div className="windrose-tile-browser-search">
         <input
           type="text"
           placeholder="Filter tiles..."
           value={searchFilter}
           onInput={(e: Event) => setSearchFilter((e.target as HTMLInputElement).value)}
-          className="dmt-tile-browser-search-input"
+          className="windrose-tile-browser-search-input"
         />
       </div>
 
       {/* Tile grid, grouped by category */}
-      <div className="dmt-tile-browser-content">
+      <div className="windrose-tile-browser-content">
         {Array.from(groupedTiles.entries()).map(([category, tiles]) => (
-          <div key={category} className="dmt-tile-browser-category">
+          <div key={category} className="windrose-tile-browser-category">
             <button
-              className="dmt-tile-browser-category-label"
+              className="windrose-tile-browser-category-label"
               onClick={() => handleToggleCategory(category)}
             >
               <Icon
@@ -510,17 +510,17 @@ const TileAssetBrowser = ({
                 size={10}
               />
               <span>{category}</span>
-              <span className="dmt-tile-browser-category-count">{tiles.length}</span>
+              <span className="windrose-tile-browser-category-count">{tiles.length}</span>
             </button>
 
             {!collapsedCategories.has(category) && (
-              <div className="dmt-tile-browser-grid">
+              <div className="windrose-tile-browser-grid">
                 {tiles.map((tile: TileEntry) => {
                   const isSelected = selectedTilesetId === activeTileset?.id && selectedTileId === tile.id;
                   return (
                     <div
                       key={tile.id}
-                      className={`dmt-tile-thumb ${isSelected ? 'dmt-tile-thumb-selected' : ''}`}
+                      className={`windrose-tile-thumb ${isSelected ? 'windrose-tile-thumb-selected' : ''}`}
                       onClick={() => handleTileClick(activeTileset?.id ?? '', tile.id)}
                       onMouseEnter={() => setHoveredTile(tile)}
                       onMouseLeave={() => setHoveredTile(null)}
@@ -539,7 +539,7 @@ const TileAssetBrowser = ({
         ))}
 
         {filteredTiles.length === 0 && (
-          <div className="dmt-tile-browser-empty">
+          <div className="windrose-tile-browser-empty">
             {searchFilter != null && searchFilter !== '' ? 'No matching tiles' : 'No tiles in this tileset'}
           </div>
         )}
@@ -547,39 +547,39 @@ const TileAssetBrowser = ({
 
       {/* Footer: rotation/flip controls */}
       {selectedTileId != null && selectedTileId !== '' && (
-        <div className="dmt-tile-browser-footer">
+        <div className="windrose-tile-browser-footer">
           <button
-            className="dmt-tile-browser-action-btn"
+            className="windrose-tile-browser-action-btn"
             onClick={handleRotateCCW}
             title="Rotate counter-clockwise (60°)"
           >
             <Icon icon="lucide-rotate-ccw" size={14} />
           </button>
-          <span className="dmt-tile-browser-rotation-label">{rotation}°</span>
+          <span className="windrose-tile-browser-rotation-label">{rotation}°</span>
           <button
-            className="dmt-tile-browser-action-btn"
+            className="windrose-tile-browser-action-btn"
             onClick={handleRotateCW}
             title="Rotate clockwise (60°)"
           >
             <Icon icon="lucide-rotate-cw" size={14} />
           </button>
           <button
-            className={`dmt-tile-browser-action-btn ${flipH ? 'dmt-tile-browser-action-active' : ''}`}
+            className={`windrose-tile-browser-action-btn ${flipH ? 'windrose-tile-browser-action-active' : ''}`}
             onClick={() => onFlipChange(!flipH)}
             title="Flip horizontal"
           >
             <Icon icon="lucide-flip-horizontal" size={14} />
           </button>
-          <div className="dmt-tile-browser-separator" />
+          <div className="windrose-tile-browser-separator" />
           <button
-            className={`dmt-tile-browser-action-btn ${stampMode ? 'dmt-tile-browser-action-active' : ''}`}
+            className={`windrose-tile-browser-action-btn ${stampMode ? 'windrose-tile-browser-action-active' : ''}`}
             onClick={() => onStampModeChange(!stampMode)}
             title={stampMode ? 'Stamp mode: ON (free placement)' : 'Stamp mode: OFF (grid-snapped)'}
           >
             <Icon icon="lucide-stamp" size={14} />
           </button>
           <button
-            className={`dmt-tile-browser-action-btn ${tileFitMode === 'auto' ? '' : tileFitMode === 'contain' ? 'dmt-tile-browser-action-active' : ''}`}
+            className={`windrose-tile-browser-action-btn ${tileFitMode === 'auto' ? '' : tileFitMode === 'contain' ? 'windrose-tile-browser-action-active' : ''}`}
             onClick={() => {
               const modes: Array<'auto' | 'fill' | 'contain'> = ['auto', 'fill', 'contain'];
               const idx = modes.indexOf(tileFitMode);
@@ -590,7 +590,7 @@ const TileAssetBrowser = ({
             <Icon icon={tileFitMode === 'contain' ? 'lucide-minimize-2' : tileFitMode === 'fill' ? 'lucide-maximize-2' : 'lucide-scan'} size={14} />
           </button>
           <button
-            className="dmt-tile-browser-action-btn"
+            className="windrose-tile-browser-action-btn"
             onClick={onTileDeselect}
             title="Deselect tile"
           >
@@ -601,7 +601,7 @@ const TileAssetBrowser = ({
 
       {/* Tile scale slider */}
       {selectedTileId != null && selectedTileId !== '' && (
-        <div className="dmt-tile-browser-scale-row">
+        <div className="windrose-tile-browser-scale-row">
           <Icon icon="lucide-scaling" size={12} />
           <input
             type="range"
@@ -610,13 +610,13 @@ const TileAssetBrowser = ({
             step="0.25"
             value={tileScale}
             onInput={(e: Event) => onTileScaleChange(parseFloat((e.target as HTMLInputElement).value))}
-            className="dmt-tile-config-slider"
+            className="windrose-tile-config-slider"
             title={`Scale: ${tileScale}x`}
           />
-          <span className="dmt-tile-config-value">{tileScale}x</span>
+          <span className="windrose-tile-config-value">{tileScale}x</span>
           {tileScale !== 1 && (
             <button
-              className="dmt-tile-browser-action-btn"
+              className="windrose-tile-browser-action-btn"
               onClick={() => onTileScaleChange(1)}
               title="Reset to 1x"
             >

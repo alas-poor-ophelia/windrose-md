@@ -311,18 +311,18 @@ const OutlineLayer = ({
   }, [drawingVertices, selectedOutlineId, canvasRef, geometry, mapData, selectedColor, outlineSettings]);
 
   const btnClass = (active?: boolean): string =>
-    `dmt-floating-bar-btn${active === true ? ' is-active' : ''}`;
+    `windrose-floating-bar-btn${active === true ? ' is-active' : ''}`;
 
   // ── JSX ────────────────────────────────────────────────────────────
   return (
-    <div className="dmt-outline-ui" style={{ position: 'relative' }}>
+    <div className="windrose-outline-ui" style={{ position: 'relative' }}>
       {/* Drawing mode: vertex count */}
       {isOutlineTool && drawingVertices.length > 0 && (
-        <div className="dmt-floating-bar">
-          <span className="dmt-floating-bar-label">
+        <div className="windrose-floating-bar">
+          <span className="windrose-floating-bar-label">
             {drawingVertices.length} vertices — double-click to close
           </span>
-          <button onClick={cancelDrawing} className="dmt-floating-bar-btn">
+          <button onClick={cancelDrawing} className="windrose-floating-bar-btn">
             Cancel
           </button>
         </div>
@@ -330,12 +330,12 @@ const OutlineLayer = ({
 
       {/* Config toolbar: shown when tool is active and not drawing */}
       {isOutlineTool && drawingVertices.length === 0 && (selectedOutlineId == null || selectedOutlineId === '') && (
-        <div className="dmt-floating-bar">
+        <div className="windrose-floating-bar">
           {/* Line style */}
           <select
             value={outlineSettings.lineStyle}
             onChange={(e: Event) => setOutlineSettings({ lineStyle: (e.target as HTMLSelectElement).value as 'solid' | 'dashed' | 'dotted' })}
-            className="dmt-floating-bar-input"
+            className="windrose-floating-bar-input"
           >
             <option value="solid">Solid</option>
             <option value="dashed">Dashed</option>
@@ -348,7 +348,7 @@ const OutlineLayer = ({
             value={selectedColor}
             onInput={(e: Event) => onColorChange((e.target as HTMLInputElement).value)}
             title="Outline color"
-            className="dmt-color-swatch-btn"
+            className="windrose-color-swatch-btn"
           />
 
           {/* Fill toggle */}
@@ -380,16 +380,16 @@ const OutlineLayer = ({
             {outlineSettings.snapMode === 'straight' ? 'Straight' : 'Hex Snap'}
           </button>
 
-          <span className="dmt-floating-bar-label-faint">
+          <span className="windrose-floating-bar-label-faint">
             Click to place vertices
           </span>
 
           {mapData?.outlines && mapData.outlines.length > 0 && (
             <>
-              <span className="dmt-floating-bar-separator">|</span>
+              <span className="windrose-floating-bar-separator">|</span>
               <button
                 onClick={() => showClearAllConfirm((mapData.outlines ?? []).length)}
-                className="dmt-floating-bar-btn is-danger"
+                className="windrose-floating-bar-btn is-danger"
                 title="Delete all outlines"
               >
                 Clear All ({mapData.outlines.length})
@@ -404,12 +404,12 @@ const OutlineLayer = ({
         const outline = mapData.outlines.find(o => o.id === selectedOutlineId);
         if (!outline) return null;
         return (
-          <div className="dmt-floating-bar">
+          <div className="windrose-floating-bar">
             {/* Line style */}
             <select
               value={outline.lineStyle}
               onChange={(e: Event) => updateOutline(outline.id, { lineStyle: (e.target as HTMLSelectElement).value as 'solid' | 'dashed' | 'dotted' })}
-              className="dmt-floating-bar-input"
+              className="windrose-floating-bar-input"
             >
               <option value="solid">Solid</option>
               <option value="dashed">Dashed</option>
@@ -422,7 +422,7 @@ const OutlineLayer = ({
               value={outline.color}
               onInput={(e: Event) => updateOutline(outline.id, { color: (e.target as HTMLInputElement).value })}
               title="Outline color"
-              className="dmt-color-swatch-btn"
+              className="windrose-color-swatch-btn"
             />
 
             {/* Fill toggle */}
@@ -454,12 +454,12 @@ const OutlineLayer = ({
               {outline.snapMode === 'straight' ? 'Straight' : 'Hex Snap'}
             </button>
 
-            <span className="dmt-floating-bar-separator">|</span>
+            <span className="windrose-floating-bar-separator">|</span>
 
-            <button onClick={() => deleteOutline(outline.id)} className="dmt-floating-bar-btn is-danger">
+            <button onClick={() => deleteOutline(outline.id)} className="windrose-floating-bar-btn is-danger">
               Delete
             </button>
-            <button onClick={deselectOutline} className="dmt-floating-bar-btn">
+            <button onClick={deselectOutline} className="windrose-floating-bar-btn">
               Done
             </button>
           </div>

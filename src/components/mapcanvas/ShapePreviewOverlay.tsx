@@ -421,7 +421,7 @@ const ShapePreviewOverlay = ({
 
   return (
     <svg
-      className="dmt-shape-preview-overlay"
+      className="windrose-shape-preview-overlay"
       style={{
         position: 'absolute',
         top: 0,

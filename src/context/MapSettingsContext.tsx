@@ -484,9 +484,9 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
     const handleClickOutside = (e: MouseEvent | TouchEvent): void => {
       if (!(e.target instanceof Element)) return;
       const target = e.target;
-      const pickerEl = target.closest('.dmt-color-picker');
-      const buttonEl = target.closest('.dmt-color-button');
-      const modalEl = target.closest('.dmt-settings-modal');
+      const pickerEl = target.closest('.windrose-color-picker');
+      const buttonEl = target.closest('.windrose-color-button');
+      const modalEl = target.closest('.windrose-settings-modal');
 
       if (!pickerEl && !buttonEl && modalEl) {
         const picker = state.activeColorPicker;

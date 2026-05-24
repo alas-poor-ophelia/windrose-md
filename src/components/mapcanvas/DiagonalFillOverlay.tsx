@@ -181,7 +181,7 @@ const DiagonalFillOverlay = ({ currentTool }: DiagonalFillOverlayProps): VNode |
   const displayScale = canvasRect.width / canvasWidth;
 
   let flexContainer: HTMLElement | null = canvas.parentElement;
-  while (flexContainer && !flexContainer.classList.contains('dmt-canvas-container')) {
+  while (flexContainer && !flexContainer.classList.contains('windrose-canvas-container')) {
     flexContainer = flexContainer.parentElement;
   }
   const containerRect = flexContainer?.getBoundingClientRect();
@@ -223,7 +223,7 @@ const DiagonalFillOverlay = ({ currentTool }: DiagonalFillOverlayProps): VNode |
 
   return (
     <svg
-      className="dmt-diagonal-fill-overlay"
+      className="windrose-diagonal-fill-overlay"
       style={{
         position: 'absolute',
         top: 0,

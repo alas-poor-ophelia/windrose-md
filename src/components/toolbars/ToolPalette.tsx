@@ -113,11 +113,11 @@ export interface ToolPaletteProps {
 
 const SubMenuFlyout = ({ subTools, currentSubTool, onSelect, onClose }: SubMenuFlyoutProps): VNode => {
   return (
-    <div className="dmt-subtool-menu">
+    <div className="windrose-subtool-menu">
       {subTools.map(subTool => (
         <button
           key={subTool.id}
-          className={`dmt-subtool-option interactive-child ${currentSubTool === subTool.id ? 'dmt-subtool-option-active' : ''}`}
+          className={`windrose-subtool-option interactive-child ${currentSubTool === subTool.id ? 'windrose-subtool-option-active' : ''}`}
           onClick={(e) => {
             e.stopPropagation();
             onSelect(subTool.id);
@@ -205,9 +205,9 @@ const ToolButtonWithSubMenu = ({
   };
 
   return (
-    <div className="dmt-tool-btn-container">
+    <div className="windrose-tool-btn-container">
       <button
-        className={`dmt-tool-btn interactive-child ${isActive ? 'dmt-tool-btn-active' : ''}`}
+        className={`windrose-tool-btn interactive-child ${isActive ? 'windrose-tool-btn-active' : ''}`}
         onPointerDown={handlePointerDown}
         onPointerUp={handlePointerUp}
         onPointerLeave={handlePointerLeave}
@@ -216,7 +216,7 @@ const ToolButtonWithSubMenu = ({
       >
         <Icon icon={currentSubToolDef?.icon} />
         {hasMultipleSubTools && (
-          <span className="dmt-subtool-indicator interactive-child">▼</span>
+          <span className="windrose-subtool-indicator interactive-child">▼</span>
         )}
       </button>
 
@@ -452,8 +452,8 @@ const ToolPalette = ({
 
     const handleClickOutside = (e: MouseEvent | TouchEvent): void => {
       const target = e.target as Element;
-      const menuElement = target.closest('.dmt-subtool-menu');
-      const buttonElement = target.closest('.dmt-tool-btn-container');
+      const menuElement = target.closest('.windrose-subtool-menu');
+      const buttonElement = target.closest('.windrose-tool-btn-container');
 
       if (!menuElement && !buttonElement) {
         handleSubMenuClose();
@@ -477,8 +477,8 @@ const ToolPalette = ({
 
     const handleClickOutside = (e: MouseEvent | TouchEvent): void => {
       const target = e.target as Element;
-      const pickerElement = target.closest('.dmt-color-picker');
-      const buttonElement = target.closest('.dmt-color-tool-btn');
+      const pickerElement = target.closest('.windrose-color-picker');
+      const buttonElement = target.closest('.windrose-color-tool-btn');
 
       if (!pickerElement && !buttonElement) {
         if (pendingCustomColorRef.current != null && pendingCustomColorRef.current !== '') {
@@ -504,8 +504,8 @@ const ToolPalette = ({
   }, [isColorPickerOpen]);
 
   return (
-    <div className="dmt-tool-palette">
-      <CornerBrackets classPrefix="dmt-tool-palette-bracket" variant="compact" filterId="palette-bracket" />
+    <div className="windrose-tool-palette">
+      <CornerBrackets classPrefix="windrose-tool-palette-bracket" variant="compact" filterId="palette-bracket" />
 
       {toolGroups.slice(0, 2).map(group => (
         <ToolButtonWithSubMenu
@@ -522,10 +522,10 @@ const ToolPalette = ({
         />
       ))}
 
-      <div className="dmt-tool-btn-container">
+      <div className="windrose-tool-btn-container">
         <button
           ref={colorBtnRef}
-          className={`dmt-tool-btn dmt-color-tool-btn interactive-child ${isColorPickerOpen ? 'dmt-tool-btn-active' : ''}`}
+          className={`windrose-tool-btn windrose-color-tool-btn interactive-child ${isColorPickerOpen ? 'windrose-tool-btn-active' : ''}`}
           onClick={toggleColorPicker}
           title="Choose color"
           style={{
@@ -576,7 +576,7 @@ const ToolPalette = ({
       {visibleSimpleTools.map(tool => (
         <button
           key={tool.id}
-          className={`dmt-tool-btn interactive-child ${currentTool === tool.id ? 'dmt-tool-btn-active' : ''}`}
+          className={`windrose-tool-btn interactive-child ${currentTool === tool.id ? 'windrose-tool-btn-active' : ''}`}
           onClick={() => onToolChange(tool.id)}
           title={titleWithShortcut(tool.title, tool.actionId, tool.shortcut)}
         >
@@ -584,9 +584,9 @@ const ToolPalette = ({
         </button>
       ))}
 
-      <div className="dmt-history-controls">
+      <div className="windrose-history-controls">
         <button
-          className="dmt-history-btn interactive-child"
+          className="windrose-history-btn interactive-child"
           onClick={onUndo}
           disabled={!canUndo}
           title="Undo"
@@ -594,7 +594,7 @@ const ToolPalette = ({
           <Icon icon="lucide-undo" />
         </button>
         <button
-          className="dmt-history-btn interactive-child"
+          className="windrose-history-btn interactive-child"
           onClick={onRedo}
           disabled={!canRedo}
           title="Redo"

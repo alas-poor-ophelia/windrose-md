@@ -93,9 +93,9 @@ function openNativeNoteLinkModal(app: App, options: OpenNativeNoteLinkModalOptio
           }
 
           renderSuggestion(entry: NoteLinkSuggestion, el: HTMLElement): void {
-            el.createDiv({ text: entry.displayName, cls: 'dmt-note-suggest-name' });
+            el.createDiv({ text: entry.displayName, cls: 'windrose-note-suggest-name' });
             if (entry.subtitle != null && entry.subtitle !== '') {
-              el.createDiv({ text: entry.subtitle, cls: 'dmt-note-suggest-path' });
+              el.createDiv({ text: entry.subtitle, cls: 'windrose-note-suggest-path' });
             }
           }
 

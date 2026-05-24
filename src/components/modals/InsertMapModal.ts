@@ -15,7 +15,7 @@ export class InsertMapModal extends Modal {
   onOpen(): void {
     const { contentEl } = this;
     contentEl.empty();
-    contentEl.addClass('dmt-insert-map-modal');
+    contentEl.addClass('windrose-insert-map-modal');
 
     contentEl.createEl('h2', { text: 'Insert new map' });
 
@@ -29,24 +29,24 @@ export class InsertMapModal extends Modal {
         setTimeout(() => text.inputEl.focus(), 10);
       });
 
-    const typeContainer = contentEl.createDiv({ cls: 'dmt-map-type-selection' });
+    const typeContainer = contentEl.createDiv({ cls: 'windrose-map-type-selection' });
     typeContainer.createEl('div', { text: 'Map type', cls: 'setting-item-name' });
     typeContainer.createEl('div', {
       text: 'Choose the grid style for this map',
       cls: 'setting-item-description'
     });
 
-    const buttonRow = typeContainer.createDiv({ cls: 'dmt-map-type-buttons' });
+    const buttonRow = typeContainer.createDiv({ cls: 'windrose-map-type-buttons' });
 
     const gridBtn = buttonRow.createEl('button', {
       text: 'Grid',
-      cls: 'dmt-map-type-btn',
+      cls: 'windrose-map-type-btn',
       attr: { type: 'button' }
     });
 
     const hexBtn = buttonRow.createEl('button', {
       text: 'Hex',
-      cls: 'dmt-map-type-btn',
+      cls: 'windrose-map-type-btn',
       attr: { type: 'button' }
     });
 
@@ -62,7 +62,7 @@ export class InsertMapModal extends Modal {
       gridBtn.removeClass('selected');
     };
 
-    const buttonContainer = contentEl.createDiv({ cls: 'dmt-modal-buttons' });
+    const buttonContainer = contentEl.createDiv({ cls: 'windrose-modal-buttons' });
 
     const cancelBtn = buttonContainer.createEl('button', { text: 'Cancel' });
     cancelBtn.onclick = () => this.close();
