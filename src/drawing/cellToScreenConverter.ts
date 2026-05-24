@@ -57,15 +57,20 @@ function cellToScreen(
       worldY = (cellY + 0.5) * geometry.cellSize;
     }
   } else {
-    if (geometry.getCellCenter != null) {
+    if (geometry.type === 'hex') {
       // Hex: no rectangular corners, use cell center as approximation
-      const cellCenter = geometry.getCellCenter(cellX, cellY);
-      worldX = cellCenter.worldX;
-      worldY = cellCenter.worldY;
-    } else if (geometry.getHexCenter != null) {
-      const hexCenter = geometry.getHexCenter(cellX, cellY);
-      worldX = hexCenter.worldX;
-      worldY = hexCenter.worldY;
+      if (geometry.getCellCenter != null) {
+        const cellCenter = geometry.getCellCenter(cellX, cellY);
+        worldX = cellCenter.worldX;
+        worldY = cellCenter.worldY;
+      } else if (geometry.getHexCenter != null) {
+        const hexCenter = geometry.getHexCenter(cellX, cellY);
+        worldX = hexCenter.worldX;
+        worldY = hexCenter.worldY;
+      } else {
+        worldX = cellX * geometry.cellSize;
+        worldY = cellY * geometry.cellSize;
+      }
     } else {
       worldX = cellX * geometry.cellSize;
       worldY = cellY * geometry.cellSize;

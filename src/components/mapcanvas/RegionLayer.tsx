@@ -178,6 +178,10 @@ const RegionLayer = ({
 
     if (!overlayRef.current) {
       const overlay = document.createElement('canvas');
+      overlay.style.position = 'absolute';
+      overlay.style.top = '0';
+      overlay.style.left = '0';
+      overlay.style.pointerEvents = 'none';
       overlay.classList.add('windrose-overlay-layer');
       mainCanvas.parentElement.appendChild(overlay);
       overlayRef.current = overlay;
