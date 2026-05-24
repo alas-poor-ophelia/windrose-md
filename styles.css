@@ -67,9 +67,9 @@ body {
   --windrose-bg-primary: var(--color-base-00);
   --windrose-bg-secondary: var(--color-base-20);
   --windrose-bg-tertiary: var(--color-base-25);
-  --windrose-border-primary: oklch(0.68 0.12 35);
+  --windrose-border-primary: oklch(0.74 0.07 75);
   --windrose-border-primary-rgb: 196, 165, 123;
-  --windrose-border-primary-dark: oklch(0.42 0.10 40);
+  --windrose-border-primary-dark: oklch(0.54 0.07 68);
   --windrose-border-secondary: oklch(0.22 0 0);
   --windrose-text-primary: var(--color-base-100);
   --windrose-text-secondary: var(--color-base-60);
