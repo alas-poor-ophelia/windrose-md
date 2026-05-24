@@ -70,15 +70,15 @@ body {
   --windrose-border-primary: oklch(0.74 0.07 75);
   --windrose-border-primary-rgb: 196, 165, 123;
   --windrose-border-primary-dark: oklch(0.54 0.07 68);
-  --windrose-border-secondary: oklch(0.22 0 0);
+  --windrose-border-secondary: oklch(0.35 0 0);
   --windrose-text-primary: var(--color-base-100);
   --windrose-text-secondary: var(--color-base-60);
   --windrose-text-muted: var(--color-base-50);
   --windrose-text-disabled: var(--color-base-40);
   --windrose-accent-blue: oklch(0.52 0.18 256);
-  --windrose-accent-blue-hover: color-mix(in oklch, var(--windrose-accent-blue) 85%, oklch(0.2 0 0));
+  --windrose-accent-blue-hover: color-mix(in oklch, var(--windrose-accent-blue) 85%, oklch(0 0 0));
   --windrose-accent-red: oklch(0.56 0.19 26);
-  --windrose-accent-red-hover: color-mix(in oklch, var(--windrose-accent-red) 85%, oklch(0.2 0 0));
+  --windrose-accent-red-hover: color-mix(in oklch, var(--windrose-accent-red) 85%, oklch(0 0 0));
   --windrose-warning: var(--color-orange);
   --windrose-error: var(--color-red);
   --windrose-success: var(--windrose-accent-blue);
