@@ -95,6 +95,7 @@ body {
   font-variant: normal;
   font-weight: normal;
   line-height: 1;
+  speak: never;
   text-transform: none;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -729,14 +730,8 @@ body {
   align-items: center;
 }
 
-button.windrose-zoom-btn,
-.is-tablet button.windrose-zoom-btn,
-button.windrose-expand-btn,
-.is-tablet button.windrose-expand-btn,
-button.windrose-layer-btn,
-.is-tablet button.windrose-layer-btn,
-button.windrose-orientation-btn,
-.is-tablet button.windrose-orientation-btn {
+button:is(.windrose-zoom-btn, .windrose-expand-btn, .windrose-layer-btn, .windrose-orientation-btn),
+.is-tablet button:is(.windrose-zoom-btn, .windrose-expand-btn, .windrose-layer-btn, .windrose-orientation-btn) {
   width: 35px;
   height: 35px;
   min-width: 35px;
@@ -5520,23 +5515,6 @@ button.windrose-breadcrumb-link {
   font-size: 12px;
   color: var(--text-muted);
   font-family: var(--font-monospace);
-}
-
-/* ===========================================
- * RPGAwesome Icon Font
- * Font-family name must be exactly 'rpgawesome'
- * Font is bundled at the top of this file (@font-face)
- * =========================================== */
-.ra.ra {
-  font-family: 'rpgawesome';
-  font-style: normal;
-  font-variant: normal;
-  font-weight: normal;
-  line-height: 1;
-  speak: never;
-  text-transform: none;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
 }
 
 /* ===========================================
