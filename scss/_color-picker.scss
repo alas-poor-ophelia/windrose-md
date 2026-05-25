@@ -1,14 +1,6 @@
 /* ============================================
    COLOR PICKER SYSTEM
    ============================================ */
-.windrose-color-picker-overlay {
-  position: fixed;
-  inset: 0;
-  background-color: transparent;
-  z-index: 2099;
-  pointer-events: auto;
-}
-
 .windrose-color-picker {
   background-color: var(--windrose-bg-secondary);
   border: 1px solid var(--windrose-border-secondary);
@@ -18,6 +10,30 @@
   z-index: 2100;
   min-width: 290px;
   animation: slideDown 0.15s ease;
+
+  &-overlay {
+    position: fixed;
+    inset: 0;
+    background-color: transparent;
+    z-index: 2099;
+    pointer-events: auto;
+  }
+
+  &-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+
+  &-title {
+    text-wrap: balance;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--windrose-text-primary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
 }
 
 @keyframes slideDown {
@@ -29,21 +45,6 @@
     opacity: 1;
     transform: translateY(0);
   }
-}
-.windrose-color-picker-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 10px;
-}
-
-.windrose-color-picker-title {
-  text-wrap: balance;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--windrose-text-primary);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
 }
 
 .windrose-color-reset-btn {
@@ -59,10 +60,11 @@
   justify-content: center;
   font-size: 14px;
   transition: var(--windrose-transition);
-}
-.windrose-color-reset-btn:hover {
-  background-color: var(--windrose-bg-tertiary);
-  border-color: var(--windrose-text-muted);
+
+  &:hover {
+    background-color: var(--windrose-bg-tertiary);
+    border-color: var(--windrose-text-muted);
+  }
 }
 
 .windrose-color-grid {
@@ -72,6 +74,8 @@
 }
 
 .windrose-color-swatch {
+  $swatch: &;
+
   width: 40px;
   height: 40px;
   border: 2px solid var(--windrose-border-secondary);
@@ -83,49 +87,53 @@
   align-items: center;
   justify-content: center;
   padding: 0;
-}
-.windrose-color-swatch:hover {
-  border-color: var(--windrose-text-primary);
-  transform: scale(1.1);
-}
-.windrose-color-swatch.windrose-color-swatch-selected {
-  border-color: var(--windrose-text-primary);
-  border-width: 3px;
-  box-shadow: 0 0 0 2px oklch(100% 0 0deg / 0.3);
-}
-.windrose-color-swatch.windrose-color-swatch-reset {
-  background-color: var(--windrose-bg-tertiary);
-  border: 2px solid var(--windrose-text-disabled);
-}
-.windrose-color-swatch.windrose-color-swatch-reset:hover {
-  background-color: var(--windrose-border-secondary);
-  border-color: var(--windrose-text-muted);
-}
-.windrose-color-swatch.windrose-color-swatch-preview {
-  border: 2px dashed var(--windrose-accent-blue);
-  position: relative;
-  animation: pulse 1s ease-in-out infinite;
-}
-.windrose-color-swatch.windrose-color-swatch-add {
-  background-color: var(--windrose-bg-secondary);
-  border: 2px dashed var(--windrose-text-disabled);
-  position: relative;
-  overflow: hidden;
-}
-.windrose-color-swatch.windrose-color-swatch-add:hover {
-  background-color: var(--windrose-bg-tertiary);
-  border-color: var(--windrose-text-muted);
-  border-style: solid;
+
+  &:hover {
+    border-color: var(--windrose-text-primary);
+    transform: scale(1.1);
+  }
+
+  &#{$swatch}-selected {
+    border-color: var(--windrose-text-primary);
+    border-width: 3px;
+    box-shadow: 0 0 0 2px oklch(100% 0 0deg / 0.3);
+  }
+
+  &#{$swatch}-reset {
+    background-color: var(--windrose-bg-tertiary);
+    border: 2px solid var(--windrose-text-disabled);
+
+    &:hover {
+      background-color: var(--windrose-border-secondary);
+      border-color: var(--windrose-text-muted);
+    }
+  }
+
+  &#{$swatch}-preview {
+    border: 2px dashed var(--windrose-accent-blue);
+    position: relative;
+    animation: pulse 1s ease-in-out infinite;
+  }
+
+  &#{$swatch}-add {
+    background-color: var(--windrose-bg-secondary);
+    border: 2px dashed var(--windrose-text-disabled);
+    position: relative;
+    overflow: hidden;
+
+    &:hover {
+      background-color: var(--windrose-bg-tertiary);
+      border-color: var(--windrose-text-muted);
+      border-style: solid;
+    }
+  }
 }
 
 @keyframes pulse {
-  0%, 100% {
-    opacity: 0.7;
-  }
-  50% {
-    opacity: 1;
-  }
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
 }
+
 .windrose-color-reset-icon,
 .windrose-color-checkmark {
   color: var(--windrose-text-primary);
@@ -156,13 +164,10 @@
 }
 
 @keyframes spin {
-  from {
-    transform: translate(-50%, -50%) rotate(0deg);
-  }
-  to {
-    transform: translate(-50%, -50%) rotate(360deg);
-  }
+  from { transform: translate(-50%, -50%) rotate(0deg); }
+  to { transform: translate(-50%, -50%) rotate(360deg); }
 }
+
 .windrose-color-add-icon,
 .windrose-color-add-icon-overlay {
   color: var(--windrose-text-primary);
@@ -209,170 +214,179 @@
   z-index: 150;
   user-select: none;
   box-shadow: 0 2px 8px oklch(0% 0 0deg / 0.3);
-}
-.windrose-color-delete-button svg {
-  width: 16px;
-  height: 16px;
-  color: var(--windrose-text-primary);
-}
-.windrose-color-delete-button:hover {
-  background-color: var(--windrose-accent-red);
-  transform: translateY(-50%) scale(1.1);
-}
-.windrose-color-delete-button:active {
-  transform: translateY(-50%) scale(0.95);
+
+  svg {
+    width: 16px;
+    height: 16px;
+    color: var(--windrose-text-primary);
+  }
+
+  &:hover {
+    background-color: var(--windrose-accent-red);
+    transform: translateY(-50%) scale(1.1);
+  }
+
+  &:active {
+    transform: translateY(-50%) scale(0.95);
+  }
 }
 
-/* Custom color edit panel (right-click/long-press) */
-.windrose-color-edit-panel {
-  position: absolute;
-  left: calc(100% + 4px);
-  top: 50%;
-  transform: translateY(-50%);
-  background: var(--windrose-bg-secondary);
-  border: 1px solid var(--windrose-border-secondary);
-  border-radius: 6px;
-  padding: 8px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  z-index: 150;
-  box-shadow: 0 4px 12px oklch(0% 0 0deg / 0.3);
-  white-space: nowrap;
+.windrose-color-edit {
+  &-panel {
+    position: absolute;
+    left: calc(100% + 4px);
+    top: 50%;
+    transform: translateY(-50%);
+    background: var(--windrose-bg-secondary);
+    border: 1px solid var(--windrose-border-secondary);
+    border-radius: 6px;
+    padding: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    z-index: 150;
+    box-shadow: 0 4px 12px oklch(0% 0 0deg / 0.3);
+    white-space: nowrap;
+  }
+
+  &-opacity {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+
+    &-label {
+      font-size: 11px;
+      color: var(--windrose-text-secondary);
+    }
+
+    &-value {
+      font-size: 11px;
+      color: var(--windrose-text-primary);
+      min-width: 32px;
+      text-align: right;
+    }
+
+    input[type=range] {
+      width: 80px;
+      height: 4px;
+      cursor: pointer;
+      appearance: none;
+      background: var(--windrose-bg-tertiary);
+      border-radius: 2px;
+
+      &::-webkit-slider-thumb {
+        appearance: none;
+        width: 12px;
+        height: 12px;
+        background: var(--windrose-border-primary);
+        border-radius: 50%;
+        cursor: pointer;
+      }
+
+      &::-moz-range-thumb {
+        width: 12px;
+        height: 12px;
+        background: var(--windrose-border-primary);
+        border: none;
+        border-radius: 50%;
+        cursor: pointer;
+      }
+    }
+  }
+
+  &-delete {
+    width: 24px;
+    height: 24px;
+    background-color: oklch(from var(--windrose-accent-red) l c h/0.8);
+    border: none;
+    border-radius: 4px;
+    color: var(--windrose-text-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: var(--windrose-transition);
+    padding: 0;
+
+    svg {
+      width: 14px;
+      height: 14px;
+    }
+
+    &:hover {
+      background-color: var(--windrose-accent-red);
+    }
+  }
 }
 
-.windrose-color-edit-opacity {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
+.windrose-color-opacity {
+  &-section {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--windrose-bg-tertiary);
+  }
 
-.windrose-color-edit-opacity-label {
-  font-size: 11px;
-  color: var(--windrose-text-secondary);
-}
+  &-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
 
-.windrose-color-edit-opacity-value {
-  font-size: 11px;
-  color: var(--windrose-text-primary);
-  min-width: 32px;
-  text-align: right;
-}
+  &-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--windrose-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
 
-.windrose-color-edit-opacity input[type=range] {
-  width: 80px;
-  height: 4px;
-  cursor: pointer;
-  appearance: none;
-  background: var(--windrose-bg-tertiary);
-  border-radius: 2px;
-}
-.windrose-color-edit-opacity input[type=range]::-webkit-slider-thumb {
-  appearance: none;
-  width: 12px;
-  height: 12px;
-  background: var(--windrose-border-primary);
-  border-radius: 50%;
-  cursor: pointer;
-}
-.windrose-color-edit-opacity input[type=range]::-moz-range-thumb {
-  width: 12px;
-  height: 12px;
-  background: var(--windrose-border-primary);
-  border: none;
-  border-radius: 50%;
-  cursor: pointer;
-}
+  &-value {
+    font-size: 12px;
+    color: var(--windrose-text-primary);
+    font-weight: 500;
+    min-width: 35px;
+    text-align: right;
+  }
 
-.windrose-color-edit-delete {
-  width: 24px;
-  height: 24px;
-  background-color: oklch(from var(--windrose-accent-red) l c h/0.8);
-  border: none;
-  border-radius: 4px;
-  color: var(--windrose-text-primary);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: var(--windrose-transition);
-  padding: 0;
-}
-.windrose-color-edit-delete svg {
-  width: 14px;
-  height: 14px;
-}
-.windrose-color-edit-delete:hover {
-  background-color: var(--windrose-accent-red);
-}
+  &-slider {
+    width: 100%;
+    height: 6px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: var(--windrose-bg-tertiary);
+    border-radius: 3px;
+    outline: none;
+    cursor: pointer;
 
-/* Color picker opacity slider */
-.windrose-color-opacity-section {
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid var(--windrose-bg-tertiary);
-}
+    &::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      background: var(--windrose-accent-blue);
+      border-radius: 50%;
+      cursor: pointer;
+      border: 2px solid var(--windrose-text-primary);
+      transition: transform 0.15s ease;
 
-.windrose-color-opacity-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-}
+      &:hover {
+        transform: scale(1.15);
+      }
+    }
 
-.windrose-color-opacity-label {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--windrose-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
+    &::-moz-range-thumb {
+      width: 16px;
+      height: 16px;
+      background: var(--windrose-accent-blue);
+      border-radius: 50%;
+      cursor: pointer;
+      border: 2px solid var(--windrose-text-primary);
+      transition: transform 0.15s ease;
 
-.windrose-color-opacity-value {
-  font-size: 12px;
-  color: var(--windrose-text-primary);
-  font-weight: 500;
-  min-width: 35px;
-  text-align: right;
-}
-
-.windrose-color-opacity-slider {
-  width: 100%;
-  height: 6px;
-  -webkit-appearance: none;
-  appearance: none;
-  background: var(--windrose-bg-tertiary);
-  border-radius: 3px;
-  outline: none;
-  cursor: pointer;
-}
-
-.windrose-color-opacity-slider::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 16px;
-  height: 16px;
-  background: var(--windrose-accent-blue);
-  border-radius: 50%;
-  cursor: pointer;
-  border: 2px solid var(--windrose-text-primary);
-  transition: transform 0.15s ease;
-}
-
-.windrose-color-opacity-slider::-webkit-slider-thumb:hover {
-  transform: scale(1.15);
-}
-
-.windrose-color-opacity-slider::-moz-range-thumb {
-  width: 16px;
-  height: 16px;
-  background: var(--windrose-accent-blue);
-  border-radius: 50%;
-  cursor: pointer;
-  border: 2px solid var(--windrose-text-primary);
-  transition: transform 0.15s ease;
-}
-
-.windrose-color-opacity-slider::-moz-range-thumb:hover {
-  transform: scale(1.15);
+      &:hover {
+        transform: scale(1.15);
+      }
+    }
+  }
 }

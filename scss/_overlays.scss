@@ -1,18 +1,6 @@
 /* ===========================================
  * Deeplink Hover Preview
  * =========================================== */
-.windrose-hover-preview-popover {
-  padding: 6px;
-}
-
-.windrose-hover-preview-host {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 240px;
-  min-height: 180px;
-}
-
 .windrose-hover-preview {
   position: relative;
   display: flex;
@@ -21,47 +9,56 @@
   background: var(--background-secondary);
   border-radius: 4px;
   overflow: hidden;
+
+  &-popover {
+    padding: 6px;
+  }
+
+  &-host {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 240px;
+    min-height: 180px;
+  }
+
+  &-header {
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--background-modifier-border);
+    background: var(--background-primary);
+    line-height: 1.25;
+
+    &-map {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-normal);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    &-note {
+      font-size: 11px;
+      color: var(--text-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+  }
+
+  canvas {
+    display: block;
+    width: 240px;
+    height: 180px;
+  }
+
+  &-state {
+    font-size: 12px;
+    color: var(--text-muted);
+    padding: 8px 12px;
+  }
 }
 
-.windrose-hover-preview-header {
-  padding: 6px 8px;
-  border-bottom: 1px solid var(--background-modifier-border);
-  background: var(--background-primary);
-  line-height: 1.25;
-}
-
-.windrose-hover-preview-header-map {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-normal);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.windrose-hover-preview-header-note {
-  font-size: 11px;
-  color: var(--text-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.windrose-hover-preview canvas {
-  display: block;
-  width: 240px;
-  height: 180px;
-}
-
-.windrose-hover-preview-state {
-  font-size: 12px;
-  color: var(--text-muted);
-  padding: 8px 12px;
-}
-
-/* Live-Preview external-link icon suppression on windrose: URLs only.
-   The icon is a ::after on span.external-link; CM6 ViewPlugin tags the
-   icon span with .windrose-deep-link-icon when its line contains windrose:. */
 .windrose-deep-link-icon::after {
   content: none;
   display: none;
@@ -88,52 +85,62 @@
   white-space: nowrap;
   pointer-events: auto;
   z-index: 1000;
-}
 
-.windrose-floating-bar-btn {
-  padding: 4px 10px;
-  background: transparent;
-  color: var(--text-muted);
-  border-radius: 4px;
-  border: 1px solid var(--background-modifier-border);
-  cursor: pointer;
-  font-size: 12px;
-  min-height: 30px;
-}
+  &-btn {
+    padding: 4px 10px;
+    background: transparent;
+    color: var(--text-muted);
+    border-radius: 4px;
+    border: 1px solid var(--background-modifier-border);
+    cursor: pointer;
+    font-size: 12px;
+    min-height: 30px;
 
-.windrose-floating-bar-btn.is-active {
-  background: var(--interactive-accent);
-  color: var(--text-on-accent);
-}
+    &.is-active {
+      background: var(--interactive-accent);
+      color: var(--text-on-accent);
+    }
 
-.windrose-floating-bar-btn.is-danger {
-  color: var(--text-error);
-}
+    &.is-danger {
+      color: var(--text-error);
+    }
 
-.windrose-floating-bar-btn.is-accent {
-  color: var(--text-accent);
-}
+    &.is-accent {
+      color: var(--text-accent);
+    }
+  }
 
-.windrose-floating-bar-label {
-  color: var(--text-muted);
-  font-size: 12px;
-}
+  &-label {
+    color: var(--text-muted);
+    font-size: 12px;
 
-.windrose-floating-bar-label-faint {
-  color: var(--text-faint);
-  font-size: 11px;
-}
+    &-faint {
+      color: var(--text-faint);
+      font-size: 11px;
+    }
+  }
 
-.windrose-floating-bar-separator {
-  color: var(--text-faint);
-  font-size: 11px;
-  margin: 0 2px;
-}
+  &-separator {
+    color: var(--text-faint);
+    font-size: 11px;
+    margin: 0 2px;
+  }
 
-.windrose-floating-bar-name {
-  color: var(--text-normal);
-  font-size: 13px;
-  font-weight: 600;
+  &-name {
+    color: var(--text-normal);
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  &-input {
+    background: var(--background-primary);
+    color: var(--text-normal);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 4px;
+    padding: 4px 6px;
+    font-size: 12px;
+    min-height: 30px;
+  }
 }
 
 .windrose-color-swatch-btn {
@@ -147,144 +154,136 @@
   background: none;
 }
 
-.windrose-floating-bar-input {
-  background: var(--background-primary);
-  color: var(--text-normal);
-  border: 1px solid var(--background-modifier-border);
-  border-radius: 4px;
-  padding: 4px 6px;
-  font-size: 12px;
-  min-height: 30px;
-}
-
 /* ============================================
    SEGMENT PICKER OVERLAY
    ============================================ */
-.windrose-segment-picker-backdrop {
-  position: fixed;
-  inset: 0;
-  background-color: oklch(0% 0 0deg / 0.6);
-  z-index: 1999;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
+.windrose-segment-picker {
+  &-backdrop {
+    position: fixed;
+    inset: 0;
+    background-color: oklch(0% 0 0deg / 0.6);
+    z-index: 1999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
 
-.windrose-segment-picker-card {
-  background-color: var(--windrose-bg-primary);
-  border-radius: 12px;
-  padding: 16px;
-  border: 2px solid var(--windrose-border-primary);
-  box-shadow: 0 8px 32px oklch(0% 0 0deg / 0.5);
-  min-width: 260px;
-}
+  &-card {
+    background-color: var(--windrose-bg-primary);
+    border-radius: 12px;
+    padding: 16px;
+    border: 2px solid var(--windrose-border-primary);
+    box-shadow: 0 8px 32px oklch(0% 0 0deg / 0.5);
+    min-width: 260px;
+  }
 
-.windrose-segment-picker-title {
-  text-wrap: balance;
-  color: var(--windrose-border-primary);
-  font-size: 14px;
-  font-weight: 600;
-  margin-bottom: 12px;
-  text-align: center;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-}
+  &-title {
+    text-wrap: balance;
+    color: var(--windrose-border-primary);
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
 
-.windrose-segment-picker-subtitle {
-  text-wrap: balance;
-  color: var(--windrose-text-muted);
-  font-size: 11px;
-  text-align: center;
-  margin-bottom: 12px;
-}
+  &-subtitle {
+    text-wrap: balance;
+    color: var(--windrose-text-muted);
+    font-size: 11px;
+    text-align: center;
+    margin-bottom: 12px;
+  }
 
-.windrose-segment-picker-svg-wrap {
-  display: flex;
-  justify-content: center;
-  margin-bottom: 16px;
-}
+  &-svg-wrap {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 16px;
+  }
 
-.windrose-segment-picker-svg {
-  background-color: var(--windrose-bg-secondary);
-  border-radius: 8px;
-  cursor: pointer;
-  touch-action: none;
-  user-select: none;
-  -webkit-user-select: none;
-  -webkit-touch-callout: none;
-}
+  &-svg {
+    background-color: var(--windrose-bg-secondary);
+    border-radius: 8px;
+    cursor: pointer;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+  }
 
-.windrose-segment-picker-actions {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 16px;
-  justify-content: center;
-}
+  &-actions {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+    justify-content: center;
+  }
 
-.windrose-segment-picker-btn {
-  padding: 6px 12px;
-  background-color: var(--windrose-bg-tertiary);
-  border: 1px solid var(--background-modifier-border);
-  border-radius: 4px;
-  color: var(--windrose-text-secondary);
-  font-size: 12px;
-  cursor: pointer;
-}
+  &-btn {
+    padding: 6px 12px;
+    background-color: var(--windrose-bg-tertiary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 4px;
+    color: var(--windrose-text-secondary);
+    font-size: 12px;
+    cursor: pointer;
 
-.windrose-segment-picker-status {
-  color: var(--windrose-text-muted);
-  font-size: 12px;
-  text-align: center;
-  margin-bottom: 12px;
-}
+    &-lg {
+      padding: 10px 24px;
+      background-color: var(--windrose-bg-tertiary);
+      border: 1px solid var(--background-modifier-border);
+      border-radius: 6px;
+      color: var(--windrose-text-secondary);
+      font-size: 14px;
+      cursor: pointer;
+      min-width: 80px;
 
-.windrose-segment-picker-remember {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  color: var(--text-muted);
-  font-size: 12px;
-  cursor: pointer;
-  margin-bottom: 16px;
-  user-select: none;
-  -webkit-user-select: none;
-}
+      &.is-primary {
+        background-color: var(--windrose-border-primary);
+        border: none;
+        color: var(--windrose-bg-primary);
+        font-weight: 600;
+      }
+    }
+  }
 
-.windrose-segment-picker-remember input {
-  width: 16px;
-  height: 16px;
-  cursor: pointer;
-  accent-color: var(--windrose-border-primary);
-}
+  &-status {
+    color: var(--windrose-text-muted);
+    font-size: 12px;
+    text-align: center;
+    margin-bottom: 12px;
+  }
 
-.windrose-segment-picker-footer {
-  display: flex;
-  gap: 12px;
-  justify-content: center;
-}
+  &-remember {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    color: var(--text-muted);
+    font-size: 12px;
+    cursor: pointer;
+    margin-bottom: 16px;
+    user-select: none;
+    -webkit-user-select: none;
 
-.windrose-segment-picker-btn-lg {
-  padding: 10px 24px;
-  background-color: var(--windrose-bg-tertiary);
-  border: 1px solid var(--background-modifier-border);
-  border-radius: 6px;
-  color: var(--windrose-text-secondary);
-  font-size: 14px;
-  cursor: pointer;
-  min-width: 80px;
-}
+    input {
+      width: 16px;
+      height: 16px;
+      cursor: pointer;
+      accent-color: var(--windrose-border-primary);
+    }
+  }
 
-.windrose-segment-picker-btn-lg.is-primary {
-  background-color: var(--windrose-border-primary);
-  border: none;
-  color: var(--windrose-bg-primary);
-  font-weight: 600;
-}
+  &-footer {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+  }
 
-.windrose-segment-picker-hint {
-  color: var(--text-faint);
-  font-size: 11px;
-  text-align: center;
-  margin-top: 12px;
+  &-hint {
+    color: var(--text-faint);
+    font-size: 11px;
+    text-align: center;
+    margin-top: 12px;
+  }
 }

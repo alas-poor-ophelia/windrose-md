@@ -10,6 +10,12 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+
+  &-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
 }
 
 .windrose-map-name {
@@ -21,57 +27,61 @@
   outline: none;
   flex: 1;
   margin-right: 16px;
-}
-.windrose-map-name::placeholder {
-  color: var(--windrose-text-disabled);
+
+  &::placeholder {
+    color: var(--windrose-text-disabled);
+  }
 }
 
-.windrose-header-controls {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+// Info toggle (double-class specificity)
+.windrose-info-toggle {
+  $toggle: &;
+
+  &#{$toggle} {
+    background: transparent;
+    border: 1px solid var(--windrose-border-secondary);
+    border-radius: 4px;
+    color: var(--windrose-text-disabled);
+    cursor: pointer;
+    padding: clamp(0.25rem, 0.5vw, 0.375rem) clamp(0.5rem, 1vw, 0.75rem);
+    transition: var(--windrose-transition);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 28px;
+    width: 28px;
+    box-shadow: none;
+    appearance: none;
+    outline: none;
+
+    svg {
+      width: 16px;
+      height: 16px;
+      color: currentColor;
+    }
+
+    &::before, &::after {
+      display: none;
+    }
+
+    &:hover {
+      border-color: var(--windrose-border-secondary);
+      color: var(--windrose-border-primary);
+    }
+
+    &#{$toggle}-active {
+      border-color: var(--windrose-border-primary);
+      color: var(--windrose-border-primary);
+
+      &:hover {
+        border-color: var(--windrose-border-primary-dark);
+        color: var(--windrose-border-primary-dark);
+      }
+    }
+  }
 }
 
-/* Info Toggle Button */
-.windrose-info-toggle.windrose-info-toggle {
-  background: transparent;
-  border: 1px solid var(--windrose-border-secondary);
-  border-radius: 4px;
-  color: var(--windrose-text-disabled);
-  cursor: pointer;
-  padding: clamp(0.25rem, 0.5vw, 0.375rem) clamp(0.5rem, 1vw, 0.75rem);
-  transition: var(--windrose-transition);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 28px;
-  width: 28px;
-  box-shadow: none;
-  appearance: none;
-  outline: none;
-}
-.windrose-info-toggle.windrose-info-toggle svg {
-  width: 16px;
-  height: 16px;
-  color: currentColor;
-}
-.windrose-info-toggle.windrose-info-toggle::before, .windrose-info-toggle.windrose-info-toggle::after {
-  display: none;
-}
-.windrose-info-toggle.windrose-info-toggle:hover {
-  border-color: var(--windrose-border-secondary);
-  color: var(--windrose-border-primary);
-}
-.windrose-info-toggle.windrose-info-toggle.windrose-info-toggle-active {
-  border-color: var(--windrose-border-primary);
-  color: var(--windrose-border-primary);
-}
-.windrose-info-toggle.windrose-info-toggle.windrose-info-toggle-active:hover {
-  border-color: var(--windrose-border-primary-dark);
-  color: var(--windrose-border-primary-dark);
-}
-
-/* Save Status */
+// Save status
 .windrose-save-status {
   font-size: 18px;
   color: var(--windrose-success);
@@ -79,26 +89,25 @@
   display: flex;
   align-items: center;
   line-height: 1;
-}
-.windrose-save-status.windrose-save-status-unsaved {
-  color: var(--windrose-warning);
-}
-.windrose-save-status.windrose-save-status-saving {
-  animation: rotate 1s linear infinite;
-}
-.windrose-save-status.windrose-save-status-error {
-  color: var(--windrose-error);
+
+  &.windrose-save-status-unsaved {
+    color: var(--windrose-warning);
+  }
+
+  &.windrose-save-status-saving {
+    animation: rotate 1s linear infinite;
+  }
+
+  &.windrose-save-status-error {
+    color: var(--windrose-error);
+  }
 }
 
 @keyframes rotate {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
-/* Orientation change animation */
+
 /* ============================================
    FOOTER
    ============================================ */
@@ -113,61 +122,73 @@
    DECORATIVE CORNER BRACKETS
    ============================================ */
 .windrose-corner-bracket {
+  $bracket: &;
+
   position: absolute;
   width: 50px;
   height: 50px;
   pointer-events: none;
   z-index: 10;
-  /* Style all SVG paths and elements to use CSS variable */
-}
-.windrose-corner-bracket path, .windrose-corner-bracket line, .windrose-corner-bracket circle {
-  stroke: var(--windrose-border-primary);
-}
-.windrose-corner-bracket.windrose-corner-bracket-tl {
-  top: -2px;
-  left: -2px;
-}
-.windrose-corner-bracket.windrose-corner-bracket-tr {
-  top: -2px;
-  right: -2px;
-  transform: scaleX(-1);
-}
-.windrose-corner-bracket.windrose-corner-bracket-bl {
-  bottom: -2px;
-  left: -2px;
-  transform: scaleY(-1);
-}
-.windrose-corner-bracket.windrose-corner-bracket-br {
-  bottom: -2px;
-  right: -2px;
-  transform: scale(-1);
+
+  path, line, circle {
+    stroke: var(--windrose-border-primary);
+  }
+
+  &#{$bracket}-tl {
+    top: -2px;
+    left: -2px;
+  }
+
+  &#{$bracket}-tr {
+    top: -2px;
+    right: -2px;
+    transform: scaleX(-1);
+  }
+
+  &#{$bracket}-bl {
+    bottom: -2px;
+    left: -2px;
+    transform: scaleY(-1);
+  }
+
+  &#{$bracket}-br {
+    bottom: -2px;
+    right: -2px;
+    transform: scale(-1);
+  }
 }
 
-/* Tool Palette Brackets (Outward facing) */
+// Tool palette brackets
 .windrose-tool-palette-bracket {
+  $bracket: &;
+
   position: absolute;
   width: 40px;
   height: 40px;
   pointer-events: none;
   z-index: 10;
-}
-.windrose-tool-palette-bracket.windrose-tool-palette-bracket-tl {
-  top: -2px;
-  left: -2px;
-  transform: rotate(0deg);
-}
-.windrose-tool-palette-bracket.windrose-tool-palette-bracket-tr {
-  top: -2px;
-  right: -2px;
-  transform: scaleX(-1);
-}
-.windrose-tool-palette-bracket.windrose-tool-palette-bracket-bl {
-  bottom: -2px;
-  left: -2px;
-  transform: scaleY(-1);
-}
-.windrose-tool-palette-bracket.windrose-tool-palette-bracket-br {
-  bottom: -2px;
-  right: -2px;
-  transform: scale(-1);
+
+  &#{$bracket}-tl {
+    top: -2px;
+    left: -2px;
+    transform: rotate(0deg);
+  }
+
+  &#{$bracket}-tr {
+    top: -2px;
+    right: -2px;
+    transform: scaleX(-1);
+  }
+
+  &#{$bracket}-bl {
+    bottom: -2px;
+    left: -2px;
+    transform: scaleY(-1);
+  }
+
+  &#{$bracket}-br {
+    bottom: -2px;
+    right: -2px;
+    transform: scale(-1);
+  }
 }

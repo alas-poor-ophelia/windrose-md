@@ -103,6 +103,11 @@ body {
   width: 100%;
   transition: width 0.3s ease, margin-left 0.3s ease;
 }
+.windrose-container.windrose-expanded {
+  --windrose-offset: 0px;
+  width: calc(100cqi - 2 * var(--windrose-offset));
+  margin-inline: calc((100% - 100cqi) / 2 + var(--windrose-offset));
+}
 
 .callout[data-callout=dungeon-map],
 .callout[data-callout=dungeon-map] .callout-content {
@@ -114,24 +119,18 @@ body {
   container-type: inline-size;
 }
 
-.windrose-container.windrose-expanded {
-  --windrose-offset: 0px;
-  width: calc(100cqi - 2 * var(--windrose-offset));
-  margin-inline: calc((100% - 100cqi) / 2 + var(--windrose-offset));
-}
-
-.markdown-source-view.is-live-preview .windrose-container.windrose-expanded, .markdown-source-view.is-live-preview .windrose-container.windrose-animating {
+.markdown-source-view.is-live-preview .windrose-container.windrose-expanded,
+.markdown-source-view.is-live-preview .windrose-container.windrose-animating {
   --windrose-offset: 20px;
 }
-
 .markdown-source-view.is-live-preview .cm-content > .cm-embed-block[contenteditable=false].windrose-cm-expanded,
 .markdown-source-view.is-live-preview .cm-content > .cm-embed-block[contenteditable=false].windrose-cm-animating {
   contain: none;
   overflow: normal;
   animation: none;
 }
-
-.markdown-source-view.is-live-preview .cm-embed-block:hover.windrose-cm-parent.windrose-cm-expanded, .markdown-source-view.is-live-preview .cm-embed-block:hover.windrose-cm-parent.windrose-cm-animating {
+.markdown-source-view.is-live-preview .cm-embed-block:hover.windrose-cm-parent.windrose-cm-expanded,
+.markdown-source-view.is-live-preview .cm-embed-block:hover.windrose-cm-parent.windrose-cm-animating {
   overflow: visible;
   animation: none;
 }
@@ -151,7 +150,6 @@ body {
   overflow: hidden;
   width: 100%;
 }
-
 .windrose-canvas-and-controls {
   flex: 1;
   position: relative;
@@ -162,7 +160,6 @@ body {
   justify-content: center;
   align-items: center;
 }
-
 .windrose-canvas-container {
   position: relative;
   background-color: var(--windrose-bg-primary);
@@ -173,7 +170,6 @@ body {
   align-items: center;
   overflow: hidden;
 }
-
 .windrose-canvas-container canvas {
   display: block;
 }
@@ -191,6 +187,11 @@ body {
   justify-content: space-between;
   align-items: center;
 }
+.windrose-header-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 
 .windrose-map-name {
   background: transparent;
@@ -202,18 +203,10 @@ body {
   flex: 1;
   margin-right: 16px;
 }
-
 .windrose-map-name::placeholder {
   color: var(--windrose-text-disabled);
 }
 
-.windrose-header-controls {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-/* Info Toggle Button */
 .windrose-info-toggle.windrose-info-toggle {
   background: transparent;
   border: 1px solid var(--windrose-border-secondary);
@@ -231,33 +224,27 @@ body {
   appearance: none;
   outline: none;
 }
-
 .windrose-info-toggle.windrose-info-toggle svg {
   width: 16px;
   height: 16px;
   color: currentColor;
 }
-
 .windrose-info-toggle.windrose-info-toggle::before, .windrose-info-toggle.windrose-info-toggle::after {
   display: none;
 }
-
 .windrose-info-toggle.windrose-info-toggle:hover {
   border-color: var(--windrose-border-secondary);
   color: var(--windrose-border-primary);
 }
-
 .windrose-info-toggle.windrose-info-toggle.windrose-info-toggle-active {
   border-color: var(--windrose-border-primary);
   color: var(--windrose-border-primary);
 }
-
 .windrose-info-toggle.windrose-info-toggle.windrose-info-toggle-active:hover {
   border-color: var(--windrose-border-primary-dark);
   color: var(--windrose-border-primary-dark);
 }
 
-/* Save Status */
 .windrose-save-status {
   font-size: 18px;
   color: var(--windrose-success);
@@ -266,15 +253,12 @@ body {
   align-items: center;
   line-height: 1;
 }
-
 .windrose-save-status.windrose-save-status-unsaved {
   color: var(--windrose-warning);
 }
-
 .windrose-save-status.windrose-save-status-saving {
   animation: rotate 1s linear infinite;
 }
-
 .windrose-save-status.windrose-save-status-error {
   color: var(--windrose-error);
 }
@@ -287,7 +271,6 @@ body {
     transform: rotate(360deg);
   }
 }
-/* Orientation change animation */
 /* ============================================
    FOOTER
    ============================================ */
@@ -307,37 +290,30 @@ body {
   height: 50px;
   pointer-events: none;
   z-index: 10;
-  /* Style all SVG paths and elements to use CSS variable */
 }
-
 .windrose-corner-bracket path, .windrose-corner-bracket line, .windrose-corner-bracket circle {
   stroke: var(--windrose-border-primary);
 }
-
 .windrose-corner-bracket.windrose-corner-bracket-tl {
   top: -2px;
   left: -2px;
 }
-
 .windrose-corner-bracket.windrose-corner-bracket-tr {
   top: -2px;
   right: -2px;
   transform: scaleX(-1);
 }
-
 .windrose-corner-bracket.windrose-corner-bracket-bl {
   bottom: -2px;
   left: -2px;
   transform: scaleY(-1);
 }
-
 .windrose-corner-bracket.windrose-corner-bracket-br {
   bottom: -2px;
   right: -2px;
   transform: scale(-1);
 }
 
-/* Tool Palette Brackets (Outward facing) */
 .windrose-tool-palette-bracket {
   position: absolute;
   width: 40px;
@@ -345,25 +321,21 @@ body {
   pointer-events: none;
   z-index: 10;
 }
-
 .windrose-tool-palette-bracket.windrose-tool-palette-bracket-tl {
   top: -2px;
   left: -2px;
   transform: rotate(0deg);
 }
-
 .windrose-tool-palette-bracket.windrose-tool-palette-bracket-tr {
   top: -2px;
   right: -2px;
   transform: scaleX(-1);
 }
-
 .windrose-tool-palette-bracket.windrose-tool-palette-bracket-bl {
   bottom: -2px;
   left: -2px;
   transform: scaleY(-1);
 }
-
 .windrose-tool-palette-bracket.windrose-tool-palette-bracket-br {
   bottom: -2px;
   right: -2px;
@@ -463,43 +435,43 @@ body {
   align-items: center;
   justify-content: center;
 }
-
 .windrose-tool-btn:hover:not(.windrose-tool-btn-active) {
   background-color: var(--windrose-bg-tertiary);
   border-color: var(--windrose-border-secondary);
 }
-
 .windrose-tool-btn:hover:not(.windrose-tool-btn-active) svg {
   color: var(--windrose-text-primary);
 }
-
 .windrose-tool-btn.windrose-tool-btn-active {
   background-color: var(--windrose-border-primary);
   border-color: var(--windrose-border-primary-dark);
   color: var(--windrose-bg-primary);
 }
-
 .windrose-tool-btn.windrose-tool-btn-active svg {
   color: var(--windrose-accent-red);
   filter: drop-shadow(1px 0 0 var(--windrose-border-primary)) drop-shadow(-1px 0 0 var(--windrose-border-primary)) drop-shadow(0 1px 0 var(--windrose-border-primary)) drop-shadow(0 -1px 0 var(--windrose-border-primary));
 }
-
 .windrose-tool-btn svg {
   color: var(--windrose-border-primary);
   width: 20px;
   height: 20px;
 }
-
 .windrose-tool-btn > span {
   display: flex;
+}
+.windrose-tool-btn-container {
+  position: relative;
+  display: inline-block;
+}
+.windrose-tool-btn-container .windrose-tool-btn {
+  min-width: 28px;
+  padding: 6px 5px;
 }
 
 .windrose-color-tool-btn {
   position: relative;
-  /* Bottom border shows current color - defined inline via style attribute */
 }
 
-/* Sub-tool indicator triangle */
 .windrose-subtool-indicator {
   position: absolute;
   bottom: 1px;
@@ -509,25 +481,6 @@ body {
   pointer-events: none;
   line-height: 1;
 }
-
-/* Buttons with sub-tools should be narrower to fit on iPad */
-.windrose-tool-btn-container .windrose-tool-btn {
-  min-width: 28px;
-  padding: 6px 5px;
-}
-
-.windrose-tool-btn-active .windrose-subtool-indicator {
-  opacity: 0.9;
-  color: var(--windrose-bg-primary);
-}
-
-/* Tool button container for sub-menu positioning */
-.windrose-tool-btn-container {
-  position: relative;
-  display: inline-block;
-}
-
-/* Sub-menu flyout */
 .windrose-subtool-menu {
   position: absolute;
   left: 100%;
@@ -546,7 +499,6 @@ body {
   box-shadow: 0 4px 12px oklch(0% 0 0deg / 0.4), inset 0 1px 0 oklch(100% 0 0deg / 0.05);
   min-width: 120px;
 }
-
 .windrose-subtool-option {
   display: flex;
   align-items: center;
@@ -565,28 +517,28 @@ body {
   text-align: left;
   box-sizing: border-box;
 }
-
 .windrose-subtool-option svg {
   width: 16px;
   height: 16px;
   color: var(--windrose-border-primary);
   flex-shrink: 0;
 }
-
 .windrose-subtool-option:hover {
   background: var(--windrose-bg-tertiary);
 }
-
 .windrose-subtool-option.windrose-subtool-option-active {
   background: var(--windrose-border-primary);
   color: var(--windrose-bg-primary);
 }
-
 .windrose-subtool-option.windrose-subtool-option-active svg {
   color: var(--windrose-bg-primary);
 }
 
-/* History Controls */
+.windrose-tool-btn-active .windrose-subtool-indicator {
+  opacity: 0.9;
+  color: var(--windrose-bg-primary);
+}
+
 .windrose-history-controls {
   display: flex;
   gap: 4px;
@@ -594,7 +546,6 @@ body {
   padding-left: 8px;
   border-left: 1px solid var(--windrose-border-secondary);
 }
-
 .windrose-history-btn {
   background-color: var(--windrose-bg-secondary);
   border: 1px solid var(--windrose-border-secondary);
@@ -610,27 +561,22 @@ body {
   align-items: center;
   justify-content: center;
 }
-
 .windrose-history-btn svg {
   color: var(--windrose-text-muted);
   width: 18px;
   height: 18px;
 }
-
 .windrose-history-btn:hover:not(:disabled) {
   background-color: var(--windrose-bg-tertiary);
   border-color: var(--windrose-border-secondary);
 }
-
 .windrose-history-btn:hover:not(:disabled) svg {
   color: var(--windrose-border-primary);
 }
-
 .windrose-history-btn:disabled {
   opacity: 0.3;
   cursor: not-allowed;
 }
-
 .windrose-history-btn:disabled svg {
   color: oklch(36% 0 0deg);
 }
@@ -649,6 +595,20 @@ body {
   min-width: 80px;
   width: 80px;
   align-items: center;
+}
+.windrose-controls-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99;
+  background: transparent;
+  cursor: default;
+}
+.windrose-controls-drawer {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: center;
+  overflow: hidden;
 }
 
 .windrose-compass {
@@ -670,24 +630,27 @@ body {
   position: relative;
   flex-shrink: 0;
 }
-
 .windrose-compass:hover {
   transform: scale(1.03);
 }
-
 .windrose-compass-disabled {
   filter: grayscale(1);
   opacity: 0.5;
 }
-
 .windrose-compass-disabled:hover {
   transform: none;
 }
-
 .windrose-compass-svg {
   width: 100%;
   height: 100%;
   overflow: visible;
+}
+.windrose-compass-animated {
+  transform: translateY(-39px);
+  transition: transform 180ms cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+.windrose-compass-revealed {
+  transform: translateY(0);
 }
 
 .windrose-zoom-controls {
@@ -695,6 +658,18 @@ body {
   flex-direction: column;
   gap: 6px;
   align-items: center;
+}
+.windrose-zoom-level {
+  font-size: 10px;
+  font-weight: 600;
+  color: oklch(from var(--windrose-border-primary) l c h/0.8);
+  text-align: center;
+  padding: 3px 6px;
+  user-select: none;
+  background-color: oklch(0% 0 0deg / 0.5);
+  border-radius: 6px;
+  width: 38px;
+  box-sizing: border-box;
 }
 
 button:is(.windrose-zoom-btn, .windrose-expand-btn, .windrose-layer-btn, .windrose-orientation-btn),
@@ -725,62 +700,17 @@ button:is(.windrose-zoom-btn, .windrose-expand-btn, .windrose-layer-btn, .windro
   overflow: visible;
   user-select: none;
 }
-
 button:is(.windrose-zoom-btn, .windrose-expand-btn, .windrose-layer-btn, .windrose-orientation-btn) svg,
 .is-tablet button:is(.windrose-zoom-btn, .windrose-expand-btn, .windrose-layer-btn, .windrose-orientation-btn) svg {
   display: block;
   width: 1em;
   height: 1em;
 }
-
 button:is(.windrose-zoom-btn, .windrose-expand-btn, .windrose-layer-btn, .windrose-orientation-btn):hover,
 .is-tablet button:is(.windrose-zoom-btn, .windrose-expand-btn, .windrose-layer-btn, .windrose-orientation-btn):hover {
   background-color: color-mix(in srgb, var(--windrose-bg-primary) 90%, transparent);
   border-color: oklch(from var(--windrose-border-primary) l c h/0.6);
   transform: scale(1.05);
-}
-
-.windrose-zoom-level {
-  font-size: 10px;
-  font-weight: 600;
-  color: oklch(from var(--windrose-border-primary) l c h/0.8);
-  text-align: center;
-  padding: 3px 6px;
-  user-select: none;
-  background-color: oklch(0% 0 0deg / 0.5);
-  border-radius: 6px;
-  width: 38px;
-  box-sizing: border-box;
-}
-
-/* ============================================
-   CONTROLS DRAWER (Collapsible Animation)
-   ============================================ */
-/* Invisible overlay to capture taps outside controls (touch devices) */
-.windrose-controls-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 99; /* Just below controls (100) */
-  background: transparent;
-  cursor: default;
-}
-
-.windrose-controls-drawer {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  align-items: center;
-  overflow: hidden;
-}
-
-/* Compass slides down to make room for expand button */
-.windrose-compass-animated {
-  transform: translateY(-39px); /* Button height (35px) + gap (4px) */
-  transition: transform 180ms cubic-bezier(0.25, 0.1, 0.25, 1); /* Near-linear with subtle ease-out */
-}
-
-.windrose-compass-revealed {
-  transform: translateY(0);
 }
 
 .windrose-drawer-item {
@@ -790,12 +720,9 @@ button:is(.windrose-zoom-btn, .windrose-expand-btn, .windrose-layer-btn, .windro
   transition-property: opacity, transform;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
 }
-
-/* Upward slide variant for items above the compass */
 .windrose-drawer-item-up {
   transform: translateY(20px) scale(0.8);
 }
-
 .windrose-drawer-item-visible {
   opacity: 1;
   transform: translateY(0) scale(1);
@@ -819,14 +746,12 @@ button:is(.windrose-zoom-btn, .windrose-expand-btn, .windrose-layer-btn, .windro
   position: relative;
   box-sizing: border-box;
 }
-
 .windrose-object-sidebar.windrose-object-sidebar-collapsed {
   width: 0;
   min-width: 0;
   border-right: none;
   overflow: visible;
 }
-
 .windrose-object-sidebar-header {
   text-wrap: balance;
   display: flex;
@@ -839,6 +764,134 @@ button:is(.windrose-zoom-btn, .windrose-expand-btn, .windrose-layer-btn, .windro
   background: var(--windrose-bg-secondary);
   border-bottom: 1px solid var(--windrose-border-secondary);
   flex-shrink: 0;
+}
+.windrose-object-sidebar-set-selector {
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--windrose-border-secondary);
+  flex-shrink: 0;
+}
+.windrose-object-sidebar-select {
+  width: 100%;
+  background: var(--windrose-bg-secondary);
+  color: var(--windrose-text-primary);
+  border: 1px solid var(--windrose-border-secondary);
+  border-radius: 3px;
+  padding: 3px 4px;
+  font-size: 11px;
+}
+.windrose-object-sidebar-search {
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--windrose-border-secondary);
+  flex-shrink: 0;
+}
+.windrose-object-sidebar-search-input {
+  width: 100%;
+  background: var(--windrose-bg-secondary);
+  color: var(--windrose-text-primary);
+  border: 1px solid var(--windrose-border-secondary);
+  border-radius: 3px;
+  padding: 4px 6px;
+  font-size: 11px;
+  box-sizing: border-box;
+}
+.windrose-object-sidebar-search-input::placeholder {
+  color: var(--windrose-text-muted);
+}
+.windrose-object-sidebar-search-input:focus {
+  outline: none;
+  border-color: var(--windrose-border-primary);
+}
+.windrose-object-sidebar-content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 4px 6px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--windrose-bg-tertiary) transparent;
+  overscroll-behavior: contain;
+}
+.windrose-object-sidebar-category {
+  margin-bottom: 4px;
+}
+.windrose-object-sidebar-category-count {
+  margin-left: auto;
+  font-size: 8px;
+  color: var(--windrose-text-disabled);
+}
+.windrose-object-sidebar-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 3px;
+  padding: 3px 0;
+}
+.windrose-object-sidebar-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 6px;
+  background: var(--windrose-bg-secondary);
+  border-top: 1px solid var(--windrose-border-secondary);
+  flex-shrink: 0;
+}
+.windrose-object-sidebar-empty {
+  padding: clamp(1rem, 1.5vw, 1.25rem) clamp(0.5rem, 1vw, 0.75rem);
+  text-align: center;
+  color: var(--windrose-text-muted);
+  font-size: 11px;
+}
+.windrose-object-sidebar-category-label,
+.is-tablet .windrose-object-sidebar-category-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 3px 4px;
+  min-height: unset;
+  max-height: unset;
+  background: none;
+  border: none;
+  color: var(--windrose-text-muted);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+}
+.windrose-object-sidebar-category-label:hover,
+.is-tablet .windrose-object-sidebar-category-label:hover {
+  color: var(--windrose-text-secondary);
+}
+
+.windrose-object-sidebar-action-btn,
+.is-tablet .windrose-object-sidebar-action-btn {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  min-height: 28px;
+  max-width: 28px;
+  max-height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--windrose-bg-secondary);
+  color: var(--windrose-text-secondary);
+  border: 1px solid var(--windrose-border-secondary);
+  border-radius: 3px;
+  cursor: pointer;
+  padding: 0;
+  transition: var(--windrose-transition);
+}
+.windrose-object-sidebar-action-btn:hover,
+.is-tablet .windrose-object-sidebar-action-btn:hover {
+  background: var(--windrose-bg-tertiary);
+  color: var(--windrose-text-primary);
+}
+
+.windrose-object-sidebar-action-active.windrose-object-sidebar-action-active,
+.windrose-object-sidebar-action-active.windrose-object-sidebar-action-active:hover {
+  background: var(--windrose-border-primary);
+  color: var(--windrose-bg-primary);
+  border-color: var(--windrose-border-primary);
 }
 
 .windrose-sidebar-collapse-btn.windrose-sidebar-collapse-btn {
@@ -859,14 +912,12 @@ button:is(.windrose-zoom-btn, .windrose-expand-btn, .windrose-layer-btn, .windro
   height: 24px;
   box-shadow: 0 0 8px oklch(from var(--windrose-border-primary) l c h/0.2);
 }
-
 .windrose-sidebar-collapse-btn.windrose-sidebar-collapse-btn:hover {
   color: var(--windrose-text-primary);
   border-color: var(--windrose-border-primary);
   background-color: oklch(from var(--windrose-border-primary) l c h/0.1);
   box-shadow: 0 0 12px oklch(from var(--windrose-border-primary) l c h/0.4);
 }
-
 .windrose-sidebar-collapse-btn.windrose-sidebar-collapse-btn svg {
   display: block;
   flex-shrink: 0;
@@ -896,7 +947,6 @@ button:is(.windrose-zoom-btn, .windrose-expand-btn, .windrose-layer-btn, .windro
   transition: var(--windrose-transition);
   padding: 0;
 }
-
 .windrose-sidebar-toggle:hover,
 .is-tablet .windrose-sidebar-toggle:hover {
   background-color: var(--windrose-bg-tertiary);
@@ -927,102 +977,9 @@ button:is(.windrose-zoom-btn, .windrose-expand-btn, .windrose-layer-btn, .windro
   box-shadow: 2px 2px 6px oklch(0% 0 0deg / 0.4), 0 0 12px oklch(from var(--windrose-border-primary) l c h/0.15);
   padding: 0;
 }
-
 .windrose-freeform-collapsed-indicator:hover,
 .is-tablet .windrose-freeform-collapsed-indicator:hover {
   filter: brightness(1.15);
-}
-
-.windrose-object-sidebar-set-selector {
-  padding: 4px 6px;
-  border-bottom: 1px solid var(--windrose-border-secondary);
-  flex-shrink: 0;
-}
-
-.windrose-object-sidebar-select {
-  width: 100%;
-  background: var(--windrose-bg-secondary);
-  color: var(--windrose-text-primary);
-  border: 1px solid var(--windrose-border-secondary);
-  border-radius: 3px;
-  padding: 3px 4px;
-  font-size: 11px;
-}
-
-.windrose-object-sidebar-search {
-  padding: 4px 6px;
-  border-bottom: 1px solid var(--windrose-border-secondary);
-  flex-shrink: 0;
-}
-
-.windrose-object-sidebar-search-input {
-  width: 100%;
-  background: var(--windrose-bg-secondary);
-  color: var(--windrose-text-primary);
-  border: 1px solid var(--windrose-border-secondary);
-  border-radius: 3px;
-  padding: 4px 6px;
-  font-size: 11px;
-  box-sizing: border-box;
-}
-
-.windrose-object-sidebar-search-input::placeholder {
-  color: var(--windrose-text-muted);
-}
-
-.windrose-object-sidebar-search-input:focus {
-  outline: none;
-  border-color: var(--windrose-border-primary);
-}
-
-.windrose-object-sidebar-content {
-  flex: 1;
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding: 4px 6px;
-  scrollbar-width: thin;
-  scrollbar-color: var(--windrose-bg-tertiary) transparent;
-  overscroll-behavior: contain;
-}
-
-.windrose-object-sidebar-category {
-  margin-bottom: 4px;
-}
-
-.windrose-object-sidebar-category-label,
-.is-tablet .windrose-object-sidebar-category-label {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  width: 100%;
-  padding: 3px 4px;
-  min-height: unset;
-  max-height: unset;
-  background: none;
-  border: none;
-  color: var(--windrose-text-muted);
-  font-size: 9px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  cursor: pointer;
-}
-
-.windrose-object-sidebar-category-label:hover,
-.is-tablet .windrose-object-sidebar-category-label:hover {
-  color: var(--windrose-text-secondary);
-}
-
-.windrose-object-sidebar-category-count {
-  margin-left: auto;
-  font-size: 8px;
-  color: var(--windrose-text-disabled);
-}
-
-.windrose-object-sidebar-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 3px;
-  padding: 3px 0;
 }
 
 button.windrose-object-grid-item,
@@ -1046,7 +1003,6 @@ button.windrose-object-grid-item,
   height: auto;
   box-shadow: none;
 }
-
 button.windrose-object-grid-item:hover,
 .is-tablet button.windrose-object-grid-item:hover {
   border-color: var(--windrose-text-muted);
@@ -1068,13 +1024,11 @@ button.windrose-object-grid-item:hover,
   color: var(--windrose-text-primary);
   text-rendering: optimizeSpeed;
 }
-
 .windrose-object-grid-image {
   width: 24px;
   height: 24px;
   object-fit: contain;
 }
-
 .windrose-object-grid-label {
   font-size: 8px;
   line-height: 1.2;
@@ -1084,57 +1038,6 @@ button.windrose-object-grid-item:hover,
   text-overflow: ellipsis;
   white-space: nowrap;
   width: 100%;
-}
-
-.windrose-object-sidebar-footer {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  padding: 6px;
-  background: var(--windrose-bg-secondary);
-  border-top: 1px solid var(--windrose-border-secondary);
-  flex-shrink: 0;
-}
-
-.windrose-object-sidebar-action-btn,
-.is-tablet .windrose-object-sidebar-action-btn {
-  width: 28px;
-  height: 28px;
-  min-width: 28px;
-  min-height: 28px;
-  max-width: 28px;
-  max-height: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--windrose-bg-secondary);
-  color: var(--windrose-text-secondary);
-  border: 1px solid var(--windrose-border-secondary);
-  border-radius: 3px;
-  cursor: pointer;
-  padding: 0;
-  transition: var(--windrose-transition);
-}
-
-.windrose-object-sidebar-action-btn:hover,
-.is-tablet .windrose-object-sidebar-action-btn:hover {
-  background: var(--windrose-bg-tertiary);
-  color: var(--windrose-text-primary);
-}
-
-.windrose-object-sidebar-action-active.windrose-object-sidebar-action-active,
-.windrose-object-sidebar-action-active.windrose-object-sidebar-action-active:hover {
-  background: var(--windrose-border-primary);
-  color: var(--windrose-bg-primary);
-  border-color: var(--windrose-border-primary);
-}
-
-.windrose-object-sidebar-empty {
-  padding: clamp(1rem, 1.5vw, 1.25rem) clamp(0.5rem, 1vw, 0.75rem);
-  text-align: center;
-  color: var(--windrose-text-muted);
-  font-size: 11px;
 }
 
 /* ============================================
@@ -1152,14 +1055,12 @@ button.windrose-object-grid-item:hover,
   height: 100%;
   box-sizing: border-box;
 }
-
 .windrose-tile-browser.windrose-tile-browser-collapsed {
   width: 0;
   border-left: none;
   overflow: visible;
   position: relative;
 }
-
 .windrose-tile-browser-toggle,
 .is-tablet .windrose-tile-browser-toggle {
   position: absolute;
@@ -1184,7 +1085,6 @@ button.windrose-object-grid-item:hover,
   transition: var(--windrose-transition);
   padding: 0;
 }
-
 .windrose-tile-browser-toggle:hover,
 .is-tablet .windrose-tile-browser-toggle:hover {
   background-color: var(--windrose-bg-tertiary);
@@ -1204,7 +1104,6 @@ button.windrose-object-grid-item:hover,
   border-bottom: 1px solid var(--windrose-border-secondary);
   flex-shrink: 0;
 }
-
 .windrose-tile-browser-tileset-selector {
   padding: 4px 6px;
   border-bottom: 1px solid var(--windrose-border-secondary);
@@ -1213,7 +1112,6 @@ button.windrose-object-grid-item:hover,
   align-items: center;
   gap: 4px;
 }
-
 .windrose-tile-browser-tileset-name {
   flex: 1;
   font-size: 12px;
@@ -1222,83 +1120,15 @@ button.windrose-object-grid-item:hover,
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-
 .windrose-tile-browser-config-btn {
   flex-shrink: 0;
 }
-
 .windrose-tile-browser-config {
   padding: 6px 8px;
   border-bottom: 1px solid var(--windrose-border-secondary);
   background: var(--background-secondary-alt);
   flex-shrink: 0;
 }
-
-.windrose-tile-config-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2px 6px;
-  margin-bottom: 8px;
-  font-size: 11px;
-}
-
-.windrose-tile-config-row:last-child {
-  margin-bottom: 0;
-}
-
-.windrose-tile-config-row label {
-  flex-shrink: 0;
-  color: var(--text-muted);
-}
-
-.windrose-tile-config-slider {
-  flex-basis: 100%;
-  order: 3;
-  min-width: 0;
-}
-
-.windrose-tile-config-value {
-  flex-shrink: 0;
-  margin-left: auto;
-  text-align: right;
-  color: var(--text-muted);
-  font-variant-numeric: tabular-nums;
-}
-
-.windrose-tile-config-select {
-  flex-basis: 100%;
-  order: 3;
-  min-width: 0;
-  font-size: 11px;
-}
-
-/* Tablet overrides for tileset config panel */
-.is-tablet .windrose-tile-browser-config {
-  padding: 10px 12px;
-}
-
-.is-tablet .windrose-tile-config-row {
-  margin-bottom: 12px;
-  font-size: 13px;
-  gap: 4px 8px;
-}
-
-.is-tablet .windrose-tile-config-select {
-  font-size: 13px;
-  padding: 6px 8px;
-}
-
-button.windrose-tile-browser-config-btn,
-.is-tablet button.windrose-tile-browser-config-btn {
-  width: 28px;
-  height: 28px;
-  min-width: 28px;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
 .windrose-tile-browser-select {
   flex: 1;
   min-width: 0;
@@ -1309,13 +1139,11 @@ button.windrose-tile-browser-config-btn,
   padding: 3px 4px;
   font-size: 11px;
 }
-
 .windrose-tile-browser-search {
   padding: 4px 6px;
   border-bottom: 1px solid var(--windrose-border-secondary);
   flex-shrink: 0;
 }
-
 .windrose-tile-browser-search-input {
   width: 100%;
   background: var(--windrose-bg-secondary);
@@ -1326,16 +1154,13 @@ button.windrose-tile-browser-config-btn,
   font-size: 11px;
   box-sizing: border-box;
 }
-
 .windrose-tile-browser-search-input::placeholder {
   color: var(--windrose-text-muted);
 }
-
 .windrose-tile-browser-search-input:focus {
   outline: none;
   border-color: var(--windrose-border-primary);
 }
-
 .windrose-tile-browser-content {
   flex: 1;
   overflow-y: auto;
@@ -1345,7 +1170,6 @@ button.windrose-tile-browser-config-btn,
   scrollbar-color: var(--windrose-bg-tertiary) transparent;
   overscroll-behavior: contain;
 }
-
 .windrose-tile-browser-category-label,
 .is-tablet .windrose-tile-browser-category-label {
   display: flex;
@@ -1363,7 +1187,6 @@ button.windrose-tile-browser-config-btn,
   letter-spacing: 0.5px;
   cursor: pointer;
 }
-
 .windrose-tile-browser-category-label:hover,
 .is-tablet .windrose-tile-browser-category-label:hover {
   color: var(--windrose-text-secondary);
@@ -1374,12 +1197,159 @@ button.windrose-tile-browser-config-btn,
   font-size: 8px;
   color: var(--windrose-text-disabled);
 }
-
 .windrose-tile-browser-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 3px;
   padding: 3px 0;
+}
+.windrose-tile-browser-empty {
+  padding: clamp(1rem, 1.5vw, 1.25rem) clamp(0.5rem, 1vw, 0.75rem);
+  text-align: center;
+  color: var(--windrose-text-muted);
+  font-size: 11px;
+}
+.windrose-tile-browser-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 6px;
+  background: var(--windrose-bg-secondary);
+  border-top: 1px solid var(--windrose-border-secondary);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+.windrose-tile-browser-scale-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: var(--windrose-bg-secondary);
+  border-top: 1px solid var(--windrose-border-secondary);
+  flex-shrink: 0;
+  color: var(--windrose-text-muted);
+  font-size: 11px;
+}
+.windrose-tile-browser-scale-row .windrose-tile-config-slider {
+  flex: 1;
+}
+.windrose-tile-browser-action-btn,
+.is-tablet .windrose-tile-browser-action-btn {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  min-height: 28px;
+  max-width: 28px;
+  max-height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--windrose-bg-secondary);
+  color: var(--windrose-text-secondary);
+  border: 1px solid var(--windrose-border-secondary);
+  border-radius: 3px;
+  cursor: pointer;
+  padding: 0;
+  transition: var(--windrose-transition);
+}
+.windrose-tile-browser-action-btn:hover,
+.is-tablet .windrose-tile-browser-action-btn:hover {
+  background: var(--windrose-bg-tertiary);
+  color: var(--windrose-text-primary);
+}
+
+.windrose-tile-browser-action-active.windrose-tile-browser-action-active,
+.windrose-tile-browser-action-active.windrose-tile-browser-action-active:hover {
+  background: var(--windrose-border-primary);
+  color: var(--windrose-bg-primary);
+  border-color: var(--windrose-border-primary);
+}
+
+.windrose-tile-browser-rotation-label {
+  font-size: 10px;
+  color: var(--windrose-text-muted);
+  min-width: 28px;
+  text-align: center;
+}
+.windrose-tile-browser-layer-toggle {
+  display: flex;
+  gap: 1px;
+  background: var(--windrose-border-secondary);
+  border-radius: 4px;
+  overflow: hidden;
+}
+button.windrose-tile-browser-layer-btn,
+.is-tablet button.windrose-tile-browser-layer-btn {
+  background: transparent;
+  border: none;
+  color: var(--windrose-text-muted);
+  font-size: 9px;
+  padding: 2px 6px;
+  width: auto;
+  height: auto;
+  min-width: 0;
+  min-height: 0;
+  max-width: none;
+  max-height: none;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  box-shadow: none;
+}
+
+.windrose-tile-browser-layer-btn:hover {
+  color: var(--windrose-text-primary);
+  background: oklch(100% 0 0deg / 0.1);
+}
+button.windrose-tile-browser-layer-btn.windrose-tile-browser-layer-active,
+.is-tablet button.windrose-tile-browser-layer-btn.windrose-tile-browser-layer-active {
+  background: var(--windrose-border-primary);
+  color: var(--windrose-bg-primary);
+}
+
+button.windrose-tile-browser-config-btn,
+.is-tablet button.windrose-tile-browser-config-btn {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.windrose-tile-config-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 6px;
+  margin-bottom: 8px;
+  font-size: 11px;
+}
+.windrose-tile-config-row:last-child {
+  margin-bottom: 0;
+}
+.windrose-tile-config-row label {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+.windrose-tile-config-slider {
+  flex-basis: 100%;
+  order: 3;
+  min-width: 0;
+}
+.windrose-tile-config-value {
+  flex-shrink: 0;
+  margin-left: auto;
+  text-align: right;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.windrose-tile-config-select {
+  flex-basis: 100%;
+  order: 3;
+  min-width: 0;
+  font-size: 11px;
 }
 
 .windrose-tile-thumb,
@@ -1400,7 +1370,6 @@ button.windrose-tile-browser-config-btn,
   max-height: unset;
   transition: var(--windrose-transition);
 }
-
 .windrose-tile-thumb:hover,
 .is-tablet .windrose-tile-thumb:hover {
   border-color: var(--windrose-text-muted);
@@ -1432,7 +1401,6 @@ button.windrose-tile-browser-config-btn,
   pointer-events: none;
   z-index: 10000;
 }
-
 .windrose-tile-preview-label {
   font-size: 10px;
   color: var(--windrose-text-muted);
@@ -1444,117 +1412,20 @@ button.windrose-tile-browser-config-btn,
   max-width: 192px;
 }
 
-.windrose-tile-browser-empty {
-  padding: clamp(1rem, 1.5vw, 1.25rem) clamp(0.5rem, 1vw, 0.75rem);
-  text-align: center;
-  color: var(--windrose-text-muted);
-  font-size: 11px;
+/* Tablet overrides for tileset config panel */
+.is-tablet .windrose-tile-browser-config {
+  padding: 10px 12px;
 }
 
-.windrose-tile-browser-footer {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  padding: 6px;
-  background: var(--windrose-bg-secondary);
-  border-top: 1px solid var(--windrose-border-secondary);
-  flex-shrink: 0;
-  flex-wrap: wrap;
+.is-tablet .windrose-tile-config-row {
+  margin-bottom: 12px;
+  font-size: 13px;
+  gap: 4px 8px;
 }
 
-.windrose-tile-browser-scale-row {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 8px;
-  background: var(--windrose-bg-secondary);
-  border-top: 1px solid var(--windrose-border-secondary);
-  flex-shrink: 0;
-  color: var(--windrose-text-muted);
-  font-size: 11px;
-}
-
-.windrose-tile-browser-scale-row .windrose-tile-config-slider {
-  flex: 1;
-}
-
-.windrose-tile-browser-action-btn,
-.is-tablet .windrose-tile-browser-action-btn {
-  width: 28px;
-  height: 28px;
-  min-width: 28px;
-  min-height: 28px;
-  max-width: 28px;
-  max-height: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--windrose-bg-secondary);
-  color: var(--windrose-text-secondary);
-  border: 1px solid var(--windrose-border-secondary);
-  border-radius: 3px;
-  cursor: pointer;
-  padding: 0;
-  transition: var(--windrose-transition);
-}
-
-.windrose-tile-browser-action-btn:hover,
-.is-tablet .windrose-tile-browser-action-btn:hover {
-  background: var(--windrose-bg-tertiary);
-  color: var(--windrose-text-primary);
-}
-
-.windrose-tile-browser-action-active.windrose-tile-browser-action-active,
-.windrose-tile-browser-action-active.windrose-tile-browser-action-active:hover {
-  background: var(--windrose-border-primary);
-  color: var(--windrose-bg-primary);
-  border-color: var(--windrose-border-primary);
-}
-
-.windrose-tile-browser-rotation-label {
-  font-size: 10px;
-  color: var(--windrose-text-muted);
-  min-width: 28px;
-  text-align: center;
-}
-
-.windrose-tile-browser-layer-toggle {
-  display: flex;
-  gap: 1px;
-  background: var(--windrose-border-secondary);
-  border-radius: 4px;
-  overflow: hidden;
-}
-
-button.windrose-tile-browser-layer-btn,
-.is-tablet button.windrose-tile-browser-layer-btn {
-  background: transparent;
-  border: none;
-  color: var(--windrose-text-muted);
-  font-size: 9px;
-  padding: 2px 6px;
-  width: auto;
-  height: auto;
-  min-width: 0;
-  min-height: 0;
-  max-width: none;
-  max-height: none;
-  cursor: pointer;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  box-shadow: none;
-}
-
-.windrose-tile-browser-layer-btn:hover {
-  color: var(--windrose-text-primary);
-  background: oklch(100% 0 0deg / 0.1);
-}
-
-button.windrose-tile-browser-layer-btn.windrose-tile-browser-layer-active,
-.is-tablet button.windrose-tile-browser-layer-btn.windrose-tile-browser-layer-active {
-  background: var(--windrose-border-primary);
-  color: var(--windrose-bg-primary);
+.is-tablet .windrose-tile-config-select {
+  font-size: 13px;
+  padding: 6px 8px;
 }
 
 /* ============================================
@@ -1594,7 +1465,6 @@ button.windrose-tile-browser-layer-btn.windrose-tile-browser-layer-active,
   user-select: none;
   box-shadow: 0 2px 8px oklch(0% 0 0deg / 0.3);
 }
-
 .windrose-rotate-button:hover,
 .windrose-note-button:hover,
 .windrose-link-note-button:hover,
@@ -1602,7 +1472,6 @@ button.windrose-tile-browser-layer-btn.windrose-tile-browser-layer-active,
   background-color: var(--windrose-accent-blue);
   transform: scale(1.1);
 }
-
 .windrose-rotate-button:active,
 .windrose-note-button:active,
 .windrose-link-note-button:active,
@@ -1630,7 +1499,6 @@ button.windrose-tile-browser-layer-btn.windrose-tile-browser-layer-active,
   color: var(--windrose-text-primary);
 }
 
-/* Visible Note Link Display */
 .windrose-selected-object-note {
   background: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
@@ -1653,13 +1521,11 @@ button.windrose-tile-browser-layer-btn.windrose-tile-browser-layer-active,
   position: relative;
   z-index: 2;
 }
-
 .windrose-note-display-link:hover {
   color: var(--text-accent-hover);
   text-decoration: underline;
 }
 
-/* Selection Toolbar */
 .windrose-selection-toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -1668,12 +1534,6 @@ button.windrose-tile-browser-layer-btn.windrose-tile-browser-layer-active,
   padding: 0;
   z-index: 150;
 }
-
-/* Multi-select toolbar styling */
-.windrose-multi-select-toolbar {
-  align-items: center;
-}
-
 .windrose-selection-count {
   display: flex;
   align-items: center;
@@ -1688,11 +1548,23 @@ button.windrose-tile-browser-layer-btn.windrose-tile-browser-layer-active,
   white-space: nowrap;
   box-shadow: 0 2px 8px oklch(0% 0 0deg / 0.2);
 }
-
 .windrose-selection-count svg {
   width: 14px;
   height: 14px;
   opacity: 0.9;
+}
+.windrose-selection-linked-note {
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  padding: 4px 8px;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px oklch(0% 0 0deg / 0.3);
+  z-index: 150;
+}
+
+.windrose-multi-select-toolbar {
+  align-items: center;
 }
 
 .windrose-toolbar-button {
@@ -1710,19 +1582,16 @@ button.windrose-tile-browser-layer-btn.windrose-tile-browser-layer-active,
   user-select: none;
   box-shadow: 0 2px 8px oklch(0% 0 0deg / 0.2);
 }
-
 .windrose-toolbar-button:hover {
   background: var(--background-primary-alt, var(--background-secondary));
   border-color: var(--text-accent);
   transform: translateY(-1px);
   box-shadow: 0 4px 12px oklch(0% 0 0deg / 0.3);
 }
-
 .windrose-toolbar-button:active {
   transform: translateY(0);
   box-shadow: 0 2px 6px oklch(0% 0 0deg / 0.2);
 }
-
 .windrose-toolbar-button svg {
   width: 20px;
   height: 20px;
@@ -1731,12 +1600,10 @@ button.windrose-tile-browser-layer-btn.windrose-tile-browser-layer-active,
 .windrose-toolbar-color-button {
   border: 2px solid oklch(100% 0 0deg / 0.3);
 }
-
 .windrose-toolbar-color-button svg {
   filter: drop-shadow(0 0 2px oklch(0% 0 0deg / 0.8));
   color: oklch(0% 0 0deg);
 }
-
 .windrose-toolbar-color-button:hover {
   border-color: oklch(100% 0 0deg / 0.5);
 }
@@ -1747,31 +1614,16 @@ button.windrose-tile-browser-layer-btn.windrose-tile-browser-layer-active,
   color: var(--text-on-accent);
 }
 
-/* Linked note display when used with toolbar */
-.windrose-selection-linked-note {
-  background: var(--background-primary);
-  border: 1px solid var(--background-modifier-border);
-  border-radius: 4px;
-  padding: 4px 8px;
-  white-space: nowrap;
-  box-shadow: 0 2px 8px oklch(0% 0 0deg / 0.3);
-  z-index: 150;
-}
-
-/* Invisible hover links over objects */
 .windrose-object-hover-link.windrose-object-hover-link {
-  pointer-events: auto; /* Changed: We handle clicks in JS now */
+  pointer-events: auto;
   overflow: hidden;
-  cursor: default; /* Show default cursor instead of pointer */
-  /* Hide dc.Link text visually but keep it functional for hover */
+  cursor: default;
 }
-
 .windrose-object-hover-link.windrose-object-hover-link > * {
   color: transparent;
   text-indent: -9999px;
 }
 
-/* Linking mode banner */
 .windrose-linking-banner {
   position: absolute;
   top: 8px;
@@ -1780,7 +1632,6 @@ button.windrose-tile-browser-layer-btn.windrose-tile-browser-layer-active,
   z-index: 200;
   pointer-events: auto;
 }
-
 .windrose-linking-banner-content {
   display: flex;
   align-items: center;
@@ -1793,13 +1644,11 @@ button.windrose-tile-browser-layer-btn.windrose-tile-browser-layer-active,
   font-size: 13px;
   white-space: nowrap;
 }
-
 .windrose-linking-banner-content svg {
   width: 16px;
   height: 16px;
   flex-shrink: 0;
 }
-
 .windrose-linking-banner-cancel {
   background: oklch(100% 0 0deg / 0.2);
   border: none;
@@ -1810,12 +1659,10 @@ button.windrose-tile-browser-layer-btn.windrose-tile-browser-layer-active,
   font-size: 12px;
   margin-left: 4px;
 }
-
 .windrose-linking-banner-cancel:hover {
   background: oklch(100% 0 0deg / 0.3);
 }
 
-/* Active state for linked object button */
 .windrose-toolbar-button-active.windrose-toolbar-button-active,
 .windrose-toolbar-button-active.windrose-toolbar-button-active:hover {
   background-color: var(--interactive-accent);
@@ -1833,15 +1680,12 @@ button.windrose-tile-browser-layer-btn.windrose-tile-browser-layer-active,
   box-shadow: inset 0 0 0 3px oklch(20% 0 0deg / 0.7), inset 0 0 0 4px oklch(from var(--windrose-border-primary) l c h/0.15), 0 4px 16px oklch(0% 0 0deg / 0.5);
   backdrop-filter: blur(8px);
 }
-
 .windrose-selection-card-content {
   padding: 6px 8px;
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
-
-/* Corner brackets */
 .windrose-selection-card-bracket {
   position: absolute;
   width: 16px;
@@ -1849,29 +1693,23 @@ button.windrose-tile-browser-layer-btn.windrose-tile-browser-layer-active,
   pointer-events: none;
   z-index: 1;
 }
-
 .windrose-selection-card-bracket-tl {
   top: 2px;
   left: 2px;
 }
-
 .windrose-selection-card-bracket-tr {
   top: 2px;
   right: 2px;
   transform: scaleX(-1);
 }
-
 .windrose-selection-card-bracket-bl {
   bottom: 2px;
   left: 2px;
   transform: scaleY(-1);
 }
-
 .windrose-selection-card-bracket-br {
   display: none;
 }
-
-/* Filigree decoration */
 .windrose-selection-card-filigree {
   position: absolute;
   bottom: -20px;
@@ -1886,29 +1724,23 @@ button.windrose-tile-browser-layer-btn.windrose-tile-browser-layer-active,
   mix-blend-mode: soft-light;
 }
 
-/* Action grid */
 .windrose-sel-grid {
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
-
 .windrose-sel-row {
   display: flex;
   gap: 2px;
 }
-
 .windrose-sel-action {
   position: relative;
   flex: 1;
   min-width: 0;
 }
-
 .windrose-sel-action-full {
   flex: 1 1 100%;
 }
-
-/* Action buttons - with tablet overrides */
 .is-tablet button.windrose-sel-action-btn,
 button.windrose-sel-action-btn,
 .windrose-sel-action-btn {
@@ -1941,58 +1773,41 @@ button.windrose-sel-action-btn,
   min-width: 14px;
   flex-shrink: 0;
 }
-
 .windrose-sel-action-btn:hover:not(:disabled) {
   background: var(--windrose-bg-tertiary);
   border-color: var(--windrose-border-secondary);
 }
-
 .windrose-sel-action-label {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-
-/* Active state (bronze fill) */
-.windrose-sel-action-active.windrose-sel-action-active,
-.windrose-sel-action-active.windrose-sel-action-active:hover {
+.windrose-sel-action-active.windrose-sel-action-active, .windrose-sel-action-active.windrose-sel-action-active:hover {
   background: var(--windrose-border-primary);
   border-color: var(--windrose-border-primary-dark);
 }
-
-.windrose-sel-action-active.windrose-sel-action-active svg,
-.windrose-sel-action-active.windrose-sel-action-active:hover svg {
+.windrose-sel-action-active.windrose-sel-action-active svg, .windrose-sel-action-active.windrose-sel-action-active:hover svg {
   color: var(--windrose-bg-primary);
 }
-
 .windrose-sel-action-active.windrose-sel-action-active .windrose-sel-action-label {
   color: var(--windrose-bg-primary);
 }
-
-/* Disabled state */
 .windrose-sel-action-disabled {
   opacity: 0.35;
   cursor: not-allowed;
 }
-
-/* Delete action */
 .windrose-sel-action-delete:hover:not(:disabled) {
   background: var(--windrose-accent-red);
   border-color: oklch(27% 0.12 22deg);
 }
-
 .windrose-sel-action-delete:hover:not(:disabled) svg {
   color: oklch(75% 0.12 20deg);
 }
-
 .windrose-sel-action-delete:hover:not(:disabled) .windrose-sel-action-label {
   color: oklch(75% 0.12 20deg);
 }
-
-/* Color swatch */
 .windrose-sel-color-btn {
   position: relative;
 }
-
 .windrose-sel-color-swatch {
   width: 14px;
   height: 14px;
@@ -2001,15 +1816,11 @@ button.windrose-sel-action-btn,
   border: 1px solid oklch(100% 0 0deg / 0.3);
   flex-shrink: 0;
 }
-
-/* Separator */
 .windrose-sel-separator {
   height: 1px;
   background: var(--windrose-border-secondary);
   margin: 2px 0;
 }
-
-/* Links toggle - with tablet overrides */
 .is-tablet button.windrose-sel-links-toggle,
 button.windrose-sel-links-toggle,
 .windrose-sel-links-toggle {
@@ -2038,70 +1849,56 @@ button.windrose-sel-links-toggle,
   height: 14px;
   min-width: 14px;
 }
-
 .windrose-sel-links-toggle svg:last-child {
   margin-left: auto;
   width: 12px;
   height: 12px;
   color: var(--windrose-text-muted);
 }
-
 .windrose-sel-links-toggle:hover {
   background: var(--windrose-bg-tertiary);
   border-color: var(--windrose-border-secondary);
 }
-
 .windrose-sel-links-toggle.expanded {
   background: oklch(25% 0 0deg / 0.5);
   border-color: var(--windrose-border-secondary);
 }
-
-/* Links panel */
 .windrose-sel-links-panel {
   display: flex;
   flex-direction: column;
   gap: 1px;
   padding-left: 8px;
 }
-
 .windrose-sel-links-panel .windrose-sel-action-btn {
   padding: 4px 4px;
   background: oklch(25% 0 0deg / 0.3);
 }
-
-/* Resize row */
 .windrose-sel-resize-row {
   display: flex;
   align-items: center;
   gap: 6px;
   padding: 4px 8px;
 }
-
 .windrose-sel-resize-row svg {
   color: var(--windrose-border-primary);
   flex-shrink: 0;
 }
-
 .windrose-sel-resize-row input[type=range] {
   flex: 1;
   min-width: 0;
 }
-
 .windrose-sel-resize-value {
   font-size: 10px;
   color: var(--windrose-text-muted);
   min-width: 28px;
   text-align: right;
 }
-
-/* Player light controls */
 .windrose-sel-player-section {
   display: flex;
   flex-direction: column;
   gap: 4px;
   padding: 4px 8px;
 }
-
 .windrose-sel-player-header {
   text-wrap: balance;
   display: flex;
@@ -2112,16 +1909,13 @@ button.windrose-sel-links-toggle,
   font-size: 11px;
   color: var(--windrose-text-secondary);
 }
-
 .windrose-sel-player-header > svg {
   color: var(--windrose-border-primary);
   flex-shrink: 0;
 }
-
 .windrose-sel-player-header > span {
   flex: 1;
 }
-
 .windrose-sel-toggle-switch {
   position: relative;
   width: 28px;
@@ -2129,7 +1923,6 @@ button.windrose-sel-links-toggle,
   flex-shrink: 0;
   cursor: pointer;
 }
-
 .is-tablet .windrose-sel-toggle-switch input,
 .windrose-sel-toggle-switch input {
   opacity: 0;
@@ -2142,6 +1935,14 @@ button.windrose-sel-links-toggle,
   position: absolute;
 }
 
+.windrose-sel-toggle-switch input:checked + .windrose-sel-toggle-slider {
+  background: oklch(from var(--windrose-border-primary) l c h/0.3);
+  border-color: var(--windrose-accent-primary);
+}
+.windrose-sel-toggle-switch input:checked + .windrose-sel-toggle-slider::before {
+  transform: translateX(14px);
+  background: var(--windrose-accent-primary);
+}
 .windrose-sel-toggle-slider {
   position: absolute;
   inset: 0;
@@ -2150,7 +1951,6 @@ button.windrose-sel-links-toggle,
   border-radius: 7px;
   transition: background 0.15s;
 }
-
 .windrose-sel-toggle-slider::before {
   content: "";
   position: absolute;
@@ -2162,24 +1962,12 @@ button.windrose-sel-links-toggle,
   border-radius: 50%;
   transition: transform 0.15s, background 0.15s;
 }
-
-.windrose-sel-toggle-switch input:checked + .windrose-sel-toggle-slider {
-  background: oklch(from var(--windrose-border-primary) l c h/0.3);
-  border-color: var(--windrose-accent-primary);
-}
-
-.windrose-sel-toggle-switch input:checked + .windrose-sel-toggle-slider::before {
-  transform: translateX(14px);
-  background: var(--windrose-accent-primary);
-}
-
 .windrose-sel-player-row {
   display: flex;
   align-items: center;
   gap: 6px;
   height: 24px;
 }
-
 .is-tablet input.windrose-sel-radius-input,
 input.windrose-sel-radius-input,
 .windrose-sel-radius-input {
@@ -2202,12 +1990,10 @@ input.windrose-sel-radius-input,
   outline: none;
   border-color: var(--windrose-accent-primary);
 }
-
 .windrose-sel-unit-label {
   font-size: 10px;
   color: var(--windrose-text-muted);
 }
-
 .is-tablet button.windrose-sel-light-color-swatch,
 button.windrose-sel-light-color-swatch,
 .windrose-sel-light-color-swatch {
@@ -2230,14 +2016,11 @@ button.windrose-sel-light-color-swatch,
 .windrose-sel-light-color-swatch:hover {
   border-color: var(--windrose-accent-primary);
 }
-
 .windrose-sel-light-color-swatch .windrose-sel-color-swatch {
   width: 16px;
   height: 16px;
   border-radius: 2px;
 }
-
-/* Footer icon buttons — glass effect lets filigree show through */
 .windrose-sel-footer-icons {
   display: flex;
   gap: 4px;
@@ -2246,7 +2029,6 @@ button.windrose-sel-light-color-swatch,
   position: relative;
   z-index: 1;
 }
-
 .is-tablet button.windrose-sel-icon-btn,
 button.windrose-sel-icon-btn,
 .windrose-sel-icon-btn {
@@ -2271,27 +2053,21 @@ button.windrose-sel-icon-btn,
   width: 14px;
   height: 14px;
 }
-
 .windrose-sel-icon-btn:hover {
   background: var(--windrose-bg-tertiary);
   border-color: var(--windrose-border-primary);
 }
-
 .windrose-sel-icon-btn:hover svg {
   color: var(--windrose-text-primary);
 }
-
 .windrose-sel-icon-btn.windrose-sel-action-active {
   background: var(--windrose-border-primary);
   border-color: var(--windrose-border-primary-dark);
 }
-
 .windrose-sel-icon-btn.windrose-sel-action-active svg,
-.windrose-sel-action-active.windrose-sel-action-active:hover svg {
+.windrose-sel-icon-btn .windrose-sel-action-active.windrose-sel-action-active:hover svg {
   color: var(--windrose-bg-primary);
 }
-
-/* Multi-select badge */
 .windrose-sel-multi-badge {
   display: flex;
   align-items: center;
@@ -2305,7 +2081,6 @@ button.windrose-sel-icon-btn,
   font-weight: 600;
   margin-bottom: 2px;
 }
-
 .windrose-sel-multi-badge svg {
   color: var(--windrose-bg-primary);
 }
@@ -2323,15 +2098,6 @@ button.windrose-sel-icon-btn,
   z-index: 2000;
   animation: fadeIn 0.15s ease;
 }
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
 .windrose-modal-content {
   background-color: var(--windrose-bg-secondary);
   border: 1px solid var(--windrose-border-secondary);
@@ -2342,17 +2108,6 @@ button.windrose-sel-icon-btn,
   box-shadow: 0 4px 20px oklch(0% 0 0deg / 0.5);
   animation: slideUp 0.2s ease;
 }
-
-@keyframes slideUp {
-  from {
-    transform: translateY(20px);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
 .windrose-modal-title {
   text-wrap: balance;
   margin: 0 0 16px 0;
@@ -2360,7 +2115,6 @@ button.windrose-sel-icon-btn,
   font-weight: 600;
   color: var(--windrose-text-primary);
 }
-
 .windrose-modal-input {
   width: 100%;
   padding: 10px 12px;
@@ -2373,142 +2127,24 @@ button.windrose-sel-icon-btn,
   transition: border-color 0.15s ease;
   box-sizing: border-box;
 }
-
 .windrose-modal-input:focus {
   border-color: var(--windrose-accent-blue);
 }
-
 .windrose-modal-input::placeholder {
   color: var(--windrose-text-disabled);
 }
-
 .windrose-modal-header {
   margin-bottom: 16px;
 }
-
 .windrose-modal-header h3 {
   margin: 0;
   font-size: 18px;
   font-weight: 600;
   color: var(--windrose-text-primary);
 }
-
 .windrose-modal-body {
   margin-bottom: 16px;
 }
-
-/* Settings modal specific - cap height and make scrollable */
-.windrose-settings-modal {
-  display: flex;
-  flex-direction: column;
-}
-
-.windrose-settings-modal .windrose-modal-body {
-  flex: 1;
-  overflow-y: auto;
-  overflow-x: hidden;
-  min-height: 0;
-  overscroll-behavior: contain;
-}
-
-/* Fallback (non-native) modal: cap the inner height */
-.windrose-modal-content.windrose-settings-modal {
-  max-height: 500px;
-}
-
-/* Native Obsidian modal sizing */
-.windrose-settings-native-modal {
-  width: 520px;
-  max-width: 95vw;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.windrose-settings-native-modal .modal-content {
-  max-height: 70vh;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  flex: 1;
-  min-height: 0;
-}
-
-.windrose-settings-native-modal .windrose-settings-modal {
-  flex: 1;
-  min-height: 0;
-}
-
-/* Resize handles for native modals (interact.js) */
-.windrose-resize-handle {
-  position: absolute;
-  z-index: 10;
-}
-
-.windrose-resize-top {
-  top: 0;
-  left: 8px;
-  right: 8px;
-  height: 6px;
-  cursor: ns-resize;
-}
-
-.windrose-resize-bottom {
-  bottom: 0;
-  left: 8px;
-  right: 8px;
-  height: 6px;
-  cursor: ns-resize;
-}
-
-.windrose-resize-left {
-  left: 0;
-  top: 8px;
-  bottom: 8px;
-  width: 6px;
-  cursor: ew-resize;
-}
-
-.windrose-resize-right {
-  right: 0;
-  top: 8px;
-  bottom: 8px;
-  width: 6px;
-  cursor: ew-resize;
-}
-
-.windrose-resize-top-left {
-  top: 0;
-  left: 0;
-  width: 12px;
-  height: 12px;
-  cursor: nwse-resize;
-}
-
-.windrose-resize-top-right {
-  top: 0;
-  right: 0;
-  width: 12px;
-  height: 12px;
-  cursor: nesw-resize;
-}
-
-.windrose-resize-bottom-left {
-  bottom: 0;
-  left: 0;
-  width: 12px;
-  height: 12px;
-  cursor: nesw-resize;
-}
-
-.windrose-resize-bottom-right {
-  bottom: 0;
-  right: 0;
-  width: 12px;
-  height: 12px;
-  cursor: nwse-resize;
-}
-
 .windrose-modal-footer {
   display: flex;
   flex-wrap: wrap;
@@ -2517,23 +2153,6 @@ button.windrose-sel-icon-btn,
   box-sizing: border-box;
   max-width: 100%;
 }
-
-.windrose-form-group {
-  margin-bottom: 12px;
-}
-
-.windrose-form-group:last-child {
-  margin-bottom: 0;
-}
-
-.windrose-form-label {
-  display: block;
-  margin-bottom: 6px;
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--windrose-text-secondary);
-}
-
 .windrose-modal-btn {
   flex: 1 1 0;
   min-width: 0;
@@ -2545,73 +2164,108 @@ button.windrose-sel-icon-btn,
   cursor: pointer;
   transition: var(--windrose-transition);
 }
-
 .windrose-modal-btn.windrose-modal-btn-cancel {
   background-color: var(--windrose-bg-tertiary);
   border-color: var(--windrose-border-secondary);
   color: var(--windrose-text-primary);
 }
-
 .windrose-modal-btn.windrose-modal-btn-cancel:hover {
   background-color: oklch(37% 0 0deg);
   border-color: oklch(45% 0 0deg);
 }
-
 .windrose-modal-btn.windrose-modal-btn-submit {
   background-color: var(--windrose-accent-blue);
   border-color: var(--windrose-accent-blue);
   color: var(--windrose-text-primary);
 }
-
 .windrose-modal-btn.windrose-modal-btn-submit:hover:not(:disabled) {
   background-color: var(--windrose-accent-blue-hover);
   border-color: var(--windrose-accent-blue-hover);
 }
-
 .windrose-modal-btn.windrose-modal-btn-submit:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
-
 .windrose-modal-btn.windrose-modal-btn-danger {
   background-color: var(--windrose-accent-red);
   border-color: var(--windrose-accent-red);
   color: var(--windrose-text-primary);
 }
-
 .windrose-modal-btn.windrose-modal-btn-danger:hover:not(:disabled) {
   background-color: var(--windrose-accent-red-hover);
   border-color: var(--windrose-accent-red-hover);
 }
-
 .windrose-modal-btn.windrose-modal-btn-danger:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
-
 .windrose-modal-hint {
   margin-top: 12px;
   font-size: 11px;
   color: var(--windrose-text-muted);
   text-align: center;
 }
-
-/* Modal Portal - for rendering modals outside viewport */
 .windrose-modal-portal {
   position: fixed;
   inset: 0;
   z-index: 10000;
   pointer-events: none;
 }
-
 .windrose-modal-portal-content {
   pointer-events: auto;
 }
 
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes slideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+.windrose-settings-modal {
+  display: flex;
+  flex-direction: column;
+}
+.windrose-settings-modal .windrose-modal-body {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0;
+  overscroll-behavior: contain;
+}
+.windrose-settings-native-modal {
+  width: 520px;
+  max-width: 95vw;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.windrose-settings-native-modal .modal-content {
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  flex: 1;
+  min-height: 0;
+}
+.windrose-settings-native-modal .windrose-settings-modal {
+  flex: 1;
+  min-height: 0;
+}
 .windrose-settings-section-header {
   margin-bottom: 12px;
 }
-
 .windrose-settings-section-title {
   text-wrap: balance;
   font-size: 14px;
@@ -2619,14 +2273,11 @@ button.windrose-sel-icon-btn,
   color: var(--windrose-text-primary);
   margin: 0 0 4px 0;
 }
-
 .windrose-settings-section-description {
   font-size: 12px;
   color: var(--windrose-text-muted);
   margin: 0;
 }
-
-/* Settings Modal Tab Bar */
 .windrose-settings-tab-bar {
   display: flex;
   flex-wrap: wrap;
@@ -2637,7 +2288,6 @@ button.windrose-sel-icon-btn,
   box-sizing: border-box;
   max-width: calc(100% + 40px);
 }
-
 .windrose-settings-tab {
   padding: 10px 16px;
   font-size: 13px;
@@ -2653,16 +2303,13 @@ button.windrose-sel-icon-btn,
   min-width: 0;
   text-align: center;
 }
-
 .windrose-settings-tab:hover {
   color: var(--text-normal);
 }
-
 .windrose-settings-tab-active {
   color: var(--text-normal);
   border-bottom-color: var(--interactive-accent);
 }
-
 .windrose-settings-tab-content {
   min-height: 325px;
   box-sizing: border-box;
@@ -2670,14 +2317,6 @@ button.windrose-sel-icon-btn,
   overflow-x: hidden;
   padding-right: 8px;
 }
-
-/* Color picker 2x2 grid items */
-.windrose-color-grid-item {
-  display: flex;
-  flex-direction: column;
-}
-
-/* Upgrade Banner */
 .windrose-settings-upgrade-banner {
   display: flex;
   align-items: center;
@@ -2690,7 +2329,6 @@ button.windrose-sel-icon-btn,
   border-radius: 6px;
   animation: slideDown 0.3s ease;
 }
-
 .windrose-settings-upgrade-info {
   display: flex;
   align-items: center;
@@ -2698,14 +2336,12 @@ button.windrose-sel-icon-btn,
   font-size: 13px;
   color: var(--windrose-text-primary);
 }
-
 .windrose-settings-upgrade-info svg {
   width: 18px;
   height: 18px;
   color: var(--windrose-accent-blue);
   flex-shrink: 0;
 }
-
 .windrose-settings-upgrade-btn {
   padding: 6px 14px;
   font-size: 12px;
@@ -2718,23 +2354,106 @@ button.windrose-sel-icon-btn,
   transition: var(--windrose-transition);
   white-space: nowrap;
 }
-
 .windrose-settings-upgrade-btn:hover {
   background-color: var(--windrose-accent-blue-hover);
   border-color: var(--windrose-accent-blue-hover);
 }
-
 .windrose-settings-upgrade-container {
   margin: -8px -8px 16px -8px;
   padding: 12px;
   background-color: oklch(0% 0 0deg / 0.2);
   border-radius: 6px;
 }
-
 .windrose-settings-upgrade-container .windrose-plugin-installer-card {
   margin: 0;
 }
 
+/* Fallback (non-native) modal: cap the inner height */
+.windrose-modal-content.windrose-settings-modal {
+  max-height: 500px;
+}
+
+.windrose-resize-handle {
+  position: absolute;
+  z-index: 10;
+}
+.windrose-resize-top {
+  top: 0;
+  left: 8px;
+  right: 8px;
+  height: 6px;
+  cursor: ns-resize;
+}
+.windrose-resize-bottom {
+  bottom: 0;
+  left: 8px;
+  right: 8px;
+  height: 6px;
+  cursor: ns-resize;
+}
+.windrose-resize-left {
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 6px;
+  cursor: ew-resize;
+}
+.windrose-resize-right {
+  right: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 6px;
+  cursor: ew-resize;
+}
+.windrose-resize-top-left {
+  top: 0;
+  left: 0;
+  width: 12px;
+  height: 12px;
+  cursor: nwse-resize;
+}
+.windrose-resize-top-right {
+  top: 0;
+  right: 0;
+  width: 12px;
+  height: 12px;
+  cursor: nesw-resize;
+}
+.windrose-resize-bottom-left {
+  bottom: 0;
+  left: 0;
+  width: 12px;
+  height: 12px;
+  cursor: nesw-resize;
+}
+.windrose-resize-bottom-right {
+  bottom: 0;
+  right: 0;
+  width: 12px;
+  height: 12px;
+  cursor: nwse-resize;
+}
+
+.windrose-form-group {
+  margin-bottom: 12px;
+}
+.windrose-form-group:last-child {
+  margin-bottom: 0;
+}
+.windrose-form-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--windrose-text-secondary);
+}
+
+.windrose-checkbox {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--windrose-accent-blue);
+}
 .windrose-checkbox-label {
   display: flex;
   align-items: center;
@@ -2744,18 +2463,14 @@ button.windrose-sel-icon-btn,
   color: var(--windrose-text-primary);
   user-select: none;
 }
-
 .windrose-checkbox-label:hover {
   color: var(--windrose-accent-blue);
 }
 
-.windrose-checkbox {
-  width: 16px;
-  height: 16px;
-  cursor: pointer;
-  accent-color: var(--windrose-accent-blue);
+.windrose-color-grid-item {
+  display: flex;
+  flex-direction: column;
 }
-
 .windrose-color-button {
   width: 100%;
   height: 36px;
@@ -2768,17 +2483,14 @@ button.windrose-sel-icon-btn,
   transition: var(--windrose-transition);
   position: relative;
 }
-
 .windrose-color-button:hover:not(:disabled) {
   border-color: var(--windrose-accent-blue);
   transform: scale(1.01);
 }
-
 .windrose-color-button:disabled {
   cursor: not-allowed;
   opacity: 0.6;
 }
-
 .windrose-color-button-label {
   font-size: 12px;
   font-weight: 600;
@@ -2789,7 +2501,6 @@ button.windrose-sel-icon-btn,
   border-radius: 3px;
   font-family: var(--font-monospace);
 }
-
 .windrose-color-settings {
   transition: opacity 0.2s ease;
 }
@@ -2797,14 +2508,6 @@ button.windrose-sel-icon-btn,
 /* ============================================
    COLOR PICKER SYSTEM
    ============================================ */
-.windrose-color-picker-overlay {
-  position: fixed;
-  inset: 0;
-  background-color: transparent;
-  z-index: 2099;
-  pointer-events: auto;
-}
-
 .windrose-color-picker {
   background-color: var(--windrose-bg-secondary);
   border: 1px solid var(--windrose-border-secondary);
@@ -2814,6 +2517,27 @@ button.windrose-sel-icon-btn,
   z-index: 2100;
   min-width: 290px;
   animation: slideDown 0.15s ease;
+}
+.windrose-color-picker-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: transparent;
+  z-index: 2099;
+  pointer-events: auto;
+}
+.windrose-color-picker-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.windrose-color-picker-title {
+  text-wrap: balance;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--windrose-text-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 @keyframes slideDown {
@@ -2826,22 +2550,6 @@ button.windrose-sel-icon-btn,
     transform: translateY(0);
   }
 }
-.windrose-color-picker-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 10px;
-}
-
-.windrose-color-picker-title {
-  text-wrap: balance;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--windrose-text-primary);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
 .windrose-color-reset-btn {
   background-color: transparent;
   border: 1px solid var(--windrose-text-disabled);
@@ -2856,7 +2564,6 @@ button.windrose-sel-icon-btn,
   font-size: 14px;
   transition: var(--windrose-transition);
 }
-
 .windrose-color-reset-btn:hover {
   background-color: var(--windrose-bg-tertiary);
   border-color: var(--windrose-text-muted);
@@ -2881,41 +2588,34 @@ button.windrose-sel-icon-btn,
   justify-content: center;
   padding: 0;
 }
-
 .windrose-color-swatch:hover {
   border-color: var(--windrose-text-primary);
   transform: scale(1.1);
 }
-
 .windrose-color-swatch.windrose-color-swatch-selected {
   border-color: var(--windrose-text-primary);
   border-width: 3px;
   box-shadow: 0 0 0 2px oklch(100% 0 0deg / 0.3);
 }
-
 .windrose-color-swatch.windrose-color-swatch-reset {
   background-color: var(--windrose-bg-tertiary);
   border: 2px solid var(--windrose-text-disabled);
 }
-
 .windrose-color-swatch.windrose-color-swatch-reset:hover {
   background-color: var(--windrose-border-secondary);
   border-color: var(--windrose-text-muted);
 }
-
 .windrose-color-swatch.windrose-color-swatch-preview {
   border: 2px dashed var(--windrose-accent-blue);
   position: relative;
   animation: pulse 1s ease-in-out infinite;
 }
-
 .windrose-color-swatch.windrose-color-swatch-add {
   background-color: var(--windrose-bg-secondary);
   border: 2px dashed var(--windrose-text-disabled);
   position: relative;
   overflow: hidden;
 }
-
 .windrose-color-swatch.windrose-color-swatch-add:hover {
   background-color: var(--windrose-bg-tertiary);
   border-color: var(--windrose-text-muted);
@@ -3014,23 +2714,19 @@ button.windrose-sel-icon-btn,
   user-select: none;
   box-shadow: 0 2px 8px oklch(0% 0 0deg / 0.3);
 }
-
 .windrose-color-delete-button svg {
   width: 16px;
   height: 16px;
   color: var(--windrose-text-primary);
 }
-
 .windrose-color-delete-button:hover {
   background-color: var(--windrose-accent-red);
   transform: translateY(-50%) scale(1.1);
 }
-
 .windrose-color-delete-button:active {
   transform: translateY(-50%) scale(0.95);
 }
 
-/* Custom color edit panel (right-click/long-press) */
 .windrose-color-edit-panel {
   position: absolute;
   left: calc(100% + 4px);
@@ -3047,25 +2743,21 @@ button.windrose-sel-icon-btn,
   box-shadow: 0 4px 12px oklch(0% 0 0deg / 0.3);
   white-space: nowrap;
 }
-
 .windrose-color-edit-opacity {
   display: flex;
   align-items: center;
   gap: 6px;
 }
-
 .windrose-color-edit-opacity-label {
   font-size: 11px;
   color: var(--windrose-text-secondary);
 }
-
 .windrose-color-edit-opacity-value {
   font-size: 11px;
   color: var(--windrose-text-primary);
   min-width: 32px;
   text-align: right;
 }
-
 .windrose-color-edit-opacity input[type=range] {
   width: 80px;
   height: 4px;
@@ -3074,7 +2766,6 @@ button.windrose-sel-icon-btn,
   background: var(--windrose-bg-tertiary);
   border-radius: 2px;
 }
-
 .windrose-color-edit-opacity input[type=range]::-webkit-slider-thumb {
   appearance: none;
   width: 12px;
@@ -3083,7 +2774,6 @@ button.windrose-sel-icon-btn,
   border-radius: 50%;
   cursor: pointer;
 }
-
 .windrose-color-edit-opacity input[type=range]::-moz-range-thumb {
   width: 12px;
   height: 12px;
@@ -3092,7 +2782,6 @@ button.windrose-sel-icon-btn,
   border-radius: 50%;
   cursor: pointer;
 }
-
 .windrose-color-edit-delete {
   width: 24px;
   height: 24px;
@@ -3107,30 +2796,25 @@ button.windrose-sel-icon-btn,
   transition: var(--windrose-transition);
   padding: 0;
 }
-
 .windrose-color-edit-delete svg {
   width: 14px;
   height: 14px;
 }
-
 .windrose-color-edit-delete:hover {
   background-color: var(--windrose-accent-red);
 }
 
-/* Color picker opacity slider */
 .windrose-color-opacity-section {
   margin-top: 12px;
   padding-top: 12px;
   border-top: 1px solid var(--windrose-bg-tertiary);
 }
-
 .windrose-color-opacity-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 8px;
 }
-
 .windrose-color-opacity-label {
   font-size: 11px;
   font-weight: 600;
@@ -3138,7 +2822,6 @@ button.windrose-sel-icon-btn,
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
-
 .windrose-color-opacity-value {
   font-size: 12px;
   color: var(--windrose-text-primary);
@@ -3146,7 +2829,6 @@ button.windrose-sel-icon-btn,
   min-width: 35px;
   text-align: right;
 }
-
 .windrose-color-opacity-slider {
   width: 100%;
   height: 6px;
@@ -3157,7 +2839,6 @@ button.windrose-sel-icon-btn,
   outline: none;
   cursor: pointer;
 }
-
 .windrose-color-opacity-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
@@ -3169,11 +2850,9 @@ button.windrose-sel-icon-btn,
   border: 2px solid var(--windrose-text-primary);
   transition: transform 0.15s ease;
 }
-
 .windrose-color-opacity-slider::-webkit-slider-thumb:hover {
   transform: scale(1.15);
 }
-
 .windrose-color-opacity-slider::-moz-range-thumb {
   width: 16px;
   height: 16px;
@@ -3183,7 +2862,6 @@ button.windrose-sel-icon-btn,
   border: 2px solid var(--windrose-text-primary);
   transition: transform 0.15s ease;
 }
-
 .windrose-color-opacity-slider::-moz-range-thumb:hover {
   transform: scale(1.15);
 }
@@ -3207,8 +2885,7 @@ button.windrose-sel-icon-btn,
   .windrose-tile-browser {
     width: 190px;
   }
-  .windrose-tile-browser-toggle,
-  .is-tablet .windrose-tile-browser-toggle {
+  .windrose-tile-browser-toggle, .is-tablet .windrose-tile-browser-toggle {
     top: 100px;
   }
   .windrose-modal-input {
@@ -3272,19 +2949,15 @@ button.windrose-sel-icon-btn,
   width: 420px;
   max-width: 90vw;
 }
-
 .windrose-text-editor-section {
   margin-bottom: 16px;
 }
-
 .windrose-text-editor-section-grow {
   flex: 1;
 }
-
 .windrose-text-editor-section-small {
   width: 80px;
 }
-
 .windrose-text-editor-label {
   display: block;
   font-size: 12px;
@@ -3292,12 +2965,10 @@ button.windrose-sel-icon-btn,
   margin-bottom: 4px;
   font-weight: 500;
 }
-
 .windrose-text-editor-row {
   display: flex;
   gap: 12px;
 }
-
 .windrose-text-editor-select {
   width: 100%;
   padding: 10px 12px;
@@ -3311,12 +2982,10 @@ button.windrose-sel-icon-btn,
   cursor: pointer;
   min-height: 40px;
 }
-
 .windrose-text-editor-select:focus {
   outline: none;
   border-color: var(--interactive-accent);
 }
-
 .windrose-text-editor-number {
   width: 100%;
   padding: 8px 10px;
@@ -3327,12 +2996,10 @@ button.windrose-sel-icon-btn,
   font-family: inherit;
   font-size: 14px;
 }
-
 .windrose-text-editor-number:focus {
   outline: none;
   border-color: var(--interactive-accent);
 }
-
 .windrose-text-editor-color-button {
   width: 100%;
   height: 40px;
@@ -3344,12 +3011,10 @@ button.windrose-sel-icon-btn,
   justify-content: center;
   transition: all 0.15s ease;
 }
-
 .windrose-text-editor-color-button:hover {
   border-color: var(--interactive-accent);
   transform: translateY(-1px);
 }
-
 .windrose-text-editor-color-label {
   font-size: 11px;
   font-weight: 600;
@@ -3357,8 +3022,6 @@ button.windrose-sel-icon-btn,
   text-shadow: -1px -1px 0 oklch(0% 0 0deg), 1px -1px 0 oklch(0% 0 0deg), -1px 1px 0 oklch(0% 0 0deg), 1px 1px 0 oklch(0% 0 0deg), 0 0 3px oklch(0% 0 0deg / 0.8);
   letter-spacing: 0.5px;
 }
-
-/* Live Preview Section */
 .windrose-text-editor-preview-toggle {
   background: none;
   border: none;
@@ -3371,17 +3034,14 @@ button.windrose-sel-icon-btn,
   border-radius: 4px;
   transition: all 0.15s ease;
 }
-
 .windrose-text-editor-preview-toggle:hover {
   background: var(--background-modifier-hover);
   color: var(--text-normal);
 }
-
 .windrose-text-editor-preview-toggle svg {
   width: 16px;
   height: 16px;
 }
-
 .windrose-text-editor-preview {
   padding: 16px;
   text-align: center;
@@ -3402,7 +3062,6 @@ button.windrose-sel-icon-btn,
   margin-top: 8px;
 }
 
-/* Edit Button (for text labels) */
 .windrose-edit-button {
   position: absolute;
   width: 32px;
@@ -3420,19 +3079,16 @@ button.windrose-sel-icon-btn,
   transition: all 0.2s ease;
   z-index: 1000;
 }
-
 .windrose-edit-button:hover {
   background: linear-gradient(135deg, oklch(70% 0.14 255deg) 0%, oklch(60% 0.12 252deg) 100%);
   transform: translateY(-2px);
   box-shadow: 0 4px 12px oklch(0% 0 0deg / 0.4);
 }
-
 .windrose-edit-button:active {
   transform: translateY(0);
   box-shadow: 0 2px 6px oklch(0% 0 0deg / 0.3);
 }
 
-/* Object Color Button (for objects) */
 .windrose-object-color-button {
   width: 32px;
   height: 32px;
@@ -3446,25 +3102,21 @@ button.windrose-sel-icon-btn,
   transition: all 0.2s ease;
   z-index: 1000;
 }
-
 .windrose-object-color-button svg {
   width: 16px;
   height: 16px;
   filter: drop-shadow(0 0 2px oklch(0% 0 0deg / 0.8));
   color: oklch(0% 0 0deg);
 }
-
 .windrose-object-color-button:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 12px oklch(0% 0 0deg / 0.4);
   border-color: oklch(100% 0 0deg / 0.5);
 }
-
 .windrose-object-color-button:active {
   transform: translateY(0);
   box-shadow: 0 2px 6px oklch(0% 0 0deg / 0.3);
 }
-
 .windrose-object-color-button .windrose-color-picker {
   position: absolute;
   left: 100%;
@@ -3472,7 +3124,6 @@ button.windrose-sel-icon-btn,
   margin-left: 8px;
 }
 
-/* Mobile/tablet adjustments for text editor */
 @media (max-width: 768px) {
   .windrose-text-editor-modal {
     width: 360px;
@@ -3497,7 +3148,6 @@ button.windrose-sel-icon-btn,
   padding: 20px;
   background: var(--windrose-bg-primary);
 }
-
 .windrose-plugin-installer-card {
   max-width: 600px;
   background: var(--windrose-bg-secondary);
@@ -3506,21 +3156,18 @@ button.windrose-sel-icon-btn,
   padding: 32px;
   box-shadow: 0 4px 20px oklch(0% 0 0deg / 0.3), inset 0 0 0 1px oklch(from var(--windrose-border-primary) l c h/0.2);
 }
-
 .windrose-plugin-installer-icon {
   display: flex;
   align-items: center;
   justify-content: center;
   margin-bottom: 24px;
 }
-
 .windrose-plugin-installer-icon svg {
   width: 64px;
   height: 64px;
   color: var(--windrose-border-primary);
   filter: drop-shadow(0 0 8px oklch(from var(--windrose-border-primary) l c h/0.4));
 }
-
 .windrose-plugin-installer-content h3 {
   margin: 0 0 16px 0;
   font-size: 24px;
@@ -3528,25 +3175,21 @@ button.windrose-sel-icon-btn,
   color: var(--windrose-text-primary);
   text-align: center;
 }
-
 .windrose-plugin-installer-content p {
   margin: 0 0 12px 0;
   font-size: 15px;
   line-height: 1.6;
   color: var(--windrose-text-secondary);
 }
-
 .windrose-plugin-installer-content ul {
   margin: 16px 0;
   padding-left: 24px;
 }
-
 .windrose-plugin-installer-content ul li {
   margin: 8px 0;
   font-size: 14px;
   color: var(--windrose-text-secondary);
 }
-
 .windrose-plugin-installer-content .windrose-plugin-installer-note {
   margin-top: 20px;
   padding: 12px;
@@ -3556,7 +3199,6 @@ button.windrose-sel-icon-btn,
   font-size: 13px;
   color: var(--windrose-text-muted);
 }
-
 .windrose-plugin-installer-error {
   margin-top: 16px;
   padding: 12px;
@@ -3567,14 +3209,12 @@ button.windrose-sel-icon-btn,
   font-size: 14px;
   text-align: center;
 }
-
 .windrose-plugin-installer-actions {
   display: flex;
   gap: 12px;
   margin-top: 24px;
   justify-content: center;
 }
-
 .windrose-plugin-installer-btn {
   padding: 12px 24px;
   border: none;
@@ -3584,33 +3224,27 @@ button.windrose-sel-icon-btn,
   cursor: pointer;
   transition: all 0.2s ease;
 }
-
 .windrose-plugin-installer-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
-
 .windrose-plugin-installer-btn-primary {
   background: linear-gradient(135deg, var(--windrose-border-primary) 0%, var(--windrose-border-primary-dark) 100%);
   color: var(--windrose-bg-primary);
   box-shadow: 0 2px 8px oklch(from var(--windrose-border-primary) l c h/0.3);
 }
-
 .windrose-plugin-installer-btn-primary:hover:not(:disabled) {
   transform: translateY(-2px);
   box-shadow: 0 4px 16px oklch(from var(--windrose-border-primary) l c h/0.4);
 }
-
 .windrose-plugin-installer-btn-primary:active:not(:disabled) {
   transform: translateY(0);
 }
-
 .windrose-plugin-installer-btn-secondary {
   background: var(--windrose-bg-tertiary);
   color: var(--windrose-text-secondary);
   border: 1px solid var(--windrose-border-secondary);
 }
-
 .windrose-plugin-installer-btn-secondary:hover:not(:disabled) {
   background: oklch(100% 0 0deg / 0.1);
   color: var(--windrose-text-primary);
@@ -3627,7 +3261,6 @@ button.windrose-sel-icon-btn,
   z-index: 10000;
   backdrop-filter: blur(4px);
 }
-
 .windrose-plugin-success-modal {
   max-width: 500px;
   background: var(--windrose-bg-secondary);
@@ -3636,6 +3269,48 @@ button.windrose-sel-icon-btn,
   padding: 32px;
   box-shadow: 0 8px 32px oklch(0% 0 0deg / 0.5), inset 0 0 0 1px oklch(from var(--windrose-border-primary) l c h/0.2);
   animation: dmt-modal-fade-in 0.2s ease;
+}
+.windrose-plugin-success-modal h3 {
+  margin: 0 0 16px 0;
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--windrose-text-primary);
+  text-align: center;
+}
+.windrose-plugin-success-modal p {
+  margin: 0 0 12px 0;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--windrose-text-secondary);
+  text-align: center;
+}
+.windrose-plugin-success-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+.windrose-plugin-success-icon svg {
+  width: 56px;
+  height: 56px;
+  color: oklch(80% 0.17 155deg);
+  filter: drop-shadow(0 0 12px oklch(80% 0.17 155deg / 0.5));
+}
+.windrose-plugin-success-note {
+  margin-top: 16px;
+  padding: 12px;
+  background: oklch(from var(--windrose-border-primary) l c h/0.1);
+  border-left: 3px solid var(--windrose-border-primary);
+  border-radius: 4px;
+  font-size: 13px;
+  color: var(--windrose-text-muted);
+  text-align: left;
+}
+.windrose-plugin-success-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 24px;
+  justify-content: center;
 }
 
 @keyframes dmt-modal-fade-in {
@@ -3648,54 +3323,6 @@ button.windrose-sel-icon-btn,
     transform: scale(1) translateY(0);
   }
 }
-.windrose-plugin-success-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 20px;
-}
-
-.windrose-plugin-success-icon svg {
-  width: 56px;
-  height: 56px;
-  color: oklch(80% 0.17 155deg);
-  filter: drop-shadow(0 0 12px oklch(80% 0.17 155deg / 0.5));
-}
-
-.windrose-plugin-success-modal h3 {
-  margin: 0 0 16px 0;
-  font-size: 22px;
-  font-weight: 600;
-  color: var(--windrose-text-primary);
-  text-align: center;
-}
-
-.windrose-plugin-success-modal p {
-  margin: 0 0 12px 0;
-  font-size: 15px;
-  line-height: 1.6;
-  color: var(--windrose-text-secondary);
-  text-align: center;
-}
-
-.windrose-plugin-success-note {
-  margin-top: 16px;
-  padding: 12px;
-  background: oklch(from var(--windrose-border-primary) l c h/0.1);
-  border-left: 3px solid var(--windrose-border-primary);
-  border-radius: 4px;
-  font-size: 13px;
-  color: var(--windrose-text-muted);
-  text-align: left;
-}
-
-.windrose-plugin-success-actions {
-  display: flex;
-  gap: 12px;
-  margin-top: 24px;
-  justify-content: center;
-}
-
 /* ============================================
    Hex Coordinate Layer
    ============================================ */
@@ -4577,11 +4204,9 @@ button.windrose-breadcrumb-link {
   overflow-y: auto;
   overscroll-behavior: contain;
 }
-
 .windrose-layer-edit-section {
   margin-bottom: 16px;
 }
-
 .windrose-layer-edit-label {
   display: block;
   font-size: 12px;
@@ -4597,7 +4222,6 @@ button.windrose-breadcrumb-link {
   gap: 4px;
   margin-bottom: 12px;
 }
-
 .windrose-icon-mode-btn {
   flex: 1;
   padding: 8px 12px;
@@ -4609,12 +4233,10 @@ button.windrose-breadcrumb-link {
   cursor: pointer;
   transition: all 0.15s ease;
 }
-
 .windrose-icon-mode-btn:hover {
   border-color: oklch(from var(--windrose-border-primary) l c h/0.5);
   color: var(--windrose-text-normal);
 }
-
 .windrose-icon-mode-btn.active {
   background: oklch(from var(--windrose-border-primary) l c h/0.2);
   border-color: var(--windrose-border-primary);
@@ -4637,7 +4259,6 @@ button.windrose-breadcrumb-link {
   border-radius: 4px;
   color: var(--windrose-text-primary);
 }
-
 .windrose-symbol-input:focus {
   outline: none;
   border-color: var(--windrose-border-primary);
@@ -4675,12 +4296,10 @@ button.windrose-breadcrumb-link {
   cursor: pointer;
   transition: all 0.1s ease;
 }
-
 .windrose-quick-symbol-btn:hover {
   background: oklch(from var(--windrose-border-primary) l c h/0.15);
   border-color: oklch(from var(--windrose-border-primary) l c h/0.4);
 }
-
 .windrose-quick-symbol-btn.selected {
   background: oklch(from var(--windrose-border-primary) l c h/0.25);
   border-color: var(--windrose-border-primary);
@@ -4692,7 +4311,6 @@ button.windrose-breadcrumb-link {
   flex-direction: column;
   gap: 8px;
 }
-
 .windrose-icon-search {
   width: 100%;
   padding: 8px 12px;
@@ -4702,18 +4320,15 @@ button.windrose-breadcrumb-link {
   border-radius: 4px;
   color: var(--windrose-text-primary);
 }
-
 .windrose-icon-search:focus {
   outline: none;
   border-color: var(--windrose-border-primary);
 }
-
 .windrose-icon-category-tabs {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
 }
-
 .windrose-icon-category-tab {
   padding: 4px 8px;
   font-size: 10px;
@@ -4724,18 +4339,15 @@ button.windrose-breadcrumb-link {
   cursor: pointer;
   transition: all 0.1s ease;
 }
-
 .windrose-icon-category-tab:hover {
   border-color: oklch(from var(--windrose-border-primary) l c h/0.4);
   color: var(--windrose-text-normal);
 }
-
 .windrose-icon-category-tab.active {
   background: oklch(from var(--windrose-border-primary) l c h/0.2);
   border-color: var(--windrose-border-primary);
   color: var(--windrose-text-primary);
 }
-
 .windrose-icon-grid {
   display: grid;
   grid-template-columns: repeat(8, 1fr);
@@ -4747,7 +4359,6 @@ button.windrose-breadcrumb-link {
   background: oklch(0% 0 0deg / 0.2);
   border-radius: 4px;
 }
-
 .windrose-icon-grid-btn {
   width: 100%;
   aspect-ratio: 1;
@@ -4760,22 +4371,18 @@ button.windrose-breadcrumb-link {
   cursor: pointer;
   transition: all 0.1s ease;
 }
-
 .windrose-icon-grid-btn .ra {
   font-size: 16px;
   color: var(--windrose-text-normal);
 }
-
 .windrose-icon-grid-btn:hover {
   background: oklch(from var(--windrose-border-primary) l c h/0.15);
   border-color: oklch(from var(--windrose-border-primary) l c h/0.3);
 }
-
 .windrose-icon-grid-btn.selected {
   background: oklch(from var(--windrose-border-primary) l c h/0.25);
   border-color: var(--windrose-border-primary);
 }
-
 .windrose-icon-grid-more {
   grid-column: 1/-1;
   text-align: center;
@@ -4783,7 +4390,6 @@ button.windrose-breadcrumb-link {
   color: var(--windrose-text-muted);
   padding: 8px;
 }
-
 .windrose-icon-grid-empty {
   grid-column: 1/-1;
   text-align: center;
@@ -4800,7 +4406,6 @@ button.windrose-breadcrumb-link {
   background: oklch(0% 0 0deg / 0.3);
   border-radius: 6px;
 }
-
 .windrose-layer-preview-btn {
   min-width: 35px;
   height: 35px;
@@ -4816,22 +4421,18 @@ button.windrose-breadcrumb-link {
   font-size: 14px;
   font-weight: 600;
 }
-
 .windrose-layer-preview-btn:not(.pill) {
   width: 35px;
   border-radius: 50%;
   padding: 0;
 }
-
 .windrose-layer-preview-icon {
   font-size: 14px;
   line-height: 1;
 }
-
 .windrose-layer-preview-icon.ra {
   font-family: "rpgawesome";
 }
-
 .windrose-layer-preview-name {
   white-space: nowrap;
 }
@@ -4839,11 +4440,9 @@ button.windrose-breadcrumb-link {
 /* ==========================================================================
    RE-ROLL DUNGEON
    ========================================================================== */
-/* Re-roll button - positioned to the left of MapControls */
 .windrose-reroll-btn.windrose-reroll-btn {
   position: absolute;
   top: 12px;
-  /* Position relative to right edge, offset from MapControls (80px width + 4px right + 12px gap) */
   right: 96px;
   z-index: 100;
   width: 36px;
@@ -4860,32 +4459,27 @@ button.windrose-breadcrumb-link {
   transition: all 0.2s ease;
   box-shadow: 0 2px 8px oklch(0% 0 0deg / 0.3);
 }
-
 .windrose-reroll-btn.windrose-reroll-btn:hover {
   background: linear-gradient(135deg, oklch(50% 0.09 65deg / 0.8), oklch(40% 0.07 62deg / 0.8));
   border-color: var(--windrose-border-primary);
   transform: scale(1.05);
   box-shadow: 0 4px 12px oklch(0% 0 0deg / 0.4);
 }
-
 .windrose-reroll-btn.windrose-reroll-btn svg {
   width: 18px;
   height: 18px;
 }
 
-/* Tablet adjustments */
 .is-tablet .windrose-reroll-btn {
   width: 44px;
   height: 44px;
-  right: 100px; /* Slightly more space on tablet */
+  right: 100px;
 }
-
 .is-tablet .windrose-reroll-btn svg {
   width: 22px;
   height: 22px;
 }
 
-/* Re-roll confirmation dialog overlay */
 .windrose-reroll-confirm-overlay {
   position: fixed;
   inset: 0;
@@ -4896,8 +4490,6 @@ button.windrose-breadcrumb-link {
   z-index: 10000;
   backdrop-filter: blur(2px);
 }
-
-/* Re-roll confirmation dialog */
 .windrose-reroll-confirm-dialog {
   background: var(--background-primary);
   border: 2px solid oklch(from var(--windrose-border-primary) l c h/0.5);
@@ -4906,24 +4498,16 @@ button.windrose-breadcrumb-link {
   max-width: 90vw;
   box-shadow: 0 8px 32px oklch(0% 0 0deg / 0.5);
 }
-
 .windrose-reroll-confirm-dialog h3 {
   margin: 0 0 12px 0;
   color: var(--text-normal);
   font-size: 1.2em;
 }
-
 .windrose-reroll-confirm-dialog p {
   margin: 0 0 12px 0;
   color: var(--text-muted);
   line-height: 1.5;
 }
-
-.windrose-reroll-warning.windrose-reroll-warning {
-  color: var(--text-error, #e74c3c);
-  font-weight: 500;
-}
-
 .windrose-reroll-confirm-buttons {
   display: flex;
   flex-wrap: wrap;
@@ -4931,9 +4515,13 @@ button.windrose-breadcrumb-link {
   justify-content: flex-end;
   margin-top: 20px;
 }
-
 .windrose-reroll-confirm-buttons.windrose-reroll-three-buttons {
   justify-content: center;
+}
+
+.windrose-reroll-warning.windrose-reroll-warning {
+  color: var(--text-error, #e74c3c);
+  font-weight: 500;
 }
 
 .windrose-btn {
@@ -4944,21 +4532,17 @@ button.windrose-breadcrumb-link {
   font-size: 0.95em;
   transition: all 0.15s ease;
 }
-
 .windrose-btn-secondary {
   background: var(--background-modifier-border);
   color: var(--text-normal);
 }
-
 .windrose-btn-secondary:hover {
   background: var(--background-modifier-border-hover);
 }
-
 .windrose-btn-primary {
   background: var(--interactive-accent);
   color: var(--text-on-accent);
 }
-
 .windrose-btn-primary:hover {
   background: var(--interactive-accent-hover);
 }
@@ -4968,7 +4552,6 @@ button.windrose-breadcrumb-link {
   font-size: 14px;
   color: var(--text-normal);
 }
-
 .windrose-note-suggest-path {
   font-size: 11px;
   color: var(--text-muted);
@@ -6223,18 +5806,6 @@ button.windrose-breadcrumb-link {
 /* ===========================================
  * Deeplink Hover Preview
  * =========================================== */
-.windrose-hover-preview-popover {
-  padding: 6px;
-}
-
-.windrose-hover-preview-host {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 240px;
-  min-height: 180px;
-}
-
 .windrose-hover-preview {
   position: relative;
   display: flex;
@@ -6244,14 +5815,22 @@ button.windrose-breadcrumb-link {
   border-radius: 4px;
   overflow: hidden;
 }
-
+.windrose-hover-preview-popover {
+  padding: 6px;
+}
+.windrose-hover-preview-host {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 240px;
+  min-height: 180px;
+}
 .windrose-hover-preview-header {
   padding: 6px 8px;
   border-bottom: 1px solid var(--background-modifier-border);
   background: var(--background-primary);
   line-height: 1.25;
 }
-
 .windrose-hover-preview-header-map {
   font-size: 12px;
   font-weight: 600;
@@ -6260,7 +5839,6 @@ button.windrose-breadcrumb-link {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-
 .windrose-hover-preview-header-note {
   font-size: 11px;
   color: var(--text-muted);
@@ -6268,22 +5846,17 @@ button.windrose-breadcrumb-link {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-
 .windrose-hover-preview canvas {
   display: block;
   width: 240px;
   height: 180px;
 }
-
 .windrose-hover-preview-state {
   font-size: 12px;
   color: var(--text-muted);
   padding: 8px 12px;
 }
 
-/* Live-Preview external-link icon suppression on windrose: URLs only.
-   The icon is a ::after on span.external-link; CM6 ViewPlugin tags the
-   icon span with .windrose-deep-link-icon when its line contains windrose:. */
 .windrose-deep-link-icon::after {
   content: none;
   display: none;
@@ -6311,7 +5884,6 @@ button.windrose-breadcrumb-link {
   pointer-events: auto;
   z-index: 1000;
 }
-
 .windrose-floating-bar-btn {
   padding: 4px 10px;
   background: transparent;
@@ -6322,40 +5894,42 @@ button.windrose-breadcrumb-link {
   font-size: 12px;
   min-height: 30px;
 }
-
 .windrose-floating-bar-btn.is-active {
   background: var(--interactive-accent);
   color: var(--text-on-accent);
 }
-
 .windrose-floating-bar-btn.is-danger {
   color: var(--text-error);
 }
-
 .windrose-floating-bar-btn.is-accent {
   color: var(--text-accent);
 }
-
 .windrose-floating-bar-label {
   color: var(--text-muted);
   font-size: 12px;
 }
-
 .windrose-floating-bar-label-faint {
   color: var(--text-faint);
   font-size: 11px;
 }
-
 .windrose-floating-bar-separator {
   color: var(--text-faint);
   font-size: 11px;
   margin: 0 2px;
 }
-
 .windrose-floating-bar-name {
   color: var(--text-normal);
   font-size: 13px;
   font-weight: 600;
+}
+.windrose-floating-bar-input {
+  background: var(--background-primary);
+  color: var(--text-normal);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  padding: 4px 6px;
+  font-size: 12px;
+  min-height: 30px;
 }
 
 .windrose-color-swatch-btn {
@@ -6367,16 +5941,6 @@ button.windrose-breadcrumb-link {
   flex-shrink: 0;
   padding: 0;
   background: none;
-}
-
-.windrose-floating-bar-input {
-  background: var(--background-primary);
-  color: var(--text-normal);
-  border: 1px solid var(--background-modifier-border);
-  border-radius: 4px;
-  padding: 4px 6px;
-  font-size: 12px;
-  min-height: 30px;
 }
 
 /* ============================================
@@ -6391,7 +5955,6 @@ button.windrose-breadcrumb-link {
   align-items: center;
   justify-content: center;
 }
-
 .windrose-segment-picker-card {
   background-color: var(--windrose-bg-primary);
   border-radius: 12px;
@@ -6400,7 +5963,6 @@ button.windrose-breadcrumb-link {
   box-shadow: 0 8px 32px oklch(0% 0 0deg / 0.5);
   min-width: 260px;
 }
-
 .windrose-segment-picker-title {
   text-wrap: balance;
   color: var(--windrose-border-primary);
@@ -6411,7 +5973,6 @@ button.windrose-breadcrumb-link {
   text-transform: uppercase;
   letter-spacing: 1px;
 }
-
 .windrose-segment-picker-subtitle {
   text-wrap: balance;
   color: var(--windrose-text-muted);
@@ -6419,13 +5980,11 @@ button.windrose-breadcrumb-link {
   text-align: center;
   margin-bottom: 12px;
 }
-
 .windrose-segment-picker-svg-wrap {
   display: flex;
   justify-content: center;
   margin-bottom: 16px;
 }
-
 .windrose-segment-picker-svg {
   background-color: var(--windrose-bg-secondary);
   border-radius: 8px;
@@ -6435,14 +5994,12 @@ button.windrose-breadcrumb-link {
   -webkit-user-select: none;
   -webkit-touch-callout: none;
 }
-
 .windrose-segment-picker-actions {
   display: flex;
   gap: 8px;
   margin-bottom: 16px;
   justify-content: center;
 }
-
 .windrose-segment-picker-btn {
   padding: 6px 12px;
   background-color: var(--windrose-bg-tertiary);
@@ -6452,14 +6009,28 @@ button.windrose-breadcrumb-link {
   font-size: 12px;
   cursor: pointer;
 }
-
+.windrose-segment-picker-btn-lg {
+  padding: 10px 24px;
+  background-color: var(--windrose-bg-tertiary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  color: var(--windrose-text-secondary);
+  font-size: 14px;
+  cursor: pointer;
+  min-width: 80px;
+}
+.windrose-segment-picker-btn-lg.is-primary {
+  background-color: var(--windrose-border-primary);
+  border: none;
+  color: var(--windrose-bg-primary);
+  font-weight: 600;
+}
 .windrose-segment-picker-status {
   color: var(--windrose-text-muted);
   font-size: 12px;
   text-align: center;
   margin-bottom: 12px;
 }
-
 .windrose-segment-picker-remember {
   display: flex;
   align-items: center;
@@ -6472,38 +6043,17 @@ button.windrose-breadcrumb-link {
   user-select: none;
   -webkit-user-select: none;
 }
-
 .windrose-segment-picker-remember input {
   width: 16px;
   height: 16px;
   cursor: pointer;
   accent-color: var(--windrose-border-primary);
 }
-
 .windrose-segment-picker-footer {
   display: flex;
   gap: 12px;
   justify-content: center;
 }
-
-.windrose-segment-picker-btn-lg {
-  padding: 10px 24px;
-  background-color: var(--windrose-bg-tertiary);
-  border: 1px solid var(--background-modifier-border);
-  border-radius: 6px;
-  color: var(--windrose-text-secondary);
-  font-size: 14px;
-  cursor: pointer;
-  min-width: 80px;
-}
-
-.windrose-segment-picker-btn-lg.is-primary {
-  background-color: var(--windrose-border-primary);
-  border: none;
-  color: var(--windrose-bg-primary);
-  font-weight: 600;
-}
-
 .windrose-segment-picker-hint {
   color: var(--text-faint);
   font-size: 11px;
