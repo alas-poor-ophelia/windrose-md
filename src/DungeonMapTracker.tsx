@@ -525,36 +525,38 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
           </div>
         )}
 
-        <ToolPalette
-          currentTool={currentTool}
-          onToolChange={setCurrentTool}
-          onUndo={wrappedHandleUndo}
-          onRedo={handleRedo}
-          canUndo={canUndo}
-          canRedo={canRedo}
-          selectedColor={selectedColor}
-          onColorChange={setSelectedColor}
-          selectedOpacity={selectedOpacity}
-          onOpacityChange={handleOpacityChange}
-          isColorPickerOpen={isColorPickerOpen}
-          onColorPickerOpenChange={setIsColorPickerOpen}
-          customColors={mapData.customColors ?? []}
-          paletteColorOpacityOverrides={mapData.paletteColorOpacityOverrides || {}}
-          onAddCustomColor={handleAddCustomColor}
-          onDeleteCustomColor={handleDeleteCustomColor}
-          onUpdateColorOpacity={handleUpdateColorOpacity}
-          mapType={mapData.mapType}
-          isFocused={isFocused}
-        />
+        <div className="windrose-toolbar-anchor">
+          <ToolPalette
+            currentTool={currentTool}
+            onToolChange={setCurrentTool}
+            onUndo={wrappedHandleUndo}
+            onRedo={handleRedo}
+            canUndo={canUndo}
+            canRedo={canRedo}
+            selectedColor={selectedColor}
+            onColorChange={setSelectedColor}
+            selectedOpacity={selectedOpacity}
+            onOpacityChange={handleOpacityChange}
+            isColorPickerOpen={isColorPickerOpen}
+            onColorPickerOpenChange={setIsColorPickerOpen}
+            customColors={mapData.customColors ?? []}
+            paletteColorOpacityOverrides={mapData.paletteColorOpacityOverrides || {}}
+            onAddCustomColor={handleAddCustomColor}
+            onDeleteCustomColor={handleDeleteCustomColor}
+            onUpdateColorOpacity={handleUpdateColorOpacity}
+            mapType={mapData.mapType}
+            isFocused={isFocused}
+          />
 
-        <VisibilityToolbar
-          isOpen={showVisibilityToolbar}
-          layerVisibility={layerVisibility}
-          onToggleLayer={handleToggleLayerVisibility}
-          mapType={mapData.mapType}
-          showFogTools={showFogTools}
-          onFogToolsToggle={handleFogToolsToggle}
-        />
+          <VisibilityToolbar
+            isOpen={showVisibilityToolbar}
+            layerVisibility={layerVisibility}
+            onToggleLayer={handleToggleLayerVisibility}
+            mapType={mapData.mapType}
+            showFogTools={showFogTools}
+            onFogToolsToggle={handleFogToolsToggle}
+          />
+        </div>
 
         <FogOfWarToolbar
           isOpen={showFogTools && showVisibilityToolbar}

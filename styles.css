@@ -68,7 +68,6 @@ body {
   --windrose-bg-secondary: var(--color-base-20);
   --windrose-bg-tertiary: var(--color-base-25);
   --windrose-border-primary: oklch(0.74 0.07 75);
-  --windrose-border-primary-rgb: 196, 165, 123;
   --windrose-border-primary-dark: oklch(0.54 0.07 68);
   --windrose-border-secondary: oklch(0.35 0 0);
   --windrose-text-primary: var(--color-base-100);
@@ -115,8 +114,8 @@ body {
   border: 2px solid var(--windrose-border-primary);
   box-shadow:
     inset 0 0 0 4px var(--windrose-bg-primary),
-    inset 0 0 0 5px rgba(var(--windrose-border-primary-rgb), 0.3),
-    0 0 20px rgba(var(--windrose-border-primary-rgb), 0.2);
+    inset 0 0 0 5px oklch(from var(--windrose-border-primary) l c h / 0.3),
+    0 0 20px oklch(from var(--windrose-border-primary) l c h / 0.2);
   width: 100%;
   transition: width 0.3s ease, margin-left 0.3s ease;
 }
@@ -202,7 +201,7 @@ body {
   text-wrap: balance;
   margin-bottom: 12px;
   padding: clamp(0.25rem, 0.4vw, 0.375rem);
-  background-color: rgba(255, 255, 255, 0.05);
+  background-color: oklch(1 0 0 / 0.05);
   border-radius: 4px;
   display: flex;
   justify-content: space-between;
@@ -471,8 +470,8 @@ body {
   position: relative;
   box-shadow:
     inset 0 0 0 3px var(--windrose-bg-primary),
-    inset 0 0 0 4px rgba(var(--windrose-border-primary-rgb), 0.3),
-    0 0 15px rgba(var(--windrose-border-primary-rgb), 0.15);
+    inset 0 0 0 4px oklch(from var(--windrose-border-primary) l c h / 0.3),
+    0 0 15px oklch(from var(--windrose-border-primary) l c h / 0.15);
 }
 
 .windrose-tool-btn {
@@ -574,8 +573,8 @@ body {
   gap: 2px;
   z-index: 1001;
   box-shadow: 
-    0 4px 12px rgba(0, 0, 0, 0.4),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    0 4px 12px oklch(0 0 0 / 0.4),
+    inset 0 1px 0 oklch(1 0 0 / 0.05);
   min-width: 120px;
 }
 
@@ -662,7 +661,7 @@ body {
     cursor: not-allowed;
 
     svg {
-      color: #444;
+      color: oklch(0.36 0 0);
     }
   }
 }
@@ -744,9 +743,10 @@ button.windrose-orientation-btn,
   min-height: 35px;
   max-width: 35px;
   max-height: 35px;
-  background-color: rgba(0, 0, 0, 0.7);
-  border: 2px solid rgba(var(--windrose-border-primary-rgb), 0.4);
-  color: var(--windrose-text-primary);
+  background-color: color-mix(in srgb, var(--windrose-bg-primary) 80%, transparent);
+  backdrop-filter: blur(8px);
+  border: 2px solid oklch(from var(--windrose-border-primary) l c h / 0.4);
+  color: var(--windrose-border-primary);
   border-radius: 50%;
   cursor: pointer;
   font-size: 18px;
@@ -755,16 +755,23 @@ button.windrose-orientation-btn,
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 0;
   transition: all 0.2s;
   flex: 0 0 auto;
   padding: 0;
   box-sizing: border-box;
-  overflow: hidden;
+  overflow: visible;
   user-select: none;
 
+  svg {
+    display: block;
+    width: 1em;
+    height: 1em;
+  }
+
   &:hover {
-    background-color: rgba(0, 0, 0, 0.85);
-    border-color: rgba(var(--windrose-border-primary-rgb), 0.6);
+    background-color: color-mix(in srgb, var(--windrose-bg-primary) 90%, transparent);
+    border-color: oklch(from var(--windrose-border-primary) l c h / 0.6);
     transform: scale(1.05);
   }
 }
@@ -772,11 +779,11 @@ button.windrose-orientation-btn,
 .windrose-zoom-level {
   font-size: 10px;
   font-weight: 600;
-  color: rgba(var(--windrose-border-primary-rgb), 0.8);
+  color: oklch(from var(--windrose-border-primary) l c h / 0.8);
   text-align: center;
   padding: 3px 6px;
   user-select: none;
-  background-color: rgba(0, 0, 0, 0.5);
+  background-color: oklch(0 0 0 / 0.5);
   border-radius: 6px;
   width: 38px;
   box-sizing: border-box;
@@ -877,7 +884,7 @@ button.windrose-orientation-btn,
 
 .windrose-sidebar-collapse-btn.windrose-sidebar-collapse-btn {
   background: transparent;
-  border: 1.5px solid rgba(var(--windrose-border-primary-rgb), 0.4);
+  border: 1.5px solid oklch(from var(--windrose-border-primary) l c h / 0.4);
   border-radius: 3px;
   color: var(--windrose-border-primary);
   cursor: pointer;
@@ -891,13 +898,13 @@ button.windrose-orientation-btn,
   justify-content: center;
   width: 24px;
   height: 24px;
-  box-shadow: 0 0 8px rgba(var(--windrose-border-primary-rgb), 0.2);
+  box-shadow: 0 0 8px oklch(from var(--windrose-border-primary) l c h / 0.2);
 
   &:hover {
     color: var(--windrose-text-primary);
     border-color: var(--windrose-border-primary);
-    background-color: rgba(var(--windrose-border-primary-rgb), 0.1);
-    box-shadow: 0 0 12px rgba(var(--windrose-border-primary-rgb), 0.4);
+    background-color: oklch(from var(--windrose-border-primary) l c h / 0.1);
+    box-shadow: 0 0 12px oklch(from var(--windrose-border-primary) l c h / 0.4);
   }
 
   svg {
@@ -927,8 +934,8 @@ button.windrose-orientation-btn,
   cursor: pointer;
   z-index: 200;
   box-shadow:
-    2px 2px 6px rgba(0, 0, 0, 0.4),
-    0 0 12px rgba(var(--windrose-border-primary-rgb), 0.15);
+    2px 2px 6px oklch(0 0 0 / 0.4),
+    0 0 12px oklch(from var(--windrose-border-primary) l c h / 0.15);
   transition: var(--windrose-transition);
   padding: 0;
 
@@ -960,8 +967,8 @@ button.windrose-orientation-btn,
   cursor: pointer;
   z-index: 200;
   box-shadow:
-    2px 2px 6px rgba(0, 0, 0, 0.4),
-    0 0 12px rgba(var(--windrose-border-primary-rgb), 0.15);
+    2px 2px 6px oklch(0 0 0 / 0.4),
+    0 0 12px oklch(from var(--windrose-border-primary) l c h / 0.15);
   padding: 0;
 
   &:hover {
@@ -1096,8 +1103,8 @@ button.windrose-object-grid-item,
 .windrose-object-grid-item-selected.windrose-object-grid-item-selected,
 .windrose-object-grid-item-selected.windrose-object-grid-item-selected:hover {
   border-color: var(--windrose-border-primary);
-  box-shadow: 0 0 6px rgba(var(--windrose-border-primary-rgb), 0.4);
-  background: rgba(var(--windrose-border-primary-rgb), 0.1);
+  box-shadow: 0 0 6px oklch(from var(--windrose-border-primary) l c h / 0.4);
+  background: oklch(from var(--windrose-border-primary) l c h / 0.1);
 }
 
 .windrose-object-grid-symbol {
@@ -1221,8 +1228,8 @@ button.windrose-object-grid-item,
   cursor: pointer;
   z-index: 200;
   box-shadow:
-    -2px 2px 6px rgba(0, 0, 0, 0.4),
-    0 0 12px rgba(var(--windrose-border-primary-rgb), 0.15);
+    -2px 2px 6px oklch(0 0 0 / 0.4),
+    0 0 12px oklch(from var(--windrose-border-primary) l c h / 0.15);
   transition: var(--windrose-transition);
   padding: 0;
 
@@ -1455,8 +1462,8 @@ button.windrose-tile-browser-config-btn,
 .windrose-tile-thumb-selected.windrose-tile-thumb-selected,
 .windrose-tile-thumb-selected.windrose-tile-thumb-selected:hover {
   border-color: var(--windrose-border-primary);
-  box-shadow: 0 0 6px rgba(var(--windrose-border-primary-rgb), 0.4);
-  background: rgba(var(--windrose-border-primary-rgb), 0.1);
+  box-shadow: 0 0 6px oklch(from var(--windrose-border-primary) l c h / 0.4);
+  background: oklch(from var(--windrose-border-primary) l c h / 0.1);
 }
 
 .windrose-tile-thumb-img {
@@ -1473,7 +1480,7 @@ button.windrose-tile-browser-config-btn,
   border: 1px solid var(--windrose-border-primary);
   border-radius: 4px;
   padding: clamp(0.25rem, 0.4vw, 0.375rem);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 4px 12px oklch(0 0 0 / 0.5);
   pointer-events: none;
   z-index: 10000;
 }
@@ -1592,7 +1599,7 @@ button.windrose-tile-browser-layer-btn,
 
 .windrose-tile-browser-layer-btn:hover {
   color: var(--windrose-text-primary);
-  background: rgba(255, 255, 255, 0.1);
+  background: oklch(1 0 0 / 0.1);
 }
 
 button.windrose-tile-browser-layer-btn.windrose-tile-browser-layer-active,
@@ -1606,13 +1613,13 @@ button.windrose-tile-browser-layer-btn.windrose-tile-browser-layer-active,
    ============================================ */
 
 .windrose-object-tooltip {
-  background-color: rgba(42, 42, 42, 0.95);
+  background-color: oklch(0.25 0 0 / 0.95);
   color: var(--windrose-text-primary);
   font-size: 11pt;
   padding: 6px 10px;
   border-radius: 4px;
   white-space: nowrap;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 2px 8px oklch(0 0 0 / 0.3);
   border: 1px solid var(--windrose-border-secondary);
   font-family: sans-serif;
   pointer-events: none;
@@ -1626,7 +1633,7 @@ button.windrose-tile-browser-layer-btn.windrose-tile-browser-layer-active,
 .windrose-resize-button {
   width: 32px;
   height: 32px;
-  background-color: rgba(74, 158, 255, 0.9);
+  background-color: oklch(from var(--windrose-accent-blue) l c h / 0.9);
   border: 2px solid var(--windrose-text-primary);
   border-radius: 50%;
   color: var(--windrose-text-primary);
@@ -1637,10 +1644,10 @@ button.windrose-tile-browser-layer-btn.windrose-tile-browser-layer-active,
   transition: var(--windrose-transition);
   z-index: 150;
   user-select: none;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 2px 8px oklch(0 0 0 / 0.3);
 
   &:hover {
-    background-color: rgba(74, 158, 255, 1);
+    background-color: var(--windrose-accent-blue);
     transform: scale(1.1);
   }
 
@@ -1676,7 +1683,7 @@ button.windrose-tile-browser-layer-btn.windrose-tile-browser-layer-active,
   border-radius: 4px;
   padding: 4px 8px;
   white-space: nowrap;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 2px 8px oklch(0 0 0 / 0.3);
   z-index: 150;
   position: relative;
 }
@@ -1725,7 +1732,7 @@ button.windrose-tile-browser-layer-btn.windrose-tile-browser-layer-active,
   font-size: 13px;
   font-weight: 500;
   white-space: nowrap;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 2px 8px oklch(0 0 0 / 0.2);
 }
 
 .windrose-selection-count svg {
@@ -1747,18 +1754,18 @@ button.windrose-tile-browser-layer-btn.windrose-tile-browser-layer-active,
   cursor: pointer;
   transition: var(--windrose-transition);
   user-select: none;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 2px 8px oklch(0 0 0 / 0.2);
 
   &:hover {
     background: var(--background-primary-alt, var(--background-secondary));
     border-color: var(--text-accent);
     transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 4px 12px oklch(0 0 0 / 0.3);
   }
 
   &:active {
     transform: translateY(0);
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 2px 6px oklch(0 0 0 / 0.2);
   }
 
   svg {
@@ -1768,15 +1775,15 @@ button.windrose-tile-browser-layer-btn.windrose-tile-browser-layer-active,
 }
 
 .windrose-toolbar-color-button {
-  border: 2px solid rgba(255, 255, 255, 0.3);
+  border: 2px solid oklch(1 0 0 / 0.3);
   
   svg {
-    filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.8));
-    color: #000;
+    filter: drop-shadow(0 0 2px oklch(0 0 0 / 0.8));
+    color: oklch(0 0 0);
   }
 
   &:hover {
-    border-color: rgba(255, 255, 255, 0.5);
+    border-color: oklch(1 0 0 / 0.5);
   }
 }
 
@@ -1795,7 +1802,7 @@ button.windrose-tile-browser-layer-btn.windrose-tile-browser-layer-active,
   border-radius: 4px;
   padding: 4px 8px;
   white-space: nowrap;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 2px 8px oklch(0 0 0 / 0.3);
   z-index: 150;
 }
 
@@ -1830,7 +1837,7 @@ button.windrose-tile-browser-layer-btn.windrose-tile-browser-layer-active,
   color: var(--text-on-accent);
   padding: 8px 12px;
   border-radius: 6px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 2px 12px oklch(0 0 0 / 0.4);
   font-size: 13px;
   white-space: nowrap;
 }
@@ -1842,7 +1849,7 @@ button.windrose-tile-browser-layer-btn.windrose-tile-browser-layer-active,
 }
 
 .windrose-linking-banner-cancel {
-  background: rgba(255, 255, 255, 0.2);
+  background: oklch(1 0 0 / 0.2);
   border: none;
   color: inherit;
   padding: 4px 8px;
@@ -1853,7 +1860,7 @@ button.windrose-tile-browser-layer-btn.windrose-tile-browser-layer-active,
 }
 
 .windrose-linking-banner-cancel:hover {
-  background: rgba(255, 255, 255, 0.3);
+  background: oklch(1 0 0 / 0.3);
 }
 
 /* Active state for linked object button */
@@ -1869,13 +1876,13 @@ button.windrose-tile-browser-layer-btn.windrose-tile-browser-layer-active,
 
 .windrose-selection-card {
   position: relative;
-  background: rgba(26, 26, 26, 0.7);
-  border: 2px solid rgba(var(--windrose-border-primary-rgb), 0.7);
+  background: oklch(0.20 0 0 / 0.7);
+  border: 2px solid oklch(from var(--windrose-border-primary) l c h / 0.7);
   border-radius: 4px;
   box-shadow:
-    inset 0 0 0 3px rgba(26, 26, 26, 0.7),
-    inset 0 0 0 4px rgba(var(--windrose-border-primary-rgb), 0.15),
-    0 4px 16px rgba(0, 0, 0, 0.5);
+    inset 0 0 0 3px oklch(0.20 0 0 / 0.7),
+    inset 0 0 0 4px oklch(from var(--windrose-border-primary) l c h / 0.15),
+    0 4px 16px oklch(0 0 0 / 0.5);
   backdrop-filter: blur(8px);
 }
 
@@ -1950,7 +1957,7 @@ button.windrose-sel-action-btn,
   max-height: 28px;
   min-width: unset;
   max-width: unset;
-  background: rgba(42, 42, 42, 0.25);
+  background: oklch(0.25 0 0 / 0.25);
   border: 1px solid transparent;
   border-radius: 3px;
   color: var(--windrose-text-primary);
@@ -2003,13 +2010,13 @@ button.windrose-sel-action-btn,
 /* Delete action */
 .windrose-sel-action-delete:hover:not(:disabled) {
   background: var(--windrose-accent-red);
-  border-color: #6b0000;
+  border-color: oklch(0.27 0.12 22);
 }
 .windrose-sel-action-delete:hover:not(:disabled) svg {
-  color: #ff8080;
+  color: oklch(0.75 0.12 20);
 }
 .windrose-sel-action-delete:hover:not(:disabled) .windrose-sel-action-label {
-  color: #ff8080;
+  color: oklch(0.75 0.12 20);
 }
 
 /* Color swatch */
@@ -2021,7 +2028,7 @@ button.windrose-sel-action-btn,
   height: 14px;
   min-width: 14px;
   border-radius: 2px;
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  border: 1px solid oklch(1 0 0 / 0.3);
   flex-shrink: 0;
 }
 
@@ -2046,7 +2053,7 @@ button.windrose-sel-links-toggle,
   max-height: 28px;
   min-width: unset;
   max-width: unset;
-  background: rgba(42, 42, 42, 0.3);
+  background: oklch(0.25 0 0 / 0.3);
   border: 1px solid transparent;
   border-radius: 3px;
   color: var(--windrose-text-secondary);
@@ -2071,7 +2078,7 @@ button.windrose-sel-links-toggle,
   border-color: var(--windrose-border-secondary);
 }
 .windrose-sel-links-toggle.expanded {
-  background: rgba(42, 42, 42, 0.5);
+  background: oklch(0.25 0 0 / 0.5);
   border-color: var(--windrose-border-secondary);
 }
 
@@ -2084,7 +2091,7 @@ button.windrose-sel-links-toggle,
 }
 .windrose-sel-links-panel .windrose-sel-action-btn {
   padding: 4px 4px;
-  background: rgba(42, 42, 42, 0.3);
+  background: oklch(0.25 0 0 / 0.3);
 }
 
 /* Resize row */
@@ -2154,7 +2161,7 @@ button.windrose-sel-links-toggle,
 .windrose-sel-toggle-slider {
   position: absolute;
   inset: 0;
-  background: rgba(42, 42, 42, 0.6);
+  background: oklch(0.25 0 0 / 0.6);
   border: 1px solid var(--windrose-border-primary);
   border-radius: 7px;
   transition: background 0.15s;
@@ -2171,7 +2178,7 @@ button.windrose-sel-links-toggle,
   transition: transform 0.15s, background 0.15s;
 }
 .windrose-sel-toggle-switch input:checked + .windrose-sel-toggle-slider {
-  background: rgba(var(--windrose-border-primary-rgb), 0.3);
+  background: oklch(from var(--windrose-border-primary) l c h / 0.3);
   border-color: var(--windrose-accent-primary);
 }
 .windrose-sel-toggle-switch input:checked + .windrose-sel-toggle-slider::before {
@@ -2191,7 +2198,7 @@ input.windrose-sel-radius-input,
   height: 22px;
   padding: 2px 4px;
   font-size: 11px;
-  background: rgba(42, 42, 42, 0.4);
+  background: oklch(0.25 0 0 / 0.4);
   border: 1px solid var(--windrose-border-primary);
   border-radius: 3px;
   color: var(--windrose-text-primary);
@@ -2222,7 +2229,7 @@ button.windrose-sel-light-color-swatch,
   max-width: 22px;
   max-height: 22px;
   padding: 2px;
-  background: rgba(42, 42, 42, 0.4);
+  background: oklch(0.25 0 0 / 0.4);
   border: 1px solid var(--windrose-border-primary);
   border-radius: 3px;
   cursor: pointer;
@@ -2258,8 +2265,8 @@ button.windrose-sel-icon-btn,
   min-height: 24px;
   max-width: 24px;
   max-height: 24px;
-  background: rgba(42, 42, 42, 0.6);
-  border: 1px solid rgba(58, 58, 58, 0.6);
+  background: oklch(0.25 0 0 / 0.6);
+  border: 1px solid oklch(0.33 0 0 / 0.6);
   border-radius: 3px;
   cursor: pointer;
   transition: var(--windrose-transition);
@@ -2313,7 +2320,7 @@ button.windrose-sel-icon-btn,
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.7);
+  background-color: oklch(0 0 0 / 0.7);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2338,7 +2345,7 @@ button.windrose-sel-icon-btn,
   padding: 20px;
   width: 400px;
   max-width: 90vw;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 4px 20px oklch(0 0 0 / 0.5);
   animation: slideUp 0.2s ease;
 }
 
@@ -2499,8 +2506,8 @@ button.windrose-sel-icon-btn,
     color: var(--windrose-text-primary);
 
     &:hover {
-      background-color: #454545;
-      border-color: #5a5a5a;
+      background-color: oklch(0.37 0 0);
+      border-color: oklch(0.45 0 0);
     }
   }
 
@@ -2641,8 +2648,8 @@ button.windrose-sel-icon-btn,
   gap: 12px;
   padding: 12px 16px;
   margin: -8px -8px 16px -8px;
-  background: linear-gradient(135deg, rgba(74, 158, 255, 0.1), rgba(74, 158, 255, 0.05));
-  border: 1px solid rgba(74, 158, 255, 0.3);
+  background: linear-gradient(135deg, oklch(from var(--windrose-accent-blue) l c h / 0.1), oklch(from var(--windrose-accent-blue) l c h / 0.05));
+  border: 1px solid oklch(from var(--windrose-accent-blue) l c h / 0.3);
   border-radius: 6px;
   animation: slideDown 0.3s ease;
 }
@@ -2683,7 +2690,7 @@ button.windrose-sel-icon-btn,
 .windrose-settings-upgrade-container {
   margin: -8px -8px 16px -8px;
   padding: 12px;
-  background-color: rgba(0, 0, 0, 0.2);
+  background-color: oklch(0 0 0 / 0.2);
   border-radius: 6px;
   
   .windrose-plugin-installer-card {
@@ -2751,11 +2758,11 @@ button.windrose-sel-icon-btn,
   font-size: 12px;
   font-weight: 600;
   text-shadow: 
-    0 0 4px rgba(0, 0, 0, 0.8),
-    0 1px 2px rgba(0, 0, 0, 0.9);
+    0 0 4px oklch(0 0 0 / 0.8),
+    0 1px 2px oklch(0 0 0 / 0.9);
   color: white;
   padding: 2px 8px;
-  background-color: rgba(0, 0, 0, 0.4);
+  background-color: oklch(0 0 0 / 0.4);
   border-radius: 3px;
   font-family: var(--font-monospace);
 }
@@ -2784,7 +2791,7 @@ button.windrose-sel-icon-btn,
   border: 1px solid var(--windrose-border-secondary);
   border-radius: 8px;
   padding: 12px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 4px 20px oklch(0 0 0 / 0.5);
   z-index: 2100;
   min-width: 290px;
   animation: slideDown 0.15s ease;
@@ -2865,7 +2872,7 @@ button.windrose-sel-icon-btn,
   &.windrose-color-swatch-selected {
     border-color: var(--windrose-text-primary);
     border-width: 3px;
-    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.3);
+    box-shadow: 0 0 0 2px oklch(1 0 0 / 0.3);
   }
 
   &.windrose-color-swatch-reset {
@@ -2914,7 +2921,7 @@ button.windrose-sel-icon-btn,
 .windrose-color-checkmark {
   color: var(--windrose-text-primary);
   font-weight: bold;
-  text-shadow: 0 0 4px rgba(0, 0, 0, 0.8);
+  text-shadow: 0 0 4px oklch(0 0 0 / 0.8);
 }
 
 .windrose-color-reset-icon {
@@ -2934,7 +2941,7 @@ button.windrose-sel-icon-btn,
   color: var(--windrose-text-primary);
   font-size: 18px;
   font-weight: bold;
-  text-shadow: 0 0 4px rgba(0, 0, 0, 0.8);
+  text-shadow: 0 0 4px oklch(0 0 0 / 0.8);
   animation: spin 2s linear infinite;
   mix-blend-mode: difference;
 }
@@ -2983,7 +2990,7 @@ button.windrose-sel-icon-btn,
   transform: translateY(-50%);
   width: 32px;
   height: 32px;
-  background-color: rgba(239, 68, 68, 0.9);
+  background-color: oklch(from var(--windrose-accent-red) l c h / 0.9);
   border: 2px solid var(--windrose-text-primary);
   border-radius: 50%;
   color: var(--windrose-text-primary);
@@ -2994,7 +3001,7 @@ button.windrose-sel-icon-btn,
   transition: var(--windrose-transition);
   z-index: 150;
   user-select: none;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 2px 8px oklch(0 0 0 / 0.3);
 
   svg {
     width: 16px;
@@ -3003,7 +3010,7 @@ button.windrose-sel-icon-btn,
   }
 
   &:hover {
-    background-color: rgba(239, 68, 68, 1);
+    background-color: var(--windrose-accent-red);
     transform: translateY(-50%) scale(1.1);
   }
 
@@ -3026,7 +3033,7 @@ button.windrose-sel-icon-btn,
   align-items: center;
   gap: 8px;
   z-index: 150;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 12px oklch(0 0 0 / 0.3);
   white-space: nowrap;
 }
 
@@ -3078,7 +3085,7 @@ button.windrose-sel-icon-btn,
 .windrose-color-edit-delete {
   width: 24px;
   height: 24px;
-  background-color: rgba(239, 68, 68, 0.8);
+  background-color: oklch(from var(--windrose-accent-red) l c h / 0.8);
   border: none;
   border-radius: 4px;
   color: var(--windrose-text-primary);
@@ -3095,7 +3102,7 @@ button.windrose-sel-icon-btn,
   }
   
   &:hover {
-    background-color: rgba(239, 68, 68, 1);
+    background-color: var(--windrose-accent-red);
   }
 }
 
@@ -3356,11 +3363,11 @@ button.windrose-sel-icon-btn,
   font-weight: 600;
   color: white;
   text-shadow:
-    -1px -1px 0 #000,
-    1px -1px 0 #000,
-    -1px 1px 0 #000,
-    1px 1px 0 #000,
-    0 0 3px rgba(0, 0, 0, 0.8);
+    -1px -1px 0 oklch(0 0 0),
+    1px -1px 0 oklch(0 0 0),
+    -1px 1px 0 oklch(0 0 0),
+    1px 1px 0 oklch(0 0 0),
+    0 0 3px oklch(0 0 0 / 0.8);
   letter-spacing: 0.5px;
 }
 
@@ -3413,42 +3420,42 @@ button.windrose-sel-icon-btn,
   position: absolute;
   width: 32px;
   height: 32px;
-  background: linear-gradient(135deg, var(--windrose-accent-blue) 0%, #357abd 100%);
+  background: linear-gradient(135deg, var(--windrose-accent-blue) 0%, oklch(0.55 0.12 250) 100%);
   color: white;
-  border: 2px solid rgba(255, 255, 255, 0.3);
+  border: 2px solid oklch(1 0 0 / 0.3);
   border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   font-size: 18px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 2px 8px oklch(0 0 0 / 0.3);
   transition: all 0.2s ease;
   z-index: 1000;
 }
 
 .windrose-edit-button:hover {
-  background: linear-gradient(135deg, #5aa5ff 0%, #4088cd 100%);
+  background: linear-gradient(135deg, oklch(0.70 0.14 255) 0%, oklch(0.60 0.12 252) 100%);
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 4px 12px oklch(0 0 0 / 0.4);
 }
 
 .windrose-edit-button:active {
   transform: translateY(0);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 2px 6px oklch(0 0 0 / 0.3);
 }
 
 /* Object Color Button (for objects) */
 .windrose-object-color-button {
   width: 32px;
   height: 32px;
-  border: 2px solid rgba(255, 255, 255, 0.3);
+  border: 2px solid oklch(1 0 0 / 0.3);
   border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 2px 8px oklch(0 0 0 / 0.3);
   transition: all 0.2s ease;
   z-index: 1000;
 }
@@ -3456,19 +3463,19 @@ button.windrose-sel-icon-btn,
 .windrose-object-color-button svg {
   width: 16px;
   height: 16px;
-  filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.8));
-  color: #000;
+  filter: drop-shadow(0 0 2px oklch(0 0 0 / 0.8));
+  color: oklch(0 0 0);
 }
 
 .windrose-object-color-button:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-  border-color: rgba(255, 255, 255, 0.5);
+  box-shadow: 0 4px 12px oklch(0 0 0 / 0.4);
+  border-color: oklch(1 0 0 / 0.5);
 }
 
 .windrose-object-color-button:active {
   transform: translateY(0);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 2px 6px oklch(0 0 0 / 0.3);
 }
 
 .windrose-object-color-button .windrose-color-picker {
@@ -3514,8 +3521,8 @@ button.windrose-sel-icon-btn,
   border: 2px solid var(--windrose-border-primary);
   border-radius: 8px;
   padding: 32px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3),
-              inset 0 0 0 1px rgba(var(--windrose-border-primary-rgb), 0.2);
+  box-shadow: 0 4px 20px oklch(0 0 0 / 0.3),
+              inset 0 0 0 1px oklch(from var(--windrose-border-primary) l c h / 0.2);
 }
 
 .windrose-plugin-installer-icon {
@@ -3528,7 +3535,7 @@ button.windrose-sel-icon-btn,
     width: 64px;
     height: 64px;
     color: var(--windrose-border-primary);
-    filter: drop-shadow(0 0 8px rgba(var(--windrose-border-primary-rgb), 0.4));
+    filter: drop-shadow(0 0 8px oklch(from var(--windrose-border-primary) l c h / 0.4));
   }
 }
 
@@ -3562,7 +3569,7 @@ button.windrose-sel-icon-btn,
   .windrose-plugin-installer-note {
     margin-top: 20px;
     padding: 12px;
-    background: rgba(var(--windrose-border-primary-rgb), 0.1);
+    background: oklch(from var(--windrose-border-primary) l c h / 0.1);
     border-left: 3px solid var(--windrose-border-primary);
     border-radius: 4px;
     font-size: 13px;
@@ -3573,7 +3580,7 @@ button.windrose-sel-icon-btn,
 .windrose-plugin-installer-error {
   margin-top: 16px;
   padding: 12px;
-  background: rgba(239, 68, 68, 0.1);
+  background: oklch(from var(--windrose-accent-red) l c h / 0.1);
   border: 1px solid var(--windrose-error);
   border-radius: 4px;
   color: var(--windrose-error);
@@ -3606,11 +3613,11 @@ button.windrose-sel-icon-btn,
 .windrose-plugin-installer-btn-primary {
   background: linear-gradient(135deg, var(--windrose-border-primary) 0%, var(--windrose-border-primary-dark) 100%);
   color: var(--windrose-bg-primary);
-  box-shadow: 0 2px 8px rgba(var(--windrose-border-primary-rgb), 0.3);
+  box-shadow: 0 2px 8px oklch(from var(--windrose-border-primary) l c h / 0.3);
   
   &:hover:not(:disabled) {
     transform: translateY(-2px);
-    box-shadow: 0 4px 16px rgba(var(--windrose-border-primary-rgb), 0.4);
+    box-shadow: 0 4px 16px oklch(from var(--windrose-border-primary) l c h / 0.4);
   }
   
   &:active:not(:disabled) {
@@ -3624,7 +3631,7 @@ button.windrose-sel-icon-btn,
   border: 1px solid var(--windrose-border-secondary);
   
   &:hover:not(:disabled) {
-    background: rgba(255, 255, 255, 0.1);
+    background: oklch(1 0 0 / 0.1);
     color: var(--windrose-text-primary);
   }
 }
@@ -3636,7 +3643,7 @@ button.windrose-sel-icon-btn,
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.7);
+  background: oklch(0 0 0 / 0.7);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3650,8 +3657,8 @@ button.windrose-sel-icon-btn,
   border: 2px solid var(--windrose-border-primary);
   border-radius: 8px;
   padding: 32px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5),
-              inset 0 0 0 1px rgba(var(--windrose-border-primary-rgb), 0.2);
+  box-shadow: 0 8px 32px oklch(0 0 0 / 0.5),
+              inset 0 0 0 1px oklch(from var(--windrose-border-primary) l c h / 0.2);
   animation: dmt-modal-fade-in 0.2s ease;
 }
 
@@ -3675,8 +3682,8 @@ button.windrose-sel-icon-btn,
   svg {
     width: 56px;
     height: 56px;
-    color: #4ade80;
-    filter: drop-shadow(0 0 12px rgba(74, 222, 128, 0.5));
+    color: oklch(0.80 0.17 155);
+    filter: drop-shadow(0 0 12px oklch(0.80 0.17 155 / 0.5));
   }
 }
 
@@ -3699,7 +3706,7 @@ button.windrose-sel-icon-btn,
 .windrose-plugin-success-note {
   margin-top: 16px;
   padding: 12px;
-  background: rgba(var(--windrose-border-primary-rgb), 0.1);
+  background: oklch(from var(--windrose-border-primary) l c h / 0.1);
   border-left: 3px solid var(--windrose-border-primary);
   border-radius: 4px;
   font-size: 13px;
@@ -3742,9 +3749,13 @@ button.windrose-sel-icon-btn,
    Visibility Toolbar
    ============================================ */
 
+.windrose-toolbar-anchor {
+  position: relative;
+}
+
 .windrose-visibility-toolbar {
   position: absolute;
-  top: 128px; /* Below MapHeader + ToolPalette + extra spacing for iPad/mobile (header ~44px + palette ~60px + container padding 12px + gap 12px) */
+  top: calc(100% + 12px);
   left: 50%;
   transform: translateX(-50%) translateY(-20px);
   display: flex;
@@ -3755,8 +3766,8 @@ button.windrose-sel-icon-btn,
   border-radius: 4px;
   z-index: 200;
   box-shadow:
-    0 4px 12px rgba(0, 0, 0, 0.5),
-    inset 0 0 0 1px rgba(var(--windrose-border-primary-rgb), 0.2);
+    0 4px 12px oklch(0 0 0 / 0.5),
+    inset 0 0 0 1px oklch(from var(--windrose-border-primary) l c h / 0.2);
   opacity: 0;
   pointer-events: none;
   transition: opacity 200ms ease-out, transform 200ms ease-out;
@@ -3808,10 +3819,10 @@ button.windrose-sel-icon-btn,
 
 .windrose-visibility-btn-hidden {
   opacity: 0.6;
-  background-color: rgba(0, 0, 0, 0.3);
+  background-color: oklch(0 0 0 / 0.3);
   
   &:hover {
-    background-color: rgba(0, 0, 0, 0.4);
+    background-color: oklch(0 0 0 / 0.4);
     border-color: var(--windrose-border-secondary);
   }
 
@@ -3820,15 +3831,19 @@ button.windrose-sel-icon-btn,
   }
 }
 
-/* Active state for visibility toggle button in controls */
-.windrose-expand-btn-active.windrose-expand-btn-active,
-.windrose-expand-btn-active.windrose-expand-btn-active:hover {
+/* Active state for toggle buttons in map controls */
+button.windrose-expand-btn.windrose-expand-btn-active,
+.is-tablet button.windrose-expand-btn.windrose-expand-btn-active {
   background-color: var(--windrose-border-primary);
   border-color: var(--windrose-border-primary-dark);
-  
-  svg {
-    color: var(--windrose-bg-primary);
-  }
+  color: var(--windrose-bg-primary);
+}
+
+button.windrose-expand-btn.windrose-expand-btn-active:hover,
+.is-tablet button.windrose-expand-btn.windrose-expand-btn-active:hover {
+  background-color: var(--windrose-border-primary-dark);
+  border-color: var(--windrose-border-primary);
+  transform: scale(1.05);
 }
 
 /* ==========================================================================
@@ -3986,8 +4001,8 @@ button.windrose-fow-tool-btn,
   z-index: 1000;
   box-shadow:
     inset 0 0 0 3px var(--windrose-bg-primary),
-    inset 0 0 0 4px rgba(var(--windrose-border-primary-rgb), 0.3),
-    0 4px 12px rgba(0, 0, 0, 0.4);
+    inset 0 0 0 4px oklch(from var(--windrose-border-primary) l c h / 0.3),
+    0 4px 12px oklch(0 0 0 / 0.4);
   white-space: nowrap;
 }
 
@@ -4007,8 +4022,8 @@ button.windrose-fow-tool-btn,
   border: 1px solid var(--windrose-border-primary);
   border-radius: 6px;
   padding: 6px 10px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3),
-              inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  box-shadow: 0 2px 8px oklch(0 0 0 / 0.3),
+              inset 0 1px 0 oklch(1 0 0 / 0.05);
 }
 
 .windrose-scale-slider-inner {
@@ -4040,7 +4055,7 @@ button.windrose-fow-tool-btn,
     border-radius: 50%;
     cursor: pointer;
     border: 2px solid var(--windrose-bg-secondary);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 1px 3px oklch(0 0 0 / 0.3);
     transition: transform 0.1s ease;
     
     &:hover {
@@ -4055,7 +4070,7 @@ button.windrose-fow-tool-btn,
     border-radius: 50%;
     cursor: pointer;
     border: 2px solid var(--windrose-bg-secondary);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 1px 3px oklch(0 0 0 / 0.3);
     transition: transform 0.1s ease;
     
     &:hover {
@@ -4158,9 +4173,9 @@ button.windrose-layer-btn {
   max-width: 35px;
   max-height: 35px;
   border-radius: 50%;
-  background: rgba(0, 0, 0, 0.7);
-  border: 2px solid rgba(var(--windrose-border-primary-rgb), 0.4);
-  color: var(--windrose-text-primary);
+  background: oklch(0 0 0 / 0.7);
+  border: 2px solid oklch(from var(--windrose-border-primary) l c h / 0.4);
+  color: var(--windrose-border-primary);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
@@ -4173,20 +4188,24 @@ button.windrose-layer-btn {
 }
 
 .windrose-layer-btn:hover {
-  border-color: rgba(var(--windrose-border-primary-rgb), 0.6);
-  background: rgba(0, 0, 0, 0.85);
+  border-color: oklch(from var(--windrose-border-primary) l c h / 0.6);
+  background: oklch(0 0 0 / 0.85);
   transform: scale(1.05);
 }
 
-.windrose-layer-btn-active {
-  border-color: var(--windrose-border-primary);
-  box-shadow: 0 0 8px rgba(var(--windrose-border-primary-rgb), 0.4);
-  background: rgba(var(--windrose-border-primary-rgb), 0.2);
+button.windrose-layer-btn.windrose-layer-btn-active,
+.is-tablet button.windrose-layer-btn.windrose-layer-btn-active {
+  background: var(--windrose-border-primary);
+  border-color: var(--windrose-border-primary-dark);
+  color: var(--windrose-bg-primary);
+  box-shadow: 0 0 8px oklch(from var(--windrose-border-primary) l c h / 0.4);
 }
 
-.windrose-layer-btn-active:hover {
+button.windrose-layer-btn.windrose-layer-btn-active:hover,
+.is-tablet button.windrose-layer-btn.windrose-layer-btn-active:hover {
+  background: var(--windrose-border-primary-dark);
   border-color: var(--windrose-border-primary);
-  background: rgba(var(--windrose-border-primary-rgb), 0.3);
+  transform: scale(1.05);
 }
 
 /* Layer Options Slide-out */
@@ -4220,8 +4239,8 @@ button.windrose-layer-option-btn {
   max-width: 28px;
   max-height: 28px;
   border-radius: 50%;
-  background: rgba(0, 0, 0, 0.8);
-  border: 2px solid rgba(var(--windrose-border-primary-rgb), 0.4);
+  background: oklch(0 0 0 / 0.8);
+  border: 2px solid oklch(from var(--windrose-border-primary) l c h / 0.4);
   color: var(--windrose-text-muted);
   cursor: pointer;
   display: flex;
@@ -4236,13 +4255,13 @@ button.windrose-layer-option-btn {
 
 .windrose-layer-option-btn:hover {
   color: var(--windrose-text-normal);
-  border-color: rgba(var(--windrose-border-primary-rgb), 0.6);
+  border-color: oklch(from var(--windrose-border-primary) l c h / 0.6);
 }
 
 .windrose-layer-option-btn.delete:hover {
   color: var(--windrose-error);
   border-color: var(--windrose-error);
-  background: rgba(239, 68, 68, 0.1);
+  background: oklch(from var(--windrose-accent-red) l c h / 0.1);
 }
 
 /* Layer Transparency Toggle */
@@ -4253,13 +4272,13 @@ button.windrose-layer-option-btn {
 .windrose-layer-option-btn.transparency.active {
   color: var(--windrose-accent-blue);
   border-color: var(--windrose-accent-blue);
-  background: rgba(74, 158, 255, 0.15);
-  box-shadow: 0 0 8px rgba(74, 158, 255, 0.4);
+  background: oklch(from var(--windrose-accent-blue) l c h / 0.15);
+  box-shadow: 0 0 8px oklch(from var(--windrose-accent-blue) l c h / 0.4);
 }
 
 .windrose-layer-option-btn.transparency:hover {
   color: var(--windrose-accent-blue);
-  border-color: rgba(74, 158, 255, 0.6);
+  border-color: oklch(from var(--windrose-accent-blue) l c h / 0.6);
 }
 
 .windrose-opacity-slider-popup {
@@ -4267,15 +4286,15 @@ button.windrose-layer-option-btn {
   left: calc(100% + 8px);
   top: 50%;
   transform: translateY(-50%);
-  background: rgba(20, 20, 20, 0.95);
-  border: 1px solid rgba(var(--windrose-border-primary-rgb), 0.4);
+  background: oklch(0.17 0 0 / 0.95);
+  border: 1px solid oklch(from var(--windrose-border-primary) l c h / 0.4);
   border-radius: 6px;
   padding: 8px 12px;
   display: flex;
   align-items: center;
   gap: 8px;
   z-index: 200;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 4px 12px oklch(0 0 0 / 0.5);
   white-space: nowrap;
 }
 
@@ -4286,7 +4305,7 @@ button.windrose-layer-option-btn {
   top: 50%;
   transform: translateY(-50%);
   border: 6px solid transparent;
-  border-right-color: rgba(var(--windrose-border-primary-rgb), 0.4);
+  border-right-color: oklch(from var(--windrose-border-primary) l c h / 0.4);
 }
 
 .windrose-opacity-slider {
@@ -4294,7 +4313,7 @@ button.windrose-layer-option-btn {
   height: 4px;
   -webkit-appearance: none;
   appearance: none;
-  background: rgba(255, 255, 255, 0.2);
+  background: oklch(1 0 0 / 0.2);
   border-radius: 2px;
   cursor: pointer;
 }
@@ -4333,8 +4352,8 @@ button.windrose-layer-add-btn {
   max-width: 35px;
   max-height: 35px;
   border-radius: 50%;
-  background: rgba(0, 0, 0, 0.5);
-  border: 2px dashed rgba(var(--windrose-border-primary-rgb), 0.4);
+  background: oklch(0 0 0 / 0.5);
+  border: 2px dashed oklch(from var(--windrose-border-primary) l c h / 0.4);
   color: var(--windrose-text-muted);
   cursor: pointer;
   display: flex;
@@ -4349,8 +4368,8 @@ button.windrose-layer-add-btn {
 }
 
 .windrose-layer-add-btn:hover {
-  background: rgba(0, 0, 0, 0.7);
-  border-color: rgba(var(--windrose-border-primary-rgb), 0.6);
+  background: oklch(0 0 0 / 0.7);
+  border-color: oklch(from var(--windrose-border-primary) l c h / 0.6);
   border-style: solid;
   color: var(--windrose-text-primary);
   transform: scale(1.05);
@@ -4369,7 +4388,7 @@ button.windrose-layer-add-btn {
 .windrose-layer-btn.drag-over {
   border-color: var(--windrose-border-primary);
   transform: scale(1.05);
-  box-shadow: 0 0 12px rgba(var(--windrose-border-primary-rgb), 0.5);
+  box-shadow: 0 0 12px oklch(from var(--windrose-border-primary) l c h / 0.5);
 }
 
 /* Layer Button - Pill Mode (for named layers) */
@@ -4410,7 +4429,7 @@ button.windrose-layer-btn.windrose-layer-btn-pill {
 .windrose-layer-option-btn.edit:hover {
   color: var(--windrose-accent-blue);
   border-color: var(--windrose-accent-blue);
-  background: rgba(74, 158, 255, 0.1);
+  background: oklch(from var(--windrose-accent-blue) l c h / 0.1);
 }
 
 /* ==========================================================================
@@ -4485,7 +4504,7 @@ button.windrose-region-item {
   height: 10px;
   border-radius: 50%;
   flex-shrink: 0;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid oklch(1 0 0 / 0.2);
 }
 
 .windrose-region-name {
@@ -4597,8 +4616,8 @@ button.windrose-breadcrumb-link {
 .windrose-icon-mode-btn {
   flex: 1;
   padding: 8px 12px;
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(var(--windrose-border-primary-rgb), 0.3);
+  background: oklch(0 0 0 / 0.3);
+  border: 1px solid oklch(from var(--windrose-border-primary) l c h / 0.3);
   border-radius: 4px;
   color: var(--windrose-text-muted);
   font-size: 12px;
@@ -4607,12 +4626,12 @@ button.windrose-breadcrumb-link {
 }
 
 .windrose-icon-mode-btn:hover {
-  border-color: rgba(var(--windrose-border-primary-rgb), 0.5);
+  border-color: oklch(from var(--windrose-border-primary) l c h / 0.5);
   color: var(--windrose-text-normal);
 }
 
 .windrose-icon-mode-btn.active {
-  background: rgba(var(--windrose-border-primary-rgb), 0.2);
+  background: oklch(from var(--windrose-border-primary) l c h / 0.2);
   border-color: var(--windrose-border-primary);
   color: var(--windrose-text-primary);
 }
@@ -4628,8 +4647,8 @@ button.windrose-breadcrumb-link {
   flex: 1;
   padding: 8px 12px;
   font-size: 16px;
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(var(--windrose-border-primary-rgb), 0.3);
+  background: oklch(0 0 0 / 0.3);
+  border: 1px solid oklch(from var(--windrose-border-primary) l c h / 0.3);
   border-radius: 4px;
   color: var(--windrose-text-primary);
 }
@@ -4645,8 +4664,8 @@ button.windrose-breadcrumb-link {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.4);
-  border: 1px solid rgba(var(--windrose-border-primary-rgb), 0.3);
+  background: oklch(0 0 0 / 0.4);
+  border: 1px solid oklch(from var(--windrose-border-primary) l c h / 0.3);
   border-radius: 4px;
   font-size: 20px;
 }
@@ -4663,8 +4682,8 @@ button.windrose-breadcrumb-link {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(var(--windrose-border-primary-rgb), 0.2);
+  background: oklch(0 0 0 / 0.3);
+  border: 1px solid oklch(from var(--windrose-border-primary) l c h / 0.2);
   border-radius: 4px;
   font-size: 14px;
   color: var(--windrose-text-normal);
@@ -4673,12 +4692,12 @@ button.windrose-breadcrumb-link {
 }
 
 .windrose-quick-symbol-btn:hover {
-  background: rgba(var(--windrose-border-primary-rgb), 0.15);
-  border-color: rgba(var(--windrose-border-primary-rgb), 0.4);
+  background: oklch(from var(--windrose-border-primary) l c h / 0.15);
+  border-color: oklch(from var(--windrose-border-primary) l c h / 0.4);
 }
 
 .windrose-quick-symbol-btn.selected {
-  background: rgba(var(--windrose-border-primary-rgb), 0.25);
+  background: oklch(from var(--windrose-border-primary) l c h / 0.25);
   border-color: var(--windrose-border-primary);
 }
 
@@ -4693,8 +4712,8 @@ button.windrose-breadcrumb-link {
   width: 100%;
   padding: 8px 12px;
   font-size: 13px;
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(var(--windrose-border-primary-rgb), 0.3);
+  background: oklch(0 0 0 / 0.3);
+  border: 1px solid oklch(from var(--windrose-border-primary) l c h / 0.3);
   border-radius: 4px;
   color: var(--windrose-text-primary);
 }
@@ -4713,8 +4732,8 @@ button.windrose-breadcrumb-link {
 .windrose-icon-category-tab {
   padding: 4px 8px;
   font-size: 10px;
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(var(--windrose-border-primary-rgb), 0.2);
+  background: oklch(0 0 0 / 0.3);
+  border: 1px solid oklch(from var(--windrose-border-primary) l c h / 0.2);
   border-radius: 3px;
   color: var(--windrose-text-muted);
   cursor: pointer;
@@ -4722,12 +4741,12 @@ button.windrose-breadcrumb-link {
 }
 
 .windrose-icon-category-tab:hover {
-  border-color: rgba(var(--windrose-border-primary-rgb), 0.4);
+  border-color: oklch(from var(--windrose-border-primary) l c h / 0.4);
   color: var(--windrose-text-normal);
 }
 
 .windrose-icon-category-tab.active {
-  background: rgba(var(--windrose-border-primary-rgb), 0.2);
+  background: oklch(from var(--windrose-border-primary) l c h / 0.2);
   border-color: var(--windrose-border-primary);
   color: var(--windrose-text-primary);
 }
@@ -4739,7 +4758,7 @@ button.windrose-breadcrumb-link {
   max-height: 180px;
   overflow-y: auto;
   padding: clamp(0.25rem, 0.4vw, 0.375rem);
-  background: rgba(0, 0, 0, 0.2);
+  background: oklch(0 0 0 / 0.2);
   border-radius: 4px;
 }
 
@@ -4749,7 +4768,7 @@ button.windrose-breadcrumb-link {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.3);
+  background: oklch(0 0 0 / 0.3);
   border: 1px solid transparent;
   border-radius: 4px;
   cursor: pointer;
@@ -4762,12 +4781,12 @@ button.windrose-breadcrumb-link {
 }
 
 .windrose-icon-grid-btn:hover {
-  background: rgba(var(--windrose-border-primary-rgb), 0.15);
-  border-color: rgba(var(--windrose-border-primary-rgb), 0.3);
+  background: oklch(from var(--windrose-border-primary) l c h / 0.15);
+  border-color: oklch(from var(--windrose-border-primary) l c h / 0.3);
 }
 
 .windrose-icon-grid-btn.selected {
-  background: rgba(var(--windrose-border-primary-rgb), 0.25);
+  background: oklch(from var(--windrose-border-primary) l c h / 0.25);
   border-color: var(--windrose-border-primary);
 }
 
@@ -4792,7 +4811,7 @@ button.windrose-breadcrumb-link {
   display: flex;
   justify-content: center;
   padding: 12px;
-  background: rgba(0, 0, 0, 0.3);
+  background: oklch(0 0 0 / 0.3);
   border-radius: 6px;
 }
 
@@ -4804,8 +4823,8 @@ button.windrose-breadcrumb-link {
   align-items: center;
   justify-content: center;
   gap: 4px;
-  background: rgba(0, 0, 0, 0.7);
-  border: 2px solid rgba(var(--windrose-border-primary-rgb), 0.6);
+  background: oklch(0 0 0 / 0.7);
+  border: 2px solid oklch(from var(--windrose-border-primary) l c h / 0.6);
   border-radius: 17.5px;
   color: var(--windrose-text-primary);
   font-size: 14px;
@@ -4848,20 +4867,20 @@ button.windrose-breadcrumb-link {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, rgba(139, 90, 43, 0.6), rgba(101, 67, 33, 0.6));
-  border: 2px solid rgba(var(--windrose-border-primary-rgb), 0.6);
+  background: linear-gradient(135deg, oklch(0.50 0.09 65 / 0.6), oklch(0.40 0.07 62 / 0.6));
+  border: 2px solid oklch(from var(--windrose-border-primary) l c h / 0.6);
   border-radius: 6px;
   color: var(--windrose-border-primary);
   cursor: pointer;
   transition: all 0.2s ease;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 2px 8px oklch(0 0 0 / 0.3);
 }
 
 .windrose-reroll-btn.windrose-reroll-btn:hover {
-  background: linear-gradient(135deg, rgba(139, 90, 43, 0.8), rgba(101, 67, 33, 0.8));
+  background: linear-gradient(135deg, oklch(0.50 0.09 65 / 0.8), oklch(0.40 0.07 62 / 0.8));
   border-color: var(--windrose-border-primary);
   transform: scale(1.05);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 4px 12px oklch(0 0 0 / 0.4);
 }
 
 .windrose-reroll-btn.windrose-reroll-btn svg {
@@ -4888,7 +4907,7 @@ button.windrose-breadcrumb-link {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.7);
+  background: oklch(0 0 0 / 0.7);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -4899,11 +4918,11 @@ button.windrose-breadcrumb-link {
 /* Re-roll confirmation dialog */
 .windrose-reroll-confirm-dialog {
   background: var(--background-primary);
-  border: 2px solid rgba(var(--windrose-border-primary-rgb), 0.5);
+  border: 2px solid oklch(from var(--windrose-border-primary) l c h / 0.5);
   border-radius: 8px;
   padding: 24px;
   max-width: 90vw;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 8px 32px oklch(0 0 0 / 0.5);
 }
 
 .windrose-reroll-confirm-dialog h3 {
@@ -5840,7 +5859,7 @@ button.windrose-breadcrumb-link {
 /* Soften the modal container's border and shadow */
 .modal:has(.windrose-insert-dungeon-modal) {
   border: 1px solid var(--background-modifier-border);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 8px 24px oklch(0 0 0 / 0.25);
 }
 
 /* Header with Visualizer */
@@ -6316,7 +6335,7 @@ button.windrose-breadcrumb-link {
   border: 1px solid var(--background-modifier-border);
   border-radius: 8px;
   padding: 8px 14px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 4px 12px oklch(0 0 0 / 0.4);
   white-space: nowrap;
   pointer-events: auto;
   z-index: 1000;
@@ -6399,7 +6418,7 @@ button.windrose-breadcrumb-link {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.6);
+  background-color: oklch(0 0 0 / 0.6);
   z-index: 1999;
   display: flex;
   align-items: center;
@@ -6411,7 +6430,7 @@ button.windrose-breadcrumb-link {
   border-radius: 12px;
   padding: 16px;
   border: 2px solid var(--windrose-border-primary);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 8px 32px oklch(0 0 0 / 0.5);
   min-width: 260px;
 }
 
