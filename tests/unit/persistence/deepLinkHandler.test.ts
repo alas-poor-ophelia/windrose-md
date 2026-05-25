@@ -31,7 +31,7 @@ describe('deepLinkHandler', () => {
     });
 
     it('exports correct NAVIGATION_EVENT', () => {
-      expect(NAVIGATION_EVENT).toBe('dmt-navigate-to');
+      expect(NAVIGATION_EVENT).toBe('windrose-navigate-to');
     });
   });
 
@@ -219,7 +219,7 @@ describe('deepLinkHandler', () => {
 
       expect(mockDispatchEvent).toHaveBeenCalledTimes(1);
       const event = mockDispatchEvent.mock.calls[0][0] as CustomEvent;
-      expect(event.type).toBe('dmt-navigate-to');
+      expect(event.type).toBe('windrose-navigate-to');
       expect(event.detail.notePath).toBe('folder/note.md');
       expect(event.detail.mapId).toBe('map-123');
       expect(event.detail.x).toBe(5);

@@ -796,10 +796,7 @@ button.windrose-orientation-btn,
 /* Invisible overlay to capture taps outside controls (touch devices) */
 .windrose-controls-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  inset: 0;
   z-index: 99; /* Just below controls (100) */
   background: transparent;
   cursor: default;
@@ -1023,15 +1020,9 @@ button.windrose-orientation-btn,
   overflow-y: auto;
   overflow-x: hidden;
   padding: 4px 6px;
-
-  &::-webkit-scrollbar {
-    width: 6px;
-  }
-
-  &::-webkit-scrollbar-thumb {
-    background: var(--windrose-bg-tertiary);
-    border-radius: 3px;
-  }
+  scrollbar-width: thin;
+  scrollbar-color: var(--windrose-bg-tertiary) transparent;
+  overscroll-behavior: contain;
 }
 
 .windrose-object-sidebar-category {
@@ -1389,15 +1380,9 @@ button.windrose-tile-browser-config-btn,
   overflow-y: auto;
   overflow-x: hidden;
   padding: 4px 6px;
-
-  &::-webkit-scrollbar {
-    width: 6px;
-  }
-
-  &::-webkit-scrollbar-thumb {
-    background: var(--windrose-bg-tertiary);
-    border-radius: 3px;
-  }
+  scrollbar-width: thin;
+  scrollbar-color: var(--windrose-bg-tertiary) transparent;
+  overscroll-behavior: contain;
 }
 
 .windrose-tile-browser-category-label,
@@ -2316,10 +2301,7 @@ button.windrose-sel-icon-btn,
 
 .windrose-modal-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  inset: 0;
   background-color: oklch(0 0 0 / 0.7);
   display: flex;
   align-items: center;
@@ -2390,12 +2372,6 @@ button.windrose-sel-icon-btn,
   }
 }
 
-.windrose-modal-buttons {
-  display: flex;
-  gap: 8px;
-  margin-top: 16px;
-}
-
 .windrose-modal-header {
   margin-bottom: 16px;
   
@@ -2421,6 +2397,7 @@ button.windrose-sel-icon-btn,
     overflow-y: auto;
     overflow-x: hidden;
     min-height: 0;
+    overscroll-behavior: contain;
   }
 }
 
@@ -2551,18 +2528,10 @@ button.windrose-sel-icon-btn,
   text-align: center;
 }
 
-/* Settings Modal Specific Styles */
-.windrose-settings-section {
-  margin-bottom: 16px;
-}
-
 /* Modal Portal - for rendering modals outside viewport */
 .windrose-modal-portal {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  inset: 0;
   z-index: 10000;
   pointer-events: none;
 }
@@ -2698,18 +2667,6 @@ button.windrose-sel-icon-btn,
   }
 }
 
-.windrose-form-group {
-  margin-bottom: 12px;
-}
-
-.windrose-form-label {
-  display: block;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--windrose-text-secondary);
-  margin-bottom: 6px;
-}
-
 .windrose-checkbox-label {
   display: flex;
   align-items: center;
@@ -2777,10 +2734,7 @@ button.windrose-sel-icon-btn,
 
 .windrose-color-picker-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  inset: 0;
   background-color: transparent;
   z-index: 2099;
   pointer-events: auto;
@@ -3639,10 +3593,7 @@ button.windrose-sel-icon-btn,
 /* Success Modal */
 .windrose-plugin-success-modal-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  inset: 0;
   background: oklch(0 0 0 / 0.7);
   display: flex;
   align-items: center;
@@ -4446,6 +4397,7 @@ button.windrose-layer-btn.windrose-layer-btn-pill {
   transform: translateX(-20px);
   max-height: 45%;
   overflow-y: auto;
+  overscroll-behavior: contain;
   flex-shrink: 1;
 }
 
@@ -4591,6 +4543,7 @@ button.windrose-breadcrumb-link {
   max-width: 400px;
   max-height: 80vh;
   overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .windrose-layer-edit-section {
@@ -4757,6 +4710,7 @@ button.windrose-breadcrumb-link {
   gap: 4px;
   max-height: 180px;
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding: clamp(0.25rem, 0.4vw, 0.375rem);
   background: oklch(0 0 0 / 0.2);
   border-radius: 4px;
@@ -4903,10 +4857,7 @@ button.windrose-breadcrumb-link {
 /* Re-roll confirmation dialog overlay */
 .windrose-reroll-confirm-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  inset: 0;
   background: oklch(0 0 0 / 0.7);
   display: flex;
   align-items: center;
@@ -5296,6 +5247,7 @@ button.windrose-breadcrumb-link {
   gap: 4px;
   max-height: 150px;
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding: clamp(0.25rem, 0.4vw, 0.375rem);
   background: var(--background-secondary);
   border-radius: 8px;
@@ -5485,6 +5437,7 @@ button.windrose-breadcrumb-link {
   padding: 8px;
   max-height: 200px;
   overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .windrose-icon-picker-icon {
@@ -6414,10 +6367,7 @@ button.windrose-breadcrumb-link {
 
 .windrose-segment-picker-backdrop {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  inset: 0;
   background-color: oklch(0 0 0 / 0.6);
   z-index: 1999;
   display: flex;
@@ -6555,4 +6505,17 @@ button.windrose-breadcrumb-link {
 
 .setting-item {
   scroll-margin-top: clamp(20px, 3vh, 40px);
+}
+
+/* ===========================================
+ * Accessibility: Reduced Motion
+ * =========================================== */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
