@@ -1,0 +1,412 @@
+/* ============================================
+   TILE ASSET BROWSER (right sidebar)
+   ============================================ */
+.windrose-tile-browser {
+  width: 180px;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--windrose-bg-primary);
+  border-left: 2px solid var(--windrose-border-primary);
+  transition: all 0.3s ease;
+  overflow: hidden;
+  flex-shrink: 0;
+  height: 100%;
+  box-sizing: border-box;
+}
+.windrose-tile-browser.windrose-tile-browser-collapsed {
+  width: 0;
+  border-left: none;
+  overflow: visible;
+  position: relative;
+}
+
+.windrose-tile-browser-toggle,
+.is-tablet .windrose-tile-browser-toggle {
+  position: absolute;
+  right: 0;
+  top: 130px;
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  min-height: 28px;
+  max-width: 28px;
+  max-height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--windrose-bg-secondary);
+  color: var(--windrose-text-secondary);
+  border: 1.5px solid var(--windrose-border-primary);
+  border-radius: 6px 0 0 6px;
+  cursor: pointer;
+  z-index: 200;
+  box-shadow: -2px 2px 6px oklch(0% 0 0deg / 0.4), 0 0 12px oklch(from var(--windrose-border-primary) l c h/0.15);
+  transition: var(--windrose-transition);
+  padding: 0;
+}
+.windrose-tile-browser-toggle:hover,
+.is-tablet .windrose-tile-browser-toggle:hover {
+  background-color: var(--windrose-bg-tertiary);
+  color: var(--windrose-text-primary);
+}
+
+.windrose-tile-browser-header {
+  text-wrap: balance;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px;
+  font-size: 10pt;
+  font-weight: bold;
+  color: var(--windrose-text-primary);
+  background: var(--windrose-bg-secondary);
+  border-bottom: 1px solid var(--windrose-border-secondary);
+  flex-shrink: 0;
+}
+
+.windrose-tile-browser-tileset-selector {
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--windrose-border-secondary);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.windrose-tile-browser-tileset-name {
+  flex: 1;
+  font-size: 12px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.windrose-tile-browser-config-btn {
+  flex-shrink: 0;
+}
+
+.windrose-tile-browser-config {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--windrose-border-secondary);
+  background: var(--background-secondary-alt);
+  flex-shrink: 0;
+}
+
+.windrose-tile-config-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 6px;
+  margin-bottom: 8px;
+  font-size: 11px;
+}
+
+.windrose-tile-config-row:last-child {
+  margin-bottom: 0;
+}
+
+.windrose-tile-config-row label {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.windrose-tile-config-slider {
+  flex-basis: 100%;
+  order: 3;
+  min-width: 0;
+}
+
+.windrose-tile-config-value {
+  flex-shrink: 0;
+  margin-left: auto;
+  text-align: right;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.windrose-tile-config-select {
+  flex-basis: 100%;
+  order: 3;
+  min-width: 0;
+  font-size: 11px;
+}
+
+/* Tablet overrides for tileset config panel */
+.is-tablet .windrose-tile-browser-config {
+  padding: 10px 12px;
+}
+
+.is-tablet .windrose-tile-config-row {
+  margin-bottom: 12px;
+  font-size: 13px;
+  gap: 4px 8px;
+}
+
+.is-tablet .windrose-tile-config-select {
+  font-size: 13px;
+  padding: 6px 8px;
+}
+
+button.windrose-tile-browser-config-btn,
+.is-tablet button.windrose-tile-browser-config-btn {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.windrose-tile-browser-select {
+  flex: 1;
+  min-width: 0;
+  background: var(--windrose-bg-secondary);
+  color: var(--windrose-text-primary);
+  border: 1px solid var(--windrose-border-secondary);
+  border-radius: 3px;
+  padding: 3px 4px;
+  font-size: 11px;
+}
+
+.windrose-tile-browser-search {
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--windrose-border-secondary);
+  flex-shrink: 0;
+}
+
+.windrose-tile-browser-search-input {
+  width: 100%;
+  background: var(--windrose-bg-secondary);
+  color: var(--windrose-text-primary);
+  border: 1px solid var(--windrose-border-secondary);
+  border-radius: 3px;
+  padding: 4px 6px;
+  font-size: 11px;
+  box-sizing: border-box;
+}
+.windrose-tile-browser-search-input::placeholder {
+  color: var(--windrose-text-muted);
+}
+.windrose-tile-browser-search-input:focus {
+  outline: none;
+  border-color: var(--windrose-border-primary);
+}
+
+.windrose-tile-browser-content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 4px 6px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--windrose-bg-tertiary) transparent;
+  overscroll-behavior: contain;
+}
+
+.windrose-tile-browser-category-label,
+.is-tablet .windrose-tile-browser-category-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 3px 4px;
+  min-height: unset;
+  max-height: unset;
+  background: none;
+  border: none;
+  color: var(--windrose-text-muted);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+}
+.windrose-tile-browser-category-label:hover,
+.is-tablet .windrose-tile-browser-category-label:hover {
+  color: var(--windrose-text-secondary);
+}
+
+.windrose-tile-browser-category-count {
+  margin-left: auto;
+  font-size: 8px;
+  color: var(--windrose-text-disabled);
+}
+
+.windrose-tile-browser-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 3px;
+  padding: 3px 0;
+}
+
+.windrose-tile-thumb,
+.is-tablet .windrose-tile-thumb {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--windrose-bg-secondary);
+  border: 1.5px solid var(--windrose-border-secondary);
+  border-radius: 3px;
+  cursor: pointer;
+  padding: 2px;
+  overflow: hidden;
+  min-width: unset;
+  min-height: unset;
+  max-width: unset;
+  max-height: unset;
+  transition: var(--windrose-transition);
+}
+.windrose-tile-thumb:hover,
+.is-tablet .windrose-tile-thumb:hover {
+  border-color: var(--windrose-text-muted);
+  background: var(--windrose-bg-tertiary);
+}
+
+.windrose-tile-thumb-selected.windrose-tile-thumb-selected,
+.windrose-tile-thumb-selected.windrose-tile-thumb-selected:hover {
+  border-color: var(--windrose-border-primary);
+  box-shadow: 0 0 6px oklch(from var(--windrose-border-primary) l c h/0.4);
+  background: oklch(from var(--windrose-border-primary) l c h/0.1);
+}
+
+.windrose-tile-thumb-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.windrose-tile-preview-portal {
+  position: fixed;
+  display: none;
+  background: var(--windrose-bg-primary);
+  border: 1px solid var(--windrose-border-primary);
+  border-radius: 4px;
+  padding: clamp(0.25rem, 0.4vw, 0.375rem);
+  box-shadow: 0 4px 12px oklch(0% 0 0deg / 0.5);
+  pointer-events: none;
+  z-index: 10000;
+}
+
+.windrose-tile-preview-label {
+  font-size: 10px;
+  color: var(--windrose-text-muted);
+  text-align: center;
+  padding-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 192px;
+}
+
+.windrose-tile-browser-empty {
+  padding: clamp(1rem, 1.5vw, 1.25rem) clamp(0.5rem, 1vw, 0.75rem);
+  text-align: center;
+  color: var(--windrose-text-muted);
+  font-size: 11px;
+}
+
+.windrose-tile-browser-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 6px;
+  background: var(--windrose-bg-secondary);
+  border-top: 1px solid var(--windrose-border-secondary);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.windrose-tile-browser-scale-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: var(--windrose-bg-secondary);
+  border-top: 1px solid var(--windrose-border-secondary);
+  flex-shrink: 0;
+  color: var(--windrose-text-muted);
+  font-size: 11px;
+}
+
+.windrose-tile-browser-scale-row .windrose-tile-config-slider {
+  flex: 1;
+}
+
+.windrose-tile-browser-action-btn,
+.is-tablet .windrose-tile-browser-action-btn {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  min-height: 28px;
+  max-width: 28px;
+  max-height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--windrose-bg-secondary);
+  color: var(--windrose-text-secondary);
+  border: 1px solid var(--windrose-border-secondary);
+  border-radius: 3px;
+  cursor: pointer;
+  padding: 0;
+  transition: var(--windrose-transition);
+}
+.windrose-tile-browser-action-btn:hover,
+.is-tablet .windrose-tile-browser-action-btn:hover {
+  background: var(--windrose-bg-tertiary);
+  color: var(--windrose-text-primary);
+}
+
+.windrose-tile-browser-action-active.windrose-tile-browser-action-active,
+.windrose-tile-browser-action-active.windrose-tile-browser-action-active:hover {
+  background: var(--windrose-border-primary);
+  color: var(--windrose-bg-primary);
+  border-color: var(--windrose-border-primary);
+}
+
+.windrose-tile-browser-rotation-label {
+  font-size: 10px;
+  color: var(--windrose-text-muted);
+  min-width: 28px;
+  text-align: center;
+}
+
+.windrose-tile-browser-layer-toggle {
+  display: flex;
+  gap: 1px;
+  background: var(--windrose-border-secondary);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+button.windrose-tile-browser-layer-btn,
+.is-tablet button.windrose-tile-browser-layer-btn {
+  background: transparent;
+  border: none;
+  color: var(--windrose-text-muted);
+  font-size: 9px;
+  padding: 2px 6px;
+  width: auto;
+  height: auto;
+  min-width: 0;
+  min-height: 0;
+  max-width: none;
+  max-height: none;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  box-shadow: none;
+}
+
+.windrose-tile-browser-layer-btn:hover {
+  color: var(--windrose-text-primary);
+  background: oklch(100% 0 0deg / 0.1);
+}
+
+button.windrose-tile-browser-layer-btn.windrose-tile-browser-layer-active,
+.is-tablet button.windrose-tile-browser-layer-btn.windrose-tile-browser-layer-active {
+  background: var(--windrose-border-primary);
+  color: var(--windrose-bg-primary);
+}

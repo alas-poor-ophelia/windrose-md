@@ -1,0 +1,189 @@
+/* ============================================
+   TOOL PALETTE
+   ============================================ */
+.windrose-tool-palette {
+  display: flex;
+  gap: 4px;
+  padding: clamp(0.5rem, 1vw, 0.75rem);
+  background-color: var(--windrose-bg-primary);
+  border: 2px solid var(--windrose-border-primary);
+  border-radius: 4px;
+  align-items: center;
+  margin-bottom: 8px;
+  position: relative;
+  box-shadow: inset 0 0 0 3px var(--windrose-bg-primary), inset 0 0 0 4px oklch(from var(--windrose-border-primary) l c h/0.3), 0 0 15px oklch(from var(--windrose-border-primary) l c h/0.15);
+}
+
+.windrose-tool-btn {
+  position: relative;
+  background-color: var(--windrose-bg-secondary);
+  border: 1px solid var(--windrose-border-secondary);
+  border-radius: 3px;
+  color: var(--windrose-text-primary);
+  cursor: pointer;
+  padding: clamp(0.375rem, 0.75vw, 0.625rem) clamp(0.5rem, 1vw, 0.75rem);
+  font-size: 16px;
+  transition: var(--windrose-transition);
+  min-width: 32px;
+  max-width: 42px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.windrose-tool-btn:hover:not(.windrose-tool-btn-active) {
+  background-color: var(--windrose-bg-tertiary);
+  border-color: var(--windrose-border-secondary);
+}
+.windrose-tool-btn:hover:not(.windrose-tool-btn-active) svg {
+  color: var(--windrose-text-primary);
+}
+.windrose-tool-btn.windrose-tool-btn-active {
+  background-color: var(--windrose-border-primary);
+  border-color: var(--windrose-border-primary-dark);
+  color: var(--windrose-bg-primary);
+}
+.windrose-tool-btn.windrose-tool-btn-active svg {
+  color: var(--windrose-accent-red);
+  filter: drop-shadow(1px 0 0 var(--windrose-border-primary)) drop-shadow(-1px 0 0 var(--windrose-border-primary)) drop-shadow(0 1px 0 var(--windrose-border-primary)) drop-shadow(0 -1px 0 var(--windrose-border-primary));
+}
+.windrose-tool-btn svg {
+  color: var(--windrose-border-primary);
+  width: 20px;
+  height: 20px;
+}
+.windrose-tool-btn > span {
+  display: flex;
+}
+
+.windrose-color-tool-btn {
+  position: relative;
+  /* Bottom border shows current color - defined inline via style attribute */
+}
+
+/* Sub-tool indicator triangle */
+.windrose-subtool-indicator {
+  position: absolute;
+  bottom: 1px;
+  right: 1px;
+  font-size: 7px;
+  opacity: 0.6;
+  pointer-events: none;
+  line-height: 1;
+}
+
+/* Buttons with sub-tools should be narrower to fit on iPad */
+.windrose-tool-btn-container .windrose-tool-btn {
+  min-width: 28px;
+  padding: 6px 5px;
+}
+
+.windrose-tool-btn-active .windrose-subtool-indicator {
+  opacity: 0.9;
+  color: var(--windrose-bg-primary);
+}
+
+/* Tool button container for sub-menu positioning */
+.windrose-tool-btn-container {
+  position: relative;
+  display: inline-block;
+}
+
+/* Sub-menu flyout */
+.windrose-subtool-menu {
+  position: absolute;
+  left: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  margin-left: 6px;
+  background: var(--windrose-bg-secondary);
+  border: 1px solid var(--windrose-border-primary);
+  border-radius: 6px;
+  padding: clamp(0.25rem, 0.4vw, 0.375rem);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  z-index: 1001;
+  box-shadow: 0 4px 12px oklch(0% 0 0deg / 0.4), inset 0 1px 0 oklch(100% 0 0deg / 0.05);
+  min-width: 120px;
+}
+
+.windrose-subtool-option {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  padding: clamp(0.5rem, 0.8vw, 0.75rem) clamp(0.75rem, 1.5vw, 1rem);
+  border: none;
+  background: transparent;
+  color: var(--windrose-text-primary);
+  cursor: pointer;
+  border-radius: 4px;
+  white-space: nowrap;
+  font-size: 13px;
+  transition: var(--windrose-transition);
+  width: 100%;
+  text-align: left;
+  box-sizing: border-box;
+}
+.windrose-subtool-option svg {
+  width: 16px;
+  height: 16px;
+  color: var(--windrose-border-primary);
+  flex-shrink: 0;
+}
+.windrose-subtool-option:hover {
+  background: var(--windrose-bg-tertiary);
+}
+.windrose-subtool-option.windrose-subtool-option-active {
+  background: var(--windrose-border-primary);
+  color: var(--windrose-bg-primary);
+}
+.windrose-subtool-option.windrose-subtool-option-active svg {
+  color: var(--windrose-bg-primary);
+}
+
+/* History Controls */
+.windrose-history-controls {
+  display: flex;
+  gap: 4px;
+  margin-left: 4px;
+  padding-left: 8px;
+  border-left: 1px solid var(--windrose-border-secondary);
+}
+
+.windrose-history-btn {
+  background-color: var(--windrose-bg-secondary);
+  border: 1px solid var(--windrose-border-secondary);
+  border-radius: 3px;
+  color: var(--windrose-text-primary);
+  cursor: pointer;
+  padding: 6px 8px;
+  font-size: 16px;
+  transition: var(--windrose-transition);
+  min-width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.windrose-history-btn svg {
+  color: var(--windrose-text-muted);
+  width: 18px;
+  height: 18px;
+}
+.windrose-history-btn:hover:not(:disabled) {
+  background-color: var(--windrose-bg-tertiary);
+  border-color: var(--windrose-border-secondary);
+}
+.windrose-history-btn:hover:not(:disabled) svg {
+  color: var(--windrose-border-primary);
+}
+.windrose-history-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+.windrose-history-btn:disabled svg {
+  color: oklch(36% 0 0deg);
+}

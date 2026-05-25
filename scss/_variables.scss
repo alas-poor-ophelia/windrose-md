@@ -1,0 +1,40 @@
+/* ============================================
+   WINDROSE MAPDESIGNER STYLES
+   ============================================ */
+/* CSS Custom Properties */
+body {
+  --windrose-bg-primary: var(--color-base-00);
+  --windrose-bg-secondary: var(--color-base-20);
+  --windrose-bg-tertiary: var(--color-base-25);
+  --windrose-border-primary: oklch(0.74 0.07 75);
+  --windrose-border-primary-dark: oklch(0.54 0.07 68);
+  --windrose-border-secondary: oklch(0.35 0 0);
+  --windrose-text-primary: var(--color-base-100);
+  --windrose-text-secondary: var(--color-base-60);
+  --windrose-text-muted: var(--color-base-50);
+  --windrose-text-disabled: var(--color-base-40);
+  --windrose-accent-blue: oklch(0.52 0.18 256);
+  --windrose-accent-blue-hover: color-mix(in oklch, var(--windrose-accent-blue) 85%, oklch(0 0 0));
+  --windrose-accent-red: oklch(0.56 0.19 26);
+  --windrose-accent-red-hover: color-mix(in oklch, var(--windrose-accent-red) 85%, oklch(0 0 0));
+  --windrose-warning: var(--color-orange);
+  --windrose-error: var(--color-red);
+  --windrose-success: var(--windrose-accent-blue);
+  --windrose-transition: all 0.15s ease;
+}
+
+/* ============================================
+   RPGAWESOME ICON FONT BASE STYLES
+   ============================================ */
+/* Base class for RPGAwesome icons */
+.ra.ra {
+  font-family: "rpgawesome";
+  font-style: normal;
+  font-variant: normal;
+  font-weight: normal;
+  line-height: 1;
+  speak: never;
+  text-transform: none;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}

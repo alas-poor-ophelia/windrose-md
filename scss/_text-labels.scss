@@ -1,0 +1,463 @@
+/* ============================================
+   TEXT LABEL/MODAL SYSTEM
+   ============================================ */
+.windrose-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: oklch(0% 0 0deg / 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  animation: fadeIn 0.15s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.windrose-modal-content {
+  background-color: var(--windrose-bg-secondary);
+  border: 1px solid var(--windrose-border-secondary);
+  border-radius: 8px;
+  padding: 20px;
+  width: 400px;
+  max-width: 90vw;
+  box-shadow: 0 4px 20px oklch(0% 0 0deg / 0.5);
+  animation: slideUp 0.2s ease;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+.windrose-modal-title {
+  text-wrap: balance;
+  margin: 0 0 16px 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--windrose-text-primary);
+}
+
+.windrose-modal-input {
+  width: 100%;
+  padding: 10px 12px;
+  font-size: 16px;
+  background-color: var(--windrose-bg-primary);
+  border: 1px solid var(--windrose-border-secondary);
+  border-radius: 4px;
+  color: var(--windrose-text-primary);
+  outline: none;
+  transition: border-color 0.15s ease;
+  box-sizing: border-box;
+}
+.windrose-modal-input:focus {
+  border-color: var(--windrose-accent-blue);
+}
+.windrose-modal-input::placeholder {
+  color: var(--windrose-text-disabled);
+}
+
+.windrose-modal-header {
+  margin-bottom: 16px;
+}
+.windrose-modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--windrose-text-primary);
+}
+
+.windrose-modal-body {
+  margin-bottom: 16px;
+}
+
+/* Settings modal specific - cap height and make scrollable */
+.windrose-settings-modal {
+  display: flex;
+  flex-direction: column;
+}
+.windrose-settings-modal .windrose-modal-body {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0;
+  overscroll-behavior: contain;
+}
+
+/* Fallback (non-native) modal: cap the inner height */
+.windrose-modal-content.windrose-settings-modal {
+  max-height: 500px;
+}
+
+/* Native Obsidian modal sizing */
+.windrose-settings-native-modal {
+  width: 520px;
+  max-width: 95vw;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.windrose-settings-native-modal .modal-content {
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  flex: 1;
+  min-height: 0;
+}
+
+.windrose-settings-native-modal .windrose-settings-modal {
+  flex: 1;
+  min-height: 0;
+}
+
+/* Resize handles for native modals (interact.js) */
+.windrose-resize-handle {
+  position: absolute;
+  z-index: 10;
+}
+
+.windrose-resize-top {
+  top: 0;
+  left: 8px;
+  right: 8px;
+  height: 6px;
+  cursor: ns-resize;
+}
+
+.windrose-resize-bottom {
+  bottom: 0;
+  left: 8px;
+  right: 8px;
+  height: 6px;
+  cursor: ns-resize;
+}
+
+.windrose-resize-left {
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 6px;
+  cursor: ew-resize;
+}
+
+.windrose-resize-right {
+  right: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 6px;
+  cursor: ew-resize;
+}
+
+.windrose-resize-top-left {
+  top: 0;
+  left: 0;
+  width: 12px;
+  height: 12px;
+  cursor: nwse-resize;
+}
+
+.windrose-resize-top-right {
+  top: 0;
+  right: 0;
+  width: 12px;
+  height: 12px;
+  cursor: nesw-resize;
+}
+
+.windrose-resize-bottom-left {
+  bottom: 0;
+  left: 0;
+  width: 12px;
+  height: 12px;
+  cursor: nesw-resize;
+}
+
+.windrose-resize-bottom-right {
+  bottom: 0;
+  right: 0;
+  width: 12px;
+  height: 12px;
+  cursor: nwse-resize;
+}
+
+.windrose-modal-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+  box-sizing: border-box;
+  max-width: 100%;
+}
+
+.windrose-form-group {
+  margin-bottom: 12px;
+}
+.windrose-form-group:last-child {
+  margin-bottom: 0;
+}
+
+.windrose-form-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--windrose-text-secondary);
+}
+
+.windrose-modal-btn {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 4px;
+  border: 1px solid;
+  cursor: pointer;
+  transition: var(--windrose-transition);
+}
+.windrose-modal-btn.windrose-modal-btn-cancel {
+  background-color: var(--windrose-bg-tertiary);
+  border-color: var(--windrose-border-secondary);
+  color: var(--windrose-text-primary);
+}
+.windrose-modal-btn.windrose-modal-btn-cancel:hover {
+  background-color: oklch(37% 0 0deg);
+  border-color: oklch(45% 0 0deg);
+}
+.windrose-modal-btn.windrose-modal-btn-submit {
+  background-color: var(--windrose-accent-blue);
+  border-color: var(--windrose-accent-blue);
+  color: var(--windrose-text-primary);
+}
+.windrose-modal-btn.windrose-modal-btn-submit:hover:not(:disabled) {
+  background-color: var(--windrose-accent-blue-hover);
+  border-color: var(--windrose-accent-blue-hover);
+}
+.windrose-modal-btn.windrose-modal-btn-submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.windrose-modal-btn.windrose-modal-btn-danger {
+  background-color: var(--windrose-accent-red);
+  border-color: var(--windrose-accent-red);
+  color: var(--windrose-text-primary);
+}
+.windrose-modal-btn.windrose-modal-btn-danger:hover:not(:disabled) {
+  background-color: var(--windrose-accent-red-hover);
+  border-color: var(--windrose-accent-red-hover);
+}
+.windrose-modal-btn.windrose-modal-btn-danger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.windrose-modal-hint {
+  margin-top: 12px;
+  font-size: 11px;
+  color: var(--windrose-text-muted);
+  text-align: center;
+}
+
+/* Modal Portal - for rendering modals outside viewport */
+.windrose-modal-portal {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  pointer-events: none;
+}
+
+.windrose-modal-portal-content {
+  pointer-events: auto;
+}
+
+.windrose-settings-section-header {
+  margin-bottom: 12px;
+}
+
+.windrose-settings-section-title {
+  text-wrap: balance;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--windrose-text-primary);
+  margin: 0 0 4px 0;
+}
+
+.windrose-settings-section-description {
+  font-size: 12px;
+  color: var(--windrose-text-muted);
+  margin: 0;
+}
+
+/* Settings Modal Tab Bar */
+.windrose-settings-tab-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+  border-bottom: 1px solid var(--background-modifier-border);
+  margin: 0 -20px;
+  padding: 0 20px;
+  box-sizing: border-box;
+  max-width: calc(100% + 40px);
+}
+
+.windrose-settings-tab {
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+  margin-bottom: -1px;
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: center;
+}
+.windrose-settings-tab:hover {
+  color: var(--text-normal);
+}
+
+.windrose-settings-tab-active {
+  color: var(--text-normal);
+  border-bottom-color: var(--interactive-accent);
+}
+
+.windrose-settings-tab-content {
+  min-height: 325px;
+  box-sizing: border-box;
+  max-width: 100%;
+  overflow-x: hidden;
+  padding-right: 8px;
+}
+
+/* Color picker 2x2 grid items */
+.windrose-color-grid-item {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Upgrade Banner */
+.windrose-settings-upgrade-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  margin: -8px -8px 16px -8px;
+  background: linear-gradient(135deg, oklch(from var(--windrose-accent-blue) l c h/0.1), oklch(from var(--windrose-accent-blue) l c h/0.05));
+  border: 1px solid oklch(from var(--windrose-accent-blue) l c h/0.3);
+  border-radius: 6px;
+  animation: slideDown 0.3s ease;
+}
+
+.windrose-settings-upgrade-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--windrose-text-primary);
+}
+.windrose-settings-upgrade-info svg {
+  width: 18px;
+  height: 18px;
+  color: var(--windrose-accent-blue);
+  flex-shrink: 0;
+}
+
+.windrose-settings-upgrade-btn {
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  background-color: var(--windrose-accent-blue);
+  border: 1px solid var(--windrose-accent-blue);
+  border-radius: 4px;
+  color: var(--windrose-text-primary);
+  cursor: pointer;
+  transition: var(--windrose-transition);
+  white-space: nowrap;
+}
+.windrose-settings-upgrade-btn:hover {
+  background-color: var(--windrose-accent-blue-hover);
+  border-color: var(--windrose-accent-blue-hover);
+}
+
+.windrose-settings-upgrade-container {
+  margin: -8px -8px 16px -8px;
+  padding: 12px;
+  background-color: oklch(0% 0 0deg / 0.2);
+  border-radius: 6px;
+}
+.windrose-settings-upgrade-container .windrose-plugin-installer-card {
+  margin: 0;
+}
+
+.windrose-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--windrose-text-primary);
+  user-select: none;
+}
+.windrose-checkbox-label:hover {
+  color: var(--windrose-accent-blue);
+}
+
+.windrose-checkbox {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--windrose-accent-blue);
+}
+
+.windrose-color-button {
+  width: 100%;
+  height: 36px;
+  border: 1px solid var(--windrose-border-secondary);
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--windrose-transition);
+  position: relative;
+}
+.windrose-color-button:hover:not(:disabled) {
+  border-color: var(--windrose-accent-blue);
+  transform: scale(1.01);
+}
+.windrose-color-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.windrose-color-button-label {
+  font-size: 12px;
+  font-weight: 600;
+  text-shadow: 0 0 4px oklch(0% 0 0deg / 0.8), 0 1px 2px oklch(0% 0 0deg / 0.9);
+  color: white;
+  padding: 2px 8px;
+  background-color: oklch(0% 0 0deg / 0.4);
+  border-radius: 3px;
+  font-family: var(--font-monospace);
+}
+
+.windrose-color-settings {
+  transition: opacity 0.2s ease;
+}

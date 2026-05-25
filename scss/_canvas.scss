@@ -1,0 +1,59 @@
+/* ============================================
+   CANVAS CURSOR STATES
+   ============================================ */
+.windrose-canvas,
+.windrose-canvas-drawing,
+.windrose-canvas-erasing,
+.windrose-canvas-erase,
+.windrose-canvas-rectangle,
+.windrose-canvas-rectangle-active,
+.windrose-canvas-circle,
+.windrose-canvas-circle-active,
+.windrose-canvas-cleararea,
+.windrose-canvas-cleararea-active,
+.windrose-canvas-panning,
+.windrose-canvas-space-grab,
+.windrose-canvas-select,
+.windrose-canvas-selecting {
+  border: 1px solid var(--windrose-border-secondary);
+}
+
+.windrose-canvas,
+.windrose-canvas-rectangle,
+.windrose-canvas-circle,
+.windrose-canvas-cleararea,
+.windrose-canvas-add-object,
+.windrose-canvas-add-text,
+.windrose-canvas-measure,
+.windrose-canvas-diagonal-fill {
+  cursor: crosshair;
+}
+
+.windrose-canvas-drawing,
+.windrose-canvas-rectangle-active,
+.windrose-canvas-circle-active,
+.windrose-canvas-measure-active {
+  cursor: cell;
+}
+
+.windrose-canvas-erasing,
+.windrose-canvas-erase,
+.windrose-canvas-cleararea-active {
+  cursor: not-allowed;
+}
+
+.windrose-canvas-panning {
+  cursor: grabbing;
+}
+
+.windrose-canvas-space-grab {
+  cursor: grab;
+}
+
+.windrose-canvas-select {
+  cursor: default;
+}
+
+.windrose-canvas-selecting {
+  cursor: move;
+}

@@ -1,0 +1,849 @@
+/* ============================================
+   Hex Coordinate Layer
+   ============================================ */
+.windrose-coordinate-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 15; /* Above drawing/objects, below UI controls */
+  overflow: hidden;
+}
+
+.windrose-hex-coordinate {
+  font-family: var(--font-monospace);
+  font-weight: 600;
+  /* color and text-shadow applied via inline styles from settings */
+  user-select: none;
+  white-space: nowrap;
+  letter-spacing: 0.5px;
+}
+
+/* ============================================
+   Visibility Toolbar
+   ============================================ */
+.windrose-toolbar-anchor {
+  position: relative;
+}
+
+.windrose-visibility-toolbar {
+  position: absolute;
+  top: calc(100% + 12px);
+  left: 50%;
+  transform: translateX(-50%) translateY(-20px);
+  display: flex;
+  gap: 4px;
+  padding: clamp(0.25rem, 0.4vw, 0.375rem);
+  background-color: var(--windrose-bg-primary);
+  border: 2px solid var(--windrose-border-primary);
+  border-radius: 4px;
+  z-index: 200;
+  box-shadow: 0 4px 12px oklch(0% 0 0deg / 0.5), inset 0 0 0 1px oklch(from var(--windrose-border-primary) l c h/0.2);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 200ms ease-out, transform 200ms ease-out;
+}
+
+.windrose-visibility-toolbar-open {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+  pointer-events: auto;
+}
+
+.windrose-visibility-btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--windrose-bg-secondary);
+  border: 1px solid var(--windrose-border-secondary);
+  border-radius: 3px;
+  color: var(--windrose-text-primary);
+  cursor: pointer;
+  padding: 6px;
+  width: 32px;
+  height: 32px;
+  transition: var(--windrose-transition);
+}
+.windrose-visibility-btn:hover:not(.windrose-visibility-btn-hidden) {
+  background-color: var(--windrose-bg-tertiary);
+  border-color: var(--windrose-border-primary);
+}
+.windrose-visibility-btn svg:not(.windrose-visibility-strikethrough) {
+  color: var(--windrose-border-primary);
+  width: 18px;
+  height: 18px;
+}
+
+.windrose-visibility-strikethrough {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 24px;
+  height: 24px;
+  color: var(--windrose-accent-red);
+  pointer-events: none;
+}
+
+.windrose-visibility-btn-hidden {
+  opacity: 0.6;
+  background-color: oklch(0% 0 0deg / 0.3);
+}
+.windrose-visibility-btn-hidden:hover {
+  background-color: oklch(0% 0 0deg / 0.4);
+  border-color: var(--windrose-border-secondary);
+}
+.windrose-visibility-btn-hidden svg:not(.windrose-visibility-strikethrough) {
+  color: var(--windrose-text-muted);
+}
+
+/* Active state for toggle buttons in map controls */
+button.windrose-expand-btn.windrose-expand-btn-active,
+.is-tablet button.windrose-expand-btn.windrose-expand-btn-active {
+  background-color: var(--windrose-border-primary);
+  border-color: var(--windrose-border-primary-dark);
+  color: var(--windrose-bg-primary);
+}
+
+button.windrose-expand-btn.windrose-expand-btn-active:hover,
+.is-tablet button.windrose-expand-btn.windrose-expand-btn-active:hover {
+  background-color: var(--windrose-border-primary-dark);
+  border-color: var(--windrose-border-primary);
+  transform: scale(1.05);
+}
+
+/* ==========================================================================
+   Fog of War UI
+   ========================================================================== */
+/* Separator between layer toggles and FoW section */
+.windrose-visibility-separator {
+  width: 1px;
+  height: 24px;
+  background: var(--windrose-border-secondary);
+  margin: 0 4px;
+}
+
+/* FoW section container */
+.windrose-fow-section {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* FoW toggle button (always visible) */
+/* FoW toggle button - with tablet overrides */
+.is-tablet button.windrose-fow-toggle-btn,
+button.windrose-fow-toggle-btn,
+.windrose-fow-toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background-color: var(--windrose-bg-secondary);
+  border: 1px solid var(--windrose-border-secondary);
+  border-radius: 3px;
+  color: var(--windrose-text-primary);
+  cursor: pointer;
+  padding: 4px 8px;
+  height: 32px;
+  min-height: 32px;
+  max-height: 32px;
+  transition: var(--windrose-transition);
+  white-space: nowrap;
+}
+.is-tablet button.windrose-fow-toggle-btn svg,
+button.windrose-fow-toggle-btn svg,
+.windrose-fow-toggle-btn svg {
+  color: var(--windrose-border-primary);
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  min-height: 16px;
+  flex-shrink: 0;
+}
+.is-tablet button.windrose-fow-toggle-btn:hover,
+button.windrose-fow-toggle-btn:hover,
+.windrose-fow-toggle-btn:hover {
+  background-color: var(--windrose-bg-tertiary);
+  border-color: var(--windrose-border-primary);
+}
+.is-tablet button.windrose-fow-toggle-btn.expanded,
+button.windrose-fow-toggle-btn.expanded,
+.windrose-fow-toggle-btn.expanded {
+  background-color: var(--windrose-bg-tertiary);
+  border-color: var(--windrose-border-primary);
+}
+
+.windrose-fow-label {
+  font-size: 11px;
+  color: var(--windrose-text-muted);
+}
+
+/* FoW tools panel (expandable) */
+.windrose-fow-tools-panel {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  overflow: hidden;
+  max-width: 0;
+  opacity: 0;
+  transition: max-width 200ms ease-out, opacity 200ms ease-out, margin 200ms ease-out;
+}
+.windrose-fow-tools-panel.expanded {
+  max-width: 250px;
+  opacity: 1;
+  margin-left: 4px;
+  padding-left: 4px;
+  border-left: 1px solid var(--windrose-border-secondary);
+}
+
+/* Individual FoW tool buttons - with tablet overrides */
+.is-tablet button.windrose-fow-tool-btn,
+button.windrose-fow-tool-btn,
+.windrose-fow-tool-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--windrose-bg-secondary);
+  border: 1px solid var(--windrose-border-secondary);
+  border-radius: 3px;
+  color: var(--windrose-text-primary);
+  cursor: pointer;
+  padding: clamp(0.25rem, 0.4vw, 0.375rem);
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  min-height: 28px;
+  max-width: 28px;
+  max-height: 28px;
+  transition: var(--windrose-transition);
+}
+.is-tablet button.windrose-fow-tool-btn svg,
+button.windrose-fow-tool-btn svg,
+.windrose-fow-tool-btn svg {
+  color: var(--windrose-text-muted);
+  width: 16px;
+  height: 16px;
+}
+.is-tablet button.windrose-fow-tool-btn:hover:not(:disabled),
+button.windrose-fow-tool-btn:hover:not(:disabled),
+.windrose-fow-tool-btn:hover:not(:disabled) {
+  background-color: var(--windrose-bg-tertiary);
+  border-color: var(--windrose-border-primary);
+}
+.is-tablet button.windrose-fow-tool-btn:hover:not(:disabled) svg,
+button.windrose-fow-tool-btn:hover:not(:disabled) svg,
+.windrose-fow-tool-btn:hover:not(:disabled) svg {
+  color: var(--windrose-text-primary);
+}
+.is-tablet button.windrose-fow-tool-btn.active,
+button.windrose-fow-tool-btn.active,
+.windrose-fow-tool-btn.active {
+  background-color: var(--windrose-border-primary);
+  border-color: var(--windrose-border-primary-dark);
+}
+.is-tablet button.windrose-fow-tool-btn.active svg,
+button.windrose-fow-tool-btn.active svg,
+.windrose-fow-tool-btn.active svg {
+  color: var(--windrose-bg-primary);
+}
+.is-tablet button.windrose-fow-tool-btn.disabled, .is-tablet button.windrose-fow-tool-btn:disabled,
+button.windrose-fow-tool-btn.disabled,
+button.windrose-fow-tool-btn:disabled,
+.windrose-fow-tool-btn.disabled,
+.windrose-fow-tool-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.is-tablet button.windrose-fow-tool-btn.disabled svg, .is-tablet button.windrose-fow-tool-btn:disabled svg,
+button.windrose-fow-tool-btn.disabled svg,
+button.windrose-fow-tool-btn:disabled svg,
+.windrose-fow-tool-btn.disabled svg,
+.windrose-fow-tool-btn:disabled svg {
+  color: var(--windrose-text-muted);
+}
+
+/* Floating FoW toolbar (shown when fog tools are toggled) */
+.windrose-fow-floating-toolbar {
+  position: fixed;
+  bottom: 100px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--windrose-bg-primary);
+  border: 2px solid var(--windrose-border-primary);
+  border-radius: 4px;
+  padding: 6px 10px;
+  z-index: 1000;
+  box-shadow: inset 0 0 0 3px var(--windrose-bg-primary), inset 0 0 0 4px oklch(from var(--windrose-border-primary) l c h/0.3), 0 4px 12px oklch(0% 0 0deg / 0.4);
+  white-space: nowrap;
+}
+
+.windrose-fow-floating-separator {
+  width: 1px;
+  height: 20px;
+  background: var(--windrose-border-secondary);
+  margin: 0 2px;
+}
+
+/* ==========================================================================
+   Scale Slider (shown during resize mode)
+   ========================================================================== */
+.windrose-scale-slider-container {
+  background: var(--windrose-bg-secondary);
+  border: 1px solid var(--windrose-border-primary);
+  border-radius: 6px;
+  padding: 6px 10px;
+  box-shadow: 0 2px 8px oklch(0% 0 0deg / 0.3), inset 0 1px 0 oklch(100% 0 0deg / 0.05);
+}
+
+.windrose-scale-slider-inner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.windrose-scale-slider-inner svg {
+  color: var(--windrose-text-muted);
+  flex-shrink: 0;
+}
+
+.windrose-scale-slider {
+  flex: 1;
+  height: 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: var(--windrose-bg-tertiary);
+  border-radius: 2px;
+  cursor: pointer;
+}
+.windrose-scale-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  background: var(--windrose-border-primary);
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid var(--windrose-bg-secondary);
+  box-shadow: 0 1px 3px oklch(0% 0 0deg / 0.3);
+  transition: transform 0.1s ease;
+}
+.windrose-scale-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+}
+.windrose-scale-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  background: var(--windrose-border-primary);
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid var(--windrose-bg-secondary);
+  box-shadow: 0 1px 3px oklch(0% 0 0deg / 0.3);
+  transition: transform 0.1s ease;
+}
+.windrose-scale-slider::-moz-range-thumb:hover {
+  transform: scale(1.15);
+}
+.windrose-scale-slider::-webkit-slider-runnable-track {
+  height: 4px;
+  background: var(--windrose-bg-tertiary);
+  border-radius: 2px;
+}
+.windrose-scale-slider::-moz-range-track {
+  height: 4px;
+  background: var(--windrose-bg-tertiary);
+  border-radius: 2px;
+}
+
+.windrose-scale-value {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--windrose-text-muted);
+  min-width: 36px;
+  text-align: right;
+  font-family: var(--font-monospace);
+}
+
+/* ============================================
+   LAYER CONTROLS PANEL (Z-Layer System)
+   ============================================ */
+/* Left panels container — stacks layers + regions without overlap */
+.windrose-left-panels {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 12px;
+  z-index: 150;
+  pointer-events: none;
+  transition: left 0.3s ease;
+}
+
+.windrose-left-panels.sidebar-open {
+  left: 188px;
+}
+
+.windrose-left-panels.sidebar-closed {
+  left: 8px;
+}
+
+.windrose-layer-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 200ms ease-out, transform 200ms ease-out;
+  transform: translateX(-20px);
+  flex-shrink: 1;
+}
+
+.windrose-layer-controls.windrose-layer-controls-open {
+  opacity: 1;
+  transform: translateX(0);
+  pointer-events: auto;
+}
+
+.windrose-layer-controls.windrose-layer-controls-open .windrose-layer-btn,
+.windrose-layer-controls.windrose-layer-controls-open .windrose-layer-add-btn {
+  pointer-events: auto;
+}
+
+/* Remove old absolute positioning — now handled by container */
+.windrose-layer-controls.sidebar-open,
+.windrose-layer-controls.sidebar-closed {
+  left: auto;
+}
+
+/* Layer Button Wrapper (for drag handling) */
+.windrose-layer-btn-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: fit-content;
+  pointer-events: none;
+}
+
+/* Layer Button */
+.is-tablet button.windrose-layer-btn,
+button.windrose-layer-btn {
+  width: 35px;
+  height: 35px;
+  min-width: 35px;
+  min-height: 35px;
+  max-width: 35px;
+  max-height: 35px;
+  border-radius: 50%;
+  background: oklch(0% 0 0deg / 0.7);
+  border: 2px solid oklch(from var(--windrose-border-primary) l c h/0.4);
+  color: var(--windrose-border-primary);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  position: relative;
+  user-select: none;
+}
+
+.windrose-layer-btn:hover {
+  border-color: oklch(from var(--windrose-border-primary) l c h/0.6);
+  background: oklch(0% 0 0deg / 0.85);
+  transform: scale(1.05);
+}
+
+button.windrose-layer-btn.windrose-layer-btn-active,
+.is-tablet button.windrose-layer-btn.windrose-layer-btn-active {
+  background: var(--windrose-border-primary);
+  border-color: var(--windrose-border-primary-dark);
+  color: var(--windrose-bg-primary);
+  box-shadow: 0 0 8px oklch(from var(--windrose-border-primary) l c h/0.4);
+}
+
+button.windrose-layer-btn.windrose-layer-btn-active:hover,
+.is-tablet button.windrose-layer-btn.windrose-layer-btn-active:hover {
+  background: var(--windrose-border-primary-dark);
+  border-color: var(--windrose-border-primary);
+  transform: scale(1.05);
+}
+
+/* Layer Options Slide-out */
+.windrose-layer-options {
+  position: absolute;
+  left: 100%;
+  top: 0;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  padding-left: 4px;
+  gap: 4px;
+  opacity: 0;
+  transform: translateX(-10px);
+  pointer-events: none;
+  transition: all 0.2s ease;
+}
+
+.windrose-layer-options.expanded {
+  opacity: 1;
+  transform: translateX(0);
+  pointer-events: auto;
+}
+
+.is-tablet button.windrose-layer-option-btn,
+button.windrose-layer-option-btn {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  min-height: 28px;
+  max-width: 28px;
+  max-height: 28px;
+  border-radius: 50%;
+  background: oklch(0% 0 0deg / 0.8);
+  border: 2px solid oklch(from var(--windrose-border-primary) l c h/0.4);
+  color: var(--windrose-text-muted);
+  cursor: pointer;
+  display: flex;
+  flex: 0 0 auto;
+  padding: 0;
+  box-sizing: border-box;
+  overflow: hidden;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.windrose-layer-option-btn:hover {
+  color: var(--windrose-text-normal);
+  border-color: oklch(from var(--windrose-border-primary) l c h/0.6);
+}
+
+.windrose-layer-option-btn.delete:hover {
+  color: var(--windrose-error);
+  border-color: var(--windrose-error);
+  background: oklch(from var(--windrose-accent-red) l c h/0.1);
+}
+
+/* Layer Transparency Toggle */
+.windrose-layer-transparency-wrapper {
+  position: relative;
+}
+
+.windrose-layer-option-btn.transparency.active {
+  color: var(--windrose-accent-blue);
+  border-color: var(--windrose-accent-blue);
+  background: oklch(from var(--windrose-accent-blue) l c h/0.15);
+  box-shadow: 0 0 8px oklch(from var(--windrose-accent-blue) l c h/0.4);
+}
+
+.windrose-layer-option-btn.transparency:hover {
+  color: var(--windrose-accent-blue);
+  border-color: oklch(from var(--windrose-accent-blue) l c h/0.6);
+}
+
+.windrose-opacity-slider-popup {
+  position: absolute;
+  left: calc(100% + 8px);
+  top: 50%;
+  transform: translateY(-50%);
+  background: oklch(17% 0 0deg / 0.95);
+  border: 1px solid oklch(from var(--windrose-border-primary) l c h/0.4);
+  border-radius: 6px;
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  z-index: 200;
+  box-shadow: 0 4px 12px oklch(0% 0 0deg / 0.5);
+  white-space: nowrap;
+}
+
+.windrose-opacity-slider-popup::before {
+  content: "";
+  position: absolute;
+  right: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 6px solid transparent;
+  border-right-color: oklch(from var(--windrose-border-primary) l c h/0.4);
+}
+
+.windrose-opacity-slider {
+  width: 70px;
+  height: 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: oklch(100% 0 0deg / 0.2);
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.windrose-opacity-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  background: var(--windrose-accent-blue);
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.windrose-opacity-slider::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  background: var(--windrose-accent-blue);
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+}
+
+.windrose-opacity-value {
+  color: var(--windrose-text-muted);
+  font-size: 11px;
+}
+
+/* Add Layer Button */
+.is-tablet button.windrose-layer-add-btn,
+button.windrose-layer-add-btn {
+  width: 35px;
+  height: 35px;
+  min-width: 35px;
+  min-height: 35px;
+  max-width: 35px;
+  max-height: 35px;
+  border-radius: 50%;
+  background: oklch(0% 0 0deg / 0.5);
+  border: 2px dashed oklch(from var(--windrose-border-primary) l c h/0.4);
+  color: var(--windrose-text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  padding: 0;
+  box-sizing: border-box;
+  overflow: hidden;
+  transition: all 0.2s ease;
+  margin-top: 4px;
+}
+
+.windrose-layer-add-btn:hover {
+  background: oklch(0% 0 0deg / 0.7);
+  border-color: oklch(from var(--windrose-border-primary) l c h/0.6);
+  border-style: solid;
+  color: var(--windrose-text-primary);
+  transform: scale(1.05);
+}
+
+.windrose-layer-add-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Drag states */
+.windrose-layer-btn.dragging {
+  opacity: 0.5;
+}
+
+.windrose-layer-btn.drag-over {
+  border-color: var(--windrose-border-primary);
+  transform: scale(1.05);
+  box-shadow: 0 0 12px oklch(from var(--windrose-border-primary) l c h/0.5);
+}
+
+/* Layer Button - Pill Mode (for named layers) */
+.is-tablet button.windrose-layer-btn.windrose-layer-btn-pill,
+button.windrose-layer-btn.windrose-layer-btn-pill {
+  width: auto;
+  max-width: 180px;
+  min-width: 35px;
+  border-radius: 17.5px;
+  padding: 0 12px;
+  gap: 4px;
+}
+
+.windrose-layer-icon {
+  font-size: 14px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.windrose-layer-icon.ra {
+  font-family: "rpgawesome";
+  font-style: normal;
+  -webkit-font-feature-settings: normal;
+  font-feature-settings: normal;
+  font-variant: normal;
+  text-transform: none;
+  line-height: 1;
+  -webkit-font-smoothing: antialiased;
+}
+
+.windrose-layer-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Edit button styling */
+.windrose-layer-option-btn.edit:hover {
+  color: var(--windrose-accent-blue);
+  border-color: var(--windrose-accent-blue);
+  background: oklch(from var(--windrose-accent-blue) l c h/0.1);
+}
+
+/* ==========================================================================
+   REGION PANEL
+   ========================================================================== */
+.windrose-region-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 200ms ease, transform 200ms ease;
+  transform: translateX(-20px);
+  max-height: 45%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  flex-shrink: 1;
+}
+
+.windrose-region-panel.windrose-region-panel-open {
+  opacity: 1;
+  transform: translateX(0);
+  pointer-events: auto;
+}
+
+/* Remove old absolute positioning — now handled by container */
+.windrose-region-panel.sidebar-open,
+.windrose-region-panel.sidebar-closed {
+  left: auto;
+}
+
+.windrose-region-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: var(--windrose-text-muted);
+  padding: 2px 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.is-tablet button.windrose-region-item,
+button.windrose-region-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border: 1px solid var(--windrose-bg-tertiary);
+  border-radius: 4px;
+  background: var(--windrose-bg-secondary);
+  color: var(--windrose-text-primary);
+  cursor: pointer;
+  font-size: 11px;
+  min-width: 80px;
+  max-width: 160px;
+  transition: all 150ms ease;
+  white-space: nowrap;
+}
+
+.windrose-region-item:hover {
+  border-color: var(--windrose-accent-muted);
+  background: var(--windrose-bg-tertiary);
+}
+
+.windrose-region-item-hidden {
+  opacity: 0.5;
+}
+
+.windrose-region-color-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 1px solid oklch(100% 0 0deg / 0.2);
+}
+
+.windrose-region-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: left;
+}
+
+.is-tablet button.windrose-region-visibility-btn,
+button.windrose-region-visibility-btn {
+  background: none;
+  border: none;
+  color: var(--windrose-text-muted);
+  cursor: pointer;
+  padding: 0 2px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+
+.windrose-region-visibility-btn:hover {
+  color: var(--windrose-text-primary);
+}
+
+/* ==========================================================================
+   SUB-HEX BREADCRUMB
+   ========================================================================== */
+.windrose-sub-hex-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 12px;
+  background: var(--windrose-bg-secondary);
+  border-bottom: 1px solid var(--windrose-bg-tertiary);
+  font-size: 12px;
+  color: var(--windrose-text-secondary);
+  flex-shrink: 0;
+}
+
+.windrose-breadcrumb-segment {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.windrose-breadcrumb-separator {
+  display: flex;
+  align-items: center;
+  color: var(--windrose-text-muted);
+  margin: 0 2px;
+}
+
+.is-tablet button.windrose-breadcrumb-link,
+button.windrose-breadcrumb-link {
+  background: none;
+  border: none;
+  color: var(--windrose-accent-primary);
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 3px;
+  font-size: 12px;
+  transition: all 150ms ease;
+}
+
+.windrose-breadcrumb-link:hover {
+  background: var(--windrose-bg-tertiary);
+  text-decoration: underline;
+}
+
+.windrose-breadcrumb-current {
+  color: var(--windrose-text-primary);
+  font-weight: 500;
+  padding: 2px 4px;
+}

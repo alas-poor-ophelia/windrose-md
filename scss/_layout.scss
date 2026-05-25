@@ -1,0 +1,86 @@
+/* ============================================
+   CONTAINER & LAYOUT
+   ============================================ */
+.windrose-container {
+  font-family: var(--font-interface);
+  background-color: var(--windrose-bg-primary);
+  padding: clamp(0.75rem, 2vw, 1rem);
+  border-radius: 6px;
+  color: var(--windrose-text-primary);
+  position: relative;
+  border: 2px solid var(--windrose-border-primary);
+  box-shadow: inset 0 0 0 4px var(--windrose-bg-primary), inset 0 0 0 5px oklch(from var(--windrose-border-primary) l c h/0.3), 0 0 20px oklch(from var(--windrose-border-primary) l c h/0.2);
+  width: 100%;
+  transition: width 0.3s ease, margin-left 0.3s ease;
+}
+
+.callout[data-callout=dungeon-map],
+.callout[data-callout=dungeon-map] .callout-content {
+  overflow: visible;
+}
+
+.markdown-reading-view:has(.windrose-container),
+.markdown-source-view.is-live-preview:has(.windrose-container) {
+  container-type: inline-size;
+}
+
+.windrose-container.windrose-expanded {
+  --windrose-offset: 0px;
+  width: calc(100cqi - 2 * var(--windrose-offset));
+  margin-inline: calc((100% - 100cqi) / 2 + var(--windrose-offset));
+}
+
+.markdown-source-view.is-live-preview .windrose-container.windrose-expanded, .markdown-source-view.is-live-preview .windrose-container.windrose-animating {
+  --windrose-offset: 20px;
+}
+.markdown-source-view.is-live-preview .cm-content > .cm-embed-block[contenteditable=false].windrose-cm-expanded,
+.markdown-source-view.is-live-preview .cm-content > .cm-embed-block[contenteditable=false].windrose-cm-animating {
+  contain: none;
+  overflow: normal;
+  animation: none;
+}
+.markdown-source-view.is-live-preview .cm-embed-block:hover.windrose-cm-parent.windrose-cm-expanded, .markdown-source-view.is-live-preview .cm-embed-block:hover.windrose-cm-parent.windrose-cm-animating {
+  overflow: visible;
+  animation: none;
+}
+
+.windrose-loading {
+  padding: clamp(1.25rem, 3vw, 1.5rem);
+  text-align: center;
+  color: var(--windrose-text-muted);
+}
+
+.windrose-canvas-wrapper {
+  display: flex;
+  flex-direction: row;
+  position: relative;
+  background-color: var(--windrose-bg-primary);
+  border-radius: 4px;
+  overflow: hidden;
+  width: 100%;
+}
+
+.windrose-canvas-and-controls {
+  flex: 1;
+  position: relative;
+  min-width: 0;
+  height: 100%;
+  overflow: hidden;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.windrose-canvas-container {
+  position: relative;
+  background-color: var(--windrose-bg-primary);
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+}
+.windrose-canvas-container canvas {
+  display: block;
+}

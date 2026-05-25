@@ -1,0 +1,24 @@
+/* ============================================
+   PHASE 1.5: SCROLL MARGIN FOR ANCHOR NAVIGATION
+   ============================================ */
+/* Add scroll margin to common scroll-target elements to prevent fixed headers from hiding content */
+.windrose-canvas-wrapper {
+  scroll-margin-top: clamp(40px, 5vh, 80px);
+}
+
+.setting-item {
+  scroll-margin-top: clamp(20px, 3vh, 40px);
+}
+
+/* ===========================================
+ * Accessibility: Reduced Motion
+ * =========================================== */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

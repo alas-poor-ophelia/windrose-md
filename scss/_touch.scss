@@ -1,0 +1,298 @@
+/* ============================================
+   TOUCH/TABLET RESPONSIVE ADJUSTMENTS
+   ============================================ */
+@media (pointer: coarse) {
+  .windrose-compass {
+    width: 35px;
+    height: 35px;
+    max-width: 35px;
+    max-height: 35px;
+  }
+  .windrose-zoom-btn {
+    width: 35px;
+    height: 35px;
+    max-width: 35px;
+    max-height: 35px;
+  }
+  .windrose-tile-browser {
+    width: 190px;
+  }
+  .windrose-tile-browser-toggle,
+  .is-tablet .windrose-tile-browser-toggle {
+    top: 100px;
+  }
+  .windrose-modal-input {
+    font-size: 18px;
+    padding: 12px;
+  }
+  .windrose-modal-btn {
+    padding: 14px 16px;
+    font-size: 16px;
+    flex: 1 1 auto;
+    min-width: 100px;
+  }
+  .windrose-rotate-button,
+  .windrose-note-button,
+  .windrose-link-note-button,
+  .windrose-resize-button,
+  .windrose-object-color-button {
+    width: 44px;
+    height: 44px;
+  }
+  .windrose-rotate-button {
+    font-size: 24px;
+  }
+  .windrose-resize-button {
+    font-size: 22px;
+  }
+  .windrose-note-button svg {
+    width: 22px;
+    height: 22px;
+  }
+  .windrose-link-note-button svg {
+    width: 22px;
+    height: 22px;
+  }
+  .windrose-color-swatch {
+    width: 44px;
+    height: 44px;
+  }
+  .windrose-color-grid {
+    grid-template-columns: repeat(6, 44px);
+    gap: 8px;
+  }
+  .windrose-color-picker {
+    min-width: 320px;
+  }
+  .windrose-color-reset-btn {
+    width: 28px;
+    height: 28px;
+  }
+  .windrose-color-delete-button {
+    width: 44px;
+    height: 44px;
+  }
+  .windrose-color-delete-button svg {
+    width: 20px;
+    height: 20px;
+  }
+}
+/* Text Label Editor Modal Styles */
+.windrose-text-editor-modal {
+  width: 420px;
+  max-width: 90vw;
+}
+
+.windrose-text-editor-section {
+  margin-bottom: 16px;
+}
+
+.windrose-text-editor-section-grow {
+  flex: 1;
+}
+
+.windrose-text-editor-section-small {
+  width: 80px;
+}
+
+.windrose-text-editor-label {
+  display: block;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+  font-weight: 500;
+}
+
+.windrose-text-editor-row {
+  display: flex;
+  gap: 12px;
+}
+
+.windrose-text-editor-select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  background: var(--background-primary);
+  color: var(--text-normal);
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.6;
+  cursor: pointer;
+  min-height: 40px;
+}
+
+.windrose-text-editor-select:focus {
+  outline: none;
+  border-color: var(--interactive-accent);
+}
+
+.windrose-text-editor-number {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  background: var(--background-primary);
+  color: var(--text-normal);
+  font-family: inherit;
+  font-size: 14px;
+}
+
+.windrose-text-editor-number:focus {
+  outline: none;
+  border-color: var(--interactive-accent);
+}
+
+.windrose-text-editor-color-button {
+  width: 100%;
+  height: 40px;
+  border: 2px solid var(--background-modifier-border);
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.windrose-text-editor-color-button:hover {
+  border-color: var(--interactive-accent);
+  transform: translateY(-1px);
+}
+
+.windrose-text-editor-color-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: white;
+  text-shadow: -1px -1px 0 oklch(0% 0 0deg), 1px -1px 0 oklch(0% 0 0deg), -1px 1px 0 oklch(0% 0 0deg), 1px 1px 0 oklch(0% 0 0deg), 0 0 3px oklch(0% 0 0deg / 0.8);
+  letter-spacing: 0.5px;
+}
+
+/* Live Preview Section */
+.windrose-text-editor-preview-toggle {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: clamp(0.25rem, 0.4vw, 0.375rem);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+}
+
+.windrose-text-editor-preview-toggle:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.windrose-text-editor-preview-toggle svg {
+  width: 16px;
+  height: 16px;
+}
+
+.windrose-text-editor-preview {
+  padding: 16px;
+  text-align: center;
+  background: var(--windrose-bg-secondary);
+  border-radius: 4px;
+  min-height: 60px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  border: 1px solid var(--background-modifier-border);
+  margin-top: 8px;
+}
+
+.windrose-native-color-swatches {
+  margin-top: 8px;
+}
+
+/* Edit Button (for text labels) */
+.windrose-edit-button {
+  position: absolute;
+  width: 32px;
+  height: 32px;
+  background: linear-gradient(135deg, var(--windrose-accent-blue) 0%, oklch(55% 0.12 250deg) 100%);
+  color: white;
+  border: 2px solid oklch(100% 0 0deg / 0.3);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 18px;
+  box-shadow: 0 2px 8px oklch(0% 0 0deg / 0.3);
+  transition: all 0.2s ease;
+  z-index: 1000;
+}
+
+.windrose-edit-button:hover {
+  background: linear-gradient(135deg, oklch(70% 0.14 255deg) 0%, oklch(60% 0.12 252deg) 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px oklch(0% 0 0deg / 0.4);
+}
+
+.windrose-edit-button:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 6px oklch(0% 0 0deg / 0.3);
+}
+
+/* Object Color Button (for objects) */
+.windrose-object-color-button {
+  width: 32px;
+  height: 32px;
+  border: 2px solid oklch(100% 0 0deg / 0.3);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 8px oklch(0% 0 0deg / 0.3);
+  transition: all 0.2s ease;
+  z-index: 1000;
+}
+
+.windrose-object-color-button svg {
+  width: 16px;
+  height: 16px;
+  filter: drop-shadow(0 0 2px oklch(0% 0 0deg / 0.8));
+  color: oklch(0% 0 0deg);
+}
+
+.windrose-object-color-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px oklch(0% 0 0deg / 0.4);
+  border-color: oklch(100% 0 0deg / 0.5);
+}
+
+.windrose-object-color-button:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 6px oklch(0% 0 0deg / 0.3);
+}
+
+.windrose-object-color-button .windrose-color-picker {
+  position: absolute;
+  left: 100%;
+  top: 0;
+  margin-left: 8px;
+}
+
+/* Mobile/tablet adjustments for text editor */
+@media (max-width: 768px) {
+  .windrose-text-editor-modal {
+    width: 360px;
+  }
+  .windrose-text-editor-number {
+    width: 60px;
+  }
+  .windrose-edit-button {
+    width: 44px;
+    height: 44px;
+    font-size: 22px;
+  }
+}

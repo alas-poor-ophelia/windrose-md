@@ -1,0 +1,487 @@
+/* ==========================================================================
+   Selection Actions Card (unified selection toolbar)
+   ========================================================================== */
+.windrose-selection-card {
+  position: relative;
+  background: oklch(20% 0 0deg / 0.7);
+  border: 2px solid oklch(from var(--windrose-border-primary) l c h/0.7);
+  border-radius: 4px;
+  box-shadow: inset 0 0 0 3px oklch(20% 0 0deg / 0.7), inset 0 0 0 4px oklch(from var(--windrose-border-primary) l c h/0.15), 0 4px 16px oklch(0% 0 0deg / 0.5);
+  backdrop-filter: blur(8px);
+}
+
+.windrose-selection-card-content {
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Corner brackets */
+.windrose-selection-card-bracket {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.windrose-selection-card-bracket-tl {
+  top: 2px;
+  left: 2px;
+}
+
+.windrose-selection-card-bracket-tr {
+  top: 2px;
+  right: 2px;
+  transform: scaleX(-1);
+}
+
+.windrose-selection-card-bracket-bl {
+  bottom: 2px;
+  left: 2px;
+  transform: scaleY(-1);
+}
+
+.windrose-selection-card-bracket-br {
+  display: none;
+}
+
+/* Filigree decoration */
+.windrose-selection-card-filigree {
+  position: absolute;
+  bottom: -20px;
+  right: -20px;
+  width: 166px;
+  height: 166px;
+  transform: rotate(180deg);
+  color: var(--windrose-border-primary);
+  opacity: 0.55;
+  pointer-events: none;
+  z-index: 0;
+  mix-blend-mode: soft-light;
+}
+
+/* Action grid */
+.windrose-sel-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.windrose-sel-row {
+  display: flex;
+  gap: 2px;
+}
+
+.windrose-sel-action {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.windrose-sel-action-full {
+  flex: 1 1 100%;
+}
+
+/* Action buttons - with tablet overrides */
+.is-tablet button.windrose-sel-action-btn,
+button.windrose-sel-action-btn,
+.windrose-sel-action-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 4px 8px;
+  height: 28px;
+  min-height: 28px;
+  max-height: 28px;
+  min-width: unset;
+  max-width: unset;
+  background: oklch(25% 0 0deg / 0.25);
+  border: 1px solid transparent;
+  border-radius: 3px;
+  color: var(--windrose-text-primary);
+  cursor: pointer;
+  font-size: 12px;
+  transition: var(--windrose-transition);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.windrose-sel-action-btn svg {
+  color: var(--windrose-border-primary);
+  width: 14px;
+  height: 14px;
+  min-width: 14px;
+  flex-shrink: 0;
+}
+
+.windrose-sel-action-btn:hover:not(:disabled) {
+  background: var(--windrose-bg-tertiary);
+  border-color: var(--windrose-border-secondary);
+}
+
+.windrose-sel-action-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Active state (bronze fill) */
+.windrose-sel-action-active.windrose-sel-action-active,
+.windrose-sel-action-active.windrose-sel-action-active:hover {
+  background: var(--windrose-border-primary);
+  border-color: var(--windrose-border-primary-dark);
+}
+
+.windrose-sel-action-active.windrose-sel-action-active svg,
+.windrose-sel-action-active.windrose-sel-action-active:hover svg {
+  color: var(--windrose-bg-primary);
+}
+
+.windrose-sel-action-active.windrose-sel-action-active .windrose-sel-action-label {
+  color: var(--windrose-bg-primary);
+}
+
+/* Disabled state */
+.windrose-sel-action-disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* Delete action */
+.windrose-sel-action-delete:hover:not(:disabled) {
+  background: var(--windrose-accent-red);
+  border-color: oklch(27% 0.12 22deg);
+}
+
+.windrose-sel-action-delete:hover:not(:disabled) svg {
+  color: oklch(75% 0.12 20deg);
+}
+
+.windrose-sel-action-delete:hover:not(:disabled) .windrose-sel-action-label {
+  color: oklch(75% 0.12 20deg);
+}
+
+/* Color swatch */
+.windrose-sel-color-btn {
+  position: relative;
+}
+
+.windrose-sel-color-swatch {
+  width: 14px;
+  height: 14px;
+  min-width: 14px;
+  border-radius: 2px;
+  border: 1px solid oklch(100% 0 0deg / 0.3);
+  flex-shrink: 0;
+}
+
+/* Separator */
+.windrose-sel-separator {
+  height: 1px;
+  background: var(--windrose-border-secondary);
+  margin: 2px 0;
+}
+
+/* Links toggle - with tablet overrides */
+.is-tablet button.windrose-sel-links-toggle,
+button.windrose-sel-links-toggle,
+.windrose-sel-links-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 4px 8px;
+  height: 28px;
+  min-height: 28px;
+  max-height: 28px;
+  min-width: unset;
+  max-width: unset;
+  background: oklch(25% 0 0deg / 0.3);
+  border: 1px solid transparent;
+  border-radius: 3px;
+  color: var(--windrose-text-secondary);
+  cursor: pointer;
+  font-size: 12px;
+  transition: var(--windrose-transition);
+}
+
+.windrose-sel-links-toggle svg {
+  color: var(--windrose-border-primary);
+  width: 14px;
+  height: 14px;
+  min-width: 14px;
+}
+
+.windrose-sel-links-toggle svg:last-child {
+  margin-left: auto;
+  width: 12px;
+  height: 12px;
+  color: var(--windrose-text-muted);
+}
+
+.windrose-sel-links-toggle:hover {
+  background: var(--windrose-bg-tertiary);
+  border-color: var(--windrose-border-secondary);
+}
+
+.windrose-sel-links-toggle.expanded {
+  background: oklch(25% 0 0deg / 0.5);
+  border-color: var(--windrose-border-secondary);
+}
+
+/* Links panel */
+.windrose-sel-links-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding-left: 8px;
+}
+
+.windrose-sel-links-panel .windrose-sel-action-btn {
+  padding: 4px 4px;
+  background: oklch(25% 0 0deg / 0.3);
+}
+
+/* Resize row */
+.windrose-sel-resize-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+}
+
+.windrose-sel-resize-row svg {
+  color: var(--windrose-border-primary);
+  flex-shrink: 0;
+}
+
+.windrose-sel-resize-row input[type=range] {
+  flex: 1;
+  min-width: 0;
+}
+
+.windrose-sel-resize-value {
+  font-size: 10px;
+  color: var(--windrose-text-muted);
+  min-width: 28px;
+  text-align: right;
+}
+
+/* Player light controls */
+.windrose-sel-player-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 8px;
+}
+
+.windrose-sel-player-header {
+  text-wrap: balance;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--windrose-text-secondary);
+}
+
+.windrose-sel-player-header > svg {
+  color: var(--windrose-border-primary);
+  flex-shrink: 0;
+}
+
+.windrose-sel-player-header > span {
+  flex: 1;
+}
+
+.windrose-sel-toggle-switch {
+  position: relative;
+  width: 28px;
+  height: 14px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.is-tablet .windrose-sel-toggle-switch input,
+.windrose-sel-toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  min-width: 0;
+  min-height: 0;
+  max-width: 0;
+  max-height: 0;
+  position: absolute;
+}
+
+.windrose-sel-toggle-slider {
+  position: absolute;
+  inset: 0;
+  background: oklch(25% 0 0deg / 0.6);
+  border: 1px solid var(--windrose-border-primary);
+  border-radius: 7px;
+  transition: background 0.15s;
+}
+
+.windrose-sel-toggle-slider::before {
+  content: "";
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  left: 1px;
+  top: 1px;
+  background: var(--windrose-text-muted);
+  border-radius: 50%;
+  transition: transform 0.15s, background 0.15s;
+}
+
+.windrose-sel-toggle-switch input:checked + .windrose-sel-toggle-slider {
+  background: oklch(from var(--windrose-border-primary) l c h/0.3);
+  border-color: var(--windrose-accent-primary);
+}
+
+.windrose-sel-toggle-switch input:checked + .windrose-sel-toggle-slider::before {
+  transform: translateX(14px);
+  background: var(--windrose-accent-primary);
+}
+
+.windrose-sel-player-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+}
+
+.is-tablet input.windrose-sel-radius-input,
+input.windrose-sel-radius-input,
+.windrose-sel-radius-input {
+  width: 48px;
+  height: 22px;
+  padding: 2px 4px;
+  font-size: 11px;
+  background: oklch(25% 0 0deg / 0.4);
+  border: 1px solid var(--windrose-border-primary);
+  border-radius: 3px;
+  color: var(--windrose-text-primary);
+  text-align: right;
+  min-width: 48px;
+  max-width: 48px;
+  min-height: 22px;
+  max-height: 22px;
+}
+
+.windrose-sel-radius-input:focus {
+  outline: none;
+  border-color: var(--windrose-accent-primary);
+}
+
+.windrose-sel-unit-label {
+  font-size: 10px;
+  color: var(--windrose-text-muted);
+}
+
+.is-tablet button.windrose-sel-light-color-swatch,
+button.windrose-sel-light-color-swatch,
+.windrose-sel-light-color-swatch {
+  display: flex;
+  align-items: center;
+  margin-left: auto;
+  width: 22px;
+  height: 22px;
+  min-width: 22px;
+  min-height: 22px;
+  max-width: 22px;
+  max-height: 22px;
+  padding: 2px;
+  background: oklch(25% 0 0deg / 0.4);
+  border: 1px solid var(--windrose-border-primary);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.windrose-sel-light-color-swatch:hover {
+  border-color: var(--windrose-accent-primary);
+}
+
+.windrose-sel-light-color-swatch .windrose-sel-color-swatch {
+  width: 16px;
+  height: 16px;
+  border-radius: 2px;
+}
+
+/* Footer icon buttons — glass effect lets filigree show through */
+.windrose-sel-footer-icons {
+  display: flex;
+  gap: 4px;
+  justify-content: center;
+  padding: 2px 0;
+  position: relative;
+  z-index: 1;
+}
+
+.is-tablet button.windrose-sel-icon-btn,
+button.windrose-sel-icon-btn,
+.windrose-sel-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  min-height: 24px;
+  max-width: 24px;
+  max-height: 24px;
+  background: oklch(25% 0 0deg / 0.6);
+  border: 1px solid oklch(33% 0 0deg / 0.6);
+  border-radius: 3px;
+  cursor: pointer;
+  transition: var(--windrose-transition);
+}
+
+.windrose-sel-icon-btn svg {
+  color: var(--windrose-text-muted);
+  width: 14px;
+  height: 14px;
+}
+
+.windrose-sel-icon-btn:hover {
+  background: var(--windrose-bg-tertiary);
+  border-color: var(--windrose-border-primary);
+}
+
+.windrose-sel-icon-btn:hover svg {
+  color: var(--windrose-text-primary);
+}
+
+.windrose-sel-icon-btn.windrose-sel-action-active {
+  background: var(--windrose-border-primary);
+  border-color: var(--windrose-border-primary-dark);
+}
+
+.windrose-sel-icon-btn.windrose-sel-action-active svg,
+.windrose-sel-action-active.windrose-sel-action-active:hover svg {
+  color: var(--windrose-bg-primary);
+}
+
+/* Multi-select badge */
+.windrose-sel-multi-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  height: 24px;
+  background: var(--windrose-border-primary);
+  border-radius: 3px;
+  color: var(--windrose-bg-primary);
+  font-size: 11px;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.windrose-sel-multi-badge svg {
+  color: var(--windrose-bg-primary);
+}
