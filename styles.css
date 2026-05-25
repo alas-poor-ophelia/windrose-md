@@ -126,6 +126,11 @@ body {
   overflow: visible;
 }
 
+.markdown-reading-view:has(.windrose-container),
+.markdown-source-view.is-live-preview:has(.windrose-container) {
+  container-type: inline-size;
+}
+
 .windrose-container.windrose-expanded {
   --windrose-offset: 0px;
   width: calc(100cqi - 2 * var(--windrose-offset));
@@ -3130,7 +3135,7 @@ button.windrose-sel-icon-btn,
    TOUCH/TABLET RESPONSIVE ADJUSTMENTS
    ============================================ */
 
-@media (hover: none) and (pointer: coarse) {
+@media (pointer: coarse) {
 
   .windrose-compass {
     width: 35px;
