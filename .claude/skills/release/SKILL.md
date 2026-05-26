@@ -1,147 +1,128 @@
 ---
 name: release
-description: Automate Windrose release - update version/changelog, compile via Obsidian, test the compiled artifact, and tag for release. Use when preparing a new version of Windrose.
+description: Automate Windrose standalone plugin release - bump version, build, test, tag, and publish via GitHub Actions. Use when preparing a new version of Windrose.
 ---
 
 # Release Windrose
 
-Guides you through the complete release process for Windrose.
+Guides you through the complete release process for the Windrose standalone Obsidian plugin.
 
 ## Prerequisites
 
 Before running this skill:
 1. All source changes should be committed
-2. Know the new version number
-3. Changelog for this version should already be written in `Windrose Changelogs.md`
-4. **Both the source repo AND the dev harness must be on the same `release/vX.Y.Z` branch (or `main`).** The release pipeline checks both and aborts on mismatch. Verify with:
-   ```bash
-   git -C "C:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker" branch --show-current
-   git -C "C:\Dev\windrose" branch --show-current
-   ```
-   If they differ, check out the matching branch in the dev harness before proceeding.
+2. Know the new version number (semver; BRAT allows suffixes like `2.0.0-preview`)
+3. Changelog for this version should already be written in `src/Windrose Changelogs.md`
 
-The Datacore Compiler command ID is already configured: `dc-compiler:compile-projects-dungeon-map-tracker--compilersettings`
+## Commit Messages
+
+**CRITICAL:** Do NOT include any AI/LLM attribution in commit messages. No "Co-Authored-By: Claude", no "Generated with Claude Code", nothing. Keep commit messages clean and professional.
 
 ## Release Process
 
 ### Step 1: Extract and Confirm Changelog
 
-1. Read `Windrose Changelogs.md` in the source repo (`C:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker`)
-2. Find the changelog section for the version being released (under `# Changelog`, look for `## Version X.Y.Z` or similar header)
-3. Extract the full changelog content for this version - **IMPORTANT: Stop at the next `## Version` header**. Only include content from the target version's header until (but not including) the next version header.
-4. Present the extracted changelog to the user in a markdown code block (triple backticks) so they can preview the exact formatting that will be used
-5. Ask them to confirm it looks correct before proceeding
+1. Read `src/Windrose Changelogs.md`
+2. Find the changelog section for the version being released
+3. Present the extracted changelog to the user for confirmation
+4. **Do NOT generate or modify changelog content** - only extract what's already there
 
-**Important:** The user writes changelogs manually in `Windrose Changelogs.md`. Do NOT generate or modify changelog content - only extract what's already there. Be strict about version boundaries - each version section ends where the next one begins.
+### Step 2: Run Release Pipeline
 
-## Commit Messages
-
-**CRITICAL:** Do NOT include any AI/LLM attribution in commit messages. No "Co-Authored-By: Claude", no "Generated with Claude Code", no "via Happy", nothing. Keep commit messages clean and professional - just describe what the commit does.
-
-### Step 2: Update Version Files
-
-Update these files in the source repo (`C:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker`):
-
-1. **`dist/VERSION`** - Single line with version number (e.g., `1.5.1`)
-
-2. **`dist/CHANGELOG.md`** - **REPLACE** the entire file contents with ONLY the changelog for this version. Do NOT append or prepend - the file should contain ONLY the current version's changelog. Previous version notes are NOT preserved.
-
-3. **`.compilersettings`** - Update the `"version"` field to match
-
-### Step 3: Commit Version Updates
+From the dev root (`C:\Dev\windrose`):
 
 ```bash
-cd "C:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker"
-git add dist/VERSION dist/CHANGELOG.md .compilersettings
-git commit -m "Bump version to X.Y.Z"
-```
-
-### Step 4: Run Release Pipeline
-
-From the dev harness directory:
-
-```bash
-cd "C:\Dev\windrose"
-
-# Dry run first (compiles and tests, but doesn't tag)
+# Dry run first (builds and tests, but doesn't tag/push)
 npm run release:dry
 
-# If dry run passes, do the real release
+# With version bump:
+npm run release -- --bump 2.1.0 --dry-run
+
+# If dry run passes, do the real release:
 npm run release
+
+# From a non-main branch (e.g. standalone-conversion):
+npm run release -- --allow-branch
 ```
 
-The release pipeline performs these steps:
-1. Compile via Obsidian's Datacore Compiler
-2. Run E2E tests against compiled artifact
-3. Commit the compiled artifact (if changed)
-4. Push the branch to origin and **verify** the push succeeded (always runs, even with `--skip-compile`)
-5. Create and push version tag (triggers GitHub Actions release)
-6. Wait for GitHub release, download the zip, and **verify** the artifact matches local
+The release pipeline (`scripts/release/index.ts`) performs these steps:
 
-**CRITICAL: The pipeline has safeguards to prevent tagging the wrong commit:**
-- Verifies push completed before tagging
-- Verifies HEAD hasn't changed between commit and tag
-- Warns if the compiled artifact wasn't modified in the current commit
+1. **Bump version** (if `--bump` provided) - updates `manifest.json`, `package.json`, `versions.json` atomically
+2. **Check prerequisites** - correct branch, no existing tag, verify gitignore
+3. **Build production** - `npm run build:prod` (esbuild minified + SCSS compilation)
+4. **Run tests** - unit tests always run; E2E optional via `--include-e2e`
+5. **Commit version bump** - only if files changed (manifest.json, package.json, versions.json)
+6. **Tag and push** - creates annotated `vX.Y.Z` tag, pushes branch + tag to origin
+7. **Verify release** - polls GitHub for release with correct assets (main.js, styles.css, manifest.json)
 
-**Always use `npm run release`** - never manually create tags or run steps out of order.
-
-**Available flags:**
-- `--dry-run` - Compile and test, but don't commit/tag
-- `--skip-compile` - Skip compilation (use existing compiled artifact)
-- `--skip-tests` - Skip E2E tests
-- `--command=<id>` - Override the Datacore Compiler command ID
-
-**Environment variables:**
-- `WINDROSE_COMPILER_COMMAND` - Datacore Compiler command ID
-
-### Step 5: Verify Release
+### Step 3: Verify Release
 
 After `npm run release` succeeds:
 1. Check GitHub Actions for release workflow status
-2. Verify the release appears at: https://github.com/[your-repo]/releases
-3. Test the released artifact in a fresh Obsidian vault
+2. Verify the release appears at: https://github.com/alas-poor-ophelia/windrose-md/releases
+3. For BRAT users: the release is automatically available once GitHub Actions completes
+4. For manual install: download `main.js`, `styles.css`, `manifest.json` from the release
 
-### Step 6: Merge Release Branch to Main
+### Step 4: Merge to Main (when ready)
 
-After the release is verified, merge the release branch back into main and push:
+After the release is verified and any beta testing is complete:
 
 ```bash
-cd "C:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker"
 git checkout main
-git merge release/vX.Y.Z --no-edit
+git merge standalone-conversion --no-edit
 git push origin main
 ```
 
-This ensures main has the compiled artifact commit, version bump, and any fixes made during the release process (e.g. NativeModalPortal fix in v1.6.0). Without this step, the README, docs, and other files pushed on the release branch won't be visible on the main branch on GitHub.
+## Available Flags
+
+| Flag | Effect |
+|------|--------|
+| `--dry-run` | Build + test only, no commit/tag/push |
+| `--bump X.Y.Z` | Bump version in manifest.json, package.json, versions.json before building |
+| `--skip-tests` | Skip the test step entirely |
+| `--include-e2e` | Run E2E tests in addition to unit tests |
+| `--allow-branch` | Allow release from any branch (default: main or release/*) |
+
+## GitHub Actions Workflow
+
+`.github/workflows/release.yml` triggers on:
+- **Tag push** matching `v*` (normal flow from `npm run release`)
+- **Manual dispatch** with a tag input (fallback)
+
+The workflow:
+1. Checks out the tagged commit
+2. Installs dependencies (`npm ci`)
+3. Builds production bundle (`npm run build:prod`)
+4. Verifies `main.js`, `styles.css`, `manifest.json` exist
+5. Creates a GitHub Release with those three files attached
+6. Auto-marks as prerelease if version contains `-` (e.g. `2.0.0-preview`)
+
+## Release Artifacts
+
+Obsidian Community Plugins require exactly three files:
+
+| File | Source |
+|------|--------|
+| `main.js` | esbuild production bundle (minified, single file) |
+| `styles.css` | SCSS compilation (`sass scss/main.scss styles.css`) |
+| `manifest.json` | Plugin metadata (id, version, minAppVersion, author) |
+
+Additionally, `versions.json` maps plugin versions to minimum Obsidian versions for compatibility checking.
 
 ## Troubleshooting
 
-### Compilation Fails
+### Build Fails
 
-**"Command not found" error:**
-- Check that Datacore Compiler plugin is enabled in Obsidian
-- Verify the command ID is correct (check Obsidian command palette)
-- Set the correct ID: `npm run release -- --command=datacore-compiler:your-command-id`
-
-**Timeout error:**
-- Obsidian may be slow to start - try increasing timeout
-- Check if another Obsidian instance is blocking
-
-### Tests Fail
-
-Run tests in isolation to debug:
 ```bash
-# Run just the compiled artifact tests
-npm run test:release
+# Test build independently
+npm run build:prod
 
-# Check which test maps are being used
-echo $WINDROSE_TEST_MODE  # Should be "compiled"
+# Check SCSS compilation
+npm run build:css
+
+# Verify outputs
+ls -la main.js styles.css
 ```
-
-Common issues:
-- Compiled artifact has different export (`{ View: DungeonMapTracker }` vs `{ DungeonMapTracker }`)
-- Test maps not pointing to compiled output
-- Compiled artifact is stale (re-run compilation)
 
 ### Tag Already Exists
 
@@ -152,87 +133,44 @@ git tag -d vX.Y.Z
 # Delete remote tag (if pushed)
 git push origin :refs/tags/vX.Y.Z
 
-# Update VERSION to new number and retry
+# Bump to new version and retry
+npm run release -- --bump X.Y.Z+1
 ```
 
-### Tag Points to Wrong Commit
-
-If a release was created but the zip contains wrong/stale code, the tag was likely created before the artifact commit was pushed:
+### GitHub Actions Didn't Trigger
 
 ```bash
-cd "C:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker"
-
-# Check what commit the tag points to vs HEAD
-git show vX.Y.Z --quiet  # Shows tagged commit
-git log -1 --oneline     # Shows current HEAD
-
-# If they differ and HEAD has the correct artifact:
-git push origin :refs/tags/vX.Y.Z  # Delete remote tag
-git tag -d vX.Y.Z                   # Delete local tag
-git tag -a vX.Y.Z -m "Release X.Y.Z"  # Recreate on HEAD
-git push origin vX.Y.Z             # Push new tag
+# Manual dispatch as fallback
+gh workflow run release.yml -f tag=vX.Y.Z
 ```
 
-This will trigger GitHub Actions to create a new release with the correct artifact.
+### Tests Fail During Release
 
-## Manual Fallback
-
-**⚠️ WARNING:** Only use manual steps if `npm run release` fails and you understand why. Manual releases are error-prone - the v1.5.5 release bug was caused by tagging before the artifact commit was pushed.
-
-If automation fails, you can release manually, but **follow this order exactly**:
-
-### 1. Compile Manually
-1. Open Obsidian with the Absalom vault
-2. Open Command Palette (Ctrl+P)
-3. Run the Datacore Compiler command for Windrose
-4. Wait for compilation to complete
-
-### 2. Test Manually
+Run tests in isolation:
 ```bash
-cd "C:\Dev\windrose"
-set WINDROSE_TEST_MODE=compiled
-npm run test:e2e
+npm run test:unit                    # Unit tests only
+npm run test:e2e                     # E2E tests only
+npx vitest run tests/unit/path.ts --config vitest.unit.config.ts  # Single file
 ```
-
-### 3. Commit and Push Artifact (MUST complete before tagging!)
-```bash
-cd "C:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker"
-git add dist/compiled-windrose-md.md dist/VERSION
-git commit -m "Release X.Y.Z: compiled artifact"
-git push
-
-# CRITICAL: Verify the push succeeded before proceeding!
-git fetch origin main
-git log -1 --oneline origin/main  # Should show "Release X.Y.Z: compiled artifact"
-```
-
-### 4. Tag Manually (ONLY after push is verified!)
-```bash
-cd "C:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker"
-# Verify you're on the right commit
-git log -1 --oneline  # Should show "Release X.Y.Z: compiled artifact"
-
-git tag -a vX.Y.Z -m "Release X.Y.Z"
-git push origin vX.Y.Z
-```
-
-**Common mistake:** Creating the tag before the artifact commit is pushed. This causes GitHub Actions to build a release from the wrong commit (missing the compiled artifact).
 
 ## Quick Commands
 
 ```bash
-# Full release (compile + test + commit + tag)
+# Full release
 npm run release
 
-# Dry run (compile + test, no commit/tag)
+# Dry run
 npm run release:dry
 
-# Just compile
-npm run release:compile
+# Bump + release
+npm run release -- --bump 2.1.0
 
-# Just test compiled artifact
-npm run test:release
+# Release from feature branch
+npm run release -- --allow-branch
 
-# Skip compilation (test existing artifact)
-npm run release -- --skip-compile --dry-run
+# Skip tests (use sparingly)
+npm run release -- --skip-tests
+
+# Build only (no release)
+npm run build:prod
 ```

@@ -608,6 +608,51 @@ That is also now linked from the top of the README, just so it’s findable. I�
 - Fixed some UI bugs with the Map Settings modal
 - Reverted out the non-functional fix for the Color Palette automatically closing itself right after it opened on Linux, as that didn’t fix the bug, and introduced a new issue where the Color Palette couldn’t be closed by clicking outside of it. You can now once again close the palette by clicking outside of it.
 
+## Version 2.0.0-preview — Standalone Plugin
+
+Windrose MapDesigner is now a standalone Obsidian Community Plugin. No more Datacore dependency — just install and go. This release represents a ground-up conversion of the entire codebase while preserving every feature from v1.7.0.
+
+**Your existing maps will migrate automatically.** On first load, Windrose imports your settings and locates your data files from the previous installation. No manual steps required.
+
+### What's New
+- **Standalone installation** — Standard Obsidian Community Plugin. No Datacore required.
+- **Light mode support** — Map background and grid lines now respond to your Obsidian theme. Switching between dark and light mode updates the canvas immediately without reloading.
+- **Reactive theme switching** — A MutationObserver watches for Obsidian theme changes and re-renders the map in real time.
+- **SCSS pipeline** — Styles are now compiled from 22 SCSS partials, making the 6,500+ line stylesheet maintainable.
+- **CSS modernization** — OKLCH colors, container queries, `:is()` selectors, standard scrollbar styling, `prefers-reduced-motion` guard, `!important` fully eliminated.
+
+### Improvements
+- All modals now use native Obsidian Modal class directly (no Preact-in-native hacks).
+- Settings tab fully decomposed: 7 helper modules, 12 modal classes, 6 tab render mixins.
+- Migration bridge: auto-imports settings from old plugin, scans vault for existing data files, warns if old plugin is still active.
+- Deep link system fully standalone: protocol handler, markdown post-processor, CM6 Live Preview extension, DOM fallback.
+
+### Bug Fixes
+- Fixed color picker z-index layering (inline style was overriding CSS).
+- Fixed color picker close-on-click-outside for iPad/touch devices (overlay element replaces document listener).
+- Fixed compass gap when collapsed (6px spacing).
+- Fixed drawer overflow clipping when expanded.
+
+### Under the Hood — The Conversion
+
+This release is the result of a comprehensive conversion and audit of the entire codebase.
+
+**By the numbers:**
+- **215** TypeScript/TSX source files (up from 0 — previously compiled as a single Datacore script)
+- **55,500+** lines of source code across 8 domain directories
+- **5,130** lines of type definitions across 35 files
+- **53** custom Preact hooks
+- **1,233** unit tests across 36 files (~3.5s)
+- **126** E2E tests across 23 files (real Obsidian via Playwright)
+- **66** commits on the conversion branch
+- **52** JavaScript files eliminated (31 dead templates deleted, 21 converted to TypeScript)
+- **~13,600** lines of JS converted to strict TypeScript
+- All **5** strict TypeScript flags enabled, **0** type errors, **0** ESLint errors
+- **8-phase code audit**: 100+ unsafe casts eliminated, 4 hooks extracted, 5 stale closures fixed, ~1,400 lines of dead code removed
+- `window.__windrose` bridge fully eliminated (was 419 lines)
+- **CSS**: ~180 `rgba()` calls → OKLCH, 49 `!important` → 0, 283 inline styles → CSS classes
+- **Build**: 803 KB minified `main.js` via esbuild (was a 6MB+ interpreted Datacore script)
+
 ## Version 1.7.0
 
 A rather unplanned but hopefully interesting release around a few new features. A new shape/polygon overlay, as well as some new stuff for solo play. And some new/hopefully better stuff around keyboard shortcuts.

@@ -1,175 +1,139 @@
 #!/usr/bin/env npx tsx
 /**
- * Windrose Release Orchestrator
+ * Windrose Standalone Release Pipeline
  *
  * Steps:
- *   1. Compile via Obsidian's Datacore Compiler
- *   2. Run E2E tests against compiled artifact
- *   3. Commit compiled artifact, push branch to source repo
- *   4. Create and push version tag (triggers GitHub Actions release)
- *   5. Download release zip and verify artifact matches local
+ *   1. Verify prerequisites (clean git, no existing tag)
+ *   2. Optionally bump version in manifest.json, package.json, versions.json
+ *   3. Build production bundle (esbuild + SCSS)
+ *   4. Run tests (unit required, E2E optional)
+ *   5. Commit version bump, create tag, push (triggers GitHub Actions release)
+ *   6. Verify GitHub release has correct assets
  *
  * Usage:
- *   npm run release              # Full release: compile, test, commit, tag
- *   npm run release:dry          # Dry run: compile, test, but don't commit/tag
- *   npm run release -- --skip-compile    # Skip compilation step
- *   npm run release -- --skip-tests      # Skip test step
+ *   npm run release                           # Full release from current version
+ *   npm run release:dry                       # Dry run: build + test only
+ *   npm run release -- --bump 2.1.0           # Bump version first
+ *   npm run release -- --skip-tests           # Skip test step
+ *   npm run release -- --include-e2e          # Also run E2E tests
+ *   npm run release -- --allow-branch         # Allow release from non-main branch
  */
 
 import { execSync, spawnSync } from "child_process";
-import { readFileSync, existsSync, copyFileSync, mkdtempSync, rmSync, openSync, closeSync } from "fs";
-import * as os from "os";
+import { readFileSync, writeFileSync, existsSync, openSync, closeSync } from "fs";
 import * as path from "path";
-import { compileViaObsidian } from "./compile.js";
 
-// Configuration - adjust these paths as needed
-const SOURCE_ROOT =
-  "C:\\Users\\whipl\\OneDrive\\Documents\\Absalom\\Projects\\dungeon-map-tracker";
-const DEV_ROOT = "C:\\Dev\\windrose";
-const OUTPUT_PATH = path.join(SOURCE_ROOT, "dist", "compiled-windrose-md.md");
-const VERSION_PATH = path.join(SOURCE_ROOT, "dist", "VERSION");
-const CHANGELOG_PATH = path.join(SOURCE_ROOT, "dist", "CHANGELOG.md");
-const COMPILED_TEST_VAULT = path.join(DEV_ROOT, "tests", "fixtures", "test-vault-compiled");
-const COMPILED_TEST_ARTIFACT = path.join(COMPILED_TEST_VAULT, "_compiled", "compiled-windrose-md.md");
+const DEV_ROOT = path.resolve(import.meta.dirname, "../..");
 const TEST_LOG_PATH = path.join(DEV_ROOT, "test-output.log");
 const TEST_RESULTS_PATH = path.join(DEV_ROOT, "test-results.json");
 
-// Datacore Compiler command ID for Windrose
-const DEFAULT_COMPILER_COMMAND = "dc-compiler:compile-projects-dungeon-map-tracker--compilersettings";
-
 interface ReleaseOptions {
-  skipCompile: boolean;
+  bump: string | null;
   skipTests: boolean;
+  includeE2E: boolean;
   dryRun: boolean;
-  commandId: string;
+  allowBranch: boolean;
 }
 
 function parseArgs(): ReleaseOptions {
   const args = process.argv.slice(2);
+  const bumpIdx = args.indexOf("--bump");
   return {
-    skipCompile: args.includes("--skip-compile"),
+    bump: bumpIdx >= 0 ? args[bumpIdx + 1] : null,
     skipTests: args.includes("--skip-tests"),
+    includeE2E: args.includes("--include-e2e"),
     dryRun: args.includes("--dry-run"),
-    commandId:
-      args.find((a) => a.startsWith("--command="))?.split("=")[1] ||
-      process.env.WINDROSE_COMPILER_COMMAND ||
-      DEFAULT_COMPILER_COMMAND,
+    allowBranch: args.includes("--allow-branch"),
   };
 }
 
-function getVersion(): string {
-  if (!existsSync(VERSION_PATH)) {
-    throw new Error(`VERSION file not found at ${VERSION_PATH}`);
-  }
-  return readFileSync(VERSION_PATH, "utf-8").trim();
+function readManifest(): { version: string; minAppVersion: string } {
+  return JSON.parse(readFileSync(path.join(DEV_ROOT, "manifest.json"), "utf-8"));
 }
 
-function checkPrerequisites(version: string): void {
+function getVersion(): string {
+  return readManifest().version;
+}
+
+function bumpVersion(newVersion: string): void {
+  console.log(`  Bumping version to ${newVersion}...\n`);
+
+  // manifest.json
+  const manifestPath = path.join(DEV_ROOT, "manifest.json");
+  const manifest = JSON.parse(readFileSync(manifestPath, "utf-8"));
+  manifest.version = newVersion;
+  writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + "\n");
+  console.log(`    manifest.json → ${newVersion}`);
+
+  // package.json
+  const pkgPath = path.join(DEV_ROOT, "package.json");
+  const pkg = JSON.parse(readFileSync(pkgPath, "utf-8"));
+  pkg.version = newVersion;
+  writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + "\n");
+  console.log(`    package.json → ${newVersion}`);
+
+  // versions.json
+  const versionsPath = path.join(DEV_ROOT, "versions.json");
+  const versions = existsSync(versionsPath)
+    ? JSON.parse(readFileSync(versionsPath, "utf-8"))
+    : {};
+  versions[newVersion] = manifest.minAppVersion;
+  writeFileSync(versionsPath, JSON.stringify(versions, null, 2) + "\n");
+  console.log(`    versions.json → ${newVersion}: ${manifest.minAppVersion}`);
+  console.log("");
+}
+
+function checkPrerequisites(version: string, allowBranch: boolean): void {
   console.log("Checking prerequisites...\n");
 
-  // CRITICAL: Ensure both repos are on main or a release branch.
-  // Dev harness must match the source repo's branch so test infra changes
-  // and the source artifact land on the same release branch.
-  const sourceBranch = execSync("git branch --show-current", {
-    cwd: SOURCE_ROOT,
-    encoding: "utf-8",
-  }).trim();
-  if (sourceBranch !== "main" && !sourceBranch.startsWith("release/")) {
-    throw new Error(
-      `Source repo must be on 'main' or 'release/*' branch to release. Currently on '${sourceBranch}'. Run: git -C "${SOURCE_ROOT}" checkout main`
-    );
-  }
-  const devBranch = execSync("git branch --show-current", {
+  const branch = execSync("git branch --show-current", {
     cwd: DEV_ROOT,
     encoding: "utf-8",
   }).trim();
-  if (devBranch !== "main" && !devBranch.startsWith("release/")) {
-    throw new Error(
-      `Dev harness must be on 'main' or 'release/*' branch to release. Currently on '${devBranch}'. Run: git -C "${DEV_ROOT}" checkout ${sourceBranch}`
-    );
-  }
-  if (sourceBranch !== devBranch) {
-    throw new Error(
-      `Branch mismatch: source repo on '${sourceBranch}', dev harness on '${devBranch}'. Both must match. Run: git -C "${DEV_ROOT}" checkout ${sourceBranch}`
-    );
-  }
-  console.log(`  Branch: ${sourceBranch} (both repos)`);
 
-  // Check VERSION file exists
-  if (!existsSync(VERSION_PATH)) {
-    throw new Error(`VERSION file not found. Create it at: ${VERSION_PATH}`);
-  }
-  console.log(`  VERSION: ${version}`);
-
-  // Check CHANGELOG exists and mentions this version
-  if (!existsSync(CHANGELOG_PATH)) {
+  if (!allowBranch && branch !== "main" && !branch.startsWith("release/")) {
     throw new Error(
-      `CHANGELOG.md not found. Create it at: ${CHANGELOG_PATH}`
+      `Must be on 'main' or 'release/*' branch to release (on '${branch}').\n` +
+      `  Use --allow-branch to release from the current branch.`
     );
   }
-  const changelog = readFileSync(CHANGELOG_PATH, "utf-8");
-  if (!changelog.includes(version)) {
-    console.warn(
-      `  WARNING: CHANGELOG.md does not mention version ${version}`
-    );
-  } else {
-    console.log(`  CHANGELOG: mentions v${version}`);
-  }
-
-  // Check git status (in source repo)
-  const gitStatus = execSync("git status --porcelain", {
-    cwd: SOURCE_ROOT,
-    encoding: "utf-8",
-  });
-  if (gitStatus.trim()) {
-    console.warn("  WARNING: Uncommitted changes in source repo:");
-    console.warn(
-      gitStatus
-        .split("\n")
-        .map((l) => "    " + l)
-        .join("\n")
-    );
-  } else {
-    console.log("  Git: clean working directory");
-  }
+  console.log(`  Branch: ${branch}${!allowBranch ? "" : " (--allow-branch)"}`);
+  console.log(`  Version: ${version}`);
 
   // Check if tag already exists
   const tagName = `v${version}`;
   try {
-    execSync(`git rev-parse ${tagName}`, {
-      cwd: SOURCE_ROOT,
-      stdio: "pipe",
-    });
-    throw new Error(
-      `Tag ${tagName} already exists. Update VERSION to a new version.`
-    );
-  } catch (e: any) {
-    if (e.message.includes("already exists")) throw e;
-    // Tag doesn't exist, good
+    execSync(`git rev-parse ${tagName}`, { cwd: DEV_ROOT, stdio: "pipe" });
+    throw new Error(`Tag ${tagName} already exists. Bump the version first.`);
+  } catch (e: unknown) {
+    if (e instanceof Error && e.message.includes("already exists")) throw e;
     console.log(`  Tag: ${tagName} does not exist yet`);
+  }
+
+  // Verify build artifacts are gitignored
+  const mainJsTracked = execSync("git ls-files main.js", { cwd: DEV_ROOT, encoding: "utf-8" }).trim();
+  if (mainJsTracked) {
+    console.warn("  WARNING: main.js is tracked by git. It should be gitignored (built by CI).");
   }
 
   console.log("");
 }
 
-async function runCompile(commandId: string): Promise<void> {
-  console.log("Step 1: Compiling via Obsidian...\n");
+function buildProduction(): void {
+  console.log("Step 1: Building production bundle...\n");
 
-  const result = await compileViaObsidian({
-    commandId,
-    outputPath: OUTPUT_PATH,
-    timeout: 120000,
-  });
+  execSync("npm run build:prod", { cwd: DEV_ROOT, stdio: "inherit" });
 
-  if (!result.success) {
-    throw new Error(`Compilation failed: ${result.error}`);
-  }
+  // Verify outputs
+  const mainJs = path.join(DEV_ROOT, "main.js");
+  const stylesCss = path.join(DEV_ROOT, "styles.css");
+  if (!existsSync(mainJs)) throw new Error("Build failed: main.js not found");
+  if (!existsSync(stylesCss)) throw new Error("Build failed: styles.css not found");
 
-  // Copy compiled artifact to test-vault-compiled for release tests
-  copyFileSync(OUTPUT_PATH, COMPILED_TEST_ARTIFACT);
-  console.log(`  Copied artifact to test-vault-compiled`);
-
-  console.log("");
+  const mainSize = readFileSync(mainJs).length;
+  const cssSize = readFileSync(stylesCss).length;
+  console.log(`\n  main.js:    ${(mainSize / 1024).toFixed(0)} KB`);
+  console.log(`  styles.css: ${(cssSize / 1024).toFixed(0)} KB\n`);
 }
 
 function printTestSummary(jsonPath: string): { passed: boolean } {
@@ -180,8 +144,8 @@ function printTestSummary(jsonPath: string): { passed: boolean } {
 
   const results = JSON.parse(readFileSync(jsonPath, "utf-8"));
   const testFiles = results.testResults || [];
-  const passedFiles = testFiles.filter((f: any) => f.status === "passed").length;
-  const failedFiles = testFiles.filter((f: any) => f.status === "failed");
+  const passedFiles = testFiles.filter((f: Record<string, unknown>) => f.status === "passed").length;
+  const failedFiles = testFiles.filter((f: Record<string, unknown>) => f.status === "failed");
 
   let totalTests = 0;
   let totalPassed = 0;
@@ -189,10 +153,11 @@ function printTestSummary(jsonPath: string): { passed: boolean } {
   let totalSkipped = 0;
 
   for (const file of testFiles) {
-    for (const test of file.assertionResults || []) {
+    for (const test of (file as Record<string, unknown[]>).assertionResults || []) {
       totalTests++;
-      if (test.status === "passed") totalPassed++;
-      else if (test.status === "failed") totalFailed++;
+      const t = test as Record<string, string>;
+      if (t.status === "passed") totalPassed++;
+      else if (t.status === "failed") totalFailed++;
       else totalSkipped++;
     }
   }
@@ -204,193 +169,126 @@ function printTestSummary(jsonPath: string): { passed: boolean } {
   if (failedFiles.length > 0) {
     console.log(`\n  ── Failures ─────────────────────────────────`);
     for (const file of failedFiles) {
-      const relPath = path.relative(DEV_ROOT, file.name);
+      const f = file as Record<string, unknown>;
+      const relPath = path.relative(DEV_ROOT, f.name as string);
       console.log(`\n  FAIL ${relPath}`);
-      for (const test of file.assertionResults || []) {
+      for (const test of (f.assertionResults as Record<string, unknown>[]) || []) {
         if (test.status === "failed") {
-          console.log(`    ✗ ${test.ancestorTitles?.join(" > ")}${test.ancestorTitles?.length ? " > " : ""}${test.title}`);
-          const msg = (test.failureMessages || []).join("\n");
+          const ancestors = (test.ancestorTitles as string[]) || [];
+          console.log(`    ✗ ${ancestors.join(" > ")}${ancestors.length ? " > " : ""}${test.title}`);
+          const msg = ((test.failureMessages as string[]) || []).join("\n");
           const lines = msg.split("\n").slice(0, 10);
           for (const line of lines) {
             console.log(`      ${line}`);
-          }
-          if (msg.split("\n").length > 10) {
-            console.log(`      ... (${msg.split("\n").length - 10} more lines in test-output.log)`);
           }
         }
       }
     }
   }
 
-  console.log(`\n  Full output: ${TEST_LOG_PATH}`);
-  console.log(`  JSON results: ${TEST_RESULTS_PATH}\n`);
-
+  console.log(`\n  Full output: ${TEST_LOG_PATH}\n`);
   return { passed: failedFiles.length === 0 };
 }
 
-function runTests(): void {
-  console.log("Step 2: Running E2E tests against compiled artifact...\n");
+function runTests(includeE2E: boolean): void {
+  console.log(`Step 2: Running tests${includeE2E ? " (unit + E2E)" : " (unit only)"}...\n`);
 
-  const logFd = openSync(TEST_LOG_PATH, "w");
-
-  const result = spawnSync("npm", ["run", "test:release"], {
+  // Unit tests always run inline
+  const unitResult = spawnSync("npm", ["run", "test:unit"], {
     cwd: DEV_ROOT,
-    stdio: ["ignore", logFd, logFd],
+    stdio: "inherit",
     shell: true,
-    env: {
-      ...process.env,
-      WINDROSE_TEST_MODE: "compiled",
-    },
   });
 
-  closeSync(logFd);
+  if (unitResult.status !== 0) {
+    throw new Error("Unit tests failed.");
+  }
+  console.log("");
 
-  const { passed } = printTestSummary(TEST_RESULTS_PATH);
+  // E2E tests if requested
+  if (includeE2E) {
+    console.log("  Running E2E tests...\n");
+    const logFd = openSync(TEST_LOG_PATH, "w");
+    const e2eResult = spawnSync("npm", ["run", "test:release"], {
+      cwd: DEV_ROOT,
+      stdio: ["ignore", logFd, logFd],
+      shell: true,
+    });
+    closeSync(logFd);
 
-  if (result.status !== 0 || !passed) {
-    throw new Error("Tests failed. See summary above and test-output.log for details.");
+    const { passed } = printTestSummary(TEST_RESULTS_PATH);
+    if (e2eResult.status !== 0 || !passed) {
+      throw new Error("E2E tests failed. See test-output.log for details.");
+    }
   }
 }
 
-function commitArtifact(version: string, dryRun: boolean): void {
-  console.log(`Step 3: Committing compiled artifact...\n`);
+function commitAndTag(version: string, dryRun: boolean): void {
+  const tagName = `v${version}`;
 
-  // Check if there are changes to commit
-  const gitStatus = execSync("git status --porcelain dist/", {
-    cwd: SOURCE_ROOT,
-    encoding: "utf-8",
-  });
-
-  if (!gitStatus.trim()) {
-    console.log("  No changes to compiled artifact detected.");
-    console.log("  WARNING: This may indicate compilation didn't produce changes.\n");
-    return;
-  }
-
-  if (dryRun) {
-    console.log(`  [DRY RUN] Would commit compiled artifact`);
-    console.log("");
-    return;
-  }
-
-  // Stage the compiled artifact and any dist changes
-  execSync("git add dist/compiled-windrose-md.md dist/VERSION", {
-    cwd: SOURCE_ROOT,
-  });
-  console.log("  Staged compiled artifact");
-
-  // Commit
-  execSync(
-    `git commit -m "Release ${version}: compiled artifact"`,
-    { cwd: SOURCE_ROOT }
-  );
-  const commitSha = execSync("git rev-parse HEAD", { cwd: SOURCE_ROOT, encoding: "utf-8" }).trim();
-  console.log(`  Committed: Release ${version}: compiled artifact (${commitSha.slice(0, 7)})\n`);
-}
-
-function pushAndVerify(dryRun: boolean): string {
-  const branch = execSync("git branch --show-current", {
-    cwd: SOURCE_ROOT,
+  // Check if there are version-related changes to commit
+  const gitStatus = execSync("git status --porcelain manifest.json package.json versions.json", {
+    cwd: DEV_ROOT,
     encoding: "utf-8",
   }).trim();
-  const localHead = execSync("git rev-parse HEAD", { cwd: SOURCE_ROOT, encoding: "utf-8" }).trim();
 
-  console.log(`Step 3b: Pushing ${branch} to origin...\n`);
+  if (gitStatus) {
+    console.log(`Step 3: Committing version bump...\n`);
+
+    if (dryRun) {
+      console.log(`  [DRY RUN] Would commit: ${gitStatus.replace(/\n/g, ", ")}\n`);
+    } else {
+      execSync("git add manifest.json package.json versions.json", { cwd: DEV_ROOT });
+      execSync(`git commit -m "Release ${version}"`, { cwd: DEV_ROOT });
+      console.log(`  Committed version bump\n`);
+    }
+  }
+
+  console.log(`Step 4: Tagging ${tagName}...\n`);
 
   if (dryRun) {
-    console.log(`  [DRY RUN] Would push ${branch} to origin`);
-    console.log(`  [DRY RUN] Local HEAD: ${localHead.slice(0, 7)}\n`);
-    return localHead;
-  }
-
-  // Push to current branch (with upstream if needed)
-  try {
-    execSync("git push", { cwd: SOURCE_ROOT, stdio: "inherit" });
-  } catch {
-    execSync(`git push --set-upstream origin ${branch}`, { cwd: SOURCE_ROOT, stdio: "inherit" });
-  }
-  console.log("  Pushed to origin");
-
-  // Verify push succeeded by fetching and comparing
-  console.log("  Verifying push...");
-  execSync(`git fetch origin ${branch}`, { cwd: SOURCE_ROOT, stdio: "pipe" });
-  const remoteHead = execSync(`git rev-parse origin/${branch}`, { cwd: SOURCE_ROOT, encoding: "utf-8" }).trim();
-  if (remoteHead !== localHead) {
-    throw new Error(`Push verification failed: local HEAD (${localHead.slice(0, 7)}) != remote (${remoteHead.slice(0, 7)})`);
-  }
-  console.log(`  Verified: remote ${branch} is at ${localHead.slice(0, 7)}\n`);
-
-  return localHead;
-}
-
-function createTag(version: string, dryRun: boolean, expectedCommit: string): void {
-  const tagName = `v${version}`;
-  console.log(`Step 4: Creating tag ${tagName}...\n`);
-
-  // CRITICAL: Verify we're tagging the right commit
-  const currentHead = execSync("git rev-parse HEAD", { cwd: SOURCE_ROOT, encoding: "utf-8" }).trim();
-
-  if (currentHead !== expectedCommit) {
-    throw new Error(
-      `HEAD changed unexpectedly!\n` +
-      `  Expected: ${expectedCommit.slice(0, 7)}\n` +
-      `  Current:  ${currentHead.slice(0, 7)}\n` +
-      `  Aborting to prevent tagging wrong commit.`
-    );
-  }
-
-  // Verify the compiled artifact exists and was modified recently
-  const artifactStat = execSync(
-    `git log -1 --format="%H %s" -- dist/compiled-windrose-md.md`,
-    { cwd: SOURCE_ROOT, encoding: "utf-8" }
-  ).trim();
-
-  if (!artifactStat.includes(currentHead.slice(0, 7)) && !artifactStat.toLowerCase().includes("release")) {
-    console.warn(`  WARNING: compiled-windrose-md.md was not modified in the current commit.`);
-    console.warn(`  Last modified in: ${artifactStat}`);
-    console.warn(`  Current HEAD: ${currentHead.slice(0, 7)}`);
-    console.warn(`  Proceeding anyway, but verify this is intentional.\n`);
-  }
-
-  if (dryRun) {
-    console.log(`  [DRY RUN] Would create tag: ${tagName} at ${currentHead.slice(0, 7)}`);
-    console.log(`  [DRY RUN] Would push tag to origin`);
+    console.log(`  [DRY RUN] Would create tag: ${tagName}`);
+    console.log(`  [DRY RUN] Would push branch + tag to origin\n`);
     return;
   }
 
-  // Create annotated tag
-  execSync(
-    `git tag -a ${tagName} -m "Release ${version}"`,
-    { cwd: SOURCE_ROOT }
-  );
-  console.log(`  Created tag: ${tagName} at ${currentHead.slice(0, 7)}`);
+  execSync(`git tag -a ${tagName} -m "Release ${version}"`, { cwd: DEV_ROOT });
+  console.log(`  Created tag: ${tagName}`);
 
-  // Push tag to origin
-  execSync(`git push origin ${tagName}`, { cwd: SOURCE_ROOT, stdio: "inherit" });
-  console.log(`  Pushed tag to origin`);
-  console.log(`  GitHub Actions will create the release.\n`);
+  // Push branch and tag
+  const branch = execSync("git branch --show-current", { cwd: DEV_ROOT, encoding: "utf-8" }).trim();
+  try {
+    execSync(`git push origin ${branch}`, { cwd: DEV_ROOT, stdio: "inherit" });
+  } catch {
+    execSync(`git push --set-upstream origin ${branch}`, { cwd: DEV_ROOT, stdio: "inherit" });
+  }
+  execSync(`git push origin ${tagName}`, { cwd: DEV_ROOT, stdio: "inherit" });
+  console.log(`  Pushed ${branch} + ${tagName} to origin\n`);
 }
 
-function waitForRelease(version: string, maxWait: number = 120000): void {
+function waitForRelease(version: string, maxWait: number = 180000): void {
   const tagName = `v${version}`;
-  const zipName = `windrose-md-${tagName}.zip`;
   console.log(`Step 5: Verifying GitHub release...\n`);
   console.log(`  Waiting for GitHub Actions to create release for ${tagName}...`);
 
   const startTime = Date.now();
-  const pollInterval = 5000;
+  const pollInterval = 10000;
+  const requiredAssets = ["main.js", "styles.css", "manifest.json"];
 
-  // Poll until the release exists
   while (Date.now() - startTime < maxWait) {
     try {
-      const result = execSync(`gh release view ${tagName} --json assets --jq ".assets[].name"`, {
-        cwd: SOURCE_ROOT,
-        encoding: "utf-8",
-        stdio: ["pipe", "pipe", "pipe"],
-      });
-      if (result.includes(zipName)) {
-        console.log(`  Release found with ${zipName}`);
-        break;
+      const result = execSync(
+        `gh release view ${tagName} --json assets --jq ".assets[].name"`,
+        { cwd: DEV_ROOT, encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] }
+      );
+      const assets = result.trim().split("\n");
+      if (requiredAssets.every(a => assets.includes(a))) {
+        console.log(`\n  Release found with all required assets:`);
+        for (const asset of assets) {
+          console.log(`    - ${asset}`);
+        }
+        console.log("");
+        return;
       }
     } catch {
       // Release doesn't exist yet
@@ -401,111 +299,61 @@ function waitForRelease(version: string, maxWait: number = 120000): void {
     spawnSync("node", ["-e", `Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,${pollInterval})`], { stdio: "ignore" });
   }
 
-  // Final check — did we time out?
-  try {
-    execSync(`gh release view ${tagName} --json assets --jq ".assets[].name"`, {
-      cwd: SOURCE_ROOT,
-      encoding: "utf-8",
-      stdio: ["pipe", "pipe", "pipe"],
-    });
-  } catch {
-    console.warn(`\n  WARNING: Release not found after ${maxWait / 1000}s. Verify manually on GitHub.\n`);
-    return;
-  }
-
-  // Download and verify
-  const tmpDir = mkdtempSync(path.join(os.tmpdir(), "windrose-release-"));
-  try {
-    console.log(`  Downloading ${zipName}...`);
-    execSync(`gh release download ${tagName} --pattern "${zipName}" --dir "${tmpDir}" --clobber`, {
-      cwd: SOURCE_ROOT,
-      stdio: "pipe",
-    });
-
-    // Extract the compiled artifact from the zip
-    const zipPath = path.join(tmpDir, zipName);
-    const extractDir = path.join(tmpDir, "extracted");
-    execSync(`powershell -Command "Expand-Archive -Path '${zipPath}' -DestinationPath '${extractDir}' -Force"`, {
-      stdio: "pipe",
-    });
-
-    // Compare against local compiled artifact (normalize line endings — git may convert CRLF to LF)
-    const localArtifact = readFileSync(OUTPUT_PATH, "utf-8").replace(/\r\n/g, "\n");
-    const remoteArtifactPath = path.join(extractDir, "compiled-windrose-md.md");
-    const remoteArtifact = readFileSync(remoteArtifactPath, "utf-8").replace(/\r\n/g, "\n");
-
-    if (localArtifact === remoteArtifact) {
-      console.log("  VERIFIED: Release artifact matches local compiled artifact.\n");
-    } else {
-      const localLines = localArtifact.split("\n").length;
-      const remoteLines = remoteArtifact.split("\n").length;
-      throw new Error(
-        `Release artifact does NOT match local!\n` +
-        `  Local:  ${localLines} lines\n` +
-        `  Remote: ${remoteLines} lines\n` +
-        `  The release may contain a stale artifact. Investigate before distributing.`
-      );
-    }
-  } finally {
-    rmSync(tmpDir, { recursive: true, force: true });
-  }
+  console.warn(`\n  WARNING: Release not verified after ${maxWait / 1000}s. Check GitHub manually.\n`);
 }
 
 async function main(): Promise<void> {
   const options = parseArgs();
 
   console.log("╔════════════════════════════════════════════╗");
-  console.log("║       Windrose Release Pipeline            ║");
+  console.log("║    Windrose Standalone Release Pipeline    ║");
   console.log("╚════════════════════════════════════════════╝\n");
 
   if (options.dryRun) {
-    console.log("*** DRY RUN MODE - No tags will be created ***\n");
+    console.log("*** DRY RUN MODE — will build and test but not tag/push ***\n");
+  }
+
+  // Bump version if requested
+  if (options.bump) {
+    bumpVersion(options.bump);
   }
 
   const version = getVersion();
-  checkPrerequisites(version);
+  checkPrerequisites(version, options.allowBranch);
 
-  // Step 1: Compile
-  if (options.skipCompile) {
-    console.log("Step 1: Skipping compilation (--skip-compile)\n");
-  } else {
-    await runCompile(options.commandId);
-  }
+  // Step 1: Build
+  buildProduction();
 
   // Step 2: Test
   if (options.skipTests) {
     console.log("Step 2: Skipping tests (--skip-tests)\n");
   } else {
-    runTests();
+    runTests(options.includeE2E);
   }
 
-  // Step 3: Commit compiled artifact (if there are uncommitted artifact changes)
-  commitArtifact(version, options.dryRun);
+  // Steps 3-4: Commit + Tag + Push
+  commitAndTag(version, options.dryRun);
 
-  // Step 3b: Always push to origin before tagging
-  const pushedCommit = pushAndVerify(options.dryRun);
-
-  // Step 4: Tag and push (pass commit SHA for verification)
-  createTag(version, options.dryRun, pushedCommit);
-
-  // Step 5: Verify the GitHub release artifact matches local
+  // Step 5: Verify release
   if (!options.dryRun) {
     waitForRelease(version);
   }
 
   console.log("╔════════════════════════════════════════════╗");
-  console.log("║       Release Pipeline Complete!           ║");
+  console.log("║    Release Pipeline Complete!              ║");
   console.log("╚════════════════════════════════════════════╝\n");
 
   if (!options.dryRun) {
-    console.log(`Version ${version} has been tagged and pushed.`);
-    console.log("Release artifact verified.");
+    console.log(`  Version ${version} tagged and pushed.`);
+    console.log(`  GitHub Actions creating release with main.js + styles.css + manifest.json`);
+  } else {
+    console.log(`  Dry run complete. Build and tests passed for v${version}.`);
   }
 }
 
 main().catch((e) => {
   console.error("\n╔════════════════════════════════════════════╗");
-  console.error("║       Release Pipeline FAILED              ║");
+  console.error("║    Release Pipeline FAILED                ║");
   console.error("╚════════════════════════════════════════════╝\n");
   console.error("Error:", e.message);
   process.exit(1);

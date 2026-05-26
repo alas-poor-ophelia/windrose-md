@@ -4,7 +4,7 @@
   "version": "2.0.0-preview",
   "minAppVersion": "1.4.11",
   "description": "Interactive dungeon and world mapping tool for tabletop RPGs",
-  "author": "alas, poor ophelia (lashiel in discord)",
-  "authorUrl": "",
+  "author": "alas, poor ophelia",
+  "authorUrl": "https://github.com/alas-poor-ophelia",
   "isDesktopOnly": false
 }

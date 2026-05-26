@@ -1,6 +1,6 @@
 {
   "name": "windrose-md",
-  "version": "1.5.0",
+  "version": "2.0.0-preview",
   "description": "Interactive dungeon and world mapping plugin for Obsidian",
   "type": "module",
   "scripts": {
@@ -16,8 +16,6 @@
     "test": "npm run test:unit && npm run test:e2e",
     "release": "npx tsx scripts/release/index.ts",
     "release:dry": "npx tsx scripts/release/index.ts --dry-run",
-    "release:compile": "npx tsx scripts/release/compile.ts",
-    "release:cli-compile": "npx tsx scripts/release/cli-compile.ts",
     "build:css": "sass scss/main.scss styles.css --no-source-map --no-charset",
     "build": "npm run build:css && node esbuild.config.mjs",
     "build:prod": "npm run build:css && node esbuild.config.mjs production",
