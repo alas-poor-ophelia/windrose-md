@@ -606,6 +606,9 @@ body {
   align-items: center;
   overflow: hidden;
 }
+.windrose-controls-drawer-open {
+  overflow: visible;
+}
 
 .windrose-compass {
   width: 70px;
@@ -642,7 +645,7 @@ body {
   overflow: visible;
 }
 .windrose-compass-animated {
-  transform: translateY(-39px);
+  transform: translateY(-33px);
   transition: transform 180ms cubic-bezier(0.25, 0.1, 0.25, 1);
 }
 .windrose-compass-revealed {
