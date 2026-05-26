@@ -17,7 +17,7 @@ import type {
 } from '#types/settings/settings.types';
 import type { App } from 'obsidian';
 
-import { THEME, DEFAULTS } from './dmtConstants';
+import { THEME, DEFAULTS, resolveBackground, resolveGridLineColor } from './dmtConstants';
 
 // ===========================================
 // Plugin Singleton
@@ -166,12 +166,12 @@ function isPluginAvailable(): boolean {
  */
 function getTheme(): ResolvedTheme {
   const settings = getSettings();
-  
+
   return {
     grid: {
-      lines: settings.gridLineColor,
+      lines: resolveGridLineColor(settings.gridLineColor),
       lineWidth: settings.gridLineWidth,
-      background: settings.backgroundColor
+      background: resolveBackground(settings.backgroundColor)
     },
     cells: {
       fill: THEME.cells.fill,
@@ -212,13 +212,19 @@ function getEffectiveSettings(
   
   // If map has no settings or is using global settings, return global settings
   if (!mapSettings || mapSettings.useGlobalSettings) {
-    return globals;
+    return {
+      ...globals,
+      gridLineColor: resolveGridLineColor(globals.gridLineColor),
+      backgroundColor: resolveBackground(globals.backgroundColor)
+    };
   }
-  
+
   // Merge global settings with map overrides (map overrides take precedence)
+  const merged = { ...globals, ...mapSettings.overrides };
   return {
-    ...globals,
-    ...mapSettings.overrides
+    ...merged,
+    gridLineColor: resolveGridLineColor(merged.gridLineColor),
+    backgroundColor: resolveBackground(merged.backgroundColor)
   };
 }
 

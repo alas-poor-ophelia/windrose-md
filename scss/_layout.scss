@@ -35,16 +35,12 @@
   .windrose-container.windrose-animating {
     --windrose-offset: 20px;
   }
+}
 
-  .cm-content > .cm-embed-block[contenteditable=false].windrose-cm-expanded,
-  .cm-content > .cm-embed-block[contenteditable=false].windrose-cm-animating {
+.markdown-source-view.is-live-preview {
+  .cm-embed-block.windrose-cm-parent.windrose-cm-expanded,
+  .cm-embed-block.windrose-cm-parent.windrose-cm-animating {
     contain: none;
-    overflow: normal;
-    animation: none;
-  }
-
-  .cm-embed-block:hover.windrose-cm-parent.windrose-cm-expanded,
-  .cm-embed-block:hover.windrose-cm-parent.windrose-cm-animating {
     overflow: visible;
     animation: none;
   }

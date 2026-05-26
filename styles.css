@@ -123,14 +123,10 @@ body {
 .markdown-source-view.is-live-preview .windrose-container.windrose-animating {
   --windrose-offset: 20px;
 }
-.markdown-source-view.is-live-preview .cm-content > .cm-embed-block[contenteditable=false].windrose-cm-expanded,
-.markdown-source-view.is-live-preview .cm-content > .cm-embed-block[contenteditable=false].windrose-cm-animating {
+
+.markdown-source-view.is-live-preview .cm-embed-block.windrose-cm-parent.windrose-cm-expanded,
+.markdown-source-view.is-live-preview .cm-embed-block.windrose-cm-parent.windrose-cm-animating {
   contain: none;
-  overflow: normal;
-  animation: none;
-}
-.markdown-source-view.is-live-preview .cm-embed-block:hover.windrose-cm-parent.windrose-cm-expanded,
-.markdown-source-view.is-live-preview .cm-embed-block:hover.windrose-cm-parent.windrose-cm-animating {
   overflow: visible;
   animation: none;
 }
@@ -711,6 +707,12 @@ button:is(.windrose-zoom-btn, .windrose-expand-btn, .windrose-layer-btn, .windro
   background-color: color-mix(in srgb, var(--windrose-bg-primary) 90%, transparent);
   border-color: oklch(from var(--windrose-border-primary) l c h/0.6);
   transform: scale(1.05);
+}
+.theme-light button:is(.windrose-zoom-btn, .windrose-expand-btn, .windrose-layer-btn, .windrose-orientation-btn),
+.theme-light .is-tablet button:is(.windrose-zoom-btn, .windrose-expand-btn, .windrose-layer-btn, .windrose-orientation-btn) {
+  color: var(--windrose-border-primary-dark);
+  background-color: color-mix(in srgb, var(--windrose-bg-secondary) 90%, transparent);
+  border-color: oklch(from var(--windrose-border-primary-dark) l c h/0.5);
 }
 
 .windrose-drawer-item {

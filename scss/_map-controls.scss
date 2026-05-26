@@ -140,6 +140,12 @@ button:is(.windrose-zoom-btn, .windrose-expand-btn, .windrose-layer-btn, .windro
     border-color: oklch(from var(--windrose-border-primary) l c h/0.6);
     transform: scale(1.05);
   }
+
+  .theme-light & {
+    color: var(--windrose-border-primary-dark);
+    background-color: color-mix(in srgb, var(--windrose-bg-secondary) 90%, transparent);
+    border-color: oklch(from var(--windrose-border-primary-dark) l c h/0.5);
+  }
 }
 
 .windrose-drawer-item {

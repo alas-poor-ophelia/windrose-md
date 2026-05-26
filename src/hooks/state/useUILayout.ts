@@ -136,11 +136,22 @@ function useUILayout({
       cmEmbedBlock.classList.add('windrose-cm-parent');
       cmEmbedBlock.classList.toggle('windrose-cm-expanded', isExpanded);
       cmEmbedBlock.classList.toggle('windrose-cm-animating', isAnimating);
+
+      if (isExpanded || isAnimating) {
+        cmEmbedBlock.removeAttribute('contenteditable');
+      } else if (!cmEmbedBlock.hasAttribute('contenteditable')) {
+        cmEmbedBlock.setAttribute('contenteditable', 'false');
+      }
     }
 
     return () => {
       container.classList.remove('windrose-expanded', 'windrose-animating');
-      cmEmbedBlock?.classList.remove('windrose-cm-parent', 'windrose-cm-expanded', 'windrose-cm-animating');
+      if (cmEmbedBlock) {
+        cmEmbedBlock.classList.remove('windrose-cm-parent', 'windrose-cm-expanded', 'windrose-cm-animating');
+        if (!cmEmbedBlock.hasAttribute('contenteditable')) {
+          cmEmbedBlock.setAttribute('contenteditable', 'false');
+        }
+      }
     };
   }, [isExpanded, isAnimating]);
 

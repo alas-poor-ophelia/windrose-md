@@ -167,11 +167,34 @@ type DiagonalDirection = 'TL-BR' | 'TR-BL';
 // Theme Configuration
 // =============================================================================
 
+const DARK_BACKGROUND = '#1a1a1a';
+const LIGHT_BACKGROUND = '#e8e4df';
+const DARK_GRID_LINES = '#666666';
+const LIGHT_GRID_LINES = '#d5cfc8';
+
+function isLightMode(): boolean {
+  return document.body.classList.contains('theme-light');
+}
+
+function resolveBackground(color: string): string {
+  if (color === DARK_BACKGROUND && isLightMode()) {
+    return LIGHT_BACKGROUND;
+  }
+  return color;
+}
+
+function resolveGridLineColor(color: string): string {
+  if (color === DARK_GRID_LINES && isLightMode()) {
+    return LIGHT_GRID_LINES;
+  }
+  return color;
+}
+
 const THEME: Theme = {
   grid: {
     lines: '#666666',
     lineWidth: 1,
-    background: '#1a1a1a'
+    background: DARK_BACKGROUND
   },
   cells: {
     fill: '#c4a57b',
@@ -448,6 +471,6 @@ export type {
 // =============================================================================
 
 export { // Theme and defaults
-  THEME, DEFAULTS, DATA_FILE_PATH, SCHEMA_VERSION, Z_INDEX, // Segment system constants
+  THEME, DEFAULTS, DATA_FILE_PATH, SCHEMA_VERSION, Z_INDEX, resolveBackground, resolveGridLineColor, // Segment system constants
   SEGMENT_NAMES, SEGMENT_VERTICES, SEGMENT_TRIANGLES, SEGMENT_INTERNAL_ADJACENCY, SEGMENT_CROSS_CELL_ADJACENCY, SEGMENT_EXTERNAL_EDGES, // Diagonal fill tool constants
   CORNER_SEGMENT_FILL, CORNER_NEIGHBOR_CHECKS, CORNER_DIAGONAL_DIRECTION };
