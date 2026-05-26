@@ -49,6 +49,7 @@ import { useUILayout } from './hooks/state/useUILayout';
 import { usePanelState } from './hooks/state/usePanelState';
 import { useViewControls } from './hooks/state/useViewControls';
 import { useTileBrush } from './hooks/state/useTileBrush';
+import { useThemeMode } from './hooks/state/useThemeMode';
 import { SubHexBreadcrumb } from './components/controls/SubHexBreadcrumb';
 import { TileAssetBrowser } from './components/panels/TileAssetBrowser';
 import { RA_ICONS } from './assets/rpgAwesomeIcons';
@@ -77,6 +78,7 @@ interface DungeonMapTrackerProps {
 
 const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'grid', notePath = '' }: DungeonMapTrackerProps): VNode => {
   const app = useApp();
+  useThemeMode();
   const { mapData: rootMapData, isLoading, saveStatus, updateMapData: rootUpdateMapData, forceSave, tileImagesReady, getCachedImage } = useMapData(mapId, mapName, mapType);
 
   const {
