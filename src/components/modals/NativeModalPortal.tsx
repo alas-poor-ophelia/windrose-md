@@ -59,7 +59,7 @@ async function setupModalInteract(
 ): Promise<() => void> {
   const interact = await loadInteract();
 
-  modalEl.classList.add('windrose-modal-portal');
+  modalEl.classList.add('windrose-native-modal-interactive');
 
   const savedSize = loadModalSize();
   if (savedSize && options.resizable === true) {

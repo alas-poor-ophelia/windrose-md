@@ -5,6 +5,7 @@
  */
 
 import type { JSX, VNode } from 'preact';
+import { Fragment } from 'preact';
 import type { CustomColor, HexColor } from '#types/core/common.types';
 
 import type { MutableRef } from 'preact/hooks';
@@ -12,7 +13,6 @@ import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { getColorPalette, DEFAULT_COLOR } from '../../drawing/colorOperations';
 import { ModalPortal } from '../modals/ModalPortal';
 import { Icon } from './Icon';
-import { Z_INDEX } from '../../core/dmtConstants';
 
 
 
@@ -28,7 +28,6 @@ export interface ColorDef {
   isCustom?: boolean;
   isReset?: boolean;
   isAddButton?: boolean;
-  isPreview?: boolean;
 }
 
 /** Position for color picker */
@@ -84,7 +83,7 @@ const ColorPicker = ({
   isOpen,
   selectedColor,
   onColorSelect,
-  onClose: _onClose,
+  onClose,
   onReset,
   customColors = [],
   paletteColorOpacityOverrides = {},
@@ -100,7 +99,6 @@ const ColorPicker = ({
   portalled = false,
   anchorRef
 }: ColorPickerProps): VNode | null => {
-  const [previewColor, setPreviewColor] = useState<HexColor | null>(null);
   const [editTargetId, setEditTargetId] = useState<string | null>(null);
   const [editingOpacity, setEditingOpacity] = useState(1);
   const colorInputRef = useRef<HTMLInputElement>(null);
@@ -145,9 +143,6 @@ const ColorPicker = ({
       saveOpacityChanges();
       setEditTargetId(null);
     }
-    if (!isOpen) {
-      setPreviewColor(null);
-    }
   }, [isOpen, saveOpacityChanges]);
 
   useEffect((): (() => void) | undefined => {
@@ -158,7 +153,6 @@ const ColorPicker = ({
       const value = input.value;
       if (onAddCustomColor) onAddCustomColor(value);
       onColorSelect(value);
-      setPreviewColor(null);
       if (pendingCustomColorRef) pendingCustomColorRef.current = null;
     };
 
@@ -198,6 +192,8 @@ const ColorPicker = ({
       return;
     }
 
+    if (pendingCustomColorRef) pendingCustomColorRef.current = null;
+
     onColorSelect(colorDef.color);
 
     if (onOpacityChange && colorDef.opacity !== undefined) {
@@ -212,21 +208,13 @@ const ColorPicker = ({
 
   const handleColorInput = (e: JSX.TargetedEvent<HTMLInputElement, Event>): void => {
     const value = (e.target as HTMLInputElement).value;
-    setPreviewColor(value);
     if (pendingCustomColorRef) {
       pendingCustomColorRef.current = value;
     }
   };
 
-  const handleAddClick = (): void => {
-    setPreviewColor('#888888' as HexColor);
-    if (pendingCustomColorRef) {
-      pendingCustomColorRef.current = '#888888' as HexColor;
-    }
-  };
-
   const handleColorContextMenu = (e: JSX.TargetedMouseEvent<HTMLButtonElement>, colorDef: ColorDef): void => {
-    if (colorDef.isReset === true || colorDef.isAddButton === true || colorDef.isPreview === true) return;
+    if (colorDef.isReset === true || colorDef.isAddButton === true) return;
     e.preventDefault();
     e.stopPropagation();
 
@@ -237,7 +225,7 @@ const ColorPicker = ({
   };
 
   const handleLongPressStart = (colorDef: ColorDef): void => {
-    if (colorDef.isReset === true || colorDef.isAddButton === true || colorDef.isPreview === true) return;
+    if (colorDef.isReset === true || colorDef.isAddButton === true) return;
     longPressTriggeredRef.current = false;
     longPressTimerRef.current = setTimeout(() => {
       longPressTriggeredRef.current = true;
@@ -282,12 +270,6 @@ const ColorPicker = ({
     { id: 'reset', color: '' as HexColor, label: 'Reset to default', isReset: true },
     ...paletteColorsWithOverrides,
     ...customColors.map(c => ({ ...c, label: c.label ?? c.color, isCustom: true })),
-    ...(previewColor != null && previewColor !== '' ? [{
-      id: 'preview',
-      color: previewColor,
-      label: 'Selecting...',
-      isPreview: true
-    }] : []),
     { id: 'add-custom', color: '' as HexColor, label: 'Add custom color', isAddButton: true }
   ];
 
@@ -301,8 +283,7 @@ const ColorPicker = ({
       ? { bottom: 'calc(100% + 8px)', top: 'auto' }
       : { top: 'calc(100% + 8px)' }
     ),
-    ...horizontalStyle,
-    zIndex: Z_INDEX.COLOR_PICKER
+    ...horizontalStyle
   };
 
   if (portalled && anchorRef?.current) {
@@ -314,8 +295,7 @@ const ColorPicker = ({
       ...(position === 'above'
         ? { bottom: `${window.innerHeight - rect.top + gap}px` }
         : { top: `${rect.bottom + gap}px` }
-      ),
-      zIndex: Z_INDEX.COLOR_PICKER
+      )
     };
   }
 
@@ -346,26 +326,12 @@ const ColorPicker = ({
                 <Icon icon="lucide-circle-x" />
               </button>
             );
-          } else if (colorDef.isPreview === true) {
-            return (
-              <div
-                key={colorDef.id}
-                className="windrose-color-swatch windrose-color-swatch-preview"
-                style={{ backgroundColor: colorDef.color }}
-                title="Selecting..."
-              >
-                <span className="windrose-color-preview-spinner">
-                  <Icon icon="lucide-loader" />
-                </span>
-              </div>
-            );
           } else if (colorDef.isAddButton === true) {
             return (
               <div
                 key={colorDef.id}
                 className="windrose-color-swatch windrose-color-swatch-add"
                 title={colorDef.label}
-                onClick={handleAddClick}
               >
                 <input
                   ref={colorInputRef}
@@ -461,10 +427,18 @@ const ColorPicker = ({
     </div>
   );
 
+  const overlayEl = (
+    <div
+      className="windrose-color-picker-overlay"
+      onClick={onClose}
+      onTouchEnd={(e) => { e.preventDefault(); onClose(); }}
+    />
+  );
+
   if (portalled) {
-    return <ModalPortal>{pickerEl}</ModalPortal>;
+    return <ModalPortal><Fragment>{overlayEl}{pickerEl}</Fragment></ModalPortal>;
   }
-  return pickerEl;
+  return <Fragment>{overlayEl}{pickerEl}</Fragment>;
 };
 
 export { ColorPicker, DEFAULT_COLOR };

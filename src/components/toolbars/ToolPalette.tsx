@@ -444,6 +444,12 @@ const ToolPalette = ({
   };
 
   const handleCloseColorPicker = (): void => {
+    if (pendingCustomColorRef.current != null && pendingCustomColorRef.current !== '') {
+      const colorValue = pendingCustomColorRef.current;
+      onAddCustomColor?.(colorValue);
+      onColorChange(colorValue);
+      pendingCustomColorRef.current = null;
+    }
     onColorPickerOpenChange(false);
   };
 
@@ -472,36 +478,6 @@ const ToolPalette = ({
     };
   }, [openSubMenu]);
 
-  useEffect((): (() => void) | undefined => {
-    if (!isColorPickerOpen) return undefined;
-
-    const handleClickOutside = (e: MouseEvent | TouchEvent): void => {
-      const target = e.target as Element;
-      const pickerElement = target.closest('.windrose-color-picker');
-      const buttonElement = target.closest('.windrose-color-tool-btn');
-
-      if (!pickerElement && !buttonElement) {
-        if (pendingCustomColorRef.current != null && pendingCustomColorRef.current !== '') {
-          const colorValue = pendingCustomColorRef.current;
-          onAddCustomColor?.(colorValue);
-          onColorChange(colorValue);
-          pendingCustomColorRef.current = null;
-        }
-        handleCloseColorPicker();
-      }
-    };
-
-    const timerId = setTimeout(() => {
-      document.addEventListener('mousedown', handleClickOutside);
-      document.addEventListener('touchstart', handleClickOutside, { passive: true });
-    }, 10);
-
-    return () => {
-      clearTimeout(timerId);
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('touchstart', handleClickOutside);
-    };
-  }, [isColorPickerOpen]);
 
   return (
     <div className="windrose-tool-palette">

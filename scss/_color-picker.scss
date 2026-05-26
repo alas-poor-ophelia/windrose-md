@@ -184,7 +184,8 @@
   z-index: 1;
 }
 
-.windrose-color-input-as-button {
+input.windrose-color-input-as-button {
+  appearance: auto;
   width: 100%;
   height: 100%;
   opacity: 0;

@@ -151,6 +151,10 @@
   }
 }
 
+.windrose-native-modal-interactive {
+  position: fixed;
+}
+
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
