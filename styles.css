@@ -6071,6 +6071,25 @@ button.windrose-breadcrumb-link {
   margin-top: 12px;
 }
 
+.windrose-full-pane {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.windrose-full-pane .windrose-container {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.windrose-full-pane .windrose-full-pane-canvas {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+
 /* ============================================
    PHASE 1.5: SCROLL MARGIN FOR ANCHOR NAVIGATION
    ============================================ */

@@ -11,6 +11,7 @@ import * as objectPlacer from './generation/objectPlacer';
 import { registerDeepLinks } from './core/deepLinkRegistration';
 import { setPlugin, clearPlugin, FALLBACK_SETTINGS } from './core/settingsAccessor';
 import { WindroseMDSettingsTab } from './settings/WindroseSettingsTab';
+import { VIEW_TYPE_WINDROSE_MAP, WindroseMapView } from './views/WindroseMapView';
 
 /** Cell produced by the dungeon generator with grid coordinates. */
 interface DungeonCell {
@@ -49,6 +50,14 @@ export default class WindrosePlugin extends Plugin {
 
     // eslint-disable-next-line no-console
     console.log('[Windrose] Plugin loaded, version:', this.manifest.version, 'data:', this.dataFilePath);
+
+    this.registerView(VIEW_TYPE_WINDROSE_MAP, (leaf) => new WindroseMapView(leaf));
+    this.addRibbonIcon('compass', 'Open Windrose Map', () => this.activateMapView());
+    this.addCommand({
+      id: 'open-map-view',
+      name: 'Open map in full pane',
+      callback: () => this.activateMapView(),
+    });
 
     this.registerMarkdownCodeBlockProcessor('windrose-map', (source, el, ctx) => {
       const config = parseYamlConfig(source);
@@ -124,6 +133,17 @@ export default class WindrosePlugin extends Plugin {
     this.mountedElements.clear();
     clearPlugin();
     delete window.__windrose;
+  }
+
+  async activateMapView(): Promise<void> {
+    const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_WINDROSE_MAP);
+    if (leaves.length > 0) {
+      this.app.workspace.revealLeaf(leaves[0]);
+      return;
+    }
+    const leaf = this.app.workspace.getLeaf('tab');
+    await leaf.setViewState({ type: VIEW_TYPE_WINDROSE_MAP, active: true });
+    this.app.workspace.revealLeaf(leaf);
   }
 
   private initMcpNamespace(): void {

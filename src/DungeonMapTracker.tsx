@@ -70,13 +70,14 @@ interface DungeonMapTrackerProps {
   mapName?: string;
   mapType?: MapType;
   notePath?: string;
+  fullPane?: boolean;
 }
 
 // ============================================================================
 // MAIN COMPONENT
 // ============================================================================
 
-const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'grid', notePath = '' }: DungeonMapTrackerProps): VNode => {
+const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'grid', notePath = '', fullPane = false }: DungeonMapTrackerProps): VNode => {
   const app = useApp();
   useThemeMode();
   const { mapData: rootMapData, isLoading, saveStatus, updateMapData: rootUpdateMapData, forceSave, tileImagesReady, getCachedImage } = useMapData(mapId, mapName, mapType);
@@ -230,11 +231,11 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     return window.matchMedia('(hover: none) and (pointer: coarse)').matches;
   }, []);
 
-  const canvasHeight = effectiveSettings
+  const canvasHeight = fullPane ? null : (effectiveSettings
     ? (isTouchDevice
         ? (effectiveSettings.canvasHeightMobile ?? 400)
         : (effectiveSettings.canvasHeight ?? 600))
-    : (isTouchDevice ? 400 : 600);
+    : (isTouchDevice ? 400 : 600));
 
 
 
@@ -570,8 +571,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
         />
 
         <div
-          className="windrose-canvas-wrapper"
-          style={{ height: `${canvasHeight}px` }}
+          className={`windrose-canvas-wrapper${fullPane ? ' windrose-full-pane-canvas' : ''}`}
+          style={canvasHeight != null ? { height: `${canvasHeight}px` } : undefined}
           onMouseEnter={() => setIsFocused(true)}
           onMouseLeave={() => setIsFocused(false)}
         >
@@ -765,6 +766,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               currentZoom={mapData.viewState?.zoom ?? 1}
               isExpanded={isExpanded}
               onToggleExpand={handleToggleExpand}
+              hideExpand={fullPane}
               mapType={mapData.mapType}
               showLayerPanel={showLayerPanel}
               onToggleLayerPanel={() => setShowLayerPanel(!showLayerPanel)}

@@ -31,6 +31,7 @@ interface MapControlsProps {
   showRegionPanel?: boolean;
   onToggleRegionPanel?: () => void;
   alwaysShowControls?: boolean;
+  hideExpand?: boolean;
 }
 
 const MapControls = ({
@@ -49,7 +50,8 @@ const MapControls = ({
   onToggleLayerPanel,
   showRegionPanel,
   onToggleRegionPanel,
-  alwaysShowControls = false
+  alwaysShowControls = false,
+  hideExpand = false
 }: MapControlsProps): VNode => {
     // When alwaysShowControls is true, controls are always visible
     const [controlsRevealed, setControlsRevealed] = useState(alwaysShowControls);
@@ -188,14 +190,16 @@ const MapControls = ({
           onMouseLeave={handleMouseLeave}
         >
           {/* Expand/Collapse Button - Above compass, animates last */}
-          <button
-            className={`windrose-expand-btn windrose-drawer-item windrose-drawer-item-up ${controlsRevealed ? 'windrose-drawer-item-visible' : ''}`}
-            style={getExpandStyle()}
-            onClick={handleControlInteraction(onToggleExpand)}
-            title={isExpanded ? "Collapse to normal width" : "Expand to full width"}
-          >
-            <Icon icon={isExpanded ? "lucide-minimize" : "lucide-expand"} />
-          </button>
+          {!hideExpand && (
+            <button
+              className={`windrose-expand-btn windrose-drawer-item windrose-drawer-item-up ${controlsRevealed ? 'windrose-drawer-item-visible' : ''}`}
+              style={getExpandStyle()}
+              onClick={handleControlInteraction(onToggleExpand)}
+              title={isExpanded ? "Collapse to normal width" : "Expand to full width"}
+            >
+              <Icon icon={isExpanded ? "lucide-minimize" : "lucide-expand"} />
+            </button>
+          )}
           
           {/* Compass Rose - Always visible anchor, slides down on reveal */}
           <div 
