@@ -177,17 +177,19 @@ function isLightMode(): boolean {
 }
 
 function resolveBackground(color: string): string {
-  if (color === DARK_BACKGROUND && isLightMode()) {
-    return LIGHT_BACKGROUND;
-  }
+  if (color === DARK_BACKGROUND && isLightMode()) return LIGHT_BACKGROUND;
+  if (color === LIGHT_BACKGROUND && !isLightMode()) return DARK_BACKGROUND;
   return color;
 }
 
 function resolveGridLineColor(color: string): string {
-  if (color === DARK_GRID_LINES && isLightMode()) {
-    return LIGHT_GRID_LINES;
-  }
+  if (color === DARK_GRID_LINES && isLightMode()) return LIGHT_GRID_LINES;
+  if (color === LIGHT_GRID_LINES && !isLightMode()) return DARK_GRID_LINES;
   return color;
+}
+
+function resolveThemeColor(color: string): string {
+  return resolveGridLineColor(resolveBackground(color));
 }
 
 const THEME: Theme = {
@@ -471,6 +473,6 @@ export type {
 // =============================================================================
 
 export { // Theme and defaults
-  THEME, DEFAULTS, DATA_FILE_PATH, SCHEMA_VERSION, Z_INDEX, resolveBackground, resolveGridLineColor, // Segment system constants
+  THEME, DEFAULTS, DATA_FILE_PATH, SCHEMA_VERSION, Z_INDEX, resolveBackground, resolveGridLineColor, resolveThemeColor, // Segment system constants
   SEGMENT_NAMES, SEGMENT_VERTICES, SEGMENT_TRIANGLES, SEGMENT_INTERNAL_ADJACENCY, SEGMENT_CROSS_CELL_ADJACENCY, SEGMENT_EXTERNAL_EDGES, // Diagonal fill tool constants
   CORNER_SEGMENT_FILL, CORNER_NEIGHBOR_CHECKS, CORNER_DIAGONAL_DIRECTION };

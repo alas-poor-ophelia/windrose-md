@@ -14,7 +14,7 @@ import { ColorPicker } from '../shared/ColorPicker';
 import { CollapsibleSection } from '../shared/CollapsibleSection';
 import { useAppearance, useModalShell } from '../../context/MapSettingsContext';
 import type { SettingsOverrides } from '../../context/MapSettingsContext';
-import { Z_INDEX } from '../../core/dmtConstants';
+import { Z_INDEX, resolveThemeColor } from '../../core/dmtConstants';
 import { SettingItem } from './SettingItem';
 import { NativeToggle, NativeSlider } from './NativeControls';
 import { Icon } from '../shared/Icon';
@@ -52,6 +52,8 @@ function ColorPickerItem({ colorKey, label, defaultColor, align = 'left' }: Colo
     globalSettings
   } = useAppearance();
 
+  const displayColor = resolveThemeColor(overrides[colorKey] as string);
+
   return (
     <div class="windrose-color-grid-item">
       <label class="windrose-form-label" style={{ marginBottom: '4px', fontSize: '12px' }}>{label}</label>
@@ -61,12 +63,12 @@ function ColorPickerItem({ colorKey, label, defaultColor, align = 'left' }: Colo
           disabled={useGlobalSettings}
           onClick={() => !useGlobalSettings && setActiveColorPicker(colorKey)}
           style={{
-            backgroundColor: overrides[colorKey] as string,
+            backgroundColor: displayColor,
             cursor: useGlobalSettings ? 'not-allowed' : 'pointer',
             minWidth: '80px'
           }}
         >
-          <span class="windrose-color-button-label">{overrides[colorKey] as string}</span>
+          <span class="windrose-color-button-label">{displayColor}</span>
         </button>
 
         <button
@@ -81,7 +83,7 @@ function ColorPickerItem({ colorKey, label, defaultColor, align = 'left' }: Colo
 
         <ColorPicker
           isOpen={activeColorPicker === colorKey && !useGlobalSettings}
-          selectedColor={overrides[colorKey] as HexColor}
+          selectedColor={displayColor as HexColor}
           onColorSelect={(color: HexColor) => handleColorChange(colorKey, color)}
           onClose={() => setActiveColorPicker(null)}
           onReset={() => handleColorChange(colorKey, globalSettings[colorKey] as HexColor)}

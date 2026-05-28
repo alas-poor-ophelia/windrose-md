@@ -26,7 +26,6 @@ import type { MapObject } from '#types/objects/object.types';
 import { axialToOffset, isWithinOffsetBounds } from '../../geometry/core/offsetCoordinates';
 import { calculateGridFromColumns, calculateGridFromMeasurement, measurementToHexSize, validateMeasurementSize, MEASUREMENT_CORNER } from '../../geometry/core/hexMeasurements';
 import { getDisplayNameFromPath } from '../../assets/imageOperations';
-import { resolveBackground, resolveGridLineColor } from '../../core/dmtConstants';
 
 
 // ===========================================
@@ -609,9 +608,9 @@ function buildInitialState(props: BuildInitialStateProps, globalSettings: Plugin
 
     useGlobalSettings: currentSettings?.useGlobalSettings ?? true,
     overrides: {
-      gridLineColor: resolveGridLineColor(o.gridLineColor ?? globalSettings.gridLineColor ?? '#666666'),
+      gridLineColor: o.gridLineColor ?? globalSettings.gridLineColor ?? '#666666',
       gridLineWidth: o.gridLineWidth ?? globalSettings.gridLineWidth ?? 1,
-      backgroundColor: resolveBackground(o.backgroundColor ?? globalSettings.backgroundColor ?? '#1a1a1a'),
+      backgroundColor: o.backgroundColor ?? globalSettings.backgroundColor ?? '#1a1a1a',
       borderColor: o.borderColor ?? globalSettings.borderColor ?? '#8b6842',
       coordinateKeyColor: o.coordinateKeyColor ?? globalSettings.coordinateKeyColor ?? '#c4a57b',
       coordinateTextColor: o.coordinateTextColor ?? globalSettings.coordinateTextColor ?? '#ffffff',
