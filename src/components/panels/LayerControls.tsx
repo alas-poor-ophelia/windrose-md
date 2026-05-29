@@ -48,6 +48,8 @@ export interface LayerControlsProps {
   sidebarCollapsed: boolean;
   /** Whether the layer controls panel is open */
   isOpen?: boolean;
+  /** Optional pop-out button rendered in panel header */
+  popoutButton?: VNode;
 }
 
 
@@ -66,7 +68,8 @@ const LayerControls = ({
   onEditLayer,
   onLayerClone,
   sidebarCollapsed,
-  isOpen = true
+  isOpen = true,
+  popoutButton
 }: LayerControlsProps): VNode => {
   const [expandedLayerId, setExpandedLayerId] = useState<string | null>(null);
   const [dragState, setDragState] = useState<DragState | null>(null);
@@ -383,13 +386,16 @@ const LayerControls = ({
           );
         })}
 
-        <button
-          className="windrose-layer-add-btn"
-          onClick={onLayerAdd}
-          title="Add new layer"
-        >
-          <Icon icon="lucide-plus" />
-        </button>
+        <div className="windrose-layer-controls-footer">
+          <button
+            className="windrose-layer-add-btn"
+            onClick={onLayerAdd}
+            title="Add new layer"
+          >
+            <Icon icon="lucide-plus" />
+          </button>
+          {popoutButton}
+        </div>
       </div>
   );
 };

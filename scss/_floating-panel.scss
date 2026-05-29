@@ -1,0 +1,163 @@
+/* ==========================================================================
+   Floating Panel System (dockable/pop-out panels for full-pane view)
+   ========================================================================== */
+.windrose-floating-panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 160px;
+  background: var(--windrose-bg-primary);
+  border: 1px solid oklch(from var(--windrose-border-primary) l c h / 0.6);
+  border-radius: 6px;
+  box-shadow:
+    0 4px 20px oklch(0% 0 0deg / 0.35),
+    0 1px 3px oklch(0% 0 0deg / 0.2);
+  overflow: hidden;
+  user-select: none;
+  touch-action: none;
+
+  &-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    background: oklch(from var(--windrose-border-primary) l c h / 0.15);
+    border-bottom: 1px solid oklch(from var(--windrose-border-primary) l c h / 0.3);
+    cursor: grab;
+
+    &:active {
+      cursor: grabbing;
+    }
+  }
+
+  &-title {
+    flex: 1;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--windrose-text-primary);
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    pointer-events: none;
+  }
+
+  &-actions {
+    display: flex;
+    gap: 2px;
+    flex-shrink: 0;
+  }
+
+  &-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: none;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--windrose-text-secondary);
+    cursor: pointer;
+    transition: var(--windrose-transition);
+
+    &:hover {
+      background: oklch(from var(--windrose-border-primary) l c h / 0.2);
+      color: var(--windrose-text-primary);
+    }
+  }
+
+  &-content {
+    overflow: auto;
+    max-height: calc(100vh - 100px);
+  }
+
+  &-resize-handle {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    width: 40px;
+    height: 40px;
+    cursor: nwse-resize;
+    z-index: 1;
+
+    &::before,
+    &::after {
+      content: '';
+      position: absolute;
+      border-right: 2px solid var(--windrose-text-muted);
+      border-bottom: 2px solid var(--windrose-text-muted);
+      opacity: 0.5;
+    }
+
+    &::before {
+      bottom: 5px;
+      right: 5px;
+      width: 8px;
+      height: 8px;
+    }
+
+    &::after {
+      bottom: 5px;
+      right: 5px;
+      width: 16px;
+      height: 16px;
+    }
+
+    &:hover {
+      &::before,
+      &::after {
+        opacity: 0.9;
+        border-color: var(--windrose-text-primary);
+      }
+    }
+  }
+}
+
+/* Pop-out button shown on docked panels in full-pane mode */
+.windrose-popout-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--windrose-text-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: var(--windrose-transition);
+
+  &:hover {
+    background: oklch(from var(--windrose-border-primary) l c h / 0.2);
+    color: var(--windrose-text-primary);
+    opacity: 1;
+  }
+}
+
+/* Show popout button on panel hover */
+.windrose-layer-controls:hover .windrose-popout-btn,
+.windrose-region-panel:hover .windrose-popout-btn {
+  opacity: 0.6;
+
+  &:hover {
+    opacity: 1;
+  }
+}
+
+/* Layer controls footer: add button + popout side by side */
+.windrose-layer-controls-footer {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Override docked styles when inside a floating panel */
+.windrose-floating-panel-content {
+  .windrose-layer-controls {
+    opacity: 1;
+    transform: none;
+    pointer-events: auto;
+    padding: 8px;
+  }
+}

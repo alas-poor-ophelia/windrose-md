@@ -38,6 +38,7 @@ import { ModalPortal } from './components/modals/ModalPortal';
 import { getActiveLayer, getLayerById } from './persistence/layerAccessor';
 import { setCell as accessorSetCell, removeCell as accessorRemoveCell, cellToPoint } from './geometry/core/cellAccessor';
 import { LayerControls } from './components/panels/LayerControls';
+import { FloatingPanel, PopoutButton } from './components/panels/FloatingPanel';
 import { RegionPanel } from './components/panels/RegionPanel';
 import { LayerEditModal } from './components/modals/LayerEditModal';
 import { openNativeCloneLayerModal, CloneLayerModal } from './components/modals/CloneLayerModal';
@@ -46,6 +47,7 @@ import { useCustomEventHandlers } from './hooks/interactions/useCustomEventHandl
 import { useKeyboardShortcuts } from './hooks/interactions/useKeyboardShortcuts';
 import { usePlayerFogClear } from './hooks/interactions/usePlayerFogClear';
 import { useUILayout } from './hooks/state/useUILayout';
+import { useFloatingPanels } from './hooks/state/useFloatingPanels';
 import { usePanelState } from './hooks/state/usePanelState';
 import { useViewControls } from './hooks/state/useViewControls';
 import { useTileBrush } from './hooks/state/useTileBrush';
@@ -126,6 +128,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     showRegionPanel, setShowRegionPanel,
     layerVisibility, handleToggleLayerVisibility
   } = useUILayout({ mapData, updateMapData });
+
+  const { isFloating, getZIndex, getInitialPosition, toggleFloat, bringToFront } = useFloatingPanels({ fullPane });
 
   // Adjacent sub-map visibility: persisted in global plugin settings
   const [showAdjacentSubMaps, setShowAdjacentSubMapsState] = useState(() =>
@@ -592,19 +596,31 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
           {/* Left side panels container — layers + regions stacked */}
           <div className={`windrose-left-panels ${mapData.sidebarCollapsed === true ? 'sidebar-closed' : 'sidebar-open'}`}>
             {/* Layer Controls Panel (Z-Layer System) */}
-            <LayerControls
-              mapData={mapData}
-              onLayerSelect={handleLayerSelect}
-              onLayerAdd={handleLayerAdd}
-              onLayerDelete={handleLayerDelete}
-              onLayerReorder={handleLayerReorder}
-              onToggleShowLayerBelow={handleToggleShowLayerBelow}
-              onSetLayerBelowOpacity={handleSetLayerBelowOpacity}
-              onEditLayer={setEditingLayerId}
-              onLayerClone={handleCloneLayerRequest}
-              sidebarCollapsed={mapData.sidebarCollapsed ?? false}
-              isOpen={showLayerPanel}
-            />
+            <FloatingPanel
+              title="Layers"
+              isFloating={isFloating('layers')}
+              onDock={() => toggleFloat('layers')}
+              onFocus={() => bringToFront('layers')}
+              zIndex={getZIndex('layers')}
+              initialPosition={getInitialPosition('layers')}
+              resizable
+              minSize={{ width: 140, height: 100 }}
+            >
+              <LayerControls
+                mapData={mapData}
+                onLayerSelect={handleLayerSelect}
+                onLayerAdd={handleLayerAdd}
+                onLayerDelete={handleLayerDelete}
+                onLayerReorder={handleLayerReorder}
+                onToggleShowLayerBelow={handleToggleShowLayerBelow}
+                onSetLayerBelowOpacity={handleSetLayerBelowOpacity}
+                onEditLayer={setEditingLayerId}
+                onLayerClone={handleCloneLayerRequest}
+                sidebarCollapsed={mapData.sidebarCollapsed ?? false}
+                isOpen={isFloating('layers') || showLayerPanel}
+                popoutButton={fullPane && !isFloating('layers') ? <PopoutButton onClick={(pos) => toggleFloat('layers', pos)} /> : undefined}
+              />
+            </FloatingPanel>
 
             {/* Region Panel (hex maps only) */}
             {mapData.mapType === 'hex' && (
