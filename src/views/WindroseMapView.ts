@@ -28,6 +28,18 @@ class WindroseMapView extends ItemView {
 
   async onOpen(): Promise<void> {
     this.contentEl.addClass('windrose-full-pane');
+    this.addAction('repeat', 'Switch grid/hex', () => {
+      if (this.mapType === 'grid') {
+        this.mapId = 'fullpane-hex-test';
+        this.mapName = 'Full Pane Hex Test';
+        this.mapType = 'hex';
+      } else {
+        this.mapId = 'fullpane-test';
+        this.mapName = 'Full Pane Test';
+        this.mapType = 'grid';
+      }
+      this.renderMap();
+    });
     this.renderMap();
   }
 

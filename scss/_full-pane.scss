@@ -16,3 +16,8 @@
   min-height: 0;
   position: relative;
 }
+
+/* Compass: no expand button in full-pane, so remove the upward offset */
+.windrose-full-pane .windrose-compass-animated {
+  transform: translateY(0);
+}

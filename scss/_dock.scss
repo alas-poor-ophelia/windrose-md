@@ -10,7 +10,7 @@
   flex-shrink: 0;
   height: 100%;
   background: var(--windrose-bg-primary);
-  border-left: 1px solid oklch(from var(--windrose-border-primary) l c h / 0.4);
+  border-left: 2px solid var(--windrose-border-primary);
   overflow-y: auto;
   overflow-x: hidden;
 }
@@ -434,5 +434,183 @@
     border-color: var(--windrose-text-secondary);
     color: var(--windrose-text-secondary);
     background: oklch(from var(--windrose-border-primary) l c h / 0.08);
+  }
+}
+
+/* ==========================================================================
+   Dock View Panel (zoom, visibility toggles, settings)
+   ========================================================================== */
+.windrose-dock-view {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Zoom row: - [100%] + */
+.windrose-dock-view-zoom {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background: oklch(from var(--windrose-border-primary) l c h / 0.06);
+  border-radius: 4px;
+  padding: 2px;
+}
+
+.windrose-dock-view-zoom-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--windrose-text-secondary);
+  cursor: pointer;
+  transition: var(--windrose-transition);
+
+  &:hover {
+    background: oklch(from var(--windrose-border-primary) l c h / 0.15);
+    color: var(--windrose-text-primary);
+  }
+}
+
+.windrose-dock-view-zoom-level {
+  flex: 1;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--windrose-text-primary);
+  user-select: none;
+}
+
+/* Section label */
+.windrose-dock-view-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.windrose-dock-view-section-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--windrose-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* Visibility toggle grid */
+.windrose-dock-view-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 2px;
+}
+
+.windrose-dock-view-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border: none;
+  border-radius: 3px;
+  background: oklch(from var(--windrose-border-primary) l c h / 0.08);
+  color: var(--windrose-text-secondary);
+  font-size: 10px;
+  cursor: pointer;
+  transition: var(--windrose-transition);
+  line-height: 0;
+
+  span {
+    line-height: normal;
+  }
+
+  &:hover {
+    background: oklch(from var(--windrose-border-primary) l c h / 0.18);
+    color: var(--windrose-text-primary);
+  }
+
+  &.off {
+    opacity: 0.4;
+    text-decoration: line-through;
+  }
+
+  &.active {
+    background: var(--windrose-border-primary);
+    color: var(--windrose-bg-primary);
+  }
+}
+
+/* Footer with settings button */
+.windrose-dock-view-footer {
+  padding-top: 4px;
+  border-top: 1px solid oklch(from var(--windrose-border-primary) l c h / 0.15);
+}
+
+.windrose-dock-view-settings {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 4px 8px;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--windrose-text-muted);
+  font-size: 11px;
+  cursor: pointer;
+  transition: var(--windrose-transition);
+  line-height: 0;
+
+  span {
+    line-height: normal;
+  }
+
+  &:hover {
+    background: oklch(from var(--windrose-border-primary) l c h / 0.12);
+    color: var(--windrose-text-secondary);
+  }
+}
+
+/* Tablet overrides for view panel buttons */
+.is-tablet button:is(
+  .windrose-dock-view-zoom-btn,
+  .windrose-dock-view-toggle,
+  .windrose-dock-view-settings
+) {
+  padding: 0;
+}
+
+.is-tablet button.windrose-dock-view-toggle {
+  padding: 3px 8px;
+}
+
+.is-tablet button.windrose-dock-view-settings {
+  padding: 4px 8px;
+}
+
+/* ==========================================================================
+   Dock Tile Browser overrides (strip standalone sidebar chrome)
+   ========================================================================== */
+.windrose-dock-right .windrose-tile-browser {
+  width: auto;
+  height: auto;
+  border-left: none;
+  background-color: transparent;
+  flex-shrink: 1;
+
+  .windrose-tile-browser-header {
+    display: none;
+  }
+
+  .windrose-tile-browser-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .windrose-tile-thumb {
+    width: auto;
+    height: auto;
   }
 }

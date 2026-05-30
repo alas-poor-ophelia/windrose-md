@@ -442,3 +442,43 @@ button.windrose-tile-browser-config-btn,
   font-size: 13px;
   padding: 6px 8px;
 }
+
+/* Empty state — no tilesets configured */
+.windrose-tile-browser-empty-state {
+  width: auto;
+  height: auto;
+  border-left: none;
+  background: transparent;
+}
+
+.windrose-tile-browser-empty-message {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 8px;
+  color: var(--windrose-text-muted);
+  font-size: 11px;
+  text-align: center;
+}
+
+.windrose-tile-browser-configure-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  border: 1px dashed oklch(from var(--windrose-border-primary) l c h / 0.3);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--windrose-text-muted);
+  font-size: 11px;
+  cursor: pointer;
+  transition: var(--windrose-transition);
+  margin-top: 4px;
+
+  &:hover {
+    border-color: var(--windrose-text-secondary);
+    color: var(--windrose-text-secondary);
+    background: oklch(from var(--windrose-border-primary) l c h / 0.08);
+  }
+}

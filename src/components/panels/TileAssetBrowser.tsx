@@ -175,6 +175,7 @@ interface TileAssetBrowserProps {
   getCachedImage?: (path: string) => HTMLImageElement | null;
   tilesetOverrides?: Record<string, TilesetOverrides>;
   onTilesetOverrideChange?: (tilesetId: string, overrides: TilesetOverrides) => void;
+  onSettingsClick?: () => void;
 }
 
 const ROTATION_STEPS = [0, 60, 120, 180, 240, 300];
@@ -203,6 +204,7 @@ const TileAssetBrowser = ({
   getCachedImage,
   tilesetOverrides,
   onTilesetOverrideChange,
+  onSettingsClick,
 }: TileAssetBrowserProps): VNode | null => {
   const app = useApp();
   const [activeTilesetIndex, setActiveTilesetIndex] = useState<number>(0);
@@ -353,7 +355,28 @@ const TileAssetBrowser = ({
     return groups;
   }, [filteredTiles]);
 
-  if (tilesets.length === 0) return null;
+  if (tilesets.length === 0) {
+    const openTilesetSettings = (): void => {
+      (app as any).setting.open();
+      (app as any).setting.openTabById('windrose-md');
+    };
+
+    return (
+      <div className="windrose-tile-browser windrose-tile-browser-empty-state">
+        <div className="windrose-tile-browser-empty-message">
+          <Icon icon="lucide-image" size={24} />
+          <span>No tilesets configured</span>
+          <button
+            className="windrose-tile-browser-configure-btn"
+            onClick={openTilesetSettings}
+          >
+            <Icon icon="lucide-settings" size={14} />
+            <span>Configure Tilesets</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (isCollapsed) {
     return (

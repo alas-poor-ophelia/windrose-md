@@ -26,7 +26,7 @@ function useTilesetBuilder(
   }, [mapData]);
 
   useEffect(() => {
-    const currentMapType = mapTypeRef.current;
+    const currentMapType = mapData?.mapType ?? mapTypeRef.current;
     if (currentMapType == null || currentMapType !== 'hex') return;
 
     const folders = getTilesetFolders().filter((f: string) => f.trim() !== '');
@@ -88,7 +88,7 @@ function useTilesetBuilder(
         });
       }
     })();
-  }, [isLoading, settingsVersion, app, setMapData]);
+  }, [isLoading, settingsVersion, app, setMapData, mapData?.mapType]);
 }
 
 export { useTilesetBuilder };

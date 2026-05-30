@@ -41,6 +41,7 @@ import { LayerControls } from './components/panels/LayerControls';
 import { FloatingPanel, PopoutButton } from './components/panels/FloatingPanel';
 import { DockPanel } from './components/panels/DockPanel';
 import { DockLayerList } from './components/panels/DockLayerList';
+import { DockViewPanel } from './components/panels/DockViewPanel';
 import { ColorPicker } from './components/shared/ColorPicker';
 import { RegionPanel } from './components/panels/RegionPanel';
 import { LayerEditModal } from './components/modals/LayerEditModal';
@@ -174,7 +175,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   // Use rootMapData for tileset check — tilesets are built from global settings and stored on root,
   // but sub-maps should also have access to tiles
   const availableTilesets = rootMapData?.tilesets || mapData?.tilesets || [];
-  const showTilePanel = mapData?.mapType === 'hex' && availableTilesets.length > 0;
+  const showTilePanel = mapData?.mapType === 'hex';
 
   // Image alignment mode (extracted to useAlignmentMode hook)
   const {
@@ -851,8 +852,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
             />
           </div>
 
-          {/* Tile Asset Browser (right sidebar, hex maps with tilesets only) */}
-          {showTilePanel && (
+          {/* Tile Asset Browser (right sidebar, hex maps with tilesets only — not in full-pane, dock has it) */}
+          {showTilePanel && !fullPane && (
             <TileAssetBrowser
               tilesets={availableTilesets}
               selectedTilesetId={selectedTilesetId}
@@ -882,6 +883,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                   tilesetOverrides: { ...prev.tilesetOverrides, [tilesetId]: overrides },
                 }));
               }}
+              onSettingsClick={handleSettingsClick}
             />
           )}
 
@@ -919,15 +921,56 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 />
               </DockPanel>
               <DockPanel title="View" defaultCollapsed>
-                <div style={{ padding: '8px', color: 'var(--windrose-text-muted)', fontSize: '11px' }}>
-                  Zoom, visibility, fog controls
-                </div>
+                <DockViewPanel
+                  currentZoom={mapData.viewState?.zoom ?? 1}
+                  onZoomIn={handleZoomIn}
+                  onZoomOut={handleZoomOut}
+                  layerVisibility={layerVisibility}
+                  onToggleLayer={handleToggleLayerVisibility}
+                  mapType={mapData.mapType}
+                  onSettingsClick={handleSettingsClick}
+                  fogOfWarState={currentFogState}
+                  onFogToolSelect={handleFogToolSelect}
+                  onFogVisibilityToggle={handleFogVisibilityToggle}
+                  onFogFillAll={handleFogFillAll}
+                  onFogClearAll={handleFogClearAll}
+                />
               </DockPanel>
-              <DockPanel title="Tiles" flexFill defaultCollapsed>
-                <div style={{ padding: '8px', color: 'var(--windrose-text-muted)', fontSize: '11px' }}>
-                  Tile browser will render here
-                </div>
-              </DockPanel>
+              {showTilePanel && (
+                <DockPanel title="Tiles" flexFill defaultCollapsed>
+                  <TileAssetBrowser
+                    tilesets={availableTilesets}
+                    selectedTilesetId={selectedTilesetId}
+                    selectedTileId={selectedTileId}
+                    onTileSelect={handleTileSelect}
+                    onTileDeselect={handleTileDeselect}
+                    onToolChange={setCurrentTool}
+                    isCollapsed={false}
+                    onCollapseChange={() => {}}
+                    rotation={tileRotation}
+                    flipH={tileFlipH}
+                    onRotationChange={setTileRotation}
+                    onFlipChange={setTileFlipH}
+                    tileLayer={tileLayer}
+                    onTileLayerChange={setTileLayer}
+                    tileFitMode={tileFitMode}
+                    onTileFitModeChange={setTileFitMode}
+                    stampMode={stampMode}
+                    onStampModeChange={setStampMode}
+                    tileScale={tileScale}
+                    onTileScaleChange={setTileScale}
+                    getCachedImage={getCachedImage}
+                    tilesetOverrides={mapData?.tilesetOverrides}
+                    onTilesetOverrideChange={(tilesetId: string, overrides: TilesetOverrides) => {
+                      updateMapData((prev: MapData) => ({
+                        ...prev,
+                        tilesetOverrides: { ...prev.tilesetOverrides, [tilesetId]: overrides },
+                      }));
+                    }}
+                    onSettingsClick={handleSettingsClick}
+                  />
+                </DockPanel>
+              )}
             </div>
           )}
         </div>
