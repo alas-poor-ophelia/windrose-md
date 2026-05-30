@@ -12,7 +12,7 @@ import type { Cell } from '#types/core/cell.types';
 import type { TilesetOverrides } from '#types/tiles/tile.types';
 import type { CustomColor } from '#types/core/common.types';
 
-import { useCallback, useEffect, useMemo, useState } from 'preact/hooks';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { useMapData } from './hooks/state/useMapData';
 import { useLayerHistory } from './hooks/state/useLayerHistory';
 import { useToolState } from './hooks/state/useToolState';
@@ -31,7 +31,7 @@ import { FogOfWarToolbar } from './components/toolbars/FogOfWarToolbar';
 import { MapSettingsModal } from './components/settings/MapSettingsModal';
 import { getTheme, getEffectiveSettings, getSettings } from './core/settingsAccessor';
 import { DEFAULTS } from './core/dmtConstants';
-import { getColorByHex, isDefaultColor } from './drawing/colorOperations';
+import { getColorByHex, isDefaultColor, DEFAULT_COLOR } from './drawing/colorOperations';
 import { ImageAlignmentMode } from './components/overlays/ImageAlignmentMode';
 import { useAlignmentMode } from './hooks/interactions/useAlignmentMode';
 import { ModalPortal } from './components/modals/ModalPortal';
@@ -39,6 +39,9 @@ import { getActiveLayer, getLayerById } from './persistence/layerAccessor';
 import { setCell as accessorSetCell, removeCell as accessorRemoveCell, cellToPoint } from './geometry/core/cellAccessor';
 import { LayerControls } from './components/panels/LayerControls';
 import { FloatingPanel, PopoutButton } from './components/panels/FloatingPanel';
+import { DockPanel } from './components/panels/DockPanel';
+import { DockLayerList } from './components/panels/DockLayerList';
+import { ColorPicker } from './components/shared/ColorPicker';
 import { RegionPanel } from './components/panels/RegionPanel';
 import { LayerEditModal } from './components/modals/LayerEditModal';
 import { openNativeCloneLayerModal, CloneLayerModal } from './components/modals/CloneLayerModal';
@@ -130,6 +133,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   } = useUILayout({ mapData, updateMapData });
 
   const { isFloating, getZIndex, getInitialPosition, toggleFloat, bringToFront } = useFloatingPanels({ fullPane });
+
+  const floatingPickerPendingRef = useRef<string | null>(null);
 
   // Adjacent sub-map visibility: persisted in global plugin settings
   const [showAdjacentSubMaps, setShowAdjacentSubMapsState] = useState(() =>
@@ -319,6 +324,22 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     handleOutlinesChange,
     handleShapeOverlaysChange
   } = useDataHandlers({ mapData, updateMapData, addToHistory, isApplyingHistory });
+
+  const handleColorPickerPopout = useCallback((pos: { x: number; y: number }) => {
+    toggleFloat('colorPicker', pos);
+    setIsColorPickerOpen(!isFloating('colorPicker'));
+  }, [toggleFloat, isFloating, setIsColorPickerOpen]);
+
+  const handleFloatingPickerClose = useCallback(() => {
+    if (floatingPickerPendingRef.current != null && floatingPickerPendingRef.current !== '') {
+      const colorValue = floatingPickerPendingRef.current;
+      handleAddCustomColor(colorValue);
+      setSelectedColor(colorValue);
+      floatingPickerPendingRef.current = null;
+    }
+    toggleFloat('colorPicker');
+    setIsColorPickerOpen(false);
+  }, [toggleFloat, setIsColorPickerOpen, handleAddCustomColor, setSelectedColor]);
 
   // Custom event listeners (sub-hex, deep links, regions, object links, hex context menu)
   useCustomEventHandlers({
@@ -544,7 +565,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
             onColorChange={setSelectedColor}
             selectedOpacity={selectedOpacity}
             onOpacityChange={handleOpacityChange}
-            isColorPickerOpen={isColorPickerOpen}
+            isColorPickerOpen={isColorPickerOpen || isFloating('colorPicker')}
             onColorPickerOpenChange={setIsColorPickerOpen}
             customColors={mapData.customColors ?? []}
             paletteColorOpacityOverrides={mapData.paletteColorOpacityOverrides || {}}
@@ -553,6 +574,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
             onUpdateColorOpacity={handleUpdateColorOpacity}
             mapType={mapData.mapType}
             isFocused={isFocused}
+            onColorBtnPopout={fullPane ? handleColorPickerPopout : undefined}
           />
 
           <VisibilityToolbar
@@ -632,6 +654,37 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               />
             )}
           </div>
+
+          {/* Floating Color Picker (full-pane mode only) */}
+          {isFloating('colorPicker') && (
+            <FloatingPanel
+              title="Color"
+              isFloating
+              onDock={handleFloatingPickerClose}
+              onFocus={() => bringToFront('colorPicker')}
+              zIndex={getZIndex('colorPicker')}
+              initialPosition={getInitialPosition('colorPicker')}
+              resizable
+              minSize={{ width: 200, height: 150 }}
+            >
+              <ColorPicker
+                isOpen
+                floatingMode
+                selectedColor={selectedColor}
+                onColorSelect={setSelectedColor}
+                onClose={handleFloatingPickerClose}
+                onReset={() => setSelectedColor(DEFAULT_COLOR)}
+                customColors={mapData.customColors ?? []}
+                paletteColorOpacityOverrides={mapData.paletteColorOpacityOverrides || {}}
+                onAddCustomColor={handleAddCustomColor}
+                onDeleteCustomColor={handleDeleteCustomColor}
+                onUpdateColorOpacity={handleUpdateColorOpacity}
+                pendingCustomColorRef={floatingPickerPendingRef}
+                opacity={selectedOpacity}
+                onOpacityChange={handleOpacityChange}
+              />
+            </FloatingPanel>
+          )}
 
           {/* For hex maps, override northDirection to 0 for rendering while keeping real value for compass display */}
           {/* This allows the compass to show and persist the north direction without actually rotating hex maps */}
@@ -830,6 +883,52 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 }));
               }}
             />
+          )}
+
+          {/* Right Dock Panel Column (full-pane mode only) */}
+          {fullPane && (
+            <div className="windrose-dock-right">
+              <DockPanel title="Layers">
+                <DockLayerList
+                  mapData={mapData}
+                  onLayerSelect={handleLayerSelect}
+                  onLayerAdd={handleLayerAdd}
+                  onLayerDelete={handleLayerDelete}
+                  onLayerReorder={handleLayerReorder}
+                  onToggleShowLayerBelow={handleToggleShowLayerBelow}
+                  onSetLayerBelowOpacity={handleSetLayerBelowOpacity}
+                  onEditLayer={setEditingLayerId}
+                  onLayerClone={handleCloneLayerRequest}
+                />
+              </DockPanel>
+              <DockPanel title="Colors">
+                <ColorPicker
+                  isOpen
+                  floatingMode
+                  selectedColor={selectedColor}
+                  onColorSelect={setSelectedColor}
+                  onClose={() => {}}
+                  onReset={() => setSelectedColor(DEFAULT_COLOR)}
+                  customColors={mapData.customColors ?? []}
+                  paletteColorOpacityOverrides={mapData.paletteColorOpacityOverrides || {}}
+                  onAddCustomColor={handleAddCustomColor}
+                  onDeleteCustomColor={handleDeleteCustomColor}
+                  onUpdateColorOpacity={handleUpdateColorOpacity}
+                  opacity={selectedOpacity}
+                  onOpacityChange={handleOpacityChange}
+                />
+              </DockPanel>
+              <DockPanel title="View" defaultCollapsed>
+                <div style={{ padding: '8px', color: 'var(--windrose-text-muted)', fontSize: '11px' }}>
+                  Zoom, visibility, fog controls
+                </div>
+              </DockPanel>
+              <DockPanel title="Tiles" flexFill defaultCollapsed>
+                <div style={{ padding: '8px', color: 'var(--windrose-text-muted)', fontSize: '11px' }}>
+                  Tile browser will render here
+                </div>
+              </DockPanel>
+            </div>
           )}
         </div>
 

@@ -6232,6 +6232,427 @@ button.windrose-breadcrumb-link {
   pointer-events: auto;
   padding: 8px;
 }
+.windrose-floating-panel-content {
+  /* Color picker in floating mode: strip chrome that FloatingPanel provides */
+}
+.windrose-floating-panel-content .windrose-color-picker-floating {
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  z-index: auto;
+  padding: 8px;
+}
+
+/* ==========================================================================
+   Right Dock Panel System (full-pane Photoshop-style layout)
+   ========================================================================== */
+/* Dock container — right-side column for stacked panels */
+.windrose-dock-right {
+  display: flex;
+  flex-direction: column;
+  width: 240px;
+  flex-shrink: 0;
+  height: 100%;
+  background: var(--windrose-bg-primary);
+  border-left: 1px solid oklch(from var(--windrose-border-primary) l c h/0.4);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* Individual dock panel */
+.windrose-dock-panel {
+  display: flex;
+  flex-direction: column;
+  border-bottom: 1px solid oklch(from var(--windrose-border-primary) l c h/0.3);
+  min-height: 0;
+  /* Panel that absorbs remaining vertical space */
+}
+.windrose-dock-panel-fill {
+  flex: 1;
+  min-height: 120px;
+}
+.windrose-dock-panel-collapsed {
+  flex: 0 0 auto;
+}
+.windrose-dock-panel {
+  /* Panel header — clickable collapse toggle */
+}
+.windrose-dock-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 8px;
+  background: oklch(from var(--windrose-border-primary) l c h/0.08);
+  cursor: pointer;
+  user-select: none;
+  flex-shrink: 0;
+}
+.windrose-dock-panel-header:hover {
+  background: oklch(from var(--windrose-border-primary) l c h/0.15);
+}
+.windrose-dock-panel {
+  /* Collapse chevron */
+}
+.windrose-dock-panel-chevron {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  color: var(--windrose-text-muted);
+  transition: transform 0.15s ease;
+}
+.windrose-dock-panel-chevron.collapsed {
+  transform: rotate(-90deg);
+}
+.windrose-dock-panel {
+  /* Panel title */
+}
+.windrose-dock-panel-title {
+  flex: 1;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--windrose-text-secondary);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.windrose-dock-panel {
+  /* Undock button */
+}
+.windrose-dock-panel-undock {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--windrose-text-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: var(--windrose-transition);
+}
+.windrose-dock-panel-undock:hover {
+  background: oklch(from var(--windrose-border-primary) l c h/0.2);
+  color: var(--windrose-text-primary);
+}
+.windrose-dock-panel {
+  /* Show undock button on panel hover */
+}
+.windrose-dock-panel:hover .windrose-dock-panel-undock {
+  opacity: 0.6;
+}
+.windrose-dock-panel:hover .windrose-dock-panel-undock:hover {
+  opacity: 1;
+}
+.windrose-dock-panel {
+  /* Panel body — scrollable content area */
+}
+.windrose-dock-panel-body {
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 6px;
+}
+.windrose-dock-panel {
+  /* Fill panels get scrollable body that fills remaining space */
+}
+.windrose-dock-panel-fill .windrose-dock-panel-body {
+  flex: 1;
+  min-height: 0;
+}
+
+/* ==========================================================================
+   Dock Layer List (row-based layer panel for dock)
+   ========================================================================== */
+.windrose-dock-layers {
+  display: flex;
+  flex-direction: column;
+}
+
+.windrose-dock-layer-row {
+  border-bottom: 1px solid oklch(from var(--windrose-border-primary) l c h/0.15);
+  cursor: pointer;
+  transition: background 0.1s ease;
+}
+.windrose-dock-layer-row:hover {
+  background: oklch(from var(--windrose-border-primary) l c h/0.08);
+}
+.windrose-dock-layer-row.active {
+  background: oklch(from var(--windrose-border-primary) l c h/0.15);
+  border-left: 2px solid var(--windrose-text-primary);
+}
+.windrose-dock-layer-row.active .windrose-dock-layer-name {
+  color: var(--windrose-text-primary);
+  font-weight: 600;
+}
+.windrose-dock-layer-row.dragging {
+  opacity: 0.4;
+}
+.windrose-dock-layer-row.drag-over {
+  border-top: 2px solid var(--windrose-text-primary);
+}
+
+.windrose-dock-layer-main {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 6px;
+  min-height: 30px;
+}
+
+.windrose-dock-layer-grip {
+  display: flex;
+  align-items: center;
+  color: var(--windrose-text-muted);
+  cursor: grab;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  flex-shrink: 0;
+}
+.windrose-dock-layer-row:hover .windrose-dock-layer-grip {
+  opacity: 0.5;
+}
+.windrose-dock-layer-grip:active {
+  cursor: grabbing;
+}
+
+.windrose-dock-layer-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  font-size: 12px;
+  flex-shrink: 0;
+  color: var(--windrose-text-secondary);
+}
+.windrose-dock-layer-icon.ra {
+  font-family: "rpg-awesome-windrose";
+}
+
+.windrose-dock-layer-name {
+  flex: 1;
+  font-size: 12px;
+  color: var(--windrose-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.windrose-dock-layer-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 3px;
+  line-height: 0;
+}
+.windrose-dock-layer-action svg {
+  display: block;
+}
+.windrose-dock-layer-action {
+  background: transparent;
+  color: var(--windrose-text-muted);
+  cursor: pointer;
+  opacity: 0;
+  flex-shrink: 0;
+  transition: var(--windrose-transition);
+}
+.windrose-dock-layer-row:hover .windrose-dock-layer-action {
+  opacity: 0.5;
+}
+.windrose-dock-layer-action:hover {
+  background: oklch(from var(--windrose-border-primary) l c h/0.2);
+  color: var(--windrose-text-primary);
+  opacity: 1 !important;
+}
+.windrose-dock-layer-action.active {
+  opacity: 0.8;
+  color: var(--windrose-text-primary);
+}
+.windrose-dock-layer-row:hover .windrose-dock-layer-action.active {
+  opacity: 1;
+}
+.windrose-dock-layer-action.transparency.active {
+  color: oklch(75% 0.15 200deg);
+}
+
+/* Expanded actions sub-row */
+.windrose-dock-layer-expanded {
+  padding: 4px 6px 6px 28px;
+  border-top: 1px solid oklch(from var(--windrose-border-primary) l c h/0.1);
+  background: oklch(from var(--windrose-border-primary) l c h/0.05);
+}
+
+.windrose-dock-layer-actions {
+  display: flex;
+  gap: 2px;
+}
+
+.windrose-dock-layer-action-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--windrose-text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+  transition: var(--windrose-transition);
+}
+.windrose-dock-layer-action-btn:hover {
+  background: oklch(from var(--windrose-border-primary) l c h/0.2);
+  color: var(--windrose-text-primary);
+}
+.windrose-dock-layer-action-btn.delete:hover {
+  background: oklch(45% 0.15 25deg / 0.3);
+  color: oklch(75% 0.15 25deg);
+}
+
+/* Opacity slider in expanded row */
+.windrose-dock-layer-opacity {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  padding-top: 4px;
+}
+.windrose-dock-layer-opacity-label {
+  font-size: 10px;
+  color: var(--windrose-text-muted);
+  white-space: nowrap;
+}
+.windrose-dock-layer-opacity input[type=range] {
+  flex: 1;
+  height: 3px;
+  min-width: 0;
+}
+.windrose-dock-layer-opacity-value {
+  font-size: 10px;
+  color: var(--windrose-text-muted);
+  min-width: 28px;
+  text-align: right;
+}
+
+/* ==========================================================================
+   Dock Color Picker overrides (narrower grid for 240px dock)
+   ========================================================================== */
+.windrose-dock-right .windrose-color-picker {
+  padding: 2px 6px;
+  min-width: 0;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  z-index: auto;
+  animation: none;
+}
+.windrose-dock-right .windrose-color-picker .windrose-color-grid {
+  grid-template-columns: repeat(6, 34px);
+  gap: 4px;
+}
+.windrose-dock-right .windrose-color-picker .windrose-color-swatch {
+  width: 34px;
+  height: 34px;
+}
+.windrose-dock-right .windrose-color-picker .windrose-color-edit-panel {
+  left: auto;
+  right: calc(100% + 4px);
+}
+.windrose-dock-right .windrose-color-picker {
+  /* Flatten opacity into single compact row: Label ──── Value */
+}
+.windrose-dock-right .windrose-color-picker .windrose-color-opacity-section {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid oklch(from var(--windrose-border-primary) l c h/0.2);
+}
+.windrose-dock-right .windrose-color-picker .windrose-color-opacity-header {
+  display: contents;
+}
+.windrose-dock-right .windrose-color-picker .windrose-color-opacity-label {
+  font-size: 10px;
+  color: var(--windrose-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  margin-bottom: 0;
+}
+.windrose-dock-right .windrose-color-picker .windrose-color-opacity-value {
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  min-width: 28px;
+}
+.windrose-dock-right .windrose-color-picker .windrose-color-opacity-slider {
+  flex: 1;
+  min-width: 0;
+  height: 3px;
+}
+.windrose-dock-right .windrose-color-picker .windrose-color-opacity-slider::-webkit-slider-thumb {
+  width: 10px;
+  height: 10px;
+  border-width: 1px;
+}
+.windrose-dock-right .windrose-color-picker .windrose-color-opacity-slider::-moz-range-thumb {
+  width: 10px;
+  height: 10px;
+  border-width: 1px;
+}
+
+/* Add layer footer */
+.windrose-dock-layer-footer {
+  padding: 4px 6px;
+}
+
+/* Tablet override: Obsidian .is-tablet injects padding: 4px 20px on all buttons */
+.is-tablet button:is(.windrose-dock-panel-undock,
+.windrose-dock-layer-action,
+.windrose-dock-layer-action-btn,
+.windrose-dock-layer-add) {
+  padding: 0;
+}
+
+.is-tablet .windrose-dock-right button.windrose-color-swatch {
+  padding: 0;
+}
+
+.is-tablet button.windrose-dock-layer-action-btn {
+  padding: 3px 8px;
+}
+
+.is-tablet button.windrose-dock-layer-add {
+  padding: 4px 8px;
+}
+
+.windrose-dock-layer-add {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 4px 8px;
+  border: 1px dashed oklch(from var(--windrose-border-primary) l c h/0.3);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--windrose-text-muted);
+  font-size: 11px;
+  cursor: pointer;
+  transition: var(--windrose-transition);
+}
+.windrose-dock-layer-add:hover {
+  border-color: var(--windrose-text-secondary);
+  color: var(--windrose-text-secondary);
+  background: oklch(from var(--windrose-border-primary) l c h/0.08);
+}
 
 /* ============================================
    PHASE 1.5: SCROLL MARGIN FOR ANCHOR NAVIGATION

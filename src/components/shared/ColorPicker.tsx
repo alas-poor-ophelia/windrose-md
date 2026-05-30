@@ -77,6 +77,8 @@ export interface ColorPickerProps {
   portalled?: boolean;
   /** Anchor element for portalled positioning */
   anchorRef?: { current: HTMLElement | null };
+  /** Floating panel mode: no overlay, no positioning, no header */
+  floatingMode?: boolean;
 }
 
 const ColorPicker = ({
@@ -97,7 +99,8 @@ const ColorPicker = ({
   opacity = 1,
   onOpacityChange = null,
   portalled = false,
-  anchorRef
+  anchorRef,
+  floatingMode = false
 }: ColorPickerProps): VNode | null => {
   const [editTargetId, setEditTargetId] = useState<string | null>(null);
   const [editingOpacity, setEditingOpacity] = useState(1);
@@ -277,16 +280,11 @@ const ColorPicker = ({
     ? { right: '0', left: 'auto' }
     : { left: '0' };
 
-  let pickerStyle: JSX.CSSProperties = {
-    position: 'absolute',
-    ...(position === 'above'
-      ? { bottom: 'calc(100% + 8px)', top: 'auto' }
-      : { top: 'calc(100% + 8px)' }
-    ),
-    ...horizontalStyle
-  };
+  let pickerStyle: JSX.CSSProperties;
 
-  if (portalled && anchorRef?.current) {
+  if (floatingMode) {
+    pickerStyle = {};
+  } else if (portalled && anchorRef?.current) {
     const rect = anchorRef.current.getBoundingClientRect();
     const gap = 8;
     pickerStyle = {
@@ -297,11 +295,20 @@ const ColorPicker = ({
         : { top: `${rect.bottom + gap}px` }
       )
     };
+  } else {
+    pickerStyle = {
+      position: 'absolute',
+      ...(position === 'above'
+        ? { bottom: 'calc(100% + 8px)', top: 'auto' }
+        : { top: 'calc(100% + 8px)' }
+      ),
+      ...horizontalStyle
+    };
   }
 
   const pickerEl = (
     <div
-      className="windrose-color-picker"
+      className={`windrose-color-picker${floatingMode ? ' windrose-color-picker-floating' : ''}`}
       onClick={handlePickerClick}
       onMouseDown={handlePickerMouseDown}
       onTouchStart={handlePickerTouch}
@@ -309,9 +316,11 @@ const ColorPicker = ({
       onTouchEnd={handlePickerTouch}
       style={pickerStyle}
     >
-      <div className="windrose-color-picker-header">
-        <span className="windrose-color-picker-title">{title}</span>
-      </div>
+      {!floatingMode && (
+        <div className="windrose-color-picker-header">
+          <span className="windrose-color-picker-title">{title}</span>
+        </div>
+      )}
 
       <div className="windrose-color-grid">
         {allColors.map(colorDef => {
@@ -435,6 +444,9 @@ const ColorPicker = ({
     />
   );
 
+  if (floatingMode) {
+    return pickerEl;
+  }
   if (portalled) {
     return <ModalPortal><Fragment>{overlayEl}{pickerEl}</Fragment></ModalPortal>;
   }

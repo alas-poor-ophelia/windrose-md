@@ -1,0 +1,438 @@
+/* ==========================================================================
+   Right Dock Panel System (full-pane Photoshop-style layout)
+   ========================================================================== */
+
+/* Dock container — right-side column for stacked panels */
+.windrose-dock-right {
+  display: flex;
+  flex-direction: column;
+  width: 240px;
+  flex-shrink: 0;
+  height: 100%;
+  background: var(--windrose-bg-primary);
+  border-left: 1px solid oklch(from var(--windrose-border-primary) l c h / 0.4);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* Individual dock panel */
+.windrose-dock-panel {
+  display: flex;
+  flex-direction: column;
+  border-bottom: 1px solid oklch(from var(--windrose-border-primary) l c h / 0.3);
+  min-height: 0;
+
+  /* Panel that absorbs remaining vertical space */
+  &-fill {
+    flex: 1;
+    min-height: 120px;
+  }
+
+  &-collapsed {
+    flex: 0 0 auto;
+  }
+
+  /* Panel header — clickable collapse toggle */
+  &-header {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 8px;
+    background: oklch(from var(--windrose-border-primary) l c h / 0.08);
+    cursor: pointer;
+    user-select: none;
+    flex-shrink: 0;
+
+    &:hover {
+      background: oklch(from var(--windrose-border-primary) l c h / 0.15);
+    }
+  }
+
+  /* Collapse chevron */
+  &-chevron {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    color: var(--windrose-text-muted);
+    transition: transform 0.15s ease;
+
+    &.collapsed {
+      transform: rotate(-90deg);
+    }
+  }
+
+  /* Panel title */
+  &-title {
+    flex: 1;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--windrose-text-secondary);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  /* Undock button */
+  &-undock {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: none;
+    border-radius: 3px;
+    background: transparent;
+    color: var(--windrose-text-muted);
+    cursor: pointer;
+    opacity: 0;
+    transition: var(--windrose-transition);
+
+    &:hover {
+      background: oklch(from var(--windrose-border-primary) l c h / 0.2);
+      color: var(--windrose-text-primary);
+    }
+  }
+
+  /* Show undock button on panel hover */
+  &:hover &-undock {
+    opacity: 0.6;
+
+    &:hover {
+      opacity: 1;
+    }
+  }
+
+  /* Panel body — scrollable content area */
+  &-body {
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 6px;
+  }
+
+  /* Fill panels get scrollable body that fills remaining space */
+  &-fill &-body {
+    flex: 1;
+    min-height: 0;
+  }
+}
+
+/* ==========================================================================
+   Dock Layer List (row-based layer panel for dock)
+   ========================================================================== */
+.windrose-dock-layers {
+  display: flex;
+  flex-direction: column;
+}
+
+.windrose-dock-layer-row {
+  border-bottom: 1px solid oklch(from var(--windrose-border-primary) l c h / 0.15);
+  cursor: pointer;
+  transition: background 0.1s ease;
+
+  &:hover {
+    background: oklch(from var(--windrose-border-primary) l c h / 0.08);
+  }
+
+  &.active {
+    background: oklch(from var(--windrose-border-primary) l c h / 0.15);
+    border-left: 2px solid var(--windrose-text-primary);
+
+    .windrose-dock-layer-name {
+      color: var(--windrose-text-primary);
+      font-weight: 600;
+    }
+  }
+
+  &.dragging {
+    opacity: 0.4;
+  }
+
+  &.drag-over {
+    border-top: 2px solid var(--windrose-text-primary);
+  }
+}
+
+.windrose-dock-layer-main {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 6px;
+  min-height: 30px;
+}
+
+.windrose-dock-layer-grip {
+  display: flex;
+  align-items: center;
+  color: var(--windrose-text-muted);
+  cursor: grab;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  flex-shrink: 0;
+
+  .windrose-dock-layer-row:hover & {
+    opacity: 0.5;
+  }
+
+  &:active {
+    cursor: grabbing;
+  }
+}
+
+.windrose-dock-layer-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  font-size: 12px;
+  flex-shrink: 0;
+  color: var(--windrose-text-secondary);
+
+  &.ra {
+    font-family: 'rpg-awesome-windrose';
+  }
+}
+
+.windrose-dock-layer-name {
+  flex: 1;
+  font-size: 12px;
+  color: var(--windrose-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.windrose-dock-layer-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 3px;
+  line-height: 0;
+
+  svg {
+    display: block;
+  }
+  background: transparent;
+  color: var(--windrose-text-muted);
+  cursor: pointer;
+  opacity: 0;
+  flex-shrink: 0;
+  transition: var(--windrose-transition);
+
+  .windrose-dock-layer-row:hover & {
+    opacity: 0.5;
+  }
+
+  &:hover {
+    background: oklch(from var(--windrose-border-primary) l c h / 0.2);
+    color: var(--windrose-text-primary);
+    opacity: 1 !important;
+  }
+
+  &.active {
+    opacity: 0.8;
+    color: var(--windrose-text-primary);
+
+    .windrose-dock-layer-row:hover & {
+      opacity: 1;
+    }
+  }
+
+  &.transparency.active {
+    color: oklch(0.75 0.15 200deg);
+  }
+}
+
+/* Expanded actions sub-row */
+.windrose-dock-layer-expanded {
+  padding: 4px 6px 6px 28px;
+  border-top: 1px solid oklch(from var(--windrose-border-primary) l c h / 0.1);
+  background: oklch(from var(--windrose-border-primary) l c h / 0.05);
+}
+
+.windrose-dock-layer-actions {
+  display: flex;
+  gap: 2px;
+}
+
+.windrose-dock-layer-action-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--windrose-text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+  transition: var(--windrose-transition);
+
+  &:hover {
+    background: oklch(from var(--windrose-border-primary) l c h / 0.2);
+    color: var(--windrose-text-primary);
+  }
+
+  &.delete:hover {
+    background: oklch(0.45 0.15 25deg / 0.3);
+    color: oklch(0.75 0.15 25deg);
+  }
+}
+
+/* Opacity slider in expanded row */
+.windrose-dock-layer-opacity {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  padding-top: 4px;
+
+  &-label {
+    font-size: 10px;
+    color: var(--windrose-text-muted);
+    white-space: nowrap;
+  }
+
+  input[type="range"] {
+    flex: 1;
+    height: 3px;
+    min-width: 0;
+  }
+
+  &-value {
+    font-size: 10px;
+    color: var(--windrose-text-muted);
+    min-width: 28px;
+    text-align: right;
+  }
+}
+
+/* ==========================================================================
+   Dock Color Picker overrides (narrower grid for 240px dock)
+   ========================================================================== */
+.windrose-dock-right .windrose-color-picker {
+  padding: 2px 6px;
+  min-width: 0;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  z-index: auto;
+  animation: none;
+
+  .windrose-color-grid {
+    grid-template-columns: repeat(6, 34px);
+    gap: 4px;
+  }
+
+  .windrose-color-swatch {
+    width: 34px;
+    height: 34px;
+  }
+
+  .windrose-color-edit-panel {
+    left: auto;
+    right: calc(100% + 4px);
+  }
+
+  /* Flatten opacity into single compact row: Label ──── Value */
+  .windrose-color-opacity-section {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid oklch(from var(--windrose-border-primary) l c h / 0.2);
+  }
+
+  .windrose-color-opacity-header {
+    display: contents;
+  }
+
+  .windrose-color-opacity-label {
+    font-size: 10px;
+    color: var(--windrose-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+    margin-bottom: 0;
+  }
+
+  .windrose-color-opacity-value {
+    font-size: 10px;
+    font-variant-numeric: tabular-nums;
+    min-width: 28px;
+  }
+
+  .windrose-color-opacity-slider {
+    flex: 1;
+    min-width: 0;
+    height: 3px;
+
+    &::-webkit-slider-thumb {
+      width: 10px;
+      height: 10px;
+      border-width: 1px;
+    }
+
+    &::-moz-range-thumb {
+      width: 10px;
+      height: 10px;
+      border-width: 1px;
+    }
+  }
+}
+
+/* Add layer footer */
+.windrose-dock-layer-footer {
+  padding: 4px 6px;
+}
+
+/* Tablet override: Obsidian .is-tablet injects padding: 4px 20px on all buttons */
+.is-tablet button:is(
+  .windrose-dock-panel-undock,
+  .windrose-dock-layer-action,
+  .windrose-dock-layer-action-btn,
+  .windrose-dock-layer-add
+) {
+  padding: 0;
+}
+
+.is-tablet .windrose-dock-right button.windrose-color-swatch {
+  padding: 0;
+}
+
+.is-tablet button.windrose-dock-layer-action-btn {
+  padding: 3px 8px;
+}
+
+.is-tablet button.windrose-dock-layer-add {
+  padding: 4px 8px;
+}
+
+.windrose-dock-layer-add {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 4px 8px;
+  border: 1px dashed oklch(from var(--windrose-border-primary) l c h / 0.3);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--windrose-text-muted);
+  font-size: 11px;
+  cursor: pointer;
+  transition: var(--windrose-transition);
+
+  &:hover {
+    border-color: var(--windrose-text-secondary);
+    color: var(--windrose-text-secondary);
+    background: oklch(from var(--windrose-border-primary) l c h / 0.08);
+  }
+}

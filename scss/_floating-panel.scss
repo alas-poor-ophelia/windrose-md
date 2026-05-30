@@ -160,4 +160,13 @@
     pointer-events: auto;
     padding: 8px;
   }
+
+  /* Color picker in floating mode: strip chrome that FloatingPanel provides */
+  .windrose-color-picker-floating {
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    z-index: auto;
+    padding: 8px;
+  }
 }

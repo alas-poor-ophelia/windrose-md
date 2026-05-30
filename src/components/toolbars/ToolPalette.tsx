@@ -109,6 +109,8 @@ export interface ToolPaletteProps {
   onUpdateColorOpacity?: (colorId: string, opacity: number) => void;
   mapType: MapType;
   isFocused?: boolean;
+  /** When provided, color button opens floating panel instead of inline picker */
+  onColorBtnPopout?: (position: { x: number; y: number }) => void;
 }
 
 const SubMenuFlyout = ({ subTools, currentSubTool, onSelect, onClose }: SubMenuFlyoutProps): VNode => {
@@ -358,7 +360,8 @@ const ToolPalette = ({
   onDeleteCustomColor,
   onUpdateColorOpacity,
   mapType,
-  isFocused = false
+  isFocused = false,
+  onColorBtnPopout
 }: ToolPaletteProps): VNode => {
   const colorBtnRef = useRef<HTMLButtonElement>(null);
   const pendingCustomColorRef = useRef<HexColor | null>(null);
@@ -435,6 +438,11 @@ const ToolPalette = ({
 
   const toggleColorPicker = (e: JSX.TargetedMouseEvent<HTMLButtonElement>): void => {
     e.stopPropagation();
+    if (onColorBtnPopout) {
+      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+      onColorBtnPopout({ x: rect.left, y: rect.top });
+      return;
+    }
     onColorPickerOpenChange(!isColorPickerOpen);
   };
 
@@ -512,7 +520,7 @@ const ToolPalette = ({
         </button>
 
         <ColorPicker
-          isOpen={isColorPickerOpen}
+          isOpen={isColorPickerOpen && !onColorBtnPopout}
           selectedColor={selectedColor}
           onColorSelect={onColorChange}
           onClose={handleCloseColorPicker}
