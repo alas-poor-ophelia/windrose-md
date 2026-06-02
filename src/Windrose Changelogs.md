@@ -608,6 +608,26 @@ That is also now linked from the top of the README, just so it’s findable. I�
 - Fixed some UI bugs with the Map Settings modal
 - Reverted out the non-functional fix for the Color Palette automatically closing itself right after it opened on Linux, as that didn’t fix the bug, and introduced a new issue where the Color Palette couldn’t be closed by clicking outside of it. You can now once again close the palette by clicking outside of it.
 
+## Version 2.0.0-preview2
+
+This release adds a new full-pane map view for working with maps outside of note embeds, complete with a Photoshop-style dockable panel system.
+
+### New Features
+- **Full-pane map view** — Open any map as a full Obsidian tab via the compass ribbon icon or the "Open map in full pane" command. The canvas fills the entire content area with no fixed-height constraints.
+  - **Dockable panel system** — Right-side dock with collapsible panels that can be popped out into floating, draggable windows. Float/position state persists across reloads.
+    - **Layers** — Row-based layer list with inline rename, visibility toggle, delete, and expand-to-edit. Drag reorder support.
+    - **Colors** — Swatch grid with opacity slider. Color button in tool palette redirects to floating picker.
+    - **View controls** — Zoom, layer visibility toggles, fog of war tools (paint/erase/rect/fill/clear).
+    - **Tile browser** — Embedded tile asset browser with empty-state UI and configure button.
+  - **Map picker** — Header dropdown to switch between all maps without leaving the view.
+- **Insert Map modal** — The "Insert new map" command is now "Insert map." The modal shows existing maps on top for quick code block insertion, with the create-new section below.
+
+### Improvements
+- Map name from code block YAML now applies as a fallback for maps that don't have a stored name.
+
+### Bug Fixes
+- **Theme color corruption** — Grid line and background colors were being permanently corrupted when switching themes. The resolve functions were called in the write path, persisting theme-specific values to disk. Now stores raw sentinel values and resolves only for display.
+
 ## Version 2.0.0-preview — Standalone Plugin
 
 Windrose MapDesigner is now a standalone Obsidian Community Plugin. No more Datacore dependency — just install and go. This release represents a ground-up conversion of the entire codebase while preserving every feature from v1.7.0.
