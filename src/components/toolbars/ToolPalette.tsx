@@ -4,7 +4,7 @@
  * Tool selection palette with sub-tool menus, history controls, and color picker.
  */
 
-import type { JSX, VNode } from 'preact';
+import type { ComponentChildren, JSX, VNode } from 'preact';
 import type { HexColor } from '#types/core/common.types';
 import type { MapType } from '#types/core/map.types';
 import type { ToolId } from '#types/tools/tool.types';
@@ -111,6 +111,8 @@ export interface ToolPaletteProps {
   isFocused?: boolean;
   /** When provided, color button opens floating panel instead of inline picker */
   onColorBtnPopout?: (position: { x: number; y: number }) => void;
+  /** Dock/undock button rendered at the end of the toolbar */
+  dockButton?: ComponentChildren;
 }
 
 const SubMenuFlyout = ({ subTools, currentSubTool, onSelect, onClose }: SubMenuFlyoutProps): VNode => {
@@ -361,7 +363,8 @@ const ToolPalette = ({
   onUpdateColorOpacity,
   mapType,
   isFocused = false,
-  onColorBtnPopout
+  onColorBtnPopout,
+  dockButton
 }: ToolPaletteProps): VNode => {
   const colorBtnRef = useRef<HTMLButtonElement>(null);
   const pendingCustomColorRef = useRef<HexColor | null>(null);
@@ -586,6 +589,13 @@ const ToolPalette = ({
           <Icon icon="lucide-redo" />
         </button>
       </div>
+
+      {dockButton && (
+        <>
+          <div className="windrose-tool-palette-separator" />
+          {dockButton}
+        </>
+      )}
     </div>
   );
 };

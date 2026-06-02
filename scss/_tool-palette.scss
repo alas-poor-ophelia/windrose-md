@@ -200,3 +200,37 @@
     }
   }
 }
+
+/* Separator before dock/undock button — pushes to far right when docked */
+.windrose-tool-palette-separator {
+  width: 1px;
+  height: 20px;
+  background: oklch(from var(--windrose-border-primary) l c h / 0.3);
+  margin: 0 2px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+/* Keep separator tight in floating panel */
+.windrose-floating-panel-content .windrose-tool-palette .windrose-tool-palette-separator {
+  margin-left: 2px;
+}
+
+/* Dock/undock button in tool row */
+.windrose-tool-palette-dock-btn {
+  opacity: 0.5;
+  transition: var(--windrose-transition);
+
+  &:hover {
+    opacity: 1;
+  }
+}
+
+/* Strip tool palette chrome when inside a floating panel */
+.windrose-floating-panel-content .windrose-tool-palette {
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  margin-bottom: 0;
+  background: transparent;
+}

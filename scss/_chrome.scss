@@ -18,6 +18,49 @@
   }
 }
 
+.windrose-map-picker {
+  background: var(--windrose-bg-secondary);
+  border: 1px solid var(--windrose-border-secondary);
+  border-radius: 4px;
+  color: var(--windrose-text-primary);
+  font-size: 13px;
+  padding: 4px 8px;
+  margin-right: 8px;
+  max-width: 200px;
+  cursor: pointer;
+  flex-shrink: 0;
+
+  &:focus {
+    border-color: var(--windrose-border-primary);
+    outline: none;
+  }
+}
+
+.windrose-header-action-btn {
+  background: transparent;
+  border: 1px solid var(--windrose-border-secondary);
+  border-radius: 4px;
+  color: var(--windrose-text-disabled);
+  cursor: pointer;
+  padding: 4px 6px;
+  height: 28px;
+  width: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--windrose-transition);
+
+  svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  &:hover {
+    color: var(--windrose-text-primary);
+    border-color: var(--windrose-border-primary);
+  }
+}
+
 .windrose-map-name {
   background: transparent;
   border: none;

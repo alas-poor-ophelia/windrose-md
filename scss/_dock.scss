@@ -56,7 +56,12 @@
     width: 16px;
     height: 16px;
     color: var(--windrose-text-muted);
+    line-height: 0;
     transition: transform 0.15s ease;
+
+    svg {
+      display: block;
+    }
 
     &.collapsed {
       transform: rotate(-90deg);
@@ -86,8 +91,13 @@
     background: transparent;
     color: var(--windrose-text-muted);
     cursor: pointer;
+    line-height: 0;
     opacity: 0;
     transition: var(--windrose-transition);
+
+    svg {
+      display: block;
+    }
 
     &:hover {
       background: oklch(from var(--windrose-border-primary) l c h / 0.2);
@@ -317,7 +327,7 @@
 /* ==========================================================================
    Dock Color Picker overrides (narrower grid for 240px dock)
    ========================================================================== */
-.windrose-dock-right .windrose-color-picker {
+:is(.windrose-dock-right, .windrose-floating-panel-content) .windrose-color-picker {
   padding: 2px 6px;
   min-width: 0;
   border: none;
@@ -399,12 +409,13 @@
   .windrose-dock-panel-undock,
   .windrose-dock-layer-action,
   .windrose-dock-layer-action-btn,
-  .windrose-dock-layer-add
+  .windrose-dock-layer-add,
+  .windrose-floating-panel-btn
 ) {
   padding: 0;
 }
 
-.is-tablet .windrose-dock-right button.windrose-color-swatch {
+.is-tablet :is(.windrose-dock-right, .windrose-floating-panel-content) button.windrose-color-swatch {
   padding: 0;
 }
 
@@ -594,7 +605,7 @@
 /* ==========================================================================
    Dock Tile Browser overrides (strip standalone sidebar chrome)
    ========================================================================== */
-.windrose-dock-right .windrose-tile-browser {
+:is(.windrose-dock-right, .windrose-floating-panel-content) .windrose-tile-browser {
   width: auto;
   height: auto;
   border-left: none;

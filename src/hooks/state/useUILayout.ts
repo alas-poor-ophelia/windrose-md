@@ -21,6 +21,7 @@ import { getSetting } from '../../core/settingsAccessor';
 interface UseUILayoutOptions {
   mapData: MapData | null;
   updateMapData: (data: MapData | ((current: MapData) => MapData)) => void;
+  fullPane?: boolean;
 }
 
 interface LayerVisibilityState {
@@ -53,7 +54,8 @@ interface UseUILayoutResult {
 
 function useUILayout({
   mapData,
-  updateMapData
+  updateMapData,
+  fullPane = false
 }: UseUILayoutOptions): UseUILayoutResult {
 
   const [showFooter, setShowFooter] = useState(false);
@@ -87,7 +89,7 @@ function useUILayout({
   // Initialize expanded state from settings or saved state (once, when mapData first arrives)
   const expandInitializedRef = useRef(false);
   useEffect(() => {
-    if (!mapData || expandInitializedRef.current) return undefined;
+    if (!mapData || expandInitializedRef.current || fullPane) return undefined;
     expandInitializedRef.current = true;
 
     const timer = setTimeout(() => {

@@ -1,14 +1,17 @@
-import { ItemView, type WorkspaceLeaf } from 'obsidian';
+import { ItemView, Notice, type WorkspaceLeaf } from 'obsidian';
 import { h, render } from 'preact';
 import { AppContext } from '../context/AppContext';
 import { DungeonMapTracker } from '../DungeonMapTracker';
+import { listMaps } from '../persistence/fileOperations';
+import type { MapListEntry } from '../persistence/fileOperations';
+import type { MapType } from '#types/core/map.types';
 
 const VIEW_TYPE_WINDROSE_MAP = 'windrose-map-view';
 
 class WindroseMapView extends ItemView {
-  private mapId = 'fullpane-test';
-  private mapName = 'Full Pane Test';
-  private mapType: 'grid' | 'hex' = 'grid';
+  private mapId = '';
+  private mapName = '';
+  private mapType: MapType = 'grid';
 
   constructor(leaf: WorkspaceLeaf) {
     super(leaf);
@@ -28,19 +31,28 @@ class WindroseMapView extends ItemView {
 
   async onOpen(): Promise<void> {
     this.contentEl.addClass('windrose-full-pane');
-    this.addAction('repeat', 'Switch grid/hex', () => {
-      if (this.mapType === 'grid') {
-        this.mapId = 'fullpane-hex-test';
-        this.mapName = 'Full Pane Hex Test';
-        this.mapType = 'hex';
-      } else {
-        this.mapId = 'fullpane-test';
-        this.mapName = 'Full Pane Test';
-        this.mapType = 'grid';
+
+    this.addAction('copy', 'Copy as map block', () => {
+      if (!this.mapId) {
+        new Notice('No map selected');
+        return;
       }
-      this.renderMap();
+      const block = [
+        '```windrose-map',
+        `id: ${this.mapId}`,
+        `name: ${this.mapName}`,
+        `type: ${this.mapType}`,
+        '```'
+      ].join('\n');
+      navigator.clipboard.writeText(block);
+      new Notice('Map block copied to clipboard');
     });
-    this.renderMap();
+
+    if (this.mapId) {
+      this.renderMap();
+    } else {
+      await this.renderPicker();
+    }
   }
 
   async onClose(): Promise<void> {
@@ -62,24 +74,90 @@ class WindroseMapView extends ItemView {
   async setState(state: Record<string, unknown>): Promise<void> {
     if (state?.mapId) this.mapId = state.mapId as string;
     if (state?.mapName) this.mapName = state.mapName as string;
-    if (state?.mapType) this.mapType = state.mapType as 'grid' | 'hex';
+    if (state?.mapType) this.mapType = state.mapType as MapType;
+
+    if (this.mapId) {
+      this.renderMap();
+    } else {
+      await this.renderPicker();
+    }
+  }
+
+  private selectMap(id: string, name: string, type: MapType): void {
+    this.mapId = id;
+    this.mapName = name;
+    this.mapType = type;
     this.renderMap();
+    this.leaf.updateHeader();
+    this.app.workspace.requestSaveLayout();
+  }
+
+  private handleMapChange = (id: string, name: string, type: MapType): void => {
+    this.selectMap(id, name, type);
+  };
+
+  private async renderPicker(): Promise<void> {
+    const maps = await listMaps(this.app);
+    render(
+      h(FullPaneMapPicker, {
+        maps,
+        onSelect: (entry: MapListEntry) => this.selectMap(entry.id, entry.name, entry.type),
+      }),
+      this.contentEl
+    );
   }
 
   private renderMap(): void {
     render(
       h(AppContext.Provider, { value: this.app },
         h(DungeonMapTracker, {
+          key: this.mapId,
           mapId: this.mapId,
           mapName: this.mapName,
           mapType: this.mapType,
           notePath: '',
           fullPane: true,
+          onMapChange: this.handleMapChange,
         })
       ),
       this.contentEl
     );
   }
+}
+
+interface PickerProps {
+  maps: MapListEntry[];
+  onSelect: (entry: MapListEntry) => void;
+}
+
+function FullPaneMapPicker({ maps, onSelect }: PickerProps) {
+  if (maps.length === 0) {
+    return h('div', { className: 'windrose-fullpane-picker' },
+      h('div', { className: 'windrose-fullpane-picker-icon' }, '🧭'),
+      h('div', { className: 'windrose-fullpane-picker-title' }, 'No maps found'),
+      h('div', { className: 'windrose-fullpane-picker-hint' },
+        'Create a map using the ',
+        h('code', null, '```windrose-map```'),
+        ' code block in any note.'
+      )
+    );
+  }
+
+  return h('div', { className: 'windrose-fullpane-picker' },
+    h('div', { className: 'windrose-fullpane-picker-title' }, 'Select a map to open'),
+    h('div', { className: 'windrose-fullpane-picker-list' },
+      maps.map(entry =>
+        h('button', {
+          key: entry.id,
+          className: 'windrose-fullpane-picker-item',
+          onClick: () => onSelect(entry),
+        },
+          h('span', { className: 'windrose-fullpane-picker-item-name' }, entry.name || entry.id),
+          h('span', { className: 'windrose-fullpane-picker-item-type' }, entry.type)
+        )
+      )
+    )
+  );
 }
 
 export { VIEW_TYPE_WINDROSE_MAP, WindroseMapView };

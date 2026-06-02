@@ -302,4 +302,30 @@ function createNewMap(mapName: string = '', mapType: MapType = 'grid'): MapData 
   return baseMap;
 }
 
-export { loadMapData, saveMapData, createNewMap };
+interface MapListEntry {
+  id: string;
+  name: string;
+  type: MapType;
+}
+
+async function listMaps(app: App): Promise<MapListEntry[]> {
+  try {
+    const dataPath = getDataFilePath();
+    const file = app.vault.getAbstractFileByPath(dataPath);
+    if (!(file instanceof TFile)) return [];
+
+    const content = await app.vault.read(file);
+    const data = JSON.parse(content) as DataFile;
+
+    return Object.entries(data.maps).map(([id, mapData]) => ({
+      id,
+      name: mapData.name || id,
+      type: mapData.mapType || 'grid',
+    }));
+  } catch {
+    return [];
+  }
+}
+
+export { loadMapData, saveMapData, createNewMap, listMaps };
+export type { MapListEntry };

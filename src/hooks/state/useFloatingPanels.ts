@@ -2,7 +2,7 @@ import { useCallback, useRef, useState } from 'preact/hooks';
 
 import { Z_INDEX } from '../../core/dmtConstants';
 
-type PanelId = 'layers' | 'regions' | 'objects' | 'tiles' | 'colorPicker' | 'visibility' | 'fogOfWar' | 'toolPalette';
+type PanelId = 'layers' | 'regions' | 'objects' | 'tiles' | 'colorPicker' | 'view' | 'visibility' | 'fogOfWar' | 'toolPalette';
 
 interface PanelState {
   floating: boolean;

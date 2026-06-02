@@ -189,6 +189,46 @@ body {
   gap: 8px;
 }
 
+.windrose-map-picker {
+  background: var(--windrose-bg-secondary);
+  border: 1px solid var(--windrose-border-secondary);
+  border-radius: 4px;
+  color: var(--windrose-text-primary);
+  font-size: 13px;
+  padding: 4px 8px;
+  margin-right: 8px;
+  max-width: 200px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.windrose-map-picker:focus {
+  border-color: var(--windrose-border-primary);
+  outline: none;
+}
+
+.windrose-header-action-btn {
+  background: transparent;
+  border: 1px solid var(--windrose-border-secondary);
+  border-radius: 4px;
+  color: var(--windrose-text-disabled);
+  cursor: pointer;
+  padding: 4px 6px;
+  height: 28px;
+  width: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--windrose-transition);
+}
+.windrose-header-action-btn svg {
+  width: 16px;
+  height: 16px;
+}
+.windrose-header-action-btn:hover {
+  color: var(--windrose-text-primary);
+  border-color: var(--windrose-border-primary);
+}
+
 .windrose-map-name {
   background: transparent;
   border: none;
@@ -575,6 +615,39 @@ body {
 }
 .windrose-history-btn:disabled svg {
   color: oklch(36% 0 0deg);
+}
+
+/* Separator before dock/undock button — pushes to far right when docked */
+.windrose-tool-palette-separator {
+  width: 1px;
+  height: 20px;
+  background: oklch(from var(--windrose-border-primary) l c h/0.3);
+  margin: 0 2px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+/* Keep separator tight in floating panel */
+.windrose-floating-panel-content .windrose-tool-palette .windrose-tool-palette-separator {
+  margin-left: 2px;
+}
+
+/* Dock/undock button in tool row */
+.windrose-tool-palette-dock-btn {
+  opacity: 0.5;
+  transition: var(--windrose-transition);
+}
+.windrose-tool-palette-dock-btn:hover {
+  opacity: 1;
+}
+
+/* Strip tool palette chrome when inside a floating panel */
+.windrose-floating-panel-content .windrose-tool-palette {
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  margin-bottom: 0;
+  background: transparent;
 }
 
 /* ============================================
@@ -6134,6 +6207,99 @@ button.windrose-breadcrumb-link {
   transform: translateY(0);
 }
 
+.windrose-compass-standalone {
+  position: absolute;
+  bottom: 18px;
+  left: 12px;
+  width: 60px;
+  height: 60px;
+  cursor: pointer;
+  opacity: 0.85;
+  transition: opacity 0.2s ease;
+  z-index: 10;
+}
+.windrose-compass-standalone:hover {
+  opacity: 1;
+}
+.windrose-compass-standalone .windrose-compass-svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* Map picker (shown when no map is selected) */
+.windrose-fullpane-picker {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 16px;
+  color: var(--text-muted);
+}
+.windrose-fullpane-picker-icon {
+  font-size: 48px;
+  opacity: 0.6;
+}
+.windrose-fullpane-picker-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-normal);
+}
+.windrose-fullpane-picker-hint {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.windrose-fullpane-picker-hint code {
+  font-size: 12px;
+  padding: 2px 4px;
+  background: var(--background-secondary);
+  border-radius: 3px;
+}
+.windrose-fullpane-picker-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  max-width: 400px;
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: 0 16px;
+}
+.windrose-fullpane-picker-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 16px;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  text-align: left;
+  color: var(--text-normal);
+}
+.windrose-fullpane-picker-item:hover {
+  background: var(--background-modifier-hover);
+  border-color: var(--interactive-accent);
+}
+.windrose-fullpane-picker-item-name {
+  font-weight: 500;
+}
+.windrose-fullpane-picker-item-type {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* ==========================================================================
+   Floating Panel Portal — sits below Obsidian modals (z-index 50)
+   ========================================================================== */
+.windrose-floating-portal {
+  position: relative;
+  z-index: 40;
+}
+
 /* ==========================================================================
    Floating Panel System (dockable/pop-out panels for full-pane view)
    ========================================================================== */
@@ -6172,6 +6338,7 @@ button.windrose-breadcrumb-link {
 }
 .windrose-floating-panel-actions {
   display: flex;
+  align-items: center;
   gap: 2px;
   flex-shrink: 0;
 }
@@ -6187,11 +6354,24 @@ button.windrose-breadcrumb-link {
   background: transparent;
   color: var(--windrose-text-secondary);
   cursor: pointer;
+  line-height: 0;
   transition: var(--windrose-transition);
+}
+.windrose-floating-panel-btn svg {
+  display: block;
 }
 .windrose-floating-panel-btn:hover {
   background: oklch(from var(--windrose-border-primary) l c h/0.2);
   color: var(--windrose-text-primary);
+}
+.windrose-floating-panel-grip {
+  height: 5px;
+  cursor: grab;
+  background: oklch(from var(--windrose-border-primary) l c h/0.1);
+  border-bottom: 1px solid oklch(from var(--windrose-border-primary) l c h/0.15);
+}
+.windrose-floating-panel-grip:active {
+  cursor: grabbing;
 }
 .windrose-floating-panel-content {
   overflow: auto;
@@ -6243,8 +6423,12 @@ button.windrose-breadcrumb-link {
   background: transparent;
   color: var(--windrose-text-muted);
   cursor: pointer;
+  line-height: 0;
   opacity: 0;
   transition: var(--windrose-transition);
+}
+.windrose-popout-btn svg {
+  display: block;
 }
 .windrose-popout-btn:hover {
   background: oklch(from var(--windrose-border-primary) l c h/0.2);
@@ -6344,7 +6528,11 @@ button.windrose-breadcrumb-link {
   width: 16px;
   height: 16px;
   color: var(--windrose-text-muted);
+  line-height: 0;
   transition: transform 0.15s ease;
+}
+.windrose-dock-panel-chevron svg {
+  display: block;
 }
 .windrose-dock-panel-chevron.collapsed {
   transform: rotate(-90deg);
@@ -6375,8 +6563,12 @@ button.windrose-breadcrumb-link {
   background: transparent;
   color: var(--windrose-text-muted);
   cursor: pointer;
+  line-height: 0;
   opacity: 0;
   transition: var(--windrose-transition);
+}
+.windrose-dock-panel-undock svg {
+  display: block;
 }
 .windrose-dock-panel-undock:hover {
   background: oklch(from var(--windrose-border-primary) l c h/0.2);
@@ -6589,7 +6781,7 @@ button.windrose-breadcrumb-link {
 /* ==========================================================================
    Dock Color Picker overrides (narrower grid for 240px dock)
    ========================================================================== */
-.windrose-dock-right .windrose-color-picker {
+:is(.windrose-dock-right, .windrose-floating-panel-content) .windrose-color-picker {
   padding: 2px 6px;
   min-width: 0;
   border: none;
@@ -6598,22 +6790,22 @@ button.windrose-breadcrumb-link {
   z-index: auto;
   animation: none;
 }
-.windrose-dock-right .windrose-color-picker .windrose-color-grid {
+:is(.windrose-dock-right, .windrose-floating-panel-content) .windrose-color-picker .windrose-color-grid {
   grid-template-columns: repeat(6, 34px);
   gap: 4px;
 }
-.windrose-dock-right .windrose-color-picker .windrose-color-swatch {
+:is(.windrose-dock-right, .windrose-floating-panel-content) .windrose-color-picker .windrose-color-swatch {
   width: 34px;
   height: 34px;
 }
-.windrose-dock-right .windrose-color-picker .windrose-color-edit-panel {
+:is(.windrose-dock-right, .windrose-floating-panel-content) .windrose-color-picker .windrose-color-edit-panel {
   left: auto;
   right: calc(100% + 4px);
 }
-.windrose-dock-right .windrose-color-picker {
+:is(.windrose-dock-right, .windrose-floating-panel-content) .windrose-color-picker {
   /* Flatten opacity into single compact row: Label ──── Value */
 }
-.windrose-dock-right .windrose-color-picker .windrose-color-opacity-section {
+:is(.windrose-dock-right, .windrose-floating-panel-content) .windrose-color-picker .windrose-color-opacity-section {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -6621,10 +6813,10 @@ button.windrose-breadcrumb-link {
   padding-top: 8px;
   border-top: 1px solid oklch(from var(--windrose-border-primary) l c h/0.2);
 }
-.windrose-dock-right .windrose-color-picker .windrose-color-opacity-header {
+:is(.windrose-dock-right, .windrose-floating-panel-content) .windrose-color-picker .windrose-color-opacity-header {
   display: contents;
 }
-.windrose-dock-right .windrose-color-picker .windrose-color-opacity-label {
+:is(.windrose-dock-right, .windrose-floating-panel-content) .windrose-color-picker .windrose-color-opacity-label {
   font-size: 10px;
   color: var(--windrose-text-muted);
   text-transform: uppercase;
@@ -6632,22 +6824,22 @@ button.windrose-breadcrumb-link {
   white-space: nowrap;
   margin-bottom: 0;
 }
-.windrose-dock-right .windrose-color-picker .windrose-color-opacity-value {
+:is(.windrose-dock-right, .windrose-floating-panel-content) .windrose-color-picker .windrose-color-opacity-value {
   font-size: 10px;
   font-variant-numeric: tabular-nums;
   min-width: 28px;
 }
-.windrose-dock-right .windrose-color-picker .windrose-color-opacity-slider {
+:is(.windrose-dock-right, .windrose-floating-panel-content) .windrose-color-picker .windrose-color-opacity-slider {
   flex: 1;
   min-width: 0;
   height: 3px;
 }
-.windrose-dock-right .windrose-color-picker .windrose-color-opacity-slider::-webkit-slider-thumb {
+:is(.windrose-dock-right, .windrose-floating-panel-content) .windrose-color-picker .windrose-color-opacity-slider::-webkit-slider-thumb {
   width: 10px;
   height: 10px;
   border-width: 1px;
 }
-.windrose-dock-right .windrose-color-picker .windrose-color-opacity-slider::-moz-range-thumb {
+:is(.windrose-dock-right, .windrose-floating-panel-content) .windrose-color-picker .windrose-color-opacity-slider::-moz-range-thumb {
   width: 10px;
   height: 10px;
   border-width: 1px;
@@ -6662,11 +6854,12 @@ button.windrose-breadcrumb-link {
 .is-tablet button:is(.windrose-dock-panel-undock,
 .windrose-dock-layer-action,
 .windrose-dock-layer-action-btn,
-.windrose-dock-layer-add) {
+.windrose-dock-layer-add,
+.windrose-floating-panel-btn) {
   padding: 0;
 }
 
-.is-tablet .windrose-dock-right button.windrose-color-swatch {
+.is-tablet :is(.windrose-dock-right, .windrose-floating-panel-content) button.windrose-color-swatch {
   padding: 0;
 }
 
@@ -6846,20 +7039,20 @@ button.windrose-breadcrumb-link {
 /* ==========================================================================
    Dock Tile Browser overrides (strip standalone sidebar chrome)
    ========================================================================== */
-.windrose-dock-right .windrose-tile-browser {
+:is(.windrose-dock-right, .windrose-floating-panel-content) .windrose-tile-browser {
   width: auto;
   height: auto;
   border-left: none;
   background-color: transparent;
   flex-shrink: 1;
 }
-.windrose-dock-right .windrose-tile-browser .windrose-tile-browser-header {
+:is(.windrose-dock-right, .windrose-floating-panel-content) .windrose-tile-browser .windrose-tile-browser-header {
   display: none;
 }
-.windrose-dock-right .windrose-tile-browser .windrose-tile-browser-grid {
+:is(.windrose-dock-right, .windrose-floating-panel-content) .windrose-tile-browser .windrose-tile-browser-grid {
   grid-template-columns: repeat(3, 1fr);
 }
-.windrose-dock-right .windrose-tile-browser .windrose-tile-thumb {
+:is(.windrose-dock-right, .windrose-floating-panel-content) .windrose-tile-browser .windrose-tile-thumb {
   width: auto;
   height: auto;
 }

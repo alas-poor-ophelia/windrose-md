@@ -27,6 +27,7 @@ import { ToolPalette } from './components/toolbars/ToolPalette';
 import { ObjectSidebar } from './components/panels/ObjectSidebar';
 import { VisibilityToolbar } from './components/toolbars/VisibilityToolbar';
 import { FogOfWarToolbar } from './components/toolbars/FogOfWarToolbar';
+import { WindroseCompass } from './components/shared/WindroseCompass';
 
 import { MapSettingsModal } from './components/settings/MapSettingsModal';
 import { getTheme, getEffectiveSettings, getSettings } from './core/settingsAccessor';
@@ -63,6 +64,8 @@ import { injectIconCSS } from './assets/rpgAwesomeLoader';
 import { useApp } from './context/AppContext';
 import { Icon } from './components/shared/Icon';
 import { CornerBrackets } from './components/shared/CornerBrackets';
+import { listMaps } from './persistence/fileOperations';
+import type { MapListEntry } from './persistence/fileOperations';
 
 // Inject RPGAwesome icon CSS classes on module load
 injectIconCSS(RA_ICONS);
@@ -77,13 +80,14 @@ interface DungeonMapTrackerProps {
   mapType?: MapType;
   notePath?: string;
   fullPane?: boolean;
+  onMapChange?: (mapId: string, mapName: string, mapType: MapType) => void;
 }
 
 // ============================================================================
 // MAIN COMPONENT
 // ============================================================================
 
-const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'grid', notePath = '', fullPane = false }: DungeonMapTrackerProps): VNode => {
+const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'grid', notePath = '', fullPane = false, onMapChange }: DungeonMapTrackerProps): VNode => {
   const app = useApp();
   useThemeMode();
   const { mapData: rootMapData, isLoading, saveStatus, updateMapData: rootUpdateMapData, forceSave, tileImagesReady, getCachedImage } = useMapData(mapId, mapName, mapType);
@@ -131,9 +135,19 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     showLayerPanel, setShowLayerPanel,
     showRegionPanel, setShowRegionPanel,
     layerVisibility, handleToggleLayerVisibility
-  } = useUILayout({ mapData, updateMapData });
+  } = useUILayout({ mapData, updateMapData, fullPane });
 
   const { isFloating, getZIndex, getInitialPosition, toggleFloat, bringToFront } = useFloatingPanels({ fullPane });
+
+  const [mapListEntries, setMapListEntries] = useState<MapListEntry[]>([]);
+  useEffect(() => {
+    if (!fullPane) return;
+    listMaps(app).then(setMapListEntries);
+  }, [fullPane, app]);
+
+  const handleMapSelect = useCallback((entry: MapListEntry) => {
+    onMapChange?.(entry.id, entry.name, entry.type);
+  }, [onMapChange]);
 
   const floatingPickerPendingRef = useRef<string | null>(null);
 
@@ -525,6 +539,10 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
           saveStatus={saveStatus}
           showFooter={showFooter}
           onToggleFooter={() => setShowFooter(!showFooter)}
+          fullPane={fullPane}
+          mapId={mapId}
+          mapList={mapListEntries}
+          onMapSelect={handleMapSelect}
         />
 
         {isInSubHex && (
@@ -555,47 +573,65 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
         )}
 
         <div className="windrose-toolbar-anchor">
-          <ToolPalette
-            currentTool={currentTool}
-            onToolChange={setCurrentTool}
-            onUndo={wrappedHandleUndo}
-            onRedo={handleRedo}
-            canUndo={canUndo}
-            canRedo={canRedo}
-            selectedColor={selectedColor}
-            onColorChange={setSelectedColor}
-            selectedOpacity={selectedOpacity}
-            onOpacityChange={handleOpacityChange}
-            isColorPickerOpen={isColorPickerOpen || isFloating('colorPicker')}
-            onColorPickerOpenChange={setIsColorPickerOpen}
-            customColors={mapData.customColors ?? []}
-            paletteColorOpacityOverrides={mapData.paletteColorOpacityOverrides || {}}
-            onAddCustomColor={handleAddCustomColor}
-            onDeleteCustomColor={handleDeleteCustomColor}
-            onUpdateColorOpacity={handleUpdateColorOpacity}
-            mapType={mapData.mapType}
-            isFocused={isFocused}
-            onColorBtnPopout={fullPane ? handleColorPickerPopout : undefined}
-          />
+          {!isFloating('toolPalette') && (
+            <ToolPalette
+              currentTool={currentTool}
+              onToolChange={setCurrentTool}
+              onUndo={wrappedHandleUndo}
+              onRedo={handleRedo}
+              canUndo={canUndo}
+              canRedo={canRedo}
+              selectedColor={selectedColor}
+              onColorChange={setSelectedColor}
+              selectedOpacity={selectedOpacity}
+              onOpacityChange={handleOpacityChange}
+              isColorPickerOpen={isColorPickerOpen || isFloating('colorPicker')}
+              onColorPickerOpenChange={setIsColorPickerOpen}
+              customColors={mapData.customColors ?? []}
+              paletteColorOpacityOverrides={mapData.paletteColorOpacityOverrides || {}}
+              onAddCustomColor={handleAddCustomColor}
+              onDeleteCustomColor={handleDeleteCustomColor}
+              onUpdateColorOpacity={handleUpdateColorOpacity}
+              mapType={mapData.mapType}
+              isFocused={isFocused}
+              onColorBtnPopout={fullPane ? handleColorPickerPopout : undefined}
+              dockButton={fullPane ? (
+                <button
+                  className="windrose-tool-btn windrose-tool-palette-dock-btn interactive-child"
+                  onClick={(e) => {
+                    const rect = (e.currentTarget as HTMLElement).closest('.windrose-tool-palette')!.getBoundingClientRect();
+                    toggleFloat('toolPalette', { x: rect.left, y: rect.top });
+                  }}
+                  title="Pop out tools"
+                >
+                  <Icon icon="lucide-maximize-2" />
+                </button>
+              ) : undefined}
+            />
+          )}
 
-          <VisibilityToolbar
-            isOpen={showVisibilityToolbar}
-            layerVisibility={layerVisibility}
-            onToggleLayer={handleToggleLayerVisibility}
-            mapType={mapData.mapType}
-            showFogTools={showFogTools}
-            onFogToolsToggle={handleFogToolsToggle}
-          />
+          {!fullPane && (
+            <VisibilityToolbar
+              isOpen={showVisibilityToolbar}
+              layerVisibility={layerVisibility}
+              onToggleLayer={handleToggleLayerVisibility}
+              mapType={mapData.mapType}
+              showFogTools={showFogTools}
+              onFogToolsToggle={handleFogToolsToggle}
+            />
+          )}
         </div>
 
-        <FogOfWarToolbar
-          isOpen={showFogTools && showVisibilityToolbar}
-          fogOfWarState={currentFogState}
-          onFogToolSelect={handleFogToolSelect}
-          onFogVisibilityToggle={handleFogVisibilityToggle}
-          onFogFillAll={handleFogFillAll}
-          onFogClearAll={handleFogClearAll}
-        />
+        {!fullPane && (
+          <FogOfWarToolbar
+            isOpen={showFogTools && showVisibilityToolbar}
+            fogOfWarState={currentFogState}
+            onFogToolSelect={handleFogToolSelect}
+            onFogVisibilityToggle={handleFogVisibilityToggle}
+            onFogFillAll={handleFogFillAll}
+            onFogClearAll={handleFogClearAll}
+          />
+        )}
 
         <div
           className={`windrose-canvas-wrapper${fullPane ? ' windrose-full-pane-canvas' : ''}`}
@@ -616,75 +652,44 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
             onFreeformToggle={() => setFreeformPlacementMode(prev => !prev)}
           />
 
-          {/* Left side panels container — layers + regions stacked */}
-          <div className={`windrose-left-panels ${mapData.sidebarCollapsed === true ? 'sidebar-closed' : 'sidebar-open'}`}>
-            {/* Layer Controls Panel (Z-Layer System) */}
-            <FloatingPanel
-              title="Layers"
-              isFloating={isFloating('layers')}
-              onDock={() => toggleFloat('layers')}
-              onFocus={() => bringToFront('layers')}
-              zIndex={getZIndex('layers')}
-              initialPosition={getInitialPosition('layers')}
-              resizable
-              minSize={{ width: 140, height: 100 }}
-            >
-              <LayerControls
-                mapData={mapData}
-                onLayerSelect={handleLayerSelect}
-                onLayerAdd={handleLayerAdd}
-                onLayerDelete={handleLayerDelete}
-                onLayerReorder={handleLayerReorder}
-                onToggleShowLayerBelow={handleToggleShowLayerBelow}
-                onSetLayerBelowOpacity={handleSetLayerBelowOpacity}
-                onEditLayer={setEditingLayerId}
-                onLayerClone={handleCloneLayerRequest}
-                sidebarCollapsed={mapData.sidebarCollapsed ?? false}
-                isOpen={isFloating('layers') || showLayerPanel}
-                popoutButton={fullPane && !isFloating('layers') ? <PopoutButton onClick={(pos) => toggleFloat('layers', pos)} /> : undefined}
-              />
-            </FloatingPanel>
+          {/* Left side panels container — layers + regions stacked (not in full-pane, dock replaces) */}
+          {!fullPane && (
+            <div className={`windrose-left-panels ${mapData.sidebarCollapsed === true ? 'sidebar-closed' : 'sidebar-open'}`}>
+              <FloatingPanel
+                title="Layers"
+                isFloating={isFloating('layers')}
+                onDock={() => toggleFloat('layers')}
+                onFocus={() => bringToFront('layers')}
+                zIndex={getZIndex('layers')}
+                initialPosition={getInitialPosition('layers')}
+                resizable
+                minSize={{ width: 140, height: 100 }}
+              >
+                <LayerControls
+                  mapData={mapData}
+                  onLayerSelect={handleLayerSelect}
+                  onLayerAdd={handleLayerAdd}
+                  onLayerDelete={handleLayerDelete}
+                  onLayerReorder={handleLayerReorder}
+                  onToggleShowLayerBelow={handleToggleShowLayerBelow}
+                  onSetLayerBelowOpacity={handleSetLayerBelowOpacity}
+                  onEditLayer={setEditingLayerId}
+                  onLayerClone={handleCloneLayerRequest}
+                  sidebarCollapsed={mapData.sidebarCollapsed ?? false}
+                  isOpen={isFloating('layers') || showLayerPanel}
+                  popoutButton={!isFloating('layers') ? <PopoutButton onClick={(pos) => toggleFloat('layers', pos)} /> : undefined}
+                />
+              </FloatingPanel>
 
-            {/* Region Panel (hex maps only) */}
-            {mapData.mapType === 'hex' && (
-              <RegionPanel
-                regions={mapData.regions ?? []}
-                onRegionsChange={handleRegionsChange}
-                sidebarCollapsed={mapData.sidebarCollapsed ?? false}
-                isOpen={showRegionPanel}
-              />
-            )}
-          </div>
-
-          {/* Floating Color Picker (full-pane mode only) */}
-          {isFloating('colorPicker') && (
-            <FloatingPanel
-              title="Color"
-              isFloating
-              onDock={handleFloatingPickerClose}
-              onFocus={() => bringToFront('colorPicker')}
-              zIndex={getZIndex('colorPicker')}
-              initialPosition={getInitialPosition('colorPicker')}
-              resizable
-              minSize={{ width: 200, height: 150 }}
-            >
-              <ColorPicker
-                isOpen
-                floatingMode
-                selectedColor={selectedColor}
-                onColorSelect={setSelectedColor}
-                onClose={handleFloatingPickerClose}
-                onReset={() => setSelectedColor(DEFAULT_COLOR)}
-                customColors={mapData.customColors ?? []}
-                paletteColorOpacityOverrides={mapData.paletteColorOpacityOverrides || {}}
-                onAddCustomColor={handleAddCustomColor}
-                onDeleteCustomColor={handleDeleteCustomColor}
-                onUpdateColorOpacity={handleUpdateColorOpacity}
-                pendingCustomColorRef={floatingPickerPendingRef}
-                opacity={selectedOpacity}
-                onOpacityChange={handleOpacityChange}
-              />
-            </FloatingPanel>
+              {mapData.mapType === 'hex' && (
+                <RegionPanel
+                  regions={mapData.regions ?? []}
+                  onRegionsChange={handleRegionsChange}
+                  sidebarCollapsed={mapData.sidebarCollapsed ?? false}
+                  isOpen={showRegionPanel}
+                />
+              )}
+            </div>
           )}
 
           {/* For hex maps, override northDirection to 0 for rendering while keeping real value for compass display */}
@@ -827,29 +832,40 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               <MapCanvas.RerollDungeonButton />
             </MapCanvas>
 
-            <MapControls
-              onZoomIn={handleZoomIn}
-              onZoomOut={handleZoomOut}
-              onCompassClick={handleCompassClick}
-              onSettingsClick={handleSettingsClick}
-              northDirection={mapData.northDirection ?? 0}
-              currentZoom={mapData.viewState?.zoom ?? 1}
-              isExpanded={isExpanded}
-              onToggleExpand={handleToggleExpand}
-              hideExpand={fullPane}
-              mapType={mapData.mapType}
-              showLayerPanel={showLayerPanel}
-              onToggleLayerPanel={() => setShowLayerPanel(!showLayerPanel)}
-              showRegionPanel={showRegionPanel}
-              onToggleRegionPanel={mapData.mapType === 'hex' ? () => setShowRegionPanel(!showRegionPanel) : undefined}
-              showVisibilityToolbar={showVisibilityToolbar}
-              onToggleVisibilityToolbar={() => {
-                const closing = showVisibilityToolbar;
-                setShowVisibilityToolbar(!showVisibilityToolbar);
-                if (closing && showFogTools) handleFogToolsToggle();
-              }}
-              alwaysShowControls={effectiveSettings?.alwaysShowControls ?? false}
-            />
+            {!fullPane && (
+              <MapControls
+                onZoomIn={handleZoomIn}
+                onZoomOut={handleZoomOut}
+                onCompassClick={handleCompassClick}
+                onSettingsClick={handleSettingsClick}
+                northDirection={mapData.northDirection ?? 0}
+                currentZoom={mapData.viewState?.zoom ?? 1}
+                isExpanded={isExpanded}
+                onToggleExpand={handleToggleExpand}
+                hideExpand={fullPane}
+                mapType={mapData.mapType}
+                showLayerPanel={showLayerPanel}
+                onToggleLayerPanel={() => setShowLayerPanel(!showLayerPanel)}
+                showRegionPanel={showRegionPanel}
+                onToggleRegionPanel={mapData.mapType === 'hex' ? () => setShowRegionPanel(!showRegionPanel) : undefined}
+                showVisibilityToolbar={showVisibilityToolbar}
+                onToggleVisibilityToolbar={() => {
+                  const closing = showVisibilityToolbar;
+                  setShowVisibilityToolbar(!showVisibilityToolbar);
+                  if (closing && showFogTools) handleFogToolsToggle();
+                }}
+                alwaysShowControls={effectiveSettings?.alwaysShowControls ?? false}
+              />
+            )}
+            {fullPane && (
+              <div
+                className="windrose-compass-standalone"
+                onClick={handleCompassClick}
+                title={`North: ${mapData.northDirection ?? 0}° — Click to rotate`}
+              >
+                <WindroseCompass rotation={mapData.northDirection ?? 0} className="windrose-compass-svg" />
+              </div>
+            )}
           </div>
 
           {/* Tile Asset Browser (right sidebar, hex maps with tilesets only — not in full-pane, dock has it) */}
@@ -887,57 +903,230 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
             />
           )}
 
+          {/* Floating panels (portalled, render anywhere) */}
+          {isFloating('toolPalette') && (
+            <FloatingPanel
+              title="Tools"
+              isFloating
+              headerless
+              onDock={() => toggleFloat('toolPalette')}
+              onFocus={() => bringToFront('toolPalette')}
+              zIndex={getZIndex('toolPalette')}
+              initialPosition={getInitialPosition('toolPalette')}
+            >
+              <ToolPalette
+                currentTool={currentTool}
+                onToolChange={setCurrentTool}
+                onUndo={wrappedHandleUndo}
+                onRedo={handleRedo}
+                canUndo={canUndo}
+                canRedo={canRedo}
+                selectedColor={selectedColor}
+                onColorChange={setSelectedColor}
+                selectedOpacity={selectedOpacity}
+                onOpacityChange={handleOpacityChange}
+                isColorPickerOpen={isColorPickerOpen || isFloating('colorPicker')}
+                onColorPickerOpenChange={setIsColorPickerOpen}
+                customColors={mapData.customColors ?? []}
+                paletteColorOpacityOverrides={mapData.paletteColorOpacityOverrides || {}}
+                onAddCustomColor={handleAddCustomColor}
+                onDeleteCustomColor={handleDeleteCustomColor}
+                onUpdateColorOpacity={handleUpdateColorOpacity}
+                mapType={mapData.mapType}
+                isFocused={isFocused}
+                onColorBtnPopout={handleColorPickerPopout}
+                dockButton={
+                  <button
+                    className="windrose-tool-btn windrose-tool-palette-dock-btn interactive-child"
+                    onClick={() => toggleFloat('toolPalette')}
+                    title="Dock tools"
+                  >
+                    <Icon icon="lucide-pin" />
+                  </button>
+                }
+              />
+            </FloatingPanel>
+          )}
+          {isFloating('layers') && (
+            <FloatingPanel
+              title="Layers"
+              isFloating
+              onDock={() => toggleFloat('layers')}
+              onFocus={() => bringToFront('layers')}
+              zIndex={getZIndex('layers')}
+              initialPosition={getInitialPosition('layers')}
+              resizable
+              minSize={{ width: 200, height: 150 }}
+            >
+              <DockLayerList
+                mapData={mapData}
+                onLayerSelect={handleLayerSelect}
+                onLayerAdd={handleLayerAdd}
+                onLayerDelete={handleLayerDelete}
+                onLayerReorder={handleLayerReorder}
+                onToggleShowLayerBelow={handleToggleShowLayerBelow}
+                onSetLayerBelowOpacity={handleSetLayerBelowOpacity}
+                onEditLayer={setEditingLayerId}
+                onLayerClone={handleCloneLayerRequest}
+              />
+            </FloatingPanel>
+          )}
+          {isFloating('colorPicker') && (
+            <FloatingPanel
+              title="Colors"
+              isFloating
+              onDock={handleFloatingPickerClose}
+              onFocus={() => bringToFront('colorPicker')}
+              zIndex={getZIndex('colorPicker')}
+              initialPosition={getInitialPosition('colorPicker')}
+              resizable
+              minSize={{ width: 200, height: 150 }}
+            >
+              <ColorPicker
+                isOpen
+                floatingMode
+                selectedColor={selectedColor}
+                onColorSelect={setSelectedColor}
+                onClose={handleFloatingPickerClose}
+                onReset={() => setSelectedColor(DEFAULT_COLOR)}
+                customColors={mapData.customColors ?? []}
+                paletteColorOpacityOverrides={mapData.paletteColorOpacityOverrides || {}}
+                onAddCustomColor={handleAddCustomColor}
+                onDeleteCustomColor={handleDeleteCustomColor}
+                onUpdateColorOpacity={handleUpdateColorOpacity}
+                pendingCustomColorRef={floatingPickerPendingRef}
+                opacity={selectedOpacity}
+                onOpacityChange={handleOpacityChange}
+              />
+            </FloatingPanel>
+          )}
+          {isFloating('view') && (
+            <FloatingPanel
+              title="View"
+              isFloating
+              onDock={() => toggleFloat('view')}
+              onFocus={() => bringToFront('view')}
+              zIndex={getZIndex('view')}
+              initialPosition={getInitialPosition('view')}
+            >
+              <DockViewPanel
+                currentZoom={mapData.viewState?.zoom ?? 1}
+                onZoomIn={handleZoomIn}
+                onZoomOut={handleZoomOut}
+                layerVisibility={layerVisibility}
+                onToggleLayer={handleToggleLayerVisibility}
+                mapType={mapData.mapType}
+                onSettingsClick={handleSettingsClick}
+                fogOfWarState={currentFogState}
+                onFogToolSelect={handleFogToolSelect}
+                onFogVisibilityToggle={handleFogVisibilityToggle}
+                onFogFillAll={handleFogFillAll}
+                onFogClearAll={handleFogClearAll}
+              />
+            </FloatingPanel>
+          )}
+          {isFloating('tiles') && showTilePanel && (
+            <FloatingPanel
+              title="Tiles"
+              isFloating
+              onDock={() => toggleFloat('tiles')}
+              onFocus={() => bringToFront('tiles')}
+              zIndex={getZIndex('tiles')}
+              initialPosition={getInitialPosition('tiles')}
+              resizable
+              minSize={{ width: 200, height: 200 }}
+            >
+              <TileAssetBrowser
+                tilesets={availableTilesets}
+                selectedTilesetId={selectedTilesetId}
+                selectedTileId={selectedTileId}
+                onTileSelect={handleTileSelect}
+                onTileDeselect={handleTileDeselect}
+                onToolChange={setCurrentTool}
+                isCollapsed={false}
+                onCollapseChange={() => {}}
+                rotation={tileRotation}
+                flipH={tileFlipH}
+                onRotationChange={setTileRotation}
+                onFlipChange={setTileFlipH}
+                tileLayer={tileLayer}
+                onTileLayerChange={setTileLayer}
+                tileFitMode={tileFitMode}
+                onTileFitModeChange={setTileFitMode}
+                stampMode={stampMode}
+                onStampModeChange={setStampMode}
+                tileScale={tileScale}
+                onTileScaleChange={setTileScale}
+                getCachedImage={getCachedImage}
+                tilesetOverrides={mapData?.tilesetOverrides}
+                onTilesetOverrideChange={(tilesetId: string, overrides: TilesetOverrides) => {
+                  updateMapData((prev: MapData) => ({
+                    ...prev,
+                    tilesetOverrides: { ...prev.tilesetOverrides, [tilesetId]: overrides },
+                  }));
+                }}
+                onSettingsClick={handleSettingsClick}
+              />
+            </FloatingPanel>
+          )}
+
           {/* Right Dock Panel Column (full-pane mode only) */}
           {fullPane && (
             <div className="windrose-dock-right">
-              <DockPanel title="Layers">
-                <DockLayerList
-                  mapData={mapData}
-                  onLayerSelect={handleLayerSelect}
-                  onLayerAdd={handleLayerAdd}
-                  onLayerDelete={handleLayerDelete}
-                  onLayerReorder={handleLayerReorder}
-                  onToggleShowLayerBelow={handleToggleShowLayerBelow}
-                  onSetLayerBelowOpacity={handleSetLayerBelowOpacity}
-                  onEditLayer={setEditingLayerId}
-                  onLayerClone={handleCloneLayerRequest}
-                />
-              </DockPanel>
-              <DockPanel title="Colors">
-                <ColorPicker
-                  isOpen
-                  floatingMode
-                  selectedColor={selectedColor}
-                  onColorSelect={setSelectedColor}
-                  onClose={() => {}}
-                  onReset={() => setSelectedColor(DEFAULT_COLOR)}
-                  customColors={mapData.customColors ?? []}
-                  paletteColorOpacityOverrides={mapData.paletteColorOpacityOverrides || {}}
-                  onAddCustomColor={handleAddCustomColor}
-                  onDeleteCustomColor={handleDeleteCustomColor}
-                  onUpdateColorOpacity={handleUpdateColorOpacity}
-                  opacity={selectedOpacity}
-                  onOpacityChange={handleOpacityChange}
-                />
-              </DockPanel>
-              <DockPanel title="View" defaultCollapsed>
-                <DockViewPanel
-                  currentZoom={mapData.viewState?.zoom ?? 1}
-                  onZoomIn={handleZoomIn}
-                  onZoomOut={handleZoomOut}
-                  layerVisibility={layerVisibility}
-                  onToggleLayer={handleToggleLayerVisibility}
-                  mapType={mapData.mapType}
-                  onSettingsClick={handleSettingsClick}
-                  fogOfWarState={currentFogState}
-                  onFogToolSelect={handleFogToolSelect}
-                  onFogVisibilityToggle={handleFogVisibilityToggle}
-                  onFogFillAll={handleFogFillAll}
-                  onFogClearAll={handleFogClearAll}
-                />
-              </DockPanel>
-              {showTilePanel && (
-                <DockPanel title="Tiles" flexFill defaultCollapsed>
+              {!isFloating('layers') && (
+                <DockPanel title="Layers" onUndock={(pos) => toggleFloat('layers', pos)}>
+                  <DockLayerList
+                    mapData={mapData}
+                    onLayerSelect={handleLayerSelect}
+                    onLayerAdd={handleLayerAdd}
+                    onLayerDelete={handleLayerDelete}
+                    onLayerReorder={handleLayerReorder}
+                    onToggleShowLayerBelow={handleToggleShowLayerBelow}
+                    onSetLayerBelowOpacity={handleSetLayerBelowOpacity}
+                    onEditLayer={setEditingLayerId}
+                    onLayerClone={handleCloneLayerRequest}
+                  />
+                </DockPanel>
+              )}
+              {!isFloating('colorPicker') && (
+                <DockPanel title="Colors" onUndock={(pos) => toggleFloat('colorPicker', pos)}>
+                  <ColorPicker
+                    isOpen
+                    floatingMode
+                    selectedColor={selectedColor}
+                    onColorSelect={setSelectedColor}
+                    onClose={() => {}}
+                    onReset={() => setSelectedColor(DEFAULT_COLOR)}
+                    customColors={mapData.customColors ?? []}
+                    paletteColorOpacityOverrides={mapData.paletteColorOpacityOverrides || {}}
+                    onAddCustomColor={handleAddCustomColor}
+                    onDeleteCustomColor={handleDeleteCustomColor}
+                    onUpdateColorOpacity={handleUpdateColorOpacity}
+                    opacity={selectedOpacity}
+                    onOpacityChange={handleOpacityChange}
+                  />
+                </DockPanel>
+              )}
+              {!isFloating('view') && (
+                <DockPanel title="View" defaultCollapsed onUndock={(pos) => toggleFloat('view', pos)}>
+                  <DockViewPanel
+                    currentZoom={mapData.viewState?.zoom ?? 1}
+                    onZoomIn={handleZoomIn}
+                    onZoomOut={handleZoomOut}
+                    layerVisibility={layerVisibility}
+                    onToggleLayer={handleToggleLayerVisibility}
+                    mapType={mapData.mapType}
+                    onSettingsClick={handleSettingsClick}
+                    fogOfWarState={currentFogState}
+                    onFogToolSelect={handleFogToolSelect}
+                    onFogVisibilityToggle={handleFogVisibilityToggle}
+                    onFogFillAll={handleFogFillAll}
+                    onFogClearAll={handleFogClearAll}
+                  />
+                </DockPanel>
+              )}
+              {showTilePanel && !isFloating('tiles') && (
+                <DockPanel title="Tiles" flexFill defaultCollapsed onUndock={(pos) => toggleFloat('tiles', pos)}>
                   <TileAssetBrowser
                     tilesets={availableTilesets}
                     selectedTilesetId={selectedTilesetId}

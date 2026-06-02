@@ -58,6 +58,11 @@ export default class WindrosePlugin extends Plugin {
       name: 'Open map in full pane',
       callback: () => this.activateMapView(),
     });
+    this.addCommand({
+      id: 'open-new-map-view',
+      name: 'Open new map view tab',
+      callback: () => this.openNewMapView(),
+    });
 
     this.registerMarkdownCodeBlockProcessor('windrose-map', (source, el, ctx) => {
       const config = parseYamlConfig(source);
@@ -141,6 +146,10 @@ export default class WindrosePlugin extends Plugin {
       this.app.workspace.revealLeaf(leaves[0]);
       return;
     }
+    await this.openNewMapView();
+  }
+
+  private async openNewMapView(): Promise<void> {
     const leaf = this.app.workspace.getLeaf('tab');
     await leaf.setViewState({ type: VIEW_TYPE_WINDROSE_MAP, active: true });
     this.app.workspace.revealLeaf(leaf);

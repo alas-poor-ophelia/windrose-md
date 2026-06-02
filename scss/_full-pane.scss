@@ -21,3 +21,99 @@
 .windrose-full-pane .windrose-compass-animated {
   transform: translateY(0);
 }
+
+.windrose-compass-standalone {
+  position: absolute;
+  bottom: 18px;
+  left: 12px;
+  width: 60px;
+  height: 60px;
+  cursor: pointer;
+  opacity: 0.85;
+  transition: opacity 0.2s ease;
+  z-index: 10;
+
+  &:hover {
+    opacity: 1;
+  }
+
+  .windrose-compass-svg {
+    width: 100%;
+    height: 100%;
+  }
+}
+
+/* Map picker (shown when no map is selected) */
+.windrose-fullpane-picker {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 16px;
+  color: var(--text-muted);
+
+  &-icon {
+    font-size: 48px;
+    opacity: 0.6;
+  }
+
+  &-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-normal);
+  }
+
+  &-hint {
+    font-size: 13px;
+    color: var(--text-muted);
+
+    code {
+      font-size: 12px;
+      padding: 2px 4px;
+      background: var(--background-secondary);
+      border-radius: 3px;
+    }
+  }
+
+  &-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    width: 100%;
+    max-width: 400px;
+    max-height: 60vh;
+    overflow-y: auto;
+    padding: 0 16px;
+  }
+
+  &-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 16px;
+    background: var(--background-secondary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s ease;
+    text-align: left;
+    color: var(--text-normal);
+
+    &:hover {
+      background: var(--background-modifier-hover);
+      border-color: var(--interactive-accent);
+    }
+
+    &-name {
+      font-weight: 500;
+    }
+
+    &-type {
+      font-size: 11px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+  }
+}

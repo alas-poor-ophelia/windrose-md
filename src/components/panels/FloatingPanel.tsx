@@ -1,9 +1,20 @@
 import type { ComponentChildren, VNode } from 'preact';
 import { useCallback, useEffect, useRef } from 'preact/hooks';
 
+import { createPortal } from 'preact/compat';
 import { interact } from '../../core/interactjs';
-import { ModalPortal } from '../modals/ModalPortal';
 import { Icon } from '../shared/Icon';
+
+function getFloatingPortalContainer(): HTMLElement {
+  let portal = document.getElementById('windrose-floating-portal');
+  if (!portal) {
+    portal = document.createElement('div');
+    portal.id = 'windrose-floating-portal';
+    portal.className = 'windrose-floating-portal';
+    document.body.appendChild(portal);
+  }
+  return portal;
+}
 
 interface FloatingPanelProps {
   title: string;
@@ -16,6 +27,8 @@ interface FloatingPanelProps {
   minSize?: { width: number; height: number };
   children: ComponentChildren;
   className?: string;
+  /** Hide the full header and show a thin drag grip instead */
+  headerless?: boolean;
 }
 
 function FloatingPanel({
@@ -29,6 +42,7 @@ function FloatingPanel({
   minSize,
   children,
   className,
+  headerless = false,
 }: FloatingPanelProps): VNode | null {
   const panelRef = useRef<HTMLDivElement>(null);
   const positionRef = useRef({ x: 200, y: 200 });
@@ -49,8 +63,9 @@ function FloatingPanel({
     el.style.left = `${positionRef.current.x}px`;
     el.style.top = `${positionRef.current.y}px`;
 
+    const dragHandle = headerless ? '.windrose-floating-panel-grip' : '.windrose-floating-panel-header';
     const interactable = interact(el).draggable({
-      allowFrom: '.windrose-floating-panel-header',
+      allowFrom: dragHandle,
       listeners: {
         move: (event) => {
           positionRef.current = {
@@ -85,7 +100,7 @@ function FloatingPanel({
     return () => {
       interactable.unset();
     };
-  }, [isFloating, resizable, minSize]);
+  }, [isFloating, resizable, minSize, headerless]);
 
   const handlePointerDown = useCallback(() => {
     onFocus();
@@ -95,20 +110,22 @@ function FloatingPanel({
     return <>{children}</>;
   }
 
-  return (
-    <ModalPortal>
-      <div
-        ref={panelRef}
-        className={`windrose-floating-panel ${className ?? ''}`}
-        style={{
-          position: 'fixed',
-          left: `${positionRef.current.x}px`,
-          top: `${positionRef.current.y}px`,
-          zIndex,
-        }}
-        onMouseDown={handlePointerDown}
-        onTouchStart={handlePointerDown}
-      >
+  return createPortal(
+    <div
+      ref={panelRef}
+      className={`windrose-floating-panel ${className ?? ''}`}
+      style={{
+        position: 'fixed',
+        left: `${positionRef.current.x}px`,
+        top: `${positionRef.current.y}px`,
+        zIndex,
+      }}
+      onMouseDown={handlePointerDown}
+      onTouchStart={handlePointerDown}
+    >
+      {headerless ? (
+        <div className="windrose-floating-panel-grip" />
+      ) : (
         <div className="windrose-floating-panel-header">
           <span className="windrose-floating-panel-title">{title}</span>
           <div className="windrose-floating-panel-actions">
@@ -121,12 +138,13 @@ function FloatingPanel({
             </button>
           </div>
         </div>
-        <div className="windrose-floating-panel-content">
-          {children}
-        </div>
-        {resizable && <div className="windrose-floating-panel-resize-handle" />}
+      )}
+      <div className="windrose-floating-panel-content">
+        {children}
       </div>
-    </ModalPortal>
+      {resizable && <div className="windrose-floating-panel-resize-handle" />}
+    </div>,
+    getFloatingPortalContainer()
   );
 }
 

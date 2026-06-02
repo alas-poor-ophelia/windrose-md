@@ -1,4 +1,12 @@
 /* ==========================================================================
+   Floating Panel Portal — sits below Obsidian modals (z-index 50)
+   ========================================================================== */
+.windrose-floating-portal {
+  position: relative;
+  z-index: 40;
+}
+
+/* ==========================================================================
    Floating Panel System (dockable/pop-out panels for full-pane view)
    ========================================================================== */
 .windrose-floating-panel {
@@ -41,6 +49,7 @@
 
   &-actions {
     display: flex;
+    align-items: center;
     gap: 2px;
     flex-shrink: 0;
   }
@@ -57,11 +66,27 @@
     background: transparent;
     color: var(--windrose-text-secondary);
     cursor: pointer;
+    line-height: 0;
     transition: var(--windrose-transition);
+
+    svg {
+      display: block;
+    }
 
     &:hover {
       background: oklch(from var(--windrose-border-primary) l c h / 0.2);
       color: var(--windrose-text-primary);
+    }
+  }
+
+  &-grip {
+    height: 5px;
+    cursor: grab;
+    background: oklch(from var(--windrose-border-primary) l c h / 0.1);
+    border-bottom: 1px solid oklch(from var(--windrose-border-primary) l c h / 0.15);
+
+    &:active {
+      cursor: grabbing;
     }
   }
 
@@ -125,8 +150,13 @@
   background: transparent;
   color: var(--windrose-text-muted);
   cursor: pointer;
+  line-height: 0;
   opacity: 0;
   transition: var(--windrose-transition);
+
+  svg {
+    display: block;
+  }
 
   &:hover {
     background: oklch(from var(--windrose-border-primary) l c h / 0.2);
