@@ -53,6 +53,7 @@ import { useKeyboardShortcuts } from './hooks/interactions/useKeyboardShortcuts'
 import { usePlayerFogClear } from './hooks/interactions/usePlayerFogClear';
 import { useUILayout } from './hooks/state/useUILayout';
 import { useFloatingPanels } from './hooks/state/useFloatingPanels';
+import type { PanelId, PanelState } from './hooks/state/useFloatingPanels';
 import { usePanelState } from './hooks/state/usePanelState';
 import { useViewControls } from './hooks/state/useViewControls';
 import { useTileBrush } from './hooks/state/useTileBrush';
@@ -81,13 +82,15 @@ interface DungeonMapTrackerProps {
   notePath?: string;
   fullPane?: boolean;
   onMapChange?: (mapId: string, mapName: string, mapType: MapType) => void;
+  savedPanelState?: Partial<Record<PanelId, PanelState>>;
+  onPanelStateChange?: (state: Partial<Record<PanelId, PanelState>>) => void;
 }
 
 // ============================================================================
 // MAIN COMPONENT
 // ============================================================================
 
-const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'grid', notePath = '', fullPane = false, onMapChange }: DungeonMapTrackerProps): VNode => {
+const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'grid', notePath = '', fullPane = false, onMapChange, savedPanelState, onPanelStateChange }: DungeonMapTrackerProps): VNode => {
   const app = useApp();
   useThemeMode();
   const { mapData: rootMapData, isLoading, saveStatus, updateMapData: rootUpdateMapData, forceSave, tileImagesReady, getCachedImage } = useMapData(mapId, mapName, mapType);
@@ -137,7 +140,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     layerVisibility, handleToggleLayerVisibility
   } = useUILayout({ mapData, updateMapData, fullPane });
 
-  const { isFloating, getZIndex, getInitialPosition, toggleFloat, bringToFront } = useFloatingPanels({ fullPane });
+  const { isFloating, getZIndex, getInitialPosition, toggleFloat, bringToFront, updatePosition } = useFloatingPanels({ fullPane, savedState: savedPanelState, onStateChange: onPanelStateChange });
 
   const [mapListEntries, setMapListEntries] = useState<MapListEntry[]>([]);
   useEffect(() => {
@@ -913,6 +916,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               onFocus={() => bringToFront('toolPalette')}
               zIndex={getZIndex('toolPalette')}
               initialPosition={getInitialPosition('toolPalette')}
+              onPositionChange={(pos) => updatePosition('toolPalette', pos)}
             >
               <ToolPalette
                 currentTool={currentTool}
@@ -957,6 +961,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               initialPosition={getInitialPosition('layers')}
               resizable
               minSize={{ width: 200, height: 150 }}
+              onPositionChange={(pos) => updatePosition('layers', pos)}
             >
               <DockLayerList
                 mapData={mapData}
@@ -981,6 +986,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               initialPosition={getInitialPosition('colorPicker')}
               resizable
               minSize={{ width: 200, height: 150 }}
+              onPositionChange={(pos) => updatePosition('colorPicker', pos)}
             >
               <ColorPicker
                 isOpen
@@ -1008,6 +1014,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               onFocus={() => bringToFront('view')}
               zIndex={getZIndex('view')}
               initialPosition={getInitialPosition('view')}
+              onPositionChange={(pos) => updatePosition('view', pos)}
             >
               <DockViewPanel
                 currentZoom={mapData.viewState?.zoom ?? 1}
@@ -1035,6 +1042,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               initialPosition={getInitialPosition('tiles')}
               resizable
               minSize={{ width: 200, height: 200 }}
+              onPositionChange={(pos) => updatePosition('tiles', pos)}
             >
               <TileAssetBrowser
                 tilesets={availableTilesets}

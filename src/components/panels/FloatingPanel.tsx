@@ -29,6 +29,7 @@ interface FloatingPanelProps {
   className?: string;
   /** Hide the full header and show a thin drag grip instead */
   headerless?: boolean;
+  onPositionChange?: (position: { x: number; y: number }) => void;
 }
 
 function FloatingPanel({
@@ -43,6 +44,7 @@ function FloatingPanel({
   children,
   className,
   headerless = false,
+  onPositionChange,
 }: FloatingPanelProps): VNode | null {
   const panelRef = useRef<HTMLDivElement>(null);
   const positionRef = useRef({ x: 200, y: 200 });
@@ -74,6 +76,9 @@ function FloatingPanel({
           };
           el.style.left = `${positionRef.current.x}px`;
           el.style.top = `${positionRef.current.y}px`;
+        },
+        end: () => {
+          onPositionChange?.(positionRef.current);
         },
       },
     });

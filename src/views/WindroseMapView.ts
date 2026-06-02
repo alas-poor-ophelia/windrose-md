@@ -12,6 +12,7 @@ class WindroseMapView extends ItemView {
   private mapId = '';
   private mapName = '';
   private mapType: MapType = 'grid';
+  private floatingPanels: Record<string, unknown> = {};
 
   constructor(leaf: WorkspaceLeaf) {
     super(leaf);
@@ -68,6 +69,7 @@ class WindroseMapView extends ItemView {
       mapId: this.mapId,
       mapName: this.mapName,
       mapType: this.mapType,
+      floatingPanels: this.floatingPanels,
     };
   }
 
@@ -75,6 +77,7 @@ class WindroseMapView extends ItemView {
     if (state?.mapId) this.mapId = state.mapId as string;
     if (state?.mapName) this.mapName = state.mapName as string;
     if (state?.mapType) this.mapType = state.mapType as MapType;
+    if (state?.floatingPanels) this.floatingPanels = state.floatingPanels as Record<string, unknown>;
 
     if (this.mapId) {
       this.renderMap();
@@ -93,6 +96,11 @@ class WindroseMapView extends ItemView {
 
   private handleMapChange = (id: string, name: string, type: MapType): void => {
     this.selectMap(id, name, type);
+  };
+
+  private handlePanelStateChange = (state: Record<string, unknown>): void => {
+    this.floatingPanels = state;
+    this.app.workspace.requestSaveLayout();
   };
 
   private async renderPicker(): Promise<void> {
@@ -117,6 +125,8 @@ class WindroseMapView extends ItemView {
           notePath: '',
           fullPane: true,
           onMapChange: this.handleMapChange,
+          savedPanelState: this.floatingPanels,
+          onPanelStateChange: this.handlePanelStateChange,
         })
       ),
       this.contentEl

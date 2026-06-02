@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'preact/hooks';
+import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 
 import { Z_INDEX } from '../../core/dmtConstants';
 
@@ -12,6 +12,8 @@ interface PanelState {
 
 interface UseFloatingPanelsOptions {
   fullPane: boolean;
+  savedState?: Partial<Record<PanelId, PanelState>>;
+  onStateChange?: (state: Partial<Record<PanelId, PanelState>>) => void;
 }
 
 interface UseFloatingPanelsResult {
@@ -20,11 +22,30 @@ interface UseFloatingPanelsResult {
   getInitialPosition: (panelId: PanelId) => { x: number; y: number } | undefined;
   toggleFloat: (panelId: PanelId, initialPosition?: { x: number; y: number }) => void;
   bringToFront: (panelId: PanelId) => void;
+  updatePosition: (panelId: PanelId, position: { x: number; y: number }) => void;
 }
 
-function useFloatingPanels({ fullPane }: UseFloatingPanelsOptions): UseFloatingPanelsResult {
-  const [panels, setPanels] = useState<Partial<Record<PanelId, PanelState>>>({});
+function useFloatingPanels({ fullPane, savedState, onStateChange }: UseFloatingPanelsOptions): UseFloatingPanelsResult {
+  const [panels, setPanels] = useState<Partial<Record<PanelId, PanelState>>>(() => savedState ?? {});
   const focusCounterRef = useRef(0);
+  const initializedRef = useRef(false);
+
+  // Restore focus counter from saved state
+  if (!initializedRef.current && savedState) {
+    const maxOrder = Object.values(savedState).reduce((max, p) => Math.max(max, p?.focusOrder ?? 0), 0);
+    focusCounterRef.current = maxOrder;
+    initializedRef.current = true;
+  }
+
+  // Notify parent when panel state changes (skip initial render)
+  const mountedRef = useRef(false);
+  useEffect(() => {
+    if (!mountedRef.current) {
+      mountedRef.current = true;
+      return;
+    }
+    onStateChange?.(panels);
+  }, [panels, onStateChange]);
 
   const isFloating = useCallback((panelId: PanelId): boolean => {
     if (!fullPane) return false;
@@ -73,8 +94,19 @@ function useFloatingPanels({ fullPane }: UseFloatingPanelsOptions): UseFloatingP
     });
   }, []);
 
-  return { isFloating, getZIndex, getInitialPosition, toggleFloat, bringToFront };
+  const updatePosition = useCallback((panelId: PanelId, position: { x: number; y: number }) => {
+    setPanels(prev => {
+      const current = prev[panelId];
+      if (!current?.floating) return prev;
+      return {
+        ...prev,
+        [panelId]: { ...current, initialPosition: position }
+      };
+    });
+  }, []);
+
+  return { isFloating, getZIndex, getInitialPosition, toggleFloat, bringToFront, updatePosition };
 }
 
 export { useFloatingPanels };
-export type { PanelId, UseFloatingPanelsResult };
+export type { PanelId, PanelState, UseFloatingPanelsResult };

@@ -805,6 +805,52 @@
   padding: 16px;
 }
 
+.windrose-insert-section {
+  margin-bottom: 16px;
+}
+
+.windrose-insert-section-title {
+  font-size: 0.85em;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.windrose-insert-map-list {
+  max-height: 200px;
+  overflow-y: auto;
+  margin-bottom: 8px;
+}
+
+.windrose-insert-map-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.1s ease;
+
+  &:hover {
+    background: var(--background-secondary);
+  }
+}
+
+.windrose-insert-map-item-name {
+  font-weight: 500;
+}
+
+.windrose-insert-map-item-type {
+  font-size: 0.8em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
 .windrose-map-type-selection {
   margin-top: 16px;
 }

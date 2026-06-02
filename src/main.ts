@@ -93,10 +93,9 @@ export default class WindrosePlugin extends Plugin {
 
     this.addCommand({
       id: 'insert-new-map',
-      name: 'Insert new map',
+      name: 'Insert map',
       editorCallback: (editor) => {
-        new InsertMapModal(this.app, (mapName, mapType) => {
-          const mapId = 'map-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+        new InsertMapModal(this.app, (mapId, mapName, mapType) => {
           const codeBlock = [
             '```windrose-map',
             `id: ${mapId}`,
