@@ -82,6 +82,7 @@ interface DungeonMapTrackerProps {
   notePath?: string;
   fullPane?: boolean;
   onMapChange?: (mapId: string, mapName: string, mapType: MapType) => void;
+  onNameChange?: (name: string) => void;
   savedPanelState?: Partial<Record<PanelId, PanelState>>;
   onPanelStateChange?: (state: Partial<Record<PanelId, PanelState>>) => void;
 }
@@ -90,7 +91,7 @@ interface DungeonMapTrackerProps {
 // MAIN COMPONENT
 // ============================================================================
 
-const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'grid', notePath = '', fullPane = false, onMapChange, savedPanelState, onPanelStateChange }: DungeonMapTrackerProps): VNode => {
+const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'grid', notePath = '', fullPane = false, onMapChange, onNameChange, savedPanelState, onPanelStateChange }: DungeonMapTrackerProps): VNode => {
   const app = useApp();
   useThemeMode();
   const { mapData: rootMapData, isLoading, saveStatus, updateMapData: rootUpdateMapData, forceSave, tileImagesReady, getCachedImage } = useMapData(mapId, mapName, mapType);
@@ -343,6 +344,16 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     handleShapeOverlaysChange
   } = useDataHandlers({ mapData, updateMapData, addToHistory, isApplyingHistory });
 
+  const wrappedHandleNameChange = useCallback((newName: string) => {
+    handleNameChange(newName);
+    onNameChange?.(newName);
+    if (fullPane) {
+      setMapListEntries(prev => prev.map(entry =>
+        entry.id === mapId ? { ...entry, name: newName } : entry
+      ));
+    }
+  }, [handleNameChange, onNameChange, fullPane, mapId]);
+
   const handleColorPickerPopout = useCallback((pos: { x: number; y: number }) => {
     toggleFloat('colorPicker', pos);
     setIsColorPickerOpen(!isFloating('colorPicker'));
@@ -538,7 +549,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
 
         <MapHeader
           mapData={mapData}
-          onNameChange={handleNameChange}
+          onNameChange={wrappedHandleNameChange}
           saveStatus={saveStatus}
           showFooter={showFooter}
           onToggleFooter={() => setShowFooter(!showFooter)}

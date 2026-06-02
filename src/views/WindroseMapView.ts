@@ -98,6 +98,13 @@ class WindroseMapView extends ItemView {
     this.selectMap(id, name, type);
   };
 
+  private handleNameChange = (name: string): void => {
+    this.mapName = name;
+    this.leaf.updateHeader();
+    this.titleEl.textContent = this.getDisplayText();
+    this.app.workspace.requestSaveLayout();
+  };
+
   private handlePanelStateChange = (state: Record<string, unknown>): void => {
     this.floatingPanels = state;
     this.app.workspace.requestSaveLayout();
@@ -125,6 +132,7 @@ class WindroseMapView extends ItemView {
           notePath: '',
           fullPane: true,
           onMapChange: this.handleMapChange,
+          onNameChange: this.handleNameChange,
           savedPanelState: this.floatingPanels,
           onPanelStateChange: this.handlePanelStateChange,
         })

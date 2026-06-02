@@ -143,6 +143,9 @@ async function loadMapData(app: App, mapId: string, mapName: string = '', mapTyp
 
     if (data.maps[mapId] != null) {
       data.maps[mapId] = migrateMapData(data.maps[mapId]);
+      if (data.maps[mapId].name == null && mapName) {
+        data.maps[mapId].name = mapName;
+      }
       return data.maps[mapId];
     }
 
