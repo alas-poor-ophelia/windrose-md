@@ -88,7 +88,6 @@ class WindroseMapView extends ItemView {
     this.mapName = name;
     this.mapType = type;
     this.renderMap();
-    this.leaf.updateHeader();
     this.app.workspace.requestSaveLayout();
   }
 
@@ -122,6 +121,8 @@ class WindroseMapView extends ItemView {
       ),
       this.contentEl
     );
+    this.leaf.updateHeader();
+    this.titleEl.textContent = this.getDisplayText();
   }
 }
 
