@@ -33,15 +33,6 @@ const ObjectSidebar = ({ selectedObjectType, onObjectTypeSelect, onToolChange, i
   const [searchFilter, setSearchFilter] = useState('');
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
 
-  // Local state for immediate re-render; synced from prop and persisted via parent
-  const [activeSetId, setActiveSetId] = useState(objectSetId ?? null);
-  useEffect(() => { setActiveSetId(objectSetId ?? null); }, [objectSetId]);
-
-  const handleSetChange = (newSetId: string | null): void => {
-    setActiveSetId(newSetId);
-    onObjectSetChange(newSetId);
-  };
-
   // Read available object sets from plugin settings
   const objectSets = useMemo(() => {
     try {
@@ -51,6 +42,20 @@ const ObjectSidebar = ({ selectedObjectType, onObjectTypeSelect, onToolChange, i
       return [];
     }
   }, []);
+
+  // Validate that objectSetId references an existing set; fall back to Default if stale
+  const validatedSetId = useMemo(() => {
+    if (objectSetId == null || objectSetId === '') return null;
+    return objectSets.some(s => s.id === objectSetId) ? objectSetId : null;
+  }, [objectSetId, objectSets]);
+
+  const [activeSetId, setActiveSetId] = useState(validatedSetId);
+  useEffect(() => { setActiveSetId(validatedSetId); }, [validatedSetId]);
+
+  const handleSetChange = (newSetId: string | null): void => {
+    setActiveSetId(newSetId);
+    onObjectSetChange(newSetId);
+  };
 
   const allObjectTypes = getResolvedObjectTypes(mapType, activeSetId);
   const allCategories = getResolvedCategories(mapType, activeSetId);
