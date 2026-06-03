@@ -2380,9 +2380,19 @@ button.windrose-sel-icon-btn,
   flex: 1;
   min-height: 0;
 }
+.windrose-settings-native-modal .windrose-modal-render-target {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
 .windrose-settings-native-modal .windrose-settings-modal {
   flex: 1;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 .windrose-settings-section-header {
   margin-bottom: 12px;

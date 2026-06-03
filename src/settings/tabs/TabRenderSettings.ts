@@ -2,6 +2,7 @@ import { Setting } from 'obsidian';
 import { THEME, DEFAULTS } from '../../core/dmtConstants';
 import type { SettingsTabThis } from './settingsTabContext';
 import { ContentPackBrowserModal } from '../../content-packs/ContentPackBrowserModal';
+import { getInstalledPacks } from '../../content-packs/installedPacksService';
 
 const SETTING_DEFAULTS = {
   DEFAULT_HEX_ORIENTATION: DEFAULTS.hexOrientation,
@@ -306,6 +307,48 @@ export const TabRenderSettingsMethods = {
             await this.plugin.saveSettings();
             this.display();
           }));
+    }
+
+    // Installed fog textures
+    const fogPacks = getInstalledPacks(this.plugin as any).filter(p => p.type === 'fog-pack');
+    if (fogPacks.length > 0) {
+      containerEl.createEl('div', { text: 'Installed Fog Textures', cls: 'setting-item-heading' });
+
+      const currentFogImage = this.plugin.settings.fogOfWarImage;
+
+      for (const pack of fogPacks) {
+        const imagePath = pack.vaultPath + '/' + pack.id + '.jpg';
+        const isActive = currentFogImage === imagePath;
+
+        const setting = new Setting(containerEl)
+          .setName(pack.name + (isActive ? ' (active)' : ''))
+          .setDesc('v' + pack.version);
+
+        if (!isActive) {
+          setting.addButton(btn => btn
+            .setButtonText('Set as default')
+            .onClick(async () => {
+              this.plugin.settings.fogOfWarImage = imagePath;
+              this.settingsChanged = true;
+              await this.plugin.saveSettings();
+              this.display();
+            }));
+        }
+
+        setting.addExtraButton(btn => btn
+          .setIcon('trash-2')
+          .setTooltip('Remove')
+          .onClick(async () => {
+            const packs = this.plugin.settings.installedContentPacks ?? [];
+            this.plugin.settings.installedContentPacks = packs.filter(p => p.id !== pack.id);
+            if (isActive) {
+              this.plugin.settings.fogOfWarImage = null;
+            }
+            await this.plugin.saveSettings();
+            this.settingsChanged = true;
+            this.display();
+          }));
+      }
     }
 
     // Browse Fog Content Packs

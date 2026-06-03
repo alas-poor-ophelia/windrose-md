@@ -13,7 +13,8 @@ async function fetchRegistry(forceRefresh = false): Promise<ContentPackRegistry>
   }
 
   try {
-    const response = await requestUrl({ url: REGISTRY_URL });
+    const bustUrl = REGISTRY_URL + '?t=' + now;
+    const response = await requestUrl({ url: bustUrl });
     const data = response.json as ContentPackRegistry;
 
     if (data.version == null || !Array.isArray(data.packs)) {

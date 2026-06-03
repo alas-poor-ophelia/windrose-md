@@ -9,7 +9,7 @@ import type { HexColor } from '#types/core/common.types';
 import type { PluginSettings } from '#types/settings/settings.types';
 import type { VNode } from 'preact';
 
-import { useState } from 'preact/hooks';
+import { useState, useMemo } from 'preact/hooks';
 import { ColorPicker } from '../shared/ColorPicker';
 import { CollapsibleSection } from '../shared/CollapsibleSection';
 import { useAppearance, useModalShell } from '../../context/MapSettingsContext';
@@ -18,6 +18,8 @@ import { Z_INDEX, resolveThemeColor } from '../../core/dmtConstants';
 import { SettingItem } from './SettingItem';
 import { NativeToggle, NativeSlider } from './NativeControls';
 import { Icon } from '../shared/Icon';
+import { useApp } from '../../context/AppContext';
+import type { InstalledPack } from '#types/content-packs/contentPack.types';
 
 type ColorOverrideKey = keyof SettingsOverrides & keyof PluginSettings;
 
@@ -291,6 +293,12 @@ function FogOfWarSection(): VNode {
           </div>
         </SettingItem>
 
+        <InstalledFogPacks
+          currentImage={overrides.fogOfWarImage}
+          onSelect={handleFogImageSelect}
+          disabled={useGlobalSettings}
+        />
+
         <SettingItem
           name="Soft edges"
           description="Adds a subtle blur effect at fog boundaries"
@@ -488,6 +496,56 @@ function AppearanceTab(): VNode {
           </div>
         </div>
       </SettingItem>
+    </div>
+  );
+}
+
+function InstalledFogPacks({ currentImage, onSelect, disabled }: {
+  currentImage: string | null | undefined;
+  onSelect: (displayName: string) => void;
+  disabled: boolean;
+}): VNode | null {
+  const app = useApp();
+
+  const fogPacks = useMemo((): InstalledPack[] => {
+    try {
+      const plugin = app.plugins.plugins['windrose-md'] as { settings?: { installedContentPacks?: InstalledPack[] } } | undefined;
+      const packs = plugin?.settings?.installedContentPacks ?? [];
+      return packs.filter((p: InstalledPack) => p.type === 'fog-pack');
+    } catch {
+      return [];
+    }
+  }, []);
+
+  if (fogPacks.length === 0) return null;
+
+  return (
+    <div style={{ marginBottom: '8px' }}>
+      {fogPacks.map((pack: InstalledPack) => {
+        const filename = pack.id + '.jpg';
+        const isActive = currentImage != null && currentImage.endsWith(filename);
+        return (
+          <div
+            key={pack.id}
+            onClick={() => !disabled && onSelect(filename)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '6px 10px',
+              borderBottom: '1px solid var(--background-modifier-border)',
+              cursor: disabled ? 'not-allowed' : 'pointer',
+              opacity: disabled ? 0.5 : 1,
+              background: isActive ? 'var(--background-modifier-hover)' : 'transparent'
+            }}
+          >
+            <span style={{ fontSize: '13px', color: 'var(--text-normal)' }}>{pack.name}</span>
+            {isActive && (
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>active</span>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

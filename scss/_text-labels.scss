@@ -201,9 +201,20 @@
       min-height: 0;
     }
 
+    .windrose-modal-render-target {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
     .windrose-settings-modal {
       flex: 1;
       min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
     }
   }
 
