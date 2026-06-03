@@ -608,6 +608,20 @@ That is also now linked from the top of the README, just so it’s findable. I�
 - Fixed some UI bugs with the Map Settings modal
 - Reverted out the non-functional fix for the Color Palette automatically closing itself right after it opened on Linux, as that didn’t fix the bug, and introduced a new issue where the Color Palette couldn’t be closed by clicking outside of it. You can now once again close the palette by clicking outside of it.
 
+## Version 2.0.0-preview3
+
+### New Features
+- **Content pack system** — Browse and download content packs from a central registry directly within Windrose. 5 packs available at launch. Browse buttons in Object Types and Fog of War settings sections.
+- **Fog texture management** — Installed fog textures now appear in both global settings (with set-as-default and remove) and per-map settings (as clickable rows for quick selection).
+- **New map button** — Create a new map directly from the full-pane view header. The "+" button next to the map picker opens a lightweight name/type dialog and loads the new map immediately.
+
+### Improvements
+- Map settings modal content now scrolls properly while save/cancel buttons stay pinned at the bottom.
+
+### Bug Fixes
+- **Floating panels overlapping iPad sidebars** — Pop-out panels in the full-pane view no longer stack above Obsidian's slide-out sidebars on iPad.
+- **Object set picker referencing old plugin ID** — Per-map object set selection was reading from the old Datacore-era plugin ID, making it impossible to swap object sets on a per-map basis. Now correctly reads from the standalone plugin.
+
 ## Version 2.0.0-preview2
 
 This release adds a new full-pane map view for working with maps outside of note embeds, complete with a Photoshop-style dockable panel system.
