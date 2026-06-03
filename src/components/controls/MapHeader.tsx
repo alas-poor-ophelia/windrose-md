@@ -16,9 +16,10 @@ interface MapHeaderProps {
   mapId?: string;
   mapList?: MapListEntry[];
   onMapSelect?: (entry: MapListEntry) => void;
+  onNewMap?: () => void;
 }
 
-const MapHeader = ({ mapData, onNameChange, saveStatus, showFooter, onToggleFooter, fullPane, mapId, mapList, onMapSelect }: MapHeaderProps): VNode => {
+const MapHeader = ({ mapData, onNameChange, saveStatus, showFooter, onToggleFooter, fullPane, mapId, mapList, onMapSelect, onNewMap }: MapHeaderProps): VNode => {
   const getStatusIcon = (): string => {
     if (saveStatus === 'Unsaved changes') return '○';
     if (saveStatus === 'Saving...') return '⟳';
@@ -61,19 +62,32 @@ const MapHeader = ({ mapData, onNameChange, saveStatus, showFooter, onToggleFoot
 
   return (
     <div className="windrose-header">
-      {fullPane && mapList && mapList.length > 0 && (
-        <select
-          className="windrose-map-picker"
-          value={mapId || ''}
-          onChange={handleMapChange}
-          title="Switch map"
-        >
-          {mapList.map(entry => (
-            <option key={entry.id} value={entry.id}>
-              {entry.name || entry.id}
-            </option>
-          ))}
-        </select>
+      {fullPane && (
+        <div className="windrose-map-picker-group">
+          {mapList && mapList.length > 0 && (
+            <select
+              className="windrose-map-picker"
+              value={mapId || ''}
+              onChange={handleMapChange}
+              title="Switch map"
+            >
+              {mapList.map(entry => (
+                <option key={entry.id} value={entry.id}>
+                  {entry.name || entry.id}
+                </option>
+              ))}
+            </select>
+          )}
+          {onNewMap && (
+            <button
+              className="windrose-header-action-btn interactive-child"
+              onClick={onNewMap}
+              title="Create new map"
+            >
+              <Icon icon="lucide-plus" />
+            </button>
+          )}
+        </div>
       )}
 
       <input

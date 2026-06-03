@@ -67,6 +67,7 @@ import { Icon } from './components/shared/Icon';
 import { CornerBrackets } from './components/shared/CornerBrackets';
 import { listMaps } from './persistence/fileOperations';
 import type { MapListEntry } from './persistence/fileOperations';
+import { NewMapModal } from './components/modals/NewMapModal';
 
 // Inject RPGAwesome icon CSS classes on module load
 injectIconCSS(RA_ICONS);
@@ -146,12 +147,23 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   const [mapListEntries, setMapListEntries] = useState<MapListEntry[]>([]);
   useEffect(() => {
     if (!fullPane) return;
-    listMaps(app).then(setMapListEntries);
+    listMaps(app).then(entries => {
+      if (mapId && !entries.some(e => e.id === mapId)) {
+        entries.push({ id: mapId, name: mapName || '', type: mapType || 'grid' });
+      }
+      setMapListEntries(entries);
+    });
   }, [fullPane, app]);
 
   const handleMapSelect = useCallback((entry: MapListEntry) => {
     onMapChange?.(entry.id, entry.name, entry.type);
   }, [onMapChange]);
+
+  const handleNewMap = useCallback(() => {
+    new NewMapModal(app, (newId, newName, newType) => {
+      onMapChange?.(newId, newName, newType);
+    }).open();
+  }, [app, onMapChange]);
 
   const floatingPickerPendingRef = useRef<string | null>(null);
 
@@ -557,6 +569,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
           mapId={mapId}
           mapList={mapListEntries}
           onMapSelect={handleMapSelect}
+          onNewMap={fullPane ? handleNewMap : undefined}
         />
 
         {isInSubHex && (
