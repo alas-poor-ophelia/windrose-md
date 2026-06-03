@@ -1,9 +1,10 @@
 /* ==========================================================================
-   Floating Panel Portal — sits below Obsidian modals (z-index 50)
+   Floating Panel Portal — below all Obsidian chrome layers
+   (--layer-cover: 5, --layer-popover/sidebar: 30, --layer-modal: 50)
    ========================================================================== */
 .windrose-floating-portal {
   position: relative;
-  z-index: 40;
+  z-index: 4;
 }
 
 /* ==========================================================================
