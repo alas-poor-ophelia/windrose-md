@@ -13,6 +13,7 @@ import { ObjectSetExportModal } from '../modals/ObjectSetExportModal';
 import { ObjectSetImportModal } from '../modals/ObjectSetImportModal';
 import { ConfirmModal } from '../modals/ConfirmModal';
 import { PromptModal } from '../modals/PromptModal';
+import { ContentPackBrowserModal } from '../../content-packs/ContentPackBrowserModal';
 import type { SettingsTabThis } from './settingsTabContext';
 import type { ObjectOverride, CustomObject, CustomCategory, ObjectSet } from '#types/settings/settings.types';
 
@@ -793,6 +794,19 @@ export const TabRenderObjectsMethods = {
           this.display();
         }).open();
       }));
+
+    // Browse Content Packs
+    new Setting(containerEl)
+      .setName('Browse content packs')
+      .setDesc('Download object packs from the Windrose content library')
+      .addButton(btn => btn
+        .setButtonText('Browse')
+        .onClick(() => {
+          new ContentPackBrowserModal(this.app, this.plugin as PluginAny, 'object-pack', () => {
+            this.settingsChanged = true;
+            this.display();
+          }).open();
+        }));
 
     // Auto-Load Folder
     new Setting(containerEl)

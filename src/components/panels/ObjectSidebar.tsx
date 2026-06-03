@@ -45,7 +45,7 @@ const ObjectSidebar = ({ selectedObjectType, onObjectTypeSelect, onToolChange, i
   // Read available object sets from plugin settings
   const objectSets = useMemo(() => {
     try {
-      const plugin = app.plugins.plugins['dungeon-map-tracker-settings'] as { settings?: { objectSets?: ObjectSet[] } } | undefined;
+      const plugin = app.plugins.plugins['windrose-md'] as { settings?: { objectSets?: ObjectSet[] } } | undefined;
       return (plugin && plugin.settings && plugin.settings.objectSets) || [];
     } catch {
       return [];

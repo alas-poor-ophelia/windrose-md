@@ -49,5 +49,8 @@
     "mapping",
     "ttrpg"
   ],
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "fflate": "^0.8.3"
+  }
 }

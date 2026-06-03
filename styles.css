@@ -5952,6 +5952,113 @@ button.windrose-breadcrumb-link {
   border-color: var(--text-warning);
 }
 
+.windrose-content-pack-modal .windrose-content-pack-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 1em;
+}
+.windrose-content-pack-modal .windrose-content-pack-tab {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid var(--background-modifier-border);
+  background: transparent;
+  color: var(--text-normal);
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+}
+.windrose-content-pack-modal .windrose-content-pack-tab:hover:not(.active) {
+  background: var(--background-modifier-hover);
+}
+.windrose-content-pack-modal .windrose-content-pack-tab.active {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-color: var(--interactive-accent);
+}
+.windrose-content-pack-modal .windrose-content-pack-list {
+  max-height: 400px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  overscroll-behavior: contain;
+}
+.windrose-content-pack-modal .windrose-content-pack-loading,
+.windrose-content-pack-modal .windrose-content-pack-empty,
+.windrose-content-pack-modal .windrose-content-pack-error {
+  padding: 2em;
+  text-align: center;
+  color: var(--text-muted);
+}
+.windrose-content-pack-modal .windrose-content-pack-error {
+  color: var(--text-error);
+}
+.windrose-content-pack-modal .windrose-content-pack-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+.windrose-content-pack-modal .windrose-content-pack-item:last-child {
+  border-bottom: none;
+}
+.windrose-content-pack-modal .windrose-content-pack-info {
+  flex: 1;
+  min-width: 0;
+}
+.windrose-content-pack-modal .windrose-content-pack-name {
+  font-weight: 600;
+  color: var(--text-normal);
+}
+.windrose-content-pack-modal .windrose-content-pack-author {
+  font-size: 0.85em;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+.windrose-content-pack-modal .windrose-content-pack-desc {
+  font-size: 0.9em;
+  color: var(--text-normal);
+  margin-top: 6px;
+  line-height: 1.4;
+}
+.windrose-content-pack-modal .windrose-content-pack-meta {
+  font-size: 0.8em;
+  color: var(--text-faint);
+  margin-top: 4px;
+}
+.windrose-content-pack-modal .windrose-content-pack-action {
+  flex-shrink: 0;
+  align-self: center;
+}
+.windrose-content-pack-modal .windrose-content-pack-btn {
+  padding: 6px 16px;
+  border: 1px solid var(--interactive-accent);
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+.windrose-content-pack-modal .windrose-content-pack-btn:hover {
+  opacity: 0.85;
+}
+.windrose-content-pack-modal .windrose-content-pack-btn-update {
+  background: transparent;
+  color: var(--interactive-accent);
+}
+.windrose-content-pack-modal .windrose-content-pack-btn-update:hover {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+.windrose-content-pack-modal .windrose-content-pack-btn-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.windrose-content-pack-modal .windrose-content-pack-installed {
+  color: var(--text-muted);
+  font-size: 0.9em;
+  padding: 6px 0;
+}
+
 /* ===========================================
  * Animations
  * =========================================== */

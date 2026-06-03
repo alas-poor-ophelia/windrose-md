@@ -1,6 +1,7 @@
 import { Setting } from 'obsidian';
 import { THEME, DEFAULTS } from '../../core/dmtConstants';
 import type { SettingsTabThis } from './settingsTabContext';
+import { ContentPackBrowserModal } from '../../content-packs/ContentPackBrowserModal';
 
 const SETTING_DEFAULTS = {
   DEFAULT_HEX_ORIENTATION: DEFAULTS.hexOrientation,
@@ -306,6 +307,19 @@ export const TabRenderSettingsMethods = {
             this.display();
           }));
     }
+
+    // Browse Fog Content Packs
+    new Setting(containerEl)
+      .setName('Browse fog textures')
+      .setDesc('Download tileable fog of war textures from the Windrose content library')
+      .addButton(btn => btn
+        .setButtonText('Browse')
+        .onClick(() => {
+          new ContentPackBrowserModal(this.app, this.plugin as any, 'fog-pack', () => {
+            this.settingsChanged = true;
+            this.display();
+          }).open();
+        }));
   },
   renderMapBehaviorSettingsContent(this: SettingsTabThis, containerEl: HTMLElement): void {
     // Expanded by Default

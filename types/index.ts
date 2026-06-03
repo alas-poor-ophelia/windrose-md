@@ -441,6 +441,16 @@ export type {
 } from './hooks/imageAlignment.types';
 
 // ===========================================
+// Content Pack Types
+// ===========================================
+export type {
+  PackType,
+  RegistryPack,
+  ContentPackRegistry,
+  InstalledPack,
+} from './content-packs/contentPack.types';
+
+// ===========================================
 // Global Augmentations
 // ===========================================
 export type {

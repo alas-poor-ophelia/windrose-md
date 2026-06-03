@@ -161,7 +161,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   );
   const setShowAdjacentSubMaps = useCallback((v: boolean) => {
     try {
-      const plugin = app.plugins.plugins['dungeon-map-tracker-settings'] as unknown as
+      const plugin = app.plugins.plugins['windrose-md'] as unknown as
         { settings: { showAdjacentSubMaps?: boolean }; saveSettings(): Promise<void> } | undefined;
       if (plugin != null) {
         plugin.settings.showAdjacentSubMaps = v;

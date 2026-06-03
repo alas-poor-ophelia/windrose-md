@@ -6,6 +6,7 @@
  */
 
 import type { HexColor } from '../core/common.types';
+import type { InstalledPack } from '../content-packs/contentPack.types';
 
 /** Hex orientation options */
 export type HexOrientation = 'flat' | 'pointy';
@@ -152,6 +153,9 @@ export interface PluginSettings {
 
   // Keyboard shortcuts (action ID → key string)
   keyboardShortcuts?: Record<string, string>;
+
+  // Content packs (downloaded supplementary content)
+  installedContentPacks?: InstalledPack[];
 }
 
 // ===========================================
