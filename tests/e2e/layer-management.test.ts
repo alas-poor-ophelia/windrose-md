@@ -35,7 +35,7 @@ async function getLayerCount(page: any, mapId: string): Promise<number> {
 async function openLayerPanelAndVerify(page: any): Promise<void> {
   await openLayerPanel(page);
 
-  const panel = page.locator('.dmt-layer-controls-open');
+  const panel = page.locator('.windrose-layer-controls-open');
   await panel.waitFor({ state: "visible", timeout: 3000 });
   await page.waitForTimeout(200);
 }
@@ -56,7 +56,7 @@ test("Adding a layer increases layer count in data", async ({ page }) => {
 
   await openLayerPanelAndVerify(page);
 
-  const addBtn = page.locator('.dmt-layer-add-btn');
+  const addBtn = page.locator('.windrose-layer-add-btn');
   await addBtn.waitFor({ state: "visible", timeout: 3000 });
   await addBtn.click();
   await page.waitForTimeout(500);
@@ -80,14 +80,14 @@ test("Switching active layer updates activeLayerId in data", async ({ page }) =>
 
   await openLayerPanelAndVerify(page);
 
-  const layerBtns = page.locator('.dmt-layer-btn');
+  const layerBtns = page.locator('.windrose-layer-btn');
   const count = await layerBtns.count();
   expect(count).toBeGreaterThanOrEqual(2);
 
   for (let i = 0; i < count; i++) {
     const btn = layerBtns.nth(i);
     const classes = await btn.getAttribute("class") || "";
-    if (!classes.includes("dmt-layer-btn-active")) {
+    if (!classes.includes("windrose-layer-btn-active")) {
       await btn.click();
       await page.waitForTimeout(500);
       break;
@@ -116,13 +116,13 @@ test("Deleting a layer decreases layer count", async ({ page }) => {
   await openLayerPanelAndVerify(page);
 
   // Right-click to expand options on the first layer
-  const firstLayerBtn = page.locator('.dmt-layer-btn').first();
+  const firstLayerBtn = page.locator('.windrose-layer-btn').first();
   await firstLayerBtn.click({ button: 'right' });
   await page.waitForTimeout(300);
 
   // Scope delete to first layer wrapper
-  const firstWrapper = page.locator('.dmt-layer-btn-wrapper').first();
-  const deleteBtn = firstWrapper.locator('.dmt-layer-option-btn.delete');
+  const firstWrapper = page.locator('.windrose-layer-btn-wrapper').first();
+  const deleteBtn = firstWrapper.locator('.windrose-layer-option-btn.delete');
   await deleteBtn.waitFor({ state: "visible", timeout: 3000 });
   await deleteBtn.click();
   await page.waitForTimeout(500);
@@ -143,7 +143,7 @@ test("Layer persists after adding and navigating away", async ({ page }) => {
 
   await openLayerPanelAndVerify(page);
 
-  const addBtn = page.locator('.dmt-layer-add-btn');
+  const addBtn = page.locator('.windrose-layer-add-btn');
   await addBtn.waitFor({ state: "visible", timeout: 3000 });
   await addBtn.click();
   await page.waitForTimeout(500);

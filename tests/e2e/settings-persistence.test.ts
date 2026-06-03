@@ -32,7 +32,7 @@ test("Saving settings modal persists changes to data file", async ({ page }) => 
   await openSettingsModal(page);
 
   // Navigate to Preferences tab (last tab)
-  const tabs = page.locator('.dmt-settings-tab');
+  const tabs = page.locator('.windrose-settings-tab');
   const tabCount = await tabs.count();
 
   if (tabCount > 0) {
@@ -42,7 +42,7 @@ test("Saving settings modal persists changes to data file", async ({ page }) => 
   }
 
   // Find a toggle/checkbox and click it to change a setting
-  const toggle = page.locator('.dmt-settings-tab-content input[type="checkbox"], .dmt-modal-body input[type="checkbox"]').first();
+  const toggle = page.locator('.windrose-settings-tab-content input[type="checkbox"], .windrose-modal-body input[type="checkbox"]').first();
   const hasToggle = await toggle.count() > 0;
 
   if (hasToggle) {
@@ -50,7 +50,7 @@ test("Saving settings modal persists changes to data file", async ({ page }) => 
     await page.waitForTimeout(200);
 
     // Click Save button (native or fallback)
-    const saveBtn = page.locator('.modal-button-container .mod-cta, .dmt-modal-btn-submit').first();
+    const saveBtn = page.locator('.modal-button-container .mod-cta, .windrose-modal-btn-submit').first();
     await saveBtn.dispatchEvent('click');
     await page.waitForTimeout(500);
 
@@ -81,7 +81,7 @@ test("Cancelling settings modal does not persist changes", async ({ page }) => {
   await openSettingsModal(page);
 
   // Find a toggle and click it
-  const toggle = page.locator('.dmt-settings-tab-content input[type="checkbox"], .dmt-modal-body input[type="checkbox"]').first();
+  const toggle = page.locator('.windrose-settings-tab-content input[type="checkbox"], .windrose-modal-body input[type="checkbox"]').first();
   const hasToggle = await toggle.count() > 0;
 
   if (hasToggle) {
@@ -90,7 +90,7 @@ test("Cancelling settings modal does not persist changes", async ({ page }) => {
   }
 
   // Click Cancel button
-  const cancelBtn = page.locator('.dmt-modal-btn-cancel, .modal-button-container button:not(.mod-cta)').first();
+  const cancelBtn = page.locator('.windrose-modal-btn-cancel, .modal-button-container button:not(.mod-cta)').first();
   await cancelBtn.dispatchEvent('click');
   await page.waitForTimeout(500);
 
@@ -116,7 +116,7 @@ test.skip("Settings save persists across navigation", async ({ page }) => {
   await openSettingsModal(page);
 
   // Navigate to Preferences tab (last tab)
-  const tabs = page.locator('.dmt-settings-tab');
+  const tabs = page.locator('.windrose-settings-tab');
   const tabCount = await tabs.count();
   if (tabCount > 0) {
     const lastTab = tabs.nth(tabCount - 1);
@@ -125,14 +125,14 @@ test.skip("Settings save persists across navigation", async ({ page }) => {
   }
 
   // Toggle a preference
-  const toggle = page.locator('.dmt-settings-tab-content input[type="checkbox"], .dmt-modal-body input[type="checkbox"]').first();
+  const toggle = page.locator('.windrose-settings-tab-content input[type="checkbox"], .windrose-modal-body input[type="checkbox"]').first();
   const hasToggle = await toggle.count() > 0;
 
   if (hasToggle) {
     await toggle.click({ force: true });
     await page.waitForTimeout(200);
 
-    const saveBtn = page.locator('.modal-button-container .mod-cta, .dmt-modal-btn-submit').first();
+    const saveBtn = page.locator('.modal-button-container .mod-cta, .windrose-modal-btn-submit').first();
     await saveBtn.dispatchEvent('click');
     await page.waitForTimeout(500);
 

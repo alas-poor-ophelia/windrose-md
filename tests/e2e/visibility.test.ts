@@ -12,12 +12,12 @@ import {
 // ===========================================
 
 async function openVisibilityToolbar(page: any): Promise<void> {
-  const controlsArea = page.locator('.dmt-controls');
+  const controlsArea = page.locator('.windrose-controls');
   await controlsArea.waitFor({ state: "visible", timeout: 5000 });
   await controlsArea.hover();
   await page.waitForTimeout(300);
 
-  const visibilityBtn = page.locator('.dmt-expand-btn[title*="visibility"]');
+  const visibilityBtn = page.locator('.windrose-expand-btn[title*="visibility"]');
   await visibilityBtn.waitFor({ state: "visible", timeout: 5000 });
   await visibilityBtn.click();
   await page.waitForTimeout(300);
@@ -31,10 +31,10 @@ test("Visibility toolbar opens and shows toggle buttons", async ({ page }) => {
 
   await openVisibilityToolbar(page);
 
-  const toolbar = page.locator('.dmt-visibility-toolbar');
+  const toolbar = page.locator('.windrose-visibility-toolbar');
   expect(await toolbar.isVisible()).toBe(true);
 
-  const toggleBtns = page.locator('.dmt-visibility-btn');
+  const toggleBtns = page.locator('.windrose-visibility-btn');
   const count = await toggleBtns.count();
   expect(count).toBeGreaterThanOrEqual(2);
 
@@ -49,19 +49,19 @@ test("Grid visibility can be toggled off and on", async ({ page }) => {
 
   await openVisibilityToolbar(page);
 
-  const gridToggle = page.locator('.dmt-visibility-btn[title*="grid"]');
+  const gridToggle = page.locator('.windrose-visibility-btn[title*="grid"]');
   await gridToggle.waitFor({ state: "visible", timeout: 3000 });
 
   // Initially should not have hidden class
   const initialClasses = await gridToggle.getAttribute("class") || "";
-  const wasHidden = initialClasses.includes("dmt-visibility-btn-hidden");
+  const wasHidden = initialClasses.includes("windrose-visibility-btn-hidden");
 
   // Click to toggle
   await gridToggle.click();
   await page.waitForTimeout(300);
 
   const afterToggleClasses = await gridToggle.getAttribute("class") || "";
-  const isNowHidden = afterToggleClasses.includes("dmt-visibility-btn-hidden");
+  const isNowHidden = afterToggleClasses.includes("windrose-visibility-btn-hidden");
   expect(isNowHidden).not.toBe(wasHidden);
 
   // Toggle back
@@ -69,7 +69,7 @@ test("Grid visibility can be toggled off and on", async ({ page }) => {
   await page.waitForTimeout(300);
 
   const restoredClasses = await gridToggle.getAttribute("class") || "";
-  const restoredHidden = restoredClasses.includes("dmt-visibility-btn-hidden");
+  const restoredHidden = restoredClasses.includes("windrose-visibility-btn-hidden");
   expect(restoredHidden).toBe(wasHidden);
 
   expect(errors).toHaveLength(0);
@@ -83,17 +83,17 @@ test("Object visibility can be toggled", async ({ page }) => {
 
   await openVisibilityToolbar(page);
 
-  const objectToggle = page.locator('.dmt-visibility-btn[title*="object"]');
+  const objectToggle = page.locator('.windrose-visibility-btn[title*="object"]');
   await objectToggle.waitFor({ state: "visible", timeout: 3000 });
 
   const initialClasses = await objectToggle.getAttribute("class") || "";
-  const wasHidden = initialClasses.includes("dmt-visibility-btn-hidden");
+  const wasHidden = initialClasses.includes("windrose-visibility-btn-hidden");
 
   await objectToggle.click();
   await page.waitForTimeout(300);
 
   const afterClasses = await objectToggle.getAttribute("class") || "";
-  const isNowHidden = afterClasses.includes("dmt-visibility-btn-hidden");
+  const isNowHidden = afterClasses.includes("windrose-visibility-btn-hidden");
   expect(isNowHidden).not.toBe(wasHidden);
 
   expect(errors).toHaveLength(0);
@@ -107,17 +107,17 @@ test("Text label visibility can be toggled", async ({ page }) => {
 
   await openVisibilityToolbar(page);
 
-  const textToggle = page.locator('.dmt-visibility-btn[title*="text label"]');
+  const textToggle = page.locator('.windrose-visibility-btn[title*="text label"]');
   await textToggle.waitFor({ state: "visible", timeout: 3000 });
 
   const initialClasses = await textToggle.getAttribute("class") || "";
-  const wasHidden = initialClasses.includes("dmt-visibility-btn-hidden");
+  const wasHidden = initialClasses.includes("windrose-visibility-btn-hidden");
 
   await textToggle.click();
   await page.waitForTimeout(300);
 
   const afterClasses = await textToggle.getAttribute("class") || "";
-  const isNowHidden = afterClasses.includes("dmt-visibility-btn-hidden");
+  const isNowHidden = afterClasses.includes("windrose-visibility-btn-hidden");
   expect(isNowHidden).not.toBe(wasHidden);
 
   expect(errors).toHaveLength(0);
@@ -131,19 +131,19 @@ test("Visibility toolbar closes when button is clicked again", async ({ page }) 
 
   await openVisibilityToolbar(page);
 
-  const toolbar = page.locator('.dmt-visibility-toolbar');
+  const toolbar = page.locator('.windrose-visibility-toolbar');
   expect(await toolbar.isVisible()).toBe(true);
 
   // Click the visibility button again to close
-  const controlsArea = page.locator('.dmt-controls');
+  const controlsArea = page.locator('.windrose-controls');
   await controlsArea.hover();
   await page.waitForTimeout(300);
-  const visibilityBtn = page.locator('.dmt-expand-btn[title*="visibility"]');
+  const visibilityBtn = page.locator('.windrose-expand-btn[title*="visibility"]');
   await visibilityBtn.click();
   await page.waitForTimeout(300);
 
   // Toolbar should be hidden or not have open class
-  const isOpen = page.locator('.dmt-visibility-toolbar-open');
+  const isOpen = page.locator('.windrose-visibility-toolbar-open');
   const openCount = await isOpen.count();
   expect(openCount).toBe(0);
 
@@ -158,7 +158,7 @@ test("Hex map shows additional visibility toggles", async ({ page }) => {
 
   await openVisibilityToolbar(page);
 
-  const toggleBtns = page.locator('.dmt-visibility-btn');
+  const toggleBtns = page.locator('.windrose-visibility-btn');
   const hexCount = await toggleBtns.count();
 
   // Hex maps should have more toggles than grid (coordinates, regions, outlines)

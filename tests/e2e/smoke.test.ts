@@ -24,7 +24,7 @@ test("Grid map loads without errors", async ({ page }) => {
   await waitForContainer(page);
 
   // Wait for canvas wrapper
-  const canvasWrapper = page.locator(".dmt-canvas-wrapper");
+  const canvasWrapper = page.locator(".windrose-canvas-wrapper");
   await canvasWrapper.waitFor({ state: "visible", timeout: 5000 });
 
   // Verify canvas wrapper has dimensions
@@ -42,11 +42,11 @@ test("Grid map controls render", async ({ page }) => {
   await waitForContainer(page);
 
   // Check controls overlay
-  const controls = page.locator(".dmt-controls");
+  const controls = page.locator(".windrose-controls");
   await controls.waitFor({ state: "visible", timeout: 5000 });
 
   // Check compass
-  const compass = page.locator(".dmt-compass");
+  const compass = page.locator("div.windrose-compass");
   await compass.waitFor({ state: "visible", timeout: 5000 });
 });
 
@@ -61,7 +61,7 @@ test("Hex map loads without errors", async ({ page }) => {
   await waitForContainer(page);
 
   // Wait for canvas wrapper
-  const canvasWrapper = page.locator(".dmt-canvas-wrapper");
+  const canvasWrapper = page.locator(".windrose-canvas-wrapper");
   await canvasWrapper.waitFor({ state: "visible", timeout: 5000 });
 
   // Verify canvas wrapper has dimensions
@@ -79,11 +79,11 @@ test("Hex map controls render", async ({ page }) => {
   await waitForContainer(page);
 
   // Check controls overlay
-  const controls = page.locator(".dmt-controls");
+  const controls = page.locator(".windrose-controls");
   await controls.waitFor({ state: "visible", timeout: 5000 });
 
   // Check compass
-  const compass = page.locator(".dmt-compass");
+  const compass = page.locator("div.windrose-compass");
   await compass.waitFor({ state: "visible", timeout: 5000 });
 });
 
@@ -102,11 +102,11 @@ test("Diagonal fill tool can be selected and clicks register", async ({ page }) 
   await selectSubTool(page, "Rectangle", "Diagonal Fill");
 
   // Verify the tool button shows as active (the diagonal fill icon should be visible)
-  const activeToolBtn = page.locator('.dmt-tool-btn.dmt-tool-btn-active');
+  const activeToolBtn = page.locator('.windrose-tool-btn.windrose-tool-btn-active');
   await activeToolBtn.waitFor({ state: "visible", timeout: 3000 });
 
   // Get canvas for clicking
-  const canvas = page.locator(".dmt-canvas-wrapper canvas").first();
+  const canvas = page.locator(".windrose-canvas-wrapper canvas").first();
   const canvasBox = await canvas.boundingBox();
   expect(canvasBox).not.toBeNull();
 
@@ -141,11 +141,11 @@ test("Diagonal fill tool shows preview overlay on valid diagonal", async ({ page
 
   // First, draw a diagonal staircase pattern using the draw tool
   // Select draw tool (index 1)
-  const drawToolBtn = page.locator(".dmt-tool-palette .dmt-tool-btn").nth(1);
+  const drawToolBtn = page.locator(".windrose-tool-palette .windrose-tool-btn").nth(1);
   await drawToolBtn.click();
   await page.waitForTimeout(100);
 
-  const canvas = page.locator(".dmt-canvas-wrapper canvas").first();
+  const canvas = page.locator(".windrose-canvas-wrapper canvas").first();
   const canvasBox = await canvas.boundingBox();
   expect(canvasBox).not.toBeNull();
 
@@ -181,7 +181,7 @@ test("Diagonal fill tool shows preview overlay on valid diagonal", async ({ page
   await page.waitForTimeout(300);
 
   // Check if the diagonal fill overlay appeared (it shows when a valid start point is found)
-  const diagonalOverlay = page.locator(".dmt-diagonal-fill-overlay");
+  const diagonalOverlay = page.locator(".windrose-diagonal-fill-overlay");
   const overlayVisible = await diagonalOverlay.count() > 0;
 
   // Move to show preview
@@ -265,7 +265,7 @@ test("Layer transparency slider appears on hover when active", async ({ page }) 
   await page.waitForTimeout(500);
 
   // Verify slider popup appears
-  const sliderPopup = page.locator('.dmt-opacity-slider-popup');
+  const sliderPopup = page.locator('.windrose-opacity-slider-popup');
   await sliderPopup.waitFor({ state: "visible", timeout: 5000 });
 
   // Verify slider input exists
@@ -296,7 +296,7 @@ test("Layer transparency slider does not appear when toggle is inactive", async 
   await hoverTransparencyButton(page, layerIndex);
 
   // Slider should NOT appear
-  const sliderPopup = page.locator('.dmt-opacity-slider-popup');
+  const sliderPopup = page.locator('.windrose-opacity-slider-popup');
   expect(await sliderPopup.count()).toBe(0);
 
   expect(errors).toHaveLength(0);
@@ -339,7 +339,7 @@ test("Layer transparency renders without errors", async ({ page }) => {
   await page.waitForTimeout(500);
 
   // Canvas should still be visible and no errors
-  const canvas = page.locator(".dmt-canvas-wrapper canvas").first();
+  const canvas = page.locator(".windrose-canvas-wrapper canvas").first();
   await canvas.waitFor({ state: "visible", timeout: 3000 });
 
   expect(errors).toHaveLength(0);
@@ -356,30 +356,30 @@ test("Object rotation via toolbar button rotates 45 degrees", async ({ page }) =
   await waitForContainer(page);
   await waitForToolPalette(page);
 
-  const addObjectBtn = page.locator('.dmt-tool-btn[title*="Add Object"]');
+  const addObjectBtn = page.locator('.windrose-tool-btn[title*="Add Object"]');
   await addObjectBtn.click();
   await page.waitForTimeout(200);
 
-  const sidebar = page.locator('.dmt-object-sidebar');
+  const sidebar = page.locator('.windrose-object-sidebar');
   await sidebar.waitFor({ state: "visible", timeout: 5000 });
-  const objectItem = page.locator('.dmt-object-grid-item').first();
+  const objectItem = page.locator('.windrose-object-grid-item').first();
   await objectItem.click();
   await page.waitForTimeout(200);
 
-  const canvas = page.locator(".dmt-canvas-wrapper canvas").first();
+  const canvas = page.locator(".windrose-canvas-wrapper canvas").first();
   const canvasBox = await canvas.boundingBox();
   const centerX = canvasBox!.x + canvasBox!.width / 2;
   const centerY = canvasBox!.y + canvasBox!.height / 2;
   await page.mouse.click(centerX, centerY);
   await page.waitForTimeout(500);
 
-  const selectToolBtn = page.locator('.dmt-tool-btn[title*="Select"]');
+  const selectToolBtn = page.locator('.windrose-tool-btn[title*="Select"]');
   await selectToolBtn.click();
   await page.waitForTimeout(200);
   await page.mouse.click(centerX, centerY);
   await page.waitForTimeout(300);
 
-  const rotateBtn = page.locator('.dmt-toolbar-button[title*="Rotate 45"]');
+  const rotateBtn = page.locator('.windrose-toolbar-button[title*="Rotate 45"]');
   const rotateBtnExists = await rotateBtn.count() > 0;
 
   if (rotateBtnExists) {
@@ -397,30 +397,30 @@ test("Object rotation via R key rotates 45 degrees", async ({ page }) => {
   await waitForContainer(page);
   await waitForToolPalette(page);
 
-  const addObjectBtn = page.locator('.dmt-tool-btn[title*="Add Object"]');
+  const addObjectBtn = page.locator('.windrose-tool-btn[title*="Add Object"]');
   await addObjectBtn.click();
   await page.waitForTimeout(200);
 
-  const sidebar = page.locator('.dmt-object-sidebar');
+  const sidebar = page.locator('.windrose-object-sidebar');
   await sidebar.waitFor({ state: "visible", timeout: 5000 });
-  const objectItem = page.locator('.dmt-object-grid-item').first();
+  const objectItem = page.locator('.windrose-object-grid-item').first();
   await objectItem.click();
   await page.waitForTimeout(200);
 
-  const canvas = page.locator(".dmt-canvas-wrapper canvas").first();
+  const canvas = page.locator(".windrose-canvas-wrapper canvas").first();
   const canvasBox = await canvas.boundingBox();
   const centerX = canvasBox!.x + canvasBox!.width / 2;
   const centerY = canvasBox!.y + canvasBox!.height / 2;
   await page.mouse.click(centerX, centerY);
   await page.waitForTimeout(500);
 
-  const selectToolBtn = page.locator('.dmt-tool-btn[title*="Select"]');
+  const selectToolBtn = page.locator('.windrose-tool-btn[title*="Select"]');
   await selectToolBtn.click();
   await page.waitForTimeout(200);
   await page.mouse.click(centerX, centerY);
   await page.waitForTimeout(300);
 
-  const selectionToolbar = page.locator('.dmt-selection-toolbar');
+  const selectionToolbar = page.locator('.windrose-selection-toolbar');
   const isSelected = await selectionToolbar.count() > 0;
 
   if (isSelected) {

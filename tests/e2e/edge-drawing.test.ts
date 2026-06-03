@@ -32,7 +32,7 @@ test("Edge draw tool can be selected via sub-tool menu", async ({ page }) => {
   await selectSubTool(page, "Draw", "Paint Edges");
 
   // Verify an active tool button exists after sub-tool selection
-  const activeBtn = page.locator('.dmt-tool-btn.dmt-tool-btn-active');
+  const activeBtn = page.locator('.windrose-tool-btn.windrose-tool-btn-active');
   expect(await activeBtn.count()).toBeGreaterThan(0);
 
   expect(errors).toHaveLength(0);

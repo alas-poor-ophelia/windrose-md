@@ -26,10 +26,10 @@ test("Freehand tool can be selected via sub-tool menu", async ({ page }) => {
 
   // After selecting freehand, the draw group button should be active
   // and its title should now reflect the freehand sub-tool
-  const freehandBtn = page.locator('.dmt-tool-btn[title*="Freehand"]');
+  const freehandBtn = page.locator('.windrose-tool-btn[title*="Freehand"]');
   await freehandBtn.waitFor({ state: "visible", timeout: 5000 });
   const classes = await freehandBtn.getAttribute("class");
-  expect(classes).toContain("dmt-tool-btn-active");
+  expect(classes).toContain("windrose-tool-btn-active");
 
   expect(errors).toHaveLength(0);
 });

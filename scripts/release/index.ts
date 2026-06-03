@@ -14,12 +14,12 @@
  *   npm run release                           # Full release from current version
  *   npm run release:dry                       # Dry run: build + test only
  *   npm run release -- --bump 2.1.0           # Bump version first
- *   npm run release -- --skip-tests           # Skip test step
- *   npm run release -- --include-e2e          # Also run E2E tests
+ *   npm run release -- --skip-tests           # Skip test step entirely
+ *   npm run release -- --skip-e2e             # Skip E2E tests (unit only)
  *   npm run release -- --allow-branch         # Allow release from non-main branch
  */
 
-import { execSync, spawnSync } from "child_process";
+import { execSync, spawnSync, spawn as spawnChild } from "child_process";
 import { readFileSync, writeFileSync, existsSync, openSync, closeSync } from "fs";
 import * as path from "path";
 
@@ -30,7 +30,7 @@ const TEST_RESULTS_PATH = path.join(DEV_ROOT, "test-results.json");
 interface ReleaseOptions {
   bump: string | null;
   skipTests: boolean;
-  includeE2E: boolean;
+  skipE2E: boolean;
   dryRun: boolean;
   allowBranch: boolean;
 }
@@ -41,7 +41,7 @@ function parseArgs(): ReleaseOptions {
   return {
     bump: bumpIdx >= 0 ? args[bumpIdx + 1] : null,
     skipTests: args.includes("--skip-tests"),
-    includeE2E: args.includes("--include-e2e"),
+    skipE2E: args.includes("--skip-e2e"),
     dryRun: args.includes("--dry-run"),
     allowBranch: args.includes("--allow-branch"),
   };
@@ -190,8 +190,8 @@ function printTestSummary(jsonPath: string): { passed: boolean } {
   return { passed: failedFiles.length === 0 };
 }
 
-function runTests(includeE2E: boolean): void {
-  console.log(`Step 2: Running tests${includeE2E ? " (unit + E2E)" : " (unit only)"}...\n`);
+async function runTests(skipE2E: boolean): Promise<void> {
+  console.log(`Step 2: Running tests${skipE2E ? " (unit only)" : " (unit + E2E)"}...\n`);
 
   // Unit tests always run inline
   const unitResult = spawnSync("npm", ["run", "test:unit"], {
@@ -205,22 +205,49 @@ function runTests(includeE2E: boolean): void {
   }
   console.log("");
 
-  // E2E tests if requested
-  if (includeE2E) {
-    console.log("  Running E2E tests...\n");
+  // E2E tests run by default; skip with --skip-e2e
+  if (!skipE2E) {
+    console.log("  Running E2E tests (background, offscreen)...\n");
+    await runE2EBackground();
+  }
+}
+
+function runE2EBackground(): Promise<void> {
+  return new Promise((resolve, reject) => {
     const logFd = openSync(TEST_LOG_PATH, "w");
-    const e2eResult = spawnSync("npm", ["run", "test:release"], {
+    const child = spawnChild("npm", ["run", "test:release"], {
       cwd: DEV_ROOT,
       stdio: ["ignore", logFd, logFd],
       shell: true,
+      detached: false,
     });
-    closeSync(logFd);
 
-    const { passed } = printTestSummary(TEST_RESULTS_PATH);
-    if (e2eResult.status !== 0 || !passed) {
-      throw new Error("E2E tests failed. See test-output.log for details.");
-    }
-  }
+    const startTime = Date.now();
+    const timer = setInterval(() => {
+      const elapsed = Math.round((Date.now() - startTime) / 1000);
+      process.stdout.write(`\r  E2E running... ${elapsed}s elapsed`);
+    }, 5000);
+
+    child.on("close", (code: number | null) => {
+      clearInterval(timer);
+      closeSync(logFd);
+      const elapsed = Math.round((Date.now() - startTime) / 1000);
+      process.stdout.write(`\r  E2E completed in ${elapsed}s\n\n`);
+
+      const { passed } = printTestSummary(TEST_RESULTS_PATH);
+      if (code !== 0 || !passed) {
+        reject(new Error("E2E tests failed. See test-output.log for details."));
+      } else {
+        resolve();
+      }
+    });
+
+    child.on("error", (err: Error) => {
+      clearInterval(timer);
+      closeSync(logFd);
+      reject(err);
+    });
+  });
 }
 
 function commitAndTag(version: string, dryRun: boolean): void {
@@ -328,7 +355,7 @@ async function main(): Promise<void> {
   if (options.skipTests) {
     console.log("Step 2: Skipping tests (--skip-tests)\n");
   } else {
-    runTests(options.includeE2E);
+    await runTests(options.skipE2E);
   }
 
   // Steps 3-4: Commit + Tag + Push

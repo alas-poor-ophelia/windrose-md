@@ -32,7 +32,7 @@ test("Map data persists after drawing and navigation", async ({ page }) => {
   await waitForToolPalette(page);
 
   // Select draw tool
-  const drawToolBtn = page.locator(".dmt-tool-palette .dmt-tool-btn").nth(1);
+  const drawToolBtn = page.locator(".windrose-tool-palette .windrose-tool-btn").nth(1);
   await drawToolBtn.click();
   await page.waitForTimeout(100);
 
@@ -64,7 +64,7 @@ test("Map data persists after drawing and navigation", async ({ page }) => {
 
   // The map should have loaded without errors
   // Canvas should still be visible and functional
-  const canvasAfter = page.locator(".dmt-canvas-wrapper canvas").first();
+  const canvasAfter = page.locator(".windrose-canvas-wrapper canvas").first();
   await canvasAfter.waitFor({ state: "visible", timeout: 5000 });
   const boxAfter = await canvasAfter.boundingBox();
   expect(boxAfter).not.toBeNull();
@@ -94,7 +94,7 @@ test("Drawing a cell increases cell count in data", async ({ page }) => {
 
   // Select draw tool
   await waitForToolPalette(page);
-  const drawToolBtn = page.locator(".dmt-tool-palette .dmt-tool-btn").nth(1);
+  const drawToolBtn = page.locator(".windrose-tool-palette .windrose-tool-btn").nth(1);
   await drawToolBtn.click();
   await page.waitForTimeout(100);
 
@@ -128,7 +128,7 @@ test("Erasing a cell decreases cell count in data", async ({ page }) => {
   const center = await getCanvasCenter(page);
 
   // First, paint a cell to ensure we have something to erase
-  const drawToolBtn = page.locator(".dmt-tool-palette .dmt-tool-btn").nth(1);
+  const drawToolBtn = page.locator(".windrose-tool-palette .windrose-tool-btn").nth(1);
   await drawToolBtn.click();
   await page.waitForTimeout(100);
   await page.mouse.click(center.x, center.y);
@@ -142,7 +142,7 @@ test("Erasing a cell decreases cell count in data", async ({ page }) => {
   expect(countAfterPaint).toBeGreaterThan(0);
 
   // Now erase at the same position
-  const eraseToolBtn = page.locator('.dmt-tool-btn[title*="Erase"]');
+  const eraseToolBtn = page.locator('.windrose-tool-btn[title*="Erase"]');
   await eraseToolBtn.click();
   await page.waitForTimeout(100);
   await page.mouse.click(center.x, center.y);
@@ -173,7 +173,7 @@ test("Rectangle fill creates multiple cells in data", async ({ page }) => {
   await waitForToolPalette(page);
 
   // Select rectangle tool (look for it by title to be precise)
-  const rectToolBtn = page.locator('.dmt-tool-btn[title*="Rectangle"]');
+  const rectToolBtn = page.locator('.windrose-tool-btn[title*="Rectangle"]');
   await rectToolBtn.waitFor({ state: "visible", timeout: 5000 });
   await rectToolBtn.click();
   await page.waitForTimeout(100);
@@ -211,7 +211,7 @@ test("Drawing on specific layer adds cells to that layer only", async ({ page })
 
   // Open layer panel
   await openLayerPanel(page);
-  const layerControls = page.locator('.dmt-layer-controls');
+  const layerControls = page.locator('.windrose-layer-controls');
   await layerControls.waitFor({ state: "visible", timeout: 5000 });
 
   // Get the currently active layer ID
@@ -227,13 +227,13 @@ test("Drawing on specific layer adds cells to that layer only", async ({ page })
 
   // Select draw tool
   await waitForToolPalette(page);
-  const drawToolBtn = page.locator(".dmt-tool-palette .dmt-tool-btn").nth(1);
+  const drawToolBtn = page.locator(".windrose-tool-palette .windrose-tool-btn").nth(1);
   await drawToolBtn.click();
   await page.waitForTimeout(200);
 
   // Verify draw tool is active
   const drawToolClasses = await drawToolBtn.getAttribute('class');
-  expect(drawToolClasses).toContain('dmt-tool-btn-active');
+  expect(drawToolClasses).toContain('windrose-tool-btn-active');
 
   // Draw at canvas center to ensure we're on the grid
   const center = await getCanvasCenter(page);
@@ -272,7 +272,7 @@ test("Drag painting creates multiple cells in a stroke", async ({ page }) => {
   await waitForToolPalette(page);
 
   // Select draw tool
-  const drawToolBtn = page.locator(".dmt-tool-palette .dmt-tool-btn").nth(1);
+  const drawToolBtn = page.locator(".windrose-tool-palette .windrose-tool-btn").nth(1);
   await drawToolBtn.click();
   await page.waitForTimeout(100);
 

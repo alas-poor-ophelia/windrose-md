@@ -31,9 +31,9 @@ test("Text label tool can be selected", async ({ page }) => {
   await waitForToolPalette(page);
   await selectToolByTitle(page, "Add Text");
 
-  const textToolBtn = page.locator('.dmt-tool-btn[title*="Add Text"]');
+  const textToolBtn = page.locator('.windrose-tool-btn[title*="Add Text"]');
   const classes = await textToolBtn.getAttribute("class") || "";
-  expect(classes).toContain("dmt-tool-btn-active");
+  expect(classes).toContain("windrose-tool-btn-active");
 
   expect(errors).toHaveLength(0);
 });
@@ -53,7 +53,7 @@ test("Clicking canvas with text tool opens editor modal", async ({ page }) => {
 
   // Check for either native or fallback modal
   const nativeModal = page.locator('.modal-title');
-  const fallbackModal = page.locator('.dmt-text-editor-modal');
+  const fallbackModal = page.locator('.windrose-text-editor-modal');
   const hasNative = await nativeModal.count() > 0;
   const hasFallback = await fallbackModal.count() > 0;
   expect(hasNative || hasFallback).toBe(true);
@@ -81,13 +81,13 @@ test("Creating a text label persists to data", async ({ page }) => {
   await page.waitForTimeout(500);
 
   // Type text into the input field — try both native and fallback selectors
-  const textInput = page.locator('.dmt-modal-input, .modal-content input[type="text"]').first();
+  const textInput = page.locator('.windrose-modal-input, .modal-content input[type="text"]').first();
   await textInput.waitFor({ state: "visible", timeout: 3000 });
   await textInput.fill("Test Label");
   await page.waitForTimeout(200);
 
   // Click save/submit — try native first, then fallback
-  const saveBtn = page.locator('.modal-button-container .mod-cta, .dmt-modal-btn-submit').first();
+  const saveBtn = page.locator('.modal-button-container .mod-cta, .windrose-modal-btn-submit').first();
   await saveBtn.dispatchEvent('click');
   await page.waitForTimeout(500);
 
@@ -115,12 +115,12 @@ test("Text label persists after navigation", async ({ page }) => {
   await page.mouse.click(center.x, center.y);
   await page.waitForTimeout(500);
 
-  const textInput = page.locator('.dmt-modal-input, .modal-content input[type="text"]').first();
+  const textInput = page.locator('.windrose-modal-input, .modal-content input[type="text"]').first();
   await textInput.waitFor({ state: "visible", timeout: 3000 });
   await textInput.fill("Persistent Label");
   await page.waitForTimeout(200);
 
-  const saveBtn = page.locator('.modal-button-container .mod-cta, .dmt-modal-btn-submit').first();
+  const saveBtn = page.locator('.modal-button-container .mod-cta, .windrose-modal-btn-submit').first();
   await saveBtn.dispatchEvent('click');
   await page.waitForTimeout(500);
 

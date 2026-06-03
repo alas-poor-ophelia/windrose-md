@@ -38,9 +38,9 @@ test("D key activates draw tool and drawing creates data", async ({ page }) => {
   await page.waitForTimeout(200);
 
   // Verify tool is active
-  const drawBtn = page.locator('.dmt-tool-palette .dmt-tool-btn').nth(1);
+  const drawBtn = page.locator('.windrose-tool-palette .windrose-tool-btn').nth(1);
   const classes = await drawBtn.getAttribute("class") || "";
-  expect(classes).toContain("dmt-tool-btn-active");
+  expect(classes).toContain("windrose-tool-btn-active");
 
   // Now draw a cell
   const center = await getCanvasCenter(page);
@@ -107,9 +107,9 @@ test("S key returns to select tool after drawing", async ({ page }) => {
   await page.keyboard.press('s');
   await page.waitForTimeout(200);
 
-  const selectBtn = page.locator('.dmt-tool-palette .dmt-tool-btn').first();
+  const selectBtn = page.locator('.windrose-tool-palette .windrose-tool-btn').first();
   const classes = await selectBtn.getAttribute("class") || "";
-  expect(classes).toContain("dmt-tool-btn-active");
+  expect(classes).toContain("windrose-tool-btn-active");
 
   expect(errors).toHaveLength(0);
 });

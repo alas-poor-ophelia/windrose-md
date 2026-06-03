@@ -72,7 +72,7 @@ test("does something expected", async ({ page }) => {
   await waitForContainer(page);
 
   // Test logic here
-  const element = page.locator(".dmt-some-element");
+  const element = page.locator(".windrose-some-element");
   await expect(element).toBeVisible();
 
   expect(errors).toHaveLength(0);
@@ -84,7 +84,7 @@ test("does something expected", async ({ page }) => {
 ```typescript
 // Navigation
 await navigateToMap(page, TEST_MAPS.grid);
-await waitForContainer(page);  // Waits for .dmt-container
+await waitForContainer(page);  // Waits for .windrose-container
 
 // Tools
 await selectToolByIndex(page, 1);  // 0=select, 1=draw, 2=erase, 3=rect, 4=circle
@@ -110,14 +110,14 @@ const totalCells = await getTotalCellCount(page, mapId);
 
 | Element | Selector |
 |---------|----------|
-| Container | `.dmt-container` |
-| Canvas | `.dmt-canvas-wrapper canvas` |
-| Tool palette | `.dmt-tool-palette` |
-| Tool button | `.dmt-tool-palette .dmt-tool-btn` |
-| History controls | `.dmt-history-controls` |
-| Settings button | `.dmt-expand-btn[title="Map Settings"]` |
-| Layer panel | `.dmt-layer-panel` |
-| Object sidebar | `.dmt-object-sidebar` |
+| Container | `.windrose-container` |
+| Canvas | `.windrose-canvas-wrapper canvas` |
+| Tool palette | `.windrose-tool-palette` |
+| Tool button | `.windrose-tool-palette .windrose-tool-btn` |
+| History controls | `.windrose-history-controls` |
+| Settings button | `.windrose-expand-btn[title="Map Settings"]` |
+| Layer panel | `.windrose-layer-panel` |
+| Object sidebar | `.windrose-object-sidebar` |
 
 ## Test Fixtures
 

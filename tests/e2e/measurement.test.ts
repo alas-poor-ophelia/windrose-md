@@ -23,9 +23,9 @@ test("Measure tool can be activated", async ({ page }) => {
   await selectToolByTitle(page, "Measure");
 
   // Verify it's active
-  const measureToolBtn = page.locator('.dmt-tool-btn[title*="Measure"]');
+  const measureToolBtn = page.locator('.windrose-tool-btn[title*="Measure"]');
   const classes = await measureToolBtn.getAttribute("class");
-  expect(classes).toContain("dmt-tool-btn-active");
+  expect(classes).toContain("windrose-tool-btn-active");
 
   expect(errors).toHaveLength(0);
 });
@@ -58,7 +58,7 @@ test("Measure tool shows distance on mouse move", async ({ page }) => {
   await selectToolByTitle(page, "Measure");
 
   // Click on canvas to set origin point
-  const canvas = page.locator(".dmt-canvas-wrapper canvas").first();
+  const canvas = page.locator(".windrose-canvas-wrapper canvas").first();
   const canvasBox = await canvas.boundingBox();
   expect(canvasBox).not.toBeNull();
 
@@ -87,7 +87,7 @@ test("Measure tool works on hex map", async ({ page }) => {
   await selectToolByTitle(page, "Measure");
 
   // Click on canvas to set origin point
-  const canvas = page.locator(".dmt-canvas-wrapper canvas").first();
+  const canvas = page.locator(".windrose-canvas-wrapper canvas").first();
   const canvasBox = await canvas.boundingBox();
   expect(canvasBox).not.toBeNull();
 

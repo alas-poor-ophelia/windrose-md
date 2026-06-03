@@ -31,12 +31,12 @@ test("Layer panel can be opened", async ({ page }) => {
   await openLayerPanel(page);
 
   // Layer controls should now be visible
-  const layerControls = page.locator('.dmt-layer-controls');
+  const layerControls = page.locator('.windrose-layer-controls');
   await layerControls.waitFor({ state: "visible", timeout: 5000 });
   expect(await layerControls.isVisible()).toBe(true);
 
   // Should have at least one layer button
-  const layerBtns = page.locator('.dmt-layer-btn');
+  const layerBtns = page.locator('.windrose-layer-btn');
   const count = await layerBtns.count();
   expect(count).toBeGreaterThanOrEqual(1);
 
@@ -52,11 +52,11 @@ test("New layer can be added", async ({ page }) => {
   await openLayerPanel(page);
 
   // Count initial layers
-  const layerBtns = page.locator('.dmt-layer-btn');
+  const layerBtns = page.locator('.windrose-layer-btn');
   const initialCount = await layerBtns.count();
 
   // Click add layer button
-  const addLayerBtn = page.locator('.dmt-layer-add-btn');
+  const addLayerBtn = page.locator('.windrose-layer-add-btn');
   await addLayerBtn.waitFor({ state: "visible", timeout: 5000 });
   await addLayerBtn.click();
   await page.waitForTimeout(300);
@@ -82,15 +82,15 @@ test.skipIf(process.env.WINDROSE_TEST_MODE === "compiled")("Layer can be switche
 
   // Open layer panel
   await openLayerPanel(page);
-  const layerControls = page.locator('.dmt-layer-controls');
+  const layerControls = page.locator('.windrose-layer-controls');
   await layerControls.waitFor({ state: "visible", timeout: 5000 });
 
   // Ensure we have at least 2 layers (add one if needed)
-  const layerBtns = page.locator('.dmt-layer-btn');
+  const layerBtns = page.locator('.windrose-layer-btn');
   let layerCount = await layerBtns.count();
 
   if (layerCount < 2) {
-    const addLayerBtn = page.locator('.dmt-layer-add-btn');
+    const addLayerBtn = page.locator('.windrose-layer-add-btn');
     await addLayerBtn.click();
     await page.waitForTimeout(300);
     layerCount = await layerBtns.count();
@@ -99,13 +99,13 @@ test.skipIf(process.env.WINDROSE_TEST_MODE === "compiled")("Layer can be switche
   expect(layerCount).toBeGreaterThanOrEqual(2);
 
   // Get the non-active layer button and click it to switch
-  const allLayerBtns = page.locator('.dmt-layer-btn');
+  const allLayerBtns = page.locator('.windrose-layer-btn');
 
   // Find a layer that isn't active and click it
   for (let i = 0; i < layerCount; i++) {
     const btn = allLayerBtns.nth(i);
     const isActive = await btn.getAttribute("class");
-    if (!isActive?.includes("dmt-layer-btn-active")) {
+    if (!isActive?.includes("windrose-layer-btn-active")) {
       await btn.click();
       await page.waitForTimeout(200);
       break;
@@ -113,7 +113,7 @@ test.skipIf(process.env.WINDROSE_TEST_MODE === "compiled")("Layer can be switche
   }
 
   // Verify the clicked layer is now active
-  const newActiveBtn = page.locator('.dmt-layer-btn.dmt-layer-btn-active');
+  const newActiveBtn = page.locator('.windrose-layer-btn.windrose-layer-btn-active');
   expect(await newActiveBtn.count()).toBe(1);
 
   // Get the active layer ID and initial cell count
@@ -129,7 +129,7 @@ test.skipIf(process.env.WINDROSE_TEST_MODE === "compiled")("Layer can be switche
   // Draw on this layer
   await waitForToolPalette(page);
 
-  const drawToolBtn = page.locator(".dmt-tool-palette .dmt-tool-btn").nth(1);
+  const drawToolBtn = page.locator(".windrose-tool-palette .windrose-tool-btn").nth(1);
   await drawToolBtn.click();
   await page.waitForTimeout(100);
 
@@ -154,12 +154,12 @@ test("Layer switch does not cause errors", async ({ page }) => {
   await openLayerPanel(page);
 
   // Add a new layer
-  const addLayerBtn = page.locator('.dmt-layer-add-btn');
+  const addLayerBtn = page.locator('.windrose-layer-add-btn');
   await addLayerBtn.click();
   await page.waitForTimeout(300);
 
   // Switch between layers multiple times
-  const layerBtns = page.locator('.dmt-layer-btn');
+  const layerBtns = page.locator('.windrose-layer-btn');
   const count = await layerBtns.count();
 
   for (let i = 0; i < Math.min(count, 3); i++) {

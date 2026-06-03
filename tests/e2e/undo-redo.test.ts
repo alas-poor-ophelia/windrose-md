@@ -67,7 +67,7 @@ test("Drawing operation completes without errors", async ({ page }) => {
   await waitForToolPalette(page);
 
   // Draw a cell
-  const drawToolBtn = page.locator(".dmt-tool-palette .dmt-tool-btn").nth(1);
+  const drawToolBtn = page.locator(".windrose-tool-palette .windrose-tool-btn").nth(1);
   await drawToolBtn.click();
   await page.waitForTimeout(100);
 
@@ -92,7 +92,7 @@ test("Undo reverses drawing and redo restores it", async ({ page }) => {
   const baselineCount = await getTotalCellCount(page, mapId);
 
   // Draw a cell
-  const drawToolBtn = page.locator(".dmt-tool-palette .dmt-tool-btn").nth(1);
+  const drawToolBtn = page.locator(".windrose-tool-palette .windrose-tool-btn").nth(1);
   await drawToolBtn.click();
   await page.waitForTimeout(100);
 

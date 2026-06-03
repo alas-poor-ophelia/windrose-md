@@ -80,7 +80,7 @@ git push origin main
 | `--dry-run` | Build + test only, no commit/tag/push |
 | `--bump X.Y.Z` | Bump version in manifest.json, package.json, versions.json before building |
 | `--skip-tests` | Skip the test step entirely |
-| `--include-e2e` | Run E2E tests in addition to unit tests |
+| `--skip-e2e` | Skip E2E tests (unit tests only) |
 | `--allow-branch` | Allow release from any branch (default: main or release/*) |
 
 ## GitHub Actions Workflow

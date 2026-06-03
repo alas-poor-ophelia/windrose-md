@@ -23,7 +23,7 @@ test("Object can be placed on grid map", async ({ page }) => {
 
   // Expand sidebar and select an object type
   await expandObjectSidebarIfNeeded(page);
-  const objectItem = page.locator('.dmt-object-grid-item').first();
+  const objectItem = page.locator('.windrose-object-grid-item').first();
   const itemExists = await objectItem.count() > 0;
 
   if (itemExists) {
@@ -32,7 +32,7 @@ test("Object can be placed on grid map", async ({ page }) => {
 
     // Activate the Add Object tool
     await waitForToolPalette(page);
-    const addObjectBtn = page.locator('.dmt-tool-btn[title*="Add Object"]');
+    const addObjectBtn = page.locator('.windrose-tool-btn[title*="Add Object"]');
     const addBtnExists = await addObjectBtn.count() > 0;
 
     if (addBtnExists) {
@@ -55,12 +55,12 @@ test("Placed objects have valid screen positions", async ({ page }) => {
   await navigateToMap(page, TEST_MAPS.grid);
   await waitForContainer(page);
 
-  const canvasWrapper = page.locator(".dmt-canvas-wrapper");
+  const canvasWrapper = page.locator(".windrose-canvas-wrapper");
   await canvasWrapper.waitFor({ state: "visible", timeout: 5000 });
   const wrapperBox = await canvasWrapper.boundingBox();
 
   // Look for any pre-existing objects or overlays
-  const overlayElements = page.locator('.dmt-object-overlay, .dmt-overlay, [data-object-id]');
+  const overlayElements = page.locator('.windrose-object-overlay, .windrose-overlay, [data-object-id]');
   const overlayCount = await overlayElements.count();
 
   if (overlayCount > 0) {
@@ -102,7 +102,7 @@ test("Object sidebar can be expanded", async ({ page }) => {
   expect(isExpanded).toBe(true);
 
   // Should have at least one object type available
-  const objectItems = page.locator('.dmt-object-grid-item');
+  const objectItems = page.locator('.windrose-object-grid-item');
   const count = await objectItems.count();
   expect(count).toBeGreaterThan(0);
 
@@ -119,14 +119,14 @@ test("Object type can be selected from sidebar", async ({ page }) => {
   await expandObjectSidebarIfNeeded(page);
 
   // Click the first object item
-  const objectItem = page.locator('.dmt-object-grid-item').first();
+  const objectItem = page.locator('.windrose-object-grid-item').first();
   await objectItem.waitFor({ state: "visible", timeout: 5000 });
   await objectItem.click();
   await page.waitForTimeout(200);
 
   // The object item should be selected (have the selected class)
   const selectedClass = await objectItem.getAttribute("class");
-  expect(selectedClass).toContain("dmt-object-grid-item-selected");
+  expect(selectedClass).toContain("windrose-object-grid-item-selected");
 
   expect(errors).toHaveLength(0);
 });
@@ -140,13 +140,13 @@ test("Add Object tool activates correctly", async ({ page }) => {
   await waitForToolPalette(page);
 
   // Click the Add Object tool button
-  const addObjectBtn = page.locator('.dmt-tool-btn[title*="Add Object"]');
+  const addObjectBtn = page.locator('.windrose-tool-btn[title*="Add Object"]');
   await addObjectBtn.click();
   await page.waitForTimeout(200);
 
   // Verify the tool button is now active
   const toolClass = await addObjectBtn.getAttribute("class");
-  expect(toolClass).toContain("dmt-tool-btn-active");
+  expect(toolClass).toContain("windrose-tool-btn-active");
 
   expect(errors).toHaveLength(0);
 });
@@ -159,7 +159,7 @@ test("Clicking canvas with object tool selected does not throw errors", async ({
 
   // Expand sidebar and select an object type
   await expandObjectSidebarIfNeeded(page);
-  const objectItem = page.locator('.dmt-object-grid-item').first();
+  const objectItem = page.locator('.windrose-object-grid-item').first();
   await objectItem.waitFor({ state: "visible", timeout: 5000 });
   await objectItem.click();
   await page.waitForTimeout(200);

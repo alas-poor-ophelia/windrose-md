@@ -22,12 +22,12 @@ beforeEach(() => resetDataFile());
 // ===========================================
 
 async function openVisibilityToolbar(page: any): Promise<void> {
-  const controlsArea = page.locator('.dmt-controls');
+  const controlsArea = page.locator('.windrose-controls');
   await controlsArea.waitFor({ state: "visible", timeout: 5000 });
   await controlsArea.hover();
   await page.waitForTimeout(300);
 
-  const visibilityBtn = page.locator('.dmt-expand-btn[title*="visibility"]');
+  const visibilityBtn = page.locator('.windrose-expand-btn[title*="visibility"]');
   await visibilityBtn.waitFor({ state: "visible", timeout: 5000 });
   await visibilityBtn.click();
   await page.waitForTimeout(300);
@@ -36,7 +36,7 @@ async function openVisibilityToolbar(page: any): Promise<void> {
 async function openFogToolbar(page: any): Promise<void> {
   await openVisibilityToolbar(page);
 
-  const fowToggle = page.locator('.dmt-fow-toggle-btn');
+  const fowToggle = page.locator('.windrose-fow-toggle-btn');
   await fowToggle.waitFor({ state: "visible", timeout: 3000 });
   await fowToggle.click();
   await page.waitForTimeout(300);
@@ -69,7 +69,7 @@ test("Fog of war toolbar opens from visibility panel", async ({ page }) => {
 
   await openFogToolbar(page);
 
-  const fowToolbar = page.locator('.dmt-fow-floating-toolbar');
+  const fowToolbar = page.locator('.windrose-fow-floating-toolbar');
   expect(await fowToolbar.isVisible()).toBe(true);
 
   expect(errors).toHaveLength(0);
@@ -90,7 +90,7 @@ test("Fog of war paint tool creates fogged cells", async ({ page }) => {
   await openFogToolbar(page);
 
   // Select fog paint tool
-  const paintBtn = page.locator('.dmt-fow-tool-btn[title*="Paint fog"]');
+  const paintBtn = page.locator('.windrose-fow-tool-btn[title*="Paint fog"]');
   await paintBtn.waitFor({ state: "visible", timeout: 3000 });
   await paintBtn.click();
   await page.waitForTimeout(300);
@@ -126,7 +126,7 @@ test("Fog of war erase tool removes fogged cells", async ({ page }) => {
   await openFogToolbar(page);
 
   // First paint some fog
-  const paintBtn = page.locator('.dmt-fow-tool-btn[title*="Paint fog"]');
+  const paintBtn = page.locator('.windrose-fow-tool-btn[title*="Paint fog"]');
   await paintBtn.waitFor({ state: "visible", timeout: 3000 });
   await paintBtn.click();
   await page.waitForTimeout(300);
@@ -146,7 +146,7 @@ test("Fog of war erase tool removes fogged cells", async ({ page }) => {
   expect(countAfterPaint).toBeGreaterThan(0);
 
   // Now erase fog at one position
-  const eraseBtn = page.locator('.dmt-fow-tool-btn[title*="Erase fog"]');
+  const eraseBtn = page.locator('.windrose-fow-tool-btn[title*="Erase fog"]');
   await eraseBtn.waitFor({ state: "visible", timeout: 3000 });
   await eraseBtn.click();
   await page.waitForTimeout(300);
@@ -169,7 +169,7 @@ test("Fog of war toggle button shows expanded state", async ({ page }) => {
 
   await openVisibilityToolbar(page);
 
-  const fowToggle = page.locator('.dmt-fow-toggle-btn');
+  const fowToggle = page.locator('.windrose-fow-toggle-btn');
   await fowToggle.waitFor({ state: "visible", timeout: 3000 });
 
   // Initially not expanded

@@ -17,16 +17,16 @@ test("SVG overlays align with canvas coordinates", async ({ page }) => {
   await navigateToMap(page, TEST_MAPS.grid);
   await waitForContainer(page);
 
-  const canvasWrapper = page.locator(".dmt-canvas-wrapper");
+  const canvasWrapper = page.locator(".windrose-canvas-wrapper");
   await canvasWrapper.waitFor({ state: "visible", timeout: 5000 });
 
   // Get the canvas element
-  const canvas = page.locator(".dmt-canvas-wrapper canvas").first();
+  const canvas = page.locator(".windrose-canvas-wrapper canvas").first();
   const canvasBox = await canvas.boundingBox();
   expect(canvasBox).not.toBeNull();
 
   // Look for SVG overlays that should align with the canvas
-  const svgOverlays = page.locator('.dmt-canvas-wrapper svg, .dmt-svg-overlay, .dmt-preview-overlay');
+  const svgOverlays = page.locator('.windrose-canvas-wrapper svg, .windrose-svg-overlay, .windrose-preview-overlay');
   const svgCount = await svgOverlays.count();
 
   if (svgCount > 0) {
@@ -69,15 +69,15 @@ test("Object overlays remain aligned after pan", async ({ page }) => {
   await navigateToMap(page, TEST_MAPS.grid);
   await waitForContainer(page);
 
-  const canvasWrapper = page.locator(".dmt-canvas-wrapper");
+  const canvasWrapper = page.locator(".windrose-canvas-wrapper");
   await canvasWrapper.waitFor({ state: "visible", timeout: 5000 });
 
-  const canvas = page.locator(".dmt-canvas-wrapper canvas").first();
+  const canvas = page.locator(".windrose-canvas-wrapper canvas").first();
   const canvasBox = await canvas.boundingBox();
   expect(canvasBox).not.toBeNull();
 
   // Record initial overlay positions
-  const overlays = page.locator('.dmt-object-overlay, .dmt-overlay, [data-object-id]');
+  const overlays = page.locator('.windrose-object-overlay, .windrose-overlay, [data-object-id]');
   const initialOverlayCount = await overlays.count();
   const initialPositions: { x: number; y: number }[] = [];
 
@@ -133,15 +133,15 @@ test("Object overlays remain aligned after zoom", async ({ page }) => {
   await navigateToMap(page, TEST_MAPS.grid);
   await waitForContainer(page);
 
-  const canvasWrapper = page.locator(".dmt-canvas-wrapper");
+  const canvasWrapper = page.locator(".windrose-canvas-wrapper");
   await canvasWrapper.waitFor({ state: "visible", timeout: 5000 });
 
-  const canvas = page.locator(".dmt-canvas-wrapper canvas").first();
+  const canvas = page.locator(".windrose-canvas-wrapper canvas").first();
   const canvasBox = await canvas.boundingBox();
   expect(canvasBox).not.toBeNull();
 
   // Record initial state
-  const overlays = page.locator('.dmt-object-overlay, .dmt-overlay, [data-object-id]');
+  const overlays = page.locator('.windrose-object-overlay, .windrose-overlay, [data-object-id]');
   const initialOverlayCount = await overlays.count();
 
   // Perform a zoom operation (scroll wheel)

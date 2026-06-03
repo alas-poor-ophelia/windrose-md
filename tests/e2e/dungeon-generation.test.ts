@@ -58,17 +58,17 @@ beforeEach(({ page }: any) => {
 const COMMAND_ID = "windrose-md:insert-random-dungeon";
 
 const SELECTORS = {
-  modal: ".dmt-insert-dungeon-modal",
-  styleButtons: ".dmt-dungeon-style-btn",
-  sizeButtons: ".dmt-dungeon-size-btn",
-  sizeButtonRow: ".dmt-dungeon-size-buttons",
-  generateButton: ".dmt-modal-buttons .mod-cta",
-  cancelButton: ".dmt-modal-buttons button:not(.mod-cta)",
-  rerollButton: ".dmt-reroll-btn",
-  rerollOverlay: ".dmt-reroll-confirm-overlay",
-  rerollDialog: ".dmt-reroll-confirm-dialog",
-  rerollConfirmBtn: ".dmt-reroll-confirm-buttons .dmt-btn-primary",
-  rerollCancelBtn: ".dmt-reroll-confirm-buttons .dmt-btn-secondary"
+  modal: ".windrose-insert-dungeon-modal",
+  styleButtons: ".windrose-dungeon-style-btn",
+  sizeButtons: ".windrose-dungeon-size-btn",
+  sizeButtonRow: ".windrose-dungeon-size-buttons",
+  generateButton: ".windrose-modal-buttons .mod-cta",
+  cancelButton: ".windrose-modal-buttons button:not(.mod-cta)",
+  rerollButton: ".windrose-reroll-btn",
+  rerollOverlay: ".windrose-reroll-confirm-overlay",
+  rerollDialog: ".windrose-reroll-confirm-dialog",
+  rerollConfirmBtn: ".windrose-reroll-confirm-buttons .windrose-btn-primary",
+  rerollCancelBtn: ".windrose-reroll-confirm-buttons .windrose-btn-secondary"
 } as const;
 
 // Test map for reroll tests (has generationSettings)

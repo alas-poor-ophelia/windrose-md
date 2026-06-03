@@ -38,7 +38,7 @@ test("Object placement creates object in data", async ({ page }) => {
   await expandObjectSidebarIfNeeded(page);
   await page.waitForTimeout(300);
 
-  const objectItem = page.locator('.dmt-object-grid-item').first();
+  const objectItem = page.locator('.windrose-object-grid-item').first();
   await objectItem.waitFor({ state: "visible", timeout: 5000 });
   await objectItem.click();
   await page.waitForTimeout(200);
@@ -72,7 +72,7 @@ test.skip("Multiple objects can be placed on same map", async ({ page }) => {
   await expandObjectSidebarIfNeeded(page);
   await page.waitForTimeout(300);
 
-  const objectItem = page.locator('.dmt-object-grid-item').first();
+  const objectItem = page.locator('.windrose-object-grid-item').first();
   await objectItem.waitFor({ state: "visible", timeout: 5000 });
   await objectItem.click();
   await page.waitForTimeout(200);
@@ -95,7 +95,7 @@ test.skip("Multiple objects can be placed on same map", async ({ page }) => {
   await expandObjectSidebarIfNeeded(page);
   await page.waitForTimeout(300);
 
-  const objectItem2 = page.locator('.dmt-object-grid-item').first();
+  const objectItem2 = page.locator('.windrose-object-grid-item').first();
   await objectItem2.waitFor({ state: "visible", timeout: 5000 });
   await objectItem2.click();
   await page.waitForTimeout(300);
@@ -125,7 +125,7 @@ test("Placed object persists after navigation", async ({ page }) => {
   await expandObjectSidebarIfNeeded(page);
   await page.waitForTimeout(300);
 
-  const objectItem = page.locator('.dmt-object-grid-item').first();
+  const objectItem = page.locator('.windrose-object-grid-item').first();
   await objectItem.waitFor({ state: "visible", timeout: 5000 });
   await objectItem.click();
   await page.waitForTimeout(200);
@@ -168,7 +168,7 @@ test("Object placement on hex map creates object in data", async ({ page }) => {
   await expandObjectSidebarIfNeeded(page);
   await page.waitForTimeout(300);
 
-  const objectItem = page.locator('.dmt-object-grid-item').first();
+  const objectItem = page.locator('.windrose-object-grid-item').first();
   await objectItem.waitFor({ state: "visible", timeout: 5000 });
   await objectItem.click();
   await page.waitForTimeout(200);
