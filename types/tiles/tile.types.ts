@@ -126,6 +126,8 @@ interface TileAssignmentBase {
   flipH?: boolean;
   /** Render placement within this MapLayer. @default 'fill' */
   placement?: 'fill' | 'overlay';
+  /** Tile depth tier within the layer. Controls render order. @default 'ground' */
+  depth?: TileLayerRole;
   /** Override tileset fitMode for this specific tile */
   fitMode?: 'fill' | 'contain';
   /** Per-tile size multiplier. @default 1.0 */

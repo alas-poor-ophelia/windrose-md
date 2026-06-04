@@ -191,20 +191,27 @@ function renderTiles(
     ? SQRT3 * geometry.hexSize * viewState.zoom
     : 2 * geometry.hexSize * viewState.zoom;
 
-  // Single-pass partition: fill, overlay, freeform
-  const fillTiles: TileAssignment[] = [];
-  const overlayTiles: TileAssignment[] = [];
-  const freeformTiles: TileAssignment[] = [];
+  // Partition by depth tier, then by placement within each tier
+  const DEPTH_ORDER = ['ground', 'structure', 'props', 'decoration'] as const;
+  const depthBuckets = new Map<string, { fill: TileAssignment[]; overlay: TileAssignment[]; freeform: TileAssignment[] }>();
+  for (const d of DEPTH_ORDER) depthBuckets.set(d, { fill: [], overlay: [], freeform: [] });
+
   for (const t of tiles) {
-    if (t.freeform === true) freeformTiles.push(t);
-    else if (t.placement === 'overlay') overlayTiles.push(t);
-    else fillTiles.push(t);
+    const depth = t.depth ?? 'ground';
+    const bucket = depthBuckets.get(depth) ?? depthBuckets.get('ground')!;
+    if (t.freeform === true) bucket.freeform.push(t);
+    else if (t.placement === 'overlay') bucket.overlay.push(t);
+    else bucket.fill.push(t);
   }
-  // Sort grid-aligned tiles back→front; freeform in insertion order
-  const sortedFill = sortTilesForRendering(fillTiles, geometry.orientation);
-  const sortedOverlay = sortTilesForRendering(overlayTiles, geometry.orientation);
-  // Iterate sequentially instead of concatenating
-  const sorted = [sortedFill, sortedOverlay, freeformTiles];
+
+  // Build render order: for each depth tier, fill (sorted back→front) → overlay (sorted) → freeform
+  const sorted: TileAssignment[][] = [];
+  for (const d of DEPTH_ORDER) {
+    const bucket = depthBuckets.get(d)!;
+    if (bucket.fill.length > 0) sorted.push(sortTilesForRendering(bucket.fill, geometry.orientation));
+    if (bucket.overlay.length > 0) sorted.push(sortTilesForRendering(bucket.overlay, geometry.orientation));
+    if (bucket.freeform.length > 0) sorted.push(bucket.freeform);
+  }
 
   const previousAlpha = ctx.globalAlpha;
   const opacity = options?.opacity ?? 1;

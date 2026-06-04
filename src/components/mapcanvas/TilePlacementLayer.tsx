@@ -9,7 +9,7 @@
 
 import type { ToolId } from '#types/tools/tool.types';
 import type { VNode } from 'preact';
-import type { TileAssignment, TileRotation } from '#types/tiles/tile.types';
+import type { TileAssignment, TileRotation, TileLayerRole } from '#types/tiles/tile.types';
 
 import { useCallback, useEffect, useRef } from 'preact/hooks';
 import { useMapState } from '../../context/MapContext';
@@ -101,6 +101,7 @@ export interface TilePlacementLayerProps {
   stampMode: boolean;
   tileScale: number;
   brushSize: number;
+  tileDepth: TileLayerRole;
   onTilesChange: (tiles: TileAssignment[], suppressHistory?: boolean) => void;
 }
 
@@ -115,6 +116,7 @@ const TilePlacementLayer = ({
   stampMode,
   tileScale,
   brushSize,
+  tileDepth,
   onTilesChange
 }: TilePlacementLayerProps): VNode | null => {
   const { mapData, geometry, screenToGrid, screenToWorld } = useMapState();
@@ -154,6 +156,7 @@ const TilePlacementLayer = ({
         rotation: (tileRotation || undefined) as TileRotation | undefined,
         flipH: tileFlipH || undefined,
         placement: targetPlacement === 'fill' ? undefined : targetPlacement,
+        depth: tileDepth === 'ground' ? undefined : tileDepth,
         fitMode: tileFitMode === 'auto' ? undefined : tileFitMode,
         scale: tileScale !== 1 ? tileScale : undefined,
       };
@@ -171,7 +174,7 @@ const TilePlacementLayer = ({
       const isBatchedStroke = strokeInitialTilesRef.current !== null;
       onTilesChange(currentTiles, isBatchedStroke);
     }
-  }, [mapData, selectedTilesetId, selectedTileId, tileRotation, tileFlipH, tileLayer, tileFitMode, tileScale, brushSize, onTilesChange]);
+  }, [mapData, selectedTilesetId, selectedTileId, tileRotation, tileFlipH, tileLayer, tileFitMode, tileScale, brushSize, tileDepth, onTilesChange]);
 
   const eraseTilesInBrush = useCallback((col: number, row: number) => {
     if (!mapData) return;
@@ -226,12 +229,13 @@ const TilePlacementLayer = ({
         rotation: (tileRotation || undefined) as TileRotation | undefined,
         flipH: tileFlipH || undefined,
         placement: targetPlacement === 'fill' ? undefined : targetPlacement,
+        depth: tileDepth === 'ground' ? undefined : tileDepth,
         fitMode: tileFitMode === 'auto' ? undefined : tileFitMode,
       });
     }
 
     onTilesChange(newTiles);
-  }, [mapData, selectedTilesetId, selectedTileId, tileRotation, tileFlipH, tileLayer, tileFitMode, onTilesChange]);
+  }, [mapData, selectedTilesetId, selectedTileId, tileRotation, tileFlipH, tileLayer, tileFitMode, tileDepth, onTilesChange]);
 
   const placeStampAtWorld = useCallback((worldX: number, worldY: number, col: number, row: number) => {
     if (!mapData || selectedTilesetId == null || selectedTilesetId === '' || selectedTileId == null || selectedTileId === '') return;

@@ -19,6 +19,7 @@
  */
 
 
+import type { TileLayerRole } from '#types/tiles/tile.types';
 import { useCallback, useState } from 'preact/hooks';
 interface UseTileBrushResult {
   tileBrowserCollapsed: boolean;
@@ -41,6 +42,8 @@ interface UseTileBrushResult {
   setTileScale: (v: number) => void;
   brushSize: number;
   setBrushSize: (v: number) => void;
+  tileDepth: TileLayerRole;
+  setTileDepth: (v: TileLayerRole) => void;
   handleTileSelect: (tilesetId: string, tileId: string) => void;
   handleTileDeselect: () => void;
 }
@@ -56,6 +59,7 @@ function useTileBrush(): UseTileBrushResult {
   const [stampMode, setStampMode] = useState<boolean>(false);
   const [tileScale, setTileScale] = useState<number>(1);
   const [brushSize, setBrushSize] = useState<number>(1);
+  const [tileDepth, setTileDepth] = useState<TileLayerRole>('ground');
 
   const handleTileSelect = useCallback((tilesetId: string, tileId: string) => {
     setSelectedTilesetId(tilesetId);
@@ -80,6 +84,7 @@ function useTileBrush(): UseTileBrushResult {
     stampMode, setStampMode,
     tileScale, setTileScale,
     brushSize, setBrushSize,
+    tileDepth, setTileDepth,
     handleTileSelect, handleTileDeselect,
   };
 }
