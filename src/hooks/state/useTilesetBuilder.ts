@@ -27,7 +27,7 @@ function useTilesetBuilder(
 
   useEffect(() => {
     const currentMapType = mapData?.mapType ?? mapTypeRef.current;
-    if (currentMapType == null || currentMapType !== 'hex') return;
+    if (currentMapType == null) return;
 
     const folders = getTilesetFolders().filter((f: string) => f.trim() !== '');
     if (folders.length === 0) return;

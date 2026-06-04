@@ -297,7 +297,7 @@ const simpleTools: SimpleTool[] = [
   { id: 'outline', title: 'Draw Outline', icon: 'lucide-spline', hexOnly: true },
   { id: 'shape', title: 'Place Shape Overlay', icon: 'lucide-shapes' },
   { id: 'measure', title: 'Measure Distance', icon: 'lucide-ruler', shortcut: 'm', actionId: 'measureTool' },
-  { id: 'tilePaint', title: 'Place Tile (select from tile browser)', icon: 'lucide-image-plus', hexOnly: true }
+  { id: 'tilePaint', title: 'Place Tile (select from tile browser)', icon: 'lucide-image-plus' }
 ];
 
 // Derive DEFAULT shortcut map from tool config: key -> { group } or { tool }

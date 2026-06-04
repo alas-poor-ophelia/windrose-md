@@ -205,7 +205,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   // Use rootMapData for tileset check — tilesets are built from global settings and stored on root,
   // but sub-maps should also have access to tiles
   const availableTilesets = rootMapData?.tilesets || mapData?.tilesets || [];
-  const showTilePanel = mapData?.mapType === 'hex';
+  const showTilePanel = mapData != null;
 
   // Image alignment mode (extracted to useAlignmentMode hook)
   const {
@@ -725,7 +725,9 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
             <MapCanvas
               mapId={mapId}
               notePath={notePath}
-              mapData={mapData.mapType === 'hex' ? { ...mapData, northDirection: 0, tilesets: availableTilesets.length > 0 ? availableTilesets : mapData.tilesets } as MapData : mapData}
+              mapData={availableTilesets.length > 0
+                ? { ...mapData, ...(mapData.mapType === 'hex' ? { northDirection: 0 } : {}), tilesets: availableTilesets } as MapData
+                : mapData}
               onCellsChange={handleCellsChange}
               onCurvesChange={handleCurvesChange}
               onObjectsChange={handleObjectsChange}

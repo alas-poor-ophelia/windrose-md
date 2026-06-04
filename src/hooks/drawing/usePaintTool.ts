@@ -157,7 +157,7 @@ function usePaintTool({
       } else {
         // Erase tile at cell coords (overlay first, then fill)
         let tileErased = false;
-        if (geometry?.type === 'hex' && onTilesChange != null && activeLayer.tiles != null && activeLayer.tiles.length > 0) {
+        if (onTilesChange != null && activeLayer.tiles != null && activeLayer.tiles.length > 0) {
           const tiles = activeLayer.tiles;
           const overlayIdx = tiles.findIndex((t: TileAssignment) => t.col === coordX && t.row === coordY && t.placement === 'overlay');
           if (overlayIdx >= 0) {

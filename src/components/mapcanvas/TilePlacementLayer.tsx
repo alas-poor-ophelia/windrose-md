@@ -146,7 +146,7 @@ const TilePlacementLayer = ({
   }, [mapData, onTilesChange]);
 
   const handlePointerDown = useCallback((e: PointerEvent) => {
-    if (!isTileTool || !geometry || geometry.type !== 'hex') return;
+    if (!isTileTool || !geometry) return;
 
     const coords = screenToGrid(e.clientX, e.clientY);
     if (!coords) return;
@@ -173,7 +173,7 @@ const TilePlacementLayer = ({
   }, [isTileTool, geometry, screenToGrid, screenToWorld, hasTileSelected, stampMode, placeTileAtCell, placeStampAtWorld, eraseTileAtCell]);
 
   const handlePointerMove = useCallback((e: PointerEvent) => {
-    if (!isDraggingRef.current || !isTileTool || !geometry || geometry.type !== 'hex') return;
+    if (!isDraggingRef.current || !isTileTool || !geometry) return;
     if (stampMode) return;
 
     const coords = screenToGrid(e.clientX, e.clientY);

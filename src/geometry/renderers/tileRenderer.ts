@@ -54,9 +54,13 @@ function sortTilesForRendering(
   tiles: TileAssignment[],
   orientation: string
 ): TileAssignment[] {
+  const isHex = orientation === 'flat' || orientation === 'pointy';
   const offsets = new Map<TileAssignment, { col: number; row: number }>();
   for (const t of tiles) {
-    offsets.set(t, axialToOffset(t.col, t.row, orientation as import('#types/settings/settings.types').HexOrientation));
+    offsets.set(t, isHex
+      ? axialToOffset(t.col, t.row, orientation as import('#types/settings/settings.types').HexOrientation)
+      : { col: t.col, row: t.row }
+    );
   }
   return [...tiles].sort((a, b) => {
     const oa = offsets.get(a);

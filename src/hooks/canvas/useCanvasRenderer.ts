@@ -291,6 +291,11 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
     zoom: zoom
   };
 
+  // Tile rendering geometry shim (works for both hex and grid)
+  const tileGeomShim = geometry.type === 'hex'
+    ? { hexToWorld: geometry.hexToWorld.bind(geometry), worldToScreen: geometry.worldToScreen.bind(geometry), hexSize: geometry.hexSize, orientation: mapData.orientation ?? 'flat' }
+    : { hexToWorld: geometry.gridToWorld.bind(geometry), worldToScreen: geometry.worldToScreen.bind(geometry), hexSize: geometry.cellSize, orientation: 'grid' };
+
   // iOS defensive: Reset canvas state
   ctx.globalAlpha = 1;
   ctx.globalCompositeOperation = 'source-over';
@@ -319,12 +324,12 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
         showGrid: visibility.grid !== false
       });
       // Ghost layer tiles
-      if (geometry.type === 'hex' && layerBelow.tiles != null && layerBelow.tiles.length > 0 && mapData.tilesets != null && mapData.tilesets.length > 0) {
+      if (layerBelow.tiles != null && layerBelow.tiles.length > 0 && mapData.tilesets != null && mapData.tilesets.length > 0) {
         renderTiles(
           ctx,
           layerBelow.tiles,
           mapData.tilesets,
-          { hexToWorld: geometry.hexToWorld.bind(geometry), worldToScreen: geometry.worldToScreen.bind(geometry), hexSize: geometry.hexSize, orientation: mapData.orientation ?? 'flat' },
+          tileGeomShim,
           rendererViewState,
           { opacity: ghostOpacity, getCachedImage, canvasWidth: width, canvasHeight: height }
         );
@@ -460,13 +465,13 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
     });
   }
 
-  // Draw hex tiles (between curves and regions, z-sorted for overflow occlusion)
-  if (geometry.type === 'hex' && activeLayer.tiles != null && activeLayer.tiles.length > 0 && mapData.tilesets != null && mapData.tilesets.length > 0) {
+  // Draw tiles (between curves and regions, z-sorted for overflow occlusion)
+  if (activeLayer.tiles != null && activeLayer.tiles.length > 0 && mapData.tilesets != null && mapData.tilesets.length > 0) {
     renderTiles(
       ctx,
       activeLayer.tiles,
       mapData.tilesets,
-      { hexToWorld: geometry.hexToWorld.bind(geometry), worldToScreen: geometry.worldToScreen.bind(geometry), hexSize: geometry.hexSize, orientation: mapData.orientation ?? 'flat' },
+      tileGeomShim,
       rendererViewState,
       { getCachedImage, canvasWidth: width, canvasHeight: height }
     );
