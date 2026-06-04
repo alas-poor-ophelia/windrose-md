@@ -99,7 +99,7 @@ async function scanTilesetFolder(app: App, folderPath: string): Promise<TileEntr
 
       const relativePath = filePath.slice(normalizedFolder.length + 1);
       const parts = relativePath.split('/');
-      const category = parts.length > 1 ? parts[0] : undefined;
+      const category = parts.length > 1 ? parts.slice(0, -1).join('/') : undefined;
 
       const slashIdx = filePath.lastIndexOf('/');
       const filename = slashIdx >= 0 ? filePath.slice(slashIdx + 1) : filePath;
