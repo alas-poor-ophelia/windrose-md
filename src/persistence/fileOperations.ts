@@ -6,6 +6,8 @@
  */
 
 import type { MapData, MapLayer, MapType } from '#types/core/map.types';
+import type { TileLayerRole } from '#types/tiles/tile.types';
+import { DEFAULT_TILE_LAYERS } from '#types/tiles/tile.types';
 import type { App } from 'obsidian';
 import { TFile } from 'obsidian';
 
@@ -215,14 +217,30 @@ async function saveMapData(app: App, mapId: string, mapData: MapData): Promise<b
   }
 }
 
+function createTileLayer(name: string, order: number, role: TileLayerRole): MapLayer {
+  return {
+    id: generateLayerId(),
+    name,
+    order,
+    visible: true,
+    cells: [],
+    curves: [],
+    edges: [],
+    objects: [],
+    textLabels: [],
+    fogOfWar: null,
+    tileRole: role,
+  };
+}
+
 function createNewMap(mapName: string = '', mapType: MapType = 'grid'): MapData {
   // Generate layer ID for initial layer
   const initialLayerId = generateLayerId();
 
-  // Initial layer
+  // Initial layer (drawing layer for hex, or first tile layer for grid)
   const initialLayer: MapLayer = {
     id: initialLayerId,
-    name: '1',
+    name: mapType === 'grid' ? DEFAULT_TILE_LAYERS[0].name : '1',
     order: 0,
     visible: true,
     cells: [],
@@ -230,8 +248,14 @@ function createNewMap(mapName: string = '', mapType: MapType = 'grid'): MapData 
     edges: [],
     objects: [],
     textLabels: [],
-    fogOfWar: null
+    fogOfWar: null,
+    tileRole: mapType === 'grid' ? DEFAULT_TILE_LAYERS[0].role : undefined,
   };
+
+  // For grid maps, create the remaining tile layers
+  const additionalTileLayers = mapType === 'grid'
+    ? DEFAULT_TILE_LAYERS.slice(1).map(def => createTileLayer(def.name, def.order, def.role))
+    : [];
 
   // Base map structure with layer schema (v2)
   const baseMap: MapData = {
@@ -258,7 +282,7 @@ function createNewMap(mapName: string = '', mapType: MapType = 'grid'): MapData 
     schemaVersion: SCHEMA_VERSION,
     activeLayerId: initialLayerId,
     layerPanelVisible: false,
-    layers: [initialLayer],
+    layers: [initialLayer, ...additionalTileLayers],
 
     // Will be set below based on mapType
     gridSize: DEFAULTS.gridSize,
