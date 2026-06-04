@@ -12,7 +12,7 @@ import type { MapObject } from '../objects/object.types';
 import type { TextLabel } from '../objects/note.types';
 import type { HexColor } from '../core/common.types';
 import type { Edge } from '../core/rendering.types';
-import type { HexTileAssignment } from '../tiles/tile.types';
+import type { TileAssignment } from '../tiles/tile.types';
 import type { MapDataUpdater } from '../hooks/mapData.types';
 import type { LayerHistorySnapshot } from '../hooks/layerHistory.types';
 
@@ -57,8 +57,8 @@ export type HandleEdgesChange = LayerDataChangeHandler<Edge[]>;
 /** Handle curves change */
 export type HandleCurvesChange = LayerDataChangeHandler<Curve[]>;
 
-/** Handle tiles change (hex maps only) */
-export type HandleTilesChange = LayerDataChangeHandler<HexTileAssignment[]>;
+/** Handle tiles change */
+export type HandleTilesChange = LayerDataChangeHandler<TileAssignment[]>;
 
 /** Handle map name change */
 export type HandleNameChange = (newName: string) => void;

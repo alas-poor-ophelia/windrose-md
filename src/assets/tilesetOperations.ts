@@ -3,7 +3,7 @@
  * Operations for importing and managing hex tile sets from vault folders.
  */
 
-import type { TilesetDef, TileEntry } from '#types/tiles/tile.types';
+import type { TilesetDef, FolderTileset, TileEntry } from '#types/tiles/tile.types';
 import type { App } from 'obsidian';
 
 import { getApp } from '../core/settingsAccessor';
@@ -249,13 +249,14 @@ function createTilesetFromTiles(
     overflowTop?: number;
     overflowBottom?: number;
   }
-): TilesetDef {
+): FolderTileset {
   const tileWidth = options?.tileWidth ?? 256;
   const tileHeight = options?.tileHeight ?? 256;
 
   const detected = autoDetectOverflow(tileWidth, tileHeight);
 
   return {
+    source: 'folder' as const,
     id: generateTilesetId(folderPath),
     name,
     folderPath,

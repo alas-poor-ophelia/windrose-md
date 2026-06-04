@@ -13,32 +13,32 @@ import {
   renderTiles,
 } from "../../../../src/geometry/renderers/tileRenderer";
 
-import type { HexTileAssignment, TilesetDef } from '#types/tiles/tile.types';
+import type { TileAssignment, TilesetDef } from '#types/tiles/tile.types';
 
 const SQRT3 = Math.sqrt(3);
 
 describe('tileRenderer', () => {
   describe('sortTilesForRendering', () => {
-    const makeTile = (q: number, r: number): HexTileAssignment => ({
-      q, r, tilesetId: 'ts1', tileId: 'tile1',
+    const makeTile = (col: number, row: number): TileAssignment => ({
+      col, row, tilesetId: 'ts1', tileId: 'tile1',
     });
 
     it('sorts by offset row ascending (flat-top)', () => {
       const tiles = [makeTile(0, 2), makeTile(0, 0), makeTile(0, 1)];
       const sorted = sortTilesForRendering(tiles, 'flat');
-      expect(sorted.map(t => t.r)).toEqual([0, 1, 2]);
+      expect(sorted.map(t => t.row)).toEqual([0, 1, 2]);
     });
 
     it('sorts by offset row ascending (pointy-top)', () => {
       const tiles = [makeTile(0, 3), makeTile(0, 1), makeTile(0, 2)];
       const sorted = sortTilesForRendering(tiles, 'pointy');
-      expect(sorted.map(t => t.r)).toEqual([1, 2, 3]);
+      expect(sorted.map(t => t.row)).toEqual([1, 2, 3]);
     });
 
     it('breaks ties by column', () => {
       const tiles = [makeTile(2, 0), makeTile(0, 0), makeTile(1, 0)];
       const sorted = sortTilesForRendering(tiles, 'flat');
-      expect(sorted.map(t => t.q)).toEqual([0, 1, 2]);
+      expect(sorted.map(t => t.col)).toEqual([0, 1, 2]);
     });
 
     it('does not mutate the original array', () => {
@@ -66,35 +66,35 @@ describe('tileRenderer', () => {
       // So q=1,r=0 should sort before q=0,r=1
       const tiles = [makeTile(0, 1), makeTile(1, 0)];
       const sorted = sortTilesForRendering(tiles, 'flat');
-      expect(sorted[0].q).toBe(1);
-      expect(sorted[0].r).toBe(0);
+      expect(sorted[0].col).toBe(1);
+      expect(sorted[0].row).toBe(0);
     });
 
     it('treats tiles without layer field as base when sorting', () => {
       // Tiles with no layer and tiles with layer='base' should sort identically
-      const tilesNoLayer: HexTileAssignment[] = [
-        { q: 0, r: 2, tilesetId: 'ts1', tileId: 'tile1' },
-        { q: 0, r: 0, tilesetId: 'ts1', tileId: 'tile1' },
-        { q: 0, r: 1, tilesetId: 'ts1', tileId: 'tile1' },
+      const tilesNoLayer: TileAssignment[] = [
+        { col: 0, row: 2, tilesetId: 'ts1', tileId: 'tile1' },
+        { col: 0, row: 0, tilesetId: 'ts1', tileId: 'tile1' },
+        { col: 0, row: 1, tilesetId: 'ts1', tileId: 'tile1' },
       ];
-      const tilesExplicitBase: HexTileAssignment[] = [
-        { q: 0, r: 2, tilesetId: 'ts1', tileId: 'tile1', layer: 'base' },
-        { q: 0, r: 0, tilesetId: 'ts1', tileId: 'tile1', layer: 'base' },
-        { q: 0, r: 1, tilesetId: 'ts1', tileId: 'tile1', layer: 'base' },
+      const tilesExplicitBase: TileAssignment[] = [
+        { col: 0, row: 2, tilesetId: 'ts1', tileId: 'tile1', placement: 'fill' },
+        { col: 0, row: 0, tilesetId: 'ts1', tileId: 'tile1', placement: 'fill' },
+        { col: 0, row: 1, tilesetId: 'ts1', tileId: 'tile1', placement: 'fill' },
       ];
       const sortedNoLayer = sortTilesForRendering(tilesNoLayer, 'flat');
       const sortedExplicit = sortTilesForRendering(tilesExplicitBase, 'flat');
-      expect(sortedNoLayer.map(t => t.r)).toEqual(sortedExplicit.map(t => t.r));
+      expect(sortedNoLayer.map(t => t.row)).toEqual(sortedExplicit.map(t => t.row));
     });
   });
 
   describe('calculateTileDrawRect', () => {
     const makeTileset = (overrides: Partial<TilesetDef> = {}): TilesetDef => ({
-      id: 'ts1', name: 'Test', folderPath: '/test',
+      source: 'folder', id: 'ts1', name: 'Test', folderPath: '/test',
       tileWidth: 256, tileHeight: 256, hexHeight: 256,
       overflowTop: 0, overflowBottom: 0, tiles: [],
       ...overrides,
-    });
+    } as TilesetDef);
 
     it('tile drawWidth matches hex width for flat-top', () => {
       const tileset = makeTileset();
@@ -253,7 +253,7 @@ describe('tileRenderer', () => {
 
   describe('renderTiles', () => {
     const makeTileset = (overrides: Partial<TilesetDef> = {}): TilesetDef => ({
-      id: 'ts1', name: 'Test', folderPath: '/test',
+      source: 'folder', id: 'ts1', name: 'Test', folderPath: '/test',
       tileWidth: 64, tileHeight: 64, hexHeight: 64,
       overflowTop: 0, overflowBottom: 0,
       tiles: [
@@ -261,7 +261,7 @@ describe('tileRenderer', () => {
         { id: 'overlay1', filename: 'overlay1.png', vaultPath: '/test/overlay1.png' },
       ],
       ...overrides,
-    });
+    } as TilesetDef);
 
     const makeGeometry = () => ({
       hexToWorld: (q: number, r: number) => ({ worldX: q * 100, worldY: r * 100 }),
@@ -296,9 +296,9 @@ describe('tileRenderer', () => {
       const ts = makeTileset();
       ts.tiles.push({ id: 'overlay1', filename: 'overlay.png', vaultPath: 'Tiles/overlay.png' });
 
-      const tiles: HexTileAssignment[] = [
-        { q: 0, r: 0, tilesetId: 'ts1', tileId: 'overlay1', layer: 'overlay' },
-        { q: 0, r: 0, tilesetId: 'ts1', tileId: 'base1' },  // no layer = base
+      const tiles: TileAssignment[] = [
+        { col: 0, row: 0, tilesetId: 'ts1', tileId: 'overlay1', placement: 'overlay' },
+        { col: 0, row: 0, tilesetId: 'ts1', tileId: 'base1' },  // no layer = base
       ];
 
       renderTiles(ctx as unknown as CanvasRenderingContext2D, tiles, [ts], makeGeometry(), { x: 0, y: 0, zoom: 1 }, {
@@ -315,8 +315,8 @@ describe('tileRenderer', () => {
       const fakeImg = { naturalWidth: 64, naturalHeight: 64 } as HTMLImageElement;
       const ctx = makeCtx();
 
-      const tiles: HexTileAssignment[] = [
-        { q: 0, r: 0, tilesetId: 'ts1', tileId: 'overlay1', layer: 'overlay' },
+      const tiles: TileAssignment[] = [
+        { col: 0, row: 0, tilesetId: 'ts1', tileId: 'overlay1', placement: 'overlay' },
       ];
 
       renderTiles(ctx as unknown as CanvasRenderingContext2D, tiles, [makeTileset()], makeGeometry(), { x: 0, y: 0, zoom: 1 }, {
@@ -337,9 +337,9 @@ describe('tileRenderer', () => {
         drawOrder.push((img as any)._tag);
       });
 
-      const tiles: HexTileAssignment[] = [
-        { q: 0, r: 0, tilesetId: 'ts1', tileId: 'overlay1', layer: 'overlay' },
-        { q: 0, r: 0, tilesetId: 'ts1', tileId: 'base1' }, // no layer field
+      const tiles: TileAssignment[] = [
+        { col: 0, row: 0, tilesetId: 'ts1', tileId: 'overlay1', placement: 'overlay' },
+        { col: 0, row: 0, tilesetId: 'ts1', tileId: 'base1' }, // no layer field
       ];
 
       renderTiles(ctx as unknown as CanvasRenderingContext2D, tiles, [makeTileset()], makeGeometry(), { x: 0, y: 0, zoom: 1 }, {
@@ -360,8 +360,8 @@ describe('tileRenderer', () => {
         drawCalls.push({ x, y });
       });
 
-      const tiles: HexTileAssignment[] = [
-        { q: 0, r: 0, tilesetId: 'ts1', tileId: 'base1', freeform: true, worldX: 50, worldY: 75 },
+      const tiles: TileAssignment[] = [
+        { col: 0, row: 0, tilesetId: 'ts1', tileId: 'base1', freeform: true, worldX: 50, worldY: 75 },
       ];
 
       renderTiles(ctx as unknown as CanvasRenderingContext2D, tiles, [makeTileset()], makeGeometry(), { x: 0, y: 0, zoom: 1 }, {
@@ -393,10 +393,10 @@ describe('tileRenderer', () => {
         { id: 'freeform1', filename: 'freeform.png', vaultPath: 'Tiles/freeform.png' },
       );
 
-      const tiles: HexTileAssignment[] = [
-        { q: 0, r: 0, tilesetId: 'ts1', tileId: 'freeform1', freeform: true, worldX: 50, worldY: 75 },
-        { q: 0, r: 0, tilesetId: 'ts1', tileId: 'base1' },
-        { q: 0, r: 0, tilesetId: 'ts1', tileId: 'overlay1', layer: 'overlay' },
+      const tiles: TileAssignment[] = [
+        { col: 0, row: 0, tilesetId: 'ts1', tileId: 'freeform1', freeform: true, worldX: 50, worldY: 75 },
+        { col: 0, row: 0, tilesetId: 'ts1', tileId: 'base1' },
+        { col: 0, row: 0, tilesetId: 'ts1', tileId: 'overlay1', placement: 'overlay' },
       ];
 
       renderTiles(ctx as unknown as CanvasRenderingContext2D, tiles, [ts], makeGeometry(), { x: 0, y: 0, zoom: 1 }, {
@@ -417,8 +417,8 @@ describe('tileRenderer', () => {
       const fakeImg = { naturalWidth: 64, naturalHeight: 64 } as HTMLImageElement;
       const ctx = makeCtx();
 
-      const tiles: HexTileAssignment[] = [
-        { q: 0, r: 0, tilesetId: 'ts1', tileId: 'base1', rotation: 60 },
+      const tiles: TileAssignment[] = [
+        { col: 0, row: 0, tilesetId: 'ts1', tileId: 'base1', rotation: 60 },
       ];
 
       renderTiles(ctx as unknown as CanvasRenderingContext2D, tiles, [makeTileset()], makeGeometry(), { x: 0, y: 0, zoom: 1 }, {
@@ -437,8 +437,8 @@ describe('tileRenderer', () => {
       const fakeImg = { naturalWidth: 64, naturalHeight: 64 } as HTMLImageElement;
       const ctx = makeCtx();
 
-      const tiles: HexTileAssignment[] = [
-        { q: 0, r: 0, tilesetId: 'ts1', tileId: 'base1', flipH: true },
+      const tiles: TileAssignment[] = [
+        { col: 0, row: 0, tilesetId: 'ts1', tileId: 'base1', flipH: true },
       ];
 
       renderTiles(ctx as unknown as CanvasRenderingContext2D, tiles, [makeTileset()], makeGeometry(), { x: 0, y: 0, zoom: 1 }, {
@@ -456,8 +456,8 @@ describe('tileRenderer', () => {
       const fakeImg = { naturalWidth: 64, naturalHeight: 64 } as HTMLImageElement;
       const ctx = makeCtx();
 
-      const tiles: HexTileAssignment[] = [
-        { q: 0, r: 0, tilesetId: 'ts1', tileId: 'base1', rotation: 120, flipH: true },
+      const tiles: TileAssignment[] = [
+        { col: 0, row: 0, tilesetId: 'ts1', tileId: 'base1', rotation: 120, flipH: true },
       ];
 
       renderTiles(ctx as unknown as CanvasRenderingContext2D, tiles, [makeTileset()], makeGeometry(), { x: 0, y: 0, zoom: 1 }, {
@@ -482,15 +482,15 @@ describe('tileRenderer', () => {
         drawCalls.push({ x, y, w, h });
       });
 
-      const ts: TilesetDef = {
+      const ts: TilesetDef = { source: 'folder',
         id: 'ts-autodetect', name: 'Test', folderPath: 'Tiles',
         tileWidth: 256, tileHeight: 256, hexHeight: 256,
         overflowTop: 0, overflowBottom: 0,
         tiles: [{ id: 'stamp1', filename: 'stamp.png', vaultPath: 'Tiles/stamp.png' }],
       };
 
-      const tiles: HexTileAssignment[] = [
-        { q: 0, r: 0, tilesetId: 'ts-autodetect', tileId: 'stamp1' },
+      const tiles: TileAssignment[] = [
+        { col: 0, row: 0, tilesetId: 'ts-autodetect', tileId: 'stamp1' },
       ];
 
       renderTiles(ctx as unknown as CanvasRenderingContext2D, tiles, [ts], makeGeometry(), { x: 0, y: 0, zoom: 1 }, {
@@ -515,15 +515,15 @@ describe('tileRenderer', () => {
         drawCalls.push({ w, h });
       });
 
-      const ts: TilesetDef = {
+      const ts: TilesetDef = { source: 'folder',
         id: 'ts-min', name: 'Test', folderPath: 'Tiles',
         tileWidth: 256, tileHeight: 256, hexHeight: 256,
         overflowTop: 0, overflowBottom: 0,
         tiles: [{ id: 'stamp1', filename: 'stamp.png', vaultPath: 'Tiles/stamp.png' }],
       };
 
-      const tiles: HexTileAssignment[] = [
-        { q: 0, r: 0, tilesetId: 'ts-min', tileId: 'stamp1' },
+      const tiles: TileAssignment[] = [
+        { col: 0, row: 0, tilesetId: 'ts-min', tileId: 'stamp1' },
       ];
 
       renderTiles(ctx as unknown as CanvasRenderingContext2D, tiles, [ts], makeGeometry(), { x: 0, y: 0, zoom: 1 }, {
@@ -548,15 +548,15 @@ describe('tileRenderer', () => {
         drawCalls.push({ w, h });
       });
 
-      const ts: TilesetDef = {
+      const ts: TilesetDef = { source: 'folder',
         id: 'ts-ar', name: 'Test', folderPath: 'Tiles',
         tileWidth: 256, tileHeight: 256, hexHeight: 256,
         overflowTop: 0, overflowBottom: 0,
         tiles: [{ id: 'stamp1', filename: 'stamp.png', vaultPath: 'Tiles/stamp.png' }],
       };
 
-      const tiles: HexTileAssignment[] = [
-        { q: 0, r: 0, tilesetId: 'ts-ar', tileId: 'stamp1' },
+      const tiles: TileAssignment[] = [
+        { col: 0, row: 0, tilesetId: 'ts-ar', tileId: 'stamp1' },
       ];
 
       renderTiles(ctx as unknown as CanvasRenderingContext2D, tiles, [ts], makeGeometry(), { x: 0, y: 0, zoom: 1 }, {
@@ -573,14 +573,14 @@ describe('tileRenderer', () => {
 
     it('stamp minimum size scales with zoom level', () => {
       const tinyImg = { naturalWidth: 10, naturalHeight: 10 } as HTMLImageElement;
-      const ts: TilesetDef = {
+      const ts: TilesetDef = { source: 'folder',
         id: 'ts-zoom', name: 'Test', folderPath: 'Tiles',
         tileWidth: 256, tileHeight: 256, hexHeight: 256,
         overflowTop: 0, overflowBottom: 0,
         tiles: [{ id: 'stamp1', filename: 'stamp.png', vaultPath: 'Tiles/stamp.png' }],
       };
-      const tiles: HexTileAssignment[] = [
-        { q: 0, r: 0, tilesetId: 'ts-zoom', tileId: 'stamp1' },
+      const tiles: TileAssignment[] = [
+        { col: 0, row: 0, tilesetId: 'ts-zoom', tileId: 'stamp1' },
       ];
 
       // Render at zoom=1
@@ -635,7 +635,7 @@ describe('tileRenderer', () => {
         drawSmall.push({ w });
       });
       renderTiles(ctx1 as unknown as CanvasRenderingContext2D,
-        [{ q: 0, r: 0, tilesetId: 'ts-scale-s', tileId: 'small' }],
+        [{ col: 0, row: 0, tilesetId: 'ts-scale-s', tileId: 'small' }],
         [tsSmall], makeGeometry(), { x: 0, y: 0, zoom: 1 }, {
           getCachedImage: () => smallImg,
           canvasWidth: 800, canvasHeight: 600,
@@ -648,7 +648,7 @@ describe('tileRenderer', () => {
         drawLarge.push({ w });
       });
       renderTiles(ctx2 as unknown as CanvasRenderingContext2D,
-        [{ q: 0, r: 0, tilesetId: 'ts-scale-l', tileId: 'large' }],
+        [{ col: 0, row: 0, tilesetId: 'ts-scale-l', tileId: 'large' }],
         [tsLarge], makeGeometry(), { x: 0, y: 0, zoom: 1 }, {
           getCachedImage: () => largeImg,
           canvasWidth: 800, canvasHeight: 600,
@@ -677,7 +677,7 @@ describe('tileRenderer', () => {
         tiles: [{ id: 't1', filename: 't1.png', vaultPath: 'Tiles/t1.png' }],
       };
       renderTiles(ctx1 as unknown as CanvasRenderingContext2D,
-        [{ q: 0, r: 0, tilesetId: 'ts-thresh-def', tileId: 't1' }],
+        [{ col: 0, row: 0, tilesetId: 'ts-thresh-def', tileId: 't1' }],
         [tsDefault], makeGeometry(), { x: 0, y: 0, zoom: 1 }, {
           getCachedImage: () => img,
           canvasWidth: 800, canvasHeight: 600,
@@ -696,7 +696,7 @@ describe('tileRenderer', () => {
         tiles: [{ id: 't1', filename: 't1.png', vaultPath: 'Tiles/t1.png' }],
       };
       renderTiles(ctx2 as unknown as CanvasRenderingContext2D,
-        [{ q: 0, r: 0, tilesetId: 'ts-thresh-cust', tileId: 't1' }],
+        [{ col: 0, row: 0, tilesetId: 'ts-thresh-cust', tileId: 't1' }],
         [tsCustom], makeGeometry(), { x: 0, y: 0, zoom: 1 }, {
           getCachedImage: () => img,
           canvasWidth: 800, canvasHeight: 600,
@@ -723,7 +723,7 @@ describe('tileRenderer', () => {
         tiles: [{ id: 't1', filename: 't1.png', vaultPath: 'Tiles/t1.png' }],
       };
       renderTiles(ctx1 as unknown as CanvasRenderingContext2D,
-        [{ q: 0, r: 0, tilesetId: 'ts-minsc-def', tileId: 't1' }],
+        [{ col: 0, row: 0, tilesetId: 'ts-minsc-def', tileId: 't1' }],
         [tsDefault], makeGeometry(), { x: 0, y: 0, zoom: 1 }, {
           getCachedImage: () => tinyImg,
           canvasWidth: 800, canvasHeight: 600,
@@ -742,7 +742,7 @@ describe('tileRenderer', () => {
         tiles: [{ id: 't1', filename: 't1.png', vaultPath: 'Tiles/t1.png' }],
       };
       renderTiles(ctx2 as unknown as CanvasRenderingContext2D,
-        [{ q: 0, r: 0, tilesetId: 'ts-minsc-lg', tileId: 't1' }],
+        [{ col: 0, row: 0, tilesetId: 'ts-minsc-lg', tileId: 't1' }],
         [tsLarger], makeGeometry(), { x: 0, y: 0, zoom: 1 }, {
           getCachedImage: () => tinyImg,
           canvasWidth: 800, canvasHeight: 600,
@@ -756,8 +756,8 @@ describe('tileRenderer', () => {
       const fakeImg = { naturalWidth: 64, naturalHeight: 64 } as HTMLImageElement;
       const ctx = makeCtx();
 
-      const tiles: HexTileAssignment[] = [
-        { q: 100, r: 100, tilesetId: 'ts1', tileId: 'base1' },
+      const tiles: TileAssignment[] = [
+        { col: 100, row: 100, tilesetId: 'ts1', tileId: 'base1' },
       ];
 
       renderTiles(ctx as unknown as CanvasRenderingContext2D, tiles, [makeTileset()], makeGeometry(), { x: 0, y: 0, zoom: 1 }, {
@@ -774,8 +774,8 @@ describe('tileRenderer', () => {
       const fakeImg = { naturalWidth: 64, naturalHeight: 64 } as HTMLImageElement;
       const ctx = makeCtx();
 
-      const tiles: HexTileAssignment[] = [
-        { q: 0, r: 0, tilesetId: 'ts1', tileId: 'base1' },
+      const tiles: TileAssignment[] = [
+        { col: 0, row: 0, tilesetId: 'ts1', tileId: 'base1' },
       ];
 
       renderTiles(ctx as unknown as CanvasRenderingContext2D, tiles, [makeTileset()], makeGeometry(), { x: 0, y: 0, zoom: 1 }, {
@@ -792,8 +792,8 @@ describe('tileRenderer', () => {
     it('skips tile when getCachedImage returns null (image not loaded)', () => {
       const ctx = makeCtx();
 
-      const tiles: HexTileAssignment[] = [
-        { q: 0, r: 0, tilesetId: 'ts1', tileId: 'base1' },
+      const tiles: TileAssignment[] = [
+        { col: 0, row: 0, tilesetId: 'ts1', tileId: 'base1' },
       ];
 
       renderTiles(ctx as unknown as CanvasRenderingContext2D, tiles, [makeTileset()], makeGeometry(), { x: 0, y: 0, zoom: 1 }, {
@@ -809,8 +809,8 @@ describe('tileRenderer', () => {
       const fakeImg = { naturalWidth: 64, naturalHeight: 64 } as HTMLImageElement;
       const ctx = makeCtx();
 
-      const tiles: HexTileAssignment[] = [
-        { q: 0, r: 0, tilesetId: 'nonexistent', tileId: 'base1' },
+      const tiles: TileAssignment[] = [
+        { col: 0, row: 0, tilesetId: 'nonexistent', tileId: 'base1' },
       ];
 
       renderTiles(ctx as unknown as CanvasRenderingContext2D, tiles, [makeTileset()], makeGeometry(), { x: 0, y: 0, zoom: 1 }, {
@@ -826,8 +826,8 @@ describe('tileRenderer', () => {
       const fakeImg = { naturalWidth: 64, naturalHeight: 64 } as HTMLImageElement;
       const ctx = makeCtx();
 
-      const tiles: HexTileAssignment[] = [
-        { q: 0, r: 0, tilesetId: 'ts1', tileId: 'nonexistent_tile' },
+      const tiles: TileAssignment[] = [
+        { col: 0, row: 0, tilesetId: 'ts1', tileId: 'nonexistent_tile' },
       ];
 
       renderTiles(ctx as unknown as CanvasRenderingContext2D, tiles, [makeTileset()], makeGeometry(), { x: 0, y: 0, zoom: 1 }, {
@@ -847,8 +847,8 @@ describe('tileRenderer', () => {
         alphaValues.push(ctx.globalAlpha);
       });
 
-      const tiles: HexTileAssignment[] = [
-        { q: 0, r: 0, tilesetId: 'ts1', tileId: 'base1' },
+      const tiles: TileAssignment[] = [
+        { col: 0, row: 0, tilesetId: 'ts1', tileId: 'base1' },
       ];
 
       renderTiles(ctx as unknown as CanvasRenderingContext2D, tiles, [makeTileset()], makeGeometry(), { x: 0, y: 0, zoom: 1 }, {
@@ -873,8 +873,8 @@ describe('tileRenderer', () => {
         alphaValues.push(ctx.globalAlpha);
       });
 
-      const tiles: HexTileAssignment[] = [
-        { q: 0, r: 0, tilesetId: 'ts1', tileId: 'base1' },
+      const tiles: TileAssignment[] = [
+        { col: 0, row: 0, tilesetId: 'ts1', tileId: 'base1' },
       ];
 
       renderTiles(ctx as unknown as CanvasRenderingContext2D, tiles, [makeTileset()], makeGeometry(), { x: 0, y: 0, zoom: 1 }, {
@@ -899,8 +899,8 @@ describe('tileRenderer', () => {
     it('returns early without drawing when tilesets array is empty', () => {
       const ctx = makeCtx();
 
-      const tiles: HexTileAssignment[] = [
-        { q: 0, r: 0, tilesetId: 'ts1', tileId: 'base1' },
+      const tiles: TileAssignment[] = [
+        { col: 0, row: 0, tilesetId: 'ts1', tileId: 'base1' },
       ];
 
       renderTiles(ctx as unknown as CanvasRenderingContext2D, tiles, [], makeGeometry(), { x: 0, y: 0, zoom: 1 }, {
@@ -913,8 +913,8 @@ describe('tileRenderer', () => {
     it('returns early without drawing when getCachedImage is not provided', () => {
       const ctx = makeCtx();
 
-      const tiles: HexTileAssignment[] = [
-        { q: 0, r: 0, tilesetId: 'ts1', tileId: 'base1' },
+      const tiles: TileAssignment[] = [
+        { col: 0, row: 0, tilesetId: 'ts1', tileId: 'base1' },
       ];
 
       renderTiles(ctx as unknown as CanvasRenderingContext2D, tiles, [makeTileset()], makeGeometry(), { x: 0, y: 0, zoom: 1 });

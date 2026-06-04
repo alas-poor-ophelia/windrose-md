@@ -135,10 +135,17 @@ export type {
 // ===========================================
 export type {
   TilesetDef,
+  FolderTileset,
+  SheetTileset,
   TileEntry,
   TileRotation,
+  TileAssignment,
   HexTileAssignment,
+  TilesetOverrides,
+  TileLayerRole,
+  TileRenderContext,
 } from './tiles/tile.types';
+export { DEFAULT_TILE_LAYERS } from './tiles/tile.types';
 
 // ===========================================
 // Tool Types

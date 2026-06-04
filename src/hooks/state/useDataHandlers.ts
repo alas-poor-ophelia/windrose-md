@@ -17,7 +17,7 @@ import type { Curve } from '#types/core/curve.types';
 import type { MapObject } from '#types/objects/object.types';
 import type { TextLabel } from '#types/objects/note.types';
 import type { HexColor } from '#types/core/common.types';
-import type { HexTileAssignment } from '#types/tiles/tile.types';
+import type { TileAssignment } from '#types/tiles/tile.types';
 import type {
   UseDataHandlersOptions,
   UseDataHandlersResult,
@@ -121,7 +121,7 @@ function useDataHandlers({
   );
 
   const handleTilesChange = useMemo(
-    () => createLayerDataHandler<HexTileAssignment[]>('tiles'),
+    () => createLayerDataHandler<TileAssignment[]>('tiles'),
     [createLayerDataHandler]
   );
 

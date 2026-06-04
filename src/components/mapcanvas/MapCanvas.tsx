@@ -120,7 +120,7 @@ interface MapCanvasContentProps {
   onObjectsChange: (objects: MapObject[]) => void;
   onTextLabelsChange: (labels: TextLabel[]) => void;
   onEdgesChange: (edges: Edge[], skipHistory?: boolean) => void;
-  onTilesChange?: (tiles: import('#types/tiles/tile.types').HexTileAssignment[]) => void;
+  onTilesChange?: (tiles: import('#types/tiles/tile.types').TileAssignment[]) => void;
   tileImagesReady?: boolean;
   adjacentSubHexes?: AdjacentSubHexRenderData[] | null;
   onViewStateChange: (viewState: StoredViewState) => void;

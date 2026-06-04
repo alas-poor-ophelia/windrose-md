@@ -1,23 +1,19 @@
 /**
  * TilePlacementLayer.tsx
  *
- * Interaction layer for placing hex tile images.
- * Click or drag with the tilePaint tool to assign tiles to hex cells.
- * Supports drag-painting (holding pointer down while moving across hexes).
+ * Interaction layer for placing tile images on hex or grid maps.
+ * Click or drag with the tilePaint tool to assign tiles to cells.
+ * Supports drag-painting (holding pointer down while moving across cells).
  */
 
 import type { ToolId } from '#types/tools/tool.types';
 import type { VNode } from 'preact';
-import type { HexTileAssignment, TileRotation } from '#types/tiles/tile.types';
+import type { TileAssignment, TileRotation } from '#types/tiles/tile.types';
 
 import { useCallback, useEffect, useRef } from 'preact/hooks';
 import { useMapState } from '../../context/MapContext';
 import { useEventHandlerRegistration } from '../../context/EventHandlerContext';
 import { getActiveLayer } from '../../persistence/layerAccessor';
-
-
-
-
 
 
 
@@ -32,7 +28,7 @@ export interface TilePlacementLayerProps {
   tileFitMode: 'fill' | 'contain' | 'auto';
   stampMode: boolean;
   tileScale: number;
-  onTilesChange: (tiles: HexTileAssignment[], suppressHistory?: boolean) => void;
+  onTilesChange: (tiles: TileAssignment[], suppressHistory?: boolean) => void;
 }
 
 const TilePlacementLayer = ({
@@ -55,36 +51,35 @@ const TilePlacementLayer = ({
 
   const paintedInStrokeRef = useRef<Set<string>>(new Set());
   const isDraggingRef = useRef(false);
-  const strokeInitialTilesRef = useRef<HexTileAssignment[] | null>(null);
+  const strokeInitialTilesRef = useRef<TileAssignment[] | null>(null);
 
-  const placeTileAtHex = useCallback((q: number, r: number) => {
+  const placeTileAtCell = useCallback((col: number, row: number) => {
     if (!mapData || selectedTilesetId == null || selectedTilesetId === '' || selectedTileId == null || selectedTileId === '') return;
 
     const activeLayer = getActiveLayer(mapData);
     const currentTiles = activeLayer.tiles || [];
-    const key = `${q},${r}`;
+    const key = `${col},${row}`;
 
     if (paintedInStrokeRef.current.has(key)) return;
     paintedInStrokeRef.current.add(key);
 
-    // Replace existing tile at same hex and same layer, or add new
-    const targetLayer = tileLayer || 'base';
+    const targetPlacement = tileLayer === 'base' ? 'fill' : 'overlay';
     const existingIdx = currentTiles.findIndex(
-      (t: HexTileAssignment) => t.q === q && t.r === r && (t.layer || 'base') === targetLayer
+      (t: TileAssignment) => t.col === col && t.row === row && (t.placement || 'fill') === targetPlacement
     );
 
-    const newTile: HexTileAssignment = {
-      q, r,
+    const newTile: TileAssignment = {
+      col, row,
       tilesetId: selectedTilesetId,
       tileId: selectedTileId,
       rotation: (tileRotation || undefined) as TileRotation | undefined,
       flipH: tileFlipH || undefined,
-      layer: targetLayer === 'base' ? undefined : targetLayer,
+      placement: targetPlacement === 'fill' ? undefined : targetPlacement,
       fitMode: tileFitMode === 'auto' ? undefined : tileFitMode,
       scale: tileScale !== 1 ? tileScale : undefined,
     };
 
-    let newTiles: HexTileAssignment[];
+    let newTiles: TileAssignment[];
     if (existingIdx >= 0) {
       newTiles = [...currentTiles];
       newTiles[existingIdx] = newTile;
@@ -96,19 +91,19 @@ const TilePlacementLayer = ({
     onTilesChange(newTiles, isBatchedStroke);
   }, [mapData, selectedTilesetId, selectedTileId, tileRotation, tileFlipH, tileLayer, tileFitMode, tileScale, onTilesChange]);
 
-  const placeStampAtWorld = useCallback((worldX: number, worldY: number, q: number, r: number) => {
+  const placeStampAtWorld = useCallback((worldX: number, worldY: number, col: number, row: number) => {
     if (!mapData || selectedTilesetId == null || selectedTilesetId === '' || selectedTileId == null || selectedTileId === '') return;
 
     const activeLayer = getActiveLayer(mapData);
     const currentTiles = activeLayer.tiles || [];
 
-    const newTile: HexTileAssignment = {
-      q, r,
+    const newTile: TileAssignment = {
+      col, row,
       tilesetId: selectedTilesetId,
       tileId: selectedTileId,
       rotation: (tileRotation || undefined) as TileRotation | undefined,
       flipH: tileFlipH || undefined,
-      layer: 'overlay',
+      placement: 'overlay',
       fitMode: tileFitMode === 'auto' ? undefined : tileFitMode,
       scale: tileScale !== 1 ? tileScale : undefined,
       freeform: true,
@@ -119,30 +114,30 @@ const TilePlacementLayer = ({
     onTilesChange([...currentTiles, newTile]);
   }, [mapData, selectedTilesetId, selectedTileId, tileRotation, tileFlipH, tileFitMode, tileScale, onTilesChange]);
 
-  const eraseTileAtHex = useCallback((q: number, r: number) => {
+  const eraseTileAtCell = useCallback((col: number, row: number) => {
     if (!mapData) return;
 
     const activeLayer = getActiveLayer(mapData);
     const currentTiles = activeLayer.tiles || [];
-    const key = `${q},${r}`;
+    const key = `${col},${row}`;
 
     if (paintedInStrokeRef.current.has(key)) return;
     paintedInStrokeRef.current.add(key);
 
     const isBatchedStroke = strokeInitialTilesRef.current !== null;
 
-    // Prefer removing overlay first, then base
+    // Prefer removing overlay first, then fill
     const overlayIdx = currentTiles.findIndex(
-      (t: HexTileAssignment) => t.q === q && t.r === r && t.layer === 'overlay'
+      (t: TileAssignment) => t.col === col && t.row === row && t.placement === 'overlay'
     );
     if (overlayIdx >= 0) {
-      const newTiles = currentTiles.filter((_: HexTileAssignment, i: number) => i !== overlayIdx);
+      const newTiles = currentTiles.filter((_: TileAssignment, i: number) => i !== overlayIdx);
       onTilesChange(newTiles, isBatchedStroke);
       return;
     }
 
     const newTiles = currentTiles.filter(
-      (t: HexTileAssignment) => !(t.q === q && t.r === r)
+      (t: TileAssignment) => !(t.col === col && t.row === row)
     );
 
     if (newTiles.length !== currentTiles.length) {
@@ -157,7 +152,6 @@ const TilePlacementLayer = ({
     if (!coords) return;
 
     if (stampMode && hasTileSelected) {
-      // Stamp mode: place at exact world position (click only, no drag)
       const worldCoords = screenToWorld(e.clientX, e.clientY);
       if (worldCoords) {
         placeStampAtWorld(worldCoords.worldX, worldCoords.worldY, coords.x, coords.y);
@@ -172,25 +166,25 @@ const TilePlacementLayer = ({
     strokeInitialTilesRef.current = [...(activeLayer.tiles || [])];
 
     if (hasTileSelected) {
-      placeTileAtHex(coords.x, coords.y);
+      placeTileAtCell(coords.x, coords.y);
     } else {
-      eraseTileAtHex(coords.x, coords.y);
+      eraseTileAtCell(coords.x, coords.y);
     }
-  }, [isTileTool, geometry, screenToGrid, screenToWorld, hasTileSelected, stampMode, placeTileAtHex, placeStampAtWorld, eraseTileAtHex]);
+  }, [isTileTool, geometry, screenToGrid, screenToWorld, hasTileSelected, stampMode, placeTileAtCell, placeStampAtWorld, eraseTileAtCell]);
 
   const handlePointerMove = useCallback((e: PointerEvent) => {
     if (!isDraggingRef.current || !isTileTool || !geometry || geometry.type !== 'hex') return;
-    if (stampMode) return; // No drag-painting in stamp mode
+    if (stampMode) return;
 
     const coords = screenToGrid(e.clientX, e.clientY);
     if (!coords) return;
 
     if (hasTileSelected) {
-      placeTileAtHex(coords.x, coords.y);
+      placeTileAtCell(coords.x, coords.y);
     } else {
-      eraseTileAtHex(coords.x, coords.y);
+      eraseTileAtCell(coords.x, coords.y);
     }
-  }, [isTileTool, geometry, screenToGrid, hasTileSelected, stampMode, placeTileAtHex, eraseTileAtHex]);
+  }, [isTileTool, geometry, screenToGrid, hasTileSelected, stampMode, placeTileAtCell, eraseTileAtCell]);
 
   const handlePointerUp = useCallback(() => {
     if (strokeInitialTilesRef.current !== null && mapData) {

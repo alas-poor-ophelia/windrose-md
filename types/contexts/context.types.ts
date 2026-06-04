@@ -13,7 +13,7 @@ import type { MapData, MapType, ShapeOverlay, StoredViewState, TextLabelSettings
 import type { GroupDragInitialState } from '../hooks/groupDrag.types';
 import type { Cell } from '../core/cell.types';
 import type { BorderSide, Edge } from '../core/rendering.types';
-import type { HexTileAssignment } from '../tiles/tile.types';
+import type { TileAssignment } from '../tiles/tile.types';
 import type { ToolId } from '../tools/tool.types';
 
 // ===========================================
@@ -145,7 +145,7 @@ export interface MapOperationsContextValue {
   onTextLabelsChange: (labels: TextLabel[], skipHistory?: boolean) => void;
 
   // Tile operations
-  onTilesChange?: (tiles: HexTileAssignment[], suppressHistory?: boolean) => void;
+  onTilesChange?: (tiles: TileAssignment[], suppressHistory?: boolean) => void;
 
   // Note pin operations (optional — not all providers include these)
   onNotePinsChange?: (pins: NotePin[]) => void;

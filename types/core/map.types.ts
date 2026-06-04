@@ -10,7 +10,7 @@ import type { CustomColor } from './common.types';
 import type { Curve } from './curve.types';
 import type { Point } from './geometry.types';
 import type { HexOrientation, FrameSettings } from '../settings/settings.types';
-import type { TilesetDef, TilesetOverrides, HexTileAssignment } from '../tiles/tile.types';
+import type { TilesetDef, TilesetOverrides, TileAssignment, TileLayerRole } from '../tiles/tile.types';
 import type { MapObject } from '../objects/object.types';
 import type { Edge } from './rendering.types';
 
@@ -244,8 +244,10 @@ export interface MapLayer {
   layerBelowOpacity?: number;
   /** Optional icon for the layer (RPGAwesome class e.g. 'ra-sword', or Unicode char) */
   icon?: string;
-  /** Hex tile assignments for this layer (hex maps only) */
-  tiles?: HexTileAssignment[];
+  /** Tile assignments for this layer */
+  tiles?: TileAssignment[];
+  /** Layer's role in the tile layer stack (grid tile maps only) */
+  tileRole?: TileLayerRole;
 }
 
 // ===========================================

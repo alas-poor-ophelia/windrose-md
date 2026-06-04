@@ -1,12 +1,12 @@
 /**
  * tileRenderer.ts
  *
- * Renders hex tile images on the canvas with Baumgart-style z-sorting.
+ * Renders tile images on the canvas with Baumgart-style z-sorting.
  * Tiles are sorted by offset row (back to front) so overflow from
- * background hexes is naturally occluded by foreground hex content.
+ * background cells is naturally occluded by foreground cell content.
  */
 
-import type { HexTileAssignment, TilesetDef } from '#types/tiles/tile.types';
+import type { TileAssignment, TilesetDef, FolderTileset } from '#types/tiles/tile.types';
 
 import { axialToOffset } from '../core/offsetCoordinates';
 
@@ -41,18 +41,22 @@ interface TileRenderOptions {
 
 const SQRT3 = Math.sqrt(3);
 
+function isFolderTileset(ts: TilesetDef): ts is FolderTileset {
+  return !('source' in ts) || ts.source === 'folder';
+}
+
 /**
- * Sort tiles by offset row ascending (back â†’ front), then col for stability.
+ * Sort tiles by offset row ascending (back → front), then col for stability.
  * Pre-computes offsets to avoid redundant axialToOffset calls during sort.
  * Returns a new array; does not mutate the original.
  */
 function sortTilesForRendering(
-  tiles: HexTileAssignment[],
+  tiles: TileAssignment[],
   orientation: string
-): HexTileAssignment[] {
-  const offsets = new Map<HexTileAssignment, { col: number; row: number }>();
+): TileAssignment[] {
+  const offsets = new Map<TileAssignment, { col: number; row: number }>();
   for (const t of tiles) {
-    offsets.set(t, axialToOffset(t.q, t.r, orientation as import('#types/settings/settings.types').HexOrientation));
+    offsets.set(t, axialToOffset(t.col, t.row, orientation as import('#types/settings/settings.types').HexOrientation));
   }
   return [...tiles].sort((a, b) => {
     const oa = offsets.get(a);
@@ -91,10 +95,14 @@ function calculateTileDrawRect(
     ? SQRT3 * hexSize * zoom
     : 2 * hexSize * zoom;
 
+  const folder = isFolderTileset(tileset) ? tileset : null;
+  const hexHeight = folder?.hexHeight ?? tileset.tileHeight;
+  const overflowTop = folder?.overflowTop ?? 0;
+
   // Independent scale factors:
   // tileWidth maps to hex width, hexHeight maps to hex height
   const scaleX = hexScreenWidth / tileset.tileWidth;
-  const scaleY = hexScreenHeight / tileset.hexHeight;
+  const scaleY = hexScreenHeight / hexHeight;
 
   const effectiveFit = fitMode || tileset.fitMode || 'fill';
 
@@ -106,7 +114,7 @@ function calculateTileDrawRect(
 
     // Center within the hex bounding box
     const drawX = screenX - drawWidth / 2;
-    const hexAreaCenterInTile = tileset.overflowTop + tileset.hexHeight / 2;
+    const hexAreaCenterInTile = overflowTop + hexHeight / 2;
     const drawY = screenY - hexAreaCenterInTile * uniformScale;
 
     return { drawX, drawY, drawWidth, drawHeight };
@@ -118,7 +126,7 @@ function calculateTileDrawRect(
 
   // Position: center the hex-area portion on the hex center
   // The hex area starts at overflowTop pixels from the top of the tile image
-  const hexAreaCenterInTile = tileset.overflowTop + tileset.hexHeight / 2;
+  const hexAreaCenterInTile = overflowTop + hexHeight / 2;
   const drawX = screenX - drawWidth / 2;
   const drawY = screenY - hexAreaCenterInTile * scaleY;
 
@@ -153,11 +161,11 @@ function getEntryMap(tilesets: TilesetDef[]): Map<string, { entry: { vaultPath: 
 // ===========================================
 
 /**
- * Render hex tile images onto the canvas with z-sorted overflow.
+ * Render tile images onto the canvas with z-sorted overflow.
  */
 function renderTiles(
   ctx: CanvasRenderingContext2D,
-  tiles: HexTileAssignment[],
+  tiles: TileAssignment[],
   tilesets: TilesetDef[],
   geometry: TileGeometry,
   viewState: TileViewState,
@@ -179,20 +187,20 @@ function renderTiles(
     ? SQRT3 * geometry.hexSize * viewState.zoom
     : 2 * geometry.hexSize * viewState.zoom;
 
-  // Single-pass partition: base, overlay, freeform
-  const baseTiles: HexTileAssignment[] = [];
-  const overlayTiles: HexTileAssignment[] = [];
-  const freeformTiles: HexTileAssignment[] = [];
+  // Single-pass partition: fill, overlay, freeform
+  const fillTiles: TileAssignment[] = [];
+  const overlayTiles: TileAssignment[] = [];
+  const freeformTiles: TileAssignment[] = [];
   for (const t of tiles) {
     if (t.freeform === true) freeformTiles.push(t);
-    else if (t.layer === 'overlay') overlayTiles.push(t);
-    else baseTiles.push(t);
+    else if (t.placement === 'overlay') overlayTiles.push(t);
+    else fillTiles.push(t);
   }
-  // Sort grid-aligned tiles backâ†’front; freeform in insertion order
-  const sortedBase = sortTilesForRendering(baseTiles, geometry.orientation);
+  // Sort grid-aligned tiles back→front; freeform in insertion order
+  const sortedFill = sortTilesForRendering(fillTiles, geometry.orientation);
   const sortedOverlay = sortTilesForRendering(overlayTiles, geometry.orientation);
   // Iterate sequentially instead of concatenating
-  const sorted = [sortedBase, sortedOverlay, freeformTiles];
+  const sorted = [sortedFill, sortedOverlay, freeformTiles];
 
   const previousAlpha = ctx.globalAlpha;
   const opacity = options?.opacity ?? 1;
@@ -212,12 +220,15 @@ function renderTiles(
     const screen = tile.freeform === true && tile.worldX != null && tile.worldY != null
       ? geometry.worldToScreen(tile.worldX, tile.worldY, viewState.x, viewState.y, viewState.zoom)
       : (() => {
-          const world = geometry.hexToWorld(tile.q, tile.r);
+          const world = geometry.hexToWorld(tile.col, tile.row);
           return geometry.worldToScreen(world.worldX, world.worldY, viewState.x, viewState.y, viewState.zoom);
         })();
 
+    const folder = isFolderTileset(tileset) ? tileset : null;
+    const hexHeight = folder?.hexHeight ?? tileset.tileHeight;
+    const maxOverflow = Math.max(folder?.overflowTop ?? 0, folder?.overflowBottom ?? 0, tileset.tileHeight);
+
     // Viewport culling (generous margin for overflow)
-    const maxOverflow = Math.max(tileset.overflowTop, tileset.overflowBottom, tileset.tileHeight);
     const margin = maxOverflow * viewState.zoom * 2;
     if (screen.screenX < -margin || screen.screenX > canvasW + margin ||
         screen.screenY < -margin || screen.screenY > canvasH + margin) {
@@ -226,19 +237,19 @@ function renderTiles(
 
     // Auto-detect fit mode for mixed tilesets: if the actual image dimensions
     // differ significantly from the tileset's declared dimensions, this tile
-    // is a stamp/object (not hex-filling). Scale it relative to the tileset's
+    // is a stamp/object (not cell-filling). Scale it relative to the tileset's
     // coordinate space so a 55px stamp in a 256px tileset stays small.
     let drawOverride: { drawX: number; drawY: number; drawWidth: number; drawHeight: number } | null = null;
     const natW = img.naturalWidth;
     const natH = img.naturalHeight;
     if (natW > 0 && natH > 0 && tile.fitMode == null) {
       const wRatio = natW / tileset.tileWidth;
-      const hRatio = natH / tileset.hexHeight;
+      const hRatio = natH / hexHeight;
       const stampThreshold = tileset.stampThreshold ?? 0.5;
       if (wRatio < stampThreshold || hRatio < stampThreshold) {
         // Scale relative to the hex using pre-computed screen dimensions
         const fillScaleX = hexScreenWidth / tileset.tileWidth;
-        const fillScaleY = hexScreenHeight / tileset.hexHeight;
+        const fillScaleY = hexScreenHeight / hexHeight;
         // Use the smaller fill scale to preserve aspect ratio
         const baseScale = Math.min(fillScaleX, fillScaleY);
         // Ensure stamps are at least minStampScale of hex's smaller dimension
@@ -275,9 +286,10 @@ function renderTiles(
       rect = { drawX: cx - w / 2, drawY: cy - h / 2, drawWidth: w, drawHeight: h };
     }
 
-    // Apply opacity
-    if (opacity < 1) {
-      ctx.globalAlpha = previousAlpha * opacity;
+    // Apply opacity (per-tile and layer-level)
+    const tileOpacity = tile.opacity ?? 1;
+    if (opacity < 1 || tileOpacity < 1) {
+      ctx.globalAlpha = previousAlpha * opacity * tileOpacity;
     }
 
     // Apply rotation/flip if needed
@@ -301,7 +313,7 @@ function renderTiles(
     }
 
     // Restore opacity
-    if (opacity < 1) {
+    if (opacity < 1 || tileOpacity < 1) {
       ctx.globalAlpha = previousAlpha;
     }
   }

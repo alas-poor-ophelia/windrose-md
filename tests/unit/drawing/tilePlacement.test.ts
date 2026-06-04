@@ -2,11 +2,11 @@
  * tilePlacement Unit Tests
  *
  * Tests the pure data transformation logic extracted from TilePlacementLayer.
- * These operations transform HexTileAssignment[] arrays for tile paint/erase.
+ * These operations transform TileAssignment[] arrays for tile paint/erase.
  */
 
 import { describe, it, expect } from "vitest";
-import type { HexTileAssignment } from "../../../types/tiles/tile.types";
+import type { TileAssignment } from "../../../types/tiles/tile.types";
 
 // =============================================================================
 // Pure helper functions extracted from TilePlacementLayer logic
@@ -16,34 +16,34 @@ import type { HexTileAssignment } from "../../../types/tiles/tile.types";
  * Place a tile at hex (q, r) on a given layer. Replaces any existing tile
  * at the same hex+layer; otherwise appends.
  */
-function placeTileAtHex(
-  currentTiles: HexTileAssignment[],
-  q: number,
-  r: number,
+function placeTileAtCell(
+  currentTiles: TileAssignment[],
+  col: number,
+  row: number,
   tilesetId: string,
   tileId: string,
   options: {
     rotation?: number;
     flipH?: boolean;
-    layer?: "base" | "overlay";
+    placement?: "fill" | "overlay";
     fitMode?: "fill" | "contain" | "auto";
   } = {}
-): HexTileAssignment[] {
-  const targetLayer = options.layer || "base";
+): TileAssignment[] {
+  const targetPlacement = options.placement || "fill";
 
   const existingIdx = currentTiles.findIndex(
-    (t) => t.q === q && t.r === r && (t.layer || "base") === targetLayer
+    (t) => t.col === col && t.row === row && (t.placement || "fill") === targetPlacement
   );
 
-  const newTile: HexTileAssignment = {
-    q,
-    r,
+  const newTile: TileAssignment = {
+    col,
+    row,
     tilesetId,
     tileId,
-    rotation: (options.rotation || undefined) as HexTileAssignment["rotation"],
+    rotation: (options.rotation || undefined) as TileAssignment["rotation"],
     flipH: options.flipH || undefined,
-    layer: targetLayer === "base" ? undefined : targetLayer,
-    fitMode: options.fitMode === "auto" ? undefined : (options.fitMode as HexTileAssignment["fitMode"]),
+    placement: targetPlacement === "fill" ? undefined : targetPlacement,
+    fitMode: options.fitMode === "auto" ? undefined : (options.fitMode as TileAssignment["fitMode"]),
   };
 
   if (existingIdx >= 0) {
@@ -58,14 +58,14 @@ function placeTileAtHex(
  * Erase a tile at hex (q, r). Removes overlay first if present,
  * then base on the next call.
  */
-function eraseTileAtHex(
-  currentTiles: HexTileAssignment[],
-  q: number,
-  r: number
-): HexTileAssignment[] {
+function eraseTileAtCell(
+  currentTiles: TileAssignment[],
+  col: number,
+  row: number
+): TileAssignment[] {
   // Prefer removing overlay first
   const overlayIdx = currentTiles.findIndex(
-    (t) => t.q === q && t.r === r && t.layer === "overlay"
+    (t) => t.col === col && t.row === row && t.placement === "overlay"
   );
   if (overlayIdx >= 0) {
     return currentTiles.filter((_, i) => i !== overlayIdx);
@@ -73,7 +73,7 @@ function eraseTileAtHex(
 
   // Then remove any remaining tile at that hex (base)
   const newTiles = currentTiles.filter(
-    (t) => !(t.q === q && t.r === r)
+    (t) => !(t.col === col && t.row === row)
   );
   return newTiles;
 }
@@ -82,11 +82,11 @@ function eraseTileAtHex(
  * Place a freeform stamp at world coordinates. Always overlay layer.
  */
 function placeStampAtWorld(
-  currentTiles: HexTileAssignment[],
+  currentTiles: TileAssignment[],
   worldX: number,
   worldY: number,
-  q: number,
-  r: number,
+  col: number,
+  row: number,
   tilesetId: string,
   tileId: string,
   options: {
@@ -94,16 +94,16 @@ function placeStampAtWorld(
     flipH?: boolean;
     fitMode?: "fill" | "contain" | "auto";
   } = {}
-): HexTileAssignment[] {
-  const newTile: HexTileAssignment = {
-    q,
-    r,
+): TileAssignment[] {
+  const newTile: TileAssignment = {
+    col,
+    row,
     tilesetId,
     tileId,
-    rotation: (options.rotation || undefined) as HexTileAssignment["rotation"],
+    rotation: (options.rotation || undefined) as TileAssignment["rotation"],
     flipH: options.flipH || undefined,
-    layer: "overlay",
-    fitMode: options.fitMode === "auto" ? undefined : (options.fitMode as HexTileAssignment["fitMode"]),
+    placement: "overlay",
+    fitMode: options.fitMode === "auto" ? undefined : (options.fitMode as TileAssignment["fitMode"]),
     freeform: true,
     worldX,
     worldY,
@@ -117,21 +117,21 @@ function placeStampAtWorld(
 // =============================================================================
 
 function baseTile(
-  q: number,
-  r: number,
+  col: number,
+  row: number,
   tilesetId = "tileset-1",
   tileId = "grass"
-): HexTileAssignment {
-  return { q, r, tilesetId, tileId };
+): TileAssignment {
+  return { col, row, tilesetId, tileId };
 }
 
 function overlayTile(
-  q: number,
-  r: number,
+  col: number,
+  row: number,
   tilesetId = "tileset-1",
   tileId = "tree"
-): HexTileAssignment {
-  return { q, r, tilesetId, tileId, layer: "overlay" };
+): TileAssignment {
+  return { col, row, tilesetId, tileId, placement: "overlay" };
 }
 
 // =============================================================================
@@ -140,22 +140,22 @@ function overlayTile(
 
 describe("tilePlacement", () => {
   // ===========================================================================
-  // placeTileAtHex
+  // placeTileAtCell
   // ===========================================================================
 
-  describe("placeTileAtHex", () => {
+  describe("placeTileAtCell", () => {
     it("places a tile on an empty layer", () => {
-      const result = placeTileAtHex([], 3, -1, "tileset-1", "grass");
+      const result = placeTileAtCell([], 3, -1, "tileset-1", "grass");
 
       expect(result).toHaveLength(1);
       expect(result[0]).toEqual({
-        q: 3,
-        r: -1,
+        col: 3,
+        row: -1,
         tilesetId: "tileset-1",
         tileId: "grass",
         rotation: undefined,
         flipH: undefined,
-        layer: undefined,
+        placement: undefined,
         fitMode: undefined,
       });
     });
@@ -163,33 +163,33 @@ describe("tilePlacement", () => {
     it("replaces an existing tile at the same hex and layer", () => {
       const existing = [baseTile(2, 0, "tileset-1", "grass")];
 
-      const result = placeTileAtHex(existing, 2, 0, "tileset-1", "water");
+      const result = placeTileAtCell(existing, 2, 0, "tileset-1", "water");
 
       expect(result).toHaveLength(1);
       expect(result[0].tileId).toBe("water");
-      expect(result[0].q).toBe(2);
-      expect(result[0].r).toBe(0);
+      expect(result[0].col).toBe(2);
+      expect(result[0].row).toBe(0);
     });
 
     it("allows base and overlay to coexist at the same hex", () => {
       const existing = [baseTile(1, 1)];
 
-      const result = placeTileAtHex(existing, 1, 1, "tileset-1", "tree", {
-        layer: "overlay",
+      const result = placeTileAtCell(existing, 1, 1, "tileset-1", "tree", {
+        placement: "overlay",
       });
 
       expect(result).toHaveLength(2);
       // Base tile untouched
       expect(result[0]).toEqual(existing[0]);
       // Overlay added
-      expect(result[1].layer).toBe("overlay");
+      expect(result[1].placement).toBe("overlay");
       expect(result[1].tileId).toBe("tree");
-      expect(result[1].q).toBe(1);
-      expect(result[1].r).toBe(1);
+      expect(result[1].col).toBe(1);
+      expect(result[1].row).toBe(1);
     });
 
     it("coerces fitMode 'auto' to undefined", () => {
-      const result = placeTileAtHex([], 0, 0, "ts", "t", {
+      const result = placeTileAtCell([], 0, 0, "ts", "t", {
         fitMode: "auto",
       });
 
@@ -197,7 +197,7 @@ describe("tilePlacement", () => {
     });
 
     it("stores fitMode 'fill' as-is", () => {
-      const result = placeTileAtHex([], 0, 0, "ts", "t", {
+      const result = placeTileAtCell([], 0, 0, "ts", "t", {
         fitMode: "fill",
       });
 
@@ -205,7 +205,7 @@ describe("tilePlacement", () => {
     });
 
     it("stores fitMode 'contain' as-is", () => {
-      const result = placeTileAtHex([], 0, 0, "ts", "t", {
+      const result = placeTileAtCell([], 0, 0, "ts", "t", {
         fitMode: "contain",
       });
 
@@ -213,7 +213,7 @@ describe("tilePlacement", () => {
     });
 
     it("passes through rotation value", () => {
-      const result = placeTileAtHex([], 0, 0, "ts", "t", {
+      const result = placeTileAtCell([], 0, 0, "ts", "t", {
         rotation: 120,
       });
 
@@ -221,7 +221,7 @@ describe("tilePlacement", () => {
     });
 
     it("coerces rotation 0 to undefined (falsy)", () => {
-      const result = placeTileAtHex([], 0, 0, "ts", "t", {
+      const result = placeTileAtCell([], 0, 0, "ts", "t", {
         rotation: 0,
       });
 
@@ -229,7 +229,7 @@ describe("tilePlacement", () => {
     });
 
     it("passes through flipH true", () => {
-      const result = placeTileAtHex([], 0, 0, "ts", "t", {
+      const result = placeTileAtCell([], 0, 0, "ts", "t", {
         flipH: true,
       });
 
@@ -237,7 +237,7 @@ describe("tilePlacement", () => {
     });
 
     it("coerces flipH false to undefined (falsy)", () => {
-      const result = placeTileAtHex([], 0, 0, "ts", "t", {
+      const result = placeTileAtCell([], 0, 0, "ts", "t", {
         flipH: false,
       });
 
@@ -245,37 +245,37 @@ describe("tilePlacement", () => {
     });
 
     it("stores base layer as undefined (not 'base')", () => {
-      const result = placeTileAtHex([], 0, 0, "ts", "t", { layer: "base" });
+      const result = placeTileAtCell([], 0, 0, "ts", "t", { placement: "fill" });
 
-      expect(result[0].layer).toBeUndefined();
+      expect(result[0].placement).toBeUndefined();
     });
 
     it("stores overlay layer as 'overlay'", () => {
-      const result = placeTileAtHex([], 0, 0, "ts", "t", {
-        layer: "overlay",
+      const result = placeTileAtCell([], 0, 0, "ts", "t", {
+        placement: "overlay",
       });
 
-      expect(result[0].layer).toBe("overlay");
+      expect(result[0].placement).toBe("overlay");
     });
 
     it("replaces overlay without affecting base at same hex", () => {
       const existing = [baseTile(0, 0), overlayTile(0, 0, "tileset-1", "bush")];
 
-      const result = placeTileAtHex(existing, 0, 0, "tileset-1", "rock", {
-        layer: "overlay",
+      const result = placeTileAtCell(existing, 0, 0, "tileset-1", "rock", {
+        placement: "overlay",
       });
 
       expect(result).toHaveLength(2);
       expect(result[0]).toEqual(existing[0]); // base unchanged
       expect(result[1].tileId).toBe("rock");
-      expect(result[1].layer).toBe("overlay");
+      expect(result[1].placement).toBe("overlay");
     });
 
     it("does not mutate the original array", () => {
       const existing = [baseTile(0, 0)];
       const copy = [...existing];
 
-      placeTileAtHex(existing, 0, 0, "ts", "new-tile");
+      placeTileAtCell(existing, 0, 0, "ts", "new-tile");
 
       expect(existing).toEqual(copy);
     });
@@ -283,7 +283,7 @@ describe("tilePlacement", () => {
     it("preserves other tiles in the array", () => {
       const existing = [baseTile(0, 0), baseTile(1, 0), baseTile(2, 0)];
 
-      const result = placeTileAtHex(existing, 1, 0, "ts", "replaced");
+      const result = placeTileAtCell(existing, 1, 0, "ts", "replaced");
 
       expect(result).toHaveLength(3);
       expect(result[0]).toEqual(existing[0]);
@@ -293,14 +293,14 @@ describe("tilePlacement", () => {
   });
 
   // ===========================================================================
-  // eraseTileAtHex
+  // eraseTileAtCell
   // ===========================================================================
 
-  describe("eraseTileAtHex", () => {
+  describe("eraseTileAtCell", () => {
     it("removes overlay first when both base and overlay exist", () => {
       const tiles = [baseTile(0, 0), overlayTile(0, 0)];
 
-      const result = eraseTileAtHex(tiles, 0, 0);
+      const result = eraseTileAtCell(tiles, 0, 0);
 
       expect(result).toHaveLength(1);
       expect(result[0]).toEqual(tiles[0]); // base remains
@@ -309,8 +309,8 @@ describe("tilePlacement", () => {
     it("removes base tile on second erase after overlay is gone", () => {
       const tiles = [baseTile(0, 0), overlayTile(0, 0)];
 
-      const afterFirst = eraseTileAtHex(tiles, 0, 0);
-      const afterSecond = eraseTileAtHex(afterFirst, 0, 0);
+      const afterFirst = eraseTileAtCell(tiles, 0, 0);
+      const afterSecond = eraseTileAtCell(afterFirst, 0, 0);
 
       expect(afterSecond).toHaveLength(0);
     });
@@ -318,14 +318,14 @@ describe("tilePlacement", () => {
     it("returns tiles unchanged when erasing from empty hex", () => {
       const tiles = [baseTile(1, 1)];
 
-      const result = eraseTileAtHex(tiles, 5, 5);
+      const result = eraseTileAtCell(tiles, 5, 5);
 
       expect(result).toHaveLength(1);
       expect(result[0]).toEqual(tiles[0]);
     });
 
     it("does not crash on empty array", () => {
-      const result = eraseTileAtHex([], 0, 0);
+      const result = eraseTileAtCell([], 0, 0);
 
       expect(result).toHaveLength(0);
     });
@@ -333,7 +333,7 @@ describe("tilePlacement", () => {
     it("removes base tile when no overlay exists", () => {
       const tiles = [baseTile(2, 3)];
 
-      const result = eraseTileAtHex(tiles, 2, 3);
+      const result = eraseTileAtCell(tiles, 2, 3);
 
       expect(result).toHaveLength(0);
     });
@@ -341,19 +341,19 @@ describe("tilePlacement", () => {
     it("only removes tiles at the target hex", () => {
       const tiles = [baseTile(0, 0), baseTile(1, 0), overlayTile(1, 0), baseTile(2, 0)];
 
-      const result = eraseTileAtHex(tiles, 1, 0);
+      const result = eraseTileAtCell(tiles, 1, 0);
 
       // Should remove overlay at (1,0) first
       expect(result).toHaveLength(3);
-      expect(result.find((t) => t.q === 1 && t.r === 0 && t.layer === "overlay")).toBeUndefined();
-      expect(result.find((t) => t.q === 1 && t.r === 0 && !t.layer)).toBeTruthy();
+      expect(result.find((t) => t.col === 1 && t.row === 0 && t.placement === "overlay")).toBeUndefined();
+      expect(result.find((t) => t.col === 1 && t.row === 0 && !t.placement)).toBeTruthy();
     });
 
     it("does not mutate the original array", () => {
       const tiles = [baseTile(0, 0), overlayTile(0, 0)];
       const originalLength = tiles.length;
 
-      eraseTileAtHex(tiles, 0, 0);
+      eraseTileAtCell(tiles, 0, 0);
 
       expect(tiles).toHaveLength(originalLength);
     });
@@ -371,8 +371,8 @@ describe("tilePlacement", () => {
       expect(result[0].freeform).toBe(true);
       expect(result[0].worldX).toBe(150.5);
       expect(result[0].worldY).toBe(275.3);
-      expect(result[0].q).toBe(2);
-      expect(result[0].r).toBe(-1);
+      expect(result[0].col).toBe(2);
+      expect(result[0].row).toBe(-1);
       expect(result[0].tilesetId).toBe("tileset-1");
       expect(result[0].tileId).toBe("castle");
     });
@@ -380,7 +380,7 @@ describe("tilePlacement", () => {
     it("always sets layer to overlay", () => {
       const result = placeStampAtWorld([], 0, 0, 0, 0, "ts", "t");
 
-      expect(result[0].layer).toBe("overlay");
+      expect(result[0].placement).toBe("overlay");
     });
 
     it("appends to existing tiles without replacing", () => {
@@ -395,7 +395,7 @@ describe("tilePlacement", () => {
     });
 
     it("allows multiple stamps at the same nominal hex", () => {
-      let tiles: HexTileAssignment[] = [];
+      let tiles: TileAssignment[] = [];
       tiles = placeStampAtWorld(tiles, 10, 20, 1, 1, "ts", "tree");
       tiles = placeStampAtWorld(tiles, 30, 40, 1, 1, "ts", "rock");
 

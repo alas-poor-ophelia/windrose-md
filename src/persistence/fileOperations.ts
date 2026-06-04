@@ -82,10 +82,34 @@ function migrateMapData(mapData: MapData): MapData {
     mapData = migrateToLayerSchema(mapData) as MapData;
   }
 
-  // Layer-level arrays and curve migration
+  // Tileset source migration: add source: 'folder' to legacy tilesets
   if (!mapData.tilesets) mapData.tilesets = [];
+  for (const ts of mapData.tilesets) {
+    if (!('source' in ts)) {
+      (ts as Record<string, unknown>).source = 'folder';
+    }
+  }
+
+  // Layer-level arrays and curve migration
   for (const layer of mapData.layers) {
     if (!layer.tiles) layer.tiles = [];
+
+    // Tile assignment migration: q→col, r→row, layer→placement (boundary cast: legacy schema)
+    for (const tile of layer.tiles) {
+      const legacy = tile as unknown as Record<string, unknown>;
+      if ('q' in legacy && !('col' in legacy)) {
+        legacy.col = legacy.q;
+        legacy.row = legacy.r;
+        delete legacy.q;
+        delete legacy.r;
+      }
+      if ('layer' in legacy && !('placement' in legacy)) {
+        const oldLayer = legacy.layer as string;
+        legacy.placement = oldLayer === 'base' ? undefined : oldLayer;
+        delete legacy.layer;
+      }
+    }
+
     if (!layer.curves) layer.curves = [];
     layer.curves = layer.curves.filter(c => c.start != null && c.segments != null);
     for (const curve of layer.curves) {

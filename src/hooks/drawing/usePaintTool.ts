@@ -12,7 +12,7 @@ import type { MapData } from '#types/core/map.types';
 import type { MapObject } from '#types/objects/object.types';
 import type { Curve } from '#types/core/curve.types';
 import type { TextLabel } from '#types/objects/note.types';
-import type { HexTileAssignment } from '#types/tiles/tile.types';
+import type { TileAssignment } from '#types/tiles/tile.types';
 import type { DragStartContext } from '#types/hooks/drawingTools.types';
 import type { Edge } from '#types/core/rendering.types';
 import type { ExtendedGeometry, MapStateContextValue } from '#types/contexts/context.types';
@@ -53,7 +53,7 @@ interface UsePaintToolOptions {
   onObjectsChange: (objects: MapObject[]) => void;
   onTextLabelsChange: (labels: TextLabel[]) => void;
   onEdgesChange: (edges: Edge[], skipHistory?: boolean) => void;
-  onTilesChange?: (tiles: HexTileAssignment[], suppressHistory?: boolean) => void;
+  onTilesChange?: (tiles: TileAssignment[], suppressHistory?: boolean) => void;
   getTextLabelAtPosition: (labels: TextLabel[], worldX: number, worldY: number, ctx: CanvasRenderingContext2D | null) => TextLabel | null;
   removeTextLabel: (labels: TextLabel[], id: string) => TextLabel[];
   getObjectAtPosition: (objects: MapObject[], x: number, y: number) => MapObject | null;
@@ -87,7 +87,7 @@ function usePaintTool({
   const strokeInitialStateRef = useRef<Cell[] | null>(null);
   const strokeInitialEdgesRef = useRef<Edge[] | null>(null);
   const strokeInitialCurvesRef = useRef<Curve[] | null>(null);
-  const strokeInitialTilesRef = useRef<HexTileAssignment[] | null>(null);
+  const strokeInitialTilesRef = useRef<TileAssignment[] | null>(null);
 
   const toggleCell = (coords: Point, shouldFill: boolean, dragStart: DragStartContext | null = null): void => {
     if (!mapData || !geometry) return;
@@ -155,24 +155,24 @@ function usePaintTool({
           onObjectsChange(result.objects);
         }
       } else {
-        // Erase tile at hex coords (overlay first, then base)
+        // Erase tile at cell coords (overlay first, then fill)
         let tileErased = false;
         if (geometry?.type === 'hex' && onTilesChange != null && activeLayer.tiles != null && activeLayer.tiles.length > 0) {
           const tiles = activeLayer.tiles;
-          const overlayIdx = tiles.findIndex((t: HexTileAssignment) => t.q === coordX && t.r === coordY && t.layer === 'overlay');
+          const overlayIdx = tiles.findIndex((t: TileAssignment) => t.col === coordX && t.row === coordY && t.placement === 'overlay');
           if (overlayIdx >= 0) {
             if (strokeInitialTilesRef.current === null) {
               strokeInitialTilesRef.current = [...tiles];
             }
-            onTilesChange(tiles.filter((_: HexTileAssignment, i: number) => i !== overlayIdx), isBatchedStroke);
+            onTilesChange(tiles.filter((_: TileAssignment, i: number) => i !== overlayIdx), isBatchedStroke);
             tileErased = true;
           } else {
-            const baseIdx = tiles.findIndex((t: HexTileAssignment) => t.q === coordX && t.r === coordY);
+            const baseIdx = tiles.findIndex((t: TileAssignment) => t.col === coordX && t.row === coordY);
             if (baseIdx >= 0) {
               if (strokeInitialTilesRef.current === null) {
                 strokeInitialTilesRef.current = [...tiles];
               }
-              onTilesChange(tiles.filter((_: HexTileAssignment, i: number) => i !== baseIdx), isBatchedStroke);
+              onTilesChange(tiles.filter((_: TileAssignment, i: number) => i !== baseIdx), isBatchedStroke);
               tileErased = true;
             }
           }

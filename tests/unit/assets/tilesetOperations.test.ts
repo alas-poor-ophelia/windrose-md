@@ -13,7 +13,7 @@ import {
   ALPHA_COVERAGE_THRESHOLD,
 } from '../../../src/assets/tilesetOperations';
 
-import type { TileEntry } from '#types/tiles/tile.types';
+import type { TileEntry, FolderTileset } from '#types/tiles/tile.types';
 
 // ===========================================
 // Tests

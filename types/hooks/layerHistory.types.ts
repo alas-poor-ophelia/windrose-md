@@ -10,7 +10,7 @@ import type { Cell } from '../core/cell.types';
 import type { Curve } from '../core/curve.types';
 import type { Edge, TextLabel, MapData, LayerId, Region, ShapeOverlay, Outline, FogOfWar } from '../core/map.types';
 import type { MapObject } from '../objects/object.types';
-import type { HexTileAssignment } from '../tiles/tile.types';
+import type { TileAssignment } from '../tiles/tile.types';
 import type { HistoryState } from './history.types';
 
 // ===========================================
@@ -34,8 +34,8 @@ export interface LayerHistorySnapshot {
   textLabels: TextLabel[];
   /** Painted edges on the layer */
   edges: Edge[];
-  /** Hex tile assignments on the layer */
-  tiles?: HexTileAssignment[];
+  /** Tile assignments on the layer */
+  tiles?: TileAssignment[];
   /** Regions (map-level, tracked for undo) */
   regions?: Region[];
   /** Polygon outlines (map-level, tracked for undo) */
