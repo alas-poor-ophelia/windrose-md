@@ -39,8 +39,8 @@ export default class WindrosePlugin extends Plugin {
   private mountedElements: Set<HTMLElement> = new Set();
 
   async onload(): Promise<void> {
-    await this.loadSettings();
     await this.migrateFromOldPlugin();
+    await this.loadSettings();
     this.initMcpNamespace();
     await this.resolveDebugConfig();
     await this.resolveDataFilePath();
@@ -184,7 +184,8 @@ export default class WindrosePlugin extends Plugin {
   }
 
   private async migrateFromOldPlugin(): Promise<void> {
-    if (await this.loadData() != null) return;
+    const existing = await this.loadData() as Record<string, unknown> | null;
+    if (existing != null && Object.keys(existing).length > 1) return;
 
     const oldDataPath = `${this.app.vault.configDir}/plugins/dungeon-map-tracker-settings/data.json`;
     try {
@@ -197,7 +198,11 @@ export default class WindrosePlugin extends Plugin {
       this.settings = { ...FALLBACK_SETTINGS, ...importable } as PluginSettings;
       await this.saveData(this.settings);
 
-      new Notice('Windrose: settings imported from previous installation.', 10000);
+      new Notice(
+        'Windrose: Settings imported from your previous Windrose MapDesigner installation. ' +
+        'You can now disable the old "Windrose MapDesigner" plugin under Community Plugins.',
+        15000
+      );
       // eslint-disable-next-line no-console
       console.log('[Windrose] Migrated settings from dungeon-map-tracker-settings');
     } catch (e) {
@@ -224,8 +229,9 @@ export default class WindrosePlugin extends Plugin {
     const plugins = (this.app as any).plugins?.plugins as Record<string, { _loaded?: boolean }> | undefined;
     if (plugins?.['dungeon-map-tracker-settings']?._loaded === true) {
       new Notice(
-        'Windrose: The old "Dungeon Map Tracker Settings" plugin is still active. ' +
-        'Please disable it in Settings → Community Plugins to avoid conflicts.',
+        'Windrose: The old "Windrose MapDesigner" settings plugin is still active. ' +
+        'Please disable it in Settings → Community Plugins to avoid conflicts. ' +
+        'Your settings have been imported into the new standalone plugin.',
         20000
       );
       // eslint-disable-next-line no-console
