@@ -608,6 +608,13 @@ That is also now linked from the top of the README, just so it’s findable. I�
 - Fixed some UI bugs with the Map Settings modal
 - Reverted out the non-functional fix for the Color Palette automatically closing itself right after it opened on Linux, as that didn’t fix the bug, and introduced a new issue where the Color Palette couldn’t be closed by clicking outside of it. You can now once again close the palette by clicking outside of it.
 
+## Version 2.0.0-preview4
+
+### Bug Fixes
+- **Migration not firing on first install** — Settings migration from the old Windrose MapDesigner plugin now runs before initial settings load, preventing a race condition that could permanently skip the import. Migration guard relaxed so that empty or stub data files no longer block it.
+- **Manual settings import** — If migration was missed (e.g., the old plugin was disabled after installing standalone), a new "Import" button appears at the top of plugin settings when old plugin data is detected. Imports object sets, custom objects, and overrides without overwriting current settings.
+- **Confusing conflict notice** — The "old plugin still active" warning now uses the correct display name "Windrose MapDesigner" instead of the internal folder name.
+
 ## Version 2.0.0-preview3
 
 ### New Features
