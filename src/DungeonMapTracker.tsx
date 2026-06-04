@@ -200,6 +200,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     tileFitMode, setTileFitMode,
     stampMode, setStampMode,
     tileScale, setTileScale,
+    brushSize, setBrushSize,
     handleTileSelect, handleTileDeselect,
   } = useTileBrush();
   // Use rootMapData for tileset check — tilesets are built from global settings and stored on root,
@@ -815,6 +816,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 tileFitMode={tileFitMode}
                 stampMode={stampMode}
                 tileScale={tileScale}
+                brushSize={brushSize}
                 onTilesChange={handleTilesChange}
               />
 

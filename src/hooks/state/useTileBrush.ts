@@ -39,6 +39,8 @@ interface UseTileBrushResult {
   setStampMode: (v: boolean) => void;
   tileScale: number;
   setTileScale: (v: number) => void;
+  brushSize: number;
+  setBrushSize: (v: number) => void;
   handleTileSelect: (tilesetId: string, tileId: string) => void;
   handleTileDeselect: () => void;
 }
@@ -53,6 +55,7 @@ function useTileBrush(): UseTileBrushResult {
   const [tileFitMode, setTileFitMode] = useState<'fill' | 'contain' | 'auto'>('auto');
   const [stampMode, setStampMode] = useState<boolean>(false);
   const [tileScale, setTileScale] = useState<number>(1);
+  const [brushSize, setBrushSize] = useState<number>(1);
 
   const handleTileSelect = useCallback((tilesetId: string, tileId: string) => {
     setSelectedTilesetId(tilesetId);
@@ -76,6 +79,7 @@ function useTileBrush(): UseTileBrushResult {
     tileFitMode, setTileFitMode,
     stampMode, setStampMode,
     tileScale, setTileScale,
+    brushSize, setBrushSize,
     handleTileSelect, handleTileDeselect,
   };
 }
