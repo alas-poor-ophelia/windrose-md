@@ -1,4 +1,4 @@
-import { App, Plugin, PluginSettingTab } from 'obsidian';
+import { App, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
 import type { PluginSettings } from '#types/settings/settings.types';
 import type { SectionRef, ObjectSettingsForMapType, ObjectSettingsUpdate } from './tabs/settingsTabContext';
 import { TabRenderCoreMethods } from './tabs/TabRenderCore';
@@ -11,6 +11,8 @@ import { TabRenderKeyboardShortcutsMethods } from './tabs/TabRenderKeyboardShort
 interface WindrosePlugin extends Plugin {
   settings: PluginSettings;
   saveSettings(): Promise<void>;
+  mergeFromOldPlugin(): Promise<{ imported: string[] }>;
+  hasOldPluginData(): Promise<boolean>;
 }
 
 // Declaration merging: tells TypeScript this class has the mixin methods
@@ -48,6 +50,29 @@ class WindroseMDSettingsTab extends PluginSettingTab {
     this.objectFilter = '';
     this.selectedMapType = 'grid';
     this.sections = [];
+  }
+
+  private renderImportBanner(containerEl: HTMLElement): void {
+    this.plugin.hasOldPluginData().then(hasOld => {
+      if (!hasOld) return;
+      new Setting(containerEl)
+        .setName('Import settings from previous installation')
+        .setDesc('Found settings from the old Windrose MapDesigner plugin. Import object sets, custom objects, and overrides.')
+        .addButton(btn => btn
+          .setButtonText('Import')
+          .setCta()
+          .onClick(async () => {
+            const { imported } = await this.plugin.mergeFromOldPlugin();
+            if (imported.length > 0) {
+              new Notice(`Windrose: Imported ${imported.join(', ')}`, 10000);
+              this.settingsChanged = true;
+              this.display();
+            } else {
+              new Notice('Windrose: Nothing new to import — all settings already present.', 5000);
+            }
+          }));
+      containerEl.prepend(containerEl.lastElementChild!);
+    });
   }
 
   getObjectSettingsForMapType(): ObjectSettingsForMapType {
@@ -126,6 +151,7 @@ class WindroseMDSettingsTab extends PluginSettingTab {
     this.sections = [];
 
     this.renderSearchBar(containerEl);
+    this.renderImportBanner(containerEl);
 
     this.createCollapsibleSection(containerEl, 'Hex Map Settings',
       (el) => this.renderHexSettingsContent(el),

@@ -211,6 +211,71 @@ export default class WindrosePlugin extends Plugin {
     }
   }
 
+  async mergeFromOldPlugin(): Promise<{ imported: string[] }> {
+    const oldDataPath = `${this.app.vault.configDir}/plugins/dungeon-map-tracker-settings/data.json`;
+    const imported: string[] = [];
+
+    if (!await this.app.vault.adapter.exists(oldDataPath)) {
+      return { imported };
+    }
+
+    const content = await this.app.vault.adapter.read(oldDataPath);
+    const oldSettings = JSON.parse(content) as Record<string, unknown>;
+
+    const old = oldSettings as Partial<PluginSettings>;
+    const cur = this.settings;
+
+    if (old.objectSets?.length) {
+      const existingIds = new Set((cur.objectSets ?? []).map(s => s.id));
+      const newSets = old.objectSets.filter(s => !existingIds.has(s.id));
+      if (newSets.length > 0) {
+        cur.objectSets = [...(cur.objectSets ?? []), ...newSets];
+        imported.push(`${newSets.length} object set(s)`);
+      }
+    }
+
+    if (old.activeObjectSetId && !cur.activeObjectSetId) {
+      cur.activeObjectSetId = old.activeObjectSetId;
+    }
+
+    if (old.customGridObjects?.length && !(cur.customGridObjects?.length)) {
+      cur.customGridObjects = old.customGridObjects;
+      imported.push('custom grid objects');
+    }
+    if (old.customGridCategories?.length && !(cur.customGridCategories?.length)) {
+      cur.customGridCategories = old.customGridCategories;
+      imported.push('custom grid categories');
+    }
+    if (old.customHexObjects?.length && !(cur.customHexObjects?.length)) {
+      cur.customHexObjects = old.customHexObjects;
+      imported.push('custom hex objects');
+    }
+    if (old.customHexCategories?.length && !(cur.customHexCategories?.length)) {
+      cur.customHexCategories = old.customHexCategories;
+      imported.push('custom hex categories');
+    }
+
+    if (old.gridObjectOverrides && Object.keys(old.gridObjectOverrides).length > 0 && !(cur.gridObjectOverrides && Object.keys(cur.gridObjectOverrides).length > 0)) {
+      cur.gridObjectOverrides = old.gridObjectOverrides;
+      imported.push('grid object overrides');
+    }
+    if (old.hexObjectOverrides && Object.keys(old.hexObjectOverrides).length > 0 && !(cur.hexObjectOverrides && Object.keys(cur.hexObjectOverrides).length > 0)) {
+      cur.hexObjectOverrides = old.hexObjectOverrides;
+      imported.push('hex object overrides');
+    }
+
+    if (imported.length > 0) {
+      await this.saveData(this.settings);
+    }
+
+    return { imported };
+  }
+
+  async hasOldPluginData(): Promise<boolean> {
+    const oldDataPath = `${this.app.vault.configDir}/plugins/dungeon-map-tracker-settings/data.json`;
+    return this.app.vault.adapter.exists(oldDataPath);
+  }
+
   private async resolveDataFilePath(): Promise<void> {
     if (this.dataFilePath !== 'windrose-md-data.json') return;
     if (await this.app.vault.adapter.exists(this.dataFilePath)) return;
