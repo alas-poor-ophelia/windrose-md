@@ -214,6 +214,10 @@ const TilePlacementLayer = ({
   const floodFillAtCell = useCallback((col: number, row: number) => {
     if (!mapData || selectedTilesetId == null || selectedTilesetId === '' || selectedTileId == null || selectedTileId === '') return;
 
+    const ts = mapData.tilesets?.find(t => t.id === selectedTilesetId);
+    const entry = ts?.tiles.find(t => t.id === selectedTileId);
+    if (entry?.vaultPath && app) void preloadImage(app, entry.vaultPath);
+
     const activeLayer = getActiveLayer(mapData);
     const currentTiles = activeLayer.tiles || [];
 
@@ -243,10 +247,14 @@ const TilePlacementLayer = ({
     }
 
     onTilesChange(newTiles);
-  }, [mapData, selectedTilesetId, selectedTileId, tileRotation, tileFlipH, tileLayer, tileFitMode, tileDepth, onTilesChange]);
+  }, [app, mapData, selectedTilesetId, selectedTileId, tileRotation, tileFlipH, tileLayer, tileFitMode, tileDepth, onTilesChange]);
 
   const placeStampAtWorld = useCallback((worldX: number, worldY: number, col: number, row: number) => {
     if (!mapData || selectedTilesetId == null || selectedTilesetId === '' || selectedTileId == null || selectedTileId === '') return;
+
+    const ts = mapData.tilesets?.find(t => t.id === selectedTilesetId);
+    const entry = ts?.tiles.find(t => t.id === selectedTileId);
+    if (entry?.vaultPath && app) void preloadImage(app, entry.vaultPath);
 
     const activeLayer = getActiveLayer(mapData);
     const currentTiles = activeLayer.tiles || [];
@@ -266,7 +274,7 @@ const TilePlacementLayer = ({
     };
 
     onTilesChange([...currentTiles, newTile]);
-  }, [mapData, selectedTilesetId, selectedTileId, tileRotation, tileFlipH, tileFitMode, tileScale, onTilesChange]);
+  }, [app, mapData, selectedTilesetId, selectedTileId, tileRotation, tileFlipH, tileFitMode, tileScale, onTilesChange]);
 
   const handlePointerDown = useCallback((e: PointerEvent) => {
     if (!isTileTool || !geometry) return;

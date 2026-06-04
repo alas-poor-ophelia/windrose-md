@@ -30,11 +30,20 @@ type GridDensityPresets = Record<string, GridDensityPreset>;
 const imageCache = new Map<string, HTMLImageElement>();
 const loadingPromises = new Map<string, Promise<HTMLImageElement | null>>();
 const dimensionsCache = new Map<string, ImageDimensions>();
+const pinnedImages = new Set<string>();
 
 let MAX_CACHE_SIZE = 200;
 
 function setMaxCacheSize(size: number): void {
   MAX_CACHE_SIZE = size;
+}
+
+function pinImage(path: string): void {
+  pinnedImages.add(path);
+}
+
+function unpinImage(path: string): void {
+  pinnedImages.delete(path);
 }
 
 /** Move key to end of Map (most recently used position) */
@@ -46,15 +55,18 @@ function touchCacheEntry(key: string): void {
   }
 }
 
-/** Evict oldest entries until cache is within MAX_CACHE_SIZE */
+/** Evict oldest non-pinned entries until cache is within MAX_CACHE_SIZE */
 function evictIfNeeded(): void {
   while (imageCache.size > MAX_CACHE_SIZE) {
-    const oldest = imageCache.keys().next().value;
-    if (oldest !== undefined) {
-      clearCachedImage(oldest);
-    } else {
-      break;
+    let evicted = false;
+    for (const key of imageCache.keys()) {
+      if (!pinnedImages.has(key)) {
+        clearCachedImage(key);
+        evicted = true;
+        break;
+      }
     }
+    if (!evicted) break;
   }
 }
 
@@ -184,11 +196,11 @@ async function preloadImage(app: App, vaultPath: string): Promise<HTMLImageEleme
         img.src = url;
       });
 
-      // Cache the loaded image, then release the blob URL
-      // (Chromium retains the decoded bitmap once the Image element exists)
+      // Cache the loaded image — keep the blob URL alive so the browser
+      // can re-decode under memory pressure. clearCachedImage revokes it
+      // when the entry is actually evicted.
       imageCache.set(vaultPath, img);
       evictIfNeeded();
-      URL.revokeObjectURL(url);
       loadingPromises.delete(vaultPath);
 
       return img;
@@ -316,10 +328,10 @@ function calculateGridFromImage(
  */
 function clearUnusedTileImages(activePaths: Set<string>): void {
   for (const path of imageCache.keys()) {
-    if (!activePaths.has(path)) {
+    if (!activePaths.has(path) && !pinnedImages.has(path)) {
       clearCachedImage(path);
     }
   }
 }
 
-export { buildImageIndex, getImageDisplayNames, getFullPathFromDisplayName, getDisplayNameFromPath, preloadImage, getCachedImage, getImageDimensions, clearCachedImage, clearUnusedTileImages, calculateGridFromImage, GRID_DENSITY_PRESETS, MAX_CACHE_SIZE, setMaxCacheSize };
+export { buildImageIndex, getImageDisplayNames, getFullPathFromDisplayName, getDisplayNameFromPath, preloadImage, getCachedImage, getImageDimensions, clearCachedImage, clearUnusedTileImages, calculateGridFromImage, GRID_DENSITY_PRESETS, MAX_CACHE_SIZE, setMaxCacheSize, pinImage, unpinImage };

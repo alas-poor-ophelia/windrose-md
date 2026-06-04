@@ -294,7 +294,7 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   // Tile rendering geometry shim (works for both hex and grid)
   const tileGeomShim = geometry.type === 'hex'
     ? { hexToWorld: geometry.hexToWorld.bind(geometry), worldToScreen: geometry.worldToScreen.bind(geometry), hexSize: geometry.hexSize, orientation: mapData.orientation ?? 'flat' }
-    : { hexToWorld: geometry.gridToWorld.bind(geometry), worldToScreen: geometry.worldToScreen.bind(geometry), hexSize: geometry.cellSize, orientation: 'grid' };
+    : { hexToWorld: geometry.getCellCenter.bind(geometry), worldToScreen: geometry.worldToScreen.bind(geometry), hexSize: geometry.cellSize, orientation: 'grid' };
 
   // iOS defensive: Reset canvas state
   ctx.globalAlpha = 1;

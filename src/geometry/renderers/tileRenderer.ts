@@ -91,13 +91,14 @@ function calculateTileDrawRect(
   orientation: string,
   fitMode?: 'fill' | 'contain'
 ): { drawX: number; drawY: number; drawWidth: number; drawHeight: number } {
-  // On-screen hex dimensions (corner-to-corner)
-  const hexScreenWidth = orientation === 'flat'
-    ? 2 * hexSize * zoom
-    : SQRT3 * hexSize * zoom;
-  const hexScreenHeight = orientation === 'flat'
-    ? SQRT3 * hexSize * zoom
-    : 2 * hexSize * zoom;
+  // On-screen cell dimensions (corner-to-corner for hex, edge-to-edge for grid)
+  const isGrid = orientation !== 'flat' && orientation !== 'pointy';
+  const hexScreenWidth = isGrid
+    ? hexSize * zoom
+    : orientation === 'flat' ? 2 * hexSize * zoom : SQRT3 * hexSize * zoom;
+  const hexScreenHeight = isGrid
+    ? hexSize * zoom
+    : orientation === 'flat' ? SQRT3 * hexSize * zoom : 2 * hexSize * zoom;
 
   const folder = isFolderTileset(tileset) ? tileset : null;
   const hexHeight = folder?.hexHeight ?? tileset.tileHeight;
@@ -183,13 +184,14 @@ function renderTiles(
 
   const entryMap = getEntryMap(tilesets);
 
-  // Pre-compute hex screen dimensions (constant for all tiles in this frame)
-  const hexScreenWidth = geometry.orientation === 'flat'
-    ? 2 * geometry.hexSize * viewState.zoom
-    : SQRT3 * geometry.hexSize * viewState.zoom;
-  const hexScreenHeight = geometry.orientation === 'flat'
-    ? SQRT3 * geometry.hexSize * viewState.zoom
-    : 2 * geometry.hexSize * viewState.zoom;
+  // Pre-compute cell screen dimensions (constant for all tiles in this frame)
+  const isGrid = geometry.orientation !== 'flat' && geometry.orientation !== 'pointy';
+  const hexScreenWidth = isGrid
+    ? geometry.hexSize * viewState.zoom
+    : geometry.orientation === 'flat' ? 2 * geometry.hexSize * viewState.zoom : SQRT3 * geometry.hexSize * viewState.zoom;
+  const hexScreenHeight = isGrid
+    ? geometry.hexSize * viewState.zoom
+    : geometry.orientation === 'flat' ? SQRT3 * geometry.hexSize * viewState.zoom : 2 * geometry.hexSize * viewState.zoom;
 
   // Partition by depth tier, then by placement within each tier
   const DEPTH_ORDER = ['ground', 'structure', 'props', 'decoration'] as const;

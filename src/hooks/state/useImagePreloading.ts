@@ -2,7 +2,7 @@ import type { MapData } from '#types/core/map.types';
 import type { App } from 'obsidian';
 
 import { useEffect, useState } from 'preact/hooks';
-import { preloadImage } from '../../assets/imageOperations';
+import { preloadImage, pinImage, getCachedImage } from '../../assets/imageOperations';
 import { getEffectiveSettings } from '../../core/settingsAccessor';
 import { getResolvedObjectTypes, hasImagePath } from '../../objects/objectTypeResolver';
 
@@ -22,10 +22,14 @@ function useImagePreloading(
   const [tileImagesReady, setTileImagesReady] = useState(false);
 
   useEffect(() => {
-    if (mapData?.backgroundImage?.path != null && mapData.backgroundImage.path !== '') {
+    const bgPath = mapData?.backgroundImage?.path;
+    if (bgPath != null && bgPath !== '') {
       setBackgroundImageReady(false);
-      void preloadImage(app, mapData.backgroundImage.path).then((img) => {
-        if (img) setBackgroundImageReady(true);
+      void preloadImage(app, bgPath).then((img) => {
+        if (img) {
+          pinImage(bgPath);
+          setBackgroundImageReady(true);
+        }
       });
     } else {
       setBackgroundImageReady(false);
@@ -41,7 +45,10 @@ function useImagePreloading(
     if (fowImagePath != null && fowImagePath !== '') {
       setFowImageReady(false);
       void preloadImage(app, fowImagePath).then((img) => {
-        if (img) setFowImageReady(true);
+        if (img) {
+          pinImage(fowImagePath);
+          setFowImageReady(true);
+        }
       });
     } else {
       setFowImageReady(false);
@@ -82,6 +89,19 @@ function useImagePreloading(
     }
 
     if (placedPaths.size === 0) {
+      setTileImagesReady(true);
+      return;
+    }
+
+    // Skip work if all placed tiles are already cached
+    let allCached = true;
+    for (const path of placedPaths) {
+      if (!getCachedImage(path)) {
+        allCached = false;
+        break;
+      }
+    }
+    if (allCached) {
       setTileImagesReady(true);
       return;
     }
