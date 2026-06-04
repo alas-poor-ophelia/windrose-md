@@ -67,17 +67,32 @@ function useImagePreloading(
       return;
     }
 
-    setTileImagesReady(false);
-    const promises: Promise<unknown>[] = [];
-    for (const tileset of mapData.tilesets) {
-      for (const tile of tileset.tiles) {
-        if (tile.vaultPath) {
-          promises.push(preloadImage(app, tile.vaultPath));
-        }
+    // Only preload tiles actually placed on the map, not the entire catalog.
+    // The tile browser loads thumbnails on-demand via CSS background-image.
+    const placedPaths = new Set<string>();
+    for (const layer of mapData.layers) {
+      if (!layer.tiles) continue;
+      for (const tile of layer.tiles) {
+        const tsId = tile.tilesetId;
+        const tId = tile.tileId;
+        const ts = mapData.tilesets.find(t => t.id === tsId);
+        const entry = ts?.tiles.find(t => t.id === tId);
+        if (entry?.vaultPath) placedPaths.add(entry.vaultPath);
       }
     }
+
+    if (placedPaths.size === 0) {
+      setTileImagesReady(true);
+      return;
+    }
+
+    setTileImagesReady(false);
+    const promises: Promise<unknown>[] = [];
+    for (const path of placedPaths) {
+      promises.push(preloadImage(app, path));
+    }
     void Promise.all(promises).then(() => setTileImagesReady(true));
-  }, [app, mapData?.tilesets]);
+  }, [app, mapData?.tilesets, mapData?.layers]);
 
   return { backgroundImageReady, fowImageReady, tileImagesReady };
 }

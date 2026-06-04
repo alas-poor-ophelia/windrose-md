@@ -14,7 +14,9 @@ import type { TileAssignment, TileRotation, TileLayerRole } from '#types/tiles/t
 import { useCallback, useEffect, useRef } from 'preact/hooks';
 import { useMapState } from '../../context/MapContext';
 import { useEventHandlerRegistration } from '../../context/EventHandlerContext';
+import { useApp } from '../../context/AppContext';
 import { getActiveLayer } from '../../persistence/layerAccessor';
+import { preloadImage } from '../../assets/imageOperations';
 
 
 // ===========================================
@@ -120,6 +122,7 @@ const TilePlacementLayer = ({
   onTilesChange
 }: TilePlacementLayerProps): VNode | null => {
   const { mapData, geometry, screenToGrid, screenToWorld } = useMapState();
+  const app = useApp();
   const { registerHandlers, unregisterHandlers } = useEventHandlerRegistration();
 
   const isTileTool = currentTool === 'tilePaint';
@@ -132,6 +135,11 @@ const TilePlacementLayer = ({
 
   const placeTilesInBrush = useCallback((col: number, row: number) => {
     if (!mapData || selectedTilesetId == null || selectedTilesetId === '' || selectedTileId == null || selectedTileId === '') return;
+
+    // Ensure the selected tile image is cached for rendering
+    const ts = mapData.tilesets?.find(t => t.id === selectedTilesetId);
+    const entry = ts?.tiles.find(t => t.id === selectedTileId);
+    if (entry?.vaultPath && app) void preloadImage(app, entry.vaultPath);
 
     const activeLayer = getActiveLayer(mapData);
     let currentTiles = activeLayer.tiles || [];
