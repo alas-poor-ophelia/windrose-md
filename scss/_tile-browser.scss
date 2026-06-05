@@ -310,6 +310,45 @@
   }
 }
 
+.windrose-tile-depth-selector {
+  display: flex;
+  flex-direction: column;
+  border-bottom: 1px solid var(--windrose-border-secondary);
+  padding: 2px 0;
+}
+
+button.windrose-tile-depth-row,
+.is-tablet button.windrose-tile-depth-row {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 3px 10px;
+  border: none;
+  background: transparent;
+  color: var(--windrose-text-muted);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  text-align: left;
+  box-shadow: none;
+  min-width: 0;
+  min-height: 0;
+  max-width: none;
+  max-height: none;
+  height: auto;
+
+  &:hover {
+    background: oklch(100% 0 0deg / 0.06);
+    color: var(--windrose-text-primary);
+  }
+
+  &.windrose-tile-depth-active {
+    background: var(--windrose-border-primary);
+    color: var(--windrose-bg-primary);
+  }
+}
+
 // Config button — with .is-tablet specificity override
 button.windrose-tile-browser-config-btn,
 .is-tablet button.windrose-tile-browser-config-btn {

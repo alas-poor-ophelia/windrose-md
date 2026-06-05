@@ -6,7 +6,7 @@
  * Selecting a tile sets it as the active brush for placement.
  */
 
-import type { TilesetDef, TileEntry, TilesetOverrides } from '#types/tiles/tile.types';
+import type { TilesetDef, TileEntry, TilesetOverrides, TileLayerRole } from '#types/tiles/tile.types';
 import type { ToolId } from '#types/tools/tool.types';
 import type { VNode } from 'preact';
 import { TFile } from 'obsidian';
@@ -166,6 +166,9 @@ interface TileAssetBrowserProps {
   onFlipChange: (flipH: boolean) => void;
   tileLayer: 'base' | 'overlay';
   onTileLayerChange: (layer: 'base' | 'overlay') => void;
+  tileDepth: TileLayerRole;
+  onTileDepthChange: (depth: TileLayerRole) => void;
+  mapType?: string;
   tileFitMode: 'fill' | 'contain' | 'auto';
   onTileFitModeChange: (mode: 'fill' | 'contain' | 'auto') => void;
   stampMode: boolean;
@@ -195,6 +198,9 @@ const TileAssetBrowser = ({
   onFlipChange,
   tileLayer,
   onTileLayerChange,
+  tileDepth,
+  onTileDepthChange,
+  mapType,
   tileFitMode,
   onTileFitModeChange,
   stampMode,
@@ -254,7 +260,7 @@ const TileAssetBrowser = ({
   useEffect(() => {
     if (!hoveredTile || isCollapsed) {
       if (portalRef.current) {
-        portalRef.current.classList.add('windrose-hidden');
+        portalRef.current.style.display = 'none';
       }
       return undefined;
     }
@@ -284,7 +290,7 @@ const TileAssetBrowser = ({
     // Position to the left of the browser panel
     if (browserRef.current) {
       const rect = browserRef.current.getBoundingClientRect();
-      portal.classList.remove('windrose-hidden');
+      portal.style.display = 'block';
       const topVal = (rect.top + rect.height / 2 - (PREVIEW_SIZE + 24) / 2) + 'px';
       const leftVal = (rect.left - PREVIEW_SIZE - 16) + 'px';
       portal.style.setProperty('top', topVal);
@@ -396,22 +402,24 @@ const TileAssetBrowser = ({
     <div ref={browserRef} className="windrose-tile-browser">
       <div className="windrose-tile-browser-header">
         <span>Tiles</span>
-        <div className="windrose-tile-browser-layer-toggle">
-          <button
-            className={`windrose-tile-browser-layer-btn ${tileLayer === 'base' ? 'windrose-tile-browser-layer-active' : ''}`}
-            onClick={() => onTileLayerChange('base')}
-            title="Base layer: terrain tiles"
-          >
-            Base
-          </button>
-          <button
-            className={`windrose-tile-browser-layer-btn ${tileLayer === 'overlay' ? 'windrose-tile-browser-layer-active' : ''}`}
-            onClick={() => onTileLayerChange('overlay')}
-            title="Overlay layer: stamp tiles atop base"
-          >
-            Overlay
-          </button>
-        </div>
+        {mapType !== 'grid' && (
+          <div className="windrose-tile-browser-layer-toggle">
+            <button
+              className={`windrose-tile-browser-layer-btn ${tileLayer === 'base' ? 'windrose-tile-browser-layer-active' : ''}`}
+              onClick={() => onTileLayerChange('base')}
+              title="Base layer: terrain tiles"
+            >
+              Base
+            </button>
+            <button
+              className={`windrose-tile-browser-layer-btn ${tileLayer === 'overlay' ? 'windrose-tile-browser-layer-active' : ''}`}
+              onClick={() => onTileLayerChange('overlay')}
+              title="Overlay layer: stamp tiles atop base"
+            >
+              Overlay
+            </button>
+          </div>
+        )}
         <button
           className="windrose-sidebar-collapse-btn interactive-child"
           onClick={handleToggleCollapse}
@@ -420,6 +428,26 @@ const TileAssetBrowser = ({
           <Icon icon="lucide-panel-right-close" size={14} />
         </button>
       </div>
+
+      {mapType === 'grid' && (
+        <div className="windrose-tile-depth-selector">
+          {([
+            { value: 'ground' as const, label: 'Terrain' },
+            { value: 'structure' as const, label: 'Structure' },
+            { value: 'props' as const, label: 'Props' },
+            { value: 'decoration' as const, label: 'Decoration' },
+          ]).map(tier => (
+            <button
+              key={tier.value}
+              className={`windrose-tile-depth-row ${tileDepth === tier.value ? 'windrose-tile-depth-active' : ''}`}
+              onClick={() => onTileDepthChange(tier.value)}
+              title={`Paint on ${tier.label} depth tier`}
+            >
+              {tier.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Tileset selector + config gear */}
       <div className="windrose-tile-browser-tileset-selector">

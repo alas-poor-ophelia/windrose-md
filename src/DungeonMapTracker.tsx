@@ -918,6 +918,9 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               onFlipChange={setTileFlipH}
               tileLayer={tileLayer}
               onTileLayerChange={setTileLayer}
+              tileDepth={tileDepth}
+              onTileDepthChange={setTileDepth}
+              mapType={mapData?.mapType}
               tileFitMode={tileFitMode}
               onTileFitModeChange={setTileFitMode}
               stampMode={stampMode}
@@ -1089,6 +1092,9 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 onFlipChange={setTileFlipH}
                 tileLayer={tileLayer}
                 onTileLayerChange={setTileLayer}
+                tileDepth={tileDepth}
+                onTileDepthChange={setTileDepth}
+                mapType={mapData?.mapType}
                 tileFitMode={tileFitMode}
                 onTileFitModeChange={setTileFitMode}
                 stampMode={stampMode}
@@ -1180,6 +1186,9 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                     onFlipChange={setTileFlipH}
                     tileLayer={tileLayer}
                     onTileLayerChange={setTileLayer}
+                    tileDepth={tileDepth}
+                    onTileDepthChange={setTileDepth}
+                    mapType={mapData?.mapType}
                     tileFitMode={tileFitMode}
                     onTileFitModeChange={setTileFitMode}
                     stampMode={stampMode}
