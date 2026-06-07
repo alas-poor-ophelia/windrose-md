@@ -6,7 +6,7 @@
  * body (jump rail + tile grid) → loaded-brush footer.
  */
 
-import type { TilesetDef, TileEntry, TilesetOverrides, TileLayerRole } from '#types/tiles/tile.types';
+import type { TilesetDef, TileEntry, TilesetOverrides, TileLayerRole, TileMetadataStore } from '#types/tiles/tile.types';
 import type { ToolId } from '#types/tools/tool.types';
 import type { VNode } from 'preact';
 import { TFile } from 'obsidian';
@@ -16,6 +16,15 @@ import { useApp } from '../../context/AppContext';
 import { Icon } from '../shared/Icon';
 import { CornerBrackets } from '../shared/CornerBrackets';
 import { DepthBar, depthMeta } from './DepthBar';
+import {
+  loadTileMetadata,
+  saveTileMetadataDebounced,
+  bulkAddTag,
+  bulkToggleStar,
+  isStarred,
+  collectUniqueTags,
+  getAllTags,
+} from '../../persistence/tileMetadata';
 
 // ===========================================
 // Content-bounds detection for tile thumbnails
@@ -228,6 +237,37 @@ function LoadedChipThumb({ tile, getCachedImage }: { tile: TileEntry; getCachedI
 }
 
 // ===========================================
+// Category card with 2×2 mosaic preview
+// ===========================================
+
+function MosaicCard({ category, tiles, count, getCachedImage, onClick }: {
+  category: string;
+  tiles: TileEntry[];
+  count: number;
+  getCachedImage?: (path: string) => HTMLImageElement | null;
+  onClick: () => void;
+}): VNode {
+  const preview = tiles.slice(0, 4);
+  return (
+    <button className="windrose-tb-card" onClick={onClick}>
+      <div className="windrose-tb-mosaic">
+        {[0, 1, 2, 3].map(i => (
+          <div key={i} className="windrose-tb-mosaic-cell">
+            {preview[i] != null && <TileThumbnail tile={preview[i]} getCachedImage={getCachedImage} />}
+          </div>
+        ))}
+      </div>
+      <div className="windrose-tb-card-meta">
+        <span className="windrose-tb-card-name">{category}</span>
+        <span className="windrose-tb-card-count">
+          {count}<Icon icon="lucide-chevron-right" size={11} />
+        </span>
+      </div>
+    </button>
+  );
+}
+
+// ===========================================
 // Main component
 // ===========================================
 
@@ -307,9 +347,16 @@ const TileAssetBrowser = ({
   const [hoveredTile, setHoveredTile] = useState<TileEntry | null>(null);
   const [railSel, setRailSel] = useState<RailSelection>('all');
   const [activeTags, setActiveTags] = useState<Set<string>>(new Set());
+  const [openCat, setOpenCat] = useState<string | null>(null);
   const previewRef = useRef<HTMLCanvasElement>(null);
   const browserRef = useRef<HTMLDivElement>(null);
   const portalRef = useRef<HTMLDivElement | null>(null);
+  const [organize, setOrganize] = useState(false);
+  const [orgSelection, setOrgSelection] = useState<Set<string>>(new Set());
+  const [orgSearch, setOrgSearch] = useState('');
+  const [orgShowTag, setOrgShowTag] = useState(false);
+  const [orgTagInput, setOrgTagInput] = useState('');
+  const [tileMetadata, setTileMetadata] = useState<TileMetadataStore>({});
 
   // Clamp activeTilesetIndex when tilesets shrink
   useEffect(() => {
@@ -320,10 +367,11 @@ const TileAssetBrowser = ({
     }
   }, [tilesets.length]);
 
-  // Reset rail and tags when depth changes
+  // Reset rail, tags, and drill-down when depth changes
   useEffect(() => {
     setRailSel('all');
     setActiveTags(new Set());
+    setOpenCat(null);
   }, [tileDepth]);
 
   const handleTileClick = (tilesetId: string, tileId: string): void => {
@@ -432,43 +480,113 @@ const TileAssetBrowser = ({
     });
   };
 
+  // ---- Organize mode ----
+
+  useEffect(() => {
+    void loadTileMetadata(app).then(setTileMetadata);
+  }, []);
+
+  const allTilesFlat = useMemo((): TileEntry[] => {
+    const result: TileEntry[] = [];
+    for (const ts of tilesets) {
+      for (const t of ts.tiles) result.push(t);
+    }
+    return result;
+  }, [tilesets]);
+
+  const orgFilteredTiles = useMemo((): TileEntry[] => {
+    if (!organize) return [];
+    if (orgSearch === '') return allTilesFlat;
+    const lower = orgSearch.toLowerCase();
+    return allTilesFlat.filter(t =>
+      t.filename.toLowerCase().includes(lower) ||
+      (t.category != null && t.category.toLowerCase().includes(lower)) ||
+      (t.tags != null && t.tags.some(tag => tag.toLowerCase().includes(lower)))
+    );
+  }, [organize, allTilesFlat, orgSearch]);
+
+  const orgAllOn = orgFilteredTiles.length > 0 && orgFilteredTiles.every(t => orgSelection.has(t.vaultPath));
+
+  const orgTagSuggestions = useMemo((): string[] => {
+    if (!organize) return [];
+    return collectUniqueTags(allTilesFlat, tileMetadata).slice(0, 12);
+  }, [organize, allTilesFlat, tileMetadata]);
+
+  const toggleOrgSelect = (vaultPath: string): void => {
+    setOrgSelection(prev => {
+      const next = new Set(prev);
+      if (next.has(vaultPath)) next.delete(vaultPath);
+      else next.add(vaultPath);
+      return next;
+    });
+  };
+
+  const selectAllOrg = (): void => {
+    const allPaths = orgFilteredTiles.map(t => t.vaultPath);
+    setOrgSelection(orgAllOn ? new Set() : new Set(allPaths));
+  };
+
+  const handleBulkTag = (): void => {
+    if (orgTagInput.trim() === '' || orgSelection.size === 0) return;
+    const paths = Array.from(orgSelection);
+    const updated = bulkAddTag(tileMetadata, paths, orgTagInput.trim());
+    setTileMetadata(updated);
+    saveTileMetadataDebounced(app, updated);
+    setOrgTagInput('');
+    setOrgShowTag(false);
+  };
+
+  const handleBulkStar = (): void => {
+    if (orgSelection.size === 0) return;
+    const paths = Array.from(orgSelection);
+    const anyUnstarred = paths.some(p => !isStarred(tileMetadata, p));
+    const updated = bulkToggleStar(tileMetadata, paths, anyUnstarred);
+    setTileMetadata(updated);
+    saveTileMetadataDebounced(app, updated);
+  };
+
+  const exitOrganize = (): void => {
+    setOrganize(false);
+    setOrgSelection(new Set());
+    setOrgSearch('');
+    setOrgShowTag(false);
+    setOrgTagInput('');
+  };
+
   const activeTileset = tilesets[activeTilesetIndex] ?? null;
 
   // Collect available tags from tiles in the active tileset
   const availableTags = useMemo(() => {
     if (activeTileset == null) return [];
-    const tagSet = new Set<string>();
-    for (const tile of activeTileset.tiles) {
-      if (tile.tags) {
-        for (const tag of tile.tags) tagSet.add(tag);
-      }
-    }
-    return Array.from(tagSet).sort();
-  }, [activeTileset]);
+    return collectUniqueTags(activeTileset.tiles, tileMetadata);
+  }, [activeTileset, tileMetadata]);
 
   const filteredTiles = useMemo(() => {
     if (activeTileset == null) return [];
     let tiles = activeTileset.tiles;
 
-    // Text search
+    // Text search (includes import + user tags via metadata)
     if (searchFilter != null && searchFilter !== '') {
       const lower = searchFilter.toLowerCase();
-      tiles = tiles.filter((t: TileEntry) =>
-        t.filename.toLowerCase().includes(lower) ||
-        (t.category != null && t.category !== '' && t.category.toLowerCase().includes(lower)) ||
-        (t.tags != null && t.tags.some((tag: string) => tag.toLowerCase().includes(lower)))
-      );
+      tiles = tiles.filter((t: TileEntry) => {
+        if (t.filename.toLowerCase().includes(lower)) return true;
+        if (t.category != null && t.category !== '' && t.category.toLowerCase().includes(lower)) return true;
+        const tags = getAllTags(t, tileMetadata);
+        return tags.some(tag => tag.toLowerCase().includes(lower));
+      });
     }
 
-    // Tag filter (AND logic)
+    // Tag filter (AND logic, includes import + user tags)
     if (activeTags.size > 0) {
-      tiles = tiles.filter((t: TileEntry) =>
-        t.tags != null && Array.from(activeTags).every(tag => t.tags!.includes(tag))
-      );
+      tiles = tiles.filter((t: TileEntry) => {
+        const tags = getAllTags(t, tileMetadata);
+        const lowerTags = tags.map(tag => tag.toLowerCase());
+        return Array.from(activeTags).every(tag => lowerTags.includes(tag.toLowerCase()));
+      });
     }
 
     return tiles;
-  }, [activeTileset, searchFilter, activeTags]);
+  }, [activeTileset, searchFilter, activeTags, tileMetadata]);
 
   const groupedTiles = useMemo(() => {
     const groups = new Map<string, TileEntry[]>();
@@ -544,6 +662,132 @@ const TileAssetBrowser = ({
     <div ref={browserRef} className="windrose-tile-browser">
       <CornerBrackets classPrefix="windrose-tb-bracket" variant="minimal" filterId="tb-bracket" />
 
+      {organize ? (
+        <>
+          <div className="windrose-tb-head windrose-tb-head-organize">
+            <Icon icon="lucide-check-square" size={16} />
+            <div className="windrose-tb-title">Organize</div>
+            <span className="windrose-tb-cap" style={{ marginRight: 'auto', marginLeft: 4 }}>
+              tag & sort the library
+            </span>
+            <button className="windrose-tb-iconbtn ghost" title="Done" onClick={exitOrganize}>
+              <Icon icon="lucide-check" size={16} />
+            </button>
+          </div>
+
+          <div className="windrose-tb-org-search">
+            <div className="windrose-tb-search">
+              <Icon icon="lucide-search" size={15} />
+              <input
+                value={orgSearch}
+                onInput={(e: Event) => setOrgSearch((e.target as HTMLInputElement).value)}
+                placeholder="Search to narrow…"
+                style={{ fontSize: 13 }}
+              />
+              <span className="windrose-tb-cap">{orgFilteredTiles.length}</span>
+            </div>
+          </div>
+
+          <div className="windrose-tb-org-bar">
+            <button
+              className={`windrose-tb-chip ${orgAllOn ? 'active' : ''}`}
+              style={{ fontWeight: 600 }}
+              onClick={selectAllOrg}
+            >
+              <Icon icon="lucide-check-square" size={12} />
+              {orgAllOn ? 'Deselect all' : `Select all ${orgFilteredTiles.length}`}
+            </button>
+            <span
+              className="windrose-tb-cap"
+              style={{ marginLeft: 'auto', color: orgSelection.size > 0 ? 'var(--windrose-gold-bright)' : undefined }}
+            >
+              <b>{orgSelection.size}</b> selected
+            </span>
+          </div>
+
+          <div className="windrose-tb-org-body">
+            <div className="windrose-tb-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(52px, 1fr))' }}>
+              {orgFilteredTiles.map(tile => {
+                const on = orgSelection.has(tile.vaultPath);
+                return (
+                  <div
+                    key={tile.vaultPath}
+                    className={`windrose-tile-thumb ${on ? 'sel' : 'dim'}`}
+                    onClick={() => toggleOrgSelect(tile.vaultPath)}
+                    title={tile.filename}
+                  >
+                    <TileThumbnail tile={tile} getCachedImage={getCachedImage} />
+                    <div className={`windrose-tb-check ${on ? 'on' : ''}`}>
+                      {on && <Icon icon="lucide-check" size={12} />}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            {orgFilteredTiles.length === 0 && (
+              <div className="windrose-tb-empty">No matching tiles</div>
+            )}
+          </div>
+
+          {orgShowTag && (
+            <div className="windrose-tb-tag-pop">
+              <div style={{ fontSize: 11, color: 'var(--windrose-text-secondary)', marginBottom: 8 }}>
+                Add tag to <b style={{ color: 'var(--windrose-gold-bright)' }}>{orgSelection.size}</b> tiles
+              </div>
+              <div className="windrose-tb-search" style={{ marginBottom: 9 }}>
+                <Icon icon="lucide-tag" size={13} />
+                <input
+                  placeholder="New tag…"
+                  value={orgTagInput}
+                  onInput={(e: Event) => setOrgTagInput((e.target as HTMLInputElement).value)}
+                />
+              </div>
+              <div className="windrose-tb-chips-scroll" style={{ flexWrap: 'wrap' }}>
+                {orgTagSuggestions.map(t => (
+                  <button key={t} className="windrose-tb-chip" onClick={() => setOrgTagInput(t)}>
+                    {t}
+                  </button>
+                ))}
+              </div>
+              <div style={{ display: 'flex', gap: 7, marginTop: 11 }}>
+                <button
+                  className="windrose-tb-act windrose-tb-act-cancel"
+                  onClick={() => { setOrgShowTag(false); setOrgTagInput(''); }}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="windrose-tb-act windrose-tb-act-apply"
+                  onClick={handleBulkTag}
+                >
+                  Apply
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="windrose-tb-org-actions">
+            <button className="windrose-tb-act" disabled={orgSelection.size === 0} onClick={() => setOrgShowTag(true)}>
+              <Icon icon="lucide-tag" size={14} /> Tag…
+            </button>
+            <button className="windrose-tb-act" disabled={true}>
+              <Icon icon="lucide-layers" size={14} /> Tier…
+            </button>
+            <button className="windrose-tb-act" disabled={true}>
+              <Icon icon="lucide-folder-input" size={14} /> Move…
+            </button>
+            <button
+              className="windrose-tb-act windrose-tb-act-star"
+              disabled={orgSelection.size === 0}
+              onClick={handleBulkStar}
+              title="Star selection"
+            >
+              <Icon icon="lucide-star" size={14} />
+            </button>
+          </div>
+        </>
+      ) : (<>
+
       {/* Header */}
       <div className="windrose-tb-head">
         <div className="windrose-tb-title">Tiles</div>
@@ -557,6 +801,15 @@ const TileAssetBrowser = ({
             onClick={() => setShowTilesetConfig(!showTilesetConfig)}
           >
             <Icon icon="lucide-sliders-horizontal" size={15} />
+          </button>
+        )}
+        {!compact && (
+          <button
+            className="windrose-tb-iconbtn ghost"
+            title="Organize tiles"
+            onClick={() => setOrganize(true)}
+          >
+            <Icon icon="lucide-check-square" size={15} />
           </button>
         )}
         {onCollapse && (
@@ -654,20 +907,33 @@ const TileAssetBrowser = ({
         );
       })()}
 
-      {/* Filter */}
-      <div className="windrose-tb-filter">
-        <div className="windrose-tb-search">
-          <Icon icon="lucide-search" size={14} />
-          <input
-            placeholder={`Filter ${depthLabel}…`}
-            value={searchFilter}
-            onInput={(e: Event) => setSearchFilter((e.target as HTMLInputElement).value)}
-          />
+      {/* Filter / breadcrumb */}
+      {compact && openCat != null ? (
+        <div className="windrose-tb-breadcrumb">
+          <button className="windrose-tb-iconbtn" style={{ width: 22, height: 22 }} onClick={() => setOpenCat(null)}>
+            <Icon icon="lucide-arrow-left" size={12} />
+          </button>
+          <div className="windrose-tb-crumb-path">
+            {isGrid ? depthMeta(tileDepth).label : 'Tiles'}
+            <Icon icon="lucide-chevron-right" size={9} />
+            <b>{openCat}</b>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="windrose-tb-filter">
+          <div className="windrose-tb-search">
+            <Icon icon="lucide-search" size={14} />
+            <input
+              placeholder={compact ? `Search ${depthLabel}…` : `Filter ${depthLabel}…`}
+              value={searchFilter}
+              onInput={(e: Event) => setSearchFilter((e.target as HTMLInputElement).value)}
+            />
+          </div>
+        </div>
+      )}
 
-      {/* Tag chips */}
-      {availableTags.length > 0 && (
+      {/* Tag chips — full mode only */}
+      {!compact && availableTags.length > 0 && (
         <div className="windrose-tb-chips">
           <HScroll className="windrose-tb-chips-scroll">
             {availableTags.map(t => (
@@ -688,7 +954,7 @@ const TileAssetBrowser = ({
 
       {/* Body: rail + grid */}
       <div className="windrose-tb-body">
-        {showRail && (
+        {showRail && !compact && (
           <div className="windrose-tb-rail">
             <button
               className={`windrose-tb-railbtn ${railSel === 'recent' ? 'on' : ''}`}
@@ -734,51 +1000,12 @@ const TileAssetBrowser = ({
         )}
 
         <div className="windrose-tb-grid-wrap">
-          {/* Recent tiles section */}
-          {railSel === 'recent' && recentTileEntries.length > 0 && (
-            <div style={{ marginBottom: secGap }}>
-              <div className="windrose-tb-seclabel" style={{ cursor: 'default' }}>
-                <Icon icon="lucide-clock" size={11} /> Recently used
-              </div>
-              <div className="windrose-tb-grid" style={gridStyle}>
-                {recentTileEntries.map(tile => {
-                  const isSelected = selectedTilesetId === activeTileset?.id && selectedTileId === tile.id;
-                  return (
-                    <div
-                      key={tile.id}
-                      className={`windrose-tile-thumb ${isSelected ? 'sel' : ''}`}
-                      onClick={() => handleTileClick(activeTileset?.id ?? '', tile.id)}
-                      onMouseEnter={() => setHoveredTile(tile)}
-                      onMouseLeave={() => setHoveredTile(null)}
-                      title={tile.filename}
-                    >
-                      <TileThumbnail tile={tile} getCachedImage={getCachedImage} />
-                      <span className="tname">{tile.filename}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Category groups */}
-          {railSel !== 'recent' && shownGroups.map(([category, tiles]) => (
-            <div key={category} style={{ marginBottom: secGap }}>
-              <button
-                className="windrose-tb-seclabel"
-                onClick={() => handleToggleCategory(category)}
-              >
-                <Icon
-                  icon={collapsedCategories.has(category) ? 'lucide-chevron-right' : 'lucide-chevron-down'}
-                  size={10}
-                />
-                {category}
-                <span className="count">{tiles.length}</span>
-              </button>
-
-              {!collapsedCategories.has(category) && (
-                <div className="windrose-tb-grid" style={gridStyle}>
-                  {tiles.map((tile: TileEntry) => {
+          {compact ? (
+            openCat != null ? (
+              // Compact leaf grid — drilled into a category
+              <>
+                <div className="windrose-tb-leaf-grid">
+                  {(groupedTiles.get(openCat) ?? []).map((tile: TileEntry) => {
                     const isSelected = selectedTilesetId === activeTileset?.id && selectedTileId === tile.id;
                     return (
                       <div
@@ -795,20 +1022,150 @@ const TileAssetBrowser = ({
                     );
                   })}
                 </div>
+                {(groupedTiles.get(openCat) ?? []).length === 0 && (
+                  <div className="windrose-tb-empty">No tiles in this category</div>
+                )}
+              </>
+            ) : (
+              // Compact category cards view
+              <>
+                <div className="windrose-tb-cards">
+                  {Array.from(groupedTiles.entries()).map(([cat, tiles]) => (
+                    <MosaicCard
+                      key={cat}
+                      category={cat}
+                      tiles={tiles}
+                      count={tiles.length}
+                      getCachedImage={getCachedImage}
+                      onClick={() => { setOpenCat(cat); setSearchFilter(''); }}
+                    />
+                  ))}
+                </div>
+                {groupedTiles.size === 0 && (
+                  <div className="windrose-tb-empty">
+                    {searchFilter !== '' ? 'No matching tiles' : 'No tiles in this tileset'}
+                  </div>
+                )}
+              </>
+            )
+          ) : (
+            // Full mode — scrolling grid with optional sections
+            <>
+              {/* Recent tiles section */}
+              {railSel === 'recent' && recentTileEntries.length > 0 && (
+                <div style={{ marginBottom: secGap }}>
+                  <div className="windrose-tb-seclabel" style={{ cursor: 'default' }}>
+                    <Icon icon="lucide-clock" size={11} /> Recently used
+                  </div>
+                  <div className="windrose-tb-grid" style={gridStyle}>
+                    {recentTileEntries.map(tile => {
+                      const isSelected = selectedTilesetId === activeTileset?.id && selectedTileId === tile.id;
+                      return (
+                        <div
+                          key={tile.id}
+                          className={`windrose-tile-thumb ${isSelected ? 'sel' : ''}`}
+                          onClick={() => handleTileClick(activeTileset?.id ?? '', tile.id)}
+                          onMouseEnter={() => setHoveredTile(tile)}
+                          onMouseLeave={() => setHoveredTile(null)}
+                          title={tile.filename}
+                        >
+                          <TileThumbnail tile={tile} getCachedImage={getCachedImage} />
+                          <span className="tname">{tile.filename}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               )}
-            </div>
-          ))}
 
-          {filteredTiles.length === 0 && (
-            <div className="windrose-tb-empty">
-              {searchFilter != null && searchFilter !== '' ? 'No matching tiles' : 'No tiles in this tileset'}
-            </div>
+              {/* Category groups */}
+              {railSel !== 'recent' && shownGroups.map(([category, tiles]) => (
+                <div key={category} style={{ marginBottom: secGap }}>
+                  <button
+                    className="windrose-tb-seclabel"
+                    onClick={() => handleToggleCategory(category)}
+                  >
+                    <Icon
+                      icon={collapsedCategories.has(category) ? 'lucide-chevron-right' : 'lucide-chevron-down'}
+                      size={10}
+                    />
+                    {category}
+                    <span className="count">{tiles.length}</span>
+                  </button>
+
+                  {!collapsedCategories.has(category) && (
+                    <div className="windrose-tb-grid" style={gridStyle}>
+                      {tiles.map((tile: TileEntry) => {
+                        const isSelected = selectedTilesetId === activeTileset?.id && selectedTileId === tile.id;
+                        return (
+                          <div
+                            key={tile.id}
+                            className={`windrose-tile-thumb ${isSelected ? 'sel' : ''}`}
+                            onClick={() => handleTileClick(activeTileset?.id ?? '', tile.id)}
+                            onMouseEnter={() => setHoveredTile(tile)}
+                            onMouseLeave={() => setHoveredTile(null)}
+                            title={tile.filename}
+                          >
+                            <TileThumbnail tile={tile} getCachedImage={getCachedImage} />
+                            <span className="tname">{tile.filename}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              ))}
+
+              {filteredTiles.length === 0 && (
+                <div className="windrose-tb-empty">
+                  {searchFilter != null && searchFilter !== '' ? 'No matching tiles' : 'No tiles in this tileset'}
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
 
       {/* Loaded-brush footer */}
-      {selectedTile != null && (
+      {selectedTile != null && (compact ? (
+        <div className="windrose-tb-footer">
+          <div className="windrose-tb-brushbar windrose-tb-brushbar-compact">
+            <div className="chip-tile compact">
+              <LoadedChipThumb tile={selectedTile} getCachedImage={getCachedImage} />
+            </div>
+            <button className="windrose-tb-iconbtn" title="Rotate" onClick={handleRotateCW}>
+              <Icon icon="lucide-rotate-cw" size={12} />
+            </button>
+            <button
+              className={`windrose-tb-iconbtn ${stampMode ? 'active' : ''}`}
+              onClick={() => onStampModeChange(!stampMode)}
+              title={stampMode ? 'Stamp: ON' : 'Stamp: OFF'}
+            >
+              <Icon icon="lucide-stamp" size={12} />
+            </button>
+            <span className="sep" />
+            <span className="label">Scale</span>
+            <input
+              className="windrose-tb-range"
+              type="range"
+              min="0.25"
+              max="3"
+              step="0.25"
+              value={tileScale}
+              onInput={(e: Event) => onTileScaleChange(parseFloat((e.target as HTMLInputElement).value))}
+              style={{ flex: 1, minWidth: 0 }}
+            />
+            <button
+              className="windrose-tb-iconbtn ghost"
+              title="Clear brush"
+              onClick={onTileDeselect}
+              style={{ width: 22, height: 22 }}
+            >
+              <Icon icon="lucide-x" size={12} />
+            </button>
+          </div>
+        </div>
+      ) : (
         <div className="windrose-tb-footer">
           <div className="windrose-tb-loaded">
             <div className="chip-tile">
@@ -877,8 +1234,9 @@ const TileAssetBrowser = ({
             <span className="windrose-tb-cap" style={{ minWidth: 24, textAlign: 'right' }}>{tileScale}×</span>
           </div>
         </div>
-      )}
+      ))}
 
+      </>)}
     </div>
   );
 };

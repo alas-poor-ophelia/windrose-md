@@ -632,6 +632,308 @@
   font-size: 11px;
 }
 
+/* ---- Breadcrumb (compact drill-down) ---- */
+.windrose-tb-breadcrumb {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--windrose-border-secondary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.windrose-tb-crumb-path {
+  font-size: 10px;
+  color: var(--windrose-text-muted);
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+
+  b {
+    color: var(--windrose-gold-bright);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+/* ---- Category cards (compact) ---- */
+.windrose-tb-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.windrose-tb-card {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  background: var(--windrose-bg-secondary);
+  border: 1.5px solid var(--windrose-border-secondary);
+  border-radius: 6px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color .13s ease, transform .1s ease;
+
+  &:hover {
+    border-color: var(--windrose-border-primary-dark);
+    transform: translateY(-1px);
+  }
+}
+
+.windrose-tb-mosaic {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5px;
+  background: var(--windrose-border-secondary);
+}
+
+.windrose-tb-mosaic-cell {
+  aspect-ratio: 1;
+  position: relative;
+  overflow: hidden;
+  background: var(--windrose-bg-secondary);
+
+  canvas {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+}
+
+.windrose-tb-card-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 7px;
+}
+
+.windrose-tb-card-name {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--windrose-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.windrose-tb-card-count {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  font-size: 9.5px;
+  color: var(--windrose-border-primary);
+  flex-shrink: 0;
+}
+
+/* ---- Leaf grid (compact drill-down, 3 columns) ---- */
+.windrose-tb-leaf-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+}
+
+/* ---- Compact brush ribbon (single-row footer) ---- */
+.windrose-tb-brushbar-compact {
+  padding: 5px 7px;
+  gap: 4px;
+  flex-wrap: nowrap;
+
+  .chip-tile.compact {
+    width: 26px;
+    height: 26px;
+    border-radius: 4px;
+    overflow: hidden;
+    border: 1px solid var(--windrose-border-primary);
+    flex-shrink: 0;
+
+    canvas {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+  }
+
+  .windrose-tb-iconbtn {
+    width: 24px;
+    height: 24px;
+  }
+}
+
+/* ---- Compact overrides (via .is-compact on DrawerDock) ---- */
+.is-compact {
+  .windrose-tb-head {
+    padding: 6px 9px;
+  }
+
+  .windrose-tb-title {
+    font-size: 11.5px;
+  }
+
+  .windrose-tb-head .windrose-tb-iconbtn {
+    width: 24px;
+    height: 24px;
+  }
+
+  .windrose-tb-filter {
+    padding: 6px 8px;
+  }
+
+  .windrose-tb-search {
+    padding: 4px 7px;
+
+    input {
+      font-size: 11px;
+    }
+  }
+
+  .windrose-tb-grid-wrap {
+    padding: 6px 8px 8px;
+  }
+
+  .windrose-tile-thumb .tname {
+    font-size: 8px;
+  }
+}
+
+/* ---- Organize mode ---- */
+.windrose-tb-head-organize {
+  background: linear-gradient(180deg, oklch(from var(--windrose-border-primary) l c h / 0.28), oklch(from var(--windrose-border-primary) l c h / 0.1));
+}
+
+.windrose-tb-org-search {
+  padding: 9px 10px 7px;
+
+  .windrose-tb-search {
+    padding: 8px 10px;
+  }
+}
+
+.windrose-tb-org-bar {
+  padding: 0 10px 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.windrose-tb-org-body {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 2px 10px 10px;
+  position: relative;
+  min-height: 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--windrose-bg-tertiary) transparent;
+}
+
+.windrose-tb-check {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  border: 1.5px solid oklch(100% 0 0 / 0.4);
+  background: oklch(0 0 0 / 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: oklch(100% 0 0);
+  transition: background 0.12s ease, border-color 0.12s ease;
+
+  &.on {
+    background: var(--windrose-border-primary);
+    border-color: var(--windrose-gold-bright);
+    color: oklch(0.15 0.02 75);
+  }
+}
+
+.windrose-tile-thumb.dim::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: oklch(0.03 0 0 / 0.5);
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+.windrose-tb-tag-pop {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 64px;
+  background: oklch(from var(--windrose-bg-primary) calc(l + 0.02) c h);
+  border: 1px solid var(--windrose-border-primary-dark);
+  border-radius: 9px;
+  padding: 11px;
+  box-shadow: 0 -8px 26px oklch(0 0 0 / 0.6);
+  z-index: 20;
+}
+
+.windrose-tb-act {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 9px 10px;
+  border-radius: 7px;
+  cursor: pointer;
+  border: 1px solid var(--windrose-border-primary-dark);
+  background: oklch(0.18 0.025 75);
+  color: var(--windrose-gold-bright);
+  font-size: 12px;
+  font-weight: 600;
+  transition: border-color 0.12s ease;
+
+  &:hover {
+    border-color: var(--windrose-border-primary);
+  }
+
+  &[disabled] {
+    opacity: 0.4;
+    cursor: default;
+    pointer-events: none;
+  }
+
+  &-cancel {
+    flex: 1;
+    background: var(--windrose-bg-secondary);
+    color: var(--windrose-text-secondary);
+    border-color: var(--windrose-border-secondary);
+  }
+
+  &-apply {
+    flex: 1;
+    background: linear-gradient(180deg, var(--windrose-gold-bright), var(--windrose-border-primary));
+    color: oklch(0.15 0.02 75);
+    border-color: var(--windrose-gold-bright);
+  }
+
+  &-star {
+    padding: 9px;
+  }
+}
+
+.windrose-tb-org-actions {
+  padding: 9px 10px;
+  border-top: 1px solid color-mix(in oklch, var(--windrose-border-primary) 25%, #000);
+  background: linear-gradient(180deg, oklch(0.17 0.03 75), oklch(0.12 0.02 75));
+  display: flex;
+  gap: 7px;
+  flex-shrink: 0;
+
+  .windrose-tb-act {
+    flex: 1;
+  }
+
+  .windrose-tb-act-star {
+    flex: none;
+  }
+}
+
 /* ---- Tablet overrides ---- */
 .is-tablet .windrose-tb-config {
   padding: 10px 12px;
