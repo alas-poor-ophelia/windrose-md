@@ -7,7 +7,8 @@ import type { PckArchive } from './pckParser';
 import { parsePackMetadata, parseDungeondraftTags } from './pckMetadata';
 import type { DungeondraftPackMeta } from './pckMetadata';
 import { CONTENT_PACKS_FOLDER } from './contentPackConstants';
-import { loadTileMetadata, bulkSetImportTags, saveTileMetadata } from '../persistence/tileMetadata';
+import { loadTileMetadata, bulkSetImportTags, bulkSetDdSourceType, bulkSetDepthAffinity, saveTileMetadata } from '../persistence/tileMetadata';
+import { predictDepthTier } from '../assets/depthPredictor';
 
 interface PluginLike {
 	app: App;
@@ -247,6 +248,7 @@ class DungeondraftImportModal extends Modal {
 
 			const packPrefix = this.archive.files[0]?.path.match(/^res:\/\/packs\/[^/]+\//)?.[0] ?? '';
 			const importTagEntries: Array<{ vaultPath: string; tags: string[] }> = [];
+			const ddSourceEntries: Array<{ vaultPath: string; sourceType: string }> = [];
 
 			for (let i = 0; i < textures.length; i++) {
 				const entry = textures[i];
@@ -268,6 +270,11 @@ class DungeondraftImportModal extends Modal {
 				const allTags = pathToAllTags.get(tagKey);
 				if (allTags != null && allTags.length > 0) {
 					importTagEntries.push({ vaultPath: destPath, tags: allTags });
+				}
+
+				const srcMatch = relativePath.match(/^textures\/(\w+)\//);
+				if (srcMatch != null) {
+					ddSourceEntries.push({ vaultPath: destPath, sourceType: srcMatch[1] });
 				}
 
 				const parentDir = destPath.substring(0, destPath.lastIndexOf('/'));
@@ -292,10 +299,27 @@ class DungeondraftImportModal extends Modal {
 				}
 			}
 
-			if (importTagEntries.length > 0) {
+			if (importTagEntries.length > 0 || ddSourceEntries.length > 0) {
 				statusText.textContent = 'Saving tag metadata...';
 				let metadata = await loadTileMetadata(this.app);
-				metadata = bulkSetImportTags(metadata, importTagEntries);
+				if (importTagEntries.length > 0) {
+					metadata = bulkSetImportTags(metadata, importTagEntries);
+				}
+				if (ddSourceEntries.length > 0) {
+					metadata = bulkSetDdSourceType(metadata, ddSourceEntries);
+				}
+				const depthEntries: Array<{ vaultPath: string; depth: import('#types/tiles/tile.types').TileLayerRole }> = [];
+				for (const { vaultPath } of ddSourceEntries) {
+					const tile = { id: '', filename: vaultPath.split('/').pop() ?? '', vaultPath, tags: [] };
+					const entry = metadata[vaultPath];
+					const { tier, confidence } = predictDepthTier(tile, entry);
+					if (confidence >= 0.4) {
+						depthEntries.push({ vaultPath, depth: tier });
+					}
+				}
+				if (depthEntries.length > 0) {
+					metadata = bulkSetDepthAffinity(metadata, depthEntries);
+				}
 				await saveTileMetadata(this.app, metadata);
 			}
 

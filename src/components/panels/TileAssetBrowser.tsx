@@ -21,10 +21,13 @@ import {
   saveTileMetadataDebounced,
   bulkAddTag,
   bulkToggleStar,
+  bulkSetDepthAffinity,
   isStarred,
   collectUniqueTags,
+  collectDepthAwareTags,
   getAllTags,
 } from '../../persistence/tileMetadata';
+import { predictDepthTier } from '../../assets/depthPredictor';
 
 // ===========================================
 // Content-bounds detection for tile thumbnails
@@ -356,6 +359,7 @@ const TileAssetBrowser = ({
   const [orgSearch, setOrgSearch] = useState('');
   const [orgShowTag, setOrgShowTag] = useState(false);
   const [orgTagInput, setOrgTagInput] = useState('');
+  const [orgShowTier, setOrgShowTier] = useState(false);
   const [tileMetadata, setTileMetadata] = useState<TileMetadataStore>({});
 
   // Clamp activeTilesetIndex when tilesets shrink
@@ -486,6 +490,32 @@ const TileAssetBrowser = ({
     void loadTileMetadata(app).then(setTileMetadata);
   }, []);
 
+  // Auto-predict depth affinity for tiles that don't have one yet
+  const predictionRanRef = useRef(false);
+  useEffect(() => {
+    if (predictionRanRef.current) return;
+    if (tilesets.length === 0) return;
+    const allTiles = tilesets.flatMap(ts => ts.tiles);
+    if (allTiles.length === 0) return;
+    const missing: Array<{ vaultPath: string; depth: TileLayerRole }> = [];
+    for (const tile of allTiles) {
+      const entry = tileMetadata[tile.vaultPath];
+      if (entry?.depthAffinity != null) continue;
+      const { tier, confidence } = predictDepthTier(tile, entry);
+      if (confidence >= 0.4) {
+        missing.push({ vaultPath: tile.vaultPath, depth: tier });
+      }
+    }
+    if (missing.length > 0) {
+      predictionRanRef.current = true;
+      const updated = bulkSetDepthAffinity(tileMetadata, missing);
+      setTileMetadata(updated);
+      saveTileMetadataDebounced(app, updated);
+    } else if (allTiles.some(t => tileMetadata[t.vaultPath]?.depthAffinity != null)) {
+      predictionRanRef.current = true;
+    }
+  }, [tilesets, tileMetadata]);
+
   const allTilesFlat = useMemo((): TileEntry[] => {
     const result: TileEntry[] = [];
     for (const ts of tilesets) {
@@ -545,21 +575,34 @@ const TileAssetBrowser = ({
     saveTileMetadataDebounced(app, updated);
   };
 
+  const handleBulkTier = (tier: TileLayerRole): void => {
+    if (orgSelection.size === 0) return;
+    const entries = Array.from(orgSelection).map(vaultPath => ({ vaultPath, depth: tier }));
+    const updated = bulkSetDepthAffinity(tileMetadata, entries);
+    setTileMetadata(updated);
+    saveTileMetadataDebounced(app, updated);
+    setOrgShowTier(false);
+  };
+
   const exitOrganize = (): void => {
     setOrganize(false);
     setOrgSelection(new Set());
     setOrgSearch('');
     setOrgShowTag(false);
+    setOrgShowTier(false);
     setOrgTagInput('');
   };
 
   const activeTileset = tilesets[activeTilesetIndex] ?? null;
 
-  // Collect available tags from tiles in the active tileset
+  // Collect available tags, sorted by depth relevance when on grid maps
   const availableTags = useMemo(() => {
     if (activeTileset == null) return [];
+    if (mapType === 'grid') {
+      return collectDepthAwareTags(activeTileset.tiles, tileMetadata, tileDepth);
+    }
     return collectUniqueTags(activeTileset.tiles, tileMetadata);
-  }, [activeTileset, tileMetadata]);
+  }, [activeTileset, tileMetadata, tileDepth, mapType]);
 
   const filteredTiles = useMemo(() => {
     if (activeTileset == null) return [];
@@ -766,11 +809,39 @@ const TileAssetBrowser = ({
             </div>
           )}
 
+          {orgShowTier && (
+            <div className="windrose-tb-org-tier">
+              <div className="windrose-tb-org-tier-label">Assign depth tier:</div>
+              <div className="windrose-tb-org-tier-btns">
+                {(['ground', 'structure', 'props', 'decoration'] as TileLayerRole[]).map(role => (
+                  <button
+                    key={role}
+                    className="windrose-tb-act"
+                    onClick={() => handleBulkTier(role)}
+                  >
+                    <Icon icon={depthMeta(role).icon} size={14} />
+                    {depthMeta(role).label}
+                  </button>
+                ))}
+              </div>
+              <button
+                className="windrose-tb-act"
+                onClick={() => setOrgShowTier(false)}
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+
           <div className="windrose-tb-org-actions">
             <button className="windrose-tb-act" disabled={orgSelection.size === 0} onClick={() => setOrgShowTag(true)}>
               <Icon icon="lucide-tag" size={14} /> Tag…
             </button>
-            <button className="windrose-tb-act" disabled={true}>
+            <button
+              className="windrose-tb-act"
+              disabled={orgSelection.size === 0}
+              onClick={() => setOrgShowTier(!orgShowTier)}
+            >
               <Icon icon="lucide-layers" size={14} /> Tier…
             </button>
             <button className="windrose-tb-act" disabled={true}>

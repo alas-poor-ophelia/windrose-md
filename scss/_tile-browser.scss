@@ -917,6 +917,29 @@
   }
 }
 
+.windrose-tb-org-tier {
+  padding: 9px 10px;
+  border-top: 1px solid color-mix(in oklch, var(--windrose-border-primary) 25%, #000);
+  background: oklch(0.15 0.02 75);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+
+  .windrose-tb-org-tier-label {
+    font-size: 11px;
+    color: var(--windrose-text-muted);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .windrose-tb-org-tier-btns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 5px;
+  }
+}
+
 .windrose-tb-org-actions {
   padding: 9px 10px;
   border-top: 1px solid color-mix(in oklch, var(--windrose-border-primary) 25%, #000);
@@ -935,6 +958,120 @@
 }
 
 /* ---- Tablet overrides ---- */
+/* Obsidian .is-tablet injects padding + background on all buttons — reset and reapply */
+.is-tablet button:is(
+  .windrose-tb-act,
+  .windrose-tb-chip,
+  .windrose-tb-railbtn,
+  .windrose-tb-iconbtn,
+  .windrose-tb-seclabel,
+  .windrose-tb-card,
+  .windrose-tb-tileset-tab,
+  .windrose-tb-mosaic-card,
+  .windrose-tb-foot-clear
+) {
+  padding: 0;
+  background: none;
+  box-shadow: none;
+}
+
+.is-tablet button.windrose-tb-act {
+  padding: 9px 10px;
+  background: oklch(0.18 0.025 75);
+  border: 1px solid var(--windrose-border-primary-dark);
+  color: var(--windrose-gold-bright);
+
+  &[disabled] {
+    opacity: 0.4;
+  }
+
+  &.windrose-tb-act-cancel {
+    background: var(--windrose-bg-secondary);
+    color: var(--windrose-text-secondary);
+    border-color: var(--windrose-border-secondary);
+  }
+
+  &.windrose-tb-act-apply {
+    background: linear-gradient(180deg, var(--windrose-gold-bright), var(--windrose-border-primary));
+    color: oklch(0.15 0.02 75);
+    border-color: var(--windrose-gold-bright);
+  }
+}
+
+.is-tablet button.windrose-tb-chip {
+  padding: 1px 7px;
+  background: var(--windrose-bg-secondary);
+  border: 1px solid var(--windrose-border-secondary);
+  color: var(--windrose-text-secondary);
+
+  &.active {
+    background: oklch(from var(--windrose-border-primary) l c h / 0.18);
+    border-color: var(--windrose-border-primary);
+    color: var(--windrose-gold-bright);
+  }
+}
+
+.is-tablet button.windrose-tb-railbtn {
+  padding: 7px 8px;
+  background: transparent;
+  color: var(--windrose-text-muted);
+  border: none;
+
+  &.on {
+    background: linear-gradient(135deg, oklch(0.22 0.025 75) 0%, oklch(0.17 0.015 75) 100%);
+    color: var(--windrose-gold-bright);
+  }
+}
+
+.is-tablet button.windrose-tb-iconbtn {
+  padding: 0;
+  width: 28px;
+  height: 28px;
+  background: var(--windrose-bg-secondary);
+  border: 1px solid var(--windrose-border-secondary);
+  color: var(--windrose-text-secondary);
+
+  &.ghost {
+    background: transparent;
+    border-color: transparent;
+  }
+
+  &.active {
+    background: var(--windrose-border-primary);
+    color: oklch(0.15 0.02 75);
+    border-color: var(--windrose-gold-bright);
+  }
+}
+
+.is-tablet button.windrose-tb-card {
+  padding: 0;
+  height: auto;
+  min-height: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  background: var(--windrose-bg-secondary);
+  border: 1.5px solid var(--windrose-border-secondary);
+  color: inherit;
+  box-shadow: none;
+
+  &:hover {
+    border-color: var(--windrose-border-primary-dark);
+  }
+}
+
+.is-tablet button.windrose-tb-seclabel {
+  padding: 4px 2px;
+  background: none;
+  border: none;
+  color: var(--windrose-text-muted);
+  box-shadow: none;
+
+  &:hover {
+    color: var(--windrose-text-secondary);
+  }
+}
+
 .is-tablet .windrose-tb-config {
   padding: 10px 12px;
 }

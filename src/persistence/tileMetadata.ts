@@ -8,7 +8,7 @@
 
 import type { App } from 'obsidian';
 import { TFile } from 'obsidian';
-import type { TileMetadataStore, TileMetadataEntry, TileEntry } from '#types/tiles/tile.types';
+import type { TileMetadataStore, TileMetadataEntry, TileEntry, TileLayerRole } from '#types/tiles/tile.types';
 
 const METADATA_FILE = 'windrose-tile-metadata.json';
 
@@ -57,7 +57,9 @@ function pruneEmptyEntries(metadata: TileMetadataStore): TileMetadataStore {
     if (
       entry.starred === true ||
       (entry.userTags != null && entry.userTags.length > 0) ||
-      (entry.importTags != null && entry.importTags.length > 0)
+      (entry.importTags != null && entry.importTags.length > 0) ||
+      entry.depthAffinity != null ||
+      entry.ddSourceType != null
     ) {
       result[key] = entry;
     }
@@ -178,6 +180,65 @@ function collectUniqueTags(tiles: TileEntry[], metadata: TileMetadataStore): str
   return tags.sort((a, b) => a.localeCompare(b));
 }
 
+function setDepthAffinity(
+  metadata: TileMetadataStore,
+  vaultPath: string,
+  depth: TileLayerRole
+): TileMetadataStore {
+  return setEntryMetadata(metadata, vaultPath, { depthAffinity: depth });
+}
+
+function bulkSetDepthAffinity(
+  metadata: TileMetadataStore,
+  entries: Array<{ vaultPath: string; depth: TileLayerRole }>
+): TileMetadataStore {
+  let result = { ...metadata };
+  for (const { vaultPath, depth } of entries) {
+    const existing = result[vaultPath] ?? {};
+    result[vaultPath] = { ...existing, depthAffinity: depth };
+  }
+  return result;
+}
+
+function bulkSetDdSourceType(
+  metadata: TileMetadataStore,
+  entries: Array<{ vaultPath: string; sourceType: string }>
+): TileMetadataStore {
+  let result = { ...metadata };
+  for (const { vaultPath, sourceType } of entries) {
+    const existing = result[vaultPath] ?? {};
+    result[vaultPath] = { ...existing, ddSourceType: sourceType };
+  }
+  return result;
+}
+
+function collectDepthAwareTags(
+  tiles: TileEntry[],
+  metadata: TileMetadataStore,
+  activeDepth: TileLayerRole
+): string[] {
+  const depthTags = new Map<string, number>();
+  const otherTags = new Map<string, number>();
+  for (const tile of tiles) {
+    const entry = metadata[tile.vaultPath];
+    const affinity = entry?.depthAffinity;
+    const isMatch = affinity === activeDepth;
+    for (const tag of getAllTags(tile, metadata)) {
+      const lower = tag.toLowerCase();
+      const target = isMatch ? depthTags : otherTags;
+      target.set(lower, (target.get(lower) ?? 0) + 1);
+    }
+  }
+  const boosted = [...depthTags.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([t]) => t);
+  const rest = [...otherTags.entries()]
+    .filter(([t]) => !depthTags.has(t))
+    .sort((a, b) => b[1] - a[1])
+    .map(([t]) => t);
+  return [...boosted, ...rest];
+}
+
 export {
   loadTileMetadata,
   saveTileMetadata,
@@ -193,6 +254,10 @@ export {
   getUserTags,
   getAllTags,
   collectUniqueTags,
+  collectDepthAwareTags,
   setImportTags,
   bulkSetImportTags,
+  setDepthAffinity,
+  bulkSetDepthAffinity,
+  bulkSetDdSourceType,
 };

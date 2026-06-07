@@ -291,6 +291,35 @@
   min-height: 6px;
 }
 
+/* ---- Tablet overrides ---- */
+.is-tablet button.windrose-db-seg {
+  padding: 6px 9px 6px 12px;
+  background: var(--windrose-bg-secondary);
+  border: 1px solid var(--windrose-border-secondary);
+  color: var(--windrose-text-muted);
+  box-shadow: none;
+
+  &.is-active {
+    background: linear-gradient(180deg, oklch(0.2 0.03 75), oklch(0.14 0.02 70));
+    border-color: var(--windrose-border-primary);
+    color: var(--windrose-gold-bright);
+    box-shadow: inset 0 0 0 1px oklch(0.74 0.07 75 / 0.12);
+  }
+}
+
+.is-tablet button.windrose-db-fanrow {
+  padding: 8px 9px 8px 13px;
+  background: transparent;
+  border: none;
+  color: var(--windrose-text-secondary);
+  box-shadow: none;
+
+  &.is-active {
+    background: linear-gradient(90deg, oklch(0.74 0.07 75 / 0.2), oklch(0.74 0.07 75 / 0.04));
+    color: var(--windrose-gold-bright);
+  }
+}
+
 /* ---- Reduced motion ---- */
 @media (prefers-reduced-motion: reduce) {
   .windrose-db-seg,

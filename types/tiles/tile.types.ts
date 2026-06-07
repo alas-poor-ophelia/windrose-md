@@ -168,6 +168,10 @@ export interface TileMetadataEntry {
   userTags?: string[];
   /** Tags preserved from Dungeondraft import — replaced on re-import */
   importTags?: string[];
+  /** Predicted or user-assigned depth tier affinity */
+  depthAffinity?: TileLayerRole;
+  /** Original DD source directory type (objects, patterns, terrain, walls, etc.) */
+  ddSourceType?: string;
 }
 
 /** Metadata store keyed by vault path (stable across tileset rescans) */

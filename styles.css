@@ -1748,7 +1748,409 @@ button.windrose-object-grid-item:hover,
   font-size: 11px;
 }
 
+/* ---- Breadcrumb (compact drill-down) ---- */
+.windrose-tb-breadcrumb {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--windrose-border-secondary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.windrose-tb-crumb-path {
+  font-size: 10px;
+  color: var(--windrose-text-muted);
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+}
+.windrose-tb-crumb-path b {
+  color: var(--windrose-gold-bright);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---- Category cards (compact) ---- */
+.windrose-tb-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.windrose-tb-card {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  background: var(--windrose-bg-secondary);
+  border: 1.5px solid var(--windrose-border-secondary);
+  border-radius: 6px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color 0.13s ease, transform 0.1s ease;
+}
+.windrose-tb-card:hover {
+  border-color: var(--windrose-border-primary-dark);
+  transform: translateY(-1px);
+}
+
+.windrose-tb-mosaic {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5px;
+  background: var(--windrose-border-secondary);
+}
+
+.windrose-tb-mosaic-cell {
+  aspect-ratio: 1;
+  position: relative;
+  overflow: hidden;
+  background: var(--windrose-bg-secondary);
+}
+.windrose-tb-mosaic-cell canvas {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.windrose-tb-card-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 7px;
+}
+
+.windrose-tb-card-name {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--windrose-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.windrose-tb-card-count {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  font-size: 9.5px;
+  color: var(--windrose-border-primary);
+  flex-shrink: 0;
+}
+
+/* ---- Leaf grid (compact drill-down, 3 columns) ---- */
+.windrose-tb-leaf-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+}
+
+/* ---- Compact brush ribbon (single-row footer) ---- */
+.windrose-tb-brushbar-compact {
+  padding: 5px 7px;
+  gap: 4px;
+  flex-wrap: nowrap;
+}
+.windrose-tb-brushbar-compact .chip-tile.compact {
+  width: 26px;
+  height: 26px;
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid var(--windrose-border-primary);
+  flex-shrink: 0;
+}
+.windrose-tb-brushbar-compact .chip-tile.compact canvas {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.windrose-tb-brushbar-compact .windrose-tb-iconbtn {
+  width: 24px;
+  height: 24px;
+}
+
+/* ---- Compact overrides (via .is-compact on DrawerDock) ---- */
+.is-compact .windrose-tb-head {
+  padding: 6px 9px;
+}
+.is-compact .windrose-tb-title {
+  font-size: 11.5px;
+}
+.is-compact .windrose-tb-head .windrose-tb-iconbtn {
+  width: 24px;
+  height: 24px;
+}
+.is-compact .windrose-tb-filter {
+  padding: 6px 8px;
+}
+.is-compact .windrose-tb-search {
+  padding: 4px 7px;
+}
+.is-compact .windrose-tb-search input {
+  font-size: 11px;
+}
+.is-compact .windrose-tb-grid-wrap {
+  padding: 6px 8px 8px;
+}
+.is-compact .windrose-tile-thumb .tname {
+  font-size: 8px;
+}
+
+/* ---- Organize mode ---- */
+.windrose-tb-head-organize {
+  background: linear-gradient(180deg, oklch(from var(--windrose-border-primary) l c h/0.28), oklch(from var(--windrose-border-primary) l c h/0.1));
+}
+
+.windrose-tb-org-search {
+  padding: 9px 10px 7px;
+}
+.windrose-tb-org-search .windrose-tb-search {
+  padding: 8px 10px;
+}
+
+.windrose-tb-org-bar {
+  padding: 0 10px 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.windrose-tb-org-body {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 2px 10px 10px;
+  position: relative;
+  min-height: 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--windrose-bg-tertiary) transparent;
+}
+
+.windrose-tb-check {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  border: 1.5px solid oklch(100% 0 0deg / 0.4);
+  background: oklch(0% 0 0deg / 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: oklch(100% 0 0deg);
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+.windrose-tb-check.on {
+  background: var(--windrose-border-primary);
+  border-color: var(--windrose-gold-bright);
+  color: oklch(15% 0.02 75deg);
+}
+
+.windrose-tile-thumb.dim::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: oklch(3% 0 0deg / 0.5);
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+.windrose-tb-tag-pop {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 64px;
+  background: oklch(from var(--windrose-bg-primary) calc(l + 0.02) c h);
+  border: 1px solid var(--windrose-border-primary-dark);
+  border-radius: 9px;
+  padding: 11px;
+  box-shadow: 0 -8px 26px oklch(0% 0 0deg / 0.6);
+  z-index: 20;
+}
+
+.windrose-tb-act {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 9px 10px;
+  border-radius: 7px;
+  cursor: pointer;
+  border: 1px solid var(--windrose-border-primary-dark);
+  background: oklch(18% 0.025 75deg);
+  color: var(--windrose-gold-bright);
+  font-size: 12px;
+  font-weight: 600;
+  transition: border-color 0.12s ease;
+}
+.windrose-tb-act:hover {
+  border-color: var(--windrose-border-primary);
+}
+.windrose-tb-act[disabled] {
+  opacity: 0.4;
+  cursor: default;
+  pointer-events: none;
+}
+.windrose-tb-act-cancel {
+  flex: 1;
+  background: var(--windrose-bg-secondary);
+  color: var(--windrose-text-secondary);
+  border-color: var(--windrose-border-secondary);
+}
+.windrose-tb-act-apply {
+  flex: 1;
+  background: linear-gradient(180deg, var(--windrose-gold-bright), var(--windrose-border-primary));
+  color: oklch(15% 0.02 75deg);
+  border-color: var(--windrose-gold-bright);
+}
+.windrose-tb-act-star {
+  padding: 9px;
+}
+
+.windrose-tb-org-tier {
+  padding: 9px 10px;
+  border-top: 1px solid color-mix(in oklch, var(--windrose-border-primary) 25%, #000);
+  background: oklch(15% 0.02 75deg);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.windrose-tb-org-tier .windrose-tb-org-tier-label {
+  font-size: 11px;
+  color: var(--windrose-text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.windrose-tb-org-tier .windrose-tb-org-tier-btns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+}
+
+.windrose-tb-org-actions {
+  padding: 9px 10px;
+  border-top: 1px solid color-mix(in oklch, var(--windrose-border-primary) 25%, #000);
+  background: linear-gradient(180deg, oklch(17% 0.03 75deg), oklch(12% 0.02 75deg));
+  display: flex;
+  gap: 7px;
+  flex-shrink: 0;
+}
+.windrose-tb-org-actions .windrose-tb-act {
+  flex: 1;
+}
+.windrose-tb-org-actions .windrose-tb-act-star {
+  flex: none;
+}
+
 /* ---- Tablet overrides ---- */
+/* Obsidian .is-tablet injects padding + background on all buttons — reset and reapply */
+.is-tablet button:is(.windrose-tb-act,
+.windrose-tb-chip,
+.windrose-tb-railbtn,
+.windrose-tb-iconbtn,
+.windrose-tb-seclabel,
+.windrose-tb-card,
+.windrose-tb-tileset-tab,
+.windrose-tb-mosaic-card,
+.windrose-tb-foot-clear) {
+  padding: 0;
+  background: none;
+  box-shadow: none;
+}
+
+.is-tablet button.windrose-tb-act {
+  padding: 9px 10px;
+  background: oklch(18% 0.025 75deg);
+  border: 1px solid var(--windrose-border-primary-dark);
+  color: var(--windrose-gold-bright);
+}
+.is-tablet button.windrose-tb-act[disabled] {
+  opacity: 0.4;
+}
+.is-tablet button.windrose-tb-act.windrose-tb-act-cancel {
+  background: var(--windrose-bg-secondary);
+  color: var(--windrose-text-secondary);
+  border-color: var(--windrose-border-secondary);
+}
+.is-tablet button.windrose-tb-act.windrose-tb-act-apply {
+  background: linear-gradient(180deg, var(--windrose-gold-bright), var(--windrose-border-primary));
+  color: oklch(15% 0.02 75deg);
+  border-color: var(--windrose-gold-bright);
+}
+
+.is-tablet button.windrose-tb-chip {
+  padding: 1px 7px;
+  background: var(--windrose-bg-secondary);
+  border: 1px solid var(--windrose-border-secondary);
+  color: var(--windrose-text-secondary);
+}
+.is-tablet button.windrose-tb-chip.active {
+  background: oklch(from var(--windrose-border-primary) l c h/0.18);
+  border-color: var(--windrose-border-primary);
+  color: var(--windrose-gold-bright);
+}
+
+.is-tablet button.windrose-tb-railbtn {
+  padding: 7px 8px;
+  background: transparent;
+  color: var(--windrose-text-muted);
+  border: none;
+}
+.is-tablet button.windrose-tb-railbtn.on {
+  background: linear-gradient(135deg, oklch(22% 0.025 75deg) 0%, oklch(17% 0.015 75deg) 100%);
+  color: var(--windrose-gold-bright);
+}
+
+.is-tablet button.windrose-tb-iconbtn {
+  padding: 0;
+  width: 28px;
+  height: 28px;
+  background: var(--windrose-bg-secondary);
+  border: 1px solid var(--windrose-border-secondary);
+  color: var(--windrose-text-secondary);
+}
+.is-tablet button.windrose-tb-iconbtn.ghost {
+  background: transparent;
+  border-color: transparent;
+}
+.is-tablet button.windrose-tb-iconbtn.active {
+  background: var(--windrose-border-primary);
+  color: oklch(15% 0.02 75deg);
+  border-color: var(--windrose-gold-bright);
+}
+
+.is-tablet button.windrose-tb-card {
+  padding: 0;
+  height: auto;
+  min-height: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  background: var(--windrose-bg-secondary);
+  border: 1.5px solid var(--windrose-border-secondary);
+  color: inherit;
+  box-shadow: none;
+}
+.is-tablet button.windrose-tb-card:hover {
+  border-color: var(--windrose-border-primary-dark);
+}
+
+.is-tablet button.windrose-tb-seclabel {
+  padding: 4px 2px;
+  background: none;
+  border: none;
+  color: var(--windrose-text-muted);
+  box-shadow: none;
+}
+.is-tablet button.windrose-tb-seclabel:hover {
+  color: var(--windrose-text-secondary);
+}
+
 .is-tablet .windrose-tb-config {
   padding: 10px 12px;
 }
@@ -2029,6 +2431,33 @@ button.windrose-object-grid-item:hover,
 .windrose-dsr-spacer {
   flex: 1;
   min-height: 6px;
+}
+
+/* ---- Tablet overrides ---- */
+.is-tablet button.windrose-db-seg {
+  padding: 6px 9px 6px 12px;
+  background: var(--windrose-bg-secondary);
+  border: 1px solid var(--windrose-border-secondary);
+  color: var(--windrose-text-muted);
+  box-shadow: none;
+}
+.is-tablet button.windrose-db-seg.is-active {
+  background: linear-gradient(180deg, oklch(20% 0.03 75deg), oklch(14% 0.02 70deg));
+  border-color: var(--windrose-border-primary);
+  color: var(--windrose-gold-bright);
+  box-shadow: inset 0 0 0 1px oklch(74% 0.07 75deg / 0.12);
+}
+
+.is-tablet button.windrose-db-fanrow {
+  padding: 8px 9px 8px 13px;
+  background: transparent;
+  border: none;
+  color: var(--windrose-text-secondary);
+  box-shadow: none;
+}
+.is-tablet button.windrose-db-fanrow.is-active {
+  background: linear-gradient(90deg, oklch(74% 0.07 75deg / 0.2), oklch(74% 0.07 75deg / 0.04));
+  color: var(--windrose-gold-bright);
 }
 
 /* ---- Reduced motion ---- */
