@@ -461,6 +461,20 @@
   image-rendering: pixelated;
 }
 
+.windrose-tile-thumb-placeholder {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(110deg, var(--windrose-bg-secondary) 30%, oklch(from var(--windrose-bg-secondary) calc(l + 0.06) c h) 50%, var(--windrose-bg-secondary) 70%);
+  background-size: 200% 100%;
+  animation: windrose-thumb-shimmer 1.2s ease-in-out infinite;
+  border-radius: 2px;
+}
+
+@keyframes windrose-thumb-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
 /* ---- Loaded-brush footer ---- */
 .windrose-tb-footer {
   flex-shrink: 0;

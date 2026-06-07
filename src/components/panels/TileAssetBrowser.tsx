@@ -12,7 +12,11 @@ import type { VNode } from 'preact';
 import { TFile } from 'obsidian';
 
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
+import { memo } from 'preact/compat';
 import { useApp } from '../../context/AppContext';
+import { useThumbnailPipeline } from '../../hooks/state/useThumbnailPipeline';
+import { THUMB_SIZE } from '../../assets/thumbnailCache';
+import { usePreactVirtualizer } from '../../hooks/state/useVirtualizer';
 import { Icon } from '../shared/Icon';
 import { CornerBrackets } from '../shared/CornerBrackets';
 import { DepthBar, depthMeta } from './DepthBar';
@@ -86,12 +90,10 @@ function getContentBounds(img: HTMLImageElement): { x: number; y: number; w: num
 // Tile thumbnail with content cropping
 // ===========================================
 
-const THUMB_SIZE = 64;
 const PREVIEW_SIZE = 192;
 
 interface TileThumbnailProps {
-  tile: TileEntry;
-  getCachedImage?: (path: string) => HTMLImageElement | null;
+  url: string | null;
 }
 
 function drawTileToCanvas(
@@ -147,19 +149,11 @@ function loadVaultImage(
   };
 }
 
-const TileThumbnail = ({ tile, getCachedImage }: TileThumbnailProps): VNode => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  useEffect(() => {
-    return loadVaultImage(tile.vaultPath, getCachedImage, (img) => {
-      if (canvasRef.current) drawTileToCanvas(canvasRef.current, img, THUMB_SIZE);
-    });
-  }, [tile.vaultPath]);
-
-  return (
-    <canvas ref={canvasRef} className="windrose-tile-thumb-img" width={THUMB_SIZE} height={THUMB_SIZE} />
-  );
-};
+const TileThumbnail = memo(({ url }: TileThumbnailProps): VNode => {
+  return url
+    ? <img src={url} className="windrose-tile-thumb-img" width={THUMB_SIZE} height={THUMB_SIZE} alt="" />
+    : <div className="windrose-tile-thumb-placeholder" style={{ width: THUMB_SIZE, height: THUMB_SIZE }} />;
+});
 
 // ===========================================
 // Horizontal scroller (wheel→sideways + drag)
@@ -225,29 +219,21 @@ function HScroll({ className, children }: { className?: string; children: any })
 // Loaded-brush chip thumbnail
 // ===========================================
 
-function LoadedChipThumb({ tile, getCachedImage }: { tile: TileEntry; getCachedImage?: (path: string) => HTMLImageElement | null }): VNode {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  useEffect(() => {
-    return loadVaultImage(tile.vaultPath, getCachedImage, (img) => {
-      if (canvasRef.current) drawTileToCanvas(canvasRef.current, img, 38);
-    });
-  }, [tile.vaultPath]);
-
-  return (
-    <canvas ref={canvasRef} width={38} height={38} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-  );
-}
+const LoadedChipThumb = memo(({ url }: { url: string | null }): VNode => {
+  return url
+    ? <img src={url} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+    : <div style={{ width: '100%', height: '100%' }} />;
+});
 
 // ===========================================
 // Category card with 2×2 mosaic preview
 // ===========================================
 
-function MosaicCard({ category, tiles, count, getCachedImage, onClick }: {
+function MosaicCard({ category, tiles, count, getThumbUrl, onClick }: {
   category: string;
   tiles: TileEntry[];
   count: number;
-  getCachedImage?: (path: string) => HTMLImageElement | null;
+  getThumbUrl: (path: string) => string | null;
   onClick: () => void;
 }): VNode {
   const preview = tiles.slice(0, 4);
@@ -256,7 +242,7 @@ function MosaicCard({ category, tiles, count, getCachedImage, onClick }: {
       <div className="windrose-tb-mosaic">
         {[0, 1, 2, 3].map(i => (
           <div key={i} className="windrose-tb-mosaic-cell">
-            {preview[i] != null && <TileThumbnail tile={preview[i]} getCachedImage={getCachedImage} />}
+            {preview[i] != null && <TileThumbnail url={getThumbUrl(preview[i].vaultPath)} />}
           </div>
         ))}
       </div>
@@ -308,6 +294,12 @@ interface TileAssetBrowserProps {
 }
 
 type RailSelection = 'all' | 'recent' | 'starred' | string;
+
+type FullModeRow =
+  | { type: 'recentHeader' }
+  | { type: 'tileRow'; tiles: TileEntry[] }
+  | { type: 'catHeader'; category: string; count: number; collapsed: boolean }
+  | { type: 'empty'; message: string };
 
 const ROTATION_STEPS = [0, 60, 120, 180, 240, 300];
 
@@ -361,6 +353,10 @@ const TileAssetBrowser = ({
   const [orgTagInput, setOrgTagInput] = useState('');
   const [orgShowTier, setOrgShowTier] = useState(false);
   const [tileMetadata, setTileMetadata] = useState<TileMetadataStore>({});
+  const { getThumbUrl, requestThumbs } = useThumbnailPipeline();
+  const orgScrollRef = useRef<HTMLDivElement>(null);
+  const gridWrapRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState(0);
 
   // Clamp activeTilesetIndex when tilesets shrink
   useEffect(() => {
@@ -463,6 +459,17 @@ const TileAssetBrowser = ({
     };
   }, []);
 
+  useEffect(() => {
+    const target = organize ? orgScrollRef.current : gridWrapRef.current;
+    if (!target) return;
+    const ro = new ResizeObserver(entries => {
+      const entry = entries[0];
+      if (entry) setContainerWidth(entry.contentRect.width);
+    });
+    ro.observe(target);
+    return () => ro.disconnect();
+  }, [organize]);
+
   const handleToggleCategory = (category: string): void => {
     setCollapsedCategories(prev => {
       const next = new Set(prev);
@@ -490,30 +497,43 @@ const TileAssetBrowser = ({
     void loadTileMetadata(app).then(setTileMetadata);
   }, []);
 
-  // Auto-predict depth affinity for tiles that don't have one yet
+  // Thumbnail requests are driven by virtualizer visibility — see effect after virtualizer setup
+
+  // Auto-predict depth affinity for tiles that don't have one yet (deferred to idle)
   const predictionRanRef = useRef(false);
   useEffect(() => {
     if (predictionRanRef.current) return;
     if (tilesets.length === 0) return;
-    const allTiles = tilesets.flatMap(ts => ts.tiles);
-    if (allTiles.length === 0) return;
-    const missing: Array<{ vaultPath: string; depth: TileLayerRole }> = [];
-    for (const tile of allTiles) {
-      const entry = tileMetadata[tile.vaultPath];
-      if (entry?.depthAffinity != null) continue;
-      const { tier, confidence } = predictDepthTier(tile, entry);
-      if (confidence >= 0.4) {
-        missing.push({ vaultPath: tile.vaultPath, depth: tier });
+
+    const run = (): void => {
+      if (predictionRanRef.current) return;
+      const allTiles = tilesets.flatMap(ts => ts.tiles);
+      if (allTiles.length === 0) return;
+      const missing: Array<{ vaultPath: string; depth: TileLayerRole }> = [];
+      for (const tile of allTiles) {
+        const entry = tileMetadata[tile.vaultPath];
+        if (entry?.depthAffinity != null) continue;
+        const { tier, confidence } = predictDepthTier(tile, entry);
+        if (confidence >= 0.4) {
+          missing.push({ vaultPath: tile.vaultPath, depth: tier });
+        }
       }
-    }
-    if (missing.length > 0) {
-      predictionRanRef.current = true;
-      const updated = bulkSetDepthAffinity(tileMetadata, missing);
-      setTileMetadata(updated);
-      saveTileMetadataDebounced(app, updated);
-    } else if (allTiles.some(t => tileMetadata[t.vaultPath]?.depthAffinity != null)) {
-      predictionRanRef.current = true;
-    }
+      if (missing.length > 0) {
+        predictionRanRef.current = true;
+        const updated = bulkSetDepthAffinity(tileMetadata, missing);
+        setTileMetadata(updated);
+        saveTileMetadataDebounced(app, updated);
+      } else if (allTiles.some(t => tileMetadata[t.vaultPath]?.depthAffinity != null)) {
+        predictionRanRef.current = true;
+      }
+    };
+
+    const id = typeof requestIdleCallback === 'function'
+      ? requestIdleCallback(run)
+      : setTimeout(run, 200) as unknown as number;
+    return () => {
+      typeof cancelIdleCallback === 'function' ? cancelIdleCallback(id) : clearTimeout(id);
+    };
   }, [tilesets, tileMetadata]);
 
   const allTilesFlat = useMemo((): TileEntry[] => {
@@ -671,6 +691,123 @@ const TileAssetBrowser = ({
   const secGap = compact ? 5 : 11;
   const gridStyle = { gridTemplateColumns: `repeat(auto-fill, minmax(${tileMin}px, 1fr))`, gap: gridGap };
 
+  // Virtualization: column counts and cell sizes
+  const orgColCount = organize && containerWidth > 0
+    ? Math.max(1, Math.floor((containerWidth + 6) / (52 + 6)))
+    : 1;
+  const orgCellWidth = orgColCount > 0 && containerWidth > 0
+    ? (containerWidth - (orgColCount - 1) * 6) / orgColCount
+    : 52;
+
+  const fullColCount = !compact && !organize && containerWidth > 0
+    ? Math.max(1, Math.floor((containerWidth + gridGap) / (tileMin + gridGap)))
+    : 1;
+  const fullCellWidth = fullColCount > 0 && containerWidth > 0
+    ? (containerWidth - (fullColCount - 1) * gridGap) / fullColCount
+    : tileMin;
+
+  const orgRows = useMemo((): TileEntry[][] => {
+    if (!organize || containerWidth <= 0) return [];
+    const rows: TileEntry[][] = [];
+    for (let i = 0; i < orgFilteredTiles.length; i += orgColCount) {
+      rows.push(orgFilteredTiles.slice(i, i + orgColCount));
+    }
+    return rows;
+  }, [organize, containerWidth, orgFilteredTiles, orgColCount]);
+
+  const fullRows = useMemo((): FullModeRow[] => {
+    if (compact || organize || containerWidth <= 0) return [];
+    const rows: FullModeRow[] = [];
+
+    if (railSel === 'recent' && recentTileEntries.length > 0) {
+      rows.push({ type: 'recentHeader' });
+      for (let i = 0; i < recentTileEntries.length; i += fullColCount) {
+        rows.push({ type: 'tileRow', tiles: recentTileEntries.slice(i, i + fullColCount) });
+      }
+    }
+
+    if (railSel !== 'recent') {
+      for (const [category, tiles] of shownGroups) {
+        const collapsed = collapsedCategories.has(category);
+        rows.push({ type: 'catHeader', category, count: tiles.length, collapsed });
+        if (!collapsed) {
+          for (let i = 0; i < tiles.length; i += fullColCount) {
+            rows.push({ type: 'tileRow', tiles: tiles.slice(i, i + fullColCount) });
+          }
+        }
+      }
+    }
+
+    if (filteredTiles.length === 0) {
+      rows.push({
+        type: 'empty',
+        message: searchFilter !== '' ? 'No matching tiles' : 'No tiles in this tileset',
+      });
+    }
+
+    return rows;
+  }, [compact, organize, containerWidth, railSel, recentTileEntries, shownGroups, collapsedCategories, filteredTiles.length, searchFilter, fullColCount]);
+
+  const orgVirtualizer = usePreactVirtualizer({
+    count: orgRows.length,
+    getScrollElement: () => orgScrollRef.current,
+    estimateSize: () => orgCellWidth,
+    gap: 6,
+    enabled: organize && containerWidth > 0,
+    overscan: 5,
+  });
+
+  const fullVirtualizer = usePreactVirtualizer({
+    count: fullRows.length,
+    getScrollElement: () => gridWrapRef.current,
+    estimateSize: (index: number) => {
+      const row = fullRows[index];
+      if (!row) return fullCellWidth;
+      switch (row.type) {
+        case 'catHeader':
+        case 'recentHeader':
+          return 24;
+        case 'empty':
+          return 40;
+        default:
+          return fullCellWidth;
+      }
+    },
+    gap: gridGap,
+    enabled: !compact && !organize && containerWidth > 0,
+    overscan: 5,
+  });
+
+  // Request thumbnails only for visible tiles (virtualizer-driven)
+  const orgRange = orgVirtualizer.range;
+  const fullRange = fullVirtualizer.range;
+  useEffect(() => {
+    if (tilesets.length === 0) return;
+
+    const paths: string[] = [];
+
+    if (organize) {
+      for (const v of orgVirtualizer.getVirtualItems()) {
+        const row = orgRows[v.index];
+        if (row) for (const t of row) paths.push(t.vaultPath);
+      }
+    } else if (!compact) {
+      for (const v of fullVirtualizer.getVirtualItems()) {
+        const row = fullRows[v.index];
+        if (row?.type === 'tileRow') {
+          for (const t of row.tiles) paths.push(t.vaultPath);
+        }
+      }
+    } else {
+      // Compact mode: no virtualization, request all visible tiles
+      if (activeTileset) {
+        for (const t of activeTileset.tiles) paths.push(t.vaultPath);
+      }
+    }
+
+    if (paths.length > 0) requestThumbs(paths);
+  }, [tilesets, organize, compact, orgRows, fullRows, orgRange, fullRange, activeTileset, requestThumbs]);
+
   // ---- Empty state: no tilesets ----
 
   if (tilesets.length === 0) {
@@ -748,20 +885,40 @@ const TileAssetBrowser = ({
             </span>
           </div>
 
-          <div className="windrose-tb-org-body">
-            <div className="windrose-tb-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(52px, 1fr))' }}>
-              {orgFilteredTiles.map(tile => {
-                const on = orgSelection.has(tile.vaultPath);
+          <div className="windrose-tb-org-body" ref={orgScrollRef}>
+            <div style={{ height: orgVirtualizer.getTotalSize(), position: 'relative', width: '100%' }}>
+              {orgVirtualizer.getVirtualItems().map(virtualRow => {
+                const rowTiles = orgRows[virtualRow.index];
+                if (!rowTiles) return null;
                 return (
                   <div
-                    key={tile.vaultPath}
-                    className={`windrose-tile-thumb ${on ? 'sel' : 'dim'}`}
-                    onClick={() => toggleOrgSelect(tile.vaultPath)}
-                    title={tile.filename}
+                    key={virtualRow.key}
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      height: `${virtualRow.size}px`,
+                      transform: `translateY(${virtualRow.start}px)`,
+                    }}
                   >
-                    <TileThumbnail tile={tile} getCachedImage={getCachedImage} />
-                    <div className={`windrose-tb-check ${on ? 'on' : ''}`}>
-                      {on && <Icon icon="lucide-check" size={12} />}
+                    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${orgColCount}, 1fr)`, gap: 6 }}>
+                      {rowTiles.map(tile => {
+                        const on = orgSelection.has(tile.vaultPath);
+                        return (
+                          <div
+                            key={tile.vaultPath}
+                            className={`windrose-tile-thumb ${on ? 'sel' : 'dim'}`}
+                            onClick={() => toggleOrgSelect(tile.vaultPath)}
+                            title={tile.filename}
+                          >
+                            <TileThumbnail url={getThumbUrl(tile.vaultPath)} />
+                            <div className={`windrose-tb-check ${on ? 'on' : ''}`}>
+                              {on && <Icon icon="lucide-check" size={12} />}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 );
@@ -1070,7 +1227,7 @@ const TileAssetBrowser = ({
           </div>
         )}
 
-        <div className="windrose-tb-grid-wrap">
+        <div className="windrose-tb-grid-wrap" ref={gridWrapRef}>
           {compact ? (
             openCat != null ? (
               // Compact leaf grid — drilled into a category
@@ -1087,7 +1244,7 @@ const TileAssetBrowser = ({
                         onMouseLeave={() => setHoveredTile(null)}
                         title={tile.filename}
                       >
-                        <TileThumbnail tile={tile} getCachedImage={getCachedImage} />
+                        <TileThumbnail url={getThumbUrl(tile.vaultPath)} />
                         <span className="tname">{tile.filename}</span>
                       </div>
                     );
@@ -1107,7 +1264,7 @@ const TileAssetBrowser = ({
                       category={cat}
                       tiles={tiles}
                       count={tiles.length}
-                      getCachedImage={getCachedImage}
+                      getThumbUrl={getThumbUrl}
                       onClick={() => { setOpenCat(cat); setSearchFilter(''); }}
                     />
                   ))}
@@ -1120,79 +1277,68 @@ const TileAssetBrowser = ({
               </>
             )
           ) : (
-            // Full mode — scrolling grid with optional sections
-            <>
-              {/* Recent tiles section */}
-              {railSel === 'recent' && recentTileEntries.length > 0 && (
-                <div style={{ marginBottom: secGap }}>
-                  <div className="windrose-tb-seclabel" style={{ cursor: 'default' }}>
-                    <Icon icon="lucide-clock" size={11} /> Recently used
-                  </div>
-                  <div className="windrose-tb-grid" style={gridStyle}>
-                    {recentTileEntries.map(tile => {
-                      const isSelected = selectedTilesetId === activeTileset?.id && selectedTileId === tile.id;
-                      return (
-                        <div
-                          key={tile.id}
-                          className={`windrose-tile-thumb ${isSelected ? 'sel' : ''}`}
-                          onClick={() => handleTileClick(activeTileset?.id ?? '', tile.id)}
-                          onMouseEnter={() => setHoveredTile(tile)}
-                          onMouseLeave={() => setHoveredTile(null)}
-                          title={tile.filename}
-                        >
-                          <TileThumbnail tile={tile} getCachedImage={getCachedImage} />
-                          <span className="tname">{tile.filename}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Category groups */}
-              {railSel !== 'recent' && shownGroups.map(([category, tiles]) => (
-                <div key={category} style={{ marginBottom: secGap }}>
-                  <button
-                    className="windrose-tb-seclabel"
-                    onClick={() => handleToggleCategory(category)}
+            // Full mode — virtualized grid
+            <div style={{ height: fullVirtualizer.getTotalSize(), position: 'relative', width: '100%' }}>
+              {fullVirtualizer.getVirtualItems().map(virtualRow => {
+                const row = fullRows[virtualRow.index];
+                if (!row) return null;
+                return (
+                  <div
+                    key={virtualRow.key}
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      height: `${virtualRow.size}px`,
+                      transform: `translateY(${virtualRow.start}px)`,
+                    }}
                   >
-                    <Icon
-                      icon={collapsedCategories.has(category) ? 'lucide-chevron-right' : 'lucide-chevron-down'}
-                      size={10}
-                    />
-                    {category}
-                    <span className="count">{tiles.length}</span>
-                  </button>
-
-                  {!collapsedCategories.has(category) && (
-                    <div className="windrose-tb-grid" style={gridStyle}>
-                      {tiles.map((tile: TileEntry) => {
-                        const isSelected = selectedTilesetId === activeTileset?.id && selectedTileId === tile.id;
-                        return (
-                          <div
-                            key={tile.id}
-                            className={`windrose-tile-thumb ${isSelected ? 'sel' : ''}`}
-                            onClick={() => handleTileClick(activeTileset?.id ?? '', tile.id)}
-                            onMouseEnter={() => setHoveredTile(tile)}
-                            onMouseLeave={() => setHoveredTile(null)}
-                            title={tile.filename}
-                          >
-                            <TileThumbnail tile={tile} getCachedImage={getCachedImage} />
-                            <span className="tname">{tile.filename}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              ))}
-
-              {filteredTiles.length === 0 && (
-                <div className="windrose-tb-empty">
-                  {searchFilter != null && searchFilter !== '' ? 'No matching tiles' : 'No tiles in this tileset'}
-                </div>
-              )}
-            </>
+                    {row.type === 'recentHeader' && (
+                      <div className="windrose-tb-seclabel" style={{ cursor: 'default' }}>
+                        <Icon icon="lucide-clock" size={11} /> Recently used
+                      </div>
+                    )}
+                    {row.type === 'catHeader' && (
+                      <button
+                        className="windrose-tb-seclabel"
+                        onClick={() => handleToggleCategory(row.category)}
+                      >
+                        <Icon
+                          icon={row.collapsed ? 'lucide-chevron-right' : 'lucide-chevron-down'}
+                          size={10}
+                        />
+                        {row.category}
+                        <span className="count">{row.count}</span>
+                      </button>
+                    )}
+                    {row.type === 'tileRow' && (
+                      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${fullColCount}, 1fr)`, gap: gridGap }}>
+                        {row.tiles.map((tile: TileEntry) => {
+                          const isSelected = selectedTilesetId === activeTileset?.id && selectedTileId === tile.id;
+                          return (
+                            <div
+                              key={tile.id}
+                              className={`windrose-tile-thumb ${isSelected ? 'sel' : ''}`}
+                              onClick={() => handleTileClick(activeTileset?.id ?? '', tile.id)}
+                              onMouseEnter={() => setHoveredTile(tile)}
+                              onMouseLeave={() => setHoveredTile(null)}
+                              title={tile.filename}
+                            >
+                              <TileThumbnail url={getThumbUrl(tile.vaultPath)} />
+                              <span className="tname">{tile.filename}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                    {row.type === 'empty' && (
+                      <div className="windrose-tb-empty">{row.message}</div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           )}
         </div>
       </div>
@@ -1202,7 +1348,7 @@ const TileAssetBrowser = ({
         <div className="windrose-tb-footer">
           <div className="windrose-tb-brushbar windrose-tb-brushbar-compact">
             <div className="chip-tile compact">
-              <LoadedChipThumb tile={selectedTile} getCachedImage={getCachedImage} />
+              <LoadedChipThumb url={getThumbUrl(selectedTile.vaultPath)} />
             </div>
             <button className="windrose-tb-iconbtn" title="Rotate" onClick={handleRotateCW}>
               <Icon icon="lucide-rotate-cw" size={12} />
@@ -1240,7 +1386,7 @@ const TileAssetBrowser = ({
         <div className="windrose-tb-footer">
           <div className="windrose-tb-loaded">
             <div className="chip-tile">
-              <LoadedChipThumb tile={selectedTile} getCachedImage={getCachedImage} />
+              <LoadedChipThumb url={getThumbUrl(selectedTile.vaultPath)} />
             </div>
             <div className="meta">
               <div className="n">{selectedTile.filename}</div>
