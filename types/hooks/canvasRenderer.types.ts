@@ -68,6 +68,7 @@ export interface RenderCanvasOptions {
   showCoordinates?: boolean;
   layerVisibility?: LayerVisibility | null;
   adjacentSubHexes?: AdjacentSubHexRenderData[] | null;
+  hiddenTileLayers?: Set<string>;
 }
 
 /** Main render function */

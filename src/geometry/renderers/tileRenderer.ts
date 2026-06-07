@@ -33,6 +33,7 @@ interface TileRenderOptions {
   getCachedImage?: (vaultPath: string) => HTMLImageElement | null;
   canvasWidth?: number;
   canvasHeight?: number;
+  hiddenLayers?: Set<string>;
 }
 
 // ===========================================
@@ -198,8 +199,10 @@ function renderTiles(
   const depthBuckets = new Map<string, { fill: TileAssignment[]; overlay: TileAssignment[]; freeform: TileAssignment[] }>();
   for (const d of DEPTH_ORDER) depthBuckets.set(d, { fill: [], overlay: [], freeform: [] });
 
+  const hiddenLayers = options?.hiddenLayers;
   for (const t of tiles) {
     const depth = t.depth ?? 'ground';
+    if (hiddenLayers != null && hiddenLayers.size > 0 && hiddenLayers.has(depth)) continue;
     const bucket = depthBuckets.get(depth) ?? depthBuckets.get('ground')!;
     if (t.freeform === true) bucket.freeform.push(t);
     else if (t.placement === 'overlay') bucket.overlay.push(t);

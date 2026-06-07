@@ -101,11 +101,14 @@ async function scanTilesetFolder(app: App, folderPath: string): Promise<TileEntr
       const parts = relativePath.split('/');
       const category = parts.length > 1 ? parts.slice(0, -1).join('/') : undefined;
 
+      // Auto-derive tags from subfolder path segments
+      const tags = parts.length > 1 ? parts.slice(0, -1) : undefined;
+
       const slashIdx = filePath.lastIndexOf('/');
       const filename = slashIdx >= 0 ? filePath.slice(slashIdx + 1) : filePath;
       const id = filename.slice(0, filename.lastIndexOf('.'));
 
-      tiles.push({ id, filename, vaultPath: filePath, category });
+      tiles.push({ id, filename, vaultPath: filePath, category, tags });
     }
   }
 

@@ -1,0 +1,302 @@
+/* ============================================
+   DEPTH BAR & DEPTH RIBBON
+   Tile layer depth controls for the tile browser.
+   ============================================ */
+
+/* ---- Shared eye toggle ---- */
+.windrose-db-eye {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  cursor: pointer;
+  color: var(--windrose-text-muted);
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.06);
+  }
+}
+
+/* ---- Horizontal DepthBar ---- */
+.windrose-db-wrap {
+  position: relative;
+}
+
+.windrose-db-bar {
+  display: flex;
+  align-items: stretch;
+  gap: 3px;
+  padding: 7px 9px;
+}
+
+.windrose-db-seg {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 0 0 auto;
+  padding: 6px 9px 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  overflow: hidden;
+  background: var(--windrose-bg-secondary);
+  border: 1px solid var(--windrose-border-secondary);
+  color: var(--windrose-text-muted);
+  transition: flex-grow 0.34s cubic-bezier(0.2, 0.8, 0.2, 1),
+              background 0.2s ease,
+              border-color 0.2s ease,
+              color 0.2s ease;
+
+  &:hover {
+    color: var(--windrose-text-secondary);
+    border-color: color-mix(in oklch, var(--windrose-border-secondary) 70%, white);
+  }
+
+  &.is-active {
+    flex: 1 1 auto;
+    color: var(--windrose-gold-bright);
+    border-color: var(--windrose-border-primary);
+    background: linear-gradient(180deg, oklch(0.2 0.03 75), oklch(0.14 0.02 70));
+    box-shadow: inset 0 0 0 1px oklch(0.74 0.07 75 / 0.12);
+    cursor: default;
+  }
+
+  &.is-open .windrose-db-chev {
+    transform: rotate(180deg);
+  }
+}
+
+.windrose-db-cap {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  border-radius: 3px 0 0 3px;
+  background: var(--depth-color);
+}
+
+.windrose-db-icon {
+  flex-shrink: 0;
+
+  &.is-disabled {
+    color: var(--windrose-text-disabled);
+  }
+}
+
+.windrose-db-lbl {
+  font-size: 9.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+.windrose-db-cnt {
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.85;
+}
+
+.windrose-db-chev {
+  display: inline-flex;
+  margin-left: 1px;
+  transition: transform 0.3s ease;
+  color: var(--windrose-text-muted);
+}
+
+/* ---- Compact mode (narrow block drawer) ---- */
+.windrose-db-wrap.is-compact {
+  .windrose-db-bar {
+    gap: 2px;
+    padding: 5px 6px;
+  }
+
+  .windrose-db-seg {
+    padding: 4px 6px;
+    gap: 4px;
+
+    &.is-active {
+      padding: 4px 7px 4px 10px;
+    }
+  }
+
+  .windrose-db-lbl {
+    font-size: 8.5px;
+  }
+
+  .windrose-db-cnt {
+    display: none;
+  }
+}
+
+/* ---- Fan overlay dropdown ---- */
+.windrose-db-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 18;
+}
+
+.windrose-db-fan {
+  position: absolute;
+  left: 9px;
+  right: 9px;
+  top: calc(100% - 2px);
+  z-index: 20;
+  background: var(--windrose-bg-primary);
+  border: 1px solid var(--windrose-border-primary-dark);
+  border-radius: 9px;
+  padding: 7px;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.6);
+  transform-origin: top center;
+  animation: windrose-db-fan-in 0.22s cubic-bezier(0.2, 0.85, 0.25, 1);
+}
+
+@keyframes windrose-db-fan-in {
+  from {
+    transform: translateY(-7px) scaleY(0.97);
+  }
+  to {
+    transform: none;
+  }
+}
+
+.windrose-db-fanhint {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 8px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--windrose-border-primary-dark);
+  padding: 2px 6px 6px;
+}
+
+.windrose-db-fanrow {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 8px 9px 8px 13px;
+  border: none;
+  border-radius: 7px;
+  cursor: pointer;
+  text-align: left;
+  background: transparent;
+  color: var(--windrose-text-secondary);
+  transition: background 0.14s ease;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.05);
+  }
+
+  &.is-active {
+    background: linear-gradient(90deg, oklch(0.74 0.07 75 / 0.2), oklch(0.74 0.07 75 / 0.04));
+    color: var(--windrose-gold-bright);
+  }
+
+  .windrose-db-cap {
+    top: 6px;
+    bottom: 6px;
+    border-radius: 2px;
+  }
+
+  .windrose-db-lbl {
+    font-size: 11px;
+    font-weight: 600;
+    flex: 1;
+  }
+
+  .windrose-db-cnt {
+    font-size: 10px;
+    color: var(--windrose-text-muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  &.is-off {
+    .windrose-db-lbl,
+    .windrose-db-cnt {
+      opacity: 0.45;
+    }
+  }
+}
+
+/* ---- Vertical DepthRibbon (collapsed spine) ---- */
+.windrose-dsr {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  padding: 8px 0;
+  gap: 2px;
+}
+
+.windrose-dsr-label {
+  font-size: 7.5px;
+  color: var(--windrose-text-disabled);
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding: 2px 0;
+}
+
+.windrose-dsr-row {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 9px 0;
+  cursor: pointer;
+  flex-shrink: 0;
+
+  &.is-active {
+    padding: 8px 0 9px;
+  }
+}
+
+.windrose-dsr-bar {
+  position: absolute;
+  left: 0;
+  top: 7px;
+  bottom: 7px;
+  width: 3px;
+  border-radius: 0 2px 2px 0;
+  background: var(--depth-color);
+}
+
+.windrose-dsr-icon {
+  color: var(--windrose-text-secondary);
+
+  &.is-active {
+    color: var(--windrose-gold-bright);
+  }
+}
+
+.windrose-dsr-cnt {
+  font-size: 8.5px;
+  color: var(--windrose-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.windrose-dsr-spacer {
+  flex: 1;
+  min-height: 6px;
+}
+
+/* ---- Reduced motion ---- */
+@media (prefers-reduced-motion: reduce) {
+  .windrose-db-seg,
+  .windrose-db-fan,
+  .windrose-db-chev {
+    transition: none !important;
+    animation: none !important;
+  }
+}

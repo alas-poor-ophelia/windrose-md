@@ -1,0 +1,148 @@
+/* ==========================================================================
+   Tile Drawer — expandable sidebar with fold-to-spine animation
+   Docks to the left edge of windrose-dock-right. Contains the tile browser
+   (full panel) and a depth ribbon spine (collapsed state).
+   ========================================================================== */
+
+/* Shared parent for tile drawer + dock column */
+.windrose-right-group {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+}
+
+/* Drawer container — width transitions between ribbon and full panel */
+.windrose-tile-drawer {
+  position: relative;
+  flex-shrink: 0;
+  overflow: hidden;
+  height: 100%;
+  border-left: 1.5px solid oklch(from var(--windrose-border-primary) l c h / 0.5);
+}
+
+/* Spine layer — right-pinned, always rendered underneath */
+.windrose-tile-spine-layer {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+}
+
+/* Full panel layer — right-pinned, fixed width, clips off left as drawer narrows */
+.windrose-tile-panel-layer {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+}
+
+/* The spine itself — vertical strip with expand button, depth ribbon, loaded chip */
+.windrose-tile-spine {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background:
+    linear-gradient(180deg, oklch(from var(--windrose-border-primary) l c h / 0.08), transparent 90px),
+    var(--windrose-bg-primary);
+}
+
+/* Expand button at top of spine */
+.windrose-tile-spine-expand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 34px;
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid oklch(from var(--windrose-border-primary) l c h / 0.22);
+  color: var(--windrose-gold-bright, var(--windrose-border-primary));
+  cursor: pointer;
+
+  &:hover {
+    background: oklch(from var(--windrose-border-primary) l c h / 0.14);
+  }
+
+  .is-compact & {
+    height: 30px;
+  }
+}
+
+/* Loaded-tile chip at bottom of spine */
+.windrose-tile-spine-loaded {
+  flex-shrink: 0;
+  padding: 6px;
+  border-top: 1px solid oklch(from var(--windrose-border-primary) l c h / 0.2);
+  display: flex;
+  justify-content: center;
+}
+
+.windrose-tile-spine-chip {
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid var(--windrose-border-primary);
+}
+
+/* When the full panel is showing, the spine layer is behind but invisible
+   (the panel covers it). When collapsed, only spine is interactive. */
+.windrose-tile-drawer.is-collapsed {
+  .windrose-tile-spine-layer {
+    pointer-events: auto;
+  }
+
+  .windrose-tile-panel-layer {
+    pointer-events: none;
+  }
+}
+
+.windrose-tile-drawer.is-open {
+  .windrose-tile-spine-layer {
+    pointer-events: none;
+  }
+
+  .windrose-tile-panel-layer {
+    pointer-events: auto;
+  }
+}
+
+/* Resize handle — left edge of drawer, only visible when open */
+.windrose-tile-resize-handle {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 5px;
+  cursor: col-resize;
+  z-index: 10;
+  background: transparent;
+  transition: background 0.15s ease;
+
+  &:hover,
+  .is-resizing & {
+    background: oklch(from var(--windrose-border-primary) l c h / 0.4);
+  }
+}
+
+/* Prevent text selection while dragging the resize handle */
+.windrose-tile-drawer.is-resizing {
+  user-select: none;
+}
+
+/* Ensure the tile browser fills the panel layer when inside the drawer */
+.windrose-tile-panel-layer .windrose-tile-browser {
+  width: 100%;
+  height: 100%;
+  border-left: none;
+}
+
+/* Reduced motion: disable fold transitions */
+@media (prefers-reduced-motion: reduce) {
+  .windrose-tile-drawer {
+    transition: none !important;
+  }
+
+  .windrose-tile-panel-layer {
+    transition: none !important;
+  }
+}

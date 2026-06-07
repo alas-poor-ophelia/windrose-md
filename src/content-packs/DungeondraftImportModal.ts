@@ -7,6 +7,7 @@ import type { PckArchive } from './pckParser';
 import { parsePackMetadata, parseDungeondraftTags } from './pckMetadata';
 import type { DungeondraftPackMeta } from './pckMetadata';
 import { CONTENT_PACKS_FOLDER } from './contentPackConstants';
+import { loadTileMetadata, bulkSetImportTags, saveTileMetadata } from '../persistence/tileMetadata';
 
 interface PluginLike {
 	app: App;
@@ -226,18 +227,26 @@ class DungeondraftImportModal extends Modal {
 			});
 
 			const tags = parseDungeondraftTags(this.buffer, this.archive);
-			const pathToTag = new Map<string, string>();
+			const pathToFirstTag = new Map<string, string>();
+			const pathToAllTags = new Map<string, string[]>();
 			if (tags != null) {
 				for (const [tag, paths] of Object.entries(tags.tags)) {
 					for (const p of paths) {
-						if (!pathToTag.has(p)) {
-							pathToTag.set(p, tag);
+						if (!pathToFirstTag.has(p)) {
+							pathToFirstTag.set(p, tag);
+						}
+						const existing = pathToAllTags.get(p);
+						if (existing != null) {
+							existing.push(tag);
+						} else {
+							pathToAllTags.set(p, [tag]);
 						}
 					}
 				}
 			}
 
 			const packPrefix = this.archive.files[0]?.path.match(/^res:\/\/packs\/[^/]+\//)?.[0] ?? '';
+			const importTagEntries: Array<{ vaultPath: string; tags: string[] }> = [];
 
 			for (let i = 0; i < textures.length; i++) {
 				const entry = textures[i];
@@ -245,7 +254,7 @@ class DungeondraftImportModal extends Modal {
 				const filename = entry.path.split('/').pop() ?? 'unknown';
 
 				const tagKey = relativePath;
-				const tag = pathToTag.get(tagKey);
+				const tag = pathToFirstTag.get(tagKey);
 				let destPath: string;
 				if (tag != null) {
 					const safeTag = tag.replace(/[\\:*?"<>|]/g, '_');
@@ -254,6 +263,11 @@ class DungeondraftImportModal extends Modal {
 					const parts = relativePath.split('/');
 					const category = parts.length > 2 ? parts.slice(1, -1).join('/') : parts[0] ?? 'misc';
 					destPath = basePath + '/' + category + '/' + filename;
+				}
+
+				const allTags = pathToAllTags.get(tagKey);
+				if (allTags != null && allTags.length > 0) {
+					importTagEntries.push({ vaultPath: destPath, tags: allTags });
 				}
 
 				const parentDir = destPath.substring(0, destPath.lastIndexOf('/'));
@@ -276,6 +290,13 @@ class DungeondraftImportModal extends Modal {
 				if (i % 20 === 0) {
 					await new Promise(r => setTimeout(r, 0));
 				}
+			}
+
+			if (importTagEntries.length > 0) {
+				statusText.textContent = 'Saving tag metadata...';
+				let metadata = await loadTileMetadata(this.app);
+				metadata = bulkSetImportTags(metadata, importTagEntries);
+				await saveTileMetadata(this.app, metadata);
 			}
 
 			const tilesetFolders = this.plugin.settings.tilesetFolders ?? [];

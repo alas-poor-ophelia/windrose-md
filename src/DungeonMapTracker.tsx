@@ -60,6 +60,7 @@ import { useTileBrush } from './hooks/state/useTileBrush';
 import { useThemeMode } from './hooks/state/useThemeMode';
 import { SubHexBreadcrumb } from './components/controls/SubHexBreadcrumb';
 import { TileAssetBrowser } from './components/panels/TileAssetBrowser';
+import { DrawerDock } from './components/panels/DrawerDock';
 import { RA_ICONS } from './assets/rpgAwesomeIcons';
 import { injectIconCSS } from './assets/rpgAwesomeLoader';
 import { useApp } from './context/AppContext';
@@ -192,6 +193,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   // Tile browser state (hex maps only)
   const {
     tileBrowserCollapsed, setTileBrowserCollapsed,
+    tileBrowserWidth, setTileBrowserWidth,
     selectedTilesetId,
     selectedTileId,
     tileRotation, setTileRotation,
@@ -202,6 +204,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     tileScale, setTileScale,
     brushSize, setBrushSize,
     tileDepth, setTileDepth,
+    hiddenLayers, toggleHiddenLayer,
+    recentTiles,
     handleTileSelect, handleTileDeselect,
   } = useTileBrush();
   // Use rootMapData for tileset check — tilesets are built from global settings and stored on root,
@@ -737,6 +741,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               onEdgesChange={handleEdgesChange}
               onTilesChange={handleTilesChange}
               tileImagesReady={tileImagesReady}
+              hiddenTileLayers={hiddenLayers}
               onViewStateChange={handleViewStateChange}
               onTextLabelSettingsChange={handleTextLabelSettingsChange}
               currentTool={currentTool}
@@ -901,42 +906,58 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
             )}
           </div>
 
-          {/* Tile Asset Browser (right sidebar, hex maps with tilesets only — not in full-pane, dock has it) */}
+          {/* Tile Asset Browser (right sidebar, block mode) */}
           {showTilePanel && !fullPane && (
-            <TileAssetBrowser
-              tilesets={availableTilesets}
-              selectedTilesetId={selectedTilesetId}
-              selectedTileId={selectedTileId}
-              onTileSelect={handleTileSelect}
-              onTileDeselect={handleTileDeselect}
-              onToolChange={setCurrentTool}
-              isCollapsed={tileBrowserCollapsed}
-              onCollapseChange={setTileBrowserCollapsed}
-              rotation={tileRotation}
-              flipH={tileFlipH}
-              onRotationChange={setTileRotation}
-              onFlipChange={setTileFlipH}
-              tileLayer={tileLayer}
-              onTileLayerChange={setTileLayer}
-              tileDepth={tileDepth}
-              onTileDepthChange={setTileDepth}
-              mapType={mapData?.mapType}
-              tileFitMode={tileFitMode}
-              onTileFitModeChange={setTileFitMode}
-              stampMode={stampMode}
-              onStampModeChange={setStampMode}
-              tileScale={tileScale}
-              onTileScaleChange={setTileScale}
-              getCachedImage={getCachedImage}
-              tilesetOverrides={mapData?.tilesetOverrides}
-              onTilesetOverrideChange={(tilesetId: string, overrides: TilesetOverrides) => {
-                updateMapData((prev: MapData) => ({
-                  ...prev,
-                  tilesetOverrides: { ...prev.tilesetOverrides, [tilesetId]: overrides },
-                }));
-              }}
-              onSettingsClick={handleSettingsClick}
-            />
+            <DrawerDock
+              open={!tileBrowserCollapsed}
+              onCollapse={() => setTileBrowserCollapsed(true)}
+              onExpand={() => setTileBrowserCollapsed(false)}
+              drawerWidth={240}
+              ribbonWidth={46}
+              fold
+              compact
+              depth={tileDepth}
+              onDepthChange={setTileDepth}
+              hidden={hiddenLayers}
+              onToggleHide={toggleHiddenLayer}
+            >
+              <TileAssetBrowser
+                tilesets={availableTilesets}
+                selectedTilesetId={selectedTilesetId}
+                selectedTileId={selectedTileId}
+                onTileSelect={handleTileSelect}
+                onTileDeselect={handleTileDeselect}
+                onToolChange={setCurrentTool}
+                onCollapse={() => setTileBrowserCollapsed(true)}
+                rotation={tileRotation}
+                flipH={tileFlipH}
+                onRotationChange={setTileRotation}
+                onFlipChange={setTileFlipH}
+                tileLayer={tileLayer}
+                onTileLayerChange={setTileLayer}
+                tileDepth={tileDepth}
+                onTileDepthChange={setTileDepth}
+                hidden={hiddenLayers}
+                onToggleHide={toggleHiddenLayer}
+                mapType={mapData?.mapType}
+                tileFitMode={tileFitMode}
+                onTileFitModeChange={setTileFitMode}
+                stampMode={stampMode}
+                onStampModeChange={setStampMode}
+                tileScale={tileScale}
+                onTileScaleChange={setTileScale}
+                getCachedImage={getCachedImage}
+                tilesetOverrides={mapData?.tilesetOverrides}
+                onTilesetOverrideChange={(tilesetId: string, overrides: TilesetOverrides) => {
+                  updateMapData((prev: MapData) => ({
+                    ...prev,
+                    tilesetOverrides: { ...prev.tilesetOverrides, [tilesetId]: overrides },
+                  }));
+                }}
+                compact
+                recentTiles={recentTiles}
+              />
+            </DrawerDock>
           )}
 
           {/* Floating panels (portalled, render anywhere) */}
@@ -1084,8 +1105,6 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 onTileSelect={handleTileSelect}
                 onTileDeselect={handleTileDeselect}
                 onToolChange={setCurrentTool}
-                isCollapsed={false}
-                onCollapseChange={() => {}}
                 rotation={tileRotation}
                 flipH={tileFlipH}
                 onRotationChange={setTileRotation}
@@ -1094,6 +1113,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 onTileLayerChange={setTileLayer}
                 tileDepth={tileDepth}
                 onTileDepthChange={setTileDepth}
+                hidden={hiddenLayers}
+                onToggleHide={toggleHiddenLayer}
                 mapType={mapData?.mapType}
                 tileFitMode={tileFitMode}
                 onTileFitModeChange={setTileFitMode}
@@ -1109,68 +1130,31 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                     tilesetOverrides: { ...prev.tilesetOverrides, [tilesetId]: overrides },
                   }));
                 }}
-                onSettingsClick={handleSettingsClick}
+                recentTiles={recentTiles}
               />
             </FloatingPanel>
           )}
 
-          {/* Right Dock Panel Column (full-pane mode only) */}
+          {/* Right group: Tile Drawer + Dock Panel Column (full-pane mode only) */}
           {fullPane && (
-            <div className="windrose-dock-right">
-              {!isFloating('layers') && (
-                <DockPanel title="Layers" onUndock={(pos) => toggleFloat('layers', pos)}>
-                  <DockLayerList
-                    mapData={mapData}
-                    onLayerSelect={handleLayerSelect}
-                    onLayerAdd={handleLayerAdd}
-                    onLayerDelete={handleLayerDelete}
-                    onLayerReorder={handleLayerReorder}
-                    onToggleShowLayerBelow={handleToggleShowLayerBelow}
-                    onSetLayerBelowOpacity={handleSetLayerBelowOpacity}
-                    onEditLayer={setEditingLayerId}
-                    onLayerClone={handleCloneLayerRequest}
-                  />
-                </DockPanel>
-              )}
-              {!isFloating('colorPicker') && (
-                <DockPanel title="Colors" onUndock={(pos) => toggleFloat('colorPicker', pos)}>
-                  <ColorPicker
-                    isOpen
-                    floatingMode
-                    selectedColor={selectedColor}
-                    onColorSelect={setSelectedColor}
-                    onClose={() => {}}
-                    onReset={() => setSelectedColor(DEFAULT_COLOR)}
-                    customColors={mapData.customColors ?? []}
-                    paletteColorOpacityOverrides={mapData.paletteColorOpacityOverrides || {}}
-                    onAddCustomColor={handleAddCustomColor}
-                    onDeleteCustomColor={handleDeleteCustomColor}
-                    onUpdateColorOpacity={handleUpdateColorOpacity}
-                    opacity={selectedOpacity}
-                    onOpacityChange={handleOpacityChange}
-                  />
-                </DockPanel>
-              )}
-              {!isFloating('view') && (
-                <DockPanel title="View" defaultCollapsed onUndock={(pos) => toggleFloat('view', pos)}>
-                  <DockViewPanel
-                    currentZoom={mapData.viewState?.zoom ?? 1}
-                    onZoomIn={handleZoomIn}
-                    onZoomOut={handleZoomOut}
-                    layerVisibility={layerVisibility}
-                    onToggleLayer={handleToggleLayerVisibility}
-                    mapType={mapData.mapType}
-                    onSettingsClick={handleSettingsClick}
-                    fogOfWarState={currentFogState}
-                    onFogToolSelect={handleFogToolSelect}
-                    onFogVisibilityToggle={handleFogVisibilityToggle}
-                    onFogFillAll={handleFogFillAll}
-                    onFogClearAll={handleFogClearAll}
-                  />
-                </DockPanel>
-              )}
+            <div className="windrose-right-group">
               {showTilePanel && !isFloating('tiles') && (
-                <DockPanel title="Tiles" flexFill defaultCollapsed onUndock={(pos) => toggleFloat('tiles', pos)}>
+                <DrawerDock
+                  open={!tileBrowserCollapsed}
+                  onCollapse={() => setTileBrowserCollapsed(true)}
+                  onExpand={() => setTileBrowserCollapsed(false)}
+                  drawerWidth={tileBrowserWidth}
+                  onWidthChange={setTileBrowserWidth}
+                  minWidth={180}
+                  maxWidth={392}
+                  ribbonWidth={54}
+                  fold
+                  compact={false}
+                  depth={tileDepth}
+                  onDepthChange={setTileDepth}
+                  hidden={hiddenLayers}
+                  onToggleHide={toggleHiddenLayer}
+                >
                   <TileAssetBrowser
                     tilesets={availableTilesets}
                     selectedTilesetId={selectedTilesetId}
@@ -1178,8 +1162,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                     onTileSelect={handleTileSelect}
                     onTileDeselect={handleTileDeselect}
                     onToolChange={setCurrentTool}
-                    isCollapsed={false}
-                    onCollapseChange={() => {}}
+                    onCollapse={() => setTileBrowserCollapsed(true)}
                     rotation={tileRotation}
                     flipH={tileFlipH}
                     onRotationChange={setTileRotation}
@@ -1188,6 +1171,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                     onTileLayerChange={setTileLayer}
                     tileDepth={tileDepth}
                     onTileDepthChange={setTileDepth}
+                    hidden={hiddenLayers}
+                    onToggleHide={toggleHiddenLayer}
                     mapType={mapData?.mapType}
                     tileFitMode={tileFitMode}
                     onTileFitModeChange={setTileFitMode}
@@ -1203,10 +1188,65 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                         tilesetOverrides: { ...prev.tilesetOverrides, [tilesetId]: overrides },
                       }));
                     }}
-                    onSettingsClick={handleSettingsClick}
+                    showRail
+                    recentTiles={recentTiles}
                   />
-                </DockPanel>
+                </DrawerDock>
               )}
+              <div className="windrose-dock-right">
+                {!isFloating('layers') && (
+                  <DockPanel title="Layers" onUndock={(pos) => toggleFloat('layers', pos)}>
+                    <DockLayerList
+                      mapData={mapData}
+                      onLayerSelect={handleLayerSelect}
+                      onLayerAdd={handleLayerAdd}
+                      onLayerDelete={handleLayerDelete}
+                      onLayerReorder={handleLayerReorder}
+                      onToggleShowLayerBelow={handleToggleShowLayerBelow}
+                      onSetLayerBelowOpacity={handleSetLayerBelowOpacity}
+                      onEditLayer={setEditingLayerId}
+                      onLayerClone={handleCloneLayerRequest}
+                    />
+                  </DockPanel>
+                )}
+                {!isFloating('colorPicker') && (
+                  <DockPanel title="Colors" onUndock={(pos) => toggleFloat('colorPicker', pos)}>
+                    <ColorPicker
+                      isOpen
+                      floatingMode
+                      selectedColor={selectedColor}
+                      onColorSelect={setSelectedColor}
+                      onClose={() => {}}
+                      onReset={() => setSelectedColor(DEFAULT_COLOR)}
+                      customColors={mapData.customColors ?? []}
+                      paletteColorOpacityOverrides={mapData.paletteColorOpacityOverrides || {}}
+                      onAddCustomColor={handleAddCustomColor}
+                      onDeleteCustomColor={handleDeleteCustomColor}
+                      onUpdateColorOpacity={handleUpdateColorOpacity}
+                      opacity={selectedOpacity}
+                      onOpacityChange={handleOpacityChange}
+                    />
+                  </DockPanel>
+                )}
+                {!isFloating('view') && (
+                  <DockPanel title="View" defaultCollapsed onUndock={(pos) => toggleFloat('view', pos)}>
+                    <DockViewPanel
+                      currentZoom={mapData.viewState?.zoom ?? 1}
+                      onZoomIn={handleZoomIn}
+                      onZoomOut={handleZoomOut}
+                      layerVisibility={layerVisibility}
+                      onToggleLayer={handleToggleLayerVisibility}
+                      mapType={mapData.mapType}
+                      onSettingsClick={handleSettingsClick}
+                      fogOfWarState={currentFogState}
+                      onFogToolSelect={handleFogToolSelect}
+                      onFogVisibilityToggle={handleFogVisibilityToggle}
+                      onFogFillAll={handleFogFillAll}
+                      onFogClearAll={handleFogClearAll}
+                    />
+                  </DockPanel>
+                )}
+              </div>
             </div>
           )}
         </div>

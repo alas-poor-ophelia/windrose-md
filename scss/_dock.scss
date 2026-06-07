@@ -606,22 +606,6 @@
    Dock Tile Browser overrides (strip standalone sidebar chrome)
    ========================================================================== */
 :is(.windrose-dock-right, .windrose-floating-panel-content) .windrose-tile-browser {
-  width: auto;
-  height: auto;
   border-left: none;
-  background-color: transparent;
   flex-shrink: 1;
-
-  .windrose-tile-browser-header {
-    display: none;
-  }
-
-  .windrose-tile-browser-grid {
-    grid-template-columns: repeat(3, 1fr);
-  }
-
-  .windrose-tile-thumb {
-    width: auto;
-    height: auto;
-  }
 }

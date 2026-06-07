@@ -70,6 +70,12 @@ body {
   --windrose-error: var(--color-red);
   --windrose-success: var(--windrose-accent-blue);
   --windrose-transition: all 0.15s ease;
+  --windrose-depth-ground: #c4a57b;
+  --windrose-depth-structure: #7c93b8;
+  --windrose-depth-props: #c08a6a;
+  --windrose-depth-decoration: #86b87c;
+  --windrose-gold-bright: oklch(0.82 0.09 75);
+  --windrose-gold-glow: oklch(0.74 0.07 75 / 0.35);
 }
 
 /* ============================================
@@ -1134,282 +1140,160 @@ button.windrose-object-grid-item:hover,
 }
 
 /* ============================================
-   TILE ASSET BROWSER (right sidebar)
+   TILE ASSET BROWSER — full drawer content
+   Redesigned panel: header → depth band → filter →
+   tag chips → body (rail + grid) → loaded-brush footer
    ============================================ */
+/* Root panel — flex column, fills parent */
 .windrose-tile-browser {
-  width: 180px;
+  position: relative;
   display: flex;
   flex-direction: column;
-  background-color: var(--windrose-bg-primary);
-  border-left: 2px solid var(--windrose-border-primary);
-  transition: all 0.3s ease;
-  overflow: hidden;
-  flex-shrink: 0;
   height: 100%;
+  background: linear-gradient(180deg, oklch(from var(--windrose-border-primary) l c h/0.04), transparent 120px), var(--windrose-bg-primary);
+  overflow: hidden;
   box-sizing: border-box;
 }
-.windrose-tile-browser.windrose-tile-browser-collapsed {
-  width: 0;
-  border-left: none;
-  overflow: visible;
-  position: relative;
-}
-.windrose-tile-browser-toggle,
-.is-tablet .windrose-tile-browser-toggle {
+
+/* ---- Corner brackets ---- */
+.windrose-tb-bracket {
   position: absolute;
-  right: 0;
-  top: 130px;
-  width: 28px;
-  height: 28px;
-  min-width: 28px;
-  min-height: 28px;
-  max-width: 28px;
-  max-height: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: var(--windrose-bg-secondary);
-  color: var(--windrose-text-secondary);
-  border: 1.5px solid var(--windrose-border-primary);
-  border-radius: 6px 0 0 6px;
-  cursor: pointer;
-  z-index: 200;
-  box-shadow: -2px 2px 6px oklch(0% 0 0deg / 0.4), 0 0 12px oklch(from var(--windrose-border-primary) l c h/0.15);
-  transition: var(--windrose-transition);
-  padding: 0;
+  width: 15px;
+  height: 15px;
+  pointer-events: none;
+  z-index: 6;
+  opacity: 0.42;
 }
-.windrose-tile-browser-toggle:hover,
-.is-tablet .windrose-tile-browser-toggle:hover {
-  background-color: var(--windrose-bg-tertiary);
-  color: var(--windrose-text-primary);
+.windrose-tb-bracket svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.windrose-tb-bracket-tl {
+  top: 5px;
+  left: 5px;
+}
+.windrose-tb-bracket-tr {
+  top: 5px;
+  right: 5px;
+  transform: scaleX(-1);
+}
+.windrose-tb-bracket-bl {
+  bottom: 5px;
+  left: 5px;
+  transform: scaleY(-1);
+}
+.windrose-tb-bracket-br {
+  bottom: 5px;
+  right: 5px;
+  transform: scale(-1, -1);
 }
 
-.windrose-tile-browser-header {
-  text-wrap: balance;
+/* ---- Header ---- */
+.windrose-tb-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 6px 8px;
-  font-size: 10pt;
-  font-weight: bold;
-  color: var(--windrose-text-primary);
-  background: var(--windrose-bg-secondary);
-  border-bottom: 1px solid var(--windrose-border-secondary);
+  gap: 8px;
+  padding: 7px 12px;
+  background: linear-gradient(180deg, oklch(from var(--windrose-border-primary) l c h/0.14), oklch(from var(--windrose-border-primary) l c h/0.05));
+  border-bottom: 1px solid oklch(from var(--windrose-border-primary) l c h/0.26);
   flex-shrink: 0;
 }
-.windrose-tile-browser-tileset-selector {
-  padding: 4px 6px;
+
+.windrose-tb-title {
+  font-family: "Cinzel", serif;
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.05em;
+  color: var(--windrose-gold-bright);
+  text-shadow: 0 1px 1px oklch(0% 0 0deg / 0.45);
+}
+
+.windrose-tb-cap {
+  font-size: 10px;
+  color: var(--windrose-text-muted);
+}
+
+/* ---- Icon buttons ---- */
+.windrose-tb-iconbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  background: var(--windrose-bg-secondary);
+  border: 1px solid var(--windrose-border-secondary);
+  border-radius: 4px;
+  color: var(--windrose-text-secondary);
+  cursor: pointer;
+  transition: all 0.13s ease;
+  padding: 0;
+}
+.windrose-tb-iconbtn:hover {
+  background: var(--windrose-bg-tertiary);
+  color: var(--windrose-text-primary);
+  border-color: oklch(38% 0 0deg);
+}
+.windrose-tb-iconbtn.ghost {
+  background: transparent;
+  border-color: transparent;
+}
+.windrose-tb-iconbtn.ghost:hover {
+  background: oklch(from var(--windrose-border-primary) l c h/0.14);
+  color: var(--windrose-gold-bright);
+}
+.windrose-tb-iconbtn.active {
+  background: var(--windrose-border-primary);
+  color: oklch(15% 0.02 75deg);
+  border-color: var(--windrose-gold-bright);
+  box-shadow: 0 0 8px var(--windrose-gold-glow);
+}
+
+/* ---- Depth band ---- */
+.windrose-tb-band {
+  position: relative;
+  background: linear-gradient(180deg, oklch(from var(--windrose-border-primary) l c h/0.07), oklch(0% 0 0deg / 0.06));
+  border-bottom: 1px solid oklch(from var(--windrose-border-primary) l c h/0.2);
+  flex-shrink: 0;
+}
+
+/* ---- Tileset selector ---- */
+.windrose-tb-tileset {
+  padding: 4px 10px;
   border-bottom: 1px solid var(--windrose-border-secondary);
   flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: 4px;
 }
-.windrose-tile-browser-tileset-name {
+
+.windrose-tb-tileset-select {
+  flex: 1;
+  min-width: 0;
+  background: var(--windrose-bg-secondary);
+  color: var(--windrose-text-primary);
+  border: 1px solid var(--windrose-border-secondary);
+  border-radius: 3px;
+  padding: 3px 4px;
+  font-size: 11px;
+}
+
+.windrose-tb-tileset-name {
   flex: 1;
   font-size: 12px;
-  color: var(--text-muted);
+  color: var(--windrose-text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.windrose-tile-browser-config-btn {
-  flex-shrink: 0;
-}
-.windrose-tile-browser-config {
+
+/* ---- Tileset config panel ---- */
+.windrose-tb-config {
   padding: 6px 8px;
   border-bottom: 1px solid var(--windrose-border-secondary);
-  background: var(--background-secondary-alt);
+  background: var(--windrose-bg-secondary);
   flex-shrink: 0;
-}
-.windrose-tile-browser-select {
-  flex: 1;
-  min-width: 0;
-  background: var(--windrose-bg-secondary);
-  color: var(--windrose-text-primary);
-  border: 1px solid var(--windrose-border-secondary);
-  border-radius: 3px;
-  padding: 3px 4px;
-  font-size: 11px;
-}
-.windrose-tile-browser-search {
-  padding: 4px 6px;
-  border-bottom: 1px solid var(--windrose-border-secondary);
-  flex-shrink: 0;
-}
-.windrose-tile-browser-search-input {
-  width: 100%;
-  background: var(--windrose-bg-secondary);
-  color: var(--windrose-text-primary);
-  border: 1px solid var(--windrose-border-secondary);
-  border-radius: 3px;
-  padding: 4px 6px;
-  font-size: 11px;
-  box-sizing: border-box;
-}
-.windrose-tile-browser-search-input::placeholder {
-  color: var(--windrose-text-muted);
-}
-.windrose-tile-browser-search-input:focus {
-  outline: none;
-  border-color: var(--windrose-border-primary);
-}
-.windrose-tile-browser-content {
-  flex: 1;
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding: 4px 6px;
-  scrollbar-width: thin;
-  scrollbar-color: var(--windrose-bg-tertiary) transparent;
-  overscroll-behavior: contain;
-}
-.windrose-tile-browser-category-label,
-.is-tablet .windrose-tile-browser-category-label {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  width: 100%;
-  padding: 3px 4px;
-  min-height: unset;
-  max-height: unset;
-  background: none;
-  border: none;
-  color: var(--windrose-text-muted);
-  font-size: 9px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  cursor: pointer;
-}
-.windrose-tile-browser-category-label:hover,
-.is-tablet .windrose-tile-browser-category-label:hover {
-  color: var(--windrose-text-secondary);
-}
-
-.windrose-tile-browser-category-count {
-  margin-left: auto;
-  font-size: 8px;
-  color: var(--windrose-text-disabled);
-}
-.windrose-tile-browser-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 3px;
-  padding: 3px 0;
-}
-.windrose-tile-browser-empty {
-  padding: clamp(1rem, 1.5vw, 1.25rem) clamp(0.5rem, 1vw, 0.75rem);
-  text-align: center;
-  color: var(--windrose-text-muted);
-  font-size: 11px;
-}
-.windrose-tile-browser-footer {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  padding: 6px;
-  background: var(--windrose-bg-secondary);
-  border-top: 1px solid var(--windrose-border-secondary);
-  flex-shrink: 0;
-  flex-wrap: wrap;
-}
-.windrose-tile-browser-scale-row {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 8px;
-  background: var(--windrose-bg-secondary);
-  border-top: 1px solid var(--windrose-border-secondary);
-  flex-shrink: 0;
-  color: var(--windrose-text-muted);
-  font-size: 11px;
-}
-.windrose-tile-browser-scale-row .windrose-tile-config-slider {
-  flex: 1;
-}
-.windrose-tile-browser-action-btn,
-.is-tablet .windrose-tile-browser-action-btn {
-  width: 28px;
-  height: 28px;
-  min-width: 28px;
-  min-height: 28px;
-  max-width: 28px;
-  max-height: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--windrose-bg-secondary);
-  color: var(--windrose-text-secondary);
-  border: 1px solid var(--windrose-border-secondary);
-  border-radius: 3px;
-  cursor: pointer;
-  padding: 0;
-  transition: var(--windrose-transition);
-}
-.windrose-tile-browser-action-btn:hover,
-.is-tablet .windrose-tile-browser-action-btn:hover {
-  background: var(--windrose-bg-tertiary);
-  color: var(--windrose-text-primary);
-}
-
-.windrose-tile-browser-action-active.windrose-tile-browser-action-active,
-.windrose-tile-browser-action-active.windrose-tile-browser-action-active:hover {
-  background: var(--windrose-border-primary);
-  color: var(--windrose-bg-primary);
-  border-color: var(--windrose-border-primary);
-}
-
-.windrose-tile-browser-rotation-label {
-  font-size: 10px;
-  color: var(--windrose-text-muted);
-  min-width: 28px;
-  text-align: center;
-}
-.windrose-tile-browser-layer-toggle {
-  display: flex;
-  gap: 1px;
-  background: var(--windrose-border-secondary);
-  border-radius: 4px;
-  overflow: hidden;
-}
-button.windrose-tile-browser-layer-btn,
-.is-tablet button.windrose-tile-browser-layer-btn {
-  background: transparent;
-  border: none;
-  color: var(--windrose-text-muted);
-  font-size: 9px;
-  padding: 2px 6px;
-  width: auto;
-  height: auto;
-  min-width: 0;
-  min-height: 0;
-  max-width: none;
-  max-height: none;
-  cursor: pointer;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  box-shadow: none;
-}
-
-.windrose-tile-browser-layer-btn:hover {
-  color: var(--windrose-text-primary);
-  background: oklch(100% 0 0deg / 0.1);
-}
-button.windrose-tile-browser-layer-btn.windrose-tile-browser-layer-active,
-.is-tablet button.windrose-tile-browser-layer-btn.windrose-tile-browser-layer-active {
-  background: var(--windrose-border-primary);
-  color: var(--windrose-bg-primary);
-}
-
-button.windrose-tile-browser-config-btn,
-.is-tablet button.windrose-tile-browser-config-btn {
-  width: 28px;
-  height: 28px;
-  min-width: 28px;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 
 .windrose-tile-config-row {
@@ -1424,7 +1308,7 @@ button.windrose-tile-browser-config-btn,
 }
 .windrose-tile-config-row label {
   flex-shrink: 0;
-  color: var(--text-muted);
+  color: var(--windrose-text-muted);
 }
 .windrose-tile-config-slider {
   flex-basis: 100%;
@@ -1435,7 +1319,7 @@ button.windrose-tile-browser-config-btn,
   flex-shrink: 0;
   margin-left: auto;
   text-align: right;
-  color: var(--text-muted);
+  color: var(--windrose-text-muted);
   font-variant-numeric: tabular-nums;
 }
 .windrose-tile-config-select {
@@ -1445,35 +1329,255 @@ button.windrose-tile-browser-config-btn,
   font-size: 11px;
 }
 
-.windrose-tile-thumb,
-.is-tablet .windrose-tile-thumb {
-  aspect-ratio: 1;
+/* ---- Filter ---- */
+.windrose-tb-filter {
   display: flex;
+  gap: 6px;
   align-items: center;
-  justify-content: center;
-  background: var(--windrose-bg-secondary);
-  border: 1.5px solid var(--windrose-border-secondary);
-  border-radius: 3px;
-  cursor: pointer;
-  padding: 2px;
-  overflow: hidden;
-  min-width: unset;
-  min-height: unset;
-  max-width: unset;
-  max-height: unset;
-  transition: var(--windrose-transition);
-}
-.windrose-tile-thumb:hover,
-.is-tablet .windrose-tile-thumb:hover {
-  border-color: var(--windrose-text-muted);
-  background: var(--windrose-bg-tertiary);
+  padding: 9px 10px 7px;
+  flex-shrink: 0;
 }
 
-.windrose-tile-thumb-selected.windrose-tile-thumb-selected,
-.windrose-tile-thumb-selected.windrose-tile-thumb-selected:hover {
+.windrose-tb-search {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex: 1;
+  background: oklch(from var(--windrose-bg-primary) calc(l + 0.04) c h);
+  border: 1px solid var(--windrose-border-secondary);
+  border-radius: 4px;
+  padding: 6px 9px;
+  color: var(--windrose-text-muted);
+}
+.windrose-tb-search:focus-within {
+  border-color: var(--windrose-border-primary-dark);
+  box-shadow: 0 0 0 1px oklch(from var(--windrose-border-primary) l c h/0.2);
+}
+.windrose-tb-search input {
+  flex: 1;
+  min-width: 0;
+  background: none;
+  border: none;
+  outline: none;
+  color: var(--windrose-text-primary);
+  font-size: 12.5px;
+}
+.windrose-tb-search input::placeholder {
+  color: var(--windrose-text-muted);
+}
+
+/* ---- Tag chips ---- */
+.windrose-tb-chips {
+  padding: 0 10px 8px;
+  flex-shrink: 0;
+}
+
+.windrose-tb-chips-scroll {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 5px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  touch-action: pan-x;
+}
+.windrose-tb-chips-scroll::-webkit-scrollbar {
+  display: none;
+  height: 0;
+  width: 0;
+}
+
+.windrose-tb-chip {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  background: var(--windrose-bg-secondary);
+  border: 1px solid var(--windrose-border-secondary);
+  border-radius: 999px;
+  color: var(--windrose-text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.12s ease;
+  white-space: nowrap;
+}
+.windrose-tb-chip:hover {
+  border-color: var(--windrose-border-primary-dark);
+  color: var(--windrose-text-primary);
+}
+.windrose-tb-chip.active {
+  background: oklch(from var(--windrose-border-primary) l c h/0.18);
   border-color: var(--windrose-border-primary);
-  box-shadow: 0 0 6px oklch(from var(--windrose-border-primary) l c h/0.4);
-  background: oklch(from var(--windrose-border-primary) l c h/0.1);
+  color: var(--windrose-gold-bright);
+}
+.windrose-tb-chip .x {
+  opacity: 0.7;
+}
+
+/* ---- Body (rail + grid) ---- */
+.windrose-tb-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+/* ---- Jump rail ---- */
+.windrose-tb-rail {
+  width: 104px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 7px;
+  background: oklch(from var(--windrose-bg-primary) calc(l + 0.02) c h);
+  border-right: 1px solid oklch(from var(--windrose-border-primary) l c h/0.14);
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.windrose-tb-rail::-webkit-scrollbar {
+  display: none;
+}
+
+.windrose-tb-railbtn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 8px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--windrose-text-muted);
+  cursor: pointer;
+  font-size: 10.5px;
+  text-align: left;
+  transition: background 0.12s ease, color 0.12s ease;
+  width: 100%;
+}
+.windrose-tb-railbtn:hover {
+  background: oklch(100% 0 0deg / 0.04);
+  color: var(--windrose-text-secondary);
+}
+.windrose-tb-railbtn.on {
+  background: linear-gradient(90deg, oklch(from var(--windrose-border-primary) l c h/0.2), oklch(from var(--windrose-border-primary) l c h/0.03));
+  color: var(--windrose-gold-bright);
+  box-shadow: inset 2px 0 0 var(--windrose-border-primary);
+}
+.windrose-tb-railbtn .c {
+  margin-left: auto;
+  font-size: 9px;
+  color: var(--windrose-text-disabled);
+  font-variant-numeric: tabular-nums;
+}
+
+.windrose-tb-raildiv {
+  height: 1px;
+  background: var(--windrose-border-secondary);
+  margin: 6px 4px;
+}
+
+.windrose-tb-raillabel {
+  font-size: 8px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--windrose-border-primary-dark);
+  padding: 4px 8px 3px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* ---- Grid wrap ---- */
+.windrose-tb-grid-wrap {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  padding: 8px 10px 12px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--windrose-bg-tertiary) transparent;
+  overscroll-behavior: contain;
+}
+
+/* ---- Section labels ---- */
+.windrose-tb-seclabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 4px 2px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--windrose-text-muted);
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+.windrose-tb-seclabel:hover {
+  color: var(--windrose-text-secondary);
+}
+.windrose-tb-seclabel .count {
+  margin-left: auto;
+  font-size: 9px;
+  color: var(--windrose-text-disabled);
+  background: oklch(from var(--windrose-bg-primary) calc(l + 0.04) c h);
+  padding: 1px 6px;
+  border-radius: 999px;
+}
+
+/* ---- Tile grid ---- */
+.windrose-tb-grid {
+  display: grid;
+  gap: 6px;
+}
+
+/* ---- Tile thumbnails ---- */
+.windrose-tile-thumb {
+  position: relative;
+  aspect-ratio: 1;
+  background: var(--windrose-bg-secondary);
+  border: 1.5px solid var(--windrose-border-secondary);
+  border-radius: 4px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color 0.12s ease, transform 0.08s ease, box-shadow 0.12s ease;
+}
+.windrose-tile-thumb:hover {
+  border-color: var(--windrose-border-primary-dark);
+  transform: translateY(-1px);
+}
+.windrose-tile-thumb .tname {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 6px 4px 3px;
+  font-size: 8.5px;
+  line-height: 1.1;
+  color: oklch(92% 0 0deg);
+  background: linear-gradient(0deg, oklch(0% 0 0deg / 0.78), transparent);
+  opacity: 0;
+  transition: opacity 0.12s ease;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.windrose-tile-thumb:hover .tname, .windrose-tile-thumb.sel .tname {
+  opacity: 1;
+}
+.windrose-tile-thumb .fav {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  color: var(--windrose-gold-bright);
+  filter: drop-shadow(0 1px 1px oklch(0% 0 0deg / 0.7));
+}
+
+.windrose-tile-thumb.sel {
+  border-color: var(--windrose-border-primary);
+  box-shadow: 0 0 0 1px var(--windrose-border-primary), 0 0 10px var(--windrose-gold-glow);
 }
 
 .windrose-tile-thumb-img {
@@ -1483,6 +1587,101 @@ button.windrose-tile-browser-config-btn,
   image-rendering: pixelated;
 }
 
+/* ---- Loaded-brush footer ---- */
+.windrose-tb-footer {
+  flex-shrink: 0;
+  border-top: 1px solid oklch(from var(--windrose-border-primary) l c h/0.24);
+  background: linear-gradient(180deg, oklch(from var(--windrose-border-primary) l c h/0.08), oklch(0% 0 0deg / 0.14));
+}
+
+.windrose-tb-loaded {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 9px 10px 7px;
+}
+.windrose-tb-loaded .chip-tile {
+  width: 38px;
+  height: 38px;
+  border-radius: 4px;
+  overflow: hidden;
+  flex-shrink: 0;
+  border: 1px solid var(--windrose-border-primary);
+}
+.windrose-tb-loaded .meta {
+  flex: 1;
+  min-width: 0;
+}
+.windrose-tb-loaded .meta .n {
+  font-size: 12px;
+  color: var(--windrose-text-primary);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.windrose-tb-loaded .meta .s {
+  font-size: 10px;
+  color: var(--windrose-text-muted);
+}
+
+.windrose-tb-brushbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 8px 10px;
+  border-top: 1px solid var(--windrose-border-secondary);
+  flex-shrink: 0;
+}
+.windrose-tb-brushbar .sep {
+  width: 1px;
+  height: 20px;
+  background: var(--windrose-border-secondary);
+  margin: 0 2px;
+}
+.windrose-tb-brushbar .label {
+  font-size: 10px;
+  color: var(--windrose-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* ---- Range slider ---- */
+.windrose-tb-range {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 3px;
+  background: oklch(25% 0 0deg);
+  outline: none;
+  accent-color: var(--windrose-border-primary);
+  min-width: 0;
+}
+.windrose-tb-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: linear-gradient(180deg, var(--windrose-gold-bright), var(--windrose-border-primary));
+  border: 1px solid var(--windrose-border-primary-dark);
+  cursor: pointer;
+}
+.windrose-tb-range::-moz-range-thumb {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: var(--windrose-border-primary);
+  border: 1px solid var(--windrose-border-primary-dark);
+  cursor: pointer;
+}
+.windrose-tb-range::-moz-range-track {
+  height: 4px;
+  border-radius: 3px;
+  background: oklch(25% 0 0deg);
+}
+
+/* ---- Hover preview portal ---- */
 .windrose-tile-preview-portal {
   position: fixed;
   display: none;
@@ -1494,6 +1693,7 @@ button.windrose-tile-browser-config-btn,
   pointer-events: none;
   z-index: 10000;
 }
+
 .windrose-tile-preview-label {
   font-size: 10px;
   color: var(--windrose-text-muted);
@@ -1505,27 +1705,8 @@ button.windrose-tile-browser-config-btn,
   max-width: 192px;
 }
 
-/* Tablet overrides for tileset config panel */
-.is-tablet .windrose-tile-browser-config {
-  padding: 10px 12px;
-}
-
-.is-tablet .windrose-tile-config-row {
-  margin-bottom: 12px;
-  font-size: 13px;
-  gap: 4px 8px;
-}
-
-.is-tablet .windrose-tile-config-select {
-  font-size: 13px;
-  padding: 6px 8px;
-}
-
-/* Empty state — no tilesets configured */
+/* ---- Empty states ---- */
 .windrose-tile-browser-empty-state {
-  width: auto;
-  height: auto;
-  border-left: none;
   background: transparent;
 }
 
@@ -1560,6 +1741,439 @@ button.windrose-tile-browser-config-btn,
   background: oklch(from var(--windrose-border-primary) l c h/0.08);
 }
 
+.windrose-tb-empty {
+  padding: clamp(1rem, 1.5vw, 1.25rem) clamp(0.5rem, 1vw, 0.75rem);
+  text-align: center;
+  color: var(--windrose-text-muted);
+  font-size: 11px;
+}
+
+/* ---- Tablet overrides ---- */
+.is-tablet .windrose-tb-config {
+  padding: 10px 12px;
+}
+
+.is-tablet .windrose-tile-config-row {
+  margin-bottom: 12px;
+  font-size: 13px;
+  gap: 4px 8px;
+}
+
+.is-tablet .windrose-tile-config-select {
+  font-size: 13px;
+  padding: 6px 8px;
+}
+
+/* ============================================
+   DEPTH BAR & DEPTH RIBBON
+   Tile layer depth controls for the tile browser.
+   ============================================ */
+/* ---- Shared eye toggle ---- */
+.windrose-db-eye {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  cursor: pointer;
+  color: var(--windrose-text-muted);
+}
+.windrose-db-eye:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/* ---- Horizontal DepthBar ---- */
+.windrose-db-wrap {
+  position: relative;
+}
+
+.windrose-db-bar {
+  display: flex;
+  align-items: stretch;
+  gap: 3px;
+  padding: 7px 9px;
+}
+
+.windrose-db-seg {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 0 0 auto;
+  padding: 6px 9px 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  overflow: hidden;
+  background: var(--windrose-bg-secondary);
+  border: 1px solid var(--windrose-border-secondary);
+  color: var(--windrose-text-muted);
+  transition: flex-grow 0.34s cubic-bezier(0.2, 0.8, 0.2, 1), background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+.windrose-db-seg:hover {
+  color: var(--windrose-text-secondary);
+  border-color: color-mix(in oklch, var(--windrose-border-secondary) 70%, white);
+}
+.windrose-db-seg.is-active {
+  flex: 1 1 auto;
+  color: var(--windrose-gold-bright);
+  border-color: var(--windrose-border-primary);
+  background: linear-gradient(180deg, oklch(20% 0.03 75deg), oklch(14% 0.02 70deg));
+  box-shadow: inset 0 0 0 1px oklch(74% 0.07 75deg / 0.12);
+  cursor: default;
+}
+.windrose-db-seg.is-open .windrose-db-chev {
+  transform: rotate(180deg);
+}
+
+.windrose-db-cap {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  border-radius: 3px 0 0 3px;
+  background: var(--depth-color);
+}
+
+.windrose-db-icon {
+  flex-shrink: 0;
+}
+.windrose-db-icon.is-disabled {
+  color: var(--windrose-text-disabled);
+}
+
+.windrose-db-lbl {
+  font-size: 9.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+.windrose-db-cnt {
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.85;
+}
+
+.windrose-db-chev {
+  display: inline-flex;
+  margin-left: 1px;
+  transition: transform 0.3s ease;
+  color: var(--windrose-text-muted);
+}
+
+/* ---- Compact mode (narrow block drawer) ---- */
+.windrose-db-wrap.is-compact .windrose-db-bar {
+  gap: 2px;
+  padding: 5px 6px;
+}
+.windrose-db-wrap.is-compact .windrose-db-seg {
+  padding: 4px 6px;
+  gap: 4px;
+}
+.windrose-db-wrap.is-compact .windrose-db-seg.is-active {
+  padding: 4px 7px 4px 10px;
+}
+.windrose-db-wrap.is-compact .windrose-db-lbl {
+  font-size: 8.5px;
+}
+.windrose-db-wrap.is-compact .windrose-db-cnt {
+  display: none;
+}
+
+/* ---- Fan overlay dropdown ---- */
+.windrose-db-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 18;
+}
+
+.windrose-db-fan {
+  position: absolute;
+  left: 9px;
+  right: 9px;
+  top: calc(100% - 2px);
+  z-index: 20;
+  background: var(--windrose-bg-primary);
+  border: 1px solid var(--windrose-border-primary-dark);
+  border-radius: 9px;
+  padding: 7px;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.6);
+  transform-origin: top center;
+  animation: windrose-db-fan-in 0.22s cubic-bezier(0.2, 0.85, 0.25, 1);
+}
+
+@keyframes windrose-db-fan-in {
+  from {
+    transform: translateY(-7px) scaleY(0.97);
+  }
+  to {
+    transform: none;
+  }
+}
+.windrose-db-fanhint {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 8px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--windrose-border-primary-dark);
+  padding: 2px 6px 6px;
+}
+
+.windrose-db-fanrow {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 8px 9px 8px 13px;
+  border: none;
+  border-radius: 7px;
+  cursor: pointer;
+  text-align: left;
+  background: transparent;
+  color: var(--windrose-text-secondary);
+  transition: background 0.14s ease;
+}
+.windrose-db-fanrow:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+.windrose-db-fanrow.is-active {
+  background: linear-gradient(90deg, oklch(74% 0.07 75deg / 0.2), oklch(74% 0.07 75deg / 0.04));
+  color: var(--windrose-gold-bright);
+}
+.windrose-db-fanrow .windrose-db-cap {
+  top: 6px;
+  bottom: 6px;
+  border-radius: 2px;
+}
+.windrose-db-fanrow .windrose-db-lbl {
+  font-size: 11px;
+  font-weight: 600;
+  flex: 1;
+}
+.windrose-db-fanrow .windrose-db-cnt {
+  font-size: 10px;
+  color: var(--windrose-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.windrose-db-fanrow.is-off .windrose-db-lbl,
+.windrose-db-fanrow.is-off .windrose-db-cnt {
+  opacity: 0.45;
+}
+
+/* ---- Vertical DepthRibbon (collapsed spine) ---- */
+.windrose-dsr {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  padding: 8px 0;
+  gap: 2px;
+}
+
+.windrose-dsr-label {
+  font-size: 7.5px;
+  color: var(--windrose-text-disabled);
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding: 2px 0;
+}
+
+.windrose-dsr-row {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 9px 0;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.windrose-dsr-row.is-active {
+  padding: 8px 0 9px;
+}
+
+.windrose-dsr-bar {
+  position: absolute;
+  left: 0;
+  top: 7px;
+  bottom: 7px;
+  width: 3px;
+  border-radius: 0 2px 2px 0;
+  background: var(--depth-color);
+}
+
+.windrose-dsr-icon {
+  color: var(--windrose-text-secondary);
+}
+.windrose-dsr-icon.is-active {
+  color: var(--windrose-gold-bright);
+}
+
+.windrose-dsr-cnt {
+  font-size: 8.5px;
+  color: var(--windrose-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.windrose-dsr-spacer {
+  flex: 1;
+  min-height: 6px;
+}
+
+/* ---- Reduced motion ---- */
+@media (prefers-reduced-motion: reduce) {
+  .windrose-db-seg,
+  .windrose-db-fan,
+  .windrose-db-chev {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+/* ==========================================================================
+   Tile Drawer — expandable sidebar with fold-to-spine animation
+   Docks to the left edge of windrose-dock-right. Contains the tile browser
+   (full panel) and a depth ribbon spine (collapsed state).
+   ========================================================================== */
+/* Shared parent for tile drawer + dock column */
+.windrose-right-group {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+}
+
+/* Drawer container — width transitions between ribbon and full panel */
+.windrose-tile-drawer {
+  position: relative;
+  flex-shrink: 0;
+  overflow: hidden;
+  height: 100%;
+  border-left: 1.5px solid oklch(from var(--windrose-border-primary) l c h/0.5);
+}
+
+/* Spine layer — right-pinned, always rendered underneath */
+.windrose-tile-spine-layer {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+}
+
+/* Full panel layer — right-pinned, fixed width, clips off left as drawer narrows */
+.windrose-tile-panel-layer {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+}
+
+/* The spine itself — vertical strip with expand button, depth ribbon, loaded chip */
+.windrose-tile-spine {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: linear-gradient(180deg, oklch(from var(--windrose-border-primary) l c h/0.08), transparent 90px), var(--windrose-bg-primary);
+}
+
+/* Expand button at top of spine */
+.windrose-tile-spine-expand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 34px;
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid oklch(from var(--windrose-border-primary) l c h/0.22);
+  color: var(--windrose-gold-bright, var(--windrose-border-primary));
+  cursor: pointer;
+}
+.windrose-tile-spine-expand:hover {
+  background: oklch(from var(--windrose-border-primary) l c h/0.14);
+}
+.is-compact .windrose-tile-spine-expand {
+  height: 30px;
+}
+
+/* Loaded-tile chip at bottom of spine */
+.windrose-tile-spine-loaded {
+  flex-shrink: 0;
+  padding: 6px;
+  border-top: 1px solid oklch(from var(--windrose-border-primary) l c h/0.2);
+  display: flex;
+  justify-content: center;
+}
+
+.windrose-tile-spine-chip {
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid var(--windrose-border-primary);
+}
+
+/* When the full panel is showing, the spine layer is behind but invisible
+   (the panel covers it). When collapsed, only spine is interactive. */
+.windrose-tile-drawer.is-collapsed .windrose-tile-spine-layer {
+  pointer-events: auto;
+}
+.windrose-tile-drawer.is-collapsed .windrose-tile-panel-layer {
+  pointer-events: none;
+}
+
+.windrose-tile-drawer.is-open .windrose-tile-spine-layer {
+  pointer-events: none;
+}
+.windrose-tile-drawer.is-open .windrose-tile-panel-layer {
+  pointer-events: auto;
+}
+
+/* Resize handle — left edge of drawer, only visible when open */
+.windrose-tile-resize-handle {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 5px;
+  cursor: col-resize;
+  z-index: 10;
+  background: transparent;
+  transition: background 0.15s ease;
+}
+.windrose-tile-resize-handle:hover, .is-resizing .windrose-tile-resize-handle {
+  background: oklch(from var(--windrose-border-primary) l c h/0.4);
+}
+
+/* Prevent text selection while dragging the resize handle */
+.windrose-tile-drawer.is-resizing {
+  user-select: none;
+}
+
+/* Ensure the tile browser fills the panel layer when inside the drawer */
+.windrose-tile-panel-layer .windrose-tile-browser {
+  width: 100%;
+  height: 100%;
+  border-left: none;
+}
+
+/* Reduced motion: disable fold transitions */
+@media (prefers-reduced-motion: reduce) {
+  .windrose-tile-drawer {
+    transition: none !important;
+  }
+  .windrose-tile-panel-layer {
+    transition: none !important;
+  }
+}
 /* ============================================
    OBJECT INTERACTION BUTTONS
    ============================================ */
@@ -7218,21 +7832,8 @@ button.windrose-breadcrumb-link {
    Dock Tile Browser overrides (strip standalone sidebar chrome)
    ========================================================================== */
 :is(.windrose-dock-right, .windrose-floating-panel-content) .windrose-tile-browser {
-  width: auto;
-  height: auto;
   border-left: none;
-  background-color: transparent;
   flex-shrink: 1;
-}
-:is(.windrose-dock-right, .windrose-floating-panel-content) .windrose-tile-browser .windrose-tile-browser-header {
-  display: none;
-}
-:is(.windrose-dock-right, .windrose-floating-panel-content) .windrose-tile-browser .windrose-tile-browser-grid {
-  grid-template-columns: repeat(3, 1fr);
-}
-:is(.windrose-dock-right, .windrose-floating-panel-content) .windrose-tile-browser .windrose-tile-thumb {
-  width: auto;
-  height: auto;
 }
 
 /* ============================================

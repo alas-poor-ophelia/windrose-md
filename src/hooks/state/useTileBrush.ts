@@ -21,9 +21,18 @@
 
 import type { TileLayerRole } from '#types/tiles/tile.types';
 import { useCallback, useState } from 'preact/hooks';
+const MAX_RECENT_TILES = 20;
+
+interface RecentTile {
+  tilesetId: string;
+  tileId: string;
+}
+
 interface UseTileBrushResult {
   tileBrowserCollapsed: boolean;
   setTileBrowserCollapsed: (v: boolean) => void;
+  tileBrowserWidth: number;
+  setTileBrowserWidth: (v: number) => void;
   selectedTilesetId: string | null;
   setSelectedTilesetId: (v: string | null) => void;
   selectedTileId: string | null;
@@ -44,12 +53,16 @@ interface UseTileBrushResult {
   setBrushSize: (v: number) => void;
   tileDepth: TileLayerRole;
   setTileDepth: (v: TileLayerRole) => void;
+  hiddenLayers: Set<TileLayerRole>;
+  toggleHiddenLayer: (layer: TileLayerRole) => void;
+  recentTiles: RecentTile[];
   handleTileSelect: (tilesetId: string, tileId: string) => void;
   handleTileDeselect: () => void;
 }
 
 function useTileBrush(): UseTileBrushResult {
-  const [tileBrowserCollapsed, setTileBrowserCollapsed] = useState<boolean>(true);
+  const [tileBrowserCollapsed, setTileBrowserCollapsed] = useState<boolean>(false);
+  const [tileBrowserWidth, setTileBrowserWidth] = useState<number>(320);
   const [selectedTilesetId, setSelectedTilesetId] = useState<string | null>(null);
   const [selectedTileId, setSelectedTileId] = useState<string | null>(null);
   const [tileRotation, setTileRotation] = useState<number>(0);
@@ -60,11 +73,30 @@ function useTileBrush(): UseTileBrushResult {
   const [tileScale, setTileScale] = useState<number>(1);
   const [brushSize, setBrushSize] = useState<number>(1);
   const [tileDepth, setTileDepth] = useState<TileLayerRole>('ground');
+  const [hiddenLayers, setHiddenLayers] = useState<Set<TileLayerRole>>(new Set());
+  const [recentTiles, setRecentTiles] = useState<RecentTile[]>([]);
+
+  const toggleHiddenLayer = useCallback((layer: TileLayerRole) => {
+    setHiddenLayers(prev => {
+      const next = new Set(prev);
+      if (next.has(layer)) next.delete(layer);
+      else next.add(layer);
+      return next;
+    });
+  }, []);
+
+  const addRecentTile = useCallback((tilesetId: string, tileId: string) => {
+    setRecentTiles(prev => {
+      const filtered = prev.filter(r => !(r.tilesetId === tilesetId && r.tileId === tileId));
+      return [{ tilesetId, tileId }, ...filtered].slice(0, MAX_RECENT_TILES);
+    });
+  }, []);
 
   const handleTileSelect = useCallback((tilesetId: string, tileId: string) => {
     setSelectedTilesetId(tilesetId);
     setSelectedTileId(tileId);
-  }, []);
+    addRecentTile(tilesetId, tileId);
+  }, [addRecentTile]);
 
   const handleTileDeselect = useCallback(() => {
     setSelectedTilesetId(null);
@@ -75,6 +107,7 @@ function useTileBrush(): UseTileBrushResult {
 
   return {
     tileBrowserCollapsed, setTileBrowserCollapsed,
+    tileBrowserWidth, setTileBrowserWidth,
     selectedTilesetId, setSelectedTilesetId,
     selectedTileId, setSelectedTileId,
     tileRotation, setTileRotation,
@@ -85,6 +118,8 @@ function useTileBrush(): UseTileBrushResult {
     tileScale, setTileScale,
     brushSize, setBrushSize,
     tileDepth, setTileDepth,
+    hiddenLayers, toggleHiddenLayer,
+    recentTiles,
     handleTileSelect, handleTileDeselect,
   };
 }

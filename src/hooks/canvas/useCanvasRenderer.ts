@@ -218,7 +218,7 @@ function renderLayerCellsAndEdges(
 }
 
 const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, selectedItems = [], options = {}) => {
-  const { isResizeMode = false, theme = null, showCoordinates = false, layerVisibility = null, adjacentSubHexes = null } = options;
+  const { isResizeMode = false, theme = null, showCoordinates = false, layerVisibility = null, adjacentSubHexes = null, hiddenTileLayers = undefined } = options;
   if (canvas == null) return;
 
   // Normalize selectedItems to array (backward compatibility)
@@ -473,7 +473,7 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
       mapData.tilesets,
       tileGeomShim,
       rendererViewState,
-      { getCachedImage, canvasWidth: width, canvasHeight: height }
+      { getCachedImage, canvasWidth: width, canvasHeight: height, hiddenLayers: hiddenTileLayers }
     );
   }
 
@@ -651,13 +651,13 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
 };
 
 const useCanvasRenderer: UseCanvasRenderer = (canvasRef, fogCanvasRef, mapData, geometry, selectedItems = [], options = {}) => {
-  const { isResizeMode = false, theme = null, showCoordinates = false, layerVisibility = null, tileImagesReady = false, adjacentSubHexes = null } = options;
+  const { isResizeMode = false, theme = null, showCoordinates = false, layerVisibility = null, tileImagesReady = false, adjacentSubHexes = null, hiddenTileLayers = undefined } = options;
   useEffect(() => {
     if (mapData && geometry && canvasRef.current) {
       const fogCanvas = fogCanvasRef?.current || null;
-      renderCanvas(canvasRef.current, fogCanvas, mapData, geometry, selectedItems, { isResizeMode, theme, showCoordinates, layerVisibility, adjacentSubHexes });
+      renderCanvas(canvasRef.current, fogCanvas, mapData, geometry, selectedItems, { isResizeMode, theme, showCoordinates, layerVisibility, adjacentSubHexes, hiddenTileLayers });
     }
-  }, [mapData, geometry, selectedItems, isResizeMode, theme, canvasRef, fogCanvasRef, showCoordinates, layerVisibility, tileImagesReady, adjacentSubHexes]);
+  }, [mapData, geometry, selectedItems, isResizeMode, theme, canvasRef, fogCanvasRef, showCoordinates, layerVisibility, tileImagesReady, adjacentSubHexes, hiddenTileLayers]);
 };
 
 export { useCanvasRenderer, renderCanvas };

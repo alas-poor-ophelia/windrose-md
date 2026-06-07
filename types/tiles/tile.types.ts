@@ -159,6 +159,21 @@ export type TileAssignment = SnappedTile | FreeformTile;
 export type HexTileAssignment = TileAssignment;
 
 // ===========================================
+// Tile Metadata (user tags, stars, etc.)
+// ===========================================
+
+/** Per-tile metadata overlay stored in windrose-tile-metadata.json */
+export interface TileMetadataEntry {
+  starred?: boolean;
+  userTags?: string[];
+  /** Tags preserved from Dungeondraft import — replaced on re-import */
+  importTags?: string[];
+}
+
+/** Metadata store keyed by vault path (stable across tileset rescans) */
+export type TileMetadataStore = Record<string, TileMetadataEntry>;
+
+// ===========================================
 // Tile Render Context (geometry-agnostic)
 // ===========================================
 
