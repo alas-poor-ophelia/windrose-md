@@ -1,6 +1,7 @@
 import type { SettingsTabThis } from './settingsTabContext';
 import { Notice, Setting } from 'obsidian';
 import { FolderSuggest } from '../helpers/FolderSuggest';
+import { DungeondraftImportModal } from '../../content-packs/DungeondraftImportModal';
 
 // settingsPlugin-TabRenderTilesets.ts
 // WindroseMDSettingsTab render methods - Tileset configuration
@@ -58,6 +59,20 @@ export const TabRenderTilesetsMethods = {
           this.settingsChanged = true;
           await this.plugin.saveSettings();
           this.display();
+        }));
+
+    // Import Dungeondraft pack
+    new Setting(containerEl)
+      .setName('Import Dungeondraft Pack')
+      .setDesc('Import a .dungeondraft_pack file as a tileset')
+      .addButton(btn => btn
+        .setButtonText('Import Pack')
+        .onClick(() => {
+          const pluginLike = { app: this.app, settings: this.plugin.settings, saveSettings: () => this.plugin.saveSettings() };
+          new DungeondraftImportModal(this.app, pluginLike, () => {
+            this.settingsChanged = true;
+            this.display();
+          }).open();
         }));
 
     // Scan preview

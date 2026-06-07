@@ -1,0 +1,353 @@
+import { Modal, Notice } from 'obsidian';
+import type { App } from 'obsidian';
+import type { PluginSettings } from '#types/settings/settings.types';
+import type { InstalledPack } from '#types/content-packs/contentPack.types';
+import { parsePck, extractFileData } from './pckParser';
+import type { PckArchive } from './pckParser';
+import { parsePackMetadata, parseDungeondraftTags } from './pckMetadata';
+import type { DungeondraftPackMeta } from './pckMetadata';
+import { CONTENT_PACKS_FOLDER } from './contentPackConstants';
+
+interface PluginLike {
+	app: App;
+	settings: PluginSettings;
+	saveSettings(): Promise<void>;
+}
+
+interface AssetCounts {
+	objects: number;
+	patterns: number;
+	terrain: number;
+	other: number;
+	total: number;
+}
+
+function countAssets(archive: PckArchive): AssetCounts {
+	let objects = 0, patterns = 0, terrain = 0, other = 0;
+	for (const f of archive.files) {
+		if (!f.path.endsWith('.webp') && !f.path.endsWith('.png')) continue;
+		if (f.path.includes('/thumbnails/')) continue;
+		if (f.path.includes('/textures/objects/')) objects++;
+		else if (f.path.includes('/textures/patterns/')) patterns++;
+		else if (f.path.includes('/textures/terrain/')) terrain++;
+		else other++;
+	}
+	return { objects, patterns, terrain, other, total: objects + patterns + terrain + other };
+}
+
+async function ensureFolder(app: App, path: string): Promise<void> {
+	const parts = path.split('/');
+	let current = '';
+	for (const part of parts) {
+		current = current === '' ? part : current + '/' + part;
+		try { await app.vault.createFolder(current); } catch { /* exists */ }
+	}
+}
+
+class DungeondraftImportModal extends Modal {
+	private plugin: PluginLike;
+	private onImported?: () => void;
+	private archive: PckArchive | null = null;
+	private buffer: ArrayBuffer | null = null;
+	private meta: DungeondraftPackMeta | null = null;
+	private importBtn: HTMLButtonElement | null = null;
+
+	constructor(app: App, plugin: PluginLike, onImported?: () => void) {
+		super(app);
+		this.plugin = plugin;
+		this.onImported = onImported;
+	}
+
+	onOpen(): void {
+		const { contentEl } = this;
+		contentEl.empty();
+		contentEl.addClass('windrose-dd-import-modal');
+
+		contentEl.createEl('h2', { text: 'Import Dungeondraft Pack' });
+
+		contentEl.createEl('p', {
+			text: 'Select a .dungeondraft_pack file to import its assets as tiles. Only packs that allow third-party software access can be imported.',
+			cls: 'setting-item-description',
+		});
+
+		const fileContainer = contentEl.createDiv({ cls: 'windrose-dd-import-file' });
+		const fileInput = fileContainer.createEl('input', {
+			type: 'file',
+			attr: { accept: '.dungeondraft_pack' },
+		});
+
+		const previewArea = contentEl.createDiv({ cls: 'windrose-dd-import-preview' });
+		previewArea.style.display = 'none';
+
+		const progressArea = contentEl.createDiv({ cls: 'windrose-dd-import-progress' });
+		progressArea.style.display = 'none';
+
+		fileInput.addEventListener('change', (e: Event) => {
+			const file = (e.target as HTMLInputElement).files?.[0];
+			if (file == null) return;
+			void this.handleFileSelected(file, previewArea);
+		});
+
+		const buttonContainer = contentEl.createDiv({ cls: 'windrose-modal-buttons' });
+
+		const cancelBtn = buttonContainer.createEl('button', { text: 'Cancel' });
+		cancelBtn.onclick = () => this.close();
+
+		this.importBtn = buttonContainer.createEl('button', {
+			text: 'Import',
+			cls: 'mod-cta',
+		}) as HTMLButtonElement;
+		this.importBtn.disabled = true;
+		this.importBtn.onclick = () => {
+			void this.handleImport(previewArea, progressArea, fileInput);
+		};
+	}
+
+	private async handleFileSelected(file: File, previewArea: HTMLElement): Promise<void> {
+		previewArea.empty();
+		previewArea.style.display = 'block';
+		this.archive = null;
+		this.buffer = null;
+		this.meta = null;
+		if (this.importBtn) this.importBtn.disabled = true;
+
+		previewArea.createEl('p', { text: 'Reading file...' });
+
+		try {
+			const buffer = await file.arrayBuffer();
+			const archive = parsePck(buffer);
+			const result = parsePackMetadata(buffer, archive);
+
+			previewArea.empty();
+
+			if (!result.ok) {
+				previewArea.createEl('p', {
+					text: result.error,
+					cls: 'windrose-dd-import-error',
+				});
+				return;
+			}
+
+			this.archive = archive;
+			this.buffer = buffer;
+			this.meta = result.meta;
+
+			this.renderPreview(previewArea, result.meta, archive);
+
+			if (this.importBtn) this.importBtn.disabled = false;
+		} catch (err: unknown) {
+			previewArea.empty();
+			previewArea.createEl('p', {
+				text: 'Failed to read pack: ' + (err as Error).message,
+				cls: 'windrose-dd-import-error',
+			});
+		}
+	}
+
+	private renderPreview(
+		container: HTMLElement,
+		meta: DungeondraftPackMeta,
+		archive: PckArchive,
+	): void {
+		const header = container.createDiv({ cls: 'windrose-dd-import-header' });
+		header.createEl('strong', { text: meta.name });
+		header.createEl('span', { text: ' by ' + meta.author });
+		header.createEl('span', {
+			text: ' · v' + meta.version,
+			cls: 'windrose-dd-import-version',
+		});
+
+		const counts = countAssets(archive);
+		const details = container.createDiv({ cls: 'windrose-dd-import-details' });
+
+		if (counts.objects > 0) {
+			details.createEl('p', { text: '• ' + counts.objects + ' object texture(s)' });
+		}
+		if (counts.patterns > 0) {
+			details.createEl('p', { text: '• ' + counts.patterns + ' pattern texture(s)' });
+		}
+		if (counts.terrain > 0) {
+			details.createEl('p', { text: '• ' + counts.terrain + ' terrain texture(s)' });
+		}
+		if (counts.other > 0) {
+			details.createEl('p', { text: '• ' + counts.other + ' other texture(s)' });
+		}
+		details.createEl('p', {
+			text: counts.total + ' textures will be extracted to your vault.',
+			cls: 'windrose-dd-import-total',
+		});
+
+		const existing = (this.plugin.settings.installedContentPacks ?? [])
+			.find((p: InstalledPack) => p.id === meta.id);
+		if (existing != null) {
+			container.createEl('p', {
+				text: 'This pack is already imported (v' + existing.version + '). Re-importing will overwrite existing files.',
+				cls: 'windrose-dd-import-warning',
+			});
+		}
+
+		const tags = parseDungeondraftTags(this.buffer!, archive);
+		if (tags != null) {
+			const tagCount = Object.keys(tags.tags).length;
+			if (tagCount > 0) {
+				details.createEl('p', { text: '• ' + tagCount + ' tag categor(ies)' });
+			}
+		}
+	}
+
+	private async handleImport(
+		previewArea: HTMLElement,
+		progressArea: HTMLElement,
+		fileInput: HTMLInputElement,
+	): Promise<void> {
+		if (this.archive == null || this.buffer == null || this.meta == null) return;
+		if (this.importBtn == null) return;
+
+		this.importBtn.disabled = true;
+		this.importBtn.textContent = 'Importing...';
+		fileInput.disabled = true;
+		previewArea.style.display = 'none';
+		progressArea.style.display = 'block';
+
+		const progressBar = progressArea.createEl('progress', {
+			attr: { max: '100', value: '0' },
+		}) as HTMLProgressElement;
+		progressBar.style.width = '100%';
+		const statusText = progressArea.createEl('p', { text: 'Preparing...' });
+
+		try {
+			const basePath = CONTENT_PACKS_FOLDER + '/dungeondraft-packs/' + this.meta.id;
+			await ensureFolder(this.app, basePath);
+
+			const textures = this.archive.files.filter(f => {
+				if (!f.path.endsWith('.webp') && !f.path.endsWith('.png')) return false;
+				if (f.path.includes('/thumbnails/')) return false;
+				return f.path.includes('/textures/objects/') || f.path.includes('/textures/patterns/');
+			});
+
+			const tags = parseDungeondraftTags(this.buffer, this.archive);
+			const pathToTag = new Map<string, string>();
+			if (tags != null) {
+				for (const [tag, paths] of Object.entries(tags.tags)) {
+					for (const p of paths) {
+						if (!pathToTag.has(p)) {
+							pathToTag.set(p, tag);
+						}
+					}
+				}
+			}
+
+			const packPrefix = this.archive.files[0]?.path.match(/^res:\/\/packs\/[^/]+\//)?.[0] ?? '';
+
+			for (let i = 0; i < textures.length; i++) {
+				const entry = textures[i];
+				const relativePath = packPrefix ? entry.path.slice(packPrefix.length) : entry.path;
+				const filename = entry.path.split('/').pop() ?? 'unknown';
+
+				const tagKey = relativePath;
+				const tag = pathToTag.get(tagKey);
+				let destPath: string;
+				if (tag != null) {
+					const safeTag = tag.replace(/[\\:*?"<>|]/g, '_');
+					destPath = basePath + '/' + safeTag + '/' + filename;
+				} else {
+					const parts = relativePath.split('/');
+					const category = parts.length > 2 ? parts.slice(1, -1).join('/') : parts[0] ?? 'misc';
+					destPath = basePath + '/' + category + '/' + filename;
+				}
+
+				const parentDir = destPath.substring(0, destPath.lastIndexOf('/'));
+				await ensureFolder(this.app, parentDir);
+
+				const data = extractFileData(this.buffer, entry);
+				const arrayBuf = new ArrayBuffer(data.byteLength);
+				new Uint8Array(arrayBuf).set(data);
+				const existing = this.app.vault.getAbstractFileByPath(destPath);
+				if (existing != null) {
+					await this.app.vault.modifyBinary(existing as any, arrayBuf);
+				} else {
+					await this.app.vault.createBinary(destPath, arrayBuf);
+				}
+
+				const pct = Math.round(((i + 1) / textures.length) * 100);
+				progressBar.value = pct;
+				statusText.textContent = 'Extracting: ' + (i + 1) + '/' + textures.length + ' (' + pct + '%)';
+
+				if (i % 20 === 0) {
+					await new Promise(r => setTimeout(r, 0));
+				}
+			}
+
+			const tilesetFolders = this.plugin.settings.tilesetFolders ?? [];
+			if (!tilesetFolders.includes(basePath)) {
+				tilesetFolders.push(basePath);
+				this.plugin.settings.tilesetFolders = tilesetFolders;
+			}
+
+			const installed: InstalledPack = {
+				id: this.meta.id,
+				name: this.meta.name,
+				type: 'object-pack',
+				version: this.meta.version,
+				installedAt: Date.now(),
+				vaultPath: basePath,
+			};
+
+			if (this.plugin.settings.installedContentPacks == null) {
+				this.plugin.settings.installedContentPacks = [];
+			}
+			const existingIdx = this.plugin.settings.installedContentPacks
+				.findIndex((p: InstalledPack) => p.id === this.meta!.id);
+			if (existingIdx >= 0) {
+				this.plugin.settings.installedContentPacks[existingIdx] = installed;
+			} else {
+				this.plugin.settings.installedContentPacks.push(installed);
+			}
+
+			await this.plugin.saveSettings();
+
+			window.dispatchEvent(new Event('windrose-settings-changed'));
+
+			progressArea.empty();
+			progressArea.createEl('p', {
+				text: 'Successfully imported ' + textures.length + ' textures from ' + this.meta.name + '.',
+				cls: 'windrose-dd-import-success',
+			});
+
+			new Notice(this.meta.name + ' imported successfully (' + textures.length + ' textures).');
+
+			if (this.importBtn) {
+				this.importBtn.textContent = 'Done';
+				this.importBtn.onclick = () => this.close();
+				this.importBtn.disabled = false;
+			}
+		} catch (err: unknown) {
+			progressArea.empty();
+			progressArea.createEl('p', {
+				text: 'Import failed: ' + (err as Error).message,
+				cls: 'windrose-dd-import-error',
+			});
+			console.error('[Windrose] Dungeondraft import failed:', err);
+
+			if (this.importBtn) {
+				this.importBtn.textContent = 'Import';
+				this.importBtn.disabled = false;
+			}
+			fileInput.disabled = false;
+			previewArea.style.display = 'block';
+		}
+	}
+
+	onClose(): void {
+		this.buffer = null;
+		this.archive = null;
+		this.meta = null;
+		this.contentEl.empty();
+		if (this.onImported != null) {
+			this.onImported();
+		}
+	}
+}
+
+export { DungeondraftImportModal, countAssets };
+export type { AssetCounts };
