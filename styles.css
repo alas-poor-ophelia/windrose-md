@@ -76,6 +76,10 @@ body {
   --windrose-depth-decoration: #86b87c;
   --windrose-gold-bright: oklch(0.82 0.09 75);
   --windrose-gold-glow: oklch(0.74 0.07 75 / 0.35);
+  --windrose-gold-contrast: oklch(0.15 0.02 75);
+  --windrose-gold-surface: oklch(0.18 0.025 75);
+  --windrose-tile-panel-radius: 8px;
+  --windrose-tile-panel-shadow: 0 4px 16px oklch(0 0 0 / 0.3);
 }
 
 /* ============================================
@@ -1245,7 +1249,7 @@ button.windrose-object-grid-item:hover,
 }
 .windrose-tb-iconbtn.active {
   background: var(--windrose-border-primary);
-  color: oklch(15% 0.02 75deg);
+  color: var(--windrose-gold-contrast);
   border-color: var(--windrose-gold-bright);
   box-shadow: 0 0 8px var(--windrose-gold-glow);
 }
@@ -1972,7 +1976,7 @@ button.windrose-object-grid-item:hover,
 .windrose-tb-check.on {
   background: var(--windrose-border-primary);
   border-color: var(--windrose-gold-bright);
-  color: oklch(15% 0.02 75deg);
+  color: var(--windrose-gold-contrast);
 }
 
 .windrose-tile-thumb.dim::after {
@@ -1991,7 +1995,7 @@ button.windrose-object-grid-item:hover,
   bottom: 64px;
   background: oklch(from var(--windrose-bg-primary) calc(l + 0.02) c h);
   border: 1px solid var(--windrose-border-primary-dark);
-  border-radius: 9px;
+  border-radius: var(--windrose-tile-panel-radius);
   padding: 11px;
   box-shadow: 0 -8px 26px oklch(0% 0 0deg / 0.6);
   z-index: 20;
@@ -2006,7 +2010,7 @@ button.windrose-object-grid-item:hover,
   border-radius: 7px;
   cursor: pointer;
   border: 1px solid var(--windrose-border-primary-dark);
-  background: oklch(18% 0.025 75deg);
+  background: var(--windrose-gold-surface);
   color: var(--windrose-gold-bright);
   font-size: 12px;
   font-weight: 600;
@@ -2029,7 +2033,7 @@ button.windrose-object-grid-item:hover,
 .windrose-tb-act-apply {
   flex: 1;
   background: linear-gradient(180deg, var(--windrose-gold-bright), var(--windrose-border-primary));
-  color: oklch(15% 0.02 75deg);
+  color: var(--windrose-gold-contrast);
   border-color: var(--windrose-gold-bright);
 }
 .windrose-tb-act-star {
@@ -2038,8 +2042,8 @@ button.windrose-object-grid-item:hover,
 
 .windrose-tb-org-tier {
   padding: 9px 10px;
-  border-top: 1px solid color-mix(in oklch, var(--windrose-border-primary) 25%, #000);
-  background: oklch(15% 0.02 75deg);
+  border-top: 1px solid color-mix(in oklch, var(--windrose-border-primary) 25%, oklch(0% 0 0deg));
+  background: var(--windrose-gold-contrast);
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -2059,7 +2063,7 @@ button.windrose-object-grid-item:hover,
 
 .windrose-tb-org-actions {
   padding: 9px 10px;
-  border-top: 1px solid color-mix(in oklch, var(--windrose-border-primary) 25%, #000);
+  border-top: 1px solid color-mix(in oklch, var(--windrose-border-primary) 25%, oklch(0% 0 0deg));
   background: linear-gradient(180deg, oklch(17% 0.03 75deg), oklch(12% 0.02 75deg));
   display: flex;
   gap: 7px;
@@ -2090,7 +2094,7 @@ button.windrose-object-grid-item:hover,
 
 .is-tablet button.windrose-tb-act {
   padding: 9px 10px;
-  background: oklch(18% 0.025 75deg);
+  background: var(--windrose-gold-surface);
   border: 1px solid var(--windrose-border-primary-dark);
   color: var(--windrose-gold-bright);
 }
@@ -2104,7 +2108,7 @@ button.windrose-object-grid-item:hover,
 }
 .is-tablet button.windrose-tb-act.windrose-tb-act-apply {
   background: linear-gradient(180deg, var(--windrose-gold-bright), var(--windrose-border-primary));
-  color: oklch(15% 0.02 75deg);
+  color: var(--windrose-gold-contrast);
   border-color: var(--windrose-gold-bright);
 }
 
@@ -2145,7 +2149,7 @@ button.windrose-object-grid-item:hover,
 }
 .is-tablet button.windrose-tb-iconbtn.active {
   background: var(--windrose-border-primary);
-  color: oklch(15% 0.02 75deg);
+  color: var(--windrose-gold-contrast);
   border-color: var(--windrose-gold-bright);
 }
 
@@ -2208,7 +2212,7 @@ button.windrose-object-grid-item:hover,
   color: var(--windrose-text-muted);
 }
 .windrose-db-eye:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: oklch(100% 0 0deg / 0.06);
 }
 
 /* ---- Horizontal DepthBar ---- */
@@ -2248,7 +2252,7 @@ button.windrose-object-grid-item:hover,
   color: var(--windrose-gold-bright);
   border-color: var(--windrose-border-primary);
   background: linear-gradient(180deg, oklch(20% 0.03 75deg), oklch(14% 0.02 70deg));
-  box-shadow: inset 0 0 0 1px oklch(74% 0.07 75deg / 0.12);
+  box-shadow: inset 0 0 0 1px oklch(from var(--windrose-border-primary) l c h/0.12);
   cursor: default;
 }
 .windrose-db-seg.is-open .windrose-db-chev {
@@ -2329,7 +2333,7 @@ button.windrose-object-grid-item:hover,
   border: 1px solid var(--windrose-border-primary-dark);
   border-radius: 9px;
   padding: 7px;
-  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 14px 34px oklch(0% 0 0deg / 0.6);
   transform-origin: top center;
   animation: windrose-db-fan-in 0.22s cubic-bezier(0.2, 0.85, 0.25, 1);
 }
@@ -2370,10 +2374,10 @@ button.windrose-object-grid-item:hover,
   transition: background 0.14s ease;
 }
 .windrose-db-fanrow:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: oklch(100% 0 0deg / 0.05);
 }
 .windrose-db-fanrow.is-active {
-  background: linear-gradient(90deg, oklch(74% 0.07 75deg / 0.2), oklch(74% 0.07 75deg / 0.04));
+  background: linear-gradient(90deg, oklch(from var(--windrose-border-primary) l c h/0.2), oklch(from var(--windrose-border-primary) l c h/0.04));
   color: var(--windrose-gold-bright);
 }
 .windrose-db-fanrow .windrose-db-cap {
@@ -2470,7 +2474,7 @@ button.windrose-object-grid-item:hover,
   background: linear-gradient(180deg, oklch(20% 0.03 75deg), oklch(14% 0.02 70deg));
   border-color: var(--windrose-border-primary);
   color: var(--windrose-gold-bright);
-  box-shadow: inset 0 0 0 1px oklch(74% 0.07 75deg / 0.12);
+  box-shadow: inset 0 0 0 1px oklch(from var(--windrose-border-primary) l c h/0.12);
 }
 
 .is-tablet button.windrose-db-fanrow {
@@ -2481,7 +2485,7 @@ button.windrose-object-grid-item:hover,
   box-shadow: none;
 }
 .is-tablet button.windrose-db-fanrow.is-active {
-  background: linear-gradient(90deg, oklch(74% 0.07 75deg / 0.2), oklch(74% 0.07 75deg / 0.04));
+  background: linear-gradient(90deg, oklch(from var(--windrose-border-primary) l c h/0.2), oklch(from var(--windrose-border-primary) l c h/0.04));
   color: var(--windrose-gold-bright);
 }
 
@@ -2687,8 +2691,8 @@ button.windrose-object-grid-item:hover,
   flex-direction: column;
   background: var(--windrose-bg-primary);
   border: 1px solid var(--windrose-border-primary);
-  border-radius: 8px;
-  box-shadow: 0 4px 16px oklch(0% 0 0deg / 0.3);
+  border-radius: var(--windrose-tile-panel-radius);
+  box-shadow: var(--windrose-tile-panel-shadow);
   overflow: hidden;
 }
 

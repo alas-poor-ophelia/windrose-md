@@ -97,7 +97,7 @@
 
   &.active {
     background: var(--windrose-border-primary);
-    color: oklch(0.15 0.02 75);
+    color: var(--windrose-gold-contrast);
     border-color: var(--windrose-gold-bright);
     box-shadow: 0 0 8px var(--windrose-gold-glow);
   }
@@ -870,7 +870,7 @@
   &.on {
     background: var(--windrose-border-primary);
     border-color: var(--windrose-gold-bright);
-    color: oklch(0.15 0.02 75);
+    color: var(--windrose-gold-contrast);
   }
 }
 
@@ -890,7 +890,7 @@
   bottom: 64px;
   background: oklch(from var(--windrose-bg-primary) calc(l + 0.02) c h);
   border: 1px solid var(--windrose-border-primary-dark);
-  border-radius: 9px;
+  border-radius: var(--windrose-tile-panel-radius);
   padding: 11px;
   box-shadow: 0 -8px 26px oklch(0 0 0 / 0.6);
   z-index: 20;
@@ -905,7 +905,7 @@
   border-radius: 7px;
   cursor: pointer;
   border: 1px solid var(--windrose-border-primary-dark);
-  background: oklch(0.18 0.025 75);
+  background: var(--windrose-gold-surface);
   color: var(--windrose-gold-bright);
   font-size: 12px;
   font-weight: 600;
@@ -931,7 +931,7 @@
   &-apply {
     flex: 1;
     background: linear-gradient(180deg, var(--windrose-gold-bright), var(--windrose-border-primary));
-    color: oklch(0.15 0.02 75);
+    color: var(--windrose-gold-contrast);
     border-color: var(--windrose-gold-bright);
   }
 
@@ -942,8 +942,8 @@
 
 .windrose-tb-org-tier {
   padding: 9px 10px;
-  border-top: 1px solid color-mix(in oklch, var(--windrose-border-primary) 25%, #000);
-  background: oklch(0.15 0.02 75);
+  border-top: 1px solid color-mix(in oklch, var(--windrose-border-primary) 25%, oklch(0 0 0));
+  background: var(--windrose-gold-contrast);
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -965,7 +965,7 @@
 
 .windrose-tb-org-actions {
   padding: 9px 10px;
-  border-top: 1px solid color-mix(in oklch, var(--windrose-border-primary) 25%, #000);
+  border-top: 1px solid color-mix(in oklch, var(--windrose-border-primary) 25%, oklch(0 0 0));
   background: linear-gradient(180deg, oklch(0.17 0.03 75), oklch(0.12 0.02 75));
   display: flex;
   gap: 7px;
@@ -1000,7 +1000,7 @@
 
 .is-tablet button.windrose-tb-act {
   padding: 9px 10px;
-  background: oklch(0.18 0.025 75);
+  background: var(--windrose-gold-surface);
   border: 1px solid var(--windrose-border-primary-dark);
   color: var(--windrose-gold-bright);
 
@@ -1016,7 +1016,7 @@
 
   &.windrose-tb-act-apply {
     background: linear-gradient(180deg, var(--windrose-gold-bright), var(--windrose-border-primary));
-    color: oklch(0.15 0.02 75);
+    color: var(--windrose-gold-contrast);
     border-color: var(--windrose-gold-bright);
   }
 }
@@ -1061,7 +1061,7 @@
 
   &.active {
     background: var(--windrose-border-primary);
-    color: oklch(0.15 0.02 75);
+    color: var(--windrose-gold-contrast);
     border-color: var(--windrose-gold-bright);
   }
 }

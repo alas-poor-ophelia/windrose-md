@@ -209,8 +209,8 @@
   flex-direction: column;
   background: var(--windrose-bg-primary);
   border: 1px solid var(--windrose-border-primary);
-  border-radius: 8px;
-  box-shadow: 0 4px 16px oklch(0 0 0 / 0.3);
+  border-radius: var(--windrose-tile-panel-radius);
+  box-shadow: var(--windrose-tile-panel-shadow);
   overflow: hidden;
 }
 

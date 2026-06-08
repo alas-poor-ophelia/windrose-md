@@ -28,6 +28,10 @@ body {
   --windrose-depth-decoration: #86b87c;
   --windrose-gold-bright: oklch(0.82 0.09 75);
   --windrose-gold-glow: oklch(0.74 0.07 75 / 0.35);
+  --windrose-gold-contrast: oklch(0.15 0.02 75);
+  --windrose-gold-surface: oklch(0.18 0.025 75);
+  --windrose-tile-panel-radius: 8px;
+  --windrose-tile-panel-shadow: 0 4px 16px oklch(0 0 0 / 0.3);
 }
 
 /* ============================================
