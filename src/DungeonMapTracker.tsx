@@ -211,7 +211,10 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   } = useTileBrush();
   // Use rootMapData for tileset check — tilesets are built from global settings and stored on root,
   // but sub-maps should also have access to tiles
-  const availableTilesets = rootMapData?.tilesets || mapData?.tilesets || [];
+  const availableTilesets = useMemo(
+    () => rootMapData?.tilesets || mapData?.tilesets || [],
+    [rootMapData?.tilesets, mapData?.tilesets]
+  );
   const showTilePanel = mapData != null;
 
   // Flyout data for spine (recent + starred tiles)

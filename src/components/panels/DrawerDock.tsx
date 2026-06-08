@@ -70,8 +70,11 @@ function FlyoutPanel({ tiles, onSelect, onClose, label }: {
         onClose();
       }
     };
-    setTimeout(() => document.addEventListener('mousedown', handler), 0);
-    return () => document.removeEventListener('mousedown', handler);
+    const id = setTimeout(() => document.addEventListener('mousedown', handler), 0);
+    return () => {
+      clearTimeout(id);
+      document.removeEventListener('mousedown', handler);
+    };
   }, [onClose]);
 
   return (
@@ -226,6 +229,8 @@ function DrawerDock({
     if (open) setSpineFlyout(null);
   }, [open]);
 
+  const closeFlyout = useCallback(() => setSpineFlyout(null), []);
+
   const handleResizeStart = useCallback((e: MouseEvent) => {
     if (!onWidthChange) return;
     e.preventDefault();
@@ -316,7 +321,7 @@ function DrawerDock({
           <FlyoutPanel
             tiles={flyoutTiles}
             onSelect={onFlyoutSelect}
-            onClose={() => setSpineFlyout(null)}
+            onClose={closeFlyout}
             label={spineFlyout === 'recent' ? 'Recent' : 'Starred'}
           />
         </div>

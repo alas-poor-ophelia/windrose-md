@@ -497,6 +497,7 @@ const TileAssetBrowser = ({
   }, []);
 
   // Report starred tiles to parent for spine flyout
+  const prevStarredRef = useRef<string>('');
   useEffect(() => {
     if (!onStarredChange) return;
     const starred: FlyoutTile[] = [];
@@ -507,7 +508,11 @@ const TileAssetBrowser = ({
         }
       }
     }
-    onStarredChange(starred.slice(0, 20));
+    const top = starred.slice(0, 20);
+    const key = top.map(t => t.vaultPath).join('\n');
+    if (key === prevStarredRef.current) return;
+    prevStarredRef.current = key;
+    onStarredChange(top);
   }, [tileMetadata, tilesets, onStarredChange]);
 
   // Thumbnail requests are driven by virtualizer visibility — see effect after virtualizer setup
