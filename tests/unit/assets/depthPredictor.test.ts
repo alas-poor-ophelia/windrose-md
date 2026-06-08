@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { extractTokens, predictDepthTier, HEAD_NOUN_KEYWORDS } from '../../../src/assets/depthPredictor';
+import { extractTokens, predictDepthTier, predictDepthTiers, HEAD_NOUN_KEYWORDS, DD_PATH_TO_DEPTH, DD_TAG_TO_DEPTH } from '../../../src/assets/depthPredictor';
 import type { TileEntry, TileMetadataEntry } from '../../../types/tiles/tile.types';
 
 function makeTile(filename: string, opts?: Partial<TileEntry>): TileEntry {
@@ -231,5 +231,108 @@ describe('HEAD_NOUN_KEYWORDS coverage', () => {
     expect(counts.structure).toBeGreaterThanOrEqual(20);
     expect(counts.props).toBeGreaterThanOrEqual(20);
     expect(counts.decoration).toBeGreaterThanOrEqual(20);
+  });
+});
+
+describe('adversarial & edge cases', () => {
+  it('empty filename produces low confidence and defaults to props', () => {
+    const result = predictDepthTier(makeTile('.png'), undefined);
+    expect(result.confidence).toBeLessThan(0.1);
+    expect(result.tier).toBe('props');
+  });
+
+  it('filename with only numbers defaults to props with low confidence', () => {
+    const result = predictDepthTier(makeTile('12345.png'), undefined);
+    expect(result.confidence).toBeLessThan(0.1);
+  });
+
+  it('contradictory tags do not exceed confidence 1.0', () => {
+    const entry: TileMetadataEntry = {
+      ddSourceType: 'walls',
+      importTags: ['Furniture', 'Lighting', 'Obstacle', 'Structural'],
+      userTags: ['Floor', 'Wall', 'Table', 'Torch'],
+    };
+    const tile = makeTile('stone_floor_wall_table.png', {
+      tags: ['Terrain', 'Structure'],
+    });
+    const result = predictDepthTier(tile, entry);
+    expect(result.confidence).toBeLessThanOrEqual(1.0);
+  });
+
+  it('tile with no signals at all defaults to props', () => {
+    const result = predictDepthTier(makeTile('qwxyz.png'), undefined);
+    expect(result.tier).toBe('props');
+  });
+
+  it('first token fallback when last token is unrecognized', () => {
+    // "wall" is first token (recognized), "xyz" is last (unrecognized)
+    const result = predictDepthTier(makeTile('wall_xyz.png'), undefined);
+    expect(result.tier).toBe('structure');
+    expect(result.confidence).toBeGreaterThanOrEqual(0.2);
+  });
+
+  it('first token fallback has lower weight than last token match', () => {
+    // Last token match gets 0.30, first token fallback gets 0.25
+    const lastMatch = predictDepthTier(makeTile('xyz_wall.png'), undefined);
+    const firstMatch = predictDepthTier(makeTile('wall_xyz.png'), undefined);
+    expect(lastMatch.confidence).toBeGreaterThan(firstMatch.confidence);
+  });
+});
+
+describe('predictDepthTiers batch', () => {
+  it('produces a result for each tile', () => {
+    const tiles = [
+      makeTile('floor.png'),
+      makeTile('wall.png'),
+      makeTile('barrel.png'),
+    ];
+    const results = predictDepthTiers(tiles, {});
+    expect(results.size).toBe(3);
+    expect(results.get('tilesets/test/floor.png')?.tier).toBe('ground');
+    expect(results.get('tilesets/test/wall.png')?.tier).toBe('structure');
+    expect(results.get('tilesets/test/barrel.png')?.tier).toBe('props');
+  });
+
+  it('uses metadata entries when available', () => {
+    const tiles = [makeTile('unknown.png')];
+    const metadata = { 'tilesets/test/unknown.png': { ddSourceType: 'lights' } };
+    const results = predictDepthTiers(tiles, metadata);
+    expect(results.get('tilesets/test/unknown.png')?.tier).toBe('decoration');
+  });
+
+  it('returns empty map for empty tile array', () => {
+    expect(predictDepthTiers([], {}).size).toBe(0);
+  });
+});
+
+describe('DD_PATH_TO_DEPTH mapping', () => {
+  it('maps all 9 DD path prefixes', () => {
+    expect(Object.keys(DD_PATH_TO_DEPTH).length).toBe(9);
+  });
+
+  it('covers all four tiers', () => {
+    const tiers = new Set(Object.values(DD_PATH_TO_DEPTH));
+    expect(tiers.has('ground')).toBe(true);
+    expect(tiers.has('structure')).toBe(true);
+    expect(tiers.has('props')).toBe(true);
+    expect(tiers.has('decoration')).toBe(true);
+  });
+});
+
+describe('DD_TAG_TO_DEPTH mapping', () => {
+  it('maps furniture to props', () => {
+    expect(DD_TAG_TO_DEPTH['furniture']).toBe('props');
+  });
+
+  it('maps lighting to decoration', () => {
+    expect(DD_TAG_TO_DEPTH['lighting']).toBe('decoration');
+  });
+
+  it('maps structural to structure', () => {
+    expect(DD_TAG_TO_DEPTH['structural']).toBe('structure');
+  });
+
+  it('maps ocean to ground', () => {
+    expect(DD_TAG_TO_DEPTH['ocean']).toBe('ground');
   });
 });
