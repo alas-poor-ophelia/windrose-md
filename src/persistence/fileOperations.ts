@@ -7,7 +7,7 @@
 
 import type { MapData, MapLayer, MapType } from '#types/core/map.types';
 import type { App } from 'obsidian';
-import { TFile } from 'obsidian';
+import { TFile, Notice } from 'obsidian';
 
 import { DEFAULTS, SCHEMA_VERSION } from '../core/dmtConstants';
 import { getDataFilePath } from '../core/settingsAccessor';
@@ -15,6 +15,32 @@ import { offsetToAxial } from '../geometry/core/offsetCoordinates';
 import { getSettings } from '../core/settingsAccessor';
 import { migrateToLayerSchema, needsMigration, generateLayerId } from './layerAccessor';
 import { calculateFitZoom } from '../geometry/core/hexMeasurements';
+
+// Serializes saveMapData calls so concurrent writes can't race or interleave.
+// The chain is kept healthy by catching errors before re-assigning, so one
+// failed save doesn't poison subsequent ones.
+let saveQueue: Promise<unknown> = Promise.resolve();
+function enqueueSave<T>(task: () => Promise<T>): Promise<T> {
+  const next = saveQueue.then(task, task);
+  saveQueue = next.catch(() => undefined);
+  return next;
+}
+
+// Throttle the corrupted-file notice so we don't spam the user with a toast
+// every time autosave fires while the file is broken.
+let lastCorruptionNoticeAt = 0;
+const CORRUPTION_NOTICE_INTERVAL_MS = 30_000;
+function notifyCorruptedDataFile(dataPath: string): void {
+  const now = Date.now();
+  if (now - lastCorruptionNoticeAt < CORRUPTION_NOTICE_INTERVAL_MS) return;
+  lastCorruptionNoticeAt = now;
+  new Notice(
+    `Windrose: map data file is corrupted and saves are paused to protect your data.\n\n` +
+    `File: ${dataPath}\n\n` +
+    `Inspect or restore the file manually, then reload Obsidian to resume saving.`,
+    15_000
+  );
+}
 
 /** Data file structure */
 interface DataFile {
@@ -154,8 +180,8 @@ function migrateMapData(mapData: MapData): MapData {
 }
 
 async function loadMapData(app: App, mapId: string, mapName: string = '', mapType: MapType = 'grid'): Promise<MapData> {
+  const dataPath = getDataFilePath();
   try {
-    const dataPath = getDataFilePath();
     const file = app.vault.getAbstractFileByPath(dataPath);
 
     if (!(file instanceof TFile)) {
@@ -177,42 +203,74 @@ async function loadMapData(app: App, mapId: string, mapName: string = '', mapTyp
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error('[loadMapData] Failed to load map data, creating new map:', error);
+    notifyCorruptedDataFile(dataPath);
     return createNewMap(mapName, mapType);
   }
 }
 
 /**
- * Save map data to vault
+ * Save map data to vault.
+ *
+ * Saves are protected by:
+ *   1. Mutex (saveQueue) — serializes concurrent saves so two writes never race.
+ *      Required because each save does read-modify-write on the whole file;
+ *      without serialization, simultaneous saves of different maps would clobber
+ *      each other (lost-update problem).
+ *   2. Pre-write validation — JSON.parse the serialized output before any disk
+ *      write, and refuse to save if existing on-disk file is unparseable
+ *      (prevents silently overwriting corrupted data with partial state).
  */
 async function saveMapData(app: App, mapId: string, mapData: MapData): Promise<boolean> {
-  try {
-    let allData: DataFile = { maps: {} };
+  return enqueueSave(async () => {
+    try {
+      let allData: DataFile = { maps: {} };
 
-    // Load existing data
-    const abstractFile = app.vault.getAbstractFileByPath(getDataFilePath());
-    const file = abstractFile instanceof TFile ? abstractFile : null;
-    if (file) {
-      const content = await app.vault.read(file);
-      allData = JSON.parse(content) as DataFile;
+      // Load existing data
+      const dataPath = getDataFilePath();
+      const abstractFile = app.vault.getAbstractFileByPath(dataPath);
+      const file = abstractFile instanceof TFile ? abstractFile : null;
+      if (file) {
+        const content = await app.vault.read(file);
+        try {
+          allData = JSON.parse(content) as DataFile;
+        } catch (parseError) {
+          // eslint-disable-next-line no-console
+          console.error(
+            '[saveMapData] Existing data file is unparseable. Refusing to overwrite to avoid data loss. ' +
+            'Inspect or restore the file manually before saving again.',
+            parseError
+          );
+          notifyCorruptedDataFile(dataPath);
+          return false;
+        }
+      }
+
+      // Update specific map
+      allData.maps[mapId] = mapData;
+
+      // Serialize and validate BEFORE touching disk
+      const jsonString = JSON.stringify(allData, null, 2);
+      try {
+        JSON.parse(jsonString);
+      } catch (validateError) {
+        // eslint-disable-next-line no-console
+        console.error('[saveMapData] Pre-write validation failed, save aborted:', validateError);
+        return false;
+      }
+
+      if (file) {
+        await app.vault.modify(file, jsonString);
+      } else {
+        await app.vault.create(dataPath, jsonString);
+      }
+
+      return true;
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Error saving map data:', error);
+      return false;
     }
-
-    // Update specific map
-    allData.maps[mapId] = mapData;
-
-    const jsonString = JSON.stringify(allData, null, 2);
-
-    if (file) {
-      await app.vault.modify(file, jsonString);
-    } else {
-      await app.vault.create(getDataFilePath(), jsonString);
-    }
-
-    return true;
-  } catch (error) {
-    // eslint-disable-next-line no-console
-    console.error('Error saving map data:', error);
-    return false;
-  }
+  });
 }
 
 function createNewMap(mapName: string = '', mapType: MapType = 'grid'): MapData {
