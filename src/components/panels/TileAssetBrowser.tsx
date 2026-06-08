@@ -8,6 +8,7 @@
 
 import type { TilesetDef, TileEntry, TilesetOverrides, TileLayerRole, TileMetadataStore } from '#types/tiles/tile.types';
 import type { ToolId } from '#types/tools/tool.types';
+import type { FlyoutTile } from './DrawerDock';
 import type { VNode } from 'preact';
 import { TFile } from 'obsidian';
 
@@ -291,6 +292,7 @@ interface TileAssetBrowserProps {
   showRail?: boolean;
   compact?: boolean;
   recentTiles?: Array<{ tilesetId: string; tileId: string }>;
+  onStarredChange?: (tiles: FlyoutTile[]) => void;
 }
 
 type RailSelection = 'all' | 'recent' | 'starred' | string;
@@ -300,6 +302,12 @@ type FullModeRow =
   | { type: 'tileRow'; tiles: TileEntry[] }
   | { type: 'catHeader'; category: string; count: number; collapsed: boolean }
   | { type: 'empty'; message: string };
+
+function displayCategory(category: string): string {
+  const parts = category.split('/');
+  if (parts.length <= 2) return category;
+  return parts.slice(-2).join('/');
+}
 
 const ROTATION_STEPS = [0, 60, 120, 180, 240, 300];
 
@@ -333,9 +341,9 @@ const TileAssetBrowser = ({
   showRail = false,
   compact = false,
   recentTiles,
+  onStarredChange,
 }: TileAssetBrowserProps): VNode | null => {
   const app = useApp();
-  const [activeTilesetIndex, setActiveTilesetIndex] = useState<number>(0);
   const [searchFilter, setSearchFilter] = useState<string>('');
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
   const [showTilesetConfig, setShowTilesetConfig] = useState<boolean>(false);
@@ -357,15 +365,6 @@ const TileAssetBrowser = ({
   const orgScrollRef = useRef<HTMLDivElement>(null);
   const gridWrapRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
-
-  // Clamp activeTilesetIndex when tilesets shrink
-  useEffect(() => {
-    if (activeTilesetIndex >= tilesets.length && tilesets.length > 0) {
-      setActiveTilesetIndex(tilesets.length - 1);
-    } else if (tilesets.length === 0) {
-      setActiveTilesetIndex(0);
-    }
-  }, [tilesets.length]);
 
   // Reset rail, tags, and drill-down when depth changes
   useEffect(() => {
@@ -436,7 +435,7 @@ const TileAssetBrowser = ({
 
     label.textContent = hoveredTile.filename + (rotation ? ` (${rotation}°)` : '') + (flipH ? ' [flipped]' : '');
 
-    const isHoveredSelected = selectedTilesetId === activeTileset?.id && selectedTileId === hoveredTile.id;
+    const isHoveredSelected = selectedTilesetId === tileToTilesetId.get(hoveredTile.vaultPath) && selectedTileId === hoveredTile.id;
     if (isHoveredSelected && (rotation || flipH)) {
       const transformVal = `rotate(${rotation}deg)${flipH ? ' scaleX(-1)' : ''}`;
       canvas.style.setProperty('transform', transformVal);
@@ -497,6 +496,20 @@ const TileAssetBrowser = ({
     void loadTileMetadata(app).then(setTileMetadata);
   }, []);
 
+  // Report starred tiles to parent for spine flyout
+  useEffect(() => {
+    if (!onStarredChange) return;
+    const starred: FlyoutTile[] = [];
+    for (const ts of tilesets) {
+      for (const t of ts.tiles) {
+        if (isStarred(tileMetadata, t.vaultPath)) {
+          starred.push({ tilesetId: ts.id, tileId: t.id, filename: t.filename, vaultPath: t.vaultPath });
+        }
+      }
+    }
+    onStarredChange(starred.slice(0, 20));
+  }, [tileMetadata, tilesets, onStarredChange]);
+
   // Thumbnail requests are driven by virtualizer visibility — see effect after virtualizer setup
 
   // Auto-predict depth affinity for tiles that don't have one yet (deferred to idle)
@@ -536,31 +549,39 @@ const TileAssetBrowser = ({
     };
   }, [tilesets, tileMetadata]);
 
-  const allTilesFlat = useMemo((): TileEntry[] => {
-    const result: TileEntry[] = [];
+  // Merge all tileset tiles into a single pool
+  const allTiles = useMemo(() => {
+    const tiles: TileEntry[] = [];
+    for (const ts of tilesets) tiles.push(...ts.tiles);
+    return tiles;
+  }, [tilesets]);
+
+  // Map vaultPath → tilesetId for click handlers
+  const tileToTilesetId = useMemo(() => {
+    const map = new Map<string, string>();
     for (const ts of tilesets) {
-      for (const t of ts.tiles) result.push(t);
+      for (const t of ts.tiles) map.set(t.vaultPath, ts.id);
     }
-    return result;
+    return map;
   }, [tilesets]);
 
   const orgFilteredTiles = useMemo((): TileEntry[] => {
     if (!organize) return [];
-    if (orgSearch === '') return allTilesFlat;
+    if (orgSearch === '') return allTiles;
     const lower = orgSearch.toLowerCase();
-    return allTilesFlat.filter(t =>
+    return allTiles.filter(t =>
       t.filename.toLowerCase().includes(lower) ||
       (t.category != null && t.category.toLowerCase().includes(lower)) ||
       (t.tags != null && t.tags.some(tag => tag.toLowerCase().includes(lower)))
     );
-  }, [organize, allTilesFlat, orgSearch]);
+  }, [organize, allTiles, orgSearch]);
 
   const orgAllOn = orgFilteredTiles.length > 0 && orgFilteredTiles.every(t => orgSelection.has(t.vaultPath));
 
   const orgTagSuggestions = useMemo((): string[] => {
     if (!organize) return [];
-    return collectUniqueTags(allTilesFlat, tileMetadata).slice(0, 12);
-  }, [organize, allTilesFlat, tileMetadata]);
+    return collectUniqueTags(allTiles, tileMetadata).slice(0, 12);
+  }, [organize, allTiles, tileMetadata]);
 
   const toggleOrgSelect = (vaultPath: string): void => {
     setOrgSelection(prev => {
@@ -613,20 +634,18 @@ const TileAssetBrowser = ({
     setOrgTagInput('');
   };
 
-  const activeTileset = tilesets[activeTilesetIndex] ?? null;
-
   // Collect available tags, sorted by depth relevance when on grid maps
   const availableTags = useMemo(() => {
-    if (activeTileset == null) return [];
+    if (allTiles.length === 0) return [];
     if (mapType === 'grid') {
-      return collectDepthAwareTags(activeTileset.tiles, tileMetadata, tileDepth);
+      return collectDepthAwareTags(allTiles, tileMetadata, tileDepth);
     }
-    return collectUniqueTags(activeTileset.tiles, tileMetadata);
-  }, [activeTileset, tileMetadata, tileDepth, mapType]);
+    return collectUniqueTags(allTiles, tileMetadata);
+  }, [allTiles, tileMetadata, tileDepth, mapType]);
 
   const filteredTiles = useMemo(() => {
-    if (activeTileset == null) return [];
-    let tiles = activeTileset.tiles;
+    if (allTiles.length === 0) return [];
+    let tiles = allTiles;
 
     // Text search (includes import + user tags via metadata)
     if (searchFilter != null && searchFilter !== '') {
@@ -649,18 +668,41 @@ const TileAssetBrowser = ({
     }
 
     return tiles;
-  }, [activeTileset, searchFilter, activeTags, tileMetadata]);
+  }, [allTiles, searchFilter, activeTags, tileMetadata]);
+
+  // Detect categories that appear in multiple tilesets (for disambiguation)
+  const ambiguousCategories = useMemo(() => {
+    if (tilesets.length <= 1) return new Set<string>();
+    const catToTilesets = new Map<string, Set<string>>();
+    for (const ts of tilesets) {
+      for (const t of ts.tiles) {
+        const cat = t.category ?? 'Uncategorized';
+        if (!catToTilesets.has(cat)) catToTilesets.set(cat, new Set());
+        catToTilesets.get(cat)!.add(ts.id);
+      }
+    }
+    const ambiguous = new Set<string>();
+    for (const [cat, tsIds] of catToTilesets) {
+      if (tsIds.size > 1) ambiguous.add(cat);
+    }
+    return ambiguous;
+  }, [tilesets]);
 
   const groupedTiles = useMemo(() => {
     const groups = new Map<string, TileEntry[]>();
     for (const tile of filteredTiles) {
-      const cat = tile.category ?? 'Uncategorized';
+      let cat = tile.category ?? 'Uncategorized';
+      // Disambiguate categories shared across multiple tilesets
+      if (ambiguousCategories.has(cat)) {
+        const tsId = tileToTilesetId.get(tile.vaultPath);
+        const ts = tilesets.find(t => t.id === tsId);
+        if (ts) cat = `${ts.name} / ${cat}`;
+      }
       if (!groups.has(cat)) groups.set(cat, []);
-      const group = groups.get(cat);
-      if (group != null) group.push(tile);
+      groups.get(cat)!.push(tile);
     }
     return groups;
-  }, [filteredTiles]);
+  }, [filteredTiles, ambiguousCategories, tileToTilesetId, tilesets]);
 
   // Resolve which groups to show based on rail selection
   const shownGroups = useMemo((): Array<[string, TileEntry[]]> => {
@@ -671,19 +713,21 @@ const TileAssetBrowser = ({
 
   // Resolve the selected tile entry for the loaded-brush footer
   const selectedTile = useMemo((): TileEntry | null => {
-    if (selectedTileId == null || activeTileset == null) return null;
-    if (selectedTilesetId !== activeTileset.id) return null;
-    return activeTileset.tiles.find(t => t.id === selectedTileId) ?? null;
-  }, [selectedTileId, selectedTilesetId, activeTileset]);
+    if (selectedTileId == null || selectedTilesetId == null) return null;
+    const ts = tilesets.find(t => t.id === selectedTilesetId);
+    return ts?.tiles.find(t => t.id === selectedTileId) ?? null;
+  }, [selectedTileId, selectedTilesetId, tilesets]);
 
-  // Resolve recent tiles that belong to the active tileset
+  // Resolve recent tiles across all tilesets
   const recentTileEntries = useMemo((): TileEntry[] => {
-    if (!recentTiles || activeTileset == null) return [];
+    if (!recentTiles || tilesets.length === 0) return [];
     return recentTiles
-      .filter(r => r.tilesetId === activeTileset.id)
-      .map(r => activeTileset.tiles.find(t => t.id === r.tileId))
+      .map(r => {
+        const ts = tilesets.find(t => t.id === r.tilesetId);
+        return ts?.tiles.find(t => t.id === r.tileId);
+      })
       .filter((t): t is TileEntry => t != null);
-  }, [recentTiles, activeTileset]);
+  }, [recentTiles, tilesets]);
 
   // Grid sizing
   const tileMin = compact ? 42 : 56;
@@ -741,7 +785,7 @@ const TileAssetBrowser = ({
     if (filteredTiles.length === 0) {
       rows.push({
         type: 'empty',
-        message: searchFilter !== '' ? 'No matching tiles' : 'No tiles in this tileset',
+        message: searchFilter !== '' ? 'No matching tiles' : 'No tiles loaded',
       });
     }
 
@@ -799,14 +843,12 @@ const TileAssetBrowser = ({
         }
       }
     } else {
-      // Compact mode: no virtualization, request all visible tiles
-      if (activeTileset) {
-        for (const t of activeTileset.tiles) paths.push(t.vaultPath);
-      }
+      // Compact mode: no virtualization, request all filtered tiles
+      for (const t of filteredTiles) paths.push(t.vaultPath);
     }
 
     if (paths.length > 0) requestThumbs(paths);
-  }, [tilesets, organize, compact, orgRows, fullRows, orgRange, fullRange, activeTileset, requestThumbs]);
+  }, [tilesets, organize, compact, orgRows, fullRows, orgRange, fullRange, filteredTiles, requestThumbs]);
 
   // ---- Empty state: no tilesets ----
 
@@ -1020,9 +1062,9 @@ const TileAssetBrowser = ({
       <div className="windrose-tb-head">
         <div className="windrose-tb-title">Tiles</div>
         <span className="windrose-tb-cap" style={{ marginRight: 'auto', marginLeft: 2 }}>
-          {activeTileset?.name ?? ''}
+          {tilesets.length === 1 ? tilesets[0].name : `${tilesets.length} packs`}
         </span>
-        {onTilesetOverrideChange != null && activeTileset != null && (
+        {onTilesetOverrideChange != null && tilesets.length > 0 && (
           <button
             className="windrose-tb-iconbtn ghost"
             title="Tileset settings"
@@ -1060,32 +1102,18 @@ const TileAssetBrowser = ({
         </div>
       )}
 
-      {/* Tileset selector (when multiple tilesets) */}
-      {tilesets.length > 1 && (
-        <div className="windrose-tb-tileset">
-          <select
-            value={activeTilesetIndex}
-            onChange={(e: Event) => setActiveTilesetIndex(parseInt((e.target as HTMLSelectElement).value, 10))}
-            className="windrose-tb-tileset-select"
-          >
-            {tilesets.map((ts: TilesetDef, i: number) => (
-              <option key={ts.id} value={i}>{ts.name}</option>
-            ))}
-          </select>
-        </div>
-      )}
-
       {/* Tileset config panel (inline) */}
-      {showTilesetConfig && activeTileset != null && onTilesetOverrideChange != null && (() => {
-        const currentOverrides = tilesetOverrides?.[activeTileset.id] || {};
-        const threshold = currentOverrides.stampThreshold ?? activeTileset.stampThreshold ?? 0.5;
-        const minScale = currentOverrides.minStampScale ?? activeTileset.minStampScale ?? 0.2;
-        const fitMode = currentOverrides.fitMode ?? activeTileset.fitMode;
+      {showTilesetConfig && tilesets.length > 0 && onTilesetOverrideChange != null && (() => {
+        const configTileset = tilesets[0];
+        const currentOverrides = tilesetOverrides?.[configTileset.id] || {};
+        const threshold = currentOverrides.stampThreshold ?? configTileset.stampThreshold ?? 0.5;
+        const minScale = currentOverrides.minStampScale ?? configTileset.minStampScale ?? 0.2;
+        const fitMode = currentOverrides.fitMode ?? configTileset.fitMode;
 
         const handleOverrideChange = (field: keyof TilesetOverrides, value: number | string | undefined): void => {
           const updated = { ...currentOverrides, [field]: value };
           if (value === undefined) delete updated[field];
-          onTilesetOverrideChange(activeTileset.id, updated);
+          onTilesetOverrideChange(configTileset.id, updated);
         };
 
         return (
@@ -1234,12 +1262,13 @@ const TileAssetBrowser = ({
               <>
                 <div className="windrose-tb-leaf-grid">
                   {(groupedTiles.get(openCat) ?? []).map((tile: TileEntry) => {
-                    const isSelected = selectedTilesetId === activeTileset?.id && selectedTileId === tile.id;
+                    const tsId = tileToTilesetId.get(tile.vaultPath) ?? '';
+                    const isSelected = selectedTilesetId === tsId && selectedTileId === tile.id;
                     return (
                       <div
-                        key={tile.id}
+                        key={tile.vaultPath}
                         className={`windrose-tile-thumb ${isSelected ? 'sel' : ''}`}
-                        onClick={() => handleTileClick(activeTileset?.id ?? '', tile.id)}
+                        onClick={() => handleTileClick(tsId, tile.id)}
                         onMouseEnter={() => setHoveredTile(tile)}
                         onMouseLeave={() => setHoveredTile(null)}
                         title={tile.filename}
@@ -1271,7 +1300,7 @@ const TileAssetBrowser = ({
                 </div>
                 {groupedTiles.size === 0 && (
                   <div className="windrose-tb-empty">
-                    {searchFilter !== '' ? 'No matching tiles' : 'No tiles in this tileset'}
+                    {searchFilter !== '' ? 'No matching tiles' : 'No tiles loaded'}
                   </div>
                 )}
               </>
@@ -1303,24 +1332,26 @@ const TileAssetBrowser = ({
                       <button
                         className="windrose-tb-seclabel"
                         onClick={() => handleToggleCategory(row.category)}
+                        title={row.category}
                       >
                         <Icon
                           icon={row.collapsed ? 'lucide-chevron-right' : 'lucide-chevron-down'}
                           size={10}
                         />
-                        {row.category}
+                        <span className="catname">{displayCategory(row.category)}</span>
                         <span className="count">{row.count}</span>
                       </button>
                     )}
                     {row.type === 'tileRow' && (
                       <div style={{ display: 'grid', gridTemplateColumns: `repeat(${fullColCount}, 1fr)`, gap: gridGap }}>
                         {row.tiles.map((tile: TileEntry) => {
-                          const isSelected = selectedTilesetId === activeTileset?.id && selectedTileId === tile.id;
+                          const tsId = tileToTilesetId.get(tile.vaultPath) ?? '';
+                          const isSelected = selectedTilesetId === tsId && selectedTileId === tile.id;
                           return (
                             <div
-                              key={tile.id}
+                              key={tile.vaultPath}
                               className={`windrose-tile-thumb ${isSelected ? 'sel' : ''}`}
-                              onClick={() => handleTileClick(activeTileset?.id ?? '', tile.id)}
+                              onClick={() => handleTileClick(tsId, tile.id)}
                               onMouseEnter={() => setHoveredTile(tile)}
                               onMouseLeave={() => setHoveredTile(null)}
                               title={tile.filename}

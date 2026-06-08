@@ -359,6 +359,7 @@
 .windrose-tb-grid-wrap {
   flex: 1;
   min-width: 0;
+  overflow-x: hidden;
   overflow-y: auto;
   padding: 8px 10px 12px;
   scrollbar-width: thin;
@@ -372,6 +373,7 @@
   align-items: center;
   gap: 6px;
   width: 100%;
+  min-width: 0;
   padding: 4px 2px;
   background: none;
   border: none;
@@ -381,6 +383,13 @@
   letter-spacing: 0.08em;
   text-transform: uppercase;
   font-weight: 700;
+
+  .catname {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    min-width: 0;
+  }
 
   &:hover {
     color: var(--windrose-text-secondary);

@@ -61,6 +61,7 @@ import { useThemeMode } from './hooks/state/useThemeMode';
 import { SubHexBreadcrumb } from './components/controls/SubHexBreadcrumb';
 import { TileAssetBrowser } from './components/panels/TileAssetBrowser';
 import { DrawerDock } from './components/panels/DrawerDock';
+import type { FlyoutTile } from './components/panels/DrawerDock';
 import { RA_ICONS } from './assets/rpgAwesomeIcons';
 import { injectIconCSS } from './assets/rpgAwesomeLoader';
 import { useApp } from './context/AppContext';
@@ -212,6 +213,27 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   // but sub-maps should also have access to tiles
   const availableTilesets = rootMapData?.tilesets || mapData?.tilesets || [];
   const showTilePanel = mapData != null;
+
+  // Flyout data for spine (recent + starred tiles)
+  const [starredFlyoutTiles, setStarredFlyoutTiles] = useState<FlyoutTile[]>([]);
+
+  const flyoutRecent = useMemo((): FlyoutTile[] => {
+    if (!recentTiles || availableTilesets.length === 0) return [];
+    return recentTiles
+      .map(r => {
+        const ts = availableTilesets.find(t => t.id === r.tilesetId);
+        const tile = ts?.tiles.find(t => t.id === r.tileId);
+        if (!tile || !ts) return null;
+        return { tilesetId: ts.id, tileId: tile.id, filename: tile.filename, vaultPath: tile.vaultPath };
+      })
+      .filter((t): t is FlyoutTile => t != null)
+      .slice(0, 10);
+  }, [recentTiles, availableTilesets]);
+
+  const handleFlyoutSelect = useCallback((tilesetId: string, tileId: string) => {
+    handleTileSelect(tilesetId, tileId);
+    setCurrentTool('tilePaint');
+  }, [handleTileSelect, setCurrentTool]);
 
   // Image alignment mode (extracted to useAlignmentMode hook)
   const {
@@ -920,6 +942,9 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               onDepthChange={setTileDepth}
               hidden={hiddenLayers}
               onToggleHide={toggleHiddenLayer}
+              flyoutRecent={flyoutRecent}
+              flyoutStarred={starredFlyoutTiles}
+              onFlyoutSelect={handleFlyoutSelect}
             >
               <TileAssetBrowser
                 tilesets={availableTilesets}
@@ -956,6 +981,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 }}
                 compact
                 recentTiles={recentTiles}
+                onStarredChange={setStarredFlyoutTiles}
               />
             </DrawerDock>
           )}
@@ -1154,6 +1180,9 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                   onDepthChange={setTileDepth}
                   hidden={hiddenLayers}
                   onToggleHide={toggleHiddenLayer}
+                  flyoutRecent={flyoutRecent}
+                  flyoutStarred={starredFlyoutTiles}
+                  onFlyoutSelect={handleFlyoutSelect}
                 >
                   <TileAssetBrowser
                     tilesets={availableTilesets}
@@ -1190,6 +1219,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                     }}
                     showRail
                     recentTiles={recentTiles}
+                    onStarredChange={setStarredFlyoutTiles}
                   />
                 </DrawerDock>
               )}

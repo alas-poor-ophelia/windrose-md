@@ -2,8 +2,16 @@ import type { ComponentChildren, VNode } from 'preact';
 import type { TileLayerRole } from '#types/tiles/tile.types';
 
 import { useCallback, useRef, useEffect, useState } from 'preact/hooks';
+import { useApp } from '../../context/AppContext';
 import { Icon } from '../shared/Icon';
 import { DepthRibbon } from './DepthBar';
+
+interface FlyoutTile {
+  tilesetId: string;
+  tileId: string;
+  filename: string;
+  vaultPath: string;
+}
 
 interface DrawerDockProps {
   open: boolean;
@@ -23,10 +31,86 @@ interface DrawerDockProps {
   tileCounts?: Record<TileLayerRole, number>;
   selectedTileName?: string | null;
   selectedTileThumb?: HTMLCanvasElement | null;
+  flyoutRecent?: FlyoutTile[];
+  flyoutStarred?: FlyoutTile[];
+  onFlyoutSelect?: (tilesetId: string, tileId: string) => void;
   children: ComponentChildren;
 }
 
-function SpineRibbon({ depth, onDepthChange, hidden, onToggleHide, tileCounts, onExpand, selectedTileName, selectedTileThumb, ribbonWidth }: {
+function FlyoutThumb({ vaultPath }: { vaultPath: string }): VNode {
+  const app = useApp();
+  const src = app.vault.adapter.getResourcePath(vaultPath);
+  return <img className="windrose-flyout-img" src={src} loading="lazy" />;
+}
+
+function FlyoutPreview({ tile }: { tile: FlyoutTile }): VNode {
+  const app = useApp();
+  const src = app.vault.adapter.getResourcePath(tile.vaultPath);
+
+  return (
+    <div className="windrose-flyout-preview">
+      <img src={src} className="windrose-flyout-preview-img" />
+      <div className="windrose-flyout-preview-label">{tile.filename}</div>
+    </div>
+  );
+}
+
+function FlyoutPanel({ tiles, onSelect, onClose, label }: {
+  tiles: FlyoutTile[];
+  onSelect: (tilesetId: string, tileId: string) => void;
+  onClose: () => void;
+  label: string;
+}): VNode {
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [hoveredTile, setHoveredTile] = useState<FlyoutTile | null>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
+        onClose();
+      }
+    };
+    setTimeout(() => document.addEventListener('mousedown', handler), 0);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [onClose]);
+
+  return (
+    <div ref={panelRef} className="windrose-spine-flyout">
+      <div className="windrose-spine-flyout-head">
+        <span>{label}</span>
+        <button className="windrose-spine-flyout-close" onClick={onClose}>
+          <Icon icon="lucide-x" size={12} />
+        </button>
+      </div>
+      {tiles.length === 0 ? (
+        <div className="windrose-spine-flyout-empty">
+          No {label.toLowerCase()} tiles
+        </div>
+      ) : (
+        <div className="windrose-spine-flyout-grid">
+          {tiles.map(tile => (
+            <div
+              key={tile.vaultPath}
+              className="windrose-spine-flyout-tile"
+              title={tile.filename}
+              onClick={() => {
+                onSelect(tile.tilesetId, tile.tileId);
+                onClose();
+              }}
+              onMouseEnter={() => setHoveredTile(tile)}
+              onMouseLeave={() => setHoveredTile(null)}
+            >
+              <FlyoutThumb vaultPath={tile.vaultPath} />
+            </div>
+          ))}
+        </div>
+      )}
+      {hoveredTile && <FlyoutPreview tile={hoveredTile} />}
+    </div>
+  );
+}
+
+function SpineRibbon({ depth, onDepthChange, hidden, onToggleHide, tileCounts, onExpand, selectedTileName, selectedTileThumb, ribbonWidth, spineFlyout, onSpineFlyout }: {
   depth: TileLayerRole;
   onDepthChange: (d: TileLayerRole) => void;
   hidden: Set<TileLayerRole>;
@@ -36,6 +120,8 @@ function SpineRibbon({ depth, onDepthChange, hidden, onToggleHide, tileCounts, o
   selectedTileName?: string | null;
   selectedTileThumb?: HTMLCanvasElement | null;
   ribbonWidth: number;
+  spineFlyout: 'recent' | 'starred' | null;
+  onSpineFlyout: (v: 'recent' | 'starred' | null) => void;
 }): VNode {
   const chipRef = useRef<HTMLDivElement>(null);
   const chipSize = ribbonWidth - 18;
@@ -54,6 +140,10 @@ function SpineRibbon({ depth, onDepthChange, hidden, onToggleHide, tileCounts, o
     }
   }, [selectedTileThumb]);
 
+  const toggleFlyout = (which: 'recent' | 'starred') => {
+    onSpineFlyout(spineFlyout === which ? null : which);
+  };
+
   return (
     <div className="windrose-tile-spine">
       <button
@@ -63,6 +153,23 @@ function SpineRibbon({ depth, onDepthChange, hidden, onToggleHide, tileCounts, o
       >
         <Icon icon="lucide-panel-left-open" size={15} />
       </button>
+      <div className="windrose-tile-spine-flyout-btns">
+        <button
+          className={`windrose-tile-spine-fbtn ${spineFlyout === 'starred' ? 'active' : ''}`}
+          title="Starred tiles"
+          onClick={() => toggleFlyout('starred')}
+        >
+          <Icon icon="lucide-star" size={14} />
+        </button>
+        <button
+          className={`windrose-tile-spine-fbtn ${spineFlyout === 'recent' ? 'active' : ''}`}
+          title="Recent tiles"
+          onClick={() => toggleFlyout('recent')}
+        >
+          <Icon icon="lucide-clock" size={14} />
+        </button>
+      </div>
+      <div className="windrose-tile-spine-div" />
       <DepthRibbon
         active={depth}
         onPick={onDepthChange}
@@ -104,11 +211,20 @@ function DrawerDock({
   tileCounts,
   selectedTileName,
   selectedTileThumb,
+  flyoutRecent,
+  flyoutStarred,
+  onFlyoutSelect,
   children,
 }: DrawerDockProps): VNode {
   const [resizing, setResizing] = useState(false);
+  const [spineFlyout, setSpineFlyout] = useState<'recent' | 'starred' | null>(null);
   const dragRef = useRef<{ startX: number; startWidth: number } | null>(null);
   const dockWidth = open ? drawerWidth : ribbonWidth;
+
+  // Close flyout when drawer opens
+  useEffect(() => {
+    if (open) setSpineFlyout(null);
+  }, [open]);
 
   const handleResizeStart = useCallback((e: MouseEvent) => {
     if (!onWidthChange) return;
@@ -147,11 +263,16 @@ function DrawerDock({
     compact ? 'is-compact' : '',
     open ? 'is-open' : 'is-collapsed',
     resizing ? 'is-resizing' : '',
+    spineFlyout != null && !open ? 'has-flyout' : '',
   ].filter(Boolean).join(' ');
 
   const transition = fold && !resizing
     ? 'width .42s cubic-bezier(.2,.8,.2,1)'
     : 'none';
+
+  const flyoutTiles = spineFlyout === 'recent' ? flyoutRecent
+    : spineFlyout === 'starred' ? flyoutStarred
+    : undefined;
 
   return (
     <div
@@ -181,8 +302,25 @@ function DrawerDock({
           selectedTileName={selectedTileName}
           selectedTileThumb={selectedTileThumb}
           ribbonWidth={ribbonWidth}
+          spineFlyout={spineFlyout}
+          onSpineFlyout={setSpineFlyout}
         />
       </div>
+
+      {/* Flyout panel — positioned to left of spine, outside both layers */}
+      {spineFlyout != null && flyoutTiles != null && onFlyoutSelect != null && !open && (
+        <div
+          className="windrose-tile-flyout-layer"
+          style={{ right: ribbonWidth }}
+        >
+          <FlyoutPanel
+            tiles={flyoutTiles}
+            onSelect={onFlyoutSelect}
+            onClose={() => setSpineFlyout(null)}
+            label={spineFlyout === 'recent' ? 'Recent' : 'Starred'}
+          />
+        </div>
+      )}
 
       {/* Full panel — right-pinned, clips off left edge as dock narrows */}
       <div
@@ -201,4 +339,4 @@ function DrawerDock({
 }
 
 export { DrawerDock };
-export type { DrawerDockProps };
+export type { DrawerDockProps, FlyoutTile };
