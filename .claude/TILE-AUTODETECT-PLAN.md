@@ -4,6 +4,46 @@ Status: DRAFT (pending adversarial review)
 Date: 2026-06-08
 Branch: standalone-conversion
 
+## SESSION HANDOFF — 2026-06-09
+
+**Committed & done this session (branch `standalone-conversion`, NOT pushed):**
+- Phase 3 (renderer reads per-tile renderMode via module accessor), Phase 4 (predictSpan),
+  Phase 5 (footprint-aware place/draw/erase/flood-fill/hit-test + 90/270 rotation swap, 4
+  sub-commits). Also the Dungeondraft import bug fix (packPrefix per-file path + write guard
+  + live accessor sync). All typecheck-clean, full unit suite green (1433).
+- Live MCP verification confirmed the Phase 5 machinery (helpers, resolver, renderer, rotation
+  swap) is CORRECT in the real bundle and SAFE to ship (1×1 unchanged).
+
+**OPEN DESIGN DECISION (blocks Phase 4 being correct) — START HERE NEXT SESSION:**
+- `predictSpan` currently divides each tile's opaque size by `tileset.tileWidth` — but
+  `tileWidth` is a SAMPLED sibling-tile size (probeFirstTileImage), not a grid unit. Comparing a
+  tile to another tile's resolution is meaningless → ~28/120 DD objects falsely promote. KNOWN
+  BUG (harmless today only because the scan never runs — see below).
+- CORRECT form: `footprint = round(naturalSize / pixelsPerCell)` per tile, where `pixelsPerCell`
+  is the pack's AUTHORING grid-square size (constant per pack; per-tileset, NOT per-tile span).
+- Blocker: DD embeds NO grid/DPI/scale in the pack (verified by scanning the .pck), and the DD
+  authoring DPI is not fixed (creators use ~50–256 px/square). So `pixelsPerCell` must be a
+  per-tileset value: sane default + user-calibrated. Decoration packs (this one: eyes/teeth)
+  are freely sized → mostly 1 cell regardless; footprint earns its keep on grid-aligned
+  furniture/structure packs.
+- AWAITING GUILDMASTER CHOICE between: (A) hybrid — default span 1, per-tileset `pixelsPerCell`
+  the user sets to enable bulk prediction [recommended]; (B) per-tileset authoring-scale with a
+  default (e.g. 256), auto-predict all, user adjusts; (C) drop auto-predict, footprint user-set
+  per tile in the override UI. See heuristics H-521.
+
+**SECOND BUG (independent): detection scan never runs.** 0/354 metadata entries had
+opaque/alpha signals — the eager scan is gated on the tile browser being open + idle callback,
+so render-mode pixel-refinement AND span detection are both starved. Trigger detection at a
+guaranteed point (DD import, map open) or add a "scan now" action. See H-522.
+
+**Remaining phases:** 7 (per-tile override UI — now the PRIMARY footprint path), then 6 (remove
+old per-tileset render panel + tilesets[0] hack), then 9 (E2E verify). Phases 0–5 + 8 done.
+
+**MCP/runtime notes** (also in memory `project_windrose_mcp.md`): plugin id is `windrose-md`
+(reload via `app.plugins.disablePlugin/enablePlugin('windrose-md')`); data file
+`Garden/90 - Data/12 - Meta/JSON/dungeon-maps-data.json`; live-verify by adding a debug surface
+to `main.ts initMcpNamespace` then eval the real functions against `windrose-tile-metadata.json`.
+
 ## Goal
 
 Make tile render behavior **work out of the box**: Windrose should auto-detect, per
