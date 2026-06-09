@@ -238,6 +238,17 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     setCurrentTool('tilePaint');
   }, [handleTileSelect, setCurrentTool]);
 
+  // Persist a tileset's render overrides AND apply them to the live merged
+  // tileset so changes (fitMode, stamp thresholds, terrain render mode) take
+  // effect immediately without waiting for a tileset rebuild/reload.
+  const handleTilesetOverrideChange = useCallback((tilesetId: string, overrides: TilesetOverrides) => {
+    updateMapData((prev: MapData) => ({
+      ...prev,
+      tilesetOverrides: { ...prev.tilesetOverrides, [tilesetId]: overrides },
+      tilesets: (prev.tilesets ?? []).map(ts => ts.id === tilesetId ? { ...ts, ...overrides } : ts),
+    }));
+  }, [updateMapData]);
+
   // Image alignment mode (extracted to useAlignmentMode hook)
   const {
     isAlignmentMode, alignmentOffsetX, alignmentOffsetY,
@@ -976,12 +987,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 onTileScaleChange={setTileScale}
                 getCachedImage={getCachedImage}
                 tilesetOverrides={mapData?.tilesetOverrides}
-                onTilesetOverrideChange={(tilesetId: string, overrides: TilesetOverrides) => {
-                  updateMapData((prev: MapData) => ({
-                    ...prev,
-                    tilesetOverrides: { ...prev.tilesetOverrides, [tilesetId]: overrides },
-                  }));
-                }}
+                onTilesetOverrideChange={handleTilesetOverrideChange}
                 compact
                 recentTiles={recentTiles}
                 onStarredChange={setStarredFlyoutTiles}
@@ -1153,12 +1159,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 onTileScaleChange={setTileScale}
                 getCachedImage={getCachedImage}
                 tilesetOverrides={mapData?.tilesetOverrides}
-                onTilesetOverrideChange={(tilesetId: string, overrides: TilesetOverrides) => {
-                  updateMapData((prev: MapData) => ({
-                    ...prev,
-                    tilesetOverrides: { ...prev.tilesetOverrides, [tilesetId]: overrides },
-                  }));
-                }}
+                onTilesetOverrideChange={handleTilesetOverrideChange}
                 recentTiles={recentTiles}
               />
             </FloatingPanel>
@@ -1214,12 +1215,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                     onTileScaleChange={setTileScale}
                     getCachedImage={getCachedImage}
                     tilesetOverrides={mapData?.tilesetOverrides}
-                    onTilesetOverrideChange={(tilesetId: string, overrides: TilesetOverrides) => {
-                      updateMapData((prev: MapData) => ({
-                        ...prev,
-                        tilesetOverrides: { ...prev.tilesetOverrides, [tilesetId]: overrides },
-                      }));
-                    }}
+                    onTilesetOverrideChange={handleTilesetOverrideChange}
                     showRail
                     recentTiles={recentTiles}
                     onStarredChange={setStarredFlyoutTiles}

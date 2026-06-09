@@ -59,7 +59,15 @@ function pruneEmptyEntries(metadata: TileMetadataStore): TileMetadataStore {
       (entry.userTags != null && entry.userTags.length > 0) ||
       (entry.importTags != null && entry.importTags.length > 0) ||
       entry.depthAffinity != null ||
-      entry.ddSourceType != null
+      entry.ddSourceType != null ||
+      entry.renderMode != null ||
+      entry.defaultSpanW != null ||
+      entry.defaultSpanH != null ||
+      entry.worldRepeat != null ||
+      entry.edgeFeather != null ||
+      entry.alphaCoverage != null ||
+      entry.opaqueW != null ||
+      entry.opaqueH != null
     ) {
       result[key] = entry;
     }
@@ -243,6 +251,7 @@ export {
   loadTileMetadata,
   saveTileMetadata,
   saveTileMetadataDebounced,
+  pruneEmptyEntries,
   getEntryMetadata,
   setEntryMetadata,
   toggleStar,

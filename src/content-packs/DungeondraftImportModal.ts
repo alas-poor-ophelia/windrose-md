@@ -174,8 +174,9 @@ class DungeondraftImportModal extends Modal {
 		if (counts.other > 0) {
 			details.createEl('p', { text: '• ' + counts.other + ' other texture(s)' });
 		}
+		const extractable = counts.objects + counts.patterns + counts.terrain;
 		details.createEl('p', {
-			text: counts.total + ' textures will be extracted to your vault.',
+			text: extractable + ' textures will be extracted to your vault.',
 			cls: 'windrose-dd-import-total',
 		});
 
@@ -224,7 +225,9 @@ class DungeondraftImportModal extends Modal {
 			const textures = this.archive.files.filter(f => {
 				if (!f.path.endsWith('.webp') && !f.path.endsWith('.png')) return false;
 				if (f.path.includes('/thumbnails/')) return false;
-				return f.path.includes('/textures/objects/') || f.path.includes('/textures/patterns/');
+				return f.path.includes('/textures/objects/')
+					|| f.path.includes('/textures/patterns/')
+					|| f.path.includes('/textures/terrain/');
 			});
 
 			const tags = parseDungeondraftTags(this.buffer, this.archive);

@@ -347,6 +347,8 @@ const TileAssetBrowser = ({
   const [searchFilter, setSearchFilter] = useState<string>('');
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
   const [showTilesetConfig, setShowTilesetConfig] = useState<boolean>(false);
+  // Which tileset the config panel targets (null = follow the current selection).
+  const [configTilesetId, setConfigTilesetId] = useState<string | null>(null);
   const [hoveredTile, setHoveredTile] = useState<TileEntry | null>(null);
   const [railSel, setRailSel] = useState<RailSelection>('all');
   const [activeTags, setActiveTags] = useState<Set<string>>(new Set());
@@ -1109,11 +1111,18 @@ const TileAssetBrowser = ({
 
       {/* Tileset config panel (inline) */}
       {showTilesetConfig && tilesets.length > 0 && onTilesetOverrideChange != null && (() => {
-        const configTileset = tilesets[0];
+        // Configure the explicitly-picked set, else the selected tile's set, else the first.
+        const configTileset =
+          tilesets.find(t => t.id === configTilesetId) ??
+          tilesets.find(t => t.id === selectedTilesetId) ??
+          tilesets[0];
         const currentOverrides = tilesetOverrides?.[configTileset.id] || {};
         const threshold = currentOverrides.stampThreshold ?? configTileset.stampThreshold ?? 0.5;
         const minScale = currentOverrides.minStampScale ?? configTileset.minStampScale ?? 0.2;
         const fitMode = currentOverrides.fitMode ?? configTileset.fitMode;
+        const renderMode = currentOverrides.renderMode ?? configTileset.renderMode ?? 'cell';
+        const worldRepeat = currentOverrides.worldRepeat ?? configTileset.worldRepeat ?? 4;
+        const edgeFeather = currentOverrides.edgeFeather ?? configTileset.edgeFeather ?? 0.25;
 
         const handleOverrideChange = (field: keyof TilesetOverrides, value: number | string | undefined): void => {
           const updated = { ...currentOverrides, [field]: value };
@@ -1123,6 +1132,66 @@ const TileAssetBrowser = ({
 
         return (
           <div className="windrose-tb-config">
+            {tilesets.length > 1 && (
+              <div className="windrose-tile-config-row">
+                <label>Tileset</label>
+                <select
+                  value={configTileset.id}
+                  onChange={(e: Event) => setConfigTilesetId((e.target as HTMLSelectElement).value)}
+                  className="windrose-tile-config-select"
+                >
+                  {tilesets.map(ts => (
+                    <option key={ts.id} value={ts.id}>{ts.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+            {isGrid && (
+              <div className="windrose-tile-config-row">
+                <label>Terrain fill</label>
+                <select
+                  value={renderMode}
+                  onChange={(e: Event) => {
+                    const v = (e.target as HTMLSelectElement).value;
+                    handleOverrideChange('renderMode', v === 'region' ? 'region' : undefined);
+                  }}
+                  className="windrose-tile-config-select"
+                >
+                  <option value="cell">Per-cell</option>
+                  <option value="region">Tiled (seamless)</option>
+                </select>
+              </div>
+            )}
+            {isGrid && renderMode === 'region' && (
+              <div className="windrose-tile-config-row">
+                <label>Texture size</label>
+                <input
+                  type="range"
+                  min="1"
+                  max="12"
+                  step="1"
+                  value={worldRepeat}
+                  onInput={(e: Event) => handleOverrideChange('worldRepeat', parseInt((e.target as HTMLInputElement).value, 10))}
+                  className="windrose-tile-config-slider"
+                />
+                <span className="windrose-tile-config-value">{worldRepeat} {worldRepeat === 1 ? 'cell' : 'cells'}</span>
+              </div>
+            )}
+            {isGrid && renderMode === 'region' && (
+              <div className="windrose-tile-config-row">
+                <label>Edge feather</label>
+                <input
+                  type="range"
+                  min="0"
+                  max="0.6"
+                  step="0.05"
+                  value={edgeFeather}
+                  onInput={(e: Event) => handleOverrideChange('edgeFeather', parseFloat((e.target as HTMLInputElement).value))}
+                  className="windrose-tile-config-slider"
+                />
+                <span className="windrose-tile-config-value">{edgeFeather === 0 ? 'Hard' : `${(edgeFeather * 100).toFixed(0)}%`}</span>
+              </div>
+            )}
             <div className="windrose-tile-config-row">
               <label>Fit Mode</label>
               <select

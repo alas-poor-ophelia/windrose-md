@@ -221,8 +221,8 @@ const TilePlacementLayer = ({
     const activeLayer = getActiveLayer(mapData);
     const currentTiles = activeLayer.tiles || [];
 
-    const mapWidth = mapData.dimensions?.cols ?? 50;
-    const mapHeight = mapData.dimensions?.rows ?? 50;
+    const mapWidth = mapData.dimensions?.width ?? 50;
+    const mapHeight = mapData.dimensions?.height ?? 50;
     const fillCells = floodFillCells(currentTiles, col, row, mapWidth, mapHeight);
     if (fillCells.length === 0) return;
 

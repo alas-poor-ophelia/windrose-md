@@ -11,6 +11,8 @@ import {
   sortTilesForRendering,
   calculateTileDrawRect,
   renderTiles,
+  computeRegionPatternTransform,
+  regionFeatherPx,
 } from "../../../../src/geometry/renderers/tileRenderer";
 
 import type { TileAssignment, TilesetDef } from '#types/tiles/tile.types';
@@ -616,13 +618,13 @@ describe('tileRenderer', () => {
       const largeImg = { naturalWidth: 100, naturalHeight: 100 } as HTMLImageElement;
       // Use unique tileset ID to avoid entry map cache collision
       const tsSmall: TilesetDef = {
-        id: 'ts-scale-s', name: 'Test', folderPath: 'Tiles',
+        source: 'folder', id: 'ts-scale-s', name: 'Test', folderPath: 'Tiles',
         tileWidth: 256, tileHeight: 256, hexHeight: 256,
         overflowTop: 0, overflowBottom: 0,
         tiles: [{ id: 'small', filename: 'small.png', vaultPath: 'Tiles/small.png' }],
       };
       const tsLarge: TilesetDef = {
-        id: 'ts-scale-l', name: 'Test', folderPath: 'Tiles',
+        source: 'folder', id: 'ts-scale-l', name: 'Test', folderPath: 'Tiles',
         tileWidth: 256, tileHeight: 256, hexHeight: 256,
         overflowTop: 0, overflowBottom: 0,
         tiles: [{ id: 'large', filename: 'large.png', vaultPath: 'Tiles/large.png' }],
@@ -671,7 +673,7 @@ describe('tileRenderer', () => {
         drawDefault.push({ w });
       });
       const tsDefault: TilesetDef = {
-        id: 'ts-thresh-def', name: 'Test', folderPath: 'Tiles',
+        source: 'folder', id: 'ts-thresh-def', name: 'Test', folderPath: 'Tiles',
         tileWidth: 256, tileHeight: 256, hexHeight: 256,
         overflowTop: 0, overflowBottom: 0,
         tiles: [{ id: 't1', filename: 't1.png', vaultPath: 'Tiles/t1.png' }],
@@ -690,7 +692,7 @@ describe('tileRenderer', () => {
         drawCustom.push({ w });
       });
       const tsCustom: TilesetDef = {
-        id: 'ts-thresh-cust', name: 'Test', folderPath: 'Tiles',
+        source: 'folder', id: 'ts-thresh-cust', name: 'Test', folderPath: 'Tiles',
         tileWidth: 256, tileHeight: 256, hexHeight: 256,
         overflowTop: 0, overflowBottom: 0, stampThreshold: 0.7,
         tiles: [{ id: 't1', filename: 't1.png', vaultPath: 'Tiles/t1.png' }],
@@ -717,7 +719,7 @@ describe('tileRenderer', () => {
         drawDefault.push({ w });
       });
       const tsDefault: TilesetDef = {
-        id: 'ts-minsc-def', name: 'Test', folderPath: 'Tiles',
+        source: 'folder', id: 'ts-minsc-def', name: 'Test', folderPath: 'Tiles',
         tileWidth: 256, tileHeight: 256, hexHeight: 256,
         overflowTop: 0, overflowBottom: 0,
         tiles: [{ id: 't1', filename: 't1.png', vaultPath: 'Tiles/t1.png' }],
@@ -736,7 +738,7 @@ describe('tileRenderer', () => {
         drawLarger.push({ w });
       });
       const tsLarger: TilesetDef = {
-        id: 'ts-minsc-lg', name: 'Test', folderPath: 'Tiles',
+        source: 'folder', id: 'ts-minsc-lg', name: 'Test', folderPath: 'Tiles',
         tileWidth: 256, tileHeight: 256, hexHeight: 256,
         overflowTop: 0, overflowBottom: 0, minStampScale: 0.4,
         tiles: [{ id: 't1', filename: 't1.png', vaultPath: 'Tiles/t1.png' }],
@@ -920,6 +922,71 @@ describe('tileRenderer', () => {
       renderTiles(ctx as unknown as CanvasRenderingContext2D, tiles, [makeTileset()], makeGeometry(), { x: 0, y: 0, zoom: 1 });
 
       expect(ctx.drawImage).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('computeRegionPatternTransform', () => {
+    // screenPerWorld = zoom (screen px per world unit); cellSize in world units.
+    it('makes one full texture span cover worldRepeat cells on screen', () => {
+      const cellSize = 100;
+      const screenPerWorld = 1; // zoom 1
+      const naturalWidth = 3000;
+      const R = 4;
+      const { scale } = computeRegionPatternTransform(naturalWidth, R, cellSize, screenPerWorld, 0, 0);
+      // texture width on screen = scale * naturalWidth, should equal R cells of screen px
+      expect(scale * naturalWidth).toBeCloseTo(R * cellSize * screenPerWorld);
+    });
+
+    it('anchors the pattern at the supplied world-origin screen point', () => {
+      const { translateX, translateY } = computeRegionPatternTransform(2000, 4, 100, 2, 37.5, -12.25);
+      expect(translateX).toBe(37.5);
+      expect(translateY).toBe(-12.25);
+    });
+
+    it('scales linearly with screenPerWorld (zoom)', () => {
+      const base = computeRegionPatternTransform(3000, 4, 100, 1, 0, 0);
+      const zoomed = computeRegionPatternTransform(3000, 4, 100, 2, 0, 0);
+      expect(zoomed.scale).toBeCloseTo(base.scale * 2);
+    });
+
+    it('produces smaller features (smaller scale) for larger textures', () => {
+      const small = computeRegionPatternTransform(1500, 4, 100, 1, 0, 0);
+      const large = computeRegionPatternTransform(3000, 4, 100, 1, 0, 0);
+      // A 3000px texture spanning the same world area => each pixel maps to less screen
+      expect(large.scale).toBeCloseTo(small.scale / 2);
+    });
+
+    it('bigger worldRepeat makes texture features bigger (larger scale)', () => {
+      const tight = computeRegionPatternTransform(3000, 2, 100, 1, 0, 0);
+      const wide = computeRegionPatternTransform(3000, 6, 100, 1, 0, 0);
+      expect(wide.scale).toBeGreaterThan(tight.scale);
+    });
+
+    it('falls back to the default repeat when worldRepeat is non-positive', () => {
+      const zero = computeRegionPatternTransform(3000, 0, 100, 1, 0, 0);
+      const four = computeRegionPatternTransform(3000, 4, 100, 1, 0, 0);
+      expect(zero.scale).toBeCloseTo(four.scale);
+    });
+
+    it('does not divide by zero for a zero-width image', () => {
+      const { scale } = computeRegionPatternTransform(0, 4, 100, 1, 0, 0);
+      expect(Number.isFinite(scale)).toBe(true);
+    });
+  });
+
+  describe('regionFeatherPx', () => {
+    it('scales feather with cell size and ratio', () => {
+      expect(regionFeatherPx(80, 0.25)).toBeCloseTo(20);
+      expect(regionFeatherPx(40, 0.5)).toBeCloseTo(20);
+    });
+
+    it('returns 0 for a zero/negative ratio (hard edges)', () => {
+      expect(regionFeatherPx(80, 0)).toBe(0);
+      expect(regionFeatherPx(80, -0.3)).toBe(0);
+    });
+
+    it('returns 0 for a non-positive cell size', () => {
+      expect(regionFeatherPx(0, 0.25)).toBe(0);
     });
   });
 });

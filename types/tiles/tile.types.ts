@@ -31,6 +31,20 @@ interface TilesetBase {
     type: '4bit' | '8bit-blob' | 'dual-grid';
     bitmaskMap: Record<number, string>;
   };
+  /** How tiles from this set are rasterized onto the canvas.
+   *  'cell' (default) = each tile is drawn into its own cell bounding box
+   *  (stamps, objects, hex artwork — the original behavior).
+   *  'region' = the tile image is treated as a seamless texture anchored in
+   *  world space and tiled across every painted cell at once (Dungeondraft-style
+   *  terrain fill). Grid maps only; ignored on hex (falls back to 'cell'). */
+  renderMode?: 'cell' | 'region';
+  /** For renderMode 'region': how many grid cells one full texture span covers.
+   *  Larger values make texture features bigger (fewer repeats per cell).
+   *  @default 4 */
+  worldRepeat?: number;
+  /** Smart-edge feather for region fills, as a fraction of one cell's size.
+   *  Softens only the region's outer boundary; 0 = hard edges. @default 0.25 */
+  edgeFeather?: number;
 }
 
 /** Tiles sourced from individual image files in a vault folder */
@@ -69,6 +83,13 @@ export interface TilesetOverrides {
   fitMode?: 'fill' | 'contain';
   stampThreshold?: number;
   minStampScale?: number;
+  /** Terrain rendering mode: 'region' tiles a seamless texture across cells. */
+  renderMode?: 'cell' | 'region';
+  /** Cells per texture span when renderMode is 'region'. */
+  worldRepeat?: number;
+  /** Smart-edge feather for region fills, as a fraction of one cell (0 = hard
+   *  edges). Softens only the region's outer boundary. @default 0.25 */
+  edgeFeather?: number;
 }
 
 // ===========================================
@@ -130,6 +151,12 @@ interface TileAssignmentBase {
   depth?: TileLayerRole;
   /** Override tileset fitMode for this specific tile */
   fitMode?: 'fill' | 'contain';
+  /** Multi-cell footprint width in cells, anchored at col/row. @default 1.
+   *  Defaulted from the tile's detected metadata at placement time; editable
+   *  per-placement. Absent/1 = single-cell. */
+  spanW?: number;
+  /** Multi-cell footprint height in cells, anchored at col/row. @default 1. */
+  spanH?: number;
   /** Per-tile size multiplier. @default 1.0 */
   scale?: number;
   /** Opacity 0-1 for scatter brush placements. @default 1.0 */
@@ -172,6 +199,23 @@ export interface TileMetadataEntry {
   depthAffinity?: TileLayerRole;
   /** Original DD source directory type (objects, patterns, terrain, walls, etc.) */
   ddSourceType?: string;
+  /** Auto-detected or user-set render mode for this tile. Per-tile classification
+   *  that overrides the per-tileset default (a DD pack holds both terrain and props). */
+  renderMode?: 'cell' | 'region';
+  /** Auto-detected default footprint width in cells for multi-cell props. @default 1 */
+  defaultSpanW?: number;
+  /** Auto-detected default footprint height in cells for multi-cell props. @default 1 */
+  defaultSpanH?: number;
+  /** For region tiles: cells per texture span (relocated from per-tileset worldRepeat). */
+  worldRepeat?: number;
+  /** For region tiles: edge feather fraction (relocated from per-tileset edgeFeather). */
+  edgeFeather?: number;
+  /** Cached detection signal: opaque-pixel fraction 0-1 (from the eager scan pass). */
+  alphaCoverage?: number;
+  /** Cached detection signal: tight opaque-bounds width in source px. */
+  opaqueW?: number;
+  /** Cached detection signal: tight opaque-bounds height in source px. */
+  opaqueH?: number;
 }
 
 /** Metadata store keyed by vault path (stable across tileset rescans) */
