@@ -90,7 +90,9 @@ function pruneEmptyEntries(metadata: TileMetadataStore): TileMetadataStore {
       entry.edgeFeather != null ||
       entry.alphaCoverage != null ||
       entry.opaqueW != null ||
-      entry.opaqueH != null
+      entry.opaqueH != null ||
+      entry.srcW != null ||
+      entry.srcH != null
     ) {
       result[key] = entry;
     }
@@ -269,7 +271,7 @@ function bulkSetDefaultSpan(
 
 function bulkSetDetectionSignals(
   metadata: TileMetadataStore,
-  entries: Array<{ vaultPath: string; signals: { alphaCoverage: number; opaqueW: number; opaqueH: number } }>
+  entries: Array<{ vaultPath: string; signals: { alphaCoverage: number; opaqueW: number; opaqueH: number; naturalW: number; naturalH: number } }>
 ): TileMetadataStore {
   let result = { ...metadata };
   for (const { vaultPath, signals } of entries) {
@@ -279,6 +281,8 @@ function bulkSetDetectionSignals(
       alphaCoverage: signals.alphaCoverage,
       opaqueW: signals.opaqueW,
       opaqueH: signals.opaqueH,
+      srcW: signals.naturalW,
+      srcH: signals.naturalH,
     };
   }
   return result;

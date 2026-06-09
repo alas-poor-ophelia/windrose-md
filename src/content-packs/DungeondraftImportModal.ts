@@ -7,9 +7,11 @@ import type { PckArchive } from './pckParser';
 import { parsePackMetadata, parseDungeondraftTags } from './pckMetadata';
 import type { DungeondraftPackMeta } from './pckMetadata';
 import { CONTENT_PACKS_FOLDER } from './contentPackConstants';
-import { loadTileMetadata, bulkSetImportTags, bulkSetDdSourceType, bulkSetDepthAffinity, bulkSetRenderMode, saveTileMetadata, setTileMetadataForRender } from '../persistence/tileMetadata';
+import { loadTileMetadata, bulkSetImportTags, bulkSetDdSourceType, bulkSetDepthAffinity, bulkSetRenderMode, bulkSetDetectionSignals, bulkSetDefaultSpan, saveTileMetadata, setTileMetadataForRender } from '../persistence/tileMetadata';
 import { predictDepthTier } from '../assets/depthPredictor';
 import { predictRenderMode } from '../assets/renderModePredictor';
+import { runDetectionScan } from '../assets/tileImageScan';
+import { predictSpan, DEFAULT_PIXELS_PER_CELL } from '../assets/spanPredictor';
 
 interface PluginLike {
 	app: App;
@@ -365,6 +367,29 @@ class DungeondraftImportModal extends Modal {
 				if (renderModeEntries.length > 0) {
 					metadata = bulkSetRenderMode(metadata, renderModeEntries);
 				}
+
+				// Bake detection signals + footprint at import — the guaranteed trigger.
+				// Decoupled from the browser's lazy scan so signals exist even if the
+				// tile browser is never opened. Footprint uses the source size ÷ DD's
+				// 256px authoring spec; region tiles tile seamlessly and are skipped.
+				const writtenPaths = ddSourceEntries.map(e => e.vaultPath);
+				if (writtenPaths.length > 0) {
+					statusText.textContent = 'Analyzing tile footprints...';
+					const scanned = await runDetectionScan(this.app, writtenPaths, { concurrency: 4 });
+					if (scanned.length > 0) {
+						metadata = bulkSetDetectionSignals(metadata, scanned);
+						const spanEntries: Array<{ vaultPath: string; spanW: number; spanH: number }> = [];
+						for (const { vaultPath, signals } of scanned) {
+							if (metadata[vaultPath]?.renderMode === 'region') continue;
+							const { spanW, spanH } = predictSpan(signals.naturalW, signals.naturalH, DEFAULT_PIXELS_PER_CELL);
+							if (spanW > 1 || spanH > 1) spanEntries.push({ vaultPath, spanW, spanH });
+						}
+						if (spanEntries.length > 0) {
+							metadata = bulkSetDefaultSpan(metadata, spanEntries);
+						}
+					}
+				}
+
 				await saveTileMetadata(this.app, metadata);
 				// Push the freshly-written store into the renderer's accessor so any
 				// open map resolves the new per-tile render modes without a full reload.

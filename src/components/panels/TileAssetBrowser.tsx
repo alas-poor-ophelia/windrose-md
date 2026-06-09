@@ -38,7 +38,7 @@ import {
 } from '../../persistence/tileMetadata';
 import { predictDepthTier } from '../../assets/depthPredictor';
 import { predictRenderMode } from '../../assets/renderModePredictor';
-import { predictSpan } from '../../assets/spanPredictor';
+import { predictSpan, DEFAULT_PIXELS_PER_CELL } from '../../assets/spanPredictor';
 import { runDetectionScan } from '../../assets/tileImageScan';
 
 // ===========================================
@@ -586,7 +586,12 @@ const TileAssetBrowser = ({
 
       const allTiles = tilesets.flatMap(ts => ts.tiles);
       const needsScan = allTiles
-        .filter(t => tileMetadata[t.vaultPath]?.alphaCoverage == null)
+        .filter(t => {
+          const e = tileMetadata[t.vaultPath];
+          // Re-scan entries missing either signal — older scans cached
+          // alphaCoverage/opaque bounds but not the natural dims footprint needs.
+          return e?.alphaCoverage == null || e?.srcW == null;
+        })
         .map(t => t.vaultPath);
       const scanned = needsScan.length > 0
         ? await runDetectionScan(app, needsScan, { concurrency: 4, signal: controller.signal })
@@ -613,11 +618,12 @@ const TileAssetBrowser = ({
         // is the default, so only spans that exceed one cell are persisted.
         const spanEntries: Array<{ vaultPath: string; spanW: number; spanH: number }> = [];
         for (const ts of tilesets) {
+          const ppc = ts.pixelsPerCell ?? DEFAULT_PIXELS_PER_CELL;
           for (const tile of ts.tiles) {
             const e = updated[tile.vaultPath];
             if (e == null || e.defaultSpanW != null || e.renderMode === 'region') continue;
-            if (e.opaqueW == null || e.opaqueH == null) continue;
-            const { spanW, spanH } = predictSpan(e.opaqueW, e.opaqueH, ts.tileWidth, ts.tileHeight);
+            if (e.srcW == null || e.srcH == null) continue;
+            const { spanW, spanH } = predictSpan(e.srcW, e.srcH, ppc);
             if (spanW > 1 || spanH > 1) spanEntries.push({ vaultPath: tile.vaultPath, spanW, spanH });
           }
         }
@@ -1205,11 +1211,36 @@ const TileAssetBrowser = ({
         const renderMode = currentOverrides.renderMode ?? configTileset.renderMode ?? 'cell';
         const worldRepeat = currentOverrides.worldRepeat ?? configTileset.worldRepeat ?? 4;
         const edgeFeather = currentOverrides.edgeFeather ?? configTileset.edgeFeather ?? 0.25;
+        const pixelsPerCell = currentOverrides.pixelsPerCell ?? configTileset.pixelsPerCell ?? DEFAULT_PIXELS_PER_CELL;
 
         const handleOverrideChange = (field: keyof TilesetOverrides, value: number | string | undefined): void => {
           const updated = { ...currentOverrides, [field]: value };
           if (value === undefined) delete updated[field];
           onTilesetOverrideChange(configTileset.id, updated);
+        };
+
+        // pixelsPerCell is the footprint divisor (first ruler). Changing it must
+        // recompute every baked span in this tileset from the cached natural dims —
+        // pure arithmetic, no image re-decode.
+        const handlePixelsPerCellChange = (value: number | undefined): void => {
+          const updated = { ...currentOverrides, pixelsPerCell: value };
+          if (value === undefined) delete updated.pixelsPerCell;
+          onTilesetOverrideChange(configTileset.id, updated);
+          const ppc = value ?? DEFAULT_PIXELS_PER_CELL;
+          setTileMetadata(prev => {
+            const spanEntries: Array<{ vaultPath: string; spanW: number; spanH: number }> = [];
+            for (const tile of configTileset.tiles) {
+              const e = prev[tile.vaultPath];
+              if (e == null || e.renderMode === 'region') continue;
+              if (e.srcW == null || e.srcH == null) continue;
+              const { spanW, spanH } = predictSpan(e.srcW, e.srcH, ppc);
+              spanEntries.push({ vaultPath: tile.vaultPath, spanW, spanH });
+            }
+            if (spanEntries.length === 0) return prev;
+            const next = bulkSetDefaultSpan(prev, spanEntries);
+            saveTileMetadataDebounced(app, next);
+            return next;
+          });
         };
 
         return (
@@ -1314,6 +1345,23 @@ const TileAssetBrowser = ({
                 className="windrose-tile-config-slider"
               />
               <span className="windrose-tile-config-value">{(minScale * 100).toFixed(0)}%</span>
+            </div>
+            <div className="windrose-tile-config-row">
+              <label>Px / cell</label>
+              <input
+                type="number"
+                min="16"
+                max="2048"
+                step="1"
+                value={pixelsPerCell}
+                onChange={(e: Event) => {
+                  const raw = parseInt((e.target as HTMLInputElement).value, 10);
+                  const v = Number.isFinite(raw) && raw > 0 ? raw : undefined;
+                  handlePixelsPerCellChange(v === DEFAULT_PIXELS_PER_CELL ? undefined : v);
+                }}
+                className="windrose-tile-config-select"
+              />
+              <span className="windrose-tile-config-value">footprint scale</span>
             </div>
           </div>
         );

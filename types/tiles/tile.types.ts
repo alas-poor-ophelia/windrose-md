@@ -45,6 +45,11 @@ interface TilesetBase {
   /** Smart-edge feather for region fills, as a fraction of one cell's size.
    *  Softens only the region's outer boundary; 0 = hard edges. @default 0.25 */
   edgeFeather?: number;
+  /** Authoring resolution in source pixels per grid cell, used to derive each
+   *  tile's default multi-cell footprint (footprint = round(srcDim / pixelsPerCell)).
+   *  This is the art's authoring scale — NOT the map's grid size and NOT a sampled
+   *  sibling tile's pixel width. Dungeondraft authors at 256px = 1 cell. @default 256 */
+  pixelsPerCell?: number;
 }
 
 /** Tiles sourced from individual image files in a vault folder */
@@ -90,6 +95,9 @@ export interface TilesetOverrides {
   /** Smart-edge feather for region fills, as a fraction of one cell (0 = hard
    *  edges). Softens only the region's outer boundary. @default 0.25 */
   edgeFeather?: number;
+  /** Authoring resolution in source px per grid cell, overriding the 256 default.
+   *  Set per-tileset to correct packs authored at a non-standard scale (e.g. 110). */
+  pixelsPerCell?: number;
 }
 
 // ===========================================
@@ -216,6 +224,12 @@ export interface TileMetadataEntry {
   opaqueW?: number;
   /** Cached detection signal: tight opaque-bounds height in source px. */
   opaqueH?: number;
+  /** Cached detection signal: full natural image width in source px. Footprint is
+   *  derived from this ÷ the tileset's pixelsPerCell, so it can be recomputed when
+   *  that override changes without re-decoding the image. */
+  srcW?: number;
+  /** Cached detection signal: full natural image height in source px. */
+  srcH?: number;
 }
 
 /** Metadata store keyed by vault path (stable across tileset rescans) */
