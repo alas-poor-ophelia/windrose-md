@@ -23,6 +23,7 @@ import { removeEdge, getEdgeAt } from '../../drawing/edgeOperations';
 import { eraseObjectAt } from '../../objects/objectOperations';
 import { eraseCellFromCurves, eraseWorldPolygonFromCurves } from '../../geometry/curves/curveBoolean';
 import { getActiveLayer } from '../../persistence/layerAccessor';
+import { assignmentCoversCell } from '../../assets/tileFootprint';
 
 
 
@@ -159,7 +160,11 @@ function usePaintTool({
         let tileErased = false;
         if (onTilesChange != null && activeLayer.tiles != null && activeLayer.tiles.length > 0) {
           const tiles = activeLayer.tiles;
-          const overlayIdx = tiles.findIndex((t: TileAssignment) => t.col === coordX && t.row === coordY && t.placement === 'overlay');
+          // Footprint-aware: a click anywhere inside a multi-cell prop erases it;
+          // freeform stamps still erase by their drop cell.
+          const covers = (t: TileAssignment): boolean =>
+            t.freeform === true ? (t.col === coordX && t.row === coordY) : assignmentCoversCell(t, coordX, coordY);
+          const overlayIdx = tiles.findIndex((t: TileAssignment) => covers(t) && t.placement === 'overlay');
           if (overlayIdx >= 0) {
             if (strokeInitialTilesRef.current === null) {
               strokeInitialTilesRef.current = [...tiles];
@@ -167,7 +172,7 @@ function usePaintTool({
             onTilesChange(tiles.filter((_: TileAssignment, i: number) => i !== overlayIdx), isBatchedStroke);
             tileErased = true;
           } else {
-            const baseIdx = tiles.findIndex((t: TileAssignment) => t.col === coordX && t.row === coordY);
+            const baseIdx = tiles.findIndex((t: TileAssignment) => covers(t));
             if (baseIdx >= 0) {
               if (strokeInitialTilesRef.current === null) {
                 strokeInitialTilesRef.current = [...tiles];

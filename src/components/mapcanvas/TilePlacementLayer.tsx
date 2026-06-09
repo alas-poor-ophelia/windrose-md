@@ -18,7 +18,7 @@ import { useApp } from '../../context/AppContext';
 import { getActiveLayer } from '../../persistence/layerAccessor';
 import { preloadImage } from '../../assets/imageOperations';
 import { getTileMetadataForRender } from '../../persistence/tileMetadata';
-import { cellsCoveredByAssignment, assignmentsOverlap } from '../../assets/tileFootprint';
+import { cellsCoveredByAssignment, assignmentsOverlap, assignmentCoversCell } from '../../assets/tileFootprint';
 
 
 // ===========================================
@@ -60,12 +60,16 @@ function floodFillCells(
   mapWidth: number,
   mapHeight: number
 ): Array<{ col: number; row: number }> {
-  const targetKey = tiles.find(t => t.col === startCol && t.row === startRow && !t.freeform);
+  const targetKey = tiles.find(t => !t.freeform && assignmentCoversCell(t, startCol, startRow));
   const targetId = targetKey ? `${targetKey.tilesetId}:${targetKey.tileId}` : '';
 
+  // Register every cell of each prop's footprint so multi-cell occupants block
+  // the fill across their whole area, not just the anchor.
   const tileMap = new Map<string, string>();
   for (const t of tiles) {
-    if (!t.freeform) tileMap.set(`${t.col},${t.row}`, `${t.tilesetId}:${t.tileId}`);
+    if (t.freeform) continue;
+    const id = `${t.tilesetId}:${t.tileId}`;
+    for (const c of cellsCoveredByAssignment(t)) tileMap.set(`${c.col},${c.row}`, id);
   }
 
   const visited = new Set<string>();
@@ -213,8 +217,12 @@ const TilePlacementLayer = ({
 
     if (keysToErase.size === 0) return;
 
-    const newTiles = currentTiles.filter(
-      (t: TileAssignment) => !keysToErase.has(`${t.col},${t.row}`)
+    // Footprint-aware: a snapped prop is erased if the brush touches any cell it
+    // covers; freeform stamps still erase by their drop cell.
+    const newTiles = currentTiles.filter((t: TileAssignment) =>
+      t.freeform === true
+        ? !keysToErase.has(`${t.col},${t.row}`)
+        : !cellsCoveredByAssignment(t).some(c => keysToErase.has(`${c.col},${c.row}`))
     );
 
     if (newTiles.length !== currentTiles.length) {
@@ -241,9 +249,12 @@ const TilePlacementLayer = ({
     const targetPlacement = tileLayer === 'base' ? 'fill' : 'overlay';
     const fillKeys = new Set(fillCells.map(c => `${c.col},${c.row}`));
 
-    let newTiles = currentTiles.filter(
-      (t: TileAssignment) => !fillKeys.has(`${t.col},${t.row}`) || (t.placement || 'fill') !== targetPlacement
-    );
+    const newTiles = currentTiles.filter((t: TileAssignment) => {
+      if ((t.placement || 'fill') !== targetPlacement) return true;
+      return t.freeform === true
+        ? !fillKeys.has(`${t.col},${t.row}`)
+        : !cellsCoveredByAssignment(t).some(c => fillKeys.has(`${c.col},${c.row}`));
+    });
 
     for (const cell of fillCells) {
       newTiles.push({
