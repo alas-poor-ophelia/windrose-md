@@ -7,8 +7,9 @@ import type { PckArchive } from './pckParser';
 import { parsePackMetadata, parseDungeondraftTags } from './pckMetadata';
 import type { DungeondraftPackMeta } from './pckMetadata';
 import { CONTENT_PACKS_FOLDER } from './contentPackConstants';
-import { loadTileMetadata, bulkSetImportTags, bulkSetDdSourceType, bulkSetDepthAffinity, saveTileMetadata } from '../persistence/tileMetadata';
+import { loadTileMetadata, bulkSetImportTags, bulkSetDdSourceType, bulkSetDepthAffinity, bulkSetRenderMode, saveTileMetadata, setTileMetadataForRender } from '../persistence/tileMetadata';
 import { predictDepthTier } from '../assets/depthPredictor';
+import { predictRenderMode } from '../assets/renderModePredictor';
 
 interface PluginLike {
 	app: App;
@@ -44,6 +45,22 @@ async function ensureFolder(app: App, path: string): Promise<void> {
 		current = current === '' ? part : current + '/' + part;
 		try { await app.vault.createFolder(current); } catch { /* exists */ }
 	}
+}
+
+/**
+ * Map a raw .pck entry path to a vault-relative texture path.
+ *
+ * Godot/Dungeondraft entries look like `res://packs/<id>/textures/objects/...`.
+ * The category + tag + ddSourceType logic all expect a path that begins at the
+ * `textures/` segment, so slice from there per-file. Deriving a single prefix
+ * from files[0] is unsafe: files[0] is the pack manifest (not a texture), so the
+ * prefix comes back empty and every path stays un-stripped — mis-nesting the
+ * whole pack and breaking ddSourceType detection (see H-515).
+ */
+function toRelativeTexturePath(rawPath: string): string {
+	const idx = rawPath.indexOf('textures/');
+	if (idx >= 0) return rawPath.slice(idx);
+	return rawPath.replace(/^res:\/\/(?:packs\/[^/]+\/)?/, '');
 }
 
 class DungeondraftImportModal extends Modal {
@@ -249,13 +266,13 @@ class DungeondraftImportModal extends Modal {
 				}
 			}
 
-			const packPrefix = this.archive.files[0]?.path.match(/^res:\/\/packs\/[^/]+\//)?.[0] ?? '';
 			const importTagEntries: Array<{ vaultPath: string; tags: string[] }> = [];
 			const ddSourceEntries: Array<{ vaultPath: string; sourceType: string }> = [];
+			let failedCount = 0;
 
 			for (let i = 0; i < textures.length; i++) {
 				const entry = textures[i];
-				const relativePath = packPrefix ? entry.path.slice(packPrefix.length) : entry.path;
+				const relativePath = toRelativeTexturePath(entry.path);
 				const filename = entry.path.split('/').pop() ?? 'unknown';
 
 				const tagKey = relativePath;
@@ -270,27 +287,39 @@ class DungeondraftImportModal extends Modal {
 					destPath = basePath + '/' + category + '/' + filename;
 				}
 
+				try {
+					const parentDir = destPath.substring(0, destPath.lastIndexOf('/'));
+					await ensureFolder(this.app, parentDir);
+
+					const data = extractFileData(this.buffer, entry);
+					const arrayBuf = new ArrayBuffer(data.byteLength);
+					new Uint8Array(arrayBuf).set(data);
+					const existing = this.app.vault.getAbstractFileByPath(destPath);
+					if (existing != null) {
+						await this.app.vault.modifyBinary(existing as any, arrayBuf);
+					} else {
+						await this.app.vault.createBinary(destPath, arrayBuf);
+					}
+				} catch (e) {
+					// A single bad path (MAX_PATH, locked file, sync conflict) must not
+					// abort the whole import and skip the metadata-write phase below.
+					failedCount++;
+					// eslint-disable-next-line no-console
+					console.error('[Windrose] Failed to extract', destPath, e);
+					const failPct = Math.round(((i + 1) / textures.length) * 100);
+					progressBar.value = failPct;
+					statusText.textContent = 'Extracting: ' + (i + 1) + '/' + textures.length + ' (' + failPct + '%)';
+					continue;
+				}
+
+				// Record metadata only for files that actually landed in the vault.
 				const allTags = pathToAllTags.get(tagKey);
 				if (allTags != null && allTags.length > 0) {
 					importTagEntries.push({ vaultPath: destPath, tags: allTags });
 				}
-
 				const srcMatch = relativePath.match(/^textures\/(\w+)\//);
 				if (srcMatch != null) {
 					ddSourceEntries.push({ vaultPath: destPath, sourceType: srcMatch[1] });
-				}
-
-				const parentDir = destPath.substring(0, destPath.lastIndexOf('/'));
-				await ensureFolder(this.app, parentDir);
-
-				const data = extractFileData(this.buffer, entry);
-				const arrayBuf = new ArrayBuffer(data.byteLength);
-				new Uint8Array(arrayBuf).set(data);
-				const existing = this.app.vault.getAbstractFileByPath(destPath);
-				if (existing != null) {
-					await this.app.vault.modifyBinary(existing as any, arrayBuf);
-				} else {
-					await this.app.vault.createBinary(destPath, arrayBuf);
 				}
 
 				const pct = Math.round(((i + 1) / textures.length) * 100);
@@ -323,7 +352,23 @@ class DungeondraftImportModal extends Modal {
 				if (depthEntries.length > 0) {
 					metadata = bulkSetDepthAffinity(metadata, depthEntries);
 				}
+				// Predict render mode from ddSourceType (terrain/patterns -> region).
+				// Pixel-based refinement happens later via the browser's eager scan.
+				const renderModeEntries: Array<{ vaultPath: string; mode: 'region' }> = [];
+				for (const { vaultPath } of ddSourceEntries) {
+					const tile = { id: '', filename: vaultPath.split('/').pop() ?? '', vaultPath, tags: [] };
+					const { mode, confidence } = predictRenderMode(tile, metadata[vaultPath]);
+					if (mode === 'region' && confidence >= 0.5) {
+						renderModeEntries.push({ vaultPath, mode: 'region' });
+					}
+				}
+				if (renderModeEntries.length > 0) {
+					metadata = bulkSetRenderMode(metadata, renderModeEntries);
+				}
 				await saveTileMetadata(this.app, metadata);
+				// Push the freshly-written store into the renderer's accessor so any
+				// open map resolves the new per-tile render modes without a full reload.
+				setTileMetadataForRender(metadata);
 			}
 
 			const tilesetFolders = this.plugin.settings.tilesetFolders ?? [];
@@ -358,11 +403,12 @@ class DungeondraftImportModal extends Modal {
 
 			progressArea.empty();
 			progressArea.createEl('p', {
-				text: 'Successfully imported ' + textures.length + ' textures from ' + this.meta.name + '.',
-				cls: 'windrose-dd-import-success',
+				text: 'Imported ' + (textures.length - failedCount) + ' of ' + textures.length + ' textures from ' + this.meta.name + '.'
+						+ (failedCount > 0 ? ' ' + failedCount + ' file(s) failed (see developer console).' : ''),
+				cls: failedCount > 0 ? 'windrose-dd-import-warning' : 'windrose-dd-import-success',
 			});
 
-			new Notice(this.meta.name + ' imported successfully (' + textures.length + ' textures).');
+			new Notice(this.meta.name + ' imported (' + (textures.length - failedCount) + '/' + textures.length + ' textures' + (failedCount > 0 ? ', ' + failedCount + ' failed' : '') + ').');
 
 			if (this.importBtn) {
 				this.importBtn.textContent = 'Done';
