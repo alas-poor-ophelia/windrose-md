@@ -6,9 +6,11 @@
  * background cells is naturally occluded by foreground cell content.
  */
 
-import type { TileAssignment, TilesetDef, FolderTileset } from '#types/tiles/tile.types';
+import type { TileAssignment, TilesetDef, FolderTileset, TileMetadataStore } from '#types/tiles/tile.types';
 
 import { axialToOffset } from '../core/offsetCoordinates';
+import { resolveTileRender } from '../../assets/tileRenderResolution';
+import { getTileMetadataForRender } from '../../persistence/tileMetadata';
 
 
 // ===========================================
@@ -34,6 +36,9 @@ interface TileRenderOptions {
   canvasWidth?: number;
   canvasHeight?: number;
   hiddenLayers?: Set<string>;
+  /** Per-tile metadata store for render-mode resolution. Defaults to the global
+   *  render accessor (matches the getTheme() idiom); injectable for tests. */
+  tileMetadata?: TileMetadataStore;
 }
 
 // ===========================================
@@ -42,11 +47,9 @@ interface TileRenderOptions {
 
 const SQRT3 = Math.sqrt(3);
 
-/** Default cells-per-texture-span for region (terrain) fills. */
+/** Default cells-per-texture-span for region (terrain) fills. Used only as the
+ *  pattern-transform fallback; per-tile resolution supplies the live value. */
 const DEFAULT_WORLD_REPEAT = 4;
-
-/** Default smart-edge feather, as a fraction of one cell's screen size. */
-const DEFAULT_EDGE_FEATHER = 0.25;
 
 /** Reusable offscreen canvas for feathered region fills (avoids per-frame allocs). */
 let _featherCanvas: HTMLCanvasElement | null = null;
@@ -74,9 +77,6 @@ function isFolderTileset(ts: TilesetDef): ts is FolderTileset {
   return !('source' in ts) || ts.source === 'folder';
 }
 
-function getTileRenderMode(ts: TilesetDef): 'cell' | 'region' {
-  return ts.renderMode === 'region' ? 'region' : 'cell';
-}
 
 /**
  * Pure: compute the affine transform that maps a tileable texture's pixel space
@@ -103,6 +103,9 @@ interface RegionGroup {
   tileset: TilesetDef;
   vaultPath: string;
   cells: TileAssignment[];
+  /** Resolved per-tile terrain params (cells per texture span; edge feather ratio). */
+  worldRepeat: number;
+  edgeFeather: number;
 }
 
 /**
@@ -136,7 +139,7 @@ function renderRegionFills(
 
     const { scale, translateX, translateY } = computeRegionPatternTransform(
       img.naturalWidth,
-      grp.tileset.worldRepeat ?? DEFAULT_WORLD_REPEAT,
+      grp.worldRepeat,
       cs,
       screenPerWorld,
       origin.screenX,
@@ -159,7 +162,7 @@ function renderRegionFills(
     // Viewport cull: skip groups entirely off-screen.
     if (maxX < 0 || minX > canvasW || maxY < 0 || minY > canvasH) continue;
 
-    const featherPx = regionFeatherPx(cellPx, grp.tileset.edgeFeather ?? DEFAULT_EDGE_FEATHER);
+    const featherPx = regionFeatherPx(cellPx, grp.edgeFeather);
 
     // Hard-edged fill (feather disabled): clip to the cell union and fill directly.
     if (!(featherPx > 0.5)) {
@@ -384,6 +387,11 @@ function renderTiles(
 
   const entryMap = getEntryMap(tilesets);
 
+  // Per-tile metadata drives render-mode resolution (terrain → seamless region
+  // fill vs. discrete cell stamp). Read fresh each frame from the global accessor
+  // — same idiom as getTheme() — so it stays live without a cache-version dance.
+  const metaStore = options?.tileMetadata ?? getTileMetadataForRender();
+
   // Pre-compute cell screen dimensions (constant for all tiles in this frame)
   const isGrid = geometry.orientation !== 'flat' && geometry.orientation !== 'pointy';
   const hexScreenWidth = isGrid
@@ -413,16 +421,27 @@ function renderTiles(
     // Divert seamless terrain tiles into a grouped region-fill pass.
     if (canRegion && t.freeform !== true) {
       const lookup = entryMap.get(t.tilesetId + ':' + t.tileId);
-      if (lookup != null && getTileRenderMode(lookup.tileset) === 'region') {
-        const key = t.tilesetId + ':' + t.tileId;
-        const groups = regionByDepth.get(depth) ?? regionByDepth.get('ground')!;
-        let grp = groups.get(key);
-        if (grp == null) {
-          grp = { tileset: lookup.tileset, vaultPath: lookup.entry.vaultPath, cells: [] };
-          groups.set(key, grp);
+      if (lookup != null) {
+        // Resolution chain: per-placement → per-tile metadata → tileset fallback
+        // (the tileset tier is temporary, removed once the legacy override UI dies).
+        const resolved = resolveTileRender(t, metaStore[lookup.entry.vaultPath], lookup.tileset);
+        if (resolved.renderMode === 'region') {
+          const key = t.tilesetId + ':' + t.tileId;
+          const groups = regionByDepth.get(depth) ?? regionByDepth.get('ground')!;
+          let grp = groups.get(key);
+          if (grp == null) {
+            grp = {
+              tileset: lookup.tileset,
+              vaultPath: lookup.entry.vaultPath,
+              cells: [],
+              worldRepeat: resolved.worldRepeat,
+              edgeFeather: resolved.edgeFeather,
+            };
+            groups.set(key, grp);
+          }
+          grp.cells.push(t);
+          continue;
         }
-        grp.cells.push(t);
-        continue;
       }
     }
 

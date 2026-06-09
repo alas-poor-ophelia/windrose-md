@@ -69,6 +69,7 @@ import { Icon } from './components/shared/Icon';
 import { CornerBrackets } from './components/shared/CornerBrackets';
 import { listMaps } from './persistence/fileOperations';
 import type { MapListEntry } from './persistence/fileOperations';
+import { loadTileMetadata, setTileMetadataForRender } from './persistence/tileMetadata';
 import { NewMapModal } from './components/modals/NewMapModal';
 
 // Inject RPGAwesome icon CSS classes on module load
@@ -111,6 +112,17 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     navigationVersion,
     adjacentSubHexes
   } = useSubHexNavigation({ mapData: rootMapData, updateMapData: rootUpdateMapData });
+
+  // Populate the renderer's tile-metadata accessor on mount so terrain tiles
+  // resolve to seamless region fills out-of-the-box, even if the tile browser
+  // panel is never opened. Also refresh on import (windrose-settings-changed)
+  // so a pack imported while a map is open picks up the new classifications.
+  useEffect(() => {
+    const refresh = (): void => { void loadTileMetadata(app).then(setTileMetadataForRender); };
+    refresh();
+    window.addEventListener('windrose-settings-changed', refresh);
+    return () => window.removeEventListener('windrose-settings-changed', refresh);
+  }, [app]);
 
   // notePath is passed from the code block processor (ctx.sourcePath)
 

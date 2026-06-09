@@ -18,6 +18,8 @@ import {
   setDepthAffinity,
   bulkSetDepthAffinity,
   bulkSetDdSourceType,
+  getTileMetadataForRender,
+  setTileMetadataForRender,
 } from '../../../src/persistence/tileMetadata';
 
 import type { TileMetadataStore, TileEntry } from '#types/tiles/tile.types';
@@ -404,6 +406,24 @@ describe('tileMetadata', () => {
       };
       const result = collectDepthAwareTags(tiles, store, 'ground');
       expect(result.indexOf('common')).toBeLessThan(result.indexOf('rare'));
+    });
+  });
+
+  // ---- render accessor ----
+  describe('render accessor', () => {
+    it('round-trips the store the renderer reads each frame', () => {
+      const store: TileMetadataStore = { 'terrain/grass.png': { renderMode: 'region' } };
+      setTileMetadataForRender(store);
+      expect(getTileMetadataForRender()).toBe(store);
+    });
+
+    it('replaces the prior store on a subsequent set (last write wins)', () => {
+      setTileMetadataForRender({ 'a.png': { renderMode: 'region' } });
+      const next: TileMetadataStore = { 'b.png': { renderMode: 'cell' } };
+      setTileMetadataForRender(next);
+      const current = getTileMetadataForRender();
+      expect(current).toBe(next);
+      expect(current['a.png']).toBeUndefined();
     });
   });
 });

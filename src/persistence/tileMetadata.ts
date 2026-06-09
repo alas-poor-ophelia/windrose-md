@@ -15,6 +15,29 @@ const METADATA_FILE = 'windrose-tile-metadata.json';
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 const SAVE_DEBOUNCE_MS = 2000;
 
+// ===========================================
+// Render Accessor (module singleton)
+// ===========================================
+//
+// The canvas renderer needs the vault-global tile metadata store to resolve each
+// tile's render mode (cell vs seamless region) per-tile. The store is the same
+// shape as plugin settings — vault-global, not per-map — so it follows the same
+// `settingsAccessor` idiom: a module singleton read fresh each frame rather than
+// threaded through every renderCanvas call site. Populated on map mount and kept
+// in sync by the tile browser.
+
+let _renderStore: TileMetadataStore = {};
+
+/** Current metadata store for the renderer. Empty until populated on map mount. */
+function getTileMetadataForRender(): TileMetadataStore {
+  return _renderStore;
+}
+
+/** Replace the renderer's metadata store (call after load or edit). */
+function setTileMetadataForRender(store: TileMetadataStore): void {
+  _renderStore = store;
+}
+
 async function loadTileMetadata(app: App): Promise<TileMetadataStore> {
   try {
     const file = app.vault.getAbstractFileByPath(METADATA_FILE);
@@ -220,6 +243,35 @@ function bulkSetDdSourceType(
   return result;
 }
 
+function bulkSetRenderMode(
+  metadata: TileMetadataStore,
+  entries: Array<{ vaultPath: string; mode: 'cell' | 'region' }>
+): TileMetadataStore {
+  let result = { ...metadata };
+  for (const { vaultPath, mode } of entries) {
+    const existing = result[vaultPath] ?? {};
+    result[vaultPath] = { ...existing, renderMode: mode };
+  }
+  return result;
+}
+
+function bulkSetDetectionSignals(
+  metadata: TileMetadataStore,
+  entries: Array<{ vaultPath: string; signals: { alphaCoverage: number; opaqueW: number; opaqueH: number } }>
+): TileMetadataStore {
+  let result = { ...metadata };
+  for (const { vaultPath, signals } of entries) {
+    const existing = result[vaultPath] ?? {};
+    result[vaultPath] = {
+      ...existing,
+      alphaCoverage: signals.alphaCoverage,
+      opaqueW: signals.opaqueW,
+      opaqueH: signals.opaqueH,
+    };
+  }
+  return result;
+}
+
 function collectDepthAwareTags(
   tiles: TileEntry[],
   metadata: TileMetadataStore,
@@ -251,6 +303,8 @@ export {
   loadTileMetadata,
   saveTileMetadata,
   saveTileMetadataDebounced,
+  getTileMetadataForRender,
+  setTileMetadataForRender,
   pruneEmptyEntries,
   getEntryMetadata,
   setEntryMetadata,
@@ -269,4 +323,6 @@ export {
   setDepthAffinity,
   bulkSetDepthAffinity,
   bulkSetDdSourceType,
+  bulkSetDetectionSignals,
+  bulkSetRenderMode,
 };

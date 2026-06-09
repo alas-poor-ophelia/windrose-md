@@ -24,15 +24,20 @@ import { DepthBar, depthMeta } from './DepthBar';
 import {
   loadTileMetadata,
   saveTileMetadataDebounced,
+  setTileMetadataForRender,
   bulkAddTag,
   bulkToggleStar,
   bulkSetDepthAffinity,
+  bulkSetDetectionSignals,
+  bulkSetRenderMode,
   isStarred,
   collectUniqueTags,
   collectDepthAwareTags,
   getAllTags,
 } from '../../persistence/tileMetadata';
 import { predictDepthTier } from '../../assets/depthPredictor';
+import { predictRenderMode } from '../../assets/renderModePredictor';
+import { runDetectionScan } from '../../assets/tileImageScan';
 
 // ===========================================
 // Content-bounds detection for tile thumbnails
@@ -498,6 +503,13 @@ const TileAssetBrowser = ({
     void loadTileMetadata(app).then(setTileMetadata);
   }, []);
 
+  // Keep the renderer's global metadata accessor in sync with browser edits
+  // (detection scans, render-mode toggles) so placed tiles resolve their mode
+  // from the latest classification.
+  useEffect(() => {
+    setTileMetadataForRender(tileMetadata);
+  }, [tileMetadata]);
+
   // Report starred tiles to parent for spine flyout
   const prevStarredRef = useRef<string>('');
   useEffect(() => {
@@ -552,6 +564,56 @@ const TileAssetBrowser = ({
       ? requestIdleCallback(run)
       : setTimeout(run, 200) as unknown as number;
     return () => {
+      typeof cancelIdleCallback === 'function' ? cancelIdleCallback(id) : clearTimeout(id);
+    };
+  }, [tilesets, tileMetadata]);
+
+  // Eager detection scan + render-mode prediction. The scan caches per-tile alpha
+  // coverage + opaque bounds (decoupled from thumbnails, which are lazy + LRU-evicted);
+  // render-mode prediction then runs over every tile lacking an explicit renderMode,
+  // persisting confident 'region' guesses. 'cell' is the default, so it stays implicit.
+  const detectionScanRanRef = useRef(false);
+  useEffect(() => {
+    if (detectionScanRanRef.current) return;
+    if (tilesets.length === 0) return;
+
+    const controller = new AbortController();
+    const run = async (): Promise<void> => {
+      if (detectionScanRanRef.current) return;
+      detectionScanRanRef.current = true;
+
+      const allTiles = tilesets.flatMap(ts => ts.tiles);
+      const needsScan = allTiles
+        .filter(t => tileMetadata[t.vaultPath]?.alphaCoverage == null)
+        .map(t => t.vaultPath);
+      const scanned = needsScan.length > 0
+        ? await runDetectionScan(app, needsScan, { concurrency: 4, signal: controller.signal })
+        : [];
+      if (controller.signal.aborted) return;
+
+      setTileMetadata(prev => {
+        let updated = scanned.length > 0 ? bulkSetDetectionSignals(prev, scanned) : prev;
+        const regionEntries: Array<{ vaultPath: string; mode: 'region' }> = [];
+        for (const tile of allTiles) {
+          const e = updated[tile.vaultPath];
+          if (e?.renderMode != null) continue;
+          const { mode, confidence } = predictRenderMode(tile, e);
+          if (mode === 'region' && confidence >= 0.5) {
+            regionEntries.push({ vaultPath: tile.vaultPath, mode: 'region' });
+          }
+        }
+        if (scanned.length === 0 && regionEntries.length === 0) return prev;
+        if (regionEntries.length > 0) updated = bulkSetRenderMode(updated, regionEntries);
+        saveTileMetadataDebounced(app, updated);
+        return updated;
+      });
+    };
+
+    const id = typeof requestIdleCallback === 'function'
+      ? requestIdleCallback(() => void run())
+      : setTimeout(() => void run(), 400) as unknown as number;
+    return () => {
+      controller.abort();
       typeof cancelIdleCallback === 'function' ? cancelIdleCallback(id) : clearTimeout(id);
     };
   }, [tilesets, tileMetadata]);
