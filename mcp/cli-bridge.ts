@@ -55,12 +55,23 @@ function shellQuoteEval(s: string): string {
   if (/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(collapsed)) {
     throw new Error(`Control characters in eval code: ${collapsed.slice(0, 50)}`);
   }
+  // Node's exec runs cmd.exe on Windows and `/bin/sh -c` elsewhere. Neither is an
+  // interactive shell, so history expansion never applies — escaping '!' is wrong
+  // on every platform and injects a literal backslash that corrupts the JS payload
+  // (e.g. `!!x` becomes `\!\!x` → "Invalid or unexpected token").
+  if (process.platform === "win32") {
+    // cmd.exe treats $, `, and ! as literal inside double quotes; only the double
+    // quote needs escaping. Backslashes are doubled so JS string literals (e.g.
+    // Windows paths) survive intact.
+    const escaped = collapsed.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+    return `"${escaped}"`;
+  }
+  // POSIX sh -c: $ and ` remain active inside double quotes and must be escaped.
   const escaped = collapsed
     .replace(/\\/g, "\\\\")
     .replace(/"/g, '\\"')
     .replace(/\$/g, "\\$")
-    .replace(/`/g, "\\`")
-    .replace(/!/g, "\\!");
+    .replace(/`/g, "\\`");
   return `"${escaped}"`;
 }
 
