@@ -107,7 +107,14 @@ read fresh each frame. Populated on map mount (DungeonMapTracker) + kept in sync
 - Phase 7 follow-up: live-restain of already-placed tiles when the override UI toggles renderMode
   (detection writes happen pre-placement, so first paint is already correct).
 
-### Phase 4 — `predictSpan` (detection)
+### Phase 4 — `predictSpan` (detection) — DONE
+DONE: `src/assets/spanPredictor.ts` (`predictSpan(opaqueW, opaqueH, tileWidth, tileHeight)` →
+`{ spanW, spanH }` from TIGHT opaque bounds; floor at SPAN_PROMOTE_RATIO=1.4 so padding/
+marginally-large props stay 1, round above that, cap ≤ MAX_TILE_SPAN). `bulkSetDefaultSpan`
+persistence. Wired into the TileAssetBrowser detection effect AFTER render-mode prediction:
+skips region tiles (terrain has no footprint), needs cached opaque bounds, persists only spans
+> 1 (1×1 stays implicit). 9 predictor + 2 setter unit tests. Resolver already reads defaultSpan*
+(Phase 0); renderer consumption of span is Phase 5. Detection-only, no render change.
 - `predictSpan(tile, opaqueDims, tileWidth)` → `{ spanW, spanH }` =
   `round(opaqueW/tileWidth) × round(opaqueH/tileHeight)`, using TIGHT bounds so
   transparent padding doesn't inflate span. Clamp ≥1, cap ≤16, only promote >1 when ratio

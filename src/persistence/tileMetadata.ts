@@ -255,6 +255,18 @@ function bulkSetRenderMode(
   return result;
 }
 
+function bulkSetDefaultSpan(
+  metadata: TileMetadataStore,
+  entries: Array<{ vaultPath: string; spanW: number; spanH: number }>
+): TileMetadataStore {
+  const result = { ...metadata };
+  for (const { vaultPath, spanW, spanH } of entries) {
+    const existing = result[vaultPath] ?? {};
+    result[vaultPath] = { ...existing, defaultSpanW: spanW, defaultSpanH: spanH };
+  }
+  return result;
+}
+
 function bulkSetDetectionSignals(
   metadata: TileMetadataStore,
   entries: Array<{ vaultPath: string; signals: { alphaCoverage: number; opaqueW: number; opaqueH: number } }>
@@ -325,4 +337,5 @@ export {
   bulkSetDdSourceType,
   bulkSetDetectionSignals,
   bulkSetRenderMode,
+  bulkSetDefaultSpan,
 };

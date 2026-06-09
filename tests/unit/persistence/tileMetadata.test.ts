@@ -18,6 +18,7 @@ import {
   setDepthAffinity,
   bulkSetDepthAffinity,
   bulkSetDdSourceType,
+  bulkSetDefaultSpan,
   getTileMetadataForRender,
   setTileMetadataForRender,
 } from '../../../src/persistence/tileMetadata';
@@ -406,6 +407,23 @@ describe('tileMetadata', () => {
       };
       const result = collectDepthAwareTags(tiles, store, 'ground');
       expect(result.indexOf('common')).toBeLessThan(result.indexOf('rare'));
+    });
+  });
+
+  // ---- bulkSetDefaultSpan ----
+  describe('bulkSetDefaultSpan', () => {
+    it('writes defaultSpanW/H without clobbering existing fields', () => {
+      const store: TileMetadataStore = { 'a.png': { ddSourceType: 'objects', depthAffinity: 'props' } };
+      const result = bulkSetDefaultSpan(store, [{ vaultPath: 'a.png', spanW: 2, spanH: 3 }]);
+      expect(result['a.png']).toEqual({
+        ddSourceType: 'objects', depthAffinity: 'props', defaultSpanW: 2, defaultSpanH: 3,
+      });
+    });
+
+    it('does not mutate the input store', () => {
+      const store: TileMetadataStore = { 'a.png': {} };
+      bulkSetDefaultSpan(store, [{ vaultPath: 'a.png', spanW: 2, spanH: 2 }]);
+      expect(store['a.png']).toEqual({});
     });
   });
 

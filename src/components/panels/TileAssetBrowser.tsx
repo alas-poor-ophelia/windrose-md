@@ -30,6 +30,7 @@ import {
   bulkSetDepthAffinity,
   bulkSetDetectionSignals,
   bulkSetRenderMode,
+  bulkSetDefaultSpan,
   isStarred,
   collectUniqueTags,
   collectDepthAwareTags,
@@ -37,6 +38,7 @@ import {
 } from '../../persistence/tileMetadata';
 import { predictDepthTier } from '../../assets/depthPredictor';
 import { predictRenderMode } from '../../assets/renderModePredictor';
+import { predictSpan } from '../../assets/spanPredictor';
 import { runDetectionScan } from '../../assets/tileImageScan';
 
 // ===========================================
@@ -593,6 +595,8 @@ const TileAssetBrowser = ({
 
       setTileMetadata(prev => {
         let updated = scanned.length > 0 ? bulkSetDetectionSignals(prev, scanned) : prev;
+
+        // Render-mode prediction (region only; cell is the implicit default).
         const regionEntries: Array<{ vaultPath: string; mode: 'region' }> = [];
         for (const tile of allTiles) {
           const e = updated[tile.vaultPath];
@@ -602,8 +606,24 @@ const TileAssetBrowser = ({
             regionEntries.push({ vaultPath: tile.vaultPath, mode: 'region' });
           }
         }
-        if (scanned.length === 0 && regionEntries.length === 0) return prev;
         if (regionEntries.length > 0) updated = bulkSetRenderMode(updated, regionEntries);
+
+        // Footprint prediction for cell tiles with tight opaque bounds. Region
+        // tiles tile seamlessly and have no footprint, so they're skipped; 1x1
+        // is the default, so only spans that exceed one cell are persisted.
+        const spanEntries: Array<{ vaultPath: string; spanW: number; spanH: number }> = [];
+        for (const ts of tilesets) {
+          for (const tile of ts.tiles) {
+            const e = updated[tile.vaultPath];
+            if (e == null || e.defaultSpanW != null || e.renderMode === 'region') continue;
+            if (e.opaqueW == null || e.opaqueH == null) continue;
+            const { spanW, spanH } = predictSpan(e.opaqueW, e.opaqueH, ts.tileWidth, ts.tileHeight);
+            if (spanW > 1 || spanH > 1) spanEntries.push({ vaultPath: tile.vaultPath, spanW, spanH });
+          }
+        }
+        if (spanEntries.length > 0) updated = bulkSetDefaultSpan(updated, spanEntries);
+
+        if (scanned.length === 0 && regionEntries.length === 0 && spanEntries.length === 0) return prev;
         saveTileMetadataDebounced(app, updated);
         return updated;
       });
