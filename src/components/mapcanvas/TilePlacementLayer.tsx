@@ -17,6 +17,8 @@ import { useEventHandlerRegistration } from '../../context/EventHandlerContext';
 import { useApp } from '../../context/AppContext';
 import { getActiveLayer } from '../../persistence/layerAccessor';
 import { preloadImage } from '../../assets/imageOperations';
+import { getTileMetadataForRender } from '../../persistence/tileMetadata';
+import { cellsCoveredByAssignment, assignmentsOverlap } from '../../assets/tileFootprint';
 
 
 // ===========================================
@@ -146,16 +148,21 @@ const TilePlacementLayer = ({
     let changed = false;
 
     const targetPlacement = tileLayer === 'base' ? 'fill' : 'overlay';
-    const cells = getBrushCells(col, row, brushSize);
+
+    // Snapshot the tile's detected footprint (grid only) onto the placement so it
+    // stays stable if the metadata later changes. A prop with span > 1 ignores
+    // brush size and places a single footprint at the anchor.
+    const isGrid = geometry?.type === 'grid';
+    const meta = isGrid && entry?.vaultPath ? getTileMetadataForRender()[entry.vaultPath] : undefined;
+    const spanW = meta?.defaultSpanW != null && meta.defaultSpanW > 1 ? meta.defaultSpanW : undefined;
+    const spanH = meta?.defaultSpanH != null && meta.defaultSpanH > 1 ? meta.defaultSpanH : undefined;
+    const hasFootprint = spanW != null || spanH != null;
+
+    const cells = hasFootprint ? [{ col, row }] : getBrushCells(col, row, brushSize);
 
     for (const cell of cells) {
-      const key = `${cell.col},${cell.row}`;
-      if (paintedInStrokeRef.current.has(key)) continue;
-      paintedInStrokeRef.current.add(key);
-
-      const existingIdx = currentTiles.findIndex(
-        (t: TileAssignment) => t.col === cell.col && t.row === cell.row && (t.placement || 'fill') === targetPlacement
-      );
+      const anchorKey = `${cell.col},${cell.row}`;
+      if (paintedInStrokeRef.current.has(anchorKey)) continue;
 
       const newTile: TileAssignment = {
         col: cell.col, row: cell.row,
@@ -167,14 +174,19 @@ const TilePlacementLayer = ({
         depth: tileDepth === 'ground' ? undefined : tileDepth,
         fitMode: tileFitMode === 'auto' ? undefined : tileFitMode,
         scale: tileScale !== 1 ? tileScale : undefined,
+        spanW,
+        spanH,
       };
 
-      if (existingIdx >= 0) {
-        currentTiles = [...currentTiles];
-        currentTiles[existingIdx] = newTile;
-      } else {
-        currentTiles = [...currentTiles, newTile];
+      // Mark every covered cell painted (stops a drag re-placing the same prop)
+      // and remove any same-tier tile whose footprint overlaps this one.
+      for (const c of cellsCoveredByAssignment(newTile)) {
+        paintedInStrokeRef.current.add(`${c.col},${c.row}`);
       }
+      const remaining = currentTiles.filter(
+        (t: TileAssignment) => (t.placement || 'fill') !== targetPlacement || !assignmentsOverlap(t, newTile)
+      );
+      currentTiles = [...remaining, newTile];
       changed = true;
     }
 
@@ -182,7 +194,7 @@ const TilePlacementLayer = ({
       const isBatchedStroke = strokeInitialTilesRef.current !== null;
       onTilesChange(currentTiles, isBatchedStroke);
     }
-  }, [mapData, selectedTilesetId, selectedTileId, tileRotation, tileFlipH, tileLayer, tileFitMode, tileScale, brushSize, tileDepth, onTilesChange]);
+  }, [mapData, geometry, selectedTilesetId, selectedTileId, tileRotation, tileFlipH, tileLayer, tileFitMode, tileScale, brushSize, tileDepth, onTilesChange]);
 
   const eraseTilesInBrush = useCallback((col: number, row: number) => {
     if (!mapData) return;
