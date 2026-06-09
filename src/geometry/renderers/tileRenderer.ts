@@ -10,6 +10,7 @@ import type { TileAssignment, TilesetDef, FolderTileset, TileMetadataStore } fro
 
 import { axialToOffset } from '../core/offsetCoordinates';
 import { resolveTileRender } from '../../assets/tileRenderResolution';
+import { effectiveSpan } from '../../assets/tileFootprint';
 import { getTileMetadataForRender } from '../../persistence/tileMetadata';
 
 
@@ -280,16 +281,20 @@ function calculateTileDrawRect(
   hexSize: number,
   zoom: number,
   orientation: string,
-  fitMode?: 'fill' | 'contain'
+  fitMode?: 'fill' | 'contain',
+  spanW = 1,
+  spanH = 1
 ): { drawX: number; drawY: number; drawWidth: number; drawHeight: number } {
-  // On-screen cell dimensions (corner-to-corner for hex, edge-to-edge for grid)
+  // On-screen cell dimensions (corner-to-corner for hex, edge-to-edge for grid).
+  // A multi-cell footprint scales the target box by its UNROTATED span; the
+  // caller centers the rect on the footprint center and applies any rotation.
   const isGrid = orientation !== 'flat' && orientation !== 'pointy';
-  const hexScreenWidth = isGrid
+  const hexScreenWidth = (isGrid
     ? hexSize * zoom
-    : orientation === 'flat' ? 2 * hexSize * zoom : SQRT3 * hexSize * zoom;
-  const hexScreenHeight = isGrid
+    : orientation === 'flat' ? 2 * hexSize * zoom : SQRT3 * hexSize * zoom) * spanW;
+  const hexScreenHeight = (isGrid
     ? hexSize * zoom
-    : orientation === 'flat' ? SQRT3 * hexSize * zoom : 2 * hexSize * zoom;
+    : orientation === 'flat' ? SQRT3 * hexSize * zoom : 2 * hexSize * zoom) * spanH;
 
   const folder = isFolderTileset(tileset) ? tileset : null;
   const hexHeight = folder?.hexHeight ?? tileset.tileHeight;
@@ -473,6 +478,24 @@ function renderTiles(
           return geometry.worldToScreen(world.worldX, world.worldY, viewState.x, viewState.y, viewState.zoom);
         })();
 
+    // Multi-cell footprint (grid, snapped tiles only). The draw rect is sized to
+    // the UNROTATED span and centered on the footprint center derived from the
+    // EFFECTIVE (rotation-swapped) span; rotating that rect about the same center
+    // then fills the swapped cell box exactly. 1x1 / hex / freeform tiles collapse
+    // back to the anchor cell center, leaving existing behavior unchanged.
+    const resolvedSpan = isGrid && tile.freeform !== true
+      ? resolveTileRender(tile, metaStore[entry.vaultPath], tileset)
+      : null;
+    const spanW = resolvedSpan?.spanW ?? 1;
+    const spanH = resolvedSpan?.spanH ?? 1;
+    const eff = spanW > 1 || spanH > 1
+      ? effectiveSpan({ spanW, spanH, rotation: tile.rotation })
+      : { spanW, spanH };
+    const centerX = screen.screenX + ((eff.spanW - 1) / 2) * hexScreenWidth;
+    const centerY = screen.screenY + ((eff.spanH - 1) / 2) * hexScreenHeight;
+    const cellW = hexScreenWidth * spanW;
+    const cellH = hexScreenHeight * spanH;
+
     const folder = isFolderTileset(tileset) ? tileset : null;
     const hexHeight = folder?.hexHeight ?? tileset.tileHeight;
     const maxOverflow = Math.max(folder?.overflowTop ?? 0, folder?.overflowBottom ?? 0, tileset.tileHeight);
@@ -496,13 +519,13 @@ function renderTiles(
       const hRatio = natH / hexHeight;
       const stampThreshold = tileset.stampThreshold ?? 0.5;
       if (wRatio < stampThreshold || hRatio < stampThreshold) {
-        // Scale relative to the hex using pre-computed screen dimensions
-        const fillScaleX = hexScreenWidth / tileset.tileWidth;
-        const fillScaleY = hexScreenHeight / hexHeight;
+        // Scale relative to the footprint using pre-computed screen dimensions
+        const fillScaleX = cellW / tileset.tileWidth;
+        const fillScaleY = cellH / hexHeight;
         // Use the smaller fill scale to preserve aspect ratio
         const baseScale = Math.min(fillScaleX, fillScaleY);
-        // Ensure stamps are at least minStampScale of hex's smaller dimension
-        const minHexDim = Math.min(hexScreenWidth, hexScreenHeight);
+        // Ensure stamps are at least minStampScale of the footprint's smaller dimension
+        const minHexDim = Math.min(cellW, cellH);
         const minStampDim = minHexDim * (tileset.minStampScale ?? 0.35);
         const naturalMinDim = Math.min(natW, natH) * baseScale;
         const effectiveScale = (naturalMinDim < minStampDim
@@ -511,8 +534,8 @@ function renderTiles(
         const drawWidth = natW * effectiveScale;
         const drawHeight = natH * effectiveScale;
         drawOverride = {
-          drawX: screen.screenX - drawWidth / 2,
-          drawY: screen.screenY - drawHeight / 2,
+          drawX: centerX - drawWidth / 2,
+          drawY: centerY - drawHeight / 2,
           drawWidth,
           drawHeight,
         };
@@ -520,9 +543,9 @@ function renderTiles(
     }
 
     let rect = drawOverride || calculateTileDrawRect(
-      screen.screenX, screen.screenY,
+      centerX, centerY,
       tileset, geometry.hexSize, viewState.zoom, geometry.orientation,
-      tile.fitMode
+      tile.fitMode, spanW, spanH
     );
 
     // Apply per-tile scale to non-stamp tiles (stamps already applied above)
@@ -545,14 +568,14 @@ function renderTiles(
     const needsTransform = (tile.rotation != null && tile.rotation !== 0) || tile.flipH === true;
     if (needsTransform) {
       ctx.save();
-      ctx.translate(screen.screenX, screen.screenY);
+      ctx.translate(centerX, centerY);
       if (tile.rotation != null && tile.rotation !== 0) {
         ctx.rotate((tile.rotation * Math.PI) / 180);
       }
       if (tile.flipH === true) {
         ctx.scale(-1, 1);
       }
-      ctx.translate(-screen.screenX, -screen.screenY);
+      ctx.translate(-centerX, -centerY);
     }
 
     ctx.drawImage(img, rect.drawX, rect.drawY, rect.drawWidth, rect.drawHeight);

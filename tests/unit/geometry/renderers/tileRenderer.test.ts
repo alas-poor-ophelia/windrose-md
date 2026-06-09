@@ -126,6 +126,24 @@ describe('tileRenderer', () => {
       expect(rect.drawHeight).toBeCloseTo(2 * 80, 2);
     });
 
+    it('scales the draw rect by footprint span on grid (fill)', () => {
+      const tileset = makeTileset();
+      const base = calculateTileDrawRect(400, 300, tileset, 80, 1, 'grid', 'fill', 1, 1);
+      const wide = calculateTileDrawRect(400, 300, tileset, 80, 1, 'grid', 'fill', 2, 1);
+      const tall = calculateTileDrawRect(400, 300, tileset, 80, 1, 'grid', 'fill', 1, 3);
+      expect(wide.drawWidth).toBeCloseTo(base.drawWidth * 2, 2);
+      expect(wide.drawHeight).toBeCloseTo(base.drawHeight, 2);
+      expect(tall.drawHeight).toBeCloseTo(base.drawHeight * 3, 2);
+      expect(tall.drawWidth).toBeCloseTo(base.drawWidth, 2);
+    });
+
+    it('span defaults to 1x1 (omitted args leave the rect unchanged)', () => {
+      const tileset = makeTileset();
+      const omitted = calculateTileDrawRect(400, 300, tileset, 80, 1, 'grid', 'fill');
+      const explicit = calculateTileDrawRect(400, 300, tileset, 80, 1, 'grid', 'fill', 1, 1);
+      expect(omitted).toEqual(explicit);
+    });
+
     it('extends above the hex for tall tiles with overflow', () => {
       const tileset = makeTileset({
         tileHeight: 384, overflowTop: 128,
