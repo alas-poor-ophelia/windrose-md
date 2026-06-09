@@ -120,7 +120,21 @@ skips region tiles (terrain has no footprint), needs cached opaque bounds, persi
   transparent padding doesn't inflate span. Clamp ≥1, cap ≤16, only promote >1 when ratio
   clearly exceeds ~1.4. Only for cell/stamp tiles. Write `tileMetadata.defaultSpan*`.
 
-### Phase 5 — Footprint-aware placement + interaction (HEAVY core)
+### Phase 5 — Footprint-aware placement + interaction (HEAVY core) — DONE
+DONE in 4 sub-commits: (1) `src/assets/tileFootprint.ts` helpers — `effectiveSpan` (90/270
+swap baked in), `cellsCoveredByAssignment`, `assignmentCoversCell`, `assignmentsOverlap`,
+`findAssignmentAt` (15 tests). (2) Renderer: `drawCellTile` sizes the rect to the UNROTATED
+span and centers it on the footprint center from the EFFECTIVE (rotation-swapped) span;
+rotation/flip pivot moved there; `calculateTileDrawRect` gained optional spanW/spanH (grid only;
+export free via shared renderTiles). (3) Placement: `placeTilesInBrush` snapshots defaultSpan*
+into the assignment, span>1 ignores brush (single footprint at anchor), footprint-aware
+replace + stroke dedup. (4) Erase/flood-fill/hit-test footprint-aware in `TilePlacementLayer`
++ `usePaintTool` (freeform stamps still erase by drop cell). Undo/redo needed NO change
+(snapshots whole array). Full unit suite green (1433).
+- DEFERRED fast-follow: 90/270 rotation steps are not offered in the grid UI yet
+  (`TileAssetBrowser` ROTATION_STEPS is hex 60-steps) — swap logic is ready when they are;
+  placement-preview ghost; formal collision/validation rules; region-fill clip across a
+  multi-cell terrain footprint (latent — terrain is always 1×1 today).
 - Placement: copy `tileMetadata.defaultSpan*` → `TileAssignment.spanW/H` at place time
   (per-placement, editable, stable if metadata later changes).
 - Renderer: draw across footprint (anchor + span × cell), tight-bounds aware.
