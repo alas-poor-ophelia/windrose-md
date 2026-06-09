@@ -64,7 +64,19 @@ default constants; unit tests green. Type-clean (only pre-existing branch errors
   Replaces scattered `?? tileset.x ?? const` reads with one chain. Global defaults as
   module constants.
 
-### Phase 1 — Wire alpha + tight-bounds signal (cheap, piggybacked)
+### Phase 1 — Eager detection scan pass — DONE
+DONE: `src/assets/tileImageScan.ts` (`scanTileImageSignals` + concurrency-limited
+`runDetectionScan` + pure `analyzeAlphaPixels`); `bulkSetDetectionSignals` persistence;
+abortable idle-deferred backfill effect in TileAssetBrowser; 6 unit tests. Replaces the
+original thumbnail-piggyback approach (which was fatally lazy/LRU-evicted).
+
+### Phase 2 — predictRenderMode — DONE
+DONE: `src/assets/renderModePredictor.ts` (DD source + alphaCoverage + ground-noun signals,
+region gated >=0.5, cell stays implicit); `bulkSetRenderMode`; wired into the browser
+detection effect (post-scan, all unclassified tiles) AND DD import (ddSourceType-only); 12
+unit tests. Pixel refinement at browser scan supersedes the import-time DD-only guess.
+
+### Phase 1 (original) — Wire alpha + tight-bounds signal (cheap, piggybacked) — SUPERSEDED
 - Extend `scanBounds` (thumbnailCache) to also return `alphaCoverage` (opaque-pixel
   fraction) and opaque bounds W/H — already does `getImageData` on a 128px downscale, so
   near-free. Persist into `tileMetadata` during thumbnail generation.
@@ -79,12 +91,21 @@ default constants; unit tests green. Type-clean (only pre-existing branch errors
 - Trigger at same points as depth: `useTilesetBuilder` build + `DungeondraftImportModal`
   import + the TileAssetBrowser batch effect.
 
-### Phase 3 — Renderer consumes per-tile renderMode
-- `getTileRenderMode` reads resolved per-tile mode (via `tileMetadata`), not `ts.renderMode`.
-- Region grouping (`regionByDepth` keyed `tilesetId:tileId`) groups only region-resolved tiles.
-- **Thread `tileMetadata` into the renderer** (new integration point).
-- **`getEntryMap` cache key must fold a `tileMetadata` signature hash** — else live
-  per-tile edits stale until reload (the H-508 partial-key failure).
+### Phase 3 — Renderer consumes per-tile renderMode — DONE
+DONE: renderMode resolved per-tile via `resolveTileRender(assignment, meta, tileset)` at the
+region-diversion point in `renderTiles` (tileset = temporary fallback tier). `RegionGroup` now
+carries resolved `worldRepeat`/`edgeFeather` so per-tile terrain params reach `renderRegionFills`.
+Metadata sourced from a module-singleton accessor (`getTileMetadataForRender`/
+`setTileMetadataForRender` in tileMetadata.ts) — mirrors the `settingsAccessor`/`getTheme()` idiom,
+read fresh each frame. Populated on map mount (DungeonMapTracker) + kept in sync by TileAssetBrowser.
+- **No cache-version counter needed.** Resolving renderMode LIVE per-frame (not baking it into the
+  cached entryMap) sidesteps the H-508 partial-key staleness entirely — nothing to go stale.
+- **Export + hover-preview render correctly for free** — both call `renderCanvas` and the global
+  accessor reaches `renderTiles` without threading (resolves the Parallax exportOperations concern).
+- VERIFY PENDING (live app): region path needs `CAN_SET_PATTERN_TRANSFORM && isGrid`, unreachable
+  in the node unit env — confirm seamless terrain fill vs cell stamp with placed DD terrain tiles.
+- Phase 7 follow-up: live-restain of already-placed tiles when the override UI toggles renderMode
+  (detection writes happen pre-placement, so first paint is already correct).
 
 ### Phase 4 — `predictSpan` (detection)
 - `predictSpan(tile, opaqueDims, tileWidth)` → `{ spanW, spanH }` =
