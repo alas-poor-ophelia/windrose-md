@@ -327,14 +327,21 @@ function DrawerDock({
         </div>
       )}
 
-      {/* Full panel — right-pinned, clips off left edge as dock narrows */}
+      {/* Full panel — right-pinned, clips off left edge as dock narrows.
+          When collapsed it goes visibility:hidden (delayed past the fold) so the
+          browser stops painting it entirely — an opacity-0 panel still runs its
+          contents' CSS animations (thumbnail shimmer) as per-frame main-thread
+          paint work, which saturates weaker devices. */}
       <div
         className="windrose-tile-panel-layer"
         style={{
           width: drawerWidth,
           opacity: open ? 1 : 0,
+          visibility: open ? 'visible' : 'hidden',
           pointerEvents: open ? 'auto' : 'none',
-          transition: fold && !resizing ? 'opacity .26s ease' : 'none',
+          transition: fold && !resizing
+            ? (open ? 'opacity .26s ease' : 'opacity .26s ease, visibility 0s linear .45s')
+            : 'none',
         }}
       >
         {children}

@@ -477,6 +477,26 @@
   background-size: 200% 100%;
   animation: windrose-thumb-shimmer 1.2s ease-in-out infinite;
   border-radius: 2px;
+
+  /* Terminal load failure (missing/unreadable file): never animate. */
+  &.is-failed {
+    animation: none;
+    opacity: 0.45;
+  }
+}
+
+/* The folded drawer keeps the panel mounted for its fold animation; make sure
+   no placeholder animates behind it. The shimmer animates background-position,
+   which is per-frame MAIN-THREAD paint work for every element — dozens of
+   invisible shimmers saturate weaker devices (iPad) even at opacity 0. */
+.windrose-tile-drawer.is-collapsed .windrose-tile-thumb-placeholder {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .windrose-tile-thumb-placeholder {
+    animation: none;
+  }
 }
 
 @keyframes windrose-thumb-shimmer {

@@ -157,9 +157,17 @@ function loadVaultImage(
 }
 
 const TileThumbnail = memo(({ url }: TileThumbnailProps): VNode => {
-  return url
-    ? <img src={url} className="windrose-tile-thumb-img" width={THUMB_SIZE} height={THUMB_SIZE} alt="" />
-    : <div className="windrose-tile-thumb-placeholder" style={{ width: THUMB_SIZE, height: THUMB_SIZE }} />;
+  if (url) {
+    return <img src={url} className="windrose-tile-thumb-img" width={THUMB_SIZE} height={THUMB_SIZE} alt="" />;
+  }
+  // '' = terminal load failure (static placeholder); null = still loading (shimmer).
+  const failed = url === '';
+  return (
+    <div
+      className={failed ? 'windrose-tile-thumb-placeholder is-failed' : 'windrose-tile-thumb-placeholder'}
+      style={{ width: THUMB_SIZE, height: THUMB_SIZE }}
+    />
+  );
 });
 
 // ===========================================

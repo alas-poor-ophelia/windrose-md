@@ -75,6 +75,11 @@ async function processQueue(): Promise<void> {
 
   for (const { path, img } of loaded) {
     if (!img) {
+      // Terminal failure (missing/unreadable file): cache an empty sentinel.
+      // Leaving it un-cached keeps the UI in "loading" forever — the shimmer
+      // placeholder animates indefinitely, which is per-frame main-thread
+      // paint work for every dead tile.
+      cache.set(path, '');
       pending.delete(path);
       continue;
     }
