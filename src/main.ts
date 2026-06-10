@@ -1,4 +1,4 @@
-import { Plugin, Notice, TFile } from 'obsidian';
+import { Plugin, Notice, TFile, MarkdownRenderChild } from 'obsidian';
 import type { PluginSettings } from '#types/settings/settings.types';
 import type { MapType } from '#types/index';
 import { render, h } from 'preact';
@@ -91,6 +91,18 @@ export default class WindrosePlugin extends Plugin {
         el
       );
       this.mountedElements.add(el);
+
+      // Obsidian removes the block's DOM without notifying Preact, so without
+      // this the component tree stays mounted (effects running, no unmount
+      // flush) until plugin unload. The render child unmounts the tree when
+      // the block actually leaves the document — which is also what lets
+      // useDebouncedSave's unmount flush save pending edits on navigation.
+      const child = new MarkdownRenderChild(el);
+      child.register(() => {
+        render(null, el);
+        this.mountedElements.delete(el);
+      });
+      ctx.addChild(child);
     });
 
     registerDeepLinks(this);
