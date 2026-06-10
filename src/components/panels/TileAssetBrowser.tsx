@@ -29,7 +29,6 @@ import {
   bulkToggleStar,
   bulkSetDepthAffinity,
   bulkSetDetectionSignals,
-  bulkSetRenderMode,
   bulkSetDefaultSpan,
   isStarred,
   collectUniqueTags,
@@ -37,7 +36,6 @@ import {
   getAllTags,
 } from '../../persistence/tileMetadata';
 import { predictDepthTier } from '../../assets/depthPredictor';
-import { predictRenderMode } from '../../assets/renderModePredictor';
 import { predictSpan, DEFAULT_PIXELS_PER_CELL } from '../../assets/spanPredictor';
 import { runDetectionScan } from '../../assets/tileImageScan';
 
@@ -574,10 +572,10 @@ const TileAssetBrowser = ({
     };
   }, [tilesets, tileMetadata]);
 
-  // Eager detection scan + render-mode prediction. The scan caches per-tile alpha
-  // coverage + opaque bounds (decoupled from thumbnails, which are lazy + LRU-evicted);
-  // render-mode prediction then runs over every tile lacking an explicit renderMode,
-  // persisting confident 'region' guesses. 'cell' is the default, so it stays implicit.
+  // Eager detection scan: caches per-tile alpha coverage + opaque bounds + natural
+  // dims (decoupled from thumbnails, which are lazy + LRU-evicted). Signals only —
+  // render-mode/footprint predictions are applied at import time, never bulk-persisted
+  // for an existing library (see comment inside).
   const detectionScanRanRef = useRef(false);
   useEffect(() => {
     if (detectionScanRanRef.current) return;
@@ -603,37 +601,15 @@ const TileAssetBrowser = ({
       if (controller.signal.aborted) return;
 
       setTileMetadata(prev => {
-        let updated = scanned.length > 0 ? bulkSetDetectionSignals(prev, scanned) : prev;
-
-        // Render-mode prediction (region only; cell is the implicit default).
-        const regionEntries: Array<{ vaultPath: string; mode: 'region' }> = [];
-        for (const tile of allTiles) {
-          const e = updated[tile.vaultPath];
-          if (e?.renderMode != null) continue;
-          const { mode, confidence } = predictRenderMode(tile, e);
-          if (mode === 'region' && confidence >= 0.5) {
-            regionEntries.push({ vaultPath: tile.vaultPath, mode: 'region' });
-          }
-        }
-        if (regionEntries.length > 0) updated = bulkSetRenderMode(updated, regionEntries);
-
-        // Footprint prediction for cell tiles with tight opaque bounds. Region
-        // tiles tile seamlessly and have no footprint, so they're skipped; 1x1
-        // is the default, so only spans that exceed one cell are persisted.
-        const spanEntries: Array<{ vaultPath: string; spanW: number; spanH: number }> = [];
-        for (const ts of tilesets) {
-          const ppc = ts.pixelsPerCell ?? DEFAULT_PIXELS_PER_CELL;
-          for (const tile of ts.tiles) {
-            const e = updated[tile.vaultPath];
-            if (e == null || e.defaultSpanW != null || e.renderMode === 'region') continue;
-            if (e.srcW == null || e.srcH == null) continue;
-            const { spanW, spanH } = predictSpan(e.srcW, e.srcH, ppc);
-            if (spanW > 1 || spanH > 1) spanEntries.push({ vaultPath: tile.vaultPath, spanW, spanH });
-          }
-        }
-        if (spanEntries.length > 0) updated = bulkSetDefaultSpan(updated, spanEntries);
-
-        if (scanned.length === 0 && regionEntries.length === 0 && spanEntries.length === 0) return prev;
+        // Signals only. Render-mode and footprint PREDICTIONS must not be
+        // persisted here: per-tile metadata outranks the per-tileset setting in
+        // resolveTileRender, so bulk-writing predictions for an existing library
+        // retroactively changes how already-placed tiles render on every device
+        // the metadata file syncs to (2026-06-09: 304 tiles silently flipped to
+        // 'region', breaking placed terrain). Predictions are applied at import
+        // time (DungeondraftImportModal), where no placements exist yet.
+        if (scanned.length === 0) return prev;
+        const updated = bulkSetDetectionSignals(prev, scanned);
         saveTileMetadataDebounced(app, updated);
         return updated;
       });
