@@ -142,7 +142,8 @@ async function measureAlphaCoverage(app: App, tile: TileEntry): Promise<number |
         const canvas = document.createElement('canvas');
         canvas.width = w;
         canvas.height = h;
-        const ctx = canvas.getContext('2d');
+        // willReadFrequently: software-backed canvas so getImageData doesn't stall the GPU.
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
         if (!ctx) { resolve(null); URL.revokeObjectURL(url); return; }
         ctx.drawImage(img, 0, 0);
         const data = ctx.getImageData(0, 0, w, h).data;

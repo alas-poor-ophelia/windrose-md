@@ -4,7 +4,11 @@ import { TFile } from 'obsidian';
 const THUMB_SIZE = 64;
 const SCAN_SIZE = 128;
 const BATCH_SIZE = 20;
-const MAX_CACHE = 500;
+// Must exceed the largest tile-image working set. With compact (non-virtualized)
+// browser modes requesting every filtered tile, a cache smaller than the set
+// evicts entries the same pass created — every later re-render then re-reads,
+// re-decodes, and re-scans thousands of images (vault has 2,271+ tile images).
+const MAX_CACHE = 3000;
 
 const cache = new Map<string, string>();
 const pending = new Set<string>();
@@ -108,7 +112,10 @@ function scanBounds(img: ImageBitmap): { x: number; y: number; w: number; h: num
 
   scanCanvas.width = scanW;
   scanCanvas.height = scanH;
-  const ctx = scanCanvas.getContext('2d');
+  // willReadFrequently keeps this canvas software-backed: getImageData becomes
+  // a memcpy instead of a GPU pipeline flush + readback. Without it, each
+  // thumbnail scan stalls the compositor the entire app shares.
+  const ctx = scanCanvas.getContext('2d', { willReadFrequently: true });
   if (!ctx) return { x: 0, y: 0, w: natW, h: natH };
 
   ctx.clearRect(0, 0, scanW, scanH);
@@ -141,7 +148,8 @@ function scanBounds(img: ImageBitmap): { x: number; y: number; w: number; h: num
 
 function renderThumbnail(path: string, img: ImageBitmap): void {
   const bounds = scanBounds(img);
-  const ctx = scratchCanvas.getContext('2d');
+  // willReadFrequently: toDataURL below reads this canvas back every call.
+  const ctx = scratchCanvas.getContext('2d', { willReadFrequently: true });
   if (!ctx) {
     pending.delete(path);
     return;

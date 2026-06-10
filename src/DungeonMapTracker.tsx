@@ -1001,6 +1001,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 tilesetOverrides={mapData?.tilesetOverrides}
                 onTilesetOverrideChange={handleTilesetOverrideChange}
                 compact
+                active={!tileBrowserCollapsed}
                 recentTiles={recentTiles}
                 onStarredChange={setStarredFlyoutTiles}
               />
@@ -1229,6 +1230,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                     tilesetOverrides={mapData?.tilesetOverrides}
                     onTilesetOverrideChange={handleTilesetOverrideChange}
                     showRail
+                    active={!tileBrowserCollapsed}
                     recentTiles={recentTiles}
                     onStarredChange={setStarredFlyoutTiles}
                   />

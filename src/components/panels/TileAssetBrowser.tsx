@@ -59,7 +59,8 @@ function getContentBounds(img: HTMLImageElement): { x: number; y: number; w: num
 
   scratchCanvas.width = w;
   scratchCanvas.height = h;
-  const ctx = scratchCanvas.getContext('2d');
+  // willReadFrequently: software-backed canvas so getImageData doesn't stall the GPU.
+  const ctx = scratchCanvas.getContext('2d', { willReadFrequently: true });
   if (ctx == null) return { x: 0, y: 0, w, h };
   ctx.clearRect(0, 0, w, h);
   ctx.drawImage(img, 0, 0);
@@ -298,6 +299,8 @@ interface TileAssetBrowserProps {
   onTilesetOverrideChange?: (tilesetId: string, overrides: TilesetOverrides) => void;
   showRail?: boolean;
   compact?: boolean;
+  /** False while the hosting drawer is collapsed — suspends thumbnail generation for the hidden grid. */
+  active?: boolean;
   recentTiles?: Array<{ tilesetId: string; tileId: string }>;
   onStarredChange?: (tiles: FlyoutTile[]) => void;
 }
@@ -347,6 +350,7 @@ const TileAssetBrowser = ({
   onTilesetOverrideChange,
   showRail = false,
   compact = false,
+  active = true,
   recentTiles,
   onStarredChange,
 }: TileAssetBrowserProps): VNode | null => {
@@ -921,7 +925,10 @@ const TileAssetBrowser = ({
   const orgRange = orgVirtualizer.range;
   const fullRange = fullVirtualizer.range;
   useEffect(() => {
-    if (tilesets.length === 0) return;
+    // A collapsed drawer keeps this component mounted for its fold animation;
+    // generating thumbnails for an invisible grid re-decodes + rescans the whole
+    // tile library on every parent re-render (i.e. every map interaction).
+    if (!active || tilesets.length === 0) return;
 
     const paths: string[] = [];
 
@@ -943,7 +950,7 @@ const TileAssetBrowser = ({
     }
 
     if (paths.length > 0) requestThumbs(paths);
-  }, [tilesets, organize, compact, orgRows, fullRows, orgRange, fullRange, filteredTiles, requestThumbs]);
+  }, [active, tilesets, organize, compact, orgRows, fullRows, orgRange, fullRange, filteredTiles, requestThumbs]);
 
   // ---- Empty state: no tilesets ----
 
