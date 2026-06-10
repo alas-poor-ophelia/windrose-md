@@ -229,6 +229,11 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   );
   const showTilePanel = mapData != null;
 
+  // Stable handlers: TileAssetBrowser is memo()'d, so its props must keep
+  // identity across the per-pointermove re-renders of this component.
+  const collapseTileBrowser = useCallback(() => setTileBrowserCollapsed(true), [setTileBrowserCollapsed]);
+  const expandTileBrowser = useCallback(() => setTileBrowserCollapsed(false), [setTileBrowserCollapsed]);
+
   // Flyout data for spine (recent + starred tiles)
   const [starredFlyoutTiles, setStarredFlyoutTiles] = useState<FlyoutTile[]>([]);
 
@@ -958,8 +963,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
           {showTilePanel && !fullPane && (
             <DrawerDock
               open={!tileBrowserCollapsed}
-              onCollapse={() => setTileBrowserCollapsed(true)}
-              onExpand={() => setTileBrowserCollapsed(false)}
+              onCollapse={collapseTileBrowser}
+              onExpand={expandTileBrowser}
               drawerWidth={240}
               ribbonWidth={46}
               fold
@@ -979,7 +984,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 onTileSelect={handleTileSelect}
                 onTileDeselect={handleTileDeselect}
                 onToolChange={setCurrentTool}
-                onCollapse={() => setTileBrowserCollapsed(true)}
+                onCollapse={collapseTileBrowser}
                 rotation={tileRotation}
                 flipH={tileFlipH}
                 onRotationChange={setTileRotation}
@@ -1184,8 +1189,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               {showTilePanel && !isFloating('tiles') && (
                 <DrawerDock
                   open={!tileBrowserCollapsed}
-                  onCollapse={() => setTileBrowserCollapsed(true)}
-                  onExpand={() => setTileBrowserCollapsed(false)}
+                  onCollapse={collapseTileBrowser}
+                  onExpand={expandTileBrowser}
                   drawerWidth={tileBrowserWidth}
                   onWidthChange={setTileBrowserWidth}
                   minWidth={180}
@@ -1208,7 +1213,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                     onTileSelect={handleTileSelect}
                     onTileDeselect={handleTileDeselect}
                     onToolChange={setCurrentTool}
-                    onCollapse={() => setTileBrowserCollapsed(true)}
+                    onCollapse={collapseTileBrowser}
                     rotation={tileRotation}
                     flipH={tileFlipH}
                     onRotationChange={setTileRotation}

@@ -12,6 +12,7 @@
 
 import type { App } from 'obsidian';
 import { Notice, Platform } from 'obsidian';
+import { options } from 'preact';
 
 interface SecondSample {
   t: number;
@@ -35,6 +36,9 @@ interface SecondSample {
   longTasks: number;
   longTaskMs: number;
   pointerEvents: number;
+  /** Preact VDOM diff: root passes and total main-thread ms spent diffing. */
+  preactDiffs: number;
+  preactDiffMs: number;
 }
 
 interface FrameGap {
@@ -63,6 +67,7 @@ async function recordPerfTelemetry(app: App, durationMs = 60000): Promise<void> 
     vaultReads: 0, vaultWrites: 0, bytesRead: 0, bytesWritten: 0,
     jsonParses: 0, jsonParseChars: 0, jsonStringifies: 0, jsonStringifyChars: 0,
     longTasks: 0, longTaskMs: 0, pointerEvents: 0,
+    preactDiffs: 0, preactDiffMs: 0,
   };
   const series: SecondSample[] = [];
   const frameGaps: FrameGap[] = [];
@@ -175,6 +180,31 @@ async function recordPerfTelemetry(app: App, durationMs = 60000): Promise<void> 
       return res;
     }) as typeof JSON.stringify;
     return () => { JSON.parse = oParse; JSON.stringify = oStr; };
+  });
+
+  // ---- Preact VDOM diff time: measures component re-render cost directly.
+  // options.__b (mangled _diff) fires before each vnode diff, options.diffed
+  // after — depth-tracking the pair times each root diff pass. ----
+  safeWrap('preact diff timing', () => {
+    const o = options as unknown as Record<string, ((vnode: unknown) => void) | undefined>;
+    const prevDiff = o.__b;
+    const prevDiffed = o.diffed;
+    let depth = 0;
+    let start = 0;
+    o.__b = (vnode: unknown) => {
+      if (depth === 0) start = performance.now();
+      depth++;
+      prevDiff?.(vnode);
+    };
+    o.diffed = (vnode: unknown) => {
+      depth = Math.max(0, depth - 1);
+      if (depth === 0) {
+        c.preactDiffMs += performance.now() - start;
+        c.preactDiffs++;
+      }
+      prevDiffed?.(vnode);
+    };
+    return () => { o.__b = prevDiff; o.diffed = prevDiffed; };
   });
 
   // ---- long tasks (Chromium only; absent on iOS WebKit — recorded as unsupported) ----

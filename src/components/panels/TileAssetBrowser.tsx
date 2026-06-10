@@ -327,7 +327,12 @@ function displayCategory(category: string): string {
 
 const ROTATION_STEPS = [0, 60, 120, 180, 240, 300];
 
-const TileAssetBrowser = ({
+// memo: the map root re-renders on EVERY pointermove (viewState lives in its
+// state). Without memo, this entire tree — hundreds of tile nodes when any
+// tileset is configured — re-renders and re-diffs per touch event, which is
+// the dominant per-gesture CPU cost on tablets. All props must stay
+// identity-stable across pan renders (no inline arrows at call sites).
+const TileAssetBrowser = memo(({
   tilesets,
   selectedTilesetId,
   selectedTileId,
@@ -1682,6 +1687,6 @@ const TileAssetBrowser = ({
       </>)}
     </div>
   );
-};
+});
 
 export { TileAssetBrowser };
