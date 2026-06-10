@@ -1,8 +1,32 @@
 # Windrose Performance Lag — Investigation Handoff
 
-**Date:** 2026-06-09
-**Status:** PARTIALLY FIXED (desktop much better after fix + restart; **iPad still completely broken**)
-**Branch:** `standalone-conversion` (changes below are UNCOMMITTED in working tree + deployed to vault)
+**Date:** 2026-06-09 (updated session 2, late night)
+**Status:** Desktop fixed & measured. **iPad untested with Move 2** — needs user verification.
+**Branch:** `standalone-conversion`
+
+---
+
+## SESSION 2 UPDATE (2026-06-10)
+
+**Committed:**
+- `db7ea444` — Move 1 (rAF coalescing) + Tier 1 (compact save), previously uncommitted
+- `20a1a11f` — **Move 2**: viewport-cull cells/edges/borders/interior-lines (grid+hex, active+ghost+adjacent layers), gate `drawGrid` rotation padding on actual rotation (was 95 extra cells/side + 3x-length lines ALWAYS), clamp bounded hex maps to visible range (was drawing EVERY hex on the map per frame), dedupe the double `updatePan` (canvas + window mousemove both fired per event).
+
+**Measured (desktop, 1,373-cell map, zoom ~1.6 pan): fillRects/frame 4,970 → 142.** Zero long-animation-frames in post-fix probes.
+
+**The "what changed at 4-5pm" mystery — exhaustively ruled out on desktop:**
+- Obsidian app update: asar mtime March 23 (log shows hourly "up to date" all day, app ran continuously through the window)
+- Config/CSS/theme/snippets: nothing newer than Feb 2026
+- Vault data: only ONE file changed 16:00–01:00 UTC (the backup this investigation created); cell counts are small (1,434 max)
+- No GPU/crash entries in obsidian.log
+- **Remaining candidates:** (a) iPad-side Obsidian mobile App Store update ~June 9 (check Settings → About on iPad + App Store update history), (b) transient desktop GPU-process degradation that the full quit cleared. The structural render cost was always there.
+
+**Trap discovered:** `windrose_reload` MCP tool reported success but the app kept running the OLD main.js — burned a full probe cycle on "fix did nothing." Use explicit `app.plugins.disablePlugin('windrose-md')` + `enablePlugin` and verify via behavior probe (fillRect arg histogram shows which code version is drawing). Also: `windrose_get_state` snapshots can be stale/wrong (reported wrong dataFilePath + frozen viewState).
+
+**Remaining levers if iPad is still bad after syncing this build:**
+1. Cap canvas DPR on iPad (backing store may be 4-9x desktop pixels)
+2. Offscreen static-layer cache (Move 3) — kills the remaining zoomed-out cost where all cells are genuinely visible
+3. Batched Path2D instead of per-segment fillRect (verify the iOS stroke-corruption bug first)
 
 ---
 
