@@ -124,6 +124,8 @@ interface StaticLayerCacheEntry {
   vOx: number;
   vOy: number;
   key: readonly unknown[];
+  /** Image-cache version the offscreen was rendered with (soft invalidation). */
+  imageVersion: number;
   settleTimer: number | null;
 }
 
@@ -158,7 +160,8 @@ function blitStaticContent(
   zoom: number,
   width: number,
   height: number,
-  key: readonly unknown[]
+  key: readonly unknown[],
+  imageVersion: number
 ): void {
   let entry = staticLayerCaches.get(canvas);
 
@@ -206,19 +209,22 @@ function blitStaticContent(
     octx.clearRect(0, 0, ow, oh);
     draw(octx, offsetX + padX, offsetY + padY, ow, oh);
     octx.restore();
-    entry = { off, zoom, vOx: offsetX + padX, vOy: offsetY + padY, key, settleTimer: null };
+    entry = { off, zoom, vOx: offsetX + padX, vOy: offsetY + padY, key, imageVersion, settleTimer: null };
     staticLayerCaches.set(canvas, entry);
     scale = 1;
     tx = offsetX - entry.vOx;
     ty = offsetY - entry.vOy;
-  } else if (entry && scale !== 1) {
-    // Mid-zoom: blit scaled now, schedule a crisp re-render after the gesture
-    // settles. The timer resets on every zoom change (trailing debounce).
+  } else if (entry && (scale !== 1 || imageVersion !== entry.imageVersion)) {
+    // Soft invalidation: mid-zoom, or async images finished decoding since the
+    // snapshot was taken. Keep blitting the (slightly stale) snapshot and
+    // schedule ONE crisp re-render after things settle — the timer resets on
+    // every further change, so a burst of tile-image loads coalesces into a
+    // single rebuild instead of one ~full-repaint per image.
     if (entry.settleTimer != null) window.clearTimeout(entry.settleTimer);
     const settleEntry = entry;
     entry.settleTimer = window.setTimeout(() => {
       settleEntry.settleTimer = null;
-      settleEntry.key = ['__zoom-stale__'];
+      settleEntry.key = ['__settle-stale__'];
       staticSettleCallbacks.get(canvas)?.();
     }, ZOOM_SETTLE_MS);
   }
@@ -792,15 +798,17 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   // (immutable updates replace them on content change); small config objects
   // compare by value because getTheme() builds a fresh object per call.
   // NOTE: tileImagesReady is deliberately NOT in the key — it oscillates
-  // per render while images settle; getImageCacheVersion() covers
-  // "the set of decoded images changed" with a monotonic value instead.
+  // per render while images settle. Async image loads are handled as a SOFT
+  // invalidation instead: getImageCacheVersion() is passed separately and a
+  // version change keeps blitting the stale snapshot while one debounced
+  // rebuild is scheduled (a hard key entry caused a full ~repaint per image).
   const staticKey: readonly unknown[] = [
     mapData.layers, mapData.tilesets, mapData.regions, mapData.outlines,
     mapData.shapeOverlays, mapData.subHexMaps, mapData.backgroundImage,
     mapData.dimensions, mapData.hexBounds, mapData.orientation,
     mapData.objectSetId, mapData.settings, mapData.activeLayerId, activeLayer,
     geometry, hiddenTileLayers, adjacentSubHexes, showCoordinates,
-    getImageCacheVersion(), width, height,
+    width, height,
     JSON.stringify(THEME), JSON.stringify(visibility),
   ];
 
@@ -809,7 +817,7 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
     // with the cached snapshot isn't worth the complexity — draw directly.
     drawStaticContent(ctx, offsetX, offsetY, width, height);
   } else {
-    blitStaticContent(canvas, ctx, drawStaticContent, offsetX, offsetY, zoom, width, height, staticKey);
+    blitStaticContent(canvas, ctx, drawStaticContent, offsetX, offsetY, zoom, width, height, staticKey, getImageCacheVersion());
   }
 
   // =========================================================================

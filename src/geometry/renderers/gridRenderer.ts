@@ -209,12 +209,14 @@ const gridRenderer = {
     
     // Build lookup set for O(1) cell existence checks
     const cellSet = new Set(cells.map(c => `${c.x},${c.y}`));
-    
+
     // Track which interior lines we've already drawn to avoid duplicates
     const drawnLines = new Set<string>();
-    
-    ctx.fillStyle = lineColor;
-    
+
+    // Single color: batch every line into one Path2D fill — per-rect fill
+    // commands dominate frame cost on weak GPUs (iPad).
+    const path = new Path2D();
+
     for (const cell of cells) {
       const { screenX, screenY } = geometry.gridToScreen(
         cell.x,
@@ -223,14 +225,13 @@ const gridRenderer = {
         viewState.y,
         viewState.zoom
       );
-      
+
       // Check right neighbor - draw vertical line between them
       const rightKey = `${cell.x + 1},${cell.y}`;
       if (cellSet.has(rightKey)) {
         const lineKey = `v:${cell.x + 1},${cell.y}`;
         if (!drawnLines.has(lineKey)) {
-          // Vertical line using fillRect
-          ctx.fillRect(
+          path.rect(
             screenX + scaledSize - halfWidth,
             screenY,
             actualLineWidth,
@@ -239,14 +240,13 @@ const gridRenderer = {
           drawnLines.add(lineKey);
         }
       }
-      
+
       // Check bottom neighbor - draw horizontal line between them
       const bottomKey = `${cell.x},${cell.y + 1}`;
       if (cellSet.has(bottomKey)) {
         const lineKey = `h:${cell.x},${cell.y + 1}`;
         if (!drawnLines.has(lineKey)) {
-          // Horizontal line using fillRect
-          ctx.fillRect(
+          path.rect(
             screenX,
             screenY + scaledSize - halfWidth,
             scaledSize,
@@ -256,6 +256,9 @@ const gridRenderer = {
         }
       }
     }
+
+    ctx.fillStyle = lineColor;
+    ctx.fill(path);
   },
 
   /**
@@ -351,10 +354,11 @@ const gridRenderer = {
     const cellLookup = buildCellLookup(cells);
     const borderWidth = theme.borderWidth;
     const halfWidth = borderWidth / 2;
-    
-    // Use fillStyle instead of strokeStyle for fill-based rendering
-    ctx.fillStyle = theme.border;
-    
+
+    // Single color: batch every border rect into one Path2D fill — per-rect
+    // fill commands dominate frame cost on weak GPUs (iPad).
+    const path = new Path2D();
+
     for (const cell of cells) {
       const { screenX, screenY } = geometry.gridToScreen(
         cell.x,
@@ -363,15 +367,14 @@ const gridRenderer = {
         viewState.y,
         viewState.zoom
       );
-      
+
       // Calculate which borders this cell needs
       const borders = calculateBorders(cellLookup, cell.x, cell.y);
-      
-      // Draw each border as a filled rectangle
+
       for (const side of borders) {
         switch (side) {
           case 'top':
-            ctx.fillRect(
+            path.rect(
               screenX - halfWidth,
               screenY - halfWidth,
               scaledSize + borderWidth,
@@ -379,7 +382,7 @@ const gridRenderer = {
             );
             break;
           case 'right':
-            ctx.fillRect(
+            path.rect(
               screenX + scaledSize - halfWidth,
               screenY - halfWidth,
               borderWidth,
@@ -387,7 +390,7 @@ const gridRenderer = {
             );
             break;
           case 'bottom':
-            ctx.fillRect(
+            path.rect(
               screenX - halfWidth,
               screenY + scaledSize - halfWidth,
               scaledSize + borderWidth,
@@ -395,7 +398,7 @@ const gridRenderer = {
             );
             break;
           case 'left':
-            ctx.fillRect(
+            path.rect(
               screenX - halfWidth,
               screenY - halfWidth,
               borderWidth,
@@ -405,6 +408,10 @@ const gridRenderer = {
         }
       }
     }
+
+    // Use fillStyle instead of strokeStyle for fill-based rendering
+    ctx.fillStyle = theme.border;
+    ctx.fill(path);
   },
 
   /**

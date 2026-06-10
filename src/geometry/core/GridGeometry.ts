@@ -222,30 +222,33 @@ class GridGeometry extends BaseGeometry {
     ctx.globalAlpha = 1;
     
     const halfWidth = lineWidth / 2;
-    
-    // Draw vertical lines
+
+    // All lines share one color: batch into a single Path2D fill — on weak
+    // GPUs (iPad) per-rect fill commands dominate frame cost.
+    const path = new Path2D();
+
     for (let x = paddedStartX; x <= paddedEndX; x++) {
-      ctx.fillStyle = lineColor;
       const screenX = offsetX + x * scaledCellSize;
-      ctx.fillRect(
+      path.rect(
         screenX - halfWidth,
         -maxExtension,
         lineWidth,
         height + maxExtension * 2
       );
     }
-    
-    // Draw horizontal lines
+
     for (let y = paddedStartY; y <= paddedEndY; y++) {
-      ctx.fillStyle = lineColor;
       const screenY = offsetY + y * scaledCellSize;
-      ctx.fillRect(
+      path.rect(
         -maxExtension,
         screenY - halfWidth,
         width + maxExtension * 2,
         lineWidth
       );
     }
+
+    ctx.fillStyle = lineColor;
+    ctx.fill(path);
   }
   
   /**
@@ -279,12 +282,15 @@ class GridGeometry extends BaseGeometry {
     color: string
   ): void {
     const scaledCellSize = this.cellSize * zoom;
-    ctx.fillStyle = color;
-    
+
+    // One Path2D fill per color group instead of a fillRect per cell.
+    const path = new Path2D();
     for (const cell of cells) {
       const { screenX, screenY } = this.gridToScreen(cell.x, cell.y, offsetX, offsetY, zoom);
-      ctx.fillRect(screenX, screenY, scaledCellSize, scaledCellSize);
+      path.rect(screenX, screenY, scaledCellSize, scaledCellSize);
     }
+    ctx.fillStyle = color;
+    ctx.fill(path);
   }
   
   /**
