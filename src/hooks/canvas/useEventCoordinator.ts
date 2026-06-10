@@ -995,6 +995,12 @@ const useEventCoordinator = ({
     };
 
     const handleGlobalMouseMove = (e: MouseEvent): void => {
+      // The canvas's own mousemove handler already drives the pan while the
+      // cursor is over it; this window-level net only takes over once the
+      // cursor leaves the canvas. Reacting to both ran updatePan twice per
+      // physical mouse event.
+      const canvas = canvasRef.current;
+      if (canvas != null && e.target instanceof Node && canvas.contains(e.target)) return;
       const panZoomHandlers = getHandlers('panZoom');
       if (panZoomHandlers?.isPanning === true && panZoomHandlers?.updatePan != null) {
         panZoomHandlers.updatePan(e.clientX, e.clientY);

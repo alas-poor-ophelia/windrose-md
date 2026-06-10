@@ -195,24 +195,27 @@ class GridGeometry extends BaseGeometry {
     zoom: number,
     style: GridStyle = {}
   ): void {
-    const { lineColor = '#333333', lineWidth = 1 } = style;
+    const { lineColor = '#333333', lineWidth = 1, rotated = false } = style;
     const scaledCellSize = this.cellSize * zoom;
-    
+
     const { startX, endX, startY, endY } = this.getVisibleGridRange(
       offsetX, offsetY, width, height, zoom
     );
-    
-    // Add extra padding for rotation handling
+
+    // Rotation draws lines under a canvas transform, so the line range must pad
+    // out to the viewport diagonal and each line must extend past the canvas.
+    // Unrotated maps need neither — at low zoom the padding multiplied the line
+    // count several-fold and the extension tripled each line's rastered length.
     const diagonal = Math.sqrt(width * width + height * height);
-    const extraCells = Math.ceil(diagonal / scaledCellSize);
-    
+    const extraCells = rotated ? Math.ceil(diagonal / scaledCellSize) : 0;
+
     const paddedStartX = startX - extraCells;
     const paddedEndX = endX + extraCells;
     const paddedStartY = startY - extraCells;
     const paddedEndY = endY + extraCells;
-    
+
     // iOS defensive: Limit line extension
-    const maxExtension = Math.max(width, height);
+    const maxExtension = rotated ? Math.max(width, height) : 0;
     
     // iOS defensive: Reset composite operation
     ctx.globalCompositeOperation = 'source-over';

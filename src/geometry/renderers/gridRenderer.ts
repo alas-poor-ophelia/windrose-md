@@ -117,9 +117,9 @@ const gridRenderer = {
     style: GridStyle = {}
   ): void {
     if (!showGrid) return;
-    
-    const { lineColor = '#333333', lineWidth = 1 } = style;
-    
+
+    const { lineColor = '#333333', lineWidth = 1, rotated = false } = style;
+
     // Use geometry's built-in drawGrid method which handles rotation
     geometry.drawGrid(
       ctx,
@@ -128,7 +128,7 @@ const gridRenderer = {
       canvasDimensions.width,
       canvasDimensions.height,
       viewState.zoom,
-      { lineColor, lineWidth }
+      { lineColor, lineWidth, rotated }
     );
   },
 

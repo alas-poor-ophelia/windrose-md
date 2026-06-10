@@ -353,9 +353,9 @@ class HexGeometry extends BaseGeometry {
     zoom: number,
     style: GridStyle = {}
   ): void {
-    const { lineColor = '#333333', lineWidth = 1 } = style;
-    
-    if (!isFinite(width) || !isFinite(height) || !isFinite(zoom) || 
+    const { lineColor = '#333333', lineWidth = 1, rotated = false } = style;
+
+    if (!isFinite(width) || !isFinite(height) || !isFinite(zoom) ||
         !isFinite(offsetX) || !isFinite(offsetY) || zoom <= 0) {
       // eslint-disable-next-line no-console
       console.warn('[HexGeometry.drawGrid] Invalid input values, skipping render');
@@ -376,31 +376,34 @@ class HexGeometry extends BaseGeometry {
       return;
     }
 
-    let minCol: number, maxCol: number, minRow: number, maxRow: number;
+    // Rotation draws under a canvas transform around the center, so pad the
+    // visible range symmetrically out to the viewport half-diagonal; unrotated
+    // maps use the exact visible range. (Previously this expanded to 2x the
+    // diagonal toward +x/+y only — over-drawing several times the viewport in
+    // hexes every frame while still under-covering up-left when rotated.)
+    const pad = rotated ? Math.sqrt(width * width + height * height) / 2 : 0;
+    const { minQ, maxQ, minR, maxR } = this.getVisibleHexRange(
+      offsetX + pad, offsetY + pad, width + 2 * pad, height + 2 * pad, zoom
+    );
 
+    const corner1 = axialToOffset(minQ, minR, this.orientation);
+    const corner2 = axialToOffset(maxQ, maxR, this.orientation);
+    const corner3 = axialToOffset(minQ, maxR, this.orientation);
+    const corner4 = axialToOffset(maxQ, minR, this.orientation);
+
+    let minCol = Math.min(corner1.col, corner2.col, corner3.col, corner4.col);
+    let maxCol = Math.max(corner1.col, corner2.col, corner3.col, corner4.col);
+    let minRow = Math.min(corner1.row, corner2.row, corner3.row, corner4.row);
+    let maxRow = Math.max(corner1.row, corner2.row, corner3.row, corner4.row);
+
+    // Bounded maps clamp to map extents, but stay limited to the visible range —
+    // iterating the full bounds drew every hex on the map each frame (6 polygon
+    // fills per hex) regardless of viewport.
     if (this.bounds) {
-      minCol = 0;
-      maxCol = this.bounds.maxCol - 1;
-      minRow = 0;
-      maxRow = this.bounds.maxRow - 1;
-    } else {
-      const diagonal = Math.sqrt(width * width + height * height) * 2;
-      const expandedWidth = diagonal;
-      const expandedHeight = diagonal;
-
-      const { minQ, maxQ, minR, maxR } = this.getVisibleHexRange(
-        offsetX, offsetY, expandedWidth, expandedHeight, zoom
-      );
-
-      const corner1 = axialToOffset(minQ, minR, this.orientation);
-      const corner2 = axialToOffset(maxQ, maxR, this.orientation);
-      const corner3 = axialToOffset(minQ, maxR, this.orientation);
-      const corner4 = axialToOffset(maxQ, minR, this.orientation);
-
-      minCol = Math.min(corner1.col, corner2.col, corner3.col, corner4.col);
-      maxCol = Math.max(corner1.col, corner2.col, corner3.col, corner4.col);
-      minRow = Math.min(corner1.row, corner2.row, corner3.row, corner4.row);
-      maxRow = Math.max(corner1.row, corner2.row, corner3.row, corner4.row);
+      minCol = Math.max(0, minCol);
+      maxCol = Math.min(this.bounds.maxCol - 1, maxCol);
+      minRow = Math.max(0, minRow);
+      maxRow = Math.min(this.bounds.maxRow - 1, maxRow);
     }
 
     // Safety check on iteration count

@@ -80,7 +80,7 @@ interface Renderer {
     ) => void
   ): void;
 
-  renderGrid(ctx: CanvasRenderingContext2D, geometry: IGeometry, viewState: RendererViewState, dimensions: { width: number; height: number }, showGrid: boolean, options: { lineColor: string; lineWidth: number }): void;
+  renderGrid(ctx: CanvasRenderingContext2D, geometry: IGeometry, viewState: RendererViewState, dimensions: { width: number; height: number }, showGrid: boolean, options: { lineColor: string; lineWidth: number; rotated?: boolean }): void;
   renderPaintedCells(ctx: CanvasRenderingContext2D, cells: Cell[], geometry: IGeometry, viewState: RendererViewState): void;
   renderCellBorders(ctx: CanvasRenderingContext2D, cells: Cell[], geometry: IGeometry, viewState: RendererViewState, buildLookup: BuildCellLookupFn, calculateBorders: CalculateBordersFn, options: { border: string; borderWidth: number }): void;
   renderInteriorGridLines?(ctx: CanvasRenderingContext2D, cells: Cell[], geometry: IGeometry, viewState: RendererViewState, options: { lineColor: string; lineWidth: number; interiorRatio: number }): void;
@@ -113,6 +113,46 @@ interface RenderLayerContentOptions {
   opacity?: number;
   showGrid?: boolean;
   mergeIndex?: CurveCellMergeIndex | null;
+  /** Map rotation in degrees; non-zero widens cull bounds to the rotated viewport. */
+  northDirection?: number;
+}
+
+/**
+ * Build a predicate that tests whether a cell lands inside the visible canvas.
+ *
+ * Without this, the painted-cell passes (fills, borders, interior lines, edges)
+ * iterate every cell on the map, so per-frame fillRect volume scales with total
+ * painted area instead of the viewport — the dominant render cost during pan,
+ * and fatal on high-DPR mobile GPUs.
+ *
+ * Cells are drawn under the canvas rotation transform but gridToScreen returns
+ * pre-rotation coordinates, so when rotated the bounds widen to the square
+ * circumscribing the viewport. The 2-cell margin keeps interior-grid-line
+ * neighbors (1 cell away) inside the culled set.
+ */
+function makeCellVisibilityFilter(
+  geometry: IGeometry,
+  viewState: RendererViewState,
+  canvasWidth: number,
+  canvasHeight: number,
+  northDirection: number
+): (cx: number, cy: number) => boolean {
+  const margin = geometry.getScaledCellSize(viewState.zoom) * 2;
+  let minX = -margin;
+  let minY = -margin;
+  let maxX = canvasWidth + margin;
+  let maxY = canvasHeight + margin;
+  if (northDirection % 360 !== 0) {
+    const halfDiag = Math.sqrt(canvasWidth * canvasWidth + canvasHeight * canvasHeight) / 2;
+    minX = canvasWidth / 2 - halfDiag - margin;
+    maxX = canvasWidth / 2 + halfDiag + margin;
+    minY = canvasHeight / 2 - halfDiag - margin;
+    maxY = canvasHeight / 2 + halfDiag + margin;
+  }
+  return (cx, cy) => {
+    const { screenX, screenY } = geometry.gridToScreen(cx, cy, viewState.x, viewState.y, viewState.zoom);
+    return screenX >= minX && screenX <= maxX && screenY >= minY && screenY <= maxY;
+  };
 }
 
 /**
@@ -128,7 +168,11 @@ function renderLayerCellsAndEdges(
   renderer: Renderer,
   options: RenderLayerContentOptions = {}
 ): void {
-  const { opacity = 1, showGrid: showInteriorGrid = true, mergeIndex = null } = options;
+  const { opacity = 1, showGrid: showInteriorGrid = true, mergeIndex = null, northDirection = 0 } = options;
+
+  const isCellVisible = makeCellVisibilityFilter(
+    geometry, viewState, ctx.canvas.width, ctx.canvas.height, northDirection
+  );
 
   // Apply opacity if needed
   const previousAlpha = ctx.globalAlpha;
@@ -136,9 +180,13 @@ function renderLayerCellsAndEdges(
     ctx.globalAlpha = opacity;
   }
 
-  // Draw filled cells
+  // Draw filled cells (culled to the visible viewport)
   if (layer.cells.length > 0) {
-    const cellsWithColor = layer.cells.map(cell => ({
+    const visibleCells = layer.cells.filter(cell =>
+      isGridCell(cell) ? isCellVisible(cell.x, cell.y) : isCellVisible(cell.q, cell.r)
+    );
+
+    const cellsWithColor = visibleCells.map(cell => ({
       ...cell,
       color: getCellColor(cell)
     }));
@@ -161,7 +209,10 @@ function renderLayerCellsAndEdges(
       });
     }
 
-    const allCellsLookup = buildCellLookup(cellsWithColor);
+    // Border calculation must see ALL cells, not just visible ones — a culled
+    // off-screen neighbor would otherwise give a visible boundary cell a
+    // phantom border.
+    const allCellsLookup = buildCellLookup(layer.cells);
 
     // Wrap border calculator to suppress borders adjacent to same-color curves
     const bordersCalculator = mergeIndex
@@ -203,12 +254,17 @@ function renderLayerCellsAndEdges(
     }
   }
 
-  // Draw painted edges (grid maps only)
+  // Draw painted edges (grid maps only, culled to the visible viewport)
   if (layer.edges.length > 0 && renderer.supportsSegments && renderer.renderEdges) {
-    renderer.renderEdges(ctx, layer.edges, geometry, viewState, {
-      lineWidth: 1,
-      borderWidth: theme.cells.borderWidth
-    });
+    const visibleEdges = layer.edges.filter(edge =>
+      edge != null && typeof edge.x === 'number' && typeof edge.y === 'number' && isCellVisible(edge.x, edge.y)
+    );
+    if (visibleEdges.length > 0) {
+      renderer.renderEdges(ctx, visibleEdges, geometry, viewState, {
+        lineWidth: 1,
+        borderWidth: theme.cells.borderWidth
+      });
+    }
   }
 
   // Restore opacity
@@ -311,7 +367,8 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   // Draw grid lines
   renderer.renderGrid(ctx, geometry, rendererViewState, { width, height }, visibility.grid !== false, {
     lineColor: THEME.grid.lines,
-    lineWidth: THEME.grid.lineWidth ?? 1
+    lineWidth: THEME.grid.lineWidth ?? 1,
+    rotated: (northDirection ?? 0) % 360 !== 0
   });
 
   // Draw ghost layer (layer below) if enabled
@@ -321,7 +378,8 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
       const ghostOpacity = activeLayer.layerBelowOpacity ?? 0.25;
       renderLayerCellsAndEdges(ctx, layerBelow, geometry, rendererViewState, THEME, renderer, {
         opacity: ghostOpacity,
-        showGrid: visibility.grid !== false
+        showGrid: visibility.grid !== false,
+        northDirection: northDirection ?? 0
       });
       // Ghost layer tiles
       if (layerBelow.tiles != null && layerBelow.tiles.length > 0 && mapData.tilesets != null && mapData.tilesets.length > 0) {
@@ -385,7 +443,8 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
           if (layer.cells.length > 0) {
             renderLayerCellsAndEdges(ctx, layer, geometry, shiftedViewState, THEME, renderer, {
               opacity: 0.25,
-              showGrid: false
+              showGrid: false,
+              northDirection: northDirection ?? 0
             });
           }
         }
@@ -451,7 +510,8 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   // Draw active layer cells and edges
   renderLayerCellsAndEdges(ctx, activeLayer, geometry, rendererViewState, THEME, renderer, {
     showGrid: visibility.grid !== false,
-    mergeIndex: activeMergeIndex
+    mergeIndex: activeMergeIndex,
+    northDirection: northDirection ?? 0
   });
 
   // Draw freehand curves (between cells and objects)

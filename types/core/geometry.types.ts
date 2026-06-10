@@ -78,6 +78,8 @@ export interface GridStyle {
   lineColor?: string;
   lineWidth?: number;
   background?: string;
+  /** True when the map is rotated (northDirection != 0); widens draw bounds to cover the rotated viewport. */
+  rotated?: boolean;
 }
 
 // ===========================================
