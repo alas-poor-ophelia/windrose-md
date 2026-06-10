@@ -46,7 +46,7 @@ import { gridRenderer } from '../../geometry/renderers/gridRenderer';
 import { hexRenderer } from '../../geometry/renderers/hexRenderer';
 import { renderCurves } from '../../geometry/renderers/curveRenderer';
 import { buildMergeIndex } from '../../geometry/curves/curveCellOverlap';
-import { getCachedImage } from '../../assets/imageOperations';
+import { getCachedImage, getImageCacheVersion } from '../../assets/imageOperations';
 import { getSlotOffset, getMultiObjectScale, getObjectsInCell } from '../../objects/hexSlotPositioner';
 import { offsetToAxial, axialToOffset } from '../../geometry/core/offsetCoordinates';
 import { getActiveLayer, getLayerBelow, isCellFogged } from '../../persistence/layerAccessor';
@@ -98,6 +98,139 @@ interface CurveCellMergeIndex {
 
 
 
+
+// ===========================================
+// Static-layer cache
+// ===========================================
+//
+// The map content (grid, cells, borders, curves, tiles, objects, labels…) is
+// static while the user pans or zooms — only the viewport transform changes.
+// Re-issuing every draw call per frame costs thousands of fillRects; measured
+// on iPad that is ~900ms per frame (2-4 FPS). Instead, the static content is
+// rendered once into an oversized offscreen canvas and each frame blits it:
+//   - pan: translation-only drawImage (pixel-exact)
+//   - zoom: scale-blit from the cached snapshot (momentarily soft), with a
+//     debounced crisp re-render once the gesture settles
+//   - content change / pan past the padding / rotation: full re-render
+// World→screen mapping is affine (screen = offset + world·zoom) for both grid
+// and hex, so the blit transform is exact: scale = zoom/cachedZoom,
+// translate = offset − cachedOffset·scale.
+
+interface StaticLayerCacheEntry {
+  off: HTMLCanvasElement;
+  /** Zoom the offscreen was rendered at. */
+  zoom: number;
+  /** Offsets used when rendering the offscreen (offscreen pixel space). */
+  vOx: number;
+  vOy: number;
+  key: readonly unknown[];
+  settleTimer: number | null;
+}
+
+type DrawStaticFn = (tctx: CanvasRenderingContext2D, ox: number, oy: number, w: number, h: number) => void;
+
+const staticLayerCaches = new WeakMap<HTMLCanvasElement, StaticLayerCacheEntry>();
+const staticSettleCallbacks = new WeakMap<HTMLCanvasElement, () => void>();
+/** Extra rendered area on each side, as a fraction of the viewport. */
+const STATIC_PAD_RATIO = 0.5;
+/** Crisp re-render fires this long after the last zoom change. */
+const ZOOM_SETTLE_MS = 150;
+
+/** Registered by the hook so the cache can request a follow-up render after a zoom settles. */
+function setStaticSettleCallback(canvas: HTMLCanvasElement, cb: () => void): void {
+  staticSettleCallbacks.set(canvas, cb);
+}
+
+function staticKeysEqual(a: readonly unknown[], b: readonly unknown[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (!Object.is(a[i], b[i])) return false;
+  }
+  return true;
+}
+
+function blitStaticContent(
+  canvas: HTMLCanvasElement,
+  ctx: CanvasRenderingContext2D,
+  draw: DrawStaticFn,
+  offsetX: number,
+  offsetY: number,
+  zoom: number,
+  width: number,
+  height: number,
+  key: readonly unknown[]
+): void {
+  let entry = staticLayerCaches.get(canvas);
+
+  // TEMP DEBUG: track cache hit/miss and which key index breaks (remove after perf verification)
+  const w = window as unknown as { __windroseStaticDbg?: { hit: number; rerender: number; missIdx: Record<number, number> } };
+  const dbg = w.__windroseStaticDbg ?? (w.__windroseStaticDbg = { hit: 0, rerender: 0, missIdx: {} });
+  if (entry && !staticKeysEqual(entry.key, key)) {
+    for (let i = 0; i < Math.max(entry.key.length, key.length); i++) {
+      if (!Object.is(entry.key[i], key[i])) { dbg.missIdx[i] = (dbg.missIdx[i] ?? 0) + 1; break; }
+    }
+  }
+
+  let scale = 1;
+  let tx = 0;
+  let ty = 0;
+  let usable = false;
+  if (entry && staticKeysEqual(entry.key, key)) {
+    scale = zoom / entry.zoom;
+    tx = offsetX - entry.vOx * scale;
+    ty = offsetY - entry.vOy * scale;
+    // Viewport corners in offscreen pixel space must fall inside the snapshot.
+    const pMinX = (0 - tx) / scale;
+    const pMaxX = (width - tx) / scale;
+    const pMinY = (0 - ty) / scale;
+    const pMaxY = (height - ty) / scale;
+    usable = pMinX >= 0 && pMinY >= 0 && pMaxX <= entry.off.width && pMaxY <= entry.off.height;
+  }
+
+  if (!usable) {
+    const padX = Math.ceil(width * STATIC_PAD_RATIO);
+    const padY = Math.ceil(height * STATIC_PAD_RATIO);
+    const off = entry?.off ?? document.createElement('canvas');
+    const ow = width + padX * 2;
+    const oh = height + padY * 2;
+    if (off.width !== ow) off.width = ow;
+    if (off.height !== oh) off.height = oh;
+    const octx = off.getContext('2d');
+    if (!octx) {
+      // Offscreen unavailable: draw directly (previous behavior).
+      draw(ctx, offsetX, offsetY, width, height);
+      return;
+    }
+    if (entry?.settleTimer != null) window.clearTimeout(entry.settleTimer);
+    octx.save();
+    octx.clearRect(0, 0, ow, oh);
+    draw(octx, offsetX + padX, offsetY + padY, ow, oh);
+    octx.restore();
+    entry = { off, zoom, vOx: offsetX + padX, vOy: offsetY + padY, key, settleTimer: null };
+    staticLayerCaches.set(canvas, entry);
+    scale = 1;
+    tx = offsetX - entry.vOx;
+    ty = offsetY - entry.vOy;
+  } else if (entry && scale !== 1) {
+    // Mid-zoom: blit scaled now, schedule a crisp re-render after the gesture
+    // settles. The timer resets on every zoom change (trailing debounce).
+    if (entry.settleTimer != null) window.clearTimeout(entry.settleTimer);
+    const settleEntry = entry;
+    entry.settleTimer = window.setTimeout(() => {
+      settleEntry.settleTimer = null;
+      settleEntry.key = ['__zoom-stale__'];
+      staticSettleCallbacks.get(canvas)?.();
+    }, ZOOM_SETTLE_MS);
+  }
+
+  if (!entry) return;
+  if (usable) dbg.hit++; else dbg.rerender++;
+  ctx.save();
+  // Pixel-exact at scale 1; smooth when scale-blitting mid-zoom.
+  ctx.imageSmoothingEnabled = scale !== 1;
+  ctx.drawImage(entry.off, tx, ty, entry.off.width * scale, entry.off.height * scale);
+  ctx.restore();
+}
 
 /**
  * Get appropriate renderer for geometry type.
@@ -320,6 +453,12 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
     { width, height },
     zoom
   );
+
+  // ---- Static content (everything that only depends on map data + viewport
+  // transform). The parameters deliberately SHADOW the outer ctx/offsetX/
+  // offsetY/width/height so the pass bodies below run unchanged whether they
+  // target the live canvas (rotated maps) or the offscreen cache. ----
+  const drawStaticContent: DrawStaticFn = (ctx, offsetX, offsetY, width, height): void => {
 
   // Draw background image (both grid and hex maps)
   const bgImage = mapData.backgroundImage?.path != null && mapData.backgroundImage.path !== '' ? getCachedImage(mapData.backgroundImage.path) : null;
@@ -646,6 +785,33 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
     );
   }
 
+  };
+  // ---- end static content ----
+
+  // Identity key for the static snapshot. Big structures compare by reference
+  // (immutable updates replace them on content change); small config objects
+  // compare by value because getTheme() builds a fresh object per call.
+  // NOTE: tileImagesReady is deliberately NOT in the key — it oscillates
+  // per render while images settle; getImageCacheVersion() covers
+  // "the set of decoded images changed" with a monotonic value instead.
+  const staticKey: readonly unknown[] = [
+    mapData.layers, mapData.tilesets, mapData.regions, mapData.outlines,
+    mapData.shapeOverlays, mapData.subHexMaps, mapData.backgroundImage,
+    mapData.dimensions, mapData.hexBounds, mapData.orientation,
+    mapData.objectSetId, mapData.settings, mapData.activeLayerId, activeLayer,
+    geometry, hiddenTileLayers, adjacentSubHexes, showCoordinates,
+    getImageCacheVersion(), width, height,
+    JSON.stringify(THEME), JSON.stringify(visibility),
+  ];
+
+  if (((northDirection ?? 0) % 360) !== 0) {
+    // Rotated maps draw under a canvas rotation transform whose interaction
+    // with the cached snapshot isn't worth the complexity — draw directly.
+    drawStaticContent(ctx, offsetX, offsetY, width, height);
+  } else {
+    blitStaticContent(canvas, ctx, drawStaticContent, offsetX, offsetY, zoom, width, height, staticKey);
+  }
+
   // =========================================================================
   // FOG OF WAR RENDERING
   // =========================================================================
@@ -729,20 +895,27 @@ const useCanvasRenderer: UseCanvasRenderer = (canvasRef, fogCanvasRef, mapData, 
     layerVisibility: typeof layerVisibility;
     adjacentSubHexes: typeof adjacentSubHexes;
     hiddenTileLayers: typeof hiddenTileLayers;
+    tileImagesReady: boolean;
   } | null>(null);
 
   useEffect(() => {
-    renderInputsRef.current = { mapData, geometry, selectedItems, isResizeMode, theme, showCoordinates, layerVisibility, adjacentSubHexes, hiddenTileLayers };
-    // A frame is already queued — it will pick up the latest inputs from the ref.
-    if (rafIdRef.current != null) return;
-    rafIdRef.current = requestAnimationFrame(() => {
-      rafIdRef.current = null;
-      const a = renderInputsRef.current;
-      if (a && a.mapData && a.geometry && canvasRef.current) {
-        const fogCanvas = fogCanvasRef?.current || null;
-        renderCanvas(canvasRef.current, fogCanvas, a.mapData, a.geometry, a.selectedItems, { isResizeMode: a.isResizeMode, theme: a.theme, showCoordinates: a.showCoordinates, layerVisibility: a.layerVisibility, adjacentSubHexes: a.adjacentSubHexes, hiddenTileLayers: a.hiddenTileLayers });
-      }
-    });
+    renderInputsRef.current = { mapData, geometry, selectedItems, isResizeMode, theme, showCoordinates, layerVisibility, adjacentSubHexes, hiddenTileLayers, tileImagesReady };
+    const scheduleRender = (): void => {
+      // A frame is already queued — it will pick up the latest inputs from the ref.
+      if (rafIdRef.current != null) return;
+      rafIdRef.current = requestAnimationFrame(() => {
+        rafIdRef.current = null;
+        const a = renderInputsRef.current;
+        if (a && a.mapData && a.geometry && canvasRef.current) {
+          const fogCanvas = fogCanvasRef?.current || null;
+          renderCanvas(canvasRef.current, fogCanvas, a.mapData, a.geometry, a.selectedItems, { isResizeMode: a.isResizeMode, theme: a.theme, showCoordinates: a.showCoordinates, layerVisibility: a.layerVisibility, adjacentSubHexes: a.adjacentSubHexes, hiddenTileLayers: a.hiddenTileLayers, tileImagesReady: a.tileImagesReady });
+        }
+      });
+    };
+    // The static-layer cache requests a follow-up render to redraw crisp after
+    // a zoom gesture settles.
+    if (canvasRef.current) setStaticSettleCallback(canvasRef.current, scheduleRender);
+    scheduleRender();
   }, [mapData, geometry, selectedItems, isResizeMode, theme, canvasRef, fogCanvasRef, showCoordinates, layerVisibility, tileImagesReady, adjacentSubHexes, hiddenTileLayers]);
 
   // Cancel any frame still pending when the component unmounts.

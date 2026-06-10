@@ -69,6 +69,8 @@ export interface RenderCanvasOptions {
   layerVisibility?: LayerVisibility | null;
   adjacentSubHexes?: AdjacentSubHexRenderData[] | null;
   hiddenTileLayers?: Set<string>;
+  /** Flips when async tile images finish loading; part of the static-layer cache key. */
+  tileImagesReady?: boolean;
 }
 
 /** Main render function */
@@ -82,9 +84,7 @@ export type RenderCanvas = (
 ) => void;
 
 /** Additional hook-specific options beyond RenderCanvasOptions */
-export interface UseCanvasRendererOptions extends RenderCanvasOptions {
-  tileImagesReady?: boolean;
-}
+export type UseCanvasRendererOptions = RenderCanvasOptions;
 
 /** useCanvasRenderer hook - triggers re-render on data changes */
 export type UseCanvasRenderer = (

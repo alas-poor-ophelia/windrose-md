@@ -32,6 +32,14 @@ const loadingPromises = new Map<string, Promise<HTMLImageElement | null>>();
 const dimensionsCache = new Map<string, ImageDimensions>();
 const pinnedImages = new Set<string>();
 
+/** Bumped whenever an image finishes loading into the cache. Lets render-side
+ *  caches (static-layer cache) key on "the set of ready images changed". */
+let imageCacheVersion = 0;
+
+function getImageCacheVersion(): number {
+  return imageCacheVersion;
+}
+
 let MAX_CACHE_SIZE = 200;
 
 function setMaxCacheSize(size: number): void {
@@ -200,6 +208,7 @@ async function preloadImage(app: App, vaultPath: string): Promise<HTMLImageEleme
       // can re-decode under memory pressure. clearCachedImage revokes it
       // when the entry is actually evicted.
       imageCache.set(vaultPath, img);
+      imageCacheVersion++;
       evictIfNeeded();
       loadingPromises.delete(vaultPath);
 
@@ -334,4 +343,4 @@ function clearUnusedTileImages(activePaths: Set<string>): void {
   }
 }
 
-export { buildImageIndex, getImageDisplayNames, getFullPathFromDisplayName, getDisplayNameFromPath, preloadImage, getCachedImage, getImageDimensions, clearCachedImage, clearUnusedTileImages, calculateGridFromImage, GRID_DENSITY_PRESETS, MAX_CACHE_SIZE, setMaxCacheSize, pinImage, unpinImage };
+export { buildImageIndex, getImageDisplayNames, getFullPathFromDisplayName, getDisplayNameFromPath, preloadImage, getCachedImage, getImageDimensions, getImageCacheVersion, clearCachedImage, clearUnusedTileImages, calculateGridFromImage, GRID_DENSITY_PRESETS, MAX_CACHE_SIZE, setMaxCacheSize, pinImage, unpinImage };
