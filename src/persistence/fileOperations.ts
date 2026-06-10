@@ -248,13 +248,19 @@ async function saveMapData(app: App, mapId: string, mapData: MapData): Promise<b
       // Update specific map
       allData.maps[mapId] = mapData;
 
-      // Serialize and validate BEFORE touching disk
-      const jsonString = JSON.stringify(allData, null, 2);
+      // Serialize BEFORE touching disk. A circular ref or BigInt makes
+      // JSON.stringify throw, which aborts the save here without corrupting the
+      // file; a successful stringify of a plain object is ALWAYS valid JSON, so
+      // re-parsing it to "validate" only burned a full main-thread parse. Compact
+      // output (no pretty-print): on a multi-MB multi-map file the indentation
+      // pass plus the redundant re-parse tripled per-save main-thread time,
+      // freezing the UI ~300-450ms on every autosave.
+      let jsonString: string;
       try {
-        JSON.parse(jsonString);
-      } catch (validateError) {
+        jsonString = JSON.stringify(allData);
+      } catch (serializeError) {
         // eslint-disable-next-line no-console
-        console.error('[saveMapData] Pre-write validation failed, save aborted:', validateError);
+        console.error('[saveMapData] Serialization failed, save aborted:', serializeError);
         return false;
       }
 

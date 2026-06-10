@@ -5,6 +5,7 @@
 **DO NOT:**
 - Read or write `compiled-windrose-md.md` - This is a generated artifact. Modify source files instead.
 - Include AI attribution in commits (no "Co-Authored-By: Claude", "Generated with Claude Code", etc.)
+- **NEVER blame OneDrive for anything.** The vault path contains the folder name `OneDrive` (`C:\Users\whipl\OneDrive\...`), but **OneDrive sync is DISABLED at the system level** — it is off, it does not sync this vault, and it never will. The path string is a historical folder name, nothing more. Do not attribute file I/O slowness, lag, file locks, sync storms, or any other behavior to OneDrive. It is never the cause. (The user has corrected this dozens of times.)
 
 **Two-repo structure:**
 - **Source repo:** `C:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker`

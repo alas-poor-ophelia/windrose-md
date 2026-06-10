@@ -21,7 +21,7 @@ import type {
   RendererViewState,
 } from '#types/hooks/canvasRenderer.types';
 
-import { useEffect } from 'preact/hooks';
+import { useEffect, useRef } from 'preact/hooks';
 import { getTheme, getEffectiveSettings } from '../../core/settingsAccessor';
 import { buildCellLookup, calculateBordersOptimized } from '../../drawing/borderCalculator';
 import { getObjectType } from '../../objects/objectOperations';
@@ -652,12 +652,46 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
 
 const useCanvasRenderer: UseCanvasRenderer = (canvasRef, fogCanvasRef, mapData, geometry, selectedItems = [], options = {}) => {
   const { isResizeMode = false, theme = null, showCoordinates = false, layerVisibility = null, tileImagesReady = false, adjacentSubHexes = null, hiddenTileLayers = undefined } = options;
+  // Coalesce renders to at most one per animation frame. Pan/zoom writes viewState
+  // (stored on mapData) on EVERY pointermove/touchmove; on a 120Hz touch device that
+  // fires far faster than the display refreshes, so rendering synchronously per update
+  // repainted the whole canvas 100-280x/sec and flooded the main thread. We stash the
+  // latest render inputs in a ref and schedule a single rAF — rapid updates collapse
+  // into one draw per frame, and the queued frame always reads the most recent inputs.
+  const rafIdRef = useRef<number | null>(null);
+  const renderInputsRef = useRef<{
+    mapData: typeof mapData;
+    geometry: typeof geometry;
+    selectedItems: typeof selectedItems;
+    isResizeMode: boolean;
+    theme: typeof theme;
+    showCoordinates: boolean;
+    layerVisibility: typeof layerVisibility;
+    adjacentSubHexes: typeof adjacentSubHexes;
+    hiddenTileLayers: typeof hiddenTileLayers;
+  } | null>(null);
+
   useEffect(() => {
-    if (mapData && geometry && canvasRef.current) {
-      const fogCanvas = fogCanvasRef?.current || null;
-      renderCanvas(canvasRef.current, fogCanvas, mapData, geometry, selectedItems, { isResizeMode, theme, showCoordinates, layerVisibility, adjacentSubHexes, hiddenTileLayers });
-    }
+    renderInputsRef.current = { mapData, geometry, selectedItems, isResizeMode, theme, showCoordinates, layerVisibility, adjacentSubHexes, hiddenTileLayers };
+    // A frame is already queued — it will pick up the latest inputs from the ref.
+    if (rafIdRef.current != null) return;
+    rafIdRef.current = requestAnimationFrame(() => {
+      rafIdRef.current = null;
+      const a = renderInputsRef.current;
+      if (a && a.mapData && a.geometry && canvasRef.current) {
+        const fogCanvas = fogCanvasRef?.current || null;
+        renderCanvas(canvasRef.current, fogCanvas, a.mapData, a.geometry, a.selectedItems, { isResizeMode: a.isResizeMode, theme: a.theme, showCoordinates: a.showCoordinates, layerVisibility: a.layerVisibility, adjacentSubHexes: a.adjacentSubHexes, hiddenTileLayers: a.hiddenTileLayers });
+      }
+    });
   }, [mapData, geometry, selectedItems, isResizeMode, theme, canvasRef, fogCanvasRef, showCoordinates, layerVisibility, tileImagesReady, adjacentSubHexes, hiddenTileLayers]);
+
+  // Cancel any frame still pending when the component unmounts.
+  useEffect(() => () => {
+    if (rafIdRef.current != null) {
+      cancelAnimationFrame(rafIdRef.current);
+      rafIdRef.current = null;
+    }
+  }, []);
 };
 
 export { useCanvasRenderer, renderCanvas };
