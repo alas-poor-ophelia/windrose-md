@@ -63,6 +63,40 @@ consider: pace processQueue with requestIdleCallback; virtualize compact mode.
 
 ---
 
+## SESSION 3 — TELEMETRY ERA (the real fixes)
+
+Built `recordPerfTelemetry` (command: "Record performance telemetry (60s)") —
+on-device instrumentation that writes a JSON report to the vault root.
+
+**Finding 1 (desktop telemetry): save storm.** 119 one-MB full-file saves
+during a single 6s pan (payload diff: only viewState.center changed). The
+save-on-unmount effect in useDebouncedSave had pendingData in its deps, so its
+cleanup fired an un-debounced save per pointermove (since 2026-05-23,
+aa6b1bb5). Each save = main-thread stringify + write + a sync upload all
+devices ingest. FIXED `59592c46` (unmount-only flush via ref): 0 saves during
+pan, 1 trailing. Companion `17f142f4`: MarkdownRenderChild unmounts block
+Preact trees on note close (were zombies until plugin unload; the storm had
+masked the missing unmount flush). NOTE: user's "binary tileset" experiment
+was actually sync-vs-no-sync (fresh test vault had no Obsidian Sync).
+
+**Finding 2 (iPad telemetry): render-bound at 2-4 FPS.** 9,000-15,000
+fillRects/frame, ~900ms per repaint, metronomic stalls; idle = clean 60fps.
+Also: every 1MB data-file read/write costs ~900ms on iOS (vs ~10ms desktop)
+— per-map file split is future work. Culling can't help a zoomed-out map.
+FIXED `ed016584`: **static-layer cache** — static passes render once to a
+50%-padded offscreen; pan = translation blit (exact; affine world→screen),
+zoom = scale-blit + 150ms-debounced crisp settle re-render; rotation
+bypasses. Key traps: getTheme() fresh object per call (key by JSON value);
+tileImagesReady oscillates per render (excluded; imageCacheVersion counter
+covers image loads). Measured: 4s pan 2,403,404 → 9,334 fillRects, 500 cache
+hits / 5 re-renders. `window.__windroseStaticDbg` = temp hit/miss counter,
+remove after iPad verification.
+
+iPad verification pending. If good: remove debug counter, run full E2E,
+consider BRAT preview release.
+
+---
+
 ## Symptom
 
 Windrose became "incredibly laggy / unusable" on **every map, every mode, both devices**, starting ~2026-06-09. Felt like it "worked perfectly hours ago" with no obvious code change.
