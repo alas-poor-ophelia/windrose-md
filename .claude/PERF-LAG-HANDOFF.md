@@ -30,6 +30,39 @@
 
 ---
 
+## SESSION 2, PART 2 — ROOT CAUSE FOUND (`e2ef2c88`)
+
+User reported zero improvement: 5-10s freeze per single interaction, whole-Obsidian
+microstutters, and crucially **a new map with no image tiles was nearly fine**.
+
+Instrumented ONE synthetic click on the heavy data: **1,242 getImageData calls
+over 12+ seconds.** The tile-thumbnail pipeline (`thumbnailCache.ts`, merged with
+the Tile Browser Redesign 2026-06-08) was the storm:
+- TileAssetBrowser stays mounted while its drawer is collapsed (DrawerDock fold)
+- Compact mode requests thumbnails for ALL filtered tiles (no virtualization)
+- Vault has **2,271 tile images** vs `MAX_CACHE = 500` → each pass evicts its own
+  entries → every re-render (= every interaction) re-reads + re-decodes +
+  re-scans hundreds of images
+- Each thumbnail did getImageData + toDataURL on a GPU-backed canvas — two
+  compositor-stalling readbacks each. The GPU process is shared by ALL of
+  Obsidian → whole-app freezes; iPad GPU = 5-10s per interaction
+
+Fixes (commit `e2ef2c88`): MAX_CACHE 3000, `willReadFrequently: true` on all
+scan canvases (software raster — full-library scan now ~70ms CPU total, zero
+long tasks), `active` prop suspends requests while drawer collapsed.
+**Verified: second interaction after fix = 0 getImageData, 0 long tasks.**
+
+Why earlier conclusions misled: TWO overlapping problems. Pan probes measured
+the render path (real, fixed by Moves 1-2) but never triggered the interaction
+storm; the rollback test re-checked pan lag only, so "tile commits ruled out"
+was wrong for the interaction freezes.
+
+OPEN: what crossed the threshold at 4-5pm June 9 — likely a large DD pack
+import pushed the tile library past the 500-entry cache (ask user). Also
+consider: pace processQueue with requestIdleCallback; virtualize compact mode.
+
+---
+
 ## Symptom
 
 Windrose became "incredibly laggy / unusable" on **every map, every mode, both devices**, starting ~2026-06-09. Felt like it "worked perfectly hours ago" with no obvious code change.
