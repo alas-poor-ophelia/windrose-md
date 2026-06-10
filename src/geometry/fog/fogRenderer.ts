@@ -93,6 +93,67 @@ function getFogSettings(effectiveSettings: FogSettingsSource): FogSettings {
 }
 
 /**
+ * Fog texture pattern source, downscaled and cached per image path.
+ *
+ * Fog renders LIVE every frame (it sits on top of the static-layer cache), so
+ * its pattern is sampled per frame across blur passes and the main fill. Users
+ * can pick arbitrary images as fog textures — a 5000x5000 (25MP) JPEG used
+ * directly forces the GPU to hold and re-sample a ~100MB decoded texture per
+ * frame, which saturates weaker devices (measured ~900ms/frame on iPad).
+ * Downscaling the pattern source once bounds that cost permanently; the
+ * pattern transform scales it back up so the on-screen texture size is
+ * unchanged (fog is translucent and usually blurred — sharpness loss is
+ * imperceptible).
+ */
+const FOG_PATTERN_MAX_PX = 1024;
+const fogPatternSourceCache = new Map<string, { source: CanvasImageSource; invScale: number; key: string }>();
+
+function getFogPatternSource(
+  fowImagePath: string,
+  fowImage: HTMLImageElement
+): { source: CanvasImageSource; invScale: number } {
+  const key = `${fowImage.naturalWidth}x${fowImage.naturalHeight}`;
+  const cached = fogPatternSourceCache.get(fowImagePath);
+  if (cached && cached.key === key) return cached;
+
+  const scale = Math.min(1, FOG_PATTERN_MAX_PX / Math.max(fowImage.naturalWidth, fowImage.naturalHeight));
+  let source: CanvasImageSource = fowImage;
+  let invScale = 1;
+  if (scale < 1 && typeof document !== 'undefined') {
+    const c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round(fowImage.naturalWidth * scale));
+    c.height = Math.max(1, Math.round(fowImage.naturalHeight * scale));
+    const cctx = c.getContext('2d');
+    if (cctx) {
+      cctx.drawImage(fowImage, 0, 0, c.width, c.height);
+      source = c;
+      invScale = 1 / scale;
+    }
+  }
+  const entry = { source, invScale, key };
+  fogPatternSourceCache.set(fowImagePath, entry);
+  return entry;
+}
+
+/** Create the repeat pattern from the (downscaled) source, restoring original on-screen scale. */
+function createFogPattern(
+  ctx: CanvasRenderingContext2D,
+  fowImagePath: string,
+  fowImage: HTMLImageElement
+): CanvasPattern | null {
+  try {
+    const { source, invScale } = getFogPatternSource(fowImagePath, fowImage);
+    const pattern = ctx.createPattern(source, 'repeat');
+    if (pattern && invScale !== 1 && typeof pattern.setTransform === 'function') {
+      pattern.setTransform(new DOMMatrix([invScale, 0, 0, invScale, 0, 0]));
+    }
+    return pattern;
+  } catch (_e) {
+    return null;
+  }
+}
+
+/**
  * Creates fog fill style - either solid color or image pattern.
  */
 function createFogFillStyle(
@@ -107,13 +168,9 @@ function createFogFillStyle(
   if (fowImagePath != null && fowImagePath !== '') {
     const fowImage = getCachedImage(fowImagePath);
     if (fowImage && fowImage.complete && fowImage.naturalWidth > 0) {
-      try {
-        const pattern = ctx.createPattern(fowImage, 'repeat');
-        if (pattern) {
-          fillStyle = pattern;
-        }
-      } catch (_e) {
-        // Pattern creation failed, use solid color
+      const pattern = createFogPattern(ctx, fowImagePath, fowImage);
+      if (pattern) {
+        fillStyle = pattern;
       }
     }
   }
@@ -174,7 +231,7 @@ function setupFogCanvas(
   if (fowImagePath != null && fowImagePath !== '') {
     const fowImage = getCachedImage(fowImagePath);
     if (fowImage && fowImage.complete && fowImage.naturalWidth > 0) {
-      const fogPattern = fogCtx.createPattern(fowImage, 'repeat');
+      const fogPattern = createFogPattern(fogCtx, fowImagePath, fowImage);
       if (fogPattern) {
         fogCtx.fillStyle = fogPattern;
       }
