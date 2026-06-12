@@ -45,6 +45,7 @@ import { renderTiles } from '../../geometry/renderers/tileRenderer';
 import { gridRenderer } from '../../geometry/renderers/gridRenderer';
 import { hexRenderer } from '../../geometry/renderers/hexRenderer';
 import { renderCurves } from '../../geometry/renderers/curveRenderer';
+import { renderWallPaths } from '../../geometry/renderers/wallPathRenderer';
 import { buildMergeIndex } from '../../geometry/curves/curveCellOverlap';
 import { getCachedImage, getImageCacheVersion } from '../../assets/imageOperations';
 import { getSlotOffset, getMultiObjectScale, getObjectsInCell } from '../../objects/hexSlotPositioner';
@@ -544,6 +545,14 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
           : undefined;
         renderCurves(ctx, layerBelow.curves, rendererViewState, THEME, { opacity: ghostOpacity, gridConfig: ghostGridConfig });
       }
+      // Ghost layer wall paths
+      if (layerBelow.wallPaths != null && layerBelow.wallPaths.length > 0 && mapData.tilesets != null && mapData.tilesets.length > 0) {
+        const wallCellSize = geometry.type === 'grid' ? geometry.cellSize : geometry.hexSize;
+        renderWallPaths(ctx, layerBelow.wallPaths, mapData.tilesets, rendererViewState, wallCellSize, {
+          opacity: ghostOpacity,
+          getCachedImage
+        });
+      }
     }
   }
 
@@ -667,6 +676,14 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
     renderCurves(ctx, activeLayer.curves, rendererViewState, THEME, {
       mergeIndex: activeMergeIndex,
       gridConfig: curveGridConfig
+    });
+  }
+
+  // Draw wall paths (between curves and tiles)
+  if (activeLayer.wallPaths != null && activeLayer.wallPaths.length > 0 && mapData.tilesets != null && mapData.tilesets.length > 0) {
+    const wallCellSize = geometry.type === 'grid' ? geometry.cellSize : geometry.hexSize;
+    renderWallPaths(ctx, activeLayer.wallPaths, mapData.tilesets, rendererViewState, wallCellSize, {
+      getCachedImage
     });
   }
 

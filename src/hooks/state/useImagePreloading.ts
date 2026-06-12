@@ -3,6 +3,8 @@ import type { App } from 'obsidian';
 
 import { useEffect, useState } from 'preact/hooks';
 import { preloadImage, pinImage, getCachedImage } from '../../assets/imageOperations';
+import { collectWallPathImagePaths } from '../../geometry/renderers/wallPathRenderer';
+import { getTileMetadataForRender } from '../../persistence/tileMetadata';
 import { getEffectiveSettings } from '../../core/settingsAccessor';
 import { getResolvedObjectTypes, hasImagePath } from '../../objects/objectTypeResolver';
 
@@ -78,13 +80,20 @@ function useImagePreloading(
     // The tile browser loads thumbnails on-demand via CSS background-image.
     const placedPaths = new Set<string>();
     for (const layer of mapData.layers) {
-      if (!layer.tiles) continue;
-      for (const tile of layer.tiles) {
-        const tsId = tile.tilesetId;
-        const tId = tile.tileId;
-        const ts = mapData.tilesets.find(t => t.id === tsId);
-        const entry = ts?.tiles.find(t => t.id === tId);
-        if (entry?.vaultPath) placedPaths.add(entry.vaultPath);
+      if (layer.tiles) {
+        for (const tile of layer.tiles) {
+          const tsId = tile.tilesetId;
+          const tId = tile.tileId;
+          const ts = mapData.tilesets.find(t => t.id === tsId);
+          const entry = ts?.tiles.find(t => t.id === tId);
+          if (entry?.vaultPath) placedPaths.add(entry.vaultPath);
+        }
+      }
+      // Wall path strips + their end caps are render-time images too.
+      if (layer.wallPaths != null && layer.wallPaths.length > 0) {
+        for (const p of collectWallPathImagePaths(layer.wallPaths, mapData.tilesets, getTileMetadataForRender())) {
+          placedPaths.add(p);
+        }
       }
     }
 
