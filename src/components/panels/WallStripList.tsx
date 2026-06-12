@@ -121,7 +121,11 @@ function WallStripList({
   onSelect,
 }: WallStripListProps): VNode {
   const [search, setSearch] = useState('');
-  const scrollRef = useRef<HTMLDivElement>(null);
+  // Callback-ref into state (not useRef): the virtualizer attaches its rect
+  // observer during a render where the scroll element exists. This component
+  // doesn't re-render after mount on its own, so a plain ref would leave the
+  // virtualizer unmeasured and getVirtualItems() permanently empty.
+  const [scrollEl, setScrollEl] = useState<HTMLDivElement | null>(null);
 
   const rows = useMemo((): StripRow[] => {
     let filtered = strips;
@@ -145,7 +149,7 @@ function WallStripList({
 
   const virtualizer = usePreactVirtualizer({
     count: rows.length,
-    getScrollElement: () => scrollRef.current,
+    getScrollElement: () => scrollEl,
     estimateSize: (index: number) => (rows[index]?.type === 'header' ? HEADER_HEIGHT : ROW_HEIGHT),
     overscan: 8,
   });
@@ -164,7 +168,7 @@ function WallStripList({
         </div>
       </div>
 
-      <div className="windrose-wallstrip-scroll" ref={scrollRef}>
+      <div className="windrose-wallstrip-scroll" ref={setScrollEl}>
         {rows.length === 0 ? (
           <div className="windrose-tb-empty">
             {search !== ''
