@@ -98,5 +98,42 @@ function parseDungeondraftTags(buffer: ArrayBuffer, archive: PckArchive): Dungeo
 	}
 }
 
-export { parsePackMetadata, parseDungeondraftTags, findPackJson, findTagsFile };
-export type { DungeondraftPackMeta, DungeondraftTags, MetadataResult };
+/** Per-wall defaults from a .dungeondraft_wall sidecar in data/walls/. */
+interface WallSidecarInfo {
+	color?: string;
+}
+
+/**
+ * Parse all .dungeondraft_wall sidecars in the archive, keyed by filename stem
+ * (e.g. "Wall_Glass_01_a" for data/walls/Wall_Glass_01_a.dungeondraft_wall).
+ * The stem matches the wall texture's filename stem in textures/walls/.
+ * Sidecars are optional — many packs ship walls without them.
+ */
+function parseWallSidecars(buffer: ArrayBuffer, archive: PckArchive): Map<string, WallSidecarInfo> {
+	const result = new Map<string, WallSidecarInfo>();
+	const decoder = new TextDecoder('utf-8');
+
+	for (const entry of archive.files) {
+		if (!entry.path.endsWith('.dungeondraft_wall')) continue;
+		const filename = entry.path.split('/').pop() ?? '';
+		const stem = filename.replace(/\.dungeondraft_wall$/, '');
+		if (stem === '') continue;
+
+		try {
+			const text = decoder.decode(extractFileData(buffer, entry));
+			const json = JSON.parse(text) as Record<string, unknown>;
+			const info: WallSidecarInfo = {};
+			if (typeof json.color === 'string') {
+				info.color = json.color.replace(/^#/, '');
+			}
+			result.set(stem, info);
+		} catch {
+			// Malformed sidecar — wall still imports with defaults.
+		}
+	}
+
+	return result;
+}
+
+export { parsePackMetadata, parseDungeondraftTags, findPackJson, findTagsFile, parseWallSidecars };
+export type { DungeondraftPackMeta, DungeondraftTags, MetadataResult, WallSidecarInfo };

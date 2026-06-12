@@ -21,6 +21,8 @@ import { usePreactVirtualizer } from '../../hooks/state/useVirtualizer';
 import { Icon } from '../shared/Icon';
 import { CornerBrackets } from '../shared/CornerBrackets';
 import { DepthBar, depthMeta } from './DepthBar';
+import { WallStripList } from './WallStripList';
+import type { WallStripAsset } from './WallStripList';
 import {
   loadTileMetadata,
   saveTileMetadataDebounced,
@@ -369,6 +371,8 @@ const TileAssetBrowser = memo(({
   const [searchFilter, setSearchFilter] = useState<string>('');
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
   const [showTilesetConfig, setShowTilesetConfig] = useState<boolean>(false);
+  // 'tiles' = cell-tile grid; 'walls' = wall/path strip picker (shown when strips exist)
+  const [assetMode, setAssetMode] = useState<'tiles' | 'walls'>('tiles');
   // Which tileset the config panel targets (null = follow the current selection).
   const [configTilesetId, setConfigTilesetId] = useState<string | null>(null);
   const [hoveredTile, setHoveredTile] = useState<TileEntry | null>(null);
@@ -637,12 +641,42 @@ const TileAssetBrowser = memo(({
     };
   }, [tilesets, tileMetadata]);
 
-  // Merge all tileset tiles into a single pool
+  // Merge all tileset tiles into a single pool. Wall/path strips and their
+  // `_end` caps are line assets, not cell tiles — they live in the Walls mode.
   const allTiles = useMemo(() => {
     const tiles: TileEntry[] = [];
-    for (const ts of tilesets) tiles.push(...ts.tiles);
+    for (const ts of tilesets) {
+      for (const t of ts.tiles) {
+        const e = tileMetadata[t.vaultPath];
+        if (e?.ddSourceType === 'walls' || e?.ddSourceType === 'paths' || e?.isWallEndCap === true) continue;
+        tiles.push(t);
+      }
+    }
     return tiles;
-  }, [tilesets]);
+  }, [tilesets, tileMetadata]);
+
+  // Wall/path strips for the Walls picker mode (end caps excluded — they are
+  // referenced via their strip's wallEndCapPath, never placed directly).
+  const wallStrips = useMemo((): WallStripAsset[] => {
+    const strips: WallStripAsset[] = [];
+    for (const ts of tilesets) {
+      for (const t of ts.tiles) {
+        const e = tileMetadata[t.vaultPath];
+        if (e?.isWallEndCap === true) continue;
+        const kind = e?.ddSourceType === 'walls' ? 'wall' as const
+          : e?.ddSourceType === 'paths' ? 'path' as const
+          : null;
+        if (kind == null) continue;
+        strips.push({ tile: t, tilesetId: ts.id, kind, srcW: e?.srcW, srcH: e?.srcH });
+      }
+    }
+    return strips;
+  }, [tilesets, tileMetadata]);
+
+  const handleWallStripSelect = (asset: WallStripAsset): void => {
+    onTileSelect(asset.tilesetId, asset.tile.id);
+    onToolChange('wall');
+  };
 
   // Map vaultPath → tilesetId for click handlers
   const tileToTilesetId = useMemo(() => {
@@ -1151,7 +1185,24 @@ const TileAssetBrowser = memo(({
 
       {/* Header */}
       <div className="windrose-tb-head">
-        <div className="windrose-tb-title">Tiles</div>
+        {wallStrips.length > 0 ? (
+          <div className="windrose-tb-mode">
+            <button
+              className={`windrose-tb-modebtn ${assetMode === 'tiles' ? 'on' : ''}`}
+              onClick={() => setAssetMode('tiles')}
+            >
+              Tiles
+            </button>
+            <button
+              className={`windrose-tb-modebtn ${assetMode === 'walls' ? 'on' : ''}`}
+              onClick={() => setAssetMode('walls')}
+            >
+              Walls
+            </button>
+          </div>
+        ) : (
+          <div className="windrose-tb-title">Tiles</div>
+        )}
         <span className="windrose-tb-cap" style={{ marginRight: 'auto', marginLeft: 2 }}>
           {tilesets.length === 1 ? tilesets[0].name : `${tilesets.length} packs`}
         </span>
@@ -1179,6 +1230,15 @@ const TileAssetBrowser = memo(({
           </button>
         )}
       </div>
+
+      {assetMode === 'walls' ? (
+        <WallStripList
+          strips={wallStrips}
+          selectedTilesetId={selectedTilesetId}
+          selectedTileId={selectedTileId}
+          onSelect={handleWallStripSelect}
+        />
+      ) : (<>
 
       {/* Depth band */}
       {hidden != null && onToggleHide != null && (
@@ -1683,6 +1743,8 @@ const TileAssetBrowser = memo(({
           </div>
         </div>
       ))}
+
+      </>)}
 
       </>)}
     </div>

@@ -1606,8 +1606,26 @@ button.windrose-object-grid-item:hover,
   background-size: 200% 100%;
   animation: windrose-thumb-shimmer 1.2s ease-in-out infinite;
   border-radius: 2px;
+  /* Terminal load failure (missing/unreadable file): never animate. */
+}
+.windrose-tile-thumb-placeholder.is-failed {
+  animation: none;
+  opacity: 0.45;
 }
 
+/* The folded drawer keeps the panel mounted for its fold animation; make sure
+   no placeholder animates behind it. The shimmer animates background-position,
+   which is per-frame MAIN-THREAD paint work for every element — dozens of
+   invisible shimmers saturate weaker devices (iPad) even at opacity 0. */
+.windrose-tile-drawer.is-collapsed .windrose-tile-thumb-placeholder {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .windrose-tile-thumb-placeholder {
+    animation: none;
+  }
+}
 @keyframes windrose-thumb-shimmer {
   0% {
     background-position: 200% 0;
@@ -2193,6 +2211,96 @@ button.windrose-object-grid-item:hover,
 .is-tablet .windrose-tile-config-select {
   font-size: 13px;
   padding: 6px 8px;
+}
+
+/* ============================================
+   WALLS & PATHS MODE — strip picker
+   ============================================ */
+/* Header mode toggle (Tiles | Walls) */
+.windrose-tb-mode {
+  display: inline-flex;
+  border: 1px solid oklch(from var(--windrose-border-primary) l c h/0.4);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.windrose-tb-modebtn {
+  font-family: "Cinzel", serif;
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  padding: 3px 9px;
+  background: transparent;
+  border: none;
+  color: var(--windrose-text-muted);
+  cursor: pointer;
+  transition: all 0.13s ease;
+}
+.windrose-tb-modebtn:hover {
+  color: var(--windrose-text-primary);
+}
+.windrose-tb-modebtn.on {
+  background: oklch(from var(--windrose-border-primary) l c h/0.22);
+  color: var(--windrose-gold-bright);
+  text-shadow: 0 1px 1px oklch(0% 0 0deg / 0.45);
+}
+.windrose-tb-modebtn + .windrose-tb-modebtn {
+  border-left: 1px solid oklch(from var(--windrose-border-primary) l c h/0.3);
+}
+
+/* Strip list body */
+.windrose-wallstrip-list {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.windrose-wallstrip-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 8px 10px;
+}
+
+.windrose-wallstrip-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 36px;
+  padding: 3px 6px;
+  background: var(--windrose-bg-secondary);
+  border: 1px solid var(--windrose-border-secondary);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: border-color 0.13s ease, box-shadow 0.13s ease;
+  overflow: hidden;
+}
+.windrose-wallstrip-row:hover {
+  border-color: oklch(from var(--windrose-gold-bright) l c h/0.5);
+}
+.windrose-wallstrip-row.sel {
+  border-color: var(--windrose-gold-bright);
+  box-shadow: 0 0 8px var(--windrose-gold-glow);
+}
+
+.windrose-wallstrip-preview {
+  flex: 1;
+  min-width: 0;
+  height: 26px;
+  border-radius: 2px;
+  background: repeating-conic-gradient(oklch(0% 0 0deg / 0.18) 0% 25%, transparent 0% 50%) 0 0/12px 12px;
+}
+
+.windrose-wallstrip-name {
+  flex-shrink: 0;
+  max-width: 42%;
+  font-size: 10px;
+  color: var(--windrose-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: right;
 }
 
 /* ============================================

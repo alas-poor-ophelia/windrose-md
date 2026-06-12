@@ -92,7 +92,10 @@ function pruneEmptyEntries(metadata: TileMetadataStore): TileMetadataStore {
       entry.opaqueW != null ||
       entry.opaqueH != null ||
       entry.srcW != null ||
-      entry.srcH != null
+      entry.srcH != null ||
+      entry.wallEndCapPath != null ||
+      entry.wallDefaultColor != null ||
+      entry.isWallEndCap === true
     ) {
       result[key] = entry;
     }
@@ -288,6 +291,34 @@ function bulkSetDetectionSignals(
   return result;
 }
 
+function bulkSetWallStripInfo(
+  metadata: TileMetadataStore,
+  entries: Array<{ vaultPath: string; endCapPath?: string; defaultColor?: string }>
+): TileMetadataStore {
+  const result = { ...metadata };
+  for (const { vaultPath, endCapPath, defaultColor } of entries) {
+    const existing = result[vaultPath] ?? {};
+    result[vaultPath] = {
+      ...existing,
+      ...(endCapPath != null ? { wallEndCapPath: endCapPath } : {}),
+      ...(defaultColor != null ? { wallDefaultColor: defaultColor } : {}),
+    };
+  }
+  return result;
+}
+
+function bulkMarkWallEndCaps(
+  metadata: TileMetadataStore,
+  vaultPaths: string[]
+): TileMetadataStore {
+  const result = { ...metadata };
+  for (const vaultPath of vaultPaths) {
+    const existing = result[vaultPath] ?? {};
+    result[vaultPath] = { ...existing, isWallEndCap: true };
+  }
+  return result;
+}
+
 function collectDepthAwareTags(
   tiles: TileEntry[],
   metadata: TileMetadataStore,
@@ -342,4 +373,6 @@ export {
   bulkSetDetectionSignals,
   bulkSetRenderMode,
   bulkSetDefaultSpan,
+  bulkSetWallStripInfo,
+  bulkMarkWallEndCaps,
 };

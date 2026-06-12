@@ -1129,3 +1129,101 @@
   font-size: 13px;
   padding: 6px 8px;
 }
+
+/* ============================================
+   WALLS & PATHS MODE — strip picker
+   ============================================ */
+
+/* Header mode toggle (Tiles | Walls) */
+.windrose-tb-mode {
+  display: inline-flex;
+  border: 1px solid oklch(from var(--windrose-border-primary) l c h / 0.4);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.windrose-tb-modebtn {
+  font-family: "Cinzel", serif;
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  padding: 3px 9px;
+  background: transparent;
+  border: none;
+  color: var(--windrose-text-muted);
+  cursor: pointer;
+  transition: all 0.13s ease;
+
+  &:hover {
+    color: var(--windrose-text-primary);
+  }
+
+  &.on {
+    background: oklch(from var(--windrose-border-primary) l c h / 0.22);
+    color: var(--windrose-gold-bright);
+    text-shadow: 0 1px 1px oklch(0 0 0 / 0.45);
+  }
+
+  + .windrose-tb-modebtn {
+    border-left: 1px solid oklch(from var(--windrose-border-primary) l c h / 0.3);
+  }
+}
+
+/* Strip list body */
+.windrose-wallstrip-list {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.windrose-wallstrip-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 8px 10px;
+}
+
+.windrose-wallstrip-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 36px;
+  padding: 3px 6px;
+  background: var(--windrose-bg-secondary);
+  border: 1px solid var(--windrose-border-secondary);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: border-color 0.13s ease, box-shadow 0.13s ease;
+  overflow: hidden;
+
+  &:hover {
+    border-color: oklch(from var(--windrose-gold-bright) l c h / 0.5);
+  }
+
+  &.sel {
+    border-color: var(--windrose-gold-bright);
+    box-shadow: 0 0 8px var(--windrose-gold-glow);
+  }
+}
+
+.windrose-wallstrip-preview {
+  flex: 1;
+  min-width: 0;
+  height: 26px;
+  border-radius: 2px;
+  background:
+    repeating-conic-gradient(oklch(0 0 0 / 0.18) 0% 25%, transparent 0% 50%)
+    0 0 / 12px 12px;
+}
+
+.windrose-wallstrip-name {
+  flex-shrink: 0;
+  max-width: 42%;
+  font-size: 10px;
+  color: var(--windrose-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: right;
+}

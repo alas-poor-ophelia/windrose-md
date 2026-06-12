@@ -46,6 +46,8 @@ export type ToolId =
   | 'tilePaint'
   // Outline tool (hex maps)
   | 'outline'
+  // Wall/path tool (textures swept along editable polylines)
+  | 'wall'
   // Utility tools
   | 'measure'
   | 'fog'

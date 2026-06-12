@@ -230,6 +230,13 @@ export interface TileMetadataEntry {
   srcW?: number;
   /** Cached detection signal: full natural image height in source px. */
   srcH?: number;
+  /** For wall/path strips: vault path of the paired `_end` cap texture, if any. */
+  wallEndCapPath?: string;
+  /** For wall strips: default tint from the .dungeondraft_wall sidecar (hex, no #). */
+  wallDefaultColor?: string;
+  /** Marks `_end` cap textures so browsers/pools can hide them; they are only
+   *  referenced indirectly via their strip's wallEndCapPath. */
+  isWallEndCap?: boolean;
 }
 
 /** Metadata store keyed by vault path (stable across tileset rescans) */
