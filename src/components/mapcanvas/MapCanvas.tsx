@@ -45,6 +45,7 @@ import { RegionLayer } from './RegionLayer';
 import { OutlineLayer } from './OutlineLayer';
 import { ShapeOverlayLayer } from './ShapeOverlayLayer';
 import { TilePlacementLayer } from './TilePlacementLayer';
+import { WallLayer } from './WallLayer';
 import { RerollDungeonButton } from './RerollDungeonButton';
 import { getSetting } from '../../core/settingsAccessor';
 import { usePanZoomCoordinator } from '../../hooks/canvas/usePanZoomCoordinator';
@@ -550,6 +551,7 @@ MapCanvas.RegionLayer = RegionLayer;
 MapCanvas.OutlineLayer = OutlineLayer;
 MapCanvas.ShapeOverlayLayer = ShapeOverlayLayer;
 MapCanvas.TilePlacementLayer = TilePlacementLayer;
+MapCanvas.WallLayer = WallLayer;
 MapCanvas.RerollDungeonButton = RerollDungeonButton;
 
 export { MapCanvas };

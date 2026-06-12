@@ -403,6 +403,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     handleTextLabelsChange,
     handleEdgesChange,
     handleTilesChange,
+    handleWallPathsChange,
     handleAddCustomColor,
     handleDeleteCustomColor,
     handleUpdateColorOpacity,
@@ -878,6 +879,14 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 brushSize={brushSize}
                 tileDepth={tileDepth}
                 onTilesChange={handleTilesChange}
+              />
+
+              {/* WallLayer - wall/path strip drawing along polylines */}
+              <MapCanvas.WallLayer
+                currentTool={currentTool}
+                selectedTilesetId={selectedTilesetId}
+                selectedTileId={selectedTileId}
+                onWallPathsChange={handleWallPathsChange}
               />
 
               {/* RegionLayer - hex region creation and editing */}

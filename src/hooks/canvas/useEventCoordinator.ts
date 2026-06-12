@@ -346,6 +346,14 @@ const useEventCoordinator = ({
           const eventToUse = isTouchEvent ? syntheticEvent : e;
           tileHandlers.handlePointerDown(eventToUse);
         }
+      } else if (currentTool === 'wall') {
+        if (hasMultiSelection) clearSelection();
+
+        const wallHandlers = getHandlers('wall');
+        if (wallHandlers?.handlePointerDown) {
+          const eventToUse = isTouchEvent ? syntheticEvent : e;
+          wallHandlers.handlePointerDown(eventToUse);
+        }
       } else if (currentTool === 'shape') {
         if (hasMultiSelection) clearSelection();
 
@@ -564,6 +572,14 @@ const useEventCoordinator = ({
       const outlineHandlers = getHandlers('outline');
       if (outlineHandlers?.handlePointerMove) {
         outlineHandlers.handlePointerMove(e);
+      }
+      return;
+    }
+
+    if (currentTool === 'wall') {
+      const wallHandlers = getHandlers('wall');
+      if (wallHandlers?.handlePointerMove) {
+        wallHandlers.handlePointerMove(e);
       }
       return;
     }
@@ -798,6 +814,15 @@ const useEventCoordinator = ({
       const outlineHandlers = getHandlers('outline');
       if (outlineHandlers?.handleDoubleClick) {
         outlineHandlers.handleDoubleClick(e);
+        return;
+      }
+    }
+
+    // Wall mode: double-click finishes the wall
+    if (currentTool === 'wall') {
+      const wallHandlers = getHandlers('wall');
+      if (wallHandlers?.handleDoubleClick) {
+        wallHandlers.handleDoubleClick(e);
         return;
       }
     }

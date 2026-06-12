@@ -245,6 +245,7 @@ export interface HandlerTypeMap {
   outline: LayerHandlers;
   region: RegionHandlers;
   shapeOverlay: ShapeOverlayHandlers;
+  wall: LayerHandlers;
 }
 
 /** All registered layer names (derived from HandlerTypeMap) */
