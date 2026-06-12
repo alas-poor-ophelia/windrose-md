@@ -19,7 +19,7 @@ geometry/
 │   ├── gridRenderer.ts, hexRenderer.ts, backgroundRenderer.ts
 │   ├── objectRenderer.ts, textLabelRenderer.ts, selectionRenderer.ts
 │   ├── badgeRenderer.ts, segmentRenderer.ts, regionRenderer.ts
-│   └── tileRenderer.ts, curveRenderer.ts
+│   └── tileRenderer.ts, curveRenderer.ts, wallPathRenderer.ts
 ├── fog/                   # Fog-of-war rendering pipeline
 │   ├── fogRenderer.ts, gridFogRenderer.ts, hexFogRenderer.ts
 └── curves/                # Bezier math & boolean ops

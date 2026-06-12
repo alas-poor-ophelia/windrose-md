@@ -1,0 +1,22 @@
+{
+  "walls-fixture/Test_Wall_01.png": {
+    "ddSourceType": "walls",
+    "wallEndCapPath": "walls-fixture/Test_Wall_01_end.png",
+    "srcW": 256,
+    "srcH": 16,
+    "depthAffinity": "structure",
+    "alphaCoverage": 1,
+    "opaqueW": 256,
+    "opaqueH": 16
+  },
+  "walls-fixture/Test_Wall_01_end.png": {
+    "ddSourceType": "walls",
+    "isWallEndCap": true,
+    "depthAffinity": "structure",
+    "alphaCoverage": 1,
+    "opaqueW": 8,
+    "opaqueH": 16,
+    "srcW": 8,
+    "srcH": 16
+  }
+}

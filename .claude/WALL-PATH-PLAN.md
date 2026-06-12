@@ -1,6 +1,7 @@
 # Wall & Path Tiles — Implementation Plan
 
-**Status:** Draft for Guildmaster review (2026-06-12)
+**Status:** PHASES 0–6 IMPLEMENTED (2026-06-12). Commits 2b79c005..HEAD on
+standalone-conversion. Remaining polish tracked in §6 below.
 **Goal:** Dungeondraft-style wall/path tiles: textures swept along user-drawn polylines whose segments can be bent into curves, with first-class editing UX on kb/m and touch, in both map-block and full-pane views.
 
 ---
@@ -285,6 +286,23 @@ the UX-heavy phases (3-5) each ship a usable increment.
 | Q3 | **RESOLVED:** per-layer | `layer.wallPaths[]`; ghost-layer rendering and layer history apply automatically |
 
 ---
+
+## 5.5 Post-implementation status (2026-06-12)
+
+All seven phases landed in one session. Deliberate deferrals & known polish items:
+- **Tint** (multiply color from sidecars) — data captured at import, not yet applied at render.
+- **Joint styles** (bevel/round), NormalizeUV stretch mode, taper/fade — deferred as planned.
+- **Hex snap targets** — hex snaps to hex centers; vertex/edge-midpoint targets pending.
+- **Variant-letter grouping** in the Walls browser list (each strip is its own row, like DD).
+- **WallLayer decomposition** — the layer is ~700 lines (draw + edit); consider extracting
+  a useWallEditing hook if it grows further.
+- **MCP server fixes**: navigate tool dispatches dead 'dmt-navigate-to' (app listens for
+  'windrose-navigate-to'); reload tool uses stale plugin id; screenshot tool serves stale
+  frames when the window is minimized (use canvas.toDataURL via eval instead).
+- Dev pack: FC-WallsPaths-dev.dungeondraft_pack (349 walls + 218 paths) built via
+  scripts/build-dd-pack.mjs and imported into the main vault.
+- Test fixture: tests/fixtures/test-vault/walls-fixture/ (generated strip + cap,
+  registered in tilesetFolders + metadata). E2E: tests/e2e/wall-drawing.test.ts (3 tests).
 
 ## 5. Skip-log (guild discipline)
 

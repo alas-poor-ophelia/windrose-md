@@ -21,6 +21,7 @@ MapCanvas.tsx (orchestrator)
 ├── AreaSelectLayer.tsx       # Multi-select rectangle
 ├── HexCoordinateLayer.tsx    # Hex coordinate display
 ├── TilePlacementLayer.tsx    # Tile placement tool
+├── WallLayer.tsx             # Wall/path strips: draw along polylines, drag-to-bow curves, edit mode
 ├── DiagonalFillOverlay.tsx   # Diagonal fill preview
 ├── ShapePreviewOverlay.tsx   # Shape tool preview
 ├── SegmentHoverOverlay.tsx   # Segment hover feedback
