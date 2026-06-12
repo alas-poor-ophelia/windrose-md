@@ -50,6 +50,12 @@ const WallLayer = ({
   snapRef.current = snapEnabled;
   const cursorRef = useRef<{ x: number; y: number } | null>(null);
   const overlayRef = useRef<HTMLCanvasElement | null>(null);
+  // Press-drag bowing: while the pointer is down after placing a vertex,
+  // dragging bows the segment that ends at that vertex.
+  const pressActiveRef = useRef(false);
+  const [angleSnapEnabled, setAngleSnapEnabled] = useState(false);
+  const angleSnapRef = useRef(angleSnapEnabled);
+  angleSnapRef.current = angleSnapEnabled;
 
   const isWallTool = currentTool === 'wall';
   const cellSize = geometry != null
@@ -85,6 +91,21 @@ const WallLayer = ({
     const world = geometry.gridToWorld(grid.x, grid.y);
     return { x: world.worldX, y: world.worldY };
   }, [geometry]);
+
+  /** Constrain a point to 45° rays from the previous vertex (Alt or bar toggle). */
+  const angleSnap = useCallback((wx: number, wy: number, altKey: boolean): { x: number; y: number } => {
+    if (!angleSnapRef.current && !altKey) return { x: wx, y: wy };
+    const verts = verticesRef.current;
+    if (verts.length === 0) return { x: wx, y: wy };
+    const prev = verts[verts.length - 1];
+    const dx = wx - prev.x;
+    const dy = wy - prev.y;
+    const len = Math.hypot(dx, dy);
+    if (len === 0) return { x: wx, y: wy };
+    const step = Math.PI / 4;
+    const angle = Math.round(Math.atan2(dy, dx) / step) * step;
+    return { x: prev.x + len * Math.cos(angle), y: prev.y + len * Math.sin(angle) };
+  }, []);
 
   const createOverlay = useCallback((): HTMLCanvasElement | null => {
     if (overlayRef.current != null) return overlayRef.current;
@@ -240,23 +261,67 @@ const WallLayer = ({
       }
     }
 
-    const snapped = snapWorld(coords.worldX, coords.worldY);
+    const constrained = angleSnap(coords.worldX, coords.worldY, (e as MouseEvent).altKey === true);
+    const snapped = snapWorld(constrained.x, constrained.y);
     createOverlay();
-    setVertices([...verts, { x: snapped.x, y: snapped.y }]);
+    const next = [...verts, { x: snapped.x, y: snapped.y }];
+    setVertices(next);
     cursorRef.current = snapped;
     // setVertices is async; draw with the appended list immediately.
-    verticesRef.current = [...verts, { x: snapped.x, y: snapped.y }];
+    verticesRef.current = next;
+    // Press-drag bows the segment that ends at this vertex (released = confirm).
+    pressActiveRef.current = next.length >= 2;
     drawPreview();
-  }, [currentTool, selectedEntry, isStripAsset, getClientCoords, screenToWorld, snapDistance, snapWorld, createOverlay, commitWall, drawPreview]);
+  }, [currentTool, selectedEntry, isStripAsset, getClientCoords, screenToWorld, snapDistance, snapWorld, angleSnap, createOverlay, commitWall, drawPreview]);
 
   const handlePointerMove = useCallback((e: MouseEvent | TouchEvent | PointerEvent) => {
     if (currentTool !== 'wall' || verticesRef.current.length === 0) return;
     const { clientX, clientY } = getClientCoords(e);
     const coords = screenToWorld(clientX, clientY);
     if (!coords) return;
-    cursorRef.current = snapWorld(coords.worldX, coords.worldY);
+
+    const verts = verticesRef.current;
+    const zoom = mapData?.viewState?.zoom ?? 1;
+
+    // While pressing after a vertex placement, drag bows the new segment:
+    // the quadratic passes through the drag point at t=0.5. Dragging back to
+    // the chord straightens it again.
+    if (pressActiveRef.current && verts.length >= 2) {
+      const p0 = verts[verts.length - 2];
+      const p1 = verts[verts.length - 1];
+      const mx = coords.worldX;
+      const my = coords.worldY;
+      // Distance from drag point to the chord
+      const chordLen = Math.hypot(p1.x - p0.x, p1.y - p0.y);
+      let chordDist = Math.hypot(mx - p1.x, my - p1.y);
+      if (chordLen > 0) {
+        const t = ((mx - p0.x) * (p1.x - p0.x) + (my - p0.y) * (p1.y - p0.y)) / (chordLen * chordLen);
+        const ct = Math.max(0, Math.min(1, t));
+        chordDist = Math.hypot(mx - (p0.x + ct * (p1.x - p0.x)), my - (p0.y + ct * (p1.y - p0.y)));
+      }
+      const engage = 6 / zoom;
+      const next = verts.slice();
+      const last = { ...next[next.length - 2] };
+      if (chordDist > engage) {
+        last.arc = [2 * mx - (p0.x + p1.x) / 2, 2 * my - (p0.y + p1.y) / 2];
+      } else {
+        delete last.arc;
+      }
+      next[next.length - 2] = last;
+      verticesRef.current = next;
+      setVertices(next);
+      drawPreview();
+      return;
+    }
+
+    const constrained = angleSnap(coords.worldX, coords.worldY, (e as MouseEvent).altKey === true);
+    cursorRef.current = snapWorld(constrained.x, constrained.y);
     drawPreview();
-  }, [currentTool, getClientCoords, screenToWorld, snapWorld, drawPreview]);
+  }, [currentTool, mapData, getClientCoords, screenToWorld, snapWorld, angleSnap, drawPreview]);
+
+  const handlePointerUp = useCallback((_e: MouseEvent | TouchEvent | PointerEvent) => {
+    pressActiveRef.current = false;
+  }, []);
 
   const handleDoubleClick = useCallback((_e: MouseEvent) => {
     if (currentTool !== 'wall') return;
@@ -303,7 +368,7 @@ const WallLayer = ({
 
   // Register event handlers (ref + proxy to avoid re-registration churn)
   const handlersRef = useRef<Record<string, unknown> | null>(null);
-  handlersRef.current = { handlePointerDown, handlePointerMove, handleDoubleClick };
+  handlersRef.current = { handlePointerDown, handlePointerMove, handlePointerUp, handleDoubleClick };
 
   useEffect(() => {
     const proxy = new Proxy({} as Record<string, unknown>, {
@@ -339,6 +404,13 @@ const WallLayer = ({
             onClick={() => setSnapEnabled(!snapEnabled)}
           >
             <Icon icon="lucide-magnet" size={14} />
+          </button>
+          <button
+            className={`windrose-tb-iconbtn ${angleSnapEnabled ? 'active' : ''}`}
+            title={angleSnapEnabled ? '45° angle snap: ON (or hold Alt)' : '45° angle snap: OFF (or hold Alt)'}
+            onClick={() => setAngleSnapEnabled(!angleSnapEnabled)}
+          >
+            <Icon icon="lucide-triangle-right" size={14} />
           </button>
           <button
             className="windrose-tb-iconbtn"

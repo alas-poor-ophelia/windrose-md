@@ -725,6 +725,13 @@ const useEventCoordinator = ({
       }
     }
 
+    if (currentTool === 'wall') {
+      const wallHandlers = getHandlers('wall');
+      if (wallHandlers?.handlePointerUp) {
+        wallHandlers.handlePointerUp(e);
+      }
+    }
+
     if (fogHandlers?.handlePointerUp) {
       fogHandlers.handlePointerUp(e);
     }
