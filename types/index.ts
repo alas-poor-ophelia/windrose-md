@@ -47,6 +47,13 @@ export type {
 } from './core/curve.types';
 
 export type {
+  // Wall paths
+  WallPathId,
+  WallVertex,
+  WallPath,
+} from './core/wallpath.types';
+
+export type {
   // Map
   MapType,
   LayerId,

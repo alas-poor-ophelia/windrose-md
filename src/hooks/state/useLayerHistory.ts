@@ -49,6 +49,7 @@ function useLayerHistory({
     curves: [],
     name: "",
     tiles: [],
+    wallPaths: [],
     objects: [],
     textLabels: [],
     edges: [],
@@ -97,6 +98,7 @@ function useLayerHistory({
         textLabels: activeLayer.textLabels,
         edges: activeLayer.edges,
         tiles: activeLayer.tiles,
+        wallPaths: activeLayer.wallPaths,
         regions: mapData.regions ?? [],
         outlines: mapData.outlines ?? [],
         shapeOverlays: mapData.shapeOverlays ?? [],
@@ -130,6 +132,7 @@ function useLayerHistory({
       textLabels: layer.textLabels,
       edges: layer.edges,
       tiles: layer.tiles,
+      wallPaths: layer.wallPaths,
       shapeOverlays: shapeOverlays,
       fogOfWar: fogOfWar ?? layer.fogOfWar,
       regions: regions,
@@ -324,6 +327,7 @@ function useLayerHistory({
           textLabels: previousState.textLabels,
           edges: previousState.edges,
           tiles: previousState.tiles,
+          wallPaths: previousState.wallPaths,
           fogOfWar: previousState.fogOfWar !== undefined ? previousState.fogOfWar : undefined
         }
       );
@@ -349,6 +353,7 @@ function useLayerHistory({
           textLabels: nextState.textLabels,
           edges: nextState.edges,
           tiles: nextState.tiles,
+          wallPaths: nextState.wallPaths,
           fogOfWar: nextState.fogOfWar !== undefined ? nextState.fogOfWar : undefined
         }
       );

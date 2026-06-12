@@ -8,6 +8,7 @@
 import type { Cell } from './cell.types';
 import type { CustomColor } from './common.types';
 import type { Curve } from './curve.types';
+import type { WallPath } from './wallpath.types';
 import type { Point } from './geometry.types';
 import type { HexOrientation, FrameSettings } from '../settings/settings.types';
 import type { TilesetDef, TilesetOverrides, TileAssignment, TileLayerRole } from '../tiles/tile.types';
@@ -248,6 +249,8 @@ export interface MapLayer {
   tiles?: TileAssignment[];
   /** Layer's role in the tile layer stack (grid tile maps only) */
   tileRole?: TileLayerRole;
+  /** Wall/path texture strips swept along editable polylines */
+  wallPaths?: WallPath[];
 }
 
 // ===========================================

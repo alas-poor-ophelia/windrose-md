@@ -136,6 +136,9 @@ function migrateMapData(mapData: MapData): MapData {
       }
     }
 
+    if (!layer.wallPaths) layer.wallPaths = [];
+    layer.wallPaths = layer.wallPaths.filter(w => Array.isArray(w.vertices) && w.vertices.length >= 2);
+
     if (!layer.curves) layer.curves = [];
     layer.curves = layer.curves.filter(c => c.start != null && c.segments != null);
     for (const curve of layer.curves) {
@@ -168,6 +171,8 @@ function migrateMapData(mapData: MapData): MapData {
           if (!layer.tiles) layer.tiles = [];
           if (!layer.curves) layer.curves = [];
           layer.curves = layer.curves.filter(c => c.start != null && c.segments != null);
+          if (!layer.wallPaths) layer.wallPaths = [];
+          layer.wallPaths = layer.wallPaths.filter(w => Array.isArray(w.vertices) && w.vertices.length >= 2);
         }
         if (!subHex.mapData.regions) subHex.mapData.regions = [];
         if (!subHex.mapData.outlines) subHex.mapData.outlines = [];
@@ -417,5 +422,5 @@ async function listMaps(app: App): Promise<MapListEntry[]> {
   }
 }
 
-export { loadMapData, saveMapData, createNewMap, listMaps };
+export { loadMapData, saveMapData, createNewMap, listMaps, migrateMapData };
 export type { MapListEntry };

@@ -8,6 +8,7 @@
 import type { MapData, StoredViewState, TextLabelSettings, Region } from '../core/map.types';
 import type { Cell } from '../core/cell.types';
 import type { Curve } from '../core/curve.types';
+import type { WallPath } from '../core/wallpath.types';
 import type { MapObject } from '../objects/object.types';
 import type { TextLabel } from '../objects/note.types';
 import type { HexColor } from '../core/common.types';
@@ -60,6 +61,9 @@ export type HandleCurvesChange = LayerDataChangeHandler<Curve[]>;
 /** Handle tiles change */
 export type HandleTilesChange = LayerDataChangeHandler<TileAssignment[]>;
 
+/** Handle wall paths change */
+export type HandleWallPathsChange = LayerDataChangeHandler<WallPath[]>;
+
 /** Handle map name change */
 export type HandleNameChange = (newName: string) => void;
 
@@ -99,6 +103,7 @@ export interface LayerDataHandlers {
   handleTextLabelsChange: HandleTextLabelsChange;
   handleEdgesChange: HandleEdgesChange;
   handleTilesChange?: HandleTilesChange;
+  handleWallPathsChange?: HandleWallPathsChange;
 }
 
 /** Map data handlers group */
@@ -134,6 +139,7 @@ export interface UseDataHandlersResult {
   handleTextLabelsChange: HandleTextLabelsChange;
   handleEdgesChange: HandleEdgesChange;
   handleTilesChange: HandleTilesChange;
+  handleWallPathsChange: HandleWallPathsChange;
   handleAddCustomColor: HandleAddCustomColor;
   handleDeleteCustomColor: HandleDeleteCustomColor;
   handleUpdateColorOpacity: HandleUpdateColorOpacity;

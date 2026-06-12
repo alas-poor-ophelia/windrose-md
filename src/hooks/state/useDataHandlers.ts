@@ -18,6 +18,7 @@ import type { MapObject } from '#types/objects/object.types';
 import type { TextLabel } from '#types/objects/note.types';
 import type { HexColor } from '#types/core/common.types';
 import type { TileAssignment } from '#types/tiles/tile.types';
+import type { WallPath } from '#types/core/wallpath.types';
 import type {
   UseDataHandlersOptions,
   UseDataHandlersResult,
@@ -60,6 +61,7 @@ function useDataHandlers({
     textLabels: overrides.textLabels ?? layer.textLabels ?? [],
     edges: overrides.edges ?? layer.edges ?? [],
     tiles: overrides.tiles ?? layer.tiles ?? [],
+    wallPaths: overrides.wallPaths ?? layer.wallPaths ?? [],
     regions: overrides.regions ?? regions,
     outlines: overrides.outlines ?? outlines,
     shapeOverlays: overrides.shapeOverlays ?? shapeOverlays,
@@ -70,7 +72,7 @@ function useDataHandlers({
   // Factory: Create layer data change handler
   // =========================================================================
 
-  type LayerField = 'cells' | 'curves' | 'objects' | 'textLabels' | 'edges' | 'tiles';
+  type LayerField = 'cells' | 'curves' | 'objects' | 'textLabels' | 'edges' | 'tiles' | 'wallPaths';
 
   const createLayerDataHandler = useCallback(<T,>(field: LayerField) => {
     return (newValue: T, suppressHistory = false): void => {
@@ -122,6 +124,11 @@ function useDataHandlers({
 
   const handleTilesChange = useMemo(
     () => createLayerDataHandler<TileAssignment[]>('tiles'),
+    [createLayerDataHandler]
+  );
+
+  const handleWallPathsChange = useMemo(
+    () => createLayerDataHandler<WallPath[]>('wallPaths'),
     [createLayerDataHandler]
   );
 
@@ -287,7 +294,8 @@ function useDataHandlers({
     handleObjectsChange,
     handleTextLabelsChange,
     handleEdgesChange,
-    handleTilesChange
+    handleTilesChange,
+    handleWallPathsChange
   };
 
   const mapDataHandlers: MapDataHandlers = {
@@ -317,6 +325,7 @@ function useDataHandlers({
     handleTextLabelsChange,
     handleEdgesChange,
     handleTilesChange,
+    handleWallPathsChange,
     handleAddCustomColor,
     handleDeleteCustomColor,
     handleUpdateColorOpacity,
