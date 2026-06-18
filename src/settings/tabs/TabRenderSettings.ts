@@ -310,7 +310,7 @@ export const TabRenderSettingsMethods = {
     }
 
     // Installed fog textures
-    const fogPacks = getInstalledPacks(this.plugin as any).filter(p => p.type === 'fog-pack');
+    const fogPacks = getInstalledPacks(this.plugin).filter(p => p.type === 'fog-pack');
     if (fogPacks.length > 0) {
       containerEl.createEl('div', { text: 'Installed fog textures', cls: 'setting-item-heading' });
 
@@ -358,7 +358,7 @@ export const TabRenderSettingsMethods = {
       .addButton(btn => btn
         .setButtonText('Browse')
         .onClick(() => {
-          new ContentPackBrowserModal(this.app, this.plugin as any, 'fog-pack', () => {
+          new ContentPackBrowserModal(this.app, this.plugin, 'fog-pack', () => {
             this.settingsChanged = true;
             this.display();
           }).open();

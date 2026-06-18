@@ -17,9 +17,6 @@ import { ContentPackBrowserModal } from '../../content-packs/ContentPackBrowserM
 import type { SettingsTabThis } from './settingsTabContext';
 import type { ObjectOverride, CustomObject, CustomCategory, ObjectSet } from '#types/settings/settings.types';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type PluginAny = any;
-
 /**
  * Extended this-type that includes the actual method signatures used internally.
  * The SettingsTabThis interface has simplified signatures for cross-mixin use,
@@ -108,7 +105,7 @@ export const TabRenderObjectsMethods = {
         .setButtonText('+ Add Object')
         .setCta()
         .onClick(() => {
-          new ObjectEditModal(this.app, this.plugin as PluginAny, null, async () => {
+          new ObjectEditModal(this.app, this.plugin, null, async () => {
             this.settingsChanged = true;
             await this.plugin.saveSettings();
             this.display();
@@ -122,7 +119,7 @@ export const TabRenderObjectsMethods = {
       .addButton(btn => btn
         .setButtonText('+ Add Category')
         .onClick(() => {
-          new CategoryEditModal(this.app, this.plugin as PluginAny, null, async () => {
+          new CategoryEditModal(this.app, this.plugin, null, async () => {
             this.settingsChanged = true;
             await this.plugin.saveSettings();
             this.display();
@@ -136,7 +133,7 @@ export const TabRenderObjectsMethods = {
       .addButton(btn => btn
         .setButtonText('Import')
         .onClick(() => {
-          new ImportModal(this.app, this.plugin as PluginAny, async () => {
+          new ImportModal(this.app, this.plugin, async () => {
             this.settingsChanged = true;
             this.display();
           }, this.selectedMapType).open();
@@ -144,7 +141,7 @@ export const TabRenderObjectsMethods = {
       .addButton(btn => btn
         .setButtonText('Export')
         .onClick(() => {
-          new ExportModal(this.app, this.plugin as PluginAny, this.selectedMapType).open();
+          new ExportModal(this.app, this.plugin, this.selectedMapType).open();
         }));
 
     // Get resolved data using helpers with map-type-specific settings
@@ -272,7 +269,7 @@ export const TabRenderObjectsMethods = {
         const editBtn = categoryActions.createEl('button', { cls: 'windrose-settings-icon-btn', attr: { 'aria-label': 'Edit category', title: 'Edit category' } });
         IconHelpers.set(editBtn, 'pencil');
         editBtn.onclick = () => {
-          new CategoryEditModal(this.app, this.plugin as PluginAny, category as PluginAny, async () => {
+          new CategoryEditModal(this.app, this.plugin, category as CustomCategory, async () => {
             this.settingsChanged = true;
             await this.plugin.saveSettings();
             this.display();
@@ -487,7 +484,7 @@ export const TabRenderObjectsMethods = {
     const editBtn = actions.createEl('button', { cls: 'windrose-settings-icon-btn', attr: { 'aria-label': 'Edit', title: 'Edit object' } });
     IconHelpers.set(editBtn, 'pencil');
     editBtn.onclick = () => {
-      new ObjectEditModal(this.app, this.plugin as PluginAny, obj, async () => {
+      new ObjectEditModal(this.app, this.plugin, obj, async () => {
         this.settingsChanged = true;
         await this.plugin.saveSettings();
         this.display();
@@ -640,7 +637,7 @@ export const TabRenderObjectsMethods = {
 
     // Active Set indicator
     const activeSet = sets.find((st: ObjectSet) => st.id === s.activeObjectSetId);
-    const isDirty = ObjectSetHelpers.isDirty(this.plugin as PluginAny);
+    const isDirty = ObjectSetHelpers.isDirty(this.plugin);
 
     if (activeSet) {
       const bar = containerEl.createDiv({ cls: 'windrose-set-active-bar' });
@@ -680,13 +677,13 @@ export const TabRenderObjectsMethods = {
                 defaultValue: 'My Objects'
               }).openAndGetValue();
               if (name) {
-                ObjectSetHelpers.saveCurrentAsSet(this.plugin as PluginAny, name);
+                ObjectSetHelpers.saveCurrentAsSet(this.plugin, name);
               }
             }
           }
 
           if (value === '__defaults__') {
-            ObjectSetHelpers.resetToDefaults(this.plugin as PluginAny);
+            ObjectSetHelpers.resetToDefaults(this.plugin);
             this.settingsChanged = true;
             await this.plugin.saveSettings();
             window.dispatchEvent(new CustomEvent('windrose-settings-changed', {
@@ -696,7 +693,7 @@ export const TabRenderObjectsMethods = {
             return;
           }
 
-          ObjectSetHelpers.activateSet(this.plugin as PluginAny, value);
+          ObjectSetHelpers.activateSet(this.plugin, value);
           this.settingsChanged = true;
           await this.plugin.saveSettings();
           window.dispatchEvent(new CustomEvent('windrose-settings-changed', {
@@ -732,7 +729,7 @@ export const TabRenderObjectsMethods = {
         IconHelpers.set(renameBtn, 'pencil');
         renameBtn.onclick = () => {
           new ObjectSetRenameModal(this.app, set.name, async (newName: string) => {
-            ObjectSetHelpers.renameSet(this.plugin as PluginAny, set.id, newName);
+            ObjectSetHelpers.renameSet(this.plugin, set.id, newName);
             await this.plugin.saveSettings();
             this.display();
           }).open();
@@ -744,7 +741,7 @@ export const TabRenderObjectsMethods = {
         });
         IconHelpers.set(exportBtn, 'download');
         exportBtn.onclick = () => {
-          new ObjectSetExportModal(this.app, this.plugin as PluginAny, set).open();
+          new ObjectSetExportModal(this.app, this.plugin, set).open();
         };
 
         const deleteBtn = setActions.createEl('button', {
@@ -758,7 +755,7 @@ export const TabRenderObjectsMethods = {
               confirmText: 'Delete',
               isDestructive: true
             }).openAndGetValue()) {
-            ObjectSetHelpers.deleteSet(this.plugin as PluginAny, set.id);
+            ObjectSetHelpers.deleteSet(this.plugin, set.id);
             this.settingsChanged = true;
             await this.plugin.saveSettings();
             this.display();
@@ -779,7 +776,7 @@ export const TabRenderObjectsMethods = {
           defaultValue: 'My Objects'
         }).openAndGetValue();
         if (!name) return;
-        ObjectSetHelpers.saveCurrentAsSet(this.plugin as PluginAny, name);
+        ObjectSetHelpers.saveCurrentAsSet(this.plugin, name);
         await this.plugin.saveSettings();
         new Notice('Saved set: ' + name);
         this.display();
@@ -788,7 +785,7 @@ export const TabRenderObjectsMethods = {
     actionSetting.addButton(btn => btn
       .setButtonText('Import from folder')
       .onClick(() => {
-        new ObjectSetImportModal(this.app, this.plugin as PluginAny, async () => {
+        new ObjectSetImportModal(this.app, this.plugin, async () => {
           this.settingsChanged = true;
           this.display();
         }).open();
@@ -801,7 +798,7 @@ export const TabRenderObjectsMethods = {
       .addButton(btn => btn
         .setButtonText('Browse')
         .onClick(() => {
-          new ContentPackBrowserModal(this.app, this.plugin as PluginAny, 'object-pack', () => {
+          new ContentPackBrowserModal(this.app, this.plugin, 'object-pack', () => {
             this.settingsChanged = true;
             this.display();
           }).open();
@@ -824,7 +821,7 @@ export const TabRenderObjectsMethods = {
       .addButton(btn => btn
         .setButtonText('Scan now')
         .onClick(async () => {
-          const added = await ObjectSetHelpers.scanAutoLoadFolder(this.plugin as PluginAny);
+          const added = await ObjectSetHelpers.scanAutoLoadFolder(this.plugin);
           await this.plugin.saveSettings();
           if (added > 0) {
             new Notice('Found ' + added + ' new set(s)');
