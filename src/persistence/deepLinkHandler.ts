@@ -81,7 +81,7 @@ function generateDeepLinkMarkdown(
   zoom: number,
   layerId: string
 ): string {
-  const escapedText = displayText.replace(/[\[\]()]/g, '');
+  const escapedText = displayText.replace(/[[\]()]/g, '');
   const url = generateDeepLink(notePath, mapId, x, y, zoom, layerId);
   return `[${escapedText}](${url})`;
 }

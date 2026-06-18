@@ -190,7 +190,7 @@ function bulkSetImportTags(
   metadata: TileMetadataStore,
   entries: Array<{ vaultPath: string; tags: string[] }>
 ): TileMetadataStore {
-  let result = { ...metadata };
+  const result = { ...metadata };
   for (const { vaultPath, tags } of entries) {
     const existing = result[vaultPath] ?? {};
     result[vaultPath] = { ...existing, importTags: tags };
@@ -225,7 +225,7 @@ function bulkSetDepthAffinity(
   metadata: TileMetadataStore,
   entries: Array<{ vaultPath: string; depth: TileLayerRole }>
 ): TileMetadataStore {
-  let result = { ...metadata };
+  const result = { ...metadata };
   for (const { vaultPath, depth } of entries) {
     const existing = result[vaultPath] ?? {};
     result[vaultPath] = { ...existing, depthAffinity: depth };
@@ -237,7 +237,7 @@ function bulkSetDdSourceType(
   metadata: TileMetadataStore,
   entries: Array<{ vaultPath: string; sourceType: string }>
 ): TileMetadataStore {
-  let result = { ...metadata };
+  const result = { ...metadata };
   for (const { vaultPath, sourceType } of entries) {
     const existing = result[vaultPath] ?? {};
     result[vaultPath] = { ...existing, ddSourceType: sourceType };
@@ -249,7 +249,7 @@ function bulkSetRenderMode(
   metadata: TileMetadataStore,
   entries: Array<{ vaultPath: string; mode: 'cell' | 'region' }>
 ): TileMetadataStore {
-  let result = { ...metadata };
+  const result = { ...metadata };
   for (const { vaultPath, mode } of entries) {
     const existing = result[vaultPath] ?? {};
     result[vaultPath] = { ...existing, renderMode: mode };
@@ -273,7 +273,7 @@ function bulkSetDetectionSignals(
   metadata: TileMetadataStore,
   entries: Array<{ vaultPath: string; signals: { alphaCoverage: number; opaqueW: number; opaqueH: number; naturalW: number; naturalH: number } }>
 ): TileMetadataStore {
-  let result = { ...metadata };
+  const result = { ...metadata };
   for (const { vaultPath, signals } of entries) {
     const existing = result[vaultPath] ?? {};
     result[vaultPath] = {

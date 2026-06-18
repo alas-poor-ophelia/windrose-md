@@ -1,4 +1,5 @@
-import { App, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import type { App, Plugin} from 'obsidian';
+import { Notice, PluginSettingTab, Setting } from 'obsidian';
 import type { PluginSettings } from '#types/settings/settings.types';
 import type { SectionRef, ObjectSettingsForMapType, ObjectSettingsUpdate } from './tabs/settingsTabContext';
 import { TabRenderCoreMethods } from './tabs/TabRenderCore';

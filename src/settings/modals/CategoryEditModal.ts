@@ -1,4 +1,5 @@
-import { App, Modal, Setting, Notice } from 'obsidian';
+import type { App} from 'obsidian';
+import { Modal, Setting, Notice } from 'obsidian';
 import type { PluginSettings, CustomCategory } from '#types/settings/settings.types';
 
 interface WindrosePlugin {
@@ -89,7 +90,7 @@ class CategoryEditModal extends Modal {
       this.plugin.settings[categoriesKey] = [];
     }
 
-    const categories = this.plugin.settings[categoriesKey]!;
+    const categories = this.plugin.settings[categoriesKey];
 
     if (this.existingCategory) {
       const idx = categories.findIndex((c: CustomCategory) => c.id === this.existingCategory!.id);

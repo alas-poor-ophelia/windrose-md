@@ -1,4 +1,5 @@
-import { App, Modal, Setting, Notice } from 'obsidian';
+import type { App} from 'obsidian';
+import { Modal, Setting, Notice } from 'obsidian';
 
 interface PromptModalOptions {
   message?: string;

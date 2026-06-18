@@ -1,4 +1,5 @@
-import { App, Modal, Setting, Notice, TFile } from 'obsidian';
+import type { App, TFile } from 'obsidian';
+import { Modal, Setting, Notice } from 'obsidian';
 import type { PluginSettings, ObjectOverride, CustomObject, CustomCategory } from '#types/settings/settings.types';
 import { ConfirmModal } from './ConfirmModal';
 

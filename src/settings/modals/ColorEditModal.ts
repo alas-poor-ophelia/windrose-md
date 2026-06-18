@@ -1,4 +1,5 @@
-import { App, Modal, Setting, Notice } from 'obsidian';
+import type { App} from 'obsidian';
+import { Modal, Setting, Notice } from 'obsidian';
 import type { PluginSettings, BuiltInColor, ColorOverride, PaletteColor } from '#types/settings/settings.types';
 import { BUILT_IN_COLORS } from '../../core/settingsAccessor';
 

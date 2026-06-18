@@ -295,7 +295,7 @@ export const TabRenderObjectsMethods = {
             }).openAndGetValue()) {
             const categoriesKey: CustomCategoriesKey = this.selectedMapType === 'hex' ? 'customHexCategories' : 'customGridCategories';
             if (this.plugin.settings[categoriesKey]) {
-              this.plugin.settings[categoriesKey] = this.plugin.settings[categoriesKey]!.filter((c: CustomCategory) => c.id !== category.id);
+              this.plugin.settings[categoriesKey] = this.plugin.settings[categoriesKey].filter((c: CustomCategory) => c.id !== category.id);
             }
             this.settingsChanged = true;
             await this.plugin.saveSettings();
@@ -396,9 +396,9 @@ export const TabRenderObjectsMethods = {
           if (actualPosition === defaultPosition) {
             // In default position - remove order override if present
             if (this.plugin.settings[overridesKey]?.[id]) {
-              delete this.plugin.settings[overridesKey]![id].order;
-              if (Object.keys(this.plugin.settings[overridesKey]![id]).length === 0) {
-                delete this.plugin.settings[overridesKey]![id];
+              delete this.plugin.settings[overridesKey][id].order;
+              if (Object.keys(this.plugin.settings[overridesKey][id]).length === 0) {
+                delete this.plugin.settings[overridesKey][id];
               }
             }
           } else {
@@ -406,10 +406,10 @@ export const TabRenderObjectsMethods = {
             if (!this.plugin.settings[overridesKey]) {
               this.plugin.settings[overridesKey] = {};
             }
-            if (!this.plugin.settings[overridesKey]![id]) {
-              this.plugin.settings[overridesKey]![id] = {};
+            if (!this.plugin.settings[overridesKey][id]) {
+              this.plugin.settings[overridesKey][id] = {};
             }
-            this.plugin.settings[overridesKey]![id].order = newOrder;
+            this.plugin.settings[overridesKey][id].order = newOrder;
           }
 
           // Update modified indicator in DOM immediately
@@ -502,9 +502,9 @@ export const TabRenderObjectsMethods = {
         IconHelpers.set(unhideBtn, 'eye');
         unhideBtn.onclick = async () => {
           if (this.plugin.settings[overridesKey]?.[obj.id]) {
-            delete this.plugin.settings[overridesKey]![obj.id].hidden;
-            if (Object.keys(this.plugin.settings[overridesKey]![obj.id]).length === 0) {
-              delete this.plugin.settings[overridesKey]![obj.id];
+            delete this.plugin.settings[overridesKey][obj.id].hidden;
+            if (Object.keys(this.plugin.settings[overridesKey][obj.id]).length === 0) {
+              delete this.plugin.settings[overridesKey][obj.id];
             }
           }
           this.settingsChanged = true;
@@ -519,10 +519,10 @@ export const TabRenderObjectsMethods = {
           if (!this.plugin.settings[overridesKey]) {
             this.plugin.settings[overridesKey] = {};
           }
-          if (!this.plugin.settings[overridesKey]![obj.id]) {
-            this.plugin.settings[overridesKey]![obj.id] = {};
+          if (!this.plugin.settings[overridesKey][obj.id]) {
+            this.plugin.settings[overridesKey][obj.id] = {};
           }
-          this.plugin.settings[overridesKey]![obj.id].hidden = true;
+          this.plugin.settings[overridesKey][obj.id].hidden = true;
           this.settingsChanged = true;
           await this.plugin.saveSettings();
           this.display();
@@ -540,7 +540,7 @@ export const TabRenderObjectsMethods = {
               isDestructive: true
             }).openAndGetValue()) {
             if (this.plugin.settings[overridesKey]) {
-              delete this.plugin.settings[overridesKey]![obj.id];
+              delete this.plugin.settings[overridesKey][obj.id];
             }
             this.settingsChanged = true;
             await this.plugin.saveSettings();
@@ -583,7 +583,7 @@ export const TabRenderObjectsMethods = {
             if (!this.plugin.settings[targetCategoriesKey]) {
               this.plugin.settings[targetCategoriesKey] = [];
             }
-            this.plugin.settings[targetCategoriesKey]!.push({ ...sourceCat });
+            this.plugin.settings[targetCategoriesKey].push({ ...sourceCat });
           }
         }
 
@@ -598,7 +598,7 @@ export const TabRenderObjectsMethods = {
           ...(obj.order != null ? { order: obj.order } : {}),
         };
 
-        this.plugin.settings[targetObjectsKey]!.push(copiedObj);
+        this.plugin.settings[targetObjectsKey].push(copiedObj);
 
         this.settingsChanged = true;
         await this.plugin.saveSettings();
@@ -615,7 +615,7 @@ export const TabRenderObjectsMethods = {
             isDestructive: true
           }).openAndGetValue()) {
           if (this.plugin.settings[customObjectsKey]) {
-            this.plugin.settings[customObjectsKey] = this.plugin.settings[customObjectsKey]!.filter((o: CustomObject) => o.id !== obj.id);
+            this.plugin.settings[customObjectsKey] = this.plugin.settings[customObjectsKey].filter((o: CustomObject) => o.id !== obj.id);
           }
           this.settingsChanged = true;
           await this.plugin.saveSettings();

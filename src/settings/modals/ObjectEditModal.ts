@@ -1,4 +1,5 @@
-import { App, Modal, Setting, Notice } from 'obsidian';
+import type { App} from 'obsidian';
+import { Modal, Setting, Notice } from 'obsidian';
 import type { PluginSettings, ObjectOverride, CustomObject } from '#types/settings/settings.types';
 import { ObjectHelpers } from '../helpers/objectHelpers';
 import { RPGAwesomeHelpers } from '../helpers/rpgAwesomeHelpers';
@@ -205,9 +206,9 @@ class ObjectEditModal extends Modal {
     // Update button active states
     Object.entries(this.modeButtons).forEach(([mode, btn]) => {
       if (mode === newMode) {
-        (btn as HTMLElement).addClass('active');
+        (btn).addClass('active');
       } else {
-        (btn as HTMLElement).removeClass('active');
+        (btn).removeClass('active');
       }
     });
     // Re-render all mode-specific containers
@@ -599,29 +600,29 @@ class ObjectEditModal extends Modal {
       if (this.category !== original?.category) override.category = this.category;
 
       // Preserve hidden state if it exists
-      if (this.plugin.settings[overridesKey]![this.existingObject!.id!]?.hidden) {
+      if (this.plugin.settings[overridesKey][this.existingObject.id!]?.hidden) {
         override.hidden = true;
       }
 
       // Preserve order if it exists
-      if (this.plugin.settings[overridesKey]![this.existingObject!.id!]?.order !== undefined) {
-        override.order = this.plugin.settings[overridesKey]![this.existingObject!.id!]!.order!;
+      if (this.plugin.settings[overridesKey][this.existingObject.id!]?.order !== undefined) {
+        override.order = this.plugin.settings[overridesKey][this.existingObject.id!].order!;
       }
 
       if (Object.keys(override).length > 0) {
-        this.plugin.settings[overridesKey]![this.existingObject!.id!] = override as unknown as ObjectOverride;
+        this.plugin.settings[overridesKey][this.existingObject.id!] = override as unknown as ObjectOverride;
       } else {
-        delete this.plugin.settings[overridesKey]![this.existingObject!.id!];
+        delete this.plugin.settings[overridesKey][this.existingObject.id!];
       }
     } else if (this.existingObject?.isCustom) {
       // Editing existing custom object
       if (!this.plugin.settings[customObjectsKey]) {
         this.plugin.settings[customObjectsKey] = [];
       }
-      const idx = this.plugin.settings[customObjectsKey]!.findIndex(o => o.id === this.existingObject!.id);
+      const idx = this.plugin.settings[customObjectsKey].findIndex(o => o.id === this.existingObject!.id);
       if (idx !== -1) {
         const updated: Record<string, unknown> = {
-          ...this.plugin.settings[customObjectsKey]![idx],
+          ...this.plugin.settings[customObjectsKey][idx],
           label: this.label.trim(),
           category: this.category
         };
@@ -639,7 +640,7 @@ class ObjectEditModal extends Modal {
           updated.symbol = this.symbol;
         }
 
-        this.plugin.settings[customObjectsKey]![idx] = updated as unknown as CustomObject;
+        this.plugin.settings[customObjectsKey][idx] = updated as unknown as CustomObject;
       }
     } else {
       // Creating new custom object
@@ -662,7 +663,7 @@ class ObjectEditModal extends Modal {
         newObject.symbol = this.symbol;
       }
 
-      this.plugin.settings[customObjectsKey]!.push(newObject as unknown as CustomObject);
+      this.plugin.settings[customObjectsKey].push(newObject as unknown as CustomObject);
     }
 
     this.onSave();

@@ -1,5 +1,5 @@
-import { App, Modal, Setting, Notice } from 'obsidian';
-import type { TFile } from 'obsidian';
+import { Modal, Setting, Notice } from 'obsidian';
+import type { TFile , App} from 'obsidian';
 import type { PluginSettings } from '#types/settings/settings.types';
 import { ObjectSetHelpers } from '../helpers/objectSetHelpers';
 import { FolderSuggest } from '../helpers/FolderSuggest';

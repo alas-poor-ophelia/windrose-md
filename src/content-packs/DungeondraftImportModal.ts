@@ -117,7 +117,7 @@ class DungeondraftImportModal extends Modal {
 		this.importBtn = buttonContainer.createEl('button', {
 			text: 'Import',
 			cls: 'mod-cta',
-		}) as HTMLButtonElement;
+		});
 		this.importBtn.disabled = true;
 		this.importBtn.onclick = () => {
 			void this.handleImport(previewArea, progressArea, fileInput);
@@ -233,7 +233,7 @@ class DungeondraftImportModal extends Modal {
 
 		const progressBar = progressArea.createEl('progress', {
 			attr: { max: '100', value: '0' },
-		}) as HTMLProgressElement;
+		});
 		progressBar.style.width = '100%';
 		const statusText = progressArea.createEl('p', { text: 'Preparing...' });
 

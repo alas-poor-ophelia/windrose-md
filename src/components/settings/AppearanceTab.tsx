@@ -85,7 +85,7 @@ function ColorPickerItem({ colorKey, label, defaultColor, align = 'left' }: Colo
 
         <ColorPicker
           isOpen={activeColorPicker === colorKey && !useGlobalSettings}
-          selectedColor={displayColor as HexColor}
+          selectedColor={displayColor}
           onColorSelect={(color: HexColor) => handleColorChange(colorKey, color)}
           onClose={() => setActiveColorPicker(null)}
           onReset={() => handleColorChange(colorKey, globalSettings[colorKey] as HexColor)}

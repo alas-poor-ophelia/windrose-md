@@ -1,5 +1,5 @@
-import { requestUrl, Notice, TFile } from 'obsidian';
-import type { App } from 'obsidian';
+import { requestUrl, Notice } from 'obsidian';
+import type { App , TFile } from 'obsidian';
 import { unzipSync } from 'fflate';
 import type { RegistryPack, InstalledPack } from '#types/content-packs/contentPack.types';
 import type { PluginSettings } from '#types/settings/settings.types';
