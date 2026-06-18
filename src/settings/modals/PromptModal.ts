@@ -37,7 +37,7 @@ class PromptModal extends Modal {
         text.setValue(this.inputValue);
         if (this.placeholder) text.setPlaceholder(this.placeholder);
         text.onChange((v: string) => { this.inputValue = v; });
-        setTimeout(() => {
+        window.setTimeout(() => {
           text.inputEl.focus();
           text.inputEl.select();
         }, 50);

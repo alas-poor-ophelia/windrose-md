@@ -12,7 +12,7 @@ import type { TileMetadataStore, TileMetadataEntry, TileEntry, TileLayerRole } f
 
 const METADATA_FILE = 'windrose-tile-metadata.json';
 
-let saveTimer: ReturnType<typeof setTimeout> | null = null;
+let saveTimer: number | null = null;
 const SAVE_DEBOUNCE_MS = 2000;
 
 // ===========================================
@@ -67,8 +67,8 @@ async function saveTileMetadata(app: App, metadata: TileMetadataStore): Promise<
 }
 
 function saveTileMetadataDebounced(app: App, metadata: TileMetadataStore): void {
-  if (saveTimer != null) clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => {
+  if (saveTimer != null) window.clearTimeout(saveTimer);
+  saveTimer = window.setTimeout(() => {
     void saveTileMetadata(app, metadata);
     saveTimer = null;
   }, SAVE_DEBOUNCE_MS);

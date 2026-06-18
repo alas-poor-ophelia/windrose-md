@@ -329,7 +329,7 @@ function useLayerHistory({
       );
       updateMapData(newMapData);
       // Use setTimeout to ensure state update completes before re-enabling history
-      setTimeout(() => {
+      window.setTimeout(() => {
         isApplyingHistoryRef.current = false;
       }, 0);
     }
@@ -354,7 +354,7 @@ function useLayerHistory({
       );
       updateMapData(newMapData);
       // Use setTimeout to ensure state update completes before re-enabling history
-      setTimeout(() => {
+      window.setTimeout(() => {
         isApplyingHistoryRef.current = false;
       }, 0);
     }

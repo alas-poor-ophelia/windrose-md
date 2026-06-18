@@ -911,7 +911,7 @@ const useCanvasRenderer: UseCanvasRenderer = (canvasRef, fogCanvasRef, mapData, 
     const scheduleRender = (): void => {
       // A frame is already queued — it will pick up the latest inputs from the ref.
       if (rafIdRef.current != null) return;
-      rafIdRef.current = requestAnimationFrame(() => {
+      rafIdRef.current = window.requestAnimationFrame(() => {
         rafIdRef.current = null;
         const a = renderInputsRef.current;
         if (a && a.mapData && a.geometry && canvasRef.current) {

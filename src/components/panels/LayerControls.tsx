@@ -76,9 +76,9 @@ const LayerControls = ({
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const [sliderHoveredLayerId, setSliderHoveredLayerId] = useState<string | null>(null);
 
-  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressTimerRef = useRef<number | null>(null);
   const longPressTriggeredRef = useRef(false);
-  const sliderHideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sliderHideTimeoutRef = useRef<number | null>(null);
 
   const layers = getLayersOrdered(mapData);
   const reversedLayers = [...layers].reverse();
@@ -138,7 +138,7 @@ const LayerControls = ({
   const handleTouchStart = (layerId: string): void => {
     longPressTriggeredRef.current = false;
 
-    longPressTimerRef.current = setTimeout(() => {
+    longPressTimerRef.current = window.setTimeout(() => {
       longPressTriggeredRef.current = true;
       setExpandedLayerId(expandedLayerId === layerId ? null : layerId);
     }, 500);
@@ -146,7 +146,7 @@ const LayerControls = ({
 
   const handleTouchEnd = (): void => {
     if (longPressTimerRef.current) {
-      clearTimeout(longPressTimerRef.current);
+      window.clearTimeout(longPressTimerRef.current);
       longPressTimerRef.current = null;
     }
   };
@@ -266,14 +266,14 @@ const LayerControls = ({
 
   const handleSliderAreaEnter = (layerId: string): void => {
     if (sliderHideTimeoutRef.current) {
-      clearTimeout(sliderHideTimeoutRef.current);
+      window.clearTimeout(sliderHideTimeoutRef.current);
       sliderHideTimeoutRef.current = null;
     }
     setSliderHoveredLayerId(layerId);
   };
 
   const handleSliderAreaLeave = (): void => {
-    sliderHideTimeoutRef.current = setTimeout(() => {
+    sliderHideTimeoutRef.current = window.setTimeout(() => {
       setSliderHoveredLayerId(null);
     }, 150);
   };

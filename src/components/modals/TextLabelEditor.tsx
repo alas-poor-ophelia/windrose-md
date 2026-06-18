@@ -185,7 +185,7 @@ function openNativeTextLabelEditor(app: App, options: OpenNativeTextLabelEditorO
         const hint = contentEl.createDiv('windrose-modal-hint');
         hint.setText('Press enter to confirm, esc to cancel');
 
-        setTimeout(() => {
+        window.setTimeout(() => {
           this.inputEl.focus();
           if (initialValue) this.inputEl.select();
         }, 0);

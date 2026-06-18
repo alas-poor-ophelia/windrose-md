@@ -32,8 +32,8 @@ const DeeplinkHover = (() => {
 
   function clearTimers(state: LinkState | undefined): void {
     if (!state) return;
-    if (state.showTimer) { clearTimeout(state.showTimer); state.showTimer = null; }
-    if (state.hideTimer) { clearTimeout(state.hideTimer); state.hideTimer = null; }
+    if (state.showTimer) { window.clearTimeout(state.showTimer); state.showTimer = null; }
+    if (state.hideTimer) { window.clearTimeout(state.hideTimer); state.hideTimer = null; }
   }
 
   function destroyPopover(state: LinkState | undefined): void {
@@ -63,7 +63,7 @@ const DeeplinkHover = (() => {
   function cancelHide(linkEl: HTMLElement): void {
     const state = linkState.get(linkEl);
     if (state && state.hideTimer) {
-      clearTimeout(state.hideTimer);
+      window.clearTimeout(state.hideTimer);
       state.hideTimer = null;
     }
   }
@@ -145,7 +145,7 @@ const DeeplinkHover = (() => {
     const state = linkState.get(linkEl);
     if (!state) return;
     if (state.showTimer) {
-      clearTimeout(state.showTimer);
+      window.clearTimeout(state.showTimer);
       state.showTimer = null;
     }
     if (state.popover) scheduleHide(linkEl);

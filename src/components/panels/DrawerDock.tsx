@@ -70,9 +70,9 @@ function FlyoutPanel({ tiles, onSelect, onClose, label }: {
         onClose();
       }
     };
-    const id = setTimeout(() => document.addEventListener('mousedown', handler), 0);
+    const id = window.setTimeout(() => document.addEventListener('mousedown', handler), 0);
     return () => {
-      clearTimeout(id);
+      window.clearTimeout(id);
       document.removeEventListener('mousedown', handler);
     };
   }, [onClose]);

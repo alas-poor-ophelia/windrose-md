@@ -17,12 +17,12 @@ async function navigateToLink(plugin: Plugin, parsed: DeepLinkData, sourcePath: 
       new Notice('Failed to open map note');
       return;
     }
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await new Promise(resolve => window.setTimeout(resolve, 100));
   }
 
   emitNavigationEvent(parsed);
 
-  setTimeout(() => {
+  window.setTimeout(() => {
     try {
       const leaf = document.querySelector('.workspace-leaf.mod-active .view-content');
       if (leaf) {
@@ -53,7 +53,7 @@ function registerProtocolHandler(plugin: Plugin): void {
     try {
       const linkPath = parsed.notePath.replace(/\.md$/, '');
       await plugin.app.workspace.openLinkText(linkPath, '', false);
-      setTimeout(() => emitNavigationEvent(parsed), 100);
+      window.setTimeout(() => emitNavigationEvent(parsed), 100);
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error('[Windrose] Protocol handler failed:', err);

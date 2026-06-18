@@ -66,7 +66,7 @@ function openNativeTextInputModal(options: {
         });
         submitBtn.addEventListener('click', () => this.submit());
 
-        setTimeout(() => {
+        window.setTimeout(() => {
           this.inputEl.focus();
           if (initialValue) {
             this.inputEl.select();

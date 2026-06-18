@@ -244,7 +244,7 @@ class ObjectEditModal extends Modal {
     });
 
     // Focus the symbol input after a short delay
-    setTimeout(() => symbolInput.focus(), 50);
+    window.setTimeout(() => symbolInput.focus(), 50);
 
     // Symbol preview
     const previewEl = symbolSetting.controlEl.createDiv({ cls: 'windrose-symbol-preview' });

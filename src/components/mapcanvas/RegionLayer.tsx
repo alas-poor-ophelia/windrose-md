@@ -372,7 +372,7 @@ const RegionLayer = ({
   }, [contextMenu, mapData?.regions]);
 
   // ── Long-press touch support for context menu (500ms) ──────────────
-  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressTimerRef = useRef<number | null>(null);
   const longPressPosRef = useRef<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
@@ -384,7 +384,7 @@ const RegionLayer = ({
       const touch = e.touches[0];
       longPressPosRef.current = { x: touch.clientX, y: touch.clientY };
 
-      longPressTimerRef.current = setTimeout(() => {
+      longPressTimerRef.current = window.setTimeout(() => {
         if (!longPressPosRef.current) return;
         const synth = new MouseEvent('contextmenu', {
           clientX: longPressPosRef.current.x,
@@ -409,7 +409,7 @@ const RegionLayer = ({
         const dx = touch.clientX - longPressPosRef.current.x;
         const dy = touch.clientY - longPressPosRef.current.y;
         if (dx * dx + dy * dy > 100) {
-          if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+          if (longPressTimerRef.current) window.clearTimeout(longPressTimerRef.current);
           longPressPosRef.current = null;
         }
       }
@@ -417,7 +417,7 @@ const RegionLayer = ({
 
     const handleTouchEnd = (): void => {
       if (longPressTimerRef.current) {
-        clearTimeout(longPressTimerRef.current);
+        window.clearTimeout(longPressTimerRef.current);
         longPressTimerRef.current = null;
       }
       longPressPosRef.current = null;
@@ -433,7 +433,7 @@ const RegionLayer = ({
       canvas.removeEventListener('touchmove', handleTouchMove);
       canvas.removeEventListener('touchend', handleTouchEnd);
       canvas.removeEventListener('touchcancel', handleTouchEnd);
-      if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+      if (longPressTimerRef.current) window.clearTimeout(longPressTimerRef.current);
     };
   }, [canvasRef, screenToGrid, mapData?.regions, handleContextMenu]);
 
@@ -533,7 +533,7 @@ const RegionLayer = ({
             value={regionName}
             onInput={(e: Event) => setRegionName((e.target as HTMLInputElement).value)}
             onKeyDown={handleNameKeyDown}
-            ref={(el: HTMLInputElement | null) => { if (el) setTimeout(() => el.focus(), 0); }}
+            ref={(el: HTMLInputElement | null) => { if (el) window.setTimeout(() => el.focus(), 0); }}
             className="windrose-floating-bar-input"
             style={{ width: '200px', padding: '6px 10px', fontSize: '14px' }}
           />

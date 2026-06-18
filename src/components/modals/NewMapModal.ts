@@ -26,7 +26,7 @@ class NewMapModal extends Modal {
         text
           .setPlaceholder('E.g., goblin cave level 1')
           .onChange(value => { this.mapName = value; });
-        setTimeout(() => text.inputEl.focus(), 10);
+        window.setTimeout(() => text.inputEl.focus(), 10);
       });
 
     const typeContainer = contentEl.createDiv({ cls: 'windrose-map-type-selection' });

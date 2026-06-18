@@ -329,7 +329,7 @@ class DungeondraftImportModal extends Modal {
 				statusText.textContent = 'Extracting: ' + (i + 1) + '/' + textures.length + ' (' + pct + '%)';
 
 				if (i % 20 === 0) {
-					await new Promise(r => setTimeout(r, 0));
+					await new Promise(r => window.setTimeout(r, 0));
 				}
 			}
 

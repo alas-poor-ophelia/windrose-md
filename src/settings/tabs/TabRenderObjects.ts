@@ -461,7 +461,7 @@ export const TabRenderObjectsMethods = {
           e.dataTransfer.setData('text/plain', obj.id);
           e.dataTransfer.effectAllowed = 'move';
         }
-        setTimeout(() => {
+        window.setTimeout(() => {
           row.classList.add('windrose-dragging');
         }, 0);
       });

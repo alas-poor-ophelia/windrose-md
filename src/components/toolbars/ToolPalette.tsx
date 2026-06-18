@@ -148,7 +148,7 @@ const ToolButtonWithSubMenu = ({
   onSubMenuClose,
   mapType
 }: ToolButtonWithSubMenuProps): VNode | null => {
-  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressTimer = useRef<number | null>(null);
   const LONG_PRESS_DURATION = 300;
 
   // Hide entire group if it's map-type-restricted
@@ -168,7 +168,7 @@ const ToolButtonWithSubMenu = ({
   const handlePointerDown = (): void => {
     if (!hasMultipleSubTools) return;
 
-    longPressTimer.current = setTimeout(() => {
+    longPressTimer.current = window.setTimeout(() => {
       onSubMenuOpen(toolGroup.id);
       longPressTimer.current = null;
     }, LONG_PRESS_DURATION);
@@ -176,7 +176,7 @@ const ToolButtonWithSubMenu = ({
 
   const handlePointerUp = (): void => {
     if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current);
+      window.clearTimeout(longPressTimer.current);
       longPressTimer.current = null;
       onToolSelect(currentSubToolDef.id);
     } else if (!hasMultipleSubTools) {
@@ -186,7 +186,7 @@ const ToolButtonWithSubMenu = ({
 
   const handlePointerLeave = (): void => {
     if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current);
+      window.clearTimeout(longPressTimer.current);
       longPressTimer.current = null;
     }
   };
@@ -197,7 +197,7 @@ const ToolButtonWithSubMenu = ({
     e.preventDefault();
     e.stopPropagation();
     if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current);
+      window.clearTimeout(longPressTimer.current);
       longPressTimer.current = null;
     }
     onSubMenuOpen(toolGroup.id);
@@ -477,13 +477,13 @@ const ToolPalette = ({
       }
     };
 
-    const timerId = setTimeout(() => {
+    const timerId = window.setTimeout(() => {
       document.addEventListener('mousedown', handleClickOutside);
       document.addEventListener('touchstart', handleClickOutside, { passive: true });
     }, 10);
 
     return () => {
-      clearTimeout(timerId);
+      window.clearTimeout(timerId);
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('touchstart', handleClickOutside);
     };

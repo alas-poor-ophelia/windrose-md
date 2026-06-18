@@ -53,7 +53,7 @@ function PreferencesTab(): VNode {
 
       if (result.success) {
         setExportSuccess(`Map saved to: ${result.path}`);
-        setTimeout(() => setExportSuccess(null), 5000);
+        window.setTimeout(() => setExportSuccess(null), 5000);
       } else {
         setExportError(result.error ?? 'Export failed. Please try again.');
       }

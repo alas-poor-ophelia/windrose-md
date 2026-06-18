@@ -50,7 +50,7 @@ const useEventCoordinator = ({
 
   const [recentMultiTouch, setRecentMultiTouch] = useState<boolean>(false);
   const [, setPendingToolAction] = useState<PendingToolAction | null>(null);
-  const pendingToolTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingToolTimeoutRef = useRef<number | null>(null);
   const touchActiveRef = useRef(false);
 
   const panStartPositionRef = useRef<PanStartPosition | null>(null);
@@ -126,7 +126,7 @@ const useEventCoordinator = ({
       e.stopPropagation();
 
       if (pendingToolTimeoutRef.current) {
-        clearTimeout(pendingToolTimeoutRef.current);
+        window.clearTimeout(pendingToolTimeoutRef.current);
         pendingToolTimeoutRef.current = null;
         setPendingToolAction(null);
       }
@@ -360,7 +360,7 @@ const useEventCoordinator = ({
     if (isTouchEvent) {
       touchActiveRef.current = true;
       setPendingToolAction({ execute: executeToolAction });
-      pendingToolTimeoutRef.current = setTimeout(() => {
+      pendingToolTimeoutRef.current = window.setTimeout(() => {
         executeToolAction();
         setPendingToolAction(null);
         pendingToolTimeoutRef.current = null;
@@ -403,7 +403,7 @@ const useEventCoordinator = ({
       e.stopPropagation();
       if (isTouchPanningRef?.current === true) {
         if (pendingToolTimeoutRef.current) {
-          clearTimeout(pendingToolTimeoutRef.current);
+          window.clearTimeout(pendingToolTimeoutRef.current);
           pendingToolTimeoutRef.current = null;
           setPendingToolAction(null);
         }
@@ -420,7 +420,7 @@ const useEventCoordinator = ({
 
     if (touchEvent.touches != null && touchEvent.touches.length > 1) {
       if (pendingToolTimeoutRef.current) {
-        clearTimeout(pendingToolTimeoutRef.current);
+        window.clearTimeout(pendingToolTimeoutRef.current);
         pendingToolTimeoutRef.current = null;
         setPendingToolAction(null);
       }
@@ -614,7 +614,7 @@ const useEventCoordinator = ({
     } = panZoomHandlers;
 
     if (recentMultiTouch) {
-      setTimeout(() => setRecentMultiTouch(false), 300);
+      window.setTimeout(() => setRecentMultiTouch(false), 300);
     }
 
     if (isPanning) {
@@ -719,7 +719,7 @@ const useEventCoordinator = ({
     const diagonalFillHandlers = getHandlers('diagonalFill');
 
     if (pendingToolTimeoutRef.current) {
-      clearTimeout(pendingToolTimeoutRef.current);
+      window.clearTimeout(pendingToolTimeoutRef.current);
       pendingToolTimeoutRef.current = null;
       setPendingToolAction(null);
     }
@@ -841,7 +841,7 @@ const useEventCoordinator = ({
   }, [getHandlers, geometry, screenToGrid]);
 
   // Long-press timer for touch context menu
-  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressTimerRef = useRef<number | null>(null);
   const lastTapRef = useRef<{ time: number; x: number; y: number } | null>(null);
 
   useEffect(() => {
@@ -872,8 +872,8 @@ const useEventCoordinator = ({
       const startX = touch.clientX;
       const startY = touch.clientY;
 
-      if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
-      longPressTimerRef.current = setTimeout(() => {
+      if (longPressTimerRef.current) window.clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = window.setTimeout(() => {
         longPressTimerRef.current = null;
         // Dispatch as context menu event
         handleContextMenu(new MouseEvent('contextmenu', { clientX: startX, clientY: startY }));
@@ -882,7 +882,7 @@ const useEventCoordinator = ({
 
     const cancelLongPress = (): void => {
       if (longPressTimerRef.current) {
-        clearTimeout(longPressTimerRef.current);
+        window.clearTimeout(longPressTimerRef.current);
         longPressTimerRef.current = null;
       }
       lastTapRef.current = null;
@@ -969,7 +969,7 @@ const useEventCoordinator = ({
 
       if (panZoomHandlers?.isTouchPanningRef?.current === true) {
         panZoomHandlers.stopTouchPan();
-        setTimeout(() => setRecentMultiTouch(false), 100);
+        window.setTimeout(() => setRecentMultiTouch(false), 100);
       }
 
       if (objectHandlers?.stopObjectResizing) {
@@ -1059,7 +1059,7 @@ const useEventCoordinator = ({
   useEffect(() => {
     return () => {
       if (pendingToolTimeoutRef.current) {
-        clearTimeout(pendingToolTimeoutRef.current);
+        window.clearTimeout(pendingToolTimeoutRef.current);
       }
     };
   }, []);

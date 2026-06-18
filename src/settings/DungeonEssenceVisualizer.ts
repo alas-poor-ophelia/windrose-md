@@ -245,7 +245,7 @@ export class DungeonEssenceVisualizer {
 
     this.initState();
     this.lastTime = performance.now();
-    this.animationId = requestAnimationFrame((t) => this.render(t));
+    this.animationId = window.requestAnimationFrame((t) => this.render(t));
   }
 
   stop(): void {
@@ -505,7 +505,7 @@ export class DungeonEssenceVisualizer {
 
     ctx.restore();
 
-    this.animationId = requestAnimationFrame((t) => this.render(t));
+    this.animationId = window.requestAnimationFrame((t) => this.render(t));
   }
 
   updatePhase(_dt: number): void {

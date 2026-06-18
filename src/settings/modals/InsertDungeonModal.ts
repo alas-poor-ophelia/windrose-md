@@ -275,7 +275,7 @@ class InsertDungeonModal extends Modal {
           .onChange((value: string) => {
             this.mapName = value;
           });
-        setTimeout(() => text.inputEl.focus(), 10);
+        window.setTimeout(() => text.inputEl.focus(), 10);
       });
 
     const styleContainer = contentEl.createDiv({ cls: 'windrose-dungeon-style-selection' });
@@ -521,7 +521,7 @@ class InsertDungeonModal extends Modal {
     generateBtn.onclick = async () => {
       if (!this.dungeonSize) {
         buttonRow.addClass('windrose-shake');
-        setTimeout(() => buttonRow.removeClass('windrose-shake'), 300);
+        window.setTimeout(() => buttonRow.removeClass('windrose-shake'), 300);
         return;
       }
 

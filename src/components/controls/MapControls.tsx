@@ -55,7 +55,7 @@ const MapControls = ({
 }: MapControlsProps): VNode => {
     // When alwaysShowControls is true, controls are always visible
     const [controlsRevealed, setControlsRevealed] = useState(alwaysShowControls);
-    const collapseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const collapseTimerRef = useRef<number | null>(null);
     
     // Update revealed state when alwaysShowControls changes
     useEffect(() => {
@@ -75,7 +75,7 @@ const MapControls = ({
     
     const clearCollapseTimer = (): void => {
       if (collapseTimerRef.current) {
-        clearTimeout(collapseTimerRef.current);
+        window.clearTimeout(collapseTimerRef.current);
         collapseTimerRef.current = null;
       }
     };
@@ -86,7 +86,7 @@ const MapControls = ({
       
       clearCollapseTimer();
       const delay = forTouch ? COLLAPSE_DELAY_TOUCH_MS : COLLAPSE_DELAY_DESKTOP_MS;
-      collapseTimerRef.current = setTimeout(() => {
+      collapseTimerRef.current = window.setTimeout(() => {
         setControlsRevealed(false);
       }, delay);
     };

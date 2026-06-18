@@ -89,7 +89,7 @@ async function processQueue(): Promise<void> {
 
   notify();
 
-  await new Promise<void>(resolve => { setTimeout(resolve, 0); });
+  await new Promise<void>(resolve => { window.setTimeout(resolve, 0); });
   void processQueue();
 }
 

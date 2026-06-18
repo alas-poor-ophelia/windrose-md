@@ -105,7 +105,7 @@ const ColorPicker = ({
   const [editTargetId, setEditTargetId] = useState<string | null>(null);
   const [editingOpacity, setEditingOpacity] = useState(1);
   const colorInputRef = useRef<HTMLInputElement>(null);
-  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressTimerRef = useRef<number | null>(null);
   const editingOpacityRef = useRef(editingOpacity);
   const editTargetIdRef = useRef(editTargetId);
   const justOpenedEditRef = useRef(false);
@@ -224,25 +224,25 @@ const ColorPicker = ({
     setEditTargetId(colorDef.id);
     setEditingOpacity(colorDef.opacity ?? 1);
     justOpenedEditRef.current = true;
-    setTimeout(() => { justOpenedEditRef.current = false; }, 100);
+    window.setTimeout(() => { justOpenedEditRef.current = false; }, 100);
   };
 
   const handleLongPressStart = (colorDef: ColorDef): void => {
     if (colorDef.isReset === true || colorDef.isAddButton === true) return;
     longPressTriggeredRef.current = false;
-    longPressTimerRef.current = setTimeout(() => {
+    longPressTimerRef.current = window.setTimeout(() => {
       longPressTriggeredRef.current = true;
 
       setEditTargetId(colorDef.id);
       setEditingOpacity(colorDef.opacity ?? 1);
       justOpenedEditRef.current = true;
-      setTimeout(() => { justOpenedEditRef.current = false; }, 300);
+      window.setTimeout(() => { justOpenedEditRef.current = false; }, 300);
     }, 500);
   };
 
   const handleLongPressCancel = (): void => {
     if (longPressTimerRef.current) {
-      clearTimeout(longPressTimerRef.current);
+      window.clearTimeout(longPressTimerRef.current);
       longPressTimerRef.current = null;
     }
   };

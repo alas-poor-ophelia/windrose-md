@@ -579,9 +579,9 @@ const TileAssetBrowser = memo(({
 
     const id = typeof requestIdleCallback === 'function'
       ? requestIdleCallback(run)
-      : setTimeout(run, 200) as unknown as number;
+      : window.setTimeout(run, 200) as unknown as number;
     return () => {
-      typeof cancelIdleCallback === 'function' ? cancelIdleCallback(id) : clearTimeout(id);
+      typeof cancelIdleCallback === 'function' ? cancelIdleCallback(id) : window.clearTimeout(id);
     };
   }, [tilesets, tileMetadata]);
 
@@ -630,10 +630,10 @@ const TileAssetBrowser = memo(({
 
     const id = typeof requestIdleCallback === 'function'
       ? requestIdleCallback(() => void run())
-      : setTimeout(() => void run(), 400) as unknown as number;
+      : window.setTimeout(() => void run(), 400) as unknown as number;
     return () => {
       controller.abort();
-      typeof cancelIdleCallback === 'function' ? cancelIdleCallback(id) : clearTimeout(id);
+      typeof cancelIdleCallback === 'function' ? cancelIdleCallback(id) : window.clearTimeout(id);
     };
   }, [tilesets, tileMetadata]);
 

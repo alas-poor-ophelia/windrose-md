@@ -348,7 +348,7 @@ function useSubHexNavigation({
       if (newData == null) return prev;
 
       // Propagate to root for saving (async, after state update)
-      setTimeout(() => propagateToRoot(newData, navStack), 0);
+      window.setTimeout(() => propagateToRoot(newData, navStack), 0);
 
       return newData;
     });
@@ -399,7 +399,7 @@ function useSubHexNavigation({
     setNavigationVersion(prev => prev + 1);
 
     // Propagate to root
-    setTimeout(() => propagateToRoot(siblingMapData, newStack), 0);
+    window.setTimeout(() => propagateToRoot(siblingMapData, newStack), 0);
   }, [navStack, subHexMapData, propagateToRoot]);
 
   // Current hex key (for adjacent sub-hex lookup)

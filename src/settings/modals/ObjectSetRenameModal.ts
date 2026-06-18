@@ -23,7 +23,7 @@ class ObjectSetRenameModal extends Modal {
         text.setValue(this.currentName);
         text.onChange((v: string) => { newName = v; });
         // Auto-focus and select all
-        setTimeout(() => {
+        window.setTimeout(() => {
           text.inputEl.focus();
           text.inputEl.select();
         }, 50);

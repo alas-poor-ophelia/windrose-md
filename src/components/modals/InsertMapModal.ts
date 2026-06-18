@@ -66,7 +66,7 @@ export class InsertMapModal extends Modal {
           .setPlaceholder('E.g., goblin cave level 1')
           .onChange(value => { this.mapName = value; });
         if (!hasExisting) {
-          setTimeout(() => text.inputEl.focus(), 10);
+          window.setTimeout(() => text.inputEl.focus(), 10);
         }
       });
 

@@ -284,7 +284,7 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
     if (!container) return;
 
     // Wait one more frame to ensure CSS transition is fully complete
-    requestAnimationFrame(() => {
+    window.requestAnimationFrame(() => {
       const rect = container.getBoundingClientRect();
       setCanvasDimensions({
         width: Math.max(rect.width, DEFAULTS.canvasSize.width),

@@ -249,9 +249,9 @@ async function recordPerfTelemetry(app: App, durationMs = 60000): Promise<void> 
     if (gap > 100) {
       frameGaps.push({ t: now(), gapMs: Math.round(gap), sinceInteractionMs: lastInteraction < 0 ? -1 : now() - lastInteraction });
     }
-    rafId = requestAnimationFrame(heartbeat);
+    rafId = window.requestAnimationFrame(heartbeat);
   };
-  rafId = requestAnimationFrame(heartbeat);
+  rafId = window.requestAnimationFrame(heartbeat);
   restorers.push(() => cancelAnimationFrame(rafId));
 
   // ---- per-second sampler ----

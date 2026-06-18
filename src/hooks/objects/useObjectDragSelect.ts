@@ -60,7 +60,7 @@ function useObjectDragSelect(
   const { getObjectAtPosition, updateObject, onObjectsChange } = useMapOperations();
   const { selectedItem, setSelectedItem, isDraggingSelection, setIsDraggingSelection, dragStart, setDragStart, isResizeMode, setIsResizeMode } = useMapSelection();
 
-  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressTimerRef = useRef<number | null>(null);
   const dragInitialStateRef = useRef<MapObject[] | null>(null);
 
   const handleObjectSelection = useCallback((
@@ -129,11 +129,11 @@ function useObjectDragSelect(
 
       if (isAlreadySelected) {
         if (longPressTimerRef.current) {
-          clearTimeout(longPressTimerRef.current);
+          window.clearTimeout(longPressTimerRef.current);
         }
 
         if (mapData.mapType !== 'hex' && isTouchActive !== false) {
-          longPressTimerRef.current = setTimeout(() => {
+          longPressTimerRef.current = window.setTimeout(() => {
             setEdgeSnapMode(!edgeSnapModeRef.current);
 
             navigator.vibrate?.(50);
@@ -171,11 +171,11 @@ function useObjectDragSelect(
         });
 
         if (longPressTimerRef.current) {
-          clearTimeout(longPressTimerRef.current);
+          window.clearTimeout(longPressTimerRef.current);
         }
 
         if (mapData.mapType !== 'hex' && isTouchActive !== false) {
-          longPressTimerRef.current = setTimeout(() => {
+          longPressTimerRef.current = window.setTimeout(() => {
             setEdgeSnapMode(true);
 
             navigator.vibrate?.(50);
@@ -209,7 +209,7 @@ function useObjectDragSelect(
       const dy = clientY - dragStart.y;
       const distance = Math.sqrt(dx * dx + dy * dy);
       if (distance > 5) {
-        clearTimeout(longPressTimerRef.current);
+        window.clearTimeout(longPressTimerRef.current);
         longPressTimerRef.current = null;
       }
     }
@@ -419,7 +419,7 @@ function useObjectDragSelect(
     const isDraggingObject = selectedItem?.type === 'object' || (dragStart?.objectId != null && dragStart.objectId !== '');
     if (isDraggingSelection && isDraggingObject) {
       if (longPressTimerRef.current) {
-        clearTimeout(longPressTimerRef.current);
+        window.clearTimeout(longPressTimerRef.current);
         longPressTimerRef.current = null;
       }
 

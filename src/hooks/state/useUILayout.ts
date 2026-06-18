@@ -84,7 +84,7 @@ function useUILayout({
   }, []);
 
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const animationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const animationTimeoutRef = useRef<number | null>(null);
 
   // Initialize expanded state from settings or saved state (once, when mapData first arrives)
   const expandInitializedRef = useRef(false);
@@ -92,7 +92,7 @@ function useUILayout({
     if (!mapData || expandInitializedRef.current || fullPane) return undefined;
     expandInitializedRef.current = true;
 
-    const timer = setTimeout(() => {
+    const timer = window.setTimeout(() => {
       try {
         if (mapData.uiPreferences?.rememberExpandedState === true && mapData.expandedState !== undefined) {
           if (mapData.expandedState === true) {
@@ -112,7 +112,7 @@ function useUILayout({
       }
     }, 100);
 
-    return () => clearTimeout(timer);
+    return () => window.clearTimeout(timer);
   }, [mapData]);
 
   // Manage parent element classes for expand/collapse
@@ -159,7 +159,7 @@ function useUILayout({
 
   const handleToggleExpand = (): void => {
     if (animationTimeoutRef.current) {
-      clearTimeout(animationTimeoutRef.current);
+      window.clearTimeout(animationTimeoutRef.current);
       animationTimeoutRef.current = null;
     }
 
@@ -172,7 +172,7 @@ function useUILayout({
       setIsAnimating(true);
       setIsExpanded(false);
 
-      animationTimeoutRef.current = setTimeout(() => {
+      animationTimeoutRef.current = window.setTimeout(() => {
         setIsAnimating(false);
         animationTimeoutRef.current = null;
       }, 300);

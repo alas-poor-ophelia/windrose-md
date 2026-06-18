@@ -145,7 +145,7 @@ function openNativeNoteLinkModal(app: App, options: OpenNativeNoteLinkModalOptio
         });
         saveBtn.addEventListener('click', () => this.submit());
 
-        setTimeout(() => {
+        window.setTimeout(() => {
           this.inputEl.focus();
           if (displayName !== '') this.inputEl.select();
         }, 0);

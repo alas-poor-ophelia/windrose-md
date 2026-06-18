@@ -498,13 +498,13 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
       }
     };
 
-    const timeoutId = setTimeout(() => {
+    const timeoutId = window.setTimeout(() => {
       document.addEventListener('mousedown', handleClickOutside);
       document.addEventListener('touchstart', handleClickOutside, { passive: true });
     }, 0);
 
     return () => {
-      clearTimeout(timeoutId);
+      window.clearTimeout(timeoutId);
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('touchstart', handleClickOutside);
     };
