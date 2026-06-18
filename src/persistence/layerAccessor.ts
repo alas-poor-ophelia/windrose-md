@@ -232,7 +232,7 @@ function cloneLayer(mapData: MapData, layerId: LayerId, mode: 'all' | 'mapOnly')
   );
 
   // Deep copy via JSON round-trip (same pattern as createBackup)
-  const deepCopy = <T>(data: T): T => JSON.parse(JSON.stringify(data));
+  const deepCopy = <T>(data: T): T => JSON.parse(JSON.stringify(data)) as T;
 
   const sourceName = sourceLayer.name || String(sourceLayer.order + 1);
 
@@ -309,7 +309,7 @@ function reorderLayers(mapData: MapData, layerId: LayerId, newIndex: number): Ma
  */
 function createBackup<T>(mapData: T): T | null {
   try {
-    return JSON.parse(JSON.stringify(mapData));
+    return JSON.parse(JSON.stringify(mapData)) as T;
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error('[layerAccessor] Failed to create backup:', error);

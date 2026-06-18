@@ -13,7 +13,9 @@ import type {
   ResolvedColorEntry,
   MapSpecificSettings,
   CoordinateKeyMode,
-  ObjectSetData
+  ObjectSetData,
+  ColorOverride,
+  PaletteColor
 } from '#types/settings/settings.types';
 import type { App } from 'obsidian';
 
@@ -260,8 +262,7 @@ function getObjectSettingsForSet(setId: string, mapType: 'hex' | 'grid' = 'grid'
   const raw = getPluginSettingsRaw();
   if (!raw) return null;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const sets = ((raw as any).objectSets ?? []) as Array<{ id: string; data?: ObjectSetData }>;
+  const sets = raw.objectSets ?? [];
   const set = sets.find((s) => s.id === setId);
   if (set == null) return null;
 
@@ -284,21 +285,19 @@ function getObjectSettingsForSet(setId: string, mapType: 'hex' | 'grid' = 'grid'
 function getColorPaletteSettings(): ResolvedColorEntry[] {
   const raw = getPluginSettingsRaw();
   if (raw != null) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const rawAny = raw as any;
-    const colorPaletteOverrides: Record<string, Record<string, unknown> | undefined> = rawAny.colorPaletteOverrides ?? {};
-    const customPaletteColors: ResolvedColorEntry[] = rawAny.customPaletteColors ?? [];
+    const colorPaletteOverrides: Record<string, ColorOverride> = raw.colorPaletteOverrides ?? {};
+    const customPaletteColors: PaletteColor[] = raw.customPaletteColors ?? [];
 
     const resolvedBuiltIns: ResolvedColorEntry[] = BUILT_IN_COLORS
-      .filter(c => (colorPaletteOverrides[c.id]?.hidden as boolean | undefined) !== true)
+      .filter(c => colorPaletteOverrides[c.id]?.hidden !== true)
       .map((c, index) => {
         const override = colorPaletteOverrides[c.id];
         if (override != null) {
-          const { hidden, ...overrideProps } = override;
+          const { hidden: _hidden, ...overrideProps } = override;
           return {
             ...c,
             ...overrideProps,
-            order: (override.order as number | undefined) ?? index,
+            order: override.order ?? index,
             isBuiltIn: true,
             isModified: true
           };
@@ -306,7 +305,7 @@ function getColorPaletteSettings(): ResolvedColorEntry[] {
         return { ...c, order: index, isBuiltIn: true, isModified: false };
       });
 
-    const resolvedCustom: ResolvedColorEntry[] = customPaletteColors.map((c: ResolvedColorEntry, index: number) => ({
+    const resolvedCustom: ResolvedColorEntry[] = customPaletteColors.map((c, index) => ({
       ...c,
       order: c.order ?? (100 + index),
       isCustom: true,
