@@ -9,7 +9,7 @@ import { Icon } from '../shared/Icon';
 interface MapHeaderProps {
   mapData: MapData;
   onNameChange: (name: string) => void;
-  saveStatus: SaveStatus | string;
+  saveStatus: SaveStatus;
   showFooter: boolean;
   onToggleFooter: () => void;
   fullPane?: boolean;
@@ -34,7 +34,7 @@ const MapHeader = ({ mapData, onNameChange, saveStatus, showFooter, onToggleFoot
     return 'windrose-save-status';
   };
 
-  const getStatusTitle = (): SaveStatus | string => {
+  const getStatusTitle = (): SaveStatus => {
     return saveStatus;
   };
 

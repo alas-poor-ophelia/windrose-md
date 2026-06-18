@@ -311,7 +311,9 @@ interface TileAssetBrowserProps {
   onStarredChange?: (tiles: FlyoutTile[]) => void;
 }
 
-type RailSelection = 'all' | 'recent' | 'starred' | string;
+// `string & {}` keeps the literal autocomplete hints while still allowing any
+// dynamic tileset id (set via setRailSel(cat)) without collapsing to bare string.
+type RailSelection = 'all' | 'recent' | 'starred' | (string & {});
 
 type FullModeRow =
   | { type: 'recentHeader' }

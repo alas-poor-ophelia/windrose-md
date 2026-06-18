@@ -62,7 +62,7 @@ interface ObjectSelectionToolbarProps {
   showColorPicker?: boolean;
 
   // Color picker props
-  currentColor?: HexColor | string | null;
+  currentColor?: HexColor | null;
   onColorSelect?: (color: HexColor) => void;
   onColorPickerClose?: () => void;
   onColorReset?: () => void;

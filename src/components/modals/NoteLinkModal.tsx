@@ -73,7 +73,7 @@ function openNativeNoteLinkModal(app: App, options: OpenNativeNoteLinkModalOptio
         });
 
         const inputEl = this.inputEl;
-        const modalRef = this;
+        const submitModal = (): void => { void this.submit(); };
         new (class extends AbstractInputSuggestClass {
           constructor(app: App, inputEl: HTMLInputElement) { super(app, inputEl); }
           async getSuggestions(query: string): Promise<NoteLinkSuggestion[]> {
@@ -104,7 +104,7 @@ function openNativeNoteLinkModal(app: App, options: OpenNativeNoteLinkModalOptio
             inputEl.dispatchEvent(new Event('input'));
             selectedPath = entry.path;
             this.close();
-            void modalRef.submit();
+            submitModal();
           }
         })(app, this.inputEl);
 

@@ -27,7 +27,7 @@ function getExtractPath(pack: RegistryPack, settings: PluginSettings): string {
     case 'font-pack':
       return CONTENT_PACKS_FOLDER + '/fonts';
     default:
-      return CONTENT_PACKS_FOLDER + '/' + pack.type;
+      return CONTENT_PACKS_FOLDER + '/' + String(pack.type);
   }
 }
 
