@@ -1,4 +1,4 @@
-import type { JSX, VNode } from 'preact';
+import type { CSSProperties, VNode } from 'preact';
 
 import { useRef, useEffect } from 'preact/hooks';
 import { setIcon } from 'obsidian';
@@ -7,7 +7,7 @@ interface IconProps {
   icon: string;
   size?: number;
   className?: string;
-  style?: JSX.CSSProperties;
+  style?: CSSProperties;
 }
 
 function Icon({ icon, size, className, style }: IconProps): VNode {

@@ -9,7 +9,7 @@
  * - Hover tooltips
  */
 
-import type { JSX, VNode } from 'preact';
+import type { TargetedMouseEvent, VNode } from 'preact';
 import { Notice } from 'obsidian';
 import type { ToolId } from '#types/tools/tool.types';
 import type { ObjectTypeId, MapObject } from '#types/objects/object.types';
@@ -271,7 +271,7 @@ const ObjectLayer = ({
         const sourceObj = activeLayer.objects?.find((o: MapObject) => o.id === item.id);
         if (!sourceObj) continue;
 
-        const newId = `obj-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const newId = `obj-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
         const newObj = {
           ...sourceObj,
           id: newId,
@@ -286,7 +286,7 @@ const ObjectLayer = ({
         const sourceLabel = activeLayer.textLabels?.find((l: { id: string }) => l.id === item.id);
         if (!sourceLabel) continue;
 
-        const newId = `text-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const newId = `text-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
         const offsetWorld = (mapData.gridSize ?? 32) * 1;
         const newLabel = {
           ...sourceLabel,
@@ -483,7 +483,7 @@ const ObjectLayer = ({
     return () => unregisterHandlers('object');
   }, []);
 
-  const handleResizeButtonClick = (e: JSX.TargetedMouseEvent<HTMLElement>): void => {
+  const handleResizeButtonClick = (e: TargetedMouseEvent<HTMLElement>): void => {
     if (selectedItem?.type === 'object') {
       e.preventDefault();
       e.stopPropagation();
@@ -520,7 +520,7 @@ const ObjectLayer = ({
     }
   };
 
-  const handleObjectColorButtonClick = (e: JSX.TargetedMouseEvent<HTMLElement>): void => {
+  const handleObjectColorButtonClick = (e: TargetedMouseEvent<HTMLElement>): void => {
     if (selectedItem?.type === 'object') {
       e.preventDefault();
       e.stopPropagation();

@@ -16,7 +16,7 @@
 
 
 
-import type { JSX, VNode } from 'preact';
+import type { TargetedMouseEvent, VNode } from 'preact';
 import type { Ref } from 'preact';
 import type { MapData } from '#types/core/map.types';
 import type { MapObject } from '#types/objects/object.types';
@@ -33,7 +33,7 @@ import { Icon } from '../shared/Icon';
 import { InternalLink } from '../shared/InternalLink';
 import { Z_INDEX } from '../../core/dmtConstants';
 
-type MouseClickEvent = JSX.TargetedMouseEvent<HTMLButtonElement>;
+type MouseClickEvent = TargetedMouseEvent<HTMLButtonElement>;
 
 interface ObjectSelectionToolbarProps {
   selectedItem: SelectedItem | null;

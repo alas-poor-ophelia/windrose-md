@@ -1,4 +1,4 @@
-import type { JSX, VNode } from 'preact';
+import type { TargetedDragEvent, TargetedEvent, TargetedMouseEvent, VNode } from 'preact';
 import type { MapData, MapLayer } from '#types/core/map.types';
 
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
@@ -89,41 +89,41 @@ const DockLayerList = ({
     }
   };
 
-  const handleExpandToggle = (layerId: string, e: JSX.TargetedMouseEvent<HTMLButtonElement>): void => {
+  const handleExpandToggle = (layerId: string, e: TargetedMouseEvent<HTMLButtonElement>): void => {
     e.stopPropagation();
     setExpandedLayerId(expandedLayerId === layerId ? null : layerId);
   };
 
-  const handleDelete = (layerId: string, e: JSX.TargetedMouseEvent<HTMLButtonElement>): void => {
+  const handleDelete = (layerId: string, e: TargetedMouseEvent<HTMLButtonElement>): void => {
     e.stopPropagation();
     if (layers.length <= 1) return;
     setExpandedLayerId(null);
     onLayerDelete(layerId);
   };
 
-  const handleEdit = (layerId: string, e: JSX.TargetedMouseEvent<HTMLButtonElement>): void => {
+  const handleEdit = (layerId: string, e: TargetedMouseEvent<HTMLButtonElement>): void => {
     e.stopPropagation();
     setExpandedLayerId(null);
     onEditLayer(layerId);
   };
 
-  const handleClone = (layerId: string, e: JSX.TargetedMouseEvent<HTMLButtonElement>): void => {
+  const handleClone = (layerId: string, e: TargetedMouseEvent<HTMLButtonElement>): void => {
     e.stopPropagation();
     setExpandedLayerId(null);
     onLayerClone(layerId);
   };
 
-  const handleTransparencyToggle = (layerId: string, e: JSX.TargetedMouseEvent<HTMLButtonElement>): void => {
+  const handleTransparencyToggle = (layerId: string, e: TargetedMouseEvent<HTMLButtonElement>): void => {
     e.stopPropagation();
     onToggleShowLayerBelow(layerId);
   };
 
-  const handleOpacityChange = (layerId: string, e: JSX.TargetedEvent<HTMLInputElement>): void => {
+  const handleOpacityChange = (layerId: string, e: TargetedEvent<HTMLInputElement>): void => {
     const value = parseFloat((e.target as HTMLInputElement).value);
     onSetLayerBelowOpacity(layerId, value);
   };
 
-  const handleDragStart = (layerId: string, index: number, e: JSX.TargetedDragEvent<HTMLDivElement>): void => {
+  const handleDragStart = (layerId: string, index: number, e: TargetedDragEvent<HTMLDivElement>): void => {
     setDragState({ layerId, index });
     if (e.dataTransfer) {
       e.dataTransfer.effectAllowed = 'move';
@@ -131,13 +131,13 @@ const DockLayerList = ({
     }
   };
 
-  const handleDragOver = (index: number, e: JSX.TargetedDragEvent<HTMLDivElement>): void => {
+  const handleDragOver = (index: number, e: TargetedDragEvent<HTMLDivElement>): void => {
     e.preventDefault();
     if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
     setDragOverIndex(index);
   };
 
-  const handleDrop = (targetIndex: number, e: JSX.TargetedDragEvent<HTMLDivElement>): void => {
+  const handleDrop = (targetIndex: number, e: TargetedDragEvent<HTMLDivElement>): void => {
     e.preventDefault();
     if (dragState && dragState.index !== targetIndex) {
       const toOrderIndex = reversedLayers.length - 1 - targetIndex;

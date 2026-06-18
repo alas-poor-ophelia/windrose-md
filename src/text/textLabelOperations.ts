@@ -57,7 +57,7 @@ const MAX_CONTENT_LENGTH = 200;
  * Generate a unique ID for a text label
  */
 function generateTextLabelId(): TextLabelId {
-  return 'text-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+  return 'text-' + Date.now() + '-' + Math.random().toString(36).slice(2, 11);
 }
 
 // ===========================================

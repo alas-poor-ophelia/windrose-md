@@ -89,7 +89,7 @@ function normalizeEdge(x: number, y: number, side: EdgeSideInput): NormalizedEdg
  * Generate unique edge ID
  */
 function generateEdgeId(): string {
-  return 'edge-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+  return 'edge-' + Date.now() + '-' + Math.random().toString(36).slice(2, 11);
 }
 
 // ===========================================

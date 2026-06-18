@@ -18,7 +18,7 @@ function deepClone<T>(obj: T): T {
 
 export const ObjectSetHelpers = {
   generateId(): string {
-    return 'set-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+    return 'set-' + Date.now() + '-' + Math.random().toString(36).slice(2, 11);
   },
 
   resolveImagePaths(data: ObjectSetData, imagesFolder: string, vault: Vault): void {

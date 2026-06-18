@@ -28,7 +28,7 @@ function generateTilesetId(folderPath?: string): string {
     }
     return 'tileset-' + Math.abs(hash).toString(36);
   }
-  return 'tileset-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+  return 'tileset-' + Date.now() + '-' + Math.random().toString(36).slice(2, 11);
 }
 
 // ===========================================

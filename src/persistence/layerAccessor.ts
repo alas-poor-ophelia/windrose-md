@@ -30,7 +30,7 @@ import { SCHEMA_VERSION } from '../core/dmtConstants';
  * Generate a unique ID for a layer
  */
 function generateLayerId(): LayerId {
-  return 'layer-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+  return 'layer-' + Date.now() + '-' + Math.random().toString(36).slice(2, 11);
 }
 
 // ============================================================================

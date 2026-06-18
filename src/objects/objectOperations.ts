@@ -32,7 +32,7 @@ import { assignSlot, getObjectsInCell, canAddObjectToCell, getOccupiedSlots, reo
  * Generate a unique ID for an object
  */
 function generateObjectId(): ObjectId {
-  return 'obj-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+  return 'obj-' + Date.now() + '-' + Math.random().toString(36).slice(2, 11);
 }
 
 // ===========================================

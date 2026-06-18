@@ -80,7 +80,7 @@ class NewMapModal extends Modal {
 
   private submit(): void {
     if (!this.mapType) return;
-    const mapId = 'map-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+    const mapId = 'map-' + Date.now() + '-' + Math.random().toString(36).slice(2, 11);
     this.onCreate(mapId, this.mapName, this.mapType);
     this.close();
   }

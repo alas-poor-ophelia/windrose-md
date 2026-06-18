@@ -103,7 +103,7 @@ class CategoryEditModal extends Modal {
       }
     } else {
       const newCategory: CustomCategory = {
-        id: 'custom-cat-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9),
+        id: 'custom-cat-' + Date.now() + '-' + Math.random().toString(36).slice(2, 11),
         label: this.label.trim(),
         order: this.order
       };

@@ -29,7 +29,7 @@ export interface FreehandLayerProps {
 
 /** Generate a unique curve ID */
 function generateCurveId(): string {
-  return 'curve-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+  return 'curve-' + Date.now() + '-' + Math.random().toString(36).slice(2, 11);
 }
 
 const FreehandLayer = ({

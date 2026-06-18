@@ -4,7 +4,7 @@
  * Tool selection palette with sub-tool menus, history controls, and color picker.
  */
 
-import type { ComponentChildren, JSX, VNode } from 'preact';
+import type { ComponentChildren, TargetedMouseEvent, VNode } from 'preact';
 import type { HexColor } from '#types/core/common.types';
 import type { MapType } from '#types/core/map.types';
 import type { ToolId } from '#types/tools/tool.types';
@@ -191,7 +191,7 @@ const ToolButtonWithSubMenu = ({
     }
   };
 
-  const handleContextMenu = (e: JSX.TargetedMouseEvent<HTMLButtonElement>): void => {
+  const handleContextMenu = (e: TargetedMouseEvent<HTMLButtonElement>): void => {
     if (!hasMultipleSubTools) return;
 
     e.preventDefault();
@@ -439,7 +439,7 @@ const ToolPalette = ({
     }));
   };
 
-  const toggleColorPicker = (e: JSX.TargetedMouseEvent<HTMLButtonElement>): void => {
+  const toggleColorPicker = (e: TargetedMouseEvent<HTMLButtonElement>): void => {
     e.stopPropagation();
     if (onColorBtnPopout) {
       const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();

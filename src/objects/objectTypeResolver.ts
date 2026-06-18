@@ -347,14 +347,14 @@ function getOriginalBuiltIn(typeId: string): ObjectTypeDefinition | null {
  * Generate a unique ID for a custom object
  */
 function generateCustomObjectId(): string {
-  return 'custom-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+  return 'custom-' + Date.now() + '-' + Math.random().toString(36).slice(2, 11);
 }
 
 /**
  * Generate a unique ID for a custom category
  */
 function generateCustomCategoryId(): string {
-  return 'custom-cat-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+  return 'custom-cat-' + Date.now() + '-' + Math.random().toString(36).slice(2, 11);
 }
 
 /**

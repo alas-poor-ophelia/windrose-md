@@ -131,7 +131,7 @@ export default class WindrosePlugin extends Plugin {
       name: 'Generate random dungeon',
       editorCallback: async (editor) => {
         new InsertDungeonModal(this.app, this, async (mapName, cells, objects, edges, options) => {
-          const mapId = 'map-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+          const mapId = 'map-' + Date.now() + '-' + Math.random().toString(36).slice(2, 11);
           await this.saveDungeonToJson(mapId, mapName, cells as DungeonCell[], objects, edges, options as DungeonGenOptions);
 
           const codeBlock = [
@@ -390,7 +390,7 @@ export default class WindrosePlugin extends Plugin {
 
       if (allData.maps == null) allData.maps = {};
 
-      const layerId = 'layer-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+      const layerId = 'layer-' + Date.now() + '-' + Math.random().toString(36).slice(2, 11);
 
       let centerX = 5, centerY = 5;
       const gridSize = 32;

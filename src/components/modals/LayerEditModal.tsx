@@ -2,7 +2,7 @@
  * LayerEditModal.tsx
  */
 
-import type { JSX, VNode } from 'preact';
+import type { TargetedKeyboardEvent, TargetedMouseEvent, VNode } from 'preact';
 import type { MapLayer } from '#types/core/map.types';
 import type { IconWithClass } from '#types/objects/icon.types';
 
@@ -72,7 +72,7 @@ const LayerEditModal = ({
     }
   }, []);
 
-  const handleKeyDown = (e: JSX.TargetedKeyboardEvent<HTMLInputElement>): void => {
+  const handleKeyDown = (e: TargetedKeyboardEvent<HTMLInputElement>): void => {
     if (e.key === 'Enter') {
       e.preventDefault();
       handleSave();
@@ -97,7 +97,7 @@ const LayerEditModal = ({
     onSave(finalName, finalIcon);
   };
 
-  const handleModalClick = (e: JSX.TargetedMouseEvent<HTMLDivElement>): void => {
+  const handleModalClick = (e: TargetedMouseEvent<HTMLDivElement>): void => {
     e.stopPropagation();
   };
 

@@ -454,7 +454,6 @@ export const TabRenderObjectsMethods = {
       IconHelpers.set(dragHandle, 'grip-vertical');
 
       row.style.userSelect = 'none';
-      row.style.webkitUserSelect = 'none';
 
       row.addEventListener('dragstart', (e: DragEvent) => {
         if (e.dataTransfer) {
@@ -563,7 +562,7 @@ export const TabRenderObjectsMethods = {
         }
 
         // Generate new unique ID
-        const newId = 'custom-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+        const newId = 'custom-' + Date.now() + '-' + Math.random().toString(36).slice(2, 11);
 
         // Check if category exists in target
         const targetCategory = obj.category;

@@ -649,7 +649,7 @@ class ObjectEditModal extends Modal {
       }
 
       const newObject: Record<string, string> = {
-        id: 'custom-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9),
+        id: 'custom-' + Date.now() + '-' + Math.random().toString(36).slice(2, 11),
         label: this.label.trim(),
         category: this.category
       };
