@@ -115,6 +115,7 @@ function registerDomCapture(plugin: Plugin): void {
 function registerEditorExtension(plugin: Plugin): void {
   try {
      
+    // eslint-disable-next-line @typescript-eslint/no-require-imports, import/no-extraneous-dependencies, no-undef -- @codemirror/view is provided by Obsidian at runtime
     const cmView = require('@codemirror/view');
     if (cmView?.EditorView == null) return;
 

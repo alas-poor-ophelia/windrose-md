@@ -1,5 +1,6 @@
 import { requestUrl, Notice } from 'obsidian';
-import type { App , TFile } from 'obsidian';
+import { TFile } from 'obsidian';
+import type { App } from 'obsidian';
 import { unzipSync } from 'fflate';
 import type { RegistryPack, InstalledPack } from '#types/content-packs/contentPack.types';
 import type { PluginSettings } from '#types/settings/settings.types';
@@ -68,8 +69,8 @@ async function downloadAndInstallPack(
     }
 
     const existing = plugin.app.vault.getAbstractFileByPath(fullPath);
-    if (existing != null) {
-      await plugin.app.vault.modifyBinary(existing as TFile, fileData.buffer);
+    if (existing instanceof TFile) {
+      await plugin.app.vault.modifyBinary(existing, fileData.buffer);
     } else if (filePath.endsWith('.json')) {
       const text = new TextDecoder().decode(fileData);
       await plugin.app.vault.create(fullPath, text);

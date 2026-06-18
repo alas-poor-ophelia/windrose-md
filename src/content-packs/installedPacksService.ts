@@ -31,7 +31,7 @@ async function uninstallPack(plugin: PluginLike, packId: string): Promise<void> 
 
   const folder = plugin.app.vault.getAbstractFileByPath(pack.vaultPath);
   if (folder != null) {
-    await plugin.app.vault.delete(folder, true);
+    await plugin.app.fileManager.trashFile(folder);
   }
 
   plugin.settings.installedContentPacks = packs.filter(p => p.id !== packId);

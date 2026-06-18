@@ -1,5 +1,5 @@
 import type { SettingsTabThis } from './settingsTabContext';
-import { Setting } from 'obsidian';
+import { Platform, Setting } from 'obsidian';
 
 // settingsPlugin-TabRenderKeyboardShortcuts.ts
 // WindroseMDSettingsTab render methods - Keyboard Shortcuts section
@@ -34,7 +34,7 @@ export const TabRenderKeyboardShortcutsMethods = {
       rotate: 'r', layerPrev: '[', layerNext: ']', undo: 'Mod+Z', redo: 'Mod+Y'
     };
 
-    const isMac = navigator.platform.indexOf('Mac') >= 0;
+    const isMac = Platform.isMacOS;
 
     function formatKey(keyStr: string): string {
       if (!keyStr) return '—';

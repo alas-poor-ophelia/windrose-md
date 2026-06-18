@@ -49,8 +49,7 @@ export default class WindrosePlugin extends Plugin {
 
     setPlugin(this);
 
-    // eslint-disable-next-line no-console
-    console.log('[Windrose] Plugin loaded, version:', this.manifest.version, 'data:', this.dataFilePath);
+    console.debug('[Windrose] Plugin loaded, version:', this.manifest.version, 'data:', this.dataFilePath);
 
     this.registerView(VIEW_TYPE_WINDROSE_MAP, (leaf) => new WindroseMapView(leaf));
     this.addRibbonIcon('compass', 'Open Windrose Map', () => this.activateMapView());
@@ -191,12 +190,10 @@ export default class WindrosePlugin extends Plugin {
         const config = JSON.parse(content) as Record<string, unknown>;
         if (typeof config.dataFilePath === 'string' && config.dataFilePath !== '') {
           this.dataFilePath = config.dataFilePath;
-          // eslint-disable-next-line no-console
-          console.log('[Windrose] Debug data path:', config.dataFilePath);
+          console.debug('[Windrose] Debug data path:', config.dataFilePath);
         }
       }
     } catch (e) {
-      // eslint-disable-next-line no-console
       console.warn('[Windrose] Failed to load WINDROSE-DEBUG.json:', e);
     }
   }
@@ -221,10 +218,8 @@ export default class WindrosePlugin extends Plugin {
         'You can now disable the old "Windrose MapDesigner" plugin under Community Plugins.',
         15000
       );
-      // eslint-disable-next-line no-console
-      console.log('[Windrose] Migrated settings from dungeon-map-tracker-settings');
+      console.debug('[Windrose] Migrated settings from dungeon-map-tracker-settings');
     } catch (e) {
-      // eslint-disable-next-line no-console
       console.warn('[Windrose] Could not migrate old settings:', e);
     }
   }
@@ -302,8 +297,7 @@ export default class WindrosePlugin extends Plugin {
     const dataFile = allFiles.find(f => f.name === 'windrose-md-data.json');
     if (dataFile != null) {
       this.dataFilePath = dataFile.path;
-      // eslint-disable-next-line no-console
-      console.log('[Windrose] Auto-discovered data file at:', dataFile.path);
+      console.debug('[Windrose] Auto-discovered data file at:', dataFile.path);
     }
   }
 
@@ -317,7 +311,6 @@ export default class WindrosePlugin extends Plugin {
         'Your settings have been imported into the new standalone plugin.',
         20000
       );
-      // eslint-disable-next-line no-console
       console.warn('[Windrose] Old plugin dungeon-map-tracker-settings is still active');
     }
   }
@@ -466,7 +459,6 @@ export default class WindrosePlugin extends Plugin {
         await this.app.vault.create(dataFilePath, jsonString);
       }
     } catch (error) {
-      // eslint-disable-next-line no-console
       console.error('[Windrose] Failed to save dungeon:', error);
       throw error;
     }

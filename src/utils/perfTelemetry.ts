@@ -270,6 +270,7 @@ async function recordPerfTelemetry(app: App, durationMs = 60000): Promise<void> 
   const env = {
     when: new Date().toISOString(),
     platform: Platform.isMobile ? (Platform.isTablet ? 'tablet' : 'phone') : 'desktop',
+    // eslint-disable-next-line obsidianmd/platform -- raw UA captured as a diagnostic string, not for platform branching
     ua: navigator.userAgent.slice(0, 160),
     dpr: window.devicePixelRatio,
     screen: { w: window.screen.width, h: window.screen.height },

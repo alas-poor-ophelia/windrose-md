@@ -389,7 +389,7 @@ function migrateToLayerSchema(legacyMapData: LegacyMapData): MapData | LegacyMap
   }
   
   // eslint-disable-next-line no-console
-  console.log('[layerAccessor] Starting migration to schema version', SCHEMA_VERSION);
+  console.debug('[layerAccessor] Starting migration to schema version', SCHEMA_VERSION);
 
   // Create backup BEFORE any modifications
   const backup = createBackup(legacyMapData);
@@ -419,7 +419,7 @@ function migrateToLayerSchema(legacyMapData: LegacyMapData): MapData | LegacyMap
       : [];
     
     // eslint-disable-next-line no-console
-    console.log('[layerAccessor] Migrating data:', {
+    console.debug('[layerAccessor] Migrating data:', {
       cells: cellsData.length,
       edges: edgesData.length,
       objects: objectsData.length,
@@ -473,7 +473,7 @@ function migrateToLayerSchema(legacyMapData: LegacyMapData): MapData | LegacyMap
     cleanedData._migratedAt = new Date().toISOString();
     
     // eslint-disable-next-line no-console
-    console.log('[layerAccessor] Migration successful to schema version', SCHEMA_VERSION);
+    console.debug('[layerAccessor] Migration successful to schema version', SCHEMA_VERSION);
 
     return cleanedData as MapData;
 
@@ -499,7 +499,7 @@ function needsMigration(mapData: MapData | LegacyMapData | null | undefined): bo
 
   if (needsIt) {
     // eslint-disable-next-line no-console
-    console.log('[layerAccessor] Map needs migration:', {
+    console.debug('[layerAccessor] Map needs migration:', {
       currentVersion: mapData.schemaVersion ?? 'none',
       targetVersion: SCHEMA_VERSION,
       hasLayers: 'layers' in mapData

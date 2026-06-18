@@ -1,4 +1,5 @@
-import type { App, Vault, TAbstractFile, TFile } from 'obsidian';
+import { TFile } from 'obsidian';
+import type { App, Vault, TAbstractFile } from 'obsidian';
 import type { PluginSettings, ObjectSet, ObjectSetData } from '#types/settings/settings.types';
 
 interface PluginLike {
@@ -247,8 +248,8 @@ export const ObjectSetHelpers = {
     const jsonPath = basePath + '/objects.json';
     const jsonContent = JSON.stringify(exportData, null, 2);
     const existingJson = plugin.app.vault.getAbstractFileByPath(jsonPath);
-    if (existingJson != null) {
-      await plugin.app.vault.modify(existingJson as TFile, jsonContent);
+    if (existingJson instanceof TFile) {
+      await plugin.app.vault.modify(existingJson, jsonContent);
     } else {
       await plugin.app.vault.create(jsonPath, jsonContent);
     }
@@ -259,7 +260,7 @@ export const ObjectSetHelpers = {
 
       for (const fullPath of imagePaths) {
         const sourceFile = plugin.app.vault.getAbstractFileByPath(fullPath);
-        if (sourceFile == null) {
+        if (!(sourceFile instanceof TFile)) {
           // eslint-disable-next-line no-console
           console.warn('[Windrose] Export: image not found:', fullPath);
           continue;
@@ -268,7 +269,7 @@ export const ObjectSetHelpers = {
         const destPath = imgFolder + '/' + filename;
         const existingImg = plugin.app.vault.getAbstractFileByPath(destPath);
         if (existingImg == null) {
-          const binary = await plugin.app.vault.readBinary(sourceFile as TFile);
+          const binary = await plugin.app.vault.readBinary(sourceFile);
           await plugin.app.vault.createBinary(destPath, binary);
         }
       }
@@ -284,11 +285,11 @@ export const ObjectSetHelpers = {
     }
 
     const jsonFile = plugin.app.vault.getAbstractFileByPath(folderPath + '/objects.json');
-    if (jsonFile == null) {
+    if (!(jsonFile instanceof TFile)) {
       throw new Error('No objects.json found in ' + folderPath);
     }
 
-    const content = await plugin.app.vault.read(jsonFile as TFile);
+    const content = await plugin.app.vault.read(jsonFile);
     const data = JSON.parse(content) as ObjectSetData & { windroseMD_objectSet?: boolean; name?: string };
 
     if (data.windroseMD_objectSet == null) {
@@ -331,10 +332,10 @@ export const ObjectSetHelpers = {
       if (child.children == null) continue;
 
       const jsonFile = plugin.app.vault.getAbstractFileByPath(child.path + '/objects.json');
-      if (jsonFile == null) continue;
+      if (!(jsonFile instanceof TFile)) continue;
 
       try {
-        const content = await plugin.app.vault.read(jsonFile as TFile);
+        const content = await plugin.app.vault.read(jsonFile);
         const data = JSON.parse(content) as ObjectSetData & { windroseMD_objectSet?: boolean; name?: string };
         if (data.windroseMD_objectSet == null) continue;
 

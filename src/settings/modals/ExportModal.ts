@@ -1,4 +1,5 @@
-import type { App, TFile } from 'obsidian';
+import { TFile } from 'obsidian';
+import type { App } from 'obsidian';
 import { Modal, Setting, Notice } from 'obsidian';
 import type { PluginSettings, ObjectOverride, CustomObject, CustomCategory } from '#types/settings/settings.types';
 import { ConfirmModal } from './ConfirmModal';
@@ -130,7 +131,7 @@ class ExportModal extends Modal {
           try {
             // Check if file exists
             const existingFile = this.app.vault.getAbstractFileByPath(finalFilename);
-            if (existingFile) {
+            if (existingFile instanceof TFile) {
               if (!await new ConfirmModal(this.app, {
                 message: `File "${finalFilename}" already exists. Overwrite?`,
                 confirmText: 'Overwrite',
@@ -138,7 +139,7 @@ class ExportModal extends Modal {
               }).openAndGetValue()) {
                 return;
               }
-              await this.app.vault.modify(existingFile as TFile, json);
+              await this.app.vault.modify(existingFile, json);
             } else {
               await this.app.vault.create(finalFilename, json);
             }

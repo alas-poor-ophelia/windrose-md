@@ -1,5 +1,6 @@
 import { Modal, Setting, Notice } from 'obsidian';
-import type { TFile , App} from 'obsidian';
+import { TFile } from 'obsidian';
+import type { App } from 'obsidian';
 import type { PluginSettings } from '#types/settings/settings.types';
 import { ObjectSetHelpers } from '../helpers/objectSetHelpers';
 import { FolderSuggest } from '../helpers/FolderSuggest';
@@ -64,14 +65,14 @@ class ObjectSetImportModal extends Modal {
           }
 
           const jsonFile = this.app.vault.getAbstractFileByPath(folderPath + '/objects.json');
-          if (!jsonFile) {
+          if (!(jsonFile instanceof TFile)) {
             previewArea.createEl('p', { text: 'No objects.json found in this folder.', cls: 'windrose-import-error' });
             previewArea.style.display = 'block';
             return;
           }
 
           try {
-            const content = await this.app.vault.read(jsonFile as TFile);
+            const content = await this.app.vault.read(jsonFile);
             const data = JSON.parse(content) as Record<string, unknown>;
 
             if (!data.windroseMD_objectSet) {
