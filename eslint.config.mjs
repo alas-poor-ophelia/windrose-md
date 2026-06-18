@@ -1,9 +1,19 @@
 /**
  * ESLint Configuration for Windrose MapDesigner
- * 
- * Uses flat config format (ESLint 9+)
- * 
- * Structure: Dev folder with src/ symlinked to vault
+ *
+ * Flat config (ESLint 9+). Dev folder with src/ symlinked to vault.
+ *
+ * Adopts the FULL official `eslint-plugin-obsidianmd` recommended preset
+ * (v0.3.0), which is a flat-config ARRAY bundling:
+ *   - eslint:recommended
+ *   - typescript-eslint recommended-type-checked
+ *   - security plugins (no-unsanitized, @microsoft/sdl, depend, import)
+ *   - JSON linting of package.json (@eslint/json)
+ *   - the obsidianmd plugin rules
+ *
+ * NOTE: `obsidianmd.configs.recommended` MUST be spread at TOP LEVEL of this
+ * array — it is NOT a rules object. Spreading it inside a `rules: {}` block
+ * (as the 0.1.x config did) silently disables every rule.
  */
 
 import tsparser from "@typescript-eslint/parser";
@@ -11,118 +21,130 @@ import tsPlugin from "@typescript-eslint/eslint-plugin";
 import reactHooksPlugin from "eslint-plugin-react-hooks";
 import obsidianmd from "eslint-plugin-obsidianmd";
 
+const disableTypeChecked = tsPlugin.configs["disable-type-checked"].rules;
+
+// Map of every obsidian rule set to "off". Used for:
+//  - JSON files: the preset applies obsidian code-rules with no `files`
+//    restriction, so they leak onto package.json where type-checked ones crash.
+//  - tests/scripts: non-shipped Node code is not held to plugin-source rules.
+const obsidianRulesOff = Object.fromEntries(
+  Object.keys(obsidianmd.rules).map((r) => [`obsidianmd/${r}`, "off"])
+);
+
+// Rules that are meaningless for non-shipped Node test/build code.
+const nonShippedNodeRulesOff = {
+  ...obsidianRulesOff,
+  "import/no-nodejs-modules": "off",
+  "import/no-extraneous-dependencies": "off",
+  "@typescript-eslint/no-require-imports": "off",
+  "no-undef": "off", // tsc (with @types/node) covers undefined symbols here
+  "@typescript-eslint/no-explicit-any": "off",
+  "no-console": "off"
+};
+
 export default [
   // ===========================================
-  // TypeScript Files (in src/ symlink)
+  // Official Obsidian recommended preset (top-level spread)
+  // ===========================================
+  ...obsidianmd.configs.recommended,
+
+  // Obsidian code-rules must not run on JSON-language files.
+  {
+    files: ["**/*.json"],
+    rules: obsidianRulesOff
+  },
+
+  // ===========================================
+  // Type-aware parsing for ALL first-party TS/TSX.
+  // projectService resolves the nearest tsconfig per file, so type-checked
+  // rules have parser services everywhere (src, tests, scripts, types).
+  // ===========================================
+  {
+    files: ["src/**/*.{ts,tsx}", "tests/**/*.ts", "scripts/**/*.ts", "types/**/*.ts"],
+    languageOptions: {
+      parser: tsparser,
+      parserOptions: {
+        projectService: true,
+        tsconfigRootDir: import.meta.dirname,
+        ecmaVersion: 2022,
+        sourceType: "module",
+        ecmaFeatures: { jsx: true }
+      }
+    }
+  },
+
+  // ===========================================
+  // Source (shipped plugin code) — curated project rules layered on top
   // ===========================================
   {
     files: ["src/**/*.ts", "src/**/*.tsx"],
-    languageOptions: {
-      parser: tsparser,
-      parserOptions: { 
-        project: "./tsconfig.json",
-        ecmaVersion: 2022,
-        sourceType: "module",
-        ecmaFeatures: {
-          jsx: true
-        }
-      }
-    },
     plugins: {
       "@typescript-eslint": tsPlugin,
-      "react-hooks": reactHooksPlugin,
-      "obsidianmd": obsidianmd
+      "react-hooks": reactHooksPlugin
     },
     rules: {
-      // ===========================================
-      // TypeScript Strict Rules
-      // ===========================================
+      // TypeScript strictness (project conventions)
       "@typescript-eslint/no-explicit-any": "error",
       "@typescript-eslint/explicit-function-return-type": ["warn", {
-        "allowExpressions": true,
-        "allowTypedFunctionExpressions": true
+        allowExpressions: true,
+        allowTypedFunctionExpressions: true
       }],
       "@typescript-eslint/no-unused-vars": ["error", {
-        "argsIgnorePattern": "^_",
-        "varsIgnorePattern": "^_",
-        "caughtErrorsIgnorePattern": "^_",
-        "ignoreRestSiblings": true
+        argsIgnorePattern: "^_",
+        varsIgnorePattern: "^_",
+        caughtErrorsIgnorePattern: "^_",
+        ignoreRestSiblings: true
       }],
       "@typescript-eslint/no-floating-promises": "error",
       "@typescript-eslint/strict-boolean-expressions": "warn",
       "@typescript-eslint/no-non-null-assertion": "warn",
       "@typescript-eslint/no-misused-promises": ["warn", {
-        "checksVoidReturn": { "attributes": false }
+        checksVoidReturn: { attributes: false }
       }],
       "@typescript-eslint/consistent-type-imports": ["warn", {
-        "prefer": "type-imports",
-        "fixStyle": "separate-type-imports"
+        prefer: "type-imports",
+        fixStyle: "separate-type-imports"
       }],
       "@typescript-eslint/no-unnecessary-type-assertion": "warn",
       "@typescript-eslint/prefer-nullish-coalescing": "warn",
 
-      // ===========================================
-      // React Hooks Rules (Preact compatible)
-      // ===========================================
+      // React Hooks (Preact compatible)
       "react-hooks/rules-of-hooks": "error",
       "react-hooks/exhaustive-deps": "warn",
 
-      // ===========================================
-      // Standard ESLint Rules
-      // ===========================================
+      // Standard ESLint
       "no-unreachable": "error",
       "no-console": "warn",
-      "eqeqeq": ["error", "always", { "null": "ignore" }],
+      "eqeqeq": ["error", "always", { null: "ignore" }],
       "prefer-const": "error",
 
-      // ===========================================
-      // Obsidian Community Plugin Rules (recommended)
-      // ===========================================
-      ...obsidianmd.configs.recommended
+      // Keep brand names cased correctly (preset would lowercase them)
+      "obsidianmd/ui/sentence-case": ["error", {
+        enforceCamelCaseLower: true,
+        brands: ["Windrose", "Dungeondraft", "RPGAwesome"]
+      }]
     }
   },
-  
+
   // ===========================================
-  // Test files (E2E tests)
+  // Test files (E2E + unit) — not shipped; relax type-checked + style noise
   // ===========================================
   {
     files: ["tests/**/*.ts"],
-    languageOptions: {
-      parser: tsparser,
-      parserOptions: {
-        project: "./tsconfig.json",
-        ecmaVersion: 2022,
-        sourceType: "module"
-      }
-    },
-    plugins: {
-      "@typescript-eslint": tsPlugin
-    },
     rules: {
-      "@typescript-eslint/no-explicit-any": "off", // Tests use any for page objects
-      "no-console": "off" // Console is fine in tests
+      ...disableTypeChecked,
+      ...nonShippedNodeRulesOff
     }
   },
 
   // ===========================================
-  // Scripts (release automation, etc.)
+  // Scripts (release automation, etc.) — not shipped
   // ===========================================
   {
     files: ["scripts/**/*.ts"],
-    languageOptions: {
-      parser: tsparser,
-      parserOptions: {
-        project: "./tsconfig.json",
-        ecmaVersion: 2022,
-        sourceType: "module"
-      }
-    },
-    plugins: {
-      "@typescript-eslint": tsPlugin
-    },
     rules: {
-      "@typescript-eslint/no-explicit-any": "off", // Scripts use any for Obsidian internals
-      "no-console": "off" // Console output is the UI for CLI scripts
+      ...disableTypeChecked,
+      ...nonShippedNodeRulesOff
     }
   },
 
@@ -131,24 +153,14 @@ export default [
   // ===========================================
   {
     files: ["types/**/*.ts"],
-    languageOptions: {
-      parser: tsparser,
-      parserOptions: { 
-        project: "./tsconfig.json",
-        ecmaVersion: 2022,
-        sourceType: "module"
-      }
-    },
-    plugins: {
-      "@typescript-eslint": tsPlugin
-    },
     rules: {
+      ...disableTypeChecked,
       "@typescript-eslint/no-explicit-any": "error",
       "@typescript-eslint/no-unused-vars": ["error", {
-        "argsIgnorePattern": "^_",
-        "varsIgnorePattern": "^_",
-        "caughtErrorsIgnorePattern": "^_",
-        "ignoreRestSiblings": true
+        argsIgnorePattern: "^_",
+        varsIgnorePattern: "^_",
+        caughtErrorsIgnorePattern: "^_",
+        ignoreRestSiblings: true
       }]
     }
   },
@@ -161,10 +173,21 @@ export default [
       "node_modules/**",
       "mcp/**",
       "types/generated/**",
+      "tests/fixtures/**",
+      ".claude/**",
+      "internal/**",
+      // Data / output / config dirs (not plugin source)
+      "objects/**",
+      "test-results/**",
+      "**/*.json",
       "*.md",
       // Build artifacts
       "main.js",
       "styles.css",
+      // Non-TS scripts / build files (plugin source is TS only)
+      "**/*.mjs",
+      "**/*.cjs",
+      "*.config.ts",
       // Legacy JS files in vault - not linted
       "src/**/*.js",
       "src/**/*.jsx"

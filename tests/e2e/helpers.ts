@@ -17,9 +17,7 @@ export const DATA_FILE_PATH = "_test-data/dungeon-maps-data.json";
  * to prevent state pollution from prior tests in the same file.
  */
 export function resetDataFile(): void {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
   const fs = require("fs");
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
   const path = require("path");
   const fixturesDir = path.resolve(__dirname, "../fixtures");
   const cleanFile = path.join(fixturesDir, "dungeon-maps-data.clean.json");
