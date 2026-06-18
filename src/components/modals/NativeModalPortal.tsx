@@ -7,6 +7,7 @@
  */
 
 import { Modal } from 'obsidian';
+import type { App } from 'obsidian';
 import type { VNode } from 'preact';
 import { h, Fragment } from 'preact';
 import { createPortal } from 'preact/compat';
@@ -19,9 +20,9 @@ const MODAL_MAX_WIDTH = 900;
 const MODAL_MAX_HEIGHT = 800;
 const MODAL_SIZE_KEY = 'windrose-native-modal-size';
 
-function loadModalSize(): { width: number; height: number } | null {
+function loadModalSize(app: App): { width: number; height: number } | null {
   try {
-    const stored = localStorage.getItem(MODAL_SIZE_KEY);
+    const stored = app.loadLocalStorage(MODAL_SIZE_KEY) as string | null;
     if (stored != null && stored !== '') {
       const parsed = JSON.parse(stored);
       return {
@@ -33,9 +34,9 @@ function loadModalSize(): { width: number; height: number } | null {
   return null;
 }
 
-function saveModalSize(width: number, height: number): void {
+function saveModalSize(app: App, width: number, height: number): void {
   try {
-    localStorage.setItem(MODAL_SIZE_KEY, JSON.stringify({ width, height }));
+    app.saveLocalStorage(MODAL_SIZE_KEY, JSON.stringify({ width, height }));
   } catch { /* ignore */ }
 }
 
@@ -55,13 +56,14 @@ async function loadInteract(): Promise<InteractFn> {
 
 async function setupModalInteract(
   modalEl: HTMLElement,
-  options: { draggable?: boolean; resizable?: boolean }
+  options: { draggable?: boolean; resizable?: boolean },
+  app: App
 ): Promise<() => void> {
   const interact = await loadInteract();
 
   modalEl.classList.add('windrose-native-modal-interactive');
 
-  const savedSize = loadModalSize();
+  const savedSize = loadModalSize(app);
   if (savedSize && options.resizable === true) {
     modalEl.style.setProperty('width', `${savedSize.width}px`);
     modalEl.style.setProperty('height', `${savedSize.height}px`);
@@ -140,7 +142,7 @@ async function setupModalInteract(
           target.dataset.y = String(y);
         },
         end(event: { target: HTMLElement; rect: { width: number; height: number } }) {
-          saveModalSize(event.rect.width, event.rect.height);
+          saveModalSize(app, event.rect.width, event.rect.height);
         }
       }
     });
@@ -202,7 +204,7 @@ function NativeModalPortal({
         setRenderTarget(target);
 
         if ((draggable === true || resizable === true) && !('ontouchstart' in window)) {
-          setupModalInteract(this.modalEl, { draggable, resizable }).then(cleanup => {
+          setupModalInteract(this.modalEl, { draggable, resizable }, this.app).then(cleanup => {
             interactCleanupRef.current = cleanup;
           }).catch(err => {
             // eslint-disable-next-line no-console

@@ -18,6 +18,7 @@
 import { useState } from 'preact/hooks';
 import type { VNode } from 'preact';
 import { useModalShell, useAppearance } from '../../context/MapSettingsContext';
+import { useApp } from '../../context/AppContext';
 import { saveMapImageToVault } from '../../persistence/exportOperations';
 import { SettingItem, SettingHeading } from './SettingItem';
 import { NativeToggle } from './NativeControls';
@@ -33,6 +34,7 @@ interface ExportResult {
 function PreferencesTab(): VNode {
   const { preferences, handlePreferenceToggle, mapData, geometry } = useModalShell();
   const { overrides, globalSettings, handleColorChange } = useAppearance();
+  const app = useApp();
 
   const [isExporting, setIsExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
@@ -49,7 +51,7 @@ function PreferencesTab(): VNode {
     setExportSuccess(null);
 
     try {
-      const result: ExportResult = await saveMapImageToVault((globalThis as unknown as { app: import('obsidian').App }).app, mapData, geometry);
+      const result: ExportResult = await saveMapImageToVault(app, mapData, geometry);
 
       if (result.success) {
         setExportSuccess(`Map saved to: ${result.path}`);
