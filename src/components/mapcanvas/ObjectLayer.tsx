@@ -40,6 +40,7 @@ import { formatDistance, getEffectiveDistanceSettings } from '../../drawing/dist
 import { getSettings } from '../../core/settingsAccessor';
 import { rotateByIncrement } from '../../drawing/rotationOperations';
 import { Z_INDEX } from '../../core/dmtConstants';
+import type { SelectionContextMenuDetail } from '../../core/windroseEvents';
 
 
 
@@ -664,8 +665,8 @@ const ObjectLayer = ({
   useEffect(() => {
     if (!mapData || !geometry) return undefined;
 
-    const handler = (e: Event): void => {
-      const detail = (e as CustomEvent).detail;
+    const handler = (e: CustomEvent<SelectionContextMenuDetail>): void => {
+      const detail = e.detail;
       if (detail.handled === true) return;
 
       const coords = screenToGrid(detail.clientX, detail.clientY);

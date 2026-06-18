@@ -5,6 +5,7 @@ import { useEffect } from 'preact/hooks';
 import { Menu } from 'obsidian';
 import type { MenuItem } from 'obsidian';
 import { openNativeNoteLinkModal } from '../../components/modals/NoteLinkModal';
+import type { HexContextMenuDetail } from '../../core/windroseEvents';
 
 interface UseHexContextMenuOptions {
   app: App;
@@ -20,7 +21,7 @@ function useHexContextMenu({
   handleRegionsChange,
 }: UseHexContextMenuOptions): void {
   useEffect(() => {
-    const handleHexContextMenu = (event: CustomEvent): void => {
+    const handleHexContextMenu = (event: CustomEvent<HexContextMenuDetail>): void => {
       if (!mapData || mapData.mapType !== 'hex') return;
 
       const { q, r, screenX, screenY } = event.detail;
@@ -105,8 +106,8 @@ function useHexContextMenu({
       menu.showAtPosition({ x: screenX, y: screenY });
     };
 
-    document.addEventListener('windrose:hex-context-menu', handleHexContextMenu as EventListener);
-    return () => document.removeEventListener('windrose:hex-context-menu', handleHexContextMenu as EventListener);
+    document.addEventListener('windrose:hex-context-menu', handleHexContextMenu);
+    return () => document.removeEventListener('windrose:hex-context-menu', handleHexContextMenu);
   }, [app, mapData, enterSubHex, handleRegionsChange]);
 }
 

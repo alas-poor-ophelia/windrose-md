@@ -27,6 +27,7 @@ import { SelectionCardFiligree } from './SelectionCardFiligree';
 import { Icon } from '../shared/Icon';
 import { InternalLink } from '../shared/InternalLink';
 import { Z_INDEX } from '../../core/dmtConstants';
+import type { SelectionContextMenuDetail } from '../../core/windroseEvents';
 
 
 
@@ -123,8 +124,8 @@ const SelectionActionsOverlay = ({
 
   // Context menu via Obsidian Menu API
   useEffect(() => {
-    const handler = (e: Event): void => {
-      const detail = (e as CustomEvent).detail;
+    const handler = (e: CustomEvent<SelectionContextMenuDetail>): void => {
+      const detail = e.detail;
       if (detail.handled === true) return;
       detail.handled = true;
       const { screenX, screenY } = detail;

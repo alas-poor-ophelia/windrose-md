@@ -19,6 +19,7 @@ import type { MenuItem } from 'obsidian';
 import { Menu } from 'obsidian';
 import { openNativeNoteLinkModal } from '../modals/NoteLinkModal';
 import { Icon } from '../shared/Icon';
+import type { RegionIdDetail } from '../../core/windroseEvents';
 
 
 
@@ -96,14 +97,14 @@ const RegionLayer = ({
 
   // Listen for edit-region events from sidebar panel
   useEffect(() => {
-    const handler = (e: CustomEvent): void => {
+    const handler = (e: CustomEvent<RegionIdDetail>): void => {
       const { regionId } = e.detail;
-      if ((regionId as string | undefined) != null && (regionId as string) !== '') {
+      if (regionId !== '') {
         startEditingRegion(regionId);
       }
     };
-    document.addEventListener('windrose:edit-region', handler as EventListener);
-    return () => document.removeEventListener('windrose:edit-region', handler as EventListener);
+    document.addEventListener('windrose:edit-region', handler);
+    return () => document.removeEventListener('windrose:edit-region', handler);
   }, [startEditingRegion]);
 
   // Name input state

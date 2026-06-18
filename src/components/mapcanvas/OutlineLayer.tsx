@@ -19,6 +19,7 @@ import { useOutlineTools } from '../../hooks/interactions/useOutlineTools';
 import type { MenuItem } from 'obsidian';
 import { Modal, Menu } from 'obsidian';
 import { useApp } from '../../context/AppContext';
+import type { HexContextMenuDetail } from '../../core/windroseEvents';
 
 
 
@@ -128,7 +129,7 @@ const OutlineLayer = ({
   useEffect(() => {
     if (!isOutlineTool) return undefined;
 
-    const handler = (e: CustomEvent): void => {
+    const handler = (e: CustomEvent<HexContextMenuDetail>): void => {
       const { screenX, screenY } = e.detail;
       if (!mapData?.outlines) return;
 
@@ -191,8 +192,8 @@ const OutlineLayer = ({
       menu.showAtPosition({ x: screenX, y: screenY });
     };
 
-    document.addEventListener('windrose:hex-context-menu', handler as EventListener);
-    return () => document.removeEventListener('windrose:hex-context-menu', handler as EventListener);
+    document.addEventListener('windrose:hex-context-menu', handler);
+    return () => document.removeEventListener('windrose:hex-context-menu', handler);
   }, [isOutlineTool, mapData?.outlines, geometry, screenToWorld, deleteOutline, updateOutline, onOutlinesChange]);
 
   // ── Overlay canvas for in-progress drawing ────────────────────────
