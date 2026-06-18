@@ -81,7 +81,7 @@ async function downloadAndInstallPack(
 
   if (pack.type === 'object-pack') {
     try {
-      await ObjectSetHelpers.importSetFromFolder(plugin as any, basePath);
+      await ObjectSetHelpers.importSetFromFolder(plugin, basePath);
     } catch (err) {
       console.warn('[Windrose] Object set auto-import failed:', err);
     }

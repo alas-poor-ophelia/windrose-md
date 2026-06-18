@@ -1,4 +1,4 @@
-import { Modal, Notice } from 'obsidian';
+import { Modal, Notice, TFile } from 'obsidian';
 import type { App } from 'obsidian';
 import type { PluginSettings } from '#types/settings/settings.types';
 import type { InstalledPack } from '#types/content-packs/contentPack.types';
@@ -297,8 +297,8 @@ class DungeondraftImportModal extends Modal {
 					const arrayBuf = new ArrayBuffer(data.byteLength);
 					new Uint8Array(arrayBuf).set(data);
 					const existing = this.app.vault.getAbstractFileByPath(destPath);
-					if (existing != null) {
-						await this.app.vault.modifyBinary(existing as any, arrayBuf);
+					if (existing instanceof TFile) {
+						await this.app.vault.modifyBinary(existing, arrayBuf);
 					} else {
 						await this.app.vault.createBinary(destPath, arrayBuf);
 					}

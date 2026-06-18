@@ -24,7 +24,7 @@ function loadModalSize(app: App): { width: number; height: number } | null {
   try {
     const stored = app.loadLocalStorage(MODAL_SIZE_KEY) as string | null;
     if (stored != null && stored !== '') {
-      const parsed = JSON.parse(stored);
+      const parsed = JSON.parse(stored) as { width: number; height: number };
       return {
         width: Math.max(MODAL_MIN_WIDTH, Math.min(MODAL_MAX_WIDTH, parsed.width)),
         height: Math.max(MODAL_MIN_HEIGHT, Math.min(MODAL_MAX_HEIGHT, parsed.height))

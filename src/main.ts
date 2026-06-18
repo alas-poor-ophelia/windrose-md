@@ -302,8 +302,10 @@ export default class WindrosePlugin extends Plugin {
   }
 
   private checkForConflicts(): void {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const plugins = (this.app as any).plugins?.plugins as Record<string, { _loaded?: boolean }> | undefined;
+    const appWithPlugins = this.app as typeof this.app & {
+      plugins?: { plugins?: Record<string, { _loaded?: boolean }> };
+    };
+    const plugins = appWithPlugins.plugins?.plugins;
     if (plugins?.['dungeon-map-tracker-settings']?._loaded === true) {
       new Notice(
         'Windrose: The old "Windrose MapDesigner" settings plugin is still active. ' +

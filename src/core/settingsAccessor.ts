@@ -13,7 +13,6 @@ import type {
   ResolvedColorEntry,
   MapSpecificSettings,
   CoordinateKeyMode,
-  ObjectSetData,
   ColorOverride,
   PaletteColor
 } from '#types/settings/settings.types';

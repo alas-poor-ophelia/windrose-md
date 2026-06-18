@@ -9,7 +9,7 @@
 import type { TilesetDef, TileEntry, TilesetOverrides, TileLayerRole, TileMetadataStore } from '#types/tiles/tile.types';
 import type { ToolId } from '#types/tools/tool.types';
 import type { FlyoutTile } from './DrawerDock';
-import type { VNode } from 'preact';
+import type { VNode, ComponentChildren } from 'preact';
 import { TFile } from 'obsidian';
 
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
@@ -174,7 +174,7 @@ const TileThumbnail = memo(({ url }: TileThumbnailProps): VNode => {
 // Horizontal scroller (wheel→sideways + drag)
 // ===========================================
 
-function HScroll({ className, children }: { className?: string; children: any }): VNode {
+function HScroll({ className, children }: { className?: string; children: ComponentChildren }): VNode {
   const ref = useRef<HTMLDivElement>(null);
   const drag = useRef({ down: false, x: 0, sl: 0, moved: false });
 
@@ -947,8 +947,12 @@ const TileAssetBrowser = memo(({
 
   if (tilesets.length === 0) {
     const openTilesetSettings = (): void => {
-      (app as any).setting.open();
-      (app as any).setting.openTabById('windrose-md');
+      // Obsidian's settings opener is an internal (untyped) API.
+      const settingApp = app as typeof app & {
+        setting: { open(): void; openTabById(id: string): void };
+      };
+      settingApp.setting.open();
+      settingApp.setting.openTabById('windrose-md');
     };
 
     return (

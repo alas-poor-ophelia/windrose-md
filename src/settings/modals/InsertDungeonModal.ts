@@ -155,8 +155,8 @@ async function stockGeneratedDungeon(plugin: WindrosePlugin, result: DungeonGene
       exitRoomId: result.metadata.exitRoomId,
       waterRoomIds: result.metadata.waterRoomIds
     }
-  );
-  return stockResult as StockResult;
+  ) as StockResult;
+  return stockResult;
 }
 
 class InsertDungeonModal extends Modal {

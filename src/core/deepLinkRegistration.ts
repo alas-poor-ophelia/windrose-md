@@ -112,11 +112,29 @@ function registerDomCapture(plugin: Plugin): void {
   }, { capture: true } as AddEventListenerOptions);
 }
 
+/** The Extension type Obsidian's registerEditorExtension accepts (from @codemirror/state). */
+type CMExtension = Parameters<Plugin['registerEditorExtension']>[0];
+
+/** The slice of a CM EditorView instance the click handler reads. */
+interface CMEditorViewInstance {
+  posAtCoords(coords: { x: number; y: number }): number | null;
+  state: { doc: { lineAt(pos: number): { text: string; from: number } } };
+}
+
+/** The slice of the @codemirror/view module we consume (provided by Obsidian at runtime). */
+interface CMViewModule {
+  EditorView: {
+    domEventHandlers(
+      handlers: Record<string, (event: MouseEvent, view: CMEditorViewInstance) => boolean>
+    ): CMExtension;
+  };
+}
+
 function registerEditorExtension(plugin: Plugin): void {
   try {
-     
+
     // eslint-disable-next-line @typescript-eslint/no-require-imports, import/no-extraneous-dependencies, no-undef -- @codemirror/view is provided by Obsidian at runtime
-    const cmView = require('@codemirror/view');
+    const cmView = require('@codemirror/view') as CMViewModule | undefined;
     if (cmView?.EditorView == null) return;
 
     const SCHEME = 'windrose:';
@@ -153,7 +171,7 @@ function registerEditorExtension(plugin: Plugin): void {
     };
 
     const windroseEditorExt = cmView.EditorView.domEventHandlers({
-      click(event: MouseEvent, view: unknown) {
+      click(event: MouseEvent, view: CMEditorViewInstance) {
         const target = event.target as HTMLElement;
         if (target?.closest == null) return false;
 
@@ -175,10 +193,9 @@ function registerEditorExtension(plugin: Plugin): void {
 
         const linkSpan = target.closest('.cm-link, .cm-underline, .cm-hmd-internal-link');
         if (linkSpan != null) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const pos = (view as any).posAtCoords({ x: event.clientX, y: event.clientY });
+          const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
           if (pos != null) {
-            const href = findWindroseHrefAtPos(view as Parameters<typeof findWindroseHrefAtPos>[0], pos);
+            const href = findWindroseHrefAtPos(view, pos);
             if (href != null && href !== '') {
               const parsed = parseDeepLink(href);
               if (parsed != null) {

@@ -96,7 +96,7 @@ function DepthBar({ active, onPick, hidden, onToggleHide, tileCounts, compact = 
               title={`${d.label} · ${count} tiles${isOff ? ' · hidden' : ''}`}
               onClick={() => handleSegmentClick(d.id)}
             >
-              <span className="windrose-db-cap" style={{ '--depth-color': `var(--windrose-depth-${d.id})`, opacity: isOff ? 0.4 : isActive ? 1 : 0.65 } as any} />
+              <span className="windrose-db-cap" style={{ '--depth-color': `var(--windrose-depth-${d.id})`, opacity: isOff ? 0.4 : isActive ? 1 : 0.65 }} />
               <Icon icon={d.icon} size={isActive ? 15 : 14} className={`windrose-db-icon ${isOff ? 'is-disabled' : ''}`} />
               {isActive && <span className="windrose-db-lbl">{d.label}</span>}
               {isActive && !compact && <span className="windrose-db-cnt">{count}</span>}
@@ -137,7 +137,7 @@ function DepthBar({ active, onPick, hidden, onToggleHide, tileCounts, compact = 
                   className={cls}
                   onClick={() => handleFanPick(d.id)}
                 >
-                  <span className="windrose-db-cap" style={{ '--depth-color': `var(--windrose-depth-${d.id})`, opacity: isOff ? 0.4 : 1 } as any} />
+                  <span className="windrose-db-cap" style={{ '--depth-color': `var(--windrose-depth-${d.id})`, opacity: isOff ? 0.4 : 1 }} />
                   <Icon icon={d.icon} size={15} className={`windrose-db-icon ${isOff ? 'is-disabled' : ''}`} />
                   <span className="windrose-db-lbl">{d.label}</span>
                   <span className="windrose-db-cnt">{count}</span>
@@ -191,7 +191,7 @@ function DepthRibbon({ active, onPick, hidden, onToggleHide, tileCounts }: Depth
             title={`${d.label} · ${count} tiles${isOff ? ' · hidden' : ''}`}
             style={{ opacity: isOff && !isActive ? 0.55 : 1 }}
           >
-            <span className="windrose-dsr-bar" style={{ '--depth-color': `var(--windrose-depth-${d.id})`, opacity: isOff ? 0.3 : isActive ? 1 : 0.85 } as any} />
+            <span className="windrose-dsr-bar" style={{ '--depth-color': `var(--windrose-depth-${d.id})`, opacity: isOff ? 0.3 : isActive ? 1 : 0.85 }} />
             <Icon icon={d.icon} size={16} className={`windrose-dsr-icon ${isActive ? 'is-active' : ''}`} />
             {isOff
               ? <EyeToggle on={false} onClick={() => onToggleHide(d.id)} size={11} />
