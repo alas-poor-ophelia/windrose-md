@@ -57,7 +57,7 @@ const MapHeader = ({ mapData, onNameChange, saveStatus, showFooter, onToggleFoot
       `type: ${mapType}`,
       '```'
     ].join('\n');
-    navigator.clipboard.writeText(block);
+    void navigator.clipboard.writeText(block);
   }, [mapId, mapData.mapType, mapData.name]);
 
   return (

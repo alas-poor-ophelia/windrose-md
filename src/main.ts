@@ -159,7 +159,7 @@ export default class WindrosePlugin extends Plugin {
   async activateMapView(): Promise<void> {
     const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_WINDROSE_MAP);
     if (leaves.length > 0) {
-      this.app.workspace.revealLeaf(leaves[0]);
+      await this.app.workspace.revealLeaf(leaves[0]);
       return;
     }
     await this.openNewMapView();
@@ -168,7 +168,7 @@ export default class WindrosePlugin extends Plugin {
   private async openNewMapView(): Promise<void> {
     const leaf = this.app.workspace.getLeaf('tab');
     await leaf.setViewState({ type: VIEW_TYPE_WINDROSE_MAP, active: true });
-    this.app.workspace.revealLeaf(leaf);
+    await this.app.workspace.revealLeaf(leaf);
   }
 
   private initMcpNamespace(): void {

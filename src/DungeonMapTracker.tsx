@@ -161,7 +161,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   const [mapListEntries, setMapListEntries] = useState<MapListEntry[]>([]);
   useEffect(() => {
     if (!fullPane) return;
-    listMaps(app).then(entries => {
+    void listMaps(app).then(entries => {
       if (mapId && !entries.some(e => e.id === mapId)) {
         entries.push({ id: mapId, name: mapName || '', type: mapType || 'grid' });
       }
@@ -191,7 +191,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
         { settings: { showAdjacentSubMaps?: boolean }; saveSettings(): Promise<void> } | undefined;
       if (plugin != null) {
         plugin.settings.showAdjacentSubMaps = v;
-        plugin.saveSettings();
+        void plugin.saveSettings();
         window.dispatchEvent(new Event('windrose-settings-changed'));
       }
     } catch { /* settings plugin unavailable */ }

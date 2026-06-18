@@ -45,7 +45,7 @@ class WindroseMapView extends ItemView {
         `type: ${this.mapType}`,
         '```'
       ].join('\n');
-      navigator.clipboard.writeText(block);
+      void navigator.clipboard.writeText(block);
       new Notice('Map block copied to clipboard');
     });
 

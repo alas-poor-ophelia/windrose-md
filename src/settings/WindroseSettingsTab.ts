@@ -54,7 +54,7 @@ class WindroseMDSettingsTab extends PluginSettingTab {
   }
 
   private renderImportBanner(containerEl: HTMLElement): void {
-    this.plugin.hasOldPluginData().then(hasOld => {
+    void this.plugin.hasOldPluginData().then(hasOld => {
       if (!hasOld) return;
       new Setting(containerEl)
         .setName('Import settings from previous installation')

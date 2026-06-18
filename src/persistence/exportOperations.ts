@@ -219,7 +219,7 @@ async function exportMapAsImage(
   }
   
   // Render map to canvas
-  await renderMapToCanvas(ctx, {
+  renderMapToCanvas(ctx, {
     mapData,
     geometry,
     bounds: exportBounds,
