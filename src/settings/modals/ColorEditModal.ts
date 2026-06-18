@@ -82,7 +82,7 @@ class ColorEditModal extends Modal {
       .setName('Label')
       .setDesc('Display name for this color')
       .addText(text => text
-        .setPlaceholder('e.g., Ocean Blue')
+        .setPlaceholder('E.g., ocean blue')
         .setValue(labelValue)
         .onChange((value: string) => {
           labelValue = value;

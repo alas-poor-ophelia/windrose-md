@@ -86,11 +86,11 @@ export const TabRenderObjectsMethods = {
 
     // Map Type selector dropdown
     new Setting(containerEl)
-      .setName('Map Type')
+      .setName('Map type')
       .setDesc('Select which map type to configure objects for')
       .addDropdown(dropdown => dropdown
-        .addOption('grid', 'Grid Maps')
-        .addOption('hex', 'Hex Maps')
+        .addOption('grid', 'Grid maps')
+        .addOption('hex', 'Hex maps')
         .setValue(this.selectedMapType)
         .onChange((value: string) => {
           this.selectedMapType = value as 'grid' | 'hex';
@@ -102,7 +102,7 @@ export const TabRenderObjectsMethods = {
 
     // Add Custom Object button
     new Setting(containerEl)
-      .setName('Add Custom Object')
+      .setName('Add custom object')
       .setDesc('Create a new map object with your own symbol')
       .addButton(btn => btn
         .setButtonText('+ Add Object')
@@ -117,7 +117,7 @@ export const TabRenderObjectsMethods = {
 
     // Add Custom Category button
     new Setting(containerEl)
-      .setName('Add Custom Category')
+      .setName('Add custom category')
       .setDesc('Create a new category to organize objects')
       .addButton(btn => btn
         .setButtonText('+ Add Category')
@@ -164,7 +164,7 @@ export const TabRenderObjectsMethods = {
         .setName(`Reset ${this.selectedMapType === 'hex' ? 'Hex' : 'Grid'} to Defaults`)
         .setDesc(`Restore built-in objects for ${this.selectedMapType} maps. Does not affect saved sets.`)
         .addButton(btn => btn
-          .setButtonText('Reset to Defaults')
+          .setButtonText('Reset to defaults')
           .setWarning()
           .onClick(async () => {
             const counts: string[] = [];
@@ -632,7 +632,7 @@ export const TabRenderObjectsMethods = {
     const s = this.plugin.settings;
     const sets = s.objectSets || [];
 
-    containerEl.createEl('div', { cls: 'windrose-settings-subheading', text: 'Object Sets' });
+    containerEl.createEl('div', { cls: 'windrose-settings-subheading', text: 'Object sets' });
     containerEl.createEl('p', {
       text: 'Save and swap between named collections of object customizations.',
       cls: 'setting-item-description'
@@ -656,7 +656,7 @@ export const TabRenderObjectsMethods = {
 
     // Active Set dropdown
     new Setting(containerEl)
-      .setName('Active Set')
+      .setName('Active set')
       .setDesc('Switch to a saved set (overwrites current objects)')
       .addDropdown(dropdown => {
         dropdown.addOption('__defaults__', 'Defaults (built-in)');
@@ -769,10 +769,10 @@ export const TabRenderObjectsMethods = {
 
     // Action buttons
     const actionSetting = new Setting(containerEl)
-      .setName('Manage Sets');
+      .setName('Manage sets');
 
     actionSetting.addButton(btn => btn
-      .setButtonText('Save Current as Set')
+      .setButtonText('Save current as set')
       .onClick(async () => {
         const name = await new PromptModal(this.app, {
           message: 'Name for the new set:',
@@ -786,7 +786,7 @@ export const TabRenderObjectsMethods = {
       }));
 
     actionSetting.addButton(btn => btn
-      .setButtonText('Import from Folder')
+      .setButtonText('Import from folder')
       .onClick(() => {
         new ObjectSetImportModal(this.app, this.plugin as PluginAny, async () => {
           this.settingsChanged = true;
@@ -809,12 +809,12 @@ export const TabRenderObjectsMethods = {
 
     // Auto-Load Folder
     new Setting(containerEl)
-      .setName('Auto-Load Folder')
+      .setName('Auto-load folder')
       .setDesc('Vault folder to scan for object set packages on startup')
       .addSearch(search => {
         new FolderSuggest(this.app, search.inputEl);
         search
-          .setPlaceholder('e.g. windrose-objects')
+          .setPlaceholder('E.g. Windrose-objects')
           .setValue(s.objectSetsAutoLoadFolder || '')
           .onChange(async (value: string) => {
             s.objectSetsAutoLoadFolder = value.trim();
@@ -822,7 +822,7 @@ export const TabRenderObjectsMethods = {
           });
       })
       .addButton(btn => btn
-        .setButtonText('Scan Now')
+        .setButtonText('Scan now')
         .onClick(async () => {
           const added = await ObjectSetHelpers.scanAutoLoadFolder(this.plugin as PluginAny);
           await this.plugin.saveSettings();

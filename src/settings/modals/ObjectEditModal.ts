@@ -104,19 +104,19 @@ class ObjectEditModal extends Modal {
     const toggleContainer = contentEl.createDiv({ cls: 'windrose-icon-type-toggle' });
 
     const unicodeBtn = toggleContainer.createEl('button', {
-      text: 'Unicode Symbol',
+      text: 'Unicode symbol',
       cls: 'windrose-icon-type-btn' + (this.mode === 'symbol' ? ' active' : ''),
       attr: { type: 'button' }
     });
 
     const iconBtn = toggleContainer.createEl('button', {
-      text: 'RPGAwesome Icon',
+      text: 'RPGAwesome icon',
       cls: 'windrose-icon-type-btn' + (this.mode === 'icon' ? ' active' : ''),
       attr: { type: 'button' }
     });
 
     const imageBtn = toggleContainer.createEl('button', {
-      text: 'Custom Image',
+      text: 'Custom image',
       cls: 'windrose-icon-type-btn' + (this.mode === 'image' ? ' active' : ''),
       attr: { type: 'button' }
     });
@@ -161,7 +161,7 @@ class ObjectEditModal extends Modal {
       .addText(text => {
         text
           .setValue(this.label)
-          .setPlaceholder('e.g., Treasure Chest')
+          .setPlaceholder('E.g., treasure chest')
           .onChange((value: string) => {
             this.label = value;
             // Clear error when user starts typing
@@ -254,7 +254,7 @@ class ObjectEditModal extends Modal {
 
     // Quick symbols
     const quickSymbolsContainer = container.createDiv({ cls: 'windrose-quick-symbols' });
-    quickSymbolsContainer.createEl('label', { text: 'Quick Symbols', cls: 'windrose-quick-symbols-label' });
+    quickSymbolsContainer.createEl('label', { text: 'Quick symbols', cls: 'windrose-quick-symbols-label' });
     const symbolGrid = quickSymbolsContainer.createDiv({ cls: 'windrose-quick-symbols-grid' });
 
     for (const sym of QUICK_SYMBOLS) {

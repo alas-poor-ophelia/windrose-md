@@ -106,7 +106,7 @@ class ExportModal extends Modal {
     // Export button
     new Setting(contentEl)
       .addButton(btn => btn
-        .setButtonText('Export to Vault')
+        .setButtonText('Export to vault')
         .setCta()
         .onClick(async () => {
           const exportData: ExportData = {

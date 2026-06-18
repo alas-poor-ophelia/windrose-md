@@ -84,7 +84,7 @@ class DungeondraftImportModal extends Modal {
 		contentEl.empty();
 		contentEl.addClass('windrose-dd-import-modal');
 
-		contentEl.createEl('h2', { text: 'Import Dungeondraft Pack' });
+		contentEl.createEl('h2', { text: 'Import Dungeondraft pack' });
 
 		contentEl.createEl('p', {
 			text: 'Select a .dungeondraft_pack file to import its assets as tiles. Only packs that allow third-party software access can be imported.',

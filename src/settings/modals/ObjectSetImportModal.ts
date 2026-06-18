@@ -26,7 +26,7 @@ class ObjectSetImportModal extends Modal {
     contentEl.empty();
     contentEl.addClass('windrose-import-modal');
 
-    contentEl.createEl('h2', { text: 'Import Object Set from Folder' });
+    contentEl.createEl('h2', { text: 'Import object set from folder' });
 
     contentEl.createEl('p', {
       text: 'Enter the vault path to a folder containing objects.json.',
@@ -38,7 +38,7 @@ class ObjectSetImportModal extends Modal {
     previewArea.style.display = 'none';
 
     new Setting(contentEl)
-      .setName('Folder Path')
+      .setName('Folder path')
       .setDesc('Vault-relative path (e.g. object-sets/my-set)')
       .addSearch(search => {
         new FolderSuggest(this.app, search.inputEl);

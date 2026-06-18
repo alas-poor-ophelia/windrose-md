@@ -118,10 +118,16 @@ export default [
       "eqeqeq": ["error", "always", { null: "ignore" }],
       "prefer-const": "error",
 
-      // Keep brand names cased correctly (preset would lowercase them)
+      // Sentence-case for UI strings, with project-specific protections:
+      // brands + product name, technical acronyms, and a skip-list for strings
+      // carrying code tokens (paths, snake_case ids, hex, the windrose-map
+      // block name), lone glyphs, parentheticals, and +-prefixed buttons.
       "obsidianmd/ui/sentence-case": ["error", {
         enforceCamelCaseLower: true,
-        brands: ["Windrose", "Dungeondraft", "RPGAwesome"]
+        brands: ["Windrose", "Dungeondraft", "RPGAwesome", "MapDesigner"],
+        acronyms: ["MD", "ID", "RGB", "RPG", "DD", "JSON", "SVG", "PNG", "URL"],
+        ignoreWords: ["Unicode"],
+        ignoreRegex: ["/", "_", "#", "windrose-map", "^x$", "^\\s*\\(", "^\\+"]
       }]
     }
   },

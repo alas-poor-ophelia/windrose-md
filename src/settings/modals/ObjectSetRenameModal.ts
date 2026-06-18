@@ -14,11 +14,11 @@ class ObjectSetRenameModal extends Modal {
   onOpen() {
     const { contentEl } = this;
     contentEl.empty();
-    contentEl.createEl('h2', { text: 'Rename Object Set' });
+    contentEl.createEl('h2', { text: 'Rename object set' });
 
     let newName = this.currentName;
     new Setting(contentEl)
-      .setName('Set Name')
+      .setName('Set name')
       .addText(text => {
         text.setValue(this.currentName);
         text.onChange((v: string) => { newName = v; });

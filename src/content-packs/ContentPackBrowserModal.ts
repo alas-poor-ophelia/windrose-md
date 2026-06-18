@@ -37,7 +37,7 @@ class ContentPackBrowserModal extends Modal {
     contentEl.empty();
     contentEl.addClass('windrose-content-pack-modal');
 
-    contentEl.createEl('h2', { text: 'Content Packs' });
+    contentEl.createEl('h2', { text: 'Content packs' });
 
     const tabBar = contentEl.createDiv({ cls: 'windrose-content-pack-tabs' });
     for (const tab of TAB_CONFIG) {

@@ -30,7 +30,7 @@ class ObjectSetExportModal extends Modal {
     contentEl.empty();
     contentEl.addClass('windrose-export-modal');
 
-    contentEl.createEl('h2', { text: 'Export Object Set' });
+    contentEl.createEl('h2', { text: 'Export object set' });
 
     const set = this.set;
     let exportName = set.name;
@@ -38,7 +38,7 @@ class ObjectSetExportModal extends Modal {
     let includeGrid = !!set.data.grid;
 
     new Setting(contentEl)
-      .setName('Set Name')
+      .setName('Set name')
       .setDesc('Name used for the export folder')
       .addText(text => text
         .setValue(exportName)

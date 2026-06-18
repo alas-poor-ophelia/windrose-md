@@ -30,7 +30,7 @@ export const TabRenderColorsMethods = {
 
     // Add Custom Color button
     new Setting(containerEl)
-      .setName('Add Custom Color')
+      .setName('Add custom color')
       .setDesc('Create a new color for your palette')
       .addButton(btn => btn
         .setButtonText('+ Add Color')
@@ -45,10 +45,10 @@ export const TabRenderColorsMethods = {
 
     // Reset All Colors button
     new Setting(containerEl)
-      .setName('Reset Palette')
+      .setName('Reset palette')
       .setDesc('Restore all built-in colors to defaults and remove custom colors')
       .addButton(btn => btn
-        .setButtonText('Reset All')
+        .setButtonText('Reset all')
         .setWarning()
         .onClick(async () => {
           if (await new ConfirmModal(this.app, {
@@ -88,7 +88,7 @@ export const TabRenderColorsMethods = {
 
     if (visibleColors.length === 0) {
       visibleList.createEl('div', {
-        text: 'No colors visible. Use "Show" to restore hidden colors.',
+        text: 'No colors visible. Use "show" to restore hidden colors.',
         cls: 'windrose-settings-empty-message'
       });
     }

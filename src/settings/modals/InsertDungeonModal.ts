@@ -257,7 +257,7 @@ class InsertDungeonModal extends Modal {
     const visualizerContainer = headerContainer.createDiv({ cls: 'windrose-dungeon-visualizer' });
 
     const titleOverlay = headerContainer.createDiv({ cls: 'windrose-dungeon-title-overlay' });
-    titleOverlay.createEl('h2', { text: 'Generate Random Dungeon' });
+    titleOverlay.createEl('h2', { text: 'Generate random dungeon' });
 
     this.visualizer = new DungeonEssenceVisualizer(visualizerContainer, {
       height: 180,
@@ -271,7 +271,7 @@ class InsertDungeonModal extends Modal {
       .addText(text => {
         this.nameInput = text;
         text
-          .setPlaceholder('e.g., Goblin Cave Level 1')
+          .setPlaceholder('E.g., goblin cave level 1')
           .onChange((value: string) => {
             this.mapName = value;
           });
@@ -366,7 +366,7 @@ class InsertDungeonModal extends Modal {
       this.distancePerCell = parseInt((e.target as HTMLInputElement).value) || 5;
     });
 
-    distRow.createEl('span', { text: 'per cell, unit:' });
+    distRow.createEl('span', { text: 'Per cell, unit:' });
 
     const unitInput = distRow.createEl('input', {
       type: 'text',
@@ -434,7 +434,7 @@ class InsertDungeonModal extends Modal {
     createSlider(advancedContent, 'Room Size Bias', 'roomSizeBias', -1, 1, 0.1, 0, biasLabel);
 
     const corridorRow = advancedContent.createDiv({ cls: 'windrose-dungeon-slider-row' });
-    corridorRow.createEl('label', { text: 'Corridor Style' });
+    corridorRow.createEl('label', { text: 'Corridor style' });
     const corridorToggleContainer = corridorRow.createDiv({ cls: 'windrose-dungeon-toggle-container' });
 
     const corridorSelect = corridorToggleContainer.createEl('select', { cls: 'windrose-dungeon-select' });
@@ -457,13 +457,13 @@ class InsertDungeonModal extends Modal {
     const waterLabel = (v: number): string => v === 0 ? 'None' : `${Math.round(v * 100)}%`;
     createSlider(advancedContent, 'Water Features', 'waterChance', 0, 0.5, 0.05, 0.15, waterLabel);
 
-    advancedContent.createEl('div', { cls: 'windrose-dungeon-section-header', text: 'Object Placement' });
+    advancedContent.createEl('div', { cls: 'windrose-dungeon-section-header', text: 'Object placement' });
 
     const densityLabel = (v: number): string => v < 0.75 ? 'Sparse' : v > 1.25 ? 'Dense' : 'Normal';
     createSlider(advancedContent, 'Object Density', 'objectDensity', 0.5, 2, 0.1, 1.0, densityLabel);
 
     const templateRow = advancedContent.createDiv({ cls: 'windrose-dungeon-slider-row' });
-    templateRow.createEl('label', { text: 'Room Templates' });
+    templateRow.createEl('label', { text: 'Room templates' });
     const templateToggleContainer = templateRow.createDiv({ cls: 'windrose-dungeon-toggle-container' });
     const templateCheckbox = templateToggleContainer.createEl('input', {
       type: 'checkbox',
@@ -483,16 +483,16 @@ class InsertDungeonModal extends Modal {
       text: 'Generates themed rooms (library, shrine, barracks) with appropriate objects'
     });
 
-    advancedContent.createEl('div', { cls: 'windrose-dungeon-subsection', text: 'Room Categories' });
+    advancedContent.createEl('div', { cls: 'windrose-dungeon-subsection', text: 'Room categories' });
     createSlider(advancedContent, 'Monsters', 'monsterWeight', 0, 1, 0.05, 0.33, pct);
     createSlider(advancedContent, 'Empty Rooms', 'emptyWeight', 0, 1, 0.05, 0.33, pct);
     createSlider(advancedContent, 'Features', 'featureWeight', 0, 1, 0.05, 0.17, pct);
     createSlider(advancedContent, 'Traps', 'trapWeight', 0, 1, 0.05, 0.17, pct);
 
-    advancedContent.createEl('div', { cls: 'windrose-dungeon-section-header', text: 'Solo Play' });
+    advancedContent.createEl('div', { cls: 'windrose-dungeon-section-header', text: 'Solo play' });
 
     const fogRow = advancedContent.createDiv({ cls: 'windrose-dungeon-slider-row' });
-    fogRow.createEl('label', { text: 'Auto-Fog Dungeon' });
+    fogRow.createEl('label', { text: 'Auto-fog dungeon' });
     const fogToggleContainer = fogRow.createDiv({ cls: 'windrose-dungeon-toggle-container' });
     const fogCheckbox = fogToggleContainer.createEl('input', {
       type: 'checkbox',

@@ -44,7 +44,7 @@ class CategoryEditModal extends Modal {
       .addText(text => {
         nameInputEl = text.inputEl;
         text.setValue(this.label)
-          .setPlaceholder('e.g., Alchemy')
+          .setPlaceholder('E.g., alchemy')
           .onChange((value: string) => {
             this.label = value;
           });
@@ -56,7 +56,7 @@ class CategoryEditModal extends Modal {
     }
 
     new Setting(contentEl)
-      .setName('Sort Order')
+      .setName('Sort order')
       .setDesc('Lower numbers appear first (built-ins use 0-50)')
       .addText(text => text
         .setValue(String(this.order))

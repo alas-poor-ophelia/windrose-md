@@ -131,10 +131,10 @@ export const TabRenderKeyboardShortcutsMethods = {
     }
 
     new Setting(containerEl)
-      .setName('Reset All Shortcuts')
+      .setName('Reset all shortcuts')
       .setDesc('Restore all keyboard shortcuts to their default values')
       .addButton(btn => btn
-        .setButtonText('Reset All')
+        .setButtonText('Reset all')
         .setWarning()
         .onClick(async () => {
           this.plugin.settings.keyboardShortcuts = Object.assign({}, DEFAULT_SHORTCUTS);

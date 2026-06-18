@@ -52,7 +52,7 @@ export default class WindrosePlugin extends Plugin {
     console.debug('[Windrose] Plugin loaded, version:', this.manifest.version, 'data:', this.dataFilePath);
 
     this.registerView(VIEW_TYPE_WINDROSE_MAP, (leaf) => new WindroseMapView(leaf));
-    this.addRibbonIcon('compass', 'Open Windrose Map', () => this.activateMapView());
+    this.addRibbonIcon('compass', 'Open Windrose map', () => this.activateMapView());
     this.addCommand({
       id: 'open-map-view',
       name: 'Open map in full pane',

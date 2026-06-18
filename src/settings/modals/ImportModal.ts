@@ -117,7 +117,7 @@ class ImportModal extends Modal {
         // Show import options
         optionsArea.empty();
         new Setting(optionsArea)
-          .setName('Import Mode')
+          .setName('Import mode')
           .setDesc('How to handle existing customizations')
           .addDropdown(dropdown => dropdown
             .addOption('merge', 'Merge (keep existing, add new)')
