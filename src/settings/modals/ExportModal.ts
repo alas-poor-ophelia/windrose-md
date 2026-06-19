@@ -33,7 +33,7 @@ class ExportModal extends Modal {
     this.mapType = mapType;
   }
 
-  onOpen() {
+  onOpen(): void {
     const { contentEl } = this;
     contentEl.empty();
     contentEl.addClass('windrose-export-modal');
@@ -152,7 +152,7 @@ class ExportModal extends Modal {
         }));
   }
 
-  onClose() {
+  onClose(): void {
     this.contentEl.empty();
   }
 }

@@ -108,7 +108,7 @@ function MapSettingsModalContent(): VNode | null {
 
   if (!isOpen) return null;
 
-  const contextBridge = (children: unknown) =>
+  const contextBridge = (children: unknown): h.JSX.Element =>
     h(ModalShellContext.Provider, { value: shellCtx },
       h(AppearanceContext.Provider, { value: appearanceCtx },
         h(BackgroundImageContext.Provider, { value: bgImageCtx },

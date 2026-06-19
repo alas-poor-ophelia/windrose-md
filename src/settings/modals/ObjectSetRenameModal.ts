@@ -11,7 +11,7 @@ class ObjectSetRenameModal extends Modal {
     this.onSave = onSave;
   }
 
-  onOpen() {
+  onOpen(): void {
     const { contentEl } = this;
     contentEl.empty();
     contentEl.createEl('h2', { text: 'Rename object set' });
@@ -46,7 +46,7 @@ class ObjectSetRenameModal extends Modal {
     };
   }
 
-  onClose() {
+  onClose(): void {
     this.contentEl.empty();
   }
 }

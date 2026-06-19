@@ -149,7 +149,7 @@ interface PickerProps {
   onSelect: (entry: MapListEntry) => void;
 }
 
-function FullPaneMapPicker({ maps, onSelect }: PickerProps) {
+function FullPaneMapPicker({ maps, onSelect }: PickerProps): h.JSX.Element {
   if (maps.length === 0) {
     return h('div', { className: 'windrose-fullpane-picker' },
       h('div', { className: 'windrose-fullpane-picker-icon' }, '🧭'),

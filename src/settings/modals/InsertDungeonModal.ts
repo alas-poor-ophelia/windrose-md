@@ -391,7 +391,7 @@ class InsertDungeonModal extends Modal {
       chevron.textContent = this.advancedOpen ? '▼' : '▶';
     };
 
-    const createSlider = (container: HTMLElement, label: string, key: string, min: number, max: number, step: number, defaultVal: number, formatFn: (v: number) => string) => {
+    const createSlider = (container: HTMLElement, label: string, key: string, min: number, max: number, step: number, defaultVal: number, formatFn: (v: number) => string): { slider: HTMLInputElement; valueDisplay: HTMLSpanElement } => {
       const row = container.createDiv({ cls: 'windrose-dungeon-slider-row' });
       row.createEl('label', { text: label });
 

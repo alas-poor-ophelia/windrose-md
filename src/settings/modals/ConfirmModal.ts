@@ -25,7 +25,7 @@ class ConfirmModal extends Modal {
     this.resolved = false;
   }
 
-  onOpen() {
+  onOpen(): void {
     const { contentEl } = this;
     contentEl.empty();
 
@@ -54,7 +54,7 @@ class ConfirmModal extends Modal {
     };
   }
 
-  onClose() {
+  onClose(): void {
     this.contentEl.empty();
     if (!this.resolved && this.resolvePromise) {
       this.resolvePromise(false);

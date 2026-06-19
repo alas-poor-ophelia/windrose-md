@@ -91,7 +91,7 @@ class ObjectEditModal extends Modal {
     this.imageSearchResults = [];
   }
 
-  onOpen() {
+  onOpen(): void {
     const { contentEl } = this;
     contentEl.empty();
     contentEl.addClass('windrose-object-edit-modal');
@@ -201,7 +201,7 @@ class ObjectEditModal extends Modal {
     saveBtn.onclick = () => this.save();
   }
 
-  setMode(newMode: ObjectMode) {
+  setMode(newMode: ObjectMode): void {
     this.mode = newMode;
     // Update button active states
     Object.entries(this.modeButtons).forEach(([mode, btn]) => {
@@ -217,7 +217,7 @@ class ObjectEditModal extends Modal {
     this.renderImagePicker();
   }
 
-  renderSymbolInput() {
+  renderSymbolInput(): void {
     const container = this.symbolContainer;
     container.empty();
 
@@ -271,7 +271,7 @@ class ObjectEditModal extends Modal {
     }
   }
 
-  renderIconPicker() {
+  renderIconPicker(): void {
     const container = this.iconPickerContainer;
     container.empty();
 
@@ -335,7 +335,7 @@ class ObjectEditModal extends Modal {
     this.updateIconPreview();
   }
 
-  renderIconTabs(container: HTMLDivElement) {
+  renderIconTabs(container: HTMLDivElement): void {
     // Update active state on all tabs
     const tabs = container.querySelectorAll('.windrose-icon-picker-tab');
     tabs.forEach(tab => {
@@ -348,7 +348,7 @@ class ObjectEditModal extends Modal {
     });
   }
 
-  renderIconGrid() {
+  renderIconGrid(): void {
     const container = this.iconGridContainer;
     if (!container) return;
     container.empty();
@@ -390,13 +390,13 @@ class ObjectEditModal extends Modal {
     }
   }
 
-  updateSymbolPreview() {
+  updateSymbolPreview(): void {
     if (this.symbolPreviewEl) {
       this.symbolPreviewEl.textContent = this.symbol || '?';
     }
   }
 
-  updateIconPreview() {
+  updateIconPreview(): void {
     const container = this.iconPreviewContainer;
     if (!container) return;
     container.empty();
@@ -423,7 +423,7 @@ class ObjectEditModal extends Modal {
     infoBox.createDiv({ cls: 'windrose-icon-preview-class', text: this.iconClass });
   }
 
-  renderImagePicker() {
+  renderImagePicker(): void {
     const container = this.imagePickerContainer;
     container.empty();
 
@@ -487,7 +487,7 @@ class ObjectEditModal extends Modal {
     }
   }
 
-  async searchImages(query: string) {
+  async searchImages(query: string): Promise<void> {
     if (!query || query.trim().length < 2) {
       this.imageSearchResults = [];
       this.renderImageSearchResults();
@@ -511,7 +511,7 @@ class ObjectEditModal extends Modal {
     this.renderImageSearchResults();
   }
 
-  renderImageSearchResults() {
+  renderImageSearchResults(): void {
     const container = this.imageResultsContainer;
     if (!container) return;
     container.empty();
@@ -536,7 +536,7 @@ class ObjectEditModal extends Modal {
     return parts[parts.length - 1];
   }
 
-  save() {
+  save(): void {
     // Validate based on mode
     if (this.mode === 'icon') {
       if (!this.iconClass || !RPGAwesomeHelpers.isValid(this.iconClass)) {
@@ -669,7 +669,7 @@ class ObjectEditModal extends Modal {
     this.close();
   }
 
-  onClose() {
+  onClose(): void {
     this.contentEl.empty();
   }
 }

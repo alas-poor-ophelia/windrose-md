@@ -28,7 +28,7 @@ class CategoryEditModal extends Modal {
     this.order = existingCategory?.order ?? 100;
   }
 
-  onOpen() {
+  onOpen(): void {
     const { contentEl } = this;
     contentEl.empty();
     contentEl.addClass('windrose-category-edit-modal');
@@ -77,7 +77,7 @@ class CategoryEditModal extends Modal {
     saveBtn.onclick = () => this.save();
   }
 
-  save() {
+  save(): void {
     if (!this.label || this.label.trim().length === 0) {
       new Notice('Please enter a category name');
       return;
@@ -115,7 +115,7 @@ class CategoryEditModal extends Modal {
     this.close();
   }
 
-  onClose() {
+  onClose(): void {
     this.contentEl.empty();
   }
 }

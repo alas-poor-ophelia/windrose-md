@@ -25,7 +25,7 @@ interface NativeToggleProps {
   disabled?: boolean;
 }
 
-function NativeToggle({ value, onChange, disabled }: NativeToggleProps) {
+function NativeToggle({ value, onChange, disabled }: NativeToggleProps): h.JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null);
   const toggleRef = useRef<ToggleComponent | null>(null);
 
@@ -100,7 +100,7 @@ interface NativeDropdownProps {
   disabled?: boolean;
 }
 
-function NativeDropdown({ value, options, onChange, disabled }: NativeDropdownProps) {
+function NativeDropdown({ value, options, onChange, disabled }: NativeDropdownProps): h.JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<DropdownComponent | null>(null);
 
@@ -170,7 +170,7 @@ interface NativeSliderProps {
   disabled?: boolean;
 }
 
-function NativeSlider({ value, min, max, step, onChange, disabled }: NativeSliderProps) {
+function NativeSlider({ value, min, max, step, onChange, disabled }: NativeSliderProps): h.JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null);
   const sliderRef = useRef<SliderComponent | null>(null);
 

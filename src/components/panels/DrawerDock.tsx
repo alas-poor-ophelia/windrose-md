@@ -65,7 +65,7 @@ function FlyoutPanel({ tiles, onSelect, onClose, label }: {
   const [hoveredTile, setHoveredTile] = useState<FlyoutTile | null>(null);
 
   useEffect(() => {
-    const handler = (e: MouseEvent) => {
+    const handler = (e: MouseEvent): void => {
       if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
         onClose();
       }
@@ -140,7 +140,7 @@ function SpineRibbon({ depth, onDepthChange, hidden, onToggleHide, tileCounts, o
     }
   }, [selectedTileThumb]);
 
-  const toggleFlyout = (which: 'recent' | 'starred') => {
+  const toggleFlyout = (which: 'recent' | 'starred'): void => {
     onSpineFlyout(spineFlyout === which ? null : which);
   };
 
@@ -237,7 +237,7 @@ function DrawerDock({
   useEffect(() => {
     if (!resizing) return;
 
-    const handleMove = (e: MouseEvent) => {
+    const handleMove = (e: MouseEvent): void => {
       if (!dragRef.current || !onWidthChange) return;
       const delta = dragRef.current.startX - e.clientX;
       const newWidth = Math.round(
@@ -246,7 +246,7 @@ function DrawerDock({
       onWidthChange(newWidth);
     };
 
-    const handleUp = () => {
+    const handleUp = (): void => {
       dragRef.current = null;
       setResizing(false);
     };

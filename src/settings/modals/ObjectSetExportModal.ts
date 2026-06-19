@@ -25,7 +25,7 @@ class ObjectSetExportModal extends Modal {
     this.set = set;
   }
 
-  onOpen() {
+  onOpen(): void {
     const { contentEl } = this;
     contentEl.empty();
     contentEl.addClass('windrose-export-modal');
@@ -104,7 +104,7 @@ class ObjectSetExportModal extends Modal {
     };
   }
 
-  onClose() {
+  onClose(): void {
     this.contentEl.empty();
   }
 }
