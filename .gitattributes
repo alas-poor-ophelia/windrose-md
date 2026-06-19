@@ -13,3 +13,6 @@
 # Keep Windows line endings for batch files
 *.bat text eol=crlf
 *.cmd text eol=crlf
+
+# Git hooks must stay LF — CRLF breaks the shebang (/bin/sh^M: bad interpreter)
+.githooks/* text eol=lf
