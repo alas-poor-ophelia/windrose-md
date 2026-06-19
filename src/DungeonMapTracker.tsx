@@ -215,7 +215,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     tileFitMode, setTileFitMode,
     stampMode, setStampMode,
     tileScale, setTileScale,
-    brushSize, setBrushSize,
+    brushSize,
     tileDepth, setTileDepth,
     hiddenLayers, toggleHiddenLayer,
     recentTiles,

@@ -198,7 +198,6 @@ function SpineRibbon({ depth, onDepthChange, hidden, onToggleHide, tileCounts, o
 
 function DrawerDock({
   open,
-  onCollapse,
   onExpand,
   drawerWidth,
   onWidthChange,

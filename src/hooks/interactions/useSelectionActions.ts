@@ -6,7 +6,6 @@
  */
 
 import type { MapData } from '#types/core/map.types';
-import type { MapObject } from '#types/objects/object.types';
 import type { SelectedItem } from '#types/contexts/context.types';
 
 export type ActionGroup = 'transform' | 'content' | 'links' | 'style' | 'player' | 'danger';

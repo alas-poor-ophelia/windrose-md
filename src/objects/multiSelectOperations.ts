@@ -39,10 +39,6 @@ export interface WorldPoint {
 }
 
 /** Geometry with bounds check */
-interface GeometryWithBounds {
-  isWithinBounds?(x: number, y: number): boolean;
-}
-
 // ===========================================
 // Rectangle Operations
 // ===========================================

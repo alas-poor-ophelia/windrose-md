@@ -241,7 +241,7 @@ export function datacoreTransformer(options: TransformOptions = {}): Plugin {
       }
 
       // Skip if no Datacore patterns detected
-      const hasDatacoreReturn = /^return\s*[\{\(]/m.test(code);
+      const hasDatacoreReturn = /^return\s*[{(]/m.test(code);
       const hasDatacoreImports = /dc\.require|requireModuleByName/.test(code);
 
       if (!hasDatacoreReturn && !hasDatacoreImports) {

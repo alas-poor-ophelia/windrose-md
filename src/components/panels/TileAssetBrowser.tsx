@@ -11,6 +11,7 @@ import type { ToolId } from '#types/tools/tool.types';
 import type { FlyoutTile } from './DrawerDock';
 import type { VNode, ComponentChildren } from 'preact';
 import { TFile } from 'obsidian';
+import type { App } from 'obsidian';
 
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { memo } from 'preact/compat';
@@ -127,6 +128,7 @@ function drawTileToCanvas(
 }
 
 function loadVaultImage(
+  app: App,
   vaultPath: string,
   getCachedImage: ((path: string) => HTMLImageElement | null) | undefined,
   onDraw: (img: HTMLImageElement) => void,
@@ -469,7 +471,7 @@ const TileAssetBrowser = memo(({
       canvas.style.removeProperty('transform');
     }
 
-    return loadVaultImage(hoveredTile.vaultPath, getCachedImage, (img) => {
+    return loadVaultImage(app, hoveredTile.vaultPath, getCachedImage, (img) => {
       drawTileToCanvas(canvas, img, PREVIEW_SIZE);
     });
   }, [hoveredTile, rotation, flipH, selectedTilesetId, selectedTileId]);
@@ -583,7 +585,7 @@ const TileAssetBrowser = memo(({
       ? requestIdleCallback(run)
       : window.setTimeout(run, 200) as unknown as number;
     return () => {
-      typeof cancelIdleCallback === 'function' ? cancelIdleCallback(id) : window.clearTimeout(id);
+      if (typeof cancelIdleCallback === 'function') { cancelIdleCallback(id); } else { window.clearTimeout(id); }
     };
   }, [tilesets, tileMetadata]);
 
@@ -635,7 +637,7 @@ const TileAssetBrowser = memo(({
       : window.setTimeout(() => void run(), 400) as unknown as number;
     return () => {
       controller.abort();
-      typeof cancelIdleCallback === 'function' ? cancelIdleCallback(id) : window.clearTimeout(id);
+      if (typeof cancelIdleCallback === 'function') { cancelIdleCallback(id); } else { window.clearTimeout(id); }
     };
   }, [tilesets, tileMetadata]);
 
@@ -822,8 +824,6 @@ const TileAssetBrowser = memo(({
   // Grid sizing
   const tileMin = compact ? 42 : 56;
   const gridGap = compact ? 3 : 6;
-  const secGap = compact ? 5 : 11;
-  const gridStyle = { gridTemplateColumns: `repeat(auto-fill, minmax(${tileMin}px, 1fr))`, gap: gridGap };
 
   // Virtualization: column counts and cell sizes
   const orgColCount = organize && containerWidth > 0

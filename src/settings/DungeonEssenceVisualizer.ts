@@ -437,7 +437,7 @@ export class DungeonEssenceVisualizer {
     this.stampOverlay.style.transform = 'translate(-50%, -50%)';
     this.stampOverlay.style.animation = 'none';
     // Trigger reflow
-    this.stampOverlay.offsetHeight;
+    void this.stampOverlay.offsetHeight;
     this.stampOverlay.style.animation = 'windrose-windrose-stamp 0.35s ease-out forwards';
     this.stampOverlay.style.opacity = '0.75';
   }

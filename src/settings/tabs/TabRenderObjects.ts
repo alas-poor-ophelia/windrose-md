@@ -15,7 +15,7 @@ import { ConfirmModal } from '../modals/ConfirmModal';
 import { PromptModal } from '../modals/PromptModal';
 import { ContentPackBrowserModal } from '../../content-packs/ContentPackBrowserModal';
 import type { SettingsTabThis } from './settingsTabContext';
-import type { ObjectOverride, CustomObject, CustomCategory, ObjectSet } from '#types/settings/settings.types';
+import type { CustomObject, CustomCategory, ObjectSet } from '#types/settings/settings.types';
 
 /**
  * Extended this-type that includes the actual method signatures used internally.

@@ -474,10 +474,11 @@ class GridGeometry extends BaseGeometry {
         return Math.sqrt(dx * dx + dy * dy);
         
       case 'alternating':
-      default:
+      default: {
         const straights = Math.abs(dx - dy);
         const diagonals = Math.min(dx, dy);
         return straights + diagonals + Math.floor(diagonals / 2);
+      }
     }
   }
   
