@@ -90,10 +90,12 @@ async function recordPerfTelemetry(app: App, durationMs = 60000): Promise<void> 
   // ---- canvas ops ----
   safeWrap('canvas2d', () => {
     const P = CanvasRenderingContext2D.prototype;
+    /* eslint-disable @typescript-eslint/unbound-method -- captured to rebind via .apply(this); call-site `this` is preserved */
     const orig = {
       fillRect: P.fillRect, drawImage: P.drawImage, getImageData: P.getImageData,
       clearRect: P.clearRect, createPattern: P.createPattern,
     };
+    /* eslint-enable @typescript-eslint/unbound-method */
     P.fillRect = function (this: CanvasRenderingContext2D, ...a) { c.fillRect++; return orig.fillRect.apply(this, a as Parameters<typeof orig.fillRect>); };
     P.drawImage = function (this: CanvasRenderingContext2D, ...a) { c.drawImage++; return orig.drawImage.apply(this, a as Parameters<typeof orig.drawImage>); } as typeof P.drawImage;
     P.getImageData = function (this: CanvasRenderingContext2D, ...a) { c.getImageData++; return orig.getImageData.apply(this, a as Parameters<typeof orig.getImageData>); };
@@ -104,6 +106,7 @@ async function recordPerfTelemetry(app: App, durationMs = 60000): Promise<void> 
 
   safeWrap('toDataURL', () => {
     const CP = HTMLCanvasElement.prototype;
+    // eslint-disable-next-line @typescript-eslint/unbound-method -- captured to rebind via .apply(this); call-site `this` is preserved
     const orig = CP.toDataURL;
     CP.toDataURL = function (this: HTMLCanvasElement, ...a) { c.toDataURL++; return orig.apply(this, a as Parameters<typeof orig>); };
     return () => { CP.toDataURL = orig; };

@@ -112,7 +112,10 @@ export class DungeonEssenceVisualizer {
       filter: saturate(0.4);
       transition: opacity 0.3s ease;
     `;
-    this.stampOverlay.innerHTML = this.getWindroseSVG();
+    // Parse as SVG (not HTML) so filters/namespaced elements survive, and avoid
+    // the innerHTML sink. Content is a static developer-authored template.
+    const stampSvg = new DOMParser().parseFromString(this.getWindroseSVG(), 'image/svg+xml').documentElement;
+    this.stampOverlay.appendChild(stampSvg);
     this.container.style.position = 'relative';
     this.container.appendChild(this.stampOverlay);
 
