@@ -16,7 +16,12 @@ interface WindrosePlugin extends Plugin {
   hasOldPluginData(): Promise<boolean>;
 }
 
-// Declaration merging: tells TypeScript this class has the mixin methods
+// Declaration merging: tells TypeScript this class has the mixin methods that are
+// added at runtime via Object.assign(prototype, ...Methods) below. Deliberate and
+// safe. The "proper" structural fix (mixins as free functions) is DEFERRED to the
+// Obsidian declarative Settings API migration — that rewrites this whole tab, so
+// restructuring now would be throwaway work. See project_eslint_0_3_migration.
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 interface WindroseMDSettingsTab {
   renderSearchBar(containerEl: HTMLElement): void;
   renderHexSettingsContent(el: HTMLElement): void;
@@ -36,6 +41,7 @@ interface WindroseMDSettingsTab {
   renderKeyboardShortcutsContent(el: HTMLElement): void;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see interface note above (deferred to Settings API migration)
 class WindroseMDSettingsTab extends PluginSettingTab {
   plugin: WindrosePlugin;
   settingsChanged: boolean;
