@@ -583,7 +583,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
         undo: (): boolean => { wrappedHandleUndo(); return true; },
         redo: (): boolean => { handleRedo(); return true; },
         selectLayer: (layerId: string) => handleLayerSelect(layerId),
-        forceSave: () => forceSave(),
+        forceSave: () => { void forceSave(); },
       },
     };
 

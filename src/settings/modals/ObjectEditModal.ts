@@ -462,9 +462,9 @@ class ObjectEditModal extends Modal {
       };
     }
 
-    searchInput.addEventListener('input', async (e: Event) => {
+    searchInput.addEventListener('input', (e: Event) => {
       this.imageSearchQuery = (e.target as HTMLInputElement).value;
-      await this.searchImages(this.imageSearchQuery);
+      void this.searchImages(this.imageSearchQuery);
     });
 
     // Search results dropdown

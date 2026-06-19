@@ -105,9 +105,9 @@ export const TabRenderObjectsMethods = {
         .setButtonText('+ Add Object')
         .setCta()
         .onClick(() => {
-          new ObjectEditModal(this.app, this.plugin, null, async () => {
+          new ObjectEditModal(this.app, this.plugin, null, () => {
             this.settingsChanged = true;
-            await this.plugin.saveSettings();
+            void this.plugin.saveSettings();
             this.display();
           }, this.selectedMapType).open();
         }));
@@ -119,9 +119,9 @@ export const TabRenderObjectsMethods = {
       .addButton(btn => btn
         .setButtonText('+ Add Category')
         .onClick(() => {
-          new CategoryEditModal(this.app, this.plugin, null, async () => {
+          new CategoryEditModal(this.app, this.plugin, null, () => {
             this.settingsChanged = true;
-            await this.plugin.saveSettings();
+            void this.plugin.saveSettings();
             this.display();
           }, this.selectedMapType).open();
         }));
@@ -133,7 +133,7 @@ export const TabRenderObjectsMethods = {
       .addButton(btn => btn
         .setButtonText('Import')
         .onClick(() => {
-          new ImportModal(this.app, this.plugin, async () => {
+          new ImportModal(this.app, this.plugin, () => {
             this.settingsChanged = true;
             this.display();
           }, this.selectedMapType).open();
@@ -269,9 +269,9 @@ export const TabRenderObjectsMethods = {
         const editBtn = categoryActions.createEl('button', { cls: 'windrose-settings-icon-btn', attr: { 'aria-label': 'Edit category', title: 'Edit category' } });
         IconHelpers.set(editBtn, 'pencil');
         editBtn.onclick = () => {
-          new CategoryEditModal(this.app, this.plugin, category as CustomCategory, async () => {
+          new CategoryEditModal(this.app, this.plugin, category as CustomCategory, () => {
             this.settingsChanged = true;
-            await this.plugin.saveSettings();
+            void this.plugin.saveSettings();
             this.display();
           }, this.selectedMapType).open();
         };
@@ -367,7 +367,7 @@ export const TabRenderObjectsMethods = {
       e.preventDefault();
     });
 
-    objectList.addEventListener('drop', async (e: DragEvent) => {
+    objectList.addEventListener('drop', (e: DragEvent) => {
       e.preventDefault();
 
       // Get the correct settings keys for the selected map type
@@ -427,7 +427,7 @@ export const TabRenderObjectsMethods = {
       });
 
       this.settingsChanged = true;
-      await this.plugin.saveSettings();
+      void this.plugin.saveSettings();
     });
   },
   renderObjectRow(this: TabRenderObjectsThis, container: HTMLElement, obj: ResolvedObject, isHiddenSection = false, canDrag = false): void {
@@ -484,9 +484,9 @@ export const TabRenderObjectsMethods = {
     const editBtn = actions.createEl('button', { cls: 'windrose-settings-icon-btn', attr: { 'aria-label': 'Edit', title: 'Edit object' } });
     IconHelpers.set(editBtn, 'pencil');
     editBtn.onclick = () => {
-      new ObjectEditModal(this.app, this.plugin, obj, async () => {
+      new ObjectEditModal(this.app, this.plugin, obj, () => {
         this.settingsChanged = true;
-        await this.plugin.saveSettings();
+        void this.plugin.saveSettings();
         this.display();
       }, this.selectedMapType).open();
     };
@@ -728,9 +728,9 @@ export const TabRenderObjectsMethods = {
         });
         IconHelpers.set(renameBtn, 'pencil');
         renameBtn.onclick = () => {
-          new ObjectSetRenameModal(this.app, set.name, async (newName: string) => {
+          new ObjectSetRenameModal(this.app, set.name, (newName: string) => {
             ObjectSetHelpers.renameSet(this.plugin, set.id, newName);
-            await this.plugin.saveSettings();
+            void this.plugin.saveSettings();
             this.display();
           }).open();
         };
@@ -785,7 +785,7 @@ export const TabRenderObjectsMethods = {
     actionSetting.addButton(btn => btn
       .setButtonText('Import from folder')
       .onClick(() => {
-        new ObjectSetImportModal(this.app, this.plugin, async () => {
+        new ObjectSetImportModal(this.app, this.plugin, () => {
           this.settingsChanged = true;
           this.display();
         }).open();

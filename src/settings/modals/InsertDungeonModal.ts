@@ -561,7 +561,7 @@ class InsertDungeonModal extends Modal {
       }
     };
 
-    contentEl.addEventListener('keydown', async (e: KeyboardEvent) => {
+    contentEl.addEventListener('keydown', (e: KeyboardEvent) => { void (async () => {
       if (e.key === 'Enter' && this.dungeonSize) {
         e.preventDefault();
         try {
@@ -599,7 +599,7 @@ class InsertDungeonModal extends Modal {
           new Notice('Failed to generate dungeon: ' + (err as Error).message);
         }
       }
-    });
+    })(); });
   }
 
   onClose(): void {

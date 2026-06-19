@@ -54,7 +54,7 @@ class ImportModal extends Modal {
 
     let mergeMode = 'merge'; // 'merge' or 'replace'
 
-    fileInput.addEventListener('change', async (e: Event) => {
+    fileInput.addEventListener('change', (e: Event) => { void (async () => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (!file) return;
 
@@ -137,7 +137,7 @@ class ImportModal extends Modal {
         optionsArea.style.display = 'none';
         this.importData = null;
       }
-    });
+    })(); });
 
     // Buttons
     const buttonContainer = contentEl.createDiv({ cls: 'windrose-modal-buttons' });

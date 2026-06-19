@@ -126,7 +126,7 @@ class ColorEditModal extends Modal {
       text: 'Save',
       cls: 'mod-cta'
     });
-    saveBtn.addEventListener('click', async () => {
+    saveBtn.addEventListener('click', () => {
       // Validate
       if (!labelValue.trim()) {
         new Notice('Please enter a label for this color.');

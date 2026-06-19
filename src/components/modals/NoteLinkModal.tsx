@@ -143,7 +143,7 @@ function openNativeNoteLinkModal(app: App, options: OpenNativeNoteLinkModalOptio
           text: 'Save',
           cls: 'mod-cta'
         });
-        saveBtn.addEventListener('click', () => this.submit());
+        saveBtn.addEventListener('click', () => { void this.submit(); });
 
         window.setTimeout(() => {
           this.inputEl.focus();

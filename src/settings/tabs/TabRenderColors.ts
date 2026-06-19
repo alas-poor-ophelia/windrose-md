@@ -36,9 +36,9 @@ export const TabRenderColorsMethods = {
         .setButtonText('+ Add Color')
         .setCta()
         .onClick(() => {
-          new ColorEditModal(this.app, this.plugin, null, async () => {
+          new ColorEditModal(this.app, this.plugin, null, () => {
             this.settingsChanged = true;
-            await this.plugin.saveSettings();
+            void this.plugin.saveSettings();
             this.display();
           }).open();
         }));
@@ -144,9 +144,9 @@ export const TabRenderColorsMethods = {
     const editBtn = actions.createEl('button', { cls: 'windrose-btn-icon', attr: { 'aria-label': 'Edit color' } });
     IconHelpers.set(editBtn, 'pencil');
     editBtn.addEventListener('click', () => {
-      new ColorEditModal(this.app, this.plugin, color, async () => {
+      new ColorEditModal(this.app, this.plugin, color, () => {
         this.settingsChanged = true;
-        await this.plugin.saveSettings();
+        void this.plugin.saveSettings();
         this.display();
       }).open();
     });
@@ -155,7 +155,7 @@ export const TabRenderColorsMethods = {
     if (color.isBuiltIn) {
       const visBtn = actions.createEl('button', { cls: 'windrose-btn-icon', attr: { 'aria-label': isHidden ? 'Show color' : 'Hide color' } });
       IconHelpers.set(visBtn, isHidden ? 'eye' : 'eye-off');
-      visBtn.addEventListener('click', async () => {
+      visBtn.addEventListener('click', () => {
         if (!this.plugin.settings.colorPaletteOverrides) {
           this.plugin.settings.colorPaletteOverrides = {};
         }
@@ -171,7 +171,7 @@ export const TabRenderColorsMethods = {
         }
 
         this.settingsChanged = true;
-        await this.plugin.saveSettings();
+        void this.plugin.saveSettings();
         this.display();
       });
 
@@ -179,12 +179,12 @@ export const TabRenderColorsMethods = {
       if (color.isModified) {
         const resetBtn = actions.createEl('button', { cls: 'windrose-btn-icon', attr: { 'aria-label': 'Reset to default' } });
         IconHelpers.set(resetBtn, 'rotate-ccw');
-        resetBtn.addEventListener('click', async () => {
+        resetBtn.addEventListener('click', () => {
           if (this.plugin.settings.colorPaletteOverrides) {
             delete this.plugin.settings.colorPaletteOverrides[color.id];
           }
           this.settingsChanged = true;
-          await this.plugin.saveSettings();
+          void this.plugin.saveSettings();
           this.display();
         });
       }
@@ -194,10 +194,10 @@ export const TabRenderColorsMethods = {
     if (color.isCustom) {
       const delBtn = actions.createEl('button', { cls: 'windrose-btn-icon windrose-btn-danger', attr: { 'aria-label': 'Delete color' } });
       IconHelpers.set(delBtn, 'trash-2');
-      delBtn.addEventListener('click', async () => {
+      delBtn.addEventListener('click', () => {
         this.plugin.settings.customPaletteColors = (this.plugin.settings.customPaletteColors ?? []).filter(c => c.id !== color.id);
         this.settingsChanged = true;
-        await this.plugin.saveSettings();
+        void this.plugin.saveSettings();
         this.display();
       });
     }

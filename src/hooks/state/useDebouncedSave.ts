@@ -32,7 +32,7 @@ function useDebouncedSave(
 
     const currentVersion = ++saveVersionRef.current;
 
-    saveTimerRef.current = window.setTimeout(async () => {
+    saveTimerRef.current = window.setTimeout(() => { void (async () => {
       setSaveStatus('Saving...');
       const success = await saveMapData(app, mapId, pendingData);
 
@@ -45,7 +45,7 @@ function useDebouncedSave(
           setSaveStatus('Unsaved changes');
         }
       }
-    }, 2000);
+    })(); }, 2000);
 
     return () => {
       if (saveTimerRef.current) {
