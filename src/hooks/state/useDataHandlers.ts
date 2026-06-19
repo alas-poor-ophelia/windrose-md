@@ -10,7 +10,7 @@
  */
 
 // Type-only imports
-import type { MapLayer, StoredViewState, TextLabelSettings } from '#types/core/map.types';
+import type { MapLayer, StoredViewState, TextLabelSettings, Region, Outline, ShapeOverlay, FogOfWar } from '#types/core/map.types';
 import type { CustomColor } from '#types/core/common.types';
 import type { Cell } from '#types/core/cell.types';
 import type { Curve } from '#types/core/curve.types';
@@ -48,10 +48,10 @@ function useDataHandlers({
     layer: MapLayer,
     name: string,
     overrides: Partial<LayerHistorySnapshot> = {},
-    regions: import('#types/core/map.types').Region[] = [],
-    outlines: import('#types/core/map.types').Outline[] = [],
-    shapeOverlays: import('#types/core/map.types').ShapeOverlay[] = [],
-    fogOfWar: import('#types/core/map.types').FogOfWar | null = null
+    regions: Region[] = [],
+    outlines: Outline[] = [],
+    shapeOverlays: ShapeOverlay[] = [],
+    fogOfWar: FogOfWar | null = null
   ): LayerHistorySnapshot => ({
     cells: overrides.cells ?? layer.cells ?? [],
     curves: overrides.curves ?? layer.curves ?? [],
@@ -236,7 +236,7 @@ function useDataHandlers({
   }, [updateMapData]);
 
   // Handle regions change (hex maps only) - tracked in history for undo/redo
-  const handleRegionsChange = useCallback((regions: import('#types/core/map.types').Region[]): void => {
+  const handleRegionsChange = useCallback((regions: Region[]): void => {
     if (isApplyingHistory()) return;
 
     updateMapData((currentMapData) => {
@@ -250,7 +250,7 @@ function useDataHandlers({
   }, [updateMapData, addToHistory, isApplyingHistory, buildLayerHistorySnapshot]);
 
   // Handle outlines change (hex maps only) - tracked in history for undo/redo
-  const handleOutlinesChange = useCallback((outlines: import('#types/core/map.types').Outline[]): void => {
+  const handleOutlinesChange = useCallback((outlines: Outline[]): void => {
     if (isApplyingHistory()) return;
 
     updateMapData((currentMapData) => {
@@ -264,7 +264,7 @@ function useDataHandlers({
   }, [updateMapData, addToHistory, isApplyingHistory, buildLayerHistorySnapshot]);
 
   // Handle shape overlays change - tracked in history for undo/redo
-  const handleShapeOverlaysChange = useCallback((shapeOverlays: import('#types/core/map.types').ShapeOverlay[]): void => {
+  const handleShapeOverlaysChange = useCallback((shapeOverlays: ShapeOverlay[]): void => {
     if (isApplyingHistory()) return;
 
     updateMapData((currentMapData) => {

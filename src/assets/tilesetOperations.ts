@@ -4,6 +4,7 @@
  */
 
 import type { TilesetDef, FolderTileset, TileEntry } from '#types/tiles/tile.types';
+import { TFile } from 'obsidian';
 import type { App } from 'obsidian';
 
 import { getApp } from '../core/settingsAccessor';
@@ -126,9 +127,9 @@ async function scanTilesetFolder(app: App, folderPath: string): Promise<TileEntr
 async function measureAlphaCoverage(app: App, tile: TileEntry): Promise<number | null> {
   try {
     const file = app.vault.getAbstractFileByPath(tile.vaultPath);
-    if (!file) return null;
+    if (!(file instanceof TFile)) return null;
 
-    const binary = await app.vault.readBinary(file as import('obsidian').TFile);
+    const binary = await app.vault.readBinary(file);
     const blob = new Blob([binary]);
     const url = URL.createObjectURL(blob);
 
@@ -181,9 +182,9 @@ async function probeFirstTileImage(app: App, tiles: TileEntry[]): Promise<{ widt
     if (sizes.length >= MAX_PROBES) break;
     try {
       const file = app.vault.getAbstractFileByPath(tile.vaultPath);
-      if (!file) continue;
+      if (!(file instanceof TFile)) continue;
 
-      const binary = await app.vault.readBinary(file as import('obsidian').TFile);
+      const binary = await app.vault.readBinary(file);
       const blob = new Blob([binary]);
       const url = URL.createObjectURL(blob);
 

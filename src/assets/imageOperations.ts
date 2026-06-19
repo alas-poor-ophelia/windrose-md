@@ -13,6 +13,7 @@ import type {
   GridCalculation,
   GridDensityPreset,
 } from '#types/settings/settings.types';
+import { TFile } from 'obsidian';
 import type { App } from 'obsidian';
 
 import { getApp } from '../core/settingsAccessor';
@@ -163,7 +164,7 @@ async function preloadImage(app: App, vaultPath: string): Promise<HTMLImageEleme
     try {
       // Get file from vault
       const file = app.vault.getAbstractFileByPath(vaultPath);
-      if (!file) {
+      if (!(file instanceof TFile)) {
         // eslint-disable-next-line no-console
         console.warn(`[imageOperations] Image file not found: ${vaultPath}`);
         loadingPromises.delete(vaultPath);
@@ -171,7 +172,7 @@ async function preloadImage(app: App, vaultPath: string): Promise<HTMLImageEleme
       }
 
       // Read as binary
-      const binary = await app.vault.readBinary(file as import('obsidian').TFile);
+      const binary = await app.vault.readBinary(file);
 
       // Convert to blob URL (SVGs need explicit MIME type to parse correctly)
       const isSvg = vaultPath.toLowerCase().endsWith('.svg');

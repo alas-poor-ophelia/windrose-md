@@ -6,6 +6,7 @@
  */
 
 import type { ToolId } from '#types/tools/tool.types';
+import type { ObjectAlignment } from '#types/objects/object.types';
 
 import { useCallback } from 'preact/hooks';
 import { useMapState } from '../../context/MapContext';
@@ -97,7 +98,7 @@ function useObjectPlacement(
       selectedObjectType,
       gridX,
       gridY,
-      { mapType, alignment: alignment as import('#types/objects/object.types').ObjectAlignment, objectSetId: mapData.objectSetId }
+      { mapType, alignment: alignment as ObjectAlignment, objectSetId: mapData.objectSetId }
     );
 
     if (result.success) {

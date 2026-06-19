@@ -7,6 +7,7 @@
  */
 
 import type { TileAssignment, TilesetDef, FolderTileset, TileMetadataStore } from '#types/tiles/tile.types';
+import type { HexOrientation } from '#types/settings/settings.types';
 
 import { axialToOffset } from '../core/offsetCoordinates';
 import { resolveTileRender } from '../../assets/tileRenderResolution';
@@ -250,7 +251,7 @@ function sortTilesForRendering(
   const offsets = new Map<TileAssignment, { col: number; row: number }>();
   for (const t of tiles) {
     offsets.set(t, isHex
-      ? axialToOffset(t.col, t.row, orientation as import('#types/settings/settings.types').HexOrientation)
+      ? axialToOffset(t.col, t.row, orientation as HexOrientation)
       : { col: t.col, row: t.row }
     );
   }

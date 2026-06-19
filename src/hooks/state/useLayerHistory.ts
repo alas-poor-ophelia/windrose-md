@@ -13,7 +13,7 @@
  */
 
 // Type-only imports
-import type { MapData, MapLayer, LayerId } from '#types/core/map.types';
+import type { MapData, MapLayer, LayerId, Region, Outline, ShapeOverlay, FogOfWar } from '#types/core/map.types';
 import type {
   LayerHistorySnapshot,
   LayerHistoryCache,
@@ -122,7 +122,7 @@ function useLayerHistory({
    * Build a history state snapshot from layer data
    */
   const buildHistoryState = useCallback(
-    (layer: MapLayer, name: string, regions: import('#types/core/map.types').Region[] = [], outlines: import('#types/core/map.types').Outline[] = [], shapeOverlays: import('#types/core/map.types').ShapeOverlay[] = [], fogOfWar: import('#types/core/map.types').FogOfWar | null = null): LayerHistorySnapshot => ({
+    (layer: MapLayer, name: string, regions: Region[] = [], outlines: Outline[] = [], shapeOverlays: ShapeOverlay[] = [], fogOfWar: FogOfWar | null = null): LayerHistorySnapshot => ({
       cells: layer.cells,
       curves: layer.curves,
       name: name,

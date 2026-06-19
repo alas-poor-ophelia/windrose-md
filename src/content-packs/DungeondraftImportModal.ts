@@ -2,6 +2,7 @@ import { Modal, Notice, TFile } from 'obsidian';
 import type { App } from 'obsidian';
 import type { PluginSettings } from '#types/settings/settings.types';
 import type { InstalledPack } from '#types/content-packs/contentPack.types';
+import type { TileLayerRole } from '#types/tiles/tile.types';
 import { parsePck, extractFileData } from './pckParser';
 import type { PckArchive } from './pckParser';
 import { parsePackMetadata, parseDungeondraftTags } from './pckMetadata';
@@ -342,7 +343,7 @@ class DungeondraftImportModal extends Modal {
 				if (ddSourceEntries.length > 0) {
 					metadata = bulkSetDdSourceType(metadata, ddSourceEntries);
 				}
-				const depthEntries: Array<{ vaultPath: string; depth: import('#types/tiles/tile.types').TileLayerRole }> = [];
+				const depthEntries: Array<{ vaultPath: string; depth: TileLayerRole }> = [];
 				for (const { vaultPath } of ddSourceEntries) {
 					const tile = { id: '', filename: vaultPath.split('/').pop() ?? '', vaultPath, tags: [] };
 					const entry = metadata[vaultPath];

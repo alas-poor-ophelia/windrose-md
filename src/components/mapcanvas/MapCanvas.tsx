@@ -17,6 +17,7 @@ import type {
 import type { ResolvedTheme } from '#types/settings/settings.types';
 import type { ExtendedGeometry, MapStateContextValue, MapOperationsContextValue } from '#types/contexts/context.types';
 import type { AdjacentSubHexRenderData } from '#types/hooks/canvasRenderer.types';
+import type { TileAssignment } from '#types/tiles/tile.types';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { useCanvasRenderer, renderCanvas } from '../../hooks/canvas/useCanvasRenderer';
@@ -120,7 +121,7 @@ interface MapCanvasContentProps {
   onObjectsChange: (objects: MapObject[]) => void;
   onTextLabelsChange: (labels: TextLabel[]) => void;
   onEdgesChange: (edges: Edge[], skipHistory?: boolean) => void;
-  onTilesChange?: (tiles: import('#types/tiles/tile.types').TileAssignment[]) => void;
+  onTilesChange?: (tiles: TileAssignment[]) => void;
   tileImagesReady?: boolean;
   hiddenTileLayers?: Set<string>;
   adjacentSubHexes?: AdjacentSubHexRenderData[] | null;
