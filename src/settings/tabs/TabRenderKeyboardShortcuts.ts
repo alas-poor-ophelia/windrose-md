@@ -64,7 +64,18 @@ export const TabRenderKeyboardShortcutsMethods = {
         text: formatKey(currentKey),
         cls: 'windrose-kbd-key'
       });
-      kbdEl.style.cssText = 'cursor:pointer; padding:2px 8px; border:1px solid var(--background-modifier-border); border-radius:4px; font-family:var(--font-monospace); font-size:0.85em; min-width:24px; text-align:center; display:inline-block; background:var(--background-secondary);';
+      kbdEl.setCssStyles({
+        cursor: 'pointer',
+        padding: '2px 8px',
+        border: '1px solid var(--background-modifier-border)',
+        borderRadius: '4px',
+        fontFamily: 'var(--font-monospace)',
+        fontSize: '0.85em',
+        minWidth: '24px',
+        textAlign: 'center',
+        display: 'inline-block',
+        background: 'var(--background-secondary)'
+      });
 
       let isCapturing = false;
 
@@ -72,8 +83,7 @@ export const TabRenderKeyboardShortcutsMethods = {
         if (isCapturing) return;
         isCapturing = true;
         kbdEl.textContent = 'Press a key...';
-        kbdEl.style.color = 'var(--text-accent)';
-        kbdEl.style.borderColor = 'var(--text-accent)';
+        kbdEl.setCssStyles({ color: 'var(--text-accent)', borderColor: 'var(--text-accent)' });
 
         const captureHandler = (e: KeyboardEvent): void => {
           e.preventDefault();
@@ -81,8 +91,7 @@ export const TabRenderKeyboardShortcutsMethods = {
 
           if (e.key === 'Escape') {
             kbdEl.textContent = formatKey(currentKey);
-            kbdEl.style.color = '';
-            kbdEl.style.borderColor = 'var(--background-modifier-border)';
+            kbdEl.setCssStyles({ color: '', borderColor: 'var(--background-modifier-border)' });
             isCapturing = false;
             window.removeEventListener('keydown', captureHandler, true);
             return;
@@ -107,8 +116,7 @@ export const TabRenderKeyboardShortcutsMethods = {
           void this.plugin.saveSettings();
 
           kbdEl.textContent = formatKey(newKey);
-          kbdEl.style.color = '';
-          kbdEl.style.borderColor = 'var(--background-modifier-border)';
+          kbdEl.setCssStyles({ color: '', borderColor: 'var(--background-modifier-border)' });
           isCapturing = false;
           window.removeEventListener('keydown', captureHandler, true);
         };

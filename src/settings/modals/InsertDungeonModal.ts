@@ -383,11 +383,11 @@ class InsertDungeonModal extends Modal {
     advancedHeader.createSpan({ text: 'Advanced Options' });
 
     const advancedContent = advancedContainer.createDiv({ cls: 'windrose-dungeon-advanced-content' });
-    advancedContent.style.display = 'none';
+    advancedContent.hide();
 
     advancedHeader.onclick = () => {
       this.advancedOpen = !this.advancedOpen;
-      advancedContent.style.display = this.advancedOpen ? 'block' : 'none';
+      advancedContent.toggle(this.advancedOpen);
       chevron.textContent = this.advancedOpen ? '▼' : '▶';
     };
 

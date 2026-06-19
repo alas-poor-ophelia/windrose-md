@@ -426,7 +426,7 @@ const TileAssetBrowser = memo(({
   useEffect(() => {
     if (!hoveredTile) {
       if (portalRef.current) {
-        portalRef.current.style.display = 'none';
+        portalRef.current.hide();
       }
       return undefined;
     }
@@ -454,7 +454,7 @@ const TileAssetBrowser = memo(({
 
     if (browserRef.current) {
       const rect = browserRef.current.getBoundingClientRect();
-      portal.style.display = 'block';
+      portal.show();
       const topVal = (rect.top + rect.height / 2 - (PREVIEW_SIZE + 24) / 2) + 'px';
       const leftVal = (rect.left - PREVIEW_SIZE - 16) + 'px';
       portal.style.setProperty('top', topVal);

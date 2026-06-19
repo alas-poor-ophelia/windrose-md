@@ -35,7 +35,7 @@ class ObjectSetImportModal extends Modal {
 
     let folderPath = '';
     const previewArea = contentEl.createDiv({ cls: 'windrose-import-preview' });
-    previewArea.style.display = 'none';
+    previewArea.hide();
 
     new Setting(contentEl)
       .setName('Folder path')
@@ -53,21 +53,21 @@ class ObjectSetImportModal extends Modal {
 
           if (!folderPath) {
             previewArea.createEl('p', { text: 'Enter a folder path first.', cls: 'windrose-import-error' });
-            previewArea.style.display = 'block';
+            previewArea.show();
             return;
           }
 
           const folder = this.app.vault.getAbstractFileByPath(folderPath) as { children?: unknown[] } | null;
           if (!folder || !folder.children) {
             previewArea.createEl('p', { text: 'Folder not found: ' + folderPath, cls: 'windrose-import-error' });
-            previewArea.style.display = 'block';
+            previewArea.show();
             return;
           }
 
           const jsonFile = this.app.vault.getAbstractFileByPath(folderPath + '/objects.json');
           if (!(jsonFile instanceof TFile)) {
             previewArea.createEl('p', { text: 'No objects.json found in this folder.', cls: 'windrose-import-error' });
-            previewArea.style.display = 'block';
+            previewArea.show();
             return;
           }
 
@@ -77,7 +77,7 @@ class ObjectSetImportModal extends Modal {
 
             if (!data.windroseMD_objectSet) {
               previewArea.createEl('p', { text: 'Not a valid Windrose object set.', cls: 'windrose-import-error' });
-              previewArea.style.display = 'block';
+              previewArea.show();
               return;
             }
 
@@ -109,10 +109,10 @@ class ObjectSetImportModal extends Modal {
               });
             }
 
-            previewArea.style.display = 'block';
+            previewArea.show();
           } catch (err: unknown) {
             previewArea.createEl('p', { text: 'Error reading: ' + (err as Error).message, cls: 'windrose-import-error' });
-            previewArea.style.display = 'block';
+            previewArea.show();
           }
         }));
 

@@ -135,10 +135,7 @@ function SpineRibbon({ depth, onDepthChange, hidden, onToggleHide, tileCounts, o
     el.innerHTML = '';
     if (selectedTileThumb) {
       const canvas = selectedTileThumb.cloneNode(true) as HTMLCanvasElement;
-      canvas.style.width = '100%';
-      canvas.style.height = '100%';
-      canvas.style.objectFit = 'cover';
-      canvas.style.borderRadius = '3px';
+      canvas.setCssStyles({ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '3px' });
       el.appendChild(canvas);
     }
   }, [selectedTileThumb]);

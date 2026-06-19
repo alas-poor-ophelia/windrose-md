@@ -324,14 +324,14 @@ export const TabRenderObjectsMethods = {
         .setDesc('Built-in objects you\'ve hidden from the palette');
 
       const hiddenList = hiddenContainer.createDiv({ cls: 'windrose-settings-object-list windrose-settings-hidden-list' });
-      hiddenList.style.display = 'none';
+      hiddenList.hide();
 
       new Setting(hiddenContainer)
         .addButton(btn => btn
           .setButtonText('Show')
           .onClick(() => {
             const isVisible = hiddenList.style.display !== 'none';
-            hiddenList.style.display = isVisible ? 'none' : 'block';
+            hiddenList.toggle(!isVisible);
             btn.setButtonText(isVisible ? 'Show' : 'Hide');
           }));
 
@@ -450,7 +450,7 @@ export const TabRenderObjectsMethods = {
       const dragHandle = row.createSpan({ cls: 'windrose-drag-handle' });
       IconHelpers.set(dragHandle, 'grip-vertical');
 
-      row.style.userSelect = 'none';
+      row.setCssStyles({ userSelect: 'none' });
 
       row.addEventListener('dragstart', (e: DragEvent) => {
         if (e.dataTransfer) {

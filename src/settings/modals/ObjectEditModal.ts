@@ -222,10 +222,10 @@ class ObjectEditModal extends Modal {
     container.empty();
 
     if (this.mode !== 'symbol') {
-      container.style.display = 'none';
+      container.hide();
       return;
     }
-    container.style.display = 'block';
+    container.show();
 
     // Symbol input with preview
     const symbolSetting = new Setting(container)
@@ -276,10 +276,10 @@ class ObjectEditModal extends Modal {
     container.empty();
 
     if (this.mode !== 'icon') {
-      container.style.display = 'none';
+      container.hide();
       return;
     }
-    container.style.display = 'block';
+    container.show();
 
     const picker = container.createDiv({ cls: 'windrose-icon-picker' });
 
@@ -428,10 +428,10 @@ class ObjectEditModal extends Modal {
     container.empty();
 
     if (this.mode !== 'image') {
-      container.style.display = 'none';
+      container.hide();
       return;
     }
-    container.style.display = 'block';
+    container.show();
 
     // Info text
     container.createEl('p', {
@@ -483,8 +483,7 @@ class ObjectEditModal extends Modal {
         cls: 'windrose-image-preview-img',
         attr: { src: this.app.vault.adapter.getResourcePath(this.imagePath) }
       });
-      imgPreview.style.maxWidth = '100px';
-      imgPreview.style.maxHeight = '100px';
+      imgPreview.setCssStyles({ maxWidth: '100px', maxHeight: '100px' });
     }
   }
 

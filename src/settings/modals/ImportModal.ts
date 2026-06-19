@@ -46,11 +46,11 @@ class ImportModal extends Modal {
 
     // Preview area (hidden until file selected)
     const previewArea = contentEl.createDiv({ cls: 'windrose-import-preview' });
-    previewArea.style.display = 'none';
+    previewArea.hide();
 
     // Import options (hidden until file validated)
     const optionsArea = contentEl.createDiv({ cls: 'windrose-import-options' });
-    optionsArea.style.display = 'none';
+    optionsArea.hide();
 
     let mergeMode = 'merge'; // 'merge' or 'replace'
 
@@ -69,8 +69,8 @@ class ImportModal extends Modal {
             text: 'This file is not a valid Windrose MD object export.',
             cls: 'windrose-import-error'
           });
-          previewArea.style.display = 'block';
-          optionsArea.style.display = 'none';
+          previewArea.show();
+          optionsArea.hide();
           this.importData = null;
           return;
         }
@@ -112,7 +112,7 @@ class ImportModal extends Modal {
           previewArea.createEl('p', { text: `• ${customCatCount} custom category(ies)` });
         }
 
-        previewArea.style.display = 'block';
+        previewArea.show();
 
         // Show import options
         optionsArea.empty();
@@ -125,7 +125,7 @@ class ImportModal extends Modal {
             .setValue(mergeMode)
             .onChange((v: string) => { mergeMode = v; }));
 
-        optionsArea.style.display = 'block';
+        optionsArea.show();
 
       } catch (err: unknown) {
         previewArea.empty();
@@ -133,8 +133,8 @@ class ImportModal extends Modal {
           text: `Error reading file: ${(err as Error).message}`,
           cls: 'windrose-import-error'
         });
-        previewArea.style.display = 'block';
-        optionsArea.style.display = 'none';
+        previewArea.show();
+        optionsArea.hide();
         this.importData = null;
       }
     })(); });

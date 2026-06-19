@@ -99,24 +99,23 @@ export class DungeonEssenceVisualizer {
 
     // Create canvas
     this.canvas = document.createElement('canvas');
-    this.canvas.style.display = 'block';
-    this.canvas.style.width = '100%';
+    this.canvas.setCssStyles({ display: 'block', width: '100%' });
     this.container.appendChild(this.canvas);
 
     // Create stamp overlay container
     this.stampOverlay = document.createElement('div');
-    this.stampOverlay.style.cssText = `
-      position: absolute;
-      pointer-events: none;
-      opacity: 0;
-      filter: saturate(0.4);
-      transition: opacity 0.3s ease;
-    `;
+    this.stampOverlay.setCssStyles({
+      position: 'absolute',
+      pointerEvents: 'none',
+      opacity: '0',
+      filter: 'saturate(0.4)',
+      transition: 'opacity 0.3s ease'
+    });
     // Parse as SVG (not HTML) so filters/namespaced elements survive, and avoid
     // the innerHTML sink. Content is a static developer-authored template.
     const stampSvg = new DOMParser().parseFromString(this.getWindroseSVG(), 'image/svg+xml').documentElement;
     this.stampOverlay.appendChild(stampSvg);
-    this.container.style.position = 'relative';
+    this.container.setCssStyles({ position: 'relative' });
     this.container.appendChild(this.stampOverlay);
 
     this.ctx = this.canvas.getContext('2d');
@@ -432,19 +431,22 @@ export class DungeonEssenceVisualizer {
   // === Stamp Control ===
 
   showStamp(screenX: number, screenY: number): void {
-    this.stampOverlay.style.left = screenX + 'px';
-    this.stampOverlay.style.top = screenY + 'px';
-    this.stampOverlay.style.transform = 'translate(-50%, -50%)';
-    this.stampOverlay.style.animation = 'none';
+    this.stampOverlay.setCssStyles({
+      left: screenX + 'px',
+      top: screenY + 'px',
+      transform: 'translate(-50%, -50%)',
+      animation: 'none'
+    });
     // Trigger reflow
     void this.stampOverlay.offsetHeight;
-    this.stampOverlay.style.animation = 'windrose-windrose-stamp 0.35s ease-out forwards';
-    this.stampOverlay.style.opacity = '0.75';
+    this.stampOverlay.setCssStyles({
+      animation: 'windrose-windrose-stamp 0.35s ease-out forwards',
+      opacity: '0.75'
+    });
   }
 
   hideStamp(): void {
-    this.stampOverlay.style.opacity = '0';
-    this.stampOverlay.style.animation = 'none';
+    this.stampOverlay.setCssStyles({ opacity: '0', animation: 'none' });
   }
 
   // === Rendering ===

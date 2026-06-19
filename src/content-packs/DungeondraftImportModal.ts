@@ -98,10 +98,10 @@ class DungeondraftImportModal extends Modal {
 		});
 
 		const previewArea = contentEl.createDiv({ cls: 'windrose-dd-import-preview' });
-		previewArea.style.display = 'none';
+		previewArea.hide();
 
 		const progressArea = contentEl.createDiv({ cls: 'windrose-dd-import-progress' });
-		progressArea.style.display = 'none';
+		progressArea.hide();
 
 		fileInput.addEventListener('change', (e: Event) => {
 			const file = (e.target as HTMLInputElement).files?.[0];
@@ -126,7 +126,7 @@ class DungeondraftImportModal extends Modal {
 
 	private async handleFileSelected(file: File, previewArea: HTMLElement): Promise<void> {
 		previewArea.empty();
-		previewArea.style.display = 'block';
+		previewArea.show();
 		this.archive = null;
 		this.buffer = null;
 		this.meta = null;
@@ -228,13 +228,13 @@ class DungeondraftImportModal extends Modal {
 		this.importBtn.disabled = true;
 		this.importBtn.textContent = 'Importing...';
 		fileInput.disabled = true;
-		previewArea.style.display = 'none';
-		progressArea.style.display = 'block';
+		previewArea.hide();
+		progressArea.show();
 
 		const progressBar = progressArea.createEl('progress', {
 			attr: { max: '100', value: '0' },
 		});
-		progressBar.style.width = '100%';
+		progressBar.setCssStyles({ width: '100%' });
 		const statusText = progressArea.createEl('p', { text: 'Preparing...' });
 
 		try {
@@ -453,7 +453,7 @@ class DungeondraftImportModal extends Modal {
 				this.importBtn.disabled = false;
 			}
 			fileInput.disabled = false;
-			previewArea.style.display = 'block';
+			previewArea.show();
 		}
 	}
 

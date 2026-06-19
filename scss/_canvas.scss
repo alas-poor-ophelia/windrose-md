@@ -57,3 +57,12 @@
 .windrose-canvas-selecting {
   cursor: move;
 }
+
+// Transient overlay canvases (freehand / outline / region in-progress drawing).
+// Applied via classList.add('windrose-overlay-layer') in the layer components.
+.windrose-overlay-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+}
