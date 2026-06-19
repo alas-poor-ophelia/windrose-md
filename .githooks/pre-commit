@@ -1,0 +1,22 @@
+#!/bin/sh
+# Windrose pre-commit gate — lock in ESLint errors = 0.
+#
+# Blocks a commit if any STAGED .ts/.tsx file has ESLint *errors*. Warnings are
+# allowed through here (the full warning ratchet lives in `npm run check`, which
+# enforces --max-warnings). This hook is activated via the package.json `prepare`
+# script (`git config core.hooksPath .githooks`); run `npm install` once to wire it.
+#
+# Bypass in an emergency with `git commit --no-verify`.
+
+files=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(ts|tsx)$' || true)
+[ -z "$files" ] && exit 0
+
+# shellcheck disable=SC2086
+echo "$files" | xargs npx eslint
+status=$?
+if [ "$status" -ne 0 ]; then
+  echo ""
+  echo "✖ Commit blocked: ESLint errors in staged files. Fix them or run 'npm run lint:fix'."
+  echo "  (To bypass in an emergency: git commit --no-verify)"
+fi
+exit "$status"
