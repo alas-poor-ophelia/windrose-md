@@ -84,7 +84,7 @@ interface FogSettingsSource {
 
 function getFogSettings(effectiveSettings: FogSettingsSource): FogSettings {
   return {
-    fowColor: effectiveSettings.fogOfWarColor || '#000000',
+    fowColor: effectiveSettings.fogOfWarColor != null && effectiveSettings.fogOfWarColor !== '' ? effectiveSettings.fogOfWarColor : '#000000',
     fowOpacity: effectiveSettings.fogOfWarOpacity ?? 0.9,
     fowImagePath: effectiveSettings.fogOfWarImage ?? undefined,
     fowBlurEnabled: effectiveSettings.fogOfWarBlurEnabled ?? false,

@@ -409,7 +409,7 @@ async function listMaps(app: App): Promise<MapListEntry[]> {
 
     return Object.entries(data.maps).map(([id, mapData]) => ({
       id,
-      name: mapData.name || id,
+      name: mapData.name != null && mapData.name !== '' ? mapData.name : id,
       type: mapData.mapType || 'grid',
     }));
   } catch {

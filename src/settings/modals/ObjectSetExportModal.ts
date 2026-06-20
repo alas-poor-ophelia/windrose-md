@@ -69,7 +69,7 @@ class ObjectSetExportModal extends Modal {
     }
 
     // Destination info
-    const destFolder = this.plugin.settings.objectSetsAutoLoadFolder || '';
+    const destFolder = this.plugin.settings.objectSetsAutoLoadFolder ?? '';
     const destDesc = destFolder
       ? 'Will export to: ' + destFolder + '/' + (exportName || set.name).replace(/[\\\\/:*?"<>|]/g, '_')
       : 'Will export to: object-sets/' + (exportName || set.name).replace(/[\\\\/:*?"<>|]/g, '_');

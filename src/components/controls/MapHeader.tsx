@@ -47,9 +47,9 @@ const MapHeader = ({ mapData, onNameChange, saveStatus, showFooter, onToggleFoot
   }, [mapList, onMapSelect]);
 
   const handleCopyBlock = useCallback(() => {
-    if (!mapId) return;
+    if (mapId == null || mapId === '') return;
     const mapType = mapData.mapType || 'grid';
-    const mapName = mapData.name || '';
+    const mapName = mapData.name ?? '';
     const block = [
       '```windrose-map',
       `id: ${mapId}`,
@@ -67,7 +67,7 @@ const MapHeader = ({ mapData, onNameChange, saveStatus, showFooter, onToggleFoot
           {mapList && mapList.length > 0 && (
             <select
               className="windrose-map-picker"
-              value={mapId || ''}
+              value={mapId ?? ''}
               onChange={handleMapChange}
               title="Switch map"
             >
@@ -99,7 +99,7 @@ const MapHeader = ({ mapData, onNameChange, saveStatus, showFooter, onToggleFoot
       />
 
       <div className="windrose-header-controls">
-        {fullPane === true && mapId && (
+        {fullPane === true && mapId != null && mapId !== '' && (
           <button
             className="windrose-header-action-btn interactive-child"
             onClick={handleCopyBlock}

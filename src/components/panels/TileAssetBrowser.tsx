@@ -159,7 +159,7 @@ function loadVaultImage(
 }
 
 const TileThumbnail = memo(({ url }: TileThumbnailProps): VNode => {
-  if (url) {
+  if (url != null && url !== '') {
     return <img src={url} className="windrose-tile-thumb-img" width={THUMB_SIZE} height={THUMB_SIZE} alt="" />;
   }
   // '' = terminal load failure (static placeholder); null = still loading (shimmer).
@@ -237,7 +237,7 @@ function HScroll({ className, children }: { className?: string; children: Compon
 // ===========================================
 
 const LoadedChipThumb = memo(({ url }: { url: string | null }): VNode => {
-  return url
+  return url != null && url !== ''
     ? <img src={url} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
     : <div style={{ width: '100%', height: '100%' }} />;
 });

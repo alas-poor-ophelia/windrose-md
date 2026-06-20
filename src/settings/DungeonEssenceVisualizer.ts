@@ -210,7 +210,7 @@ export class DungeonEssenceVisualizer {
    * - size: Restarts animation immediately (affects node count significantly)
    */
   updateSettings(newSettings: Partial<VisualizerSettings>): void {
-    const sizeChanged = newSettings.size && newSettings.size !== this.settings.size;
+    const sizeChanged = newSettings.size != null && newSettings.size !== '' && newSettings.size !== this.settings.size;
     this.settings = { ...this.settings, ...newSettings };
 
     // Size changes warrant an immediate restart since node count changes dramatically

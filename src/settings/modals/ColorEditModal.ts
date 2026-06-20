@@ -47,8 +47,8 @@ class ColorEditModal extends Modal {
       : null;
 
     // Initialize form values
-    let colorValue = this.existingColor?.color || '#808080';
-    let labelValue = this.existingColor?.label || '';
+    let colorValue = this.existingColor?.color != null && this.existingColor.color !== '' ? this.existingColor.color : '#808080';
+    let labelValue = this.existingColor?.label ?? '';
     let opacityValue = this.existingColor?.opacity ?? 1;
 
     // Color picker

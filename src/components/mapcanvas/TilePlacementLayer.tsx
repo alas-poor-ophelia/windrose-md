@@ -145,7 +145,7 @@ const TilePlacementLayer = ({
     // Ensure the selected tile image is cached for rendering
     const ts = mapData.tilesets?.find(t => t.id === selectedTilesetId);
     const entry = ts?.tiles.find(t => t.id === selectedTileId);
-    if (entry?.vaultPath && app) void preloadImage(app, entry.vaultPath);
+    if (entry?.vaultPath != null && entry.vaultPath !== '' && app) void preloadImage(app, entry.vaultPath);
 
     const activeLayer = getActiveLayer(mapData);
     let currentTiles = activeLayer.tiles ?? [];
@@ -157,7 +157,7 @@ const TilePlacementLayer = ({
     // stays stable if the metadata later changes. A prop with span > 1 ignores
     // brush size and places a single footprint at the anchor.
     const isGrid = geometry?.type === 'grid';
-    const meta = isGrid && entry?.vaultPath ? getTileMetadataForRender()[entry.vaultPath] : undefined;
+    const meta = isGrid && entry?.vaultPath != null && entry.vaultPath !== '' ? getTileMetadataForRender()[entry.vaultPath] : undefined;
     const spanW = meta?.defaultSpanW != null && meta.defaultSpanW > 1 ? meta.defaultSpanW : undefined;
     const spanH = meta?.defaultSpanH != null && meta.defaultSpanH > 1 ? meta.defaultSpanH : undefined;
     const hasFootprint = spanW != null || spanH != null;
@@ -236,7 +236,7 @@ const TilePlacementLayer = ({
 
     const ts = mapData.tilesets?.find(t => t.id === selectedTilesetId);
     const entry = ts?.tiles.find(t => t.id === selectedTileId);
-    if (entry?.vaultPath && app) void preloadImage(app, entry.vaultPath);
+    if (entry?.vaultPath != null && entry.vaultPath !== '' && app) void preloadImage(app, entry.vaultPath);
 
     const activeLayer = getActiveLayer(mapData);
     const currentTiles = activeLayer.tiles ?? [];
@@ -277,7 +277,7 @@ const TilePlacementLayer = ({
 
     const ts = mapData.tilesets?.find(t => t.id === selectedTilesetId);
     const entry = ts?.tiles.find(t => t.id === selectedTileId);
-    if (entry?.vaultPath && app) void preloadImage(app, entry.vaultPath);
+    if (entry?.vaultPath != null && entry.vaultPath !== '' && app) void preloadImage(app, entry.vaultPath);
 
     const activeLayer = getActiveLayer(mapData);
     const currentTiles = activeLayer.tiles ?? [];

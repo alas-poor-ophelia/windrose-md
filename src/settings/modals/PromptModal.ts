@@ -17,9 +17,9 @@ class PromptModal extends Modal {
 
   constructor(app: App, options: PromptModalOptions = {}) {
     super(app);
-    this.message = options.message || '';
-    this.defaultValue = options.defaultValue || '';
-    this.placeholder = options.placeholder || '';
+    this.message = options.message ?? '';
+    this.defaultValue = options.defaultValue ?? '';
+    this.placeholder = options.placeholder ?? '';
     this.inputValue = this.defaultValue;
     this.resolved = false;
   }

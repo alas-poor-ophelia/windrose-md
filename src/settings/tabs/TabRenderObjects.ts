@@ -383,7 +383,7 @@ export const TabRenderObjectsMethods = {
       // Apply new orders to settings
       rows.forEach((row: HTMLElement, actualPosition: number) => {
         const id = row.dataset.objectId;
-        if (!id) return;
+        if (id == null || id === '') return;
         const isBuiltIn = row.dataset.isBuiltIn === 'true';
         const newOrder = actualPosition * 10;
 
@@ -570,7 +570,7 @@ export const TabRenderObjectsMethods = {
           customCategories: []
         }).map((c: ResolvedCategory) => c.id);
 
-        if (targetCategory && !builtInCategoryIds.includes(targetCategory) && !targetCategories.find((c: CustomCategory) => c.id === obj.category)) {
+        if (targetCategory != null && targetCategory !== '' && !builtInCategoryIds.includes(targetCategory) && !targetCategories.find((c: CustomCategory) => c.id === obj.category)) {
           // Custom category doesn't exist in target - copy it over
           const sourceCategoriesKey: CustomCategoriesKey = this.selectedMapType === 'hex' ? 'customHexCategories' : 'customGridCategories';
           const sourceCategories = this.plugin.settings[sourceCategoriesKey] ?? [];
@@ -663,7 +663,7 @@ export const TabRenderObjectsMethods = {
           if (set.data.grid) scope.push('grid');
           dropdown.addOption(set.id, set.name + (scope.length ? ' [' + scope.join('+') + ']' : ''));
         }
-        dropdown.setValue(s.activeObjectSetId || '__defaults__');
+        dropdown.setValue(s.activeObjectSetId != null && s.activeObjectSetId !== '' ? s.activeObjectSetId : '__defaults__');
         dropdown.onChange(async (value: string) => {
           // Prompt to save current objects before switching
           if (isDirty) {
@@ -676,7 +676,7 @@ export const TabRenderObjectsMethods = {
                 message: 'Name for the saved set:',
                 defaultValue: 'My Objects'
               }).openAndGetValue();
-              if (name) {
+              if (name != null && name !== '') {
                 ObjectSetHelpers.saveCurrentAsSet(this.plugin, name);
               }
             }
@@ -775,7 +775,7 @@ export const TabRenderObjectsMethods = {
           message: 'Name for the new set:',
           defaultValue: 'My Objects'
         }).openAndGetValue();
-        if (!name) return;
+        if (name == null || name === '') return;
         ObjectSetHelpers.saveCurrentAsSet(this.plugin, name);
         await this.plugin.saveSettings();
         new Notice('Saved set: ' + name);
@@ -812,7 +812,7 @@ export const TabRenderObjectsMethods = {
         new FolderSuggest(this.app, search.inputEl);
         search
           .setPlaceholder('E.g. Windrose-objects')
-          .setValue(s.objectSetsAutoLoadFolder || '')
+          .setValue(s.objectSetsAutoLoadFolder ?? '')
           .onChange(async (value: string) => {
             s.objectSetsAutoLoadFolder = value.trim();
             await this.plugin.saveSettings();

@@ -57,8 +57,8 @@ export const TabRenderCoreMethods = {
         details.settingItems?.forEach(item => {
           const nameEl = item.querySelector('.setting-item-name');
           const descEl = item.querySelector('.setting-item-description');
-          const name = nameEl?.textContent?.toLowerCase() || '';
-          const desc = descEl?.textContent?.toLowerCase() || '';
+          const name = nameEl?.textContent?.toLowerCase() ?? '';
+          const desc = descEl?.textContent?.toLowerCase() ?? '';
 
           const matches = name.includes(q) || desc.includes(q);
 

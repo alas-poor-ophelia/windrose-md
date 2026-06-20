@@ -76,15 +76,15 @@ class ObjectEditModal extends Modal {
     this.mapType = mapType;
 
     // Form state
-    this.symbol = existingObject?.symbol || '';
-    this.iconClass = existingObject?.iconClass || '';
-    this.imagePath = existingObject?.imagePath || '';
-    this.label = existingObject?.label || '';
-    this.category = existingObject?.category || 'features';
+    this.symbol = existingObject?.symbol ?? '';
+    this.iconClass = existingObject?.iconClass ?? '';
+    this.imagePath = existingObject?.imagePath ?? '';
+    this.label = existingObject?.label ?? '';
+    this.category = existingObject?.category != null && existingObject.category !== '' ? existingObject.category : 'features';
 
     // UI state - determine initial mode based on existing object
     // Modes: 'symbol', 'icon', 'image'
-    this.mode = existingObject?.imagePath ? 'image' : (existingObject?.iconClass ? 'icon' : 'symbol');
+    this.mode = (existingObject?.imagePath ?? '') !== '' ? 'image' : ((existingObject?.iconClass ?? '') !== '' ? 'icon' : 'symbol');
     this.iconSearchQuery = '';
     this.iconCategory = 'all';
     this.imageSearchQuery = '';
@@ -339,7 +339,8 @@ class ObjectEditModal extends Modal {
     // Update active state on all tabs
     const tabs = container.querySelectorAll('.windrose-icon-picker-tab');
     tabs.forEach(tab => {
-      const catId = tab.getAttribute('data-category') || 'all';
+      const dataCategory = tab.getAttribute('data-category');
+      const catId = dataCategory != null && dataCategory !== '' ? dataCategory : 'all';
       if (catId === this.iconCategory) {
         (tab as HTMLElement).addClass('active');
       } else {
@@ -581,12 +582,12 @@ class ObjectEditModal extends Modal {
       if (this.mode === 'icon') {
         if (this.iconClass !== originalRecord?.iconClass) override.iconClass = this.iconClass;
         // Clear other visual properties
-        if (original?.symbol) override.symbol = null;
+        if (original?.symbol != null && original.symbol !== '') override.symbol = null;
         if (originalRecord?.imagePath) override.imagePath = null;
       } else if (this.mode === 'image') {
         override.imagePath = this.imagePath;
         // Clear other visual properties
-        if (original?.symbol) override.symbol = null;
+        if (original?.symbol != null && original.symbol !== '') override.symbol = null;
         if (originalRecord?.iconClass) override.iconClass = null;
       } else {
         if (this.symbol !== original?.symbol) override.symbol = this.symbol;

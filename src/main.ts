@@ -247,7 +247,7 @@ export default class WindrosePlugin extends Plugin {
       }
     }
 
-    if (old.activeObjectSetId && !cur.activeObjectSetId) {
+    if ((old.activeObjectSetId ?? '') !== '' && (cur.activeObjectSetId ?? '') === '') {
       cur.activeObjectSetId = old.activeObjectSetId;
     }
 

@@ -177,7 +177,7 @@ function SpineRibbon({ depth, onDepthChange, hidden, onToggleHide, tileCounts, o
         onToggleHide={onToggleHide}
         tileCounts={tileCounts}
       />
-      {selectedTileName && (
+      {selectedTileName != null && selectedTileName !== '' && (
         <div
           className="windrose-tile-spine-loaded"
           title={`Loaded: ${selectedTileName}`}

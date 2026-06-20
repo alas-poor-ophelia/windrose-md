@@ -24,7 +24,7 @@ class CategoryEditModal extends Modal {
     this.onSave = onSave;
     this.mapType = mapType;
 
-    this.label = existingCategory?.label || '';
+    this.label = existingCategory?.label ?? '';
     this.order = existingCategory?.order ?? 100;
   }
 

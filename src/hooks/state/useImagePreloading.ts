@@ -84,7 +84,7 @@ function useImagePreloading(
         const tId = tile.tileId;
         const ts = mapData.tilesets.find(t => t.id === tsId);
         const entry = ts?.tiles.find(t => t.id === tId);
-        if (entry?.vaultPath) placedPaths.add(entry.vaultPath);
+        if (entry?.vaultPath != null && entry.vaultPath !== '') placedPaths.add(entry.vaultPath);
       }
     }
 
