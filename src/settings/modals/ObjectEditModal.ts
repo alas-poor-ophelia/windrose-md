@@ -575,7 +575,7 @@ class ObjectEditModal extends Modal {
       }
 
       const original = BUILT_IN_OBJECTS.find(o => o.id === this.existingObject!.id);
-      const originalRecord = original as unknown as Record<string, unknown> | undefined;
+      const originalRecord = original as unknown as { imagePath?: string; iconClass?: string } | undefined;
       const override: Record<string, string | number | boolean | null> = {};
 
       // Handle symbol/iconClass/imagePath based on mode
@@ -583,17 +583,17 @@ class ObjectEditModal extends Modal {
         if (this.iconClass !== originalRecord?.iconClass) override.iconClass = this.iconClass;
         // Clear other visual properties
         if (original?.symbol != null && original.symbol !== '') override.symbol = null;
-        if (originalRecord?.imagePath) override.imagePath = null;
+        if (originalRecord?.imagePath != null && originalRecord.imagePath !== '') override.imagePath = null;
       } else if (this.mode === 'image') {
         override.imagePath = this.imagePath;
         // Clear other visual properties
         if (original?.symbol != null && original.symbol !== '') override.symbol = null;
-        if (originalRecord?.iconClass) override.iconClass = null;
+        if (originalRecord?.iconClass != null && originalRecord.iconClass !== '') override.iconClass = null;
       } else {
         if (this.symbol !== original?.symbol) override.symbol = this.symbol;
         // Clear other visual properties
-        if (originalRecord?.iconClass) override.iconClass = null;
-        if (originalRecord?.imagePath) override.imagePath = null;
+        if (originalRecord?.iconClass != null && originalRecord.iconClass !== '') override.iconClass = null;
+        if (originalRecord?.imagePath != null && originalRecord.imagePath !== '') override.imagePath = null;
       }
 
       if (this.label !== original?.label) override.label = this.label;

@@ -11,11 +11,20 @@ type OverridesKey = 'hexObjectOverrides' | 'gridObjectOverrides';
 type CustomObjectsKey = 'customHexObjects' | 'customGridObjects';
 type CategoriesKey = 'customHexCategories' | 'customGridCategories';
 
+interface ObjectExportData {
+  windroseMD_objectExport?: boolean;
+  exportedAt?: string;
+  mapType?: string;
+  objectOverrides?: Record<string, unknown>;
+  customObjects?: unknown[];
+  customCategories?: unknown[];
+}
+
 class ImportModal extends Modal {
   private plugin: WindrosePlugin;
   private onImport: () => void;
   private mapType: string;
-  private importData: Record<string, unknown> | null;
+  private importData: ObjectExportData | null;
 
   constructor(app: App, plugin: WindrosePlugin, onImport: () => void, mapType: string = 'grid') {
     super(app);
@@ -61,10 +70,10 @@ class ImportModal extends Modal {
 
       try {
         const text = await file.text();
-        const data = JSON.parse(text) as Record<string, unknown>;
+        const data = JSON.parse(text) as ObjectExportData;
 
         // Validate it's a Windrose export
-        if (!data.windroseMD_objectExport) {
+        if (data.windroseMD_objectExport !== true) {
           previewArea.empty();
           previewArea.createEl('p', {
             text: 'This file is not a valid Windrose MD object export.',
@@ -81,15 +90,15 @@ class ImportModal extends Modal {
         // Show preview
         previewArea.empty();
         previewArea.createEl('p', { text: 'Valid Windrose MD export file' });
-        if (data.exportedAt) {
+        if (data.exportedAt != null && data.exportedAt !== '') {
           previewArea.createEl('p', {
-            text: `Exported: ${new Date(data.exportedAt as string).toLocaleString()}`,
+            text: `Exported: ${new Date(data.exportedAt).toLocaleString()}`,
             cls: 'windrose-import-date'
           });
         }
 
         // Show original map type if present
-        if (data.mapType) {
+        if (data.mapType != null && data.mapType !== '') {
           const sourceType = data.mapType === 'hex' ? 'Hex' : 'Grid';
           if (data.mapType !== this.mapType) {
             previewArea.createEl('p', {
@@ -99,9 +108,9 @@ class ImportModal extends Modal {
           }
         }
 
-        const overrideCount = data.objectOverrides ? Object.keys(data.objectOverrides as Record<string, unknown>).length : 0;
-        const customObjCount = (data.customObjects as unknown[] | undefined)?.length || 0;
-        const customCatCount = (data.customCategories as unknown[] | undefined)?.length || 0;
+        const overrideCount = data.objectOverrides != null ? Object.keys(data.objectOverrides).length : 0;
+        const customObjCount = data.customObjects?.length ?? 0;
+        const customCatCount = data.customCategories?.length ?? 0;
 
         if (overrideCount > 0) {
           previewArea.createEl('p', { text: `• ${overrideCount} built-in modification(s)` });
@@ -168,7 +177,7 @@ class ImportModal extends Modal {
       }
 
       // Import overrides
-      if (data.objectOverrides) {
+      if (data.objectOverrides != null) {
         if (!this.plugin.settings[overridesKey]) {
           this.plugin.settings[overridesKey] = {};
         }
@@ -179,7 +188,7 @@ class ImportModal extends Modal {
       }
 
       // Import custom objects (avoid duplicates by ID)
-      if (data.customObjects) {
+      if (data.customObjects != null) {
         if (!this.plugin.settings[customObjectsKey]) {
           this.plugin.settings[customObjectsKey] = [];
         }
@@ -195,7 +204,7 @@ class ImportModal extends Modal {
       }
 
       // Import custom categories (avoid duplicates by ID)
-      if (data.customCategories) {
+      if (data.customCategories != null) {
         if (!this.plugin.settings[categoriesKey]) {
           this.plugin.settings[categoriesKey] = [];
         }

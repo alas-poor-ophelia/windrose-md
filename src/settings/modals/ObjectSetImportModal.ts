@@ -11,6 +11,13 @@ interface WindrosePlugin {
   saveSettings(): Promise<void>;
 }
 
+interface ObjectSetImportData {
+  windroseMD_objectSet?: boolean;
+  hex?: Record<string, unknown>;
+  grid?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
 class ObjectSetImportModal extends Modal {
   private plugin: WindrosePlugin;
   private onImport: () => void;
@@ -73,9 +80,9 @@ class ObjectSetImportModal extends Modal {
 
           try {
             const content = await this.app.vault.read(jsonFile);
-            const data = JSON.parse(content) as Record<string, unknown>;
+            const data = JSON.parse(content) as ObjectSetImportData;
 
-            if (!data.windroseMD_objectSet) {
+            if (data.windroseMD_objectSet !== true) {
               previewArea.createEl('p', { text: 'Not a valid Windrose object set.', cls: 'windrose-import-error' });
               previewArea.show();
               return;
@@ -84,14 +91,14 @@ class ObjectSetImportModal extends Modal {
             previewArea.createEl('p', { text: 'Valid object set: ' + ((data.name as string) || 'Unnamed') });
 
             const scope: string[] = [];
-            if (data.hex) {
-              const hexData = data.hex as Record<string, unknown>;
+            if (data.hex != null) {
+              const hexData = data.hex;
               const objCount = ((hexData.customObjects as unknown[]) || []).length;
               const overCount = Object.keys((hexData.objectOverrides as Record<string, unknown>) || {}).length;
               scope.push('Hex: ' + objCount + ' custom, ' + overCount + ' overrides');
             }
-            if (data.grid) {
-              const gridData = data.grid as Record<string, unknown>;
+            if (data.grid != null) {
+              const gridData = data.grid;
               const objCount = ((gridData.customObjects as unknown[]) || []).length;
               const overCount = Object.keys((gridData.objectOverrides as Record<string, unknown>) || {}).length;
               scope.push('Grid: ' + objCount + ' custom, ' + overCount + ' overrides');

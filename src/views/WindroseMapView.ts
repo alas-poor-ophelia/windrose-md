@@ -74,10 +74,10 @@ class WindroseMapView extends ItemView {
   }
 
   async setState(state: Record<string, unknown>): Promise<void> {
-    if (state?.mapId) this.mapId = state.mapId as string;
-    if (state?.mapName) this.mapName = state.mapName as string;
-    if (state?.mapType) this.mapType = state.mapType as MapType;
-    if (state?.floatingPanels) this.floatingPanels = state.floatingPanels as Record<string, unknown>;
+    if (typeof state?.mapId === 'string' && state.mapId !== '') this.mapId = state.mapId;
+    if (typeof state?.mapName === 'string' && state.mapName !== '') this.mapName = state.mapName;
+    if (typeof state?.mapType === 'string' && state.mapType !== '') this.mapType = state.mapType as MapType;
+    if (typeof state?.floatingPanels === 'object' && state.floatingPanels !== null) this.floatingPanels = state.floatingPanels as Record<string, unknown>;
 
     if (this.mapId) {
       this.renderMap();

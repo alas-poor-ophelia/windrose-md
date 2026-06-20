@@ -4,7 +4,7 @@
   "description": "Interactive dungeon and world mapping plugin for Obsidian",
   "type": "module",
   "scripts": {
-    "lint": "eslint . --ext .ts,.tsx,.js,.jsx --max-warnings 570",
+    "lint": "eslint . --ext .ts,.tsx,.js,.jsx --max-warnings 548",
     "lint:fix": "eslint . --ext .ts,.tsx,.js,.jsx --fix",
     "typecheck": "tsc --noEmit -p tsconfig.check.json",
     "check": "npm run typecheck && npm run lint",
