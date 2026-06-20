@@ -188,7 +188,7 @@ function usePaintTool({
           let newCurves: Curve[] | null = null;
           if (geometry.type === 'hex') {
             const verts = geometry.getHexVertices(coordX, coordY);
-            if (verts) {
+            if (verts != null) {
               const clipPoly = verts.map((v: { worldX: number; worldY: number }) => [v.worldX, v.worldY] as [number, number]);
               newCurves = eraseWorldPolygonFromCurves(activeLayer.curves, clipPoly);
             }

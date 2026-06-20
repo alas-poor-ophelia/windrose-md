@@ -590,7 +590,7 @@ const ToolPalette = ({
         </button>
       </div>
 
-      {dockButton && (
+      {dockButton != null && (
         <>
           <div className="windrose-tool-palette-separator" />
           {dockButton}

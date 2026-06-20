@@ -436,7 +436,7 @@ class DungeondraftImportModal extends Modal {
 
 			new Notice(this.meta.name + ' imported (' + (textures.length - failedCount) + '/' + textures.length + ' textures' + (failedCount > 0 ? ', ' + failedCount + ' failed' : '') + ').');
 
-			if (this.importBtn) {
+			if (this.importBtn != null) {
 				this.importBtn.textContent = 'Done';
 				this.importBtn.onclick = () => this.close();
 				this.importBtn.disabled = false;
@@ -449,7 +449,7 @@ class DungeondraftImportModal extends Modal {
 			});
 			console.error('[Windrose] Dungeondraft import failed:', err);
 
-			if (this.importBtn) {
+			if (this.importBtn != null) {
 				this.importBtn.textContent = 'Import';
 				this.importBtn.disabled = false;
 			}

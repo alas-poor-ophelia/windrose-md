@@ -123,7 +123,7 @@ const DeeplinkHover = (() => {
   }
 
   function onHoverEnter(plugin: HoverPlugin, linkEl: HTMLElement, parsed: ParsedDeepLink): void {
-    if (!linkEl || !parsed) return;
+    if (linkEl == null || parsed == null) return;
 
     const state: LinkState = linkState.get(linkEl) || { showTimer: null, hideTimer: null, popover: null, hoverEl: null, host: null };
     linkState.set(linkEl, state);
@@ -140,7 +140,7 @@ const DeeplinkHover = (() => {
   }
 
   function onHoverLeave(linkEl: HTMLElement): void {
-    if (!linkEl) return;
+    if (linkEl == null) return;
     const state = linkState.get(linkEl);
     if (!state) return;
     if (state.showTimer != null) {

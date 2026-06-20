@@ -51,7 +51,7 @@ class CategoryEditModal extends Modal {
       });
 
     // Focus the name input after a short delay
-    if (nameInputEl) {
+    if (nameInputEl != null) {
       window.setTimeout(() => (nameInputEl as HTMLInputElement).focus(), 50);
     }
 

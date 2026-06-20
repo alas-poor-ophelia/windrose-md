@@ -231,7 +231,7 @@ const ShapeOverlayLayer = ({
   }
 
   // Selection overlay when a shape is selected
-  if (!isShapeSelected || !selectedItem || selectedItem.type !== 'shapeOverlay' || !mapData || !geometry) return null;
+  if (!isShapeSelected || selectedItem == null || selectedItem.type !== 'shapeOverlay' || !mapData || !geometry) return null;
 
   const shapeActions = buildShapeOverlayActions(selectedItem, {
     onColorClick: handleShapeColorClick,

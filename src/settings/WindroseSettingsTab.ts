@@ -145,7 +145,7 @@ class WindroseMDSettingsTab extends PluginSettingTab {
     const { containerEl } = this;
 
     const openSections = new Set<string>();
-    if (this.sections) {
+    if (this.sections != null) {
       this.sections.forEach(({ details, title }) => {
         if (details.hasAttribute('open')) {
           openSections.add(title);
