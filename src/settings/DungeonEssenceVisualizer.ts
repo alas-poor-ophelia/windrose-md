@@ -134,6 +134,7 @@ export class DungeonEssenceVisualizer {
   }
 
   sampleColors(): void {
+    // eslint-disable-next-line obsidianmd/prefer-active-doc -- reads Obsidian CSS theme vars off the MAIN app document body; a popout body lacks them.
     const style = getComputedStyle(document.body);
     this.colors = {
       node: style.getPropertyValue('--text-muted').trim() || '#888',

@@ -3,6 +3,8 @@
  * Handles loading the font for both canvas rendering and CSS display
  */
 
+/* eslint-disable obsidianmd/prefer-active-doc -- the font registry (document.fonts) and the one-time <style> injection are GLOBAL resources that belong on the main document, not a popout's; injectIconCSS also runs at module-load, before activeDocument is meaningful. */
+
 import type { IconMap } from '#types/objects/icon.types';
 
 /** Font loading state */

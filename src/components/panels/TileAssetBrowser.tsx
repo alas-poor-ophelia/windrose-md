@@ -45,6 +45,7 @@ import { runDetectionScan } from '../../assets/tileImageScan';
 // ===========================================
 
 const boundsCache = new Map<string, { x: number; y: number; w: number; h: number }>();
+// eslint-disable-next-line obsidianmd/prefer-active-doc -- detached offscreen scratch canvas for content-bounds detection; never attached to DOM, document-agnostic.
 const scratchCanvas = document.createElement('canvas');
 
 function getContentBounds(img: HTMLImageElement): { x: number; y: number; w: number; h: number } {
