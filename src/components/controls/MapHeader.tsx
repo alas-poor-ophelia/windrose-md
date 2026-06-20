@@ -62,7 +62,7 @@ const MapHeader = ({ mapData, onNameChange, saveStatus, showFooter, onToggleFoot
 
   return (
     <div className="windrose-header">
-      {fullPane && (
+      {fullPane === true && (
         <div className="windrose-map-picker-group">
           {mapList && mapList.length > 0 && (
             <select
@@ -99,7 +99,7 @@ const MapHeader = ({ mapData, onNameChange, saveStatus, showFooter, onToggleFoot
       />
 
       <div className="windrose-header-controls">
-        {fullPane && mapId && (
+        {fullPane === true && mapId && (
           <button
             className="windrose-header-action-btn interactive-child"
             onClick={handleCopyBlock}

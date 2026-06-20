@@ -125,7 +125,7 @@ class WindroseMDSettingsTab extends PluginSettingTab {
 
   createCollapsibleSection(containerEl: HTMLElement, title: string, renderFn: (el: HTMLElement) => void, options: { open?: boolean } = {}): HTMLDetailsElement {
     const details = containerEl.createEl('details', { cls: 'windrose-settings-section' });
-    if (options.open) details.setAttribute('open', '');
+    if (options.open === true) details.setAttribute('open', '');
 
     this.sections.push({ details, title });
 

@@ -115,7 +115,7 @@ function setEntryMetadata(
 
 function toggleStar(metadata: TileMetadataStore, vaultPath: string): TileMetadataStore {
   const existing = metadata[vaultPath] ?? {};
-  return setEntryMetadata(metadata, vaultPath, { starred: !existing.starred });
+  return setEntryMetadata(metadata, vaultPath, { starred: existing.starred !== true });
 }
 
 function addUserTag(metadata: TileMetadataStore, vaultPath: string, tag: string): TileMetadataStore {

@@ -60,14 +60,14 @@ function floodFillCells(
   mapWidth: number,
   mapHeight: number
 ): Array<{ col: number; row: number }> {
-  const targetKey = tiles.find(t => !t.freeform && assignmentCoversCell(t, startCol, startRow));
+  const targetKey = tiles.find(t => t.freeform !== true && assignmentCoversCell(t, startCol, startRow));
   const targetId = targetKey ? `${targetKey.tilesetId}:${targetKey.tileId}` : '';
 
   // Register every cell of each prop's footprint so multi-cell occupants block
   // the fill across their whole area, not just the anchor.
   const tileMap = new Map<string, string>();
   for (const t of tiles) {
-    if (t.freeform) continue;
+    if (t.freeform === true) continue;
     const id = `${t.tilesetId}:${t.tileId}`;
     for (const c of cellsCoveredByAssignment(t)) tileMap.set(`${c.col},${c.row}`, id);
   }

@@ -24,7 +24,7 @@ class ColorEditModal extends Modal {
     this.plugin = plugin;
     this.existingColor = existingColor;
     this.onSave = onSave;
-    this.isBuiltIn = existingColor?.isBuiltIn || false;
+    this.isBuiltIn = existingColor?.isBuiltIn ?? false;
   }
 
   onOpen(): void {

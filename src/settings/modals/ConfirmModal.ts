@@ -21,7 +21,7 @@ class ConfirmModal extends Modal {
     this.message = options.message || 'Are you sure?';
     this.confirmText = options.confirmText || 'Confirm';
     this.cancelText = options.cancelText || 'Cancel';
-    this.isDestructive = options.isDestructive || false;
+    this.isDestructive = options.isDestructive ?? false;
     this.resolved = false;
   }
 

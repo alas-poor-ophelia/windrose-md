@@ -124,10 +124,10 @@ export const TabRenderColorsMethods = {
     const labelContainer = row.createEl('div', { cls: 'windrose-color-row-label' });
     labelContainer.createEl('span', { text: color.label, cls: 'windrose-color-row-name' });
 
-    if (color.isModified) {
+    if (color.isModified === true) {
       labelContainer.createEl('span', { text: ' (modified)', cls: 'windrose-color-row-modified' });
     }
-    if (color.isCustom) {
+    if (color.isCustom === true) {
       labelContainer.createEl('span', { text: ' (custom)', cls: 'windrose-color-row-custom' });
     }
 
@@ -152,7 +152,7 @@ export const TabRenderColorsMethods = {
     });
 
     // Show/Hide button (for built-in colors only)
-    if (color.isBuiltIn) {
+    if (color.isBuiltIn === true) {
       const visBtn = actions.createEl('button', { cls: 'windrose-btn-icon', attr: { 'aria-label': isHidden ? 'Show color' : 'Hide color' } });
       IconHelpers.set(visBtn, isHidden ? 'eye' : 'eye-off');
       visBtn.addEventListener('click', () => {
@@ -166,7 +166,7 @@ export const TabRenderColorsMethods = {
 
         // Clean up empty override
         if (Object.keys(this.plugin.settings.colorPaletteOverrides[color.id]).length === 1
-            && !this.plugin.settings.colorPaletteOverrides[color.id].hidden) {
+            && !this.plugin.settings.colorPaletteOverrides[color.id].hidden !== true) {
           delete this.plugin.settings.colorPaletteOverrides[color.id];
         }
 
@@ -176,7 +176,7 @@ export const TabRenderColorsMethods = {
       });
 
       // Reset button (if modified)
-      if (color.isModified) {
+      if (color.isModified === true) {
         const resetBtn = actions.createEl('button', { cls: 'windrose-btn-icon', attr: { 'aria-label': 'Reset to default' } });
         IconHelpers.set(resetBtn, 'rotate-ccw');
         resetBtn.addEventListener('click', () => {
@@ -191,7 +191,7 @@ export const TabRenderColorsMethods = {
     }
 
     // Delete button (for custom colors only)
-    if (color.isCustom) {
+    if (color.isCustom === true) {
       const delBtn = actions.createEl('button', { cls: 'windrose-btn-icon windrose-btn-danger', attr: { 'aria-label': 'Delete color' } });
       IconHelpers.set(delBtn, 'trash-2');
       delBtn.addEventListener('click', () => {

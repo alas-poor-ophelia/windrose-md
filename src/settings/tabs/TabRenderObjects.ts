@@ -263,7 +263,7 @@ export const TabRenderObjectsMethods = {
       categoryHeader.createSpan({ text: labelText, cls: 'windrose-settings-category-label' });
 
       // Edit/Delete for custom categories
-      if (category.isCustom) {
+      if (category.isCustom === true) {
         const categoryActions = categoryHeader.createDiv({ cls: 'windrose-settings-category-actions' });
 
         const editBtn = categoryActions.createEl('button', { cls: 'windrose-settings-icon-btn', attr: { 'aria-label': 'Edit category', title: 'Edit category' } });
@@ -414,7 +414,7 @@ export const TabRenderObjectsMethods = {
           if (labelEl) {
             const override = this.plugin.settings[overridesKey]?.[id];
             const hasAnyOverride = override && Object.keys(override).length > 0;
-            labelEl.classList.toggle('windrose-settings-modified', !!hasAnyOverride);
+            labelEl.classList.toggle('windrose-settings-modified', hasAnyOverride === true);
           }
         } else {
           // Custom objects - always save order
@@ -473,7 +473,7 @@ export const TabRenderObjectsMethods = {
 
     // Label
     const labelEl = row.createSpan({ text: obj.label ?? '', cls: 'windrose-settings-object-label' });
-    if (obj.isModified) {
+    if (obj.isModified === true) {
       labelEl.addClass('windrose-settings-modified');
     }
 
@@ -526,7 +526,7 @@ export const TabRenderObjectsMethods = {
       }
 
       // Reset button (only for modified)
-      if (obj.isModified) {
+      if (obj.isModified === true) {
         const resetBtn = actions.createEl('button', { cls: 'windrose-settings-icon-btn', attr: { 'aria-label': 'Reset to default', title: 'Reset to default' } });
         IconHelpers.set(resetBtn, 'rotate-ccw');
         resetBtn.onclick = async () => {

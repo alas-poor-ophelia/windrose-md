@@ -157,7 +157,7 @@ export async function runDetectionScan(
 
   async function worker(): Promise<void> {
     while (cursor < needsScan.length) {
-      if (opts?.signal?.aborted) return;
+      if (opts?.signal?.aborted === true) return;
       const vaultPath = needsScan[cursor++];
       const signals = await scanTileImageSignals(app, vaultPath);
       if (signals != null) results.push({ vaultPath, signals });

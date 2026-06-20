@@ -567,7 +567,7 @@ class ObjectEditModal extends Modal {
     const overridesKey: OverridesKey = this.mapType === 'hex' ? 'hexObjectOverrides' : 'gridObjectOverrides';
     const customObjectsKey: CustomObjectsKey = this.mapType === 'hex' ? 'customHexObjects' : 'customGridObjects';
 
-    if (this.existingObject?.isBuiltIn) {
+    if (this.existingObject?.isBuiltIn === true) {
       // Modifying a built-in: save as override
       if (!this.plugin.settings[overridesKey]) {
         this.plugin.settings[overridesKey] = {};
@@ -599,7 +599,7 @@ class ObjectEditModal extends Modal {
       if (this.category !== original?.category) override.category = this.category;
 
       // Preserve hidden state if it exists
-      if (this.plugin.settings[overridesKey][this.existingObject.id!]?.hidden) {
+      if (this.plugin.settings[overridesKey][this.existingObject.id!]?.hidden === true) {
         override.hidden = true;
       }
 
@@ -613,7 +613,7 @@ class ObjectEditModal extends Modal {
       } else {
         delete this.plugin.settings[overridesKey][this.existingObject.id!];
       }
-    } else if (this.existingObject?.isCustom) {
+    } else if (this.existingObject?.isCustom === true) {
       // Editing existing custom object
       if (!this.plugin.settings[customObjectsKey]) {
         this.plugin.settings[customObjectsKey] = [];

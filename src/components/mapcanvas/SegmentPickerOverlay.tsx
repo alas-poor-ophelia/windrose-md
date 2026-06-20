@@ -96,7 +96,7 @@ const SegmentPickerOverlay = ({
       if (existingCell.segments) {
         const segs = existingCell.segments;
         const filled = (Object.keys(segs) as SegmentName[]).filter(
-          seg => segs[seg]
+          seg => segs[seg] === true
         );
         setSelectedSegments(new Set(filled));
       } else if (existingCell.color != null && existingCell.color !== '') {
