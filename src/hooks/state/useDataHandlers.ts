@@ -77,7 +77,7 @@ function useDataHandlers({
       if (isApplyingHistory()) return;
 
       updateMapData((currentMapData) => {
-        if (!currentMapData) return currentMapData;
+        if (currentMapData == null) return currentMapData;
 
         const newMapData = updateActiveLayer(currentMapData, { [field]: newValue });
 
@@ -134,7 +134,7 @@ function useDataHandlers({
     if (isApplyingHistory()) return;
 
     updateMapData((currentMapData) => {
-      if (!currentMapData) return currentMapData;
+      if (currentMapData == null) return currentMapData;
 
       const activeLayer = getActiveLayer(currentMapData);
       addToHistory(buildLayerHistorySnapshot(activeLayer, newName, {}, currentMapData.regions ?? []));
@@ -146,7 +146,7 @@ function useDataHandlers({
   // Handle adding a custom color
   const handleAddCustomColor = useCallback((newColor: HexColor): void => {
     updateMapData((currentMapData) => {
-      if (!currentMapData) return currentMapData;
+      if (currentMapData == null) return currentMapData;
 
       const customColorId = `custom-${Date.now()}`;
       const customColorNumber = (currentMapData.customColors?.length ?? 0) + 1;
@@ -168,7 +168,7 @@ function useDataHandlers({
   // Handle deleting a custom color
   const handleDeleteCustomColor = useCallback((colorId: string): void => {
     updateMapData((currentMapData) => {
-      if (!currentMapData) return currentMapData;
+      if (currentMapData == null) return currentMapData;
 
       return {
         ...currentMapData,
@@ -180,7 +180,7 @@ function useDataHandlers({
   // Handle updating a color's opacity
   const handleUpdateColorOpacity = useCallback((colorId: string, newOpacity: number): void => {
     updateMapData((currentMapData) => {
-      if (!currentMapData) return currentMapData;
+      if (currentMapData == null) return currentMapData;
 
       const isCustomColor = (currentMapData.customColors ?? []).some(c => c.id === colorId);
 
@@ -206,7 +206,7 @@ function useDataHandlers({
   // Handle view state change - NOT tracked in history
   const handleViewStateChange = useCallback((newViewState: StoredViewState): void => {
     updateMapData((currentMapData) => {
-      if (!currentMapData) return currentMapData;
+      if (currentMapData == null) return currentMapData;
       return { ...currentMapData, viewState: newViewState };
     });
   }, [updateMapData]);
@@ -214,7 +214,7 @@ function useDataHandlers({
   // Handle sidebar collapse state change - NOT tracked in history
   const handleSidebarCollapseChange = useCallback((collapsed: boolean): void => {
     updateMapData((currentMapData) => {
-      if (!currentMapData) return currentMapData;
+      if (currentMapData == null) return currentMapData;
       return { ...currentMapData, sidebarCollapsed: collapsed };
     });
   }, [updateMapData]);
@@ -222,7 +222,7 @@ function useDataHandlers({
   // Handle object set change - NOT tracked in history
   const handleObjectSetChange = useCallback((setId: string | null): void => {
     updateMapData((currentMapData) => {
-      if (!currentMapData) return currentMapData;
+      if (currentMapData == null) return currentMapData;
       return { ...currentMapData, objectSetId: setId };
     });
   }, [updateMapData]);
@@ -230,7 +230,7 @@ function useDataHandlers({
   // Handle text label settings change - NOT tracked in history
   const handleTextLabelSettingsChange = useCallback((settings: TextLabelSettings): void => {
     updateMapData((currentMapData) => {
-      if (!currentMapData) return currentMapData;
+      if (currentMapData == null) return currentMapData;
       return { ...currentMapData, lastTextLabelSettings: settings };
     });
   }, [updateMapData]);
@@ -240,7 +240,7 @@ function useDataHandlers({
     if (isApplyingHistory()) return;
 
     updateMapData((currentMapData) => {
-      if (!currentMapData) return currentMapData;
+      if (currentMapData == null) return currentMapData;
 
       const activeLayer = getActiveLayer(currentMapData);
       addToHistory(buildLayerHistorySnapshot(activeLayer, currentMapData.name ?? '', {}, regions));
@@ -254,7 +254,7 @@ function useDataHandlers({
     if (isApplyingHistory()) return;
 
     updateMapData((currentMapData) => {
-      if (!currentMapData) return currentMapData;
+      if (currentMapData == null) return currentMapData;
 
       const activeLayer = getActiveLayer(currentMapData);
       addToHistory(buildLayerHistorySnapshot(activeLayer, currentMapData.name ?? '', {}, currentMapData.regions ?? [], outlines));
@@ -268,7 +268,7 @@ function useDataHandlers({
     if (isApplyingHistory()) return;
 
     updateMapData((currentMapData) => {
-      if (!currentMapData) return currentMapData;
+      if (currentMapData == null) return currentMapData;
 
       const activeLayer = getActiveLayer(currentMapData);
       addToHistory(buildLayerHistorySnapshot(activeLayer, currentMapData.name ?? '', {}, currentMapData.regions ?? [], currentMapData.outlines ?? [], shapeOverlays));

@@ -159,9 +159,7 @@ export const TabRenderColorsMethods = {
         if (!this.plugin.settings.colorPaletteOverrides) {
           this.plugin.settings.colorPaletteOverrides = {};
         }
-        if (!this.plugin.settings.colorPaletteOverrides[color.id]) {
-          this.plugin.settings.colorPaletteOverrides[color.id] = {};
-        }
+        this.plugin.settings.colorPaletteOverrides[color.id] ??= {};
         this.plugin.settings.colorPaletteOverrides[color.id].hidden = !isHidden;
 
         // Clean up empty override

@@ -238,7 +238,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   const [starredFlyoutTiles, setStarredFlyoutTiles] = useState<FlyoutTile[]>([]);
 
   const flyoutRecent = useMemo((): FlyoutTile[] => {
-    if (!recentTiles || availableTilesets.length === 0) return [];
+    if (availableTilesets.length === 0) return [];
     return recentTiles
       .map(r => {
         const ts = availableTilesets.find(t => t.id === r.tilesetId);

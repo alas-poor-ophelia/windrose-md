@@ -403,9 +403,7 @@ export const TabRenderObjectsMethods = {
             if (!this.plugin.settings[overridesKey]) {
               this.plugin.settings[overridesKey] = {};
             }
-            if (!this.plugin.settings[overridesKey][id]) {
-              this.plugin.settings[overridesKey][id] = {};
-            }
+            this.plugin.settings[overridesKey][id] ??= {};
             this.plugin.settings[overridesKey][id].order = newOrder;
           }
 
@@ -515,9 +513,7 @@ export const TabRenderObjectsMethods = {
           if (!this.plugin.settings[overridesKey]) {
             this.plugin.settings[overridesKey] = {};
           }
-          if (!this.plugin.settings[overridesKey][obj.id]) {
-            this.plugin.settings[overridesKey][obj.id] = {};
-          }
+          this.plugin.settings[overridesKey][obj.id] ??= {};
           this.plugin.settings[overridesKey][obj.id].hidden = true;
           this.settingsChanged = true;
           await this.plugin.saveSettings();

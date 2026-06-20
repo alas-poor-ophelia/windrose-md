@@ -523,7 +523,7 @@ export class DungeonEssenceVisualizer {
     switch (state.phase) {
       case 'JOURNEY': {
         const conn = state.connections[state.journeyStep];
-        if (!conn) {
+        if (conn == null) {
           state.phase = 'REVEAL';
           state.phaseTime = 0;
           break;
@@ -604,7 +604,7 @@ export class DungeonEssenceVisualizer {
       case 'STAMPING': {
         if (state.phaseTime < 20 && state.circledNode !== null) {
           const node = state.nodes[state.circledNode];
-          if (node) {
+          if (node != null) {
             const screenX = (node.x - state.camera.x) * state.camera.zoom + width / 2;
             const screenY = (node.y - state.camera.y) * state.camera.zoom + height / 2;
             this.showStamp(screenX, screenY);

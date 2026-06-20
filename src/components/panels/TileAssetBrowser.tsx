@@ -491,7 +491,7 @@ const TileAssetBrowser = memo(({
     if (!target) return;
     const ro = new ResizeObserver(entries => {
       const entry = entries[0];
-      if (entry) setContainerWidth(entry.contentRect.width);
+      if (entry != null) setContainerWidth(entry.contentRect.width);
     });
     ro.observe(target);
     return () => ro.disconnect();
@@ -896,7 +896,7 @@ const TileAssetBrowser = memo(({
     getScrollElement: () => gridWrapRef.current,
     estimateSize: (index: number) => {
       const row = fullRows[index];
-      if (!row) return fullCellWidth;
+      if (row == null) return fullCellWidth;
       switch (row.type) {
         case 'catHeader':
         case 'recentHeader':
@@ -926,7 +926,7 @@ const TileAssetBrowser = memo(({
     if (organize) {
       for (const v of orgVirtualizer.getVirtualItems()) {
         const row = orgRows[v.index];
-        if (row) for (const t of row) paths.push(t.vaultPath);
+        if (row != null) for (const t of row) paths.push(t.vaultPath);
       }
     } else if (!compact) {
       for (const v of fullVirtualizer.getVirtualItems()) {
@@ -1028,7 +1028,7 @@ const TileAssetBrowser = memo(({
             <div style={{ height: orgVirtualizer.getTotalSize(), position: 'relative', width: '100%' }}>
               {orgVirtualizer.getVirtualItems().map(virtualRow => {
                 const rowTiles = orgRows[virtualRow.index];
-                if (!rowTiles) return null;
+                if (rowTiles == null) return null;
                 return (
                   <div
                     key={virtualRow.key}
@@ -1516,7 +1516,7 @@ const TileAssetBrowser = memo(({
             <div style={{ height: fullVirtualizer.getTotalSize(), position: 'relative', width: '100%' }}>
               {fullVirtualizer.getVirtualItems().map(virtualRow => {
                 const row = fullRows[virtualRow.index];
-                if (!row) return null;
+                if (row == null) return null;
                 return (
                   <div
                     key={virtualRow.key}

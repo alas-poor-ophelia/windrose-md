@@ -67,7 +67,7 @@ class PromptModal extends Modal {
 
   onClose(): void {
     this.contentEl.empty();
-    if (!this.resolved && this.resolvePromise) {
+    if (!this.resolved && this.resolvePromise != null) {
       this.resolvePromise(null);
     }
   }

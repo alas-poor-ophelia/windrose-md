@@ -126,7 +126,7 @@ async function recordPerfTelemetry(app: App, durationMs = 60000): Promise<void> 
 
   safeWrap('createImageBitmap', () => {
     const orig = window.createImageBitmap?.bind(window);
-    if (!orig) return null;
+    if (orig == null) return null;
     window.createImageBitmap = ((...a: Parameters<typeof createImageBitmap>) => {
       c.imageBitmaps++;
       return orig(...a);

@@ -136,7 +136,7 @@ function migrateMapData(mapData: MapData): MapData {
       }
     }
 
-    if (!layer.curves) layer.curves = [];
+    layer.curves ??= [];
     layer.curves = layer.curves.filter(c => c.start != null && c.segments != null);
     for (const curve of layer.curves) {
       // Migrate legacy holes (flat number[]) to innerRings (boundary cast: legacy schema)
@@ -166,7 +166,7 @@ function migrateMapData(mapData: MapData): MapData {
       if (subHex?.mapData != null) {
         for (const layer of subHex.mapData.layers) {
           if (!layer.tiles) layer.tiles = [];
-          if (!layer.curves) layer.curves = [];
+          layer.curves ??= [];
           layer.curves = layer.curves.filter(c => c.start != null && c.segments != null);
         }
         if (!subHex.mapData.regions) subHex.mapData.regions = [];

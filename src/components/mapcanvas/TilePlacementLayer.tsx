@@ -145,7 +145,7 @@ const TilePlacementLayer = ({
     // Ensure the selected tile image is cached for rendering
     const ts = mapData.tilesets?.find(t => t.id === selectedTilesetId);
     const entry = ts?.tiles.find(t => t.id === selectedTileId);
-    if (entry?.vaultPath != null && entry.vaultPath !== '' && app) void preloadImage(app, entry.vaultPath);
+    if (entry?.vaultPath != null && entry.vaultPath !== '') void preloadImage(app, entry.vaultPath);
 
     const activeLayer = getActiveLayer(mapData);
     let currentTiles = activeLayer.tiles ?? [];
@@ -236,7 +236,7 @@ const TilePlacementLayer = ({
 
     const ts = mapData.tilesets?.find(t => t.id === selectedTilesetId);
     const entry = ts?.tiles.find(t => t.id === selectedTileId);
-    if (entry?.vaultPath != null && entry.vaultPath !== '' && app) void preloadImage(app, entry.vaultPath);
+    if (entry?.vaultPath != null && entry.vaultPath !== '') void preloadImage(app, entry.vaultPath);
 
     const activeLayer = getActiveLayer(mapData);
     const currentTiles = activeLayer.tiles ?? [];
@@ -277,7 +277,7 @@ const TilePlacementLayer = ({
 
     const ts = mapData.tilesets?.find(t => t.id === selectedTilesetId);
     const entry = ts?.tiles.find(t => t.id === selectedTileId);
-    if (entry?.vaultPath != null && entry.vaultPath !== '' && app) void preloadImage(app, entry.vaultPath);
+    if (entry?.vaultPath != null && entry.vaultPath !== '') void preloadImage(app, entry.vaultPath);
 
     const activeLayer = getActiveLayer(mapData);
     const currentTiles = activeLayer.tiles ?? [];
