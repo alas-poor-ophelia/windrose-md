@@ -406,14 +406,14 @@ const RegionLayer = ({
         const dx = touch.clientX - longPressPosRef.current.x;
         const dy = touch.clientY - longPressPosRef.current.y;
         if (dx * dx + dy * dy > 100) {
-          if (longPressTimerRef.current) window.clearTimeout(longPressTimerRef.current);
+          if (longPressTimerRef.current != null) window.clearTimeout(longPressTimerRef.current);
           longPressPosRef.current = null;
         }
       }
     };
 
     const handleTouchEnd = (): void => {
-      if (longPressTimerRef.current) {
+      if (longPressTimerRef.current != null) {
         window.clearTimeout(longPressTimerRef.current);
         longPressTimerRef.current = null;
       }
@@ -430,7 +430,7 @@ const RegionLayer = ({
       canvas.removeEventListener('touchmove', handleTouchMove);
       canvas.removeEventListener('touchend', handleTouchEnd);
       canvas.removeEventListener('touchcancel', handleTouchEnd);
-      if (longPressTimerRef.current) window.clearTimeout(longPressTimerRef.current);
+      if (longPressTimerRef.current != null) window.clearTimeout(longPressTimerRef.current);
     };
   }, [canvasRef, screenToGrid, mapData?.regions, handleContextMenu]);
 

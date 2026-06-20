@@ -128,7 +128,7 @@ function useObjectDragSelect(
       const isAlreadySelected = selectedItem?.type === 'object' && selectedItem.id === object.id;
 
       if (isAlreadySelected) {
-        if (longPressTimerRef.current) {
+        if (longPressTimerRef.current != null) {
           window.clearTimeout(longPressTimerRef.current);
         }
 
@@ -170,7 +170,7 @@ function useObjectDragSelect(
           worldY: worldCoords?.worldY
         });
 
-        if (longPressTimerRef.current) {
+        if (longPressTimerRef.current != null) {
           window.clearTimeout(longPressTimerRef.current);
         }
 
@@ -204,7 +204,7 @@ function useObjectDragSelect(
 
     const { clientX, clientY } = getClientCoords(e);
 
-    if (longPressTimerRef.current) {
+    if (longPressTimerRef.current != null) {
       const dx = clientX - dragStart.x;
       const dy = clientY - dragStart.y;
       const distance = Math.sqrt(dx * dx + dy * dy);
@@ -418,7 +418,7 @@ function useObjectDragSelect(
     if (mapData == null || geometry == null) return false;
     const isDraggingObject = selectedItem?.type === 'object' || (dragStart?.objectId != null && dragStart.objectId !== '');
     if (isDraggingSelection && isDraggingObject) {
-      if (longPressTimerRef.current) {
+      if (longPressTimerRef.current != null) {
         window.clearTimeout(longPressTimerRef.current);
         longPressTimerRef.current = null;
       }

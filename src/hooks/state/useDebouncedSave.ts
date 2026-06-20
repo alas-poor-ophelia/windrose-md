@@ -26,7 +26,7 @@ function useDebouncedSave(
   useEffect(() => {
     if (!pendingData) return undefined;
 
-    if (saveTimerRef.current) {
+    if (saveTimerRef.current != null) {
       window.clearTimeout(saveTimerRef.current);
     }
 
@@ -48,7 +48,7 @@ function useDebouncedSave(
     })(); }, 2000);
 
     return () => {
-      if (saveTimerRef.current) {
+      if (saveTimerRef.current != null) {
         window.clearTimeout(saveTimerRef.current);
       }
     };
@@ -65,7 +65,7 @@ function useDebouncedSave(
   useEffect(() => {
     return () => {
       const { app: a, mapId: m, pendingData: pd } = flushRef.current;
-      if (pd && saveTimerRef.current) {
+      if (pd && saveTimerRef.current != null) {
         window.clearTimeout(saveTimerRef.current);
         void saveMapData(a, m, pd);
       }
@@ -86,7 +86,7 @@ function useDebouncedSave(
 
   const forceSave = useCallback(async (): Promise<void> => {
     if (pendingData) {
-      if (saveTimerRef.current) {
+      if (saveTimerRef.current != null) {
         window.clearTimeout(saveTimerRef.current);
         saveTimerRef.current = null;
       }

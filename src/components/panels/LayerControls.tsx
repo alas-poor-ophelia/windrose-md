@@ -145,7 +145,7 @@ const LayerControls = ({
   };
 
   const handleTouchEnd = (): void => {
-    if (longPressTimerRef.current) {
+    if (longPressTimerRef.current != null) {
       window.clearTimeout(longPressTimerRef.current);
       longPressTimerRef.current = null;
     }
@@ -265,7 +265,7 @@ const LayerControls = ({
   };
 
   const handleSliderAreaEnter = (layerId: string): void => {
-    if (sliderHideTimeoutRef.current) {
+    if (sliderHideTimeoutRef.current != null) {
       window.clearTimeout(sliderHideTimeoutRef.current);
       sliderHideTimeoutRef.current = null;
     }

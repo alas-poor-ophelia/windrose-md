@@ -125,7 +125,7 @@ const useEventCoordinator = ({
       e.preventDefault();
       e.stopPropagation();
 
-      if (pendingToolTimeoutRef.current) {
+      if (pendingToolTimeoutRef.current != null) {
         window.clearTimeout(pendingToolTimeoutRef.current);
         pendingToolTimeoutRef.current = null;
         setPendingToolAction(null);
@@ -402,7 +402,7 @@ const useEventCoordinator = ({
       e.preventDefault();
       e.stopPropagation();
       if (isTouchPanningRef?.current === true) {
-        if (pendingToolTimeoutRef.current) {
+        if (pendingToolTimeoutRef.current != null) {
           window.clearTimeout(pendingToolTimeoutRef.current);
           pendingToolTimeoutRef.current = null;
           setPendingToolAction(null);
@@ -419,7 +419,7 @@ const useEventCoordinator = ({
     }
 
     if (touchEvent.touches != null && touchEvent.touches.length > 1) {
-      if (pendingToolTimeoutRef.current) {
+      if (pendingToolTimeoutRef.current != null) {
         window.clearTimeout(pendingToolTimeoutRef.current);
         pendingToolTimeoutRef.current = null;
         setPendingToolAction(null);
@@ -718,7 +718,7 @@ const useEventCoordinator = ({
     const drawingHandlers = getHandlers('drawing');
     const diagonalFillHandlers = getHandlers('diagonalFill');
 
-    if (pendingToolTimeoutRef.current) {
+    if (pendingToolTimeoutRef.current != null) {
       window.clearTimeout(pendingToolTimeoutRef.current);
       pendingToolTimeoutRef.current = null;
       setPendingToolAction(null);
@@ -872,7 +872,7 @@ const useEventCoordinator = ({
       const startX = touch.clientX;
       const startY = touch.clientY;
 
-      if (longPressTimerRef.current) window.clearTimeout(longPressTimerRef.current);
+      if (longPressTimerRef.current != null) window.clearTimeout(longPressTimerRef.current);
       longPressTimerRef.current = window.setTimeout(() => {
         longPressTimerRef.current = null;
         // Dispatch as context menu event
@@ -881,7 +881,7 @@ const useEventCoordinator = ({
     };
 
     const cancelLongPress = (): void => {
-      if (longPressTimerRef.current) {
+      if (longPressTimerRef.current != null) {
         window.clearTimeout(longPressTimerRef.current);
         longPressTimerRef.current = null;
       }
@@ -1058,7 +1058,7 @@ const useEventCoordinator = ({
 
   useEffect(() => {
     return () => {
-      if (pendingToolTimeoutRef.current) {
+      if (pendingToolTimeoutRef.current != null) {
         window.clearTimeout(pendingToolTimeoutRef.current);
       }
     };

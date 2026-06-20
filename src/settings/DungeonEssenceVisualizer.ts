@@ -84,7 +84,7 @@ export class DungeonEssenceVisualizer {
 
   constructor(container: HTMLElement, options: VisualizerOptions = {}) {
     this.container = container;
-    this.height = options.height || 150;
+    this.height = options.height != null && options.height !== 0 ? options.height : 150;
     this.width = 0;
     this.stampSize = 0;
     this.lastTime = 0;
@@ -194,7 +194,7 @@ export class DungeonEssenceVisualizer {
     this.stampOverlay.style.height = stampSize + 'px';
 
     // Restart animation with new dimensions
-    if (this.animationId) {
+    if (this.animationId != null) {
       this.stop();
       this.start();
     }
@@ -214,7 +214,7 @@ export class DungeonEssenceVisualizer {
     this.settings = { ...this.settings, ...newSettings };
 
     // Size changes warrant an immediate restart since node count changes dramatically
-    if (sizeChanged && this.animationId) {
+    if (sizeChanged && this.animationId != null) {
       this.restartAnimation();
     }
   }
@@ -223,7 +223,7 @@ export class DungeonEssenceVisualizer {
    * Restart the animation with current settings
    */
   restartAnimation(): void {
-    if (!this.animationId) return;
+    if (this.animationId == null) return;
 
     this.hideStamp();
     this.initState();
@@ -243,7 +243,7 @@ export class DungeonEssenceVisualizer {
   }
 
   start(): void {
-    if (this.animationId) return;
+    if (this.animationId != null) return;
 
     this.initState();
     this.lastTime = performance.now();
@@ -251,7 +251,7 @@ export class DungeonEssenceVisualizer {
   }
 
   stop(): void {
-    if (this.animationId) {
+    if (this.animationId != null) {
       cancelAnimationFrame(this.animationId);
       this.animationId = null;
     }

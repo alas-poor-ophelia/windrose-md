@@ -241,7 +241,7 @@ const ColorPicker = ({
   };
 
   const handleLongPressCancel = (): void => {
-    if (longPressTimerRef.current) {
+    if (longPressTimerRef.current != null) {
       window.clearTimeout(longPressTimerRef.current);
       longPressTimerRef.current = null;
     }

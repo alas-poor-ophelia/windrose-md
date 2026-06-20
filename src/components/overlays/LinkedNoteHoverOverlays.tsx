@@ -65,7 +65,7 @@ const LinkedNoteHoverOverlays = ({ selectedItem }: LinkedNoteHoverOverlaysProps)
         };
 
         const handleTouchEnd = (e: TouchEvent): void => {
-          if (touchTimer) {
+          if (touchTimer != null) {
             window.clearTimeout(touchTimer);
             touchTimer = null;
           }
@@ -108,7 +108,7 @@ const LinkedNoteHoverOverlays = ({ selectedItem }: LinkedNoteHoverOverlaysProps)
         };
         
         const handleTouchCancel = (): void => {
-          if (touchTimer) {
+          if (touchTimer != null) {
             window.clearTimeout(touchTimer);
             touchTimer = null;
           }

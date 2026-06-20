@@ -175,7 +175,7 @@ const ToolButtonWithSubMenu = ({
   };
 
   const handlePointerUp = (): void => {
-    if (longPressTimer.current) {
+    if (longPressTimer.current != null) {
       window.clearTimeout(longPressTimer.current);
       longPressTimer.current = null;
       onToolSelect(currentSubToolDef.id);
@@ -185,7 +185,7 @@ const ToolButtonWithSubMenu = ({
   };
 
   const handlePointerLeave = (): void => {
-    if (longPressTimer.current) {
+    if (longPressTimer.current != null) {
       window.clearTimeout(longPressTimer.current);
       longPressTimer.current = null;
     }
@@ -196,7 +196,7 @@ const ToolButtonWithSubMenu = ({
 
     e.preventDefault();
     e.stopPropagation();
-    if (longPressTimer.current) {
+    if (longPressTimer.current != null) {
       window.clearTimeout(longPressTimer.current);
       longPressTimer.current = null;
     }

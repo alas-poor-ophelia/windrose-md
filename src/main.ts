@@ -238,7 +238,7 @@ export default class WindrosePlugin extends Plugin {
     const old = oldSettings as Partial<PluginSettings>;
     const cur = this.settings;
 
-    if (old.objectSets?.length) {
+    if (old.objectSets != null && old.objectSets.length > 0) {
       const existingIds = new Set((cur.objectSets ?? []).map(s => s.id));
       const newSets = old.objectSets.filter(s => !existingIds.has(s.id));
       if (newSets.length > 0) {
@@ -251,19 +251,19 @@ export default class WindrosePlugin extends Plugin {
       cur.activeObjectSetId = old.activeObjectSetId;
     }
 
-    if (old.customGridObjects?.length && !(cur.customGridObjects?.length)) {
+    if ((old.customGridObjects?.length ?? 0) > 0 && (cur.customGridObjects?.length ?? 0) === 0) {
       cur.customGridObjects = old.customGridObjects;
       imported.push('custom grid objects');
     }
-    if (old.customGridCategories?.length && !(cur.customGridCategories?.length)) {
+    if ((old.customGridCategories?.length ?? 0) > 0 && (cur.customGridCategories?.length ?? 0) === 0) {
       cur.customGridCategories = old.customGridCategories;
       imported.push('custom grid categories');
     }
-    if (old.customHexObjects?.length && !(cur.customHexObjects?.length)) {
+    if ((old.customHexObjects?.length ?? 0) > 0 && (cur.customHexObjects?.length ?? 0) === 0) {
       cur.customHexObjects = old.customHexObjects;
       imported.push('custom hex objects');
     }
-    if (old.customHexCategories?.length && !(cur.customHexCategories?.length)) {
+    if ((old.customHexCategories?.length ?? 0) > 0 && (cur.customHexCategories?.length ?? 0) === 0) {
       cur.customHexCategories = old.customHexCategories;
       imported.push('custom hex categories');
     }

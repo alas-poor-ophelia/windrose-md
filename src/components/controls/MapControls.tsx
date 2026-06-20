@@ -74,7 +74,7 @@ const MapControls = ({
     }, []);
     
     const clearCollapseTimer = (): void => {
-      if (collapseTimerRef.current) {
+      if (collapseTimerRef.current != null) {
         window.clearTimeout(collapseTimerRef.current);
         collapseTimerRef.current = null;
       }

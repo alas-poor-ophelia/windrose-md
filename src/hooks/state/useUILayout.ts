@@ -158,7 +158,7 @@ function useUILayout({
   }, [isExpanded, isAnimating]);
 
   const handleToggleExpand = (): void => {
-    if (animationTimeoutRef.current) {
+    if (animationTimeoutRef.current != null) {
       window.clearTimeout(animationTimeoutRef.current);
       animationTimeoutRef.current = null;
     }

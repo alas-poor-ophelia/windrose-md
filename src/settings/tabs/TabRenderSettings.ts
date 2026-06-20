@@ -422,7 +422,7 @@ export const TabRenderSettingsMethods = {
         }));
 
     // Hover Preview Size
-    const previewScalePercent = Math.round((this.plugin.settings.hoverPreviewScale || 1.0) * 100);
+    const previewScalePercent = Math.round((this.plugin.settings.hoverPreviewScale != null && this.plugin.settings.hoverPreviewScale !== 0 ? this.plugin.settings.hoverPreviewScale : 1.0) * 100);
     new Setting(containerEl)
       .setName('Link preview size')
       .setDesc(`Scale of the hover preview panel (currently ${previewScalePercent}%)`)
@@ -446,7 +446,7 @@ export const TabRenderSettingsMethods = {
         }));
 
     // Hover Preview Zoom
-    const previewZoom = this.plugin.settings.hoverPreviewZoom || 0.5;
+    const previewZoom = this.plugin.settings.hoverPreviewZoom != null && this.plugin.settings.hoverPreviewZoom !== 0 ? this.plugin.settings.hoverPreviewZoom : 0.5;
     const previewZoomPercent = Math.round(previewZoom * 100);
     new Setting(containerEl)
       .setName('Link preview zoom')
