@@ -98,12 +98,12 @@ export class DungeonEssenceVisualizer {
     };
 
     // Create canvas
-    this.canvas = document.createElement('canvas');
+    this.canvas = activeDocument.createElement('canvas');
     this.canvas.setCssStyles({ display: 'block', width: '100%' });
     this.container.appendChild(this.canvas);
 
     // Create stamp overlay container
-    this.stampOverlay = document.createElement('div');
+    this.stampOverlay = activeDocument.createElement('div');
     this.stampOverlay.setCssStyles({
       position: 'absolute',
       pointerEvents: 'none',

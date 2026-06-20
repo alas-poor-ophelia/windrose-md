@@ -265,7 +265,7 @@ async function recordPerfTelemetry(app: App, durationMs = 60000): Promise<void> 
   restorers.push(() => window.clearInterval(sampler));
 
   // ---- environment snapshot ----
-  const canvases = Array.from(document.querySelectorAll('canvas')).map(cv => ({
+  const canvases = Array.from(activeDocument.querySelectorAll('canvas')).map(cv => ({
     w: cv.width, h: cv.height, mp: +((cv.width * cv.height) / 1e6).toFixed(2),
     cls: cv.className.toString().slice(0, 40),
   }));

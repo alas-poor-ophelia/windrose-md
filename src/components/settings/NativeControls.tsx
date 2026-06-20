@@ -38,7 +38,7 @@ function NativeToggle({ value, onChange, disabled }: NativeToggleProps): h.JSX.E
 
     try {
       // Create a temporary setting to extract its toggle component
-      const tempContainer = document.createElement('div');
+      const tempContainer = activeDocument.createElement('div');
       const setting = new Setting(tempContainer);
       let toggleInstance: ToggleComponent | null = null;
 
@@ -111,7 +111,7 @@ function NativeDropdown({ value, options, onChange, disabled }: NativeDropdownPr
     if (!containerRef.current) return undefined;
 
     try {
-      const tempContainer = document.createElement('div');
+      const tempContainer = activeDocument.createElement('div');
       const setting = new Setting(tempContainer);
       let dropdownInstance: DropdownComponent | null = null;
 
@@ -181,7 +181,7 @@ function NativeSlider({ value, min, max, step, onChange, disabled }: NativeSlide
     if (!containerRef.current) return undefined;
 
     try {
-      const tempContainer = document.createElement('div');
+      const tempContainer = activeDocument.createElement('div');
       const setting = new Setting(tempContainer);
       let sliderInstance: SliderComponent | null = null;
 

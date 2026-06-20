@@ -90,8 +90,8 @@ const ShapeOverlayLayer = ({
         cancelPlacement();
       }
     };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
+    activeDocument.addEventListener('keydown', handler);
+    return () => activeDocument.removeEventListener('keydown', handler);
   }, [isShapeTool, cancelPlacement]);
 
   const distanceSettings = useMemo(() => {

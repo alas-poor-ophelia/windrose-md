@@ -101,11 +101,11 @@ const LayerControls = ({
       }
     };
 
-    document.addEventListener('keydown', handleEscape);
-    document.addEventListener('pointerdown', handleClickOutside, true);
+    activeDocument.addEventListener('keydown', handleEscape);
+    activeDocument.addEventListener('pointerdown', handleClickOutside, true);
     return () => {
-      document.removeEventListener('keydown', handleEscape);
-      document.removeEventListener('pointerdown', handleClickOutside, true);
+      activeDocument.removeEventListener('keydown', handleEscape);
+      activeDocument.removeEventListener('pointerdown', handleClickOutside, true);
     };
   }, [expandedLayerId]);
 

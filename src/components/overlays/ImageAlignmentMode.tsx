@@ -62,7 +62,7 @@ function ImageAlignmentMode({ isActive, offsetX, offsetY, onOffsetChange, onAppl
   // Canvas drag event handlers - use useCallback to stabilize
   const handleCanvasPointerDown = useCallback((e: PointerEvent | TouchEvent) => {
     // Only handle events on the canvas
-    const canvas = document.querySelector('[class^="windrose-canvas"]');
+    const canvas = activeDocument.querySelector('[class^="windrose-canvas"]');
     const target = e.target as HTMLElement | null;
     if (canvas == null || !target?.closest('[class^="windrose-canvas"]')) {
       return;
@@ -103,29 +103,29 @@ function ImageAlignmentMode({ isActive, offsetX, offsetY, onOffsetChange, onAppl
   useEffect(() => {    if (!isActive) {      return undefined;
     }
 
-    const canvas = document.querySelector('[class^="windrose-canvas"]');
+    const canvas = activeDocument.querySelector('[class^="windrose-canvas"]');
     if (!canvas) return undefined;
 
     // Attach to document instead of canvas to avoid CodeMirror interception
-    document.addEventListener('pointerdown', handleCanvasPointerDown);
-    document.addEventListener('pointermove', handleCanvasPointerMove);
-    document.addEventListener('pointerup', handleCanvasPointerUp);
-    document.addEventListener('pointercancel', handleCanvasPointerUp);
+    activeDocument.addEventListener('pointerdown', handleCanvasPointerDown);
+    activeDocument.addEventListener('pointermove', handleCanvasPointerMove);
+    activeDocument.addEventListener('pointerup', handleCanvasPointerUp);
+    activeDocument.addEventListener('pointercancel', handleCanvasPointerUp);
     
     // Also handle touch events for better mobile support
-    document.addEventListener('touchstart', handleCanvasPointerDown);
-    document.addEventListener('touchmove', handleCanvasPointerMove);
-    document.addEventListener('touchend', handleCanvasPointerUp);
-    document.addEventListener('touchcancel', handleCanvasPointerUp);
+    activeDocument.addEventListener('touchstart', handleCanvasPointerDown);
+    activeDocument.addEventListener('touchmove', handleCanvasPointerMove);
+    activeDocument.addEventListener('touchend', handleCanvasPointerUp);
+    activeDocument.addEventListener('touchcancel', handleCanvasPointerUp);
     
-    return () => {      document.removeEventListener('pointerdown', handleCanvasPointerDown);
-      document.removeEventListener('pointermove', handleCanvasPointerMove);
-      document.removeEventListener('pointerup', handleCanvasPointerUp);
-      document.removeEventListener('pointercancel', handleCanvasPointerUp);
-      document.removeEventListener('touchstart', handleCanvasPointerDown);
-      document.removeEventListener('touchmove', handleCanvasPointerMove);
-      document.removeEventListener('touchend', handleCanvasPointerUp);
-      document.removeEventListener('touchcancel', handleCanvasPointerUp);
+    return () => {      activeDocument.removeEventListener('pointerdown', handleCanvasPointerDown);
+      activeDocument.removeEventListener('pointermove', handleCanvasPointerMove);
+      activeDocument.removeEventListener('pointerup', handleCanvasPointerUp);
+      activeDocument.removeEventListener('pointercancel', handleCanvasPointerUp);
+      activeDocument.removeEventListener('touchstart', handleCanvasPointerDown);
+      activeDocument.removeEventListener('touchmove', handleCanvasPointerMove);
+      activeDocument.removeEventListener('touchend', handleCanvasPointerUp);
+      activeDocument.removeEventListener('touchcancel', handleCanvasPointerUp);
     };
   }, [isActive, handleCanvasPointerDown, handleCanvasPointerMove, handleCanvasPointerUp]);
   
@@ -175,8 +175,8 @@ function ImageAlignmentMode({ isActive, offsetX, offsetY, onOffsetChange, onAppl
       }
     };
     
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
+    activeDocument.addEventListener('keydown', handleKeyDown);
+    return () => activeDocument.removeEventListener('keydown', handleKeyDown);
   }, [isActive, offsetX, offsetY, onOffsetChange]);
   
   // Panel dragging (mouse + touch)
@@ -214,16 +214,16 @@ function ImageAlignmentMode({ isActive, offsetX, offsetY, onOffsetChange, onAppl
       setIsDragging(false);
     };
 
-    document.addEventListener('mousemove', handleMove);
-    document.addEventListener('mouseup', handleEnd);
-    document.addEventListener('touchmove', handleMove, { passive: false });
-    document.addEventListener('touchend', handleEnd);
+    activeDocument.addEventListener('mousemove', handleMove);
+    activeDocument.addEventListener('mouseup', handleEnd);
+    activeDocument.addEventListener('touchmove', handleMove, { passive: false });
+    activeDocument.addEventListener('touchend', handleEnd);
 
     return () => {
-      document.removeEventListener('mousemove', handleMove);
-      document.removeEventListener('mouseup', handleEnd);
-      document.removeEventListener('touchmove', handleMove);
-      document.removeEventListener('touchend', handleEnd);
+      activeDocument.removeEventListener('mousemove', handleMove);
+      activeDocument.removeEventListener('mouseup', handleEnd);
+      activeDocument.removeEventListener('touchmove', handleMove);
+      activeDocument.removeEventListener('touchend', handleEnd);
     };
   }, [isDragging, dragStart]);
   

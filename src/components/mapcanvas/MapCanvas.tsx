@@ -307,7 +307,7 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
     // During animation, preserve canvas content
     if (isAnimating) {
       // Save current canvas content
-      const tempCanvas = document.createElement('canvas');
+      const tempCanvas = activeDocument.createElement('canvas');
       tempCanvas.width = canvas.width;
       tempCanvas.height = canvas.height;
       const tempCtx = tempCanvas.getContext('2d');

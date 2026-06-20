@@ -70,10 +70,10 @@ function FlyoutPanel({ tiles, onSelect, onClose, label }: {
         onClose();
       }
     };
-    const id = window.setTimeout(() => document.addEventListener('mousedown', handler), 0);
+    const id = window.setTimeout(() => activeDocument.addEventListener('mousedown', handler), 0);
     return () => {
       window.clearTimeout(id);
-      document.removeEventListener('mousedown', handler);
+      activeDocument.removeEventListener('mousedown', handler);
     };
   }, [onClose]);
 
@@ -251,11 +251,11 @@ function DrawerDock({
       setResizing(false);
     };
 
-    document.addEventListener('mousemove', handleMove);
-    document.addEventListener('mouseup', handleUp);
+    activeDocument.addEventListener('mousemove', handleMove);
+    activeDocument.addEventListener('mouseup', handleUp);
     return () => {
-      document.removeEventListener('mousemove', handleMove);
-      document.removeEventListener('mouseup', handleUp);
+      activeDocument.removeEventListener('mousemove', handleMove);
+      activeDocument.removeEventListener('mouseup', handleUp);
     };
   }, [resizing, onWidthChange, minWidth, maxWidth]);
 

@@ -24,7 +24,7 @@ async function navigateToLink(plugin: Plugin, parsed: DeepLinkData, sourcePath: 
 
   window.setTimeout(() => {
     try {
-      const leaf = document.querySelector('.workspace-leaf.mod-active .view-content');
+      const leaf = activeDocument.querySelector('.workspace-leaf.mod-active .view-content');
       if (leaf) {
         const mapEl = leaf.querySelector('.windrose-container');
         if (mapEl) {
@@ -76,7 +76,7 @@ function registerPostProcessor(plugin: Plugin): void {
         : dataHref.startsWith('windrose:') ? dataHref : '';
       if (original === '') return;
 
-      const replacement = document.createElement('a');
+      const replacement = activeDocument.createElement('a');
       replacement.textContent = link.textContent;
       replacement.className = 'windrose-deep-link';
       replacement.setAttribute('href', '#');
@@ -87,7 +87,7 @@ function registerPostProcessor(plugin: Plugin): void {
 }
 
 function registerDomCapture(plugin: Plugin): void {
-  plugin.registerDomEvent(document, 'click', async (e: MouseEvent) => {
+  plugin.registerDomEvent(activeDocument, 'click', async (e: MouseEvent) => {
     const target = e.target as HTMLElement;
     if (target?.closest == null) return;
 

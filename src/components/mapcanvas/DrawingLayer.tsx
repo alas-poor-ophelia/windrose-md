@@ -150,8 +150,8 @@ const DrawingLayer = ({
   }, [rectangleStart, circleStart, edgeLineStart, touchConfirmPending, cancelShapePreview, segmentPickerOpen, closeSegmentPicker]);
 
   useEffect(() => {
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
+    activeDocument.addEventListener('keydown', handleKeyDown);
+    return () => activeDocument.removeEventListener('keydown', handleKeyDown);
   }, [handleKeyDown]);
 
   const { registerHandlers, unregisterHandlers } = useEventHandlerRegistration();

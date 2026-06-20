@@ -111,8 +111,8 @@ const useEventCoordinator = ({
 
     if (touchEvent.touches != null && touchEvent.touches.length === 2) {
       if (isColorPickerOpen || showObjectColorPicker) {
-        const touch1Target = document.elementFromPoint(touchEvent.touches[0].clientX, touchEvent.touches[0].clientY);
-        const touch2Target = document.elementFromPoint(touchEvent.touches[1].clientX, touchEvent.touches[1].clientY);
+        const touch1Target = activeDocument.elementFromPoint(touchEvent.touches[0].clientX, touchEvent.touches[0].clientY);
+        const touch2Target = activeDocument.elementFromPoint(touchEvent.touches[1].clientX, touchEvent.touches[1].clientY);
 
         const pickerOrButton1 = touch1Target?.closest('.windrose-color-picker, .windrose-color-tool-btn, .windrose-object-color-button');
         const pickerOrButton2 = touch2Target?.closest('.windrose-color-picker, .windrose-color-tool-btn, .windrose-object-color-button');
@@ -777,7 +777,7 @@ const useEventCoordinator = ({
     if (currentTool === 'select' && geometry?.type === 'hex' && screenToGrid != null) {
       const coords = screenToGrid(e.clientX, e.clientY);
       if (coords) {
-        document.dispatchEvent(new CustomEvent('windrose:enter-sub-hex', {
+        activeDocument.dispatchEvent(new CustomEvent('windrose:enter-sub-hex', {
           detail: { q: coords.x, r: coords.y }
         }));
         return;
@@ -814,14 +814,14 @@ const useEventCoordinator = ({
     // Try object/text context menu first — dispatch event for handlers to claim
     const contextDetail = { screenX: e.clientX, screenY: e.clientY, clientX: e.clientX, clientY: e.clientY, handled: false };
     const contextEvent = new CustomEvent('windrose:selection-context-menu', { detail: contextDetail });
-    document.dispatchEvent(contextEvent);
+    activeDocument.dispatchEvent(contextEvent);
     if (contextDetail.handled) return;
 
     // General hex context menu (dispatch for DungeonMapTracker to handle)
     if (geometry?.type === 'hex' && screenToGrid != null) {
       const coords = screenToGrid(e.clientX, e.clientY);
       if (coords) {
-        document.dispatchEvent(new CustomEvent('windrose:hex-context-menu', {
+        activeDocument.dispatchEvent(new CustomEvent('windrose:hex-context-menu', {
           detail: { q: coords.x, r: coords.y, screenX: e.clientX, screenY: e.clientY }
         }));
         return;

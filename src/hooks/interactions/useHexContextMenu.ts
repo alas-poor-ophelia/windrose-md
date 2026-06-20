@@ -46,7 +46,7 @@ function useHexContextMenu({
           item.setTitle(`Edit Region: ${region.name}`);
           item.setIcon('lucide-pencil');
           item.onClick(() => {
-            document.dispatchEvent(new CustomEvent('windrose:edit-region', { detail: { regionId: region.id } }));
+            activeDocument.dispatchEvent(new CustomEvent('windrose:edit-region', { detail: { regionId: region.id } }));
           });
         });
 
@@ -106,8 +106,8 @@ function useHexContextMenu({
       menu.showAtPosition({ x: screenX, y: screenY });
     };
 
-    document.addEventListener('windrose:hex-context-menu', handleHexContextMenu);
-    return () => document.removeEventListener('windrose:hex-context-menu', handleHexContextMenu);
+    activeDocument.addEventListener('windrose:hex-context-menu', handleHexContextMenu);
+    return () => activeDocument.removeEventListener('windrose:hex-context-menu', handleHexContextMenu);
   }, [app, mapData, enterSubHex, handleRegionsChange]);
 }
 

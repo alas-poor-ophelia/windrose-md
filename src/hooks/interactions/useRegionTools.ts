@@ -395,17 +395,17 @@ function useRegionTools(options: RegionToolsOptions): UseRegionToolsResult {
     const onMove = (e: PointerEvent): void => { handlePointerMoveRef.current?.(e); };
     const onUp = (e: PointerEvent): void => { handlePointerUpRef.current?.(e); };
 
-    document.addEventListener('pointermove', onMove);
-    document.addEventListener('pointerup', onUp);
+    activeDocument.addEventListener('pointermove', onMove);
+    activeDocument.addEventListener('pointerup', onUp);
 
     labelDragCleanupRef.current = () => {
-      document.removeEventListener('pointermove', onMove);
-      document.removeEventListener('pointerup', onUp);
+      activeDocument.removeEventListener('pointermove', onMove);
+      activeDocument.removeEventListener('pointerup', onUp);
     };
 
     return () => {
-      document.removeEventListener('pointermove', onMove);
-      document.removeEventListener('pointerup', onUp);
+      activeDocument.removeEventListener('pointermove', onMove);
+      activeDocument.removeEventListener('pointerup', onUp);
     };
   }, [draggingLabelRegionId]);
 

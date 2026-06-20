@@ -62,15 +62,15 @@ function useCustomEventHandlers({
       if (e.key === 'Escape') {
         const target = e.target as HTMLElement;
         if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
-        if (document.querySelector('.modal-container')) return;
+        if (activeDocument.querySelector('.modal-container')) return;
         e.preventDefault();
         e.stopPropagation();
         exitSubHex();
       }
     };
 
-    document.addEventListener('keydown', handleEscape, true);
-    return () => document.removeEventListener('keydown', handleEscape, true);
+    activeDocument.addEventListener('keydown', handleEscape, true);
+    return () => activeDocument.removeEventListener('keydown', handleEscape, true);
   }, [isInSubHex, exitSubHex]);
 
   // Listen for sub-hex entry events from double-click on hex
@@ -82,8 +82,8 @@ function useCustomEventHandlers({
       }
     };
 
-    document.addEventListener('windrose:enter-sub-hex', handleEnterSubHex);
-    return () => document.removeEventListener('windrose:enter-sub-hex', handleEnterSubHex);
+    activeDocument.addEventListener('windrose:enter-sub-hex', handleEnterSubHex);
+    return () => activeDocument.removeEventListener('windrose:enter-sub-hex', handleEnterSubHex);
   }, [mapData?.mapType, enterSubHex]);
 
   // Listen for sibling sub-hex navigation (click on adjacent preview)
@@ -93,8 +93,8 @@ function useCustomEventHandlers({
       const { q, r } = event.detail;
       navigateToSibling(q, r);
     };
-    document.addEventListener('windrose:navigate-sibling-sub-hex', handleNavigateSibling);
-    return () => document.removeEventListener('windrose:navigate-sibling-sub-hex', handleNavigateSibling);
+    activeDocument.addEventListener('windrose:navigate-sibling-sub-hex', handleNavigateSibling);
+    return () => activeDocument.removeEventListener('windrose:navigate-sibling-sub-hex', handleNavigateSibling);
   }, [isInSubHex, navigateToSibling]);
 
   // Deep link navigation — also consumes stashed navigation from cross-note openLinkText
@@ -179,8 +179,8 @@ function useCustomEventHandlers({
       }));
     };
 
-    document.addEventListener('windrose:center-on-region', handleCenterOnRegion);
-    return () => document.removeEventListener('windrose:center-on-region', handleCenterOnRegion);
+    activeDocument.addEventListener('windrose:center-on-region', handleCenterOnRegion);
+    return () => activeDocument.removeEventListener('windrose:center-on-region', handleCenterOnRegion);
   }, [mapData, geometry, updateMapData]);
 
   // Cross-layer object link events

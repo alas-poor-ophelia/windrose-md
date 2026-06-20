@@ -103,8 +103,8 @@ const RegionLayer = ({
         startEditingRegion(regionId);
       }
     };
-    document.addEventListener('windrose:edit-region', handler);
-    return () => document.removeEventListener('windrose:edit-region', handler);
+    activeDocument.addEventListener('windrose:edit-region', handler);
+    return () => activeDocument.removeEventListener('windrose:edit-region', handler);
   }, [startEditingRegion]);
 
   // Name input state
@@ -121,8 +121,8 @@ const RegionLayer = ({
         setRegionName('');
       }
     };
-    document.addEventListener('windrose:before-undo', handler);
-    return () => document.removeEventListener('windrose:before-undo', handler);
+    activeDocument.addEventListener('windrose:before-undo', handler);
+    return () => activeDocument.removeEventListener('windrose:before-undo', handler);
   }, [pendingHexes.length, editingRegionId, showNameInput, cancelRegion]);
 
   const handleCreateClick = useCallback(() => {
@@ -178,7 +178,7 @@ const RegionLayer = ({
     }
 
     if (!overlayRef.current) {
-      const overlay = document.createElement('canvas');
+      const overlay = activeDocument.createElement('canvas');
       overlay.classList.add('windrose-overlay-layer');
       mainCanvas.parentElement.appendChild(overlay);
       overlayRef.current = overlay;

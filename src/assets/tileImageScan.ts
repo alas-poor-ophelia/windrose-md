@@ -79,7 +79,7 @@ export function analyzeAlphaPixels(
 // resized per scan) to avoid per-call allocation.
 let scanCanvas: HTMLCanvasElement | null = null;
 function getScanCtx(w: number, h: number): CanvasRenderingContext2D | null {
-  if (scanCanvas == null) scanCanvas = document.createElement('canvas');
+  if (scanCanvas == null) scanCanvas = activeDocument.createElement('canvas');
   scanCanvas.width = w;
   scanCanvas.height = h;
   return scanCanvas.getContext('2d', { willReadFrequently: true });

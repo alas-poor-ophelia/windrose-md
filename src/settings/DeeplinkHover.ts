@@ -81,7 +81,7 @@ const DeeplinkHover = (() => {
 
     // Custom popover div — simpler and more reliable than HoverPopover which
     // requires internal lifecycle we don't have access to.
-    const popoverEl = document.body.createDiv({ cls: 'windrose-hover-preview-popover popover' });
+    const popoverEl = activeDocument.body.createDiv({ cls: 'windrose-hover-preview-popover popover' });
     popoverEl.setCssStyles({ position: 'fixed', zIndex: '1000' });
 
     const rect = linkEl.getBoundingClientRect();

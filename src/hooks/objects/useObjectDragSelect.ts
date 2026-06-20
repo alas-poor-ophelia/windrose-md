@@ -459,7 +459,7 @@ function useObjectDragSelect(
               || initialObj.worldPosition?.x !== currentObj.worldPosition?.x
               || initialObj.worldPosition?.y !== currentObj.worldPosition?.y;
             if (moved) {
-              document.dispatchEvent(new CustomEvent('windrose:player-fog-clear', {
+              activeDocument.dispatchEvent(new CustomEvent('windrose:player-fog-clear', {
                 detail: { objectId: fogObjectId }
               }));
             }

@@ -369,7 +369,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   // Wrap undo to let in-progress operations (e.g. region creation) cancel first
   const wrappedHandleUndo = useCallback(() => {
     const event = new CustomEvent('windrose:before-undo', { cancelable: true });
-    document.dispatchEvent(event);
+    activeDocument.dispatchEvent(event);
     if (!event.defaultPrevented) {
       handleUndo();
     }
@@ -492,7 +492,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
         if (relX * relX + relY * relY < gridRadius * gridRadius) {
           // Parse the hex key to get absolute q, r
           const [aq, ar] = adj.hexKey.split(',').map(Number);
-          document.dispatchEvent(new CustomEvent('windrose:navigate-sibling-sub-hex', { detail: { q: aq, r: ar } }));
+          activeDocument.dispatchEvent(new CustomEvent('windrose:navigate-sibling-sub-hex', { detail: { q: aq, r: ar } }));
           e.stopPropagation();
           e.preventDefault();
           return;
@@ -500,8 +500,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
       }
     };
 
-    document.addEventListener('click', handleAdjacentClick, true);
-    return () => document.removeEventListener('click', handleAdjacentClick, true);
+    activeDocument.addEventListener('click', handleAdjacentClick, true);
+    return () => activeDocument.removeEventListener('click', handleAdjacentClick, true);
   }, [showAdjacentSubMaps, isInSubHex, adjacentSubHexes, geometry, mapData]);
 
   // View controls (zoom, compass)

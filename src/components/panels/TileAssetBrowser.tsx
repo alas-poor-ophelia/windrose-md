@@ -432,17 +432,17 @@ const TileAssetBrowser = memo(({
     }
 
     if (!portalRef.current) {
-      const div = document.createElement('div');
+      const div = activeDocument.createElement('div');
       div.className = 'windrose-tile-preview-portal';
-      const canvas = document.createElement('canvas');
+      const canvas = activeDocument.createElement('canvas');
       canvas.width = PREVIEW_SIZE;
       canvas.height = PREVIEW_SIZE;
       canvas.classList.add('windrose-tile-preview-canvas');
-      const label = document.createElement('div');
+      const label = activeDocument.createElement('div');
       label.className = 'windrose-tile-preview-label';
       div.appendChild(canvas);
       div.appendChild(label);
-      document.body.appendChild(div);
+      activeDocument.body.appendChild(div);
       portalRef.current = div;
       previewRef.current = canvas;
     }
@@ -480,7 +480,7 @@ const TileAssetBrowser = memo(({
   useEffect(() => {
     return () => {
       if (portalRef.current) {
-        document.body.removeChild(portalRef.current);
+        activeDocument.body.removeChild(portalRef.current);
         portalRef.current = null;
       }
     };

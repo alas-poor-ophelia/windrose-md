@@ -151,8 +151,8 @@ const SelectionActionsOverlay = ({
       menu.showAtPosition({ x: screenX, y: screenY });
     };
 
-    document.addEventListener('windrose:selection-context-menu', handler);
-    return () => document.removeEventListener('windrose:selection-context-menu', handler);
+    activeDocument.addEventListener('windrose:selection-context-menu', handler);
+    return () => activeDocument.removeEventListener('windrose:selection-context-menu', handler);
   }, [actions]);
 
   const hasRequiredRefs = selectedItems.length > 0 && canvasRef.current != null && containerRef.current != null;

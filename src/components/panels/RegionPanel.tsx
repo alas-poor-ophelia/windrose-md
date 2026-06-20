@@ -44,7 +44,7 @@ const RegionPanel = ({
   };
 
   const handleRegionClick = (regionId: string): void => {
-    document.dispatchEvent(new CustomEvent('windrose:center-on-region', {
+    activeDocument.dispatchEvent(new CustomEvent('windrose:center-on-region', {
       detail: { regionId }
     }));
   };

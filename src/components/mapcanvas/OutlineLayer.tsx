@@ -121,8 +121,8 @@ const OutlineLayer = ({
         deleteOutline(selectedOutlineId);
       }
     };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
+    activeDocument.addEventListener('keydown', handler);
+    return () => activeDocument.removeEventListener('keydown', handler);
   }, [isOutlineTool, cancelDrawing, selectedOutlineId, deleteOutline]);
 
   // Context menu via windrose:hex-context-menu
@@ -192,8 +192,8 @@ const OutlineLayer = ({
       menu.showAtPosition({ x: screenX, y: screenY });
     };
 
-    document.addEventListener('windrose:hex-context-menu', handler);
-    return () => document.removeEventListener('windrose:hex-context-menu', handler);
+    activeDocument.addEventListener('windrose:hex-context-menu', handler);
+    return () => activeDocument.removeEventListener('windrose:hex-context-menu', handler);
   }, [isOutlineTool, mapData?.outlines, geometry, screenToWorld, deleteOutline, updateOutline, onOutlinesChange]);
 
   // ── Overlay canvas for in-progress drawing ────────────────────────
@@ -210,7 +210,7 @@ const OutlineLayer = ({
     }
 
     if (!overlayRef.current) {
-      const overlay = document.createElement('canvas');
+      const overlay = activeDocument.createElement('canvas');
       overlay.classList.add('windrose-overlay-layer');
       mainCanvas.parentElement.appendChild(overlay);
       overlayRef.current = overlay;

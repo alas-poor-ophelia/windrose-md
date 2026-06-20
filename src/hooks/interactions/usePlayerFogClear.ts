@@ -90,8 +90,8 @@ function usePlayerFogClear({
       });
     };
 
-    document.addEventListener('windrose:player-fog-clear', handler);
-    return () => document.removeEventListener('windrose:player-fog-clear', handler);
+    activeDocument.addEventListener('windrose:player-fog-clear', handler);
+    return () => activeDocument.removeEventListener('windrose:player-fog-clear', handler);
   }, [geometry, updateMapData, addToHistory, isApplyingHistory]);
 }
 

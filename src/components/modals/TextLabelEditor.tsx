@@ -193,7 +193,7 @@ function openNativeTextLabelEditor(app: App, options: OpenNativeTextLabelEditorO
 
       renderColorPicker(): void {
         if (this.clickOutsideHandler) {
-          document.removeEventListener('mousedown', this.clickOutsideHandler);
+          activeDocument.removeEventListener('mousedown', this.clickOutsideHandler);
           this.clickOutsideHandler = null;
         }
 
@@ -206,7 +206,7 @@ function openNativeTextLabelEditor(app: App, options: OpenNativeTextLabelEditorO
             this.isPickerOpen = false;
             this.renderColorPicker();
           };
-          document.addEventListener('mousedown', this.clickOutsideHandler);
+          activeDocument.addEventListener('mousedown', this.clickOutsideHandler);
 
           preactRender(
             h(ColorPicker, {
@@ -287,7 +287,7 @@ function openNativeTextLabelEditor(app: App, options: OpenNativeTextLabelEditorO
 
       onClose(): void {
         if (this.clickOutsideHandler) {
-          document.removeEventListener('mousedown', this.clickOutsideHandler);
+          activeDocument.removeEventListener('mousedown', this.clickOutsideHandler);
           this.clickOutsideHandler = null;
         }
         if (this.colorPickerContainerEl != null) {

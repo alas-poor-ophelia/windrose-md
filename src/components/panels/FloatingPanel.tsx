@@ -6,12 +6,12 @@ import { interact } from '../../core/interactjs';
 import { Icon } from '../shared/Icon';
 
 function getFloatingPortalContainer(): HTMLElement {
-  let portal = document.getElementById('windrose-floating-portal');
+  let portal = activeDocument.getElementById('windrose-floating-portal');
   if (!portal) {
-    portal = document.createElement('div');
+    portal = activeDocument.createElement('div');
     portal.id = 'windrose-floating-portal';
     portal.className = 'windrose-floating-portal';
-    document.body.appendChild(portal);
+    activeDocument.body.appendChild(portal);
   }
   return portal;
 }

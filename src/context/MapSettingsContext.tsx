@@ -499,14 +499,14 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
     };
 
     const timeoutId = window.setTimeout(() => {
-      document.addEventListener('mousedown', handleClickOutside);
-      document.addEventListener('touchstart', handleClickOutside, { passive: true });
+      activeDocument.addEventListener('mousedown', handleClickOutside);
+      activeDocument.addEventListener('touchstart', handleClickOutside, { passive: true });
     }, 0);
 
     return () => {
       window.clearTimeout(timeoutId);
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('touchstart', handleClickOutside);
+      activeDocument.removeEventListener('mousedown', handleClickOutside);
+      activeDocument.removeEventListener('touchstart', handleClickOutside);
     };
   }, [state.activeColorPicker]);
 

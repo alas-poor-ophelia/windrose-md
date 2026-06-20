@@ -193,7 +193,7 @@ function blitStaticContent(
   if (!usable) {
     const padX = Math.ceil(width * STATIC_PAD_RATIO);
     const padY = Math.ceil(height * STATIC_PAD_RATIO);
-    const off = entry?.off ?? document.createElement('canvas');
+    const off = entry?.off ?? activeDocument.createElement('canvas');
     const ow = width + padX * 2;
     const oh = height + padY * 2;
     if (off.width !== ow) off.width = ow;

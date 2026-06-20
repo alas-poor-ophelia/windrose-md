@@ -652,12 +652,12 @@ const ObjectLayer = ({
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    document.addEventListener('touchstart', handleClickOutside, { passive: true });
+    activeDocument.addEventListener('mousedown', handleClickOutside);
+    activeDocument.addEventListener('touchstart', handleClickOutside, { passive: true });
 
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('touchstart', handleClickOutside);
+      activeDocument.removeEventListener('mousedown', handleClickOutside);
+      activeDocument.removeEventListener('touchstart', handleClickOutside);
     };
   }, [showObjectColorPicker]);
 
@@ -711,8 +711,8 @@ const ObjectLayer = ({
       menu.showAtPosition({ x: detail.screenX, y: detail.screenY });
     };
 
-    document.addEventListener('windrose:selection-context-menu', handler);
-    return () => document.removeEventListener('windrose:selection-context-menu', handler);
+    activeDocument.addEventListener('windrose:selection-context-menu', handler);
+    return () => activeDocument.removeEventListener('windrose:selection-context-menu', handler);
   }, [mapData, geometry, screenToGrid, isResizeMode]);
 
   if (showCoordinates || !layerVisibility.objects) {
