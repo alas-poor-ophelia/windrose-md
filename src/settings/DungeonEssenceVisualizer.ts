@@ -238,7 +238,7 @@ export class DungeonEssenceVisualizer {
       crypt: { circleChance: 0.1, corridorStyle: 'straight', loopChance: 0.02 }
     };
 
-    const overrides = styleOverrides[styleName] || {};
+    const overrides = styleOverrides[styleName] ?? {};
     this.updateSettings(overrides);
   }
 

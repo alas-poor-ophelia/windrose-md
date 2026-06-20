@@ -43,7 +43,7 @@ function isObjectUnderFog(
 ): boolean {
   if (layer.fogOfWar?.enabled !== true) return false;
 
-  const size = obj.size || { width: 1, height: 1 };
+  const size = obj.size ?? { width: 1, height: 1 };
   const baseOffset = geometry.toOffsetCoords(obj.position.x, obj.position.y);
 
   if (isHexMap) {
@@ -75,7 +75,7 @@ function calculateObjectPosition(
   deps: Pick<ObjectRenderDeps, 'getObjectsInCell' | 'getSlotOffset' | 'getMultiObjectScale'>
 ): { screenX: number; screenY: number; objectWidth: number; objectHeight: number } {
   const { offsetX, offsetY, zoom, scaledSize } = context;
-  const size = obj.size || { width: 1, height: 1 };
+  const size = obj.size ?? { width: 1, height: 1 };
 
   // Freeform objects use world-space coordinates directly
   // worldPosition is the object's center, but the renderer expects top-left

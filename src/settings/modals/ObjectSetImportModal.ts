@@ -93,14 +93,14 @@ class ObjectSetImportModal extends Modal {
             const scope: string[] = [];
             if (data.hex != null) {
               const hexData = data.hex;
-              const objCount = ((hexData.customObjects as unknown[]) || []).length;
-              const overCount = Object.keys((hexData.objectOverrides as Record<string, unknown>) || {}).length;
+              const objCount = ((hexData.customObjects as unknown[]) ?? []).length;
+              const overCount = Object.keys((hexData.objectOverrides as Record<string, unknown>) ?? {}).length;
               scope.push('Hex: ' + objCount + ' custom, ' + overCount + ' overrides');
             }
             if (data.grid != null) {
               const gridData = data.grid;
-              const objCount = ((gridData.customObjects as unknown[]) || []).length;
-              const overCount = Object.keys((gridData.objectOverrides as Record<string, unknown>) || {}).length;
+              const objCount = ((gridData.customObjects as unknown[]) ?? []).length;
+              const overCount = Object.keys((gridData.objectOverrides as Record<string, unknown>) ?? {}).length;
               scope.push('Grid: ' + objCount + ' custom, ' + overCount + ' overrides');
             }
             for (const line of scope) {

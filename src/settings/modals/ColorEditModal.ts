@@ -142,7 +142,7 @@ class ColorEditModal extends Modal {
         if (!this.plugin.settings.colorPaletteOverrides) {
           this.plugin.settings.colorPaletteOverrides = {};
         }
-        const existingOverride = this.plugin.settings.colorPaletteOverrides[this.existingColor!.id] || {};
+        const existingOverride = this.plugin.settings.colorPaletteOverrides[this.existingColor!.id] ?? {};
         this.plugin.settings.colorPaletteOverrides[this.existingColor!.id] = {
           ...existingOverride,
           color: colorValue,

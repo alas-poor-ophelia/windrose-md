@@ -150,9 +150,9 @@ export const TabRenderObjectsMethods = {
     const hiddenObjects = ObjectHelpers.getHidden(mapTypeSettings as unknown as Record<string, unknown>) as ResolvedObject[];
 
     // Check if there are any customizations for this map type
-    const hasOverrides = Object.keys(mapTypeSettings.objectOverrides || {}).length > 0;
-    const hasCustomObjects = (mapTypeSettings.customObjects || []).length > 0;
-    const hasCustomCategories = (mapTypeSettings.customCategories || []).length > 0;
+    const hasOverrides = Object.keys(mapTypeSettings.objectOverrides ?? {}).length > 0;
+    const hasCustomObjects = (mapTypeSettings.customObjects ?? []).length > 0;
+    const hasCustomCategories = (mapTypeSettings.customCategories ?? []).length > 0;
     const hasAnyCustomizations = hasOverrides || hasCustomObjects || hasCustomCategories;
 
     // Reset All button (only show if there are customizations)

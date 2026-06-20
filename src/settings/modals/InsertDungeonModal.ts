@@ -210,7 +210,7 @@ class InsertDungeonModal extends Modal {
   }
 
   getVisualizerSettings(): VisualizerSettings {
-    const base = DUNGEON_STYLE_DEFAULTS[this.dungeonStyle] || DUNGEON_STYLE_DEFAULTS.classic;
+    const base = DUNGEON_STYLE_DEFAULTS[this.dungeonStyle] ?? DUNGEON_STYLE_DEFAULTS.classic;
 
     const settings: VisualizerSettings = { ...base, size: this.dungeonSize || 'medium' };
     if (this.configOverrides.circleChance !== null) settings.circleChance = this.configOverrides.circleChance;
@@ -227,7 +227,7 @@ class InsertDungeonModal extends Modal {
   }
 
   syncSlidersToStyle(): void {
-    const defaults = DUNGEON_STYLE_DEFAULTS[this.dungeonStyle] || DUNGEON_STYLE_DEFAULTS.classic;
+    const defaults = DUNGEON_STYLE_DEFAULTS[this.dungeonStyle] ?? DUNGEON_STYLE_DEFAULTS.classic;
 
     for (const [key, ref] of Object.entries(this.sliderRefs)) {
       const defaultVal = defaults[key as keyof DungeonStyleDefaults];
@@ -537,7 +537,7 @@ class InsertDungeonModal extends Modal {
         const stockResult = await stockGeneratedDungeon(this.plugin, result, overrides);
         const allObjects = [...result.objects, ...stockResult.objects];
 
-        await this.onInsert(this.mapName, result.cells, allObjects, result.edges || [], {
+        await this.onInsert(this.mapName, result.cells, allObjects, result.edges ?? [], {
           distancePerCell: this.distancePerCell,
           distanceUnit: this.distanceUnit,
           preset: this.dungeonSize,
@@ -576,7 +576,7 @@ class InsertDungeonModal extends Modal {
           const stockResult = await stockGeneratedDungeon(this.plugin, result, overrides);
           const allObjects = [...result.objects, ...stockResult.objects];
 
-          await this.onInsert(this.mapName, result.cells, allObjects, result.edges || [], {
+          await this.onInsert(this.mapName, result.cells, allObjects, result.edges ?? [], {
             distancePerCell: this.distancePerCell,
             distanceUnit: this.distanceUnit,
             preset: this.dungeonSize,
