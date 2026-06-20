@@ -48,11 +48,11 @@ function getActiveLayer(mapData: MapData | null | undefined): MapLayer {
       name: '1',
       order: 0,
       visible: true,
-      cells: (mapData as LegacyMapData)?.cells || [],
+      cells: (mapData as LegacyMapData)?.cells ?? [],
       curves: [],
-      edges: (mapData as LegacyMapData)?.edges || [],
-      objects: ((mapData as LegacyMapData)?.objects || []) as unknown as MapObject[],
-      textLabels: (mapData as LegacyMapData)?.textLabels || [],
+      edges: (mapData as LegacyMapData)?.edges ?? [],
+      objects: ((mapData as LegacyMapData)?.objects ?? []) as unknown as MapObject[],
+      textLabels: (mapData as LegacyMapData)?.textLabels ?? [],
       fogOfWar: null
     };
   }
@@ -247,7 +247,7 @@ function cloneLayer(mapData: MapData, layerId: LayerId, mode: 'all' | 'mapOnly')
     objects: mode === 'all' ? deepCopy(sourceLayer.objects) : [],
     textLabels: mode === 'all' ? deepCopy(sourceLayer.textLabels) : [],
     fogOfWar: mode === 'all' && sourceLayer.fogOfWar ? deepCopy(sourceLayer.fogOfWar) : null,
-    tiles: deepCopy(sourceLayer.tiles || []),
+    tiles: deepCopy(sourceLayer.tiles ?? []),
   };
 
   if (mode === 'all') {

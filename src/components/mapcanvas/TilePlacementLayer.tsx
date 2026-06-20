@@ -148,7 +148,7 @@ const TilePlacementLayer = ({
     if (entry?.vaultPath && app) void preloadImage(app, entry.vaultPath);
 
     const activeLayer = getActiveLayer(mapData);
-    let currentTiles = activeLayer.tiles || [];
+    let currentTiles = activeLayer.tiles ?? [];
     let changed = false;
 
     const targetPlacement = tileLayer === 'base' ? 'fill' : 'overlay';
@@ -204,7 +204,7 @@ const TilePlacementLayer = ({
     if (!mapData) return;
 
     const activeLayer = getActiveLayer(mapData);
-    const currentTiles = activeLayer.tiles || [];
+    const currentTiles = activeLayer.tiles ?? [];
     const cells = getBrushCells(col, row, brushSize);
     const keysToErase = new Set<string>();
 
@@ -239,7 +239,7 @@ const TilePlacementLayer = ({
     if (entry?.vaultPath && app) void preloadImage(app, entry.vaultPath);
 
     const activeLayer = getActiveLayer(mapData);
-    const currentTiles = activeLayer.tiles || [];
+    const currentTiles = activeLayer.tiles ?? [];
 
     const mapWidth = mapData.dimensions?.width ?? 50;
     const mapHeight = mapData.dimensions?.height ?? 50;
@@ -280,7 +280,7 @@ const TilePlacementLayer = ({
     if (entry?.vaultPath && app) void preloadImage(app, entry.vaultPath);
 
     const activeLayer = getActiveLayer(mapData);
-    const currentTiles = activeLayer.tiles || [];
+    const currentTiles = activeLayer.tiles ?? [];
 
     const newTile: TileAssignment = {
       col, row,
@@ -325,7 +325,7 @@ const TilePlacementLayer = ({
     lastGridPosRef.current = { col: coords.x, row: coords.y };
 
     const activeLayer = getActiveLayer(mapData);
-    strokeInitialTilesRef.current = [...(activeLayer.tiles || [])];
+    strokeInitialTilesRef.current = [...(activeLayer.tiles ?? [])];
 
     if (hasTileSelected) {
       placeTilesInBrush(coords.x, coords.y);
@@ -363,7 +363,7 @@ const TilePlacementLayer = ({
   const handlePointerUp = useCallback(() => {
     if (strokeInitialTilesRef.current !== null && mapData) {
       const activeLayer = getActiveLayer(mapData);
-      onTilesChange(activeLayer.tiles || [], false);
+      onTilesChange(activeLayer.tiles ?? [], false);
       strokeInitialTilesRef.current = null;
     }
     isDraggingRef.current = false;

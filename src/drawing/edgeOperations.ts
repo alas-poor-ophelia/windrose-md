@@ -128,10 +128,10 @@ function addEdge(
 ): Edge[] {
   // Validate inputs - return unchanged array if invalid
   if (typeof x !== 'number' || typeof y !== 'number' || !side || !color) {
-    return edges || [];
+    return edges ?? [];
   }
   
-  const edgeArray = edges || [];
+  const edgeArray = edges ?? [];
   const normalized = normalizeEdge(x, y, side);
   const existing = getEdgeAt(edgeArray, x, y, side);
   
@@ -264,7 +264,7 @@ function generateEdgeLine(
  * Handles duplicates by updating color of existing edges.
  */
 function mergeEdges(edges: Edge[] | null | undefined, newEdges: EdgeTemplate[]): Edge[] {
-  let result = [...(edges || [])];
+  let result = [...(edges ?? [])];
   
   for (const edge of newEdges) {
     if (edge.color !== null) {
@@ -288,7 +288,7 @@ function removeEdgeLine(
   // Generate the edges that would be in this line (color doesn't matter for removal)
   const lineEdges = generateEdgeLine(startX, startY, endX, endY, null);
   
-  let result = [...(edges || [])];
+  let result = [...(edges ?? [])];
   for (const edge of lineEdges) {
     result = removeEdge(result, edge.x, edge.y, edge.side);
   }

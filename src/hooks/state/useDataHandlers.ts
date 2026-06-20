@@ -83,7 +83,7 @@ function useDataHandlers({
 
         if (!suppressHistory) {
           const activeLayer = getActiveLayer(currentMapData);
-          addToHistory(buildLayerHistorySnapshot(activeLayer, currentMapData.name ?? '', { [field]: newValue } as Partial<LayerHistorySnapshot>, currentMapData.regions || [], currentMapData.outlines || [], currentMapData.shapeOverlays || [], activeLayer.fogOfWar));
+          addToHistory(buildLayerHistorySnapshot(activeLayer, currentMapData.name ?? '', { [field]: newValue } as Partial<LayerHistorySnapshot>, currentMapData.regions ?? [], currentMapData.outlines ?? [], currentMapData.shapeOverlays ?? [], activeLayer.fogOfWar));
         }
 
         return newMapData;
@@ -137,7 +137,7 @@ function useDataHandlers({
       if (!currentMapData) return currentMapData;
 
       const activeLayer = getActiveLayer(currentMapData);
-      addToHistory(buildLayerHistorySnapshot(activeLayer, newName, {}, currentMapData.regions || []));
+      addToHistory(buildLayerHistorySnapshot(activeLayer, newName, {}, currentMapData.regions ?? []));
 
       return { ...currentMapData, name: newName };
     });
@@ -160,7 +160,7 @@ function useDataHandlers({
 
       return {
         ...currentMapData,
-        customColors: [...(currentMapData.customColors || []), newCustomColor]
+        customColors: [...(currentMapData.customColors ?? []), newCustomColor]
       };
     });
   }, [updateMapData]);
@@ -172,7 +172,7 @@ function useDataHandlers({
 
       return {
         ...currentMapData,
-        customColors: (currentMapData.customColors || []).filter(c => c.id !== colorId)
+        customColors: (currentMapData.customColors ?? []).filter(c => c.id !== colorId)
       };
     });
   }, [updateMapData]);
@@ -182,12 +182,12 @@ function useDataHandlers({
     updateMapData((currentMapData) => {
       if (!currentMapData) return currentMapData;
 
-      const isCustomColor = (currentMapData.customColors || []).some(c => c.id === colorId);
+      const isCustomColor = (currentMapData.customColors ?? []).some(c => c.id === colorId);
 
       if (isCustomColor) {
         return {
           ...currentMapData,
-          customColors: (currentMapData.customColors || []).map(c =>
+          customColors: (currentMapData.customColors ?? []).map(c =>
             c.id === colorId ? { ...c, opacity: newOpacity } : c
           )
         };
@@ -195,7 +195,7 @@ function useDataHandlers({
         return {
           ...currentMapData,
           paletteColorOpacityOverrides: {
-            ...(currentMapData.paletteColorOpacityOverrides || {}),
+            ...(currentMapData.paletteColorOpacityOverrides ?? {}),
             [colorId]: newOpacity
           }
         };
@@ -257,7 +257,7 @@ function useDataHandlers({
       if (!currentMapData) return currentMapData;
 
       const activeLayer = getActiveLayer(currentMapData);
-      addToHistory(buildLayerHistorySnapshot(activeLayer, currentMapData.name ?? '', {}, currentMapData.regions || [], outlines));
+      addToHistory(buildLayerHistorySnapshot(activeLayer, currentMapData.name ?? '', {}, currentMapData.regions ?? [], outlines));
 
       return { ...currentMapData, outlines };
     });
@@ -271,7 +271,7 @@ function useDataHandlers({
       if (!currentMapData) return currentMapData;
 
       const activeLayer = getActiveLayer(currentMapData);
-      addToHistory(buildLayerHistorySnapshot(activeLayer, currentMapData.name ?? '', {}, currentMapData.regions || [], currentMapData.outlines || [], shapeOverlays));
+      addToHistory(buildLayerHistorySnapshot(activeLayer, currentMapData.name ?? '', {}, currentMapData.regions ?? [], currentMapData.outlines ?? [], shapeOverlays));
 
       return { ...currentMapData, shapeOverlays };
     });

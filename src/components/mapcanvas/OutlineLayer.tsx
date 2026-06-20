@@ -174,9 +174,9 @@ const OutlineLayer = ({
           const dup: Outline = {
             ...outlineRef,
             id: `outline-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-            order: (mapData.outlines || []).length
+            order: (mapData.outlines ?? []).length
           };
-          onOutlinesChange([...(mapData.outlines || []), dup]);
+          onOutlinesChange([...(mapData.outlines ?? []), dup]);
         });
       });
 

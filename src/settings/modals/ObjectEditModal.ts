@@ -175,8 +175,8 @@ class ObjectEditModal extends Modal {
 
     // Category dropdown - use map-type-specific settings
     const mapTypeSettings = this.mapType === 'hex'
-      ? { customCategories: this.plugin.settings.customHexCategories || [] }
-      : { customCategories: this.plugin.settings.customGridCategories || [] };
+      ? { customCategories: this.plugin.settings.customHexCategories ?? [] }
+      : { customCategories: this.plugin.settings.customGridCategories ?? [] };
     const allCategories = ObjectHelpers.getAllCategories(mapTypeSettings);
     new Setting(contentEl)
       .setName('Category')

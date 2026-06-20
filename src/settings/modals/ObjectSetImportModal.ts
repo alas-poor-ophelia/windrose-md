@@ -101,7 +101,7 @@ class ObjectSetImportModal extends Modal {
             }
 
             // Check for duplicate name
-            const existing = (this.plugin.settings.objectSets || []).find(s => s.name === data.name);
+            const existing = (this.plugin.settings.objectSets ?? []).find(s => s.name === data.name);
             if (existing) {
               previewArea.createEl('p', {
                 text: 'A set named "' + (data.name as string) + '" already exists. It will be imported with a unique name.',

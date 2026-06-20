@@ -198,7 +198,7 @@ function useSubHexNavigation({
       const updatedCurrent = {
         ...currentMapData,
         subHexMaps: {
-          ...(currentMapData.subHexMaps || {}),
+          ...(currentMapData.subHexMaps ?? {}),
           [hexKey]: subHex
         }
       } as MapData;
@@ -239,9 +239,9 @@ function useSubHexNavigation({
       const parentWithUpdate = {
         ...frame.parentMapData,
         subHexMaps: {
-          ...(frame.parentMapData.subHexMaps || {}),
+          ...(frame.parentMapData.subHexMaps ?? {}),
           [frame.hexKey]: {
-            ...(frame.parentMapData.subHexMaps?.[frame.hexKey] || {}),
+            ...(frame.parentMapData.subHexMaps?.[frame.hexKey] ?? {}),
             mapData: nestedMapData,
             lastModified: new Date().toISOString()
           }
@@ -265,9 +265,9 @@ function useSubHexNavigation({
     const restoredParent = {
       ...topFrame.parentMapData,
       subHexMaps: {
-        ...(topFrame.parentMapData.subHexMaps || {}),
+        ...(topFrame.parentMapData.subHexMaps ?? {}),
         [topFrame.hexKey]: {
-          ...(topFrame.parentMapData.subHexMaps?.[topFrame.hexKey] || {}),
+          ...(topFrame.parentMapData.subHexMaps?.[topFrame.hexKey] ?? {}),
           mapData: currentSubHex,
           lastModified: new Date().toISOString()
         }
@@ -305,9 +305,9 @@ function useSubHexNavigation({
       const parent = {
         ...frame.parentMapData,
         subHexMaps: {
-          ...(frame.parentMapData.subHexMaps || {}),
+          ...(frame.parentMapData.subHexMaps ?? {}),
           [frame.hexKey]: {
-            ...(frame.parentMapData.subHexMaps?.[frame.hexKey] || {}),
+            ...(frame.parentMapData.subHexMaps?.[frame.hexKey] ?? {}),
             mapData: currentData,
             lastModified: new Date().toISOString()
           }
@@ -366,9 +366,9 @@ function useSubHexNavigation({
     const restoredParent = {
       ...topFrame.parentMapData,
       subHexMaps: {
-        ...(topFrame.parentMapData.subHexMaps || {}),
+        ...(topFrame.parentMapData.subHexMaps ?? {}),
         [topFrame.hexKey]: {
-          ...(topFrame.parentMapData.subHexMaps?.[topFrame.hexKey] || {}),
+          ...(topFrame.parentMapData.subHexMaps?.[topFrame.hexKey] ?? {}),
           mapData: currentSubHex,
           lastModified: new Date().toISOString()
         }
@@ -380,7 +380,7 @@ function useSubHexNavigation({
     if (!siblingSubHex) {
       siblingSubHex = createSubHexMapData(restoredParent, q, r);
       restoredParent.subHexMaps = {
-        ...(restoredParent.subHexMaps || {}),
+        ...(restoredParent.subHexMaps ?? {}),
         [siblingKey]: siblingSubHex
       } as Record<string, SubHexMapData>;
     }

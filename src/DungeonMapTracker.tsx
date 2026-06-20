@@ -224,7 +224,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   // Use rootMapData for tileset check — tilesets are built from global settings and stored on root,
   // but sub-maps should also have access to tiles
   const availableTilesets = useMemo(
-    () => rootMapData?.tilesets || mapData?.tilesets || [],
+    () => rootMapData?.tilesets ?? mapData?.tilesets ?? [],
     [rootMapData?.tilesets, mapData?.tilesets]
   );
   const showTilePanel = mapData != null;
@@ -674,7 +674,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               isColorPickerOpen={isColorPickerOpen || isFloating('colorPicker')}
               onColorPickerOpenChange={setIsColorPickerOpen}
               customColors={mapData.customColors ?? []}
-              paletteColorOpacityOverrides={mapData.paletteColorOpacityOverrides || {}}
+              paletteColorOpacityOverrides={mapData.paletteColorOpacityOverrides ?? {}}
               onAddCustomColor={handleAddCustomColor}
               onDeleteCustomColor={handleDeleteCustomColor}
               onUpdateColorOpacity={handleUpdateColorOpacity}
@@ -1039,7 +1039,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 isColorPickerOpen={isColorPickerOpen || isFloating('colorPicker')}
                 onColorPickerOpenChange={setIsColorPickerOpen}
                 customColors={mapData.customColors ?? []}
-                paletteColorOpacityOverrides={mapData.paletteColorOpacityOverrides || {}}
+                paletteColorOpacityOverrides={mapData.paletteColorOpacityOverrides ?? {}}
                 onAddCustomColor={handleAddCustomColor}
                 onDeleteCustomColor={handleDeleteCustomColor}
                 onUpdateColorOpacity={handleUpdateColorOpacity}
@@ -1103,7 +1103,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 onClose={handleFloatingPickerClose}
                 onReset={() => setSelectedColor(DEFAULT_COLOR)}
                 customColors={mapData.customColors ?? []}
-                paletteColorOpacityOverrides={mapData.paletteColorOpacityOverrides || {}}
+                paletteColorOpacityOverrides={mapData.paletteColorOpacityOverrides ?? {}}
                 onAddCustomColor={handleAddCustomColor}
                 onDeleteCustomColor={handleDeleteCustomColor}
                 onUpdateColorOpacity={handleUpdateColorOpacity}
@@ -1267,7 +1267,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                       onClose={() => {}}
                       onReset={() => setSelectedColor(DEFAULT_COLOR)}
                       customColors={mapData.customColors ?? []}
-                      paletteColorOpacityOverrides={mapData.paletteColorOpacityOverrides || {}}
+                      paletteColorOpacityOverrides={mapData.paletteColorOpacityOverrides ?? {}}
                       onAddCustomColor={handleAddCustomColor}
                       onDeleteCustomColor={handleDeleteCustomColor}
                       onUpdateColorOpacity={handleUpdateColorOpacity}

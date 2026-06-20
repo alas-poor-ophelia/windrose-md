@@ -46,9 +46,9 @@ class ExportModal extends Modal {
     const customObjectsKey: CustomObjectsKey = this.mapType === 'hex' ? 'customHexObjects' : 'customGridObjects';
     const categoriesKey: CategoriesKey = this.mapType === 'hex' ? 'customHexCategories' : 'customGridCategories';
 
-    const objectOverrides = this.plugin.settings[overridesKey] || {};
-    const customObjects = this.plugin.settings[customObjectsKey] || [];
-    const customCategories = this.plugin.settings[categoriesKey] || [];
+    const objectOverrides = this.plugin.settings[overridesKey] ?? {};
+    const customObjects = this.plugin.settings[customObjectsKey] ?? [];
+    const customCategories = this.plugin.settings[categoriesKey] ?? [];
 
     const hasOverrides = Object.keys(objectOverrides).length > 0;
     const hasCustom = customObjects.length > 0 || customCategories.length > 0;

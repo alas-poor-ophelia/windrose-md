@@ -99,7 +99,7 @@ function addTextLabel(
     ...(options.opacity !== undefined && options.opacity !== 1 ? { opacity: options.opacity } : {})
   };
   
-  return [...(labels || []), newLabel];
+  return [...(labels ?? []), newLabel];
 }
 
 /**

@@ -1206,7 +1206,7 @@ const TileAssetBrowser = memo(({
           tilesets.find(t => t.id === configTilesetId) ??
           tilesets.find(t => t.id === selectedTilesetId) ??
           tilesets[0];
-        const currentOverrides = tilesetOverrides?.[configTileset.id] || {};
+        const currentOverrides = tilesetOverrides?.[configTileset.id] ?? {};
         const threshold = currentOverrides.stampThreshold ?? configTileset.stampThreshold ?? 0.5;
         const minScale = currentOverrides.minStampScale ?? configTileset.minStampScale ?? 0.2;
         const fitMode = currentOverrides.fitMode ?? configTileset.fitMode;

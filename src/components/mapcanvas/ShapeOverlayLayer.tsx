@@ -96,7 +96,7 @@ const ShapeOverlayLayer = ({
 
   const distanceSettings = useMemo(() => {
     if (!mapData) return null;
-    const settings = mapData.settings?.overrides || {};
+    const settings = mapData.settings?.overrides ?? {};
     return {
       distancePerCell: (settings.distancePerCell as number) || 5,
       distanceUnit: (settings.distanceUnit as string) || 'ft',

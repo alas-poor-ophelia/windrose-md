@@ -418,7 +418,7 @@ export const TabRenderObjectsMethods = {
           }
         } else {
           // Custom objects - always save order
-          const customObjects = this.plugin.settings[customObjectsKey] || [];
+          const customObjects = this.plugin.settings[customObjectsKey] ?? [];
           const customObj = customObjects.find((o: CustomObject) => o.id === id);
           if (customObj) {
             customObj.order = newOrder;
@@ -563,7 +563,7 @@ export const TabRenderObjectsMethods = {
 
         // Check if category exists in target
         const targetCategory = obj.category;
-        const targetCategories = this.plugin.settings[targetCategoriesKey] || [];
+        const targetCategories = this.plugin.settings[targetCategoriesKey] ?? [];
         const builtInCategoryIds = ObjectHelpers.getCategories({
           objectOverrides: {},
           customObjects: [],
@@ -573,7 +573,7 @@ export const TabRenderObjectsMethods = {
         if (targetCategory && !builtInCategoryIds.includes(targetCategory) && !targetCategories.find((c: CustomCategory) => c.id === obj.category)) {
           // Custom category doesn't exist in target - copy it over
           const sourceCategoriesKey: CustomCategoriesKey = this.selectedMapType === 'hex' ? 'customHexCategories' : 'customGridCategories';
-          const sourceCategories = this.plugin.settings[sourceCategoriesKey] || [];
+          const sourceCategories = this.plugin.settings[sourceCategoriesKey] ?? [];
           const sourceCat = sourceCategories.find((c: CustomCategory) => c.id === obj.category);
           if (sourceCat) {
             if (!this.plugin.settings[targetCategoriesKey]) {
@@ -627,7 +627,7 @@ export const TabRenderObjectsMethods = {
 
   renderObjectSetsBlock(this: TabRenderObjectsThis, containerEl: HTMLElement): void {
     const s = this.plugin.settings;
-    const sets = s.objectSets || [];
+    const sets = s.objectSets ?? [];
 
     containerEl.createEl('div', { cls: 'windrose-settings-subheading', text: 'Object sets' });
     containerEl.createEl('p', {

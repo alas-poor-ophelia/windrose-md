@@ -51,7 +51,7 @@ export const TabRenderKeyboardShortcutsMethods = {
     });
 
     for (const action of SHORTCUT_ACTIONS) {
-      const shortcuts = this.plugin.settings.keyboardShortcuts || {};
+      const shortcuts = this.plugin.settings.keyboardShortcuts ?? {};
       const currentKey = shortcuts[action.id] || DEFAULT_SHORTCUTS[action.id] || '';
 
       const setting = new Setting(containerEl)

@@ -238,15 +238,15 @@ function getObjectSettings(mapType: 'hex' | 'grid' = 'grid'): ObjectSettings {
   if (raw) {
     if (mapType === 'hex') {
       return {
-        objectOverrides: raw.hexObjectOverrides || {},
-        customObjects: raw.customHexObjects || [],
-        customCategories: raw.customHexCategories || []
+        objectOverrides: raw.hexObjectOverrides ?? {},
+        customObjects: raw.customHexObjects ?? [],
+        customCategories: raw.customHexCategories ?? []
       };
     } else {
       return {
-        objectOverrides: raw.gridObjectOverrides || {},
-        customObjects: raw.customGridObjects || [],
-        customCategories: raw.customGridCategories || []
+        objectOverrides: raw.gridObjectOverrides ?? {},
+        customObjects: raw.customGridObjects ?? [],
+        customCategories: raw.customGridCategories ?? []
       };
     }
   }

@@ -37,7 +37,7 @@ const ObjectSidebar = ({ selectedObjectType, onObjectTypeSelect, onToolChange, i
   const objectSets = useMemo(() => {
     try {
       const plugin = app.plugins.plugins['windrose-md'] as { settings?: { objectSets?: ObjectSet[] } } | undefined;
-      return (plugin && plugin.settings && plugin.settings.objectSets) || [];
+      return (plugin && plugin.settings && plugin.settings.objectSets) ?? [];
     } catch {
       return [];
     }
