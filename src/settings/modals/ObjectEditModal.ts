@@ -572,7 +572,9 @@ class ObjectEditModal extends Modal {
       // Modifying a built-in: save as override
       this.plugin.settings[overridesKey] ??= {};
 
-      const original = BUILT_IN_OBJECTS.find(o => o.id === this.existingObject!.id);
+      const objId = this.existingObject?.id;
+      if (objId == null) return;
+      const original = BUILT_IN_OBJECTS.find(o => o.id === objId);
       const originalRecord = original as unknown as { imagePath?: string; iconClass?: string } | undefined;
       const override: Record<string, string | number | boolean | null> = {};
 
@@ -598,24 +600,25 @@ class ObjectEditModal extends Modal {
       if (this.category !== original?.category) override.category = this.category;
 
       // Preserve hidden state if it exists
-      if (this.plugin.settings[overridesKey][this.existingObject.id!]?.hidden === true) {
+      if (this.plugin.settings[overridesKey][objId]?.hidden === true) {
         override.hidden = true;
       }
 
       // Preserve order if it exists
-      if (this.plugin.settings[overridesKey][this.existingObject.id!]?.order !== undefined) {
-        override.order = this.plugin.settings[overridesKey][this.existingObject.id!].order!;
+      if (this.plugin.settings[overridesKey][objId]?.order !== undefined) {
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- order presence confirmed by the !== undefined guard on the line above
+        override.order = this.plugin.settings[overridesKey][objId].order!;
       }
 
       if (Object.keys(override).length > 0) {
-        this.plugin.settings[overridesKey][this.existingObject.id!] = override as unknown as ObjectOverride;
+        this.plugin.settings[overridesKey][objId] = override as unknown as ObjectOverride;
       } else {
-        delete this.plugin.settings[overridesKey][this.existingObject.id!];
+        delete this.plugin.settings[overridesKey][objId];
       }
     } else if (this.existingObject?.isCustom === true) {
       // Editing existing custom object
       this.plugin.settings[customObjectsKey] ??= [];
-      const idx = this.plugin.settings[customObjectsKey].findIndex(o => o.id === this.existingObject!.id);
+      const idx = this.plugin.settings[customObjectsKey].findIndex(o => o.id === this.existingObject?.id);
       if (idx !== -1) {
         const updated: Record<string, unknown> = {
           ...this.plugin.settings[customObjectsKey][idx],

@@ -91,7 +91,8 @@ class CategoryEditModal extends Modal {
     const categories = this.plugin.settings[categoriesKey];
 
     if (this.existingCategory) {
-      const idx = categories.findIndex((c: CustomCategory) => c.id === this.existingCategory!.id);
+      const existing = this.existingCategory;
+      const idx = categories.findIndex((c: CustomCategory) => c.id === existing.id);
       if (idx !== -1) {
         categories[idx] = {
           ...categories[idx],

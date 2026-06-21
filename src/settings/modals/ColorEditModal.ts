@@ -37,13 +37,13 @@ class ColorEditModal extends Modal {
 
     contentEl.createEl('h2', {
       text: isEdit
-        ? (isBuiltIn ? `Edit: ${this.existingColor!.label}` : 'Edit Custom Color')
+        ? (isBuiltIn ? `Edit: ${this.existingColor?.label ?? ''}` : 'Edit Custom Color')
         : 'Add Custom Color'
     });
 
     // Get original built-in values if editing a built-in
     const originalBuiltIn = isBuiltIn
-      ? BUILT_IN_COLORS.find((c: BuiltInColor) => c.id === this.existingColor!.id)
+      ? BUILT_IN_COLORS.find((c: BuiltInColor) => c.id === this.existingColor?.id)
       : null;
 
     // Initialize form values
@@ -140,8 +140,10 @@ class ColorEditModal extends Modal {
       if (isBuiltIn) {
         // Save as override
         this.plugin.settings.colorPaletteOverrides ??= {};
-        const existingOverride = this.plugin.settings.colorPaletteOverrides[this.existingColor!.id] ?? {};
-        this.plugin.settings.colorPaletteOverrides[this.existingColor!.id] = {
+        const colorId = this.existingColor?.id;
+        if (colorId == null) return;
+        const existingOverride = this.plugin.settings.colorPaletteOverrides[colorId] ?? {};
+        this.plugin.settings.colorPaletteOverrides[colorId] = {
           ...existingOverride,
           color: colorValue,
           label: labelValue,
@@ -149,10 +151,11 @@ class ColorEditModal extends Modal {
         } as ColorOverride;
       } else if (isEdit) {
         // Update existing custom color
-        const idx = this.plugin.settings.customPaletteColors!.findIndex((c: PaletteColor) => c.id === this.existingColor!.id);
+        if (this.plugin.settings.customPaletteColors == null) return;
+        const idx = this.plugin.settings.customPaletteColors.findIndex((c: PaletteColor) => c.id === this.existingColor?.id);
         if (idx !== -1) {
-          this.plugin.settings.customPaletteColors![idx] = {
-            ...this.plugin.settings.customPaletteColors![idx],
+          this.plugin.settings.customPaletteColors[idx] = {
+            ...this.plugin.settings.customPaletteColors[idx],
             color: colorValue,
             label: labelValue,
             opacity: opacityValue
