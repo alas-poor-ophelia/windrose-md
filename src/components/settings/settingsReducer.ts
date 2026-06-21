@@ -604,7 +604,7 @@ function buildInitialState(props: BuildInitialStateProps, globalSettings: Plugin
   const o = (currentSettings?.overrides ?? {}) as Partial<SettingsOverrides>;
 
   return {
-    activeTab: initialTab || 'appearance',
+    activeTab: initialTab ?? 'appearance',
 
     useGlobalSettings: currentSettings?.useGlobalSettings ?? true,
     overrides: {

@@ -108,7 +108,7 @@ function usePaintTool({
       const newCells = accessorSetCell(activeLayer.cells, coords, selectedColor, selectedOpacity, geometry);
       onCellsChange(newCells, isBatchedStroke);
     } else {
-      const { clientX, clientY } = dragStart || { clientX: 0, clientY: 0 };
+      const { clientX, clientY } = dragStart ?? { clientX: 0, clientY: 0 };
       const worldCoords = screenToWorld(clientX, clientY);
       if (worldCoords) {
         const canvas = canvasRef.current;

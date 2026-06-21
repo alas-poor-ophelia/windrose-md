@@ -215,7 +215,7 @@ function useSubHexNavigation({
     // Push current state onto navigation stack
     const frame: SubHexNavFrame = {
       parentMapData: currentMapData,
-      parentStoredViewState: currentMapData.viewState || { zoom: 1.0, center: { x: 0, y: 0 } },
+      parentStoredViewState: currentMapData.viewState ?? { zoom: 1.0, center: { x: 0, y: 0 } },
       hexKey
     };
 

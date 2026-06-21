@@ -161,7 +161,7 @@ const ToolButtonWithSubMenu = ({
 
   if (visibleSubTools.length === 0) return null;
 
-  const currentSubToolDef = visibleSubTools.find(st => st.id === currentSubTool) || visibleSubTools[0];
+  const currentSubToolDef = visibleSubTools.find(st => st.id === currentSubTool) ?? visibleSubTools[0];
   const isActive = visibleSubTools.some(st => st.id === currentTool);
   const hasMultipleSubTools = visibleSubTools.length > 1;
 

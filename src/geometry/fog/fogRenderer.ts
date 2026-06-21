@@ -272,7 +272,7 @@ function calculateGridVisibleBounds(
 function calculateHexVisibleBounds(
   hexBounds?: { maxCol: number; maxRow: number }
 ): { minCol: number; maxCol: number; minRow: number; maxRow: number } {
-  const bounds = hexBounds || { maxCol: 100, maxRow: 100 };
+  const bounds = hexBounds ?? { maxCol: 100, maxRow: 100 };
   return {
     minCol: 0,
     maxCol: bounds.maxCol,

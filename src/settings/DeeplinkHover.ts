@@ -76,7 +76,7 @@ const DeeplinkHover = (() => {
     }
     currentLink = linkEl;
 
-    const state: LinkState = linkState.get(linkEl) || { showTimer: null, hideTimer: null, popover: null, hoverEl: null, host: null };
+    const state: LinkState = linkState.get(linkEl) ?? { showTimer: null, hideTimer: null, popover: null, hoverEl: null, host: null };
     linkState.set(linkEl, state);
 
     // Custom popover div — simpler and more reliable than HoverPopover which
@@ -125,7 +125,7 @@ const DeeplinkHover = (() => {
   function onHoverEnter(plugin: HoverPlugin, linkEl: HTMLElement, parsed: ParsedDeepLink): void {
     if (linkEl == null || parsed == null) return;
 
-    const state: LinkState = linkState.get(linkEl) || { showTimer: null, hideTimer: null, popover: null, hoverEl: null, host: null };
+    const state: LinkState = linkState.get(linkEl) ?? { showTimer: null, hideTimer: null, popover: null, hoverEl: null, host: null };
     linkState.set(linkEl, state);
 
     cancelHide(linkEl);

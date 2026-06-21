@@ -90,7 +90,7 @@ function getObjectWorldBounds(
     const hexSize = geometry.hexSize;
     
     // Approximate hex bounds as a rectangle
-    const orientation: HexOrientation = (mapData as MapData & { orientation?: HexOrientation }).orientation || 'flat';
+    const orientation: HexOrientation = (mapData as MapData & { orientation?: HexOrientation }).orientation ?? 'flat';
     let halfWidth: number, halfHeight: number;
     
     if (orientation === 'flat') {

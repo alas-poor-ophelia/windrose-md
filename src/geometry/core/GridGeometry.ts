@@ -552,7 +552,7 @@ class GridGeometry extends BaseGeometry {
    * Get the bounding box of an object in world coordinates
    */
   getObjectBounds(obj: { position: Point; size?: { width: number; height: number } }): BoundingBox {
-    const size = obj.size || { width: 1, height: 1 };
+    const size = obj.size ?? { width: 1, height: 1 };
     const x = obj.position.x * this.cellSize;
     const y = obj.position.y * this.cellSize;
     return {

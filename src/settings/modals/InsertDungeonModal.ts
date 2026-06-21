@@ -212,7 +212,7 @@ class InsertDungeonModal extends Modal {
   getVisualizerSettings(): VisualizerSettings {
     const base = DUNGEON_STYLE_DEFAULTS[this.dungeonStyle] ?? DUNGEON_STYLE_DEFAULTS.classic;
 
-    const settings: VisualizerSettings = { ...base, size: this.dungeonSize || 'medium' };
+    const settings: VisualizerSettings = { ...base, size: this.dungeonSize ?? 'medium' };
     if (this.configOverrides.circleChance !== null) settings.circleChance = this.configOverrides.circleChance;
     if (this.configOverrides.loopChance !== null) settings.loopChance = this.configOverrides.loopChance;
     if (this.configOverrides.corridorStyle !== null) settings.corridorStyle = this.configOverrides.corridorStyle as CorridorStyle;

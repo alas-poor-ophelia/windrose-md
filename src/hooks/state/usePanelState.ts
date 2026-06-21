@@ -107,7 +107,7 @@ function usePanelState({ mapData, updateMapData }: UsePanelStateOptions): UsePan
       newMapData.hexBounds = hexBounds;
 
       if (deleteOrphanedContent) {
-        const orientation = mapData.orientation || 'flat';
+        const orientation = mapData.orientation ?? 'flat';
         const isRadial = hexBounds.maxRing !== undefined;
 
         const isInBounds = (q: number, r: number): boolean => {
@@ -161,7 +161,7 @@ function usePanelState({ mapData, updateMapData }: UsePanelStateOptions): UsePan
         if (isNowRadial) {
           newMapData.viewState = { ...mapData.viewState, center: { x: 0, y: 0 }, zoom: mapData.viewState?.zoom ?? 1 };
         } else {
-          const orientation = mapData.orientation || 'flat';
+          const orientation = mapData.orientation ?? 'flat';
           const hSize = hexSize ?? mapData.hexSize ?? 40;
           const centerCol = Math.floor(hexBounds.maxCol / 2);
           const centerRow = Math.floor(hexBounds.maxRow / 2);

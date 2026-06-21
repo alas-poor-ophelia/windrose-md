@@ -188,7 +188,7 @@ const TilePlacementLayer = ({
         paintedInStrokeRef.current.add(`${c.col},${c.row}`);
       }
       const remaining = currentTiles.filter(
-        (t: TileAssignment) => (t.placement || 'fill') !== targetPlacement || !assignmentsOverlap(t, newTile)
+        (t: TileAssignment) => (t.placement ?? 'fill') !== targetPlacement || !assignmentsOverlap(t, newTile)
       );
       currentTiles = [...remaining, newTile];
       changed = true;
@@ -250,7 +250,7 @@ const TilePlacementLayer = ({
     const fillKeys = new Set(fillCells.map(c => `${c.col},${c.row}`));
 
     const newTiles = currentTiles.filter((t: TileAssignment) => {
-      if ((t.placement || 'fill') !== targetPlacement) return true;
+      if ((t.placement ?? 'fill') !== targetPlacement) return true;
       return t.freeform === true
         ? !fillKeys.has(`${t.col},${t.row}`)
         : !cellsCoveredByAssignment(t).some(c => fillKeys.has(`${c.col},${c.row}`));

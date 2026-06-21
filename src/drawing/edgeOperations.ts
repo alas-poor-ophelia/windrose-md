@@ -112,7 +112,7 @@ function getEdgeAt(
     e.x === normalized.x && 
     e.y === normalized.y && 
     e.side === normalized.side
-  ) || null;
+  ) ?? null;
 }
 
 /**

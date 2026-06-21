@@ -146,7 +146,7 @@ function useRegionTools(options: RegionToolsOptions): UseRegionToolsResult {
     const key = hexKey(q, r);
     return mapData.regions.find(region =>
       region.hexes.some(h => hexKey(h.x, h.y) === key)
-    ) || null;
+    ) ?? null;
   }, [mapData?.regions]);
 
   // ── Paint Mode Handlers ────────────────────────────────────────────
@@ -295,7 +295,7 @@ function useRegionTools(options: RegionToolsOptions): UseRegionToolsResult {
       // Rectangular bounds - iterate offset coords and convert
       for (let col = 0; col <= bounds.maxCol; col++) {
         for (let row = 0; row <= bounds.maxRow; row++) {
-          const { q, r } = offsetToAxial(col, row, mapData.orientation || 'flat');
+          const { q, r } = offsetToAxial(col, row, mapData.orientation ?? 'flat');
           if (hexGeom.isWithinBounds(q, r)) {
             const center = hexGeom.hexToWorld(q, r);
             if (pointInPolygon(center.worldX, center.worldY, boundaryVertices)) {

@@ -423,7 +423,7 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   const visibility: LayerVisibility = layerVisibility ?? { grid: true, objects: true, textLabels: true, hexCoordinates: true, regions: true, outlines: true };
 
   // Get theme with current settings (use provided theme or fetch global)
-  const THEME = theme || getTheme();
+  const THEME = theme ?? getTheme();
 
   // Extract active layer data (supports layer schema v2)
   const activeLayer = getActiveLayer(mapData);
@@ -471,7 +471,7 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   const isHexMapForBg = geometry.type === 'hex';
   const boundsOrDimensions = isHexMapForBg
     ? mapData.hexBounds
-    : mapData.dimensions || { width: 300, height: 300 };
+    : mapData.dimensions ?? { width: 300, height: 300 };
   renderer.renderBackgroundImage(
     ctx,
     geometry,
@@ -915,7 +915,7 @@ const useCanvasRenderer: UseCanvasRenderer = (canvasRef, fogCanvasRef, mapData, 
         rafIdRef.current = null;
         const a = renderInputsRef.current;
         if (a && a.mapData && a.geometry && canvasRef.current) {
-          const fogCanvas = fogCanvasRef?.current || null;
+          const fogCanvas = fogCanvasRef?.current ?? null;
           renderCanvas(canvasRef.current, fogCanvas, a.mapData, a.geometry, a.selectedItems, { isResizeMode: a.isResizeMode, theme: a.theme, showCoordinates: a.showCoordinates, layerVisibility: a.layerVisibility, adjacentSubHexes: a.adjacentSubHexes, hiddenTileLayers: a.hiddenTileLayers, tileImagesReady: a.tileImagesReady });
         }
       });

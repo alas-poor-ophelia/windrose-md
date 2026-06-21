@@ -72,7 +72,7 @@ function getLayersOrdered(mapData: MapData | null | undefined): MapLayer[] {
  * Get layer by ID
  */
 function getLayerById(mapData: MapData | null | undefined, layerId: LayerId): MapLayer | null {
-  return mapData?.layers?.find(l => l.id === layerId) || null;
+  return mapData?.layers?.find(l => l.id === layerId) ?? null;
 }
 
 /**
@@ -444,7 +444,7 @@ function migrateToLayerSchema(legacyMapData: LegacyMapData): MapData | LegacyMap
     const migratedData: MapData = {
       ...legacyMapData as Partial<MapData>,
       schemaVersion: SCHEMA_VERSION,
-      mapType: legacyMapData.mapType || 'grid',
+      mapType: legacyMapData.mapType ?? 'grid',
       activeLayerId: layerId,
       layerPanelVisible: false,
       layers: [layerData]

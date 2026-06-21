@@ -156,8 +156,8 @@ const ShapeOverlayLayer = ({
       {preview && !preview.corner1 && (
         <ShapePreviewOverlay
           shapeType="shapeCircle"
-          startPoint={preview.circleEdge || preview.center}
-          endPoint={preview.circleCenter || preview.center}
+          startPoint={preview.circleEdge ?? preview.center}
+          endPoint={preview.circleCenter ?? preview.center}
           geometry={geometry}
           mapData={mapData}
           canvasRef={canvasRef}

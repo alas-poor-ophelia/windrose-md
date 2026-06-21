@@ -68,7 +68,7 @@ function cornerToScreen(
 ): Point {
   if (!mapData.viewState) return { x: 0, y: 0 };
   const { zoom, center } = mapData.viewState;
-  const northDirection = mapData.northDirection != null ? mapData.northDirection : 0;
+  const northDirection = mapData.northDirection ?? 0;
   const cellSize = geometry.cellSize;
 
   const cornerWorldOffsets: Record<CornerName, Point> = {
@@ -173,7 +173,7 @@ const DiagonalFillOverlay = ({ currentTool }: DiagonalFillOverlayProps): VNode |
     return null;
   }
 
-  const displayEnd: FillEndPoint | null = fillEnd || previewEnd;
+  const displayEnd: FillEndPoint | null = fillEnd ?? previewEnd;
 
   const canvas = canvasRef.current;
   const { width: canvasWidth, height: canvasHeight } = canvas;

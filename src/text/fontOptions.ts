@@ -80,7 +80,7 @@ function getFontCss(fontId: string): string {
  * Get font option by ID
  */
 function getFontOption(fontId: string): FontOption {
-  return FONT_OPTIONS.find(f => f.id === fontId) || FONT_OPTIONS[0];
+  return FONT_OPTIONS.find(f => f.id === fontId) ?? FONT_OPTIONS[0];
 }
 
 export { FONT_OPTIONS, DEFAULT_FONT, DEFAULT_FONT_SIZE, DEFAULT_TEXT_COLOR, FONT_SIZE_MIN, FONT_SIZE_MAX, FONT_SIZE_STEP, getFontCss, getFontOption };

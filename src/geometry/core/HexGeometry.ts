@@ -468,7 +468,7 @@ class HexGeometry extends BaseGeometry {
     lineWidth: number | null = null
   ): void {
     const vertices = this.getHexVertices(q, r);
-    const width = lineWidth !== null ? lineWidth : (ctx.lineWidth || 1);
+    const width = lineWidth ?? (ctx.lineWidth || 1);
     
     const screenVertices = vertices.map(v => 
       this.worldToScreen(v.worldX, v.worldY, offsetX, offsetY, zoom)
@@ -819,7 +819,7 @@ class HexGeometry extends BaseGeometry {
    */
   getObjectBounds(obj: { position: Point; size?: { width: number; height: number } }): BoundingBox {
     const center = this.hexToWorld(obj.position.x, obj.position.y);
-    const size = obj.size || { width: 1, height: 1 };
+    const size = obj.size ?? { width: 1, height: 1 };
     
     const halfWidth = (this.width * size.width) / 2;
     const halfHeight = (this.height * size.height) / 2;

@@ -112,7 +112,7 @@ function calculateObjectScreenPosition(
   }
 
   const rect = canvas.getBoundingClientRect();
-  const container = containerRef?.current || canvas.parentElement;
+  const container = containerRef?.current ?? canvas.parentElement;
   if (!container) return null;
 
   const containerRect = container.getBoundingClientRect();

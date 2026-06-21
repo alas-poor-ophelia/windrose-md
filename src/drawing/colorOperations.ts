@@ -66,7 +66,7 @@ function getCellColor(cell: Cell): string {
  */
 function getColorByHex(colorHex: string): ColorDefinition | null {
   const palette = getColorPalette();
-  return palette.find(c => c.color === colorHex) || null;
+  return palette.find(c => c.color === colorHex) ?? null;
 }
 
 /**

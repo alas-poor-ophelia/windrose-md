@@ -53,7 +53,7 @@ function getObjectAtPosition(objects: MapObject[] | null | undefined, x: number,
     // Check if (x, y) is within object bounds
     return x >= pos.x && x < pos.x + size.width &&
            y >= pos.y && y < pos.y + size.height;
-  }) || null;
+  }) ?? null;
 }
 
 // ===========================================
@@ -522,7 +522,7 @@ function convertObjectToFreeform(
   cellCenterWorldY: number,
   cellSize: number
 ): ObjectUpdate {
-  const alignOffset = getAlignmentOffset(obj.alignment || 'center');
+  const alignOffset = getAlignmentOffset(obj.alignment ?? 'center');
   return {
     freeform: true,
     worldPosition: {

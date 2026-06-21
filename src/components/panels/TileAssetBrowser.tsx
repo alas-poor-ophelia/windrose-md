@@ -1311,7 +1311,7 @@ const TileAssetBrowser = memo(({
             <div className="windrose-tile-config-row">
               <label>Fit Mode</label>
               <select
-                value={fitMode || 'auto'}
+                value={fitMode ?? 'auto'}
                 onChange={(e: Event) => {
                   const v = (e.target as HTMLSelectElement).value;
                   handleOverrideChange('fitMode', v === 'auto' ? undefined : v as 'fill' | 'contain');

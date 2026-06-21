@@ -112,7 +112,7 @@ const FALLBACK_OBJECT_SETTINGS: ObjectSettings = {
 // ===========================================
 
 function getPluginSettingsRaw(): Partial<PluginSettings> | null {
-  return _plugin?.settings || null;
+  return _plugin?.settings ?? null;
 }
 
 function getApp(): App {
@@ -209,7 +209,7 @@ function getEffectiveSettings(
   globalSettings: PluginSettings | null = null
 ): PluginSettings {
   // Get global settings if not provided
-  const globals = globalSettings || getSettings();
+  const globals = globalSettings ?? getSettings();
   
   // If map has no settings or is using global settings, return global settings
   if (!mapSettings || mapSettings.useGlobalSettings) {

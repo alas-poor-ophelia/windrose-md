@@ -94,7 +94,7 @@ const FreehandLayer = ({
     const { width, height } = overlay;
 
     const { offsetX, offsetY } = calculateViewportOffset(
-      geometry || { type: 'hex', cellSize: 1 },
+      geometry ?? { type: 'hex', cellSize: 1 },
       center,
       { width, height },
       zoom

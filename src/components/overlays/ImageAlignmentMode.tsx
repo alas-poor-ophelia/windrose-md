@@ -356,7 +356,7 @@ function ImageAlignmentMode({ isActive, offsetX, offsetY, onOffsetChange, onAppl
               </label>
               <input
                 type="number"
-                value={gridSize != null ? gridSize : ''}
+                value={gridSize ?? ''}
                 min="1"
                 onChange={handleGridSizeChange}
                 placeholder="e.g. 140"

@@ -116,7 +116,7 @@ function calculateHexObjectSelectionPosition(
 ): { screenX: number; screenY: number; objectWidth: number; objectHeight: number; cellWidth: number; cellHeight: number } {
   const { offsetX, offsetY, zoom, scaledSize } = context;
   const size = object.size ?? { width: 1, height: 1 };
-  const alignment = object.alignment || 'center';
+  const alignment = object.alignment ?? 'center';
 
   const { worldX, worldY } = hexGeometry.hexToWorld(object.position.x, object.position.y);
 
@@ -175,7 +175,7 @@ function calculateGridObjectSelectionPosition(
 ): { screenX: number; screenY: number; objectWidth: number; objectHeight: number; cellWidth: number; cellHeight: number } {
   const { offsetX, offsetY, zoom, scaledSize } = context;
   const size = object.size ?? { width: 1, height: 1 };
-  const alignment = object.alignment || 'center';
+  const alignment = object.alignment ?? 'center';
 
   const gridPos = geometry.gridToScreen(object.position.x, object.position.y, offsetX, offsetY, zoom);
   let screenX = gridPos.screenX;

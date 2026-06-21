@@ -256,7 +256,7 @@ async function getImageDimensions(vaultPath: string): Promise<ImageDimensions | 
   if (!img) return null;
 
   // Should be in cache now
-  return dimensionsCache.get(vaultPath) || null;
+  return dimensionsCache.get(vaultPath) ?? null;
 }
 
 /**

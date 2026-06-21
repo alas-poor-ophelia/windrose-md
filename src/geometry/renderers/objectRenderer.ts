@@ -128,7 +128,7 @@ function calculateObjectPosition(
   }
 
   // Apply alignment offset
-  const alignment = obj.alignment || 'center';
+  const alignment = obj.alignment ?? 'center';
   if (alignment !== 'center') {
     const halfCell = scaledSize / 2;
     switch (alignment) {

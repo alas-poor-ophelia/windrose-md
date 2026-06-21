@@ -57,7 +57,7 @@ function useObjectHover(): {
               getActiveLayer(mapData).objects,
               x, y,
               clickOffsetX, clickOffsetY,
-              mapData.orientation || 'flat'
+              mapData.orientation ?? 'flat'
             );
           }
         }

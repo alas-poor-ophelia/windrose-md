@@ -168,7 +168,7 @@ function cellKeyFromCell(cell: Cell, geometry: IGeometry): CellKey {
  * @returns Cell or null if not found
  */
 function getCellAt(cells: Cell[], coords: Point, geometry: IGeometry): Cell | null {
-  return cells.find(cell => geometry.cellMatchesCoords(cell, coords)) || null;
+  return cells.find(cell => geometry.cellMatchesCoords(cell, coords)) ?? null;
 }
 
 /**

@@ -306,7 +306,7 @@ function calculateTileDrawRect(
   const scaleX = hexScreenWidth / tileset.tileWidth;
   const scaleY = hexScreenHeight / hexHeight;
 
-  const effectiveFit = fitMode || tileset.fitMode || 'fill';
+  const effectiveFit = fitMode ?? tileset.fitMode ?? 'fill';
 
   if (effectiveFit === 'contain') {
     // Uniform scaling: preserve aspect ratio, fit within hex bounding box
@@ -543,7 +543,7 @@ function renderTiles(
       }
     }
 
-    let rect = drawOverride || calculateTileDrawRect(
+    let rect = drawOverride ?? calculateTileDrawRect(
       centerX, centerY,
       tileset, geometry.hexSize, viewState.zoom, geometry.orientation,
       tile.fitMode, spanW, spanH

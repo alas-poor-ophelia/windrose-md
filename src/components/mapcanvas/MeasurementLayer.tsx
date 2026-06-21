@@ -38,7 +38,7 @@ const MeasurementLayer = ({
     canvasRef
   } = useMapState();
 
-  const mapType = mapData?.mapType || 'grid';
+  const mapType = mapData?.mapType ?? 'grid';
 
   const {
     measureOrigin,

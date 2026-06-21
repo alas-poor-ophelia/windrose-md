@@ -87,7 +87,7 @@ const DrawingLayer = ({
   } = useMapState();
 
   const previewSettings = useMemo((): PreviewSettings => {
-    const settings = globalSettings || getSettings();
+    const settings = globalSettings ?? getSettings();
     return {
       kbmEnabled: (settings).shapePreviewKbm !== false,
       touchEnabled: (settings).shapePreviewTouch === true
@@ -95,8 +95,8 @@ const DrawingLayer = ({
   }, [globalSettings]);
 
   const distanceSettings = useMemo(() => {
-    const mapType = mapData?.mapType || 'grid';
-    const settings = globalSettings || getSettings();
+    const mapType = mapData?.mapType ?? 'grid';
+    const settings = globalSettings ?? getSettings();
     return getEffectiveDistanceSettings(mapType, settings, mapDistanceOverrides);
   }, [mapData?.mapType, globalSettings, mapDistanceOverrides]);
 

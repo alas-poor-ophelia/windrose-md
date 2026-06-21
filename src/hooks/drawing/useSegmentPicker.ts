@@ -60,7 +60,7 @@ function useSegmentPicker({
     );
 
     setSegmentPickerCell({ x: cellX, y: cellY });
-    setSegmentPickerExistingCell(existingCell || null);
+    setSegmentPickerExistingCell(existingCell ?? null);
     setSegmentPickerOpen(true);
   };
 
