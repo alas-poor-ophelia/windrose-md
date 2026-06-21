@@ -105,6 +105,7 @@ function FloatingPanel({
     return () => {
       interactable.unset();
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- interact.js drag/resize setup re-runs only on layout props; onPositionChange is a low-churn optional callback invoked via closure in the end-listener
   }, [isFloating, resizable, minSize, headerless]);
 
   const handlePointerDown = useCallback(() => {

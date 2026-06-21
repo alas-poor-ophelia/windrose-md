@@ -177,6 +177,7 @@ function ImageAlignmentMode({ isActive, offsetX, offsetY, onOffsetChange, onAppl
     
     activeDocument.addEventListener('keydown', handleKeyDown);
     return () => activeDocument.removeEventListener('keydown', handleKeyDown);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- handleApply/handleCancel are forward-declared (TDZ if listed); they depend on offsetX/offsetY which ARE deps, so the closure refreshes when those change
   }, [isActive, offsetX, offsetY, onOffsetChange]);
   
   // Panel dragging (mouse + touch)

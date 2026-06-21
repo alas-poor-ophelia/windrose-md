@@ -308,7 +308,7 @@ const ObjectLayer = ({
     if (newSelectedItems.length > 0) {
       selectMultiple(newSelectedItems);
     }
-  }, [hasMultiSelection, mapData, selectedItems, contextOnObjectsChange, onTextLabelsChange, selectMultiple]);
+  }, [hasMultiSelection, mapData, selectedItems, onObjectsChange, onTextLabelsChange, selectMultiple]);
 
   const handleDeleteAll = useCallback(() => {
     if (!hasMultiSelection || !mapData) return;

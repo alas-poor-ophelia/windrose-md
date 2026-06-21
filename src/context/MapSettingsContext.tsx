@@ -872,6 +872,7 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
     setCoordinateDisplayMode: handlers.setCoordinateDisplayMode,
     handleResizeConfirmDelete: stableHandleResizeConfirmDelete,
     handleResizeConfirmCancel: handlers.handleResizeConfirmCancel,
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- handlers is a plain object recreated each render; listing handlers.* invalidates this memo every render (stableHandleResizeConfirmDelete is stable but cannot clear the warning alone)
   }), [
     state.hexBounds, state.boundsShape, state.boundsLocked,
     state.coordinateDisplayMode, state.showResizeConfirm,
