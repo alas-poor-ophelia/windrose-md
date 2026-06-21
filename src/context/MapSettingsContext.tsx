@@ -668,7 +668,20 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
   // Dispatch Wrappers
   // ===========================================================================
 
-  const handlers: MapSettingsHandlers = {
+  // Stable ref wrappers (handlers closing over changing state keep a stable identity,
+  // so the handlers object below can be memoized and listed honestly in downstream memos)
+  const handleSaveRef = useRef(handleSave);
+  handleSaveRef.current = handleSave;
+  const stableHandleSave = useCallback(() => handleSaveRef.current(), []);
+
+  const handleResizeConfirmDeleteRef = useRef(handleResizeConfirmDelete);
+  handleResizeConfirmDeleteRef.current = handleResizeConfirmDelete;
+  const stableHandleResizeConfirmDelete = useCallback(() => handleResizeConfirmDeleteRef.current(), []);
+
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  const handlers: MapSettingsHandlers = useMemo(() => ({
     // Simple dispatches
     setActiveTab: (tab) => dispatch({ type: Actions.SET_TAB, payload: tab }),
     handleToggleUseGlobal: () => dispatch({ type: Actions.TOGGLE_USE_GLOBAL }),
@@ -686,10 +699,10 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
     setImageOffsetX: (x) => dispatch({ type: Actions.SET_IMAGE_OFFSET_X, payload: x }),
     setImageOffsetY: (y) => dispatch({ type: Actions.SET_IMAGE_OFFSET_Y, payload: y }),
     setImageGridSize: (size) => dispatch({ type: Actions.SET_IMAGE_GRID_SIZE, payload: size }),
-    handleResizeConfirmDelete,
+    handleResizeConfirmDelete: stableHandleResizeConfirmDelete,
     handleResizeConfirmCancel: () => dispatch({ type: Actions.CANCEL_RESIZE }),
     handleObjectSetChange: (setId) => dispatch({ type: Actions.SET_OBJECT_SET_ID, payload: setId }),
-    handleCancel: () => onClose(),
+    handleCancel: () => onCloseRef.current(),
 
     // Bounds shape
     boundsShape: state.boundsShape,
@@ -745,26 +758,14 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
     // Async
     handleImageSearch,
     handleImageSelect,
-    handleSave,
+    handleSave: stableHandleSave,
 
     // Fog of War handlers
     setFogImageDisplayName: (name) => dispatch({ type: Actions.SET_FOG_IMAGE_DISPLAY_NAME, payload: name }),
     handleFogImageSearch,
     handleFogImageSelect,
     handleFogImageClear: () => dispatch({ type: Actions.CLEAR_FOG_IMAGE })
-  };
-
-  // ===========================================================================
-  // Stable Ref Wrappers (for handlers that close over changing state)
-  // ===========================================================================
-
-  const handleSaveRef = useRef(handleSave);
-  handleSaveRef.current = handleSave;
-  const stableHandleSave = useCallback(() => handleSaveRef.current(), []);
-
-  const handleResizeConfirmDeleteRef = useRef(handlers.handleResizeConfirmDelete);
-  handleResizeConfirmDeleteRef.current = handlers.handleResizeConfirmDelete;
-  const stableHandleResizeConfirmDelete = useCallback(() => handleResizeConfirmDeleteRef.current(), []);
+  }), [dispatch, orientation, state.hexBounds, state.boundsShape, stableHandleSave, stableHandleResizeConfirmDelete, handleImageSearch, handleImageSelect, handleFogImageSearch, handleFogImageSelect]);
 
   // ===========================================================================
   // Memoized Sub-Context Values
@@ -783,8 +784,9 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
     handlePreferenceToggle: handlers.handlePreferenceToggle,
     mapData, geometry,
     isInSubHex, subMapName
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- handlers is a plain object recreated each render; listing handlers.* invalidates this memo every render (structural fix: memoize handlers)
-  }), [isOpen, state.activeTab, state.isLoading, state.distanceSettings, state.preferences, isInSubHex, subMapName]);
+  }), [isOpen, state.activeTab, state.isLoading, state.distanceSettings, state.preferences, isInSubHex, subMapName,
+    geometry, isHexMap, mapData, mapType, tabs, stableHandleSave,
+    handlers.handleCancel, handlers.handlePreferenceToggle, handlers.setActiveTab, handlers.setDistanceSettings]);
 
   const appearanceValue = useMemo((): AppearanceContextValue => ({
     useGlobalSettings: state.useGlobalSettings,
@@ -805,10 +807,13 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
     handleFogImageSearch: handlers.handleFogImageSearch,
     handleFogImageSelect: handlers.handleFogImageSelect,
     handleFogImageClear: handlers.handleFogImageClear,
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- handlers is a plain object recreated each render; listing handlers.* invalidates this memo every render
   }), [
     state.useGlobalSettings, state.overrides, state.activeColorPicker,
-    state.objectSetId, state.fogImageDisplayName, state.fogImageSearchResults
+    state.objectSetId, state.fogImageDisplayName, state.fogImageSearchResults,
+    globalSettings,
+    handlers.handleColorChange, handlers.handleFogImageClear, handlers.handleFogImageSearch,
+    handlers.handleFogImageSelect, handlers.handleLineWidthChange, handlers.handleObjectSetChange,
+    handlers.handleToggleUseGlobal, handlers.setActiveColorPicker, handlers.setFogImageDisplayName
   ]);
 
   const backgroundImageValue = useMemo((): BackgroundImageContextValue => ({
@@ -847,14 +852,18 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
     MEASUREMENT_EDGE, MEASUREMENT_CORNER,
     calculateGridFromColumns, calculateGridFromMeasurement,
     measurementToHexSize, hexSizeToMeasurement, getFineTuneRange,
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- handlers is a plain object recreated each render; listing handlers.* invalidates this memo every render
   }), [
     state.backgroundImagePath, state.backgroundImageDisplayName,
     state.imageDimensions, state.imageSearchResults,
     state.imageOpacity, state.imageOffsetX, state.imageOffsetY, state.imageGridSize,
     state.sizingMode, state.gridDensity, state.customColumns,
     state.measurementMethod, state.measurementSize, state.fineTuneOffset,
-    orientation, onOpenAlignmentMode, handleImageSearch, handleImageSelect
+    orientation, onOpenAlignmentMode,
+    handlers.handleCustomColumnsChange, handlers.handleDensityChange, handlers.handleFineTuneChange,
+    handlers.handleFineTuneReset, handlers.handleImageClear, handlers.handleImageSearch,
+    handlers.handleImageSelect, handlers.handleMeasurementMethodChange, handlers.handleMeasurementSizeChange,
+    handlers.handleSizingModeChange, handlers.setBackgroundImageDisplayName, handlers.setImageGridSize,
+    handlers.setImageOffsetX, handlers.setImageOffsetY, handlers.setImageOpacity
   ]);
 
   const hexGridValue = useMemo((): HexGridContextValue => ({
@@ -872,11 +881,13 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
     setCoordinateDisplayMode: handlers.setCoordinateDisplayMode,
     handleResizeConfirmDelete: stableHandleResizeConfirmDelete,
     handleResizeConfirmCancel: handlers.handleResizeConfirmCancel,
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- handlers is a plain object recreated each render; listing handlers.* invalidates this memo every render (stableHandleResizeConfirmDelete is stable but cannot clear the warning alone)
   }), [
     state.hexBounds, state.boundsShape, state.boundsLocked,
     state.coordinateDisplayMode, state.showResizeConfirm,
-    state.pendingBoundsChange, state.orphanInfo
+    state.pendingBoundsChange, state.orphanInfo,
+    stableHandleResizeConfirmDelete,
+    handlers.handleBoundsLockToggle, handlers.handleBoundsShapeChange, handlers.handleHexBoundsChange,
+    handlers.handleRadiusChange, handlers.handleResizeConfirmCancel, handlers.setCoordinateDisplayMode
   ]);
 
   return (
