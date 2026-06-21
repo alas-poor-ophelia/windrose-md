@@ -51,7 +51,7 @@ export const ObjectSetHelpers = {
 
   saveCurrentAsSet(plugin: PluginLike, name: string): ObjectSet {
     const s = plugin.settings;
-    if (s.objectSets == null) s.objectSets = [];
+    s.objectSets ??= [];
 
     const set: ObjectSet = {
       id: ObjectSetHelpers.generateId(),
@@ -299,7 +299,7 @@ export const ObjectSetHelpers = {
     ObjectSetHelpers.resolveImagePaths(data, folderPath + '/images', plugin.app.vault);
 
     const s = plugin.settings;
-    if (s.objectSets == null) s.objectSets = [];
+    s.objectSets ??= [];
 
     const setName = ObjectSetHelpers.deduplicateName(s.objectSets, data.name ?? 'Imported Set');
 
@@ -325,7 +325,7 @@ export const ObjectSetHelpers = {
     const folder = plugin.app.vault.getAbstractFileByPath(folderPath) as TAbstractFile & { children?: (TAbstractFile & { children?: unknown[]; name: string; path: string })[] } | null;
     if (folder == null || folder.children == null) return 0;
 
-    if (plugin.settings.objectSets == null) plugin.settings.objectSets = [];
+    plugin.settings.objectSets ??= [];
 
     let added = 0;
     for (const child of folder.children) {

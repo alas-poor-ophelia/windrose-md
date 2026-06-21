@@ -383,7 +383,7 @@ export default class WindrosePlugin extends Plugin {
         allData = JSON.parse(content) as { maps: Record<string, unknown> };
       }
 
-      if (allData.maps == null) allData.maps = {};
+      allData.maps ??= {};
 
       const layerId = 'layer-' + Date.now() + '-' + Math.random().toString(36).slice(2, 11);
 

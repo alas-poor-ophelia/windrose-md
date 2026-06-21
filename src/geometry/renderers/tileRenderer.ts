@@ -57,7 +57,7 @@ const DEFAULT_WORLD_REPEAT = 4;
 let _featherCanvas: HTMLCanvasElement | null = null;
 function getFeatherCanvas(w: number, h: number): HTMLCanvasElement | null {
   if (typeof document === 'undefined') return null;
-  if (_featherCanvas == null) _featherCanvas = activeDocument.createElement('canvas');
+  _featherCanvas ??= activeDocument.createElement('canvas');
   if (_featherCanvas.width !== w) _featherCanvas.width = w;
   if (_featherCanvas.height !== h) _featherCanvas.height = h;
   return _featherCanvas;

@@ -48,13 +48,13 @@ interface DataFile {
 }
 
 function migrateMapData(mapData: MapData): MapData {
-  if (!mapData.objects) mapData.objects = [];
-  if (!mapData.textLabels) mapData.textLabels = [];
-  if (!mapData.customColors) mapData.customColors = [];
-  if (!mapData.edges) mapData.edges = [];
-  if (!mapData.regions) mapData.regions = [];
-  if (!mapData.outlines) mapData.outlines = [];
-  if (!mapData.shapeOverlays) mapData.shapeOverlays = [];
+  mapData.objects ??= [];
+  mapData.textLabels ??= [];
+  mapData.customColors ??= [];
+  mapData.edges ??= [];
+  mapData.regions ??= [];
+  mapData.outlines ??= [];
+  mapData.shapeOverlays ??= [];
   if (!mapData.mapType) mapData.mapType = 'grid';
   if (!mapData.settings) {
     mapData.settings = { useGlobalSettings: true, overrides: {} };
@@ -66,8 +66,8 @@ function migrateMapData(mapData: MapData): MapData {
       rememberExpandedState: false
     };
   }
-  if (mapData.expandedState === undefined) mapData.expandedState = false;
-  if (!mapData.lastTextLabelSettings) mapData.lastTextLabelSettings = null;
+  mapData.expandedState ??= false;
+  mapData.lastTextLabelSettings ??= null;
 
   // Hex-specific migration
   if (mapData.mapType === 'hex') {
@@ -94,12 +94,12 @@ function migrateMapData(mapData: MapData): MapData {
         fineTuneOffset: 0
       };
     } else {
-      if (mapData.backgroundImage.gridDensity === undefined) mapData.backgroundImage.gridDensity = 'medium';
-      if (mapData.backgroundImage.customColumns === undefined) mapData.backgroundImage.customColumns = 24;
-      if (mapData.backgroundImage.sizingMode === undefined) mapData.backgroundImage.sizingMode = 'density';
-      if (mapData.backgroundImage.measurementMethod === undefined) mapData.backgroundImage.measurementMethod = 'corner';
-      if (mapData.backgroundImage.measurementSize === undefined) mapData.backgroundImage.measurementSize = 86;
-      if (mapData.backgroundImage.fineTuneOffset === undefined) mapData.backgroundImage.fineTuneOffset = 0;
+      mapData.backgroundImage.gridDensity ??= 'medium';
+      mapData.backgroundImage.customColumns ??= 24;
+      mapData.backgroundImage.sizingMode ??= 'density';
+      mapData.backgroundImage.measurementMethod ??= 'corner';
+      mapData.backgroundImage.measurementSize ??= 86;
+      mapData.backgroundImage.fineTuneOffset ??= 0;
     }
   }
 
@@ -109,7 +109,7 @@ function migrateMapData(mapData: MapData): MapData {
   }
 
   // Tileset source migration: add source: 'folder' to legacy tilesets
-  if (!mapData.tilesets) mapData.tilesets = [];
+  mapData.tilesets ??= [];
   for (const ts of mapData.tilesets) {
     if (!('source' in ts)) {
       (ts as Record<string, unknown>).source = 'folder';
@@ -118,7 +118,7 @@ function migrateMapData(mapData: MapData): MapData {
 
   // Layer-level arrays and curve migration
   for (const layer of mapData.layers) {
-    if (!layer.tiles) layer.tiles = [];
+    layer.tiles ??= [];
 
     // Tile assignment migration: q→col, r→row, layer→placement (boundary cast: legacy schema)
     for (const tile of layer.tiles) {
@@ -165,13 +165,13 @@ function migrateMapData(mapData: MapData): MapData {
       const subHex = mapData.subHexMaps[hexKey];
       if (subHex?.mapData != null) {
         for (const layer of subHex.mapData.layers) {
-          if (!layer.tiles) layer.tiles = [];
+          layer.tiles ??= [];
           layer.curves ??= [];
           layer.curves = layer.curves.filter(c => c.start != null && c.segments != null);
         }
-        if (!subHex.mapData.regions) subHex.mapData.regions = [];
-        if (!subHex.mapData.outlines) subHex.mapData.outlines = [];
-        if (!subHex.mapData.shapeOverlays) subHex.mapData.shapeOverlays = [];
+        subHex.mapData.regions ??= [];
+        subHex.mapData.outlines ??= [];
+        subHex.mapData.shapeOverlays ??= [];
       }
     }
   }
