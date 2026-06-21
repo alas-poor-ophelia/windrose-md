@@ -38,14 +38,15 @@ const ModalPortal = ({ children }: ModalPortalProps): VNode => {
   }, []);
 
   useEffect(() => {
-    if (wrapperRef.current && portalContainerRef.current) {
-      portalContainerRef.current.appendChild(wrapperRef.current);
+    const wrapper = wrapperRef.current;
+    if (wrapper && portalContainerRef.current) {
+      portalContainerRef.current.appendChild(wrapper);
       setIsInPortal(true);
     }
 
     return () => {
-      if (wrapperRef.current && wrapperRef.current.parentNode) {
-        wrapperRef.current.parentNode.removeChild(wrapperRef.current);
+      if (wrapper && wrapper.parentNode) {
+        wrapper.parentNode.removeChild(wrapper);
       }
     };
   }, []);

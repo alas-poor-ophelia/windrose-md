@@ -58,10 +58,9 @@ function NativeToggle({ value, onChange, disabled }: NativeToggleProps): h.JSX.E
 
       toggleRef.current = toggleInstance;
 
+      const containerEl = containerRef.current;
       return () => {
-        if (containerRef.current) {
-          containerRef.current.innerHTML = '';
-        }
+        containerEl.innerHTML = '';
       };
     } catch {
       // Fallback will render
@@ -133,10 +132,9 @@ function NativeDropdown({ value, options, onChange, disabled }: NativeDropdownPr
 
       dropdownRef.current = dropdownInstance;
 
+      const containerEl = containerRef.current;
       return () => {
-        if (containerRef.current) {
-          containerRef.current.innerHTML = '';
-        }
+        containerEl.innerHTML = '';
       };
     } catch {
       // Fallback will render
@@ -201,10 +199,9 @@ function NativeSlider({ value, min, max, step, onChange, disabled }: NativeSlide
 
       sliderRef.current = sliderInstance;
 
+      const containerEl = containerRef.current;
       return () => {
-        if (containerRef.current) {
-          containerRef.current.innerHTML = '';
-        }
+        containerEl.innerHTML = '';
       };
     } catch {
       // Fallback will render

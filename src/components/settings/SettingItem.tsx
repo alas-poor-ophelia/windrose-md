@@ -57,9 +57,9 @@ function SettingItem({ name, description, vertical, children }: SettingItemProps
 
       settingRef.current = setting;
 
+      const el = containerRef.current;
       return () => {
         // Setting appends its own DOM to containerRef — clear it
-        const el = containerRef.current;
         if (el != null) {
           if (typeof el.empty === 'function') { el.empty(); } else { el.innerHTML = ''; }
         }
