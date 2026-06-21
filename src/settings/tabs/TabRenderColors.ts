@@ -156,9 +156,7 @@ export const TabRenderColorsMethods = {
       const visBtn = actions.createEl('button', { cls: 'windrose-btn-icon', attr: { 'aria-label': isHidden ? 'Show color' : 'Hide color' } });
       IconHelpers.set(visBtn, isHidden ? 'eye' : 'eye-off');
       visBtn.addEventListener('click', () => {
-        if (!this.plugin.settings.colorPaletteOverrides) {
-          this.plugin.settings.colorPaletteOverrides = {};
-        }
+        this.plugin.settings.colorPaletteOverrides ??= {};
         this.plugin.settings.colorPaletteOverrides[color.id] ??= {};
         this.plugin.settings.colorPaletteOverrides[color.id].hidden = !isHidden;
 

@@ -56,16 +56,12 @@ function migrateMapData(mapData: MapData): MapData {
   mapData.outlines ??= [];
   mapData.shapeOverlays ??= [];
   if (!mapData.mapType) mapData.mapType = 'grid';
-  if (!mapData.settings) {
-    mapData.settings = { useGlobalSettings: true, overrides: {} };
-  }
-  if (!mapData.uiPreferences) {
-    mapData.uiPreferences = {
-      rememberPanZoom: true,
-      rememberSidebarState: true,
-      rememberExpandedState: false
-    };
-  }
+  mapData.settings ??= { useGlobalSettings: true, overrides: {} };
+  mapData.uiPreferences ??= {
+    rememberPanZoom: true,
+    rememberSidebarState: true,
+    rememberExpandedState: false
+  };
   mapData.expandedState ??= false;
   mapData.lastTextLabelSettings ??= null;
 

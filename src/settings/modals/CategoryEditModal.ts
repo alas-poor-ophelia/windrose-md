@@ -86,9 +86,7 @@ class CategoryEditModal extends Modal {
     // Get the correct settings key for this map type
     const categoriesKey: CategoriesKey = this.mapType === 'hex' ? 'customHexCategories' : 'customGridCategories';
 
-    if (!this.plugin.settings[categoriesKey]) {
-      this.plugin.settings[categoriesKey] = [];
-    }
+    this.plugin.settings[categoriesKey] ??= [];
 
     const categories = this.plugin.settings[categoriesKey];
 

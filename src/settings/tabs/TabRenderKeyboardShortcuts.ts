@@ -108,9 +108,7 @@ export const TabRenderKeyboardShortcutsMethods = {
           else if (e.key.length === 1) newKey += e.key.toLowerCase();
           else newKey += e.key;
 
-          if (!this.plugin.settings.keyboardShortcuts) {
-            this.plugin.settings.keyboardShortcuts = Object.assign({}, DEFAULT_SHORTCUTS);
-          }
+          this.plugin.settings.keyboardShortcuts ??= Object.assign({}, DEFAULT_SHORTCUTS);
           this.plugin.settings.keyboardShortcuts[action.id] = newKey;
           this.settingsChanged = true;
           void this.plugin.saveSettings();
@@ -128,9 +126,7 @@ export const TabRenderKeyboardShortcutsMethods = {
         .setIcon('rotate-ccw')
         .setTooltip('Reset to default')
         .onClick(async () => {
-          if (!this.plugin.settings.keyboardShortcuts) {
-            this.plugin.settings.keyboardShortcuts = Object.assign({}, DEFAULT_SHORTCUTS);
-          }
+          this.plugin.settings.keyboardShortcuts ??= Object.assign({}, DEFAULT_SHORTCUTS);
           this.plugin.settings.keyboardShortcuts[action.id] = DEFAULT_SHORTCUTS[action.id];
           this.settingsChanged = true;
           await this.plugin.saveSettings();

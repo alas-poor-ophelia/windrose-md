@@ -108,9 +108,7 @@ function calculateObjectPosition(
       objectHeight *= multiScale;
 
       let effectiveSlot = obj.slot;
-      if (effectiveSlot === undefined || effectiveSlot === null) {
-        effectiveSlot = cellObjects.findIndex(o => o.id === obj.id);
-      }
+      effectiveSlot ??= cellObjects.findIndex(o => o.id === obj.id);
 
       const { offsetX: slotOffsetX, offsetY: slotOffsetY } = deps.getSlotOffset(
         effectiveSlot,

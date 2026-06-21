@@ -570,9 +570,7 @@ class ObjectEditModal extends Modal {
 
     if (this.existingObject?.isBuiltIn === true) {
       // Modifying a built-in: save as override
-      if (!this.plugin.settings[overridesKey]) {
-        this.plugin.settings[overridesKey] = {};
-      }
+      this.plugin.settings[overridesKey] ??= {};
 
       const original = BUILT_IN_OBJECTS.find(o => o.id === this.existingObject!.id);
       const originalRecord = original as unknown as { imagePath?: string; iconClass?: string } | undefined;
@@ -616,9 +614,7 @@ class ObjectEditModal extends Modal {
       }
     } else if (this.existingObject?.isCustom === true) {
       // Editing existing custom object
-      if (!this.plugin.settings[customObjectsKey]) {
-        this.plugin.settings[customObjectsKey] = [];
-      }
+      this.plugin.settings[customObjectsKey] ??= [];
       const idx = this.plugin.settings[customObjectsKey].findIndex(o => o.id === this.existingObject!.id);
       if (idx !== -1) {
         const updated: Record<string, unknown> = {
@@ -644,9 +640,7 @@ class ObjectEditModal extends Modal {
       }
     } else {
       // Creating new custom object
-      if (!this.plugin.settings[customObjectsKey]) {
-        this.plugin.settings[customObjectsKey] = [];
-      }
+      this.plugin.settings[customObjectsKey] ??= [];
 
       const newObject: Record<string, string> = {
         id: 'custom-' + Date.now() + '-' + Math.random().toString(36).slice(2, 11),

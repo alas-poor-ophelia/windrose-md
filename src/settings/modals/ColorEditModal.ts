@@ -139,9 +139,7 @@ class ColorEditModal extends Modal {
 
       if (isBuiltIn) {
         // Save as override
-        if (!this.plugin.settings.colorPaletteOverrides) {
-          this.plugin.settings.colorPaletteOverrides = {};
-        }
+        this.plugin.settings.colorPaletteOverrides ??= {};
         const existingOverride = this.plugin.settings.colorPaletteOverrides[this.existingColor!.id] ?? {};
         this.plugin.settings.colorPaletteOverrides[this.existingColor!.id] = {
           ...existingOverride,
@@ -162,9 +160,7 @@ class ColorEditModal extends Modal {
         }
       } else {
         // Add new custom color
-        if (!this.plugin.settings.customPaletteColors) {
-          this.plugin.settings.customPaletteColors = [];
-        }
+        this.plugin.settings.customPaletteColors ??= [];
         this.plugin.settings.customPaletteColors.push({
           id: 'custom-' + Date.now(),
           color: colorValue,

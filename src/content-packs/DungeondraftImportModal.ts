@@ -412,9 +412,7 @@ class DungeondraftImportModal extends Modal {
 				vaultPath: basePath,
 			};
 
-			if (this.plugin.settings.installedContentPacks == null) {
-				this.plugin.settings.installedContentPacks = [];
-			}
+			this.plugin.settings.installedContentPacks ??= [];
 			const existingIdx = this.plugin.settings.installedContentPacks
 				.findIndex((p: InstalledPack) => p.id === this.meta!.id);
 			if (existingIdx >= 0) {

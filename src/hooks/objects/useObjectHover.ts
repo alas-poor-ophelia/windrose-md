@@ -62,9 +62,7 @@ function useObjectHover(): {
           }
         }
 
-        if (!obj) {
-          obj = getObjectAtPosition(getActiveLayer(mapData).objects, x, y);
-        }
+        obj ??= getObjectAtPosition(getActiveLayer(mapData).objects, x, y);
 
         if (obj) {
           const activeLayer = getActiveLayer(mapData);

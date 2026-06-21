@@ -96,9 +96,7 @@ async function downloadAndInstallPack(
     vaultPath: basePath,
   };
 
-  if (plugin.settings.installedContentPacks == null) {
-    plugin.settings.installedContentPacks = [];
-  }
+  plugin.settings.installedContentPacks ??= [];
 
   const existingIdx = plugin.settings.installedContentPacks.findIndex((p: InstalledPack) => p.id === pack.id);
   if (existingIdx >= 0) {

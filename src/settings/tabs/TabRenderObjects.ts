@@ -400,9 +400,7 @@ export const TabRenderObjectsMethods = {
             }
           } else {
             // Not in default position - save order override
-            if (!this.plugin.settings[overridesKey]) {
-              this.plugin.settings[overridesKey] = {};
-            }
+            this.plugin.settings[overridesKey] ??= {};
             this.plugin.settings[overridesKey][id] ??= {};
             this.plugin.settings[overridesKey][id].order = newOrder;
           }
@@ -510,9 +508,7 @@ export const TabRenderObjectsMethods = {
         const hideBtn = actions.createEl('button', { cls: 'windrose-settings-icon-btn', attr: { 'aria-label': 'Hide', title: 'Hide from palette' } });
         IconHelpers.set(hideBtn, 'eye-off');
         hideBtn.onclick = async () => {
-          if (!this.plugin.settings[overridesKey]) {
-            this.plugin.settings[overridesKey] = {};
-          }
+          this.plugin.settings[overridesKey] ??= {};
           this.plugin.settings[overridesKey][obj.id] ??= {};
           this.plugin.settings[overridesKey][obj.id].hidden = true;
           this.settingsChanged = true;
@@ -550,9 +546,7 @@ export const TabRenderObjectsMethods = {
         const targetObjectsKey: CustomObjectsKey = targetType === 'hex' ? 'customHexObjects' : 'customGridObjects';
         const targetCategoriesKey: CustomCategoriesKey = targetType === 'hex' ? 'customHexCategories' : 'customGridCategories';
 
-        if (!this.plugin.settings[targetObjectsKey]) {
-          this.plugin.settings[targetObjectsKey] = [];
-        }
+        this.plugin.settings[targetObjectsKey] ??= [];
 
         // Generate new unique ID
         const newId = 'custom-' + Date.now() + '-' + Math.random().toString(36).slice(2, 11);
@@ -572,9 +566,7 @@ export const TabRenderObjectsMethods = {
           const sourceCategories = this.plugin.settings[sourceCategoriesKey] ?? [];
           const sourceCat = sourceCategories.find((c: CustomCategory) => c.id === obj.category);
           if (sourceCat) {
-            if (!this.plugin.settings[targetCategoriesKey]) {
-              this.plugin.settings[targetCategoriesKey] = [];
-            }
+            this.plugin.settings[targetCategoriesKey] ??= [];
             this.plugin.settings[targetCategoriesKey].push({ ...sourceCat });
           }
         }

@@ -178,9 +178,7 @@ class ImportModal extends Modal {
 
       // Import overrides
       if (data.objectOverrides != null) {
-        if (!this.plugin.settings[overridesKey]) {
-          this.plugin.settings[overridesKey] = {};
-        }
+        this.plugin.settings[overridesKey] ??= {};
         Object.assign(
           this.plugin.settings[overridesKey] as Record<string, ObjectOverride>,
           data.objectOverrides
@@ -189,9 +187,7 @@ class ImportModal extends Modal {
 
       // Import custom objects (avoid duplicates by ID)
       if (data.customObjects != null) {
-        if (!this.plugin.settings[customObjectsKey]) {
-          this.plugin.settings[customObjectsKey] = [];
-        }
+        this.plugin.settings[customObjectsKey] ??= [];
         const customObjects = this.plugin.settings[customObjectsKey] as CustomObject[];
         for (const obj of data.customObjects as CustomObject[]) {
           const existingIdx = customObjects.findIndex((o: CustomObject) => o.id === obj.id);
@@ -205,9 +201,7 @@ class ImportModal extends Modal {
 
       // Import custom categories (avoid duplicates by ID)
       if (data.customCategories != null) {
-        if (!this.plugin.settings[categoriesKey]) {
-          this.plugin.settings[categoriesKey] = [];
-        }
+        this.plugin.settings[categoriesKey] ??= [];
         const customCategories = this.plugin.settings[categoriesKey] as CustomCategory[];
         for (const cat of data.customCategories as CustomCategory[]) {
           const existingIdx = customCategories.findIndex((c: CustomCategory) => c.id === cat.id);
