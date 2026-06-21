@@ -189,8 +189,9 @@ function useObjectDragSelect(
     }
 
     return false;
-  }, [currentTool, selectedObjectType, selectedItem, isResizeMode, mapData, geometry,
-    getObjectAtPosition, setSelectedItem, setIsDraggingSelection, setDragStart, screenToWorld, getClickedCorner, beginResize
+  }, [currentTool, selectedItem, isResizeMode, mapData, geometry,
+    getObjectAtPosition, setSelectedItem, setIsDraggingSelection, setDragStart, screenToWorld, getClickedCorner, beginResize,
+    setEdgeSnapMode, setIsResizeMode
   ]);
 
   const handleObjectDragging = useCallback((e: PointerEvent | MouseEvent | TouchEvent): boolean => {
@@ -412,7 +413,7 @@ function useObjectDragSelect(
     }
     return true;
   }, [isDraggingSelection, selectedItem, dragStart, mapData, edgeSnapMode, geometry,
-    getClientCoords, screenToGrid, screenToWorld, updateObject, onObjectsChange, setDragStart, setSelectedItem, getObjectAtPosition]);
+    getClientCoords, screenToGrid, screenToWorld, updateObject, onObjectsChange, setDragStart, setSelectedItem, getObjectAtPosition, altKeyPressedRef, shiftKeyPressedRef]);
 
   const stopObjectDragging = useCallback((): boolean => {
     if (mapData == null || geometry == null) return false;

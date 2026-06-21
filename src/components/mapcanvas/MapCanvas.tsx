@@ -379,7 +379,7 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [isFocused, mapData?.mapType]);
+  }, [isFocused, mapData?.mapType, setShowCoordinates]);
 
   // Determine cursor class based on current tool and interaction state
   const getCursorClass = (): string => {

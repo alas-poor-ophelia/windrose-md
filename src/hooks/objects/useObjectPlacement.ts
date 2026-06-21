@@ -105,7 +105,7 @@ function useObjectPlacement(
       onObjectsChange(result.objects);
     }
     return true;
-  }, [currentTool, selectedObjectType, mapData, geometry, edgeSnapMode, onObjectsChange, screenToWorld]);
+  }, [currentTool, selectedObjectType, mapData, geometry, edgeSnapMode, onObjectsChange, screenToWorld, altKeyPressedRef, freeformPlacementModeRef, shiftKeyPressedRef]);
 
   return { handleObjectPlacement };
 }
