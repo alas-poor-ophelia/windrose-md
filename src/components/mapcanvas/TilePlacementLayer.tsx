@@ -198,7 +198,7 @@ const TilePlacementLayer = ({
       const isBatchedStroke = strokeInitialTilesRef.current !== null;
       onTilesChange(currentTiles, isBatchedStroke);
     }
-  }, [mapData, geometry, selectedTilesetId, selectedTileId, tileRotation, tileFlipH, tileLayer, tileFitMode, tileScale, brushSize, tileDepth, onTilesChange]);
+  }, [mapData, geometry, selectedTilesetId, selectedTileId, tileRotation, tileFlipH, tileLayer, tileFitMode, tileScale, brushSize, tileDepth, onTilesChange, app]);
 
   const eraseTilesInBrush = useCallback((col: number, row: number) => {
     if (!mapData) return;
@@ -332,7 +332,7 @@ const TilePlacementLayer = ({
     } else {
       eraseTilesInBrush(coords.x, coords.y);
     }
-  }, [isTileTool, geometry, screenToGrid, screenToWorld, hasTileSelected, stampMode, placeTilesInBrush, eraseTilesInBrush, placeStampAtWorld, floodFillAtCell]);
+  }, [isTileTool, geometry, screenToGrid, screenToWorld, hasTileSelected, stampMode, placeTilesInBrush, eraseTilesInBrush, placeStampAtWorld, floodFillAtCell, mapData]);
 
   const handlePointerMove = useCallback((e: PointerEvent) => {
     if (!isDraggingRef.current || !isTileTool || !geometry) return;

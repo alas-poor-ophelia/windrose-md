@@ -112,7 +112,7 @@ function useUILayout({
     }, 100);
 
     return () => window.clearTimeout(timer);
-  }, [mapData]);
+  }, [mapData, fullPane]);
 
   // Manage parent element classes for expand/collapse
   useEffect(() => {

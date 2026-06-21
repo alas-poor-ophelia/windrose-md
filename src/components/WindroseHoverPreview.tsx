@@ -164,7 +164,7 @@ function WindroseHoverPreview({ mapId, x, y, zoom: zoomProp, layerId, notePath }
       }
     })();
     return () => { cancelled = true; };
-  }, [mapId, x, y, zoom, layerId]);
+  }, [mapId, x, y, zoom, layerId, preview.width, preview.height]);
 
   const noteLabel = noteBasename(notePath);
   const headerMapName = mapName || mapId;

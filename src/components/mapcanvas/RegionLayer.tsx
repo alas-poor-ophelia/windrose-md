@@ -366,7 +366,7 @@ const RegionLayer = ({
 
     menu.showAtPosition({ x: contextMenu.screenX, y: contextMenu.screenY });
     dismissContextMenu();
-  }, [contextMenu, mapData?.regions]);
+  }, [contextMenu, mapData?.regions, app, deleteRegion, dismissContextMenu, startEditingRegion, updateRegion]);
 
   // ── Long-press touch support for context menu (500ms) ──────────────
   const longPressTimerRef = useRef<number | null>(null);

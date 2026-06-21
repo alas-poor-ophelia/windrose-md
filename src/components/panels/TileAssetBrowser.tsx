@@ -588,7 +588,7 @@ const TileAssetBrowser = memo(({
     return () => {
       if (typeof cancelIdleCallback === 'function') { cancelIdleCallback(id); } else { window.clearTimeout(id); }
     };
-  }, [tilesets, tileMetadata]);
+  }, [tilesets, tileMetadata, app]);
 
   // Eager detection scan: caches per-tile alpha coverage + opaque bounds + natural
   // dims (decoupled from thumbnails, which are lazy + LRU-evicted). Signals only —
@@ -640,7 +640,7 @@ const TileAssetBrowser = memo(({
       controller.abort();
       if (typeof cancelIdleCallback === 'function') { cancelIdleCallback(id); } else { window.clearTimeout(id); }
     };
-  }, [tilesets, tileMetadata]);
+  }, [tilesets, tileMetadata, app]);
 
   // Merge all tileset tiles into a single pool
   const allTiles = useMemo(() => {
@@ -942,7 +942,7 @@ const TileAssetBrowser = memo(({
     }
 
     if (paths.length > 0) requestThumbs(paths);
-  }, [active, tilesets, organize, compact, orgRows, fullRows, orgRange, fullRange, filteredTiles, requestThumbs]);
+  }, [active, tilesets, organize, compact, orgRows, fullRows, orgRange, fullRange, filteredTiles, requestThumbs, fullVirtualizer, orgVirtualizer]);
 
   // ---- Empty state: no tilesets ----
 

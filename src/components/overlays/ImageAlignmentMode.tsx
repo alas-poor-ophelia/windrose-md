@@ -52,7 +52,7 @@ function ImageAlignmentMode({ isActive, offsetX, offsetY, onOffsetChange, onAppl
       // Store initial offset for reset/cancel
       setInitialOffset({ x: offsetX, y: offsetY });
     }
-  }, [isActive]);
+  }, [isActive, offsetX, offsetY, panelPosition.x]);
   
   // Use refs to avoid stale closures in event handlers
   const isDraggingRef = useRef(false);

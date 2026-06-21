@@ -196,7 +196,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
       }
     } catch { /* settings plugin unavailable */ }
     setShowAdjacentSubMapsState(v);
-  }, []);
+  }, [app]);
   useEffect(() => {
     const handler = (): void => { setShowAdjacentSubMapsState(getSettings().showAdjacentSubMaps ?? false); };
     window.addEventListener('windrose-settings-changed', handler);
@@ -392,7 +392,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     if (!opened) {
       setCloningLayerId(layerId);
     }
-  }, [mapData, handleLayerClone]);
+  }, [mapData, handleLayerClone, app]);
 
   // Data change handlers (extracted to useDataHandlers hook)
   const {

@@ -659,7 +659,7 @@ const ObjectLayer = ({
       activeDocument.removeEventListener('mousedown', handleClickOutside);
       activeDocument.removeEventListener('touchstart', handleClickOutside);
     };
-  }, [showObjectColorPicker]);
+  }, [showObjectColorPicker, handleObjectColorSelect, onAddCustomColor, pendingObjectCustomColorRef]);
 
   // Context menu: hit-test for object, select it, show native menu
   useEffect(() => {
