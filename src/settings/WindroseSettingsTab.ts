@@ -78,6 +78,7 @@ class WindroseMDSettingsTab extends PluginSettingTab {
               new Notice('Windrose: Nothing new to import — all settings already present.', 5000);
             }
           }));
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- lastElementChild was just appended by the new Setting() chain above
       containerEl.prepend(containerEl.lastElementChild!);
     });
   }

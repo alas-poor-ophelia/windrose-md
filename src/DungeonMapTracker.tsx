@@ -687,6 +687,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 <button
                   className="windrose-tool-btn windrose-tool-palette-dock-btn interactive-child"
                   onClick={(e) => {
+                    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- button is rendered inside .windrose-tool-palette, so closest() always finds it
                     const rect = (e.currentTarget as HTMLElement).closest('.windrose-tool-palette')!.getBoundingClientRect();
                     toggleFloat('toolPalette', { x: rect.left, y: rect.top });
                   }}

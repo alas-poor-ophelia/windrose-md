@@ -209,6 +209,7 @@ class DungeondraftImportModal extends Modal {
 			});
 		}
 
+		// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- this.buffer is set before renderPreview is called (single call site at line 157)
 		const tags = parseDungeondraftTags(this.buffer!, archive);
 		if (tags != null) {
 			const tagCount = Object.keys(tags.tags).length;
@@ -413,6 +414,7 @@ class DungeondraftImportModal extends Modal {
 
 			this.plugin.settings.installedContentPacks ??= [];
 			const existingIdx = this.plugin.settings.installedContentPacks
+				// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- this.meta is guarded non-null by the early return at the start of handleImport
 				.findIndex((p: InstalledPack) => p.id === this.meta!.id);
 			if (existingIdx >= 0) {
 				this.plugin.settings.installedContentPacks[existingIdx] = installed;

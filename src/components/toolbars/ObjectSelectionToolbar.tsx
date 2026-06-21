@@ -118,6 +118,7 @@ const ObjectSelectionToolbar = ({
     : null;
 
   const screenPos = hasRequiredInputs && object != null && geometry != null
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- canvasRef.current non-null: hasRequiredInputs already gates on !!canvasRef?.current
     ? calculateObjectScreenPosition(object, canvasRef.current!, mapData, geometry, containerRef)
     : null;
 

@@ -433,6 +433,7 @@ function renderTiles(
         const resolved = resolveTileRender(t, metaStore[lookup.entry.vaultPath], lookup.tileset);
         if (resolved.renderMode === 'region') {
           const key = t.tilesetId + ':' + t.tileId;
+          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- regionByDepth is pre-seeded for every DEPTH_ORDER key including 'ground'
           const groups = regionByDepth.get(depth) ?? regionByDepth.get('ground')!;
           let grp = groups.get(key);
           if (grp == null) {
@@ -451,6 +452,7 @@ function renderTiles(
       }
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- depthBuckets is pre-seeded for every DEPTH_ORDER key including 'ground'
     const bucket = depthBuckets.get(depth) ?? depthBuckets.get('ground')!;
     if (t.freeform === true) bucket.freeform.push(t);
     else if (t.placement === 'overlay') bucket.overlay.push(t);
@@ -598,6 +600,7 @@ function renderTiles(
     if (regionGroups != null && regionGroups.size > 0) {
       renderRegionFills(ctx, regionGroups, geometry, viewState, getCachedImage, previousAlpha * opacity, canvasW, canvasH);
     }
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- d iterates DEPTH_ORDER, which was used to seed depthBuckets
     const bucket = depthBuckets.get(d)!;
     if (bucket.fill.length > 0) {
       for (const tile of sortTilesForRendering(bucket.fill, geometry.orientation)) drawCellTile(tile);

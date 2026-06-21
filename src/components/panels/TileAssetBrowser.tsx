@@ -773,6 +773,7 @@ const TileAssetBrowser = memo(({
       for (const t of ts.tiles) {
         const cat = t.category ?? 'Uncategorized';
         if (!catToTilesets.has(cat)) catToTilesets.set(cat, new Set());
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- key guaranteed by the has()+set() guard on the preceding line
         catToTilesets.get(cat)!.add(ts.id);
       }
     }
@@ -794,6 +795,7 @@ const TileAssetBrowser = memo(({
         if (ts) cat = `${ts.name} / ${cat}`;
       }
       if (!groups.has(cat)) groups.set(cat, []);
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- key guaranteed by the has()+set() guard on the preceding line
       groups.get(cat)!.push(tile);
     }
     return groups;

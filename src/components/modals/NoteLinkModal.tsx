@@ -11,7 +11,7 @@
 import { getNoteEntries, getFullPathFromDisplayName, getDisplayNameFromPath } from '../../persistence/noteOperations';
 import { getObjectType } from '../../objects/objectTypeResolver';
 import { Modal, Setting, AbstractInputSuggest } from 'obsidian';
-import type { App, SearchComponent } from 'obsidian';
+import type { App } from 'obsidian';
 import type { NoteIndexEntry } from '#types/objects/note.types';
 
 interface NoteLinkSuggestion extends NoteIndexEntry {
@@ -55,18 +55,15 @@ function openNativeNoteLinkModal(app: App, options: OpenNativeNoteLinkModalOptio
 
         const displayName = getDisplayNameFromPath(currentNotePath);
 
-        let searchComponent: SearchComponent | null = null;
         new Setting(contentEl)
           .setName('Note name')
           .addSearch(search => {
-            searchComponent = search;
+            this.inputEl = search.inputEl;
             search.setPlaceholder('Type to search notes...');
             if (displayName !== '') {
               search.setValue(displayName);
             }
           });
-
-        this.inputEl = searchComponent!.inputEl;
 
         this.inputEl.addEventListener('input', () => {
           selectedPath = null;
