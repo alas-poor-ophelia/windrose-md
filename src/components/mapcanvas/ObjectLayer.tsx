@@ -482,7 +482,7 @@ const ObjectLayer = ({
     });
     registerHandlers('object', proxy);
     return () => unregisterHandlers('object');
-  }, []);
+  }, [registerHandlers, unregisterHandlers]);
 
   const handleResizeButtonClick = (e: TargetedMouseEvent<HTMLElement>): void => {
     if (selectedItem?.type === 'object') {

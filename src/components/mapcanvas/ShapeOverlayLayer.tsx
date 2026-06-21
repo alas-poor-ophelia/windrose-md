@@ -79,7 +79,7 @@ const ShapeOverlayLayer = ({
     });
     registerHandlers('shapeOverlay', proxy);
     return () => unregisterHandlers('shapeOverlay');
-  }, []);
+  }, [registerHandlers, unregisterHandlers]);
 
   // ESC to cancel placement
   useEffect(() => {

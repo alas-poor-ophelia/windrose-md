@@ -270,7 +270,7 @@ const FreehandLayer = ({
     });
     registerHandlers('freehand', proxy);
     return () => unregisterHandlers('freehand');
-  }, []);
+  }, [registerHandlers, unregisterHandlers]);
 
   // No visual output — drawing happens on the overlay canvas
   return null;

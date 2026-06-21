@@ -107,7 +107,7 @@ const OutlineLayer = ({
     });
     registerHandlers('outline', proxy);
     return () => unregisterHandlers('outline');
-  }, []);
+  }, [registerHandlers, unregisterHandlers]);
 
   // ESC to cancel drawing, Delete/Backspace to delete selected
   useEffect(() => {

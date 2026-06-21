@@ -93,7 +93,7 @@ const RegionLayer = ({
     });
     registerHandlers('region', proxy);
     return () => unregisterHandlers('region');
-  }, []);
+  }, [registerHandlers, unregisterHandlers]);
 
   // Listen for edit-region events from sidebar panel
   useEffect(() => {

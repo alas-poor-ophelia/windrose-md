@@ -163,7 +163,7 @@ const DiagonalFillOverlay = ({ currentTool }: DiagonalFillOverlayProps): VNode |
     });
     registerHandlers('diagonalFill', proxy);
     return () => unregisterHandlers('diagonalFill');
-  }, []);
+  }, [registerHandlers, unregisterHandlers]);
 
   if (currentTool !== 'diagonalFill' || !fillStart || !geometry || !mapData || !mapData.viewState || !canvasRef?.current) {
     return null;

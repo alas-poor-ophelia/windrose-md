@@ -64,7 +64,7 @@ const AreaSelectLayer = ({ currentTool }: AreaSelectLayerProps): VNode | null =>
     });
     registerHandlers('areaSelect', proxy);
     return () => unregisterHandlers('areaSelect');
-  }, []);
+  }, [registerHandlers, unregisterHandlers]);
 
   useEffect(() => {
     if (currentTool !== 'areaSelect' && areaSelectStart) {

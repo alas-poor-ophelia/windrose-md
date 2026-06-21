@@ -130,7 +130,7 @@ function useImageAlignment({
     });
     registerHandlers('imageAlignment', proxy);
     return () => unregisterHandlers('imageAlignment');
-  }, [isAlignmentMode]);
+  }, [isAlignmentMode, registerHandlers, unregisterHandlers]);
 
   return {
     isDraggingImage

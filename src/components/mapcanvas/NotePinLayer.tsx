@@ -71,7 +71,7 @@ const NotePinLayer = ({
     });
     registerHandlers('notePin', proxy);
     return () => unregisterHandlers('notePin');
-  }, []);
+  }, [registerHandlers, unregisterHandlers]);
 
   useEffect(() => {
     if (!showNoteLinkModal || pendingNotePinId == null || pendingNotePinId === '' || !mapData) return;

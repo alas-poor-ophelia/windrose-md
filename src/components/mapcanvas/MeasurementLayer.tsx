@@ -69,7 +69,7 @@ const MeasurementLayer = ({
     });
     registerHandlers('measure', proxy);
     return () => unregisterHandlers('measure');
-  }, []);
+  }, [registerHandlers, unregisterHandlers]);
 
   if (currentTool !== 'measure' || !measureOrigin) {
     return null;

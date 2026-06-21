@@ -145,7 +145,7 @@ const TextLayer = ({
     });
     registerHandlers('text', proxy);
     return () => unregisterHandlers('text');
-  }, []);
+  }, [registerHandlers, unregisterHandlers]);
 
   if (showCoordinates || !layerVisibility.textLabels) {
     return null;

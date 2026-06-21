@@ -175,7 +175,7 @@ const DrawingLayer = ({
     });
     registerHandlers('drawing', proxy);
     return () => unregisterHandlers('drawing');
-  }, []);
+  }, [registerHandlers, unregisterHandlers]);
 
   useEffect(() => {
     if (onDrawingStateChange) {

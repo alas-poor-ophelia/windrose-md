@@ -79,7 +79,7 @@ const FogOfWarLayer = ({
     });
     registerHandlers('fogOfWar', proxy);
     return () => unregisterHandlers('fogOfWar');
-  }, [activeTool]);
+  }, [activeTool, registerHandlers, unregisterHandlers]);
 
   const renderPreviewOverlay = (): VNode | null => {
     if (!activeTool || !rectangleStart || !canvasRef.current || !containerRef?.current || !geometry) {

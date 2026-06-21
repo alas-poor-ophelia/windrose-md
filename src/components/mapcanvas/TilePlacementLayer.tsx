@@ -384,7 +384,7 @@ const TilePlacementLayer = ({
     });
     registerHandlers('tilePlacement', proxy);
     return () => unregisterHandlers('tilePlacement');
-  }, []);
+  }, [registerHandlers, unregisterHandlers]);
 
   return null;
 };
