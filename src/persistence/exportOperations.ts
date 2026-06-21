@@ -267,7 +267,6 @@ async function saveMapImageToVault(
 
     return { success: true, path: safeName };
   } catch (error) {
-    // eslint-disable-next-line no-console
     console.error('[exportOperations] Export failed:', error);
     return { success: false, error: (error as Error).message };
   }

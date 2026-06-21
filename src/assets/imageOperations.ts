@@ -165,7 +165,6 @@ async function preloadImage(app: App, vaultPath: string): Promise<HTMLImageEleme
       // Get file from vault
       const file = app.vault.getAbstractFileByPath(vaultPath);
       if (!(file instanceof TFile)) {
-        // eslint-disable-next-line no-console
         console.warn(`[imageOperations] Image file not found: ${vaultPath}`);
         loadingPromises.delete(vaultPath);
         return null;
@@ -197,7 +196,6 @@ async function preloadImage(app: App, vaultPath: string): Promise<HTMLImageEleme
           resolve();
         };
         img.onerror = () => {
-          // eslint-disable-next-line no-console
           console.error(`[imageOperations] Failed to load image: ${vaultPath}`);
           URL.revokeObjectURL(url);
           reject(new Error(`Failed to load image: ${vaultPath}`));
@@ -215,7 +213,6 @@ async function preloadImage(app: App, vaultPath: string): Promise<HTMLImageEleme
 
       return img;
     } catch (error) {
-      // eslint-disable-next-line no-console
       console.error('[imageOperations] Error loading image:', error);
       loadingPromises.delete(vaultPath);
       return null;

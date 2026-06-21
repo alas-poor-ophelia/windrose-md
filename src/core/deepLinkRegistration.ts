@@ -12,7 +12,6 @@ async function navigateToLink(plugin: Plugin, parsed: DeepLinkData, sourcePath: 
       const linkPath = parsed.notePath.replace(/\.md$/, '');
       await plugin.app.workspace.openLinkText(linkPath, '', false);
     } catch (err) {
-      // eslint-disable-next-line no-console
       console.error('[Windrose] Deep link: failed to open note', err);
       new Notice('Failed to open map note');
       return;
@@ -55,7 +54,6 @@ function registerProtocolHandler(plugin: Plugin): void {
       await plugin.app.workspace.openLinkText(linkPath, '', false);
       window.setTimeout(() => emitNavigationEvent(parsed), 100);
     } catch (err) {
-      // eslint-disable-next-line no-console
       console.error('[Windrose] Protocol handler failed:', err);
       new Notice('Failed to open map note');
     }
@@ -214,7 +212,6 @@ function registerEditorExtension(plugin: Plugin): void {
 
     plugin.registerEditorExtension([windroseEditorExt]);
   } catch (err) {
-    // eslint-disable-next-line no-console
     console.warn('[Windrose] Could not register CM6 extension:', err);
   }
 }

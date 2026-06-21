@@ -357,7 +357,6 @@ class HexGeometry extends BaseGeometry {
 
     if (!isFinite(width) || !isFinite(height) || !isFinite(zoom) ||
         !isFinite(offsetX) || !isFinite(offsetY) || zoom <= 0) {
-      // eslint-disable-next-line no-console
       console.warn('[HexGeometry.drawGrid] Invalid input values, skipping render');
       return;
     }
@@ -409,7 +408,6 @@ class HexGeometry extends BaseGeometry {
     // Safety check on iteration count
     const totalHexes = (maxCol - minCol + 1) * (maxRow - minRow + 1);
     if (totalHexes > 50000 || !isFinite(totalHexes)) {
-      // eslint-disable-next-line no-console
       console.warn(`[HexGeometry.drawGrid] Too many hexes to draw (${totalHexes}), aborting`);
       return;
     }

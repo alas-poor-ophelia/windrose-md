@@ -82,7 +82,6 @@ async function recordPerfTelemetry(app: App, durationMs = 60000): Promise<void> 
       const r = fn();
       if (r) restorers.push(r);
     } catch (e) {
-      // eslint-disable-next-line no-console
       console.warn(`[Windrose perf] could not instrument ${label}:`, e);
     }
   };
@@ -96,11 +95,11 @@ async function recordPerfTelemetry(app: App, durationMs = 60000): Promise<void> 
       clearRect: P.clearRect, createPattern: P.createPattern,
     };
     /* eslint-enable @typescript-eslint/unbound-method */
-    P.fillRect = function (this: CanvasRenderingContext2D, ...a) { c.fillRect++; return orig.fillRect.apply(this, a as Parameters<typeof orig.fillRect>); };
+    P.fillRect = function (this: CanvasRenderingContext2D, ...a) { c.fillRect++; return orig.fillRect.apply(this, a); };
     P.drawImage = function (this: CanvasRenderingContext2D, ...a) { c.drawImage++; return orig.drawImage.apply(this, a as Parameters<typeof orig.drawImage>); } as typeof P.drawImage;
-    P.getImageData = function (this: CanvasRenderingContext2D, ...a) { c.getImageData++; return orig.getImageData.apply(this, a as Parameters<typeof orig.getImageData>); };
-    P.clearRect = function (this: CanvasRenderingContext2D, ...a) { c.clearRect++; return orig.clearRect.apply(this, a as Parameters<typeof orig.clearRect>); };
-    P.createPattern = function (this: CanvasRenderingContext2D, ...a) { c.createPattern++; return orig.createPattern.apply(this, a as Parameters<typeof orig.createPattern>); };
+    P.getImageData = function (this: CanvasRenderingContext2D, ...a) { c.getImageData++; return orig.getImageData.apply(this, a); };
+    P.clearRect = function (this: CanvasRenderingContext2D, ...a) { c.clearRect++; return orig.clearRect.apply(this, a); };
+    P.createPattern = function (this: CanvasRenderingContext2D, ...a) { c.createPattern++; return orig.createPattern.apply(this, a); };
     return () => { Object.assign(P, orig); };
   });
 
@@ -108,7 +107,7 @@ async function recordPerfTelemetry(app: App, durationMs = 60000): Promise<void> 
     const CP = HTMLCanvasElement.prototype;
     // eslint-disable-next-line @typescript-eslint/unbound-method -- captured to rebind via .apply(this); call-site `this` is preserved
     const orig = CP.toDataURL;
-    CP.toDataURL = function (this: HTMLCanvasElement, ...a) { c.toDataURL++; return orig.apply(this, a as Parameters<typeof orig>); };
+    CP.toDataURL = function (this: HTMLCanvasElement, ...a) { c.toDataURL++; return orig.apply(this, a); };
     return () => { CP.toDataURL = orig; };
   });
 

@@ -147,7 +147,6 @@ function getRenderChar(objectType: ObjectTypeDefinition | null | undefined): Ren
       return { char: iconChar, isIcon: true };
     }
     // iconClass was set but invalid - fall through to symbol/fallback
-    // eslint-disable-next-line no-console
     console.warn(`[objectTypeResolver] Invalid iconClass: ${objectType.iconClass}`);
   }
 

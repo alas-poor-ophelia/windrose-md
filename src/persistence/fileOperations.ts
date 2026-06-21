@@ -197,7 +197,6 @@ async function loadMapData(app: App, mapId: string, mapName: string = '', mapTyp
 
     return createNewMap(mapName, mapType);
   } catch (error) {
-    // eslint-disable-next-line no-console
     console.error('[loadMapData] Failed to load map data, creating new map:', error);
     notifyCorruptedDataFile(dataPath);
     return createNewMap(mapName, mapType);
@@ -230,7 +229,6 @@ async function saveMapData(app: App, mapId: string, mapData: MapData): Promise<b
         try {
           allData = JSON.parse(content) as DataFile;
         } catch (parseError) {
-          // eslint-disable-next-line no-console
           console.error(
             '[saveMapData] Existing data file is unparseable. Refusing to overwrite to avoid data loss. ' +
             'Inspect or restore the file manually before saving again.',
@@ -255,7 +253,6 @@ async function saveMapData(app: App, mapId: string, mapData: MapData): Promise<b
       try {
         jsonString = JSON.stringify(allData);
       } catch (serializeError) {
-        // eslint-disable-next-line no-console
         console.error('[saveMapData] Serialization failed, save aborted:', serializeError);
         return false;
       }
@@ -268,7 +265,6 @@ async function saveMapData(app: App, mapId: string, mapData: MapData): Promise<b
 
       return true;
     } catch (error) {
-      // eslint-disable-next-line no-console
       console.error('Error saving map data:', error);
       return false;
     }

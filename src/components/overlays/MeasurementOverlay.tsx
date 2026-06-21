@@ -64,7 +64,6 @@ const MeasurementOverlay = ({
     flexContainer = flexContainer.parentElement;
     traversalCount++;
     if (traversalCount > 10) {
-      // eslint-disable-next-line no-console
       console.warn('[MeasurementOverlay] Could not find windrose-canvas-container after 10 levels');
       break;
     }

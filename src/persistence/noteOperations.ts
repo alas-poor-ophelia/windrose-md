@@ -46,7 +46,6 @@ async function buildNoteIndex(app: App): Promise<NoteIndexEntry[]> {
 
     return entries;
   } catch (error) {
-    // eslint-disable-next-line no-console
     console.error('[buildNoteIndex] Error indexing vault notes:', error);
     return [];
   }
@@ -95,7 +94,6 @@ function getDisplayNameFromPath(fullPath: string | null | undefined): string {
  */
 async function openNoteInNewTab(notePath: string | null | undefined): Promise<boolean> {
   if (notePath == null || notePath === '') {
-    // eslint-disable-next-line no-console
     console.warn('[openNoteInNewTab] No note path provided');
     return false;
   }
@@ -105,7 +103,6 @@ async function openNoteInNewTab(notePath: string | null | undefined): Promise<bo
     await app.workspace.openLinkText(notePath.replace(/\.md$/, ''), '', true);
     return true;
   } catch (error) {
-    // eslint-disable-next-line no-console
     console.error('[openNoteInNewTab] Error opening note:', error);
     return false;
   }
@@ -126,7 +123,6 @@ async function isValidNotePath(notePath: string | null | undefined): Promise<boo
     const file = app.vault.getAbstractFileByPath(notePath);
     return file !== null && file !== undefined;
   } catch (error) {
-    // eslint-disable-next-line no-console
     console.error('[isValidNotePath] Error validating path:', error);
     return false;
   }

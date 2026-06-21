@@ -61,7 +61,6 @@ async function saveTileMetadata(app: App, metadata: TileMetadataStore): Promise<
       await app.vault.create(METADATA_FILE, json);
     }
   } catch (e) {
-    // eslint-disable-next-line no-console
     console.error('[Windrose] Failed to save tile metadata:', e);
   }
 }

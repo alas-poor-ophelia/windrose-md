@@ -20,8 +20,24 @@
               "icon": "lucide-file",
               "title": "smoke-test-map"
             }
+          },
+          {
+            "id": "3bdf267e1961f161",
+            "type": "leaf",
+            "state": {
+              "type": "windrose-map-view",
+              "state": {
+                "mapId": "dungeon-test-map-001",
+                "mapName": "Dungeon Test Map",
+                "mapType": "grid",
+                "floatingPanels": {}
+              },
+              "icon": "compass",
+              "title": "Dungeon Test Map"
+            }
           }
-        ]
+        ],
+        "currentTab": 1
       }
     ],
     "direction": "vertical"
@@ -166,10 +182,12 @@
       "daily-notes:Open today's daily note": false,
       "templates:Insert template": false,
       "command-palette:Open command palette": false,
-      "bases:Create new base": false
+      "bases:Create new base": false,
+      "windrose-md:Open Windrose Map": false,
+      "carrel:Open Carrel": false
     }
   },
-  "active": "ed76bca9751474d7",
+  "active": "3bdf267e1961f161",
   "lastOpenFiles": [
     "_testing/smoke-test-hex.md",
     "_testing/smoke-test-map.md",

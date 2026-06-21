@@ -261,7 +261,6 @@ export const ObjectSetHelpers = {
       for (const fullPath of imagePaths) {
         const sourceFile = plugin.app.vault.getAbstractFileByPath(fullPath);
         if (!(sourceFile instanceof TFile)) {
-          // eslint-disable-next-line no-console
           console.warn('[Windrose] Export: image not found:', fullPath);
           continue;
         }
@@ -364,7 +363,6 @@ export const ObjectSetHelpers = {
           added++;
         }
       } catch (e) {
-        // eslint-disable-next-line no-console
         console.warn('[Windrose] Scan: failed to read', child.path, (e as Error).message);
       }
     }

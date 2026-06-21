@@ -207,7 +207,6 @@ function NativeModalPortal({
           setupModalInteract(this.modalEl, { draggable, resizable }, this.app).then(cleanup => {
             interactCleanupRef.current = cleanup;
           }).catch(err => {
-            // eslint-disable-next-line no-console
             console.warn('[Windrose] Failed to set up modal drag/resize:', err);
           });
         }

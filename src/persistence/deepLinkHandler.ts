@@ -100,7 +100,6 @@ function copyDeepLinkToClipboard(
   navigator.clipboard.writeText(markdown).then(() => {
     new Notice('Deep link copied to clipboard');
   }).catch((err: Error) => {
-    // eslint-disable-next-line no-console
     console.error('Failed to copy link:', err);
     new Notice('Failed to copy link');
   });

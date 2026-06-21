@@ -307,7 +307,6 @@ class DungeondraftImportModal extends Modal {
 					// A single bad path (MAX_PATH, locked file, sync conflict) must not
 					// abort the whole import and skip the metadata-write phase below.
 					failedCount++;
-					// eslint-disable-next-line no-console
 					console.error('[Windrose] Failed to extract', destPath, e);
 					const failPct = Math.round(((i + 1) / textures.length) * 100);
 					progressBar.value = failPct;

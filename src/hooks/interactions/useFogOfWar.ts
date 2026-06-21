@@ -115,7 +115,6 @@ function useFogOfWar({
     } else {
       // Unbounded maps: fog only painted cells
       if (activeLayer.cells == null || activeLayer.cells.length === 0) {
-        // eslint-disable-next-line no-console
         console.warn('[FoW] No painted cells to fog');
         return;
       }

@@ -39,7 +39,7 @@ export async function setup() {
         }
         console.log(`  Cleaned ${files.length} screenshots from previous run`);
       }
-    } catch (e) {
+    } catch {
       // Ignore errors
     }
   }
@@ -113,7 +113,7 @@ export async function teardown() {
         const fullPath = path.join(tempDir, dir);
         try {
           await fs.rm(fullPath, { recursive: true, force: true });
-        } catch (e) {
+        } catch {
           // Ignore errors for individual directories (may be in use)
         }
       }

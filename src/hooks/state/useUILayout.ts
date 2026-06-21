@@ -107,7 +107,6 @@ function useUILayout({
           }
         }
       } catch (error) {
-        // eslint-disable-next-line no-console
         console.warn('[DungeonMapTracker] Error reading expanded state:', error);
       }
     }, 100);

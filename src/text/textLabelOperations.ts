@@ -77,13 +77,11 @@ function addTextLabel(
   // Validate content
   const trimmed = content.trim();
   if (trimmed.length === 0) {
-    // eslint-disable-next-line no-console
     console.warn('Cannot add empty text label');
     return labels ?? [];
   }
 
   if (trimmed.length > MAX_CONTENT_LENGTH) {
-    // eslint-disable-next-line no-console
     console.warn(`Text label content exceeds ${MAX_CONTENT_LENGTH} character limit`);
     return labels ?? [];
   }

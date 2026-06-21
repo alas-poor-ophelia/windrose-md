@@ -66,7 +66,6 @@ function getObjectAtPosition(objects: MapObject[] | null | undefined, x: number,
 function addObject(objects: MapObject[], typeId: string, x: number, y: number, mapType: MapType = 'grid', objectSetId?: string | null): MapObject[] {
   const objectType = getObjectType(typeId, mapType, objectSetId);
   if (objectType.isUnknown === true) {
-    // eslint-disable-next-line no-console
     console.error(`Unknown object type: ${typeId}`);
     return objects;
   }
@@ -74,7 +73,6 @@ function addObject(objects: MapObject[], typeId: string, x: number, y: number, m
   // Check if object already exists at position
   const existing = getObjectAtPosition(objects, x, y);
   if (existing) {
-    // eslint-disable-next-line no-console
     console.warn(`Object already exists at position (${x}, ${y})`);
     return objects;
   }

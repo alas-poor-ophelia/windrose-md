@@ -303,7 +303,6 @@ function openNativeTextLabelEditor(app: App, options: OpenNativeTextLabelEditorO
     modal.open();
     return true;
   } catch (e) {
-    // eslint-disable-next-line no-console
     console.warn('[Windrose] Failed to open native TextLabelEditor:', (e as Error).message);
     return false;
   }

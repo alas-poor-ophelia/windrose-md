@@ -60,7 +60,6 @@ function PreferencesTab(): VNode {
         setExportError(result.error ?? 'Export failed. Please try again.');
       }
     } catch (error) {
-      // eslint-disable-next-line no-console
       console.error('[PreferencesTab] Export error:', error);
       setExportError((error as Error).message || 'Export failed. Please try again.');
     } finally {

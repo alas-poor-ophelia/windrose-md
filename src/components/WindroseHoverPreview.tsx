@@ -159,7 +159,6 @@ function WindroseHoverPreview({ mapId, x, y, zoom: zoomProp, layerId, notePath }
 
         setStatus('ready');
       } catch (err) {
-        // eslint-disable-next-line no-console
         console.error('[WindroseHoverPreview] render failed', err);
         if (!cancelled) setStatus('error');
       }
@@ -196,7 +195,6 @@ function renderHoverPreview(el: HTMLElement, params: WindroseHoverPreviewProps):
   try {
     render(<WindroseHoverPreview {...params} />, el);
   } catch (err) {
-    // eslint-disable-next-line no-console
     console.error('[WindroseHoverPreview] renderPreview failed', err);
   }
 }

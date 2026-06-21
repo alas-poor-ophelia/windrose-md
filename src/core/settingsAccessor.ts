@@ -147,7 +147,6 @@ function getSetting<K extends keyof PluginSettings>(key: K): PluginSettings[K] {
     const settings = getSettings();
     return settings[key];
   } catch (error) {
-    // eslint-disable-next-line no-console
     console.warn('[settingsAccessor] Error getting setting:', key, error);
     return FALLBACK_SETTINGS[key];
   }

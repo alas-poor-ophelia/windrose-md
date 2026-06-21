@@ -50,7 +50,6 @@ function useTilesetBuilder(
             newTilesets.push(tileset);
           }
         } catch (e) {
-          // eslint-disable-next-line no-console
           console.warn('[Windrose] Failed to scan tileset folder:', folder, e);
         }
       }

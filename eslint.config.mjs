@@ -114,7 +114,8 @@ export default [
 
       // Standard ESLint
       "no-unreachable": "error",
-      "no-console": "warn",
+      // Plugin diagnostics via console.debug/info/warn/error (all '[Windrose]'-prefixed) are intentional; only console.log is noise.
+      "no-console": ["warn", { allow: ["debug", "info", "warn", "error"] }],
       "eqeqeq": ["error", "always", { null: "ignore" }],
       "prefer-const": "error",
 

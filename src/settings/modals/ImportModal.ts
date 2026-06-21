@@ -1,6 +1,6 @@
 import type { App } from 'obsidian';
 import { Modal, Setting, Notice } from 'obsidian';
-import type { PluginSettings, CustomObject, CustomCategory, ObjectOverride } from '#types/settings/settings.types';
+import type { PluginSettings, CustomObject, CustomCategory } from '#types/settings/settings.types';
 
 interface WindrosePlugin {
   settings: PluginSettings;
@@ -180,7 +180,7 @@ class ImportModal extends Modal {
       if (data.objectOverrides != null) {
         this.plugin.settings[overridesKey] ??= {};
         Object.assign(
-          this.plugin.settings[overridesKey] as Record<string, ObjectOverride>,
+          this.plugin.settings[overridesKey],
           data.objectOverrides
         );
       }
@@ -188,7 +188,7 @@ class ImportModal extends Modal {
       // Import custom objects (avoid duplicates by ID)
       if (data.customObjects != null) {
         this.plugin.settings[customObjectsKey] ??= [];
-        const customObjects = this.plugin.settings[customObjectsKey] as CustomObject[];
+        const customObjects = this.plugin.settings[customObjectsKey];
         for (const obj of data.customObjects as CustomObject[]) {
           const existingIdx = customObjects.findIndex((o: CustomObject) => o.id === obj.id);
           if (existingIdx !== -1) {
@@ -202,7 +202,7 @@ class ImportModal extends Modal {
       // Import custom categories (avoid duplicates by ID)
       if (data.customCategories != null) {
         this.plugin.settings[categoriesKey] ??= [];
-        const customCategories = this.plugin.settings[categoriesKey] as CustomCategory[];
+        const customCategories = this.plugin.settings[categoriesKey];
         for (const cat of data.customCategories as CustomCategory[]) {
           const existingIdx = customCategories.findIndex((c: CustomCategory) => c.id === cat.id);
           if (existingIdx !== -1) {
