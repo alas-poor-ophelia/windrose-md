@@ -158,6 +158,7 @@ function useShapeOverlayTools(options: ShapeOverlayToolsOptions): UseShapeOverla
       setFirstClick(null);
       setCurrentWorldPos(null);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- cancelPlacement is a stable useCallback([]) declared later; forward reference, safe to omit
   }, [isShapeTool, getWorldCoords, mapData, firstClick, activeShape, selectedColor, selectedOpacity, computeShapeFromClicks, onShapeOverlaysChange]);
 
   const handlePointerMove = useCallback((e: PointerEvent) => {

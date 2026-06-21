@@ -41,6 +41,7 @@ const ObjectSidebar = ({ selectedObjectType, onObjectTypeSelect, onToolChange, i
     } catch {
       return [];
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-once read of plugin settings; app.plugins.plugins is a stable mutable registry object
   }, []);
 
   // Validate that objectSetId references an existing set; fall back to Default if stale

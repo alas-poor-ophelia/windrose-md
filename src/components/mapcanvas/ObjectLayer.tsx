@@ -713,6 +713,7 @@ const ObjectLayer = ({
 
     activeDocument.addEventListener('windrose:selection-context-menu', handler);
     return () => activeDocument.removeEventListener('windrose:selection-context-menu', handler);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- context-menu listener; several handlers are plain fns + measureMovement volatile; handlers captured at invocation time
   }, [mapData, geometry, screenToGrid, isResizeMode]);
 
   if (showCoordinates || !layerVisibility.objects) {

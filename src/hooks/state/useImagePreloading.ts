@@ -53,6 +53,7 @@ function useImagePreloading(
     } else {
       setFowImageReady(false);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- mapData?.settings is the correct granular dep; full mapData thrashes fog-image preloading every edit
   }, [app, mapData?.settings]);
 
   useEffect(() => {
@@ -66,6 +67,7 @@ function useImagePreloading(
         void preloadImage(app, objType.imagePath);
       }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- granular field deps are correct; full mapData thrashes object-image preloading every edit
   }, [app, mapData?.mapType, mapData?.objectSetId, settingsVersion]);
 
   useEffect(() => {

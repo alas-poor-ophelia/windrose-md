@@ -66,6 +66,7 @@ function NativeToggle({ value, onChange, disabled }: NativeToggleProps): h.JSX.E
       // Fallback will render
       return undefined;
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- builds native toggle once; value/disabled live-updated by sibling effects keyed on [value]/[disabled]
   }, []);
 
   // Update value without recreating
@@ -140,6 +141,7 @@ function NativeDropdown({ value, options, onChange, disabled }: NativeDropdownPr
       // Fallback will render
       return undefined;
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- builds native dropdown once; value/disabled via siblings; options set imperatively at creation
   }, []);
 
   useEffect(() => {
@@ -207,6 +209,7 @@ function NativeSlider({ value, min, max, step, onChange, disabled }: NativeSlide
       // Fallback will render
       return undefined;
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- builds native slider once; value/disabled via siblings; min/max/step fixed at setLimits()
   }, []);
 
   useEffect(() => {

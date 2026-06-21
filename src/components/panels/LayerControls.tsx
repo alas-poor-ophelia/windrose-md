@@ -240,6 +240,7 @@ const LayerControls = ({
         displayName: getLayerDisplayName(layer)
       }
     ]));
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- getLayerDisplayName/shouldShowPill are plain inner fns stable in behavior re: layers; adding invalidates this memo every render
   }, [layers]);
 
   const handleEdit = (layerId: string, e: TargetedMouseEvent<HTMLButtonElement>): void => {

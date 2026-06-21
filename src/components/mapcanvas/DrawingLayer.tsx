@@ -195,6 +195,7 @@ const DrawingLayer = ({
         }
       });
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- handlers are plain fns recreated each render; adding them fires this state-sync effect every render
   }, [isDrawing, rectangleStart, circleStart, edgeLineStart, shapeHoverPosition,
     touchConfirmPending, onDrawingStateChange, handleStopDrawing, cancelShapePreview]);
 

@@ -37,6 +37,7 @@ function usePreactVirtualizer(options: PreactVirtualizerOptions): Virtualizer<HT
 
   useEffect(() => {
     return instance._didMount();
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- _didMount() is a one-time lifecycle; instance is stable (same Virtualizer from ref)
   }, []);
 
   instance._willUpdate();

@@ -246,6 +246,7 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
       const gridSize = mapData.gridSize ?? DEFAULTS.gridSize;
       return new GridGeometry(gridSize);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional fine-grained deps: geometry rebuilds only on shape-param change, not every cell paint
   }, [mapData?.mapType, mapData?.gridSize, mapData?.hexSize, mapData?.orientation, mapData?.hexBounds]);
 
   // Use canvas interaction ONLY for coordinate utility functions
@@ -334,6 +335,7 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
       // After animation, do a proper redraw with correct dimensions
       renderCanvas(canvas, fogCanvas, mapData, geometry, selectedItem ?? undefined, { isResizeMode, theme, showCoordinates, layerVisibility, adjacentSubHexes, hiddenTileLayers });
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- supplemental resize-only redraw; useCanvasRenderer owns normal re-renders; adding mapData/geometry double-renders every edit
   }, [canvasDimensions.width, canvasDimensions.height, isAnimating, showCoordinates, layerVisibility, adjacentSubHexes]);
 
   // 'C' key handler for coordinate overlay (hex maps only)

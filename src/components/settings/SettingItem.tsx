@@ -68,6 +68,7 @@ function SettingItem({ name, description, vertical, children }: SettingItemProps
       // If Setting creation fails, fallback DOM is already visible
       return undefined;
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- builds native Setting once; name/description via siblings; vertical class applied at creation
   }, []);
 
   // Update name/description reactively

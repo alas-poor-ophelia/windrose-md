@@ -54,6 +54,7 @@ function useToolState(options: UseToolStateOptions = {}): UseToolStateResult {
     if (mapData.lastSelectedOpacity !== undefined) {
       setSelectedOpacity(mapData.lastSelectedOpacity);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- mapData?.lastSelectedOpacity is the correct granular dep; full mapData resets opacity continuously
   }, [mapData?.lastSelectedOpacity]);
 
   // Handler to update opacity and persist to mapData

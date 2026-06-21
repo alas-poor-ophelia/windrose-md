@@ -515,6 +515,7 @@ function InstalledFogPacks({ currentImage, onSelect, disabled }: {
     } catch {
       return [];
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-once content-pack read; app.plugins.plugins is a stable mutable registry object
   }, []);
 
   if (fogPacks.length === 0) return null;

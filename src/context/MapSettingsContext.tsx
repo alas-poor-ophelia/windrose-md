@@ -475,6 +475,7 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
         }
       });
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- modal init: runs once per open; depending on currentSettings/etc would reset in-progress user edits
   }, [isOpen]);
 
   // Close color picker on outside click
@@ -782,6 +783,7 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
     handlePreferenceToggle: handlers.handlePreferenceToggle,
     mapData, geometry,
     isInSubHex, subMapName
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- handlers is a plain object recreated each render; listing handlers.* invalidates this memo every render (structural fix: memoize handlers)
   }), [isOpen, state.activeTab, state.isLoading, state.distanceSettings, state.preferences, isInSubHex, subMapName]);
 
   const appearanceValue = useMemo((): AppearanceContextValue => ({
@@ -803,6 +805,7 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
     handleFogImageSearch: handlers.handleFogImageSearch,
     handleFogImageSelect: handlers.handleFogImageSelect,
     handleFogImageClear: handlers.handleFogImageClear,
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- handlers is a plain object recreated each render; listing handlers.* invalidates this memo every render
   }), [
     state.useGlobalSettings, state.overrides, state.activeColorPicker,
     state.objectSetId, state.fogImageDisplayName, state.fogImageSearchResults
@@ -844,6 +847,7 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
     MEASUREMENT_EDGE, MEASUREMENT_CORNER,
     calculateGridFromColumns, calculateGridFromMeasurement,
     measurementToHexSize, hexSizeToMeasurement, getFineTuneRange,
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- handlers is a plain object recreated each render; listing handlers.* invalidates this memo every render
   }), [
     state.backgroundImagePath, state.backgroundImageDisplayName,
     state.imageDimensions, state.imageSearchResults,

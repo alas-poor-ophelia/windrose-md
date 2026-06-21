@@ -167,6 +167,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
       }
       setMapListEntries(entries);
     });
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-once list seed; mapId/mapName/mapType are fallbacks not triggers; re-running thrashes vault I/O
   }, [fullPane, app]);
 
   const handleMapSelect = useCallback((entry: MapListEntry) => {
@@ -290,6 +291,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
       const gridSize = mapData.gridSize ?? DEFAULTS.gridSize;
       return new GridGeometry(gridSize);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional fine-grained deps: geometry rebuilds only on shape-param change, not every cell paint
   }, [mapData?.mapType, mapData?.gridSize, mapData?.hexSize, mapData?.orientation, mapData?.hexBounds]);
 
   // Fog of War state and handlers (extracted to useFogOfWar hook)
