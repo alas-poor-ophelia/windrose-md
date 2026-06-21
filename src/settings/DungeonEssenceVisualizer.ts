@@ -302,6 +302,7 @@ export class DungeonEssenceVisualizer {
   }
 
   generateNodes(count: number): void {
+    if (this.state == null) return;
     const nodes: DungeonNode[] = [];
     const padding = 30;
     const bottomPadding = 55; // Extra space at bottom for title overlay
@@ -340,17 +341,18 @@ export class DungeonEssenceVisualizer {
 
     if (nodes.length > 0) {
       nodes[0].opacity = 1;
-      this.state!.discoveredNodes.add(0);
-      this.state!.circledNode = nodes.length - 1;
+      this.state.discoveredNodes.add(0);
+      this.state.circledNode = nodes.length - 1;
     }
 
-    this.state!.nodes = nodes;
+    this.state.nodes = nodes;
   }
 
   buildMST(): void {
-    const nodes = this.state!.nodes;
+    if (this.state == null) return;
+    const nodes = this.state.nodes;
     if (nodes.length < 2) {
-      this.state!.connections = [];
+      this.state.connections = [];
       return;
     }
 
@@ -384,11 +386,12 @@ export class DungeonEssenceVisualizer {
       }
     }
 
-    this.state!.connections = connections;
+    this.state.connections = connections;
   }
 
   buildLoops(): void {
-    const { nodes, connections } = this.state!;
+    if (this.state == null) return;
+    const { nodes, connections } = this.state;
     const loops: LoopConnection[] = [];
     const existingPairs = new Set(
       connections.map(c => `${Math.min(c.from, c.to)}-${Math.max(c.from, c.to)}`)
@@ -403,7 +406,7 @@ export class DungeonEssenceVisualizer {
       }
     }
 
-    this.state!.loopConnections = loops;
+    this.state.loopConnections = loops;
   }
 
   // === Easing & Math ===
