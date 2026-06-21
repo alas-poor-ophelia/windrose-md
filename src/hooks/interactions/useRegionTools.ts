@@ -85,7 +85,6 @@ function useRegionTools(options: RegionToolsOptions): UseRegionToolsResult {
   const {
     currentTool,
     selectedColor,
-    selectedOpacity,
     mapData,
     geometry,
     screenToWorld,
@@ -439,7 +438,7 @@ function useRegionTools(options: RegionToolsOptions): UseRegionToolsResult {
     onRegionsChange([...updatedExisting, newRegion]);
     setPendingHexes([]);
     setBoundaryVertices([]);
-  }, [pendingHexes, mapData, selectedColor, selectedOpacity, onRegionsChange]);
+  }, [pendingHexes, mapData, selectedColor, onRegionsChange]);
 
   const cancelRegion = useCallback(() => {
     setPendingHexes([]);

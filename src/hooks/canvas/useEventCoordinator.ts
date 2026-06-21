@@ -587,7 +587,7 @@ const useEventCoordinator = ({
     if (layerVisibility.objects && objectHandlers?.handleHoverUpdate) {
       objectHandlers.handleHoverUpdate(e);
     }
-  }, [currentTool, isDraggingSelection, dragStart, selectedItem, isGroupDragging, handleGroupDrag, getHandlers, layerVisibility, isAlignmentMode, geometry, screenToWorld]);
+  }, [currentTool, isDraggingSelection, dragStart, selectedItem, handleGroupDrag, getHandlers, layerVisibility, isAlignmentMode, geometry, screenToWorld]);
 
   const handlePointerUp = useCallback((e: MouseEvent | TouchEvent): void => {
     const drawingHandlers = getHandlers('drawing');
@@ -712,7 +712,7 @@ const useEventCoordinator = ({
     if (fogHandlers?.handlePointerUp) {
       fogHandlers.handlePointerUp(e);
     }
-  }, [currentTool, recentMultiTouch, isDraggingSelection, dragStart, selectedItem, setSelectedItem, isGroupDragging, stopGroupDrag, getHandlers, isAlignmentMode]);
+  }, [currentTool, recentMultiTouch, isDraggingSelection, dragStart, selectedItem, setSelectedItem, stopGroupDrag, getHandlers, isAlignmentMode]);
 
   const handlePointerLeave = useCallback((_e: MouseEvent): void => {
     const drawingHandlers = getHandlers('drawing');
