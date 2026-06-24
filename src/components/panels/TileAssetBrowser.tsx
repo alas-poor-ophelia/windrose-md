@@ -381,6 +381,7 @@ const TileAssetBrowser = memo(({
   const [hoveredTile, setHoveredTile] = useState<TileEntry | null>(null);
   const [railSel, setRailSel] = useState<RailSelection>('all');
   const [activeTags, setActiveTags] = useState<Set<string>>(new Set());
+  const [packFilter, setPackFilter] = useState<Set<string>>(new Set());
   const [openCat, setOpenCat] = useState<string | null>(null);
   const previewRef = useRef<HTMLCanvasElement>(null);
   const browserRef = useRef<HTMLDivElement>(null);
@@ -401,6 +402,7 @@ const TileAssetBrowser = memo(({
   useEffect(() => {
     setRailSel('all');
     setActiveTags(new Set());
+    setPackFilter(new Set());
     setOpenCat(null);
   }, [tileDepth]);
 
@@ -518,6 +520,15 @@ const TileAssetBrowser = memo(({
       const next = new Set(prev);
       if (next.has(tag)) next.delete(tag);
       else next.add(tag);
+      return next;
+    });
+  };
+
+  const togglePack = (id: string): void => {
+    setPackFilter(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
   };
@@ -764,8 +775,23 @@ const TileAssetBrowser = memo(({
       });
     }
 
+    // Pack filter (OR within packs, AND with the other facets)
+    if (packFilter.size > 0) {
+      tiles = tiles.filter((t: TileEntry) => packFilter.has(tileToTilesetId.get(t.vaultPath) ?? 'unknown'));
+    }
+
     return tiles;
-  }, [allTiles, searchFilter, activeTags, tileMetadata]);
+  }, [allTiles, searchFilter, activeTags, packFilter, tileToTilesetId, tileMetadata]);
+
+  // Packs present in the current tile set, for the Pack filter facet (Phase 3).
+  const availablePacks = useMemo((): Array<{ id: string; name: string }> => {
+    const present = new Set<string>();
+    for (const tile of allTiles) {
+      const id = tileToTilesetId.get(tile.vaultPath);
+      if (id != null) present.add(id);
+    }
+    return tilesets.filter(ts => present.has(ts.id)).map(ts => ({ id: ts.id, name: ts.name }));
+  }, [allTiles, tileToTilesetId, tilesets]);
 
   // Cross-pack category merge (Phase 2): collapse messy import-time folders into
   // one canonical category, with cross-pack duplicates merged. Built over ALL tiles
@@ -1429,6 +1455,26 @@ const TileAssetBrowser = memo(({
               >
                 {t}
                 {activeTags.has(t) && (
+                  <span className="x"><Icon icon="lucide-x" size={10} /></span>
+                )}
+              </button>
+            ))}
+          </HScroll>
+        </div>
+      )}
+
+      {/* Pack chips — full mode only, when more than one pack is present */}
+      {!compact && availablePacks.length > 1 && (
+        <div className="windrose-tb-chips windrose-tb-packs">
+          <HScroll className="windrose-tb-chips-scroll">
+            {availablePacks.map(p => (
+              <button
+                key={p.id}
+                className={`windrose-tb-chip ${packFilter.has(p.id) ? 'active' : ''}`}
+                onClick={() => togglePack(p.id)}
+              >
+                {p.name}
+                {packFilter.has(p.id) && (
                   <span className="x"><Icon icon="lucide-x" size={10} /></span>
                 )}
               </button>
