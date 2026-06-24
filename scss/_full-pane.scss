@@ -17,6 +17,16 @@
   position: relative;
 }
 
+/* Full-pane: float the tool palette as a vertical bar over the canvas left edge.
+   Absolute removal from the column lets the canvas reclaim the height. */
+.windrose-full-pane .windrose-toolbar-anchor {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 12;
+}
+
 /* Compass: no expand button in full-pane, so remove the upward offset */
 .windrose-full-pane .windrose-compass-animated {
   transform: translateY(0);

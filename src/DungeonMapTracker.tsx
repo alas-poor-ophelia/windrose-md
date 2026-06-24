@@ -714,6 +714,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               onUpdateColorOpacity={handleUpdateColorOpacity}
               mapType={mapData.mapType}
               isFocused={isFocused}
+              vertical={fullPane}
               onColorBtnPopout={fullPane ? handleColorPickerPopout : undefined}
               dockButton={fullPane ? (
                 <button

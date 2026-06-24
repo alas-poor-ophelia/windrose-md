@@ -113,6 +113,8 @@ export interface ToolPaletteProps {
   onColorBtnPopout?: (position: { x: number; y: number }) => void;
   /** Dock/undock button rendered at the end of the toolbar */
   dockButton?: ComponentChildren;
+  /** Full-pane vertical layout: 54px left bar, color chip below a divider, right-opening flyouts */
+  vertical?: boolean;
 }
 
 const SubMenuFlyout = ({ subTools, currentSubTool, onSelect, onClose }: SubMenuFlyoutProps): VNode => {
@@ -364,7 +366,8 @@ const ToolPalette = ({
   mapType,
   isFocused = false,
   onColorBtnPopout,
-  dockButton
+  dockButton,
+  vertical = false
 }: ToolPaletteProps): VNode => {
   const colorBtnRef = useRef<HTMLButtonElement>(null);
   const pendingCustomColorRef = useRef<HexColor | null>(null);
@@ -490,8 +493,42 @@ const ToolPalette = ({
   }, [openSubMenu]);
 
 
+  const colorBlock = (
+    <div className="windrose-tool-btn-container">
+      <button
+        ref={colorBtnRef}
+        className={`windrose-tool-btn windrose-color-tool-btn interactive-child ${isColorPickerOpen ? 'windrose-tool-btn-active' : ''}`}
+        onClick={toggleColorPicker}
+        title="Choose color"
+        style={{
+          borderBottom: `4px solid ${selectedColor ?? DEFAULT_COLOR}`
+        }}
+      >
+        <Icon icon="lucide-palette" />
+      </button>
+
+      <ColorPicker
+        isOpen={isColorPickerOpen && !onColorBtnPopout}
+        selectedColor={selectedColor}
+        onColorSelect={onColorChange}
+        onClose={handleCloseColorPicker}
+        onReset={handleColorReset}
+        customColors={customColors}
+        paletteColorOpacityOverrides={paletteColorOpacityOverrides}
+        onAddCustomColor={onAddCustomColor}
+        onDeleteCustomColor={onDeleteCustomColor}
+        onUpdateColorOpacity={onUpdateColorOpacity}
+        position={null}
+        pendingCustomColorRef={pendingCustomColorRef}
+        title="Color"
+        opacity={selectedOpacity}
+        onOpacityChange={onOpacityChange}
+      />
+    </div>
+  );
+
   return (
-    <div className="windrose-tool-palette">
+    <div className={`windrose-tool-palette${vertical ? ' windrose-tool-palette-vertical' : ''}`}>
       <CornerBrackets classPrefix="windrose-tool-palette-bracket" variant="compact" filterId="palette-bracket" />
 
       {toolGroups.slice(0, 2).map(group => (
@@ -509,37 +546,8 @@ const ToolPalette = ({
         />
       ))}
 
-      <div className="windrose-tool-btn-container">
-        <button
-          ref={colorBtnRef}
-          className={`windrose-tool-btn windrose-color-tool-btn interactive-child ${isColorPickerOpen ? 'windrose-tool-btn-active' : ''}`}
-          onClick={toggleColorPicker}
-          title="Choose color"
-          style={{
-            borderBottom: `4px solid ${selectedColor ?? DEFAULT_COLOR}`
-          }}
-        >
-          <Icon icon="lucide-palette" />
-        </button>
-
-        <ColorPicker
-          isOpen={isColorPickerOpen && !onColorBtnPopout}
-          selectedColor={selectedColor}
-          onColorSelect={onColorChange}
-          onClose={handleCloseColorPicker}
-          onReset={handleColorReset}
-          customColors={customColors}
-          paletteColorOpacityOverrides={paletteColorOpacityOverrides}
-          onAddCustomColor={onAddCustomColor}
-          onDeleteCustomColor={onDeleteCustomColor}
-          onUpdateColorOpacity={onUpdateColorOpacity}
-          position={null}
-          pendingCustomColorRef={pendingCustomColorRef}
-          title="Color"
-          opacity={selectedOpacity}
-          onOpacityChange={onOpacityChange}
-        />
-      </div>
+      {/* Horizontal: color chip sits mid-row. Vertical: relocated below a divider (see foot). */}
+      {!vertical && colorBlock}
 
       {toolGroups.slice(2).map(group => {
         if (group.gridOnly === true && mapType === 'hex') return null;
@@ -570,6 +578,13 @@ const ToolPalette = ({
           <Icon icon={tool.icon} />
         </button>
       ))}
+
+      {vertical && (
+        <>
+          <div className="windrose-tool-palette-divider" />
+          {colorBlock}
+        </>
+      )}
 
       <div className="windrose-history-controls">
         <button
