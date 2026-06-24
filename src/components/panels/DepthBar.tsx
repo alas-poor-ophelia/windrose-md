@@ -1,26 +1,10 @@
 import type { VNode } from 'preact';
 import type { TileLayerRole } from '#types/tiles/tile.types';
+import type { RoleMeta as DepthMeta } from '../../assets/tileRoles';
 
 import { useState, useCallback } from 'preact/hooks';
 import { Icon } from '../shared/Icon';
-
-interface DepthMeta {
-  id: TileLayerRole;
-  label: string;
-  icon: string;
-  hint: string;
-}
-
-const DEPTHS: readonly DepthMeta[] = [
-  { id: 'ground',     label: 'Terrain',    icon: 'grid-2x-2x', hint: 'ground' },
-  { id: 'structure',  label: 'Structure',  icon: 'door-open',  hint: 'walls' },
-  { id: 'props',      label: 'Props',      icon: 'sofa',       hint: 'objects' },
-  { id: 'decoration', label: 'Decoration', icon: 'sparkles',   hint: 'top' },
-];
-
-function depthMeta(id: TileLayerRole): DepthMeta {
-  return DEPTHS.find(d => d.id === id) ?? DEPTHS[0];
-}
+import { ROLE_META as DEPTHS, roleMeta as depthMeta } from '../../assets/tileRoles';
 
 // ==========================================
 // EyeToggle

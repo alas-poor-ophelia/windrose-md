@@ -72,8 +72,10 @@ body {
   --windrose-transition: all 0.15s ease;
   --windrose-depth-ground: #c4a57b;
   --windrose-depth-structure: #7c93b8;
-  --windrose-depth-props: #c08a6a;
+  --windrose-depth-props: #a98bdb;
   --windrose-depth-decoration: #86b87c;
+  /* active role hue, overridden high in the tree from the active depth */
+  --windrose-role-tint: var(--windrose-depth-ground);
   --windrose-gold-bright: oklch(0.82 0.09 75);
   --windrose-gold-glow: oklch(0.74 0.07 75 / 0.35);
   --windrose-gold-contrast: oklch(0.15 0.02 75);
