@@ -7,17 +7,16 @@
 - Include AI attribution in commits (no "Co-Authored-By: Claude", "Generated with Claude Code", etc.)
 - **NEVER blame OneDrive for anything.** The vault path contains the folder name `OneDrive` (`C:\Users\whipl\OneDrive\...`), but **OneDrive sync is DISABLED at the system level** — it is off, it does not sync this vault, and it never will. The path string is a historical folder name, nothing more. Do not attribute file I/O slowness, lag, file locks, sync storms, or any other behavior to OneDrive. It is never the cause. (The user has corrected this dozens of times.)
 
-**Two-repo structure:**
-- **Source repo:** `C:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker`
-- **Dev harness:** `C:\Dev\windrose` (this directory)
-
-The `src/` directory is a symlink to the source repo. Edit files via `src/` but understand they live in the Obsidian vault.
+**Single-repo standalone structure:**
+- `src/` is a **real, tracked directory** in this repo (≈264 source files) — the actual plugin source. It is **NOT a symlink**; the source was migrated out of the Obsidian vault into the repo (single-repo unification).
+- Build here; `npm run deploy` copies `main.js`/`styles.css`/`manifest.json` into the vault plugin folder for live testing.
+- An old copy still exists at `C:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker` as a **preserved backup, pending deletion** — it is stale; do not read or edit it.
 
 ## Structure
 
 ```
 windrose/                     # Dev root (this directory)
-├── src/ → symlink            # Actual source (in Obsidian vault)
+├── src/                      # Plugin source (real tracked directory, ~264 files)
 ├── types/                    # TypeScript definitions (#types/*)
 ├── tests/
 │   ├── unit/                 # Unit tests (fast, no Obsidian)

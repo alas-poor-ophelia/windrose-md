@@ -40,8 +40,8 @@ export { MyComponent };
 - JSX configured for Preact (`jsxImportSource: "preact"`)
 - `tsconfig.check.json` for type checking (separate from build)
 
-### Development Environment (Symlinked Structure)
-The project uses an inverted setup to keep the Obsidian vault clean:
+### Development Environment (Single-Repo Standalone)
+`src/` is a real, tracked directory in this repo — the actual plugin source. Dependencies and tooling live at the dev root; the built plugin is deployed into the vault for testing:
 ```
 windrose/                        # Development root (OUTSIDE vault)
 ├── node_modules/                # Dependencies live here, not in vault
@@ -56,14 +56,13 @@ windrose/                        # Development root (OUTSIDE vault)
 ├── tests/
 │   ├── unit/                    # Vitest unit tests (~1200 tests)
 │   └── e2e/                     # Playwright E2E tests
-└── src/ ──► SYMLINK ──► vault/path/to/dungeon-map-tracker/
-                         └── (actual source files)
+└── src/                         # Plugin source — real tracked directory (~264 files)
 ```
 
 #### Why this structure:
-- Prevents node_modules bloat in Obsidian vault (sync, search, performance)
-- Tooling (TypeScript, ESLint, esbuild) runs from dev root with full Node.js access
-- Source files remain in vault for live testing in Obsidian
+- Source lives in the repo (version-controlled, single source of truth) — not in the vault
+- Dependencies/tooling (TypeScript, ESLint, esbuild) run from the dev root with full Node.js access
+- `npm run deploy` builds and copies the plugin into the vault for live testing in Obsidian
 - Types are referenced via `#types/*` path alias
 
 ## Architecture Patterns
