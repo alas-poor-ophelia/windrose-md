@@ -137,6 +137,39 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     handleOpacityChange
   } = useToolState({ mapData, updateMapData });
 
+  // Tile drawer pane: Tiles vs Objects (Objects sidebar folded into the drawer).
+  const [tilePane, setTilePane] = useState<'tiles' | 'objects'>('tiles');
+  // Selecting a pane couples to the active tool: Objects → addObject, Tiles → tilePaint.
+  // Forcing tilePaint on the Tiles tab avoids ping-pong with the coupling effect below.
+  const selectPane = useCallback((p: 'tiles' | 'objects'): void => {
+    setTilePane(p);
+    setCurrentTool(p === 'objects' ? 'addObject' : 'tilePaint');
+  }, [setCurrentTool]);
+  // Coupling: picking the Object tool elsewhere (e.g. an object grid) flips the drawer to Objects.
+  useEffect(() => {
+    if (currentTool === 'addObject') setTilePane('objects');
+  }, [currentTool]);
+  const renderPaneTabs = (): VNode => (
+    <div className="windrose-drawer-panetabs">
+      <button className={tilePane === 'tiles' ? 'on' : ''} onClick={() => selectPane('tiles')}>Tiles</button>
+      <button className={tilePane === 'objects' ? 'on' : ''} onClick={() => selectPane('objects')}>Objects</button>
+    </div>
+  );
+  const renderObjectsPane = (): VNode => (
+    <ObjectSidebar
+      selectedObjectType={selectedObjectType}
+      onObjectTypeSelect={setSelectedObjectType}
+      onToolChange={setCurrentTool}
+      isCollapsed={false}
+      onCollapseChange={() => {}}
+      mapType={mapData?.mapType ?? 'grid'}
+      objectSetId={mapData?.objectSetId}
+      onObjectSetChange={handleObjectSetChange}
+      isFreeformMode={freeformPlacementMode}
+      onFreeformToggle={() => setFreeformPlacementMode(prev => !prev)}
+    />
+  );
+
   // Panel/modal state (plugin installer, settings modal, layer edit)
   const {
     showSettingsModal, setShowSettingsModal,
@@ -409,7 +442,6 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     handleDeleteCustomColor,
     handleUpdateColorOpacity,
     handleViewStateChange,
-    handleSidebarCollapseChange,
     handleObjectSetChange,
     handleTextLabelSettingsChange,
     handleRegionsChange,
@@ -728,19 +760,6 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
           onMouseEnter={() => setIsFocused(true)}
           onMouseLeave={() => setIsFocused(false)}
         >
-          <ObjectSidebar
-            selectedObjectType={selectedObjectType}
-            onObjectTypeSelect={setSelectedObjectType}
-            onToolChange={setCurrentTool}
-            isCollapsed={mapData.sidebarCollapsed ?? false}
-            onCollapseChange={handleSidebarCollapseChange}
-            mapType={mapData.mapType ?? 'grid'}
-            objectSetId={mapData.objectSetId}
-            onObjectSetChange={handleObjectSetChange}
-            isFreeformMode={freeformPlacementMode}
-            onFreeformToggle={() => setFreeformPlacementMode(prev => !prev)}
-          />
-
           {/* Left side panels container — layers + regions stacked (not in full-pane, dock replaces) */}
           {!fullPane && (
             <div className={`windrose-left-panels ${mapData.sidebarCollapsed === true ? 'sidebar-closed' : 'sidebar-open'}`}>
@@ -980,6 +999,9 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               flyoutStarred={starredFlyoutTiles}
               onFlyoutSelect={handleFlyoutSelect}
             >
+              <div className="windrose-drawer-pane">
+              {renderPaneTabs()}
+              {tilePane === 'objects' ? renderObjectsPane() : (
               <TileAssetBrowser
                 tilesets={availableTilesets}
                 selectedTilesetId={selectedTilesetId}
@@ -1013,6 +1035,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 recentTiles={recentTiles}
                 onStarredChange={setStarredFlyoutTiles}
               />
+              )}
+              </div>
             </DrawerDock>
           )}
 
@@ -1209,6 +1233,9 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                   flyoutStarred={starredFlyoutTiles}
                   onFlyoutSelect={handleFlyoutSelect}
                 >
+                  <div className="windrose-drawer-pane">
+                  {renderPaneTabs()}
+                  {tilePane === 'objects' ? renderObjectsPane() : (
                   <TileAssetBrowser
                     tilesets={availableTilesets}
                     selectedTilesetId={selectedTilesetId}
@@ -1242,6 +1269,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                     recentTiles={recentTiles}
                     onStarredChange={setStarredFlyoutTiles}
                   />
+                  )}
+                  </div>
                 </DrawerDock>
               )}
               <div className="windrose-dock-right">
