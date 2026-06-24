@@ -37,6 +37,8 @@ import {
   getAllTags,
 } from '../../persistence/tileMetadata';
 import { predictDepthTier } from '../../assets/depthPredictor';
+import { clusterCategories } from '../../assets/categoryMerge';
+import type { FolderInput } from '../../assets/categoryMerge';
 import { predictSpan, DEFAULT_PIXELS_PER_CELL } from '../../assets/spanPredictor';
 import { runDetectionScan } from '../../assets/tileImageScan';
 
@@ -765,41 +767,57 @@ const TileAssetBrowser = memo(({
     return tiles;
   }, [allTiles, searchFilter, activeTags, tileMetadata]);
 
-  // Detect categories that appear in multiple tilesets (for disambiguation)
-  const ambiguousCategories = useMemo(() => {
-    if (tilesets.length <= 1) return new Set<string>();
-    const catToTilesets = new Map<string, Set<string>>();
-    for (const ts of tilesets) {
-      for (const t of ts.tiles) {
-        const cat = t.category ?? 'Uncategorized';
-        if (!catToTilesets.has(cat)) catToTilesets.set(cat, new Set());
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- key guaranteed by the has()+set() guard on the preceding line
-        catToTilesets.get(cat)!.add(ts.id);
+  // Cross-pack category merge (Phase 2): collapse messy import-time folders into
+  // one canonical category, with cross-pack duplicates merged. Built over ALL tiles
+  // so the category set stays stable regardless of search/tag filtering. Keyed by
+  // `${pack}|${rawCategory}` so the same folder name in different packs resolves
+  // independently. Replaces the old pack-name-prefix disambiguation.
+  const mergedCategories = useMemo(() => {
+    const seen = new Set<string>();
+    const folders: FolderInput[] = [];
+    for (const tile of allTiles) {
+      const raw = tile.category ?? 'Uncategorized';
+      const pack = tileToTilesetId.get(tile.vaultPath) ?? 'unknown';
+      const key = `${pack}|${raw}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        folders.push({ raw, pack });
       }
     }
-    const ambiguous = new Set<string>();
-    for (const [cat, tsIds] of catToTilesets) {
-      if (tsIds.size > 1) ambiguous.add(cat);
+    const lookup = new Map<string, string>();
+    // Per-canonical-label provenance for the merge banner (only where a merge happened).
+    const meta = new Map<string, { folders: number; packs: number }>();
+    for (const c of clusterCategories(folders)) {
+      for (const m of c.members) lookup.set(`${m.pack}|${m.raw}`, c.label);
+      if (c.merged) {
+        const packs = new Set(c.members.map(m => m.pack));
+        meta.set(c.label, { folders: c.members.length, packs: packs.size });
+      }
     }
-    return ambiguous;
-  }, [tilesets]);
+    return { lookup, meta };
+  }, [allTiles, tileToTilesetId]);
 
   const groupedTiles = useMemo(() => {
     const groups = new Map<string, TileEntry[]>();
     for (const tile of filteredTiles) {
-      let cat = tile.category ?? 'Uncategorized';
-      // Disambiguate categories shared across multiple tilesets
-      if (ambiguousCategories.has(cat)) {
-        const tsId = tileToTilesetId.get(tile.vaultPath);
-        const ts = tilesets.find(t => t.id === tsId);
-        if (ts) cat = `${ts.name} / ${cat}`;
+      const raw = tile.category ?? 'Uncategorized';
+      const pack = tileToTilesetId.get(tile.vaultPath) ?? 'unknown';
+      const cat = mergedCategories.lookup.get(`${pack}|${raw}`) ?? raw;
+      const bucket = groups.get(cat);
+      if (bucket === undefined) {
+        groups.set(cat, [tile]);
+      } else {
+        bucket.push(tile);
       }
-      if (!groups.has(cat)) groups.set(cat, []);
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- key guaranteed by the has()+set() guard on the preceding line
-      groups.get(cat)!.push(tile);
     }
     return groups;
-  }, [filteredTiles, ambiguousCategories, tileToTilesetId, tilesets]);
+  }, [filteredTiles, mergedCategories, tileToTilesetId]);
+
+  // Merge banner (Option B): provenance for the currently-open single category.
+  const openCategoryMerge = useMemo(() => {
+    if (railSel === 'all' || railSel === 'recent' || railSel === 'starred') return null;
+    return mergedCategories.meta.get(railSel) ?? null;
+  }, [railSel, mergedCategories]);
 
   // Resolve which groups to show based on rail selection
   const shownGroups = useMemo((): Array<[string, TileEntry[]]> => {
@@ -1420,6 +1438,21 @@ const TileAssetBrowser = memo(({
       )}
 
       {/* Body: rail + grid */}
+      {!compact && openCategoryMerge != null && (
+        <div className="windrose-tb-merge-banner">
+          <span className="windrose-tb-merge-text">
+            Merged from {openCategoryMerge.folders} folders
+            {openCategoryMerge.packs > 1 && <> across {openCategoryMerge.packs} packs</>}
+          </span>
+          <button
+            type="button"
+            className="windrose-tb-merge-adjust"
+            onClick={() => setOrganize(true)}
+          >
+            Adjust
+          </button>
+        </div>
+      )}
       <div className="windrose-tb-body">
         {showRail && !compact && (
           <div className="windrose-tb-rail">

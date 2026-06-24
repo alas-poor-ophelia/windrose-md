@@ -1429,6 +1429,40 @@ button.windrose-object-grid-item:hover,
 }
 
 /* ---- Body (rail + grid) ---- */
+/* ---- Merge banner (Option B): provenance for an opened merged category ---- */
+.windrose-tb-merge-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 10px 0;
+  padding: 5px 9px;
+  font-size: 11px;
+  color: var(--windrose-text-secondary);
+  background: color-mix(in oklch, var(--windrose-border-primary) 10%, transparent);
+  border: 1px solid color-mix(in oklch, var(--windrose-border-primary) 30%, transparent);
+  border-radius: var(--windrose-tile-panel-radius, 8px);
+}
+
+.windrose-tb-merge-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.windrose-tb-merge-adjust {
+  height: auto;
+  padding: 2px 8px;
+  font-size: 10.5px;
+  color: var(--windrose-gold-bright);
+  background: transparent;
+  border: 1px solid color-mix(in oklch, var(--windrose-border-primary) 40%, transparent);
+  border-radius: 5px;
+  cursor: pointer;
+  box-shadow: none;
+}
+.windrose-tb-merge-adjust:hover {
+  background: color-mix(in oklch, var(--windrose-border-primary) 14%, transparent);
+}
+
 .windrose-tb-body {
   display: flex;
   flex: 1;
