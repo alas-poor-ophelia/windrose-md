@@ -13,7 +13,7 @@ import { DEFAULTS, SCHEMA_VERSION } from '../core/dmtConstants';
 import { getDataFilePath } from '../core/settingsAccessor';
 import { offsetToAxial } from '../geometry/core/offsetCoordinates';
 import { getSettings } from '../core/settingsAccessor';
-import { migrateToLayerSchema, needsMigration, generateLayerId } from './layerAccessor';
+import { migrateToLayerSchema, needsMigration, generateLayerId, ensureBoards, DEFAULT_BOARD_ID } from './layerAccessor';
 import { calculateFitZoom } from '../geometry/core/hexMeasurements';
 
 // Serializes saveMapData calls so concurrent writes can't race or interleave.
@@ -155,6 +155,10 @@ function migrateMapData(mapData: MapData): MapData {
     }
   }
 
+  // Board (floor) projection: ensure every layer has a boardId, the boards registry
+  // exists, and activeBoardId is valid. Idempotent — safe on already-migrated maps.
+  ensureBoards(mapData);
+
   // Sub-hex migration
   if (mapData.subHexMaps) {
     for (const hexKey of Object.keys(mapData.subHexMaps)) {
@@ -168,6 +172,9 @@ function migrateMapData(mapData: MapData): MapData {
         subHex.mapData.regions ??= [];
         subHex.mapData.outlines ??= [];
         subHex.mapData.shapeOverlays ??= [];
+        // Sub-hex maps get their own implicit board too (Parallax: don't leave
+        // sub-hex layers boardless or board filters would drop them).
+        ensureBoards(subHex.mapData);
       }
     }
   }
@@ -286,6 +293,7 @@ function createNewMap(mapName: string = '', mapType: MapType = 'grid'): MapData 
     objects: [],
     textLabels: [],
     fogOfWar: null,
+    boardId: DEFAULT_BOARD_ID,
   };
 
   // Base map structure with layer schema (v2)
@@ -314,6 +322,10 @@ function createNewMap(mapName: string = '', mapType: MapType = 'grid'): MapData 
     activeLayerId: initialLayerId,
     layerPanelVisible: false,
     layers: [initialLayer],
+
+    // Board (floor) system — one implicit default board
+    boards: [{ id: DEFAULT_BOARD_ID, name: 'Ground Floor', order: 0 }],
+    activeBoardId: DEFAULT_BOARD_ID,
 
     // Will be set below based on mapType
     gridSize: DEFAULTS.gridSize,

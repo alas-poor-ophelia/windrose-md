@@ -10,6 +10,8 @@ import type {
   MapData,
   MapLayer,
   LayerId,
+  Board,
+  BoardId,
   LayerUpdate,
   LegacyMapData,
   FoggedCell,
@@ -19,7 +21,20 @@ import type {
 } from '#types/core/map.types';
 import type { MapObject } from '#types/objects/object.types';
 
+import { DEFAULT_TILE_LAYERS } from '#types/tiles/tile.types';
 import { SCHEMA_VERSION } from '../core/dmtConstants';
+
+// ============================================================================
+// BOARD (FLOOR) CONSTANTS
+// ============================================================================
+
+/** Stable id for the implicit board every migrated/legacy map gets. */
+const DEFAULT_BOARD_ID = 'board-default';
+
+/** Generate a unique id for a board. */
+function generateBoardId(): BoardId {
+  return 'board-' + Date.now() + '-' + Math.random().toString(36).slice(2, 11);
+}
 
 
 // ============================================================================
@@ -56,8 +71,11 @@ function getActiveLayer(mapData: MapData | null | undefined): MapLayer {
       fogOfWar: null
     };
   }
-  const layer = mapData.layers.find(l => l.id === mapData.activeLayerId) ?? mapData.layers[0];
-  return layer;
+  const layer = mapData.layers.find(l => l.id === mapData.activeLayerId);
+  if (layer) return layer;
+  // M2: board-scoped fallback — never cross boards into a foreign layers[0].
+  const boardLayers = getActiveBoardLayers(mapData);
+  return boardLayers[0] ?? mapData.layers[0];
 }
 
 /**
@@ -93,8 +111,8 @@ function getLayerBelow(mapData: MapData | null | undefined, layerId: LayerId): M
   const layer = getLayerById(mapData, layerId);
   if (!layer) return null;
 
-  // Find the layer with the highest order that is still less than this layer's order
-  const sortedLayers = getLayersOrdered(mapData);
+  // C3: only consider layers on the SAME board — the ghost must respect board bounds.
+  const sortedLayers = getBoardLayers(mapData, layerBoardId(layer));
   let layerBelow: MapLayer | null = null;
 
   for (const candidate of sortedLayers) {
@@ -107,6 +125,174 @@ function getLayerBelow(mapData: MapData | null | undefined, layerId: LayerId): M
   }
 
   return layerBelow;
+}
+
+// ============================================================================
+// BOARD (FLOOR) ACCESS & PROJECTION
+// ============================================================================
+
+/** The board id a layer belongs to (default board when unset). */
+function layerBoardId(layer: MapLayer | null | undefined): BoardId {
+  return (layer?.boardId != null && layer.boardId !== '') ? layer.boardId : DEFAULT_BOARD_ID;
+}
+
+/** All boards sorted by order (ascending). */
+function getBoardsOrdered(mapData: MapData | null | undefined): Board[] {
+  if (!mapData?.boards) return [];
+  return [...mapData.boards].sort((a, b) => a.order - b.order);
+}
+
+/** The active board id, with safe fallbacks for un-migrated/partial data. */
+function getActiveBoardId(mapData: MapData | null | undefined): BoardId {
+  if (!mapData) return DEFAULT_BOARD_ID;
+  if (mapData.activeBoardId != null && mapData.activeBoardId !== '') return mapData.activeBoardId;
+  const active = mapData.layers?.find(l => l.id === mapData.activeLayerId);
+  if (active != null) return layerBoardId(active);
+  const first = getBoardsOrdered(mapData)[0];
+  return first?.id ?? DEFAULT_BOARD_ID;
+}
+
+/** Layers belonging to a board, sorted by order (ascending). */
+function getBoardLayers(mapData: MapData | null | undefined, boardId: BoardId): MapLayer[] {
+  if (!mapData?.layers) return [];
+  return mapData.layers.filter(l => layerBoardId(l) === boardId).sort((a, b) => a.order - b.order);
+}
+
+/** Layers belonging to the active board, sorted by order (ascending). */
+function getActiveBoardLayers(mapData: MapData | null | undefined): MapLayer[] {
+  return getBoardLayers(mapData, getActiveBoardId(mapData));
+}
+
+/**
+ * Idempotently ensure board structure exists: every layer has a boardId, the
+ * `boards` registry covers all referenced boards, and activeBoardId is valid and
+ * matches the active layer's board (M2 invariant). Mutates in place to match the
+ * load-path migration idiom, and returns mapData.
+ */
+function ensureBoards(mapData: MapData): MapData {
+  const layers = mapData.layers;
+  if (!Array.isArray(layers) || layers.length === 0) return mapData;
+
+  // 1. Stamp a default board id on any layer missing one.
+  for (const layer of layers) {
+    if (layer.boardId == null || layer.boardId === '') layer.boardId = DEFAULT_BOARD_ID;
+  }
+
+  // 2. Ensure the boards registry covers every referenced board id.
+  const referenced = new Set<BoardId>(layers.map(l => layerBoardId(l)));
+  const existing = Array.isArray(mapData.boards) ? mapData.boards : [];
+  const byId = new Map<BoardId, Board>(existing.map(b => [b.id, b]));
+  let nextOrder = existing.length;
+  for (const id of referenced) {
+    if (!byId.has(id)) {
+      byId.set(id, {
+        id,
+        name: id === DEFAULT_BOARD_ID ? 'Ground Floor' : 'Floor ' + (nextOrder + 1),
+        order: nextOrder,
+      });
+      nextOrder += 1;
+    }
+  }
+  // Drop orphan boards (no layers); always keep at least one.
+  let boards = [...byId.values()].filter(b => referenced.has(b.id)).sort((a, b) => a.order - b.order);
+  if (boards.length === 0) boards = [{ id: DEFAULT_BOARD_ID, name: 'Ground Floor', order: 0 }];
+  mapData.boards = boards;
+
+  // 3. Enforce activeBoardId validity + the active-layer-belongs-to-active-board invariant.
+  const isValid = (id: BoardId | undefined): boolean => id != null && id !== '' && boards.some(b => b.id === id);
+  const activeLayer = layers.find(l => l.id === mapData.activeLayerId);
+  if (activeLayer != null && isValid(layerBoardId(activeLayer))) {
+    mapData.activeBoardId = layerBoardId(activeLayer);
+  } else if (!isValid(mapData.activeBoardId)) {
+    mapData.activeBoardId = boards[0].id;
+  }
+  return mapData;
+}
+
+/**
+ * Add a new board (floor) seeded with the default tile-layer stack
+ * (one MapLayer per DEFAULT_TILE_LAYERS role) and switch to it.
+ */
+function addBoard(mapData: MapData, name: string | null = null): MapData {
+  const boards = getBoardsOrdered(mapData);
+  const boardId = generateBoardId();
+  const order = boards.length > 0 ? Math.max(...boards.map(b => b.order)) + 1 : 0;
+  const board: Board = { id: boardId, name: name ?? 'Floor ' + (order + 1), order };
+
+  // Seed the board's strata. Orders are board-local (0..3 per DEFAULT_TILE_LAYERS).
+  const newLayers: MapLayer[] = DEFAULT_TILE_LAYERS.map((def, i) => ({
+    id: generateLayerId() + '-' + i,
+    name: def.name,
+    order: def.order,
+    visible: true,
+    cells: [],
+    curves: [],
+    edges: [],
+    objects: [],
+    textLabels: [],
+    fogOfWar: null,
+    tiles: [],
+    tileRole: def.role,
+    boardId,
+  }));
+
+  return {
+    ...mapData,
+    boards: [...(mapData.boards ?? []), board],
+    layers: [...mapData.layers, ...newLayers],
+    activeLayerId: newLayers[0].id,
+    activeBoardId: boardId,
+  };
+}
+
+/**
+ * Remove a board (floor) and all its layers. Refuses to remove the last board
+ * or to leave the map with zero layers. Reassigns active board/layer if needed.
+ */
+function removeBoard(mapData: MapData, boardId: BoardId): MapData {
+  const boards = getBoardsOrdered(mapData);
+  if (boards.length <= 1) {
+    console.warn('Cannot remove the last board');
+    return mapData;
+  }
+  const remainingBoards = boards.filter(b => b.id !== boardId);
+  const remainingLayers = mapData.layers.filter(l => layerBoardId(l) !== boardId);
+  if (remainingLayers.length === 0) {
+    console.warn('Cannot remove board: would leave no layers');
+    return mapData;
+  }
+
+  let activeBoardId = mapData.activeBoardId;
+  let activeLayerId = mapData.activeLayerId;
+  const removedActiveBoard = getActiveBoardId(mapData) === boardId;
+  const removedActiveLayer = !remainingLayers.some(l => l.id === activeLayerId);
+  if (removedActiveBoard || removedActiveLayer) {
+    const target = remainingBoards[0];
+    activeBoardId = target.id;
+    const targetLayers = remainingLayers
+      .filter(l => layerBoardId(l) === target.id)
+      .sort((a, b) => a.order - b.order);
+    activeLayerId = targetLayers[0]?.id ?? remainingLayers[0].id;
+  }
+
+  return { ...mapData, boards: remainingBoards, layers: remainingLayers, activeBoardId, activeLayerId };
+}
+
+/**
+ * Switch the active board (floor). Single setter that keeps activeLayerId on the
+ * target board (M2 invariant): keeps the current layer if it's already on the
+ * board, else picks the board's top layer.
+ */
+function setActiveBoard(mapData: MapData, boardId: BoardId): MapData {
+  if (mapData.boards == null || !mapData.boards.some(b => b.id === boardId)) {
+    console.warn('Cannot set active board: board ' + boardId + ' not found');
+    return mapData;
+  }
+  const layers = getBoardLayers(mapData, boardId);
+  const keep = layers.some(l => l.id === mapData.activeLayerId);
+  const topLayer = layers[layers.length - 1];
+  const activeLayerId = keep ? mapData.activeLayerId : (topLayer?.id ?? mapData.activeLayerId);
+  return { ...mapData, activeBoardId: boardId, activeLayerId };
 }
 
 // ============================================================================
@@ -138,29 +324,32 @@ function updateActiveLayer(mapData: MapData, updates: LayerUpdate): MapData {
  */
 function setActiveLayer(mapData: MapData, layerId: LayerId): MapData {
   // Verify the layer exists
-  if (!getLayerById(mapData, layerId)) {
+  const target = getLayerById(mapData, layerId);
+  if (!target) {
     console.warn(`Cannot set active layer: layer ${layerId} not found`);
     return mapData;
   }
-  
-  return {
-    ...mapData,
-    activeLayerId: layerId
-  };
+
+  // M2: single setter — keep activeBoardId in sync with the active layer's board.
+  const updated: MapData = { ...mapData, activeLayerId: layerId };
+  if (mapData.boards != null) updated.activeBoardId = layerBoardId(target);
+  return updated;
 }
 
 /**
  * Add a new layer to the map
  */
 function addLayer(mapData: MapData, name: string | null = null): MapData {
-  // Calculate new order (one higher than current max)
-  const maxOrder = mapData.layers.length > 0
-    ? Math.max(...mapData.layers.map(l => l.order))
+  // M5: seed order from the ACTIVE BOARD's max, and stamp the active board id.
+  const boardId = getActiveBoardId(mapData);
+  const boardLayers = getBoardLayers(mapData, boardId);
+  const maxOrder = boardLayers.length > 0
+    ? Math.max(...boardLayers.map(l => l.order))
     : -1;
-  
+
   const newLayer: MapLayer = {
     id: generateLayerId(),
-    name: name ?? String(mapData.layers.length + 1),
+    name: name ?? String(boardLayers.length + 1),
     order: maxOrder + 1,
     visible: true,
     cells: [],
@@ -170,11 +359,12 @@ function addLayer(mapData: MapData, name: string | null = null): MapData {
     textLabels: [],
     fogOfWar: null
   };
-  
+  if (mapData.boards != null) newLayer.boardId = boardId;
+
   return {
     ...mapData,
     layers: [...mapData.layers, newLayer],
-    activeLayerId: newLayer.id  // Auto-switch to new layer
+    activeLayerId: newLayer.id  // Auto-switch to new layer (stays on active board)
   };
 }
 
@@ -182,27 +372,37 @@ function addLayer(mapData: MapData, name: string | null = null): MapData {
  * Remove a layer from the map (prevents removing last layer)
  */
 function removeLayer(mapData: MapData, layerId: LayerId): MapData {
-  // Prevent removing the last layer
-  if (mapData.layers.length <= 1) {
-    console.warn('Cannot remove last layer');
+  const target = getLayerById(mapData, layerId);
+  if (!target) return mapData;
+
+  // C1: guard on the last layer ON THIS BOARD, not the global count. Deleting a
+  // whole floor goes through removeBoard (which lifts this guard intentionally).
+  const boardId = layerBoardId(target);
+  const boardLayers = getBoardLayers(mapData, boardId);
+  if (boardLayers.length <= 1) {
+    console.warn('Cannot remove the last layer on its board');
     return mapData;
   }
-  
+
   const newLayers = mapData.layers.filter(l => l.id !== layerId);
-  const wasActive = mapData.activeLayerId === layerId;
-  
-  // If we removed the active layer, switch to the first remaining layer
-  // (sorted by order for consistency)
   let newActiveId = mapData.activeLayerId;
-  if (wasActive) {
-    const sortedRemaining = [...newLayers].sort((a, b) => a.order - b.order);
-    newActiveId = sortedRemaining[0].id;
+  let newActiveBoardId = mapData.activeBoardId;
+
+  // If we removed the active layer, switch to the first remaining layer ON THE SAME
+  // board (never cross boards). The board still has >= 1 layer per the guard above.
+  if (mapData.activeLayerId === layerId) {
+    const remainingOnBoard = newLayers
+      .filter(l => layerBoardId(l) === boardId)
+      .sort((a, b) => a.order - b.order);
+    newActiveId = remainingOnBoard[0].id;
+    newActiveBoardId = boardId;
   }
-  
+
   return {
     ...mapData,
     layers: newLayers,
-    activeLayerId: newActiveId
+    activeLayerId: newActiveId,
+    activeBoardId: newActiveBoardId
   };
 }
 
@@ -220,10 +420,12 @@ function cloneLayer(mapData: MapData, layerId: LayerId, mode: 'all' | 'mapOnly')
 
   const cloneId = generateLayerId();
   const cloneOrder = sourceLayer.order + 1;
+  const sourceBoardId = layerBoardId(sourceLayer);
 
-  // Shift layers above the source up by 1 to make room
+  // Shift layers above the source up by 1 to make room — ONLY within the source's
+  // board, so other boards' order values are never disturbed.
   const shiftedLayers = mapData.layers.map(layer =>
-    layer.order > sourceLayer.order
+    layerBoardId(layer) === sourceBoardId && layer.order > sourceLayer.order
       ? { ...layer, order: layer.order + 1 }
       : layer
   );
@@ -247,6 +449,10 @@ function cloneLayer(mapData: MapData, layerId: LayerId, mode: 'all' | 'mapOnly')
     tiles: deepCopy(sourceLayer.tiles ?? []),
   };
 
+  // Clone stays on the same board (and same stratum, if any).
+  if (sourceLayer.boardId != null) clonedLayer.boardId = sourceLayer.boardId;
+  if (sourceLayer.tileRole != null) clonedLayer.tileRole = sourceLayer.tileRole;
+
   if (mode === 'all') {
     if (sourceLayer.icon != null && sourceLayer.icon !== '') clonedLayer.icon = sourceLayer.icon;
     if (sourceLayer.showLayerBelow !== undefined) clonedLayer.showLayerBelow = sourceLayer.showLayerBelow;
@@ -264,32 +470,37 @@ function cloneLayer(mapData: MapData, layerId: LayerId, mode: 'all' | 'mapOnly')
  * Reorder layers by moving a layer to a new position
  */
 function reorderLayers(mapData: MapData, layerId: LayerId, newIndex: number): MapData {
-  // Get layers sorted by current order
-  const sortedLayers = getLayersOrdered(mapData);
-  const currentIndex = sortedLayers.findIndex(l => l.id === layerId);
-  
-  if (currentIndex === -1) {
+  const target = getLayerById(mapData, layerId);
+  if (!target) {
     console.warn(`Cannot reorder: layer ${layerId} not found`);
     return mapData;
   }
-  
-  // Clamp newIndex to valid range
-  const clampedIndex = Math.max(0, Math.min(newIndex, sortedLayers.length - 1));
-  
+
+  // C2: reorder WITHIN the layer's board only. Other boards keep their order values.
+  const boardId = layerBoardId(target);
+  const boardLayers = getBoardLayers(mapData, boardId); // sorted ascending by order
+  const slots = boardLayers.map(l => l.order);          // order values owned by this board
+  const currentIndex = boardLayers.findIndex(l => l.id === layerId);
+
+  // Clamp newIndex to the board's range
+  const clampedIndex = Math.max(0, Math.min(newIndex, boardLayers.length - 1));
   if (currentIndex === clampedIndex) {
     return mapData; // No change needed
   }
-  
-  // Remove layer from current position and insert at new position
-  const [movedLayer] = sortedLayers.splice(currentIndex, 1);
-  sortedLayers.splice(clampedIndex, 0, movedLayer);
-  
-  // Reassign order values based on new positions
-  const reorderedLayers = sortedLayers.map((layer, index) => ({
-    ...layer,
-    order: index
-  }));
-  
+
+  const arranged = [...boardLayers];
+  const [moved] = arranged.splice(currentIndex, 1);
+  arranged.splice(clampedIndex, 0, moved);
+
+  // Map each board layer onto this board's existing order slots in the new arrangement.
+  const orderById = new Map<LayerId, number>();
+  arranged.forEach((l, i) => orderById.set(l.id, slots[i]));
+
+  const reorderedLayers = mapData.layers.map(l => {
+    const o = orderById.get(l.id);
+    return o !== undefined ? { ...l, order: o } : l;
+  });
+
   return {
     ...mapData,
     layers: reorderedLayers
@@ -748,6 +959,9 @@ export {
   getActiveLayer, getLayersOrdered, getLayerById, getLayerIndex, getLayerBelow,
   updateLayer, updateActiveLayer, setActiveLayer, addLayer, cloneLayer, removeLayer, reorderLayers,
   migrateToLayerSchema, needsMigration,
+  // Board (floor) projection
+  DEFAULT_BOARD_ID, generateBoardId, layerBoardId, getBoardsOrdered, getActiveBoardId,
+  getBoardLayers, getActiveBoardLayers, ensureBoards, addBoard, removeBoard, setActiveBoard,
   initializeFogOfWar, isCellFogged, fogCell, revealCell,
   fogRectangle, revealRectangle, fogAll, fogPaintedCells, revealAll,
   toggleFogVisibility, setFogVisibility, hasFogData, getFogState

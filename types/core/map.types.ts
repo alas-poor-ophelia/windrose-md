@@ -226,6 +226,22 @@ export interface MapObjectRef {
 /** Layer identifier */
 export type LayerId = string;
 
+/** Board (floor) identifier */
+export type BoardId = string;
+
+/**
+ * A Board is a "floor" — an independent set of layers. Board → Stratum → Layer
+ * is a *projection* over the flat `MapData.layers` array via two grouping keys
+ * (`MapLayer.boardId` + `MapLayer.tileRole`); a Board is NOT a nested data entity.
+ * Only the active board's layers render.
+ */
+export interface Board {
+  id: BoardId;
+  name: string;
+  /** Display/switch order among boards (ascending). */
+  order: number;
+}
+
 /** Individual map layer */
 export interface MapLayer {
   id: LayerId;
@@ -248,6 +264,11 @@ export interface MapLayer {
   tiles?: TileAssignment[];
   /** Layer's role in the tile layer stack (grid tile maps only) */
   tileRole?: TileLayerRole;
+  /**
+   * The board (floor) this layer belongs to. Optional for back-compat; the load
+   * migration assigns every layer a default board. Stratum = (boardId, tileRole).
+   */
+  boardId?: BoardId;
 }
 
 // ===========================================
@@ -273,6 +294,11 @@ export interface MapData {
   activeLayerId: LayerId;
   layerPanelVisible: boolean;
   layers: MapLayer[];
+
+  // Board (floor) management — Board→Stratum→Layer projection over the flat layers[].
+  // Optional for back-compat; the load migration seeds a default board.
+  boards?: Board[];
+  activeBoardId?: BoardId;
 
   // View state (pan/zoom) - optional, defaults calculated based on map type
   viewState?: StoredViewState;
