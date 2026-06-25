@@ -354,6 +354,50 @@ visual fit inside the wider drawer. **Phase 8 unblocked:** left edge is now clea
 ---
 
 ## 8. Deferred / revisit (recorded during the build — easy to tweak later)
+- **Phase 4b/5 — ribbon geometry:** built as a HORIZONTAL strip under the panetabs, not the prototype's
+  46px vertical `.fd-subrib`. Function (form badge + gated subtools) is full-pane live-verified; the vertical
+  geometry is visual polish (fidelity rules exempt heavy header/text treatments). (Phase 4b)
+- **Phase 4b/5 — subtool behavior wiring DEFERRED:** ribbon subtool selection is display/arming state only.
+  The line/autotile/scatter placement renderers don't exist yet, so an armed subtool does NOT change placement
+  behavior. Wiring `scatter`→`stampMode` (the one available real behavior) was intentionally NOT done to avoid
+  dual-control conflict with the browser's own stamp toggle. (Phase 5)
+- **Phase 5 — classifier limits (confirmed by scout):** `scatter` has NO per-tile signal (it's a brush mode),
+  so `deriveTileForm` never returns it — it exists only in the matrix/ribbon. `autotile` requires
+  `tileset.autoTileConfig`, which is reserved/unused, so it's effectively inert today. Real signals are
+  `line` (ddSourceType walls/paths/portals), `region` (renderMode), `cell` (default). (Phase 5)
+- **Phase 4b — NOT done (remaining 4b polish):** Tiles/Objects buttons on the collapsed EdgeRibbon spine;
+  ObjectSidebar visual fit inside the wider drawer (its header "Hide" button is now a dead no-op since
+  onCollapseChange is a stub). Recent/Starred already exist as spine flyouts. (Phase 4b)
+- **Phase 5 — per-tile form badge in the GRID:** the badge currently shows only in the ribbon for the selected
+  tile. The design's D5 per-tile form badge on every grid thumbnail is not yet applied. (Phase 5)
+
+- **Phase 8 — block-mode live verification GAP (important):** EdgeRail compiles + passes the gate but was
+  NOT visually confirmed in-app. This vault renders maps ONLY via the legacy datacore path
+  (`datacorejsx` → `compiled-dungeon-map-tracker`); there are zero real `windrose-map` code-block notes, and a
+  synthetic one does not render in reading OR live-preview here (the standalone code-block processor produces no
+  output for it — an Obsidian post-processor quirk, independent of our code since the processor is unchanged).
+  The rail is block-only (`!fullPane`) and the full-pane view never shows it, so it can't be exercised via the
+  windrose-map-view either. Confidence rests on: clean tsc/eslint and reuse of the SAME DockLayerList/ColorPicker/
+  DockViewPanel already verified in the full-pane dock. **TODO:** verify once a real block map renders (e.g.
+  migrate a scratch note to a `windrose-map` block, or fix reading-mode render of fresh notes). (Phase 8)
+- **Phase 8 — Regions as a 4th rail icon (hex only):** deviation from the strict "Layers/Colors/View" — added
+  Regions to preserve the region-panel access that `windrose-left-panels` provided for hex maps. (Phase 8)
+- **Phase 8 — MapControls toggles repurposed:** the canvas MapControls Layers/Regions buttons now drive the
+  rail's controlled `openId` (retired the `showLayerPanel`/`showRegionPanel` UI state). Old `.windrose-left-panels`
+  SCSS rules left in place (dead, harmless) — cleanup optional. (Phase 8)
+
+- **Phase 6 — subtool flyout direction:** the plan said "today they open below"; the live `.windrose-subtool-menu`
+  already uses `left:100%; top:50%` (opens RIGHT). No change made — already matches the design. Minor: in the
+  vertical bar a rightward flyout could clip near the container's left padding; not observed, revisit if it does. (Phase 6)
+- **Phase 6 — color chip behavior:** full-pane keeps the existing popout-to-floating-ColorPicker (`onColorBtnPopout`);
+  the vertical slot just RELOCATES the button below a divider. Inline picker in the bar was not added (design didn't
+  mandate it). (Phase 6)
+- **Phase 6 — vertical bar positioning:** implemented by floating `.windrose-full-pane .windrose-toolbar-anchor`
+  `position:absolute; left:10px; top:50%` over the canvas (NOT a flex column in the layout — avoids a JSX row
+  restructure). Robust for 600px+ panes; on a very short canvas the ~684px tall bar could exceed canvas height.
+  Revisit with a flex-row wrapper if short-canvas clipping shows up. (Phase 6)
+
+
 - **Curated-pack marker** — no tileset is flagged "Core/curated", so merge label-seeding is first-wins.
   Designate a curated pack to get preferential canonical labels. (Phase 1/2)
 - **Role-scoped browsing** — the browser shows all tiles regardless of `tileDepth` (placement target only);
