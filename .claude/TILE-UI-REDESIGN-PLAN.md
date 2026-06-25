@@ -408,3 +408,31 @@ visual fit inside the wider drawer. **Phase 8 unblocked:** left edge is now clea
   multi-line name is a visual polish not yet applied. (Phase 2)
 - **Full-pane Filter drill-down screen** — quick tag/pack chips cover the common case; the power-user
   push/pop screen (type-to-find over large tag/pack lists, Done) is additive over the same filter state. (Phase 3)
+
+---
+
+## 9. NEXT SESSION — Phase 7 entry point (Board → Strata → Layer)
+
+**Status as of this session:** Phases 0–6 + 8 SHIPPED on `feature/tile-ui-redesign`
+(0–3 prior; 4a `49c6ed72`, 6 `20b69c20`, 8 `c467750a`, 4b+5 `f1584a7f`, plan `0eee5063`).
+Unit suite 1477/1477 green. Only Phase 7 + Phase 9 remain.
+
+**Why Phase 7 is its own session:** it is the heaviest + RCA-sensitive phase — schema fields +
+a persistence migration + render/history/export rewires behind 10 board-aware guards. A prior
+incident silently re-rendered 304 tiles. **Hard Rule #4 applies: run Parallax adversarial review
+FIRST, pass findings to Meridian, THEN implement the guards.**
+
+**Start-here checklist (all detail already in §4 Phase 7, §6 Q5, and the guards C1–C5/M1–M5):**
+1. Confirm branch contains `src/` (ground truth: `git ls-tree feature/tile-ui-redesign --name-only | grep '^src$'`).
+2. Re-confirm the guard line numbers against the REAL files (they drift): `src/persistence/layerAccessor.ts`,
+   `src/hooks/canvas/useCanvasRenderer.ts`, `src/hooks/state/useLayerHistory.ts`, `src/persistence/exportOperations.ts`.
+3. Parallax adversarial review of the flat-projection plan + the 10 guards BEFORE writing code.
+4. Schema: add `boardId` to `MapLayer`; `boards` registry + `activeBoardId` to `MapData`; migration in
+   `migrateToLayerSchema` assigns every existing layer a default board (Simple/non-tile maps get one implicit board).
+5. Implement guards C1–C5 + M1–M5 (each unit-tested) — do NOT skip; they corrupt/leak the moment a 2nd board exists.
+6. LayersDock projection (Board→Strata→Layer) + Simple↔Strata toggle + bidirectional hue threading.
+7. Decide M1 export semantics (active board vs all-boards composite) and DOCUMENT it.
+
+**Phase 9 (after 7):** Organize/Adjust stub wiring, reduced-motion (disable fan animation), persist view prefs,
+full `npm run test:unit` + `npm run test:e2e` regression. Also fold the EdgeRail's Layers flyout onto the new
+LayersDock once it lands, and re-verify the Phase 8 block rail once a real `windrose-map` block render is available.
