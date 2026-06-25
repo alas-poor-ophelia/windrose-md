@@ -127,6 +127,19 @@ export type TileRotation = 0 | 60 | 90 | 120 | 180 | 240 | 270 | 300;
 /** Fixed tile layer categories for grid maps */
 export type TileLayerRole = 'ground' | 'structure' | 'props' | 'decoration';
 
+/**
+ * Derived "render form" of a tile — a composite classification over renderMode,
+ * ddSourceType and autoTileConfig. NOT a stored field and NOT an overload of
+ * `renderMode` ('cell'|'region' stay the only persisted render modes). It drives
+ * which placement subtools the drawer ribbon lights for a selected tile.
+ *   cell     — discrete per-cell stamp (the default)
+ *   region   — seamless world-anchored terrain fill (renderMode === 'region')
+ *   line     — wall/path/portal art meant to be drawn along edges/curves
+ *   autotile — bitmask-driven auto-tiling (tileset has autoTileConfig)
+ *   scatter  — freeform brush scatter (a brush mode; not derived per-tile)
+ */
+export type TileForm = 'cell' | 'region' | 'line' | 'autotile' | 'scatter';
+
 /** Default layer stack for grid tile maps */
 export const DEFAULT_TILE_LAYERS: ReadonlyArray<{
   name: string;

@@ -48,6 +48,87 @@
   min-height: 0;
 }
 
+/* Subtool ribbon — form badge + form-gated placement subtools */
+.windrose-fd-subrib {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  padding: 4px 6px;
+  border-bottom: 1px solid oklch(from var(--windrose-border-primary) l c h / 0.4);
+
+  &.windrose-fd-subrib-empty {
+    color: var(--windrose-text-muted, var(--text-muted));
+    font-size: 11px;
+    padding: 6px 8px;
+  }
+}
+
+.windrose-fd-subrib-badge {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  color: var(--windrose-gold-bright);
+  padding: 2px 6px;
+  border: 1px solid oklch(from var(--windrose-gold-bright) l c h / 0.4);
+  border-radius: 3px;
+  background: oklch(from var(--windrose-gold-bright) l c h / 0.1);
+}
+
+.windrose-fd-subrib-div {
+  width: 1px;
+  height: 18px;
+  background: oklch(from var(--windrose-border-primary) l c h / 0.4);
+}
+
+.windrose-fd-subrib-tools {
+  display: flex;
+  gap: 2px;
+}
+
+.windrose-fd-subtool {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--windrose-text-muted, var(--text-muted));
+  cursor: pointer;
+  box-shadow: none;
+
+  &:hover:not(:disabled) {
+    background: var(--windrose-bg-tertiary);
+    color: var(--windrose-text-primary);
+  }
+
+  &.on {
+    color: var(--windrose-gold-bright);
+    border-color: oklch(from var(--windrose-gold-bright) l c h / 0.5);
+    background: oklch(from var(--windrose-gold-bright) l c h / 0.12);
+  }
+
+  &.dim,
+  &:disabled {
+    opacity: 0.3;
+    cursor: default;
+  }
+
+  .windrose-fd-subtool-star {
+    position: absolute;
+    top: -3px;
+    right: -2px;
+    font-size: 8px;
+    line-height: 1;
+    color: var(--windrose-gold-bright);
+  }
+}
+
 /* Tiles/Objects segmented control */
 .windrose-drawer-panetabs {
   display: flex;

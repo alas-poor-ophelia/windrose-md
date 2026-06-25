@@ -9,7 +9,7 @@ import type { ExtendedGeometry } from '#types/contexts/context.types';
 import type { ResolvedTheme } from '#types/settings/settings.types';
 import type { ToolId } from '#types/tools/tool.types';
 import type { Cell } from '#types/core/cell.types';
-import type { TilesetOverrides } from '#types/tiles/tile.types';
+import type { TilesetOverrides, TileForm } from '#types/tiles/tile.types';
 import type { CustomColor } from '#types/core/common.types';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
@@ -45,6 +45,9 @@ import { DockViewPanel } from './components/panels/DockViewPanel';
 import { ColorPicker } from './components/shared/ColorPicker';
 import { RegionPanel } from './components/panels/RegionPanel';
 import { EdgeRail } from './components/panels/EdgeRail';
+import { TileSubtoolRibbon } from './components/panels/TileSubtoolRibbon';
+import { formDef } from './assets/tileForm';
+import type { TileSubtoolId } from './assets/tileForm';
 import { LayerEditModal } from './components/modals/LayerEditModal';
 import { openNativeCloneLayerModal, CloneLayerModal } from './components/modals/CloneLayerModal';
 import { useSubHexNavigation } from './hooks/interactions/useSubHexNavigation';
@@ -154,6 +157,19 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
       <button className={tilePane === 'tiles' ? 'on' : ''} onClick={() => selectPane('tiles')}>Tiles</button>
       <button className={tilePane === 'objects' ? 'on' : ''} onClick={() => selectPane('objects')}>Objects</button>
     </div>
+  );
+
+  // Selected tile's derived render-form + armed placement subtool (drawer ribbon).
+  const [selectedTileForm, setSelectedTileForm] = useState<TileForm | null>(null);
+  const [tileSubtool, setTileSubtool] = useState<TileSubtoolId | null>(null);
+  // Arm the form's default subtool whenever the selected form changes.
+  useEffect(() => {
+    setTileSubtool(selectedTileForm != null ? formDef(selectedTileForm).defaultSubtool : null);
+  }, [selectedTileForm]);
+  const renderSubtoolRibbon = (): VNode | null => (
+    tilePane === 'tiles'
+      ? <TileSubtoolRibbon form={selectedTileForm} activeSubtool={tileSubtool} onSubtoolChange={setTileSubtool} />
+      : null
   );
   const renderObjectsPane = (): VNode => (
     <ObjectSidebar
@@ -1049,6 +1065,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
             >
               <div className="windrose-drawer-pane">
               {renderPaneTabs()}
+              {renderSubtoolRibbon()}
               {tilePane === 'objects' ? renderObjectsPane() : (
               <TileAssetBrowser
                 tilesets={availableTilesets}
@@ -1082,6 +1099,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 active={!tileBrowserCollapsed}
                 recentTiles={recentTiles}
                 onStarredChange={setStarredFlyoutTiles}
+                onSelectedFormChange={setSelectedTileForm}
               />
               )}
               </div>
@@ -1283,6 +1301,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 >
                   <div className="windrose-drawer-pane">
                   {renderPaneTabs()}
+                  {renderSubtoolRibbon()}
                   {tilePane === 'objects' ? renderObjectsPane() : (
                   <TileAssetBrowser
                     tilesets={availableTilesets}
@@ -1316,6 +1335,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                     active={!tileBrowserCollapsed}
                     recentTiles={recentTiles}
                     onStarredChange={setStarredFlyoutTiles}
+                    onSelectedFormChange={setSelectedTileForm}
                   />
                   )}
                   </div>

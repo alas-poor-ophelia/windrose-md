@@ -6,7 +6,7 @@
  * body (jump rail + tile grid) → loaded-brush footer.
  */
 
-import type { TilesetDef, TileEntry, TilesetOverrides, TileLayerRole, TileMetadataStore } from '#types/tiles/tile.types';
+import type { TilesetDef, TileEntry, TileForm, TilesetOverrides, TileLayerRole, TileMetadataStore } from '#types/tiles/tile.types';
 import type { ToolId } from '#types/tools/tool.types';
 import type { FlyoutTile } from './DrawerDock';
 import type { VNode, ComponentChildren } from 'preact';
@@ -37,6 +37,7 @@ import {
   getAllTags,
 } from '../../persistence/tileMetadata';
 import { predictDepthTier } from '../../assets/depthPredictor';
+import { deriveTileForm } from '../../assets/tileForm';
 import { clusterCategories } from '../../assets/categoryMerge';
 import type { FolderInput } from '../../assets/categoryMerge';
 import { predictSpan, DEFAULT_PIXELS_PER_CELL } from '../../assets/spanPredictor';
@@ -314,6 +315,8 @@ interface TileAssetBrowserProps {
   active?: boolean;
   recentTiles?: Array<{ tilesetId: string; tileId: string }>;
   onStarredChange?: (tiles: FlyoutTile[]) => void;
+  /** Reports the selected tile's derived render-form (for the drawer subtool ribbon). */
+  onSelectedFormChange?: (form: TileForm | null) => void;
 }
 
 // `string & {}` keeps the literal autocomplete hints while still allowing any
@@ -371,6 +374,7 @@ const TileAssetBrowser = memo(({
   active = true,
   recentTiles,
   onStarredChange,
+  onSelectedFormChange,
 }: TileAssetBrowserProps): VNode | null => {
   const app = useApp();
   const [searchFilter, setSearchFilter] = useState<string>('');
@@ -858,6 +862,17 @@ const TileAssetBrowser = memo(({
     const ts = tilesets.find(t => t.id === selectedTilesetId);
     return ts?.tiles.find(t => t.id === selectedTileId) ?? null;
   }, [selectedTileId, selectedTilesetId, tilesets]);
+
+  // Report the selected tile's derived render-form upward (drives the drawer subtool ribbon).
+  useEffect(() => {
+    if (onSelectedFormChange == null) return;
+    if (selectedTile == null || selectedTilesetId == null) {
+      onSelectedFormChange(null);
+      return;
+    }
+    const ts = tilesets.find(t => t.id === selectedTilesetId);
+    onSelectedFormChange(deriveTileForm(tileMetadata[selectedTile.vaultPath], ts));
+  }, [selectedTile, selectedTilesetId, tilesets, tileMetadata, onSelectedFormChange]);
 
   // Resolve recent tiles across all tilesets
   const recentTileEntries = useMemo((): TileEntry[] => {
