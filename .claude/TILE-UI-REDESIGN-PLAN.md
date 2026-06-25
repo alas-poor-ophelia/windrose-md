@@ -409,6 +409,27 @@ visual fit inside the wider drawer. **Phase 8 unblocked:** left edge is now clea
 - **Full-pane Filter drill-down screen** — quick tag/pack chips cover the common case; the power-user
   push/pop screen (type-to-find over large tag/pack lists, Done) is additive over the same filter state. (Phase 3)
 
+- **Phase 7 — model REVISED after Parallax+Meridian (kept the plan's intent, corrected the mechanism).**
+  The render path is single-active-layer; the 4 strata already exist as `tile.depth` buckets within one
+  layer (`tileRenderer.ts:411`). Board=floor is still `boardId` on `MapLayer` (per plan), but rendering 4
+  separate strata per floor required a real **compositing** change behind a persisted gate. Shipped inc 1+2:
+  schema (`boardId`/`boards`/`activeBoardId`/`layerMode`), `ensureBoards` migration, board-aware guards
+  C1/C2/C3/M2/M5 + Parallax additions, render compositing via `getRenderLayers`. (Phase 7)
+- **Phase 7 — C5 (undo/redo) verified safe by construction**, no code: history is keyed by globally-unique
+  `layerId` (`useLayerHistory.ts:146`), so board switches isolate undo stacks automatically. (Phase 7)
+- **Phase 7 — M4 (adjacent sub-hex ghost) DEFERRED:** the 0.25 neighbor-preview loop (`useCanvasRenderer.ts:585`)
+  shows all of a neighbor's layers by design; board-filtering it would regress the preview and only matters for
+  exotic multi-board sub-hex maps. Revisit if sub-hex maps gain real boards. (Phase 7)
+- **Phase 7 — M3 (visibility) PARTIAL:** per-layer `visible` is now load-bearing in strata compositing
+  (`getRenderLayers` filters `visible !== false`). Full retirement of session-only `hiddenLayers` + wiring the
+  stratum-eye to persisted `layer.visible` is LayersDock (UI) work. (Phase 7)
+- **Phase 7 — objects/textLabels stay active-layer-only in strata mode** (Parallax: rendering non-active-board
+  objects creates a render≠interaction divergence — visible but unclickable). Per-stratum objects would be the
+  Meridian "Model L" escalation (4-slot strata record on the layer); deferred unless requested. (Phase 7)
+- **Phase 7 — Simple→Strata data transform NOT built:** toggling an existing single-layer tile map to `strata`
+  composites 1 layer (= same render). Splitting one layer's depth-bucketed tiles into 4 per-`tileRole`
+  stratum-layers is a data migration owned by the LayersDock Simple↔Strata toggle. (Phase 7 / LayersDock)
+
 ---
 
 ## 9. NEXT SESSION — Phase 7 entry point (Board → Strata → Layer)

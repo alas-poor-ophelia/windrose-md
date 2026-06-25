@@ -20,6 +20,7 @@ import {
   removeBoard,
   setActiveBoard,
   getActiveLayer,
+  getRenderLayers,
   setActiveLayer,
   addLayer,
   cloneLayer,
@@ -182,6 +183,12 @@ describe("layerAccessor — board projection", () => {
       expect(seeded.some(l => l.id === next.activeLayerId)).toBe(true);
     });
 
+    it("promotes the map to strata render mode", () => {
+      const map = twoBoardMap();
+      expect(map.layerMode).toBeUndefined();
+      expect(addBoard(map, "Roof").layerMode).toBe("strata");
+    });
+
     it("does not disturb existing boards' layers", () => {
       const map = twoBoardMap();
       const next = addBoard(map, "Roof");
@@ -295,6 +302,30 @@ describe("layerAccessor — board-aware guards", () => {
     // even though b-layers share order values.
     expect(getLayerBelow(map, "a1")).toBeNull();
     expect(getLayerBelow(map, "a2")?.id).toBe("a1");
+  });
+
+  it("getRenderLayers: Simple maps render ONLY the active layer (no mass-render)", () => {
+    // Two boards, default 'simple' mode (layerMode unset). Even though board A has
+    // two layers, only the active one renders — today's behavior is preserved.
+    const map = twoBoardMap();
+    const rendered = getRenderLayers(map);
+    expect(rendered.map(l => l.id)).toEqual(["a1"]);
+  });
+
+  it("getRenderLayers: Strata maps composite the active board's visible layers in order", () => {
+    const map = twoBoardMap();
+    map.layerMode = "strata";
+    expect(getRenderLayers(map).map(l => l.id)).toEqual(["a1", "a2"]);
+    // Switching board composites the other board's layers.
+    const onB = setActiveBoard(map, "B");
+    expect(getRenderLayers(onB).map(l => l.id)).toEqual(["b1", "b2"]);
+  });
+
+  it("getRenderLayers: Strata mode skips hidden (visible:false) strata layers", () => {
+    const map = twoBoardMap();
+    map.layerMode = "strata";
+    map.layers[1].visible = false; // hide a2
+    expect(getRenderLayers(map).map(l => l.id)).toEqual(["a1"]);
   });
 
   it("Parallax: cloneLayer carries boardId + tileRole and shifts order within the board only", () => {

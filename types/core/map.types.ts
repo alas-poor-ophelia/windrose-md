@@ -299,6 +299,13 @@ export interface MapData {
   // Optional for back-compat; the load migration seeds a default board.
   boards?: Board[];
   activeBoardId?: BoardId;
+  /**
+   * Layer rendering mode. 'simple' (default/absent) renders ONLY the active layer
+   * (today's behavior — safe for non-tile maps). 'strata' composites the active
+   * board's visible layers as stacked strata. Set to 'strata' when a map acquires
+   * a real board (addBoard); never auto-promoted, so Simple maps never mass-render.
+   */
+  layerMode?: 'simple' | 'strata';
 
   // View state (pan/zoom) - optional, defaults calculated based on map type
   viewState?: StoredViewState;

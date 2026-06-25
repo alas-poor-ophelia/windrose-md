@@ -164,6 +164,22 @@ function getActiveBoardLayers(mapData: MapData | null | undefined): MapLayer[] {
 }
 
 /**
+ * The layers the canvas should COMPOSITE (cells/curves/tiles), in draw order.
+ * Strata maps composite the active board's visible layers as stacked strata;
+ * every other map renders just the active layer (today's single-layer behavior).
+ * The persisted `layerMode` flag is the authority — never inferred from shape, so
+ * un-migrated/Simple maps never mass-render during the migration window.
+ */
+function getRenderLayers(mapData: MapData | null | undefined): MapLayer[] {
+  if (!mapData) return [];
+  if (mapData.layerMode === 'strata') {
+    return getActiveBoardLayers(mapData).filter(l => l.visible !== false);
+  }
+  // getActiveLayer always resolves to a layer (legacy fallback included).
+  return [getActiveLayer(mapData)];
+}
+
+/**
  * Idempotently ensure board structure exists: every layer has a boardId, the
  * `boards` registry covers all referenced boards, and activeBoardId is valid and
  * matches the active layer's board (M2 invariant). Mutates in place to match the
@@ -242,6 +258,9 @@ function addBoard(mapData: MapData, name: string | null = null): MapData {
     layers: [...mapData.layers, ...newLayers],
     activeLayerId: newLayers[0].id,
     activeBoardId: boardId,
+    // Acquiring a real board promotes the map to strata rendering (composite the
+    // active board's strata). Never auto-demoted; Simple maps never reach here.
+    layerMode: 'strata',
   };
 }
 
@@ -961,7 +980,7 @@ export {
   migrateToLayerSchema, needsMigration,
   // Board (floor) projection
   DEFAULT_BOARD_ID, generateBoardId, layerBoardId, getBoardsOrdered, getActiveBoardId,
-  getBoardLayers, getActiveBoardLayers, ensureBoards, addBoard, removeBoard, setActiveBoard,
+  getBoardLayers, getActiveBoardLayers, getRenderLayers, ensureBoards, addBoard, removeBoard, setActiveBoard,
   initializeFogOfWar, isCellFogged, fogCell, revealCell,
   fogRectangle, revealRectangle, fogAll, fogPaintedCells, revealAll,
   toggleFogVisibility, setFogVisibility, hasFogData, getFogState
