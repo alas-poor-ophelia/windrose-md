@@ -5285,6 +5285,112 @@ button.windrose-fow-tool-btn:disabled svg,
   left: 8px;
 }
 
+/* ============================================
+   BLOCK-MODE LEFT ICON RAIL (Phase 8)
+   42px rail + ~198px flyout overlaying the canvas left edge.
+   ============================================ */
+.windrose-edge-rail-root {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 42px;
+  z-index: 9;
+  display: flex;
+}
+
+.windrose-edge-rail {
+  width: 42px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 0;
+  background: var(--windrose-bg-primary);
+  border-right: 1px solid oklch(from var(--windrose-border-primary) l c h/0.4);
+  box-shadow: 2px 0 8px oklch(0% 0 0deg / 0.2);
+}
+
+.windrose-edge-rail-btn {
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--windrose-text-muted);
+  cursor: pointer;
+  box-shadow: none;
+  transition: var(--windrose-transition);
+}
+.windrose-edge-rail-btn svg {
+  width: 18px;
+  height: 18px;
+}
+.windrose-edge-rail-btn:hover {
+  background: var(--windrose-bg-tertiary);
+  color: var(--windrose-text-primary);
+}
+.windrose-edge-rail-btn.on {
+  color: var(--windrose-gold-bright);
+  border-color: oklch(from var(--windrose-gold-bright) l c h/0.5);
+  background: oklch(from var(--windrose-gold-bright) l c h/0.12);
+}
+
+.windrose-edge-rail-flyout {
+  position: absolute;
+  left: 42px;
+  top: 8px;
+  width: 198px;
+  max-height: calc(100% - 16px);
+  display: flex;
+  flex-direction: column;
+  background: var(--windrose-bg-primary);
+  border: 1px solid var(--windrose-border-primary);
+  border-radius: 6px;
+  box-shadow: 8px 0 26px oklch(0% 0 0deg / 0.45);
+  overflow: hidden;
+  z-index: 9;
+}
+
+.windrose-edge-rail-flyout-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--windrose-text-primary);
+  border-bottom: 1px solid oklch(from var(--windrose-border-primary) l c h/0.5);
+}
+
+.windrose-edge-rail-flyout-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+  color: var(--windrose-text-muted);
+  cursor: pointer;
+  box-shadow: none;
+}
+.windrose-edge-rail-flyout-close:hover {
+  color: var(--windrose-text-primary);
+  background: var(--windrose-bg-tertiary);
+}
+
+.windrose-edge-rail-flyout-body {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 6px;
+}
+
 .windrose-layer-controls {
   display: flex;
   flex-direction: column;

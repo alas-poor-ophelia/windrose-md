@@ -38,13 +38,13 @@ import { useAlignmentMode } from './hooks/interactions/useAlignmentMode';
 import { ModalPortal } from './components/modals/ModalPortal';
 import { getActiveLayer, getLayerById } from './persistence/layerAccessor';
 import { setCell as accessorSetCell, removeCell as accessorRemoveCell, cellToPoint } from './geometry/core/cellAccessor';
-import { LayerControls } from './components/panels/LayerControls';
-import { FloatingPanel, PopoutButton } from './components/panels/FloatingPanel';
+import { FloatingPanel } from './components/panels/FloatingPanel';
 import { DockPanel } from './components/panels/DockPanel';
 import { DockLayerList } from './components/panels/DockLayerList';
 import { DockViewPanel } from './components/panels/DockViewPanel';
 import { ColorPicker } from './components/shared/ColorPicker';
 import { RegionPanel } from './components/panels/RegionPanel';
+import { EdgeRail } from './components/panels/EdgeRail';
 import { LayerEditModal } from './components/modals/LayerEditModal';
 import { openNativeCloneLayerModal, CloneLayerModal } from './components/modals/CloneLayerModal';
 import { useSubHexNavigation } from './hooks/interactions/useSubHexNavigation';
@@ -184,10 +184,12 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     isExpanded, isAnimating, handleToggleExpand,
     showFooter, setShowFooter,
     showVisibilityToolbar, setShowVisibilityToolbar,
-    showLayerPanel, setShowLayerPanel,
-    showRegionPanel, setShowRegionPanel,
     layerVisibility, handleToggleLayerVisibility
   } = useUILayout({ mapData, updateMapData, fullPane });
+
+  // Block-mode left icon rail: which flyout (if any) is open. Canvas controls
+  // (MapControls Layers/Regions buttons) drive this too, so it's lifted here.
+  const [railOpenId, setRailOpenId] = useState<string | null>(null);
 
   const { isFloating, getZIndex, getInitialPosition, toggleFloat, bringToFront, updatePosition } = useFloatingPanels({ fullPane, savedState: savedPanelState, onStateChange: onPanelStateChange });
 
@@ -761,44 +763,89 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
           onMouseEnter={() => setIsFocused(true)}
           onMouseLeave={() => setIsFocused(false)}
         >
-          {/* Left side panels container — layers + regions stacked (not in full-pane, dock replaces) */}
+          {/* Block-mode left icon rail — Layers / Colors / View (+ Regions on hex).
+              42px rail, flyouts overlay the canvas. Replaces windrose-left-panels. */}
           {!fullPane && (
-            <div className={`windrose-left-panels ${mapData.sidebarCollapsed === true ? 'sidebar-closed' : 'sidebar-open'}`}>
-              <FloatingPanel
-                title="Layers"
-                isFloating={isFloating('layers')}
-                onDock={() => toggleFloat('layers')}
-                onFocus={() => bringToFront('layers')}
-                zIndex={getZIndex('layers')}
-                initialPosition={getInitialPosition('layers')}
-                resizable
-                minSize={{ width: 140, height: 100 }}
-              >
-                <LayerControls
-                  mapData={mapData}
-                  onLayerSelect={handleLayerSelect}
-                  onLayerAdd={handleLayerAdd}
-                  onLayerDelete={handleLayerDelete}
-                  onLayerReorder={handleLayerReorder}
-                  onToggleShowLayerBelow={handleToggleShowLayerBelow}
-                  onSetLayerBelowOpacity={handleSetLayerBelowOpacity}
-                  onEditLayer={setEditingLayerId}
-                  onLayerClone={handleCloneLayerRequest}
-                  sidebarCollapsed={mapData.sidebarCollapsed ?? false}
-                  isOpen={isFloating('layers') || showLayerPanel}
-                  popoutButton={!isFloating('layers') ? <PopoutButton onClick={(pos) => toggleFloat('layers', pos)} /> : undefined}
-                />
-              </FloatingPanel>
-
-              {mapData.mapType === 'hex' && (
-                <RegionPanel
-                  regions={mapData.regions ?? []}
-                  onRegionsChange={handleRegionsChange}
-                  sidebarCollapsed={mapData.sidebarCollapsed ?? false}
-                  isOpen={showRegionPanel}
-                />
-              )}
-            </div>
+            <EdgeRail
+              openId={railOpenId}
+              onOpenChange={setRailOpenId}
+              panels={[
+                {
+                  id: 'layers',
+                  icon: 'lucide-layers',
+                  title: 'Layers',
+                  content: (
+                    <DockLayerList
+                      mapData={mapData}
+                      onLayerSelect={handleLayerSelect}
+                      onLayerAdd={handleLayerAdd}
+                      onLayerDelete={handleLayerDelete}
+                      onLayerReorder={handleLayerReorder}
+                      onToggleShowLayerBelow={handleToggleShowLayerBelow}
+                      onSetLayerBelowOpacity={handleSetLayerBelowOpacity}
+                      onEditLayer={setEditingLayerId}
+                      onLayerClone={handleCloneLayerRequest}
+                    />
+                  )
+                },
+                {
+                  id: 'colors',
+                  icon: 'lucide-palette',
+                  title: 'Colors',
+                  content: (
+                    <ColorPicker
+                      isOpen
+                      floatingMode
+                      selectedColor={selectedColor}
+                      onColorSelect={setSelectedColor}
+                      onClose={() => {}}
+                      onReset={() => setSelectedColor(DEFAULT_COLOR)}
+                      customColors={mapData.customColors ?? []}
+                      paletteColorOpacityOverrides={mapData.paletteColorOpacityOverrides ?? {}}
+                      onAddCustomColor={handleAddCustomColor}
+                      onDeleteCustomColor={handleDeleteCustomColor}
+                      onUpdateColorOpacity={handleUpdateColorOpacity}
+                      opacity={selectedOpacity}
+                      onOpacityChange={handleOpacityChange}
+                    />
+                  )
+                },
+                {
+                  id: 'view',
+                  icon: 'lucide-eye',
+                  title: 'View',
+                  content: (
+                    <DockViewPanel
+                      currentZoom={mapData.viewState?.zoom ?? 1}
+                      onZoomIn={handleZoomIn}
+                      onZoomOut={handleZoomOut}
+                      layerVisibility={layerVisibility}
+                      onToggleLayer={handleToggleLayerVisibility}
+                      mapType={mapData.mapType}
+                      onSettingsClick={handleSettingsClick}
+                      fogOfWarState={currentFogState}
+                      onFogToolSelect={handleFogToolSelect}
+                      onFogVisibilityToggle={handleFogVisibilityToggle}
+                      onFogFillAll={handleFogFillAll}
+                      onFogClearAll={handleFogClearAll}
+                    />
+                  )
+                },
+                ...(mapData.mapType === 'hex' ? [{
+                  id: 'regions',
+                  icon: 'lucide-map',
+                  title: 'Regions',
+                  content: (
+                    <RegionPanel
+                      regions={mapData.regions ?? []}
+                      onRegionsChange={handleRegionsChange}
+                      sidebarCollapsed={false}
+                      isOpen
+                    />
+                  )
+                }] : [])
+              ]}
+            />
           )}
 
           {/* For hex maps, override northDirection to 0 for rendering while keeping real value for compass display */}
@@ -958,10 +1005,10 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 onToggleExpand={handleToggleExpand}
                 hideExpand={fullPane}
                 mapType={mapData.mapType}
-                showLayerPanel={showLayerPanel}
-                onToggleLayerPanel={() => setShowLayerPanel(!showLayerPanel)}
-                showRegionPanel={showRegionPanel}
-                onToggleRegionPanel={mapData.mapType === 'hex' ? () => setShowRegionPanel(!showRegionPanel) : undefined}
+                showLayerPanel={railOpenId === 'layers'}
+                onToggleLayerPanel={() => setRailOpenId(prev => prev === 'layers' ? null : 'layers')}
+                showRegionPanel={railOpenId === 'regions'}
+                onToggleRegionPanel={mapData.mapType === 'hex' ? () => setRailOpenId(prev => prev === 'regions' ? null : 'regions') : undefined}
                 showVisibilityToolbar={showVisibilityToolbar}
                 onToggleVisibilityToolbar={() => {
                   const closing = showVisibilityToolbar;
