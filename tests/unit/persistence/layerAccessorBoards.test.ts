@@ -21,6 +21,8 @@ import {
   setActiveBoard,
   getActiveLayer,
   getRenderLayers,
+  promoteToStrata,
+  setLayerMode,
   setActiveLayer,
   addLayer,
   cloneLayer,
@@ -326,6 +328,68 @@ describe("layerAccessor — board-aware guards", () => {
     map.layerMode = "strata";
     map.layers[1].visible = false; // hide a2
     expect(getRenderLayers(map).map(l => l.id)).toEqual(["a1"]);
+  });
+
+  describe("promoteToStrata (best-effort Simple->Strata)", () => {
+    it("splits a single-layer board's tiles into the four stratum layers by depth", () => {
+      const layer = mkLayer("solo", 0, "A", {
+        tiles: [
+          { col: 0, row: 0, tilesetId: "t", tileId: "g", depth: "ground" },
+          { col: 1, row: 0, tilesetId: "t", tileId: "s", depth: "structure" },
+          { col: 2, row: 0, tilesetId: "t", tileId: "p", depth: "props" },
+          { col: 3, row: 0, tilesetId: "t", tileId: "d", depth: "decoration" },
+          { col: 4, row: 0, tilesetId: "t", tileId: "g2" }, // no depth -> ground
+        ],
+      } as Partial<MapLayer>);
+      const map = mkMap([layer], "solo", {
+        boards: [{ id: "A", name: "A", order: 0 }],
+        activeBoardId: "A",
+      });
+      const next = promoteToStrata(map);
+      expect(next.layerMode).toBe("strata");
+      const strata = getBoardLayers(next, "A");
+      expect(strata.map(l => l.tileRole)).toEqual(["ground", "structure", "props", "decoration"]);
+      const byRole = (role: string): MapLayer => strata.find(l => l.tileRole === role) as MapLayer;
+      expect(byRole("ground").tiles?.map(t => t.tileId).sort()).toEqual(["g", "g2"]);
+      expect(byRole("structure").tiles?.map(t => t.tileId)).toEqual(["s"]);
+      expect(byRole("props").tiles?.map(t => t.tileId)).toEqual(["p"]);
+      expect(byRole("decoration").tiles?.map(t => t.tileId)).toEqual(["d"]);
+    });
+
+    it("keeps non-tile content on the ground stratum and preserves the base layer id", () => {
+      const layer = mkLayer("solo", 0, "A", {
+        cells: [{ x: 0, y: 0, color: "#fff" }],
+      } as Partial<MapLayer>);
+      const map = mkMap([layer], "solo", {
+        boards: [{ id: "A", name: "A", order: 0 }],
+        activeBoardId: "A",
+      });
+      const next = promoteToStrata(map);
+      const ground = getBoardLayers(next, "A").find(l => l.tileRole === "ground");
+      expect(ground?.id).toBe("solo"); // base layer id preserved
+      expect(ground?.cells.length).toBe(1);
+      expect(next.activeLayerId).toBe("solo");
+    });
+
+    it("is idempotent — a board already covering all strata just flips the flag", () => {
+      const seeded = addBoard(twoBoardMap(), "Roof"); // already 4 strata, layerMode strata
+      const boardId = seeded.activeBoardId as string;
+      const before = getBoardLayers(seeded, boardId).map(l => l.id);
+      const next = promoteToStrata(seeded);
+      expect(getBoardLayers(next, boardId).map(l => l.id)).toEqual(before);
+    });
+
+    it("does not disturb other boards", () => {
+      const map = twoBoardMap();
+      const next = promoteToStrata(map); // promotes active board A
+      expect(getBoardLayers(next, "B").map(l => l.id)).toEqual(["b1", "b2"]);
+    });
+  });
+
+  it("setLayerMode('simple') just flips the flag back", () => {
+    const map = addBoard(twoBoardMap(), "Roof");
+    expect(map.layerMode).toBe("strata");
+    expect(setLayerMode(map, "simple").layerMode).toBe("simple");
   });
 
   it("Parallax: cloneLayer carries boardId + tileRole and shifts order within the board only", () => {

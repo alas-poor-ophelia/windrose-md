@@ -20,6 +20,7 @@ import type {
   MigrationValidation
 } from '#types/core/map.types';
 import type { MapObject } from '#types/objects/object.types';
+import type { TileLayerRole } from '#types/tiles/tile.types';
 
 import { DEFAULT_TILE_LAYERS } from '#types/tiles/tile.types';
 import { SCHEMA_VERSION } from '../core/dmtConstants';
@@ -312,6 +313,73 @@ function setActiveBoard(mapData: MapData, boardId: BoardId): MapData {
   const topLayer = layers[layers.length - 1];
   const activeLayerId = keep ? mapData.activeLayerId : (topLayer?.id ?? mapData.activeLayerId);
   return { ...mapData, activeBoardId: boardId, activeLayerId };
+}
+
+/**
+ * Promote a map to strata rendering, ensuring the ACTIVE board has the four
+ * stratum layers (one per tileRole). Best-effort, idempotent:
+ *  - if the board already covers all four roles, just flips the flag;
+ *  - otherwise folds the board's content into four stratum layers — the first
+ *    layer becomes the ground stratum (keeps its id/name/cells/curves/objects/fog),
+ *    tiles are redistributed by their `depth` tier, and any extra board layers'
+ *    non-tile content merges into ground. Single-layer boards (the common case)
+ *    convert losslessly; multi-layer boards merge — hand-fixable, by design.
+ */
+function promoteToStrata(mapData: MapData): MapData {
+  const boardId = getActiveBoardId(mapData);
+  const boardLayers = getBoardLayers(mapData, boardId);
+  if (boardLayers.length === 0) return { ...mapData, layerMode: 'strata' };
+
+  const roles = new Set(
+    boardLayers
+      .map(l => l.tileRole)
+      .filter((r): r is TileLayerRole => r != null)
+  );
+  const hasAllStrata = DEFAULT_TILE_LAYERS.every(d => roles.has(d.role));
+  if (hasAllStrata) return { ...mapData, layerMode: 'strata' };
+
+  const base = boardLayers[0];
+  const allTiles = boardLayers.flatMap(l => l.tiles ?? []);
+  const mergedCells = boardLayers.flatMap(l => l.cells);
+  const mergedCurves = boardLayers.flatMap(l => l.curves);
+  const mergedEdges = boardLayers.flatMap(l => l.edges);
+  const mergedObjects = boardLayers.flatMap(l => l.objects);
+  const mergedText = boardLayers.flatMap(l => l.textLabels);
+
+  const strata: MapLayer[] = DEFAULT_TILE_LAYERS.map((def, i) => {
+    const isGround = def.role === 'ground';
+    return {
+      id: isGround ? base.id : generateLayerId() + '-' + i,
+      name: isGround ? base.name : def.name,
+      order: def.order,
+      visible: true,
+      cells: isGround ? mergedCells : [],
+      curves: isGround ? mergedCurves : [],
+      edges: isGround ? mergedEdges : [],
+      objects: isGround ? mergedObjects : [],
+      textLabels: isGround ? mergedText : [],
+      fogOfWar: isGround ? base.fogOfWar : null,
+      tiles: allTiles.filter(t => (t.depth ?? 'ground') === def.role),
+      tileRole: def.role,
+      boardId,
+    };
+  });
+
+  const otherLayers = mapData.layers.filter(l => layerBoardId(l) !== boardId);
+  return {
+    ...mapData,
+    layers: [...otherLayers, ...strata],
+    activeLayerId: base.id,
+    activeBoardId: boardId,
+    layerMode: 'strata',
+  };
+}
+
+/** Set the layer rendering mode. 'strata' runs the best-effort promotion; 'simple'
+ *  just flips the flag (keeps any stratum layers, renders active-only). */
+function setLayerMode(mapData: MapData, mode: 'simple' | 'strata'): MapData {
+  if (mode === 'strata') return promoteToStrata(mapData);
+  return { ...mapData, layerMode: 'simple' };
 }
 
 // ============================================================================
@@ -981,6 +1049,7 @@ export {
   // Board (floor) projection
   DEFAULT_BOARD_ID, generateBoardId, layerBoardId, getBoardsOrdered, getActiveBoardId,
   getBoardLayers, getActiveBoardLayers, getRenderLayers, ensureBoards, addBoard, removeBoard, setActiveBoard,
+  promoteToStrata, setLayerMode,
   initializeFogOfWar, isCellFogged, fogCell, revealCell,
   fogRectangle, revealRectangle, fogAll, fogPaintedCells, revealAll,
   toggleFogVisibility, setFogVisibility, hasFogData, getFogState

@@ -36,7 +36,8 @@ import { getColorByHex, isDefaultColor, DEFAULT_COLOR } from './drawing/colorOpe
 import { ImageAlignmentMode } from './components/overlays/ImageAlignmentMode';
 import { useAlignmentMode } from './hooks/interactions/useAlignmentMode';
 import { ModalPortal } from './components/modals/ModalPortal';
-import { getActiveLayer, getLayerById } from './persistence/layerAccessor';
+import { getActiveLayer, getLayerById, addBoard, setActiveBoard, removeBoard, setLayerMode, addLayer, updateActiveLayer } from './persistence/layerAccessor';
+import type { TileLayerRole } from '#types/tiles/tile.types';
 import { setCell as accessorSetCell, removeCell as accessorRemoveCell, cellToPoint } from './geometry/core/cellAccessor';
 import { FloatingPanel } from './components/panels/FloatingPanel';
 import { DockPanel } from './components/panels/DockPanel';
@@ -418,6 +419,30 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     addToHistory,
     isApplyingHistory
   } = useLayerHistory({ mapData, updateMapData, isLoading, navigationVersion });
+
+  // Board (floor) + strata-mode handlers (Phase 7). Structural board ops update map
+  // data directly; layer-content undo is unaffected (history is per-layerId).
+  const handleToggleStrataMode = useCallback((): void => {
+    updateMapData((prev: MapData) => setLayerMode(prev, prev.layerMode === 'strata' ? 'simple' : 'strata'));
+  }, [updateMapData]);
+  const handleBoardAdd = useCallback((): void => {
+    updateMapData((prev: MapData) => addBoard(prev));
+  }, [updateMapData]);
+  const handleBoardSelect = useCallback((boardId: string): void => {
+    updateMapData((prev: MapData) => setActiveBoard(prev, boardId));
+  }, [updateMapData]);
+  const handleBoardDelete = useCallback((boardId: string): void => {
+    updateMapData((prev: MapData) => removeBoard(prev, boardId));
+  }, [updateMapData]);
+  const handleAddLayerToStratum = useCallback((role: TileLayerRole): void => {
+    updateMapData((prev: MapData) => updateActiveLayer(addLayer(prev), { tileRole: role }));
+  }, [updateMapData]);
+  const handleToggleLayerVisible = useCallback((layerId: string): void => {
+    updateMapData((prev: MapData) => ({
+      ...prev,
+      layers: prev.layers.map(l => l.id === layerId ? { ...l, visible: l.visible === false } : l),
+    }));
+  }, [updateMapData]);
 
   // Wrap undo to let in-progress operations (e.g. region creation) cancel first
   const wrappedHandleUndo = useCallback(() => {
@@ -801,6 +826,12 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                       onSetLayerBelowOpacity={handleSetLayerBelowOpacity}
                       onEditLayer={setEditingLayerId}
                       onLayerClone={handleCloneLayerRequest}
+                      onToggleStrataMode={handleToggleStrataMode}
+                      onBoardAdd={handleBoardAdd}
+                      onBoardSelect={handleBoardSelect}
+                      onBoardDelete={handleBoardDelete}
+                      onAddLayerToStratum={handleAddLayerToStratum}
+                      onToggleLayerVisible={handleToggleLayerVisible}
                     />
                   )
                 },
@@ -1173,6 +1204,12 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 onSetLayerBelowOpacity={handleSetLayerBelowOpacity}
                 onEditLayer={setEditingLayerId}
                 onLayerClone={handleCloneLayerRequest}
+                onToggleStrataMode={handleToggleStrataMode}
+                onBoardAdd={handleBoardAdd}
+                onBoardSelect={handleBoardSelect}
+                onBoardDelete={handleBoardDelete}
+                onAddLayerToStratum={handleAddLayerToStratum}
+                onToggleLayerVisible={handleToggleLayerVisible}
               />
             </FloatingPanel>
           )}
@@ -1354,6 +1391,12 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                       onSetLayerBelowOpacity={handleSetLayerBelowOpacity}
                       onEditLayer={setEditingLayerId}
                       onLayerClone={handleCloneLayerRequest}
+                      onToggleStrataMode={handleToggleStrataMode}
+                      onBoardAdd={handleBoardAdd}
+                      onBoardSelect={handleBoardSelect}
+                      onBoardDelete={handleBoardDelete}
+                      onAddLayerToStratum={handleAddLayerToStratum}
+                      onToggleLayerVisible={handleToggleLayerVisible}
                     />
                   </DockPanel>
                 )}

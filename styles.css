@@ -8546,6 +8546,166 @@ button.windrose-breadcrumb-link {
 }
 
 /* ==========================================================================
+   Board -> Stratum -> Layer projection (Phase 7, strata mode)
+   ========================================================================== */
+.windrose-dock-board-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  border-bottom: 1px solid oklch(from var(--windrose-border-primary) l c h/0.2);
+}
+.windrose-dock-board-bar.simple {
+  justify-content: space-between;
+}
+
+.windrose-dock-mode-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--windrose-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.windrose-dock-board-tabs {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.windrose-dock-board-tab {
+  padding: 3px 8px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: oklch(from var(--windrose-border-primary) l c h/0.1);
+  color: var(--windrose-text-muted);
+  font-size: 11px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.windrose-dock-board-tab:hover {
+  background: oklch(from var(--windrose-border-primary) l c h/0.2);
+}
+.windrose-dock-board-tab.active {
+  background: oklch(from var(--windrose-text-primary) l c h/0.16);
+  color: var(--windrose-text-primary);
+  font-weight: 600;
+}
+
+.windrose-dock-board-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.windrose-dock-board-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--windrose-text-muted);
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.windrose-dock-board-btn:hover {
+  background: oklch(from var(--windrose-border-primary) l c h/0.15);
+  color: var(--windrose-text-primary);
+}
+.windrose-dock-board-btn.delete:hover {
+  color: var(--windrose-danger, oklch(60% 0.2 25deg));
+}
+.windrose-dock-board-btn.mode.active {
+  color: var(--windrose-text-primary);
+}
+
+.windrose-dock-stratum {
+  border-bottom: 1px solid oklch(from var(--windrose-border-primary) l c h/0.12);
+}
+
+.windrose-dock-stratum-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  background: oklch(from var(--role-tint, var(--windrose-border-primary)) l c h/0.08);
+}
+
+.windrose-dock-stratum-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--role-tint, var(--windrose-text-muted));
+  flex-shrink: 0;
+}
+
+.windrose-dock-stratum-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--windrose-text-primary);
+  flex: 1;
+}
+
+.windrose-dock-stratum-count {
+  font-size: 10px;
+  color: var(--windrose-text-muted);
+  min-width: 14px;
+  text-align: center;
+}
+
+.windrose-dock-stratum-add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--windrose-text-muted);
+  cursor: pointer;
+}
+.windrose-dock-stratum-add:hover {
+  background: oklch(from var(--role-tint, var(--windrose-border-primary)) l c h/0.25);
+  color: var(--windrose-text-primary);
+}
+
+.windrose-dock-stratum-layers {
+  padding-left: 6px;
+  /* In strata mode the active row glows its stratum's role hue. */
+}
+.windrose-dock-stratum-layers .windrose-dock-layer-row.active {
+  border-left-color: var(--role-tint, var(--windrose-text-primary));
+  background: oklch(from var(--role-tint, var(--windrose-border-primary)) l c h/0.14);
+}
+
+.windrose-dock-layer-row.hidden .windrose-dock-layer-name,
+.windrose-dock-layer-row.hidden .windrose-dock-layer-icon {
+  opacity: 0.45;
+}
+
+.windrose-dock-layer-action.eye {
+  opacity: 0.4;
+}
+.windrose-dock-layer-action.eye.active {
+  opacity: 0.85;
+}
+.windrose-dock-layer-action.eye:hover {
+  opacity: 1;
+}
+
+/* ==========================================================================
    Dock Color Picker overrides (narrower grid for 240px dock)
    ========================================================================== */
 :is(.windrose-dock-right, .windrose-floating-panel-content) .windrose-color-picker {
