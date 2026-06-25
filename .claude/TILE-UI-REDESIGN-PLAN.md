@@ -426,13 +426,30 @@ visual fit inside the wider drawer. **Phase 8 unblocked:** left edge is now clea
 - **Phase 7 — objects/textLabels stay active-layer-only in strata mode** (Parallax: rendering non-active-board
   objects creates a render≠interaction divergence — visible but unclickable). Per-stratum objects would be the
   Meridian "Model L" escalation (4-slot strata record on the layer); deferred unless requested. (Phase 7)
-- **Phase 7 — Simple→Strata data transform NOT built:** toggling an existing single-layer tile map to `strata`
-  composites 1 layer (= same render). Splitting one layer's depth-bucketed tiles into 4 per-`tileRole`
-  stratum-layers is a data migration owned by the LayersDock Simple↔Strata toggle. (Phase 7 / LayersDock)
+- **Phase 7 — Simple→Strata data transform BUILT (`promoteToStrata`):** single-layer boards convert
+  losslessly; multi-layer boards merge non-tile content into the ground stratum (best-effort, per
+  Guildmaster — unreleased, hand-fixable). Live-verified in the running app. (Phase 7 — DONE)
+- **Phase 7 deferrals (live-verified DONE otherwise):** within-stratum drag-reorder, board-op undo
+  history, and the bidirectional depth-fan ⇄ stratum active-role sync are NOT wired. The visual hue
+  (stratum dot + active-row glow) is in; clicking a stratum does not yet drive the depth fan's active role.
 
 ---
 
-## 9. NEXT SESSION — Phase 7 entry point (Board → Strata → Layer)
+## 9. Phase 7 SHIPPED + LIVE-VERIFIED — Phase 9 status
+
+**Phase 7 COMPLETE** on `feature/tile-ui-redesign` across three increments:
+- inc 1 `17293059` — schema (`boardId`/`boards`/`activeBoardId`) + `ensureBoards` migration + guards C1/C2/C3/M2/M5.
+- inc 2 `c2406021` — render compositing behind the persisted `layerMode` gate (C4); C5 verified safe.
+- inc 3 `cd4eae34` — LayersDock Board→Stratum→Layer projection + Simple/Strata toggle (`promoteToStrata`).
+Unit suite 1514/1514. Full `npm run check` clean. **Live-verified in-app** (full-pane): floor switcher,
+4 strata sections, add-board/add-layer-to-stratum/switch/toggle all work; canvas composites without crash.
+
+**Phase 9 status:** Organize/Adjust wiring (already `setOrganize(true)`), reduced-motion (global
+`_utilities.scss` rule + `_depth-bar.scss:323`), and EdgeRail→DockLayerList fold (already threaded) are all
+DONE. Remaining: full E2E regression (in progress). Block-rail (Phase 8) still NOT live-verifiable here
+(datacore-only vault). Deferrals above remain.
+
+--- (historical entry-point notes below) ---
 
 **Status as of this session:** Phases 0–6 + 8 SHIPPED on `feature/tile-ui-redesign`
 (0–3 prior; 4a `49c6ed72`, 6 `20b69c20`, 8 `c467750a`, 4b+5 `f1584a7f`, plan `0eee5063`).
