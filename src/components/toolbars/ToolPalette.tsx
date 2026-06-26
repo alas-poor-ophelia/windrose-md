@@ -11,7 +11,7 @@ import type { ToolId } from '#types/tools/tool.types';
 import type { CustomColor } from '#types/core/common.types';
 import type { ColorOpacityOverrides } from '../shared/ColorPicker.tsx';
 
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { DEFAULT_COLOR } from '../../drawing/colorOperations';
 import { ColorPicker } from '../shared/ColorPicker';
 import { CornerBrackets } from '../shared/CornerBrackets';
@@ -73,6 +73,12 @@ interface SubMenuFlyoutProps {
   currentSubTool: ToolId;
   onSelect: (id: ToolId) => void;
   onClose: () => void;
+  /**
+   * Viewport-anchored position. In the vertical rail the flyout must be
+   * `position: fixed` to escape the rail's `overflow-y: auto` clip (which forces
+   * `overflow-x: auto`); null = horizontal mode, keep the CSS `absolute` layout.
+   */
+  fixedAnchor?: { left: number; top: number } | null;
 }
 
 /** Props for ToolButtonWithSubMenu */
@@ -86,6 +92,8 @@ interface ToolButtonWithSubMenuProps {
   onSubMenuOpen: (groupId: string) => void;
   onSubMenuClose: () => void;
   mapType: MapType;
+  /** Vertical rail: flyouts open fixed-positioned to escape the rail's overflow clip. */
+  vertical?: boolean;
 }
 
 /** Props for ToolPalette */
@@ -117,9 +125,41 @@ export interface ToolPaletteProps {
   vertical?: boolean;
 }
 
-const SubMenuFlyout = ({ subTools, currentSubTool, onSelect, onClose }: SubMenuFlyoutProps): VNode => {
+/**
+ * Offset of the nearest ancestor that acts as the containing block for a
+ * `position: fixed` child — an element with transform/filter/perspective/will-change
+ * or `contain`. Obsidian workspace leaves set `contain: strict`, so a fixed flyout is
+ * positioned relative to the leaf, not the viewport; its rect must be subtracted from
+ * viewport coords. Returns {0,0} when the viewport is the containing block.
+ */
+function fixedContainingOffset(el: HTMLElement): { left: number; top: number } {
+  let p: HTMLElement | null = el.parentElement;
+  while (p != null && p.tagName !== 'HTML' && p.tagName !== 'BODY') {
+    const cs = getComputedStyle(p);
+    const establishesCB =
+      cs.transform !== 'none' ||
+      cs.filter !== 'none' ||
+      cs.perspective !== 'none' ||
+      cs.willChange === 'transform' || cs.willChange === 'filter' || cs.willChange === 'perspective' ||
+      cs.contain === 'strict' || cs.contain === 'content' ||
+      cs.contain.includes('layout') || cs.contain.includes('paint');
+    if (establishesCB) {
+      const r = p.getBoundingClientRect();
+      return { left: r.left, top: r.top };
+    }
+    p = p.parentElement;
+  }
+  return { left: 0, top: 0 };
+}
+
+const SubMenuFlyout = ({ subTools, currentSubTool, onSelect, onClose, fixedAnchor }: SubMenuFlyoutProps): VNode => {
+  // Fixed positioning escapes the vertical rail's overflow clip; left/top come from
+  // the trigger button rect, and the CSS margin-left + translateY(-50%) still apply.
+  const style = fixedAnchor != null
+    ? { position: 'fixed' as const, left: `${fixedAnchor.left}px`, top: `${fixedAnchor.top}px` }
+    : undefined;
   return (
-    <div className="windrose-subtool-menu">
+    <div className="windrose-subtool-menu" style={style}>
       {subTools.map(subTool => (
         <button
           key={subTool.id}
@@ -148,10 +188,23 @@ const ToolButtonWithSubMenu = ({
   onSubToolSelect,
   onSubMenuOpen,
   onSubMenuClose,
-  mapType
+  mapType,
+  vertical = false
 }: ToolButtonWithSubMenuProps): VNode | null => {
   const longPressTimer = useRef<number | null>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
   const LONG_PRESS_DURATION = 300;
+
+  // In the vertical rail the flyout opens `position: fixed` to escape the rail's
+  // overflow clip; capture the trigger button's viewport rect when the menu opens.
+  const [fixedAnchor, setFixedAnchor] = useState<{ left: number; top: number } | null>(null);
+  useLayoutEffect(() => {
+    const el = buttonRef.current;
+    if (!vertical || !isSubMenuOpen || el == null) { setFixedAnchor(null); return; }
+    const r = el.getBoundingClientRect();
+    const off = fixedContainingOffset(el);
+    setFixedAnchor({ left: r.right - off.left, top: r.top + r.height / 2 - off.top });
+  }, [vertical, isSubMenuOpen]);
 
   // Hide entire group if it's map-type-restricted
   if (toolGroup.hexOnly === true && mapType !== 'hex') return null;
@@ -213,6 +266,7 @@ const ToolButtonWithSubMenu = ({
   return (
     <div className="windrose-tool-btn-container">
       <button
+        ref={buttonRef}
         className={`windrose-tool-btn interactive-child ${isActive ? 'windrose-tool-btn-active' : ''}`}
         onPointerDown={handlePointerDown}
         onPointerUp={handlePointerUp}
@@ -232,6 +286,7 @@ const ToolButtonWithSubMenu = ({
           currentSubTool={currentSubTool}
           onSelect={handleSubToolSelect}
           onClose={onSubMenuClose}
+          fixedAnchor={fixedAnchor}
         />
       )}
     </div>
@@ -543,6 +598,7 @@ const ToolPalette = ({
           onSubMenuOpen={handleSubMenuOpen}
           onSubMenuClose={handleSubMenuClose}
           mapType={mapType}
+          vertical={vertical}
         />
       ))}
 
@@ -564,6 +620,7 @@ const ToolPalette = ({
             onSubMenuOpen={handleSubMenuOpen}
             onSubMenuClose={handleSubMenuClose}
             mapType={mapType}
+            vertical={vertical}
           />
         );
       })}
