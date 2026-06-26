@@ -3160,11 +3160,31 @@ button.windrose-object-grid-item:hover,
    Docks to the left edge of windrose-dock-right. Contains the tile browser
    (full panel) and a depth ribbon spine (collapsed state).
    ========================================================================== */
-/* Shared parent for tile drawer + dock column */
+/* Shared parent for tile drawer + dock column.
+   position:relative anchors the absolutely-overlaid drawer below. */
 .windrose-right-group {
   display: flex;
+  position: relative;
   height: 100%;
   min-height: 0;
+}
+
+/* Full-pane only: float the drawer over the canvas instead of letting it occupy
+   flex space. Folding a flex sibling shrank the row and let the flex:1 canvas
+   grow, firing MapCanvas's ResizeObserver every frame → fold lag + a stale,
+   centred backing-store frame that drifted until the final crisp render.
+   As an absolute overlay anchored to the dock column's left edge (right:100%),
+   the drawer grows leftward over the map and the canvas keeps a constant width,
+   so it never resizes during the fold — mirroring the embedded block-mode
+   drawer, which is already an absolute overlay outside the canvas flex flow.
+   Scoped to .windrose-right-group, which only renders in full-pane. */
+.windrose-right-group > .windrose-tile-drawer {
+  position: absolute;
+  right: 100%;
+  top: 0;
+  bottom: 0;
+  height: auto;
+  z-index: 15;
 }
 
 /* Drawer container — width transitions between ribbon and full panel */
