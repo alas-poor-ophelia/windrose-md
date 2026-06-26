@@ -13,7 +13,7 @@ Found during on-device review after the P0–P4 rebuild commit (`762c46e3`).
 - [x] **4** Boards switcher is now a **dropdown** (`<select class="windrose-dock-board-select">`) replacing the button row — `DockLayerList.tsx` + `_dock.scss` (incl. `.is-tablet` select override).
 
 **Still open (handoff — fresh session):**
-- [ ] **5** Thumbnail/List view toggle — **reclassified: this is a BUILD, not a missing control.** `TileAssetBrowser` has no `viewMode`/list-mode rendering at all (only the prototype did). Needs: `viewMode` state, a `.windrose-tb-list` dense-row render path, and the header grid/list toggle.
+- [x] **5** Thumbnail/List view toggle — **DONE & live-verified (2026-06-25).** Built the missing capability: `viewMode` state (`grid`|`list`), a `listMode` derived flag (`!compact && !organize && viewMode==='list'`), `rowSlice` (1 tile/row in list) feeding `fullRows`, a `LIST_ROW_H=34` virtualizer height, a `.windrose-tb-list`/`.windrose-tb-listrow` dense `[thumb|name|pack]` render branch, and a header `.windrose-tb-viewtoggle` grid/list segmented control (`lucide-layout-grid`/`lucide-list` — both verified rendering real SVG path content live, 4/6 children). Reuses the existing virtualizer + `TileThumbnail` + `handleTileClick`. Verified live: toggle flips, list shows 34px rows (name+pack `Hex Samples`+thumb), row-click selects (`.sel`), active button gold, toggle-back restores grid. 0-warning gate held.
 - [ ] **13** Remaining Layers-menu `.is-tablet` — earlier pass covered board-tab/board-btn/stratum-add/layer-action; the new `.windrose-dock-board-select` got its own tablet override. Spot-check any other dock controls on device.
 
 **Handoff (fresh session — builds / investigations):**

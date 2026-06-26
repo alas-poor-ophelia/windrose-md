@@ -103,6 +103,17 @@
   }
 }
 
+/* ---- Grid / list view toggle ---- */
+.windrose-tb-viewtoggle {
+  display: inline-flex;
+  gap: 2px;
+
+  .windrose-tb-iconbtn {
+    width: 26px;
+    height: 26px;
+  }
+}
+
 /* ---- Depth band ---- */
 .windrose-tb-band {
   position: relative;
@@ -667,6 +678,74 @@
 .windrose-tb-grid {
   display: grid;
   gap: 6px;
+}
+
+/* ---- Tile list view (dense rows) ---- */
+.windrose-tb-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.windrose-tb-listrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  height: 34px;
+  padding: 0 6px;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  text-align: left;
+  color: var(--windrose-text-secondary);
+
+  .lthumb {
+    flex-shrink: 0;
+    width: 24px;
+    height: 24px;
+    border-radius: 3px;
+    overflow: hidden;
+    background: var(--windrose-bg-secondary);
+    border: 1px solid var(--windrose-border-secondary);
+  }
+
+  .lname {
+    flex: 1;
+    min-width: 0;
+    font-size: 11px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .lpack {
+    flex-shrink: 0;
+    font-size: 9px;
+    letter-spacing: 0.04em;
+    color: var(--windrose-text-disabled);
+    text-transform: uppercase;
+    max-width: 38%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  &:hover {
+    background: oklch(from var(--windrose-border-primary) l c h / 0.1);
+    color: var(--windrose-text-primary);
+  }
+
+  &.sel {
+    background: oklch(from var(--windrose-border-primary) l c h / 0.16);
+    border-color: var(--windrose-border-primary);
+    color: var(--windrose-text-primary);
+
+    .lpack {
+      color: var(--windrose-gold-bright);
+    }
+  }
 }
 
 /* ---- Tile thumbnails ---- */

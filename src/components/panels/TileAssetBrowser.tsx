@@ -408,6 +408,7 @@ const TileAssetBrowser = memo(({
   const browserRef = useRef<HTMLDivElement>(null);
   const portalRef = useRef<HTMLDivElement | null>(null);
   const [organize, setOrganize] = useState(false);
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [orgSelection, setOrgSelection] = useState<Set<string>>(new Set());
   const [orgSearch, setOrgSearch] = useState('');
   const [orgShowTag, setOrgShowTag] = useState(false);
@@ -947,6 +948,11 @@ const TileAssetBrowser = memo(({
     ? (containerWidth - (fullColCount - 1) * gridGap) / fullColCount
     : tileMin;
 
+  // List view: one tile per row, rendered as a dense [thumb | name | pack] strip.
+  const listMode = !compact && !organize && viewMode === 'list';
+  const rowSlice = listMode ? 1 : fullColCount;
+  const LIST_ROW_H = 34;
+
   const orgRows = useMemo((): TileEntry[][] => {
     if (!organize || containerWidth <= 0) return [];
     const rows: TileEntry[][] = [];
@@ -962,8 +968,8 @@ const TileAssetBrowser = memo(({
 
     if (railSel === 'recent' && recentTileEntries.length > 0) {
       rows.push({ type: 'recentHeader' });
-      for (let i = 0; i < recentTileEntries.length; i += fullColCount) {
-        rows.push({ type: 'tileRow', tiles: recentTileEntries.slice(i, i + fullColCount) });
+      for (let i = 0; i < recentTileEntries.length; i += rowSlice) {
+        rows.push({ type: 'tileRow', tiles: recentTileEntries.slice(i, i + rowSlice) });
       }
     }
 
@@ -972,8 +978,8 @@ const TileAssetBrowser = memo(({
         const collapsed = collapsedCategories.has(category);
         rows.push({ type: 'catHeader', category, count: tiles.length, collapsed });
         if (!collapsed) {
-          for (let i = 0; i < tiles.length; i += fullColCount) {
-            rows.push({ type: 'tileRow', tiles: tiles.slice(i, i + fullColCount) });
+          for (let i = 0; i < tiles.length; i += rowSlice) {
+            rows.push({ type: 'tileRow', tiles: tiles.slice(i, i + rowSlice) });
           }
         }
       }
@@ -987,7 +993,7 @@ const TileAssetBrowser = memo(({
     }
 
     return rows;
-  }, [compact, organize, containerWidth, railSel, recentTileEntries, shownGroups, collapsedCategories, filteredTiles.length, searchFilter, fullColCount]);
+  }, [compact, organize, containerWidth, railSel, recentTileEntries, shownGroups, collapsedCategories, filteredTiles.length, searchFilter, rowSlice]);
 
   const orgVirtualizer = usePreactVirtualizer({
     count: orgRows.length,
@@ -1011,7 +1017,7 @@ const TileAssetBrowser = memo(({
         case 'empty':
           return 40;
         default:
-          return fullCellWidth;
+          return listMode ? LIST_ROW_H : fullCellWidth;
       }
     },
     gap: gridGap,
@@ -1305,6 +1311,26 @@ const TileAssetBrowser = memo(({
           >
             <Icon icon="lucide-sliders-horizontal" size={15} />
           </button>
+        )}
+        {!compact && (
+          <div className="windrose-tb-viewtoggle" role="group" aria-label="View mode">
+            <button
+              className={`windrose-tb-iconbtn ${viewMode === 'grid' ? 'active' : 'ghost'}`}
+              title="Grid view"
+              aria-pressed={viewMode === 'grid'}
+              onClick={() => setViewMode('grid')}
+            >
+              <Icon icon="lucide-layout-grid" size={15} />
+            </button>
+            <button
+              className={`windrose-tb-iconbtn ${viewMode === 'list' ? 'active' : 'ghost'}`}
+              title="List view"
+              aria-pressed={viewMode === 'list'}
+              onClick={() => setViewMode('list')}
+            >
+              <Icon icon="lucide-list" size={15} />
+            </button>
+          </div>
         )}
         {!compact && (
           <button
@@ -1838,7 +1864,32 @@ const TileAssetBrowser = memo(({
                         <span className="count">{row.count}</span>
                       </button>
                     )}
-                    {row.type === 'tileRow' && (
+                    {row.type === 'tileRow' && listMode && (
+                      <div className="windrose-tb-list">
+                        {row.tiles.map((tile: TileEntry) => {
+                          const tsId = tileToTilesetId.get(tile.vaultPath) ?? '';
+                          const isSelected = selectedTilesetId === tsId && selectedTileId === tile.id;
+                          const packName = tilesets.find(t => t.id === tsId)?.name ?? '';
+                          return (
+                            <button
+                              key={tile.vaultPath}
+                              className={`windrose-tb-listrow ${isSelected ? 'sel' : ''}`}
+                              onClick={() => handleTileClick(tsId, tile.id)}
+                              onMouseEnter={() => setHoveredTile(tile)}
+                              onMouseLeave={() => setHoveredTile(null)}
+                              title={tile.filename}
+                            >
+                              <span className="lthumb">
+                                <TileThumbnail url={getThumbUrl(tile.vaultPath)} />
+                              </span>
+                              <span className="lname">{tile.filename}</span>
+                              {packName !== '' && <span className="lpack">{packName}</span>}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                    {row.type === 'tileRow' && !listMode && (
                       <div style={{ display: 'grid', gridTemplateColumns: `repeat(${fullColCount}, 1fr)`, gap: gridGap }}>
                         {row.tiles.map((tile: TileEntry) => {
                           const tsId = tileToTilesetId.get(tile.vaultPath) ?? '';
