@@ -17,14 +17,29 @@
   position: relative;
 }
 
-/* Full-pane: float the tool palette as a vertical bar over the canvas left edge.
-   Absolute removal from the column lets the canvas reclaim the height. */
+/* Stage wraps [tool rail | canvas]. Layout-transparent everywhere except
+   full-pane, so block mode keeps its existing top-toolbar column flow. */
+.windrose-stage {
+  display: contents;
+}
+
+/* Full-pane: the tool palette is a full-height ribbon flush against the canvas's
+   left edge — a flex row [ rail | canvas ] sitting below the map header. */
+.windrose-full-pane .windrose-stage {
+  display: flex;
+  flex-direction: row;
+  flex: 1;
+  min-height: 0;
+}
+
 .windrose-full-pane .windrose-toolbar-anchor {
-  position: absolute;
-  left: 10px;
-  top: 50%;
-  transform: translateY(-50%);
+  flex-shrink: 0;
+  align-self: stretch;
   z-index: 12;
+}
+
+.windrose-full-pane .windrose-full-pane-canvas {
+  min-width: 0;
 }
 
 /* Compass: no expand button in full-pane, so remove the upward offset */

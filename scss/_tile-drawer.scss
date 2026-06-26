@@ -40,58 +40,78 @@
   bottom: 0;
 }
 
-/* Drawer pane wrapper — holds the Tiles/Objects toggle above the active pane */
+/* Drawer pane wrapper — vertical ribbon on the left, active pane fills the rest */
 .windrose-drawer-pane {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   height: 100%;
   min-height: 0;
 }
 
-/* Subtool ribbon — form badge + form-gated placement subtools */
+/* Main content column to the right of the vertical ribbon */
+.windrose-drawer-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Vertical left ribbon — Tiles/Objects tabs + form-gated placement subtools */
 .windrose-fd-subrib {
+  width: 46px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 0;
+  border-right: 1px solid oklch(from var(--windrose-border-primary) l c h / 0.4);
+}
+
+/* Ribbon tab — icon button toggling Tiles vs Objects pane */
+.windrose-fd-ribtab {
+  width: 34px;
+  height: 34px;
   display: flex;
   align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
-  padding: 4px 6px;
-  border-bottom: 1px solid oklch(from var(--windrose-border-primary) l c h / 0.4);
+  justify-content: center;
+  border-radius: 7px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--windrose-text-muted, var(--text-muted));
+  cursor: pointer;
+  box-shadow: none;
 
-  &.windrose-fd-subrib-empty {
-    color: var(--windrose-text-muted, var(--text-muted));
-    font-size: 11px;
-    padding: 6px 8px;
+  &:hover {
+    background: var(--windrose-bg-secondary);
+  }
+
+  &.on {
+    border-color: oklch(from var(--windrose-gold-bright) l c h / 0.5);
+    background: var(--windrose-bg-secondary);
+    color: var(--windrose-gold-bright);
   }
 }
 
-.windrose-fd-subrib-badge {
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  white-space: nowrap;
-  color: var(--windrose-gold-bright);
-  padding: 2px 6px;
-  border: 1px solid oklch(from var(--windrose-gold-bright) l c h / 0.4);
-  border-radius: 3px;
-  background: oklch(from var(--windrose-gold-bright) l c h / 0.1);
-}
-
 .windrose-fd-subrib-div {
-  width: 1px;
-  height: 18px;
+  width: 60%;
+  height: 1px;
   background: oklch(from var(--windrose-border-primary) l c h / 0.4);
 }
 
 .windrose-fd-subrib-tools {
   display: flex;
-  gap: 2px;
+  flex-direction: column;
+  gap: 4px;
+  align-items: center;
 }
 
 .windrose-fd-subtool {
   position: relative;
-  width: 28px;
-  height: 28px;
+  width: 34px;
+  height: 34px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -129,37 +149,47 @@
   }
 }
 
-/* Tiles/Objects segmented control */
-.windrose-drawer-panetabs {
+/* ---- Tablet overrides ---- */
+/* Obsidian .is-tablet injects padding + background on every non-clickable-icon button.
+   Re-state the icon-button box so the ribbon tabs and subtools keep their 34x34 shape. */
+.is-tablet button.windrose-fd-ribtab {
+  width: 34px;
+  height: 34px;
   display: flex;
-  flex-shrink: 0;
-  gap: 2px;
-  padding: 4px;
-  border-bottom: 1px solid oklch(from var(--windrose-border-primary) l c h / 0.5);
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: 7px;
+  border: 1px solid transparent;
+  background: transparent;
+  box-shadow: none;
+  color: var(--windrose-text-muted, var(--text-muted));
 
-  button {
-    flex: 1;
-    height: auto;
-    padding: 4px 0;
-    font-size: 11px;
-    font-weight: 600;
-    color: var(--windrose-text-muted, var(--text-muted));
-    background: transparent;
-    border: 1px solid transparent;
-    border-radius: 4px;
-    cursor: pointer;
-    box-shadow: none;
+  &.on {
+    border-color: oklch(from var(--windrose-gold-bright) l c h / 0.5);
+    background: var(--windrose-bg-secondary);
+    color: var(--windrose-gold-bright);
+  }
+}
 
-    &:hover {
-      color: var(--windrose-text-normal, var(--text-normal));
-      background: oklch(from var(--windrose-border-primary) l c h / 0.15);
-    }
+.is-tablet button.windrose-fd-subtool {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  box-shadow: none;
+  color: var(--windrose-text-muted, var(--text-muted));
 
-    &.on {
-      color: var(--windrose-gold-bright);
-      border-color: oklch(from var(--windrose-gold-bright) l c h / 0.5);
-      background: oklch(from var(--windrose-gold-bright) l c h / 0.12);
-    }
+  &.on {
+    color: var(--windrose-gold-bright);
+    border-color: oklch(from var(--windrose-gold-bright) l c h / 0.5);
+    background: oklch(from var(--windrose-gold-bright) l c h / 0.12);
   }
 }
 

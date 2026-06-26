@@ -591,12 +591,65 @@
   padding: 0;
 }
 
+.is-tablet button.windrose-dock-layer-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+  color: var(--windrose-text-muted);
+}
+
 .is-tablet button.windrose-dock-layer-action-btn {
   padding: 3px 8px;
 }
 
 .is-tablet button.windrose-dock-layer-add {
   padding: 4px 8px;
+}
+
+/* Phase 7 Board->Strata->Layer buttons — neutralize Obsidian's injected padding/background */
+.is-tablet button.windrose-dock-board-tab {
+  padding: 3px 8px;
+  background: oklch(from var(--windrose-border-primary) l c h / 0.1);
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--windrose-text-muted);
+
+  &.active {
+    background: oklch(from var(--windrose-text-primary) l c h / 0.16);
+    color: var(--windrose-text-primary);
+  }
+}
+
+.is-tablet button.windrose-dock-board-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+  color: var(--windrose-text-muted);
+}
+
+.is-tablet button.windrose-dock-stratum-add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+  color: var(--windrose-text-muted);
 }
 
 .windrose-dock-layer-add {

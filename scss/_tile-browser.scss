@@ -324,7 +324,7 @@
 
 /* ---- Jump rail ---- */
 .windrose-tb-rail {
-  width: 104px;
+  width: 128px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -370,6 +370,32 @@
     color: var(--windrose-text-disabled);
     font-variant-numeric: tabular-nums;
   }
+}
+
+/* Category rows: mini 2×2 mosaic + wrapping (never-truncated) name + count. */
+.windrose-tb-railbtn-cat {
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.windrose-tb-railmosaic {
+  flex-shrink: 0;
+  width: 22px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  border-radius: 3px;
+  overflow: hidden;
+  margin-top: 1px;
+}
+
+.windrose-tb-railname {
+  flex: 1;
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.2;
+  text-align: left;
 }
 
 .windrose-tb-raildiv {
@@ -420,9 +446,7 @@
   font-weight: 700;
 
   .catname {
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
+    overflow-wrap: anywhere;
     min-width: 0;
   }
 
@@ -791,9 +815,8 @@
   font-size: 10.5px;
   font-weight: 600;
   color: var(--windrose-text-primary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
+  line-height: 1.2;
 }
 
 .windrose-tb-card-count {
@@ -1090,15 +1113,37 @@
 }
 
 .is-tablet button.windrose-tb-railbtn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
   padding: 7px 8px;
   background: transparent;
   color: var(--windrose-text-muted);
   border: none;
+  border-radius: 6px;
+  text-align: left;
 
   &.on {
     background: linear-gradient(135deg, oklch(0.22 0.025 75) 0%, oklch(0.17 0.015 75) 100%);
     color: var(--windrose-gold-bright);
   }
+
+  /* Category rows align their mosaic + wrapping name to the top. */
+  &.windrose-tb-railbtn-cat {
+    align-items: flex-start;
+    gap: 6px;
+  }
+}
+
+.is-tablet button.windrose-tb-merge-adjust {
+  height: auto;
+  padding: 2px 8px;
+  background: transparent;
+  border: 1px solid color-mix(in oklch, var(--windrose-border-primary) 40%, transparent);
+  border-radius: 5px;
+  color: var(--windrose-gold-bright);
+  box-shadow: none;
 }
 
 .is-tablet button.windrose-tb-iconbtn {
@@ -1148,6 +1193,18 @@
   &:hover {
     color: var(--windrose-text-secondary);
   }
+}
+
+.is-tablet button.windrose-tile-browser-configure-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  background: transparent;
+  border: 1px dashed oklch(from var(--windrose-border-primary) l c h / 0.3);
+  border-radius: 4px;
+  color: var(--windrose-text-muted);
+  box-shadow: none;
 }
 
 .is-tablet .windrose-tb-config {

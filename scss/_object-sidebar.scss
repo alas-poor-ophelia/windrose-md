@@ -4,8 +4,10 @@
 .windrose-object-sidebar {
   $sidebar: &;
 
-  width: 180px;
-  min-width: 180px;
+  // Embedded in the tile drawer: fill the drawer width rather than the
+  // legacy fixed 180px (which left dead space beside the objects grid).
+  width: 100%;
+  min-width: 0;
   height: 100%;
   background-color: var(--windrose-bg-primary);
   border-right: 2px solid var(--windrose-border-primary);

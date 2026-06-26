@@ -153,13 +153,6 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   useEffect(() => {
     if (currentTool === 'addObject') setTilePane('objects');
   }, [currentTool]);
-  const renderPaneTabs = (): VNode => (
-    <div className="windrose-drawer-panetabs">
-      <button className={tilePane === 'tiles' ? 'on' : ''} onClick={() => selectPane('tiles')}>Tiles</button>
-      <button className={tilePane === 'objects' ? 'on' : ''} onClick={() => selectPane('objects')}>Objects</button>
-    </div>
-  );
-
   // Selected tile's derived render-form + armed placement subtool (drawer ribbon).
   const [selectedTileForm, setSelectedTileForm] = useState<TileForm | null>(null);
   const [tileSubtool, setTileSubtool] = useState<TileSubtoolId | null>(null);
@@ -167,10 +160,18 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   useEffect(() => {
     setTileSubtool(selectedTileForm != null ? formDef(selectedTileForm).defaultSubtool : null);
   }, [selectedTileForm]);
-  const renderSubtoolRibbon = (): VNode | null => (
-    tilePane === 'tiles'
-      ? <TileSubtoolRibbon form={selectedTileForm} activeSubtool={tileSubtool} onSubtoolChange={setTileSubtool} />
-      : null
+  // Vertical left ribbon: Tiles/Objects tabs + (on Tiles with a tile selected) placement subtools.
+  const renderDrawerRibbon = (): VNode => (
+    <div className="windrose-fd-subrib">
+      <button className={`windrose-fd-ribtab interactive-child ${tilePane === 'tiles' ? 'on' : ''}`} title="Tiles" onClick={() => selectPane('tiles')}><Icon icon="lucide-grid-3x3" size={16} /></button>
+      <button className={`windrose-fd-ribtab interactive-child ${tilePane === 'objects' ? 'on' : ''}`} title="Objects" onClick={() => selectPane('objects')}><Icon icon="lucide-sofa" size={16} /></button>
+      {tilePane === 'tiles' && selectedTileForm != null && (
+        <>
+          <div className="windrose-fd-subrib-div" />
+          <TileSubtoolRibbon form={selectedTileForm} activeSubtool={tileSubtool} onSubtoolChange={setTileSubtool} />
+        </>
+      )}
+    </div>
   );
   const renderObjectsPane = (): VNode => (
     <ObjectSidebar
@@ -735,6 +736,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
           </div>
         )}
 
+        <div className="windrose-stage">
         <div className="windrose-toolbar-anchor">
           {!isFloating('toolPalette') && (
             <ToolPalette
@@ -1095,8 +1097,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               onFlyoutSelect={handleFlyoutSelect}
             >
               <div className="windrose-drawer-pane">
-              {renderPaneTabs()}
-              {renderSubtoolRibbon()}
+              {renderDrawerRibbon()}
+              <div className="windrose-drawer-main">
               {tilePane === 'objects' ? renderObjectsPane() : (
               <TileAssetBrowser
                 tilesets={availableTilesets}
@@ -1133,6 +1135,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 onSelectedFormChange={setSelectedTileForm}
               />
               )}
+              </div>
               </div>
             </DrawerDock>
           )}
@@ -1337,8 +1340,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                   onFlyoutSelect={handleFlyoutSelect}
                 >
                   <div className="windrose-drawer-pane">
-                  {renderPaneTabs()}
-                  {renderSubtoolRibbon()}
+                  {renderDrawerRibbon()}
+                  <div className="windrose-drawer-main">
                   {tilePane === 'objects' ? renderObjectsPane() : (
                   <TileAssetBrowser
                     tilesets={availableTilesets}
@@ -1375,6 +1378,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                     onSelectedFormChange={setSelectedTileForm}
                   />
                   )}
+                  </div>
                   </div>
                 </DrawerDock>
               )}
@@ -1440,6 +1444,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               </div>
             </div>
           )}
+        </div>
         </div>
 
         {showFooter && (

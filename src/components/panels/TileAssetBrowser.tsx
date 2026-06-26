@@ -38,7 +38,7 @@ import {
 } from '../../persistence/tileMetadata';
 import { predictDepthTier } from '../../assets/depthPredictor';
 import { deriveTileForm } from '../../assets/tileForm';
-import { clusterCategories } from '../../assets/categoryMerge';
+import { clusterCategories, NOISE } from '../../assets/categoryMerge';
 import type { FolderInput } from '../../assets/categoryMerge';
 import { predictSpan, DEFAULT_PIXELS_PER_CELL } from '../../assets/spanPredictor';
 import { runDetectionScan } from '../../assets/tileImageScan';
@@ -746,13 +746,24 @@ const TileAssetBrowser = memo(({
     setOrgTagInput('');
   };
 
-  // Collect available tags, sorted by depth relevance when on grid maps
+  // Collect available tags for the filter chips, then drop folder/pack noise.
+  // A tag is junk if it contains a grid/packaging NOISE word (hex/set/pack/… —
+  // semantic tags never do, only folder & pack names) or matches a pack/dev-id
+  // pattern (e.g. "FCWallsDev1": no spaces, mixes letters + digits). Clean tags
+  // like "walls"/"wooden" survive. Search still matches every tag (getAllTags).
   const availableTags = useMemo(() => {
     if (allTiles.length === 0) return [];
-    if (mapType === 'grid') {
-      return collectDepthAwareTags(allTiles, tileMetadata, tileDepth);
-    }
-    return collectUniqueTags(allTiles, tileMetadata);
+    const raw = mapType === 'grid'
+      ? collectDepthAwareTags(allTiles, tileMetadata, tileDepth)
+      : collectUniqueTags(allTiles, tileMetadata);
+    return raw.filter(tag => {
+      if (!/\s/.test(tag) && /[a-z]/i.test(tag) && /\d/.test(tag)) return false;
+      for (const piece of tag.toLowerCase().split(/[/_\-\s&,()]+/)) {
+        const tok = piece.replace(/[^a-z]/g, '');
+        if (tok !== '' && NOISE.has(tok)) return false;
+      }
+      return true;
+    });
   }, [allTiles, tileMetadata, tileDepth, mapType]);
 
   const filteredTiles = useMemo(() => {
@@ -784,8 +795,21 @@ const TileAssetBrowser = memo(({
       tiles = tiles.filter((t: TileEntry) => packFilter.has(tileToTilesetId.get(t.vaultPath) ?? 'unknown'));
     }
 
+    // Role filter: on grid maps the depth selector scopes the rail to the active
+    // role. A classified tile shows under its role; an unclassified tile (no
+    // depthAffinity yet) is treated as 'ground' — the base role per
+    // DEFAULT_TILE_LAYERS — so the non-ground roles stay clean and untagged
+    // tiles land on Terrain rather than bleeding across every role.
+    // Read-only use of depthAffinity (no persistence → no RCA risk).
+    if (mapType === 'grid') {
+      tiles = tiles.filter((t: TileEntry) => {
+        const affinity = tileMetadata[t.vaultPath]?.depthAffinity ?? 'ground';
+        return affinity === tileDepth;
+      });
+    }
+
     return tiles;
-  }, [allTiles, searchFilter, activeTags, packFilter, tileToTilesetId, tileMetadata]);
+  }, [allTiles, searchFilter, activeTags, packFilter, tileToTilesetId, tileMetadata, tileDepth, mapType]);
 
   // Packs present in the current tile set, for the Pack filter facet (Phase 3).
   const availablePacks = useMemo((): Array<{ id: string; name: string }> => {
@@ -1549,11 +1573,18 @@ const TileAssetBrowser = memo(({
             {Array.from(groupedTiles.entries()).map(([cat, tiles]) => (
               <button
                 key={cat}
-                className={`windrose-tb-railbtn ${railSel === cat ? 'on' : ''}`}
+                className={`windrose-tb-railbtn windrose-tb-railbtn-cat ${railSel === cat ? 'on' : ''}`}
                 onClick={() => setRailSel(cat)}
                 title={cat}
               >
-                <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{cat}</span>
+                <span className="windrose-tb-railmosaic">
+                  {[0, 1, 2, 3].map(i => (
+                    <span key={i} className="windrose-tb-mosaic-cell">
+                      {tiles[i] != null && <TileThumbnail url={getThumbUrl(tiles[i].vaultPath)} />}
+                    </span>
+                  ))}
+                </span>
+                <span className="windrose-tb-railname">{cat}</span>
                 <span className="c">{tiles.length}</span>
               </button>
             ))}

@@ -27,7 +27,7 @@ import type {
 import type { LayerHistorySnapshot } from '#types/hooks/layerHistory.types';
 
 import { useCallback, useMemo } from 'preact/hooks';
-import { getActiveLayer, updateActiveLayer } from '../../persistence/layerAccessor';
+import { getActiveLayer, updateActiveLayer, promoteToStrata } from '../../persistence/layerAccessor';
 
 
 /**
@@ -120,9 +120,34 @@ function useDataHandlers({
     [createLayerDataHandler]
   );
 
-  const handleTilesChange = useMemo(
-    () => createLayerDataHandler<TileAssignment[]>('tiles'),
-    [createLayerDataHandler]
+  // Tiles get a dedicated handler (not the generic factory): the first time a
+  // Simple map ever gains a tile it is promoted to Strata mode, so tile maps
+  // surface the Board→Strata→Layer hierarchy by default. promoteToStrata is the
+  // same idempotent operation the Simple/Strata toggle runs.
+  const handleTilesChange = useCallback(
+    (newValue: TileAssignment[], suppressHistory = false): void => {
+      if (isApplyingHistory()) return;
+
+      updateMapData((currentMapData) => {
+        if (currentMapData == null) return currentMapData;
+
+        const activeLayer = getActiveLayer(currentMapData);
+        if (!suppressHistory) {
+          addToHistory(buildLayerHistorySnapshot(activeLayer, currentMapData.name ?? '', { tiles: newValue } as Partial<LayerHistorySnapshot>, currentMapData.regions ?? [], currentMapData.outlines ?? [], currentMapData.shapeOverlays ?? [], activeLayer.fogOfWar));
+        }
+
+        let nextMapData = updateActiveLayer(currentMapData, { tiles: newValue });
+
+        // 0→first-tile transition (anywhere on the map) promotes Simple → Strata, once.
+        const mapHadTiles = currentMapData.layers.some(l => (l.tiles?.length ?? 0) > 0);
+        if (currentMapData.layerMode !== 'strata' && !mapHadTiles && newValue.length > 0) {
+          nextMapData = promoteToStrata(nextMapData);
+        }
+
+        return nextMapData;
+      });
+    },
+    [updateMapData, addToHistory, isApplyingHistory, buildLayerHistorySnapshot]
   );
 
   // =========================================================================

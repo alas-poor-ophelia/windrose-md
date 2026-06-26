@@ -62,7 +62,7 @@ interface UseTileBrushResult {
 
 function useTileBrush(): UseTileBrushResult {
   const [tileBrowserCollapsed, setTileBrowserCollapsed] = useState<boolean>(false);
-  const [tileBrowserWidth, setTileBrowserWidth] = useState<number>(320);
+  const [tileBrowserWidth, setTileBrowserWidth] = useState<number>(384);
   const [selectedTilesetId, setSelectedTilesetId] = useState<string | null>(null);
   const [selectedTileId, setSelectedTileId] = useState<string | null>(null);
   const [tileRotation, setTileRotation] = useState<number>(0);

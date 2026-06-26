@@ -26,40 +26,30 @@ interface TileSubtoolRibbonProps {
   onSubtoolChange: (id: TileSubtoolId) => void;
 }
 
-const TileSubtoolRibbon = ({ form, activeSubtool, onSubtoolChange }: TileSubtoolRibbonProps): VNode => {
-  if (form == null) {
-    return (
-      <div className="windrose-fd-subrib windrose-fd-subrib-empty">
-        <span>Select a tile</span>
-      </div>
-    );
-  }
+const TileSubtoolRibbon = ({ form, activeSubtool, onSubtoolChange }: TileSubtoolRibbonProps): VNode | null => {
+  if (form == null) return null;
 
   const def = formDef(form);
 
   return (
-    <div className="windrose-fd-subrib">
-      <span className="windrose-fd-subrib-badge" title={`Render form: ${def.label}`}>{def.label}</span>
-      <div className="windrose-fd-subrib-div" />
-      <div className="windrose-fd-subrib-tools">
-        {ALL_SUBTOOLS.map(id => {
-          const supported = formSupportsSubtool(form, id);
-          const meta = SUBTOOL_META[id];
-          const isDefault = def.defaultSubtool === id;
-          return (
-            <button
-              key={id}
-              className={`windrose-fd-subtool interactive-child ${activeSubtool === id ? 'on' : ''} ${supported ? '' : 'dim'}`}
-              disabled={!supported}
-              title={isDefault ? `${meta.title} (default)` : meta.title}
-              onClick={() => { if (supported) onSubtoolChange(id); }}
-            >
-              <Icon icon={meta.icon} size={15} />
-              {isDefault && <span className="windrose-fd-subtool-star">★</span>}
-            </button>
-          );
-        })}
-      </div>
+    <div className="windrose-fd-subrib-tools">
+      {ALL_SUBTOOLS.map(id => {
+        const supported = formSupportsSubtool(form, id);
+        const meta = SUBTOOL_META[id];
+        const isDefault = def.defaultSubtool === id;
+        return (
+          <button
+            key={id}
+            className={`windrose-fd-subtool interactive-child ${activeSubtool === id ? 'on' : ''} ${supported ? '' : 'dim'}`}
+            disabled={!supported}
+            title={isDefault ? `${meta.title} (default)` : meta.title}
+            onClick={() => { if (supported) onSubtoolChange(id); }}
+          >
+            <Icon icon={meta.icon} size={15} />
+            {isDefault && <span className="windrose-fd-subtool-star">★</span>}
+          </button>
+        );
+      })}
     </div>
   );
 };
