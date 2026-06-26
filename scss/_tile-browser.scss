@@ -611,7 +611,7 @@
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
   padding: 8px 7px;
   background: oklch(from var(--windrose-bg-primary) calc(l + 0.02) c h);
   border-right: 1px solid oklch(from var(--windrose-border-primary) l c h / 0.14);
@@ -628,10 +628,15 @@
   padding: 7px 8px;
   border: none;
   border-radius: 6px;
+  /* Grow to fit wrapped category names — host app.css pins `button` to a fixed
+     var(--input-height), which a 2-line name overflows (spilling into the row
+     below). Auto height + a comfortable floor lets the row expand instead. */
+  height: auto;
+  min-height: 30px;
   background: transparent;
   color: var(--windrose-text-muted);
   cursor: pointer;
-  font-size: 10.5px;
+  font-size: 12.5px;
   text-align: left;
   transition: background 0.12s ease, color 0.12s ease;
   width: 100%;

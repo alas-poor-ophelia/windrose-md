@@ -24,6 +24,55 @@
   }
 }
 
+/* ==========================================================================
+   Host-theme button-chrome escape
+   Obsidian's `button:not(.clickable-icon)` (app.css, specificity 0,1,1) paints
+   every native <button> with --interactive-normal and a hard --input-shadow,
+   outranking our single-class (0,1,0) resets — the source of the stray black
+   fills, bevels, and the 2px drop-shadow that bleeds onto the row below.
+   :where() pins this blanket to the host's exact specificity so load order wins,
+   while our state rules (.on / .sel / .active, 0,2,0) still override it.
+   ========================================================================== */
+:where(.windrose-tile-drawer) button:not(.clickable-icon) {
+  box-shadow: none;
+  appearance: none;
+}
+
+/* Host also fills every button with --interactive-normal (#0b0f13), overriding
+   our single-class surfaces — black ribbon tabs, near-black chips. Re-assert the
+   intended rest surface at the host's specificity (button + class = 0,1,1); the
+   :not() chain keeps each rule off its own hover/selected states so those paint. */
+
+/* Buttons whose resting surface is meant to be transparent. */
+button:is(
+  .windrose-tb-railbtn,
+  .windrose-tb-listrow,
+  .windrose-tb-seclabel,
+  .windrose-tb-frow,
+  .windrose-tb-vrow,
+  .windrose-tb-packclear,
+  .windrose-fd-ribtab,
+  .windrose-fd-subtool,
+  .windrose-tile-spine-expand,
+  .windrose-tile-spine-fbtn,
+  .windrose-spine-flyout-close
+):not(:hover):not(.on):not(.sel):not(.active) {
+  background-color: transparent;
+}
+
+/* Filled buttons whose intended rest surface is --windrose-bg-secondary
+   (#262626). :not(.ghost)/:not(.active) leave the transparent and gold icon-button
+   variants alone. */
+button:is(
+  .windrose-tb-iconbtn,
+  .windrose-tb-chip,
+  .windrose-tb-packchip,
+  .windrose-tb-filtbtn,
+  .windrose-tb-card
+):not(.ghost):not(.active):not(.on):not(.sel):not(:hover) {
+  background-color: var(--windrose-bg-secondary);
+}
+
 /* Spine layer — right-pinned, always rendered underneath */
 .windrose-tile-spine-layer {
   position: absolute;

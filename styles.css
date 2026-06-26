@@ -1411,6 +1411,16 @@ button.windrose-object-grid-item:hover,
   box-shadow: 0 0 8px var(--windrose-gold-glow);
 }
 
+/* ---- Grid / list view toggle ---- */
+.windrose-tb-viewtoggle {
+  display: inline-flex;
+  gap: 2px;
+}
+.windrose-tb-viewtoggle .windrose-tb-iconbtn {
+  width: 26px;
+  height: 26px;
+}
+
 /* ---- Depth band ---- */
 .windrose-tb-band {
   position: relative;
@@ -1576,6 +1586,270 @@ button.windrose-object-grid-item:hover,
   opacity: 0.7;
 }
 
+/* ---- Pack filter chips (labeled facet row) ---- */
+.windrose-tb-packs {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 10px 8px;
+  flex-shrink: 0;
+}
+
+.windrose-tb-packlbl {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 8px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: oklch(from var(--windrose-gold-bright) calc(l - 0.22) c h);
+}
+
+.windrose-tb-packchip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  font-size: 10px;
+  white-space: nowrap;
+  background: var(--windrose-bg-secondary);
+  border: 1px solid var(--windrose-border-secondary);
+  border-radius: 999px;
+  color: var(--windrose-text-secondary);
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+.windrose-tb-packchip .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--windrose-depth-ground);
+}
+.windrose-tb-packchip .pc {
+  font-size: 8.5px;
+  color: var(--windrose-text-disabled);
+  font-variant-numeric: tabular-nums;
+}
+.windrose-tb-packchip:hover {
+  border-color: var(--windrose-border-primary-dark);
+  color: var(--windrose-text-primary);
+}
+.windrose-tb-packchip.on {
+  border-color: var(--windrose-border-primary);
+  color: var(--windrose-gold-bright);
+  background: oklch(from var(--windrose-border-primary) l c h/0.18);
+}
+
+.windrose-tb-packclear {
+  background: none;
+  border: none;
+  padding: 0 2px;
+  color: var(--windrose-text-muted);
+  font-size: 10px;
+  cursor: pointer;
+  text-decoration: underline;
+}
+.windrose-tb-packclear:hover {
+  color: var(--windrose-text-primary);
+}
+
+/* ---- Filter button (opens the power-user drill-down) ---- */
+.windrose-tb-filtbtn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 11px;
+  border-radius: 4px;
+  border: 1px solid var(--windrose-border-secondary);
+  background: var(--windrose-bg-secondary);
+  color: var(--windrose-text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+.windrose-tb-filtbtn:hover {
+  border-color: var(--windrose-border-primary-dark);
+  color: var(--windrose-text-primary);
+}
+.windrose-tb-filtbtn.on {
+  border-color: var(--windrose-border-primary);
+  color: var(--windrose-gold-bright);
+  background: oklch(from var(--windrose-border-primary) l c h/0.18);
+}
+.windrose-tb-filtbtn .fc {
+  background: var(--windrose-border-primary);
+  color: var(--windrose-bg-primary);
+  font-size: 9px;
+  font-weight: 800;
+  border-radius: 999px;
+  min-width: 15px;
+  height: 15px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+}
+
+/* ---- Filter drill-down screen (full-takeover overlay) ---- */
+.windrose-tb-fscreen {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  background: var(--windrose-bg-primary);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.windrose-tb-fhead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--windrose-border-secondary);
+  background: linear-gradient(180deg, oklch(from var(--windrose-border-primary) l c h/0.08), transparent);
+}
+
+.windrose-tb-fcrumb {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--windrose-gold-bright);
+}
+.windrose-tb-fcrumb .dim {
+  color: var(--windrose-text-muted);
+  font-weight: 600;
+}
+
+.windrose-tb-fsearchwrap {
+  padding: 8px 12px 0;
+}
+
+.windrose-tb-fscroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 10px;
+}
+
+.windrose-tb-frow {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  width: 100%;
+  padding: 11px 10px;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: left;
+  color: var(--windrose-text-primary);
+}
+.windrose-tb-frow:hover {
+  background: oklch(from var(--windrose-text-primary) l c h/0.04);
+}
+.windrose-tb-frow .lbl {
+  flex: 1;
+  font-size: 13px;
+}
+.windrose-tb-frow .badge {
+  background: var(--windrose-border-primary);
+  color: var(--windrose-bg-primary);
+  font-size: 9px;
+  font-weight: 800;
+  border-radius: 999px;
+  padding: 0 6px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+}
+.windrose-tb-frow.note {
+  cursor: default;
+  color: var(--windrose-text-muted);
+}
+.windrose-tb-frow.note .lbl {
+  color: var(--windrose-text-muted);
+}
+.windrose-tb-frow .auto {
+  font-size: 10px;
+  color: var(--windrose-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.windrose-tb-vrow {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 10px;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: left;
+}
+.windrose-tb-vrow:hover {
+  background: oklch(from var(--windrose-text-primary) l c h/0.04);
+}
+.windrose-tb-vrow .vlbl {
+  font-size: 13px;
+  color: var(--windrose-text-primary);
+}
+
+.windrose-tb-fcheck {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 5px;
+  border: 1.5px solid var(--windrose-border-secondary);
+  color: var(--windrose-bg-primary);
+}
+.windrose-tb-fcheck.on {
+  background: var(--windrose-border-primary);
+  border-color: var(--windrose-border-primary);
+}
+
+.windrose-tb-fempty {
+  padding: 18px;
+  text-align: center;
+  font-size: 11px;
+  color: var(--windrose-text-muted);
+}
+
+.windrose-tb-fbig {
+  margin: 8px 12px 12px;
+  padding: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border-radius: 8px;
+  border: 1px solid var(--windrose-gold-bright);
+  background: linear-gradient(180deg, var(--windrose-gold-bright), var(--windrose-border-primary));
+  color: var(--windrose-bg-primary);
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+}
+.windrose-tb-fbig.ghost {
+  background: transparent;
+  color: var(--windrose-text-secondary);
+  border: 1px solid var(--windrose-border-secondary);
+}
+
 /* ---- Body (rail + grid) ---- */
 /* ---- Merge banner (Option B): provenance for an opened merged category ---- */
 .windrose-tb-merge-banner {
@@ -1623,7 +1897,7 @@ button.windrose-object-grid-item:hover,
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
   padding: 8px 7px;
   background: oklch(from var(--windrose-bg-primary) calc(l + 0.02) c h);
   border-right: 1px solid oklch(from var(--windrose-border-primary) l c h/0.14);
@@ -1641,10 +1915,15 @@ button.windrose-object-grid-item:hover,
   padding: 7px 8px;
   border: none;
   border-radius: 6px;
+  /* Grow to fit wrapped category names — host app.css pins `button` to a fixed
+     var(--input-height), which a 2-line name overflows (spilling into the row
+     below). Auto height + a comfortable floor lets the row expand instead. */
+  height: auto;
+  min-height: 30px;
   background: transparent;
   color: var(--windrose-text-muted);
   cursor: pointer;
-  font-size: 10.5px;
+  font-size: 12.5px;
   text-align: left;
   transition: background 0.12s ease, color 0.12s ease;
   width: 100%;
@@ -1758,6 +2037,66 @@ button.windrose-object-grid-item:hover,
 .windrose-tb-grid {
   display: grid;
   gap: 6px;
+}
+
+/* ---- Tile list view (dense rows) ---- */
+.windrose-tb-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.windrose-tb-listrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  height: 44px;
+  padding: 0 6px;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  text-align: left;
+  color: var(--windrose-text-secondary);
+}
+.windrose-tb-listrow .lthumb {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 3px;
+  overflow: hidden;
+  background: var(--windrose-bg-secondary);
+  border: 1px solid var(--windrose-border-secondary);
+}
+.windrose-tb-listrow .lname {
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+  line-height: 1.25;
+  /* Wrap to two lines, then clamp — keeps each row at a fixed height so the
+     virtualizer's row estimate stays accurate. white-space:normal overrides
+     the nowrap inherited from the head/grid chrome; no standalone line-clamp
+     (it flips computed display to flow-root and breaks the -webkit-box clamp). */
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  /* Hard 2-line cap independent of the -webkit-box clamp (Chromium computes
+     its display as flow-root for a flex child, so the clamp alone won't bound
+     it) — keeps the row's fixed virtualizer height honest. */
+  max-height: 2.5em;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.windrose-tb-listrow:hover {
+  background: oklch(from var(--windrose-border-primary) l c h/0.1);
+  color: var(--windrose-text-primary);
+}
+.windrose-tb-listrow.sel {
+  background: oklch(from var(--windrose-border-primary) l c h/0.16);
+  border-color: var(--windrose-border-primary);
+  color: var(--windrose-text-primary);
 }
 
 /* ---- Tile thumbnails ---- */
@@ -2318,10 +2657,37 @@ button.windrose-object-grid-item:hover,
 .windrose-tb-card,
 .windrose-tb-tileset-tab,
 .windrose-tb-mosaic-card,
-.windrose-tb-foot-clear) {
+.windrose-tb-foot-clear,
+.windrose-tb-listrow,
+.windrose-tb-packchip,
+.windrose-tb-packclear) {
   padding: 0;
   background: none;
   box-shadow: none;
+}
+
+.is-tablet button.windrose-tb-listrow {
+  padding: 0 6px;
+}
+.is-tablet button.windrose-tb-listrow.sel {
+  background: oklch(from var(--windrose-border-primary) l c h/0.16);
+}
+
+.is-tablet button.windrose-tb-packchip {
+  padding: 3px 8px;
+  background: var(--windrose-bg-secondary);
+  border: 1px solid var(--windrose-border-secondary);
+  color: var(--windrose-text-secondary);
+}
+.is-tablet button.windrose-tb-packchip.on {
+  border-color: var(--windrose-border-primary);
+  color: var(--windrose-gold-bright);
+  background: oklch(from var(--windrose-border-primary) l c h/0.18);
+}
+
+.is-tablet button.windrose-tb-packclear {
+  padding: 0 2px;
+  color: var(--windrose-text-muted);
 }
 
 .is-tablet button.windrose-tb-act {
@@ -2789,6 +3155,50 @@ button.windrose-object-grid-item:hover,
   overflow: visible;
 }
 
+/* ==========================================================================
+   Host-theme button-chrome escape
+   Obsidian's `button:not(.clickable-icon)` (app.css, specificity 0,1,1) paints
+   every native <button> with --interactive-normal and a hard --input-shadow,
+   outranking our single-class (0,1,0) resets — the source of the stray black
+   fills, bevels, and the 2px drop-shadow that bleeds onto the row below.
+   :where() pins this blanket to the host's exact specificity so load order wins,
+   while our state rules (.on / .sel / .active, 0,2,0) still override it.
+   ========================================================================== */
+:where(.windrose-tile-drawer) button:not(.clickable-icon) {
+  box-shadow: none;
+  appearance: none;
+}
+
+/* Host also fills every button with --interactive-normal (#0b0f13), overriding
+   our single-class surfaces — black ribbon tabs, near-black chips. Re-assert the
+   intended rest surface at the host's specificity (button + class = 0,1,1); the
+   :not() chain keeps each rule off its own hover/selected states so those paint. */
+/* Buttons whose resting surface is meant to be transparent. */
+button:is(.windrose-tb-railbtn,
+.windrose-tb-listrow,
+.windrose-tb-seclabel,
+.windrose-tb-frow,
+.windrose-tb-vrow,
+.windrose-tb-packclear,
+.windrose-fd-ribtab,
+.windrose-fd-subtool,
+.windrose-tile-spine-expand,
+.windrose-tile-spine-fbtn,
+.windrose-spine-flyout-close):not(:hover):not(.on):not(.sel):not(.active) {
+  background-color: transparent;
+}
+
+/* Filled buttons whose intended rest surface is --windrose-bg-secondary
+   (#262626). :not(.ghost)/:not(.active) leave the transparent and gold icon-button
+   variants alone. */
+button:is(.windrose-tb-iconbtn,
+.windrose-tb-chip,
+.windrose-tb-packchip,
+.windrose-tb-filtbtn,
+.windrose-tb-card):not(.ghost):not(.active):not(.on):not(.sel):not(:hover) {
+  background-color: var(--windrose-bg-secondary);
+}
+
 /* Spine layer — right-pinned, always rendered underneath */
 .windrose-tile-spine-layer {
   position: absolute;
@@ -2862,6 +3272,14 @@ button.windrose-object-grid-item:hover,
   width: 60%;
   height: 1px;
   background: oklch(from var(--windrose-border-primary) l c h/0.4);
+}
+
+.windrose-fd-subrib-cap {
+  font-size: 7px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--windrose-border-primary-dark);
 }
 
 .windrose-fd-subrib-tools {
@@ -8743,6 +9161,65 @@ button.windrose-breadcrumb-link {
   letter-spacing: 0.04em;
 }
 
+/* ---- Simple mode: Boards-only floor list ---- */
+.windrose-dock-floor-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.windrose-dock-floor-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  cursor: pointer;
+  color: var(--windrose-text-secondary);
+  border-bottom: 1px solid oklch(from var(--windrose-border-primary) l c h/0.15);
+  transition: background 0.1s ease;
+}
+.windrose-dock-floor-row:hover {
+  background: oklch(from var(--windrose-border-primary) l c h/0.08);
+  color: var(--windrose-text-primary);
+}
+.windrose-dock-floor-row.active {
+  background: oklch(from var(--windrose-border-primary) l c h/0.15);
+  border-left: 2px solid var(--windrose-text-primary);
+  color: var(--windrose-text-primary);
+}
+.windrose-dock-floor-row.active .windrose-dock-floor-name {
+  font-weight: 600;
+}
+
+.windrose-dock-floor-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.windrose-dock-floor-del {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  padding: 2px;
+  border-radius: 3px;
+  color: var(--windrose-text-disabled);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.1s ease, color 0.1s ease;
+}
+.windrose-dock-floor-del:hover {
+  color: var(--windrose-color-danger, oklch(62% 0.2 25deg));
+}
+.windrose-dock-floor-row:hover .windrose-dock-floor-del {
+  opacity: 1;
+}
+
 .windrose-dock-board-tabs {
   display: flex;
   align-items: center;
@@ -8984,8 +9461,27 @@ button.windrose-breadcrumb-link {
 .windrose-dock-layer-action,
 .windrose-dock-layer-action-btn,
 .windrose-dock-layer-add,
-.windrose-floating-panel-btn) {
+.windrose-floating-panel-btn,
+.windrose-dock-floor-del) {
   padding: 0;
+}
+
+/* Simple-mode floor list — roomier tap targets, neutralize button injection */
+.is-tablet .windrose-dock-floor-row {
+  padding: 11px 10px;
+}
+
+.is-tablet button.windrose-dock-floor-del {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+  color: var(--windrose-text-disabled);
 }
 
 .is-tablet :is(.windrose-dock-right, .windrose-floating-panel-content) button.windrose-color-swatch {
