@@ -6,7 +6,7 @@
  * body (jump rail + tile grid) → loaded-brush footer.
  */
 
-import type { TilesetDef, TileEntry, TileForm, TilesetOverrides, TileLayerRole, TileMetadataStore } from '#types/tiles/tile.types';
+import type { TilesetDef, TileEntry, TileForm, TilesetOverrides, TileLayerRole, TileMetadataStore, TilesetOrigin } from '#types/tiles/tile.types';
 import type { ToolId } from '#types/tools/tool.types';
 import type { FlyoutTile } from './DrawerDock';
 import type { VNode, ComponentChildren } from 'preact';
@@ -850,7 +850,7 @@ const TileAssetBrowser = memo(({
   // humanized short label and a per-pack count, scoped to the active depth on
   // grid maps (mirrors filteredTiles' role filter) so chips match the spec's
   // `packsHere`. Count ignores search/tag/pack filters so it stays stable.
-  const availablePacks = useMemo((): Array<{ id: string; name: string; short: string; count: number }> => {
+  const availablePacks = useMemo((): Array<{ id: string; name: string; short: string; count: number; origin: TilesetOrigin }> => {
     const counts = new Map<string, number>();
     for (const tile of allTiles) {
       if (mapType === 'grid') {
@@ -863,7 +863,13 @@ const TileAssetBrowser = memo(({
     }
     return tilesets
       .filter(ts => counts.has(ts.id))
-      .map(ts => ({ id: ts.id, name: ts.name, short: humanizePackName(ts.name), count: counts.get(ts.id) ?? 0 }));
+      .map(ts => ({
+        id: ts.id,
+        name: ts.name,
+        short: humanizePackName(ts.name),
+        count: counts.get(ts.id) ?? 0,
+        origin: ts.origin ?? 'native',
+      }));
   }, [allTiles, tileToTilesetId, tilesets, tileMetadata, tileDepth, mapType]);
 
   // Cross-pack category merge (Phase 2): collapse messy import-time folders into
@@ -1625,7 +1631,10 @@ const TileAssetBrowser = memo(({
               onClick={() => togglePack(p.id)}
               title={p.name}
             >
-              <span className="dot" />
+              <span
+                className="dot"
+                style={{ background: p.origin === 'dungeondraft' ? 'var(--windrose-accent-blue)' : 'var(--windrose-depth-ground)' }}
+              />
               {p.short}
               <span className="pc">{p.count}</span>
             </button>

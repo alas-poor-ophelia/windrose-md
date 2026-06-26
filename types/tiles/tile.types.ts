@@ -9,9 +9,16 @@
 // Tileset Source Types
 // ===========================================
 
+/** Where a tileset's tiles came from. Drives provenance UI (e.g. the pack chip
+ *  dot color). 'dungeondraft' = extracted from a .dungeondraft_pack import. */
+export type TilesetOrigin = 'dungeondraft' | 'native';
+
 interface TilesetBase {
   id: string;
   name: string;
+  /** Provenance of the tiles. Derived at build from the tiles' vault paths
+   *  (Dungeondraft imports live under `.../dungeondraft-packs/`). @default 'native' */
+  origin?: TilesetOrigin;
   tileWidth: number;
   tileHeight: number;
   tiles: TileEntry[];

@@ -3,7 +3,7 @@
  * Operations for importing and managing hex tile sets from vault folders.
  */
 
-import type { TilesetDef, FolderTileset, TileEntry } from '#types/tiles/tile.types';
+import type { TilesetDef, FolderTileset, TileEntry, TilesetOrigin } from '#types/tiles/tile.types';
 import { TFile } from 'obsidian';
 import type { App } from 'obsidian';
 
@@ -260,10 +260,17 @@ function createTilesetFromTiles(
 
   const detected = autoDetectOverflow(tileWidth, tileHeight);
 
+  // Provenance: Dungeondraft imports extract under `.../dungeondraft-packs/`,
+  // so a tile path under that segment marks the whole set as DD-origin.
+  const origin: TilesetOrigin = tiles.some(t => t.vaultPath.includes('/dungeondraft-packs/'))
+    ? 'dungeondraft'
+    : 'native';
+
   return {
     source: 'folder' as const,
     id: generateTilesetId(folderPath),
     name,
+    origin,
     folderPath,
     tileWidth,
     tileHeight,

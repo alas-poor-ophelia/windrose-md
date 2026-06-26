@@ -264,6 +264,19 @@ describe('tilesetOperations', () => {
       const forest = result.tiles.find(t => t.id === 'forest');
       expect(forest?.category).toBe('trees');
     });
+
+    it('marks origin native for ordinary vault folders', () => {
+      const result = createTilesetFromTiles('Tiles', 'Test', sampleTiles);
+      expect(result.origin).toBe('native');
+    });
+
+    it('marks origin dungeondraft when tiles live under dungeondraft-packs', () => {
+      const ddTiles = [
+        { id: 'wall', filename: 'wall.png', vaultPath: 'windrose-content/dungeondraft-packs/FCWalls/walls/wall.png', category: 'walls' },
+      ];
+      const result = createTilesetFromTiles('windrose-content/dungeondraft-packs/FCWalls', 'FC Walls', ddTiles);
+      expect(result.origin).toBe('dungeondraft');
+    });
   });
 
   describe('ALPHA_COVERAGE_THRESHOLD', () => {
