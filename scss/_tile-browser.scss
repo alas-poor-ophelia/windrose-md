@@ -1416,11 +1416,40 @@
   .windrose-tb-card,
   .windrose-tb-tileset-tab,
   .windrose-tb-mosaic-card,
-  .windrose-tb-foot-clear
+  .windrose-tb-foot-clear,
+  .windrose-tb-listrow,
+  .windrose-tb-packchip,
+  .windrose-tb-packclear
 ) {
   padding: 0;
   background: none;
   box-shadow: none;
+}
+
+.is-tablet button.windrose-tb-listrow {
+  padding: 0 6px;
+
+  &.sel {
+    background: oklch(from var(--windrose-border-primary) l c h / 0.16);
+  }
+}
+
+.is-tablet button.windrose-tb-packchip {
+  padding: 3px 8px;
+  background: var(--windrose-bg-secondary);
+  border: 1px solid var(--windrose-border-secondary);
+  color: var(--windrose-text-secondary);
+
+  &.on {
+    border-color: var(--windrose-border-primary);
+    color: var(--windrose-gold-bright);
+    background: oklch(from var(--windrose-border-primary) l c h / 0.18);
+  }
+}
+
+.is-tablet button.windrose-tb-packclear {
+  padding: 0 2px;
+  color: var(--windrose-text-muted);
 }
 
 .is-tablet button.windrose-tb-act {
