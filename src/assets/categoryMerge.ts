@@ -166,12 +166,34 @@ function clusterCategories(folders: readonly FolderInput[]): MergeCluster[] {
   return clusters;
 }
 
+/**
+ * Humanize a tileset/pack name for chip + filter display: split camelCase and
+ * acronym-word runs, normalize separators, and drop trailing version/dev tokens.
+ * "FCWallsDev1" → "FC Walls", "hex_samples_v2" → "hex samples", "Hex Samples"
+ * unchanged. Falls back to the raw name if humanizing empties it.
+ */
+function humanizePackName(name: string): string {
+  let s = name
+    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2') // ACRONYMWord → ACRONYM Word
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')     // camelCase → spaced
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  // Drop a trailing dev/version/build marker (with optional number), then a
+  // bare trailing number — both only when preceded by a space, so single-word
+  // names and embedded digits survive.
+  s = s.replace(/\s+(dev|build|rev|version|ver|v)\s*\d*$/i, '').trim();
+  s = s.replace(/\s+\d+$/, '').trim();
+  return s === '' ? name.trim() : s;
+}
+
 export {
   MERGE_THRESHOLD,
   NOISE,
   ALIAS,
   normalizeTokens,
   cleanLabel,
+  humanizePackName,
   diceCoefficient,
   clusterCategories,
 };

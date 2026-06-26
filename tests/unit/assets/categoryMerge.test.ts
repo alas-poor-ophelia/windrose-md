@@ -5,9 +5,28 @@ import {
   MERGE_THRESHOLD,
   normalizeTokens,
   cleanLabel,
+  humanizePackName,
   diceCoefficient,
   clusterCategories,
 } from '../../../src/assets/categoryMerge';
+
+describe('categoryMerge — humanizePackName', () => {
+  it('splits acronym+camelCase and strips trailing dev/version tokens', () => {
+    expect(humanizePackName('FCWallsDev1')).toBe('FC Walls');
+    expect(humanizePackName('hex_samples_v2')).toBe('hex samples');
+    expect(humanizePackName('ForestPackBuild12')).toBe('Forest Pack');
+  });
+
+  it('leaves already-clean names untouched', () => {
+    expect(humanizePackName('Hex Samples')).toBe('Hex Samples');
+    expect(humanizePackName('Crypts')).toBe('Crypts');
+  });
+
+  it('falls back to the raw name when humanizing would empty it', () => {
+    expect(humanizePackName('v2')).toBe('v2');
+    expect(humanizePackName('')).toBe('');
+  });
+});
 
 describe('categoryMerge — normalizeTokens', () => {
   it('strips grid/packaging NOISE words', () => {

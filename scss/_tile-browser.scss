@@ -291,6 +291,79 @@
   .x { opacity: 0.7; }
 }
 
+/* ---- Pack filter chips (labeled facet row) ---- */
+.windrose-tb-packs {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 10px 8px;
+  flex-shrink: 0;
+}
+
+.windrose-tb-packlbl {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 8px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: oklch(from var(--windrose-gold-bright) calc(l - 0.22) c h);
+}
+
+.windrose-tb-packchip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  font-size: 10px;
+  white-space: nowrap;
+  background: var(--windrose-bg-secondary);
+  border: 1px solid var(--windrose-border-secondary);
+  border-radius: 999px;
+  color: var(--windrose-text-secondary);
+  cursor: pointer;
+  transition: all 0.12s ease;
+
+  .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background: var(--windrose-depth-ground);
+  }
+
+  .pc {
+    font-size: 8.5px;
+    color: var(--windrose-text-disabled);
+    font-variant-numeric: tabular-nums;
+  }
+
+  &:hover {
+    border-color: var(--windrose-border-primary-dark);
+    color: var(--windrose-text-primary);
+  }
+
+  &.on {
+    border-color: var(--windrose-border-primary);
+    color: var(--windrose-gold-bright);
+    background: oklch(from var(--windrose-border-primary) l c h / 0.18);
+  }
+}
+
+.windrose-tb-packclear {
+  background: none;
+  border: none;
+  padding: 0 2px;
+  color: var(--windrose-text-muted);
+  font-size: 10px;
+  cursor: pointer;
+  text-decoration: underline;
+
+  &:hover { color: var(--windrose-text-primary); }
+}
+
 /* ---- Filter button (opens the power-user drill-down) ---- */
 .windrose-tb-filtbtn {
   flex-shrink: 0;

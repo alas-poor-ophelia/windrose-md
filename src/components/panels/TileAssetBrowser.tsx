@@ -38,7 +38,7 @@ import {
 } from '../../persistence/tileMetadata';
 import { predictDepthTier } from '../../assets/depthPredictor';
 import { deriveTileForm } from '../../assets/tileForm';
-import { clusterCategories, NOISE } from '../../assets/categoryMerge';
+import { clusterCategories, NOISE, humanizePackName } from '../../assets/categoryMerge';
 import type { FolderInput } from '../../assets/categoryMerge';
 import { predictSpan, DEFAULT_PIXELS_PER_CELL } from '../../assets/spanPredictor';
 import { runDetectionScan } from '../../assets/tileImageScan';
@@ -846,15 +846,25 @@ const TileAssetBrowser = memo(({
     return tiles;
   }, [allTiles, searchFilter, activeTags, packFilter, tileToTilesetId, tileMetadata, tileDepth, mapType]);
 
-  // Packs present in the current tile set, for the Pack filter facet (Phase 3).
-  const availablePacks = useMemo((): Array<{ id: string; name: string }> => {
-    const present = new Set<string>();
+  // Packs present in the current role, for the Pack filter facet — with a
+  // humanized short label and a per-pack count, scoped to the active depth on
+  // grid maps (mirrors filteredTiles' role filter) so chips match the spec's
+  // `packsHere`. Count ignores search/tag/pack filters so it stays stable.
+  const availablePacks = useMemo((): Array<{ id: string; name: string; short: string; count: number }> => {
+    const counts = new Map<string, number>();
     for (const tile of allTiles) {
+      if (mapType === 'grid') {
+        const affinity = tileMetadata[tile.vaultPath]?.depthAffinity ?? 'ground';
+        if (affinity !== tileDepth) continue;
+      }
       const id = tileToTilesetId.get(tile.vaultPath);
-      if (id != null) present.add(id);
+      if (id == null) continue;
+      counts.set(id, (counts.get(id) ?? 0) + 1);
     }
-    return tilesets.filter(ts => present.has(ts.id)).map(ts => ({ id: ts.id, name: ts.name }));
-  }, [allTiles, tileToTilesetId, tilesets]);
+    return tilesets
+      .filter(ts => counts.has(ts.id))
+      .map(ts => ({ id: ts.id, name: ts.name, short: humanizePackName(ts.name), count: counts.get(ts.id) ?? 0 }));
+  }, [allTiles, tileToTilesetId, tilesets, tileMetadata, tileDepth, mapType]);
 
   // Cross-pack category merge (Phase 2): collapse messy import-time folders into
   // one canonical category, with cross-pack duplicates merged. Built over ALL tiles
@@ -1129,7 +1139,7 @@ const TileAssetBrowser = memo(({
     { id: 'tags', label: 'Tags', icon: 'lucide-tag', values: availableTags,
       has: (v: string): boolean => activeTags.has(v), toggle: toggleTag, size: activeTags.size },
     { id: 'packs', label: 'Packs', icon: 'lucide-folder-input', values: availablePacks.map(p => p.id),
-      labelFor: (id: string): string => availablePacks.find(p => p.id === id)?.name ?? id,
+      labelFor: (id: string): string => availablePacks.find(p => p.id === id)?.short ?? id,
       has: (v: string): boolean => packFilter.has(v), toggle: togglePack, size: packFilter.size },
   ];
   const clearAllFilters = (): void => { setActiveTags(new Set()); setPackFilter(new Set()); };
@@ -1582,11 +1592,11 @@ const TileAssetBrowser = memo(({
         </div>
       )}
 
-      {/* Tag chips — full mode only */}
+      {/* Tag chips — full mode only; curated to the first 8 (full set via Filter) */}
       {!compact && availableTags.length > 0 && (
         <div className="windrose-tb-chips">
           <HScroll className="windrose-tb-chips-scroll">
-            {availableTags.map(t => (
+            {availableTags.slice(0, 8).map(t => (
               <button
                 key={t}
                 className={`windrose-tb-chip ${activeTags.has(t) ? 'active' : ''}`}
@@ -1602,23 +1612,29 @@ const TileAssetBrowser = memo(({
         </div>
       )}
 
-      {/* Pack chips — full mode only, when more than one pack is present */}
+      {/* Pack chips — full mode only, when more than one pack is present in the role */}
       {!compact && availablePacks.length > 1 && (
-        <div className="windrose-tb-chips windrose-tb-packs">
-          <HScroll className="windrose-tb-chips-scroll">
-            {availablePacks.map(p => (
-              <button
-                key={p.id}
-                className={`windrose-tb-chip ${packFilter.has(p.id) ? 'active' : ''}`}
-                onClick={() => togglePack(p.id)}
-              >
-                {p.name}
-                {packFilter.has(p.id) && (
-                  <span className="x"><Icon icon="lucide-x" size={10} /></span>
-                )}
-              </button>
-            ))}
-          </HScroll>
+        <div className="windrose-tb-packs">
+          <span className="windrose-tb-packlbl">
+            <Icon icon="lucide-folder-input" size={10} />Packs
+          </span>
+          {availablePacks.map(p => (
+            <button
+              key={p.id}
+              className={`windrose-tb-packchip ${packFilter.has(p.id) ? 'on' : ''}`}
+              onClick={() => togglePack(p.id)}
+              title={p.name}
+            >
+              <span className="dot" />
+              {p.short}
+              <span className="pc">{p.count}</span>
+            </button>
+          ))}
+          {packFilter.size > 0 && (
+            <button className="windrose-tb-packclear" onClick={() => setPackFilter(new Set())}>
+              clear
+            </button>
+          )}
         </div>
       )}
 
