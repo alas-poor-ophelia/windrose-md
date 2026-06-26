@@ -381,17 +381,60 @@ const DockLayerList = ({
     );
   }
 
-  // ---- Flat (Simple) list — unchanged behavior ----
+  // ---- Simple mode: Boards-only floor list ----
+  // For board-capable (tile) maps, Simple shows just the floors — pick / add /
+  // delete a floor — with no per-layer rows; layer management lives in Strata.
+  if (onBoardSelect != null) {
+    const canDeleteBoard = boards.length > 1;
+    return (
+      <div ref={listRef} className="windrose-dock-layers simple-floors">
+        <div className="windrose-dock-board-bar simple">
+          <span className="windrose-dock-mode-label">Floors</span>
+          {onToggleStrataMode != null && (
+            <button className="windrose-dock-board-btn mode" onClick={onToggleStrataMode} title="Switch to Strata (layers)">
+              <Icon icon="lucide-layers-3" size={14} />
+            </button>
+          )}
+        </div>
+
+        <div className="windrose-dock-floor-list">
+          {boards.map(board => (
+            <div
+              key={board.id}
+              className={`windrose-dock-floor-row ${board.id === activeBoardId ? 'active' : ''}`}
+              onClick={() => onBoardSelect?.(board.id)}
+              title={board.name}
+            >
+              <Icon icon="lucide-square-stack" size={14} />
+              <span className="windrose-dock-floor-name">{board.name}</span>
+              {canDeleteBoard && onBoardDelete != null && (
+                <button
+                  className="windrose-dock-floor-del"
+                  onClick={(e) => { e.stopPropagation(); onBoardDelete(board.id); }}
+                  title="Delete this floor"
+                >
+                  <Icon icon="lucide-trash-2" size={12} />
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {onBoardAdd != null && (
+          <div className="windrose-dock-layer-footer">
+            <button className="windrose-dock-layer-add" onClick={onBoardAdd} title="Add floor">
+              <Icon icon="lucide-plus" size={14} />
+              <span>Add Floor</span>
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ---- Flat layer list — non-board maps keep today's behavior ----
   return (
     <div ref={listRef} className="windrose-dock-layers">
-      {onToggleStrataMode != null && (
-        <div className="windrose-dock-board-bar simple">
-          <span className="windrose-dock-mode-label">Layers</span>
-          <button className="windrose-dock-board-btn mode" onClick={onToggleStrataMode} title="Switch to Strata (floors)">
-            <Icon icon="lucide-layers-3" size={14} />
-          </button>
-        </div>
-      )}
       {reversedLayers.map((layer, visualIndex) => renderRow(layer, visualIndex, true, layers.length > 1))}
 
       <div className="windrose-dock-layer-footer">

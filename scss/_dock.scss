@@ -347,6 +347,70 @@
   letter-spacing: 0.04em;
 }
 
+/* ---- Simple mode: Boards-only floor list ---- */
+.windrose-dock-floor-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.windrose-dock-floor-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  cursor: pointer;
+  color: var(--windrose-text-secondary);
+  border-bottom: 1px solid oklch(from var(--windrose-border-primary) l c h / 0.15);
+  transition: background 0.1s ease;
+
+  &:hover {
+    background: oklch(from var(--windrose-border-primary) l c h / 0.08);
+    color: var(--windrose-text-primary);
+  }
+
+  &.active {
+    background: oklch(from var(--windrose-border-primary) l c h / 0.15);
+    border-left: 2px solid var(--windrose-text-primary);
+    color: var(--windrose-text-primary);
+
+    .windrose-dock-floor-name {
+      font-weight: 600;
+    }
+  }
+}
+
+.windrose-dock-floor-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.windrose-dock-floor-del {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  padding: 2px;
+  border-radius: 3px;
+  color: var(--windrose-text-disabled);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.1s ease, color 0.1s ease;
+
+  &:hover {
+    color: var(--windrose-color-danger, oklch(0.62 0.2 25));
+  }
+
+  .windrose-dock-floor-row:hover & {
+    opacity: 1;
+  }
+}
+
 .windrose-dock-board-tabs {
   display: flex;
   align-items: center;
