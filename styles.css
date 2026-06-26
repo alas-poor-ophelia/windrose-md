@@ -8753,6 +8753,32 @@ button.windrose-breadcrumb-link {
   scrollbar-width: thin;
 }
 
+/* Board (floor) switcher — a compact dropdown, not a button row. */
+.windrose-dock-board-select {
+  flex: 1;
+  min-width: 0;
+  background: var(--windrose-bg-secondary);
+  color: var(--windrose-text-primary);
+  border: 1px solid var(--windrose-border-secondary);
+  border-radius: 4px;
+  padding: 3px 8px;
+  font-size: 11px;
+  cursor: pointer;
+}
+.windrose-dock-board-select:hover {
+  border-color: var(--windrose-border-primary-dark);
+}
+
+/* Obsidian pins input/select height on tablet — keep it compact. */
+.is-tablet select.windrose-dock-board-select {
+  height: auto;
+  padding: 3px 8px;
+  font-size: 11px;
+  background: var(--windrose-bg-secondary);
+  border: 1px solid var(--windrose-border-secondary);
+  border-radius: 4px;
+}
+
 .windrose-dock-board-tab {
   padding: 3px 8px;
   border: 1px solid transparent;

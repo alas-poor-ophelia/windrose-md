@@ -311,18 +311,20 @@ const DockLayerList = ({
       <div ref={listRef} className="windrose-dock-layers strata">
         {/* Board (floor) switcher */}
         <div className="windrose-dock-board-bar">
-          <div className="windrose-dock-board-tabs">
+          <select
+            className="windrose-dock-board-select"
+            value={activeBoardId}
+            onChange={(e) => {
+              const id = e.currentTarget.value;
+              const board = boards.find(b => b.id === id);
+              if (board) onBoardSelect?.(board.id);
+            }}
+            title="Switch floor"
+          >
             {boards.map(board => (
-              <button
-                key={board.id}
-                className={`windrose-dock-board-tab${board.id === activeBoardId ? ' active' : ''}`}
-                onClick={() => onBoardSelect?.(board.id)}
-                title={board.name}
-              >
-                {board.name}
-              </button>
+              <option key={board.id} value={board.id}>{board.name}</option>
             ))}
-          </div>
+          </select>
           <div className="windrose-dock-board-actions">
             {onBoardAdd != null && (
               <button className="windrose-dock-board-btn" onClick={onBoardAdd} title="Add floor">

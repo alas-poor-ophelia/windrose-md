@@ -10,10 +10,11 @@ Found during on-device review after the P0–P4 rebuild commit (`762c46e3`).
 - [x] **2** Active tool icon — was muted gold on a gold frame (monochrome). Now bright `--windrose-text-primary` icon on `--windrose-bg-primary` + gold border/glow (`_tool-palette.scss`).
 - [x] **8** Strata/depth fan text now uses the stratum hue — added `--depth-color` to the bar segment + fan rows and pointed `.is-active` color at it (`DepthBar.tsx`, `_depth-bar.scss`).
 
-**Still open (deferred this session — handoff):**
-- [ ] **5** Thumbnail/List view-mode toggle missing from the drawer header (state/`viewMode` exists — re-add the control).
-- [ ] **4** Layers "Boards" is a row of buttons — design wants a **dropdown** board switcher. `DockLayerList.tsx` board bar.
-- [ ] **13** Remaining Layers-menu `.is-tablet` — the earlier pass covered board-tab/board-btn/stratum-add/layer-action; recheck after the boards-dropdown (#4) lands, since that adds new controls.
+- [x] **4** Boards switcher is now a **dropdown** (`<select class="windrose-dock-board-select">`) replacing the button row — `DockLayerList.tsx` + `_dock.scss` (incl. `.is-tablet` select override).
+
+**Still open (handoff — fresh session):**
+- [ ] **5** Thumbnail/List view toggle — **reclassified: this is a BUILD, not a missing control.** `TileAssetBrowser` has no `viewMode`/list-mode rendering at all (only the prototype did). Needs: `viewMode` state, a `.windrose-tb-list` dense-row render path, and the header grid/list toggle.
+- [ ] **13** Remaining Layers-menu `.is-tablet` — earlier pass covered board-tab/board-btn/stratum-add/layer-action; the new `.windrose-dock-board-select` got its own tablet override. Spot-check any other dock controls on device.
 
 **Handoff (fresh session — builds / investigations):**
 - [ ] **1** Left ribbon incomplete — Tiles/Objects tabs are mis-positioned, and **Recent/Starred + the Mode subtools are absent from the ribbon** (Recent/Starred currently live in the category rail; subtools only when a tile is selected). Restructure per handoff: ribbon = Tiles/Objects tabs → Recent/Starred → active tool's Mode subtools.
