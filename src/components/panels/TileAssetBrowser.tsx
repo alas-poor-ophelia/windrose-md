@@ -1042,13 +1042,22 @@ const TileAssetBrowser = memo(({
           for (const t of row.tiles) paths.push(t.vaultPath);
         }
       }
+      // Rail category mosaics: each row shows a 2×2 preview of its first 4 tiles.
+      // Those tiles live outside the grid's virtual window, so request them
+      // explicitly or the mosaic stays blank until the category is opened (#12).
+      if (showRail) {
+        for (const group of groupedTiles.values()) {
+          const n = Math.min(4, group.length);
+          for (let i = 0; i < n; i++) paths.push(group[i].vaultPath);
+        }
+      }
     } else {
       // Compact mode: no virtualization, request all filtered tiles
       for (const t of filteredTiles) paths.push(t.vaultPath);
     }
 
     if (paths.length > 0) requestThumbs(paths);
-  }, [active, tilesets, organize, compact, orgRows, fullRows, orgRange, fullRange, filteredTiles, requestThumbs, fullVirtualizer, orgVirtualizer]);
+  }, [active, tilesets, organize, compact, orgRows, fullRows, orgRange, fullRange, filteredTiles, requestThumbs, fullVirtualizer, orgVirtualizer, showRail, groupedTiles]);
 
   // ---- Empty state: no tilesets ----
 
