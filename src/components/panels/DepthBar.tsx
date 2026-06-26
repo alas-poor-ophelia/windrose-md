@@ -77,6 +77,7 @@ function DepthBar({ active, onPick, hidden, onToggleHide, tileCounts, compact = 
             <button
               key={d.id}
               className={cls}
+              style={{ '--depth-color': `var(--windrose-depth-${d.id})` }}
               title={`${d.label} · ${count} tiles${isOff ? ' · hidden' : ''}`}
               onClick={() => handleSegmentClick(d.id)}
             >
@@ -119,6 +120,7 @@ function DepthBar({ active, onPick, hidden, onToggleHide, tileCounts, compact = 
                 <button
                   key={d.id}
                   className={cls}
+                  style={{ '--depth-color': `var(--windrose-depth-${d.id})` }}
                   onClick={() => handleFanPick(d.id)}
                 >
                   <span className="windrose-db-cap" style={{ '--depth-color': `var(--windrose-depth-${d.id})`, opacity: isOff ? 0.4 : 1 }} />

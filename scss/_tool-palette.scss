@@ -263,16 +263,17 @@
     height: 38px;
   }
 
-  /* Active = gold border + glow (vs the horizontal bar's filled style) */
+  /* Active = gold border + glow framing a bright, high-contrast icon (the gold
+     icon-on-gold-frame read as nearly invisible). */
   .windrose-tool-btn-active {
-    background-color: var(--windrose-bg-secondary);
+    background-color: var(--windrose-bg-primary);
     border-color: var(--windrose-gold-bright);
     box-shadow:
       0 0 8px oklch(from var(--windrose-gold-bright) l c h / 0.5),
       inset 0 0 0 1px oklch(from var(--windrose-gold-bright) l c h / 0.35);
 
     svg {
-      color: var(--windrose-gold-bright);
+      color: var(--windrose-text-primary);
       filter: none;
     }
   }

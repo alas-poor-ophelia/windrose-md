@@ -1566,7 +1566,7 @@ const TileAssetBrowser = memo(({
               className={`windrose-tb-railbtn ${railSel === 'all' ? 'on' : ''}`}
               onClick={() => setRailSel('all')}
             >
-              <Icon icon="lucide-grid-2x2" size={14} />
+              <Icon icon="lucide-layout-dashboard" size={14} />
               All
               <span className="c">{filteredTiles.length}</span>
             </button>

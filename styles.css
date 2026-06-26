@@ -710,15 +710,16 @@ body {
   height: 38px;
 }
 .windrose-tool-palette-vertical {
-  /* Active = gold border + glow (vs the horizontal bar's filled style) */
+  /* Active = gold border + glow framing a bright, high-contrast icon (the gold
+     icon-on-gold-frame read as nearly invisible). */
 }
 .windrose-tool-palette-vertical .windrose-tool-btn-active {
-  background-color: var(--windrose-bg-secondary);
+  background-color: var(--windrose-bg-primary);
   border-color: var(--windrose-gold-bright);
   box-shadow: 0 0 8px oklch(from var(--windrose-gold-bright) l c h/0.5), inset 0 0 0 1px oklch(from var(--windrose-gold-bright) l c h/0.35);
 }
 .windrose-tool-palette-vertical .windrose-tool-btn-active svg {
-  color: var(--windrose-gold-bright);
+  color: var(--windrose-text-primary);
   filter: none;
 }
 .windrose-tool-palette-vertical {
@@ -2515,7 +2516,7 @@ button.windrose-object-grid-item:hover,
 }
 .windrose-db-seg.is-active {
   flex: 1 1 auto;
-  color: var(--windrose-gold-bright);
+  color: var(--depth-color, var(--windrose-gold-bright));
   border-color: var(--windrose-border-primary);
   background: linear-gradient(180deg, oklch(20% 0.03 75deg), oklch(14% 0.02 70deg));
   box-shadow: inset 0 0 0 1px oklch(from var(--windrose-border-primary) l c h/0.12);
@@ -2644,7 +2645,7 @@ button.windrose-object-grid-item:hover,
 }
 .windrose-db-fanrow.is-active {
   background: linear-gradient(90deg, oklch(from var(--windrose-border-primary) l c h/0.2), oklch(from var(--windrose-border-primary) l c h/0.04));
-  color: var(--windrose-gold-bright);
+  color: var(--depth-color, var(--windrose-gold-bright));
 }
 .windrose-db-fanrow .windrose-db-cap {
   top: 6px;
@@ -2752,7 +2753,7 @@ button.windrose-object-grid-item:hover,
 }
 .is-tablet button.windrose-db-fanrow.is-active {
   background: linear-gradient(90deg, oklch(from var(--windrose-border-primary) l c h/0.2), oklch(from var(--windrose-border-primary) l c h/0.04));
-  color: var(--windrose-gold-bright);
+  color: var(--depth-color, var(--windrose-gold-bright));
 }
 
 /* ---- Reduced motion ---- */

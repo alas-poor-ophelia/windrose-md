@@ -2,6 +2,28 @@
 
 Companion to `TILE-UI-FIDELITY-AUDIT.md`. Grounded in a 3-scout source map of the **real** component tree (file:line below). Branch: `feature/tile-ui-redesign`.
 
+## P5 — Post-rebuild punch-list (Guildmaster review, 2026-06-25)
+Found during on-device review after the P0–P4 rebuild commit (`762c46e3`).
+
+**Quick strikes — DONE (commit after `762c46e3`):**
+- [x] **6** Tiles ribbon icon — `lucide-grid-3x3` AND `lucide-grid-2x2` are both invalid in this Obsidian build (silent empty span); switched to `lucide-layout-dashboard`. Also fixed the identically-broken rail "All" icon (`TileAssetBrowser.tsx`).
+- [x] **2** Active tool icon — was muted gold on a gold frame (monochrome). Now bright `--windrose-text-primary` icon on `--windrose-bg-primary` + gold border/glow (`_tool-palette.scss`).
+- [x] **8** Strata/depth fan text now uses the stratum hue — added `--depth-color` to the bar segment + fan rows and pointed `.is-active` color at it (`DepthBar.tsx`, `_depth-bar.scss`).
+
+**Still open (deferred this session — handoff):**
+- [ ] **5** Thumbnail/List view-mode toggle missing from the drawer header (state/`viewMode` exists — re-add the control).
+- [ ] **4** Layers "Boards" is a row of buttons — design wants a **dropdown** board switcher. `DockLayerList.tsx` board bar.
+- [ ] **13** Remaining Layers-menu `.is-tablet` — the earlier pass covered board-tab/board-btn/stratum-add/layer-action; recheck after the boards-dropdown (#4) lands, since that adds new controls.
+
+**Handoff (fresh session — builds / investigations):**
+- [ ] **1** Left ribbon incomplete — Tiles/Objects tabs are mis-positioned, and **Recent/Starred + the Mode subtools are absent from the ribbon** (Recent/Starred currently live in the category rail; subtools only when a tile is selected). Restructure per handoff: ribbon = Tiles/Objects tabs → Recent/Starred → active tool's Mode subtools.
+- [ ] **3** Subtool flyouts don't open — the blue subtool triangle shows but the flyout never opens in the vertical palette. Investigate `ToolPalette` subtool-menu trigger/positioning in vertical mode.
+- [ ] **7** Layers **Simple mode should be Boards-only** (currently a flat layer list). Confirm against `Layers × Tiles.html` / README, then change the Simple branch in `DockLayerList.tsx`.
+- [ ] **9** **Filters menu entirely missing** — the power-user Filter drill-down (search + Filter button → Tags/Packs checkable value lists → Done), shared state with quick chips. Whole feature build per README §"Filter row".
+- [ ] **10** Pack/tag chip section is wrong vs the design (layout/behaviour) — compare to prototype.
+- [ ] **11** Category-vs-Packs — the legible rail may still be **pack-shaped, not the merged "Category" concept**; verify `groupedTiles`/`mergedCategories` is actually merging across packs (may need a re-import to populate `TileEntry.category`). Investigate before assuming a code bug.
+- [ ] **12** 2×2 rail mosaics don't load until clicked — `getThumbUrl` returns but the thumbnail callback/`requestThumbs` never fires for some rail previews (visibility-driven pipeline not triggered for rail mosaics). Wire `requestThumbs` for rail preview tiles.
+
 ## Status (2026-06-25)
 - ✅ **P0 — Objects width** (`_object-sidebar.scss` fluid) · **drawer 320→384** (`useTileBrush.ts`) · **Strata-on-first-tile** (`useDataHandlers.ts` dedicated `handleTilesChange` → `promoteToStrata`). Live-verified.
 - ✅ **P1 — Tool rail containment**: `.windrose-stage` flex-row wrap (`DungeonMapTracker.tsx` + `_full-pane.scss`), vertical palette `height:100%` (`_tool-palette.scss`). Now a full-height flush-left ribbon; undo/redo fell to the bottom. Live-verified.
