@@ -692,7 +692,7 @@
   gap: 8px;
   width: 100%;
   min-width: 0;
-  height: 34px;
+  height: 44px;
   padding: 0 6px;
   background: none;
   border: 1px solid transparent;
@@ -703,8 +703,8 @@
 
   .lthumb {
     flex-shrink: 0;
-    width: 24px;
-    height: 24px;
+    width: 28px;
+    height: 28px;
     border-radius: 3px;
     overflow: hidden;
     background: var(--windrose-bg-secondary);
@@ -715,21 +715,15 @@
     flex: 1;
     min-width: 0;
     font-size: 11px;
-    white-space: nowrap;
+    line-height: 1.25;
+    /* Wrap to two lines, then clamp — keeps each row at a fixed height so the
+       virtualizer's row estimate stays accurate. */
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
     overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .lpack {
-    flex-shrink: 0;
-    font-size: 9px;
-    letter-spacing: 0.04em;
-    color: var(--windrose-text-disabled);
-    text-transform: uppercase;
-    max-width: 38%;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    overflow-wrap: anywhere;
   }
 
   &:hover {
@@ -741,10 +735,6 @@
     background: oklch(from var(--windrose-border-primary) l c h / 0.16);
     border-color: var(--windrose-border-primary);
     color: var(--windrose-text-primary);
-
-    .lpack {
-      color: var(--windrose-gold-bright);
-    }
   }
 }
 

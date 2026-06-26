@@ -951,7 +951,7 @@ const TileAssetBrowser = memo(({
   // List view: one tile per row, rendered as a dense [thumb | name | pack] strip.
   const listMode = !compact && !organize && viewMode === 'list';
   const rowSlice = listMode ? 1 : fullColCount;
-  const LIST_ROW_H = 34;
+  const LIST_ROW_H = 44;
 
   const orgRows = useMemo((): TileEntry[][] => {
     if (!organize || containerWidth <= 0) return [];
@@ -1869,7 +1869,6 @@ const TileAssetBrowser = memo(({
                         {row.tiles.map((tile: TileEntry) => {
                           const tsId = tileToTilesetId.get(tile.vaultPath) ?? '';
                           const isSelected = selectedTilesetId === tsId && selectedTileId === tile.id;
-                          const packName = tilesets.find(t => t.id === tsId)?.name ?? '';
                           return (
                             <button
                               key={tile.vaultPath}
@@ -1883,7 +1882,6 @@ const TileAssetBrowser = memo(({
                                 <TileThumbnail url={getThumbUrl(tile.vaultPath)} />
                               </span>
                               <span className="lname">{tile.filename}</span>
-                              {packName !== '' && <span className="lpack">{packName}</span>}
                             </button>
                           );
                         })}
