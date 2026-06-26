@@ -387,6 +387,9 @@ const TileAssetBrowser = memo(({
   const [activeTags, setActiveTags] = useState<Set<string>>(new Set());
   const [packFilter, setPackFilter] = useState<Set<string>>(new Set());
   const [openCat, setOpenCat] = useState<string | null>(null);
+  // Power-user Filter drill-down screen: null = closed, 'types' = top level, else a facet id ('tags' | 'packs').
+  const [filterView, setFilterView] = useState<string | null>(null);
+  const [filterSearch, setFilterSearch] = useState<string>('');
   const previewRef = useRef<HTMLCanvasElement>(null);
   const browserRef = useRef<HTMLDivElement>(null);
   const portalRef = useRef<HTMLDivElement | null>(null);
@@ -408,6 +411,8 @@ const TileAssetBrowser = memo(({
     setActiveTags(new Set());
     setPackFilter(new Set());
     setOpenCat(null);
+    setFilterView(null);
+    setFilterSearch('');
   }, [tileDepth]);
 
   const handleTileClick = (tilesetId: string, tileId: string): void => {
@@ -1065,6 +1070,26 @@ const TileAssetBrowser = memo(({
   const isGrid = mapType === 'grid';
   const depthLabel = isGrid ? depthMeta(tileDepth).label.toLowerCase() : tileLayer;
 
+  // Unified facet model — the quick chips AND the dedicated Filter screen share one filter state.
+  const activeFilterCount = activeTags.size + packFilter.size;
+  const filterTypes: Array<{
+    id: string;
+    label: string;
+    icon: string;
+    values: string[];
+    labelFor?: (v: string) => string;
+    has: (v: string) => boolean;
+    toggle: (v: string) => void;
+    size: number;
+  }> = [
+    { id: 'tags', label: 'Tags', icon: 'lucide-tag', values: availableTags,
+      has: (v: string): boolean => activeTags.has(v), toggle: toggleTag, size: activeTags.size },
+    { id: 'packs', label: 'Packs', icon: 'lucide-folder-input', values: availablePacks.map(p => p.id),
+      labelFor: (id: string): string => availablePacks.find(p => p.id === id)?.name ?? id,
+      has: (v: string): boolean => packFilter.has(v), toggle: togglePack, size: packFilter.size },
+  ];
+  const clearAllFilters = (): void => { setActiveTags(new Set()); setPackFilter(new Set()); };
+
   return (
     <div ref={browserRef} className="windrose-tile-browser">
       <CornerBrackets classPrefix="windrose-tb-bracket" variant="minimal" filterId="tb-bracket" />
@@ -1479,6 +1504,17 @@ const TileAssetBrowser = memo(({
               onInput={(e: Event) => setSearchFilter((e.target as HTMLInputElement).value)}
             />
           </div>
+          {!compact && (
+            <button
+              className={`windrose-tb-filtbtn ${activeFilterCount > 0 ? 'on' : ''}`}
+              title="All filters"
+              onClick={() => { setFilterSearch(''); setFilterView('types'); }}
+            >
+              <Icon icon="lucide-filter" size={13} />
+              Filter
+              {activeFilterCount > 0 && <span className="fc">{activeFilterCount}</span>}
+            </button>
+          )}
         </div>
       )}
 
@@ -1519,6 +1555,121 @@ const TileAssetBrowser = memo(({
               </button>
             ))}
           </HScroll>
+        </div>
+      )}
+
+      {/* Dedicated Filter screen (power-user) — drills Tags / Packs, searchable; shares state with the quick chips */}
+      {!compact && filterView != null && (
+        <div className="windrose-tb-fscreen">
+          <div className="windrose-tb-fhead">
+            <button
+              className="windrose-tb-iconbtn"
+              title="Back"
+              onClick={() => { setFilterView(filterView === 'types' ? null : 'types'); }}
+            >
+              <Icon icon="lucide-arrow-left" size={15} />
+            </button>
+            <div className="windrose-tb-fcrumb">
+              {filterView === 'types' ? (
+                'Filter'
+              ) : (
+                <>
+                  <span className="dim">Filter</span>
+                  <Icon icon="lucide-chevron-right" size={11} />
+                  {filterTypes.find(f => f.id === filterView)?.label ?? ''}
+                </>
+              )}
+            </div>
+            <button
+              className="windrose-tb-iconbtn ghost"
+              style={{ marginLeft: 'auto' }}
+              title="Close"
+              onClick={() => { setFilterView(null); }}
+            >
+              <Icon icon="lucide-x" size={15} />
+            </button>
+          </div>
+
+          {filterView === 'types' ? (
+            <>
+              <div className="windrose-tb-fscroll">
+                {filterTypes.map(f => (
+                  <button
+                    key={f.id}
+                    className="windrose-tb-frow"
+                    onClick={() => { setFilterSearch(''); setFilterView(f.id); }}
+                  >
+                    <Icon icon={f.icon} size={16} />
+                    <span className="lbl">{f.label}</span>
+                    {f.size > 0 && <span className="badge">{f.size}</span>}
+                    <Icon icon="lucide-chevron-right" size={15} />
+                  </button>
+                ))}
+                <div className="windrose-tb-frow note">
+                  <Icon icon="lucide-layout-dashboard" size={16} />
+                  <span className="lbl">Grid</span>
+                  <span className="auto">auto · {isGrid ? 'grid' : String(mapType)} map</span>
+                </div>
+              </div>
+              {activeFilterCount > 0 && (
+                <button className="windrose-tb-fbig ghost" onClick={clearAllFilters}>
+                  Clear all filters
+                </button>
+              )}
+            </>
+          ) : (() => {
+            const f = filterTypes.find(x => x.id === filterView);
+            if (f == null) return null;
+            const q = filterSearch.toLowerCase();
+            const vis = f.values.filter(v =>
+              String(f.labelFor != null ? f.labelFor(v) : v).toLowerCase().includes(q));
+            return (
+              <>
+                <div className="windrose-tb-fsearchwrap">
+                  <div className="windrose-tb-search">
+                    <Icon icon="lucide-search" size={14} />
+                    <input
+                      autoFocus
+                      placeholder={`Search ${f.label.toLowerCase()}…`}
+                      value={filterSearch}
+                      onInput={(e: Event) => setFilterSearch((e.target as HTMLInputElement).value)}
+                    />
+                    {filterSearch !== '' && (
+                      <button
+                        className="windrose-tb-iconbtn ghost"
+                        style={{ width: 20, height: 20 }}
+                        title="Clear search"
+                        onClick={() => { setFilterSearch(''); }}
+                      >
+                        <Icon icon="lucide-x" size={12} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <div className="windrose-tb-fscroll">
+                  {vis.map(v => {
+                    const on = f.has(v);
+                    const lbl = f.labelFor != null ? f.labelFor(v) : v;
+                    return (
+                      <button key={v} className="windrose-tb-vrow" onClick={() => { f.toggle(v); }}>
+                        <span className={`windrose-tb-fcheck ${on ? 'on' : ''}`}>
+                          {on && <Icon icon="lucide-check" size={13} />}
+                        </span>
+                        <span className="vlbl">{lbl}</span>
+                      </button>
+                    );
+                  })}
+                  {vis.length === 0 && (
+                    <div className="windrose-tb-fempty">No {f.label.toLowerCase()} match “{filterSearch}”.</div>
+                  )}
+                </div>
+                <button className="windrose-tb-fbig" onClick={() => { setFilterView('types'); }}>
+                  <Icon icon="lucide-check" size={15} />
+                  Done{f.size > 0 ? ` · ${f.size}` : ''}
+                </button>
+              </>
+            );
+          })()}
         </div>
       )}
 
