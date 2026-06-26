@@ -717,11 +717,17 @@
     font-size: 11px;
     line-height: 1.25;
     /* Wrap to two lines, then clamp — keeps each row at a fixed height so the
-       virtualizer's row estimate stays accurate. */
+       virtualizer's row estimate stays accurate. white-space:normal overrides
+       the nowrap inherited from the head/grid chrome; no standalone line-clamp
+       (it flips computed display to flow-root and breaks the -webkit-box clamp). */
+    white-space: normal;
     display: -webkit-box;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
-    line-clamp: 2;
+    /* Hard 2-line cap independent of the -webkit-box clamp (Chromium computes
+       its display as flow-root for a flex child, so the clamp alone won't bound
+       it) — keeps the row's fixed virtualizer height honest. */
+    max-height: 2.5em;
     overflow: hidden;
     overflow-wrap: anywhere;
   }

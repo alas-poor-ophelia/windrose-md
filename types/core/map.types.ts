@@ -310,6 +310,9 @@ export interface MapData {
   // View state (pan/zoom) - optional, defaults calculated based on map type
   viewState?: StoredViewState;
 
+  // Tile drawer view: grid (thumbnail wall) vs list (dense rows). Persisted per map.
+  tileViewMode?: 'grid' | 'list';
+
   // Map dimensions - optional, defaults from DEFAULTS
   dimensions?: MapDimensions;
 

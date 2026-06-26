@@ -324,7 +324,16 @@ interface TileAssetBrowserProps {
    */
   railSel?: RailSelection;
   onRailSelChange?: (sel: RailSelection) => void;
+  /**
+   * Grid vs list tile view. When provided (with onViewModeChange) the host owns
+   * it so the choice survives the Objects-pane swap and persists per map;
+   * omitted = uncontrolled (internal state).
+   */
+  viewMode?: TileViewMode;
+  onViewModeChange?: (mode: TileViewMode) => void;
 }
+
+export type TileViewMode = 'grid' | 'list';
 
 // `string & {}` keeps the literal autocomplete hints while still allowing any
 // dynamic tileset id (set via setRailSel(cat)) without collapsing to bare string.
@@ -384,6 +393,8 @@ const TileAssetBrowser = memo(({
   onSelectedFormChange,
   railSel: railSelProp,
   onRailSelChange,
+  viewMode: viewModeProp,
+  onViewModeChange,
 }: TileAssetBrowserProps): VNode | null => {
   const app = useApp();
   const [searchFilter, setSearchFilter] = useState<string>('');
@@ -408,7 +419,11 @@ const TileAssetBrowser = memo(({
   const browserRef = useRef<HTMLDivElement>(null);
   const portalRef = useRef<HTMLDivElement | null>(null);
   const [organize, setOrganize] = useState(false);
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  // Controlled/uncontrolled hybrid (mirrors railSel): host-owned when supplied,
+  // so the grid/list choice survives the Objects swap and persists per map.
+  const [viewModeLocal, setViewModeLocal] = useState<TileViewMode>('grid');
+  const viewMode = viewModeProp ?? viewModeLocal;
+  const setViewMode = onViewModeChange ?? setViewModeLocal;
   const [orgSelection, setOrgSelection] = useState<Set<string>>(new Set());
   const [orgSearch, setOrgSearch] = useState('');
   const [orgShowTag, setOrgShowTag] = useState(false);

@@ -157,6 +157,12 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   // Category-rail / view selection, owned here so the Recent/Starred view-filters
   // can live on the drawer ribbon while the rail (categories) lives in the browser.
   const [tileRailSel, setTileRailSel] = useState<RailSelection>('all');
+  // Grid/list tile view, owned here so it survives the Objects-pane swap (which
+  // unmounts the browser) and persists per map via mapData.
+  const tileViewMode = mapData?.tileViewMode ?? 'grid';
+  const setTileViewMode = useCallback((mode: 'grid' | 'list'): void => {
+    updateMapData((prev: MapData) => ({ ...prev, tileViewMode: mode }));
+  }, [updateMapData]);
   // Selected tile's derived render-form + armed placement subtool (drawer ribbon).
   const [selectedTileForm, setSelectedTileForm] = useState<TileForm | null>(null);
   const [tileSubtool, setTileSubtool] = useState<TileSubtoolId | null>(null);
@@ -1147,6 +1153,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 onSelectedFormChange={setSelectedTileForm}
                 railSel={tileRailSel}
                 onRailSelChange={setTileRailSel}
+                viewMode={tileViewMode}
+                onViewModeChange={setTileViewMode}
               />
               )}
               </div>
@@ -1392,6 +1400,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                     onSelectedFormChange={setSelectedTileForm}
                     railSel={tileRailSel}
                     onRailSelChange={setTileRailSel}
+                    viewMode={tileViewMode}
+                    onViewModeChange={setTileViewMode}
                   />
                   )}
                   </div>
