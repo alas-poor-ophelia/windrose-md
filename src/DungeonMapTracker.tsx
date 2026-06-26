@@ -64,6 +64,7 @@ import { useTileBrush } from './hooks/state/useTileBrush';
 import { useThemeMode } from './hooks/state/useThemeMode';
 import { SubHexBreadcrumb } from './components/controls/SubHexBreadcrumb';
 import { TileAssetBrowser } from './components/panels/TileAssetBrowser';
+import type { RailSelection } from './components/panels/TileAssetBrowser';
 import { DrawerDock } from './components/panels/DrawerDock';
 import type { FlyoutTile } from './components/panels/DrawerDock';
 import { RA_ICONS } from './assets/rpgAwesomeIcons';
@@ -153,6 +154,9 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   useEffect(() => {
     if (currentTool === 'addObject') setTilePane('objects');
   }, [currentTool]);
+  // Category-rail / view selection, owned here so the Recent/Starred view-filters
+  // can live on the drawer ribbon while the rail (categories) lives in the browser.
+  const [tileRailSel, setTileRailSel] = useState<RailSelection>('all');
   // Selected tile's derived render-form + armed placement subtool (drawer ribbon).
   const [selectedTileForm, setSelectedTileForm] = useState<TileForm | null>(null);
   const [tileSubtool, setTileSubtool] = useState<TileSubtoolId | null>(null);
@@ -165,9 +169,17 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     <div className="windrose-fd-subrib">
       <button className={`windrose-fd-ribtab interactive-child ${tilePane === 'tiles' ? 'on' : ''}`} title="Tiles" onClick={() => selectPane('tiles')}><Icon icon="lucide-layout-dashboard" size={16} /></button>
       <button className={`windrose-fd-ribtab interactive-child ${tilePane === 'objects' ? 'on' : ''}`} title="Objects" onClick={() => selectPane('objects')}><Icon icon="lucide-sofa" size={16} /></button>
+      {tilePane === 'tiles' && (
+        <>
+          <div className="windrose-fd-subrib-div" />
+          <button className={`windrose-fd-ribtab interactive-child ${tileRailSel === 'recent' ? 'on' : ''}`} title="Recent" onClick={() => setTileRailSel(tileRailSel === 'recent' ? 'all' : 'recent')}><Icon icon="lucide-clock" size={16} /></button>
+          <button className={`windrose-fd-ribtab interactive-child ${tileRailSel === 'starred' ? 'on' : ''}`} title="Starred" onClick={() => setTileRailSel(tileRailSel === 'starred' ? 'all' : 'starred')}><Icon icon="lucide-star" size={16} /></button>
+        </>
+      )}
       {tilePane === 'tiles' && selectedTileForm != null && (
         <>
           <div className="windrose-fd-subrib-div" />
+          <div className="windrose-fd-subrib-cap">Mode</div>
           <TileSubtoolRibbon form={selectedTileForm} activeSubtool={tileSubtool} onSubtoolChange={setTileSubtool} />
         </>
       )}
@@ -1133,6 +1145,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 recentTiles={recentTiles}
                 onStarredChange={setStarredFlyoutTiles}
                 onSelectedFormChange={setSelectedTileForm}
+                railSel={tileRailSel}
+                onRailSelChange={setTileRailSel}
               />
               )}
               </div>
@@ -1376,6 +1390,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                     recentTiles={recentTiles}
                     onStarredChange={setStarredFlyoutTiles}
                     onSelectedFormChange={setSelectedTileForm}
+                    railSel={tileRailSel}
+                    onRailSelChange={setTileRailSel}
                   />
                   )}
                   </div>

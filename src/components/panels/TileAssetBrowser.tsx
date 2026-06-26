@@ -317,11 +317,18 @@ interface TileAssetBrowserProps {
   onStarredChange?: (tiles: FlyoutTile[]) => void;
   /** Reports the selected tile's derived render-form (for the drawer subtool ribbon). */
   onSelectedFormChange?: (form: TileForm | null) => void;
+  /**
+   * Category-rail / view selection. When provided (with onRailSelChange) the
+   * component is controlled by the host so the Recent/Starred view-filters can
+   * live on the drawer ribbon; omitted = uncontrolled (internal state).
+   */
+  railSel?: RailSelection;
+  onRailSelChange?: (sel: RailSelection) => void;
 }
 
 // `string & {}` keeps the literal autocomplete hints while still allowing any
 // dynamic tileset id (set via setRailSel(cat)) without collapsing to bare string.
-type RailSelection = 'all' | 'recent' | 'starred' | (string & {});
+export type RailSelection = 'all' | 'recent' | 'starred' | (string & {});
 
 type FullModeRow =
   | { type: 'recentHeader' }
@@ -375,6 +382,8 @@ const TileAssetBrowser = memo(({
   recentTiles,
   onStarredChange,
   onSelectedFormChange,
+  railSel: railSelProp,
+  onRailSelChange,
 }: TileAssetBrowserProps): VNode | null => {
   const app = useApp();
   const [searchFilter, setSearchFilter] = useState<string>('');
@@ -383,7 +392,12 @@ const TileAssetBrowser = memo(({
   // Which tileset the config panel targets (null = follow the current selection).
   const [configTilesetId, setConfigTilesetId] = useState<string | null>(null);
   const [hoveredTile, setHoveredTile] = useState<TileEntry | null>(null);
-  const [railSel, setRailSel] = useState<RailSelection>('all');
+  // Controlled/uncontrolled hybrid: when the host supplies railSel + onRailSelChange
+  // (so Recent/Starred can live on the drawer ribbon) we defer to it; otherwise we
+  // own the selection locally. Every railSel/setRailSel call site is identical either way.
+  const [railSelLocal, setRailSelLocal] = useState<RailSelection>('all');
+  const railSel = railSelProp ?? railSelLocal;
+  const setRailSel = onRailSelChange ?? setRailSelLocal;
   const [activeTags, setActiveTags] = useState<Set<string>>(new Set());
   const [packFilter, setPackFilter] = useState<Set<string>>(new Set());
   const [openCat, setOpenCat] = useState<string | null>(null);
@@ -413,7 +427,7 @@ const TileAssetBrowser = memo(({
     setOpenCat(null);
     setFilterView(null);
     setFilterSearch('');
-  }, [tileDepth]);
+  }, [tileDepth, setRailSel]);
 
   const handleTileClick = (tilesetId: string, tileId: string): void => {
     if (selectedTilesetId === tilesetId && selectedTileId === tileId) {
@@ -1692,21 +1706,7 @@ const TileAssetBrowser = memo(({
       <div className="windrose-tb-body">
         {showRail && !compact && (
           <div className="windrose-tb-rail">
-            <button
-              className={`windrose-tb-railbtn ${railSel === 'recent' ? 'on' : ''}`}
-              onClick={() => setRailSel('recent')}
-            >
-              <Icon icon="lucide-clock" size={14} />
-              Recent
-            </button>
-            <button
-              className={`windrose-tb-railbtn ${railSel === 'starred' ? 'on' : ''}`}
-              onClick={() => setRailSel('starred')}
-            >
-              <Icon icon="lucide-star" size={14} />
-              Starred
-            </button>
-            <div className="windrose-tb-raildiv" />
+            {/* Recent/Starred view-filters live on the drawer ribbon (see renderDrawerRibbon); the rail is categories only. */}
             {isGrid && (
               <div className="windrose-tb-raillabel">
                 <Icon icon={depthMeta(tileDepth).icon} size={11} />

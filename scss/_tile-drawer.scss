@@ -101,6 +101,14 @@
   background: oklch(from var(--windrose-border-primary) l c h / 0.4);
 }
 
+.windrose-fd-subrib-cap {
+  font-size: 7px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--windrose-border-primary-dark);
+}
+
 .windrose-fd-subrib-tools {
   display: flex;
   flex-direction: column;
