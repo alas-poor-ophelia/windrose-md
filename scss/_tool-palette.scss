@@ -245,7 +245,21 @@
   margin-bottom: 0;
   gap: 4px;
   height: 100%;
+  min-height: 0;
+  /* A 54px tool column must never scroll horizontally. Without this, a hair of
+     horizontal content spawns an h-scrollbar, which steals ~17px of height,
+     which pushes content past the vertical edge, which spawns a v-scrollbar — a
+     two-scrollbar feedback loop that reads as jittery "overscroll". Clipping x
+     breaks the loop. The tools fit with ~130px of slack on any normal pane, so
+     the residual vertical scrollbar is sub-pixel-rounding spurious; hide it
+     (matching .windrose-tb-rail) while keeping overflow-y:auto so genuinely
+     short panes can still reach the bottom history controls. */
+  overflow-x: hidden;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar { display: none; }
 
   .windrose-tool-btn-container {
     display: block;

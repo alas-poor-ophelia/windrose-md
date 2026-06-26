@@ -4,11 +4,24 @@
   height: 100%;
 }
 
+/* Tame Obsidian's default view-content padding (12px sides / 32px bottom via
+   `.workspace-leaf-content .view-content`, specificity 0,2,0): keep a comfortable
+   12px margin around the whole editor so it clears the host's title chrome on all
+   sides, but drop the bloated 32px bottom to match. Specificity + later source
+   order wins the cascade. */
+.workspace-leaf-content .windrose-full-pane.view-content {
+  padding: 12px;
+}
+
 .windrose-full-pane .windrose-container {
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
+  /* The 4px pane padding above provides the breathing gap in full-pane; drop the
+     container's own clamp() padding here so the two don't stack. Embedded block
+     view keeps its padding (rule lives in _layout.scss, unscoped). */
+  padding: 0;
 }
 
 .windrose-full-pane .windrose-full-pane-canvas {

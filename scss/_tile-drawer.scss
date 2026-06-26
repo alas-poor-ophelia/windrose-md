@@ -116,6 +116,9 @@ button:is(
   align-items: center;
   gap: 4px;
   padding: 8px 0;
+  /* Darker than the category rail (l + 0.02) so the chrome column reads as the
+     deepest layer of the drawer, per the handoff's subrib < rail < grid order. */
+  background: oklch(from var(--windrose-bg-primary) calc(l - 0.02) c h);
   border-right: 1px solid oklch(from var(--windrose-border-primary) l c h / 0.4);
 }
 
@@ -389,6 +392,40 @@ button:is(
 
   &.active {
     background: oklch(from var(--windrose-gold-bright) l c h / 0.18);
+    color: var(--windrose-gold-bright, var(--windrose-text-primary));
+  }
+}
+
+/* Collapsed-spine Tiles/Objects switcher — clicking switches pane and expands.
+   Active button gets the gold-framed treatment from the handoff's EdgeRibbon. */
+.windrose-tile-spine-pane {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 6px 0;
+}
+
+.windrose-tile-spine-panebtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 30px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--windrose-text-secondary);
+  cursor: pointer;
+
+  &:hover {
+    background: oklch(from var(--windrose-border-primary) l c h / 0.14);
+    color: var(--windrose-text-primary);
+  }
+
+  &.active {
+    background: linear-gradient(180deg, oklch(from var(--windrose-border-primary) l c h / 0.22), oklch(from var(--windrose-border-primary) l c h / 0.08));
+    border-color: oklch(from var(--windrose-gold-bright) l c h / 0.6);
     color: var(--windrose-gold-bright, var(--windrose-text-primary));
   }
 }

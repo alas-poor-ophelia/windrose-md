@@ -331,6 +331,12 @@ interface TileAssetBrowserProps {
    */
   viewMode?: TileViewMode;
   onViewModeChange?: (mode: TileViewMode) => void;
+  /**
+   * The vertical drawer ribbon (Tiles/Objects + subtools), rendered by the host.
+   * Placed as the left column INSIDE the body so the header/depth/filter/chip rows
+   * span the panel's full width above it (per the design handoff's `.fd-body`).
+   */
+  ribbon?: VNode;
 }
 
 export type TileViewMode = 'grid' | 'list';
@@ -395,6 +401,7 @@ const TileAssetBrowser = memo(({
   onRailSelChange,
   viewMode: viewModeProp,
   onViewModeChange,
+  ribbon,
 }: TileAssetBrowserProps): VNode | null => {
   const app = useApp();
   const [searchFilter, setSearchFilter] = useState<string>('');
@@ -1334,15 +1341,6 @@ const TileAssetBrowser = memo(({
         <span className="windrose-tb-cap" style={{ marginRight: 'auto', marginLeft: 2 }}>
           {tilesets.length === 1 ? tilesets[0].name : `${tilesets.length} packs`}
         </span>
-        {onTilesetOverrideChange != null && tilesets.length > 0 && (
-          <button
-            className="windrose-tb-iconbtn ghost"
-            title="Tileset settings"
-            onClick={() => setShowTilesetConfig(!showTilesetConfig)}
-          >
-            <Icon icon="lucide-sliders-horizontal" size={15} />
-          </button>
-        )}
         {!compact && (
           <div className="windrose-tb-viewtoggle" role="group" aria-label="View mode">
             <button
@@ -1363,20 +1361,32 @@ const TileAssetBrowser = memo(({
             </button>
           </div>
         )}
-        {!compact && (
-          <button
-            className="windrose-tb-iconbtn ghost"
-            title="Organize tiles"
-            onClick={() => setOrganize(true)}
-          >
-            <Icon icon="lucide-check-square" size={15} />
-          </button>
-        )}
-        {onCollapse && (
-          <button className="windrose-tb-iconbtn ghost" title="Collapse to edge" onClick={onCollapse}>
-            <Icon icon="lucide-panel-right" size={15} />
-          </button>
-        )}
+        {/* Action cluster — separated from the view toggle by a distinct gap */}
+        <div className="windrose-tb-head-actions">
+          {onTilesetOverrideChange != null && tilesets.length > 0 && (
+            <button
+              className="windrose-tb-iconbtn ghost"
+              title="Tileset settings"
+              onClick={() => setShowTilesetConfig(!showTilesetConfig)}
+            >
+              <Icon icon="lucide-sliders-horizontal" size={15} />
+            </button>
+          )}
+          {!compact && (
+            <button
+              className="windrose-tb-iconbtn ghost"
+              title="Organize tiles"
+              onClick={() => setOrganize(true)}
+            >
+              <Icon icon="lucide-check-square" size={15} />
+            </button>
+          )}
+          {onCollapse && (
+            <button className="windrose-tb-iconbtn ghost" title="Collapse to edge" onClick={onCollapse}>
+              <Icon icon="lucide-panel-right" size={15} />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Depth band */}
@@ -1779,6 +1789,7 @@ const TileAssetBrowser = memo(({
         </div>
       )}
       <div className="windrose-tb-body">
+        {ribbon}
         {showRail && !compact && (
           <div className="windrose-tb-rail">
             {/* Recent/Starred view-filters live on the drawer ribbon (see renderDrawerRibbon); the rail is categories only. */}

@@ -1113,11 +1113,17 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               flyoutRecent={flyoutRecent}
               flyoutStarred={starredFlyoutTiles}
               onFlyoutSelect={handleFlyoutSelect}
+              pane={tilePane}
+              onPane={selectPane}
             >
+              {tilePane === 'objects' ? (
               <div className="windrose-drawer-pane">
               {renderDrawerRibbon()}
               <div className="windrose-drawer-main">
-              {tilePane === 'objects' ? renderObjectsPane() : (
+              {renderObjectsPane()}
+              </div>
+              </div>
+              ) : (
               <TileAssetBrowser
                 tilesets={availableTilesets}
                 selectedTilesetId={selectedTilesetId}
@@ -1155,10 +1161,9 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 onRailSelChange={setTileRailSel}
                 viewMode={tileViewMode}
                 onViewModeChange={setTileViewMode}
+                ribbon={renderDrawerRibbon()}
               />
               )}
-              </div>
-              </div>
             </DrawerDock>
           )}
 
@@ -1360,11 +1365,17 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                   flyoutRecent={flyoutRecent}
                   flyoutStarred={starredFlyoutTiles}
                   onFlyoutSelect={handleFlyoutSelect}
+                  pane={tilePane}
+                  onPane={selectPane}
                 >
+                  {tilePane === 'objects' ? (
                   <div className="windrose-drawer-pane">
                   {renderDrawerRibbon()}
                   <div className="windrose-drawer-main">
-                  {tilePane === 'objects' ? renderObjectsPane() : (
+                  {renderObjectsPane()}
+                  </div>
+                  </div>
+                  ) : (
                   <TileAssetBrowser
                     tilesets={availableTilesets}
                     selectedTilesetId={selectedTilesetId}
@@ -1402,10 +1413,9 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                     onRailSelChange={setTileRailSel}
                     viewMode={tileViewMode}
                     onViewModeChange={setTileViewMode}
+                    ribbon={renderDrawerRibbon()}
                   />
                   )}
-                  </div>
-                  </div>
                 </DrawerDock>
               )}
               <div className="windrose-dock-right">

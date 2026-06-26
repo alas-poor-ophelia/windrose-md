@@ -114,6 +114,15 @@
   }
 }
 
+/* Action cluster (settings / organize / collapse) — kept tight and held apart
+   from the view toggle by a distinct gap so the two read as separate groups. */
+.windrose-tb-head-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: 10px;
+}
+
 /* ---- Depth band ---- */
 .windrose-tb-band {
   position: relative;

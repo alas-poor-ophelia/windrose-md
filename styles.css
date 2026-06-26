@@ -694,7 +694,22 @@ body {
   margin-bottom: 0;
   gap: 4px;
   height: 100%;
+  min-height: 0;
+  /* A 54px tool column must never scroll horizontally. Without this, a hair of
+     horizontal content spawns an h-scrollbar, which steals ~17px of height,
+     which pushes content past the vertical edge, which spawns a v-scrollbar — a
+     two-scrollbar feedback loop that reads as jittery "overscroll". Clipping x
+     breaks the loop. The tools fit with ~130px of slack on any normal pane, so
+     the residual vertical scrollbar is sub-pixel-rounding spurious; hide it
+     (matching .windrose-tb-rail) while keeping overflow-y:auto so genuinely
+     short panes can still reach the bottom history controls. */
+  overflow-x: hidden;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+.windrose-tool-palette-vertical::-webkit-scrollbar {
+  display: none;
 }
 .windrose-tool-palette-vertical .windrose-tool-btn-container {
   display: block;
@@ -1419,6 +1434,15 @@ button.windrose-object-grid-item:hover,
 .windrose-tb-viewtoggle .windrose-tb-iconbtn {
   width: 26px;
   height: 26px;
+}
+
+/* Action cluster (settings / organize / collapse) — kept tight and held apart
+   from the view toggle by a distinct gap so the two read as separate groups. */
+.windrose-tb-head-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: 10px;
 }
 
 /* ---- Depth band ---- */
@@ -3242,6 +3266,9 @@ button:is(.windrose-tb-iconbtn,
   align-items: center;
   gap: 4px;
   padding: 8px 0;
+  /* Darker than the category rail (l + 0.02) so the chrome column reads as the
+     deepest layer of the drawer, per the handoff's subrib < rail < grid order. */
+  background: oklch(from var(--windrose-bg-primary) calc(l - 0.02) c h);
   border-right: 1px solid oklch(from var(--windrose-border-primary) l c h/0.4);
 }
 
@@ -3491,6 +3518,38 @@ button:is(.windrose-tb-iconbtn,
 }
 .windrose-tile-spine-fbtn.active {
   background: oklch(from var(--windrose-gold-bright) l c h/0.18);
+  color: var(--windrose-gold-bright, var(--windrose-text-primary));
+}
+
+/* Collapsed-spine Tiles/Objects switcher — clicking switches pane and expands.
+   Active button gets the gold-framed treatment from the handoff's EdgeRibbon. */
+.windrose-tile-spine-pane {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 6px 0;
+}
+
+.windrose-tile-spine-panebtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 30px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--windrose-text-secondary);
+  cursor: pointer;
+}
+.windrose-tile-spine-panebtn:hover {
+  background: oklch(from var(--windrose-border-primary) l c h/0.14);
+  color: var(--windrose-text-primary);
+}
+.windrose-tile-spine-panebtn.active {
+  background: linear-gradient(180deg, oklch(from var(--windrose-border-primary) l c h/0.22), oklch(from var(--windrose-border-primary) l c h/0.08));
+  border-color: oklch(from var(--windrose-gold-bright) l c h/0.6);
   color: var(--windrose-gold-bright, var(--windrose-text-primary));
 }
 
@@ -8524,11 +8583,24 @@ button.windrose-breadcrumb-link {
   height: 100%;
 }
 
+/* Tame Obsidian's default view-content padding (12px sides / 32px bottom via
+   `.workspace-leaf-content .view-content`, specificity 0,2,0): keep a comfortable
+   12px margin around the whole editor so it clears the host's title chrome on all
+   sides, but drop the bloated 32px bottom to match. Specificity + later source
+   order wins the cascade. */
+.workspace-leaf-content .windrose-full-pane.view-content {
+  padding: 12px;
+}
+
 .windrose-full-pane .windrose-container {
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
+  /* The 4px pane padding above provides the breathing gap in full-pane; drop the
+     container's own clamp() padding here so the two don't stack. Embedded block
+     view keeps its padding (rule lives in _layout.scss, unscoped). */
+  padding: 0;
 }
 
 .windrose-full-pane .windrose-full-pane-canvas {
