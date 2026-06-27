@@ -188,12 +188,6 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
     width: DEFAULTS.canvasSize.width,
     height: DEFAULTS.canvasSize.height
   });
-  // Read the live isAnimating flag inside the mount-once ResizeObserver without
-  // re-subscribing: map expand/collapse commits resizes immediately (keeps its
-  // cheap-stretch smooth), everything else debounces.
-  const isAnimatingRef = useRef(isAnimating);
-  isAnimatingRef.current = isAnimating;
-
   // Create onMapDataUpdate wrapper for map-level changes
   // This bridges the old prop-based API with the new context-based approach
   const onMapDataUpdate = useCallback((updates: MapDataUpdate) => {
@@ -276,28 +270,11 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
     // Initial size
     updateCanvasSize();
 
-    // Watch for container size changes. The full-pane tile-drawer fold animates
-    // its width as a flex sibling of the canvas, so the canvas reflows every
-    // frame for 0.42s — each tick used to re-render the whole map (lag) and clear
-    // the bitmap (blank). Debounce non-animated resizes so the canvas keeps its
-    // current content during the fold and commits its new size ONCE after it
-    // settles. Map expand/collapse (isAnimating) stays immediate so its existing
-    // cheap-stretch in the redraw effect keeps the map filling smoothly.
-    let debounceId: number | null = null;
-    const resizeObserver = new ResizeObserver(() => {
-      if (isAnimatingRef.current) {
-        updateCanvasSize();
-      } else {
-        if (debounceId != null) window.clearTimeout(debounceId);
-        debounceId = window.setTimeout(updateCanvasSize, 150);
-      }
-    });
+    // Watch for container size changes
+    const resizeObserver = new ResizeObserver(updateCanvasSize);
     resizeObserver.observe(container);
 
-    return () => {
-      resizeObserver.disconnect();
-      if (debounceId != null) window.clearTimeout(debounceId);
-    };
+    return () => resizeObserver.disconnect();
   }, []);
 
   // Force canvas resize when animation completes
