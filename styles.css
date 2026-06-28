@@ -377,6 +377,15 @@ body {
   transform: scale(-1);
 }
 
+/* Block/embedded mode is a small widget — shrink the ornate frame brackets so
+   they read as a reduced accent rather than heavy chrome (proportionally thins
+   the strokes too, since the SVG scales with the box). */
+.windrose-container-block .windrose-corner-bracket {
+  width: 32px;
+  height: 32px;
+  opacity: 0.85;
+}
+
 .windrose-tool-palette-bracket {
   position: absolute;
   width: 40px;
@@ -888,6 +897,18 @@ body {
   max-width: 70px;
   max-height: 70px;
   background-color: transparent;
+  /* Block/embedded mode is a compact 600x400-ish widget — the full 70px compass
+     reads oversized there. Scope a smaller compass to the non-full-pane canvas. */
+}
+.windrose-canvas-wrapper:not(.windrose-full-pane-canvas) .windrose-compass {
+  width: 48px;
+  height: 48px;
+  min-width: 48px;
+  min-height: 48px;
+  max-width: 48px;
+  max-height: 48px;
+}
+.windrose-compass {
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -2852,6 +2873,62 @@ button.windrose-object-grid-item:hover,
   padding: 6px 8px;
 }
 
+/* Filter drill-down overlay (.windrose-tb-fscreen) controls — added after the
+   :is() reset above, so restore each one's box past Obsidian's button injection. */
+.is-tablet button.windrose-tb-filtbtn {
+  height: auto;
+  padding: 7px 11px;
+  background: var(--windrose-bg-secondary);
+  border: 1px solid var(--windrose-border-secondary);
+  border-radius: 4px;
+  color: var(--windrose-text-secondary);
+  font-size: 11px;
+  box-shadow: none;
+}
+.is-tablet button.windrose-tb-filtbtn.on {
+  border-color: var(--windrose-border-primary);
+  color: var(--windrose-gold-bright);
+  background: oklch(from var(--windrose-border-primary) l c h/0.18);
+}
+
+.is-tablet button.windrose-tb-frow {
+  width: 100%;
+  height: auto;
+  padding: 11px 10px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  color: var(--windrose-text-primary);
+  box-shadow: none;
+}
+
+.is-tablet button.windrose-tb-vrow {
+  width: 100%;
+  height: auto;
+  padding: 9px 10px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  box-shadow: none;
+}
+
+.is-tablet button.windrose-tb-fbig {
+  height: auto;
+  padding: 11px;
+  border: 1px solid var(--windrose-gold-bright);
+  border-radius: 8px;
+  background: linear-gradient(180deg, var(--windrose-gold-bright), var(--windrose-border-primary));
+  color: var(--windrose-bg-primary);
+  font-weight: 700;
+  font-size: 13px;
+  box-shadow: none;
+}
+.is-tablet button.windrose-tb-fbig.ghost {
+  background: transparent;
+  color: var(--windrose-text-secondary);
+  border: 1px solid var(--windrose-border-secondary);
+}
+
 /* ============================================
    DEPTH BAR & DEPTH RIBBON
    Tile layer depth controls for the tile browser.
@@ -3277,6 +3354,66 @@ button:is(.windrose-tb-iconbtn,
   overflow: hidden;
 }
 
+/* ---- Block-mode compact drawer: shared header above both panes ---- */
+.windrose-cd {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.windrose-cd-main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.windrose-cd-head {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 9px;
+  border-bottom: 1px solid oklch(from var(--windrose-border-primary) l c h/0.5);
+}
+
+/* Segmented Tiles | Objects control (the block pane switch) */
+.windrose-cd-paneseg {
+  display: flex;
+  gap: 1px;
+  margin-right: auto;
+  padding: 1px;
+  background: oklch(from var(--windrose-bg-primary) calc(l - 0.02) c h);
+  border: 1px solid var(--windrose-border-primary);
+  border-radius: 6px;
+}
+
+.windrose-cd-segbtn {
+  padding: 3px 10px;
+  font-size: 10.5px;
+  font-weight: 600;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--windrose-text-muted);
+  cursor: pointer;
+  box-shadow: none;
+}
+.windrose-cd-segbtn:hover {
+  color: var(--windrose-text-primary);
+}
+.windrose-cd-segbtn.active {
+  background: linear-gradient(180deg, var(--windrose-gold-bright), var(--windrose-gold));
+  color: #241c12;
+}
+
+.windrose-cd-vtog {
+  display: flex;
+  gap: 1px;
+}
+
 /* Vertical left ribbon — Tiles/Objects tabs + form-gated placement subtools */
 .windrose-fd-subrib {
   width: 46px;
@@ -3412,6 +3549,78 @@ button:is(.windrose-tb-iconbtn,
   color: var(--windrose-gold-bright);
   border-color: oklch(from var(--windrose-gold-bright) l c h/0.5);
   background: oklch(from var(--windrose-gold-bright) l c h/0.12);
+}
+
+/* Compact-drawer header segmented control */
+.is-tablet button.windrose-cd-segbtn {
+  height: auto;
+  padding: 3px 10px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--windrose-text-muted);
+  font-size: 10.5px;
+  font-weight: 600;
+}
+.is-tablet button.windrose-cd-segbtn.active {
+  background: linear-gradient(180deg, var(--windrose-gold-bright), var(--windrose-gold));
+  color: #241c12;
+}
+
+/* Collapsed-spine buttons — keep their fixed icon-button boxes on tablet */
+.is-tablet button.windrose-tile-spine-expand {
+  width: 100%;
+  height: 34px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid oklch(from var(--windrose-border-primary) l c h/0.22);
+  border-radius: 0;
+  box-shadow: none;
+  color: var(--windrose-gold-bright);
+}
+
+.is-tablet button.windrose-tile-spine-fbtn {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--windrose-text-disabled);
+}
+.is-tablet button.windrose-tile-spine-fbtn.active {
+  background: oklch(from var(--windrose-gold-bright) l c h/0.18);
+  color: var(--windrose-gold-bright);
+}
+
+.is-tablet button.windrose-tile-spine-panebtn {
+  width: 32px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--windrose-text-secondary);
+}
+.is-tablet button.windrose-tile-spine-panebtn.active {
+  background: linear-gradient(180deg, oklch(from var(--windrose-border-primary) l c h/0.22), oklch(from var(--windrose-border-primary) l c h/0.08));
+  border-color: oklch(from var(--windrose-gold-bright) l c h/0.6);
+  color: var(--windrose-gold-bright);
+}
+
+.is-tablet button.windrose-spine-flyout-close {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--windrose-text-disabled);
 }
 
 /* The spine itself — vertical strip with expand button, depth ribbon, loaded chip */
@@ -6019,8 +6228,9 @@ button.windrose-fow-tool-btn:disabled svg,
 }
 
 /* ============================================
-   BLOCK-MODE LEFT ICON RAIL (Phase 8)
-   42px rail + ~198px flyout overlaying the canvas left edge.
+   BLOCK-MODE LEFT DRAWER (Layers / Colors / View)
+   42px icon rail + a 198px panel that FOLDS open beside it (mirror of the
+   right tile drawer). Overlays the canvas left edge — never pushes it.
    ============================================ */
 .windrose-edge-rail-root {
   position: absolute;
@@ -6073,35 +6283,42 @@ button.windrose-fow-tool-btn:disabled svg,
   background: oklch(from var(--windrose-gold-bright) l c h/0.12);
 }
 
-.windrose-edge-rail-flyout {
+.windrose-edge-rail-drawer {
+  /* Layout/chrome only — width, opacity, visibility and the fold transition are
+     driven inline from EdgeRail.tsx (the DrawerDock pattern), because a
+     class-driven width transition does not commit reliably for this overlay
+     inside Obsidian's live-preview embed. */
   position: absolute;
   left: 42px;
-  top: 8px;
-  width: 198px;
-  max-height: calc(100% - 16px);
+  top: 0;
+  bottom: 0;
   display: flex;
   flex-direction: column;
   background: var(--windrose-bg-primary);
-  border: 1px solid var(--windrose-border-primary);
-  border-radius: 6px;
+  border-right: 1.5px solid oklch(from var(--windrose-gold-bright) l c h/0.5);
   box-shadow: 8px 0 26px oklch(0% 0 0deg / 0.45);
   overflow: hidden;
   z-index: 9;
 }
 
-.windrose-edge-rail-flyout-header {
+/* Inner content is pinned to the full 198px so it clips (rather than reflows)
+   while the drawer width animates — the same trick the right drawer uses. */
+.windrose-edge-rail-drawer-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  flex-shrink: 0;
-  padding: 6px 10px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--windrose-text-primary);
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  width: 198px;
+  padding: 7px 10px;
+  font-family: "Cinzel", serif;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--windrose-gold-bright);
   border-bottom: 1px solid oklch(from var(--windrose-border-primary) l c h/0.5);
 }
 
-.windrose-edge-rail-flyout-close {
+.windrose-edge-rail-drawer-close {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -6113,15 +6330,57 @@ button.windrose-fow-tool-btn:disabled svg,
   cursor: pointer;
   box-shadow: none;
 }
-.windrose-edge-rail-flyout-close:hover {
+.windrose-edge-rail-drawer-close:hover {
   color: var(--windrose-text-primary);
   background: var(--windrose-bg-tertiary);
 }
 
-.windrose-edge-rail-flyout-body {
+.windrose-edge-rail-drawer-body {
+  flex: 1 1 auto;
+  box-sizing: border-box;
+  width: 198px;
   min-height: 0;
   overflow-y: auto;
   padding: 6px;
+}
+
+/* ---- Tablet overrides: edge-rail + visibility buttons ----
+   Obsidian's .is-tablet injects padding/height/background on every <button>. */
+.is-tablet button.windrose-edge-rail-btn {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  box-shadow: none;
+  color: var(--windrose-text-muted);
+}
+.is-tablet button.windrose-edge-rail-btn.on {
+  color: var(--windrose-gold-bright);
+  border-color: oklch(from var(--windrose-gold-bright) l c h/0.5);
+  background: oklch(from var(--windrose-gold-bright) l c h/0.12);
+}
+
+.is-tablet button.windrose-edge-rail-drawer-close {
+  width: auto;
+  height: auto;
+  padding: 2px;
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+  box-shadow: none;
+  color: var(--windrose-text-muted);
+}
+
+.is-tablet button.windrose-visibility-btn {
+  width: 32px;
+  height: 32px;
+  padding: 6px;
+  background-color: var(--windrose-bg-secondary);
+  border: 1px solid var(--windrose-border-secondary);
+  border-radius: 3px;
+  color: var(--windrose-text-primary);
 }
 
 .windrose-layer-controls {

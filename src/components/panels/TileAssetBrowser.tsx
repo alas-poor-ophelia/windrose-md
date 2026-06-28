@@ -311,6 +311,9 @@ interface TileAssetBrowserProps {
   onTilesetOverrideChange?: (tilesetId: string, overrides: TilesetOverrides) => void;
   showRail?: boolean;
   compact?: boolean;
+  /** Suppress the internal header — block mode hoists a shared compact header
+      (segmented Tiles/Objects + view toggle) above both panes instead. */
+  hideHeader?: boolean;
   /** False while the hosting drawer is collapsed — suspends thumbnail generation for the hidden grid. */
   active?: boolean;
   recentTiles?: Array<{ tilesetId: string; tileId: string }>;
@@ -393,6 +396,7 @@ const TileAssetBrowser = memo(({
   onTilesetOverrideChange,
   showRail = false,
   compact = false,
+  hideHeader = false,
   active = true,
   recentTiles,
   onStarredChange,
@@ -1336,6 +1340,7 @@ const TileAssetBrowser = memo(({
       ) : (<>
 
       {/* Header */}
+      {!hideHeader && (
       <div className="windrose-tb-head">
         <div className="windrose-tb-title">Tiles</div>
         <span className="windrose-tb-cap" style={{ marginRight: 'auto', marginLeft: 2 }}>
@@ -1388,6 +1393,7 @@ const TileAssetBrowser = memo(({
           )}
         </div>
       </div>
+      )}
 
       {/* Depth band */}
       {hidden != null && onToggleHide != null && (

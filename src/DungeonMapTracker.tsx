@@ -205,6 +205,44 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
       onFreeformToggle={() => setFreeformPlacementMode(prev => !prev)}
     />
   );
+  // Block-mode shared drawer header: a segmented Tiles|Objects control (the
+  // block spec's pane switch, replacing the .fd-subrib), the grid/list view
+  // toggle (tiles only) and a collapse button — sits above both panes.
+  const renderCompactDrawerHead = (): VNode => (
+    <div className="windrose-cd-head">
+      <div className="windrose-cd-paneseg interactive-child" role="group" aria-label="Tiles or Objects">
+        <button
+          className={`windrose-cd-segbtn ${tilePane === 'tiles' ? 'active' : ''}`}
+          onClick={() => selectPane('tiles')}
+        >Tiles</button>
+        <button
+          className={`windrose-cd-segbtn ${tilePane === 'objects' ? 'active' : ''}`}
+          onClick={() => selectPane('objects')}
+        >Objects</button>
+      </div>
+      {tilePane === 'tiles' && (
+        <div className="windrose-cd-vtog interactive-child" role="group" aria-label="View mode">
+          <button
+            className={`windrose-tb-iconbtn ${tileViewMode === 'grid' ? 'active' : 'ghost'}`}
+            title="Grid view"
+            aria-pressed={tileViewMode === 'grid'}
+            onClick={() => setTileViewMode('grid')}
+          ><Icon icon="lucide-layout-grid" size={14} /></button>
+          <button
+            className={`windrose-tb-iconbtn ${tileViewMode === 'list' ? 'active' : 'ghost'}`}
+            title="List view"
+            aria-pressed={tileViewMode === 'list'}
+            onClick={() => setTileViewMode('list')}
+          ><Icon icon="lucide-list" size={14} /></button>
+        </div>
+      )}
+      <button
+        className="windrose-tb-iconbtn ghost interactive-child windrose-cd-collapse"
+        title="Collapse to edge"
+        onClick={collapseTileBrowser}
+      ><Icon icon="lucide-panel-right" size={15} /></button>
+    </div>
+  );
 
   // Panel/modal state (plugin installer, settings modal, layer edit)
   const {
@@ -710,22 +748,26 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     <>
       <div
         ref={containerRef}
-        className={`windrose-container interactive-child`}
+        className={`windrose-container interactive-child${fullPane ? '' : ' windrose-container-block'}`}
       >
         <CornerBrackets classPrefix="windrose-corner-bracket" variant="ornate" filterId="bracket" />
 
-        <MapHeader
-          mapData={mapData}
-          onNameChange={wrappedHandleNameChange}
-          saveStatus={saveStatus}
-          showFooter={showFooter}
-          onToggleFooter={() => setShowFooter(!showFooter)}
-          fullPane={fullPane}
-          mapId={mapId}
-          mapList={mapListEntries}
-          onMapSelect={handleMapSelect}
-          onNewMap={fullPane ? handleNewMap : undefined}
-        />
+        {/* Map-name header is a full-pane surface; the block spec's layout is
+            toolbar → rail/canvas/drawer with no header bar. */}
+        {fullPane && (
+          <MapHeader
+            mapData={mapData}
+            onNameChange={wrappedHandleNameChange}
+            saveStatus={saveStatus}
+            showFooter={showFooter}
+            onToggleFooter={() => setShowFooter(!showFooter)}
+            fullPane={fullPane}
+            mapId={mapId}
+            mapList={mapListEntries}
+            onMapSelect={handleMapSelect}
+            onNewMap={fullPane ? handleNewMap : undefined}
+          />
+        )}
 
         {isInSubHex && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -1071,6 +1113,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 isExpanded={isExpanded}
                 onToggleExpand={handleToggleExpand}
                 hideExpand={fullPane}
+                minimalControls
                 mapType={mapData.mapType}
                 showLayerPanel={railOpenId === 'layers'}
                 onToggleLayerPanel={() => setRailOpenId(prev => prev === 'layers' ? null : 'layers')}
@@ -1116,13 +1159,11 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               pane={tilePane}
               onPane={selectPane}
             >
+              <div className="windrose-cd">
+              {renderCompactDrawerHead()}
+              <div className="windrose-cd-main">
               {tilePane === 'objects' ? (
-              <div className="windrose-drawer-pane">
-              {renderDrawerRibbon()}
-              <div className="windrose-drawer-main">
-              {renderObjectsPane()}
-              </div>
-              </div>
+              renderObjectsPane()
               ) : (
               <TileAssetBrowser
                 tilesets={availableTilesets}
@@ -1153,6 +1194,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 tilesetOverrides={mapData?.tilesetOverrides}
                 onTilesetOverrideChange={handleTilesetOverrideChange}
                 compact
+                hideHeader
                 active={!tileBrowserCollapsed}
                 recentTiles={recentTiles}
                 onStarredChange={setStarredFlyoutTiles}
@@ -1161,9 +1203,10 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 onRailSelChange={setTileRailSel}
                 viewMode={tileViewMode}
                 onViewModeChange={setTileViewMode}
-                ribbon={renderDrawerRibbon()}
               />
               )}
+              </div>
+              </div>
             </DrawerDock>
           )}
 

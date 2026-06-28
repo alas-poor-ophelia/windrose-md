@@ -42,6 +42,17 @@
   max-width: 70px;
   max-height: 70px;
   background-color: transparent;
+
+  /* Block/embedded mode is a compact 600x400-ish widget — the full 70px compass
+     reads oversized there. Scope a smaller compass to the non-full-pane canvas. */
+  .windrose-canvas-wrapper:not(.windrose-full-pane-canvas) & {
+    width: 48px;
+    height: 48px;
+    min-width: 48px;
+    min-height: 48px;
+    max-width: 48px;
+    max-height: 48px;
+  }
   border-radius: 50%;
   display: flex;
   align-items: center;

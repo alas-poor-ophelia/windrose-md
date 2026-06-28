@@ -32,6 +32,10 @@ interface MapControlsProps {
   onToggleRegionPanel?: () => void;
   alwaysShowControls?: boolean;
   hideExpand?: boolean;
+  /** Block mode: float only compass + zoom. The Layers/Region/Visibility/Settings
+      toggles are redundant with the left EdgeRail, and the full-width expand button
+      collides with the compass — so they're dropped here per the block spec. */
+  minimalControls?: boolean;
 }
 
 const MapControls = ({
@@ -51,7 +55,8 @@ const MapControls = ({
   showRegionPanel,
   onToggleRegionPanel,
   alwaysShowControls = false,
-  hideExpand = false
+  hideExpand = false,
+  minimalControls = false
 }: MapControlsProps): VNode => {
     // When alwaysShowControls is true, controls are always visible
     const [controlsRevealed, setControlsRevealed] = useState(alwaysShowControls);
@@ -190,7 +195,7 @@ const MapControls = ({
           onMouseLeave={handleMouseLeave}
         >
           {/* Expand/Collapse Button - Above compass, animates last */}
-          {!hideExpand && (
+          {!hideExpand && !minimalControls && (
             <button
               className={`windrose-expand-btn windrose-drawer-item windrose-drawer-item-up ${controlsRevealed ? 'windrose-drawer-item-visible' : ''}`}
               style={getExpandStyle()}
@@ -236,6 +241,7 @@ const MapControls = ({
               </button>
             </div>
             
+            {!minimalControls && (<>
             {/* Layer Panel Toggle Button */}
             <button
               className={`windrose-expand-btn windrose-drawer-item ${showLayerPanel ? 'windrose-expand-btn-active' : ''} ${controlsRevealed ? 'windrose-drawer-item-visible' : ''}`}
@@ -281,6 +287,7 @@ const MapControls = ({
             >
               <Icon icon="lucide-settings" />
             </button>
+            </>)}
           </div>
         </div>
       </>

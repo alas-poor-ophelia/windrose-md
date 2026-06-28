@@ -1611,3 +1611,61 @@
   font-size: 13px;
   padding: 6px 8px;
 }
+
+/* Filter drill-down overlay (.windrose-tb-fscreen) controls — added after the
+   :is() reset above, so restore each one's box past Obsidian's button injection. */
+.is-tablet button.windrose-tb-filtbtn {
+  height: auto;
+  padding: 7px 11px;
+  background: var(--windrose-bg-secondary);
+  border: 1px solid var(--windrose-border-secondary);
+  border-radius: 4px;
+  color: var(--windrose-text-secondary);
+  font-size: 11px;
+  box-shadow: none;
+
+  &.on {
+    border-color: var(--windrose-border-primary);
+    color: var(--windrose-gold-bright);
+    background: oklch(from var(--windrose-border-primary) l c h / 0.18);
+  }
+}
+
+.is-tablet button.windrose-tb-frow {
+  width: 100%;
+  height: auto;
+  padding: 11px 10px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  color: var(--windrose-text-primary);
+  box-shadow: none;
+}
+
+.is-tablet button.windrose-tb-vrow {
+  width: 100%;
+  height: auto;
+  padding: 9px 10px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  box-shadow: none;
+}
+
+.is-tablet button.windrose-tb-fbig {
+  height: auto;
+  padding: 11px;
+  border: 1px solid var(--windrose-gold-bright);
+  border-radius: 8px;
+  background: linear-gradient(180deg, var(--windrose-gold-bright), var(--windrose-border-primary));
+  color: var(--windrose-bg-primary);
+  font-weight: 700;
+  font-size: 13px;
+  box-shadow: none;
+
+  &.ghost {
+    background: transparent;
+    color: var(--windrose-text-secondary);
+    border: 1px solid var(--windrose-border-secondary);
+  }
+}

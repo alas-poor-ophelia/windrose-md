@@ -1,16 +1,21 @@
 /**
  * EdgeRail.tsx
  *
- * Block-mode 42px left icon rail. Each icon toggles a ~198px flyout panel
- * that overlays the left of the canvas (does NOT push it). Default closed,
- * so a 600x400 map stays usable. Replaces the old `windrose-left-panels`
- * floating chip-list.
+ * Block-mode left dock: a 42px icon rail (Layers / Colors / View [+ Regions])
+ * whose active icon folds open a ~198px panel beside it — a left drawer that
+ * mirrors the right tile drawer's fold-to-ribbon. One panel at a time, picked
+ * by the rail icon. Default folded (rail only) so a 600x400 map stays usable.
+ * Folds as a left-anchored overlay (does NOT push the canvas) — deliberately,
+ * to avoid the per-frame canvas resize-storm a width-pushing sibling causes.
  */
 
 import type { ComponentChildren, VNode } from 'preact';
 
-import { useEffect, useRef } from 'preact/hooks';
+import { useRef } from 'preact/hooks';
 import { Icon } from '../shared/Icon';
+
+/** Folded-open panel width (px). Inner content is pinned to this in the SCSS. */
+const DRAWER_WIDTH = 198;
 
 interface EdgeRailPanel {
   id: string;
@@ -21,44 +26,27 @@ interface EdgeRailPanel {
 
 interface EdgeRailProps {
   panels: EdgeRailPanel[];
-  /** Controlled open panel id (null = all closed). Lets canvas controls drive the rail too. */
+  /** Controlled open panel id (null = folded to rail). Lets canvas controls drive the rail too. */
   openId: string | null;
   onOpenChange: (id: string | null) => void;
 }
 
 const EdgeRail = ({ panels, openId, onOpenChange }: EdgeRailProps): VNode => {
-  const rootRef = useRef<HTMLDivElement>(null);
-
   const toggle = (id: string): void => {
     onOpenChange(openId === id ? null : id);
   };
 
-  useEffect((): (() => void) | undefined => {
-    if (openId == null) return undefined;
-
-    const handleClickOutside = (e: MouseEvent | TouchEvent): void => {
-      if (rootRef.current != null && !rootRef.current.contains(e.target as Node)) {
-        onOpenChange(null);
-      }
-    };
-
-    // Defer binding so the click that opened the flyout doesn't immediately close it.
-    const timer = window.setTimeout(() => {
-      activeDocument.addEventListener('mousedown', handleClickOutside);
-      activeDocument.addEventListener('touchstart', handleClickOutside, { passive: true });
-    }, 10);
-
-    return () => {
-      window.clearTimeout(timer);
-      activeDocument.removeEventListener('mousedown', handleClickOutside);
-      activeDocument.removeEventListener('touchstart', handleClickOutside);
-    };
-  }, [openId, onOpenChange]);
-
   const openPanel = panels.find(p => p.id === openId);
 
+  // Keep the last-open panel's content mounted through the fold-out animation so
+  // the drawer collapses with its content still painted (mirrors DrawerDock).
+  const lastPanelRef = useRef<EdgeRailPanel | undefined>(openPanel);
+  if (openPanel != null) lastPanelRef.current = openPanel;
+  const shown = openPanel ?? lastPanelRef.current;
+  const isOpen = openPanel != null;
+
   return (
-    <div className="windrose-edge-rail-root" ref={rootRef}>
+    <div className="windrose-edge-rail-root">
       <div className="windrose-edge-rail">
         {panels.map(panel => (
           <button
@@ -72,23 +60,39 @@ const EdgeRail = ({ panels, openId, onOpenChange }: EdgeRailProps): VNode => {
         ))}
       </div>
 
-      {openPanel != null && (
-        <div className="windrose-edge-rail-flyout">
-          <div className="windrose-edge-rail-flyout-header">
-            <span>{openPanel.title}</span>
-            <button
-              className="windrose-edge-rail-flyout-close interactive-child"
-              onClick={() => onOpenChange(null)}
-              title="Close"
-            >
-              <Icon icon="lucide-x" size={14} />
-            </button>
-          </div>
-          <div className="windrose-edge-rail-flyout-body">
-            {openPanel.content}
-          </div>
-        </div>
-      )}
+      <div
+        className={`windrose-edge-rail-drawer ${isOpen ? 'is-open' : 'is-collapsed'}`}
+        style={{
+          // Drive the fold via inline style (same proven pattern as DrawerDock).
+          // Class-driven width transitions don't commit reliably for this overlay
+          // in Obsidian's live-preview embed, so animate the values directly.
+          width: isOpen ? DRAWER_WIDTH : 0,
+          opacity: isOpen ? 1 : 0,
+          visibility: isOpen ? 'visible' : 'hidden',
+          pointerEvents: isOpen ? 'auto' : 'none',
+          transition: isOpen
+            ? 'width .42s cubic-bezier(.2,.8,.2,1), opacity .26s ease'
+            : 'width .42s cubic-bezier(.2,.8,.2,1), opacity .26s ease, visibility 0s linear .45s',
+        }}
+      >
+        {shown != null && (
+          <>
+            <div className="windrose-edge-rail-drawer-header">
+              <span>{shown.title}</span>
+              <button
+                className="windrose-edge-rail-drawer-close interactive-child"
+                onClick={() => onOpenChange(null)}
+                title="Collapse"
+              >
+                <Icon icon="lucide-panel-left-close" size={14} />
+              </button>
+            </div>
+            <div className="windrose-edge-rail-drawer-body">
+              {shown.content}
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 };

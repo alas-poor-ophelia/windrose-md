@@ -216,6 +216,15 @@
   }
 }
 
+/* Block/embedded mode is a small widget — shrink the ornate frame brackets so
+   they read as a reduced accent rather than heavy chrome (proportionally thins
+   the strokes too, since the SVG scales with the box). */
+.windrose-container-block .windrose-corner-bracket {
+  width: 32px;
+  height: 32px;
+  opacity: 0.85;
+}
+
 // Tool palette brackets
 .windrose-tool-palette-bracket {
   $bracket: &;
