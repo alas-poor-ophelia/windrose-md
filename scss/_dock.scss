@@ -568,7 +568,10 @@
   }
 }
 
-.windrose-dock-layer-row.hidden {
+/* `is-layer-hidden` (not the bare `hidden` token) — Obsidian ships a global
+   `.hidden { display: none !important }` utility that would yank the whole row
+   out of layout, making a hidden layer impossible to toggle back on. */
+.windrose-dock-layer-row.is-layer-hidden {
   .windrose-dock-layer-name,
   .windrose-dock-layer-icon {
     opacity: 0.45;
@@ -664,18 +667,34 @@
 
 /* The edge-rail drawer (198px) is narrower than the 240px dock, so the dock's
    fixed six-column 34px grid (204px) overflows and crams the swatches together.
-   Drop the grid here and let them flow: full-size squares wrapping to as many
-   rows as needed. flex-wrap (not grid) so they reflow at their natural size. */
+   Use a 4-column fractional grid so the swatches always FILL the drawer width
+   (no fixed px width left a dead strip on the right edge). */
+/* Let the floating picker's mid-grey panel fill drop away so the swatch area
+   reads as part of the drawer (which is bg-primary), not a grey inset card. */
+.windrose-edge-rail-drawer-body .windrose-color-picker {
+  background: transparent;
+}
+
 .windrose-edge-rail-drawer-body .windrose-color-picker .windrose-color-grid {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
   gap: 6px;
 }
 
 .windrose-edge-rail-drawer-body .windrose-color-picker .windrose-color-swatch {
-  flex: 0 0 auto;
-  width: 34px;
-  height: 34px;
+  /* padding:0 + min-width:0 on the BASE rule (not just an .is-tablet override):
+     Obsidian injects `button { padding: 4px 20px }` on tablet, and a grid item's
+     default min-width:auto resolves to min-content — both would push the columns
+     past the track and break the 4-up layout. Square via aspect-ratio so the
+     swatch height follows the fractional column width. */
+  padding: 0;
+  min-width: 0;
+  /* width:100% (not auto) — an empty/transparent swatch button has no content,
+     so width:auto collapses it to ~min-content instead of filling its 1fr cell.
+     100% fills the track; aspect-ratio keeps it square. */
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
 }
 
 /* Add layer footer */

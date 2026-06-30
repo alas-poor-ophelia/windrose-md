@@ -20,6 +20,46 @@
   }
 }
 
+/* Block mode: the top chrome (toolbar row) keeps its top + horizontal padding,
+   but everything below it — the rail/canvas/drawer region — runs nearly
+   full-bleed: only a 4px side gutter and no bottom strip. This kills the wide
+   inset that made the collapsed ribbons read as too wide. */
+.windrose-container-block {
+  padding: clamp(0.75rem, 2vw, 1rem) 0 0;
+
+  /* Bump the secondary inner-border line (the 0.3 hairline 1px inside the outer
+     frame) up to 0.5 so it reads continuously down BOTH side edges. At 0.3 it
+     only looked crisp where the canvas/rail content hugs it (below the chrome);
+     beside the chrome's wider gutter it had no contrast and appeared to "stop"
+     at the top-chrome boundary. Brightening completes the unbroken rectangle. */
+  box-shadow:
+    inset 0 0 0 4px var(--windrose-bg-primary),
+    inset 0 0 0 5px oklch(from var(--windrose-border-primary) l c h / 0.5),
+    0 0 20px oklch(from var(--windrose-border-primary) l c h / 0.2);
+
+  .windrose-toolbar-anchor {
+    padding-inline: clamp(0.75rem, 2vw, 1rem);
+  }
+
+  /* Slim the re-added name/status header in block mode: tighter vertical padding
+     and a smaller gap to the tool palette, keeping the horizontal chrome gutter. */
+  .windrose-header {
+    padding: 2px clamp(0.75rem, 2vw, 1rem);
+    margin-bottom: 6px;
+  }
+
+  /* Drop the tool palette's bottom gap so the rail/canvas/drawers abut the top
+     chrome directly — no dead strip between them. */
+  .windrose-tool-palette {
+    margin-bottom: 0;
+  }
+
+  .windrose-canvas-wrapper {
+    width: auto;
+    margin-inline: 4px;
+  }
+}
+
 .callout[data-callout=dungeon-map],
 .callout[data-callout=dungeon-map] .callout-content {
   overflow: visible;

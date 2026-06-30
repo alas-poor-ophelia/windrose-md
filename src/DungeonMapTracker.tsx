@@ -240,7 +240,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
         className="windrose-tb-iconbtn ghost interactive-child windrose-cd-collapse"
         title="Collapse to edge"
         onClick={collapseTileBrowser}
-      ><Icon icon="lucide-panel-right" size={15} /></button>
+      ><Icon icon="lucide-panel-left-open" size={15} /></button>
     </div>
   );
 
@@ -752,22 +752,21 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
       >
         <CornerBrackets classPrefix="windrose-corner-bracket" variant="ornate" filterId="bracket" />
 
-        {/* Map-name header is a full-pane surface; the block spec's layout is
-            toolbar → rail/canvas/drawer with no header bar. */}
-        {fullPane && (
-          <MapHeader
-            mapData={mapData}
-            onNameChange={wrappedHandleNameChange}
-            saveStatus={saveStatus}
-            showFooter={showFooter}
-            onToggleFooter={() => setShowFooter(!showFooter)}
-            fullPane={fullPane}
-            mapId={mapId}
-            mapList={mapListEntries}
-            onMapSelect={handleMapSelect}
-            onNewMap={fullPane ? handleNewMap : undefined}
-          />
-        )}
+        {/* Map name + save status header — sits above the tool palette in both
+            full-pane and block mode (the map-picker/new/copy controls inside are
+            full-pane only). */}
+        <MapHeader
+          mapData={mapData}
+          onNameChange={wrappedHandleNameChange}
+          saveStatus={saveStatus}
+          showFooter={showFooter}
+          onToggleFooter={() => setShowFooter(!showFooter)}
+          fullPane={fullPane}
+          mapId={mapId}
+          mapList={mapListEntries}
+          onMapSelect={handleMapSelect}
+          onNewMap={fullPane ? handleNewMap : undefined}
+        />
 
         {isInSubHex && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>

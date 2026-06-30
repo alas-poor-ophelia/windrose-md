@@ -121,6 +121,42 @@ body {
   margin-inline: calc((100% - 100cqi) / 2 + var(--windrose-offset));
 }
 
+/* Block mode: the top chrome (toolbar row) keeps its top + horizontal padding,
+   but everything below it — the rail/canvas/drawer region — runs nearly
+   full-bleed: only a 4px side gutter and no bottom strip. This kills the wide
+   inset that made the collapsed ribbons read as too wide. */
+.windrose-container-block {
+  padding: clamp(0.75rem, 2vw, 1rem) 0 0;
+  /* Bump the secondary inner-border line (the 0.3 hairline 1px inside the outer
+     frame) up to 0.5 so it reads continuously down BOTH side edges. At 0.3 it
+     only looked crisp where the canvas/rail content hugs it (below the chrome);
+     beside the chrome's wider gutter it had no contrast and appeared to "stop"
+     at the top-chrome boundary. Brightening completes the unbroken rectangle. */
+  box-shadow: inset 0 0 0 4px var(--windrose-bg-primary), inset 0 0 0 5px oklch(from var(--windrose-border-primary) l c h/0.5), 0 0 20px oklch(from var(--windrose-border-primary) l c h/0.2);
+}
+.windrose-container-block .windrose-toolbar-anchor {
+  padding-inline: clamp(0.75rem, 2vw, 1rem);
+}
+.windrose-container-block {
+  /* Slim the re-added name/status header in block mode: tighter vertical padding
+     and a smaller gap to the tool palette, keeping the horizontal chrome gutter. */
+}
+.windrose-container-block .windrose-header {
+  padding: 2px clamp(0.75rem, 2vw, 1rem);
+  margin-bottom: 6px;
+}
+.windrose-container-block {
+  /* Drop the tool palette's bottom gap so the rail/canvas/drawers abut the top
+     chrome directly — no dead strip between them. */
+}
+.windrose-container-block .windrose-tool-palette {
+  margin-bottom: 0;
+}
+.windrose-container-block .windrose-canvas-wrapper {
+  width: auto;
+  margin-inline: 4px;
+}
+
 .callout[data-callout=dungeon-map],
 .callout[data-callout=dungeon-map] .callout-content {
   overflow: visible;
@@ -6281,7 +6317,7 @@ button.windrose-fow-tool-btn:disabled svg,
   gap: 4px;
   padding: 8px 0;
   background: var(--windrose-bg-primary);
-  border-right: 1px solid oklch(from var(--windrose-border-primary) l c h/0.4);
+  border-right: 1.5px solid oklch(from var(--windrose-border-primary) l c h/0.5);
   box-shadow: 2px 0 8px oklch(0% 0 0deg / 0.2);
 }
 
@@ -9755,8 +9791,11 @@ button.windrose-breadcrumb-link {
   background: oklch(from var(--role-tint, var(--windrose-border-primary)) l c h/0.14);
 }
 
-.windrose-dock-layer-row.hidden .windrose-dock-layer-name,
-.windrose-dock-layer-row.hidden .windrose-dock-layer-icon {
+/* `is-layer-hidden` (not the bare `hidden` token) — Obsidian ships a global
+   `.hidden { display: none !important }` utility that would yank the whole row
+   out of layout, making a hidden layer impossible to toggle back on. */
+.windrose-dock-layer-row.is-layer-hidden .windrose-dock-layer-name,
+.windrose-dock-layer-row.is-layer-hidden .windrose-dock-layer-icon {
   opacity: 0.45;
 }
 
@@ -9839,18 +9878,34 @@ button.windrose-breadcrumb-link {
 
 /* The edge-rail drawer (198px) is narrower than the 240px dock, so the dock's
    fixed six-column 34px grid (204px) overflows and crams the swatches together.
-   Drop the grid here and let them flow: full-size squares wrapping to as many
-   rows as needed. flex-wrap (not grid) so they reflow at their natural size. */
+   Use a 4-column fractional grid so the swatches always FILL the drawer width
+   (no fixed px width left a dead strip on the right edge). */
+/* Let the floating picker's mid-grey panel fill drop away so the swatch area
+   reads as part of the drawer (which is bg-primary), not a grey inset card. */
+.windrose-edge-rail-drawer-body .windrose-color-picker {
+  background: transparent;
+}
+
 .windrose-edge-rail-drawer-body .windrose-color-picker .windrose-color-grid {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
   gap: 6px;
 }
 
 .windrose-edge-rail-drawer-body .windrose-color-picker .windrose-color-swatch {
-  flex: 0 0 auto;
-  width: 34px;
-  height: 34px;
+  /* padding:0 + min-width:0 on the BASE rule (not just an .is-tablet override):
+     Obsidian injects `button { padding: 4px 20px }` on tablet, and a grid item's
+     default min-width:auto resolves to min-content — both would push the columns
+     past the track and break the 4-up layout. Square via aspect-ratio so the
+     swatch height follows the fractional column width. */
+  padding: 0;
+  min-width: 0;
+  /* width:100% (not auto) — an empty/transparent swatch button has no content,
+     so width:auto collapses it to ~min-content instead of filling its 1fr cell.
+     100% fills the track; aspect-ratio keeps it square. */
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
 }
 
 /* Add layer footer */

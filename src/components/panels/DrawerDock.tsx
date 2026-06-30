@@ -152,13 +152,6 @@ function SpineRibbon({ depth, onDepthChange, hidden, onToggleHide, tileCounts, o
 
   return (
     <div className="windrose-tile-spine">
-      <button
-        className="windrose-tile-spine-expand"
-        title="Expand tiles"
-        onClick={onExpand}
-      >
-        <Icon icon="lucide-panel-left-open" size={15} />
-      </button>
       {pane != null && onPane != null && (
         <>
           <div className="windrose-tile-spine-pane">

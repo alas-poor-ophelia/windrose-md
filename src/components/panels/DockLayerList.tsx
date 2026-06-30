@@ -202,7 +202,7 @@ const DockLayerList = ({
     return (
       <div
         key={layer.id}
-        className={`windrose-dock-layer-row${isActive ? ' active' : ''}${isDragging ? ' dragging' : ''}${isDragOver ? ' drag-over' : ''}${isHidden ? ' hidden' : ''}`}
+        className={`windrose-dock-layer-row${isActive ? ' active' : ''}${isDragging ? ' dragging' : ''}${isDragOver ? ' drag-over' : ''}${isHidden ? ' is-layer-hidden' : ''}`}
         {...dragProps}
         onClick={() => handleRowClick(layer.id)}
       >

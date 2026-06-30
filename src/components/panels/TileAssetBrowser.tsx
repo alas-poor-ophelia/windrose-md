@@ -20,7 +20,6 @@ import { useThumbnailPipeline } from '../../hooks/state/useThumbnailPipeline';
 import { THUMB_SIZE } from '../../assets/thumbnailCache';
 import { usePreactVirtualizer } from '../../hooks/state/useVirtualizer';
 import { Icon } from '../shared/Icon';
-import { CornerBrackets } from '../shared/CornerBrackets';
 import { DepthBar, depthMeta } from './DepthBar';
 import {
   loadTileMetadata,
@@ -1163,8 +1162,6 @@ const TileAssetBrowser = memo(({
 
   return (
     <div ref={browserRef} className="windrose-tile-browser">
-      <CornerBrackets classPrefix="windrose-tb-bracket" variant="minimal" filterId="tb-bracket" />
-
       {organize ? (
         <>
           <div className="windrose-tb-head windrose-tb-head-organize">
@@ -1388,7 +1385,7 @@ const TileAssetBrowser = memo(({
           )}
           {onCollapse && (
             <button className="windrose-tb-iconbtn ghost" title="Collapse to edge" onClick={onCollapse}>
-              <Icon icon="lucide-panel-right" size={15} />
+              <Icon icon="lucide-panel-left-open" size={15} />
             </button>
           )}
         </div>
@@ -1837,29 +1834,90 @@ const TileAssetBrowser = memo(({
         <div className="windrose-tb-grid-wrap" ref={gridWrapRef}>
           {compact ? (
             openCat != null ? (
-              // Compact leaf grid — drilled into a category
+              // Compact leaf — drilled into a category. Grid or list per viewMode.
               <>
-                <div className="windrose-tb-leaf-grid">
-                  {(groupedTiles.get(openCat) ?? []).map((tile: TileEntry) => {
-                    const tsId = tileToTilesetId.get(tile.vaultPath) ?? '';
-                    const isSelected = selectedTilesetId === tsId && selectedTileId === tile.id;
-                    return (
-                      <div
-                        key={tile.vaultPath}
-                        className={`windrose-tile-thumb ${isSelected ? 'sel' : ''}`}
-                        onClick={() => handleTileClick(tsId, tile.id)}
-                        onMouseEnter={() => setHoveredTile(tile)}
-                        onMouseLeave={() => setHoveredTile(null)}
-                        title={tile.filename}
-                      >
-                        <TileThumbnail url={getThumbUrl(tile.vaultPath)} />
-                        <span className="tname">{tile.filename}</span>
-                      </div>
-                    );
-                  })}
-                </div>
+                {viewMode === 'list' ? (
+                  <div className="windrose-tb-list">
+                    {(groupedTiles.get(openCat) ?? []).map((tile: TileEntry) => {
+                      const tsId = tileToTilesetId.get(tile.vaultPath) ?? '';
+                      const isSelected = selectedTilesetId === tsId && selectedTileId === tile.id;
+                      return (
+                        <button
+                          key={tile.vaultPath}
+                          className={`windrose-tb-listrow ${isSelected ? 'sel' : ''}`}
+                          onClick={() => handleTileClick(tsId, tile.id)}
+                          onMouseEnter={() => setHoveredTile(tile)}
+                          onMouseLeave={() => setHoveredTile(null)}
+                          title={tile.filename}
+                        >
+                          <span className="lthumb">
+                            <TileThumbnail url={getThumbUrl(tile.vaultPath)} />
+                          </span>
+                          <span className="lname">{tile.filename}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="windrose-tb-leaf-grid">
+                    {(groupedTiles.get(openCat) ?? []).map((tile: TileEntry) => {
+                      const tsId = tileToTilesetId.get(tile.vaultPath) ?? '';
+                      const isSelected = selectedTilesetId === tsId && selectedTileId === tile.id;
+                      return (
+                        <div
+                          key={tile.vaultPath}
+                          className={`windrose-tile-thumb ${isSelected ? 'sel' : ''}`}
+                          onClick={() => handleTileClick(tsId, tile.id)}
+                          onMouseEnter={() => setHoveredTile(tile)}
+                          onMouseLeave={() => setHoveredTile(null)}
+                          title={tile.filename}
+                        >
+                          <TileThumbnail url={getThumbUrl(tile.vaultPath)} />
+                          <span className="tname">{tile.filename}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
                 {(groupedTiles.get(openCat) ?? []).length === 0 && (
                   <div className="windrose-tb-empty">No tiles in this category</div>
+                )}
+              </>
+            ) : viewMode === 'list' ? (
+              // Compact top-level list — every tile as a row, under category headers.
+              // (The card view drills into one category; list view flattens them all.)
+              <>
+                <div className="windrose-tb-list">
+                  {Array.from(groupedTiles.entries()).flatMap(([cat, tiles]) => [
+                    <div key={`h-${cat}`} className="windrose-tb-seclabel" style={{ cursor: 'default' }}>
+                      <span className="catname">{displayCategory(cat)}</span>
+                      <span className="count">{tiles.length}</span>
+                    </div>,
+                    ...tiles.map((tile: TileEntry) => {
+                      const tsId = tileToTilesetId.get(tile.vaultPath) ?? '';
+                      const isSelected = selectedTilesetId === tsId && selectedTileId === tile.id;
+                      return (
+                        <button
+                          key={tile.vaultPath}
+                          className={`windrose-tb-listrow ${isSelected ? 'sel' : ''}`}
+                          onClick={() => handleTileClick(tsId, tile.id)}
+                          onMouseEnter={() => setHoveredTile(tile)}
+                          onMouseLeave={() => setHoveredTile(null)}
+                          title={tile.filename}
+                        >
+                          <span className="lthumb">
+                            <TileThumbnail url={getThumbUrl(tile.vaultPath)} />
+                          </span>
+                          <span className="lname">{tile.filename}</span>
+                        </button>
+                      );
+                    }),
+                  ])}
+                </div>
+                {groupedTiles.size === 0 && (
+                  <div className="windrose-tb-empty">
+                    {searchFilter !== '' ? 'No matching tiles' : 'No tiles loaded'}
+                  </div>
                 )}
               </>
             ) : (

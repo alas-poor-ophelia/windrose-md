@@ -417,7 +417,7 @@ button.windrose-fow-tool-btn:disabled svg,
   gap: 4px;
   padding: 8px 0;
   background: var(--windrose-bg-primary);
-  border-right: 1px solid oklch(from var(--windrose-border-primary) l c h / 0.4);
+  border-right: 1.5px solid oklch(from var(--windrose-border-primary) l c h / 0.5);
   box-shadow: 2px 0 8px oklch(0% 0 0deg / 0.2);
 }
 
