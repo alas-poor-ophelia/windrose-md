@@ -693,6 +693,14 @@
   overflow-wrap: anywhere;
   line-height: 1.2;
   text-align: left;
+  /* Full-pane rail has more vertical room than the block cards: allow up to three
+     rows for a long merged pack name, then clamp. Same flex-child / flow-root
+     caveat as the cards, so max-height (3 × line-height) is the hard cap. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  max-height: 3.6em;
+  overflow: hidden;
 }
 
 .windrose-tb-raildiv {
@@ -1178,6 +1186,20 @@
   color: var(--windrose-text-primary);
   overflow-wrap: anywhere;
   line-height: 1.2;
+  /* Block-mode thumbnail cards: wrap a long (often merged) pack name to at most
+     two rows, then clamp — otherwise it spills past the card edge. The card-name
+     is a flex child, so Chromium blockifies its -webkit-box to flow-root and the
+     clamp alone won't bound it; max-height (2 × line-height) is the hard cap, per
+     the .lname pattern above. */
+  min-width: 0;
+  /* Override the nowrap inherited from the head/grid chrome so the name can wrap
+     instead of overflowing the card edge. */
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  max-height: 2.4em;
+  overflow: hidden;
 }
 
 .windrose-tb-card-count {

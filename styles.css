@@ -2013,6 +2013,14 @@ button.windrose-object-grid-item:hover,
   overflow-wrap: anywhere;
   line-height: 1.2;
   text-align: left;
+  /* Full-pane rail has more vertical room than the block cards: allow up to three
+     rows for a long merged pack name, then clamp. Same flex-child / flow-root
+     caveat as the cards, so max-height (3 × line-height) is the hard cap. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  max-height: 3.6em;
+  overflow: hidden;
 }
 
 .windrose-tb-raildiv {
@@ -2474,6 +2482,20 @@ button.windrose-object-grid-item:hover,
   color: var(--windrose-text-primary);
   overflow-wrap: anywhere;
   line-height: 1.2;
+  /* Block-mode thumbnail cards: wrap a long (often merged) pack name to at most
+     two rows, then clamp — otherwise it spills past the card edge. The card-name
+     is a flex child, so Chromium blockifies its -webkit-box to flow-root and the
+     clamp alone won't bound it; max-height (2 × line-height) is the hard cap, per
+     the .lname pattern above. */
+  min-width: 0;
+  /* Override the nowrap inherited from the head/grid chrome so the name can wrap
+     instead of overflowing the card edge. */
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  max-height: 2.4em;
+  overflow: hidden;
 }
 
 .windrose-tb-card-count {
@@ -3141,8 +3163,8 @@ button.windrose-object-grid-item:hover,
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  padding: 8px 0;
-  gap: 2px;
+  padding: 5px 0;
+  gap: 1px;
 }
 
 .windrose-dsr-label {
@@ -3159,13 +3181,13 @@ button.windrose-object-grid-item:hover,
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 3px;
-  padding: 9px 0;
+  gap: 1px;
+  padding: 5px 0;
   cursor: pointer;
   flex-shrink: 0;
 }
 .windrose-dsr-row.is-active {
-  padding: 8px 0 9px;
+  padding: 4px 0 5px;
 }
 
 .windrose-dsr-bar {
@@ -3676,8 +3698,16 @@ button:is(.windrose-tb-iconbtn,
   pointer-events: none;
 }
 
+.windrose-tile-drawer.is-open {
+  /* The cd-head behind the panel's collapse button is transparent, so the spine
+     underneath (its right-pinned expand button lands exactly under the collapse
+     button) shows through and the controls visually stack. The spine is meant to
+     be invisible while open anyway, so hide it outright — visibility (not
+     display) keeps its box so nothing reflows under the fold animation. */
+}
 .windrose-tile-drawer.is-open .windrose-tile-spine-layer {
   pointer-events: none;
+  visibility: hidden;
 }
 .windrose-tile-drawer.is-open .windrose-tile-panel-layer {
   pointer-events: auto;
@@ -6237,13 +6267,13 @@ button.windrose-fow-tool-btn:disabled svg,
   left: 0;
   top: 0;
   bottom: 0;
-  width: 42px;
+  width: 36px;
   z-index: 9;
   display: flex;
 }
 
 .windrose-edge-rail {
-  width: 42px;
+  width: 36px;
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -6258,6 +6288,10 @@ button.windrose-fow-tool-btn:disabled svg,
 .windrose-edge-rail-btn {
   width: 34px;
   height: 34px;
+  /* Zero the host button padding + min-content floor, else Obsidian's default
+     `button { padding: 4px 12px }` inflates the icon box past its set width. */
+  padding: 0;
+  min-width: 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -6289,7 +6323,7 @@ button.windrose-fow-tool-btn:disabled svg,
      class-driven width transition does not commit reliably for this overlay
      inside Obsidian's live-preview embed. */
   position: absolute;
-  left: 42px;
+  left: 36px;
   top: 0;
   bottom: 0;
   display: flex;
@@ -6341,6 +6375,7 @@ button.windrose-fow-tool-btn:disabled svg,
   width: 198px;
   min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 6px;
 }
 
@@ -9738,7 +9773,7 @@ button.windrose-breadcrumb-link {
 /* ==========================================================================
    Dock Color Picker overrides (narrower grid for 240px dock)
    ========================================================================== */
-:is(.windrose-dock-right, .windrose-floating-panel-content) .windrose-color-picker {
+:is(.windrose-dock-right, .windrose-floating-panel-content, .windrose-edge-rail-drawer-body) .windrose-color-picker {
   padding: 2px 6px;
   min-width: 0;
   border: none;
@@ -9747,22 +9782,22 @@ button.windrose-breadcrumb-link {
   z-index: auto;
   animation: none;
 }
-:is(.windrose-dock-right, .windrose-floating-panel-content) .windrose-color-picker .windrose-color-grid {
+:is(.windrose-dock-right, .windrose-floating-panel-content, .windrose-edge-rail-drawer-body) .windrose-color-picker .windrose-color-grid {
   grid-template-columns: repeat(6, 34px);
   gap: 4px;
 }
-:is(.windrose-dock-right, .windrose-floating-panel-content) .windrose-color-picker .windrose-color-swatch {
+:is(.windrose-dock-right, .windrose-floating-panel-content, .windrose-edge-rail-drawer-body) .windrose-color-picker .windrose-color-swatch {
   width: 34px;
   height: 34px;
 }
-:is(.windrose-dock-right, .windrose-floating-panel-content) .windrose-color-picker .windrose-color-edit-panel {
+:is(.windrose-dock-right, .windrose-floating-panel-content, .windrose-edge-rail-drawer-body) .windrose-color-picker .windrose-color-edit-panel {
   left: auto;
   right: calc(100% + 4px);
 }
-:is(.windrose-dock-right, .windrose-floating-panel-content) .windrose-color-picker {
+:is(.windrose-dock-right, .windrose-floating-panel-content, .windrose-edge-rail-drawer-body) .windrose-color-picker {
   /* Flatten opacity into single compact row: Label ──── Value */
 }
-:is(.windrose-dock-right, .windrose-floating-panel-content) .windrose-color-picker .windrose-color-opacity-section {
+:is(.windrose-dock-right, .windrose-floating-panel-content, .windrose-edge-rail-drawer-body) .windrose-color-picker .windrose-color-opacity-section {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -9770,10 +9805,10 @@ button.windrose-breadcrumb-link {
   padding-top: 8px;
   border-top: 1px solid oklch(from var(--windrose-border-primary) l c h/0.2);
 }
-:is(.windrose-dock-right, .windrose-floating-panel-content) .windrose-color-picker .windrose-color-opacity-header {
+:is(.windrose-dock-right, .windrose-floating-panel-content, .windrose-edge-rail-drawer-body) .windrose-color-picker .windrose-color-opacity-header {
   display: contents;
 }
-:is(.windrose-dock-right, .windrose-floating-panel-content) .windrose-color-picker .windrose-color-opacity-label {
+:is(.windrose-dock-right, .windrose-floating-panel-content, .windrose-edge-rail-drawer-body) .windrose-color-picker .windrose-color-opacity-label {
   font-size: 10px;
   color: var(--windrose-text-muted);
   text-transform: uppercase;
@@ -9781,25 +9816,41 @@ button.windrose-breadcrumb-link {
   white-space: nowrap;
   margin-bottom: 0;
 }
-:is(.windrose-dock-right, .windrose-floating-panel-content) .windrose-color-picker .windrose-color-opacity-value {
+:is(.windrose-dock-right, .windrose-floating-panel-content, .windrose-edge-rail-drawer-body) .windrose-color-picker .windrose-color-opacity-value {
   font-size: 10px;
   font-variant-numeric: tabular-nums;
   min-width: 28px;
 }
-:is(.windrose-dock-right, .windrose-floating-panel-content) .windrose-color-picker .windrose-color-opacity-slider {
+:is(.windrose-dock-right, .windrose-floating-panel-content, .windrose-edge-rail-drawer-body) .windrose-color-picker .windrose-color-opacity-slider {
   flex: 1;
   min-width: 0;
   height: 3px;
 }
-:is(.windrose-dock-right, .windrose-floating-panel-content) .windrose-color-picker .windrose-color-opacity-slider::-webkit-slider-thumb {
+:is(.windrose-dock-right, .windrose-floating-panel-content, .windrose-edge-rail-drawer-body) .windrose-color-picker .windrose-color-opacity-slider::-webkit-slider-thumb {
   width: 10px;
   height: 10px;
   border-width: 1px;
 }
-:is(.windrose-dock-right, .windrose-floating-panel-content) .windrose-color-picker .windrose-color-opacity-slider::-moz-range-thumb {
+:is(.windrose-dock-right, .windrose-floating-panel-content, .windrose-edge-rail-drawer-body) .windrose-color-picker .windrose-color-opacity-slider::-moz-range-thumb {
   width: 10px;
   height: 10px;
   border-width: 1px;
+}
+
+/* The edge-rail drawer (198px) is narrower than the 240px dock, so the dock's
+   fixed six-column 34px grid (204px) overflows and crams the swatches together.
+   Drop the grid here and let them flow: full-size squares wrapping to as many
+   rows as needed. flex-wrap (not grid) so they reflow at their natural size. */
+.windrose-edge-rail-drawer-body .windrose-color-picker .windrose-color-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.windrose-edge-rail-drawer-body .windrose-color-picker .windrose-color-swatch {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
 }
 
 /* Add layer footer */
@@ -10049,19 +10100,56 @@ button.windrose-breadcrumb-link {
   color: var(--windrose-text-secondary);
 }
 
-/* Tablet overrides for view panel buttons */
-.is-tablet button:is(.windrose-dock-view-zoom-btn,
-.windrose-dock-view-toggle,
-.windrose-dock-view-settings) {
+/* Tablet overrides for view panel buttons — Obsidian's .is-tablet injects
+   padding/height/min-height/background onto every <button>, bloating these
+   compact controls. Re-state each box in full. The selectors are host-agnostic,
+   so they apply both in the full-pane dock and the block-mode edge-rail drawer. */
+.is-tablet button.windrose-dock-view-zoom-btn {
+  width: 26px;
+  height: 26px;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: 0;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--windrose-text-secondary);
 }
 
 .is-tablet button.windrose-dock-view-toggle {
+  height: auto;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
   padding: 3px 8px;
+  border: none;
+  border-radius: 3px;
+  background: oklch(from var(--windrose-border-primary) l c h/0.08);
+  box-shadow: none;
+  color: var(--windrose-text-secondary);
+}
+.is-tablet button.windrose-dock-view-toggle.active {
+  background: var(--windrose-border-primary);
+  color: var(--windrose-bg-primary);
 }
 
 .is-tablet button.windrose-dock-view-settings {
+  width: 100%;
+  height: auto;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
   padding: 4px 8px;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--windrose-text-muted);
 }
 
 /* ==========================================================================

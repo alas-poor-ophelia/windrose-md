@@ -234,8 +234,8 @@
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  padding: 8px 0;
-  gap: 2px;
+  padding: 5px 0;
+  gap: 1px;
 }
 
 .windrose-dsr-label {
@@ -252,13 +252,13 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 3px;
-  padding: 9px 0;
+  gap: 1px;
+  padding: 5px 0;
   cursor: pointer;
   flex-shrink: 0;
 
   &.is-active {
-    padding: 8px 0 9px;
+    padding: 4px 0 5px;
   }
 }
 

@@ -403,13 +403,13 @@ button.windrose-fow-tool-btn:disabled svg,
   left: 0;
   top: 0;
   bottom: 0;
-  width: 42px;
+  width: 36px;
   z-index: 9;
   display: flex;
 }
 
 .windrose-edge-rail {
-  width: 42px;
+  width: 36px;
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -424,6 +424,10 @@ button.windrose-fow-tool-btn:disabled svg,
 .windrose-edge-rail-btn {
   width: 34px;
   height: 34px;
+  /* Zero the host button padding + min-content floor, else Obsidian's default
+     `button { padding: 4px 12px }` inflates the icon box past its set width. */
+  padding: 0;
+  min-width: 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -458,7 +462,7 @@ button.windrose-fow-tool-btn:disabled svg,
      class-driven width transition does not commit reliably for this overlay
      inside Obsidian's live-preview embed. */
   position: absolute;
-  left: 42px;
+  left: 36px;
   top: 0;
   bottom: 0;
   display: flex;
@@ -511,6 +515,7 @@ button.windrose-fow-tool-btn:disabled svg,
   width: 198px;
   min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 6px;
 }
 

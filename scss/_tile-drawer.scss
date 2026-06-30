@@ -471,8 +471,14 @@ button:is(
 }
 
 .windrose-tile-drawer.is-open {
+  /* The cd-head behind the panel's collapse button is transparent, so the spine
+     underneath (its right-pinned expand button lands exactly under the collapse
+     button) shows through and the controls visually stack. The spine is meant to
+     be invisible while open anyway, so hide it outright — visibility (not
+     display) keeps its box so nothing reflows under the fold animation. */
   .windrose-tile-spine-layer {
     pointer-events: none;
+    visibility: hidden;
   }
 
   .windrose-tile-panel-layer {

@@ -126,13 +126,6 @@ const ObjectSidebar = ({ selectedObjectType, onObjectTypeSelect, onToolChange, i
     <div className="windrose-object-sidebar">
       <div className="windrose-object-sidebar-header">
         <span>Objects</span>
-        <button
-          className="windrose-sidebar-collapse-btn interactive-child"
-          onClick={handleToggleCollapse}
-          title="Hide sidebar"
-        >
-          <Icon icon="lucide-panel-left-close" size={14} />
-        </button>
       </div>
 
       {objectSets.length > 0 && (

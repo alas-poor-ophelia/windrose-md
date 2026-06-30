@@ -590,7 +590,7 @@
 /* ==========================================================================
    Dock Color Picker overrides (narrower grid for 240px dock)
    ========================================================================== */
-:is(.windrose-dock-right, .windrose-floating-panel-content) .windrose-color-picker {
+:is(.windrose-dock-right, .windrose-floating-panel-content, .windrose-edge-rail-drawer-body) .windrose-color-picker {
   padding: 2px 6px;
   min-width: 0;
   border: none;
@@ -660,6 +660,22 @@
       border-width: 1px;
     }
   }
+}
+
+/* The edge-rail drawer (198px) is narrower than the 240px dock, so the dock's
+   fixed six-column 34px grid (204px) overflows and crams the swatches together.
+   Drop the grid here and let them flow: full-size squares wrapping to as many
+   rows as needed. flex-wrap (not grid) so they reflow at their natural size. */
+.windrose-edge-rail-drawer-body .windrose-color-picker .windrose-color-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.windrose-edge-rail-drawer-body .windrose-color-picker .windrose-color-swatch {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
 }
 
 /* Add layer footer */
@@ -920,21 +936,57 @@
   }
 }
 
-/* Tablet overrides for view panel buttons */
-.is-tablet button:is(
-  .windrose-dock-view-zoom-btn,
-  .windrose-dock-view-toggle,
-  .windrose-dock-view-settings
-) {
+/* Tablet overrides for view panel buttons — Obsidian's .is-tablet injects
+   padding/height/min-height/background onto every <button>, bloating these
+   compact controls. Re-state each box in full. The selectors are host-agnostic,
+   so they apply both in the full-pane dock and the block-mode edge-rail drawer. */
+.is-tablet button.windrose-dock-view-zoom-btn {
+  width: 26px;
+  height: 26px;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: 0;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--windrose-text-secondary);
 }
 
 .is-tablet button.windrose-dock-view-toggle {
+  height: auto;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
   padding: 3px 8px;
+  border: none;
+  border-radius: 3px;
+  background: oklch(from var(--windrose-border-primary) l c h / 0.08);
+  box-shadow: none;
+  color: var(--windrose-text-secondary);
+
+  &.active {
+    background: var(--windrose-border-primary);
+    color: var(--windrose-bg-primary);
+  }
 }
 
 .is-tablet button.windrose-dock-view-settings {
+  width: 100%;
+  height: auto;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
   padding: 4px 8px;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--windrose-text-muted);
 }
 
 /* ==========================================================================

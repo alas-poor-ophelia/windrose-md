@@ -32,9 +32,10 @@ interface MapControlsProps {
   onToggleRegionPanel?: () => void;
   alwaysShowControls?: boolean;
   hideExpand?: boolean;
-  /** Block mode: float only compass + zoom. The Layers/Region/Visibility/Settings
-      toggles are redundant with the left EdgeRail, and the full-width expand button
-      collides with the compass — so they're dropped here per the block spec. */
+  /** Block mode: float compass + zoom + the expand button. The Layers/Region/
+      Visibility/Settings toggles are redundant with the left EdgeRail, so they're
+      dropped here per the block spec. The expand button is kept — it reserves the
+      space above the compass that the compass's -33px reveal lift compensates for. */
   minimalControls?: boolean;
 }
 
@@ -195,7 +196,7 @@ const MapControls = ({
           onMouseLeave={handleMouseLeave}
         >
           {/* Expand/Collapse Button - Above compass, animates last */}
-          {!hideExpand && !minimalControls && (
+          {!hideExpand && (
             <button
               className={`windrose-expand-btn windrose-drawer-item windrose-drawer-item-up ${controlsRevealed ? 'windrose-drawer-item-visible' : ''}`}
               style={getExpandStyle()}
