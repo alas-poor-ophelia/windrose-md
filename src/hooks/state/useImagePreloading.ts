@@ -97,6 +97,14 @@ function useImagePreloading(
           placedPaths.add(p);
         }
       }
+      // Terrain brush strokes reference region textures like placed tiles.
+      if (layer.terrainStrokes != null && layer.terrainStrokes.length > 0) {
+        for (const s of layer.terrainStrokes) {
+          const ts = mapData.tilesets.find(t => t.id === s.tilesetId);
+          const entry = ts?.tiles.find(t => t.id === s.tileId);
+          if (entry?.vaultPath != null && entry.vaultPath !== '') placedPaths.add(entry.vaultPath);
+        }
+      }
     }
 
     if (placedPaths.size === 0) {

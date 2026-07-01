@@ -135,6 +135,12 @@ function migrateMapData(mapData: MapData): MapData {
     layer.wallPaths ??= [];
     layer.wallPaths = layer.wallPaths.filter(w => Array.isArray(w.vertices) && w.vertices.length >= 2);
 
+    layer.terrainStrokes ??= [];
+    layer.terrainStrokes = layer.terrainStrokes.filter(s =>
+      Array.isArray(s.points) && s.points.length >= 2 && s.points.length % 2 === 0 &&
+      Number.isFinite(s.radius) && s.radius > 0 &&
+      typeof s.tilesetId === 'string' && typeof s.tileId === 'string');
+
     layer.curves ??= [];
     layer.curves = layer.curves.filter(c => c.start != null && c.segments != null);
     for (const curve of layer.curves) {
@@ -173,6 +179,11 @@ function migrateMapData(mapData: MapData): MapData {
           layer.curves = layer.curves.filter(c => c.start != null && c.segments != null);
           layer.wallPaths ??= [];
           layer.wallPaths = layer.wallPaths.filter(w => Array.isArray(w.vertices) && w.vertices.length >= 2);
+          layer.terrainStrokes ??= [];
+          layer.terrainStrokes = layer.terrainStrokes.filter(s =>
+            Array.isArray(s.points) && s.points.length >= 2 && s.points.length % 2 === 0 &&
+            Number.isFinite(s.radius) && s.radius > 0 &&
+            typeof s.tilesetId === 'string' && typeof s.tileId === 'string');
         }
         subHex.mapData.regions ??= [];
         subHex.mapData.outlines ??= [];

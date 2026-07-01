@@ -9,6 +9,7 @@
 import type { Cell } from '../core/cell.types';
 import type { Curve } from '../core/curve.types';
 import type { WallPath } from '../core/wallpath.types';
+import type { TerrainStroke } from '../core/terrainstroke.types';
 import type { Edge, TextLabel, MapData, LayerId, Region, ShapeOverlay, Outline, FogOfWar } from '../core/map.types';
 import type { MapObject } from '../objects/object.types';
 import type { TileAssignment } from '../tiles/tile.types';
@@ -39,6 +40,8 @@ export interface LayerHistorySnapshot {
   tiles?: TileAssignment[];
   /** Wall/path strips on the layer */
   wallPaths?: WallPath[];
+  /** Terrain brush strokes on the layer */
+  terrainStrokes?: TerrainStroke[];
   /** Regions (map-level, tracked for undo) */
   regions?: Region[];
   /** Polygon outlines (map-level, tracked for undo) */

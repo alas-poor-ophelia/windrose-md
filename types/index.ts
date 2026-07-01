@@ -54,6 +54,12 @@ export type {
 } from './core/wallpath.types';
 
 export type {
+  // Terrain strokes
+  TerrainStrokeId,
+  TerrainStroke,
+} from './core/terrainstroke.types';
+
+export type {
   // Map
   MapType,
   LayerId,

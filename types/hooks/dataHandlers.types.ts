@@ -9,6 +9,7 @@ import type { MapData, StoredViewState, TextLabelSettings, Region } from '../cor
 import type { Cell } from '../core/cell.types';
 import type { Curve } from '../core/curve.types';
 import type { WallPath } from '../core/wallpath.types';
+import type { TerrainStroke } from '../core/terrainstroke.types';
 import type { MapObject } from '../objects/object.types';
 import type { TextLabel } from '../objects/note.types';
 import type { HexColor } from '../core/common.types';
@@ -64,6 +65,9 @@ export type HandleTilesChange = LayerDataChangeHandler<TileAssignment[]>;
 /** Handle wall paths change */
 export type HandleWallPathsChange = LayerDataChangeHandler<WallPath[]>;
 
+/** Handle terrain strokes change */
+export type HandleTerrainStrokesChange = LayerDataChangeHandler<TerrainStroke[]>;
+
 /** Handle map name change */
 export type HandleNameChange = (newName: string) => void;
 
@@ -104,6 +108,7 @@ export interface LayerDataHandlers {
   handleEdgesChange: HandleEdgesChange;
   handleTilesChange?: HandleTilesChange;
   handleWallPathsChange?: HandleWallPathsChange;
+  handleTerrainStrokesChange?: HandleTerrainStrokesChange;
 }
 
 /** Map data handlers group */
@@ -140,6 +145,7 @@ export interface UseDataHandlersResult {
   handleEdgesChange: HandleEdgesChange;
   handleTilesChange: HandleTilesChange;
   handleWallPathsChange: HandleWallPathsChange;
+  handleTerrainStrokesChange: HandleTerrainStrokesChange;
   handleAddCustomColor: HandleAddCustomColor;
   handleDeleteCustomColor: HandleDeleteCustomColor;
   handleUpdateColorOpacity: HandleUpdateColorOpacity;

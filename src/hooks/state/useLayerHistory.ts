@@ -50,6 +50,7 @@ function useLayerHistory({
     name: "",
     tiles: [],
     wallPaths: [],
+    terrainStrokes: [],
     objects: [],
     textLabels: [],
     edges: [],
@@ -99,6 +100,7 @@ function useLayerHistory({
         edges: activeLayer.edges,
         tiles: activeLayer.tiles,
         wallPaths: activeLayer.wallPaths,
+        terrainStrokes: activeLayer.terrainStrokes,
         regions: mapData.regions ?? [],
         outlines: mapData.outlines ?? [],
         shapeOverlays: mapData.shapeOverlays ?? [],
@@ -133,6 +135,7 @@ function useLayerHistory({
       edges: layer.edges,
       tiles: layer.tiles,
       wallPaths: layer.wallPaths,
+      terrainStrokes: layer.terrainStrokes,
       shapeOverlays: shapeOverlays,
       fogOfWar: fogOfWar ?? layer.fogOfWar,
       regions: regions,
@@ -328,6 +331,7 @@ function useLayerHistory({
           edges: previousState.edges,
           tiles: previousState.tiles,
           wallPaths: previousState.wallPaths,
+          terrainStrokes: previousState.terrainStrokes,
           fogOfWar: previousState.fogOfWar !== undefined ? previousState.fogOfWar : undefined
         }
       );
@@ -354,6 +358,7 @@ function useLayerHistory({
           edges: nextState.edges,
           tiles: nextState.tiles,
           wallPaths: nextState.wallPaths,
+          terrainStrokes: nextState.terrainStrokes,
           fogOfWar: nextState.fogOfWar !== undefined ? nextState.fogOfWar : undefined
         }
       );

@@ -9,6 +9,7 @@ import type { Cell } from './cell.types';
 import type { CustomColor } from './common.types';
 import type { Curve } from './curve.types';
 import type { WallPath } from './wallpath.types';
+import type { TerrainStroke } from './terrainstroke.types';
 import type { Point } from './geometry.types';
 import type { HexOrientation, FrameSettings } from '../settings/settings.types';
 import type { TilesetDef, TilesetOverrides, TileAssignment, TileLayerRole } from '../tiles/tile.types';
@@ -267,6 +268,8 @@ export interface MapLayer {
   tileRole?: TileLayerRole;
   /** Wall/path texture strips swept along editable polylines */
   wallPaths?: WallPath[];
+  /** Soft-edged terrain brush strokes (world-space region texture painting) */
+  terrainStrokes?: TerrainStroke[];
   /**
    * The board (floor) this layer belongs to. Optional for back-compat; the load
    * migration assigns every layer a default board. Stratum = (boardId, tileRole).
