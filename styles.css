@@ -266,6 +266,11 @@ select.windrose-map-picker:focus {
   outline: none;
 }
 
+/* Tablet: match the header buttons' 36px touch height. */
+.is-tablet select.windrose-map-picker {
+  height: 36px;
+}
+
 .is-tablet button.windrose-header-action-btn,
 .windrose-header-action-btn {
   background: transparent;
@@ -273,6 +278,7 @@ select.windrose-map-picker:focus {
   border-radius: 4px;
   color: var(--windrose-text-disabled);
   cursor: pointer;
+  box-sizing: border-box;
   padding: 0;
   height: 28px;
   width: 28px;
@@ -317,7 +323,12 @@ select.windrose-map-picker:focus {
   border-radius: 4px;
   color: var(--windrose-text-disabled);
   cursor: pointer;
-  padding: clamp(0.25rem, 0.5vw, 0.375rem) clamp(0.5rem, 1vw, 0.75rem);
+  /* Explicit border-box + zero padding so this matches .windrose-header-action-btn
+     exactly. The old clamp() padding only stayed 28px while box-sizing resolved to
+     border-box (inherited); if a theme reset it to content-box the padding inflated
+     this button ~14px wider than its siblings — the "different sizes" bug. */
+  box-sizing: border-box;
+  padding: 0;
   transition: var(--windrose-transition);
   display: flex;
   align-items: center;
@@ -347,6 +358,15 @@ select.windrose-map-picker:focus {
 .windrose-info-toggle.windrose-info-toggle.windrose-info-toggle-active:hover {
   border-color: var(--windrose-border-primary-dark);
   color: var(--windrose-border-primary-dark);
+}
+
+/* Tablet: match the action buttons' 36x36 touch size. Without this, Obsidian's
+   `.is-tablet button:not(.clickable-icon) { padding: 4px 20px }` (0,2,1) beats our
+   base info-toggle rule (0,2,0) and inflates it to ~42x28 — the odd one out. */
+.is-tablet button.windrose-info-toggle {
+  width: 36px;
+  height: 36px;
+  padding: 0;
 }
 
 .windrose-save-status {
