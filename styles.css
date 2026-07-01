@@ -245,18 +245,23 @@ body {
   flex-shrink: 0;
 }
 
-.windrose-map-picker {
+/* `select.` (0,1,1) beats Obsidian's `select { height: var(--input-height) }`,
+   which otherwise pins the picker taller than the now-condensed header and clips
+   it. Height matches the sibling +new-map action button (28px). */
+select.windrose-map-picker {
+  height: 28px;
+  box-sizing: border-box;
   background: var(--windrose-bg-secondary);
   border: 1px solid var(--windrose-border-secondary);
   border-radius: 4px;
   color: var(--windrose-text-primary);
   font-size: 13px;
-  padding: 4px 8px;
+  padding: 2px 8px;
   max-width: 200px;
   cursor: pointer;
   flex-shrink: 0;
 }
-.windrose-map-picker:focus {
+select.windrose-map-picker:focus {
   border-color: var(--windrose-border-primary);
   outline: none;
 }
@@ -2447,6 +2452,12 @@ button.windrose-object-grid-item:hover,
   display: flex;
   flex-direction: column;
   padding: 0;
+  /* Desktop anchor: Obsidian's `button { height: var(--input-height) }` pins the
+     card to a single-line height and crushes the 2x2 mosaic (whose cells size by
+     aspect-ratio against a resolved height). The .is-tablet override fixes tablet;
+     this fixes desktop. */
+  height: auto;
+  min-height: auto;
   background: var(--windrose-bg-secondary);
   border: 1.5px solid var(--windrose-border-secondary);
   border-radius: 6px;
@@ -6277,7 +6288,11 @@ button.windrose-fow-tool-btn:disabled svg,
   box-shadow: 2px 0 8px oklch(0% 0 0deg / 0.2);
 }
 
-.windrose-edge-rail-btn {
+/* `button.` prefix (specificity 0,1,1) is required to beat Obsidian's
+   `button:not(.clickable-icon)` (0,1,1, wins on load order) which injects a dark
+   fill + bevel box-shadow, and its `button:hover`. The old bare-class rule (0,1,0)
+   lost that fight on desktop — only the .is-tablet override (0,2,1) held. */
+button.windrose-edge-rail-btn {
   width: 34px;
   height: 34px;
   /* Zero the host button padding + min-content floor, else Obsidian's default
@@ -6295,15 +6310,15 @@ button.windrose-fow-tool-btn:disabled svg,
   box-shadow: none;
   transition: var(--windrose-transition);
 }
-.windrose-edge-rail-btn svg {
+button.windrose-edge-rail-btn svg {
   width: 18px;
   height: 18px;
 }
-.windrose-edge-rail-btn:hover {
+button.windrose-edge-rail-btn:hover {
   background: var(--windrose-bg-tertiary);
   color: var(--windrose-text-primary);
 }
-.windrose-edge-rail-btn.on {
+button.windrose-edge-rail-btn.on {
   color: var(--windrose-gold-bright);
   border-color: oklch(from var(--windrose-gold-bright) l c h/0.5);
   background: oklch(from var(--windrose-gold-bright) l c h/0.12);
@@ -8913,6 +8928,14 @@ button.windrose-breadcrumb-link {
   flex: 1;
   min-height: 0;
   position: relative;
+}
+
+/* Map-name header: drop the bottom padding + margin to tighten the section, and
+   divide it from the stage/canvas with the same gold stroke the sidebars use. */
+.windrose-full-pane .windrose-header {
+  padding-bottom: 0;
+  margin-bottom: 0;
+  border-bottom: 1.5px solid oklch(from var(--windrose-border-primary) l c h/0.5);
 }
 
 /* Stage wraps [tool rail | canvas]. Layout-transparent everywhere except

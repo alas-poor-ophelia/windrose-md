@@ -1143,6 +1143,12 @@
   display: flex;
   flex-direction: column;
   padding: 0;
+  /* Desktop anchor: Obsidian's `button { height: var(--input-height) }` pins the
+     card to a single-line height and crushes the 2x2 mosaic (whose cells size by
+     aspect-ratio against a resolved height). The .is-tablet override fixes tablet;
+     this fixes desktop. */
+  height: auto;
+  min-height: auto;
   background: var(--windrose-bg-secondary);
   border: 1.5px solid var(--windrose-border-secondary);
   border-radius: 6px;

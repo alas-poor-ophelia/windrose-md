@@ -30,6 +30,14 @@
   position: relative;
 }
 
+/* Map-name header: drop the bottom padding + margin to tighten the section, and
+   divide it from the stage/canvas with the same gold stroke the sidebars use. */
+.windrose-full-pane .windrose-header {
+  padding-bottom: 0;
+  margin-bottom: 0;
+  border-bottom: 1.5px solid oklch(from var(--windrose-border-primary) l c h / 0.5);
+}
+
 /* Stage wraps [tool rail | canvas]. Layout-transparent everywhere except
    full-pane, so block mode keeps its existing top-toolbar column flow. */
 .windrose-stage {

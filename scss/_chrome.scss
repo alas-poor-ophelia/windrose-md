@@ -26,13 +26,18 @@
   flex-shrink: 0;
 }
 
-.windrose-map-picker {
+/* `select.` (0,1,1) beats Obsidian's `select { height: var(--input-height) }`,
+   which otherwise pins the picker taller than the now-condensed header and clips
+   it. Height matches the sibling +new-map action button (28px). */
+select.windrose-map-picker {
+  height: 28px;
+  box-sizing: border-box;
   background: var(--windrose-bg-secondary);
   border: 1px solid var(--windrose-border-secondary);
   border-radius: 4px;
   color: var(--windrose-text-primary);
   font-size: 13px;
-  padding: 4px 8px;
+  padding: 2px 8px;
   max-width: 200px;
   cursor: pointer;
   flex-shrink: 0;

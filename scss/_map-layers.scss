@@ -421,7 +421,11 @@ button.windrose-fow-tool-btn:disabled svg,
   box-shadow: 2px 0 8px oklch(0% 0 0deg / 0.2);
 }
 
-.windrose-edge-rail-btn {
+/* `button.` prefix (specificity 0,1,1) is required to beat Obsidian's
+   `button:not(.clickable-icon)` (0,1,1, wins on load order) which injects a dark
+   fill + bevel box-shadow, and its `button:hover`. The old bare-class rule (0,1,0)
+   lost that fight on desktop — only the .is-tablet override (0,2,1) held. */
+button.windrose-edge-rail-btn {
   width: 34px;
   height: 34px;
   /* Zero the host button padding + min-content floor, else Obsidian's default
