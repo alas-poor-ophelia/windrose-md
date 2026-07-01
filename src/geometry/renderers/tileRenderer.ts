@@ -7,12 +7,14 @@
  */
 
 import type { TileAssignment, TilesetDef, FolderTileset, TileMetadataStore } from '#types/tiles/tile.types';
+import type { TerrainStroke } from '#types/core/terrainstroke.types';
 import type { HexOrientation } from '#types/settings/settings.types';
 
 import { axialToOffset } from '../core/offsetCoordinates';
 import { resolveTileRender } from '../../assets/tileRenderResolution';
 import { effectiveSpan } from '../../assets/tileFootprint';
 import { getTileMetadataForRender } from '../../persistence/tileMetadata';
+import { strokeBoundsWorld } from '../strokes/terrainStrokeGeometry';
 
 
 // ===========================================
@@ -41,6 +43,9 @@ interface TileRenderOptions {
   /** Per-tile metadata store for render-mode resolution. Defaults to the global
    *  render accessor (matches the getTheme() idiom); injectable for tests. */
   tileMetadata?: TileMetadataStore;
+  /** Terrain brush strokes for the layer — join the region-fill pass so strokes
+   *  and cell fills of the same texture share one mask (and one feather). */
+  terrainStrokes?: TerrainStroke[];
 }
 
 // ===========================================
@@ -61,6 +66,18 @@ function getFeatherCanvas(w: number, h: number): HTMLCanvasElement | null {
   if (_featherCanvas.width !== w) _featherCanvas.width = w;
   if (_featherCanvas.height !== h) _featherCanvas.height = h;
   return _featherCanvas;
+}
+
+/** Second scratch canvas: hard (unblurred) mask when a group mixes cells and
+ *  strokes — the union is drawn sharp here, then blurred ONCE into the feather
+ *  canvas, so overlapping shapes can't accumulate alpha into visible seams. */
+let _maskCanvas: HTMLCanvasElement | null = null;
+function getMaskCanvas(w: number, h: number): HTMLCanvasElement | null {
+  if (typeof document === 'undefined') return null;
+  _maskCanvas ??= activeDocument.createElement('canvas');
+  if (_maskCanvas.width !== w) _maskCanvas.width = w;
+  if (_maskCanvas.height !== h) _maskCanvas.height = h;
+  return _maskCanvas;
 }
 
 /** Pure: feather radius in screen px for a given cell size and ratio (clamped ≥ 0). */
@@ -105,16 +122,64 @@ interface RegionGroup {
   tileset: TilesetDef;
   vaultPath: string;
   cells: TileAssignment[];
+  /** Terrain brush strokes of this texture (world-space capsule sweeps). */
+  strokes: TerrainStroke[];
   /** Resolved per-tile terrain params (cells per texture span; edge feather ratio). */
   worldRepeat: number;
   edgeFeather: number;
 }
 
+/** Build the screen-space Path2D of a stroke's polyline spine. */
+function strokeScreenPath(
+  stroke: TerrainStroke,
+  geometry: TileGeometry,
+  viewState: TileViewState
+): Path2D {
+  const p = new Path2D();
+  const pts = stroke.points;
+  const s0 = geometry.worldToScreen(pts[0], pts[1], viewState.x, viewState.y, viewState.zoom);
+  p.moveTo(s0.screenX, s0.screenY);
+  for (let i = 2; i + 1 < pts.length; i += 2) {
+    const s = geometry.worldToScreen(pts[i], pts[i + 1], viewState.x, viewState.y, viewState.zoom);
+    p.lineTo(s.screenX, s.screenY);
+  }
+  return p;
+}
+
+/** Draw a group's strokes into a mask context as white round-cap sweeps. */
+function drawStrokeMask(
+  mctx: CanvasRenderingContext2D,
+  strokes: TerrainStroke[],
+  geometry: TileGeometry,
+  viewState: TileViewState,
+  screenPerWorld: number
+): void {
+  mctx.fillStyle = '#ffffff';
+  mctx.strokeStyle = '#ffffff';
+  mctx.lineCap = 'round';
+  mctx.lineJoin = 'round';
+  for (const st of strokes) {
+    const radiusPx = st.radius * screenPerWorld;
+    if (st.points.length <= 2) {
+      // Single-point dab: a zero-length stroke may not paint; use an arc fill.
+      const c = geometry.worldToScreen(st.points[0], st.points[1], viewState.x, viewState.y, viewState.zoom);
+      const dab = new Path2D();
+      dab.arc(c.screenX, c.screenY, radiusPx, 0, Math.PI * 2);
+      mctx.fill(dab);
+    } else {
+      mctx.lineWidth = radiusPx * 2;
+      mctx.stroke(strokeScreenPath(st, geometry, viewState));
+    }
+  }
+}
+
 /**
- * Render one or more groups of grid-snapped cells as seamless tiled-texture
- * fills. Each group shares a single world-anchored CanvasPattern, clipped to the
- * union of its cells. Per-tile rotation/flip/scale do not apply to region fills
- * (the texture is continuous); layer/ghost opacity is honored via `alpha`.
+ * Render one or more groups of grid-snapped cells AND terrain brush strokes as
+ * seamless tiled-texture fills. Each group shares a single world-anchored
+ * CanvasPattern, masked by the union of its cell rects and stroke capsules —
+ * one shared mask means one feather pass, so strokes and cells of the same
+ * texture merge without double-edged seams. Per-tile rotation/flip/scale do
+ * not apply (the texture is continuous); layer/ghost opacity via `alpha`.
  */
 function renderRegionFills(
   ctx: CanvasRenderingContext2D,
@@ -160,6 +225,17 @@ function renderRegionFills(
       if (tl.screenX + cellPx > maxX) maxX = tl.screenX + cellPx;
       if (tl.screenY + cellPx > maxY) maxY = tl.screenY + cellPx;
     }
+    // Extend the bbox by each stroke's capsule bounds.
+    const hasStrokes = grp.strokes.length > 0;
+    for (const st of grp.strokes) {
+      const b = strokeBoundsWorld(st);
+      const tl = geometry.worldToScreen(b.minX, b.minY, viewState.x, viewState.y, viewState.zoom);
+      const br = geometry.worldToScreen(b.maxX, b.maxY, viewState.x, viewState.y, viewState.zoom);
+      if (tl.screenX < minX) minX = tl.screenX;
+      if (tl.screenY < minY) minY = tl.screenY;
+      if (br.screenX > maxX) maxX = br.screenX;
+      if (br.screenY > maxY) maxY = br.screenY;
+    }
     if (minX > maxX) continue;
     // Viewport cull: skip groups entirely off-screen.
     if (maxX < 0 || minX > canvasW || maxY < 0 || minY > canvasH) continue;
@@ -168,11 +244,11 @@ function renderRegionFills(
 
     // Hard-edged fill (feather disabled): clip to the cell union and fill directly.
     if (!(featherPx > 0.5)) {
-      hardFillRegion(ctx, img, path, scale, translateX, translateY, alpha, minX, minY, maxX, maxY);
+      hardFillRegion(ctx, img, grp, path, geometry, viewState, screenPerWorld, scale, translateX, translateY, alpha, minX, minY, maxX, maxY);
       continue;
     }
 
-    // Smart-edge feather: render into an offscreen buffer where the cell-union
+    // Smart-edge feather: render into an offscreen buffer where the union
     // mask is blurred — only the OUTER boundary of the union softens; interior
     // edges shared with same-terrain neighbours stay inside the blob and remain
     // opaque — then composite the world-anchored texture through that mask.
@@ -188,20 +264,44 @@ function renderRegionFills(
     const octx = oc?.getContext('2d') ?? null;
     if (oc == null || octx == null) {
       // Offscreen unavailable (e.g. non-DOM env): degrade to a hard edge.
-      hardFillRegion(ctx, img, path, scale, translateX, translateY, alpha, minX, minY, maxX, maxY);
+      hardFillRegion(ctx, img, grp, path, geometry, viewState, screenPerWorld, scale, translateX, translateY, alpha, minX, minY, maxX, maxY);
       continue;
     }
     const pattern = octx.createPattern(img, 'repeat');
     if (!pattern) continue;
 
     octx.clearRect(0, 0, bw, bh);
-    // 1. Blurred alpha mask of the cell union (path is screen-space; shift into offscreen space).
-    octx.save();
-    octx.translate(-bx, -by);
-    octx.filter = `blur(${featherPx}px)`;
-    octx.fillStyle = '#ffffff';
-    octx.fill(path);
-    octx.restore();
+    if (!hasStrokes) {
+      // Cells only: blur the union path in one draw call (original fast path).
+      octx.save();
+      octx.translate(-bx, -by);
+      octx.filter = `blur(${featherPx}px)`;
+      octx.fillStyle = '#ffffff';
+      octx.fill(path);
+      octx.restore();
+    } else {
+      // Cells + strokes need MULTIPLE mask draw calls; blurring each call
+      // separately would stack alpha where shapes overlap (visible seams).
+      // Draw the union hard into the mask canvas, then blur it ONCE.
+      const mc = getMaskCanvas(bw, bh);
+      const mctx = mc?.getContext('2d') ?? null;
+      if (mc == null || mctx == null) {
+        hardFillRegion(ctx, img, grp, path, geometry, viewState, screenPerWorld, scale, translateX, translateY, alpha, minX, minY, maxX, maxY);
+        continue;
+      }
+      mctx.clearRect(0, 0, bw, bh);
+      mctx.save();
+      mctx.translate(-bx, -by);
+      mctx.fillStyle = '#ffffff';
+      if (grp.cells.length > 0) mctx.fill(path);
+      drawStrokeMask(mctx, grp.strokes, geometry, viewState, screenPerWorld);
+      mctx.restore();
+
+      octx.save();
+      octx.filter = `blur(${featherPx}px)`;
+      octx.drawImage(mc, 0, 0);
+      octx.restore();
+    }
     // 2. Paint the texture only where the mask exists, weighted by mask alpha.
     octx.globalCompositeOperation = 'source-in';
     pattern.setTransform(new DOMMatrix([scale, 0, 0, scale, translateX - bx, translateY - by]));
@@ -216,11 +316,15 @@ function renderRegionFills(
   }
 }
 
-/** Clip to the cell union and fill with the world-anchored texture (hard edges). */
+/** Fill the cell union and stroke sweeps with the world-anchored texture (hard edges). */
 function hardFillRegion(
   ctx: CanvasRenderingContext2D,
   img: HTMLImageElement,
+  grp: RegionGroup,
   path: Path2D,
+  geometry: TileGeometry,
+  viewState: TileViewState,
+  screenPerWorld: number,
   scale: number,
   translateX: number,
   translateY: number,
@@ -232,9 +336,32 @@ function hardFillRegion(
   pattern.setTransform(new DOMMatrix([scale, 0, 0, scale, translateX, translateY]));
   ctx.save();
   ctx.globalAlpha = alpha;
-  ctx.clip(path);
-  ctx.fillStyle = pattern;
-  ctx.fillRect(minX, minY, maxX - minX, maxY - minY);
+  if (grp.cells.length > 0) {
+    ctx.save();
+    ctx.clip(path);
+    ctx.fillStyle = pattern;
+    ctx.fillRect(minX, minY, maxX - minX, maxY - minY);
+    ctx.restore();
+  }
+  if (grp.strokes.length > 0) {
+    // Sweep the pattern along each stroke spine (round caps = capsule union).
+    ctx.strokeStyle = pattern;
+    ctx.fillStyle = pattern;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    for (const st of grp.strokes) {
+      const radiusPx = st.radius * screenPerWorld;
+      if (st.points.length <= 2) {
+        const c = geometry.worldToScreen(st.points[0], st.points[1], viewState.x, viewState.y, viewState.zoom);
+        const dab = new Path2D();
+        dab.arc(c.screenX, c.screenY, radiusPx, 0, Math.PI * 2);
+        ctx.fill(dab);
+      } else {
+        ctx.lineWidth = radiusPx * 2;
+        ctx.stroke(strokeScreenPath(st, geometry, viewState));
+      }
+    }
+  }
   ctx.restore();
 }
 
@@ -385,8 +512,10 @@ function renderTiles(
   viewState: TileViewState,
   options?: TileRenderOptions
 ): void {
-  if (tiles == null || tiles.length === 0) return;
+  const terrainStrokes = options?.terrainStrokes ?? [];
+  if ((tiles == null || tiles.length === 0) && terrainStrokes.length === 0) return;
   if (tilesets == null || tilesets.length === 0) return;
+  tiles ??= [];
 
   const getCachedImage = options?.getCachedImage;
   if (!getCachedImage) return;
@@ -441,6 +570,7 @@ function renderTiles(
               tileset: lookup.tileset,
               vaultPath: lookup.entry.vaultPath,
               cells: [],
+              strokes: [],
               worldRepeat: resolved.worldRepeat,
               edgeFeather: resolved.edgeFeather,
             };
@@ -457,6 +587,36 @@ function renderTiles(
     if (t.freeform === true) bucket.freeform.push(t);
     else if (t.placement === 'overlay') bucket.overlay.push(t);
     else bucket.fill.push(t);
+  }
+
+  // Terrain brush strokes join the region pass. They have no cell dependency,
+  // so unlike cell region fills they are NOT gated on isGrid — world-anchored
+  // pattern transforms work identically on hex (worldToScreen is affine).
+  if (CAN_SET_PATTERN_TRANSFORM) {
+    for (const s of terrainStrokes) {
+      if (s.points.length < 2) continue;
+      const depth = s.depth ?? 'ground';
+      if (hiddenLayers != null && hiddenLayers.size > 0 && hiddenLayers.has(depth)) continue;
+      const lookup = entryMap.get(s.tilesetId + ':' + s.tileId);
+      if (lookup == null) continue;
+      const resolved = resolveTileRender(undefined, metaStore[lookup.entry.vaultPath], lookup.tileset);
+      const key = s.tilesetId + ':' + s.tileId;
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- regionByDepth is pre-seeded for every DEPTH_ORDER key including 'ground'
+      const groups = regionByDepth.get(depth) ?? regionByDepth.get('ground')!;
+      let grp = groups.get(key);
+      if (grp == null) {
+        grp = {
+          tileset: lookup.tileset,
+          vaultPath: lookup.entry.vaultPath,
+          cells: [],
+          strokes: [],
+          worldRepeat: resolved.worldRepeat,
+          edgeFeather: resolved.edgeFeather,
+        };
+        groups.set(key, grp);
+      }
+      grp.strokes.push(s);
+    }
   }
 
   const previousAlpha = ctx.globalAlpha;

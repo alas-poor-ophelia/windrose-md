@@ -534,15 +534,17 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
         showGrid: visibility.grid !== false,
         northDirection: northDirection ?? 0
       });
-      // Ghost layer tiles
-      if (layerBelow.tiles != null && layerBelow.tiles.length > 0 && mapData.tilesets != null && mapData.tilesets.length > 0) {
+      // Ghost layer tiles (+ terrain brush strokes)
+      const ghostHasTiles = layerBelow.tiles != null && layerBelow.tiles.length > 0;
+      const ghostHasStrokes = layerBelow.terrainStrokes != null && layerBelow.terrainStrokes.length > 0;
+      if ((ghostHasTiles || ghostHasStrokes) && mapData.tilesets != null && mapData.tilesets.length > 0) {
         renderTiles(
           ctx,
-          layerBelow.tiles,
+          layerBelow.tiles ?? [],
           mapData.tilesets,
           tileGeomShim,
           rendererViewState,
-          { opacity: ghostOpacity, getCachedImage, canvasWidth: width, canvasHeight: height }
+          { opacity: ghostOpacity, getCachedImage, canvasWidth: width, canvasHeight: height, terrainStrokes: layerBelow.terrainStrokes }
         );
       }
       // Ghost layer curves
@@ -702,15 +704,18 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
       }
     }
 
-    // Tiles (between curves and regions, z-sorted for overflow occlusion)
-    if (drawLayer.tiles != null && drawLayer.tiles.length > 0 && mapData.tilesets != null && mapData.tilesets.length > 0) {
+    // Tiles + terrain brush strokes (between curves and regions, z-sorted for
+    // overflow occlusion). A layer holding only strokes must still render.
+    const hasTiles = drawLayer.tiles != null && drawLayer.tiles.length > 0;
+    const hasStrokes = drawLayer.terrainStrokes != null && drawLayer.terrainStrokes.length > 0;
+    if ((hasTiles || hasStrokes) && mapData.tilesets != null && mapData.tilesets.length > 0) {
       renderTiles(
         ctx,
-        drawLayer.tiles,
+        drawLayer.tiles ?? [],
         mapData.tilesets,
         tileGeomShim,
         rendererViewState,
-        { getCachedImage, canvasWidth: width, canvasHeight: height, hiddenLayers: hiddenTileLayers }
+        { getCachedImage, canvasWidth: width, canvasHeight: height, hiddenLayers: hiddenTileLayers, terrainStrokes: drawLayer.terrainStrokes }
       );
     }
   }
