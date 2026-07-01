@@ -107,9 +107,17 @@ drag-onto-drawer source.
 
 ## NOT DONE (open work, roughly priority-ordered)
 
-1. **Category-rail truncation / mosaic presentation** — highest-leverage legibility fix that
-   remains. Wire `mergedCategories` into the rail with the no-truncation 2×2 row spec.
-   (`TILE-UI-FIDELITY-AUDIT.md`, `TILE-UI-REDESIGN-PLAN.md` Phase 2.)
+1. ~~**Category-rail truncation / mosaic presentation**~~ — **STALE ITEM (verified 2026-07-01):
+   this was copied from the pre-rebuild fidelity audit; the late-June punch-list already fixed
+   it.** Full-pane rail today: 2×2 mosaic (22px ≈ spec's 20px `fd-railthumb`), names wrap up
+   to 3 lines (`overflow-wrap:anywhere` + auto-height for the host button clamp), merged
+   labels feed the rail via `mergedCategories.lookup`, thumbs load eagerly (#12), and the
+   MergeB provenance banner exists. **Block-mode root 2-up MosaicCard grid is INTENTIONAL** —
+   Guildmaster pivoted back to cards on purpose; the grid/list toggle covers the compact-rows
+   preference. Do not "fix" it to the design's row spec. Tiny optional leftovers only:
+   `displayCategory()` still lops unmerged deep paths to 2 segments in section headers
+   (harmless post-merge), and merge provenance is Option B rather than the design-narrative's
+   Option C (accepted).
 2. **Organize → Move…** — hard `disabled={true}` stub (`TileAssetBrowser.tsx` ~L1347). Needs a
    folder/category reassignment or pack-remap UX. Organize is otherwise the "reconcile leftovers"
    surface the IA doc envisions (merge "Foliage" into "Forest", re-tier a mis-sorted tile).
