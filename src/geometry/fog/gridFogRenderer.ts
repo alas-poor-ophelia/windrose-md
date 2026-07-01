@@ -76,7 +76,7 @@ function renderBlurPasses(
   const cellRadius = scaledSize / 2;
   const maxRadius = cellRadius + blurRadius;
 
-  const targetCtx = fogCtx || ctx;
+  const targetCtx = fogCtx ?? ctx;
   const useFilterFallback = !fogCtx;
   const filterBlurAmount = blurRadius / numPasses;
 

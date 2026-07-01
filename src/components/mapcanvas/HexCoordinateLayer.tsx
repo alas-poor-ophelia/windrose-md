@@ -114,7 +114,7 @@ function getVisibleHexes(geometry: ExtendedHexGeometry, mapData: MapData, canvas
   // Use the positioning ancestor (.windrose-canvas-container) for offset calculation,
   // since .windrose-coordinate-layer is position:absolute relative to it
   const positioningAncestor = canvas.closest('.windrose-canvas-container');
-  const containerRect = positioningAncestor?.getBoundingClientRect() || rect;
+  const containerRect = positioningAncestor?.getBoundingClientRect() ?? rect;
 
   // Calculate canvas offset within the positioning container (due to flex centering)
   const canvasOffsetX = rect.left - containerRect.left;
@@ -190,7 +190,7 @@ function getVisibleHexes(geometry: ExtendedHexGeometry, mapData: MapData, canvas
       }
     } else {
       // Rectangular bounds with radial label display: derive center from bounds
-      const hexBounds = mapData.hexBounds || { maxCol: 26, maxRow: 20 };
+      const hexBounds = mapData.hexBounds ?? { maxCol: 26, maxRow: 20 };
       const maxRadius = Math.floor(Math.min(hexBounds.maxCol, hexBounds.maxRow) / 2);
       const centerCol = Math.floor((hexBounds.maxCol - 1) / 2);
       const centerRow = Math.floor((hexBounds.maxRow - 1) / 2);

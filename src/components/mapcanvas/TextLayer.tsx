@@ -109,6 +109,7 @@ const TextLayer = ({
       onSubmit: handleTextSubmit,
       onCancel: handleTextCancel
     });
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- modal opens once on showTextModal/editingTextId; submit/cancel inline + mapData/customColors volatile would reopen mid-edit
   }, [showTextModal, editingTextId]);
 
   const handleCopyLink = useCallback(() => {
@@ -145,7 +146,7 @@ const TextLayer = ({
     });
     registerHandlers('text', proxy);
     return () => unregisterHandlers('text');
-  }, []);
+  }, [registerHandlers, unregisterHandlers]);
 
   if (showCoordinates || !layerVisibility.textLabels) {
     return null;

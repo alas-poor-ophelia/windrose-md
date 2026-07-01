@@ -37,7 +37,7 @@ function getBrushCells(col: number, row: number, brushSize: number): Array<{ col
 
 function bresenhamLine(x0: number, y0: number, x1: number, y1: number): Array<{ col: number; row: number }> {
   const points: Array<{ col: number; row: number }> = [];
-  let dx = Math.abs(x1 - x0), dy = Math.abs(y1 - y0);
+  const dx = Math.abs(x1 - x0), dy = Math.abs(y1 - y0);
   const sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
   let err = dx - dy;
   let cx = x0, cy = y0;
@@ -60,14 +60,14 @@ function floodFillCells(
   mapWidth: number,
   mapHeight: number
 ): Array<{ col: number; row: number }> {
-  const targetKey = tiles.find(t => !t.freeform && assignmentCoversCell(t, startCol, startRow));
+  const targetKey = tiles.find(t => t.freeform !== true && assignmentCoversCell(t, startCol, startRow));
   const targetId = targetKey ? `${targetKey.tilesetId}:${targetKey.tileId}` : '';
 
   // Register every cell of each prop's footprint so multi-cell occupants block
   // the fill across their whole area, not just the anchor.
   const tileMap = new Map<string, string>();
   for (const t of tiles) {
-    if (t.freeform) continue;
+    if (t.freeform === true) continue;
     const id = `${t.tilesetId}:${t.tileId}`;
     for (const c of cellsCoveredByAssignment(t)) tileMap.set(`${c.col},${c.row}`, id);
   }
@@ -77,6 +77,7 @@ function floodFillCells(
   const stack = [{ col: startCol, row: startRow }];
 
   while (stack.length > 0 && result.length < FLOOD_FILL_MAX) {
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- stack is non-empty: the while-loop condition guarantees stack.length > 0
     const { col, row } = stack.pop()!;
     const key = `${col},${row}`;
     if (visited.has(key)) continue;
@@ -145,10 +146,10 @@ const TilePlacementLayer = ({
     // Ensure the selected tile image is cached for rendering
     const ts = mapData.tilesets?.find(t => t.id === selectedTilesetId);
     const entry = ts?.tiles.find(t => t.id === selectedTileId);
-    if (entry?.vaultPath && app) void preloadImage(app, entry.vaultPath);
+    if (entry?.vaultPath != null && entry.vaultPath !== '') void preloadImage(app, entry.vaultPath);
 
     const activeLayer = getActiveLayer(mapData);
-    let currentTiles = activeLayer.tiles || [];
+    let currentTiles = activeLayer.tiles ?? [];
     let changed = false;
 
     const targetPlacement = tileLayer === 'base' ? 'fill' : 'overlay';
@@ -157,7 +158,7 @@ const TilePlacementLayer = ({
     // stays stable if the metadata later changes. A prop with span > 1 ignores
     // brush size and places a single footprint at the anchor.
     const isGrid = geometry?.type === 'grid';
-    const meta = isGrid && entry?.vaultPath ? getTileMetadataForRender()[entry.vaultPath] : undefined;
+    const meta = isGrid && entry?.vaultPath != null && entry.vaultPath !== '' ? getTileMetadataForRender()[entry.vaultPath] : undefined;
     const spanW = meta?.defaultSpanW != null && meta.defaultSpanW > 1 ? meta.defaultSpanW : undefined;
     const spanH = meta?.defaultSpanH != null && meta.defaultSpanH > 1 ? meta.defaultSpanH : undefined;
     const hasFootprint = spanW != null || spanH != null;
@@ -188,7 +189,7 @@ const TilePlacementLayer = ({
         paintedInStrokeRef.current.add(`${c.col},${c.row}`);
       }
       const remaining = currentTiles.filter(
-        (t: TileAssignment) => (t.placement || 'fill') !== targetPlacement || !assignmentsOverlap(t, newTile)
+        (t: TileAssignment) => (t.placement ?? 'fill') !== targetPlacement || !assignmentsOverlap(t, newTile)
       );
       currentTiles = [...remaining, newTile];
       changed = true;
@@ -198,13 +199,13 @@ const TilePlacementLayer = ({
       const isBatchedStroke = strokeInitialTilesRef.current !== null;
       onTilesChange(currentTiles, isBatchedStroke);
     }
-  }, [mapData, geometry, selectedTilesetId, selectedTileId, tileRotation, tileFlipH, tileLayer, tileFitMode, tileScale, brushSize, tileDepth, onTilesChange]);
+  }, [mapData, geometry, selectedTilesetId, selectedTileId, tileRotation, tileFlipH, tileLayer, tileFitMode, tileScale, brushSize, tileDepth, onTilesChange, app]);
 
   const eraseTilesInBrush = useCallback((col: number, row: number) => {
     if (!mapData) return;
 
     const activeLayer = getActiveLayer(mapData);
-    const currentTiles = activeLayer.tiles || [];
+    const currentTiles = activeLayer.tiles ?? [];
     const cells = getBrushCells(col, row, brushSize);
     const keysToErase = new Set<string>();
 
@@ -236,10 +237,10 @@ const TilePlacementLayer = ({
 
     const ts = mapData.tilesets?.find(t => t.id === selectedTilesetId);
     const entry = ts?.tiles.find(t => t.id === selectedTileId);
-    if (entry?.vaultPath && app) void preloadImage(app, entry.vaultPath);
+    if (entry?.vaultPath != null && entry.vaultPath !== '') void preloadImage(app, entry.vaultPath);
 
     const activeLayer = getActiveLayer(mapData);
-    const currentTiles = activeLayer.tiles || [];
+    const currentTiles = activeLayer.tiles ?? [];
 
     const mapWidth = mapData.dimensions?.width ?? 50;
     const mapHeight = mapData.dimensions?.height ?? 50;
@@ -250,7 +251,7 @@ const TilePlacementLayer = ({
     const fillKeys = new Set(fillCells.map(c => `${c.col},${c.row}`));
 
     const newTiles = currentTiles.filter((t: TileAssignment) => {
-      if ((t.placement || 'fill') !== targetPlacement) return true;
+      if ((t.placement ?? 'fill') !== targetPlacement) return true;
       return t.freeform === true
         ? !fillKeys.has(`${t.col},${t.row}`)
         : !cellsCoveredByAssignment(t).some(c => fillKeys.has(`${c.col},${c.row}`));
@@ -277,10 +278,10 @@ const TilePlacementLayer = ({
 
     const ts = mapData.tilesets?.find(t => t.id === selectedTilesetId);
     const entry = ts?.tiles.find(t => t.id === selectedTileId);
-    if (entry?.vaultPath && app) void preloadImage(app, entry.vaultPath);
+    if (entry?.vaultPath != null && entry.vaultPath !== '') void preloadImage(app, entry.vaultPath);
 
     const activeLayer = getActiveLayer(mapData);
-    const currentTiles = activeLayer.tiles || [];
+    const currentTiles = activeLayer.tiles ?? [];
 
     const newTile: TileAssignment = {
       col, row,
@@ -325,14 +326,14 @@ const TilePlacementLayer = ({
     lastGridPosRef.current = { col: coords.x, row: coords.y };
 
     const activeLayer = getActiveLayer(mapData);
-    strokeInitialTilesRef.current = [...(activeLayer.tiles || [])];
+    strokeInitialTilesRef.current = [...(activeLayer.tiles ?? [])];
 
     if (hasTileSelected) {
       placeTilesInBrush(coords.x, coords.y);
     } else {
       eraseTilesInBrush(coords.x, coords.y);
     }
-  }, [isTileTool, geometry, screenToGrid, screenToWorld, hasTileSelected, stampMode, placeTilesInBrush, eraseTilesInBrush, placeStampAtWorld, floodFillAtCell]);
+  }, [isTileTool, geometry, screenToGrid, screenToWorld, hasTileSelected, stampMode, placeTilesInBrush, eraseTilesInBrush, placeStampAtWorld, floodFillAtCell, mapData]);
 
   const handlePointerMove = useCallback((e: PointerEvent) => {
     if (!isDraggingRef.current || !isTileTool || !geometry) return;
@@ -363,7 +364,7 @@ const TilePlacementLayer = ({
   const handlePointerUp = useCallback(() => {
     if (strokeInitialTilesRef.current !== null && mapData) {
       const activeLayer = getActiveLayer(mapData);
-      onTilesChange(activeLayer.tiles || [], false);
+      onTilesChange(activeLayer.tiles ?? [], false);
       strokeInitialTilesRef.current = null;
     }
     isDraggingRef.current = false;
@@ -384,7 +385,7 @@ const TilePlacementLayer = ({
     });
     registerHandlers('tilePlacement', proxy);
     return () => unregisterHandlers('tilePlacement');
-  }, []);
+  }, [registerHandlers, unregisterHandlers]);
 
   return null;
 };

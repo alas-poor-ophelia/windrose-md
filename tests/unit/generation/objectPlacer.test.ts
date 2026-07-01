@@ -254,7 +254,7 @@ describe("objectPlacer", () => {
     });
 
     it("each style has required pools", () => {
-      for (const [_style, pool] of Object.entries(STYLE_OBJECT_POOLS)) {
+      for (const pool of Object.values(STYLE_OBJECT_POOLS)) {
         const p = pool as any;
         expect(p).toHaveProperty("monsters");
         expect(p).toHaveProperty("treasures");
@@ -279,7 +279,7 @@ describe("objectPlacer", () => {
     });
 
     it("each template has valid structure", () => {
-      for (const [_name, template] of Object.entries(ROOM_TEMPLATES)) {
+      for (const template of Object.values(ROOM_TEMPLATES)) {
         const t = template as any;
         expect(t).toHaveProperty("name");
         expect(t).toHaveProperty("objects");

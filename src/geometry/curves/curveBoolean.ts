@@ -685,7 +685,7 @@ function subtractCellFromCurve(
 
     const id = i === 0
       ? curve.id
-      : curve.id + '-' + Date.now() + '-' + Math.random().toString(36).substr(2, 6);
+      : curve.id + '-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
 
     resultCurves.push(polygonToCurve(simplified, curve, id));
   }
@@ -836,7 +836,7 @@ function eraseRectangleFromCurves(
       const simplified: Polygon = poly.map(ring => simplifyRing(ring));
       const id = j === 0
         ? curve.id
-        : curve.id + '-' + Date.now() + '-' + Math.random().toString(36).substr(2, 6);
+        : curve.id + '-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
       newCurves.push(polygonToCurve(simplified, curve, id));
       anyKept = true;
     }
@@ -920,7 +920,7 @@ function eraseWorldPolygonFromCurves(
       const simplified: Polygon = poly.map(r => simplifyRing(r));
       const id = j === 0
         ? curve.id
-        : curve.id + '-' + Date.now() + '-' + Math.random().toString(36).substr(2, 6);
+        : curve.id + '-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
       newCurves.push(polygonToCurve(simplified, curve, id));
       anyKept = true;
     }

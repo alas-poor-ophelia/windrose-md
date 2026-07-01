@@ -1,5 +1,5 @@
 import type { SettingsTabThis } from './settingsTabContext';
-import { Setting } from 'obsidian';
+import { Platform, Setting } from 'obsidian';
 
 // settingsPlugin-TabRenderKeyboardShortcuts.ts
 // WindroseMDSettingsTab render methods - Keyboard Shortcuts section
@@ -34,7 +34,7 @@ export const TabRenderKeyboardShortcutsMethods = {
       rotate: 'r', layerPrev: '[', layerNext: ']', undo: 'Mod+Z', redo: 'Mod+Y'
     };
 
-    const isMac = navigator.platform.indexOf('Mac') >= 0;
+    const isMac = Platform.isMacOS;
 
     function formatKey(keyStr: string): string {
       if (!keyStr) return '—';
@@ -51,7 +51,7 @@ export const TabRenderKeyboardShortcutsMethods = {
     });
 
     for (const action of SHORTCUT_ACTIONS) {
-      const shortcuts = this.plugin.settings.keyboardShortcuts || {};
+      const shortcuts = this.plugin.settings.keyboardShortcuts ?? {};
       const currentKey = shortcuts[action.id] || DEFAULT_SHORTCUTS[action.id] || '';
 
       const setting = new Setting(containerEl)
@@ -64,7 +64,18 @@ export const TabRenderKeyboardShortcutsMethods = {
         text: formatKey(currentKey),
         cls: 'windrose-kbd-key'
       });
-      kbdEl.style.cssText = 'cursor:pointer; padding:2px 8px; border:1px solid var(--background-modifier-border); border-radius:4px; font-family:var(--font-monospace); font-size:0.85em; min-width:24px; text-align:center; display:inline-block; background:var(--background-secondary);';
+      kbdEl.setCssStyles({
+        cursor: 'pointer',
+        padding: '2px 8px',
+        border: '1px solid var(--background-modifier-border)',
+        borderRadius: '4px',
+        fontFamily: 'var(--font-monospace)',
+        fontSize: '0.85em',
+        minWidth: '24px',
+        textAlign: 'center',
+        display: 'inline-block',
+        background: 'var(--background-secondary)'
+      });
 
       let isCapturing = false;
 
@@ -72,8 +83,7 @@ export const TabRenderKeyboardShortcutsMethods = {
         if (isCapturing) return;
         isCapturing = true;
         kbdEl.textContent = 'Press a key...';
-        kbdEl.style.color = 'var(--text-accent)';
-        kbdEl.style.borderColor = 'var(--text-accent)';
+        kbdEl.setCssStyles({ color: 'var(--text-accent)', borderColor: 'var(--text-accent)' });
 
         const captureHandler = (e: KeyboardEvent): void => {
           e.preventDefault();
@@ -81,8 +91,7 @@ export const TabRenderKeyboardShortcutsMethods = {
 
           if (e.key === 'Escape') {
             kbdEl.textContent = formatKey(currentKey);
-            kbdEl.style.color = '';
-            kbdEl.style.borderColor = 'var(--background-modifier-border)';
+            kbdEl.setCssStyles({ color: '', borderColor: 'var(--background-modifier-border)' });
             isCapturing = false;
             window.removeEventListener('keydown', captureHandler, true);
             return;
@@ -99,16 +108,13 @@ export const TabRenderKeyboardShortcutsMethods = {
           else if (e.key.length === 1) newKey += e.key.toLowerCase();
           else newKey += e.key;
 
-          if (!this.plugin.settings.keyboardShortcuts) {
-            this.plugin.settings.keyboardShortcuts = Object.assign({}, DEFAULT_SHORTCUTS);
-          }
+          this.plugin.settings.keyboardShortcuts ??= Object.assign({}, DEFAULT_SHORTCUTS);
           this.plugin.settings.keyboardShortcuts[action.id] = newKey;
           this.settingsChanged = true;
           void this.plugin.saveSettings();
 
           kbdEl.textContent = formatKey(newKey);
-          kbdEl.style.color = '';
-          kbdEl.style.borderColor = 'var(--background-modifier-border)';
+          kbdEl.setCssStyles({ color: '', borderColor: 'var(--background-modifier-border)' });
           isCapturing = false;
           window.removeEventListener('keydown', captureHandler, true);
         };
@@ -120,9 +126,7 @@ export const TabRenderKeyboardShortcutsMethods = {
         .setIcon('rotate-ccw')
         .setTooltip('Reset to default')
         .onClick(async () => {
-          if (!this.plugin.settings.keyboardShortcuts) {
-            this.plugin.settings.keyboardShortcuts = Object.assign({}, DEFAULT_SHORTCUTS);
-          }
+          this.plugin.settings.keyboardShortcuts ??= Object.assign({}, DEFAULT_SHORTCUTS);
           this.plugin.settings.keyboardShortcuts[action.id] = DEFAULT_SHORTCUTS[action.id];
           this.settingsChanged = true;
           await this.plugin.saveSettings();
@@ -131,10 +135,10 @@ export const TabRenderKeyboardShortcutsMethods = {
     }
 
     new Setting(containerEl)
-      .setName('Reset All Shortcuts')
+      .setName('Reset all shortcuts')
       .setDesc('Restore all keyboard shortcuts to their default values')
       .addButton(btn => btn
-        .setButtonText('Reset All')
+        .setButtonText('Reset all')
         .setWarning()
         .onClick(async () => {
           this.plugin.settings.keyboardShortcuts = Object.assign({}, DEFAULT_SHORTCUTS);

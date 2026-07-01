@@ -357,7 +357,6 @@ class HexGeometry extends BaseGeometry {
 
     if (!isFinite(width) || !isFinite(height) || !isFinite(zoom) ||
         !isFinite(offsetX) || !isFinite(offsetY) || zoom <= 0) {
-      // eslint-disable-next-line no-console
       console.warn('[HexGeometry.drawGrid] Invalid input values, skipping render');
       return;
     }
@@ -409,7 +408,6 @@ class HexGeometry extends BaseGeometry {
     // Safety check on iteration count
     const totalHexes = (maxCol - minCol + 1) * (maxRow - minRow + 1);
     if (totalHexes > 50000 || !isFinite(totalHexes)) {
-      // eslint-disable-next-line no-console
       console.warn(`[HexGeometry.drawGrid] Too many hexes to draw (${totalHexes}), aborting`);
       return;
     }
@@ -468,7 +466,7 @@ class HexGeometry extends BaseGeometry {
     lineWidth: number | null = null
   ): void {
     const vertices = this.getHexVertices(q, r);
-    const width = lineWidth !== null ? lineWidth : (ctx.lineWidth || 1);
+    const width = lineWidth ?? (ctx.lineWidth || 1);
     
     const screenVertices = vertices.map(v => 
       this.worldToScreen(v.worldX, v.worldY, offsetX, offsetY, zoom)
@@ -819,7 +817,7 @@ class HexGeometry extends BaseGeometry {
    */
   getObjectBounds(obj: { position: Point; size?: { width: number; height: number } }): BoundingBox {
     const center = this.hexToWorld(obj.position.x, obj.position.y);
-    const size = obj.size || { width: 1, height: 1 };
+    const size = obj.size ?? { width: 1, height: 1 };
     
     const halfWidth = (this.width * size.width) / 2;
     const halfHeight = (this.height * size.height) / 2;

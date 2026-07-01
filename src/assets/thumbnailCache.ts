@@ -16,10 +16,12 @@ const queue: Array<{ path: string; app: App }> = [];
 let processing = false;
 const subscribers = new Set<() => void>();
 
+// eslint-disable-next-line obsidianmd/prefer-active-doc -- detached offscreen scratch canvas (never attached to DOM); document-agnostic, created once.
 const scratchCanvas = document.createElement('canvas');
 scratchCanvas.width = THUMB_SIZE;
 scratchCanvas.height = THUMB_SIZE;
 
+// eslint-disable-next-line obsidianmd/prefer-active-doc -- detached offscreen scan canvas; document-agnostic.
 const scanCanvas = document.createElement('canvas');
 
 function subscribe(cb: () => void): () => void {
@@ -89,7 +91,7 @@ async function processQueue(): Promise<void> {
 
   notify();
 
-  await new Promise<void>(resolve => { setTimeout(resolve, 0); });
+  await new Promise<void>(resolve => { window.setTimeout(resolve, 0); });
   void processQueue();
 }
 

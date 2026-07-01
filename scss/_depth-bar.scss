@@ -58,7 +58,7 @@
 
   &.is-active {
     flex: 1 1 auto;
-    color: var(--windrose-gold-bright);
+    color: var(--depth-color, var(--windrose-gold-bright));
     border-color: var(--windrose-border-primary);
     background: linear-gradient(180deg, oklch(0.2 0.03 75), oklch(0.14 0.02 70));
     box-shadow: inset 0 0 0 1px oklch(from var(--windrose-border-primary) l c h / 0.12);
@@ -103,7 +103,7 @@
 }
 
 .windrose-db-chev {
-  display: inline-flex;
+  display: none; /* depth fan hidden for now — restore to inline-flex to bring the caret back */
   margin-left: 1px;
   transition: transform 0.3s ease;
   color: var(--windrose-text-muted);
@@ -198,7 +198,7 @@
 
   &.is-active {
     background: linear-gradient(90deg, oklch(from var(--windrose-border-primary) l c h / 0.2), oklch(from var(--windrose-border-primary) l c h / 0.04));
-    color: var(--windrose-gold-bright);
+    color: var(--depth-color, var(--windrose-gold-bright));
   }
 
   .windrose-db-cap {
@@ -234,8 +234,8 @@
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  padding: 8px 0;
-  gap: 2px;
+  padding: 5px 0;
+  gap: 1px;
 }
 
 .windrose-dsr-label {
@@ -252,13 +252,13 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 3px;
-  padding: 9px 0;
+  gap: 1px;
+  padding: 5px 0;
   cursor: pointer;
   flex-shrink: 0;
 
   &.is-active {
-    padding: 8px 0 9px;
+    padding: 4px 0 5px;
   }
 }
 
@@ -281,6 +281,7 @@
 }
 
 .windrose-dsr-cnt {
+  display: none; /* collapsed-ribbon stratum count hidden for now — remove this line to restore */
   font-size: 8.5px;
   color: var(--windrose-text-muted);
   font-variant-numeric: tabular-nums;
@@ -316,7 +317,7 @@
 
   &.is-active {
     background: linear-gradient(90deg, oklch(from var(--windrose-border-primary) l c h / 0.2), oklch(from var(--windrose-border-primary) l c h / 0.04));
-    color: var(--windrose-gold-bright);
+    color: var(--depth-color, var(--windrose-gold-bright));
   }
 }
 

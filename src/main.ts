@@ -49,11 +49,10 @@ export default class WindrosePlugin extends Plugin {
 
     setPlugin(this);
 
-    // eslint-disable-next-line no-console
-    console.log('[Windrose] Plugin loaded, version:', this.manifest.version, 'data:', this.dataFilePath);
+    console.debug('[Windrose] Plugin loaded, version:', this.manifest.version, 'data:', this.dataFilePath);
 
     this.registerView(VIEW_TYPE_WINDROSE_MAP, (leaf) => new WindroseMapView(leaf));
-    this.addRibbonIcon('compass', 'Open Windrose Map', () => this.activateMapView());
+    this.addRibbonIcon('compass', 'Open Windrose map', () => this.activateMapView());
     this.addCommand({
       id: 'open-map-view',
       name: 'Open map in full pane',
@@ -131,7 +130,7 @@ export default class WindrosePlugin extends Plugin {
       name: 'Generate random dungeon',
       editorCallback: async (editor) => {
         new InsertDungeonModal(this.app, this, async (mapName, cells, objects, edges, options) => {
-          const mapId = 'map-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+          const mapId = 'map-' + Date.now() + '-' + Math.random().toString(36).slice(2, 11);
           await this.saveDungeonToJson(mapId, mapName, cells as DungeonCell[], objects, edges, options as DungeonGenOptions);
 
           const codeBlock = [
@@ -160,7 +159,7 @@ export default class WindrosePlugin extends Plugin {
   async activateMapView(): Promise<void> {
     const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_WINDROSE_MAP);
     if (leaves.length > 0) {
-      this.app.workspace.revealLeaf(leaves[0]);
+      await this.app.workspace.revealLeaf(leaves[0]);
       return;
     }
     await this.openNewMapView();
@@ -169,7 +168,7 @@ export default class WindrosePlugin extends Plugin {
   private async openNewMapView(): Promise<void> {
     const leaf = this.app.workspace.getLeaf('tab');
     await leaf.setViewState({ type: VIEW_TYPE_WINDROSE_MAP, active: true });
-    this.app.workspace.revealLeaf(leaf);
+    await this.app.workspace.revealLeaf(leaf);
   }
 
   private initMcpNamespace(): void {
@@ -191,12 +190,10 @@ export default class WindrosePlugin extends Plugin {
         const config = JSON.parse(content) as Record<string, unknown>;
         if (typeof config.dataFilePath === 'string' && config.dataFilePath !== '') {
           this.dataFilePath = config.dataFilePath;
-          // eslint-disable-next-line no-console
-          console.log('[Windrose] Debug data path:', config.dataFilePath);
+          console.debug('[Windrose] Debug data path:', config.dataFilePath);
         }
       }
     } catch (e) {
-      // eslint-disable-next-line no-console
       console.warn('[Windrose] Failed to load WINDROSE-DEBUG.json:', e);
     }
   }
@@ -221,10 +218,8 @@ export default class WindrosePlugin extends Plugin {
         'You can now disable the old "Windrose MapDesigner" plugin under Community Plugins.',
         15000
       );
-      // eslint-disable-next-line no-console
-      console.log('[Windrose] Migrated settings from dungeon-map-tracker-settings');
+      console.debug('[Windrose] Migrated settings from dungeon-map-tracker-settings');
     } catch (e) {
-      // eslint-disable-next-line no-console
       console.warn('[Windrose] Could not migrate old settings:', e);
     }
   }
@@ -243,7 +238,7 @@ export default class WindrosePlugin extends Plugin {
     const old = oldSettings as Partial<PluginSettings>;
     const cur = this.settings;
 
-    if (old.objectSets?.length) {
+    if (old.objectSets != null && old.objectSets.length > 0) {
       const existingIds = new Set((cur.objectSets ?? []).map(s => s.id));
       const newSets = old.objectSets.filter(s => !existingIds.has(s.id));
       if (newSets.length > 0) {
@@ -252,23 +247,23 @@ export default class WindrosePlugin extends Plugin {
       }
     }
 
-    if (old.activeObjectSetId && !cur.activeObjectSetId) {
+    if ((old.activeObjectSetId ?? '') !== '' && (cur.activeObjectSetId ?? '') === '') {
       cur.activeObjectSetId = old.activeObjectSetId;
     }
 
-    if (old.customGridObjects?.length && !(cur.customGridObjects?.length)) {
+    if ((old.customGridObjects?.length ?? 0) > 0 && (cur.customGridObjects?.length ?? 0) === 0) {
       cur.customGridObjects = old.customGridObjects;
       imported.push('custom grid objects');
     }
-    if (old.customGridCategories?.length && !(cur.customGridCategories?.length)) {
+    if ((old.customGridCategories?.length ?? 0) > 0 && (cur.customGridCategories?.length ?? 0) === 0) {
       cur.customGridCategories = old.customGridCategories;
       imported.push('custom grid categories');
     }
-    if (old.customHexObjects?.length && !(cur.customHexObjects?.length)) {
+    if ((old.customHexObjects?.length ?? 0) > 0 && (cur.customHexObjects?.length ?? 0) === 0) {
       cur.customHexObjects = old.customHexObjects;
       imported.push('custom hex objects');
     }
-    if (old.customHexCategories?.length && !(cur.customHexCategories?.length)) {
+    if ((old.customHexCategories?.length ?? 0) > 0 && (cur.customHexCategories?.length ?? 0) === 0) {
       cur.customHexCategories = old.customHexCategories;
       imported.push('custom hex categories');
     }
@@ -302,14 +297,15 @@ export default class WindrosePlugin extends Plugin {
     const dataFile = allFiles.find(f => f.name === 'windrose-md-data.json');
     if (dataFile != null) {
       this.dataFilePath = dataFile.path;
-      // eslint-disable-next-line no-console
-      console.log('[Windrose] Auto-discovered data file at:', dataFile.path);
+      console.debug('[Windrose] Auto-discovered data file at:', dataFile.path);
     }
   }
 
   private checkForConflicts(): void {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const plugins = (this.app as any).plugins?.plugins as Record<string, { _loaded?: boolean }> | undefined;
+    const appWithPlugins = this.app as typeof this.app & {
+      plugins?: { plugins?: Record<string, { _loaded?: boolean }> };
+    };
+    const plugins = appWithPlugins.plugins?.plugins;
     if (plugins?.['dungeon-map-tracker-settings']?._loaded === true) {
       new Notice(
         'Windrose: The old "Windrose MapDesigner" settings plugin is still active. ' +
@@ -317,7 +313,6 @@ export default class WindrosePlugin extends Plugin {
         'Your settings have been imported into the new standalone plugin.',
         20000
       );
-      // eslint-disable-next-line no-console
       console.warn('[Windrose] Old plugin dungeon-map-tracker-settings is still active');
     }
   }
@@ -388,9 +383,9 @@ export default class WindrosePlugin extends Plugin {
         allData = JSON.parse(content) as { maps: Record<string, unknown> };
       }
 
-      if (allData.maps == null) allData.maps = {};
+      allData.maps ??= {};
 
-      const layerId = 'layer-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+      const layerId = 'layer-' + Date.now() + '-' + Math.random().toString(36).slice(2, 11);
 
       let centerX = 5, centerY = 5;
       const gridSize = 32;
@@ -466,7 +461,6 @@ export default class WindrosePlugin extends Plugin {
         await this.app.vault.create(dataFilePath, jsonString);
       }
     } catch (error) {
-      // eslint-disable-next-line no-console
       console.error('[Windrose] Failed to save dungeon:', error);
       throw error;
     }

@@ -198,7 +198,7 @@ function useSubHexNavigation({
       const updatedCurrent = {
         ...currentMapData,
         subHexMaps: {
-          ...(currentMapData.subHexMaps || {}),
+          ...(currentMapData.subHexMaps ?? {}),
           [hexKey]: subHex
         }
       } as MapData;
@@ -215,13 +215,14 @@ function useSubHexNavigation({
     // Push current state onto navigation stack
     const frame: SubHexNavFrame = {
       parentMapData: currentMapData,
-      parentStoredViewState: currentMapData.viewState || { zoom: 1.0, center: { x: 0, y: 0 } },
+      parentStoredViewState: currentMapData.viewState ?? { zoom: 1.0, center: { x: 0, y: 0 } },
       hexKey
     };
 
     setNavStack(prev => [...prev, frame]);
     setSubHexMapData(subHex.mapData);
     setNavigationVersion(prev => prev + 1);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- propagateToRoot/rootUpdateMapData are stable but declared later; forward reference, safe to omit
   }, [rootMapData, subHexMapData, isInSubHex, navStack]);
 
   // Propagate sub-hex changes up the navigation stack to root for saving
@@ -239,9 +240,9 @@ function useSubHexNavigation({
       const parentWithUpdate = {
         ...frame.parentMapData,
         subHexMaps: {
-          ...(frame.parentMapData.subHexMaps || {}),
+          ...(frame.parentMapData.subHexMaps ?? {}),
           [frame.hexKey]: {
-            ...(frame.parentMapData.subHexMaps?.[frame.hexKey] || {}),
+            ...(frame.parentMapData.subHexMaps?.[frame.hexKey] ?? {}),
             mapData: nestedMapData,
             lastModified: new Date().toISOString()
           }
@@ -265,9 +266,9 @@ function useSubHexNavigation({
     const restoredParent = {
       ...topFrame.parentMapData,
       subHexMaps: {
-        ...(topFrame.parentMapData.subHexMaps || {}),
+        ...(topFrame.parentMapData.subHexMaps ?? {}),
         [topFrame.hexKey]: {
-          ...(topFrame.parentMapData.subHexMaps?.[topFrame.hexKey] || {}),
+          ...(topFrame.parentMapData.subHexMaps?.[topFrame.hexKey] ?? {}),
           mapData: currentSubHex,
           lastModified: new Date().toISOString()
         }
@@ -305,9 +306,9 @@ function useSubHexNavigation({
       const parent = {
         ...frame.parentMapData,
         subHexMaps: {
-          ...(frame.parentMapData.subHexMaps || {}),
+          ...(frame.parentMapData.subHexMaps ?? {}),
           [frame.hexKey]: {
-            ...(frame.parentMapData.subHexMaps?.[frame.hexKey] || {}),
+            ...(frame.parentMapData.subHexMaps?.[frame.hexKey] ?? {}),
             mapData: currentData,
             lastModified: new Date().toISOString()
           }
@@ -348,7 +349,7 @@ function useSubHexNavigation({
       if (newData == null) return prev;
 
       // Propagate to root for saving (async, after state update)
-      setTimeout(() => propagateToRoot(newData, navStack), 0);
+      window.setTimeout(() => propagateToRoot(newData, navStack), 0);
 
       return newData;
     });
@@ -366,9 +367,9 @@ function useSubHexNavigation({
     const restoredParent = {
       ...topFrame.parentMapData,
       subHexMaps: {
-        ...(topFrame.parentMapData.subHexMaps || {}),
+        ...(topFrame.parentMapData.subHexMaps ?? {}),
         [topFrame.hexKey]: {
-          ...(topFrame.parentMapData.subHexMaps?.[topFrame.hexKey] || {}),
+          ...(topFrame.parentMapData.subHexMaps?.[topFrame.hexKey] ?? {}),
           mapData: currentSubHex,
           lastModified: new Date().toISOString()
         }
@@ -380,7 +381,7 @@ function useSubHexNavigation({
     if (!siblingSubHex) {
       siblingSubHex = createSubHexMapData(restoredParent, q, r);
       restoredParent.subHexMaps = {
-        ...(restoredParent.subHexMaps || {}),
+        ...(restoredParent.subHexMaps ?? {}),
         [siblingKey]: siblingSubHex
       } as Record<string, SubHexMapData>;
     }
@@ -399,7 +400,7 @@ function useSubHexNavigation({
     setNavigationVersion(prev => prev + 1);
 
     // Propagate to root
-    setTimeout(() => propagateToRoot(siblingMapData, newStack), 0);
+    window.setTimeout(() => propagateToRoot(siblingMapData, newStack), 0);
   }, [navStack, subHexMapData, propagateToRoot]);
 
   // Current hex key (for adjacent sub-hex lookup)

@@ -12,19 +12,18 @@ async function navigateToLink(plugin: Plugin, parsed: DeepLinkData, sourcePath: 
       const linkPath = parsed.notePath.replace(/\.md$/, '');
       await plugin.app.workspace.openLinkText(linkPath, '', false);
     } catch (err) {
-      // eslint-disable-next-line no-console
       console.error('[Windrose] Deep link: failed to open note', err);
       new Notice('Failed to open map note');
       return;
     }
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await new Promise(resolve => window.setTimeout(resolve, 100));
   }
 
   emitNavigationEvent(parsed);
 
-  setTimeout(() => {
+  window.setTimeout(() => {
     try {
-      const leaf = document.querySelector('.workspace-leaf.mod-active .view-content');
+      const leaf = activeDocument.querySelector('.workspace-leaf.mod-active .view-content');
       if (leaf) {
         const mapEl = leaf.querySelector('.windrose-container');
         if (mapEl) {
@@ -53,9 +52,8 @@ function registerProtocolHandler(plugin: Plugin): void {
     try {
       const linkPath = parsed.notePath.replace(/\.md$/, '');
       await plugin.app.workspace.openLinkText(linkPath, '', false);
-      setTimeout(() => emitNavigationEvent(parsed), 100);
+      window.setTimeout(() => emitNavigationEvent(parsed), 100);
     } catch (err) {
-      // eslint-disable-next-line no-console
       console.error('[Windrose] Protocol handler failed:', err);
       new Notice('Failed to open map note');
     }
@@ -76,7 +74,7 @@ function registerPostProcessor(plugin: Plugin): void {
         : dataHref.startsWith('windrose:') ? dataHref : '';
       if (original === '') return;
 
-      const replacement = document.createElement('a');
+      const replacement = activeDocument.createElement('a');
       replacement.textContent = link.textContent;
       replacement.className = 'windrose-deep-link';
       replacement.setAttribute('href', '#');
@@ -87,7 +85,7 @@ function registerPostProcessor(plugin: Plugin): void {
 }
 
 function registerDomCapture(plugin: Plugin): void {
-  plugin.registerDomEvent(document, 'click', async (e: MouseEvent) => {
+  plugin.registerDomEvent(activeDocument, 'click', async (e: MouseEvent) => {
     const target = e.target as HTMLElement;
     if (target?.closest == null) return;
 
@@ -112,10 +110,29 @@ function registerDomCapture(plugin: Plugin): void {
   }, { capture: true } as AddEventListenerOptions);
 }
 
+/** The Extension type Obsidian's registerEditorExtension accepts (from @codemirror/state). */
+type CMExtension = Parameters<Plugin['registerEditorExtension']>[0];
+
+/** The slice of a CM EditorView instance the click handler reads. */
+interface CMEditorViewInstance {
+  posAtCoords(coords: { x: number; y: number }): number | null;
+  state: { doc: { lineAt(pos: number): { text: string; from: number } } };
+}
+
+/** The slice of the @codemirror/view module we consume (provided by Obsidian at runtime). */
+interface CMViewModule {
+  EditorView: {
+    domEventHandlers(
+      handlers: Record<string, (event: MouseEvent, view: CMEditorViewInstance) => boolean>
+    ): CMExtension;
+  };
+}
+
 function registerEditorExtension(plugin: Plugin): void {
   try {
-     
-    const cmView = require('@codemirror/view');
+
+    // eslint-disable-next-line @typescript-eslint/no-require-imports, import/no-extraneous-dependencies, no-undef -- @codemirror/view is provided by Obsidian at runtime
+    const cmView = require('@codemirror/view') as CMViewModule | undefined;
     if (cmView?.EditorView == null) return;
 
     const SCHEME = 'windrose:';
@@ -152,7 +169,7 @@ function registerEditorExtension(plugin: Plugin): void {
     };
 
     const windroseEditorExt = cmView.EditorView.domEventHandlers({
-      click(event: MouseEvent, view: unknown) {
+      click(event: MouseEvent, view: CMEditorViewInstance) {
         const target = event.target as HTMLElement;
         if (target?.closest == null) return false;
 
@@ -174,10 +191,9 @@ function registerEditorExtension(plugin: Plugin): void {
 
         const linkSpan = target.closest('.cm-link, .cm-underline, .cm-hmd-internal-link');
         if (linkSpan != null) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const pos = (view as any).posAtCoords({ x: event.clientX, y: event.clientY });
+          const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
           if (pos != null) {
-            const href = findWindroseHrefAtPos(view as Parameters<typeof findWindroseHrefAtPos>[0], pos);
+            const href = findWindroseHrefAtPos(view, pos);
             if (href != null && href !== '') {
               const parsed = parseDeepLink(href);
               if (parsed != null) {
@@ -196,7 +212,6 @@ function registerEditorExtension(plugin: Plugin): void {
 
     plugin.registerEditorExtension([windroseEditorExt]);
   } catch (err) {
-    // eslint-disable-next-line no-console
     console.warn('[Windrose] Could not register CM6 extension:', err);
   }
 }

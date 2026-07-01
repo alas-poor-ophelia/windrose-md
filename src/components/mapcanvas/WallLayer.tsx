@@ -177,7 +177,7 @@ const WallLayer = ({
     if (overlayRef.current != null) return overlayRef.current;
     const mainCanvas = canvasRef.current;
     if (!mainCanvas || !mainCanvas.parentElement) return null;
-    const overlay = document.createElement('canvas');
+    const overlay = activeDocument.createElement('canvas');
     overlay.width = mainCanvas.width;
     overlay.height = mainCanvas.height;
     overlay.classList.add('windrose-overlay-layer');
@@ -680,8 +680,8 @@ const WallLayer = ({
         }
       }
     };
-    document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
+    activeDocument.addEventListener('keydown', onKeyDown);
+    return () => activeDocument.removeEventListener('keydown', onKeyDown);
   }, [isWallTool, getWalls, updateWall, onWallPathsChange, cancelDrawing, commitWall, drawPreview]);
 
   // Reset transient state when the tool changes away.

@@ -109,7 +109,7 @@ function useShapeTools({
   const [touchConfirmPending, setTouchConfirmPending] = useState<boolean>(false);
   const [pendingEndPoint, setPendingEndPoint] = useState<PendingEndPoint | null>(null);
 
-  const fillRectangle = (x1: number, y1: number, x2: number, y2: number): void => {
+  const fillRectangle = useCallback((x1: number, y1: number, x2: number, y2: number): void => {
     if (!mapData || !geometry) return;
 
     const activeLayer = getActiveLayer(mapData);
@@ -121,9 +121,9 @@ function useShapeTools({
     }));
     const newCells = setCells(activeLayer.cells, cellUpdates, geometry);
     onCellsChange(newCells);
-  };
+  }, [mapData, geometry, selectedColor, selectedOpacity, onCellsChange]);
 
-  const fillCircle = (edgeX: number, edgeY: number, centerX: number, centerY: number): void => {
+  const fillCircle = useCallback((edgeX: number, edgeY: number, centerX: number, centerY: number): void => {
     if (!mapData || !geometry) return;
 
     const activeLayer = getActiveLayer(mapData);
@@ -136,9 +136,9 @@ function useShapeTools({
     }));
     const newCells = setCells(activeLayer.cells, cellUpdates, geometry);
     onCellsChange(newCells);
-  };
+  }, [mapData, geometry, selectedColor, selectedOpacity, onCellsChange]);
 
-  const clearRectangle = (x1: number, y1: number, x2: number, y2: number): void => {
+  const clearRectangle = useCallback((x1: number, y1: number, x2: number, y2: number): void => {
     if (!mapData || !geometry) return;
 
     const activeLayer = getActiveLayer(mapData);
@@ -182,9 +182,9 @@ function useShapeTools({
         onCurvesChange(newCurves);
       }
     }
-  };
+  }, [mapData, geometry, removeObjectsInRectangle, onObjectsChange, onTextLabelsChange, onCellsChange, onEdgesChange, onCurvesChange]);
 
-  const fillEdgeLine = (x1: number, y1: number, x2: number, y2: number): void => {
+  const fillEdgeLine = useCallback((x1: number, y1: number, x2: number, y2: number): void => {
     if (!mapData) return;
     if (!geometry || geometry.type !== 'grid') return;
 
@@ -204,7 +204,7 @@ function useShapeTools({
     const newEdgesData = generateEdgeLine(lineX1, lineY1, lineX2, lineY2, selectedColor);
     const newEdges = mergeEdges(activeLayer.edges, newEdgesData);
     onEdgesChange(newEdges);
-  };
+  }, [mapData, geometry, selectedColor, onEdgesChange]);
 
   const updateShapeHover = useCallback((gridX: number, gridY: number): void => {
     if (touchConfirmPending) return;

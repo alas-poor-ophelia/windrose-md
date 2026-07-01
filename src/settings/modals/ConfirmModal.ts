@@ -1,4 +1,5 @@
-import { App, Modal } from 'obsidian';
+import type { App} from 'obsidian';
+import { Modal } from 'obsidian';
 
 interface ConfirmModalOptions {
   message?: string;
@@ -17,14 +18,14 @@ class ConfirmModal extends Modal {
 
   constructor(app: App, options: ConfirmModalOptions = {}) {
     super(app);
-    this.message = options.message || 'Are you sure?';
-    this.confirmText = options.confirmText || 'Confirm';
-    this.cancelText = options.cancelText || 'Cancel';
-    this.isDestructive = options.isDestructive || false;
+    this.message = options.message != null && options.message !== '' ? options.message : 'Are you sure?';
+    this.confirmText = options.confirmText != null && options.confirmText !== '' ? options.confirmText : 'Confirm';
+    this.cancelText = options.cancelText != null && options.cancelText !== '' ? options.cancelText : 'Cancel';
+    this.isDestructive = options.isDestructive ?? false;
     this.resolved = false;
   }
 
-  onOpen() {
+  onOpen(): void {
     const { contentEl } = this;
     contentEl.empty();
 
@@ -53,9 +54,9 @@ class ConfirmModal extends Modal {
     };
   }
 
-  onClose() {
+  onClose(): void {
     this.contentEl.empty();
-    if (!this.resolved && this.resolvePromise) {
+    if (!this.resolved && this.resolvePromise != null) {
       this.resolvePromise(false);
     }
   }

@@ -79,7 +79,7 @@ export function analyzeAlphaPixels(
 // resized per scan) to avoid per-call allocation.
 let scanCanvas: HTMLCanvasElement | null = null;
 function getScanCtx(w: number, h: number): CanvasRenderingContext2D | null {
-  if (scanCanvas == null) scanCanvas = document.createElement('canvas');
+  scanCanvas ??= activeDocument.createElement('canvas');
   scanCanvas.width = w;
   scanCanvas.height = h;
   return scanCanvas.getContext('2d', { willReadFrequently: true });
@@ -157,7 +157,7 @@ export async function runDetectionScan(
 
   async function worker(): Promise<void> {
     while (cursor < needsScan.length) {
-      if (opts?.signal?.aborted) return;
+      if (opts?.signal?.aborted === true) return;
       const vaultPath = needsScan[cursor++];
       const signals = await scanTileImageSignals(app, vaultPath);
       if (signals != null) results.push({ vaultPath, signals });

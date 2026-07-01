@@ -1,4 +1,5 @@
-import { App, Modal, Setting, Notice } from 'obsidian';
+import type { App} from 'obsidian';
+import { Modal, Setting, Notice } from 'obsidian';
 import type { PluginSettings, ObjectSetData } from '#types/settings/settings.types';
 import { ObjectSetHelpers } from '../helpers/objectSetHelpers';
 
@@ -24,12 +25,12 @@ class ObjectSetExportModal extends Modal {
     this.set = set;
   }
 
-  onOpen() {
+  onOpen(): void {
     const { contentEl } = this;
     contentEl.empty();
     contentEl.addClass('windrose-export-modal');
 
-    contentEl.createEl('h2', { text: 'Export Object Set' });
+    contentEl.createEl('h2', { text: 'Export object set' });
 
     const set = this.set;
     let exportName = set.name;
@@ -37,7 +38,7 @@ class ObjectSetExportModal extends Modal {
     let includeGrid = !!set.data.grid;
 
     new Setting(contentEl)
-      .setName('Set Name')
+      .setName('Set name')
       .setDesc('Name used for the export folder')
       .addText(text => text
         .setValue(exportName)
@@ -68,7 +69,7 @@ class ObjectSetExportModal extends Modal {
     }
 
     // Destination info
-    const destFolder = this.plugin.settings.objectSetsAutoLoadFolder || '';
+    const destFolder = this.plugin.settings.objectSetsAutoLoadFolder ?? '';
     const destDesc = destFolder
       ? 'Will export to: ' + destFolder + '/' + (exportName || set.name).replace(/[\\\\/:*?"<>|]/g, '_')
       : 'Will export to: object-sets/' + (exportName || set.name).replace(/[\\\\/:*?"<>|]/g, '_');
@@ -103,7 +104,7 @@ class ObjectSetExportModal extends Modal {
     };
   }
 
-  onClose() {
+  onClose(): void {
     this.contentEl.empty();
   }
 }

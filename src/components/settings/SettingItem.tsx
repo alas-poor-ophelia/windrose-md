@@ -57,9 +57,9 @@ function SettingItem({ name, description, vertical, children }: SettingItemProps
 
       settingRef.current = setting;
 
+      const el = containerRef.current;
       return () => {
         // Setting appends its own DOM to containerRef — clear it
-        const el = containerRef.current;
         if (el != null) {
           if (typeof el.empty === 'function') { el.empty(); } else { el.innerHTML = ''; }
         }
@@ -68,6 +68,7 @@ function SettingItem({ name, description, vertical, children }: SettingItemProps
       // If Setting creation fails, fallback DOM is already visible
       return undefined;
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- builds native Setting once; name/description via siblings; vertical class applied at creation
   }, []);
 
   // Update name/description reactively

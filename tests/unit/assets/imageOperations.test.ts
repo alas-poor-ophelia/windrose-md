@@ -12,6 +12,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { TFile } from 'obsidian';
 
 // We need to set up globals BEFORE importing the module, since it runs
 // at import time and may reference `app` or DOM APIs.
@@ -50,7 +51,7 @@ import {
  * Returns the mock HTMLImageElement that was cached.
  */
 async function seedCache(vaultPath: string, width = 100, height = 100): Promise<void> {
-  const mockFile = { path: vaultPath };
+  const mockFile = Object.assign(new TFile(), { path: vaultPath });
   const mockBinary = new ArrayBuffer(8);
 
   mockVault.getAbstractFileByPath.mockReturnValue(mockFile);

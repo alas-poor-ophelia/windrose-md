@@ -19,6 +19,7 @@ import { useOutlineTools } from '../../hooks/interactions/useOutlineTools';
 import type { MenuItem } from 'obsidian';
 import { Modal, Menu } from 'obsidian';
 import { useApp } from '../../context/AppContext';
+import type { HexContextMenuDetail } from '../../core/windroseEvents';
 
 
 
@@ -106,7 +107,7 @@ const OutlineLayer = ({
     });
     registerHandlers('outline', proxy);
     return () => unregisterHandlers('outline');
-  }, []);
+  }, [registerHandlers, unregisterHandlers]);
 
   // ESC to cancel drawing, Delete/Backspace to delete selected
   useEffect(() => {
@@ -120,15 +121,15 @@ const OutlineLayer = ({
         deleteOutline(selectedOutlineId);
       }
     };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
+    activeDocument.addEventListener('keydown', handler);
+    return () => activeDocument.removeEventListener('keydown', handler);
   }, [isOutlineTool, cancelDrawing, selectedOutlineId, deleteOutline]);
 
   // Context menu via windrose:hex-context-menu
   useEffect(() => {
     if (!isOutlineTool) return undefined;
 
-    const handler = (e: CustomEvent): void => {
+    const handler = (e: CustomEvent<HexContextMenuDetail>): void => {
       const { screenX, screenY } = e.detail;
       if (!mapData?.outlines) return;
 
@@ -173,9 +174,9 @@ const OutlineLayer = ({
           const dup: Outline = {
             ...outlineRef,
             id: `outline-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-            order: (mapData.outlines || []).length
+            order: (mapData.outlines ?? []).length
           };
-          onOutlinesChange([...(mapData.outlines || []), dup]);
+          onOutlinesChange([...(mapData.outlines ?? []), dup]);
         });
       });
 
@@ -191,8 +192,8 @@ const OutlineLayer = ({
       menu.showAtPosition({ x: screenX, y: screenY });
     };
 
-    document.addEventListener('windrose:hex-context-menu', handler as EventListener);
-    return () => document.removeEventListener('windrose:hex-context-menu', handler as EventListener);
+    activeDocument.addEventListener('windrose:hex-context-menu', handler);
+    return () => activeDocument.removeEventListener('windrose:hex-context-menu', handler);
   }, [isOutlineTool, mapData?.outlines, geometry, screenToWorld, deleteOutline, updateOutline, onOutlinesChange]);
 
   // ── Overlay canvas for in-progress drawing ────────────────────────
@@ -209,11 +210,7 @@ const OutlineLayer = ({
     }
 
     if (!overlayRef.current) {
-      const overlay = document.createElement('canvas');
-      overlay.style.position = 'absolute';
-      overlay.style.top = '0';
-      overlay.style.left = '0';
-      overlay.style.pointerEvents = 'none';
+      const overlay = activeDocument.createElement('canvas');
       overlay.classList.add('windrose-overlay-layer');
       mainCanvas.parentElement.appendChild(overlay);
       overlayRef.current = overlay;

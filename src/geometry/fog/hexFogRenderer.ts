@@ -133,7 +133,7 @@ function renderHexBlurPasses(
   const numPasses = 8;
   const maxExpansion = blurRadius / (hexGeometry.hexSize * zoom);
 
-  const targetCtx = fogCtx || ctx;
+  const targetCtx = fogCtx ?? ctx;
   const useFilterFallback = !fogCtx;
   const filterBlurAmount = blurRadius / numPasses;
 

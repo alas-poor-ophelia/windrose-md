@@ -1,4 +1,5 @@
-import { App, Modal, Setting, Notice } from 'obsidian';
+import type { App} from 'obsidian';
+import { Modal, Setting, Notice } from 'obsidian';
 import type { PluginSettings, BuiltInColor, ColorOverride, PaletteColor } from '#types/settings/settings.types';
 import { BUILT_IN_COLORS } from '../../core/settingsAccessor';
 
@@ -23,10 +24,10 @@ class ColorEditModal extends Modal {
     this.plugin = plugin;
     this.existingColor = existingColor;
     this.onSave = onSave;
-    this.isBuiltIn = existingColor?.isBuiltIn || false;
+    this.isBuiltIn = existingColor?.isBuiltIn ?? false;
   }
 
-  onOpen() {
+  onOpen(): void {
     const { contentEl } = this;
     contentEl.empty();
     contentEl.addClass('windrose-color-edit-modal');
@@ -36,18 +37,18 @@ class ColorEditModal extends Modal {
 
     contentEl.createEl('h2', {
       text: isEdit
-        ? (isBuiltIn ? `Edit: ${this.existingColor!.label}` : 'Edit Custom Color')
+        ? (isBuiltIn ? `Edit: ${this.existingColor?.label ?? ''}` : 'Edit Custom Color')
         : 'Add Custom Color'
     });
 
     // Get original built-in values if editing a built-in
     const originalBuiltIn = isBuiltIn
-      ? BUILT_IN_COLORS.find((c: BuiltInColor) => c.id === this.existingColor!.id)
+      ? BUILT_IN_COLORS.find((c: BuiltInColor) => c.id === this.existingColor?.id)
       : null;
 
     // Initialize form values
-    let colorValue = this.existingColor?.color || '#808080';
-    let labelValue = this.existingColor?.label || '';
+    let colorValue = this.existingColor?.color != null && this.existingColor.color !== '' ? this.existingColor.color : '#808080';
+    let labelValue = this.existingColor?.label ?? '';
     let opacityValue = this.existingColor?.opacity ?? 1;
 
     // Color picker
@@ -81,7 +82,7 @@ class ColorEditModal extends Modal {
       .setName('Label')
       .setDesc('Display name for this color')
       .addText(text => text
-        .setPlaceholder('e.g., Ocean Blue')
+        .setPlaceholder('E.g., ocean blue')
         .setValue(labelValue)
         .onChange((value: string) => {
           labelValue = value;
@@ -125,7 +126,7 @@ class ColorEditModal extends Modal {
       text: 'Save',
       cls: 'mod-cta'
     });
-    saveBtn.addEventListener('click', async () => {
+    saveBtn.addEventListener('click', () => {
       // Validate
       if (!labelValue.trim()) {
         new Notice('Please enter a label for this color.');
@@ -138,11 +139,11 @@ class ColorEditModal extends Modal {
 
       if (isBuiltIn) {
         // Save as override
-        if (!this.plugin.settings.colorPaletteOverrides) {
-          this.plugin.settings.colorPaletteOverrides = {};
-        }
-        const existingOverride = this.plugin.settings.colorPaletteOverrides[this.existingColor!.id] || {};
-        this.plugin.settings.colorPaletteOverrides[this.existingColor!.id] = {
+        this.plugin.settings.colorPaletteOverrides ??= {};
+        const colorId = this.existingColor?.id;
+        if (colorId == null) return;
+        const existingOverride = this.plugin.settings.colorPaletteOverrides[colorId] ?? {};
+        this.plugin.settings.colorPaletteOverrides[colorId] = {
           ...existingOverride,
           color: colorValue,
           label: labelValue,
@@ -150,10 +151,11 @@ class ColorEditModal extends Modal {
         } as ColorOverride;
       } else if (isEdit) {
         // Update existing custom color
-        const idx = this.plugin.settings.customPaletteColors!.findIndex((c: PaletteColor) => c.id === this.existingColor!.id);
+        if (this.plugin.settings.customPaletteColors == null) return;
+        const idx = this.plugin.settings.customPaletteColors.findIndex((c: PaletteColor) => c.id === this.existingColor?.id);
         if (idx !== -1) {
-          this.plugin.settings.customPaletteColors![idx] = {
-            ...this.plugin.settings.customPaletteColors![idx],
+          this.plugin.settings.customPaletteColors[idx] = {
+            ...this.plugin.settings.customPaletteColors[idx],
             color: colorValue,
             label: labelValue,
             opacity: opacityValue
@@ -161,9 +163,7 @@ class ColorEditModal extends Modal {
         }
       } else {
         // Add new custom color
-        if (!this.plugin.settings.customPaletteColors) {
-          this.plugin.settings.customPaletteColors = [];
-        }
+        this.plugin.settings.customPaletteColors ??= [];
         this.plugin.settings.customPaletteColors.push({
           id: 'custom-' + Date.now(),
           color: colorValue,
@@ -180,7 +180,7 @@ class ColorEditModal extends Modal {
     cancelBtn.addEventListener('click', () => this.close());
   }
 
-  onClose() {
+  onClose(): void {
     this.contentEl.empty();
   }
 }

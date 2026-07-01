@@ -1,4 +1,5 @@
-import { App, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import type { App, Plugin} from 'obsidian';
+import { Notice, PluginSettingTab, Setting } from 'obsidian';
 import type { PluginSettings } from '#types/settings/settings.types';
 import type { SectionRef, ObjectSettingsForMapType, ObjectSettingsUpdate } from './tabs/settingsTabContext';
 import { TabRenderCoreMethods } from './tabs/TabRenderCore';
@@ -15,7 +16,12 @@ interface WindrosePlugin extends Plugin {
   hasOldPluginData(): Promise<boolean>;
 }
 
-// Declaration merging: tells TypeScript this class has the mixin methods
+// Declaration merging: tells TypeScript this class has the mixin methods that are
+// added at runtime via Object.assign(prototype, ...Methods) below. Deliberate and
+// safe. The "proper" structural fix (mixins as free functions) is DEFERRED to the
+// Obsidian declarative Settings API migration — that rewrites this whole tab, so
+// restructuring now would be throwaway work. See project_eslint_0_3_migration.
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 interface WindroseMDSettingsTab {
   renderSearchBar(containerEl: HTMLElement): void;
   renderHexSettingsContent(el: HTMLElement): void;
@@ -35,6 +41,7 @@ interface WindroseMDSettingsTab {
   renderKeyboardShortcutsContent(el: HTMLElement): void;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see interface note above (deferred to Settings API migration)
 class WindroseMDSettingsTab extends PluginSettingTab {
   plugin: WindrosePlugin;
   settingsChanged: boolean;
@@ -53,7 +60,7 @@ class WindroseMDSettingsTab extends PluginSettingTab {
   }
 
   private renderImportBanner(containerEl: HTMLElement): void {
-    this.plugin.hasOldPluginData().then(hasOld => {
+    void this.plugin.hasOldPluginData().then(hasOld => {
       if (!hasOld) return;
       new Setting(containerEl)
         .setName('Import settings from previous installation')
@@ -71,6 +78,7 @@ class WindroseMDSettingsTab extends PluginSettingTab {
               new Notice('Windrose: Nothing new to import — all settings already present.', 5000);
             }
           }));
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- lastElementChild was just appended by the new Setting() chain above
       containerEl.prepend(containerEl.lastElementChild!);
     });
   }
@@ -118,7 +126,7 @@ class WindroseMDSettingsTab extends PluginSettingTab {
 
   createCollapsibleSection(containerEl: HTMLElement, title: string, renderFn: (el: HTMLElement) => void, options: { open?: boolean } = {}): HTMLDetailsElement {
     const details = containerEl.createEl('details', { cls: 'windrose-settings-section' });
-    if (options.open) details.setAttribute('open', '');
+    if (options.open === true) details.setAttribute('open', '');
 
     this.sections.push({ details, title });
 
@@ -138,7 +146,7 @@ class WindroseMDSettingsTab extends PluginSettingTab {
     const { containerEl } = this;
 
     const openSections = new Set<string>();
-    if (this.sections) {
+    if (this.sections != null) {
       this.sections.forEach(({ details, title }) => {
         if (details.hasAttribute('open')) {
           openSections.add(title);

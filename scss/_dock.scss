@@ -13,6 +13,105 @@
   border-left: 2px solid var(--windrose-border-primary);
   overflow-y: auto;
   overflow-x: hidden;
+
+  /* Collapsed: the whole column shrinks to an icon ribbon. The ribbon replaces
+     the stacked panels (they never show together), so no per-panel chrome here. */
+  &.is-collapsed {
+    width: 44px;
+    overflow: visible;
+  }
+}
+
+/* ==========================================================================
+   Collapsed dock ribbon (icon strip; one button per docked sub-panel)
+   ========================================================================== */
+.windrose-dock-ribbon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 4px;
+}
+
+/* `button.` prefix (0,1,1) beats Obsidian's `button:not(.clickable-icon)` which
+   injects fill + padding on desktop — the same fight the edge-rail buttons face. */
+button.windrose-dock-ribbon-btn {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--windrose-text-muted);
+  cursor: pointer;
+  box-shadow: none;
+  transition: var(--windrose-transition);
+
+  svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  &:hover {
+    background: var(--windrose-bg-tertiary);
+    color: var(--windrose-text-primary);
+  }
+}
+
+/* Collapse-to-ribbon button, tucked into the Layers header's top-right corner. */
+button.windrose-dock-panel-collapse {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  min-width: 0;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--windrose-text-muted);
+  cursor: pointer;
+  line-height: 0;
+  box-shadow: none;
+  transition: var(--windrose-transition);
+
+  svg {
+    display: block;
+  }
+
+  &:hover {
+    background: oklch(from var(--windrose-border-primary) l c h / 0.2);
+    color: var(--windrose-text-primary);
+  }
+}
+
+/* Tablet twins — Obsidian's .is-tablet injects padding/height/bg on every
+   <button>; re-state the boxes in full so the ribbon + collapse control hold. */
+.is-tablet button.windrose-dock-ribbon-btn {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  box-shadow: none;
+  color: var(--windrose-text-muted);
+}
+
+.is-tablet button.windrose-dock-panel-collapse {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+  box-shadow: none;
+  color: var(--windrose-text-muted);
 }
 
 /* Individual dock panel */
@@ -325,9 +424,275 @@
 }
 
 /* ==========================================================================
+   Board -> Stratum -> Layer projection (Phase 7, strata mode)
+   ========================================================================== */
+.windrose-dock-board-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  border-bottom: 1px solid oklch(from var(--windrose-border-primary) l c h / 0.2);
+
+  &.simple {
+    justify-content: space-between;
+  }
+}
+
+.windrose-dock-mode-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--windrose-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* ---- Simple mode: Boards-only floor list ---- */
+.windrose-dock-floor-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.windrose-dock-floor-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  cursor: pointer;
+  color: var(--windrose-text-secondary);
+  border-bottom: 1px solid oklch(from var(--windrose-border-primary) l c h / 0.15);
+  transition: background 0.1s ease;
+
+  &:hover {
+    background: oklch(from var(--windrose-border-primary) l c h / 0.08);
+    color: var(--windrose-text-primary);
+  }
+
+  &.active {
+    background: oklch(from var(--windrose-border-primary) l c h / 0.15);
+    border-left: 2px solid var(--windrose-text-primary);
+    color: var(--windrose-text-primary);
+
+    .windrose-dock-floor-name {
+      font-weight: 600;
+    }
+  }
+}
+
+.windrose-dock-floor-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.windrose-dock-floor-del {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  padding: 2px;
+  border-radius: 3px;
+  color: var(--windrose-text-disabled);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.1s ease, color 0.1s ease;
+
+  &:hover {
+    color: var(--windrose-color-danger, oklch(0.62 0.2 25));
+  }
+
+  .windrose-dock-floor-row:hover & {
+    opacity: 1;
+  }
+}
+
+.windrose-dock-board-tabs {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+/* Board (floor) switcher — a compact dropdown, not a button row. */
+.windrose-dock-board-select {
+  flex: 1;
+  min-width: 0;
+  background: var(--windrose-bg-secondary);
+  color: var(--windrose-text-primary);
+  border: 1px solid var(--windrose-border-secondary);
+  border-radius: 4px;
+  padding: 3px 8px;
+  font-size: 11px;
+  cursor: pointer;
+
+  &:hover {
+    border-color: var(--windrose-border-primary-dark);
+  }
+}
+
+/* Obsidian pins input/select height on tablet — keep it compact. */
+.is-tablet select.windrose-dock-board-select {
+  height: auto;
+  padding: 3px 8px;
+  font-size: 11px;
+  background: var(--windrose-bg-secondary);
+  border: 1px solid var(--windrose-border-secondary);
+  border-radius: 4px;
+}
+
+.windrose-dock-board-tab {
+  padding: 3px 8px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: oklch(from var(--windrose-border-primary) l c h / 0.1);
+  color: var(--windrose-text-muted);
+  font-size: 11px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+
+  &:hover {
+    background: oklch(from var(--windrose-border-primary) l c h / 0.2);
+  }
+
+  &.active {
+    background: oklch(from var(--windrose-text-primary) l c h / 0.16);
+    color: var(--windrose-text-primary);
+    font-weight: 600;
+  }
+}
+
+.windrose-dock-board-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.windrose-dock-board-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--windrose-text-muted);
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+
+  &:hover {
+    background: oklch(from var(--windrose-border-primary) l c h / 0.15);
+    color: var(--windrose-text-primary);
+  }
+
+  &.delete:hover {
+    color: var(--windrose-danger, oklch(0.6 0.2 25));
+  }
+
+  &.mode.active {
+    color: var(--windrose-text-primary);
+  }
+}
+
+.windrose-dock-stratum {
+  border-bottom: 1px solid oklch(from var(--windrose-border-primary) l c h / 0.12);
+}
+
+.windrose-dock-stratum-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  background: oklch(from var(--role-tint, var(--windrose-border-primary)) l c h / 0.08);
+}
+
+.windrose-dock-stratum-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--role-tint, var(--windrose-text-muted));
+  flex-shrink: 0;
+}
+
+.windrose-dock-stratum-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--windrose-text-primary);
+  flex: 1;
+}
+
+.windrose-dock-stratum-count {
+  font-size: 10px;
+  color: var(--windrose-text-muted);
+  min-width: 14px;
+  text-align: center;
+}
+
+.windrose-dock-stratum-add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--windrose-text-muted);
+  cursor: pointer;
+
+  &:hover {
+    background: oklch(from var(--role-tint, var(--windrose-border-primary)) l c h / 0.25);
+    color: var(--windrose-text-primary);
+  }
+}
+
+.windrose-dock-stratum-layers {
+  padding-left: 6px;
+
+  /* In strata mode the active row glows its stratum's role hue. */
+  .windrose-dock-layer-row.active {
+    border-left-color: var(--role-tint, var(--windrose-text-primary));
+    background: oklch(from var(--role-tint, var(--windrose-border-primary)) l c h / 0.14);
+  }
+}
+
+/* `is-layer-hidden` (not the bare `hidden` token) — Obsidian ships a global
+   `.hidden { display: none !important }` utility that would yank the whole row
+   out of layout, making a hidden layer impossible to toggle back on. */
+.windrose-dock-layer-row.is-layer-hidden {
+  .windrose-dock-layer-name,
+  .windrose-dock-layer-icon {
+    opacity: 0.45;
+  }
+}
+
+.windrose-dock-layer-action.eye {
+  opacity: 0.4;
+
+  &.active {
+    opacity: 0.85;
+  }
+
+  &:hover {
+    opacity: 1;
+  }
+}
+
+/* ==========================================================================
    Dock Color Picker overrides (narrower grid for 240px dock)
    ========================================================================== */
-:is(.windrose-dock-right, .windrose-floating-panel-content) .windrose-color-picker {
+:is(.windrose-dock-right, .windrose-floating-panel-content, .windrose-edge-rail-drawer-body) .windrose-color-picker {
   padding: 2px 6px;
   min-width: 0;
   border: none;
@@ -399,6 +764,38 @@
   }
 }
 
+/* The edge-rail drawer (198px) is narrower than the 240px dock, so the dock's
+   fixed six-column 34px grid (204px) overflows and crams the swatches together.
+   Use a 4-column fractional grid so the swatches always FILL the drawer width
+   (no fixed px width left a dead strip on the right edge). */
+/* Let the floating picker's mid-grey panel fill drop away so the swatch area
+   reads as part of the drawer (which is bg-primary), not a grey inset card. */
+.windrose-edge-rail-drawer-body .windrose-color-picker {
+  background: transparent;
+}
+
+.windrose-edge-rail-drawer-body .windrose-color-picker .windrose-color-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.windrose-edge-rail-drawer-body .windrose-color-picker .windrose-color-swatch {
+  /* padding:0 + min-width:0 on the BASE rule (not just an .is-tablet override):
+     Obsidian injects `button { padding: 4px 20px }` on tablet, and a grid item's
+     default min-width:auto resolves to min-content — both would push the columns
+     past the track and break the 4-up layout. Square via aspect-ratio so the
+     swatch height follows the fractional column width. */
+  padding: 0;
+  min-width: 0;
+  /* width:100% (not auto) — an empty/transparent swatch button has no content,
+     so width:auto collapses it to ~min-content instead of filling its 1fr cell.
+     100% fills the track; aspect-ratio keeps it square. */
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+}
+
 /* Add layer footer */
 .windrose-dock-layer-footer {
   padding: 4px 6px;
@@ -410,13 +807,45 @@
   .windrose-dock-layer-action,
   .windrose-dock-layer-action-btn,
   .windrose-dock-layer-add,
-  .windrose-floating-panel-btn
+  .windrose-floating-panel-btn,
+  .windrose-dock-floor-del
 ) {
   padding: 0;
 }
 
+/* Simple-mode floor list — roomier tap targets, neutralize button injection */
+.is-tablet .windrose-dock-floor-row {
+  padding: 11px 10px;
+}
+
+.is-tablet button.windrose-dock-floor-del {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+  color: var(--windrose-text-disabled);
+}
+
 .is-tablet :is(.windrose-dock-right, .windrose-floating-panel-content) button.windrose-color-swatch {
   padding: 0;
+}
+
+.is-tablet button.windrose-dock-layer-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+  color: var(--windrose-text-muted);
 }
 
 .is-tablet button.windrose-dock-layer-action-btn {
@@ -424,7 +853,57 @@
 }
 
 .is-tablet button.windrose-dock-layer-add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
   padding: 4px 8px;
+  background: transparent;
+  border: 1px solid oklch(from var(--windrose-border-primary) l c h / 0.3);
+  border-radius: 4px;
+  color: var(--windrose-text-muted);
+  font-size: 11px;
+}
+
+/* Phase 7 Board->Strata->Layer buttons — neutralize Obsidian's injected padding/background */
+.is-tablet button.windrose-dock-board-tab {
+  padding: 3px 8px;
+  background: oklch(from var(--windrose-border-primary) l c h / 0.1);
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--windrose-text-muted);
+
+  &.active {
+    background: oklch(from var(--windrose-text-primary) l c h / 0.16);
+    color: var(--windrose-text-primary);
+  }
+}
+
+.is-tablet button.windrose-dock-board-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+  color: var(--windrose-text-muted);
+}
+
+.is-tablet button.windrose-dock-stratum-add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+  color: var(--windrose-text-muted);
 }
 
 .windrose-dock-layer-add {
@@ -433,7 +912,7 @@
   gap: 4px;
   width: 100%;
   padding: 4px 8px;
-  border: 1px dashed oklch(from var(--windrose-border-primary) l c h / 0.3);
+  border: 1px solid oklch(from var(--windrose-border-primary) l c h / 0.3);
   border-radius: 4px;
   background: transparent;
   color: var(--windrose-text-muted);
@@ -585,21 +1064,57 @@
   }
 }
 
-/* Tablet overrides for view panel buttons */
-.is-tablet button:is(
-  .windrose-dock-view-zoom-btn,
-  .windrose-dock-view-toggle,
-  .windrose-dock-view-settings
-) {
+/* Tablet overrides for view panel buttons — Obsidian's .is-tablet injects
+   padding/height/min-height/background onto every <button>, bloating these
+   compact controls. Re-state each box in full. The selectors are host-agnostic,
+   so they apply both in the full-pane dock and the block-mode edge-rail drawer. */
+.is-tablet button.windrose-dock-view-zoom-btn {
+  width: 26px;
+  height: 26px;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: 0;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--windrose-text-secondary);
 }
 
 .is-tablet button.windrose-dock-view-toggle {
+  height: auto;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
   padding: 3px 8px;
+  border: none;
+  border-radius: 3px;
+  background: oklch(from var(--windrose-border-primary) l c h / 0.08);
+  box-shadow: none;
+  color: var(--windrose-text-secondary);
+
+  &.active {
+    background: var(--windrose-border-primary);
+    color: var(--windrose-bg-primary);
+  }
 }
 
 .is-tablet button.windrose-dock-view-settings {
+  width: 100%;
+  height: auto;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
   padding: 4px 8px;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--windrose-text-muted);
 }
 
 /* ==========================================================================

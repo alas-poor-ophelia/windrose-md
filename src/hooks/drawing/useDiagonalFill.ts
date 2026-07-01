@@ -207,6 +207,7 @@ const useDiagonalFill = (currentTool: ToolId): UseDiagonalFillResult => {
 
       return true;
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- executeFill is a stable useCallback declared later in the file; forward reference, safe to omit
     [currentTool, geometry, mapData, cellMap, fillStart, fillEnd, isEndLocked, getClientCoords, screenToWorld, screenToGrid, executeFillPath, resetState]
   );
 

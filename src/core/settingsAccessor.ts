@@ -13,7 +13,8 @@ import type {
   ResolvedColorEntry,
   MapSpecificSettings,
   CoordinateKeyMode,
-  ObjectSetData
+  ColorOverride,
+  PaletteColor
 } from '#types/settings/settings.types';
 import type { App } from 'obsidian';
 
@@ -111,7 +112,7 @@ const FALLBACK_OBJECT_SETTINGS: ObjectSettings = {
 // ===========================================
 
 function getPluginSettingsRaw(): Partial<PluginSettings> | null {
-  return _plugin?.settings || null;
+  return _plugin?.settings ?? null;
 }
 
 function getApp(): App {
@@ -146,7 +147,6 @@ function getSetting<K extends keyof PluginSettings>(key: K): PluginSettings[K] {
     const settings = getSettings();
     return settings[key];
   } catch (error) {
-    // eslint-disable-next-line no-console
     console.warn('[settingsAccessor] Error getting setting:', key, error);
     return FALLBACK_SETTINGS[key];
   }
@@ -208,7 +208,7 @@ function getEffectiveSettings(
   globalSettings: PluginSettings | null = null
 ): PluginSettings {
   // Get global settings if not provided
-  const globals = globalSettings || getSettings();
+  const globals = globalSettings ?? getSettings();
   
   // If map has no settings or is using global settings, return global settings
   if (!mapSettings || mapSettings.useGlobalSettings) {
@@ -237,15 +237,15 @@ function getObjectSettings(mapType: 'hex' | 'grid' = 'grid'): ObjectSettings {
   if (raw) {
     if (mapType === 'hex') {
       return {
-        objectOverrides: raw.hexObjectOverrides || {},
-        customObjects: raw.customHexObjects || [],
-        customCategories: raw.customHexCategories || []
+        objectOverrides: raw.hexObjectOverrides ?? {},
+        customObjects: raw.customHexObjects ?? [],
+        customCategories: raw.customHexCategories ?? []
       };
     } else {
       return {
-        objectOverrides: raw.gridObjectOverrides || {},
-        customObjects: raw.customGridObjects || [],
-        customCategories: raw.customGridCategories || []
+        objectOverrides: raw.gridObjectOverrides ?? {},
+        customObjects: raw.customGridObjects ?? [],
+        customCategories: raw.customGridCategories ?? []
       };
     }
   }
@@ -260,8 +260,7 @@ function getObjectSettingsForSet(setId: string, mapType: 'hex' | 'grid' = 'grid'
   const raw = getPluginSettingsRaw();
   if (!raw) return null;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const sets = ((raw as any).objectSets ?? []) as Array<{ id: string; data?: ObjectSetData }>;
+  const sets = raw.objectSets ?? [];
   const set = sets.find((s) => s.id === setId);
   if (set == null) return null;
 
@@ -284,21 +283,19 @@ function getObjectSettingsForSet(setId: string, mapType: 'hex' | 'grid' = 'grid'
 function getColorPaletteSettings(): ResolvedColorEntry[] {
   const raw = getPluginSettingsRaw();
   if (raw != null) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const rawAny = raw as any;
-    const colorPaletteOverrides: Record<string, Record<string, unknown> | undefined> = rawAny.colorPaletteOverrides ?? {};
-    const customPaletteColors: ResolvedColorEntry[] = rawAny.customPaletteColors ?? [];
+    const colorPaletteOverrides: Record<string, ColorOverride> = raw.colorPaletteOverrides ?? {};
+    const customPaletteColors: PaletteColor[] = raw.customPaletteColors ?? [];
 
     const resolvedBuiltIns: ResolvedColorEntry[] = BUILT_IN_COLORS
-      .filter(c => (colorPaletteOverrides[c.id]?.hidden as boolean | undefined) !== true)
+      .filter(c => colorPaletteOverrides[c.id]?.hidden !== true)
       .map((c, index) => {
         const override = colorPaletteOverrides[c.id];
         if (override != null) {
-          const { hidden, ...overrideProps } = override;
+          const { hidden: _hidden, ...overrideProps } = override;
           return {
             ...c,
             ...overrideProps,
-            order: (override.order as number | undefined) ?? index,
+            order: override.order ?? index,
             isBuiltIn: true,
             isModified: true
           };
@@ -306,7 +303,7 @@ function getColorPaletteSettings(): ResolvedColorEntry[] {
         return { ...c, order: index, isBuiltIn: true, isModified: false };
       });
 
-    const resolvedCustom: ResolvedColorEntry[] = customPaletteColors.map((c: ResolvedColorEntry, index: number) => ({
+    const resolvedCustom: ResolvedColorEntry[] = customPaletteColors.map((c, index) => ({
       ...c,
       order: c.order ?? (100 + index),
       isCustom: true,

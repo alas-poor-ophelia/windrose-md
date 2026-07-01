@@ -1,26 +1,10 @@
 import type { VNode } from 'preact';
 import type { TileLayerRole } from '#types/tiles/tile.types';
+import type { RoleMeta as DepthMeta } from '../../assets/tileRoles';
 
 import { useState, useCallback } from 'preact/hooks';
 import { Icon } from '../shared/Icon';
-
-interface DepthMeta {
-  id: TileLayerRole;
-  label: string;
-  icon: string;
-  hint: string;
-}
-
-const DEPTHS: readonly DepthMeta[] = [
-  { id: 'ground',     label: 'Terrain',    icon: 'grid-2x-2x', hint: 'ground' },
-  { id: 'structure',  label: 'Structure',  icon: 'door-open',  hint: 'walls' },
-  { id: 'props',      label: 'Props',      icon: 'sofa',       hint: 'objects' },
-  { id: 'decoration', label: 'Decoration', icon: 'sparkles',   hint: 'top' },
-];
-
-function depthMeta(id: TileLayerRole): DepthMeta {
-  return DEPTHS.find(d => d.id === id) ?? DEPTHS[0];
-}
+import { ROLE_META as DEPTHS, roleMeta as depthMeta } from '../../assets/tileRoles';
 
 // ==========================================
 // EyeToggle
@@ -61,12 +45,12 @@ function DepthBar({ active, onPick, hidden, onToggleHide, tileCounts, compact = 
   const [fanOpen, setFanOpen] = useState(false);
 
   const handleSegmentClick = useCallback((id: TileLayerRole) => {
-    if (id === active) {
-      setFanOpen(o => !o);
-    } else {
+    if (id !== active) {
       onPick(id);
       setFanOpen(false);
     }
+    // Depth fan hidden for now — clicking the already-active segment is a no-op
+    // (was: setFanOpen(o => !o) to open the vertical stratum switcher).
   }, [active, onPick]);
 
   const handleFanPick = useCallback((id: TileLayerRole) => {
@@ -93,10 +77,11 @@ function DepthBar({ active, onPick, hidden, onToggleHide, tileCounts, compact = 
             <button
               key={d.id}
               className={cls}
+              style={{ '--depth-color': `var(--windrose-depth-${d.id})` }}
               title={`${d.label} · ${count} tiles${isOff ? ' · hidden' : ''}`}
               onClick={() => handleSegmentClick(d.id)}
             >
-              <span className="windrose-db-cap" style={{ '--depth-color': `var(--windrose-depth-${d.id})`, opacity: isOff ? 0.4 : isActive ? 1 : 0.65 } as any} />
+              <span className="windrose-db-cap" style={{ '--depth-color': `var(--windrose-depth-${d.id})`, opacity: isOff ? 0.4 : isActive ? 1 : 0.65 }} />
               <Icon icon={d.icon} size={isActive ? 15 : 14} className={`windrose-db-icon ${isOff ? 'is-disabled' : ''}`} />
               {isActive && <span className="windrose-db-lbl">{d.label}</span>}
               {isActive && !compact && <span className="windrose-db-cnt">{count}</span>}
@@ -135,9 +120,10 @@ function DepthBar({ active, onPick, hidden, onToggleHide, tileCounts, compact = 
                 <button
                   key={d.id}
                   className={cls}
+                  style={{ '--depth-color': `var(--windrose-depth-${d.id})` }}
                   onClick={() => handleFanPick(d.id)}
                 >
-                  <span className="windrose-db-cap" style={{ '--depth-color': `var(--windrose-depth-${d.id})`, opacity: isOff ? 0.4 : 1 } as any} />
+                  <span className="windrose-db-cap" style={{ '--depth-color': `var(--windrose-depth-${d.id})`, opacity: isOff ? 0.4 : 1 }} />
                   <Icon icon={d.icon} size={15} className={`windrose-db-icon ${isOff ? 'is-disabled' : ''}`} />
                   <span className="windrose-db-lbl">{d.label}</span>
                   <span className="windrose-db-cnt">{count}</span>
@@ -191,7 +177,7 @@ function DepthRibbon({ active, onPick, hidden, onToggleHide, tileCounts }: Depth
             title={`${d.label} · ${count} tiles${isOff ? ' · hidden' : ''}`}
             style={{ opacity: isOff && !isActive ? 0.55 : 1 }}
           >
-            <span className="windrose-dsr-bar" style={{ '--depth-color': `var(--windrose-depth-${d.id})`, opacity: isOff ? 0.3 : isActive ? 1 : 0.85 } as any} />
+            <span className="windrose-dsr-bar" style={{ '--depth-color': `var(--windrose-depth-${d.id})`, opacity: isOff ? 0.3 : isActive ? 1 : 0.85 }} />
             <Icon icon={d.icon} size={16} className={`windrose-dsr-icon ${isActive ? 'is-active' : ''}`} />
             {isOff
               ? <EyeToggle on={false} onClick={() => onToggleHide(d.id)} size={11} />

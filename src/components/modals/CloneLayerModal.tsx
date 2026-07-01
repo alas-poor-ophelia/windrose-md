@@ -6,7 +6,7 @@
  * falls back to Preact overlay otherwise.
  */
 
-import type { JSX, VNode } from 'preact';
+import type { TargetedMouseEvent, VNode } from 'preact';
 
 import { Modal } from 'obsidian';
 import type { App } from 'obsidian';
@@ -75,7 +75,6 @@ function openNativeCloneLayerModal(options: {
     modal.open();
     return true;
   } catch (e) {
-    // eslint-disable-next-line no-console
     console.warn('[Windrose] Failed to open native clone modal, falling back to Preact:', (e as Error).message);
     return false;
   }
@@ -87,7 +86,7 @@ const CloneLayerModal = ({
   onCancel
 }: CloneLayerModalProps): VNode => {
 
-  const handleModalClick = (e: JSX.TargetedMouseEvent<HTMLDivElement>): void => {
+  const handleModalClick = (e: TargetedMouseEvent<HTMLDivElement>): void => {
     e.stopPropagation();
   };
 

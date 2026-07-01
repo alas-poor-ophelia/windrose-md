@@ -5,7 +5,7 @@
  * Provides controls for switching, adding, deleting, and reordering layers.
  */
 
-import type { JSX, VNode } from 'preact';
+import type { TargetedDragEvent, TargetedEvent, TargetedMouseEvent, VNode } from 'preact';
 import type { MapData, MapLayer } from '#types/core/map.types';
 
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
@@ -76,9 +76,9 @@ const LayerControls = ({
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const [sliderHoveredLayerId, setSliderHoveredLayerId] = useState<string | null>(null);
 
-  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressTimerRef = useRef<number | null>(null);
   const longPressTriggeredRef = useRef(false);
-  const sliderHideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sliderHideTimeoutRef = useRef<number | null>(null);
 
   const layers = getLayersOrdered(mapData);
   const reversedLayers = [...layers].reverse();
@@ -101,15 +101,15 @@ const LayerControls = ({
       }
     };
 
-    document.addEventListener('keydown', handleEscape);
-    document.addEventListener('pointerdown', handleClickOutside, true);
+    activeDocument.addEventListener('keydown', handleEscape);
+    activeDocument.addEventListener('pointerdown', handleClickOutside, true);
     return () => {
-      document.removeEventListener('keydown', handleEscape);
-      document.removeEventListener('pointerdown', handleClickOutside, true);
+      activeDocument.removeEventListener('keydown', handleEscape);
+      activeDocument.removeEventListener('pointerdown', handleClickOutside, true);
     };
   }, [expandedLayerId]);
 
-  const handleLayerClick = (layerId: string, e: JSX.TargetedMouseEvent<HTMLButtonElement>): void => {
+  const handleLayerClick = (layerId: string, e: TargetedMouseEvent<HTMLButtonElement>): void => {
     e.stopPropagation();
 
     if (longPressTriggeredRef.current) {
@@ -129,7 +129,7 @@ const LayerControls = ({
     }
   };
 
-  const handleContextMenu = (layerId: string, e: JSX.TargetedMouseEvent<HTMLButtonElement>): void => {
+  const handleContextMenu = (layerId: string, e: TargetedMouseEvent<HTMLButtonElement>): void => {
     e.preventDefault();
     e.stopPropagation();
     setExpandedLayerId(expandedLayerId === layerId ? null : layerId);
@@ -138,20 +138,20 @@ const LayerControls = ({
   const handleTouchStart = (layerId: string): void => {
     longPressTriggeredRef.current = false;
 
-    longPressTimerRef.current = setTimeout(() => {
+    longPressTimerRef.current = window.setTimeout(() => {
       longPressTriggeredRef.current = true;
       setExpandedLayerId(expandedLayerId === layerId ? null : layerId);
     }, 500);
   };
 
   const handleTouchEnd = (): void => {
-    if (longPressTimerRef.current) {
-      clearTimeout(longPressTimerRef.current);
+    if (longPressTimerRef.current != null) {
+      window.clearTimeout(longPressTimerRef.current);
       longPressTimerRef.current = null;
     }
   };
 
-  const handleDelete = (layerId: string, e: JSX.TargetedMouseEvent<HTMLButtonElement>): void => {
+  const handleDelete = (layerId: string, e: TargetedMouseEvent<HTMLButtonElement>): void => {
     e.stopPropagation();
 
     if (layers.length <= 1) {
@@ -162,7 +162,7 @@ const LayerControls = ({
     onLayerDelete(layerId);
   };
 
-  const handleDragStart = (layerId: string, index: number, e: JSX.TargetedDragEvent<HTMLDivElement>): void => {
+  const handleDragStart = (layerId: string, index: number, e: TargetedDragEvent<HTMLDivElement>): void => {
     setDragState({ layerId, index });
     if (e.dataTransfer) {
       e.dataTransfer.effectAllowed = 'move';
@@ -170,7 +170,7 @@ const LayerControls = ({
     }
   };
 
-  const handleDragOver = (index: number, e: JSX.TargetedDragEvent<HTMLDivElement>): void => {
+  const handleDragOver = (index: number, e: TargetedDragEvent<HTMLDivElement>): void => {
     e.preventDefault();
     if (e.dataTransfer) {
       e.dataTransfer.dropEffect = 'move';
@@ -182,7 +182,7 @@ const LayerControls = ({
     setDragOverIndex(null);
   };
 
-  const handleDrop = (targetIndex: number, e: JSX.TargetedDragEvent<HTMLDivElement>): void => {
+  const handleDrop = (targetIndex: number, e: TargetedDragEvent<HTMLDivElement>): void => {
     e.preventDefault();
 
     if (dragState && dragState.index !== targetIndex) {
@@ -240,40 +240,41 @@ const LayerControls = ({
         displayName: getLayerDisplayName(layer)
       }
     ]));
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- getLayerDisplayName/shouldShowPill are plain inner fns stable in behavior re: layers; adding invalidates this memo every render
   }, [layers]);
 
-  const handleEdit = (layerId: string, e: JSX.TargetedMouseEvent<HTMLButtonElement>): void => {
+  const handleEdit = (layerId: string, e: TargetedMouseEvent<HTMLButtonElement>): void => {
     e.stopPropagation();
     setExpandedLayerId(null);
     onEditLayer(layerId);
   };
 
-  const handleClone = (layerId: string, e: JSX.TargetedMouseEvent<HTMLButtonElement>): void => {
+  const handleClone = (layerId: string, e: TargetedMouseEvent<HTMLButtonElement>): void => {
     e.stopPropagation();
     setExpandedLayerId(null);
     onLayerClone(layerId);
   };
 
-  const handleTransparencyToggle = (layerId: string, e: JSX.TargetedMouseEvent<HTMLButtonElement>): void => {
+  const handleTransparencyToggle = (layerId: string, e: TargetedMouseEvent<HTMLButtonElement>): void => {
     e.stopPropagation();
     onToggleShowLayerBelow(layerId);
   };
 
-  const handleOpacityChange = (layerId: string, e: JSX.TargetedEvent<HTMLInputElement>): void => {
+  const handleOpacityChange = (layerId: string, e: TargetedEvent<HTMLInputElement>): void => {
     const value = parseFloat((e.target as HTMLInputElement).value);
     onSetLayerBelowOpacity(layerId, value);
   };
 
   const handleSliderAreaEnter = (layerId: string): void => {
-    if (sliderHideTimeoutRef.current) {
-      clearTimeout(sliderHideTimeoutRef.current);
+    if (sliderHideTimeoutRef.current != null) {
+      window.clearTimeout(sliderHideTimeoutRef.current);
       sliderHideTimeoutRef.current = null;
     }
     setSliderHoveredLayerId(layerId);
   };
 
   const handleSliderAreaLeave = (): void => {
-    sliderHideTimeoutRef.current = setTimeout(() => {
+    sliderHideTimeoutRef.current = window.setTimeout(() => {
       setSliderHoveredLayerId(null);
     }, 150);
   };

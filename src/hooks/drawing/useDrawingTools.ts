@@ -186,6 +186,7 @@ const useDrawingTools = (
 
   useEffect(() => {
     resetDrawingState();
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- resetDrawingState is a plain fn recreated each render; effect must run only on currentTool change
   }, [currentTool]);
 
   return {

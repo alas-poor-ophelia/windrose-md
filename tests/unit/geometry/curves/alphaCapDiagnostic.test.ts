@@ -792,6 +792,7 @@ describe("alpha cap diagnostic: segment-level detection", () => {
       sx = seg[4];
       sy = seg[5];
     }
+    void cappedCount; // diagnostic counter; loop above exercises bezier fitting
 
     // Even with capped segments, the closed curve polygon should produce
     // geometry that polygon-clipping can handle.
@@ -904,6 +905,7 @@ describe("alpha cap diagnostic: segment-level detection", () => {
       sx = seg[4];
       sy = seg[5];
     }
+    void cappedCount; // diagnostic counter; loop above exercises bezier fitting
 
     // Now test: does subtracting a small polygon from the self-intersecting
     // curve produce a result with reasonable area? (i.e., no silent failure

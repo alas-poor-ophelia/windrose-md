@@ -13,6 +13,7 @@ class WindroseMapView extends ItemView {
   private mapName = '';
   private mapType: MapType = 'grid';
   private floatingPanels: Record<string, unknown> = {};
+  private dockCollapsed = false;
 
   constructor(leaf: WorkspaceLeaf) {
     super(leaf);
@@ -45,7 +46,7 @@ class WindroseMapView extends ItemView {
         `type: ${this.mapType}`,
         '```'
       ].join('\n');
-      navigator.clipboard.writeText(block);
+      void navigator.clipboard.writeText(block);
       new Notice('Map block copied to clipboard');
     });
 
@@ -70,14 +71,16 @@ class WindroseMapView extends ItemView {
       mapName: this.mapName,
       mapType: this.mapType,
       floatingPanels: this.floatingPanels,
+      dockCollapsed: this.dockCollapsed,
     };
   }
 
   async setState(state: Record<string, unknown>): Promise<void> {
-    if (state?.mapId) this.mapId = state.mapId as string;
-    if (state?.mapName) this.mapName = state.mapName as string;
-    if (state?.mapType) this.mapType = state.mapType as MapType;
-    if (state?.floatingPanels) this.floatingPanels = state.floatingPanels as Record<string, unknown>;
+    if (typeof state?.mapId === 'string' && state.mapId !== '') this.mapId = state.mapId;
+    if (typeof state?.mapName === 'string' && state.mapName !== '') this.mapName = state.mapName;
+    if (typeof state?.mapType === 'string' && state.mapType !== '') this.mapType = state.mapType as MapType;
+    if (typeof state?.floatingPanels === 'object' && state.floatingPanels !== null) this.floatingPanels = state.floatingPanels as Record<string, unknown>;
+    if (typeof state?.dockCollapsed === 'boolean') this.dockCollapsed = state.dockCollapsed;
 
     if (this.mapId) {
       this.renderMap();
@@ -110,6 +113,11 @@ class WindroseMapView extends ItemView {
     this.app.workspace.requestSaveLayout();
   };
 
+  private handleDockCollapsedChange = (collapsed: boolean): void => {
+    this.dockCollapsed = collapsed;
+    this.app.workspace.requestSaveLayout();
+  };
+
   private async renderPicker(): Promise<void> {
     const maps = await listMaps(this.app);
     render(
@@ -135,6 +143,8 @@ class WindroseMapView extends ItemView {
           onNameChange: this.handleNameChange,
           savedPanelState: this.floatingPanels,
           onPanelStateChange: this.handlePanelStateChange,
+          savedDockCollapsed: this.dockCollapsed,
+          onDockCollapsedChange: this.handleDockCollapsedChange,
         })
       ),
       this.contentEl
@@ -149,7 +159,7 @@ interface PickerProps {
   onSelect: (entry: MapListEntry) => void;
 }
 
-function FullPaneMapPicker({ maps, onSelect }: PickerProps) {
+function FullPaneMapPicker({ maps, onSelect }: PickerProps): h.JSX.Element {
   if (maps.length === 0) {
     return h('div', { className: 'windrose-fullpane-picker' },
       h('div', { className: 'windrose-fullpane-picker-icon' }, '🧭'),

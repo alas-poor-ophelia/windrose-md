@@ -27,7 +27,7 @@ class DungeondraftImportModal extends Modal {
 		contentEl.empty();
 		contentEl.addClass('windrose-dd-import-modal');
 
-		contentEl.createEl('h2', { text: 'Import Dungeondraft Pack' });
+		contentEl.createEl('h2', { text: 'Import Dungeondraft pack' });
 
 		contentEl.createEl('p', {
 			text: 'Select a .dungeondraft_pack file to import its assets as tiles. Only packs that allow third-party software access can be imported.',
@@ -41,10 +41,10 @@ class DungeondraftImportModal extends Modal {
 		});
 
 		const previewArea = contentEl.createDiv({ cls: 'windrose-dd-import-preview' });
-		previewArea.style.display = 'none';
+		previewArea.hide();
 
 		const progressArea = contentEl.createDiv({ cls: 'windrose-dd-import-progress' });
-		progressArea.style.display = 'none';
+		progressArea.hide();
 
 		fileInput.addEventListener('change', (e: Event) => {
 			const file = (e.target as HTMLInputElement).files?.[0];
@@ -60,7 +60,7 @@ class DungeondraftImportModal extends Modal {
 		this.importBtn = buttonContainer.createEl('button', {
 			text: 'Import',
 			cls: 'mod-cta',
-		}) as HTMLButtonElement;
+		});
 		this.importBtn.disabled = true;
 		this.importBtn.onclick = () => {
 			void this.handleImport(previewArea, progressArea, fileInput);
@@ -69,7 +69,7 @@ class DungeondraftImportModal extends Modal {
 
 	private async handleFileSelected(file: File, previewArea: HTMLElement): Promise<void> {
 		previewArea.empty();
-		previewArea.style.display = 'block';
+		previewArea.show();
 		this.archive = null;
 		this.buffer = null;
 		this.meta = null;
@@ -152,6 +152,7 @@ class DungeondraftImportModal extends Modal {
 			});
 		}
 
+		// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- this.buffer is set by handleFileSelected before renderPreview runs
 		const tags = parseDungeondraftTags(this.buffer!, archive);
 		if (tags != null) {
 			const tagCount = Object.keys(tags.tags).length;
@@ -172,13 +173,13 @@ class DungeondraftImportModal extends Modal {
 		this.importBtn.disabled = true;
 		this.importBtn.textContent = 'Importing...';
 		fileInput.disabled = true;
-		previewArea.style.display = 'none';
-		progressArea.style.display = 'block';
+		previewArea.hide();
+		progressArea.show();
 
 		const progressBar = progressArea.createEl('progress', {
 			attr: { max: '100', value: '0' },
-		}) as HTMLProgressElement;
-		progressBar.style.width = '100%';
+		});
+		progressBar.setCssStyles({ width: '100%' });
 		const statusText = progressArea.createEl('p', { text: 'Preparing...' });
 
 		try {
@@ -210,7 +211,7 @@ class DungeondraftImportModal extends Modal {
 
 			new Notice(result.packName + ' imported (' + result.imported + '/' + result.total + ' textures' + (result.failed > 0 ? ', ' + result.failed + ' failed' : '') + ').');
 
-			if (this.importBtn) {
+			if (this.importBtn != null) {
 				this.importBtn.textContent = 'Done';
 				this.importBtn.onclick = () => this.close();
 				this.importBtn.disabled = false;
@@ -223,12 +224,12 @@ class DungeondraftImportModal extends Modal {
 			});
 			console.error('[Windrose] Dungeondraft import failed:', err);
 
-			if (this.importBtn) {
+			if (this.importBtn != null) {
 				this.importBtn.textContent = 'Import';
 				this.importBtn.disabled = false;
 			}
 			fileInput.disabled = false;
-			previewArea.style.display = 'block';
+			previewArea.show();
 		}
 	}
 

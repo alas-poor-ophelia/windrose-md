@@ -82,7 +82,6 @@ async function recordPerfTelemetry(app: App, durationMs = 60000): Promise<void> 
       const r = fn();
       if (r) restorers.push(r);
     } catch (e) {
-      // eslint-disable-next-line no-console
       console.warn(`[Windrose perf] could not instrument ${label}:`, e);
     }
   };
@@ -90,22 +89,25 @@ async function recordPerfTelemetry(app: App, durationMs = 60000): Promise<void> 
   // ---- canvas ops ----
   safeWrap('canvas2d', () => {
     const P = CanvasRenderingContext2D.prototype;
+    /* eslint-disable @typescript-eslint/unbound-method -- captured to rebind via .apply(this); call-site `this` is preserved */
     const orig = {
       fillRect: P.fillRect, drawImage: P.drawImage, getImageData: P.getImageData,
       clearRect: P.clearRect, createPattern: P.createPattern,
     };
-    P.fillRect = function (this: CanvasRenderingContext2D, ...a) { c.fillRect++; return orig.fillRect.apply(this, a as Parameters<typeof orig.fillRect>); };
+    /* eslint-enable @typescript-eslint/unbound-method */
+    P.fillRect = function (this: CanvasRenderingContext2D, ...a) { c.fillRect++; return orig.fillRect.apply(this, a); };
     P.drawImage = function (this: CanvasRenderingContext2D, ...a) { c.drawImage++; return orig.drawImage.apply(this, a as Parameters<typeof orig.drawImage>); } as typeof P.drawImage;
-    P.getImageData = function (this: CanvasRenderingContext2D, ...a) { c.getImageData++; return orig.getImageData.apply(this, a as Parameters<typeof orig.getImageData>); };
-    P.clearRect = function (this: CanvasRenderingContext2D, ...a) { c.clearRect++; return orig.clearRect.apply(this, a as Parameters<typeof orig.clearRect>); };
-    P.createPattern = function (this: CanvasRenderingContext2D, ...a) { c.createPattern++; return orig.createPattern.apply(this, a as Parameters<typeof orig.createPattern>); };
+    P.getImageData = function (this: CanvasRenderingContext2D, ...a) { c.getImageData++; return orig.getImageData.apply(this, a); };
+    P.clearRect = function (this: CanvasRenderingContext2D, ...a) { c.clearRect++; return orig.clearRect.apply(this, a); };
+    P.createPattern = function (this: CanvasRenderingContext2D, ...a) { c.createPattern++; return orig.createPattern.apply(this, a); };
     return () => { Object.assign(P, orig); };
   });
 
   safeWrap('toDataURL', () => {
     const CP = HTMLCanvasElement.prototype;
+    // eslint-disable-next-line @typescript-eslint/unbound-method -- captured to rebind via .apply(this); call-site `this` is preserved
     const orig = CP.toDataURL;
-    CP.toDataURL = function (this: HTMLCanvasElement, ...a) { c.toDataURL++; return orig.apply(this, a as Parameters<typeof orig>); };
+    CP.toDataURL = function (this: HTMLCanvasElement, ...a) { c.toDataURL++; return orig.apply(this, a); };
     return () => { CP.toDataURL = orig; };
   });
 
@@ -123,7 +125,7 @@ async function recordPerfTelemetry(app: App, durationMs = 60000): Promise<void> 
 
   safeWrap('createImageBitmap', () => {
     const orig = window.createImageBitmap?.bind(window);
-    if (!orig) return null;
+    if (orig == null) return null;
     window.createImageBitmap = ((...a: Parameters<typeof createImageBitmap>) => {
       c.imageBitmaps++;
       return orig(...a);
@@ -249,9 +251,9 @@ async function recordPerfTelemetry(app: App, durationMs = 60000): Promise<void> 
     if (gap > 100) {
       frameGaps.push({ t: now(), gapMs: Math.round(gap), sinceInteractionMs: lastInteraction < 0 ? -1 : now() - lastInteraction });
     }
-    rafId = requestAnimationFrame(heartbeat);
+    rafId = window.requestAnimationFrame(heartbeat);
   };
-  rafId = requestAnimationFrame(heartbeat);
+  rafId = window.requestAnimationFrame(heartbeat);
   restorers.push(() => cancelAnimationFrame(rafId));
 
   // ---- per-second sampler ----
@@ -262,7 +264,7 @@ async function recordPerfTelemetry(app: App, durationMs = 60000): Promise<void> 
   restorers.push(() => window.clearInterval(sampler));
 
   // ---- environment snapshot ----
-  const canvases = Array.from(document.querySelectorAll('canvas')).map(cv => ({
+  const canvases = Array.from(activeDocument.querySelectorAll('canvas')).map(cv => ({
     w: cv.width, h: cv.height, mp: +((cv.width * cv.height) / 1e6).toFixed(2),
     cls: cv.className.toString().slice(0, 40),
   }));
@@ -270,6 +272,7 @@ async function recordPerfTelemetry(app: App, durationMs = 60000): Promise<void> 
   const env = {
     when: new Date().toISOString(),
     platform: Platform.isMobile ? (Platform.isTablet ? 'tablet' : 'phone') : 'desktop',
+    // eslint-disable-next-line obsidianmd/platform -- raw UA captured as a diagnostic string, not for platform branching
     ua: navigator.userAgent.slice(0, 160),
     dpr: window.devicePixelRatio,
     screen: { w: window.screen.width, h: window.screen.height },

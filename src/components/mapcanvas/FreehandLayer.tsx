@@ -29,7 +29,7 @@ export interface FreehandLayerProps {
 
 /** Generate a unique curve ID */
 function generateCurveId(): string {
-  return 'curve-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+  return 'curve-' + Date.now() + '-' + Math.random().toString(36).slice(2, 11);
 }
 
 const FreehandLayer = ({
@@ -58,13 +58,9 @@ const FreehandLayer = ({
     const mainCanvas = canvasRef.current;
     if (!mainCanvas || !mainCanvas.parentElement) return null;
 
-    const overlay = document.createElement('canvas');
+    const overlay = activeDocument.createElement('canvas');
     overlay.width = mainCanvas.width;
     overlay.height = mainCanvas.height;
-    overlay.style.position = 'absolute';
-    overlay.style.top = '0';
-    overlay.style.left = '0';
-    overlay.style.pointerEvents = 'none';
     overlay.classList.add('windrose-overlay-layer');
     mainCanvas.parentElement.appendChild(overlay);
     overlayRef.current = overlay;
@@ -98,7 +94,7 @@ const FreehandLayer = ({
     const { width, height } = overlay;
 
     const { offsetX, offsetY } = calculateViewportOffset(
-      geometry || { type: 'hex', cellSize: 1 },
+      geometry ?? { type: 'hex', cellSize: 1 },
       center,
       { width, height },
       zoom
@@ -274,7 +270,7 @@ const FreehandLayer = ({
     });
     registerHandlers('freehand', proxy);
     return () => unregisterHandlers('freehand');
-  }, []);
+  }, [registerHandlers, unregisterHandlers]);
 
   // No visual output — drawing happens on the overlay canvas
   return null;

@@ -14,6 +14,7 @@ import { useEffect, useMemo, useState } from 'preact/hooks';
 import { useApp } from '../../context/AppContext';
 import { getResolvedObjectTypes, getResolvedCategories, hasIconClass, hasImagePath } from '../../objects/objectTypeResolver';
 import { Icon } from '../shared/Icon';
+import { DrawerPaneHead, DrawerSearch, type DrawerViewMode } from './drawerChrome';
 
 interface ObjectSidebarProps {
   selectedObjectType: string | null;
@@ -26,9 +27,20 @@ interface ObjectSidebarProps {
   onObjectSetChange: (id: string | null) => void;
   isFreeformMode?: boolean;
   onFreeformToggle?: () => void;
+  /** Suppress the internal header — block mode hoists a shared compact header above both panes. */
+  hideHeader?: boolean;
+  /** Grid vs list view (per-map, host-owned so it matches the tile pane's toggle). */
+  viewMode?: DrawerViewMode;
+  onViewModeChange?: (mode: DrawerViewMode) => void;
+  /** Collapse the drawer to its edge (header close button). */
+  onCollapse?: () => void;
+  /** The vertical drawer ribbon (Tiles/Objects tabs). Rendered as the left column
+   *  of the body — below the header, level with the objects content — to match the
+   *  tile pane. Omitted in block mode (the compact head hoists the pane switch). */
+  ribbon?: VNode;
 }
 
-const ObjectSidebar = ({ selectedObjectType, onObjectTypeSelect, onToolChange, isCollapsed, onCollapseChange, mapType = 'grid', objectSetId, onObjectSetChange, isFreeformMode = false, onFreeformToggle }: ObjectSidebarProps): VNode => {
+const ObjectSidebar = ({ selectedObjectType, onObjectTypeSelect, onToolChange, isCollapsed, onCollapseChange, mapType = 'grid', objectSetId, onObjectSetChange, isFreeformMode = false, onFreeformToggle, hideHeader = false, viewMode = 'grid', onViewModeChange, onCollapse, ribbon }: ObjectSidebarProps): VNode => {
   const app = useApp();
   const [searchFilter, setSearchFilter] = useState('');
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
@@ -37,10 +49,11 @@ const ObjectSidebar = ({ selectedObjectType, onObjectTypeSelect, onToolChange, i
   const objectSets = useMemo(() => {
     try {
       const plugin = app.plugins.plugins['windrose-md'] as { settings?: { objectSets?: ObjectSet[] } } | undefined;
-      return (plugin && plugin.settings && plugin.settings.objectSets) || [];
+      return (plugin && plugin.settings && plugin.settings.objectSets) ?? [];
     } catch {
       return [];
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-once read of plugin settings; app.plugins.plugins is a stable mutable registry object
   }, []);
 
   // Validate that objectSetId references an existing set; fall back to Default if stale
@@ -98,6 +111,19 @@ const ObjectSidebar = ({ selectedObjectType, onObjectTypeSelect, onToolChange, i
     });
   };
 
+  // The object's visual — image, icon-font glyph, or plain symbol. Shared by the
+  // grid cell and the list row so the two render forms never drift apart.
+  type ObjType = (typeof allObjectTypes)[number];
+  const renderObjectVisual = (objType: ObjType): VNode => {
+    if (hasImagePath(objType)) {
+      return <img src={app.vault.adapter.getResourcePath(objType.imagePath ?? '')} alt={objType.label} className="windrose-object-grid-image" />;
+    }
+    if (hasIconClass(objType)) {
+      return <span className={`ra ${objType.iconClass}`}></span>;
+    }
+    return <span>{objType.symbol ?? '?'}</span>;
+  };
+
   if (isCollapsed) {
     return (
       <div className="windrose-object-sidebar windrose-object-sidebar-collapsed">
@@ -123,16 +149,20 @@ const ObjectSidebar = ({ selectedObjectType, onObjectTypeSelect, onToolChange, i
 
   return (
     <div className="windrose-object-sidebar">
-      <div className="windrose-object-sidebar-header">
-        <span>Objects</span>
-        <button
-          className="windrose-sidebar-collapse-btn interactive-child"
-          onClick={handleToggleCollapse}
-          title="Hide sidebar"
-        >
-          <Icon icon="lucide-panel-left-close" size={14} />
-        </button>
-      </div>
+      {!hideHeader && (
+        <DrawerPaneHead
+          title="Objects"
+          viewMode={viewMode}
+          onViewModeChange={onViewModeChange}
+          actions={
+            onCollapse != null ? (
+              <button className="windrose-tb-iconbtn ghost" title="Collapse to edge" onClick={onCollapse}>
+                <Icon icon="lucide-panel-left-open" size={15} />
+              </button>
+            ) : undefined
+          }
+        />
+      )}
 
       {objectSets.length > 0 && (
         <div className="windrose-object-sidebar-set-selector">
@@ -149,66 +179,67 @@ const ObjectSidebar = ({ selectedObjectType, onObjectTypeSelect, onToolChange, i
         </div>
       )}
 
-      <div className="windrose-object-sidebar-search">
-        <input
-          type="text"
-          placeholder="Filter objects..."
-          value={searchFilter}
-          onInput={(e) => setSearchFilter((e.target as HTMLInputElement).value)}
-          className="windrose-object-sidebar-search-input"
-        />
+      <div className="windrose-tb-filter">
+        <DrawerSearch value={searchFilter} placeholder="Filter objects…" onInput={setSearchFilter} />
       </div>
 
-      <div className="windrose-object-sidebar-content">
-        {objectsByCategory.map(category => (
-          <div key={category.id} className="windrose-object-sidebar-category">
-            <button
-              className="windrose-object-sidebar-category-label"
-              onClick={() => handleToggleCategory(category.id)}
-            >
-              <Icon
-                icon={collapsedCategories.has(category.id) ? 'lucide-chevron-right' : 'lucide-chevron-down'}
-                size={10}
-              />
-              <span>{category.label}</span>
-              <span className="windrose-object-sidebar-category-count">{category.objects.length}</span>
-            </button>
+      <div className="windrose-object-sidebar-body">
+        {ribbon}
+        <div className="windrose-object-sidebar-content">
+        {objectsByCategory.map(category => {
+          const collapsed = collapsedCategories.has(category.id);
+          return (
+            <div key={category.id} className="windrose-object-sidebar-category">
+              {/* Category header — mirrors the tile pane's section labels */}
+              <button
+                className="windrose-tb-seclabel"
+                onClick={() => handleToggleCategory(category.id)}
+                title={category.label}
+              >
+                <Icon icon={collapsed ? 'lucide-chevron-right' : 'lucide-chevron-down'} size={10} />
+                <span className="catname">{category.label}</span>
+                <span className="count">{category.objects.length}</span>
+              </button>
 
-            {!collapsedCategories.has(category.id) && (
-              <div className="windrose-object-sidebar-grid">
-                {category.objects.map(objType => (
-                  <button
-                    key={objType.id}
-                    className={`windrose-object-grid-item ${selectedObjectType === objType.id ? 'windrose-object-grid-item-selected' : ''}`}
-                    onClick={() => handleObjectSelect(objType.id)}
-                    title={objType.label}
-                  >
-                    <div className="windrose-object-grid-symbol">
-                      {hasImagePath(objType) ? (
-                        <img
-                          src={app.vault.adapter.getResourcePath(objType.imagePath ?? '')}
-                          alt={objType.label}
-                          className="windrose-object-grid-image"
-                        />
-                      ) : hasIconClass(objType) ? (
-                        <span className={`ra ${objType.iconClass}`}></span>
-                      ) : (
-                        objType.symbol ?? '?'
-                      )}
-                    </div>
-                    <div className="windrose-object-grid-label">{objType.label}</div>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        ))}
+              {!collapsed && (viewMode === 'list' ? (
+                <div className="windrose-tb-list">
+                  {category.objects.map(objType => (
+                    <button
+                      key={objType.id}
+                      className={`windrose-tb-listrow is-object ${selectedObjectType === objType.id ? 'sel' : ''}`}
+                      onClick={() => handleObjectSelect(objType.id)}
+                      title={objType.label}
+                    >
+                      <div className="lthumb">{renderObjectVisual(objType)}</div>
+                      <div className="lname">{objType.label}</div>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="windrose-object-sidebar-grid">
+                  {category.objects.map(objType => (
+                    <button
+                      key={objType.id}
+                      className={`windrose-object-grid-item ${selectedObjectType === objType.id ? 'windrose-object-grid-item-selected' : ''}`}
+                      onClick={() => handleObjectSelect(objType.id)}
+                      title={objType.label}
+                    >
+                      <div className="windrose-object-grid-symbol">{renderObjectVisual(objType)}</div>
+                      <div className="windrose-object-grid-label">{objType.label}</div>
+                    </button>
+                  ))}
+                </div>
+              ))}
+            </div>
+          );
+        })}
 
         {objectsByCategory.length === 0 && (
           <div className="windrose-object-sidebar-empty">
             {searchFilter != null && searchFilter !== '' ? 'No matching objects' : 'No objects available'}
           </div>
         )}
+        </div>
       </div>
 
       <div className="windrose-object-sidebar-footer">

@@ -4,7 +4,6 @@ import {
   setupErrorTracking,
   navigateToMap,
   waitForContainer,
-  getCanvasCenter,
   waitForToolPalette,
   TEST_MAPS,
 } from "./helpers";

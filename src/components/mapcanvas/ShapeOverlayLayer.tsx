@@ -79,7 +79,7 @@ const ShapeOverlayLayer = ({
     });
     registerHandlers('shapeOverlay', proxy);
     return () => unregisterHandlers('shapeOverlay');
-  }, []);
+  }, [registerHandlers, unregisterHandlers]);
 
   // ESC to cancel placement
   useEffect(() => {
@@ -90,13 +90,13 @@ const ShapeOverlayLayer = ({
         cancelPlacement();
       }
     };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
+    activeDocument.addEventListener('keydown', handler);
+    return () => activeDocument.removeEventListener('keydown', handler);
   }, [isShapeTool, cancelPlacement]);
 
   const distanceSettings = useMemo(() => {
     if (!mapData) return null;
-    const settings = mapData.settings?.overrides || {};
+    const settings = mapData.settings?.overrides ?? {};
     return {
       distancePerCell: (settings.distancePerCell as number) || 5,
       distanceUnit: (settings.distanceUnit as string) || 'ft',
@@ -156,8 +156,8 @@ const ShapeOverlayLayer = ({
       {preview && !preview.corner1 && (
         <ShapePreviewOverlay
           shapeType="shapeCircle"
-          startPoint={preview.circleEdge || preview.center}
-          endPoint={preview.circleCenter || preview.center}
+          startPoint={preview.circleEdge ?? preview.center}
+          endPoint={preview.circleCenter ?? preview.center}
           geometry={geometry}
           mapData={mapData}
           canvasRef={canvasRef}
@@ -231,7 +231,7 @@ const ShapeOverlayLayer = ({
   }
 
   // Selection overlay when a shape is selected
-  if (!isShapeSelected || !selectedItem || selectedItem.type !== 'shapeOverlay' || !mapData || !geometry) return null;
+  if (!isShapeSelected || selectedItem == null || selectedItem.type !== 'shapeOverlay' || !mapData || !geometry) return null;
 
   const shapeActions = buildShapeOverlayActions(selectedItem, {
     onColorClick: handleShapeColorClick,

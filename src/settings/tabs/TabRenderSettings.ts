@@ -22,11 +22,11 @@ export const TabRenderSettingsMethods = {
   renderHexSettingsContent(this: SettingsTabThis, containerEl: HTMLElement): void {
     // Hex Orientation
     new Setting(containerEl)
-      .setName('Hex Grid Orientation')
+      .setName('Hex grid orientation')
       .setDesc('Default orientation for hex grids (flat-top or pointy-top)')
       .addDropdown(dropdown => dropdown
-        .addOption('flat', 'Flat-Top')
-        .addOption('pointy', 'Pointy-Top')
+        .addOption('flat', 'Flat-top')
+        .addOption('pointy', 'Pointy-top')
         .setValue(this.plugin.settings.hexOrientation)
         .onChange(async (value: string) => {
           this.plugin.settings.hexOrientation = value as 'flat' | 'pointy';
@@ -36,10 +36,10 @@ export const TabRenderSettingsMethods = {
 
     // Coordinate Key Mode
     new Setting(containerEl)
-      .setName('Coordinate Overlay Mode')
+      .setName('Coordinate overlay mode')
       .setDesc('How the C key activates coordinate labels: hold to show temporarily, or toggle on/off')
       .addDropdown(dropdown => dropdown
-        .addOption('hold', 'Hold to Show')
+        .addOption('hold', 'Hold to show')
         .addOption('toggle', 'Toggle On/Off')
         .setValue(this.plugin.settings.coordinateKeyMode || 'hold')
         .onChange(async (value: string) => {
@@ -50,7 +50,7 @@ export const TabRenderSettingsMethods = {
 
     // Coordinate Text Color
     new Setting(containerEl)
-      .setName('Coordinate Text Color')
+      .setName('Coordinate text color')
       .setDesc('Primary color for hex coordinate overlay text (hex format: #RRGGBB)')
       .addColorPicker(color => color
         .setValue(this.plugin.settings.coordinateTextColor)
@@ -81,7 +81,7 @@ export const TabRenderSettingsMethods = {
 
     // Coordinate Text Shadow
     new Setting(containerEl)
-      .setName('Coordinate Text Shadow')
+      .setName('Coordinate text shadow')
       .setDesc('Shadow/outline color for hex coordinate overlay text (hex format: #RRGGBB)')
       .addColorPicker(color => color
         .setValue(this.plugin.settings.coordinateTextShadow)
@@ -112,13 +112,13 @@ export const TabRenderSettingsMethods = {
   },
   renderColorSettingsContent(this: SettingsTabThis, containerEl: HTMLElement): void {
     containerEl.createEl('p', {
-      text: 'These settings control default colors and behavior for all WindroseMD maps in this vault.',
+      text: 'These settings control default colors and behavior for all windrosemd maps in this vault.',
       cls: 'setting-item-description'
     });
 
     // Grid Line Color
     new Setting(containerEl)
-      .setName('Grid Line Color')
+      .setName('Grid line color')
       .setDesc('Color for grid lines (hex format: #RRGGBB)')
       .addColorPicker(color => color
         .setValue(this.plugin.settings.gridLineColor)
@@ -149,7 +149,7 @@ export const TabRenderSettingsMethods = {
 
     // Grid Line Width (grid maps only)
     new Setting(containerEl)
-      .setName('Grid Line Width')
+      .setName('Grid line width')
       .setDesc('Thickness of grid lines in pixels (1-5). Applies to grid maps only.')
       .addSlider(slider => slider
         .setLimits(1, 5, 1)
@@ -172,7 +172,7 @@ export const TabRenderSettingsMethods = {
 
     // Background Color
     new Setting(containerEl)
-      .setName('Background Color')
+      .setName('Background color')
       .setDesc('Canvas background color (hex format: #RRGGBB)')
       .addColorPicker(color => color
         .setValue(this.plugin.settings.backgroundColor)
@@ -203,7 +203,7 @@ export const TabRenderSettingsMethods = {
 
     // Border Color
     new Setting(containerEl)
-      .setName('Border Color')
+      .setName('Border color')
       .setDesc('Color for painted cell borders (hex format: #RRGGBB)')
       .addColorPicker(color => color
         .setValue(this.plugin.settings.borderColor)
@@ -234,7 +234,7 @@ export const TabRenderSettingsMethods = {
 
     // Coordinate Key Color
     new Setting(containerEl)
-      .setName('Coordinate Key Color')
+      .setName('Coordinate key color')
       .setDesc('Background color for coordinate key indicator (hex format: #RRGGBB)')
       .addColorPicker(color => color
         .setValue(this.plugin.settings.coordinateKeyColor)
@@ -271,7 +271,7 @@ export const TabRenderSettingsMethods = {
 
     // Soft Edges Toggle
     new Setting(containerEl)
-      .setName('Soft Edges')
+      .setName('Soft edges')
       .setDesc('Enable a blur effect at fog boundaries for a softer, more atmospheric look')
       .addToggle(toggle => toggle
         .setValue(this.plugin.settings.fogOfWarBlurEnabled)
@@ -287,7 +287,7 @@ export const TabRenderSettingsMethods = {
       const blurPercent = Math.round((this.plugin.settings.fogOfWarBlurFactor || 0.20) * 100);
 
       new Setting(containerEl)
-        .setName('Blur Intensity')
+        .setName('Blur intensity')
         .setDesc(`Size of blur effect as percentage of cell size (currently ${blurPercent}%)`)
         .addSlider(slider => slider
           .setLimits(5, 50, 1)
@@ -310,9 +310,9 @@ export const TabRenderSettingsMethods = {
     }
 
     // Installed fog textures
-    const fogPacks = getInstalledPacks(this.plugin as any).filter(p => p.type === 'fog-pack');
+    const fogPacks = getInstalledPacks(this.plugin).filter(p => p.type === 'fog-pack');
     if (fogPacks.length > 0) {
-      containerEl.createEl('div', { text: 'Installed Fog Textures', cls: 'setting-item-heading' });
+      containerEl.createEl('div', { text: 'Installed fog textures', cls: 'setting-item-heading' });
 
       const currentFogImage = this.plugin.settings.fogOfWarImage;
 
@@ -358,7 +358,7 @@ export const TabRenderSettingsMethods = {
       .addButton(btn => btn
         .setButtonText('Browse')
         .onClick(() => {
-          new ContentPackBrowserModal(this.app, this.plugin as any, 'fog-pack', () => {
+          new ContentPackBrowserModal(this.app, this.plugin, 'fog-pack', () => {
             this.settingsChanged = true;
             this.display();
           }).open();
@@ -367,7 +367,7 @@ export const TabRenderSettingsMethods = {
   renderMapBehaviorSettingsContent(this: SettingsTabThis, containerEl: HTMLElement): void {
     // Expanded by Default
     new Setting(containerEl)
-      .setName('Start Maps Expanded')
+      .setName('Start maps expanded')
       .setDesc('When enabled, maps will start in expanded (fullscreen) mode by default')
       .addToggle(toggle => toggle
         .setValue(this.plugin.settings.expandedByDefault)
@@ -379,7 +379,7 @@ export const TabRenderSettingsMethods = {
 
     // Always Show Controls
     new Setting(containerEl)
-      .setName('Always Show Controls')
+      .setName('Always show controls')
       .setDesc('Keep map controls visible at all times instead of auto-hiding')
       .addToggle(toggle => toggle
         .setValue(this.plugin.settings.alwaysShowControls)
@@ -391,7 +391,7 @@ export const TabRenderSettingsMethods = {
 
     // Canvas Height (Desktop)
     new Setting(containerEl)
-      .setName('Canvas Height (Desktop)')
+      .setName('Canvas height (desktop)')
       .setDesc('Default height in pixels for map canvas on desktop devices')
       .addText(text => text
         .setPlaceholder('600')
@@ -422,9 +422,9 @@ export const TabRenderSettingsMethods = {
         }));
 
     // Hover Preview Size
-    const previewScalePercent = Math.round((this.plugin.settings.hoverPreviewScale || 1.0) * 100);
+    const previewScalePercent = Math.round((this.plugin.settings.hoverPreviewScale != null && this.plugin.settings.hoverPreviewScale !== 0 ? this.plugin.settings.hoverPreviewScale : 1.0) * 100);
     new Setting(containerEl)
-      .setName('Link Preview Size')
+      .setName('Link preview size')
       .setDesc(`Scale of the hover preview panel (currently ${previewScalePercent}%)`)
       .addSlider(slider => slider
         .setLimits(50, 200, 10)
@@ -446,10 +446,10 @@ export const TabRenderSettingsMethods = {
         }));
 
     // Hover Preview Zoom
-    const previewZoom = this.plugin.settings.hoverPreviewZoom || 0.5;
+    const previewZoom = this.plugin.settings.hoverPreviewZoom != null && this.plugin.settings.hoverPreviewZoom !== 0 ? this.plugin.settings.hoverPreviewZoom : 0.5;
     const previewZoomPercent = Math.round(previewZoom * 100);
     new Setting(containerEl)
-      .setName('Link Preview Zoom')
+      .setName('Link preview zoom')
       .setDesc(`How zoomed in the preview map appears (currently ${previewZoomPercent}%)`)
       .addSlider(slider => slider
         .setLimits(10, 200, 10)
@@ -473,8 +473,8 @@ export const TabRenderSettingsMethods = {
   renderDistanceMeasurementSettingsContent(this: SettingsTabThis, containerEl: HTMLElement): void {
     // Grid: Distance per cell
     new Setting(containerEl)
-      .setName('Grid Map: Distance per Cell')
-      .setDesc('Distance each cell represents on grid maps (default: 5 ft for D&D)')
+      .setName('Grid map: Distance per cell')
+      .setDesc('Distance each cell represents on grid maps (default: 5 ft for d&d)')
       .addText(text => text
         .setPlaceholder('5')
         .setValue(String(this.plugin.settings.distancePerCellGrid))
@@ -487,11 +487,11 @@ export const TabRenderSettingsMethods = {
           }
         }))
       .addDropdown(dropdown => dropdown
-        .addOption('ft', 'feet')
-        .addOption('m', 'meters')
-        .addOption('mi', 'miles')
-        .addOption('km', 'kilometers')
-        .addOption('yd', 'yards')
+        .addOption('ft', 'Feet')
+        .addOption('m', 'Meters')
+        .addOption('mi', 'Miles')
+        .addOption('km', 'Kilometers')
+        .addOption('yd', 'Yards')
         .setValue(this.plugin.settings.distanceUnitGrid)
         .onChange(async (value: string) => {
           this.plugin.settings.distanceUnitGrid = value;
@@ -501,7 +501,7 @@ export const TabRenderSettingsMethods = {
 
     // Hex: Distance per cell
     new Setting(containerEl)
-      .setName('Hex Map: Distance per Hex')
+      .setName('Hex map: Distance per hex')
       .setDesc('Distance each hex represents on hex maps (default: 6 miles for world maps)')
       .addText(text => text
         .setPlaceholder('6')
@@ -515,11 +515,11 @@ export const TabRenderSettingsMethods = {
           }
         }))
       .addDropdown(dropdown => dropdown
-        .addOption('mi', 'miles')
-        .addOption('km', 'kilometers')
-        .addOption('ft', 'feet')
-        .addOption('m', 'meters')
-        .addOption('yd', 'yards')
+        .addOption('mi', 'Miles')
+        .addOption('km', 'Kilometers')
+        .addOption('ft', 'Feet')
+        .addOption('m', 'Meters')
+        .addOption('yd', 'Yards')
         .setValue(this.plugin.settings.distanceUnitHex)
         .onChange(async (value: string) => {
           this.plugin.settings.distanceUnitHex = value;
@@ -529,12 +529,12 @@ export const TabRenderSettingsMethods = {
 
     // Grid diagonal rule
     new Setting(containerEl)
-      .setName('Grid Diagonal Movement')
+      .setName('Grid diagonal movement')
       .setDesc('How to calculate diagonal distance on grid maps')
       .addDropdown(dropdown => dropdown
-        .addOption('alternating', 'Alternating (5-10-5-10, D&D 5e)')
-        .addOption('equal', 'Equal (Chebyshev, all moves = 1)')
-        .addOption('euclidean', 'True Distance (Euclidean)')
+        .addOption('alternating', 'Alternating (5-10-5-10, d&d 5e)')
+        .addOption('equal', 'Equal (chebyshev, all moves = 1)')
+        .addOption('euclidean', 'True distance (euclidean)')
         .setValue(this.plugin.settings.gridDiagonalRule)
         .onChange(async (value: string) => {
           this.plugin.settings.gridDiagonalRule = value as 'alternating' | 'equal' | 'euclidean';
@@ -544,12 +544,12 @@ export const TabRenderSettingsMethods = {
 
     // Display format
     new Setting(containerEl)
-      .setName('Distance Display Format')
+      .setName('Distance display format')
       .setDesc('How to display measured distances')
       .addDropdown(dropdown => dropdown
-        .addOption('both', 'Cells and Units (e.g., "3 cells (15 ft)")')
-        .addOption('cells', 'Cells Only (e.g., "3 cells")')
-        .addOption('units', 'Units Only (e.g., "15 ft")')
+        .addOption('both', 'Cells and units (e.g., "3 cells (15 ft)")')
+        .addOption('cells', 'Cells only (e.g., "3 cells")')
+        .addOption('units', 'Units only (e.g., "15 ft")')
         .setValue(this.plugin.settings.distanceDisplayFormat)
         .onChange(async (value: string) => {
           this.plugin.settings.distanceDisplayFormat = value as 'cells' | 'units' | 'both';

@@ -85,7 +85,7 @@ function ColorPickerItem({ colorKey, label, defaultColor, align = 'left' }: Colo
 
         <ColorPicker
           isOpen={activeColorPicker === colorKey && !useGlobalSettings}
-          selectedColor={displayColor as HexColor}
+          selectedColor={displayColor}
           onColorSelect={(color: HexColor) => handleColorChange(colorKey, color)}
           onClose={() => setActiveColorPicker(null)}
           onReset={() => handleColorChange(colorKey, globalSettings[colorKey] as HexColor)}
@@ -515,6 +515,7 @@ function InstalledFogPacks({ currentImage, onSelect, disabled }: {
     } catch {
       return [];
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-once content-pack read; app.plugins.plugins is a stable mutable registry object
   }, []);
 
   if (fogPacks.length === 0) return null;

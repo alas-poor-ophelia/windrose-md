@@ -17,7 +17,7 @@
  * cache, so cost is per-edit, not per-frame.
  */
 
-import type { WallPath, WallVertex } from '#types/core/wallpath.types';
+import type { WallPath } from '#types/core/wallpath.types';
 import type { TilesetDef, TileMetadataStore } from '#types/tiles/tile.types';
 
 import { getTileMetadataForRender } from '../../persistence/tileMetadata';

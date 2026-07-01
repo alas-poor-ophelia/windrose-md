@@ -19,6 +19,7 @@ import type { MenuItem } from 'obsidian';
 import { Menu } from 'obsidian';
 import { openNativeNoteLinkModal } from '../modals/NoteLinkModal';
 import { Icon } from '../shared/Icon';
+import type { RegionIdDetail } from '../../core/windroseEvents';
 
 
 
@@ -92,18 +93,18 @@ const RegionLayer = ({
     });
     registerHandlers('region', proxy);
     return () => unregisterHandlers('region');
-  }, []);
+  }, [registerHandlers, unregisterHandlers]);
 
   // Listen for edit-region events from sidebar panel
   useEffect(() => {
-    const handler = (e: CustomEvent): void => {
+    const handler = (e: CustomEvent<RegionIdDetail>): void => {
       const { regionId } = e.detail;
-      if ((regionId as string | undefined) != null && (regionId as string) !== '') {
+      if (regionId !== '') {
         startEditingRegion(regionId);
       }
     };
-    document.addEventListener('windrose:edit-region', handler as EventListener);
-    return () => document.removeEventListener('windrose:edit-region', handler as EventListener);
+    activeDocument.addEventListener('windrose:edit-region', handler);
+    return () => activeDocument.removeEventListener('windrose:edit-region', handler);
   }, [startEditingRegion]);
 
   // Name input state
@@ -120,8 +121,8 @@ const RegionLayer = ({
         setRegionName('');
       }
     };
-    document.addEventListener('windrose:before-undo', handler);
-    return () => document.removeEventListener('windrose:before-undo', handler);
+    activeDocument.addEventListener('windrose:before-undo', handler);
+    return () => activeDocument.removeEventListener('windrose:before-undo', handler);
   }, [pendingHexes.length, editingRegionId, showNameInput, cancelRegion]);
 
   const handleCreateClick = useCallback(() => {
@@ -177,11 +178,7 @@ const RegionLayer = ({
     }
 
     if (!overlayRef.current) {
-      const overlay = document.createElement('canvas');
-      overlay.style.position = 'absolute';
-      overlay.style.top = '0';
-      overlay.style.left = '0';
-      overlay.style.pointerEvents = 'none';
+      const overlay = activeDocument.createElement('canvas');
       overlay.classList.add('windrose-overlay-layer');
       mainCanvas.parentElement.appendChild(overlay);
       overlayRef.current = overlay;
@@ -369,10 +366,10 @@ const RegionLayer = ({
 
     menu.showAtPosition({ x: contextMenu.screenX, y: contextMenu.screenY });
     dismissContextMenu();
-  }, [contextMenu, mapData?.regions]);
+  }, [contextMenu, mapData?.regions, app, deleteRegion, dismissContextMenu, startEditingRegion, updateRegion]);
 
   // ── Long-press touch support for context menu (500ms) ──────────────
-  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressTimerRef = useRef<number | null>(null);
   const longPressPosRef = useRef<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
@@ -384,7 +381,7 @@ const RegionLayer = ({
       const touch = e.touches[0];
       longPressPosRef.current = { x: touch.clientX, y: touch.clientY };
 
-      longPressTimerRef.current = setTimeout(() => {
+      longPressTimerRef.current = window.setTimeout(() => {
         if (!longPressPosRef.current) return;
         const synth = new MouseEvent('contextmenu', {
           clientX: longPressPosRef.current.x,
@@ -409,15 +406,15 @@ const RegionLayer = ({
         const dx = touch.clientX - longPressPosRef.current.x;
         const dy = touch.clientY - longPressPosRef.current.y;
         if (dx * dx + dy * dy > 100) {
-          if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+          if (longPressTimerRef.current != null) window.clearTimeout(longPressTimerRef.current);
           longPressPosRef.current = null;
         }
       }
     };
 
     const handleTouchEnd = (): void => {
-      if (longPressTimerRef.current) {
-        clearTimeout(longPressTimerRef.current);
+      if (longPressTimerRef.current != null) {
+        window.clearTimeout(longPressTimerRef.current);
         longPressTimerRef.current = null;
       }
       longPressPosRef.current = null;
@@ -433,7 +430,7 @@ const RegionLayer = ({
       canvas.removeEventListener('touchmove', handleTouchMove);
       canvas.removeEventListener('touchend', handleTouchEnd);
       canvas.removeEventListener('touchcancel', handleTouchEnd);
-      if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+      if (longPressTimerRef.current != null) window.clearTimeout(longPressTimerRef.current);
     };
   }, [canvasRef, screenToGrid, mapData?.regions, handleContextMenu]);
 
@@ -533,7 +530,7 @@ const RegionLayer = ({
             value={regionName}
             onInput={(e: Event) => setRegionName((e.target as HTMLInputElement).value)}
             onKeyDown={handleNameKeyDown}
-            ref={(el: HTMLInputElement | null) => { if (el) setTimeout(() => el.focus(), 0); }}
+            ref={(el: HTMLInputElement | null) => { if (el) window.setTimeout(() => el.focus(), 0); }}
             className="windrose-floating-bar-input"
             style={{ width: '200px', padding: '6px 10px', fontSize: '14px' }}
           />

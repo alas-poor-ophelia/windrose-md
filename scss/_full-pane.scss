@@ -4,17 +4,67 @@
   height: 100%;
 }
 
+/* Tame Obsidian's default view-content padding (12px sides / 32px bottom via
+   `.workspace-leaf-content .view-content`, specificity 0,2,0): keep a comfortable
+   12px margin around the whole editor so it clears the host's title chrome on all
+   sides, but drop the bloated 32px bottom to match. Specificity + later source
+   order wins the cascade. */
+.workspace-leaf-content .windrose-full-pane.view-content {
+  padding: 12px;
+}
+
 .windrose-full-pane .windrose-container {
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
+  /* The 4px pane padding above provides the breathing gap in full-pane; drop the
+     container's own clamp() padding here so the two don't stack. Embedded block
+     view keeps its padding (rule lives in _layout.scss, unscoped). */
+  padding: 0;
 }
 
 .windrose-full-pane .windrose-full-pane-canvas {
   flex: 1;
   min-height: 0;
   position: relative;
+}
+
+/* Map-name header. Asymmetric vertical padding, deliberately: the container's
+   inset box-shadow stroke sits ~4-5px in from the top edge (container padding is
+   0 in full-pane), so the controls need ~7px top clearance to stay below that
+   thin line; the bottom only needs ~4px to float above the gold divider. Divide
+   it from the stage/canvas with the same gold stroke the sidebars use. */
+.windrose-full-pane .windrose-header {
+  padding-top: 7px;
+  padding-bottom: 4px;
+  margin-bottom: 0;
+  border-bottom: 1.5px solid oklch(from var(--windrose-border-primary) l c h / 0.5);
+}
+
+/* Stage wraps [tool rail | canvas]. Layout-transparent everywhere except
+   full-pane, so block mode keeps its existing top-toolbar column flow. */
+.windrose-stage {
+  display: contents;
+}
+
+/* Full-pane: the tool palette is a full-height ribbon flush against the canvas's
+   left edge — a flex row [ rail | canvas ] sitting below the map header. */
+.windrose-full-pane .windrose-stage {
+  display: flex;
+  flex-direction: row;
+  flex: 1;
+  min-height: 0;
+}
+
+.windrose-full-pane .windrose-toolbar-anchor {
+  flex-shrink: 0;
+  align-self: stretch;
+  z-index: 12;
+}
+
+.windrose-full-pane .windrose-full-pane-canvas {
+  min-width: 0;
 }
 
 /* Compass: no expand button in full-pane, so remove the upward offset */

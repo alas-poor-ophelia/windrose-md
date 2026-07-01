@@ -12,7 +12,7 @@ import type { TileMetadataStore, TileMetadataEntry, TileEntry, TileLayerRole } f
 
 const METADATA_FILE = 'windrose-tile-metadata.json';
 
-let saveTimer: ReturnType<typeof setTimeout> | null = null;
+let saveTimer: number | null = null;
 const SAVE_DEBOUNCE_MS = 2000;
 
 // ===========================================
@@ -61,14 +61,13 @@ async function saveTileMetadata(app: App, metadata: TileMetadataStore): Promise<
       await app.vault.create(METADATA_FILE, json);
     }
   } catch (e) {
-    // eslint-disable-next-line no-console
     console.error('[Windrose] Failed to save tile metadata:', e);
   }
 }
 
 function saveTileMetadataDebounced(app: App, metadata: TileMetadataStore): void {
-  if (saveTimer != null) clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => {
+  if (saveTimer != null) window.clearTimeout(saveTimer);
+  saveTimer = window.setTimeout(() => {
     void saveTileMetadata(app, metadata);
     saveTimer = null;
   }, SAVE_DEBOUNCE_MS);
@@ -118,7 +117,7 @@ function setEntryMetadata(
 
 function toggleStar(metadata: TileMetadataStore, vaultPath: string): TileMetadataStore {
   const existing = metadata[vaultPath] ?? {};
-  return setEntryMetadata(metadata, vaultPath, { starred: !existing.starred });
+  return setEntryMetadata(metadata, vaultPath, { starred: existing.starred !== true });
 }
 
 function addUserTag(metadata: TileMetadataStore, vaultPath: string, tag: string): TileMetadataStore {
@@ -193,7 +192,7 @@ function bulkSetImportTags(
   metadata: TileMetadataStore,
   entries: Array<{ vaultPath: string; tags: string[] }>
 ): TileMetadataStore {
-  let result = { ...metadata };
+  const result = { ...metadata };
   for (const { vaultPath, tags } of entries) {
     const existing = result[vaultPath] ?? {};
     result[vaultPath] = { ...existing, importTags: tags };
@@ -228,7 +227,7 @@ function bulkSetDepthAffinity(
   metadata: TileMetadataStore,
   entries: Array<{ vaultPath: string; depth: TileLayerRole }>
 ): TileMetadataStore {
-  let result = { ...metadata };
+  const result = { ...metadata };
   for (const { vaultPath, depth } of entries) {
     const existing = result[vaultPath] ?? {};
     result[vaultPath] = { ...existing, depthAffinity: depth };
@@ -240,7 +239,7 @@ function bulkSetDdSourceType(
   metadata: TileMetadataStore,
   entries: Array<{ vaultPath: string; sourceType: string }>
 ): TileMetadataStore {
-  let result = { ...metadata };
+  const result = { ...metadata };
   for (const { vaultPath, sourceType } of entries) {
     const existing = result[vaultPath] ?? {};
     result[vaultPath] = { ...existing, ddSourceType: sourceType };
@@ -252,7 +251,7 @@ function bulkSetRenderMode(
   metadata: TileMetadataStore,
   entries: Array<{ vaultPath: string; mode: 'cell' | 'region' }>
 ): TileMetadataStore {
-  let result = { ...metadata };
+  const result = { ...metadata };
   for (const { vaultPath, mode } of entries) {
     const existing = result[vaultPath] ?? {};
     result[vaultPath] = { ...existing, renderMode: mode };
@@ -276,7 +275,7 @@ function bulkSetDetectionSignals(
   metadata: TileMetadataStore,
   entries: Array<{ vaultPath: string; signals: { alphaCoverage: number; opaqueW: number; opaqueH: number; naturalW: number; naturalH: number } }>
 ): TileMetadataStore {
-  let result = { ...metadata };
+  const result = { ...metadata };
   for (const { vaultPath, signals } of entries) {
     const existing = result[vaultPath] ?? {};
     result[vaultPath] = {

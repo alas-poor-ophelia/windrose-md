@@ -50,7 +50,7 @@ const RerollDungeonButton = (): VNode | null => {
   };
 
   const handleRerollAll = (): void => {
-    const result = generateDungeon(settings.preset, undefined, (settings.configOverrides || {}) as Record<string, unknown>);
+    const result = generateDungeon(settings.preset, undefined, (settings.configOverrides ?? {}) as Record<string, unknown>);
     const stockResult = stockDungeon(
       result.metadata.rooms,
       result.metadata.corridorResult,
@@ -87,14 +87,14 @@ const RerollDungeonButton = (): VNode | null => {
 
     // Get current objects and filter to keep only structural ones
     const layer = mapData?.layers?.find(l => l.id === mapData.activeLayerId);
-    const currentObjects = layer?.objects || [];
+    const currentObjects = layer?.objects ?? [];
     const structuralObjects = currentObjects.filter(obj => STRUCTURAL_TYPES.has(obj.type));
 
     const stairPositions = structuralObjects
       .filter(obj => obj.type === 'stairs-up' || obj.type === 'stairs-down')
       .map(obj => ({ x: obj.position.x, y: obj.position.y }));
 
-    const occupiedPositions = [...(meta.doorPositions || []), ...stairPositions];
+    const occupiedPositions = [...(meta.doorPositions ?? []), ...stairPositions];
 
     // Generate new stocking objects using saved metadata
     const stockResult = stockDungeon(

@@ -9,7 +9,7 @@ import { DungeondraftImportModal } from '../../content-packs/DungeondraftImportM
 export const TabRenderTilesetsMethods = {
   renderTilesetFoldersContent(this: SettingsTabThis, containerEl: HTMLElement): void {
     const s = this.plugin.settings;
-    const folders = s.tilesetFolders || [];
+    const folders = s.tilesetFolders ?? [];
 
     containerEl.createEl('p', {
       text: 'Configure vault folders containing hex tile images. Each folder becomes a tileset available to all hex maps. Subfolders are used as tile categories.',
@@ -27,7 +27,7 @@ export const TabRenderTilesetsMethods = {
             .setPlaceholder('e.g. Assets/Tiles/Baumgart')
             .setValue(folderPath)
             .onChange(async (value: string) => {
-              const updated = [...(s.tilesetFolders || [])];
+              const updated = [...(s.tilesetFolders ?? [])];
               updated[i] = value.trim();
               s.tilesetFolders = updated;
               this.settingsChanged = true;
@@ -38,7 +38,7 @@ export const TabRenderTilesetsMethods = {
           .setIcon('trash-2')
           .setTooltip('Remove folder')
           .onClick(async () => {
-            const updated = [...(s.tilesetFolders || [])];
+            const updated = [...(s.tilesetFolders ?? [])];
             updated.splice(i, 1);
             s.tilesetFolders = updated;
             this.settingsChanged = true;
@@ -49,12 +49,12 @@ export const TabRenderTilesetsMethods = {
 
     // Add folder button
     new Setting(containerEl)
-      .setName('Add Tile Folder')
+      .setName('Add tile folder')
       .setDesc('Add a vault folder to scan for tile images')
       .addButton(btn => btn
-        .setButtonText('Add Folder')
+        .setButtonText('Add folder')
         .onClick(async () => {
-          const updated = [...(s.tilesetFolders || []), ''];
+          const updated = [...(s.tilesetFolders ?? []), ''];
           s.tilesetFolders = updated;
           this.settingsChanged = true;
           await this.plugin.saveSettings();
@@ -63,10 +63,10 @@ export const TabRenderTilesetsMethods = {
 
     // Import Dungeondraft pack
     new Setting(containerEl)
-      .setName('Import Dungeondraft Pack')
+      .setName('Import Dungeondraft pack')
       .setDesc('Import a .dungeondraft_pack file as a tileset')
       .addButton(btn => btn
-        .setButtonText('Import Pack')
+        .setButtonText('Import pack')
         .onClick(() => {
           const pluginLike = { app: this.app, settings: this.plugin.settings, saveSettings: () => this.plugin.saveSettings() };
           new DungeondraftImportModal(this.app, pluginLike, () => {
@@ -81,7 +81,7 @@ export const TabRenderTilesetsMethods = {
         .setName('Preview')
         .setDesc('Check what tiles would be loaded from configured folders')
         .addButton(btn => btn
-          .setButtonText('Scan Folders')
+          .setButtonText('Scan folders')
           .onClick(() => {
             let totalTiles = 0;
             const results: string[] = [];

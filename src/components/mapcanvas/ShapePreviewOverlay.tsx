@@ -31,7 +31,10 @@ type ShapeType = 'rectangle' | 'circle' | 'clearArea' | 'edgeLine';
 /** Props for ShapePreviewOverlay component */
 export interface ShapePreviewOverlayProps {
   /** Shape type to preview */
-  shapeType: ShapeType | string | null;
+  // Callers pass values beyond ShapeType (e.g. 'areaSelect', 'shapeSquare', or a
+  // raw string from DrawingLayer); `string & {}` keeps literal hints without
+  // collapsing to bare string.
+  shapeType: ShapeType | (string & {}) | null;
   /** Starting point */
   startPoint: Point | null;
   /** End/hover point */

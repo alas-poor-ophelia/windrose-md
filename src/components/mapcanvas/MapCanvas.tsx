@@ -17,6 +17,7 @@ import type {
 import type { ResolvedTheme } from '#types/settings/settings.types';
 import type { ExtendedGeometry, MapStateContextValue, MapOperationsContextValue } from '#types/contexts/context.types';
 import type { AdjacentSubHexRenderData } from '#types/hooks/canvasRenderer.types';
+import type { TileAssignment } from '#types/tiles/tile.types';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { useCanvasRenderer, renderCanvas } from '../../hooks/canvas/useCanvasRenderer';
@@ -121,7 +122,7 @@ interface MapCanvasContentProps {
   onObjectsChange: (objects: MapObject[]) => void;
   onTextLabelsChange: (labels: TextLabel[]) => void;
   onEdgesChange: (edges: Edge[], skipHistory?: boolean) => void;
-  onTilesChange?: (tiles: import('#types/tiles/tile.types').TileAssignment[]) => void;
+  onTilesChange?: (tiles: TileAssignment[]) => void;
   tileImagesReady?: boolean;
   hiddenTileLayers?: Set<string>;
   adjacentSubHexes?: AdjacentSubHexRenderData[] | null;
@@ -188,7 +189,6 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
     width: DEFAULTS.canvasSize.width,
     height: DEFAULTS.canvasSize.height
   });
-
   // Create onMapDataUpdate wrapper for map-level changes
   // This bridges the old prop-based API with the new context-based approach
   const onMapDataUpdate = useCallback((updates: MapDataUpdate) => {
@@ -246,6 +246,7 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
       const gridSize = mapData.gridSize ?? DEFAULTS.gridSize;
       return new GridGeometry(gridSize);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional fine-grained deps: geometry rebuilds only on shape-param change, not every cell paint
   }, [mapData?.mapType, mapData?.gridSize, mapData?.hexSize, mapData?.orientation, mapData?.hexBounds]);
 
   // Use canvas interaction ONLY for coordinate utility functions
@@ -285,7 +286,7 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
     if (!container) return;
 
     // Wait one more frame to ensure CSS transition is fully complete
-    requestAnimationFrame(() => {
+    window.requestAnimationFrame(() => {
       const rect = container.getBoundingClientRect();
       setCanvasDimensions({
         width: Math.max(rect.width, DEFAULTS.canvasSize.width),
@@ -307,7 +308,7 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
     // During animation, preserve canvas content
     if (isAnimating) {
       // Save current canvas content
-      const tempCanvas = document.createElement('canvas');
+      const tempCanvas = activeDocument.createElement('canvas');
       tempCanvas.width = canvas.width;
       tempCanvas.height = canvas.height;
       const tempCtx = tempCanvas.getContext('2d');
@@ -334,6 +335,7 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
       // After animation, do a proper redraw with correct dimensions
       renderCanvas(canvas, fogCanvas, mapData, geometry, selectedItem ?? undefined, { isResizeMode, theme, showCoordinates, layerVisibility, adjacentSubHexes, hiddenTileLayers });
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- supplemental resize-only redraw; useCanvasRenderer owns normal re-renders; adding mapData/geometry double-renders every edit
   }, [canvasDimensions.width, canvasDimensions.height, isAnimating, showCoordinates, layerVisibility, adjacentSubHexes]);
 
   // 'C' key handler for coordinate overlay (hex maps only)
@@ -379,7 +381,7 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [isFocused, mapData?.mapType]);
+  }, [isFocused, mapData?.mapType, setShowCoordinates]);
 
   // Determine cursor class based on current tool and interaction state
   const getCursorClass = (): string => {

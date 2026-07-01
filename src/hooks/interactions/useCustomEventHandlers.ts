@@ -18,6 +18,13 @@ import type { MapObject, ObjectLink } from '#types/objects/object.types';
 import { useEffect } from 'preact/hooks';
 import { useApp } from '../../context/AppContext';
 import { consumePendingNavigate } from '../../persistence/deepLinkHandler';
+import type { NavigationEventDetail } from '../../persistence/deepLinkHandler';
+import type {
+  SubHexCoordDetail,
+  RegionIdDetail,
+  CreateObjectLinkDetail,
+  RemoveObjectLinkDetail
+} from '../../core/windroseEvents';
 import { useHexContextMenu } from './useHexContextMenu';
 
 interface UseCustomEventHandlersOptions {
@@ -55,44 +62,44 @@ function useCustomEventHandlers({
       if (e.key === 'Escape') {
         const target = e.target as HTMLElement;
         if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
-        if (document.querySelector('.modal-container')) return;
+        if (activeDocument.querySelector('.modal-container')) return;
         e.preventDefault();
         e.stopPropagation();
         exitSubHex();
       }
     };
 
-    document.addEventListener('keydown', handleEscape, true);
-    return () => document.removeEventListener('keydown', handleEscape, true);
+    activeDocument.addEventListener('keydown', handleEscape, true);
+    return () => activeDocument.removeEventListener('keydown', handleEscape, true);
   }, [isInSubHex, exitSubHex]);
 
   // Listen for sub-hex entry events from double-click on hex
   useEffect(() => {
-    const handleEnterSubHex = (event: CustomEvent): void => {
+    const handleEnterSubHex = (event: CustomEvent<SubHexCoordDetail>): void => {
       const { q, r } = event.detail;
       if (mapData?.mapType === 'hex') {
         enterSubHex(q, r);
       }
     };
 
-    document.addEventListener('windrose:enter-sub-hex', handleEnterSubHex as EventListener);
-    return () => document.removeEventListener('windrose:enter-sub-hex', handleEnterSubHex as EventListener);
+    activeDocument.addEventListener('windrose:enter-sub-hex', handleEnterSubHex);
+    return () => activeDocument.removeEventListener('windrose:enter-sub-hex', handleEnterSubHex);
   }, [mapData?.mapType, enterSubHex]);
 
   // Listen for sibling sub-hex navigation (click on adjacent preview)
   useEffect(() => {
     if (!navigateToSibling || !isInSubHex) return undefined;
-    const handleNavigateSibling = (event: CustomEvent): void => {
+    const handleNavigateSibling = (event: CustomEvent<SubHexCoordDetail>): void => {
       const { q, r } = event.detail;
       navigateToSibling(q, r);
     };
-    document.addEventListener('windrose:navigate-sibling-sub-hex', handleNavigateSibling as EventListener);
-    return () => document.removeEventListener('windrose:navigate-sibling-sub-hex', handleNavigateSibling as EventListener);
+    activeDocument.addEventListener('windrose:navigate-sibling-sub-hex', handleNavigateSibling);
+    return () => activeDocument.removeEventListener('windrose:navigate-sibling-sub-hex', handleNavigateSibling);
   }, [isInSubHex, navigateToSibling]);
 
   // Deep link navigation — also consumes stashed navigation from cross-note openLinkText
   useEffect(() => {
-    const handleNavigateTo = (event: CustomEvent): void => {
+    const handleNavigateTo = (event: CustomEvent<NavigationEventDetail>): void => {
       const { mapId: targetMapId, x, y, zoom, layerId } = event.detail;
 
       if (targetMapId !== mapId) return;
@@ -132,7 +139,7 @@ function useCustomEventHandlers({
       new Notice(`Navigated to location on ${mapData?.name ?? 'map'}`);
     };
 
-    window.addEventListener('windrose-navigate-to', handleNavigateTo as EventListener);
+    window.addEventListener('windrose-navigate-to', handleNavigateTo);
 
     const pending = consumePendingNavigate(mapId);
     if (pending) {
@@ -140,13 +147,13 @@ function useCustomEventHandlers({
     }
 
     return () => {
-      window.removeEventListener('windrose-navigate-to', handleNavigateTo as EventListener);
+      window.removeEventListener('windrose-navigate-to', handleNavigateTo);
     };
   }, [mapId, mapData, geometry, updateMapData, handleLayerSelect]);
 
   // Center-on-region events from region panel
   useEffect(() => {
-    const handleCenterOnRegion = (event: CustomEvent): void => {
+    const handleCenterOnRegion = (event: CustomEvent<RegionIdDetail>): void => {
       const { regionId } = event.detail;
       if (!mapData || !geometry || geometry.type !== 'hex') return;
 
@@ -172,8 +179,8 @@ function useCustomEventHandlers({
       }));
     };
 
-    document.addEventListener('windrose:center-on-region', handleCenterOnRegion as EventListener);
-    return () => document.removeEventListener('windrose:center-on-region', handleCenterOnRegion as EventListener);
+    activeDocument.addEventListener('windrose:center-on-region', handleCenterOnRegion);
+    return () => activeDocument.removeEventListener('windrose:center-on-region', handleCenterOnRegion);
   }, [mapData, geometry, updateMapData]);
 
   // Cross-layer object link events
@@ -203,7 +210,7 @@ function useCustomEventHandlers({
       }));
     };
 
-    const handleCreateObjectLink = (event: CustomEvent): void => {
+    const handleCreateObjectLink = (event: CustomEvent<CreateObjectLinkDetail>): void => {
       const { sourceLayerId, sourceObjectId, sourceLink, targetLayerId, targetObjectId, targetLink } = event.detail;
       updateObjectLinksAcrossLayers([
         { layerId: sourceLayerId, objectId: sourceObjectId, link: sourceLink },
@@ -211,7 +218,7 @@ function useCustomEventHandlers({
       ]);
     };
 
-    const handleRemoveObjectLink = (event: CustomEvent): void => {
+    const handleRemoveObjectLink = (event: CustomEvent<RemoveObjectLinkDetail>): void => {
       const { sourceLayerId, sourceObjectId, targetLayerId, targetObjectId } = event.detail;
       updateObjectLinksAcrossLayers([
         { layerId: sourceLayerId, objectId: sourceObjectId },
@@ -219,12 +226,12 @@ function useCustomEventHandlers({
       ]);
     };
 
-    window.addEventListener('windrose-create-object-link', handleCreateObjectLink as EventListener);
-    window.addEventListener('windrose-remove-object-link', handleRemoveObjectLink as EventListener);
+    window.addEventListener('windrose-create-object-link', handleCreateObjectLink);
+    window.addEventListener('windrose-remove-object-link', handleRemoveObjectLink);
 
     return () => {
-      window.removeEventListener('windrose-create-object-link', handleCreateObjectLink as EventListener);
-      window.removeEventListener('windrose-remove-object-link', handleRemoveObjectLink as EventListener);
+      window.removeEventListener('windrose-create-object-link', handleCreateObjectLink);
+      window.removeEventListener('windrose-remove-object-link', handleRemoveObjectLink);
     };
   }, [updateMapData]);
 

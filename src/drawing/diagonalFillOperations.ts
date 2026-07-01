@@ -123,7 +123,7 @@ function cellIsEmpty(cellMap: CellMap, x: number, y: number): boolean {
  */
 function getCell(cellMap: CellMap, x: number, y: number): Cell | null {
   const key = `${x},${y}`;
-  return cellMap.get(key) || null;
+  return cellMap.get(key) ?? null;
 }
 
 // ===========================================

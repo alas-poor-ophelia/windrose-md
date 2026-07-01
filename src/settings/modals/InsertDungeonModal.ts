@@ -155,8 +155,8 @@ async function stockGeneratedDungeon(plugin: WindrosePlugin, result: DungeonGene
       exitRoomId: result.metadata.exitRoomId,
       waterRoomIds: result.metadata.waterRoomIds
     }
-  );
-  return stockResult as StockResult;
+  ) as StockResult;
+  return stockResult;
 }
 
 class InsertDungeonModal extends Modal {
@@ -210,9 +210,9 @@ class InsertDungeonModal extends Modal {
   }
 
   getVisualizerSettings(): VisualizerSettings {
-    const base = DUNGEON_STYLE_DEFAULTS[this.dungeonStyle] || DUNGEON_STYLE_DEFAULTS.classic;
+    const base = DUNGEON_STYLE_DEFAULTS[this.dungeonStyle] ?? DUNGEON_STYLE_DEFAULTS.classic;
 
-    const settings: VisualizerSettings = { ...base, size: this.dungeonSize || 'medium' };
+    const settings: VisualizerSettings = { ...base, size: this.dungeonSize ?? 'medium' };
     if (this.configOverrides.circleChance !== null) settings.circleChance = this.configOverrides.circleChance;
     if (this.configOverrides.loopChance !== null) settings.loopChance = this.configOverrides.loopChance;
     if (this.configOverrides.corridorStyle !== null) settings.corridorStyle = this.configOverrides.corridorStyle as CorridorStyle;
@@ -227,7 +227,7 @@ class InsertDungeonModal extends Modal {
   }
 
   syncSlidersToStyle(): void {
-    const defaults = DUNGEON_STYLE_DEFAULTS[this.dungeonStyle] || DUNGEON_STYLE_DEFAULTS.classic;
+    const defaults = DUNGEON_STYLE_DEFAULTS[this.dungeonStyle] ?? DUNGEON_STYLE_DEFAULTS.classic;
 
     for (const [key, ref] of Object.entries(this.sliderRefs)) {
       const defaultVal = defaults[key as keyof DungeonStyleDefaults];
@@ -257,7 +257,7 @@ class InsertDungeonModal extends Modal {
     const visualizerContainer = headerContainer.createDiv({ cls: 'windrose-dungeon-visualizer' });
 
     const titleOverlay = headerContainer.createDiv({ cls: 'windrose-dungeon-title-overlay' });
-    titleOverlay.createEl('h2', { text: 'Generate Random Dungeon' });
+    titleOverlay.createEl('h2', { text: 'Generate random dungeon' });
 
     this.visualizer = new DungeonEssenceVisualizer(visualizerContainer, {
       height: 180,
@@ -271,11 +271,11 @@ class InsertDungeonModal extends Modal {
       .addText(text => {
         this.nameInput = text;
         text
-          .setPlaceholder('e.g., Goblin Cave Level 1')
+          .setPlaceholder('E.g., goblin cave level 1')
           .onChange((value: string) => {
             this.mapName = value;
           });
-        setTimeout(() => text.inputEl.focus(), 10);
+        window.setTimeout(() => text.inputEl.focus(), 10);
       });
 
     const styleContainer = contentEl.createDiv({ cls: 'windrose-dungeon-style-selection' });
@@ -366,7 +366,7 @@ class InsertDungeonModal extends Modal {
       this.distancePerCell = parseInt((e.target as HTMLInputElement).value) || 5;
     });
 
-    distRow.createEl('span', { text: 'per cell, unit:' });
+    distRow.createEl('span', { text: 'Per cell, unit:' });
 
     const unitInput = distRow.createEl('input', {
       type: 'text',
@@ -383,15 +383,15 @@ class InsertDungeonModal extends Modal {
     advancedHeader.createSpan({ text: 'Advanced Options' });
 
     const advancedContent = advancedContainer.createDiv({ cls: 'windrose-dungeon-advanced-content' });
-    advancedContent.style.display = 'none';
+    advancedContent.hide();
 
     advancedHeader.onclick = () => {
       this.advancedOpen = !this.advancedOpen;
-      advancedContent.style.display = this.advancedOpen ? 'block' : 'none';
+      advancedContent.toggle(this.advancedOpen);
       chevron.textContent = this.advancedOpen ? '▼' : '▶';
     };
 
-    const createSlider = (container: HTMLElement, label: string, key: string, min: number, max: number, step: number, defaultVal: number, formatFn: (v: number) => string) => {
+    const createSlider = (container: HTMLElement, label: string, key: string, min: number, max: number, step: number, defaultVal: number, formatFn: (v: number) => string): { slider: HTMLInputElement; valueDisplay: HTMLSpanElement } => {
       const row = container.createDiv({ cls: 'windrose-dungeon-slider-row' });
       row.createEl('label', { text: label });
 
@@ -434,7 +434,7 @@ class InsertDungeonModal extends Modal {
     createSlider(advancedContent, 'Room Size Bias', 'roomSizeBias', -1, 1, 0.1, 0, biasLabel);
 
     const corridorRow = advancedContent.createDiv({ cls: 'windrose-dungeon-slider-row' });
-    corridorRow.createEl('label', { text: 'Corridor Style' });
+    corridorRow.createEl('label', { text: 'Corridor style' });
     const corridorToggleContainer = corridorRow.createDiv({ cls: 'windrose-dungeon-toggle-container' });
 
     const corridorSelect = corridorToggleContainer.createEl('select', { cls: 'windrose-dungeon-select' });
@@ -457,13 +457,13 @@ class InsertDungeonModal extends Modal {
     const waterLabel = (v: number): string => v === 0 ? 'None' : `${Math.round(v * 100)}%`;
     createSlider(advancedContent, 'Water Features', 'waterChance', 0, 0.5, 0.05, 0.15, waterLabel);
 
-    advancedContent.createEl('div', { cls: 'windrose-dungeon-section-header', text: 'Object Placement' });
+    advancedContent.createEl('div', { cls: 'windrose-dungeon-section-header', text: 'Object placement' });
 
     const densityLabel = (v: number): string => v < 0.75 ? 'Sparse' : v > 1.25 ? 'Dense' : 'Normal';
     createSlider(advancedContent, 'Object Density', 'objectDensity', 0.5, 2, 0.1, 1.0, densityLabel);
 
     const templateRow = advancedContent.createDiv({ cls: 'windrose-dungeon-slider-row' });
-    templateRow.createEl('label', { text: 'Room Templates' });
+    templateRow.createEl('label', { text: 'Room templates' });
     const templateToggleContainer = templateRow.createDiv({ cls: 'windrose-dungeon-toggle-container' });
     const templateCheckbox = templateToggleContainer.createEl('input', {
       type: 'checkbox',
@@ -483,16 +483,16 @@ class InsertDungeonModal extends Modal {
       text: 'Generates themed rooms (library, shrine, barracks) with appropriate objects'
     });
 
-    advancedContent.createEl('div', { cls: 'windrose-dungeon-subsection', text: 'Room Categories' });
+    advancedContent.createEl('div', { cls: 'windrose-dungeon-subsection', text: 'Room categories' });
     createSlider(advancedContent, 'Monsters', 'monsterWeight', 0, 1, 0.05, 0.33, pct);
     createSlider(advancedContent, 'Empty Rooms', 'emptyWeight', 0, 1, 0.05, 0.33, pct);
     createSlider(advancedContent, 'Features', 'featureWeight', 0, 1, 0.05, 0.17, pct);
     createSlider(advancedContent, 'Traps', 'trapWeight', 0, 1, 0.05, 0.17, pct);
 
-    advancedContent.createEl('div', { cls: 'windrose-dungeon-section-header', text: 'Solo Play' });
+    advancedContent.createEl('div', { cls: 'windrose-dungeon-section-header', text: 'Solo play' });
 
     const fogRow = advancedContent.createDiv({ cls: 'windrose-dungeon-slider-row' });
-    fogRow.createEl('label', { text: 'Auto-Fog Dungeon' });
+    fogRow.createEl('label', { text: 'Auto-fog dungeon' });
     const fogToggleContainer = fogRow.createDiv({ cls: 'windrose-dungeon-toggle-container' });
     const fogCheckbox = fogToggleContainer.createEl('input', {
       type: 'checkbox',
@@ -521,7 +521,7 @@ class InsertDungeonModal extends Modal {
     generateBtn.onclick = async () => {
       if (!this.dungeonSize) {
         buttonRow.addClass('windrose-shake');
-        setTimeout(() => buttonRow.removeClass('windrose-shake'), 300);
+        window.setTimeout(() => buttonRow.removeClass('windrose-shake'), 300);
         return;
       }
 
@@ -537,7 +537,7 @@ class InsertDungeonModal extends Modal {
         const stockResult = await stockGeneratedDungeon(this.plugin, result, overrides);
         const allObjects = [...result.objects, ...stockResult.objects];
 
-        await this.onInsert(this.mapName, result.cells, allObjects, result.edges || [], {
+        await this.onInsert(this.mapName, result.cells, allObjects, result.edges ?? [], {
           distancePerCell: this.distancePerCell,
           distanceUnit: this.distanceUnit,
           preset: this.dungeonSize,
@@ -561,7 +561,7 @@ class InsertDungeonModal extends Modal {
       }
     };
 
-    contentEl.addEventListener('keydown', async (e: KeyboardEvent) => {
+    contentEl.addEventListener('keydown', (e: KeyboardEvent) => { void (async () => {
       if (e.key === 'Enter' && this.dungeonSize) {
         e.preventDefault();
         try {
@@ -576,7 +576,7 @@ class InsertDungeonModal extends Modal {
           const stockResult = await stockGeneratedDungeon(this.plugin, result, overrides);
           const allObjects = [...result.objects, ...stockResult.objects];
 
-          await this.onInsert(this.mapName, result.cells, allObjects, result.edges || [], {
+          await this.onInsert(this.mapName, result.cells, allObjects, result.edges ?? [], {
             distancePerCell: this.distancePerCell,
             distanceUnit: this.distanceUnit,
             preset: this.dungeonSize,
@@ -599,7 +599,7 @@ class InsertDungeonModal extends Modal {
           new Notice('Failed to generate dungeon: ' + (err as Error).message);
         }
       }
-    });
+    })(); });
   }
 
   onClose(): void {

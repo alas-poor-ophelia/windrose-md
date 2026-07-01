@@ -7,6 +7,7 @@
  */
 
 import type { TileAssignment, TilesetDef, FolderTileset, TileMetadataStore } from '#types/tiles/tile.types';
+import type { HexOrientation } from '#types/settings/settings.types';
 
 import { axialToOffset } from '../core/offsetCoordinates';
 import { resolveTileRender } from '../../assets/tileRenderResolution';
@@ -56,7 +57,7 @@ const DEFAULT_WORLD_REPEAT = 4;
 let _featherCanvas: HTMLCanvasElement | null = null;
 function getFeatherCanvas(w: number, h: number): HTMLCanvasElement | null {
   if (typeof document === 'undefined') return null;
-  if (_featherCanvas == null) _featherCanvas = document.createElement('canvas');
+  _featherCanvas ??= activeDocument.createElement('canvas');
   if (_featherCanvas.width !== w) _featherCanvas.width = w;
   if (_featherCanvas.height !== h) _featherCanvas.height = h;
   return _featherCanvas;
@@ -250,7 +251,7 @@ function sortTilesForRendering(
   const offsets = new Map<TileAssignment, { col: number; row: number }>();
   for (const t of tiles) {
     offsets.set(t, isHex
-      ? axialToOffset(t.col, t.row, orientation as import('#types/settings/settings.types').HexOrientation)
+      ? axialToOffset(t.col, t.row, orientation as HexOrientation)
       : { col: t.col, row: t.row }
     );
   }
@@ -305,7 +306,7 @@ function calculateTileDrawRect(
   const scaleX = hexScreenWidth / tileset.tileWidth;
   const scaleY = hexScreenHeight / hexHeight;
 
-  const effectiveFit = fitMode || tileset.fitMode || 'fill';
+  const effectiveFit = fitMode ?? tileset.fitMode ?? 'fill';
 
   if (effectiveFit === 'contain') {
     // Uniform scaling: preserve aspect ratio, fit within hex bounding box
@@ -432,6 +433,7 @@ function renderTiles(
         const resolved = resolveTileRender(t, metaStore[lookup.entry.vaultPath], lookup.tileset);
         if (resolved.renderMode === 'region') {
           const key = t.tilesetId + ':' + t.tileId;
+          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- regionByDepth is pre-seeded for every DEPTH_ORDER key including 'ground'
           const groups = regionByDepth.get(depth) ?? regionByDepth.get('ground')!;
           let grp = groups.get(key);
           if (grp == null) {
@@ -450,6 +452,7 @@ function renderTiles(
       }
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- depthBuckets is pre-seeded for every DEPTH_ORDER key including 'ground'
     const bucket = depthBuckets.get(depth) ?? depthBuckets.get('ground')!;
     if (t.freeform === true) bucket.freeform.push(t);
     else if (t.placement === 'overlay') bucket.overlay.push(t);
@@ -542,7 +545,7 @@ function renderTiles(
       }
     }
 
-    let rect = drawOverride || calculateTileDrawRect(
+    let rect = drawOverride ?? calculateTileDrawRect(
       centerX, centerY,
       tileset, geometry.hexSize, viewState.zoom, geometry.orientation,
       tile.fitMode, spanW, spanH
@@ -597,6 +600,7 @@ function renderTiles(
     if (regionGroups != null && regionGroups.size > 0) {
       renderRegionFills(ctx, regionGroups, geometry, viewState, getCachedImage, previousAlpha * opacity, canvasW, canvasH);
     }
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- d iterates DEPTH_ORDER, which was used to seed depthBuckets
     const bucket = depthBuckets.get(d)!;
     if (bucket.fill.length > 0) {
       for (const tile of sortTilesForRendering(bucket.fill, geometry.orientation)) drawCellTile(tile);

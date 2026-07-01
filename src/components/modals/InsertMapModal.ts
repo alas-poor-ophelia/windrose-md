@@ -66,7 +66,7 @@ export class InsertMapModal extends Modal {
           .setPlaceholder('E.g., goblin cave level 1')
           .onChange(value => { this.mapName = value; });
         if (!hasExisting) {
-          setTimeout(() => text.inputEl.focus(), 10);
+          window.setTimeout(() => text.inputEl.focus(), 10);
         }
       });
 
@@ -113,7 +113,7 @@ export class InsertMapModal extends Modal {
   }
 
   private generateMapId(): string {
-    return 'map-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+    return 'map-' + Date.now() + '-' + Math.random().toString(36).slice(2, 11);
   }
 
   private submitNew(): void {

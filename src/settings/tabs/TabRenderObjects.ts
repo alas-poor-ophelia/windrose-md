@@ -15,10 +15,7 @@ import { ConfirmModal } from '../modals/ConfirmModal';
 import { PromptModal } from '../modals/PromptModal';
 import { ContentPackBrowserModal } from '../../content-packs/ContentPackBrowserModal';
 import type { SettingsTabThis } from './settingsTabContext';
-import type { ObjectOverride, CustomObject, CustomCategory, ObjectSet } from '#types/settings/settings.types';
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type PluginAny = any;
+import type { CustomObject, CustomCategory, ObjectSet } from '#types/settings/settings.types';
 
 /**
  * Extended this-type that includes the actual method signatures used internally.
@@ -86,11 +83,11 @@ export const TabRenderObjectsMethods = {
 
     // Map Type selector dropdown
     new Setting(containerEl)
-      .setName('Map Type')
+      .setName('Map type')
       .setDesc('Select which map type to configure objects for')
       .addDropdown(dropdown => dropdown
-        .addOption('grid', 'Grid Maps')
-        .addOption('hex', 'Hex Maps')
+        .addOption('grid', 'Grid maps')
+        .addOption('hex', 'Hex maps')
         .setValue(this.selectedMapType)
         .onChange((value: string) => {
           this.selectedMapType = value as 'grid' | 'hex';
@@ -102,29 +99,29 @@ export const TabRenderObjectsMethods = {
 
     // Add Custom Object button
     new Setting(containerEl)
-      .setName('Add Custom Object')
+      .setName('Add custom object')
       .setDesc('Create a new map object with your own symbol')
       .addButton(btn => btn
         .setButtonText('+ Add Object')
         .setCta()
         .onClick(() => {
-          new ObjectEditModal(this.app, this.plugin as PluginAny, null, async () => {
+          new ObjectEditModal(this.app, this.plugin, null, () => {
             this.settingsChanged = true;
-            await this.plugin.saveSettings();
+            void this.plugin.saveSettings();
             this.display();
           }, this.selectedMapType).open();
         }));
 
     // Add Custom Category button
     new Setting(containerEl)
-      .setName('Add Custom Category')
+      .setName('Add custom category')
       .setDesc('Create a new category to organize objects')
       .addButton(btn => btn
         .setButtonText('+ Add Category')
         .onClick(() => {
-          new CategoryEditModal(this.app, this.plugin as PluginAny, null, async () => {
+          new CategoryEditModal(this.app, this.plugin, null, () => {
             this.settingsChanged = true;
-            await this.plugin.saveSettings();
+            void this.plugin.saveSettings();
             this.display();
           }, this.selectedMapType).open();
         }));
@@ -136,7 +133,7 @@ export const TabRenderObjectsMethods = {
       .addButton(btn => btn
         .setButtonText('Import')
         .onClick(() => {
-          new ImportModal(this.app, this.plugin as PluginAny, async () => {
+          new ImportModal(this.app, this.plugin, () => {
             this.settingsChanged = true;
             this.display();
           }, this.selectedMapType).open();
@@ -144,7 +141,7 @@ export const TabRenderObjectsMethods = {
       .addButton(btn => btn
         .setButtonText('Export')
         .onClick(() => {
-          new ExportModal(this.app, this.plugin as PluginAny, this.selectedMapType).open();
+          new ExportModal(this.app, this.plugin, this.selectedMapType).open();
         }));
 
     // Get resolved data using helpers with map-type-specific settings
@@ -153,9 +150,9 @@ export const TabRenderObjectsMethods = {
     const hiddenObjects = ObjectHelpers.getHidden(mapTypeSettings as unknown as Record<string, unknown>) as ResolvedObject[];
 
     // Check if there are any customizations for this map type
-    const hasOverrides = Object.keys(mapTypeSettings.objectOverrides || {}).length > 0;
-    const hasCustomObjects = (mapTypeSettings.customObjects || []).length > 0;
-    const hasCustomCategories = (mapTypeSettings.customCategories || []).length > 0;
+    const hasOverrides = Object.keys(mapTypeSettings.objectOverrides ?? {}).length > 0;
+    const hasCustomObjects = (mapTypeSettings.customObjects ?? []).length > 0;
+    const hasCustomCategories = (mapTypeSettings.customCategories ?? []).length > 0;
     const hasAnyCustomizations = hasOverrides || hasCustomObjects || hasCustomCategories;
 
     // Reset All button (only show if there are customizations)
@@ -164,7 +161,7 @@ export const TabRenderObjectsMethods = {
         .setName(`Reset ${this.selectedMapType === 'hex' ? 'Hex' : 'Grid'} to Defaults`)
         .setDesc(`Restore built-in objects for ${this.selectedMapType} maps. Does not affect saved sets.`)
         .addButton(btn => btn
-          .setButtonText('Reset to Defaults')
+          .setButtonText('Reset to defaults')
           .setWarning()
           .onClick(async () => {
             const counts: string[] = [];
@@ -266,15 +263,15 @@ export const TabRenderObjectsMethods = {
       categoryHeader.createSpan({ text: labelText, cls: 'windrose-settings-category-label' });
 
       // Edit/Delete for custom categories
-      if (category.isCustom) {
+      if (category.isCustom === true) {
         const categoryActions = categoryHeader.createDiv({ cls: 'windrose-settings-category-actions' });
 
         const editBtn = categoryActions.createEl('button', { cls: 'windrose-settings-icon-btn', attr: { 'aria-label': 'Edit category', title: 'Edit category' } });
         IconHelpers.set(editBtn, 'pencil');
         editBtn.onclick = () => {
-          new CategoryEditModal(this.app, this.plugin as PluginAny, category as PluginAny, async () => {
+          new CategoryEditModal(this.app, this.plugin, category as CustomCategory, () => {
             this.settingsChanged = true;
-            await this.plugin.saveSettings();
+            void this.plugin.saveSettings();
             this.display();
           }, this.selectedMapType).open();
         };
@@ -295,7 +292,7 @@ export const TabRenderObjectsMethods = {
             }).openAndGetValue()) {
             const categoriesKey: CustomCategoriesKey = this.selectedMapType === 'hex' ? 'customHexCategories' : 'customGridCategories';
             if (this.plugin.settings[categoriesKey]) {
-              this.plugin.settings[categoriesKey] = this.plugin.settings[categoriesKey]!.filter((c: CustomCategory) => c.id !== category.id);
+              this.plugin.settings[categoriesKey] = this.plugin.settings[categoriesKey].filter((c: CustomCategory) => c.id !== category.id);
             }
             this.settingsChanged = true;
             await this.plugin.saveSettings();
@@ -327,14 +324,14 @@ export const TabRenderObjectsMethods = {
         .setDesc('Built-in objects you\'ve hidden from the palette');
 
       const hiddenList = hiddenContainer.createDiv({ cls: 'windrose-settings-object-list windrose-settings-hidden-list' });
-      hiddenList.style.display = 'none';
+      hiddenList.hide();
 
       new Setting(hiddenContainer)
         .addButton(btn => btn
           .setButtonText('Show')
           .onClick(() => {
             const isVisible = hiddenList.style.display !== 'none';
-            hiddenList.style.display = isVisible ? 'none' : 'block';
+            hiddenList.toggle(!isVisible);
             btn.setButtonText(isVisible ? 'Show' : 'Hide');
           }));
 
@@ -370,7 +367,7 @@ export const TabRenderObjectsMethods = {
       e.preventDefault();
     });
 
-    objectList.addEventListener('drop', async (e: DragEvent) => {
+    objectList.addEventListener('drop', (e: DragEvent) => {
       e.preventDefault();
 
       // Get the correct settings keys for the selected map type
@@ -386,7 +383,7 @@ export const TabRenderObjectsMethods = {
       // Apply new orders to settings
       rows.forEach((row: HTMLElement, actualPosition: number) => {
         const id = row.dataset.objectId;
-        if (!id) return;
+        if (id == null || id === '') return;
         const isBuiltIn = row.dataset.isBuiltIn === 'true';
         const newOrder = actualPosition * 10;
 
@@ -396,20 +393,16 @@ export const TabRenderObjectsMethods = {
           if (actualPosition === defaultPosition) {
             // In default position - remove order override if present
             if (this.plugin.settings[overridesKey]?.[id]) {
-              delete this.plugin.settings[overridesKey]![id].order;
-              if (Object.keys(this.plugin.settings[overridesKey]![id]).length === 0) {
-                delete this.plugin.settings[overridesKey]![id];
+              delete this.plugin.settings[overridesKey][id].order;
+              if (Object.keys(this.plugin.settings[overridesKey][id]).length === 0) {
+                delete this.plugin.settings[overridesKey][id];
               }
             }
           } else {
             // Not in default position - save order override
-            if (!this.plugin.settings[overridesKey]) {
-              this.plugin.settings[overridesKey] = {};
-            }
-            if (!this.plugin.settings[overridesKey]![id]) {
-              this.plugin.settings[overridesKey]![id] = {};
-            }
-            this.plugin.settings[overridesKey]![id].order = newOrder;
+            this.plugin.settings[overridesKey] ??= {};
+            this.plugin.settings[overridesKey][id] ??= {};
+            this.plugin.settings[overridesKey][id].order = newOrder;
           }
 
           // Update modified indicator in DOM immediately
@@ -417,11 +410,11 @@ export const TabRenderObjectsMethods = {
           if (labelEl) {
             const override = this.plugin.settings[overridesKey]?.[id];
             const hasAnyOverride = override && Object.keys(override).length > 0;
-            labelEl.classList.toggle('windrose-settings-modified', !!hasAnyOverride);
+            labelEl.classList.toggle('windrose-settings-modified', hasAnyOverride === true);
           }
         } else {
           // Custom objects - always save order
-          const customObjects = this.plugin.settings[customObjectsKey] || [];
+          const customObjects = this.plugin.settings[customObjectsKey] ?? [];
           const customObj = customObjects.find((o: CustomObject) => o.id === id);
           if (customObj) {
             customObj.order = newOrder;
@@ -430,7 +423,7 @@ export const TabRenderObjectsMethods = {
       });
 
       this.settingsChanged = true;
-      await this.plugin.saveSettings();
+      void this.plugin.saveSettings();
     });
   },
   renderObjectRow(this: TabRenderObjectsThis, container: HTMLElement, obj: ResolvedObject, isHiddenSection = false, canDrag = false): void {
@@ -453,15 +446,14 @@ export const TabRenderObjectsMethods = {
       const dragHandle = row.createSpan({ cls: 'windrose-drag-handle' });
       IconHelpers.set(dragHandle, 'grip-vertical');
 
-      row.style.userSelect = 'none';
-      row.style.webkitUserSelect = 'none';
+      row.setCssStyles({ userSelect: 'none' });
 
       row.addEventListener('dragstart', (e: DragEvent) => {
         if (e.dataTransfer) {
           e.dataTransfer.setData('text/plain', obj.id);
           e.dataTransfer.effectAllowed = 'move';
         }
-        setTimeout(() => {
+        window.setTimeout(() => {
           row.classList.add('windrose-dragging');
         }, 0);
       });
@@ -477,7 +469,7 @@ export const TabRenderObjectsMethods = {
 
     // Label
     const labelEl = row.createSpan({ text: obj.label ?? '', cls: 'windrose-settings-object-label' });
-    if (obj.isModified) {
+    if (obj.isModified === true) {
       labelEl.addClass('windrose-settings-modified');
     }
 
@@ -488,9 +480,9 @@ export const TabRenderObjectsMethods = {
     const editBtn = actions.createEl('button', { cls: 'windrose-settings-icon-btn', attr: { 'aria-label': 'Edit', title: 'Edit object' } });
     IconHelpers.set(editBtn, 'pencil');
     editBtn.onclick = () => {
-      new ObjectEditModal(this.app, this.plugin as PluginAny, obj, async () => {
+      new ObjectEditModal(this.app, this.plugin, obj, () => {
         this.settingsChanged = true;
-        await this.plugin.saveSettings();
+        void this.plugin.saveSettings();
         this.display();
       }, this.selectedMapType).open();
     };
@@ -502,9 +494,9 @@ export const TabRenderObjectsMethods = {
         IconHelpers.set(unhideBtn, 'eye');
         unhideBtn.onclick = async () => {
           if (this.plugin.settings[overridesKey]?.[obj.id]) {
-            delete this.plugin.settings[overridesKey]![obj.id].hidden;
-            if (Object.keys(this.plugin.settings[overridesKey]![obj.id]).length === 0) {
-              delete this.plugin.settings[overridesKey]![obj.id];
+            delete this.plugin.settings[overridesKey][obj.id].hidden;
+            if (Object.keys(this.plugin.settings[overridesKey][obj.id]).length === 0) {
+              delete this.plugin.settings[overridesKey][obj.id];
             }
           }
           this.settingsChanged = true;
@@ -516,13 +508,9 @@ export const TabRenderObjectsMethods = {
         const hideBtn = actions.createEl('button', { cls: 'windrose-settings-icon-btn', attr: { 'aria-label': 'Hide', title: 'Hide from palette' } });
         IconHelpers.set(hideBtn, 'eye-off');
         hideBtn.onclick = async () => {
-          if (!this.plugin.settings[overridesKey]) {
-            this.plugin.settings[overridesKey] = {};
-          }
-          if (!this.plugin.settings[overridesKey]![obj.id]) {
-            this.plugin.settings[overridesKey]![obj.id] = {};
-          }
-          this.plugin.settings[overridesKey]![obj.id].hidden = true;
+          this.plugin.settings[overridesKey] ??= {};
+          this.plugin.settings[overridesKey][obj.id] ??= {};
+          this.plugin.settings[overridesKey][obj.id].hidden = true;
           this.settingsChanged = true;
           await this.plugin.saveSettings();
           this.display();
@@ -530,7 +518,7 @@ export const TabRenderObjectsMethods = {
       }
 
       // Reset button (only for modified)
-      if (obj.isModified) {
+      if (obj.isModified === true) {
         const resetBtn = actions.createEl('button', { cls: 'windrose-settings-icon-btn', attr: { 'aria-label': 'Reset to default', title: 'Reset to default' } });
         IconHelpers.set(resetBtn, 'rotate-ccw');
         resetBtn.onclick = async () => {
@@ -540,7 +528,7 @@ export const TabRenderObjectsMethods = {
               isDestructive: true
             }).openAndGetValue()) {
             if (this.plugin.settings[overridesKey]) {
-              delete this.plugin.settings[overridesKey]![obj.id];
+              delete this.plugin.settings[overridesKey][obj.id];
             }
             this.settingsChanged = true;
             await this.plugin.saveSettings();
@@ -558,32 +546,28 @@ export const TabRenderObjectsMethods = {
         const targetObjectsKey: CustomObjectsKey = targetType === 'hex' ? 'customHexObjects' : 'customGridObjects';
         const targetCategoriesKey: CustomCategoriesKey = targetType === 'hex' ? 'customHexCategories' : 'customGridCategories';
 
-        if (!this.plugin.settings[targetObjectsKey]) {
-          this.plugin.settings[targetObjectsKey] = [];
-        }
+        this.plugin.settings[targetObjectsKey] ??= [];
 
         // Generate new unique ID
-        const newId = 'custom-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+        const newId = 'custom-' + Date.now() + '-' + Math.random().toString(36).slice(2, 11);
 
         // Check if category exists in target
         const targetCategory = obj.category;
-        const targetCategories = this.plugin.settings[targetCategoriesKey] || [];
+        const targetCategories = this.plugin.settings[targetCategoriesKey] ?? [];
         const builtInCategoryIds = ObjectHelpers.getCategories({
           objectOverrides: {},
           customObjects: [],
           customCategories: []
         }).map((c: ResolvedCategory) => c.id);
 
-        if (targetCategory && !builtInCategoryIds.includes(targetCategory) && !targetCategories.find((c: CustomCategory) => c.id === obj.category)) {
+        if (targetCategory != null && targetCategory !== '' && !builtInCategoryIds.includes(targetCategory) && !targetCategories.find((c: CustomCategory) => c.id === obj.category)) {
           // Custom category doesn't exist in target - copy it over
           const sourceCategoriesKey: CustomCategoriesKey = this.selectedMapType === 'hex' ? 'customHexCategories' : 'customGridCategories';
-          const sourceCategories = this.plugin.settings[sourceCategoriesKey] || [];
+          const sourceCategories = this.plugin.settings[sourceCategoriesKey] ?? [];
           const sourceCat = sourceCategories.find((c: CustomCategory) => c.id === obj.category);
           if (sourceCat) {
-            if (!this.plugin.settings[targetCategoriesKey]) {
-              this.plugin.settings[targetCategoriesKey] = [];
-            }
-            this.plugin.settings[targetCategoriesKey]!.push({ ...sourceCat });
+            this.plugin.settings[targetCategoriesKey] ??= [];
+            this.plugin.settings[targetCategoriesKey].push({ ...sourceCat });
           }
         }
 
@@ -598,7 +582,7 @@ export const TabRenderObjectsMethods = {
           ...(obj.order != null ? { order: obj.order } : {}),
         };
 
-        this.plugin.settings[targetObjectsKey]!.push(copiedObj);
+        this.plugin.settings[targetObjectsKey].push(copiedObj);
 
         this.settingsChanged = true;
         await this.plugin.saveSettings();
@@ -615,7 +599,7 @@ export const TabRenderObjectsMethods = {
             isDestructive: true
           }).openAndGetValue()) {
           if (this.plugin.settings[customObjectsKey]) {
-            this.plugin.settings[customObjectsKey] = this.plugin.settings[customObjectsKey]!.filter((o: CustomObject) => o.id !== obj.id);
+            this.plugin.settings[customObjectsKey] = this.plugin.settings[customObjectsKey].filter((o: CustomObject) => o.id !== obj.id);
           }
           this.settingsChanged = true;
           await this.plugin.saveSettings();
@@ -631,9 +615,9 @@ export const TabRenderObjectsMethods = {
 
   renderObjectSetsBlock(this: TabRenderObjectsThis, containerEl: HTMLElement): void {
     const s = this.plugin.settings;
-    const sets = s.objectSets || [];
+    const sets = s.objectSets ?? [];
 
-    containerEl.createEl('div', { cls: 'windrose-settings-subheading', text: 'Object Sets' });
+    containerEl.createEl('div', { cls: 'windrose-settings-subheading', text: 'Object sets' });
     containerEl.createEl('p', {
       text: 'Save and swap between named collections of object customizations.',
       cls: 'setting-item-description'
@@ -641,7 +625,7 @@ export const TabRenderObjectsMethods = {
 
     // Active Set indicator
     const activeSet = sets.find((st: ObjectSet) => st.id === s.activeObjectSetId);
-    const isDirty = ObjectSetHelpers.isDirty(this.plugin as PluginAny);
+    const isDirty = ObjectSetHelpers.isDirty(this.plugin);
 
     if (activeSet) {
       const bar = containerEl.createDiv({ cls: 'windrose-set-active-bar' });
@@ -657,7 +641,7 @@ export const TabRenderObjectsMethods = {
 
     // Active Set dropdown
     new Setting(containerEl)
-      .setName('Active Set')
+      .setName('Active set')
       .setDesc('Switch to a saved set (overwrites current objects)')
       .addDropdown(dropdown => {
         dropdown.addOption('__defaults__', 'Defaults (built-in)');
@@ -667,7 +651,7 @@ export const TabRenderObjectsMethods = {
           if (set.data.grid) scope.push('grid');
           dropdown.addOption(set.id, set.name + (scope.length ? ' [' + scope.join('+') + ']' : ''));
         }
-        dropdown.setValue(s.activeObjectSetId || '__defaults__');
+        dropdown.setValue(s.activeObjectSetId != null && s.activeObjectSetId !== '' ? s.activeObjectSetId : '__defaults__');
         dropdown.onChange(async (value: string) => {
           // Prompt to save current objects before switching
           if (isDirty) {
@@ -680,14 +664,14 @@ export const TabRenderObjectsMethods = {
                 message: 'Name for the saved set:',
                 defaultValue: 'My Objects'
               }).openAndGetValue();
-              if (name) {
-                ObjectSetHelpers.saveCurrentAsSet(this.plugin as PluginAny, name);
+              if (name != null && name !== '') {
+                ObjectSetHelpers.saveCurrentAsSet(this.plugin, name);
               }
             }
           }
 
           if (value === '__defaults__') {
-            ObjectSetHelpers.resetToDefaults(this.plugin as PluginAny);
+            ObjectSetHelpers.resetToDefaults(this.plugin);
             this.settingsChanged = true;
             await this.plugin.saveSettings();
             window.dispatchEvent(new CustomEvent('windrose-settings-changed', {
@@ -697,7 +681,7 @@ export const TabRenderObjectsMethods = {
             return;
           }
 
-          ObjectSetHelpers.activateSet(this.plugin as PluginAny, value);
+          ObjectSetHelpers.activateSet(this.plugin, value);
           this.settingsChanged = true;
           await this.plugin.saveSettings();
           window.dispatchEvent(new CustomEvent('windrose-settings-changed', {
@@ -732,9 +716,9 @@ export const TabRenderObjectsMethods = {
         });
         IconHelpers.set(renameBtn, 'pencil');
         renameBtn.onclick = () => {
-          new ObjectSetRenameModal(this.app, set.name, async (newName: string) => {
-            ObjectSetHelpers.renameSet(this.plugin as PluginAny, set.id, newName);
-            await this.plugin.saveSettings();
+          new ObjectSetRenameModal(this.app, set.name, (newName: string) => {
+            ObjectSetHelpers.renameSet(this.plugin, set.id, newName);
+            void this.plugin.saveSettings();
             this.display();
           }).open();
         };
@@ -745,7 +729,7 @@ export const TabRenderObjectsMethods = {
         });
         IconHelpers.set(exportBtn, 'download');
         exportBtn.onclick = () => {
-          new ObjectSetExportModal(this.app, this.plugin as PluginAny, set).open();
+          new ObjectSetExportModal(this.app, this.plugin, set).open();
         };
 
         const deleteBtn = setActions.createEl('button', {
@@ -759,7 +743,7 @@ export const TabRenderObjectsMethods = {
               confirmText: 'Delete',
               isDestructive: true
             }).openAndGetValue()) {
-            ObjectSetHelpers.deleteSet(this.plugin as PluginAny, set.id);
+            ObjectSetHelpers.deleteSet(this.plugin, set.id);
             this.settingsChanged = true;
             await this.plugin.saveSettings();
             this.display();
@@ -770,26 +754,26 @@ export const TabRenderObjectsMethods = {
 
     // Action buttons
     const actionSetting = new Setting(containerEl)
-      .setName('Manage Sets');
+      .setName('Manage sets');
 
     actionSetting.addButton(btn => btn
-      .setButtonText('Save Current as Set')
+      .setButtonText('Save current as set')
       .onClick(async () => {
         const name = await new PromptModal(this.app, {
           message: 'Name for the new set:',
           defaultValue: 'My Objects'
         }).openAndGetValue();
-        if (!name) return;
-        ObjectSetHelpers.saveCurrentAsSet(this.plugin as PluginAny, name);
+        if (name == null || name === '') return;
+        ObjectSetHelpers.saveCurrentAsSet(this.plugin, name);
         await this.plugin.saveSettings();
         new Notice('Saved set: ' + name);
         this.display();
       }));
 
     actionSetting.addButton(btn => btn
-      .setButtonText('Import from Folder')
+      .setButtonText('Import from folder')
       .onClick(() => {
-        new ObjectSetImportModal(this.app, this.plugin as PluginAny, async () => {
+        new ObjectSetImportModal(this.app, this.plugin, () => {
           this.settingsChanged = true;
           this.display();
         }).open();
@@ -802,7 +786,7 @@ export const TabRenderObjectsMethods = {
       .addButton(btn => btn
         .setButtonText('Browse')
         .onClick(() => {
-          new ContentPackBrowserModal(this.app, this.plugin as PluginAny, 'object-pack', () => {
+          new ContentPackBrowserModal(this.app, this.plugin, 'object-pack', () => {
             this.settingsChanged = true;
             this.display();
           }).open();
@@ -810,22 +794,22 @@ export const TabRenderObjectsMethods = {
 
     // Auto-Load Folder
     new Setting(containerEl)
-      .setName('Auto-Load Folder')
+      .setName('Auto-load folder')
       .setDesc('Vault folder to scan for object set packages on startup')
       .addSearch(search => {
         new FolderSuggest(this.app, search.inputEl);
         search
-          .setPlaceholder('e.g. windrose-objects')
-          .setValue(s.objectSetsAutoLoadFolder || '')
+          .setPlaceholder('E.g. Windrose-objects')
+          .setValue(s.objectSetsAutoLoadFolder ?? '')
           .onChange(async (value: string) => {
             s.objectSetsAutoLoadFolder = value.trim();
             await this.plugin.saveSettings();
           });
       })
       .addButton(btn => btn
-        .setButtonText('Scan Now')
+        .setButtonText('Scan now')
         .onClick(async () => {
-          const added = await ObjectSetHelpers.scanAutoLoadFolder(this.plugin as PluginAny);
+          const added = await ObjectSetHelpers.scanAutoLoadFolder(this.plugin);
           await this.plugin.saveSettings();
           if (added > 0) {
             new Notice('Found ' + added + ' new set(s)');

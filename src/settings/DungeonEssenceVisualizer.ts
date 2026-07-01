@@ -84,7 +84,7 @@ export class DungeonEssenceVisualizer {
 
   constructor(container: HTMLElement, options: VisualizerOptions = {}) {
     this.container = container;
-    this.height = options.height || 150;
+    this.height = options.height != null && options.height !== 0 ? options.height : 150;
     this.width = 0;
     this.stampSize = 0;
     this.lastTime = 0;
@@ -98,22 +98,24 @@ export class DungeonEssenceVisualizer {
     };
 
     // Create canvas
-    this.canvas = document.createElement('canvas');
-    this.canvas.style.display = 'block';
-    this.canvas.style.width = '100%';
+    this.canvas = activeDocument.createElement('canvas');
+    this.canvas.setCssStyles({ display: 'block', width: '100%' });
     this.container.appendChild(this.canvas);
 
     // Create stamp overlay container
-    this.stampOverlay = document.createElement('div');
-    this.stampOverlay.style.cssText = `
-      position: absolute;
-      pointer-events: none;
-      opacity: 0;
-      filter: saturate(0.4);
-      transition: opacity 0.3s ease;
-    `;
-    this.stampOverlay.innerHTML = this.getWindroseSVG();
-    this.container.style.position = 'relative';
+    this.stampOverlay = activeDocument.createElement('div');
+    this.stampOverlay.setCssStyles({
+      position: 'absolute',
+      pointerEvents: 'none',
+      opacity: '0',
+      filter: 'saturate(0.4)',
+      transition: 'opacity 0.3s ease'
+    });
+    // Parse as SVG (not HTML) so filters/namespaced elements survive, and avoid
+    // the innerHTML sink. Content is a static developer-authored template.
+    const stampSvg = new DOMParser().parseFromString(this.getWindroseSVG(), 'image/svg+xml').documentElement;
+    this.stampOverlay.appendChild(stampSvg);
+    this.container.setCssStyles({ position: 'relative' });
     this.container.appendChild(this.stampOverlay);
 
     this.ctx = this.canvas.getContext('2d');
@@ -132,6 +134,7 @@ export class DungeonEssenceVisualizer {
   }
 
   sampleColors(): void {
+    // eslint-disable-next-line obsidianmd/prefer-active-doc -- reads Obsidian CSS theme vars off the MAIN app document body; a popout body lacks them.
     const style = getComputedStyle(document.body);
     this.colors = {
       node: style.getPropertyValue('--text-muted').trim() || '#888',
@@ -192,7 +195,7 @@ export class DungeonEssenceVisualizer {
     this.stampOverlay.style.height = stampSize + 'px';
 
     // Restart animation with new dimensions
-    if (this.animationId) {
+    if (this.animationId != null) {
       this.stop();
       this.start();
     }
@@ -208,11 +211,11 @@ export class DungeonEssenceVisualizer {
    * - size: Restarts animation immediately (affects node count significantly)
    */
   updateSettings(newSettings: Partial<VisualizerSettings>): void {
-    const sizeChanged = newSettings.size && newSettings.size !== this.settings.size;
+    const sizeChanged = newSettings.size != null && newSettings.size !== '' && newSettings.size !== this.settings.size;
     this.settings = { ...this.settings, ...newSettings };
 
     // Size changes warrant an immediate restart since node count changes dramatically
-    if (sizeChanged && this.animationId) {
+    if (sizeChanged && this.animationId != null) {
       this.restartAnimation();
     }
   }
@@ -221,7 +224,7 @@ export class DungeonEssenceVisualizer {
    * Restart the animation with current settings
    */
   restartAnimation(): void {
-    if (!this.animationId) return;
+    if (this.animationId == null) return;
 
     this.hideStamp();
     this.initState();
@@ -236,20 +239,20 @@ export class DungeonEssenceVisualizer {
       crypt: { circleChance: 0.1, corridorStyle: 'straight', loopChance: 0.02 }
     };
 
-    const overrides = styleOverrides[styleName] || {};
+    const overrides = styleOverrides[styleName] ?? {};
     this.updateSettings(overrides);
   }
 
   start(): void {
-    if (this.animationId) return;
+    if (this.animationId != null) return;
 
     this.initState();
     this.lastTime = performance.now();
-    this.animationId = requestAnimationFrame((t) => this.render(t));
+    this.animationId = window.requestAnimationFrame((t) => this.render(t));
   }
 
   stop(): void {
-    if (this.animationId) {
+    if (this.animationId != null) {
       cancelAnimationFrame(this.animationId);
       this.animationId = null;
     }
@@ -299,6 +302,7 @@ export class DungeonEssenceVisualizer {
   }
 
   generateNodes(count: number): void {
+    if (this.state == null) return;
     const nodes: DungeonNode[] = [];
     const padding = 30;
     const bottomPadding = 55; // Extra space at bottom for title overlay
@@ -337,17 +341,18 @@ export class DungeonEssenceVisualizer {
 
     if (nodes.length > 0) {
       nodes[0].opacity = 1;
-      this.state!.discoveredNodes.add(0);
-      this.state!.circledNode = nodes.length - 1;
+      this.state.discoveredNodes.add(0);
+      this.state.circledNode = nodes.length - 1;
     }
 
-    this.state!.nodes = nodes;
+    this.state.nodes = nodes;
   }
 
   buildMST(): void {
-    const nodes = this.state!.nodes;
+    if (this.state == null) return;
+    const nodes = this.state.nodes;
     if (nodes.length < 2) {
-      this.state!.connections = [];
+      this.state.connections = [];
       return;
     }
 
@@ -381,11 +386,12 @@ export class DungeonEssenceVisualizer {
       }
     }
 
-    this.state!.connections = connections;
+    this.state.connections = connections;
   }
 
   buildLoops(): void {
-    const { nodes, connections } = this.state!;
+    if (this.state == null) return;
+    const { nodes, connections } = this.state;
     const loops: LoopConnection[] = [];
     const existingPairs = new Set(
       connections.map(c => `${Math.min(c.from, c.to)}-${Math.max(c.from, c.to)}`)
@@ -400,7 +406,7 @@ export class DungeonEssenceVisualizer {
       }
     }
 
-    this.state!.loopConnections = loops;
+    this.state.loopConnections = loops;
   }
 
   // === Easing & Math ===
@@ -429,19 +435,22 @@ export class DungeonEssenceVisualizer {
   // === Stamp Control ===
 
   showStamp(screenX: number, screenY: number): void {
-    this.stampOverlay.style.left = screenX + 'px';
-    this.stampOverlay.style.top = screenY + 'px';
-    this.stampOverlay.style.transform = 'translate(-50%, -50%)';
-    this.stampOverlay.style.animation = 'none';
+    this.stampOverlay.setCssStyles({
+      left: screenX + 'px',
+      top: screenY + 'px',
+      transform: 'translate(-50%, -50%)',
+      animation: 'none'
+    });
     // Trigger reflow
-    this.stampOverlay.offsetHeight;
-    this.stampOverlay.style.animation = 'windrose-windrose-stamp 0.35s ease-out forwards';
-    this.stampOverlay.style.opacity = '0.75';
+    void this.stampOverlay.offsetHeight;
+    this.stampOverlay.setCssStyles({
+      animation: 'windrose-windrose-stamp 0.35s ease-out forwards',
+      opacity: '0.75'
+    });
   }
 
   hideStamp(): void {
-    this.stampOverlay.style.opacity = '0';
-    this.stampOverlay.style.animation = 'none';
+    this.stampOverlay.setCssStyles({ opacity: '0', animation: 'none' });
   }
 
   // === Rendering ===
@@ -505,7 +514,7 @@ export class DungeonEssenceVisualizer {
 
     ctx.restore();
 
-    this.animationId = requestAnimationFrame((t) => this.render(t));
+    this.animationId = window.requestAnimationFrame((t) => this.render(t));
   }
 
   updatePhase(_dt: number): void {
@@ -518,7 +527,7 @@ export class DungeonEssenceVisualizer {
     switch (state.phase) {
       case 'JOURNEY': {
         const conn = state.connections[state.journeyStep];
-        if (!conn) {
+        if (conn == null) {
           state.phase = 'REVEAL';
           state.phaseTime = 0;
           break;
@@ -599,7 +608,7 @@ export class DungeonEssenceVisualizer {
       case 'STAMPING': {
         if (state.phaseTime < 20 && state.circledNode !== null) {
           const node = state.nodes[state.circledNode];
-          if (node) {
+          if (node != null) {
             const screenX = (node.x - state.camera.x) * state.camera.zoom + width / 2;
             const screenY = (node.y - state.camera.y) * state.camera.zoom + height / 2;
             this.showStamp(screenX, screenY);

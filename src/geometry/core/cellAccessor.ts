@@ -168,7 +168,7 @@ function cellKeyFromCell(cell: Cell, geometry: IGeometry): CellKey {
  * @returns Cell or null if not found
  */
 function getCellAt(cells: Cell[], coords: Point, geometry: IGeometry): Cell | null {
-  return cells.find(cell => geometry.cellMatchesCoords(cell, coords)) || null;
+  return cells.find(cell => geometry.cellMatchesCoords(cell, coords)) ?? null;
 }
 
 /**
@@ -369,7 +369,6 @@ function setSegments(
 ): Cell[] {
   // Grid-only feature check
   if (!isGridGeometry(geometry)) {
-    // eslint-disable-next-line no-console
     console.warn('setSegments: Segment painting is only supported for grid maps');
     return cells;
   }
@@ -457,7 +456,6 @@ function removeSegments(
 ): Cell[] {
   // Grid-only feature check
   if (!isGridGeometry(geometry)) {
-    // eslint-disable-next-line no-console
     console.warn('removeSegments: Segment painting is only supported for grid maps');
     return cells;
   }

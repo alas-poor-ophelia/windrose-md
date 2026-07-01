@@ -66,7 +66,7 @@ function openNativeTextInputModal(options: {
         });
         submitBtn.addEventListener('click', () => this.submit());
 
-        setTimeout(() => {
+        window.setTimeout(() => {
           this.inputEl.focus();
           if (initialValue) {
             this.inputEl.select();
@@ -94,7 +94,6 @@ function openNativeTextInputModal(options: {
     modal.open();
     return true;
   } catch (e) {
-    // eslint-disable-next-line no-console
     console.warn('[Windrose] Failed to open native TextInputModal:', (e as Error).message);
     return false;
   }

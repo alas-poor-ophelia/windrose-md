@@ -13,7 +13,7 @@ import { DEFAULTS, SCHEMA_VERSION } from '../core/dmtConstants';
 import { getDataFilePath } from '../core/settingsAccessor';
 import { offsetToAxial } from '../geometry/core/offsetCoordinates';
 import { getSettings } from '../core/settingsAccessor';
-import { migrateToLayerSchema, needsMigration, generateLayerId } from './layerAccessor';
+import { migrateToLayerSchema, needsMigration, generateLayerId, ensureBoards, DEFAULT_BOARD_ID } from './layerAccessor';
 import { calculateFitZoom } from '../geometry/core/hexMeasurements';
 
 // Serializes saveMapData calls so concurrent writes can't race or interleave.
@@ -48,26 +48,22 @@ interface DataFile {
 }
 
 function migrateMapData(mapData: MapData): MapData {
-  if (!mapData.objects) mapData.objects = [];
-  if (!mapData.textLabels) mapData.textLabels = [];
-  if (!mapData.customColors) mapData.customColors = [];
-  if (!mapData.edges) mapData.edges = [];
-  if (!mapData.regions) mapData.regions = [];
-  if (!mapData.outlines) mapData.outlines = [];
-  if (!mapData.shapeOverlays) mapData.shapeOverlays = [];
+  mapData.objects ??= [];
+  mapData.textLabels ??= [];
+  mapData.customColors ??= [];
+  mapData.edges ??= [];
+  mapData.regions ??= [];
+  mapData.outlines ??= [];
+  mapData.shapeOverlays ??= [];
   if (!mapData.mapType) mapData.mapType = 'grid';
-  if (!mapData.settings) {
-    mapData.settings = { useGlobalSettings: true, overrides: {} };
-  }
-  if (!mapData.uiPreferences) {
-    mapData.uiPreferences = {
-      rememberPanZoom: true,
-      rememberSidebarState: true,
-      rememberExpandedState: false
-    };
-  }
-  if (mapData.expandedState === undefined) mapData.expandedState = false;
-  if (!mapData.lastTextLabelSettings) mapData.lastTextLabelSettings = null;
+  mapData.settings ??= { useGlobalSettings: true, overrides: {} };
+  mapData.uiPreferences ??= {
+    rememberPanZoom: true,
+    rememberSidebarState: true,
+    rememberExpandedState: false
+  };
+  mapData.expandedState ??= false;
+  mapData.lastTextLabelSettings ??= null;
 
   // Hex-specific migration
   if (mapData.mapType === 'hex') {
@@ -94,12 +90,12 @@ function migrateMapData(mapData: MapData): MapData {
         fineTuneOffset: 0
       };
     } else {
-      if (mapData.backgroundImage.gridDensity === undefined) mapData.backgroundImage.gridDensity = 'medium';
-      if (mapData.backgroundImage.customColumns === undefined) mapData.backgroundImage.customColumns = 24;
-      if (mapData.backgroundImage.sizingMode === undefined) mapData.backgroundImage.sizingMode = 'density';
-      if (mapData.backgroundImage.measurementMethod === undefined) mapData.backgroundImage.measurementMethod = 'corner';
-      if (mapData.backgroundImage.measurementSize === undefined) mapData.backgroundImage.measurementSize = 86;
-      if (mapData.backgroundImage.fineTuneOffset === undefined) mapData.backgroundImage.fineTuneOffset = 0;
+      mapData.backgroundImage.gridDensity ??= 'medium';
+      mapData.backgroundImage.customColumns ??= 24;
+      mapData.backgroundImage.sizingMode ??= 'density';
+      mapData.backgroundImage.measurementMethod ??= 'corner';
+      mapData.backgroundImage.measurementSize ??= 86;
+      mapData.backgroundImage.fineTuneOffset ??= 0;
     }
   }
 
@@ -109,7 +105,7 @@ function migrateMapData(mapData: MapData): MapData {
   }
 
   // Tileset source migration: add source: 'folder' to legacy tilesets
-  if (!mapData.tilesets) mapData.tilesets = [];
+  mapData.tilesets ??= [];
   for (const ts of mapData.tilesets) {
     if (!('source' in ts)) {
       (ts as Record<string, unknown>).source = 'folder';
@@ -118,7 +114,7 @@ function migrateMapData(mapData: MapData): MapData {
 
   // Layer-level arrays and curve migration
   for (const layer of mapData.layers) {
-    if (!layer.tiles) layer.tiles = [];
+    layer.tiles ??= [];
 
     // Tile assignment migration: q→col, r→row, layer→placement (boundary cast: legacy schema)
     for (const tile of layer.tiles) {
@@ -136,10 +132,10 @@ function migrateMapData(mapData: MapData): MapData {
       }
     }
 
-    if (!layer.wallPaths) layer.wallPaths = [];
+    layer.wallPaths ??= [];
     layer.wallPaths = layer.wallPaths.filter(w => Array.isArray(w.vertices) && w.vertices.length >= 2);
 
-    if (!layer.curves) layer.curves = [];
+    layer.curves ??= [];
     layer.curves = layer.curves.filter(c => c.start != null && c.segments != null);
     for (const curve of layer.curves) {
       // Migrate legacy holes (flat number[]) to innerRings (boundary cast: legacy schema)
@@ -162,21 +158,28 @@ function migrateMapData(mapData: MapData): MapData {
     }
   }
 
+  // Board (floor) projection: ensure every layer has a boardId, the boards registry
+  // exists, and activeBoardId is valid. Idempotent — safe on already-migrated maps.
+  ensureBoards(mapData);
+
   // Sub-hex migration
   if (mapData.subHexMaps) {
     for (const hexKey of Object.keys(mapData.subHexMaps)) {
       const subHex = mapData.subHexMaps[hexKey];
       if (subHex?.mapData != null) {
         for (const layer of subHex.mapData.layers) {
-          if (!layer.tiles) layer.tiles = [];
-          if (!layer.curves) layer.curves = [];
+          layer.tiles ??= [];
+          layer.curves ??= [];
           layer.curves = layer.curves.filter(c => c.start != null && c.segments != null);
-          if (!layer.wallPaths) layer.wallPaths = [];
+          layer.wallPaths ??= [];
           layer.wallPaths = layer.wallPaths.filter(w => Array.isArray(w.vertices) && w.vertices.length >= 2);
         }
-        if (!subHex.mapData.regions) subHex.mapData.regions = [];
-        if (!subHex.mapData.outlines) subHex.mapData.outlines = [];
-        if (!subHex.mapData.shapeOverlays) subHex.mapData.shapeOverlays = [];
+        subHex.mapData.regions ??= [];
+        subHex.mapData.outlines ??= [];
+        subHex.mapData.shapeOverlays ??= [];
+        // Sub-hex maps get their own implicit board too (Parallax: don't leave
+        // sub-hex layers boardless or board filters would drop them).
+        ensureBoards(subHex.mapData);
       }
     }
   }
@@ -206,7 +209,6 @@ async function loadMapData(app: App, mapId: string, mapName: string = '', mapTyp
 
     return createNewMap(mapName, mapType);
   } catch (error) {
-    // eslint-disable-next-line no-console
     console.error('[loadMapData] Failed to load map data, creating new map:', error);
     notifyCorruptedDataFile(dataPath);
     return createNewMap(mapName, mapType);
@@ -239,7 +241,6 @@ async function saveMapData(app: App, mapId: string, mapData: MapData): Promise<b
         try {
           allData = JSON.parse(content) as DataFile;
         } catch (parseError) {
-          // eslint-disable-next-line no-console
           console.error(
             '[saveMapData] Existing data file is unparseable. Refusing to overwrite to avoid data loss. ' +
             'Inspect or restore the file manually before saving again.',
@@ -264,7 +265,6 @@ async function saveMapData(app: App, mapId: string, mapData: MapData): Promise<b
       try {
         jsonString = JSON.stringify(allData);
       } catch (serializeError) {
-        // eslint-disable-next-line no-console
         console.error('[saveMapData] Serialization failed, save aborted:', serializeError);
         return false;
       }
@@ -277,7 +277,6 @@ async function saveMapData(app: App, mapId: string, mapData: MapData): Promise<b
 
       return true;
     } catch (error) {
-      // eslint-disable-next-line no-console
       console.error('Error saving map data:', error);
       return false;
     }
@@ -299,6 +298,7 @@ function createNewMap(mapName: string = '', mapType: MapType = 'grid'): MapData 
     objects: [],
     textLabels: [],
     fogOfWar: null,
+    boardId: DEFAULT_BOARD_ID,
   };
 
   // Base map structure with layer schema (v2)
@@ -327,6 +327,10 @@ function createNewMap(mapName: string = '', mapType: MapType = 'grid'): MapData 
     activeLayerId: initialLayerId,
     layerPanelVisible: false,
     layers: [initialLayer],
+
+    // Board (floor) system — one implicit default board
+    boards: [{ id: DEFAULT_BOARD_ID, name: 'Ground Floor', order: 0 }],
+    activeBoardId: DEFAULT_BOARD_ID,
 
     // Will be set below based on mapType
     gridSize: DEFAULTS.gridSize,
@@ -414,7 +418,7 @@ async function listMaps(app: App): Promise<MapListEntry[]> {
 
     return Object.entries(data.maps).map(([id, mapData]) => ({
       id,
-      name: mapData.name || id,
+      name: mapData.name != null && mapData.name !== '' ? mapData.name : id,
       type: mapData.mapType || 'grid',
     }));
   } catch {

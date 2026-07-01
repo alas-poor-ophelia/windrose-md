@@ -5,7 +5,7 @@
  * Extracted from ObjectLayer.tsx to reduce component size.
  */
 
-import type { JSX } from 'preact';
+import type { TargetedMouseEvent } from 'preact';
 import type { MapObject } from '#types/objects/object.types';
 
 import { useApp } from '../../context/AppContext';
@@ -30,7 +30,7 @@ interface UseObjectModalsArgs {
 }
 
 const useObjectModals = ({ onObjectsChange, handleNoteSubmit }: UseObjectModalsArgs): {
-  handleNoteButtonClick: (e: JSX.TargetedMouseEvent<HTMLElement>) => void;
+  handleNoteButtonClick: (e: TargetedMouseEvent<HTMLElement>) => void;
   handleEditNoteLink: (objectId: string) => void;
 } => {
   const app = useApp();
@@ -41,7 +41,7 @@ const useObjectModals = ({ onObjectsChange, handleNoteSubmit }: UseObjectModalsA
     setDragStart,
   } = useMapSelection();
 
-  const handleNoteButtonClick = (e: JSX.TargetedMouseEvent<HTMLElement>): void => {
+  const handleNoteButtonClick = (e: TargetedMouseEvent<HTMLElement>): void => {
     if (selectedItem?.type === 'object') {
       e.preventDefault();
       e.stopPropagation();

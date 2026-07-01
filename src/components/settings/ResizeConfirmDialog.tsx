@@ -108,7 +108,7 @@ function NativeResizeConfirmDialog(): VNode | null {
       closedByCode = true;
       modal.close();
     };
-  }, [showResizeConfirm]);
+  }, [showResizeConfirm, app, orphanInfo.cells, orphanInfo.objects]);
 
   return null;
 }

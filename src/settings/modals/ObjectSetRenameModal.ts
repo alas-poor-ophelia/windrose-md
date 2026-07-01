@@ -1,4 +1,5 @@
-import { App, Modal, Setting, Notice } from 'obsidian';
+import type { App} from 'obsidian';
+import { Modal, Setting, Notice } from 'obsidian';
 
 class ObjectSetRenameModal extends Modal {
   private currentName: string;
@@ -10,19 +11,19 @@ class ObjectSetRenameModal extends Modal {
     this.onSave = onSave;
   }
 
-  onOpen() {
+  onOpen(): void {
     const { contentEl } = this;
     contentEl.empty();
-    contentEl.createEl('h2', { text: 'Rename Object Set' });
+    contentEl.createEl('h2', { text: 'Rename object set' });
 
     let newName = this.currentName;
     new Setting(contentEl)
-      .setName('Set Name')
+      .setName('Set name')
       .addText(text => {
         text.setValue(this.currentName);
         text.onChange((v: string) => { newName = v; });
         // Auto-focus and select all
-        setTimeout(() => {
+        window.setTimeout(() => {
           text.inputEl.focus();
           text.inputEl.select();
         }, 50);
@@ -45,7 +46,7 @@ class ObjectSetRenameModal extends Modal {
     };
   }
 
-  onClose() {
+  onClose(): void {
     this.contentEl.empty();
   }
 }

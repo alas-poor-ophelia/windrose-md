@@ -84,7 +84,7 @@ interface FogSettingsSource {
 
 function getFogSettings(effectiveSettings: FogSettingsSource): FogSettings {
   return {
-    fowColor: effectiveSettings.fogOfWarColor || '#000000',
+    fowColor: effectiveSettings.fogOfWarColor != null && effectiveSettings.fogOfWarColor !== '' ? effectiveSettings.fogOfWarColor : '#000000',
     fowOpacity: effectiveSettings.fogOfWarOpacity ?? 0.9,
     fowImagePath: effectiveSettings.fogOfWarImage ?? undefined,
     fowBlurEnabled: effectiveSettings.fogOfWarBlurEnabled ?? false,
@@ -120,7 +120,7 @@ function getFogPatternSource(
   let source: CanvasImageSource = fowImage;
   let invScale = 1;
   if (scale < 1 && typeof document !== 'undefined') {
-    const c = document.createElement('canvas');
+    const c = activeDocument.createElement('canvas');
     c.width = Math.max(1, Math.round(fowImage.naturalWidth * scale));
     c.height = Math.max(1, Math.round(fowImage.naturalHeight * scale));
     const cctx = c.getContext('2d');
@@ -272,7 +272,7 @@ function calculateGridVisibleBounds(
 function calculateHexVisibleBounds(
   hexBounds?: { maxCol: number; maxRow: number }
 ): { minCol: number; maxCol: number; minRow: number; maxRow: number } {
-  const bounds = hexBounds || { maxCol: 100, maxRow: 100 };
+  const bounds = hexBounds ?? { maxCol: 100, maxRow: 100 };
   return {
     minCol: 0,
     maxCol: bounds.maxCol,

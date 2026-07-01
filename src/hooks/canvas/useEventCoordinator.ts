@@ -50,7 +50,7 @@ const useEventCoordinator = ({
 
   const [recentMultiTouch, setRecentMultiTouch] = useState<boolean>(false);
   const [, setPendingToolAction] = useState<PendingToolAction | null>(null);
-  const pendingToolTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingToolTimeoutRef = useRef<number | null>(null);
   const touchActiveRef = useRef(false);
 
   const panStartPositionRef = useRef<PanStartPosition | null>(null);
@@ -111,8 +111,8 @@ const useEventCoordinator = ({
 
     if (touchEvent.touches != null && touchEvent.touches.length === 2) {
       if (isColorPickerOpen || showObjectColorPicker) {
-        const touch1Target = document.elementFromPoint(touchEvent.touches[0].clientX, touchEvent.touches[0].clientY);
-        const touch2Target = document.elementFromPoint(touchEvent.touches[1].clientX, touchEvent.touches[1].clientY);
+        const touch1Target = activeDocument.elementFromPoint(touchEvent.touches[0].clientX, touchEvent.touches[0].clientY);
+        const touch2Target = activeDocument.elementFromPoint(touchEvent.touches[1].clientX, touchEvent.touches[1].clientY);
 
         const pickerOrButton1 = touch1Target?.closest('.windrose-color-picker, .windrose-color-tool-btn, .windrose-object-color-button');
         const pickerOrButton2 = touch2Target?.closest('.windrose-color-picker, .windrose-color-tool-btn, .windrose-object-color-button');
@@ -125,8 +125,8 @@ const useEventCoordinator = ({
       e.preventDefault();
       e.stopPropagation();
 
-      if (pendingToolTimeoutRef.current) {
-        clearTimeout(pendingToolTimeoutRef.current);
+      if (pendingToolTimeoutRef.current != null) {
+        window.clearTimeout(pendingToolTimeoutRef.current);
         pendingToolTimeoutRef.current = null;
         setPendingToolAction(null);
       }
@@ -368,7 +368,7 @@ const useEventCoordinator = ({
     if (isTouchEvent) {
       touchActiveRef.current = true;
       setPendingToolAction({ execute: executeToolAction });
-      pendingToolTimeoutRef.current = setTimeout(() => {
+      pendingToolTimeoutRef.current = window.setTimeout(() => {
         executeToolAction();
         setPendingToolAction(null);
         pendingToolTimeoutRef.current = null;
@@ -376,7 +376,7 @@ const useEventCoordinator = ({
     } else {
       executeToolAction();
     }
-  }, [currentTool, isColorPickerOpen, showObjectColorPicker, recentMultiTouch, selectedItem, hasMultiSelection, clearSelection, screenToWorld, getClickedSelectedItem, startGroupDrag, getHandlers, layerVisibility, isAlignmentMode]);
+  }, [currentTool, isColorPickerOpen, showObjectColorPicker, recentMultiTouch, selectedItem, hasMultiSelection, clearSelection, screenToWorld, getClickedSelectedItem, startGroupDrag, getHandlers, layerVisibility, isAlignmentMode, setSelectedItem]);
 
   const handlePointerMove = useCallback((e: MouseEvent | TouchEvent): void => {
     const drawingHandlers = getHandlers('drawing');
@@ -410,8 +410,8 @@ const useEventCoordinator = ({
       e.preventDefault();
       e.stopPropagation();
       if (isTouchPanningRef?.current === true) {
-        if (pendingToolTimeoutRef.current) {
-          clearTimeout(pendingToolTimeoutRef.current);
+        if (pendingToolTimeoutRef.current != null) {
+          window.clearTimeout(pendingToolTimeoutRef.current);
           pendingToolTimeoutRef.current = null;
           setPendingToolAction(null);
         }
@@ -427,8 +427,8 @@ const useEventCoordinator = ({
     }
 
     if (touchEvent.touches != null && touchEvent.touches.length > 1) {
-      if (pendingToolTimeoutRef.current) {
-        clearTimeout(pendingToolTimeoutRef.current);
+      if (pendingToolTimeoutRef.current != null) {
+        window.clearTimeout(pendingToolTimeoutRef.current);
         pendingToolTimeoutRef.current = null;
         setPendingToolAction(null);
       }
@@ -603,7 +603,7 @@ const useEventCoordinator = ({
     if (layerVisibility.objects && objectHandlers?.handleHoverUpdate) {
       objectHandlers.handleHoverUpdate(e);
     }
-  }, [currentTool, isDraggingSelection, dragStart, selectedItem, isGroupDragging, handleGroupDrag, getHandlers, layerVisibility, isAlignmentMode, geometry, screenToWorld]);
+  }, [currentTool, isDraggingSelection, dragStart, selectedItem, handleGroupDrag, getHandlers, layerVisibility, isAlignmentMode, geometry, screenToWorld]);
 
   const handlePointerUp = useCallback((e: MouseEvent | TouchEvent): void => {
     const drawingHandlers = getHandlers('drawing');
@@ -630,7 +630,7 @@ const useEventCoordinator = ({
     } = panZoomHandlers;
 
     if (recentMultiTouch) {
-      setTimeout(() => setRecentMultiTouch(false), 300);
+      window.setTimeout(() => setRecentMultiTouch(false), 300);
     }
 
     if (isPanning) {
@@ -735,14 +735,14 @@ const useEventCoordinator = ({
     if (fogHandlers?.handlePointerUp) {
       fogHandlers.handlePointerUp(e);
     }
-  }, [currentTool, recentMultiTouch, isDraggingSelection, dragStart, selectedItem, setSelectedItem, isGroupDragging, stopGroupDrag, getHandlers, isAlignmentMode]);
+  }, [currentTool, recentMultiTouch, isDraggingSelection, dragStart, selectedItem, setSelectedItem, stopGroupDrag, getHandlers, isAlignmentMode]);
 
   const handlePointerLeave = useCallback((_e: MouseEvent): void => {
     const drawingHandlers = getHandlers('drawing');
     const diagonalFillHandlers = getHandlers('diagonalFill');
 
-    if (pendingToolTimeoutRef.current) {
-      clearTimeout(pendingToolTimeoutRef.current);
+    if (pendingToolTimeoutRef.current != null) {
+      window.clearTimeout(pendingToolTimeoutRef.current);
       pendingToolTimeoutRef.current = null;
       setPendingToolAction(null);
     }
@@ -800,7 +800,7 @@ const useEventCoordinator = ({
     if (currentTool === 'select' && geometry?.type === 'hex' && screenToGrid != null) {
       const coords = screenToGrid(e.clientX, e.clientY);
       if (coords) {
-        document.dispatchEvent(new CustomEvent('windrose:enter-sub-hex', {
+        activeDocument.dispatchEvent(new CustomEvent('windrose:enter-sub-hex', {
           detail: { q: coords.x, r: coords.y }
         }));
         return;
@@ -846,14 +846,14 @@ const useEventCoordinator = ({
     // Try object/text context menu first — dispatch event for handlers to claim
     const contextDetail = { screenX: e.clientX, screenY: e.clientY, clientX: e.clientX, clientY: e.clientY, handled: false };
     const contextEvent = new CustomEvent('windrose:selection-context-menu', { detail: contextDetail });
-    document.dispatchEvent(contextEvent);
+    activeDocument.dispatchEvent(contextEvent);
     if (contextDetail.handled) return;
 
     // General hex context menu (dispatch for DungeonMapTracker to handle)
     if (geometry?.type === 'hex' && screenToGrid != null) {
       const coords = screenToGrid(e.clientX, e.clientY);
       if (coords) {
-        document.dispatchEvent(new CustomEvent('windrose:hex-context-menu', {
+        activeDocument.dispatchEvent(new CustomEvent('windrose:hex-context-menu', {
           detail: { q: coords.x, r: coords.y, screenX: e.clientX, screenY: e.clientY }
         }));
         return;
@@ -873,7 +873,7 @@ const useEventCoordinator = ({
   }, [getHandlers, geometry, screenToGrid]);
 
   // Long-press timer for touch context menu
-  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressTimerRef = useRef<number | null>(null);
   const lastTapRef = useRef<{ time: number; x: number; y: number } | null>(null);
 
   useEffect(() => {
@@ -904,8 +904,8 @@ const useEventCoordinator = ({
       const startX = touch.clientX;
       const startY = touch.clientY;
 
-      if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
-      longPressTimerRef.current = setTimeout(() => {
+      if (longPressTimerRef.current != null) window.clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = window.setTimeout(() => {
         longPressTimerRef.current = null;
         // Dispatch as context menu event
         handleContextMenu(new MouseEvent('contextmenu', { clientX: startX, clientY: startY }));
@@ -913,8 +913,8 @@ const useEventCoordinator = ({
     };
 
     const cancelLongPress = (): void => {
-      if (longPressTimerRef.current) {
-        clearTimeout(longPressTimerRef.current);
+      if (longPressTimerRef.current != null) {
+        window.clearTimeout(longPressTimerRef.current);
         longPressTimerRef.current = null;
       }
       lastTapRef.current = null;
@@ -1001,7 +1001,7 @@ const useEventCoordinator = ({
 
       if (panZoomHandlers?.isTouchPanningRef?.current === true) {
         panZoomHandlers.stopTouchPan();
-        setTimeout(() => setRecentMultiTouch(false), 100);
+        window.setTimeout(() => setRecentMultiTouch(false), 100);
       }
 
       if (objectHandlers?.stopObjectResizing) {
@@ -1058,7 +1058,7 @@ const useEventCoordinator = ({
       window.removeEventListener('mousemove', handleGlobalMouseMove);
       window.removeEventListener('touchmove', handleGlobalTouchMove);
     };
-  }, [isDraggingSelection, dragStart, setIsDraggingSelection, setDragStart, isGroupDragging, stopGroupDrag, getHandlers]);
+  }, [isDraggingSelection, dragStart, setIsDraggingSelection, setDragStart, isGroupDragging, stopGroupDrag, getHandlers, canvasRef]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent): void => {
@@ -1090,8 +1090,8 @@ const useEventCoordinator = ({
 
   useEffect(() => {
     return () => {
-      if (pendingToolTimeoutRef.current) {
-        clearTimeout(pendingToolTimeoutRef.current);
+      if (pendingToolTimeoutRef.current != null) {
+        window.clearTimeout(pendingToolTimeoutRef.current);
       }
     };
   }, []);

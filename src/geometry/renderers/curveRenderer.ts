@@ -492,7 +492,7 @@ function renderCurves(
       for (let ci = 0; ci < group.curveIndices.length; ci++) {
         const rects = mergeIndex.curveCellRects?.get(group.curveIndices[ci]);
         if (rects && rects.length > 0) {
-          if (!aggregatedRects) aggregatedRects = [];
+          aggregatedRects ??= [];
           for (let r = 0; r < rects.length; r++) {
             aggregatedRects.push(rects[r]);
           }

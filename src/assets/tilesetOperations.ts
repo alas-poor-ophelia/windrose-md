@@ -3,7 +3,8 @@
  * Operations for importing and managing hex tile sets from vault folders.
  */
 
-import type { TilesetDef, FolderTileset, TileEntry } from '#types/tiles/tile.types';
+import type { TilesetDef, FolderTileset, TileEntry, TilesetOrigin } from '#types/tiles/tile.types';
+import { TFile } from 'obsidian';
 import type { App } from 'obsidian';
 
 import { getApp } from '../core/settingsAccessor';
@@ -28,7 +29,7 @@ function generateTilesetId(folderPath?: string): string {
     }
     return 'tileset-' + Math.abs(hash).toString(36);
   }
-  return 'tileset-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+  return 'tileset-' + Date.now() + '-' + Math.random().toString(36).slice(2, 11);
 }
 
 // ===========================================
@@ -126,9 +127,9 @@ async function scanTilesetFolder(app: App, folderPath: string): Promise<TileEntr
 async function measureAlphaCoverage(app: App, tile: TileEntry): Promise<number | null> {
   try {
     const file = app.vault.getAbstractFileByPath(tile.vaultPath);
-    if (!file) return null;
+    if (!(file instanceof TFile)) return null;
 
-    const binary = await app.vault.readBinary(file as import('obsidian').TFile);
+    const binary = await app.vault.readBinary(file);
     const blob = new Blob([binary]);
     const url = URL.createObjectURL(blob);
 
@@ -139,7 +140,7 @@ async function measureAlphaCoverage(app: App, tile: TileEntry): Promise<number |
         const h = img.naturalHeight;
         if (w === 0 || h === 0) { resolve(null); URL.revokeObjectURL(url); return; }
 
-        const canvas = document.createElement('canvas');
+        const canvas = activeDocument.createElement('canvas');
         canvas.width = w;
         canvas.height = h;
         // willReadFrequently: software-backed canvas so getImageData doesn't stall the GPU.
@@ -181,9 +182,9 @@ async function probeFirstTileImage(app: App, tiles: TileEntry[]): Promise<{ widt
     if (sizes.length >= MAX_PROBES) break;
     try {
       const file = app.vault.getAbstractFileByPath(tile.vaultPath);
-      if (!file) continue;
+      if (!(file instanceof TFile)) continue;
 
-      const binary = await app.vault.readBinary(file as import('obsidian').TFile);
+      const binary = await app.vault.readBinary(file);
       const blob = new Blob([binary]);
       const url = URL.createObjectURL(blob);
 
@@ -259,10 +260,17 @@ function createTilesetFromTiles(
 
   const detected = autoDetectOverflow(tileWidth, tileHeight);
 
+  // Provenance: Dungeondraft imports extract under `.../dungeondraft-packs/`,
+  // so a tile path under that segment marks the whole set as DD-origin.
+  const origin: TilesetOrigin = tiles.some(t => t.vaultPath.includes('/dungeondraft-packs/'))
+    ? 'dungeondraft'
+    : 'native';
+
   return {
     source: 'folder' as const,
     id: generateTilesetId(folderPath),
     name,
+    origin,
     folderPath,
     tileWidth,
     tileHeight,

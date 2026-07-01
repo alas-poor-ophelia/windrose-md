@@ -25,7 +25,7 @@ interface NativeToggleProps {
   disabled?: boolean;
 }
 
-function NativeToggle({ value, onChange, disabled }: NativeToggleProps) {
+function NativeToggle({ value, onChange, disabled }: NativeToggleProps): h.JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null);
   const toggleRef = useRef<ToggleComponent | null>(null);
 
@@ -38,7 +38,7 @@ function NativeToggle({ value, onChange, disabled }: NativeToggleProps) {
 
     try {
       // Create a temporary setting to extract its toggle component
-      const tempContainer = document.createElement('div');
+      const tempContainer = activeDocument.createElement('div');
       const setting = new Setting(tempContainer);
       let toggleInstance: ToggleComponent | null = null;
 
@@ -58,15 +58,15 @@ function NativeToggle({ value, onChange, disabled }: NativeToggleProps) {
 
       toggleRef.current = toggleInstance;
 
+      const containerEl = containerRef.current;
       return () => {
-        if (containerRef.current) {
-          containerRef.current.innerHTML = '';
-        }
+        containerEl.innerHTML = '';
       };
     } catch {
       // Fallback will render
       return undefined;
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- builds native toggle once; value/disabled live-updated by sibling effects keyed on [value]/[disabled]
   }, []);
 
   // Update value without recreating
@@ -100,7 +100,7 @@ interface NativeDropdownProps {
   disabled?: boolean;
 }
 
-function NativeDropdown({ value, options, onChange, disabled }: NativeDropdownProps) {
+function NativeDropdown({ value, options, onChange, disabled }: NativeDropdownProps): h.JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<DropdownComponent | null>(null);
 
@@ -111,7 +111,7 @@ function NativeDropdown({ value, options, onChange, disabled }: NativeDropdownPr
     if (!containerRef.current) return undefined;
 
     try {
-      const tempContainer = document.createElement('div');
+      const tempContainer = activeDocument.createElement('div');
       const setting = new Setting(tempContainer);
       let dropdownInstance: DropdownComponent | null = null;
 
@@ -133,15 +133,15 @@ function NativeDropdown({ value, options, onChange, disabled }: NativeDropdownPr
 
       dropdownRef.current = dropdownInstance;
 
+      const containerEl = containerRef.current;
       return () => {
-        if (containerRef.current) {
-          containerRef.current.innerHTML = '';
-        }
+        containerEl.innerHTML = '';
       };
     } catch {
       // Fallback will render
       return undefined;
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- builds native dropdown once; value/disabled via siblings; options set imperatively at creation
   }, []);
 
   useEffect(() => {
@@ -170,7 +170,7 @@ interface NativeSliderProps {
   disabled?: boolean;
 }
 
-function NativeSlider({ value, min, max, step, onChange, disabled }: NativeSliderProps) {
+function NativeSlider({ value, min, max, step, onChange, disabled }: NativeSliderProps): h.JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null);
   const sliderRef = useRef<SliderComponent | null>(null);
 
@@ -181,7 +181,7 @@ function NativeSlider({ value, min, max, step, onChange, disabled }: NativeSlide
     if (!containerRef.current) return undefined;
 
     try {
-      const tempContainer = document.createElement('div');
+      const tempContainer = activeDocument.createElement('div');
       const setting = new Setting(tempContainer);
       let sliderInstance: SliderComponent | null = null;
 
@@ -201,15 +201,15 @@ function NativeSlider({ value, min, max, step, onChange, disabled }: NativeSlide
 
       sliderRef.current = sliderInstance;
 
+      const containerEl = containerRef.current;
       return () => {
-        if (containerRef.current) {
-          containerRef.current.innerHTML = '';
-        }
+        containerEl.innerHTML = '';
       };
     } catch {
       // Fallback will render
       return undefined;
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- builds native slider once; value/disabled via siblings; min/max/step fixed at setLimits()
   }, []);
 
   useEffect(() => {

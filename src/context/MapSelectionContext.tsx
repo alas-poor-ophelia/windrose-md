@@ -88,7 +88,7 @@ const MapSelectionProvider: FunctionComponent<MapSelectionProviderProps> = ({ ch
    * Select multiple items (replaces existing selection)
    */
   const selectMultiple = useCallback((items: SelectedItem[] | null): void => {
-    setSelectedItems(items || []);
+    setSelectedItems(items ?? []);
   }, []);
 
   /**

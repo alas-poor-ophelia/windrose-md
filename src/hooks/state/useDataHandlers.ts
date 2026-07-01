@@ -10,7 +10,7 @@
  */
 
 // Type-only imports
-import type { MapLayer, StoredViewState, TextLabelSettings } from '#types/core/map.types';
+import type { MapLayer, StoredViewState, TextLabelSettings, Region, Outline, ShapeOverlay, FogOfWar } from '#types/core/map.types';
 import type { CustomColor } from '#types/core/common.types';
 import type { Cell } from '#types/core/cell.types';
 import type { Curve } from '#types/core/curve.types';
@@ -28,7 +28,7 @@ import type {
 import type { LayerHistorySnapshot } from '#types/hooks/layerHistory.types';
 
 import { useCallback, useMemo } from 'preact/hooks';
-import { getActiveLayer, updateActiveLayer } from '../../persistence/layerAccessor';
+import { getActiveLayer, updateActiveLayer, promoteToStrata } from '../../persistence/layerAccessor';
 
 
 /**
@@ -49,10 +49,10 @@ function useDataHandlers({
     layer: MapLayer,
     name: string,
     overrides: Partial<LayerHistorySnapshot> = {},
-    regions: import('#types/core/map.types').Region[] = [],
-    outlines: import('#types/core/map.types').Outline[] = [],
-    shapeOverlays: import('#types/core/map.types').ShapeOverlay[] = [],
-    fogOfWar: import('#types/core/map.types').FogOfWar | null = null
+    regions: Region[] = [],
+    outlines: Outline[] = [],
+    shapeOverlays: ShapeOverlay[] = [],
+    fogOfWar: FogOfWar | null = null
   ): LayerHistorySnapshot => ({
     cells: overrides.cells ?? layer.cells ?? [],
     curves: overrides.curves ?? layer.curves ?? [],
@@ -79,13 +79,13 @@ function useDataHandlers({
       if (isApplyingHistory()) return;
 
       updateMapData((currentMapData) => {
-        if (!currentMapData) return currentMapData;
+        if (currentMapData == null) return currentMapData;
 
         const newMapData = updateActiveLayer(currentMapData, { [field]: newValue });
 
         if (!suppressHistory) {
           const activeLayer = getActiveLayer(currentMapData);
-          addToHistory(buildLayerHistorySnapshot(activeLayer, currentMapData.name ?? '', { [field]: newValue } as Partial<LayerHistorySnapshot>, currentMapData.regions || [], currentMapData.outlines || [], currentMapData.shapeOverlays || [], activeLayer.fogOfWar));
+          addToHistory(buildLayerHistorySnapshot(activeLayer, currentMapData.name ?? '', { [field]: newValue } as Partial<LayerHistorySnapshot>, currentMapData.regions ?? [], currentMapData.outlines ?? [], currentMapData.shapeOverlays ?? [], activeLayer.fogOfWar));
         }
 
         return newMapData;
@@ -122,9 +122,34 @@ function useDataHandlers({
     [createLayerDataHandler]
   );
 
-  const handleTilesChange = useMemo(
-    () => createLayerDataHandler<TileAssignment[]>('tiles'),
-    [createLayerDataHandler]
+  // Tiles get a dedicated handler (not the generic factory): the first time a
+  // Simple map ever gains a tile it is promoted to Strata mode, so tile maps
+  // surface the Board→Strata→Layer hierarchy by default. promoteToStrata is the
+  // same idempotent operation the Simple/Strata toggle runs.
+  const handleTilesChange = useCallback(
+    (newValue: TileAssignment[], suppressHistory = false): void => {
+      if (isApplyingHistory()) return;
+
+      updateMapData((currentMapData) => {
+        if (currentMapData == null) return currentMapData;
+
+        const activeLayer = getActiveLayer(currentMapData);
+        if (!suppressHistory) {
+          addToHistory(buildLayerHistorySnapshot(activeLayer, currentMapData.name ?? '', { tiles: newValue } as Partial<LayerHistorySnapshot>, currentMapData.regions ?? [], currentMapData.outlines ?? [], currentMapData.shapeOverlays ?? [], activeLayer.fogOfWar));
+        }
+
+        let nextMapData = updateActiveLayer(currentMapData, { tiles: newValue });
+
+        // 0→first-tile transition (anywhere on the map) promotes Simple → Strata, once.
+        const mapHadTiles = currentMapData.layers.some(l => (l.tiles?.length ?? 0) > 0);
+        if (currentMapData.layerMode !== 'strata' && !mapHadTiles && newValue.length > 0) {
+          nextMapData = promoteToStrata(nextMapData);
+        }
+
+        return nextMapData;
+      });
+    },
+    [updateMapData, addToHistory, isApplyingHistory, buildLayerHistorySnapshot]
   );
 
   const handleWallPathsChange = useMemo(
@@ -141,10 +166,10 @@ function useDataHandlers({
     if (isApplyingHistory()) return;
 
     updateMapData((currentMapData) => {
-      if (!currentMapData) return currentMapData;
+      if (currentMapData == null) return currentMapData;
 
       const activeLayer = getActiveLayer(currentMapData);
-      addToHistory(buildLayerHistorySnapshot(activeLayer, newName, {}, currentMapData.regions || []));
+      addToHistory(buildLayerHistorySnapshot(activeLayer, newName, {}, currentMapData.regions ?? []));
 
       return { ...currentMapData, name: newName };
     });
@@ -153,7 +178,7 @@ function useDataHandlers({
   // Handle adding a custom color
   const handleAddCustomColor = useCallback((newColor: HexColor): void => {
     updateMapData((currentMapData) => {
-      if (!currentMapData) return currentMapData;
+      if (currentMapData == null) return currentMapData;
 
       const customColorId = `custom-${Date.now()}`;
       const customColorNumber = (currentMapData.customColors?.length ?? 0) + 1;
@@ -167,7 +192,7 @@ function useDataHandlers({
 
       return {
         ...currentMapData,
-        customColors: [...(currentMapData.customColors || []), newCustomColor]
+        customColors: [...(currentMapData.customColors ?? []), newCustomColor]
       };
     });
   }, [updateMapData]);
@@ -175,11 +200,11 @@ function useDataHandlers({
   // Handle deleting a custom color
   const handleDeleteCustomColor = useCallback((colorId: string): void => {
     updateMapData((currentMapData) => {
-      if (!currentMapData) return currentMapData;
+      if (currentMapData == null) return currentMapData;
 
       return {
         ...currentMapData,
-        customColors: (currentMapData.customColors || []).filter(c => c.id !== colorId)
+        customColors: (currentMapData.customColors ?? []).filter(c => c.id !== colorId)
       };
     });
   }, [updateMapData]);
@@ -187,14 +212,14 @@ function useDataHandlers({
   // Handle updating a color's opacity
   const handleUpdateColorOpacity = useCallback((colorId: string, newOpacity: number): void => {
     updateMapData((currentMapData) => {
-      if (!currentMapData) return currentMapData;
+      if (currentMapData == null) return currentMapData;
 
-      const isCustomColor = (currentMapData.customColors || []).some(c => c.id === colorId);
+      const isCustomColor = (currentMapData.customColors ?? []).some(c => c.id === colorId);
 
       if (isCustomColor) {
         return {
           ...currentMapData,
-          customColors: (currentMapData.customColors || []).map(c =>
+          customColors: (currentMapData.customColors ?? []).map(c =>
             c.id === colorId ? { ...c, opacity: newOpacity } : c
           )
         };
@@ -202,7 +227,7 @@ function useDataHandlers({
         return {
           ...currentMapData,
           paletteColorOpacityOverrides: {
-            ...(currentMapData.paletteColorOpacityOverrides || {}),
+            ...(currentMapData.paletteColorOpacityOverrides ?? {}),
             [colorId]: newOpacity
           }
         };
@@ -213,7 +238,7 @@ function useDataHandlers({
   // Handle view state change - NOT tracked in history
   const handleViewStateChange = useCallback((newViewState: StoredViewState): void => {
     updateMapData((currentMapData) => {
-      if (!currentMapData) return currentMapData;
+      if (currentMapData == null) return currentMapData;
       return { ...currentMapData, viewState: newViewState };
     });
   }, [updateMapData]);
@@ -221,7 +246,7 @@ function useDataHandlers({
   // Handle sidebar collapse state change - NOT tracked in history
   const handleSidebarCollapseChange = useCallback((collapsed: boolean): void => {
     updateMapData((currentMapData) => {
-      if (!currentMapData) return currentMapData;
+      if (currentMapData == null) return currentMapData;
       return { ...currentMapData, sidebarCollapsed: collapsed };
     });
   }, [updateMapData]);
@@ -229,7 +254,7 @@ function useDataHandlers({
   // Handle object set change - NOT tracked in history
   const handleObjectSetChange = useCallback((setId: string | null): void => {
     updateMapData((currentMapData) => {
-      if (!currentMapData) return currentMapData;
+      if (currentMapData == null) return currentMapData;
       return { ...currentMapData, objectSetId: setId };
     });
   }, [updateMapData]);
@@ -237,17 +262,17 @@ function useDataHandlers({
   // Handle text label settings change - NOT tracked in history
   const handleTextLabelSettingsChange = useCallback((settings: TextLabelSettings): void => {
     updateMapData((currentMapData) => {
-      if (!currentMapData) return currentMapData;
+      if (currentMapData == null) return currentMapData;
       return { ...currentMapData, lastTextLabelSettings: settings };
     });
   }, [updateMapData]);
 
   // Handle regions change (hex maps only) - tracked in history for undo/redo
-  const handleRegionsChange = useCallback((regions: import('#types/core/map.types').Region[]): void => {
+  const handleRegionsChange = useCallback((regions: Region[]): void => {
     if (isApplyingHistory()) return;
 
     updateMapData((currentMapData) => {
-      if (!currentMapData) return currentMapData;
+      if (currentMapData == null) return currentMapData;
 
       const activeLayer = getActiveLayer(currentMapData);
       addToHistory(buildLayerHistorySnapshot(activeLayer, currentMapData.name ?? '', {}, regions));
@@ -257,28 +282,28 @@ function useDataHandlers({
   }, [updateMapData, addToHistory, isApplyingHistory, buildLayerHistorySnapshot]);
 
   // Handle outlines change (hex maps only) - tracked in history for undo/redo
-  const handleOutlinesChange = useCallback((outlines: import('#types/core/map.types').Outline[]): void => {
+  const handleOutlinesChange = useCallback((outlines: Outline[]): void => {
     if (isApplyingHistory()) return;
 
     updateMapData((currentMapData) => {
-      if (!currentMapData) return currentMapData;
+      if (currentMapData == null) return currentMapData;
 
       const activeLayer = getActiveLayer(currentMapData);
-      addToHistory(buildLayerHistorySnapshot(activeLayer, currentMapData.name ?? '', {}, currentMapData.regions || [], outlines));
+      addToHistory(buildLayerHistorySnapshot(activeLayer, currentMapData.name ?? '', {}, currentMapData.regions ?? [], outlines));
 
       return { ...currentMapData, outlines };
     });
   }, [updateMapData, addToHistory, isApplyingHistory, buildLayerHistorySnapshot]);
 
   // Handle shape overlays change - tracked in history for undo/redo
-  const handleShapeOverlaysChange = useCallback((shapeOverlays: import('#types/core/map.types').ShapeOverlay[]): void => {
+  const handleShapeOverlaysChange = useCallback((shapeOverlays: ShapeOverlay[]): void => {
     if (isApplyingHistory()) return;
 
     updateMapData((currentMapData) => {
-      if (!currentMapData) return currentMapData;
+      if (currentMapData == null) return currentMapData;
 
       const activeLayer = getActiveLayer(currentMapData);
-      addToHistory(buildLayerHistorySnapshot(activeLayer, currentMapData.name ?? '', {}, currentMapData.regions || [], currentMapData.outlines || [], shapeOverlays));
+      addToHistory(buildLayerHistorySnapshot(activeLayer, currentMapData.name ?? '', {}, currentMapData.regions ?? [], currentMapData.outlines ?? [], shapeOverlays));
 
       return { ...currentMapData, shapeOverlays };
     });

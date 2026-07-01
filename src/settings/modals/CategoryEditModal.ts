@@ -1,4 +1,5 @@
-import { App, Modal, Setting, Notice } from 'obsidian';
+import type { App} from 'obsidian';
+import { Modal, Setting, Notice } from 'obsidian';
 import type { PluginSettings, CustomCategory } from '#types/settings/settings.types';
 
 interface WindrosePlugin {
@@ -23,11 +24,11 @@ class CategoryEditModal extends Modal {
     this.onSave = onSave;
     this.mapType = mapType;
 
-    this.label = existingCategory?.label || '';
+    this.label = existingCategory?.label ?? '';
     this.order = existingCategory?.order ?? 100;
   }
 
-  onOpen() {
+  onOpen(): void {
     const { contentEl } = this;
     contentEl.empty();
     contentEl.addClass('windrose-category-edit-modal');
@@ -43,19 +44,19 @@ class CategoryEditModal extends Modal {
       .addText(text => {
         nameInputEl = text.inputEl;
         text.setValue(this.label)
-          .setPlaceholder('e.g., Alchemy')
+          .setPlaceholder('E.g., alchemy')
           .onChange((value: string) => {
             this.label = value;
           });
       });
 
     // Focus the name input after a short delay
-    if (nameInputEl) {
-      setTimeout(() => (nameInputEl as HTMLInputElement).focus(), 50);
+    if (nameInputEl != null) {
+      window.setTimeout(() => (nameInputEl as HTMLInputElement).focus(), 50);
     }
 
     new Setting(contentEl)
-      .setName('Sort Order')
+      .setName('Sort order')
       .setDesc('Lower numbers appear first (built-ins use 0-50)')
       .addText(text => text
         .setValue(String(this.order))
@@ -76,7 +77,7 @@ class CategoryEditModal extends Modal {
     saveBtn.onclick = () => this.save();
   }
 
-  save() {
+  save(): void {
     if (!this.label || this.label.trim().length === 0) {
       new Notice('Please enter a category name');
       return;
@@ -85,14 +86,13 @@ class CategoryEditModal extends Modal {
     // Get the correct settings key for this map type
     const categoriesKey: CategoriesKey = this.mapType === 'hex' ? 'customHexCategories' : 'customGridCategories';
 
-    if (!this.plugin.settings[categoriesKey]) {
-      this.plugin.settings[categoriesKey] = [];
-    }
+    this.plugin.settings[categoriesKey] ??= [];
 
-    const categories = this.plugin.settings[categoriesKey]!;
+    const categories = this.plugin.settings[categoriesKey];
 
     if (this.existingCategory) {
-      const idx = categories.findIndex((c: CustomCategory) => c.id === this.existingCategory!.id);
+      const existing = this.existingCategory;
+      const idx = categories.findIndex((c: CustomCategory) => c.id === existing.id);
       if (idx !== -1) {
         categories[idx] = {
           ...categories[idx],
@@ -102,7 +102,7 @@ class CategoryEditModal extends Modal {
       }
     } else {
       const newCategory: CustomCategory = {
-        id: 'custom-cat-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9),
+        id: 'custom-cat-' + Date.now() + '-' + Math.random().toString(36).slice(2, 11),
         label: this.label.trim(),
         order: this.order
       };
@@ -114,7 +114,7 @@ class CategoryEditModal extends Modal {
     this.close();
   }
 
-  onClose() {
+  onClose(): void {
     this.contentEl.empty();
   }
 }

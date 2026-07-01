@@ -163,9 +163,7 @@ const gridRenderer = {
       const cellsByColor: Record<string, RenderCell[]> = {};
       for (const cell of fullOpacityCells) {
         const color = cell.color;
-        if (cellsByColor[color] == null) {
-          cellsByColor[color] = [];
-        }
+        cellsByColor[color] ??= [];
         cellsByColor[color]?.push(cell);
       }
       

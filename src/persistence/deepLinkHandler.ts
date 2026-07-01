@@ -81,7 +81,7 @@ function generateDeepLinkMarkdown(
   zoom: number,
   layerId: string
 ): string {
-  const escapedText = displayText.replace(/[\[\]()]/g, '');
+  const escapedText = displayText.replace(/[[\]()]/g, '');
   const url = generateDeepLink(notePath, mapId, x, y, zoom, layerId);
   return `[${escapedText}](${url})`;
 }
@@ -100,7 +100,6 @@ function copyDeepLinkToClipboard(
   navigator.clipboard.writeText(markdown).then(() => {
     new Notice('Deep link copied to clipboard');
   }).catch((err: Error) => {
-    // eslint-disable-next-line no-console
     console.error('Failed to copy link:', err);
     new Notice('Failed to copy link');
   });

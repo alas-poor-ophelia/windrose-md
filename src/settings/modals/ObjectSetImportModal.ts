@@ -1,5 +1,6 @@
-import { App, Modal, Setting, Notice } from 'obsidian';
-import type { TFile } from 'obsidian';
+import { Modal, Setting, Notice } from 'obsidian';
+import { TFile } from 'obsidian';
+import type { App } from 'obsidian';
 import type { PluginSettings } from '#types/settings/settings.types';
 import { ObjectSetHelpers } from '../helpers/objectSetHelpers';
 import { FolderSuggest } from '../helpers/FolderSuggest';
@@ -8,6 +9,13 @@ interface WindrosePlugin {
   app: App;
   settings: PluginSettings;
   saveSettings(): Promise<void>;
+}
+
+interface ObjectSetImportData {
+  windroseMD_objectSet?: boolean;
+  hex?: Record<string, unknown>;
+  grid?: Record<string, unknown>;
+  [key: string]: unknown;
 }
 
 class ObjectSetImportModal extends Modal {
@@ -20,12 +28,12 @@ class ObjectSetImportModal extends Modal {
     this.onImport = onImport;
   }
 
-  onOpen() {
+  onOpen(): void {
     const { contentEl } = this;
     contentEl.empty();
     contentEl.addClass('windrose-import-modal');
 
-    contentEl.createEl('h2', { text: 'Import Object Set from Folder' });
+    contentEl.createEl('h2', { text: 'Import object set from folder' });
 
     contentEl.createEl('p', {
       text: 'Enter the vault path to a folder containing objects.json.',
@@ -34,10 +42,10 @@ class ObjectSetImportModal extends Modal {
 
     let folderPath = '';
     const previewArea = contentEl.createDiv({ cls: 'windrose-import-preview' });
-    previewArea.style.display = 'none';
+    previewArea.hide();
 
     new Setting(contentEl)
-      .setName('Folder Path')
+      .setName('Folder path')
       .setDesc('Vault-relative path (e.g. object-sets/my-set)')
       .addSearch(search => {
         new FolderSuggest(this.app, search.inputEl);
@@ -52,47 +60,47 @@ class ObjectSetImportModal extends Modal {
 
           if (!folderPath) {
             previewArea.createEl('p', { text: 'Enter a folder path first.', cls: 'windrose-import-error' });
-            previewArea.style.display = 'block';
+            previewArea.show();
             return;
           }
 
           const folder = this.app.vault.getAbstractFileByPath(folderPath) as { children?: unknown[] } | null;
           if (!folder || !folder.children) {
             previewArea.createEl('p', { text: 'Folder not found: ' + folderPath, cls: 'windrose-import-error' });
-            previewArea.style.display = 'block';
+            previewArea.show();
             return;
           }
 
           const jsonFile = this.app.vault.getAbstractFileByPath(folderPath + '/objects.json');
-          if (!jsonFile) {
+          if (!(jsonFile instanceof TFile)) {
             previewArea.createEl('p', { text: 'No objects.json found in this folder.', cls: 'windrose-import-error' });
-            previewArea.style.display = 'block';
+            previewArea.show();
             return;
           }
 
           try {
-            const content = await this.app.vault.read(jsonFile as TFile);
-            const data = JSON.parse(content) as Record<string, unknown>;
+            const content = await this.app.vault.read(jsonFile);
+            const data = JSON.parse(content) as ObjectSetImportData;
 
-            if (!data.windroseMD_objectSet) {
+            if (data.windroseMD_objectSet !== true) {
               previewArea.createEl('p', { text: 'Not a valid Windrose object set.', cls: 'windrose-import-error' });
-              previewArea.style.display = 'block';
+              previewArea.show();
               return;
             }
 
             previewArea.createEl('p', { text: 'Valid object set: ' + ((data.name as string) || 'Unnamed') });
 
             const scope: string[] = [];
-            if (data.hex) {
-              const hexData = data.hex as Record<string, unknown>;
-              const objCount = ((hexData.customObjects as unknown[]) || []).length;
-              const overCount = Object.keys((hexData.objectOverrides as Record<string, unknown>) || {}).length;
+            if (data.hex != null) {
+              const hexData = data.hex;
+              const objCount = ((hexData.customObjects as unknown[]) ?? []).length;
+              const overCount = Object.keys((hexData.objectOverrides as Record<string, unknown>) ?? {}).length;
               scope.push('Hex: ' + objCount + ' custom, ' + overCount + ' overrides');
             }
-            if (data.grid) {
-              const gridData = data.grid as Record<string, unknown>;
-              const objCount = ((gridData.customObjects as unknown[]) || []).length;
-              const overCount = Object.keys((gridData.objectOverrides as Record<string, unknown>) || {}).length;
+            if (data.grid != null) {
+              const gridData = data.grid;
+              const objCount = ((gridData.customObjects as unknown[]) ?? []).length;
+              const overCount = Object.keys((gridData.objectOverrides as Record<string, unknown>) ?? {}).length;
               scope.push('Grid: ' + objCount + ' custom, ' + overCount + ' overrides');
             }
             for (const line of scope) {
@@ -100,7 +108,7 @@ class ObjectSetImportModal extends Modal {
             }
 
             // Check for duplicate name
-            const existing = (this.plugin.settings.objectSets || []).find(s => s.name === data.name);
+            const existing = (this.plugin.settings.objectSets ?? []).find(s => s.name === data.name);
             if (existing) {
               previewArea.createEl('p', {
                 text: 'A set named "' + (data.name as string) + '" already exists. It will be imported with a unique name.',
@@ -108,10 +116,10 @@ class ObjectSetImportModal extends Modal {
               });
             }
 
-            previewArea.style.display = 'block';
+            previewArea.show();
           } catch (err: unknown) {
             previewArea.createEl('p', { text: 'Error reading: ' + (err as Error).message, cls: 'windrose-import-error' });
-            previewArea.style.display = 'block';
+            previewArea.show();
           }
         }));
 
@@ -139,7 +147,7 @@ class ObjectSetImportModal extends Modal {
     };
   }
 
-  onClose() {
+  onClose(): void {
     this.contentEl.empty();
   }
 }

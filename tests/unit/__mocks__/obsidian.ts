@@ -56,3 +56,18 @@ export const Platform = {
   isMobile: false,
   isDesktop: true,
 };
+
+export class TAbstractFile {
+  path = '';
+  name = '';
+}
+
+export class TFile extends TAbstractFile {
+  extension = '';
+  basename = '';
+  stat = { ctime: 0, mtime: 0, size: 0 };
+}
+
+export class TFolder extends TAbstractFile {
+  children: TAbstractFile[] = [];
+}

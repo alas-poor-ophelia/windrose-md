@@ -2,6 +2,7 @@ import type { App } from 'obsidian';
 import type { PluginSettings, ObjectOverride, CustomObject, CustomCategory } from '#types/settings/settings.types';
 
 interface WindrosePlugin {
+  app: App;
   settings: PluginSettings;
   saveSettings(): Promise<void>;
 }

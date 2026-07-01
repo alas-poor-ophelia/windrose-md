@@ -1,5 +1,6 @@
-import { App, Modal, Setting, Notice } from 'obsidian';
-import type { PluginSettings, CustomObject, CustomCategory, ObjectOverride } from '#types/settings/settings.types';
+import type { App } from 'obsidian';
+import { Modal, Setting, Notice } from 'obsidian';
+import type { PluginSettings, CustomObject, CustomCategory } from '#types/settings/settings.types';
 
 interface WindrosePlugin {
   settings: PluginSettings;
@@ -10,11 +11,20 @@ type OverridesKey = 'hexObjectOverrides' | 'gridObjectOverrides';
 type CustomObjectsKey = 'customHexObjects' | 'customGridObjects';
 type CategoriesKey = 'customHexCategories' | 'customGridCategories';
 
+interface ObjectExportData {
+  windroseMD_objectExport?: boolean;
+  exportedAt?: string;
+  mapType?: string;
+  objectOverrides?: Record<string, unknown>;
+  customObjects?: unknown[];
+  customCategories?: unknown[];
+}
+
 class ImportModal extends Modal {
   private plugin: WindrosePlugin;
   private onImport: () => void;
   private mapType: string;
-  private importData: Record<string, unknown> | null;
+  private importData: ObjectExportData | null;
 
   constructor(app: App, plugin: WindrosePlugin, onImport: () => void, mapType: string = 'grid') {
     super(app);
@@ -24,7 +34,7 @@ class ImportModal extends Modal {
     this.importData = null;
   }
 
-  onOpen() {
+  onOpen(): void {
     const { contentEl } = this;
     contentEl.empty();
     contentEl.addClass('windrose-import-modal');
@@ -46,31 +56,31 @@ class ImportModal extends Modal {
 
     // Preview area (hidden until file selected)
     const previewArea = contentEl.createDiv({ cls: 'windrose-import-preview' });
-    previewArea.style.display = 'none';
+    previewArea.hide();
 
     // Import options (hidden until file validated)
     const optionsArea = contentEl.createDiv({ cls: 'windrose-import-options' });
-    optionsArea.style.display = 'none';
+    optionsArea.hide();
 
     let mergeMode = 'merge'; // 'merge' or 'replace'
 
-    fileInput.addEventListener('change', async (e: Event) => {
+    fileInput.addEventListener('change', (e: Event) => { void (async () => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (!file) return;
 
       try {
         const text = await file.text();
-        const data = JSON.parse(text) as Record<string, unknown>;
+        const data = JSON.parse(text) as ObjectExportData;
 
         // Validate it's a Windrose export
-        if (!data.windroseMD_objectExport) {
+        if (data.windroseMD_objectExport !== true) {
           previewArea.empty();
           previewArea.createEl('p', {
             text: 'This file is not a valid Windrose MD object export.',
             cls: 'windrose-import-error'
           });
-          previewArea.style.display = 'block';
-          optionsArea.style.display = 'none';
+          previewArea.show();
+          optionsArea.hide();
           this.importData = null;
           return;
         }
@@ -80,15 +90,15 @@ class ImportModal extends Modal {
         // Show preview
         previewArea.empty();
         previewArea.createEl('p', { text: 'Valid Windrose MD export file' });
-        if (data.exportedAt) {
+        if (data.exportedAt != null && data.exportedAt !== '') {
           previewArea.createEl('p', {
-            text: `Exported: ${new Date(data.exportedAt as string).toLocaleString()}`,
+            text: `Exported: ${new Date(data.exportedAt).toLocaleString()}`,
             cls: 'windrose-import-date'
           });
         }
 
         // Show original map type if present
-        if (data.mapType) {
+        if (data.mapType != null && data.mapType !== '') {
           const sourceType = data.mapType === 'hex' ? 'Hex' : 'Grid';
           if (data.mapType !== this.mapType) {
             previewArea.createEl('p', {
@@ -98,9 +108,9 @@ class ImportModal extends Modal {
           }
         }
 
-        const overrideCount = data.objectOverrides ? Object.keys(data.objectOverrides as Record<string, unknown>).length : 0;
-        const customObjCount = (data.customObjects as unknown[] | undefined)?.length || 0;
-        const customCatCount = (data.customCategories as unknown[] | undefined)?.length || 0;
+        const overrideCount = data.objectOverrides != null ? Object.keys(data.objectOverrides).length : 0;
+        const customObjCount = data.customObjects?.length ?? 0;
+        const customCatCount = data.customCategories?.length ?? 0;
 
         if (overrideCount > 0) {
           previewArea.createEl('p', { text: `• ${overrideCount} built-in modification(s)` });
@@ -112,12 +122,12 @@ class ImportModal extends Modal {
           previewArea.createEl('p', { text: `• ${customCatCount} custom category(ies)` });
         }
 
-        previewArea.style.display = 'block';
+        previewArea.show();
 
         // Show import options
         optionsArea.empty();
         new Setting(optionsArea)
-          .setName('Import Mode')
+          .setName('Import mode')
           .setDesc('How to handle existing customizations')
           .addDropdown(dropdown => dropdown
             .addOption('merge', 'Merge (keep existing, add new)')
@@ -125,7 +135,7 @@ class ImportModal extends Modal {
             .setValue(mergeMode)
             .onChange((v: string) => { mergeMode = v; }));
 
-        optionsArea.style.display = 'block';
+        optionsArea.show();
 
       } catch (err: unknown) {
         previewArea.empty();
@@ -133,11 +143,11 @@ class ImportModal extends Modal {
           text: `Error reading file: ${(err as Error).message}`,
           cls: 'windrose-import-error'
         });
-        previewArea.style.display = 'block';
-        optionsArea.style.display = 'none';
+        previewArea.show();
+        optionsArea.hide();
         this.importData = null;
       }
-    });
+    })(); });
 
     // Buttons
     const buttonContainer = contentEl.createDiv({ cls: 'windrose-modal-buttons' });
@@ -167,22 +177,18 @@ class ImportModal extends Modal {
       }
 
       // Import overrides
-      if (data.objectOverrides) {
-        if (!this.plugin.settings[overridesKey]) {
-          this.plugin.settings[overridesKey] = {};
-        }
+      if (data.objectOverrides != null) {
+        this.plugin.settings[overridesKey] ??= {};
         Object.assign(
-          this.plugin.settings[overridesKey] as Record<string, ObjectOverride>,
+          this.plugin.settings[overridesKey],
           data.objectOverrides
         );
       }
 
       // Import custom objects (avoid duplicates by ID)
-      if (data.customObjects) {
-        if (!this.plugin.settings[customObjectsKey]) {
-          this.plugin.settings[customObjectsKey] = [];
-        }
-        const customObjects = this.plugin.settings[customObjectsKey] as CustomObject[];
+      if (data.customObjects != null) {
+        this.plugin.settings[customObjectsKey] ??= [];
+        const customObjects = this.plugin.settings[customObjectsKey];
         for (const obj of data.customObjects as CustomObject[]) {
           const existingIdx = customObjects.findIndex((o: CustomObject) => o.id === obj.id);
           if (existingIdx !== -1) {
@@ -194,11 +200,9 @@ class ImportModal extends Modal {
       }
 
       // Import custom categories (avoid duplicates by ID)
-      if (data.customCategories) {
-        if (!this.plugin.settings[categoriesKey]) {
-          this.plugin.settings[categoriesKey] = [];
-        }
-        const customCategories = this.plugin.settings[categoriesKey] as CustomCategory[];
+      if (data.customCategories != null) {
+        this.plugin.settings[categoriesKey] ??= [];
+        const customCategories = this.plugin.settings[categoriesKey];
         for (const cat of data.customCategories as CustomCategory[]) {
           const existingIdx = customCategories.findIndex((c: CustomCategory) => c.id === cat.id);
           if (existingIdx !== -1) {
@@ -215,7 +219,7 @@ class ImportModal extends Modal {
     };
   }
 
-  onClose() {
+  onClose(): void {
     this.contentEl.empty();
   }
 }

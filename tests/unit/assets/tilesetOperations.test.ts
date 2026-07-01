@@ -13,7 +13,7 @@ import {
   ALPHA_COVERAGE_THRESHOLD,
 } from '../../../src/assets/tilesetOperations';
 
-import type { TileEntry, FolderTileset } from '#types/tiles/tile.types';
+import type { TileEntry } from '#types/tiles/tile.types';
 
 // ===========================================
 // Tests
@@ -263,6 +263,19 @@ describe('tilesetOperations', () => {
       const result = createTilesetFromTiles('Tiles', 'Test', sampleTiles);
       const forest = result.tiles.find(t => t.id === 'forest');
       expect(forest?.category).toBe('trees');
+    });
+
+    it('marks origin native for ordinary vault folders', () => {
+      const result = createTilesetFromTiles('Tiles', 'Test', sampleTiles);
+      expect(result.origin).toBe('native');
+    });
+
+    it('marks origin dungeondraft when tiles live under dungeondraft-packs', () => {
+      const ddTiles = [
+        { id: 'wall', filename: 'wall.png', vaultPath: 'windrose-content/dungeondraft-packs/FCWalls/walls/wall.png', category: 'walls' },
+      ];
+      const result = createTilesetFromTiles('windrose-content/dungeondraft-packs/FCWalls', 'FC Walls', ddTiles);
+      expect(result.origin).toBe('dungeondraft');
     });
   });
 

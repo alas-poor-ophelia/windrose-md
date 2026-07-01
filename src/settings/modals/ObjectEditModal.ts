@@ -1,4 +1,5 @@
-import { App, Modal, Setting, Notice } from 'obsidian';
+import type { App} from 'obsidian';
+import { Modal, Setting, Notice } from 'obsidian';
 import type { PluginSettings, ObjectOverride, CustomObject } from '#types/settings/settings.types';
 import { ObjectHelpers } from '../helpers/objectHelpers';
 import { RPGAwesomeHelpers } from '../helpers/rpgAwesomeHelpers';
@@ -75,22 +76,22 @@ class ObjectEditModal extends Modal {
     this.mapType = mapType;
 
     // Form state
-    this.symbol = existingObject?.symbol || '';
-    this.iconClass = existingObject?.iconClass || '';
-    this.imagePath = existingObject?.imagePath || '';
-    this.label = existingObject?.label || '';
-    this.category = existingObject?.category || 'features';
+    this.symbol = existingObject?.symbol ?? '';
+    this.iconClass = existingObject?.iconClass ?? '';
+    this.imagePath = existingObject?.imagePath ?? '';
+    this.label = existingObject?.label ?? '';
+    this.category = existingObject?.category != null && existingObject.category !== '' ? existingObject.category : 'features';
 
     // UI state - determine initial mode based on existing object
     // Modes: 'symbol', 'icon', 'image'
-    this.mode = existingObject?.imagePath ? 'image' : (existingObject?.iconClass ? 'icon' : 'symbol');
+    this.mode = (existingObject?.imagePath ?? '') !== '' ? 'image' : ((existingObject?.iconClass ?? '') !== '' ? 'icon' : 'symbol');
     this.iconSearchQuery = '';
     this.iconCategory = 'all';
     this.imageSearchQuery = '';
     this.imageSearchResults = [];
   }
 
-  onOpen() {
+  onOpen(): void {
     const { contentEl } = this;
     contentEl.empty();
     contentEl.addClass('windrose-object-edit-modal');
@@ -103,19 +104,19 @@ class ObjectEditModal extends Modal {
     const toggleContainer = contentEl.createDiv({ cls: 'windrose-icon-type-toggle' });
 
     const unicodeBtn = toggleContainer.createEl('button', {
-      text: 'Unicode Symbol',
+      text: 'Unicode symbol',
       cls: 'windrose-icon-type-btn' + (this.mode === 'symbol' ? ' active' : ''),
       attr: { type: 'button' }
     });
 
     const iconBtn = toggleContainer.createEl('button', {
-      text: 'RPGAwesome Icon',
+      text: 'RPGAwesome icon',
       cls: 'windrose-icon-type-btn' + (this.mode === 'icon' ? ' active' : ''),
       attr: { type: 'button' }
     });
 
     const imageBtn = toggleContainer.createEl('button', {
-      text: 'Custom Image',
+      text: 'Custom image',
       cls: 'windrose-icon-type-btn' + (this.mode === 'image' ? ' active' : ''),
       attr: { type: 'button' }
     });
@@ -160,7 +161,7 @@ class ObjectEditModal extends Modal {
       .addText(text => {
         text
           .setValue(this.label)
-          .setPlaceholder('e.g., Treasure Chest')
+          .setPlaceholder('E.g., treasure chest')
           .onChange((value: string) => {
             this.label = value;
             // Clear error when user starts typing
@@ -174,8 +175,8 @@ class ObjectEditModal extends Modal {
 
     // Category dropdown - use map-type-specific settings
     const mapTypeSettings = this.mapType === 'hex'
-      ? { customCategories: this.plugin.settings.customHexCategories || [] }
-      : { customCategories: this.plugin.settings.customGridCategories || [] };
+      ? { customCategories: this.plugin.settings.customHexCategories ?? [] }
+      : { customCategories: this.plugin.settings.customGridCategories ?? [] };
     const allCategories = ObjectHelpers.getAllCategories(mapTypeSettings);
     new Setting(contentEl)
       .setName('Category')
@@ -200,14 +201,14 @@ class ObjectEditModal extends Modal {
     saveBtn.onclick = () => this.save();
   }
 
-  setMode(newMode: ObjectMode) {
+  setMode(newMode: ObjectMode): void {
     this.mode = newMode;
     // Update button active states
     Object.entries(this.modeButtons).forEach(([mode, btn]) => {
       if (mode === newMode) {
-        (btn as HTMLElement).addClass('active');
+        (btn).addClass('active');
       } else {
-        (btn as HTMLElement).removeClass('active');
+        (btn).removeClass('active');
       }
     });
     // Re-render all mode-specific containers
@@ -216,15 +217,15 @@ class ObjectEditModal extends Modal {
     this.renderImagePicker();
   }
 
-  renderSymbolInput() {
+  renderSymbolInput(): void {
     const container = this.symbolContainer;
     container.empty();
 
     if (this.mode !== 'symbol') {
-      container.style.display = 'none';
+      container.hide();
       return;
     }
-    container.style.display = 'block';
+    container.show();
 
     // Symbol input with preview
     const symbolSetting = new Setting(container)
@@ -243,7 +244,7 @@ class ObjectEditModal extends Modal {
     });
 
     // Focus the symbol input after a short delay
-    setTimeout(() => symbolInput.focus(), 50);
+    window.setTimeout(() => symbolInput.focus(), 50);
 
     // Symbol preview
     const previewEl = symbolSetting.controlEl.createDiv({ cls: 'windrose-symbol-preview' });
@@ -253,7 +254,7 @@ class ObjectEditModal extends Modal {
 
     // Quick symbols
     const quickSymbolsContainer = container.createDiv({ cls: 'windrose-quick-symbols' });
-    quickSymbolsContainer.createEl('label', { text: 'Quick Symbols', cls: 'windrose-quick-symbols-label' });
+    quickSymbolsContainer.createEl('label', { text: 'Quick symbols', cls: 'windrose-quick-symbols-label' });
     const symbolGrid = quickSymbolsContainer.createDiv({ cls: 'windrose-quick-symbols-grid' });
 
     for (const sym of QUICK_SYMBOLS) {
@@ -270,15 +271,15 @@ class ObjectEditModal extends Modal {
     }
   }
 
-  renderIconPicker() {
+  renderIconPicker(): void {
     const container = this.iconPickerContainer;
     container.empty();
 
     if (this.mode !== 'icon') {
-      container.style.display = 'none';
+      container.hide();
       return;
     }
-    container.style.display = 'block';
+    container.show();
 
     const picker = container.createDiv({ cls: 'windrose-icon-picker' });
 
@@ -334,11 +335,12 @@ class ObjectEditModal extends Modal {
     this.updateIconPreview();
   }
 
-  renderIconTabs(container: HTMLDivElement) {
+  renderIconTabs(container: HTMLDivElement): void {
     // Update active state on all tabs
     const tabs = container.querySelectorAll('.windrose-icon-picker-tab');
     tabs.forEach(tab => {
-      const catId = tab.getAttribute('data-category') || 'all';
+      const dataCategory = tab.getAttribute('data-category');
+      const catId = dataCategory != null && dataCategory !== '' ? dataCategory : 'all';
       if (catId === this.iconCategory) {
         (tab as HTMLElement).addClass('active');
       } else {
@@ -347,7 +349,7 @@ class ObjectEditModal extends Modal {
     });
   }
 
-  renderIconGrid() {
+  renderIconGrid(): void {
     const container = this.iconGridContainer;
     if (!container) return;
     container.empty();
@@ -389,13 +391,13 @@ class ObjectEditModal extends Modal {
     }
   }
 
-  updateSymbolPreview() {
+  updateSymbolPreview(): void {
     if (this.symbolPreviewEl) {
       this.symbolPreviewEl.textContent = this.symbol || '?';
     }
   }
 
-  updateIconPreview() {
+  updateIconPreview(): void {
     const container = this.iconPreviewContainer;
     if (!container) return;
     container.empty();
@@ -422,15 +424,15 @@ class ObjectEditModal extends Modal {
     infoBox.createDiv({ cls: 'windrose-icon-preview-class', text: this.iconClass });
   }
 
-  renderImagePicker() {
+  renderImagePicker(): void {
     const container = this.imagePickerContainer;
     container.empty();
 
     if (this.mode !== 'image') {
-      container.style.display = 'none';
+      container.hide();
       return;
     }
-    container.style.display = 'block';
+    container.show();
 
     // Info text
     container.createEl('p', {
@@ -461,9 +463,9 @@ class ObjectEditModal extends Modal {
       };
     }
 
-    searchInput.addEventListener('input', async (e: Event) => {
+    searchInput.addEventListener('input', (e: Event) => {
       this.imageSearchQuery = (e.target as HTMLInputElement).value;
-      await this.searchImages(this.imageSearchQuery);
+      void this.searchImages(this.imageSearchQuery);
     });
 
     // Search results dropdown
@@ -482,12 +484,11 @@ class ObjectEditModal extends Modal {
         cls: 'windrose-image-preview-img',
         attr: { src: this.app.vault.adapter.getResourcePath(this.imagePath) }
       });
-      imgPreview.style.maxWidth = '100px';
-      imgPreview.style.maxHeight = '100px';
+      imgPreview.setCssStyles({ maxWidth: '100px', maxHeight: '100px' });
     }
   }
 
-  async searchImages(query: string) {
+  async searchImages(query: string): Promise<void> {
     if (!query || query.trim().length < 2) {
       this.imageSearchResults = [];
       this.renderImageSearchResults();
@@ -511,7 +512,7 @@ class ObjectEditModal extends Modal {
     this.renderImageSearchResults();
   }
 
-  renderImageSearchResults() {
+  renderImageSearchResults(): void {
     const container = this.imageResultsContainer;
     if (!container) return;
     container.empty();
@@ -536,7 +537,7 @@ class ObjectEditModal extends Modal {
     return parts[parts.length - 1];
   }
 
-  save() {
+  save(): void {
     // Validate based on mode
     if (this.mode === 'icon') {
       if (!this.iconClass || !RPGAwesomeHelpers.isValid(this.iconClass)) {
@@ -567,61 +568,60 @@ class ObjectEditModal extends Modal {
     const overridesKey: OverridesKey = this.mapType === 'hex' ? 'hexObjectOverrides' : 'gridObjectOverrides';
     const customObjectsKey: CustomObjectsKey = this.mapType === 'hex' ? 'customHexObjects' : 'customGridObjects';
 
-    if (this.existingObject?.isBuiltIn) {
+    if (this.existingObject?.isBuiltIn === true) {
       // Modifying a built-in: save as override
-      if (!this.plugin.settings[overridesKey]) {
-        this.plugin.settings[overridesKey] = {};
-      }
+      this.plugin.settings[overridesKey] ??= {};
 
-      const original = BUILT_IN_OBJECTS.find(o => o.id === this.existingObject!.id);
-      const originalRecord = original as unknown as Record<string, unknown> | undefined;
+      const objId = this.existingObject?.id;
+      if (objId == null) return;
+      const original = BUILT_IN_OBJECTS.find(o => o.id === objId);
+      const originalRecord = original as unknown as { imagePath?: string; iconClass?: string } | undefined;
       const override: Record<string, string | number | boolean | null> = {};
 
       // Handle symbol/iconClass/imagePath based on mode
       if (this.mode === 'icon') {
         if (this.iconClass !== originalRecord?.iconClass) override.iconClass = this.iconClass;
         // Clear other visual properties
-        if (original?.symbol) override.symbol = null;
-        if (originalRecord?.imagePath) override.imagePath = null;
+        if (original?.symbol != null && original.symbol !== '') override.symbol = null;
+        if (originalRecord?.imagePath != null && originalRecord.imagePath !== '') override.imagePath = null;
       } else if (this.mode === 'image') {
         override.imagePath = this.imagePath;
         // Clear other visual properties
-        if (original?.symbol) override.symbol = null;
-        if (originalRecord?.iconClass) override.iconClass = null;
+        if (original?.symbol != null && original.symbol !== '') override.symbol = null;
+        if (originalRecord?.iconClass != null && originalRecord.iconClass !== '') override.iconClass = null;
       } else {
         if (this.symbol !== original?.symbol) override.symbol = this.symbol;
         // Clear other visual properties
-        if (originalRecord?.iconClass) override.iconClass = null;
-        if (originalRecord?.imagePath) override.imagePath = null;
+        if (originalRecord?.iconClass != null && originalRecord.iconClass !== '') override.iconClass = null;
+        if (originalRecord?.imagePath != null && originalRecord.imagePath !== '') override.imagePath = null;
       }
 
       if (this.label !== original?.label) override.label = this.label;
       if (this.category !== original?.category) override.category = this.category;
 
       // Preserve hidden state if it exists
-      if (this.plugin.settings[overridesKey]![this.existingObject!.id!]?.hidden) {
+      if (this.plugin.settings[overridesKey][objId]?.hidden === true) {
         override.hidden = true;
       }
 
       // Preserve order if it exists
-      if (this.plugin.settings[overridesKey]![this.existingObject!.id!]?.order !== undefined) {
-        override.order = this.plugin.settings[overridesKey]![this.existingObject!.id!]!.order!;
+      if (this.plugin.settings[overridesKey][objId]?.order !== undefined) {
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- order presence confirmed by the !== undefined guard on the line above
+        override.order = this.plugin.settings[overridesKey][objId].order!;
       }
 
       if (Object.keys(override).length > 0) {
-        this.plugin.settings[overridesKey]![this.existingObject!.id!] = override as unknown as ObjectOverride;
+        this.plugin.settings[overridesKey][objId] = override as unknown as ObjectOverride;
       } else {
-        delete this.plugin.settings[overridesKey]![this.existingObject!.id!];
+        delete this.plugin.settings[overridesKey][objId];
       }
-    } else if (this.existingObject?.isCustom) {
+    } else if (this.existingObject?.isCustom === true) {
       // Editing existing custom object
-      if (!this.plugin.settings[customObjectsKey]) {
-        this.plugin.settings[customObjectsKey] = [];
-      }
-      const idx = this.plugin.settings[customObjectsKey]!.findIndex(o => o.id === this.existingObject!.id);
+      this.plugin.settings[customObjectsKey] ??= [];
+      const idx = this.plugin.settings[customObjectsKey].findIndex(o => o.id === this.existingObject?.id);
       if (idx !== -1) {
         const updated: Record<string, unknown> = {
-          ...this.plugin.settings[customObjectsKey]![idx],
+          ...this.plugin.settings[customObjectsKey][idx],
           label: this.label.trim(),
           category: this.category
         };
@@ -639,16 +639,14 @@ class ObjectEditModal extends Modal {
           updated.symbol = this.symbol;
         }
 
-        this.plugin.settings[customObjectsKey]![idx] = updated as unknown as CustomObject;
+        this.plugin.settings[customObjectsKey][idx] = updated as unknown as CustomObject;
       }
     } else {
       // Creating new custom object
-      if (!this.plugin.settings[customObjectsKey]) {
-        this.plugin.settings[customObjectsKey] = [];
-      }
+      this.plugin.settings[customObjectsKey] ??= [];
 
       const newObject: Record<string, string> = {
-        id: 'custom-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9),
+        id: 'custom-' + Date.now() + '-' + Math.random().toString(36).slice(2, 11),
         label: this.label.trim(),
         category: this.category
       };
@@ -662,14 +660,14 @@ class ObjectEditModal extends Modal {
         newObject.symbol = this.symbol;
       }
 
-      this.plugin.settings[customObjectsKey]!.push(newObject as unknown as CustomObject);
+      this.plugin.settings[customObjectsKey].push(newObject as unknown as CustomObject);
     }
 
     this.onSave();
     this.close();
   }
 
-  onClose() {
+  onClose(): void {
     this.contentEl.empty();
   }
 }

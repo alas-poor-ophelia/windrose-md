@@ -5,6 +5,7 @@ import type { MapObject } from '#types/objects/object.types';
 import type { MapDataUpdater } from '#types/hooks/mapData.types';
 import type { LayerHistorySnapshot } from '#types/hooks/layerHistory.types';
 import { getActiveLayer } from '../../persistence/layerAccessor';
+import type { PlayerFogClearDetail } from '../../core/windroseEvents';
 
 interface UsePlayerFogClearOptions {
   geometry: ExtendedGeometry | null;
@@ -17,7 +18,7 @@ function usePlayerFogClear({
   geometry, updateMapData, addToHistory, isApplyingHistory
 }: UsePlayerFogClearOptions): void {
   useEffect(() => {
-    const handler = (e: CustomEvent): void => {
+    const handler = (e: CustomEvent<PlayerFogClearDetail>): void => {
       if (geometry == null || isApplyingHistory()) return;
       const { objectId } = e.detail;
 
@@ -89,8 +90,8 @@ function usePlayerFogClear({
       });
     };
 
-    document.addEventListener('windrose:player-fog-clear', handler as EventListener);
-    return () => document.removeEventListener('windrose:player-fog-clear', handler as EventListener);
+    activeDocument.addEventListener('windrose:player-fog-clear', handler);
+    return () => activeDocument.removeEventListener('windrose:player-fog-clear', handler);
   }, [geometry, updateMapData, addToHistory, isApplyingHistory]);
 }
 

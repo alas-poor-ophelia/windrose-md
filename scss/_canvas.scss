@@ -58,7 +58,8 @@
   cursor: move;
 }
 
-/* Transient tool-preview overlay canvases (freehand, wall drawing) */
+// Transient overlay canvases (freehand / outline / region / wall in-progress drawing).
+// Applied via classList.add('windrose-overlay-layer') in the layer components.
 .windrose-overlay-layer {
   position: absolute;
   top: 0;

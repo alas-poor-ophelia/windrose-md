@@ -19,7 +19,7 @@ function InternalLink({ link, children }: InternalLinkProps): VNode {
 
   return (
     <a href={link} class="internal-link" onClick={handleClick}>
-      {children != null ? children : link}
+      {children ?? link}
     </a>
   );
 }

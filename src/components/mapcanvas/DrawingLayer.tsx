@@ -87,7 +87,7 @@ const DrawingLayer = ({
   } = useMapState();
 
   const previewSettings = useMemo((): PreviewSettings => {
-    const settings = globalSettings || getSettings();
+    const settings = globalSettings ?? getSettings();
     return {
       kbmEnabled: (settings).shapePreviewKbm !== false,
       touchEnabled: (settings).shapePreviewTouch === true
@@ -95,8 +95,8 @@ const DrawingLayer = ({
   }, [globalSettings]);
 
   const distanceSettings = useMemo(() => {
-    const mapType = mapData?.mapType || 'grid';
-    const settings = globalSettings || getSettings();
+    const mapType = mapData?.mapType ?? 'grid';
+    const settings = globalSettings ?? getSettings();
     return getEffectiveDistanceSettings(mapType, settings, mapDistanceOverrides);
   }, [mapData?.mapType, globalSettings, mapDistanceOverrides]);
 
@@ -150,8 +150,8 @@ const DrawingLayer = ({
   }, [rectangleStart, circleStart, edgeLineStart, touchConfirmPending, cancelShapePreview, segmentPickerOpen, closeSegmentPicker]);
 
   useEffect(() => {
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
+    activeDocument.addEventListener('keydown', handleKeyDown);
+    return () => activeDocument.removeEventListener('keydown', handleKeyDown);
   }, [handleKeyDown]);
 
   const { registerHandlers, unregisterHandlers } = useEventHandlerRegistration();
@@ -175,7 +175,7 @@ const DrawingLayer = ({
     });
     registerHandlers('drawing', proxy);
     return () => unregisterHandlers('drawing');
-  }, []);
+  }, [registerHandlers, unregisterHandlers]);
 
   useEffect(() => {
     if (onDrawingStateChange) {
@@ -195,6 +195,7 @@ const DrawingLayer = ({
         }
       });
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- handlers are plain fns recreated each render; adding them fires this state-sync effect every render
   }, [isDrawing, rectangleStart, circleStart, edgeLineStart, shapeHoverPosition,
     touchConfirmPending, onDrawingStateChange, handleStopDrawing, cancelShapePreview]);
 

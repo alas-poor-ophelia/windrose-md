@@ -98,7 +98,7 @@ const usePanZoomCoordinator = ({
     });
     registerHandlers('panZoom', proxy);
     return () => unregisterHandlers('panZoom');
-  }, []);
+  }, [registerHandlers, unregisterHandlers]);
 
   // Coordinator hooks don't return anything - they just set up behavior
 };

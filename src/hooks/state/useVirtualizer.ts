@@ -18,15 +18,13 @@ function usePreactVirtualizer(options: PreactVirtualizerOptions): Virtualizer<HT
   const [, rerender] = useState(0);
 
   const instanceRef = useRef<Virtualizer<HTMLElement, HTMLElement> | null>(null);
-  if (instanceRef.current == null) {
-    instanceRef.current = new Virtualizer<HTMLElement, HTMLElement>({
-      ...options,
-      observeElementRect,
-      observeElementOffset,
-      scrollToFn: elementScroll,
-      onChange: () => { rerender(t => t + 1); },
-    });
-  }
+  instanceRef.current ??= new Virtualizer<HTMLElement, HTMLElement>({
+    ...options,
+    observeElementRect,
+    observeElementOffset,
+    scrollToFn: elementScroll,
+    onChange: () => { rerender(t => t + 1); },
+  });
 
   const instance = instanceRef.current;
   instance.setOptions({
@@ -39,6 +37,7 @@ function usePreactVirtualizer(options: PreactVirtualizerOptions): Virtualizer<HT
 
   useEffect(() => {
     return instance._didMount();
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- _didMount() is a one-time lifecycle; instance is stable (same Virtualizer from ref)
   }, []);
 
   instance._willUpdate();

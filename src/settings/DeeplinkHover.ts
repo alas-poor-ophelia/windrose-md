@@ -32,8 +32,8 @@ const DeeplinkHover = (() => {
 
   function clearTimers(state: LinkState | undefined): void {
     if (!state) return;
-    if (state.showTimer) { clearTimeout(state.showTimer); state.showTimer = null; }
-    if (state.hideTimer) { clearTimeout(state.hideTimer); state.hideTimer = null; }
+    if (state.showTimer != null) { window.clearTimeout(state.showTimer); state.showTimer = null; }
+    if (state.hideTimer != null) { window.clearTimeout(state.hideTimer); state.hideTimer = null; }
   }
 
   function destroyPopover(state: LinkState | undefined): void {
@@ -52,7 +52,7 @@ const DeeplinkHover = (() => {
   function scheduleHide(linkEl: HTMLElement): void {
     const state = linkState.get(linkEl);
     if (!state) return;
-    if (state.hideTimer) return;
+    if (state.hideTimer != null) return;
     state.hideTimer = window.setTimeout(() => {
       state.hideTimer = null;
       destroyPopover(state);
@@ -62,8 +62,8 @@ const DeeplinkHover = (() => {
 
   function cancelHide(linkEl: HTMLElement): void {
     const state = linkState.get(linkEl);
-    if (state && state.hideTimer) {
-      clearTimeout(state.hideTimer);
+    if (state && state.hideTimer != null) {
+      window.clearTimeout(state.hideTimer);
       state.hideTimer = null;
     }
   }
@@ -76,14 +76,13 @@ const DeeplinkHover = (() => {
     }
     currentLink = linkEl;
 
-    const state: LinkState = linkState.get(linkEl) || { showTimer: null, hideTimer: null, popover: null, hoverEl: null, host: null };
+    const state: LinkState = linkState.get(linkEl) ?? { showTimer: null, hideTimer: null, popover: null, hoverEl: null, host: null };
     linkState.set(linkEl, state);
 
     // Custom popover div — simpler and more reliable than HoverPopover which
     // requires internal lifecycle we don't have access to.
-    const popoverEl = document.body.createDiv({ cls: 'windrose-hover-preview-popover popover' });
-    popoverEl.style.position = 'fixed';
-    popoverEl.style.zIndex = '1000';
+    const popoverEl = activeDocument.body.createDiv({ cls: 'windrose-hover-preview-popover popover' });
+    popoverEl.setCssStyles({ position: 'fixed', zIndex: '1000' });
 
     const rect = linkEl.getBoundingClientRect();
     const viewportW = window.innerWidth || 1200;
@@ -124,14 +123,14 @@ const DeeplinkHover = (() => {
   }
 
   function onHoverEnter(plugin: HoverPlugin, linkEl: HTMLElement, parsed: ParsedDeepLink): void {
-    if (!linkEl || !parsed) return;
+    if (linkEl == null || parsed == null) return;
 
-    const state: LinkState = linkState.get(linkEl) || { showTimer: null, hideTimer: null, popover: null, hoverEl: null, host: null };
+    const state: LinkState = linkState.get(linkEl) ?? { showTimer: null, hideTimer: null, popover: null, hoverEl: null, host: null };
     linkState.set(linkEl, state);
 
     cancelHide(linkEl);
 
-    if (state.showTimer) return;
+    if (state.showTimer != null) return;
     if (state.popover) return;
 
     state.showTimer = window.setTimeout(() => {
@@ -141,11 +140,11 @@ const DeeplinkHover = (() => {
   }
 
   function onHoverLeave(linkEl: HTMLElement): void {
-    if (!linkEl) return;
+    if (linkEl == null) return;
     const state = linkState.get(linkEl);
     if (!state) return;
-    if (state.showTimer) {
-      clearTimeout(state.showTimer);
+    if (state.showTimer != null) {
+      window.clearTimeout(state.showTimer);
       state.showTimer = null;
     }
     if (state.popover) scheduleHide(linkEl);

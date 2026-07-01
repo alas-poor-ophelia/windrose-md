@@ -1,4 +1,6 @@
-import { App, Modal, Setting, Notice, TFile } from 'obsidian';
+import { TFile } from 'obsidian';
+import type { App } from 'obsidian';
+import { Modal, Setting, Notice } from 'obsidian';
 import type { PluginSettings, ObjectOverride, CustomObject, CustomCategory } from '#types/settings/settings.types';
 import { ConfirmModal } from './ConfirmModal';
 
@@ -31,7 +33,7 @@ class ExportModal extends Modal {
     this.mapType = mapType;
   }
 
-  onOpen() {
+  onOpen(): void {
     const { contentEl } = this;
     contentEl.empty();
     contentEl.addClass('windrose-export-modal');
@@ -44,9 +46,9 @@ class ExportModal extends Modal {
     const customObjectsKey: CustomObjectsKey = this.mapType === 'hex' ? 'customHexObjects' : 'customGridObjects';
     const categoriesKey: CategoriesKey = this.mapType === 'hex' ? 'customHexCategories' : 'customGridCategories';
 
-    const objectOverrides = this.plugin.settings[overridesKey] || {};
-    const customObjects = this.plugin.settings[customObjectsKey] || [];
-    const customCategories = this.plugin.settings[categoriesKey] || [];
+    const objectOverrides = this.plugin.settings[overridesKey] ?? {};
+    const customObjects = this.plugin.settings[customObjectsKey] ?? [];
+    const customCategories = this.plugin.settings[categoriesKey] ?? [];
 
     const hasOverrides = Object.keys(objectOverrides).length > 0;
     const hasCustom = customObjects.length > 0 || customCategories.length > 0;
@@ -104,7 +106,7 @@ class ExportModal extends Modal {
     // Export button
     new Setting(contentEl)
       .addButton(btn => btn
-        .setButtonText('Export to Vault')
+        .setButtonText('Export to vault')
         .setCta()
         .onClick(async () => {
           const exportData: ExportData = {
@@ -129,7 +131,7 @@ class ExportModal extends Modal {
           try {
             // Check if file exists
             const existingFile = this.app.vault.getAbstractFileByPath(finalFilename);
-            if (existingFile) {
+            if (existingFile instanceof TFile) {
               if (!await new ConfirmModal(this.app, {
                 message: `File "${finalFilename}" already exists. Overwrite?`,
                 confirmText: 'Overwrite',
@@ -137,7 +139,7 @@ class ExportModal extends Modal {
               }).openAndGetValue()) {
                 return;
               }
-              await this.app.vault.modify(existingFile as TFile, json);
+              await this.app.vault.modify(existingFile, json);
             } else {
               await this.app.vault.create(finalFilename, json);
             }
@@ -150,7 +152,7 @@ class ExportModal extends Modal {
         }));
   }
 
-  onClose() {
+  onClose(): void {
     this.contentEl.empty();
   }
 }

@@ -39,10 +39,6 @@ export interface WorldPoint {
 }
 
 /** Geometry with bounds check */
-interface GeometryWithBounds {
-  isWithinBounds?(x: number, y: number): boolean;
-}
-
 // ===========================================
 // Rectangle Operations
 // ===========================================
@@ -94,7 +90,7 @@ function getObjectWorldBounds(
     const hexSize = geometry.hexSize;
     
     // Approximate hex bounds as a rectangle
-    const orientation: HexOrientation = (mapData as MapData & { orientation?: HexOrientation }).orientation || 'flat';
+    const orientation: HexOrientation = (mapData as MapData & { orientation?: HexOrientation }).orientation ?? 'flat';
     let halfWidth: number, halfHeight: number;
     
     if (orientation === 'flat') {
@@ -133,7 +129,7 @@ function getTextLabelWorldBounds(
   const pos = label.position;
   const fontSize = label.fontSize || 16;
   const fontFace = label.fontFace || 'sans';
-  const rotation = label.rotation || 0;
+  const rotation = label.rotation ?? 0;
   
   // Measure text width
   let textWidth: number, textHeight: number;

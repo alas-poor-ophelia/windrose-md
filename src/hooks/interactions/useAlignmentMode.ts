@@ -43,7 +43,7 @@ function useAlignmentMode({ mapData, updateMapData, setShowSettingsModal }: UseA
     setAlignmentOffsetY(currentY);
     setIsAlignmentMode(true);
     setShowSettingsModal(false);
-  }, []);
+  }, [setShowSettingsModal]);
 
   const handleAlignmentOffsetChange = useCallback((newX: number, newY: number) => {
     setAlignmentOffsetX(newX);
@@ -77,7 +77,7 @@ function useAlignmentMode({ mapData, updateMapData, setShowSettingsModal }: UseA
     setIsAlignmentMode(false);
     setReturningFromAlignment(true);
     setShowSettingsModal(true);
-  }, []);
+  }, [setShowSettingsModal]);
 
   const handleAlignmentCancel = useCallback((originalX: number, originalY: number) => {
     setAlignmentOffsetX(originalX);
@@ -97,7 +97,7 @@ function useAlignmentMode({ mapData, updateMapData, setShowSettingsModal }: UseA
     setIsAlignmentMode(false);
     setReturningFromAlignment(true);
     setShowSettingsModal(true);
-  }, [mapData, updateMapData]);
+  }, [mapData, updateMapData, setShowSettingsModal]);
 
   return {
     isAlignmentMode,

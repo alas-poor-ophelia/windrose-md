@@ -57,14 +57,12 @@ function useObjectHover(): {
               getActiveLayer(mapData).objects,
               x, y,
               clickOffsetX, clickOffsetY,
-              mapData.orientation || 'flat'
+              mapData.orientation ?? 'flat'
             );
           }
         }
 
-        if (!obj) {
-          obj = getObjectAtPosition(getActiveLayer(mapData).objects, x, y);
-        }
+        obj ??= getObjectAtPosition(getActiveLayer(mapData).objects, x, y);
 
         if (obj) {
           const activeLayer = getActiveLayer(mapData);

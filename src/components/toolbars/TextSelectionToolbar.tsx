@@ -15,7 +15,7 @@
  * Calculate bounding box for a text label in screen coordinates
  */
 
-import type { JSX, VNode } from 'preact';
+import type { TargetedMouseEvent, VNode } from 'preact';
 import type { MapData } from '#types/core/map.types';
 import type { TextLabel } from '#types/objects/note.types';
 import type { SelectedItem } from '#types/contexts/context.types';
@@ -25,7 +25,7 @@ import { useToolbarPosition } from '../../hooks/interactions/useToolbarPosition'
 import { Icon } from '../shared/Icon';
 import { Z_INDEX } from '../../core/dmtConstants';
 
-type MouseClickEvent = JSX.TargetedMouseEvent<HTMLButtonElement>;
+type MouseClickEvent = TargetedMouseEvent<HTMLButtonElement>;
 
 interface TextSelectionToolbarProps {
   selectedItem: SelectedItem | null;

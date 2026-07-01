@@ -21,7 +21,7 @@ export const TabRenderCoreMethods = {
 
     // Clear button (hidden initially)
     const clearBtn = searchBox.createEl('button', { cls: 'clear-btn' });
-    clearBtn.style.display = 'none';
+    clearBtn.hide();
     IconHelpers.set(clearBtn, 'x');
 
     // No results message (hidden initially)
@@ -29,23 +29,23 @@ export const TabRenderCoreMethods = {
       cls: 'windrose-settings-no-results',
       text: 'No settings found matching your search.'
     });
-    this.noResultsEl.style.display = 'none';
+    this.noResultsEl.hide();
 
     // Search handler
     const handleSearch = (query: string): void => {
       const q = query.toLowerCase().trim();
-      clearBtn.style.display = q ? 'block' : 'none';
+      clearBtn.toggle(Boolean(q));
 
       if (!q) {
         // Clear search - show all, collapse sections
         this.sections?.forEach(({ details }) => {
-          details.style.display = '';
+          details.show();
           details.settingItems?.forEach(item => {
             item.classList.remove('windrose-setting-hidden');
           });
           details.removeAttribute('open');
         });
-        this.noResultsEl.style.display = 'none';
+        this.noResultsEl.hide();
         return;
       }
 
@@ -57,8 +57,8 @@ export const TabRenderCoreMethods = {
         details.settingItems?.forEach(item => {
           const nameEl = item.querySelector('.setting-item-name');
           const descEl = item.querySelector('.setting-item-description');
-          const name = nameEl?.textContent?.toLowerCase() || '';
-          const desc = descEl?.textContent?.toLowerCase() || '';
+          const name = nameEl?.textContent?.toLowerCase() ?? '';
+          const desc = descEl?.textContent?.toLowerCase() ?? '';
 
           const matches = name.includes(q) || desc.includes(q);
 
@@ -71,15 +71,15 @@ export const TabRenderCoreMethods = {
         });
 
         if (sectionHasMatch) {
-          details.style.display = '';
+          details.show();
           details.setAttribute('open', '');
           anyMatches = true;
         } else {
-          details.style.display = 'none';
+          details.hide();
         }
       });
 
-      this.noResultsEl.style.display = anyMatches ? 'none' : 'block';
+      this.noResultsEl.toggle(!anyMatches);
     };
 
     input.addEventListener('input', (e: Event) => handleSearch((e.target as HTMLInputElement).value));

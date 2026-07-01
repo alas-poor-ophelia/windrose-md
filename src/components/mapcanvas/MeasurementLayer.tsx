@@ -12,6 +12,7 @@ import type { PluginSettings } from '#types/settings/settings.types';
 
 import { useEffect, useRef } from 'preact/hooks';
 import { useDistanceMeasurement } from '../../hooks/interactions/useDistanceMeasurement';
+import { getSettings } from '../../core/settingsAccessor';
 import { MeasurementOverlay } from '../overlays/MeasurementOverlay';
 import { useMapState } from '../../context/MapContext';
 import { useEventHandlerRegistration } from '../../context/EventHandlerContext';
@@ -38,7 +39,7 @@ const MeasurementLayer = ({
     canvasRef
   } = useMapState();
 
-  const mapType = mapData?.mapType || 'grid';
+  const mapType = mapData?.mapType ?? 'grid';
 
   const {
     measureOrigin,
@@ -52,7 +53,7 @@ const MeasurementLayer = ({
     currentTool,
     geometry,
     mapType,
-    globalSettings!,
+    globalSettings ?? getSettings(),
     (mapDistanceOverrides ?? null) as MapDistanceOverrides | null
   );
 
@@ -69,7 +70,7 @@ const MeasurementLayer = ({
     });
     registerHandlers('measure', proxy);
     return () => unregisterHandlers('measure');
-  }, []);
+  }, [registerHandlers, unregisterHandlers]);
 
   if (currentTool !== 'measure' || !measureOrigin) {
     return null;

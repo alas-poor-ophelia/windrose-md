@@ -71,7 +71,7 @@ const NotePinLayer = ({
     });
     registerHandlers('notePin', proxy);
     return () => unregisterHandlers('notePin');
-  }, []);
+  }, [registerHandlers, unregisterHandlers]);
 
   useEffect(() => {
     if (!showNoteLinkModal || pendingNotePinId == null || pendingNotePinId === '' || !mapData) return;
@@ -86,6 +86,7 @@ const NotePinLayer = ({
       currentNotePath,
       objectType: 'note_pin'
     });
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- modal opens once when showNoteLinkModal flips; handlers inline + mapData volatile would reopen mid-session
   }, [showNoteLinkModal, pendingNotePinId]);
 
   if (showCoordinates) {

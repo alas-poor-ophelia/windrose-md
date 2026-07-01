@@ -236,10 +236,10 @@ function useOutlineTools(options: OutlineToolsOptions): UseOutlineToolsResult {
       fillOpacity: outlineSettings.fillOpacity,
       snapMode: outlineSettings.snapMode,
       visible: true,
-      order: (mapData.outlines || []).length
+      order: (mapData.outlines ?? []).length
     };
 
-    onOutlinesChange([...(mapData.outlines || []), newOutline]);
+    onOutlinesChange([...(mapData.outlines ?? []), newOutline]);
     setDrawingVertices([]);
   }, [drawingVertices, mapData, selectedColor, outlineSettings, onOutlinesChange]);
 
@@ -255,14 +255,14 @@ function useOutlineTools(options: OutlineToolsOptions): UseOutlineToolsResult {
 
   const deleteOutline = useCallback((outlineId: string) => {
     if (!mapData) return;
-    const outlines = (mapData.outlines || []).filter(o => o.id !== outlineId);
+    const outlines = (mapData.outlines ?? []).filter(o => o.id !== outlineId);
     onOutlinesChange(outlines);
     if (selectedOutlineId === outlineId) setSelectedOutlineId(null);
   }, [mapData, onOutlinesChange, selectedOutlineId]);
 
   const updateOutline = useCallback((outlineId: string, updates: Partial<Outline>) => {
     if (!mapData) return;
-    const outlines = (mapData.outlines || []).map(o =>
+    const outlines = (mapData.outlines ?? []).map(o =>
       o.id === outlineId ? { ...o, ...updates } : o
     );
     onOutlinesChange(outlines);

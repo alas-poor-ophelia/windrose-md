@@ -1,4 +1,5 @@
-import { App, Modal, Setting, Notice } from 'obsidian';
+import type { App} from 'obsidian';
+import { Modal, Setting, Notice } from 'obsidian';
 
 interface PromptModalOptions {
   message?: string;
@@ -16,14 +17,14 @@ class PromptModal extends Modal {
 
   constructor(app: App, options: PromptModalOptions = {}) {
     super(app);
-    this.message = options.message || '';
-    this.defaultValue = options.defaultValue || '';
-    this.placeholder = options.placeholder || '';
+    this.message = options.message ?? '';
+    this.defaultValue = options.defaultValue ?? '';
+    this.placeholder = options.placeholder ?? '';
     this.inputValue = this.defaultValue;
     this.resolved = false;
   }
 
-  onOpen() {
+  onOpen(): void {
     const { contentEl } = this;
     contentEl.empty();
 
@@ -36,7 +37,7 @@ class PromptModal extends Modal {
         text.setValue(this.inputValue);
         if (this.placeholder) text.setPlaceholder(this.placeholder);
         text.onChange((v: string) => { this.inputValue = v; });
-        setTimeout(() => {
+        window.setTimeout(() => {
           text.inputEl.focus();
           text.inputEl.select();
         }, 50);
@@ -64,9 +65,9 @@ class PromptModal extends Modal {
     };
   }
 
-  onClose() {
+  onClose(): void {
     this.contentEl.empty();
-    if (!this.resolved && this.resolvePromise) {
+    if (!this.resolved && this.resolvePromise != null) {
       this.resolvePromise(null);
     }
   }

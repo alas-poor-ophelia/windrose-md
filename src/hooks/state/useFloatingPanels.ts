@@ -54,7 +54,7 @@ function useFloatingPanels({ fullPane, savedState, onStateChange }: UseFloatingP
 
   const getZIndex = useCallback((panelId: PanelId): number => {
     const panel = panels[panelId];
-    if (!panel?.floating) return Z_INDEX.FLOATING_PANEL;
+    if (panel?.floating !== true) return Z_INDEX.FLOATING_PANEL;
     return Z_INDEX.FLOATING_PANEL + panel.focusOrder;
   }, [panels]);
 
@@ -84,7 +84,7 @@ function useFloatingPanels({ fullPane, savedState, onStateChange }: UseFloatingP
   const bringToFront = useCallback((panelId: PanelId) => {
     setPanels(prev => {
       const current = prev[panelId];
-      if (!current?.floating) return prev;
+      if (current?.floating !== true) return prev;
       focusCounterRef.current += 1;
       if (current.focusOrder === focusCounterRef.current - 1) return prev;
       return {
@@ -97,7 +97,7 @@ function useFloatingPanels({ fullPane, savedState, onStateChange }: UseFloatingP
   const updatePosition = useCallback((panelId: PanelId, position: { x: number; y: number }) => {
     setPanels(prev => {
       const current = prev[panelId];
-      if (!current?.floating) return prev;
+      if (current?.floating !== true) return prev;
       return {
         ...prev,
         [panelId]: { ...current, initialPosition: position }

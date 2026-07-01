@@ -115,8 +115,8 @@ function calculateHexObjectSelectionPosition(
   deps: Pick<SelectionRenderDeps, 'getObjectsInCell' | 'getSlotOffset' | 'getMultiObjectScale'>
 ): { screenX: number; screenY: number; objectWidth: number; objectHeight: number; cellWidth: number; cellHeight: number } {
   const { offsetX, offsetY, zoom, scaledSize } = context;
-  const size = object.size || { width: 1, height: 1 };
-  const alignment = object.alignment || 'center';
+  const size = object.size ?? { width: 1, height: 1 };
+  const alignment = object.alignment ?? 'center';
 
   const { worldX, worldY } = hexGeometry.hexToWorld(object.position.x, object.position.y);
 
@@ -174,8 +174,8 @@ function calculateGridObjectSelectionPosition(
   context: SelectionRenderContext
 ): { screenX: number; screenY: number; objectWidth: number; objectHeight: number; cellWidth: number; cellHeight: number } {
   const { offsetX, offsetY, zoom, scaledSize } = context;
-  const size = object.size || { width: 1, height: 1 };
-  const alignment = object.alignment || 'center';
+  const size = object.size ?? { width: 1, height: 1 };
+  const alignment = object.alignment ?? 'center';
 
   const gridPos = geometry.gridToScreen(object.position.x, object.position.y, offsetX, offsetY, zoom);
   let screenX = gridPos.screenX;
@@ -210,7 +210,7 @@ function renderResizeOverlay(
   cellWidth: number,
   cellHeight: number
 ): void {
-  const size = object.size || { width: 1, height: 1 };
+  const size = object.size ?? { width: 1, height: 1 };
 
   ctx.fillStyle = 'rgba(74, 158, 255, 0.15)';
   for (let dx = 0; dx < size.width; dx++) {
@@ -296,7 +296,7 @@ function renderObjectSelection(
 
   if (object.freeform === true && object.worldPosition != null) {
     const { offsetX, offsetY, zoom, scaledSize } = context;
-    const size = object.size || { width: 1, height: 1 };
+    const size = object.size ?? { width: 1, height: 1 };
     const { screenX, screenY } = geometry.worldToScreen(
       object.worldPosition.x, object.worldPosition.y, offsetX, offsetY, zoom
     );

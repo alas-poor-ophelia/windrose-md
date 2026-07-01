@@ -44,7 +44,7 @@ function parsePackMetadata(buffer: ArrayBuffer, archive: PckArchive): MetadataRe
 
 	let json: Record<string, unknown>;
 	try {
-		json = JSON.parse(text);
+		json = JSON.parse(text) as Record<string, unknown>;
 	} catch {
 		return { ok: false, error: 'Invalid JSON in pack.json' };
 	}

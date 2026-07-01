@@ -192,7 +192,7 @@ const useGroupDrag = (): UseGroupDragResult => {
     });
 
     return true;
-  }, [hasMultiSelection, selectedItems, mapData, screenToWorld, setIsDraggingSelection, setDragStart]);
+  }, [hasMultiSelection, selectedItems, mapData, screenToWorld, setIsDraggingSelection, setDragStart, groupDragInitialStateRef, groupDragOffsetsRef]);
 
   const handleGroupDrag = useCallback((e: PointerEvent | MouseEvent | TouchEvent): boolean => {
     if (!isDraggingSelection || dragStart?.isGroupDrag !== true) {
@@ -393,7 +393,7 @@ const useGroupDrag = (): UseGroupDragResult => {
 
     return true;
   }, [isDraggingSelection, dragStart, mapData, geometry, selectedItems, getClientCoords,
-      screenToGrid, screenToWorld, onObjectsChange, onTextLabelsChange, setDragStart, updateSelectedItemsData]);
+      screenToGrid, screenToWorld, onObjectsChange, onTextLabelsChange, setDragStart, updateSelectedItemsData, groupDragOffsetsRef]);
 
   const stopGroupDrag = useCallback((): boolean => {
     if (!isDraggingSelection || dragStart?.isGroupDrag !== true) {
@@ -451,7 +451,7 @@ const useGroupDrag = (): UseGroupDragResult => {
     groupDragOffsetsRef.current = new Map();
 
     return true;
-  }, [isDraggingSelection, dragStart, mapData, geometry, setIsDraggingSelection, setDragStart, onObjectsChange, onTextLabelsChange]);
+  }, [isDraggingSelection, dragStart, mapData, geometry, setIsDraggingSelection, setDragStart, onObjectsChange, onTextLabelsChange, groupDragInitialStateRef, groupDragOffsetsRef]);
 
   return {
     isGroupDragging,

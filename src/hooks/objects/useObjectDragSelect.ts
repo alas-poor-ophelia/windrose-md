@@ -60,7 +60,7 @@ function useObjectDragSelect(
   const { getObjectAtPosition, updateObject, onObjectsChange } = useMapOperations();
   const { selectedItem, setSelectedItem, isDraggingSelection, setIsDraggingSelection, dragStart, setDragStart, isResizeMode, setIsResizeMode } = useMapSelection();
 
-  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressTimerRef = useRef<number | null>(null);
   const dragInitialStateRef = useRef<MapObject[] | null>(null);
 
   const handleObjectSelection = useCallback((
@@ -128,12 +128,12 @@ function useObjectDragSelect(
       const isAlreadySelected = selectedItem?.type === 'object' && selectedItem.id === object.id;
 
       if (isAlreadySelected) {
-        if (longPressTimerRef.current) {
-          clearTimeout(longPressTimerRef.current);
+        if (longPressTimerRef.current != null) {
+          window.clearTimeout(longPressTimerRef.current);
         }
 
         if (mapData.mapType !== 'hex' && isTouchActive !== false) {
-          longPressTimerRef.current = setTimeout(() => {
+          longPressTimerRef.current = window.setTimeout(() => {
             setEdgeSnapMode(!edgeSnapModeRef.current);
 
             navigator.vibrate?.(50);
@@ -170,12 +170,12 @@ function useObjectDragSelect(
           worldY: worldCoords?.worldY
         });
 
-        if (longPressTimerRef.current) {
-          clearTimeout(longPressTimerRef.current);
+        if (longPressTimerRef.current != null) {
+          window.clearTimeout(longPressTimerRef.current);
         }
 
         if (mapData.mapType !== 'hex' && isTouchActive !== false) {
-          longPressTimerRef.current = setTimeout(() => {
+          longPressTimerRef.current = window.setTimeout(() => {
             setEdgeSnapMode(true);
 
             navigator.vibrate?.(50);
@@ -189,8 +189,9 @@ function useObjectDragSelect(
     }
 
     return false;
-  }, [currentTool, selectedObjectType, selectedItem, isResizeMode, mapData, geometry,
-    getObjectAtPosition, setSelectedItem, setIsDraggingSelection, setDragStart, screenToWorld, getClickedCorner, beginResize
+  }, [currentTool, selectedItem, isResizeMode, mapData, geometry,
+    getObjectAtPosition, setSelectedItem, setIsDraggingSelection, setDragStart, screenToWorld, getClickedCorner, beginResize,
+    setEdgeSnapMode, setIsResizeMode
   ]);
 
   const handleObjectDragging = useCallback((e: PointerEvent | MouseEvent | TouchEvent): boolean => {
@@ -204,12 +205,12 @@ function useObjectDragSelect(
 
     const { clientX, clientY } = getClientCoords(e);
 
-    if (longPressTimerRef.current) {
+    if (longPressTimerRef.current != null) {
       const dx = clientX - dragStart.x;
       const dy = clientY - dragStart.y;
       const distance = Math.sqrt(dx * dx + dy * dy);
       if (distance > 5) {
-        clearTimeout(longPressTimerRef.current);
+        window.clearTimeout(longPressTimerRef.current);
         longPressTimerRef.current = null;
       }
     }
@@ -412,14 +413,14 @@ function useObjectDragSelect(
     }
     return true;
   }, [isDraggingSelection, selectedItem, dragStart, mapData, edgeSnapMode, geometry,
-    getClientCoords, screenToGrid, screenToWorld, updateObject, onObjectsChange, setDragStart, setSelectedItem, getObjectAtPosition]);
+    getClientCoords, screenToGrid, screenToWorld, updateObject, onObjectsChange, setDragStart, setSelectedItem, getObjectAtPosition, altKeyPressedRef, shiftKeyPressedRef]);
 
   const stopObjectDragging = useCallback((): boolean => {
     if (mapData == null || geometry == null) return false;
     const isDraggingObject = selectedItem?.type === 'object' || (dragStart?.objectId != null && dragStart.objectId !== '');
     if (isDraggingSelection && isDraggingObject) {
-      if (longPressTimerRef.current) {
-        clearTimeout(longPressTimerRef.current);
+      if (longPressTimerRef.current != null) {
+        window.clearTimeout(longPressTimerRef.current);
         longPressTimerRef.current = null;
       }
 
@@ -459,7 +460,7 @@ function useObjectDragSelect(
               || initialObj.worldPosition?.x !== currentObj.worldPosition?.x
               || initialObj.worldPosition?.y !== currentObj.worldPosition?.y;
             if (moved) {
-              document.dispatchEvent(new CustomEvent('windrose:player-fog-clear', {
+              activeDocument.dispatchEvent(new CustomEvent('windrose:player-fog-clear', {
                 detail: { objectId: fogObjectId }
               }));
             }

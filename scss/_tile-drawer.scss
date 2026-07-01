@@ -4,11 +4,31 @@
    (full panel) and a depth ribbon spine (collapsed state).
    ========================================================================== */
 
-/* Shared parent for tile drawer + dock column */
+/* Shared parent for tile drawer + dock column.
+   position:relative anchors the absolutely-overlaid drawer below. */
 .windrose-right-group {
   display: flex;
+  position: relative;
   height: 100%;
   min-height: 0;
+}
+
+/* Full-pane only: float the drawer over the canvas instead of letting it occupy
+   flex space. Folding a flex sibling shrank the row and let the flex:1 canvas
+   grow, firing MapCanvas's ResizeObserver every frame → fold lag + a stale,
+   centred backing-store frame that drifted until the final crisp render.
+   As an absolute overlay anchored to the dock column's left edge (right:100%),
+   the drawer grows leftward over the map and the canvas keeps a constant width,
+   so it never resizes during the fold — mirroring the embedded block-mode
+   drawer, which is already an absolute overlay outside the canvas flex flow.
+   Scoped to .windrose-right-group, which only renders in full-pane. */
+.windrose-right-group > .windrose-tile-drawer {
+  position: absolute;
+  right: 100%;
+  top: 0;
+  bottom: 0;
+  height: auto;
+  z-index: 15;
 }
 
 /* Drawer container — width transitions between ribbon and full panel */
@@ -22,6 +42,55 @@
   &.has-flyout {
     overflow: visible;
   }
+}
+
+/* ==========================================================================
+   Host-theme button-chrome escape
+   Obsidian's `button:not(.clickable-icon)` (app.css, specificity 0,1,1) paints
+   every native <button> with --interactive-normal and a hard --input-shadow,
+   outranking our single-class (0,1,0) resets — the source of the stray black
+   fills, bevels, and the 2px drop-shadow that bleeds onto the row below.
+   :where() pins this blanket to the host's exact specificity so load order wins,
+   while our state rules (.on / .sel / .active, 0,2,0) still override it.
+   ========================================================================== */
+:where(.windrose-tile-drawer) button:not(.clickable-icon) {
+  box-shadow: none;
+  appearance: none;
+}
+
+/* Host also fills every button with --interactive-normal (#0b0f13), overriding
+   our single-class surfaces — black ribbon tabs, near-black chips. Re-assert the
+   intended rest surface at the host's specificity (button + class = 0,1,1); the
+   :not() chain keeps each rule off its own hover/selected states so those paint. */
+
+/* Buttons whose resting surface is meant to be transparent. */
+button:is(
+  .windrose-tb-railbtn,
+  .windrose-tb-listrow,
+  .windrose-tb-seclabel,
+  .windrose-tb-frow,
+  .windrose-tb-vrow,
+  .windrose-tb-packclear,
+  .windrose-fd-ribtab,
+  .windrose-fd-subtool,
+  .windrose-tile-spine-expand,
+  .windrose-tile-spine-fbtn,
+  .windrose-spine-flyout-close
+):not(:hover):not(.on):not(.sel):not(.active) {
+  background-color: transparent;
+}
+
+/* Filled buttons whose intended rest surface is --windrose-bg-secondary
+   (#262626). :not(.ghost)/:not(.active) leave the transparent and gold icon-button
+   variants alone. */
+button:is(
+  .windrose-tb-iconbtn,
+  .windrose-tb-chip,
+  .windrose-tb-packchip,
+  .windrose-tb-filtbtn,
+  .windrose-tb-card
+):not(.ghost):not(.active):not(.on):not(.sel):not(:hover) {
+  background-color: var(--windrose-bg-secondary);
 }
 
 /* Spine layer — right-pinned, always rendered underneath */
@@ -38,6 +107,290 @@
   right: 0;
   top: 0;
   bottom: 0;
+}
+
+/* Drawer pane wrapper — vertical ribbon on the left, active pane fills the rest */
+/* ---- Block-mode compact drawer: shared header above both panes ---- */
+.windrose-cd {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.windrose-cd-main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.windrose-cd-head {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 9px;
+  border-bottom: 1px solid oklch(from var(--windrose-border-primary) l c h / 0.5);
+}
+
+/* Segmented Tiles | Objects control (the block pane switch) */
+.windrose-cd-paneseg {
+  display: flex;
+  gap: 1px;
+  margin-right: auto;
+  padding: 1px;
+  background: oklch(from var(--windrose-bg-primary) calc(l - 0.02) c h);
+  border: 1px solid var(--windrose-border-primary);
+  border-radius: 6px;
+}
+
+.windrose-cd-segbtn {
+  padding: 3px 10px;
+  font-size: 10.5px;
+  font-weight: 600;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--windrose-text-muted);
+  cursor: pointer;
+  box-shadow: none;
+
+  &:hover {
+    color: var(--windrose-text-primary);
+  }
+
+  &.active {
+    background: linear-gradient(180deg, var(--windrose-gold-bright), var(--windrose-gold));
+    color: #241c12;
+  }
+}
+
+.windrose-cd-vtog {
+  display: flex;
+  gap: 1px;
+}
+
+/* Vertical left ribbon — Tiles/Objects tabs + form-gated placement subtools */
+.windrose-fd-subrib {
+  width: 46px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 0;
+  /* Darker than the category rail (l + 0.02) so the chrome column reads as the
+     deepest layer of the drawer, per the handoff's subrib < rail < grid order. */
+  background: oklch(from var(--windrose-bg-primary) calc(l - 0.02) c h);
+  border-right: 1px solid oklch(from var(--windrose-border-primary) l c h / 0.4);
+}
+
+/* Ribbon tab — icon button toggling Tiles vs Objects pane */
+.windrose-fd-ribtab {
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--windrose-text-muted, var(--text-muted));
+  cursor: pointer;
+  box-shadow: none;
+
+  &:hover {
+    background: var(--windrose-bg-secondary);
+  }
+
+  &.on {
+    border-color: oklch(from var(--windrose-gold-bright) l c h / 0.5);
+    background: var(--windrose-bg-secondary);
+    color: var(--windrose-gold-bright);
+  }
+}
+
+.windrose-fd-subrib-div {
+  width: 60%;
+  height: 1px;
+  background: oklch(from var(--windrose-border-primary) l c h / 0.4);
+}
+
+.windrose-fd-subrib-cap {
+  font-size: 7px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--windrose-border-primary-dark);
+}
+
+.windrose-fd-subrib-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: center;
+}
+
+.windrose-fd-subtool {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--windrose-text-muted, var(--text-muted));
+  cursor: pointer;
+  box-shadow: none;
+
+  &:hover:not(:disabled) {
+    background: var(--windrose-bg-tertiary);
+    color: var(--windrose-text-primary);
+  }
+
+  &.on {
+    color: var(--windrose-gold-bright);
+    border-color: oklch(from var(--windrose-gold-bright) l c h / 0.5);
+    background: oklch(from var(--windrose-gold-bright) l c h / 0.12);
+  }
+
+  &.dim,
+  &:disabled {
+    opacity: 0.3;
+    cursor: default;
+  }
+
+  .windrose-fd-subtool-star {
+    position: absolute;
+    top: -3px;
+    right: -2px;
+    font-size: 8px;
+    line-height: 1;
+    color: var(--windrose-gold-bright);
+  }
+}
+
+/* ---- Tablet overrides ---- */
+/* Obsidian .is-tablet injects padding + background on every non-clickable-icon button.
+   Re-state the icon-button box so the ribbon tabs and subtools keep their 34x34 shape. */
+.is-tablet button.windrose-fd-ribtab {
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: 7px;
+  border: 1px solid transparent;
+  background: transparent;
+  box-shadow: none;
+  color: var(--windrose-text-muted, var(--text-muted));
+
+  &.on {
+    border-color: oklch(from var(--windrose-gold-bright) l c h / 0.5);
+    background: var(--windrose-bg-secondary);
+    color: var(--windrose-gold-bright);
+  }
+}
+
+.is-tablet button.windrose-fd-subtool {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  box-shadow: none;
+  color: var(--windrose-text-muted, var(--text-muted));
+
+  &.on {
+    color: var(--windrose-gold-bright);
+    border-color: oklch(from var(--windrose-gold-bright) l c h / 0.5);
+    background: oklch(from var(--windrose-gold-bright) l c h / 0.12);
+  }
+}
+
+/* Compact-drawer header segmented control */
+.is-tablet button.windrose-cd-segbtn {
+  height: auto;
+  padding: 3px 10px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--windrose-text-muted);
+  font-size: 10.5px;
+  font-weight: 600;
+
+  &.active {
+    background: linear-gradient(180deg, var(--windrose-gold-bright), var(--windrose-gold));
+    color: #241c12;
+  }
+}
+
+/* Collapsed-spine buttons — keep their fixed icon-button boxes on tablet */
+.is-tablet button.windrose-tile-spine-expand {
+  width: 100%;
+  height: 34px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid oklch(from var(--windrose-border-primary) l c h / 0.22);
+  border-radius: 0;
+  box-shadow: none;
+  color: var(--windrose-gold-bright);
+}
+
+.is-tablet button.windrose-tile-spine-fbtn {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--windrose-text-disabled);
+
+  &.active {
+    background: oklch(from var(--windrose-gold-bright) l c h / 0.18);
+    color: var(--windrose-gold-bright);
+  }
+}
+
+.is-tablet button.windrose-tile-spine-panebtn {
+  width: 32px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--windrose-text-secondary);
+
+  &.active {
+    background: linear-gradient(180deg, oklch(from var(--windrose-border-primary) l c h / 0.22), oklch(from var(--windrose-border-primary) l c h / 0.08));
+    border-color: oklch(from var(--windrose-gold-bright) l c h / 0.6);
+    color: var(--windrose-gold-bright);
+  }
+}
+
+.is-tablet button.windrose-spine-flyout-close {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--windrose-text-disabled);
 }
 
 /* The spine itself — vertical strip with expand button, depth ribbon, loaded chip */
@@ -101,8 +454,14 @@
 }
 
 .windrose-tile-drawer.is-open {
+  /* The cd-head behind the panel's collapse button is transparent, so the spine
+     underneath (its right-pinned expand button lands exactly under the collapse
+     button) shows through and the controls visually stack. The spine is meant to
+     be invisible while open anyway, so hide it outright — visibility (not
+     display) keeps its box so nothing reflows under the fold animation. */
   .windrose-tile-spine-layer {
     pointer-events: none;
+    visibility: hidden;
   }
 
   .windrose-tile-panel-layer {
@@ -179,6 +538,40 @@
 
   &.active {
     background: oklch(from var(--windrose-gold-bright) l c h / 0.18);
+    color: var(--windrose-gold-bright, var(--windrose-text-primary));
+  }
+}
+
+/* Collapsed-spine Tiles/Objects switcher — clicking switches pane and expands.
+   Active button gets the gold-framed treatment from the handoff's EdgeRibbon. */
+.windrose-tile-spine-pane {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 6px 0;
+}
+
+.windrose-tile-spine-panebtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 30px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--windrose-text-secondary);
+  cursor: pointer;
+
+  &:hover {
+    background: oklch(from var(--windrose-border-primary) l c h / 0.14);
+    color: var(--windrose-text-primary);
+  }
+
+  &.active {
+    background: linear-gradient(180deg, oklch(from var(--windrose-border-primary) l c h / 0.22), oklch(from var(--windrose-border-primary) l c h / 0.08));
+    border-color: oklch(from var(--windrose-gold-bright) l c h / 0.6);
     color: var(--windrose-gold-bright, var(--windrose-text-primary));
   }
 }

@@ -108,7 +108,7 @@ function usePaintTool({
       const newCells = accessorSetCell(activeLayer.cells, coords, selectedColor, selectedOpacity, geometry);
       onCellsChange(newCells, isBatchedStroke);
     } else {
-      const { clientX, clientY } = dragStart || { clientX: 0, clientY: 0 };
+      const { clientX, clientY } = dragStart ?? { clientX: 0, clientY: 0 };
       const worldCoords = screenToWorld(clientX, clientY);
       if (worldCoords) {
         const canvas = canvasRef.current;
@@ -133,9 +133,7 @@ function usePaintTool({
             if (!processedEdges.has(edgeKey)) {
               const existingEdge = getEdgeAt(activeLayer.edges, edgeInfo.x, edgeInfo.y, edgeInfo.side);
               if (existingEdge) {
-                if (strokeInitialEdgesRef.current === null) {
-                  strokeInitialEdgesRef.current = [...activeLayer.edges];
-                }
+                strokeInitialEdgesRef.current ??= [...activeLayer.edges];
                 setProcessedEdges((prev: Set<string>) => new Set([...prev, edgeKey]));
                 const newEdges = removeEdge(activeLayer.edges, edgeInfo.x, edgeInfo.y, edgeInfo.side);
                 onEdgesChange(newEdges, isBatchedStroke);
@@ -166,17 +164,13 @@ function usePaintTool({
             t.freeform === true ? (t.col === coordX && t.row === coordY) : assignmentCoversCell(t, coordX, coordY);
           const overlayIdx = tiles.findIndex((t: TileAssignment) => covers(t) && t.placement === 'overlay');
           if (overlayIdx >= 0) {
-            if (strokeInitialTilesRef.current === null) {
-              strokeInitialTilesRef.current = [...tiles];
-            }
+            strokeInitialTilesRef.current ??= [...tiles];
             onTilesChange(tiles.filter((_: TileAssignment, i: number) => i !== overlayIdx), isBatchedStroke);
             tileErased = true;
           } else {
             const baseIdx = tiles.findIndex((t: TileAssignment) => covers(t));
             if (baseIdx >= 0) {
-              if (strokeInitialTilesRef.current === null) {
-                strokeInitialTilesRef.current = [...tiles];
-              }
+              strokeInitialTilesRef.current ??= [...tiles];
               onTilesChange(tiles.filter((_: TileAssignment, i: number) => i !== baseIdx), isBatchedStroke);
               tileErased = true;
             }
@@ -188,7 +182,7 @@ function usePaintTool({
           let newCurves: Curve[] | null = null;
           if (geometry.type === 'hex') {
             const verts = geometry.getHexVertices(coordX, coordY);
-            if (verts) {
+            if (verts != null) {
               const clipPoly = verts.map((v: { worldX: number; worldY: number }) => [v.worldX, v.worldY] as [number, number]);
               newCurves = eraseWorldPolygonFromCurves(activeLayer.curves, clipPoly);
             }
@@ -199,9 +193,7 @@ function usePaintTool({
             }
           }
           if (newCurves) {
-            if (strokeInitialCurvesRef.current === null) {
-              strokeInitialCurvesRef.current = activeLayer.curves;
-            }
+            strokeInitialCurvesRef.current ??= activeLayer.curves;
             onCurvesChange(newCurves, isBatchedStroke);
             curveErased = true;
           }

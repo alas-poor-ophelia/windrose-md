@@ -88,7 +88,7 @@ function WindroseHoverPreview({ mapId, x, y, zoom: zoomProp, layerId, notePath }
           ? new HexGeometry(
               (focused.hexSize as number) || (DEFAULTS.hexSize),
               ((focused.orientation as string) || (DEFAULTS.hexOrientation as string)) as 'flat' | 'pointy',
-              focused.hexBounds || null
+              focused.hexBounds ?? null
             )
           : new GridGeometry((focused.gridSize as number) || (DEFAULTS.gridSize));
 
@@ -159,13 +159,12 @@ function WindroseHoverPreview({ mapId, x, y, zoom: zoomProp, layerId, notePath }
 
         setStatus('ready');
       } catch (err) {
-        // eslint-disable-next-line no-console
         console.error('[WindroseHoverPreview] render failed', err);
         if (!cancelled) setStatus('error');
       }
     })();
     return () => { cancelled = true; };
-  }, [mapId, x, y, zoom, layerId]);
+  }, [mapId, x, y, zoom, layerId, preview.width, preview.height]);
 
   const noteLabel = noteBasename(notePath);
   const headerMapName = mapName || mapId;
@@ -196,7 +195,6 @@ function renderHoverPreview(el: HTMLElement, params: WindroseHoverPreviewProps):
   try {
     render(<WindroseHoverPreview {...params} />, el);
   } catch (err) {
-    // eslint-disable-next-line no-console
     console.error('[WindroseHoverPreview] renderPreview failed', err);
   }
 }

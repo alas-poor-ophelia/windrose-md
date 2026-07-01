@@ -16,7 +16,7 @@
 
 
 
-import type { JSX, VNode } from 'preact';
+import type { TargetedMouseEvent, VNode } from 'preact';
 import type { Ref } from 'preact';
 import type { MapData } from '#types/core/map.types';
 import type { MapObject } from '#types/objects/object.types';
@@ -33,7 +33,7 @@ import { Icon } from '../shared/Icon';
 import { InternalLink } from '../shared/InternalLink';
 import { Z_INDEX } from '../../core/dmtConstants';
 
-type MouseClickEvent = JSX.TargetedMouseEvent<HTMLButtonElement>;
+type MouseClickEvent = TargetedMouseEvent<HTMLButtonElement>;
 
 interface ObjectSelectionToolbarProps {
   selectedItem: SelectedItem | null;
@@ -62,7 +62,7 @@ interface ObjectSelectionToolbarProps {
   showColorPicker?: boolean;
 
   // Color picker props
-  currentColor?: HexColor | string | null;
+  currentColor?: HexColor | null;
   onColorSelect?: (color: HexColor) => void;
   onColorPickerClose?: () => void;
   onColorReset?: () => void;
@@ -118,6 +118,7 @@ const ObjectSelectionToolbar = ({
     : null;
 
   const screenPos = hasRequiredInputs && object != null && geometry != null
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- canvasRef.current non-null: hasRequiredInputs already gates on !!canvasRef?.current
     ? calculateObjectScreenPosition(object, canvasRef.current!, mapData, geometry, containerRef)
     : null;
 

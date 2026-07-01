@@ -20,19 +20,19 @@ function useDebouncedSave(
 ): UseDebouncedSaveResult {
   const [pendingData, setPendingData] = useState<MapData | null>(null);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('Saved');
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saveTimerRef = useRef<number | null>(null);
   const saveVersionRef = useRef<number>(0);
 
   useEffect(() => {
     if (!pendingData) return undefined;
 
-    if (saveTimerRef.current) {
-      clearTimeout(saveTimerRef.current);
+    if (saveTimerRef.current != null) {
+      window.clearTimeout(saveTimerRef.current);
     }
 
     const currentVersion = ++saveVersionRef.current;
 
-    saveTimerRef.current = setTimeout(async () => {
+    saveTimerRef.current = window.setTimeout(() => { void (async () => {
       setSaveStatus('Saving...');
       const success = await saveMapData(app, mapId, pendingData);
 
@@ -45,11 +45,11 @@ function useDebouncedSave(
           setSaveStatus('Unsaved changes');
         }
       }
-    }, 2000);
+    })(); }, 2000);
 
     return () => {
-      if (saveTimerRef.current) {
-        clearTimeout(saveTimerRef.current);
+      if (saveTimerRef.current != null) {
+        window.clearTimeout(saveTimerRef.current);
       }
     };
   }, [pendingData, mapId, app]);
@@ -65,8 +65,8 @@ function useDebouncedSave(
   useEffect(() => {
     return () => {
       const { app: a, mapId: m, pendingData: pd } = flushRef.current;
-      if (pd && saveTimerRef.current) {
-        clearTimeout(saveTimerRef.current);
+      if (pd && saveTimerRef.current != null) {
+        window.clearTimeout(saveTimerRef.current);
         void saveMapData(a, m, pd);
       }
     };
@@ -86,8 +86,8 @@ function useDebouncedSave(
 
   const forceSave = useCallback(async (): Promise<void> => {
     if (pendingData) {
-      if (saveTimerRef.current) {
-        clearTimeout(saveTimerRef.current);
+      if (saveTimerRef.current != null) {
+        window.clearTimeout(saveTimerRef.current);
         saveTimerRef.current = null;
       }
 

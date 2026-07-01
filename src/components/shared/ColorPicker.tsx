@@ -4,7 +4,7 @@
  * Color picker component with custom color support and opacity controls.
  */
 
-import type { JSX, VNode } from 'preact';
+import type { CSSProperties, TargetedEvent, TargetedMouseEvent, TargetedTouchEvent, VNode } from 'preact';
 import { Fragment } from 'preact';
 import type { CustomColor, HexColor } from '#types/core/common.types';
 
@@ -105,7 +105,7 @@ const ColorPicker = ({
   const [editTargetId, setEditTargetId] = useState<string | null>(null);
   const [editingOpacity, setEditingOpacity] = useState(1);
   const colorInputRef = useRef<HTMLInputElement>(null);
-  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressTimerRef = useRef<number | null>(null);
   const editingOpacityRef = useRef(editingOpacity);
   const editTargetIdRef = useRef(editTargetId);
   const justOpenedEditRef = useRef(false);
@@ -165,11 +165,11 @@ const ColorPicker = ({
 
   if (!isOpen) return null;
 
-  const handlePickerClick = (e: JSX.TargetedMouseEvent<HTMLDivElement>): void => {
+  const handlePickerClick = (e: TargetedMouseEvent<HTMLDivElement>): void => {
     e.stopPropagation();
   };
 
-  const handlePickerMouseDown = (e: JSX.TargetedMouseEvent<HTMLDivElement>): void => {
+  const handlePickerMouseDown = (e: TargetedMouseEvent<HTMLDivElement>): void => {
     e.stopPropagation();
 
     if (editTargetId != null && editTargetId !== '' && !(e.target as Element).closest('.windrose-color-edit-panel')) {
@@ -179,7 +179,7 @@ const ColorPicker = ({
     }
   };
 
-  const handlePickerTouch = (e: JSX.TargetedTouchEvent<HTMLDivElement>): void => {
+  const handlePickerTouch = (e: TargetedTouchEvent<HTMLDivElement>): void => {
     e.stopPropagation();
 
     if (editTargetId != null && !(e.target as Element).closest('.windrose-color-edit-panel')) {
@@ -204,19 +204,19 @@ const ColorPicker = ({
     }
   };
 
-  const handleReset = (e: JSX.TargetedMouseEvent<HTMLButtonElement>): void => {
+  const handleReset = (e: TargetedMouseEvent<HTMLButtonElement>): void => {
     e.stopPropagation();
     onReset();
   };
 
-  const handleColorInput = (e: JSX.TargetedEvent<HTMLInputElement, Event>): void => {
+  const handleColorInput = (e: TargetedEvent<HTMLInputElement, Event>): void => {
     const value = (e.target as HTMLInputElement).value;
     if (pendingCustomColorRef) {
       pendingCustomColorRef.current = value;
     }
   };
 
-  const handleColorContextMenu = (e: JSX.TargetedMouseEvent<HTMLButtonElement>, colorDef: ColorDef): void => {
+  const handleColorContextMenu = (e: TargetedMouseEvent<HTMLButtonElement>, colorDef: ColorDef): void => {
     if (colorDef.isReset === true || colorDef.isAddButton === true) return;
     e.preventDefault();
     e.stopPropagation();
@@ -224,30 +224,30 @@ const ColorPicker = ({
     setEditTargetId(colorDef.id);
     setEditingOpacity(colorDef.opacity ?? 1);
     justOpenedEditRef.current = true;
-    setTimeout(() => { justOpenedEditRef.current = false; }, 100);
+    window.setTimeout(() => { justOpenedEditRef.current = false; }, 100);
   };
 
   const handleLongPressStart = (colorDef: ColorDef): void => {
     if (colorDef.isReset === true || colorDef.isAddButton === true) return;
     longPressTriggeredRef.current = false;
-    longPressTimerRef.current = setTimeout(() => {
+    longPressTimerRef.current = window.setTimeout(() => {
       longPressTriggeredRef.current = true;
 
       setEditTargetId(colorDef.id);
       setEditingOpacity(colorDef.opacity ?? 1);
       justOpenedEditRef.current = true;
-      setTimeout(() => { justOpenedEditRef.current = false; }, 300);
+      window.setTimeout(() => { justOpenedEditRef.current = false; }, 300);
     }, 500);
   };
 
   const handleLongPressCancel = (): void => {
-    if (longPressTimerRef.current) {
-      clearTimeout(longPressTimerRef.current);
+    if (longPressTimerRef.current != null) {
+      window.clearTimeout(longPressTimerRef.current);
       longPressTimerRef.current = null;
     }
   };
 
-  const handleDeleteClick = (e: JSX.TargetedMouseEvent<HTMLButtonElement>, colorId: string): void => {
+  const handleDeleteClick = (e: TargetedMouseEvent<HTMLButtonElement>, colorId: string): void => {
     e.preventDefault();
     e.stopPropagation();
     if (onDeleteCustomColor) {
@@ -256,7 +256,7 @@ const ColorPicker = ({
     setEditTargetId(null);
   };
 
-  const handleEditOpacityChange = (e: JSX.TargetedEvent<HTMLInputElement, Event>): void => {
+  const handleEditOpacityChange = (e: TargetedEvent<HTMLInputElement, Event>): void => {
     e.stopPropagation();
     const newOpacity = parseInt((e.target as HTMLInputElement).value, 10) / 100;
     setEditingOpacity(newOpacity);
@@ -280,7 +280,7 @@ const ColorPicker = ({
     ? { right: '0', left: 'auto' }
     : { left: '0' };
 
-  let pickerStyle: JSX.CSSProperties;
+  let pickerStyle: CSSProperties;
 
   if (floatingMode) {
     pickerStyle = {};

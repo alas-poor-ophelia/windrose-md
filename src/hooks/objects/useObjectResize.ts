@@ -155,7 +155,7 @@ function useObjectResize(): {
     if (!dragStart.object) return false;
     const originalObject = dragStart.object as { position: { x: number; y: number }; size?: { width: number; height: number } };
     const originalPos = originalObject.position;
-    const originalSize = originalObject.size || { width: 1, height: 1 };
+    const originalSize = originalObject.size ?? { width: 1, height: 1 };
 
     let newX = originalPos.x;
     let newY = originalPos.y;

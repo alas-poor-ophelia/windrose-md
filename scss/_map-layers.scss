@@ -393,6 +393,176 @@ button.windrose-fow-tool-btn:disabled svg,
   left: 8px;
 }
 
+/* ============================================
+   BLOCK-MODE LEFT DRAWER (Layers / Colors / View)
+   42px icon rail + a 198px panel that FOLDS open beside it (mirror of the
+   right tile drawer). Overlays the canvas left edge — never pushes it.
+   ============================================ */
+.windrose-edge-rail-root {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 40px;
+  z-index: 9;
+  display: flex;
+}
+
+.windrose-edge-rail {
+  width: 40px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 0;
+  background: var(--windrose-bg-primary);
+  border-right: 1.5px solid oklch(from var(--windrose-border-primary) l c h / 0.5);
+  box-shadow: 2px 0 8px oklch(0% 0 0deg / 0.2);
+}
+
+/* `button.` prefix (specificity 0,1,1) is required to beat Obsidian's
+   `button:not(.clickable-icon)` (0,1,1, wins on load order) which injects a dark
+   fill + bevel box-shadow, and its `button:hover`. The old bare-class rule (0,1,0)
+   lost that fight on desktop — only the .is-tablet override (0,2,1) held. */
+button.windrose-edge-rail-btn {
+  width: 34px;
+  height: 34px;
+  /* Zero the host button padding + min-content floor, else Obsidian's default
+     `button { padding: 4px 12px }` inflates the icon box past its set width. */
+  padding: 0;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--windrose-text-muted);
+  cursor: pointer;
+  box-shadow: none;
+  transition: var(--windrose-transition);
+
+  svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  &:hover {
+    background: var(--windrose-bg-tertiary);
+    color: var(--windrose-text-primary);
+  }
+
+  &.on {
+    color: var(--windrose-gold-bright);
+    border-color: oklch(from var(--windrose-gold-bright) l c h / 0.5);
+    background: oklch(from var(--windrose-gold-bright) l c h / 0.12);
+  }
+}
+
+.windrose-edge-rail-drawer {
+  /* Layout/chrome only — width, opacity, visibility and the fold transition are
+     driven inline from EdgeRail.tsx (the DrawerDock pattern), because a
+     class-driven width transition does not commit reliably for this overlay
+     inside Obsidian's live-preview embed. */
+  position: absolute;
+  left: 40px;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--windrose-bg-primary);
+  border-right: 1.5px solid oklch(from var(--windrose-gold-bright) l c h / 0.5);
+  box-shadow: 8px 0 26px oklch(0% 0 0deg / 0.45);
+  overflow: hidden;
+  z-index: 9;
+}
+
+/* Inner content is pinned to the full 198px so it clips (rather than reflows)
+   while the drawer width animates — the same trick the right drawer uses. */
+.windrose-edge-rail-drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  width: 198px;
+  padding: 7px 10px;
+  font-family: "Cinzel", serif;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--windrose-gold-bright);
+  border-bottom: 1px solid oklch(from var(--windrose-border-primary) l c h / 0.5);
+}
+
+.windrose-edge-rail-drawer-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+  color: var(--windrose-text-muted);
+  cursor: pointer;
+  box-shadow: none;
+
+  &:hover {
+    color: var(--windrose-text-primary);
+    background: var(--windrose-bg-tertiary);
+  }
+}
+
+.windrose-edge-rail-drawer-body {
+  flex: 1 1 auto;
+  box-sizing: border-box;
+  width: 198px;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 6px;
+}
+
+/* ---- Tablet overrides: edge-rail + visibility buttons ----
+   Obsidian's .is-tablet injects padding/height/background on every <button>. */
+.is-tablet button.windrose-edge-rail-btn {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  box-shadow: none;
+  color: var(--windrose-text-muted);
+
+  &.on {
+    color: var(--windrose-gold-bright);
+    border-color: oklch(from var(--windrose-gold-bright) l c h / 0.5);
+    background: oklch(from var(--windrose-gold-bright) l c h / 0.12);
+  }
+}
+
+.is-tablet button.windrose-edge-rail-drawer-close {
+  width: auto;
+  height: auto;
+  padding: 2px;
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+  box-shadow: none;
+  color: var(--windrose-text-muted);
+}
+
+.is-tablet button.windrose-visibility-btn {
+  width: 32px;
+  height: 32px;
+  padding: 6px;
+  background-color: var(--windrose-bg-secondary);
+  border: 1px solid var(--windrose-border-secondary);
+  border-radius: 3px;
+  color: var(--windrose-text-primary);
+}
+
 .windrose-layer-controls {
   display: flex;
   flex-direction: column;

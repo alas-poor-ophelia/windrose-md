@@ -3,6 +3,8 @@
  * Handles loading the font for both canvas rendering and CSS display
  */
 
+/* eslint-disable obsidianmd/prefer-active-doc -- the font registry (document.fonts) and the one-time <style> injection are GLOBAL resources that belong on the main document, not a popout's; injectIconCSS also runs at module-load, before activeDocument is meaningful. */
+
 import type { IconMap } from '#types/objects/icon.types';
 
 /** Font loading state */
@@ -58,7 +60,6 @@ async function loadRPGAwesomeFont(fontPath: string): Promise<boolean> {
           fontLoaded = true;
           return true;
         } catch (fontFaceError) {
-          // eslint-disable-next-line no-console
           console.warn('[RPGAwesome] FontFace API failed, falling back to CSS injection:', fontFaceError);
         }
       }
@@ -78,12 +79,10 @@ async function loadRPGAwesomeFont(fontPath: string): Promise<boolean> {
         fontLoaded = true;
         return true;
       } else {
-        // eslint-disable-next-line no-console
         console.warn('[RPGAwesome] Font may not have loaded correctly');
         return false;
       }
     } catch (error) {
-      // eslint-disable-next-line no-console
       console.error('[RPGAwesome] Failed to load font:', error);
       fontLoaded = false;
       return false;

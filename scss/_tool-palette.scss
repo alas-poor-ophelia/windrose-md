@@ -77,14 +77,23 @@
 }
 
 .windrose-subtool {
+  /* Red corner triangle, BOTTOM-right (block/horizontal palette). The vertical
+     full-pane palette flips this to the top-right corner to suit its orientation.
+     font-size:0 hides the "▼" glyph the component renders as the indicator's text. */
   &-indicator {
     position: absolute;
-    bottom: 1px;
-    right: 1px;
-    font-size: 7px;
-    opacity: 0.6;
+    bottom: 2px;
+    right: 2px;
+    top: auto;
+    width: 0;
+    height: 0;
+    font-size: 0;
+    opacity: 1;
     pointer-events: none;
     line-height: 1;
+    border-style: solid;
+    border-width: 8px 8px 0 0;
+    border-color: transparent var(--windrose-accent-red) transparent transparent;
   }
 
   &-menu {
@@ -147,8 +156,7 @@
 }
 
 .windrose-tool-btn-active .windrose-subtool-indicator {
-  opacity: 0.9;
-  color: var(--windrose-bg-primary);
+  opacity: 1;
 }
 
 .windrose-history {
@@ -233,4 +241,173 @@
   box-shadow: none;
   margin-bottom: 0;
   background: transparent;
+}
+
+/* ============================================
+   VERTICAL TOOL PALETTE (full-pane left bar)
+   ============================================ */
+.windrose-tool-palette-vertical {
+  flex-direction: column;
+  width: 54px;
+  align-items: center;
+  margin-bottom: 0;
+  gap: 4px;
+  height: 100%;
+  min-height: 0;
+  /* A 54px tool column must never scroll horizontally. Without this, a hair of
+     horizontal content spawns an h-scrollbar, which steals ~17px of height,
+     which pushes content past the vertical edge, which spawns a v-scrollbar — a
+     two-scrollbar feedback loop that reads as jittery "overscroll". Clipping x
+     breaks the loop. The tools fit with ~130px of slack on any normal pane, so
+     the residual vertical scrollbar is sub-pixel-rounding spurious; hide it
+     (matching .windrose-tb-rail) while keeping overflow-y:auto so genuinely
+     short panes can still reach the bottom history controls. */
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar { display: none; }
+
+  .windrose-tool-btn-container {
+    display: block;
+
+    .windrose-tool-btn {
+      min-width: 38px;
+      max-width: 38px;
+      padding: 6px;
+    }
+  }
+
+  .windrose-tool-btn {
+    min-width: 38px;
+    max-width: 38px;
+    height: 38px;
+  }
+
+  /* Active state intentionally NOT overridden here — the block-mode (horizontal)
+     palette is the source of truth: gold fill + red icon with a gold drop-shadow
+     outline. Inheriting it keeps the two palettes 100% matched. */
+
+  /* Subtool flag → red corner triangle, top-right */
+  .windrose-subtool-indicator {
+    top: 2px;
+    right: 2px;
+    bottom: auto;
+    width: 0;
+    height: 0;
+    font-size: 0;
+    opacity: 1;
+    border-style: solid;
+    border-width: 0 8px 8px 0;
+    border-color: transparent var(--windrose-accent-red) transparent transparent;
+  }
+
+  /* Undo/redo stacked at the bottom under a top divider */
+  .windrose-history-controls {
+    flex-direction: column;
+    width: 100%;
+    align-items: center;
+    margin-left: 0;
+    margin-top: auto;
+    padding-left: 0;
+    padding-top: 8px;
+    border-left: none;
+    border-top: 1px solid var(--windrose-border-secondary);
+  }
+}
+
+/* Divider between tools and the relocated color chip in the vertical bar */
+.windrose-tool-palette-divider {
+  width: 70%;
+  height: 1px;
+  background: oklch(from var(--windrose-border-primary) l c h / 0.3);
+  margin: 2px 0;
+  flex-shrink: 0;
+}
+
+/* ---- Tablet overrides ---- */
+/* Obsidian .is-tablet injects padding + background on every non-clickable-icon button;
+   re-state the box so the tool buttons keep their compact 32px shape on iPad.
+   (windrose-color-tool-btn and windrose-tool-palette-dock-btn are always co-applied
+   with windrose-tool-btn, so this rule covers them too.) */
+.is-tablet button.windrose-tool-btn {
+  min-width: 32px;
+  max-width: 42px;
+  height: 32px;
+  padding: clamp(0.375rem, 0.75vw, 0.625rem) clamp(0.5rem, 1vw, 0.75rem);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--windrose-bg-secondary);
+  border: 1px solid var(--windrose-border-secondary);
+  border-radius: 3px;
+  color: var(--windrose-text-primary);
+
+  &.windrose-tool-btn-active {
+    background-color: var(--windrose-border-primary);
+    border-color: var(--windrose-border-primary-dark);
+    color: var(--windrose-bg-primary);
+  }
+}
+
+.is-tablet .windrose-tool-btn-container button.windrose-tool-btn {
+  min-width: 28px;
+  padding: 6px 5px;
+}
+
+.is-tablet .windrose-tool-palette-vertical button.windrose-tool-btn {
+  min-width: 38px;
+  max-width: 38px;
+  height: 38px;
+  padding: 6px;
+}
+
+/* Popout/dock button lives in the full-pane vertical bar. Give it its own tablet
+   twin so Obsidian's injected padding can't squeeze the 20px icon — the general
+   .windrose-tool-btn reset covers it by inheritance, but this control is pinned
+   explicitly (keep it half-lit until hover). */
+.is-tablet .windrose-tool-palette-vertical button.windrose-tool-palette-dock-btn {
+  min-width: 38px;
+  max-width: 38px;
+  height: 38px;
+  padding: 6px;
+  opacity: 0.5;
+}
+
+.is-tablet button.windrose-history-btn {
+  min-width: 32px;
+  height: 32px;
+  padding: 6px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--windrose-bg-secondary);
+  border: 1px solid var(--windrose-border-secondary);
+  border-radius: 3px;
+  color: var(--windrose-text-primary);
+
+  &:disabled {
+    opacity: 0.3;
+  }
+}
+
+.is-tablet button.windrose-subtool-option {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  width: 100%;
+  padding: clamp(0.5rem, 0.8vw, 0.75rem) clamp(0.75rem, 1.5vw, 1rem);
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: var(--windrose-text-primary);
+  text-align: left;
+  box-shadow: none;
+
+  &.windrose-subtool-option-active {
+    background: var(--windrose-border-primary);
+    color: var(--windrose-bg-primary);
+  }
 }

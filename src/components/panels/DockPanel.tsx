@@ -11,6 +11,13 @@ interface DockPanelProps {
   /** Panel absorbs remaining vertical space in the dock */
   flexFill?: boolean;
   defaultCollapsed?: boolean;
+  /** Controlled section-collapse state. When provided, the panel is driven by
+   *  the parent (so a ribbon click can expand it); omit for internal state. */
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
+  /** When set, renders a button at the header's right corner that collapses the
+   *  whole dock column to its icon ribbon. Placed only on the top (Layers) panel. */
+  onCollapseDock?: () => void;
 }
 
 function DockPanel({
@@ -20,12 +27,18 @@ function DockPanel({
   className,
   flexFill = false,
   defaultCollapsed = false,
+  collapsed,
+  onToggleCollapse,
+  onCollapseDock,
 }: DockPanelProps): VNode {
-  const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed);
+  const [internalCollapsed, setInternalCollapsed] = useState(defaultCollapsed);
+  const isControlled = collapsed !== undefined;
+  const isCollapsed = isControlled ? collapsed : internalCollapsed;
 
   const handleToggle = useCallback(() => {
-    setIsCollapsed(prev => !prev);
-  }, []);
+    if (isControlled) onToggleCollapse?.();
+    else setInternalCollapsed(prev => !prev);
+  }, [isControlled, onToggleCollapse]);
 
   const handleUndock = useCallback((e: MouseEvent) => {
     if (!onUndock) return;
@@ -49,6 +62,15 @@ function DockPanel({
             title="Pop out panel"
           >
             <Icon icon="lucide-maximize-2" size={12} />
+          </button>
+        )}
+        {onCollapseDock && (
+          <button
+            className="windrose-dock-panel-collapse"
+            onClick={(e) => { e.stopPropagation(); onCollapseDock(); }}
+            title="Collapse panels to ribbon"
+          >
+            <Icon icon="lucide-panel-right-close" size={14} />
           </button>
         )}
       </div>

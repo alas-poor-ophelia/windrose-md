@@ -13,6 +13,7 @@ import type {
   GridCalculation,
   GridDensityPreset,
 } from '#types/settings/settings.types';
+import { TFile } from 'obsidian';
 import type { App } from 'obsidian';
 
 import { getApp } from '../core/settingsAccessor';
@@ -163,15 +164,14 @@ async function preloadImage(app: App, vaultPath: string): Promise<HTMLImageEleme
     try {
       // Get file from vault
       const file = app.vault.getAbstractFileByPath(vaultPath);
-      if (!file) {
-        // eslint-disable-next-line no-console
+      if (!(file instanceof TFile)) {
         console.warn(`[imageOperations] Image file not found: ${vaultPath}`);
         loadingPromises.delete(vaultPath);
         return null;
       }
 
       // Read as binary
-      const binary = await app.vault.readBinary(file as import('obsidian').TFile);
+      const binary = await app.vault.readBinary(file);
 
       // Convert to blob URL (SVGs need explicit MIME type to parse correctly)
       const isSvg = vaultPath.toLowerCase().endsWith('.svg');
@@ -196,7 +196,6 @@ async function preloadImage(app: App, vaultPath: string): Promise<HTMLImageEleme
           resolve();
         };
         img.onerror = () => {
-          // eslint-disable-next-line no-console
           console.error(`[imageOperations] Failed to load image: ${vaultPath}`);
           URL.revokeObjectURL(url);
           reject(new Error(`Failed to load image: ${vaultPath}`));
@@ -214,7 +213,6 @@ async function preloadImage(app: App, vaultPath: string): Promise<HTMLImageEleme
 
       return img;
     } catch (error) {
-      // eslint-disable-next-line no-console
       console.error('[imageOperations] Error loading image:', error);
       loadingPromises.delete(vaultPath);
       return null;
@@ -255,7 +253,7 @@ async function getImageDimensions(vaultPath: string): Promise<ImageDimensions | 
   if (!img) return null;
 
   // Should be in cache now
-  return dimensionsCache.get(vaultPath) || null;
+  return dimensionsCache.get(vaultPath) ?? null;
 }
 
 /**

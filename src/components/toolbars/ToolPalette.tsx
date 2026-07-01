@@ -4,14 +4,14 @@
  * Tool selection palette with sub-tool menus, history controls, and color picker.
  */
 
-import type { ComponentChildren, JSX, VNode } from 'preact';
+import type { ComponentChildren, TargetedMouseEvent, VNode } from 'preact';
 import type { HexColor } from '#types/core/common.types';
 import type { MapType } from '#types/core/map.types';
 import type { ToolId } from '#types/tools/tool.types';
 import type { CustomColor } from '#types/core/common.types';
 import type { ColorOpacityOverrides } from '../shared/ColorPicker.tsx';
 
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { DEFAULT_COLOR } from '../../drawing/colorOperations';
 import { ColorPicker } from '../shared/ColorPicker';
 import { CornerBrackets } from '../shared/CornerBrackets';
@@ -73,6 +73,12 @@ interface SubMenuFlyoutProps {
   currentSubTool: ToolId;
   onSelect: (id: ToolId) => void;
   onClose: () => void;
+  /**
+   * Viewport-anchored position. In the vertical rail the flyout must be
+   * `position: fixed` to escape the rail's `overflow-y: auto` clip (which forces
+   * `overflow-x: auto`); null = horizontal mode, keep the CSS `absolute` layout.
+   */
+  fixedAnchor?: { left: number; top: number } | null;
 }
 
 /** Props for ToolButtonWithSubMenu */
@@ -86,6 +92,8 @@ interface ToolButtonWithSubMenuProps {
   onSubMenuOpen: (groupId: string) => void;
   onSubMenuClose: () => void;
   mapType: MapType;
+  /** Vertical rail: flyouts open fixed-positioned to escape the rail's overflow clip. */
+  vertical?: boolean;
 }
 
 /** Props for ToolPalette */
@@ -113,11 +121,45 @@ export interface ToolPaletteProps {
   onColorBtnPopout?: (position: { x: number; y: number }) => void;
   /** Dock/undock button rendered at the end of the toolbar */
   dockButton?: ComponentChildren;
+  /** Full-pane vertical layout: 54px left bar, color chip below a divider, right-opening flyouts */
+  vertical?: boolean;
 }
 
-const SubMenuFlyout = ({ subTools, currentSubTool, onSelect, onClose }: SubMenuFlyoutProps): VNode => {
+/**
+ * Offset of the nearest ancestor that acts as the containing block for a
+ * `position: fixed` child — an element with transform/filter/perspective/will-change
+ * or `contain`. Obsidian workspace leaves set `contain: strict`, so a fixed flyout is
+ * positioned relative to the leaf, not the viewport; its rect must be subtracted from
+ * viewport coords. Returns {0,0} when the viewport is the containing block.
+ */
+function fixedContainingOffset(el: HTMLElement): { left: number; top: number } {
+  let p: HTMLElement | null = el.parentElement;
+  while (p != null && p.tagName !== 'HTML' && p.tagName !== 'BODY') {
+    const cs = getComputedStyle(p);
+    const establishesCB =
+      cs.transform !== 'none' ||
+      cs.filter !== 'none' ||
+      cs.perspective !== 'none' ||
+      cs.willChange === 'transform' || cs.willChange === 'filter' || cs.willChange === 'perspective' ||
+      cs.contain === 'strict' || cs.contain === 'content' ||
+      cs.contain.includes('layout') || cs.contain.includes('paint');
+    if (establishesCB) {
+      const r = p.getBoundingClientRect();
+      return { left: r.left, top: r.top };
+    }
+    p = p.parentElement;
+  }
+  return { left: 0, top: 0 };
+}
+
+const SubMenuFlyout = ({ subTools, currentSubTool, onSelect, onClose, fixedAnchor }: SubMenuFlyoutProps): VNode => {
+  // Fixed positioning escapes the vertical rail's overflow clip; left/top come from
+  // the trigger button rect, and the CSS margin-left + translateY(-50%) still apply.
+  const style = fixedAnchor != null
+    ? { position: 'fixed' as const, left: `${fixedAnchor.left}px`, top: `${fixedAnchor.top}px` }
+    : undefined;
   return (
-    <div className="windrose-subtool-menu">
+    <div className="windrose-subtool-menu" style={style}>
       {subTools.map(subTool => (
         <button
           key={subTool.id}
@@ -146,10 +188,23 @@ const ToolButtonWithSubMenu = ({
   onSubToolSelect,
   onSubMenuOpen,
   onSubMenuClose,
-  mapType
+  mapType,
+  vertical = false
 }: ToolButtonWithSubMenuProps): VNode | null => {
-  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressTimer = useRef<number | null>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
   const LONG_PRESS_DURATION = 300;
+
+  // In the vertical rail the flyout opens `position: fixed` to escape the rail's
+  // overflow clip; capture the trigger button's viewport rect when the menu opens.
+  const [fixedAnchor, setFixedAnchor] = useState<{ left: number; top: number } | null>(null);
+  useLayoutEffect(() => {
+    const el = buttonRef.current;
+    if (!vertical || !isSubMenuOpen || el == null) { setFixedAnchor(null); return; }
+    const r = el.getBoundingClientRect();
+    const off = fixedContainingOffset(el);
+    setFixedAnchor({ left: r.right - off.left, top: r.top + r.height / 2 - off.top });
+  }, [vertical, isSubMenuOpen]);
 
   // Hide entire group if it's map-type-restricted
   if (toolGroup.hexOnly === true && mapType !== 'hex') return null;
@@ -161,22 +216,22 @@ const ToolButtonWithSubMenu = ({
 
   if (visibleSubTools.length === 0) return null;
 
-  const currentSubToolDef = visibleSubTools.find(st => st.id === currentSubTool) || visibleSubTools[0];
+  const currentSubToolDef = visibleSubTools.find(st => st.id === currentSubTool) ?? visibleSubTools[0];
   const isActive = visibleSubTools.some(st => st.id === currentTool);
   const hasMultipleSubTools = visibleSubTools.length > 1;
 
   const handlePointerDown = (): void => {
     if (!hasMultipleSubTools) return;
 
-    longPressTimer.current = setTimeout(() => {
+    longPressTimer.current = window.setTimeout(() => {
       onSubMenuOpen(toolGroup.id);
       longPressTimer.current = null;
     }, LONG_PRESS_DURATION);
   };
 
   const handlePointerUp = (): void => {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current);
+    if (longPressTimer.current != null) {
+      window.clearTimeout(longPressTimer.current);
       longPressTimer.current = null;
       onToolSelect(currentSubToolDef.id);
     } else if (!hasMultipleSubTools) {
@@ -185,19 +240,19 @@ const ToolButtonWithSubMenu = ({
   };
 
   const handlePointerLeave = (): void => {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current);
+    if (longPressTimer.current != null) {
+      window.clearTimeout(longPressTimer.current);
       longPressTimer.current = null;
     }
   };
 
-  const handleContextMenu = (e: JSX.TargetedMouseEvent<HTMLButtonElement>): void => {
+  const handleContextMenu = (e: TargetedMouseEvent<HTMLButtonElement>): void => {
     if (!hasMultipleSubTools) return;
 
     e.preventDefault();
     e.stopPropagation();
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current);
+    if (longPressTimer.current != null) {
+      window.clearTimeout(longPressTimer.current);
       longPressTimer.current = null;
     }
     onSubMenuOpen(toolGroup.id);
@@ -211,6 +266,7 @@ const ToolButtonWithSubMenu = ({
   return (
     <div className="windrose-tool-btn-container">
       <button
+        ref={buttonRef}
         className={`windrose-tool-btn interactive-child ${isActive ? 'windrose-tool-btn-active' : ''}`}
         onPointerDown={handlePointerDown}
         onPointerUp={handlePointerUp}
@@ -230,6 +286,7 @@ const ToolButtonWithSubMenu = ({
           currentSubTool={currentSubTool}
           onSelect={handleSubToolSelect}
           onClose={onSubMenuClose}
+          fixedAnchor={fixedAnchor}
         />
       )}
     </div>
@@ -365,7 +422,8 @@ const ToolPalette = ({
   mapType,
   isFocused = false,
   onColorBtnPopout,
-  dockButton
+  dockButton,
+  vertical = false
 }: ToolPaletteProps): VNode => {
   const colorBtnRef = useRef<HTMLButtonElement>(null);
   const pendingCustomColorRef = useRef<HexColor | null>(null);
@@ -440,7 +498,7 @@ const ToolPalette = ({
     }));
   };
 
-  const toggleColorPicker = (e: JSX.TargetedMouseEvent<HTMLButtonElement>): void => {
+  const toggleColorPicker = (e: TargetedMouseEvent<HTMLButtonElement>): void => {
     e.stopPropagation();
     if (onColorBtnPopout) {
       const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
@@ -474,25 +532,66 @@ const ToolPalette = ({
       const buttonElement = target.closest('.windrose-tool-btn-container');
 
       if (!menuElement && !buttonElement) {
+        // Full-pane: the canvas fills the pane and calls stopPropagation on its
+        // own mousedown, so a bubble-phase listener never sees the dismissing
+        // click. Listen in the CAPTURE phase (fires before the canvas) and
+        // swallow the event so the first outside click ONLY closes the menu — it
+        // must not also paint/use the tool (matching block mode).
+        e.preventDefault();
+        e.stopPropagation();
         handleSubMenuClose();
       }
     };
 
-    const timerId = setTimeout(() => {
-      document.addEventListener('mousedown', handleClickOutside);
-      document.addEventListener('touchstart', handleClickOutside, { passive: true });
+    const timerId = window.setTimeout(() => {
+      activeDocument.addEventListener('mousedown', handleClickOutside, true);
+      activeDocument.addEventListener('touchstart', handleClickOutside, { capture: true, passive: false });
     }, 10);
 
     return () => {
-      clearTimeout(timerId);
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('touchstart', handleClickOutside);
+      window.clearTimeout(timerId);
+      activeDocument.removeEventListener('mousedown', handleClickOutside, true);
+      activeDocument.removeEventListener('touchstart', handleClickOutside, true);
     };
   }, [openSubMenu]);
 
 
+  const colorBlock = (
+    <div className="windrose-tool-btn-container">
+      <button
+        ref={colorBtnRef}
+        className={`windrose-tool-btn windrose-color-tool-btn interactive-child ${isColorPickerOpen ? 'windrose-tool-btn-active' : ''}`}
+        onClick={toggleColorPicker}
+        title="Choose color"
+        style={{
+          borderBottom: `4px solid ${selectedColor ?? DEFAULT_COLOR}`
+        }}
+      >
+        <Icon icon="lucide-palette" />
+      </button>
+
+      <ColorPicker
+        isOpen={isColorPickerOpen && !onColorBtnPopout}
+        selectedColor={selectedColor}
+        onColorSelect={onColorChange}
+        onClose={handleCloseColorPicker}
+        onReset={handleColorReset}
+        customColors={customColors}
+        paletteColorOpacityOverrides={paletteColorOpacityOverrides}
+        onAddCustomColor={onAddCustomColor}
+        onDeleteCustomColor={onDeleteCustomColor}
+        onUpdateColorOpacity={onUpdateColorOpacity}
+        position={null}
+        pendingCustomColorRef={pendingCustomColorRef}
+        title="Color"
+        opacity={selectedOpacity}
+        onOpacityChange={onOpacityChange}
+      />
+    </div>
+  );
+
   return (
-    <div className="windrose-tool-palette">
+    <div className={`windrose-tool-palette${vertical ? ' windrose-tool-palette-vertical' : ''}`}>
       <CornerBrackets classPrefix="windrose-tool-palette-bracket" variant="compact" filterId="palette-bracket" />
 
       {toolGroups.slice(0, 2).map(group => (
@@ -507,40 +606,12 @@ const ToolPalette = ({
           onSubMenuOpen={handleSubMenuOpen}
           onSubMenuClose={handleSubMenuClose}
           mapType={mapType}
+          vertical={vertical}
         />
       ))}
 
-      <div className="windrose-tool-btn-container">
-        <button
-          ref={colorBtnRef}
-          className={`windrose-tool-btn windrose-color-tool-btn interactive-child ${isColorPickerOpen ? 'windrose-tool-btn-active' : ''}`}
-          onClick={toggleColorPicker}
-          title="Choose color"
-          style={{
-            borderBottom: `4px solid ${selectedColor ?? DEFAULT_COLOR}`
-          }}
-        >
-          <Icon icon="lucide-palette" />
-        </button>
-
-        <ColorPicker
-          isOpen={isColorPickerOpen && !onColorBtnPopout}
-          selectedColor={selectedColor}
-          onColorSelect={onColorChange}
-          onClose={handleCloseColorPicker}
-          onReset={handleColorReset}
-          customColors={customColors}
-          paletteColorOpacityOverrides={paletteColorOpacityOverrides}
-          onAddCustomColor={onAddCustomColor}
-          onDeleteCustomColor={onDeleteCustomColor}
-          onUpdateColorOpacity={onUpdateColorOpacity}
-          position={null}
-          pendingCustomColorRef={pendingCustomColorRef}
-          title="Color"
-          opacity={selectedOpacity}
-          onOpacityChange={onOpacityChange}
-        />
-      </div>
+      {/* Horizontal: color chip sits mid-row. Vertical: relocated below a divider (see foot). */}
+      {!vertical && colorBlock}
 
       {toolGroups.slice(2).map(group => {
         if (group.gridOnly === true && mapType === 'hex') return null;
@@ -557,6 +628,7 @@ const ToolPalette = ({
             onSubMenuOpen={handleSubMenuOpen}
             onSubMenuClose={handleSubMenuClose}
             mapType={mapType}
+            vertical={vertical}
           />
         );
       })}
@@ -571,6 +643,13 @@ const ToolPalette = ({
           <Icon icon={tool.icon} />
         </button>
       ))}
+
+      {vertical && (
+        <>
+          <div className="windrose-tool-palette-divider" />
+          {colorBlock}
+        </>
+      )}
 
       <div className="windrose-history-controls">
         <button
@@ -591,7 +670,7 @@ const ToolPalette = ({
         </button>
       </div>
 
-      {dockButton && (
+      {dockButton != null && (
         <>
           <div className="windrose-tool-palette-separator" />
           {dockButton}

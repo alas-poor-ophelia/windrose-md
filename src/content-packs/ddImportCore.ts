@@ -245,7 +245,6 @@ async function runDdImport(
 			// A single bad path (MAX_PATH, locked file, sync conflict) must not
 			// abort the whole import and skip the metadata-write phase below.
 			failedCount++;
-			// eslint-disable-next-line no-console
 			console.error('[Windrose] Failed to extract', destPath, e);
 			onProgress?.(i + 1, textures.length, 'extract');
 			continue;
@@ -264,7 +263,7 @@ async function runDdImport(
 		onProgress?.(i + 1, textures.length, 'extract');
 
 		if (i % 20 === 0) {
-			await new Promise(r => setTimeout(r, 0));
+			await new Promise(r => window.setTimeout(r, 0));
 		}
 	}
 
@@ -382,9 +381,7 @@ async function runDdImport(
 		vaultPath: basePath,
 	};
 
-	if (plugin.settings.installedContentPacks == null) {
-		plugin.settings.installedContentPacks = [];
-	}
+	plugin.settings.installedContentPacks ??= [];
 	const existingIdx = plugin.settings.installedContentPacks
 		.findIndex((p: InstalledPack) => p.id === meta.id);
 	if (existingIdx >= 0) {

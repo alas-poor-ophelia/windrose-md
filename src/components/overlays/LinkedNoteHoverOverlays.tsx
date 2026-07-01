@@ -51,13 +51,13 @@ const LinkedNoteHoverOverlays = ({ selectedItem }: LinkedNoteHoverOverlaysProps)
         
         // Touch handling state (local to each overlay)
         let touchStartTime: number | null = null;
-        let touchTimer: ReturnType<typeof setTimeout> | null = null;
+        let touchTimer: number | null = null;
 
         const handleTouchStart = (_e: TouchEvent): void => {
           touchStartTime = Date.now();
 
           // Set up long-press detection (500ms)
-          touchTimer = setTimeout(() => {
+          touchTimer = window.setTimeout(() => {
             // Long press detected - open note
             void openNoteInNewTab(obj.linkedNote);
             touchStartTime = null; // Prevent click from also firing
@@ -65,8 +65,8 @@ const LinkedNoteHoverOverlays = ({ selectedItem }: LinkedNoteHoverOverlaysProps)
         };
 
         const handleTouchEnd = (e: TouchEvent): void => {
-          if (touchTimer) {
-            clearTimeout(touchTimer);
+          if (touchTimer != null) {
+            window.clearTimeout(touchTimer);
             touchTimer = null;
           }
           
@@ -99,7 +99,7 @@ const LinkedNoteHoverOverlays = ({ selectedItem }: LinkedNoteHoverOverlaysProps)
             
             canvas.dispatchEvent(mouseDownEvent);
             // Small delay to ensure mousedown is processed first
-            setTimeout(() => {
+            window.setTimeout(() => {
               canvas.dispatchEvent(mouseUpEvent);
             }, 0);
           }
@@ -108,8 +108,8 @@ const LinkedNoteHoverOverlays = ({ selectedItem }: LinkedNoteHoverOverlaysProps)
         };
         
         const handleTouchCancel = (): void => {
-          if (touchTimer) {
-            clearTimeout(touchTimer);
+          if (touchTimer != null) {
+            window.clearTimeout(touchTimer);
             touchTimer = null;
           }
           touchStartTime = null;
@@ -165,7 +165,7 @@ const LinkedNoteHoverOverlays = ({ selectedItem }: LinkedNoteHoverOverlaysProps)
                 
                 canvas.dispatchEvent(mouseDownEvent);
                 // Small delay to ensure mousedown is processed first
-                setTimeout(() => {
+                window.setTimeout(() => {
                   canvas.dispatchEvent(mouseUpEvent);
                 }, 0);
               }

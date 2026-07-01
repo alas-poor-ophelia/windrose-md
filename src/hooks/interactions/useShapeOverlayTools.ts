@@ -88,7 +88,7 @@ function useShapeOverlayTools(options: ShapeOverlayToolsOptions): UseShapeOverla
     if (!geometry || !mapData) return '';
     const cellSize = geometry.cellSize ?? 1;
     const cellDistance = size / cellSize;
-    const settings = mapData.settings?.overrides || {};
+    const settings = mapData.settings?.overrides ?? {};
     const distancePerCell = (settings.distancePerCell as number) || 5;
     const distanceUnit = (settings.distanceUnit as string) || 'ft';
     return formatDistance(cellDistance, distancePerCell, distanceUnit, 'both');
@@ -154,10 +154,11 @@ function useShapeOverlayTools(options: ShapeOverlayToolsOptions): UseShapeOverla
         visible: true
       };
 
-      onShapeOverlaysChange([...(mapData.shapeOverlays || []), newShape]);
+      onShapeOverlaysChange([...(mapData.shapeOverlays ?? []), newShape]);
       setFirstClick(null);
       setCurrentWorldPos(null);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- cancelPlacement is a stable useCallback([]) declared later; forward reference, safe to omit
   }, [isShapeTool, getWorldCoords, mapData, firstClick, activeShape, selectedColor, selectedOpacity, computeShapeFromClicks, onShapeOverlaysChange]);
 
   const handlePointerMove = useCallback((e: PointerEvent) => {
@@ -174,13 +175,13 @@ function useShapeOverlayTools(options: ShapeOverlayToolsOptions): UseShapeOverla
 
   const deleteShapeOverlay = useCallback((id: string) => {
     if (!mapData) return;
-    const shapes = (mapData.shapeOverlays || []).filter(s => s.id !== id);
+    const shapes = (mapData.shapeOverlays ?? []).filter(s => s.id !== id);
     onShapeOverlaysChange(shapes);
   }, [mapData, onShapeOverlaysChange]);
 
   const updateShapeOverlay = useCallback((id: string, updates: Partial<ShapeOverlay>) => {
     if (!mapData) return;
-    const shapes = (mapData.shapeOverlays || []).map(s =>
+    const shapes = (mapData.shapeOverlays ?? []).map(s =>
       s.id === id ? { ...s, ...updates } : s
     );
     onShapeOverlaysChange(shapes);
@@ -234,7 +235,7 @@ function useShapeOverlayTools(options: ShapeOverlayToolsOptions): UseShapeOverla
     dragPrevRef.current = { worldX: world.worldX, worldY: world.worldY };
 
     const selectedId = currentSelectedItem.id;
-    onShapeOverlaysChange((mapData.shapeOverlays || []).map(s =>
+    onShapeOverlaysChange((mapData.shapeOverlays ?? []).map(s =>
       s.id === selectedId
         ? { ...s, worldPosition: { x: s.worldPosition.x + dx, y: s.worldPosition.y + dy } }
         : s

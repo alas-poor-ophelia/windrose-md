@@ -32,6 +32,11 @@ interface MapControlsProps {
   onToggleRegionPanel?: () => void;
   alwaysShowControls?: boolean;
   hideExpand?: boolean;
+  /** Block mode: float compass + zoom + the expand button. The Layers/Region/
+      Visibility/Settings toggles are redundant with the left EdgeRail, so they're
+      dropped here per the block spec. The expand button is kept — it reserves the
+      space above the compass that the compass's -33px reveal lift compensates for. */
+  minimalControls?: boolean;
 }
 
 const MapControls = ({
@@ -51,11 +56,12 @@ const MapControls = ({
   showRegionPanel,
   onToggleRegionPanel,
   alwaysShowControls = false,
-  hideExpand = false
+  hideExpand = false,
+  minimalControls = false
 }: MapControlsProps): VNode => {
     // When alwaysShowControls is true, controls are always visible
     const [controlsRevealed, setControlsRevealed] = useState(alwaysShowControls);
-    const collapseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const collapseTimerRef = useRef<number | null>(null);
     
     // Update revealed state when alwaysShowControls changes
     useEffect(() => {
@@ -74,8 +80,8 @@ const MapControls = ({
     }, []);
     
     const clearCollapseTimer = (): void => {
-      if (collapseTimerRef.current) {
-        clearTimeout(collapseTimerRef.current);
+      if (collapseTimerRef.current != null) {
+        window.clearTimeout(collapseTimerRef.current);
         collapseTimerRef.current = null;
       }
     };
@@ -86,7 +92,7 @@ const MapControls = ({
       
       clearCollapseTimer();
       const delay = forTouch ? COLLAPSE_DELAY_TOUCH_MS : COLLAPSE_DELAY_DESKTOP_MS;
-      collapseTimerRef.current = setTimeout(() => {
+      collapseTimerRef.current = window.setTimeout(() => {
         setControlsRevealed(false);
       }, delay);
     };
@@ -236,6 +242,7 @@ const MapControls = ({
               </button>
             </div>
             
+            {!minimalControls && (<>
             {/* Layer Panel Toggle Button */}
             <button
               className={`windrose-expand-btn windrose-drawer-item ${showLayerPanel ? 'windrose-expand-btn-active' : ''} ${controlsRevealed ? 'windrose-drawer-item-visible' : ''}`}
@@ -281,6 +288,7 @@ const MapControls = ({
             >
               <Icon icon="lucide-settings" />
             </button>
+            </>)}
           </div>
         </div>
       </>

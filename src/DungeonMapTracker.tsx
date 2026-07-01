@@ -9,7 +9,7 @@ import type { ExtendedGeometry } from '#types/contexts/context.types';
 import type { ResolvedTheme } from '#types/settings/settings.types';
 import type { ToolId } from '#types/tools/tool.types';
 import type { Cell } from '#types/core/cell.types';
-import type { TilesetOverrides } from '#types/tiles/tile.types';
+import type { TilesetOverrides, TileForm } from '#types/tiles/tile.types';
 import type { CustomColor } from '#types/core/common.types';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
@@ -36,15 +36,20 @@ import { getColorByHex, isDefaultColor, DEFAULT_COLOR } from './drawing/colorOpe
 import { ImageAlignmentMode } from './components/overlays/ImageAlignmentMode';
 import { useAlignmentMode } from './hooks/interactions/useAlignmentMode';
 import { ModalPortal } from './components/modals/ModalPortal';
-import { getActiveLayer, getLayerById } from './persistence/layerAccessor';
+import { getActiveLayer, getLayerById, addBoard, setActiveBoard, removeBoard, setLayerMode, addLayer, updateActiveLayer } from './persistence/layerAccessor';
+import type { TileLayerRole } from '#types/tiles/tile.types';
 import { setCell as accessorSetCell, removeCell as accessorRemoveCell, cellToPoint } from './geometry/core/cellAccessor';
-import { LayerControls } from './components/panels/LayerControls';
-import { FloatingPanel, PopoutButton } from './components/panels/FloatingPanel';
+import { FloatingPanel } from './components/panels/FloatingPanel';
 import { DockPanel } from './components/panels/DockPanel';
+import { DockRibbon } from './components/panels/DockRibbon';
 import { DockLayerList } from './components/panels/DockLayerList';
 import { DockViewPanel } from './components/panels/DockViewPanel';
 import { ColorPicker } from './components/shared/ColorPicker';
 import { RegionPanel } from './components/panels/RegionPanel';
+import { EdgeRail } from './components/panels/EdgeRail';
+import { TileSubtoolRibbon } from './components/panels/TileSubtoolRibbon';
+import { formDef } from './assets/tileForm';
+import type { TileSubtoolId } from './assets/tileForm';
 import { LayerEditModal } from './components/modals/LayerEditModal';
 import { openNativeCloneLayerModal, CloneLayerModal } from './components/modals/CloneLayerModal';
 import { useSubHexNavigation } from './hooks/interactions/useSubHexNavigation';
@@ -60,6 +65,7 @@ import { useTileBrush } from './hooks/state/useTileBrush';
 import { useThemeMode } from './hooks/state/useThemeMode';
 import { SubHexBreadcrumb } from './components/controls/SubHexBreadcrumb';
 import { TileAssetBrowser } from './components/panels/TileAssetBrowser';
+import type { RailSelection } from './components/panels/TileAssetBrowser';
 import { DrawerDock } from './components/panels/DrawerDock';
 import type { FlyoutTile } from './components/panels/DrawerDock';
 import { RA_ICONS } from './assets/rpgAwesomeIcons';
@@ -89,13 +95,15 @@ interface DungeonMapTrackerProps {
   onNameChange?: (name: string) => void;
   savedPanelState?: Partial<Record<PanelId, PanelState>>;
   onPanelStateChange?: (state: Partial<Record<PanelId, PanelState>>) => void;
+  savedDockCollapsed?: boolean;
+  onDockCollapsedChange?: (collapsed: boolean) => void;
 }
 
 // ============================================================================
 // MAIN COMPONENT
 // ============================================================================
 
-const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'grid', notePath = '', fullPane = false, onMapChange, onNameChange, savedPanelState, onPanelStateChange }: DungeonMapTrackerProps): VNode => {
+const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'grid', notePath = '', fullPane = false, onMapChange, onNameChange, savedPanelState, onPanelStateChange, savedDockCollapsed, onDockCollapsedChange }: DungeonMapTrackerProps): VNode => {
   const app = useApp();
   useThemeMode();
   const { mapData: rootMapData, isLoading, saveStatus, updateMapData: rootUpdateMapData, forceSave, tileImagesReady, getCachedImage } = useMapData(mapId, mapName, mapType);
@@ -137,6 +145,124 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     handleOpacityChange
   } = useToolState({ mapData, updateMapData });
 
+  // Tile drawer pane: Tiles vs Objects (Objects sidebar folded into the drawer).
+  const [tilePane, setTilePane] = useState<'tiles' | 'objects'>('tiles');
+  // Selecting a pane couples to the active tool: Objects → addObject, Tiles → tilePaint.
+  // Forcing tilePaint on the Tiles tab avoids ping-pong with the coupling effect below.
+  const selectPane = useCallback((p: 'tiles' | 'objects'): void => {
+    setTilePane(p);
+    setCurrentTool(p === 'objects' ? 'addObject' : 'tilePaint');
+  }, [setCurrentTool]);
+  // Coupling: picking the Object tool elsewhere (e.g. an object grid) flips the drawer to Objects.
+  useEffect(() => {
+    if (currentTool === 'addObject') setTilePane('objects');
+  }, [currentTool]);
+  // Category-rail / view selection, owned here so the Recent/Starred view-filters
+  // can live on the drawer ribbon while the rail (categories) lives in the browser.
+  const [tileRailSel, setTileRailSel] = useState<RailSelection>('all');
+  // Grid/list tile view, owned here so it survives the Objects-pane swap (which
+  // unmounts the browser) and persists per map via mapData.
+  const tileViewMode = mapData?.tileViewMode ?? 'grid';
+  const setTileViewMode = useCallback((mode: 'grid' | 'list'): void => {
+    updateMapData((prev: MapData) => ({ ...prev, tileViewMode: mode }));
+  }, [updateMapData]);
+  // Objects pane grid/list view — its own per-map field, independent of tiles.
+  const objectViewMode = mapData?.objectViewMode ?? 'grid';
+  const setObjectViewMode = useCallback((mode: 'grid' | 'list'): void => {
+    updateMapData((prev: MapData) => ({ ...prev, objectViewMode: mode }));
+  }, [updateMapData]);
+  // Selected tile's derived render-form + armed placement subtool (drawer ribbon).
+  const [selectedTileForm, setSelectedTileForm] = useState<TileForm | null>(null);
+  const [tileSubtool, setTileSubtool] = useState<TileSubtoolId | null>(null);
+  // Arm the form's default subtool whenever the selected form changes.
+  useEffect(() => {
+    setTileSubtool(selectedTileForm != null ? formDef(selectedTileForm).defaultSubtool : null);
+  }, [selectedTileForm]);
+  // Vertical left ribbon: Tiles/Objects tabs + (on Tiles with a tile selected) placement subtools.
+  const renderDrawerRibbon = (): VNode => (
+    <div className="windrose-fd-subrib">
+      <button className={`windrose-fd-ribtab interactive-child ${tilePane === 'tiles' ? 'on' : ''}`} title="Tiles" onClick={() => selectPane('tiles')}><Icon icon="lucide-layout-dashboard" size={16} /></button>
+      <button className={`windrose-fd-ribtab interactive-child ${tilePane === 'objects' ? 'on' : ''}`} title="Objects" onClick={() => selectPane('objects')}><Icon icon="lucide-sofa" size={16} /></button>
+      {tilePane === 'tiles' && (
+        <>
+          <div className="windrose-fd-subrib-div" />
+          <button className={`windrose-fd-ribtab interactive-child ${tileRailSel === 'recent' ? 'on' : ''}`} title="Recent" onClick={() => setTileRailSel(tileRailSel === 'recent' ? 'all' : 'recent')}><Icon icon="lucide-clock" size={16} /></button>
+          <button className={`windrose-fd-ribtab interactive-child ${tileRailSel === 'starred' ? 'on' : ''}`} title="Starred" onClick={() => setTileRailSel(tileRailSel === 'starred' ? 'all' : 'starred')}><Icon icon="lucide-star" size={16} /></button>
+        </>
+      )}
+      {tilePane === 'tiles' && selectedTileForm != null && (
+        <>
+          <div className="windrose-fd-subrib-div" />
+          <div className="windrose-fd-subrib-cap">Mode</div>
+          <TileSubtoolRibbon form={selectedTileForm} activeSubtool={tileSubtool} onSubtoolChange={setTileSubtool} />
+        </>
+      )}
+    </div>
+  );
+  // `hideHeader` in block mode (the compact head above both panes serves); the
+  // full-pane pane renders its own DrawerPaneHead to match the tile pane, and
+  // takes the vertical ribbon so it seats below the header like the tile ribbon.
+  const renderObjectsPane = (hideHeader: boolean, ribbon?: VNode): VNode => (
+    <ObjectSidebar
+      selectedObjectType={selectedObjectType}
+      onObjectTypeSelect={setSelectedObjectType}
+      onToolChange={setCurrentTool}
+      isCollapsed={false}
+      onCollapseChange={() => {}}
+      mapType={mapData?.mapType ?? 'grid'}
+      objectSetId={mapData?.objectSetId}
+      onObjectSetChange={handleObjectSetChange}
+      isFreeformMode={freeformPlacementMode}
+      onFreeformToggle={() => setFreeformPlacementMode(prev => !prev)}
+      hideHeader={hideHeader}
+      viewMode={objectViewMode}
+      onViewModeChange={setObjectViewMode}
+      onCollapse={collapseTileBrowser}
+      ribbon={ribbon}
+    />
+  );
+  // Block-mode shared drawer header: a segmented Tiles|Objects control (the
+  // block spec's pane switch, replacing the .fd-subrib), the grid/list view
+  // toggle (tiles only) and a collapse button — sits above both panes.
+  const renderCompactDrawerHead = (): VNode => {
+    // The grid/list toggle serves whichever pane is active.
+    const paneViewMode = tilePane === 'tiles' ? tileViewMode : objectViewMode;
+    const setPaneViewMode = tilePane === 'tiles' ? setTileViewMode : setObjectViewMode;
+    return (
+      <div className="windrose-cd-head">
+        <div className="windrose-cd-paneseg interactive-child" role="group" aria-label="Tiles or Objects">
+          <button
+            className={`windrose-cd-segbtn ${tilePane === 'tiles' ? 'active' : ''}`}
+            onClick={() => selectPane('tiles')}
+          >Tiles</button>
+          <button
+            className={`windrose-cd-segbtn ${tilePane === 'objects' ? 'active' : ''}`}
+            onClick={() => selectPane('objects')}
+          >Objects</button>
+        </div>
+        <div className="windrose-cd-vtog interactive-child" role="group" aria-label="View mode">
+          <button
+            className={`windrose-tb-iconbtn ${paneViewMode === 'grid' ? 'active' : 'ghost'}`}
+            title="Grid view"
+            aria-pressed={paneViewMode === 'grid'}
+            onClick={() => setPaneViewMode('grid')}
+          ><Icon icon="lucide-layout-grid" size={14} /></button>
+          <button
+            className={`windrose-tb-iconbtn ${paneViewMode === 'list' ? 'active' : 'ghost'}`}
+            title="List view"
+            aria-pressed={paneViewMode === 'list'}
+            onClick={() => setPaneViewMode('list')}
+          ><Icon icon="lucide-list" size={14} /></button>
+        </div>
+        <button
+          className="windrose-tb-iconbtn ghost interactive-child windrose-cd-collapse"
+          title="Collapse to edge"
+          onClick={collapseTileBrowser}
+        ><Icon icon="lucide-panel-left-open" size={15} /></button>
+      </div>
+    );
+  };
+
   // Panel/modal state (plugin installer, settings modal, layer edit)
   const {
     showSettingsModal, setShowSettingsModal,
@@ -151,22 +277,44 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     isExpanded, isAnimating, handleToggleExpand,
     showFooter, setShowFooter,
     showVisibilityToolbar, setShowVisibilityToolbar,
-    showLayerPanel, setShowLayerPanel,
-    showRegionPanel, setShowRegionPanel,
     layerVisibility, handleToggleLayerVisibility
   } = useUILayout({ mapData, updateMapData, fullPane });
 
+  // Block-mode left icon rail: which flyout (if any) is open. Canvas controls
+  // (MapControls Layers/Regions buttons) drive this too, so it's lifted here.
+  const [railOpenId, setRailOpenId] = useState<string | null>(null);
+
   const { isFloating, getZIndex, getInitialPosition, toggleFloat, bringToFront, updatePosition } = useFloatingPanels({ fullPane, savedState: savedPanelState, onStateChange: onPanelStateChange });
+
+  // Full-pane right dock: collapse the whole stacked panel column to an icon
+  // ribbon (persisted in the view's workspace state). Unlike the block-mode
+  // rail, the ribbon replaces the panels — it never shows alongside them.
+  const [dockCollapsed, setDockCollapsedState] = useState<boolean>(savedDockCollapsed ?? false);
+  const setDockCollapsed = useCallback((collapsed: boolean) => {
+    setDockCollapsedState(collapsed);
+    onDockCollapsedChange?.(collapsed);
+  }, [onDockCollapsedChange]);
+  // Per-section collapse (controlled, so a ribbon click can expand a section).
+  // View starts collapsed, matching its former defaultCollapsed.
+  const [dockSectionCollapsed, setDockSectionCollapsed] = useState<Record<string, boolean>>({ layers: false, colorPicker: false, view: true });
+  const toggleDockSection = useCallback((id: string) => {
+    setDockSectionCollapsed(prev => ({ ...prev, [id]: !prev[id] }));
+  }, []);
+  const handleDockRibbonExpand = useCallback((id: string) => {
+    setDockCollapsed(false);
+    setDockSectionCollapsed(prev => ({ ...prev, [id]: false }));
+  }, [setDockCollapsed]);
 
   const [mapListEntries, setMapListEntries] = useState<MapListEntry[]>([]);
   useEffect(() => {
     if (!fullPane) return;
-    listMaps(app).then(entries => {
+    void listMaps(app).then(entries => {
       if (mapId && !entries.some(e => e.id === mapId)) {
         entries.push({ id: mapId, name: mapName || '', type: mapType || 'grid' });
       }
       setMapListEntries(entries);
     });
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-once list seed; mapId/mapName/mapType are fallbacks not triggers; re-running thrashes vault I/O
   }, [fullPane, app]);
 
   const handleMapSelect = useCallback((entry: MapListEntry) => {
@@ -191,12 +339,12 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
         { settings: { showAdjacentSubMaps?: boolean }; saveSettings(): Promise<void> } | undefined;
       if (plugin != null) {
         plugin.settings.showAdjacentSubMaps = v;
-        plugin.saveSettings();
+        void plugin.saveSettings();
         window.dispatchEvent(new Event('windrose-settings-changed'));
       }
     } catch { /* settings plugin unavailable */ }
     setShowAdjacentSubMapsState(v);
-  }, []);
+  }, [app]);
   useEffect(() => {
     const handler = (): void => { setShowAdjacentSubMapsState(getSettings().showAdjacentSubMaps ?? false); };
     window.addEventListener('windrose-settings-changed', handler);
@@ -215,7 +363,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     tileFitMode, setTileFitMode,
     stampMode, setStampMode,
     tileScale, setTileScale,
-    brushSize, setBrushSize,
+    brushSize,
     tileDepth, setTileDepth,
     hiddenLayers, toggleHiddenLayer,
     recentTiles,
@@ -224,7 +372,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   // Use rootMapData for tileset check — tilesets are built from global settings and stored on root,
   // but sub-maps should also have access to tiles
   const availableTilesets = useMemo(
-    () => rootMapData?.tilesets || mapData?.tilesets || [],
+    () => rootMapData?.tilesets ?? mapData?.tilesets ?? [],
     [rootMapData?.tilesets, mapData?.tilesets]
   );
   const showTilePanel = mapData != null;
@@ -238,7 +386,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   const [starredFlyoutTiles, setStarredFlyoutTiles] = useState<FlyoutTile[]>([]);
 
   const flyoutRecent = useMemo((): FlyoutTile[] => {
-    if (!recentTiles || availableTilesets.length === 0) return [];
+    if (availableTilesets.length === 0) return [];
     return recentTiles
       .map(r => {
         const ts = availableTilesets.find(t => t.id === r.tilesetId);
@@ -290,6 +438,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
       const gridSize = mapData.gridSize ?? DEFAULTS.gridSize;
       return new GridGeometry(gridSize);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional fine-grained deps: geometry rebuilds only on shape-param change, not every cell paint
   }, [mapData?.mapType, mapData?.gridSize, mapData?.hexSize, mapData?.orientation, mapData?.hexBounds]);
 
   // Fog of War state and handlers (extracted to useFogOfWar hook)
@@ -366,10 +515,34 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     isApplyingHistory
   } = useLayerHistory({ mapData, updateMapData, isLoading, navigationVersion });
 
+  // Board (floor) + strata-mode handlers (Phase 7). Structural board ops update map
+  // data directly; layer-content undo is unaffected (history is per-layerId).
+  const handleToggleStrataMode = useCallback((): void => {
+    updateMapData((prev: MapData) => setLayerMode(prev, prev.layerMode === 'strata' ? 'simple' : 'strata'));
+  }, [updateMapData]);
+  const handleBoardAdd = useCallback((): void => {
+    updateMapData((prev: MapData) => addBoard(prev));
+  }, [updateMapData]);
+  const handleBoardSelect = useCallback((boardId: string): void => {
+    updateMapData((prev: MapData) => setActiveBoard(prev, boardId));
+  }, [updateMapData]);
+  const handleBoardDelete = useCallback((boardId: string): void => {
+    updateMapData((prev: MapData) => removeBoard(prev, boardId));
+  }, [updateMapData]);
+  const handleAddLayerToStratum = useCallback((role: TileLayerRole): void => {
+    updateMapData((prev: MapData) => updateActiveLayer(addLayer(prev), { tileRole: role }));
+  }, [updateMapData]);
+  const handleToggleLayerVisible = useCallback((layerId: string): void => {
+    updateMapData((prev: MapData) => ({
+      ...prev,
+      layers: prev.layers.map(l => l.id === layerId ? { ...l, visible: l.visible === false } : l),
+    }));
+  }, [updateMapData]);
+
   // Wrap undo to let in-progress operations (e.g. region creation) cancel first
   const wrappedHandleUndo = useCallback(() => {
     const event = new CustomEvent('windrose:before-undo', { cancelable: true });
-    document.dispatchEvent(event);
+    activeDocument.dispatchEvent(event);
     if (!event.defaultPrevented) {
       handleUndo();
     }
@@ -392,7 +565,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     if (!opened) {
       setCloningLayerId(layerId);
     }
-  }, [mapData, handleLayerClone]);
+  }, [mapData, handleLayerClone, app]);
 
   // Data change handlers (extracted to useDataHandlers hook)
   const {
@@ -408,7 +581,6 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     handleDeleteCustomColor,
     handleUpdateColorOpacity,
     handleViewStateChange,
-    handleSidebarCollapseChange,
     handleObjectSetChange,
     handleTextLabelSettingsChange,
     handleRegionsChange,
@@ -493,7 +665,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
         if (relX * relX + relY * relY < gridRadius * gridRadius) {
           // Parse the hex key to get absolute q, r
           const [aq, ar] = adj.hexKey.split(',').map(Number);
-          document.dispatchEvent(new CustomEvent('windrose:navigate-sibling-sub-hex', { detail: { q: aq, r: ar } }));
+          activeDocument.dispatchEvent(new CustomEvent('windrose:navigate-sibling-sub-hex', { detail: { q: aq, r: ar } }));
           e.stopPropagation();
           e.preventDefault();
           return;
@@ -501,8 +673,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
       }
     };
 
-    document.addEventListener('click', handleAdjacentClick, true);
-    return () => document.removeEventListener('click', handleAdjacentClick, true);
+    activeDocument.addEventListener('click', handleAdjacentClick, true);
+    return () => activeDocument.removeEventListener('click', handleAdjacentClick, true);
   }, [showAdjacentSubMaps, isInSubHex, adjacentSubHexes, geometry, mapData]);
 
   // View controls (zoom, compass)
@@ -584,7 +756,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
         undo: (): boolean => { wrappedHandleUndo(); return true; },
         redo: (): boolean => { handleRedo(); return true; },
         selectLayer: (layerId: string) => handleLayerSelect(layerId),
-        forceSave: () => forceSave(),
+        forceSave: () => { void forceSave(); },
       },
     };
 
@@ -615,10 +787,13 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     <>
       <div
         ref={containerRef}
-        className={`windrose-container interactive-child`}
+        className={`windrose-container interactive-child${fullPane ? '' : ' windrose-container-block'}`}
       >
         <CornerBrackets classPrefix="windrose-corner-bracket" variant="ornate" filterId="bracket" />
 
+        {/* Map name + save status header — sits above the tool palette in both
+            full-pane and block mode (the map-picker/new/copy controls inside are
+            full-pane only). */}
         <MapHeader
           mapData={mapData}
           onNameChange={wrappedHandleNameChange}
@@ -659,6 +834,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
           </div>
         )}
 
+        <div className="windrose-stage">
         <div className="windrose-toolbar-anchor">
           {!isFloating('toolPalette') && (
             <ToolPalette
@@ -675,17 +851,19 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               isColorPickerOpen={isColorPickerOpen || isFloating('colorPicker')}
               onColorPickerOpenChange={setIsColorPickerOpen}
               customColors={mapData.customColors ?? []}
-              paletteColorOpacityOverrides={mapData.paletteColorOpacityOverrides || {}}
+              paletteColorOpacityOverrides={mapData.paletteColorOpacityOverrides ?? {}}
               onAddCustomColor={handleAddCustomColor}
               onDeleteCustomColor={handleDeleteCustomColor}
               onUpdateColorOpacity={handleUpdateColorOpacity}
               mapType={mapData.mapType}
               isFocused={isFocused}
+              vertical={fullPane}
               onColorBtnPopout={fullPane ? handleColorPickerPopout : undefined}
               dockButton={fullPane ? (
                 <button
                   className="windrose-tool-btn windrose-tool-palette-dock-btn interactive-child"
                   onClick={(e) => {
+                    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- button is rendered inside .windrose-tool-palette, so closest() always finds it
                     const rect = (e.currentTarget as HTMLElement).closest('.windrose-tool-palette')!.getBoundingClientRect();
                     toggleFloat('toolPalette', { x: rect.left, y: rect.top });
                   }}
@@ -726,57 +904,95 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
           onMouseEnter={() => setIsFocused(true)}
           onMouseLeave={() => setIsFocused(false)}
         >
-          <ObjectSidebar
-            selectedObjectType={selectedObjectType}
-            onObjectTypeSelect={setSelectedObjectType}
-            onToolChange={setCurrentTool}
-            isCollapsed={mapData.sidebarCollapsed ?? false}
-            onCollapseChange={handleSidebarCollapseChange}
-            mapType={mapData.mapType ?? 'grid'}
-            objectSetId={mapData.objectSetId}
-            onObjectSetChange={handleObjectSetChange}
-            isFreeformMode={freeformPlacementMode}
-            onFreeformToggle={() => setFreeformPlacementMode(prev => !prev)}
-          />
-
-          {/* Left side panels container — layers + regions stacked (not in full-pane, dock replaces) */}
+          {/* Block-mode left icon rail — Layers / Colors / View (+ Regions on hex).
+              42px rail, flyouts overlay the canvas. Replaces windrose-left-panels. */}
           {!fullPane && (
-            <div className={`windrose-left-panels ${mapData.sidebarCollapsed === true ? 'sidebar-closed' : 'sidebar-open'}`}>
-              <FloatingPanel
-                title="Layers"
-                isFloating={isFloating('layers')}
-                onDock={() => toggleFloat('layers')}
-                onFocus={() => bringToFront('layers')}
-                zIndex={getZIndex('layers')}
-                initialPosition={getInitialPosition('layers')}
-                resizable
-                minSize={{ width: 140, height: 100 }}
-              >
-                <LayerControls
-                  mapData={mapData}
-                  onLayerSelect={handleLayerSelect}
-                  onLayerAdd={handleLayerAdd}
-                  onLayerDelete={handleLayerDelete}
-                  onLayerReorder={handleLayerReorder}
-                  onToggleShowLayerBelow={handleToggleShowLayerBelow}
-                  onSetLayerBelowOpacity={handleSetLayerBelowOpacity}
-                  onEditLayer={setEditingLayerId}
-                  onLayerClone={handleCloneLayerRequest}
-                  sidebarCollapsed={mapData.sidebarCollapsed ?? false}
-                  isOpen={isFloating('layers') || showLayerPanel}
-                  popoutButton={!isFloating('layers') ? <PopoutButton onClick={(pos) => toggleFloat('layers', pos)} /> : undefined}
-                />
-              </FloatingPanel>
-
-              {mapData.mapType === 'hex' && (
-                <RegionPanel
-                  regions={mapData.regions ?? []}
-                  onRegionsChange={handleRegionsChange}
-                  sidebarCollapsed={mapData.sidebarCollapsed ?? false}
-                  isOpen={showRegionPanel}
-                />
-              )}
-            </div>
+            <EdgeRail
+              openId={railOpenId}
+              onOpenChange={setRailOpenId}
+              panels={[
+                {
+                  id: 'layers',
+                  icon: 'lucide-layers',
+                  title: 'Layers',
+                  content: (
+                    <DockLayerList
+                      mapData={mapData}
+                      onLayerSelect={handleLayerSelect}
+                      onLayerAdd={handleLayerAdd}
+                      onLayerDelete={handleLayerDelete}
+                      onLayerReorder={handleLayerReorder}
+                      onToggleShowLayerBelow={handleToggleShowLayerBelow}
+                      onSetLayerBelowOpacity={handleSetLayerBelowOpacity}
+                      onEditLayer={setEditingLayerId}
+                      onLayerClone={handleCloneLayerRequest}
+                      onToggleStrataMode={handleToggleStrataMode}
+                      onBoardAdd={handleBoardAdd}
+                      onBoardSelect={handleBoardSelect}
+                      onBoardDelete={handleBoardDelete}
+                      onAddLayerToStratum={handleAddLayerToStratum}
+                      onToggleLayerVisible={handleToggleLayerVisible}
+                    />
+                  )
+                },
+                {
+                  id: 'colors',
+                  icon: 'lucide-palette',
+                  title: 'Colors',
+                  content: (
+                    <ColorPicker
+                      isOpen
+                      floatingMode
+                      selectedColor={selectedColor}
+                      onColorSelect={setSelectedColor}
+                      onClose={() => {}}
+                      onReset={() => setSelectedColor(DEFAULT_COLOR)}
+                      customColors={mapData.customColors ?? []}
+                      paletteColorOpacityOverrides={mapData.paletteColorOpacityOverrides ?? {}}
+                      onAddCustomColor={handleAddCustomColor}
+                      onDeleteCustomColor={handleDeleteCustomColor}
+                      onUpdateColorOpacity={handleUpdateColorOpacity}
+                      opacity={selectedOpacity}
+                      onOpacityChange={handleOpacityChange}
+                    />
+                  )
+                },
+                {
+                  id: 'view',
+                  icon: 'lucide-eye',
+                  title: 'View',
+                  content: (
+                    <DockViewPanel
+                      currentZoom={mapData.viewState?.zoom ?? 1}
+                      onZoomIn={handleZoomIn}
+                      onZoomOut={handleZoomOut}
+                      layerVisibility={layerVisibility}
+                      onToggleLayer={handleToggleLayerVisibility}
+                      mapType={mapData.mapType}
+                      onSettingsClick={handleSettingsClick}
+                      fogOfWarState={currentFogState}
+                      onFogToolSelect={handleFogToolSelect}
+                      onFogVisibilityToggle={handleFogVisibilityToggle}
+                      onFogFillAll={handleFogFillAll}
+                      onFogClearAll={handleFogClearAll}
+                    />
+                  )
+                },
+                ...(mapData.mapType === 'hex' ? [{
+                  id: 'regions',
+                  icon: 'lucide-map',
+                  title: 'Regions',
+                  content: (
+                    <RegionPanel
+                      regions={mapData.regions ?? []}
+                      onRegionsChange={handleRegionsChange}
+                      sidebarCollapsed={false}
+                      isOpen
+                    />
+                  )
+                }] : [])
+              ]}
+            />
           )}
 
           {/* For hex maps, override northDirection to 0 for rendering while keeping real value for compass display */}
@@ -943,11 +1159,12 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 isExpanded={isExpanded}
                 onToggleExpand={handleToggleExpand}
                 hideExpand={fullPane}
+                minimalControls
                 mapType={mapData.mapType}
-                showLayerPanel={showLayerPanel}
-                onToggleLayerPanel={() => setShowLayerPanel(!showLayerPanel)}
-                showRegionPanel={showRegionPanel}
-                onToggleRegionPanel={mapData.mapType === 'hex' ? () => setShowRegionPanel(!showRegionPanel) : undefined}
+                showLayerPanel={railOpenId === 'layers'}
+                onToggleLayerPanel={() => setRailOpenId(prev => prev === 'layers' ? null : 'layers')}
+                showRegionPanel={railOpenId === 'regions'}
+                onToggleRegionPanel={mapData.mapType === 'hex' ? () => setRailOpenId(prev => prev === 'regions' ? null : 'regions') : undefined}
                 showVisibilityToolbar={showVisibilityToolbar}
                 onToggleVisibilityToolbar={() => {
                   const closing = showVisibilityToolbar;
@@ -985,7 +1202,15 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               flyoutRecent={flyoutRecent}
               flyoutStarred={starredFlyoutTiles}
               onFlyoutSelect={handleFlyoutSelect}
+              pane={tilePane}
+              onPane={selectPane}
             >
+              <div className="windrose-cd">
+              {renderCompactDrawerHead()}
+              <div className="windrose-cd-main">
+              {tilePane === 'objects' ? (
+              renderObjectsPane(true)
+              ) : (
               <TileAssetBrowser
                 tilesets={availableTilesets}
                 selectedTilesetId={selectedTilesetId}
@@ -1015,10 +1240,19 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 tilesetOverrides={mapData?.tilesetOverrides}
                 onTilesetOverrideChange={handleTilesetOverrideChange}
                 compact
+                hideHeader
                 active={!tileBrowserCollapsed}
                 recentTiles={recentTiles}
                 onStarredChange={setStarredFlyoutTiles}
+                onSelectedFormChange={setSelectedTileForm}
+                railSel={tileRailSel}
+                onRailSelChange={setTileRailSel}
+                viewMode={tileViewMode}
+                onViewModeChange={setTileViewMode}
               />
+              )}
+              </div>
+              </div>
             </DrawerDock>
           )}
 
@@ -1048,7 +1282,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 isColorPickerOpen={isColorPickerOpen || isFloating('colorPicker')}
                 onColorPickerOpenChange={setIsColorPickerOpen}
                 customColors={mapData.customColors ?? []}
-                paletteColorOpacityOverrides={mapData.paletteColorOpacityOverrides || {}}
+                paletteColorOpacityOverrides={mapData.paletteColorOpacityOverrides ?? {}}
                 onAddCustomColor={handleAddCustomColor}
                 onDeleteCustomColor={handleDeleteCustomColor}
                 onUpdateColorOpacity={handleUpdateColorOpacity}
@@ -1089,6 +1323,12 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 onSetLayerBelowOpacity={handleSetLayerBelowOpacity}
                 onEditLayer={setEditingLayerId}
                 onLayerClone={handleCloneLayerRequest}
+                onToggleStrataMode={handleToggleStrataMode}
+                onBoardAdd={handleBoardAdd}
+                onBoardSelect={handleBoardSelect}
+                onBoardDelete={handleBoardDelete}
+                onAddLayerToStratum={handleAddLayerToStratum}
+                onToggleLayerVisible={handleToggleLayerVisible}
               />
             </FloatingPanel>
           )}
@@ -1112,7 +1352,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 onClose={handleFloatingPickerClose}
                 onReset={() => setSelectedColor(DEFAULT_COLOR)}
                 customColors={mapData.customColors ?? []}
-                paletteColorOpacityOverrides={mapData.paletteColorOpacityOverrides || {}}
+                paletteColorOpacityOverrides={mapData.paletteColorOpacityOverrides ?? {}}
                 onAddCustomColor={handleAddCustomColor}
                 onDeleteCustomColor={handleDeleteCustomColor}
                 onUpdateColorOpacity={handleUpdateColorOpacity}
@@ -1214,7 +1454,12 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                   flyoutRecent={flyoutRecent}
                   flyoutStarred={starredFlyoutTiles}
                   onFlyoutSelect={handleFlyoutSelect}
+                  pane={tilePane}
+                  onPane={selectPane}
                 >
+                  {tilePane === 'objects' ? (
+                  renderObjectsPane(false, renderDrawerRibbon())
+                  ) : (
                   <TileAssetBrowser
                     tilesets={availableTilesets}
                     selectedTilesetId={selectedTilesetId}
@@ -1247,12 +1492,36 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                     active={!tileBrowserCollapsed}
                     recentTiles={recentTiles}
                     onStarredChange={setStarredFlyoutTiles}
+                    onSelectedFormChange={setSelectedTileForm}
+                    railSel={tileRailSel}
+                    onRailSelChange={setTileRailSel}
+                    viewMode={tileViewMode}
+                    onViewModeChange={setTileViewMode}
+                    ribbon={renderDrawerRibbon()}
                   />
+                  )}
                 </DrawerDock>
               )}
-              <div className="windrose-dock-right">
+              <div className={`windrose-dock-right${dockCollapsed ? ' is-collapsed' : ''}`}>
+                {dockCollapsed ? (
+                  <DockRibbon
+                    items={[
+                      { id: 'layers', icon: 'lucide-layers', title: 'Layers' },
+                      { id: 'colorPicker', icon: 'lucide-palette', title: 'Colors' },
+                      { id: 'view', icon: 'lucide-eye', title: 'View' },
+                    ].filter(it => !isFloating(it.id as PanelId))}
+                    onExpand={handleDockRibbonExpand}
+                  />
+                ) : (
+                <>
                 {!isFloating('layers') && (
-                  <DockPanel title="Layers" onUndock={(pos) => toggleFloat('layers', pos)}>
+                  <DockPanel
+                    title="Layers"
+                    collapsed={dockSectionCollapsed['layers'] ?? false}
+                    onToggleCollapse={() => toggleDockSection('layers')}
+                    onCollapseDock={() => setDockCollapsed(true)}
+                    onUndock={(pos) => toggleFloat('layers', pos)}
+                  >
                     <DockLayerList
                       mapData={mapData}
                       onLayerSelect={handleLayerSelect}
@@ -1263,11 +1532,22 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                       onSetLayerBelowOpacity={handleSetLayerBelowOpacity}
                       onEditLayer={setEditingLayerId}
                       onLayerClone={handleCloneLayerRequest}
+                      onToggleStrataMode={handleToggleStrataMode}
+                      onBoardAdd={handleBoardAdd}
+                      onBoardSelect={handleBoardSelect}
+                      onBoardDelete={handleBoardDelete}
+                      onAddLayerToStratum={handleAddLayerToStratum}
+                      onToggleLayerVisible={handleToggleLayerVisible}
                     />
                   </DockPanel>
                 )}
                 {!isFloating('colorPicker') && (
-                  <DockPanel title="Colors" onUndock={(pos) => toggleFloat('colorPicker', pos)}>
+                  <DockPanel
+                    title="Colors"
+                    collapsed={dockSectionCollapsed['colorPicker'] ?? false}
+                    onToggleCollapse={() => toggleDockSection('colorPicker')}
+                    onUndock={(pos) => toggleFloat('colorPicker', pos)}
+                  >
                     <ColorPicker
                       isOpen
                       floatingMode
@@ -1276,7 +1556,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                       onClose={() => {}}
                       onReset={() => setSelectedColor(DEFAULT_COLOR)}
                       customColors={mapData.customColors ?? []}
-                      paletteColorOpacityOverrides={mapData.paletteColorOpacityOverrides || {}}
+                      paletteColorOpacityOverrides={mapData.paletteColorOpacityOverrides ?? {}}
                       onAddCustomColor={handleAddCustomColor}
                       onDeleteCustomColor={handleDeleteCustomColor}
                       onUpdateColorOpacity={handleUpdateColorOpacity}
@@ -1286,7 +1566,12 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                   </DockPanel>
                 )}
                 {!isFloating('view') && (
-                  <DockPanel title="View" defaultCollapsed onUndock={(pos) => toggleFloat('view', pos)}>
+                  <DockPanel
+                    title="View"
+                    collapsed={dockSectionCollapsed['view'] ?? true}
+                    onToggleCollapse={() => toggleDockSection('view')}
+                    onUndock={(pos) => toggleFloat('view', pos)}
+                  >
                     <DockViewPanel
                       currentZoom={mapData.viewState?.zoom ?? 1}
                       onZoomIn={handleZoomIn}
@@ -1303,9 +1588,12 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                     />
                   </DockPanel>
                 )}
+                </>
+                )}
               </div>
             </div>
           )}
+        </div>
         </div>
 
         {showFooter && (

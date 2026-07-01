@@ -32,7 +32,7 @@ import { assignSlot, getObjectsInCell, canAddObjectToCell, getOccupiedSlots, reo
  * Generate a unique ID for an object
  */
 function generateObjectId(): ObjectId {
-  return 'obj-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+  return 'obj-' + Date.now() + '-' + Math.random().toString(36).slice(2, 11);
 }
 
 // ===========================================
@@ -53,7 +53,7 @@ function getObjectAtPosition(objects: MapObject[] | null | undefined, x: number,
     // Check if (x, y) is within object bounds
     return x >= pos.x && x < pos.x + size.width &&
            y >= pos.y && y < pos.y + size.height;
-  }) || null;
+  }) ?? null;
 }
 
 // ===========================================
@@ -66,7 +66,6 @@ function getObjectAtPosition(objects: MapObject[] | null | undefined, x: number,
 function addObject(objects: MapObject[], typeId: string, x: number, y: number, mapType: MapType = 'grid', objectSetId?: string | null): MapObject[] {
   const objectType = getObjectType(typeId, mapType, objectSetId);
   if (objectType.isUnknown === true) {
-    // eslint-disable-next-line no-console
     console.error(`Unknown object type: ${typeId}`);
     return objects;
   }
@@ -74,7 +73,6 @@ function addObject(objects: MapObject[], typeId: string, x: number, y: number, m
   // Check if object already exists at position
   const existing = getObjectAtPosition(objects, x, y);
   if (existing) {
-    // eslint-disable-next-line no-console
     console.warn(`Object already exists at position (${x}, ${y})`);
     return objects;
   }
@@ -522,7 +520,7 @@ function convertObjectToFreeform(
   cellCenterWorldY: number,
   cellSize: number
 ): ObjectUpdate {
-  const alignOffset = getAlignmentOffset(obj.alignment || 'center');
+  const alignOffset = getAlignmentOffset(obj.alignment ?? 'center');
   return {
     freeform: true,
     worldPosition: {

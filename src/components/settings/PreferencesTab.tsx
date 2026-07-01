@@ -18,6 +18,7 @@
 import { useState } from 'preact/hooks';
 import type { VNode } from 'preact';
 import { useModalShell, useAppearance } from '../../context/MapSettingsContext';
+import { useApp } from '../../context/AppContext';
 import { saveMapImageToVault } from '../../persistence/exportOperations';
 import { SettingItem, SettingHeading } from './SettingItem';
 import { NativeToggle } from './NativeControls';
@@ -33,6 +34,7 @@ interface ExportResult {
 function PreferencesTab(): VNode {
   const { preferences, handlePreferenceToggle, mapData, geometry } = useModalShell();
   const { overrides, globalSettings, handleColorChange } = useAppearance();
+  const app = useApp();
 
   const [isExporting, setIsExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
@@ -49,16 +51,15 @@ function PreferencesTab(): VNode {
     setExportSuccess(null);
 
     try {
-      const result: ExportResult = await saveMapImageToVault((globalThis as unknown as { app: import('obsidian').App }).app, mapData, geometry);
+      const result: ExportResult = await saveMapImageToVault(app, mapData, geometry);
 
       if (result.success) {
         setExportSuccess(`Map saved to: ${result.path}`);
-        setTimeout(() => setExportSuccess(null), 5000);
+        window.setTimeout(() => setExportSuccess(null), 5000);
       } else {
         setExportError(result.error ?? 'Export failed. Please try again.');
       }
     } catch (error) {
-      // eslint-disable-next-line no-console
       console.error('[PreferencesTab] Export error:', error);
       setExportError((error as Error).message || 'Export failed. Please try again.');
     } finally {

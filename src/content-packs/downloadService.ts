@@ -1,4 +1,5 @@
-import { requestUrl, Notice, TFile } from 'obsidian';
+import { requestUrl, Notice } from 'obsidian';
+import { TFile } from 'obsidian';
 import type { App } from 'obsidian';
 import { unzipSync } from 'fflate';
 import type { RegistryPack, InstalledPack } from '#types/content-packs/contentPack.types';
@@ -26,7 +27,7 @@ function getExtractPath(pack: RegistryPack, settings: PluginSettings): string {
     case 'font-pack':
       return CONTENT_PACKS_FOLDER + '/fonts';
     default:
-      return CONTENT_PACKS_FOLDER + '/' + pack.type;
+      return CONTENT_PACKS_FOLDER + '/' + String(pack.type);
   }
 }
 
@@ -68,8 +69,8 @@ async function downloadAndInstallPack(
     }
 
     const existing = plugin.app.vault.getAbstractFileByPath(fullPath);
-    if (existing != null) {
-      await plugin.app.vault.modifyBinary(existing as TFile, fileData.buffer);
+    if (existing instanceof TFile) {
+      await plugin.app.vault.modifyBinary(existing, fileData.buffer);
     } else if (filePath.endsWith('.json')) {
       const text = new TextDecoder().decode(fileData);
       await plugin.app.vault.create(fullPath, text);
@@ -80,7 +81,7 @@ async function downloadAndInstallPack(
 
   if (pack.type === 'object-pack') {
     try {
-      await ObjectSetHelpers.importSetFromFolder(plugin as any, basePath);
+      await ObjectSetHelpers.importSetFromFolder(plugin, basePath);
     } catch (err) {
       console.warn('[Windrose] Object set auto-import failed:', err);
     }
@@ -95,9 +96,7 @@ async function downloadAndInstallPack(
     vaultPath: basePath,
   };
 
-  if (plugin.settings.installedContentPacks == null) {
-    plugin.settings.installedContentPacks = [];
-  }
+  plugin.settings.installedContentPacks ??= [];
 
   const existingIdx = plugin.settings.installedContentPacks.findIndex((p: InstalledPack) => p.id === pack.id);
   if (existingIdx >= 0) {

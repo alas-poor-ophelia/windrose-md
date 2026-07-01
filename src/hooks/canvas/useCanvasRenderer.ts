@@ -50,7 +50,7 @@ import { buildMergeIndex } from '../../geometry/curves/curveCellOverlap';
 import { getCachedImage, getImageCacheVersion } from '../../assets/imageOperations';
 import { getSlotOffset, getMultiObjectScale, getObjectsInCell } from '../../objects/hexSlotPositioner';
 import { offsetToAxial, axialToOffset } from '../../geometry/core/offsetCoordinates';
-import { getActiveLayer, getLayerBelow, isCellFogged } from '../../persistence/layerAccessor';
+import { getActiveLayer, getLayerBelow, getRenderLayers, isCellFogged } from '../../persistence/layerAccessor';
 
 interface Renderer {
   // Polymorphic properties
@@ -194,7 +194,7 @@ function blitStaticContent(
   if (!usable) {
     const padX = Math.ceil(width * STATIC_PAD_RATIO);
     const padY = Math.ceil(height * STATIC_PAD_RATIO);
-    const off = entry?.off ?? document.createElement('canvas');
+    const off = entry?.off ?? activeDocument.createElement('canvas');
     const ow = width + padX * 2;
     const oh = height + padY * 2;
     if (off.width !== ow) off.width = ow;
@@ -424,10 +424,15 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   const visibility: LayerVisibility = layerVisibility ?? { grid: true, objects: true, textLabels: true, hexCoordinates: true, regions: true, outlines: true };
 
   // Get theme with current settings (use provided theme or fetch global)
-  const THEME = theme || getTheme();
+  const THEME = theme ?? getTheme();
 
-  // Extract active layer data (supports layer schema v2)
+  // Extract active layer data (supports layer schema v2). activeLayer is the EDIT
+  // target (objects/text/fog/selection stay on it); renderLayers is the set of
+  // layers whose cells/curves/tiles get COMPOSITED (strata maps = the active
+  // board's visible layers; all other maps = just the active layer).
   const activeLayer = getActiveLayer(mapData);
+  const renderLayers = getRenderLayers(mapData);
+  const isStrata = mapData.layerMode === 'strata';
 
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
@@ -472,7 +477,7 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   const isHexMapForBg = geometry.type === 'hex';
   const boundsOrDimensions = isHexMapForBg
     ? mapData.hexBounds
-    : mapData.dimensions || { width: 300, height: 300 };
+    : mapData.dimensions ?? { width: 300, height: 300 };
   renderer.renderBackgroundImage(
     ctx,
     geometry,
@@ -517,8 +522,10 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
     rotated: (northDirection ?? 0) % 360 !== 0
   });
 
-  // Draw ghost layer (layer below) if enabled
-  if (activeLayer.showLayerBelow === true) {
+  // Draw ghost layer (layer below) if enabled. Disabled in strata mode: the
+  // composite already draws the layer below at full opacity, so a ghost would
+  // double-draw it.
+  if (!isStrata && activeLayer.showLayerBelow === true) {
     const layerBelow = getLayerBelow(mapData, activeLayer.id);
     if (layerBelow) {
       const ghostOpacity = activeLayer.layerBelowOpacity ?? 0.25;
@@ -646,57 +653,60 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
     ctx.restore();
   }
 
-  // Build curve-cell merge index for active layer (grid maps only)
-  let activeMergeIndex: CurveCellMergeIndex | null = null;
-  if (geometry.type === 'grid' &&
-      activeLayer.cells.length > 0 &&
-      activeLayer.curves.length > 0) {
-    const cellsForMerge = activeLayer.cells.filter(isGridCell).map(cell => ({
-      x: cell.x, y: cell.y, color: getCellColor(cell)
-    }));
-    activeMergeIndex = buildMergeIndex(
-      cellsForMerge,
-      activeLayer.curves,
-      geometry.cellSize
-    );
-  }
+  // Composite each render layer's cells/edges, curves and tiles in draw order.
+  // Simple maps loop exactly once over the active layer (identical to before);
+  // strata maps stack the active board's visible layers. Objects/text/fog/region
+  // stay active-layer-only (rendered after this loop) so the interaction surface
+  // and the single-activeLayer fog passes remain correct.
+  const curveGridConfig = geometry.type === 'grid'
+    ? { cellSize: geometry.cellSize, lineColor: THEME.grid.lines, lineWidth: THEME.grid.lineWidth ?? 1, interiorRatio: 0.5 }
+    : undefined;
+  for (const drawLayer of renderLayers) {
+    // Build curve-cell merge index for this layer (grid maps only)
+    let mergeIndex: CurveCellMergeIndex | null = null;
+    if (geometry.type === 'grid' &&
+        drawLayer.cells.length > 0 &&
+        drawLayer.curves.length > 0) {
+      const cellsForMerge = drawLayer.cells.filter(isGridCell).map(cell => ({
+        x: cell.x, y: cell.y, color: getCellColor(cell)
+      }));
+      mergeIndex = buildMergeIndex(cellsForMerge, drawLayer.curves, geometry.cellSize);
+    }
 
-  // Draw active layer cells and edges
-  renderLayerCellsAndEdges(ctx, activeLayer, geometry, rendererViewState, THEME, renderer, {
-    showGrid: visibility.grid !== false,
-    mergeIndex: activeMergeIndex,
-    northDirection: northDirection ?? 0
-  });
-
-  // Draw freehand curves (between cells and objects)
-  if (activeLayer.curves.length > 0) {
-    const curveGridConfig = geometry.type === 'grid'
-      ? { cellSize: geometry.cellSize, lineColor: THEME.grid.lines, lineWidth: THEME.grid.lineWidth ?? 1, interiorRatio: 0.5 }
-      : undefined;
-    renderCurves(ctx, activeLayer.curves, rendererViewState, THEME, {
-      mergeIndex: activeMergeIndex,
-      gridConfig: curveGridConfig
+    // Cells and edges
+    renderLayerCellsAndEdges(ctx, drawLayer, geometry, rendererViewState, THEME, renderer, {
+      showGrid: visibility.grid !== false,
+      mergeIndex,
+      northDirection: northDirection ?? 0
     });
-  }
 
-  // Draw wall paths (between curves and tiles)
-  if (activeLayer.wallPaths != null && activeLayer.wallPaths.length > 0 && mapData.tilesets != null && mapData.tilesets.length > 0) {
-    const wallCellSize = geometry.type === 'grid' ? geometry.cellSize : geometry.hexSize;
-    renderWallPaths(ctx, activeLayer.wallPaths, mapData.tilesets, rendererViewState, wallCellSize, {
-      getCachedImage
-    });
-  }
+    // Freehand curves (between cells and tiles)
+    if (drawLayer.curves.length > 0) {
+      renderCurves(ctx, drawLayer.curves, rendererViewState, THEME, {
+        mergeIndex,
+        gridConfig: curveGridConfig
+      });
+    }
 
-  // Draw tiles (between curves and regions, z-sorted for overflow occlusion)
-  if (activeLayer.tiles != null && activeLayer.tiles.length > 0 && mapData.tilesets != null && mapData.tilesets.length > 0) {
-    renderTiles(
-      ctx,
-      activeLayer.tiles,
-      mapData.tilesets,
-      tileGeomShim,
-      rendererViewState,
-      { getCachedImage, canvasWidth: width, canvasHeight: height, hiddenLayers: hiddenTileLayers }
-    );
+    // Wall paths (between curves and tiles)
+    if (drawLayer.wallPaths != null && drawLayer.wallPaths.length > 0 && mapData.tilesets != null && mapData.tilesets.length > 0) {
+      const wallCellSize = geometry.type === 'grid' ? geometry.cellSize : geometry.hexSize;
+      renderWallPaths(ctx, drawLayer.wallPaths, mapData.tilesets, rendererViewState, wallCellSize, {
+        getCachedImage
+      });
+    }
+
+    // Tiles (between curves and regions, z-sorted for overflow occlusion)
+    if (drawLayer.tiles != null && drawLayer.tiles.length > 0 && mapData.tilesets != null && mapData.tilesets.length > 0) {
+      renderTiles(
+        ctx,
+        drawLayer.tiles,
+        mapData.tilesets,
+        tileGeomShim,
+        rendererViewState,
+        { getCachedImage, canvasWidth: width, canvasHeight: height, hiddenLayers: hiddenTileLayers }
+      );
+    }
   }
 
   // Draw regions (hex maps only, between curves and objects)
@@ -824,6 +834,7 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
     mapData.shapeOverlays, mapData.subHexMaps, mapData.backgroundImage,
     mapData.dimensions, mapData.hexBounds, mapData.orientation,
     mapData.objectSetId, mapData.settings, mapData.activeLayerId, activeLayer,
+    mapData.activeBoardId, mapData.layerMode,
     geometry, hiddenTileLayers, adjacentSubHexes, showCoordinates,
     width, height,
     JSON.stringify(THEME), JSON.stringify(visibility),
@@ -928,11 +939,11 @@ const useCanvasRenderer: UseCanvasRenderer = (canvasRef, fogCanvasRef, mapData, 
     const scheduleRender = (): void => {
       // A frame is already queued — it will pick up the latest inputs from the ref.
       if (rafIdRef.current != null) return;
-      rafIdRef.current = requestAnimationFrame(() => {
+      rafIdRef.current = window.requestAnimationFrame(() => {
         rafIdRef.current = null;
         const a = renderInputsRef.current;
         if (a && a.mapData && a.geometry && canvasRef.current) {
-          const fogCanvas = fogCanvasRef?.current || null;
+          const fogCanvas = fogCanvasRef?.current ?? null;
           renderCanvas(canvasRef.current, fogCanvas, a.mapData, a.geometry, a.selectedItems, { isResizeMode: a.isResizeMode, theme: a.theme, showCoordinates: a.showCoordinates, layerVisibility: a.layerVisibility, adjacentSubHexes: a.adjacentSubHexes, hiddenTileLayers: a.hiddenTileLayers, tileImagesReady: a.tileImagesReady });
         }
       });

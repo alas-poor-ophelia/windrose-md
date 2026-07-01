@@ -34,6 +34,10 @@ interface DrawerDockProps {
   flyoutRecent?: FlyoutTile[];
   flyoutStarred?: FlyoutTile[];
   onFlyoutSelect?: (tilesetId: string, tileId: string) => void;
+  /** Active drawer pane + switcher — surfaces the Tiles/Objects toggle on the
+      collapsed spine (clicking switches pane AND expands the drawer). */
+  pane?: 'tiles' | 'objects';
+  onPane?: (pane: 'tiles' | 'objects') => void;
   children: ComponentChildren;
 }
 
@@ -65,15 +69,15 @@ function FlyoutPanel({ tiles, onSelect, onClose, label }: {
   const [hoveredTile, setHoveredTile] = useState<FlyoutTile | null>(null);
 
   useEffect(() => {
-    const handler = (e: MouseEvent) => {
+    const handler = (e: MouseEvent): void => {
       if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
         onClose();
       }
     };
-    const id = setTimeout(() => document.addEventListener('mousedown', handler), 0);
+    const id = window.setTimeout(() => activeDocument.addEventListener('mousedown', handler), 0);
     return () => {
-      clearTimeout(id);
-      document.removeEventListener('mousedown', handler);
+      window.clearTimeout(id);
+      activeDocument.removeEventListener('mousedown', handler);
     };
   }, [onClose]);
 
@@ -113,7 +117,7 @@ function FlyoutPanel({ tiles, onSelect, onClose, label }: {
   );
 }
 
-function SpineRibbon({ depth, onDepthChange, hidden, onToggleHide, tileCounts, onExpand, selectedTileName, selectedTileThumb, ribbonWidth, spineFlyout, onSpineFlyout }: {
+function SpineRibbon({ depth, onDepthChange, hidden, onToggleHide, tileCounts, onExpand, selectedTileName, selectedTileThumb, ribbonWidth, spineFlyout, onSpineFlyout, pane, onPane }: {
   depth: TileLayerRole;
   onDepthChange: (d: TileLayerRole) => void;
   hidden: Set<TileLayerRole>;
@@ -125,6 +129,8 @@ function SpineRibbon({ depth, onDepthChange, hidden, onToggleHide, tileCounts, o
   ribbonWidth: number;
   spineFlyout: 'recent' | 'starred' | null;
   onSpineFlyout: (v: 'recent' | 'starred' | null) => void;
+  pane?: 'tiles' | 'objects';
+  onPane?: (pane: 'tiles' | 'objects') => void;
 }): VNode {
   const chipRef = useRef<HTMLDivElement>(null);
   const chipSize = ribbonWidth - 18;
@@ -135,27 +141,38 @@ function SpineRibbon({ depth, onDepthChange, hidden, onToggleHide, tileCounts, o
     el.innerHTML = '';
     if (selectedTileThumb) {
       const canvas = selectedTileThumb.cloneNode(true) as HTMLCanvasElement;
-      canvas.style.width = '100%';
-      canvas.style.height = '100%';
-      canvas.style.objectFit = 'cover';
-      canvas.style.borderRadius = '3px';
+      canvas.setCssStyles({ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '3px' });
       el.appendChild(canvas);
     }
   }, [selectedTileThumb]);
 
-  const toggleFlyout = (which: 'recent' | 'starred') => {
+  const toggleFlyout = (which: 'recent' | 'starred'): void => {
     onSpineFlyout(spineFlyout === which ? null : which);
   };
 
   return (
     <div className="windrose-tile-spine">
-      <button
-        className="windrose-tile-spine-expand"
-        title="Expand tiles"
-        onClick={onExpand}
-      >
-        <Icon icon="lucide-panel-left-open" size={15} />
-      </button>
+      {pane != null && onPane != null && (
+        <>
+          <div className="windrose-tile-spine-pane">
+            <button
+              className={`windrose-tile-spine-panebtn ${pane === 'tiles' ? 'active' : ''}`}
+              title="Tiles — open"
+              onClick={() => { onPane('tiles'); onExpand(); }}
+            >
+              <Icon icon="lucide-layout-dashboard" size={15} />
+            </button>
+            <button
+              className={`windrose-tile-spine-panebtn ${pane === 'objects' ? 'active' : ''}`}
+              title="Objects — open"
+              onClick={() => { onPane('objects'); onExpand(); }}
+            >
+              <Icon icon="lucide-sofa" size={15} />
+            </button>
+          </div>
+          <div className="windrose-tile-spine-div" />
+        </>
+      )}
       <div className="windrose-tile-spine-flyout-btns">
         <button
           className={`windrose-tile-spine-fbtn ${spineFlyout === 'starred' ? 'active' : ''}`}
@@ -180,7 +197,7 @@ function SpineRibbon({ depth, onDepthChange, hidden, onToggleHide, tileCounts, o
         onToggleHide={onToggleHide}
         tileCounts={tileCounts}
       />
-      {selectedTileName && (
+      {selectedTileName != null && selectedTileName !== '' && (
         <div
           className="windrose-tile-spine-loaded"
           title={`Loaded: ${selectedTileName}`}
@@ -198,7 +215,6 @@ function SpineRibbon({ depth, onDepthChange, hidden, onToggleHide, tileCounts, o
 
 function DrawerDock({
   open,
-  onCollapse,
   onExpand,
   drawerWidth,
   onWidthChange,
@@ -217,6 +233,8 @@ function DrawerDock({
   flyoutRecent,
   flyoutStarred,
   onFlyoutSelect,
+  pane,
+  onPane,
   children,
 }: DrawerDockProps): VNode {
   const [resizing, setResizing] = useState(false);
@@ -241,7 +259,7 @@ function DrawerDock({
   useEffect(() => {
     if (!resizing) return;
 
-    const handleMove = (e: MouseEvent) => {
+    const handleMove = (e: MouseEvent): void => {
       if (!dragRef.current || !onWidthChange) return;
       const delta = dragRef.current.startX - e.clientX;
       const newWidth = Math.round(
@@ -250,16 +268,16 @@ function DrawerDock({
       onWidthChange(newWidth);
     };
 
-    const handleUp = () => {
+    const handleUp = (): void => {
       dragRef.current = null;
       setResizing(false);
     };
 
-    document.addEventListener('mousemove', handleMove);
-    document.addEventListener('mouseup', handleUp);
+    activeDocument.addEventListener('mousemove', handleMove);
+    activeDocument.addEventListener('mouseup', handleUp);
     return () => {
-      document.removeEventListener('mousemove', handleMove);
-      document.removeEventListener('mouseup', handleUp);
+      activeDocument.removeEventListener('mousemove', handleMove);
+      activeDocument.removeEventListener('mouseup', handleUp);
     };
   }, [resizing, onWidthChange, minWidth, maxWidth]);
 
@@ -309,6 +327,8 @@ function DrawerDock({
           ribbonWidth={ribbonWidth}
           spineFlyout={spineFlyout}
           onSpineFlyout={setSpineFlyout}
+          pane={pane}
+          onPane={onPane}
         />
       </div>
 

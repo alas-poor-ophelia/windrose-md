@@ -21,12 +21,12 @@ const ModalPortal = ({ children }: ModalPortalProps): VNode => {
   const [isInPortal, setIsInPortal] = useState(false);
 
   useEffect(() => {
-    let portal = document.getElementById('windrose-modal-portal') as HTMLDivElement | null;
+    let portal = activeDocument.getElementById('windrose-modal-portal') as HTMLDivElement | null;
     if (!portal) {
-      portal = document.createElement('div');
+      portal = activeDocument.createElement('div');
       portal.id = 'windrose-modal-portal';
       portal.className = 'windrose-modal-portal';
-      document.body.appendChild(portal);
+      activeDocument.body.appendChild(portal);
     }
     portalContainerRef.current = portal;
 
@@ -38,14 +38,15 @@ const ModalPortal = ({ children }: ModalPortalProps): VNode => {
   }, []);
 
   useEffect(() => {
-    if (wrapperRef.current && portalContainerRef.current) {
-      portalContainerRef.current.appendChild(wrapperRef.current);
+    const wrapper = wrapperRef.current;
+    if (wrapper && portalContainerRef.current) {
+      portalContainerRef.current.appendChild(wrapper);
       setIsInPortal(true);
     }
 
     return () => {
-      if (wrapperRef.current && wrapperRef.current.parentNode) {
-        wrapperRef.current.parentNode.removeChild(wrapperRef.current);
+      if (wrapper && wrapper.parentNode) {
+        wrapper.parentNode.removeChild(wrapper);
       }
     };
   }, []);

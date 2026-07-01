@@ -57,7 +57,7 @@ const MAX_CONTENT_LENGTH = 200;
  * Generate a unique ID for a text label
  */
 function generateTextLabelId(): TextLabelId {
-  return 'text-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+  return 'text-' + Date.now() + '-' + Math.random().toString(36).slice(2, 11);
 }
 
 // ===========================================
@@ -77,13 +77,11 @@ function addTextLabel(
   // Validate content
   const trimmed = content.trim();
   if (trimmed.length === 0) {
-    // eslint-disable-next-line no-console
     console.warn('Cannot add empty text label');
     return labels ?? [];
   }
 
   if (trimmed.length > MAX_CONTENT_LENGTH) {
-    // eslint-disable-next-line no-console
     console.warn(`Text label content exceeds ${MAX_CONTENT_LENGTH} character limit`);
     return labels ?? [];
   }
@@ -99,7 +97,7 @@ function addTextLabel(
     ...(options.opacity !== undefined && options.opacity !== 1 ? { opacity: options.opacity } : {})
   };
   
-  return [...(labels || []), newLabel];
+  return [...(labels ?? []), newLabel];
 }
 
 /**
@@ -177,7 +175,7 @@ function getTextLabelAtPosition(
   let tempCanvas: HTMLCanvasElement | null = null;
   let context = ctx;
   if (!context) {
-    tempCanvas = document.createElement('canvas');
+    tempCanvas = activeDocument.createElement('canvas');
     context = tempCanvas.getContext('2d');
     if (!context) return null;
   }

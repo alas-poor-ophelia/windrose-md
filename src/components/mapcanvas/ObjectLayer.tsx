@@ -9,7 +9,7 @@
  * - Hover tooltips
  */
 
-import type { JSX, VNode } from 'preact';
+import type { TargetedMouseEvent, VNode } from 'preact';
 import { Notice } from 'obsidian';
 import type { ToolId } from '#types/tools/tool.types';
 import type { ObjectTypeId, MapObject } from '#types/objects/object.types';
@@ -40,6 +40,7 @@ import { formatDistance, getEffectiveDistanceSettings } from '../../drawing/dist
 import { getSettings } from '../../core/settingsAccessor';
 import { rotateByIncrement } from '../../drawing/rotationOperations';
 import { Z_INDEX } from '../../core/dmtConstants';
+import type { SelectionContextMenuDetail } from '../../core/windroseEvents';
 
 
 
@@ -271,7 +272,7 @@ const ObjectLayer = ({
         const sourceObj = activeLayer.objects?.find((o: MapObject) => o.id === item.id);
         if (!sourceObj) continue;
 
-        const newId = `obj-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const newId = `obj-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
         const newObj = {
           ...sourceObj,
           id: newId,
@@ -286,7 +287,7 @@ const ObjectLayer = ({
         const sourceLabel = activeLayer.textLabels?.find((l: { id: string }) => l.id === item.id);
         if (!sourceLabel) continue;
 
-        const newId = `text-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const newId = `text-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
         const offsetWorld = (mapData.gridSize ?? 32) * 1;
         const newLabel = {
           ...sourceLabel,
@@ -307,7 +308,7 @@ const ObjectLayer = ({
     if (newSelectedItems.length > 0) {
       selectMultiple(newSelectedItems);
     }
-  }, [hasMultiSelection, mapData, selectedItems, contextOnObjectsChange, onTextLabelsChange, selectMultiple]);
+  }, [hasMultiSelection, mapData, selectedItems, onObjectsChange, onTextLabelsChange, selectMultiple]);
 
   const handleDeleteAll = useCallback(() => {
     if (!hasMultiSelection || !mapData) return;
@@ -481,9 +482,9 @@ const ObjectLayer = ({
     });
     registerHandlers('object', proxy);
     return () => unregisterHandlers('object');
-  }, []);
+  }, [registerHandlers, unregisterHandlers]);
 
-  const handleResizeButtonClick = (e: JSX.TargetedMouseEvent<HTMLElement>): void => {
+  const handleResizeButtonClick = (e: TargetedMouseEvent<HTMLElement>): void => {
     if (selectedItem?.type === 'object') {
       e.preventDefault();
       e.stopPropagation();
@@ -520,7 +521,7 @@ const ObjectLayer = ({
     }
   };
 
-  const handleObjectColorButtonClick = (e: JSX.TargetedMouseEvent<HTMLElement>): void => {
+  const handleObjectColorButtonClick = (e: TargetedMouseEvent<HTMLElement>): void => {
     if (selectedItem?.type === 'object') {
       e.preventDefault();
       e.stopPropagation();
@@ -651,21 +652,21 @@ const ObjectLayer = ({
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    document.addEventListener('touchstart', handleClickOutside, { passive: true });
+    activeDocument.addEventListener('mousedown', handleClickOutside);
+    activeDocument.addEventListener('touchstart', handleClickOutside, { passive: true });
 
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('touchstart', handleClickOutside);
+      activeDocument.removeEventListener('mousedown', handleClickOutside);
+      activeDocument.removeEventListener('touchstart', handleClickOutside);
     };
-  }, [showObjectColorPicker]);
+  }, [showObjectColorPicker, handleObjectColorSelect, onAddCustomColor, pendingObjectCustomColorRef]);
 
   // Context menu: hit-test for object, select it, show native menu
   useEffect(() => {
     if (!mapData || !geometry) return undefined;
 
-    const handler = (e: Event): void => {
-      const detail = (e as CustomEvent).detail;
+    const handler = (e: CustomEvent<SelectionContextMenuDetail>): void => {
+      const detail = e.detail;
       if (detail.handled === true) return;
 
       const coords = screenToGrid(detail.clientX, detail.clientY);
@@ -710,8 +711,9 @@ const ObjectLayer = ({
       menu.showAtPosition({ x: detail.screenX, y: detail.screenY });
     };
 
-    document.addEventListener('windrose:selection-context-menu', handler);
-    return () => document.removeEventListener('windrose:selection-context-menu', handler);
+    activeDocument.addEventListener('windrose:selection-context-menu', handler);
+    return () => activeDocument.removeEventListener('windrose:selection-context-menu', handler);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- context-menu listener; several handlers are plain fns + measureMovement volatile; handlers captured at invocation time
   }, [mapData, geometry, screenToGrid, isResizeMode]);
 
   if (showCoordinates || !layerVisibility.objects) {

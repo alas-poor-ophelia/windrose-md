@@ -52,7 +52,7 @@ function useSegmentDragTool({
 
   const toggleSegment = (worldX: number, worldY: number): void => {
     if (!mapData || !geometry) return;
-    if (!geometry || geometry.type !== 'grid') return;
+    if (geometry.type !== 'grid') return;
 
     const activeLayer = getActiveLayer(mapData);
 
