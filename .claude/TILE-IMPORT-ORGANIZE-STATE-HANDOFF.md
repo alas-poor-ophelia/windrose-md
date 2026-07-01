@@ -89,6 +89,16 @@ Finish = register folder + tier/tag writes + `runImportDetectionPass`. Live-veri
 end-to-end. **Deferred:** absorbing DD into steps ②③, suggestion "merge into" links,
 drag-onto-drawer source.
 
+**UPDATE 2026-07-01 (`b61c50d8`): DD packs ABSORBED into steps ②③** — the pack card
+parses in-memory (`analyzePckForWizard`), tier rows key on `destFolderOf` (the exact
+extraction folders: strips→source dir, tagged cells→first tag, else subpath), pack tags
+show as applied chips, mined suggestions exclude pack-covered tokens, Finish calls
+`runDdImport(..., DdWizardDecisions)` (extra tags merge pre-extraction; confirmed tiers
+apply post-prediction). `DungeondraftImportModal` DELETED. Strips-only packs pass the
+gate (first live probe caught them locked out). Verified with EA Sea & Sky: junk `[EA]`
+first-tag folder surfaced, patterns/normal re-tiered to ground via dropdown, mined
+`cannon` tag on its 16 tiles. Remaining deferrals: "merge into" links, drag-onto-drawer.
+
 ---
 
 ## MAYBE / PARTIAL (built but not where it should be)
