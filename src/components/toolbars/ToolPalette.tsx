@@ -531,19 +531,26 @@ const ToolPalette = ({
       const buttonElement = target.closest('.windrose-tool-btn-container');
 
       if (!menuElement && !buttonElement) {
+        // Full-pane: the canvas fills the pane and calls stopPropagation on its
+        // own mousedown, so a bubble-phase listener never sees the dismissing
+        // click. Listen in the CAPTURE phase (fires before the canvas) and
+        // swallow the event so the first outside click ONLY closes the menu — it
+        // must not also paint/use the tool (matching block mode).
+        e.preventDefault();
+        e.stopPropagation();
         handleSubMenuClose();
       }
     };
 
     const timerId = window.setTimeout(() => {
-      activeDocument.addEventListener('mousedown', handleClickOutside);
-      activeDocument.addEventListener('touchstart', handleClickOutside, { passive: true });
+      activeDocument.addEventListener('mousedown', handleClickOutside, true);
+      activeDocument.addEventListener('touchstart', handleClickOutside, { capture: true, passive: false });
     }, 10);
 
     return () => {
       window.clearTimeout(timerId);
-      activeDocument.removeEventListener('mousedown', handleClickOutside);
-      activeDocument.removeEventListener('touchstart', handleClickOutside);
+      activeDocument.removeEventListener('mousedown', handleClickOutside, true);
+      activeDocument.removeEventListener('touchstart', handleClickOutside, true);
     };
   }, [openSubMenu]);
 

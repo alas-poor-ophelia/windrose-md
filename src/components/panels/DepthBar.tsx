@@ -45,12 +45,12 @@ function DepthBar({ active, onPick, hidden, onToggleHide, tileCounts, compact = 
   const [fanOpen, setFanOpen] = useState(false);
 
   const handleSegmentClick = useCallback((id: TileLayerRole) => {
-    if (id === active) {
-      setFanOpen(o => !o);
-    } else {
+    if (id !== active) {
       onPick(id);
       setFanOpen(false);
     }
+    // Depth fan hidden for now — clicking the already-active segment is a no-op
+    // (was: setFanOpen(o => !o) to open the vertical stratum switcher).
   }, [active, onPick]);
 
   const handleFanPick = useCallback((id: TileLayerRole) => {

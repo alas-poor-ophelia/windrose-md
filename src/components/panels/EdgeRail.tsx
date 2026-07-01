@@ -76,21 +76,11 @@ const EdgeRail = ({ panels, openId, onOpenChange }: EdgeRailProps): VNode => {
         }}
       >
         {shown != null && (
-          <>
-            <div className="windrose-edge-rail-drawer-header">
-              <span>{shown.title}</span>
-              <button
-                className="windrose-edge-rail-drawer-close interactive-child"
-                onClick={() => onOpenChange(null)}
-                title="Collapse"
-              >
-                <Icon icon="lucide-panel-left-close" size={14} />
-              </button>
-            </div>
-            <div className="windrose-edge-rail-drawer-body">
-              {shown.content}
-            </div>
-          </>
+          // Per-page header ("Layers"/"Colors"/…) removed by request — the rail
+          // icon toggles the drawer closed, so no collapse button is needed here.
+          <div className="windrose-edge-rail-drawer-body">
+            {shown.content}
+          </div>
         )}
       </div>
     </div>

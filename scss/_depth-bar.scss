@@ -103,7 +103,7 @@
 }
 
 .windrose-db-chev {
-  display: inline-flex;
+  display: none; /* depth fan hidden for now — restore to inline-flex to bring the caret back */
   margin-left: 1px;
   transition: transform 0.3s ease;
   color: var(--windrose-text-muted);
@@ -281,6 +281,7 @@
 }
 
 .windrose-dsr-cnt {
+  display: none; /* collapsed-ribbon stratum count hidden for now — remove this line to restore */
   font-size: 8.5px;
   color: var(--windrose-text-muted);
   font-variant-numeric: tabular-nums;
