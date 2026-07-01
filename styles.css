@@ -152,9 +152,18 @@ body {
 .windrose-container-block .windrose-tool-palette {
   margin-bottom: 0;
 }
+.windrose-container-block {
+  /* 6px (not 4px) side gutter: the inner hairline is the container's inset
+     box-shadow at the 4–5px band, painted BEHIND children. At margin 4px the
+     opaque canvas-wrapper (and the edge-rail nested inside it) sat directly over
+     that band and clipped the line the moment it left the transparent header —
+     it "stopped" just above the left rail. Insetting the opaque child to 6px
+     leaves the 4–5px gold band in the container's own bg gutter, so the ring
+     reads continuously down both side edges. */
+}
 .windrose-container-block .windrose-canvas-wrapper {
   width: auto;
-  margin-inline: 4px;
+  margin-inline: 6px;
 }
 
 .callout[data-callout=dungeon-map],
@@ -6316,13 +6325,13 @@ button.windrose-fow-tool-btn:disabled svg,
   left: 0;
   top: 0;
   bottom: 0;
-  width: 36px;
+  width: 40px;
   z-index: 9;
   display: flex;
 }
 
 .windrose-edge-rail {
-  width: 36px;
+  width: 40px;
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -6376,7 +6385,7 @@ button.windrose-edge-rail-btn.on {
      class-driven width transition does not commit reliably for this overlay
      inside Obsidian's live-preview embed. */
   position: absolute;
-  left: 36px;
+  left: 40px;
   top: 0;
   bottom: 0;
   display: flex;
@@ -9293,6 +9302,100 @@ button.windrose-breadcrumb-link {
   border-left: 2px solid var(--windrose-border-primary);
   overflow-y: auto;
   overflow-x: hidden;
+  /* Collapsed: the whole column shrinks to an icon ribbon. The ribbon replaces
+     the stacked panels (they never show together), so no per-panel chrome here. */
+}
+.windrose-dock-right.is-collapsed {
+  width: 44px;
+  overflow: visible;
+}
+
+/* ==========================================================================
+   Collapsed dock ribbon (icon strip; one button per docked sub-panel)
+   ========================================================================== */
+.windrose-dock-ribbon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 4px;
+}
+
+/* `button.` prefix (0,1,1) beats Obsidian's `button:not(.clickable-icon)` which
+   injects fill + padding on desktop — the same fight the edge-rail buttons face. */
+button.windrose-dock-ribbon-btn {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--windrose-text-muted);
+  cursor: pointer;
+  box-shadow: none;
+  transition: var(--windrose-transition);
+}
+button.windrose-dock-ribbon-btn svg {
+  width: 18px;
+  height: 18px;
+}
+button.windrose-dock-ribbon-btn:hover {
+  background: var(--windrose-bg-tertiary);
+  color: var(--windrose-text-primary);
+}
+
+/* Collapse-to-ribbon button, tucked into the Layers header's top-right corner. */
+button.windrose-dock-panel-collapse {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  min-width: 0;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--windrose-text-muted);
+  cursor: pointer;
+  line-height: 0;
+  box-shadow: none;
+  transition: var(--windrose-transition);
+}
+button.windrose-dock-panel-collapse svg {
+  display: block;
+}
+button.windrose-dock-panel-collapse:hover {
+  background: oklch(from var(--windrose-border-primary) l c h/0.2);
+  color: var(--windrose-text-primary);
+}
+
+/* Tablet twins — Obsidian's .is-tablet injects padding/height/bg on every
+   <button>; re-state the boxes in full so the ribbon + collapse control hold. */
+.is-tablet button.windrose-dock-ribbon-btn {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  box-shadow: none;
+  color: var(--windrose-text-muted);
+}
+
+.is-tablet button.windrose-dock-panel-collapse {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+  box-shadow: none;
+  color: var(--windrose-text-muted);
 }
 
 /* Individual dock panel */

@@ -403,13 +403,13 @@ button.windrose-fow-tool-btn:disabled svg,
   left: 0;
   top: 0;
   bottom: 0;
-  width: 36px;
+  width: 40px;
   z-index: 9;
   display: flex;
 }
 
 .windrose-edge-rail {
-  width: 36px;
+  width: 40px;
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -466,7 +466,7 @@ button.windrose-edge-rail-btn {
      class-driven width transition does not commit reliably for this overlay
      inside Obsidian's live-preview embed. */
   position: absolute;
-  left: 36px;
+  left: 40px;
   top: 0;
   bottom: 0;
   display: flex;

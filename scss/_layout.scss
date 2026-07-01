@@ -54,9 +54,16 @@
     margin-bottom: 0;
   }
 
+  /* 6px (not 4px) side gutter: the inner hairline is the container's inset
+     box-shadow at the 4–5px band, painted BEHIND children. At margin 4px the
+     opaque canvas-wrapper (and the edge-rail nested inside it) sat directly over
+     that band and clipped the line the moment it left the transparent header —
+     it "stopped" just above the left rail. Insetting the opaque child to 6px
+     leaves the 4–5px gold band in the container's own bg gutter, so the ring
+     reads continuously down both side edges. */
   .windrose-canvas-wrapper {
     width: auto;
-    margin-inline: 4px;
+    margin-inline: 6px;
   }
 }
 

@@ -13,6 +13,7 @@ class WindroseMapView extends ItemView {
   private mapName = '';
   private mapType: MapType = 'grid';
   private floatingPanels: Record<string, unknown> = {};
+  private dockCollapsed = false;
 
   constructor(leaf: WorkspaceLeaf) {
     super(leaf);
@@ -70,6 +71,7 @@ class WindroseMapView extends ItemView {
       mapName: this.mapName,
       mapType: this.mapType,
       floatingPanels: this.floatingPanels,
+      dockCollapsed: this.dockCollapsed,
     };
   }
 
@@ -78,6 +80,7 @@ class WindroseMapView extends ItemView {
     if (typeof state?.mapName === 'string' && state.mapName !== '') this.mapName = state.mapName;
     if (typeof state?.mapType === 'string' && state.mapType !== '') this.mapType = state.mapType as MapType;
     if (typeof state?.floatingPanels === 'object' && state.floatingPanels !== null) this.floatingPanels = state.floatingPanels as Record<string, unknown>;
+    if (typeof state?.dockCollapsed === 'boolean') this.dockCollapsed = state.dockCollapsed;
 
     if (this.mapId) {
       this.renderMap();
@@ -110,6 +113,11 @@ class WindroseMapView extends ItemView {
     this.app.workspace.requestSaveLayout();
   };
 
+  private handleDockCollapsedChange = (collapsed: boolean): void => {
+    this.dockCollapsed = collapsed;
+    this.app.workspace.requestSaveLayout();
+  };
+
   private async renderPicker(): Promise<void> {
     const maps = await listMaps(this.app);
     render(
@@ -135,6 +143,8 @@ class WindroseMapView extends ItemView {
           onNameChange: this.handleNameChange,
           savedPanelState: this.floatingPanels,
           onPanelStateChange: this.handlePanelStateChange,
+          savedDockCollapsed: this.dockCollapsed,
+          onDockCollapsedChange: this.handleDockCollapsedChange,
         })
       ),
       this.contentEl

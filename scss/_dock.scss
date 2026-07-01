@@ -13,6 +13,105 @@
   border-left: 2px solid var(--windrose-border-primary);
   overflow-y: auto;
   overflow-x: hidden;
+
+  /* Collapsed: the whole column shrinks to an icon ribbon. The ribbon replaces
+     the stacked panels (they never show together), so no per-panel chrome here. */
+  &.is-collapsed {
+    width: 44px;
+    overflow: visible;
+  }
+}
+
+/* ==========================================================================
+   Collapsed dock ribbon (icon strip; one button per docked sub-panel)
+   ========================================================================== */
+.windrose-dock-ribbon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 4px;
+}
+
+/* `button.` prefix (0,1,1) beats Obsidian's `button:not(.clickable-icon)` which
+   injects fill + padding on desktop — the same fight the edge-rail buttons face. */
+button.windrose-dock-ribbon-btn {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--windrose-text-muted);
+  cursor: pointer;
+  box-shadow: none;
+  transition: var(--windrose-transition);
+
+  svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  &:hover {
+    background: var(--windrose-bg-tertiary);
+    color: var(--windrose-text-primary);
+  }
+}
+
+/* Collapse-to-ribbon button, tucked into the Layers header's top-right corner. */
+button.windrose-dock-panel-collapse {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  min-width: 0;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--windrose-text-muted);
+  cursor: pointer;
+  line-height: 0;
+  box-shadow: none;
+  transition: var(--windrose-transition);
+
+  svg {
+    display: block;
+  }
+
+  &:hover {
+    background: oklch(from var(--windrose-border-primary) l c h / 0.2);
+    color: var(--windrose-text-primary);
+  }
+}
+
+/* Tablet twins — Obsidian's .is-tablet injects padding/height/bg on every
+   <button>; re-state the boxes in full so the ribbon + collapse control hold. */
+.is-tablet button.windrose-dock-ribbon-btn {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  box-shadow: none;
+  color: var(--windrose-text-muted);
+}
+
+.is-tablet button.windrose-dock-panel-collapse {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+  box-shadow: none;
+  color: var(--windrose-text-muted);
 }
 
 /* Individual dock panel */

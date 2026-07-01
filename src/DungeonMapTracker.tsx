@@ -41,6 +41,7 @@ import type { TileLayerRole } from '#types/tiles/tile.types';
 import { setCell as accessorSetCell, removeCell as accessorRemoveCell, cellToPoint } from './geometry/core/cellAccessor';
 import { FloatingPanel } from './components/panels/FloatingPanel';
 import { DockPanel } from './components/panels/DockPanel';
+import { DockRibbon } from './components/panels/DockRibbon';
 import { DockLayerList } from './components/panels/DockLayerList';
 import { DockViewPanel } from './components/panels/DockViewPanel';
 import { ColorPicker } from './components/shared/ColorPicker';
@@ -94,13 +95,15 @@ interface DungeonMapTrackerProps {
   onNameChange?: (name: string) => void;
   savedPanelState?: Partial<Record<PanelId, PanelState>>;
   onPanelStateChange?: (state: Partial<Record<PanelId, PanelState>>) => void;
+  savedDockCollapsed?: boolean;
+  onDockCollapsedChange?: (collapsed: boolean) => void;
 }
 
 // ============================================================================
 // MAIN COMPONENT
 // ============================================================================
 
-const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'grid', notePath = '', fullPane = false, onMapChange, onNameChange, savedPanelState, onPanelStateChange }: DungeonMapTrackerProps): VNode => {
+const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'grid', notePath = '', fullPane = false, onMapChange, onNameChange, savedPanelState, onPanelStateChange, savedDockCollapsed, onDockCollapsedChange }: DungeonMapTrackerProps): VNode => {
   const app = useApp();
   useThemeMode();
   const { mapData: rootMapData, isLoading, saveStatus, updateMapData: rootUpdateMapData, forceSave, tileImagesReady, getCachedImage } = useMapData(mapId, mapName, mapType);
@@ -282,6 +285,25 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   const [railOpenId, setRailOpenId] = useState<string | null>(null);
 
   const { isFloating, getZIndex, getInitialPosition, toggleFloat, bringToFront, updatePosition } = useFloatingPanels({ fullPane, savedState: savedPanelState, onStateChange: onPanelStateChange });
+
+  // Full-pane right dock: collapse the whole stacked panel column to an icon
+  // ribbon (persisted in the view's workspace state). Unlike the block-mode
+  // rail, the ribbon replaces the panels — it never shows alongside them.
+  const [dockCollapsed, setDockCollapsedState] = useState<boolean>(savedDockCollapsed ?? false);
+  const setDockCollapsed = useCallback((collapsed: boolean) => {
+    setDockCollapsedState(collapsed);
+    onDockCollapsedChange?.(collapsed);
+  }, [onDockCollapsedChange]);
+  // Per-section collapse (controlled, so a ribbon click can expand a section).
+  // View starts collapsed, matching its former defaultCollapsed.
+  const [dockSectionCollapsed, setDockSectionCollapsed] = useState<Record<string, boolean>>({ layers: false, colorPicker: false, view: true });
+  const toggleDockSection = useCallback((id: string) => {
+    setDockSectionCollapsed(prev => ({ ...prev, [id]: !prev[id] }));
+  }, []);
+  const handleDockRibbonExpand = useCallback((id: string) => {
+    setDockCollapsed(false);
+    setDockSectionCollapsed(prev => ({ ...prev, [id]: false }));
+  }, [setDockCollapsed]);
 
   const [mapListEntries, setMapListEntries] = useState<MapListEntry[]>([]);
   useEffect(() => {
@@ -1471,9 +1493,26 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                   )}
                 </DrawerDock>
               )}
-              <div className="windrose-dock-right">
+              <div className={`windrose-dock-right${dockCollapsed ? ' is-collapsed' : ''}`}>
+                {dockCollapsed ? (
+                  <DockRibbon
+                    items={[
+                      { id: 'layers', icon: 'lucide-layers', title: 'Layers' },
+                      { id: 'colorPicker', icon: 'lucide-palette', title: 'Colors' },
+                      { id: 'view', icon: 'lucide-eye', title: 'View' },
+                    ].filter(it => !isFloating(it.id as PanelId))}
+                    onExpand={handleDockRibbonExpand}
+                  />
+                ) : (
+                <>
                 {!isFloating('layers') && (
-                  <DockPanel title="Layers" onUndock={(pos) => toggleFloat('layers', pos)}>
+                  <DockPanel
+                    title="Layers"
+                    collapsed={dockSectionCollapsed['layers'] ?? false}
+                    onToggleCollapse={() => toggleDockSection('layers')}
+                    onCollapseDock={() => setDockCollapsed(true)}
+                    onUndock={(pos) => toggleFloat('layers', pos)}
+                  >
                     <DockLayerList
                       mapData={mapData}
                       onLayerSelect={handleLayerSelect}
@@ -1494,7 +1533,12 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                   </DockPanel>
                 )}
                 {!isFloating('colorPicker') && (
-                  <DockPanel title="Colors" onUndock={(pos) => toggleFloat('colorPicker', pos)}>
+                  <DockPanel
+                    title="Colors"
+                    collapsed={dockSectionCollapsed['colorPicker'] ?? false}
+                    onToggleCollapse={() => toggleDockSection('colorPicker')}
+                    onUndock={(pos) => toggleFloat('colorPicker', pos)}
+                  >
                     <ColorPicker
                       isOpen
                       floatingMode
@@ -1513,7 +1557,12 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                   </DockPanel>
                 )}
                 {!isFloating('view') && (
-                  <DockPanel title="View" defaultCollapsed onUndock={(pos) => toggleFloat('view', pos)}>
+                  <DockPanel
+                    title="View"
+                    collapsed={dockSectionCollapsed['view'] ?? true}
+                    onToggleCollapse={() => toggleDockSection('view')}
+                    onUndock={(pos) => toggleFloat('view', pos)}
+                  >
                     <DockViewPanel
                       currentZoom={mapData.viewState?.zoom ?? 1}
                       onZoomIn={handleZoomIn}
@@ -1529,6 +1578,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                       onFogClearAll={handleFogClearAll}
                     />
                   </DockPanel>
+                )}
+                </>
                 )}
               </div>
             </div>
